@@ -23,6 +23,7 @@
       "default": "./icons.web.ts"
     },
     "./native": "./native.ts",
+    "./admin": "./admin/index.ts",
     "./adaptive-panes": "./adaptive-panes/index.tsx",
     "./adaptive-panes/parts": "./adaptive-panes/parts.ts"
   },
