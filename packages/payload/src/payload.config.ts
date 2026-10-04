@@ -13,6 +13,12 @@ import { AUTH_BASE_PATH, PAYLOAD_API_ROUTE, PAYLOAD_ORIGINS, betterAuthOptions }
 import { adminComponents } from './admin/components';
 import { Users } from './collections/Users';
 import { Media } from './collections/Media';
+import { AuditEvents } from './collections/AuditEvents';
+import { CareStates } from './collections/CareStates';
+import { Eggs } from './collections/Eggs';
+import { GuardianConsents } from './collections/GuardianConsents';
+import { IntegrityRuns } from './collections/IntegrityRuns';
+import { MonInstances } from './collections/MonInstances';
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -29,7 +35,7 @@ export default buildConfig({
   routes: {
     api: PAYLOAD_API_ROUTE,
   },
-  collections: [Users, Media],
+  collections: [Users, Media, GuardianConsents, Eggs, MonInstances, CareStates, AuditEvents, IntegrityRuns],
   plugins: [
     // Generates Better Auth's session, account, verification and passkey
     // collections; `users` is written by hand in collections/Users.ts.

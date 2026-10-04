@@ -69,6 +69,12 @@ export interface Config {
   collections: {
     users: User;
     media: Media;
+    'guardian-consents': GuardianConsent;
+    eggs: Egg;
+    'mon-instances': MonInstance;
+    'care-states': CareState;
+    'audit-events': AuditEvent;
+    'integrity-runs': IntegrityRun;
     sessions: Session;
     accounts: Account;
     verifications: Verification;
@@ -82,6 +88,12 @@ export interface Config {
   collectionsSelect: {
     users: UsersSelect<false> | UsersSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
+    'guardian-consents': GuardianConsentsSelect<false> | GuardianConsentsSelect<true>;
+    eggs: EggsSelect<false> | EggsSelect<true>;
+    'mon-instances': MonInstancesSelect<false> | MonInstancesSelect<true>;
+    'care-states': CareStatesSelect<false> | CareStatesSelect<true>;
+    'audit-events': AuditEventsSelect<false> | AuditEventsSelect<true>;
+    'integrity-runs': IntegrityRunsSelect<false> | IntegrityRunsSelect<true>;
     sessions: SessionsSelect<false> | SessionsSelect<true>;
     accounts: AccountsSelect<false> | AccountsSelect<true>;
     verifications: VerificationsSelect<false> | VerificationsSelect<true>;
@@ -162,6 +174,169 @@ export interface Media {
   height?: number | null;
   focalX?: number | null;
   focalY?: number | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "guardian-consents".
+ */
+export interface GuardianConsent {
+  id: number;
+  parentEmail: string;
+  birthYear: number;
+  status: 'pending' | 'approved' | 'denied' | 'expired';
+  expiresAt: string;
+  emailsSent: number;
+  lastEmailSentAt?: string | null;
+  parentRequest: 'none' | 'review' | 'delete';
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "eggs".
+ */
+export interface Egg {
+  id: number;
+  eggId: string;
+  monInstanceId: string;
+  speciesId: string;
+  hatchesIntoSpeciesId: string;
+  callerId: string;
+  nickname?: string | null;
+  incubationMinutes: number;
+  createdAtMs: number;
+  incubationEndsAt: number;
+  hatched: boolean;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "mon-instances".
+ */
+export interface MonInstance {
+  id: number;
+  monInstanceId: string;
+  eggId: string;
+  speciesId: string;
+  nickname?: string | null;
+  callerId: string;
+  hatchedAt: number;
+  bond: number;
+  stage: 'Baby' | 'Small' | 'Mid' | 'Max';
+  voiceLineageId?: string | null;
+  serverConfirmedAt?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "care-states".
+ */
+export interface CareState {
+  id: number;
+  monInstanceId: string;
+  energy: number;
+  fullness: number;
+  social: number;
+  updatedAtMs: number;
+  lastFedAt?: number | null;
+  lastRestedAt?: number | null;
+  lastSocialAt?: number | null;
+  activity:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  sluggishUntil?: number | null;
+  pendingRequest?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  lastSeqByDevice:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "audit-events".
+ */
+export interface AuditEvent {
+  id: number;
+  at: string;
+  actor?: (number | null) | User;
+  actorRole: string;
+  action:
+    | 'caller.value_shown'
+    | 'caller.deletion_scheduled'
+    | 'caller.deletion_cancelled'
+    | 'caller.deleted'
+    | 'caller.signed_out_everywhere'
+    | 'consent.email_sent'
+    | 'consent.approved'
+    | 'consent.denied'
+    | 'consent.expired'
+    | 'consent.deleted'
+    | 'integrity.check_run'
+    | 'staff.added'
+    | 'staff.role_changed'
+    | 'staff.removed'
+    | 'audit.exported'
+    | 'consent.requested'
+    | 'consent.value_shown'
+    | 'egg.value_shown'
+    | 'egg.caller_changed'
+    | 'mon.value_shown'
+    | 'mon.caller_changed';
+  targetType: 'caller' | 'consent' | 'mon' | 'egg' | 'staff' | 'audit' | 'integrity';
+  targetId: string;
+  reasonCode?:
+    | (
+        | 'support_request'
+        | 'parent_request'
+        | 'deletion_check'
+        | 'legal'
+        | 'caller_request'
+        | 'parent_withdrew'
+        | 'sent_in_error'
+      )
+    | null;
+  requestId?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "integrity-runs".
+ */
+export interface IntegrityRun {
+  id: number;
+  at: string;
+  trigger: 'manual' | 'scheduled';
+  actor?: (number | null) | User;
+  sharedEgg: number;
+  idMismatch: number;
+  orphans: number;
+  staleReady: number;
+  updatedAt: string;
+  createdAt: string;
 }
 /**
  * Auto-generated from Better Auth schema (session)
@@ -267,6 +442,30 @@ export interface PayloadLockedDocument {
         value: number | Media;
       } | null)
     | ({
+        relationTo: 'guardian-consents';
+        value: number | GuardianConsent;
+      } | null)
+    | ({
+        relationTo: 'eggs';
+        value: number | Egg;
+      } | null)
+    | ({
+        relationTo: 'mon-instances';
+        value: number | MonInstance;
+      } | null)
+    | ({
+        relationTo: 'care-states';
+        value: number | CareState;
+      } | null)
+    | ({
+        relationTo: 'audit-events';
+        value: number | AuditEvent;
+      } | null)
+    | ({
+        relationTo: 'integrity-runs';
+        value: number | IntegrityRun;
+      } | null)
+    | ({
         relationTo: 'sessions';
         value: number | Session;
       } | null)
@@ -356,6 +555,108 @@ export interface MediaSelect<T extends boolean = true> {
   height?: T;
   focalX?: T;
   focalY?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "guardian-consents_select".
+ */
+export interface GuardianConsentsSelect<T extends boolean = true> {
+  parentEmail?: T;
+  birthYear?: T;
+  status?: T;
+  expiresAt?: T;
+  emailsSent?: T;
+  lastEmailSentAt?: T;
+  parentRequest?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "eggs_select".
+ */
+export interface EggsSelect<T extends boolean = true> {
+  eggId?: T;
+  monInstanceId?: T;
+  speciesId?: T;
+  hatchesIntoSpeciesId?: T;
+  callerId?: T;
+  nickname?: T;
+  incubationMinutes?: T;
+  createdAtMs?: T;
+  incubationEndsAt?: T;
+  hatched?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "mon-instances_select".
+ */
+export interface MonInstancesSelect<T extends boolean = true> {
+  monInstanceId?: T;
+  eggId?: T;
+  speciesId?: T;
+  nickname?: T;
+  callerId?: T;
+  hatchedAt?: T;
+  bond?: T;
+  stage?: T;
+  voiceLineageId?: T;
+  serverConfirmedAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "care-states_select".
+ */
+export interface CareStatesSelect<T extends boolean = true> {
+  monInstanceId?: T;
+  energy?: T;
+  fullness?: T;
+  social?: T;
+  updatedAtMs?: T;
+  lastFedAt?: T;
+  lastRestedAt?: T;
+  lastSocialAt?: T;
+  activity?: T;
+  sluggishUntil?: T;
+  pendingRequest?: T;
+  lastSeqByDevice?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "audit-events_select".
+ */
+export interface AuditEventsSelect<T extends boolean = true> {
+  at?: T;
+  actor?: T;
+  actorRole?: T;
+  action?: T;
+  targetType?: T;
+  targetId?: T;
+  reasonCode?: T;
+  requestId?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "integrity-runs_select".
+ */
+export interface IntegrityRunsSelect<T extends boolean = true> {
+  at?: T;
+  trigger?: T;
+  actor?: T;
+  sharedEgg?: T;
+  idMismatch?: T;
+  orphans?: T;
+  staleReady?: T;
+  updatedAt?: T;
+  createdAt?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
