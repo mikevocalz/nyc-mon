@@ -42,7 +42,7 @@ export type { CardSliderNativeProps } from './card-slider-native.types';
  */
 export function CardSlider({
   children, label, visibleCount = 1, gap = 16, showButtons = true, showProgress = true,
-  progressStyle = 'bar', loop = false, tone, district, className, itemClassName,
+  progressStyle = 'bar', progressPosition = 'inset', loop = false, tone, district, className, itemClassName,
   buttonPosition = 'sides', prevButtonCorner = 'bottom-left', nextButtonCorner = 'bottom-right',
   autoPlay = false, autoPlayInterval = 3000, showEdgeFades = false, edgeFadeColor,
   showCornerAccents = false, cornerAccentStyle = 'frame', scanLines = false, viewportClassName,
@@ -86,6 +86,24 @@ export function CardSlider({
       {showCornerAccents ? <CornerAccents tone={resolved} style={cornerAccentStyle} /> : null}
     </View>
   ));
+  const sliderControls = (
+    <SliderControls
+      index={index}
+      count={slides.length}
+      visible={layout.visible}
+      maxIndex={layout.maxIndex}
+      loop={loop}
+      tone={resolved}
+      showButtons={showButtons && paged}
+      showProgress={showProgress && paged}
+      progressStyle={progressStyle}
+      onGo={go}
+      buttonPosition={buttonPosition}
+      prevCorner={prevButtonCorner}
+      nextCorner={nextButtonCorner}
+      autoplay={autoPlay && paged ? { playing, onToggle: () => store.setState({ playing: !store.getState().playing }) } : undefined}
+    />
+  );
 
   return (
     <Section
@@ -143,23 +161,9 @@ export function CardSlider({
             onGo={go}
           />
         ) : null}
+        {progressPosition === 'inset' ? sliderControls : null}
       </View>
-      <SliderControls
-        index={index}
-        count={slides.length}
-        visible={layout.visible}
-        maxIndex={layout.maxIndex}
-        loop={loop}
-        tone={resolved}
-        showButtons={showButtons && paged}
-        showProgress={showProgress && paged}
-        progressStyle={progressStyle}
-        onGo={go}
-        buttonPosition={buttonPosition}
-        prevCorner={prevButtonCorner}
-        nextCorner={nextButtonCorner}
-        autoplay={autoPlay && paged ? { playing, onToggle: () => store.setState({ playing: !store.getState().playing }) } : undefined}
-      />
+      {progressPosition === 'below-content' ? sliderControls : null}
     </Section>
   );
 }

@@ -50,6 +50,7 @@ const meta = {
     buttonVisibility: 'always',
     showProgress: true,
     progressStyle: 'bar',
+    progressPosition: 'inset',
     loop: false,
     autoPlay: false,
     autoPlayInterval: 3000,
@@ -66,6 +67,7 @@ const meta = {
     district: { control: 'inline-radio', options: DISTRICTS },
     tone: { control: 'select', options: [undefined, 'orange', 'royal', 'carolina', 'leaf', 'apple', 'brick'] },
     progressStyle: { control: 'inline-radio', options: ['bar', 'dots', 'counter'] },
+    progressPosition: { control: 'inline-radio', options: ['inset', 'below-content'] },
     buttonPosition: { control: 'inline-radio', options: ['sides', 'bottom'] },
     buttonVisibility: { control: 'inline-radio', options: ['always', 'hover'] },
     cornerAccentStyle: { control: 'inline-radio', options: ['frame', 'plus'] },
@@ -167,6 +169,35 @@ export const ProgressStyles: Story = {
       <CardSlider label="Landmarks, Downtown first" district="downtown" visibleCount={{ sm: 1, md: 2 }} progressStyle="bar" buttonPosition="bottom">{slides('cornerCut', 'classic', 2, from('downtown'))}</CardSlider>
       <CardSlider label="Landmarks, Harlem first" district="harlem" visibleCount={{ sm: 1, md: 3 }} progressStyle="dots" buttonPosition="bottom" loop>{slides('notch', 'tall', 3, from('harlem'))}</CardSlider>
       <CardSlider label="Landmarks, Mega City first" district="megacity" visibleCount={{ sm: 1, md: 2 }} progressStyle="counter" buttonPosition="bottom">{slides('beam', 'classic', 2, from('megacity'))}</CardSlider>
+    </View>
+  ),
+};
+
+const onboardingPanels = [
+  ['Meet the city', 'Explore one block at a time and find what is waiting nearby.'],
+  ['Choose your path', 'Each neighbourhood has its own places, people and stories.'],
+  ['Start calling', 'You are ready to begin your first NYC-MON journey.'],
+] as const;
+
+/** Welcome-style panels keep dots and arrows below the slide content. */
+export const OnboardingPanels: Story = {
+  render: () => (
+    <View className="min-h-screen bg-bg px-4 py-8 md:px-10">
+      <CardSlider
+        label="Welcome panels"
+        visibleCount={1}
+        progressStyle="dots"
+        progressPosition="below-content"
+        buttonPosition="bottom"
+        tone="royal"
+      >
+        {onboardingPanels.map(([title, body]) => (
+          <View key={title} className="min-h-64 justify-end gap-3 border-2 border-border bg-surface-raised p-6">
+            <Heading level={2} className="font-display text-type-title text-text">{title}</Heading>
+            <Text className="text-type-body text-text">{body}</Text>
+          </View>
+        ))}
+      </CardSlider>
     </View>
   ),
 };

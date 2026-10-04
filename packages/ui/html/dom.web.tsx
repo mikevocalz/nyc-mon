@@ -118,6 +118,13 @@ export interface InputBaseProps extends P {
   placeholderTextColor?: string;
   numberOfLines?: number;
   autoFocus?: boolean;
+  maxLength?: number;
+  autoCorrect?: boolean;
+  autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
+  /** RN keyboard hint; maps to `inputMode` on web. */
+  keyboardType?: 'default' | 'email-address' | 'number-pad' | 'numeric' | 'decimal-pad' | 'phone-pad' | 'url' | 'web-search' | string;
+  /** iOS autofill hint; maps to `autoComplete` on web. */
+  textContentType?: string;
   onBlur?: () => void;
   onFocus?: () => void;
   role?: string;
@@ -129,8 +136,30 @@ const ENTER_KEY_HINT: Record<string, React.HTMLAttributes<HTMLElement>['enterKey
   search: 'search', done: 'done', go: 'go', next: 'next', send: 'send',
 };
 
+const KEYBOARD_INPUT_MODE: Record<string, React.HTMLAttributes<HTMLInputElement>['inputMode']> = {
+  'email-address': 'email',
+  'number-pad': 'numeric',
+  numeric: 'numeric',
+  'decimal-pad': 'decimal',
+  'phone-pad': 'tel',
+  url: 'url',
+  'web-search': 'search',
+};
+
+const TEXT_CONTENT_AUTO_COMPLETE: Record<string, string> = {
+  emailAddress: 'email',
+  username: 'username',
+  nickname: 'nickname',
+  password: 'current-password',
+  newPassword: 'new-password',
+  oneTimeCode: 'one-time-code',
+  telephoneNumber: 'tel',
+  none: 'off',
+};
+
 export const InputBase = ({
   ref, onChangeText, onSubmitEditing, editable, secureTextEntry, returnKeyType,
+  keyboardType, textContentType, autoCorrect, autoCapitalize,
   placeholderTextColor: _ptc, numberOfLines: _n, role: _role, className, style, ...props
 }: InputBaseProps) => {
   const el = React.useRef<HTMLInputElement>(null);
@@ -141,6 +170,10 @@ export const InputBase = ({
     type={secureTextEntry ? 'password' : 'text'}
     readOnly={editable === false}
     enterKeyHint={returnKeyType ? ENTER_KEY_HINT[returnKeyType] : undefined}
+    inputMode={keyboardType ? KEYBOARD_INPUT_MODE[keyboardType] : undefined}
+    autoComplete={textContentType ? TEXT_CONTENT_AUTO_COMPLETE[textContentType] : undefined}
+    autoCorrect={autoCorrect === undefined ? undefined : autoCorrect ? 'on' : 'off'}
+    autoCapitalize={autoCapitalize}
     onChange={(e) => onChangeText?.(e.target.value)}
     onKeyDown={(e) => { if (e.key === 'Enter') onSubmitEditing?.(); }}
     {...toDom(className, style)}
@@ -151,11 +184,14 @@ export const InputBase = ({
 
 export const TextareaBase = ({
   ref: _ref, onChangeText, onSubmitEditing: _s, editable, secureTextEntry: _p, returnKeyType: _r,
+  keyboardType: _kt, textContentType: _tc, autoCorrect, autoCapitalize,
   placeholderTextColor: _ptc, numberOfLines, role: _role, className, style, ...props
 }: InputBaseProps) => (
   <textarea
     readOnly={editable === false}
     rows={numberOfLines}
+    autoCorrect={autoCorrect === undefined ? undefined : autoCorrect ? 'on' : 'off'}
+    autoCapitalize={autoCapitalize}
     onChange={(e) => onChangeText?.(e.target.value)}
     {...toDom(className, style)}
     {...props}

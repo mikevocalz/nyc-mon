@@ -109,7 +109,7 @@ const useClearStory = create<{ value: string; setValue: (value: string) => void 
   setValue: (value) => set({ value }),
 }));
 
-/** `clearButton`: a 44 pt clear control inside the field while it has text. The label is the caller's copy. */
+/** `clearable`: a 44 pt clear control inside the field while it has text. */
 export const Clearable: Story = {
   render: function Render() {
     const { value, setValue } = useClearStory();
@@ -121,9 +121,9 @@ export const Clearable: Story = {
           hint="Up to 16 characters."
           value={value}
           onChangeText={setValue}
-          clearButton={{ accessibilityLabel: 'Clear Caller name' }}
+          clearable
         />
-        <TextField label="Crew name" value={value} onChangeText={setValue} clearButton={{ accessibilityLabel: 'Clear crew name' }} />
+        <TextField label="Crew name" value={value} onChangeText={setValue} clearable />
       </View>
     );
   },

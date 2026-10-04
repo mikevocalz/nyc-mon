@@ -2,10 +2,11 @@
 import { useRef } from 'react';
 import { tv } from 'tailwind-variants';
 import { PasteWrapper, type PasteEventPayload } from './paste-wrapper';
-import { View, Pressable, Text as TWText } from './tw';
+import { View, Text as TWText } from './tw';
 import { Input, Label } from './primitives';
 import type { InputHandle } from './html/dom';
 import { Text } from './Text';
+import { IconButton } from './IconButton';
 import { X } from './icons';
 import { NEON_FIELD, neonErrorVariant, neonFieldCompounds, neonLabelCompounds } from './cards/neon-field';
 import { resolveControlTone, toneVariants, type ControlTone, type District } from './district';
@@ -72,6 +73,8 @@ export interface TextFieldProps extends React.ComponentProps<typeof Input> {
   district?: District;
   /** Rich paste (text / images / GIFs from the clipboard) via expo-paste-input — iOS, Android, and web. */
   onPaste?: (payload: PasteEventPayload) => void;
+  /** Show a trailing {@linkcode IconButton} while a controlled value has text. */
+  clearable?: boolean;
   /**
    * A 44 pt clear button inside the field, shown while `value` has text.
    * Needs a controlled `value` and `onChangeText`; pressing it sends '' and
@@ -83,14 +86,15 @@ export interface TextFieldProps extends React.ComponentProps<typeof Input> {
 
 export function TextField({
   rounded = false, label, hint, error, disabled, className, containerClassName, variant: _variant,
-  surface = 'well', tone, district, onPaste, clearButton, ...inputProps
+  surface = 'well', tone, district, onPaste, clearable = false, clearButton, ...inputProps
 }: TextFieldProps) {
   const s = surface === 'daylit'
     ? daylit({ error: !!error, disabled })
     : field({ error: !!error, disabled, tone: resolveControlTone(tone, district) });
   const fieldRef = useRef<InputHandle>(null);
   const value = inputProps.value;
-  const showClear = !!clearButton && !disabled && typeof value === 'string' && value.length > 0;
+  const hasClearControl = clearable || !!clearButton;
+  const showClear = hasClearControl && !disabled && inputProps.editable !== false && typeof value === 'string' && value.length > 0;
   // Trailing room for whatever sits inside the field: the paste chip, the clear button, or both.
   const trail = showClear && onPaste ? 'pr-24' : showClear || onPaste ? 'pr-12' : '';
   const input = (
@@ -105,21 +109,22 @@ export function TextField({
     />
   );
   const clear = showClear ? (
-    <Pressable
-      role="button"
-      accessibilityLabel={clearButton.accessibilityLabel}
-      onPress={() => {
-        inputProps.onChangeText?.('');
-        // The button leaves with the text, so focus goes back to the field, not the page.
-        fieldRef.current?.focus();
-      }}
-      className={`absolute bottom-0 top-0 w-11 items-center justify-center rounded-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus ${onPaste ? 'right-12' : 'right-0'}`}
-    >
-      <X size={18} strokeWidth={2.5} className={surface === 'daylit' ? 'text-text-muted' : 'text-silver-300'} />
-    </Pressable>
+    <View className={`absolute bottom-0 top-0 justify-center ${onPaste ? 'right-12' : 'right-0'}`}>
+      <IconButton
+        variant="ghost"
+        size="sm"
+        aria-label={clearButton?.accessibilityLabel ?? 'Clear'}
+        onPress={() => {
+          inputProps.onChangeText?.('');
+          // The button leaves with the text, so focus goes back to the field, not the page.
+          fieldRef.current?.focus();
+        }}
+        icon={<X size={18} strokeWidth={2.5} className={surface === 'daylit' ? 'text-text-muted' : 'text-silver-300'} />}
+      />
+    </View>
   ) : null;
-  // Stable while a clear button is configured: switching wrappers would remount the input and drop its focus.
-  const trailing = !!onPaste || !!clearButton;
+  // Stable while a clear control is configured: switching wrappers would remount the input and drop its focus.
+  const trailing = !!onPaste || hasClearControl;
   return (
     <View className={s.root({ className: containerClassName })}>
       <Label className={s.label()}>{label}</Label>

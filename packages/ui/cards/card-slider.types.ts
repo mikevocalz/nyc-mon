@@ -9,6 +9,8 @@ import type { ControlTone, District } from './tones';
  * card-slider props, with NYC-MON tones and districts.
  */
 export type CardSliderProgressStyle = 'bar' | 'dots' | 'counter';
+/** Where {@linkcode SliderControls} sits relative to the slide content. */
+export type CardSliderProgressPosition = 'inset' | 'below-content';
 /** sides: over the left and right edges of the track. bottom: in the bar under it, either side of the progress. */
 export type CardSliderButtonPosition = 'sides' | 'bottom';
 /** always, or only while the slider is hovered or has keyboard focus. */
@@ -32,6 +34,8 @@ export interface CardSliderProps {
   showProgress?: boolean;
   /** bar: a solid fill; dots: one tile per stop; counter: 02 / 06. Default bar. */
   progressStyle?: CardSliderProgressStyle;
+  /** Keep controls inset with the track, or place them below the slide content. Default inset. */
+  progressPosition?: CardSliderProgressPosition;
   /** Stepping past the last card wraps to the first. Default false. */
   loop?: boolean;
   /** Where previous and next sit. Default sides. */

@@ -25,6 +25,11 @@ export { FormField, type FormFieldProps } from './FormField';
 export { ErrorMessage, type ErrorMessageProps } from './ErrorMessage';
 export { SearchBar, type SearchBarProps } from './SearchBar';
 export { DropZone, type DropZoneProps, type DropAsset } from './DropZone';
+export { AuthProviderButton, type AuthProviderButtonProps, type AuthProvider, type AuthIntent } from './AuthProviderButton';
+export { StatusRow, type StatusRowProps, type StatusRowItem, type StatusRowTone } from './StatusRow';
+export { SignagePlate, type SignagePlateProps } from './SignagePlate';
+export { NotificationPreview, type NotificationPreviewProps } from './NotificationPreview';
+export { YearGrid, type YearGridProps, type YearGridStep } from './YearGrid';
 
 // feedback
 export { EmptyState, type EmptyStateProps } from './EmptyState';
@@ -87,6 +92,7 @@ export { LazyScene, type LazySceneProps, type LazySceneState } from './backgroun
 export { SceneSection, type SceneSectionProps } from './backgrounds/SceneSection';
 export { SkylineDivider, type SkylineDividerProps } from './backgrounds/SkylineDivider';
 export { useInView } from './backgrounds/use-in-view';
+export { useReducedMotion } from './backgrounds/use-reduced-motion';
 export type { InView, InViewOptions } from './backgrounds/use-in-view.types';
 // Districts and tones: one module for the whole kit.
 export {

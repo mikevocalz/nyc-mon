@@ -40,7 +40,7 @@ interface SliderState {
  */
 export function CardSlider({
   children, label, visibleCount = 1, gap = 16, showButtons = true, showProgress = true,
-  progressStyle = 'bar', loop = false, tone, district, className, itemClassName,
+  progressStyle = 'bar', progressPosition = 'inset', loop = false, tone, district, className, itemClassName,
   buttonPosition = 'sides', buttonVisibility = 'always', prevButtonCorner = 'bottom-left', nextButtonCorner = 'bottom-right',
   enableSwipe = true, swipeThreshold = 50, autoPlay = false, autoPlayInterval = 3000,
   showEdgeFades = false, edgeFadeColor, showCornerAccents = false, cornerAccentStyle = 'frame', scanLines = false,
@@ -137,6 +137,25 @@ export function CardSlider({
   const dragging = state.drag !== null;
   // Side buttons sit in gutters beside the track, so they never cover card text.
   const sides = showButtons && paged && buttonPosition === 'sides';
+  const sliderControls = (
+    <SliderControls
+      index={index}
+      count={slides.length}
+      visible={m.visible}
+      maxIndex={m.maxIndex}
+      loop={loop}
+      tone={resolved}
+      showButtons={showButtons && paged}
+      showProgress={showProgress && paged}
+      progressStyle={progressStyle}
+      onGo={go}
+      buttonPosition={buttonPosition}
+      prevCorner={prevButtonCorner}
+      nextCorner={nextButtonCorner}
+      buttonClassName={fade}
+      autoplay={autoPlay && paged ? { playing: state.playing, onToggle: () => store.setState({ playing: !store.getState().playing }) } : undefined}
+    />
+  );
 
   return (
     <Section
@@ -188,24 +207,9 @@ export function CardSlider({
             className={fade}
           />
         ) : null}
+        {progressPosition === 'inset' ? sliderControls : null}
       </View>
-      <SliderControls
-        index={index}
-        count={slides.length}
-        visible={m.visible}
-        maxIndex={m.maxIndex}
-        loop={loop}
-        tone={resolved}
-        showButtons={showButtons && paged}
-        showProgress={showProgress && paged}
-        progressStyle={progressStyle}
-        onGo={go}
-        buttonPosition={buttonPosition}
-        prevCorner={prevButtonCorner}
-        nextCorner={nextButtonCorner}
-        buttonClassName={fade}
-        autoplay={autoPlay && paged ? { playing: state.playing, onToggle: () => store.setState({ playing: !store.getState().playing }) } : undefined}
-      />
+      {progressPosition === 'below-content' ? sliderControls : null}
     </Section>
   );
 }
