@@ -238,3 +238,32 @@ Story copy may call the F02 bloodline "Bodega Cee", as v11 does: Mari's partner 
 - **Answers:** research finding 4
 
 An under-13 Caller can play locally while guardian consent is pending (ADR 0001). If the guardian says no, the hatched Mon stays with Dr. Alessandra Santoro in the story. It is never deleted on screen and never turned back into an egg (Law 8). The child's personal data is deleted as COPPA requires. If consent comes later, the Caller starts fresh. How Santoro looks after the Mon is TODO(canon).
+
+## Decision 16 — the three H-Lynk tiers, from the creator's device sheet
+
+- **Date:** 2026-10-04
+- **Decided by:** Mike (creator), who supplied a three-tier H-Lynk concept sheet in session. The image file still needs to be added to `docs/canon/source/`.
+- **Answers:** `docs/canon/OPEN_QUESTIONS.md` Q5 (Entry body), and part of the H-Lynk hardware gap
+
+The sheet shows three tiers. The design follows it. Under the index rule (concept-art text is never database authority), the on-screen text does not count as canon.
+
+| Tier | Name on the sheet | Body | Rear camera |
+|---|---|---|---|
+| Entry | **H-Lynk Core** | matte red plastic | 1 lens |
+| Midrange | **H-Lynk** | matte charcoal/gunmetal | 2 lenses |
+| Premium | **H-Lynk Pro** | white/silver, faceted armour panels with red edge lights | 3 lenses |
+
+All three tiers share these parts:
+- A black **scanner head** across the top edge, with red emitters, projecting a red fan of light upward. Mike: the top is a barcode scanner. This is v11's separate red scanner/emitter.
+- A black stub **antenna** at the top left.
+- A tall screen with a dark bezel.
+- A bottom control row: home, menu, a large square **centre trackpad** ringed in red, back, and forward.
+- Side keys: volume +/−, power, and a left action key, as v11 describes.
+- A thin vertical red status light on the back.
+- The tier name printed on the backplate.
+
+The app's companion chrome is the **H-Lynk Core** (Entry), so its body is red. This replaces the open choice between concrete and Knicks blue in Q5. The red LED and scanner always sit in the black scanner head, never on bare red plastic.
+
+The sheet also shows on-screen UI: the Mon name, "Lv. 12", a gender mark, a "SCAN READY" chip, HP/Energy/Fullness/Social meters, a "CALL MON" button, and DEX/CREW/CARE/BAG/CITY tabs. That UI is concept text, not canon. It is reference for the companion screen layout only, and every label still has to clear Law 1 and Law 9.
+
+**Open:** the sheet prints the **EngineX** logo on the front of every tier. v11 calls Dr. Santoro the H-Lynk's inventor and makes EngineX the concealed eradication program. See Q40.
