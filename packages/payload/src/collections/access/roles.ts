@@ -4,19 +4,14 @@ import type { Access, FieldAccess, PayloadRequest } from 'payload';
  * Staff roles the console's access rules read from `users.role`.
  *
  * The names are Decision 22 (`docs/canon/DECISIONS.md`): `ops`, `support`,
- * `consent`, `content`, one role per staff member.
- * TODO(adr-0004): ADR 0004 adds them to `users.role`. Until it lands,
- * `users.role` holds only `user` and `admin`, and `admin` is read as `ops` so
- * the owner keeps access.
+ * `consent`, `content`, one role per staff member. `users.role` carries them
+ * (ADR 0004 §8); Callers hold `user`.
  */
 export const STAFF_ROLES = ['ops', 'support', 'consent', 'content'] as const;
 
 export type StaffRole = (typeof STAFF_ROLES)[number];
 
-/** TODO(adr-0004): drop once `users.role` carries the staff roles. */
-const LEGACY_ROLE_ALIASES: Readonly<Record<string, StaffRole>> = { admin: 'ops' };
-
-function isStaffRole(value: string): value is StaffRole {
+export function isStaffRole(value: string): value is StaffRole {
   return (STAFF_ROLES as readonly string[]).includes(value);
 }
 
@@ -28,8 +23,7 @@ export function readStaffRole(user: unknown): StaffRole | undefined {
   if (typeof user !== 'object' || user === null || !('role' in user)) return undefined;
   const role = user.role;
   if (typeof role !== 'string') return undefined;
-  if (isStaffRole(role)) return role;
-  return LEGACY_ROLE_ALIASES[role];
+  return isStaffRole(role) ? role : undefined;
 }
 
 /** The staff user's id, or `undefined` when the request has no staff user. */

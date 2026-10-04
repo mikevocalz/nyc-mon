@@ -79,7 +79,11 @@ export interface Config {
     accounts: Account;
     verifications: Verification;
     passkeys: Passkey;
+    twoFactors: TwoFactor;
+    deviceCodes: DeviceCode;
+    rateLimits: RateLimit;
     'payload-kv': PayloadKv;
+    'payload-jobs': PayloadJob;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
     'payload-migrations': PayloadMigration;
@@ -98,7 +102,11 @@ export interface Config {
     accounts: AccountsSelect<false> | AccountsSelect<true>;
     verifications: VerificationsSelect<false> | VerificationsSelect<true>;
     passkeys: PasskeysSelect<false> | PasskeysSelect<true>;
+    twoFactors: TwoFactorsSelect<false> | TwoFactorsSelect<true>;
+    deviceCodes: DeviceCodesSelect<false> | DeviceCodesSelect<true>;
+    rateLimits: RateLimitsSelect<false> | RateLimitsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
+    'payload-jobs': PayloadJobsSelect<false> | PayloadJobsSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
     'payload-migrations': PayloadMigrationsSelect<false> | PayloadMigrationsSelect<true>;
@@ -107,8 +115,12 @@ export interface Config {
     defaultIDType: number;
   };
   fallbackLocale: null;
-  globals: {};
-  globalsSelect: {};
+  globals: {
+    'payload-jobs-stats': PayloadJobsStat;
+  };
+  globalsSelect: {
+    'payload-jobs-stats': PayloadJobsStatsSelect<false> | PayloadJobsStatsSelect<true>;
+  };
   locale: null;
   widgets: {
     collections: CollectionsWidget;
@@ -117,7 +129,13 @@ export interface Config {
   };
   user: User;
   jobs: {
-    tasks: unknown;
+    tasks: {
+      'delete-due-callers': TaskDeleteDueCallers;
+      inline: {
+        input: unknown;
+        output: unknown;
+      };
+    };
     workflows: unknown;
   };
 }
@@ -149,9 +167,18 @@ export interface User {
   emailVerified?: boolean | null;
   name?: string | null;
   image?: string | null;
-  role?: ('user' | 'admin') | null;
+  role?: ('user' | 'ops' | 'support' | 'consent' | 'content') | null;
   birthYear?: number | null;
   consentStatus?: ('not-required' | 'pending' | 'approved' | 'denied') | null;
+  phoneConsentAt?: string | null;
+  twoFactorEnabled?: boolean | null;
+  twoFactorOtpChannel?: ('email' | 'sms') | null;
+  phoneNumber?: string | null;
+  phoneNumberVerified?: boolean | null;
+  username?: string | null;
+  displayUsername?: string | null;
+  activeMonInstanceId?: string | null;
+  deletionScheduledFor?: string | null;
   updatedAt: string;
   createdAt: string;
   collection: 'users';
@@ -351,6 +378,7 @@ export interface Session {
   ipAddress?: string | null;
   userAgent?: string | null;
   user: number | User;
+  surface?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -410,6 +438,57 @@ export interface Passkey {
   createdAt: string;
 }
 /**
+ * Auto-generated from Better Auth schema (twoFactor)
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "twoFactors".
+ */
+export interface TwoFactor {
+  id: number;
+  secret: string;
+  backupCodes: string;
+  user: number | User;
+  verified?: boolean | null;
+  failedVerificationCount?: number | null;
+  lockedUntil?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Auto-generated from Better Auth schema (deviceCode)
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "deviceCodes".
+ */
+export interface DeviceCode {
+  id: number;
+  deviceCode: string;
+  userCode: string;
+  userId?: string | null;
+  expiresAt: string;
+  status: string;
+  lastPolledAt?: string | null;
+  pollingInterval?: number | null;
+  clientId?: string | null;
+  scope?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Auto-generated from Better Auth schema (rateLimit)
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "rateLimits".
+ */
+export interface RateLimit {
+  id: number;
+  key: string;
+  count: number;
+  lastRequest: number;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv".
  */
@@ -425,6 +504,116 @@ export interface PayloadKv {
     | number
     | boolean
     | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "payload-jobs".
+ */
+export interface PayloadJob {
+  id: number;
+  /**
+   * Input data provided to the job
+   */
+  input?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  taskStatus?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  meta?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  completedAt?: string | null;
+  totalTried?: number | null;
+  /**
+   * If hasError is true this job will not be retried
+   */
+  hasError?: boolean | null;
+  /**
+   * If hasError is true, this is the error that caused it
+   */
+  error?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  /**
+   * Task execution log
+   */
+  log?:
+    | {
+        executedAt: string;
+        completedAt: string;
+        taskSlug: 'inline' | 'delete-due-callers';
+        taskID: string;
+        input:
+          | {
+              [k: string]: unknown;
+            }
+          | unknown[]
+          | string
+          | number
+          | boolean
+          | null;
+        output?:
+          | {
+              [k: string]: unknown;
+            }
+          | unknown[]
+          | string
+          | number
+          | boolean
+          | null;
+        state: 'failed' | 'succeeded';
+        error?:
+          | {
+              [k: string]: unknown;
+            }
+          | unknown[]
+          | string
+          | number
+          | boolean
+          | null;
+        parent?: {
+          taskSlug?: ('inline' | 'delete-due-callers') | null;
+          taskID?: string | null;
+        };
+        id?: string | null;
+      }[]
+    | null;
+  taskSlug?: ('inline' | 'delete-due-callers') | null;
+  queue?: string | null;
+  waitUntil?: string | null;
+  processingUntil?: string | null;
+  processingToken?: string | null;
+  /**
+   * Used for concurrency control. Jobs with the same key are subject to exclusive/supersedes rules.
+   */
+  concurrencyKey?: string | null;
+  updatedAt: string;
+  createdAt: string;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -480,6 +669,18 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'passkeys';
         value: number | Passkey;
+      } | null)
+    | ({
+        relationTo: 'twoFactors';
+        value: number | TwoFactor;
+      } | null)
+    | ({
+        relationTo: 'deviceCodes';
+        value: number | DeviceCode;
+      } | null)
+    | ({
+        relationTo: 'rateLimits';
+        value: number | RateLimit;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -535,6 +736,15 @@ export interface UsersSelect<T extends boolean = true> {
   role?: T;
   birthYear?: T;
   consentStatus?: T;
+  phoneConsentAt?: T;
+  twoFactorEnabled?: T;
+  twoFactorOtpChannel?: T;
+  phoneNumber?: T;
+  phoneNumberVerified?: T;
+  username?: T;
+  displayUsername?: T;
+  activeMonInstanceId?: T;
+  deletionScheduledFor?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -668,6 +878,7 @@ export interface SessionsSelect<T extends boolean = true> {
   ipAddress?: T;
   userAgent?: T;
   user?: T;
+  surface?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -719,11 +930,93 @@ export interface PasskeysSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "twoFactors_select".
+ */
+export interface TwoFactorsSelect<T extends boolean = true> {
+  secret?: T;
+  backupCodes?: T;
+  user?: T;
+  verified?: T;
+  failedVerificationCount?: T;
+  lockedUntil?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "deviceCodes_select".
+ */
+export interface DeviceCodesSelect<T extends boolean = true> {
+  deviceCode?: T;
+  userCode?: T;
+  userId?: T;
+  expiresAt?: T;
+  status?: T;
+  lastPolledAt?: T;
+  pollingInterval?: T;
+  clientId?: T;
+  scope?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "rateLimits_select".
+ */
+export interface RateLimitsSelect<T extends boolean = true> {
+  key?: T;
+  count?: T;
+  lastRequest?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv_select".
  */
 export interface PayloadKvSelect<T extends boolean = true> {
   key?: T;
   data?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "payload-jobs_select".
+ */
+export interface PayloadJobsSelect<T extends boolean = true> {
+  input?: T;
+  taskStatus?: T;
+  meta?: T;
+  completedAt?: T;
+  totalTried?: T;
+  hasError?: T;
+  error?: T;
+  log?:
+    | T
+    | {
+        executedAt?: T;
+        completedAt?: T;
+        taskSlug?: T;
+        taskID?: T;
+        input?: T;
+        output?: T;
+        state?: T;
+        error?: T;
+        parent?:
+          | T
+          | {
+              taskSlug?: T;
+              taskID?: T;
+            };
+        id?: T;
+      };
+  taskSlug?: T;
+  queue?: T;
+  waitUntil?: T;
+  processingUntil?: T;
+  processingToken?: T;
+  concurrencyKey?: T;
+  updatedAt?: T;
+  createdAt?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -759,6 +1052,34 @@ export interface PayloadMigrationsSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "payload-jobs-stats".
+ */
+export interface PayloadJobsStat {
+  id: number;
+  stats?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "payload-jobs-stats_select".
+ */
+export interface PayloadJobsStatsSelect<T extends boolean = true> {
+  stats?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "collections_widget".
  */
 export interface CollectionsWidget {
@@ -774,7 +1095,16 @@ export interface CollectionsWidget {
 export interface CollectionQueryWidget {
   data?: {
     title?: string | null;
-    relatedCollection: 'users' | 'media' | 'sessions' | 'accounts' | 'verifications' | 'passkeys';
+    relatedCollection:
+      | 'users'
+      | 'media'
+      | 'sessions'
+      | 'accounts'
+      | 'verifications'
+      | 'passkeys'
+      | 'twoFactors'
+      | 'deviceCodes'
+      | 'rateLimits';
     where?:
       | {
           [k: string]: unknown;
@@ -796,9 +1126,31 @@ export interface CollectionQueryWidget {
  */
 export interface ActivityWidget {
   data?: {
-    excludedCollections?: ('users' | 'media' | 'sessions' | 'accounts' | 'verifications' | 'passkeys')[] | null;
+    excludedCollections?:
+      | (
+          | 'users'
+          | 'media'
+          | 'sessions'
+          | 'accounts'
+          | 'verifications'
+          | 'passkeys'
+          | 'twoFactors'
+          | 'deviceCodes'
+          | 'rateLimits'
+        )[]
+      | null;
   };
   width: 'x-small' | 'small' | 'medium' | 'large' | 'x-large' | 'full';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "TaskDelete-due-callers".
+ */
+export interface TaskDeleteDueCallers {
+  input?: unknown;
+  output: {
+    deleted: number;
+  };
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

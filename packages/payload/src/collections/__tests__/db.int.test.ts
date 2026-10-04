@@ -49,7 +49,7 @@ describe.skipIf(url === undefined)('X1 collections on Postgres', () => {
     payload = await getPayload({ config });
     const user = await payload.create({
       collection: 'users',
-      data: { email: `staff-${run}@example.com`, role: 'admin' },
+      data: { email: `staff-${run}@example.com`, role: 'ops' },
       overrideAccess: true,
     });
     staffId = user.id;
