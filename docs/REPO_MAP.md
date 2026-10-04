@@ -110,7 +110,7 @@ Every design handoff (`08-handoff.md`) maps to this inventory. If a screen needs
 
 Gaps against §0A.2: `Figure` renders a `div` with a role, not a native `<figure>`; there is no `ol`, `dl`, `blockquote`, `img`/`picture`, or `<section aria-labelledby>` helper.
 
-`@acme/ui/tw` (`packages/ui/tw.tsx`) is a second, smaller wrapper set over the same elements: `View`, `Text`, `Pressable`, `TextInput`, `ScrollView`, `Main`, `Section`, `Article`, `Nav`, `Header`, `Footer`, `H1`, `H2`, `H3`, `P`. Web currently builds its header and footer from this set, not from `@acme/ui/html`. Mobile imports `Header`, `Aside`, `Main`, `Section` from `@acme/ui/primitives` (`apps/mobile/components/AppHeader.tsx`, `apps/mobile/app/(drawer)/split/_layout.tsx`, `apps/mobile/src/navigation/split-view/index.android.tsx`).
+`@acme/ui/tw` (`packages/ui/tw.tsx`) is a second, smaller wrapper set over the same elements: `View`, `Text`, `Pressable`, `TextInput`, `ScrollView`, `Main`, `Section`, `Article`, `Nav`, `Header`, `Footer`, `H1`, `H2`, `H3`, `P`. Web currently builds its header and footer from this set, not from `@acme/ui/html`. Mobile imports `Header`, `Aside`, `Main`, `Section` from `@acme/ui/primitives` (`apps/mobile/components/AppHeader.tsx`, `apps/mobile/app/(drawer)/split/_layout.tsx`, `packages/ui/adaptive-panes/index.tsx`).
 
 ### 5.2 Variant unions on the core controls
 
@@ -147,6 +147,7 @@ Generated from the source tree at `42c3273` (`.stories.tsx`, tests, `.skia.tsx` 
 | `Card.tsx` | — | Card | UI/Card (Elevated, Flat, Raised, Districts, OnLightPage, Notch, CornerCut, Beam, Rounded) |
 | `Checkbox.tsx` | web | Checkbox | UI/Checkbox (States, Neon) |
 | `Collapsible.tsx` | native,web | Collapsible | UI/Collapsible (States, Districts) |
+| `adaptive-panes/index.tsx` (`@acme/ui/adaptive-panes`) | per-file native,web | SplitView (= AdaptivePanes) + `.Column` / `.Inspector`, PaneToggle, PaneSearchBar, PaneListHeader, DetailNavbar, SidebarSection, fold planner, useReservedRegions, ReservedRegionsOverride, useAdaptiveNavigationPlacement | Layout/SplitView (Compact, Medium, Expanded, Large, ExtraLarge, BookPosture, DualScreenHinge, Tabletop, Trifold, TrifoldInspector) — in `SplitView.stories.tsx` |
 | `DataTable.tsx` | — | DataTable | UI/DataTable (Sortable, Neon) |
 | `Dialog.tsx` | — | DialogCard, Dialog | UI/Dialog (Open, Surface, SurfaceWithoutActions, Neon, NeonDistricts, NeonModalOpen) |
 | `DropZone.tsx` | native,web | DropZone | UI/DropZone (Basic, CustomContent, Districts) |
@@ -336,7 +337,7 @@ Not present: Better Auth, Supabase, Firebase, Clerk, Auth.js; no passkey, Sign i
 ## 9. State
 
 - **zustand 5.0.15**: used in about 31 files across `apps/*` and `packages/*` (feature stores in `packages/app/features/*/*.store.ts`, `packages/spatial/districtStore.ts`, `packages/ui/use-instance-store.ts`, web header state).
-- **react-native-mmkv 4.3.2** (`createMMKV`): one store, `packages/app/features/editor/preferences.store.native.ts`, plus `apps/mobile/src/navigation/split-view/pane-overrides.store.ts`. No versioned save blob exists.
+- **react-native-mmkv 4.3.2** (`createMMKV`): one store, `packages/app/features/editor/preferences.store.native.ts`, plus `apps/mobile/src/navigation/split-view/pane-storage.ts` (handed to the kit's pane overrides through `configurePaneOverrideStorage`). No versioned save blob exists.
 - **@tanstack/react-query 5.104.1** for server data (`packages/app/providers/query-provider.tsx`).
 
 ## 10. Installed versions of the §0B seams

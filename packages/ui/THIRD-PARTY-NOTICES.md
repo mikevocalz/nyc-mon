@@ -146,3 +146,10 @@ Ten photos from Wikimedia Commons, bundled as 1200x800 WebP crops (resized, crop
 - `harlem-lenox-rowhouses.webp`: "Lenox 123 rowhouses jeh" by Jim.henderson. CC0 1.0 (https://creativecommons.org/publicdomain/zero/1.0/). Source: https://commons.wikimedia.org/wiki/File:Lenox_123_rowhouses_jeh.jpg
 - `megacity-brooklyn-bridge-night.webp`: "Brooklyn Bridge at night" by Kai Pilger. CC0 1.0 (https://creativecommons.org/publicdomain/zero/1.0/). Source: https://commons.wikimedia.org/wiki/File:Brooklyn_Bridge_at_night.jpg
 - `megacity-bridge-deck.webp`: "Brooklyn Bridge, New York" by Pierre Blaché. CC0 1.0 (https://creativecommons.org/publicdomain/zero/1.0/). Source: https://commons.wikimedia.org/wiki/File:Brooklyn_Bridge,_New_York.jpg
+
+## react-freeze
+
+`adaptive-panes/pane-freeze.tsx` reproduces the `Freeze` component from
+react-freeze 1.0.4 by Software Mansion (https://github.com/software-mansion/react-freeze),
+MIT License, Copyright (c) 2021 Software Mansion. It is inlined so `@acme/ui`
+does not take a dependency for a component of about fifteen lines.

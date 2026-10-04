@@ -22,7 +22,9 @@
       "react-native": "./icons.native.tsx",
       "default": "./icons.web.ts"
     },
-    "./native": "./native.ts"
+    "./native": "./native.ts",
+    "./adaptive-panes": "./adaptive-panes/index.tsx",
+    "./adaptive-panes/parts": "./adaptive-panes/parts.ts"
   },
   "scripts": {
     "lint": "eslint",
