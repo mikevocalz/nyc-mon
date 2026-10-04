@@ -1,0 +1,56 @@
+import type { Meta, StoryObj } from '@storybook/react-vite';
+import { CityHeightfield, type CityHeightfieldProps } from './backgrounds/CityHeightfield';
+import { DISTRICTS, DISTRICT_NAMES } from './backgrounds/district-theme';
+import { BackgroundCaption, DistrictGrid } from './backgrounds/story-helpers';
+import { Section } from './html';
+
+const meta = {
+  title: 'Backgrounds/CityHeightfield',
+  component: CityHeightfield,
+  parameters: { layout: 'fullscreen', backgrounds: { disable: true } },
+  args: { district: 'midtown', waveAmplitude: 0.8, waveFrequency: 1.5, waveSpeed: 1, bumpRadius: 3.5, bumpStrength: 2.5, cameraHeight: 10, gridSegments: 12, fog: true, opacity: 100, hoverEffect: true, windowLights: true, forceFallback: false },
+  argTypes: {
+    district: { control: 'inline-radio', options: DISTRICTS },
+    waveAmplitude: { control: { type: 'range', min: 0, max: 2, step: 0.05 } },
+    waveFrequency: { control: { type: 'range', min: 0.2, max: 4, step: 0.1 } },
+    waveSpeed: { control: { type: 'range', min: 0, max: 3, step: 0.1 } },
+    bumpRadius: { control: { type: 'range', min: 1, max: 8, step: 0.5 } },
+    bumpStrength: { control: { type: 'range', min: 0, max: 6, step: 0.5 } },
+    cameraHeight: { control: { type: 'range', min: 2, max: 18, step: 1 } },
+    gridSegments: { control: { type: 'range', min: 4, max: 24, step: 1 } },
+    opacity: { control: { type: 'range', min: 0, max: 100, step: 1 } },
+    lineColor: { control: 'color' },
+    bgColor: { control: 'color' },
+    forceFallback: { description: 'Draw with Skia even where WebGPU works.' },
+  },
+} satisfies Meta<typeof CityHeightfield>;
+
+export default meta;
+type Story = StoryObj<typeof meta>;
+
+/** Every prop as a control. */
+export const Playground: Story = {
+  render: (args: CityHeightfieldProps) => (
+    <Section className="h-screen min-h-[520px]">
+      <CityHeightfield {...args} className="flex-1">
+        <BackgroundCaption title="CityHeightfield" line="A stepped city heightfield. Move the pointer to lift the blocks." />
+      </CityHeightfield>
+    </Section>
+  ),
+};
+
+/** The same background on the Skia fallback, as browsers without WebGPU see it. */
+export const SkiaFallback: Story = { ...Playground, args: { forceFallback: true } };
+
+/** One tile per district. */
+export const Districts: Story = {
+  render: (args: CityHeightfieldProps) => (
+    <DistrictGrid>
+      {DISTRICTS.map((district) => (
+        <CityHeightfield key={district} {...args} district={district} className="flex-1">
+          <BackgroundCaption title={DISTRICT_NAMES[district]} />
+        </CityHeightfield>
+      ))}
+    </DistrictGrid>
+  ),
+};

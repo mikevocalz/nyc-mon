@@ -7,8 +7,20 @@ in NeonBlade UI by NeuronRush: https://github.com/vprix21/neonblade-ui
 
 Ported so far:
 
-- `backgrounds/GridFloor`, `GridScene`, `GlyphCity`: prop APIs follow NeonBlade's
-  Grid Floor, Grid Scene and Glyph City.
+- `backgrounds/GridFloor`, `GridScene`: prop APIs follow NeonBlade's Grid Floor
+  and Grid Scene; both are now drawn as solid street-grid planes.
+- `backgrounds/CitySkyline` (also exported as `GlyphCity`): the port of
+  NeonBlade's Glyph City (`packages/registry/components/glyph-city`), redrawn
+  as solid district skylines. Keeps Glyph City's colour, speed, vehicle and
+  light props.
+- `backgrounds/SignRain`: port of NeonBlade's ASCII Rain (`ascii-rain`).
+- `backgrounds/SubwayLines`: port of NeonBlade's Cyber Circuit (`cyber-circuit`).
+- `backgrounds/StreetPulse`: port of NeonBlade's Datalines with Grid
+  (`datalines-with-grid`).
+- `backgrounds/CityHeightfield`: port of NeonBlade's Holographic Terrain
+  (`holographic-terrain`).
+- `backgrounds/RiverTide`: port of NeonBlade's Neon Tide (`neon-tide`).
+- `backgrounds/RainWindow`: port of NeonBlade's Pluviophile (`pluviophile`).
 - `backgrounds/CityBlocks`: began as the port of NeonBlade's Hexagons background
   (`packages/registry/components/hexagons`) and was redrawn as a solid NYC
   city-block tiling. It keeps Hexagons' `hoverEffect`, `hoverColor` and
