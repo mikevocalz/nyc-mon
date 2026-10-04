@@ -59,6 +59,14 @@ const config: ExpoConfig & { newArchEnabled: true } = {
       },
     ],
     'expo-image',
+    [
+      'expo-calendar',
+      {
+        calendarPermission:
+          'Allow NYC-MON to sync Mon care reminders, play dates, and battles to your calendar.',
+      },
+    ],
+    'expo-notifications',
     'react-native-webgpu',
     // Adds the device flavors (mobile, quest) and the Quest manifest: VR
     // intent category, headtracking, hand tracking and supported devices.

@@ -11,11 +11,13 @@ overrides:
   react-dom: 19.3.0
   "@expo/dom-webview": 58.0.2
 
-# @reactvision/react-viro comes from the mikevocalz/viro fork, pinned to a
-# merge commit on its main branch (catalog below). The fork commits its built
-# dist/, so pnpm installs it without running its build scripts. Its peer range
-# covers Expo 58 and React Native 0.88. apps/mobile/scripts/assert-viro-fork.mjs
-# still guards native commands against a resolution that drifts back to npm.
+# @reactvision/react-viro is vendored at vendor/reactvision-react-viro-3.0.2-moyo.1.tgz:
+# an npm pack of the mikevocalz/viro fork pinned at commit 5393d00744f4. The
+# fork is a private repo, so a git/tarball URL would fail in CI without
+# credentials. Regenerate with: npm pack the pinned checkout (dist/ is
+# committed upstream, so no build step is needed). Its peer range covers Expo
+# 58 and React Native 0.88. apps/mobile/scripts/assert-viro-fork.mjs still
+# guards native commands against a resolution that drifts back to npm.
 # Known, accepted peer warnings (pnpm 12.8.1 ignored the packageExtensions that
 # used to sit here: removing them left the resolved graph unchanged, so they
 # were dropped on 2026-10-04).
@@ -24,10 +26,9 @@ overrides:
 #   Nitro 0.37.x (also npm latest).
 
 allowBuilds:
-  # false: install the fork's committed dist/ without running its prepare
-  # (tsc). pnpm refuses an unlisted git dependency that has build scripts.
-  # Bump the commit here together with the catalog pin.
-  "@reactvision/react-viro@git+https://github.com/mikevocalz/viro.git#5393d00744f448fc462ef13ee76b1346fc47512e": false
+  # false: the vendored tarball ships the fork's committed dist/; there is no
+  # build to run. Bump the tarball together with the catalog pin.
+  "@reactvision/react-viro@file:vendor/reactvision-react-viro-3.0.2-moyo.1.tgz": false
   sharp: true
   unrs-resolver: true
   esbuild: true
@@ -74,6 +75,8 @@ catalog:
   expo-image: 58.0.11
   expo-document-picker: 58.0.4
   expo-image-picker: 58.0.10
+  expo-calendar: 58.0.6
+  expo-notifications: 58.0.11
   expo-glass-effect: 58.0.3
   expo-symbols: 58.0.4
   "@expo/material-symbols": 0.1.1
@@ -128,7 +131,7 @@ catalog:
   "@typegpu/gl": 0.12.5
 
   # spatial / XR / Rive
-  "@reactvision/react-viro": github:mikevocalz/viro#5393d00744f448fc462ef13ee76b1346fc47512e
+  "@reactvision/react-viro": file:vendor/reactvision-react-viro-3.0.2-moyo.1.tgz
   "@reactvision/viro-web-renderer": 1.0.1
   "@metavr/layout-compat": 1.0.0
   "@metavr/layout-window-compat": 1.0.0

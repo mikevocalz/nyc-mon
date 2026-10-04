@@ -5,6 +5,11 @@ export { EventBlock, type EventBlockProps } from './EventBlock';
 
 export {
   RESOURCE_ACCENTS,
+  MON_SCHEDULE_EVENT_KINDS,
+  defaultScheduleEventTitle,
+  isMealKind,
+  scheduleKindLabel,
+  zonedDateKey,
   accentForEvent,
   eventsOverlap,
   zonedMinutesOfDay,
@@ -13,6 +18,7 @@ export {
   type ScheduleDay,
   type ScheduleEvent,
   type ScheduleEventKind,
+  type ScheduleRecurrence,
 } from './model';
 export { assignLanes, lanesByResource, type LaidOutEvent } from './lanes';
 export {
@@ -34,7 +40,8 @@ export {
   HOUR_HEIGHT_STEPS,
   type ScheduleView,
 } from './store';
-export { DEMO_DAY, DEMO_NOW, DEMO_RESOURCES, DEMO_EVENTS } from './fixtures';
+export { buildDemoDay, DEMO_DAY, DEMO_NOW, DEMO_RESOURCES, DEMO_EVENTS } from './fixtures';
+export { syncEventIntegrations, removeEventIntegrations } from './event-integrations';
 export { MiniCalendar, type MiniCalendarProps } from './MiniCalendar';
 export { monthMatrix, addMonths, isSameDay, formatMonthTitle, WEEKDAY_INITIALS } from './month';
 export { BookingForm, type BookingFormProps } from './BookingForm';

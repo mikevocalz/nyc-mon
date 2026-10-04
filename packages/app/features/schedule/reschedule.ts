@@ -111,6 +111,28 @@ export function applyOverrides(
 ): ScheduleEvent[] {
   return events.map((event) => {
     const override = overrides[event.id];
-    return override ? { ...event, ...override } : event;
+    if (!override) return event;
+
+    // A recurring meal move changes its wall-clock routine, not just one
+    // absolute date. Apply the moved time-of-day onto whichever day is being
+    // rendered so dragging breakfast from 8:00 to 8:30 sticks tomorrow too.
+    if (event.recurrence === 'daily') {
+      const durationMs = event.end.getTime() - event.start.getTime();
+      const start = new Date(event.start);
+      start.setHours(
+        override.start.getHours(),
+        override.start.getMinutes(),
+        override.start.getSeconds(),
+        override.start.getMilliseconds(),
+      );
+      return {
+        ...event,
+        resourceId: override.resourceId,
+        start,
+        end: new Date(start.getTime() + durationMs),
+      };
+    }
+
+    return { ...event, ...override };
   });
 }

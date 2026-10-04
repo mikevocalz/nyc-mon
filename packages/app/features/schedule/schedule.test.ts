@@ -22,7 +22,7 @@ function event(id: string, startISO: string, endISO: string): ScheduleEvent {
     title: id,
     start: new Date(startISO),
     end: new Date(endISO),
-    kind: 'lesson',
+    kind: 'custom',
   };
 }
 
@@ -341,12 +341,34 @@ describe('applyOverrides', () => {
     assert.deepEqual(applyOverrides(base, {}), base);
   });
 
+  it('applies a recurring move as a wall-clock routine on another day', () => {
+    const recurring = {
+      ...event('meal', '2026-06-15T12:00:00Z', '2026-06-15T12:30:00Z'),
+      kind: 'breakfast' as const,
+      recurrence: 'daily' as const,
+    };
+    const tomorrow = {
+      ...recurring,
+      start: new Date('2026-06-16T12:00:00Z'),
+      end: new Date('2026-06-16T12:30:00Z'),
+    };
+    const out = applyOverrides([tomorrow], {
+      meal: {
+        start: new Date('2026-06-15T12:30:00Z'),
+        end: new Date('2026-06-15T13:00:00Z'),
+        resourceId: 'r1',
+      },
+    });
+    assert.equal(out[0]!.start.getDate(), tomorrow.start.getDate());
+    assert.equal(out[0]!.start.getHours(), new Date('2026-06-15T12:30:00Z').getHours());
+  });
+
   it('keeps title and kind when moving', () => {
     const out = applyOverrides(base, {
       a: { start: new Date('2026-06-15T17:00:00Z'), end: new Date('2026-06-15T18:00:00Z'), resourceId: 'grace' },
     });
     assert.equal(out[0]!.title, 'a');
-    assert.equal(out[0]!.kind, 'lesson');
+    assert.equal(out[0]!.kind, 'custom');
     assert.equal(out[0]!.resourceId, 'grace');
   });
 });

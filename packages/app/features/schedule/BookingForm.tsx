@@ -1,37 +1,31 @@
 'use client';
+
 import { View, Text, Pressable } from '@acme/ui/tw';
 import { Section } from '@acme/ui/primitives';
 import { Avatar, Button, Container, notify, useAppForm, useFormStore } from '@acme/ui';
-import { DEMO_DAY, DEMO_RESOURCES } from './fixtures.ts';
+import { buildDemoDay, DEMO_RESOURCES } from './fixtures.ts';
 import { slotsForResource } from './slots.ts';
 import { formatTime } from './format.ts';
 import { useScheduleStore } from './store.ts';
 import { NotesEditor } from './NotesEditor.tsx';
 import { pickNoteImage } from './pick-note-image';
+import {
+  MON_SCHEDULE_EVENT_KINDS,
+  defaultScheduleEventTitle,
+  isMealKind,
+  scheduleKindLabel,
+  type ScheduleEvent,
+  type ScheduleEventKind,
+} from './model.ts';
+import { syncEventIntegrations } from './event-integrations';
 
 export interface BookingFormProps {
-  /** Opens editor settings. Supplied by the route, which owns navigation. */
   onOpenEditorSettings?: () => void;
-  /** Called after a successful submit so the host can dismiss the sheet. */
   onDone: () => void;
 }
 
-/**
- * New-booking form.
- *
- * TanStack Form via the kit's `useAppForm` — form state lives in TanStack's own
- * store, never React state, per the repo rule.
- *
- * Instructor and time are CHIPS, not selects. Two reasons, and the first is
- * functional: the kit's Select renders a non-interactive View+Text on native
- * (primitives/dom.native.tsx), so a select here could not be operated at all —
- * it showed the raw resource id and an empty time. Chips are also the app's
- * established active-state grammar (black-on-yellow), so the choices are
- * visible rather than remembered, which is the whole point of a booking form.
- */
-const SLOT_GROUPS = ['Morning', 'Afternoon'] as const;
+const SLOT_GROUPS = ['Morning', 'Afternoon', 'Evening'] as const;
 
-/** Which half of the day a slot falls in, in the calendar's zone. */
 function partOfDay(instant: Date, timeZone: string): (typeof SLOT_GROUPS)[number] {
   const hour = Number.parseInt(
     new Intl.DateTimeFormat('en-US', { timeZone, hour: '2-digit', hourCycle: 'h23' }).format(
@@ -39,137 +33,220 @@ function partOfDay(instant: Date, timeZone: string): (typeof SLOT_GROUPS)[number
     ),
     10,
   );
-  return hour < 12 ? 'Morning' : 'Afternoon';
+  if (hour < 12) return 'Morning';
+  if (hour < 17) return 'Afternoon';
+  return 'Evening';
+}
+
+function preferredMinutes(kind: ScheduleEventKind): number {
+  switch (kind) {
+    case 'breakfast':
+      return 8 * 60;
+    case 'lunch':
+      return 12 * 60 + 30;
+    case 'dinner':
+      return 18 * 60 + 30;
+    case 'play-date':
+      return 16 * 60;
+    case 'battle':
+      return 19 * 60;
+    default:
+      return 10 * 60;
+  }
+}
+
+function eventDurationMinutes(kind: ScheduleEventKind): number {
+  if (kind === 'play-date' || kind === 'battle') return 60;
+  return 30;
+}
+
+function reminderLeadMinutes(kind: ScheduleEventKind): number {
+  if (kind === 'battle') return 30;
+  if (kind === 'play-date') return 15;
+  return 0;
+}
+
+function idForEvent() {
+  return `mon-event-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 export function BookingForm({ onDone, onOpenEditorSettings }: BookingFormProps) {
-  const moveEvent = useScheduleStore((state) => state.moveEvent);
+  const selectedDate = useScheduleStore((state) => state.selectedDate);
+  const selectedEventId = useScheduleStore((state) => state.selectedEventId);
+  const createdEvents = useScheduleStore((state) => state.createdEvents);
+  const deletedEventIds = useScheduleStore((state) => state.deletedEventIds);
+  const createEvent = useScheduleStore((state) => state.createEvent);
   const selectEvent = useScheduleStore((state) => state.selectEvent);
+  const syncPersonalCalendar = useScheduleStore((state) => state.syncPersonalCalendar);
+  const setSyncPersonalCalendar = useScheduleStore((state) => state.setSyncPersonalCalendar);
+  const remindersEnabled = useScheduleStore((state) => state.remindersEnabled);
+  const setRemindersEnabled = useScheduleStore((state) => state.setRemindersEnabled);
+  const setCalendarEventId = useScheduleStore((state) => state.setCalendarEventId);
+  const setNotificationId = useScheduleStore((state) => state.setNotificationId);
+
+  const reference = selectedDate ? new Date(selectedDate) : new Date();
+  const day = buildDemoDay(reference, Object.values(createdEvents), deletedEventIds);
+  const firstMon = DEMO_RESOURCES[0];
+  const firstKind: ScheduleEventKind = 'breakfast';
+  const selectedSlotTime =
+    selectedEventId && !Number.isNaN(Date.parse(selectedEventId))
+      ? new Date(selectedEventId)
+      : undefined;
+  const firstSlot = selectedSlotTime ?? new Date(day.dayStart);
+  if (!selectedSlotTime) firstSlot.setHours(8, 0, 0, 0);
 
   const form = useAppForm({
     defaultValues: {
       title: '',
-      resourceId: DEMO_RESOURCES[0]?.id ?? '',
-      slot: '',
+      resourceId: firstMon?.id ?? '',
+      kind: firstKind as ScheduleEventKind,
+      slot: firstSlot.toISOString(),
       notes: '',
     },
     onSubmit: async ({ value }) => {
-      // Booking creation is not backed by a collection yet, so the new slot is
-      // recorded as an override and selected — the same path the grid and the
-      // slot list already read. Swap for a mutation when Payload lands.
-      if (value.slot) {
-        const start = new Date(value.slot);
-        moveEvent(`booking-${start.toISOString()}`, {
-          start,
-          end: new Date(start.getTime() + 30 * 60_000),
-          resourceId: value.resourceId,
-        });
-        selectEvent(value.slot);
-        // The sheet closes on submit, so without this the booking is created
-        // with no acknowledgement at all — the user is returned to the grid and
-        // has to hunt for the slot to know it worked.
-        notify.success('Booking created', {
-          description: `${value.title || 'Untitled'} · ${formatTime(start, DEMO_DAY.timeZone)}`,
-        });
-      }
+      const mon = DEMO_RESOURCES.find((candidate) => candidate.id === value.resourceId);
+      if (!mon || !value.slot) return;
+
+      const kind = value.kind as ScheduleEventKind;
+      const start = new Date(value.slot);
+      const title = value.title.trim() || defaultScheduleEventTitle(kind, mon.name);
+      const event: ScheduleEvent = {
+        id: idForEvent(),
+        resourceId: mon.id,
+        title,
+        start,
+        end: new Date(start.getTime() + eventDurationMinutes(kind) * 60_000),
+        kind,
+        recurrence: isMealKind(kind) ? 'daily' : 'none',
+        reminderEnabled: remindersEnabled,
+        reminderMinutesBefore: reminderLeadMinutes(kind),
+        syncToPersonalCalendar: syncPersonalCalendar,
+        notes: value.notes,
+      };
+
+      createEvent(event);
+      selectEvent(event.id);
+
+      const integration = await syncEventIntegrations(event, {
+        monName: mon.name,
+        timeZone: day.timeZone,
+      });
+
+      if (integration.calendarEventId) setCalendarEventId(event.id, integration.calendarEventId);
+      if (integration.notificationId) setNotificationId(event.id, integration.notificationId);
+
+      const parts = [`${scheduleKindLabel(kind)} · ${formatTime(start, day.timeZone)}`];
+      if (isMealKind(kind)) parts.push('repeats daily');
+      if (integration.calendarStatus === 'synced') parts.push('personal calendar synced');
+      if (integration.calendarStatus === 'denied') parts.push('calendar permission not granted');
+      if (integration.reminderStatus === 'scheduled') parts.push('reminder set');
+
+      notify.success('Mon event scheduled', { description: parts.join(' · ') });
       onDone();
     },
   });
 
-  // Subscribed, not snapshotted. Reading `form.state.values` directly does not
-  // re-render on change, so tapping a chip set the value but the selection
-  // never appeared — the chips looked unselectable.
   const resourceId = useFormStore(form.store, (state) => state.values.resourceId);
   const selectedSlot = useFormStore(form.store, (state) => state.values.slot);
+  const selectedKind = useFormStore(form.store, (state) => state.values.kind) as ScheduleEventKind;
 
   const slots = slotsForResource({
-    dayStart: DEMO_DAY.dayStart,
-    startHour: DEMO_DAY.startHour,
-    endHour: DEMO_DAY.endHour,
-    events: DEMO_DAY.events,
+    dayStart: day.dayStart,
+    startHour: day.startHour,
+    endHour: day.endHour,
+    events: day.events,
     resourceId,
-  }).filter((slot) => slot.available);
+  });
+
+  const pickKind = (kind: ScheduleEventKind) => {
+    form.setFieldValue('kind', kind);
+    const minutes = preferredMinutes(kind);
+    const next = new Date(day.dayStart);
+    next.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0);
+    form.setFieldValue('slot', next.toISOString());
+  };
 
   return (
-    // Sheet shell caps at max-w-3xl (content-detail = 48rem) and centres.
     <Container width="detail" className="flex-1 px-6 pb-10 pt-3">
-      {/* One cap only. A second, narrower container used to sit here and
-          squeezed the content to 38rem, which forced the notes toolbar to wrap
-          mid-row. Sections are spaced far enough apart to read as groups. */}
       <View className="gap-7">
-      <Section className="gap-1">
-        <Text className="font-display text-xl text-text">New booking</Text>
-        <Text className="text-sm text-text-muted">
-          Pick who is teaching and when. You can add notes after.
-        </Text>
-      </Section>
-
-      <form.AppField
-        name="title"
-        validators={{
-          onChange: ({ value }) => (value.trim() ? undefined : 'Give the booking a name'),
-        }}
-      >
-        {(field) => <field.TextField label="What is it?" placeholder="Theory lesson" />}
-      </form.AppField>
-
-      <Section className="gap-2">
-        <Text className="text-sm font-medium text-text">Instructor</Text>
-        <View className="flex-row flex-wrap gap-2">
-          {DEMO_RESOURCES.map((resource) => {
-            const active = resource.id === resourceId;
-            return (
-              <Pressable
-                key={resource.id}
-                onPress={() => {
-                  form.setFieldValue('resourceId', resource.id);
-                  // Their free slots differ, so a stale time would be wrong.
-                  form.setFieldValue('slot', '');
-                }}
-                accessibilityState={{ selected: active }}
-                className={`flex-row items-center gap-2 rounded-none border-2 border-border px-2.5 py-1.5 ${
-                  active ? 'bg-primary' : 'bg-surface'
-                }`}
-              >
-                <Avatar size="sm" name={resource.name} />
-                <Text
-                  className={`text-sm font-medium ${active ? 'text-on-primary' : 'text-text'}`}
-                >
-                  {resource.name}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      </Section>
-
-      <Section className="gap-3">
-        <View className="flex-row items-baseline justify-between">
-          <Text className="text-sm font-medium text-text">Available times</Text>
-          {/* Duration stated ONCE here instead of repeated in every chip — the
-              chips then only carry the start time, which is the part that
-              actually differs and the part being scanned. */}
-          <Text className="text-xs text-text-muted">30 min each</Text>
-        </View>
-
-        {slots.length === 0 ? (
+        <Section className="gap-1">
+          <Text className="font-display text-xl text-text">Add to Mon Calendar</Text>
           <Text className="text-sm text-text-muted">
-            Fully booked today. Try another instructor.
+            Meals can repeat every day. Play dates and battles stay one-time unless you add another.
           </Text>
-        ) : (
-          SLOT_GROUPS.map((group) => {
-            const inGroup = slots.filter(
-              (slot) => partOfDay(slot.start, DEMO_DAY.timeZone) === group,
-            );
-            if (inGroup.length === 0) return null;
+        </Section>
 
+        <Section className="gap-2">
+          <Text className="text-sm font-medium text-text">Mon</Text>
+          <View className="flex-row flex-wrap gap-2">
+            {DEMO_RESOURCES.map((mon) => {
+              const active = mon.id === resourceId;
+              return (
+                <Pressable
+                  key={mon.id}
+                  onPress={() => form.setFieldValue('resourceId', mon.id)}
+                  accessibilityState={{ selected: active }}
+                  className={`flex-row items-center gap-2 border-2 border-border px-3 py-2 ${
+                    active ? 'bg-primary' : 'bg-surface'
+                  }`}
+                >
+                  <Avatar size="sm" name={mon.name} imageUri={mon.avatarUrl} />
+                  <Text className={`text-sm font-medium ${active ? 'text-on-primary' : 'text-text'}`}>
+                    {mon.name}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </Section>
+
+        <Section className="gap-2">
+          <Text className="text-sm font-medium text-text">What are you scheduling?</Text>
+          <View className="flex-row flex-wrap gap-2">
+            {MON_SCHEDULE_EVENT_KINDS.filter((kind) => kind !== 'care').map((kind) => {
+              const active = kind === selectedKind;
+              return (
+                <Pressable
+                  key={kind}
+                  onPress={() => pickKind(kind)}
+                  accessibilityState={{ selected: active }}
+                  className={`border-2 border-border px-3 py-2.5 ${active ? 'bg-primary' : 'bg-surface'}`}
+                >
+                  <Text className={`text-sm font-semibold ${active ? 'text-on-primary' : 'text-text'}`}>
+                    {scheduleKindLabel(kind)}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </Section>
+
+        <form.AppField name="title">
+          {(field) => (
+            <field.TextField
+              label="Name (optional)"
+              placeholder={defaultScheduleEventTitle(
+                selectedKind,
+                DEMO_RESOURCES.find((mon) => mon.id === resourceId)?.name ?? 'Mon',
+              )}
+            />
+          )}
+        </form.AppField>
+
+        <Section className="gap-3">
+          <View className="flex-row items-baseline justify-between">
+            <Text className="text-sm font-medium text-text">Time</Text>
+            <Text className="text-xs text-text-muted">
+              {eventDurationMinutes(selectedKind)} min
+            </Text>
+          </View>
+
+          {SLOT_GROUPS.map((group) => {
+            const inGroup = slots.filter((slot) => partOfDay(slot.start, day.timeZone) === group);
+            if (inGroup.length === 0) return null;
             return (
               <View key={group} className="gap-2">
-                {/* Chunked into morning/afternoon so the eye scans a short
-                    list twice instead of one undifferentiated block of ten. */}
-                <Text className="text-sm font-semibold text-text-muted">
-                  {group}
-                </Text>
+                <Text className="text-sm font-semibold text-text-muted">{group}</Text>
                 <View className="flex-row flex-wrap gap-2">
                   {inGroup.map((slot) => {
                     const iso = slot.start.toISOString();
@@ -178,21 +255,14 @@ export function BookingForm({ onDone, onOpenEditorSettings }: BookingFormProps) 
                       <Pressable
                         key={iso}
                         onPress={() => form.setFieldValue('slot', iso)}
-                        accessibilityLabel={formatTime(slot.start, DEMO_DAY.timeZone)}
+                        accessibilityLabel={formatTime(slot.start, day.timeZone)}
                         accessibilityState={{ selected: active }}
-                        // w-28 keeps every chip the same width so they form a
-                        // grid rather than a ragged wrap; py-3 clears the 44dp
-                        // minimum touch target the previous py-1.5 missed.
-                        className={`w-28 items-center rounded-none border-2 border-border py-3 ${
+                        className={`w-28 items-center border-2 border-border py-3 ${
                           active ? 'bg-primary' : 'bg-surface'
                         }`}
                       >
-                        <Text
-                          className={`text-base font-semibold ${
-                            active ? 'text-on-primary' : 'text-text'
-                          }`}
-                        >
-                          {formatTime(slot.start, DEMO_DAY.timeZone)}
+                        <Text className={`text-base font-semibold ${active ? 'text-on-primary' : 'text-text'}`}>
+                          {formatTime(slot.start, day.timeZone)}
                         </Text>
                       </Pressable>
                     );
@@ -200,30 +270,51 @@ export function BookingForm({ onDone, onOpenEditorSettings }: BookingFormProps) 
                 </View>
               </View>
             );
-          })
-        )}
-      </Section>
+          })}
+        </Section>
 
-      <form.AppField name="notes">
-        {(field) => (
-          <NotesEditor
-            label="Notes"
-            placeholder="Anything to prepare?"
-            onChangeHtml={field.handleChange}
-            onPickImage={pickNoteImage}
-            onOpenSettings={onOpenEditorSettings}
-          />
-        )}
-      </form.AppField>
+        <Section className="gap-2">
+          <Text className="text-sm font-medium text-text">Reminders & sync</Text>
+          <View className="flex-row flex-wrap gap-2">
+            <Pressable
+              onPress={() => setRemindersEnabled(!remindersEnabled)}
+              accessibilityState={{ selected: remindersEnabled }}
+              className={`border-2 border-border px-3 py-2.5 ${remindersEnabled ? 'bg-primary' : 'bg-surface'}`}
+            >
+              <Text className={`text-sm font-semibold ${remindersEnabled ? 'text-on-primary' : 'text-text'}`}>
+                Reminders {remindersEnabled ? 'On' : 'Off'}
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setSyncPersonalCalendar(!syncPersonalCalendar)}
+              accessibilityState={{ selected: syncPersonalCalendar }}
+              className={`border-2 border-border px-3 py-2.5 ${syncPersonalCalendar ? 'bg-primary' : 'bg-surface'}`}
+            >
+              <Text className={`text-sm font-semibold ${syncPersonalCalendar ? 'text-on-primary' : 'text-text'}`}>
+                Personal calendar {syncPersonalCalendar ? 'On' : 'Off'}
+              </Text>
+            </Pressable>
+          </View>
+        </Section>
 
-      {/* Cancel sits beside Create so there is an explicit exit, not just a
-          swipe-down. Secondary weight, so it never competes with the action. */}
-      <View className="flex-row gap-3 border-t-2 border-border/20 pt-5">
-        <Button variant="outline" title="Cancel" onPress={onDone} className="flex-1" />
-        <form.AppForm>
-          <form.SubmitButton title="Create booking" className="flex-[2]" />
-        </form.AppForm>
-      </View>
+        <form.AppField name="notes">
+          {(field) => (
+            <NotesEditor
+              label="Notes"
+              placeholder={selectedKind === 'battle' ? 'Opponent, location, rules…' : 'Anything to remember?'}
+              onChangeHtml={field.handleChange}
+              onPickImage={pickNoteImage}
+              onOpenSettings={onOpenEditorSettings}
+            />
+          )}
+        </form.AppField>
+
+        <View className="flex-row gap-3 border-t-2 border-border/20 pt-5">
+          <Button variant="outline" title="Cancel" onPress={onDone} className="flex-1" />
+          <form.AppForm>
+            <form.SubmitButton title="Add to calendar" className="flex-[2]" />
+          </form.AppForm>
+        </View>
       </View>
     </Container>
   );

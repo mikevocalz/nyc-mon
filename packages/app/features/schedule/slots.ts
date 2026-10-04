@@ -42,7 +42,7 @@ export function slotsForResource(params: {
       title: '',
       start,
       end,
-      kind: 'block',
+      kind: 'custom',
     };
     slots.push({
       start,
