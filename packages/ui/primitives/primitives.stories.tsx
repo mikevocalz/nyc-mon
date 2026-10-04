@@ -115,7 +115,7 @@ export const FormControls: Story = {
         </Fieldset>
         <Page className="flex-row flex-wrap items-center gap-3">
           <Button
-            className={`items-center rounded-none border-2 ${o.controlKeyline} ${o.face} px-5 py-2.5 shadow-[4px_4px_0_0_var(--color-orange-700)] transition-transform duration-fast active:translate-x-[4px] active:translate-y-[4px] active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 motion-reduce:transition-none`}
+            className={`items-center rounded-none border-2 ${o.controlKeyline} ${o.face} px-5 py-2.5 shadow-[4px_4px_0_0_var(--color-orange-700)] transition-transform duration-fast active:translate-x-[4px] active:translate-y-[4px] active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-bg motion-reduce:transition-none`}
           >
             <Text className={`whitespace-nowrap font-display ${o.onFace}`}>Save changes</Text>
           </Button>

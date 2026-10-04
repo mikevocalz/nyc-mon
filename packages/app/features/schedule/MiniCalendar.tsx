@@ -108,7 +108,7 @@ export function MiniCalendar({
                         ? 'font-semibold text-on-primary'
                         : inMonth
                           ? 'text-text'
-                          : 'text-text-muted/50'
+                          : 'text-text-muted'
                     }`}
                   >
                     {date.getDate()}

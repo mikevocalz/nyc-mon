@@ -25,7 +25,7 @@ export const dropdown = tv({
       royal: { itemActive: 'bg-royal-500 hover:bg-royal-500', itemActiveText: 'text-white' },
       carolina: { itemActive: 'bg-carolina-500 hover:bg-carolina-500' },
       leaf: { itemActive: 'bg-leaf-500 hover:bg-leaf-500' },
-      apple: { itemActive: 'bg-apple-500 hover:bg-apple-500', itemActiveText: 'text-white' },
+      apple: { itemActive: 'bg-apple-500 hover:bg-apple-500', itemActiveText: 'text-ink-950' },
       brick: { itemActive: 'bg-orange-800 hover:bg-orange-800', itemActiveText: 'text-white' },
     },
     rounded: {

@@ -71,7 +71,7 @@ export function BookingSurface({ day, resource, onBook }: BookingSurfaceProps) {
                     isSelected
                       ? 'text-on-primary'
                       : isPast
-                        ? 'text-text-muted/50'
+                        ? 'text-text-muted'
                         : 'text-text'
                   }`}
                 >

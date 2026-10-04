@@ -23,7 +23,7 @@ const searchBar = tv({
     input: `${NEON_FIELD.input} -ml-[2px] pr-11`,
     clear:
       'absolute right-1.5 top-1/2 h-8 w-8 -translate-y-1/2 items-center justify-center transition-colors duration-fast ' +
-      'hover:bg-ink-800 active:bg-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/60 ' +
+      'hover:bg-ink-800 active:bg-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ' +
       'motion-reduce:transition-none',
   },
   variants: {

@@ -13,7 +13,7 @@ const segmented = tv({
     root: 'flex-row gap-1 self-start border-2 border-ink-800 bg-ink-950 p-1',
     segment:
       'min-h-9 items-center justify-center border-2 px-3 py-1.5 transition-colors duration-fast md:px-4 md:py-2 ' +
-      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/60 motion-reduce:transition-none',
+      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus motion-reduce:transition-none',
     label: 'font-display text-sm tracking-wide md:text-base',
   },
   variants: {

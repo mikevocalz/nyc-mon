@@ -17,7 +17,7 @@ const iconButton = tv({
   slots: {
     root:
       'group shrink-0 self-start rounded-none border-0 bg-transparent transition-transform duration-fast ' +
-      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/60 focus-visible:ring-offset-2 ' +
+      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-bg ' +
       'motion-reduce:transition-none',
     tint: 'pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-fast group-hover:opacity-100 motion-reduce:transition-none',
   },

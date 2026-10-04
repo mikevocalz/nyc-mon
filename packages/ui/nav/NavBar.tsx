@@ -80,7 +80,7 @@ const bar = tv({
       royal: { linkActive: 'bg-royal-500', keyline: 'bg-royal-500', linkActiveText: 'text-white' },
       carolina: { linkActive: 'bg-carolina-500', keyline: 'bg-carolina-500' },
       leaf: { linkActive: 'bg-leaf-500', keyline: 'bg-leaf-500' },
-      apple: { linkActive: 'bg-apple-500', keyline: 'bg-apple-500', linkActiveText: 'text-white' },
+      apple: { linkActive: 'bg-apple-500', keyline: 'bg-apple-500', linkActiveText: 'text-ink-950' },
     },
     transparency: {
       solid: { root: 'bg-ink-950' },

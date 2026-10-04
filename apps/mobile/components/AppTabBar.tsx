@@ -39,6 +39,12 @@ type RouteName = keyof typeof ICONS;
  * position as a wide ~20%-of-window sidebar rather than a rail. Owning the
  * render gives the app's slab language, true M3 rail metrics, and somewhere to
  * put the menu button.
+ *
+ * On the grid tab the bar is a night facade in both themes, like the kit's
+ * Card and NavBar: the grid screen is a night city, so the bar draws with
+ * palette steps (ink-950, silver-300, orange-400) instead of themed tokens
+ * that would flip to a light bar under white labels. Measured in
+ * packages/theme/contrast.ts as the "grid tab" rows.
  */
 export function AppTabBar({ state, emitter, navigateToTab, insets, rail }: BottomTabBarProps & { rail: boolean }) {
   const gridMode = state.routes[state.index]?.name === 'index';
@@ -75,7 +81,7 @@ export function AppTabBar({ state, emitter, navigateToTab, insets, rail }: Botto
           } ${
             focused
               ? gridMode
-                ? 'border-primary/60 bg-primary/15 shadow-glow-orange'
+                ? 'border-orange-500/60 bg-orange-500/15 shadow-glow-orange'
                 : 'border-border bg-primary shadow-card hover:bg-primary-pressed'
               : gridMode
                 ? 'border-transparent hover:bg-white/5'
@@ -87,8 +93,8 @@ export function AppTabBar({ state, emitter, navigateToTab, insets, rail }: Botto
             className={
               gridMode
                 ? focused
-                  ? 'text-primary'
-                  : 'text-white/70'
+                  ? 'text-orange-400'
+                  : 'text-silver-300'
                 : focused
                   ? 'text-on-primary'
                   : 'text-text-muted'
@@ -99,8 +105,8 @@ export function AppTabBar({ state, emitter, navigateToTab, insets, rail }: Botto
             className={`text-xs font-semibold md:text-sm ${
               gridMode
                 ? focused
-                  ? 'text-primary'
-                  : 'text-white/70'
+                  ? 'text-orange-400'
+                  : 'text-silver-300'
                 : focused
                   ? 'text-on-primary'
                   : 'text-text-muted'
@@ -119,7 +125,7 @@ export function AppTabBar({ state, emitter, navigateToTab, insets, rail }: Botto
         style={{ paddingBottom: insets.bottom }}
         className={`flex-row items-center gap-1 px-2 pt-1 ${
           gridMode
-            ? 'border-t border-structure/40 bg-bg/95'
+            ? 'border-t border-structure/40 bg-ink-950/95'
             : 'border-t-2 border-border bg-surface'
         }`}
       >
@@ -136,7 +142,7 @@ export function AppTabBar({ state, emitter, navigateToTab, insets, rail }: Botto
         paddingBottom: insets.bottom + MENU_BOTTOM_GAP,
       }}
       className={`h-full items-center gap-2 px-1.5 ${
-        gridMode ? 'bg-bg' : 'bg-surface'
+        gridMode ? 'bg-ink-950' : 'bg-surface'
       }`}
     >
       {items}

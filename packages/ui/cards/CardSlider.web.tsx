@@ -141,7 +141,7 @@ export function CardSlider({
   return (
     <Section
       aria-label={label}
-      className={`select-none rounded-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/50 focus-visible:ring-offset-2 ${className ?? ''}`}
+      className={`select-none rounded-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-bg ${className ?? ''}`}
       {...regionProps}
     >
       <View className={`relative w-full ${sides ? 'px-14' : ''}`}>

@@ -16,7 +16,7 @@ const neonSwitch = tv({
     label: 'min-w-0 flex-1 font-semibold',
     track:
       'relative h-8 w-14 shrink-0 justify-center border-2 transition-colors duration-base motion-reduce:transition-none ' +
-      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/50 focus-visible:ring-offset-2',
+      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-bg',
     thumb: 'h-6 w-6 border-2',
   },
   variants: {

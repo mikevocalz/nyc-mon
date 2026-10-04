@@ -18,7 +18,7 @@ const STACK = ['Expo SDK 57', 'Next.js 16', 'Solito 5', 'Uniwind 1', 'TanStack',
 
 const footerLink =
   'text-sm text-text-muted transition-colors duration-fast hover:text-text ' +
-  'rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/50';
+  'rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus';
 
 export function SiteFooter() {
   const pathname = usePathname() ?? '/';

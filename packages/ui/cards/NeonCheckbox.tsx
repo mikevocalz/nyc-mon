@@ -10,7 +10,7 @@ const neonCheckbox = tv({
   slots: {
     root:
       'min-h-11 flex-row items-center gap-3 self-start ' +
-      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/50 focus-visible:ring-offset-2',
+      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-bg',
     wrap: 'relative h-8 w-8',
     plate: 'absolute left-1 top-1 h-7 w-7',
     box: 'h-7 w-7 items-center justify-center border-2 transition-colors duration-fast motion-reduce:transition-none',

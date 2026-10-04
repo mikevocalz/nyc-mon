@@ -21,6 +21,7 @@
   },
   "devDependencies": {
     "@acme/config": "workspace:*",
+    "@types/node": "catalog:",
     "eslint": "catalog:",
     "eslint-config-expo": "catalog:",
     "react-native": "catalog:",

@@ -20,7 +20,7 @@ const button = tv({
   slots: {
     root:
       'group shrink-0 self-start rounded-none border-0 bg-transparent transition-transform duration-fast ' +
-      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/60 focus-visible:ring-offset-2 ' +
+      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-bg ' +
       'motion-reduce:transition-none',
     label: 'whitespace-nowrap font-display tracking-wide',
     // Ghost hover: a tone tint layer, faded in by the root's group-hover.
