@@ -12,9 +12,12 @@
  *   on web these render the same react-native-web elements the tw wrappers
  *   compile to, and MotionText carries tw.Text's default text color.
  * - FadeIn / ScaleIn / SlideUp: entrance presets components compose; pass
- *   `delay` to stagger. Override any Motion prop as needed.
+ *   `delay` to stagger and `reducedMotion` for the authored reduced sibling
+ *   (motionTokens in @acme/theme). Override any Motion prop as needed.
  */
 import { useSyncExternalStore } from 'react';
+import { Easing } from 'react-native';
+import { motion as motionScale, motionTokens, type MotionEasing } from '@acme/theme';
 import {
   Motion,
   AnimatePresence,
@@ -63,49 +66,98 @@ export const MotionText = ({ className, ...props }: MotionTextProps) => (
 );
 MotionText.displayName = 'CSS(Motion.Text)';
 
-export interface MotionPresetProps extends MotionViewProps {
-  /** Delay in ms — stagger sibling entrances. */
-  delay?: number;
+/** Parse a {@linkcode motionScale.easing} token (`cubic-bezier(a, b, c, d)`) into an easing function. */
+function tokenEasing(name: MotionEasing): (t: number) => number {
+  const [x1 = 0, y1 = 0, x2 = 1, y2 = 1] = (motionScale.easing[name].match(/-?\d*\.?\d+/g) ?? []).map(Number);
+  return Easing.bezier(x1, y1, x2, y2);
 }
 
-/** Soft rise-and-fade entrance — content blocks, empty states, list headers. */
-export const FadeIn = ({ delay = 0, ...props }: MotionPresetProps) => {
-  const hydrated = useHydrated();
-  return (
-  <MotionView
-    key={hydrated ? 'hydrated' : 'ssr'}
-    initial={hydrated ? { y: 12 } : undefined}
-    animate={hydrated ? { y: 0 } : undefined}
-    transition={{ type: 'timing', duration: 280, ease: 'easeOut', delay }}
-    {...props}
-  />
-  );
-};
+/**
+ * The reduced-motion sibling of a preset, read from {@linkcode motionTokens}.
+ * Every reduced sibling the presets use is a fade (no travel, no scale); the
+ * token decides its duration and easing, so the preset never derives one by
+ * zeroing the full animation (§0A.2).
+ */
+function reducedFade(token: 'motion-enter' | 'motion-step') {
+  const step = motionTokens[token].reduced;
+  return {
+    initial: { opacity: 0 },
+    animate: { opacity: 1 },
+    transition: { type: 'timing' as const, duration: step.durationMs, easing: tokenEasing(step.easing) },
+  };
+}
 
-/** Pop entrance — dialog cards, badges, confirmation moments. */
-export const ScaleIn = ({ delay = 0, ...props }: MotionPresetProps) => {
-  const hydrated = useHydrated();
-  return (
-  <MotionView
-    key={hydrated ? 'hydrated' : 'ssr'}
-    initial={hydrated ? { scale: 0.94 } : undefined}
-    animate={hydrated ? { scale: 1 } : undefined}
-    transition={{ type: 'spring', damping: 18, stiffness: 260, delay }}
-    {...props}
-  />
-  );
-};
+/**
+ * Props for {@linkcode FadeIn}, {@linkcode ScaleIn} and {@linkcode SlideUp}.
+ * Any Motion prop overrides the preset.
+ */
+export interface MotionPresetProps extends MotionViewProps {
+  /** Delay in ms: stagger sibling entrances. */
+  delay?: number;
+  /**
+   * Play the authored reduced-motion sibling instead of the full entrance: a
+   * fade with no travel or scale, timed by the preset's motion token
+   * (`motion-enter` for FadeIn and ScaleIn, `motion-step` for SlideUp).
+   * Callers pass the app's reduced-motion setting; the preset never reads
+   * the OS itself.
+   * @default false
+   */
+  reducedMotion?: boolean;
+}
 
-/** Docked-surface entrance — toasts, tab-bar accessories, bottom docks. */
-export const SlideUp = ({ delay = 0, ...props }: MotionPresetProps) => {
+/** Shared body of the presets: SSR-safe keying plus the full or reduced step. */
+function Preset({
+  delay,
+  reducedMotion,
+  full,
+  reducedToken,
+  ...props
+}: MotionPresetProps & {
+  full: Pick<MotionViewProps, 'initial' | 'animate' | 'transition'>;
+  reducedToken: 'motion-enter' | 'motion-step';
+}) {
   const hydrated = useHydrated();
+  const step = reducedMotion ? reducedFade(reducedToken) : full;
   return (
-  <MotionView
-    key={hydrated ? 'hydrated' : 'ssr'}
-    initial={hydrated ? { y: 24 } : undefined}
-    animate={hydrated ? { y: 0 } : undefined}
-    transition={{ type: 'spring', damping: 20, stiffness: 300, delay }}
+    <MotionView
+      key={hydrated ? `hydrated-${reducedMotion ? 'reduced' : 'full'}` : 'ssr'}
+      initial={hydrated ? step.initial : undefined}
+      animate={hydrated ? step.animate : undefined}
+      transition={{ ...step.transition, delay } as MotionViewProps['transition']}
+      {...props}
+    />
+  );
+}
+
+/** Soft rise entrance: content blocks, empty states, list headers. Reduced: `motion-enter` fade. */
+export const FadeIn = ({ delay = 0, reducedMotion = false, ...props }: MotionPresetProps) => (
+  <Preset
+    delay={delay}
+    reducedMotion={reducedMotion}
+    reducedToken="motion-enter"
+    full={{ initial: { y: 12 }, animate: { y: 0 }, transition: { type: 'timing', duration: 280, ease: 'easeOut' } }}
     {...props}
   />
-  );
-};
+);
+
+/** Pop entrance: dialog cards, badges, confirmation moments. Reduced: `motion-enter` fade, no scale. */
+export const ScaleIn = ({ delay = 0, reducedMotion = false, ...props }: MotionPresetProps) => (
+  <Preset
+    delay={delay}
+    reducedMotion={reducedMotion}
+    reducedToken="motion-enter"
+    full={{ initial: { scale: 0.94 }, animate: { scale: 1 }, transition: { type: 'spring', damping: 18, stiffness: 260 } }}
+    {...props}
+  />
+);
+
+/** Docked-surface entrance: toasts, tab-bar accessories, bottom docks. Reduced: `motion-step` fade. */
+export const SlideUp = ({ delay = 0, reducedMotion = false, ...props }: MotionPresetProps) => (
+  <Preset
+    delay={delay}
+    reducedMotion={reducedMotion}
+    reducedToken="motion-step"
+    full={{ initial: { y: 24 }, animate: { y: 0 }, transition: { type: 'spring', damping: 20, stiffness: 300 } }}
+    {...props}
+  />
+);
