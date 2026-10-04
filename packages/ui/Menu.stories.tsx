@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Menu } from './Menu';
 import { Text } from './Text';
 import { View } from './tw';
+import { DISTRICTS } from './district';
 
 const ACTIONS = [
   { id: 'share', title: 'Share' },
@@ -23,7 +24,9 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 // The panel opens over the canvas, so leave room below the trigger for it.
+/** Click the trigger to open. Native renders the OS menu. */
 export const Default: Story = {
+  argTypes: { district: { control: 'inline-radio', options: DISTRICTS } },
   render: (args) => (
     <View className="h-72 items-end p-4">
       <Menu {...args} />

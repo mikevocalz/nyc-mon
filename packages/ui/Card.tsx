@@ -1,8 +1,10 @@
 'use client';
 import { useMemo, type ReactNode } from 'react';
-import { tv, type VariantProps } from 'tailwind-variants';
+import { tv } from 'tailwind-variants';
 import { brand } from '@acme/theme';
 import { Article, Heading, Paragraph } from './primitives';
+import { NIGHT_SCHEME, NightScope } from './NightScope';
+import { CARD_DEPTH, splitCardClasses } from './surface-look';
 import { View } from './tw';
 import { CornerCutFrame } from './neon/CornerCutFrame';
 import type { CutCorner } from './neon/corner-cut';
@@ -12,23 +14,13 @@ import { DEFAULT_NOTCH, type NotchSide } from './cards/notch';
 import { useReducedMotion } from './backgrounds/use-reduced-motion';
 import { resolveControlTone, toneHex, toneInput, toneVariants, type ControlTone, type District } from './district';
 
-const card = tv({
-  base: 'rounded-card bg-surface-raised',
-  variants: {
-    elevation: {
-      flat: 'border-2 border-border',
-      card: 'border-2 border-border shadow-card',
-      raised: 'border-2 border-border shadow-raised',
-    },
-    padded: { true: 'p-5', false: 'overflow-hidden' },
-  },
-  defaultVariants: { elevation: 'card', padded: true },
-});
-
 /*
-  NeonBlade card variants: notch, cornerCut and beam. Solid first: notch is
-  a solid tone face, cornerCut is a night face in a heavy tone ring with an
-  accent glow, beam is a night face whose ring carries a travelling light.
+  The NYC-MON card. With no variant it is the corner-cut facade: a night face
+  in a heavy district-tone ring over a solid depth plate, glow off, so any
+  content a screen drops in stays the loudest thing. notch is a solid tone
+  face with notches bitten out; beam is the night face whose ring carries a
+  travelling light. Ported from NeonBlade UI's cards (MIT, see
+  THIRD-PARTY-NOTICES.md).
 */
 const neonCard = tv({
   slots: {
@@ -44,6 +36,7 @@ const neonCard = tv({
       beam: { title: 'text-ink-50', description: 'text-silver-300' },
     },
     size: {
+      none: {},
       sm: { face: 'p-4' },
       md: { face: 'p-5 md:p-6' },
       lg: { face: 'p-6 md:p-8' },
@@ -71,11 +64,20 @@ function toneVariantsList(
 
 export type CardVariant = 'default' | 'notch' | 'cornerCut' | 'beam';
 
-export interface CardProps
-  extends React.ComponentProps<typeof Article>,
-    VariantProps<typeof card> {
-  /** default is the kit card; notch, cornerCut and beam are the NeonBlade ports. */
+export interface CardProps extends React.ComponentProps<typeof Article> {
+  /**
+   * cornerCut (the default) is the night facade in a tone ring; notch is a
+   * solid tone face; beam carries a travelling light. `default` is an alias
+   * for cornerCut.
+   */
   variant?: CardVariant;
+  /**
+   * Legacy kit prop, read as the depth plate: flat drops it, card (default)
+   * steps it 6px, raised 10px.
+   */
+  elevation?: keyof typeof CARD_DEPTH;
+  /** Legacy kit prop: false drops the face padding so content can run edge to edge. Default true. */
+  padded?: boolean;
   /** Colour family for the NeonBlade variants. Overrides `district`. */
   tone?: ControlTone;
   /** Theme by neighbourhood: Downtown royal, Midtown orange, Harlem brick, Mega City carolina. */
@@ -88,7 +90,7 @@ export interface CardProps
   description?: string;
   /** Heading level for `title`. Default 3. */
   titleLevel?: 1 | 2 | 3 | 4 | 5 | 6;
-  /** Accent glow. Default on for cornerCut, off for notch and beam. */
+  /** Accent glow around the frame. Off by default: glow marks focus and active things, not every card. */
   glow?: boolean;
   // notch
   notchSides?: NotchSide[];
@@ -108,33 +110,23 @@ export interface CardProps
   durationB?: number;
 }
 
-export function Card(props: CardProps) {
-  const { variant = 'default', elevation, padded, className, ...rest } = props;
-  if (variant === 'default') {
-    const {
-      tone: _t, district: _d, size: _s, icon, title, description, titleLevel = 3, glow: _g,
-      notchSides: _ns, notchSize: _nz, notchWidth: _nw, notchWidthV: _nv, notchSkew: _nk,
-      corner: _c, cornerSize: _cs, beamVariant: _bv, beamToneB: _bt, duration: _du, durationB: _db,
-      children, ...articleProps
-    } = rest;
-    return (
-      <Article className={card({ elevation, padded, className })} {...articleProps}>
-        {icon ? <View className="mb-3">{icon}</View> : null}
-        {title ? <Heading level={titleLevel} className="my-0 text-lg font-semibold text-text">{title}</Heading> : null}
-        {description ? <Paragraph className="my-0 text-text-muted">{description}</Paragraph> : null}
-        {children}
-      </Article>
-    );
-  }
-  return <NeonCard {...props} variant={variant} />;
+/**
+ * `className` is split: layout classes (width, margin, flex-1, self-*) place
+ * the card, everything else (gap, padding, row layout) styles the face that
+ * holds the children, which is where the legacy card applied them.
+ */
+export function Card({ variant = 'cornerCut', ...props }: CardProps) {
+  return <NeonCard {...props} variant={variant === 'default' ? 'cornerCut' : variant} />;
 }
 
 function NeonCard({
   variant, tone: toneProp, district, size = 'md', icon, title, description, titleLevel = 3, glow,
   notchSides, notchSize, notchWidth, notchWidthV, notchSkew,
   corner = 'bottom-right', cornerSize = 20, beamVariant = 'single', beamToneB, duration = 4, durationB = 6,
-  className, children, elevation: _e, padded: _p, ...articleProps
+  className, children, elevation = 'card', padded = true, ...articleProps
 }: CardProps & { variant: Exclude<CardVariant, 'default'> }) {
+  const { outer, inner } = splitCardClasses(className);
+  const depth = CARD_DEPTH[elevation];
   const tone = resolveControlTone(toneProp, district);
   const hex = toneHex(tone);
   const reduced = useReducedMotion();
@@ -149,7 +141,10 @@ function NeonCard({
     }),
     [sidesKey, notchSize, notchWidth, notchWidthV, notchSkew],
   );
-  const s = neonCard({ variant, size, tone, notchTop: variant === 'notch' && shape.sides.includes('top') });
+  const s = neonCard({
+    variant, size: padded ? size : 'none', tone, notchTop: padded && variant === 'notch' && shape.sides.includes('top'),
+  });
+  const faceClass = s.face({ className: `${variant === 'notch' ? '' : NIGHT_SCHEME} ${padded ? '' : 'overflow-hidden'} ${inner}` });
 
   const body = (
     <>
@@ -168,8 +163,9 @@ function NeonCard({
         fill={hex.face}
         border={hex.keyline}
         depthColor={hex.plate}
+        depth={depth}
         glow={glow ? hex.glow : undefined}
-        className={s.face()}
+        className={faceClass}
       >
         {body}
       </NotchFrame>
@@ -182,9 +178,9 @@ function NeonCard({
         corner={corner}
         cut={cornerSize}
         borderWidth={4}
-        depth={6}
-        glow={glow === false ? false : 'low'}
-        className={s.face()}
+        depth={depth}
+        glow={glow ? 'low' : false}
+        className={faceClass}
       >
         {body}
       </CornerCutFrame>
@@ -202,11 +198,12 @@ function NeonCard({
         tail={hex.face}
         beamB={toneHex(toneB).highlight}
         depthColor={hex.keyline}
+        depth={depth}
         variant={beamVariant}
         duration={duration}
         durationB={durationB}
         still={reduced}
-        className={s.face()}
+        className={faceClass}
       >
         {body}
       </BeamFrame>
@@ -215,8 +212,8 @@ function NeonCard({
 
   return (
     // The Article is the semantic card; the frame inside draws it.
-    <Article className={className} {...articleProps}>
-      {frame}
+    <Article className={outer} {...articleProps}>
+      {variant === 'notch' ? frame : <NightScope>{frame}</NightScope>}
     </Article>
   );
 }

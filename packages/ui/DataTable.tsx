@@ -19,80 +19,57 @@ import {
 import { View, Text, Pressable, ScrollView } from './tw';
 import { districtTone, type ChartTone, type District } from './district';
 
+/**
+ * The NYC-MON table, and its only look: NeonBlade's NeonTable as a
+ * scoreboard. A solid tone title bar on a darker plate, a night body,
+ * cornice corner brackets, and a tone bar that slides along the hovered row.
+ * Ported from NeonBlade UI (MIT, see THIRD-PARTY-NOTICES.md).
+ */
 const dataTable = tv({
   slots: {
-    root: 'w-full overflow-hidden rounded-card border-2 border-border bg-surface-raised shadow-card',
+    root: 'relative w-full overflow-hidden border-2 border-ink-800 bg-ink-950',
     titleBar: 'px-4 py-3',
-    titleText: 'text-base font-semibold text-text',
-    titlePlate: 'hidden',
-    headRow: 'flex-row border-b-2 border-border-strong bg-surface-sunken',
-    headCell: 'flex-1 p-3 text-left text-sm font-semibold text-text',
+    titleText: 'font-display text-lg text-ink-950',
+    titlePlate: 'flex h-1.5',
+    headRow: 'flex-row border-b-2 border-l-4 border-l-transparent bg-ink-900',
+    headCell: 'flex-1 p-3 text-left font-display text-xs text-silver-300',
     headButton: 'flex-row items-center gap-1.5',
     // Explicit colour: on web RNW's unlayered default (black) beats the base-layer text colour.
-    headLabel: 'text-sm font-semibold text-text',
-    sortGlyph: 'text-xs text-text-muted',
-    row: 'flex-row border-b-2 border-border transition-colors duration-fast hover:bg-surface-sunken motion-reduce:transition-none',
-    stripe: 'bg-surface-sunken',
-    cell: 'flex-1 justify-center p-3 text-sm text-text',
-    divider: 'border-r-2 border-border',
+    headLabel: 'font-display text-xs text-silver-300',
+    sortGlyph: 'text-xs',
+    row:
+      'flex-row border-b border-l-4 border-b-ink-800 border-l-transparent transition-colors duration-fast ' +
+      'motion-reduce:transition-none',
+    stripe: 'bg-ink-900',
+    cell: 'flex-1 justify-center p-3 text-sm text-silver-100',
+    divider: 'border-r border-ink-800',
     empty: 'items-center p-8',
-    emptyText: 'text-sm text-text-muted',
-    skeleton: 'h-3 w-3/4 bg-surface-sunken',
-    corner: 'hidden',
-    pager: 'flex-row items-center justify-between gap-3 border-t-2 border-border px-3 py-2',
-    pagerText: 'text-xs text-text-muted',
-    pagerButton: 'min-h-11 justify-center border-2 border-border px-3 disabled:opacity-40',
-    pagerLabel: 'text-sm font-semibold text-text',
+    emptyText: 'font-display text-sm text-silver-400',
+    skeleton: 'h-3 w-3/4 bg-ink-800',
+    corner: 'absolute flex h-4 w-4',
+    pager: 'flex-row items-center justify-between gap-3 border-t-2 border-ink-800 bg-ink-900 px-3 py-2',
+    pagerText: 'text-xs text-silver-400',
+    pagerButton: 'min-h-11 justify-center border-2 border-ink-700 bg-ink-950 px-3 disabled:opacity-40',
+    pagerLabel: 'text-sm font-semibold text-silver-100',
   },
   variants: {
-    variant: {
-      default: {},
-      /**
-       * NeonBlade's NeonTable as a scoreboard: a solid tone title bar on a
-       * darker plate, a night body, cornice corner brackets, and a tone bar
-       * that slides along the hovered row.
-       */
-      neon: {
-        root: 'relative rounded-none border-ink-800 bg-ink-950 shadow-none',
-        titleBar: 'px-4 py-3',
-        titleText: 'font-display text-lg text-ink-950',
-        titlePlate: 'flex h-1.5',
-        headRow: 'border-b-2 border-l-4 border-l-transparent bg-ink-900',
-        headCell: 'font-display text-xs text-silver-300',
-        headLabel: 'font-display text-xs text-silver-300',
-        row: 'border-b border-l-4 border-b-ink-800 border-l-transparent',
-        stripe: 'bg-ink-900',
-        cell: 'text-silver-100',
-        divider: 'border-r border-ink-800',
-        emptyText: 'font-display text-sm text-silver-500',
-        skeleton: 'bg-ink-800',
-        corner: 'absolute flex h-4 w-4',
-        pager: 'border-ink-800 bg-ink-900',
-        pagerText: 'text-silver-400',
-        pagerButton: 'border-ink-700 bg-ink-950',
-        pagerLabel: 'text-silver-100',
-      },
-    },
     tone: {
-      orange: {}, royal: {}, carolina: {}, leaf: {}, apple: {},
+      orange: { titleBar: 'bg-orange-500', titlePlate: 'bg-orange-800', headRow: 'border-b-orange-500', row: 'hover:border-l-orange-500 hover:bg-orange-500/10', sortGlyph: 'text-orange-400', corner: 'border-orange-500' },
+      royal: { titleBar: 'bg-royal-500', titlePlate: 'bg-royal-800', headRow: 'border-b-royal-500', row: 'hover:border-l-royal-400 hover:bg-royal-500/15', sortGlyph: 'text-royal-300', corner: 'border-royal-500', titleText: 'text-white' },
+      carolina: { titleBar: 'bg-carolina-500', titlePlate: 'bg-carolina-800', headRow: 'border-b-carolina-500', row: 'hover:border-l-carolina-500 hover:bg-carolina-500/10', sortGlyph: 'text-carolina-300', corner: 'border-carolina-500' },
+      leaf: { titleBar: 'bg-leaf-500', titlePlate: 'bg-leaf-800', headRow: 'border-b-leaf-500', row: 'hover:border-l-leaf-500 hover:bg-leaf-500/10', sortGlyph: 'text-leaf-300', corner: 'border-leaf-500' },
+      // Night title text: white on apple-500 is 3.96:1, under 4.5 for an 18px title.
+      apple: { titleBar: 'bg-apple-500', titlePlate: 'bg-apple-800', headRow: 'border-b-apple-500', row: 'hover:border-l-apple-500 hover:bg-apple-500/10', sortGlyph: 'text-apple-300', corner: 'border-apple-500' },
     },
     compact: {
       true: { headCell: 'px-3 py-2', cell: 'px-3 py-2' },
       false: {},
     },
   },
-  // Tone only colours the neon variant; the default table stays on theme tokens.
-  compoundVariants: [
-    { variant: 'neon', tone: 'orange', class: { titleBar: 'bg-orange-500', titlePlate: 'bg-orange-800', headRow: 'border-b-orange-500', row: 'hover:border-l-orange-500 hover:bg-orange-500/10', sortGlyph: 'text-orange-400', corner: 'border-orange-500' } },
-    { variant: 'neon', tone: 'royal', class: { titleBar: 'bg-royal-500', titlePlate: 'bg-royal-800', headRow: 'border-b-royal-500', row: 'hover:border-l-royal-400 hover:bg-royal-500/15', sortGlyph: 'text-royal-300', corner: 'border-royal-500', titleText: 'text-white' } },
-    { variant: 'neon', tone: 'carolina', class: { titleBar: 'bg-carolina-500', titlePlate: 'bg-carolina-800', headRow: 'border-b-carolina-500', row: 'hover:border-l-carolina-500 hover:bg-carolina-500/10', sortGlyph: 'text-carolina-300', corner: 'border-carolina-500' } },
-    { variant: 'neon', tone: 'leaf', class: { titleBar: 'bg-leaf-500', titlePlate: 'bg-leaf-800', headRow: 'border-b-leaf-500', row: 'hover:border-l-leaf-500 hover:bg-leaf-500/10', sortGlyph: 'text-leaf-300', corner: 'border-leaf-500' } },
-    { variant: 'neon', tone: 'apple', class: { titleBar: 'bg-apple-500', titlePlate: 'bg-apple-800', headRow: 'border-b-apple-500', row: 'hover:border-l-apple-500 hover:bg-apple-500/10', sortGlyph: 'text-apple-300', corner: 'border-apple-500', titleText: 'text-white' } },
-  ],
-  defaultVariants: { variant: 'default', tone: 'orange', compact: false },
+  defaultVariants: { tone: 'orange', compact: false },
 });
 
-// Corner brackets: the cornice at each corner of the neon table.
+// Corner brackets: the cornice at each corner of the table.
 const CORNERS = [
   'left-0 top-0 border-l-4 border-t-4',
   'right-0 top-0 border-r-4 border-t-4',
@@ -119,7 +96,7 @@ export interface DataTableProps<T extends RowData> {
   columns: ColumnDef<T, unknown>[];
   /** Enable click-to-sort headers. */
   sortable?: boolean;
-  /** "neon" is NeonBlade's NeonTable in NYC-MON colours. Default "default". */
+  /** Kept for callers: both names render the NYC-MON scoreboard table. */
   variant?: 'default' | 'neon';
   /** Heading bar above the table. */
   title?: string;
@@ -127,15 +104,15 @@ export interface DataTableProps<T extends RowData> {
   color?: ChartTone | 'cyan' | 'pink' | 'green';
   /** Neon accent by neighbourhood. Default midtown (orange). */
   district?: District;
-  /** Tone bar and tint on the hovered row (neon). Default true. */
+  /** Tone bar and tint on the hovered row. Default true. */
   rowHover?: boolean;
   /** Alternate row shading. Default false. */
   striped?: boolean;
   /** Tighter rows. Default false. */
   compact?: boolean;
-  /** Lines between columns. Default true for neon, false otherwise. */
+  /** Lines between columns. Default true. */
   grid?: boolean;
-  /** Corner brackets (neon). Default true. */
+  /** Corner brackets. Default true. */
   corners?: boolean;
   /** Rows per page; 0 shows every row. Default 0. */
   pageSize?: number;
@@ -155,7 +132,7 @@ export function DataTable<T extends RowData>({
   data,
   columns,
   sortable = true,
-  variant = 'default',
+  variant: _variant,
   title,
   color,
   district = 'midtown',
@@ -188,10 +165,9 @@ export function DataTable<T extends RowData>({
     enableSorting: sortable,
   });
 
-  const neon = variant === 'neon';
   const tone: ChartTone = color ? (PRESETS[color] ?? (color as ChartTone)) : districtTone(district);
-  const s = dataTable({ variant, tone, compact });
-  const showGrid = gridProp ?? neon;
+  const s = dataTable({ tone, compact });
+  const showGrid = gridProp ?? true;
   const rows = table.getRowModel().rows;
   const pages = pageSize > 0 ? Math.max(1, Math.ceil(rows.length / pageSize)) : 1;
   const current = Math.min(page, pages - 1);
@@ -203,8 +179,8 @@ export function DataTable<T extends RowData>({
     <Table
       className="w-full flex-col"
       aria-busy={loading || undefined}
-      // Computed geometry: neon tables keep ~112px a column and scroll sideways on phones.
-      style={neon ? { minWidth: columnCount * 112 } : undefined}
+      // Computed geometry: tables keep ~112px a column and scroll sideways on phones.
+      style={{ minWidth: columnCount * 112 }}
     >
       <TableHeader>
         {table.getHeaderGroups().map((headerGroup) => (
@@ -262,7 +238,7 @@ export function DataTable<T extends RowData>({
                 return (
                   <TableRow
                     key={row.id}
-                    className={`${s.row()} ${striped && r % 2 ? s.stripe() : ''} ${rowHover ? '' : 'hover:bg-transparent'}`}
+                    className={`${s.row()} ${striped && r % 2 ? s.stripe() : ''} ${rowHover ? '' : 'hover:border-l-transparent hover:bg-transparent'}`}
                   >
                     {cells.map((cell, c) => (
                       <TableCell key={cell.id} className={`${s.cell()} ${showGrid && c < cells.length - 1 ? s.divider() : ''}`}>
@@ -286,13 +262,9 @@ export function DataTable<T extends RowData>({
           <View aria-hidden className={s.titlePlate()} />
         </View>
       ) : null}
-      {neon ? (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="min-w-full">
-          {grid}
-        </ScrollView>
-      ) : (
-        grid
-      )}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="min-w-full">
+        {grid}
+      </ScrollView>
       {pageSize > 0 && pages > 1 ? (
         <View className={s.pager()}>
           <Text className={s.pagerText()}>{`Page ${current + 1} of ${pages}`}</Text>
@@ -306,7 +278,7 @@ export function DataTable<T extends RowData>({
           </View>
         </View>
       ) : null}
-      {neon && corners
+      {corners
         ? CORNERS.map((pos) => <View key={pos} aria-hidden pointerEvents="none" className={`${s.corner()} ${pos}`} />)
         : null}
     </View>

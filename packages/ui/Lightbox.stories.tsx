@@ -4,6 +4,7 @@ import { Button } from './Button';
 import { Image } from './Image';
 import { Pressable, View } from './tw';
 import { create } from 'zustand';
+import { DISTRICTS } from './district';
 
 // Story state — zustand always (repo rule).
 const useLightboxStory = create<{
@@ -30,7 +31,9 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Gallery: Story = {
-  render: function Render() {
+  args: { district: 'midtown' },
+  argTypes: { district: { control: 'inline-radio', options: DISTRICTS } },
+  render: function Render({ district }) {
     const { open, index, openAt, close } = useLightboxStory();
     return (
       <View className="gap-4 p-4">
@@ -40,21 +43,28 @@ export const Gallery: Story = {
               key={uri}
               aria-label={`Open image ${i + 1}`}
               onPress={() => openAt(i)}
-              className="rounded-lg transition-opacity duration-fast hover:opacity-90 active:opacity-80"
+              className="transition-opacity duration-fast hover:opacity-90 active:opacity-80"
             >
               <Image
                 src={uri}
                 alt={`Thumbnail ${i + 1}`}
                 unoptimized
-                className="h-24 w-32 rounded-lg border border-border/60 shadow-card"
+                district={district}
+                className="h-24 w-32"
                 sizes="128px"
               />
             </Pressable>
           ))}
         </View>
         <Button title="Open lightbox" variant="outline" size="sm" onPress={() => openAt(0)} />
-        <Lightbox images={IMAGES} initialIndex={index} open={open} onClose={close} />
+        <Lightbox images={IMAGES} initialIndex={index} open={open} onClose={close} district={district} />
       </View>
     );
   },
+};
+
+/** Open on the second image: tone pip, counter, square tiles. */
+export const Open: Story = {
+  args: { images: IMAGES, initialIndex: 1, open: true, district: 'downtown' },
+  argTypes: { district: { control: 'inline-radio', options: DISTRICTS } },
 };

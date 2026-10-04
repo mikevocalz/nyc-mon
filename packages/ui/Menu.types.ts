@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import type { ControlTone, District } from './district';
 
 export interface MenuAction {
   id: string;
@@ -16,4 +17,8 @@ export interface MenuProps {
   /** Heading shown at the top of the menu. */
   title?: string;
   className?: string;
+  /** Web: title, hover bar and focus colour by neighbourhood. Default midtown. Native uses the OS menu. */
+  district?: District;
+  /** Web: accent tone; overrides the district. */
+  tone?: ControlTone;
 }

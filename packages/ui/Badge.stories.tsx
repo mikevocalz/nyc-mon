@@ -7,24 +7,33 @@ const meta = { title: 'UI/Badge', component: Badge, args: { label: 'Badge' } } s
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/** No props renders the district chip; the legacy semantic tones map onto brand tones. */
 export const Tones: Story = {
-  render: () => (
-    <View className="flex-row flex-wrap gap-2 p-4">
-      <Badge label="Neutral" />
-      <Badge label="Primary" tone="primary" />
-      <Badge label="Accent" tone="accent" />
-      <Badge label="Success" tone="success" />
-      <Badge label="Danger" tone="danger" />
+  args: { label: 'Booking' },
+  argTypes: {
+    district: { control: 'inline-radio', options: DISTRICTS },
+    tone: { control: 'select', options: [undefined, 'neutral', 'primary', 'accent', 'success', 'info', 'inverse', 'danger'] },
+  },
+  render: (args) => (
+    <View className="gap-4 p-4">
+      <Badge {...args} />
+      <View className="flex-row flex-wrap gap-3">
+        <Badge label="Neutral" tone="neutral" />
+        <Badge label="Primary" tone="primary" />
+        <Badge label="Accent" tone="accent" />
+        <Badge label="Success" tone="success" />
+        <Badge label="Info" tone="info" />
+        <Badge label="Inverse" tone="inverse" />
+        <Badge label="Danger" tone="danger" />
+      </View>
     </View>
   ),
 };
 
-
-/** The neon variant: every district, fill, size and status light. */
+/** Every district, fill, size and status light. */
 export const Neon: Story = {
-  args: { variant: 'neon', label: 'Live', district: 'midtown', fill: 'solid', size: 'sm', shape: 'pill', dot: 'pulse', glow: false },
+  args: { label: 'Live', district: 'midtown', fill: 'solid', size: 'sm', shape: 'pill', dot: 'pulse', glow: false },
   argTypes: {
-    variant: { control: 'inline-radio', options: ['default', 'neon'] },
     district: { control: 'inline-radio', options: DISTRICTS },
     fill: { control: 'inline-radio', options: ['solid', 'outline', 'ghost'] },
     size: { control: 'inline-radio', options: ['xs', 'sm', 'md'] },
@@ -37,11 +46,11 @@ export const Neon: Story = {
       <Badge {...args} />
       {DISTRICTS.map((district) => (
         <View key={district} className="flex-row flex-wrap items-center gap-3">
-          <Badge variant="neon" district={district} label={district === 'megacity' ? 'Mega City' : district[0]!.toUpperCase() + district.slice(1)} size="md" />
-          <Badge variant="neon" district={district} label="Outline" fill="outline" />
-          <Badge variant="neon" district={district} label="Ghost" fill="ghost" />
-          <Badge variant="neon" district={district} label="On air" dot="pulse" shape="rectangle" />
-          <Badge variant="neon" district={district} label="New" size="xs" glow />
+          <Badge district={district} label={district === 'megacity' ? 'Mega City' : district[0]!.toUpperCase() + district.slice(1)} size="md" />
+          <Badge district={district} label="Outline" fill="outline" />
+          <Badge district={district} label="Ghost" fill="ghost" />
+          <Badge district={district} label="On air" dot="pulse" shape="rectangle" />
+          <Badge district={district} label="New" size="xs" glow />
         </View>
       ))}
     </View>
