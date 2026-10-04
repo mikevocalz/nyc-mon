@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { Card } from './Card';
+import { semantic } from '@acme/theme';
+import { Card, type CardVariant } from './Card';
 import { Text } from './Text';
 import { View } from './tw';
 import { DISTRICTS, DISTRICT_NAME } from './district';
@@ -60,6 +61,29 @@ export const Districts: Story = {
   ),
 };
 
+/** The canvas the play tests read: semantic token name to its value on `el`. */
+function tokenOn(el: Element, name: string): string {
+  return getComputedStyle(el).getPropertyValue(`--color-${name}`).trim().toUpperCase();
+}
+
+/**
+ * Every night face must hold the dark value of every semantic colour, whatever
+ * the page scheme. Next lowers light-dark() so the tokens settle at :root; the
+ * face has to redeclare them (CARD_NIGHT_TOKENS) or a text-text heading comes
+ * out black on night. This canvas keeps native light-dark(), so the test reads
+ * the declared tokens, not the painted colour.
+ */
+function assertNightFaces(canvasElement: HTMLElement, expected: number) {
+  const faces = canvasElement.querySelectorAll('article .scheme-dark');
+  if (faces.length < expected) throw new Error(`expected ${expected} night faces, found ${faces.length}`);
+  for (const face of faces) {
+    for (const [name, { dark }] of Object.entries(semantic)) {
+      const got = tokenOn(face, name);
+      if (got !== dark.toUpperCase()) throw new Error(`--color-${name} on a night face is ${got}, want ${dark}`);
+    }
+  }
+}
+
 /** The facade keeps its own night scheme, so token text inside stays legible on a light page. */
 export const OnLightPage: Story = {
   render: () => (
@@ -68,6 +92,36 @@ export const OnLightPage: Story = {
       <View className="max-w-md"><Card className="gap-4"><SettingsBody /></Card></View>
     </View>
   ),
+  play: ({ canvasElement }) => assertNightFaces(canvasElement, 1),
+};
+
+const VARIANTS: Exclude<CardVariant, 'default'>[] = ['cornerCut', 'beam', 'notch'];
+
+/**
+ * Each variant with screen content: a themed heading, a muted body and a
+ * caption footer, on a light page. cornerCut and beam read the night palette;
+ * notch reads its tone's on-face step.
+ */
+export const VariantsOnLightPage: Story = {
+  render: () => (
+    <View className="scheme-light gap-6 bg-surface p-6 md:flex-row md:flex-wrap">
+      {VARIANTS.map((v) => (
+        <Card key={v} variant={v} district="midtown" className="gap-3 md:w-80">
+          <Text variant="heading">{v}</Text>
+          <Text tone="muted">Sign out on this device only.</Text>
+          <Text variant="caption" tone="muted">Last active 2 hours ago</Text>
+        </Card>
+      ))}
+    </View>
+  ),
+  play: ({ canvasElement }) => {
+    assertNightFaces(canvasElement, 2);
+    // Midtown is orange; its notch face takes night ink, so the heading paints ink-950.
+    const notch = canvasElement.querySelectorAll('article')[2];
+    const heading = [...(notch?.querySelectorAll('*') ?? [])].find((e) => e.textContent === 'notch' && !e.children.length);
+    const color = heading ? getComputedStyle(heading).color : 'missing';
+    if (color !== 'rgb(0, 4, 28)') throw new Error(`notch heading paints ${color}, want ink-950`);
+  },
 };
 
 const TONES = [undefined, 'orange', 'royal', 'carolina', 'leaf', 'apple', 'brick'] as const;

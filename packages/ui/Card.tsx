@@ -1,5 +1,6 @@
 'use client';
 import { useMemo, type ReactNode } from 'react';
+import { Platform } from 'react-native';
 import { tv } from 'tailwind-variants';
 import { brand } from '@acme/theme';
 import { Article, Heading, Paragraph } from './primitives';
@@ -23,6 +24,48 @@ import { resolveControlTone, toneHex, toneInput, toneVariants, type ControlTone,
   travelling light. Ported from NeonBlade UI's cards (MIT, see
   THIRD-PARTY-NOTICES.md).
 */
+/*
+  Night tokens for the web face. NIGHT_SCHEME alone does not reach the themed
+  text classes under Next: lightningcss lowers each `light-dark()` token to
+  `var(--lightningcss-light, A) var(--lightningcss-dark, B)` on :root, and a
+  custom property that holds var() is substituted where it is declared. So
+  `--color-text` is settled at :root with the page's scheme and inherited as a
+  plain colour; `scheme-dark` on the face flips nothing beneath it, and a
+  `text-text` heading came out black on night on a light page. The face
+  redeclares every semantic colour at its dark value, so whatever a screen
+  drops in reads the night palette. One literal string so Tailwind generates
+  every class; the Card story's play test checks it against tokens.ts.
+*/
+export const CARD_NIGHT_TOKENS =
+  '[--color-bg:var(--color-ink-950)] [--color-surface:var(--color-ink-950)] ' +
+  '[--color-surface-raised:#0A1230] [--color-surface-sunken:#000212] ' +
+  '[--color-text:var(--color-ink-50)] [--color-text-muted:var(--color-silver-500)] ' +
+  '[--color-text-secondary:var(--color-silver-500)] [--color-text-inverse:var(--color-ink-950)] ' +
+  '[--color-primary:var(--color-orange-500)] [--color-primary-pressed:var(--color-orange-400)] ' +
+  '[--color-on-primary:var(--color-ink-950)] [--color-cta:var(--color-orange-500)] ' +
+  '[--color-cta-pressed:var(--color-orange-400)] [--color-on-cta:var(--color-ink-950)] ' +
+  '[--color-accent:var(--color-carolina-500)] [--color-accent-pressed:var(--color-carolina-400)] ' +
+  '[--color-on-accent:var(--color-ink-950)] [--color-structure:var(--color-royal-500)] ' +
+  '[--color-border:#1A2E6E] [--color-border-strong:var(--color-royal-400)] ' +
+  '[--color-focus:var(--color-carolina-500)] [--color-success:var(--color-leaf-500)] ' +
+  '[--color-on-success:var(--color-ink-950)] [--color-danger:var(--color-apple-400)] ' +
+  '[--color-on-danger:var(--color-ink-950)] [--color-info:var(--color-carolina-500)] ' +
+  '[--color-on-info:var(--color-ink-950)] [--color-tone-orange-text:var(--color-orange-400)] ' +
+  '[--color-tone-royal-text:var(--color-royal-300)] [--color-tone-carolina-text:var(--color-carolina-400)] ' +
+  '[--color-tone-leaf-text:var(--color-leaf-400)] [--color-tone-apple-text:var(--color-apple-400)] ' +
+  '[--color-tone-brick-text:var(--color-orange-300)] [--color-glow:#0058F8A6] [--color-glow-hot:#FC7C0080]';
+
+/*
+  The notch face is the tone itself in both themes, so themed text dropped on
+  it takes the tone's on-face step: night ink on the light tones, white on
+  royal and brick. Muted and secondary collapse to the same step; no lighter
+  step holds 4.5:1 on a tone face.
+*/
+const NOTCH_ON_INK =
+  '[--color-text:var(--color-ink-950)] [--color-text-muted:var(--color-ink-950)] [--color-text-secondary:var(--color-ink-950)]';
+const NOTCH_ON_WHITE =
+  '[--color-text:var(--color-white)] [--color-text-muted:var(--color-white)] [--color-text-secondary:var(--color-white)]';
+
 const neonCard = tv({
   slots: {
     face: 'gap-3',
@@ -48,7 +91,10 @@ const neonCard = tv({
   },
   compoundVariants: [
     // The notch face is the tone itself, so text and the icon tile take the on-face colour.
-    ...toneVariantsList('notch', (t) => ({ title: t.onFace, description: t.onFace, icon: '' })),
+    ...toneVariantsList('notch', (t) => ({
+      title: t.onFace, description: t.onFace, icon: '',
+      face: Platform.OS === 'web' ? (t.onFace === 'text-ink-950' ? NOTCH_ON_INK : NOTCH_ON_WHITE) : '',
+    })),
     ...toneVariantsList('cornerCut', (t) => ({ icon: `${t.face} ${t.controlKeyline}` })),
     ...toneVariantsList('beam', (t) => ({ icon: `${t.face} ${t.controlKeyline}` })),
   ],
@@ -147,7 +193,10 @@ function NeonCard({
   const s = neonCard({
     variant, size: padded ? size : 'none', tone, notchTop: padded && variant === 'notch' && shape.sides.includes('top'),
   });
-  const faceClass = s.face({ className: `${variant === 'notch' ? '' : NIGHT_SCHEME} ${padded ? '' : 'overflow-hidden'} ${inner}` });
+  // cornerCut and beam faces are night in both themes: scheme-dark for
+  // controls that read color-scheme, the night tokens for themed text.
+  const night = variant === 'notch' ? '' : Platform.OS === 'web' ? `${NIGHT_SCHEME} ${CARD_NIGHT_TOKENS}` : NIGHT_SCHEME;
+  const faceClass = s.face({ className: `${night} ${padded ? '' : 'overflow-hidden'} ${inner}` });
 
   const body = (
     <>
