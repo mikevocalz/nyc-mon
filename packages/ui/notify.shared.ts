@@ -1,3 +1,5 @@
+import type { District } from './elements/tones';
+
 export type NotifyVariant = 'info' | 'success' | 'warning' | 'error' | 'loading';
 
 export interface NotifyOptions {
@@ -10,6 +12,13 @@ export interface NotifyOptions {
   id?: string | number;
   /** Adds an explicit close control. On by default for error and loading. */
   dismissible?: boolean;
+  /**
+   * The card's look. `neon` is the NYC-MON storefront card; the status
+   * (info, success...) still comes from the method you call. Default `default`.
+   */
+  variant?: 'default' | 'neon';
+  /** With `variant: 'neon'`: colour by neighbourhood. Default midtown. */
+  district?: District;
 }
 
 /** Long enough to read a sentence, short enough not to sit in the way. */
