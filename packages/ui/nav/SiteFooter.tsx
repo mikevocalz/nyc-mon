@@ -8,6 +8,9 @@ import { districtTone, type ChartTone, type District } from '../district';
 import { useAppForm } from '../form';
 import { Footer, Heading, Link, List, ListItem, Nav, Paragraph } from '../primitives';
 import { Text, View } from '../tw';
+import { brand as brandColors } from '@acme/theme';
+import { LazyScene } from '../backgrounds/LazyScene';
+import { RiverTide } from '../backgrounds/RiverTide';
 import { SkylineBand } from './SkylineBand';
 
 export interface FooterLink {
@@ -28,6 +31,9 @@ export interface FooterSocialLink {
   href: string;
   icon: ReactNode;
 }
+
+/** The top band of {@linkcode SiteFooter}. @see {@linkcode SiteFooterProps.scene} */
+export type FooterScene = 'river-tide' | 'skyline' | 'none';
 
 export interface SiteFooterProps {
   /**
@@ -58,16 +64,35 @@ export interface SiteFooterProps {
   newsletterPlaceholder?: string;
   newsletterButtonLabel?: string;
   onNewsletterSubmit?: (email: string) => void | Promise<void>;
-  /** The skyline along the top edge, and the default accent. */
+  /**
+   * The district the top band shows, and the default accent. Default harlem:
+   * the East River under the uptown shore.
+   */
   district?: District;
   color?: ChartTone | 'cyan' | 'pink' | 'green';
-  /** Show the district skyline. Default true. */
-  skyline?: boolean;
+  /**
+   * The band along the top edge.
+   * - `river-tide`: the district's river at night ({@linkcode RiverTide}), a
+   *   canvas that mounts as the footer scrolls near and pauses off screen.
+   * - `skyline`: the flat district skyline ({@linkcode SkylineBand}), plain
+   *   views that render on the server and cost nothing.
+   * - `none`: just the keyline.
+   * The band keeps its height before the canvas draws, so nothing shifts.
+   * @default 'river-tide'
+   */
+  scene?: FooterScene;
   renderLink?: (link: FooterLink, children: ReactNode, className: string) => ReactNode;
   className?: string;
 }
 
 const PRESETS: Record<string, ChartTone> = { cyan: 'carolina', pink: 'apple', green: 'leaf' };
+// The river needs room for the far shore and a few swells; minimal stays slim.
+const TIDE_HEIGHT: Record<NonNullable<SiteFooterProps['variant']>, string> = {
+  minimal: 'h-20 md:h-24',
+  columns: 'h-32 md:h-44',
+  centered: 'h-32 md:h-44',
+  mega: 'h-44 md:h-64',
+};
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const foot = tv({
@@ -133,8 +158,8 @@ function Newsletter({
 }
 
 /**
- * NeonBlade's Footer as the NYC-MON city edge: a district skyline standing on
- * a tone keyline, then the wordmark, the tagline, link columns in tone
+ * NeonBlade's Footer as the NYC-MON city edge: the district's river at night
+ * (or its skyline) over a tone keyline, then the wordmark, the tagline, link columns in tone
  * headings, and an optional email sign-up on the kit's TanStack Form fields.
  */
 export function SiteFooter({
@@ -152,9 +177,9 @@ export function SiteFooter({
   newsletterPlaceholder = 'name@example.com',
   newsletterButtonLabel = 'Get the report',
   onNewsletterSubmit,
-  district = 'midtown',
+  district = 'harlem',
   color,
-  skyline = true,
+  scene = 'river-tide',
   renderLink,
   className,
 }: SiteFooterProps) {
@@ -208,7 +233,15 @@ export function SiteFooter({
 
   return (
     <Footer className={s.root({ className })}>
-      {skyline ? <SkylineBand district={district} className={variant === 'mega' ? 'h-24 md:h-32' : 'h-12 md:h-16'} /> : null}
+      {scene === 'river-tide' ? (
+        <LazyScene className={TIDE_HEIGHT[variant]} placeholderColor={brandColors.night}>
+          {({ paused }) => (
+            // Shore raised to mid-band so the district skyline keeps its height in a short strip; calmer swell.
+            <RiverTide district={district} horizon={0.5} bands={5} amplitude={0.8} origin="bottom-left" paused={paused} className="flex-1" />
+          )}
+        </LazyScene>
+      ) : null}
+      {scene === 'skyline' ? <SkylineBand district={district} className={variant === 'mega' ? 'h-24 md:h-32' : 'h-12 md:h-16'} /> : null}
       <View aria-hidden className={s.keyline()} />
       <View className={s.inner()}>
         {brand}

@@ -8,7 +8,7 @@ const meta = {
   title: 'Backgrounds/RiverTide',
   component: RiverTide,
   parameters: { layout: 'fullscreen', backgrounds: { disable: true } },
-  args: { district: 'downtown', origin: 'top-right', speed: 0.5, amplitude: 1.2, frequency: 0.55, glow: 0.9, gloss: 0.6, bands: 7, shore: true, opacity: 100, hoverEffect: true, hoverRadius: 4, hoverStrength: 1.4, seed: 1, forceFallback: false },
+  args: { district: 'downtown', origin: 'top-right', speed: 0.5, amplitude: 1.2, frequency: 0.55, glow: 0.9, gloss: 0.6, bands: 7, shore: true, horizon: 0.34, opacity: 100, hoverEffect: true, hoverRadius: 4, hoverStrength: 1.4, seed: 1, forceFallback: false },
   argTypes: {
     district: { control: 'inline-radio', options: DISTRICTS },
     origin: { control: 'inline-radio', options: ['top-left', 'top-right', 'bottom-left', 'bottom-right'] },
@@ -18,6 +18,7 @@ const meta = {
     glow: { control: { type: 'range', min: 0, max: 1, step: 0.05 } },
     gloss: { control: { type: 'range', min: 0, max: 1, step: 0.05 } },
     bands: { control: { type: 'range', min: 3, max: 12, step: 1 } },
+    horizon: { control: { type: 'range', min: 0.15, max: 0.7, step: 0.01 } },
     opacity: { control: { type: 'range', min: 0, max: 100, step: 1 } },
     colorA: { control: 'color' },
     colorB: { control: 'color' },
@@ -53,5 +54,22 @@ export const Districts: Story = {
         </RiverTide>
       ))}
     </DistrictGrid>
+  ),
+};
+
+/**
+ * Harlem's East River in a short band, as the site footer frames it: the
+ * brownstone shore low on the horizon, apple beacons, warm window light on
+ * the swell.
+ */
+export const HarlemBand: Story = {
+  name: 'Harlem band',
+  args: { district: 'harlem', horizon: 0.5, bands: 5, amplitude: 0.8, origin: 'bottom-left' },
+  render: (args: RiverTideProps) => (
+    <Section className="min-h-screen justify-end gap-6 bg-ink-950">
+      <RiverTide {...args} className="h-32 flex-none md:h-44" />
+      <RiverTide {...args} className="h-44 flex-none md:h-64" />
+      <RiverTide {...args} horizon={0.34} bands={7} amplitude={1.2} origin="top-right" className="h-32 flex-none md:h-44" />
+    </Section>
   ),
 };

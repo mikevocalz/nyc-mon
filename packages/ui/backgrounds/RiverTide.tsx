@@ -44,6 +44,12 @@ export interface RiverTideProps extends SolidBackgroundBaseProps {
   bands?: number;
   /** Far-shore skyline. Default true. */
   shore?: boolean;
+  /**
+   * Where the far shore meets the water, as a fraction of the height from the
+   * top (0.15 to 0.7). Raise it in a short band so the district's skyline
+   * keeps its height: the site footer uses 0.5. Default 0.34.
+   */
+  horizon?: number;
   /** NeonBlade name: 0 to 100 (or 0 to 1). Default 100. */
   opacity?: number;
   /** NeonBlade name: the swell rises under the pointer. Default true. */
@@ -69,6 +75,7 @@ export function RiverTide({
   gloss = 0.6,
   bands = 7,
   shore = true,
+  horizon = 0.34,
   opacity = 100,
   hoverEffect = true,
   hoverRadius = 4,
@@ -78,7 +85,7 @@ export function RiverTide({
 }: RiverTideProps) {
   const layers = useLayers(riverTideLayers, {
     district, colorA: colorA ?? null, colorB: colorB ?? null, bgColor, origin, speed, amplitude, frequency,
-    glow, gloss, bands, shore, hoverEffect, hoverRadius, hoverStrength, seed,
+    glow, gloss, bands, shore, horizon, hoverEffect, hoverRadius, hoverStrength, seed,
   });
   return <QuadBackground {...rest} layers={layers} background={bgColor} opacity={normaliseOpacity(opacity)} tracksPointer={hoverEffect} />;
 }

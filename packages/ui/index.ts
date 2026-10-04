@@ -82,6 +82,11 @@ export { ThreeCanvas } from './three/ThreeCanvas';
 export type { ThreeBackend, ThreeCanvasHandle, ThreeCanvasProps, ThreeContext, ThreeFrame, ThreePointer, ThreeScene, ThreeSetup } from './three/types';
 export { RiverTide, type RiverTideProps, type RiverTideOrigin } from './backgrounds/RiverTide';
 export { RainWindow, type RainWindowProps } from './backgrounds/RainWindow';
+export { LazyScene, type LazySceneProps, type LazySceneState } from './backgrounds/LazyScene';
+export { SceneSection, type SceneSectionProps } from './backgrounds/SceneSection';
+export { SkylineDivider, type SkylineDividerProps } from './backgrounds/SkylineDivider';
+export { useInView } from './backgrounds/use-in-view';
+export type { InView, InViewOptions } from './backgrounds/use-in-view.types';
 // Districts and tones: one module for the whole kit.
 export {
   DISTRICTS, DISTRICT_NAME, DISTRICT_NAMES, TONES, CONTROL_TONES, DISTRICT_TONES, DISTRICT_TONE, TONE_CLASSES,

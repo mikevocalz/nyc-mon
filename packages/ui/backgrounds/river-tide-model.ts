@@ -26,6 +26,8 @@ export interface RiverTideOptions {
   bands: number;
   /** Far shore with the district skyline. */
   shore: boolean;
+  /** The far shoreline as a fraction of height, 0.15 to 0.7. */
+  horizon: number;
   hoverEffect: boolean;
   hoverRadius: number;
   hoverStrength: number;
@@ -61,7 +63,7 @@ export function riverTideLayers(o: RiverTideOptions): Layer[] {
   let memo: { width: number; height: number; skyline: Skyline; shoreY: number } | null = null;
   const layout = (width: number, height: number) => {
     if (!memo || memo.width !== width || memo.height !== height) {
-      const shoreY = height * 0.34;
+      const shoreY = height * Math.min(0.7, Math.max(0.15, o.horizon));
       memo = {
         width,
         height,

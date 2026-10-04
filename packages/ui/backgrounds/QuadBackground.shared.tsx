@@ -27,6 +27,11 @@ export interface SolidBackgroundBaseProps {
   className?: string;
   /** Foreground content, laid over the background. */
   children?: ReactNode;
+  /**
+   * Stop the frame loop and hold the current frame, as reduced motion does.
+   * LazyScene sets it while the scene is off screen. Default false.
+   */
+  paused?: boolean;
 }
 
 export interface QuadBackgroundProps extends SolidBackgroundBaseProps {
@@ -53,6 +58,7 @@ export function QuadBackgroundShell({
   tracksPointer = false,
   opacity = 1,
   forceFallback = false,
+  paused = false,
   accessibilityLabel,
   className,
   children,
@@ -96,8 +102,9 @@ export function QuadBackgroundShell({
           setup={createQuadScene}
           params={params}
           forceFallback={forceFallback}
+          paused={paused}
           accessibilityLabel={accessibilityLabel}
-          fallback={renderFallback({ layers, background, pointer, running: animated && !reducedMotion })}
+          fallback={renderFallback({ layers, background, pointer, running: animated && !reducedMotion && !paused })}
         />
       </View>
       {children}

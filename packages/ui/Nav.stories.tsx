@@ -103,14 +103,15 @@ export const Districts: StoryObj = {
 export const Footer: StoryObj<typeof SiteFooter> = {
   args: {
     variant: 'columns',
-    district: 'midtown',
+    district: 'harlem',
     description: 'A field guide to the creatures that live on New York blocks, from the bodegas to the sky bridges.',
     linkGroups: GROUPS,
     navLinks: GROUPS[0]!.links,
-    skyline: true,
+    scene: 'river-tide',
   },
   argTypes: {
     variant: { control: 'inline-radio', options: ['minimal', 'columns', 'centered', 'mega'] },
+    scene: { control: 'inline-radio', options: ['river-tide', 'skyline', 'none'] },
     mark: { control: 'inline-radio', options: ['wordmark', 'badge'] },
     district: districtControl,
     color: toneControl,
@@ -128,7 +129,7 @@ export const FooterBadge: StoryObj<typeof SiteFooter> = {
   args: {
     variant: 'columns',
     mark: 'badge',
-    district: 'midtown',
+    district: 'harlem',
     description: 'A field guide to the creatures that live on New York blocks, from the bodegas to the sky bridges.',
     linkGroups: GROUPS,
   },
@@ -136,6 +137,18 @@ export const FooterBadge: StoryObj<typeof SiteFooter> = {
   render: (args) => (
     <View className="min-h-screen justify-end bg-ink-900">
       <SiteFooter {...args} />
+    </View>
+  ),
+};
+
+/** The three top bands: the Harlem river (default), the flat skyline, and none. */
+export const FooterScenes: StoryObj = {
+  name: 'Footer scenes',
+  render: () => (
+    <View className="gap-10 bg-ink-900">
+      <SiteFooter variant="columns" mark="badge" linkGroups={GROUPS} scene="river-tide" />
+      <SiteFooter variant="columns" mark="badge" linkGroups={GROUPS} scene="skyline" />
+      <SiteFooter variant="columns" mark="badge" linkGroups={GROUPS} scene="none" />
     </View>
   ),
 };
