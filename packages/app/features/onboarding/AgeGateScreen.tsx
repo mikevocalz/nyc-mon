@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { MIN_BIRTH_YEAR } from '@acme/core/schemas';
 import { resolveCreateEntry } from '@acme/core/sim';
 import { Button, Heading, KeyboardAwareScroll, Text, TextField, YearGrid, type YearGridStep } from '@acme/ui';
-import { Form, Main } from '@acme/ui/primitives';
+import { Form } from '@acme/ui/primitives';
 import { View } from '@acme/ui/tw';
 import { copy } from './copy';
 import { useOnboarding } from './onboarding.store';
@@ -50,7 +50,7 @@ export function AgeGateScreen() {
 
   return (
     <KeyboardAwareScroll>
-      <Main className="flex-1 px-4 py-6">
+      <View className="flex-1 px-4 py-6">
         <Form className="mx-auto w-full max-w-content-form gap-6">
           <View className="gap-2">
             <Heading level={1} size="title" testID="m04-title">{copy('m04.title')}</Heading>
@@ -136,7 +136,7 @@ export function AgeGateScreen() {
             />
           ) : null}
         </Form>
-      </Main>
+      </View>
     </KeyboardAwareScroll>
   );
 }

@@ -6,7 +6,7 @@ import { CALLER_NAME_MAX_LENGTH, callerNameErrorCopyId, isConsentRequired, valid
 import { MIN_BIRTH_YEAR } from '@acme/core/schemas';
 import type { CallerProfile } from '@acme/core/types';
 import { Button, Heading, KeyboardAwareScroll, SignagePlate, StatusRow, TextField } from '@acme/ui';
-import { Form, Main } from '@acme/ui/primitives';
+import { Form } from '@acme/ui/primitives';
 import { View } from '@acme/ui/tw';
 import { announcePolitely } from './announce';
 import { defaultCallerNameFilter } from './caller-name-filter';
@@ -90,7 +90,7 @@ export function CallerNameScreen() {
 
   return (
     <KeyboardAwareScroll>
-      <Main className="flex-1 px-4 py-6">
+      <View className="flex-1 px-4 py-6">
         {consentPending ? (
           <StatusRow
             items={[{ id: 'status-consent-pending', label: copy('m05.badge.pending'), tone: 'pending' }]}
@@ -126,7 +126,7 @@ export function CallerNameScreen() {
             />
           </View>
         </Form>
-      </Main>
+      </View>
     </KeyboardAwareScroll>
   );
 }

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import type { AuthError } from '@acme/auth';
 import { Button, ErrorMessage, Heading, KeyboardAwareScroll, Text, TextField } from '@acme/ui';
-import { Form, Main } from '@acme/ui/primitives';
+import { Form } from '@acme/ui/primitives';
 import { View } from '@acme/ui/tw';
 import { auth, isPasskeySupported } from './auth';
 import { APP_HOME_PATH } from './boot';
@@ -151,7 +151,7 @@ export function SignInScreen() {
 
   return (
     <KeyboardAwareScroll>
-      <Main className="flex-1 px-4 py-6">
+      <View className="flex-1 px-4 py-6">
         <Form className="mx-auto w-full max-w-content-form gap-6">
           <View className="gap-2">
             <Heading level={1} size="title">{title}</Heading>
@@ -274,7 +274,7 @@ export function SignInScreen() {
             </View>
           )}
         </Form>
-      </Main>
+      </View>
     </KeyboardAwareScroll>
   );
 }

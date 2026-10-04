@@ -12,7 +12,7 @@ import {
   Text,
   TextField,
 } from '@acme/ui';
-import { Form, Main } from '@acme/ui/primitives';
+import { Form } from '@acme/ui/primitives';
 import { View } from '@acme/ui/tw';
 import { AUTH_BASE_URL } from './auth';
 import { copy } from './copy';
@@ -73,18 +73,18 @@ export function ConsentScreen() {
 
   if (mode === 'denied') {
     return (
-      <Main className="flex-1 items-center justify-center px-4 py-6">
+      <View className="flex-1 items-center justify-center px-4 py-6">
         <EmptyState
           title={copy('m05.denied.title.no_mon')}
           description={copy('m05.denied.body.no_mon')}
         />
-      </Main>
+      </View>
     );
   }
 
   return (
     <KeyboardAwareScroll>
-      <Main className="flex-1 px-4 py-6">
+      <View className="flex-1 px-4 py-6">
         <Form className="mx-auto w-full max-w-content-form gap-6">
           {mode === 'sent' ? (
             <>
@@ -148,7 +148,7 @@ export function ConsentScreen() {
             </>
           )}
         </Form>
-      </Main>
+      </View>
     </KeyboardAwareScroll>
   );
 }
