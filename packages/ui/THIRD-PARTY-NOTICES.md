@@ -117,3 +117,18 @@ Port agents: add each newly ported component to the list above.
 (https://github.com/margelo/react-native-graph), MIT License, Copyright (c)
 2026 Marc Rousavy. It is patched (`patches/react-native-graph@1.4.0.patch`) to
 build paths with react-native-skia v3's SkPathBuilder.
+
+## NYC photos (packages/assets/photos)
+
+Ten photos from Wikimedia Commons, bundled as 1200x800 WebP crops (resized, cropped and recompressed; no other changes). Used by the image cards in the card slider. CC0 and public-domain files need no credit; they are listed for provenance.
+
+- `downtown-one-wtc.webp`: "One World Trade Center(Freedom Tower)" by Mkdasher64. CC0 1.0 (https://creativecommons.org/publicdomain/zero/1.0/). Source: https://commons.wikimedia.org/wiki/File:One_World_Trade_Center(Freedom_Tower).jpg
+- `downtown-nyse.webp`: "New York Stock Exchange Entrance" by Balon Greyjoy. CC0 1.0 (https://creativecommons.org/publicdomain/zero/1.0/). Source: https://commons.wikimedia.org/wiki/File:New_York_Stock_Exchange_Entrance.jpg
+- `midtown-empire-sunset.webp`: "Empire State Building during sunset" by Michael Discenza. CC0 1.0 (https://creativecommons.org/publicdomain/zero/1.0/). Source: https://commons.wikimedia.org/wiki/File:Empire_State_Building_during_sunset.jpg
+- `midtown-times-square.webp`: "Sunset at Times Square, New York City (2017)" by Luca Bravo. CC0 1.0 (https://creativecommons.org/publicdomain/zero/1.0/). Source: https://commons.wikimedia.org/wiki/File:Sunset_at_Times_Square,_New_York_City_(2017).jpg
+- `midtown-chrysler-spire.webp`: "Chrysler Building spire, Manhattan, by Carol Highsmith (LOC highsm.04444)" by Carol M. Highsmith. Public domain (Library of Congress, Carol M. Highsmith Archive). Source: https://commons.wikimedia.org/wiki/File:Chrysler_Building_spire,_Manhattan,_by_Carol_Highsmith_(LOC_highsm.04444).jpg
+- `harlem-apollo.webp`: "Apollo Theater (6279250673)" by Erik Drost. CC BY 2.0 (https://creativecommons.org/licenses/by/2.0/). Source: https://commons.wikimedia.org/wiki/File:Apollo_Theater_(6279250673).jpg
+- `harlem-brownstone-stoops.webp`: "Harlem, New York brownstones" by Paul Lowry. CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Source: https://commons.wikimedia.org/wiki/File:Harlem,_New_York_brownstones.jpg
+- `harlem-lenox-rowhouses.webp`: "Lenox 123 rowhouses jeh" by Jim.henderson. CC0 1.0 (https://creativecommons.org/publicdomain/zero/1.0/). Source: https://commons.wikimedia.org/wiki/File:Lenox_123_rowhouses_jeh.jpg
+- `megacity-brooklyn-bridge-night.webp`: "Brooklyn Bridge at night" by Kai Pilger. CC0 1.0 (https://creativecommons.org/publicdomain/zero/1.0/). Source: https://commons.wikimedia.org/wiki/File:Brooklyn_Bridge_at_night.jpg
+- `megacity-bridge-deck.webp`: "Brooklyn Bridge, New York" by Pierre Blaché. CC0 1.0 (https://creativecommons.org/publicdomain/zero/1.0/). Source: https://commons.wikimedia.org/wiki/File:Brooklyn_Bridge,_New_York.jpg

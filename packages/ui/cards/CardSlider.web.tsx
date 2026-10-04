@@ -89,6 +89,8 @@ export function CardSlider({
   const node = () => scrollRef.current?.getScrollableNode?.() ?? null;
   const dragProps = enableSwipe
     ? {
+        // Photos in slides are <img>s; the browser's own image drag would steal the mouse drag.
+        onDragStart: (e: { preventDefault: () => void }) => e.preventDefault(),
         onPointerDown: (e: { pointerType: string; clientX: number; button: number }) => {
           if (e.pointerType !== 'mouse' || e.button !== 0) return;
           const el = node();
