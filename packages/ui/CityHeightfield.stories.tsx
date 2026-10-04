@@ -4,24 +4,28 @@ import { DISTRICTS, DISTRICT_NAMES } from './district';
 import { BackgroundCaption, DistrictGrid } from './backgrounds/story-helpers';
 import { Section } from './html';
 
+// CityHeightfield is now an alias of HolographicTerrain (the 3D three.js
+// scene); its story ids stay so links into it keep working.
+
 const meta = {
   title: 'Backgrounds/CityHeightfield',
   component: CityHeightfield,
   parameters: { layout: 'fullscreen', backgrounds: { disable: true } },
-  args: { district: 'midtown', waveAmplitude: 0.8, waveFrequency: 1.5, waveSpeed: 1, bumpRadius: 3.5, bumpStrength: 2.5, cameraHeight: 10, gridSegments: 12, fog: true, opacity: 100, hoverEffect: true, windowLights: true, forceFallback: false },
+  args: { district: 'midtown', variant: 'solid', waveAmplitude: 0.8, waveFrequency: 1.5, waveSpeed: 1, bumpRadius: 3.5, bumpStrength: 2.5, cameraHeight: 10, fog: true, opacity: 100, hoverEffect: true, windowLights: true, forceFallback: false },
   argTypes: {
     district: { control: 'inline-radio', options: DISTRICTS },
+    variant: { control: 'inline-radio', options: ['solid', 'lines'] },
     waveAmplitude: { control: { type: 'range', min: 0, max: 2, step: 0.05 } },
     waveFrequency: { control: { type: 'range', min: 0.2, max: 4, step: 0.1 } },
     waveSpeed: { control: { type: 'range', min: 0, max: 3, step: 0.1 } },
     bumpRadius: { control: { type: 'range', min: 1, max: 8, step: 0.5 } },
     bumpStrength: { control: { type: 'range', min: 0, max: 6, step: 0.5 } },
-    cameraHeight: { control: { type: 'range', min: 2, max: 18, step: 1 } },
-    gridSegments: { control: { type: 'range', min: 4, max: 24, step: 1 } },
+    cameraHeight: { control: { type: 'range', min: 3, max: 20, step: 0.5 } },
+    gridSegments: { control: { type: 'range', min: 8, max: 120, step: 2 } },
     opacity: { control: { type: 'range', min: 0, max: 100, step: 1 } },
     lineColor: { control: 'color' },
     bgColor: { control: 'color' },
-    forceFallback: { description: 'Draw with Skia even where WebGPU works.' },
+    forceFallback: { description: 'Skip three.js and draw the flat 2D heightfield (CityHeightfieldFlat).' },
   },
 } satisfies Meta<typeof CityHeightfield>;
 
@@ -33,13 +37,13 @@ export const Playground: Story = {
   render: (args: CityHeightfieldProps) => (
     <Section className="h-screen min-h-[520px]">
       <CityHeightfield {...args} className="flex-1">
-        <BackgroundCaption title="CityHeightfield" line="A stepped city heightfield. Move the pointer to lift the blocks." />
+        <BackgroundCaption title="CityHeightfield" line="HolographicTerrain under its older name. Move the pointer to lift the blocks." />
       </CityHeightfield>
     </Section>
   ),
 };
 
-/** The same background on the Skia fallback, as browsers without WebGPU see it. */
+/** The flat 2D heightfield, the fallback where no three.js backend runs. */
 export const SkiaFallback: Story = { ...Playground, args: { forceFallback: true } };
 
 /** One tile per district. */
