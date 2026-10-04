@@ -49,10 +49,11 @@ const button = tv({
     fullWidth: { true: { root: 'w-full self-auto' } },
   },
   compoundVariants: [
-    // Ghost pads its own root; framed looks pad the face (CUT_FACE).
-    { look: 'ghost', size: 'sm', class: { root: 'min-h-9 px-3 py-2' } },
-    { look: 'ghost', size: 'md', class: { root: 'min-h-11 px-4 py-2.5 md:px-5 md:py-3' } },
-    { look: 'ghost', size: 'lg', class: { root: 'min-h-12 px-5 py-3.5 md:px-6 md:py-4' } },
+    // Ghost pads its own root to the framed face's height (CUT_FACE padding plus
+    // the 2px border), so a ghost and a solid button share a row's centre line.
+    { look: 'ghost', size: 'sm', class: { root: 'min-h-9 px-3 py-3' } },
+    { look: 'ghost', size: 'md', class: { root: 'min-h-11 px-4 py-[14px] md:px-5 md:py-4' } },
+    { look: 'ghost', size: 'lg', class: { root: 'min-h-12 px-5 py-[18px] md:px-6 md:py-[22px]' } },
   ],
   defaultVariants: { look: 'solid', size: 'md', disabled: false },
 });
