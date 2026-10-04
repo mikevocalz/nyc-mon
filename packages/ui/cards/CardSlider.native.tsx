@@ -16,16 +16,16 @@ import { toneHex } from './tones';
 
 export type { CardSliderNativeProps } from './card-slider-native.types';
 
-/** Cut length of each card's corner, the kit CornerCutFrame default. */
-const CARD_CUT = 16;
-
 /**
  * Native: the track is a native carousel.
  * - iOS: a SwiftUI paging ScrollView (modules/nyc-carousel/ios).
  * - Android: Material 3's centred-hero, multi-browse and uncontained
  *   carousels (modules/nyc-carousel/android).
- * Each card is the React Native slide, hosted natively and masked to the
- * corner-cut shape with a keyline in the tone. Binaries without the module
+ * Each card is the React Native slide, hosted natively, so photo slides
+ * (CardSliderImageItem) render exactly as on web: the kit Image fills the
+ * card and the carousel's mask squeezes it, Material's photo-card pattern.
+ * Slides bring their own frame; `itemCut` adds a cut mask for plain ones.
+ * Binaries without the module
  * (Expo Go, older builds, iOS below 17) get the React Native LegendList track
  * instead, with the same controls.
  *
@@ -46,7 +46,7 @@ export function CardSlider({
   buttonPosition = 'sides', prevButtonCorner = 'bottom-left', nextButtonCorner = 'bottom-right',
   autoPlay = false, autoPlayInterval = 3000, showEdgeFades = false, edgeFadeColor,
   showCornerAccents = false, cornerAccentStyle = 'frame', scanLines = false, viewportClassName,
-  variant = 'uncontained', snap = true, onIndexChange,
+  variant = 'uncontained', snap = true, itemCut = 0, onIndexChange,
 }: CardSliderNativeProps) {
   const slides = slidesOf(children);
   const { size, onLayout } = useLayoutSize({ width: 0, height: 0 });
@@ -114,8 +114,8 @@ export function CardSlider({
                 itemWidth={layout.itemWidth}
                 itemSpacing={gap}
                 snap={snap}
-                cut={CARD_CUT}
-                keylineColor={toneHex(resolved).face}
+                cut={itemCut}
+                keylineColor={itemCut > 0 ? toneHex(resolved).face : undefined}
                 itemLabels={slideLabels(slides.length)}
               />
             ) : (
@@ -125,7 +125,6 @@ export function CardSlider({
                 gap={gap}
                 index={index}
                 animated={!reduced}
-                tone={resolved}
                 onSettle={go}
               />
             )

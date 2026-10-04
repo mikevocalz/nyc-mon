@@ -2,11 +2,9 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
 import { LegendList, type LegendListRef } from '@legendapp/list/react-native';
-import { CornerCutFrame } from '../neon';
 import { View } from '../tw';
 import { indexAtOffset } from './card-slider-model';
 import type { NativeSliderLayout } from './card-slider-native-model';
-import { toneInput, type ControlTone } from './tones';
 
 interface ListTrackProps {
   slides: ReactNode[];
@@ -14,18 +12,15 @@ interface ListTrackProps {
   gap: number;
   index: number;
   animated: boolean;
-  tone: ControlTone;
   onSettle: (index: number) => void;
 }
 
 /**
  * Fallback track when the native carousel module isn't in the binary (Expo
  * Go, builds older than the module, iOS below 17): a horizontal LegendList
- * snapping every card width plus gap. Each card sits in an outline
- * CornerCutFrame in the slider tone, the same cut and keyline the native
- * carousels mask their cards with.
+ * snapping every card width plus gap, the web slider's layout.
  */
-export function CardSliderListTrack({ slides, layout, gap, index, animated, tone, onSettle }: ListTrackProps) {
+export function CardSliderListTrack({ slides, layout, gap, index, animated, onSettle }: ListTrackProps) {
   const listRef = useRef<LegendListRef>(null);
   const settled = useRef(index);
   const data = slides.map((slide, i) => ({ key: String(i), slide }));
@@ -61,9 +56,7 @@ export function CardSliderListTrack({ slides, layout, gap, index, animated, tone
           // Computed: card width comes from the measured track.
           style={{ width: layout.itemWidth, marginRight: i < data.length - 1 ? gap : 0 }}
         >
-          <CornerCutFrame variant="outline" tone={toneInput(tone)} depth={0}>
-            {item.slide}
-          </CornerCutFrame>
+          {item.slide}
         </View>
       )}
     />
