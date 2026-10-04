@@ -1,4 +1,6 @@
 'use client';
+// First: Reanimated reads __DEV__ at import time, and on web nothing has defined it yet.
+import './rn-globals-shim';
 import { tv } from 'tailwind-variants';
 import Animated, { type CSSAnimationKeyframes } from 'react-native-reanimated';
 import { Modal } from './Modal';

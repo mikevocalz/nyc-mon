@@ -178,13 +178,27 @@ export const contentWidths = {
   'pane-inspector': '20rem',
 } as const;
 
+/**
+ * Corners. NYC-MON is square: every step of the Tailwind radius scale is 0, so
+ * `rounded-md`, `rounded-card` and friends draw square corners, and the neon
+ * shapes (corner cuts, cornices) carry the silhouette. Rounding is opt-in:
+ * components take a `rounded` prop that applies `rounded-soft`. `full` stays
+ * a circle for the few things that are round on purpose (status dots, loader
+ * pills, the donut).
+ */
 export const radius = {
-  xs: '0.125rem',
-  sm: '0.25rem',
-  md: '0.375rem',
-  lg: '0.5rem',
-  card: '0.625rem',
-  sheet: '0.875rem',
+  xs: '0px',
+  sm: '0px',
+  md: '0px',
+  lg: '0px',
+  xl: '0px',
+  '2xl': '0px',
+  '3xl': '0px',
+  '4xl': '0px',
+  card: '0px',
+  sheet: '0px',
+  /** The opt-in rounding behind every component's `rounded` prop. */
+  soft: '0.625rem',
   full: '9999px',
 } as const;
 
