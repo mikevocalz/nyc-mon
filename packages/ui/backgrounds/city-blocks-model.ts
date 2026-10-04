@@ -479,37 +479,3 @@ export function districtDefaults(district: District) {
     litFraction: spec.litFraction,
   };
 }
-
-const hashCell = (x: number, y: number) => {
-  const h = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
-  return h - Math.floor(h);
-};
-
-/**
- * Lit window centres, for renderers without a per-pixel window shader (the
- * Skia fallback). Same lit test as the GPU shader at time zero. Facades are
- * sampled every `stride` cells and the total is capped, so a dense district
- * stays cheap to draw.
- */
-export function litWindows(layout: CityLayout, maxPoints = 12000, stride = 2): { x: number; y: number }[] {
-  const points: { x: number; y: number }[] = [];
-  for (const q of layout.quads) {
-    const [cols, rows, seed, lit] = q.win;
-    if (cols <= 0.5) continue;
-    for (let row = 0; row < rows; row += stride) {
-      for (let col = 0; col < cols; col += stride) {
-        if (hashCell(col + seed, row) >= lit) continue;
-        const u = (col + 0.5) / cols;
-        const v = (row + 0.5) / rows;
-        const [ax, ay, bx, by, cx, cy, dx, dy] = q.p;
-        const topX = ax + (bx - ax) * u;
-        const topY = ay + (by - ay) * u;
-        const botX = dx + (cx - dx) * u;
-        const botY = dy + (cy - dy) * u;
-        points.push({ x: topX + (botX - topX) * v, y: topY + (botY - topY) * v });
-        if (points.length >= maxPoints) return points;
-      }
-    }
-  }
-  return points;
-}

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
-  blockAt, buildCity, litWindows, packQuads, QUAD_FLOATS, QuadKind, trafficAt, trafficCapacity,
+  blockAt, buildCity, packQuads, QUAD_FLOATS, QuadKind, trafficAt, trafficCapacity,
   type CityInput, type District,
 } from './city-blocks-model.ts';
 
@@ -65,11 +65,4 @@ test('packQuads lays out 16 floats per quad: corners, colour, win', () => {
   const q = city.quads[3]!;
   assert.deepEqual(Array.from(out.slice(3 * 16, 3 * 16 + 8)), q.p.map((v) => Math.fround(v)));
   assert.deepEqual(Array.from(out.slice(3 * 16 + 8, 3 * 16 + 12)), q.color.map((v) => Math.fround(v)));
-});
-
-test('litWindows stays under its cap and is empty with lights off', () => {
-  const city = buildCity(input('midtown'));
-  const pts = litWindows(city, 500);
-  assert.ok(pts.length > 0 && pts.length <= 500);
-  assert.equal(litWindows(buildCity(input('midtown', { windowLights: false }))).length, 0);
 });
