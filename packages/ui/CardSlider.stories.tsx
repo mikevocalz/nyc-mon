@@ -1,29 +1,37 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { Badge } from './Badge';
-import { Card } from './Card';
+import type { CardSliderImageAspect, CardSliderImageFrame, CardSliderImageItemData } from './cards/card-slider.types';
 import { CardSlider, type CardSliderProps } from './cards/CardSlider';
-import { DISTRICT_NAME, DISTRICTS, type District } from './district';
+import { CITY_PHOTO_ITEMS, CardSliderImageItem } from './cards/slider-items';
+import { DISTRICTS, type District } from './district';
 import { Heading } from './html';
 import { Text } from './Text';
 import { View } from './tw';
 
-// One block per stop, in NeonBlade's demo shape (a status, a name, a reading).
-const BLOCKS: { d: District; name: string; reading: string; status: string }[] = [
-  { d: 'downtown', name: 'Wall St and Broad', reading: 'Crews 4', status: 'Held' },
-  { d: 'midtown', name: 'Bryant Park', reading: 'Sightings 38', status: 'Open' },
-  { d: 'harlem', name: '125th and Lenox', reading: 'Streak 6 days', status: 'Claimed' },
-  { d: 'megacity', name: 'Level 90 bridge', reading: 'Wait 3 min', status: 'Rising' },
-  { d: 'downtown', name: 'Bowling Green', reading: 'Crews 2', status: 'Open' },
-  { d: 'midtown', name: 'Grand Central', reading: 'Sightings 51', status: 'Busy' },
-];
+// A reading per photo, in NeonBlade's demo shape (a place, a line, a number).
+const READINGS: Record<string, string> = {
+  'downtown-one-wtc': 'Crews 4',
+  'downtown-nyse': 'Held 2 days',
+  'midtown-empire-sunset': 'Sightings 38',
+  'midtown-times-square': 'Busy',
+  'midtown-chrysler-spire': 'Sightings 51',
+  'harlem-apollo': 'Streak 6 days',
+  'harlem-brownstone-stoops': 'Claimed',
+  'harlem-lenox-rowhouses': 'Crews 3',
+  'megacity-brooklyn-bridge-night': 'Wait 3 min',
+  'megacity-bridge-deck': 'Rising',
+};
+const ITEMS: CardSliderImageItemData[] = CITY_PHOTO_ITEMS.map((it) => ({ ...it, meta: READINGS[it.id] }));
 
-const slides = (variant: 'notch' | 'cornerCut' | 'beam') =>
-  BLOCKS.map((b, i) => (
-    <Card key={i} variant={variant} district={b.d} title={b.name} description={`${DISTRICT_NAME[b.d]}, ${b.reading}`}>
-      <View className="mt-3 flex-row">
-        <Badge label={b.status} />
-      </View>
-    </Card>
+/** Every photo, the given district's first, so each demo opens on its own neighbourhood. */
+const from = (d: District) => [...ITEMS.filter((it) => it.district === d), ...ITEMS.filter((it) => it.district !== d)];
+
+/**
+ * One image slide per photo. The first `eager` slides load at once (they are
+ * on screen at first paint); the rest load lazily as they near the viewport.
+ */
+const slides = (frame: CardSliderImageFrame, aspect: CardSliderImageAspect = 'classic', eager = 1, items = ITEMS) =>
+  items.map((it, i) => (
+    <CardSliderImageItem key={it.id} {...it} frame={frame} aspect={aspect} priority={i < eager} />
   ));
 
 const meta = {
@@ -31,10 +39,10 @@ const meta = {
   component: CardSlider,
   parameters: {
     layout: 'fullscreen',
-    docs: { description: { component: 'CardSlider, the port of NeonBlade card-slider (Card Slider).' } },
+    docs: { description: { component: 'CardSlider, the port of NeonBlade card-slider (Card Slider). Slides here are CardSliderImageItem: a bundled NYC photo in a notch, corner-cut or beam frame with a solid title band in the district tone. CardSlider itself takes any children.' } },
   },
   args: {
-    label: 'Featured blocks',
+    label: 'City landmarks',
     visibleCount: { sm: 1, md: 2, xl: 3 },
     gap: 16,
     showButtons: true,
@@ -77,7 +85,7 @@ export const Playground: Story = {
   name: 'Card Slider (NeonBlade: Card Slider)',
   render: (args: CardSliderProps) => (
     <View className="min-h-screen bg-ink-950 px-4 py-8 md:px-10">
-      <CardSlider {...args}>{slides('notch')}</CardSlider>
+      <CardSlider {...args}>{slides('notch', 'classic', 3)}</CardSlider>
     </View>
   ),
 };
@@ -101,13 +109,13 @@ export const NeonBladeDemos: Story = {
   render: () => (
     <View className="min-h-screen gap-12 bg-ink-950 px-4 py-8 md:px-10">
       <Demo title="One card, bar progress, side buttons">
-        <CardSlider label="Downtown blocks" district="downtown" visibleCount={1} progressStyle="bar" buttonPosition="sides">
-          {slides('cornerCut')}
+        <CardSlider label="Landmarks, Downtown first" district="downtown" visibleCount={1} progressStyle="bar" buttonPosition="sides">
+          {slides('cornerCut', 'wide', 1, from('downtown'))}
         </CardSlider>
       </Demo>
       <Demo title="One, two, then three across, dots, bottom buttons, frame corners">
         <CardSlider
-          label="Midtown blocks"
+          label="Landmarks, Midtown first"
           district="midtown"
           visibleCount={{ sm: 1, md: 2, lg: 3 }}
           progressStyle="dots"
@@ -115,14 +123,14 @@ export const NeonBladeDemos: Story = {
           showCornerAccents
           cornerAccentStyle="frame"
         >
-          {slides('notch')}
+          {slides('notch', 'classic', 3, from('midtown'))}
         </CardSlider>
       </Demo>
-      <Demo title="Two across, counter, buttons on hover, plus corners">
+      <Demo title="Two across (one on phones), counter, buttons on hover, plus corners">
         <CardSlider
-          label="Harlem blocks"
+          label="Landmarks, Harlem first"
           district="harlem"
-          visibleCount={2}
+          visibleCount={{ sm: 1, md: 2 }}
           progressStyle="counter"
           buttonVisibility="hover"
           showCornerAccents
@@ -130,13 +138,13 @@ export const NeonBladeDemos: Story = {
           showEdgeFades
           loop
         >
-          {slides('notch')}
+          {slides('notch', 'classic', 2, from('harlem'))}
         </CardSlider>
       </Demo>
       <Demo title="Autoplay with a pause control, scan lines">
         <Text className="text-silver-400">Holds while hovered or focused. Starts paused when reduced motion is on.</Text>
         <CardSlider
-          label="Mega City blocks"
+          label="Landmarks, Mega City first"
           district="megacity"
           visibleCount={{ sm: 1, md: 2 }}
           autoPlay
@@ -145,7 +153,7 @@ export const NeonBladeDemos: Story = {
           scanLines
           showEdgeFades
         >
-          {slides('beam')}
+          {slides('beam', 'classic', 2, from('megacity'))}
         </CardSlider>
       </Demo>
     </View>
@@ -156,9 +164,9 @@ export const NeonBladeDemos: Story = {
 export const ProgressStyles: Story = {
   render: () => (
     <View className="min-h-screen gap-12 bg-ink-950 px-4 py-8 md:px-10">
-      <CardSlider label="Downtown blocks" district="downtown" visibleCount={{ sm: 1, md: 2 }} progressStyle="bar" buttonPosition="bottom">{slides('cornerCut')}</CardSlider>
-      <CardSlider label="Harlem blocks" district="harlem" visibleCount={{ sm: 1, md: 3 }} progressStyle="dots" buttonPosition="bottom" loop>{slides('notch')}</CardSlider>
-      <CardSlider label="Mega City blocks" district="megacity" visibleCount={{ sm: 1, md: 2 }} progressStyle="counter" buttonPosition="bottom">{slides('beam')}</CardSlider>
+      <CardSlider label="Landmarks, Downtown first" district="downtown" visibleCount={{ sm: 1, md: 2 }} progressStyle="bar" buttonPosition="bottom">{slides('cornerCut', 'classic', 2, from('downtown'))}</CardSlider>
+      <CardSlider label="Landmarks, Harlem first" district="harlem" visibleCount={{ sm: 1, md: 3 }} progressStyle="dots" buttonPosition="bottom" loop>{slides('notch', 'tall', 3, from('harlem'))}</CardSlider>
+      <CardSlider label="Landmarks, Mega City first" district="megacity" visibleCount={{ sm: 1, md: 2 }} progressStyle="counter" buttonPosition="bottom">{slides('beam', 'classic', 2, from('megacity'))}</CardSlider>
     </View>
   ),
 };

@@ -8,4 +8,5 @@ export {
   CardSlider, type CardSliderProps, type CardSliderProgressStyle, type CardSliderButtonPosition,
   type CardSliderButtonVisibility, type CardSliderCornerAccentStyle,
 } from './CardSlider';
+export { CardSliderImageItem, CITY_PHOTO_ITEMS, photoItem, type CardSliderImageItemProps } from './slider-items';
 export { visibleFor, sliderMetrics, type VisibleCount } from './card-slider-model';

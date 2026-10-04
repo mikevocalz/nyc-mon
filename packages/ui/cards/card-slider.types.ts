@@ -71,3 +71,43 @@ export interface CardSliderProps {
   /** Classes for each slide wrapper. */
   itemClassName?: string;
 }
+
+/**
+ * A static image as the bundler hands it over: a URL string (Vite, or a
+ * remote URL), StaticImageData (Next) or an asset id number (Metro).
+ */
+export type CardSliderImageSource = string | number | { src: string; width?: number; height?: number };
+
+/** Frame drawn around an image slide, the same shapes as the Card variants. */
+export type CardSliderImageFrame = 'notch' | 'cornerCut' | 'beam';
+/** Photo box ratio: wide 16:9 (4:3 below md), classic 4:3, tall 4:5. Fixed, so slides never shift as photos load. */
+export type CardSliderImageAspect = 'wide' | 'classic' | 'tall';
+
+/**
+ * One image slide's data: a photo with a title band. Shared by the web and
+ * native sliders, so every platform renders the same item from the same
+ * record.
+ */
+export interface CardSliderImageItemData {
+  /** Stable key. */
+  id: string;
+  image: {
+    source: CardSliderImageSource;
+    /** What the photo shows, read by screen readers. */
+    alt: string;
+    /** Tiny data URL shown blurred until the photo loads. */
+    blurDataURL?: string;
+  };
+  /** Band headline, e.g. the landmark. */
+  title: string;
+  /** Second band line, e.g. the street. */
+  subtitle?: string;
+  /** A short reading on the right of the band, e.g. "Crews 4". */
+  meta?: string;
+  /** Picks the band and chip tone, and the chip label. */
+  district: District;
+  /** Overrides the district's tone. */
+  tone?: ControlTone;
+  /** Chip text. Default the district name. */
+  chip?: string;
+}
