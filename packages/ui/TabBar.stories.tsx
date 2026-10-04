@@ -1,20 +1,26 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { TabBar } from './TabBar';
-import { Text } from './tw';
+import { TabBar, type TabBarTab } from './TabBar';
+import { DISTRICTS, DISTRICT_NAME, CONTROL_TONES } from './district';
+import { Calendar, Home, Play, Users, MoreHorizontal } from './icons';
+import { Text, View } from './tw';
 
-const glyph = (g: string) => <Text className="text-lg">{g}</Text>;
+const TABS: TabBarTab[] = [
+  { key: 'home', label: 'Home', icon: ({ colorClass }) => <Home size={20} className={colorClass} /> },
+  { key: 'events', label: 'Events', icon: ({ colorClass }) => <Calendar size={20} className={colorClass} /> },
+  { key: 'listen', label: 'Listen', icon: ({ colorClass }) => <Play size={22} className={colorClass} /> },
+  { key: 'people', label: 'People', icon: ({ colorClass }) => <Users size={20} className={colorClass} /> },
+  { key: 'more', label: 'More', icon: ({ colorClass }) => <MoreHorizontal size={20} className={colorClass} /> },
+];
+const tabs = (activeKey: string): TabBarTab[] => TABS.map((t) => ({ ...t, active: t.key === activeKey }));
 
 const meta = {
   title: 'UI/TabBar',
   component: TabBar,
-  args: {
-    tabs: [
-      { key: 'home', label: 'Home', icon: glyph('⌂'), active: true },
-      { key: 'events', label: 'Events', icon: glyph('🗓') },
-      { key: 'listen', label: 'Listen', icon: glyph('▸') },
-      { key: 'people', label: 'People', icon: glyph('☺') },
-      { key: 'more', label: 'More', icon: glyph('…') },
-    ],
+  args: { tabs: tabs('home'), district: 'midtown' },
+  argTypes: {
+    district: { control: 'inline-radio', options: DISTRICTS },
+    tone: { control: 'select', options: [undefined, ...CONTROL_TONES] },
+    emphasizedKey: { control: 'select', options: [undefined, 'home', 'events', 'listen', 'people', 'more'] },
   },
 } satisfies Meta<typeof TabBar>;
 
@@ -28,11 +34,19 @@ export const EmphasizedCenter: Story = {
 };
 
 export const SecondTabActive: Story = {
-  args: {
-    tabs: [
-      { key: 'home', label: 'Home', icon: glyph('⌂') },
-      { key: 'events', label: 'Events', icon: glyph('🗓'), active: true },
-      { key: 'listen', label: 'Listen', icon: glyph('▸') },
-    ],
-  },
+  args: { tabs: tabs('events').slice(0, 3) },
+};
+
+/** One bar per district, the center tab emphasized and the second tab active. */
+export const Districts: Story = {
+  render: () => (
+    <View className="gap-6">
+      {DISTRICTS.map((d) => (
+        <View key={d} className="gap-2">
+          <Text className="font-display text-sm text-text">{DISTRICT_NAME[d]}</Text>
+          <TabBar tabs={tabs('events')} emphasizedKey="listen" district={d} />
+        </View>
+      ))}
+    </View>
+  ),
 };

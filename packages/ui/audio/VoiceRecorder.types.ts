@@ -1,3 +1,5 @@
+import type { ControlTone, District } from '../district';
+
 export interface VoiceRecording {
   /** File URI of the finished take. */
   uri: string;
@@ -14,5 +16,9 @@ export interface VoiceRecorderProps {
   onCancel: () => void;
   /** Stop automatically at this many seconds. Omit for no limit. */
   maxSeconds?: number;
+  /** Colour family. Overrides `district`. Recording always switches to apple. */
+  tone?: ControlTone;
+  /** Theme by neighbourhood. Default midtown (orange). */
+  district?: District;
   className?: string;
 }

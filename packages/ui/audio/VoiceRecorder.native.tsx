@@ -3,12 +3,13 @@ import { useEffect, useRef } from 'react';
 import { PermissionsAndroid, Platform } from 'react-native';
 import { createStore, useStore } from 'zustand';
 import { AudioContext, AudioRecorder } from 'react-native-audio-api';
-import { View } from '../tw';
-import { Text } from '../Text';
-import { Pressable } from '../tw';
+import { View, Text } from '../tw';
+import { Button } from '../Button';
 import { Mic, Square, Trash2 } from '../icons';
 import { haptics } from '../haptics';
+import { TONE_CLASSES, resolveControlTone } from '../district';
 import { AudioPlayer } from './AudioPlayer';
+import { CutTile } from './PlayerShell';
 import { Waveform } from './Waveform.tsx';
 import { frameLevel, pushLevel } from './waveform.ts';
 import type { VoiceRecorderProps, VoiceRecording } from './VoiceRecorder.types.ts';
@@ -63,7 +64,8 @@ function createRecorderStore() {
  * Lives in the kit because a voice note is not a notes-editor feature — a
  * message composer wants exactly this component.
  */
-export function VoiceRecorder({ onComplete, onCancel, maxSeconds, className }: VoiceRecorderProps) {
+export function VoiceRecorder({ onComplete, onCancel, maxSeconds, tone: toneProp, district, className }: VoiceRecorderProps) {
+  const tone = resolveControlTone(toneProp, district);
   const store = useRef<ReturnType<typeof createRecorderStore> | null>(null);
   store.current ??= createRecorderStore();
   const recording = useStore(store.current, (state) => state.recording);
@@ -220,86 +222,70 @@ export function VoiceRecorder({ onComplete, onCancel, maxSeconds, className }: V
   if (take !== null) {
     return (
       <View className={`gap-4 ${className ?? ''}`}>
-        <AudioPlayer
-          uri={take.uri}
-          duration={take.duration}
-          levels={take.levels}
-          label="Your recording"
-        />
+        <AudioPlayer uri={take.uri} duration={take.duration} levels={take.levels} label="Your recording" tone={tone} />
 
         <View className="flex-row gap-3">
-          <Pressable
-            role="button"
-            aria-label="Record again"
+          <Button
+            title="Record again"
+            variant="outline"
+            tone={tone}
+            className="flex-1"
             onPress={() => {
               store.current?.getState().set({ take: null, levels: [], seconds: 0 });
             }}
-            className="h-11 flex-1 items-center justify-center rounded-md border-2 border-border bg-surface-raised px-3 transition-colors duration-fast hover:bg-surface-sunken active:bg-surface-sunken motion-reduce:transition-none"
-          >
-            <Text numberOfLines={1} className="text-sm font-medium text-text md:text-base">Record again</Text>
-          </Pressable>
-
-          <Pressable
-            role="button"
-            aria-label="Use this recording"
-            onPress={() => onComplete(take)}
-            className="h-11 flex-1 items-center justify-center rounded-md border-2 border-border bg-primary px-3 shadow-card transition-colors duration-fast hover:bg-primary-pressed active:bg-primary-pressed motion-reduce:transition-none"
-          >
-            <Text numberOfLines={1} className="text-sm font-semibold text-on-primary md:text-base">Use recording</Text>
-          </Pressable>
+          />
+          <Button title="Use recording" tone={tone} className="flex-1" onPress={() => onComplete(take)} />
         </View>
       </View>
     );
   }
 
+  // Recording switches the panel to the apple tone: the one state that must never be missed.
+  const live = recording ? 'apple' : tone;
   return (
     <View className={`gap-4 ${className ?? ''}`}>
-      {/* The waveform is the subject, so it gets the slab and the space. */}
-      <View className="gap-2 rounded-md border-2 border-border bg-surface-sunken px-3 py-3">
-        <Waveform levels={levels} height={56} />
-        <View className="flex-row items-center justify-between">
-          <Text className="text-sm font-semibold text-text md:text-base">{clock_}</Text>
-          <Text className="text-xs text-text-muted md:text-sm">
-            {recording ? 'Recording' : 'Ready'}
-          </Text>
+      {/* The waveform is the subject, so it gets the night panel and the space. */}
+      <View className="border-2 border-ink-800 bg-ink-900">
+        <View aria-hidden className={`h-1 w-full ${TONE_CLASSES[live].face}`} />
+        <View className="gap-2 px-3 py-3">
+          <Waveform levels={levels} height={56} tone={live} />
+          <View className="flex-row items-center justify-between">
+            <Text className="font-display text-base text-ink-50">{clock_}</Text>
+            <Text className={`font-display text-xs md:text-sm ${recording ? TONE_CLASSES.apple.text : 'text-silver-300'}`}>
+              {recording ? 'Recording' : 'Ready'}
+            </Text>
+          </View>
         </View>
       </View>
 
       <View className="flex-row items-center justify-center gap-4">
         {recording ? (
-          <Pressable
-            role="button"
-            aria-label="Discard recording"
-            onPress={cancel}
-            className="h-12 w-12 items-center justify-center rounded-md border-2 border-border bg-surface-raised transition-colors duration-fast hover:bg-surface-sunken active:bg-surface-sunken motion-reduce:transition-none"
-          >
-            <Trash2 size={20} className="text-danger" />
-          </Pressable>
+          <CutTile label="Discard recording" onPress={cancel} tone="apple" size={48}>
+            <Trash2 size={20} className={TONE_CLASSES.apple.onFace} />
+          </CutTile>
         ) : null}
 
         {/* One control that changes meaning in place, so the target never moves
             out from under the finger mid-take. */}
-        <Pressable
-          role="button"
-          aria-label={recording ? 'Stop and keep recording' : 'Start recording'}
+        <CutTile
+          label={recording ? 'Stop and keep recording' : 'Start recording'}
           onPress={() => void (recording ? stop() : start())}
-          className={`h-16 w-16 items-center justify-center rounded-md border-2 border-border shadow-card transition-colors duration-fast motion-reduce:transition-none ${
-            recording ? 'bg-danger' : 'bg-primary'
-          }`}
+          tone={live}
+          size={64}
         >
           {recording ? (
-            <Square size={24} className="text-on-danger" />
+            <Square size={24} className={TONE_CLASSES.apple.onFace} />
           ) : (
-            <Mic size={24} className="text-on-primary" />
+            <Mic size={24} className={TONE_CLASSES[tone].onFace} />
           )}
-        </Pressable>
+        </CutTile>
       </View>
 
-      <Text className="text-center text-sm text-text-muted md:text-base">
+      <Text className="text-center text-sm text-silver-300 md:text-base">
         {recording ? 'Tap the square to finish' : 'Tap the mic to start'}
       </Text>
 
-      {error ? <Text className="text-center text-sm text-danger">{error}</Text> : null}
+      {error ? <Text role="alert" className="text-center text-sm text-apple-400">{error}</Text> : null}
     </View>
   );
 }

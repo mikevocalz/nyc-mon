@@ -2,12 +2,8 @@
 import { useEffect, useRef } from 'react';
 import { createStore, useStore } from 'zustand';
 import { AudioContext, decodeAudioData } from 'react-native-audio-api';
-import { View, Pressable } from '../tw';
-import { Text } from '../Text';
-import { Play, Pause, AudioLines } from '../icons';
 import { haptics } from '../haptics';
-import { Slider } from '../Slider';
-import { Waveform } from './Waveform.tsx';
+import { PlayerShell } from './PlayerShell';
 import { summarise } from './waveform.ts';
 import type { AudioPlayerProps } from './AudioPlayer.types.ts';
 
@@ -31,9 +27,6 @@ function createPlayerStore() {
   }));
 }
 
-const clock = (seconds: number) =>
-  `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
-
 /**
  * Play a voice note.
  *
@@ -47,7 +40,7 @@ const clock = (seconds: number) =>
  * from the context's own time rather than a counter, so pausing and resuming
  * cannot drift away from the audio.
  */
-export function AudioPlayer({ uri, duration, levels, label, className }: AudioPlayerProps) {
+export function AudioPlayer({ uri, duration, levels, label, tone, district, className }: AudioPlayerProps) {
   const store = useRef<ReturnType<typeof createPlayerStore> | null>(null);
   store.current ??= createPlayerStore();
   const playing = useStore(store.current, (state) => state.playing);
@@ -154,58 +147,19 @@ export function AudioPlayer({ uri, duration, levels, label, className }: AudioPl
     if (wasPlaying) play();
   };
 
-  const progress = total > 0 ? Math.min(1, elapsed / total) : 0;
-
   return (
-    <View
-      className={`my-2 gap-2 rounded-md border-2 border-border bg-surface-raised p-3 shadow-card ${className ?? ''}`}
-    >
-      {label ? (
-        <View className="flex-row items-center gap-2">
-          <AudioLines size={16} className="text-accent" />
-          <Text className="flex-1 text-sm font-medium text-text md:text-base">{label}</Text>
-        </View>
-      ) : null}
-
-      <View className="flex-row items-center gap-3">
-        <Pressable
-          role="button"
-          aria-label={playing ? 'Pause' : 'Play'}
-          onPress={() => (playing ? pause() : play())}
-          className="h-12 w-12 items-center justify-center rounded-md border-2 border-border bg-primary shadow-card transition-colors duration-fast hover:bg-primary-pressed active:bg-primary-pressed motion-reduce:transition-none"
-        >
-          {playing ? (
-            <Pause size={20} className="text-on-primary" />
-          ) : (
-            <Play size={20} className="text-on-primary" />
-          )}
-        </Pressable>
-
-        <View className="flex-1 gap-1">
-          <Waveform levels={bars} progress={progress} height={36} />
-
-          {/* The waveform SHOWS position; the slider is what moves it. A
-              waveform can be made draggable, but it is a poor target — bars are
-              a few dp wide and it carries no accessibility semantics. The kit's
-              Slider is the platform's own control, so it arrives with a
-              keyboard path, screen-reader value announcements and the right
-              touch slop already. */}
-          <Slider
-            value={elapsed}
-            min={0}
-            max={Math.max(total, 0.1)}
-            onValueChange={seek}
-            label={`Seek, ${clock(elapsed)} of ${clock(total)}`}
-          />
-
-          <View className="flex-row justify-between">
-            <Text className="text-xs text-text-muted md:text-sm">{clock(elapsed)}</Text>
-            <Text className="text-xs text-text-muted md:text-sm">{clock(total)}</Text>
-          </View>
-        </View>
-      </View>
-
-      {error ? <Text className="text-sm text-danger">{error}</Text> : null}
-    </View>
+    <PlayerShell
+      label={label}
+      playing={playing}
+      elapsed={elapsed}
+      total={total}
+      bars={bars}
+      error={error}
+      onToggle={() => (playing ? pause() : play())}
+      onSeek={seek}
+      tone={tone}
+      district={district}
+      className={className}
+    />
   );
 }

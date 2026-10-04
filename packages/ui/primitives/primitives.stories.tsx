@@ -6,8 +6,15 @@ import {
   Button, Link, Form, Fieldset, Legend, Label, Input, Textarea, Select,
   Table, TableHeader, TableBody, TableRow, TableCell, TableHeaderCell,
 } from './index';
+import { TONE_CLASSES } from '../district';
 
-// §7: every primitive rendered semantically — the a11y addon audits each story.
+// §7: every primitive rendered semantically; the a11y addon audits each story.
+// The primitives are unstyled semantic hosts. These stories dress them in the
+// NYC-MON grammar the kit components use: night surfaces, heavy ink keylines,
+// square corners, solid orange faces on a depth plate, the display face for
+// titles, and glow only on keyboard focus.
+
+const o = TONE_CLASSES.orange;
 
 const meta = { title: 'Primitives' } satisfies Meta;
 export default meta;
@@ -15,28 +22,28 @@ type Story = StoryObj;
 
 export const Landmarks: Story = {
   render: () => (
-    <Page className="gap-4 bg-surface p-6">
-      <Header className="border-b-2 border-border pb-3">
-        <Nav className="flex-row gap-4">
-          <Link href="https://example.com" className="font-semibold text-text underline decoration-primary decoration-2">Home</Link>
-          <Link href="https://example.com/social" className="font-semibold text-text underline decoration-primary decoration-2">Instagram</Link>
+    <Page className="gap-4 bg-ink-950 p-6">
+      <Header className={`border-b-4 ${o.border} pb-3`}>
+        <Nav className="flex-row gap-2">
+          <Link href="https://example.com" className={`${o.face} px-3 py-1.5 font-display text-sm ${o.onFace}`}>Home</Link>
+          <Link href="https://example.com/social" className="px-3 py-1.5 font-display text-sm text-silver-300 hover:bg-ink-800">Instagram</Link>
         </Nav>
       </Header>
       <Main className="gap-4">
-        <Section className="gap-2">
-          <Heading level={2} className="font-display text-display-sm text-text">Schedule</Heading>
-          <Article className="gap-1 rounded-card bg-surface-raised p-4 shadow-card">
-            <Heading level={3} className="text-lg font-semibold text-text">Tuesday standup</Heading>
-            <Paragraph className="text-text-muted">Whole team — bring your quarterly notes.</Paragraph>
-            <Time className="text-sm text-text-muted">9:00 AM</Time>
+        <Section className="gap-3">
+          <Heading level={2} className="font-display text-display-sm text-ink-50">Schedule</Heading>
+          <Article className="gap-1 border-2 border-ink-800 bg-ink-900 p-4">
+            <Heading level={3} className="font-display text-lg text-ink-50">Tuesday standup</Heading>
+            <Paragraph className="text-silver-300">Whole team: bring your quarterly notes.</Paragraph>
+            <Time className={`font-display text-sm ${o.text}`}>9:00 AM</Time>
           </Article>
         </Section>
-        <Aside className="rounded-card bg-surface-sunken p-4">
-          <Paragraph className="text-sm text-text-muted">From the team lead</Paragraph>
+        <Aside className="border-l-4 border-royal-500 bg-ink-900 p-4">
+          <Paragraph className="text-sm text-silver-300">From the team lead</Paragraph>
         </Aside>
       </Main>
-      <Footer className="border-t-2 border-border pt-3">
-        <Address className="text-sm text-text-muted">Harlem, New York</Address>
+      <Footer className="border-t-2 border-ink-800 pt-3">
+        <Address className="text-sm text-silver-300">Harlem, New York</Address>
       </Footer>
     </Page>
   ),
@@ -44,46 +51,47 @@ export const Landmarks: Story = {
 
 export const ContentAndLists: Story = {
   render: () => (
-    <Page className="gap-4 bg-surface p-6">
+    <Page className="gap-4 bg-ink-950 p-6">
       {([1, 2, 3, 4, 5, 6] as const).map((level) => (
-        <Heading key={level} level={level} className="font-display text-text">
+        <Heading key={level} level={level} className="font-display text-ink-50">
           Heading level {level}
         </Heading>
       ))}
-      <Paragraph className="text-text">
-        Body paragraph with <Text className="font-semibold text-accent">inline text</Text> inside.
+      <Paragraph className="text-ink-50">
+        Body paragraph with <Text className={`font-semibold ${o.text}`}>inline text</Text> inside.
       </Paragraph>
       <Figure className="gap-1">
         <Text className="text-4xl">🖼️</Text>
-        <Figcaption className="text-sm text-text-muted">A caption for the figure</Figcaption>
+        <Figcaption className="text-sm text-silver-300">A caption for the figure</Figcaption>
       </Figure>
-      <Details className="rounded-md border-2 border-border p-3">
-        <Summary className="font-semibold text-text">Release notes (details/summary)</Summary>
-        <Paragraph className="pt-2 text-text-muted">Highlights from the latest release.</Paragraph>
+      <Details className="border-2 border-ink-800 bg-ink-900 p-3">
+        <Summary className="font-display text-ink-50">Release notes (details/summary)</Summary>
+        <Paragraph className="pt-2 text-silver-300">Highlights from the latest release.</Paragraph>
       </Details>
       <List className="gap-1 pl-4">
-        <ListItem className="text-text">First item</ListItem>
-        <ListItem className="text-text">Second item</ListItem>
-        <ListItem className="text-text">Third item</ListItem>
+        <ListItem className="text-ink-50">First item</ListItem>
+        <ListItem className="text-ink-50">Second item</ListItem>
+        <ListItem className="text-ink-50">Third item</ListItem>
       </List>
     </Page>
   ),
 };
 
-// Retro form grammar: each field is a label-over-control group; the fieldset
-// is a slab card whose legend sits on the border as a yellow tab; actions are
-// press-into-the-page slab buttons. Same classes the kit components use.
-const fieldLabel = 'text-xs font-bold uppercase tracking-wide text-text';
+// NYC-MON form grammar: each field is a label-over-control group in a night
+// well with a heavy ink keyline that turns orange (and glows) on focus; the
+// fieldset is a night panel whose legend is a solid orange nameplate; the
+// action is a solid face that drops into its depth plate when pressed.
+const fieldLabel = 'font-display text-sm text-ink-50';
 const control =
-  'w-full rounded-md border-2 border-border bg-surface p-3 text-text ' +
-  'placeholder:text-text-muted/70 transition-all duration-fast focus:shadow-card focus:outline-none';
+  `w-full rounded-none border-2 border-ink-800 bg-ink-950 p-3 text-ink-50 placeholder:text-ink-400 ` +
+  `transition-colors duration-fast focus:outline-none ${o.focusBorder} ${o.focusGlow} motion-reduce:transition-none`;
 
 export const FormControls: Story = {
   render: () => (
-    <Page className="max-w-content-form gap-5 bg-surface p-6">
+    <Page className="max-w-content-form gap-5 bg-ink-950 p-6">
       <Form className="gap-5">
-        <Fieldset className="flex flex-col gap-4 rounded-card border-2 border-border bg-surface-raised p-5 shadow-card">
-          <Legend className="rounded-sm border-2 border-border-strong bg-primary px-2.5 py-0.5 text-sm font-bold text-on-primary">
+        <Fieldset className="flex flex-col gap-4 border-2 border-ink-800 bg-ink-900 p-5">
+          <Legend className={`${o.face} px-2.5 py-0.5 font-display text-sm ${o.onFace}`}>
             Profile
           </Legend>
           <Label className="flex flex-col gap-1.5">
@@ -93,7 +101,7 @@ export const FormControls: Story = {
           <Label className="flex flex-col gap-1.5">
             <Text className={fieldLabel}>Bio</Text>
             <Textarea placeholder="A few words about you" className={`min-h-24 ${control}`} />
-            <Text className="text-xs text-text-muted">Shown on your public page.</Text>
+            <Text className="text-xs text-silver-300">Shown on your public page.</Text>
           </Label>
           <Label className="flex flex-col gap-1.5">
             <Text className={fieldLabel}>Role</Text>
@@ -105,15 +113,17 @@ export const FormControls: Story = {
             </Select>
           </Label>
         </Fieldset>
-        <Page className="flex-row items-center gap-3">
-          <Button className="items-center rounded-md border-2 border-border-strong bg-primary px-5 py-2.5 shadow-card transition-all duration-fast hover:bg-primary-pressed active:translate-x-[3px] active:translate-y-[3px] active:shadow-none">
-            <Text className="font-semibold text-on-primary">Save changes</Text>
+        <Page className="flex-row flex-wrap items-center gap-3">
+          <Button
+            className={`items-center rounded-none border-2 ${o.controlKeyline} ${o.face} px-5 py-2.5 shadow-[4px_4px_0_0_var(--color-orange-700)] transition-transform duration-fast active:translate-x-[4px] active:translate-y-[4px] active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 motion-reduce:transition-none`}
+          >
+            <Text className={`whitespace-nowrap font-display ${o.onFace}`}>Save changes</Text>
           </Button>
           <Button
             aria-disabled
-            className="items-center rounded-md border-2 border-border bg-surface-sunken px-5 py-2.5 opacity-50"
+            className="cursor-not-allowed items-center rounded-none border-2 border-ink-700 bg-ink-950 px-5 py-2.5"
           >
-            <Text className="font-semibold text-text-muted">Save changes</Text>
+            <Text className="whitespace-nowrap font-display text-ink-400">Save changes</Text>
           </Button>
         </Page>
       </Form>
@@ -123,25 +133,25 @@ export const FormControls: Story = {
 
 export const DataTable: Story = {
   render: () => (
-    <Page className="bg-surface p-6">
-      <Table className="w-full">
+    <Page className="bg-ink-950 p-6">
+      <Table className="w-full border-2 border-ink-800 bg-ink-900">
         <TableHeader>
-          <TableRow className="border-b-2 border-border-strong">
-            <TableHeaderCell className="p-2 text-left font-semibold text-text">Item</TableHeaderCell>
-            <TableHeaderCell className="p-2 text-left font-semibold text-text">Status</TableHeaderCell>
-            <TableHeaderCell className="p-2 text-left font-semibold text-text">Count</TableHeaderCell>
+          <TableRow className={`border-b-4 ${o.border}`}>
+            <TableHeaderCell className="p-2 text-left font-display text-ink-50">Item</TableHeaderCell>
+            <TableHeaderCell className="p-2 text-left font-display text-ink-50">Status</TableHeaderCell>
+            <TableHeaderCell className="p-2 text-left font-display text-ink-50">Count</TableHeaderCell>
           </TableRow>
         </TableHeader>
         <TableBody>
-          <TableRow className="border-b-2 border-border">
-            <TableCell className="p-2 text-text">First item</TableCell>
-            <TableCell className="p-2 text-text-muted">Active</TableCell>
-            <TableCell className="p-2 text-text-muted">63</TableCell>
+          <TableRow className="border-b-2 border-ink-800">
+            <TableCell className="p-2 text-ink-50">First item</TableCell>
+            <TableCell className={`p-2 ${o.text}`}>Active</TableCell>
+            <TableCell className="p-2 text-silver-300">63</TableCell>
           </TableRow>
           <TableRow>
-            <TableCell className="p-2 text-text">Second item</TableCell>
-            <TableCell className="p-2 text-text-muted">Draft</TableCell>
-            <TableCell className="p-2 text-text-muted">72</TableCell>
+            <TableCell className="p-2 text-ink-50">Second item</TableCell>
+            <TableCell className="p-2 text-silver-300">Draft</TableCell>
+            <TableCell className="p-2 text-silver-300">72</TableCell>
           </TableRow>
         </TableBody>
       </Table>

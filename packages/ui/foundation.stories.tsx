@@ -3,6 +3,9 @@ import {
   brand, palette, semantic, typeScale, contentWidths, radius, motion,
 } from '@acme/theme';
 import { BrandLogo } from './brand/BrandLogo';
+import { CONTROL_TONES, DISTRICTS, DISTRICT_NAME, DISTRICT_TONE, TONE_CLASSES } from './district';
+import { Heading } from './Heading';
+import { Text as KitText } from './Text';
 import { View, Text, H2 } from './tw';
 
 // PROMPT-2 foundation stories: Colors, Typography, Spacing, Content Widths.
@@ -119,6 +122,15 @@ export const Colors: Story = {
 export const Typography: Story = {
   render: () => (
     <View className="gap-4 p-6 bg-surface">
+      <View className="gap-2 border-2 border-ink-800 bg-ink-950 p-4">
+        <Text className="text-xs text-silver-300">Kit defaults: Heading with no props, then the Text scale</Text>
+        <Heading className="text-ink-50">Every block has a legend</Heading>
+        <KitText variant="title" className="text-ink-50">Title, display face</KitText>
+        <KitText variant="heading" className="text-ink-50">Heading, display face</KitText>
+        <KitText className="text-ink-50">Body stays in Space Grotesk, because running text in a poster face is hard to read.</KitText>
+        <KitText variant="caption" className="text-silver-300">Caption</KitText>
+        <KitText variant="label" tone="district" district="midtown">Label, Midtown tone</KitText>
+      </View>
       {Object.keys(typeScale).map((name) => (
         <View key={name} className="gap-1">
           <Text className="text-xs text-text-muted">{name}, font-display</Text>
@@ -161,6 +173,46 @@ export const ContentWidths: Story = {
           <View className="h-8 rounded-sm bg-accent" style={{ maxWidth: width as never, width: '100%' }} />
         </View>
       ))}
+    </View>
+  ),
+};
+
+// '<prefix>-<family>-<step>' class from the tone table, read back to its palette hex.
+const classHex = (cls: string) => {
+  const m = /-(\w+)-(\d+)$/.exec(cls.split(' ')[0] ?? '');
+  const fam = m ? (palette as unknown as Record<string, Record<string, string>>)[m[1]!] : undefined;
+  if (m && fam?.[m[2]!]) return fam[m[2]!]!;
+  return cls.endsWith('white') ? '#FFFFFF' : brand.night;
+};
+
+/**
+ * Every control tone as the components use it: the solid face with its ink,
+ * and the tone's text step on night, each with its live contrast ratio.
+ */
+export const ToneTable: Story = {
+  render: () => (
+    <View className="gap-3 bg-ink-950 p-6 md:flex-row md:flex-wrap">
+      {CONTROL_TONES.map((t) => {
+        const c = TONE_CLASSES[t];
+        const face = classHex(c.face);
+        const on = classHex(c.onFace);
+        const txt = classHex(c.text);
+        const district = DISTRICTS.find((d) => DISTRICT_TONE[d] === t);
+        return (
+          <View key={t} className="w-full gap-2 border-2 border-ink-800 bg-ink-900 p-3 md:w-56">
+            <View className="relative">
+              <View aria-hidden className={`absolute inset-0 translate-x-[4px] translate-y-[4px] ${c.plate}`} />
+              <View className={`px-3 py-2 ${c.face}`}>
+                <Text className={`font-display text-base ${c.onFace}`}>{t}</Text>
+              </View>
+            </View>
+            <Text className={`pt-1 font-display text-sm ${c.text}`}>{district ? DISTRICT_NAME[district] : 'Tone text'}</Text>
+            <Text className="text-xs text-silver-300">
+              {`Ink on face ${contrast(on, face).toFixed(2)}:1. Text on night ${contrast(txt, brand.night).toFixed(2)}:1.`}
+            </Text>
+          </View>
+        );
+      })}
     </View>
   ),
 };
