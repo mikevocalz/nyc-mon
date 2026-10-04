@@ -24,7 +24,35 @@ export interface AppleClient extends OAuthClient {
   appBundleIdentifier: string | undefined;
 }
 
+/** How SMS leaves the server (ADR 0004 §6). */
+export type SmsTransport = 'sns' | 'console';
+
+export interface SmsEnv {
+  transport: SmsTransport;
+  /** Comma-separated ISO codes from `AUTH_SMS_ALLOWED_COUNTRIES`, raw; `phone.ts` narrows them. */
+  allowedCountries: string | undefined;
+  awsRegion: string | undefined;
+  /** Registered toll-free or 10DLC number in E.164. */
+  originationNumber: string | undefined;
+}
+
+/** Headset and tablet client ids allowed to request a device code (ADR 0004 §9). */
+export const DEFAULT_DEVICE_CLIENT_IDS = ['nyc-mon-quest', 'nyc-mon-visionos', 'nyc-mon-tablet'] as const;
+
+function smsTransport(raw: string | undefined): SmsTransport | undefined {
+  const value = clean(raw);
+  if (value === undefined) return undefined;
+  if (value === 'sns' || value === 'console') return value;
+  throw new Error(`AUTH_SMS_TRANSPORT must be "sns" or "console", got "${value}".`);
+}
+
 export interface AuthEnv {
+  /** True when NODE_ENV is "production". */
+  isProduction: boolean;
+  /** SMS configuration, or `undefined` when SMS is off in this environment. */
+  sms: SmsEnv | undefined;
+  /** Client ids `deviceAuthorization` accepts. */
+  deviceClientIds: string[];
   /** Public origin of apps/admin-vite, where Better Auth issues links and cookies. */
   baseURL: string;
   /** Public origin of the product site (apps/web), if configured. */
@@ -54,7 +82,21 @@ export function readAuthEnv(): AuthEnv {
   const google = oauthClient(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET);
   const appleClient = oauthClient(process.env.APPLE_CLIENT_ID, process.env.APPLE_CLIENT_SECRET);
 
+  const transport = smsTransport(process.env.AUTH_SMS_TRANSPORT);
+  const deviceClientIds = list(process.env.AUTH_DEVICE_CLIENT_IDS);
+
   return {
+    isProduction: process.env.NODE_ENV === 'production',
+    sms:
+      transport === undefined
+        ? undefined
+        : {
+            transport,
+            allowedCountries: clean(process.env.AUTH_SMS_ALLOWED_COUNTRIES),
+            awsRegion: clean(process.env.AWS_REGION),
+            originationNumber: clean(process.env.AWS_SNS_ORIGINATION_NUMBER),
+          },
+    deviceClientIds: deviceClientIds.length > 0 ? deviceClientIds : [...DEFAULT_DEVICE_CLIENT_IDS],
     // Better Auth lives on the admin/API host (docs/adr/0003-admin-app-split.md),
     // never on the product site, so NEXT_PUBLIC_SITE_URL is not a fallback.
     baseURL: clean(process.env.BETTER_AUTH_URL) ?? 'http://localhost:5174',
