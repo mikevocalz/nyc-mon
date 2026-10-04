@@ -17,6 +17,13 @@ export interface SolidPanelProps {
   depth?: 'none' | 'sm' | 'md' | 'lg';
   /** Lit top edge: a highlight-shade band along the top of the face. Default true. */
   rim?: boolean;
+  /**
+   * `page`: the face takes the page's raised surface instead of a tone, so it
+   * is daylit in the light scheme and night in the dark one, and themed text
+   * inside reads the page palette. Use it to put copy over a busy scene
+   * without turning the page dark. Overrides `tone`. Default `tone`.
+   */
+  surface?: 'tone' | 'page';
 }
 
 /**
@@ -41,6 +48,10 @@ const solid = tv({
       apple: { plate: 'bg-apple-800', face: 'border-apple-950 bg-apple-500', rim: 'bg-apple-300' },
       ink: { plate: 'bg-ink-950', face: 'border-ink-950 bg-ink-800', rim: 'bg-ink-600' },
     },
+    surface: {
+      tone: {},
+      page: { plate: 'bg-ink-950', face: 'border-ink-950 bg-surface-raised', rim: 'bg-cta' },
+    },
     depth: {
       none: { plate: 'hidden' },
       sm: { root: 'mb-1 mr-1', plate: 'translate-x-1 translate-y-1' },
@@ -50,11 +61,14 @@ const solid = tv({
   },
 });
 
-export function SolidPanel({ children, className, tone = 'orange', depth = 'md', rim = true }: SolidPanelProps) {
-  const s = solid({ tone, depth });
+export function SolidPanel({ children, className, tone = 'orange', depth = 'md', rim = true, surface = 'tone' }: SolidPanelProps) {
+  const page = surface === 'page';
+  // A page face drops the tone classes so the surface ones are the only fill.
+  const s = solid({ tone: page ? undefined : tone, depth, surface });
   // The ink face is night in both themes, so themed tokens dropped inside it
   // (text-primary, text-muted) must resolve their dark values, as on Card.
-  const night = tone === 'ink';
+  // A page face follows the page scheme, so it never scopes night.
+  const night = !page && tone === 'ink';
   const panel = (
     <View className={s.root()}>
       <View aria-hidden className={s.plate()} />
