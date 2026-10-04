@@ -77,6 +77,7 @@ export { CityHeightfield, type CityHeightfieldProps } from './backgrounds/CityHe
 export { CityHeightfieldFlat, type CityHeightfieldFlatProps } from './backgrounds/CityHeightfieldFlat';
 // three.js on WebGPURenderer (WebGPU, WebGL2 on web without it, react-native-webgpu on native). Also '@acme/ui/three'.
 export { HolographicTerrain, type HolographicTerrainProps } from './three/HolographicTerrain';
+export { NeonTide, type NeonTideProps, type NeonTideOrigin } from './three/NeonTide';
 export { ThreeCanvas } from './three/ThreeCanvas';
 export type { ThreeBackend, ThreeCanvasHandle, ThreeCanvasProps, ThreeContext, ThreeFrame, ThreePointer, ThreeScene, ThreeSetup } from './three/types';
 export { RiverTide, type RiverTideProps, type RiverTideOrigin } from './backgrounds/RiverTide';
