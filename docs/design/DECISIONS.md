@@ -78,6 +78,18 @@ Design and product decisions made by `design-director` or handed to it by the le
 - **Reason:** Decision #4 sets daylit as the default and dark for night and the hatch. Auth forms are not a place for a theatrical night mode; the companion shell is.
 - **Decision:** M02–M07 use the semantic theme (daylit unless the OS is in dark mode). The H-Lynk shell uses the time-of-day rig. M01's shell starts in the scheme the clock picks.
 
+### D9 — Birth year is picked decade-then-year, no default
+
+- **Date:** 2026-10-04
+- **Reason:** FTC COPPA FAQ D.7 treats a preset value as non-neutral, and a native wheel always opens on a value; `screens/M04/01-research.md` flags wheels as slow with VoiceOver and Switch Control.
+- **Decision:** `YearGrid`, two taps, plus a typed alternative. Deviates from §4.1 "one tap"; the lead signs off or overrules. `screens/M04/03-direction.md`.
+
+### D10 — The Caller-name preview is a signage plate
+
+- **Date:** 2026-10-04
+- **Reason:** P4 rules out a character voice; the MTA sign band is the clearest New York cue available to a text-only screen.
+- **Decision:** new kit component `SignagePlate`, reused at M09. `screens/M07/03-direction.md`.
+
 ## Links
 
 - `docs/design/hlynk/DIRECTION.md`
