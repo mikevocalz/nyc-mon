@@ -1,0 +1,11 @@
+{
+  "name": "nyc-carousel",
+  "platforms": ["apple", "android"],
+  "coreFeatures": ["swiftui", "compose"],
+  "apple": {
+    "modules": ["NycCarouselModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.nyccarousel.NycCarouselModule"]
+  }
+}
