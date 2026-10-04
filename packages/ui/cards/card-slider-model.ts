@@ -71,3 +71,24 @@ export function progressOf(index: number, maxIndex: number): number {
 }
 
 export const pad2 = (n: number) => String(n).padStart(2, '0');
+
+/**
+ * Autoplay's next stop. With loop it wraps to the start; without, it holds
+ * on the last stop (NeonBlade's behaviour) and returns null so the timer can
+ * stop instead of ticking in place.
+ */
+export function autoplayNext(index: number, maxIndex: number, loop: boolean): number | null {
+  if (maxIndex <= 0) return null;
+  if (index >= maxIndex) return loop ? 0 : null;
+  return index + 1;
+}
+
+/**
+ * Where a mouse drag lands: past the threshold it moves one stop the way it
+ * was dragged (more for a long drag), otherwise it springs back.
+ */
+export function dragTarget(startIndex: number, dx: number, stride: number, threshold: number, maxIndex: number): number {
+  if (Math.abs(dx) < threshold || stride <= 0) return clampIndex(startIndex, maxIndex);
+  const steps = Math.max(1, Math.round(Math.abs(dx) / stride));
+  return clampIndex(startIndex + (dx < 0 ? steps : -steps), maxIndex);
+}

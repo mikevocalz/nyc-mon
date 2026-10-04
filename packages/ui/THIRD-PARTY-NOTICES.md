@@ -38,7 +38,9 @@ Ported so far:
 - `Dialog` / `DialogCard` (`variant="neon"`), `ToastCard` and `Toast`
   (`appearance="neon"`), `notify` (`variant: 'neon'`): NeonBlade's Neon Modal
   (`neon-modal`), redrawn as a building facade; keeps its size, animation,
-  glow, footer-align, close-button and backdrop props.
+  glow, footer-align, close-button, backdrop, label, dividers, border beam
+  (a window marquee), scrollable body, Escape and header props. `notify.modal`
+  opens the same facade through the sonner toasters.
 - `progress/ProgressBar`, `RainLoader`, `ArrowLoader`, `CircularProgress`,
   `TurbineLoader`: NeonBlade's Progress Bar, Rain Loader, Arrow Loader,
   Circular Progress and Turbine Loader, redrawn as a building skyline, window
@@ -54,12 +56,16 @@ Ported so far:
 - `TextField`, `Textarea`, `Select`, `Checkbox` and `Switch` `variant="neon"`:
   ports of NeonBlade's neon input, neon select, neon checkbox and neon toggle.
 - `cards/CardSlider`: port of NeonBlade's card slider (`visibleCount`, `gap`,
-  `showButtons`, `showProgress`, `progressStyle`, `loop`).
+  `showButtons`, `buttonPosition`, `buttonVisibility`, `prevButtonCorner`,
+  `nextButtonCorner`, `enableSwipe`, `swipeThreshold`, `showProgress`,
+  `progressStyle`, `loop`, `autoPlay`, `autoPlayInterval`, `showEdgeFades`,
+  `edgeFadeColor`, `showCornerAccents`, `cornerAccentStyle`, `scanLines`).
 - `charts/`: NeonLineChart, NeonSparkline, NeonBarChart, NeonDonutChart and
   StatCard keep the prop names of NeonBlade's neon-line-chart, neon-sparkline,
   neon-bar-chart, neon-donut-chart and stat-card (data, series, dataKey,
-  xAxisKey, area, grid, legend, glowIntensity, barGap, multiColor,
-  paddingAngle, cornerRadius, centerLabel, trend, change, sparkData...).
+  xAxisKey, area, grid, legend, glowIntensity, barGap, radius, multiColor,
+  dots, curve, paddingAngle, cornerRadius, centerLabel, color, tooltip,
+  trend, change, sparkData, background...).
 - `DataTable` `variant="neon"`: NeonBlade's neon-table (title, striped,
   compact, grid, corners, pageSize, emptyText, loading, rowHover).
 - `Text` `variant="glitch" | "neonGlow" | "outline" | "blur"`: NeonBlade's
@@ -69,10 +75,13 @@ Ported so far:
 - `nav/NavBar`, `nav/SiteFooter`: NeonBlade's navbar and footer (items with
   dropdown children, position, transparency, navAlign; footer variants
   minimal, columns, centered, mega, linkGroups, socialLinks, newsletter).
-- `cursors/`: `PointerCursor` covers NeonBlade's fox-cursor (redrawn as an
-  arrow, no fox) and `Crosshair` covers its crosshair (redrawn as a
-  rounded-square reticle); both keep hideNativeCursor, disabled,
+- `cursors/`: `MouseCursor` covers NeonBlade's fox-cursor, redrawn as an
+  animated city mouse that chases the pointer (no fox); `PointerCursor` is
+  a separate NYC-MON arrow; `Crosshair` covers its crosshair (redrawn as a
+  rounded-square reticle). All keep hideNativeCursor, disabled,
   containerRef and glowIntensity.
+- `NeonBlade.stories.tsx` and `neonblade/catalog.ts`: an index of all 41
+  NeonBlade components and their ports, with links to the NeonBlade site.
 
 NeonBlade UI is distributed under the MIT License:
 

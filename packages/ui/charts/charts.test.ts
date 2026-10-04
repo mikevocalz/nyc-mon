@@ -3,7 +3,7 @@ import test from 'node:test';
 import { brand, palette } from '@acme/theme';
 import {
   bandAt, barLayout, buildingWindows, categoryLabels, describeSeries, donutSegments, formatValue,
-  linePoints, nearestIndex, niceTicks, polar, resolveSeries, segmentAt, smoothPath,
+  curvePath, linePoints, nearestIndex, niceTicks, polar, resolveSeries, segmentAt, smoothPath,
 } from './chart-model.ts';
 import { keylineFor, seriesColor, seriesShades } from './district-tones.ts';
 import { skylineProfile } from '../nav/skyline-profile.ts';
@@ -142,4 +142,18 @@ test('skyline profiles are deterministic per district and fill the width', () =>
   // Harlem rows sit low; downtown towers rise higher on average.
   const avg = (d: Parameters<typeof skylineProfile>[0]) => skylineProfile(d, 40).reduce((s, b) => s + b.height, 0) / 40;
   assert.ok(avg('downtown') > avg('harlem'));
+});
+
+test('curve types: linear joins points, steps hold values, smooth kinds use the spline', () => {
+  const pts = [{ x: 0, y: 10 }, { x: 10, y: 0 }, { x: 20, y: 5 }];
+  assert.deepEqual(curvePath(pts, 'linear'), [
+    { type: 'M', x: 0, y: 10 }, { type: 'L', x: 10, y: 0 }, { type: 'L', x: 20, y: 5 },
+  ]);
+  assert.deepEqual(curvePath(pts, 'stepAfter').slice(1, 3), [{ type: 'L', x: 10, y: 10 }, { type: 'L', x: 10, y: 0 }]);
+  assert.deepEqual(curvePath(pts, 'stepBefore').slice(1, 3), [{ type: 'L', x: 0, y: 0 }, { type: 'L', x: 10, y: 0 }]);
+  assert.deepEqual(curvePath(pts, 'step').slice(1, 4), [
+    { type: 'L', x: 5, y: 10 }, { type: 'L', x: 5, y: 0 }, { type: 'L', x: 10, y: 0 },
+  ]);
+  assert.deepEqual(curvePath(pts, 'monotone'), smoothPath(pts));
+  assert.deepEqual(curvePath(pts), smoothPath(pts));
 });

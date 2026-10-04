@@ -8,5 +8,8 @@ export {
 export { notchPolygon, notchClipPath, DEFAULT_NOTCH, type NotchSide, type NotchShape } from './notch';
 export { NotchFrame, type NotchFrameProps } from './NotchFrame';
 export { BeamFrame, type BeamFrameProps, type BeamVariant } from './BeamFrame';
-export { CardSlider, type CardSliderProps, type CardSliderProgressStyle } from './CardSlider';
+export {
+  CardSlider, type CardSliderProps, type CardSliderProgressStyle, type CardSliderButtonPosition,
+  type CardSliderButtonVisibility, type CardSliderCornerAccentStyle,
+} from './CardSlider';
 export { visibleFor, sliderMetrics, type VisibleCount } from './card-slider-model';

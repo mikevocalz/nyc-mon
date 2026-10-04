@@ -1,3 +1,5 @@
+import type { CurveType } from './chart-model';
+
 export type GlowLevel = 'none' | 'low' | 'medium' | 'high';
 
 export const GLOW_BLUR: Record<GlowLevel, number> = { none: 0, low: 3, medium: 6, high: 10 };
@@ -36,4 +38,9 @@ export interface LinePlotProps {
   reduced: boolean;
   /** Inset so the stroke and the selection dot never clip. */
   pad: number;
+  /**
+   * Line shape. Web draws every kind; native draws react-native-graph's
+   * spline, so non-smooth kinds fall back to the Skia plot there.
+   */
+  curve?: CurveType;
 }

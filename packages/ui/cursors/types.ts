@@ -18,7 +18,31 @@ interface CursorBase {
   glowIntensity?: CursorGlow;
 }
 
-/** The NYC-MON pointer, standing in for NeonBlade's FoxCursor. */
+/**
+ * NeonBlade's FoxCursor as an animated NYC-MON city mouse that chases the
+ * pointer, sits and nibbles its pizza when the pointer rests.
+ */
+export interface MouseCursorProps extends Omit<CursorBase, 'hideNativeCursor'> {
+  /** Drawing width in px. Default 48. */
+  size?: number;
+  /** chase: runs after the pointer and catches up. snap: nose pinned to the pointer, like the fox. Default chase. */
+  follow?: 'chase' | 'snap';
+  /** Chase speed, share of the gap closed per second (higher is quicker). Default 8. */
+  speed?: number;
+  /** ms the pointer must rest before the mouse sits down. Default 900. */
+  idleAfter?: number;
+  /** The slice of pizza it carries. Default true. */
+  pizza?: boolean;
+  /** Glow colour. Default royal. */
+  glowColor?: NeonColorInput;
+  /**
+   * Hide the OS cursor. Default false: the mouse runs behind the pointer, so
+   * the arrow stays for precise pointing. Turn on with follow="snap".
+   */
+  hideNativeCursor?: boolean;
+}
+
+/** The NYC-MON arrow pointer, a separate cursor from the mouse character. */
 export interface PointerCursorProps extends CursorBase {
   /** Fill. Default orange. */
   color?: NeonColorInput;
