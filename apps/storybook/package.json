@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "storybook dev -p 6006",
     "build": "storybook build",
+    "test": "vitest run",
     "lint": "eslint",
     "typecheck": "tsc --noEmit"
   },
@@ -21,18 +22,23 @@
   "devDependencies": {
     "@acme/config": "workspace:*",
     "@storybook/addon-a11y": "catalog:",
+    "@storybook/addon-vitest": "10.6.1",
     "@storybook/react-vite": "catalog:",
     "@tailwindcss/postcss": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@vitejs/plugin-react": "catalog:",
+    "@vitest/browser-playwright": "^5.0.3",
+    "@vitest/coverage-v8": "^5.0.3",
     "eslint": "catalog:",
     "eslint-config-expo": "catalog:",
     "expo": "catalog:",
+    "playwright": "^1.63.0",
     "storybook": "catalog:",
     "tailwindcss": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
-    "vite-plugin-react-native-web": "catalog:"
+    "vite-plugin-react-native-web": "catalog:",
+    "vitest": "^5.0.3"
   }
 }

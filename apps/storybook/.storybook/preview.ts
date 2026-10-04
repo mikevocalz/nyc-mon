@@ -10,7 +10,9 @@ const preview: Preview = {
         order: ['NeonBlade', ['Index', ['All components', '*']], 'Charts', ['All charts', '*'], '*'],
       },
     },
+
     controls: { matchers: { color: /(background|color)$/i } },
+
     viewport: {
       options: {
         phone: { name: 'Phone', styles: { width: '390px', height: '844px' } },
@@ -18,6 +20,13 @@ const preview: Preview = {
         tabletLandscape: { name: 'Tablet landscape', styles: { width: '1194px', height: '834px' } },
       },
     },
+
+    a11y: {
+      // 'todo' - show a11y violations in the test UI only
+      // 'error' - fail CI on a11y violations
+      // 'off' - skip a11y checks entirely
+      test: 'todo'
+    }
   },
   globalTypes: {
     theme: {

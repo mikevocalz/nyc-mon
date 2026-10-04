@@ -28,7 +28,7 @@ const VITE_DEFAULT_EXTENSIONS = ['.mjs', '.js', '.mts', '.ts', '.jsx', '.tsx', '
 const config: StorybookConfig = {
   framework: '@storybook/react-vite',
   typescript: { reactDocgen: false },
-  addons: ['@storybook/addon-a11y'],
+  addons: ['@storybook/addon-a11y', '@storybook/addon-vitest'],
   stories: [
     '../../../packages/ui/*.stories.@(ts|tsx)',
     '../../../packages/ui/primitives/*.stories.@(ts|tsx)',
