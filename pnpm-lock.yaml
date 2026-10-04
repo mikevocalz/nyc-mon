@@ -213,8 +213,8 @@ catalogs:
       specifier: 7.5.0
       version: 7.5.0
     '@reactvision/react-viro':
-      specifier: 3.0.2
-      version: 3.0.2
+      specifier: github:mikevocalz/viro#5393d00744f448fc462ef13ee76b1346fc47512e
+      version: git+https://github.com/mikevocalz/viro.git#5393d00744f448fc462ef13ee76b1346fc47512e
     '@reactvision/viro-web-renderer':
       specifier: 1.0.1
       version: 1.0.1
@@ -534,7 +534,7 @@ importers:
         version: 7.5.0(react-native@0.88.0-rc.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0-rc.3(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0)
       '@reactvision/react-viro':
         specifier: 'catalog:'
-        version: 3.0.2(@reactvision/viro-web-renderer@1.0.1)(expo@58.0.3)(react-native-web@0.21.3(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-native@0.88.0-rc.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0-rc.3(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0)
+        version: git+https://github.com/mikevocalz/viro.git#5393d00744f448fc462ef13ee76b1346fc47512e(bbb1974c15b26f91fe29d6c02c6b0802)
       '@rive-app/react-native':
         specifier: 'catalog:'
         version: 0.5.2(react-native-nitro-modules@0.37.1(react-native@0.88.0-rc.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0-rc.3(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0))(react-native@0.88.0-rc.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0-rc.3(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0)
@@ -782,7 +782,7 @@ importers:
         version: 4.0.0-canary.37(@types/react@19.3.0)(monaco-editor@0.55.1)(payload@4.0.0-canary.37(graphql@16.14.2)(supports-color@8.1.1)(typescript@6.0.3))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(supports-color@8.1.1)(typescript@6.0.3)
       '@reactvision/react-viro':
         specifier: 'catalog:'
-        version: 3.0.2(@reactvision/viro-web-renderer@1.0.1)(expo@58.0.3)(react-native-web@0.21.3(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-native@0.88.0-rc.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0-rc.3(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0)
+        version: git+https://github.com/mikevocalz/viro.git#5393d00744f448fc462ef13ee76b1346fc47512e(bbb1974c15b26f91fe29d6c02c6b0802)
       '@reactvision/viro-web-renderer':
         specifier: 'catalog:'
         version: 1.0.1
@@ -1049,7 +1049,7 @@ importers:
         version: link:../ui
       '@reactvision/react-viro':
         specifier: 'catalog:'
-        version: 3.0.2(@reactvision/viro-web-renderer@1.0.1)(expo@58.0.3)(react-native-web@0.21.3(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-native@0.88.0-rc.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0-rc.3(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0)
+        version: git+https://github.com/mikevocalz/viro.git#5393d00744f448fc462ef13ee76b1346fc47512e(bbb1974c15b26f91fe29d6c02c6b0802)
       '@reactvision/viro-web-renderer':
         specifier: 'catalog:'
         version: 1.0.1
@@ -3536,20 +3536,31 @@ packages:
   '@react-navigation/routers@7.6.4':
     resolution: {integrity: sha512-GI7eJm8/KsZUQaYcXvEExikKurRZRgEsSzyZ7faENfi65yqJBCXjDMwyN1pF6pNW1MoLH1ErDwDivFxY6BzD3w==}
 
-  '@reactvision/react-viro@3.0.2':
-    resolution: {integrity: sha512-KVkDEivVXCFTm6rEfN36kCe1fr2UiyRzTo85zyTdco5sgKCTGps5Vr/CpBeIeefH3yHIwGESsBeSv7nC10B/AQ==}
-    engines: {react-native: '>=0.86.0 <0.87.0'}
+  '@reactvision/react-viro@git+https://github.com/mikevocalz/viro.git#5393d00744f448fc462ef13ee76b1346fc47512e':
+    resolution: {commit: 5393d00744f448fc462ef13ee76b1346fc47512e, repo: https://github.com/mikevocalz/viro.git, type: git}
+    version: 3.0.2-moyo.1
+    engines: {react-native: '>=0.86.0 <0.89.0'}
+    hasBin: true
     peerDependencies:
-      '@reactvision/react-native-visionos': '>=0.86.0 <0.87.0'
+      '@metavr/layout-compat': ^1.0.0
+      '@metavr/layout-window-compat': ^1.0.0
+      '@reactvision/react-native-visionos': '>=0.86.0 <0.89.0'
       '@reactvision/viro-web-renderer': ^1.0.1
-      expo: '>=57.0.0 <58.0.0'
+      '@viro-external/specs': '>=0.2.0-rc.1 <0.3.0'
+      expo: '>=57.0.0 <59.0.0'
       react: 19.3.0
-      react-native: '>=0.86.0 <0.87.0'
+      react-native: '>=0.86.0 <0.89.0'
       react-native-web: '>=0.19.0'
     peerDependenciesMeta:
+      '@metavr/layout-compat':
+        optional: true
+      '@metavr/layout-window-compat':
+        optional: true
       '@reactvision/react-native-visionos':
         optional: true
       '@reactvision/viro-web-renderer':
+        optional: true
+      '@viro-external/specs':
         optional: true
       expo:
         optional: true
@@ -11553,14 +11564,24 @@ snapshots:
     dependencies:
       nanoid: 3.3.18
 
-  '@reactvision/react-viro@3.0.2(@reactvision/viro-web-renderer@1.0.1)(expo@58.0.3)(react-native-web@0.21.3(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-native@0.88.0-rc.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0-rc.3(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0)':
+  '@reactvision/react-viro@git+https://github.com/mikevocalz/viro.git#5393d00744f448fc462ef13ee76b1346fc47512e(bbb1974c15b26f91fe29d6c02c6b0802)':
     dependencies:
+      '@babel/parser': 7.29.7
+      '@babel/traverse': 7.29.7(supports-color@8.1.1)
       react: 19.3.0
       react-native: 0.88.0-rc.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0-rc.3(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1)
+      zustand: 5.0.15(@types/react@19.3.0)(react@19.3.0)(use-sync-external-store@1.6.0(react@19.3.0))
     optionalDependencies:
+      '@metavr/layout-compat': 1.0.0(react-native@0.88.0-rc.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0-rc.3(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0)
+      '@metavr/layout-window-compat': 1.0.0(react-native@0.88.0-rc.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0-rc.3(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0)
       '@reactvision/viro-web-renderer': 1.0.1
       expo: 58.0.3(234bffef070c2e75b0461e220a930265)
       react-native-web: 0.21.3(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+    transitivePeerDependencies:
+      - '@types/react'
+      - immer
+      - supports-color
+      - use-sync-external-store
 
   '@reactvision/viro-web-renderer@1.0.1': {}
 
