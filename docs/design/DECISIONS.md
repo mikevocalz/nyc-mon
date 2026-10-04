@@ -60,7 +60,7 @@ Design and product decisions made by `design-director` or handed to it by the le
 - **Reason:** Decision #7; `orange-500` on `concrete-50` is 2.38:1.
 - **Decision:** new `cta` / `on-cta` tokens (orange face, black label, 8.02:1). One orange button per screen at most. `docs/DESIGN_SYSTEM.md`.
 
-### D6 — Entry body colour stays open (concrete proposal), pending Q5
+### D6 — Entry body colour stays open (concrete proposal), pending Q5 (superseded by D11)
 
 - **Date:** 2026-10-04
 - **Reason:** v11 says only "Entry is plastic"; the build prompt contradicts itself (§1.1 Knicks blue, §1.3 concrete grey). `docs/canon/OPEN_QUESTIONS.md` Q5.
@@ -89,6 +89,20 @@ Design and product decisions made by `design-director` or handed to it by the le
 - **Date:** 2026-10-04
 - **Reason:** P4 rules out a character voice; the MTA sign band is the clearest New York cue available to a text-only screen.
 - **Decision:** new kit component `SignagePlate`, reused at M09. `screens/M07/03-direction.md`.
+
+### D11 — The chrome is the H-Lynk Core: red body, black head and controls (supersedes D6)
+
+- **Date:** 2026-10-04
+- **Reason:** canon Decision #16 (commit 9609b0d) closes Q5. The tier sheet makes the Entry tier the **H-Lynk Core** in matte red, with a black scanner head, black controls and a bottom row of home, menu, trackpad, back and forward.
+- **Decision:**
+  - Body `apple-600` #D50000. It is the darkest kit red where black controls keep a 3:1 edge (3.83:1). On `apple-700`, black keys measure 2.80:1.
+  - The LED, emitters and trackpad ring sit on black (4.99:1), never on the body (1.30:1).
+  - Only white ink goes on the body (5.48:1).
+  - The body stays red in daylit and night.
+  - Components take `tier: 'core' | 'standard' | 'pro'`.
+  - No EngineX mark (Q40). The sheet's on-screen UI is layout reference only (Q41, Q42).
+  - D3's "dark well" holds in a new form: the black scanner head is the well.
+- **Docs:** `hlynk/DIRECTION.md`, `docs/DESIGN_SYSTEM.md` (`hlynk.core` group, re-measured pairs, forbidden list), `screens/M01/03-direction.md`, `screens/M01/04-components.md`.
 
 ## Links
 
