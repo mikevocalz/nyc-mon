@@ -17,8 +17,8 @@
 // free, whereas cross-file @import resolution inside a package is not.
 import { writeFileSync } from 'node:fs';
 import {
-  palette, semantic, fontFamilies, typeScale, contentWidths,
-  radius, shadows, zIndex, motion, breakpoints,
+  palette, semantic, fontFamilies, typeScale, typeRamp, contentWidths,
+  radius, shadows, zIndex, motion, motionTokens, breakpoints, led, hlynk,
 } from './tokens.ts';
 
 const HEADER = '/* GENERATED from tokens.ts — do not edit by hand. `node build-css.mjs` */';
@@ -45,6 +45,23 @@ const sharedThemeTokens = () => {
     out.push(`  --text-${name}: ${t.size};`);
     out.push(`  --text-${name}--line-height: ${t.lineHeight};`);
     out.push(`  --text-${name}--letter-spacing: ${t.tracking};`);
+  }
+
+  // H-Lynk chrome colours: scheme-invariant (the body is plastic), so plain
+  // @theme entries → bg-led-on, border-hlynk-core-black, ...
+  for (const [key, hex] of Object.entries(led)) out.push(`  --color-led-${key}: ${hex};`);
+  for (const [tier, group] of Object.entries(hlynk)) {
+    for (const [key, hex] of Object.entries(group)) {
+      const kebab = key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
+      out.push(`  --color-hlynk-${tier}-${kebab}: ${hex};`);
+    }
+  }
+
+  // mobile type ramp → text-type-* utilities (size + line height + weight)
+  for (const [name, t] of Object.entries(typeRamp)) {
+    out.push(`  --text-${name}: ${t.sizePt}px;`);
+    out.push(`  --text-${name}--line-height: ${t.lineHeightPt}px;`);
+    out.push(`  --text-${name}--font-weight: ${t.weight};`);
   }
 
   // content widths → max-w-content-* utilities
@@ -76,6 +93,14 @@ const rootVars = () => {
   for (const [name, value] of Object.entries(motion.duration)) {
     out.push(`  --duration-${name}: ${value};`);
   }
+  // Named motion: each tween and its reduced sibling (instant/absent → 0ms).
+  const ms = (step) => (step.kind === 'tween' ? `${step.durationMs}ms` : step.kind === 'breathe' ? `${step.periodMs}ms` : null);
+  for (const [name, { full, reduced }] of Object.entries(motionTokens)) {
+    const f = ms(full);
+    if (f === null) continue;
+    out.push(`  --duration-${name}: ${f};`);
+    out.push(`  --duration-${name}-reduced: ${ms(reduced) ?? '0ms'};`);
+  }
   return out;
 };
 
@@ -97,7 +122,7 @@ for (const [name, { light, dark }] of Object.entries(semantic)) {
 web.push('}');
 web.push('');
 web.push(':root {');
-web.push('  color-scheme: dark; /* NYC Mon is dark-first; override via [data-theme] */');
+web.push('  color-scheme: light; /* daylit by default (canon Decision #4); night via [data-theme], scheme-dark, NightScope */');
 web.push(...rootVars());
 web.push('}');
 web.push('');

@@ -77,6 +77,18 @@
   --color-ink-800: #25293D;
   --color-ink-900: #14182E;
   --color-ink-950: #00041C;
+  --color-concrete-50: #F3F4F4;
+  --color-concrete-100: #EBECED;
+  --color-concrete-200: #D2D4D6;
+  --color-concrete-300: #B8BBBE;
+  --color-concrete-400: #9A9EA2;
+  --color-concrete-500: #7C8085;
+  --color-concrete-600: #61656A;
+  --color-concrete-700: #484C51;
+  --color-concrete-800: #303337;
+  --color-concrete-900: #1C1E21;
+  --color-signage-black: #000000;
+  --color-signage-white: #FFFFFF;
   --color-white: #FFFFFF;
   --color-burgundy-50: #FFF7F0;
   --color-burgundy-100: #FFEDDB;
@@ -172,6 +184,34 @@
   --text-display-sm: 1.875rem;
   --text-display-sm--line-height: 1.2;
   --text-display-sm--letter-spacing: 0;
+  --color-led-on: #F80000;
+  --color-led-off: #5E0000;
+  --color-hlynk-core-body: #D50000;
+  --color-hlynk-core-black: #000000;
+  --color-hlynk-core-ring: #F80000;
+  --color-hlynk-core-glyph: #DFE0E1;
+  --color-hlynk-core-glyph-pressed: #FFFFFF;
+  --color-hlynk-core-glyph-disabled: #484C51;
+  --color-hlynk-core-ink: #FFFFFF;
+  --color-hlynk-core-hatch-rim: #FC7C00;
+  --text-type-station: 34px;
+  --text-type-station--line-height: 38px;
+  --text-type-station--font-weight: 400;
+  --text-type-title: 24px;
+  --text-type-title--line-height: 30px;
+  --text-type-title--font-weight: 700;
+  --text-type-body: 17px;
+  --text-type-body--line-height: 24px;
+  --text-type-body--font-weight: 400;
+  --text-type-body-strong: 17px;
+  --text-type-body-strong--line-height: 24px;
+  --text-type-body-strong--font-weight: 600;
+  --text-type-label: 15px;
+  --text-type-label--line-height: 20px;
+  --text-type-label--font-weight: 500;
+  --text-type-caption: 13px;
+  --text-type-caption--line-height: 18px;
+  --text-type-caption--font-weight: 400;
   --container-content-form: 28rem;
   --container-content-feed: 38rem;
   --container-content-prose: 65ch;
@@ -217,21 +257,24 @@
 @layer theme {
   :root {
     @variant light {
-      --color-bg: #F8F8F8;
-      --color-surface: #F8F8F8;
+      --color-bg: #F3F4F4;
+      --color-surface: #F3F4F4;
       --color-surface-raised: #FFFFFF;
-      --color-surface-sunken: #ECECED;
-      --color-text: #00041C;
-      --color-text-muted: #545767;
+      --color-surface-sunken: #EBECED;
+      --color-text: #000000;
+      --color-text-muted: #61656A;
       --color-text-inverse: #F8F8F8;
       --color-primary: #A35100;
       --color-primary-pressed: #884300;
       --color-on-primary: #FFFFFF;
+      --color-cta: #FC7C00;
+      --color-cta-pressed: #FD9D40;
+      --color-on-cta: #000000;
       --color-accent: #0058F8;
       --color-accent-pressed: #004CD9;
       --color-on-accent: #FFFFFF;
       --color-structure: #0058F8;
-      --color-border: #D8D8DB;
+      --color-border: #D2D4D6;
       --color-border-strong: #0058F8;
       --color-focus: #0058F8;
       --color-success: #2C7A29;
@@ -240,8 +283,8 @@
       --color-on-danger: #FFFFFF;
       --color-info: #295D8E;
       --color-on-info: #FFFFFF;
-      --color-glow: #0058F833;
-      --color-glow-hot: #FC7C0033;
+      --color-glow: #0058F800;
+      --color-glow-hot: #FC7C0000;
     }
     @variant dark {
       --color-bg: #00041C;
@@ -254,6 +297,9 @@
       --color-primary: #FC7C00;
       --color-primary-pressed: #FD9D40;
       --color-on-primary: #00041C;
+      --color-cta: #FC7C00;
+      --color-cta-pressed: #FD9D40;
+      --color-on-cta: #00041C;
       --color-accent: #4BA8F0;
       --color-accent-pressed: #78BEF4;
       --color-on-accent: #00041C;
@@ -285,6 +331,20 @@
   --duration-base: 200ms;
   --duration-slow: 300ms;
   --duration-slower: 500ms;
+  --duration-motion-tap: 120ms;
+  --duration-motion-tap-reduced: 120ms;
+  --duration-motion-step: 200ms;
+  --duration-motion-step-reduced: 120ms;
+  --duration-motion-enter: 300ms;
+  --duration-motion-enter-reduced: 200ms;
+  --duration-motion-scheme: 500ms;
+  --duration-motion-scheme-reduced: 0ms;
+  --duration-motion-power-on: 240ms;
+  --duration-motion-power-on-reduced: 0ms;
+  --duration-motion-led-breath: 4000ms;
+  --duration-motion-led-breath-reduced: 0ms;
+  --duration-motion-scan-fan: 400ms;
+  --duration-motion-scan-fan-reduced: 0ms;
 }
 
 @layer base {

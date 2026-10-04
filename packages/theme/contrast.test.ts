@@ -12,7 +12,7 @@ import {
   measureForbidden,
   relativeLuminance,
 } from './contrast.ts';
-import { semantic } from './tokens.ts';
+import { hlynk, led, motion, motionTokens, semantic, typeRamp, type MotionToken } from './tokens.ts';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -73,6 +73,52 @@ test('Law 10: every semantic token is measured', () => {
   const measured = new Set(PAIRS.flatMap((p) => [p.fg, ...p.bg]).map((n) => n.split('/')[0]));
   for (const token of Object.keys(semantic)) {
     assert.ok(measured.has(token), `semantic token "${token}" has no contrast measurement`);
+  }
+});
+
+test('Law 10: every LED and H-Lynk token is measured', () => {
+  const measured = new Set(PAIRS.flatMap((p) => [p.fg, ...p.bg]).map((n) => n.split('/')[0]));
+  for (const key of Object.keys(led)) assert.ok(measured.has(`led-${key}`), `led.${key} has no contrast measurement`);
+  for (const [tier, group] of Object.entries(hlynk)) {
+    for (const key of Object.keys(group)) {
+      const kebab = key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
+      assert.ok(measured.has(`hlynk-${tier}-${kebab}`), `hlynk.${tier}.${key} has no contrast measurement`);
+    }
+  }
+});
+
+test('§0A.2: every motion token has an authored reduced-motion sibling', () => {
+  const durations = new Set(Object.values(motion.duration).map((d) => Number.parseInt(d, 10)));
+  for (const [name, { full, reduced }] of Object.entries(motionTokens) as [string, MotionToken][]) {
+    assert.notDeepEqual(reduced, full, `${name}: reduced is a copy of full`);
+    // Reduced never adds movement: no scale or travel, and never longer than full.
+    if (reduced.kind === 'tween') {
+      assert.equal(reduced.scale, undefined, `${name}: reduced scales`);
+      assert.equal(reduced.risePt, undefined, `${name}: reduced rises`);
+      assert.equal(reduced.slidePt, undefined, `${name}: reduced slides`);
+      if (full.kind === 'tween') assert.ok(reduced.durationMs <= full.durationMs, `${name}: reduced is slower than full`);
+    }
+    assert.notEqual(reduced.kind, 'breathe', `${name}: reduced loops`);
+    assert.notEqual(reduced.kind, 'blink', `${name}: reduced blinks`);
+    // WCAG 2.3.1: no more than three flashes in any one-second window. A burst
+    // is `count` flashes; bursts repeat far apart, so one window sees one burst.
+    if (full.kind === 'blink') {
+      const period = full.onMs + full.offMs;
+      const perSecond = Math.min(full.count, Math.floor(1000 / period) + 1);
+      assert.ok(perSecond <= 3, `${name}: ${perSecond} flashes in one second`);
+      assert.ok(full.intervalMs >= full.count * period + 1000, `${name}: bursts overlap one second window`);
+    }
+    // UI tweens reuse the duration scale; the LED ramp (240) and fan (400) are new by design.
+    if (full.kind === 'tween' && !['motion-power-on', 'motion-scan-fan'].includes(name)) {
+      assert.ok(durations.has(full.durationMs), `${name}: ${full.durationMs} ms is off the motion.duration scale`);
+    }
+  }
+});
+
+test('type ramp: nothing under 13 pt, line height at least the size', () => {
+  for (const [name, t] of Object.entries(typeRamp)) {
+    assert.ok(t.sizePt >= 13, `${name} is ${t.sizePt} pt`);
+    assert.ok(t.lineHeightPt >= t.sizePt, `${name} line height under its size`);
   }
 });
 

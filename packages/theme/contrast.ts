@@ -8,7 +8,7 @@
  * text or UI that measures under its threshold; docs/design/CONTRAST.md is
  * the human-readable copy of the same registry.
  */
-import { brand, palette, semantic } from './tokens.ts';
+import { brand, hlynk, led, palette, semantic } from './tokens.ts';
 
 // ---- math -------------------------------------------------------------------
 
@@ -67,9 +67,15 @@ export function isSemantic(name: string): boolean {
   return name.split('/')[0]! in SEMANTIC;
 }
 
+const LED = led as Record<string, string>;
+const HLYNK = hlynk as Record<string, Record<string, string>>;
+
 /**
  * A Tailwind colour name to RGBA: `primary`, `text-muted`, `orange-500`,
- * `white`, `night`, each with an optional `/NN` opacity modifier.
+ * `concrete-50`, `signage-black`, `white`, `night`, each with an optional
+ * `/NN` opacity modifier. The H-Lynk groups resolve as `led-<key>` and
+ * `hlynk-<tier>-<key>` (`led-on`, `hlynk-core-body`); they are not Tailwind
+ * classes, only names for the registry.
  */
 export function resolveToken(name: string, mode: Mode): Rgba {
   const [base, alpha] = name.split('/') as [string, string | undefined];
@@ -77,8 +83,13 @@ export function resolveToken(name: string, mode: Mode): Rgba {
   if (base in SEMANTIC) hex = SEMANTIC[base]![mode];
   else if (base === 'night') hex = brand.night;
   else if (base === 'white') hex = palette.white;
-  else {
-    const m = /^([a-z]+)-(\d+)$/.exec(base);
+  else if (base.startsWith('led-')) hex = LED[base.slice(4)];
+  else if (base.startsWith('hlynk-')) {
+    const [, tier, ...rest] = base.split('-') as [string, string, ...string[]];
+    const key = rest.map((w, i) => (i === 0 ? w : w[0]!.toUpperCase() + w.slice(1))).join('');
+    hex = HLYNK[tier]?.[key];
+  } else {
+    const m = /^([a-z]+)-([a-z0-9]+)$/.exec(base);
     const fam = m ? FAMILIES[m[1]!] : undefined;
     if (fam && typeof fam === 'object') hex = fam[m![2]!];
   }
@@ -151,6 +162,8 @@ const CONTRACT: Pair[] = [
     [
       ['on-primary', 'primary'],
       ['on-primary', 'primary-pressed'],
+      ['on-cta', 'cta'],
+      ['on-cta', 'cta-pressed'],
       ['on-accent', 'accent'],
       ['on-accent', 'accent-pressed'],
       ['on-success', 'success'],
@@ -188,9 +201,9 @@ const USAGE: Pair[] = [
   { id: 'unavailable slot (muted/60)', fg: 'text-muted/60', bg: ['surface-sunken'], role: 'disabled', usedAt: ['packages/app/features/schedule/BookingSurface.tsx:107'], reason: 'accessibilityState disabled (BookingSurface.tsx:96)' },
   // The grid tab bar is a night facade in both themes (palette steps, no themed
   // tokens). The 95% bar is measured over a light page, its worst case.
-  { id: 'grid tab label idle', fg: 'silver-300', bg: ['ink-50', 'ink-950/95'], role: 'text', usedAt: ['apps/mobile/components/AppTabBar.tsx:97', 'apps/mobile/components/AppTabBar.tsx:109', 'apps/mobile/components/AppTabBar.tsx:128'], reason: 'bar is bg-ink-950/95 in both themes; measured over a light page' },
-  { id: 'grid tab label active', fg: 'orange-400', bg: ['ink-50', 'ink-950/95', 'orange-500/15'], role: 'text', usedAt: ['apps/mobile/components/AppTabBar.tsx:84', 'apps/mobile/components/AppTabBar.tsx:96', 'apps/mobile/components/AppTabBar.tsx:108'] },
-  { id: 'grid tab selected edge', fg: 'orange-500/60', bg: ['ink-50', 'ink-950/95', 'orange-500/15'], role: 'ui', usedAt: ['apps/mobile/components/AppTabBar.tsx:84'] },
+  { id: 'grid tab label idle', fg: 'silver-300', bg: ['concrete-50', 'ink-950/95'], role: 'text', usedAt: ['apps/mobile/components/AppTabBar.tsx:97', 'apps/mobile/components/AppTabBar.tsx:109', 'apps/mobile/components/AppTabBar.tsx:128'], reason: 'bar is bg-ink-950/95 in both themes; measured over a light page' },
+  { id: 'grid tab label active', fg: 'orange-400', bg: ['concrete-50', 'ink-950/95', 'orange-500/15'], role: 'text', usedAt: ['apps/mobile/components/AppTabBar.tsx:84', 'apps/mobile/components/AppTabBar.tsx:96', 'apps/mobile/components/AppTabBar.tsx:108'] },
+  { id: 'grid tab selected edge', fg: 'orange-500/60', bg: ['concrete-50', 'ink-950/95', 'orange-500/15'], role: 'ui', usedAt: ['apps/mobile/components/AppTabBar.tsx:84'] },
   { id: 'grid rail label idle', fg: 'silver-300', bg: ['ink-950'], role: 'text', usedAt: ['apps/mobile/components/AppTabBar.tsx:109', 'apps/mobile/components/AppTabBar.tsx:145'] },
   { id: 'focus ring on offset band', fg: 'focus', bg: ['bg'], role: 'ui', usedAt: ['packages/ui/Button.tsx:23', 'packages/ui/IconButton.tsx:20', 'packages/ui/cards/NeonSwitch.tsx:19', 'packages/ui/cards/NeonCheckbox.tsx:13', 'packages/ui/cards/CardSlider.web.tsx:144'], reason: 'ring-offset-2 ring-offset-bg paints the page colour between the control and the ring' },
   { id: 'focus ring on night control', fg: 'focus', bg: ['ink-950'], role: 'ui', usedAt: ['packages/ui/SearchBar.tsx:26', 'packages/ui/SegmentedControl.web.tsx:16'], reason: 'no offset: the ring touches the night control face' },
@@ -202,8 +215,8 @@ const USAGE: Pair[] = [
   { id: 'profile ring hover', fg: 'border-strong', bg: ['surface'], role: 'ui', usedAt: ['apps/web/components/site/SiteHeader.tsx:203'] },
   { id: 'unread dot', fg: 'danger', bg: ['surface-raised'], role: 'ui', usedAt: ['apps/mobile/components/AppHeader.tsx:71'] },
   { id: 'theme border', fg: 'border', bg: ['surface-raised'], role: 'decorative', usedAt: ['apps/mobile/components/EventActionsSheet.tsx:42', 'apps/mobile/components/AppHeader.tsx:68'], reason: 'frame on controls whose text label or icon identifies them; separators' },
-  { id: 'neon glow', fg: 'glow', bg: ['bg'], role: 'decorative', usedAt: ['packages/theme/tokens.ts:208', 'packages/ui/district/tones.ts:126'], reason: 'box-shadow halo behind a surface that already has its own edge' },
-  { id: 'hot glow', fg: 'glow-hot', bg: ['bg'], role: 'decorative', usedAt: ['packages/theme/tokens.ts:211', 'apps/mobile/components/AppTabBar.tsx:84'], reason: 'box-shadow halo behind a surface that already has its own edge' },
+  { id: 'neon glow', fg: 'glow', bg: ['bg'], role: 'decorative', usedAt: ['packages/theme/tokens.ts:340', 'packages/ui/district/tones.ts:126'], reason: 'box-shadow halo behind a surface that already has its own edge; fully transparent on daylit (no glow in daylight)' },
+  { id: 'hot glow', fg: 'glow-hot', bg: ['bg'], role: 'decorative', usedAt: ['packages/theme/tokens.ts:343', 'apps/mobile/components/AppTabBar.tsx:84'], reason: 'box-shadow halo behind a surface that already has its own edge; fully transparent on daylit (no glow in daylight)' },
   { id: 'structure rule /40', fg: 'structure/40', bg: ['bg'], role: 'decorative', usedAt: ['apps/mobile/components/AppTabBar.tsx:128', 'apps/web/components/site/SiteFooter.tsx:28'], reason: 'section rule; no information' },
 
   // -- night facades (palette steps: mode-invariant) -------------------------
@@ -228,8 +241,8 @@ const USAGE: Pair[] = [
   { id: 'sort glyph leaf-300', fg: 'leaf-300', bg: ['ink-900'], role: 'ui', usedAt: ['packages/ui/DataTable.tsx:60'] },
   { id: 'sort glyph apple-300', fg: 'apple-300', bg: ['ink-900'], role: 'ui', usedAt: ['packages/ui/DataTable.tsx:62'] },
   { id: 'home headline on ink panel', fg: 'orange-500', bg: ['ink-800'], role: 'large-text', usedAt: ['packages/spatial/SpatialScreen.tsx:106', 'packages/ui/neon/SolidPanel.tsx:42'], reason: 'Heading display-sm (30px web, 26px native at rem 14) on the SolidPanel tone="ink" face, which is night in both themes' },
-  { id: 'orange eyebrow on glass card', fg: 'orange-500', bg: ['ink-50', 'ink-950/85'], role: 'text', usedAt: ['packages/ui/future/GridCard.tsx:29', 'packages/ui/future/CircuitButton.tsx:49'], reason: 'measured over a light page, the worst case for the 85% night glass' },
-  { id: 'carolina eyebrow on glass card', fg: 'carolina-500', bg: ['ink-50', 'ink-950/85'], role: 'text', usedAt: ['packages/ui/future/GridCard.tsx:30', 'packages/ui/future/CircuitButton.tsx:50'], reason: 'measured over a light page, the worst case for the 85% night glass' },
+  { id: 'orange eyebrow on glass card', fg: 'orange-500', bg: ['concrete-50', 'ink-950/85'], role: 'text', usedAt: ['packages/ui/future/GridCard.tsx:29', 'packages/ui/future/CircuitButton.tsx:49'], reason: 'measured over a light page, the worst case for the 85% night glass' },
+  { id: 'carolina eyebrow on glass card', fg: 'carolina-500', bg: ['concrete-50', 'ink-950/85'], role: 'text', usedAt: ['packages/ui/future/GridCard.tsx:30', 'packages/ui/future/CircuitButton.tsx:50'], reason: 'measured over a light page, the worst case for the 85% night glass' },
 
   // -- labels on tone faces ---------------------------------------------------
   { id: 'night on orange face', fg: 'ink-950', bg: ['orange-500'], role: 'text', usedAt: ['packages/ui/district/tones.ts:117', 'packages/ui/dropdown.ts:19', 'packages/ui/nav/NavBar.tsx:69'] },
@@ -276,6 +289,45 @@ const USAGE: Pair[] = [
   { id: 'night control keyline', fg: 'ink-700', bg: NIGHT, role: 'decorative', usedAt: ['packages/ui/nav/NavBar.tsx:71', 'packages/ui/DataTable.tsx:52', 'packages/ui/cards/neon-field.ts:22'], reason: 'frame around a control whose glyph or label (white / silver-100 / silver-300) identifies it' },
   { id: 'outline knock-out', fg: 'surface', bg: ['surface'], role: 'decorative', usedAt: ['packages/ui/text-effects/OutlineText.tsx:63'], reason: 'fills the glyph face with the surface; the outline stroke carries the text' },
 
+
+  // -- daylit page (Decision #4): concrete neutrals, signage-black type -------
+  // Palette steps, so one `both` row each; the semantic light column resolves to
+  // these and is measured again by the token contract above.
+  ...(['concrete-50', 'concrete-100', 'white'] as const).map((page): Pair => ({
+    id: `daylit: signage-black on ${page}`, fg: 'signage-black', bg: [page], role: 'text', usedAt: [],
+  })),
+  ...(['concrete-50', 'concrete-100', 'white'] as const).map((page): Pair => ({
+    id: `daylit: muted concrete-600 on ${page}`, fg: 'concrete-600', bg: [page], role: 'text', usedAt: [],
+  })),
+  ...(['concrete-50', 'concrete-100'] as const).map((page): Pair => ({
+    id: `daylit: secondary concrete-700 on ${page}`, fg: 'concrete-700', bg: [page], role: 'text', usedAt: [],
+  })),
+  { id: 'daylit: large/ui grey concrete-500 on page', fg: 'concrete-500', bg: ['concrete-50'], role: 'large-text', usedAt: [], reason: 'never body text; large text and marks only' },
+  { id: 'daylit: CTA label', fg: 'signage-black', bg: ['orange-500'], role: 'text', usedAt: [] },
+  { id: 'daylit: CTA pressed label', fg: 'signage-black', bg: ['orange-400'], role: 'text', usedAt: [] },
+  ...(['concrete-50', 'concrete-100'] as const).flatMap((page): Pair[] => [
+    { id: `daylit: link/focus royal-500 on ${page}`, fg: 'royal-500', bg: [page], role: 'text', usedAt: [] },
+    { id: `daylit: danger apple-600 on ${page}`, fg: 'apple-600', bg: [page], role: 'text', usedAt: [] },
+    { id: `daylit: success leaf-700 on ${page}`, fg: 'leaf-700', bg: [page], role: 'text', usedAt: [] },
+    { id: `daylit: info carolina-800 on ${page}`, fg: 'carolina-800', bg: [page], role: 'text', usedAt: [] },
+  ]),
+  { id: 'daylit: hairline concrete-200 on page', fg: 'concrete-200', bg: ['concrete-50'], role: 'decorative', usedAt: ['packages/theme/tokens.ts:150'], reason: '`border` on daylit: dividers and frames around controls whose label identifies them' },
+  { id: 'daylit: keyline concrete-400 on page', fg: 'concrete-400', bg: ['concrete-50'], role: 'decorative', usedAt: ['packages/theme/tokens.ts:78'], reason: 'decorative keylines (docs/DESIGN_SYSTEM.md concrete-400); no information' },
+
+  // -- H-Lynk Core (Decision #16): body plastic is scheme-invariant -----------
+  { id: 'hlynk: LED on in the black head', fg: 'led-on', bg: ['hlynk-core-black'], role: 'ui', usedAt: [] },
+  { id: 'hlynk: trackpad ring on pad face', fg: 'hlynk-core-ring', bg: ['hlynk-core-black'], role: 'ui', usedAt: [] },
+  { id: 'hlynk: black control edge on body', fg: 'hlynk-core-black', bg: ['hlynk-core-body'], role: 'ui', usedAt: [], reason: 'the key, pad and head edges identify each control; black is never text on the body' },
+  { id: 'hlynk: key glyph', fg: 'hlynk-core-glyph', bg: ['hlynk-core-black'], role: 'ui', usedAt: [] },
+  { id: 'hlynk: key glyph pressed', fg: 'hlynk-core-glyph-pressed', bg: ['hlynk-core-black'], role: 'ui', usedAt: [] },
+  { id: 'hlynk: text on body', fg: 'hlynk-core-ink', bg: ['hlynk-core-body'], role: 'text', usedAt: [] },
+  { id: 'hlynk: hatch rim on pad face', fg: 'hlynk-core-hatch-rim', bg: ['hlynk-core-black'], role: 'ui', usedAt: [] },
+  { id: 'hlynk: hatch orange on night', fg: 'hlynk-core-hatch-rim', bg: NIGHT, role: 'text', usedAt: [] },
+  { id: 'hlynk: body on daylit page', fg: 'hlynk-core-body', bg: ['concrete-50'], role: 'decorative', usedAt: ['packages/theme/tokens.ts:188'], reason: 'the shell is not a control; its edge needs no ratio (measures 4.98 anyway)' },
+  { id: 'hlynk: body on night page', fg: 'hlynk-core-body', bg: NIGHT, role: 'decorative', usedAt: ['packages/theme/tokens.ts:188'], reason: 'the shell is not a control; its edge needs no ratio (measures 3.70 anyway)' },
+  { id: 'hlynk: LED off in the black head', fg: 'led-off', bg: ['hlynk-core-black'], role: 'decorative', usedAt: ['packages/theme/tokens.ts:174'], reason: 'the unlit lens; LED state is never conveyed by the LED alone (a text chip sits in the screen)' },
+  { id: 'hlynk: disabled key glyph', fg: 'hlynk-core-glyph-disabled', bg: ['hlynk-core-black'], role: 'disabled', usedAt: ['packages/theme/tokens.ts:198'], reason: 'inactive key' },
+
   // -- disabled ---------------------------------------------------------------
   { id: 'disabled label', fg: 'ink-400', bg: NIGHT, role: 'disabled', usedAt: ['packages/ui/Button.tsx:48', 'packages/ui/IconButton.tsx:77', 'packages/ui/neon/NeonChevron.tsx:55', 'packages/ui/audio/PlayerShell.tsx:123'], reason: 'inactive control' },
   { id: 'disabled slider icon', fg: 'ink-700', bg: NIGHT, role: 'disabled', usedAt: ['packages/ui/cards/CardSlider.shared.tsx:158'], reason: 'inactive control' },
@@ -293,6 +345,11 @@ export interface Forbidden {
   bg: string;
   role: Exclude<Role, 'decorative' | 'disabled'>;
   rule: string;
+  /**
+   * A house floor above the role's WCAG threshold, for rules about margin
+   * rather than failure. The pair must measure under this instead.
+   */
+  floor?: number;
 }
 
 export const FORBIDDEN: readonly Forbidden[] = [
@@ -305,6 +362,12 @@ export const FORBIDDEN: readonly Forbidden[] = [
   { id: 'leaf on light', fg: 'leaf-500', bg: 'ink-50', role: 'ui', rule: 'Leaf on light fails even 3:1; use success (leaf-700).' },
   { id: 'apple on light (text)', fg: 'apple-500', bg: 'ink-50', role: 'text', rule: 'Apple on light holds 3:1 for marks only; text uses danger (apple-600).' },
   { id: 'royal on night (text)', fg: 'royal-500', bg: 'ink-950', role: 'text', rule: 'Royal reads as structure on night, never as text; royal text uses royal-300.' },
+  { id: 'orange on daylit page', fg: 'orange-500', bg: 'concrete-50', role: 'ui', rule: 'Orange is a face on daylit (cta), never text, icon or line.' },
+  { id: 'LED on Core body', fg: 'led-on', bg: 'hlynk-core-body', role: 'ui', rule: 'The LED, emitters and the trackpad ring never touch bare body plastic; they sit on black.' },
+  { id: 'apple-400 on Core body', fg: 'apple-400', bg: 'hlynk-core-body', role: 'ui', rule: 'Same for the lighter red.' },
+  { id: 'black text on Core body', fg: 'signage-black', bg: 'hlynk-core-body', role: 'text', rule: 'Black is a control face on the body, never text. Text on the body is hlynk-core-ink (white).' },
+  { id: 'concrete-900 keys on Core body', fg: 'concrete-900', bg: 'hlynk-core-body', role: 'ui', floor: 3.5, rule: 'Passes 3:1 by 0.05; too thin a margin for key edges. Core keys are pure black.' },
+  { id: 'black keys on apple-700', fg: 'signage-black', bg: 'apple-700', role: 'ui', rule: 'Why the body is not the deeper red.' },
   { id: 'brick face on night', fg: 'orange-800', bg: 'ink-950', role: 'ui', rule: 'Brick (orange-800) is a face colour; its control edge on night is orange-700.' },
 ];
 
@@ -333,5 +396,5 @@ export function measureAll(pairs: readonly Pair[] = PAIRS): Measurement[] {
 }
 
 export function measureForbidden(f: Forbidden): { ratio: number; threshold: number } {
-  return { ratio: contrastRatio(resolveToken(f.fg, 'dark'), resolveToken(f.bg, 'dark')), threshold: THRESHOLD[f.role] };
+  return { ratio: contrastRatio(resolveToken(f.fg, 'dark'), resolveToken(f.bg, 'dark')), threshold: f.floor ?? THRESHOLD[f.role] };
 }

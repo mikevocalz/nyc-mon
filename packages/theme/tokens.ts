@@ -1,7 +1,9 @@
 /**
  * @acme/theme — the single token source (PROMPT-2).
  * Brand: NYC Mon. Knicks orange, royal blue, carolina blue, leaf green,
- * candy apple red, black and white, all sampled from the logo. Dark-first.
+ * candy apple red, black and white, all sampled from the logo. Daylit by
+ * default (canon Decision #4): the light column is the city by day (concrete
+ * neutrals, MTA signage black); the dark column is night and the hatch.
  *
  * `build-css.mjs` emits theme.css (web/storybook, Tailwind v4 `@theme` with
  * light-dark()) and theme-native.css (mobile, Uniwind `@variant` theme blocks)
@@ -67,6 +69,26 @@ const ink = {
   500: '#70727F', 600: '#545767', 700: '#3C3F51', 800: '#25293D', 900: '#14182E', 950: '#00041C',
 } as const;
 
+/**
+ * City neutrals: a cool, slightly blue-grey scale sampled by eye from NYC
+ * sidewalk slab and curb. 50 is the daylit page. docs/DESIGN_SYSTEM.md
+ * "New primitive: concrete" gives each step's role.
+ */
+export const concrete = {
+  50: '#F3F4F4', 100: '#EBECED', 200: '#D2D4D6', 300: '#B8BBBE', 400: '#9A9EA2',
+  500: '#7C8085', 600: '#61656A', 700: '#484C51', 800: '#303337', 900: '#1C1E21',
+} as const;
+
+/**
+ * MTA signage black and white (1970 NYCTA Graphics Standards Manual,
+ * https://standardsmanual.com/products/nyctamanual). `black` is type on daylit
+ * neutrals and the H-Lynk Core's black parts; pure, not a tinted near-black.
+ */
+export const signage = {
+  black: '#000000',
+  white: '#FFFFFF',
+} as const;
+
 export const palette = {
   orange,
   royal,
@@ -75,6 +97,8 @@ export const palette = {
   apple,
   silver,
   ink,
+  concrete,
+  signage,
   white: '#FFFFFF',
   // Legacy scale names. Components and stories written against the starter
   // keep working; each name now points at the NYC Mon family it played.
@@ -89,30 +113,41 @@ export const palette = {
 
 // ---- semantic colors (light / dark) ----------------------------------------
 // Emitted as `light-dark(...)` so system-following is zero-code on every platform.
-// Dark is the brand's home: night base, orange hero, royal structure, carolina
-// for secondary/info. Light mode keeps the same roles with deeper tones so every
-// text pair still clears WCAG AA (ratios: `node contrast.mjs`).
+// Light is daylit and the default (Decision #4): concrete neutrals, signage-black
+// type, orange only as a face (`cta`). Dark is night and the hatch, unchanged:
+// night base, orange hero, royal structure, carolina for secondary/info.
+// Every pair is measured in contrast.ts (Law 10).
 
+/** The semantic colour roles; every value is a `{ light, dark }` pair. */
 export const semantic = {
   /** page base */
-  bg: { light: ink[50], dark: brand.night },
-  surface: { light: ink[50], dark: brand.night },
+  bg: { light: concrete[50], dark: brand.night },
+  surface: { light: concrete[50], dark: brand.night },
   'surface-raised': { light: palette.white, dark: '#0A1230' },
-  'surface-sunken': { light: ink[100], dark: '#000212' },
-  text: { light: brand.night, dark: brand.white },
-  'text-muted': { light: ink[600], dark: brand.silver },
+  'surface-sunken': { light: concrete[100], dark: '#000212' },
+  text: { light: signage.black, dark: brand.white },
+  'text-muted': { light: concrete[600], dark: brand.silver },
   'text-inverse': { light: brand.white, dark: brand.night },
-  // Orange is the hero. Light mode needs the deep step to read as text on white.
+  /**
+   * Kept for existing screens, which draw it as text (orange-700 on daylit).
+   * New screens use `cta` for the primary action face, `accent` for links and
+   * `text` for emphasis.
+   */
   primary: { light: orange[700], dark: brand.orange },
   'primary-pressed': { light: orange[800], dark: orange[400] },
   'on-primary': { light: palette.white, dark: brand.night },
+  /** Primary call to action: brand orange is a face in both schemes (Decision #7). Never text. */
+  cta: { light: orange[500], dark: brand.orange },
+  'cta-pressed': { light: orange[400], dark: orange[400] },
+  /** Label on `cta`. Never white: white on orange is 2.62:1. */
+  'on-cta': { light: signage.black, dark: brand.night },
   // Accent = the secondary voice: royal on light, carolina on night.
   accent: { light: royal[500], dark: brand.carolina },
   'accent-pressed': { light: royal[600], dark: carolina[400] },
   'on-accent': { light: palette.white, dark: brand.night },
   // Royal blue is the structure: rules, outlines, the grid's glow.
   structure: { light: royal[500], dark: royal[500] },
-  border: { light: ink[200], dark: '#1A2E6E' },
+  border: { light: concrete[200], dark: '#1A2E6E' },
   'border-strong': { light: royal[500], dark: royal[400] },
   focus: { light: royal[500], dark: brand.carolina },
   success: { light: leaf[700], dark: brand.leaf },
@@ -121,9 +156,51 @@ export const semantic = {
   'on-danger': { light: palette.white, dark: brand.night },
   info: { light: carolina[800], dark: brand.carolina },
   'on-info': { light: palette.white, dark: brand.night },
-  // Glow colours (8-digit hex, alpha baked in) for neon shadows.
-  glow: { light: '#0058F833', dark: '#0058F8A6' },
-  'glow-hot': { light: '#FC7C0033', dark: '#FC7C0080' },
+  // Glow colours (8-digit hex, alpha baked in) for neon shadows. No glow in
+  // daylight: the light value is fully transparent (alpha 00).
+  glow: { light: '#0058F800', dark: '#0058F8A6' },
+  'glow-hot': { light: '#FC7C0000', dark: '#FC7C0080' },
+} as const;
+
+/**
+ * The scanner LED (Decision #7). It always sits in the H-Lynk's black scanner
+ * head (Decision #16), so it needs no per-scheme well.
+ * @see hlynk
+ */
+export const led = {
+  /** lit lens and emitters; on `signage-black` only */
+  on: apple[500],
+  /** unlit lens; decorative */
+  off: apple[900],
+} as const;
+
+/**
+ * H-Lynk chrome, per tier (Decision #16). The body is plastic, so these do not
+ * change between daylit and night; only the page behind the device and the
+ * scene inside its screen follow the scheme. Consumed by the H-Lynk kit
+ * components only. `standard` and `pro` are added, and measured, when those
+ * tiers ship. docs/design/hlynk/DIRECTION.md maps each value to its part.
+ */
+export const hlynk = {
+  /** H-Lynk Core (Entry tier): matte red body, black head and controls. */
+  core: {
+    /** matte red body: the darkest kit red where black controls hold 3:1 */
+    body: apple[600],
+    /** scanner head, antenna, bezel, key faces, trackpad face */
+    black: signage.black,
+    /** trackpad ring, inset 4 pt on the black face */
+    ring: apple[500],
+    /** key glyphs */
+    glyph: silver[300],
+    /** pressed key glyph */
+    glyphPressed: signage.white,
+    /** disabled key glyph (exempt: inactive control) */
+    glyphDisabled: concrete[700],
+    /** any text printed on the body; white is the only ink allowed there */
+    ink: signage.white,
+    /** trackpad rim during the hatch only */
+    hatchRim: orange[500],
+  },
 } as const;
 
 /**
@@ -157,7 +234,62 @@ export const typeScale = {
   'display-sm': { size: '1.875rem', lineHeight: '1.2', tracking: '0' },
 } as const;
 
+/**
+ * Mobile type ramp (docs/DESIGN_SYSTEM.md "Type"). Sizes and line heights are
+ * points at the default Dynamic Type size; the OS scales them up to XXL.
+ * Sentence case everywhere. `station` is the one display use per screen; the
+ * `display-*` steps in {@linkcode typeScale} stay for the website.
+ * Emitted to CSS as `--text-type-<name>` (utility `text-type-<name>`).
+ */
+export const typeRamp = {
+  /** one line per screen at most: the screen's name, a Mon's name at the hatch */
+  'type-station': { family: 'display', sizePt: 34, lineHeightPt: 38, weight: 400 },
+  /** the screen's question */
+  'type-title': { family: 'sans', sizePt: 24, lineHeightPt: 30, weight: 700 },
+  /** default body copy */
+  'type-body': { family: 'sans', sizePt: 17, lineHeightPt: 24, weight: 400 },
+  /** inline emphasis and values */
+  'type-body-strong': { family: 'sans', sizePt: 17, lineHeightPt: 24, weight: 600 },
+  /** buttons, field labels, keys */
+  'type-label': { family: 'sans', sizePt: 15, lineHeightPt: 20, weight: 500 },
+  /** legal links and hints; nothing is set smaller */
+  'type-caption': { family: 'sans', sizePt: 13, lineHeightPt: 18, weight: 400 },
+} as const satisfies Record<string, TypeStep>;
+
+/** One step of {@linkcode typeRamp}. */
+export interface TypeStep {
+  /** key of {@linkcode fontFamilies} */
+  family: keyof typeof fontFamilies;
+  sizePt: number;
+  lineHeightPt: number;
+  /** CSS font weight; Archivo Black has only 400 */
+  weight: 400 | 500 | 600 | 700;
+}
+
 // ---- layout -----------------------------------------------------------------
+
+/**
+ * Spacing on a 4 pt base (docs/DESIGN_SYSTEM.md "Space and layout"). These are
+ * the only steps a screen names; Tailwind's `--spacing` (0.25rem) already
+ * produces them as `p-1`, `p-2`, `p-3`, `p-4`, `p-6`, `p-8`, `p-12`.
+ */
+export const space = {
+  1: 4, 2: 8, 3: 12, 4: 16, 6: 24, 8: 32, 12: 48,
+} as const;
+
+/** Screen layout constants in points (dp on Android). */
+export const layout = {
+  /** screen side gutter below the `md` breakpoint */
+  gutterPt: 16,
+  /** screen side gutter from `md` up */
+  gutterMdPt: 24,
+  /** gap between the primary action and the safe bottom inset */
+  actionInsetPt: 16,
+  /** minimum touch target, Apple HIG */
+  minTargetIosPt: 44,
+  /** minimum touch target, Material */
+  minTargetAndroidDp: 48,
+} as const;
 
 /** §8.2 content-width scale — width scales by adding columns, not stretching. */
 export const contentWidths = {
@@ -238,6 +370,103 @@ export const motion = {
   },
 } as const;
 
+/** An easing in {@linkcode motion.easing}. */
+export type MotionEasing = keyof typeof motion.easing;
+
+/**
+ * One authored animation, full or reduced. A discriminated union, so a reduced
+ * sibling is a design (`fade`, `color`, `steady`), not "duration 0".
+ * @see motionTokens
+ */
+export type MotionStep =
+  /** A one-shot transition. Transform fields are omitted when the step does not move. */
+  | {
+      kind: 'tween';
+      durationMs: number;
+      easing: MotionEasing;
+      /** opacity is animated */
+      fade: boolean;
+      /** colour is animated (the reduced press feedback) */
+      color: boolean;
+      /** scale at the pressed or starting end, e.g. 0.97 */
+      scale?: number;
+      /** vertical travel in points; positive rises into place */
+      risePt?: number;
+      /** horizontal travel in points */
+      slidePt?: number;
+    }
+  /** A looping opacity breath. */
+  | { kind: 'breathe'; periodMs: number; minOpacity: number; maxOpacity: number }
+  /** A burst of blinks, repeated every `intervalMs`. Under 3 flashes per second (WCAG 2.3.1). */
+  | { kind: 'blink'; count: number; onMs: number; offMs: number; intervalMs: number }
+  /** Held light with a static shape cue standing in for the rhythm. */
+  | { kind: 'steady'; cue: 'progress-ticks' | 'filled-dot' | 'exclamation-dot' }
+  /** The end state is applied in one frame. */
+  | { kind: 'instant' }
+  /** The animation is not drawn at all (decorative motion only). */
+  | { kind: 'absent' };
+
+/** A motion token: the full animation and its authored reduced-motion sibling. */
+export interface MotionToken {
+  full: MotionStep;
+  reduced: MotionStep;
+}
+
+/**
+ * Named motion (docs/DESIGN_SYSTEM.md "Motion", docs/design/hlynk/DIRECTION.md).
+ * Every token carries its reduced-motion sibling (§0A.2). Durations reuse
+ * {@linkcode motion.duration} except the LED ramp, breath and blinks.
+ */
+export const motionTokens = {
+  /** press feedback */
+  'motion-tap': {
+    full: { kind: 'tween', durationMs: 120, easing: 'standard', fade: false, color: false, scale: 0.97 },
+    reduced: { kind: 'tween', durationMs: 120, easing: 'standard', fade: false, color: true },
+  },
+  /** carousel and focus steps */
+  'motion-step': {
+    full: { kind: 'tween', durationMs: 200, easing: 'standard', fade: false, color: false, slidePt: 24 },
+    reduced: { kind: 'tween', durationMs: 120, easing: 'standard', fade: true, color: false },
+  },
+  /** content entering */
+  'motion-enter': {
+    full: { kind: 'tween', durationMs: 300, easing: 'emphasized', fade: true, color: false, risePt: 8 },
+    reduced: { kind: 'tween', durationMs: 200, easing: 'emphasized', fade: true, color: false },
+  },
+  /** daylit to night and back: a token cross-fade */
+  'motion-scheme': {
+    full: { kind: 'tween', durationMs: 500, easing: 'standard', fade: true, color: true },
+    reduced: { kind: 'instant' },
+  },
+  /** M01 boot: LED ramp and screen fade-up */
+  'motion-power-on': {
+    full: { kind: 'tween', durationMs: 240, easing: 'standard', fade: true, color: false, scale: 0.98 },
+    reduced: { kind: 'instant' },
+  },
+  /** LED while `incubating` */
+  'motion-led-breath': {
+    full: { kind: 'breathe', periodMs: 4000, minOpacity: 0.35, maxOpacity: 1 },
+    reduced: { kind: 'steady', cue: 'progress-ticks' },
+  },
+  /** one upward scanner fan sweep at M01 boot; decorative */
+  'motion-scan-fan': {
+    full: { kind: 'tween', durationMs: 400, easing: 'emphasized', fade: true, color: false },
+    reduced: { kind: 'absent' },
+  },
+  /** LED `ready`: two blinks, then steady, every 6 s */
+  'motion-led-blink-ready': {
+    full: { kind: 'blink', count: 2, onMs: 150, offMs: 150, intervalMs: 6000 },
+    reduced: { kind: 'steady', cue: 'filled-dot' },
+  },
+  /** LED `needsYou`: three blinks every 10 s */
+  'motion-led-blink-needs-you': {
+    full: { kind: 'blink', count: 3, onMs: 150, offMs: 150, intervalMs: 10000 },
+    reduced: { kind: 'steady', cue: 'exclamation-dot' },
+  },
+} as const satisfies Record<string, MotionToken>;
+
+export type MotionTokenName = keyof typeof motionTokens;
+
 export const breakpoints = {
   sm: '40rem',
   md: '48rem',
@@ -248,4 +477,5 @@ export const breakpoints = {
 
 export type Palette = typeof palette;
 export type SemanticColor = keyof typeof semantic;
+export type TypeRampStep = keyof typeof typeRamp;
 export type ContentWidth = keyof typeof contentWidths;
