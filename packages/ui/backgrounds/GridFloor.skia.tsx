@@ -25,12 +25,12 @@ function Row({
 }) {
   const clock = useClock();
   const t = useDerivedValue(() => {
-    const phase = speed === 0 ? 0 : ((clock.value / 1000) * speed * 1.5) % 1;
+    const phase = speed === 0 ? 0 : ((clock.get() / 1000) * speed * 1.5) % 1;
     return (index + phase) / rows;
   });
-  const p1 = useDerivedValue(() => vec(0, horizonY + planeHeight * t.value * t.value));
-  const p2 = useDerivedValue(() => vec(width, horizonY + planeHeight * t.value * t.value));
-  const alpha = useDerivedValue(() => Math.min((t.value * t.value) / 0.35, 1) * opacity);
+  const p1 = useDerivedValue(() => vec(0, horizonY + planeHeight * t.get() * t.get()));
+  const p2 = useDerivedValue(() => vec(width, horizonY + planeHeight * t.get() * t.get()));
+  const alpha = useDerivedValue(() => Math.min((t.get() * t.get()) / 0.35, 1) * opacity);
 
   return (
     <>
@@ -85,10 +85,12 @@ export default function GridFloorSkia({
   return (
     <View
       className={`relative flex-1 overflow-hidden ${className ?? ''}`}
+      // Caller colour prop (bgColor), not a theme token, so it can't be a class.
       style={{ backgroundColor: fill }}
       onLayout={onLayout}
     >
-      <Canvas style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
+      {/* Skia surface: Canvas takes a style, not a className. Decorative, so hidden from assistive tech. */}
+      <Canvas aria-hidden style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
         <Fill color={fill} />
         {haze ? (
           <Rect x={0} y={horizonY - height * 0.18} width={width} height={height * 0.3}>

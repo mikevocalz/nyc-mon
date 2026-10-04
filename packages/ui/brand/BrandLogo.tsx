@@ -19,6 +19,7 @@ export function BrandLogo({ size }: BrandLogoProps) {
       accessibilityLabel="NYC-MON"
       aria-label="NYC-MON"
       resizeMode="contain"
+      // Computed geometry: the size is a numeric prop, not a fixed class.
       style={{ width: size, height: size }}
     />
   );

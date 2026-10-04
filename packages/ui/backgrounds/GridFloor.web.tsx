@@ -15,6 +15,7 @@ export function GridFloor(props: GridFloorProps) {
       fallback={
         <View
           className={`flex-1 ${props.className ?? ''}`}
+          // Caller colour prop (bgColor), not a theme token, so it can't be a class.
           style={{ backgroundColor: props.bgColor ?? props.backgroundColor ?? neon.bg }}
         >
           {props.children}

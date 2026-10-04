@@ -17,12 +17,12 @@ function MovingLine({
 }) {
   const clock = useClock();
   const y = useDerivedValue(() => {
-    const phase = speed === 0 ? 0 : ((clock.value / 1000) * speed * 1.5) % 1;
+    const phase = speed === 0 ? 0 : ((clock.get() / 1000) * speed * 1.5) % 1;
     const t = (index + phase) / rows;
     return edgeY + (farY - edgeY) * t * t;
   });
-  const p1 = useDerivedValue(() => vec(0, y.value));
-  const p2 = useDerivedValue(() => vec(width, y.value));
+  const p1 = useDerivedValue(() => vec(0, y.get()));
+  const p2 = useDerivedValue(() => vec(width, y.get()));
   const alpha = Math.min(1, ((index + 1) / rows) / 0.35) * opacity;
 
   // Blurred glow underlay + crisp line on top (NeonBlade's shadowBlur look).
@@ -91,10 +91,12 @@ export default function GridSceneSkia({
   return (
     <View
       className={`relative flex-1 overflow-hidden ${className ?? ''}`}
+      // Caller colour prop (backgroundColor), not a theme token, so it can't be a class.
       style={{ backgroundColor }}
       onLayout={onLayout}
     >
-      <Canvas style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
+      {/* Skia surface: Canvas takes a style, not a className. Decorative, so hidden from assistive tech. */}
+      <Canvas aria-hidden style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
         <Fill color={backgroundColor} />
         <Group>
           {showFloor ? planeColumns(true) : null}

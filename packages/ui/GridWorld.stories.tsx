@@ -6,7 +6,8 @@ import { GridCard } from './future/GridCard';
 import { GlyphCity } from './backgrounds/GlyphCity';
 import { GridFloor, type GridFloorProps } from './backgrounds/GridFloor';
 import { GridScene } from './backgrounds/GridScene';
-import { Text, View } from './tw';
+import { Heading, Paragraph, Section } from './html';
+import { View } from './tw';
 
 const meta = {
   title: 'NYC Mon/Grid world',
@@ -24,7 +25,7 @@ export const Gateway: Story = {
   render: () => (
     <View className="h-screen min-h-[720px] bg-bg">
       <GridFloor className="flex-1" horizon={0.45} speed={0.35}>
-        <View className="absolute inset-x-0 top-0 h-[45%]" style={{ pointerEvents: 'none' }}>
+        <View className="pointer-events-none absolute inset-x-0 top-0 h-[45%]">
           <GlyphCity className="flex-1" variant="megacity" colorPrimary={neon.glow} colorSecondary={neon.line} colorTertiary={neon.glowSoft} opacity={0.5} />
         </View>
         <View className="mx-auto w-full max-w-6xl flex-1 items-center justify-center gap-8 px-6 py-10 md:flex-row">
@@ -32,10 +33,10 @@ export const Gateway: Story = {
             <BrandLogo size={300} />
           </View>
           <View className="max-w-xl flex-1 gap-4 md:order-1">
-            <Text className="font-display text-4xl text-primary md:text-6xl">Every block has a legend.</Text>
-            <Text className="text-base leading-7 text-white/80">
+            <Heading level={1} className="my-0 font-display text-4xl text-primary md:text-6xl">Every block has a legend.</Heading>
+            <Paragraph className="my-0 text-base leading-7 text-white/80">
               Race light cycles across a neon New York grid on your phone, in the browser, or in a headset.
-            </Text>
+            </Paragraph>
             <View className="flex-row flex-wrap gap-3">
               <CircuitButton tone="orange" variant="solid">Start a race</CircuitButton>
               <CircuitButton>Enter the VR grid</CircuitButton>
@@ -85,27 +86,27 @@ export const GridFloorPlayground: StoryObj<GridFloorProps> = {
 export const BackgroundSystems: Story = {
   render: () => (
     <View className="min-h-screen gap-6 bg-bg p-6">
-      <View className="h-[360px] overflow-hidden border border-structure/40">
+      <Section className="h-[360px] overflow-hidden border border-structure/40">
         <GridFloor>
           <View className="flex-1 items-center justify-center">
-            <Text className="font-display text-xl text-primary">Grid floor</Text>
+            <Heading level={2} className="my-0 font-display text-xl text-primary">Grid floor</Heading>
           </View>
         </GridFloor>
-      </View>
-      <View className="h-[360px] overflow-hidden border border-structure/40">
+      </Section>
+      <Section className="h-[360px] overflow-hidden border border-structure/40">
         <GridScene>
           <View className="flex-1 items-center justify-center">
-            <Text className="font-display text-xl text-accent">Grid scene, floor and ceiling</Text>
+            <Heading level={2} className="my-0 font-display text-xl text-accent">Grid scene, floor and ceiling</Heading>
           </View>
         </GridScene>
-      </View>
-      <View className="h-[360px] overflow-hidden border border-structure/40">
+      </Section>
+      <Section className="h-[360px] overflow-hidden border border-structure/40">
         <GridScene showCeiling={false}>
           <View className="absolute inset-x-0 bottom-0 h-2/3">
             <GlyphCity className="flex-1" variant="downtown" />
           </View>
         </GridScene>
-      </View>
+      </Section>
     </View>
   ),
 };
@@ -124,13 +125,13 @@ export const FutureControls: Story = {
       </View>
       <View className="gap-4 md:flex-row">
         <GridCard className="flex-1" title="Royal card" eyebrow="Default tone">
-          <Text className="text-sm text-white/75">Structure: rules, outlines and the glow under the grid.</Text>
+          <Paragraph className="my-0 text-sm text-white/75">Structure: rules, outlines and the glow under the grid.</Paragraph>
         </GridCard>
         <GridCard className="flex-1" title="Carolina card" tone="carolina">
-          <Text className="text-sm text-white/75">Secondary actions and information.</Text>
+          <Paragraph className="my-0 text-sm text-white/75">Secondary actions and information.</Paragraph>
         </GridCard>
         <GridCard className="flex-1" title="Orange card" tone="orange">
-          <Text className="text-sm text-white/75">The main action on a screen.</Text>
+          <Paragraph className="my-0 text-sm text-white/75">The main action on a screen.</Paragraph>
         </GridCard>
       </View>
     </View>

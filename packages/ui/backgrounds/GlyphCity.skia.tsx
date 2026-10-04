@@ -71,7 +71,7 @@ function BuildingNode({
 }) {
   const clock = useClock();
   const lightOpacity = useDerivedValue(() =>
-    blinkingLights ? 0.25 + 0.75 * Math.abs(Math.sin(clock.value / 480 + building.seed)) : 0.9,
+    blinkingLights ? 0.25 + 0.75 * Math.abs(Math.sin(clock.get() / 480 + building.seed)) : 0.9,
   );
   const top = ground - building.height;
   const tone = palette[building.tone] ?? palette[0] ?? neon.glow;
@@ -140,10 +140,10 @@ function Vehicle({
 }) {
   const clock = useClock();
   const x = useDerivedValue(() => {
-    const travel = ((clock.value / 1000) * (90 + index * 13) * speed + index * 210) % (width + 180);
+    const travel = ((clock.get() / 1000) * (90 + index * 13) * speed + index * 210) % (width + 180);
     return travel - 90;
   });
-  const transform = useDerivedValue(() => [{ translateX: x.value }]);
+  const transform = useDerivedValue(() => [{ translateX: x.get() }]);
   const y = height * (0.14 + index * 0.08);
 
   return (
@@ -182,7 +182,8 @@ export default function GlyphCitySkia({
       className={`relative flex-1 overflow-hidden ${className ?? ''}`}
       onLayout={onLayout}
     >
-      <Canvas style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
+      {/* Skia surface: Canvas takes a style, not a className. Decorative, so hidden from assistive tech. */}
+      <Canvas aria-hidden style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
         {backgroundColor !== 'transparent' ? <Fill color={backgroundColor} /> : null}
         <Group opacity={opacity}>
           <Line p1={vec(0, height - 1)} p2={vec(width, height - 1)} color={colorPrimary} opacity={0.45} strokeWidth={2} />
