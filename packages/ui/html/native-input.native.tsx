@@ -1,7 +1,7 @@
 'use client';
-import { useEffect } from 'react';
+import { useEffect, useImperativeHandle, useRef, type Ref } from 'react';
 import { Div } from '@expo/html-elements';
-import { Host, TextInput as BaseExpoTextInput, useNativeState } from '@expo/ui';
+import { Host, TextInput as BaseExpoTextInput, useNativeState, type TextInputRef } from '@expo/ui';
 import { css } from './css';
 
 /**
@@ -20,7 +20,14 @@ const ExpoTextInput = css(BaseExpoTextInput, 'ExpoTextInput');
  * exist here, and borrowing them would promise behaviour this control cannot
  * honour.
  */
+/** What a kit field exposes to its owner: focus, for a clear button that hands focus back. */
+export interface InputHandle {
+  focus: () => void;
+}
+
 export interface NativeInputProps {
+  /** Imperative handle (focus). Backed by @expo/ui's TextInputRef. */
+  ref?: Ref<InputHandle>;
   value?: string;
   onChangeText?: (text: string) => void;
   onFocus?: () => void;
@@ -64,6 +71,7 @@ export interface NativeInputProps {
  * wrapper, and only resolved values (colour, size) cross into the native view.
  */
 export function NativeInput({
+  ref,
   value,
   onChangeText,
   onFocus,
@@ -82,6 +90,8 @@ export function NativeInput({
   containerStyle,
 }: NativeInputProps) {
   const state = useNativeState(value ?? '');
+  const field = useRef<TextInputRef>(null);
+  useImperativeHandle(ref, () => ({ focus: () => field.current?.focus() }), []);
 
   // Adopt external changes — a parent clearing a query, a form reset. Compared
   // first so a JS write never echoes back over text the user is mid-way through
@@ -116,6 +126,7 @@ export function NativeInput({
     <Div style={containerStyle as never}>
       <Host matchContents={{ vertical: true, horizontal: false }}>
         <ExpoTextInput
+          ref={field}
           value={state}
           onChangeText={onChangeText}
           onFocus={onFocus}

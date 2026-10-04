@@ -247,6 +247,17 @@ const USAGE: Pair[] = [
   // on night: the themed danger (apple-600 daylit, apple-400 night).
   { id: 'field error message on page', fg: 'danger', bg: ['bg'], role: 'text', usedAt: ['packages/ui/cards/neon-field.ts:22', 'packages/ui/ErrorMessage.tsx:21', 'packages/ui/cards/NeonCheckbox.tsx:80', 'packages/ui/audio/VoiceRecorder.native.tsx:288'] },
 
+  // -- TextField surface="daylit": raised face, text-muted edge, themed throughout
+  { id: 'daylit field edge on page', fg: 'text-muted', bg: ['bg'], role: 'ui', usedAt: ['packages/ui/TextField.tsx:41'], reason: 'the 2px edge is the field boundary (SC 1.4.11)' },
+  { id: 'daylit field edge on sunken', fg: 'text-muted', bg: ['surface-sunken'], role: 'ui', usedAt: ['packages/ui/TextField.tsx:41'] },
+  { id: 'daylit field text', fg: 'text', bg: ['surface-raised'], role: 'text', usedAt: ['packages/ui/TextField.tsx:41'] },
+  { id: 'daylit field placeholder', fg: 'text-muted', bg: ['surface-raised'], role: 'text', usedAt: ['packages/ui/TextField.tsx:42'] },
+  { id: 'daylit field label', fg: 'text', bg: ['bg'], role: 'text', usedAt: ['packages/ui/TextField.tsx:39'] },
+  { id: 'daylit field error edge', fg: 'danger', bg: ['bg'], role: 'ui', usedAt: ['packages/ui/TextField.tsx:46'] },
+  { id: 'daylit field focus edge', fg: 'focus', bg: ['bg'], role: 'ui', usedAt: ['packages/ui/TextField.tsx:42'] },
+  { id: 'field clear glyph (daylit)', fg: 'text-muted', bg: ['surface-raised'], role: 'ui', usedAt: ['packages/ui/TextField.tsx:118'] },
+  { id: 'field clear glyph (well)', fg: 'silver-300', bg: NIGHT, role: 'ui', usedAt: ['packages/ui/TextField.tsx:118'] },
+
   // -- night facades (palette steps: mode-invariant) -------------------------
   { id: 'title on night', fg: 'ink-50', bg: NIGHT, role: 'text', usedAt: ['packages/ui/Card.tsx:36', 'packages/ui/cards/neon-field.ts:15', 'packages/ui/ToastCard.tsx:37'] },
   { id: 'white on night', fg: 'white', bg: NIGHT, role: 'text', usedAt: ['packages/ui/charts/StatCard.tsx:54', 'packages/ui/nav/NavBar.tsx:88', 'packages/ui/nav/SiteFooter.tsx:79'] },

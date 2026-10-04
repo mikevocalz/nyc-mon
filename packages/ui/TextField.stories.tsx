@@ -89,6 +89,46 @@ export const Neon: Story = {
   ),
 };
 
+/**
+ * `surface="daylit"`: a raised face with a `text-muted` edge and the label
+ * above in type-label `text`, for forms on the daylit page. Every colour is a
+ * theme token, so the same field reads at night. Hint, error and disabled.
+ */
+export const Daylit: Story = {
+  render: () => (
+    <View className="max-w-content-form gap-5 bg-bg p-4">
+      <TextField surface="daylit" label="Email" placeholder="you@example.com" hint="We send a code to this address." />
+      <TextField surface="daylit" label="Birth year" defaultValue="20" error="Enter all four digits of the year." />
+      <TextField surface="daylit" label="Locked" disabled defaultValue="Read only" />
+    </View>
+  ),
+};
+
+const useClearStory = create<{ value: string; setValue: (value: string) => void }>((set) => ({
+  value: 'Bodega Cee',
+  setValue: (value) => set({ value }),
+}));
+
+/** `clearButton`: a 44 pt clear control inside the field while it has text. The label is the caller's copy. */
+export const Clearable: Story = {
+  render: function Render() {
+    const { value, setValue } = useClearStory();
+    return (
+      <View className="max-w-content-form gap-5 bg-bg p-4">
+        <TextField
+          surface="daylit"
+          label="Caller name"
+          hint="Up to 16 characters."
+          value={value}
+          onChangeText={setValue}
+          clearButton={{ accessibilityLabel: 'Clear Caller name' }}
+        />
+        <TextField label="Crew name" value={value} onChangeText={setValue} clearButton={{ accessibilityLabel: 'Clear crew name' }} />
+      </View>
+    );
+  },
+};
+
 /** Rounding is opt-in. */
 export const Rounded: Story = {
   args: { label: 'Rounded' },

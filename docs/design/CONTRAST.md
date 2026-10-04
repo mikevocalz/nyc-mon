@@ -18,7 +18,7 @@ The registry lives in `packages/theme/contrast.ts`; `packages/theme/contrast.tes
 
 <!-- contrast:summary:start -->
 
-- 338 measured rows: 314 pass, 0 fail, 24 exempt (decorative or disabled).
+- 355 measured rows: 331 pass, 0 fail, 24 exempt (decorative or disabled).
 
 <!-- contrast:summary:end -->
 - Semantic tokens are measured in light and dark. Palette steps (`orange-500`, `ink-950`) do not change with the theme and get one `both` row.
@@ -173,6 +173,23 @@ The test keeps these honest: each forbidden pair below must still measure under 
 | disabled ghost label on page | both | `ink-400` #90929C | `concrete-50` #F3F4F4 | 2.81 | disabled (0) | exempt | `packages/ui/Button.tsx:48`, `packages/ui/IconButton.tsx:79`; inactive control: aria-disabled, no press handler |
 | field error message on page | light | `danger` #D50000 | `bg` #F3F4F4 | 4.98 | text (4.5) | pass | `packages/ui/cards/neon-field.ts:22`, `packages/ui/ErrorMessage.tsx:21`, `packages/ui/cards/NeonCheckbox.tsx:80`, `packages/ui/audio/VoiceRecorder.native.tsx:288` |
 | field error message on page | dark | `danger` #FA4040 | `bg` #00041C | 5.68 | text (4.5) | pass | `packages/ui/cards/neon-field.ts:22`, `packages/ui/ErrorMessage.tsx:21`, `packages/ui/cards/NeonCheckbox.tsx:80`, `packages/ui/audio/VoiceRecorder.native.tsx:288` |
+| daylit field edge on page | light | `text-muted` #61656A | `bg` #F3F4F4 | 5.33 | ui (3) | pass | `packages/ui/TextField.tsx:41`; the 2px edge is the field boundary (SC 1.4.11) |
+| daylit field edge on page | dark | `text-muted` #BEC0C2 | `bg` #00041C | 11.13 | ui (3) | pass | `packages/ui/TextField.tsx:41`; the 2px edge is the field boundary (SC 1.4.11) |
+| daylit field edge on sunken | light | `text-muted` #61656A | `surface-sunken` #EBECED | 4.96 | ui (3) | pass | `packages/ui/TextField.tsx:41` |
+| daylit field edge on sunken | dark | `text-muted` #BEC0C2 | `surface-sunken` #000212 | 11.31 | ui (3) | pass | `packages/ui/TextField.tsx:41` |
+| daylit field text | light | `text` #000000 | `surface-raised` #FFFFFF | 21.00 | text (4.5) | pass | `packages/ui/TextField.tsx:41` |
+| daylit field text | dark | `text` #F8F8F8 | `surface-raised` #0A1230 | 17.31 | text (4.5) | pass | `packages/ui/TextField.tsx:41` |
+| daylit field placeholder | light | `text-muted` #61656A | `surface-raised` #FFFFFF | 5.87 | text (4.5) | pass | `packages/ui/TextField.tsx:42` |
+| daylit field placeholder | dark | `text-muted` #BEC0C2 | `surface-raised` #0A1230 | 10.08 | text (4.5) | pass | `packages/ui/TextField.tsx:42` |
+| daylit field label | light | `text` #000000 | `bg` #F3F4F4 | 19.06 | text (4.5) | pass | `packages/ui/TextField.tsx:39` |
+| daylit field label | dark | `text` #F8F8F8 | `bg` #00041C | 19.12 | text (4.5) | pass | `packages/ui/TextField.tsx:39` |
+| daylit field error edge | light | `danger` #D50000 | `bg` #F3F4F4 | 4.98 | ui (3) | pass | `packages/ui/TextField.tsx:46` |
+| daylit field error edge | dark | `danger` #FA4040 | `bg` #00041C | 5.68 | ui (3) | pass | `packages/ui/TextField.tsx:46` |
+| daylit field focus edge | light | `focus` #0058F8 | `bg` #F3F4F4 | 5.08 | ui (3) | pass | `packages/ui/TextField.tsx:42` |
+| daylit field focus edge | dark | `focus` #4BA8F0 | `bg` #00041C | 7.89 | ui (3) | pass | `packages/ui/TextField.tsx:42` |
+| field clear glyph (daylit) | light | `text-muted` #61656A | `surface-raised` #FFFFFF | 5.87 | ui (3) | pass | `packages/ui/TextField.tsx:118` |
+| field clear glyph (daylit) | dark | `text-muted` #BEC0C2 | `surface-raised` #0A1230 | 10.08 | ui (3) | pass | `packages/ui/TextField.tsx:118` |
+| field clear glyph (well) | both | `silver-300` #DFE0E1 | `ink-950` #00041C | 15.36 | ui (3) | pass | `packages/ui/TextField.tsx:118` |
 | title on night | both | `ink-50` #F8F8F8 | `ink-950` #00041C | 19.12 | text (4.5) | pass | `packages/ui/Card.tsx:36`, `packages/ui/cards/neon-field.ts:15`, `packages/ui/ToastCard.tsx:37` |
 | white on night | both | `white` #FFFFFF | `ink-950` #00041C | 20.31 | text (4.5) | pass | `packages/ui/charts/StatCard.tsx:54`, `packages/ui/nav/NavBar.tsx:88`, `packages/ui/nav/SiteFooter.tsx:79` |
 | table cell on stripe | both | `silver-100` #F6F6F6 | `ink-900` #14182E | 16.20 | text (4.5) | pass | `packages/ui/DataTable.tsx:44`, `packages/ui/DataTable.tsx:53` |

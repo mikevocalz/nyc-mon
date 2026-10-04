@@ -12,7 +12,7 @@ import { Children, isValidElement } from 'react';
 import { Pressable, StyleSheet, type TextInputProps } from 'react-native';
 import { Div, Span } from '@expo/html-elements';
 import { Host, Picker } from '@expo/ui';
-import { NativeInput, type NativeInputProps } from './native-input.native';
+import { NativeInput, type InputHandle, type NativeInputProps } from './native-input.native';
 
 type P = { children?: React.ReactNode };
 
@@ -84,7 +84,9 @@ export const ButtonBase = ({ role, onKeyDown: _onKeyDown, ...props }: PressBaseP
   <Pressable role={(role ?? 'button') as never} {...props} />
 );
 
-export type InputBaseProps = TextInputProps;
+export type { InputHandle };
+/** RN's TextInput props, plus the kit's imperative handle (focus). */
+export type InputBaseProps = Omit<TextInputProps, 'ref'> & { ref?: React.Ref<InputHandle> };
 
 /**
  * Text fields render through `@expo/ui`'s universal TextInput (SwiftUI /
@@ -125,6 +127,7 @@ function toNativeInputProps(
     color: typeof flat.color === 'string' ? flat.color : undefined,
     fontSize: typeof flat.fontSize === 'number' ? flat.fontSize : undefined,
     containerStyle,
+    ref: props.ref,
     value: typeof props.value === 'string' ? props.value : undefined,
     onChangeText: props.onChangeText,
     onFocus: props.onFocus ? () => props.onFocus?.(undefined as never) : undefined,

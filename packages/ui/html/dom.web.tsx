@@ -99,7 +99,14 @@ export const ButtonBase = ({
   />
 );
 
+/** What a kit field exposes to its owner: focus, for a clear button that hands focus back. */
+export interface InputHandle {
+  focus: () => void;
+}
+
 export interface InputBaseProps extends P {
+  /** Imperative handle (focus). */
+  ref?: React.Ref<InputHandle>;
   value?: string;
   defaultValue?: string;
   placeholder?: string;
@@ -123,10 +130,14 @@ const ENTER_KEY_HINT: Record<string, React.HTMLAttributes<HTMLElement>['enterKey
 };
 
 export const InputBase = ({
-  onChangeText, onSubmitEditing, editable, secureTextEntry, returnKeyType,
+  ref, onChangeText, onSubmitEditing, editable, secureTextEntry, returnKeyType,
   placeholderTextColor: _ptc, numberOfLines: _n, role: _role, className, style, ...props
-}: InputBaseProps) => (
+}: InputBaseProps) => {
+  const el = React.useRef<HTMLInputElement>(null);
+  React.useImperativeHandle(ref, () => ({ focus: () => el.current?.focus() }), []);
+  return (
   <input
+    ref={el}
     type={secureTextEntry ? 'password' : 'text'}
     readOnly={editable === false}
     enterKeyHint={returnKeyType ? ENTER_KEY_HINT[returnKeyType] : undefined}
@@ -135,10 +146,11 @@ export const InputBase = ({
     {...toDom(className, style)}
     {...props}
   />
-);
+  );
+};
 
 export const TextareaBase = ({
-  onChangeText, onSubmitEditing: _s, editable, secureTextEntry: _p, returnKeyType: _r,
+  ref: _ref, onChangeText, onSubmitEditing: _s, editable, secureTextEntry: _p, returnKeyType: _r,
   placeholderTextColor: _ptc, numberOfLines, role: _role, className, style, ...props
 }: InputBaseProps) => (
   <textarea
