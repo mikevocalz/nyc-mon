@@ -8,6 +8,7 @@ export { Container, type ContainerProps } from './layout/Container';
 export { Text, type TextProps } from './Text';
 export { Heading, type HeadingProps } from './Heading';
 export { Button, type ButtonProps } from './Button';
+export { LinkButton, type LinkButtonProps, type LinkButtonVariant } from './LinkButton';
 export { IconButton, type IconButtonProps } from './IconButton';
 export { Card, type CardProps } from './Card';
 export { Badge, type BadgeProps } from './Badge';
@@ -114,3 +115,6 @@ export * from './charts';
 export * from './nav';
 export * from './cursors';
 export type { TextEffectOptions, GlitchIntensity, GlitchSpeed, TextGlowLevel } from './text-effects';
+
+// H-Lynk chrome: shell, scanner head, screen, trackpad, keys.
+export * from './hlynk';

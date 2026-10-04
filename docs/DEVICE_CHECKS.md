@@ -23,6 +23,14 @@ Target matrix (BUILD_PROMPT_v3 §0C, §6 step 11): iPhone SE 3, iPhone 16 Pro Ma
 - [ ] **H-Lynk Core shell** on SE 3, Pro Max and Pixel 8: the bottom row fits (the SE budget is 139 pt), safe areas, and contrast of the red body under real display gamma.
 - [ ] **M01 boot** routes in 240 ms or less from the MMKV snapshot.
 - [ ] **VoiceOver and TalkBack** on M01–M07, plus Dynamic Type XXL, including the copy deck's estimated line and character limits (`docs/COPY_DECK.md`).
+- [ ] **H-Lynk kit on device** (`packages/ui/hlynk`, verified only in Storybook on web so far):
+  - LED rhythms on iOS and Android through Reanimated CSS animations: 4 s breath, `ready` two blinks every 6 s, `needsYou` three blinks every 10 s. Count the flashes on a recording; three a second is the limit (WCAG 2.3.1).
+  - Scanner fan: the Skia wedge (`ScannerFan.native.tsx`) sweeps once at boot, stays inside the black head, never over the status bar; absent with Reduce Motion on.
+  - Trackpad gestures on the responder system: tap activates, a 24 pt flick steps, a 600 ms hold commits, M13 pan deltas. Haptics: light tap, selection tick, success on commit.
+  - VoiceOver: trackpad reads as adjustable; swipe up/down steps; the named commit action ("Choose this egg" on M08) appears in the rotor. TalkBack: the same actions in the actions menu.
+  - Keys: Large Content Viewer on long-press at accessibility text sizes (iOS); disabled keys read "Available after start-up".
+  - "H-Lynk on" announced once, queued behind current speech, only on the `booting` to `on` transition.
+  - A 320 pt wide phone or a zoomed display: the trackpad shrinks, the keys stay 48 pt.
 - [ ] **Lock-screen truncation** of the hatch notification (`m23.*`) on iOS and Android.
 
 ## Auth
