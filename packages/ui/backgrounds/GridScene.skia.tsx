@@ -97,7 +97,7 @@ export default function GridSceneSkia({
         if (next.width !== width || next.height !== height) setSize({ width: next.width, height: next.height });
       }}
     >
-      <Canvas pointerEvents="none" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
+      <Canvas style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
         <Fill color={backgroundColor} />
         <Group>
           {showFloor ? planeColumns(true) : null}

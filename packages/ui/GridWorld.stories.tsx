@@ -24,7 +24,7 @@ export const Gateway: Story = {
   render: () => (
     <View className="h-screen min-h-[720px] bg-bg">
       <GridFloor className="flex-1" horizon={0.45} speed={0.35}>
-        <View pointerEvents="none" className="absolute inset-x-0 top-0 h-[45%]">
+        <View className="absolute inset-x-0 top-0 h-[45%]" style={{ pointerEvents: 'none' }}>
           <GlyphCity className="flex-1" variant="megacity" colorPrimary={neon.glow} colorSecondary={neon.line} colorTertiary={neon.glowSoft} opacity={0.5} />
         </View>
         <View className="mx-auto w-full max-w-6xl flex-1 items-center justify-center gap-8 px-6 py-10 md:flex-row">

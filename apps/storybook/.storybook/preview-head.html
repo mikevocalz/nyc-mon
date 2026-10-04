@@ -1,0 +1,10 @@
+<!-- The story iframe has no icon of its own; an empty data URL stops the
+     browser requesting /favicon.ico and logging a 404 on every story. -->
+<link rel="icon" href="data:," />
+<!-- next/image (reached through solito/image) reads process.env.* at module
+     load. Next's bundler inlines those reads; Vite does not, so give the
+     browser an empty env and let every unknown key read as undefined. -->
+<script>
+  globalThis.process ??= { env: {} };
+  globalThis.process.env ??= {};
+</script>

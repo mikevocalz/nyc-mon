@@ -47,8 +47,8 @@ export function CircuitButton({
       }}
     >
       {/* NeonBlade-style corner brackets */}
-      <View pointerEvents="none" className="absolute left-0 top-0 h-2 w-8" style={{ borderTopWidth: 2, borderLeftWidth: 2, borderColor: tick }} />
-      <View pointerEvents="none" className="absolute bottom-0 right-0 h-2 w-8" style={{ borderBottomWidth: 2, borderRightWidth: 2, borderColor: tick }} />
+      <View className="absolute left-0 top-0 h-2 w-8" style={{ borderTopWidth: 2, borderLeftWidth: 2, borderColor: tick, pointerEvents: 'none' }} />
+      <View className="absolute bottom-0 right-0 h-2 w-8" style={{ borderBottomWidth: 2, borderRightWidth: 2, borderColor: tick, pointerEvents: 'none' }} />
       <Text className="text-center text-sm font-bold tracking-wide" style={{ color: solid ? solidLabel : outlineLabel }}>
         {children}
       </Text>

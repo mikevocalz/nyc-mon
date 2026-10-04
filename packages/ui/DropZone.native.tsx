@@ -57,7 +57,11 @@ export function DropZone({
       {children ?? (
         <>
           <View className={s.well()}>
-            {glyph ?? <CloudUpload size={28} className="text-text-muted" />}
+            {typeof glyph === 'string' || typeof glyph === 'number' ? (
+              <Text className="text-2xl">{glyph}</Text>
+            ) : (
+              glyph ?? <CloudUpload size={28} className="text-text-muted" />
+            )}
           </View>
           <Text className={s.title()}>{title}</Text>
           <Text variant="caption" tone="muted" className={s.description()}>

@@ -184,7 +184,7 @@ export default function GlyphCitySkia({
         if (next.width !== width || next.height !== height) setSize({ width: next.width, height: next.height });
       }}
     >
-      <Canvas pointerEvents="none" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
+      <Canvas style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
         {backgroundColor !== 'transparent' ? <Fill color={backgroundColor} /> : null}
         <Group opacity={opacity}>
           <Line p1={vec(0, height - 1)} p2={vec(width, height - 1)} color={colorPrimary} opacity={0.45} strokeWidth={2} />
