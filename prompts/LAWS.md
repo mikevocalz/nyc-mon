@@ -37,3 +37,4 @@ R3. **Every screen and page is built from our NYC-Tron UI kit (`@acme/ui`, `pack
 R4. **Every task runs with its named skills loaded, through subagents, and passes the §6 handoff gate (`08-handoff.md`) before implementation.**
 
 - **R5. API design uses Margelo's `api-design` skill** (https://github.com/margelo/react-native-skills/tree/main/skills/api-design) for every public surface: `@acme/*` exports, hooks, options objects, events, errors, and the `/v1` server contract.
+- **R6. Payload work uses the `payload` skill** (https://github.com/payloadcms/skills), checked against the installed Payload 4 canary source (Law 2).
