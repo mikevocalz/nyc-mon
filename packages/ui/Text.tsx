@@ -1,5 +1,10 @@
 import { tv, type VariantProps } from 'tailwind-variants';
 import { Text as TWText } from './tw';
+import { BlurText } from './text-effects/BlurText';
+import { GlitchText } from './text-effects/GlitchText';
+import { NeonGlowText } from './text-effects/NeonGlowText';
+import { OutlineText } from './text-effects/OutlineText';
+import type { TextEffectOptions } from './text-effects/types';
 
 /**
  * The type scale steps up with the window, not with the device.
@@ -36,10 +41,73 @@ const text = tv({
   defaultVariants: { variant: 'body', tone: 'default' },
 });
 
-export interface TextProps
-  extends React.ComponentProps<typeof TWText>,
-    VariantProps<typeof text> {}
+/**
+ * Typography for the NeonBlade effect variants. No colour classes here: the
+ * effects colour their layers at runtime, and on web a colour utility is
+ * !important and would beat them.
+ */
+const effectText = tv({
+  base: 'font-display',
+  variants: {
+    variant: {
+      glitch: 'text-display-md md:text-display-lg',
+      neonGlow: 'text-display-md md:text-display-lg',
+      outline: 'text-display-md md:text-display-lg',
+      blur: 'font-sans text-2xl font-semibold md:text-3xl',
+    },
+  },
+});
 
-export function Text({ variant, tone, className, ...props }: TextProps) {
-  return <TWText className={text({ variant, tone, className })} {...props} />;
+const EFFECTS = {
+  glitch: GlitchText,
+  neonGlow: NeonGlowText,
+  outline: OutlineText,
+  blur: BlurText,
+} as const;
+
+type EffectVariant = keyof typeof EFFECTS;
+type BaseVariant = NonNullable<VariantProps<typeof text>['variant']>;
+
+export interface TextProps
+  extends Omit<React.ComponentProps<typeof TWText>, 'children'>,
+    Omit<VariantProps<typeof text>, 'variant'>,
+    TextEffectOptions {
+  /**
+   * Type scale step, or a NeonBlade effect:
+   *   glitch: solid misprint layers that jump in bursts.
+   *   neonGlow: solid letters on a drop stack with an accent glow.
+   *   outline: badge lettering, orange fill on a royal outline.
+   *   blur: soft until hovered (web); a one-time focus-in on native.
+   * Effects respect reduced motion. Their options are listed on TextEffectOptions.
+   */
+  variant?: BaseVariant | EffectVariant;
+  children?: React.ReactNode;
+}
+
+const isEffect = (v: TextProps['variant']): v is EffectVariant => v !== undefined && v in EFFECTS;
+
+export function Text({
+  variant, tone, className, children,
+  mode, colorA, colorB, intensity, speed, colors, glowColor, glowIntensity, animate,
+  strokeColor, fillColor, strokeWidth, hoverStrokeColor, hoverFillColor,
+  ...props
+}: TextProps) {
+  if (isEffect(variant)) {
+    const Effect = EFFECTS[variant];
+    const label = typeof children === 'string' ? children : (props['aria-label'] as string | undefined);
+    return (
+      <Effect
+        className={effectText({ variant, className })}
+        accessibilityLabel={label}
+        {...{ mode, colorA, colorB, intensity, speed, colors, glowColor, glowIntensity, animate, strokeColor, fillColor, strokeWidth, hoverStrokeColor, hoverFillColor }}
+      >
+        {children}
+      </Effect>
+    );
+  }
+  return (
+    <TWText className={text({ variant, tone, className })} {...props}>
+      {children}
+    </TWText>
+  );
 }

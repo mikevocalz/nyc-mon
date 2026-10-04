@@ -82,3 +82,8 @@ export { useLayoutSize, type LayoutSize } from './use-layout-size';
 
 // NeonBlade control and card ports (tones, frames, CardSlider).
 export * from './cards';
+// NeonBlade ports: charts, site header/footer, and web/pointer cursors.
+export * from './charts';
+export * from './nav';
+export * from './cursors';
+export type { TextEffectOptions, GlitchIntensity, GlitchSpeed, TextGlowLevel } from './text-effects';

@@ -43,6 +43,24 @@ Ported so far:
   ports of NeonBlade's neon input, neon select, neon checkbox and neon toggle.
 - `cards/CardSlider`: port of NeonBlade's card slider (`visibleCount`, `gap`,
   `showButtons`, `showProgress`, `progressStyle`, `loop`).
+- `charts/`: NeonLineChart, NeonSparkline, NeonBarChart, NeonDonutChart and
+  StatCard keep the prop names of NeonBlade's neon-line-chart, neon-sparkline,
+  neon-bar-chart, neon-donut-chart and stat-card (data, series, dataKey,
+  xAxisKey, area, grid, legend, glowIntensity, barGap, multiColor,
+  paddingAngle, cornerRadius, centerLabel, trend, change, sparkData...).
+- `DataTable` `variant="neon"`: NeonBlade's neon-table (title, striped,
+  compact, grid, corners, pageSize, emptyText, loading, rowHover).
+- `Text` `variant="glitch" | "neonGlow" | "outline" | "blur"`: NeonBlade's
+  glitch-text, neon-glow, outline-text and blur-text (mode, colorA, colorB,
+  intensity, speed, colors, glowColor, glowIntensity, animate, strokeColor,
+  fillColor, strokeWidth, hoverStrokeColor, hoverFillColor).
+- `nav/NavBar`, `nav/SiteFooter`: NeonBlade's navbar and footer (items with
+  dropdown children, position, transparency, navAlign; footer variants
+  minimal, columns, centered, mega, linkGroups, socialLinks, newsletter).
+- `cursors/`: `PointerCursor` covers NeonBlade's fox-cursor (redrawn as an
+  arrow, no fox) and `Crosshair` covers its crosshair (redrawn as a
+  rounded-square reticle); both keep hideNativeCursor, disabled,
+  containerRef and glowIntensity.
 
 NeonBlade UI is distributed under the MIT License:
 
@@ -71,3 +89,10 @@ SOFTWARE.
 ```
 
 Port agents: add each newly ported component to the list above.
+
+## react-native-graph
+
+`charts/LinePlot.native.tsx` draws with react-native-graph by Margelo
+(https://github.com/margelo/react-native-graph), MIT License, Copyright (c)
+2026 Marc Rousavy. It is patched (`patches/react-native-graph@1.4.0.patch`) to
+build paths with react-native-skia v3's SkPathBuilder.
