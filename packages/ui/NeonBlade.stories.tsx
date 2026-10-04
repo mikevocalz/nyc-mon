@@ -25,6 +25,7 @@ import * as GridFloorStories from './GridFloor.stories';
 import * as GridSceneStories from './GridScene.stories';
 import * as HolographicTerrainStories from './HolographicTerrain.stories';
 import * as NavStories from './Nav.stories';
+import * as NeonTideStories from './NeonTide.stories';
 import * as NeonBarChartStories from './NeonBarChart.stories';
 import * as NeonDonutChartStories from './NeonDonutChart.stories';
 import * as NeonLineChartStories from './NeonLineChart.stories';
@@ -75,6 +76,7 @@ const MODULES: Record<string, StoryModule> = {
   GridScene: GridSceneStories,
   HolographicTerrain: HolographicTerrainStories,
   Nav: NavStories,
+  NeonTide: NeonTideStories,
   NeonBarChart: NeonBarChartStories,
   NeonDonutChart: NeonDonutChartStories,
   NeonLineChart: NeonLineChartStories,
