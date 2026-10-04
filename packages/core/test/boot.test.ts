@@ -156,11 +156,41 @@ describe('resolveBootRoute (M01)', () => {
     });
   });
 
-  it('a session without a Caller resumes at the Caller name', () => {
-    expect(resolveBootRoute(snapshot({ hasSession: true }))).toEqual({
+  it('a session with no save on this device -> restore from the server, never a new Caller', () => {
+    expect(resolveBootRoute(snapshot({ hasSession: true }))).toEqual({ kind: 'restore' });
+    expect(resolveBootRoute(snapshot({ hasSession: true, ageAnswer: adult }))).toEqual({ kind: 'restore' });
+  });
+
+  it('after restore, a server profile with no Caller name resumes at the Caller name', () => {
+    expect(resolveBootRoute(snapshot({ hasSession: true, save: loaded(createEmptySave('d', T0)) }))).toEqual({
       kind: 'resume-onboarding',
       step: 'caller-name',
     });
+  });
+
+  it('after restore, a restored save routes like any returning save', () => {
+    const e = egg();
+    const mon = mintMonInstance(e);
+    const restored = withCaller({ eggs: [e], mons: [mon] });
+    expect(resolveBootRoute(snapshot({ hasSession: true, save: loaded(restored) }))).toEqual({
+      kind: 'companion',
+      monInstanceId: mon.monInstanceId,
+    });
+  });
+
+  it('property: restore is returned exactly when a session exists and no save is on the device', () => {
+    forAll(
+      5_000,
+      (random) => randomSnapshot(random),
+      (snap) => {
+        const isRestore = resolveBootRoute(snap).kind === 'restore';
+        expect(isRestore).toBe(snap.hasSession && snap.save.status === 'missing');
+      },
+    );
+  });
+
+  it('without a session, a missing save never asks for restore', () => {
+    expect(resolveBootRoute(snapshot({ ageAnswer: adult })).kind).not.toBe('restore');
   });
 
   describe('P1: the create intent needs a stored age answer', () => {

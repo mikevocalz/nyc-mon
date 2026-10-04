@@ -117,3 +117,17 @@ Design and product decisions made by `design-director` or handed to it by the le
 - **Decided by:** the lead, on design-director's D9
 
 The brief asks for one tap. A native wheel always opens on a preset year, and FTC COPPA FAQ D.7 counts a preset as a default that can steer the answer (https://www.ftc.gov/business-guidance/resources/complying-coppa-frequently-asked-questions). So M04 is decade-then-year: two taps, and no year is preselected. The age screen stays neutral, which matters more than the tap count.
+
+## L2 — M01 boot route: restore for a signed-in fresh install, and three departures from the M01 handoff
+
+- **Date:** 2026-10-04
+- **Decided by:** the lead, on the `sim-core` report for M01 B2
+- **Code:** `packages/core/sim/boot.ts`, `sim/onboarding.ts`, `sim/consent.ts`; ADR `docs/adr/0002-sim-core.md`
+
+**Restore.** A player with a local session and no save on the device (a fresh install, a new phone) gets `{ kind: 'restore' }`, not M07. The server owns their Caller and Mons; the Bible's "a device session is a surface, not a new creature" rules out minting a second Caller. The app fetches `GET /v1/me/mons` and the Caller profile, writes the save, and calls `resolveBootRoute` again. `caller-name` (M07) is only for a session whose restored server profile has no Caller name.
+
+What `sim-core` built that differs from `screens/M01/08-handoff.md` § Data:
+
+1. **Signature and union.** `resolveBootRoute(snapshot: BootSnapshot)`, where the snapshot is `{ save, hasSession, ageAnswer, nowMs }`, replaces `(save, nowMs)`: the route also needs the session flag and the stored M04 answer. `readBootSave(raw)` builds `save` from the raw MMKV value (`missing` / `loaded` / `unreadable`). Beyond the handoff's six kinds, the union adds `restore`, `resume-onboarding` with `step: 'create-account' | 'guardian-consent' | 'caller-name' | 'egg-choice'`, and a `reason` on `save-recovered` for M22. `resume-onboarding` covers states the handoff left undefined: a Caller with no egg yet (M08), an age answer stored but no account (M03 create or M05), and a restored profile with no name (M07). The P1 guard runs inside it, so `create-account` is unreachable without a stored age answer, on boot as well as from M02 and M03 (`resolveCreateEntry`).
+2. **`isConsentRequired({ birthYear, nowMs })`**, not `(birthYear, currentYear)` as M04 § Data writes it. It takes the UTC year of `nowMs`, the year the server sign-up hook uses, and throws on a non-integer year instead of returning false.
+3. **`validateCallerName(raw, filter)`** takes the block list as a required second argument, so no build can call it without the M07 B4 filter wired. Reasons stay `'blank' | 'too-long' | 'characters' | 'blocked'`; `callerNameErrorCopyId(reason)` returns the matching `m07.error.*` id.

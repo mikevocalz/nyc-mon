@@ -34,7 +34,7 @@ export interface BootSnapshot {
  *
  * - `create-account`: M03 with the create intent (an age answer is stored, 13+).
  * - `guardian-consent`: M05 (an age answer is stored and needs consent).
- * - `caller-name`: M07 (a session exists but no Caller profile yet).
+ * - `caller-name`: M07 (a session whose server profile, already restored, has no Caller name).
  * - `egg-choice`: M08 (a Caller exists but has no egg or Mon yet).
  */
 export type OnboardingStep = 'create-account' | 'guardian-consent' | 'caller-name' | 'egg-choice';
@@ -42,6 +42,7 @@ export type OnboardingStep = 'create-account' | 'guardian-consent' | 'caller-nam
 /** Where M01 sends this session. Produced by {@linkcode resolveBootRoute}; map it with an exhaustive `switch`. */
 export type BootRoute =
   | { readonly kind: 'first-run' }
+  | { readonly kind: 'restore' }
   | { readonly kind: 'resume-onboarding'; readonly step: OnboardingStep }
   | { readonly kind: 'incubating'; readonly eggId: string }
   | { readonly kind: 'egg-ready'; readonly eggId: string }
@@ -52,12 +53,15 @@ export type BootRoute =
 /**
  * Decides where M01 sends this session, from local state only.
  *
- * Order: unreadable save → `save-recovered` (M22); denied consent →
+ * Order: unreadable save → `save-recovered` (M22); a session with no save on
+ * this device → `restore` (the app fetches `GET /v1/me/mons` and the Caller
+ * profile, writes the save, and calls this again); denied consent →
  * `consent-denied` (M05); a hatched Mon → `companion` (M13); an egg past
  * `incubationEndsAt` or mid-presentation → `egg-ready` (M11); an egg still
  * incubating → `incubating` (M11); a Caller with nothing yet → `egg-choice`;
- * no Caller → the P1 entry (`create-account` / `guardian-consent` only with a
- * stored age answer), `caller-name` with a session, else `first-run` (M02).
+ * no Caller → `caller-name` with a session (the restored profile had no
+ * name), else the P1 entry (`create-account` / `guardian-consent` only with a
+ * stored age answer), else `first-run` (M02).
  *
  * With several eggs, the earliest `incubationEndsAt` wins, ties by `eggId`.
  */
@@ -65,7 +69,9 @@ export function resolveBootRoute(snapshot: BootSnapshot): BootRoute {
   const { save } = snapshot;
   switch (save.status) {
     case 'missing':
-      return routeWithoutCaller(snapshot);
+      // A signed-in player on a fresh install: the server owns their Caller and
+      // Mons ("a device session is a surface, not a new creature"). Lead ruling L2.
+      return snapshot.hasSession ? { kind: 'restore' } : routeWithoutCaller(snapshot);
     case 'unreadable':
       return { kind: 'save-recovered', reason: save.reason };
     case 'loaded':
