@@ -4,6 +4,8 @@ import { Button } from './Button';
 import { View } from './tw';
 import { Calendar, Users } from './icons';
 import { DISTRICTS, DISTRICT_NAME } from './district';
+import { Image, type ImageProps } from './Image';
+import { NYC_PHOTOS } from '../assets/photos';
 
 const meta = {
   title: 'UI/EmptyState',
@@ -44,4 +46,34 @@ export const Districts: Story = {
       ))}
     </View>
   ),
+};
+
+const STOOPS = NYC_PHOTOS.find((p) => p.id === 'harlem-brownstone-stoops') ?? NYC_PHOTOS[0]!;
+
+/**
+ * `illustration` replaces the icon tile and skyline. The caller owns the
+ * art's accessible name: here a bundled photo with its alt text.
+ */
+export const WithIllustration: Story = {
+  args: {
+    icon: undefined,
+    // The bundler's static import (URL, StaticImageData or asset id), as CardSliderImageItem passes it.
+    illustration: <Image src={STOOPS.source as ImageProps['src']} alt={STOOPS.alt} width={320} height={213} unoptimized district="harlem" />,
+    title: 'No crew on this block yet',
+    description: 'Invite a friend to start one.',
+    district: 'harlem',
+  },
+};
+
+/**
+ * No icon and no art (the art is still to come): the slot renders nothing
+ * and the state starts at its title, with no gap above it.
+ */
+export const WithoutIllustration: Story = {
+  args: {
+    icon: undefined,
+    title: 'This request has expired',
+    description: 'Ask again and we will send a new link.',
+    action: <Button title="Ask again" size="md" onPress={() => {}} />,
+  },
 };
