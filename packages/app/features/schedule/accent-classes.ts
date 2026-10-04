@@ -9,14 +9,15 @@ import type { ResourceAccent } from './model';
  * scanned file, which is what this record is for.
  *
  * Shape follows the target: a thick saturated bar on the leading edge, the
- * block tinted to ~10% of that accent, and the title in the accent hue. The
+ * block tinted to ~15% of that accent, and the title in the text colour. The
  * selected state is the same accent at full saturation with inverse text, so it
  * reads as one system rather than a one-off style.
  *
- * Each entry carries a `dark:` counterpart. A single fixed shade cannot serve
- * both themes: the 700 title that reads well on a light 10% tint disappears
- * against the dark surface, so dark mode lifts the text to 200 and the tint to
- * 20% to hold contrast.
+ * The title is the theme's text colour, not the accent hue. The surface
+ * follows `color-scheme` (dark-first), but `dark:` follows the OS media
+ * query, so an accent-coloured title keyed on `dark:` rendered its light
+ * 700 step on the night grid for anyone whose OS is in light mode (royal 700
+ * on night is under 2:1). The accent lives in the bar, tint and header dot.
  */
 export interface AccentClasses {
   /** Leading edge bar. */
@@ -36,40 +37,40 @@ export interface AccentClasses {
 export const ACCENT_CLASSES: Record<ResourceAccent, AccentClasses> = {
   ember: {
     bar: 'bg-ember-500',
-    surface: 'bg-ember-500/10 dark:bg-ember-500/20',
-    title: 'text-ember-700 dark:text-ember-200',
+    surface: 'bg-ember-500/15',
+    title: 'text-text',
     selectedSurface: 'bg-ember-500',
     selectedTitle: 'text-white',
     dot: 'bg-ember-500',
   },
   gold: {
     bar: 'bg-gold-500',
-    surface: 'bg-gold-500/10 dark:bg-gold-500/20',
-    title: 'text-gold-700 dark:text-gold-200',
+    surface: 'bg-gold-500/15',
+    title: 'text-text',
     selectedSurface: 'bg-gold-700',
     selectedTitle: 'text-white',
     dot: 'bg-gold-500',
   },
   forest: {
     bar: 'bg-forest-500',
-    surface: 'bg-forest-500/10 dark:bg-forest-500/20',
-    title: 'text-forest-700 dark:text-forest-200',
+    surface: 'bg-forest-500/15',
+    title: 'text-text',
     selectedSurface: 'bg-forest-700',
     selectedTitle: 'text-white',
     dot: 'bg-forest-500',
   },
   sky: {
     bar: 'bg-sky-500',
-    surface: 'bg-sky-500/10 dark:bg-sky-500/20',
-    title: 'text-sky-800 dark:text-sky-200',
+    surface: 'bg-sky-500/15',
+    title: 'text-text',
     selectedSurface: 'bg-sky-700',
     selectedTitle: 'text-white',
     dot: 'bg-sky-500',
   },
   rose: {
     bar: 'bg-rose-500',
-    surface: 'bg-rose-500/10 dark:bg-rose-500/20',
-    title: 'text-rose-700 dark:text-rose-200',
+    surface: 'bg-rose-500/15',
+    title: 'text-text',
     selectedSurface: 'bg-rose-700',
     selectedTitle: 'text-white',
     dot: 'bg-rose-500',

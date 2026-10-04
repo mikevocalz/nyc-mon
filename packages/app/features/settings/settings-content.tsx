@@ -1,8 +1,8 @@
 'use client';
 // Settings — reached from Profile. Preferences, appearance, and session
 // controls live here; identity stays on the profile screen.
-import { Section, View, Pressable } from '@acme/ui/tw';
-import { Button, Card, Heading, Switch, Text, FadeIn } from '@acme/ui';
+import { Section, View } from '@acme/ui/tw';
+import { Button, Card, Heading, SegmentedControl, Switch, Text, FadeIn } from '@acme/ui';
 import { useProfile, type ThemePreference } from '../profile/profile.store';
 
 const THEME_OPTIONS: { value: ThemePreference; label: string }[] = [
@@ -14,29 +14,7 @@ const THEME_OPTIONS: { value: ThemePreference; label: string }[] = [
 function ThemeSegment() {
   const theme = useProfile((s) => s.theme);
   const setTheme = useProfile((s) => s.setTheme);
-  return (
-    <View className="flex-row gap-1 self-start rounded-lg border-2 border-border bg-surface-sunken p-1">
-      {THEME_OPTIONS.map((option) => {
-        const active = theme === option.value;
-        return (
-          <Pressable
-            key={option.value}
-            role="radio"
-            aria-checked={active}
-            aria-label={option.label}
-            onPress={() => setTheme(option.value)}
-            className={`rounded-md px-4 py-1.5 transition-colors duration-fast ${
-              active ? 'border-2 border-border-strong bg-primary' : 'hover:bg-surface-raised/60'
-            }`}
-          >
-            <Text variant="caption" className={active ? 'font-semibold text-on-primary' : 'text-text-muted'}>
-              {option.label}
-            </Text>
-          </Pressable>
-        );
-      })}
-    </View>
-  );
+  return <SegmentedControl options={THEME_OPTIONS} value={theme} onChange={setTheme} className="self-start" />;
 }
 
 export function SettingsContent() {

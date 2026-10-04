@@ -32,7 +32,8 @@ export const WELL: Record<Tone, string> = {
 export const INK: Record<Tone, string> = {
   primary: 'text-primary',
   accent: 'text-accent',
-  gold: 'text-gold-700 dark:text-gold-400',
+  // text-primary is light-dark() aware; `dark:` follows the OS, not the app scheme.
+  gold: 'text-primary',
 };
 export const BAR: Record<Tone, string> = {
   primary: 'bg-primary',

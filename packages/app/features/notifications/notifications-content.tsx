@@ -2,7 +2,7 @@
 // Notifications — mirrors the liquid-glass template (unread header + mark-all,
 // Today/Earlier groups, icon-well rows, tap to read) with Legend Motion.
 import { Section, View, Text as TWText, Pressable } from '@acme/ui/tw';
-import { Heading, Text, FadeIn } from '@acme/ui';
+import { Button, Heading, Text, FadeIn } from '@acme/ui';
 import { WELL, INK } from '../home/home.data';
 import { useNotifications, type Notification } from './notifications.store';
 
@@ -67,14 +67,7 @@ export function NotificationsContent() {
             {unread > 0 ? <Text variant="caption" tone="muted">{unread} unread</Text> : null}
           </View>
           {unread > 0 ? (
-            <Pressable
-              role="button"
-              aria-label="Mark all notifications read"
-              onPress={markAllRead}
-              className="rounded-md border-2 border-border-strong bg-primary px-3.5 py-2 shadow-card transition-all duration-fast hover:bg-primary-pressed active:translate-x-[3px] active:translate-y-[3px] active:shadow-none"
-            >
-              <TWText className="text-sm font-semibold text-on-primary">Mark all read</TWText>
-            </Pressable>
+            <Button title="Mark all read" size="sm" aria-label="Mark all notifications read" onPress={markAllRead} />
           ) : null}
         </Section>
       </FadeIn>
