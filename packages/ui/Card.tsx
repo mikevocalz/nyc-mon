@@ -90,6 +90,12 @@ export interface CardProps extends React.ComponentProps<typeof Article> {
    */
   variant?: CardVariant;
   /**
+   * 'night' (default) is the facade; 'page' is the ops console's daylit face
+   * (04-components.md G1): a `surface-raised` panel with a `border` keyline,
+   * themed text, no frame, plate, glow or cut.
+   */
+  surface?: 'night' | 'page';
+  /**
    * Legacy kit prop, read as the depth plate: flat drops it, card (default)
    * steps it 6px, raised 10px.
    */
@@ -133,15 +139,39 @@ export interface CardProps extends React.ComponentProps<typeof Article> {
  * the card, everything else (gap, padding, row layout) styles the face that
  * holds the children, which is where the legacy card applied them.
  */
-export function Card({ variant = 'cornerCut', ...props }: CardProps) {
+export function Card({ variant = 'cornerCut', surface = 'night', ...props }: CardProps) {
+  if (surface === 'page') return <PageCard {...props} />;
   return <NeonCard {...props} variant={variant === 'default' ? 'cornerCut' : variant} />;
+}
+
+/**
+ * The `surface="page"` face (G1): one raised panel, themed type, no frame,
+ * plate, glow or cut. Separate component so the NeonBlade hooks stay
+ * unconditional.
+ */
+function PageCard({
+  size = 'md', icon, title, description, titleLevel = 3,
+  className, children, padded = true, rounded = false, ...articleProps
+}: CardProps) {
+  const { outer, inner } = splitCardClasses(className);
+  const sizePad = padded ? { none: '', sm: 'p-4', md: 'p-5 md:p-6', lg: 'p-6 md:p-8', xl: 'p-8 md:p-10' }[size] : '';
+  return (
+    <Article className={`border border-border bg-surface-raised ${rounded ? 'rounded-soft' : ''} ${outer}`} {...articleProps}>
+      <View className={`gap-3 ${sizePad} ${inner}`}>
+        {icon ? <View aria-hidden className="mb-1 h-11 w-11 items-center justify-center border-2 border-border">{icon}</View> : null}
+        {title ? <Heading level={titleLevel} className="my-0 font-display text-lg leading-tight text-text md:text-xl">{title}</Heading> : null}
+        {description ? <Paragraph className="my-0 text-sm leading-relaxed text-text-secondary md:text-base">{description}</Paragraph> : null}
+        {children}
+      </View>
+    </Article>
+  );
 }
 
 function NeonCard({
   variant, tone: toneProp, district, size = 'md', icon, title, description, titleLevel = 3, glow,
   notchSides, notchSize, notchWidth, notchWidthV, notchSkew,
   corner = 'bottom-right', cornerSize = 20, beamVariant = 'single', beamToneB, duration = 4, durationB = 6,
-  className, children, elevation = 'card', padded = true, rounded = false, ...articleProps
+  className, children, elevation = 'card', padded = true, rounded = false, surface: _surface, ...articleProps
 }: CardProps & { variant: Exclude<CardVariant, 'default'> }) {
   const { outer, inner } = splitCardClasses(className);
   const depth = CARD_DEPTH[elevation];

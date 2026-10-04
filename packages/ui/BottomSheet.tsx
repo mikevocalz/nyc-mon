@@ -87,7 +87,7 @@ export function SheetSurface({ title, children, className, onClose, closeLabel, 
   const t = TONE_CLASSES[resolveControlTone(tone, district)];
   const s = sheet({ scheme });
   const face = (
-    <View role="dialog" aria-label={title} className={s.content({ className })}>
+    <View role="dialog" aria-modal={true} aria-label={title} className={s.content({ className })}>
         <View aria-hidden className={s.cornice({ className: t.face })}>
           <View className={s.handle({ className: t.side })} />
         </View>

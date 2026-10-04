@@ -2,6 +2,7 @@
 import type { ReactNode } from 'react';
 import { tv } from 'tailwind-variants';
 import { Nav } from './primitives';
+import { Link } from './html';
 import { View, Text, Pressable } from './tw';
 import { CornerCutFrame } from './neon/CornerCutFrame';
 import { TONE_CLASSES, resolveControlTone, toneInput, toneVariants, type ControlTone, type District } from './district';
@@ -56,6 +57,8 @@ export interface TabBarTab {
   icon: ReactNode | ((state: TabIconState) => ReactNode);
   active?: boolean;
   onPress?: () => void;
+  /** Link destination in `semantics="navigation"` mode. */
+  href?: string;
 }
 
 export interface TabBarProps {
@@ -66,48 +69,73 @@ export interface TabBarProps {
   tone?: ControlTone;
   /** Theme by neighbourhood. Default midtown (orange). */
   district?: District;
+  /**
+   * 'tabs' (default) is the tab widget: `role="tablist"` with `role="tab"`
+   * items and `aria-selected`. 'navigation' (04-components.md G15) is route
+   * nav: links with `aria-current="page"` and no tab roles — navigating to a
+   * section is not switching a tab panel.
+   */
+  semantics?: 'tabs' | 'navigation';
   className?: string;
 }
 
 const renderIcon = (icon: TabBarTab['icon'], state: TabIconState) =>
   typeof icon === 'function' ? icon(state) : icon;
 
-export function TabBar({ tabs, emphasizedKey, tone: toneProp, district, className }: TabBarProps) {
+export function TabBar({ tabs, emphasizedKey, tone: toneProp, district, semantics = 'tabs', className }: TabBarProps) {
   const tone = resolveControlTone(toneProp, district);
   const onFace = TONE_CLASSES[tone].onFace;
   const s = tabBar({ tone });
+  const navMode = semantics === 'navigation';
   return (
-    <Nav role="tablist" aria-label="Main navigation" className={s.root({ className })}>
+    <Nav role={navMode ? undefined : 'tablist'} aria-label="Main navigation" className={s.root({ className })}>
       <View aria-hidden className={s.keyline()} />
       <View className={s.row()}>
         {tabs.map((tab) => {
           const active = !!tab.active;
           const emphasized = tab.key === emphasizedKey;
-          return (
-            <Pressable
-              key={tab.key}
-              role="tab"
-              aria-label={tab.label}
-              aria-selected={active}
-              onPress={tab.onPress}
-              className={s.tab()}
-            >
-              {emphasized ? (
+          const body = emphasized ? (
                 <View className={s.emphasis()}>
                   <CornerCutFrame tone={toneInput(tone)} cut={12} depth={4} glow={active ? 'low' : false} className="h-12 w-14 items-center justify-center">
                     {renderIcon(tab.icon, { active, colorClass: onFace })}
                   </CornerCutFrame>
                   <Text className={s.emphasisLabel()}>{tab.label}</Text>
                 </View>
-              ) : (
-                <View className={s.chip()}>
-                  {active ? <View aria-hidden className={s.plate()} /> : null}
-                  <View className={s.face({ active, className: active ? s.faceOn() : undefined })}>
-                    {renderIcon(tab.icon, { active, colorClass: active ? onFace : 'text-silver-300' })}
-                    <Text className={s.label({ active, className: active ? s.labelOn() : undefined })}>{tab.label}</Text>
-                  </View>
-                </View>
-              )}
+          ) : (
+            <View className={s.chip()}>
+              {active ? <View aria-hidden className={s.plate()} /> : null}
+              <View className={s.face({ active, className: active ? s.faceOn() : undefined })}>
+                {renderIcon(tab.icon, { active, colorClass: active ? onFace : 'text-silver-300' })}
+                <Text className={s.label({ active, className: active ? s.labelOn() : undefined })}>{tab.label}</Text>
+              </View>
+            </View>
+          );
+          // Navigation mode: a real link (or a plain pressable when no href is
+          // wired yet) with aria-current, never the tab roles.
+          if (navMode && tab.href) {
+            return (
+              <Link
+                key={tab.key}
+                href={tab.href}
+                aria-label={tab.label}
+                aria-current={active ? 'page' : undefined}
+                className={`${s.tab()} block no-underline`}
+              >
+                {body}
+              </Link>
+            );
+          }
+          return (
+            <Pressable
+              key={tab.key}
+              role={navMode ? 'link' : 'tab'}
+              aria-label={tab.label}
+              aria-selected={navMode ? undefined : active}
+              aria-current={navMode && active ? 'page' : undefined}
+              onPress={tab.onPress}
+              className={s.tab()}
+            >
+              {body}
             </Pressable>
           );
         })}

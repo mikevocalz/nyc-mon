@@ -96,3 +96,6 @@ export const Square = icon(L.Square as React.ComponentType<object>, 'Square');
 export const AudioLines = icon(L.AudioLines as React.ComponentType<object>, 'AudioLines');
 export const Play = icon(L.Play as React.ComponentType<object>, 'Play');
 export const Pause = icon(L.Pause as React.ComponentType<object>, 'Pause');
+export const Plus = icon(L.Plus as React.ComponentType<object>, 'Plus');
+export const EyeOff = icon(L.EyeOff as React.ComponentType<object>, 'EyeOff');
+export const Minus = icon(L.Minus as React.ComponentType<object>, 'Minus');

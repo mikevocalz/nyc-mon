@@ -75,3 +75,17 @@ export const Districts: Story = {
     </View>
   ),
 };
+
+/** G14: nav items are links; the current section carries aria-current="page". */
+export const Navigation: Story = {
+  render: () => (
+    <View className="w-64 p-4">
+      <List>
+        <ListItem href="/admin/overview">Overview</ListItem>
+        <ListItem href="/admin/callers" current>Callers</ListItem>
+        <ListItem href="/admin/consent">Consent queue</ListItem>
+        <ListItem href="/admin/audit">Audit log</ListItem>
+      </List>
+    </View>
+  ),
+};

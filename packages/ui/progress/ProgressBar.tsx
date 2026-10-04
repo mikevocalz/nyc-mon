@@ -51,6 +51,12 @@ export interface ProgressBarProps {
   glow?: boolean;
   /** What is loading, for screen readers. Default "Progress". */
   accessibilityLabel?: string;
+  /**
+   * 'progressbar' (default) for work that finishes; 'meter' for a level read
+   * off a scale — the console's care meters and bond (04-components.md G18).
+   * Both carry aria-valuemin/max/now; a meter has no "done" state.
+   */
+  role?: 'progressbar' | 'meter';
   className?: string;
 }
 
@@ -107,6 +113,7 @@ export function ProgressBar({
   label,
   glow = true,
   accessibilityLabel = 'Progress',
+  role,
   className,
 }: ProgressBarProps) {
   const reduced = useReducedMotion();
@@ -122,7 +129,7 @@ export function ProgressBar({
   const cycle = 1800;
 
   return (
-    <View {...progressA11y({ value, max, indeterminate, label: accessibilityLabel })} className={s.root({ className })}>
+    <View {...progressA11y({ value, max, indeterminate, label: accessibilityLabel, role })} className={s.root({ className })}>
       {showLabel ? (
         <View className={s.header()}>
           <Text className={s.label()}>{label ?? accessibilityLabel}</Text>

@@ -416,6 +416,10 @@ const USAGE: Pair[] = [
   { id: 'scene plate selected tab face', fg: 'orange-500', bg: ['ink-800'], role: 'ui', usedAt: ['packages/app/features/explore/explore-content.tsx:24'] },
   { id: 'skyline divider keyline', fg: 'orange-500', bg: ['ink-950'], role: 'decorative', usedAt: ['packages/ui/backgrounds/SkylineDivider.tsx:35'], reason: 'aria-hidden band between sections; the section headings carry the structure' },
 
+  // -- admin console (08-handoff §9): signage bands and the page-surface cards -
+  { id: 'console: signage band headline', fg: 'signage-white', bg: ['signage-black'], role: 'text', usedAt: [] },
+  { id: 'console: signage band detail', fg: 'signage-white/85', bg: ['signage-black'], role: 'text', usedAt: [] },
+
   // -- disabled ---------------------------------------------------------------
   { id: 'disabled label', fg: 'ink-400', bg: NIGHT, role: 'disabled', usedAt: ['packages/ui/Button.tsx:48', 'packages/ui/IconButton.tsx:79', 'packages/ui/neon/NeonChevron.tsx:55', 'packages/ui/audio/PlayerShell.tsx:123'], reason: 'inactive control' },
   { id: 'disabled slider icon', fg: 'ink-700', bg: NIGHT, role: 'disabled', usedAt: ['packages/ui/cards/CardSlider.shared.tsx:159'], reason: 'inactive control' },

@@ -182,3 +182,15 @@ export const Rounded: Story = {
     </View>
   ),
 };
+
+/** G1: the daylit console face — raised surface, themed type, no frame or glow. */
+export const PageSurface: Story = {
+  render: () => (
+    <View className="max-w-md gap-4 p-4">
+      <Card surface="page" title="Console section" description="The page surface: a raised panel and a keyline." />
+      <View className="scheme-dark">
+        <Card surface="page" title="Night scheme" description="The same face follows the scheme." />
+      </View>
+    </View>
+  ),
+};

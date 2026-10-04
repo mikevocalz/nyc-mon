@@ -50,3 +50,11 @@ export const Districts: Story = {
     </View>
   ),
 };
+
+/** G15: navigation mode — links with aria-current="page", no tablist/tab roles. */
+export const Navigation: Story = {
+  args: {
+    semantics: 'navigation',
+    tabs: tabs('home').map((t) => ({ ...t, href: `/admin/${t.key}` })),
+  },
+};

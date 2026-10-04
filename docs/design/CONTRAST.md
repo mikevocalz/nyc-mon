@@ -18,7 +18,7 @@ The registry lives in `packages/theme/contrast.ts`; `packages/theme/contrast.tes
 
 <!-- contrast:summary:start -->
 
-- 402 measured rows: 374 pass, 0 fail, 28 exempt (decorative or disabled).
+- 404 measured rows: 376 pass, 0 fail, 28 exempt (decorative or disabled).
 
 <!-- contrast:summary:end -->
 - Semantic tokens are measured in light and dark. Palette steps (`orange-500`, `ink-950`) do not change with the theme and get one `both` row.
@@ -325,6 +325,8 @@ The test keeps these honest: each forbidden pair below must still measure under 
 | scene plate selected tab label | both | `ink-950` #00041C | `orange-500` #FC7C00 | 7.76 | text (4.5) | pass | `packages/app/features/explore/explore-content.tsx:26` |
 | scene plate selected tab face | both | `orange-500` #FC7C00 | `ink-800` #25293D | 5.48 | ui (3) | pass | `packages/app/features/explore/explore-content.tsx:24` |
 | skyline divider keyline | both | `orange-500` #FC7C00 | `ink-950` #00041C | 7.76 | decorative (0) | exempt | `packages/ui/backgrounds/SkylineDivider.tsx:35`; aria-hidden band between sections; the section headings carry the structure |
+| console: signage band headline | both | `signage-white` #FFFFFF | `signage-black` #000000 | 21.00 | text (4.5) | pass | token contract |
+| console: signage band detail | both | `signage-white/85` #D9D9D9 | `signage-black` #000000 | 14.84 | text (4.5) | pass | token contract |
 | disabled label | both | `ink-400` #90929C | `ink-950` #00041C | 6.55 | disabled (0) | exempt | `packages/ui/Button.tsx:48`, `packages/ui/IconButton.tsx:79`, `packages/ui/neon/NeonChevron.tsx:55`, `packages/ui/audio/PlayerShell.tsx:123`; inactive control |
 | disabled slider icon | both | `ink-700` #3C3F51 | `ink-950` #00041C | 1.96 | disabled (0) | exempt | `packages/ui/cards/CardSlider.shared.tsx:159`; inactive control |
 

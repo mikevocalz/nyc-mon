@@ -2,6 +2,7 @@
 import { createContext, useContext } from 'react';
 import { tv } from 'tailwind-variants';
 import { Pressable, View } from './tw';
+import { Link } from './html';
 import { Text } from './Text';
 import { NIGHT_SCHEME } from './NightScope';
 import { resolveControlTone, type ControlTone } from './district';
@@ -46,7 +47,7 @@ export function List({ children, onRefresh: _onRefresh, className, district, ton
 }
 
 export function ListItem({
-  children, onPress, leading, trailing, supportingText, className, selected,
+  children, onPress, leading, trailing, supportingText, className, selected, current, href,
 }: ListItemProps) {
   const bar = ROW_BAR[useContext(ToneContext)];
   const s = list();
@@ -60,7 +61,23 @@ export function ListItem({
       {trailing}
     </View>
   );
-  const state = selected ? `${bar.bar} ${bar.tint}` : '';
+  // `current` is the page marker: same look as selected, aria-current="page".
+  const state = selected || current ? `${bar.bar} ${bar.tint}` : '';
+
+  // Nav items are real links (G14): an anchor with aria-current, not a pressable.
+  if (href) {
+    return (
+      <Link
+        href={href}
+        aria-current={current ? 'page' : undefined}
+        className={s.row({
+          className: `block no-underline ${state} ${bar.hover} ${bar.hoverTint} ${bar.focus} ${bar.focusTint} ${className ?? ''}`,
+        })}
+      >
+        {content}
+      </Link>
+    );
+  }
 
   if (!onPress) {
     return <View role="listitem" className={s.row({ className: `${state} ${className ?? ''}` })}>{content}</View>;
@@ -70,6 +87,7 @@ export function ListItem({
     <Pressable
       role="listitem"
       aria-selected={selected}
+      aria-current={current ? 'page' : undefined}
       onPress={onPress}
       className={s.row({
         className: `${state} ${bar.hover} ${bar.hoverTint} ${bar.focus} ${bar.focusTint} active:opacity-90 ${className ?? ''}`,

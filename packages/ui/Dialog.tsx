@@ -225,6 +225,8 @@ function FacadeCard({
 export interface DialogProps extends DialogCardProps {
   open: boolean;
   onClose: () => void;
+  /** 'bottom' pins the card to the window's foot (a tabletop fold's bottom segment). Default center. */
+  position?: 'center' | 'bottom';
   /** neon: show the close control on the sign. Default true. */
   showCloseButton?: boolean;
   /** Close when the scrim is pressed. Default true. */
@@ -242,7 +244,7 @@ export interface DialogProps extends DialogCardProps {
  * the body, traps focus and closes on Escape) with a scrim and the card.
  */
 export function Dialog({
-  open, onClose, showCloseButton = true, closeOnBackdrop = true, closeOnEscape = true,
+  open, onClose, position = 'center', showCloseButton = true, closeOnBackdrop = true, closeOnEscape = true,
   backdropOverlay = true, backdropBlur = true, ...cardProps
 }: DialogProps) {
   const reduced = useReducedMotion();
@@ -254,7 +256,7 @@ export function Dialog({
       animationType={reduced ? 'none' : 'fade'}
       onRequestClose={closeOnEscape ? onClose : () => {}}
     >
-      <View className={s.wrapper()}>
+      <View className={`${s.wrapper()} ${position === 'bottom' ? 'justify-end' : ''}`}>
         {/* The card comes first so the Modal's focus trap lands inside it, not
             on the scrim (focus on the scrim made Enter close the dialog). */}
         <View className="z-10 w-full items-center">

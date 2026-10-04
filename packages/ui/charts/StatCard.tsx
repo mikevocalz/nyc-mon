@@ -38,6 +38,12 @@ export interface StatCardProps {
   className?: string;
   /** Opt-in rounded corners in place of the corner cut. Default false. */
   rounded?: boolean;
+  /**
+   * 'night' (default) is the neon card; 'page' is the ops console's daylit
+   * face (04-components.md G1): themed text on `surface-raised`, tone only on
+   * the accent band.
+   */
+  surface?: 'night' | 'page';
 }
 
 const PRESET: Record<'cyan' | 'pink' | 'green', ChartTone> = { cyan: 'carolina', pink: 'apple', green: 'leaf' };
@@ -70,6 +76,8 @@ const stat = tv({
 const ARROWS: Record<StatTrend, string> = { up: '▲', down: '▼', neutral: '–' };
 const TREND_WORD: Record<StatTrend, string> = { up: 'up', down: 'down', neutral: 'flat' };
 const TREND_CLASS: Record<StatTrend, string> = { up: 'text-leaf-400', down: 'text-apple-400', neutral: 'text-silver-400' };
+// Page surface: the same trend meaning, but steps that hold 4.5:1 on a raised face by day.
+const PAGE_TREND_CLASS: Record<StatTrend, string> = { up: 'text-success', down: 'text-danger', neutral: 'text-text-muted' };
 
 /**
  * NeonBlade's StatCard as a neon card: the kit's corner-cut Card in the
@@ -81,13 +89,21 @@ const TREND_CLASS: Record<StatTrend, string> = { up: 'text-leaf-400', down: 'tex
  */
 export function StatCard({
   value, label, unit, trend, change, changeLabel, sparkData, color, district = 'midtown', icon,
-  background, glowIntensity = 'low', className, rounded = false,
+  background, glowIntensity = 'low', className, rounded = false, surface = 'night',
 }: StatCardProps) {
   const tone: ChartTone = color ? (color in PRESET ? PRESET[color as keyof typeof PRESET] : (color as ChartTone)) : districtTone(district);
   const s = stat({ tone });
   const spoken = [label, `${value}${unit ? ` ${unit}` : ''}`, change ? `${trend ? `${TREND_WORD[trend]} ` : ''}${change}` : null, changeLabel]
     .filter(Boolean)
     .join(', ');
+  // Page surface swaps the night steps for the themed ones; the silver steps
+  // below stay the night card's.
+  const page = surface === 'page';
+  const labelClass = page ? 'font-display text-xs tracking-wide text-text-muted' : s.label();
+  const valueClass = page ? 'font-display text-4xl text-text md:text-5xl' : s.value();
+  const unitClass = page ? 'font-display text-lg text-text-muted' : s.unit();
+  const trendClass = page ? PAGE_TREND_CLASS : TREND_CLASS;
+  const changeLabelClass = page ? 'text-xs text-text-muted' : s.changeLabel();
 
   return (
     <Card
@@ -98,6 +114,7 @@ export function StatCard({
       glow={glowIntensity !== 'none'}
       rounded={rounded}
       className={className}
+      surface={surface}
       aria-label={spoken}
     >
       <View aria-hidden className={s.band()} />
@@ -107,19 +124,19 @@ export function StatCard({
         <View aria-hidden className="absolute inset-0 -z-10" style={{ backgroundColor: background }} />
       ) : null}
       <View className={s.head()}>
-        <Text className={s.label()}>{label}</Text>
+        <Text className={labelClass}>{label}</Text>
         {icon ? <View aria-hidden>{icon}</View> : null}
       </View>
       <View className={s.valueRow()}>
-        <Text className={s.value()}>{String(value)}</Text>
-        {unit ? <Text className={s.unit()}>{unit}</Text> : null}
+        <Text className={valueClass}>{String(value)}</Text>
+        {unit ? <Text className={unitClass}>{unit}</Text> : null}
       </View>
       {change ? (
         <View className={s.change()}>
-          <Text className={`font-display text-sm ${TREND_CLASS[trend ?? 'neutral']}`}>
+          <Text className={`font-display text-sm ${trendClass[trend ?? 'neutral']}`}>
             {`${ARROWS[trend ?? 'neutral']} ${change}`}
           </Text>
-          {changeLabel ? <Text className={s.changeLabel()}>{changeLabel}</Text> : null}
+          {changeLabel ? <Text className={changeLabelClass}>{changeLabel}</Text> : null}
         </View>
       ) : null}
       {sparkData?.length ? (
