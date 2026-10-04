@@ -50,7 +50,7 @@ Email expands in place (no modal stacking, §4.1). Apple and Google sheets are t
 
 ## Colour
 
-No orange on this screen: provider buttons follow their brands' rules (Apple: black or white; Google: its own). The fourth button (email) is `outline`-equivalent on daylit: white face, `concrete-600` edge (5.87:1 on white as text, edge ui 3.95:1 on body is not needed here; edge on `concrete-50` measured below in `04-components.md`).
+No orange on this screen except the email path's Continue button. Provider buttons follow their brands' rules (Apple: black or white; Google: its own). The email button is a white face with a `concrete-600` edge (5.33:1 on `concrete-50`, ui).
 
 ## No-list
 
