@@ -104,6 +104,16 @@ Design and product decisions made by `design-director` or handed to it by the le
   - D3's "dark well" holds in a new form: the black scanner head is the well.
 - **Docs:** `hlynk/DIRECTION.md`, `docs/DESIGN_SYSTEM.md` (`hlynk.core` group, re-measured pairs, forbidden list), `screens/M01/03-direction.md`, `screens/M01/04-components.md`.
 
+### D12 — W01: the seal keeps the hero's right column; the 3D H-Lynk Core gets its own section below
+
+- **Date:** 2026-10-04
+- **Reason:** `prompts/BUILD_PROMPT_v3.md` §5 puts a live H-Lynk canvas on the right of the home hero. Mike, the same day: "I love the logo on the right for home but it needs work. Leave the Mega City (district) options." His direction outranks the brief.
+- **Decision:**
+  - The hero's right column is the NYC-MON seal (`BrandLogo`), unedited. The district selector stays and drives the city behind the hero.
+  - `apps/web/components/DeviceStage.tsx` keeps every §5 requirement (`model: 'placeholder' | 'h-lynk-entry'`, `figure aria-label="H-Lynk device"`, static capture for no-script and reduced motion, slow idle yaw, pointer tilt of 8° or less, paused offscreen, mounted after LCP) and sits in its own section directly below the hero, before the starters.
+  - The placeholder is the H-Lynk Core (canon #16): `hlynk.core.body` red, black scanner head with red emitters, a red fan of light upward, black antenna stub, dark bezel, black control row with a red-ringed trackpad.
+- **Docs:** `screens/W01/03-direction.md`, `screens/W01/08-handoff.md`.
+
 ## Links
 
 - `docs/design/hlynk/DIRECTION.md`
