@@ -46,7 +46,7 @@ export function CardSlider({
   buttonPosition = 'sides', prevButtonCorner = 'bottom-left', nextButtonCorner = 'bottom-right',
   autoPlay = false, autoPlayInterval = 3000, showEdgeFades = false, edgeFadeColor,
   showCornerAccents = false, cornerAccentStyle = 'frame', scanLines = false, viewportClassName,
-  variant = 'uncontained', snap = true, parallax = false, onIndexChange,
+  variant = 'uncontained', snap = true, onIndexChange,
 }: CardSliderNativeProps) {
   const slides = slidesOf(children);
   const { size, onLayout } = useLayoutSize({ width: 0, height: 0 });
@@ -114,7 +114,6 @@ export function CardSlider({
                 itemWidth={layout.itemWidth}
                 itemSpacing={gap}
                 snap={snap}
-                parallax={parallax}
                 cut={CARD_CUT}
                 keylineColor={toneHex(resolved).face}
                 itemLabels={slideLabels(slides.length)}

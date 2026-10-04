@@ -9,8 +9,6 @@ import SwiftUI
  - The controlled index is bound through `scrollPosition(id:)`. JS changes
    to `props.index` scroll to that card, and the card the user lands on is
    sent back as `onIndexChange`.
- - With `parallax`, a second `scrollTransition` before the clip moves the
-   card's content against the scroll inside its cut mask (image cards).
  - `scrollTransition` gives the Material strategies their look: in hero and
    multi-browse the cards outside the focus position shrink and dim, the way
    Material's keylines squeeze peeking items.
@@ -23,8 +21,6 @@ struct NycCarouselScroll: View {
 
   /** Width of the neighbours that peek in either side of a hero card. */
   private let heroPeek: CGFloat = 40
-  /** How far image content drifts inside its mask across one card of scroll. */
-  private let parallaxShift: CGFloat = 28
 
   var body: some View {
     let children = props.children ?? []
@@ -64,7 +60,6 @@ struct NycCarouselScroll: View {
     let keyline = props.keylineColor
     // Read on the main actor here; scrollTransition's closure is Sendable.
     let squeezes = props.variant != .uncontained && !reduceMotion
-    let drifts = props.parallax && !reduceMotion
     AnyView(view)
       .modifier(
         NycCarouselItemFrame(
@@ -75,13 +70,6 @@ struct NycCarouselScroll: View {
           spacing: spacing
         )
       )
-      // Parallax runs before the clip, so the content moves inside the cut
-      // shape. The 1.12 overscan keeps the shifted edge out of view.
-      .scrollTransition(axis: .horizontal) { content, phase in
-        content
-          .offset(x: drifts ? phase.value * -parallaxShift : 0)
-          .scaleEffect(drifts ? 1.12 : 1)
-      }
       .clipShape(shape)
       .overlay {
         if let keyline {

@@ -26,11 +26,6 @@ final class NycCarouselViewProps: UIBaseViewProps {
   /** Keyline around each card's cut shape, in the slider tone. */
   @Field var keylineColor: Color?
   @Field var keylineWidth: Double = 2
-  /**
-   Image cards: shift each card's content against the scroll inside its cut
-   mask, so photos drift behind the frame.
-   */
-  @Field var parallax: Bool = false
   /** Spoken name for each card, e.g. "Card 2 of 6". */
   @Field var itemLabels: [String] = []
 

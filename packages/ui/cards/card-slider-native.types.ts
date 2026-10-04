@@ -12,13 +12,6 @@ export interface CardSliderNativeExtras {
   variant?: CardSliderVariant;
   /** Snap a card at a time. Default true. */
   snap?: boolean;
-  /**
-   * Image cards: the photo drifts against the scroll inside each card's cut
-   * mask (iOS scrollTransition). Android's Material carousel reveals items
-   * through a moving mask, which gives the same drift without this flag.
-   * Default false.
-   */
-  parallax?: boolean;
   /** Fires when the slider settles on a new index: swipe, buttons, autoplay, or assistive tech. */
   onIndexChange?: (index: number) => void;
 }
