@@ -25,8 +25,10 @@ export interface AppleClient extends OAuthClient {
 }
 
 export interface AuthEnv {
-  /** Public origin Better Auth issues links and cookies for. */
+  /** Public origin of apps/admin-vite, where Better Auth issues links and cookies. */
   baseURL: string;
+  /** Public origin of the product site (apps/web), if configured. */
+  siteURL: string | undefined;
   secret: string | undefined;
   /** Extra origins (Expo scheme, preview hosts). The baseURL origin is always trusted. */
   trustedOrigins: string[];
@@ -53,7 +55,10 @@ export function readAuthEnv(): AuthEnv {
   const appleClient = oauthClient(process.env.APPLE_CLIENT_ID, process.env.APPLE_CLIENT_SECRET);
 
   return {
-    baseURL: clean(process.env.BETTER_AUTH_URL) ?? clean(process.env.NEXT_PUBLIC_SITE_URL) ?? 'http://localhost:3000',
+    // Better Auth lives on the admin/API host (docs/adr/0003-admin-app-split.md),
+    // never on the product site, so NEXT_PUBLIC_SITE_URL is not a fallback.
+    baseURL: clean(process.env.BETTER_AUTH_URL) ?? 'http://localhost:5174',
+    siteURL: clean(process.env.NEXT_PUBLIC_SITE_URL),
     secret: clean(process.env.BETTER_AUTH_SECRET),
     trustedOrigins: list(process.env.BETTER_AUTH_TRUSTED_ORIGINS),
     resendApiKey: clean(process.env.RESEND_API_KEY),

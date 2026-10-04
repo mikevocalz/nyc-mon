@@ -166,7 +166,7 @@ catalog:
   # The pin is the fork's payload-4-dist branch: the PR commit plus its built
   # dist/, because pnpm does not build git dependencies that only declare
   # prepublishOnly. Bump this together with the PR branch.
-  "@delmaredigital/payload-better-auth": github:mikevocalz/payload-better-auth#3eb634b9f8ecff60f649864f75cdd7ea7afeea27
+  "@delmaredigital/payload-better-auth": github:mikevocalz/payload-better-auth#5134d0b3b14f4dd5f59acbd0a0c09b2326c48f80
   better-auth: 1.7.7
   "@better-auth/passkey": 1.7.7
   resend: 6.32.0
@@ -176,6 +176,18 @@ catalog:
   "@payloadcms/db-postgres": 4.0.0-canary.37
   "@payloadcms/next": 4.0.0-canary.37
   "@payloadcms/ui": 4.0.0-canary.37
+  # The admin runs on TanStack Start in apps/admin-vite (docs/adr/0003).
+  # The adapter peers vite >=8, @vitejs/plugin-react ^6, @vitejs/plugin-rsc
+  # ^0.5.21, @tanstack/react-start ^1.168.26 and the exact payload version.
+  "@payloadcms/tanstack-start": 4.0.0-canary.37
+  "@tanstack/react-start": 1.168.60
+  # Exact match for @tanstack/react-start 1.168.60's own dependency.
+  "@tanstack/react-router": 1.170.41
+  "@vitejs/plugin-rsc": 0.5.35
+  # Emits Vercel Build Output API v3 for apps/admin-vite (preset: 'vercel').
+  nitro: 3.0.260903-beta
+  # waitUntil() for Better Auth's background tasks (mail) outside Next.
+  "@vercel/functions": 3.9.11
   graphql: 16.14.2
   pg: 8.23.1
   sharp: 0.35.5

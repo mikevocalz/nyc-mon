@@ -1,5 +1,4 @@
 import type { NextConfig } from 'next'
-import { withPayload } from '@payloadcms/next/withPayload'
 
 // Turbopack (Next 16 default). webpack is unusable in this workspace — its
 // FileSystemInfo snapshot walker dies with RangeError on the pnpm symlink
@@ -55,7 +54,6 @@ const nextConfig: NextConfig = {
   transpilePackages: [
     '@acme/ui',
     '@acme/app',
-    '@acme/payload',
     '@expo/html-elements',
     'expo-paste-input',
     'expo-drag-drop-content-view',
@@ -96,4 +94,4 @@ const nextConfig: NextConfig = {
   },
 }
 
-export default withPayload(nextConfig, { devBundleServerPackages: false })
+export default nextConfig

@@ -1,0 +1,49 @@
+{
+  "name": "admin-vite",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --env-file-if-exists=../../.env --env-file-if-exists=../../.env.local node_modules/vite/bin/vite.js dev",
+    "build": "vite build",
+    "preview": "node --env-file-if-exists=../../.env --env-file-if-exists=../../.env.local node_modules/vite/bin/vite.js preview",
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "payload": "node --env-file-if-exists=../../.env --env-file-if-exists=../../.env.local node_modules/payload/bin.js",
+    "payload:importmap": "pnpm payload generate:importmap",
+    "payload:types": "pnpm payload generate:types",
+    "payload:migrate": "pnpm payload migrate",
+    "payload:migrate:create": "pnpm payload migrate:create"
+  },
+  "dependencies": {
+    "@acme/payload": "workspace:*",
+    "@better-auth/passkey": "catalog:",
+    "@delmaredigital/payload-better-auth": "catalog:",
+    "@payloadcms/db-postgres": "catalog:",
+    "@payloadcms/tanstack-start": "catalog:",
+    "@payloadcms/ui": "catalog:",
+    "@tanstack/react-router": "catalog:",
+    "@tanstack/react-start": "catalog:",
+    "better-auth": "catalog:",
+    "graphql": "catalog:",
+    "payload": "catalog:",
+    "pg": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "sharp": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@acme/config": "workspace:*",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
+    "@vitejs/plugin-rsc": "catalog:",
+    "eslint": "catalog:",
+    "eslint-config-expo": "catalog:",
+    "nitro": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:"
+  }
+}

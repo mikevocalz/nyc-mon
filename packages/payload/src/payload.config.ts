@@ -9,19 +9,21 @@ import {
 import { betterAuth } from 'better-auth';
 import { buildConfig } from 'payload';
 import sharp from 'sharp';
-import { AUTH_BASE_PATH, PAYLOAD_API_ROUTE, betterAuthOptions } from './auth/options';
+import { AUTH_BASE_PATH, PAYLOAD_API_ROUTE, PAYLOAD_ORIGINS, betterAuthOptions } from './auth/options';
+import { adminComponents } from './admin/components';
 import { Users } from './collections/Users';
 import { Media } from './collections/Media';
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
-const serverURL = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
 
 export default buildConfig({
   admin: {
     user: Users.slug,
+    components: adminComponents,
     importMap: {
       baseDir: dirname,
-      importMapFile: path.resolve(dirname, '../../../apps/web/app/(payload)/admin/importMap.js'),
+      // The admin is served by apps/admin-vite (docs/adr/0003-admin-app-split.md).
+      importMapFile: path.resolve(dirname, '../../../apps/admin-vite/src/routes/_payload/importMap.js'),
     },
   },
   routes: {
@@ -51,8 +53,8 @@ export default buildConfig({
     push: process.env.PAYLOAD_PUSH === 'true',
     schemaName: 'payload',
   }),
-  cors: [serverURL],
-  csrf: [serverURL],
+  cors: PAYLOAD_ORIGINS,
+  csrf: PAYLOAD_ORIGINS,
   secret: process.env.PAYLOAD_SECRET || '',
   sharp,
   typescript: {

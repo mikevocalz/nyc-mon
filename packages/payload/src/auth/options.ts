@@ -4,7 +4,7 @@
 import { passkey } from '@better-auth/passkey';
 import type { BetterAuthOptions } from 'better-auth';
 import { APIError } from 'better-auth/api';
-import { after } from 'next/server';
+import { waitUntil } from '@vercel/functions';
 import { needsGuardianConsent, parseBirthYear } from './age';
 import { createAuthMailer } from './email';
 import { readAuthEnv } from './env';
@@ -32,13 +32,10 @@ function runInBackground(promise: Promise<unknown>): void {
       console.error('[auth] background task failed', error);
     },
   );
-  try {
-    // Keeps the serverless function alive until the mail is sent, without
-    // making the response wait for it.
-    after(settled);
-  } catch {
-    // Outside a request scope (scripts, tests) there is nothing to extend.
-  }
+  // Keeps the Vercel Function alive until the mail is sent, without making the
+  // response wait for it. Outside Vercel (local dev, scripts) waitUntil has no
+  // request context and does nothing; the promise still settles on its own.
+  waitUntil(settled);
 }
 
 const socialProviders: NonNullable<BetterAuthOptions['socialProviders']> = {};
@@ -50,6 +47,20 @@ if (env.apple !== undefined) {
 }
 
 const baseOrigin = new URL(env.baseURL);
+
+/**
+ * Origins Payload accepts for CORS and CSRF: the admin/API host itself, the
+ * product site (apps/web reads published content over REST), and the extra
+ * Better Auth origins. docs/adr/0003-admin-app-split.md.
+ */
+export const PAYLOAD_ORIGINS: string[] = [
+  ...new Set(
+    [baseOrigin.origin, env.siteURL, ...env.trustedOrigins]
+      .filter((origin): origin is string => origin !== undefined)
+      .filter((origin) => /^https?:\/\//.test(origin))
+      .map((origin) => new URL(origin).origin),
+  ),
+];
 
 export const betterAuthOptions = {
   appName: 'NYC-MON',

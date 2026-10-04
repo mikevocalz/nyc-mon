@@ -9,7 +9,7 @@ import { toAuthResult } from './toAuthResult.ts';
 
 /** Options for {@link createAuth}. */
 export interface CreateAuthOptions {
-  /** Origin of the NYC-MON web app that serves `/payload-api/auth`, e.g. `https://nycmon.app`. */
+  /** Origin of apps/admin-vite, the host that serves `/payload-api/auth` (docs/adr/0003-admin-app-split.md). */
   baseURL: string;
 }
 
