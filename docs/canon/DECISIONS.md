@@ -197,3 +197,21 @@ The starter card reads:
 In data the grouping is a bloodline: `bloodlineId` (`F01`, `F02`, `F12`, the roster's family numbers) and `bloodlineName` (`Hood Ratti`, `Bodega Baddiee Cee`, `Yote`). UI copy builds the label as `${bloodlineName} Bloodline`. The roster and the other source files keep saying "family"; quotes from them stay verbatim.
 
 **Note for `prompts/LAWS.md` Law 9 (language is canon):** add "`Bloodline` in UI and data for a Dex family" to its list. Recorded here; whoever owns `LAWS.md` makes the edit.
+
+## Decision 12 — A Mid evolves into exactly one of its Max forms
+
+- **Date:** 2026-10-04
+- **Decided by:** Mike (creator)
+- **Answers:** `docs/canon/OPEN_QUESTIONS.md` Q35
+
+The Max forms branch. A Mid evolves into exactly one of its three Max forms: #004 Hood Ratti → #005 Ratti Royale OR #006 Agua Ratti OR #007 Phantom Ratti; #011 Bodega Cee → #012, #013 or #014; #064 Barrio-Yote → #065, #066 or #067. The serial arrows in the roster's chain lines (`ROSTER L72`, `L76`, `L116`) are listing order, not a sequence. This matches v7 ("exactly **005 OR 006 OR 007**", `[v7] M7 L38`).
+
+Edges before Mid are linear: Egg → Baby → Small → Mid. `@acme/content` stores these edges as data. Data is not an evolution: nothing fires without an authored `EvolutionEvent` (Law 7), and Phase 1 ships none. What decides the branch (bond, personality; `V11 ¶68`) stays `TODO(canon)`.
+
+## Decision 13 — "Bodega Cee" stays as the casual story name for the F02 bloodline
+
+- **Date:** 2026-10-04
+- **Decided by:** Mike (creator)
+- **Answers:** `docs/canon/OPEN_QUESTIONS.md` Q38
+
+Story copy may call the F02 bloodline "Bodega Cee", as v11 does: Mari's partner comes "from the Bodega Cee line" (`V11 ¶76`), and that line stays as written. UI labels still follow #11: "Bodega Baddiee Cee Bloodline". Data keeps `bloodlineName: "Bodega Baddiee Cee"`; the casual name is a copy-deck choice, not a second data field.

@@ -103,7 +103,7 @@ Roster v11.1, registry with stages (`ROSTER L150-L163`, `L210-L216`):
 > | #066 | F12 · Yote | Yote del Eléctrico | Max |
 > | #067 | F12 · Yote | Agua-Yote | Max |
 
-The chain lines draw serial arrows through #005 → #006 → #007 (and the F02 and F12 equivalents), while the registry stages all three as Max and v7 branches from the Mid (below). That is `OPEN_QUESTIONS.md` Q35. The roster gives no type column and no `form_*` string IDs (Q37).
+The chain lines draw serial arrows through #005 → #006 → #007 (and the F02 and F12 equivalents), while the registry stages all three as Max and v7 branches from the Mid (below). Decision #12 (answering Q35) settles it: the arrows are listing order, and each Mid branches to exactly one of its three Max forms. The roster gives no type column and no `form_*` string IDs (Q37).
 
 Labels (Decision #11): "Hood Ratti Bloodline", "Bodega Baddiee Cee Bloodline", "Yote Bloodline". The roster's family names, quoted verbatim above, are the `bloodlineName`.
 
@@ -683,17 +683,17 @@ Coverage: v11 **found**. v7 **found**. They agree.
 
 | Topic | roster v11.1 | v11 docx | v7 |
 |---|---|---|---|
-| Hood Ratti Bloodline: Dex numbers, forms, edges | found (IDs, names, stages; Max edges ambiguous, Q35) | absent | found |
+| Hood Ratti Bloodline: Dex numbers, forms, edges | found (IDs, names, stages; Max forms branch per Decision #12) | absent | found |
 | Hood Ratti Bloodline: Baby body, scale, palette | absent | absent | found (scale is a "design target") |
 | Hood Ratti Bloodline: food | absent | absent | found (favorite chopped cheese + fries; no food class) |
 | Hood Ratti Bloodline: personality | absent | found for Malik's Ratti only | found (family-wide line) |
 | Hood Ratti Bloodline: culture | absent | found (Malik's Ratti; species not locked) | absent |
-| Bodega Baddiee Cee Bloodline: Dex numbers, forms, edges | found (IDs, names, stages; Max edges ambiguous, Q35) | absent | found |
+| Bodega Baddiee Cee Bloodline: Dex numbers, forms, edges | found (IDs, names, stages; Max forms branch per Decision #12) | absent | found |
 | Bodega Baddiee Cee Bloodline: Baby body, scale, palette | absent | absent | found |
 | Bodega Baddiee Cee Bloodline: food | absent | absent | found (wings + fries) |
 | Bodega Baddiee Cee Bloodline: personality | absent | absent | found |
 | Bodega Baddiee Cee Bloodline: culture; Mari's partner identity | absent | partial (line only) | absent |
-| Yote Bloodline: Dex numbers, forms, edges | found (IDs, names, stages; Max edges ambiguous, Q35) | absent | found |
+| Yote Bloodline: Dex numbers, forms, edges | found (IDs, names, stages; Max forms branch per Decision #12) | absent | found |
 | Yote Bloodline: Baby body, scale, palette | absent | absent | found |
 | Yote Bloodline: food | absent | absent | found (spicy chicken over rice) |
 | Yote Bloodline: personality | absent | absent | found |
