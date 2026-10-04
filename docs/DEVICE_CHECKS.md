@@ -30,6 +30,10 @@ Target matrix (BUILD_PROMPT_v3 §0C, §6 step 11): iPhone SE 3, iPhone 16 Pro Ma
 - [ ] **Passkey ceremonies** on iOS and Android (associated domains and asset links).
 - [ ] **Sign in with Apple and Google** in the Expo app (`@better-auth/expo` isn't installed yet).
 - [ ] **Resend delivery:** the verification, reset and guardian-consent emails.
+- [ ] **SMS through AWS SNS** (ADR 0004 §6): needs Mike's AWS account out of the SNS SMS sandbox, a registered toll-free or 10DLC origination number, and `AUTH_SMS_TRANSPORT=sns` with the AWS env names from `.env.example`. Then: phone verification and an SMS two-factor code delivered to a real US number and a real Canadian number; a `+1 876` (Jamaica) number refused before any send.
+- [ ] **Headset sign-in** (ADR 0004 §9): a Meta Quest and an Apple Vision Pro each request a device code, the Caller approves it on the phone (M29), and the headset reads the same Mon through `/v1/me/mons`.
+- [ ] **Tablet handoff:** the tablet scans the phone's QR (M30) and gets its own session; revoking it leaves the phone signed in. The code-approval fallback works on a tablet with no camera access.
+- [ ] **Passkey on the family device** for an under-13 account after guardian consent (DECISIONS #17).
 
 ## Admin console
 

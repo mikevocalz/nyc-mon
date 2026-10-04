@@ -267,3 +267,57 @@ The app's companion chrome is the **H-Lynk Core** (Entry), so its body is red. T
 The sheet also shows on-screen UI: the Mon name, "Lv. 12", a gender mark, a "SCAN READY" chip, HP/Energy/Fullness/Social meters, a "CALL MON" button, and DEX/CREW/CARE/BAG/CITY tabs. That UI is concept text, not canon. It is reference for the companion screen layout only, and every label still has to clear Law 1 and Law 9.
 
 **Open:** the sheet prints the **EngineX** logo on the front of every tier. v11 calls Dr. Santoro the H-Lynk's inventor and makes EngineX the concealed eradication program. See Q40.
+
+## Decision 17 — under-13 sign-in after consent: username and passkey, guardian email for recovery
+
+- **Date:** 2026-10-04
+- **Decided by:** Mike (creator)
+- **Answers:** `docs/adr/0004-auth-methods-and-device-handoff.md`, open question 1
+- **Kind:** product
+
+After a guardian approves consent, the child signs in with a username and a passkey on the family device. The account's email is the guardian's verified address, used only for recovery. No account ever carries a placeholder email.
+
+## Decision 18 — a merged account keeps both starters; Home asks which one is active
+
+- **Date:** 2026-10-04
+- **Decided by:** Mike (creator)
+- **Answers:** `docs/adr/0004-auth-methods-and-device-handoff.md`, open question 2; closes the `TODO(canon)` on merging two accounts that each hatched a starter
+- **Kind:** canon
+
+When two accounts merge and each has hatched a starter, the Caller keeps both Mons. Home asks the Caller which one is active. Nothing is lost: no Mon is deleted, released or sent back (Laws 6 and 8).
+
+## Decision 19 — SMS goes to US and Canadian numbers
+
+- **Date:** 2026-10-04
+- **Decided by:** Mike (creator)
+- **Answers:** `docs/adr/0004-auth-methods-and-device-handoff.md`, open question 3
+- **Kind:** product
+
+Phone verification and SMS sign-in codes accept US and Canadian numbers only.
+
+## Decision 20 — tablet handoff: QR first, code approval as the fallback
+
+- **Date:** 2026-10-04
+- **Decided by:** Mike (creator)
+- **Answers:** `docs/adr/0004-auth-methods-and-device-handoff.md`, open question 5
+- **Kind:** product
+
+A tablet signs in by scanning a QR shown on the Caller's phone. When it can't scan, it shows a code and the Caller approves it on the phone, the same flow a headset uses.
+
+## Decision 21 — a guardian-consented account unlocks phone features at 13 with a second guardian approval
+
+- **Date:** 2026-10-04
+- **Decided by:** the lead agent, delegated by Mike on 2026-10-04
+- **Answers:** `docs/adr/0004-auth-methods-and-device-handoff.md`, open question 6
+- **Kind:** product
+
+An account created through guardian consent can add a phone number and receive SMS codes only after the Caller turns 13 and the guardian approves again. Until both are true, the account uses TOTP, passkeys and email codes sent to the guardian.
+
+## Decision 22 — staff hold one role each if multi-value roles don't persist
+
+- **Date:** 2026-10-04
+- **Decided by:** the lead agent, delegated by Mike on 2026-10-04
+- **Answers:** `docs/adr/0004-auth-methods-and-device-handoff.md`, open question 7
+- **Kind:** product
+
+Staff roles are `ops`, `support`, `consent` and `content`. If the auth adapter cannot store more than one role on a user, each staff member holds exactly one, and ADR 0004 records the limit until the plugin's configurable role field reaches the pinned fork.

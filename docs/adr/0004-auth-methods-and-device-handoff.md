@@ -1,6 +1,6 @@
 # ADR 0004: Auth methods, account merging, staff roles and device handoff
 
-- **Status:** Proposed (2026-10-04). Mike signs off; the items under "Needs Mike" block the parts they name, not the whole ADR.
+- **Status:** Accepted (2026-10-04). Mike answered the open questions the same day; see "Decisions recorded" below and `docs/canon/DECISIONS.md` #17–#22.
 - **Date:** 2026-10-04
 - **Deciders:** Mike (creator) decided the method list, AWS SNS for SMS and the COPPA rule for phones on 2026-10-04; the `platform` agent designs and implements
 - **Builds on:** `docs/adr/0001-auth-and-identity.md` (Better Auth inside Payload, Resend, the `/v1` contract, age and consent), `docs/adr/0003-admin-app-split.md` (auth lives on the admin-vite host)
@@ -139,15 +139,15 @@ Merging is for a Caller who ends up with two accounts, for example an Apple rela
 
 **Why `callerAliases`.** An offline egg's `monInstanceId` is `UUIDv5(NYC_MON_NAMESPACE, callerId + ":" + eggId)` (ADR 0001). An egg queued on B's phone before the merge carries an id derived from B's `callerId`. After the merge that phone gets a 401, the Caller signs in as the survivor, and the queue replays. `POST /v1/eggs` and `/hatch` must accept a derivation from the survivor's id **or any id in `callerAliases`**, and must keep the id the client sent instead of re-deriving it. Without this, the replay is rejected or the server mints a second `monInstanceId` for the same egg: the duplicate Law 6 calls a P0.
 
-**Merging more than one starter.** If both accounts hatched a starter, the survivor owns two Mons after the merge. Nothing is deleted (Law 8). Whether a Caller may hold two starters, and how Home picks which one to show, is a canon question (see "Needs Mike").
+**Merging more than one starter.** If both accounts hatched a starter, the survivor owns two Mons after the merge. Nothing is deleted (Law 8). Mike decided both are kept and Home asks which one is active (DECISIONS #18). The choice is stored as `users.activeMonInstanceId`, set only by the Caller.
 
 ### 4. COPPA rules per method
 
-ADR 0001's gate applies: `needsGuardianConsent(birthYear, currentYear)` is true for any year that could belong to someone under 13 (`currentYear - birthYear <= 13`). The **phone gate** passes only when all three hold: `consentStatus === 'not-required'`, `birthYear` is set, and `needsGuardianConsent(birthYear, now)` is false. A missing birth year fails the gate. An account created through guardian consent (`consentStatus: 'approved'`) fails it for as long as it exists in Phase 1, even after the Caller's birthday; changing that is a later decision.
+ADR 0001's gate applies: `needsGuardianConsent(birthYear, currentYear)` is true for any year that could belong to someone under 13 (`currentYear - birthYear <= 13`). The **phone gate** passes only when all three hold: `consentStatus === 'not-required'`, `birthYear` is set, and `needsGuardianConsent(birthYear, now)` is false. A missing birth year fails the gate. An account created through guardian consent (`consentStatus: 'approved'`) passes only when the birth year is out of the consent range **and** `phoneConsentAt` is set by a second guardian approval (DECISIONS #21).
 
 | Method | 13 and over | Under 13 (after guardian consent only) |
 |---|---|---|
-| Email + password | yes | Needs Mike: which email, if any, the child's account carries (see below) |
+| Email + password | yes | no; the account's email is the guardian's verified address, for recovery only, and the account has no password (DECISIONS #17) |
 | Passkey | yes | yes; holds no personal data on our side beyond the public key |
 | Apple / Google | yes | no; ADR 0001 collects no child Apple or Google identity |
 | TOTP + backup codes | yes | yes |
@@ -194,7 +194,7 @@ export interface SmsSender {
 - `createSmsSender(env)` returns SNS when `AUTH_SMS_TRANSPORT=sns`, the console sender when `AUTH_SMS_TRANSPORT=console`, and `undefined` when unset. **The boot fails** if `NODE_ENV=production` and the transport is `console`. With `undefined`, the `phoneNumber` plugin is not registered and the SMS channel is not offered, so no endpoint exists that cannot deliver.
 - Message body: the code and the app name only. No link, no name, no Mon.
 
-**Toll fraud.** Paid SMS endpoints attract SMS pumping. Besides the rate limits below: `phoneNumberValidator` accepts E.164 numbers in `AUTH_SMS_ALLOWED_COUNTRIES` only (default `US`), and the server counts sends per number and per user in the `verification` table, capping at 5 per number per 24 hours and 10 per user per 24 hours.
+**Toll fraud.** Paid SMS endpoints attract SMS pumping. Besides the rate limits below: `phoneNumberValidator` accepts E.164 numbers in `AUTH_SMS_ALLOWED_COUNTRIES` only (`US,CA`, DECISIONS #19), and the server counts sends per number and per user in the `verification` table, capping at 5 per number per 24 hours and 10 per user per 24 hours.
 
 Env names (values in `.env.local` and the admin-vite Vercel project only): `AUTH_SMS_TRANSPORT` (`sns` | `console`), `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` (or the Vercel AWS integration's role instead of keys), `AWS_SNS_ORIGINATION_NUMBER`, `AUTH_SMS_ALLOWED_COUNTRIES`.
 
@@ -317,25 +317,30 @@ The admin console's sign-in and settings screens already exist in `docs/design/a
 
 - New Better Auth tables (`twoFactor`, `deviceCode`, `rateLimit`) and new `users` fields (`twoFactorEnabled`, `phoneNumber`, `phoneNumberVerified`, `username`, `displayUsername`, `twoFactorOtpChannel`, `callerAliases`) plus `session.surface` each need a Payload migration. `users` is hand-written (ADR 0001), so its new fields are added by hand and must match the plugins' schemas exactly.
 - `users.role` changes type, from a single select to `hasMany`. Every access check that compares `role === 'admin'` moves to the helpers in `access/staff.ts`.
-- Two new dependencies through the catalog: `@aws-sdk/client-sns` and `@better-auth/expo`.
+- One new dependency through the catalog now, `@aws-sdk/client-sns`; `@better-auth/expo` follows with the mobile auth wiring.
 - AWS SNS in a new account starts in the SMS sandbox and only sends to verified numbers until AWS moves it out; US delivery also needs a registered toll-free or 10DLC origination number.
 - Production cannot turn on linking, merging or device approval until Resend sends from a verified domain, because the security notices depend on it.
 - ADR 0001 is amended for per-surface care sequencing and caller aliases; both change `/v1` handler logic that is not built yet, so nothing deployed breaks.
 
-## Needs Mike
+## Decisions recorded (2026-10-04)
 
-1. **Under-13 sign-in credential.** ADR 0001 collects no child email. After consent, does the child sign in with a passkey and a username + password, and does the account's required `email` field hold the guardian's address or a placeholder? A placeholder like `@*.invalid` can never be verified, which is the MoyoLearn lockout pattern, so the consent flow would have to mark it verified server-side. Counsel's consent-method decision (ADR 0001) may settle this.
-2. **Two starters after a merge.** Canon has each Caller meet three eggs and take one (DECISIONS #5). If two accounts that each hatched a starter merge, the survivor holds two Mons. Is that allowed, and which one does Home show? Recorded as `TODO(canon)` until decided.
-3. **SMS countries.** Default allowlist is `US`. Add Canada or others?
-4. **AWS setup:** an AWS account with SNS out of the sandbox, a registered origination number, and either keys or the Vercel AWS integration for the admin-vite project.
-5. **Tablet handoff mechanism:** keep the one-time-token QR (tablet scans the phone) or use device authorization everywhere (one flow, more typing).
-6. **Consented accounts and phones later.** Should a guardian-consented account ever unlock phone features once the Caller is old enough, or stay email/TOTP-only for the life of the account?
-7. **Staff roles fallback.** If `hasMany` roles do not round-trip through the auth adapter, staff hold one role each until the fork picks up `roleField`. Acceptable?
+Mike answered 1–4; the lead decided 5 and 6. Each is also a numbered entry in `docs/canon/DECISIONS.md`. Where an answer changes a section above, that section is superseded by this list.
 
-## Phase B plan (on `feat/auth-methods`, after the go-ahead)
+1. **Under-13 sign-in after consent (DECISIONS #17).** The child signs in with a username and a passkey on the family device. The account's `email` is the guardian's verified address, used only for recovery and for the email channel of one-time codes. **No placeholder emails, ever.** The guardian-consent flow creates the account with `emailVerified: true` because the guardian proved that address by approving consent. The child account has no password, so `emailAndPassword` sign-in does not apply to it; `/sign-in/username` needs a password and is therefore not the child's path either. The child's way in is the passkey; the username identifies the account on the family device and in support. Recovery runs through the guardian's email.
+2. **Merge with two starters (DECISIONS #18, creator decision, closes the `TODO(canon)` in section 3).** Both Mons are kept. Home asks the Caller which one is active. Nothing is lost.
+3. **SMS countries (DECISIONS #19).** US and Canada: `AUTH_SMS_ALLOWED_COUNTRIES=US,CA`, both `+1`. The validator accepts `+1` numbers with a valid NANP area code and refuses the `+1` area codes that belong to other countries (the Caribbean and Atlantic NANP members, a common SMS-pumping target), premium `900`, and toll-free codes, which cannot receive SMS. US territories stay in, since they are the US.
+4. **Tablet handoff (DECISIONS #20).** Both mechanisms. The QR handoff (section 9) is used when the tablet can scan the phone; device-code approval, the headset flow, is the fallback.
+5. **Consented accounts and phones (DECISIONS #21, lead).** An account created through guardian consent unlocks phone verification and SMS codes only when the Caller has turned 13 **and** the guardian approves again. Until both hold, the phone gate fails. The re-approval is recorded on the account as `phoneConsentAt` (date) and is the only path that sets it.
+6. **Staff roles fallback (DECISIONS #22, lead).** If multi-value roles do not persist through the auth adapter, each staff member holds one role, and that limit is recorded here and in the collection. See "Verified" for which branch Phase B took.
 
-1. Branch from main after the new collections land.
-2. Catalog: `@aws-sdk/client-sns`, `@better-auth/expo`; `pnpm install`.
+**AWS.** SNS out of the sandbox, a toll-free or 10DLC origination number and the keys are Mike's to provide. Phase B builds behind the console sender, lists the env names in `.env.example`, and adds a line to `docs/DEVICE_CHECKS.md`.
+
+## Phase B plan
+
+Other agents share the working tree on main, so Phase B commits on main with explicit pathspecs, one commit per method or area, and the lead cuts `feat/auth-methods` from the right base when pushing. Files owned by the collections agent (`guardian-consents`, `eggs`, `mon-instances`, `audit-events`, `integrity-runs`, `collections/access/*`, `collections/audit/*`) are not edited here.
+
+1. Wait for nothing; coordinate through `git log`.
+2. Catalog: `@aws-sdk/client-sns`; `pnpm install`. `@better-auth/expo` waits for the mobile auth wiring: nothing in the repo runs a Better Auth client on native yet, and the server `expo()` plugin only matters once one does.
 3. Server: plugins and options in `options.ts`; `sms.ts`; mail templates; the merge + handoff plugin; phone-gate hooks; staff roles, `access/staff.ts`, the reveal endpoint, `staff:grant` script; remove `firstUserAdmin`; `.env.example` names.
 4. `@acme/auth`: client plugins and the members in section 10.
 5. Tests (Vitest): phone gate refusals, `sendOTP` channel choice, SMS sender selection and the production console guard, username validator, merge rules (birth-year mismatch, provider conflict, Mons moved and none deleted, single-use code), handoff creates a distinct session, staff access matrix.
