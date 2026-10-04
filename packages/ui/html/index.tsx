@@ -17,10 +17,13 @@ import {
 } from '@expo/html-elements';
 import type { Role } from 'react-native';
 import { css, type CN } from './css';
+import { bodyFace, withBodyFace } from './body-font';
 import {
   FigcaptionBase, AddressBase, DetailsBase, SummaryBase,
   FieldsetBase, LegendBase, SelectBase,
   ButtonBase, InputBase, TextareaBase, LabelBase, FormBase,
+  FigureBase, DescriptionListBase, DescriptionTermBase, DescriptionDetailsBase,
+  OrderedListBase, TableCaptionBase, SearchBase, OutputBase, VisuallyHiddenBase,
 } from './dom';
 
 // ---- layout -------------------------------------------------------------
@@ -37,13 +40,8 @@ export const Section = css(ESection, 'Section');
 export const Article = css(EArticle, 'Article');
 export const Aside = css(EAside, 'Aside');
 
-// figure = Div with the figure role; figcaption needs the fork
-export const Figure = css(
-  (props: React.ComponentProps<typeof Div>) => (
-    <Div role={'figure' as Role} {...props} />
-  ),
-  'Figure',
-);
+// A real <figure> on web (dom fork; REPO_MAP gap #12), role="figure" on native.
+export const Figure = css(FigureBase, 'Figure');
 export const Figcaption = css(FigcaptionBase, 'Figcaption');
 export const Address = css(AddressBase, 'Address');
 export const Details = css(DetailsBase, 'Details');
@@ -60,27 +58,47 @@ export type HeadingProps = React.ComponentProps<typeof H1> & CN & {
 };
 export function Heading({ level = 1, ...props }: HeadingProps) {
   const Tag = HEADINGS[level];
-  return <Tag {...props} />;
+  return <Tag {...props} className={withBodyFace(props.className)} />;
 }
 
 // RNW maps role="paragraph" to a real <p>; RN's Role type lags behind, hence the cast.
-export const Paragraph = css(
+export const Paragraph = bodyFace(css(
   (props: React.ComponentProps<typeof EP>) => <EP role={'paragraph' as Role} {...props} />,
   'Paragraph',
-);
-export const Text = css(Span, 'Text');
-export const Time = css(ETime, 'Time');
+), 'Paragraph');
+export const Text = bodyFace(css(Span, 'Text'), 'Text');
+export const Time = bodyFace(css(ETime, 'Time'), 'Time');
 
 // ---- lists ----------------------------------------------------------------
 
 export const List = css(UL, 'List');
-export const ListItem = css(LI, 'ListItem');
+export const ListItem = bodyFace(css(LI, 'ListItem'), 'ListItem');
+/** `<ol>`: an ordered list (a sequence the reader needs in order). */
+export const OrderedList = css(OrderedListBase, 'OrderedList');
+/** `<dl>`: name/value groups. Children are DescriptionTerm + DescriptionDetails pairs. */
+export const DescriptionList = css(DescriptionListBase, 'DescriptionList');
+/** `<dt>`: the name in a DescriptionList group. */
+export const DescriptionTerm = css(DescriptionTermBase, 'DescriptionTerm');
+/** `<dd>`: the value in a DescriptionList group. */
+export const DescriptionDetails = css(DescriptionDetailsBase, 'DescriptionDetails');
+
+// ---- landmarks and live text ------------------------------------------------
+
+/** The `<search>` landmark around a search field and its filters. */
+export const Search = css(SearchBase, 'Search');
+/** `<output>`: a live result (a check, a count). Announced politely when it changes. */
+export const Output = css(OutputBase, 'Output');
+/**
+ * Text for assistive technology only (captions, hidden header labels, live
+ * announcements). Unstyled by design: it never draws.
+ */
+export const VisuallyHidden = VisuallyHiddenBase;
 
 // ---- interactive / forms ---------------------------------------------------
 
 // A real <button> on web; Pressable with role="button" on native (dom fork).
 export const Button = css(ButtonBase, 'Button');
-export const Link = css(A, 'Link');
+export const Link = bodyFace(css(A, 'Link'), 'Link');
 export const Form = css(FormBase, 'Form');
 export const Fieldset = css(FieldsetBase, 'Fieldset');
 export const Legend = css(LegendBase, 'Legend');
@@ -98,5 +116,7 @@ export const Table = css(ETable, 'Table');
 export const TableHeader = css(THead, 'TableHeader');
 export const TableBody = css(TBody, 'TableBody');
 export const TableRow = css(TR, 'TableRow');
-export const TableCell = css(TD, 'TableCell');
-export const TableHeaderCell = css(TH, 'TableHeaderCell');
+export const TableCell = bodyFace(css(TD, 'TableCell'), 'TableCell');
+export const TableHeaderCell = bodyFace(css(TH, 'TableHeaderCell'), 'TableHeaderCell');
+/** `<caption>`: the table's name. First child of Table. */
+export const TableCaption = css(TableCaptionBase, 'TableCaption');

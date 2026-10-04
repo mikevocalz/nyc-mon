@@ -114,7 +114,10 @@ export function cssAnimation(
     animationName: KEYFRAMES[name] as unknown as CSSAnimationKeyframes,
     animationDuration: `${Math.max(1, Math.round(durationMs))}ms`,
     animationDelay: `${Math.round(delay)}ms`,
-    animationTimingFunction: timing,
+    // The web style type wants CSSTimingFunction; the native type wants
+    // MaybeSharedValue<string>. The runtime takes CSSTimingFunction on both,
+    // so the prop is a documented type hole (same as animationName above).
+    animationTimingFunction: timing as never,
     animationIterationCount: iterations,
     animationDirection: direction,
     animationFillMode: fill,

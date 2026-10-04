@@ -169,6 +169,48 @@ export const FormBase = ({ className, ...props }: P) => (
 );
 
 
+// ---- structure the RNW mapping lacks (04-components.md §4, H1-H6) ----------
+// Real elements, seeded as flex columns like the RN views around them, so the
+// kit's flex classes keep working on them.
+
+const flexDom = <T extends P>(Tag: string, base: string) => {
+  const Plain = dom<T>(Tag);
+  const Component = ({ className, ...props }: T) =>
+    React.createElement(Plain, { ...props, className: `${base} ${className ?? ''}` } as T);
+  Component.displayName = `Dom(${Tag})`;
+  return Component;
+};
+
+type Labelled = P & { 'aria-label'?: string; 'aria-labelledby'?: string; id?: string };
+
+/** `<figure>`: REPO_MAP gap #12 (RNW has no figure mapping, it rendered a div). */
+export const FigureBase = flexDom<Labelled>('figure', 'flex flex-col');
+export const DescriptionListBase = flexDom<Labelled>('dl', 'flex flex-col');
+export const DescriptionTermBase = dom<P & { id?: string }>('dt');
+export const DescriptionDetailsBase = flexDom<P & { id?: string }>('dd', 'flex flex-col');
+export const OrderedListBase = flexDom<Labelled & { start?: number; reversed?: boolean }>('ol', 'flex flex-col');
+export const TableCaptionBase = dom<P & { id?: string }>('caption');
+/** The `<search>` landmark (HTML living standard). */
+export const SearchBase = flexDom<Labelled>('search', 'flex flex-col');
+/**
+ * `<output>`: the live result of a calculation or check. Browsers expose it
+ * as a polite live region (role="status").
+ */
+export const OutputBase = dom<P & { id?: string; htmlFor?: string; 'aria-live'?: 'polite' | 'off' }>('output');
+
+/**
+ * Text read by assistive technology and invisible on screen: the clip pattern
+ * (same declarations as Tailwind's `sr-only`, inline so it holds without the
+ * stylesheet and inside any portal).
+ */
+const VISUALLY_HIDDEN: React.CSSProperties = {
+  position: 'absolute', width: 1, height: 1, padding: 0, margin: -1,
+  overflow: 'hidden', clip: 'rect(0, 0, 0, 0)', whiteSpace: 'nowrap', borderWidth: 0,
+};
+export const VisuallyHiddenBase = ({ children, id }: { children?: React.ReactNode; id?: string }) => (
+  <span id={id} style={VISUALLY_HIDDEN}>{children}</span>
+);
+
 export type DropSurfaceProps =
   Omit<React.HTMLAttributes<HTMLDivElement>, 'className' | 'style'> &
   P;

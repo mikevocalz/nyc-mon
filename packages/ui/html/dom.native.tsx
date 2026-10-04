@@ -71,6 +71,29 @@ export const SelectBase = (
   );
 };
 
+// ---- structure the RNW mapping lacks: native mappings (04-components.md §4) --
+
+type Labelled = P & { 'aria-label'?: string; 'aria-labelledby'?: string; id?: string };
+
+export const FigureBase = (props: Labelled) => <Div role={'figure' as never} {...props} />;
+export const DescriptionListBase = (props: Labelled) => <Div role="list" {...props} />;
+export const DescriptionTermBase = (props: P & { id?: string }) => <Span {...props} />;
+export const DescriptionDetailsBase = (props: P & { id?: string }) => <Div {...props} />;
+export const OrderedListBase = ({ start: _s, reversed: _r, ...props }: Labelled & { start?: number; reversed?: boolean }) => (
+  <Div role="list" {...props} />
+);
+/** A table's name; announced as a heading on native, where tables have no caption. */
+export const TableCaptionBase = (props: P & { id?: string }) => <Span role="heading" {...props} />;
+export const SearchBase = (props: Labelled) => <Div accessibilityRole="search" {...props} />;
+export const OutputBase = ({ htmlFor: _f, 'aria-live': live, ...props }: P & { id?: string; htmlFor?: string; 'aria-live'?: 'polite' | 'off' }) => (
+  <Span accessibilityLiveRegion={live === 'off' ? 'none' : 'polite'} {...props} />
+);
+/** Read by the screen reader, drawn at zero size. */
+export const VisuallyHiddenBase = ({ children, id: _id }: { children?: React.ReactNode; id?: string }) => (
+  <Span style={HIDDEN}>{children}</Span>
+);
+const HIDDEN = StyleSheet.create({ h: { position: 'absolute', width: 1, height: 1, overflow: 'hidden', opacity: 0 } }).h;
+
 export type PressBaseProps = React.ComponentProps<typeof Pressable> & {
   /** Web-only; accepted here so one JSX tree serves both forks. */
   onKeyDown?: (event: unknown) => void;
