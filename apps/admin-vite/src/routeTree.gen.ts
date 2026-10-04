@@ -11,6 +11,10 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as V1GuardianConsentsRouteImport } from './routes/v1/guardian-consents'
+import { Route as V1MeMonsRouteImport } from './routes/v1/me/mons'
+import { Route as V1EggsRouteImport } from './routes/v1/eggs'
+import { Route as V1EggsIdHatchRouteImport } from './routes/v1/eggs/$id/hatch'
+import { Route as V1MonsIdCareRouteImport } from './routes/v1/mons/$id/care'
 import { Route as PayloadRouteImport } from './routes/_payload'
 import { Route as PayloadAdminIndexRouteImport } from './routes/_payload/admin.index'
 import { Route as PayloadAdminSplatRouteImport } from './routes/_payload/admin.$'
@@ -24,6 +28,26 @@ const IndexRoute = IndexRouteImport.update({
 const V1GuardianConsentsRoute = V1GuardianConsentsRouteImport.update({
   id: '/v1/guardian-consents',
   path: '/v1/guardian-consents',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const V1MeMonsRoute = V1MeMonsRouteImport.update({
+  id: '/v1/me/mons',
+  path: '/v1/me/mons',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const V1EggsRoute = V1EggsRouteImport.update({
+  id: '/v1/eggs',
+  path: '/v1/eggs',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const V1EggsIdHatchRoute = V1EggsIdHatchRouteImport.update({
+  id: '/v1/eggs/$id/hatch',
+  path: '/v1/eggs/$id/hatch',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const V1MonsIdCareRoute = V1MonsIdCareRouteImport.update({
+  id: '/v1/mons/$id/care',
+  path: '/v1/mons/$id/care',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PayloadRoute = PayloadRouteImport.update({
@@ -49,6 +73,10 @@ const PayloadPayloadApiSplatRoute = PayloadPayloadApiSplatRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/v1/guardian-consents': typeof V1GuardianConsentsRoute
+  '/v1/me/mons': typeof V1MeMonsRoute
+  '/v1/eggs': typeof V1EggsRoute
+  '/v1/eggs/$id/hatch': typeof V1EggsIdHatchRoute
+  '/v1/mons/$id/care': typeof V1MonsIdCareRoute
   '/admin/$': typeof PayloadAdminSplatRoute
   '/payload-api/$': typeof PayloadPayloadApiSplatRoute
   '/admin/': typeof PayloadAdminIndexRoute
@@ -56,6 +84,10 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/v1/guardian-consents': typeof V1GuardianConsentsRoute
+  '/v1/me/mons': typeof V1MeMonsRoute
+  '/v1/eggs': typeof V1EggsRoute
+  '/v1/eggs/$id/hatch': typeof V1EggsIdHatchRoute
+  '/v1/mons/$id/care': typeof V1MonsIdCareRoute
   '/admin/$': typeof PayloadAdminSplatRoute
   '/payload-api/$': typeof PayloadPayloadApiSplatRoute
   '/admin': typeof PayloadAdminIndexRoute
@@ -64,6 +96,10 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/v1/guardian-consents': typeof V1GuardianConsentsRoute
+  '/v1/me/mons': typeof V1MeMonsRoute
+  '/v1/eggs': typeof V1EggsRoute
+  '/v1/eggs/$id/hatch': typeof V1EggsIdHatchRoute
+  '/v1/mons/$id/care': typeof V1MonsIdCareRoute
   '/_payload': typeof PayloadRouteWithChildren
   '/_payload/admin/$': typeof PayloadAdminSplatRoute
   '/_payload/payload-api/$': typeof PayloadPayloadApiSplatRoute
@@ -71,13 +107,35 @@ export interface FileRoutesById {
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/v1/guardian-consents' | '/admin/$' | '/payload-api/$' | '/admin/'
+  fullPaths:
+    | '/'
+    | '/v1/guardian-consents'
+    | '/v1/me/mons'
+    | '/v1/eggs'
+    | '/v1/eggs/$id/hatch'
+    | '/v1/mons/$id/care'
+    | '/admin/$'
+    | '/payload-api/$'
+    | '/admin/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/v1/guardian-consents' | '/admin/$' | '/payload-api/$' | '/admin'
+  to:
+    | '/'
+    | '/v1/guardian-consents'
+    | '/v1/me/mons'
+    | '/v1/eggs'
+    | '/v1/eggs/$id/hatch'
+    | '/v1/mons/$id/care'
+    | '/admin/$'
+    | '/payload-api/$'
+    | '/admin'
   id:
     | '__root__'
     | '/'
     | '/v1/guardian-consents'
+    | '/v1/me/mons'
+    | '/v1/eggs'
+    | '/v1/eggs/$id/hatch'
+    | '/v1/mons/$id/care'
     | '/_payload'
     | '/_payload/admin/$'
     | '/_payload/payload-api/$'
@@ -87,6 +145,10 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   V1GuardianConsentsRoute: typeof V1GuardianConsentsRoute
+  V1MeMonsRoute: typeof V1MeMonsRoute
+  V1EggsRoute: typeof V1EggsRoute
+  V1EggsIdHatchRoute: typeof V1EggsIdHatchRoute
+  V1MonsIdCareRoute: typeof V1MonsIdCareRoute
   PayloadRoute: typeof PayloadRouteWithChildren
 }
 
@@ -104,6 +166,34 @@ declare module '@tanstack/react-router' {
       path: '/v1/guardian-consents'
       fullPath: '/v1/guardian-consents'
       preLoaderRoute: typeof V1GuardianConsentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/v1/me/mons': {
+      id: '/v1/me/mons'
+      path: '/v1/me/mons'
+      fullPath: '/v1/me/mons'
+      preLoaderRoute: typeof V1MeMonsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/v1/eggs': {
+      id: '/v1/eggs'
+      path: '/v1/eggs'
+      fullPath: '/v1/eggs'
+      preLoaderRoute: typeof V1EggsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/v1/eggs/$id/hatch': {
+      id: '/v1/eggs/$id/hatch'
+      path: '/v1/eggs/$id/hatch'
+      fullPath: '/v1/eggs/$id/hatch'
+      preLoaderRoute: typeof V1EggsIdHatchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/v1/mons/$id/care': {
+      id: '/v1/mons/$id/care'
+      path: '/v1/mons/$id/care'
+      fullPath: '/v1/mons/$id/care'
+      preLoaderRoute: typeof V1MonsIdCareRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_payload': {
@@ -155,6 +245,10 @@ const PayloadRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   V1GuardianConsentsRoute: V1GuardianConsentsRoute,
+  V1MeMonsRoute: V1MeMonsRoute,
+  V1EggsRoute: V1EggsRoute,
+  V1EggsIdHatchRoute: V1EggsIdHatchRoute,
+  V1MonsIdCareRoute: V1MonsIdCareRoute,
   PayloadRoute: PayloadRouteWithChildren,
 }
 export const routeTree = rootRouteImport

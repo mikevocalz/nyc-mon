@@ -27,8 +27,9 @@ export const CreateEggResponseSchema = z.object({
 /** POST /v1/eggs/:id/hatch — idempotent, same MonInstance on every retry. */
 export const HatchEggResponseSchema = z.object({ mon: MonInstanceSchema });
 
-/** GET /v1/me/mons */
-export const ListMyMonsResponseSchema = z.object({ mons: z.array(MonInstanceSchema) });
+/** GET /v1/me/mons — the caller's Mons and their authoritative care states for restore. */
+export const MonWithCareSchema = z.object({ mon: MonInstanceSchema, care: CareStateSchema });
+export const ListMyMonsResponseSchema = z.object({ mons: z.array(MonWithCareSchema) });
 
 /** One queued care write. `seq` is monotonic per device. */
 export const CareWriteSchema = z.object({

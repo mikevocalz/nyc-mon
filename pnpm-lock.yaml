@@ -1273,6 +1273,9 @@ importers:
       '@payloadcms/db-postgres':
         specifier: 'catalog:'
         version: 4.0.0-canary.37(@electric-sql/pglite@0.5.4)(kysely@0.29.4)(payload@4.0.0-canary.37(graphql@16.14.2)(supports-color@8.1.1)(typescript@6.0.3))(supports-color@8.1.1)
+      '@payloadcms/ui':
+        specifier: 'catalog:'
+        version: 4.0.0-canary.37(@types/react@19.3.0)(monaco-editor@0.55.1)(payload@4.0.0-canary.37(graphql@16.14.2)(supports-color@8.1.1)(typescript@6.0.3))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(supports-color@8.1.1)(typescript@6.0.3)
       '@vercel/functions':
         specifier: 'catalog:'
         version: 3.9.11(@aws-sdk/credential-provider-web-identity@3.972.78)(ws@8.21.3)

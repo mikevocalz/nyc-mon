@@ -26,6 +26,10 @@
       "types": "./src/admin/console/guardian-consent.ts",
       "default": "./src/admin/console/guardian-consent.ts"
     },
+    "./admin/console/v1-game": {
+      "types": "./src/admin/console/v1/game.ts",
+      "default": "./src/admin/console/v1/game.ts"
+    },
     "./admin/console/stores": {
       "types": "./src/admin/console/stores/index.ts",
       "default": "./src/admin/console/stores/index.ts"
@@ -59,6 +63,7 @@
     "@better-auth/passkey": "catalog:",
     "@delmaredigital/payload-better-auth": "catalog:",
     "@payloadcms/db-postgres": "catalog:",
+    "@payloadcms/ui": "catalog:",
     "@vercel/functions": "catalog:",
     "better-auth": "catalog:",
     "payload": "catalog:",
