@@ -23,6 +23,7 @@ import * as DataTableStories from './DataTable.stories';
 import * as DialogStories from './Dialog.stories';
 import * as GridFloorStories from './GridFloor.stories';
 import * as GridSceneStories from './GridScene.stories';
+import * as HolographicTerrainStories from './HolographicTerrain.stories';
 import * as NavStories from './Nav.stories';
 import * as NeonBarChartStories from './NeonBarChart.stories';
 import * as NeonDonutChartStories from './NeonDonutChart.stories';
@@ -72,6 +73,7 @@ const MODULES: Record<string, StoryModule> = {
   Dialog: DialogStories,
   GridFloor: GridFloorStories,
   GridScene: GridSceneStories,
+  HolographicTerrain: HolographicTerrainStories,
   Nav: NavStories,
   NeonBarChart: NeonBarChartStories,
   NeonDonutChart: NeonDonutChartStories,
