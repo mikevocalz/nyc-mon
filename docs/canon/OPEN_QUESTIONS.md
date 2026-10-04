@@ -4,15 +4,17 @@ Questions for Mike. Each one blocks a field that BUILD_PROMPT_v3 §2.2 (starters
 
 Until a question is answered, its field stays `TODO(canon)`. An answer goes into `docs/canon/DECISIONS.md` with a date; this file then marks the question closed and links the decision.
 
-Compiled 2026-10-04 by `canon-keeper`. Sources on disk: the v11 Canon & Lore Bible docx, the v11 canon index, an unversioned 3D architecture note, and the v7 bibles in `~/Downloads`. The v8 109-record Dex inside `NYC_Mon_Master_Bible_v11.md` is not on disk, so every Dex number below comes from v7 and is provisional.
+Compiled 2026-10-04 by `canon-keeper`. Sources on disk: the v11 Canon & Lore Bible docx, the v11 canon index, an unversioned 3D architecture note, and the v7 bibles in `~/Downloads`. The v8 109-record Dex inside `NYC_Mon_Master_Bible_v11.md` is not on disk.
+
+Updated 2026-10-04: roster v11.1 (`ROSTER Ln` = `docs/canon/source/NYC_MON_Egg_Baby_All_Forms_Roster_v11_1.md`, commit 08d31f7) now fixes the starter Dex IDs, form names and stages (Decision #9). Dex numbers below that the roster covers are no longer provisional.
 
 ## Top 10
 
 These block the most downstream work (Dex cards, `content/mons/*.ts` schemas, clip lists, the meeting and hatch screens).
 
 1. **Q1** (answered → Decision #5) Meeting order: what does the Caller meet before the egg exists?
-2. **Q8** (label answered → Decision #6; Dex number waits on Q9) Which form is "the starter": the Baby form or the Mid form whose name labels the line?
-3. **Q9** Dex numbers: are v7's #001-#007, #008-#014 and #061-#067 the v8 numbers? Send `NYC_Mon_Master_Bible_v11.md`.
+2. **Q8** (answered → Decisions #6, #9, #11) Which form is "the starter": the Baby form or the Mid form whose name labels the line?
+3. **Q9** (answered → Decision #9) Dex numbers: roster v11.1 keeps v7's #001-#007, #008-#014 and #061-#067.
 4. **Q2** (answered → Decision #7) Scanner LED: red (v11) or orange (build prompt)?
 5. **Q3** (answered → Decision #8) Is the app itself an H-Lynk, given v11 says the H-Lynk is optional?
 6. **Q12** Culture notes for the player's three starters.
@@ -43,13 +45,13 @@ The Bible outranks the build prompt (`IDX L7-L8`; BUILD_PROMPT_v3 §0B Law 1). E
 
 ## B. Starter identity and Dex fields (§2.2)
 
-**Q8. Starter form.** **Label answered → Decision #6**: Baby form name, with "<line> line" as the label. The Dex number shown stays open until Q9 is settled. v11: "Hood Ratti is a form/species label" (`V11 ¶44`). In v7, "Hood Ratti" is the Mid form #004 and the Baby is #002 Squeaklet; "Bodega Cee" is the Mid form #011 and the Baby is #009 Kittee Cee; the Yote Baby is #062 Yotito and there is no form named "Yotes". Fill in for the Dex card on M08/M17: species label shown = ______ (line name, or current form name); Dex number shown = ______ (Baby form number, or Mid).
+**Q8. Starter form.** **Answered.** Decision #6: the card shows the Baby form name. Decision #9: the Baby forms and Dex numbers are #002 Squeaklet, #009 Kittee Cee, #062 Yotito (`ROSTER L151`, `L158`, `L211`), and the card shows the Baby's number. Decision #11 (superseding #10): the label is "<family name> Bloodline". Original question kept for the record: v11: "Hood Ratti is a form/species label" (`V11 ¶44`). In v7, "Hood Ratti" is the Mid form #004 and the Baby is #002 Squeaklet; "Bodega Cee" is the Mid form #011 and the Baby is #009 Kittee Cee; the Yote Baby is #062 Yotito and there is no form named "Yotes". Fill in for the Dex card on M08/M17: species label shown = ______ (line name, or current form name); Dex number shown = ______ (Baby form number, or Mid).
 
-**Q9. Dex numbers.** v7 numbering: F01 #001-#007, F02 #008-#014, F12 #061-#067. The index promises "stable Dex/form IDs" carried from v8 (`IDX L35`). Yes/no: v8 uses the same numbers and form IDs (`form_squeaklet`, `form_kittee_cee`, `form_yotito`, etc.) as v7? Fastest answer: put `NYC_Mon_Master_Bible_v11.md` in `docs/canon/source/`.
+**Q9. Dex numbers.** **Answered → Decision #9.** Roster v11.1 registers F01 #001-#007 (`ROSTER L150-L156`), F02 #008-#014 (`L157-L163`) and F12 #061-#067 (`L210-L216`), the same names and stages as v7, and keeps #001-#109 as the preserved baseline (`L9`). The roster gives no `form_*` IDs; that part moves to Q37. Original question: v7 numbering: F01 #001-#007, F02 #008-#014, F12 #061-#067. The index promises "stable Dex/form IDs" carried from v8 (`IDX L35`). Yes/no: v8 uses the same numbers and form IDs (`form_squeaklet`, `form_kittee_cee`, `form_yotito`, etc.) as v7? Fastest answer: put `NYC_Mon_Master_Bible_v11.md` in `docs/canon/source/`.
 
-**Q10. Line names.** v7 calls F02 "Bodega Baddiee Cee" (after its Max) and F12 "Yote family". v11 says "the Bodega Cee line" (`V11 ¶76`) and "Yotes" (`V11 ¶53`). Yes/no: the line labels in data and UI are exactly "Hood Ratti", "Bodega Cee", "Yotes"?
+**Q10. Line names.** **Answered → Decision #11** (via Q34): the label is the roster family name plus "Bloodline", not "Bodega Cee" or "Yotes". Original question: v7 calls F02 "Bodega Baddiee Cee" (after its Max) and F12 "Yote family". v11 says "the Bodega Cee line" (`V11 ¶76`) and "Yotes" (`V11 ¶53`). Yes/no: the line labels in data and UI are exactly "Hood Ratti", "Bodega Cee", "Yotes"?
 
-**Q11. Egg forms.** v7 gives each line its own egg: #001 Metro Egg (red, white stripes), #008 Corner Egg (pink, white fur wrap), #061 Prism Egg (black, flames, clear crystal). Yes/no: the player's egg uses its line's egg skin inside the case?
+**Q11. Egg forms.** **Egg names answered by the roster** (Decision #9): #001 Metro Egg, #008 Corner Egg, #061 Prism Egg (`ROSTER L24`, `L25`, `L35`). The roster says nothing about egg skins, so the yes/no below is still open. v7 gives each line its own egg: #001 Metro Egg (red, white stripes), #008 Corner Egg (pink, white fur wrap), #061 Prism Egg (black, flames, clear crystal). Yes/no: the player's egg uses its line's egg skin inside the case?
 
 **Q12. Culture notes.** The M08 and M17 Dex cards show a "culture note (from canon)". v11 has: Malik's Ratti is Black American / NYC Black, and "The Ratti species is not ethnically locked" (`V11 ¶53`); "Yotes carry a Latino family identity" (`V11 ¶53`); nothing for Bodega Cee. v11 also says culture "belong[s] to the individual" (`V11 ¶44`). Fill in, per starter: species card culture note = ______; the player's individual's culture = ______ (fixed by canon / chosen by the player / left blank in Phase 1).
 
@@ -85,7 +87,7 @@ The Bible outranks the build prompt (`IDX L7-L8`; BUILD_PROMPT_v3 §0B Law 1). E
 
 **Q27. Incubation length.** v11 gives 15/30/60 min (`V11 ¶49`) and says nothing about whether length changes anything. Yes/no: length has no effect on the Mon in Phase 1?
 
-**Q28. Stage names.** `ARCH L320-L328` lists Ratti forms as "Egg / Baby / Form I / Form II / Form III / Apex". v11 has five stages, Egg → Max (`V11 ¶25`). Yes/no: the architecture note's names are obsolete and `LifecycleStage` uses Egg, Baby, Small, Mid, Max only?
+**Q28. Stage names.** **Answered by the roster:** "Current canon is **Egg → Baby → Small → Mid → Max**." (`ROSTER L16`), which matches `V11 ¶25`. `LifecycleStage` keeps those five names; the architecture note's names are obsolete. Original question: `ARCH L320-L328` lists Ratti forms as "Egg / Baby / Form I / Form II / Form III / Apex". v11 has five stages, Egg → Max (`V11 ¶25`). Yes/no: the architecture note's names are obsolete and `LifecycleStage` uses Egg, Baby, Small, Mid, Max only?
 
 ## D. Body, scale and animation (§3.2)
 
@@ -99,18 +101,33 @@ The Bible outranks the build prompt (`IDX L7-L8`; BUILD_PROMPT_v3 §0B Law 1). E
 
 **Q33. Type field.** v7 types all three Babies "Neutral". The index calls type fields "legacy data until the explicit migration map is authored" (`IDX L41`); v11 lists that map as open (`V11 ¶101`). Yes/no: Phase 1 content omits type/Affinity entirely?
 
+
+## F. Raised by roster v11.1 (added 2026-10-04)
+
+**Q34. Line label on the starter card.** **Answered → Decision #10, superseded the same day by Decision #11.** Decision #1 used "Bodega Cee" and "Yotes". The roster names the families "F02 · Bodega Baddiee Cee" (after its Max form #012, `ROSTER L25`) and "F12 · Yote" (singular, `L35`). Mike's ruling: the label is the roster family name plus "Bloodline": "Hood Ratti Bloodline", "Bodega Baddiee Cee Bloodline", "Yote Bloodline".
+
+**Q35. Branch edges at Max.** The roster's chain lines use serial arrows through the Max forms: "#004 Hood Ratti → #005 Ratti Royale → #006 Agua Ratti → #007 Phantom Ratti" (`ROSTER L72`; F02 `L76` and F12 `L116` read the same way). Its registry marks #005, #006 and #007 all as Max (`L154-L156`), and v7 says the Mid evolves into "exactly **005 OR 006 OR 007**" with "no serial Max arrows" (`[v7] M7 L38`, `L717`). Yes/no: the chain arrows are listing order only, and each Mid branches to one of its three Max forms? `@acme/content` encodes no edges until this is answered (Phase 1 ships no `EvolutionEvent` anyway).
+
+**Q36. Record count.** The index says, unless a v11 file says otherwise, "109 numbered records", "18 evolutionary families", "37 Max endpoints" (`IDX L31-L36`). The roster says the current total is "115 records across 19 evolutionary families" and that "the old 37-Max-endpoint count must not be repeated as current" (`ROSTER L7`, `L12`). Yes/no: the roster counts as the "v11 file" that overrides the index, and the index should be updated to 115/19 with the Max subtotal left open? This does not touch the starters, whose IDs sit inside the preserved #001-#109 range.
+
+**Q37. Stable form IDs.** v7 gives each form a string ID (`form_squeaklet`, `form_kittee_cee`, `form_yotito`, ...; `[v7] M7 L444`, `L1381`, `L7928`). The roster gives Dex numbers only. The index promises "stable Dex/form IDs" (`IDX L35`). Until Mike answers, `@acme/content` keys each record by its Dex number (`dex-002`), which invents no names. Yes/no: adopt v7's `form_*` IDs as the stable keys?
+
+**Q38. Mari's partner and "the Bodega Cee line".** v11 says Mari's "partner comes from the Bodega Cee line" (`V11 ¶76`). In the roster, Bodega Cee is the Mid form #011 inside the Bodega Baddiee Cee family (`ROSTER L160`). Yes/no: v11's "Bodega Cee line" means the F02 bloodline, so in-app copy about Mari's partner says "Bodega Baddiee Cee Bloodline"? (Q16, the partner's name and form, stays open.)
+
+**Q39. Hood Ratti as both bloodline and form.** "Hood Ratti" is the F01 family name and the Mid form #004 (`ROSTER L24`, `L153`); "Bodega Cee" and "Barrio-Yote" are Mid forms whose names differ from their bloodline. v11 calls Hood Ratti "a form/species label" (`V11 ¶44`). No action needed unless Mike wants it: copy must say "Hood Ratti Bloodline" for the bloodline, and plain "Hood Ratti" only for the #004 form.
+
 ---
 
 ## E. Which missing file would answer what
 
 | Missing file (named in `IDX L15-L22`) | Questions it should settle |
 |---|---|
-| `NYC_Mon_Master_Bible_v11.md` (v8 109-record Dex + v11 overrides) | Q8, Q9, Q10, Q11, Q12, Q14, Q15, Q16, Q23, Q24, Q29, Q33 |
+| `NYC_Mon_Master_Bible_v11.md` (v8 109-record Dex + v11 overrides) | Q11, Q12, Q14, Q15, Q16, Q23, Q24, Q29, Q33 |
 | `NYC_Mon_Gameplay_Lifecycle_and_Care_Bible_v11.md` | Q1, Q4, Q7, Q18, Q19, Q20, Q21, Q22, Q23, Q25, Q26, Q27, Q30 |
 | `NYC_Mon_Voice_Identity_and_Dialogue_Bible_v11.md` | Q12, Q13, Q14, Q15, Q16, Q17, Q31, Q32 |
 | `NYC_MON_HLynk_Capture_and_Handoff_Bible_v11.md` | Q1, Q2, Q3, Q4, Q5 |
 | `NYC_Mon_Animation_and_Performance_Bible_v9.md` | Q22 (eat clips), Q30, Q31 |
-| `NYC_Mon_3D_Character_Architecture_v5.md` | Q28, Q29 |
+| `NYC_Mon_3D_Character_Architecture_v5.md` | Q29 |
 | `NYC_Mon_Street_Circuit_Card_Game_Bible_v1.md` | none for Phase 1 |
 
 Q6 has no canon source; it needs a product decision.

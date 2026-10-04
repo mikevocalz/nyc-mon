@@ -1,8 +1,8 @@
-# Starters canon extract: Hood Ratti, Bodega Cee, Yotes
+# Starters canon extract: the Hood Ratti, Bodega Baddiee Cee and Yote Bloodlines
 
 Verbatim quotes only. This file transcribes what the sources on disk say about the three Phase 1 starters and the systems around them. It does not settle anything, and nothing here is Mon data for `content/`. Gaps and conflicts go to `docs/canon/OPEN_QUESTIONS.md`.
 
-Compiled 2026-10-04 by `canon-keeper`.
+Compiled 2026-10-04 by `canon-keeper`. Updated the same day for roster v11.1 (Decision #9) and the Bloodline label (Decision #11). Section titles now use the roster's form names and Dex IDs; the body text under them is still v7 wherever it is marked `[v7]`.
 
 ## Sources and how to read the citations
 
@@ -18,13 +18,14 @@ Authority order, quoted from the index (`IDX L6-L12`):
 | Tag | File | Status |
 |---|---|---|
 | `V11 ¶n` | `docs/canon/source/NYC_MON_Canon_and_Lore_Bible_v11.docx` | Authority 2. On disk. `¶n` is the n-th non-empty paragraph (table cells count as paragraphs) of `word/document.xml`, extracted with `unzip -p … word/document.xml`. |
+| `ROSTER Ln` | `docs/canon/source/NYC_MON_Egg_Baby_All_Forms_Roster_v11_1.md` ("Roster reconciliation v11.1 — 4 October 2026", commit 08d31f7) | Supplied by the creator and recorded as Decision #9, so authority 1 for Dex IDs, form names and stages. It carries no body, food, culture or type data. On disk. |
 | `IDX Ln` | `docs/canon/source/NYC_MON_CURRENT_CANON_INDEX_v11.md` | Defines the authority order. On disk. |
 | `ARCH Ln` | `docs/canon/source/nyc-mon-3d-character-architecture.md` | Unversioned. The index names `NYC_Mon_3D_Character_Architecture_v5.md`, which is not on disk; this file's relation to v5 is unknown. |
 | `[v7] M7 Ln` | `~/Downloads/NYC_Mon_Master_Bible_v7.md` (sha256 `3cd22f75b4bb7a9b…`, dated "28 September 2026") | Authority 5: usable only where v11 does not contradict it. Not in the repo. |
 | `[v7] Atlas` | `~/Downloads/NYC_Mon_Character_Atlas_v7.md` (sha256 `44c67e0a5f807d12…`) | The dossiers are byte-identical to `M7` apart from heading depth. Atlas line = M7 line − 324 for every dossier quoted here (checked for #001, #004, #011, #062, #064). |
 | `[v7] Dex7` | `~/Downloads/NYC_Mon_Dex_and_Evolution_Reference_v7.html` | Same numbering and edges as `M7` §2. |
 
-Not on disk, all named by the index (`IDX L15-L22`): `NYC_Mon_Master_Bible_v11.md` (the v8 109-record Dex), `NYC_Mon_Gameplay_Lifecycle_and_Care_Bible_v11.md`, `NYC_Mon_Voice_Identity_and_Dialogue_Bible_v11.md`, `NYC_MON_HLynk_Capture_and_Handoff_Bible_v11.md`, `NYC_Mon_Animation_and_Performance_Bible_v9.md`, `NYC_Mon_3D_Character_Architecture_v5.md`, `NYC_Mon_Street_Circuit_Card_Game_Bible_v1.md`. The v8 Dex is the source BUILD_PROMPT_v3 §2.2 names for Dex IDs, body data, culture notes and food classes, so every v7 number below is provisional until it is checked against v8.
+Not on disk, all named by the index (`IDX L15-L22`): `NYC_Mon_Master_Bible_v11.md` (the v8 109-record Dex), `NYC_Mon_Gameplay_Lifecycle_and_Care_Bible_v11.md`, `NYC_Mon_Voice_Identity_and_Dialogue_Bible_v11.md`, `NYC_MON_HLynk_Capture_and_Handoff_Bible_v11.md`, `NYC_Mon_Animation_and_Performance_Bible_v9.md`, `NYC_Mon_3D_Character_Architecture_v5.md`, `NYC_Mon_Street_Circuit_Card_Game_Bible_v1.md`. The v8 Dex is the source BUILD_PROMPT_v3 §2.2 names for Dex IDs, body data, culture notes and food classes. Roster v11.1 now settles the Dex IDs, form names and stages for the starters (§1); body data, culture notes and food classes quoted below are still v7 only.
 
 The index says stable data carries over (`IDX L31-L36`):
 
@@ -36,13 +37,75 @@ The index says stable data carries over (`IDX L31-L36`):
 
 `[v7] M7 L4` reports the same totals: "**109 numbered entries · 18 families · 37 Max forms · 10 types · 216 moves**". Matching totals do not prove matching numbers per record.
 
+Roster v11.1 revises the totals and keeps the baseline numbers:
+
+> - **Current reconciled roster: 115 records across 19 evolutionary families.**
+> - The older **109 / 18-family** count is the v8 baseline, not the current working total.
+> - **#001–#109** remain the preserved baseline. (`ROSTER L7-L9`)
+
+> - The old **37-Max-endpoint** count must not be repeated as current until F19 staging is fully reconciled. (`ROSTER L12`)
+
+The index/roster disagreement on totals is `OPEN_QUESTIONS.md` Q36. It does not touch the starters.
+
 Coverage legend: **found** (the source states it), **partial** (some of it, or only by implication), **absent**.
 
 ---
 
-## 1. The three lines: Dex numbers and evolution
+## 1. The three Bloodlines: Dex numbers and evolution
 
-Coverage: v11 **partial** (names the lines, no numbers). v7 **found**.
+Coverage: roster v11.1 **found** (Dex IDs, form names, stages; Decision #9). v11 docx **partial** (names the lines, no numbers). v7 **found** and agrees with the roster record for record.
+
+Roster v11.1, eggs and babies (`ROSTER L24`, `L25`, `L35`, `L48`, `L49`, `L59`):
+
+> | F01 · Hood Ratti | #001 | Metro Egg |
+> | F02 · Bodega Baddiee Cee | #008 | Corner Egg |
+> | F12 · Yote | #061 | Prism Egg |
+
+> | F01 · Hood Ratti | #002 | Squeaklet |
+> | F02 · Bodega Baddiee Cee | #009 | Kittee Cee |
+> | F12 · Yote | #062 | Yotito |
+
+Roster v11.1, chains (`ROSTER L70-L76`, `L114-L116`):
+
+> ### F01 · Hood Ratti
+>
+> #001 Metro Egg → #002 Squeaklet → #003 Lil’ Ratti → #004 Hood Ratti → #005 Ratti Royale → #006 Agua Ratti → #007 Phantom Ratti
+
+> ### F02 · Bodega Baddiee Cee
+>
+> #008 Corner Egg → #009 Kittee Cee → #010 Lil’ Cee → #011 Bodega Cee → #012 Bodega Baddiee Cee → #013 Knocka Cee → #014 Midnight Cee
+
+> ### F12 · Yote
+>
+> #061 Prism Egg → #062 Yotito → #063 Lil’ Yote → #064 Barrio-Yote → #065 Fuego-Yote → #066 Yote del Eléctrico → #067 Agua-Yote
+
+Roster v11.1, registry with stages (`ROSTER L150-L163`, `L210-L216`):
+
+> | #001 | F01 · Hood Ratti | Metro Egg | Egg |
+> | #002 | F01 · Hood Ratti | Squeaklet | Baby |
+> | #003 | F01 · Hood Ratti | Lil’ Ratti | Small |
+> | #004 | F01 · Hood Ratti | Hood Ratti | Mid |
+> | #005 | F01 · Hood Ratti | Ratti Royale | Max |
+> | #006 | F01 · Hood Ratti | Agua Ratti | Max |
+> | #007 | F01 · Hood Ratti | Phantom Ratti | Max |
+> | #008 | F02 · Bodega Baddiee Cee | Corner Egg | Egg |
+> | #009 | F02 · Bodega Baddiee Cee | Kittee Cee | Baby |
+> | #010 | F02 · Bodega Baddiee Cee | Lil’ Cee | Small |
+> | #011 | F02 · Bodega Baddiee Cee | Bodega Cee | Mid |
+> | #012 | F02 · Bodega Baddiee Cee | Bodega Baddiee Cee | Max |
+> | #013 | F02 · Bodega Baddiee Cee | Knocka Cee | Max |
+> | #014 | F02 · Bodega Baddiee Cee | Midnight Cee | Max |
+> | #061 | F12 · Yote | Prism Egg | Egg |
+> | #062 | F12 · Yote | Yotito | Baby |
+> | #063 | F12 · Yote | Lil’ Yote | Small |
+> | #064 | F12 · Yote | Barrio-Yote | Mid |
+> | #065 | F12 · Yote | Fuego-Yote | Max |
+> | #066 | F12 · Yote | Yote del Eléctrico | Max |
+> | #067 | F12 · Yote | Agua-Yote | Max |
+
+The chain lines draw serial arrows through #005 → #006 → #007 (and the F02 and F12 equivalents), while the registry stages all three as Max and v7 branches from the Mid (below). That is `OPEN_QUESTIONS.md` Q35. The roster gives no type column and no `form_*` string IDs (Q37).
+
+Labels (Decision #11): "Hood Ratti Bloodline", "Bodega Baddiee Cee Bloodline", "Yote Bloodline". The roster's family names, quoted verbatim above, are the `bloodlineName`.
 
 v11 names the lines but gives no Dex numbers:
 
@@ -58,7 +121,7 @@ v11 names the lines but gives no Dex numbers:
 > | F02 Bodega Baddiee Cee | #008–#014 | Bodega Cee | #012 Bodega Baddiee Cee (Neutral); #013 Knocka Cee (Neutral); #014 Midnight Cee (Ghost) |
 > | F12 Yote family | #061–#067 | Barrio-Yote | #065 Fuego-Yote (Fire); #066 Yote del Eléctrico (Electric); #067 Agua-Yote (Water) |
 
-The third column is headed "Shared Mid" (`M7 L51`). In v7 the family is named after its Max form for F02 ("Bodega Baddiee Cee") and the starter label "Bodega Cee" is the Mid form #011. "Hood Ratti" is both the family name and the Mid form #004. "Yotes" is not a form name; v7 says "Yote family".
+The third column is headed "Shared Mid" (`M7 L51`). In v7 and in the roster, F02 is named after its Max form ("Bodega Baddiee Cee"), and "Bodega Cee" is the Mid form #011. "Hood Ratti" is both the family name and the Mid form #004. "Yotes" is not a form name; v7 says "Yote family" and the roster "F12 · Yote".
 
 [v7] Entry index (`M7 L77-L83`, `L84-L90`, `L139-L143`, plus `L137-L138`):
 
@@ -86,7 +149,7 @@ The third column is headed "Shared Mid" (`M7 L51`). In v7 the family is named af
 
 (Markdown link syntax around the names is stripped; the names are unchanged.)
 
-[v7] Stable form IDs, one per dossier: `form_metro_egg` (`M7 L358`), `form_squeaklet` (`L444`), `form_lil_ratti` (`L532`), `form_hood_ratti` (`L664`), `form_corner_egg` (`L1297`), `form_kittee_cee` (`L1381`), `form_bodega_cee` (`L1597`), `form_prism_egg` (`L7844`), `form_yotito` (`L7928`), `form_lil_yote` (`L8014`), `form_barrio_yote` (`L8144`). Each line continues: "**Status:** exact creator constraints are fixed; newly authored measurements, acting detail and tuning are design proposals."
+[v7] Stable form IDs, one per dossier (the roster has none; Q37): `form_metro_egg` (`M7 L358`), `form_squeaklet` (`L444`), `form_lil_ratti` (`L532`), `form_hood_ratti` (`L664`), `form_corner_egg` (`L1297`), `form_kittee_cee` (`L1381`), `form_bodega_cee` (`L1597`), `form_prism_egg` (`L7844`), `form_yotito` (`L7928`), `form_lil_yote` (`L8014`), `form_barrio_yote` (`L8144`). Each line continues: "**Status:** exact creator constraints are fixed; newly authored measurements, acting detail and tuning are design proposals."
 
 [v7] Branching rule:
 
@@ -100,7 +163,7 @@ The third column is headed "Shared Mid" (`M7 L51`). In v7 the family is named af
 
 ---
 
-## 2. Hood Ratti (F01) and Malik's Ratti
+## 2. Hood Ratti Bloodline (F01) and Malik's Ratti
 
 ### 2.1 Malik's Ratti, the individual
 
@@ -120,9 +183,9 @@ Coverage: v11 **found**. v7 **absent** (v7 never mentions Malik, Ratti as an ind
 
 v11 does not say which Dex form Malik's Ratti is at the story's start.
 
-### 2.2 Egg: #001 Metro Egg [v7]
+### 2.2 Egg: #001 Metro Egg
 
-Coverage: v11 **absent** for this form. v7 **found**.
+Coverage: roster **found** for ID, name and stage (`ROSTER L150`). v11 docx **absent**. v7 **found** for everything below.
 
 > **Defining silhouette.** Rounded triangular egg with uninterrupted stripe bands and a small plain circular inset. (`M7 L364`)
 
@@ -144,9 +207,9 @@ Coverage: v11 **absent** for this form. v7 **found**.
 
 > **Social reaction:** Respond to gentle attention with a small safe wobble and family light cue. No food, battle attacks, hunger punishment or splitting into two companions. (`M7 L421`)
 
-### 2.3 Baby: #002 Squeaklet [v7]
+### 2.3 Baby: #002 Squeaklet
 
-Coverage: v11 **absent** for this form. v7 **found**. This is the stage Phase 1 ships, if the v8 Dex keeps v7's numbering.
+Coverage: roster **found** for ID, name and stage (`ROSTER L151`). v11 docx **absent**. v7 **found** for everything below. This is the stage Phase 1 ships.
 
 > Squeaklet — first trust. A quick-witted street survivor becomes the friend who never leaves anyone behind. (`M7 L442`)
 
@@ -186,9 +249,9 @@ Coverage: v11 **absent** for this form. v7 **found**. This is the stage Phase 1 
 
 > No canine muzzle, fire-rat branch, electric-rat branch, extra water egg, early split, extra tail, headpiece or M-shaped emblem. (`M7 L517`)
 
-### 2.4 Small #003 Lil' Ratti and Mid #004 Hood Ratti [v7], abridged
+### 2.4 Small #003 Lil’ Ratti and Mid #004 Hood Ratti, abridged
 
-Phase 1 stops at Baby. These lines are here because the starter is labelled with the Mid name.
+IDs, names and stages: roster (`ROSTER L152-L153`). Text below: v7. Phase 1 stops at Baby. These lines are here because "Hood Ratti" is also the Mid form's name.
 
 > **Defining silhouette.** Slim quick adolescent, longer tail and oversized hood; a plain token instead of the finished heavy medallion. (`M7 L538`, #003)
 
@@ -222,7 +285,7 @@ Coverage: v11 **found** for Malik's individual and the species-not-locked rule (
 
 ---
 
-## 3. Bodega Cee (F02) and Mari's partner
+## 3. Bodega Baddiee Cee Bloodline (F02) and Mari's partner
 
 ### 3.1 Mari's partner
 
@@ -232,7 +295,9 @@ Coverage: v11 **partial** (line only, no individual name, form or personality). 
 
 v11 gives no culture note for the Bodega Cee line or for Mari's partner. `V11 ¶53` lists communities without assigning one to this line.
 
-### 3.2 Egg: #008 Corner Egg [v7]
+### 3.2 Egg: #008 Corner Egg
+
+Coverage: roster **found** for ID, name and stage (`ROSTER L157`). Text below: v7.
 
 > Corner Egg — dormant potential. Three expressions of city confidence: counter timing, sonic style and supernatural night work. (`M7 L1295`)
 
@@ -248,7 +313,9 @@ v11 gives no culture note for the Bodega Cee line or for Mari's partner. `V11 ¶
 
 Scale, egg expression states, "No eating at Egg" and the Egg social reaction repeat the #001 wording (`M7 L1317`, `L1327`, `L1358`, `L1360`).
 
-### 3.3 Baby: #009 Kittee Cee [v7]
+### 3.3 Baby: #009 Kittee Cee
+
+Coverage: roster **found** for ID, name and stage (`ROSTER L158`). Text below: v7.
 
 > Kittee Cee — first trust. Three expressions of city confidence: counter timing, sonic style and supernatural night work. (`M7 L1379`)
 
@@ -278,7 +345,9 @@ Scale, egg expression states, "No eating at Egg" and the Egg social reaction rep
 
 > No humanoid cleavage, identical three-color recolors, round hoops replacing door knockers, mysterious typing inferred only from black fur, or head ornaments. (`M7 L1454`)
 
-### 3.4 Small #010 Lil' Cee and Mid #011 Bodega Cee [v7], abridged
+### 3.4 Small #010 Lil’ Cee and Mid #011 Bodega Cee, abridged
+
+IDs, names and stages: roster (`ROSTER L159-L160`). Text below: v7.
 
 > **Defining silhouette.** Longer feline body, playful extended tail and tiny collar charm; no puffer bulk. (`M7 L1473`, #010)
 
@@ -310,7 +379,7 @@ Coverage: v11 **absent**. v7 **absent** for culture; v7 uses "she"/"her" for the
 
 ---
 
-## 4. Yotes (F12)
+## 4. Yote Bloodline (F12)
 
 ### 4.1 Identity
 
@@ -324,7 +393,9 @@ v11 does not say whether "Latino family identity" binds every Yote or one family
 
 > Never frame a language or accent as an animal joke. (`M7 L8042`, last sentence of the Yote voice line)
 
-### 4.2 Egg: #061 Prism Egg [v7]
+### 4.2 Egg: #061 Prism Egg
+
+Coverage: roster **found** for ID, name and stage (`ROSTER L210`). Text below: v7.
 
 > Prism Egg — dormant potential. An adaptable long-legged coyote chooses an elemental route while keeping one unmistakable family body. (`M7 L7842`)
 
@@ -340,7 +411,9 @@ v11 does not say whether "Latino family identity" binds every Yote or one family
 
 > No fire form as shared ancestor, no rat branch, no forced sequence Fire→Electric→Water, no instant heal by reattunement. (`M7 L7915`)
 
-### 4.3 Baby: #062 Yotito [v7]
+### 4.3 Baby: #062 Yotito
+
+Coverage: roster **found** for ID, name and stage (`ROSTER L211`). Text below: v7.
 
 > Yotito — first trust. An adaptable long-legged coyote chooses an elemental route while keeping one unmistakable family body. (`M7 L7926`)
 
@@ -368,7 +441,9 @@ v11 does not say whether "Latino family identity" binds every Yote or one family
 
 > **Social reaction:** Simple attention or a gentle offered interaction suited to the baby body. Observe its approach/step-back cue; use a small toy rather than adult equipment. One Social HP meter only. (`M7 L7993`)
 
-### 4.4 Small #063 Lil' Yote and Mid #064 Barrio-Yote [v7], abridged
+### 4.4 Small #063 Lil’ Yote and Mid #064 Barrio-Yote, abridged
+
+IDs, names and stages: roster (`ROSTER L212-L213`). Text below: v7.
 
 > **Defining silhouette.** Long-legged young coyote with developing dark saddle and a clouded crystal charm. (`M7 L8020`, #063)
 
@@ -396,7 +471,9 @@ Coverage: v11 **absent** for Yotes. v7 **absent** (no pronoun used for F12 in th
 
 ## 5. Lifecycle stages
 
-Coverage: v11 **found**. v7 **found** (stage column of the index). They agree on the five names.
+Coverage: v11 **found**. Roster **found**. v7 **found** (stage column of the index). All three agree on the five names.
+
+> Current canon is **Egg → Baby → Small → Mid → Max**. A hatched Mon is the Baby form and remains Baby until an authored evolution event. (`ROSTER L16`)
 
 > Egg → Baby → Small → Mid → Max. A newly hatched Mon stays Baby until an authored evolution event. (`V11 ¶25`)
 
@@ -408,7 +485,7 @@ Coverage: v11 **found**. v7 **found** (stage column of the index). They agree on
 
 [v7] "**Stage function.**" per stage: "Dormant potential" (Egg, `M7 L362`), "First trust" (Baby, `L448`), "Learning independence" (Small, `L536`), "Capable companion" (Mid, `L668`), and for Max "mastered identity" (`L812`).
 
-Conflict inside the on-disk sources: `ARCH L320-L328` lists `Species: Ratti` with forms "Egg / Baby / Form I / Form II / Form III / Apex". That is six stages with different names. v11 `¶25` and v7 both give five.
+Conflict inside the on-disk sources (resolved by the roster and v11; Q28 closed): `ARCH L320-L328` lists `Species: Ratti` with forms "Egg / Baby / Form I / Form II / Form III / Apex". That is six stages with different names. v11 `¶25` and v7 both give five.
 
 ---
 
@@ -604,31 +681,31 @@ Coverage: v11 **found**. v7 **found**. They agree.
 
 ## 15. Coverage summary
 
-| Topic | v11 docx | v7 |
-|---|---|---|
-| Hood Ratti: Dex numbers, forms, edges | absent (v8 Dex not on disk) | found |
-| Hood Ratti: Baby body, scale, palette | absent | found (scale is a "design target") |
-| Hood Ratti: food | absent | found (favorite chopped cheese + fries; no food class) |
-| Hood Ratti: personality | found for Malik's Ratti only | found (family-wide line) |
-| Hood Ratti: culture | found (Malik's Ratti; species not locked) | absent |
-| Bodega Cee: Dex numbers, forms, edges | absent | found |
-| Bodega Cee: Baby body, scale, palette | absent | found |
-| Bodega Cee: food | absent | found (wings + fries) |
-| Bodega Cee: personality | absent | found |
-| Bodega Cee: culture; Mari's partner identity | partial (line only) | absent |
-| Yotes: Dex numbers, forms, edges | absent | found |
-| Yotes: Baby body, scale, palette | absent | found |
-| Yotes: food | absent | found (spicy chicken over rice) |
-| Yotes: personality | absent | found |
-| Yotes: culture | partial (one sentence) | absent |
-| Lifecycle stages | found | found |
-| Care meters | found (names) | found (numbers, all "proposals") |
-| Incubation timing, notification, atomic hatch | found | absent |
-| Hatch performance per egg | absent | found |
-| Caller / Callah | found | absent ("owner") |
-| Hood Mon | found | absent ("wild") |
-| Mons are people / consent | found | partial |
-| H-Lynk | found | absent |
-| Capture case | found | absent |
-| Cross-device | found | absent |
-| Faint | found | found |
+| Topic | roster v11.1 | v11 docx | v7 |
+|---|---|---|---|
+| Hood Ratti Bloodline: Dex numbers, forms, edges | found (IDs, names, stages; Max edges ambiguous, Q35) | absent | found |
+| Hood Ratti Bloodline: Baby body, scale, palette | absent | absent | found (scale is a "design target") |
+| Hood Ratti Bloodline: food | absent | absent | found (favorite chopped cheese + fries; no food class) |
+| Hood Ratti Bloodline: personality | absent | found for Malik's Ratti only | found (family-wide line) |
+| Hood Ratti Bloodline: culture | absent | found (Malik's Ratti; species not locked) | absent |
+| Bodega Baddiee Cee Bloodline: Dex numbers, forms, edges | found (IDs, names, stages; Max edges ambiguous, Q35) | absent | found |
+| Bodega Baddiee Cee Bloodline: Baby body, scale, palette | absent | absent | found |
+| Bodega Baddiee Cee Bloodline: food | absent | absent | found (wings + fries) |
+| Bodega Baddiee Cee Bloodline: personality | absent | absent | found |
+| Bodega Baddiee Cee Bloodline: culture; Mari's partner identity | absent | partial (line only) | absent |
+| Yote Bloodline: Dex numbers, forms, edges | found (IDs, names, stages; Max edges ambiguous, Q35) | absent | found |
+| Yote Bloodline: Baby body, scale, palette | absent | absent | found |
+| Yote Bloodline: food | absent | absent | found (spicy chicken over rice) |
+| Yote Bloodline: personality | absent | absent | found |
+| Yote Bloodline: culture | absent | partial (one sentence) | absent |
+| Lifecycle stages | found | found | found |
+| Care meters | absent | found (names) | found (numbers, all "proposals") |
+| Incubation timing, notification, atomic hatch | absent | found | absent |
+| Hatch performance per egg | absent | absent | found |
+| Caller / Callah | absent | found | absent ("owner") |
+| Hood Mon | absent | found | absent ("wild") |
+| Mons are people / consent | absent | found | partial |
+| H-Lynk | absent | found | absent |
+| Capture case | absent | found | absent |
+| Cross-device | absent | found | absent |
+| Faint | absent | found | found |

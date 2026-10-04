@@ -20,6 +20,7 @@ In the repo, under `docs/canon/source/`:
 - `NYC_MON_Canon_and_Lore_Bible_v11.docx` (title page: "VERSION 11 / 4 OCTOBER 2026")
 - `NYC_MON_CURRENT_CANON_INDEX_v11.md`
 - `nyc-mon-3d-character-architecture.md`
+- `NYC_MON_Egg_Baby_All_Forms_Roster_v11_1.md` (added in 08d31f7; roster reconciliation v11.1, 115 records / 19 families; see Decision #9)
 
 Not yet in the repo, though the index lists them:
 
@@ -60,6 +61,8 @@ Bible text these anchors rest on (`NYC_MON_Canon_and_Lore_Bible_v11.docx`):
 - Principal cast, Ratti: "Malik’s particular Hood Ratti."
 - Principal cast, Amara "Mari" Rosario: "Caller whose partner comes from the Bodega Cee line."
 - Identity, culture, gender and voice: "Yotes carry a Latino family identity." and "Culture is biography and community, not elemental biology."
+
+**Update 2026-10-04:** Decision #11 (superseding #10) sets the labels the UI and data use for these lines: "Hood Ratti Bloodline", "Bodega Baddiee Cee Bloodline", "Yote Bloodline". The slot order and the content file names above are unchanged; `packages/content` keeps `mons/hood-ratti.ts`, `mons/bodega-cee.ts` and `mons/yotes.ts`.
 
 ---
 
@@ -120,6 +123,8 @@ The card shows the Baby form name with the line as its label:
 
 The three Baby names come from v7 and stay provisional until the v8 Dex in `NYC_Mon_Master_Bible_v11.md` confirms them. Which Dex number the card shows is still open under Q9.
 
+**Update 2026-10-04:** Decision #9 confirms the three Baby names and their Dex IDs (#002, #009, #062) from roster v11.1. Decision #11 (superseding #10) replaces the "<line> line" labels in the table above with "<roster family name> Bloodline".
+
 ## Decision 7 — The scanner LED is red
 
 - **Date:** 2026-10-04
@@ -136,3 +141,59 @@ The H-Lynk scanner/emitter LED is red, per v11 (`V11 ¶63`). Orange stays the ac
 - **Answers:** `docs/canon/OPEN_QUESTIONS.md` Q3
 
 Companion screens are framed as an H-Lynk Entry unit, which Santoro hands the Caller. The bond lives on the `MonInstance`, never on the device. No code path stores partnership or bond state on the H-Lynk, and no copy implies the device owns or controls the Mon (`V11 ¶23`, `V11 ¶43`).
+
+## Decision 9 — Starter Dex IDs and form names follow roster v11.1
+
+- **Date:** 2026-10-04
+- **Decided by:** Mike (creator), who supplied the roster
+- **Source:** `docs/canon/source/NYC_MON_Egg_Baby_All_Forms_Roster_v11_1.md` ("Roster reconciliation v11.1 — 4 October 2026", committed in 08d31f7)
+- **Answers:** `docs/canon/OPEN_QUESTIONS.md` Q9, and the Dex-number and form-name parts of Q8
+
+The roster keeps #001–#109 as the preserved baseline (roster L9) and states the lifecycle as "Egg → Baby → Small → Mid → Max" (L16). For the three starter families it registers (L150-L156, L157-L163, L210-L216):
+
+| Family | Egg | Baby | Small | Mid | Max |
+|---|---|---|---|---|---|
+| F01 · Hood Ratti | #001 Metro Egg | #002 Squeaklet | #003 Lil’ Ratti | #004 Hood Ratti | #005 Ratti Royale, #006 Agua Ratti, #007 Phantom Ratti |
+| F02 · Bodega Baddiee Cee | #008 Corner Egg | #009 Kittee Cee | #010 Lil’ Cee | #011 Bodega Cee | #012 Bodega Baddiee Cee, #013 Knocka Cee, #014 Midnight Cee |
+| F12 · Yote | #061 Prism Egg | #062 Yotito | #063 Lil’ Yote | #064 Barrio-Yote | #065 Fuego-Yote, #066 Yote del Eléctrico, #067 Agua-Yote |
+
+These match the v7 numbering in `STARTERS_EXTRACT.md` §1 record for record. `@acme/content` transcribes them; nobody renumbers them. The starter card's Dex number is the Baby form's: #002, #009, #062.
+
+The roster settles IDs, names and stages only. Body data, scale, food, culture notes, clips, type/Affinity and the Mid-to-Max branch edges stay `TODO(canon)` until the v8 Dex in `NYC_Mon_Master_Bible_v11.md` or another creator ruling covers them.
+
+## Decision 10 — The starter card labels each starter with its roster family name
+
+- **Date:** 2026-10-04
+- **Decided by:** Mike (creator), answering "family"
+- **Answers:** `docs/canon/OPEN_QUESTIONS.md` Q34 (and Q10)
+- **Amends:** Decision #6 (the label column) and Decision #1 (the line labels)
+- **Superseded by:** Decision #11 (same day: the word "family" becomes "Bloodline")
+
+The label uses the roster's family name exactly, with the word "family":
+
+| Baby form | Label |
+|---|---|
+| #002 Squeaklet | Hood Ratti family |
+| #009 Kittee Cee | Bodega Baddiee Cee family |
+| #062 Yotito | Yote family |
+
+"Bodega Cee" and "Yotes" no longer label the starters. In data, the grouping is a family: `familyId` (`F01`, `F02`, `F12`) plus `familyName` (`Hood Ratti`, `Bodega Baddiee Cee`, `Yote`). The §2.2 content file names stay as they are (`hood-ratti.ts`, `bodega-cee.ts`, `yotes.ts`); they are file paths, never shown to a player.
+
+## Decision 11 — "Bloodline" is the term for a Dex family, in UI and data
+
+- **Date:** 2026-10-04
+- **Decided by:** Mike (creator): "it's more hood NYC"
+- **Supersedes:** the word "family" in Decision #10. Everything else in #10 stands: the roster family name is used exactly, and the §2.2 file names stay.
+- **Answers:** `docs/canon/OPEN_QUESTIONS.md` Q34 (and Q10)
+
+The starter card reads:
+
+| Baby form | Label |
+|---|---|
+| #002 Squeaklet | Hood Ratti Bloodline |
+| #009 Kittee Cee | Bodega Baddiee Cee Bloodline |
+| #062 Yotito | Yote Bloodline |
+
+In data the grouping is a bloodline: `bloodlineId` (`F01`, `F02`, `F12`, the roster's family numbers) and `bloodlineName` (`Hood Ratti`, `Bodega Baddiee Cee`, `Yote`). UI copy builds the label as `${bloodlineName} Bloodline`. The roster and the other source files keep saying "family"; quotes from them stay verbatim.
+
+**Note for `prompts/LAWS.md` Law 9 (language is canon):** add "`Bloodline` in UI and data for a Dex family" to its list. Recorded here; whoever owns `LAWS.md` makes the edit.
