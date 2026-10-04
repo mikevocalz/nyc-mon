@@ -8,19 +8,19 @@ const appDir = dirname(fileURLToPath(import.meta.url));
 loadProjectEnv(join(appDir, '../..'), { silent: true, force: true });
 
 const config: ExpoConfig = {
-  name: 'Spatial Solotio Starter',
-  slug: 'spatial-solotio-starter',
-  scheme: 'spatialsolotio',
+  name: 'NYC Mon',
+  slug: 'nyc-mon',
+  scheme: 'nycmon',
   version: '0.1.0',
   orientation: 'default',
   icon: './assets/images/icon.png',
   userInterfaceStyle: 'automatic',
   ios: {
-    bundleIdentifier: 'com.example.solitostarter',
+    bundleIdentifier: 'com.nycmon.app',
     supportsTablet: true,
   },
   android: {
-    package: 'com.example.solitostarter',
+    package: 'com.nycmon.app',
     adaptiveIcon: {
       foregroundImage: './assets/images/adaptive-icon.png',
       backgroundColor: palette.ink[50],

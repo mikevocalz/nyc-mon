@@ -82,7 +82,7 @@ export function SiteFooter() {
       {/* Legal bar */}
       <View className="border-t-2 border-border">
         <View className="mx-auto w-full max-w-screen-2xl flex-row flex-wrap items-center justify-between gap-2 px-4 py-5 sm:px-6">
-          <TWText className="text-xs text-text-muted">© Solito NativeUI Starter</TWText>
+          <TWText className="text-xs text-text-muted">© NYC Mon</TWText>
           <TWText className="text-xs text-text-muted">MIT licensed — make it yours.</TWText>
         </View>
       </View>

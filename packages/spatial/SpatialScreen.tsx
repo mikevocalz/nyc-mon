@@ -63,7 +63,7 @@ export function SpatialScreen() {
         >
           <Section className="max-w-4xl gap-3">
             <Text className="text-xs font-semibold uppercase tracking-[0.32em] text-cyan-200">
-              Spatial-Solotio-Starter / Grid Program
+              NYC Mon / Grid Program
             </Text>
             <Heading level={1} size="display-sm" className="text-white">
               Build once for screen, spatial windows, WebXR, Quest and Pico.

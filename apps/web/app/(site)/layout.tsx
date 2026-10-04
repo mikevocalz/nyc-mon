@@ -8,8 +8,8 @@ import '../globals.css';
 
 export const metadata: Metadata = {
   title: {
-    default: 'Spatial-Solotio-Starter',
-    template: '%s — Spatial-Solotio-Starter',
+    default: 'NYC Mon',
+    template: '%s — NYC Mon',
   },
   description:
     'Futuristic universal spatial starter — Expo SDK 58, Next.js, Skia, Rive, Viro/OpenXR and a Neon Grid interface.',

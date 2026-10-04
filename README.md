@@ -1,4 +1,4 @@
-# Spatial-Solotio-Starter
+# NYC Mon
 
 A spatial-first universal app starter: **Expo SDK 58 (iOS/Android) + Next.js 16**
 sharing application code through **Solito**, with **Tailwind CSS 4 + Uniwind** for

@@ -1,8 +1,8 @@
 {
-  "name": "spatial-solotio-starter",
+  "name": "nyc-mon",
   "version": "0.1.0",
   "private": true,
-  "description": "Spatial-Solotio-Starter — Expo SDK 58 + Next.js + Skia + Viro Web/OpenXR + Rive universal spatial starter.",
+  "description": "NYC Mon — Expo SDK 58 + Next.js + Skia + Viro Web/OpenXR + Rive universal spatial starter.",
   "license": "MIT",
   "packageManager": "pnpm@12.8.1",
   "engines": {
