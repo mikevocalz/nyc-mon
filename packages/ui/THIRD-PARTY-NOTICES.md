@@ -17,12 +17,16 @@ Ported so far:
 - `backgrounds/SubwayLines`: port of NeonBlade's Cyber Circuit (`cyber-circuit`).
 - `backgrounds/StreetPulse`: port of NeonBlade's Datalines with Grid
   (`datalines-with-grid`).
-- `three/HolographicTerrain` (also exported as `backgrounds/CityHeightfield`):
-  port of NeonBlade's Holographic Terrain (`holographic-terrain`), kept a
-  three.js scene like the original (WebGPURenderer, FogExp2, a raised
-  perspective camera, the pointer raycast onto a horizontal plane) and
-  redrawn as solid city blocks. Keeps its prop names. The first, flat port
-  stays as `backgrounds/CityHeightfieldFlat`, the fallback.
+- `three/HolographicTerrain`: port of NeonBlade's Holographic Terrain
+  (`holographic-terrain`). Same plane geometry, four-sine height, cursor
+  gaussian bump raycast onto a horizontal plane, FogExp2 and camera, on
+  WebGPURenderer with the height written as a TypeGPU function. Keeps its
+  props; colours default to the NYC-MON theme, and an `accentColor` tints the
+  lines the cursor lifts.
+- `three/CityHeightfield` (also `backgrounds/CityHeightfield`): a solid
+  city-blocks scene built on the same terrain idea, with NeonBlade's prop
+  names. Its first, flat port stays as `backgrounds/CityHeightfieldFlat`, the
+  fallback.
 - `backgrounds/RiverTide`: port of NeonBlade's Neon Tide (`neon-tide`).
 - `backgrounds/RainWindow`: port of NeonBlade's Pluviophile (`pluviophile`).
 - `backgrounds/CityBlocks`: began as the port of NeonBlade's Hexagons background

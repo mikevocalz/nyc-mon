@@ -4,8 +4,8 @@ import { DISTRICTS, DISTRICT_NAMES } from './district';
 import { BackgroundCaption, DistrictGrid } from './backgrounds/story-helpers';
 import { Section } from './html';
 
-// CityHeightfield is now an alias of HolographicTerrain (the 3D three.js
-// scene); its story ids stay so links into it keep working.
+// CityHeightfield is the solid city-blocks three.js scene (three/CityHeightfield);
+// HolographicTerrain is the faithful wireframe port.
 
 const meta = {
   title: 'Backgrounds/CityHeightfield',
@@ -37,7 +37,7 @@ export const Playground: Story = {
   render: (args: CityHeightfieldProps) => (
     <Section className="h-screen min-h-[520px]">
       <CityHeightfield {...args} className="flex-1">
-        <BackgroundCaption title="CityHeightfield" line="HolographicTerrain under its older name. Move the pointer to lift the blocks." />
+        <BackgroundCaption title="CityHeightfield" line="Solid city blocks built on the Holographic Terrain. Move the pointer to lift them." />
       </CityHeightfield>
     </Section>
   ),

@@ -14,7 +14,7 @@ import { normaliseOpacity, useLayers, type SolidBackgroundBaseProps } from './Qu
  * go, with lit facades and the pointer lifting the blocks under it.
  *
  * This was the first port of NeonBlade UI's Holographic Terrain. The 3D
- * version, HolographicTerrain (three/HolographicTerrain), replaced it as
+ * city, three/CityHeightfield, replaced it as
  * `CityHeightfield`; this one stays as its fallback where no three.js backend
  * runs (native without WebGPU) and for `forceFallback`.
  */
