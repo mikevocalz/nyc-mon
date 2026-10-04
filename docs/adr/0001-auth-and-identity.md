@@ -1,6 +1,6 @@
 # ADR 0001: Auth and identity
 
-- **Status:** Accepted (2026-10-04). Implementation is blocked until the plugin supports Payload 4; see "Compatibility gate".
+- **Status:** Accepted (2026-10-04). Implemented on a fork of the plugin until upstream merges Payload 4 support; see "Compatibility gate".
 - **Date:** 2026-10-04
 - **Deciders:** Mike (creator) decided; the `platform` agent implements
 - **Decisions recorded:** `docs/canon/DECISIONS.md` #2 (auth) and #3 (email)
@@ -47,7 +47,7 @@ This replaces the earlier proposal of a separate Better Auth schema bridged to P
 
 Mobile uses Better Auth's Expo integration (https://www.better-auth.com/docs/integrations/expo): the server adds the `expo()` plugin and the app scheme to `trustedOrigins`; the client stores the session in `expo-secure-store` and sends it as a cookie header on `/v1` calls. `betterAuthStrategy` reads that header the same way it reads a browser cookie.
 
-None of `better-auth`, `@better-auth/passkey`, `@better-auth/expo` or `resend` is installed in nyc-mon yet. The option names in this table come from their docs and are unverified against installed source until the compatibility gate clears (Law 2).
+Installed and read in `node_modules` (Law 2): `better-auth` 1.7.7, `@better-auth/passkey` 1.7.7, `resend` 6.32.0. `@better-auth/expo` is not installed yet; it lands with the mobile wiring, so the Expo details above are still from its docs.
 
 ### `@acme/auth`
 
@@ -66,7 +66,9 @@ None of `better-auth`, `@better-auth/passkey`, `@better-auth/expo` or `resend` i
 
 **What's needed, fixed in the library (not patched around in the app):** a Payload 4 line of the plugin. A port that clears both checks exists in the session scratchpad as `payload-better-auth-payload4.patch`: 8 edits across 6 files (the import move, the prop renames, one typed index). After it, `tsc --noEmit` exits 0 and all 434 tests pass on Payload 4. The renamed props do not exist in Payload 3, so upstream cannot ship it under the current `<4` range; it needs a v4 release line with the peer widened to `>=4.0.0-canary <5`. The route is a fork under Mike's GitHub with a PR to `delmaredigital/payload-better-auth`, then a catalog pin to the fork commit (the same pattern as `@reactvision/react-viro` in `pnpm-workspace.yaml`) until upstream publishes. The upstream fix also needs a cleaner type for `access.ts` than the cast in the scratch patch.
 
-Until then nothing in this ADR is installed, and `packages/payload` keeps Payload's local strategy.
+**Status of the fix (2026-10-04).** Mike approved the fork. The port is PR https://github.com/delmaredigital/payload-better-auth/pull/43 from https://github.com/mikevocalz/payload-better-auth (branch `payload-4-port`). nyc-mon pins the fork's `payload-4-dist` branch, which is the PR head plus its built `dist/`, because pnpm does not build a git dependency that only declares `prepublishOnly`. The pin lives in the `pnpm-workspace.yaml` catalog, next to the `@reactvision/react-viro` fork pin.
+
+Booting against Postgres found a fourth Payload 4 break the type check and unit tests missed. Payload 4 changed the Local API's `overrideAccess` default from `true` to `false`. `betterAuthStrategy` runs before `req.user` exists, so its `users` lookup was access-checked as anonymous, threw `Forbidden`, and every request came back unauthenticated even with a valid session. The fork passes `overrideAccess: true` on the strategy's seven lookups, and the strategy test mock now rejects calls without it (8 tests fail on the old code). Plugin checks on Payload 4 after the fix: `tsc` exit 0, 45 files and 434 tests pass, build exit 0.
 
 ## The §1.4 contract on top
 
@@ -114,7 +116,9 @@ Better Auth can lock every account out with no error at config time. Read from `
 - `requireEmailVerification: true` with no `sendVerificationEmail` refuses every unverified sign-in with `EMAIL_NOT_VERIFIED`, forever, and nothing can verify the account.
 - `sendOnSignIn` has no default, so it is false unless set. Without it, an account that signed up while mail was broken never gets another link.
 
-Rules:
+Re-read in the installed `better-auth@1.7.7` (`dist/api/routes/sign-in.mjs`, lines 339–351): unchanged. `sendOnSignIn` is typed `@default false` in `@better-auth/core` `dist/types/init-options.d.mts`.
+
+Rules (implemented in `packages/payload/src/auth/options.ts` unless noted):
 
 1. `requireEmailVerification` stays `false` until Resend sends from a verified domain in that environment.
 2. When it is turned on, `emailVerification.sendOnSignIn: true` is set explicitly.
@@ -122,6 +126,27 @@ Rules:
 4. Clients check `res.error?.code`. `authClient.signIn.email()` resolves with `{ data, error }` and does not throw, so a `try/catch` catches nothing.
 5. Every password-reset request passes `redirectTo`, and its origin is in `trustedOrigins`. Without it the emailed link carries an empty `callbackURL` and lands on `INVALID_TOKEN`.
 6. `advanced.backgroundTasks.handler` is set (Vercel `waitUntil`), so sending mail doesn't make a real account answer slower than an unknown one.
+
+## What runs today (verified 2026-10-04)
+
+Server: `packages/payload/src/auth/` (`env.ts`, `email.ts`, `age.ts`, `options.ts`), the `users` collection, and the two plugin entries in `payload.config.ts`. Better Auth answers at `/payload-api/auth/*`. Client: `@acme/auth` (`packages/auth`) wraps the Better Auth React client and the passkey client, and returns `{ ok, error }` from every call.
+
+Checked by booting `apps/web` (`next dev`, Next 16.3.8) against a throwaway Postgres 16 cluster with `PAYLOAD_PUSH=true`:
+
+| Request | Result |
+|---|---|
+| `GET /payload-api/auth/ok` | 200 `{"ok":true}` |
+| `POST sign-up/email`, birth year 1999 | 200; user created, `role: user` (the first account became `admin` through `firstUserAdmin`) |
+| `GET /payload-api/users/me` with the session cookie | 200; the Payload `users` doc via `betterAuthStrategy`, `consentStatus: not-required` |
+| `POST sign-out`, then `users/me` | `user: null` |
+| `POST sign-in/email`, wrong password | 401 `INVALID_EMAIL_OR_PASSWORD` |
+| `POST sign-in/email`, then `users/me` | 200; same user |
+| `POST sign-up/email`, birth year 2014 or 2015 | 403 `GUARDIAN_CONSENT_REQUIRED`; no row written |
+| `POST sign-up/email`, birth year 3000 | 400 `INVALID_BIRTH_YEAR` |
+| `POST request-password-reset` with no Resend config | 400 `RESET_PASSWORD_DISABLED` (loud, as intended) |
+| `GET /admin/login` | 200; the plugin's login view (email and passkey) |
+
+Not verified yet: passkey ceremonies, Apple and Google (no client ids), Resend delivery (no key), the Expo client, and the guardian-consent flow, which is designed above but not built.
 
 ## Consequences
 
