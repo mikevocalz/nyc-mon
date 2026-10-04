@@ -1,0 +1,7 @@
+{
+  "name": "nyc-carousel",
+  "version": "1.0.0",
+  "private": true,
+  "description": "NYC-MON native card carousel: SwiftUI paging scroll view on iOS, Material 3 carousels on Android. Local Expo module, linked through apps/mobile's autolinking nativeModulesDir.",
+  "main": "src/index.ts"
+}
