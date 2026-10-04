@@ -4,7 +4,7 @@ import { View } from './tw';
 import { Text } from './Text';
 import { CONTROL_TONES, DISTRICTS, DISTRICT_NAME } from './district';
 
-const VARIANTS = ['cornerCut', 'primary', 'accent', 'outline', 'ghost', 'danger', 'neon'] as const;
+const VARIANTS = ['cornerCut', 'primary', 'accent', 'outline', 'ghost', 'danger', 'cta', 'neon'] as const;
 
 const meta = {
   title: 'UI/Button',
@@ -33,6 +33,20 @@ export const Outline: Story = { args: { variant: 'outline', title: 'Cancel' } };
 export const Ghost: Story = { args: { variant: 'ghost', title: 'Skip for now' } };
 /** danger: always apple. */
 export const Danger: Story = { args: { variant: 'danger', title: 'Remove' } };
+/**
+ * The screen's one call to action: brand orange in both schemes with the
+ * `on-cta` label. Tone and district are ignored. Shown full width, as M02-M07 use it.
+ */
+export const Cta: Story = {
+  render: () => (
+    <View className="max-w-content-form gap-3 bg-bg p-4">
+      <Button variant="cta" size="lg" fullWidth title="Get started" onPress={() => {}} />
+      <Button variant="cta" size="lg" fullWidth title="Sending" loading onPress={() => {}} />
+      <Button variant="cta" size="lg" fullWidth title="Continue" disabled onPress={() => {}} />
+    </View>
+  ),
+};
+
 /** Unavailable: no tone, no depth plate, muted label. */
 export const Disabled: Story = { args: { disabled: true } };
 export const Loading: Story = { args: { loading: true, title: 'Saving' } };

@@ -44,3 +44,8 @@ test('outerLayout lets a caller align the button', () => {
   assert.equal(outerLayout('flex-1 mt-2'), 'self-start flex-1');
   assert.equal(outerLayout('self-end'), 'self-end');
 });
+
+test('cta is the orange solid face whatever the tone or district', () => {
+  assert.deepEqual(controlLook('cta'), { look: 'solid', tone: 'orange' });
+  assert.deepEqual(controlLook('cta', 'royal', 'downtown'), { look: 'solid', tone: 'orange' });
+});

@@ -10,8 +10,12 @@ import { resolveAccent, resolveControlTone, toneInput, type ControlTone, type Di
  */
 export type ControlLook = 'solid' | 'outline' | 'ghost';
 
-/** Every variant name Button accepts. `cornerCut` and `neon` are aliases of the default. */
-export type ButtonVariant = 'cornerCut' | 'neon' | 'primary' | 'accent' | 'outline' | 'ghost' | 'danger';
+/**
+ * Every variant name Button accepts. `cornerCut` and `neon` are aliases of the
+ * default. `cta` is the screen's one primary call to action: the brand orange
+ * face in both schemes, labelled with the `on-cta` token (Decision #7).
+ */
+export type ButtonVariant = 'cornerCut' | 'neon' | 'primary' | 'accent' | 'outline' | 'ghost' | 'danger' | 'cta';
 /** Every variant name IconButton accepts. */
 export type IconButtonVariant = 'cornerCut' | 'neon' | 'primary' | 'outline' | 'ghost';
 
@@ -21,6 +25,7 @@ const LOOK: Record<ButtonVariant, ControlLook> = {
   primary: 'solid',
   accent: 'solid',
   danger: 'solid',
+  cta: 'solid',
   outline: 'outline',
   ghost: 'ghost',
 };
@@ -38,6 +43,8 @@ export function controlLook(
 ): { look: ControlLook; tone: ControlTone } {
   const v = variant ?? 'cornerCut';
   if (v === 'danger') return { look: 'solid', tone: 'apple' };
+  // The CTA face is brand orange whatever the tone or district: `cta` is orange-500 in both schemes.
+  if (v === 'cta') return { look: 'solid', tone: 'orange' };
   if (v === 'accent' && !tone) {
     const accent = resolveAccent(district ?? 'midtown');
     return { look: 'solid', tone: accent === 'white' ? 'royal' : accent };

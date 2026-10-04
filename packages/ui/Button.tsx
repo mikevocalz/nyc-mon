@@ -85,7 +85,8 @@ export interface ButtonProps {
    * Default (no variant, `cornerCut` or `neon`): the solid corner-cut face.
    * Legacy names keep working: primary = default, accent = the district's
    * second tone (royal in Midtown), danger = apple, outline = night face
-   * with a tone border, ghost = no frame, tone label.
+   * with a tone border, ghost = no frame, tone label. `cta` = the screen's one
+   * primary call to action: brand orange face, `on-cta` label, any tone ignored.
    */
   variant?: ButtonVariant;
   size?: 'sm' | 'md' | 'lg';
@@ -112,7 +113,8 @@ export function Button({
   const { look, tone } = controlLook(variant, toneProp, district);
   const off = !!(disabled || loading);
   const s = button({ look, size, disabled: off, fullWidth });
-  const labelClass = s.label({ className: off ? undefined : labelTone(look, tone) });
+  // cta labels read the on-cta token (signage black by day, night after dark), not the tone table.
+  const labelClass = s.label({ className: off ? undefined : variant === 'cta' ? 'text-on-cta' : labelTone(look, tone) });
   const content = (
     <>
       {loading ? (

@@ -263,6 +263,11 @@ const USAGE: Pair[] = [
   { id: 'system sheet close edge', fg: 'border-strong', bg: ['surface-raised'], role: 'ui', usedAt: ['packages/ui/BottomSheet.tsx:50'] },
   { id: 'system sheet close glyph', fg: 'text', bg: ['surface-raised'], role: 'ui', usedAt: ['packages/ui/BottomSheet.tsx:51'] },
 
+  // -- Button variant="cta": orange-500 face in both schemes, on-cta label
+  { id: 'cta button label', fg: 'on-cta', bg: ['cta'], role: 'text', usedAt: ['packages/ui/Button.tsx:117', 'packages/ui/control-look.ts:47'] },
+  { id: 'cta keyline on daylit page', fg: 'orange-950', bg: ['concrete-50'], role: 'ui', usedAt: ['packages/ui/neon/frame-colors.ts:10'], reason: 'the face (orange-500) is 2.38:1 on concrete-50, so the night keyline is the boundary by day' },
+  { id: 'cta face on night page', fg: 'orange-500', bg: NIGHT, role: 'ui', usedAt: ['packages/ui/neon/frame-colors.ts:10'], reason: 'after dark the face itself is the boundary; its orange-950 keyline is not' },
+
   // -- night facades (palette steps: mode-invariant) -------------------------
   { id: 'title on night', fg: 'ink-50', bg: NIGHT, role: 'text', usedAt: ['packages/ui/Card.tsx:36', 'packages/ui/cards/neon-field.ts:15', 'packages/ui/ToastCard.tsx:37'] },
   { id: 'white on night', fg: 'white', bg: NIGHT, role: 'text', usedAt: ['packages/ui/charts/StatCard.tsx:54', 'packages/ui/nav/NavBar.tsx:88', 'packages/ui/nav/SiteFooter.tsx:79'] },
