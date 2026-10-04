@@ -108,9 +108,7 @@ catalog:
   "@shopify/react-native-skia": 2.14.0
   canvaskit-wasm: 0.41.0
   react-native-webgpu: 0.10.4
-  three: 0.186.1
   typegpu: 0.12.6
-  "@typegpu/three": 0.12.1
 
   # spatial / XR / Rive
   "@reactvision/react-viro": 3.0.2
@@ -170,7 +168,6 @@ catalog:
   "@types/react": ~19.3.0
   "@types/node": ^26.6.4
   "@types/react-dom": ^19.3.0
-  "@types/three": 0.186.0
   "@webgpu/types": 0.1.74
   unplugin-typegpu: 0.12.4
   eslint: ^9.39.5

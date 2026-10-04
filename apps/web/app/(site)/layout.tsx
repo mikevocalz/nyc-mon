@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { SITE_DESCRIPTION } from '@acme/spatial/copy';
 import { View } from '@acme/ui/tw';
 import { Document } from '../Document';
 import { SiteHeader } from '../../components/site/SiteHeader';
@@ -11,8 +12,7 @@ export const metadata: Metadata = {
     default: 'NYC-MON',
     template: '%s | NYC-MON',
   },
-  description:
-    'Every block has a legend. Race light cycles across a neon New York grid on your phone, in the browser, or in a headset.',
+  description: SITE_DESCRIPTION,
 };
 
 export default function SiteLayout({ children }: Readonly<{ children: React.ReactNode }>) {

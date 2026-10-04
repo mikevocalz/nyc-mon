@@ -32,6 +32,10 @@ export function PasteWrapper({ onPaste, children }: PasteWrapperProps) {
     else onPaste({ type: 'unsupported' });
   };
 
+  // Raw-element exception: the kit View is react-native-web underneath, and
+  // RNW drops onPaste (it is not in its forwarded-props list), so the
+  // ClipboardEvent never arrives. A bare element with display: contents is the
+  // only host that receives it without entering layout.
   return (
     <div style={{ display: 'contents' }} onPaste={handlePaste}>
       {children}

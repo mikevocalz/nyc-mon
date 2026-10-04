@@ -17,7 +17,7 @@ import { useStickyHeader } from '@/src/navigation/split-view/use-sticky-header';
 import { PANE_WIDTH_DP } from '@/src/navigation/split-view/pane-widths';
 import { usePaneSearch } from '@/src/navigation/split-view/pane-search.store';
 import { Pressable, View, Text } from '@acme/ui/tw';
-import { Avatar, Badge, EmptyState, IconButton, KeyboardAwareScroll, Menu, SafeArea, SegmentedControl } from '@acme/ui';
+import { Avatar, Badge, BrandWordmark, EmptyState, IconButton, KeyboardAwareScroll, Menu, SafeArea, SegmentedControl } from '@acme/ui';
 import { Header } from '@acme/ui/primitives';
 import { Calendar, MoreHorizontal, Users } from '@acme/ui/icons';
 import {
@@ -147,9 +147,11 @@ export default function SplitLayout() {
         the screen — so without this row there is no title and no way back to
         the drawer from the schedule.
       */}
-      <Header className="flex-row items-center gap-3 border-b-2 border-border bg-primary px-4 py-3">
+      {/* Same night bar and wordmark as AppHeader, so both read as one app. */}
+      <Header className="flex-row items-center gap-3 border-b-2 border-primary bg-ink-950 px-4 py-2">
         <MenuButton />
-        <Text className="flex-1 text-lg font-semibold text-on-primary md:text-xl lg:text-2xl">Schedule</Text>
+        <BrandWordmark height={36} />
+        <Text numberOfLines={1} className="flex-1 text-lg font-semibold text-ink-50 md:text-xl">Schedule</Text>
         {/* A control that hides a pane cannot live inside that pane, or there
             is no way back. Both sit in the screen header; the inspector's is in
             its own chrome because selection reopens it anyway. */}

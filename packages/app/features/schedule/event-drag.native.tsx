@@ -20,7 +20,7 @@ export type { EventDragProps } from './event-drag.web';
  *    whenever the gesture object identity changes, so an un-memoised
  *    `Gesture.Pan()` rebuilt on every render tore itself down mid-drag.
  *  - The drag drives a Reanimated shared value on the UI thread. The previous
- *    version used `.runOnJS(true)` and wrote the Zustand store on every frame,
+ *    version ran the gesture on the JS thread and wrote the Zustand store per frame,
  *    which re-rendered the whole grid per pointer move — that is the jank.
  *  - The store is written exactly ONCE, on release, via `scheduleOnRN`. Gesture
  *    callbacks are workletized when Reanimated is installed, so calling a
@@ -52,28 +52,28 @@ export function EventDrag({
         // and the surrounding grid can still scroll.
         .activeOffsetY([-8, 8])
         .onBegin(() => {
-          startY.value = offsetY.value;
+          startY.set(offsetY.get());
         })
         .onUpdate((event) => {
           // Follow the finger CONTINUOUSLY. Quantising here made the block
           // teleport between 15-minute steps, which reads as jumping — the
           // snap belongs on release, not during the drag.
-          offsetY.value = startY.value + event.translationY;
+          offsetY.set(startY.get() + event.translationY);
         })
         .onEnd(() => {
           // Settle onto the 15-minute grid with a spring so the block eases
           // into its slot instead of snapping instantly, then hand the final
           // offset to JS. The store re-renders `top` to the committed time and
           // the transform returns to zero, so this must not double-count.
-          const settled = snapPx > 0 ? Math.round(offsetY.value / snapPx) * snapPx : offsetY.value;
+          const settled = snapPx > 0 ? Math.round(offsetY.get() / snapPx) * snapPx : offsetY.get();
           scheduleOnRN(onCommit, settled);
-          offsetY.value = withSpring(0, { damping: 30, stiffness: 220 });
+          offsetY.set(withSpring(0, { damping: 30, stiffness: 220 }));
         }),
     [enabled, onCommit, snapPx, offsetY, startY],
   );
 
   const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: offsetY.value }],
+    transform: [{ translateY: offsetY.get() }],
   }));
 
   // Memoised so the style array identity does not change on every render,

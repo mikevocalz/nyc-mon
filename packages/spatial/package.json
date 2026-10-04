@@ -6,20 +6,11 @@
   "types": "./index.ts",
   "exports": {
     ".": "./index.ts",
+    "./copy": "./homeCopy.ts",
     "./rive": {
       "react-native": "./rive/RiveStage.native.tsx",
       "default": "./rive/RiveStage.web.tsx"
     },
-    "./lightcycle": "./lightcycle/index.ts",
-    "./lightcycle/three": {
-      "react-native": "./lightcycle/three/index.native.ts",
-      "default": "./lightcycle/three/index.web.ts"
-    },
-    "./rive-fx": {
-      "react-native": "./rive-fx/index.native.ts",
-      "default": "./rive-fx/index.web.ts"
-    },
-    "./mcp": "./mcp/index.ts",
     "./audio": {
       "react-native": "./audio/index.native.ts",
       "default": "./audio/index.web.ts"
@@ -27,11 +18,7 @@
   },
   "scripts": {
     "lint": "eslint",
-    "typecheck": "tsc --noEmit",
-    "test": "node --test 'lightcycle/**/*.test.ts' 'mcp/**/*.test.ts'",
-    "rive-fx:verify": "cd rive-fx/rive && rive . --verify",
-    "rive-fx:inspect": "cd rive-fx/rive && rive inspect . --summary",
-    "rive-fx:spinner-shot": "cd rive-fx/rive && mkdir -p build && rive . --screenshot=build/grid-core-spinner.png --advance=30"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@acme/theme": "workspace:*",
@@ -42,25 +29,18 @@
     "@rive-app/react-webgl2": "catalog:",
     "react-native-nitro-modules": "catalog:",
     "zustand": "catalog:",
-    "@typegpu/three": "catalog:",
-    "react-native-webgpu": "catalog:",
-    "three": "catalog:",
-    "typegpu": "catalog:",
     "react-native-audio-api": "catalog:"
   },
   "devDependencies": {
     "@acme/config": "workspace:*",
     "@expo/dom-webview": "catalog:",
     "@types/react": "catalog:",
-    "@types/three": "catalog:",
-    "@webgpu/types": "catalog:",
     "eslint": "catalog:",
     "eslint-config-expo": "catalog:",
     "expo": "catalog:",
     "react": "catalog:",
     "react-native": "catalog:",
-    "typescript": "catalog:",
-    "unplugin-typegpu": "catalog:"
+    "typescript": "catalog:"
   },
   "peerDependencies": {
     "react": "*",

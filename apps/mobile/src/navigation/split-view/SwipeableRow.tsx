@@ -2,12 +2,12 @@
 import { useMemo } from 'react';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
-  runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
 import { View } from '@acme/ui/tw';
+import { scheduleOnRN } from 'react-native-worklets';
 import { haptics } from '@acme/ui/haptics';
 import {
   resolveSwipe,
@@ -64,32 +64,32 @@ export function SwipeableRow({
         .activeOffsetX(side === 'trailing' ? [-12, 9999] : [-9999, 12])
         .failOffsetY([-8, 8])
         .onUpdate((event) => {
-          translateX.value = swipeTranslation(event.translationX, ACTION_WIDTH, rowWidth, side);
+          translateX.set(swipeTranslation(event.translationX, ACTION_WIDTH, rowWidth, side));
         })
         .onEnd((event) => {
           const outcome = resolveSwipe({
-            translation: translateX.value,
+            translation: translateX.get(),
             velocity: event.velocityX,
             actionWidth: ACTION_WIDTH,
             rowWidth,
           });
 
-          translateX.value = withTiming(
+          translateX.set(withTiming(
             restingTranslation(outcome, ACTION_WIDTH, rowWidth, side),
             { duration: SETTLE_MS },
-          );
+          ));
 
-          if (outcome.kind === 'commit' && !committed.value) {
-            committed.value = true;
-            runOnJS(haptics.selection)();
-            runOnJS(onCommit)();
+          if (outcome.kind === 'commit' && !committed.get()) {
+            committed.set(true);
+            scheduleOnRN(haptics.selection);
+            scheduleOnRN(onCommit);
           }
         }),
     [side, rowWidth, onCommit, translateX, committed],
   );
 
   const rowStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: translateX.value }],
+    transform: [{ translateX: translateX.get() }],
   }));
 
   return (

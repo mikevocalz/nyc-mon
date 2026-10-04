@@ -35,11 +35,10 @@ export const Gateway: Story = {
           <View className="max-w-xl flex-1 gap-4 md:order-1">
             <Heading level={1} className="my-0 font-display text-4xl text-primary md:text-6xl">Every block has a legend.</Heading>
             <Paragraph className="my-0 text-base leading-7 text-white/80">
-              Race light cycles across a neon New York grid on your phone, in the browser, or in a headset.
+              Each New York district has its own NYC-MON. Find them on your phone, then meet them in a headset.
             </Paragraph>
             <View className="flex-row flex-wrap gap-3">
-              <CircuitButton tone="orange" variant="solid">Start a race</CircuitButton>
-              <CircuitButton>Enter the VR grid</CircuitButton>
+              <CircuitButton tone="orange" variant="solid">Walk the district</CircuitButton>
             </View>
           </View>
         </View>
@@ -116,12 +115,12 @@ export const FutureControls: Story = {
   render: () => (
     <View className="min-h-screen gap-6 bg-bg p-8">
       <View className="flex-row flex-wrap gap-3">
-        <CircuitButton tone="orange" variant="solid">Start a race</CircuitButton>
-        <CircuitButton tone="orange">Solo against AI</CircuitButton>
-        <CircuitButton tone="carolina" variant="solid">Join table</CircuitButton>
-        <CircuitButton tone="carolina">Enter the VR grid</CircuitButton>
-        <CircuitButton tone="royal" variant="solid">Create table</CircuitButton>
-        <CircuitButton tone="royal">Leave session</CircuitButton>
+        <CircuitButton tone="orange" variant="solid">Walk the district</CircuitButton>
+        <CircuitButton tone="orange">Leave the district</CircuitButton>
+        <CircuitButton tone="carolina" variant="solid">Open in headset</CircuitButton>
+        <CircuitButton tone="carolina">Pick a district</CircuitButton>
+        <CircuitButton tone="royal" variant="solid">Save</CircuitButton>
+        <CircuitButton tone="royal">Cancel</CircuitButton>
       </View>
       <View className="gap-4 md:flex-row">
         <GridCard className="flex-1" title="Royal card" eyebrow="Default tone">

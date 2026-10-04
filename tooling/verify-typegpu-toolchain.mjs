@@ -4,19 +4,19 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const spatialEntry = join(root, 'packages/spatial/index.ts');
-const spatialRequire = createRequire(spatialEntry);
+const uiEntry = join(root, 'packages/ui/index.ts');
+const uiRequire = createRequire(uiEntry);
 const failures = [];
 
 let typegpuBabel = null;
 try {
-  typegpuBabel = spatialRequire.resolve('unplugin-typegpu/babel');
+  typegpuBabel = uiRequire.resolve('unplugin-typegpu/babel');
   if (!existsSync(typegpuBabel)) {
     failures.push(`resolved TypeGPU Babel plugin does not exist: ${typegpuBabel}`);
   }
 } catch (error) {
   failures.push(
-    `@acme/spatial cannot resolve unplugin-typegpu/babel: ${error instanceof Error ? error.message : String(error)}`,
+    `@acme/ui cannot resolve unplugin-typegpu/babel: ${error instanceof Error ? error.message : String(error)}`,
   );
 }
 
@@ -46,7 +46,7 @@ for (const [label, configPath] of [
       !resolved.some((plugin) => plugin === typegpuBabel)
     ) {
       failures.push(
-        `${label} Babel config is not using the canonical TypeGPU compiler resolved from @acme/spatial`,
+        `${label} Babel config is not using the canonical TypeGPU compiler resolved from @acme/ui`,
       );
     }
   } catch (error) {

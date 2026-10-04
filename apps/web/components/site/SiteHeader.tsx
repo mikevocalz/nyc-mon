@@ -4,7 +4,7 @@ import { Link } from 'solito/link';
 import { usePathname } from 'solito/navigation';
 import { create } from 'zustand';
 import { Header, Nav, Pressable, View, Text as TWText } from '@acme/ui/tw';
-import { Avatar, BrandLogo, MotionView, useHydrated } from '@acme/ui';
+import { Avatar, BrandWordmark, MotionView, useHydrated } from '@acme/ui';
 import { AVATAR_URI, useProfile } from '@acme/app';
 import { NAV_ITEMS, PROFILE, useMobileMenu } from './nav';
 
@@ -169,20 +169,12 @@ export function SiteHeader() {
           className="flex items-center gap-2.5 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/50"
         >
           <MotionView
-            initial={hydrated ? { scale: 0.6 } : undefined}
+            initial={hydrated ? { scale: 0.8 } : undefined}
             animate={hydrated ? { scale: 1 } : undefined}
             transition={{ type: 'spring', damping: 15, stiffness: 320, delay: 60 }}
           >
-            <BrandLogo size={52} />
-          </MotionView>
-          <MotionView
-            initial={hydrated ? { x: -8 } : undefined}
-            animate={hydrated ? { x: 0 } : undefined}
-            transition={{ type: 'timing', duration: 240, ease: 'easeOut', delay: 140 }}
-          >
-            <TWText className="font-display text-xl tracking-tight text-primary">
-              NYC-MON
-            </TWText>
+            {/* The wordmark carries the name, so no text label sits beside it. */}
+            <BrandWordmark height={40} />
           </MotionView>
         </Link>
 

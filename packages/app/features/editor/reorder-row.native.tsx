@@ -2,11 +2,11 @@
 import { useMemo } from 'react';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
-  runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 import { View } from '@acme/ui/tw';
 import { GripVertical } from '@acme/ui/icons';
 import { haptics } from '@acme/ui/haptics';
@@ -44,29 +44,29 @@ export function ReorderRow({
         // handler for as long as it stays active.
         .blocksExternalGesture(scrollRef as never)
         .onStart(() => {
-          lifted.value = true;
-          runOnJS(haptics.selection)();
+          lifted.set(true);
+          scheduleOnRN(haptics.selection);
         })
         .onUpdate((event) => {
-          offsetY.value = event.translationY;
+          offsetY.set(event.translationY);
         })
         .onEnd(() => {
-          const steps = Math.round(offsetY.value / rowHeight);
+          const steps = Math.round(offsetY.get() / rowHeight);
           const target = Math.min(Math.max(index + steps, 0), count - 1);
 
-          lifted.value = false;
+          lifted.set(false);
           // Snap home first; the list re-renders in the new order underneath.
-          offsetY.value = withTiming(0, { duration: 140 });
-          if (target !== index) runOnJS(onMove)(index, target);
+          offsetY.set(withTiming(0, { duration: 140 }));
+          if (target !== index) scheduleOnRN(onMove, index, target);
         }),
     [index, count, rowHeight, onMove, offsetY, lifted],
   );
 
   const style = useAnimatedStyle(() => ({
-    transform: [{ translateY: offsetY.value }],
+    transform: [{ translateY: offsetY.get() }],
     // Lifting the row above its neighbours is what makes the drag legible.
-    zIndex: lifted.value ? 10 : 0,
-    opacity: lifted.value ? 0.95 : 1,
+    zIndex: lifted.get() ? 10 : 0,
+    opacity: lifted.get() ? 0.95 : 1,
   }));
 
   return (

@@ -4,7 +4,6 @@ export { SpatialRivePanel } from './SpatialRivePanel';
 export { ForkSpatialLayout, getSpatialForkCapabilities } from './ForkSpatialLayout';
 export { RiveStage, type RiveStageProps } from './rive/RiveStage';
 
-export { GridRaceScene } from './GridRaceScene';
-export * from './lightcycle';
-export * from './mcp';
-export * from './tabletopRenderState';
+export { DistrictScene } from './DistrictScene';
+export { useDistrictStore, type District } from './districtStore';
+export { DISTRICT_COPY, DISTRICTS, HOME_COPY, SITE_DESCRIPTION } from './homeCopy';

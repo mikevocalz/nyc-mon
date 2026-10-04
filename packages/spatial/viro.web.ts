@@ -59,5 +59,5 @@ export function triggerViroHaptic(
   _viewTag: number | null,
   _options?: ForkHapticOptions,
 ) {
-  // Headset haptics are native-only. Keep the shared race scene portable on web.
+  // Headset haptics are native-only. Keep the shared scenes portable on web.
 }

@@ -37,7 +37,7 @@ const ViroRivePanel = (
 export function SpatialRivePanel({
   bytes,
   bindings,
-  artboard = 'LightCycleScoreboard',
+  artboard,
   stateMachine = 'Main',
   position = [0, 0.1, -2.2],
   rotation,
@@ -90,7 +90,7 @@ export function SpatialRivePanel({
         scale={[0.4, 0.4, 0.4]}
         text={
           ViroRivePanel
-            ? 'Set EXPO_PUBLIC_LIGHTCYCLE_SCOREBOARD_RIV_URL to load the Rive scoreboard'
+            ? 'Pass .riv bytes to show a Rive panel here'
             : 'Viro fork Rive bridge available after fork override'
         }
         style={{

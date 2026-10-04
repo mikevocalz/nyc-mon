@@ -1,11 +1,13 @@
 'use client';
 /**
  * PLATFORM FORK — virtualized list on web via @tanstack/react-virtual.
- * The scroll container is a real overflow div (behavioral, like ScrollView);
- * give it a height via className (e.g. "h-96").
+ * The scroll container is an overflow View (behavioral, like ScrollView);
+ * give it a height via className (e.g. "h-96"). Every host is a kit View: on
+ * web its ref is the DOM node, which is all the virtualizer needs.
  */
 import { useEffect, useRef } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
+import { View } from './tw';
 
 export interface VirtualListProps<T> {
   data: T[];
@@ -26,7 +28,7 @@ export function VirtualList<T>({
   className,
   onEndReached,
 }: VirtualListProps<T>) {
-  const parentRef = useRef<HTMLDivElement>(null);
+  const parentRef = useRef<HTMLElement>(null);
   const endFiredAt = useRef(-1);
   const virtualizer = useVirtualizer({
     count: data.length,
@@ -46,22 +48,30 @@ export function VirtualList<T>({
   }, [lastVisible, data.length, onEndReached]);
 
   return (
-    <div ref={parentRef} className={`overflow-y-auto ${className ?? ''}`}>
-      <div style={{ height: virtualizer.getTotalSize(), position: 'relative', width: '100%' }}>
+    <View ref={parentRef as never} className={`overflow-y-auto ${className ?? ''}`}>
+      <View
+        className="relative w-full"
+        // Computed geometry: the total height comes from the virtualizer.
+        style={{ height: virtualizer.getTotalSize() }}
+      >
         {items.map((vi) => {
           const item = data[vi.index] as T;
           return (
-            <div
+            <View
               key={keyExtractor?.(item, vi.index) ?? vi.key}
-              data-index={vi.index}
-              ref={virtualizer.measureElement}
-              style={{ position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${vi.start}px)` }}
+              // RNW writes dataSet as data-* attributes; measureElement reads
+              // data-index. The prop is RNW-only, so it is not in View's types.
+              {...({ dataSet: { index: vi.index } } as object)}
+              ref={virtualizer.measureElement as never}
+              className="absolute left-0 top-0 w-full"
+              // Computed geometry: each row's offset comes from the virtualizer.
+              style={{ transform: [{ translateY: vi.start }] }}
             >
               {renderItem({ item, index: vi.index })}
-            </div>
+            </View>
           );
         })}
-      </div>
-    </div>
+      </View>
+    </View>
   );
 }

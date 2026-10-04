@@ -72,6 +72,7 @@ export { GlyphCity, type GlyphCityProps, type GlyphCityVariant } from './backgro
 export { CityBlocks, type CityBlocksProps, type District } from './backgrounds/CityBlocks';
 export { CircuitButton, type CircuitButtonProps, type CircuitTone, GridCard, type GridCardProps } from './future';
 export { BrandLogo, type BrandLogoProps } from './brand/BrandLogo';
+export { BrandWordmark, type BrandWordmarkProps } from './brand/BrandWordmark';
 
 // GPU surface (WebGPU + TypeGPU, web and native) and the neon primitives the
 // NeonBlade ports build on. Also importable as '@acme/ui/gpu' and '@acme/ui/neon'.

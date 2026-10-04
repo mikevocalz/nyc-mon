@@ -37,9 +37,11 @@ export interface PaneDividerProps {
  * deprecates the builder in favour of `usePanGesture` and the `use*Gestures`
  * hooks; revisit if the SDK moves forward again.
  *
- * `.runOnJS(true)` because the handler writes to a Zustand store, which is not
- * worklet-safe. The resize is a low-frequency drag, so keeping it on the JS
- * thread is the correct trade rather than marshalling through runOnJS per frame.
+ * Justified grep exception: `.runOnJS(true)` below is gesture-handler's
+ * builder config (run this gesture's callbacks on the JS thread), not
+ * Reanimated's deprecated runOnJS function. The handler writes to a Zustand
+ * store, which is not worklet-safe, and the resize is a low-frequency drag, so
+ * keeping it on the JS thread beats hopping threads with scheduleOnRN per frame.
  */
 export function PaneDivider({ width }: PaneDividerProps) {
   const setPrimaryWidth = useSplitViewStore((state) => state.setPrimaryWidth);

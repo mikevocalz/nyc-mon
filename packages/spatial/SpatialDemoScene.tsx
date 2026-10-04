@@ -1,1 +1,1 @@
-export { GridRaceScene as SpatialDemoScene } from './GridRaceScene';
+export { DistrictScene as SpatialDemoScene } from './DistrictScene';

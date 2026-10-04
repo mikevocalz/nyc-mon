@@ -1,67 +1,71 @@
 'use client';
 
-import { BrandLogo, CircuitButton, GlyphCity, GridCard, GridFloor, Heading, Text } from '@acme/ui';
-import { neon } from '@acme/theme';
+import { BrandLogo, CircuitButton, CityBlocks, GridCard, Heading, SegmentedControl, SolidPanel, Text } from '@acme/ui';
+import { List, ListItem } from '@acme/ui/html';
 import { Platform, useWindowDimensions } from 'react-native';
-import { ScrollView, Section, View } from '@acme/ui/tw';
-import { RiveStage } from './rive/RiveStage';
+import { Pressable, ScrollView, Section, View } from '@acme/ui/tw';
 import { ForkSpatialLayout, getSpatialForkCapabilities } from './ForkSpatialLayout';
 import { SpatialViroExperience } from './SpatialViroExperience';
-import { TabletopSessionPanel } from './TabletopSessionPanel';
-import { gridRace } from './gridRaceStore';
-import { tabletopSession, useTabletopSessionStore } from './tabletopSessionStore';
+import { useDistrictStore, type District } from './districtStore';
+import { DISTRICT_COPY, DISTRICTS, HOME_COPY } from './homeCopy';
 
-const RIVE_DEMO = 'https://cdn.rive.app/animations/vehicles.riv';
+const DISTRICT_OPTIONS = DISTRICTS.map((value) => ({ value, label: DISTRICT_COPY[value].name }));
+
+function DistrictList({ active, onPick }: { active: District; onPick: (d: District) => void }) {
+  return (
+    <List className="m-0 list-none gap-3 p-0 md:flex-row">
+      {DISTRICTS.map((district) => {
+        const copy = DISTRICT_COPY[district];
+        const selected = district === active;
+        return (
+          <ListItem key={district} className="flex-1">
+            <Pressable
+              role="button"
+              aria-pressed={selected}
+              aria-label={`Show ${copy.name}`}
+              onPress={() => onPick(district)}
+              className={`h-full gap-1 border-2 px-4 py-3 transition-colors duration-fast motion-reduce:transition-none ${
+                selected ? 'border-orange-950 bg-orange-500' : 'border-ink-950 bg-ink-800 hover:bg-ink-700'
+              }`}
+            >
+              <Text className={`font-display text-lg ${selected ? 'text-ink-950' : 'text-ink-50'}`}>{copy.name}</Text>
+              <Text className={`text-sm leading-6 ${selected ? 'text-ink-900' : 'text-silver-300'}`}>{copy.line}</Text>
+            </Pressable>
+          </ListItem>
+        );
+      })}
+    </List>
+  );
+}
 
 export function SpatialScreen() {
   const capabilities = getSpatialForkCapabilities();
-  // The hero fills most of the first screen so the grid floor shows below it
-  // before the cards scroll in over it.
   const { height: windowHeight } = useWindowDimensions();
   const isWeb = Platform.OS === 'web';
-  const showRace = useTabletopSessionStore((state) => state.spatialViewOpen);
-  const setShowRace = useTabletopSessionStore((state) => state.setSpatialViewOpen);
+  const district = useDistrictStore((state) => state.district);
+  const setDistrict = useDistrictStore((state) => state.setDistrict);
+  const cityOpen = useDistrictStore((state) => state.cityOpen);
+  const setCityOpen = useDistrictStore((state) => state.setCityOpen);
 
   const tools = (
     <GridCard eyebrow="Runtime" title="Spatial backend">
       <Text className="text-sm text-white/75">
         {capabilities.metaSpatialWindows ? 'Meta Layout spatial window' : 'Inline / Viro spatial fallback'}
       </Text>
-      <Text className="text-xs text-white/65">
-        Viro Rive surface: {capabilities.viroRivePanel ? 'fork bridge detected' : 'stock fallback'}
-      </Text>
     </GridCard>
   );
 
   return (
     <ForkSpatialLayout panel={tools}>
-      {/* NeonBlade Grid Floor in the NYC Mon palette: orange lines, royal glow,
-          carolina horizon haze on night. Slow scroll; reduced motion stops it. */}
-      {/* On web the document scrolls, so an unbounded floor would stretch to the
-          content height and push the horizon off-screen. Pin it to the
-          viewport there and let the inner ScrollView scroll instead. */}
-      <GridFloor
+      {/* The district is the background: switching it redraws the city below
+          the hero. On web the document scrolls, so the city is pinned to the
+          viewport there and the inner ScrollView scrolls instead. */}
+      <CityBlocks
         className={isWeb ? 'h-dvh max-h-dvh' : 'flex-1'}
-        horizon={0.45}
-        columns={24}
-        rows={18}
-        speed={0.35}
-        opacity={0.85}
-        lineColor={neon.line}
-        glowColor={neon.glow}
-        horizonGlowColor={neon.glowSoft}
-        bgColor={neon.bg}
+        district={district}
+        overlay
+        accessibilityLabel={`${DISTRICT_COPY[district].name} street grid`}
       >
-        <View pointerEvents="none" className="absolute inset-x-0 top-0 h-[45%]">
-          <GlyphCity
-            className="flex-1"
-            variant="megacity"
-            colorPrimary={neon.glow}
-            colorSecondary={neon.line}
-            colorTertiary={neon.glowSoft}
-            opacity={0.5}
-          />
-        </View>
         <ScrollView
           className="flex-1"
           contentContainerClassName="mx-auto w-full max-w-screen-2xl gap-6 px-4 py-8 sm:px-6 lg:px-8"
@@ -69,9 +73,9 @@ export function SpatialScreen() {
           showsVerticalScrollIndicator={false}
         >
           <Section
-            className={`items-center justify-center gap-6 md:flex-row md:gap-10 ${isWeb ? 'min-h-[82dvh]' : ''}`}
+            className={`items-center justify-center gap-6 md:flex-row md:gap-10 ${isWeb ? 'min-h-[78dvh]' : ''}`}
             // Native has no dvh; web uses the class so SSR and hydration agree.
-            style={isWeb ? undefined : { minHeight: windowHeight * 0.82 }}
+            style={isWeb ? undefined : { minHeight: windowHeight * 0.78 }}
           >
             <View className="md:order-2">
               <View className="md:hidden">
@@ -84,73 +88,39 @@ export function SpatialScreen() {
                 <BrandLogo size={340} />
               </View>
             </View>
-            <View className="max-w-3xl flex-1 gap-4 md:order-1">
-              <Heading level={1} size="display-sm" className="text-center text-primary md:text-left">
-                Every block has a legend.
-              </Heading>
-              <Text className="max-w-2xl text-center text-white/80 md:text-left">
-                Race light cycles across a neon New York grid on your phone, in the browser, or in a
-                Quest or Pico headset. One codebase drives all of them.
-              </Text>
-              <View className="mt-2 flex-row flex-wrap justify-center gap-3 md:justify-start">
-                <CircuitButton
-                  tone="orange"
-                  variant="solid"
-                  onPress={() => {
-                    if (showRace) {
-                      gridRace.enterGateway();
-                      tabletopSession.getState().reset();
-                      setShowRace(false);
-                    } else {
-                      tabletopSession.getState().reset();
-                      gridRace.startRace();
-                      setShowRace(true);
-                    }
-                  }}
-                >
-                  {showRace ? 'Exit the race' : 'Start a 37-cycle race'}
-                </CircuitButton>
-                <CircuitButton onPress={() => { tabletopSession.getState().reset(); gridRace.enterGateway(); setShowRace(true); }}>
-                  Enter the VR grid
-                </CircuitButton>
-              </View>
+            {/* The copy sits on a solid ink slab: over the live city it was
+                unreadable, and the brand is solid blocks, not translucent glass. */}
+            <View className="max-w-3xl flex-1 md:order-1">
+              <SolidPanel tone="ink" depth="lg" className="gap-4 px-5 py-6 md:px-8 md:py-8">
+                <Heading level={1} size="display-sm" className="my-0 text-center text-primary md:text-left">
+                  {HOME_COPY.tagline}
+                </Heading>
+                <Text className="max-w-2xl text-center text-ink-50 md:text-left">{HOME_COPY.intro}</Text>
+                <View className="items-center md:items-start">
+                  <SegmentedControl options={DISTRICT_OPTIONS} value={district} onChange={setDistrict} />
+                </View>
+                <View className="mt-2 flex-row flex-wrap justify-center gap-3 md:justify-start">
+                  <CircuitButton tone="orange" variant="solid" onPress={() => setCityOpen(!cityOpen)}>
+                    {cityOpen ? HOME_COPY.closeCity : HOME_COPY.openCity}
+                  </CircuitButton>
+                </View>
+              </SolidPanel>
             </View>
           </Section>
 
-          <View className="gap-4 lg:flex-row">
-            <GridCard className="flex-1" title="One renderer for every screen">
-              <Text className="text-sm leading-6 text-white/75">The grid floor, the skyline and the glyph city are Skia drawings that run unchanged on Expo and the web.</Text>
-            </GridCard>
-            <GridCard className="flex-1" title="Controls in team colours" tone="carolina">
-              <Text className="text-sm leading-6 text-white/75">Grid cards and circuit buttons read their colours from the NYC Mon tokens, so a palette change lands everywhere at once.</Text>
-            </GridCard>
-            <GridCard className="flex-1" title="A race you can stand in" tone="orange">
-              <Text className="text-sm leading-6 text-white/75">Light cycles turn at right angles, leave walls behind them, boost, and derez on contact. AI rivals fill the empty seats.</Text>
-            </GridCard>
-          </View>
+          <DistrictList active={district} onPick={setDistrict} />
 
-          <TabletopSessionPanel onLaunch={() => setShowRace(true)} />
-
-          {showRace ? (
-            <View className="min-h-[460px] overflow-hidden border border-structure/40 bg-black/70">
+          {cityOpen ? (
+            <View className="min-h-[460px] overflow-hidden border-2 border-ink-950 bg-ink-950">
               <SpatialViroExperience />
             </View>
           ) : (
-            <GridCard title="Headset ready" tone="orange">
-              <Text className="text-sm leading-6 text-white/75">
-                Choose Enter the VR grid to load the shared Viro scene. Quest and Pico run the same scene module as this preview.
-              </Text>
+            <GridCard title={HOME_COPY.headsetTitle} tone="orange">
+              <Text className="text-sm leading-6 text-white/75">{HOME_COPY.headsetBody}</Text>
             </GridCard>
           )}
-
-          <View className="gap-3">
-            <Text className="text-base font-semibold text-accent">
-              Rive surface
-            </Text>
-            <RiveStage source={RIVE_DEMO} />
-          </View>
         </ScrollView>
-      </GridFloor>
+      </CityBlocks>
     </ForkSpatialLayout>
   );
 }
