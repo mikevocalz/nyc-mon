@@ -274,6 +274,12 @@
   --color-on-danger: light-dark(#FFFFFF, #00041C);
   --color-info: light-dark(#295D8E, #4BA8F0);
   --color-on-info: light-dark(#FFFFFF, #00041C);
+  --color-tone-orange-text: light-dark(#884300, #FD9D40);
+  --color-tone-royal-text: light-dark(#004CD9, #80ACFC);
+  --color-tone-carolina-text: light-dark(#295D8E, #78BEF4);
+  --color-tone-leaf-text: light-dark(#225E1F, #6FC26B);
+  --color-tone-apple-text: light-dark(#AE0000, #FA4040);
+  --color-tone-brick-text: light-dark(#602F00, #FEBE80);
   --color-glow: light-dark(#0058F800, #0058F8A6);
   --color-glow-hot: light-dark(#FC7C0000, #FC7C0080);
 }

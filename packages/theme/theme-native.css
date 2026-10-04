@@ -283,6 +283,12 @@
       --color-on-danger: #FFFFFF;
       --color-info: #295D8E;
       --color-on-info: #FFFFFF;
+      --color-tone-orange-text: #884300;
+      --color-tone-royal-text: #004CD9;
+      --color-tone-carolina-text: #295D8E;
+      --color-tone-leaf-text: #225E1F;
+      --color-tone-apple-text: #AE0000;
+      --color-tone-brick-text: #602F00;
       --color-glow: #0058F800;
       --color-glow-hot: #FC7C0000;
     }
@@ -313,6 +319,12 @@
       --color-on-danger: #00041C;
       --color-info: #4BA8F0;
       --color-on-info: #00041C;
+      --color-tone-orange-text: #FD9D40;
+      --color-tone-royal-text: #80ACFC;
+      --color-tone-carolina-text: #78BEF4;
+      --color-tone-leaf-text: #6FC26B;
+      --color-tone-apple-text: #FA4040;
+      --color-tone-brick-text: #FEBE80;
       --color-glow: #0058F8A6;
       --color-glow-hot: #FC7C0080;
     }

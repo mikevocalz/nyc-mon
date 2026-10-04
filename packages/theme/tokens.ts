@@ -156,6 +156,19 @@ export const semantic = {
   'on-danger': { light: palette.white, dark: brand.night },
   info: { light: carolina[800], dark: brand.carolina },
   'on-info': { light: palette.white, dark: brand.night },
+  // Tone text: a district tone as text straight on the page (ghost Button and
+  // IconButton labels, the CardSlider counter). Dark keeps the night steps the
+  // tone table always used. The bright steps fail on concrete (orange-400 is
+  // 1.89:1), so light takes the darkest step that still reads as the tone and
+  // holds 4.5:1 on page, raised and sunken, including under the ghost's 15%
+  // hover tint (25% for brick). Measured in contrast.ts.
+  'tone-orange-text': { light: orange[800], dark: orange[400] },
+  'tone-royal-text': { light: royal[600], dark: royal[300] },
+  'tone-carolina-text': { light: carolina[800], dark: carolina[400] },
+  'tone-leaf-text': { light: leaf[800], dark: leaf[400] },
+  'tone-apple-text': { light: apple[700], dark: apple[400] },
+  /** Brick is Harlem's deep orange, so its light step sits one below orange's. */
+  'tone-brick-text': { light: orange[900], dark: orange[300] },
   // Glow colours (8-digit hex, alpha baked in) for neon shadows. No glow in
   // daylight: the light value is fully transparent (alpha 00).
   glow: { light: '#0058F800', dark: '#0058F8A6' },
