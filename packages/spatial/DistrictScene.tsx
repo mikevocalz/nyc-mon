@@ -14,6 +14,8 @@ import {
   isPico,
 } from './viro';
 import { useDistrictStore } from './districtStore';
+import { DistrictLandmark } from './DistrictLandmark';
+import { CROSS_STREET_GAP, SIDEWALK_HALF, StreetDressing } from './StreetDressing';
 
 /**
  * The immersive scene: one NYC-MON district built from solid boxes around the
@@ -86,7 +88,10 @@ const PREVIEW_GROUND_Y = isMetaHorizonXR || isPico ? 0 : -EYE_HEIGHT;
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
-/** Two rows of buildings either side of a street, plus a back row. */
+/**
+ * Two rows of buildings either side of a street, plus a back row, with a gap
+ * for the cross street. The landmark closes the far end.
+ */
 function buildDistrict(district: District): Building[] {
   const spec = SPECS[district];
   const r = rng(district.length * 7919 + 17);
@@ -98,16 +103,20 @@ function buildDistrict(district: District): Building[] {
       while (z > -60) {
         const w = lerp(spec.width[0], spec.width[1], r());
         const tall = row === 1 ? 1.4 : 1;
-        out.push({
+        // Leave the cross street open. The draw order is unchanged so every
+        // district keeps its seeded skyline either side of the gap.
+        const inCrossStreet = z > CROSS_STREET_GAP[0] && z - w < CROSS_STREET_GAP[1];
+        const building: Building = {
           key: `${side}-${row}-${i}`,
-          x: side * (7 + row * 9 + w / 2),
+          x: side * (SIDEWALK_HALF + row * 9 + w / 2),
           z: z - w / 2,
           w,
           d: lerp(spec.width[0], spec.width[1], r()),
           h: lerp(spec.height[0], spec.height[1], r()) * tall,
           body: spec.bodies[Math.floor(r() * spec.bodies.length)] ?? 'districtInk',
           setback: r() < spec.setback ? lerp(0.45, 0.7, r()) : 0,
-        });
+        };
+        if (!inCrossStreet) out.push(building);
         z -= w + (district === 'harlem' ? 0.15 : 1.2);
         i += 1;
       }
@@ -164,9 +173,10 @@ function DistrictStreet({ groundY }: { groundY: number }) {
       <ViroAmbientLight color={palette.carolina[200]} intensity={220} />
       <ViroDirectionalLight color={palette.orange[200]} intensity={420} direction={[0.4, -1, -0.5]} />
       <ViroNode position={[0, groundY, 0]}>
-        {/* Street plane at floor level, with the avenue centre line. */}
-        <ViroQuad position={[0, 0, -28]} rotation={[-90, 0, 0]} width={80} height={80} materials={['districtStreet']} />
-        <ViroQuad position={[0, 0.01, -28]} rotation={[-90, 0, 0]} width={0.25} height={64} materials={['districtAvenue']} />
+        {/* Road surface at floor level, out past the landmark. */}
+        <ViroQuad position={[0, 0, -40]} rotation={[-90, 0, 0]} width={100} height={110} materials={['districtStreet']} />
+        <StreetDressing />
+        <DistrictLandmark district={district} />
         {buildings.map((b) => (
           <BuildingMass key={`${district}-${b.key}`} b={b} crown={spec.crown} />
         ))}
