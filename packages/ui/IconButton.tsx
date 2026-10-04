@@ -31,8 +31,10 @@ const iconButton = tv({
     disabled: { true: { root: 'cursor-not-allowed active:translate-x-0 active:translate-y-0' } },
   },
   compoundVariants: [
-    { look: 'ghost', size: 'sm', class: { root: 'h-8 w-8' } },
-    { look: 'ghost', size: 'md', class: { root: 'h-10 w-10' } },
+    // The frameless root is the whole target: never under 44 pt (48 dp on
+    // Android), whatever the size. `sm` and `md` differ only in the caller's glyph.
+    { look: 'ghost', size: 'sm', class: { root: 'h-11 w-11 android:h-12 android:w-12' } },
+    { look: 'ghost', size: 'md', class: { root: 'h-11 w-11 android:h-12 android:w-12' } },
     { look: 'ghost', size: 'lg', class: { root: 'h-12 w-12' } },
   ],
   defaultVariants: { look: 'solid', size: 'md', disabled: false },

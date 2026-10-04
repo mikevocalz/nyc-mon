@@ -33,6 +33,17 @@ export const Variants: Story = {
   ),
 };
 
+/** Ghost sizes: every one is at least a 44 pt (48 dp Android) square. The outline marks the hit area. */
+export const GhostSizes: Story = {
+  render: () => (
+    <View className="flex-row flex-wrap items-center gap-4 bg-bg p-4">
+      {(['sm', 'md', 'lg'] as const).map((size) => (
+        <IconButton key={size} variant="ghost" size={size} aria-label={`Settings, ${size}`} icon={<Settings size={20} strokeWidth={2.5} />} className="outline outline-1 outline-border" />
+      ))}
+    </View>
+  ),
+};
+
 /** One default icon button per district, every size, plus a disabled one. */
 export const CornerCut: Story = {
   render: () => (

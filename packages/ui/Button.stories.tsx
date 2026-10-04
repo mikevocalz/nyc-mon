@@ -46,6 +46,21 @@ export const Sizes: Story = {
   ),
 };
 
+/**
+ * Ghost has no frame, so its hit area is its whole size. Every ghost size is
+ * at least 44 pt tall (48 dp on Android): `sm` keeps its tighter padding but
+ * not a shorter target.
+ */
+export const GhostSizes: Story = {
+  render: () => (
+    <View className="flex-row flex-wrap items-center gap-4 p-4">
+      <Button variant="ghost" title="Small" size="sm" onPress={() => {}} className="outline outline-1 outline-border" />
+      <Button variant="ghost" title="Medium" size="md" onPress={() => {}} className="outline outline-1 outline-border" />
+      <Button variant="ghost" title="Large" size="lg" onPress={() => {}} className="outline outline-1 outline-border" />
+    </View>
+  ),
+};
+
 /** The `cornerCut` alias still renders the default; every control is live. */
 export const CornerCut: Story = {
   args: { variant: 'cornerCut', district: 'midtown', corner: 'bottom-right', glow: false },
