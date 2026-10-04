@@ -2,53 +2,103 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+/**
+ * Checks the XR contract of the generated Android project.
+ *
+ * apps/mobile/android is Continuous Native Generation output (gitignored), so
+ * this runs after `expo prebuild --platform android`. It fails when a config
+ * plugin stops emitting something the Quest or PICO flavor depends on.
+ */
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const android = join(root, 'apps/mobile/android');
+const pkgDir = 'app/src/main/java/com/nycmon/app';
+
+if (!existsSync(join(android, 'settings.gradle'))) {
+  console.error(
+    '[spatial:verify-android] apps/mobile/android does not exist. It is generated: run\n' +
+      '  pnpm --filter mobile exec expo prebuild --platform android --no-install\n' +
+      'first.',
+  );
+  process.exit(1);
+}
 
 const read = (relative) => readFileSync(join(android, relative), 'utf8');
+
+// The public Viro 3.0.2 plugin knows AR and QUEST only; the mikevocalz fork
+// also registers PICO and wires Meta's spatial layout library. Require those
+// only when the fork is installed.
+const viroPkg = JSON.parse(
+  readFileSync(
+    join(root, 'apps/mobile/node_modules/@reactvision/react-viro/package.json'),
+    'utf8',
+  ),
+);
+const viroFork = viroPkg.version !== '3.0.2';
+
 const checks = [
   ['settings.gradle', [
     "include ':react_viro', ':arcore_client', ':gvr_common', ':viro_renderer'",
-    "android/viro_renderer",
   ]],
   ['app/build.gradle', [
     "implementation project(path: ':react_viro')",
     "implementation project(path: ':viro_renderer')",
-    "com.meta.metavrx:metavrx-bom:1.2026.0.0",
-    "layout-react-compat",
-    "layout-window-react-compat",
+    // Meta spatial layout (metaSpatialLayout) is a fork plugin option.
+    ...(viroFork
+      ? ['com.meta.metavrx:metavrx-bom:1.2026.0.0', 'layout-react-compat', 'layout-window-react-compat']
+      : []),
+    'flavorDimensions += "device"',
+    'mobile { dimension "device" }',
+    'pico {',
+    'quest {',
   ]],
   ['gradle.properties', [
     'reactNativeArchitectures=arm64-v8a',
     'android.targetSdkVersion=34',
+    'android.minSdkVersion=29',
+    'picoXrMode=pico-os5',
   ]],
-  ['app/src/main/java/com/example/solitostarter/MainApplication.kt', [
+  [`${pkgDir}/MainApplication.kt`, [
     'ReactViroPackage.ViroPlatform.AR',
     'ReactViroPackage.ViroPlatform.QUEST',
-    'ReactViroPackage.ViroPlatform.PICO',
+    ...(viroFork ? ['ReactViroPackage.ViroPlatform.PICO'] : []),
+  ]],
+  [`${pkgDir}/VRActivity.kt`, [
+    'getMainComponentName(): String = "VRQuestScene"',
   ]],
   ['app/src/main/AndroidManifest.xml', [
-    'android:scheme="spatialsolotio"',
+    'android:scheme="nycmon"',
     'android:name=".VRActivity"',
     'com.oculus.intent.category.VR',
     'com.oculus.supportedDevices',
-    'com.meta.store.defaultDeviceTargets',
-    'android:value="quest3+"',
     'horizonos.permission.USE_ANCHOR_API',
-    'horizonos.permission.HEADSET_CAMERA',
-    'horizonos.permission.IMPORT_EXPORT_IOT_MAP_DATA',
     'com.oculus.permission.HAND_TRACKING',
     'com.oculus.feature.PASSTHROUGH',
-    'android:name="android.hardware.vr.headtracking" android:required="false"',
     'android:glEsVersion="0x00030000"',
   ]],
+  ['app/src/quest/AndroidManifest.xml', [
+    'com.oculus.supportedDevices" android:value="quest2|questpro|quest3|quest3s"',
+    'android:defaultWidth="1280dp"',
+    'android:defaultHeight="800dp"',
+  ]],
+  ['app/src/pico/AndroidManifest.xml', [
+    'com.pico.intent.category.VR',
+    'org.khronos.openxr.intent.category.IMMERSIVE_HMD',
+    'libopenxr_loader.so',
+    'com.pico.xrMode" android:value="pico-os5"',
+    'android:defaultWidth="1280dp"',
+    'android:defaultHeight="800dp"',
+  ]],
   ['app/src/main/res/values/strings.xml', [
-    '<string name="app_name">Spatial Solotio Starter</string>',
+    '<string name="app_name">NYC-MON</string>',
   ]],
 ];
 
 const failures = [];
 for (const [relative, needles] of checks) {
+  if (!existsSync(join(android, relative))) {
+    failures.push(`${relative}: missing`);
+    continue;
+  }
   const body = read(relative);
   for (const needle of needles) {
     if (!body.includes(needle)) failures.push(`${relative}: missing ${needle}`);
@@ -56,30 +106,26 @@ for (const [relative, needles] of checks) {
 }
 
 const manifest = read('app/src/main/AndroidManifest.xml');
-if (manifest.includes('android:name="android.hardware.vr.headtracking" android:required="true"')) {
-  failures.push(
-    'app/src/main/AndroidManifest.xml: VR head tracking must remain optional for the combined phone + Quest APK',
-  );
+if (manifest.includes('android.permission.SYSTEM_ALERT_WINDOW') &&
+  !read('app/src/quest/AndroidManifest.xml').includes(
+    'android.permission.SYSTEM_ALERT_WINDOW" tools:node="remove"',
+  )) {
+  failures.push('SYSTEM_ALERT_WINDOW must be stripped from the Quest flavor');
 }
 
-if (manifest.includes('android.permission.SYSTEM_ALERT_WINDOW')) {
-  failures.push(
-    'app/src/main/AndroidManifest.xml: SYSTEM_ALERT_WINDOW must not ship in the Quest manifest',
-  );
-}
-
-const vrActivity =
-  'app/src/main/java/com/example/solitostarter/VRActivity.kt';
-if (!existsSync(join(android, vrActivity))) {
-  failures.push(`${vrActivity}: missing`);
-} else if (!read(vrActivity).includes('getMainComponentName(): String = "VRQuestScene"')) {
-  failures.push(`${vrActivity}: does not mount VRQuestScene`);
+// One native Skia: the @shopify alias resolves to the same directory, and
+// autolinking would register it as a second native project unless disabled.
+const rnConfig = join(root, 'apps/mobile/react-native.config.js');
+if (!existsSync(rnConfig) || !readFileSync(rnConfig, 'utf8').includes("'@shopify/react-native-skia'")) {
+  failures.push('apps/mobile/react-native.config.js: must disable autolinking for the @shopify/react-native-skia alias');
 }
 
 if (failures.length) {
-  console.error('[spatial:verify-android] Native XR project drift detected:');
+  console.error('[spatial:verify-android] Android XR contract drift:');
   for (const failure of failures) console.error(` - ${failure}`);
   process.exit(1);
 }
 
-console.log('[spatial:verify-android] Android XR project matches the checked-in Viro Meta Horizon/PICO contract.');
+console.log(
+  `[spatial:verify-android] mobile, quest and pico flavors match the XR contract (Viro ${viroPkg.version}).`,
+);

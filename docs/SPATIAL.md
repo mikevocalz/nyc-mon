@@ -92,9 +92,19 @@ pnpm spatial:prepare-web
 pnpm skia:prepare-web
 ```
 
-## Checked-in Android XR project
+## Android project (generated)
 
-The Android project is committed and kept in sync with the fork's generated Quest/OpenXR contract. `pnpm spatial:verify-android` verifies Viro Gradle projects/dependencies, Meta Layout SDK dependencies, AR/Quest/PICO package registration, Quest permissions/features, `VRActivity`, arm64 targeting, target SDK ceiling, scheme and app branding. CI runs this before the monorepo build so generated native drift fails visibly.
+`apps/mobile/android` is Continuous Native Generation output and is gitignored. `expo prebuild --platform android` writes it from `app.config.ts`:
+
+- `expo-horizon-core` adds the `mobile` and `quest` flavors, the Quest manifest and the 1280x800 window.
+- `@expo-pico/core` adds the `pico` flavor: PICO OS 5 OpenXR runtime, the PICO VR launcher categories on `VRActivity`, and the renderer overlay that puts PICO's origin on the floor.
+- The Viro plugin writes `VRActivity` and registers its packages in `MainApplication`.
+
+Build a flavor with `pnpm --filter mobile android:quest` (questDebug) or `android:pico` (picoDebug); never install plain `debug` on a headset. `pnpm spatial:verify-android` checks the generated project against the XR contract, and CI runs it after a prebuild.
+
+expo-pico installs from GitHub release branches (`github:mikevocalz/expo-pico#release/core`, `#release/platform-service-common`, `#release/horizon-core`); see expo-pico's `docs/INSTALL-FROM-GITHUB.md`.
+
+`@shopify/react-native-skia` is disabled in `apps/mobile/react-native.config.js`. It is a pnpm alias of `react-native-skia`, and autolinking would otherwise register the same directory as a second native Skia.
 
 ## Quest + Meta Layout SDK
 

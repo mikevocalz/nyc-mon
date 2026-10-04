@@ -22,6 +22,8 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # android/ is generated (CNG); build it before checking the XR contract.
+      - run: pnpm --filter mobile exec expo prebuild --platform android --no-install
       - run: pnpm spatial:verify-android
       - run: pnpm spatial:verify-typegpu
       - run: pnpm turbo build typecheck lint

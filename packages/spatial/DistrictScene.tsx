@@ -81,7 +81,8 @@ function rng(seed: number) {
  * phone previews put the camera at the origin, so the street drops to a
  * standing eye height below it.
  */
-const GROUND_Y = isMetaHorizonXR || isPico ? 0 : -1.6;
+const EYE_HEIGHT = 1.6;
+const PREVIEW_GROUND_Y = isMetaHorizonXR || isPico ? 0 : -EYE_HEIGHT;
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
@@ -153,7 +154,7 @@ function BuildingMass({ b, crown }: { b: Building; crown: string }) {
   );
 }
 
-export function DistrictScene() {
+function DistrictStreet({ groundY }: { groundY: number }) {
   const district = useDistrictStore((state) => state.district);
   const spec = SPECS[district];
   const buildings = districtBuildings(district);
@@ -162,7 +163,7 @@ export function DistrictScene() {
     <ViroScene>
       <ViroAmbientLight color={palette.carolina[200]} intensity={220} />
       <ViroDirectionalLight color={palette.orange[200]} intensity={420} direction={[0.4, -1, -0.5]} />
-      <ViroNode position={[0, GROUND_Y, 0]}>
+      <ViroNode position={[0, groundY, 0]}>
         {/* Street plane at floor level, with the avenue centre line. */}
         <ViroQuad position={[0, 0, -28]} rotation={[-90, 0, 0]} width={80} height={80} materials={['districtStreet']} />
         <ViroQuad position={[0, 0.01, -28]} rotation={[-90, 0, 0]} width={0.25} height={64} materials={['districtAvenue']} />
@@ -172,4 +173,19 @@ export function DistrictScene() {
       </ViroNode>
     </ViroScene>
   );
+}
+
+/** For navigators whose origin follows the runtime (web, phone preview, Quest XR navigator). */
+export function DistrictScene() {
+  return <DistrictStreet groundY={PREVIEW_GROUND_Y} />;
+}
+
+/**
+ * For a session that already tracks from the floor: PICO's immersive
+ * activity with expo-pico's viroRendererOverlay, which moves PICO's origin to
+ * the floor. Stock Viro does not report PICO, so this cannot be detected from
+ * the scene and the immersive root picks it explicitly.
+ */
+export function DistrictFloorScene() {
+  return <DistrictStreet groundY={0} />;
 }

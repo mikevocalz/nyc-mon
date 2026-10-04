@@ -38,7 +38,16 @@ function DistrictList({ active, onPick }: { active: District; onPick: (d: Distri
   );
 }
 
-export function SpatialScreen() {
+export interface SpatialScreenProps {
+  /**
+   * Hands the district to a headset's immersive activity. Resolves true when
+   * it did (PICO, through expo-pico), false to fall back to the inline view.
+   * Only the Expo app passes this; web and phones use the inline view.
+   */
+  enterImmersive?: () => Promise<boolean>;
+}
+
+export function SpatialScreen({ enterImmersive }: SpatialScreenProps = {}) {
   const capabilities = getSpatialForkCapabilities();
   const { height: windowHeight } = useWindowDimensions();
   const isWeb = Platform.OS === 'web';
@@ -100,7 +109,10 @@ export function SpatialScreen() {
                   <SegmentedControl options={DISTRICT_OPTIONS} value={district} onChange={setDistrict} />
                 </View>
                 <View className="mt-2 flex-row flex-wrap justify-center gap-3 md:justify-start">
-                  <CircuitButton tone="orange" variant="solid" onPress={() => setCityOpen(!cityOpen)}>
+                  <CircuitButton tone="orange" variant="solid" onPress={async () => {
+                      if (!cityOpen && enterImmersive && (await enterImmersive())) return;
+                      setCityOpen(!cityOpen);
+                    }}>
                     {cityOpen ? HOME_COPY.closeCity : HOME_COPY.openCity}
                   </CircuitButton>
                 </View>
