@@ -19,30 +19,23 @@ interface CursorBase {
 }
 
 /**
- * NeonBlade's FoxCursor as an animated NYC-MON city mouse that chases the
- * pointer, sits and nibbles its pizza when the pointer rests.
+ * NeonBlade's FoxCursor with a mouse face: a geometric line-art mouse centred
+ * on the pointer, moving exactly with it.
  */
-export interface MouseCursorProps extends Omit<CursorBase, 'hideNativeCursor'> {
-  /** Drawing width in px. Default 48. */
-  size?: number;
-  /** chase: runs after the pointer and catches up. snap: nose pinned to the pointer, like the fox. Default chase. */
-  follow?: 'chase' | 'snap';
-  /** Chase speed, share of the gap closed per second (higher is quicker). Default 8. */
-  speed?: number;
-  /** ms the pointer must rest before the mouse sits down. Default 900. */
-  idleAfter?: number;
-  /** The slice of pizza it carries. Default true. */
-  pizza?: boolean;
-  /** Glow colour. Default royal. */
+export interface MouseCursorProps extends CursorBase {
+  /** Line colour: a NeonBlade preset, a brand token or any CSS colour. Default orange. */
+  color?: NeonColorInput;
+  /** Glow colour. Default: the colour's paired glow (orange glows royal). */
   glowColor?: NeonColorInput;
-  /**
-   * Hide the OS cursor. Default false: the mouse runs behind the pointer, so
-   * the arrow stays for precise pointing. Turn on with follow="snap".
-   */
-  hideNativeCursor?: boolean;
+  /** Width and height of the face in px. Default 64. */
+  size?: number;
+  /** Line weight, in the same units as NeonBlade's fox. Default 2. */
+  strokeWidth?: number;
+  /** Translucent face fill, 0 (lines only) to 1. Default 0. */
+  fillOpacity?: number;
 }
 
-/** The NYC-MON arrow pointer, a separate cursor from the mouse character. */
+/** The NYC-MON arrow pointer, a separate cursor from the mouse face. */
 export interface PointerCursorProps extends CursorBase {
   /** Fill. Default orange. */
   color?: NeonColorInput;

@@ -3,7 +3,7 @@
  *
  * Each glyph is 15 bits, row-major from the top-left pixel (bit 0) to the
  * bottom-right (bit 14). The GPU shader tests bits with float maths; the Skia
- * fallback expands them into rectangles with `glyphPixels`.
+ * fallback expands them into rectangles with `glyphPixels` (skia-mesh.ts).
  */
 const ROWS: Record<string, string> = {
   A: '010101111101101', B: '110101110101110', C: '011100100100011', D: '110101101101110',

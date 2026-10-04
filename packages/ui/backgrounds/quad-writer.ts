@@ -205,18 +205,6 @@ export function hash(a: number, b = 0, c = 0): number {
   return (h >>> 0) / 4294967296;
 }
 
-/** The shader's window hash, for renderers that light windows on the CPU. */
-export function windowHash(x: number, y: number): number {
-  const h = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
-  return h - Math.floor(h);
-}
-
-/** Whether facade cell (col, row) is lit at `time`; mirrors the fragment shader. */
-export function windowLit(col: number, row: number, seed: number, lit: number, time: number): boolean {
-  const epoch = Math.floor(time * 0.15 + windowHash(col + seed, row + 3.7) * 9);
-  return windowHash(col + seed, row + epoch * 0.37) < lit;
-}
-
 // ---------------------------------------------------------------------------
 // Layers.
 
