@@ -16,7 +16,8 @@
   "scripts": {
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "build": "node build-css.mjs"
+    "build": "node build-css.mjs",
+    "test": "node --test '**/*.test.ts'"
   },
   "devDependencies": {
     "@acme/config": "workspace:*",
