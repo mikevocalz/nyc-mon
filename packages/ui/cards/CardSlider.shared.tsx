@@ -1,38 +1,20 @@
 'use client';
-import { Children, type ReactNode } from 'react';
+import { Children, useEffect, type ReactNode } from 'react';
 import { tv } from 'tailwind-variants';
-import { ChevronLeft, ChevronRight } from '../icons';
+import { ChevronLeft, ChevronRight, Pause, Play } from '../icons';
 import { IconButton } from '../IconButton';
 import { Text } from '../Text';
 import { View } from '../tw';
-import { pad2, progressOf, stepIndex } from './card-slider-model';
-import type { VisibleCount } from './card-slider-model';
+import { autoplayNext, pad2, progressOf, stepIndex } from './card-slider-model';
+import type {
+  CardSliderProgressStyle, CardSliderButtonPosition, CardSliderCornerAccentStyle, ButtonCorner,
+} from './card-slider.types';
 import { TONE_CLASSES, resolveTone, toneVariants, type ControlTone, type District, type ToneClasses } from './tones';
 
-export type CardSliderProgressStyle = 'bar' | 'dots' | 'counter';
-
-export interface CardSliderProps {
-  /** Slides: kit Cards or anything else. Each becomes one snap stop. */
-  children: ReactNode;
-  /** Names the carousel for screen readers, e.g. "Featured blocks". */
-  label: string;
-  /** Cards visible at once: a number, or per breakpoint `{ sm, md, lg, xl }`. Default 1. */
-  visibleCount?: VisibleCount;
-  /** Gap between cards, px. Default 16. */
-  gap?: number;
-  /** Previous and next buttons. Default true. */
-  showButtons?: boolean;
-  showProgress?: boolean;
-  /** bar: a solid fill; dots: one tile per stop; counter: 02 / 06. Default bar. */
-  progressStyle?: CardSliderProgressStyle;
-  /** Stepping past the last card wraps to the first. Default false. */
-  loop?: boolean;
-  tone?: ControlTone;
-  district?: District;
-  className?: string;
-  /** Classes for each slide wrapper. */
-  itemClassName?: string;
-}
+export type {
+  CardSliderProps, CardSliderProgressStyle, CardSliderButtonPosition, CardSliderButtonVisibility,
+  CardSliderCornerAccentStyle, ButtonCorner,
+} from './card-slider.types';
 
 const controls = tv({
   slots: {
@@ -72,6 +54,14 @@ interface ControlsProps {
   showProgress: boolean;
   progressStyle: CardSliderProgressStyle;
   onGo: (index: number) => void;
+  /** Buttons go either side of the progress (bottom) or are drawn elsewhere (sides). */
+  buttonPosition?: CardSliderButtonPosition;
+  prevCorner?: ButtonCorner;
+  nextCorner?: ButtonCorner;
+  /** Autoplay control; omitted when autoplay is off. */
+  autoplay?: { playing: boolean; onToggle: () => void };
+  /** Classes for the button wrappers (the hover fade). */
+  buttonClassName?: string;
 }
 
 /**
@@ -80,7 +70,11 @@ interface ControlsProps {
  * the direction they move. The counter doubles as the text equivalent of
  * the progress bar, so it is always readable by assistive tech.
  */
-export function SliderControls({ index, count, visible, maxIndex, loop, tone, showButtons, showProgress, progressStyle, onGo }: ControlsProps) {
+export function SliderControls({
+  index, count, visible, maxIndex, loop, tone, showButtons, showProgress, progressStyle, onGo,
+  // 'bottom' here keeps callers that draw no side buttons (the current native fork) showing them in the bar.
+  buttonPosition = 'bottom', prevCorner = 'bottom-left', nextCorner = 'bottom-right', autoplay, buttonClassName,
+}: ControlsProps) {
   const s = controls({ tone });
   const atStart = !loop && index <= 0;
   const atEnd = !loop && index >= maxIndex;
@@ -89,9 +83,28 @@ export function SliderControls({ index, count, visible, maxIndex, loop, tone, sh
   const last = Math.min(count, index + visible);
   const status = sliderStatus(index, count, visible);
   const counter = first === last ? `${pad2(first)} / ${pad2(count)}` : `${pad2(first)}–${pad2(last)} / ${pad2(count)}`;
-  if (!showButtons && !showProgress) return null;
+  const bottomButtons = showButtons && buttonPosition === 'bottom';
+  if (!bottomButtons && !showProgress && !autoplay) return null;
   return (
     <View className={s.bar()}>
+      {autoplay ? (
+        <IconButton
+          variant="cornerCut"
+          tone={tone}
+          size="sm"
+          corner="top-right"
+          aria-label={autoplay.playing ? 'Pause autoplay' : 'Start autoplay'}
+          onPress={autoplay.onToggle}
+          icon={autoplay.playing
+            ? <Pause size={16} className={TONE_CLASSES[tone].onFace} />
+            : <Play size={16} className={TONE_CLASSES[tone].onFace} />}
+        />
+      ) : null}
+      {bottomButtons ? (
+        <View className={buttonClassName}>
+          <NavButton dir="prev" tone={tone} corner={prevCorner} disabled={atStart} onPress={() => onGo(stepIndex(index, -1, maxIndex, loop))} />
+        </View>
+      ) : null}
       {showProgress ? (
         progressStyle === 'counter' ? (
           <Text className={s.counter()} aria-label={status}>{counter}</Text>
@@ -118,30 +131,156 @@ export function SliderControls({ index, count, visible, maxIndex, loop, tone, sh
       ) : (
         <View className="flex-1" />
       )}
-      {showButtons ? (
-        <View className="flex-row gap-3">
-          <IconButton
-            variant="cornerCut"
-            tone={tone}
-            corner="top-left"
-            aria-label="Previous card"
-            disabled={atStart}
-            onPress={() => onGo(stepIndex(index, -1, maxIndex, loop))}
-            icon={<ChevronLeft size={20} className={atStart ? 'text-ink-700' : TONE_CLASSES[tone].onFace} />}
-          />
-          <IconButton
-            variant="cornerCut"
-            tone={tone}
-            corner="bottom-right"
-            aria-label="Next card"
-            disabled={atEnd}
-            onPress={() => onGo(stepIndex(index, 1, maxIndex, loop))}
-            icon={<ChevronRight size={20} className={atEnd ? 'text-ink-700' : TONE_CLASSES[tone].onFace} />}
-          />
+      {bottomButtons ? (
+        <View className={buttonClassName}>
+          <NavButton dir="next" tone={tone} corner={nextCorner} disabled={atEnd} onPress={() => onGo(stepIndex(index, 1, maxIndex, loop))} />
         </View>
       ) : null}
     </View>
   );
+}
+
+/** One previous/next button: a kit IconButton in the corner-cut variant. */
+export function NavButton({
+  dir, tone, corner, disabled, onPress,
+}: { dir: 'prev' | 'next'; tone: ControlTone; corner: ButtonCorner; disabled: boolean; onPress: () => void }) {
+  const Icon = dir === 'prev' ? ChevronLeft : ChevronRight;
+  return (
+    <IconButton
+      variant="cornerCut"
+      tone={tone}
+      corner={corner}
+      aria-label={dir === 'prev' ? 'Previous card' : 'Next card'}
+      disabled={disabled}
+      onPress={onPress}
+      icon={<Icon size={20} className={disabled ? 'text-ink-700' : TONE_CLASSES[tone].onFace} />}
+    />
+  );
+}
+
+/**
+ * NeonBlade's side buttons: previous and next float over the track's left
+ * and right edges, vertically centred. The track sets `relative`.
+ */
+export function SideButtons({
+  index, maxIndex, loop, tone, prevCorner = 'bottom-left', nextCorner = 'bottom-right', onGo, className,
+}: {
+  index: number; maxIndex: number; loop: boolean; tone: ControlTone;
+  prevCorner?: ButtonCorner; nextCorner?: ButtonCorner; onGo: (i: number) => void; className?: string;
+}) {
+  const atStart = !loop && index <= 0;
+  const atEnd = !loop && index >= maxIndex;
+  return (
+    <>
+      <View className={`absolute bottom-0 left-0 top-0 z-20 justify-center ${className ?? ''}`} pointerEvents="box-none">
+        <NavButton dir="prev" tone={tone} corner={prevCorner} disabled={atStart} onPress={() => onGo(stepIndex(index, -1, maxIndex, loop))} />
+      </View>
+      <View className={`absolute bottom-0 right-0 top-0 z-20 justify-center ${className ?? ''}`} pointerEvents="box-none">
+        <NavButton dir="next" tone={tone} corner={nextCorner} disabled={atEnd} onPress={() => onGo(stepIndex(index, 1, maxIndex, loop))} />
+      </View>
+    </>
+  );
+}
+
+// Stepped fade: solid bands of falling opacity, the shade-step look, the
+// same on every platform (no gradient support needed).
+const FADE_STEPS = [0.85, 0.6, 0.35, 0.15];
+
+/** Edge fades over the track, left and right. */
+export function EdgeFades({ color }: { color?: string }) {
+  const band = (o: number, i: number) => (
+    <View
+      key={i}
+      className={`h-full w-4 ${color ? '' : 'bg-ink-950'}`}
+      // Runtime opacity per band, and an optional caller colour.
+      style={color ? { backgroundColor: color, opacity: o } : { opacity: o }}
+    />
+  );
+  return (
+    <>
+      <View aria-hidden pointerEvents="none" className="absolute bottom-0 left-0 top-0 z-10 flex-row">
+        {FADE_STEPS.map(band)}
+      </View>
+      <View aria-hidden pointerEvents="none" className="absolute bottom-0 right-0 top-0 z-10 flex-row-reverse">
+        {FADE_STEPS.map(band)}
+      </View>
+    </>
+  );
+}
+
+const FRAME_CORNERS = [
+  'left-0 top-0 border-l-[3px] border-t-[3px]',
+  'right-0 top-0 border-r-[3px] border-t-[3px]',
+  'bottom-0 left-0 border-b-[3px] border-l-[3px]',
+  'bottom-0 right-0 border-b-[3px] border-r-[3px]',
+] as const;
+const PLUS_CORNERS = ['-left-2 -top-2', '-right-2 -top-2', '-bottom-2 -left-2', '-bottom-2 -right-2'] as const;
+
+/** NeonBlade's per-card corner accents, in the slider's tone. */
+export function CornerAccents({ tone, style }: { tone: ControlTone; style: CardSliderCornerAccentStyle }) {
+  const t = TONE_CLASSES[tone];
+  if (style === 'plus') {
+    return (
+      <>
+        {PLUS_CORNERS.map((pos) => (
+          <View key={pos} aria-hidden pointerEvents="none" className={`absolute z-20 h-4 w-4 items-center justify-center ${pos}`}>
+            <View className={`absolute h-4 w-1 ${t.face}`} />
+            <View className={`absolute h-1 w-4 ${t.face}`} />
+          </View>
+        ))}
+      </>
+    );
+  }
+  return (
+    <>
+      {FRAME_CORNERS.map((pos) => (
+        <View key={pos} aria-hidden pointerEvents="none" className={`absolute z-20 h-4 w-4 ${t.border} ${pos}`} />
+      ))}
+    </>
+  );
+}
+
+/** Blind lines across the track, every 4px. */
+export function ScanLines({ height }: { height: number }) {
+  const rows = Math.max(0, Math.floor(height / 4));
+  return (
+    <View aria-hidden pointerEvents="none" className="absolute inset-0 z-10 overflow-hidden">
+      {Array.from({ length: rows }, (_, i) => (
+        <View key={i} className="mb-[3px] h-px bg-ink-950/40" />
+      ))}
+    </View>
+  );
+}
+
+export interface AutoplayState {
+  /** The user has not paused it. */
+  enabled: boolean;
+  /** Hovered or focused: hold the timer without changing the button. */
+  held: boolean;
+}
+
+/**
+ * The autoplay timer. Ticks every `interval` while enabled and not held,
+ * stops itself at the end when not looping. Calls `step(next)`.
+ */
+export function useAutoplay({
+  autoPlay, interval, enabled, held, getIndex, maxIndex, loop, step,
+}: {
+  autoPlay: boolean; interval: number; enabled: boolean; held: boolean;
+  getIndex: () => number; maxIndex: number; loop: boolean; step: (next: number) => void;
+}) {
+  useEffect(() => {
+    if (!autoPlay || !enabled || held || maxIndex <= 0) return;
+    const id = setInterval(() => {
+      const next = autoplayNext(getIndex(), maxIndex, loop);
+      if (next === null) clearInterval(id);
+      else step(next);
+    }, Math.max(800, interval));
+    return () => clearInterval(id);
+    // getIndex and step read the latest state through the store; their
+    // identity changing every render must not restart the timer.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoPlay, enabled, held, interval, maxIndex, loop]);
 }
 
 export function sliderTone(tone?: ControlTone, district?: District) {

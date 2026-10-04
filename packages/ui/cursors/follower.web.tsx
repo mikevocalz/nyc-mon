@@ -29,7 +29,7 @@ let sheetUsers = 0;
  * Hide the OS cursor inside elements carrying the scope attribute. One
  * constructed stylesheet shared by every mounted cursor (no <style> tags).
  */
-function hideOsCursor(el: HTMLElement): () => void {
+export function hideOsCursor(el: HTMLElement): () => void {
   if (!sheet) {
     sheet = new CSSStyleSheet();
     sheet.replaceSync(`[${SCOPE_ATTR}], [${SCOPE_ATTR}] * { cursor: none !important; }`);

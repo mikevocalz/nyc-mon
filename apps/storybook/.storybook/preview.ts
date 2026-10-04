@@ -4,6 +4,12 @@ import '../globals.css';
 const preview: Preview = {
   initialGlobals: { theme: 'dark', motion: 'full' },
   parameters: {
+    // NeonBlade/Index first: the map from every NeonBlade component to its port.
+    options: {
+      storySort: {
+        order: ['NeonBlade', ['Index', ['All components', '*']], 'Charts', ['All charts', '*'], '*'],
+      },
+    },
     controls: { matchers: { color: /(background|color)$/i } },
     viewport: {
       options: {

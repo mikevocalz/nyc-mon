@@ -2,7 +2,7 @@
 import '../rn-globals-shim';
 
 import { useMemo } from 'react';
-import { BlurMask, Canvas, Group, Path, Rect, Skia, vec, type SkPath } from 'react-native-skia';
+import { BlurMask, Canvas, CornerPathEffect, Group, Path, Rect, Skia, vec, type SkPath } from 'react-native-skia';
 import { palette } from '@acme/theme';
 import { withAlpha } from '../neon/colors';
 import type { ShadeSteps } from '../neon/shade';
@@ -27,6 +27,8 @@ export interface BarCanvasProps {
   crown: boolean;
   glow: number;
   reduced: boolean;
+  /** Rounds the building's corners, px (NeonBlade's bar `radius`). */
+  radius?: number;
 }
 
 const poly = (pts: number[]) => {
@@ -105,7 +107,7 @@ function scaleX(p: number): Grow[] {
  * the street.
  */
 export default function BarCanvas({
-  layout, width, height, orientation, shades, light, district, selected, windows, crown, glow, reduced,
+  layout, width, height, orientation, shades, light, district, selected, windows, crown, glow, reduced, radius = 0,
 }: BarCanvasProps) {
   const vertical = orientation === 'vertical';
   const progress = useIntro(700, reduced);
@@ -152,9 +154,19 @@ export default function BarCanvas({
                   <BlurMask blur={glow} style="outer" />
                 </Rect>
               ) : null}
-              <Rect x={bar.x} y={bar.y} width={bar.w} height={bar.h} color={on && dimmed ? s.top : s.face} />
-              {side ? <Path path={side} color={s.side} /> : null}
-              {top ? <Path path={top} color={s.highlight} /> : null}
+              <Rect x={bar.x} y={bar.y} width={bar.w} height={bar.h} color={on && dimmed ? s.top : s.face}>
+                {radius > 0 ? <CornerPathEffect r={radius} /> : null}
+              </Rect>
+              {side ? (
+                <Path path={side} color={s.side}>
+                  {radius > 0 ? <CornerPathEffect r={radius} /> : null}
+                </Path>
+              ) : null}
+              {top ? (
+                <Path path={top} color={s.highlight}>
+                  {radius > 0 ? <CornerPathEffect r={radius} /> : null}
+                </Path>
+              ) : null}
               {crownShape && i === tallestIndex ? <Path path={crownShape} color={s.highlight} /> : null}
             </Group>
           );

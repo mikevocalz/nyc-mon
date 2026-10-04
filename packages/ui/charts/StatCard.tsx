@@ -7,6 +7,7 @@ import { Text } from '../Text';
 import { View } from '../tw';
 import { districtTone, type ChartTone, type District } from './district-tones';
 import { NeonSparkline } from './NeonSparkline';
+import type { GlowLevel } from './LinePlot.types';
 
 export type StatTrend = 'up' | 'down' | 'neutral';
 
@@ -30,6 +31,10 @@ export interface StatCardProps {
   district?: District;
   /** Top right. */
   icon?: ReactNode;
+  /** Card fill: any CSS colour (NeonBlade's `background`). Default the night panel. */
+  background?: string;
+  /** Accent glow around the card and under the sparkline. Default none. */
+  glowIntensity?: GlowLevel;
   className?: string;
 }
 
@@ -48,6 +53,12 @@ const stat = tv({
     changeLabel: 'text-xs text-silver-500',
   },
   variants: {
+    glow: {
+      none: {},
+      low: { root: 'shadow-glow-royal' },
+      medium: { root: 'shadow-glow-royal' },
+      high: { root: 'shadow-glow-orange' },
+    },
     tone: {
       orange: { band: 'bg-orange-500' },
       royal: { band: 'bg-royal-500' },
@@ -68,16 +79,23 @@ const TREND_CLASS: Record<StatTrend, string> = { up: 'text-leaf-400', down: 'tex
  * or apple, and a sparkline along the bottom edge.
  */
 export function StatCard({
-  value, label, unit, trend, change, changeLabel, sparkData, color, district = 'midtown', icon, className,
+  value, label, unit, trend, change, changeLabel, sparkData, color, district = 'midtown', icon,
+  background, glowIntensity = 'none', className,
 }: StatCardProps) {
   const tone: ChartTone = color ? (color in PRESET ? PRESET[color as keyof typeof PRESET] : (color as ChartTone)) : districtTone(district);
-  const s = stat({ tone });
+  const s = stat({ tone, glow: glowIntensity });
   const spoken = [label, `${value}${unit ? ` ${unit}` : ''}`, change ? `${trend ? `${TREND_WORD[trend]} ` : ''}${change}` : null, changeLabel]
     .filter(Boolean)
     .join(', ');
 
   return (
-    <Card elevation="flat" className={s.root({ className })} aria-label={spoken}>
+    <Card
+      elevation="flat"
+      className={s.root({ className })}
+      aria-label={spoken}
+      // Runtime colour: `background` takes any CSS colour, which no class can name.
+      style={background ? { backgroundColor: background } : undefined}
+    >
       <View aria-hidden className={s.band()} />
       <View className={s.head()}>
         <Text variant="label" className={s.label()}>{label}</Text>
@@ -96,7 +114,7 @@ export function StatCard({
         </View>
       ) : null}
       {sparkData?.length ? (
-        <NeonSparkline data={sparkData} width="100%" height={44} color={tone} district={district} label={label} />
+        <NeonSparkline data={sparkData} width="100%" height={44} color={tone} district={district} label={label} glowIntensity={glowIntensity} />
       ) : null}
     </Card>
   );
