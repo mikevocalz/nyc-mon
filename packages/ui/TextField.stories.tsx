@@ -66,3 +66,16 @@ export const WithPaste: Story = {
     );
   },
 };
+
+/** NeonBlade neon input: tone nameplate label, night well, focus glow. One per district plus error and disabled. */
+export const Neon: Story = {
+  render: () => (
+    <View className="max-w-content-form gap-5 bg-ink-950 p-6">
+      <TextField variant="neon" district="downtown" label="Crew name" placeholder="Wall Street Wolves" />
+      <TextField variant="neon" district="midtown" label="Home block" placeholder="W 34th St & 5th Ave" />
+      <TextField variant="neon" district="harlem" label="Stoop" placeholder="Lenox Ave" hint="The corner you play from." />
+      <TextField variant="neon" district="megacity" label="Sky bridge" error="Pick a bridge that exists." defaultValue="Level 90" />
+      <TextField variant="neon" label="Locked" disabled defaultValue="Read only" />
+    </View>
+  ),
+};

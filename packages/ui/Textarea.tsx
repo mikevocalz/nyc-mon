@@ -4,6 +4,8 @@ import { PasteWrapper, type PasteEventPayload } from './paste-wrapper';
 import { View, Text as TWText } from './tw';
 import { Textarea as PrimitiveTextarea, Label } from './primitives';
 import { Text } from './Text';
+import { NEON_FIELD, neonErrorCompound, neonFieldCompounds } from './cards/neon-field';
+import { resolveTone, toneVariants, type ControlTone, type District } from './cards/tones';
 
 const field = tv({
   slots: {
@@ -18,7 +20,11 @@ const field = tv({
   variants: {
     error: { true: { input: 'border-danger focus:border-danger', message: 'text-danger' } },
     disabled: { true: { input: 'opacity-50' } },
+    // neon: the NeonBlade input look (see cards/neon-field.ts); default is the kit field.
+    variant: { default: {}, neon: { label: NEON_FIELD.label, input: NEON_FIELD.input } },
+    tone: toneVariants(() => ({})),
   },
+  compoundVariants: [...neonFieldCompounds('input'), neonErrorCompound('input')],
 });
 
 export interface TextareaProps extends React.ComponentProps<typeof PrimitiveTextarea> {
@@ -27,14 +33,20 @@ export interface TextareaProps extends React.ComponentProps<typeof PrimitiveText
   error?: string;
   disabled?: boolean;
   containerClassName?: string;
+  /** neon is the NeonBlade input look; default is the kit field. */
+  variant?: 'default' | 'neon';
+  /** neon: colour family. Overrides `district`. */
+  tone?: ControlTone;
+  /** neon: theme by neighbourhood. */
+  district?: District;
   /** Rich paste (text / images / GIFs from the clipboard) via expo-paste-input — iOS, Android, and web. */
   onPaste?: (payload: PasteEventPayload) => void;
 }
 
 export function Textarea({
-  label, hint, error, disabled, className, containerClassName, onPaste, ...inputProps
+  label, hint, error, disabled, className, containerClassName, variant = 'default', tone, district, onPaste, ...inputProps
 }: TextareaProps) {
-  const s = field({ error: !!error, disabled });
+  const s = field({ error: !!error, disabled, variant, tone: resolveTone(tone, district) });
   const input = (
     <PrimitiveTextarea
       aria-label={label}

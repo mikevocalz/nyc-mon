@@ -4,8 +4,12 @@ import { haptics } from './haptics';
 import { Pressable, View } from './tw';
 import { Text } from './Text';
 import type { SwitchProps } from './Switch.types';
+import { NeonSwitch } from './cards/NeonSwitch';
 
-export function Switch({ value, onChange, label, disabled, className }: SwitchProps) {
+export function Switch({ value, onChange, label, disabled, className, variant, tone, district }: SwitchProps) {
+  if (variant === 'neon') {
+    return <NeonSwitch {...{ value, onChange, label, disabled, className, tone, district }} />;
+  }
   return (
     <View
       className={`w-full flex-row items-center justify-between gap-3 ${disabled ? 'opacity-50' : ''} ${className ?? ''}`}

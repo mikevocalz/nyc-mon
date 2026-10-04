@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Switch } from './Switch';
+import { useInstanceStore, useStore } from './use-instance-store';
 import { View } from './tw';
 
 const meta = {
@@ -19,3 +20,26 @@ export const States: Story = {
     </View>
   ),
 };
+
+function NeonDemo() {
+  const store = useInstanceStore(() => ({ downtown: true, midtown: false, harlem: true, megacity: false }));
+  const values = useStore(store);
+  return (
+    <View className="max-w-content-form gap-4 bg-ink-950 p-6">
+      {(['downtown', 'midtown', 'harlem', 'megacity'] as const).map((d) => (
+        <Switch
+          key={d}
+          variant="neon"
+          district={d}
+          value={values[d]}
+          onChange={(next) => store.setState({ [d]: next })}
+          label={`${d === 'megacity' ? 'Mega City' : d[0]!.toUpperCase() + d.slice(1)} alerts`}
+        />
+      ))}
+      <Switch variant="neon" value onChange={() => {}} label="Locked" disabled />
+    </View>
+  );
+}
+
+/** Neon toggle: the track fills with the district tone, the thumb slides (instant under reduced motion). */
+export const Neon: Story = { render: () => <NeonDemo /> };

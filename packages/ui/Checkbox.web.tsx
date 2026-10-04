@@ -1,6 +1,8 @@
 'use client';
 import { tv } from 'tailwind-variants';
 import { haptics } from './haptics';
+import { NeonCheckbox } from './cards/NeonCheckbox';
+import type { ControlTone, District } from './cards/tones';
 import { View, Text, Pressable } from './tw';
 
 const checkbox = tv({
@@ -29,9 +31,18 @@ export interface CheckboxProps {
   label: string;
   disabled?: boolean;
   className?: string;
+  /** neon is the NeonBlade checkbox; default is the platform control (native) or kit box (web). */
+  variant?: 'default' | 'neon';
+  /** neon: colour family. Overrides `district`. */
+  tone?: ControlTone;
+  /** neon: theme by neighbourhood. */
+  district?: District;
 }
 
-export function Checkbox({ checked, onChange, label, disabled, className }: CheckboxProps) {
+export function Checkbox({ checked, onChange, label, disabled, className, variant, tone, district }: CheckboxProps) {
+  if (variant === 'neon') {
+    return <NeonCheckbox {...{ checked, onChange, label, disabled, className, tone, district }} />;
+  }
   const s = checkbox({ checked, disabled });
   return (
     <Pressable
