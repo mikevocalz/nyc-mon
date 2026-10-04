@@ -1,0 +1,36 @@
+# Device checks
+
+Everything below has passed typecheck, unit tests and web/Storybook screenshots, but has **not been run on a phone, tablet, foldable or simulator**. No device is set up yet. Do these checks before the matching milestone closes. Every `08-handoff.md` links back here.
+
+Target matrix (BUILD_PROMPT_v3 §0C, §6 step 11): iPhone SE 3, iPhone 16 Pro Max, Pixel 8, plus one Android foldable (Pixel Fold or Galaxy Z Fold) and one Android tablet.
+
+## Rendering
+
+- [ ] **HolographicTerrain, NeonTide, CityHeightfield on native** (react-native-webgpu): render, present, touch lift, AppState pause. The iOS bundle includes `three/webgpu`, but nothing has rendered on a device. Android hasn't been bundled at all.
+- [ ] **Frame budget:** 60 fps steady on iPhone SE 3 and Pixel 8, measured on device, not in Chrome.
+- [ ] **Skia web workarounds** behave the same after a react-native-skia release with PRs #42/#44 (then delete `skia-vertices.web.ts`, `skia-color-space.web.ts`).
+
+## Kit components
+
+- [ ] **Avatar (corner-cut gradient), native:** Skia path and clipped `useImage` photos. These typecheck only.
+- [ ] **Native CardSlider:** SwiftUI on iOS 17+, Material 3 carousels on Android.
+- [ ] **Modals on Android:** the back button closes Dialog, Lightbox and BottomSheet. This was checked by reading code only.
+- [ ] **Split view on iOS and Android:** iOS still uses `index.ios.tsx`; Android uses the moved `AdaptiveSplitView`.
+- [ ] **Adaptive panes + fold module** (`@acme/ui/adaptive-panes`, the reserved-regions Kotlin module): tablet width classes, book and tabletop postures, a hinge that never splits a pane, tri-fold, and the Android nav rail. The Kotlin hasn't been built.
+
+## H-Lynk chrome and Phase 1 screens
+
+- [ ] **H-Lynk Core shell** on SE 3, Pro Max and Pixel 8: the bottom row fits (the SE budget is 139 pt), safe areas, and contrast of the red body under real display gamma.
+- [ ] **M01 boot** routes in 240 ms or less from the MMKV snapshot.
+- [ ] **VoiceOver and TalkBack** on M01–M07, plus Dynamic Type XXL, including the copy deck's estimated line and character limits (`docs/COPY_DECK.md`).
+- [ ] **Lock-screen truncation** of the hatch notification (`m23.*`) on iOS and Android.
+
+## Auth
+
+- [ ] **Passkey ceremonies** on iOS and Android (associated domains and asset links).
+- [ ] **Sign in with Apple and Google** in the Expo app (`@better-auth/expo` isn't installed yet).
+- [ ] **Resend delivery:** the verification, reset and guardian-consent emails.
+
+## Admin console
+
+- [ ] **Responsive matrix** at 390, 768, 1280 and 1440 widths, plus foldable postures, on real hardware browsers (Safari iOS, Chrome Android).
