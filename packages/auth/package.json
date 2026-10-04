@@ -1,34 +1,32 @@
 {
-  "name": "@acme/payload",
+  "name": "@acme/auth",
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "main": "./src/payload.config.ts",
+  "main": "./index.ts",
   "types": "./index.ts",
   "exports": {
-    ".": "./index.ts",
-    "./config": "./src/payload.config.ts"
+    ".": "./index.ts"
   },
   "scripts": {
     "lint": "eslint",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@acme/core": "workspace:*",
     "@better-auth/passkey": "catalog:",
-    "@delmaredigital/payload-better-auth": "catalog:",
-    "@payloadcms/db-postgres": "catalog:",
     "better-auth": "catalog:",
-    "next": "catalog:",
-    "payload": "catalog:",
-    "pg": "catalog:",
-    "resend": "catalog:",
-    "sharp": "catalog:"
+    "zod": "catalog:"
+  },
+  "peerDependencies": {
+    "react": "catalog:"
   },
   "devDependencies": {
     "@acme/config": "workspace:*",
-    "@types/pg": "catalog:",
+    "@types/react": "catalog:",
     "eslint": "catalog:",
     "eslint-config-expo": "catalog:",
+    "react": "catalog:",
     "typescript": "catalog:"
   }
 }

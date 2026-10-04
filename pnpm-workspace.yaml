@@ -160,6 +160,17 @@ catalog:
   zustand: 5.0.15
   zod: 4.6.5
 
+  # auth (ADR 0001; DECISIONS #2, #3)
+  # @delmaredigital/payload-better-auth comes from the mikevocalz fork until
+  # upstream ships Payload 4 support (PR delmaredigital/payload-better-auth#43).
+  # The pin is the fork's payload-4-dist branch: the PR commit plus its built
+  # dist/, because pnpm does not build git dependencies that only declare
+  # prepublishOnly. Bump this together with the PR branch.
+  "@delmaredigital/payload-better-auth": github:mikevocalz/payload-better-auth#3eb634b9f8ecff60f649864f75cdd7ea7afeea27
+  better-auth: 1.7.7
+  "@better-auth/passkey": 1.7.7
+  resend: 6.32.0
+
   # backend / cms
   payload: 4.0.0-canary.37
   "@payloadcms/db-postgres": 4.0.0-canary.37
@@ -198,3 +209,7 @@ catalog:
 
 patchedDependencies:
   react-native-graph@1.4.0: patches/react-native-graph@1.4.0.patch
+  # Backports uniwind PR #706: the web resolver no longer cycles through
+  # InputAccessoryView, which left `expo start --web` blank. Remove once
+  # uniwind releases #706 (uni-stack/uniwind#704).
+  uniwind@1.12.1: patches/uniwind@1.12.1.patch
