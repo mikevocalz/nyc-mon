@@ -29,22 +29,28 @@ config.resolver.assetExts = Array.from(
  * Solito must resolve the same React Navigation instance Expo Router mounts.
  * Keep Expo's resolver as the final fallback so SDK 58's package exports,
  * tsconfig aliases, web/server conditions and monorepo resolution stay intact.
+ *
+ * pnpm installs are isolated (each package lives under node_modules/.pnpm and
+ * is symlinked into the workspace that declares it), so expo-router is never
+ * at <root>/node_modules/expo-router. Resolve it from this app instead of
+ * assuming a hoisted layout.
  */
+const expoRouterDir = path.dirname(
+  require.resolve("expo-router/package.json", { paths: [__dirname] }),
+);
 const VENDORED_NAVIGATION = {
-  "@react-navigation/native": path.resolve(
-    __dirname,
-    "../../node_modules/expo-router/build/react-navigation/native",
+  "@react-navigation/native": require.resolve(
+    path.join(expoRouterDir, "build/react-navigation/native"),
   ),
-  "@react-navigation/core": path.resolve(
-    __dirname,
-    "../../node_modules/expo-router/build/react-navigation/core",
+  "@react-navigation/core": require.resolve(
+    path.join(expoRouterDir, "build/react-navigation/core"),
   ),
 };
 
 config.resolver.resolveRequest = (context, moduleName, platform) => {
   const vendored = VENDORED_NAVIGATION[moduleName];
   if (vendored) {
-    return { type: "sourceFile", filePath: require.resolve(vendored) };
+    return { type: "sourceFile", filePath: vendored };
   }
   return context.resolveRequest(context, moduleName, platform);
 };
