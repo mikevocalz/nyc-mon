@@ -12,7 +12,7 @@ Verbatim from `prompts/BUILD_PROMPT_v3.md` §0B (Laws) and §0A.2 (standing stan
 6. **Hatch is atomic.** One `monInstanceId` per egg, minted server-side (or by a server-replayable deterministic function when offline), idempotent on reconnect, skip-animation, process death, and device handoff. A duplicated individual is a P0 bug (Bible: "A device session is a surface, not a new creature").
 7. **Baby stays Baby.** No evolution fires without an authored `EvolutionEvent` in `content/`. Phase 1 ships Egg → Baby only; Baby → Small is a stubbed, feature-flagged path with its content schema present.
 8. **Faint is never death.** No code path converts a Mon to an egg or deletes an instance on 0 HP. Phase 1 has no HP combat, but the `CareState` type and the copy deck already encode this.
-9. **Language is canon.** `Caller` in code, data, and UI. `Callah` only inside Mon dialogue strings flagged `voice: "character"`. `Hood Mon`, never `wild`. `H-Lynk`, never "device" in UI copy.
+9. **Language is canon.** `Caller` in code, data, and UI. `Callah` only inside Mon dialogue strings flagged `voice: "character"`. `Hood Mon`, never `wild`. `H-Lynk`, never "device" in UI copy. `Bloodline` for a Dex family in UI and data, never "family" or "line" (Decision #11).
 10. **Palette ships only with a measured contrast table** (§1.3). A token without a WCAG 2.2 measurement does not exist.
 
 ## Standing standards (§0A.2, apply in every PR)
