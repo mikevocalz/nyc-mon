@@ -255,12 +255,16 @@ export function Dialog({
       onRequestClose={closeOnEscape ? onClose : () => {}}
     >
       <View className={s.wrapper()}>
+        {/* The card comes first so the Modal's focus trap lands inside it, not
+            on the scrim (focus on the scrim made Enter close the dialog). */}
+        <View className="z-10 w-full items-center">
+          <DialogCard {...cardProps} onClose={showCloseButton ? onClose : undefined} />
+        </View>
         <Pressable
           aria-label="Close dialog"
           onPress={closeOnBackdrop ? onClose : undefined}
           className={s.scrim()}
         />
-        <DialogCard {...cardProps} onClose={showCloseButton ? onClose : undefined} />
       </View>
     </Modal>
   );
