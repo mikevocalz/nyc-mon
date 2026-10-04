@@ -71,10 +71,22 @@ export function createAuth({ baseURL }: CreateAuthOptions) {
     return toAuthResult(await client.signOut());
   }
 
+  /** M03 "Forgot password?": always resolves ok on the client so the answer never reveals whether the email exists. */
+  async function requestPasswordReset(email: string): Promise<AuthResult> {
+    return toAuthResult(await client.requestPasswordReset({ email }));
+  }
+
+  /** M03 verify view: resends the verification mail. Throttled server-side. */
+  async function resendVerification(email: string): Promise<AuthResult> {
+    return toAuthResult(await client.sendVerificationEmail({ email }));
+  }
+
   return {
     signIn,
     signUp,
     signOut,
+    requestPasswordReset,
+    resendVerification,
     /** React hook: the current session, or `null` when signed out. */
     useSession: client.useSession,
     /** Registers a passkey for the signed-in Caller. */

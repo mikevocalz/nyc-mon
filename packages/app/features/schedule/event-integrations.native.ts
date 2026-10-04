@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import * as Calendar from 'expo-calendar/legacy';
 import * as Notifications from 'expo-notifications';
+import { AndroidImportance } from 'expo-notifications';
 import type { ScheduleEvent } from './model';
 import type { EventIntegrationContext, EventIntegrationResult } from './event-integrations.types';
 
@@ -73,7 +74,7 @@ async function ensureNotificationChannel() {
   if (channelReady || Platform.OS !== 'android') return;
   await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
     name: 'Mon care and battles',
-    importance: Notifications.AndroidImportance.HIGH,
+    importance: AndroidImportance.HIGH,
   });
   channelReady = true;
 }

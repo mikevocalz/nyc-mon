@@ -14,6 +14,8 @@
     "test": "node --test '**/*.test.ts'"
   },
   "dependencies": {
+    "@acme/auth": "workspace:*",
+    "@acme/core": "workspace:*",
     "@acme/theme": "workspace:*",
     "@acme/ui": "workspace:*",
     "@tanstack/react-query": "catalog:",
