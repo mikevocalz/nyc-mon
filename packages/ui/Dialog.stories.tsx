@@ -22,9 +22,31 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-// RN Modal portals outside the story canvas — the inline surface stories below
-// are the reliable visual reference; this one exercises the modal wiring.
-export const Open: Story = {};
+/**
+ * Opens on load and closes for real: the close control, the scrim, Escape
+ * and the Android back button all call onClose, which flips the story's own
+ * `open`. A Dialog is fully controlled, so a story that pins `open: true`
+ * with a no-op onClose can never close.
+ */
+export const Open: Story = {
+  render: function Render(args) {
+    const store = useInstanceStore(() => ({ open: args.open }));
+    const open = useStore(store, (s) => s.open);
+    return (
+      <View className="items-start p-6">
+        <Button title="Open dialog" onPress={() => store.setState({ open: true })} />
+        <Dialog
+          {...args}
+          open={open}
+          onClose={() => {
+            args.onClose();
+            store.setState({ open: false });
+          }}
+        />
+      </View>
+    );
+  },
+};
 
 export const Surface: Story = {
   render: () => (

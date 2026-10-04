@@ -5,6 +5,7 @@ import { Image } from './Image';
 import { Pressable, View } from './tw';
 import { create } from 'zustand';
 import { DISTRICTS } from './district';
+import { useInstanceStore, useStore } from './use-instance-store';
 
 // Story state — zustand always (repo rule).
 const useLightboxStory = create<{
@@ -63,8 +64,29 @@ export const Gallery: Story = {
   },
 };
 
-/** Open on the second image: tone pip, counter, square tiles. */
+/**
+ * Open on the second image: tone pip, counter, square tiles. Close, Escape
+ * and the Android back button flip the story's own `open`; a pinned
+ * `open: true` with a no-op onClose would never close.
+ */
 export const Open: Story = {
   args: { images: IMAGES, initialIndex: 1, open: true, district: 'downtown' },
   argTypes: { district: { control: 'inline-radio', options: DISTRICTS } },
+  render: function Render(args) {
+    const store = useInstanceStore(() => ({ open: args.open }));
+    const open = useStore(store, (s) => s.open);
+    return (
+      <View className="items-start p-4">
+        <Button title="Open lightbox" variant="outline" size="sm" onPress={() => store.setState({ open: true })} />
+        <Lightbox
+          {...args}
+          open={open}
+          onClose={() => {
+            args.onClose();
+            store.setState({ open: false });
+          }}
+        />
+      </View>
+    );
+  },
 };

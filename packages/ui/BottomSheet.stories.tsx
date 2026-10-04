@@ -3,6 +3,7 @@ import { BottomSheet, SheetSurface } from './BottomSheet';
 import { Button } from './Button';
 import { Text, View } from './tw';
 import { DISTRICTS, DISTRICT_NAME } from './district';
+import { useInstanceStore, useStore } from './use-instance-store';
 
 const meta = {
   title: 'UI/BottomSheet',
@@ -18,11 +19,32 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-// RN Modal portals outside the story canvas — the inline surface stories below
-// are the reliable visual reference; this one exercises the modal wiring.
+/**
+ * Opens on load and closes for real: the close control, the scrim, Escape,
+ * a drag down and the Android back button all call onClose, which flips the
+ * story's own `open`. The sheet is fully controlled, so a pinned
+ * `open: true` with a no-op onClose would never close.
+ */
 export const Open: Story = {
   args: {
     children: <Text className="text-base text-text-muted">Everything you need for the session, in one place.</Text>,
+  },
+  render: function Render(args) {
+    const store = useInstanceStore(() => ({ open: args.open }));
+    const open = useStore(store, (s) => s.open);
+    return (
+      <View className="items-start p-6">
+        <Button title="Open sheet" onPress={() => store.setState({ open: true })} />
+        <BottomSheet
+          {...args}
+          open={open}
+          onClose={() => {
+            args.onClose();
+            store.setState({ open: false });
+          }}
+        />
+      </View>
+    );
   },
 };
 

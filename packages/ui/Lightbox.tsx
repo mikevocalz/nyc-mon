@@ -1,9 +1,9 @@
 'use client';
 import { useEffect } from 'react';
-import { Modal } from 'react-native';
 import { SolitoImage } from 'solito/image';
 import { useInstanceStore, useStore } from './use-instance-store';
 import { tv } from 'tailwind-variants';
+import { Modal } from './Modal';
 import { View, Text, Pressable } from './tw';
 import { ChevronLeft, ChevronRight, X } from './icons';
 import { TONE_CLASSES, resolveControlTone, type ControlTone, type District } from './district';
@@ -21,7 +21,7 @@ const box = tv({
     tile:
       'h-11 w-11 items-center justify-center border-2 border-ink-700 bg-ink-900 transition-colors duration-fast hover:border-ink-400 ' +
       'active:opacity-80 motion-reduce:transition-none',
-    close: 'absolute right-4 top-4 z-10',
+    close: 'absolute right-4 top-4 z-20',
     side: 'absolute bottom-0 top-0 z-10 w-16 justify-center',
     disabled: 'opacity-30',
     footer: 'absolute inset-x-0 bottom-6 items-center gap-3',
@@ -56,18 +56,18 @@ export function Lightbox({ images, initialIndex = 0, open, onClose, district, to
 
   const count = images.length;
 
-  // Keyboard navigation (web): ← → move, Escape closes. Native uses the
-  // on-screen arrows and the Modal back handler.
+  // Keyboard navigation (web): ← → move. Escape is not handled here: the kit
+  // Modal already routes Escape (web) and the Android back button to
+  // onRequestClose, and a second listener would call onClose twice.
   useEffect(() => {
     if (!open || typeof document === 'undefined') return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'ArrowLeft') store.setState((s) => ({ index: Math.max(0, s.index - 1) }));
       else if (e.key === 'ArrowRight') store.setState((s) => ({ index: Math.min(count - 1, s.index + 1) }));
-      else if (e.key === 'Escape') onClose();
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [open, count, onClose, store]);
+  }, [open, count, store]);
 
   if (!images.length) return null;
   const current = images[index] ?? '';
@@ -85,7 +85,7 @@ export function Lightbox({ images, initialIndex = 0, open, onClose, district, to
         </Pressable>
 
         {hasMultiple ? (
-          <View className={`${s.side()} left-0 pl-4`}>
+          <View pointerEvents="box-none" className={`${s.side()} left-0 pl-4`}>
             <Pressable
               onPress={() => setIndex((i) => Math.max(0, i - 1))}
               disabled={index === 0}
@@ -101,7 +101,7 @@ export function Lightbox({ images, initialIndex = 0, open, onClose, district, to
         <SolitoImage src={current} alt="" fill unoptimized contentFit="contain" sizes="100vw" />
 
         {hasMultiple ? (
-          <View className={`${s.side()} right-0 items-end pr-4`}>
+          <View pointerEvents="box-none" className={`${s.side()} right-0 items-end pr-4`}>
             <Pressable
               onPress={() => setIndex((i) => Math.min(images.length - 1, i + 1))}
               disabled={index === images.length - 1}
@@ -115,7 +115,7 @@ export function Lightbox({ images, initialIndex = 0, open, onClose, district, to
         ) : null}
 
         {hasMultiple ? (
-          <View className={s.footer()}>
+          <View pointerEvents="box-none" className={s.footer()}>
             <View aria-hidden className={s.pips()}>
               {images.map((_, i) => (
                 <View key={i} className={s.pip({ className: i === index ? t.face : 'bg-ink-600' })} />
