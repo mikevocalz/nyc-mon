@@ -13,8 +13,10 @@ import { TONE_CLASSES, resolveTone, toneVariants, type ControlTone, type Distric
 
 export type {
   CardSliderProps, CardSliderProgressStyle, CardSliderButtonPosition, CardSliderButtonVisibility,
-  CardSliderCornerAccentStyle, ButtonCorner,
+  CardSliderCornerAccentStyle, ButtonCorner, CardSliderImageItemData, CardSliderImageSource,
+  CardSliderImageFrame, CardSliderImageAspect,
 } from './card-slider.types';
+export { CardSliderImageItem, CITY_PHOTO_ITEMS, photoItem, type CardSliderImageItemProps } from './slider-items';
 
 const controls = tv({
   slots: {

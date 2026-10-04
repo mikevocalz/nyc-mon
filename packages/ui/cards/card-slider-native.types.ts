@@ -12,6 +12,12 @@ export interface CardSliderNativeExtras {
   variant?: CardSliderVariant;
   /** Snap a card at a time. Default true. */
   snap?: boolean;
+  /**
+   * Cut the native carousel's mask at the bottom-right corner, this many px,
+   * with a keyline in the tone. For plain slides with no frame of their own;
+   * framed slides (CardSliderImageItem) already draw their shape. Default 0.
+   */
+  itemCut?: number;
   /** Fires when the slider settles on a new index: swipe, buttons, autoplay, or assistive tech. */
   onIndexChange?: (index: number) => void;
 }
