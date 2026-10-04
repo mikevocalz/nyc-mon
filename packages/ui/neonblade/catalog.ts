@@ -1,6 +1,6 @@
 /**
  * Every NeonBlade UI component (https://neonbladeui.neuronrush.com/components)
- * and its NYC-MON port: what it is called here, where its story is, and
+ * and its NYC-Tron port: what it is called here, where its story is, and
  * which story file and export the index previews. Drives NeonBlade/Index.
  */
 export const NEONBLADE_SITE = 'https://neonbladeui.neuronrush.com/components';

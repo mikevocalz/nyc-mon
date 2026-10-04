@@ -18,7 +18,7 @@ apps/
   storybook   Storybook 10 + Vite; includes Spatial / Grid World showcases
 packages/
   app         Shared product screens and providers
-  ui          Universal semantic UI + Skia backgrounds + futuristic controls
+  ui          NYC-Tron UI kit: universal semantic UI, Skia/three.js backgrounds, neon controls
   spatial     Shared Viro scene, XR routing, race state, Rive surfaces
   theme       Design tokens + Tailwind theme CSS
   assets      Shared fonts/assets
@@ -49,6 +49,19 @@ pnpm --filter storybook dev
 Postinstall copies Viro WASM/SLAM sidecars and CanvasKit into the app public
 directories. Do not replace those scripts with remote CDN dependencies; the starter
 is designed to build from pinned local runtime assets.
+
+## UI kit: NYC-Tron
+
+The components in `packages/ui` (imported as `@acme/ui`) make up NYC-Tron, the
+UI kit NYC-MON is built on. [packages/ui/README.md](packages/ui/README.md)
+covers imports and Storybook.
+
+NYC-Tron is inspired by [NeonBlade UI](https://neonbladeui.neuronrush.com) by
+[vprix21](https://github.com/vprix21/neonblade-ui) (MIT). Many components are
+ports of NeonBlade's, re-themed for the NYC-MON palette. Thanks to vprix21;
+the README's "Inspired by NeonBlade UI" section says what came from where, and
+[packages/ui/THIRD-PARTY-NOTICES.md](packages/ui/THIRD-PARTY-NOTICES.md) holds
+the licence.
 
 ## Rendering model
 

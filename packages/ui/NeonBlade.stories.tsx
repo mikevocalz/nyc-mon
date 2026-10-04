@@ -47,7 +47,7 @@ import * as ToastStories from './Toast.stories';
 import * as TurbineLoaderStories from './TurbineLoader.stories';
 
 /**
- * NeonBlade/Index: every NeonBlade UI component next to its NYC-MON port,
+ * NeonBlade/Index: every NeonBlade UI component next to its NYC-Tron port,
  * in the site's categories, with a live preview, our name, and links to the
  * story here and the demo on the NeonBlade site. Each component also has its
  * own entry below the index, named as NeonBlade names it, so the sidebar
@@ -276,7 +276,7 @@ const meta = {
   title: 'NeonBlade/Index',
   parameters: {
     layout: 'fullscreen',
-    docs: { description: { component: 'Every NeonBlade UI component and its NYC-MON port.' } },
+    docs: { description: { component: 'Every NeonBlade UI component and its NYC-Tron port.' } },
   },
 } satisfies Meta;
 export default meta;
