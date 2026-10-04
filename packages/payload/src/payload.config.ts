@@ -1,8 +1,15 @@
 import { postgresAdapter } from '@payloadcms/db-postgres';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  betterAuthCollections,
+  createBetterAuthPlugin,
+  payloadAdapter,
+} from '@delmaredigital/payload-better-auth';
+import { betterAuth } from 'better-auth';
 import { buildConfig } from 'payload';
 import sharp from 'sharp';
+import { AUTH_BASE_PATH, PAYLOAD_API_ROUTE, betterAuthOptions } from './auth/options';
 import { Users } from './collections/Users';
 import { Media } from './collections/Media';
 
@@ -18,9 +25,22 @@ export default buildConfig({
     },
   },
   routes: {
-    api: '/payload-api',
+    api: PAYLOAD_API_ROUTE,
   },
   collections: [Users, Media],
+  plugins: [
+    // Generates Better Auth's session, account, verification and passkey
+    // collections; `users` is written by hand in collections/Users.ts.
+    betterAuthCollections({ betterAuthOptions, skipCollections: ['user'] }),
+    createBetterAuthPlugin({
+      authBasePath: AUTH_BASE_PATH,
+      createAuth: (payload) =>
+        betterAuth({
+          ...betterAuthOptions,
+          database: payloadAdapter({ payloadClient: payload }),
+        }),
+    }),
+  ],
   db: postgresAdapter({
     pool: {
       connectionString: process.env.DATABASE_URL,
