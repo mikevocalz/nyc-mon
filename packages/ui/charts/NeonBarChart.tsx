@@ -48,6 +48,8 @@ export interface NeonBarChartProps {
   windows?: boolean;
   /** The tallest building gets its district's crown (spire, deco top, cornice, sky bridge). Default true. */
   crown?: boolean;
+  /** Rounds the buildings' corners in px (NeonBlade's `radius`). Default 0, square blocks. */
+  radius?: number;
   /** Called with the selected category index, or null. */
   onBarSelected?: (index: number | null) => void;
   title?: string;
@@ -103,6 +105,7 @@ export function NeonBarChart({
   multiColor = false,
   windows = true,
   crown = true,
+  radius = 0,
   onBarSelected,
   title,
   className,
@@ -202,6 +205,7 @@ export function NeonBarChart({
               crown={crown}
               glow={GLOW_BLUR[glowIntensity]}
               reduced={reduced}
+              radius={radius}
             />
           ) : null}
           {selected >= 0 ? (

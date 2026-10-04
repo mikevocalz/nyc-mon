@@ -5,7 +5,7 @@ import { Text } from '../Text';
 import { useInstanceStore, useStore } from '../use-instance-store';
 import { View } from '../tw';
 import { useReducedMotion } from '../backgrounds/use-reduced-motion';
-import { describeSeries, formatValue } from './chart-model';
+import { describeSeries, formatValue, type CurveType } from './chart-model';
 import { keylineFor, seriesColor, type District } from './district-tones';
 import { LinePlot } from './LinePlot';
 import type { GlowLevel } from './LinePlot.types';
@@ -32,6 +32,8 @@ export interface NeonSparklineProps {
   keyline?: boolean;
   /** Scrub readout in the corner. Default true. */
   tooltip?: boolean;
+  /** Line shape (NeonBlade's `curve`): smooth, linear or step. Default smooth. */
+  curve?: CurveType;
   /** Accessible name; the trend summary is appended. */
   label?: string;
   className?: string;
@@ -53,6 +55,7 @@ export function NeonSparkline({
   area = true,
   keyline = false,
   tooltip = true,
+  curve = 'smooth',
   label = 'Trend',
   className,
 }: NeonSparklineProps) {
@@ -91,6 +94,7 @@ export function NeonSparkline({
         onSelect={(index) => selection.setState({ index: index ?? -1 })}
         reduced={reduced}
         pad={strokeWidth + 2}
+        curve={curve}
       />
       {tooltip && selected >= 0 ? (
         <View pointerEvents="none" className="absolute right-0 top-0 bg-ink-950 px-1">

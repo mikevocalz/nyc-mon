@@ -10,9 +10,9 @@ import { withAlpha } from '../neon/colors';
 import { useInstanceStore, useStore } from '../use-instance-store';
 import { useLayoutSize } from '../use-layout-size';
 import { View } from '../tw';
-import { linePoints, nearestIndex, smoothPath, type PathCommand, type Point } from './chart-model';
+import { curvePath, linePoints, nearestIndex, type PathCommand, type Point } from './chart-model';
 import { GLOW_BLUR, type LinePlotProps } from './LinePlot.types';
-import { useIntro } from './use-intro';
+import { useIntro, useIntroValue } from './use-intro';
 
 type PointerLike = { nativeEvent: { offsetX?: number; locationX?: number } };
 
@@ -20,6 +20,7 @@ function toPath(cmds: PathCommand[], close?: { bottom: number; first: Point; las
   const b = Skia.PathBuilder.Make();
   for (const c of cmds) {
     if (c.type === 'M') b.moveTo(c.x, c.y);
+    else if (c.type === 'L') b.lineTo(c.x, c.y);
     else b.cubicTo(c.x1, c.y1, c.x2, c.y2, c.x, c.y);
   }
   if (close) b.lineTo(close.last.x, close.bottom).lineTo(close.first.x, close.bottom).close();
@@ -32,7 +33,7 @@ function toPath(cmds: PathCommand[], close?: { bottom: number; first: Point; las
  * reveal; selection follows the pointer (mouse, pen or a dragged finger).
  */
 export default function LinePlotSkia({
-  series, range, strokeWidth, area, keylines, glow, selectable, indicator, onSelect, reduced, pad,
+  series, range, strokeWidth, area, keylines, glow, selectable, indicator, onSelect, reduced, pad, curve = 'smooth',
 }: LinePlotProps) {
   const { size, onLayout } = useLayoutSize();
   const { width, height } = size;
@@ -40,17 +41,24 @@ export default function LinePlotSkia({
   const selection = useInstanceStore<{ index: number }>(() => ({ index: -1 }));
   const selected = useStore(selection, (s) => s.index);
   const progress = useIntro(900, reduced);
+  // Left-to-right reveal. A number on web, a shared value on native (the
+  // non-smooth curve fallback), so the clip is mapped through useIntroValue.
+  const reveal = useIntroValue(progress, (p) => {
+    'worklet';
+    return Skia.XYWHRect(0, 0, Math.max(1, width * p), Math.max(1, height));
+  });
+  const introDone = typeof progress === 'number' ? progress >= 1 : true;
 
   const shapes = useMemo(
     () =>
       series.map((s) => {
         const points = linePoints(s.values, range, box);
-        const cmds = smoothPath(points);
+        const cmds = curvePath(points, curve);
         const line = points.length ? toPath(cmds) : null;
         const fill = points.length > 1 ? toPath(cmds, { bottom: height, first: points[0]!, last: points[points.length - 1]! }) : null;
         return { ...s, points, line, fill };
       }),
-    [series, range, box, height],
+    [series, range, box, height, curve],
   );
 
   const count = series[0]?.values.length ?? 0;
@@ -82,7 +90,7 @@ export default function LinePlotSkia({
     >
       {/* Skia surface: Canvas takes a style, not a className. */}
       <Canvas style={{ flex: 1 }}>
-        <Group clip={Skia.XYWHRect(0, 0, Math.max(1, width * progress), height)}>
+        <Group clip={reveal}>
           {area
             ? shapes.map((s, i) =>
                 s.fill ? (
@@ -125,7 +133,7 @@ export default function LinePlotSkia({
               ) : null;
             })}
           </Group>
-        ) : indicator && end && progress >= 1 ? (
+        ) : indicator && end && introDone ? (
           <Group>
             <Circle cx={end.x} cy={end.y} r={strokeWidth + 4} color={lead!.keyline} />
             <Circle cx={end.x} cy={end.y} r={strokeWidth + 1.5} color={lead!.color} />
