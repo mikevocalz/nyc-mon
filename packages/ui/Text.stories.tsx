@@ -30,6 +30,23 @@ export const Variants: Story = {
   ),
 };
 
+/**
+ * The mobile type ramp through the kit Text, with a colour tone set. The
+ * `text-type-*` size has to survive the tone class in tv() (type-scale.ts).
+ */
+export const TypeRamp: Story = {
+  render: () => (
+    <View className="gap-2 p-4">
+      <Text className="font-display text-type-station" tone="primary">Station, primary</Text>
+      <Text className="text-type-title" tone="accent">Title, accent</Text>
+      <Text className="text-type-body">Body, default</Text>
+      <Text className="text-type-body-strong" tone="danger">Body strong, danger</Text>
+      <Text className="text-type-label" tone="muted">Label, muted</Text>
+      <Text variant="caption" className="text-type-caption" tone="muted">Caption, muted</Text>
+    </View>
+  ),
+};
+
 export const Playground: Story = {
   render: (args) => (
     <View className="bg-ink-950 p-4">
