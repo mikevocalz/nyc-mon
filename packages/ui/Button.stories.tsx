@@ -61,6 +61,21 @@ export const GhostSizes: Story = {
   ),
 };
 
+/**
+ * Full-width buttons wrap their label instead of clipping it: at large text
+ * sizes "Already a Caller? Sign in" no longer fits one line on a small phone.
+ * Shown in a 220 pt column, the narrowest a full-width action gets.
+ */
+export const FullWidthWraps: Story = {
+  render: () => (
+    <View className="w-[220px] gap-3 p-4">
+      <Button fullWidth size="lg" title="Already a Caller? Sign in" onPress={() => {}} />
+      <Button fullWidth size="lg" variant="outline" title="Already a Caller? Sign in" onPress={() => {}} />
+      <Button fullWidth size="lg" variant="ghost" title="Already a Caller? Sign in" onPress={() => {}} />
+    </View>
+  ),
+};
+
 /** The `cornerCut` alias still renders the default; every control is live. */
 export const CornerCut: Story = {
   args: { variant: 'cornerCut', district: 'midtown', corner: 'bottom-right', glow: false },

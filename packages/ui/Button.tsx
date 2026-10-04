@@ -47,7 +47,9 @@ const button = tv({
     disabled: {
       true: { root: 'cursor-not-allowed active:translate-x-0 active:translate-y-0', label: 'text-ink-400' },
     },
-    fullWidth: { true: { root: 'w-full self-auto' } },
+    // A full-width label wraps rather than clip at large text sizes (WCAG 1.4.4);
+    // shrink lets it break inside the frame's flex row.
+    fullWidth: { true: { root: 'w-full self-auto', label: 'min-w-0 shrink whitespace-normal text-center' } },
   },
   compoundVariants: [
     // Ghost pads its own root to the framed face's height (CUT_FACE padding plus
