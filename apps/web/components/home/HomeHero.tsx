@@ -42,7 +42,7 @@ export function HomeHero({ starters }: HomeHeroProps) {
         data-testid="w01-hero"
         className="mx-auto w-full max-w-screen-xl flex-1 items-center justify-center gap-8 px-4 py-10 sm:px-6 md:flex-row md:gap-10 md:py-16 lg:px-8"
       >
-        <View className="items-center md:order-2 md:w-5/12">
+        <View className="min-w-0 items-center md:order-2 md:flex-[5_1_0%]">
           <View className="md:hidden">
             <BrandLogo size={208} />
           </View>
@@ -54,7 +54,7 @@ export function HomeHero({ starters }: HomeHeroProps) {
           </View>
         </View>
 
-        <View className="w-full md:order-1 md:w-7/12">
+        <View className="w-full min-w-0 md:order-1 md:flex-[7_1_0%]">
           <SolidPanel surface="page" depth="lg" className="gap-6 px-5 py-7 md:px-8 md:py-9">
             <Heading
               level={1}

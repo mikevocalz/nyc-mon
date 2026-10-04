@@ -1,5 +1,6 @@
-// User theme override — web. The cookie is read server-side in the Next root
-// layout and rendered as <html data-theme=...>, so there is zero flash.
+// User theme override — web. An inline script in apps/web/app/Document.tsx
+// reads the cookie before paint and sets <html data-theme=...>, so there is
+// no flash despite it being client-side.
 export type ThemePreference = 'light' | 'dark' | 'system';
 
 export const THEME_COOKIE = 'app-theme';

@@ -16,7 +16,7 @@ export interface DeviceStageProps {
 }
 
 /** The static capture shown before the canvas mounts, without JavaScript, and under reduced motion. */
-export const DEVICE_CAPTURE = { src: '/home/h-lynk-core.png', width: 960, height: 1200 } as const;
+export const DEVICE_CAPTURE = { src: '/home/h-lynk-core.png', width: 896, height: 1120 } as const;
 
 // Module-level and stable, so three.js and the scene stay out of the first chunk.
 const loadDeviceScene = (): Promise<ThreeSetup<DeviceSceneParams>> =>
@@ -52,7 +52,7 @@ export function DeviceStage({ model = 'placeholder', caption, className }: Devic
       fill
       framed={false}
       sizes="(min-width: 768px) 40vw, 90vw"
-      className="absolute inset-0"
+      className="h-full w-full"
     />
   );
 
