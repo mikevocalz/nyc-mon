@@ -263,6 +263,7 @@
       --color-surface-sunken: #EBECED;
       --color-text: #000000;
       --color-text-muted: #61656A;
+      --color-text-secondary: #484C51;
       --color-text-inverse: #F8F8F8;
       --color-primary: #A35100;
       --color-primary-pressed: #884300;
@@ -299,6 +300,7 @@
       --color-surface-sunken: #000212;
       --color-text: #F8F8F8;
       --color-text-muted: #BEC0C2;
+      --color-text-secondary: #BEC0C2;
       --color-text-inverse: #00041C;
       --color-primary: #FC7C00;
       --color-primary-pressed: #FD9D40;

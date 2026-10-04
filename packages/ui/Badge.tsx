@@ -6,6 +6,7 @@ import type { NeonColorInput } from './neon/colors';
 import { AnimatedView, cssAnimation } from './progress/motion';
 import { View, Text } from './tw';
 import { badgeLegacyLook, type LegacyBadgeTone } from './surface-look';
+import { TYPE_SCALE_TV } from './type-scale';
 
 /**
  * The NYC-MON chip, and the only Badge look: a chunky sports-badge chip.
@@ -23,16 +24,18 @@ const neon = tv({
   },
   variants: {
     size: {
-      xs: { root: 'mb-0.5 mr-0.5', face: 'gap-1 px-1.5 py-0.5', label: 'text-[10px]', dot: 'h-1.5 w-1.5' },
-      sm: { root: 'mb-0.5 mr-0.5', face: 'gap-1.5 px-2 py-1', label: 'text-xs', dot: 'h-2 w-2' },
-      md: { root: 'mb-1 mr-1', plate: 'translate-x-1 translate-y-1', face: 'gap-2 px-3 py-1.5', label: 'text-sm', dot: 'h-2.5 w-2.5' },
+      // Chip text never drops under the 13 pt type-caption floor (docs/DESIGN_SYSTEM.md
+      // "Type"); xs and sm differ in padding, not in type size.
+      xs: { root: 'mb-0.5 mr-0.5', face: 'gap-1 px-1.5 py-0.5', label: 'text-type-caption leading-none', dot: 'h-1.5 w-1.5' },
+      sm: { root: 'mb-0.5 mr-0.5', face: 'gap-1.5 px-2 py-1', label: 'text-type-caption leading-none', dot: 'h-2 w-2' },
+      md: { root: 'mb-1 mr-1', plate: 'translate-x-1 translate-y-1', face: 'gap-2 px-3 py-1.5', label: 'text-sm leading-none', dot: 'h-2.5 w-2.5' },
     },
     shape: {
       pill: { plate: 'rounded-full', face: 'rounded-full' },
       rectangle: { plate: 'rounded-xs', face: 'rounded-xs' },
     },
   },
-});
+}, TYPE_SCALE_TV);
 
 export type BadgeNeonFill = 'solid' | 'outline' | 'ghost';
 export type BadgeDot = 'none' | 'solid' | 'pulse' | 'flicker';
@@ -45,7 +48,8 @@ export interface BadgeProps {
   /**
    * Legacy semantic tone, mapped onto the brand: primary follows the
    * district, accent royal, success leaf, info carolina, danger apple,
-   * inverse a white chip, neutral a night outline chip. `color` wins over it.
+   * inverse a white chip. neutral is the quiet status chip: secondary text on
+   * the sunken surface, following the scheme. `color` wins over it.
    */
   tone?: LegacyBadgeTone;
   /** Colour by neighbourhood. Default midtown (orange). */
@@ -87,6 +91,17 @@ export function Badge({
   const t = TONE_CLASSES[toneName];
   const shape = rounded ? 'pill' : (shapeProp ?? 'rectangle');
   const s = neon({ size, shape });
+  // Neutral is a status chip, not a brand chip: theme tokens, no depth plate, no glow.
+  if (tone === 'neutral' && color === undefined) {
+    return (
+      <View className={s.root({ className })}>
+        <View className={s.face({ className: 'border-border bg-surface-sunken' })}>
+          {dot !== 'none' ? <View aria-hidden className={s.dot({ className: 'bg-text-secondary' })} /> : null}
+          <Text className={s.label({ className: 'text-text-secondary' })}>{label}</Text>
+        </View>
+      </View>
+    );
+  }
   const face =
     fill === 'solid'
       ? `${t.face} border-ink-950`

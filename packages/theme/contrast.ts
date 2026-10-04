@@ -163,7 +163,7 @@ const TONE_TEXT_LINE: Record<string, number> = { orange: 123, royal: 131, caroli
 
 /** Token contract: every semantic text token on every surface, and every on-* on its fill. */
 const CONTRACT: Pair[] = [
-  ...(['text', 'text-muted', 'primary', 'accent', 'success', 'danger', 'info'] as const).flatMap((fg) =>
+  ...(['text', 'text-muted', 'text-secondary', 'primary', 'accent', 'success', 'danger', 'info'] as const).flatMap((fg) =>
     SURFACES.map((s): Pair => ({ id: `contract:${fg}/${s}`, fg, bg: [s], role: 'text', usedAt: [] })),
   ),
   ...(
@@ -268,6 +268,10 @@ const USAGE: Pair[] = [
   { id: 'cta keyline on daylit page', fg: 'orange-950', bg: ['concrete-50'], role: 'ui', usedAt: ['packages/ui/neon/frame-colors.ts:10'], reason: 'the face (orange-500) is 2.38:1 on concrete-50, so the night keyline is the boundary by day' },
   { id: 'cta face on night page', fg: 'orange-500', bg: NIGHT, role: 'ui', usedAt: ['packages/ui/neon/frame-colors.ts:10'], reason: 'after dark the face itself is the boundary; its orange-950 keyline is not' },
 
+  // -- Badge tone="neutral": the quiet status chip, themed (M05 pending badge)
+  { id: 'neutral badge label', fg: 'text-secondary', bg: ['surface-sunken'], role: 'text', usedAt: ['packages/ui/Badge.tsx:100'] },
+  { id: 'neutral badge edge', fg: 'border', bg: ['bg'], role: 'decorative', usedAt: ['packages/ui/Badge.tsx:98'], reason: 'status chip, not a control; its text identifies it' },
+
   // -- night facades (palette steps: mode-invariant) -------------------------
   { id: 'title on night', fg: 'ink-50', bg: NIGHT, role: 'text', usedAt: ['packages/ui/Card.tsx:36', 'packages/ui/cards/neon-field.ts:15', 'packages/ui/ToastCard.tsx:37'] },
   { id: 'white on night', fg: 'white', bg: NIGHT, role: 'text', usedAt: ['packages/ui/charts/StatCard.tsx:54', 'packages/ui/nav/NavBar.tsx:88', 'packages/ui/nav/SiteFooter.tsx:79'] },
@@ -299,10 +303,10 @@ const USAGE: Pair[] = [
   { id: 'banner white on royal face', fg: 'ink-50', bg: ['royal-500'], role: 'text', usedAt: ['packages/ui/district/tones.ts:131', 'packages/ui/future/CircuitButton.tsx:48'] },
   { id: 'night on carolina face', fg: 'ink-950', bg: ['carolina-500'], role: 'text', usedAt: ['packages/ui/district/tones.ts:138', 'packages/ui/future/CircuitButton.tsx:47'] },
   { id: 'night on leaf face', fg: 'ink-950', bg: ['leaf-500'], role: 'text', usedAt: ['packages/ui/district/tones.ts:145'] },
-  { id: 'night on apple face', fg: 'ink-950', bg: ['apple-500'], role: 'text', usedAt: ['packages/ui/district/tones.ts:153', 'packages/ui/Badge.tsx:98', 'packages/ui/dropdown.ts:28', 'packages/ui/nav/NavBar.tsx:103'] },
+  { id: 'night on apple face', fg: 'ink-950', bg: ['apple-500'], role: 'text', usedAt: ['packages/ui/district/tones.ts:153', 'packages/ui/Badge.tsx:113', 'packages/ui/dropdown.ts:28', 'packages/ui/nav/NavBar.tsx:103'] },
   { id: 'white on brick face', fg: 'white', bg: ['orange-800'], role: 'text', usedAt: ['packages/ui/district/tones.ts:160', 'packages/ui/dropdown.ts:30'] },
   { id: 'banner white on brick face', fg: 'ink-50', bg: ['orange-800'], role: 'text', usedAt: ['packages/ui/district/tones.ts:160'] },
-  { id: 'night on white face', fg: 'ink-950', bg: ['ink-50'], role: 'text', usedAt: ['packages/ui/district/tones.ts:167', 'packages/ui/Badge.tsx:98'] },
+  { id: 'night on white face', fg: 'ink-950', bg: ['ink-50'], role: 'text', usedAt: ['packages/ui/district/tones.ts:167', 'packages/ui/Badge.tsx:113'] },
   { id: 'selected event: white on gold-700', fg: 'white', bg: ['gold-700'], role: 'text', usedAt: ['packages/app/features/schedule/accent-classes.ts:50', 'packages/app/features/schedule/accent-classes.ts:51'] },
   { id: 'selected event: white on forest-700', fg: 'white', bg: ['forest-700'], role: 'text', usedAt: ['packages/app/features/schedule/accent-classes.ts:58', 'packages/app/features/schedule/accent-classes.ts:59'] },
   { id: 'selected event: white on sky-700', fg: 'white', bg: ['sky-700'], role: 'text', usedAt: ['packages/app/features/schedule/accent-classes.ts:66', 'packages/app/features/schedule/accent-classes.ts:67'] },

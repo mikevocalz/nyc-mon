@@ -254,6 +254,7 @@
   --color-surface-sunken: light-dark(#EBECED, #000212);
   --color-text: light-dark(#000000, #F8F8F8);
   --color-text-muted: light-dark(#61656A, #BEC0C2);
+  --color-text-secondary: light-dark(#484C51, #BEC0C2);
   --color-text-inverse: light-dark(#F8F8F8, #00041C);
   --color-primary: light-dark(#A35100, #FC7C00);
   --color-primary-pressed: light-dark(#884300, #FD9D40);

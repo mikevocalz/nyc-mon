@@ -67,3 +67,33 @@ export const Rounded: Story = {
     </View>
   ),
 };
+
+/**
+ * `tone="neutral"`: a quiet status chip that follows the scheme, secondary
+ * text on the sunken surface (concrete-700 on concrete-100 by day, silver on
+ * night). Every size, on the page and on the raised surface.
+ */
+export const Neutral: Story = {
+  render: () => (
+    <View className="gap-3 p-4">
+      {(['bg-bg', 'bg-surface-raised'] as const).map((surface) => (
+        <View key={surface} className={`flex-row flex-wrap items-center gap-3 p-3 ${surface}`}>
+          <Badge tone="neutral" size="xs" label="Waiting for a grown-up" />
+          <Badge tone="neutral" size="sm" label="Waiting for a grown-up" />
+          <Badge tone="neutral" size="md" label="Waiting for a grown-up" dot="solid" />
+        </View>
+      ))}
+    </View>
+  ),
+};
+
+/** No chip text is set under the 13 pt type-caption floor: xs and sm read at 13, md at 14. */
+export const TextFloor: Story = {
+  render: () => (
+    <View className="flex-row flex-wrap items-center gap-3 p-4">
+      <Badge size="xs" label="New" />
+      <Badge size="sm" label="Live" dot="pulse" />
+      <Badge size="md" label="Sold out" color="apple" />
+    </View>
+  ),
+};

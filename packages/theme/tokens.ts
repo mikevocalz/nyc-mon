@@ -127,6 +127,8 @@ export const semantic = {
   'surface-sunken': { light: concrete[100], dark: '#000212' },
   text: { light: signage.black, dark: brand.white },
   'text-muted': { light: concrete[600], dark: brand.silver },
+  /** Secondary text with more weight than muted: quiet status chips (Badge tone="neutral"). */
+  'text-secondary': { light: concrete[700], dark: brand.silver },
   'text-inverse': { light: brand.white, dark: brand.night },
   /**
    * Kept for existing screens, which draw it as text (orange-700 on daylit).

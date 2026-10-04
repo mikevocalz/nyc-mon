@@ -18,7 +18,7 @@ The registry lives in `packages/theme/contrast.ts`; `packages/theme/contrast.tes
 
 <!-- contrast:summary:start -->
 
-- 365 measured rows: 341 pass, 0 fail, 24 exempt (decorative or disabled).
+- 377 measured rows: 351 pass, 0 fail, 26 exempt (decorative or disabled).
 
 <!-- contrast:summary:end -->
 - Semantic tokens are measured in light and dark. Palette steps (`orange-500`, `ink-950`) do not change with the theme and get one `both` row.
@@ -200,6 +200,10 @@ The test keeps these honest: each forbidden pair below must still measure under 
 | cta button label | dark | `on-cta` #00041C | `cta` #FC7C00 | 7.76 | text (4.5) | pass | `packages/ui/Button.tsx:117`, `packages/ui/control-look.ts:47` |
 | cta keyline on daylit page | both | `orange-950` #3C1E00 | `concrete-50` #F3F4F4 | 13.83 | ui (3) | pass | `packages/ui/neon/frame-colors.ts:10`; the face (orange-500) is 2.38:1 on concrete-50, so the night keyline is the boundary by day |
 | cta face on night page | both | `orange-500` #FC7C00 | `ink-950` #00041C | 7.76 | ui (3) | pass | `packages/ui/neon/frame-colors.ts:10`; after dark the face itself is the boundary; its orange-950 keyline is not |
+| neutral badge label | light | `text-secondary` #484C51 | `surface-sunken` #EBECED | 7.31 | text (4.5) | pass | `packages/ui/Badge.tsx:100` |
+| neutral badge label | dark | `text-secondary` #BEC0C2 | `surface-sunken` #000212 | 11.31 | text (4.5) | pass | `packages/ui/Badge.tsx:100` |
+| neutral badge edge | light | `border` #D2D4D6 | `bg` #F3F4F4 | 1.35 | decorative (0) | exempt | `packages/ui/Badge.tsx:98`; status chip, not a control; its text identifies it |
+| neutral badge edge | dark | `border` #1A2E6E | `bg` #00041C | 1.61 | decorative (0) | exempt | `packages/ui/Badge.tsx:98`; status chip, not a control; its text identifies it |
 | title on night | both | `ink-50` #F8F8F8 | `ink-950` #00041C | 19.12 | text (4.5) | pass | `packages/ui/Card.tsx:36`, `packages/ui/cards/neon-field.ts:15`, `packages/ui/ToastCard.tsx:37` |
 | white on night | both | `white` #FFFFFF | `ink-950` #00041C | 20.31 | text (4.5) | pass | `packages/ui/charts/StatCard.tsx:54`, `packages/ui/nav/NavBar.tsx:88`, `packages/ui/nav/SiteFooter.tsx:79` |
 | table cell on stripe | both | `silver-100` #F6F6F6 | `ink-900` #14182E | 16.20 | text (4.5) | pass | `packages/ui/DataTable.tsx:44`, `packages/ui/DataTable.tsx:53` |
@@ -228,10 +232,10 @@ The test keeps these honest: each forbidden pair below must still measure under 
 | banner white on royal face | both | `ink-50` #F8F8F8 | `royal-500` #0058F8 | 5.27 | text (4.5) | pass | `packages/ui/district/tones.ts:131`, `packages/ui/future/CircuitButton.tsx:48` |
 | night on carolina face | both | `ink-950` #00041C | `carolina-500` #4BA8F0 | 7.89 | text (4.5) | pass | `packages/ui/district/tones.ts:138`, `packages/ui/future/CircuitButton.tsx:47` |
 | night on leaf face | both | `ink-950` #00041C | `leaf-500` #3FAE3A | 7.09 | text (4.5) | pass | `packages/ui/district/tones.ts:145` |
-| night on apple face | both | `ink-950` #00041C | `apple-500` #F80000 | 4.83 | text (4.5) | pass | `packages/ui/district/tones.ts:153`, `packages/ui/Badge.tsx:98`, `packages/ui/dropdown.ts:28`, `packages/ui/nav/NavBar.tsx:103` |
+| night on apple face | both | `ink-950` #00041C | `apple-500` #F80000 | 4.83 | text (4.5) | pass | `packages/ui/district/tones.ts:153`, `packages/ui/Badge.tsx:113`, `packages/ui/dropdown.ts:28`, `packages/ui/nav/NavBar.tsx:103` |
 | white on brick face | both | `white` #FFFFFF | `orange-800` #884300 | 7.37 | text (4.5) | pass | `packages/ui/district/tones.ts:160`, `packages/ui/dropdown.ts:30` |
 | banner white on brick face | both | `ink-50` #F8F8F8 | `orange-800` #884300 | 6.94 | text (4.5) | pass | `packages/ui/district/tones.ts:160` |
-| night on white face | both | `ink-950` #00041C | `ink-50` #F8F8F8 | 19.12 | text (4.5) | pass | `packages/ui/district/tones.ts:167`, `packages/ui/Badge.tsx:98` |
+| night on white face | both | `ink-950` #00041C | `ink-50` #F8F8F8 | 19.12 | text (4.5) | pass | `packages/ui/district/tones.ts:167`, `packages/ui/Badge.tsx:113` |
 | selected event: white on gold-700 | both | `white` #FFFFFF | `gold-700` #A35100 | 5.62 | text (4.5) | pass | `packages/app/features/schedule/accent-classes.ts:50`, `packages/app/features/schedule/accent-classes.ts:51` |
 | selected event: white on forest-700 | both | `white` #FFFFFF | `forest-700` #2C7A29 | 5.35 | text (4.5) | pass | `packages/app/features/schedule/accent-classes.ts:58`, `packages/app/features/schedule/accent-classes.ts:59` |
 | selected event: white on sky-700 | both | `white` #FFFFFF | `sky-700` #3577B0 | 4.75 | text (4.5) | pass | `packages/app/features/schedule/accent-classes.ts:66`, `packages/app/features/schedule/accent-classes.ts:67` |
@@ -323,6 +327,14 @@ The test keeps these honest: each forbidden pair below must still measure under 
 | contract:text-muted/surface-raised | dark | `text-muted` #BEC0C2 | `surface-raised` #0A1230 | 10.08 | text (4.5) | pass | token contract |
 | contract:text-muted/surface-sunken | light | `text-muted` #61656A | `surface-sunken` #EBECED | 4.96 | text (4.5) | pass | token contract |
 | contract:text-muted/surface-sunken | dark | `text-muted` #BEC0C2 | `surface-sunken` #000212 | 11.31 | text (4.5) | pass | token contract |
+| contract:text-secondary/bg | light | `text-secondary` #484C51 | `bg` #F3F4F4 | 7.85 | text (4.5) | pass | token contract |
+| contract:text-secondary/bg | dark | `text-secondary` #BEC0C2 | `bg` #00041C | 11.13 | text (4.5) | pass | token contract |
+| contract:text-secondary/surface | light | `text-secondary` #484C51 | `surface` #F3F4F4 | 7.85 | text (4.5) | pass | token contract |
+| contract:text-secondary/surface | dark | `text-secondary` #BEC0C2 | `surface` #00041C | 11.13 | text (4.5) | pass | token contract |
+| contract:text-secondary/surface-raised | light | `text-secondary` #484C51 | `surface-raised` #FFFFFF | 8.65 | text (4.5) | pass | token contract |
+| contract:text-secondary/surface-raised | dark | `text-secondary` #BEC0C2 | `surface-raised` #0A1230 | 10.08 | text (4.5) | pass | token contract |
+| contract:text-secondary/surface-sunken | light | `text-secondary` #484C51 | `surface-sunken` #EBECED | 7.31 | text (4.5) | pass | token contract |
+| contract:text-secondary/surface-sunken | dark | `text-secondary` #BEC0C2 | `surface-sunken` #000212 | 11.31 | text (4.5) | pass | token contract |
 | contract:primary/bg | light | `primary` #A35100 | `bg` #F3F4F4 | 5.10 | text (4.5) | pass | token contract |
 | contract:primary/bg | dark | `primary` #FC7C00 | `bg` #00041C | 7.76 | text (4.5) | pass | token contract |
 | contract:primary/surface | light | `primary` #A35100 | `surface` #F3F4F4 | 5.10 | text (4.5) | pass | token contract |
