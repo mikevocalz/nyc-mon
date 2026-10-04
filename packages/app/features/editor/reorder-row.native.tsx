@@ -73,7 +73,7 @@ export function ReorderRow({
     <Animated.View
       style={[style, { position: 'absolute', top: index * rowHeight, left: 0, right: 0 }]}
     >
-      <View className="mb-2 h-12 flex-row items-center gap-3 rounded-md border-2 border-border bg-surface-raised px-3">
+      <View className="mb-2 h-12 flex-row items-center gap-3 rounded-none border-2 border-border bg-surface-raised px-3">
         <GestureDetector gesture={pan}>
           <View aria-label={`Reorder ${label}`} className="h-11 w-8 items-center justify-center">
             <GripVertical size={18} className="text-text-muted" />

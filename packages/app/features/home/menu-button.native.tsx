@@ -28,7 +28,7 @@ export function MenuButton({ className, outerClassName, iconSize = 20 }: MenuBut
     <PressScale
       aria-label="Open menu"
       onPress={openDrawer}
-      className={`items-center justify-center rounded-md border-2 border-border bg-surface-raised ${className ?? 'h-10 w-10'}`}
+      className={`items-center justify-center rounded-none border-2 border-border bg-surface-raised ${className ?? 'h-10 w-10'}`}
       outerClassName={outerClassName ?? 'self-start'}
     >
       <Menu size={iconSize} className="text-text-muted" />

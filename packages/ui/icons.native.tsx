@@ -59,6 +59,7 @@ export const ListChecks = icon(L.ListChecks as React.ComponentType<object>, 'Lis
 export const Quote = icon(L.Quote as React.ComponentType<object>, 'Quote');
 export const ImagePlus = icon(L.ImagePlus as React.ComponentType<object>, 'ImagePlus');
 export const ChevronLeft = icon(L.ChevronLeft as React.ComponentType<object>, 'ChevronLeft');
+export const ChevronDown = icon(L.ChevronDown as React.ComponentType<object>, 'ChevronDown');
 export const Menu = icon(L.Menu as React.ComponentType<object>, 'Menu');
 export const X = icon(L.X as React.ComponentType<object>, 'X');
 export const Check = icon(L.Check as React.ComponentType<object>, 'Check');

@@ -83,14 +83,14 @@ export function AttachSheet() {
           hanging off the bottom-right corner over the screen behind. The height
           cap keeps the card inside the viewport on a short window, and the drop
           zone gives up its own space first. */}
-      <View className="w-full max-w-lg gap-4 overflow-hidden rounded-card border-2 border-border bg-surface-raised p-5 shadow-overlay">
+      <View className="w-full max-w-lg gap-4 overflow-hidden rounded-none border-2 border-border bg-surface-raised p-5 shadow-overlay">
         <View className="flex-row items-center gap-2">
           <Paperclip size={20} className="text-accent" />
           <Text className="flex-1 text-lg font-semibold text-text md:text-xl">Attach a file</Text>
           <Pressable
             aria-label="Close"
             onPress={onClose}
-            className="h-11 w-11 items-center justify-center rounded-md border-2 border-border bg-surface transition-colors duration-fast hover:bg-surface-sunken active:bg-surface-sunken motion-reduce:transition-none"
+            className="h-11 w-11 items-center justify-center rounded-none border-2 border-border bg-surface transition-colors duration-fast hover:bg-surface-sunken active:bg-surface-sunken motion-reduce:transition-none"
           >
             <X size={18} className="text-text-muted" />
           </Pressable>
@@ -116,7 +116,7 @@ export function AttachSheet() {
           }}
         >
           <View className="h-full w-full items-center justify-center gap-3">
-            <View className="h-16 w-16 items-center justify-center rounded-md border-2 border-border bg-surface-raised shadow-card">
+            <View className="h-16 w-16 items-center justify-center rounded-none border-2 border-border bg-surface-raised shadow-card">
               <CloudUpload size={28} className={hovering ? 'text-accent' : 'text-text-muted'} />
             </View>
             <Text className="text-center text-base font-semibold text-text md:text-lg">
@@ -126,7 +126,7 @@ export function AttachSheet() {
               role="button"
               aria-label="Browse files"
               onPress={() => void choose()}
-              className="min-h-11 items-center justify-center rounded-md border-2 border-border bg-surface-raised px-4 py-2 transition-colors duration-fast hover:bg-surface-sunken active:bg-surface-sunken motion-reduce:transition-none"
+              className="min-h-11 items-center justify-center rounded-none border-2 border-border bg-surface-raised px-4 py-2 transition-colors duration-fast hover:bg-surface-sunken active:bg-surface-sunken motion-reduce:transition-none"
             >
               <Text className="text-sm font-medium text-text md:text-base">Browse files</Text>
             </Pressable>
@@ -156,7 +156,7 @@ export function AttachSheet() {
             {/* The track is full-width; the fill is the measured ratio. An
                 indeterminate transfer fills the track rather than sitting at
                 zero, which would read as stalled. */}
-            <View className="h-3 overflow-hidden rounded-sm border-2 border-border bg-surface-sunken">
+            <View className="h-3 overflow-hidden rounded-none border-2 border-border bg-surface-sunken">
               <MotionView
                 animate={{ width: `${progress.phase === 'done' || indeterminate ? 100 : percent}%` }}
                 transition={{ type: 'timing', duration: 160 }}

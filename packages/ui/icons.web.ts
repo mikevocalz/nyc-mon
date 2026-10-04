@@ -48,6 +48,7 @@ export {
   Quote,
   ImagePlus,
   ChevronLeft,
+  ChevronDown,
   Menu,
   X,
   Check,

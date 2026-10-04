@@ -5,29 +5,36 @@ import { TONE_CLASSES, resolveControlTone, type ControlTone, type District } fro
 import { initialsOf } from './surface-look';
 
 /**
- * The NYC-MON avatar: a jersey-number tile. A solid tone face in a night
- * keyline over a depth plate stepped down and right, initials in the display
- * face. Plate and face both sit inside the box the size (or a caller's
- * className, e.g. `md:h-11 md:w-11`) sets, so the tile never spills into
- * the row around it.
+ * The NYC-MON avatar, cut like a cell of the neon DataTable: a square night
+ * tile in an ink keyline with the table's cornice brackets at each corner in
+ * the district tone, initials in the display face and the tone's text step.
+ * Square everywhere; nothing about it is round. The brackets sit inside the
+ * box the size (or a caller's className, e.g. `md:h-11 md:w-11`) sets, so the
+ * tile never spills into the row around it.
  */
 const avatar = tv({
   slots: {
-    root: 'relative',
-    plate: 'absolute bottom-0 right-0',
-    face: 'absolute left-0 top-0 items-center justify-center overflow-hidden border-2 border-ink-950',
+    root: 'relative overflow-hidden border-2 border-ink-800 bg-ink-900',
+    face: 'absolute inset-0 items-center justify-center',
     initials: 'font-display leading-none',
+    bracket: 'absolute',
   },
   variants: {
     size: {
-      sm: { root: 'h-8 w-8', plate: 'left-0.5 top-0.5', face: 'bottom-0.5 right-0.5', initials: 'text-[11px]' },
-      md: { root: 'h-11 w-11', plate: 'left-1 top-1', face: 'bottom-1 right-1', initials: 'text-sm' },
-      lg: { root: 'h-16 w-16', plate: 'left-1.5 top-1.5', face: 'bottom-1.5 right-1.5', initials: 'text-xl' },
-      xl: { root: 'h-24 w-24', plate: 'left-2 top-2', face: 'bottom-2 right-2 border-[3px]', initials: 'text-3xl' },
+      sm: { root: 'h-8 w-8', initials: 'text-[11px]', bracket: 'h-2 w-2' },
+      md: { root: 'h-11 w-11', initials: 'text-sm', bracket: 'h-2.5 w-2.5' },
+      lg: { root: 'h-16 w-16', initials: 'text-xl', bracket: 'h-3.5 w-3.5' },
+      xl: { root: 'h-24 w-24', initials: 'text-3xl', bracket: 'h-5 w-5' },
     },
   },
   defaultVariants: { size: 'md' },
 });
+
+// The DataTable's cornice brackets, one per corner. Heavier on the larger tiles.
+const CORNERS = {
+  thin: ['left-0 top-0 border-l-2 border-t-2', 'right-0 top-0 border-r-2 border-t-2', 'bottom-0 left-0 border-b-2 border-l-2', 'bottom-0 right-0 border-b-2 border-r-2'],
+  thick: ['left-0 top-0 border-l-4 border-t-4', 'right-0 top-0 border-r-4 border-t-4', 'bottom-0 left-0 border-b-4 border-l-4', 'bottom-0 right-0 border-b-4 border-r-4'],
+} as const;
 
 export interface AvatarProps {
   name: string;
@@ -35,28 +42,29 @@ export interface AvatarProps {
   /** Default md (44px). */
   size?: 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
-  /** Tile colour by neighbourhood. Default midtown (orange). */
+  /** Bracket and initials colour by neighbourhood. Default midtown (orange). */
   district?: District;
-  /** Tile colour; overrides the district. */
+  /** Bracket and initials colour; overrides the district. */
   tone?: ControlTone;
 }
 
-export function Avatar({ name, imageUri, size, className, district, tone }: AvatarProps) {
-  const toneName = resolveControlTone(tone, district);
-  const t = TONE_CLASSES[toneName];
-  // Small initials need 4.5:1; white on apple-500 is 3.96:1, night is 4.83:1.
-  const on = toneName === 'apple' ? 'text-ink-950' : t.onFace;
+export function Avatar({ name, imageUri, size = 'md', className, district, tone }: AvatarProps) {
+  const t = TONE_CLASSES[resolveControlTone(tone, district)];
   const s = avatar({ size });
+  const corners = size === 'lg' || size === 'xl' ? CORNERS.thick : CORNERS.thin;
   return (
     <View role="img" aria-label={name} className={s.root({ className })}>
-      <View aria-hidden className={s.plate({ className: t.plate })} />
-      <View className={s.face({ className: t.face })}>
+      <View className={s.face()}>
         {imageUri ? (
           <SolitoImage src={imageUri} alt="" fill unoptimized contentFit="cover" sizes="96px" />
         ) : (
-          <Text aria-hidden className={s.initials({ className: on })}>{initialsOf(name)}</Text>
+          // Tone text steps hold 4.5:1 on night (district.test.ts checks them).
+          <Text aria-hidden className={s.initials({ className: t.text })}>{initialsOf(name)}</Text>
         )}
       </View>
+      {corners.map((pos) => (
+        <View key={pos} aria-hidden pointerEvents="none" className={s.bracket({ className: `${pos} ${t.controlBorder}` })} />
+      ))}
     </View>
   );
 }

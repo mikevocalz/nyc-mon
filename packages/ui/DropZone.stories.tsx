@@ -48,10 +48,10 @@ export const Basic: Story = {
                   src={a.uri}
                   alt={a.fileName ?? 'Dropped image'}
                   unoptimized
-                  className="h-24 w-24 rounded-lg border border-border/60 shadow-card"
+                  className="h-24 w-24 rounded-none border border-border/60 shadow-card"
                 />
               ) : (
-                <View key={i} className="flex-row items-center gap-2 rounded-full border border-border bg-surface-raised px-3 py-1.5 shadow-card">
+                <View key={i} className="flex-row items-center gap-2 rounded-none border border-border bg-surface-raised px-3 py-1.5 shadow-card">
                   <TWText className="text-sm">📄</TWText>
                   <Text variant="caption">{a.fileName ?? a.text ?? a.type}</Text>
                 </View>

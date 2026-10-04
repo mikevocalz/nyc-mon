@@ -56,7 +56,7 @@ export function UrlSheet() {
       */}
       <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
       <View className="flex-1 items-center justify-center bg-ink-950/40 p-6">
-        <View className="w-full max-w-md gap-4 overflow-hidden rounded-card border-2 border-border bg-surface-raised p-5 shadow-overlay">
+        <View className="w-full max-w-md gap-4 overflow-hidden rounded-none border-2 border-border bg-surface-raised p-5 shadow-overlay">
           <View className="flex-row items-center gap-2">
             {isYouTube ? (
               <Video size={20} className="text-accent" />
@@ -69,7 +69,7 @@ export function UrlSheet() {
             <Pressable
               aria-label="Close"
               onPress={() => close(null)}
-              className="h-11 w-11 items-center justify-center rounded-md border-2 border-border bg-surface transition-colors duration-fast hover:bg-surface-sunken active:bg-surface-sunken motion-reduce:transition-none"
+              className="h-11 w-11 items-center justify-center rounded-none border-2 border-border bg-surface transition-colors duration-fast hover:bg-surface-sunken active:bg-surface-sunken motion-reduce:transition-none"
             >
               <X size={18} className="text-text-muted" />
             </Pressable>

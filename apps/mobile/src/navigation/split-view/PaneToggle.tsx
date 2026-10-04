@@ -80,7 +80,7 @@ export function PaneToggle({ pane, columnCount, className }: PaneToggleProps) {
       // A white slab on the primary field, so the control stays legible
       // against it; the icon takes the accent rather than ink, which is what
       // separates an action from the header's own text.
-      className={`h-11 w-11 items-center justify-center rounded-md border-2 border-border bg-surface-raised transition-colors duration-fast hover:bg-surface-sunken active:bg-surface-sunken motion-reduce:transition-none ${className ?? ''}`}
+      className={`h-11 w-11 items-center justify-center rounded-none border-2 border-border bg-surface-raised transition-colors duration-fast hover:bg-surface-sunken active:bg-surface-sunken motion-reduce:transition-none ${className ?? ''}`}
     >
       {/* Rotation only — a native-driven property, so it never shares a node
           with the pane width animation on the JS thread. The supplementary

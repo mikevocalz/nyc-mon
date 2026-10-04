@@ -9,6 +9,7 @@ import { Header, Link, List, ListItem, Nav } from '../primitives';
 import { useInstanceStore, useStore } from '../use-instance-store';
 import { Pressable, Text, View } from '../tw';
 import { SkylineBand } from './SkylineBand';
+import { NeonChevron } from '../neon/NeonChevron';
 
 export interface NavItem {
   label: string;
@@ -57,7 +58,7 @@ const bar = tv({
     root: 'z-50 w-full',
     // z-10: dropdowns paint over the keyline and skyline that follow.
     inner: 'relative z-10 mx-auto w-full max-w-screen-2xl flex-row items-center gap-4 px-4 py-3 md:px-6',
-    logo: 'rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus',
+    logo: 'rounded-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus',
     links: 'hidden flex-1 flex-row items-center gap-1 md:flex',
     // `flex`: on web the Link primitive is an inline anchor, so flex-row alone does nothing.
     link: 'flex min-h-11 flex-row items-center gap-1.5 px-3.5 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus',
@@ -163,7 +164,7 @@ export function NavBar({
                       className={linkClass(item)}
                     >
                       <Text className={textClass(item)}>{item.label}</Text>
-                      <Text className={twMerge(textClass(item), 'text-xs')}>{dropdown === i ? '▲' : '▼'}</Text>
+                      <NeonChevron open={dropdown === i} tone={tone} size="sm" plain={!item.active} />
                     </Pressable>
                     {dropdown === i ? (
                       <List className={s.menu()}>

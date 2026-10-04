@@ -17,7 +17,7 @@ function NotificationRow({ item, index }: { item: Notification; index: number })
           item.read ? '' : 'bg-primary/5'
         }`}
       >
-        <View className={`h-10 w-10 items-center justify-center rounded-xl ${WELL[item.tone]}`}>
+        <View className={`h-10 w-10 items-center justify-center rounded-none ${WELL[item.tone]}`}>
           <item.icon size={18} className={INK[item.tone]} />
         </View>
         <View className="flex-1 gap-0.5">
@@ -40,7 +40,7 @@ function Group({ label, items, offset }: { label: string; items: Notification[];
   return (
     <Section className="gap-2">
       <Text variant="label" tone="muted">{label}</Text>
-      <View className="overflow-hidden rounded-card border-2 border-border bg-surface-raised shadow-card">
+      <View className="overflow-hidden rounded-none border-2 border-border bg-surface-raised shadow-card">
         {items.map((item, i) => (
           <View key={item.id} className={i > 0 ? 'border-t-2 border-border' : ''}>
             <NotificationRow item={item} index={offset + i} />

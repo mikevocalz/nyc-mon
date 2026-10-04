@@ -10,7 +10,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 const Block = () => (
-  <View className="rounded-card bg-surface-raised p-6 shadow-card">
+  <View className="rounded-none bg-surface-raised p-6 shadow-card">
     <Text className="text-text">
       Cards fill their container — the container owns the cap (§8.2).
     </Text>

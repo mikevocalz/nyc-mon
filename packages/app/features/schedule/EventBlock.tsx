@@ -50,7 +50,7 @@ function EventBlockImpl({
       }}
       // Fills the EventDrag wrapper, which owns the absolute geometry so the
       // native fork has something to animate.
-      className={`absolute inset-0 overflow-hidden rounded-md ${
+      className={`absolute inset-0 overflow-hidden rounded-none ${
         selected ? classes.selectedSurface : classes.surface
       }`}
     >

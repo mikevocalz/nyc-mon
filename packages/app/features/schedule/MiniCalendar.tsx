@@ -48,7 +48,7 @@ export function MiniCalendar({
   const weeks = monthMatrix(month);
 
   return (
-    <View className="gap-2 rounded-md border-2 border-border bg-surface-raised p-3 shadow-card">
+    <View className="gap-2 rounded-none border-2 border-border bg-surface-raised p-3 shadow-card">
       <View className="flex-row items-center justify-between">
         <IconButton
           variant="ghost"
@@ -94,7 +94,7 @@ export function MiniCalendar({
                 className="items-center"
               >
                 <View
-                  className={`h-7 w-7 items-center justify-center rounded-md ${
+                  className={`h-7 w-7 items-center justify-center rounded-none ${
                     isSelected
                       ? 'bg-primary'
                       : isToday

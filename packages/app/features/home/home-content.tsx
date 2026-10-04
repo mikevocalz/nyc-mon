@@ -41,9 +41,9 @@ export function HomeContent() {
 
       {/* Hero banner */}
       <FadeIn delay={80}>
-        <PressScale className="w-full overflow-hidden rounded-card bg-primary p-6 shadow-card" outerClassName="w-full">
-          <View aria-hidden className="absolute -right-8 -top-10 h-36 w-36 rounded-full bg-ink-50/10" />
-          <View aria-hidden className="absolute -bottom-12 right-16 h-28 w-28 rounded-full bg-ink-50/5" />
+        <PressScale className="w-full overflow-hidden rounded-none bg-primary p-6 shadow-card" outerClassName="w-full">
+          <View aria-hidden className="absolute -right-8 -top-10 h-36 w-36 rounded-none bg-ink-50/10" />
+          <View aria-hidden className="absolute -bottom-12 right-16 h-28 w-28 rounded-none bg-ink-50/5" />
           <View className="gap-1">
             <TWText className="text-sm font-semibold text-on-primary">
               Weekly summary
@@ -65,10 +65,10 @@ export function HomeContent() {
             {STATS.map((stat, i) => (
               <ScaleIn key={stat.label} delay={180 + i * 50} className="min-w-36 flex-1 basis-[45%]">
                 <PressScale
-                  className="w-full gap-2 rounded-card border-2 border-border bg-surface-raised p-4 shadow-card"
+                  className="w-full gap-2 rounded-none border-2 border-border bg-surface-raised p-4 shadow-card"
                   outerClassName="w-full"
                 >
-                  <View className={`h-9 w-9 items-center justify-center rounded-lg ${WELL[stat.tone]}`}>
+                  <View className={`h-9 w-9 items-center justify-center rounded-none ${WELL[stat.tone]}`}>
                     <stat.icon size={18} className={INK[stat.tone]} />
                   </View>
                   <TWText className="text-2xl font-bold text-text">{stat.value}</TWText>
@@ -93,10 +93,10 @@ export function HomeContent() {
             {QUICK_ACTIONS.map((action, i) => (
               <FadeIn key={action.label} delay={280 + i * 40} className="min-w-20 flex-1">
                 <PressScale
-                  className="w-full items-center gap-2 rounded-card border-2 border-border bg-surface-raised px-3 py-4"
+                  className="w-full items-center gap-2 rounded-none border-2 border-border bg-surface-raised px-3 py-4"
                   outerClassName="w-full"
                 >
-                  <View className={`h-11 w-11 items-center justify-center rounded-xl ${WELL[action.tone]}`}>
+                  <View className={`h-11 w-11 items-center justify-center rounded-none ${WELL[action.tone]}`}>
                     <action.icon size={22} className={INK[action.tone]} />
                   </View>
                   <Text variant="caption" tone="muted">{action.label}</Text>
@@ -112,7 +112,7 @@ export function HomeContent() {
         <Section className="gap-3">
           <View className="flex-row items-center justify-between">
             <Text variant="label" tone="muted">Active projects</Text>
-            <PressScale onPress={() => {}} className="rounded-md px-2 py-1" outerClassName="self-start">
+            <PressScale onPress={() => {}} className="rounded-none px-2 py-1" outerClassName="self-start">
               <Text variant="caption" className="font-bold text-text underline">See all</Text>
             </PressScale>
           </View>
@@ -125,9 +125,9 @@ export function HomeContent() {
                     <TWText className="flex-1 text-base font-semibold text-text">{project.name}</TWText>
                     <TWText className={`text-sm font-bold ${INK[project.tone]}`}>{project.progress}%</TWText>
                   </View>
-                  <View className="h-2 overflow-hidden rounded-full bg-surface-sunken">
+                  <View className="h-2 overflow-hidden rounded-none bg-surface-sunken">
                     <View
-                      className={`h-full rounded-full ${BAR[project.tone]} ${
+                      className={`h-full rounded-none ${BAR[project.tone]} ${
                         project.progress > 90 ? 'w-[95%]' : project.progress > 75 ? 'w-4/5' : 'w-3/5'
                       }`}
                     />

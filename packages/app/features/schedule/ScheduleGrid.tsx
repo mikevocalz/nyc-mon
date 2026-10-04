@@ -177,7 +177,7 @@ export function ScheduleGrid({ day, now }: ScheduleGridProps) {
 
   return (
     <View
-      className="flex-1 overflow-hidden rounded-sheet border border-border bg-surface-raised"
+      className="flex-1 overflow-hidden rounded-none border border-border bg-surface-raised"
       onLayout={(event) => widthStore.current?.getState().measure(event.nativeEvent.layout.width)}
     >
       <ScrollView horizontal className="flex-1" contentContainerClassName="grow">

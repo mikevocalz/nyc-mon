@@ -22,14 +22,14 @@ export function AudioRecorderSheet() {
   return (
     <Modal visible={open} transparent animationType="fade" onRequestClose={() => resolve(null)}>
       <View className="flex-1 items-center justify-center bg-ink-950/40 p-6">
-        <View className="w-full max-w-md gap-5 overflow-hidden rounded-card border-2 border-border bg-surface-raised p-5 shadow-overlay">
+        <View className="w-full max-w-md gap-5 overflow-hidden rounded-none border-2 border-border bg-surface-raised p-5 shadow-overlay">
           <View className="flex-row items-center gap-2">
             <Mic size={20} className="text-accent" />
             <Text className="flex-1 text-lg font-semibold text-text md:text-xl">Voice note</Text>
             <Pressable
               aria-label="Close"
               onPress={() => resolve(null)}
-              className="h-11 w-11 items-center justify-center rounded-md border-2 border-border bg-surface transition-colors duration-fast hover:bg-surface-sunken active:bg-surface-sunken motion-reduce:transition-none"
+              className="h-11 w-11 items-center justify-center rounded-none border-2 border-border bg-surface transition-colors duration-fast hover:bg-surface-sunken active:bg-surface-sunken motion-reduce:transition-none"
             >
               <X size={18} className="text-text-muted" />
             </Pressable>

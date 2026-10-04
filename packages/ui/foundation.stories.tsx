@@ -19,7 +19,7 @@ function Swatch({ name, value }: { name: string; value: string }) {
   return (
     <View className="items-center gap-1">
       <View
-        className="h-14 w-14 rounded-md border border-border"
+        className="h-14 w-14 rounded-none border border-border"
         style={{ backgroundColor: value }}
       />
       <Text className="text-xs text-text-muted">{name}</Text>
@@ -107,8 +107,8 @@ export const Colors: Story = {
           {Object.entries(semantic).map(([name, { light, dark }]) => (
             <View key={name} className="items-center gap-1">
               <View className="flex-row">
-                <View className="h-14 w-7 rounded-l-md" style={{ backgroundColor: light }} />
-                <View className="h-14 w-7 rounded-r-md" style={{ backgroundColor: dark }} />
+                <View className="h-14 w-7 rounded-none" style={{ backgroundColor: light }} />
+                <View className="h-14 w-7 rounded-none" style={{ backgroundColor: dark }} />
               </View>
               <Text className="text-xs text-text-muted">{name}</Text>
             </View>
@@ -170,7 +170,7 @@ export const ContentWidths: Story = {
       {Object.entries(contentWidths).map(([name, width]) => (
         <View key={name} className="gap-1">
           <Text className="text-xs text-text-muted">{name}: {width}</Text>
-          <View className="h-8 rounded-sm bg-accent" style={{ maxWidth: width as never, width: '100%' }} />
+          <View className="h-8 rounded-none bg-accent" style={{ maxWidth: width as never, width: '100%' }} />
         </View>
       ))}
     </View>

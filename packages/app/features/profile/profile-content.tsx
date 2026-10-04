@@ -47,12 +47,12 @@ export function ProfileContent() {
           </View>
           <View className="flex-row flex-wrap gap-2">
             {TAGS.map((tag) => (
-              <View key={tag} className="rounded-sm border-2 border-border bg-primary/20 px-3 py-1">
+              <View key={tag} className="rounded-none border-2 border-border bg-primary/20 px-3 py-1">
                 <Text variant="caption" className="font-semibold text-text">{tag}</Text>
               </View>
             ))}
           </View>
-          <View className="flex-row overflow-hidden rounded-card border-2 border-border bg-surface-raised shadow-card">
+          <View className="flex-row overflow-hidden rounded-none border-2 border-border bg-surface-raised shadow-card">
             {STATS.map((stat, i) => (
               <View key={stat.label} className={`flex-1 items-center gap-0.5 py-4 ${i > 0 ? 'border-l-2 border-border' : ''}`}>
                 <Text variant="heading">{stat.value}</Text>
@@ -80,10 +80,10 @@ export function ProfileContent() {
         <PressScale
           aria-label="Open settings"
           onPress={() => router.push('/settings')}
-          className="w-full flex-row items-center gap-3 rounded-card border-2 border-border bg-surface-raised p-4 shadow-card"
+          className="w-full flex-row items-center gap-3 rounded-none border-2 border-border bg-surface-raised p-4 shadow-card"
           outerClassName="w-full"
         >
-          <View className="h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+          <View className="h-10 w-10 items-center justify-center rounded-none bg-primary/10">
             <SettingsIcon size={20} className="text-text" />
           </View>
           <View className="flex-1 gap-0.5">

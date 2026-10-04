@@ -19,7 +19,7 @@ export function YouTubeEmbed({ videoId, className }: YouTubeEmbedProps) {
 
   return (
     <View
-      className={`my-2 overflow-hidden rounded-md border-2 border-border bg-ink-950 ${className ?? ''}`}
+      className={`my-2 overflow-hidden rounded-none border-2 border-border bg-ink-950 ${className ?? ''}`}
       // The border is the app's; the player fills inside it. `aspectRatio`
       // rather than a height so it scales with whatever pane it lands in.
       style={{ aspectRatio: 16 / 9 }}

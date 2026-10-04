@@ -173,7 +173,7 @@ export default function SplitLayout() {
               a clipped word reads as a bug, an icon reads as a rail. */}
           <Link href="/split">
             <View
-              className={`flex-row items-center gap-2 rounded-md border-2 border-border bg-primary py-2 shadow-card ${
+              className={`flex-row items-center gap-2 rounded-none border-2 border-border bg-primary py-2 shadow-card ${
                 rail ? 'justify-center px-2' : 'px-3'
               }`}
             >
@@ -357,7 +357,7 @@ export default function SplitLayout() {
                     without its own press handling. */}
                 <View
                   aria-label="Event actions"
-                  className="h-11 w-11 items-center justify-center rounded-md"
+                  className="h-11 w-11 items-center justify-center rounded-none"
                 >
                   <MoreHorizontal size={20} className="text-text-muted" />
                 </View>

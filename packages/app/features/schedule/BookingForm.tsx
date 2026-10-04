@@ -127,7 +127,7 @@ export function BookingForm({ onDone, onOpenEditorSettings }: BookingFormProps) 
                   form.setFieldValue('slot', '');
                 }}
                 accessibilityState={{ selected: active }}
-                className={`flex-row items-center gap-2 rounded-md border-2 border-border px-2.5 py-1.5 ${
+                className={`flex-row items-center gap-2 rounded-none border-2 border-border px-2.5 py-1.5 ${
                   active ? 'bg-primary' : 'bg-surface'
                 }`}
               >
@@ -183,7 +183,7 @@ export function BookingForm({ onDone, onOpenEditorSettings }: BookingFormProps) 
                         // w-28 keeps every chip the same width so they form a
                         // grid rather than a ragged wrap; py-3 clears the 44dp
                         // minimum touch target the previous py-1.5 missed.
-                        className={`w-28 items-center rounded-md border-2 border-border py-3 ${
+                        className={`w-28 items-center rounded-none border-2 border-border py-3 ${
                           active ? 'bg-primary' : 'bg-surface'
                         }`}
                       >

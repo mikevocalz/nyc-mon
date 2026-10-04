@@ -15,11 +15,6 @@ const dialog = tv({
     // Modal content is portal-rendered; the wrapper centers the surface.
     wrapper: 'flex-1 items-center justify-center p-6',
     scrim: 'absolute inset-0',
-    card: 'w-full max-w-content-form rounded-sheet border-2 border-border bg-surface-raised p-6 shadow-overlay',
-    title: 'font-display text-xl font-semibold text-text',
-    description: 'mt-2 text-base text-text-muted',
-    body: 'mt-4',
-    actions: 'mt-6 flex-row items-center justify-end gap-3',
   },
   variants: {
     overlay: { true: { scrim: 'bg-ink-950/70' }, false: { scrim: 'bg-transparent' } },
@@ -48,7 +43,7 @@ const facade = tv({
     signText: 'flex-1 gap-0.5',
     label: 'text-xs font-semibold',
     title: 'my-0 font-display text-xl leading-tight',
-    close: 'h-9 w-9 items-center justify-center rounded-xs border-2 border-ink-950 bg-ink-950/20',
+    close: 'h-9 w-9 items-center justify-center rounded-none border-2 border-ink-950 bg-ink-950/20',
     description: 'px-5 pt-3 text-base leading-snug text-silver-300',
     body: 'px-5 pt-4',
     scroll: 'max-h-[55vh]',
@@ -103,7 +98,7 @@ export interface DialogCardProps {
   children?: React.ReactNode;
   actions?: React.ReactNode;
   className?: string;
-  /** default: the kit dialog. neon: the NYC-MON building facade. */
+  /** The facade is the only look; kept so older callers compile. */
   variant?: 'default' | 'neon';
   /** neon: colour by neighbourhood. Default midtown. */
   district?: District;
@@ -146,17 +141,7 @@ export interface DialogCardProps {
  * inline (e.g. in Storybook) without the RN Modal portal.
  */
 export function DialogCard(props: DialogCardProps) {
-  if (props.variant === 'neon') return <FacadeCard {...props} />;
-  const { title, description, children, actions, className } = props;
-  const s = dialog();
-  return (
-    <ScaleIn role="dialog" aria-modal aria-label={title} className={s.card({ className })}>
-      <Text className={s.title()}>{title}</Text>
-      {description ? <Text className={s.description()}>{description}</Text> : null}
-      {children ? <View className={s.body()}>{children}</View> : null}
-      {actions ? <View className={s.actions()}>{actions}</View> : null}
-    </ScaleIn>
-  );
+  return <FacadeCard {...props} />;
 }
 
 function FacadeCard({
@@ -273,7 +258,7 @@ export function Dialog({
           onPress={closeOnBackdrop ? onClose : undefined}
           className={s.scrim()}
         />
-        <DialogCard {...cardProps} onClose={cardProps.variant === 'neon' && showCloseButton ? onClose : undefined} />
+        <DialogCard {...cardProps} onClose={showCloseButton ? onClose : undefined} />
       </View>
     </Modal>
   );

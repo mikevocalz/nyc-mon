@@ -11,3 +11,4 @@ export { neonSize, useNeonSize, type NeonSize, type NeonSizeMetrics } from './si
 export { cornerCutPolygon, cornerCutClipPath, insetCut, type CutCorner } from './corner-cut';
 export { CornerCutFrame, type CornerCutFrameProps } from './CornerCutFrame';
 export { SolidPanel, type SolidPanelProps, type SolidTone } from './SolidPanel';
+export { NeonChevron, type NeonChevronProps } from './NeonChevron';

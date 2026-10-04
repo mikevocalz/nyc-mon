@@ -39,7 +39,7 @@ export function ExploreContent() {
                 role="tab"
                 aria-label={cat.label}
                 onPress={() => setCategory(cat.label)}
-                className={`flex-row items-center gap-1.5 rounded-md border-2 px-4 py-2 transition-colors duration-fast ${
+                className={`flex-row items-center gap-1.5 rounded-none border-2 px-4 py-2 transition-colors duration-fast ${
                   active
                     ? 'border-primary bg-primary'
                     : 'border-border bg-surface-raised hover:bg-surface-sunken'
@@ -63,10 +63,10 @@ export function ExploreContent() {
             {FEATURED.map((item, i) => (
               <ScaleIn key={item.title} delay={160 + i * 60}>
                 <PressScale
-                  className={`w-48 gap-8 overflow-hidden rounded-card p-5 shadow-card ${item.bg}`}
+                  className={`w-48 gap-8 overflow-hidden rounded-none p-5 shadow-card ${item.bg}`}
                   outerClassName="self-start"
                 >
-                  <View aria-hidden className="absolute -right-6 -top-8 h-24 w-24 rounded-full bg-ink-50/10" />
+                  <View aria-hidden className="absolute -right-6 -top-8 h-24 w-24 rounded-none bg-ink-50/10" />
                   <item.icon size={26} className={item.fg} />
                   <View className="gap-0.5">
                     <TWText className={`text-base font-bold ${item.fg}`}>{item.title}</TWText>
@@ -86,14 +86,14 @@ export function ExploreContent() {
           {visible.map((card, i) => (
             <FadeIn key={card.title} delay={200 + i * 50} className="min-w-40 flex-1 basis-[45%]">
               <PressScale
-                className="w-full gap-3 rounded-card border-2 border-border bg-surface-raised p-4 shadow-card"
+                className="w-full gap-3 rounded-none border-2 border-border bg-surface-raised p-4 shadow-card"
                 outerClassName="w-full"
               >
                 <View className="flex-row items-start justify-between">
-                  <View className={`h-10 w-10 items-center justify-center rounded-xl ${WELL[card.tone]}`}>
+                  <View className={`h-10 w-10 items-center justify-center rounded-none ${WELL[card.tone]}`}>
                     <card.icon size={20} className={INK[card.tone]} />
                   </View>
-                  <View className="rounded-sm bg-surface-sunken px-2.5 py-1">
+                  <View className="rounded-none bg-surface-sunken px-2.5 py-1">
                     <TWText className="text-xs font-semibold text-text-muted">
                       {card.tag}
                     </TWText>

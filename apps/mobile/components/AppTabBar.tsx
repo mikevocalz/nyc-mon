@@ -70,7 +70,7 @@ export function AppTabBar({ state, emitter, navigateToTab, insets, rail }: Botto
             so selection does not shift anything by the border's width. */}
         <View
           style={rail ? { height: RAIL_ITEM_HEIGHT } : undefined}
-          className={`items-center justify-center gap-0.5 rounded-md border-2 transition-colors duration-fast motion-reduce:transition-none ${
+          className={`items-center justify-center gap-0.5 rounded-none border-2 transition-colors duration-fast motion-reduce:transition-none ${
             rail ? 'px-1' : 'px-3 py-1.5'
           } ${
             focused

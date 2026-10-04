@@ -1,6 +1,8 @@
 'use client';
 import { tv } from 'tailwind-variants';
+import { Platform } from 'react-native';
 import { View } from './tw';
+import { NeonChevron } from './neon/NeonChevron';
 import { Select as PrimitiveSelect, Label } from './primitives';
 import { Text } from './Text';
 import { NEON_FIELD, neonErrorVariant, neonFieldCompounds, neonLabelCompounds } from './cards/neon-field';
@@ -10,7 +12,9 @@ const field = tv({
   slots: {
     root: NEON_FIELD.root,
     label: NEON_FIELD.label,
-    select: `${NEON_FIELD.input}`,
+    // Web: the browser arrow is hidden and the kit chevron sits in the right padding.
+    select: `${NEON_FIELD.input} cursor-pointer appearance-none pr-14`,
+    chevron: 'absolute right-2 top-1/2 -translate-y-1/2',
     message: NEON_FIELD.message,
   },
   variants: {
@@ -47,22 +51,29 @@ export interface SelectProps extends React.ComponentProps<typeof PrimitiveSelect
 export function Select({
   label, hint, error, disabled, className, containerClassName, variant: _variant, tone, district, options, children, ...selectProps
 }: SelectProps) {
-  const s = field({ error: !!error, disabled, tone: resolveControlTone(tone, district) });
+  const toneName = resolveControlTone(tone, district);
+  const s = field({ error: !!error, disabled, tone: toneName });
+  // Native renders the OS picker (a menu on both platforms), which draws its own
+  // indicator; a second chevron there would double it.
+  const ownChevron = Platform.OS === 'web';
   return (
     <View className={s.root({ className: containerClassName })}>
       <Label className={s.label()}>{label}</Label>
-      <PrimitiveSelect
-        aria-label={label}
-        disabled={disabled}
-        className={s.select({ className })}
-        {...selectProps}
-      >
-        {options?.map((o) => (
-          // <option> is what the web <select> needs; the native fork reads value and label from it.
-          <option key={o.value} value={o.value} disabled={o.disabled}>{o.label ?? o.value}</option>
-        ))}
-        {children}
-      </PrimitiveSelect>
+      <View className="relative w-full">
+        <PrimitiveSelect
+          aria-label={label}
+          disabled={disabled}
+          className={s.select({ className })}
+          {...selectProps}
+        >
+          {options?.map((o) => (
+            // <option> is what the web <select> needs; the native fork reads value and label from it.
+            <option key={o.value} value={o.value} disabled={o.disabled}>{o.label ?? o.value}</option>
+          ))}
+          {children}
+        </PrimitiveSelect>
+        {ownChevron ? <NeonChevron tone={toneName} disabled={disabled} className={s.chevron()} /> : null}
+      </View>
       {error ? (
         <Text role="alert" className={s.message()}>{error}</Text>
       ) : hint ? (

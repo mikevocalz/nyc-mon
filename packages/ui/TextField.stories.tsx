@@ -64,7 +64,7 @@ export const WithPaste: Story = {
                 src={uri}
                 alt="Pasted"
                 unoptimized
-                className="h-20 w-20 rounded-lg border border-border/60 shadow-card"
+                className="h-20 w-20 rounded-none border border-border/60 shadow-card"
               />
             ))}
           </View>

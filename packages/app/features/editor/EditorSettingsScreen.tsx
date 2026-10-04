@@ -101,7 +101,7 @@ export function EditorSettingsScreen() {
           <Text className="text-sm font-semibold text-text-muted md:text-base">
             {GROUP_LABEL[group]}
           </Text>
-          <View className="gap-3 rounded-card border-2 border-border bg-surface-raised p-4 shadow-card">
+          <View className="gap-3 rounded-none border-2 border-border bg-surface-raised p-4 shadow-card">
             {capabilities.map((capability) => (
               <Switch
                 key={capability.id}
@@ -118,7 +118,7 @@ export function EditorSettingsScreen() {
         role="button"
         aria-label="Reset toolbar to defaults"
         onPress={reset}
-        className="min-h-11 items-center justify-center rounded-md border-2 border-border bg-surface-raised px-4 py-2.5 transition-colors duration-fast hover:bg-surface-sunken active:bg-surface-sunken motion-reduce:transition-none"
+        className="min-h-11 items-center justify-center rounded-none border-2 border-border bg-surface-raised px-4 py-2.5 transition-colors duration-fast hover:bg-surface-sunken active:bg-surface-sunken motion-reduce:transition-none"
       >
         <Text className="text-base font-medium text-text">Reset to defaults</Text>
       </Pressable>

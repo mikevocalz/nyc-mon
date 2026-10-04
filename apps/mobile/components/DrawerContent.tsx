@@ -43,7 +43,7 @@ export function DrawerContent(props: DrawerContentComponentProps) {
       {/* Identity block. The 2px rule and the raised slab match every other
           bordered surface in the app; the old hairline was the only 1px border
           in the drawer and read as an unfinished divider. */}
-      <View className="mx-3 mb-4 flex-row items-center gap-3 rounded-md border-2 border-border bg-surface-raised p-3 shadow-card">
+      <View className="mx-3 mb-4 flex-row items-center gap-3 rounded-none border-2 border-border bg-surface-raised p-3 shadow-card">
         <Avatar name={profileName} imageUri={AVATAR_URI} />
         <View className="flex-1">
           <Text numberOfLines={1} className="text-base font-semibold text-text">
@@ -77,7 +77,7 @@ export function DrawerContent(props: DrawerContentComponentProps) {
               // lift. It only ever fires on web and pointer-equipped devices,
               // so it is a refinement layered on top of the active state, never
               // the only signal that a row is interactive.
-              className={`mx-3 mb-1 min-h-11 flex-row items-center gap-3 rounded-md border-2 px-3 py-2.5 transition-colors duration-fast motion-reduce:transition-none ${
+              className={`mx-3 mb-1 min-h-11 flex-row items-center gap-3 rounded-none border-2 px-3 py-2.5 transition-colors duration-fast motion-reduce:transition-none ${
                 active
                   ? 'border-border bg-primary shadow-card hover:bg-primary-pressed'
                   : 'border-transparent hover:bg-surface-sunken active:bg-surface-sunken'

@@ -66,7 +66,7 @@ function DesktopNavLink({
           }
         }}
         aria-current={active ? 'page' : undefined}
-        className={`rounded-md px-3.5 py-2 text-sm font-medium transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/50 ${
+        className={`rounded-none px-3.5 py-2 text-sm font-medium transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/50 ${
           active ? 'bg-primary font-semibold text-on-primary' : 'text-text-muted hover:bg-surface-sunken hover:text-text'
         }`}
       >
@@ -90,7 +90,7 @@ function NavIndicator({ pathname }: { pathname: string }) {
       aria-hidden
       animate={{ x: m?.x ?? 0, width: m?.width ?? 0, opacity: m ? 1 : 0 }}
       transition={{ type: 'spring', damping: 20, stiffness: 180, mass: 0.6 }}
-      className="absolute -bottom-3 left-0 h-[3px] w-0 rounded-full bg-accent"
+      className="absolute -bottom-3 left-0 h-[3px] w-0 rounded-none bg-accent"
     />
   );
 }
@@ -111,7 +111,7 @@ function MobileNavLink({
         href={href}
         onClick={onNavigate}
         aria-current={active ? 'page' : undefined}
-        className={`flex items-center justify-between rounded-xl px-4 py-3.5 text-base font-medium transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/50 ${
+        className={`flex items-center justify-between rounded-none px-4 py-3.5 text-base font-medium transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/50 ${
           active ? 'bg-primary font-semibold text-on-primary' : 'text-text hover:bg-surface-sunken'
         }`}
       >
@@ -166,7 +166,7 @@ export function SiteHeader() {
           href="/"
           onClick={close}
           aria-label="NYC-MON home"
-          className="flex items-center gap-2.5 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/50"
+          className="flex items-center gap-2.5 rounded-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/50"
         >
           <MotionView
             initial={hydrated ? { scale: 0.8 } : undefined}
@@ -214,7 +214,7 @@ export function SiteHeader() {
             aria-expanded={open}
             aria-controls="mobile-menu"
             onPress={toggle}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-md border-2 border-border transition-colors duration-fast hover:bg-surface-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/50 active:opacity-80 md:hidden"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-none border-2 border-border transition-colors duration-fast hover:bg-surface-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/50 active:opacity-80 md:hidden"
           >
             <TWText className="text-xl leading-none text-text">{open ? '✕' : '☰'}</TWText>
           </Pressable>
@@ -239,7 +239,7 @@ export function SiteHeader() {
             initial={{ y: -12 }}
             animate={{ y: 0 }}
             transition={{ type: 'spring', damping: 24, stiffness: 380 }}
-            className="absolute inset-x-0 top-full rounded-b-sheet border-b-2 border-structure/50 bg-surface shadow-raised md:hidden"
+            className="absolute inset-x-0 top-full rounded-none border-b-2 border-structure/50 bg-surface shadow-raised md:hidden"
           >
             {/* Identity row — profile anchors the menu; settings live inside it */}
             <MotionView
@@ -251,7 +251,7 @@ export function SiteHeader() {
                 href={PROFILE.href}
                 onClick={close}
                 aria-current={profileActive ? 'page' : undefined}
-                className={`mx-3 mt-3 flex items-center gap-3 rounded-xl px-3 py-3 transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/50 ${
+                className={`mx-3 mt-3 flex items-center gap-3 rounded-none px-3 py-3 transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/50 ${
                   profileActive ? 'bg-surface-sunken' : 'hover:bg-surface-sunken'
                 }`}
               >

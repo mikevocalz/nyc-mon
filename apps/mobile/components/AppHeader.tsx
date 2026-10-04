@@ -65,7 +65,7 @@ export function AppHeader() {
         <Pressable
           aria-label="Notifications"
           onPress={() => router.push('/notifications')}
-          className="relative h-11 w-11 items-center justify-center rounded-md border-2 border-border bg-surface-raised transition-colors duration-fast hover:bg-surface-sunken active:bg-surface-sunken motion-reduce:transition-none"
+          className="relative h-11 w-11 items-center justify-center rounded-none border-2 border-border bg-surface-raised transition-colors duration-fast hover:bg-surface-sunken active:bg-surface-sunken motion-reduce:transition-none"
         >
           <Bell size={20} className="text-accent" />
           <View className="absolute right-2 top-2 h-2 w-2 rounded-full bg-danger" />
@@ -74,7 +74,7 @@ export function AppHeader() {
         <Pressable
           aria-label="Profile"
           onPress={() => router.push('/profile')}
-          className="rounded-md"
+          className="rounded-none"
         >
           <Avatar name={profileName} imageUri={AVATAR_URI} />
         </Pressable>

@@ -49,7 +49,7 @@ export function SidebarSection({
           haptics.selection();
           onOpenChange(!open);
         }}
-        className="min-h-11 flex-row items-center gap-1.5 rounded-md px-1 py-1.5 transition-colors duration-fast hover:bg-surface-sunken motion-reduce:transition-none"
+        className="min-h-11 flex-row items-center gap-1.5 rounded-none px-1 py-1.5 transition-colors duration-fast hover:bg-surface-sunken motion-reduce:transition-none"
       >
         <MotionView
           animate={{ rotate: open ? '90deg' : '0deg' }}

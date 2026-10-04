@@ -35,7 +35,7 @@ export function EditorToolbar({ context, activeState, onOpenSettings }: EditorTo
   const ids = visibleToolbarIds(preferences);
 
   return (
-    <View className="flex-row flex-wrap items-center gap-1 rounded-md border-2 border-border bg-surface-sunken p-2">
+    <View className="flex-row flex-wrap items-center gap-1 rounded-none border-2 border-border bg-surface-sunken p-2">
       {ids.map((id) => {
         const capability = CAPABILITY_BY_ID[id];
         if (capability === undefined) return null;
@@ -56,7 +56,7 @@ export function EditorToolbar({ context, activeState, onOpenSettings }: EditorTo
             onPress={() => {
               if (isEnabled) void capability.run?.(context);
             }}
-            className={`h-11 w-11 items-center justify-center rounded-md border-2 transition-colors duration-fast motion-reduce:transition-none ${
+            className={`h-11 w-11 items-center justify-center rounded-none border-2 transition-colors duration-fast motion-reduce:transition-none ${
               isActive
                 ? 'border-border bg-primary shadow-card'
                 : 'border-transparent hover:bg-surface-raised active:bg-surface-raised'
@@ -74,7 +74,7 @@ export function EditorToolbar({ context, activeState, onOpenSettings }: EditorTo
             role="button"
             aria-label="Editor settings"
             onPress={onOpenSettings}
-            className="h-11 w-11 items-center justify-center rounded-md border-2 border-transparent transition-colors duration-fast hover:bg-surface-raised active:bg-surface-raised motion-reduce:transition-none"
+            className="h-11 w-11 items-center justify-center rounded-none border-2 border-transparent transition-colors duration-fast hover:bg-surface-raised active:bg-surface-raised motion-reduce:transition-none"
           >
             <Settings2 size={18} className="text-text-muted" />
           </Pressable>

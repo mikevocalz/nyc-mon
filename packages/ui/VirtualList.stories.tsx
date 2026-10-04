@@ -25,7 +25,7 @@ export const FiveThousandRows: Story = {
         data={PEOPLE}
         keyExtractor={(p) => p.id}
         estimatedItemSize={64}
-        className="h-96 rounded-card border border-border/60 bg-surface-raised shadow-card"
+        className="h-96 rounded-none border border-border/60 bg-surface-raised shadow-card"
         renderItem={({ item }) => (
           <View className="flex-row items-center gap-3 border-b border-border px-4 py-3">
             <Avatar name={item.name} size="sm" />

@@ -9,7 +9,7 @@ import type { YouTubeEmbedProps } from './YouTubeEmbed.types.ts';
 export function YouTubeEmbed({ videoId, className }: YouTubeEmbedProps) {
   return (
     <View
-      className={`my-2 overflow-hidden rounded-md border-2 border-border bg-ink-950 ${className ?? ''}`}
+      className={`my-2 overflow-hidden rounded-none border-2 border-border bg-ink-950 ${className ?? ''}`}
       style={{ aspectRatio: 16 / 9 }}
     >
       <iframe

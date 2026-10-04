@@ -16,7 +16,7 @@ import type { ReorderRowProps } from './reorder-row.types.ts';
 export function ReorderRow({ children, label, index, count, rowHeight, onMove }: ReorderRowProps) {
   return (
     <View style={{ position: 'absolute', top: index * rowHeight, left: 0, right: 0 }}>
-      <View className="mb-2 h-12 flex-row items-center gap-3 rounded-md border-2 border-border bg-surface-raised px-3">
+      <View className="mb-2 h-12 flex-row items-center gap-3 rounded-none border-2 border-border bg-surface-raised px-3">
         <Pressable
           role="button"
           aria-label={`Reorder ${label}`}

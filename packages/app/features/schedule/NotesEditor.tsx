@@ -171,7 +171,7 @@ export function NotesEditor({
 
       <EditorToolbar context={context} activeState={activeState} onOpenSettings={onOpenSettings} />
 
-      <View className="rounded-md border-2 border-border bg-surface p-1">
+      <View className="rounded-none border-2 border-border bg-surface p-1">
         <EnrichedTextInput
           ref={ref}
           defaultValue={defaultValue}

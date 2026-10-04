@@ -45,7 +45,7 @@ export function BookingSurface({ day, resource, onBook }: BookingSurfaceProps) {
   const selectedSlot = slots.find((slot) => slot.start.toISOString() === selectedEventId);
 
   return (
-    <View className="flex-1 gap-4 rounded-sheet border border-border bg-surface-raised p-4">
+    <View className="flex-1 gap-4 rounded-none border border-border bg-surface-raised p-4">
       <View className="flex-row justify-between">
         {DAY_INITIALS.map((initial, index) => {
           const date = new Date(weekStart.getTime() + index * MS_PER_DAY);
@@ -62,7 +62,7 @@ export function BookingSurface({ day, resource, onBook }: BookingSurfaceProps) {
             >
               <Text className="text-xs font-medium text-text-muted">{initial}</Text>
               <View
-                className={`h-9 w-9 items-center justify-center rounded-full ${
+                className={`h-9 w-9 items-center justify-center rounded-none ${
                   isSelected ? 'bg-primary' : ''
                 }`}
               >
@@ -94,7 +94,7 @@ export function BookingSurface({ day, resource, onBook }: BookingSurfaceProps) {
               disabled={!slot.available}
               onPress={() => selectEvent(iso)}
               accessibilityState={{ selected: isSelected, disabled: !slot.available }}
-              className={`rounded-md border-2 px-4 py-3 ${
+              className={`rounded-none border-2 px-4 py-3 ${
                 isSelected
                   ? 'border-primary bg-primary/10'
                   : slot.available
