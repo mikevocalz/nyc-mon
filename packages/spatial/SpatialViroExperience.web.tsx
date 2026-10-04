@@ -8,6 +8,7 @@ import { DistrictScene } from './DistrictScene';
 type WebNavigatorProps = {
   initialScene: { scene: ComponentType<any> };
   webRendererOptions: { assetBaseUrl: string };
+  showReticle?: boolean;
   style?: Record<string, unknown>;
 };
 
@@ -21,6 +22,9 @@ export function SpatialViroExperience() {
       <WebViro3DSceneNavigator
         initialScene={{ scene: DistrictScene }}
         webRendererOptions={{ assetBaseUrl: '/viro/wasm/' }}
+        // The mouse aims on web; the headset's centre gaze dot only covers
+        // the street. False is the fork's web default, stated here on purpose.
+        showReticle={false}
         // Navigator host props are a style object, not a className target.
         style={{ flex: 1 }}
       />

@@ -6,12 +6,6 @@ import { withPayload } from '@payloadcms/next/withPayload'
 // forest. RN globals (__DEV__) come from a runtime shim imported in the root
 // layout instead of DefinePlugin.
 const nextConfig: NextConfig = {
-  // React StrictMode mounts each component twice in dev. Viro's web navigator
-  // (@reactvision/react-viro 3.0.2) builds its WebGL scene on mount and the
-  // second mount leaves the canvas empty: "Walk the district" showed only the
-  // gaze reticle. Production never double-mounts, so this only affects dev.
-  // Remove once the Viro web navigator survives a remount.
-  reactStrictMode: false,
   // React Compiler — auto-memoization, same as the mobile app's
   // experiments.reactCompiler in app.config.ts.
   reactCompiler: true,
