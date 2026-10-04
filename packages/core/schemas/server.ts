@@ -11,7 +11,10 @@ export const SERVER_CONTRACT_VERSION = 'v1';
 export const CreateEggRequestSchema = z.object({
   /** Client-generated id so an offline egg keeps its id after reconnect. */
   eggId: IdSchema,
+  /** The Egg form's Dex record. */
   speciesId: IdSchema,
+  /** The Baby form it hatches into. The server checks this pair against content. */
+  hatchesIntoSpeciesId: IdSchema,
   nickname: z.string().min(1).max(64).nullable(),
   incubationMinutes: IncubationMinutesSchema,
 });

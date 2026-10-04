@@ -16,7 +16,8 @@ import { MINUTE, T0 } from './harness.ts';
 
 const egg: EggRecord = createEggRecord({
   eggId: 'egg-1',
-  speciesId: 'species-test',
+  speciesId: 'dex-egg-test',
+  hatchesIntoSpeciesId: 'dex-baby-test',
   callerId: 'caller-1',
   nickname: 'Testy',
   incubationMinutes: 30,
@@ -56,6 +57,14 @@ describe('egg records and the offline mint', () => {
     expect(mon).toMatchObject({ monInstanceId: egg.monInstanceId, stage: 'Baby', hatchedAt: READY_AT, voiceLineageId: null });
     const late = monOf(run([{ type: 'open', now: READY_AT + 5 * 24 * 60 * MINUTE }]));
     expect(late).toEqual(mon);
+  });
+
+  it('mints the Baby form the egg hatches into, not the Egg form', () => {
+    const mon = mintMonInstance(egg);
+    expect(mon.speciesId).toBe('dex-baby-test');
+    expect(mon.speciesId).not.toBe(egg.speciesId);
+    expect(resolveHatch(new Map(), egg).mon.speciesId).toBe('dex-baby-test');
+    expect(monOf(run([{ type: 'open', now: READY_AT }, { type: 'skip' }])).speciesId).toBe('dex-baby-test');
   });
 
   it('refuses an egg whose reserved id does not match the derivation', () => {

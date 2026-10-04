@@ -26,7 +26,7 @@ describe('boundary schemas (Law 5)', () => {
   });
 
   it('accepts only 15, 30 or 60 minute incubation', () => {
-    const base = { eggId: 'e', speciesId: 's', nickname: null };
+    const base = { eggId: 'e', speciesId: 's', hatchesIntoSpeciesId: 'b', nickname: null };
     expect(CreateEggRequestSchema.safeParse({ ...base, incubationMinutes: 30 }).success).toBe(true);
     expect(CreateEggRequestSchema.safeParse({ ...base, incubationMinutes: 45 }).success).toBe(false);
   });

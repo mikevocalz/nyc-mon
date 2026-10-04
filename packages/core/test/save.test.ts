@@ -8,7 +8,8 @@ import { T0 } from './harness.ts';
 function fullV1Save() {
   const egg = createEggRecord({
     eggId: 'egg-1',
-    speciesId: 'species-test',
+    speciesId: 'dex-egg-test',
+    hatchesIntoSpeciesId: 'dex-baby-test',
     callerId: 'caller-1',
     nickname: 'Testy',
     incubationMinutes: 15,

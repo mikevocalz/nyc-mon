@@ -19,7 +19,10 @@ export function deriveMonInstanceId(eggId: string): string {
 
 export interface CreateEggInput {
   readonly eggId: string;
+  /** The Egg form's Dex record. */
   readonly speciesId: string;
+  /** The Baby form the egg hatches into, resolved from content by the caller. */
+  readonly hatchesIntoSpeciesId: string;
   readonly callerId: string;
   readonly nickname: string | null;
   readonly incubationMinutes: IncubationMinutes;
@@ -35,7 +38,8 @@ export function createEggRecord(input: CreateEggInput): EggRecord {
 }
 
 /**
- * Mints the individual an egg hatches into. A pure function of the EggRecord:
+ * Mints the individual an egg hatches into, as its Baby form
+ * (`egg.hatchesIntoSpeciesId`). A pure function of the EggRecord:
  * `hatchedAt` is the incubation end, not the device clock, so device A, device B
  * and the server replay all mint the identical MonInstance.
  */
@@ -45,7 +49,7 @@ export function mintMonInstance(egg: EggRecord): MonInstance {
   }
   return {
     monInstanceId: egg.monInstanceId,
-    speciesId: egg.speciesId,
+    speciesId: egg.hatchesIntoSpeciesId,
     nickname: egg.nickname,
     callerId: egg.callerId,
     hatchedAt: egg.incubationEndsAt,

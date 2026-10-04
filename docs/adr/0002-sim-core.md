@@ -47,7 +47,7 @@ Schemas are the single source of truth; types are inferred from them. `sim/` nev
 ### Hatch (Law 6)
 
 - `deriveMonInstanceId(eggId)` is the one id an egg can produce. The server reserves it with the same function in `POST /v1/eggs`, so an egg created offline and an egg created online reserve the same id.
-- `mintMonInstance(egg)` is a pure function of the `EggRecord`. `hatchedAt` is `incubationEndsAt`, not the device clock, so device A, device B and the server mint identical individuals.
+- `mintMonInstance(egg)` is a pure function of the `EggRecord`. The Mon is minted as the Baby form in `egg.hatchesIntoSpeciesId` (e.g. Metro Egg `dex-001` hatches into Squeaklet `dex-002`); the caller copies that id from `@acme/content` when it creates the egg, so core never imports content. `hatchedAt` is `incubationEndsAt`, not the device clock, so device A, device B and the server mint identical individuals.
 - `transitionHatch` is a discriminated union: `incubating → ready → presenting(phase) → hatched`. The individual is committed on the first `ready → presenting` edge (or `ready → hatched` on skip). Presentation phases are cosmetic; skip at any phase lands on the same individual. A second `open` is a no-op. A server confirmation with a different `monInstanceId` throws `HatchIntegrityError`, the P0 case.
 - `resolveHatch(ledger, egg)` is the server half: returns the existing individual on retry, mints once otherwise.
 

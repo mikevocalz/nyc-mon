@@ -13,7 +13,13 @@ export const IncubationMinutesSchema = z.union([z.literal(15), z.literal(30), z.
 export const EggRecordSchema = z.object({
   eggId: IdSchema,
   monInstanceId: IdSchema,
+  /** The Egg form's Dex record (e.g. `dex-001`, Metro Egg). */
   speciesId: IdSchema,
+  /**
+   * The Baby form this egg hatches into (e.g. `dex-002`, Squeaklet). Set at
+   * creation from content, so the mint never needs a content lookup.
+   */
+  hatchesIntoSpeciesId: IdSchema,
   callerId: IdSchema,
   nickname: z.string().min(1).max(64).nullable(),
   incubationMinutes: IncubationMinutesSchema,
