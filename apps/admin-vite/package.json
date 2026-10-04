@@ -9,6 +9,7 @@
     "preview": "node --env-file-if-exists=../../.env --env-file-if-exists=../../.env.local node_modules/vite/bin/vite.js preview",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
+    "test": "node --test console-scope.test.mjs",
     "payload": "node --env-file-if-exists=../../.env --env-file-if-exists=../../.env.local node_modules/payload/bin.js",
     "payload:importmap": "pnpm payload generate:importmap",
     "payload:types": "pnpm payload generate:types",
@@ -17,6 +18,8 @@
   },
   "dependencies": {
     "@acme/payload": "workspace:*",
+    "@acme/theme": "workspace:*",
+    "@acme/ui": "workspace:*",
     "@better-auth/passkey": "catalog:",
     "@delmaredigital/payload-better-auth": "catalog:",
     "@payloadcms/db-postgres": "catalog:",
@@ -30,11 +33,13 @@
     "pg": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
+    "react-native-web": "catalog:",
     "sharp": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@acme/config": "workspace:*",
+    "@tailwindcss/postcss": "catalog:",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
@@ -43,6 +48,7 @@
     "eslint": "catalog:",
     "eslint-config-expo": "catalog:",
     "nitro": "catalog:",
+    "tailwindcss": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:"
   }

@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@acme/core": "workspace:*",
+    "@acme/ui": "workspace:*",
     "@aws-sdk/client-sns": "catalog:",
     "@better-auth/passkey": "catalog:",
     "@delmaredigital/payload-better-auth": "catalog:",
@@ -24,12 +25,15 @@
     "better-auth": "catalog:",
     "payload": "catalog:",
     "pg": "catalog:",
+    "react": "catalog:",
     "resend": "catalog:",
-    "sharp": "catalog:"
+    "sharp": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@acme/config": "workspace:*",
     "@types/pg": "catalog:",
+    "@types/react": "catalog:",
     "eslint": "catalog:",
     "eslint-config-expo": "catalog:",
     "typescript": "catalog:",

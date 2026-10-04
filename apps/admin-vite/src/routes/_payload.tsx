@@ -13,8 +13,11 @@
 import { payloadLayoutRoute } from '@payloadcms/tanstack-start/client';
 import { createFileRoute } from '@tanstack/react-router';
 
-// Payload's own panel stylesheet is the whole stylesheet budget of this app.
+// Payload's own panel stylesheet, then the ops console's. The console sheet
+// is scoped to `.nycmon-console` and layered after `payload-default`
+// (console-scope.postcss.mjs), so on a stock Payload screen it matches nothing.
 import '@payloadcms/ui/css/app.css';
+import '../console.css';
 
 import { getLayoutDataFn, serverFunctionHandler } from './_payload/server.functions';
 

@@ -1,0 +1,32 @@
+/*
+ * The ops console's stylesheet: @acme/theme tokens + Tailwind v4 for the
+ * @acme/ui kit, confined to `.nycmon-console` by console-scope.postcss.mjs
+ * (docs/design/admin/08-handoff.md P2, P5). Loaded on every admin page after
+ * Payload's own sheet; outside a `.nycmon-console` element it matches nothing.
+ *
+ * Same entry as apps/storybook/globals.css, split into Tailwind's parts so the
+ * preflight can be scoped with the rest. `important`: react-native-web injects
+ * unlayered runtime styles (default black text, flex-grow: 0) that beat any
+ * layered utility; v4's important flag puts utilities back on top.
+ */
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/preflight.css' layer(base);
+@import 'tailwindcss/utilities.css' layer(utilities) important;
+@import '@acme/theme/theme.css';
+
+@source '../../../packages/ui';
+@source '../../../packages/payload/src/admin/console';
+
+/* Brand fonts, from the shared assets package (same as apps/storybook). */
+@font-face {
+  font-family: 'Archivo Black';
+  src: url('../../../packages/assets/fonts/ArchivoBlack-Regular.ttf') format('truetype');
+  font-weight: 400 900;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Space Grotesk';
+  src: url('../../../packages/assets/fonts/SpaceGrotesk-Variable.ttf') format('truetype');
+  font-weight: 300 700;
+  font-display: swap;
+}
