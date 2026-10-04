@@ -20,4 +20,14 @@ import type { Config } from 'payload';
 
 type AdminComponents = NonNullable<NonNullable<Config['admin']>['components']>;
 
-export const adminComponents: AdminComponents = {};
+export const adminComponents: AdminComponents = {
+  views: {
+    // SPIKE (blocker X3): proves @acme/ui renders in a Payload root view.
+    // Replaced by the real `overview` → OverviewView (08-handoff.md §3).
+    overview: {
+      Component: './admin/console/OverviewSpike#OverviewSpike',
+      path: '/overview',
+      exact: true,
+    },
+  },
+};
