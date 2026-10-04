@@ -60,6 +60,7 @@ export default buildConfig({
     createBetterAuthPlugin({
       authBasePath: AUTH_BASE_PATH,
       admin: {
+        loginViewComponent: './admin/console/Chrome#ConsoleLogin',
         login: {
           // Any one staff role opens the console (ADR 0004 §8).
           requiredRole: [...STAFF_ROLES],

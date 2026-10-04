@@ -21,13 +21,22 @@ import type { Config } from 'payload';
 type AdminComponents = NonNullable<NonNullable<Config['admin']>['components']>;
 
 export const adminComponents: AdminComponents = {
+  graphics: {
+    Logo: './admin/console/Shell#ConsoleLogo',
+    Icon: './admin/console/Chrome#ConsoleIcon',
+  },
+  Nav: './admin/console/Shell#ConsoleNavFallback',
   views: {
-    // SPIKE (blocker X3): proves @acme/ui renders in a Payload root view.
-    // Replaced by the real `overview` → OverviewView (08-handoff.md §3).
-    overview: {
-      Component: './admin/console/OverviewSpike#OverviewSpike',
-      path: '/overview',
-      exact: true,
-    },
+    dashboard: { Component: './admin/console/Redirects#DashboardRedirect' },
+    account: { Component: './admin/console/Redirects#AccountRedirect' },
+    overview: { Component: './admin/console/views/Views#OverviewView', path: '/overview', exact: true },
+    callers: { Component: './admin/console/views/Views#CallersView', path: '/callers/:callerId?' },
+    consent: { Component: './admin/console/views/Views#ConsentView', path: '/consent/:consentId?' },
+    mons: { Component: './admin/console/views/Views#MonsView', path: '/mons/:monInstanceId?' },
+    eggs: { Component: './admin/console/views/Views#MonsView', path: '/eggs/:eggId?' },
+    integrity: { Component: './admin/console/views/Views#MonsView', path: '/integrity', exact: true },
+    content: { Component: './admin/console/views/Views#ContentView', path: '/content/:rest*' },
+    audit: { Component: './admin/console/views/Views#AuditView', path: '/audit/:eventId?' },
+    settings: { Component: './admin/console/views/Views#SettingsView', path: '/settings/:rest*' },
   },
 };
