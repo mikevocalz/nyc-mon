@@ -79,3 +79,9 @@ export { BrandWordmark, type BrandWordmarkProps } from './brand/BrandWordmark';
 export * from './gpu';
 export * from './neon';
 export { useLayoutSize, type LayoutSize } from './use-layout-size';
+
+// NeonBlade ports: charts, site header/footer, and web/pointer cursors.
+export * from './charts';
+export * from './nav';
+export * from './cursors';
+export type { TextEffectOptions, GlitchIntensity, GlitchSpeed, TextGlowLevel } from './text-effects';

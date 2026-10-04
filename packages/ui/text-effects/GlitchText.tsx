@@ -1,4 +1,6 @@
 'use client';
+// First: Reanimated reads __DEV__ at module load, and web bundlers don't define it.
+import '../rn-globals-shim';
 
 import Animated, { steps } from 'react-native-reanimated';
 import { neonColor } from '../neon/colors';
