@@ -1,11 +1,11 @@
 import type { Metadata } from 'next';
 import { SITE_DESCRIPTION } from '@acme/spatial/copy';
-import { View } from '@acme/ui/tw';
 import { Document } from '../Document';
 import { SiteFooterBar, SiteNavBar } from '../../components/site/SiteChrome';
 import { CONTENT_ID } from '../../components/site/nav';
 import '../rn-globals';
 import '../globals.css';
+import { Main } from '@acme/ui/html';
 
 export const metadata: Metadata = {
   title: {
@@ -19,9 +19,9 @@ export default function SiteLayout({ children }: Readonly<{ children: React.Reac
   return (
     <Document>
       <SiteNavBar />
-      <View id={CONTENT_ID} className="min-h-screen flex-1">
+      <Main id={CONTENT_ID} className="min-h-screen flex-1">
         {children}
-      </View>
+      </Main>
       <SiteFooterBar />
     </Document>
   );
