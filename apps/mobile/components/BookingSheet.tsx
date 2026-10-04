@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { BookingForm, useScheduleStore } from '@acme/app';
 
 /**
- * New-booking sheet backed by Expo UI's universal sheet.
+ * Mon-event sheet backed by Expo UI's universal sheet.
  * SwiftUI / Material own the native presentation while the same component
  * keeps a web implementation, eliminating the former Gorhom-only fork.
  */
@@ -15,7 +15,7 @@ export function BookingSheet() {
   const closeBooking = useScheduleStore((state) => state.closeBooking);
 
   return (
-    <BottomSheet open={bookingOpen} onClose={closeBooking} closeLabel="Close new booking" title="New booking">
+    <BottomSheet open={bookingOpen} onClose={closeBooking} closeLabel="Close add Mon event" title="Add Mon event">
       <BookingForm
         onDone={closeBooking}
         onOpenEditorSettings={() => {

@@ -4,7 +4,7 @@ import { Button, Container, EmptyState, LoadingSkeleton, SegmentedControl, useSi
 import { Calendar } from '@acme/ui/icons';
 import { BookingSurface } from './BookingSurface.tsx';
 import { ScheduleGrid } from './ScheduleGrid.tsx';
-import type { ScheduleDay } from './model.ts';
+import type { ScheduleDay, ScheduleEvent } from './model.ts';
 import type { Slot } from './slots.ts';
 import { useScheduleStore, type ScheduleView } from './store.ts';
 
@@ -16,8 +16,9 @@ export interface ScheduleProps {
   now: Date;
   loading?: boolean;
   onBook: (slot: Slot) => void;
-  /** Header action — create a booking outside the slot list. */
+  /** Header action — create a Mon calendar event. */
   onNewBooking: () => void;
+  onEventRescheduled?: (event: ScheduleEvent) => void;
 }
 
 const VIEWS: { value: ScheduleView; label: string }[] = [
@@ -33,7 +34,7 @@ const VIEWS: { value: ScheduleView; label: string }[] = [
  * what lets the detail pane host it without either side importing the other.
  */
 export function Schedule({
-  fill, day, now, loading = false, onBook, onNewBooking }: ScheduleProps) {
+  fill, day, now, loading = false, onBook, onNewBooking, onEventRescheduled }: ScheduleProps) {
   const sizeClass = useSizeClass();
   const view = useScheduleStore((state) => state.view);
   const setView = useScheduleStore((state) => state.setView);
@@ -55,14 +56,14 @@ export function Schedule({
       className={`flex-1 gap-4 bg-surface-sunken py-4 ${fill ? 'px-4 sm:px-6' : ''}`}
     >
       <View className="flex-row items-center gap-3">
-        <Text className="flex-1 text-xl font-semibold text-text md:text-2xl lg:text-3xl">Today&apos;s Schedule</Text>
+        <Text className="flex-1 text-xl font-semibold text-text md:text-2xl lg:text-3xl">Mon Calendar</Text>
 
         {/* The platform's own segmented control (@expo/ui), not a hand-rolled
             row of pressables — same reasoning as every other native control in
             the kit. */}
         <SegmentedControl options={VIEWS} value={view} onChange={setView} />
 
-        <Button variant="primary" title="New booking" onPress={onNewBooking} />
+        <Button variant="primary" title="Add event" onPress={onNewBooking} />
       </View>
 
       {loading ? (
@@ -70,13 +71,13 @@ export function Schedule({
       ) : day.resources.length === 0 ? (
         <EmptyState
           icon={<Calendar className="text-text-muted" />}
-          title="No one is scheduled today"
-          description="Add an instructor to this day to start booking lessons."
+          title="No Mons on this calendar"
+          description="Choose a Mon and add a care reminder, play date, or battle."
         />
       ) : sizeClass === 'compact' && firstResource ? (
         <BookingSurface day={day} resource={firstResource} onBook={onBook} />
       ) : (
-        <ScheduleGrid day={day} now={now} />
+        <ScheduleGrid day={day} now={now} onEventRescheduled={onEventRescheduled} />
       )}
     </Container>
   );

@@ -24,11 +24,14 @@ import { Avatar, Badge, BrandWordmark, EmptyState, IconButton, KeyboardAwareScro
 import { Header } from '@acme/ui/primitives';
 import { Calendar, MoreHorizontal, Users } from '@acme/ui/icons';
 import {
+  buildDemoDay,
   DEMO_DAY,
   DEMO_RESOURCES,
   MenuButton,
   MiniCalendar,
   formatTimeRange,
+  scheduleKindLabel,
+  removeEventIntegrations,
   useScheduleStore,
   useProfile,
 } from '@acme/app';
@@ -86,9 +89,15 @@ export default function SplitLayout() {
   const selectDate = useScheduleStore((state) => state.selectDate);
   const visibleMonth = useScheduleStore((state) => state.visibleMonth);
   const showMonth = useScheduleStore((state) => state.showMonth);
+  const createdEvents = useScheduleStore((state) => state.createdEvents);
+  const deletedEventIds = useScheduleStore((state) => state.deletedEventIds);
+  const deleteEvent = useScheduleStore((state) => state.deleteEvent);
+  const calendarEventIds = useScheduleStore((state) => state.calendarEventIds);
+  const notificationIds = useScheduleStore((state) => state.notificationIds);
 
   const activeDate = selectedDate ? new Date(selectedDate) : DEMO_DAY.dayStart;
   const month = visibleMonth ? new Date(visibleMonth) : activeDate;
+  const scheduleDay = buildDemoDay(activeDate, Object.values(createdEvents), deletedEventIds);
 
   // Filtering reads the DEBOUNCED query, not the draft: re-filtering on every
   // keystroke would rebuild the roster faster than it can be read.
@@ -138,10 +147,18 @@ export default function SplitLayout() {
       )
     : DEMO_RESOURCES;
 
-  const selectedEvent = DEMO_DAY.events.find((event) => event.id === selectedEventId);
+  const selectedEvent = scheduleDay.events.find((event) => event.id === selectedEventId);
   const eventResource = DEMO_RESOURCES.find(
     (resource) => resource.id === selectedEvent?.resourceId,
   );
+  const deleteSelectedEvent = () => {
+    if (!selectedEvent) return;
+    const calendarEventId = calendarEventIds[selectedEvent.id];
+    const notificationId = notificationIds[selectedEvent.id];
+    void removeEventIntegrations({ calendarEventId, notificationId });
+    deleteEvent(selectedEvent.id);
+    selectEvent(null);
+  };
 
   return (
     <SafeArea edges={['top']} className="flex-1">
@@ -154,7 +171,7 @@ export default function SplitLayout() {
       <Header className="flex-row items-center gap-3 border-b-2 border-primary bg-ink-950 px-4 py-2">
         <MenuButton />
         <BrandWordmark height={36} />
-        <Text numberOfLines={1} className="flex-1 text-lg font-semibold text-ink-50 md:text-xl">Schedule</Text>
+        <Text numberOfLines={1} className="flex-1 text-lg font-semibold text-ink-50 md:text-xl">Mon Calendar</Text>
         {/* A control that hides a pane cannot live inside that pane, or there
             is no way back. Both sit in the screen header; the inspector's is in
             its own chrome because selection reopens it anyway. */}
@@ -188,7 +205,7 @@ export default function SplitLayout() {
           </Link>
 
           <SidebarSection
-            label="Instructors"
+            label="My Mons"
             open={instructorsOpen}
             onOpenChange={setInstructorsOpen}
             rail={rail}
@@ -235,7 +252,7 @@ export default function SplitLayout() {
             the field ends up under the keyboard, with its clear button pinned
             against the keyboard's edge. */}
         <PaneListHeader
-          title="Studio"
+          title="Mon Calendar"
           subtitle={`${staff.length} ${staff.length === 1 ? 'person' : 'people'}`}
           header={listHeader}
         >
@@ -262,13 +279,13 @@ export default function SplitLayout() {
             onMonthChange={(next) => showMonth(next.toISOString())}
           />
 
-          <Text className="text-sm font-semibold text-text-muted md:text-base">Staff</Text>
+          <Text className="text-sm font-semibold text-text-muted md:text-base">Mons</Text>
 
           {/* The pane composes its own field — see PaneSearchBar for why this
               is composition rather than a `searchable` flag. */}
           <PaneSearchBar
             pane="supplementary"
-            placeholder="Search staff"
+            placeholder="Search Mons"
             resultCount={staff.length}
           />
 
@@ -278,11 +295,11 @@ export default function SplitLayout() {
           {staff.length === 0 ? (
             <EmptyState
               icon={<Users className="text-text-muted" />}
-              title={staffQuery ? 'No matches' : 'No staff yet'}
+              title={staffQuery ? 'No matches' : 'No Mons yet'}
               description={
                 staffQuery
                   ? `No one matches “${staffQuery}”.`
-                  : 'Add someone to the studio to see them here.'
+                  : 'Your Mons will appear here after they join your crew.'
               }
             />
           ) : null}
@@ -332,7 +349,7 @@ export default function SplitLayout() {
               leaving them unsure whether more is loading. */}
           {staff.length > 0 ? (
             <Text className="py-2 text-center text-xs text-text-muted md:text-sm">
-              {staff.length} {staff.length === 1 ? 'person' : 'people'} · swipe a row to hide
+              {staff.length} {staff.length === 1 ? 'Mon' : 'Mons'} · swipe a row to hide
             </Text>
           ) : null}
         </KeyboardAwareScroll>
@@ -351,7 +368,7 @@ export default function SplitLayout() {
                 title={selectedEvent.title}
                 actions={EVENT_ACTIONS}
                 onAction={(id) => {
-                  if (id === 'delete') selectEvent(null);
+                  if (id === 'delete') deleteSelectedEvent();
                 }}
               >
                 {/* NOT an IconButton: MenuView wraps its child in its own
@@ -372,7 +389,7 @@ export default function SplitLayout() {
             <>
               <Text className="text-lg font-semibold text-text md:text-xl lg:text-2xl">{selectedEvent.title}</Text>
               <Text className="text-sm text-text-muted md:text-base">
-                {formatTimeRange(selectedEvent, DEMO_DAY.timeZone)}
+                {formatTimeRange(selectedEvent, scheduleDay.timeZone)}
               </Text>
               {eventResource ? (
                 <View className="flex-row items-center gap-2 pt-1">
@@ -380,7 +397,7 @@ export default function SplitLayout() {
                   <Text className="text-sm text-text md:text-base">{eventResource.name}</Text>
                 </View>
               ) : null}
-              <Badge label={selectedEvent.kind} />
+              <Badge label={scheduleKindLabel(selectedEvent.kind)} />
             </>
           ) : (
             /* REQUIRED, not optional: at expanded widths this pane is on screen
@@ -389,7 +406,7 @@ export default function SplitLayout() {
             <EmptyState
               icon={<Calendar className="text-text-muted" />}
               title="Nothing selected"
-              description="Pick a booking in the schedule to see its details here."
+              description="Pick a Mon event in the calendar to see its details here."
             />
           )}
         </View>
@@ -406,7 +423,7 @@ export default function SplitLayout() {
           eventTitle={selectedEvent.title}
           onDuplicate={() => {}}
           onReschedule={() => {}}
-          onDelete={() => selectEvent(null)}
+          onDelete={deleteSelectedEvent}
         />
       ) : null}
     </SafeArea>

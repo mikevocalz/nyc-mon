@@ -1,74 +1,110 @@
 /**
- * Resource-major schedule model.
+ * NYC-MON schedule domain.
  *
- * The grid's columns are RESOURCES (instructors, rooms, chairs) and the date is
- * fixed — this is a day view of who is busy when, not a week view of dates.
- * That inverts the usual calendar model and is why the virtualization axis is
- * resources rather than days.
- */
-
-/**
- * Accent families available to a resource column.
- *
- * These are palette family names from packages/theme/tokens.ts. They exist so
- * every column gets a visually distinct hue while still resolving to design
- * tokens — see accent-classes.ts for why the class strings are spelled out
- * rather than built from this value.
+ * Calendar columns are Mons. Events belong to a Mon instance and can be care
+ * routines, social time, battles, or a custom Caller-authored event.
  */
 export const RESOURCE_ACCENTS = ['ember', 'gold', 'forest', 'sky', 'rose'] as const;
 
 export type ResourceAccent = (typeof RESOURCE_ACCENTS)[number];
 
 export interface Resource {
+  /** Mon instance id once the real /v1/me/mons query is wired. */
   id: string;
+  /** Caller's nickname / display name for the Mon. */
   name: string;
-  /** Remote avatar. Absent falls back to a monogram built from `name`. */
   avatarUrl?: string;
   accent: ResourceAccent;
 }
 
-export type ScheduleEventKind = 'lesson' | 'block' | 'break';
+export const MON_SCHEDULE_EVENT_KINDS = [
+  'breakfast',
+  'lunch',
+  'dinner',
+  'play-date',
+  'battle',
+  'care',
+  'custom',
+] as const;
+
+export type ScheduleEventKind = (typeof MON_SCHEDULE_EVENT_KINDS)[number];
+export type ScheduleRecurrence = 'none' | 'daily';
 
 export interface ScheduleEvent {
   id: string;
+  /** Mon instance id. */
   resourceId: string;
   title: string;
-  /**
-   * Instants, not naive local strings. A `Date` is an absolute point in time;
-   * where it lands on the grid is resolved against the calendar's IANA zone by
-   * `zonedMinutesOfDay`, so a schedule authored in one zone renders correctly
-   * when read in another.
-   */
   start: Date;
   end: Date;
   kind: ScheduleEventKind;
+  /** Meals default to daily; social/battle events default to one-off. */
+  recurrence?: ScheduleRecurrence;
+  /** Local app notification. */
+  reminderEnabled?: boolean;
+  /** Minutes before start; 0 means at start time. */
+  reminderMinutesBefore?: number;
+  /** Mirror this event into the device user's personal calendar. */
+  syncToPersonalCalendar?: boolean;
+  notes?: string;
+  /** Other Mons involved in a play date or battle, when known. */
+  participantMonIds?: string[];
+  /** Free-text opponent label for battles before matchmaking lands. */
+  opponentName?: string;
 }
 
 export interface ScheduleDay {
-  /**
-   * Instant at which `startHour` falls on the displayed date.
-   *
-   * Supplied by the data layer rather than derived here on purpose: going from
-   * a wall-clock hour BACK to an instant requires resolving the zone offset for
-   * that date, including the two days a year where a local time is ambiguous or
-   * does not exist. The read direction (instant -> wall clock) is unambiguous
-   * and is what `zonedMinutesOfDay` does.
-   */
   dayStart: Date;
   /** IANA zone the grid is drawn in, e.g. 'America/New_York'. */
   timeZone: string;
-  /** First hour rule, in wall-clock hours of `timeZone`. */
   startHour: number;
-  /** Last hour rule, exclusive of the following hour's label. */
   endHour: number;
   resources: Resource[];
   events: ScheduleEvent[];
 }
 
-/**
- * Accent belongs to the RESOURCE, never to the event — Noto colours a column,
- * not an appointment. Deriving it here keeps the two from drifting apart.
- */
+export function isMealKind(kind: ScheduleEventKind): boolean {
+  return kind === 'breakfast' || kind === 'lunch' || kind === 'dinner';
+}
+
+export function scheduleKindLabel(kind: ScheduleEventKind): string {
+  switch (kind) {
+    case 'play-date':
+      return 'Play date';
+    case 'battle':
+      return 'Battle';
+    case 'breakfast':
+      return 'Breakfast';
+    case 'lunch':
+      return 'Lunch';
+    case 'dinner':
+      return 'Dinner';
+    case 'care':
+      return 'Care';
+    default:
+      return 'Custom';
+  }
+}
+
+export function defaultScheduleEventTitle(kind: ScheduleEventKind, monName: string): string {
+  switch (kind) {
+    case 'breakfast':
+      return `Feed ${monName} · Breakfast`;
+    case 'lunch':
+      return `Feed ${monName} · Lunch`;
+    case 'dinner':
+      return `Feed ${monName} · Dinner`;
+    case 'play-date':
+      return `${monName} play date`;
+    case 'battle':
+      return `${monName} battle`;
+    case 'care':
+      return `${monName} care`;
+    default:
+      return `${monName} event`;
+  }
+}
+
 export function accentForEvent(
   event: ScheduleEvent,
   resources: readonly Resource[],
@@ -78,14 +114,6 @@ export function accentForEvent(
 
 const MINUTES_PER_HOUR = 60;
 
-/**
- * Wall-clock minutes since midnight for `instant` as observed in `timeZone`.
- *
- * Uses Intl rather than a date library because Intl is the only thing in the
- * runtime that already knows the IANA database, including DST transitions.
- * `hourCycle: 'h23'` avoids the 24-vs-0 midnight ambiguity that 'h24' and the
- * default hour12 formatting both introduce.
- */
 export function zonedMinutesOfDay(instant: Date, timeZone: string): number {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone,
@@ -100,6 +128,19 @@ export function zonedMinutesOfDay(instant: Date, timeZone: string): number {
   };
 
   return read('hour') * MINUTES_PER_HOUR + read('minute');
+}
+
+/** YYYY-MM-DD as observed in the calendar's zone. */
+export function zonedDateKey(instant: Date, timeZone: string): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(instant);
+  const read = (type: 'year' | 'month' | 'day') =>
+    parts.find((part) => part.type === type)?.value ?? '';
+  return `${read('year')}-${read('month')}-${read('day')}`;
 }
 
 /** Inclusive-start, exclusive-end overlap — touching events do not collide. */

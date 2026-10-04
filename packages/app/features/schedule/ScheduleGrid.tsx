@@ -21,13 +21,15 @@ import { assignLanes } from './lanes.ts';
 import { columnIdForEvent, columnsForView, eventsForView, type GridColumn } from './columns.ts';
 import { applyOverrides, rescheduleByMinutes, rescheduleByOffset, SNAP_MINUTES } from './reschedule.ts';
 import { EventDrag } from './event-drag';
-import { zonedMinutesOfDay, type ScheduleDay } from './model.ts';
+import { zonedMinutesOfDay, type ScheduleDay, type ScheduleEvent } from './model.ts';
 import { useScheduleStore } from './store.ts';
 
 export interface ScheduleGridProps {
   day: ScheduleDay;
   /** Injected so the live rule is deterministic in tests and stories. */
   now: Date;
+  /** Keeps local reminders and personal-calendar mirrors aligned after a move. */
+  onEventRescheduled?: (event: ScheduleEvent) => void;
 }
 
 /**
@@ -44,7 +46,7 @@ export interface ScheduleGridProps {
  * scrolls horizontally with the grid once the resources overflow the viewport.
  * See README.md for the upgrade path.
  */
-export function ScheduleGrid({ day, now }: ScheduleGridProps) {
+export function ScheduleGrid({ day, now, onEventRescheduled }: ScheduleGridProps) {
   const hourHeight = useScheduleStore((state) => state.hourHeight);
   const selectedEventId = useScheduleStore((state) => state.selectedEventId);
   const selectEvent = useScheduleStore((state) => state.selectEvent);
@@ -127,8 +129,9 @@ export function ScheduleGrid({ day, now }: ScheduleGridProps) {
         end: moved.end,
         resourceId: moved.resourceId,
       });
+      onEventRescheduled?.(moved);
     },
-    [resolveCurrent, day, moveEvent],
+    [resolveCurrent, day, moveEvent, onEventRescheduled],
   );
 
   /** Commit a finished drag once, converting the pixel offset to a new time. */
@@ -148,11 +151,12 @@ export function ScheduleGrid({ day, now }: ScheduleGridProps) {
         end: moved.end,
         resourceId: moved.resourceId,
       });
+      onEventRescheduled?.(moved);
       // Deliberately does NOT select: a drag is a move, not a selection, and
       // opening the details drawer mid-drag steals width from the grid you are
       // dragging in. Selection stays a tap.
     },
-    [resolveCurrent, day, hourHeight, moveEvent],
+    [resolveCurrent, day, hourHeight, moveEvent, onEventRescheduled],
   );
 
   const nowOffset = currentTimeOffset(now, day, hourHeight);
