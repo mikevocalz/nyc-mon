@@ -16,6 +16,17 @@ Ported so far:
 - `neon/`: the colour presets (cyan, pink, green, white, orange, purple, red,
   yellow), the corner-cut geometry (`ccb-clip-*`), the xs to xl size scale and
   the glow intensity presets follow NeonBlade's corner-cut button.
+- `Button` and `IconButton` `variant="cornerCut"`: port of NeonBlade's
+  corner-cut button (`corner-cut-button`).
+- `Card` `variant="notch"`, `"cornerCut"` and `"beam"`: ports of NeonBlade's
+  notch card, neon glow corner-cut card and border beam corner-cut card. The
+  notch geometry in `cards/notch.ts` follows the notch card's clip path, and
+  the props keep NeonBlade's names (`notchSides`, `notchSize`, `notchWidth`,
+  `notchWidthV`, `notchSkew`, `corner`, `cornerSize`, `duration`).
+- `TextField`, `Textarea`, `Select`, `Checkbox` and `Switch` `variant="neon"`:
+  ports of NeonBlade's neon input, neon select, neon checkbox and neon toggle.
+- `cards/CardSlider`: port of NeonBlade's card slider (`visibleCount`, `gap`,
+  `showButtons`, `showProgress`, `progressStyle`, `loop`).
 
 NeonBlade UI is distributed under the MIT License:
 
