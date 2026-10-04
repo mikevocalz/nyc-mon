@@ -11,6 +11,8 @@
     "./html": "./html/index.tsx",
     "./gpu": "./gpu/index.ts",
     "./neon": "./neon/index.ts",
+    "./elements": "./elements/index.ts",
+    "./progress": "./progress/index.ts",
     "./haptics": {
       "react-native": "./haptics.native.ts",
       "default": "./haptics.web.ts"

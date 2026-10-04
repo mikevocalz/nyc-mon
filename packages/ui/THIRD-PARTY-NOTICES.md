@@ -16,6 +16,22 @@ Ported so far:
 - `neon/`: the colour presets (cyan, pink, green, white, orange, purple, red,
   yellow), the corner-cut geometry (`ccb-clip-*`), the xs to xl size scale and
   the glow intensity presets follow NeonBlade's corner-cut button.
+- `elements/AccentFrame`: NeonBlade's Accent Frame (`accent-frame`), redrawn
+  with setback and cornice corners. Keeps its colour, corner, hover, mode and
+  background props.
+- `elements/Timeline`: NeonBlade's Timeline (`timeline`), redrawn as a subway
+  line. Keeps its item shape and variant, line, dot, align and animate props.
+- `Badge` (`variant="neon"`): NeonBlade's Badge (`badge`). Its solid, outline
+  and ghost variants are the `fill` prop; size, shape, dot and glow carry over.
+- `Dialog` / `DialogCard` (`variant="neon"`), `ToastCard` and `Toast`
+  (`appearance="neon"`), `notify` (`variant: 'neon'`): NeonBlade's Neon Modal
+  (`neon-modal`), redrawn as a building facade; keeps its size, animation,
+  glow, footer-align, close-button and backdrop props.
+- `progress/ProgressBar`, `RainLoader`, `ArrowLoader`, `CircularProgress`,
+  `TurbineLoader`: NeonBlade's Progress Bar, Rain Loader, Arrow Loader,
+  Circular Progress and Turbine Loader, redrawn as a building skyline, window
+  lights, subway chevrons, a segmented token ring and a rooftop water tower
+  with a fan. Each keeps the original props that still apply.
 
 NeonBlade UI is distributed under the MIT License:
 

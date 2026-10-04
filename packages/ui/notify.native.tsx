@@ -15,6 +15,8 @@ function show(variant: NotifyVariant, title: string, options: NotifyOptions = {}
       title={title}
       description={options.description}
       action={options.action}
+      appearance={options.variant}
+      district={options.district}
       onDismiss={dismissibleFor(variant, options.dismissible)
         ? () => sonner.dismiss(id)
         : undefined}
