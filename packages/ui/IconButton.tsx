@@ -74,7 +74,9 @@ export function IconButton({
   const { look, tone } = controlLook(variant, toneProp, district);
   const s = iconButton({ look, size, disabled });
   const face = CUT_FACE[size];
-  const iconColor = disabled ? 'text-ink-400' : look === 'solid' ? TONE_CLASSES[tone].onFace : TONE_CLASSES[tone].text;
+  // Ghost has no face: the icon sits on the page, so it takes the themed page step.
+  const c = TONE_CLASSES[tone];
+  const iconColor = disabled ? 'text-ink-400' : look === 'solid' ? c.onFace : look === 'ghost' ? c.pageText : c.text;
   return (
     <PressScale
       onPress={disabled ? undefined : () => { haptics.tap(); onPress?.(); }}

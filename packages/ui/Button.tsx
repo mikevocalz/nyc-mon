@@ -66,9 +66,11 @@ const CUT_FACE = {
   lg: { className: 'px-8 py-4 md:px-10 md:py-5', cut: 18 },
 } as const;
 
+// Solid labels sit on the tone face, outline labels on the night face, ghost
+// labels straight on the page, so ghost takes the themed page step.
 function labelTone(look: ControlLook, tone: ControlTone) {
   const c = TONE_CLASSES[tone];
-  return look === 'solid' ? c.onFace : c.text;
+  return look === 'solid' ? c.onFace : look === 'ghost' ? c.pageText : c.text;
 }
 
 export interface ButtonProps {

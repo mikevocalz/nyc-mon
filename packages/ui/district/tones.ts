@@ -85,8 +85,14 @@ export interface ToneClasses {
   shadow: string;
   /** Lit window colour. */
   light: string;
-  /** Tone-coloured text that holds AA on night. */
+  /** Tone-coloured text that holds AA on night. Night facades only: it fails on the daylit page. */
   text: string;
+  /**
+   * Tone-coloured text straight on the page (ghost labels, the slider
+   * counter): a themed `tone-*-text` token, so it is the `text` step on night
+   * and a darker step that holds 4.5:1 on concrete in daylight.
+   */
+  pageText: string;
   /** Same as `text`; the name the control ports used. */
   ink: string;
   /** Text on a surface face. */
@@ -114,7 +120,7 @@ export interface ToneClasses {
 const TABLE: Record<Tone, Omit<ToneClasses, 'ink'>> = {
   orange: {
     face: 'bg-orange-500', top: 'bg-orange-300', side: 'bg-orange-700', plate: 'bg-orange-700', deep: 'bg-orange-900',
-    shadow: 'bg-orange-950', light: 'bg-orange-200', text: 'text-orange-400', on: 'text-ink-950', onFace: 'text-ink-950',
+    shadow: 'bg-orange-950', light: 'bg-orange-200', text: 'text-orange-400', pageText: 'text-tone-orange-text', on: 'text-ink-950', onFace: 'text-ink-950',
     border: 'border-orange-500', keyline: 'border-orange-950', controlBorder: 'border-orange-500', controlKeyline: 'border-orange-950',
     focusBorder: 'focus:border-orange-300', soft: 'bg-orange-500/15', glow: 'shadow-glow-orange',
     focusGlow: 'focus:shadow-[0_0_18px_-4px_var(--color-orange-500)]',
@@ -122,21 +128,21 @@ const TABLE: Record<Tone, Omit<ToneClasses, 'ink'>> = {
   // Royal is too dark to read as text on night, so royal labels use its 300 step.
   royal: {
     face: 'bg-royal-500', top: 'bg-royal-300', side: 'bg-royal-700', plate: 'bg-royal-700', deep: 'bg-royal-900',
-    shadow: 'bg-royal-950', light: 'bg-carolina-200', text: 'text-royal-300', on: 'text-ink-50', onFace: 'text-white',
+    shadow: 'bg-royal-950', light: 'bg-carolina-200', text: 'text-royal-300', pageText: 'text-tone-royal-text', on: 'text-ink-50', onFace: 'text-white',
     border: 'border-royal-500', keyline: 'border-royal-950', controlBorder: 'border-royal-500', controlKeyline: 'border-royal-950',
     focusBorder: 'focus:border-royal-300', soft: 'bg-royal-500/15', glow: 'shadow-glow-royal',
     focusGlow: 'focus:shadow-[0_0_18px_-4px_var(--color-royal-400)]',
   },
   carolina: {
     face: 'bg-carolina-500', top: 'bg-carolina-300', side: 'bg-carolina-700', plate: 'bg-carolina-700', deep: 'bg-carolina-900',
-    shadow: 'bg-carolina-950', light: 'bg-carolina-100', text: 'text-carolina-400', on: 'text-ink-950', onFace: 'text-ink-950',
+    shadow: 'bg-carolina-950', light: 'bg-carolina-100', text: 'text-carolina-400', pageText: 'text-tone-carolina-text', on: 'text-ink-950', onFace: 'text-ink-950',
     border: 'border-carolina-500', keyline: 'border-carolina-950', controlBorder: 'border-carolina-500', controlKeyline: 'border-carolina-950',
     focusBorder: 'focus:border-carolina-300', soft: 'bg-carolina-500/15', glow: 'shadow-glow-royal',
     focusGlow: 'focus:shadow-[0_0_18px_-4px_var(--color-carolina-500)]',
   },
   leaf: {
     face: 'bg-leaf-500', top: 'bg-leaf-300', side: 'bg-leaf-700', plate: 'bg-leaf-700', deep: 'bg-leaf-900',
-    shadow: 'bg-leaf-950', light: 'bg-leaf-200', text: 'text-leaf-400', on: 'text-ink-950', onFace: 'text-ink-950',
+    shadow: 'bg-leaf-950', light: 'bg-leaf-200', text: 'text-leaf-400', pageText: 'text-tone-leaf-text', on: 'text-ink-950', onFace: 'text-ink-950',
     border: 'border-leaf-500', keyline: 'border-leaf-950', controlBorder: 'border-leaf-500', controlKeyline: 'border-leaf-950',
     focusBorder: 'focus:border-leaf-300', soft: 'bg-leaf-500/15', glow: 'shadow-glow-royal',
     focusGlow: 'focus:shadow-[0_0_18px_-4px_var(--color-leaf-500)]',
@@ -144,21 +150,21 @@ const TABLE: Record<Tone, Omit<ToneClasses, 'ink'>> = {
   // White on apple-500 is 4.21:1, under AA for small text; night is 4.83:1.
   apple: {
     face: 'bg-apple-500', top: 'bg-apple-300', side: 'bg-apple-700', plate: 'bg-apple-700', deep: 'bg-apple-900',
-    shadow: 'bg-apple-950', light: 'bg-orange-200', text: 'text-apple-400', on: 'text-ink-950', onFace: 'text-ink-950',
+    shadow: 'bg-apple-950', light: 'bg-orange-200', text: 'text-apple-400', pageText: 'text-tone-apple-text', on: 'text-ink-950', onFace: 'text-ink-950',
     border: 'border-apple-500', keyline: 'border-apple-950', controlBorder: 'border-apple-500', controlKeyline: 'border-apple-950',
     focusBorder: 'focus:border-apple-300', soft: 'bg-apple-500/15', glow: 'shadow-glow-orange',
     focusGlow: 'focus:shadow-[0_0_18px_-4px_var(--color-apple-500)]',
   },
   brick: {
     face: 'bg-orange-800', top: 'bg-orange-600', side: 'bg-orange-900', plate: 'bg-orange-950', deep: 'bg-orange-950',
-    shadow: 'bg-ink-950', light: 'bg-orange-300', text: 'text-orange-300', on: 'text-ink-50', onFace: 'text-white',
+    shadow: 'bg-ink-950', light: 'bg-orange-300', text: 'text-orange-300', pageText: 'text-tone-brick-text', on: 'text-ink-50', onFace: 'text-white',
     border: 'border-orange-800', keyline: 'border-orange-950', controlBorder: 'border-orange-700', controlKeyline: 'border-ink-950',
     focusBorder: 'focus:border-apple-400', soft: 'bg-orange-800/25', glow: 'shadow-glow-orange',
     focusGlow: 'focus:shadow-[0_0_18px_-4px_var(--color-apple-500)]',
   },
   white: {
     face: 'bg-ink-50', top: 'bg-white', side: 'bg-ink-300', plate: 'bg-ink-300', deep: 'bg-ink-600',
-    shadow: 'bg-ink-900', light: 'bg-orange-200', text: 'text-ink-50', on: 'text-ink-950', onFace: 'text-ink-950',
+    shadow: 'bg-ink-900', light: 'bg-orange-200', text: 'text-ink-50', pageText: 'text-text', on: 'text-ink-950', onFace: 'text-ink-950',
     border: 'border-ink-50', keyline: 'border-ink-900', controlBorder: 'border-ink-50', controlKeyline: 'border-ink-900',
     focusBorder: 'focus:border-white', soft: 'bg-ink-50/15', glow: 'shadow-glow-royal',
     focusGlow: 'focus:shadow-[0_0_18px_-4px_var(--color-ink-50)]',

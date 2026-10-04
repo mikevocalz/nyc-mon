@@ -93,6 +93,26 @@ export const VariantShowcase: Story = {
   ),
 };
 
+/**
+ * Ghost labels sit straight on the page, so every tone draws its themed
+ * `tone-*-text` step: the night step on night, a darker one on daylit. Shown
+ * on the page and on the sunken surface (the darker light background).
+ */
+export const GhostTones: Story = {
+  render: () => (
+    <View className="gap-4 p-4">
+      {(['bg-bg', 'bg-surface-sunken'] as const).map((surface) => (
+        <View key={surface} className={`flex-row flex-wrap items-center gap-2 p-2 ${surface}`}>
+          {CONTROL_TONES.map((t) => (
+            <Button key={t} tone={t} variant="ghost" title={t} onPress={() => {}} />
+          ))}
+          <Button variant="ghost" title="disabled" disabled onPress={() => {}} />
+        </View>
+      ))}
+    </View>
+  ),
+};
+
 /** Callers that pass flex classes: Cancel + Create share a row (BookingForm), and a full-width CTA. */
 export const InLayout: Story = {
   render: () => (

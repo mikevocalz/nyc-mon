@@ -281,11 +281,11 @@ export function VoiceRecorder({ onComplete, onCancel, maxSeconds, tone: toneProp
         </CutTile>
       </View>
 
-      <Text className="text-center text-sm text-silver-300 md:text-base">
+      <Text className="text-center text-sm text-text-muted md:text-base">
         {recording ? 'Tap the square to finish' : 'Tap the mic to start'}
       </Text>
 
-      {error ? <Text role="alert" className="text-center text-sm text-apple-400">{error}</Text> : null}
+      {error ? <Text role="alert" className="text-center text-sm text-danger">{error}</Text> : null}
     </View>
   );
 }

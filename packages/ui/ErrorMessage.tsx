@@ -8,8 +8,9 @@ export interface ErrorMessageProps {
 }
 
 /**
- * A form-level error: apple 400 in the display face, led by a solid apple
- * block so the state is not carried by colour alone. Renders nothing when
+ * A form-level error: the themed `danger` colour (apple 600 on daylit, apple
+ * 400 on night) in the display face, led by a solid apple block so the state
+ * is not carried by colour alone. Renders nothing when
  * there is no message, so the row collapses.
  */
 export function ErrorMessage({ message, className }: ErrorMessageProps) {

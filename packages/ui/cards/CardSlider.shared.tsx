@@ -29,7 +29,8 @@ const controls = tv({
   },
   variants: { tone: toneVariants(() => ({})) },
   compoundVariants: (Object.entries(toneVariants((c) => c)) as [ControlTone, ToneClasses][]).map(([tone, c]) => ({
-    tone, class: { fill: c.face, counter: c.ink },
+    // The counter sits under the track on the page, not on a night face.
+    tone, class: { fill: c.face, counter: c.pageText },
   })),
 });
 

@@ -55,3 +55,23 @@ test('text on every control face holds AA (4.5:1)', async () => {
     assert.ok(ratio(hex(c.text), night) >= 4.5, `${t}: ${c.text} on night`);
   }
 });
+
+test('page text is the themed tone token: the night step in dark, a page-safe step in light', async () => {
+  const { palette, semantic } = await import('@acme/theme');
+  const sem = semantic as Record<string, { light: string; dark: string }>;
+  const step = (cls: string): string => {
+    const m = /^text-(\w+)-(\d+)$/.exec(cls)!;
+    return (palette as unknown as Record<string, Record<string, string>>)[m[1]!]![m[2]!]!;
+  };
+  for (const t of CONTROL_TONES) {
+    const c = TONE_CLASSES[t];
+    const token = c.pageText.replace(/^text-/, '');
+    assert.equal(token, `tone-${t}-text`, `${t}: pageText names its tone token`);
+    assert.ok(token in sem, `${t}: ${token} is a semantic token`);
+    // Dark keeps the step the tone table always drew on night.
+    assert.equal(sem[token]!.dark, step(c.text), `${t}: dark ${token} matches ${c.text}`);
+    // Light is a different, darker step (contrast.ts measures it on every surface).
+    assert.notEqual(sem[token]!.light, sem[token]!.dark, `${t}: light ${token} is a page step`);
+  }
+  assert.equal(TONE_CLASSES.white.pageText, 'text-text');
+});

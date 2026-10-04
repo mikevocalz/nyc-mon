@@ -59,6 +59,18 @@ export const CornerCut: Story = {
   ),
 };
 
+/** Ghost icons with no colour of their own take the tone's themed page step (`tone-*-text`). */
+export const GhostTones: Story = {
+  render: () => (
+    <View className="flex-row flex-wrap items-center gap-2 bg-bg p-4">
+      {CONTROL_TONES.map((t) => (
+        <IconButton key={t} tone={t} variant="ghost" aria-label={`Settings, ${t}`} icon={<Settings size={20} strokeWidth={2.5} />} />
+      ))}
+      <IconButton variant="ghost" disabled aria-label="Settings, disabled" icon={<Settings size={20} strokeWidth={2.5} />} />
+    </View>
+  ),
+};
+
 /** Ghost in a nav bar (DetailNavbar, MiniCalendar): compact, the caller's muted icon stays legible. */
 export const GhostNavBar: Story = {
   render: () => (

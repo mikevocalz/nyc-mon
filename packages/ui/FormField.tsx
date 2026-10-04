@@ -7,7 +7,7 @@ import { resolveControlTone, toneVariants, type ControlTone, type District } fro
 
 // The label + hint/error shell from TextField, for controls that bring their
 // own input: the label is the neon nameplate (a solid tone tag in the display
-// face), the error is apple 400 in the display face. Presentational only; the
+// face), the error is the themed danger colour in the display face. Presentational only; the
 // control comes in as children, controlled by the parent.
 const formField = tv({
   slots: {

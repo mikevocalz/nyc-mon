@@ -14,8 +14,12 @@ export const NEON_FIELD = {
   input:
     'w-full min-h-11 rounded-none border-2 bg-ink-950 px-4 py-2.5 text-base font-semibold text-ink-50 ' +
     'placeholder:text-silver-500 transition-all duration-fast focus:outline-none motion-reduce:transition-none',
-  /** Validation message: apple 400 in the display face. */
-  message: 'font-display text-sm tracking-wide text-apple-400',
+  /**
+   * Validation message in the display face. It sits under the well, on the
+   * page, so it takes the themed `danger` (apple 600 on daylit, apple 400 on
+   * night), not a fixed night step.
+   */
+  message: 'font-display text-sm tracking-wide text-danger',
   /** Hint under a field: silver on night, the theme's muted text elsewhere. */
   hint: 'text-sm text-text-muted',
   /** The ⌘V paste chip inside a well. */
