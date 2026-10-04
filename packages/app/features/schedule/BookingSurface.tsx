@@ -117,13 +117,12 @@ export function BookingSurface({ day, resource, onBook }: BookingSurfaceProps) {
         })}
       </ScrollView>
 
-      {/* The kit's Button has no `disabled`, so the unavailable state is the
-          absence of a press handler plus a dimmed surface, not a fake prop. */}
       <Button
         variant="primary"
         title="Book appointment"
+        disabled={!selectedSlot}
         onPress={selectedSlot ? () => onBook(selectedSlot) : undefined}
-        className={`w-full ${selectedSlot ? '' : 'opacity-50'}`}
+        fullWidth
       />
     </View>
   );

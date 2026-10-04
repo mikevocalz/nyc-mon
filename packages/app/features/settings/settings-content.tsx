@@ -81,7 +81,7 @@ export function SettingsContent() {
           </View>
           <View className="flex-row gap-3">
             <Button title="Sign out" variant="outline" onPress={() => {}} />
-            <Button title="Delete account" variant="ghost" onPress={() => {}} />
+            <Button title="Delete account" variant="danger" onPress={() => {}} />
           </View>
         </Card>
       </FadeIn>

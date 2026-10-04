@@ -77,8 +77,14 @@ export { CityHeightfield, type CityHeightfieldProps } from './backgrounds/CityHe
 export { RiverTide, type RiverTideProps, type RiverTideOrigin } from './backgrounds/RiverTide';
 export { RainWindow, type RainWindowProps } from './backgrounds/RainWindow';
 // Districts and tones: one module for the whole kit.
-export * from './district';
-export { THEMES as DISTRICT_THEMES } from './district';
+export {
+  DISTRICTS, DISTRICT_NAME, DISTRICT_NAMES, TONES, CONTROL_TONES, DISTRICT_TONES, DISTRICT_TONE, TONE_CLASSES,
+  resolveTone, resolveControlTone, resolveAccent, toneClasses, toneVariants, toneHex, toneInput,
+  DISTRICT_CHART_TONE, DISTRICT_LIGHT, districtSeries, districtTone, seriesColor, seriesShades, keylineFor,
+  THEMES, THEMES as DISTRICT_THEMES, steps, skyBands,
+  type District, type Tone, type ControlTone, type ToneClasses, type ToneHex, type DistrictTheme,
+} from './district';
+// ChartTone is exported once, through './charts'.
 export { CityBlocks, type CityBlocksProps } from './backgrounds/CityBlocks';
 export { CircuitButton, type CircuitButtonProps, type CircuitTone, GridCard, type GridCardProps } from './future';
 export { BrandLogo, type BrandLogoProps } from './brand/BrandLogo';

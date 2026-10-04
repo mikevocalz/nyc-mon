@@ -141,9 +141,10 @@ const TABLE: Record<Tone, Omit<ToneClasses, 'ink'>> = {
     focusBorder: 'focus:border-leaf-300', soft: 'bg-leaf-500/15', glow: 'shadow-glow-royal',
     focusGlow: 'focus:shadow-[0_0_18px_-4px_var(--color-leaf-500)]',
   },
+  // White on apple-500 is 4.21:1, under AA for small text; night is 4.83:1.
   apple: {
     face: 'bg-apple-500', top: 'bg-apple-300', side: 'bg-apple-700', plate: 'bg-apple-700', deep: 'bg-apple-900',
-    shadow: 'bg-apple-950', light: 'bg-orange-200', text: 'text-apple-400', on: 'text-ink-50', onFace: 'text-white',
+    shadow: 'bg-apple-950', light: 'bg-orange-200', text: 'text-apple-400', on: 'text-ink-950', onFace: 'text-ink-950',
     border: 'border-apple-500', keyline: 'border-apple-950', controlBorder: 'border-apple-500', controlKeyline: 'border-apple-950',
     focusBorder: 'focus:border-apple-300', soft: 'bg-apple-500/15', glow: 'shadow-glow-orange',
     focusGlow: 'focus:shadow-[0_0_18px_-4px_var(--color-apple-500)]',
@@ -206,7 +207,7 @@ export function toneHex(tone: ControlTone): ToneHex {
     return { highlight: o[500], face: o[800], plate: o[950], deep: o[950], keyline: palette.ink[950], glow: brand.apple, on: brand.white };
   }
   const s = shadeSteps(tone);
-  const on = tone === 'royal' || tone === 'apple' ? brand.white : brand.night;
+  const on = tone === 'royal' ? brand.white : brand.night;
   return {
     highlight: s.highlight,
     face: s.face,
