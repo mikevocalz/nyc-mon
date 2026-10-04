@@ -227,6 +227,7 @@ const USAGE: Pair[] = [
   { id: 'sort glyph carolina-300', fg: 'carolina-300', bg: ['ink-900'], role: 'ui', usedAt: ['packages/ui/DataTable.tsx:59'] },
   { id: 'sort glyph leaf-300', fg: 'leaf-300', bg: ['ink-900'], role: 'ui', usedAt: ['packages/ui/DataTable.tsx:60'] },
   { id: 'sort glyph apple-300', fg: 'apple-300', bg: ['ink-900'], role: 'ui', usedAt: ['packages/ui/DataTable.tsx:62'] },
+  { id: 'home headline on ink panel', fg: 'orange-500', bg: ['ink-800'], role: 'large-text', usedAt: ['packages/spatial/SpatialScreen.tsx:106', 'packages/ui/neon/SolidPanel.tsx:42'], reason: 'Heading display-sm (30px web, 26px native at rem 14) on the SolidPanel tone="ink" face, which is night in both themes' },
   { id: 'orange eyebrow on glass card', fg: 'orange-500', bg: ['ink-50', 'ink-950/85'], role: 'text', usedAt: ['packages/ui/future/GridCard.tsx:29', 'packages/ui/future/CircuitButton.tsx:49'], reason: 'measured over a light page, the worst case for the 85% night glass' },
   { id: 'carolina eyebrow on glass card', fg: 'carolina-500', bg: ['ink-50', 'ink-950/85'], role: 'text', usedAt: ['packages/ui/future/GridCard.tsx:30', 'packages/ui/future/CircuitButton.tsx:50'], reason: 'measured over a light page, the worst case for the 85% night glass' },
 

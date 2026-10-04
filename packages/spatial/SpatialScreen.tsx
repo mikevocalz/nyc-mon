@@ -101,7 +101,9 @@ export function SpatialScreen({ enterImmersive }: SpatialScreenProps = {}) {
                 unreadable, and the brand is solid blocks, not translucent glass. */}
             <View className="max-w-3xl flex-1 md:order-1">
               <SolidPanel tone="ink" depth="lg" className="gap-4 px-5 py-6 md:px-8 md:py-8">
-                <Heading level={1} size="display-sm" className="my-0 text-center text-primary md:text-left">
+                {/* Palette step, not `primary`: the ink slab is night in both
+                    themes, and `primary` drops to orange-700 in light (2.55:1 here). */}
+                <Heading level={1} size="display-sm" className="my-0 text-center text-orange-500 md:text-left">
                   {HOME_COPY.tagline}
                 </Heading>
                 <Text className="max-w-2xl text-center text-ink-50 md:text-left">{HOME_COPY.intro}</Text>

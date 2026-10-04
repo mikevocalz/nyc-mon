@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react';
 import { tv } from 'tailwind-variants';
+import { NIGHT_SCHEME, NightScope } from '../NightScope';
 import { View } from '../tw';
 
 export type SolidTone = 'orange' | 'royal' | 'carolina' | 'leaf' | 'apple' | 'ink';
@@ -51,13 +52,17 @@ const solid = tv({
 
 export function SolidPanel({ children, className, tone = 'orange', depth = 'md', rim = true }: SolidPanelProps) {
   const s = solid({ tone, depth });
-  return (
+  // The ink face is night in both themes, so themed tokens dropped inside it
+  // (text-primary, text-muted) must resolve their dark values, as on Card.
+  const night = tone === 'ink';
+  const panel = (
     <View className={s.root()}>
       <View aria-hidden className={s.plate()} />
-      <View className={s.face({ className })}>
+      <View className={s.face({ className: night ? `${NIGHT_SCHEME} ${className ?? ''}` : className })}>
         {rim ? <View aria-hidden className={s.rim()} /> : null}
         {children}
       </View>
     </View>
   );
+  return night ? <NightScope>{panel}</NightScope> : panel;
 }

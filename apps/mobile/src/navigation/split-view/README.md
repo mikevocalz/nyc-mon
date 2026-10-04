@@ -21,7 +21,10 @@ import { SplitView } from '@/src/navigation/split-view';
 ```
 
 `index.ios.tsx` re-exports expo-router's implementation untouched;
-`index.android.tsx` is the adaptive one. Metro picks the fork.
+`index.android.tsx` and `index.web.tsx` re-export the adaptive one in
+`AdaptiveSplitView.tsx`. Metro picks the fork. The `index.tsx` anchor also
+re-exports the adaptive one, so a platform without a fork still gets working
+columns rather than expo-router's non-iOS `<Slot />` fallback.
 
 ## Breakpoints
 
