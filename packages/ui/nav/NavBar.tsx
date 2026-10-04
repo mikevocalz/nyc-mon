@@ -10,6 +10,7 @@ import { useInstanceStore, useStore } from '../use-instance-store';
 import { Pressable, Text, View } from '../tw';
 import { SkylineBand } from './SkylineBand';
 import { NeonChevron } from '../neon/NeonChevron';
+import { dropdown as dropdownLook } from '../dropdown';
 
 export interface NavItem {
   label: string;
@@ -66,8 +67,6 @@ const bar = tv({
     linkIdle: 'hover:bg-ink-800',
     linkActive: '',
     linkActiveText: 'text-ink-950',
-    menu: 'absolute top-full z-50 mt-1 min-w-48 border-2 border-ink-700 bg-ink-950 py-1',
-    menuLink: 'flex min-h-11 flex-col justify-center px-4 py-2 hover:bg-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus',
     trailing: 'flex-row items-center gap-3',
     toggle: 'h-11 w-11 items-center justify-center border-2 border-ink-700 md:hidden',
     toggleText: 'text-xl leading-none text-white',
@@ -125,6 +124,8 @@ export function NavBar({
 }: NavBarProps) {
   const tone: ChartTone = color ? (PRESETS[color] ?? (color as ChartTone)) : districtTone(district);
   const s = bar({ tone, transparency, position, navAlign });
+  // The dropdown panel and rows are the kit's shared list (also Select's open list).
+  const d = dropdownLook({ tone });
   const store = useInstanceStore(() => ({ sheet: false, dropdown: -1 }));
   const sheet = useStore(store, (st) => st.sheet);
   const dropdown = useStore(store, (st) => st.dropdown);
@@ -167,10 +168,14 @@ export function NavBar({
                       <NeonChevron open={dropdown === i} tone={tone} size="sm" plain={!item.active} />
                     </Pressable>
                     {dropdown === i ? (
-                      <List className={s.menu()}>
+                      <List className={d.panel()}>
                         {item.children.map((child, c) => (
                           <ListItem key={`${child.label}-${c}`}>
-                            {anchor(child, <Text className={textClass(child)}>{child.label}</Text>, `${s.menuLink()} ${child.active ? s.linkActive() : ''}`)}
+                            {anchor(
+                              child,
+                              <Text className={twMerge(d.itemText(), child.active ? d.itemActiveText() : '')}>{child.label}</Text>,
+                              twMerge(d.item(), child.active ? d.itemActive() : ''),
+                            )}
                           </ListItem>
                         ))}
                       </List>

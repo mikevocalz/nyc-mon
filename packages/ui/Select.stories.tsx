@@ -53,3 +53,12 @@ export const Neon: Story = {
     </View>
   ),
 };
+
+/** Rounding is opt-in: `rounded` softens the well and the open list together. */
+export const Rounded: Story = {
+  render: () => (
+    <View className="max-w-content-form gap-4 p-4">
+      <Select rounded district="megacity" label="Rounded" value="midtown" options={DISTRICT_OPTIONS} />
+    </View>
+  ),
+};
