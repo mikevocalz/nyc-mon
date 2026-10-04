@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Card } from './Card';
 import { CardSlider, type CardSliderProps } from './cards/CardSlider';
-import { DISTRICT_NAME, DISTRICTS } from './cards/tones';
+import { DISTRICT_NAME, DISTRICTS } from './district';
 import { View } from './tw';
 
 const LINES = [

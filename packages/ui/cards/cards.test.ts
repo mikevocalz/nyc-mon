@@ -5,13 +5,13 @@ import {
   clampIndex, indexAtOffset, indexForKey, pad2, progressOf, sliderMetrics, stepIndex, visibleFor,
 } from './card-slider-model.ts';
 import { DEFAULT_NOTCH, insetNotch, notchClipPath, notchPolygon } from './notch.ts';
-import { DISTRICT_TONE, TONE_CLASSES, resolveTone, toneHex, toneVariants } from './tones.ts';
+import { DISTRICT_TONE, TONE_CLASSES, resolveControlTone, toneHex, toneVariants } from '../district/index.ts';
 
 test('district picks the tone unless a tone is passed', () => {
-  assert.equal(resolveTone(undefined, 'harlem'), 'brick');
-  assert.equal(resolveTone(undefined, 'downtown'), 'royal');
-  assert.equal(resolveTone('leaf', 'harlem'), 'leaf');
-  assert.equal(resolveTone(), 'orange');
+  assert.equal(resolveControlTone(undefined, 'harlem'), 'brick');
+  assert.equal(resolveControlTone(undefined, 'downtown'), 'royal');
+  assert.equal(resolveControlTone('leaf', 'harlem'), 'leaf');
+  assert.equal(resolveControlTone(), 'orange');
   assert.deepEqual(Object.keys(DISTRICT_TONE).sort(), ['downtown', 'harlem', 'megacity', 'midtown']);
 });
 

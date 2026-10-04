@@ -10,7 +10,9 @@ import { shadeSteps } from '../neon/shade.ts';
  * both draw the same city from the same seed. Everything is in layout px.
  */
 
-export type District = 'downtown' | 'midtown' | 'harlem' | 'megacity';
+import type { District } from '../district/districts.ts';
+
+export type { District };
 
 /**
  * Quad kinds, read by both renderers:

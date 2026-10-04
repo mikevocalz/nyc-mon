@@ -4,7 +4,7 @@ import { haptics } from './haptics';
 import { PressScale } from './press-scale';
 import { CornerCutFrame } from './neon/CornerCutFrame';
 import type { CutCorner } from './neon/corner-cut';
-import { resolveTone, toneInput, type ControlTone, type District } from './cards/tones';
+import { resolveControlTone, toneInput, type ControlTone, type District } from './district';
 
 // Press feedback: §8 ladder rung 1 — active-state opacity via NW5 transitions;
 // motion-reduce kills transitions.
@@ -71,7 +71,7 @@ export function IconButton({
     >
       {variant === 'cornerCut' ? (
         <CornerCutFrame
-          tone={disabled ? 'silver' : toneInput(resolveTone(tone, district))}
+          tone={disabled ? 'silver' : toneInput(resolveControlTone(tone, district))}
           corner={corner}
           cut={face.cut}
           depth={disabled ? 0 : 3}

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { citySkylineLayers } from './city-skyline-model.ts';
-import { DISTRICTS, skyBands, THEMES } from './district-theme.ts';
+import { DISTRICTS, skyBands, THEMES } from '../district/index.ts';
 import { blockHeight, FLOORS_PER_BLOCK, heightfieldLayers } from './heightfield-model.ts';
 import { glyphMask, glyphPixels, glyphPool } from './pixel-font.ts';
 import { composeLayers, Kind, QUAD_STRIDE, QuadWriter, type Layer } from './quad-writer.ts';

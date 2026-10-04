@@ -4,8 +4,8 @@ import { SiteFooter, type FooterLinkGroup } from './nav/SiteFooter';
 import { SkylineBand } from './nav/SkylineBand';
 import { Heading, Main, Paragraph, Section } from './html';
 import { View } from './tw';
+import { DISTRICTS, DISTRICT_NAME } from './district';
 
-const DISTRICTS = ['downtown', 'midtown', 'harlem', 'megacity'] as const;
 const districtControl = { control: 'inline-radio', options: DISTRICTS } as const;
 const toneControl = { control: 'inline-radio', options: ['orange', 'royal', 'carolina', 'leaf', 'apple'] } as const;
 
@@ -26,7 +26,7 @@ const ITEMS: NavItem[] = [
 
 const GROUPS: FooterLinkGroup[] = [
   { title: 'Play', links: [{ label: 'Map', href: '#map' }, { label: 'Legends', href: '#legends' }, { label: 'Crew', href: '#crew' }] },
-  { title: 'Districts', links: DISTRICTS.map((d) => ({ label: d === 'megacity' ? 'Mega City' : d[0]!.toUpperCase() + d.slice(1), href: `#${d}` })) },
+  { title: 'Districts', links: DISTRICTS.map((d) => ({ label: DISTRICT_NAME[d], href: `#${d}` })) },
   { title: 'Help', links: [{ label: 'Safety on the street', href: '#safety' }, { label: 'Contact', href: '#contact' }] },
 ];
 

@@ -13,7 +13,7 @@ import { useReducedMotion } from '../backgrounds/use-reduced-motion';
 import {
   bandAt, barLayout, categoryLabels, formatValue, resolveSeries, type ChartDatum, type SeriesInput,
 } from './chart-model';
-import { DISTRICT_LIGHT, districtSeries, seriesColor, seriesShades, type District } from './district-tones';
+import { DISTRICT_LIGHT, districtSeries, seriesColor, seriesShades, type District } from '../district';
 import { BarCanvas } from './BarCanvas';
 import { GLOW_BLUR, type GlowLevel } from './LinePlot.types';
 import { plotPointer } from './plot-pointer';

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { DISTRICTS } from '../district/index.ts';
 import {
   blockFills, clampInt, isIndeterminate, litCount, percentLabel, progressA11y, progressFraction, quantize,
   resolveSize, ringAngles, skylineHeights,
@@ -63,7 +64,7 @@ test('quantize rounds down to whole floors', () => {
 
 test('skylines are deterministic, in range, and shaped by district', () => {
   assert.deepEqual(skylineHeights(12, 'downtown', 3), skylineHeights(12, 'downtown', 3));
-  for (const d of ['downtown', 'midtown', 'harlem', 'megacity'] as const) {
+  for (const d of DISTRICTS) {
     for (const h of skylineHeights(40, d, 2)) assert.ok(h > 0 && h <= 1, `${d} ${h}`);
   }
   const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;

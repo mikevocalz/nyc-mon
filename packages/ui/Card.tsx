@@ -10,7 +10,7 @@ import { NotchFrame } from './cards/NotchFrame';
 import { BeamFrame, type BeamVariant } from './cards/BeamFrame';
 import { DEFAULT_NOTCH, type NotchSide } from './cards/notch';
 import { useReducedMotion } from './backgrounds/use-reduced-motion';
-import { resolveTone, toneHex, toneInput, toneVariants, type ControlTone, type District } from './cards/tones';
+import { resolveControlTone, toneHex, toneInput, toneVariants, type ControlTone, type District } from './district';
 
 const card = tv({
   base: 'rounded-card bg-surface-raised',
@@ -55,15 +55,15 @@ const neonCard = tv({
   compoundVariants: [
     // The notch face is the tone itself, so text and the icon tile take the on-face colour.
     ...toneVariantsList('notch', (t) => ({ title: t.onFace, description: t.onFace, icon: '' })),
-    ...toneVariantsList('cornerCut', (t) => ({ icon: `${t.face} ${t.keyline}` })),
-    ...toneVariantsList('beam', (t) => ({ icon: `${t.face} ${t.keyline}` })),
+    ...toneVariantsList('cornerCut', (t) => ({ icon: `${t.face} ${t.controlKeyline}` })),
+    ...toneVariantsList('beam', (t) => ({ icon: `${t.face} ${t.controlKeyline}` })),
   ],
   defaultVariants: { size: 'md' },
 });
 
 function toneVariantsList(
   variant: 'notch' | 'cornerCut' | 'beam',
-  pick: (c: import('./cards/tones').ToneClasses) => Record<string, string>,
+  pick: (c: import('./district').ToneClasses) => Record<string, string>,
 ) {
   const all = toneVariants(pick);
   return (Object.keys(all) as ControlTone[]).map((tone) => ({ variant, tone, class: all[tone] }));
@@ -135,7 +135,7 @@ function NeonCard({
   corner = 'bottom-right', cornerSize = 20, beamVariant = 'single', beamToneB, duration = 4, durationB = 6,
   className, children, elevation: _e, padded: _p, ...articleProps
 }: CardProps & { variant: Exclude<CardVariant, 'default'> }) {
-  const tone = resolveTone(toneProp, district);
+  const tone = resolveControlTone(toneProp, district);
   const hex = toneHex(tone);
   const reduced = useReducedMotion();
   const sidesKey = (notchSides ?? DEFAULT_NOTCH.sides).join(',');

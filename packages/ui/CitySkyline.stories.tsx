@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { CitySkyline } from './backgrounds/CitySkyline';
 import type { CitySkylineProps } from './backgrounds/CitySkyline.types';
-import { DISTRICTS, DISTRICT_NAMES } from './backgrounds/district-theme';
+import { DISTRICTS, DISTRICT_NAMES } from './district';
 import { BackgroundCaption, DistrictGrid } from './backgrounds/story-helpers';
 import { Section } from './html';
 

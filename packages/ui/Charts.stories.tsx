@@ -4,17 +4,10 @@ import { NeonDonutChart } from './charts/NeonDonutChart';
 import { NeonLineChart } from './charts/NeonLineChart';
 import { NeonSparkline } from './charts/NeonSparkline';
 import { StatCard } from './charts/StatCard';
-import type { District } from './charts/district-tones';
+import { DISTRICTS, DISTRICT_NAMES, type District } from './district';
 import { Heading, Paragraph, Section } from './html';
 import { View } from './tw';
 
-const DISTRICTS = ['downtown', 'midtown', 'harlem', 'megacity'] as const satisfies readonly District[];
-const DISTRICT_NAMES: Record<District, string> = {
-  downtown: 'Downtown',
-  midtown: 'Midtown',
-  harlem: 'Harlem',
-  megacity: 'Mega City',
-};
 
 const SIGHTINGS = [
   { name: 'Jan', sightings: 420, catches: 160 },

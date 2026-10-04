@@ -9,7 +9,7 @@ import { AnimatedView, cssAnimation } from '../progress/motion';
 import { View } from '../tw';
 import { useSizeClass } from '../use-size-class';
 import { itemSide, segmentServed, stationStates, type StationState, type TimelineAlign } from './timeline-model';
-import { resolveTone, TONE_CLASSES, type District, type Tone } from './tones';
+import { resolveTone, TONE_CLASSES, type District, type Tone } from '../district';
 
 export type { TimelineAlign };
 export type TimelineVariant = 'default' | 'glow' | 'minimal' | 'stepped';

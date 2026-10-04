@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { cornerPieces } from './accent-frame-model.ts';
 import { itemSide, segmentServed, stationStates } from './timeline-model.ts';
-import { DISTRICTS, DISTRICT_TONES, resolveAccent, resolveTone, TONE_CLASSES } from './tones.ts';
+import { DISTRICTS, DISTRICT_TONES, resolveAccent, resolveTone, TONE_CLASSES } from '../district/index.ts';
 
 test('every district has a tone and accent with class strings', () => {
   for (const d of DISTRICTS) {

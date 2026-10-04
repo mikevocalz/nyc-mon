@@ -6,7 +6,7 @@ import { TextField } from './TextField';
 import { Select } from './Select';
 import { Checkbox } from './Checkbox';
 import { Switch } from './Switch';
-import { DISTRICT_NAME, DISTRICT_TONE, DISTRICTS, TONE_CLASSES, type District } from './cards/tones';
+import { DISTRICT_NAME, DISTRICT_TONE, DISTRICTS, TONE_CLASSES, type District } from './district';
 import { Form, Heading, Main, Paragraph, Section } from './html';
 import { Text } from './Text';
 import { View } from './tw';

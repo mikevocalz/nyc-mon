@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Dialog, DialogCard } from './Dialog';
 import { Button } from './Button';
 import { View } from './tw';
+import { DISTRICTS } from './district';
 
 const meta = {
   title: 'UI/Dialog',
@@ -50,7 +51,7 @@ export const Neon: Story = {
   args: { variant: 'neon', district: 'midtown', size: 'md', footerAlign: 'right', animation: 'scale', glow: true },
   argTypes: {
     variant: { control: 'inline-radio', options: ['default', 'neon'] },
-    district: { control: 'inline-radio', options: ['downtown', 'midtown', 'harlem', 'megacity'] },
+    district: { control: 'inline-radio', options: DISTRICTS },
     size: { control: 'inline-radio', options: ['xs', 'sm', 'md', 'lg', 'xl', 'full'] },
     footerAlign: { control: 'inline-radio', options: ['left', 'center', 'right', 'between'] },
     animation: { control: 'inline-radio', options: ['scale', 'slide', 'none'] },
@@ -77,7 +78,7 @@ export const Neon: Story = {
 export const NeonDistricts: Story = {
   render: () => (
     <View className="gap-8 p-4 lg:flex-row lg:flex-wrap">
-      {(['downtown', 'midtown', 'harlem', 'megacity'] as const).map((district) => (
+      {DISTRICTS.map((district) => (
         <View key={district} className="lg:w-[calc(50%-1rem)]">
           <DialogCard
             variant="neon"

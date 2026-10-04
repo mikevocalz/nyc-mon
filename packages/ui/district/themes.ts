@@ -1,17 +1,6 @@
 import { brand, palette } from '@acme/theme';
 import { mixColor } from '../neon/colors.ts';
-import type { District } from './city-blocks-model.ts';
-
-export type { District };
-
-export const DISTRICTS: readonly District[] = ['downtown', 'midtown', 'harlem', 'megacity'];
-
-export const DISTRICT_NAMES: Record<District, string> = {
-  downtown: 'Downtown',
-  midtown: 'Midtown',
-  harlem: 'Harlem',
-  megacity: 'Mega City',
-};
+import type { District } from './districts.ts';
 
 /**
  * The solid colour set of each district. Every value comes from the theme
@@ -41,6 +30,7 @@ export interface DistrictTheme {
 const brick = mixColor(palette.apple[900], palette.orange[900], 0.5);
 const brickDeep = mixColor(palette.apple[950], palette.orange[950], 0.5);
 
+/** The background colour set per district (CityBlocks, skylines, rain, river...). */
 export const THEMES: Record<District, DistrictTheme> = {
   // FiDi at night: royal glass, orange lights, the harbour in royal steps.
   downtown: {

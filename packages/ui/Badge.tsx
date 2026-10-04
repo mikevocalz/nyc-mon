@@ -1,7 +1,7 @@
 'use client';
 import { tv, type VariantProps } from 'tailwind-variants';
 import { useReducedMotion } from './backgrounds/use-reduced-motion';
-import { TONE_CLASSES, resolveTone, type District, type Tone } from './elements/tones';
+import { TONE_CLASSES, resolveTone, type District, type Tone } from './district';
 import type { NeonColorInput } from './neon/colors';
 import { AnimatedView, cssAnimation } from './progress/motion';
 import { View, Text } from './tw';

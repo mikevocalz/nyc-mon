@@ -7,7 +7,7 @@ import { haptics } from './haptics';
 import { CornerCutFrame } from './neon/CornerCutFrame';
 import type { CutCorner } from './neon/corner-cut';
 import type { GlowIntensity } from './neon/glow';
-import { resolveTone, toneInput, toneVariants, type ControlTone, type District } from './cards/tones';
+import { resolveControlTone, toneInput, toneVariants, type ControlTone, type District } from './district';
 
 // Press feedback: §8 ladder rung 1 — simple active-state opacity/scale via
 // NW5 transitions; respects reduced motion (motion-reduce kills transitions).
@@ -97,7 +97,7 @@ export function Button({
   title, onPress, variant, size, disabled, fullWidth, loading, className,
   tone: toneProp, district, corner = 'bottom-right', glow = false, ...a11y
 }: ButtonProps) {
-  const tone = resolveTone(toneProp, district);
+  const tone = resolveControlTone(toneProp, district);
   const off = !!(disabled || loading);
   const { root, label } = button({ variant, size, tone, disabled: off, fullWidth });
   const content = (

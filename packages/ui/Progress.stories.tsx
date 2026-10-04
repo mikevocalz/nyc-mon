@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { DISTRICT_NAME, type District } from './elements/tones';
+import { DISTRICT_NAME, type District } from './district';
 import { Heading, Paragraph, Section } from './html';
 import { ArrowLoader, CircularProgress, ProgressBar, RainLoader, TurbineLoader } from './progress';
 import { districtControl } from './progress/story-kit';

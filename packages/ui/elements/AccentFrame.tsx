@@ -6,7 +6,7 @@ import type { NeonColorInput } from '../neon/colors';
 import { AnimatedView, cssAnimation } from '../progress/motion';
 import { View } from '../tw';
 import { useInstanceStore, useStore } from '../use-instance-store';
-import { resolveAccent, resolveTone, TONE_CLASSES, type District, type Tone } from './tones';
+import { resolveAccent, resolveTone, TONE_CLASSES, type District, type Tone } from '../district';
 import { cornerPieces, type Corner, type CornerStyle } from './accent-frame-model';
 
 export type AccentFrameHoverEffect = 'expand' | 'glow' | 'pulse' | 'flicker' | 'none';

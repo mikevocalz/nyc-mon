@@ -1,4 +1,4 @@
-import type { ControlTone, District } from './cards/tones';
+import type { ControlTone, District } from './district';
 
 export interface SwitchProps {
   value: boolean;

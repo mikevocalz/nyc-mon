@@ -3,7 +3,7 @@ import { tv } from 'tailwind-variants';
 import { haptics } from '../haptics';
 import { Pressable, Text as TWText, View } from '../tw';
 import { Text } from '../Text';
-import { resolveTone, toneVariants, type ControlTone, type District } from './tones';
+import { resolveControlTone, toneVariants, type ControlTone, type District } from '../district';
 
 const neonCheckbox = tv({
   slots: {
@@ -24,8 +24,8 @@ const neonCheckbox = tv({
     },
     disabled: { true: { root: 'opacity-50' } },
   },
-  compoundVariants: (Object.entries(toneVariants((c) => c)) as [ControlTone, import('./tones').ToneClasses][]).map(
-    ([tone, c]) => ({ tone, checked: true, class: { box: `${c.face} ${c.keyline}`, plate: c.plate, check: c.onFace } }),
+  compoundVariants: (Object.entries(toneVariants((c) => c)) as [ControlTone, import('../district').ToneClasses][]).map(
+    ([tone, c]) => ({ tone, checked: true, class: { box: `${c.face} ${c.controlKeyline}`, plate: c.plate, check: c.onFace } }),
   ),
 });
 
@@ -49,7 +49,7 @@ export interface NeonCheckboxProps {
  * and a Pressable with the checkbox role on native.
  */
 export function NeonCheckbox({ checked, onChange, label, disabled, className, tone, district, error }: NeonCheckboxProps) {
-  const s = neonCheckbox({ checked, disabled, tone: resolveTone(tone, district) });
+  const s = neonCheckbox({ checked, disabled, tone: resolveControlTone(tone, district) });
   const box = (
     <Pressable
       role="checkbox"

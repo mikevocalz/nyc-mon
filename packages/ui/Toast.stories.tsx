@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Toast } from './Toast';
 import { View } from './tw';
+import { DISTRICTS } from './district';
 
 const meta = {
   title: 'UI/Toast',
@@ -25,7 +26,7 @@ export const Neon: Story = {
   args: { appearance: 'neon', district: 'midtown', variant: 'info' },
   argTypes: {
     appearance: { control: 'inline-radio', options: ['default', 'neon'] },
-    district: { control: 'inline-radio', options: ['downtown', 'midtown', 'harlem', 'megacity'] },
+    district: { control: 'inline-radio', options: DISTRICTS },
     variant: { control: 'inline-radio', options: ['info', 'success', 'error'] },
   },
   render: (args) => (

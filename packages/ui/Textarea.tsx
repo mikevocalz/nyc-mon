@@ -5,7 +5,7 @@ import { View, Text as TWText } from './tw';
 import { Textarea as PrimitiveTextarea, Label } from './primitives';
 import { Text } from './Text';
 import { NEON_FIELD, neonErrorCompound, neonFieldCompounds } from './cards/neon-field';
-import { resolveTone, toneVariants, type ControlTone, type District } from './cards/tones';
+import { resolveControlTone, toneVariants, type ControlTone, type District } from './district';
 
 const field = tv({
   slots: {
@@ -46,7 +46,7 @@ export interface TextareaProps extends React.ComponentProps<typeof PrimitiveText
 export function Textarea({
   label, hint, error, disabled, className, containerClassName, variant = 'default', tone, district, onPaste, ...inputProps
 }: TextareaProps) {
-  const s = field({ error: !!error, disabled, variant, tone: resolveTone(tone, district) });
+  const s = field({ error: !!error, disabled, variant, tone: resolveControlTone(tone, district) });
   const input = (
     <PrimitiveTextarea
       aria-label={label}

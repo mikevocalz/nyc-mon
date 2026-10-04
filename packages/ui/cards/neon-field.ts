@@ -1,4 +1,4 @@
-import { CONTROL_TONES, TONE_CLASSES } from './tones.ts';
+import { CONTROL_TONES, TONE_CLASSES } from '../district/index.ts';
 
 /**
  * The neon look for the kit's text inputs (TextField, Textarea, Select):
@@ -22,7 +22,7 @@ export function neonFieldCompounds<F extends string>(field: F) {
     return {
       variant: 'neon' as const,
       tone,
-      class: { label: `${c.face} ${c.onFace}`, [field]: `${c.border} ${c.focusBorder} ${c.focusGlow}` } as Record<'label' | F, string>,
+      class: { label: `${c.face} ${c.onFace}`, [field]: `${c.controlBorder} ${c.focusBorder} ${c.focusGlow}` } as Record<'label' | F, string>,
     };
   });
 }

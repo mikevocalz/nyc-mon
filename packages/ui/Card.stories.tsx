@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Card } from './Card';
 import { Text } from './Text';
 import { View } from './tw';
+import { DISTRICTS } from './district';
 
 const meta = { title: 'UI/Card', component: Card } satisfies Meta<typeof Card>;
 export default meta;
@@ -23,7 +24,6 @@ export const Raised: Story = {
   ),
 };
 
-const DISTRICTS = ['downtown', 'midtown', 'harlem', 'megacity'] as const;
 const TONES = [undefined, 'orange', 'royal', 'carolina', 'leaf', 'apple', 'brick'] as const;
 const night = (S: React.ComponentType) => <View className="max-w-md bg-ink-950 p-6"><S /></View>;
 

@@ -1,9 +1,7 @@
 import { brand, palette } from '@acme/theme';
 import { neonColor, neonToken, type NeonColorInput, type NeonToken } from '../neon/colors.ts';
 import { shadeSteps, type ShadeSteps } from '../neon/shade.ts';
-import type { District } from '../backgrounds/city-blocks-model.ts';
-
-export type { District };
+import type { District } from './districts.ts';
 
 /** Solid tone families a chart, table or nav can take. */
 export type ChartTone = 'orange' | 'royal' | 'carolina' | 'leaf' | 'apple';
@@ -25,8 +23,12 @@ const DISTRICT_SERIES: Record<District, string[]> = {
   megacity: ['royal', 'carolina', 'leaf', 'orange', 'apple'],
 };
 
-/** The solid tone family (for class-based surfaces) that leads each district. */
-const DISTRICT_TONE: Record<District, ChartTone> = {
+/**
+ * The solid tone family that leads each district's charts, table and nav.
+ * It follows the series hero, so it differs from DISTRICT_TONE (Downtown's
+ * charts lead carolina, Harlem's orange, Mega City's royal).
+ */
+export const DISTRICT_CHART_TONE: Record<District, ChartTone> = {
   downtown: 'carolina',
   midtown: 'orange',
   harlem: 'orange',
@@ -46,7 +48,7 @@ export function districtSeries(district: District = 'midtown'): string[] {
 }
 
 export function districtTone(district: District = 'midtown'): ChartTone {
-  return DISTRICT_TONE[district];
+  return DISTRICT_CHART_TONE[district];
 }
 
 /**

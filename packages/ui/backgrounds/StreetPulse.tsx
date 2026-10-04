@@ -2,7 +2,7 @@
 
 import { brand } from '@acme/theme';
 import type { NeonColorInput } from '../neon/colors';
-import { THEMES, type District } from './district-theme';
+import { THEMES, type District } from '../district';
 import { QuadBackground } from './QuadBackground';
 import { useLayers, type SolidBackgroundBaseProps } from './QuadBackground.shared';
 import { streetPulseLayers } from './street-pulse-model';

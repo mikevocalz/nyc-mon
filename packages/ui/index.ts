@@ -76,8 +76,10 @@ export { StreetPulse, type StreetPulseProps } from './backgrounds/StreetPulse';
 export { CityHeightfield, type CityHeightfieldProps } from './backgrounds/CityHeightfield';
 export { RiverTide, type RiverTideProps, type RiverTideOrigin } from './backgrounds/RiverTide';
 export { RainWindow, type RainWindowProps } from './backgrounds/RainWindow';
-export { DISTRICTS, DISTRICT_NAMES, THEMES as DISTRICT_THEMES, type DistrictTheme } from './backgrounds/district-theme';
-export { CityBlocks, type CityBlocksProps, type District } from './backgrounds/CityBlocks';
+// Districts and tones: one module for the whole kit.
+export * from './district';
+export { THEMES as DISTRICT_THEMES } from './district';
+export { CityBlocks, type CityBlocksProps } from './backgrounds/CityBlocks';
 export { CircuitButton, type CircuitButtonProps, type CircuitTone, GridCard, type GridCardProps } from './future';
 export { BrandLogo, type BrandLogoProps } from './brand/BrandLogo';
 export { BrandWordmark, type BrandWordmarkProps } from './brand/BrandWordmark';

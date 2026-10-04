@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import type { ReactNode } from 'react';
 import { CityHeightfield } from './backgrounds/CityHeightfield';
 import { CitySkyline } from './backgrounds/CitySkyline';
-import { DISTRICTS, DISTRICT_NAMES, type District } from './backgrounds/district-theme';
+import { DISTRICTS, DISTRICT_NAMES, type District } from './district';
 import { GridFloor } from './backgrounds/GridFloor';
 import { GridScene } from './backgrounds/GridScene';
 import { RainWindow } from './backgrounds/RainWindow';

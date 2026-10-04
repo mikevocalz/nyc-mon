@@ -7,5 +7,4 @@ export { NeonBarChart, type NeonBarChartProps } from './NeonBarChart';
 export { NeonDonutChart, type NeonDonutChartProps, type DonutSegmentInput } from './NeonDonutChart';
 export { StatCard, type StatCardProps, type StatTrend } from './StatCard';
 export type { ChartDatum, SeriesInput } from './chart-model';
-export type { ChartTone } from './district-tones';
 export type { GlowLevel } from './LinePlot.types';

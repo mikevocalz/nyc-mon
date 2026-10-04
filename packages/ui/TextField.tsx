@@ -5,7 +5,7 @@ import { View, Text as TWText } from './tw';
 import { Input, Label } from './primitives';
 import { Text } from './Text';
 import { NEON_FIELD, neonErrorCompound, neonFieldCompounds } from './cards/neon-field';
-import { resolveTone, toneVariants, type ControlTone, type District } from './cards/tones';
+import { resolveControlTone, toneVariants, type ControlTone, type District } from './district';
 
 const field = tv({
   slots: {
@@ -51,7 +51,7 @@ export interface TextFieldProps extends React.ComponentProps<typeof Input> {
 export function TextField({
   label, hint, error, disabled, className, containerClassName, variant = 'default', tone, district, onPaste, ...inputProps
 }: TextFieldProps) {
-  const s = field({ error: !!error, disabled, variant, tone: resolveTone(tone, district) });
+  const s = field({ error: !!error, disabled, variant, tone: resolveControlTone(tone, district) });
   const input = (
     <Input
       aria-label={label}

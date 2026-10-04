@@ -4,7 +4,7 @@ import { View } from './tw';
 import { Select as PrimitiveSelect, Label } from './primitives';
 import { Text } from './Text';
 import { NEON_FIELD, neonErrorCompound, neonFieldCompounds } from './cards/neon-field';
-import { resolveTone, toneVariants, type ControlTone, type District } from './cards/tones';
+import { resolveControlTone, toneVariants, type ControlTone, type District } from './district';
 
 const field = tv({
   slots: {
@@ -51,7 +51,7 @@ export interface SelectProps extends React.ComponentProps<typeof PrimitiveSelect
 export function Select({
   label, hint, error, disabled, className, containerClassName, variant = 'default', tone, district, options, children, ...selectProps
 }: SelectProps) {
-  const s = field({ error: !!error, disabled, variant, tone: resolveTone(tone, district) });
+  const s = field({ error: !!error, disabled, variant, tone: resolveControlTone(tone, district) });
   return (
     <View className={s.root({ className: containerClassName })}>
       <Label className={s.label()}>{label}</Label>

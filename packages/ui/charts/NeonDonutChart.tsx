@@ -11,7 +11,7 @@ import { useLayoutSize } from '../use-layout-size';
 import { Pressable, View } from '../tw';
 import { useReducedMotion } from '../backgrounds/use-reduced-motion';
 import { donutSegments, formatValue, segmentAt } from './chart-model';
-import { districtSeries, type District } from './district-tones';
+import { districtSeries, type District } from '../district';
 import { DonutCanvas } from './DonutCanvas';
 import { GLOW_BLUR, type GlowLevel } from './LinePlot.types';
 import { plotPointer } from './plot-pointer';

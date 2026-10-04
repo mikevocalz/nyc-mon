@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { DataTable, type ColumnDef } from './DataTable';
 import { Badge } from './Badge';
 import { View } from './tw';
+import { DISTRICTS } from './district';
 
 type Row = { name: string; role: string; status: 'Active' | 'Invited'; logins: number };
 
@@ -73,7 +74,7 @@ export const Neon: StoryObj<typeof DataTable<Legend>> = {
     loading: false,
   },
   argTypes: {
-    district: { control: 'inline-radio', options: ['downtown', 'midtown', 'harlem', 'megacity'] },
+    district: { control: 'inline-radio', options: DISTRICTS },
     color: { control: 'inline-radio', options: ['orange', 'royal', 'carolina', 'leaf', 'apple'] },
   },
   render: (args) => (

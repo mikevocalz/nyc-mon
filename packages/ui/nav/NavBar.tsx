@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import { twMerge } from 'tailwind-merge';
 import { tv } from 'tailwind-variants';
 import { BrandWordmark } from '../brand/BrandWordmark';
-import { districtTone, type ChartTone, type District } from '../charts/district-tones';
+import { districtTone, type ChartTone, type District } from '../district';
 import { Header, Link, List, ListItem, Nav } from '../primitives';
 import { useInstanceStore, useStore } from '../use-instance-store';
 import { Pressable, Text, View } from '../tw';

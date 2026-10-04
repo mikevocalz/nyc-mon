@@ -3,7 +3,7 @@ import { useMemo } from 'react';
 import { tv } from 'tailwind-variants';
 import { useReducedMotion } from '../backgrounds/use-reduced-motion';
 import type { NeonColorInput } from '../neon/colors';
-import { toneClasses, type District, type Tone } from '../elements/tones';
+import { toneClasses, type District, type Tone } from '../district';
 import { Text, View } from '../tw';
 import { AnimatedView, cssAnimation, cssTransition } from './motion';
 import {

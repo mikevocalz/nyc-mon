@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Button } from './Button';
 import { View } from './tw';
+import { DISTRICTS } from './district';
 
 const meta = {
   title: 'UI/Button',
@@ -28,13 +29,12 @@ export const Sizes: Story = {
   ),
 };
 
-const DISTRICT_LIST = ['downtown', 'midtown', 'harlem', 'megacity'] as const;
 
 /** NeonBlade corner-cut button: solid face, depth plate, cut corner. Every control is live. */
 export const CornerCut: Story = {
   args: { variant: 'cornerCut', title: 'Claim this block', district: 'midtown', corner: 'bottom-right', glow: false },
   argTypes: {
-    district: { control: 'inline-radio', options: DISTRICT_LIST },
+    district: { control: 'inline-radio', options: DISTRICTS },
     tone: { control: 'select', options: [undefined, 'orange', 'royal', 'carolina', 'leaf', 'apple', 'brick'] },
     corner: { control: 'inline-radio', options: ['top-left', 'top-right', 'bottom-right', 'bottom-left', 'all'] },
     glow: { control: 'inline-radio', options: [false, 'low', 'medium', 'high'] },

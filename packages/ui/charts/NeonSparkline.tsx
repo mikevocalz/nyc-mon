@@ -6,7 +6,7 @@ import { useInstanceStore, useStore } from '../use-instance-store';
 import { View } from '../tw';
 import { useReducedMotion } from '../backgrounds/use-reduced-motion';
 import { describeSeries, formatValue } from './chart-model';
-import { keylineFor, seriesColor, type District } from './district-tones';
+import { keylineFor, seriesColor, type District } from '../district';
 import { LinePlot } from './LinePlot';
 import type { GlowLevel } from './LinePlot.types';
 

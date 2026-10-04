@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Switch } from './Switch';
 import { useInstanceStore, useStore } from './use-instance-store';
 import { View } from './tw';
+import { DISTRICTS } from './district';
 
 const meta = {
   title: 'UI/Switch',
@@ -26,7 +27,7 @@ function NeonDemo() {
   const values = useStore(store);
   return (
     <View className="max-w-content-form gap-4 bg-ink-950 p-6">
-      {(['downtown', 'midtown', 'harlem', 'megacity'] as const).map((d) => (
+      {DISTRICTS.map((d) => (
         <Switch
           key={d}
           variant="neon"

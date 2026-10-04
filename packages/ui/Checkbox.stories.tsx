@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Checkbox } from './Checkbox';
 import { useInstanceStore, useStore } from './use-instance-store';
 import { View } from './tw';
+import { DISTRICTS } from './district';
 
 const meta = {
   title: 'UI/Checkbox',
@@ -27,7 +28,7 @@ function NeonDemo() {
   const values = useStore(store);
   return (
     <View className="gap-2 bg-ink-950 p-6">
-      {(['downtown', 'midtown', 'harlem', 'megacity'] as const).map((d) => (
+      {DISTRICTS.map((d) => (
         <Checkbox
           key={d}
           variant="neon"

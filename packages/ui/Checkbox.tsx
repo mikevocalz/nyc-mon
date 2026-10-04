@@ -3,7 +3,7 @@ import { tv } from 'tailwind-variants';
 import { Host, Checkbox as ExpoCheckbox } from '@expo/ui';
 import { haptics } from './haptics';
 import { NeonCheckbox } from './cards/NeonCheckbox';
-import type { ControlTone, District } from './cards/tones';
+import type { ControlTone, District } from './district';
 // Native control tint comes from theme tokens — the platform toolkit
 // (SwiftUI / Compose via @expo/ui Host) cannot consume Tailwind classes.
 import { semantic } from '@acme/theme';

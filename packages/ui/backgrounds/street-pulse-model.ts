@@ -1,6 +1,6 @@
 import { brand, palette } from '@acme/theme';
 import type { NeonColorInput } from '../neon/colors.ts';
-import { THEMES, type District } from './district-theme.ts';
+import { THEMES, type District } from '../district/index.ts';
 import { hash, mixRgba, rgba, rng, type Layer } from './quad-writer.ts';
 
 export interface StreetPulseOptions {

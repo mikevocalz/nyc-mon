@@ -13,7 +13,7 @@ import {
   categoryLabels, describeSeries, formatValue, niceTicks, resolveSeries,
   type ChartDatum, type SeriesInput,
 } from './chart-model';
-import { keylineFor, seriesColor, type District } from './district-tones';
+import { keylineFor, seriesColor, type District } from '../district';
 import { LinePlot } from './LinePlot';
 import type { GlowLevel, PlotSeries } from './LinePlot.types';
 

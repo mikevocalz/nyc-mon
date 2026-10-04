@@ -5,7 +5,7 @@ import { haptics } from '../haptics';
 import { Pressable, View } from '../tw';
 import { Text } from '../Text';
 import { useReducedMotion } from '../backgrounds/use-reduced-motion';
-import { resolveTone, toneVariants, type ControlTone, type District, type ToneClasses } from './tones';
+import { resolveControlTone, toneVariants, type ControlTone, type District, type ToneClasses } from '../district';
 
 const neonSwitch = tv({
   slots: {
@@ -25,7 +25,7 @@ const neonSwitch = tv({
     disabled: { true: { root: 'opacity-50' } },
   },
   compoundVariants: (Object.entries(toneVariants((c) => c)) as [ControlTone, ToneClasses][]).map(([tone, c]) => ({
-    tone, value: true, class: { track: `${c.face} ${c.keyline}` },
+    tone, value: true, class: { track: `${c.face} ${c.controlKeyline}` },
   })),
 });
 
@@ -51,7 +51,7 @@ export interface NeonSwitchProps {
  */
 export function NeonSwitch({ value, onChange, label, disabled, className, tone, district }: NeonSwitchProps) {
   const reduced = useReducedMotion();
-  const s = neonSwitch({ value, disabled, tone: resolveTone(tone, district) });
+  const s = neonSwitch({ value, disabled, tone: resolveControlTone(tone, district) });
   return (
     <View className={s.root({ className })}>
       <Text className={s.label()}>{label}</Text>

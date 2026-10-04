@@ -7,7 +7,7 @@ import { palette } from '@acme/theme';
 import { withAlpha } from '../neon/colors';
 import type { ShadeSteps } from '../neon/shade';
 import { buildingWindows, type Bar, type BarLayout } from './chart-model';
-import type { District } from './district-tones';
+import type { District } from '../district';
 import { useIntro, useIntroValue } from './use-intro';
 
 export interface BarCanvasProps {

@@ -4,7 +4,7 @@ import { Button } from './Button';
 import { DialogCard } from './Dialog';
 import { AccentFrame } from './elements/AccentFrame';
 import { Timeline } from './elements/Timeline';
-import { DISTRICT_NAME, type District } from './elements/tones';
+import { DISTRICT_NAME, type District } from './district';
 import { Heading, Paragraph, Section } from './html';
 import { districtControl } from './progress/story-kit';
 import { ToastCard } from './ToastCard';

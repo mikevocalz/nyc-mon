@@ -17,7 +17,7 @@ import {
   Table, TableHeader, TableBody, TableRow, TableCell, TableHeaderCell,
 } from './primitives';
 import { View, Text, Pressable, ScrollView } from './tw';
-import { districtTone, type ChartTone, type District } from './charts/district-tones';
+import { districtTone, type ChartTone, type District } from './district';
 
 const dataTable = tv({
   slots: {

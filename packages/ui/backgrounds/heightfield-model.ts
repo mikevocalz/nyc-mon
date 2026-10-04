@@ -1,6 +1,6 @@
 import { brand } from '@acme/theme';
 import type { NeonColorInput, Rgba } from '../neon/colors.ts';
-import { skyBands, THEMES, type District } from './district-theme.ts';
+import { skyBands, THEMES, type District } from '../district/index.ts';
 import { mixRgba, rgba, type Layer, type Pointer } from './quad-writer.ts';
 import { paintSky } from './skyline-model.ts';
 

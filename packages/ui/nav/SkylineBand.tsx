@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import { tv } from 'tailwind-variants';
 import { hash2 } from '../charts/chart-model';
-import type { ChartTone, District } from '../charts/district-tones';
+import type { ChartTone, District } from '../district';
 import { View } from '../tw';
 import { skylineProfile } from './skyline-profile';
 

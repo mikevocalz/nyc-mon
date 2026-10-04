@@ -1,6 +1,6 @@
 // Shared bits for the progress and element stories.
 import type { ReactNode } from 'react';
-import { DISTRICTS, DISTRICT_NAME, type District } from '../elements/tones';
+import { DISTRICTS, DISTRICT_NAME, type District } from '../district';
 import { Heading, Section } from '../html';
 import { View } from '../tw';
 

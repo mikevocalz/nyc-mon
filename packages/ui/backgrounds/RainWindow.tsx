@@ -2,7 +2,7 @@
 
 import { brand, palette } from '@acme/theme';
 import type { NeonColorInput } from '../neon/colors';
-import type { District } from './district-theme';
+import type { District } from '../district';
 import { QuadBackground } from './QuadBackground';
 import { useLayers, type SolidBackgroundBaseProps } from './QuadBackground.shared';
 import { rainWindowLayers } from './rain-window-model';

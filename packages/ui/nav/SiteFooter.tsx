@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react';
 import { tv } from 'tailwind-variants';
 import { BrandWordmark } from '../brand/BrandWordmark';
-import { districtTone, type ChartTone, type District } from '../charts/district-tones';
+import { districtTone, type ChartTone, type District } from '../district';
 import { useAppForm } from '../form';
 import { Footer, Heading, Link, List, ListItem, Nav, Paragraph } from '../primitives';
 import { Text, View } from '../tw';

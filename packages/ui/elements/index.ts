@@ -9,4 +9,4 @@ export {
 export {
   DISTRICTS, DISTRICT_NAME, DISTRICT_TONES, TONES, TONE_CLASSES, resolveTone, resolveAccent, toneClasses,
   type District, type Tone, type ToneClasses,
-} from './tones';
+} from '../district';

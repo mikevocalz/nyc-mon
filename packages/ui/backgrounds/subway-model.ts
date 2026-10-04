@@ -1,6 +1,6 @@
 import { brand, palette } from '@acme/theme';
 import type { NeonColorInput, Rgba } from '../neon/colors.ts';
-import { THEMES, type District } from './district-theme.ts';
+import { THEMES, type District } from '../district/index.ts';
 import { glyphMask } from './pixel-font.ts';
 import { hash, mixRgba, rgba, rng, type Layer, type QuadWriter } from './quad-writer.ts';
 

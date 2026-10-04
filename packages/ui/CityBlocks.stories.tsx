@@ -3,6 +3,7 @@ import { CityBlocks, type CityBlocksProps, type District } from './backgrounds/C
 import { Heading, Paragraph, Section } from './html';
 import { SolidPanel } from './neon/SolidPanel';
 import { View } from './tw';
+import { DISTRICTS } from './district';
 
 const meta = {
   title: 'NYC Mon/City blocks',
@@ -21,7 +22,7 @@ const meta = {
     forceFallback: false,
   },
   argTypes: {
-    district: { control: 'inline-radio', options: ['downtown', 'midtown', 'harlem', 'megacity'] satisfies District[] },
+    district: { control: 'inline-radio', options: DISTRICTS },
     blockSize: { control: { type: 'range', min: 32, max: 96, step: 2 } },
     streetWidth: { control: { type: 'range', min: 4, max: 24, step: 1 } },
     seed: { control: { type: 'number', min: 1, step: 1 } },
@@ -78,7 +79,7 @@ export const SkiaFallback: Story = {
 export const Districts: Story = {
   render: (args: CityBlocksProps) => (
     <View className="min-h-screen gap-4 bg-ink-950 p-4 md:flex-row md:flex-wrap">
-      {(['downtown', 'midtown', 'harlem', 'megacity'] as const).map((district) => (
+      {DISTRICTS.map((district) => (
         <Section key={district} className="h-[320px] overflow-hidden border-2 border-ink-800 md:h-[380px] md:w-[calc(50%-0.5rem)]">
           <CityBlocks {...args} district={district} className="flex-1">
             <Caption district={district} />

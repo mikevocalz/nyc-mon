@@ -1,4 +1,4 @@
-import type { District } from './elements/tones';
+import type { District } from './district';
 
 export type NotifyVariant = 'info' | 'success' | 'warning' | 'error' | 'loading';
 

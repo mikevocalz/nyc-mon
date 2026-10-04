@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Card } from './Card';
 import { Button } from './Button';
 import { CardSlider } from './cards/CardSlider';
-import { DISTRICT_NAME, DISTRICTS, type District } from './cards/tones';
+import { DISTRICT_NAME, DISTRICTS, type District } from './district';
 import { Heading, Main, Paragraph, Section } from './html';
 import { View } from './tw';
 

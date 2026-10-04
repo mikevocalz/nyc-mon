@@ -3,7 +3,7 @@ import { View } from './tw';
 import { Text } from './Text';
 import { SlideUp } from './motion';
 import { ToastCard } from './ToastCard';
-import type { District, Tone } from './elements/tones';
+import type { District, Tone } from './district';
 import type { NeonColorInput } from './neon/colors';
 
 // Presentational shell — visibility and entrance animation are owned by the

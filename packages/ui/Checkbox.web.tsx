@@ -2,7 +2,7 @@
 import { tv } from 'tailwind-variants';
 import { haptics } from './haptics';
 import { NeonCheckbox } from './cards/NeonCheckbox';
-import type { ControlTone, District } from './cards/tones';
+import type { ControlTone, District } from './district';
 import { View, Text, Pressable } from './tw';
 
 const checkbox = tv({
