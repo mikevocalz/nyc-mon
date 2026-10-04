@@ -222,3 +222,19 @@ Edges before Mid are linear: Egg → Baby → Small → Mid. `@acme/content` sto
 - **Answers:** `docs/canon/OPEN_QUESTIONS.md` Q38
 
 Story copy may call the F02 bloodline "Bodega Cee", as v11 does: Mari's partner comes "from the Bodega Cee line" (`V11 ¶76`), and that line stays as written. UI labels still follow #11: "Bodega Baddiee Cee Bloodline". Data keeps `bloodlineName: "Bodega Baddiee Cee"`; the casual name is a copy-deck choice, not a second data field.
+
+## Decision 14 — the Mon's choice happens at hatch
+
+- **Date:** 2026-10-04
+- **Decided by:** Mike (creator)
+- **Answers:** research finding 3 (commit 87affb2, `docs/design/screens/M0*/01-research.md`)
+
+"The Mon chooses too" (`V11 ¶47`) lands at the hatch. The Baby's first look at the Caller is its choice. It leans in, or it hesitates and needs a moment of care before the bond forms. It never rejects the Caller, and the egg is never sent back. M08 stays a meeting with three eggs (#5).
+
+## Decision 15 — if a guardian denies consent, Dr. Santoro keeps the Mon safe
+
+- **Date:** 2026-10-04
+- **Decided by:** Mike (creator)
+- **Answers:** research finding 4
+
+An under-13 Caller can play locally while guardian consent is pending (ADR 0001). If the guardian says no, the hatched Mon stays with Dr. Alessandra Santoro in the story. It is never deleted on screen and never turned back into an egg (Law 8). The child's personal data is deleted as COPPA requires. If consent comes later, the Caller starts fresh. How Santoro looks after the Mon is TODO(canon).
