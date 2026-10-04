@@ -70,7 +70,7 @@ export const VariantShowcase: Story = {
     <View className="gap-6 p-4">
       {DISTRICTS.map((d) => (
         <View key={d} className="gap-2">
-          <Text className="font-display text-sm text-silver-300">{DISTRICT_NAME[d]}</Text>
+          <Text className="font-display text-sm text-text-muted">{DISTRICT_NAME[d]}</Text>
           <View className="flex-row flex-wrap items-center gap-3">
             <Button district={d} title="Default" onPress={() => {}} />
             <Button district={d} variant="accent" title="Accent" onPress={() => {}} />
