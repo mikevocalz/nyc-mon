@@ -208,6 +208,13 @@ The Max forms branch. A Mid evolves into exactly one of its three Max forms: #00
 
 Edges before Mid are linear: Egg → Baby → Small → Mid. `@acme/content` stores these edges as data. Data is not an evolution: nothing fires without an authored `EvolutionEvent` (Law 7), and Phase 1 ships none. What decides the branch (bond, personality; `V11 ¶68`) stays `TODO(canon)`.
 
+**Data shape (Mike, same day: "we can have a bloodline (evolution list), just like the Pokémon API does and Digimon"):**
+
+- Each Bloodline is an evolution-chain resource, after PokeAPI's evolution-chain (https://pokeapi.co/docs/v2#evolution-chains): `Bloodline = { bloodlineId, bloodlineName, chain }`, where `chain` is a tree rooted at the Egg and each node is `{ speciesId, dexId, formName, stage, evolutionDetails, evolvesTo: node[] }`. `evolutionDetails` lists the `eventId`s of authored `EvolutionEvent`s and is empty in Phase 1. Schemas: `BloodlineSchema` and `EvolutionNodeSchema` in `@acme/core`.
+- Each form also has Digimon-API-style lists (https://digi-api.com/, `priorEvolutions` / `nextEvolutions`): `priorEvolutions(speciesId)` returns the form it evolves from, and `nextEvolutions(speciesId)` returns the forms it can become (three for a Mid). Both are derived from the chain in `@acme/content`, never stored separately.
+- Digimon's level ladder plays the role our stages play. No Digimon level names are borrowed: `stage` is always one of the canon five, Egg, Baby, Small, Mid, Max (`V11 ¶25`, `ROSTER L16`).
+- `@acme/content` exports `bloodlines`: the three starter chains in slot order, which the Dex screen (M17) and the web /mons pages (W02) render from.
+
 ## Decision 13 — "Bodega Cee" stays as the casual story name for the F02 bloodline
 
 - **Date:** 2026-10-04

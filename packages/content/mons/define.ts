@@ -1,6 +1,7 @@
-import type { BloodlineId, LifecycleStage, MonSpeciesDef } from '@acme/core';
+import type { Bloodline, BloodlineId, EvolutionNode, LifecycleStage, MonSpeciesDef } from '@acme/core';
 
-export interface Bloodline {
+/** A bloodline's identity without its chain: the roster's family number and name. */
+export interface BloodlineRef {
   readonly bloodlineId: BloodlineId;
   /** The roster's family name, verbatim (DECISIONS.md #11). */
   readonly bloodlineName: string;
@@ -17,7 +18,7 @@ export function speciesIdForDex(dexId: number): string {
  * and stays null until the v8 Dex or a creator decision supplies it.
  */
 export function rosterForm(
-  bloodline: Bloodline,
+  bloodline: BloodlineRef,
   dexId: number,
   formName: string,
   stage: LifecycleStage,
@@ -44,4 +45,46 @@ export function rosterForm(
     // TODO(canon): combat Class list not authored.
     classId: null,
   };
+}
+
+function formsAt(forms: readonly MonSpeciesDef[], stage: LifecycleStage): readonly MonSpeciesDef[] {
+  return forms.filter((form) => form.stage === stage);
+}
+
+function onlyFormAt(forms: readonly MonSpeciesDef[], stage: LifecycleStage): MonSpeciesDef {
+  const matches = formsAt(forms, stage);
+  const [only] = matches;
+  if (matches.length !== 1 || only === undefined) {
+    throw new Error(`Bloodline needs exactly one ${stage} form, found ${matches.length}`);
+  }
+  return only;
+}
+
+function toNode(form: MonSpeciesDef, evolvesTo: readonly EvolutionNode[]): EvolutionNode {
+  return {
+    speciesId: form.speciesId,
+    dexId: form.dexId,
+    formName: form.formName,
+    stage: form.stage,
+    // TODO(canon): no EvolutionEvent is authored, so nothing can fire (Law 7).
+    evolutionDetails: [],
+    evolvesTo: [...evolvesTo],
+  };
+}
+
+/**
+ * Builds a bloodline's evolution tree from its forms, per DECISIONS.md #12:
+ * Egg → Baby → Small → Mid in a line, then Mid → each Max form as a branch.
+ */
+export function buildBloodline(ref: BloodlineRef, forms: readonly MonSpeciesDef[]): Bloodline {
+  const maxForms = formsAt(forms, 'Max');
+  if (maxForms.length === 0) throw new Error(`${ref.bloodlineId} has no Max form`);
+  const mid = toNode(
+    onlyFormAt(forms, 'Mid'),
+    maxForms.map((max) => toNode(max, [])),
+  );
+  const small = toNode(onlyFormAt(forms, 'Small'), [mid]);
+  const baby = toNode(onlyFormAt(forms, 'Baby'), [small]);
+  const egg = toNode(onlyFormAt(forms, 'Egg'), [baby]);
+  return { bloodlineId: ref.bloodlineId, bloodlineName: ref.bloodlineName, chain: egg };
 }
