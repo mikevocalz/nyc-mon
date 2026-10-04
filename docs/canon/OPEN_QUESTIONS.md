@@ -10,11 +10,11 @@ Compiled 2026-10-04 by `canon-keeper`. Sources on disk: the v11 Canon & Lore Bib
 
 These block the most downstream work (Dex cards, `content/mons/*.ts` schemas, clip lists, the meeting and hatch screens).
 
-1. **Q1** Meeting order: what does the Caller meet before the egg exists?
-2. **Q8** Which form is "the starter": the Baby form or the Mid form whose name labels the line?
+1. **Q1** (answered → Decision #5) Meeting order: what does the Caller meet before the egg exists?
+2. **Q8** (label answered → Decision #6; Dex number waits on Q9) Which form is "the starter": the Baby form or the Mid form whose name labels the line?
 3. **Q9** Dex numbers: are v7's #001-#007, #008-#014 and #061-#067 the v8 numbers? Send `NYC_Mon_Master_Bible_v11.md`.
-4. **Q2** Scanner LED: red (v11) or orange (build prompt)?
-5. **Q3** Is the app itself an H-Lynk, given v11 says the H-Lynk is optional?
+4. **Q2** (answered → Decision #7) Scanner LED: red (v11) or orange (build prompt)?
+5. **Q3** (answered → Decision #8) Is the app itself an H-Lynk, given v11 says the H-Lynk is optional?
 6. **Q12** Culture notes for the player's three starters.
 7. **Q18** Meter name: "Social" or "Social HP"?
 8. **Q19** Are v7's care numbers canon?
@@ -27,11 +27,11 @@ These block the most downstream work (Dex cards, `content/mons/*.ts` schemas, cl
 
 The Bible outranks the build prompt (`IDX L7-L8`; BUILD_PROMPT_v3 §0B Law 1). Each item is an issue against the prompt until Mike rules.
 
-**Q1. Meeting before incubation.** The prompt runs M08 Meeting ("Three live Mons … Confirmation is mutual") → M09 Naming → M10 Incubation ("Case closes with the egg") → M12 Hatch. v11 says the individual starts as an egg and stays the same individual from Egg onward: "Egg → Baby → Small → Mid → Max. A newly hatched Mon stays Baby until an authored evolution event." (`V11 ¶25`) and "Evolution preserves the same monInstanceId …" (`V11 ¶47`). A living Mon you meet and name cannot then be the egg that hatches. Fill in: in M08, the Caller meets ______ (a: three eggs, each with a reaction; b: three adult/Mid Mons who entrust an egg of their line; c: three Babies, and the incubation step is cut; d: other). And who does the naming ceremony name: the egg or the hatched Baby?
+**Q1. Meeting before incubation.** **Answered → Decision #5** (`docs/canon/DECISIONS.md`): three eggs presented by Santoro; the Caller chooses one; naming happens after the hatch. The prompt runs M08 Meeting ("Three live Mons … Confirmation is mutual") → M09 Naming → M10 Incubation ("Case closes with the egg") → M12 Hatch. v11 says the individual starts as an egg and stays the same individual from Egg onward: "Egg → Baby → Small → Mid → Max. A newly hatched Mon stays Baby until an authored evolution event." (`V11 ¶25`) and "Evolution preserves the same monInstanceId …" (`V11 ¶47`). A living Mon you meet and name cannot then be the egg that hatches. Fill in: in M08, the Caller meets ______ (a: three eggs, each with a reaction; b: three adult/Mid Mons who entrust an egg of their line; c: three Babies, and the incubation step is cut; d: other). And who does the naming ceremony name: the egg or the hatched Baby?
 
-**Q2. Scanner LED color.** v11: "a top antenna and a separate red scanner/emitter" (`V11 ¶63`). The prompt says "orange scanner LED" (§1.1, line 146), "the orange reserved for the scanner LED" (§1.3, line 169) and "orange emissive LED" on the web hero (W01, line 319), but "the red scanner LED is a status light" (§2.4, line 221) and "scanner LED red" (§3.5, line 254). Yes/no: the scanner LED is red, and orange is limited to the hatch moment and primary CTA?
+**Q2. Scanner LED color.** **Answered → Decision #7**: red; orange stays the CTA and hatch accent. v11: "a top antenna and a separate red scanner/emitter" (`V11 ¶63`). The prompt says "orange scanner LED" (§1.1, line 146), "the orange reserved for the scanner LED" (§1.3, line 169) and "orange emissive LED" on the web hero (W01, line 319), but "the red scanner LED is a status light" (§2.4, line 221) and "scanner LED red" (§3.5, line 254). Yes/no: the scanner LED is red, and orange is limited to the hatch moment and primary CTA?
 
-**Q3. App as H-Lynk.** v11: "H-Lynk (“Hood Link”) is an optional communication/care/recovery device. It is not proof of ownership, personhood or partnership." (`V11 ¶23`); "A partnership is social and relational, not a device flag." (`V11 ¶43`). The prompt makes the app chrome an H-Lynk Entry unit on every companion screen (§1.1, §2.4) and Law 9 says "`H-Lynk`, never 'device' in UI copy". Yes/no: framing the app as the Caller's H-Lynk is fine, as long as no code or copy treats having an H-Lynk as the partnership itself (bond lives on `MonInstance`, never on the device)?
+**Q3. App as H-Lynk.** **Answered → Decision #8**: yes, framed as an Entry unit Santoro hands the Caller; bond lives on `MonInstance`. v11: "H-Lynk (“Hood Link”) is an optional communication/care/recovery device. It is not proof of ownership, personhood or partnership." (`V11 ¶23`); "A partnership is social and relational, not a device flag." (`V11 ¶43`). The prompt makes the app chrome an H-Lynk Entry unit on every companion screen (§1.1, §2.4) and Law 9 says "`H-Lynk`, never 'device' in UI copy". Yes/no: framing the app as the Caller's H-Lynk is fine, as long as no code or copy treats having an H-Lynk as the partnership itself (bond lives on `MonInstance`, never on the device)?
 
 **Q4. Capture case as incubator.** v11 names the prop "Single-egg capture/containment case" (`V11 ¶64`) and lists its "emergency-release protocol" as open (`V11 ¶102`). v11 also says "H-Lynk containment is not consent." (`V11 ¶43`). The prompt has the egg incubate inside the case (§2.4, M10, M11, §3.5). Yes/no: the case is the incubation cradle in Phase 1? If yes, should UI copy call it a "case" rather than anything with "capture" in it?
 
@@ -43,7 +43,7 @@ The Bible outranks the build prompt (`IDX L7-L8`; BUILD_PROMPT_v3 §0B Law 1). E
 
 ## B. Starter identity and Dex fields (§2.2)
 
-**Q8. Starter form.** v11: "Hood Ratti is a form/species label" (`V11 ¶44`). In v7, "Hood Ratti" is the Mid form #004 and the Baby is #002 Squeaklet; "Bodega Cee" is the Mid form #011 and the Baby is #009 Kittee Cee; the Yote Baby is #062 Yotito and there is no form named "Yotes". Fill in for the Dex card on M08/M17: species label shown = ______ (line name, or current form name); Dex number shown = ______ (Baby form number, or Mid).
+**Q8. Starter form.** **Label answered → Decision #6**: Baby form name, with "<line> line" as the label. The Dex number shown stays open until Q9 is settled. v11: "Hood Ratti is a form/species label" (`V11 ¶44`). In v7, "Hood Ratti" is the Mid form #004 and the Baby is #002 Squeaklet; "Bodega Cee" is the Mid form #011 and the Baby is #009 Kittee Cee; the Yote Baby is #062 Yotito and there is no form named "Yotes". Fill in for the Dex card on M08/M17: species label shown = ______ (line name, or current form name); Dex number shown = ______ (Baby form number, or Mid).
 
 **Q9. Dex numbers.** v7 numbering: F01 #001-#007, F02 #008-#014, F12 #061-#067. The index promises "stable Dex/form IDs" carried from v8 (`IDX L35`). Yes/no: v8 uses the same numbers and form IDs (`form_squeaklet`, `form_kittee_cee`, `form_yotito`, etc.) as v7? Fastest answer: put `NYC_Mon_Master_Bible_v11.md` in `docs/canon/source/`.
 
