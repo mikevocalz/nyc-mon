@@ -72,3 +72,9 @@ export function layoutClasses(className?: string): string {
     .filter((c) => /^(flex-(1|auto|initial|none|\[.+\])|grow(-\d+)?|shrink(-\d+)?|basis-.+|w-.+|min-w-.+|max-w-.+|self-.+)$/.test(c))
     .join(' ');
 }
+
+/** The outer pressable's layout: the caller's layout classes, self-start unless they set their own self-*. */
+export function outerLayout(className?: string): string {
+  const own = layoutClasses(className);
+  return /(^|\s)self-/.test(own) ? own : `self-start ${own}`.trim();
+}

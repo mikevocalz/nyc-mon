@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { palette } from '@acme/theme';
-import { DISABLED_FRAME_TONE, controlLook, frameTone, layoutClasses } from './control-look.ts';
+import { DISABLED_FRAME_TONE, controlLook, frameTone, layoutClasses, outerLayout } from './control-look.ts';
 
 test('no variant is the solid corner-cut face in the district tone', () => {
   assert.deepEqual(controlLook(undefined), { look: 'solid', tone: 'orange' });
@@ -37,4 +37,10 @@ test('layoutClasses keeps only the classes that size the control in its parent',
   assert.equal(layoutClasses('flex-[2]'), 'flex-[2]');
   assert.equal(layoutClasses('w-full opacity-50'), 'w-full');
   assert.equal(layoutClasses('mt-2 self-stretch flex-row'), 'self-stretch');
+});
+
+test('outerLayout lets a caller align the button', () => {
+  assert.equal(outerLayout(undefined), 'self-start');
+  assert.equal(outerLayout('flex-1 mt-2'), 'self-start flex-1');
+  assert.equal(outerLayout('self-end'), 'self-end');
 });

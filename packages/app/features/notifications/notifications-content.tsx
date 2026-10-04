@@ -67,7 +67,7 @@ export function NotificationsContent() {
             {unread > 0 ? <Text variant="caption" tone="muted">{unread} unread</Text> : null}
           </View>
           {unread > 0 ? (
-            <Button title="Mark all read" size="sm" aria-label="Mark all notifications read" onPress={markAllRead} />
+            <Button title="Mark all read" size="sm" className="self-end" aria-label="Mark all notifications read" onPress={markAllRead} />
           ) : null}
         </Section>
       </FadeIn>

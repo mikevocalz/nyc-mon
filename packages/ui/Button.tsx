@@ -8,7 +8,7 @@ import { CornerCutFrame } from './neon/CornerCutFrame';
 import type { CutCorner } from './neon/corner-cut';
 import type { GlowIntensity } from './neon/glow';
 import { TONE_CLASSES, toneHex, type ControlTone, type District } from './district';
-import { DISABLED_FRAME_TONE, controlLook, frameTone, layoutClasses, type ButtonVariant, type ControlLook } from './control-look';
+import { DISABLED_FRAME_TONE, controlLook, frameTone, outerLayout, type ButtonVariant, type ControlLook } from './control-look';
 
 // The NYC-MON button. Solid and outline looks draw a CornerCutFrame inside
 // the pressable, so the root only owns the hit area, focus ring and press
@@ -118,7 +118,7 @@ export function Button({
       aria-disabled={off}
       accessibilityState={{ disabled: off }}
       className={s.root({ className })}
-      outerClassName={fullWidth ? 'w-full' : `self-start ${layoutClasses(className)}`}
+      outerClassName={fullWidth ? 'w-full' : outerLayout(className)}
       {...a11y}
     >
       {look === 'ghost' ? (
