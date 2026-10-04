@@ -380,6 +380,20 @@ const USAGE: Pair[] = [
   { id: 'hlynk: body on night page', fg: 'hlynk-core-body', bg: NIGHT, role: 'decorative', usedAt: ['packages/theme/tokens.ts:188'], reason: 'the shell is not a control; its edge needs no ratio (measures 3.70 anyway)' },
   { id: 'hlynk: LED off in the black head', fg: 'led-off', bg: ['hlynk-core-black'], role: 'decorative', usedAt: ['packages/theme/tokens.ts:174'], reason: 'the unlit lens; LED state is never conveyed by the LED alone (a text chip sits in the screen)' },
   { id: 'hlynk: disabled key glyph', fg: 'hlynk-core-glyph-disabled', bg: ['hlynk-core-black'], role: 'disabled', usedAt: ['packages/theme/tokens.ts:198'], reason: 'inactive key' },
+  { id: 'hlynk: key and trackpad focus outline on body', fg: 'hlynk-core-ink', bg: ['hlynk-core-body'], role: 'ui', usedAt: ['packages/ui/hlynk/HLynkKey.tsx:67', 'packages/ui/hlynk/Trackpad.web.tsx:46'] },
+  { id: 'hlynk: trackpad ring, booting or disabled', fg: 'led-off', bg: ['hlynk-core-black'], role: 'disabled', usedAt: ['packages/ui/hlynk/TrackpadFace.tsx:41'], reason: 'inactive trackpad during boot (WCAG 1.4.11 inactive components)' },
+  { id: 'hlynk: reduced-motion LED cue in the black head', fg: 'led-on', bg: ['hlynk-core-black'], role: 'ui', usedAt: ['packages/ui/hlynk/ScannerLed.tsx:84', 'packages/ui/hlynk/ScannerLed.tsx:92', 'packages/ui/hlynk/ScannerLed.tsx:95'], reason: 'tick row, filled dot and exclamation dot that stand in for the LED rhythm' },
+
+  // -- text on the ink plate over a scene (SolidPanel tone="ink": ink-800 face in both themes)
+  { id: 'scene plate headline', fg: 'orange-500', bg: ['ink-800'], role: 'large-text', usedAt: ['packages/app/features/explore/explore-content.tsx:22', 'packages/app/features/profile/profile-content.tsx:46', 'packages/app/features/error/screen.shared.tsx:25'], reason: 'display-sm heading and the display-xl 404 on the plate' },
+  { id: 'scene plate title', fg: 'ink-50', bg: ['ink-800'], role: 'large-text', usedAt: ['packages/app/features/error/screen.shared.tsx:29'] },
+  { id: 'scene plate body', fg: 'silver-200', bg: ['ink-800'], role: 'text', usedAt: ['packages/app/features/profile/profile-content.tsx:47', 'packages/app/features/error/screen.shared.tsx:32'] },
+  { id: 'scene plate line', fg: 'silver-300', bg: ['ink-800'], role: 'text', usedAt: ['packages/app/features/explore/explore-content.tsx:43', 'packages/app/features/profile/profile-content.tsx:45'] },
+  { id: 'scene plate tab label', fg: 'silver-200', bg: ['ink-900'], role: 'text', usedAt: ['packages/app/features/explore/explore-content.tsx:25'] },
+  { id: 'scene plate tab edge', fg: 'ink-400', bg: ['ink-800'], role: 'ui', usedAt: ['packages/app/features/explore/explore-content.tsx:23'] },
+  { id: 'scene plate selected tab label', fg: 'ink-950', bg: ['orange-500'], role: 'text', usedAt: ['packages/app/features/explore/explore-content.tsx:26'] },
+  { id: 'scene plate selected tab face', fg: 'orange-500', bg: ['ink-800'], role: 'ui', usedAt: ['packages/app/features/explore/explore-content.tsx:24'] },
+  { id: 'skyline divider keyline', fg: 'orange-500', bg: ['ink-950'], role: 'decorative', usedAt: ['packages/ui/backgrounds/SkylineDivider.tsx:35'], reason: 'aria-hidden band between sections; the section headings carry the structure' },
 
   // -- disabled ---------------------------------------------------------------
   { id: 'disabled label', fg: 'ink-400', bg: NIGHT, role: 'disabled', usedAt: ['packages/ui/Button.tsx:48', 'packages/ui/IconButton.tsx:79', 'packages/ui/neon/NeonChevron.tsx:55', 'packages/ui/audio/PlayerShell.tsx:123'], reason: 'inactive control' },
