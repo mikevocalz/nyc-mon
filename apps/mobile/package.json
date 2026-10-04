@@ -18,6 +18,7 @@
     "@acme/spatial": "workspace:*",
     "@acme/theme": "workspace:*",
     "@acme/ui": "workspace:*",
+    "@expo/dom-webview": "catalog:",
     "@expo/env": "catalog:",
     "@expo/metro-runtime": "catalog:",
     "@expo/ui": "catalog:",
@@ -32,6 +33,7 @@
     "canvaskit-wasm": "catalog:",
     "expo": "catalog:",
     "expo-asset": "catalog:",
+    "expo-constants": "catalog:",
     "expo-drag-drop-content-view": "catalog:",
     "expo-font": "catalog:",
     "expo-image": "catalog:",
@@ -56,6 +58,7 @@
     "react-native-screens": "catalog:",
     "react-native-svg": "catalog:",
     "react-native-web": "catalog:",
+    "react-native-webgpu": "catalog:",
     "react-native-worklets": "catalog:",
     "solito": "catalog:",
     "uniwind": "catalog:",
@@ -63,6 +66,7 @@
   },
   "devDependencies": {
     "@acme/config": "workspace:*",
+    "@react-native/metro-config": "catalog:",
     "@tailwindcss/postcss": "catalog:",
     "@types/react": "catalog:",
     "eslint": "catalog:",
@@ -75,7 +79,8 @@
     "install": {
       "exclude": [
         "react",
-        "react-dom"
+        "react-dom",
+        "@shopify/react-native-skia"
       ]
     }
   }

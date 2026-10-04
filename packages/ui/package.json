@@ -58,6 +58,7 @@
   },
   "devDependencies": {
     "@acme/config": "workspace:*",
+    "@expo/dom-webview": "catalog:",
     "@storybook/react-vite": "catalog:",
     "@types/react": "catalog:",
     "eslint": "catalog:",

@@ -39,9 +39,13 @@
   },
   "devDependencies": {
     "@acme/config": "workspace:*",
+    "@expo/dom-webview": "catalog:",
+    "@react-native/metro-config": "catalog:",
     "@types/react": "catalog:",
     "eslint": "catalog:",
     "eslint-config-expo": "catalog:",
+    "react": "catalog:",
+    "react-native": "catalog:",
     "typescript": "catalog:"
   },
   "peerDependencies": {

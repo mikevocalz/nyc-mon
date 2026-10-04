@@ -50,15 +50,16 @@
   },
   "devDependencies": {
     "@acme/config": "workspace:*",
+    "@expo/dom-webview": "catalog:",
     "@types/react": "catalog:",
+    "@types/three": "catalog:",
+    "@webgpu/types": "catalog:",
     "eslint": "catalog:",
     "eslint-config-expo": "catalog:",
     "expo": "catalog:",
     "react": "catalog:",
     "react-native": "catalog:",
     "typescript": "catalog:",
-    "@types/three": "catalog:",
-    "@webgpu/types": "catalog:",
     "unplugin-typegpu": "catalog:"
   },
   "peerDependencies": {
