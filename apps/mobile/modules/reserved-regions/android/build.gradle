@@ -1,0 +1,43 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'com.nycmon'
+version = '0.2.0'
+
+/*
+ * Expo Modules 2.0, not the legacy ModuleDefinition bridge.
+ *
+ * expo-modules-core 58's gradle plugin reads `v2 true`
+ * (ExpoModuleExtension.v2) and applies the expo-modules-v2 compiler, which
+ * discovers @ExpoModule / @JS / @Event / @Record declarations at compile time
+ * and exposes them through globalThis.expoV2.modules. The runtime artifact,
+ * io.github.expo:expo-modules-v2-react 0.2.2, comes in through
+ * expo-modules-core's own `api(...)` dependency, so it is not repeated here.
+ */
+expoModule {
+  canBePublished false
+  v2 true
+}
+
+android {
+  namespace "com.nycmon.reservedregions"
+  defaultConfig {
+    versionCode 2
+    versionName "0.2.0"
+  }
+}
+
+dependencies {
+  // LifecycleEventListener is referenced directly. Gradle resolves this to the
+  // same react-android artifact/version as the app.
+  implementation 'com.facebook.react:react-android'
+
+  // Jetpack WindowManager: WindowInfoTracker supplies FoldingFeature bounds,
+  // orientation, state, occlusion and isSeparating. Declared here, on the
+  // module, not in the app: nothing else in apps/mobile pulls androidx.window,
+  // so without this line the module would not compile. 1.5.1 is the stable
+  // line already in the local Gradle cache.
+  implementation "androidx.window:window:1.5.1"
+}

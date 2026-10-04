@@ -1,17 +1,25 @@
-import { useWindowDimensions } from 'react-native';
 import { Tabs } from 'expo-router';
+import { useAdaptiveNavigationPlacement } from '@acme/ui/adaptive-panes';
 import { AppTabBar } from '../../../components/AppTabBar';
 
-/**
- * Material's navigation rail threshold. Below 600dp the bar sits at the bottom;
- * from medium up — tablets and unfolded foldables — it moves to the leading
- * edge as a rail.
- *
- * This is NOT the kit's REGULAR_MIN_WIDTH (768). That constant governs when a
- * layout earns a second pane; the rail switches earlier, at the width where a
- * full-width bottom bar starts wasting a wide window's vertical space.
- */
-const RAIL_MIN_WIDTH = 600;
+/*
+  WHERE THE BAR GOES is the kit's Material 3 Adaptive policy
+  (`resolveAdaptiveNavigationPlacement`, packages/ui/adaptive-navigation.ts),
+  fed by the window size class, the window height and the native fold posture:
+
+  - compact width (<600dp): bottom bar
+  - Android tabletop posture, or a window under 480dp tall: bottom bar, so a
+    half-open foldable or a landscape phone keeps its height for content
+  - otherwise: a rail on the logical leading edge (right in RTL)
+
+  This is NOT the kit's REGULAR_MIN_WIDTH (768). That constant governs when a
+  layout earns a second pane; the rail switches earlier, at the width where a
+  full-width bottom bar starts wasting a wide window's vertical space.
+
+  `placement.expanded` (extra-large windows) asks for Material's expanded rail
+  with labels beside icons; AppTabBar draws the 80dp rail at every width until
+  the theme carries a `railExpanded` token.
+*/
 
 /**
  * These are expo-router's JS tabs, not `NativeTabs`.
@@ -24,14 +32,14 @@ const RAIL_MIN_WIDTH = 600;
  * the rail is identical on both platforms and carries the app's own styling.
  */
 export default function TabLayout() {
-  const { width } = useWindowDimensions();
-  const rail = width >= RAIL_MIN_WIDTH;
+  const placement = useAdaptiveNavigationPlacement();
+  const rail = placement.rail;
 
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarPosition: rail ? 'left' : 'bottom',
+        tabBarPosition: placement.position,
       }}
       tabBar={(props) => <AppTabBar {...props} rail={rail} />}
     >

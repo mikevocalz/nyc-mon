@@ -3,8 +3,7 @@ import { useColorScheme } from 'react-native';
 import { palette } from '@acme/theme';
 import { DrawerContent } from '../../components/DrawerContent';
 import { AppHeader } from '../../components/AppHeader';
-import { horizontalGesturesEnabled } from '@/src/navigation/split-view/pane-search';
-import { usePaneSearchStore } from '@/src/navigation/split-view/pane-search.store';
+import { horizontalGesturesEnabled, usePaneSearchStore } from '@/src/navigation/split-view';
 
 export default function DrawerLayout() {
   const isDark = useColorScheme() === 'dark';

@@ -15,7 +15,7 @@ import {
   swipeTranslation,
   type SwipeSide,
 } from './swipe-actions.ts';
-import { TRANSITIONS } from './transitions.ts';
+import { TRANSITIONS } from '@acme/ui/adaptive-panes';
 
 /** Width of the revealed action area, in dp. */
 const ACTION_WIDTH = 88;

@@ -5,8 +5,13 @@
  * identity: expo-router filters children with `child.type === SplitViewColumn`
  * (expo-router/build/split-view/split-view.js), and any wrapper component here
  * would fail that check and be dropped with a warning.
+ *
+ * The pane chrome (PaneToggle, PaneSearchBar, DetailNavbar, ...) and the size
+ * class helpers are still the kit's.
  */
+import './pane-storage';
+
+export * from '@acme/ui/adaptive-panes/parts';
+export { PaneOpenContext, usePaneOpen } from '@acme/ui/adaptive-panes';
 export { SplitView } from 'expo-router/unstable-split-view';
-export type { SplitViewProps, SplitNavigableColumn, SplitViewCommands } from './types';
-export { useWindowSizeClass, windowSizeClassForWidth } from './use-window-size-class';
-export { WINDOW_SIZE_CLASS_MIN_WIDTH_DP, type WindowSizeClass } from './constants';
+export { SwipeableRow, ACTION_WIDTH, type SwipeableRowProps } from './SwipeableRow';

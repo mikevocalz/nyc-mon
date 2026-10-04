@@ -1,21 +1,24 @@
 'use client';
 import { Link } from 'solito/link';
-import { SplitView } from '@/src/navigation/split-view';
-import { PaneToggle } from '@/src/navigation/split-view/PaneToggle';
-import { PaneSearchBar } from '@/src/navigation/split-view/PaneSearchBar';
-import { SwipeableRow } from '@/src/navigation/split-view/SwipeableRow';
-import { PaneListHeader } from '@/src/navigation/split-view/PaneListHeader';
+import {
+  DetailNavbar,
+  PANE_WIDTH_DP,
+  PaneListHeader,
+  PaneSearchBar,
+  PaneToggle,
+  SidebarSection,
+  SplitView,
+  SwipeableRow,
+  isCollapsed,
+  usePaneSearch,
+  usePaneVisibility,
+  useStickyHeader,
+  windowSizeClassForWidth,
+} from '@/src/navigation/split-view';
 import { useRef } from 'react';
 import { useWindowDimensions } from 'react-native';
 import { createStore, useStore } from 'zustand';
-import { DetailNavbar } from '@/src/navigation/split-view/DetailNavbar';
-import { SidebarSection } from '@/src/navigation/split-view/SidebarSection';
-import { usePaneVisibility } from '@/src/navigation/split-view/use-pane-visibility';
-import { isCollapsed, windowSizeClassForWidth } from '@/src/navigation/split-view/constants';
 import { EventActionsSheet } from '../../../components/EventActionsSheet';
-import { useStickyHeader } from '@/src/navigation/split-view/use-sticky-header';
-import { PANE_WIDTH_DP } from '@/src/navigation/split-view/pane-widths';
-import { usePaneSearch } from '@/src/navigation/split-view/pane-search.store';
 import { Pressable, View, Text } from '@acme/ui/tw';
 import { Avatar, Badge, BrandWordmark, EmptyState, IconButton, KeyboardAwareScroll, Menu, SafeArea, SegmentedControl } from '@acme/ui';
 import { Header } from '@acme/ui/primitives';
