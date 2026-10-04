@@ -32,6 +32,17 @@ Ported so far:
   Circular Progress and Turbine Loader, redrawn as a building skyline, window
   lights, subway chevrons, a segmented token ring and a rooftop water tower
   with a fan. Each keeps the original props that still apply.
+- `Button` and `IconButton` `variant="cornerCut"`: port of NeonBlade's
+  corner-cut button (`corner-cut-button`).
+- `Card` `variant="notch"`, `"cornerCut"` and `"beam"`: ports of NeonBlade's
+  notch card, neon glow corner-cut card and border beam corner-cut card. The
+  notch geometry in `cards/notch.ts` follows the notch card's clip path, and
+  the props keep NeonBlade's names (`notchSides`, `notchSize`, `notchWidth`,
+  `notchWidthV`, `notchSkew`, `corner`, `cornerSize`, `duration`).
+- `TextField`, `Textarea`, `Select`, `Checkbox` and `Switch` `variant="neon"`:
+  ports of NeonBlade's neon input, neon select, neon checkbox and neon toggle.
+- `cards/CardSlider`: port of NeonBlade's card slider (`visibleCount`, `gap`,
+  `showButtons`, `showProgress`, `progressStyle`, `loop`).
 
 NeonBlade UI is distributed under the MIT License:
 

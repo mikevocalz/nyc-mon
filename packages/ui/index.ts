@@ -79,3 +79,6 @@ export { BrandWordmark, type BrandWordmarkProps } from './brand/BrandWordmark';
 export * from './gpu';
 export * from './neon';
 export { useLayoutSize, type LayoutSize } from './use-layout-size';
+
+// NeonBlade control and card ports (tones, frames, CardSlider).
+export * from './cards';

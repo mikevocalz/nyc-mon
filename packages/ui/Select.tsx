@@ -3,6 +3,8 @@ import { tv } from 'tailwind-variants';
 import { View } from './tw';
 import { Select as PrimitiveSelect, Label } from './primitives';
 import { Text } from './Text';
+import { NEON_FIELD, neonErrorCompound, neonFieldCompounds } from './cards/neon-field';
+import { resolveTone, toneVariants, type ControlTone, type District } from './cards/tones';
 
 const field = tv({
   slots: {
@@ -17,8 +19,18 @@ const field = tv({
   variants: {
     error: { true: { select: 'border-danger focus:border-danger', message: 'text-danger' } },
     disabled: { true: { select: 'opacity-50' } },
+    // neon: the NeonBlade input look (see cards/neon-field.ts); default is the kit field.
+    variant: { default: {}, neon: { label: NEON_FIELD.label, select: NEON_FIELD.input } },
+    tone: toneVariants(() => ({})),
   },
+  compoundVariants: [...neonFieldCompounds('select'), neonErrorCompound('select')],
 });
+
+export interface SelectOption {
+  value: string;
+  label?: string;
+  disabled?: boolean;
+}
 
 export interface SelectProps extends React.ComponentProps<typeof PrimitiveSelect> {
   label: string;
@@ -26,12 +38,20 @@ export interface SelectProps extends React.ComponentProps<typeof PrimitiveSelect
   error?: string;
   disabled?: boolean;
   containerClassName?: string;
+  /** Options as data (NeonBlade's API). Rendered before any option children. */
+  options?: SelectOption[];
+  /** neon is the NeonBlade input look; default is the kit field. */
+  variant?: 'default' | 'neon';
+  /** neon: colour family. Overrides `district`. */
+  tone?: ControlTone;
+  /** neon: theme by neighbourhood. */
+  district?: District;
 }
 
 export function Select({
-  label, hint, error, disabled, className, containerClassName, ...selectProps
+  label, hint, error, disabled, className, containerClassName, variant = 'default', tone, district, options, children, ...selectProps
 }: SelectProps) {
-  const s = field({ error: !!error, disabled });
+  const s = field({ error: !!error, disabled, variant, tone: resolveTone(tone, district) });
   return (
     <View className={s.root({ className: containerClassName })}>
       <Label className={s.label()}>{label}</Label>
@@ -40,7 +60,13 @@ export function Select({
         disabled={disabled}
         className={s.select({ className })}
         {...selectProps}
-      />
+      >
+        {options?.map((o) => (
+          // <option> is what the web <select> needs; the native fork reads value and label from it.
+          <option key={o.value} value={o.value} disabled={o.disabled}>{o.label ?? o.value}</option>
+        ))}
+        {children}
+      </PrimitiveSelect>
       {error ? (
         <Text className={s.message()}>{error}</Text>
       ) : hint ? (

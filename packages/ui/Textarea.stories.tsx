@@ -71,3 +71,13 @@ export const WithPaste: Story = {
     );
   },
 };
+
+/** Neon textarea in each district tone. */
+export const Neon: Story = {
+  render: () => (
+    <View className="max-w-content-form gap-5 bg-ink-950 p-6">
+      <Textarea variant="neon" district="harlem" label="Block story" placeholder="What happened on your corner" />
+      <Textarea variant="neon" district="megacity" label="Plan" error="Keep it under 280 characters." defaultValue="Level 90 to level 120 by the east bridge." />
+    </View>
+  ),
+};

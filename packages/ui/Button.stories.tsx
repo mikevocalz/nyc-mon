@@ -27,3 +27,32 @@ export const Sizes: Story = {
     </View>
   ),
 };
+
+const DISTRICT_LIST = ['downtown', 'midtown', 'harlem', 'megacity'] as const;
+
+/** NeonBlade corner-cut button: solid face, depth plate, cut corner. Every control is live. */
+export const CornerCut: Story = {
+  args: { variant: 'cornerCut', title: 'Claim this block', district: 'midtown', corner: 'bottom-right', glow: false },
+  argTypes: {
+    district: { control: 'inline-radio', options: DISTRICT_LIST },
+    tone: { control: 'select', options: [undefined, 'orange', 'royal', 'carolina', 'leaf', 'apple', 'brick'] },
+    corner: { control: 'inline-radio', options: ['top-left', 'top-right', 'bottom-right', 'bottom-left', 'all'] },
+    glow: { control: 'inline-radio', options: [false, 'low', 'medium', 'high'] },
+    size: { control: 'inline-radio', options: ['sm', 'md', 'lg'] },
+  },
+  decorators: [(S) => <View className="bg-ink-950 p-6"><S /></View>],
+};
+
+/** One corner-cut button per district, plus disabled and loading. */
+export const CornerCutDistricts: Story = {
+  render: () => (
+    <View className="flex-row flex-wrap gap-4 bg-ink-950 p-6">
+      <Button variant="cornerCut" district="downtown" title="Downtown" onPress={() => {}} />
+      <Button variant="cornerCut" district="midtown" title="Midtown" onPress={() => {}} />
+      <Button variant="cornerCut" district="harlem" title="Harlem" onPress={() => {}} />
+      <Button variant="cornerCut" district="megacity" title="Mega City" glow="medium" onPress={() => {}} />
+      <Button variant="cornerCut" title="Locked" disabled onPress={() => {}} />
+      <Button variant="cornerCut" title="Saving" loading onPress={() => {}} />
+    </View>
+  ),
+};
