@@ -9,7 +9,8 @@ Package manager: pnpm 12.8.1. Node `>=24.15.0 <26`. Task runner: Turborepo 2.11.
 | §1.1 expects | Repo has | Status |
 |---|---|---|
 | `apps/mobile` (Expo latest, New Arch, expo-router) | `apps/mobile` (Expo SDK 58.0.3, RN 0.88.0-rc.3, expo-router 58.0.13) | Present |
-| `apps/web` (Next.js App Router, Vercel) | `apps/web` (Next 16.3.8, App Router, Payload admin mounted inside) | Present |
+| `apps/web` (Next.js App Router, Vercel) | `apps/web` (Next 16.3.8, App Router, product and promo site only) | Present |
+| — | `apps/admin-vite` (TanStack Start 1.168.60 on Vite 8, Payload admin at `/admin`, Payload REST and Better Auth at `/payload-api`; ADR 0003) | Extra |
 | — | `apps/storybook` (Storybook 10.6.1 on Vite, react-native-web) | Extra |
 | `packages/ui` | `packages/ui` (`@acme/ui`, the NYC-Tron kit) | Present |
 | `packages/ui/html` | `packages/ui/html` (`@acme/ui/html`; `@acme/ui/primitives` re-exports it) | Present |
@@ -62,9 +63,15 @@ The commit message calls these "the v7 canon sources", but the docx and the inde
 - **Next.js 16.3.8**, App Router, React Compiler (`babel-plugin-react-compiler` 1.0.0). Styling on web goes through `react-native-css` 3.0.7 because Uniwind does not support Next.js (see the comment in `packages/ui/tw.tsx`).
 - Routes under `apps/web/app/`:
   - `(site)/layout.tsx`, `page.tsx`, `explore/`, `notifications/`, `profile/`, `schedule/`, `settings/`, `spatial/`, `error.tsx`, `not-found.tsx` — starter demo pages, none of W01–W07.
-  - `(payload)/admin/[[...segments]]/page.tsx` (Payload admin), `(payload)/payload-api/[...slug]/route.ts` (Payload REST, mounted at `/payload-api`), `(payload)/payload-api/graphql/route.ts`.
+  - No Payload routes. The admin, REST and Better Auth moved to `apps/admin-vite` on 2026-10-04 (`docs/adr/0003-admin-app-split.md`); `apps/web` holds no database or auth secrets.
 - Site header and footer: `apps/web/components/site/SiteHeader.tsx` and `apps/web/components/site/SiteFooter.tsx`, built from `@acme/ui/tw` (`Header`, `Nav`, `Footer`, `View`, `P`) plus `BrandWordmark` / `BrandLogo` from `@acme/ui`. They do **not** use the kit's own `NavBar` / `SiteFooter` (`packages/ui/nav/`), and they import `@acme/ui/tw` rather than `@acme/ui/html`. Nav items: `apps/web/components/site/nav.ts`.
 - Lint guard: `apps/web/eslint.config.mjs` forbids raw semantic tags in `app/(site)/**` and `components/site/**` ("Use @acme/ui/html or an @acme/ui component") and forbids importing `@expo/ui` / `@expo/html-elements` directly. `components/site/Landing.tsx` is allow-listed for GSAP but does not exist.
+### `apps/admin-vite`
+
+- **TanStack Start** 1.168.60 + `@payloadcms/tanstack-start` 4.0.0-canary.37 on Vite 8.3.2, `@vitejs/plugin-rsc` 0.5.35, Nitro 3.0.260903-beta with the `vercel` preset (Build Output API v3 in `.vercel/output`). Dev port 5174, `strictPort`. `pnpm --filter admin-vite dev` loads the root `.env` then `.env.local` through `node --env-file-if-exists`, which never overrides variables already set in the shell.
+- Routes under `apps/admin-vite/src/routes/`: `index.tsx` (307 to `/admin`), `_payload.tsx` (pathless layout, `no-store` + `noindex`), `_payload/admin.index.tsx` and `_payload/admin.$.tsx` (admin views), `_payload/payload-api.$.ts` (Payload REST through `handleEndpoints`, including Better Auth at `/payload-api/auth/*`). No GraphQL.
+- Consumes `packages/payload/src/payload.config.ts` unchanged; the generated import map is `src/routes/_payload/importMap.js` (`pnpm --filter admin-vite payload:importmap`).
+
 - `eslint-plugin-jsx-a11y` 6.10.2 is in the pnpm store only as a transitive dependency; no workspace declares it and no config enables its strict preset (§0A.2 requires that).
 
 ### `apps/storybook`
@@ -79,7 +86,7 @@ The commit message calls these "the v7 canon sources", but the docx and the inde
 | `packages/theme` | `@acme/theme` | Tokens. `tokens.ts` is the only file with hexes; `build-css.mjs` generates `theme.css` (Tailwind v4 `@theme` with `light-dark()`) and `theme-native.css` (Uniwind). `contrast.mjs` is a WCAG ratio script (section 6). |
 | `packages/assets` | `@acme/assets` | `brand/` logo PNGs, `fonts/ArchivoBlack-Regular.ttf`, `fonts/SpaceGrotesk-Variable.ttf`, `photos/*.webp` (ten NYC photos keyed by district: downtown, midtown, harlem, megacity). |
 | `packages/app` | `@acme/app` | Solito feature screens from the starter: `features/{editor,error,explore,home,notifications,profile,schedule,settings}`, `providers/` (React Query, safe area). Zustand stores per feature; MMKV in `features/editor/preferences.store.native.ts`. Nothing NYC-MON-specific. |
-| `packages/payload` | `@acme/payload` | Payload CMS 4.0.0-canary.37 config (`src/payload.config.ts`), collections `Users` (auth) and `Media`, generated `src/payload-types.ts`, and a typed REST reader in `index.ts`. |
+| `packages/payload` | `@acme/payload` | Payload CMS 4.0.0-canary.37 config (`src/payload.config.ts`), collections `Users` (auth) and `Media`, Better Auth options (`src/auth/`), generated `src/payload-types.ts`, and a typed REST reader in `index.ts`. Hosted by `apps/admin-vite`. |
 | `packages/spatial` | `@acme/spatial` | Viro (fork `@reactvision/react-viro` 3.0.2-moyo.1) and Rive XR scenes, district scene, spatial audio, and the site copy constants (`homeCopy.ts`, exported as `@acme/spatial/copy`). Out of Phase 1 scope except that `apps/web` reads its copy. |
 | `packages/config` | `@acme/config` | `eslint/base.mjs`, `eslint/boundaries.mjs` (keeps platform UI behind `@acme/ui`), `prettier/index.json`, `typescript/{base,nextjs,react-library}.json`, `jest-rsc-preset.js`. |
 
@@ -315,7 +322,9 @@ There is **no H-Lynk mark** anywhere in the repo, and no SVG logo; both masters 
 
 ## 8. Backend and auth
 
-The repo standardises on **Payload CMS 4.0.0-canary.37 on Postgres** (`@payloadcms/db-postgres` 4.0.0-canary.37, `pg` 8.23.1), mounted inside `apps/web`:
+> **Updated 2026-10-04.** The bullets below describe the repo at `42c3273`. Since then Better Auth runs inside Payload (ADR 0001) and Payload, its admin, REST and Better Auth are hosted by `apps/admin-vite`, not `apps/web` (ADR 0003).
+
+The repo standardises on **Payload CMS 4.0.0-canary.37 on Postgres** (`@payloadcms/db-postgres` 4.0.0-canary.37, `pg` 8.23.1), mounted inside `apps/web` at `42c3273`:
 
 - Config `packages/payload/src/payload.config.ts`: REST at `/payload-api`, Postgres schema `payload`, `push` gated by an env flag, CORS/CSRF limited to the site URL.
 - `packages/payload/src/collections/Users.ts`: `auth: true` (Payload's local email + password strategy, JWT/cookie sessions), one extra field `name`.
@@ -351,7 +360,7 @@ Not present: Better Auth, Supabase, Firebase, Clerk, Auth.js; no passkey, Sign i
 | `expo` / `react-native` / `react` | 58.0.3 / 0.88.0-rc.3 / 19.3.0 | all apps |
 | `tailwindcss` / `uniwind` | 4.3.3 / 1.12.1 | apps, `packages/ui` |
 | `vitest` | 5.0.3 | `apps/storybook` only; packages test with `node --test` |
-| `payload` | 4.0.0-canary.37 | `apps/web`, `packages/payload` |
+| `payload` | 4.0.0-canary.37 | `apps/admin-vite`, `packages/payload` |
 
 The §1.2 floor holds: three r186 ≥ r168, RN 0.88 ≥ 0.81, New Architecture only. RN 0.88 is a release candidate, and Payload 4 is a canary.
 

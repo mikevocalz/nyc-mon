@@ -6,6 +6,7 @@
 - **Decisions recorded:** `docs/canon/DECISIONS.md` #2 (auth) and #3 (email)
 - **Spec:** `prompts/BUILD_PROMPT_v3.md` §1.4 (accounts and the server seam), §1.5 (age and consent), Laws 2, 5 and 6 in `prompts/LAWS.md`
 - **Repo evidence:** `docs/REPO_MAP.md` §8
+- **Hosting:** since 2026-10-04 Payload, Better Auth and `/v1` run in `apps/admin-vite`, not `apps/web`; see `docs/adr/0003-admin-app-split.md`. Paths below that name `apps/web` describe the original mount.
 
 ## Context
 
@@ -72,7 +73,7 @@ Booting against Postgres found a fourth Payload 4 break the type check and unit 
 
 ## The §1.4 contract on top
 
-`/v1` lives in Next route handlers under `apps/web/app/v1/**` (https://nextjs.org/docs/app/api-reference/file-conventions/route), outside `/payload-api` so the contract path stays stable. Each handler:
+`/v1` lives in TanStack Start server routes under `apps/admin-vite/src/routes/v1/**` (https://tanstack.com/start/latest/docs/framework/react/guide/server-routes), on the same host as Better Auth (ADR 0003), outside `/payload-api` so the contract path stays stable. It was first planned as Next route handlers in `apps/web/app/v1/**`. Each handler:
 
 1. calls `payload.auth({ headers: req.headers })`. That runs `betterAuthStrategy`, which returns the Caller's `users` doc or `null` (401). Per the plugin README this read does not refresh the session, so handlers never write a cookie the database didn't issue.
 2. checks consent state on the user (see §1.5 below) and returns 403 `CONSENT_REQUIRED` if the account is pending.
@@ -145,6 +146,8 @@ Checked by booting `apps/web` (`next dev`, Next 16.3.8) against a throwaway Post
 | `POST sign-up/email`, birth year 3000 | 400 `INVALID_BIRTH_YEAR` |
 | `POST request-password-reset` with no Resend config | 400 `RESET_PASSWORD_DISABLED` (loud, as intended) |
 | `GET /admin/login` | 200; the plugin's login view (email and passkey) |
+
+Re-run on `apps/admin-vite` (TanStack Start) on 2026-10-04: `auth/ok`, sign-up, sign-in, `users/me` and the admin login all pass; see ADR 0003.
 
 Not verified yet: passkey ceremonies, Apple and Google (no client ids), Resend delivery (no key), the Expo client, and the guardian-consent flow, which is designed above but not built.
 
