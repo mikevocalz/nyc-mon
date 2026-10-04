@@ -1,7 +1,7 @@
 /**
  * Pure maths for the native CardSlider (CardSlider.native.tsx): how each
- * native carousel strategy maps onto the slider's index, and the autoplay
- * step. Covered by card-slider-native-model.test.ts.
+ * native carousel strategy maps onto the slider's index, and each card's
+ * spoken label. Covered by card-slider-native-model.test.ts.
  */
 import { sliderMetrics, type VisibleCount } from './card-slider-model.ts';
 
@@ -39,15 +39,6 @@ export function nativeSliderLayout(
   return { visible: 1, maxIndex: Math.max(0, count - 1), itemWidth, stride: itemWidth + gap };
 }
 
-/**
- * Autoplay's next stop. With loop it wraps to the start; without, it stops
- * on the last card and returns null so the timer can end.
- */
-export function autoplayStep(index: number, maxIndex: number, loop: boolean): number | null {
-  if (maxIndex <= 0) return null;
-  if (index >= maxIndex) return loop ? 0 : null;
-  return index + 1;
-}
 
 /** Spoken name for each card. */
 export function slideLabels(count: number): string[] {

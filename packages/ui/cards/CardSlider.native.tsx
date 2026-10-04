@@ -1,7 +1,4 @@
 'use client';
-import { useEffect } from 'react';
-import { Pause, Play } from '../icons';
-import { IconButton } from '../IconButton';
 import { Section } from '../html';
 import { View } from '../tw';
 import { useInstanceStore, useStore } from '../use-instance-store';
@@ -9,13 +6,13 @@ import { useLayoutSize } from '../use-layout-size';
 import { useReducedMotion } from '../backgrounds/use-reduced-motion';
 import { NycCarousel, isNycCarouselAvailable } from '../modules/nyc-carousel/src';
 import { stepIndex } from './card-slider-model';
-import { autoplayStep, nativeSliderLayout, slideLabels } from './card-slider-native-model';
+import { nativeSliderLayout, slideLabels } from './card-slider-native-model';
 import type { CardSliderNativeProps } from './card-slider-native.types';
 import { CardSliderListTrack } from './CardSliderListTrack';
-import { SliderControls, sliderStatus, slidesOf, sliderTone } from './CardSlider.shared';
-import { CardSliderEdgeFades } from './CardSliderEdgeFades';
-import { CardSliderSideButtons } from './CardSliderSideButtons';
-import { TONE_CLASSES, toneHex } from './tones';
+import {
+  CornerAccents, EdgeFades, ScanLines, SideButtons, SliderControls, sliderStatus, slidesOf, sliderTone, useAutoplay,
+} from './CardSlider.shared';
+import { toneHex } from './tones';
 
 export type { CardSliderNativeProps } from './card-slider-native.types';
 
@@ -32,32 +29,37 @@ const CARD_CUT = 16;
  * (Expo Go, older builds, iOS below 17) get the React Native LegendList track
  * instead, with the same controls.
  *
+ * Everything around the track is the web fork's: SliderControls with the
+ * autoplay slot, SideButtons in gutters, EdgeFades, CornerAccents, ScanLines
+ * and useAutoplay. Touch has no hover, so `buttonVisibility` is always on
+ * and autoplay holds only when paused.
+ *
  * The index lives in a zustand instance store. Buttons, autoplay and
  * assistive-tech increments set it and the carousel scrolls to match;
- * swipes report back through onIndexChange. The region is adjustable, so
- * VoiceOver and TalkBack swipe up and down between cards and read
- * "Card 2 of 6".
+ * swipes report back through the carousel's onIndexChange. The region is
+ * adjustable, so VoiceOver and TalkBack swipe up and down between cards and
+ * read "Card 2 of 6".
  */
 export function CardSlider({
   children, label, visibleCount = 1, gap = 16, showButtons = true, showProgress = true,
   progressStyle = 'bar', loop = false, tone, district, className, itemClassName,
-  variant = 'uncontained', snap = true, onIndexChange, autoPlay = false, autoPlayInterval = 3000,
-  showEdgeFades = false, edgeFadeColor, buttonPosition = 'bottom',
+  buttonPosition = 'sides', prevButtonCorner = 'bottom-left', nextButtonCorner = 'bottom-right',
+  autoPlay = false, autoPlayInterval = 3000, showEdgeFades = false, edgeFadeColor,
+  showCornerAccents = false, cornerAccentStyle = 'frame', scanLines = false, viewportClassName,
+  variant = 'uncontained', snap = true, onIndexChange,
 }: CardSliderNativeProps) {
   const slides = slidesOf(children);
   const { size, onLayout } = useLayoutSize({ width: 0, height: 0 });
   // The list fallback only has the uncontained layout.
   const layout = nativeSliderLayout(isNycCarouselAvailable ? variant : 'uncontained', size.width, slides.length, visibleCount, gap);
-  // userPlaying: null until the user presses pause/play; before that,
-  // autoplay runs unless reduced motion is on.
-  const store = useInstanceStore(() => ({ index: 0, userPlaying: null as boolean | null }));
-  const index = Math.min(useStore(store, (s) => s.index), layout.maxIndex);
-  const userPlaying = useStore(store, (s) => s.userPlaying);
   const reduced = useReducedMotion();
-  const playing = autoPlay && (userPlaying ?? !reduced);
+  // playing: autoplay not paused by the user. Starts paused under reduced motion.
+  const store = useInstanceStore(() => ({ index: 0, playing: !reduced }));
+  const index = Math.min(useStore(store, (s) => s.index), layout.maxIndex);
+  const playing = useStore(store, (s) => s.playing);
   const resolved = sliderTone(tone, district);
-  const hex = toneHex(resolved);
-  const canMove = layout.maxIndex > 0;
+  const paged = layout.maxIndex > 0;
+  const sides = showButtons && paged && buttonPosition === 'sides';
 
   const go = (next: number) => {
     if (next === store.getState().index) return;
@@ -65,21 +67,24 @@ export function CardSlider({
     onIndexChange?.(next);
   };
 
-  // One timer per stop: it re-arms whenever the index moves, so a swipe or a
-  // button press restarts the wait instead of stepping straight after it.
-  useEffect(() => {
-    if (!playing || !canMove) return;
-    const id = setTimeout(() => {
-      const next = autoplayStep(store.getState().index, layout.maxIndex, loop);
-      if (next !== null) go(next);
-    }, Math.max(800, autoPlayInterval));
-    return () => clearTimeout(id);
-    // go reads the latest state through the store; its identity changes every render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playing, canMove, index, layout.maxIndex, loop, autoPlayInterval]);
+  useAutoplay({
+    autoPlay,
+    interval: autoPlayInterval,
+    enabled: playing,
+    held: false,
+    getIndex: () => store.getState().index,
+    maxIndex: layout.maxIndex,
+    loop,
+    step: go,
+  });
 
+  // Plus accents overhang the card by 8px; pad so the native mask keeps them.
+  const slideClass = `relative ${showCornerAccents && cornerAccentStyle === 'plus' ? 'p-2' : ''} ${itemClassName ?? ''}`;
   const nativeSlides = slides.map((slide, i) => (
-    <View key={i} className={itemClassName}>{slide}</View>
+    <View key={i} className={slideClass}>
+      {slide}
+      {showCornerAccents ? <CornerAccents tone={resolved} style={cornerAccentStyle} /> : null}
+    </View>
   ));
 
   return (
@@ -94,71 +99,68 @@ export function CardSlider({
       }}
       className={className}
     >
-      <View onLayout={onLayout} className="relative w-full">
-        {size.width > 0 ? (
-          isNycCarouselAvailable ? (
-            <NycCarousel
-              slides={nativeSlides}
-              variant={variant}
-              index={index}
-              onIndexChange={(i) => go(Math.min(i, layout.maxIndex))}
-              animated={!reduced}
-              visibleCount={layout.visible}
-              itemWidth={layout.itemWidth}
-              itemSpacing={gap}
-              snap={snap}
-              cut={CARD_CUT}
-              keylineColor={hex.face}
-              itemLabels={slideLabels(slides.length)}
-            />
-          ) : (
-            <CardSliderListTrack
-              slides={slides}
-              layout={layout}
-              gap={gap}
-              index={index}
-              animated={!reduced}
-              tone={resolved}
-              itemClassName={itemClassName}
-              onSettle={go}
-            />
-          )
-        ) : null}
-        {showEdgeFades ? <CardSliderEdgeFades color={edgeFadeColor} /> : null}
-        {showButtons && buttonPosition === 'sides' && canMove ? (
-          <CardSliderSideButtons index={index} maxIndex={layout.maxIndex} loop={loop} tone={resolved} onGo={go} />
-        ) : null}
-      </View>
-      <View className="flex-row items-end gap-3">
-        {autoPlay && canMove ? (
-          <IconButton
-            variant="cornerCut"
-            tone={resolved}
-            size="sm"
-            corner="top-right"
-            className="mt-4"
-            aria-label={playing ? 'Pause autoplay' : 'Start autoplay'}
-            onPress={() => store.setState({ userPlaying: !playing })}
-            icon={playing
-              ? <Pause size={16} className={TONE_CLASSES[resolved].onFace} />
-              : <Play size={16} className={TONE_CLASSES[resolved].onFace} />}
-          />
-        ) : null}
-        <View className="flex-1">
-          <SliderControls
+      {/* Side buttons sit in gutters beside the track, as on web. */}
+      <View className={`relative w-full ${sides ? 'px-14' : ''}`}>
+        <View onLayout={onLayout} className={`relative w-full ${viewportClassName ?? ''}`}>
+          {size.width > 0 ? (
+            isNycCarouselAvailable ? (
+              <NycCarousel
+                slides={nativeSlides}
+                variant={variant}
+                index={index}
+                onIndexChange={(i) => go(Math.min(i, layout.maxIndex))}
+                animated={!reduced}
+                visibleCount={layout.visible}
+                itemWidth={layout.itemWidth}
+                itemSpacing={gap}
+                snap={snap}
+                cut={CARD_CUT}
+                keylineColor={toneHex(resolved).face}
+                itemLabels={slideLabels(slides.length)}
+              />
+            ) : (
+              <CardSliderListTrack
+                slides={nativeSlides}
+                layout={layout}
+                gap={gap}
+                index={index}
+                animated={!reduced}
+                tone={resolved}
+                onSettle={go}
+              />
+            )
+          ) : null}
+          {scanLines ? <ScanLines height={size.height} /> : null}
+          {showEdgeFades ? <EdgeFades color={edgeFadeColor} /> : null}
+        </View>
+        {sides ? (
+          <SideButtons
             index={index}
-            count={slides.length}
-            visible={layout.visible}
             maxIndex={layout.maxIndex}
             loop={loop}
             tone={resolved}
-            showButtons={showButtons && buttonPosition === 'bottom' && canMove}
-            showProgress={showProgress && canMove}
-            progressStyle={progressStyle}
+            prevCorner={prevButtonCorner}
+            nextCorner={nextButtonCorner}
             onGo={go}
           />
-        </View>
+        ) : null}
       </View>
+      <SliderControls
+        index={index}
+        count={slides.length}
+        visible={layout.visible}
+        maxIndex={layout.maxIndex}
+        loop={loop}
+        tone={resolved}
+        showButtons={showButtons && paged}
+        showProgress={showProgress && paged}
+        progressStyle={progressStyle}
+        onGo={go}
+        buttonPosition={buttonPosition}
+        prevCorner={prevButtonCorner}
+        nextCorner={nextButtonCorner}
+        autoplay={autoPlay && paged ? { playing, onToggle: () => store.setState({ playing: !store.getState().playing }) } : undefined}
+      />
     </Section>
   );
 }
