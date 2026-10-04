@@ -110,3 +110,10 @@ Design and product decisions made by `design-director` or handed to it by the le
 - `docs/DESIGN_SYSTEM.md`
 - `docs/design/screens/M01` … `M07` (`02-references.md`, `03-direction.md`, `04-components.md`, `06-critique.md`)
 - Research: `docs/design/research/JOURNEY.md`, `PERSONAS.md`, `HALLWAY_TESTS.md`
+
+## L1 — M04 takes two taps (decade, then year)
+
+- **Date:** 2026-10-04
+- **Decided by:** the lead, on design-director's D9
+
+The brief asks for one tap. A native wheel always opens on a preset year, and FTC COPPA FAQ D.7 counts a preset as a default that can steer the answer (https://www.ftc.gov/business-guidance/resources/complying-coppa-frequently-asked-questions). So M04 is decade-then-year: two taps, and no year is preselected. The age screen stays neutral, which matters more than the tap count.
