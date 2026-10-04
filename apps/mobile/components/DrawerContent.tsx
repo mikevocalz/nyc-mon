@@ -13,7 +13,7 @@ import { AVATAR_URI, useProfile } from '@acme/app';
 
 
 const MAIN_ITEMS = [
-  { label: 'Home', icon: Home, href: '/' },
+  { label: 'Home', icon: Home, href: '/home' },
   { label: 'Explore', icon: Compass, href: '/explore' },
   { label: 'Schedule', icon: Calendar, href: '/split' },
   { label: 'Spatial', icon: Compass, href: '/spatial' },
@@ -23,7 +23,7 @@ const MAIN_ITEMS = [
 ] as const;
 
 export function DrawerContent(props: DrawerContentComponentProps) {
-  const pathname = usePathname() ?? '/';
+  const pathname = usePathname() ?? '/home';
   // The signed-in user lives in the profile store; the drawer used to hardcode
   // a second copy of the name, so the two drifted apart.
   const profileName = useProfile((state) => state.name);
@@ -36,7 +36,7 @@ export function DrawerContent(props: DrawerContentComponentProps) {
   };
 
   const isActive = (href: string) =>
-    href === '/' ? pathname === '/' || pathname === '' : pathname.startsWith(href);
+    href === '/home' ? pathname === '/' || pathname === '' : pathname.startsWith(href);
 
   return (
     <DrawerContentScrollView {...props} showsVerticalScrollIndicator={false}>

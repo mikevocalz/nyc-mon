@@ -16,14 +16,14 @@ const RAIL_ITEM_HEIGHT = 56;
 const MENU_BOTTOM_GAP = 10;
 
 const ICONS = {
-  index: Home,
+  home: Home,
   explore: Compass,
   notifications: Bell,
   profile: User,
 } as const;
 
 const LABELS = {
-  index: 'Grid',
+  home: 'Grid',
   explore: 'Explore',
   notifications: 'Alerts',
   profile: 'Profile',
@@ -53,7 +53,7 @@ export function AppTabBar({
   state, emitter, navigateToTab, insets, rail, expanded = false,
 }: BottomTabBarProps & { rail: boolean; /** Extra-large windows: the wide rail with labels beside icons. */ expanded?: boolean }) {
   const wide = rail && expanded;
-  const gridMode = state.routes[state.index]?.name === 'index';
+  const gridMode = state.routes[state.index]?.name === 'home';
 
   const items = state.routes.map((route, index) => {
     const focused = state.index === index;
