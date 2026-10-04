@@ -25,6 +25,7 @@ import * as GridFloorStories from './GridFloor.stories';
 import * as GridSceneStories from './GridScene.stories';
 import * as HolographicTerrainStories from './HolographicTerrain.stories';
 import * as NavStories from './Nav.stories';
+import * as NeonTideStories from './NeonTide.stories';
 import * as NeonBarChartStories from './NeonBarChart.stories';
 import * as NeonDonutChartStories from './NeonDonutChart.stories';
 import * as NeonLineChartStories from './NeonLineChart.stories';
@@ -46,7 +47,7 @@ import * as ToastStories from './Toast.stories';
 import * as TurbineLoaderStories from './TurbineLoader.stories';
 
 /**
- * NeonBlade/Index: every NeonBlade UI component next to its NYC-MON port,
+ * NeonBlade/Index: every NeonBlade UI component next to its NYC-Tron port,
  * in the site's categories, with a live preview, our name, and links to the
  * story here and the demo on the NeonBlade site. Each component also has its
  * own entry below the index, named as NeonBlade names it, so the sidebar
@@ -75,6 +76,7 @@ const MODULES: Record<string, StoryModule> = {
   GridScene: GridSceneStories,
   HolographicTerrain: HolographicTerrainStories,
   Nav: NavStories,
+  NeonTide: NeonTideStories,
   NeonBarChart: NeonBarChartStories,
   NeonDonutChart: NeonDonutChartStories,
   NeonLineChart: NeonLineChartStories,
@@ -274,7 +276,7 @@ const meta = {
   title: 'NeonBlade/Index',
   parameters: {
     layout: 'fullscreen',
-    docs: { description: { component: 'Every NeonBlade UI component and its NYC-MON port.' } },
+    docs: { description: { component: 'Every NeonBlade UI component and its NYC-Tron port.' } },
   },
 } satisfies Meta;
 export default meta;

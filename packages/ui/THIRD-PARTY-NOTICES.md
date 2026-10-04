@@ -27,7 +27,13 @@ Ported so far:
   city-blocks scene built on the same terrain idea, with NeonBlade's prop
   names. Its first, flat port stays as `backgrounds/CityHeightfieldFlat`, the
   fallback.
-- `backgrounds/RiverTide`: port of NeonBlade's Neon Tide (`neon-tide`).
+- `three/NeonTide`: port of NeonBlade's Neon Tide (`neon-tide`), kept a
+  three.js scene like the original: the same wave surface, lighting (diffuse,
+  fresnel rim, specular), FogExp2, corner shift and tilt, camera and pointer
+  bump, reimplemented on WebGPURenderer with the wave as a TypeGPU function.
+  Keeps its prop names; the default colours come from the NYC-MON theme.
+- `backgrounds/RiverTide`: the first, flat port of Neon Tide, redrawn as the
+  river under a district skyline. Also NeonTide's fallback.
 - `backgrounds/RainWindow`: port of NeonBlade's Pluviophile (`pluviophile`).
 - `backgrounds/CityBlocks`: began as the port of NeonBlade's Hexagons background
   (`packages/registry/components/hexagons`) and was redrawn as a solid NYC
