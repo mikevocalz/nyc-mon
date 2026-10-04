@@ -42,4 +42,4 @@ export {
   PutCareResponseSchema,
   SERVER_CONTRACT_VERSION,
 } from './server.ts';
-export { IdleVignetteDefSchema, MonSpeciesDefSchema } from './species.ts';
+export { BloodlineIdSchema, IdleVignetteDefSchema, MonSpeciesDefSchema } from './species.ts';

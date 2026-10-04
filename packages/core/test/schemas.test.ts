@@ -40,19 +40,54 @@ describe('boundary schemas (Law 5)', () => {
     expect(CareActionSchema.safeParse({ kind: 'heal' }).success).toBe(false);
   });
 
-  it('species content needs at least one food class and allows TODO(canon) nulls', () => {
+  describe('MonSpeciesDef', () => {
     const species = {
       speciesId: 'species-test',
-      dexId: null,
-      lineLabel: 'Test line',
+      dexId: 999,
+      bloodlineId: 'F99',
+      bloodlineName: 'Test',
+      formName: 'Test form',
+      stage: 'Baby',
       foodClassIds: ['food-test'],
       scaleMeters: 0.3,
       rigDefinitionId: 'rig-test',
+      cultureNote: 'Test note',
       idleVignettes: [],
       affinityId: null,
       classId: null,
     };
-    expect(MonSpeciesDefSchema.safeParse(species).success).toBe(true);
-    expect(MonSpeciesDefSchema.safeParse({ ...species, foodClassIds: [] }).success).toBe(false);
+
+    it('parses a fully authored record', () => {
+      expect(MonSpeciesDefSchema.safeParse(species).success).toBe(true);
+    });
+
+    it('accepts null for every TODO(canon) field', () => {
+      const unknown = {
+        ...species,
+        dexId: null,
+        formName: null,
+        foodClassIds: null,
+        scaleMeters: null,
+        rigDefinitionId: null,
+        cultureNote: null,
+      };
+      expect(MonSpeciesDefSchema.safeParse(unknown).success).toBe(true);
+    });
+
+    it('rejects an empty food list: unknown is null, never []', () => {
+      expect(MonSpeciesDefSchema.safeParse({ ...species, foodClassIds: [] }).success).toBe(false);
+    });
+
+    it('rejects a zero scale, an empty culture note and a non-roster bloodline id', () => {
+      expect(MonSpeciesDefSchema.safeParse({ ...species, scaleMeters: 0 }).success).toBe(false);
+      expect(MonSpeciesDefSchema.safeParse({ ...species, cultureNote: '' }).success).toBe(false);
+      for (const bad of ['F1', 'f01', 'F001', 'Hood Ratti']) {
+        expect(MonSpeciesDefSchema.safeParse({ ...species, bloodlineId: bad }).success).toBe(false);
+      }
+    });
+
+    it('requires a lifecycle stage from the five canon stages', () => {
+      expect(MonSpeciesDefSchema.safeParse({ ...species, stage: 'Apex' }).success).toBe(false);
+    });
   });
 });

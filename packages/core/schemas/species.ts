@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { LifecycleStageSchema } from './lifecycle.ts';
 import { IdSchema, UnitIntervalSchema } from './primitives.ts';
 
 /**
@@ -14,19 +15,40 @@ export const IdleVignetteDefSchema = z.object({
 });
 
 /**
- * Content schema for a species line (e.g. the line the Bible calls Hood Ratti).
- * No species data lives in core; `content/` supplies records that parse through this.
+ * A Dex family, called a Bloodline in UI and data (docs/canon/DECISIONS.md #11).
+ * The id is the roster's family number: `F01`, `F02`, … `F19`.
+ */
+export const BloodlineIdSchema = z.string().regex(/^F\d{2}$/);
+
+/**
+ * Content schema for one Dex record: a single form of a Bloodline at one
+ * lifecycle stage (e.g. #002 Squeaklet, Baby, Hood Ratti Bloodline). No species
+ * data lives in core; `@acme/content` supplies records that parse through this.
+ *
+ * Every nullable field means TODO(canon): the source has not settled it yet.
+ * Null is never a default to render; consumers must handle it explicitly.
  */
 export const MonSpeciesDefSchema = z.object({
   speciesId: IdSchema,
-  /** TODO(canon): stable Dex id from the v8 Dex + v11 overrides; null until transcribed. */
+  /**
+   * Dex number from roster v11.1 (DECISIONS.md #9). Null only for a creature
+   * the roster has not promoted to a permanent Dex ID.
+   */
   dexId: z.number().int().positive().nullable(),
-  lineLabel: z.string().min(1),
-  /** Food classes this anatomy can eat. Ids resolve against `content/food`. */
-  foodClassIds: z.array(IdSchema).min(1),
-  /** Size against the 1 m ground disc (§3.2 relative-scale rule). */
-  scaleMeters: z.number().positive(),
-  rigDefinitionId: IdSchema,
+  bloodlineId: BloodlineIdSchema,
+  /** The roster's family name, verbatim. UI renders `${bloodlineName} Bloodline`. */
+  bloodlineName: z.string().min(1),
+  /** Registered form name. Null where the roster marks the name [OPEN] (e.g. #110). */
+  formName: z.string().min(1).nullable(),
+  stage: LifecycleStageSchema,
+  /** TODO(canon) when null. Food classes this anatomy can eat; ids resolve against `content/food`. */
+  foodClassIds: z.array(IdSchema).min(1).nullable(),
+  /** TODO(canon) when null. Size against the 1 m ground disc (§3.2 relative-scale rule). */
+  scaleMeters: z.number().positive().nullable(),
+  /** TODO(canon) when null. No rig is authored before body data is canon. */
+  rigDefinitionId: IdSchema.nullable(),
+  /** TODO(canon) when null. Species-card culture note; culture belongs to the individual (V11 ¶44). */
+  cultureNote: z.string().min(1).nullable(),
   idleVignettes: z.array(IdleVignetteDefSchema),
   /** TODO(canon): eight-Affinity names are not yet authored in v11. */
   affinityId: IdSchema.nullable(),
