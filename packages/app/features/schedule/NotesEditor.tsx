@@ -190,7 +190,6 @@ export function NotesEditor({
           // rather than classNames — the same exception the Gorhom sheet makes.
           style={{
             minHeight: 140,
-            borderRadius: 6,
             backgroundColor: palette.white,
             paddingHorizontal: 14,
             paddingVertical: 10,

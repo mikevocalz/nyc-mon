@@ -25,7 +25,7 @@ export interface MiniCalendarProps {
  * Month grid for the supplementary column.
  *
  * Follows the kit's RetroUI grammar rather than a generic calendar look: ink
- * borders, a hard offset shadow, square-ish `rounded-md` cells, and the
+ * borders, a hard offset shadow, square cells, and the
  * selected day as a BLACK-ON-YELLOW chip. Yellow text is never used as the
  * indicator — it is illegible on light paper, and the chip is the same active
  * state the rest of the app uses, so the calendar reads as part of the system

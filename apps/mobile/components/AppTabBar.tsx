@@ -34,7 +34,7 @@ type RouteName = keyof typeof ICONS;
  * WHY CUSTOM: react-navigation's built-in bar is Material 3 — a tinted stadium
  * pill behind the icon on a hairline surface. Recolouring that pill is not
  * enough, because the *shape* is what makes it foreign: everything else on
- * screen is a rounded-md slab with a 2px ink border and a hard 4px offset
+ * screen is a square slab with a 2px ink border and a hard 4px offset
  * shadow (chips, buttons, cards). Its `uikit` variant also renders the leading
  * position as a wide ~20%-of-window sidebar rather than a rail. Owning the
  * render gives the app's slab language, true M3 rail metrics, and somewhere to
