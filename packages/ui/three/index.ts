@@ -1,6 +1,7 @@
 // three.js on WebGPURenderer for web (WebGPU, WebGL2 fallback) and native (react-native-webgpu).
 export { ThreeCanvas } from './ThreeCanvas';
 export { HolographicTerrain, type HolographicTerrainProps } from './HolographicTerrain';
+export { CityHeightfield, type CityHeightfieldProps } from './CityHeightfield';
 export { NeonTide, type NeonTideProps, type NeonTideOrigin } from './NeonTide';
 export { loadThree } from './load-three';
 export { toNdc, approach } from './pointer';

@@ -1,122 +1,83 @@
-import { brand, palette } from '@acme/theme';
-import { mixColor, type NeonColorInput } from '../../neon/colors.ts';
-import { THEMES, type District } from '../../backgrounds/district-theme.ts';
-
-export type TerrainVariant = 'solid' | 'lines';
-export type CursorEffect = 'lift' | 'ripple';
+import { brand } from '@acme/theme';
+import type { NeonColorInput } from '../../neon/colors.ts';
 
 /** Everything the terrain scene reads each frame. Built from HolographicTerrain's props. */
 export interface TerrainOptions {
-  district: District;
-  variant: TerrainVariant;
-  /** NeonBlade name: the accent. Roof caps of the tallest blocks and, in `lines`, the edges. */
   lineColor: NeonColorInput;
-  /** NeonBlade name: sky, clear and fog colour. */
-  bgColor: string;
+  bgColor: NeonColorInput;
+  /** Tint of the lines the cursor lifts, blended in by the bump's own falloff. */
+  accentColor: NeonColorInput;
   waveAmplitude: number;
   waveFrequency: number;
   waveSpeed: number;
-  /** World units, as in NeonBlade. */
   bumpRadius: number;
-  /** World units, as in NeonBlade. */
   bumpStrength: number;
   planeWidth: number;
   planeDepth: number;
   cameraHeight: number;
-  /** Blocks across `planeWidth`. */
   gridSegments: number;
   fog: boolean;
-  fogDensity: number;
-  hoverEffect: boolean;
-  cursorEffect: CursorEffect;
-  windowLights: boolean;
-  /** Blocks per second the city travels toward the camera. */
-  scrollSpeed: number;
+  /** 0..1. */
+  opacity: number;
 }
 
 /**
- * Each district's height profile, in blocks: the base every block stands on,
- * the swell's peak, a ridge along the centre line, and the boost of the odd
- * slab (0 for none).
- * - Downtown: a tall spine of towers down the middle.
- * - Midtown: big, even Deco masses.
- * - Harlem: low row houses with tall plain project slabs standing over them.
- * - Mega City: everything tall, with taller stacks.
+ * Default colours, from the theme: night behind, carolina lines (the brand
+ * family NeonBlade's cyan maps to) and orange where the cursor lifts the
+ * mesh. NeonBlade's own are #00ffff on #020a0a, with no accent.
  */
-export const PROFILES: Record<District, readonly [base: number, peak: number, centre: number, slab: number]> = {
-  downtown: [0.8, 2.4, 2.2, 1.2],
-  midtown: [1.0, 2.0, 0.9, 0.8],
-  harlem: [0.5, 0.7, 0, 2.4],
-  megacity: [1.5, 3.0, 1.2, 2.6],
-};
+export const TERRAIN_COLORS = {
+  lineColor: brand.carolina,
+  bgColor: brand.night,
+  accentColor: brand.orange,
+} as const;
 
-/** Share of windows lit, per district. */
-export const WINDOW_DENSITY: Record<District, number> = {
-  downtown: 0.55,
-  midtown: 0.45,
-  harlem: 0.4,
-  megacity: 0.6,
-};
+/** NeonBlade's numbers, unchanged. */
+export const TERRAIN_DEFAULTS = {
+  waveAmplitude: 0.8,
+  waveFrequency: 1.5,
+  waveSpeed: 1,
+  bumpRadius: 3.5,
+  bumpStrength: 2.5,
+  planeWidth: 24,
+  planeDepth: 24,
+  cameraHeight: 10,
+  gridSegments: 60,
+  fog: true,
+  opacity: 100,
+} as const;
 
-/** A block's footprint inside its cell; the rest is street. */
-export const FOOTPRINT = 0.74;
-/** World height of one block of height, per world unit of cell width. Keeps towers in proportion as the grid changes. */
-export const HEIGHT_SCALE = 0.8;
-
-export interface TerrainGrid {
-  /** Columns, always even so block edges sit on whole cells and avenues line up. */
-  cols: number;
-  rows: number;
-  /** Cell width in world units. */
-  cell: number;
-}
-
-/** Columns, rows and cell size for a plane and block count. */
-export function terrainGrid(planeWidth: number, planeDepth: number, gridSegments: number): TerrainGrid {
-  const width = Math.max(4, planeWidth);
-  const depth = Math.max(4, planeDepth);
-  const cols = Math.max(8, Math.min(160, 2 * Math.round(gridSegments / 2)));
-  const cell = width / cols;
-  const rows = Math.max(4, Math.min(240, Math.round(depth / cell)));
-  return { cols, rows, cell };
-}
-
-export interface TerrainPalette {
-  /** Four building body colours, picked per block. */
-  bodies: [string, string, string, string];
-  accent: NeonColorInput;
-  light: string;
-  ground: string;
-  avenue: string;
-  sky: string;
-}
+/** FogExp2 density, NeonBlade's fixed value. */
+export const FOG_DENSITY = 0.045;
+/** Camera field of view, degrees. */
+export const CAMERA_FOV = 60;
+/** How much of the accent the very top of the cursor bump takes; the rest stays the line colour. */
+export const ACCENT_MIX = 0.85;
 
 /**
- * The district's solid colour set, from the theme tokens. Bodies are lifted a
- * step from the 2D skyline's (the 3D faces are shaded darker by the light),
- * and the ground sits one step above the sky so streets read against the fog.
+ * Pointer easing, per second (exp(-rate * dt)). NeonBlade moves the bump to
+ * each new hit and switches it on and off in one frame; easing both keeps the
+ * mesh from jumping with every pointer event.
  */
-export function terrainPalette(district: District, lineColor: NeonColorInput | undefined, bgColor: string): TerrainPalette {
-  const theme = THEMES[district];
-  const lift = (c: string) => mixColor(c, brand.white, 0.1);
-  const [a, b, c, d] = theme.bodies;
-  return {
-    bodies: [lift(a!), lift(b!), lift(c!), lift(d!)],
-    accent: lineColor || theme.accent,
-    light: theme.light,
-    ground: mixColor(bgColor, palette.ink[900], 0.6),
-    avenue: mixColor(theme.light, theme.accent, 0.35),
-    sky: bgColor,
-  };
+export const CURSOR_FOLLOW = 14;
+export const CURSOR_FADE = 6;
+
+/** Plane subdivisions per axis, clamped to 8..200 as NeonBlade does. */
+export function terrainSegments(gridSegments: number): number {
+  return Math.max(8, Math.min(Math.round(gridSegments), 200));
 }
 
-/** NeonBlade's world-unit pointer radius and strength in blocks. */
-export function bumpInBlocks(bumpRadius: number, bumpStrength: number, cell: number): { radius: number; strength: number } {
-  const c = Math.max(0.05, cell);
-  return { radius: Math.max(0.5, bumpRadius / c), strength: Math.max(0, bumpStrength / c) * 0.6 };
+/** Camera position: NeonBlade derives z from the height (x 1.4) for its ~35 degree tilt, and looks at the origin. */
+export function cameraPosition(cameraHeight: number): [x: number, y: number, z: number] {
+  return [0, cameraHeight, cameraHeight * 1.4];
 }
 
-/** Camera field of view: wider on portrait screens so a phone still sees a street's width of city. */
-export function cameraFov(aspect: number): number {
-  return aspect >= 1 ? 55 : 55 + Math.min(1, 1 - aspect) * 30;
+/** NeonBlade's 0..100 opacity; 0..1 is accepted too. */
+export function terrainOpacity(opacity: number): number {
+  return Math.max(0, Math.min(1, opacity > 1 ? opacity / 100 : opacity));
+}
+
+/** three's FogExp2 factor at a view depth: 0 near, toward 1 far. */
+export function fogFactor(depth: number, density = FOG_DENSITY): number {
+  return 1 - Math.exp(-density * density * depth * depth);
 }
