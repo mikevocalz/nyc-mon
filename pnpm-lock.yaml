@@ -1189,6 +1189,9 @@ importers:
       react-native-svg:
         specifier: 'catalog:'
         version: 15.15.5(react-native@0.88.0-rc.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0-rc.3(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0)
+      react-native-webgpu:
+        specifier: 'catalog:'
+        version: 0.10.4(3437d375848eabd3343a32c2c440aa1b)
       solito:
         specifier: 'catalog:'
         version: 5.0.0
@@ -1204,6 +1207,9 @@ importers:
       tailwind-variants:
         specifier: 'catalog:'
         version: 3.3.1(tailwind-merge@3.7.0)(tailwindcss@4.3.3)
+      typegpu:
+        specifier: 'catalog:'
+        version: 0.12.6
       uniwind:
         specifier: 'catalog:'
         version: 1.12.1(@expo/metro-config@58.0.8(expo@58.0.3)(supports-color@8.1.1)(typescript@6.0.3))(metro-cache@0.87.1(supports-color@8.1.1))(metro-transform-worker@0.87.0(supports-color@8.1.1))(metro@0.87.1(supports-color@8.1.1))(react-native@0.88.0-rc.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0-rc.3(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0)(tailwindcss@4.3.3)
@@ -1223,6 +1229,9 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.3.0
+      '@webgpu/types':
+        specifier: 'catalog:'
+        version: 0.1.74
       eslint:
         specifier: 'catalog:'
         version: 9.39.5(jiti@2.7.0)(supports-color@8.1.1)
@@ -1241,6 +1250,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      unplugin-typegpu:
+        specifier: 'catalog:'
+        version: 0.12.4(acorn@8.17.0)(esbuild@0.28.1)(rolldown@1.2.11)(rollup@4.54.0)(supports-color@8.1.1)(typegpu@0.12.6)(vite@8.3.2(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.77.4)(terser@5.46.0)(tsx@4.22.4)(yaml@2.8.2))(webpack@5.108.4(esbuild@0.28.1)(lightningcss@1.30.1)(postcss@8.5.28))
 
 packages:
 
@@ -17581,6 +17593,34 @@ snapshots:
       - vite
       - webpack
 
+  unplugin-typegpu@0.12.4(acorn@8.17.0)(esbuild@0.28.1)(rolldown@1.2.11)(rollup@4.54.0)(supports-color@8.1.1)(typegpu@0.12.6)(vite@8.3.2(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.77.4)(terser@5.46.0)(tsx@4.22.4)(yaml@2.8.2))(webpack@5.108.4(esbuild@0.28.1)(lightningcss@1.30.1)(postcss@8.5.28)):
+    dependencies:
+      '@babel/parser': 7.29.7
+      '@babel/traverse': 7.29.7(supports-color@8.1.1)
+      '@babel/types': 7.29.7
+      ast-kit: 2.2.0
+      defu: 6.1.7
+      magic-string: 0.30.21
+      pathe: 2.0.3
+      picomatch: 4.0.7
+      tinyest: 0.3.4
+      tinyest-for-wgsl: 0.4.2(@babel/types@7.29.7)(acorn@8.17.0)
+      typegpu: 0.12.6
+      unplugin: 3.4.0(esbuild@0.28.1)(rolldown@1.2.11)(rollup@4.54.0)(vite@8.3.2(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.77.4)(terser@5.46.0)(tsx@4.22.4)(yaml@2.8.2))(webpack@5.108.4(esbuild@0.28.1)(lightningcss@1.30.1)(postcss@8.5.28))
+    transitivePeerDependencies:
+      - '@farmfe/core'
+      - '@rsbuild/core'
+      - '@rspack/core'
+      - acorn
+      - bun-types-no-globals
+      - esbuild
+      - rolldown
+      - rollup
+      - supports-color
+      - unloader
+      - vite
+      - webpack
+
   unplugin@3.4.0(esbuild@0.25.12)(rolldown@1.2.11)(rollup@4.54.0)(webpack@5.108.4(esbuild@0.25.12)(lightningcss@1.30.1)(postcss@8.5.28)):
     dependencies:
       '@jridgewell/remapping': 2.3.5
@@ -17602,6 +17642,18 @@ snapshots:
       rolldown: 1.2.11
       rollup: 4.54.0
       vite: 8.3.1(@types/node@26.6.3)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.77.4)(terser@5.46.0)(tsx@4.22.4)(yaml@2.8.2)
+      webpack: 5.108.4(esbuild@0.28.1)(lightningcss@1.30.1)(postcss@8.5.28)
+
+  unplugin@3.4.0(esbuild@0.28.1)(rolldown@1.2.11)(rollup@4.54.0)(vite@8.3.2(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.77.4)(terser@5.46.0)(tsx@4.22.4)(yaml@2.8.2))(webpack@5.108.4(esbuild@0.28.1)(lightningcss@1.30.1)(postcss@8.5.28)):
+    dependencies:
+      '@jridgewell/remapping': 2.3.5
+      picomatch: 4.0.7
+      webpack-virtual-modules: 0.6.2
+    optionalDependencies:
+      esbuild: 0.28.1
+      rolldown: 1.2.11
+      rollup: 4.54.0
+      vite: 8.3.2(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.77.4)(terser@5.46.0)(tsx@4.22.4)(yaml@2.8.2)
       webpack: 5.108.4(esbuild@0.28.1)(lightningcss@1.30.1)(postcss@8.5.28)
 
   unrs-resolver@1.11.1:

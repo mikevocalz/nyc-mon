@@ -1,6 +1,6 @@
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { StorybookConfig } from '@storybook/react-vite';
 import react from '@vitejs/plugin-react';
 
@@ -9,7 +9,8 @@ const here = dirname(fileURLToPath(import.meta.url));
 // pnpm installs isolated, so a dependency of @acme/ui is only reachable from
 // @acme/ui itself. Resolve through its manifest instead of guessing a
 // hoisted ../../node_modules path.
-const requireFromUi = createRequire(resolve(here, '../../../packages/ui/package.json'));
+const uiManifest = resolve(here, '../../../packages/ui/package.json');
+const requireFromUi = createRequire(uiManifest);
 // @legendapp/motion's package entry is `export * from './lib/commonjs'`,
 // which the optimizer cannot enumerate, so named exports such as
 // AnimatePresence disappear. Its ESM build exports them statically.
@@ -39,8 +40,20 @@ const config: StorybookConfig = {
     //   '../../../packages/app/features/*/**/*.stories.@(ts|tsx)',
   ],
   viteFinal: async (viteConfig) => {
+    // TypeGPU's 'use gpu' functions are compiled to WGSL by unplugin-typegpu
+    // (Next and Expo run its Babel build). Resolved through @acme/ui, which
+    // owns the GPU foundation.
+    // require.resolve from @acme/ui lands on the CJS build, whose module
+    // namespace nests the plugin factory one `default` deeper than ESM.
+    type PluginFactory = (options?: object) => import('vite').PluginOption;
+    const typegpuModule = (await import(
+      pathToFileURL(requireFromUi.resolve('unplugin-typegpu/vite')).href
+    )) as { default: PluginFactory | { default: PluginFactory } };
+    const typegpu =
+      typeof typegpuModule.default === 'function' ? typegpuModule.default : typegpuModule.default.default;
     viteConfig.plugins = [
       ...(viteConfig.plugins ?? []),
+      typegpu(),
       react(),
     ];
     const existingAlias = viteConfig.resolve?.alias;

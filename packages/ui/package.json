@@ -9,6 +9,8 @@
     "./tw": "./tw.tsx",
     "./primitives": "./primitives/index.tsx",
     "./html": "./html/index.tsx",
+    "./gpu": "./gpu/index.ts",
+    "./neon": "./neon/index.ts",
     "./haptics": {
       "react-native": "./haptics.native.ts",
       "default": "./haptics.web.ts"
@@ -21,7 +23,8 @@
   },
   "scripts": {
     "lint": "eslint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --test '**/*.test.ts'"
   },
   "dependencies": {
     "@acme/theme": "workspace:*",
@@ -48,11 +51,13 @@
     "react-native-reanimated": "catalog:",
     "react-native-safe-area-context": "catalog:",
     "react-native-svg": "catalog:",
+    "react-native-webgpu": "catalog:",
     "solito": "catalog:",
     "sonner": "catalog:",
     "sonner-native": "catalog:",
     "tailwind-merge": "catalog:",
     "tailwind-variants": "catalog:",
+    "typegpu": "catalog:",
     "uniwind": "catalog:",
     "zustand": "catalog:"
   },
@@ -61,12 +66,14 @@
     "@expo/dom-webview": "catalog:",
     "@storybook/react-vite": "catalog:",
     "@types/react": "catalog:",
+    "@webgpu/types": "catalog:",
     "eslint": "catalog:",
     "eslint-config-expo": "catalog:",
     "expo": "catalog:",
     "react": "catalog:",
     "react-native": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "unplugin-typegpu": "catalog:"
   },
   "peerDependencies": {
     "react": "*",
