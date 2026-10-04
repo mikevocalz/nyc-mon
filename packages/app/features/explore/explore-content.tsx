@@ -7,20 +7,43 @@ import { Heading, PressScale, SearchBar, Text, FadeIn, ScaleIn } from '@acme/ui'
 import { WELL, INK } from '../home/home.data';
 import { CATEGORIES, FEATURED, CARDS, useExplore } from './explore.store';
 
-export function ExploreContent() {
-  const { query, category, setQuery, setCategory } = useExplore();
-  const visible = CARDS.filter(
-    (card) =>
-      (category === 'All' || card.category === category) &&
-      (!query || card.title.toLowerCase().includes(query.toLowerCase())),
-  );
+// Explicit palette steps on the night plate: themed tokens resolve for the
+// page's scheme, so on a light page they would come out dark on ink.
+// Measured in packages/theme/contrast.ts ('explore lead on ink plate').
+const LEAD = {
+  page: {
+    heading: undefined,
+    pill: 'border-border bg-surface-raised hover:bg-surface-sunken',
+    pillActive: 'border-primary bg-primary',
+    ink: 'text-text-muted',
+    inkActive: 'text-on-primary',
+  },
+  night: {
+    heading: 'text-orange-500',
+    pill: 'border-ink-400 bg-ink-900 hover:bg-ink-700',
+    pillActive: 'border-orange-950 bg-orange-500',
+    ink: 'text-silver-200',
+    inkActive: 'text-ink-950',
+  },
+} as const;
 
+/**
+ * Title, search and category tabs. `surface="night"` styles it for the ink
+ * plate the web hero lays it on. Default page.
+ */
+export function ExploreLead({ surface = 'page' }: { surface?: 'page' | 'night' }) {
+  const { query, category, setQuery, setCategory } = useExplore();
+  const c = LEAD[surface];
   return (
-    <View className="gap-6 md:gap-10 lg:gap-12">
+    <View className="gap-6">
       <FadeIn>
         <Section className="gap-1">
-          <Heading level={1} size="display-sm">Explore</Heading>
-          <Text tone="muted">Discover templates and resources.</Text>
+          <Heading level={1} size="display-sm" className={c.heading}>Explore</Heading>
+          {surface === 'night' ? (
+            <Text className="text-silver-300">Discover templates and resources.</Text>
+          ) : (
+            <Text tone="muted">Discover templates and resources.</Text>
+          )}
         </Section>
       </FadeIn>
 
@@ -40,13 +63,11 @@ export function ExploreContent() {
                 aria-label={cat.label}
                 onPress={() => setCategory(cat.label)}
                 className={`flex-row items-center gap-1.5 rounded-none border-2 px-4 py-2 transition-colors duration-fast ${
-                  active
-                    ? 'border-primary bg-primary'
-                    : 'border-border bg-surface-raised hover:bg-surface-sunken'
+                  active ? c.pillActive : c.pill
                 }`}
               >
-                <cat.icon size={14} className={active ? 'text-on-primary' : 'text-text-muted'} />
-                <TWText className={`text-sm font-medium ${active ? 'text-on-primary' : 'text-text-muted'}`}>
+                <cat.icon size={14} className={active ? c.inkActive : c.ink} />
+                <TWText className={`text-sm font-medium ${active ? c.inkActive : c.ink}`}>
                   {cat.label}
                 </TWText>
               </Pressable>
@@ -54,67 +75,91 @@ export function ExploreContent() {
           })}
         </ScrollView>
       </FadeIn>
+    </View>
+  );
+}
 
-      {/* Featured rail */}
-      <FadeIn delay={140}>
-        <Section className="gap-3">
-          <Text variant="label" tone="muted">Featured</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="flex-row gap-3 pb-1.5 pr-1.5">
-            {FEATURED.map((item, i) => (
-              <ScaleIn key={item.title} delay={160 + i * 60}>
-                <PressScale
-                  className={`w-48 gap-8 overflow-hidden rounded-none p-5 shadow-card ${item.bg}`}
-                  outerClassName="self-start"
-                >
-                  <View aria-hidden className="absolute -right-6 -top-8 h-24 w-24 rounded-none bg-ink-50/10" />
-                  <item.icon size={26} className={item.fg} />
-                  <View className="gap-0.5">
-                    <TWText className={`text-base font-bold ${item.fg}`}>{item.title}</TWText>
-                    <TWText className={`text-xs ${item.fg}`}>{item.subtitle}</TWText>
-                  </View>
-                </PressScale>
-              </ScaleIn>
-            ))}
-          </ScrollView>
-        </Section>
-      </FadeIn>
-
-      {/* Resource grid */}
+/** The featured rail. */
+export function ExploreFeatured() {
+  return (
+    <FadeIn delay={140}>
       <Section className="gap-3">
-        <Text variant="label" tone="muted">Resources</Text>
-        <View className="flex-row flex-wrap gap-3">
-          {visible.map((card, i) => (
-            <FadeIn key={card.title} delay={200 + i * 50} className="min-w-40 flex-1 basis-[45%]">
+        <Text variant="label" tone="muted">Featured</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="flex-row gap-3 pb-1.5 pr-1.5">
+          {FEATURED.map((item, i) => (
+            <ScaleIn key={item.title} delay={160 + i * 60}>
               <PressScale
-                className="w-full gap-3 rounded-none border-2 border-border bg-surface-raised p-4 shadow-card"
-                outerClassName="w-full"
+                className={`w-48 gap-8 overflow-hidden rounded-none p-5 shadow-card ${item.bg}`}
+                outerClassName="self-start"
               >
-                <View className="flex-row items-start justify-between">
-                  <View className={`h-10 w-10 items-center justify-center rounded-none ${WELL[card.tone]}`}>
-                    <card.icon size={20} className={INK[card.tone]} />
-                  </View>
-                  <View className="rounded-none bg-surface-sunken px-2.5 py-1">
-                    <TWText className="text-xs font-semibold text-text-muted">
-                      {card.tag}
-                    </TWText>
-                  </View>
-                </View>
-                <TWText className="text-base font-semibold text-text">{card.title}</TWText>
-                <View className="flex-row items-center gap-4">
-                  <View className="flex-row items-center gap-1">
-                    <Heart size={13} className="text-text-muted" />
-                    <Text variant="caption" tone="muted">{card.likes}</Text>
-                  </View>
-                  <View className="flex-row items-center gap-1">
-                    <Eye size={13} className="text-text-muted" />
-                    <Text variant="caption" tone="muted">{card.views}</Text>
-                  </View>
+                <View aria-hidden className="absolute -right-6 -top-8 h-24 w-24 rounded-none bg-ink-50/10" />
+                <item.icon size={26} className={item.fg} />
+                <View className="gap-0.5">
+                  <TWText className={`text-base font-bold ${item.fg}`}>{item.title}</TWText>
+                  <TWText className={`text-xs ${item.fg}`}>{item.subtitle}</TWText>
                 </View>
               </PressScale>
-            </FadeIn>
+            </ScaleIn>
           ))}
-        </View>
+        </ScrollView>
       </Section>
+    </FadeIn>
+  );
+}
+
+/** The resource grid, filtered by the search and the category. */
+export function ExploreResources() {
+  const { query, category } = useExplore();
+  const visible = CARDS.filter(
+    (card) =>
+      (category === 'All' || card.category === category) &&
+      (!query || card.title.toLowerCase().includes(query.toLowerCase())),
+  );
+  return (
+    <Section className="gap-3">
+      <Text variant="label" tone="muted">Resources</Text>
+      <View className="flex-row flex-wrap gap-3">
+        {visible.map((card, i) => (
+          <FadeIn key={card.title} delay={200 + i * 50} className="min-w-40 flex-1 basis-[45%]">
+            <PressScale
+              className="w-full gap-3 rounded-none border-2 border-border bg-surface-raised p-4 shadow-card"
+              outerClassName="w-full"
+            >
+              <View className="flex-row items-start justify-between">
+                <View className={`h-10 w-10 items-center justify-center rounded-none ${WELL[card.tone]}`}>
+                  <card.icon size={20} className={INK[card.tone]} />
+                </View>
+                <View className="rounded-none bg-surface-sunken px-2.5 py-1">
+                  <TWText className="text-xs font-semibold text-text-muted">
+                    {card.tag}
+                  </TWText>
+                </View>
+              </View>
+              <TWText className="text-base font-semibold text-text">{card.title}</TWText>
+              <View className="flex-row items-center gap-4">
+                <View className="flex-row items-center gap-1">
+                  <Heart size={13} className="text-text-muted" />
+                  <Text variant="caption" tone="muted">{card.likes}</Text>
+                </View>
+                <View className="flex-row items-center gap-1">
+                  <Eye size={13} className="text-text-muted" />
+                  <Text variant="caption" tone="muted">{card.views}</Text>
+                </View>
+              </View>
+            </PressScale>
+          </FadeIn>
+        ))}
+      </View>
+    </Section>
+  );
+}
+
+export function ExploreContent() {
+  return (
+    <View className="gap-6 md:gap-10 lg:gap-12">
+      <ExploreLead />
+      <ExploreFeatured />
+      <ExploreResources />
     </View>
   );
 }

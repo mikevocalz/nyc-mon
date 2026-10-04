@@ -25,44 +25,74 @@ const STATS = [
   { label: 'Following', value: '184' },
 ];
 
-export function ProfileContent() {
+/**
+ * Avatar, name and handle. `surface="night"` styles it for the ink plate the
+ * web hero lays it on (explicit palette steps: themed tokens follow the
+ * page's scheme). Measured in packages/theme/contrast.ts ('profile identity
+ * on ink plate'). On the page it carries the edit button inline.
+ */
+export function ProfileIdentity({ surface = 'page' }: { surface?: 'page' | 'night' }) {
+  const p = useProfile();
+  const night = surface === 'night';
+  return (
+    <View className="flex-row flex-wrap items-center gap-5">
+      <ScaleIn delay={60}>
+        <Avatar name={p.name} imageUri={AVATAR_URI} size="xl" />
+      </ScaleIn>
+      <View className="min-w-40 flex-1 gap-1">
+        {night ? (
+          <>
+            <Text variant="label" className="text-silver-300">Account</Text>
+            <Heading level={1} size="display-sm" className="text-orange-500">{p.name}</Heading>
+            <Text className="text-silver-200">{p.handle}</Text>
+          </>
+        ) : (
+          <>
+            <Text variant="label" tone="muted">Account</Text>
+            <Heading level={1} size="display-sm">{p.name}</Heading>
+            <Text tone="muted">{p.handle}</Text>
+          </>
+        )}
+      </View>
+      {night ? null : <EditProfileButton />}
+    </View>
+  );
+}
+
+function EditProfileButton() {
+  return <Button title="Edit profile" variant="outline" size="sm" onPress={() => {}} />;
+}
+
+/** Tags and stats. `showEdit` adds the edit button for layouts where the identity sits elsewhere. */
+export function ProfileOverview({ showEdit = false }: { showEdit?: boolean }) {
+  return (
+    <View className="gap-4">
+      <View className="flex-row flex-wrap items-center gap-2">
+        {TAGS.map((tag) => (
+          <View key={tag} className="rounded-none border-2 border-border bg-primary/20 px-3 py-1">
+            <Text variant="caption" className="font-semibold text-text">{tag}</Text>
+          </View>
+        ))}
+        {showEdit ? <View className="ml-auto"><EditProfileButton /></View> : null}
+      </View>
+      <View className="flex-row overflow-hidden rounded-none border-2 border-border bg-surface-raised shadow-card">
+        {STATS.map((stat, i) => (
+          <View key={stat.label} className={`flex-1 items-center gap-0.5 py-4 ${i > 0 ? 'border-l-2 border-border' : ''}`}>
+            <Text variant="heading">{stat.value}</Text>
+            <Text variant="caption" tone="muted">{stat.label}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+/** The account fields and the way into settings. */
+export function ProfileDetails() {
   const p = useProfile();
   const router = useRouter();
-
   return (
     <View className="gap-6 md:gap-10 lg:gap-12">
-      {/* Identity */}
-      <FadeIn>
-        <Section className="gap-4">
-          <View className="flex-row flex-wrap items-center gap-5">
-            <ScaleIn delay={60}>
-              <Avatar name={p.name} imageUri={AVATAR_URI} size="xl" />
-            </ScaleIn>
-            <View className="min-w-40 flex-1 gap-1">
-              <Text variant="label" tone="muted">Account</Text>
-              <Heading level={1} size="display-sm">{p.name}</Heading>
-              <Text tone="muted">{p.handle}</Text>
-            </View>
-            <Button title="Edit profile" variant="outline" size="sm" onPress={() => {}} />
-          </View>
-          <View className="flex-row flex-wrap gap-2">
-            {TAGS.map((tag) => (
-              <View key={tag} className="rounded-none border-2 border-border bg-primary/20 px-3 py-1">
-                <Text variant="caption" className="font-semibold text-text">{tag}</Text>
-              </View>
-            ))}
-          </View>
-          <View className="flex-row overflow-hidden rounded-none border-2 border-border bg-surface-raised shadow-card">
-            {STATS.map((stat, i) => (
-              <View key={stat.label} className={`flex-1 items-center gap-0.5 py-4 ${i > 0 ? 'border-l-2 border-border' : ''}`}>
-                <Text variant="heading">{stat.value}</Text>
-                <Text variant="caption" tone="muted">{stat.label}</Text>
-              </View>
-            ))}
-          </View>
-        </Section>
-      </FadeIn>
-
       {/* Account */}
       <FadeIn delay={80}>
         <Card className="gap-4">
@@ -93,9 +123,20 @@ export function ProfileContent() {
           <ChevronRight size={18} className="text-text-muted" />
         </PressScale>
       </FadeIn>
+    </View>
+  );
+}
 
-
-
+export function ProfileContent() {
+  return (
+    <View className="gap-6 md:gap-10 lg:gap-12">
+      <FadeIn>
+        <Section className="gap-4">
+          <ProfileIdentity />
+          <ProfileOverview />
+        </Section>
+      </FadeIn>
+      <ProfileDetails />
     </View>
   );
 }

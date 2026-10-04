@@ -54,7 +54,7 @@ export function SiteNavBar() {
   );
 }
 
-/** The kit SiteFooter with this site's page columns and the badge. */
+/** The kit SiteFooter with this site's page columns, the badge and Harlem's East River along the top. */
 export function SiteFooterBar() {
   const pathname = usePathname() ?? '/';
   if (!showsSiteChrome(pathname)) return null;
@@ -63,7 +63,8 @@ export function SiteFooterBar() {
     <SiteFooter
       variant="columns"
       mark="badge"
-      district="midtown"
+      district="harlem"
+      scene="river-tide"
       description={FOOTER_DESCRIPTION}
       linkGroups={FOOTER_GROUPS}
       renderLink={footerLink}
