@@ -15,7 +15,7 @@ const meta = {
   title: 'Elements/Timeline',
   component: Timeline,
   args: {
-    items: LINE, district: 'midtown', variant: 'default', lineStyle: 'solid', dotStyle: 'circle', dotAnim: 'ping',
+    items: LINE, district: 'midtown', variant: 'default', lineStyle: 'solid', dotStyle: 'square', dotAnim: 'ping',
     align: 'left', animate: true, accessibilityLabel: 'Route progress',
   },
   argTypes: {
@@ -50,7 +50,7 @@ export const Districts: Story = {
           items={LINE.slice(0, 4)}
           variant={district === 'downtown' ? 'minimal' : district === 'harlem' ? 'stepped' : district === 'megacity' ? 'glow' : 'default'}
           lineStyle={district === 'megacity' ? 'dashed' : 'solid'}
-          dotStyle={district === 'harlem' ? 'square' : 'circle'}
+          dotStyle={district === 'harlem' ? 'diamond' : 'square'}
           dotAnim="pulse"
         />
       )}

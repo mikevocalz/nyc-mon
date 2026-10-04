@@ -4,6 +4,7 @@ import { haptics } from './haptics';
 import { PressScale } from './press-scale';
 import { View } from './tw';
 import { CornerCutFrame } from './neon/CornerCutFrame';
+import { ROUND_RADIUS } from './neon/corner-cut';
 import type { CutCorner } from './neon/corner-cut';
 import { TONE_CLASSES, type ControlTone, type District } from './district';
 import { DISABLED_FRAME_TONE, controlLook, frameTone, type IconButtonVariant } from './control-look';
@@ -45,6 +46,8 @@ const CUT_FACE = {
 } as const;
 
 export interface IconButtonProps {
+  /** Opt-in rounded corners (rounded-soft) in place of the neon corner cut. Default false: square, cut. */
+  rounded?: boolean;
   icon: React.ReactNode;
   'aria-label': string;
   onPress?: () => void;
@@ -66,7 +69,7 @@ export interface IconButtonProps {
 }
 
 export function IconButton({
-  icon, onPress, variant, size = 'md', disabled, className, tone: toneProp, district, corner = 'bottom-right', ...a11y
+  icon, onPress, variant, size = 'md', disabled, className, tone: toneProp, district, corner = 'bottom-right', rounded = false, ...a11y
 }: IconButtonProps) {
   const { look, tone } = controlLook(variant, toneProp, district);
   const s = iconButton({ look, size, disabled });
@@ -79,7 +82,7 @@ export function IconButton({
       accessibilityState={{ disabled: !!disabled }}
       // The root carries the icon colour (currentColor) for icons that set none;
       // a caller's own icon class (text-text-muted in nav bars) still wins.
-      className={s.root({ className: `${iconColor} ${className ?? ''}` })}
+      className={s.root({ className: `${iconColor} ${rounded ? 'rounded-soft' : ''} ${className ?? ''}` })}
       outerClassName="self-start"
       {...a11y}
     >
@@ -90,6 +93,7 @@ export function IconButton({
         </>
       ) : (
         <CornerCutFrame
+          radius={rounded ? ROUND_RADIUS : 0}
           tone={disabled ? DISABLED_FRAME_TONE : frameTone(look, tone)}
           variant={disabled || look === 'outline' ? 'outline' : 'solid'}
           corner={corner}

@@ -7,6 +7,7 @@ import { NIGHT_SCHEME, NightScope } from './NightScope';
 import { CARD_DEPTH, splitCardClasses } from './surface-look';
 import { View } from './tw';
 import { CornerCutFrame } from './neon/CornerCutFrame';
+import { ROUND_RADIUS } from './neon/corner-cut';
 import type { CutCorner } from './neon/corner-cut';
 import { NotchFrame } from './cards/NotchFrame';
 import { BeamFrame, type BeamVariant } from './cards/BeamFrame';
@@ -65,6 +66,8 @@ function toneVariantsList(
 export type CardVariant = 'default' | 'notch' | 'cornerCut' | 'beam';
 
 export interface CardProps extends React.ComponentProps<typeof Article> {
+  /** Opt-in rounded corners (rounded-soft) for the corner-cut card. Default false: square, cut. Notch and beam keep their shape. */
+  rounded?: boolean;
   /**
    * cornerCut (the default) is the night facade in a tone ring; notch is a
    * solid tone face; beam carries a travelling light. `default` is an alias
@@ -123,7 +126,7 @@ function NeonCard({
   variant, tone: toneProp, district, size = 'md', icon, title, description, titleLevel = 3, glow,
   notchSides, notchSize, notchWidth, notchWidthV, notchSkew,
   corner = 'bottom-right', cornerSize = 20, beamVariant = 'single', beamToneB, duration = 4, durationB = 6,
-  className, children, elevation = 'card', padded = true, ...articleProps
+  className, children, elevation = 'card', padded = true, rounded = false, ...articleProps
 }: CardProps & { variant: Exclude<CardVariant, 'default'> }) {
   const { outer, inner } = splitCardClasses(className);
   const depth = CARD_DEPTH[elevation];
@@ -180,6 +183,7 @@ function NeonCard({
         borderWidth={4}
         depth={depth}
         glow={glow ? 'low' : false}
+        radius={rounded ? ROUND_RADIUS : 0}
         className={faceClass}
       >
         {body}

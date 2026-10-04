@@ -31,40 +31,38 @@ export interface StatCardProps {
   district?: District;
   /** Top right. */
   icon?: ReactNode;
-  /** Card fill: any CSS colour (NeonBlade's `background`). Default the night panel. */
+  /** Face fill: any CSS colour (NeonBlade's `background`). Default the night face. */
   background?: string;
-  /** Accent glow around the card and under the sparkline. Default none. */
+  /** Accent glow around the card and under the sparkline. Default low. */
   glowIntensity?: GlowLevel;
   className?: string;
+  /** Opt-in rounded corners in place of the corner cut. Default false. */
+  rounded?: boolean;
 }
 
 const PRESET: Record<'cyan' | 'pink' | 'green', ChartTone> = { cyan: 'carolina', pink: 'apple', green: 'leaf' };
 
+// The card itself is the kit's corner-cut Card (night face, tone ring, depth
+// plate). These slots only lay out what sits on its face.
 const stat = tv({
   slots: {
-    root: 'relative gap-3 border-2 border-ink-800 bg-ink-900',
-    band: 'absolute inset-x-0 top-0 h-1.5',
-    head: 'flex-row items-start justify-between gap-3 pt-1',
-    label: 'text-silver-300',
+    band: 'absolute left-0 right-0 top-0 h-1.5',
+    bracket: 'absolute left-0 top-0 h-4 w-4 border-l-4 border-t-4',
+    head: 'flex-row items-start justify-between gap-3 pt-2',
+    label: 'font-display text-xs tracking-wide text-silver-300',
     valueRow: 'flex-row items-baseline gap-1.5',
     value: 'font-display text-4xl text-white md:text-5xl',
     unit: 'font-display text-lg text-silver-300',
     change: 'flex-row items-center gap-2',
-    changeLabel: 'text-xs text-silver-500',
+    changeLabel: 'text-xs text-silver-400',
   },
   variants: {
-    glow: {
-      none: {},
-      low: { root: 'shadow-glow-royal' },
-      medium: { root: 'shadow-glow-royal' },
-      high: { root: 'shadow-glow-orange' },
-    },
     tone: {
-      orange: { band: 'bg-orange-500' },
-      royal: { band: 'bg-royal-500' },
-      carolina: { band: 'bg-carolina-500' },
-      leaf: { band: 'bg-leaf-500' },
-      apple: { band: 'bg-apple-500' },
+      orange: { band: 'bg-orange-500', bracket: 'border-orange-300' },
+      royal: { band: 'bg-royal-500', bracket: 'border-royal-300' },
+      carolina: { band: 'bg-carolina-500', bracket: 'border-carolina-300' },
+      leaf: { band: 'bg-leaf-500', bracket: 'border-leaf-300' },
+      apple: { band: 'bg-apple-500', bracket: 'border-apple-300' },
     },
   },
 });
@@ -74,31 +72,42 @@ const TREND_WORD: Record<StatTrend, string> = { up: 'up', down: 'down', neutral:
 const TREND_CLASS: Record<StatTrend, string> = { up: 'text-leaf-400', down: 'text-apple-400', neutral: 'text-silver-400' };
 
 /**
- * NeonBlade's StatCard on the kit Card: a solid tone band across the top
- * (the scoreboard strip), the number in the jersey face, the change in leaf
- * or apple, and a sparkline along the bottom edge.
+ * NeonBlade's StatCard as a neon card: the kit's corner-cut Card in the
+ * district tone (night face, heavy tone ring, depth plate, the cut at the
+ * bottom right), a solid tone accent bar across the top with a cornice
+ * bracket in the opposite corner, the number in the jersey face, the change
+ * in leaf or apple, and the sparkline along the bottom. Glow is an accent:
+ * low by default, `glowIntensity="none"` drops it.
  */
 export function StatCard({
   value, label, unit, trend, change, changeLabel, sparkData, color, district = 'midtown', icon,
-  background, glowIntensity = 'none', className,
+  background, glowIntensity = 'low', className, rounded = false,
 }: StatCardProps) {
   const tone: ChartTone = color ? (color in PRESET ? PRESET[color as keyof typeof PRESET] : (color as ChartTone)) : districtTone(district);
-  const s = stat({ tone, glow: glowIntensity });
+  const s = stat({ tone });
   const spoken = [label, `${value}${unit ? ` ${unit}` : ''}`, change ? `${trend ? `${TREND_WORD[trend]} ` : ''}${change}` : null, changeLabel]
     .filter(Boolean)
     .join(', ');
 
   return (
     <Card
-      elevation="flat"
-      className={s.root({ className })}
+      variant="cornerCut"
+      tone={tone}
+      size="md"
+      cornerSize={18}
+      glow={glowIntensity !== 'none'}
+      rounded={rounded}
+      className={className}
       aria-label={spoken}
-      // Runtime colour: `background` takes any CSS colour, which no class can name.
-      style={background ? { backgroundColor: background } : undefined}
     >
       <View aria-hidden className={s.band()} />
+      <View aria-hidden className={s.bracket()} />
+      {background ? (
+        // Runtime colour: `background` takes any CSS colour (NeonBlade's prop), which no class can name.
+        <View aria-hidden className="absolute inset-0 -z-10" style={{ backgroundColor: background }} />
+      ) : null}
       <View className={s.head()}>
-        <Text variant="label" className={s.label()}>{label}</Text>
+        <Text className={s.label()}>{label}</Text>
         {icon ? <View aria-hidden>{icon}</View> : null}
       </View>
       <View className={s.valueRow()}>
@@ -107,7 +116,7 @@ export function StatCard({
       </View>
       {change ? (
         <View className={s.change()}>
-          <Text className={`text-sm font-semibold ${TREND_CLASS[trend ?? 'neutral']}`}>
+          <Text className={`font-display text-sm ${TREND_CLASS[trend ?? 'neutral']}`}>
             {`${ARROWS[trend ?? 'neutral']} ${change}`}
           </Text>
           {changeLabel ? <Text className={s.changeLabel()}>{changeLabel}</Text> : null}

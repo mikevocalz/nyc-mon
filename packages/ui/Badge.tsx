@@ -56,8 +56,10 @@ export interface BadgeProps {
   fill?: BadgeNeonFill;
   /** Default sm. */
   size?: 'xs' | 'sm' | 'md';
-  /** Default pill. */
+  /** Default rectangle (square chip). `pill`, or `rounded`, rounds it. */
   shape?: 'pill' | 'rectangle';
+  /** Opt-in rounding: the same as shape="pill". */
+  rounded?: boolean;
   /** A status light before the label. Default none. */
   dot?: BadgeDot;
   /** Accent glow. Default false. */
@@ -72,7 +74,8 @@ export function Badge({
   color,
   fill: fillProp,
   size = 'sm',
-  shape = 'pill',
+  shape: shapeProp,
+  rounded = false,
   dot = 'none',
   glow = false,
 }: BadgeProps) {
@@ -82,6 +85,7 @@ export function Badge({
   const pick = color ?? (legacy && legacy.tone !== 'district' ? legacy.tone : undefined);
   const toneName = resolveTone(district, pick);
   const t = TONE_CLASSES[toneName];
+  const shape = rounded ? 'pill' : (shapeProp ?? 'rectangle');
   const s = neon({ size, shape });
   const face =
     fill === 'solid'

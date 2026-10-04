@@ -31,6 +31,8 @@ const neonCheckbox = tv({
 });
 
 export interface NeonCheckboxProps {
+  /** Opt-in rounded corners (rounded-soft). Default false: square. */
+  rounded?: boolean;
   checked: boolean;
   onChange: (next: boolean) => void;
   label: string;
@@ -49,7 +51,7 @@ export interface NeonCheckboxProps {
  * `variant="neon"`; the pressable is a real <button role="checkbox"> on web
  * and a Pressable with the checkbox role on native.
  */
-export function NeonCheckbox({ checked, onChange, label, disabled, className, tone, district, error }: NeonCheckboxProps) {
+export function NeonCheckbox({ checked, onChange, label, disabled, className, tone, district, error, rounded = false }: NeonCheckboxProps) {
   const s = neonCheckbox({ checked, disabled, tone: resolveControlTone(tone, district) });
   const box = (
     <Pressable
@@ -64,7 +66,7 @@ export function NeonCheckbox({ checked, onChange, label, disabled, className, to
     >
       <View aria-hidden className={s.wrap()}>
         <View className={s.plate()} />
-        <View className={s.box()}>
+        <View className={s.box({ className: rounded ? 'rounded-[4px]' : '' })}>
           {checked ? <TWText className={s.check()}>✓</TWText> : null}
         </View>
       </View>

@@ -46,14 +46,16 @@ export interface AvatarProps {
   district?: District;
   /** Bracket and initials colour; overrides the district. */
   tone?: ControlTone;
+  /** Opt-in rounded corners (rounded-soft). Default false: square. */
+  rounded?: boolean;
 }
 
-export function Avatar({ name, imageUri, size = 'md', className, district, tone }: AvatarProps) {
+export function Avatar({ name, imageUri, size = 'md', className, district, tone, rounded = false }: AvatarProps) {
   const t = TONE_CLASSES[resolveControlTone(tone, district)];
   const s = avatar({ size });
   const corners = size === 'lg' || size === 'xl' ? CORNERS.thick : CORNERS.thin;
   return (
-    <View role="img" aria-label={name} className={s.root({ className })}>
+    <View role="img" aria-label={name} className={s.root({ className: `${rounded ? 'rounded-soft' : ''} ${className ?? ''}` })}>
       <View className={s.face()}>
         {imageUri ? (
           <SolitoImage src={imageUri} alt="" fill unoptimized contentFit="cover" sizes="96px" />

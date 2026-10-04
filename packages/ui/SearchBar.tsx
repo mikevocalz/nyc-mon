@@ -40,6 +40,8 @@ const searchBar = tv({
 });
 
 export interface SearchBarProps {
+  /** Opt-in rounded corners (rounded-soft). Default false: square. */
+  rounded?: boolean;
   value: string;
   onChangeText: (text: string) => void;
   placeholder?: string;
@@ -61,7 +63,7 @@ export interface SearchBarProps {
 }
 
 export function SearchBar({
-  value, onChangeText, placeholder, onSubmit, debounceMs, className, onFocus, onBlur, tone, district,
+  rounded = false, value, onChangeText, placeholder, onSubmit, debounceMs, className, onFocus, onBlur, tone, district,
   'aria-label': ariaLabel = 'Search',
 }: SearchBarProps) {
   const resolved = resolveControlTone(tone, district);
@@ -101,7 +103,7 @@ export function SearchBar({
 
   return (
     // RNW renders role="search" as a search landmark; RN's Role type lags behind, hence the cast.
-    <View role={'search' as never} className={s.root({ className })}>
+    <View role={'search' as never} className={s.root({ className: `${rounded ? 'rounded-soft overflow-hidden' : ''} ${className ?? ''}` })}>
       <View aria-hidden className={s.tile()}>
         <View className="relative">
           <View className={s.ring()} />

@@ -37,6 +37,8 @@ const ON_X = 26;
 const OFF_X = 2;
 
 export interface NeonSwitchProps {
+  /** Opt-in rounded corners (rounded-soft). Default false: square. */
+  rounded?: boolean;
   value: boolean;
   onChange: (next: boolean) => void;
   label: string;
@@ -52,7 +54,7 @@ export interface NeonSwitchProps {
  * 4 CSS transition on the thumb; reduced motion makes it instant. Shared by
  * the web and native Switch forks for `variant="neon"`.
  */
-export function NeonSwitch({ value, onChange, label, disabled, className, tone, district }: NeonSwitchProps) {
+export function NeonSwitch({ value, onChange, label, disabled, className, tone, district, rounded = false }: NeonSwitchProps) {
   const reduced = useReducedMotion();
   const s = neonSwitch({ value, disabled, tone: resolveControlTone(tone, district) });
   return (
@@ -70,7 +72,7 @@ export function NeonSwitch({ value, onChange, label, disabled, className, tone, 
           haptics.selection();
           onChange(!value);
         }}
-        className={s.track()}
+        className={s.track({ className: rounded ? 'rounded-soft' : '' })}
       >
         <Animated.View
           // Animated style: the thumb offset is a Reanimated CSS transition, which a class cannot drive.

@@ -46,10 +46,12 @@ export interface SelectProps extends React.ComponentProps<typeof PrimitiveSelect
   tone?: ControlTone;
   /** Theme by neighbourhood. Default Midtown (orange). */
   district?: District;
+  /** Opt-in rounded corners (rounded-soft). Default false: square. */
+  rounded?: boolean;
 }
 
 export function Select({
-  label, hint, error, disabled, className, containerClassName, variant: _variant, tone, district, options, children, ...selectProps
+  label, hint, error, disabled, className, rounded = false, containerClassName, variant: _variant, tone, district, options, children, ...selectProps
 }: SelectProps) {
   const toneName = resolveControlTone(tone, district);
   const s = field({ error: !!error, disabled, tone: toneName });
@@ -63,7 +65,7 @@ export function Select({
         <PrimitiveSelect
           aria-label={label}
           disabled={disabled}
-          className={s.select({ className })}
+          className={s.select({ className: `${rounded ? 'rounded-soft' : ''} ${className ?? ''}` })}
           {...selectProps}
         >
           {options?.map((o) => (

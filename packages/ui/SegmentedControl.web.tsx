@@ -29,11 +29,11 @@ const segmented = tv({
 });
 
 export function SegmentedControl<T extends string>({
-  options, value, onChange, className, tone, district,
+  options, value, onChange, className, tone, district, rounded = false,
 }: SegmentedControlProps<T>) {
   const resolved = resolveControlTone(tone, district);
   return (
-    <View role="tablist" className={segmented({ tone: resolved }).root({ className })}>
+    <View role="tablist" className={segmented({ tone: resolved }).root({ className: `${rounded ? 'rounded-soft' : ''} overflow-hidden ${className ?? ''}` })}>
       {options.map((option) => {
         const active = option.value === value;
         const s = segmented({ tone: resolved, active });

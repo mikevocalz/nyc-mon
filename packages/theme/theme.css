@@ -264,6 +264,16 @@
    fill or theme it. Stylesheet !important beats the inline styles. */
 [data-vaul-drawer] {
   background-color: var(--color-surface-raised) !important;
+  /* Square like the rest of NYC-MON; vaul rounds its top corners inline. */
+  border-radius: 0 !important;
+}
+[data-vaul-handle],
+[data-expo-ui-bottom-sheet],
+[data-expo-ui-bottom-sheet-panel],
+[data-expo-ui-bottom-sheet-handle],
+[data-expo-ui-bottom-sheet-panel] > *,
+[data-expo-ui-bottom-sheet-panel] > * > * {
+  border-radius: 0 !important;
 }
 [data-vaul-drawer] > div:last-child {
   flex: 1;

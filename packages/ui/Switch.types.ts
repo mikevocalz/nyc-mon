@@ -16,4 +16,6 @@ export interface SwitchProps {
   tone?: ControlTone;
   /** Theme by neighbourhood. Default Midtown (orange). */
   district?: District;
+  /** Opt-in rounded corners (rounded-soft). Default false: square. */
+  rounded?: boolean;
 }

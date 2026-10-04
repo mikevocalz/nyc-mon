@@ -26,6 +26,8 @@ const field = tv({
 export type { PasteEventPayload };
 
 export interface TextFieldProps extends React.ComponentProps<typeof Input> {
+  /** Opt-in rounded corners (rounded-soft). Default false: square. */
+  rounded?: boolean;
   label: string;
   hint?: string;
   error?: string;
@@ -42,7 +44,7 @@ export interface TextFieldProps extends React.ComponentProps<typeof Input> {
 }
 
 export function TextField({
-  label, hint, error, disabled, className, containerClassName, variant: _variant, tone, district, onPaste, ...inputProps
+  rounded = false, label, hint, error, disabled, className, containerClassName, variant: _variant, tone, district, onPaste, ...inputProps
 }: TextFieldProps) {
   const s = field({ error: !!error, disabled, tone: resolveControlTone(tone, district) });
   const input = (
@@ -51,7 +53,7 @@ export function TextField({
       aria-invalid={!!error}
       editable={!disabled}
       placeholderTextColor={undefined}
-      className={s.input({ className: onPaste ? `pr-12 ${className ?? ''}` : className })}
+      className={s.input({ className: `${rounded ? 'rounded-soft' : ''} ${onPaste ? 'pr-12' : ''} ${className ?? ''}` })}
       {...inputProps}
     />
   );

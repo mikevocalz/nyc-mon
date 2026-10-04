@@ -26,10 +26,15 @@ export function CornerCutFrame({
   borderWidth = 2,
   depth = 4,
   glow = false,
+  radius = 0,
 }: CornerCutFrameProps) {
   const colors = frameColors(tone, variant);
-  const outer = cornerCutClipPath(cut, corner);
-  const inner = cornerCutClipPath(insetCut(cut, borderWidth), corner);
+  // Opt-in rounding swaps the clip polygon for a border radius on each layer.
+  const round = radius > 0;
+  const outer = round ? undefined : cornerCutClipPath(cut, corner);
+  const inner = round ? undefined : cornerCutClipPath(insetCut(cut, borderWidth), corner);
+  const outerRadius = round ? radius : undefined;
+  const innerRadius = round ? Math.max(0, radius - borderWidth) : undefined;
   const glowRadius = glow === false ? 0 : glow === true ? GLOW_INTENSITY.medium : GLOW_INTENSITY[glow];
 
   return (
@@ -40,17 +45,17 @@ export function CornerCutFrame({
           aria-hidden
           className="pointer-events-none absolute inset-0"
           // Computed: depth offset and tone colour from props, clip polygon from cut.
-          style={{ transform: [{ translateX: depth }, { translateY: depth }], backgroundColor: colors.depth, clipPath: outer } as object}
+          style={{ transform: [{ translateX: depth }, { translateY: depth }], backgroundColor: colors.depth, clipPath: outer, borderRadius: outerRadius } as object}
         />
       ) : null}
       <View
         // Computed: border width, tone colour and clip polygon from props.
-        style={{ padding: borderWidth, backgroundColor: colors.border, clipPath: outer } as object}
+        style={{ padding: borderWidth, backgroundColor: colors.border, clipPath: outer, borderRadius: outerRadius } as object}
       >
         <View
           className={className}
           // Computed: tone colour and inset clip polygon from props.
-          style={{ backgroundColor: colors.fill, clipPath: inner } as object}
+          style={{ backgroundColor: colors.fill, clipPath: inner, borderRadius: innerRadius } as object}
         >
           {children}
         </View>

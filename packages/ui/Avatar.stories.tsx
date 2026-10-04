@@ -55,3 +55,14 @@ export const Districts: Story = {
     </View>
   ),
 };
+
+/** Rounding is opt-in. */
+export const Rounded: Story = {
+  args: { name: 'Maya Rodriguez' },
+  render: () => (
+    <View className="flex-row gap-4 bg-ink-950 p-6">
+      <Avatar name="Maya Rodriguez" size="lg" />
+      <Avatar name="Maya Rodriguez" size="lg" rounded />
+    </View>
+  ),
+};

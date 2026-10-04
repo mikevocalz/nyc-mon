@@ -30,6 +30,7 @@ export function CornerCutFrame({
   borderWidth = 2,
   depth = 4,
   glow = false,
+  radius = 0,
 }: CornerCutFrameProps) {
   const { size, onLayout } = useLayoutSize();
   const { width, height } = size;
@@ -37,6 +38,17 @@ export function CornerCutFrame({
   const glowRadius = glow === false ? 0 : glow === true ? GLOW_INTENSITY.medium : GLOW_INTENSITY[glow];
 
   const paths = useMemo(() => {
+    if (radius > 0) {
+      // Opt-in rounding: rounded rectangles in place of the cut polygon.
+      const rr = (x: number, y: number, w: number, h: number, r: number) =>
+        Skia.PathBuilder.Make().addRRect(Skia.RRectXY(Skia.XYWHRect(x, y, w, h), r, r)).build();
+      const inner = Math.max(0, radius - borderWidth);
+      return {
+        outer: rr(0, 0, width, height, radius),
+        depth: rr(depth, depth, width, height, radius),
+        inner: rr(borderWidth, borderWidth, width - borderWidth * 2, height - borderWidth * 2, inner),
+      };
+    }
     const outer = cornerCutPolygon(width, height, cut, corner);
     const innerCut = insetCut(cut, borderWidth);
     const inner = cornerCutPolygon(width - borderWidth * 2, height - borderWidth * 2, innerCut, corner);
@@ -45,7 +57,7 @@ export function CornerCutFrame({
       depth: polygonPath(outer, depth, depth),
       inner: polygonPath(inner, borderWidth, borderWidth),
     };
-  }, [width, height, cut, corner, borderWidth, depth]);
+  }, [width, height, cut, corner, borderWidth, depth, radius]);
 
   return (
     <View className="relative" onLayout={onLayout}>

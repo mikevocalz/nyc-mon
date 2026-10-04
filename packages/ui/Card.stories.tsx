@@ -118,3 +118,13 @@ export const Beam: Story = {
   argTypes: neonArgTypes,
   decorators: [night],
 };
+
+/** Rounding is opt-in: `rounded` swaps the corner cut for rounded-soft corners. */
+export const Rounded: Story = {
+  render: () => (
+    <View className="gap-4 bg-ink-950 p-6 md:flex-row">
+      <Card title="Square (default)" description="The corner-cut frame." className="md:flex-1" />
+      <Card title="Rounded" description="rounded, opt-in." rounded className="md:flex-1" />
+    </View>
+  ),
+};

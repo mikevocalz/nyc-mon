@@ -45,7 +45,7 @@ export interface TimelineProps {
   variant?: TimelineVariant;
   /** solid, dashed (planned service), glow, none. Default solid. */
   lineStyle?: TimelineLineStyle;
-  /** Default circle, the subway map's stop. */
+  /** Default square, a solid station block. circle (the subway map's round stop) is opt-in. */
   dotStyle?: TimelineDotStyle;
   /** Motion on the current stop. Default none. */
   dotAnim?: TimelineDotAnim;
@@ -98,7 +98,7 @@ export function Timeline({
   color,
   variant = 'default',
   lineStyle = 'solid',
-  dotStyle = 'circle',
+  dotStyle = 'square',
   dotAnim = 'none',
   align = 'left',
   animate = false,
@@ -112,7 +112,7 @@ export function Timeline({
   const s = line({ variant });
   const states = stationStates(items);
   const glowRoute = variant === 'glow' || lineStyle === 'glow';
-  const shape = dotStyle === 'circle' ? 'rounded-full' : dotStyle === 'square' ? 'rounded-xs' : 'rounded-xs rotate-45';
+  const shape = dotStyle === 'circle' ? 'rounded-full' : dotStyle === 'square' ? 'rounded-none' : 'rounded-none rotate-45';
 
   const track = (served: boolean, position: 'above' | 'below') => {
     if (lineStyle === 'none') return null;

@@ -151,12 +151,6 @@ export const Typography: Story = {
 export const Spacing: Story = {
   render: () => (
     <View className="gap-3 p-6 bg-surface">
-      {Object.entries(radius).map(([name, value]) => (
-        <View key={name} className="flex-row items-center gap-3">
-          <View className="h-10 w-20 bg-primary" style={{ borderRadius: value as never }} />
-          <Text className="text-sm text-text-muted">radius-{name}: {value}</Text>
-        </View>
-      ))}
       {Object.entries(motion.duration).map(([name, value]) => (
         <Text key={name} className="text-sm text-text-muted">duration-{name}: {value}</Text>
       ))}
@@ -213,6 +207,21 @@ export const ToneTable: Story = {
           </View>
         );
       })}
+    </View>
+  ),
+};
+
+/** The radius tokens. Every step is 0 (square); `soft` is the opt-in rounding behind each component's `rounded` prop. */
+export const RoundedTokens: Story = {
+  name: 'Radius (opt-in rounded)',
+  render: () => (
+    <View className="gap-3 p-6 bg-surface">
+      {Object.entries(radius).map(([name, value]) => (
+        <View key={name} className="flex-row items-center gap-3">
+          <View className="h-10 w-20 bg-primary" style={{ borderRadius: value as never }} />
+          <Text className="text-sm text-text-muted">radius-{name}: {value}</Text>
+        </View>
+      ))}
     </View>
   ),
 };

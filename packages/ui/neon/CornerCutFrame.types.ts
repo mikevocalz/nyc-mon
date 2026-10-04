@@ -30,4 +30,9 @@ export interface CornerCutFrameProps {
   depth?: number;
   /** Accent glow around the cut shape. Off by default. */
   glow?: boolean | GlowIntensity;
+  /**
+   * Opt-in rounding: a corner radius in px. When set (> 0) the frame draws a
+   * rounded rectangle instead of the corner cut. Default 0: the neon cut.
+   */
+  radius?: number;
 }

@@ -5,6 +5,7 @@ import { PressScale } from './press-scale';
 import { Text, View } from './tw';
 import { haptics } from './haptics';
 import { CornerCutFrame } from './neon/CornerCutFrame';
+import { ROUND_RADIUS } from './neon/corner-cut';
 import type { CutCorner } from './neon/corner-cut';
 import type { GlowIntensity } from './neon/glow';
 import { TONE_CLASSES, toneHex, type ControlTone, type District } from './district';
@@ -71,6 +72,8 @@ function labelTone(look: ControlLook, tone: ControlTone) {
 }
 
 export interface ButtonProps {
+  /** Opt-in rounded corners (rounded-soft) in place of the neon corner cut. Default false: square, cut. */
+  rounded?: boolean;
   title: string;
   /**
    * Default (no variant, `cornerCut` or `neon`): the solid corner-cut face.
@@ -98,7 +101,7 @@ export interface ButtonProps {
 
 export function Button({
   title, onPress, variant, size = 'md', disabled, fullWidth, loading, className,
-  tone: toneProp, district, corner = 'bottom-right', glow = false, ...a11y
+  tone: toneProp, district, corner = 'bottom-right', glow = false, rounded = false, ...a11y
 }: ButtonProps) {
   const { look, tone } = controlLook(variant, toneProp, district);
   const off = !!(disabled || loading);
@@ -118,7 +121,7 @@ export function Button({
       onPress={off ? undefined : () => { haptics.tap(); onPress?.(); }}
       aria-disabled={off}
       accessibilityState={{ disabled: off }}
-      className={s.root({ className })}
+      className={s.root({ className: `${rounded ? 'rounded-soft' : ''} ${className ?? ''}` })}
       outerClassName={fullWidth ? 'w-full' : outerLayout(className)}
       {...a11y}
     >
@@ -129,6 +132,7 @@ export function Button({
         </>
       ) : (
         <CornerCutFrame
+          radius={rounded ? ROUND_RADIUS : 0}
           tone={off ? DISABLED_FRAME_TONE : frameTone(look, tone)}
           variant={off || look === 'outline' ? 'outline' : 'solid'}
           corner={corner}

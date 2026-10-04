@@ -106,3 +106,15 @@ export const InLayout: Story = {
     </View>
   ),
 };
+
+/** Rounding is opt-in: `rounded` swaps the corner cut for rounded-soft corners. */
+export const Rounded: Story = {
+  args: { title: 'Rounded' },
+  render: () => (
+    <View className="flex-row flex-wrap gap-4 bg-ink-950 p-6">
+      <Button title="Square (default)" />
+      <Button title="Rounded" rounded />
+      <Button title="Rounded outline" variant="outline" rounded />
+    </View>
+  ),
+};

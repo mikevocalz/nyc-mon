@@ -122,6 +122,8 @@ export interface DataTableProps<T extends RowData> {
   loading?: boolean;
   /** Placeholder row count. Default 5. */
   loadingRows?: number;
+  /** Opt-in rounded corners (rounded-soft). Default false: square. */
+  rounded?: boolean;
   className?: string;
 }
 
@@ -145,7 +147,7 @@ export function DataTable<T extends RowData>({
   emptyText = 'No rows yet',
   loading = false,
   loadingRows = 5,
-  className,
+  className, rounded = false,
 }: DataTableProps<T>) {
   const store = useInstanceStore<{ sorting: SortingState; page: number }>(() => ({ sorting: [], page: 0 }));
   const sorting = useStore(store, (s) => s.sorting);
@@ -253,7 +255,7 @@ export function DataTable<T extends RowData>({
   );
 
   return (
-    <View className={s.root({ className })}>
+    <View className={s.root({ className: `${rounded ? 'rounded-soft overflow-hidden' : ''} ${className ?? ''}` })}>
       {title ? (
         <View>
           <View className={s.titleBar()}>

@@ -24,6 +24,8 @@ const field = tv({
 });
 
 export interface TextareaProps extends React.ComponentProps<typeof PrimitiveTextarea> {
+  /** Opt-in rounded corners (rounded-soft). Default false: square. */
+  rounded?: boolean;
   label: string;
   hint?: string;
   error?: string;
@@ -40,7 +42,7 @@ export interface TextareaProps extends React.ComponentProps<typeof PrimitiveText
 }
 
 export function Textarea({
-  label, hint, error, disabled, className, containerClassName, variant: _variant, tone, district, onPaste, ...inputProps
+  rounded = false, label, hint, error, disabled, className, containerClassName, variant: _variant, tone, district, onPaste, ...inputProps
 }: TextareaProps) {
   const s = field({ error: !!error, disabled, tone: resolveControlTone(tone, district) });
   const input = (
@@ -48,7 +50,7 @@ export function Textarea({
       aria-label={label}
       aria-invalid={!!error}
       editable={!disabled}
-      className={s.input({ className: onPaste ? `pr-12 ${className ?? ''}` : className })}
+      className={s.input({ className: `${rounded ? 'rounded-soft' : ''} ${onPaste ? 'pr-12' : ''} ${className ?? ''}` })}
       {...inputProps}
     />
   );

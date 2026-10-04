@@ -30,6 +30,8 @@ export interface ImageProps extends Omit<SolitoImageProps, 'fill'> {
   fill?: boolean;
   /** Keyline and depth plate around the picture. Default true; false renders the bare image. */
   framed?: boolean;
+  /** Opt-in rounded corners (rounded-soft). Default false: square. */
+  rounded?: boolean;
   /** Frame colour by neighbourhood. Default: night keyline and plate. */
   district?: District;
   /** Frame colour; overrides the district. */
@@ -41,14 +43,15 @@ const DEPTH = 6;
 
 // Universal content image — SolitoImage renders next/image on web and
 // expo-image on native, so one component covers both.
-export function Image({ className, fill, width, height, framed = true, district, tone, ...props }: ImageProps) {
+export function Image({ className, fill, width, height, framed = true, district, tone, rounded = false, ...props }: ImageProps) {
+  const round = rounded ? 'rounded-soft overflow-hidden' : '';
   const useFill = fill ?? (width == null && height == null);
   const sized = !useFill && width != null && height != null;
   // A frame needs a box: one of width/height alone has no box to draw, so it stays bare.
   if (!framed || (!useFill && !sized)) {
     if (!useFill) return <SolitoImage width={width} height={height} {...props} />;
     return (
-      <View className={`relative overflow-hidden ${className ?? ''}`}>
+      <View className={`relative overflow-hidden ${round} ${className ?? ''}`}>
         <SolitoImage fill contentFit="cover" {...props} />
       </View>
     );
@@ -60,7 +63,7 @@ export function Image({ className, fill, width, height, framed = true, district,
 
   return (
     <View
-      className={s.root({ className })}
+      className={s.root({ className: `${round} ${className ?? ''}` })}
       // Computed geometry: a fixed-size image keeps its width/height and adds the plate offset.
       style={sized ? { width: Number(width) + DEPTH, height: Number(height) + DEPTH } : undefined}
     >

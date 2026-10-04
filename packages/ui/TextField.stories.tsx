@@ -88,3 +88,14 @@ export const Neon: Story = {
     </View>
   ),
 };
+
+/** Rounding is opt-in. */
+export const Rounded: Story = {
+  args: { label: 'Rounded' },
+  render: () => (
+    <View className="gap-4 bg-ink-950 p-6">
+      <TextField label="Square (default)" placeholder="Name" />
+      <TextField label="Rounded" placeholder="Name" rounded />
+    </View>
+  ),
+};

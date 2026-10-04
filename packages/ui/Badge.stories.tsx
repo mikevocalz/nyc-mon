@@ -32,7 +32,7 @@ export const Tones: Story = {
 
 /** Every district, fill, size and status light. */
 export const Neon: Story = {
-  args: { label: 'Live', district: 'midtown', fill: 'solid', size: 'sm', shape: 'pill', dot: 'pulse', glow: false },
+  args: { label: 'Live', district: 'midtown', fill: 'solid', size: 'sm', shape: 'rectangle', dot: 'pulse', glow: false },
   argTypes: {
     district: { control: 'inline-radio', options: DISTRICTS },
     fill: { control: 'inline-radio', options: ['solid', 'outline', 'ghost'] },
@@ -53,6 +53,17 @@ export const Neon: Story = {
           <Badge district={district} label="New" size="xs" glow />
         </View>
       ))}
+    </View>
+  ),
+};
+
+/** Rounding is opt-in: `rounded` (or shape="pill") makes the chip a pill. */
+export const Rounded: Story = {
+  args: { label: 'Rounded' },
+  render: () => (
+    <View className="flex-row gap-3 bg-ink-950 p-6">
+      <Badge label="Square (default)" />
+      <Badge label="Pill" rounded />
     </View>
   ),
 };
