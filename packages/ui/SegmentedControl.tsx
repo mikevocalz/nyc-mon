@@ -1,4 +1,3 @@
-// Platform resolution anchor. Native delegates to Expo UI's SwiftUI / Compose
-// segmented control; web keeps the semantic design-system treatment.
+// Platform resolution anchor. Both forks render the NYC-MON segmented control.
 export { SegmentedControl } from './SegmentedControl.web';
 export type { SegmentedControlProps, SegmentedOption } from './SegmentedControl.types';

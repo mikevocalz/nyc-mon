@@ -1,91 +1,93 @@
 'use client';
-import { tv, type VariantProps } from 'tailwind-variants';
+import { tv } from 'tailwind-variants';
 import { ActivityIndicator } from 'react-native';
 import { PressScale } from './press-scale';
-import { Text } from './tw';
+import { Text, View } from './tw';
 import { haptics } from './haptics';
 import { CornerCutFrame } from './neon/CornerCutFrame';
 import type { CutCorner } from './neon/corner-cut';
 import type { GlowIntensity } from './neon/glow';
-import { resolveControlTone, toneInput, toneVariants, type ControlTone, type District } from './district';
+import { TONE_CLASSES, toneHex, type ControlTone, type District } from './district';
+import { DISABLED_FRAME_TONE, controlLook, frameTone, layoutClasses, type ButtonVariant, type ControlLook } from './control-look';
 
-// Press feedback: §8 ladder rung 1 — simple active-state opacity/scale via
-// NW5 transitions; respects reduced motion (motion-reduce kills transitions).
+// The NYC-MON button. Solid and outline looks draw a CornerCutFrame inside
+// the pressable, so the root only owns the hit area, focus ring and press
+// sink (web: the face drops into its depth plate; native: PressScale's
+// spring). Ghost has no frame: a tone label and a soft tint on hover.
+// motion-reduce kills the transitions.
 const button = tv({
   slots: {
     root:
-      'shrink-0 flex-row items-center justify-center gap-2 self-start rounded-md border-2 border-border-strong ' +
-      'transition-all duration-fast active:translate-x-[3px] active:translate-y-[3px] active:shadow-none ' +
-      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/50 focus-visible:ring-offset-2 ' +
+      'group shrink-0 self-start rounded-none border-0 bg-transparent transition-transform duration-fast ' +
+      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/60 focus-visible:ring-offset-2 ' +
       'motion-reduce:transition-none',
-    label: 'whitespace-nowrap font-semibold',
+    label: 'whitespace-nowrap font-display tracking-wide',
+    // Ghost hover: a tone tint layer, faded in by the root's group-hover.
+    tint: 'pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-fast group-hover:opacity-100 motion-reduce:transition-none',
   },
   variants: {
-    variant: {
-      primary: { root: 'bg-primary shadow-card hover:bg-primary-pressed', label: 'text-on-primary' },
-      accent: { root: 'bg-accent shadow-card hover:bg-accent-pressed', label: 'text-on-accent' },
-      outline: { root: 'bg-surface-raised shadow-card hover:bg-surface-sunken', label: 'text-text' },
-      ghost: { root: 'border-transparent bg-transparent shadow-none hover:bg-surface-sunken active:shadow-none', label: 'text-text' },
-      danger: { root: 'bg-danger shadow-card hover:opacity-90', label: 'text-on-danger' },
-      // NeonBlade corner-cut button: the shape is drawn by CornerCutFrame
-      // inside the pressable, so the root drops its own box. Pressing sinks
-      // the face into its depth plate (the base active: translate).
-      cornerCut: {
-        root: 'rounded-none border-0 bg-transparent shadow-none hover:bg-transparent',
-        label: 'font-display tracking-wide',
-      },
+    look: {
+      // Frames stretch to the root, so className="flex-1" / fullWidth grow the face, not just the hit area.
+      solid: { root: 'flex-col items-stretch active:translate-x-[3px] active:translate-y-[3px]' },
+      outline: { root: 'flex-col items-stretch active:translate-x-[3px] active:translate-y-[3px]' },
+      ghost: { root: 'relative flex-row items-center justify-center gap-2' },
     },
-    tone: toneVariants(() => ({})),
-    // Labels and padding both step up at md. Scaling the label alone would
-    // leave the text crowded against a phone-sized box on a tablet, so the
-    // control grows with its text.
     size: {
-      sm: { root: 'px-4 py-2 md:px-5 md:py-2.5', label: 'text-sm md:text-base' },
-      md: { root: 'px-5 py-2.5 md:px-6 md:py-3', label: 'text-sm md:text-base' },
-      lg: { root: 'px-6 py-3.5 md:px-8 md:py-4', label: 'text-base md:text-lg' },
+      sm: { label: 'text-sm md:text-base' },
+      md: { label: 'text-sm md:text-base' },
+      lg: { label: 'text-base md:text-lg' },
     },
     /*
-      Unavailable has to READ as unavailable. Opacity alone was not enough: a
-      50%-opacity yellow button on a white sheet still looks like a yellow
-      button, so a disabled submit invited a tap that did nothing and explained
-      nothing. In this design language the hard offset shadow IS the pressable
-      affordance, so dropping it — plus a muted fill and label — is what says
-      "not yet". The colour cue is deliberately not the only one.
+      Unavailable has to READ as unavailable. A dimmed tone face still looks
+      like a button you can press, so a disabled control drops its tone, its
+      depth plate (the press affordance) and its glow: a night face behind an
+      ink keyline with a muted label, and no press sink.
     */
     disabled: {
-      true: {
-        root: 'border-border bg-surface-sunken shadow-none hover:bg-surface-sunken active:translate-x-0 active:translate-y-0',
-        label: 'text-text-muted',
-      },
+      true: { root: 'cursor-not-allowed active:translate-x-0 active:translate-y-0', label: 'text-ink-400' },
     },
     fullWidth: { true: { root: 'w-full self-auto' } },
   },
   compoundVariants: [
-    { variant: 'cornerCut', class: { root: 'p-0 md:p-0' } },
-    ...(Object.entries(toneVariants((c) => c.onFace)) as [ControlTone, string][]).map(([tone, onFace]) => ({
-      variant: 'cornerCut' as const, tone, disabled: false, class: { label: onFace },
-    })),
-    { variant: 'cornerCut', disabled: true, class: { root: 'bg-transparent', label: 'text-ink-700' } },
+    // Ghost pads its own root; framed looks pad the face (CUT_FACE).
+    { look: 'ghost', size: 'sm', class: { root: 'min-h-9 px-3 py-2' } },
+    { look: 'ghost', size: 'md', class: { root: 'min-h-11 px-4 py-2.5 md:px-5 md:py-3' } },
+    { look: 'ghost', size: 'lg', class: { root: 'min-h-12 px-5 py-3.5 md:px-6 md:py-4' } },
   ],
-  defaultVariants: { variant: 'primary', size: 'md', disabled: false },
+  defaultVariants: { look: 'solid', size: 'md', disabled: false },
 });
 
-// Corner-cut face padding and cut length per size; padding steps up at md like the kit sizes.
+// Corner-cut face padding and cut length per size; padding steps up at md.
 const CUT_FACE = {
   sm: { className: 'px-5 py-2.5', cut: 10 },
   md: { className: 'px-6 py-3 md:px-8 md:py-3.5', cut: 14 },
   lg: { className: 'px-8 py-4 md:px-10 md:py-5', cut: 18 },
 } as const;
 
-export interface ButtonProps extends Omit<VariantProps<typeof button>, 'tone'> {
+function labelTone(look: ControlLook, tone: ControlTone) {
+  const c = TONE_CLASSES[tone];
+  return look === 'solid' ? c.onFace : c.text;
+}
+
+export interface ButtonProps {
   title: string;
-  /** cornerCut: colour family. Overrides `district`. */
+  /**
+   * Default (no variant, `cornerCut` or `neon`): the solid corner-cut face.
+   * Legacy names keep working: primary = default, accent = the district's
+   * second tone (royal in Midtown), danger = apple, outline = night face
+   * with a tone border, ghost = no frame, tone label.
+   */
+  variant?: ButtonVariant;
+  size?: 'sm' | 'md' | 'lg';
+  disabled?: boolean;
+  fullWidth?: boolean;
+  /** Colour family. Overrides `district`. */
   tone?: ControlTone;
-  /** cornerCut: theme by neighbourhood (Downtown royal, Midtown orange, Harlem brick, Mega City carolina). */
+  /** Theme by neighbourhood (Downtown royal, Midtown orange, Harlem brick, Mega City carolina). Default Midtown. */
   district?: District;
-  /** cornerCut: which corner is cut. Default bottom-right. */
+  /** Which corner is cut. Default bottom-right. */
   corner?: CutCorner;
-  /** cornerCut: accent glow around the cut shape. Off by default. */
+  /** Accent glow around the cut shape. Off by default. */
   glow?: boolean | GlowIntensity;
   onPress?: () => void;
   loading?: boolean;
@@ -94,38 +96,49 @@ export interface ButtonProps extends Omit<VariantProps<typeof button>, 'tone'> {
 }
 
 export function Button({
-  title, onPress, variant, size, disabled, fullWidth, loading, className,
+  title, onPress, variant, size = 'md', disabled, fullWidth, loading, className,
   tone: toneProp, district, corner = 'bottom-right', glow = false, ...a11y
 }: ButtonProps) {
-  const tone = resolveControlTone(toneProp, district);
+  const { look, tone } = controlLook(variant, toneProp, district);
   const off = !!(disabled || loading);
-  const { root, label } = button({ variant, size, tone, disabled: off, fullWidth });
+  const s = button({ look, size, disabled: off, fullWidth });
+  const labelClass = s.label({ className: off ? undefined : labelTone(look, tone) });
   const content = (
     <>
-      {loading ? <ActivityIndicator size="small" /> : null}
-      <Text className={label()}>{title}</Text>
+      {loading ? (
+        // ActivityIndicator takes a colour prop, not a class: the label colour on this face.
+        <ActivityIndicator size="small" color={look === 'solid' && !off ? toneHex(tone).on : undefined} />
+      ) : null}
+      <Text className={labelClass}>{title}</Text>
     </>
   );
   return (
     <PressScale
-      onPress={disabled || loading ? undefined : () => { haptics.tap(); onPress?.(); }}
-      aria-disabled={disabled || loading}
-      className={root({ className })}
-      outerClassName={fullWidth ? 'w-full' : 'self-start'}
+      onPress={off ? undefined : () => { haptics.tap(); onPress?.(); }}
+      aria-disabled={off}
+      accessibilityState={{ disabled: off }}
+      className={s.root({ className })}
+      outerClassName={fullWidth ? 'w-full' : `self-start ${layoutClasses(className)}`}
       {...a11y}
     >
-      {variant === 'cornerCut' ? (
+      {look === 'ghost' ? (
+        <>
+          <View aria-hidden className={s.tint({ className: TONE_CLASSES[tone].soft })} />
+          {content}
+        </>
+      ) : (
         <CornerCutFrame
-          tone={off ? 'silver' : toneInput(tone)}
+          tone={off ? DISABLED_FRAME_TONE : frameTone(look, tone)}
+          variant={off || look === 'outline' ? 'outline' : 'solid'}
           corner={corner}
-          cut={CUT_FACE[size ?? 'md'].cut}
+          cut={CUT_FACE[size].cut}
           depth={off ? 0 : 4}
           glow={off ? false : glow}
-          className={`flex-row items-center justify-center gap-2 ${CUT_FACE[size ?? 'md'].className}`}
+          className={`flex-row items-center justify-center gap-2 ${CUT_FACE[size].className}`}
         >
           {content}
         </CornerCutFrame>
-      ) : content}
+      )}
     </PressScale>
   );
 }

@@ -2,7 +2,6 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { create } from 'zustand';
 import { ErrorMessage } from './ErrorMessage';
 import { Button } from './Button';
-import { Card } from './Card';
 import { Text } from './Text';
 import { View } from './tw';
 
@@ -27,13 +26,13 @@ export const CollapsesWhenEmpty: Story = {
     const { show, toggle } = useErrorDemo();
     return (
       <View className="max-w-content-form gap-3 p-4">
-        <Card className="gap-2">
+        <View className="gap-2">
           <Text variant="heading">Form footer</Text>
           <ErrorMessage message={show ? 'Something went wrong — try again.' : undefined} />
           <Text variant="caption" tone="muted">
             The alert renders nothing when message is empty — the row above collapses.
           </Text>
-        </Card>
+        </View>
         <Button
           title={show ? 'Clear error' : 'Raise error'}
           variant="outline"

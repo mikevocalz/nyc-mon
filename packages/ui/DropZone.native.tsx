@@ -1,5 +1,4 @@
 'use client';
-import { tv } from 'tailwind-variants';
 import {
   DragDropContentView,
   type DragDropContentViewProps,
@@ -8,31 +7,13 @@ import { css } from './html/css';
 import { View } from './tw';
 import { CloudUpload } from './icons';
 import { Text } from './Text';
+import { NightScope } from './NightScope';
+import { dropZone } from './DropZone.styles';
+import { resolveControlTone } from './district';
 import type { DropZoneProps, DropAsset, Assets } from './DropZone.types';
 
 export type { DropAsset, Assets };
 
-const dropZone = tv({
-  slots: {
-    root:
-      'items-center justify-center gap-3 rounded-sheet border-2 border-dashed border-border-strong ' +
-      'bg-surface-sunken p-10 transition-all duration-base ' +
-      'hover:border-focus/60 hover:bg-surface-raised motion-reduce:transition-none',
-    well:
-      'h-16 w-16 items-center justify-center rounded-md border-2 border-border bg-surface-raised shadow-card ' +
-      'transition-all duration-base motion-reduce:transition-none',
-    title: 'text-center font-semibold',
-    description: 'max-w-content-form text-center',
-  },
-  variants: {
-    active: {
-      true: {
-        root: 'border-focus bg-surface-raised shadow-card ring-4 ring-focus/10',
-        well: '-translate-y-0.5 scale-105 bg-ember-50 shadow-raised',
-      },
-    },
-  },
-});
 
 const CssDragDrop = css(
   DragDropContentView as React.ComponentType<object>,
@@ -46,29 +27,31 @@ export function DropZone({
   description = 'Or browse from your device. Images, documents and audio.',
   glyph,
   children,
+  tone,
+  district,
   ...props
 }: DropZoneProps) {
-  const s = dropZone({ active });
+  const s = dropZone({ active, tone: resolveControlTone(tone, district) });
   return (
     <CssDragDrop
       className={s.root({ className })}
       {...(props as DragDropContentViewProps)}
     >
+      <NightScope>
       {children ?? (
         <>
-          <View className={s.well()}>
+          <View aria-hidden className={s.tile()}>
             {typeof glyph === 'string' || typeof glyph === 'number' ? (
               <Text className="text-2xl">{glyph}</Text>
             ) : (
-              glyph ?? <CloudUpload size={28} className="text-text-muted" />
+              glyph ?? <CloudUpload size={28} strokeWidth={2.5} className={s.glyph()} />
             )}
           </View>
           <Text className={s.title()}>{title}</Text>
-          <Text variant="caption" tone="muted" className={s.description()}>
-            {description}
-          </Text>
+          <Text className={s.description()}>{description}</Text>
         </>
       )}
+      </NightScope>
     </CssDragDrop>
   );
 }

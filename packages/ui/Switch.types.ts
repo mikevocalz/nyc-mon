@@ -6,10 +6,14 @@ export interface SwitchProps {
   label: string;
   disabled?: boolean;
   className?: string;
-  /** neon is the NeonBlade toggle; default is the platform switch (native) or kit switch (web). */
+  /**
+   * The NYC-MON toggle is the only look: the track fills with the tone and
+   * the night-keyed thumb slides across. `neon` and `default` are both
+   * accepted so older callers and stories keep compiling.
+   */
   variant?: 'default' | 'neon';
-  /** neon: colour family. Overrides `district`. */
+  /** Colour family. Overrides `district`. */
   tone?: ControlTone;
-  /** neon: theme by neighbourhood. */
+  /** Theme by neighbourhood. Default Midtown (orange). */
   district?: District;
 }

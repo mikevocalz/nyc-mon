@@ -1,36 +1,16 @@
 'use client';
 
 import { useRef } from 'react';
-import { tv } from 'tailwind-variants';
 import { DropSurface } from './html/dom.web';
 import { View } from './tw';
 import { CloudUpload } from './icons';
 import { Text } from './Text';
+import { dropZone } from './DropZone.styles';
+import { resolveControlTone } from './district';
 import type { Assets, DropAsset, DropZoneProps } from './DropZone.types';
 
 export type { Assets, DropAsset };
 
-const dropZone = tv({
-  slots: {
-    root:
-      'flex items-center justify-center gap-3 rounded-sheet border-2 border-dashed border-border-strong ' +
-      'bg-surface-sunken p-10 transition-all duration-base ' +
-      'hover:border-focus/60 hover:bg-surface-raised motion-reduce:transition-none',
-    well:
-      'h-16 w-16 items-center justify-center rounded-md border-2 border-border bg-surface-raised shadow-card ' +
-      'transition-all duration-base motion-reduce:transition-none',
-    title: 'text-center font-semibold',
-    description: 'max-w-content-form text-center',
-  },
-  variants: {
-    active: {
-      true: {
-        root: 'border-focus bg-surface-raised shadow-card ring-4 ring-focus/10',
-        well: '-translate-y-0.5 scale-105 bg-ember-50 shadow-raised',
-      },
-    },
-  },
-});
 
 function accepts(type: string, allowed?: (string | RegExp)[]) {
   if (allowed === undefined) return true;
@@ -82,6 +62,8 @@ export function DropZone({
   description = 'Or browse from your device. Images, documents and audio.',
   glyph,
   children,
+  tone,
+  district,
   onDrop,
   onEnter,
   onExit,
@@ -94,12 +76,13 @@ export function DropZone({
   style,
   ...rest
 }: DropZoneProps) {
-  const s = dropZone({ active });
+  const s = dropZone({ active, tone: resolveControlTone(tone, district) });
   const dragDepth = useRef(0);
 
   return (
     <DropSurface
-      className={s.root({ className })}
+      // DropSurface is a plain DOM box, so it needs the flex column RN views get by default.
+      className={s.root({ className: `flex flex-col ${className ?? ''}` })}
       style={style as never}
       draggable={Boolean(draggableSources?.length)}
       onDragStart={(event) => {
@@ -156,17 +139,15 @@ export function DropZone({
     >
       {children ?? (
         <>
-          <View className={s.well()}>
+          <View aria-hidden className={s.tile()}>
             {typeof glyph === 'string' || typeof glyph === 'number' ? (
               <Text className="text-2xl">{glyph}</Text>
             ) : (
-              glyph ?? <CloudUpload size={28} className="text-text-muted" />
+              glyph ?? <CloudUpload size={28} strokeWidth={2.5} className={s.glyph()} />
             )}
           </View>
           <Text className={s.title()}>{title}</Text>
-          <Text variant="caption" tone="muted" className={s.description()}>
-            {description}
-          </Text>
+          <Text className={s.description()}>{description}</Text>
         </>
       )}
     </DropSurface>

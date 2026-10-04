@@ -4,30 +4,23 @@ import { PasteWrapper, type PasteEventPayload } from './paste-wrapper';
 import { View, Text as TWText } from './tw';
 import { Input, Label } from './primitives';
 import { Text } from './Text';
-import { NEON_FIELD, neonErrorCompound, neonFieldCompounds } from './cards/neon-field';
+import { NEON_FIELD, neonErrorVariant, neonFieldCompounds, neonLabelCompounds } from './cards/neon-field';
 import { resolveControlTone, toneVariants, type ControlTone, type District } from './district';
 
 const field = tv({
   slots: {
-    root: 'gap-1.5',
-    label: 'text-sm font-medium text-text',
-    // `w-full` is explicit because the field is an @expo/ui Host now, and a
-    // Host sizes to its content — it no longer inherits a column's default
-    // stretch, which is what left fields only as wide as their placeholder.
-    input:
-      'w-full min-h-11 justify-center rounded-md border-2 border-border bg-surface-raised px-4 py-2.5 text-base text-text ' +
-      'placeholder:text-text-muted/70 transition-all duration-fast ' +
-      'focus:shadow-card focus:outline-none motion-reduce:transition-none',
-    message: 'text-sm',
+    root: NEON_FIELD.root,
+    label: NEON_FIELD.label,
+    input: `${NEON_FIELD.input}`,
+    message: NEON_FIELD.message,
   },
   variants: {
-    error: { true: { input: 'border-danger focus:border-danger', message: 'text-danger' } },
-    disabled: { true: { input: 'opacity-50' } },
-    // neon: the NeonBlade input look (see cards/neon-field.ts); default is the kit field.
-    variant: { default: {}, neon: { label: NEON_FIELD.label, input: NEON_FIELD.input } },
+    error: { true: neonErrorVariant('input'), false: {} },
+    disabled: { true: { input: NEON_FIELD.disabled } },
     tone: toneVariants(() => ({})),
   },
-  compoundVariants: [...neonFieldCompounds('input'), neonErrorCompound('input')],
+  compoundVariants: [...neonFieldCompounds('input'), ...neonLabelCompounds()],
+  defaultVariants: { error: false },
 });
 
 export type { PasteEventPayload };
@@ -38,20 +31,20 @@ export interface TextFieldProps extends React.ComponentProps<typeof Input> {
   error?: string;
   disabled?: boolean;
   containerClassName?: string;
-  /** neon is the NeonBlade input look; default is the kit field. */
+  /** The NYC-MON field is the only look; `neon` and `default` are both accepted for older callers. */
   variant?: 'default' | 'neon';
-  /** neon: colour family. Overrides `district`. */
+  /** Colour family for the nameplate and well border. Overrides `district`. */
   tone?: ControlTone;
-  /** neon: theme by neighbourhood. */
+  /** Theme by neighbourhood. Default Midtown (orange). */
   district?: District;
   /** Rich paste (text / images / GIFs from the clipboard) via expo-paste-input — iOS, Android, and web. */
   onPaste?: (payload: PasteEventPayload) => void;
 }
 
 export function TextField({
-  label, hint, error, disabled, className, containerClassName, variant = 'default', tone, district, onPaste, ...inputProps
+  label, hint, error, disabled, className, containerClassName, variant: _variant, tone, district, onPaste, ...inputProps
 }: TextFieldProps) {
-  const s = field({ error: !!error, disabled, variant, tone: resolveControlTone(tone, district) });
+  const s = field({ error: !!error, disabled, tone: resolveControlTone(tone, district) });
   const input = (
     <Input
       aria-label={label}
@@ -71,17 +64,17 @@ export function TextField({
             {input}
             <View
               aria-hidden
-              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md border-2 border-border bg-surface-sunken px-1.5 py-0.5"
+              className={`absolute right-3 top-1/2 -translate-y-1/2 ${NEON_FIELD.chip}`}
             >
-              <TWText className="text-[10px] font-semibold tracking-wide text-text-muted">⌘V</TWText>
+              <TWText className={NEON_FIELD.chipText}>⌘V</TWText>
             </View>
           </View>
         </PasteWrapper>
       ) : input}
       {error ? (
-        <Text className={s.message()}>{error}</Text>
+        <Text role="alert" className={s.message()}>{error}</Text>
       ) : hint ? (
-        <Text tone="muted" variant="caption">{hint}</Text>
+        <Text className={NEON_FIELD.hint}>{hint}</Text>
       ) : null}
     </View>
   );

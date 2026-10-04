@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Textarea } from './Textarea';
 import type { PasteEventPayload } from './TextField';
 import { View } from './tw';
+import { CONTROL_TONES, DISTRICTS } from './district';
 import { Text } from './Text';
 import { Image } from './Image';
 import { create } from 'zustand';
@@ -20,6 +21,10 @@ const meta = {
   title: 'UI/Textarea',
   component: Textarea,
   args: { label: 'Bio' },
+  argTypes: {
+    district: { control: 'inline-radio', options: [undefined, ...DISTRICTS] },
+    tone: { control: 'select', options: [undefined, ...CONTROL_TONES] },
+  },
 } satisfies Meta<typeof Textarea>;
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -72,12 +77,12 @@ export const WithPaste: Story = {
   },
 };
 
-/** Neon textarea in each district tone. */
+/** District showcase: the field in each district tone. */
 export const Neon: Story = {
   render: () => (
-    <View className="max-w-content-form gap-5 bg-ink-950 p-6">
-      <Textarea variant="neon" district="harlem" label="Block story" placeholder="What happened on your corner" />
-      <Textarea variant="neon" district="megacity" label="Plan" error="Keep it under 280 characters." defaultValue="Level 90 to level 120 by the east bridge." />
+    <View className="max-w-content-form gap-5 p-4">
+      <Textarea district="harlem" label="Block story" placeholder="What happened on your corner" />
+      <Textarea district="megacity" label="Plan" error="Keep it under 280 characters." defaultValue="Level 90 to level 120 by the east bridge." />
     </View>
   ),
 };

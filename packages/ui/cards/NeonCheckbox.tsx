@@ -3,6 +3,7 @@ import { tv } from 'tailwind-variants';
 import { haptics } from '../haptics';
 import { Pressable, Text as TWText, View } from '../tw';
 import { Text } from '../Text';
+import { NEON_FIELD } from './neon-field';
 import { resolveControlTone, toneVariants, type ControlTone, type District } from '../district';
 
 const neonCheckbox = tv({
@@ -74,7 +75,7 @@ export function NeonCheckbox({ checked, onChange, label, disabled, className, to
   return (
     <View className="gap-1">
       {box}
-      <Text className="text-sm font-semibold text-apple-400">{error}</Text>
+      <Text role="alert" className={NEON_FIELD.message}>{error}</Text>
     </View>
   );
 }

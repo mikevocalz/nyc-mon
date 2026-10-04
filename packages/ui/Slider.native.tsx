@@ -1,32 +1,28 @@
 'use client';
 import { Host, Slider as ExpoSlider } from '@expo/ui';
+import { tint } from '@expo/ui/swift-ui/modifiers';
 import { View } from './tw';
-import { Text } from './Text';
+import { Label } from './primitives';
+import { NEON_FIELD } from './cards/neon-field';
+import { TONE_CLASSES, resolveControlTone, toneHex } from './district';
 import type { SliderProps } from './Slider.types';
 
 /**
- * Range control, rendered by `@expo/ui` (SwiftUI / Jetpack Compose).
- *
- * A slider is exactly the kind of control worth handing to the platform: the
- * drag physics, the accessibility actions and the haptic detents are behaviour
- * a hand-rolled version has to reimplement and usually gets subtly wrong.
- *
- * The label stays in JS so it keeps the kit's type scale and className styling;
- * only the track itself is native.
+ * iOS (and any non-Android native target): the SwiftUI slider, tinted in the
+ * tone. A slider keeps the OS control on native because the drag physics,
+ * the VoiceOver adjustable actions and the haptic detents are behaviour a
+ * hand-rolled track would have to reimplement (and the package carries no
+ * gesture-handler dependency to build one on). The nameplate label stays in
+ * the kit. Android has its own fork (Slider.android.tsx) for Compose colours.
  */
 export function Slider({
-  value,
-  onValueChange,
-  min = 0,
-  max = 1,
-  step,
-  disabled,
-  label,
-  className,
+  value, onValueChange, min = 0, max = 1, step, disabled, label, className, tone, district,
 }: SliderProps) {
+  const resolved = resolveControlTone(tone, district);
+  const c = TONE_CLASSES[resolved];
   return (
     <View className={`gap-2 ${className ?? ''}`}>
-      {label ? <Text className="text-sm font-medium text-text md:text-base">{label}</Text> : null}
+      {label ? <Label className={`${NEON_FIELD.label} ${c.face} ${c.onFace}`}>{label}</Label> : null}
       <Host matchContents>
         <ExpoSlider
           value={value}
@@ -35,6 +31,8 @@ export function Slider({
           max={max}
           step={step}
           disabled={disabled}
+          // SwiftUI takes the colour as a modifier, not a class.
+          modifiers={[tint(toneHex(resolved).face)]}
         />
       </Host>
     </View>

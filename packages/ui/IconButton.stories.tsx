@@ -1,36 +1,71 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { IconButton } from './IconButton';
-import { Text } from './Text';
 import { View } from './tw';
+import { Text } from './Text';
+import { ChevronLeft, ChevronRight, Settings, X } from './icons';
+import { CONTROL_TONES, DISTRICTS, DISTRICT_NAME } from './district';
 
 const meta = {
   title: 'UI/IconButton',
   component: IconButton,
-  args: { icon: <Text>＋</Text>, 'aria-label': 'Add' },
+  // No colour class on the icon: it takes the frame's label colour (currentColor).
+  args: { icon: <Settings size={20} strokeWidth={2.5} />, 'aria-label': 'Settings' },
+  argTypes: {
+    variant: { control: 'select', options: [undefined, 'cornerCut', 'primary', 'outline', 'ghost', 'neon'] },
+    district: { control: 'inline-radio', options: [undefined, ...DISTRICTS] },
+    tone: { control: 'select', options: [undefined, ...CONTROL_TONES] },
+    size: { control: 'inline-radio', options: ['sm', 'md', 'lg'] },
+    corner: { control: 'inline-radio', options: ['top-left', 'top-right', 'bottom-right', 'bottom-left', 'all'] },
+  },
 } satisfies Meta<typeof IconButton>;
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/** Default (no variant), outline, ghost and disabled. */
 export const Variants: Story = {
   render: () => (
-    <View className="flex-row gap-3 p-4">
-      <IconButton icon={<Text className="text-on-primary">＋</Text>} aria-label="Primary" />
-      <IconButton variant="ghost" icon={<Text>＋</Text>} aria-label="Ghost" />
-      <IconButton variant="outline" icon={<Text>＋</Text>} aria-label="Outline" />
-      <IconButton disabled icon={<Text className="text-on-primary">＋</Text>} aria-label="Disabled" />
+    <View className="flex-row flex-wrap items-center gap-4 p-4">
+      <IconButton icon={<Settings size={20} strokeWidth={2.5} />} aria-label="Default" />
+      <IconButton variant="outline" icon={<Settings size={20} strokeWidth={2.5} />} aria-label="Outline" />
+      <IconButton variant="ghost" icon={<Settings size={20} strokeWidth={2.5} />} aria-label="Ghost" />
+      <IconButton disabled icon={<Settings size={20} strokeWidth={2.5} />} aria-label="Disabled" />
     </View>
   ),
 };
 
-/** Corner-cut icon buttons per district; the last is disabled. */
+/** One default icon button per district, every size, plus a disabled one. */
 export const CornerCut: Story = {
   render: () => (
-    <View className="flex-row gap-4 bg-ink-950 p-6">
-      <IconButton variant="cornerCut" district="downtown" icon={<Text className="font-display text-white">＋</Text>} aria-label="Add a Downtown block" />
-      <IconButton variant="cornerCut" district="midtown" icon={<Text className="font-display text-ink-950">＋</Text>} aria-label="Add a Midtown block" />
-      <IconButton variant="cornerCut" district="harlem" corner="top-left" icon={<Text className="font-display text-white">＋</Text>} aria-label="Add a Harlem block" />
-      <IconButton variant="cornerCut" district="megacity" size="lg" icon={<Text className="font-display text-ink-950">＋</Text>} aria-label="Add a Mega City block" />
-      <IconButton variant="cornerCut" disabled icon={<Text className="font-display text-ink-700">＋</Text>} aria-label="Add (disabled)" />
+    <View className="gap-5 p-4">
+      <View className="flex-row flex-wrap items-center gap-4">
+        {DISTRICTS.map((d, i) => (
+          <IconButton
+            key={d}
+            district={d}
+            size={(['sm', 'md', 'lg', 'md'] as const)[i]}
+            corner={d === 'harlem' ? 'top-left' : 'bottom-right'}
+            icon={<Settings size={20} strokeWidth={2.5} />}
+            aria-label={`${DISTRICT_NAME[d]} settings`}
+          />
+        ))}
+        <IconButton disabled icon={<Settings size={20} strokeWidth={2.5} />} aria-label="Settings (disabled)" />
+      </View>
+      <View className="flex-row flex-wrap items-center gap-4">
+        {DISTRICTS.map((d) => (
+          <IconButton key={d} district={d} variant="outline" icon={<X size={20} strokeWidth={2.5} />} aria-label={`Close ${DISTRICT_NAME[d]}`} />
+        ))}
+      </View>
+    </View>
+  ),
+};
+
+/** Ghost in a nav bar (DetailNavbar, MiniCalendar): compact, the caller's muted icon stays legible. */
+export const GhostNavBar: Story = {
+  render: () => (
+    <View className="max-w-content-form flex-row items-center gap-2 border-2 border-ink-800 bg-ink-900 p-2">
+      <IconButton variant="ghost" size="sm" aria-label="Previous month" icon={<ChevronLeft className="text-text-muted" />} />
+      <Text className="flex-1 text-center font-display text-sm text-ink-50">October 2026</Text>
+      <IconButton variant="ghost" size="sm" aria-label="Next month" icon={<ChevronRight className="text-text-muted" />} />
     </View>
   ),
 };

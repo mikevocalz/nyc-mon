@@ -3,22 +3,39 @@ import { useEffect } from 'react';
 import { tv } from 'tailwind-variants';
 import { useDebouncedCallback } from '@tanstack/react-pacer';
 import { useInstanceStore, useStore } from './use-instance-store';
-import { View, Text, Pressable } from './tw';
+import { View, Pressable } from './tw';
 import { X } from './icons';
 import { Input } from './primitives';
+import { NEON_FIELD } from './cards/neon-field';
+import { TONE_CLASSES, resolveControlTone, toneVariants, type ControlTone, type District } from './district';
 
+// The NYC-MON search field: a solid tone tile carrying the magnifier, butted
+// against a night well with a heavy tone border (the same well as
+// NEON_FIELD). Focus lightens the border and adds the tone's accent glow.
 const searchBar = tv({
   slots: {
-    root:
-      'flex-row items-center gap-2 rounded-lg border-2 border-border bg-surface-raised px-4 py-2.5 ' +
-      'transition-all duration-fast hover:border-border-strong ' +
-      'focus-within:shadow-card ' +
-      'motion-reduce:transition-none',
-    glyph: 'text-base text-text-muted',
-    input: 'flex-1 p-0 text-base text-text placeholder:text-text-muted/70 focus:outline-none',
+    root: 'flex-row items-stretch',
+    tile: 'w-11 shrink-0 items-center justify-center border-2 md:w-12',
+    // The magnifier, drawn as two solid pieces: a ring and a 45-degree handle.
+    ring: 'h-3.5 w-3.5 rounded-full border-2',
+    handle: 'absolute bottom-[-3px] right-[-2px] h-2 w-[3px] -rotate-45',
+    well: 'relative min-w-0 flex-1 justify-center',
+    input: `${NEON_FIELD.input} -ml-[2px] pr-11`,
     clear:
-      'h-6 w-6 items-center justify-center rounded-full transition-colors duration-fast ' +
-      'hover:bg-surface-sunken active:opacity-80 motion-reduce:transition-none',
+      'absolute right-1.5 top-1/2 h-8 w-8 -translate-y-1/2 items-center justify-center transition-colors duration-fast ' +
+      'hover:bg-ink-800 active:bg-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/60 ' +
+      'motion-reduce:transition-none',
+  },
+  variants: {
+    tone: toneVariants((c) => ({
+      tile: `${c.face} ${c.controlKeyline}`,
+      input: `${c.controlBorder} ${c.focusBorder} ${c.focusGlow}`,
+    })),
+    // Glyph colour follows the label colour on that face (TONE_CLASSES.onFace).
+    darkGlyph: {
+      true: { ring: 'border-ink-950', handle: 'bg-ink-950' },
+      false: { ring: 'border-white', handle: 'bg-white' },
+    },
   },
 });
 
@@ -37,13 +54,18 @@ export interface SearchBarProps {
   /** Focus callbacks — consumers gate competing gestures on these. */
   onFocus?: () => void;
   onBlur?: () => void;
+  /** Colour family for the tile and well border. Overrides `district`. */
+  tone?: ControlTone;
+  /** Theme by neighbourhood. Default Midtown (orange). */
+  district?: District;
 }
 
 export function SearchBar({
-  value, onChangeText, placeholder, onSubmit, debounceMs, className, onFocus, onBlur,
+  value, onChangeText, placeholder, onSubmit, debounceMs, className, onFocus, onBlur, tone, district,
   'aria-label': ariaLabel = 'Search',
 }: SearchBarProps) {
-  const s = searchBar();
+  const resolved = resolveControlTone(tone, district);
+  const s = searchBar({ tone: resolved, darkGlyph: TONE_CLASSES[resolved].onFace === 'text-ink-950' });
 
   // Instant local echo (zustand — repo rule) with debounced upstream delivery.
   const echo = useInstanceStore<{ text: string; external: string }>(() => ({
@@ -78,33 +100,39 @@ export function SearchBar({
   };
 
   return (
-    <View className={s.root({ className })}>
-      <Text aria-hidden className={s.glyph()}>🔍</Text>
-      <Input
-        role="searchbox"
-        aria-label={ariaLabel}
-        value={shownValue}
-        onChangeText={handleChange}
-        placeholder={placeholder}
-        onSubmitEditing={onSubmit}
-        onFocus={onFocus}
-        onBlur={onBlur}
-        returnKeyType="search"
-        className={s.input()}
-      />
-      {shownValue ? (
-        <Pressable
-          role="button"
-          aria-label="Clear search"
-          onPress={clear}
-          className={s.clear()}
-        >
-          {/* The ✕ character rendered at the font's own hairline weight, which
-              read as stray punctuation rather than a control. A lucide X with a
-              heavier stroke matches the weight of every other icon in the kit. */}
-          <X size={16} strokeWidth={2.5} className="text-text-muted" />
-        </Pressable>
-      ) : null}
+    // RNW renders role="search" as a search landmark; RN's Role type lags behind, hence the cast.
+    <View role={'search' as never} className={s.root({ className })}>
+      <View aria-hidden className={s.tile()}>
+        <View className="relative">
+          <View className={s.ring()} />
+          <View className={s.handle()} />
+        </View>
+      </View>
+      <View className={s.well()}>
+        <Input
+          role="searchbox"
+          aria-label={ariaLabel}
+          value={shownValue}
+          onChangeText={handleChange}
+          placeholder={placeholder}
+          onSubmitEditing={onSubmit}
+          onFocus={onFocus}
+          onBlur={onBlur}
+          returnKeyType="search"
+          className={s.input()}
+        />
+        {shownValue ? (
+          <Pressable
+            role="button"
+            aria-label="Clear search"
+            onPress={clear}
+            className={s.clear()}
+          >
+            {/* A lucide X at a heavy stroke, matching the weight of every other icon in the kit. */}
+            <X size={16} strokeWidth={2.75} className="text-silver-300" />
+          </Pressable>
+        ) : null}
+      </View>
     </View>
   );
 }

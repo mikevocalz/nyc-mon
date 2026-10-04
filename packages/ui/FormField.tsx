@@ -2,17 +2,22 @@ import { tv } from 'tailwind-variants';
 import { View } from './tw';
 import { Label } from './primitives';
 import { Text } from './Text';
+import { NEON_FIELD } from './cards/neon-field';
+import { resolveControlTone, toneVariants, type ControlTone, type District } from './district';
 
-// Extracted label + hint/error shell from TextField — presentational only;
-// the control itself comes in as children (controlled by the parent).
+// The label + hint/error shell from TextField, for controls that bring their
+// own input: the label is the neon nameplate (a solid tone tag in the display
+// face), the error is apple 400 in the display face. Presentational only; the
+// control comes in as children, controlled by the parent.
 const formField = tv({
   slots: {
-    root: 'gap-1.5',
-    label: 'text-sm font-medium text-text',
-    message: 'text-sm text-danger',
+    root: NEON_FIELD.root,
+    label: NEON_FIELD.label,
+    message: NEON_FIELD.message,
   },
   variants: {
-    disabled: { true: { root: 'opacity-50' } },
+    tone: toneVariants((c) => ({ label: `${c.face} ${c.onFace}` })),
+    disabled: { true: { root: NEON_FIELD.disabled } },
   },
 });
 
@@ -23,10 +28,14 @@ export interface FormFieldProps {
   error?: string;
   disabled?: boolean;
   className?: string;
+  /** Colour family of the nameplate. Overrides `district`. */
+  tone?: ControlTone;
+  /** Theme by neighbourhood. Default Midtown (orange). */
+  district?: District;
 }
 
-export function FormField({ label, children, hint, error, disabled, className }: FormFieldProps) {
-  const s = formField({ disabled });
+export function FormField({ label, children, hint, error, disabled, className, tone, district }: FormFieldProps) {
+  const s = formField({ disabled, tone: resolveControlTone(tone, district) });
   return (
     <View className={s.root({ className })}>
       <Label className={s.label()}>{label}</Label>
@@ -34,7 +43,7 @@ export function FormField({ label, children, hint, error, disabled, className }:
       {error ? (
         <Text role="alert" className={s.message()}>{error}</Text>
       ) : hint ? (
-        <Text tone="muted" variant="caption">{hint}</Text>
+        <Text className={NEON_FIELD.hint}>{hint}</Text>
       ) : null}
     </View>
   );

@@ -4,27 +4,23 @@ import { PasteWrapper, type PasteEventPayload } from './paste-wrapper';
 import { View, Text as TWText } from './tw';
 import { Textarea as PrimitiveTextarea, Label } from './primitives';
 import { Text } from './Text';
-import { NEON_FIELD, neonErrorCompound, neonFieldCompounds } from './cards/neon-field';
+import { NEON_FIELD, neonErrorVariant, neonFieldCompounds, neonLabelCompounds } from './cards/neon-field';
 import { resolveControlTone, toneVariants, type ControlTone, type District } from './district';
 
 const field = tv({
   slots: {
-    root: 'gap-1.5',
-    label: 'text-sm font-medium text-text',
-    input:
-      'min-h-24 rounded-lg border-2 border-border bg-surface-raised px-3.5 py-2.5 text-base text-text ' +
-      'placeholder:text-text-muted/70 transition-all duration-fast ' +
-      'focus:shadow-card focus:outline-none motion-reduce:transition-none',
-    message: 'text-sm',
+    root: NEON_FIELD.root,
+    label: NEON_FIELD.label,
+    input: `${NEON_FIELD.input} min-h-24 align-top`,
+    message: NEON_FIELD.message,
   },
   variants: {
-    error: { true: { input: 'border-danger focus:border-danger', message: 'text-danger' } },
-    disabled: { true: { input: 'opacity-50' } },
-    // neon: the NeonBlade input look (see cards/neon-field.ts); default is the kit field.
-    variant: { default: {}, neon: { label: NEON_FIELD.label, input: NEON_FIELD.input } },
+    error: { true: neonErrorVariant('input'), false: {} },
+    disabled: { true: { input: NEON_FIELD.disabled } },
     tone: toneVariants(() => ({})),
   },
-  compoundVariants: [...neonFieldCompounds('input'), neonErrorCompound('input')],
+  compoundVariants: [...neonFieldCompounds('input'), ...neonLabelCompounds()],
+  defaultVariants: { error: false },
 });
 
 export interface TextareaProps extends React.ComponentProps<typeof PrimitiveTextarea> {
@@ -33,20 +29,20 @@ export interface TextareaProps extends React.ComponentProps<typeof PrimitiveText
   error?: string;
   disabled?: boolean;
   containerClassName?: string;
-  /** neon is the NeonBlade input look; default is the kit field. */
+  /** The NYC-MON field is the only look; `neon` and `default` are both accepted for older callers. */
   variant?: 'default' | 'neon';
-  /** neon: colour family. Overrides `district`. */
+  /** Colour family for the nameplate and well border. Overrides `district`. */
   tone?: ControlTone;
-  /** neon: theme by neighbourhood. */
+  /** Theme by neighbourhood. Default Midtown (orange). */
   district?: District;
   /** Rich paste (text / images / GIFs from the clipboard) via expo-paste-input — iOS, Android, and web. */
   onPaste?: (payload: PasteEventPayload) => void;
 }
 
 export function Textarea({
-  label, hint, error, disabled, className, containerClassName, variant = 'default', tone, district, onPaste, ...inputProps
+  label, hint, error, disabled, className, containerClassName, variant: _variant, tone, district, onPaste, ...inputProps
 }: TextareaProps) {
-  const s = field({ error: !!error, disabled, variant, tone: resolveControlTone(tone, district) });
+  const s = field({ error: !!error, disabled, tone: resolveControlTone(tone, district) });
   const input = (
     <PrimitiveTextarea
       aria-label={label}
@@ -65,17 +61,17 @@ export function Textarea({
             {input}
             <View
               aria-hidden
-              className="absolute right-3 top-3 rounded-md border-2 border-border bg-surface-sunken px-1.5 py-0.5"
+              className={`absolute right-3 top-3 ${NEON_FIELD.chip}`}
             >
-              <TWText className="text-[10px] font-semibold tracking-wide text-text-muted">⌘V</TWText>
+              <TWText className={NEON_FIELD.chipText}>⌘V</TWText>
             </View>
           </View>
         </PasteWrapper>
       ) : input}
       {error ? (
-        <Text className={s.message()}>{error}</Text>
+        <Text role="alert" className={s.message()}>{error}</Text>
       ) : hint ? (
-        <Text tone="muted" variant="caption">{hint}</Text>
+        <Text className={NEON_FIELD.hint}>{hint}</Text>
       ) : null}
     </View>
   );

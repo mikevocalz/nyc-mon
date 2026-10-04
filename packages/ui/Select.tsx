@@ -3,27 +3,23 @@ import { tv } from 'tailwind-variants';
 import { View } from './tw';
 import { Select as PrimitiveSelect, Label } from './primitives';
 import { Text } from './Text';
-import { NEON_FIELD, neonErrorCompound, neonFieldCompounds } from './cards/neon-field';
+import { NEON_FIELD, neonErrorVariant, neonFieldCompounds, neonLabelCompounds } from './cards/neon-field';
 import { resolveControlTone, toneVariants, type ControlTone, type District } from './district';
 
 const field = tv({
   slots: {
-    root: 'gap-1.5',
-    label: 'text-sm font-medium text-text',
-    select:
-      'rounded-lg border-2 border-border bg-surface-raised px-3.5 py-2.5 text-base text-text ' +
-      'placeholder:text-text-muted/70 transition-all duration-fast ' +
-      'focus:shadow-card focus:outline-none motion-reduce:transition-none',
-    message: 'text-sm',
+    root: NEON_FIELD.root,
+    label: NEON_FIELD.label,
+    select: `${NEON_FIELD.input}`,
+    message: NEON_FIELD.message,
   },
   variants: {
-    error: { true: { select: 'border-danger focus:border-danger', message: 'text-danger' } },
-    disabled: { true: { select: 'opacity-50' } },
-    // neon: the NeonBlade input look (see cards/neon-field.ts); default is the kit field.
-    variant: { default: {}, neon: { label: NEON_FIELD.label, select: NEON_FIELD.input } },
+    error: { true: neonErrorVariant('select'), false: {} },
+    disabled: { true: { select: NEON_FIELD.disabled } },
     tone: toneVariants(() => ({})),
   },
-  compoundVariants: [...neonFieldCompounds('select'), neonErrorCompound('select')],
+  compoundVariants: [...neonFieldCompounds('select'), ...neonLabelCompounds()],
+  defaultVariants: { error: false },
 });
 
 export interface SelectOption {
@@ -40,18 +36,18 @@ export interface SelectProps extends React.ComponentProps<typeof PrimitiveSelect
   containerClassName?: string;
   /** Options as data (NeonBlade's API). Rendered before any option children. */
   options?: SelectOption[];
-  /** neon is the NeonBlade input look; default is the kit field. */
+  /** The NYC-MON field is the only look; `neon` and `default` are both accepted for older callers. */
   variant?: 'default' | 'neon';
-  /** neon: colour family. Overrides `district`. */
+  /** Colour family for the nameplate and well border. Overrides `district`. */
   tone?: ControlTone;
-  /** neon: theme by neighbourhood. */
+  /** Theme by neighbourhood. Default Midtown (orange). */
   district?: District;
 }
 
 export function Select({
-  label, hint, error, disabled, className, containerClassName, variant = 'default', tone, district, options, children, ...selectProps
+  label, hint, error, disabled, className, containerClassName, variant: _variant, tone, district, options, children, ...selectProps
 }: SelectProps) {
-  const s = field({ error: !!error, disabled, variant, tone: resolveControlTone(tone, district) });
+  const s = field({ error: !!error, disabled, tone: resolveControlTone(tone, district) });
   return (
     <View className={s.root({ className: containerClassName })}>
       <Label className={s.label()}>{label}</Label>
@@ -68,9 +64,9 @@ export function Select({
         {children}
       </PrimitiveSelect>
       {error ? (
-        <Text className={s.message()}>{error}</Text>
+        <Text role="alert" className={s.message()}>{error}</Text>
       ) : hint ? (
-        <Text tone="muted" variant="caption">{hint}</Text>
+        <Text className={NEON_FIELD.hint}>{hint}</Text>
       ) : null}
     </View>
   );

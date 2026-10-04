@@ -1,11 +1,16 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Select } from './Select';
 import { View } from './tw';
+import { CONTROL_TONES, DISTRICTS } from './district';
 
 const meta = {
   title: 'UI/Select',
   component: Select,
   args: { label: 'Role' },
+  argTypes: {
+    district: { control: 'inline-radio', options: [undefined, ...DISTRICTS] },
+    tone: { control: 'select', options: [undefined, ...CONTROL_TONES] },
+  },
 } satisfies Meta<typeof Select>;
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -37,14 +42,14 @@ const DISTRICT_OPTIONS = [
   { value: 'megacity', label: 'Mega City' },
 ];
 
-/** Neon select, options passed as data (NeonBlade's API). */
+/** District showcase, options passed as data (NeonBlade's API). */
 export const Neon: Story = {
   render: () => (
-    <View className="max-w-content-form gap-5 bg-ink-950 p-6">
-      <Select variant="neon" district="downtown" label="Home district" value="downtown" options={DISTRICT_OPTIONS} />
-      <Select variant="neon" district="midtown" label="Rival district" value="harlem" options={DISTRICT_OPTIONS} />
-      <Select variant="neon" district="harlem" label="Missing" value="" error="Choose a district." options={[{ value: '', label: 'Choose one' }, ...DISTRICT_OPTIONS]} />
-      <Select variant="neon" district="megacity" label="Locked" disabled value="megacity" options={DISTRICT_OPTIONS} />
+    <View className="max-w-content-form gap-5 p-4">
+      <Select district="downtown" label="Home district" value="downtown" options={DISTRICT_OPTIONS} />
+      <Select district="midtown" label="Rival district" value="harlem" options={DISTRICT_OPTIONS} />
+      <Select district="harlem" label="Missing" value="" error="Choose a district." options={[{ value: '', label: 'Choose one' }, ...DISTRICT_OPTIONS]} />
+      <Select district="megacity" label="Locked" disabled value="megacity" options={DISTRICT_OPTIONS} />
     </View>
   ),
 };

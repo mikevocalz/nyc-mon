@@ -1,4 +1,7 @@
 'use client';
+// RN globals before Reanimated: it reads __DEV__ at module scope, and on web
+// this file can be the first kit module a page evaluates.
+import '../rn-globals-shim';
 import Animated from 'react-native-reanimated';
 import { tv } from 'tailwind-variants';
 import { haptics } from '../haptics';

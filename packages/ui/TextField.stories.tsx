@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { TextField, type PasteEventPayload } from './TextField';
 import { View } from './tw';
+import { CONTROL_TONES, DISTRICTS } from './district';
 import { Text } from './Text';
 import { Image } from './Image';
 import { create } from 'zustand';
@@ -15,7 +16,15 @@ const usePasteStory = create<{
   addImages: (uris) => set((s) => ({ images: [...s.images, ...uris] })),
 }));
 
-const meta = { title: 'UI/TextField', component: TextField, args: { label: 'Field' } } satisfies Meta<typeof TextField>;
+const meta = {
+  title: 'UI/TextField',
+  component: TextField,
+  args: { label: 'Field' },
+  argTypes: {
+    district: { control: 'inline-radio', options: [undefined, ...DISTRICTS] },
+    tone: { control: 'select', options: [undefined, ...CONTROL_TONES] },
+  },
+} satisfies Meta<typeof TextField>;
 export default meta;
 type Story = StoryObj<typeof meta>;
 
@@ -67,15 +76,15 @@ export const WithPaste: Story = {
   },
 };
 
-/** NeonBlade neon input: tone nameplate label, night well, focus glow. One per district plus error and disabled. */
+/** District showcase: tone nameplate label, night well, focus glow. One per district plus error and disabled. */
 export const Neon: Story = {
   render: () => (
-    <View className="max-w-content-form gap-5 bg-ink-950 p-6">
-      <TextField variant="neon" district="downtown" label="Crew name" placeholder="Wall Street Wolves" />
-      <TextField variant="neon" district="midtown" label="Home block" placeholder="W 34th St & 5th Ave" />
-      <TextField variant="neon" district="harlem" label="Stoop" placeholder="Lenox Ave" hint="The corner you play from." />
-      <TextField variant="neon" district="megacity" label="Sky bridge" error="Pick a bridge that exists." defaultValue="Level 90" />
-      <TextField variant="neon" label="Locked" disabled defaultValue="Read only" />
+    <View className="max-w-content-form gap-5 p-4">
+      <TextField district="downtown" label="Crew name" placeholder="Wall Street Wolves" />
+      <TextField district="midtown" label="Home block" placeholder="W 34th St & 5th Ave" />
+      <TextField district="harlem" label="Stoop" placeholder="Lenox Ave" hint="The corner you play from." />
+      <TextField district="megacity" label="Sky bridge" error="Pick a bridge that exists." defaultValue="Level 90" />
+      <TextField label="Locked" disabled defaultValue="Read only" />
     </View>
   ),
 };

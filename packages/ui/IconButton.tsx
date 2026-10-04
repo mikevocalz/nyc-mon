@@ -1,39 +1,40 @@
 'use client';
-import { tv, type VariantProps } from 'tailwind-variants';
+import { tv } from 'tailwind-variants';
 import { haptics } from './haptics';
 import { PressScale } from './press-scale';
+import { View } from './tw';
 import { CornerCutFrame } from './neon/CornerCutFrame';
 import type { CutCorner } from './neon/corner-cut';
-import { resolveControlTone, toneInput, type ControlTone, type District } from './district';
+import { TONE_CLASSES, type ControlTone, type District } from './district';
+import { DISABLED_FRAME_TONE, controlLook, frameTone, type IconButtonVariant } from './control-look';
 
-// Press feedback: §8 ladder rung 1 — active-state opacity via NW5 transitions;
-// motion-reduce kills transitions.
+// The NYC-MON icon button. Solid and outline looks draw a square
+// CornerCutFrame; ghost stays a compact, frameless hit area for nav bars,
+// with a soft tone tint on hover. The caller's icon keeps its own colour.
+// motion-reduce kills the transitions.
 const iconButton = tv({
-  base:
-    'shrink-0 items-center justify-center self-start rounded-md border-2 border-border-strong transition-all duration-fast ' +
-    'active:translate-x-[2px] active:translate-y-[2px] active:shadow-none ' +
-    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/50 focus-visible:ring-offset-2 ' +
-    'motion-reduce:transition-none',
+  slots: {
+    root:
+      'group shrink-0 self-start rounded-none border-0 bg-transparent transition-transform duration-fast ' +
+      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/60 focus-visible:ring-offset-2 ' +
+      'motion-reduce:transition-none',
+    tint: 'pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-fast group-hover:opacity-100 motion-reduce:transition-none',
+  },
   variants: {
-    variant: {
-      primary: 'bg-primary shadow-card hover:bg-primary-pressed',
-      ghost: 'border-transparent bg-transparent hover:bg-surface-sunken',
-      outline: 'bg-surface-raised shadow-card hover:bg-surface-sunken',
-      // NeonBlade corner-cut: CornerCutFrame draws the face inside; the root keeps only the hit area.
-      cornerCut: 'h-auto w-auto rounded-none border-0 bg-transparent shadow-none',
+    look: {
+      solid: { root: 'active:translate-x-[2px] active:translate-y-[2px]' },
+      outline: { root: 'active:translate-x-[2px] active:translate-y-[2px]' },
+      ghost: { root: 'relative items-center justify-center' },
     },
-    size: {
-      sm: 'h-8 w-8',
-      md: 'h-10 w-10',
-      lg: 'h-12 w-12',
-    },
-    disabled: { true: 'opacity-50' },
+    size: { sm: {}, md: {}, lg: {} },
+    disabled: { true: { root: 'cursor-not-allowed active:translate-x-0 active:translate-y-0' } },
   },
   compoundVariants: [
-    { variant: 'cornerCut', class: 'h-auto w-auto' },
-    { variant: 'cornerCut', disabled: true, class: 'opacity-100' },
+    { look: 'ghost', size: 'sm', class: { root: 'h-8 w-8' } },
+    { look: 'ghost', size: 'md', class: { root: 'h-10 w-10' } },
+    { look: 'ghost', size: 'lg', class: { root: 'h-12 w-12' } },
   ],
-  defaultVariants: { variant: 'primary', size: 'md', disabled: false },
+  defaultVariants: { look: 'solid', size: 'md', disabled: false },
 });
 
 // Face size and cut per size. md and lg clear the 44px touch target.
@@ -43,43 +44,62 @@ const CUT_FACE = {
   lg: { className: 'h-12 w-12', cut: 12 },
 } as const;
 
-export interface IconButtonProps extends VariantProps<typeof iconButton> {
+export interface IconButtonProps {
   icon: React.ReactNode;
   'aria-label': string;
   onPress?: () => void;
   className?: string;
-  /** cornerCut: colour family. Overrides `district`. */
+  /**
+   * Default (no variant, `cornerCut` or `neon`): the solid corner-cut tile.
+   * primary = default, outline = night tile with a tone border, ghost = no
+   * frame (nav bars), tone tint on hover.
+   */
+  variant?: IconButtonVariant;
+  size?: 'sm' | 'md' | 'lg';
+  disabled?: boolean;
+  /** Colour family. Overrides `district`. */
   tone?: ControlTone;
-  /** cornerCut: theme by neighbourhood. */
+  /** Theme by neighbourhood. Default Midtown. */
   district?: District;
-  /** cornerCut: which corner is cut. Default bottom-right. */
+  /** Which corner is cut. Default bottom-right. */
   corner?: CutCorner;
 }
 
 export function IconButton({
-  icon, onPress, variant, size, disabled, className, tone, district, corner = 'bottom-right', ...a11y
+  icon, onPress, variant, size = 'md', disabled, className, tone: toneProp, district, corner = 'bottom-right', ...a11y
 }: IconButtonProps) {
-  const face = CUT_FACE[size ?? 'md'];
+  const { look, tone } = controlLook(variant, toneProp, district);
+  const s = iconButton({ look, size, disabled });
+  const face = CUT_FACE[size];
+  const iconColor = disabled ? 'text-ink-400' : look === 'solid' ? TONE_CLASSES[tone].onFace : TONE_CLASSES[tone].text;
   return (
     <PressScale
       onPress={disabled ? undefined : () => { haptics.tap(); onPress?.(); }}
       aria-disabled={disabled}
       accessibilityState={{ disabled: !!disabled }}
-      className={iconButton({ variant, size, disabled, className })}
+      // The root carries the icon colour (currentColor) for icons that set none;
+      // a caller's own icon class (text-text-muted in nav bars) still wins.
+      className={s.root({ className: `${iconColor} ${className ?? ''}` })}
       outerClassName="self-start"
       {...a11y}
     >
-      {variant === 'cornerCut' ? (
+      {look === 'ghost' ? (
+        <>
+          <View aria-hidden className={s.tint({ className: TONE_CLASSES[tone].soft })} />
+          {icon}
+        </>
+      ) : (
         <CornerCutFrame
-          tone={disabled ? 'silver' : toneInput(resolveControlTone(tone, district))}
+          tone={disabled ? DISABLED_FRAME_TONE : frameTone(look, tone)}
+          variant={disabled || look === 'outline' ? 'outline' : 'solid'}
           corner={corner}
           cut={face.cut}
           depth={disabled ? 0 : 3}
-          className={`items-center justify-center ${face.className}`}
+          className={`items-center justify-center ${face.className} ${iconColor}`}
         >
           {icon}
         </CornerCutFrame>
-      ) : icon}
+      )}
     </PressScale>
   );
 }

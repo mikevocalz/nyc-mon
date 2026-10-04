@@ -4,6 +4,7 @@ import { Text as TWText, View } from './tw';
 import { Text } from './Text';
 import { Image } from './Image';
 import { create } from 'zustand';
+import { CONTROL_TONES, DISTRICTS, DISTRICT_NAME } from './district';
 
 // Story state — zustand always (repo rule).
 const useDropStory = create<{
@@ -15,7 +16,15 @@ const useDropStory = create<{
   addAssets: (assets) => set((s) => ({ active: false, dropped: [...s.dropped, ...assets] })),
 }));
 
-const meta = { title: 'UI/DropZone', component: DropZone } satisfies Meta<typeof DropZone>;
+const meta = {
+  title: 'UI/DropZone',
+  component: DropZone,
+  argTypes: {
+    district: { control: 'inline-radio', options: [undefined, ...DISTRICTS] },
+    tone: { control: 'select', options: [undefined, ...CONTROL_TONES] },
+    active: { control: 'boolean' },
+  },
+} satisfies Meta<typeof DropZone>;
 export default meta;
 type Story = StoryObj<typeof meta>;
 
@@ -59,6 +68,24 @@ export const CustomContent: Story = {
   render: () => (
     <View className="max-w-content-form p-6">
       <DropZone title="Add attachments" description="Up to 10 files. Images, PDFs, and text." glyph="🖼️" />
+    </View>
+  ),
+};
+
+/** District showcase: resting (dashed) and drag-over (solid border, accent glow). */
+export const Districts: Story = {
+  render: () => (
+    <View className="gap-4 p-6 md:flex-row md:flex-wrap">
+      {DISTRICTS.map((d, i) => (
+        <DropZone
+          key={d}
+          district={d}
+          active={i % 2 === 1}
+          title={i % 2 === 1 ? 'Release to attach' : `Drop a ${DISTRICT_NAME[d]} photo`}
+          description="Images, documents and audio."
+          className="md:w-80"
+        />
+      ))}
     </View>
   ),
 };

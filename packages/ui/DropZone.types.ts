@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import type { View } from './tw';
+import type { ControlTone, District } from './district';
 
 export type DropAsset = {
   uri?: string;
@@ -36,4 +37,8 @@ export interface DropZoneProps extends Omit<React.ComponentProps<typeof View>, '
   title?: string;
   description?: string;
   glyph?: ReactNode;
+  /** Colour family of the dashed border, glyph tile and drag glow. Overrides `district`. */
+  tone?: ControlTone;
+  /** Theme by neighbourhood. Default Midtown (orange). */
+  district?: District;
 }
