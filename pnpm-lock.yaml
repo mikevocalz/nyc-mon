@@ -222,8 +222,8 @@ catalogs:
       specifier: 7.5.0
       version: 7.5.0
     '@reactvision/react-viro':
-      specifier: github:mikevocalz/viro#5393d00744f448fc462ef13ee76b1346fc47512e
-      version: git+https://github.com/mikevocalz/viro.git#5393d00744f448fc462ef13ee76b1346fc47512e
+      specifier: file:vendor/reactvision-react-viro-3.0.2-moyo.1.tgz
+      version: file:vendor/reactvision-react-viro-3.0.2-moyo.1.tgz
     '@reactvision/viro-web-renderer':
       specifier: 1.0.1
       version: 1.0.1
@@ -686,7 +686,7 @@ importers:
         version: 7.5.0(react-native@0.88.0-rc.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0-rc.3(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0)
       '@reactvision/react-viro':
         specifier: 'catalog:'
-        version: git+https://github.com/mikevocalz/viro.git#5393d00744f448fc462ef13ee76b1346fc47512e(bbb1974c15b26f91fe29d6c02c6b0802)
+        version: file:vendor/reactvision-react-viro-3.0.2-moyo.1.tgz(bbb1974c15b26f91fe29d6c02c6b0802)
       '@rive-app/react-native':
         specifier: 'catalog:'
         version: 0.5.2(react-native-nitro-modules@0.37.1(react-native@0.88.0-rc.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0-rc.3(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0))(react-native@0.88.0-rc.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0-rc.3(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0)
@@ -943,7 +943,7 @@ importers:
         version: 16.3.8
       '@reactvision/react-viro':
         specifier: 'catalog:'
-        version: git+https://github.com/mikevocalz/viro.git#5393d00744f448fc462ef13ee76b1346fc47512e(bbb1974c15b26f91fe29d6c02c6b0802)
+        version: file:vendor/reactvision-react-viro-3.0.2-moyo.1.tgz(bbb1974c15b26f91fe29d6c02c6b0802)
       '@reactvision/viro-web-renderer':
         specifier: 'catalog:'
         version: 1.0.1
@@ -1321,7 +1321,7 @@ importers:
         version: link:../ui
       '@reactvision/react-viro':
         specifier: 'catalog:'
-        version: git+https://github.com/mikevocalz/viro.git#5393d00744f448fc462ef13ee76b1346fc47512e(bbb1974c15b26f91fe29d6c02c6b0802)
+        version: file:vendor/reactvision-react-viro-3.0.2-moyo.1.tgz(bbb1974c15b26f91fe29d6c02c6b0802)
       '@reactvision/viro-web-renderer':
         specifier: 'catalog:'
         version: 1.0.1
@@ -4130,8 +4130,8 @@ packages:
   '@react-navigation/routers@7.6.4':
     resolution: {integrity: sha512-GI7eJm8/KsZUQaYcXvEExikKurRZRgEsSzyZ7faENfi65yqJBCXjDMwyN1pF6pNW1MoLH1ErDwDivFxY6BzD3w==}
 
-  '@reactvision/react-viro@git+https://github.com/mikevocalz/viro.git#5393d00744f448fc462ef13ee76b1346fc47512e':
-    resolution: {commit: 5393d00744f448fc462ef13ee76b1346fc47512e, repo: https://github.com/mikevocalz/viro.git, type: git}
+  '@reactvision/react-viro@file:vendor/reactvision-react-viro-3.0.2-moyo.1.tgz':
+    resolution: {integrity: sha512-1BUmRSvnGPc6yyNHoWLSENtovojBvXx9nVo8ZxFydUm6QBFIKLNTn1Fo9Z3kGxLFt7dSEUzOmKVwvwFxTCgYbA==, tarball: file:vendor/reactvision-react-viro-3.0.2-moyo.1.tgz}
     version: 3.0.2-moyo.1
     engines: {react-native: '>=0.86.0 <0.89.0'}
     hasBin: true
@@ -6796,7 +6796,7 @@ packages:
     resolution: {integrity: sha512-g7IYrZ+XvT+KBWvmPBCagK/9KHPLvdlky8g+h+lGBmKSlsgODnM/Vc+MrDjiBi+sQ99bI8mWm+wQqC8anfFlzA==}
     peerDependencies:
       expo: '*'
-      react: '*'
+      react: 19.3.0
       react-native: '*'
 
   expo-paste-input@0.2.2:
@@ -13316,7 +13316,7 @@ snapshots:
     dependencies:
       nanoid: 3.3.18
 
-  '@reactvision/react-viro@git+https://github.com/mikevocalz/viro.git#5393d00744f448fc462ef13ee76b1346fc47512e(bbb1974c15b26f91fe29d6c02c6b0802)':
+  '@reactvision/react-viro@file:vendor/reactvision-react-viro-3.0.2-moyo.1.tgz(bbb1974c15b26f91fe29d6c02c6b0802)':
     dependencies:
       '@babel/parser': 7.29.9
       '@babel/traverse': 7.29.7(supports-color@8.1.1)
@@ -15148,7 +15148,9 @@ snapshots:
   '@xtuc/long@4.2.2':
     optional: true
 
-  abort-controller@3.0.0: {}
+  abort-controller@3.0.0:
+    dependencies:
+      event-target-shim: 5.0.1
 
   accepts@1.3.8:
     dependencies:
