@@ -163,3 +163,11 @@ test('§1.3: no white-on-orange or orange-on-royal in component code', () => {
   }
   assert.deepEqual(hits, []);
 });
+
+test('the contrast tables in the docs match the registry', async () => {
+  const { render } = await import('./contrast-docs.ts');
+  for (const file of ['docs/design/CONTRAST.md', 'docs/DESIGN_SYSTEM.md']) {
+    const text = readFileSync(join(ROOT, file), 'utf8');
+    assert.equal(render(file, text), text, `${file} is stale; run: node packages/theme/contrast-docs.ts`);
+  }
+});

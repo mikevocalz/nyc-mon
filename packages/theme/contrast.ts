@@ -153,6 +153,14 @@ export interface Measurement {
 const SURFACES = ['bg', 'surface', 'surface-raised', 'surface-sunken'] as const;
 const NIGHT = ['ink-950'] as const;
 
+/** The themed tone text tokens (ghost labels, slider counter): tone-<tone>-text. */
+const TONE_TEXT = ['orange', 'royal', 'carolina', 'leaf', 'apple', 'brick'].map((t) => `tone-${t}-text`);
+/** Each tone's hover tint, as TONE_CLASSES[tone].soft paints it behind a ghost label. */
+const TONE_SOFT: Record<string, string> = {
+  orange: 'orange-500/15', royal: 'royal-500/15', carolina: 'carolina-500/15', leaf: 'leaf-500/15', apple: 'apple-500/15', brick: 'orange-800/25',
+};
+const TONE_TEXT_LINE: Record<string, number> = { orange: 123, royal: 131, carolina: 138, leaf: 145, apple: 153, brick: 160 };
+
 /** Token contract: every semantic text token on every surface, and every on-* on its fill. */
 const CONTRACT: Pair[] = [
   ...(['text', 'text-muted', 'primary', 'accent', 'success', 'danger', 'info'] as const).flatMap((fg) =>
@@ -172,6 +180,9 @@ const CONTRACT: Pair[] = [
       ['text-inverse', 'text'],
     ] as const
   ).map(([fg, bg]): Pair => ({ id: `contract:${fg}/${bg}`, fg, bg: [bg], role: 'text', usedAt: [] })),
+  ...(TONE_TEXT).flatMap((fg) =>
+    SURFACES.map((s): Pair => ({ id: `contract:${fg}/${s}`, fg, bg: [s], role: 'text', usedAt: [] })),
+  ),
   ...(['focus', 'border-strong', 'structure'] as const).flatMap((fg) =>
     SURFACES.map((s): Pair => ({ id: `contract:${fg}/${s}`, fg, bg: [s], role: 'ui', usedAt: [] })),
   ),
@@ -215,9 +226,25 @@ const USAGE: Pair[] = [
   { id: 'profile ring hover', fg: 'border-strong', bg: ['surface'], role: 'ui', usedAt: ['apps/web/components/site/SiteHeader.tsx:203'] },
   { id: 'unread dot', fg: 'danger', bg: ['surface-raised'], role: 'ui', usedAt: ['apps/mobile/components/AppHeader.tsx:71'] },
   { id: 'theme border', fg: 'border', bg: ['surface-raised'], role: 'decorative', usedAt: ['apps/mobile/components/EventActionsSheet.tsx:42', 'apps/mobile/components/AppHeader.tsx:68'], reason: 'frame on controls whose text label or icon identifies them; separators' },
-  { id: 'neon glow', fg: 'glow', bg: ['bg'], role: 'decorative', usedAt: ['packages/theme/tokens.ts:340', 'packages/ui/district/tones.ts:126'], reason: 'box-shadow halo behind a surface that already has its own edge; fully transparent on daylit (no glow in daylight)' },
+  { id: 'neon glow', fg: 'glow', bg: ['bg'], role: 'decorative', usedAt: ['packages/theme/tokens.ts:340', 'packages/ui/district/tones.ts:132'], reason: 'box-shadow halo behind a surface that already has its own edge; fully transparent on daylit (no glow in daylight)' },
   { id: 'hot glow', fg: 'glow-hot', bg: ['bg'], role: 'decorative', usedAt: ['packages/theme/tokens.ts:343', 'apps/mobile/components/AppTabBar.tsx:84'], reason: 'box-shadow halo behind a surface that already has its own edge; fully transparent on daylit (no glow in daylight)' },
   { id: 'structure rule /40', fg: 'structure/40', bg: ['bg'], role: 'decorative', usedAt: ['apps/mobile/components/AppTabBar.tsx:128', 'apps/web/components/site/SiteFooter.tsx:28'], reason: 'section rule; no information' },
+
+  // -- tone text on the page (themed tone-*-text: night step dark, page step light)
+  // Ghost Button / IconButton labels and the CardSlider counter sit straight on
+  // the page. The hover tint row is measured over surface-sunken, the darkest
+  // page surface, so it is the worst case for the 15% (brick 25%) tint.
+  ...Object.keys(TONE_SOFT).flatMap((t): Pair[] => {
+    const at = [`packages/ui/district/tones.ts:${TONE_TEXT_LINE[t]}`, 'packages/ui/Button.tsx:73', 'packages/ui/IconButton.tsx:79'];
+    return [
+      { id: `${t} ghost label on page`, fg: `tone-${t}-text`, bg: ['bg'], role: 'text', usedAt: [...at, 'packages/ui/cards/CardSlider.shared.tsx:33'] },
+      { id: `${t} ghost label on hover tint`, fg: `tone-${t}-text`, bg: ['surface-sunken', TONE_SOFT[t]!], role: 'text', usedAt: [...at, 'packages/ui/Button.tsx:132'], reason: 'tint layer fades in on group-hover; measured on the sunken page surface' },
+    ];
+  }),
+  { id: 'disabled ghost label on page', fg: 'ink-400', bg: ['concrete-50'], role: 'disabled', usedAt: ['packages/ui/Button.tsx:48', 'packages/ui/IconButton.tsx:79'], reason: 'inactive control: aria-disabled, no press handler' },
+  // Validation and recorder errors sit under the field well on the page, not
+  // on night: the themed danger (apple-600 daylit, apple-400 night).
+  { id: 'field error message on page', fg: 'danger', bg: ['bg'], role: 'text', usedAt: ['packages/ui/cards/neon-field.ts:22', 'packages/ui/ErrorMessage.tsx:21', 'packages/ui/cards/NeonCheckbox.tsx:80', 'packages/ui/audio/VoiceRecorder.native.tsx:288'] },
 
   // -- night facades (palette steps: mode-invariant) -------------------------
   { id: 'title on night', fg: 'ink-50', bg: NIGHT, role: 'text', usedAt: ['packages/ui/Card.tsx:36', 'packages/ui/cards/neon-field.ts:15', 'packages/ui/ToastCard.tsx:37'] },
@@ -231,12 +258,12 @@ const USAGE: Pair[] = [
   { id: 'pager text on ink-900', fg: 'silver-400', bg: ['ink-900'], role: 'text', usedAt: ['packages/ui/DataTable.tsx:51'] },
   { id: 'axis tick on night', fg: 'silver-500', bg: NIGHT, role: 'text', usedAt: ['packages/ui/charts/NeonBarChart.tsx:64', 'packages/ui/charts/NeonLineChart.tsx:78', 'packages/ui/nav/SiteFooter.tsx:81'] },
   { id: 'placeholder on field well', fg: 'silver-500', bg: NIGHT, role: 'text', usedAt: ['packages/ui/cards/neon-field.ts:16'] },
-  { id: 'orange tone text on night', fg: 'orange-400', bg: NIGHT, role: 'text', usedAt: ['packages/ui/district/tones.ts:117', 'packages/ui/nav/SiteFooter.tsx:86'] },
-  { id: 'royal tone text on night', fg: 'royal-300', bg: NIGHT, role: 'text', usedAt: ['packages/ui/district/tones.ts:125', 'packages/ui/nav/SiteFooter.tsx:87'] },
-  { id: 'carolina tone text on night', fg: 'carolina-400', bg: NIGHT, role: 'text', usedAt: ['packages/ui/district/tones.ts:132', 'packages/ui/nav/SiteFooter.tsx:88'] },
-  { id: 'leaf tone text on night', fg: 'leaf-400', bg: NIGHT, role: 'text', usedAt: ['packages/ui/district/tones.ts:139', 'packages/ui/charts/StatCard.tsx:72'] },
-  { id: 'apple tone text on night', fg: 'apple-400', bg: NIGHT, role: 'text', usedAt: ['packages/ui/district/tones.ts:147', 'packages/ui/cards/neon-field.ts:18', 'packages/ui/Menu.web.tsx:63'] },
-  { id: 'brick tone text on night', fg: 'orange-300', bg: NIGHT, role: 'text', usedAt: ['packages/ui/district/tones.ts:154'] },
+  { id: 'orange tone text on night', fg: 'orange-400', bg: NIGHT, role: 'text', usedAt: ['packages/ui/district/tones.ts:123', 'packages/ui/nav/SiteFooter.tsx:86'] },
+  { id: 'royal tone text on night', fg: 'royal-300', bg: NIGHT, role: 'text', usedAt: ['packages/ui/district/tones.ts:131', 'packages/ui/nav/SiteFooter.tsx:87'] },
+  { id: 'carolina tone text on night', fg: 'carolina-400', bg: NIGHT, role: 'text', usedAt: ['packages/ui/district/tones.ts:138', 'packages/ui/nav/SiteFooter.tsx:88'] },
+  { id: 'leaf tone text on night', fg: 'leaf-400', bg: NIGHT, role: 'text', usedAt: ['packages/ui/district/tones.ts:145', 'packages/ui/charts/StatCard.tsx:72'] },
+  { id: 'apple tone text on night', fg: 'apple-400', bg: NIGHT, role: 'text', usedAt: ['packages/ui/district/tones.ts:153', 'packages/ui/Menu.web.tsx:63', 'packages/ui/audio/PlayerShell.tsx:34'] },
+  { id: 'brick tone text on night', fg: 'orange-300', bg: NIGHT, role: 'text', usedAt: ['packages/ui/district/tones.ts:160'] },
   { id: 'sort glyph carolina-300', fg: 'carolina-300', bg: ['ink-900'], role: 'ui', usedAt: ['packages/ui/DataTable.tsx:59'] },
   { id: 'sort glyph leaf-300', fg: 'leaf-300', bg: ['ink-900'], role: 'ui', usedAt: ['packages/ui/DataTable.tsx:60'] },
   { id: 'sort glyph apple-300', fg: 'apple-300', bg: ['ink-900'], role: 'ui', usedAt: ['packages/ui/DataTable.tsx:62'] },
@@ -245,27 +272,27 @@ const USAGE: Pair[] = [
   { id: 'carolina eyebrow on glass card', fg: 'carolina-500', bg: ['concrete-50', 'ink-950/85'], role: 'text', usedAt: ['packages/ui/future/GridCard.tsx:30', 'packages/ui/future/CircuitButton.tsx:50'], reason: 'measured over a light page, the worst case for the 85% night glass' },
 
   // -- labels on tone faces ---------------------------------------------------
-  { id: 'night on orange face', fg: 'ink-950', bg: ['orange-500'], role: 'text', usedAt: ['packages/ui/district/tones.ts:117', 'packages/ui/dropdown.ts:19', 'packages/ui/nav/NavBar.tsx:69'] },
-  { id: 'white on royal face', fg: 'white', bg: ['royal-500'], role: 'text', usedAt: ['packages/ui/district/tones.ts:125', 'packages/ui/dropdown.ts:25', 'packages/ui/DataTable.tsx:58', 'packages/app/features/schedule/accent-classes.ts:43'] },
-  { id: 'banner white on royal face', fg: 'ink-50', bg: ['royal-500'], role: 'text', usedAt: ['packages/ui/district/tones.ts:125', 'packages/ui/future/CircuitButton.tsx:48'] },
-  { id: 'night on carolina face', fg: 'ink-950', bg: ['carolina-500'], role: 'text', usedAt: ['packages/ui/district/tones.ts:132', 'packages/ui/future/CircuitButton.tsx:47'] },
-  { id: 'night on leaf face', fg: 'ink-950', bg: ['leaf-500'], role: 'text', usedAt: ['packages/ui/district/tones.ts:139'] },
-  { id: 'night on apple face', fg: 'ink-950', bg: ['apple-500'], role: 'text', usedAt: ['packages/ui/district/tones.ts:147', 'packages/ui/Badge.tsx:98', 'packages/ui/dropdown.ts:28', 'packages/ui/nav/NavBar.tsx:83'] },
-  { id: 'white on brick face', fg: 'white', bg: ['orange-800'], role: 'text', usedAt: ['packages/ui/district/tones.ts:154', 'packages/ui/dropdown.ts:30'] },
-  { id: 'banner white on brick face', fg: 'ink-50', bg: ['orange-800'], role: 'text', usedAt: ['packages/ui/district/tones.ts:154'] },
-  { id: 'night on white face', fg: 'ink-950', bg: ['ink-50'], role: 'text', usedAt: ['packages/ui/district/tones.ts:161', 'packages/ui/Badge.tsx:98'] },
+  { id: 'night on orange face', fg: 'ink-950', bg: ['orange-500'], role: 'text', usedAt: ['packages/ui/district/tones.ts:123', 'packages/ui/dropdown.ts:19', 'packages/ui/nav/NavBar.tsx:69'] },
+  { id: 'white on royal face', fg: 'white', bg: ['royal-500'], role: 'text', usedAt: ['packages/ui/district/tones.ts:131', 'packages/ui/dropdown.ts:25', 'packages/ui/DataTable.tsx:58', 'packages/app/features/schedule/accent-classes.ts:43'] },
+  { id: 'banner white on royal face', fg: 'ink-50', bg: ['royal-500'], role: 'text', usedAt: ['packages/ui/district/tones.ts:131', 'packages/ui/future/CircuitButton.tsx:48'] },
+  { id: 'night on carolina face', fg: 'ink-950', bg: ['carolina-500'], role: 'text', usedAt: ['packages/ui/district/tones.ts:138', 'packages/ui/future/CircuitButton.tsx:47'] },
+  { id: 'night on leaf face', fg: 'ink-950', bg: ['leaf-500'], role: 'text', usedAt: ['packages/ui/district/tones.ts:145'] },
+  { id: 'night on apple face', fg: 'ink-950', bg: ['apple-500'], role: 'text', usedAt: ['packages/ui/district/tones.ts:153', 'packages/ui/Badge.tsx:98', 'packages/ui/dropdown.ts:28', 'packages/ui/nav/NavBar.tsx:83'] },
+  { id: 'white on brick face', fg: 'white', bg: ['orange-800'], role: 'text', usedAt: ['packages/ui/district/tones.ts:160', 'packages/ui/dropdown.ts:30'] },
+  { id: 'banner white on brick face', fg: 'ink-50', bg: ['orange-800'], role: 'text', usedAt: ['packages/ui/district/tones.ts:160'] },
+  { id: 'night on white face', fg: 'ink-950', bg: ['ink-50'], role: 'text', usedAt: ['packages/ui/district/tones.ts:167', 'packages/ui/Badge.tsx:98'] },
   { id: 'selected event: white on gold-700', fg: 'white', bg: ['gold-700'], role: 'text', usedAt: ['packages/app/features/schedule/accent-classes.ts:50', 'packages/app/features/schedule/accent-classes.ts:51'] },
   { id: 'selected event: white on forest-700', fg: 'white', bg: ['forest-700'], role: 'text', usedAt: ['packages/app/features/schedule/accent-classes.ts:58', 'packages/app/features/schedule/accent-classes.ts:59'] },
   { id: 'selected event: white on sky-700', fg: 'white', bg: ['sky-700'], role: 'text', usedAt: ['packages/app/features/schedule/accent-classes.ts:66', 'packages/app/features/schedule/accent-classes.ts:67'] },
   { id: 'selected event: white on rose-700', fg: 'white', bg: ['rose-700'], role: 'text', usedAt: ['packages/app/features/schedule/accent-classes.ts:74', 'packages/app/features/schedule/accent-classes.ts:75'] },
 
   // -- control edges, state marks and chart marks on night (SC 1.4.11) -------
-  { id: 'orange field edge', fg: 'orange-500', bg: NIGHT, role: 'ui', usedAt: ['packages/ui/district/tones.ts:118', 'packages/ui/cards/neon-field.ts:34'] },
-  { id: 'royal field edge', fg: 'royal-500', bg: NIGHT, role: 'ui', usedAt: ['packages/ui/district/tones.ts:126', 'packages/ui/cards/neon-field.ts:34'] },
-  { id: 'carolina field edge', fg: 'carolina-500', bg: NIGHT, role: 'ui', usedAt: ['packages/ui/district/tones.ts:133', 'packages/ui/cards/neon-field.ts:34'] },
-  { id: 'leaf field edge', fg: 'leaf-500', bg: NIGHT, role: 'ui', usedAt: ['packages/ui/district/tones.ts:140', 'packages/ui/cards/neon-field.ts:34'] },
-  { id: 'apple field edge', fg: 'apple-500', bg: NIGHT, role: 'ui', usedAt: ['packages/ui/district/tones.ts:148', 'packages/ui/cards/neon-field.ts:34'] },
-  { id: 'brick field edge', fg: 'orange-700', bg: NIGHT, role: 'ui', usedAt: ['packages/ui/district/tones.ts:155', 'packages/ui/control-look.ts:54'] },
+  { id: 'orange field edge', fg: 'orange-500', bg: NIGHT, role: 'ui', usedAt: ['packages/ui/district/tones.ts:124', 'packages/ui/cards/neon-field.ts:38'] },
+  { id: 'royal field edge', fg: 'royal-500', bg: NIGHT, role: 'ui', usedAt: ['packages/ui/district/tones.ts:132', 'packages/ui/cards/neon-field.ts:38'] },
+  { id: 'carolina field edge', fg: 'carolina-500', bg: NIGHT, role: 'ui', usedAt: ['packages/ui/district/tones.ts:139', 'packages/ui/cards/neon-field.ts:38'] },
+  { id: 'leaf field edge', fg: 'leaf-500', bg: NIGHT, role: 'ui', usedAt: ['packages/ui/district/tones.ts:146', 'packages/ui/cards/neon-field.ts:38'] },
+  { id: 'apple field edge', fg: 'apple-500', bg: NIGHT, role: 'ui', usedAt: ['packages/ui/district/tones.ts:154', 'packages/ui/cards/neon-field.ts:38'] },
+  { id: 'brick field edge', fg: 'orange-700', bg: NIGHT, role: 'ui', usedAt: ['packages/ui/district/tones.ts:161', 'packages/ui/control-look.ts:54'] },
   { id: 'switch off: track edge', fg: 'silver-600', bg: NIGHT, role: 'ui', usedAt: ['packages/ui/cards/NeonSwitch.tsx:26'] },
   { id: 'switch off: thumb on track', fg: 'silver-400', bg: ['ink-900'], role: 'ui', usedAt: ['packages/ui/cards/NeonSwitch.tsx:26'] },
   // The on-thumb is a banner-white square in a 2px night keyline. On the bright
@@ -286,7 +313,7 @@ const USAGE: Pair[] = [
   { id: 'chart series: brick', fg: 'orange-700', bg: NIGHT, role: 'ui', usedAt: ['packages/ui/district/series.ts:10', 'packages/ui/district/series.ts:22'] },
   { id: 'chart keyline: royal under orange', fg: 'royal-500', bg: ['orange-500'], role: 'decorative', usedAt: ['packages/ui/district/series.ts:75', 'packages/ui/charts/NeonLineChart.tsx:129'], reason: 'the wordmark keyline under a stroke; the stroke against night carries the data' },
   { id: 'night facade border', fg: 'ink-800', bg: NIGHT, role: 'decorative', usedAt: ['packages/ui/DataTable.tsx:30', 'packages/ui/SegmentedControl.web.tsx:13', 'packages/ui/charts/StoryPanel.tsx:8'], reason: 'container keylines; the selected segment face and cell text identify content' },
-  { id: 'night control keyline', fg: 'ink-700', bg: NIGHT, role: 'decorative', usedAt: ['packages/ui/nav/NavBar.tsx:71', 'packages/ui/DataTable.tsx:52', 'packages/ui/cards/neon-field.ts:22'], reason: 'frame around a control whose glyph or label (white / silver-100 / silver-300) identifies it' },
+  { id: 'night control keyline', fg: 'ink-700', bg: NIGHT, role: 'decorative', usedAt: ['packages/ui/nav/NavBar.tsx:71', 'packages/ui/DataTable.tsx:52', 'packages/ui/cards/neon-field.ts:26'], reason: 'frame around a control whose glyph or label (white / silver-100 / silver-300) identifies it' },
   { id: 'outline knock-out', fg: 'surface', bg: ['surface'], role: 'decorative', usedAt: ['packages/ui/text-effects/OutlineText.tsx:63'], reason: 'fills the glyph face with the surface; the outline stroke carries the text' },
 
 
@@ -329,8 +356,8 @@ const USAGE: Pair[] = [
   { id: 'hlynk: disabled key glyph', fg: 'hlynk-core-glyph-disabled', bg: ['hlynk-core-black'], role: 'disabled', usedAt: ['packages/theme/tokens.ts:198'], reason: 'inactive key' },
 
   // -- disabled ---------------------------------------------------------------
-  { id: 'disabled label', fg: 'ink-400', bg: NIGHT, role: 'disabled', usedAt: ['packages/ui/Button.tsx:48', 'packages/ui/IconButton.tsx:77', 'packages/ui/neon/NeonChevron.tsx:55', 'packages/ui/audio/PlayerShell.tsx:123'], reason: 'inactive control' },
-  { id: 'disabled slider icon', fg: 'ink-700', bg: NIGHT, role: 'disabled', usedAt: ['packages/ui/cards/CardSlider.shared.tsx:158'], reason: 'inactive control' },
+  { id: 'disabled label', fg: 'ink-400', bg: NIGHT, role: 'disabled', usedAt: ['packages/ui/Button.tsx:48', 'packages/ui/IconButton.tsx:79', 'packages/ui/neon/NeonChevron.tsx:55', 'packages/ui/audio/PlayerShell.tsx:123'], reason: 'inactive control' },
+  { id: 'disabled slider icon', fg: 'ink-700', bg: NIGHT, role: 'disabled', usedAt: ['packages/ui/cards/CardSlider.shared.tsx:159'], reason: 'inactive control' },
 ];
 
 export const PAIRS: readonly Pair[] = [...CONTRACT, ...USAGE];
