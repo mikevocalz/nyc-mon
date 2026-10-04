@@ -32,7 +32,9 @@ export const Variants: Story = {
 
 /**
  * The mobile type ramp through the kit Text, with a colour tone set. The
- * `text-type-*` size has to survive the tone class in tv() (type-scale.ts).
+ * `text-type-*` size survives the tone class in tv() (type-scale.ts), and a
+ * ramp step switches off the variant's window step-up, so the sizes hold at
+ * tablet and desktop widths too (34/24/17/17/15/13 at 1200 px).
  */
 export const TypeRamp: Story = {
   render: () => (

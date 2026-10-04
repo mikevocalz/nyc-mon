@@ -24,17 +24,36 @@ import { TYPE_SCALE_TV } from './type-scale';
  * face (one weight, so no font-semibold on it); body, caption and label stay
  * in Space Grotesk, because running text in a poster face is hard to read.
  */
+const VARIANT_SIZE = {
+  display: 'text-display-md md:text-display-lg',
+  title: 'text-2xl md:text-3xl',
+  heading: 'text-lg md:text-xl lg:text-2xl',
+  body: 'text-base md:text-lg',
+  caption: 'text-sm md:text-base',
+  label: 'text-sm md:text-base',
+} as const;
+
+/**
+ * A `text-type-*` class (the mobile ramp, docs/DESIGN_SYSTEM.md "Type") sets
+ * the size itself. The variant's window step-up (`md:text-lg`...) carries a
+ * breakpoint, so tailwind-merge keeps it beside the ramp class and it wins
+ * from 768 up. `stepped: false` leaves the step-up out.
+ */
+const RAMP_CLASS = /(^|\s)text-type-[a-z-]+(\s|$)/;
+
 const text = tv({
   base: 'font-sans text-text',
   variants: {
     variant: {
-      display: 'font-display text-display-md md:text-display-lg',
-      title: 'font-display text-2xl md:text-3xl',
-      heading: 'font-display text-lg md:text-xl lg:text-2xl',
-      body: 'text-base md:text-lg',
-      caption: 'text-sm md:text-base',
-      label: 'text-sm font-semibold md:text-base',
+      display: 'font-display',
+      title: 'font-display',
+      heading: 'font-display',
+      body: '',
+      caption: '',
+      label: 'font-semibold',
     },
+    /** Apply the variant's size and its window step-up. Off when a ramp step is given. */
+    stepped: { true: '', false: '' },
     tone: {
       default: 'text-text',
       muted: 'text-text-muted',
@@ -46,8 +65,16 @@ const text = tv({
       district: '',
     },
   },
-  defaultVariants: { variant: 'body', tone: 'default' },
+  compoundVariants: (Object.entries(VARIANT_SIZE) as [keyof typeof VARIANT_SIZE, string][]).map(([variant, size]) => ({
+    variant, stepped: true, class: size,
+  })),
+  defaultVariants: { variant: 'body', tone: 'default', stepped: true },
 }, TYPE_SCALE_TV);
+
+/** True when the caller's className names a type-ramp step (`text-type-body`...). */
+export function hasRampStep(className: TextProps['className']): boolean {
+  return typeof className === 'string' && RAMP_CLASS.test(className);
+}
 
 /**
  * Tone text for `tone="district"`: the tone's `.text` class (orange-400,
@@ -129,7 +156,12 @@ export function Text({
   }
   return (
     <TWText
-      className={text({ variant, tone, className: tone === 'district' ? [districtTextClass(district, districtTone), className] : className })}
+      className={text({
+        variant,
+        tone,
+        stepped: !hasRampStep(className),
+        className: tone === 'district' ? [districtTextClass(district, districtTone), className] : className,
+      })}
       {...props}
     >
       {children}
