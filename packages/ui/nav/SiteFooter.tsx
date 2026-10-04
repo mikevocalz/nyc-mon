@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react';
 import { tv } from 'tailwind-variants';
+import { BrandLogo } from '../brand/BrandLogo';
 import { BrandWordmark } from '../brand/BrandWordmark';
 import { districtTone, type ChartTone, type District } from '../district';
 import { useAppForm } from '../form';
@@ -36,6 +37,12 @@ export interface SiteFooterProps {
    */
   variant?: 'minimal' | 'columns' | 'centered' | 'mega';
   logo?: ReactNode;
+  /**
+   * Which repo logo to show when `logo` is not set: the wordmark lettering or
+   * the round badge. Both are shown as supplied, with "NYC-MON" as their
+   * accessible name, so no text label sits beside them. Default "wordmark".
+   */
+  mark?: 'wordmark' | 'badge';
   logoHref?: string;
   /** Under the logo. Default "Every block has a legend." */
   tagline?: string;
@@ -133,6 +140,7 @@ function Newsletter({
 export function SiteFooter({
   variant = 'columns',
   logo,
+  mark = 'wordmark',
   logoHref = '/',
   tagline = 'Every block has a legend.',
   description,
@@ -175,7 +183,12 @@ export function SiteFooter({
   const brand = (
     <View className={s.brand()}>
       <Link href={logoHref} aria-label="NYC-MON home" className={s.link()}>
-        {logo ?? <BrandWordmark height={variant === 'minimal' ? 28 : 44} />}
+        {logo ??
+          (mark === 'badge' ? (
+            <BrandLogo size={variant === 'minimal' ? 72 : 112} />
+          ) : (
+            <BrandWordmark height={variant === 'minimal' ? 28 : 44} />
+          ))}
       </Link>
       {variant === 'minimal' ? null : <Text className={s.tagline()}>{tagline}</Text>}
       {description && variant !== 'minimal' ? <Paragraph className={s.description()}>{description}</Paragraph> : null}

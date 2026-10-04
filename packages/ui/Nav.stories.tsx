@@ -38,7 +38,7 @@ export default meta;
 
 function Page() {
   return (
-    <Main className="gap-3 px-4 py-10 md:px-6">
+    <Main id="story-main" className="gap-3 px-4 py-10 md:px-6">
       <Heading level={1} className="my-0 font-display text-4xl text-white">Every block has a legend</Heading>
       <Paragraph className="my-0 max-w-xl text-base text-silver-300">
         The header holds the wordmark, the pages and the district skyline. Open Districts for the dropdown;
@@ -50,7 +50,7 @@ function Page() {
 
 export const NavBarStory: StoryObj<typeof NavBar> = {
   name: 'Nav bar',
-  args: { items: ITEMS, district: 'midtown', position: 'static', transparency: 'solid', navAlign: 'right', skyline: true },
+  args: { items: ITEMS, district: 'midtown', position: 'static', transparency: 'solid', navAlign: 'right', skyline: true, skipTo: 'story-main' },
   argTypes: {
     district: districtControl,
     color: toneControl,
@@ -58,6 +58,29 @@ export const NavBarStory: StoryObj<typeof NavBar> = {
     transparency: { control: 'inline-radio', options: ['solid', 'glass', 'transparent'] },
     navAlign: { control: 'inline-radio', options: ['left', 'center', 'right'] },
   },
+  render: (args) => (
+    <View className="min-h-screen bg-ink-900">
+      <NavBar {...args} />
+      <Page />
+    </View>
+  ),
+};
+
+/**
+ * The site header shape: one primary action after the links (the last row of
+ * the phone menu), a trailing slot that stays on phones, and a skip link that
+ * appears on the first Tab.
+ */
+export const WithAction: StoryObj<typeof NavBar> = {
+  name: 'With primary action',
+  args: {
+    items: ITEMS,
+    district: 'midtown',
+    position: 'static',
+    cta: { label: 'Walk the district', href: '#walk' },
+    skipTo: 'story-main',
+  },
+  argTypes: { district: districtControl, color: toneControl },
   render: (args) => (
     <View className="min-h-screen bg-ink-900">
       <NavBar {...args} />
@@ -88,9 +111,28 @@ export const Footer: StoryObj<typeof SiteFooter> = {
   },
   argTypes: {
     variant: { control: 'inline-radio', options: ['minimal', 'columns', 'centered', 'mega'] },
+    mark: { control: 'inline-radio', options: ['wordmark', 'badge'] },
     district: districtControl,
     color: toneControl,
   },
+  render: (args) => (
+    <View className="min-h-screen justify-end bg-ink-900">
+      <SiteFooter {...args} />
+    </View>
+  ),
+};
+
+/** The badge in place of the wordmark, as the site footer uses it. No text label sits beside it. */
+export const FooterBadge: StoryObj<typeof SiteFooter> = {
+  name: 'Footer with badge',
+  args: {
+    variant: 'columns',
+    mark: 'badge',
+    district: 'midtown',
+    description: 'A field guide to the creatures that live on New York blocks, from the bodegas to the sky bridges.',
+    linkGroups: GROUPS,
+  },
+  argTypes: { district: districtControl, color: toneControl },
   render: (args) => (
     <View className="min-h-screen justify-end bg-ink-900">
       <SiteFooter {...args} />

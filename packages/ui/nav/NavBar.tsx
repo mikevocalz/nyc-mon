@@ -1,6 +1,7 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useEffect, useId, type ReactNode } from 'react';
+import { Platform } from 'react-native';
 import { twMerge } from 'tailwind-merge';
 import { tv } from 'tailwind-variants';
 import { BrandWordmark } from '../brand/BrandWordmark';
@@ -22,6 +23,9 @@ export interface NavItem {
   children?: NavItem[];
 }
 
+/** The one primary action in a {@linkcode NavBar}, set apart from the page links. */
+export type NavCta = Pick<NavItem, 'label' | 'href' | 'onPress'>;
+
 export interface NavBarProps {
   items?: NavItem[];
   /** Left mark. Default: the NYC-MON wordmark. */
@@ -40,8 +44,20 @@ export interface NavBarProps {
   skyline?: boolean;
   /** NeonBlade: where the links sit on wide screens. Default right. */
   navAlign?: 'left' | 'center' | 'right';
-  /** Right of the links: an avatar, a button. */
+  /** Right of the links: an avatar, a button. Stays visible on phones. */
   trailing?: ReactNode;
+  /**
+   * The one primary action: an outlined tone button after the links on wide
+   * screens, and the last row of the phone menu.
+   */
+  cta?: NavCta;
+  /**
+   * Web only: the id of the main content. Adds a "Skip to content" link as
+   * the first focus stop, hidden until it is focused.
+   */
+  skipTo?: string;
+  /** Label of the skip link. Default "Skip to content". */
+  skipLabel?: string;
   /**
    * Render a link yourself (e.g. solito's Link for in-app routing). Default:
    * the semantic Link primitive (a real anchor on web).
@@ -73,14 +89,18 @@ const bar = tv({
     sheet: 'border-t-2 border-ink-800 bg-ink-950 px-3 pb-4 pt-2 md:hidden',
     sheetLink: 'flex min-h-12 flex-row items-center justify-between px-3 py-3',
     keyline: 'h-1 w-full',
+    cta: 'flex min-h-11 flex-row items-center justify-center border-2 px-4 py-2 hover:bg-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus',
+    ctaText: 'text-sm font-semibold',
+    skip: 'sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-3 focus:z-[60] focus:px-4 focus:py-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus',
   },
   variants: {
     tone: {
-      orange: { linkActive: 'bg-orange-500', keyline: 'bg-orange-500' },
-      royal: { linkActive: 'bg-royal-500', keyline: 'bg-royal-500', linkActiveText: 'text-white' },
-      carolina: { linkActive: 'bg-carolina-500', keyline: 'bg-carolina-500' },
-      leaf: { linkActive: 'bg-leaf-500', keyline: 'bg-leaf-500' },
-      apple: { linkActive: 'bg-apple-500', keyline: 'bg-apple-500', linkActiveText: 'text-ink-950' },
+      // CTA text uses the same tone steps as the footer's group titles on ink-950.
+      orange: { linkActive: 'bg-orange-500', keyline: 'bg-orange-500', cta: 'border-orange-500', ctaText: 'text-orange-400', skip: 'bg-orange-500' },
+      royal: { linkActive: 'bg-royal-500', keyline: 'bg-royal-500', linkActiveText: 'text-white', cta: 'border-royal-500', ctaText: 'text-royal-300', skip: 'bg-royal-500' },
+      carolina: { linkActive: 'bg-carolina-500', keyline: 'bg-carolina-500', cta: 'border-carolina-500', ctaText: 'text-carolina-400', skip: 'bg-carolina-500' },
+      leaf: { linkActive: 'bg-leaf-500', keyline: 'bg-leaf-500', cta: 'border-leaf-500', ctaText: 'text-leaf-400', skip: 'bg-leaf-500' },
+      apple: { linkActive: 'bg-apple-500', keyline: 'bg-apple-500', linkActiveText: 'text-ink-950', cta: 'border-apple-500', ctaText: 'text-apple-400', skip: 'bg-apple-500' },
     },
     transparency: {
       solid: { root: 'bg-ink-950' },
@@ -118,6 +138,9 @@ export function NavBar({
   skyline = true,
   navAlign = 'right',
   trailing,
+  cta,
+  skipTo,
+  skipLabel = 'Skip to content',
   renderLink,
   label = 'Primary',
   className,
@@ -130,6 +153,18 @@ export function NavBar({
   const sheet = useStore(store, (st) => st.sheet);
   const dropdown = useStore(store, (st) => st.dropdown);
   const close = () => store.setState({ sheet: false, dropdown: -1 });
+  const sheetId = `navbar-menu-${useId().replace(/:/g, '')}`;
+  const open = sheet || dropdown >= 0;
+
+  // Escape closes the phone menu or an open dropdown (web keyboards).
+  useEffect(() => {
+    if (!open || Platform.OS !== 'web' || typeof document === 'undefined') return undefined;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') store.setState({ sheet: false, dropdown: -1 });
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open, store]);
 
   const anchor = (item: NavItem, children: ReactNode, cls: string) =>
     renderLink ? (
@@ -145,6 +180,11 @@ export function NavBar({
 
   return (
     <Header className={s.root({ className })}>
+      {skipTo && Platform.OS === 'web' ? (
+        <Link href={`#${skipTo}`} className={s.skip()}>
+          <Text className={twMerge(s.linkText(), s.linkActiveText())}>{skipLabel}</Text>
+        </Link>
+      ) : null}
       <View className={s.inner()}>
         {anchor(
           { label: 'NYC-MON home', href: logoHref },
@@ -189,12 +229,20 @@ export function NavBar({
           </List>
         </Nav>
         <View className={`${s.trailing()} ml-auto md:ml-0`}>
+          {cta
+            ? anchor(
+                { ...cta, active: false },
+                <Text className={s.ctaText()}>{cta.label}</Text>,
+                twMerge(s.cta(), items.length ? 'hidden md:flex' : ''),
+              )
+            : null}
           {trailing}
           {items.length ? (
             <Pressable
               role="button"
               aria-label={sheet ? 'Close menu' : 'Open menu'}
               aria-expanded={sheet}
+              aria-controls={sheetId}
               onPress={() => store.setState({ sheet: !sheet, dropdown: -1 })}
               className={s.toggle()}
             >
@@ -205,7 +253,7 @@ export function NavBar({
       </View>
 
       {sheet ? (
-        <Nav aria-label={label} className={s.sheet()}>
+        <Nav id={sheetId} aria-label={label} className={s.sheet()}>
           <List className="gap-1">
             {items.flatMap((item) => [item, ...(item.children ?? []).map((c) => ({ ...c, label: `${item.label}: ${c.label}` }))])
               .filter((item) => item.href || item.onPress)
@@ -221,6 +269,15 @@ export function NavBar({
                   )}
                 </ListItem>
               ))}
+            {cta ? (
+              <ListItem className="pt-2">
+                {anchor(
+                  { ...cta, active: false, onPress: () => { cta.onPress?.(); close(); } },
+                  <Text className={twMerge(s.ctaText(), 'text-base')}>{cta.label}</Text>,
+                  s.cta(),
+                )}
+              </ListItem>
+            ) : null}
           </List>
         </Nav>
       ) : null}
