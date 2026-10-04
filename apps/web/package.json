@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@acme/app": "workspace:*",
+    "@acme/content": "workspace:*",
     "@acme/spatial": "workspace:*",
     "@acme/theme": "workspace:*",
     "@acme/ui": "workspace:*",

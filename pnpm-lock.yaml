@@ -917,6 +917,9 @@ importers:
       '@acme/app':
         specifier: workspace:*
         version: link:../../packages/app
+      '@acme/content':
+        specifier: workspace:*
+        version: link:../../packages/content
       '@acme/spatial':
         specifier: workspace:*
         version: link:../../packages/spatial

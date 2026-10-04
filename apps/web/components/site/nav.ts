@@ -25,8 +25,8 @@ export const isActive = (pathname: string, href: string) =>
 export const navItems = (pathname: string): NavItem[] =>
   PAGES.map((page) => ({ ...page, active: isActive(pathname, page.href) }));
 
-/** Home and Spatial draw their own full-bleed city; the site header and footer stay off them. */
-export const showsSiteChrome = (pathname: string) => pathname !== '/' && !pathname.startsWith('/spatial');
+/** Spatial draws its own full-bleed city; the site header and footer stay off it. Home (W01) carries both. */
+export const showsSiteChrome = (pathname: string) => !pathname.startsWith('/spatial');
 
 export const FOOTER_DESCRIPTION = HOME_COPY.intro;
 
