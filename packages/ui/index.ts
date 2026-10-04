@@ -74,6 +74,11 @@ export { SignRain, type SignRainProps } from './backgrounds/SignRain';
 export { SubwayLines, type SubwayLinesProps } from './backgrounds/SubwayLines';
 export { StreetPulse, type StreetPulseProps } from './backgrounds/StreetPulse';
 export { CityHeightfield, type CityHeightfieldProps } from './backgrounds/CityHeightfield';
+export { CityHeightfieldFlat, type CityHeightfieldFlatProps } from './backgrounds/CityHeightfieldFlat';
+// three.js on WebGPURenderer (WebGPU, WebGL2 on web without it, react-native-webgpu on native). Also '@acme/ui/three'.
+export { HolographicTerrain, type HolographicTerrainProps } from './three/HolographicTerrain';
+export { ThreeCanvas } from './three/ThreeCanvas';
+export type { ThreeBackend, ThreeCanvasHandle, ThreeCanvasProps, ThreeContext, ThreeFrame, ThreePointer, ThreeScene, ThreeSetup } from './three/types';
 export { RiverTide, type RiverTideProps, type RiverTideOrigin } from './backgrounds/RiverTide';
 export { RainWindow, type RainWindowProps } from './backgrounds/RainWindow';
 export { DISTRICTS, DISTRICT_NAMES, THEMES as DISTRICT_THEMES, type DistrictTheme } from './backgrounds/district-theme';
