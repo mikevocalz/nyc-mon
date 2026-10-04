@@ -75,7 +75,7 @@ export function AppTabBar({ state, emitter, navigateToTab, insets, rail }: Botto
           } ${
             focused
               ? gridMode
-                ? 'border-cyan-300/40 bg-cyan-300/10 shadow-card'
+                ? 'border-primary/60 bg-primary/15 shadow-glow-orange'
                 : 'border-border bg-primary shadow-card hover:bg-primary-pressed'
               : gridMode
                 ? 'border-transparent hover:bg-white/5'
@@ -87,8 +87,8 @@ export function AppTabBar({ state, emitter, navigateToTab, insets, rail }: Botto
             className={
               gridMode
                 ? focused
-                  ? 'text-cyan-200'
-                  : 'text-white/55'
+                  ? 'text-primary'
+                  : 'text-white/70'
                 : focused
                   ? 'text-on-primary'
                   : 'text-text-muted'
@@ -99,8 +99,8 @@ export function AppTabBar({ state, emitter, navigateToTab, insets, rail }: Botto
             className={`text-xs font-semibold md:text-sm ${
               gridMode
                 ? focused
-                  ? 'text-cyan-100'
-                  : 'text-white/55'
+                  ? 'text-primary'
+                  : 'text-white/70'
                 : focused
                   ? 'text-on-primary'
                   : 'text-text-muted'
@@ -119,7 +119,7 @@ export function AppTabBar({ state, emitter, navigateToTab, insets, rail }: Botto
         style={{ paddingBottom: insets.bottom }}
         className={`flex-row items-center gap-1 px-2 pt-1 ${
           gridMode
-            ? 'border-t border-cyan-300/25 bg-[#020407]/95'
+            ? 'border-t border-structure/40 bg-bg/95'
             : 'border-t-2 border-border bg-surface'
         }`}
       >
@@ -136,7 +136,7 @@ export function AppTabBar({ state, emitter, navigateToTab, insets, rail }: Botto
         paddingBottom: insets.bottom + MENU_BOTTOM_GAP,
       }}
       className={`h-full items-center gap-2 px-1.5 ${
-        gridMode ? 'bg-[#020407]' : 'bg-surface'
+        gridMode ? 'bg-bg' : 'bg-surface'
       }`}
     >
       {items}

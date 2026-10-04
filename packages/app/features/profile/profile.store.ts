@@ -30,7 +30,7 @@ export const useProfile = create<ProfileState>((set) => ({
   notifications: true,
   digest: false,
   publicProfile: true,
-  theme: 'system',
+  theme: 'dark', // NYC Mon is dark-first
   setName: (name) => set({ name }),
   setEmail: (email) => set({ email }),
   setNotifications: (notifications) => set({ notifications }),

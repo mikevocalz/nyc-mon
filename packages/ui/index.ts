@@ -69,4 +69,5 @@ export * from './audio';
 export { GridFloor, type GridFloorProps } from './backgrounds/GridFloor';
 export { GridScene, type GridSceneProps } from './backgrounds/GridScene';
 export { GlyphCity, type GlyphCityProps, type GlyphCityVariant } from './backgrounds/GlyphCity';
-export { CircuitButton, type CircuitButtonProps, GridCard, type GridCardProps } from './future';
+export { CircuitButton, type CircuitButtonProps, type CircuitTone, GridCard, type GridCardProps } from './future';
+export { BrandLogo, type BrandLogoProps } from './brand/BrandLogo';

@@ -58,7 +58,7 @@ export function SidebarSection({
         >
           <ChevronRight size={14} className="text-text-muted" />
         </MotionView>
-        <Text className="flex-1 text-xs font-semibold uppercase text-text-muted md:text-sm">
+        <Text className="flex-1 text-sm font-semibold text-text-muted md:text-base">
           {label}
         </Text>
       </Pressable>

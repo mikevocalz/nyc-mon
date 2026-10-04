@@ -68,7 +68,7 @@ export function EditorSettingsScreen() {
       </View>
 
       <View className="gap-3">
-        <Text className="text-xs font-semibold uppercase text-text-muted md:text-sm">
+        <Text className="text-sm font-semibold text-text-muted md:text-base">
           Toolbar order
         </Text>
         <View style={{ height: visible.length * ROW_HEIGHT }}>
@@ -98,7 +98,7 @@ export function EditorSettingsScreen() {
 
       {grouped.map(([group, capabilities]) => (
         <View key={group} className="gap-3">
-          <Text className="text-xs font-semibold uppercase text-text-muted md:text-sm">
+          <Text className="text-sm font-semibold text-text-muted md:text-base">
             {GROUP_LABEL[group]}
           </Text>
           <View className="gap-3 rounded-card border-2 border-border bg-surface-raised p-4 shadow-card">

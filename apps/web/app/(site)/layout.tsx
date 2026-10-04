@@ -8,11 +8,11 @@ import '../globals.css';
 
 export const metadata: Metadata = {
   title: {
-    default: 'NYC Mon',
-    template: '%s — NYC Mon',
+    default: 'NYC-MON',
+    template: '%s | NYC-MON',
   },
   description:
-    'Futuristic universal spatial starter — Expo SDK 58, Next.js, Skia, Rive, Viro/OpenXR and a Neon Grid interface.',
+    'Every block has a legend. Race light cycles across a neon New York grid on your phone, in the browser, or in a headset.',
 };
 
 export default function SiteLayout({ children }: Readonly<{ children: React.ReactNode }>) {

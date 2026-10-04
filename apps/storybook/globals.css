@@ -6,6 +6,7 @@
 
 @source '../../packages/ui';
 @source '../../packages/app/features';
+@source '../../packages/spatial';
 
 /* Retro brand fonts — the web app loads these via next/font; storybook (vite)
    needs plain @font-face pointing at the shared assets package. */

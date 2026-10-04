@@ -4,7 +4,8 @@ import { StatusBar } from "expo-status-bar";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { withUniwind } from "uniwind";
-import { AppQueryProvider, SafeAreaProvider } from "@acme/app";
+import { AppQueryProvider, SafeAreaProvider, useProfile } from "@acme/app";
+import { setThemePreference } from "@acme/theme/switch";
 import { BookingSheet } from "../components/BookingSheet";
 import { AttachSheet, AudioRecorderSheet, UrlSheet } from "@acme/app";
 import { Toaster } from "@acme/ui";
@@ -18,6 +19,10 @@ import "../global.css";
 // repo uses them (the kit ships a SafeArea component instead). Add the listener
 // here if those classes are ever adopted — docs.uniwind.dev/migration-from-nativewind.
 const GestureRoot = withUniwind(GestureHandlerRootView);
+
+// NYC Mon is dark-first: apply the stored preference (default 'dark') before
+// the first frame instead of inheriting the OS appearance.
+setThemePreference(useProfile.getState().theme);
 
 export default function RootLayout() {
   return (

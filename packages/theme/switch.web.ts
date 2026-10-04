@@ -6,11 +6,8 @@ export const THEME_COOKIE = 'app-theme';
 
 export function setThemePreference(pref: ThemePreference) {
   const root = document.documentElement;
-  if (pref === 'system') {
-    root.removeAttribute('data-theme');
-    document.cookie = `${THEME_COOKIE}=; path=/; max-age=0`;
-  } else {
-    root.setAttribute('data-theme', pref);
-    document.cookie = `${THEME_COOKIE}=${pref}; path=/; max-age=31536000; samesite=lax`;
-  }
+  // No attribute = the brand default (dark). 'system' is an explicit opt-in to
+  // following the OS, so it is stored like the other two choices.
+  root.setAttribute('data-theme', pref);
+  document.cookie = `${THEME_COOKIE}=${pref}; path=/; max-age=31536000; samesite=lax`;
 }

@@ -27,7 +27,7 @@ import { Bell } from '@acme/ui/icons';
 const TAB_PATHS = new Set(['/', '/explore', '/notifications', '/profile']);
 
 const TITLES: Record<string, string> = {
-  '/': 'Home',
+  '/': 'NYC-MON',
   '/explore': 'Explore',
   '/notifications': 'Notifications',
   '/profile': 'Profile',
@@ -55,7 +55,7 @@ export function AppHeader() {
       <Header className="flex-row items-center gap-3 border-b-2 border-border bg-primary px-4 py-3">
         {railHasMenu ? null : <MenuButton />}
         <Text className="flex-1 text-lg font-semibold text-on-primary md:text-xl lg:text-2xl">
-          {TITLES[pathname] ?? 'Home'}
+          {TITLES[pathname] ?? 'NYC-MON'}
         </Text>
 
         {/* Notifications and profile live here rather than inside the Home

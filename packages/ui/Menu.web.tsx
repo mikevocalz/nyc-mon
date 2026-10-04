@@ -16,7 +16,7 @@ export function Menu({ children, actions, onAction, title, className }: MenuProp
       <summary className="cursor-pointer list-none">{children}</summary>
       <View className="absolute right-0 top-full z-10 mt-1 min-w-48 gap-1 rounded-md border-2 border-border bg-surface-raised p-1 shadow-card">
         {title ? (
-          <Text className="px-2 py-1 text-xs font-semibold uppercase text-text-muted">{title}</Text>
+          <Text className="px-2 py-1 text-sm font-semibold text-text-muted">{title}</Text>
         ) : null}
         {actions.map((action) => (
           <Pressable

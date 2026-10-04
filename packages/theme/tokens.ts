@@ -1,6 +1,7 @@
 /**
  * @acme/theme — the single token source (PROMPT-2).
- * Brand: burgundy, black, pumpkin orange. Warm dark mode + elegant light mode.
+ * Brand: NYC Mon. Knicks orange, royal blue, carolina blue, leaf green,
+ * candy apple red, black and white, all sampled from the logo. Dark-first.
  *
  * `build-css.mjs` emits theme.css (web/storybook, Tailwind v4 `@theme` with
  * light-dark()) and theme-native.css (mobile, Uniwind `@variant` theme blocks)
@@ -10,108 +11,139 @@
  */
 
 // ---- primitive palettes -----------------------------------------------------
+// Every 500 step is a colour sampled from packages/assets/brand/nyc-mon-logo.png
+// (the anchor). Lighter steps mix toward white, darker steps toward the logo's
+// blue-black keyline, so each family stays on-brand at every step.
+
+/** Brand anchors, exactly as sampled from the logo. */
+export const brand = {
+  /** wordmark + outer ring */
+  orange: '#FC7C00',
+  /** wordmark shadow tone */
+  orangeDeep: '#FC6C00',
+  /** wordmark outline, buildings */
+  royal: '#0058F8',
+  /** sky; lifted from the sampled #0080FC so it holds AA as text on night */
+  carolina: '#4BA8F0',
+  /** the Big Apple */
+  apple: '#F80000',
+  /** apple leaf + trees, brightened from #2C7824 so it holds AA on night */
+  leaf: '#3FAE3A',
+  /** keyline + banner: the base background, used instead of pure black */
+  night: '#00041C',
+  /** banner text */
+  white: '#F8F8F8',
+  /** Knicks secondary — sparing neutral */
+  silver: '#BEC0C2',
+} as const;
+
+const orange = {
+  50: '#FFF7F0', 100: '#FFEDDB', 200: '#FED8B3', 300: '#FEBE80', 400: '#FD9D40',
+  500: '#FC7C00', 600: '#D96B00', 700: '#A35100', 800: '#884300', 900: '#602F00', 950: '#3C1E00',
+} as const;
+const royal = {
+  50: '#F0F5FF', 100: '#DBE8FE', 200: '#B3CDFD', 300: '#80ACFC', 400: '#4082FA',
+  500: '#0058F8', 600: '#004CD9', 700: '#003FB6', 800: '#003193', 900: '#002470', 950: '#001851',
+} as const;
+const carolina = {
+  50: '#F4FAFE', 100: '#E6F3FD', 200: '#C9E5FB', 300: '#A5D4F8', 400: '#78BEF4',
+  500: '#4BA8F0', 600: '#4191D2', 700: '#3577B0', 800: '#295D8E', 900: '#1D426D', 950: '#122B4F',
+} as const;
+const leaf = {
+  50: '#F3FAF3', 100: '#E4F4E3', 200: '#C5E7C4', 300: '#9FD79D', 400: '#6FC26B',
+  500: '#3FAE3A', 600: '#369632', 700: '#2C7A29', 800: '#225E1F', 900: '#184216', 950: '#0F2A0E',
+} as const;
+const apple = {
+  50: '#FFF0F0', 100: '#FEDBDB', 200: '#FDB3B3', 300: '#FC8080', 400: '#FA4040',
+  500: '#F80000', 600: '#D50000', 700: '#AE0000', 800: '#860000', 900: '#5E0000', 950: '#3C0000',
+} as const;
+const silver = {
+  50: '#FBFBFB', 100: '#F6F6F6', 200: '#ECECED', 300: '#DFE0E1', 400: '#CED0D1',
+  500: '#BEC0C2', 600: '#A3A6AB', 700: '#858890', 800: '#676A76', 900: '#484B5B', 950: '#2E3144',
+} as const;
+/** Neutrals: banner white (#F8F8F8) down to the keyline night (#00041C). */
+const ink = {
+  50: '#F8F8F8', 100: '#ECECED', 200: '#D8D8DB', 300: '#B5B6BD', 400: '#90929C',
+  500: '#70727F', 600: '#545767', 700: '#3C3F51', 800: '#25293D', 900: '#14182E', 950: '#00041C',
+} as const;
 
 export const palette = {
-  // RETRO primary — electric yellow (scale name kept for class compatibility)
-  burgundy: {
-    50: '#FFFCEB',
-    100: '#FFF7C7',
-    200: '#FFEE8A',
-    300: '#FFE14D',
-    400: '#FFDB33',
-    500: '#F2C700',
-    600: '#D1A800',
-    700: '#A98700',
-    800: '#806400',
-    900: '#574400',
-    950: '#332800',
-  },
-  // RETRO accent — hot pink (scale name kept for class compatibility)
-  ember: {
-    50: '#FFF0F7',
-    100: '#FFDBEC',
-    200: '#FFB8D9',
-    300: '#FF8FC2',
-    400: '#FF69B4',
-    500: '#F7418F',
-    600: '#DB2777',
-    700: '#B01B5E',
-    800: '#831146',
-    900: '#570A2E',
-    950: '#33061B',
-  },
-  // RETRO neutrals — paper cream to true black
-  ink: {
-    50: '#FFFDF7',
-    100: '#F6F3E8',
-    200: '#E5E1D3',
-    300: '#C4C0B0',
-    400: '#94917F',
-    500: '#6E6B5C',
-    600: '#55524A',
-    700: '#3B3833',
-    800: '#262420',
-    900: '#171614',
-    950: '#0D0C0B',
-  },
+  orange,
+  royal,
+  carolina,
+  leaf,
+  apple,
+  silver,
+  ink,
   white: '#FFFFFF',
-  // choir calendar event-type accents — warm, dignified, readable on light/dark surfaces
-  gold: {
-    50: '#EEF4FF', 100: '#DCE8FF', 200: '#B8D0FF', 300: '#8AB0FF',
-    400: '#5C8AFF', 500: '#3B6DF6', 600: '#2952D9', 700: '#1F3FAD',
-    800: '#172E80', 900: '#101F57', 950: '#0A1433',
-  },
-  forest: {
-    50: '#EEF6F0', 100: '#D3E9D8', 200: '#ADD6B6', 300: '#7DB98B',
-    400: '#529B65', 500: '#357A49', 600: '#28613A', 700: '#214E30',
-    800: '#183D26', 900: '#102B1C', 950: '#08190F',
-  },
-  sky: {
-    50: '#EEF4FA', 100: '#D4E6F4', 200: '#B3D4ED', 300: '#88BBE2',
-    400: '#5B9DD3', 500: '#3B7EB8', 600: '#2F6597', 700: '#28527D',
-    800: '#214060', 900: '#172E45', 950: '#0D1B29',
-  },
-  rose: {
-    50: '#FDF2F2', 100: '#FBE0E0', 200: '#F6C5C5', 300: '#EB9C9C',
-    400: '#D96B6B', 500: '#C04444', 600: '#A03333', 700: '#7E2929',
-    800: '#5D2121', 900: '#3D1717', 950: '#230C0C',
-  },
-  slate: {
-    50: '#F4F4F5', 100: '#E4E4E7', 200: '#D4D4D8', 300: '#A1A1AA',
-    400: '#71717A', 500: '#52525B', 600: '#3F3F46', 700: '#27272A',
-    800: '#18181B', 900: '#121215', 950: '#09090B',
-  },
+  // Legacy scale names. Components and stories written against the starter
+  // keep working; each name now points at the NYC Mon family it played.
+  burgundy: orange, // was the primary scale
+  ember: royal, // was the accent scale
+  gold: orange, // schedule accent
+  forest: leaf, // schedule accent
+  sky: carolina, // schedule accent
+  rose: apple, // schedule accent
+  slate: silver, // neutral
 } as const;
 
 // ---- semantic colors (light / dark) ----------------------------------------
 // Emitted as `light-dark(...)` so system-following is zero-code on every platform.
+// Dark is the brand's home: night base, orange hero, royal structure, carolina
+// for secondary/info. Light mode keeps the same roles with deeper tones so every
+// text pair still clears WCAG AA (ratios: `node contrast.mjs`).
 
 export const semantic = {
-  surface: { light: palette.ink[50], dark: '#161411' },
-  'surface-raised': { light: palette.white, dark: '#211F1B' },
-  'surface-sunken': { light: palette.ink[100], dark: '#0F0E0C' },
-  text: { light: palette.ink[950], dark: palette.ink[50] },
-  'text-muted': { light: palette.ink[600], dark: palette.ink[400] },
-  'text-inverse': { light: palette.ink[50], dark: palette.ink[950] },
-  // RETRO: flat electric yellow, black ink on top
-  primary: { light: palette.burgundy[400], dark: palette.burgundy[400] },
-  'primary-pressed': { light: palette.burgundy[500], dark: palette.burgundy[500] },
-  'on-primary': { light: palette.ink[950], dark: palette.ink[950] },
-  accent: { light: palette.ember[500], dark: palette.ember[400] },
-  'accent-pressed': { light: palette.ember[600], dark: palette.ember[500] },
-  'on-accent': { light: palette.ink[950], dark: palette.ink[950] },
-  // RETRO: borders are ink, not grey — the outline IS the design
-  border: { light: palette.ink[950], dark: palette.ink[50] },
-  'border-strong': { light: '#000000', dark: '#FFFDF7' },
-  focus: { light: palette.gold[500], dark: palette.gold[400] },
-  danger: { light: '#D31F2B', dark: '#FF7A85' },
-  'on-danger': { light: palette.white, dark: '#3D0508' },
+  /** page base */
+  bg: { light: ink[50], dark: brand.night },
+  surface: { light: ink[50], dark: brand.night },
+  'surface-raised': { light: palette.white, dark: '#0A1230' },
+  'surface-sunken': { light: ink[100], dark: '#000212' },
+  text: { light: brand.night, dark: brand.white },
+  'text-muted': { light: ink[600], dark: brand.silver },
+  'text-inverse': { light: brand.white, dark: brand.night },
+  // Orange is the hero. Light mode needs the deep step to read as text on white.
+  primary: { light: orange[700], dark: brand.orange },
+  'primary-pressed': { light: orange[800], dark: orange[400] },
+  'on-primary': { light: palette.white, dark: brand.night },
+  // Accent = the secondary voice: royal on light, carolina on night.
+  accent: { light: royal[500], dark: brand.carolina },
+  'accent-pressed': { light: royal[600], dark: carolina[400] },
+  'on-accent': { light: palette.white, dark: brand.night },
+  // Royal blue is the structure: rules, outlines, the grid's glow.
+  structure: { light: royal[500], dark: royal[500] },
+  border: { light: ink[200], dark: '#1A2E6E' },
+  'border-strong': { light: royal[500], dark: royal[400] },
+  focus: { light: royal[500], dark: brand.carolina },
+  success: { light: leaf[700], dark: brand.leaf },
+  'on-success': { light: palette.white, dark: brand.night },
+  danger: { light: apple[600], dark: apple[400] },
+  'on-danger': { light: palette.white, dark: brand.night },
+  info: { light: carolina[800], dark: brand.carolina },
+  'on-info': { light: palette.white, dark: brand.night },
+  // Glow colours (8-digit hex, alpha baked in) for neon shadows.
+  glow: { light: '#0058F833', dark: '#0058F8A6' },
+  'glow-hot': { light: '#FC7C0033', dark: '#FC7C0080' },
+} as const;
+
+/**
+ * Neon tokens for canvas renderers (Skia grid floor, glyph city) — they can't
+ * read CSS variables. NeonBlade's Grid Floor look in the NYC Mon palette.
+ */
+export const neon = {
+  bg: brand.night,
+  line: brand.orange,
+  glow: brand.royal,
+  glowSoft: brand.carolina,
+  hot: brand.apple,
+  leaf: brand.leaf,
+  white: brand.white,
 } as const;
 
 // ---- typography -------------------------------------------------------------
 
 export const fontFamilies = {
-  // RETRO: Archivo Black shouts the headlines; Space Grotesk does the work.
+  // Archivo Black for the jersey-weight headlines; Space Grotesk does the work.
   display: "'Archivo Black', 'Arial Black', sans-serif",
   sans: "'Space Grotesk', system-ui, -apple-system, sans-serif",
 } as const;
@@ -156,11 +188,14 @@ export const radius = {
   full: '9999px',
 } as const;
 
-// RETRO elevation: hard offset slabs in the border color — no blur, ever.
+// Neon elevation (NeonBlade): a soft royal-blue glow instead of a grey drop.
+// `glow-*` are the hero glows for focused or featured surfaces.
 export const shadows = {
-  card: '4px 4px 0 0 var(--color-border-strong)',
-  raised: '6px 6px 0 0 var(--color-border-strong)',
-  overlay: '9px 9px 0 0 var(--color-border-strong)',
+  card: '0 0 22px -8px var(--color-glow)',
+  raised: '0 0 32px -8px var(--color-glow)',
+  overlay: '0 0 48px -6px var(--color-glow)',
+  'glow-orange': '0 0 28px -4px var(--color-glow-hot)',
+  'glow-royal': '0 0 28px -4px var(--color-glow)',
 } as const;
 
 export const zIndex = {

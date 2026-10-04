@@ -1,13 +1,15 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { neon } from '@acme/theme';
+import { BrandLogo } from './brand/BrandLogo';
 import { CircuitButton } from './future/CircuitButton';
 import { GridCard } from './future/GridCard';
 import { GlyphCity } from './backgrounds/GlyphCity';
-import { GridFloor } from './backgrounds/GridFloor';
+import { GridFloor, type GridFloorProps } from './backgrounds/GridFloor';
 import { GridScene } from './backgrounds/GridScene';
 import { Text, View } from './tw';
 
 const meta = {
-  title: 'Spatial/Grid World',
+  title: 'NYC Mon/Grid world',
   parameters: {
     layout: 'fullscreen',
     backgrounds: { disable: true },
@@ -17,101 +19,118 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/** The home hero: badge over a NeonBlade-style floor and the glyph skyline. */
 export const Gateway: Story = {
   render: () => (
-    <View className="h-screen min-h-[720px] bg-black">
-      <GridScene
-        className="flex-1"
-        gap={0.07}
-        speed={0.42}
-        lineColor="#00f3ff"
-        glowColor="#00f3ff"
-      >
-        <View pointerEvents="none" className="absolute inset-x-0 bottom-0 h-[58%]">
-          <GlyphCity
-            className="flex-1"
-            variant="megacity"
-            colorPrimary="#00f3ff"
-            colorSecondary="#ff8a00"
-            colorTertiary="#fff6cf"
-            opacity={0.72}
-          />
+    <View className="h-screen min-h-[720px] bg-bg">
+      <GridFloor className="flex-1" horizon={0.45} speed={0.35}>
+        <View pointerEvents="none" className="absolute inset-x-0 top-0 h-[45%]">
+          <GlyphCity className="flex-1" variant="megacity" colorPrimary={neon.glow} colorSecondary={neon.line} colorTertiary={neon.glowSoft} opacity={0.5} />
         </View>
-
-        <View className="mx-auto flex-1 w-full max-w-6xl justify-between gap-6 px-6 py-10">
-          <View className="max-w-3xl gap-4">
-            <Text className="text-xs font-bold uppercase tracking-[0.32em] text-cyan-200">
-              Spatial-Solotio / System 01
-            </Text>
-            <Text className="text-4xl font-bold uppercase tracking-[0.04em] text-white md:text-6xl">
-              Enter the Grid
-            </Text>
-            <Text className="max-w-2xl text-base leading-7 text-white/60">
-              Universal Tailwind 4 product UI over a Skia-rendered procedural world,
-              with the immersive handoff owned by Viro/OpenXR.
+        <View className="mx-auto w-full max-w-6xl flex-1 items-center justify-center gap-8 px-6 py-10 md:flex-row">
+          <View className="md:order-2">
+            <BrandLogo size={300} />
+          </View>
+          <View className="max-w-xl flex-1 gap-4 md:order-1">
+            <Text className="font-display text-4xl text-primary md:text-6xl">Every block has a legend.</Text>
+            <Text className="text-base leading-7 text-white/80">
+              Race light cycles across a neon New York grid on your phone, in the browser, or in a headset.
             </Text>
             <View className="flex-row flex-wrap gap-3">
-              <CircuitButton>Enter VR Grid</CircuitButton>
-              <CircuitButton tone="orange" variant="solid">Start Cycle Race</CircuitButton>
+              <CircuitButton tone="orange" variant="solid">Start a race</CircuitButton>
+              <CircuitButton>Enter the VR grid</CircuitButton>
             </View>
           </View>
-
-          <View className="gap-3 md:flex-row">
-            <GridCard className="flex-1" eyebrow="Render" title="Skia / CanvasKit">
-              <Text className="text-sm leading-6 text-white/55">
-                The same Grid Scene and Glyph City drawing code runs on Expo and web.
-              </Text>
-            </GridCard>
-            <GridCard className="flex-1" eyebrow="Motion" title="Viro Game Loop" tone="orange">
-              <Text className="text-sm leading-6 text-white/55">
-                Fixed-step racing, analog input, collisions, scoring and OpenXR entry.
-              </Text>
-            </GridCard>
-          </View>
         </View>
-      </GridScene>
+      </GridFloor>
     </View>
   ),
 };
 
+/**
+ * NeonBlade Grid Floor props, NYC Mon defaults. Turn on reduced motion in the
+ * OS (or emulate `prefers-reduced-motion: reduce`) and the scroll stops.
+ */
+export const GridFloorPlayground: StoryObj<GridFloorProps> = {
+  args: {
+    horizon: 0.45,
+    columns: 24,
+    rows: 18,
+    lineColor: neon.line,
+    glowColor: neon.glow,
+    horizonGlowColor: neon.glowSoft,
+    bgColor: neon.bg,
+    speed: 0.6,
+    opacity: 0.85,
+    lineWidth: 1,
+  },
+  argTypes: {
+    horizon: { control: { type: 'range', min: 0.1, max: 0.9, step: 0.01 } },
+    speed: { control: { type: 'range', min: 0, max: 2, step: 0.05 } },
+    opacity: { control: { type: 'range', min: 0, max: 1, step: 0.05 } },
+    lineWidth: { control: { type: 'range', min: 0.5, max: 4, step: 0.5 } },
+    lineColor: { control: 'color' },
+    glowColor: { control: 'color' },
+    horizonGlowColor: { control: 'color' },
+    bgColor: { control: 'color' },
+  },
+  render: (args) => (
+    <View className="h-screen min-h-[560px]">
+      <GridFloor {...args} className="flex-1" />
+    </View>
+  ),
+};
+
+/** The three canvases side by side in brand colours. */
 export const BackgroundSystems: Story = {
   render: () => (
-    <View className="min-h-screen gap-6 bg-black p-6">
-      <View className="h-[420px] overflow-hidden border border-cyan-300/20">
-        <GridScene>
-          <View className="absolute inset-x-0 bottom-0 h-2/3">
-            <GlyphCity className="flex-1" variant="downtown" opacity={0.78} />
-          </View>
-        </GridScene>
-      </View>
-      <View className="h-[360px] overflow-hidden border border-orange-300/20">
-        <GridFloor lineColor="#ff8a00" glowColor="#ff8a00">
+    <View className="min-h-screen gap-6 bg-bg p-6">
+      <View className="h-[360px] overflow-hidden border border-structure/40">
+        <GridFloor>
           <View className="flex-1 items-center justify-center">
-            <Text className="text-xl font-bold uppercase tracking-[0.25em] text-orange-100">
-              Floor primitive
-            </Text>
+            <Text className="font-display text-xl text-primary">Grid floor</Text>
           </View>
         </GridFloor>
       </View>
+      <View className="h-[360px] overflow-hidden border border-structure/40">
+        <GridScene>
+          <View className="flex-1 items-center justify-center">
+            <Text className="font-display text-xl text-accent">Grid scene, floor and ceiling</Text>
+          </View>
+        </GridScene>
+      </View>
+      <View className="h-[360px] overflow-hidden border border-structure/40">
+        <GridScene showCeiling={false}>
+          <View className="absolute inset-x-0 bottom-0 h-2/3">
+            <GlyphCity className="flex-1" variant="downtown" />
+          </View>
+        </GridScene>
+      </View>
     </View>
   ),
 };
 
+/** Every tone and variant of the circuit button, and the card tones. */
 export const FutureControls: Story = {
   render: () => (
-    <View className="min-h-screen gap-6 bg-[#020407] p-8">
+    <View className="min-h-screen gap-6 bg-bg p-8">
       <View className="flex-row flex-wrap gap-3">
-        <CircuitButton>Enter Grid</CircuitButton>
-        <CircuitButton tone="orange">Diagnostics</CircuitButton>
-        <CircuitButton variant="solid">Confirm</CircuitButton>
-        <CircuitButton tone="orange" variant="solid">Race</CircuitButton>
+        <CircuitButton tone="orange" variant="solid">Start a race</CircuitButton>
+        <CircuitButton tone="orange">Solo against AI</CircuitButton>
+        <CircuitButton tone="carolina" variant="solid">Join table</CircuitButton>
+        <CircuitButton tone="carolina">Enter the VR grid</CircuitButton>
+        <CircuitButton tone="royal" variant="solid">Create table</CircuitButton>
+        <CircuitButton tone="royal">Leave session</CircuitButton>
       </View>
       <View className="gap-4 md:flex-row">
-        <GridCard className="flex-1" eyebrow="Node A" title="System online">
-          <Text className="text-sm text-white/55">Cyan information surface.</Text>
+        <GridCard className="flex-1" title="Royal card" eyebrow="Default tone">
+          <Text className="text-sm text-white/75">Structure: rules, outlines and the glow under the grid.</Text>
         </GridCard>
-        <GridCard className="flex-1" eyebrow="Node B" title="Race program" tone="orange">
-          <Text className="text-sm text-white/55">Orange action surface.</Text>
+        <GridCard className="flex-1" title="Carolina card" tone="carolina">
+          <Text className="text-sm text-white/75">Secondary actions and information.</Text>
+        </GridCard>
+        <GridCard className="flex-1" title="Orange card" tone="orange">
+          <Text className="text-sm text-white/75">The main action on a screen.</Text>
         </GridCard>
       </View>
     </View>

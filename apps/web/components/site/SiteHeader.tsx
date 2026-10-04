@@ -4,7 +4,7 @@ import { Link } from 'solito/link';
 import { usePathname } from 'solito/navigation';
 import { create } from 'zustand';
 import { Header, Nav, Pressable, View, Text as TWText } from '@acme/ui/tw';
-import { Avatar, MotionView, useHydrated } from '@acme/ui';
+import { Avatar, BrandLogo, MotionView, useHydrated } from '@acme/ui';
 import { AVATAR_URI, useProfile } from '@acme/app';
 import { NAV_ITEMS, PROFILE, useMobileMenu } from './nav';
 
@@ -150,7 +150,7 @@ export function SiteHeader() {
   return (
     <Header
       className={`sticky top-0 z-50 border-b backdrop-blur-md transition-all duration-base motion-reduce:transition-none ${
-        scrolled ? 'border-border bg-surface/95 shadow-card' : 'border-border bg-surface/80'
+        scrolled ? 'border-structure/50 bg-surface/95 shadow-card' : 'border-structure/30 bg-surface/80'
       }`}
     >
       {/* Load choreography: the bar settles first, then logo, then links. */}
@@ -165,24 +165,23 @@ export function SiteHeader() {
         <Link
           href="/"
           onClick={close}
-          aria-label="Home"
+          aria-label="NYC-MON home"
           className="flex items-center gap-2.5 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/50"
         >
           <MotionView
             initial={hydrated ? { scale: 0.6 } : undefined}
             animate={hydrated ? { scale: 1 } : undefined}
             transition={{ type: 'spring', damping: 15, stiffness: 320, delay: 60 }}
-            className="h-9 w-9 items-center justify-center rounded-md border-2 border-border-strong bg-primary shadow-card"
           >
-            <TWText className="text-base font-bold text-on-primary">S</TWText>
+            <BrandLogo size={52} />
           </MotionView>
           <MotionView
             initial={hydrated ? { x: -8 } : undefined}
             animate={hydrated ? { x: 0 } : undefined}
             transition={{ type: 'timing', duration: 240, ease: 'easeOut', delay: 140 }}
           >
-            <TWText className="font-display text-lg font-bold tracking-tight text-text">
-              Starter
+            <TWText className="font-display text-xl tracking-tight text-primary">
+              NYC-MON
             </TWText>
           </MotionView>
         </Link>
@@ -248,7 +247,7 @@ export function SiteHeader() {
             initial={{ y: -12 }}
             animate={{ y: 0 }}
             transition={{ type: 'spring', damping: 24, stiffness: 380 }}
-            className="absolute inset-x-0 top-full rounded-b-sheet border-b-2 border-border bg-surface shadow-raised md:hidden"
+            className="absolute inset-x-0 top-full rounded-b-sheet border-b-2 border-structure/50 bg-surface shadow-raised md:hidden"
           >
             {/* Identity row — profile anchors the menu; settings live inside it */}
             <MotionView
@@ -267,7 +266,7 @@ export function SiteHeader() {
                 <Avatar name={name} imageUri={AVATAR_URI} size="lg" />
                 <View className="flex-1 gap-0.5">
                   <TWText className="text-base font-semibold text-text">{name}</TWText>
-                  <TWText className="text-sm text-text-muted">{handle} · Profile & settings</TWText>
+                  <TWText className="text-sm text-text-muted">{handle}, profile and settings</TWText>
                 </View>
                 <TWText className="text-lg text-text-muted">›</TWText>
               </Link>

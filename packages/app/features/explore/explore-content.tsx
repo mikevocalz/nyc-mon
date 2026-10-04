@@ -67,10 +67,10 @@ export function ExploreContent() {
                   outerClassName="self-start"
                 >
                   <View aria-hidden className="absolute -right-6 -top-8 h-24 w-24 rounded-full bg-ink-50/10" />
-                  <item.icon size={26} className="text-ink-50" />
+                  <item.icon size={26} className={item.fg} />
                   <View className="gap-0.5">
-                    <TWText className="text-base font-bold text-ink-50">{item.title}</TWText>
-                    <TWText className="text-xs text-ink-50/80">{item.subtitle}</TWText>
+                    <TWText className={`text-base font-bold ${item.fg}`}>{item.title}</TWText>
+                    <TWText className={`text-xs ${item.fg}`}>{item.subtitle}</TWText>
                   </View>
                 </PressScale>
               </ScaleIn>
@@ -94,7 +94,7 @@ export function ExploreContent() {
                     <card.icon size={20} className={INK[card.tone]} />
                   </View>
                   <View className="rounded-sm bg-surface-sunken px-2.5 py-1">
-                    <TWText className="text-[10px] font-semibold uppercase tracking-wide text-text-muted">
+                    <TWText className="text-xs font-semibold text-text-muted">
                       {card.tag}
                     </TWText>
                   </View>

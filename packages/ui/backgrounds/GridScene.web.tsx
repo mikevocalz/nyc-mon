@@ -1,5 +1,6 @@
 'use client';
 
+import { neon } from '@acme/theme';
 import type { GridSceneProps } from './GridScene.types';
 import { View } from '../tw';
 import { SkiaWebGate } from './SkiaWebGate';
@@ -11,7 +12,7 @@ export function GridScene(props: GridSceneProps) {
     <SkiaWebGate
       load={loadGridScene}
       props={props}
-      fallback={<View className={`flex-1 bg-black ${props.className ?? ''}`}>{props.children}</View>}
+      fallback={<View className={`flex-1 ${props.className ?? ''}`} style={{ backgroundColor: props.backgroundColor ?? neon.bg }}>{props.children}</View>}
     />
   );
 }

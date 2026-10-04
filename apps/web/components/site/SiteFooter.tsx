@@ -2,6 +2,7 @@
 import { Link } from 'solito/link';
 import { usePathname } from 'solito/navigation';
 import { Footer, Nav, View, Text as TWText, P } from '@acme/ui/tw';
+import { BrandLogo } from '@acme/ui';
 import { NAV_ITEMS, PROFILE } from './nav';
 
 // The footer is a system map of the template, not decoration: every column
@@ -24,28 +25,27 @@ export function SiteFooter() {
   if (pathname === '/' || pathname.startsWith('/spatial')) return null;
 
   return (
-    <Footer className="border-t-2 border-border bg-surface-sunken">
+    <Footer className="border-t-2 border-structure/60 bg-surface-sunken">
       <View className="mx-auto w-full max-w-screen-2xl gap-10 px-4 py-12 sm:px-6 md:flex-row md:justify-between">
         {/* Brand */}
         <View className="max-w-xs gap-3">
-          <View className="flex-row items-center gap-2.5">
-            <View className="h-9 w-9 items-center justify-center rounded-xl bg-primary shadow-card">
-              <TWText className="text-base font-bold text-on-primary">S</TWText>
-            </View>
-            <TWText className="font-display text-lg font-bold tracking-tight text-text">
-              Starter
+          <View className="flex-row items-center gap-3">
+            <BrandLogo size={88} />
+            <TWText className="font-display text-xl tracking-tight text-primary">
+              NYC-MON
             </TWText>
           </View>
+          <TWText className="text-base font-semibold text-text">Every block has a legend.</TWText>
           <P className="text-sm leading-relaxed text-text-muted">
-            One codebase for iOS, Android, and the web — screens shared through
-            Solito, styled by one token system.
+            One codebase for iOS, Android and the web, with screens shared
+            through Solito and styled by one token system.
           </P>
         </View>
 
         {/* Columns */}
         <View className="flex-row flex-wrap gap-10 md:gap-16">
           <Nav aria-label="Pages" className="min-w-28 gap-2.5">
-            <TWText className="text-xs font-semibold uppercase tracking-wider text-text-muted">
+            <TWText className="text-sm font-semibold text-accent">
               Pages
             </TWText>
             {[...NAV_ITEMS, PROFILE].map((item) => (
@@ -56,7 +56,7 @@ export function SiteFooter() {
           </Nav>
 
           <Nav aria-label="Toolkit" className="min-w-28 gap-2.5">
-            <TWText className="text-xs font-semibold uppercase tracking-wider text-text-muted">
+            <TWText className="text-sm font-semibold text-accent">
               Toolkit
             </TWText>
             {TOOLKIT.map((item) => (
@@ -67,7 +67,7 @@ export function SiteFooter() {
           </Nav>
 
           <View className="min-w-28 gap-2.5">
-            <TWText className="text-xs font-semibold uppercase tracking-wider text-text-muted">
+            <TWText className="text-sm font-semibold text-accent">
               Stack
             </TWText>
             {STACK.map((item) => (
@@ -80,10 +80,10 @@ export function SiteFooter() {
       </View>
 
       {/* Legal bar */}
-      <View className="border-t-2 border-border">
+      <View className="border-t border-structure/30">
         <View className="mx-auto w-full max-w-screen-2xl flex-row flex-wrap items-center justify-between gap-2 px-4 py-5 sm:px-6">
-          <TWText className="text-xs text-text-muted">© NYC Mon</TWText>
-          <TWText className="text-xs text-text-muted">MIT licensed — make it yours.</TWText>
+          <TWText className="text-xs text-text-muted">© NYC-MON</TWText>
+          <TWText className="text-xs text-text-muted">MIT licensed. Make it yours.</TWText>
         </View>
       </View>
     </Footer>

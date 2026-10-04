@@ -31,7 +31,7 @@ FieldGroup.Section = function FieldSection({ children, title, titleUppercase = t
 };
 
 FieldGroup.SectionHeader = function FieldSectionHeader({ children }: { children?: React.ReactNode }) {
-  return <Text className="text-xs font-semibold uppercase text-text-muted md:text-sm">{children}</Text>;
+  return <Text className="text-sm font-semibold text-text-muted md:text-base">{children}</Text>;
 };
 
 FieldGroup.SectionFooter = function FieldSectionFooter({ children }: { children?: React.ReactNode }) {

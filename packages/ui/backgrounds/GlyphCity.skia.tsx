@@ -3,7 +3,9 @@
 import { useMemo, useState } from 'react';
 import { BlurMask, Canvas, Circle, Fill, Group, Line, Rect, vec, useClock } from '@shopify/react-native-skia';
 import { useDerivedValue } from 'react-native-reanimated';
+import { neon } from '@acme/theme';
 import { View } from '../tw';
+import { useReducedMotion } from './use-reduced-motion';
 import type { GlyphCityProps, GlyphCityVariant } from './GlyphCity.types';
 
 type Building = {
@@ -71,13 +73,13 @@ function BuildingNode({
     blinkingLights ? 0.25 + 0.75 * Math.abs(Math.sin(clock.value / 480 + building.seed)) : 0.9,
   );
   const top = ground - building.height;
-  const tone = palette[building.tone] ?? palette[0] ?? '#00f3ff';
+  const tone = palette[building.tone] ?? palette[0] ?? neon.glow;
   const columns = Math.max(2, Math.floor(building.width / 18));
   const rows = Math.max(3, Math.floor(building.height / 24));
 
   return (
     <Group>
-      <Rect x={building.x} y={top} width={building.width} height={building.height} color="#020408" opacity={0.78} />
+      <Rect x={building.x} y={top} width={building.width} height={building.height} color={neon.bg} opacity={0.82} />
       <Line p1={vec(building.x, ground)} p2={vec(building.x, top)} color={tone} strokeWidth={2}>
         <BlurMask blur={4} style="solid" />
       </Line>
@@ -159,15 +161,16 @@ export default function GlyphCitySkia({
   className,
   children,
   variant = 'downtown',
-  colorPrimary = '#00f3ff',
-  colorSecondary = '#ff8a00',
-  colorTertiary = '#fff3a3',
+  colorPrimary = neon.glow,
+  colorSecondary = neon.line,
+  colorTertiary = neon.white,
   backgroundColor = 'transparent',
   speed = 1,
   showVehicles = true,
   blinkingLights = true,
   opacity = 0.92,
 }: GlyphCityProps) {
+  const reducedMotion = useReducedMotion();
   const [size, setSize] = useState({ width: 1, height: 1 });
   const { width, height } = size;
   const buildings = useMemo(() => buildCity(width, height, variant), [height, variant, width]);
@@ -192,10 +195,10 @@ export default function GlyphCitySkia({
               ground={height}
               palette={palette}
               tertiary={colorTertiary}
-              blinkingLights={blinkingLights}
+              blinkingLights={blinkingLights && !reducedMotion}
             />
           ))}
-          {showVehicles ? (
+          {showVehicles && !reducedMotion ? (
             <>
               <Vehicle index={0} color={colorSecondary} speed={speed} width={width} height={height} />
               <Vehicle index={1} color={colorPrimary} speed={speed * 0.82} width={width} height={height} />

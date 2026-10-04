@@ -14,9 +14,9 @@ export const CATEGORIES = [
 ] as const;
 
 export const FEATURED = [
-  { title: 'Mobile UI Kit', subtitle: '120+ components', icon: Smartphone, bg: 'bg-primary' },
-  { title: 'Dashboard Pro', subtitle: 'Admin templates', icon: LineChart, bg: 'bg-burgundy-500' },
-  { title: 'Brand Kit', subtitle: 'Logos & assets', icon: Star, bg: 'bg-accent' },
+  { title: 'Mobile UI Kit', subtitle: '120+ components', icon: Smartphone, bg: 'bg-primary', fg: 'text-on-primary' },
+  { title: 'Dashboard Pro', subtitle: 'Admin templates', icon: LineChart, bg: 'bg-primary-pressed', fg: 'text-on-primary' },
+  { title: 'Brand Kit', subtitle: 'Logos & assets', icon: Star, bg: 'bg-accent', fg: 'text-on-accent' },
 ] as const;
 
 export const CARDS = [

@@ -22,7 +22,7 @@ const text = tv({
       heading: 'text-lg font-semibold md:text-xl lg:text-2xl',
       body: 'text-base md:text-lg',
       caption: 'text-sm md:text-base',
-      label: 'text-xs font-medium uppercase tracking-wide md:text-sm',
+      label: 'text-sm font-semibold md:text-base',
     },
     tone: {
       default: 'text-text',

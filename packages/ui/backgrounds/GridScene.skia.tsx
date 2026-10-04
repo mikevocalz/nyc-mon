@@ -3,14 +3,17 @@
 import { useState } from 'react';
 import { BlurMask, Canvas, Fill, Group, Line, LinearGradient, vec, useClock } from '@shopify/react-native-skia';
 import { useDerivedValue } from 'react-native-reanimated';
+import { neon } from '@acme/theme';
 import { View } from '../tw';
+import { useReducedMotion } from './use-reduced-motion';
+import { useWebPhase } from './use-web-phase';
 import type { GridSceneProps } from './GridScene.types';
 
 function MovingLine({
-  index, rows, edgeY, farY, width, speed, color, opacity, lineWidth,
+  index, rows, edgeY, farY, width, speed, color, glowColor, opacity, lineWidth,
 }: {
   index: number; rows: number; edgeY: number; farY: number; width: number;
-  speed: number; color: string; opacity: number; lineWidth: number;
+  speed: number; color: string; glowColor: string; opacity: number; lineWidth: number;
 }) {
   const clock = useClock();
   const y = useDerivedValue(() => {
@@ -22,18 +25,45 @@ function MovingLine({
   const p2 = useDerivedValue(() => vec(width, y.value));
   const alpha = Math.min(1, ((index + 1) / rows) / 0.35) * opacity;
 
+  // Blurred glow underlay + crisp line on top (NeonBlade's shadowBlur look).
   return (
-    <Line p1={p1} p2={p2} color={color} opacity={alpha} strokeWidth={lineWidth}>
-      <BlurMask blur={lineWidth * 2.5} style="solid" />
-    </Line>
+    <Group opacity={alpha}>
+      <Line p1={p1} p2={p2} color={glowColor} strokeWidth={lineWidth * 3}>
+        <BlurMask blur={lineWidth * 3} style="normal" />
+      </Line>
+      <Line p1={p1} p2={p2} color={color} strokeWidth={lineWidth} />
+    </Group>
+  );
+}
+
+// Plain-number row for web, where Reanimated-driven Skia props don't draw.
+function StaticLine({
+  index, rows, edgeY, farY, width, phase, color, glowColor, opacity, lineWidth,
+}: {
+  index: number; rows: number; edgeY: number; farY: number; width: number;
+  phase: number; color: string; glowColor: string; opacity: number; lineWidth: number;
+}) {
+  const t = (index + phase) / rows;
+  const y = edgeY + (farY - edgeY) * t * t;
+  const alpha = Math.min(1, ((index + 1) / rows) / 0.35) * opacity;
+  return (
+    <Group opacity={alpha}>
+      <Line p1={vec(0, y)} p2={vec(width, y)} color={glowColor} strokeWidth={lineWidth * 3}>
+        <BlurMask blur={lineWidth * 3} style="normal" />
+      </Line>
+      <Line p1={vec(0, y)} p2={vec(width, y)} color={color} strokeWidth={lineWidth} />
+    </Group>
   );
 }
 
 export default function GridSceneSkia({
   className, children, horizon = 0.5, gap = 0.08, columns = 24, rows = 18,
-  lineColor = '#00f3ff', glowColor = '#00f3ff', backgroundColor = '#050505',
+  lineColor = neon.line, glowColor = neon.glow, backgroundColor = neon.bg,
   speed = 0.6, opacity = 0.85, lineWidth = 1, showCeiling = true, showFloor = true,
 }: GridSceneProps) {
+  const reducedMotion = useReducedMotion();
+  const effectiveSpeed = reducedMotion ? 0 : speed;
+  const webPhase = useWebPhase(effectiveSpeed);
   const [size, setSize] = useState({ width: 1, height: 1 });
   const { width, height } = size;
   const horizonY = height * horizon;
@@ -73,10 +103,18 @@ export default function GridSceneSkia({
           {showFloor ? planeColumns(true) : null}
           {showCeiling ? planeColumns(false) : null}
           {showFloor ? rowsArray.map((index) => (
-            <MovingLine key={`fr-${index}`} index={index} rows={rows} edgeY={floorEdgeY} farY={height} width={width} speed={speed} color={glowColor} opacity={opacity} lineWidth={lineWidth} />
+            webPhase === null ? (
+              <MovingLine key={`fr-${index}`} index={index} rows={rows} edgeY={floorEdgeY} farY={height} width={width} speed={effectiveSpeed} color={lineColor} glowColor={glowColor} opacity={opacity} lineWidth={lineWidth} />
+            ) : (
+              <StaticLine key={`fr-${index}`} index={index} rows={rows} edgeY={floorEdgeY} farY={height} width={width} phase={webPhase} color={lineColor} glowColor={glowColor} opacity={opacity} lineWidth={lineWidth} />
+            )
           )) : null}
           {showCeiling ? rowsArray.map((index) => (
-            <MovingLine key={`cr-${index}`} index={index} rows={rows} edgeY={ceilingEdgeY} farY={0} width={width} speed={speed} color={glowColor} opacity={opacity} lineWidth={lineWidth} />
+            webPhase === null ? (
+              <MovingLine key={`cr-${index}`} index={index} rows={rows} edgeY={ceilingEdgeY} farY={0} width={width} speed={effectiveSpeed} color={lineColor} glowColor={glowColor} opacity={opacity} lineWidth={lineWidth} />
+            ) : (
+              <StaticLine key={`cr-${index}`} index={index} rows={rows} edgeY={ceilingEdgeY} farY={0} width={width} phase={webPhase} color={lineColor} glowColor={glowColor} opacity={opacity} lineWidth={lineWidth} />
+            )
           )) : null}
         </Group>
       </Canvas>

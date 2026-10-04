@@ -45,7 +45,7 @@ export function HomeContent() {
           <View aria-hidden className="absolute -right-8 -top-10 h-36 w-36 rounded-full bg-ink-50/10" />
           <View aria-hidden className="absolute -bottom-12 right-16 h-28 w-28 rounded-full bg-ink-50/5" />
           <View className="gap-1">
-            <TWText className="text-xs font-semibold uppercase tracking-wider text-on-primary/70">
+            <TWText className="text-sm font-semibold text-on-primary">
               Weekly summary
             </TWText>
             <TWText className="font-display text-4xl font-bold text-on-primary">$24,820</TWText>

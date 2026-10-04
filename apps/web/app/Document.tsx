@@ -2,7 +2,7 @@ import NextTopLoader from 'nextjs-toploader';
 import { display, sans } from './fonts';
 
 const THEME_SCRIPT =
-  "try{var m=document.cookie.match(/(?:^|; )app-theme=(light|dark)/);" +
+  "try{var m=document.cookie.match(/(?:^|; )app-theme=(light|dark|system)/);" +
   "if(m)document.documentElement.setAttribute('data-theme',m[1]);}catch(e){}";
 
 type Props = {

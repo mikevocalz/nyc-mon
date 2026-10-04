@@ -97,13 +97,14 @@ for (const [name, { light, dark }] of Object.entries(semantic)) {
 web.push('}');
 web.push('');
 web.push(':root {');
-web.push('  color-scheme: light dark; /* system-following default; override via [data-theme] */');
+web.push('  color-scheme: dark; /* NYC Mon is dark-first; override via [data-theme] */');
 web.push(...rootVars());
 web.push('}');
 web.push('');
 web.push('/* user override (persisted): data-theme wins over system */');
 web.push("[data-theme='light'] { color-scheme: light; }");
 web.push("[data-theme='dark'] { color-scheme: dark; }");
+web.push("[data-theme='system'] { color-scheme: light dark; }");
 web.push('');
 web.push(BODY_TEXT_BASE);
 web.push(`

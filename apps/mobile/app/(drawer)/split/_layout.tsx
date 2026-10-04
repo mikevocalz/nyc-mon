@@ -257,7 +257,7 @@ export default function SplitLayout() {
             onMonthChange={(next) => showMonth(next.toISOString())}
           />
 
-          <Text className="text-xs font-semibold uppercase text-text-muted md:text-sm">Staff</Text>
+          <Text className="text-sm font-semibold text-text-muted md:text-base">Staff</Text>
 
           {/* The pane composes its own field — see PaneSearchBar for why this
               is composition rather than a `searchable` flag. */}

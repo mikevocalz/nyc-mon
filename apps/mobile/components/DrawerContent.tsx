@@ -55,7 +55,7 @@ export function DrawerContent(props: DrawerContentComponentProps) {
         </View>
       </View>
 
-      <Text className="mx-5 mb-1 text-xs font-semibold uppercase text-text-muted">Menu</Text>
+      <Text className="mx-5 mb-1 text-sm font-semibold text-text-muted">Menu</Text>
 
       <View className="py-2">
         {MAIN_ITEMS.map((item) => {

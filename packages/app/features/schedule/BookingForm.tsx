@@ -167,7 +167,7 @@ export function BookingForm({ onDone, onOpenEditorSettings }: BookingFormProps) 
               <View key={group} className="gap-2">
                 {/* Chunked into morning/afternoon so the eye scans a short
                     list twice instead of one undifferentiated block of ten. */}
-                <Text className="text-xs font-semibold uppercase text-text-muted">
+                <Text className="text-sm font-semibold text-text-muted">
                   {group}
                 </Text>
                 <View className="flex-row flex-wrap gap-2">

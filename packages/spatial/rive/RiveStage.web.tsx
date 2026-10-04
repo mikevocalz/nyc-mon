@@ -22,7 +22,7 @@ export function RiveStage({
 
   return (
     <View
-      className={`overflow-hidden rounded-2xl border border-cyan-300/25 bg-black/40 ${className ?? ''}`}
+      className={`overflow-hidden rounded-2xl border border-structure/40 bg-black/40 ${className ?? ''}`}
       style={{ height }}
     >
       <RiveComponent style={{ width: '100%', height: '100%' }} />
