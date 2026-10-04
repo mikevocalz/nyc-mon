@@ -68,7 +68,15 @@ export * from './audio';
 
 export { GridFloor, type GridFloorProps } from './backgrounds/GridFloor';
 export { GridScene, type GridSceneProps } from './backgrounds/GridScene';
-export { GlyphCity, type GlyphCityProps, type GlyphCityVariant } from './backgrounds/GlyphCity';
+export { CitySkyline, GlyphCity } from './backgrounds/CitySkyline';
+export type { CitySkylineProps, GlyphCityProps, GlyphCityVariant } from './backgrounds/CitySkyline.types';
+export { SignRain, type SignRainProps } from './backgrounds/SignRain';
+export { SubwayLines, type SubwayLinesProps } from './backgrounds/SubwayLines';
+export { StreetPulse, type StreetPulseProps } from './backgrounds/StreetPulse';
+export { CityHeightfield, type CityHeightfieldProps } from './backgrounds/CityHeightfield';
+export { RiverTide, type RiverTideProps, type RiverTideOrigin } from './backgrounds/RiverTide';
+export { RainWindow, type RainWindowProps } from './backgrounds/RainWindow';
+export { DISTRICTS, DISTRICT_NAMES, THEMES as DISTRICT_THEMES, type DistrictTheme } from './backgrounds/district-theme';
 export { CityBlocks, type CityBlocksProps, type District } from './backgrounds/CityBlocks';
 export { CircuitButton, type CircuitButtonProps, type CircuitTone, GridCard, type GridCardProps } from './future';
 export { BrandLogo, type BrandLogoProps } from './brand/BrandLogo';
