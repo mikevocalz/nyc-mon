@@ -4,7 +4,7 @@ import { brand } from '@acme/theme';
 import { useSizeClass } from '../use-size-class';
 import { citySkylineLayers } from './city-skyline-model';
 import type { CitySkylineProps, GlyphCityVariant } from './CitySkyline.types';
-import { THEMES } from '../district';
+import { THEMES } from './district-theme';
 import { QuadBackground } from './QuadBackground';
 import { normaliseOpacity, useLayers } from './QuadBackground.shared';
 import type { SkylineDistrict } from './skyline-model';

@@ -3,7 +3,7 @@
 import { brand } from '@acme/theme';
 import { useSizeClass } from '../use-size-class';
 import type { NeonColorInput } from '../neon/colors';
-import { THEMES, type District } from '../district';
+import { THEMES, type District } from './district-theme';
 import { heightfieldLayers } from './heightfield-model';
 import { QuadBackground } from './QuadBackground';
 import { normaliseOpacity, useLayers, type SolidBackgroundBaseProps } from './QuadBackground.shared';

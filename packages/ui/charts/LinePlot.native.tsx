@@ -7,7 +7,7 @@ import {
 import { brand } from '@acme/theme';
 import { withAlpha } from '../neon/colors';
 import { View } from '../tw';
-import { keylineFor } from '../district';
+import { keylineFor } from './district-tones';
 import type { LinePlotProps } from './LinePlot.types';
 
 const SPRING = { mass: 1, stiffness: 900, damping: 50 } as const;

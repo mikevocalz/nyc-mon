@@ -7,7 +7,7 @@ import { Text } from '../Text';
 import { View } from '../tw';
 import { pad2, progressOf, stepIndex } from './card-slider-model';
 import type { VisibleCount } from './card-slider-model';
-import { TONE_CLASSES, resolveControlTone, toneVariants, type ControlTone, type District, type ToneClasses } from '../district';
+import { TONE_CLASSES, resolveTone, toneVariants, type ControlTone, type District, type ToneClasses } from './tones';
 
 export type CardSliderProgressStyle = 'bar' | 'dots' | 'counter';
 
@@ -45,7 +45,7 @@ const controls = tv({
   },
   variants: { tone: toneVariants(() => ({})) },
   compoundVariants: (Object.entries(toneVariants((c) => c)) as [ControlTone, ToneClasses][]).map(([tone, c]) => ({
-    tone, class: { fill: c.face, counter: c.text },
+    tone, class: { fill: c.face, counter: c.ink },
   })),
 });
 
@@ -145,5 +145,5 @@ export function SliderControls({ index, count, visible, maxIndex, loop, tone, sh
 }
 
 export function sliderTone(tone?: ControlTone, district?: District) {
-  return resolveControlTone(tone, district);
+  return resolveTone(tone, district);
 }

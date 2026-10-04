@@ -1,9 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { CityBlocks, type CityBlocksProps, type District } from './backgrounds/CityBlocks';
+import { DISTRICTS } from './district';
 import { Heading, Paragraph, Section } from './html';
 import { SolidPanel } from './neon/SolidPanel';
 import { View } from './tw';
-import { DISTRICTS } from './district';
 
 const meta = {
   title: 'NYC Mon/City blocks',

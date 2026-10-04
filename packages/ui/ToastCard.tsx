@@ -3,7 +3,7 @@ import { tv, type VariantProps } from 'tailwind-variants';
 import { Pressable, View } from './tw';
 import { Text } from './Text';
 import { Check, Info, LoaderCircle, TriangleAlert, X } from './icons';
-import { TONE_CLASSES, resolveTone, type District, type Tone } from './district';
+import { TONE_CLASSES, resolveTone, type District, type Tone } from './elements/tones';
 import type { NeonColorInput } from './neon/colors';
 
 /**

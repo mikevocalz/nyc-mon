@@ -87,6 +87,8 @@ export interface ToneClasses {
   light: string;
   /** Tone-coloured text that holds AA on night. */
   text: string;
+  /** Same as `text`; the name the control ports used. */
+  ink: string;
   /** Text on a surface face. */
   on: string;
   /** Text on a control face. */
@@ -109,7 +111,7 @@ export interface ToneClasses {
   focusGlow: string;
 }
 
-export const TONE_CLASSES: Record<Tone, ToneClasses> = {
+const TABLE: Record<Tone, Omit<ToneClasses, 'ink'>> = {
   orange: {
     face: 'bg-orange-500', top: 'bg-orange-300', side: 'bg-orange-700', plate: 'bg-orange-700', deep: 'bg-orange-900',
     shadow: 'bg-orange-950', light: 'bg-orange-200', text: 'text-orange-400', on: 'text-ink-950', onFace: 'text-ink-950',
@@ -161,6 +163,10 @@ export const TONE_CLASSES: Record<Tone, ToneClasses> = {
     focusGlow: 'focus:shadow-[0_0_18px_-4px_var(--color-ink-50)]',
   },
 };
+
+export const TONE_CLASSES: Record<Tone, ToneClasses> = Object.fromEntries(
+  TONES.map((t) => [t, { ...TABLE[t], ink: TABLE[t].text }]),
+) as Record<Tone, ToneClasses>;
 
 /** The class table for a district, or for an explicit colour. */
 export function toneClasses(district?: District, color?: NeonColorInput | Tone): ToneClasses {

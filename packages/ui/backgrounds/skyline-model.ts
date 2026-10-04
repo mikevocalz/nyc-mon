@@ -1,7 +1,7 @@
 import { brand, palette } from '@acme/theme';
 import type { Rgba } from '../neon/colors.ts';
 import type { District } from './city-blocks-model.ts';
-import { THEMES } from '../district/index.ts';
+import { THEMES } from './district-theme.ts';
 import { mixRgba, rgba, rng, type QuadWriter } from './quad-writer.ts';
 
 /**

@@ -1,7 +1,7 @@
 'use client';
 
 import { brand } from '@acme/theme';
-import { THEMES, type District } from '../district';
+import { THEMES, type District } from './district-theme';
 import { QuadBackground } from './QuadBackground';
 import { normaliseOpacity, useLayers, type SolidBackgroundBaseProps } from './QuadBackground.shared';
 import { streetFloorLayers } from './street-floor-model';

@@ -5,7 +5,7 @@ import { tv } from 'tailwind-variants';
 import { Card } from '../Card';
 import { Text } from '../Text';
 import { View } from '../tw';
-import { districtTone, type ChartTone, type District } from '../district';
+import { districtTone, type ChartTone, type District } from './district-tones';
 import { NeonSparkline } from './NeonSparkline';
 
 export type StatTrend = 'up' | 'down' | 'neutral';

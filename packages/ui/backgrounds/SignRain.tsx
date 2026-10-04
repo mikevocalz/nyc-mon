@@ -2,7 +2,7 @@
 
 import { brand } from '@acme/theme';
 import type { NeonColorInput } from '../neon/colors';
-import { THEMES, type District } from '../district';
+import { THEMES, type District } from './district-theme';
 import { QuadBackground } from './QuadBackground';
 import { normaliseOpacity, useLayers, type SolidBackgroundBaseProps } from './QuadBackground.shared';
 import { SIGN_GREEN, signRainLayers, STREET_CHARACTERS } from './sign-rain-model';

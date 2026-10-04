@@ -5,7 +5,7 @@ import {
   bandAt, barLayout, buildingWindows, categoryLabels, describeSeries, donutSegments, formatValue,
   linePoints, nearestIndex, niceTicks, polar, resolveSeries, segmentAt, smoothPath,
 } from './chart-model.ts';
-import { keylineFor, seriesColor, seriesShades } from '../district/index.ts';
+import { keylineFor, seriesColor, seriesShades } from './district-tones.ts';
 import { skylineProfile } from '../nav/skyline-profile.ts';
 
 const DATA = [

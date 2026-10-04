@@ -5,7 +5,7 @@ import { View, Text, Pressable } from './tw';
 import { ScaleIn, SlideUp } from './motion';
 import { X } from './icons';
 import { Heading } from './html';
-import { TONE_CLASSES, resolveAccent, resolveTone, type District, type Tone } from './district';
+import { TONE_CLASSES, resolveAccent, resolveTone, type District, type Tone } from './elements/tones';
 import type { NeonColorInput } from './neon/colors';
 
 const dialog = tv({
