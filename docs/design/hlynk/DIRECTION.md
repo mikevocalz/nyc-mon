@@ -112,7 +112,7 @@ v11 says only "Entry is plastic" (`V11 ¶63`). BUILD_PROMPT §1.1 says "Knicks b
 | Body edge keyline | `concrete-400` #9A9EA2 (decorative) | `concrete-700` #484C51 (decorative) |
 | Screen bezel lip | `concrete-900` #1C1E21 | `night` #00041C |
 | LED well | `concrete-900` #1C1E21 | `night` #00041C |
-| Trackpad face | `concrete-100` #E6E7E8 | `concrete-900` #1C1E21 |
+| Trackpad face | `concrete-100` #EBECED | `concrete-900` #1C1E21 |
 | Trackpad edge (ui, 3:1) | `concrete-600` #61656A on body = **3.95:1** | `concrete-400` #9A9EA2 on body = **4.71:1** |
 | Key face | `concrete-300` #B8BBBE | `concrete-700` #484C51 |
 | Key glyph (ui, 3:1) | `signage-black` on key = **10.89:1** | `concrete-300` on `concrete-800` = **6.58:1** |
