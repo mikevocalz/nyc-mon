@@ -55,6 +55,30 @@ async function patchRuntimeAssetFallbacks() {
 
 await patchRuntimeAssetFallbacks();
 
+/**
+ * The mikevocalz/viro fork vendors a newer WASM build under web/renderer/ (see
+ * its build.json for the virocore commit and CI run). It exports what the
+ * fork's JS feature-detects and npm 1.0.1 lacks: drag, pinch, scroll and the
+ * reticle switch. Its glue and .data match 1.0.1, so the npm package's JS
+ * wrapper loads it unchanged; it is copied over the npm wasm/ files.
+ */
+const VENDORED_RENDERER_FILES = [
+  'viro-web.js',
+  'viro-web.wasm',
+  'viro-web.data',
+  'THIRD-PARTY-LICENSES.md',
+];
+
+let vendoredRendererDir = null;
+try {
+  const viroRoot = dirname(webRequire.resolve('@reactvision/react-viro/package.json'));
+  const candidate = join(viroRoot, 'web/renderer');
+  await access(join(candidate, 'viro-web.wasm'));
+  vendoredRendererDir = candidate;
+} catch {
+  // Public npm Viro has no vendored renderer; keep the npm WASM.
+}
+
 const targets = [
   join(root, 'apps/web/public/viro'),
   join(root, 'apps/mobile/public/viro'),
@@ -70,5 +94,25 @@ for (const target of targets) {
     } catch {
       // A renderer release may omit an optional sidecar family.
     }
+  }
+  if (vendoredRendererDir) {
+    for (const file of VENDORED_RENDERER_FILES) {
+      try {
+        await cp(join(vendoredRendererDir, file), join(target, 'wasm', file), {
+          force: true,
+        });
+      } catch {
+        // THIRD-PARTY-LICENSES.md is optional; the three binaries are checked
+        // together below.
+      }
+    }
+  }
+}
+
+if (vendoredRendererDir) {
+  const wasm = await readFile(join(root, 'apps/web/public/viro/wasm/viro-web.wasm'));
+  if (!wasm.includes('viroSetReticleVisible')) {
+    console.error('[viro] vendored renderer copy did not land in apps/web/public/viro/wasm');
+    process.exit(1);
   }
 }

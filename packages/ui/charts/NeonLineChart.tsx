@@ -10,14 +10,14 @@ import { useLayoutSize } from '../use-layout-size';
 import { Text as TWText, View } from '../tw';
 import { useReducedMotion } from '../backgrounds/use-reduced-motion';
 import {
-  categoryLabels, describeSeries, formatValue, niceTicks, resolveSeries,
-  type ChartDatum, type SeriesInput,
+  categoryLabels, describeSeries, formatValue, linePoints, niceTicks, resolveSeries,
+  type ChartDatum, type CurveType, type SeriesInput,
 } from './chart-model';
 import { keylineFor, seriesColor, type District } from './district-tones';
 import { LinePlot } from './LinePlot';
 import type { GlowLevel, PlotSeries } from './LinePlot.types';
 
-export type { ChartDatum, SeriesInput, District, GlowLevel };
+export type { ChartDatum, CurveType, SeriesInput, District, GlowLevel };
 
 export interface NeonLineChartProps {
   /** One object per x category, keyed by `xAxisKey` and each series' dataKey. */
@@ -56,6 +56,10 @@ export interface NeonLineChartProps {
   indicator?: boolean;
   /** Called with the scrubbed index, or null when scrubbing ends. */
   onPointSelected?: (index: number | null) => void;
+  /** A solid marker on every data point (NeonBlade's `dots`). Default false. */
+  dots?: boolean;
+  /** Line shape: smooth (monotone, basis), linear, step, stepAfter, stepBefore. Default smooth. */
+  curve?: CurveType;
   /** Caption for the figure; also the readout heading. */
   title?: string;
   className?: string;
@@ -108,6 +112,8 @@ export function NeonLineChart({
   selectable = true,
   indicator = true,
   onPointSelected,
+  dots = false,
+  curve = 'smooth',
   title,
   className,
 }: NeonLineChartProps) {
@@ -198,7 +204,22 @@ export function NeonLineChart({
             onSelect={onSelect}
             reduced={reduced}
             pad={pad}
+            curve={curve}
           />
+          {dots && plotSize.width > 1
+            ? plotSeries.map((ps, si) =>
+                linePoints(ps.values, range, { width: plotSize.width, height, padX: pad, padY: pad }).map((p, i) => (
+                  <View
+                    key={`${si}-${i}`}
+                    aria-hidden
+                    pointerEvents="none"
+                    className="absolute h-2.5 w-2.5 border-2"
+                    // Computed geometry and series colour: each marker sits on its data point.
+                    style={{ left: p.x - 5, top: p.y - 5, backgroundColor: ps.color, borderColor: ps.keyline }}
+                  />
+                )),
+              )
+            : null}
         </View>
       </View>
 

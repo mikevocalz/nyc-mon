@@ -1,11 +1,21 @@
 import type { GestureResponderEvent } from 'react-native';
 
 type PointLike = {
-  nativeEvent: { offsetX?: number; offsetY?: number; locationX?: number; locationY?: number };
+  nativeEvent: { offsetX?: number; offsetY?: number; locationX?: number; locationY?: number; clientX?: number; clientY?: number };
+  currentTarget?: unknown;
 };
+
+type Measurable = { getBoundingClientRect: () => { left: number; top: number } };
 
 const point = (event: PointLike) => {
   const e = event.nativeEvent;
+  // Web: measure against the element the handler is on. offsetX is relative
+  // to whatever child was hit (the canvas, a label), which is not the plot.
+  const t = event.currentTarget as Measurable | undefined;
+  if (typeof e.clientX === 'number' && typeof e.clientY === 'number' && t && typeof t.getBoundingClientRect === 'function') {
+    const r = t.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  }
   const x = e.offsetX ?? e.locationX;
   const y = e.offsetY ?? e.locationY;
   return x === undefined || y === undefined ? null : { x, y };

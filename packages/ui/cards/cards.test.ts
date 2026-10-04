@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { brand, palette } from '@acme/theme';
 import {
+  autoplayNext, dragTarget,
   clampIndex, indexAtOffset, indexForKey, pad2, progressOf, sliderMetrics, stepIndex, visibleFor,
 } from './card-slider-model.ts';
 import { DEFAULT_NOTCH, insetNotch, notchClipPath, notchPolygon } from './notch.ts';
@@ -104,4 +105,19 @@ test('progress and counter', () => {
   assert.equal(progressOf(3, 3), 1);
   assert.equal(progressOf(0, 0), 1);
   assert.equal(pad2(7), '07');
+});
+
+test('autoplay advances, wraps with loop and stops at the end without it', () => {
+  assert.equal(autoplayNext(0, 3, false), 1);
+  assert.equal(autoplayNext(3, 3, false), null);
+  assert.equal(autoplayNext(3, 3, true), 0);
+  assert.equal(autoplayNext(0, 0, true), null);
+});
+
+test('a mouse drag moves past the threshold and springs back under it', () => {
+  assert.equal(dragTarget(2, -20, 300, 50, 5), 2);
+  assert.equal(dragTarget(2, -80, 300, 50, 5), 3);
+  assert.equal(dragTarget(2, 80, 300, 50, 5), 1);
+  assert.equal(dragTarget(2, -700, 300, 50, 5), 4);
+  assert.equal(dragTarget(5, -400, 300, 50, 5), 5);
 });

@@ -130,7 +130,40 @@ export function linePoints(values: readonly number[], range: { min: number; max:
 
 export type PathCommand =
   | { type: 'M'; x: number; y: number }
+  | { type: 'L'; x: number; y: number }
   | { type: 'C'; x1: number; y1: number; x2: number; y2: number; x: number; y: number };
+
+/**
+ * NeonBlade's `curve` prop (Recharts' curve names). monotone and basis draw
+ * the smooth spline; linear joins points straight; the step kinds hold each
+ * value flat. step centres the riser between points, stepAfter rises at the
+ * next point, stepBefore at the current one.
+ */
+export type CurveType = 'smooth' | 'monotone' | 'basis' | 'linear' | 'step' | 'stepAfter' | 'stepBefore';
+
+/** Path commands for a curve type. The smooth kinds return smoothPath. */
+export function curvePath(points: readonly Point[], curve: CurveType = 'smooth'): PathCommand[] {
+  if (curve === 'smooth' || curve === 'monotone' || curve === 'basis') return smoothPath(points);
+  const out: PathCommand[] = [];
+  points.forEach((p, i) => {
+    if (i === 0) {
+      out.push({ type: 'M', x: p.x, y: p.y });
+      return;
+    }
+    const prev = points[i - 1]!;
+    if (curve === 'stepAfter') {
+      out.push({ type: 'L', x: p.x, y: prev.y }, { type: 'L', x: p.x, y: p.y });
+    } else if (curve === 'stepBefore') {
+      out.push({ type: 'L', x: prev.x, y: p.y }, { type: 'L', x: p.x, y: p.y });
+    } else if (curve === 'step') {
+      const mid = (prev.x + p.x) / 2;
+      out.push({ type: 'L', x: mid, y: prev.y }, { type: 'L', x: mid, y: p.y }, { type: 'L', x: p.x, y: p.y });
+    } else {
+      out.push({ type: 'L', x: p.x, y: p.y });
+    }
+  });
+  return out;
+}
 
 /**
  * The same uniform B-spline react-native-graph draws (CreateGraphPath), so the

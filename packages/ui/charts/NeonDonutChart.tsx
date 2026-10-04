@@ -8,7 +8,8 @@ import { neonColor } from '../neon/colors';
 import { shadeSteps } from '../neon/shade';
 import { useInstanceStore, useStore } from '../use-instance-store';
 import { useLayoutSize } from '../use-layout-size';
-import { Pressable, View } from '../tw';
+import { brand } from '@acme/theme';
+import { Pressable, Text as TWText, View } from '../tw';
 import { useReducedMotion } from '../backgrounds/use-reduced-motion';
 import { donutSegments, formatValue, segmentAt } from './chart-model';
 import { districtSeries, type District } from './district-tones';
@@ -44,6 +45,10 @@ export interface NeonDonutChartProps {
   totalLabel?: string;
   /** Legend list (also selects segments by keyboard). Default true. */
   legend?: boolean;
+  /** Primary colour: the total in the hole and segments with no colour of their own start here. Default: the district's palette. */
+  color?: string;
+  /** Floating readout next to the pointer while hovering a segment. Default true. */
+  tooltip?: boolean;
   onSegmentSelected?: (index: number | null) => void;
   title?: string;
   className?: string;
@@ -55,7 +60,12 @@ const chart = tv({
     stage: 'relative items-center justify-center',
     center: 'absolute items-center',
     centerLabel: 'text-xs text-silver-400',
-    centerValue: 'font-display text-3xl text-white',
+    // No colour class: the value takes the selected segment's colour inline.
+    centerValue: 'font-display text-3xl',
+    tip: 'absolute border-2 border-ink-950 bg-ink-950 px-3 py-2',
+    tipBand: 'absolute inset-x-0 top-0 h-1',
+    tipName: 'pt-1 text-xs text-silver-300',
+    tipValue: 'font-display text-lg',
     centerPct: 'text-sm font-semibold text-silver-300',
     legend: 'w-full gap-1 md:w-auto md:min-w-56',
     item: 'flex-row items-center gap-3 px-2 py-1.5',
@@ -87,6 +97,8 @@ export function NeonDonutChart({
   centerLabel = true,
   totalLabel = 'Total',
   legend = true,
+  color,
+  tooltip = true,
   onSegmentSelected,
   title,
   className,
@@ -96,9 +108,10 @@ export function NeonDonutChart({
   const size = Math.max(1, Math.min(stageSize.width, height));
   const segments = useMemo(() => donutSegments(data.map((d) => d.value), paddingAngle), [data, paddingAngle]);
   const colors = useMemo(() => {
-    const tones = districtSeries(district);
+    const tones = color ? [color, ...districtSeries(district)] : districtSeries(district);
     return data.map((d, i) => (d.color ? neonColor(d.color).base : neonColor(tones[i % tones.length]!).base));
-  }, [data, district]);
+  }, [data, district, color]);
+  const primary = color ? neonColor(color).base : brand.white;
   const shades = useMemo(() => segments.map((s) => shadeSteps(colors[s.index]!)), [segments, colors]);
   const total = data.reduce((a, d) => a + Math.max(0, d.value), 0);
 
@@ -107,18 +120,22 @@ export function NeonDonutChart({
   const outer = Math.max(4, radius(outerRadius, half));
   const inner = Math.min(outer - 4, Math.max(0, radius(innerRadius, half)));
 
-  const selection = useInstanceStore<{ index: number }>(() => ({ index: -1 }));
+  // Selection plus where the pointer is (null when chosen from the legend,
+  // which has no pointer, so no floating tooltip).
+  const selection = useInstanceStore<{ index: number; at: { x: number; y: number } | null }>(() => ({ index: -1, at: null }));
   const selected = useStore(selection, (s) => s.index);
-  const select = (index: number) => {
-    if (index === selection.getState().index) return;
-    selection.setState({ index });
-    onSegmentSelected?.(index < 0 ? null : index);
+  const at = useStore(selection, (s) => s.at);
+  const select = (index: number, point: { x: number; y: number } | null = null) => {
+    const prev = selection.getState().index;
+    selection.setState({ index, at: index >= 0 ? point : null });
+    if (index !== prev) onSegmentSelected?.(index < 0 ? null : index);
   };
   const offsetX = (stageSize.width - size) / 2;
   const pointer = plotPointer(
-    (x, y) => select(segmentAt(x - offsetX, y, { cx: size / 2, cy: size / 2 - depth / 2, inner, outer: outer + 7 }, segments)),
+    (x, y) => select(segmentAt(x - offsetX, y, { cx: size / 2, cy: size / 2 - depth / 2, inner, outer: outer + 7 }, segments), { x, y }),
     () => select(-1),
   );
+  const tipWidth = 150;
 
   const s = chart();
   const pick = selected >= 0 ? data[selected] : undefined;
@@ -130,6 +147,8 @@ export function NeonDonutChart({
       {/* Computed geometry: the stage is as tall as the height prop. */}
       <View className={`${s.stage()} w-full md:w-auto md:flex-1`} style={{ height }} onLayout={onLayout} {...pointer}>
         {stageSize.width > 1 ? (
+          // The stage takes the pointer; the canvas must not be the touch target (native locationX is per target).
+          <View pointerEvents="none">
           <DonutCanvas
             size={size}
             segments={segments}
@@ -142,12 +161,36 @@ export function NeonDonutChart({
             glow={GLOW_BLUR[glowIntensity]}
             reduced={reduced}
           />
+          </View>
         ) : null}
         {centerLabel ? (
           <View pointerEvents="none" className={s.center()} style={{ maxWidth: inner * 1.6 }}>
             <Text numberOfLines={1} className={s.centerLabel()}>{pick ? pick.name : totalLabel}</Text>
-            <Text className={s.centerValue()}>{formatValue(pick ? pick.value : total)}</Text>
+            {/* Runtime colour: the selected segment's, or the primary colour for the total. */}
+            <TWText className={s.centerValue()} style={{ color: pick ? colors[selected] : primary }}>
+              {formatValue(pick ? pick.value : total)}
+            </TWText>
             {pick ? <Text className={s.centerPct()}>{pct(pick.value)}</Text> : null}
+          </View>
+        ) : null}
+        {tooltip && pick && at ? (
+          <View
+            pointerEvents="none"
+            className={s.tip()}
+            // Computed geometry: the readout follows the pointer, flipped and clamped inside the stage.
+            style={{
+              width: tipWidth,
+              left: Math.max(0, Math.min(at.x + 14 + tipWidth > stageSize.width ? at.x - tipWidth - 14 : at.x + 14, stageSize.width - tipWidth)),
+              top: Math.max(0, Math.min(at.y + 14, height - 70)),
+            }}
+          >
+            {/* Segment colour is a runtime value. */}
+            <View aria-hidden className={s.tipBand()} style={{ backgroundColor: colors[selected] }} />
+            <Text numberOfLines={1} className={s.tipName()}>{pick.name}</Text>
+            <View className="flex-row items-baseline gap-2">
+              <TWText className={s.tipValue()} style={{ color: colors[selected] }}>{pick.value.toLocaleString()}</TWText>
+              <Text className="text-xs text-silver-400">{pct(pick.value)}</Text>
+            </View>
           </View>
         ) : null}
       </View>

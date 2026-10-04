@@ -104,14 +104,13 @@ Resolved package:
 Resolved version:
   ${pkg.version ?? 'unknown'}
 
-The public @reactvision/react-viro package remains installed only so public
-clones, web, Storybook and CI can resolve Viro without access to the private
-fork. It is intentionally NOT accepted for Expo SDK 58 native/headset builds.
+The pnpm-workspace.yaml catalog pins @reactvision/react-viro to
+github:mikevocalz/viro at a commit on main. Something resolved a different
+copy (an override, a stale install, or the public npm package), and that copy
+lacks the capabilities below. The public package is NOT accepted for Expo
+SDK 58 native/headset builds.
 
-Enable the fork, reinstall, then retry:
-
-  overrides:
-    "@reactvision/react-viro": "github:mikevocalz/viro#decax9-three-panel"
+Restore the catalog pin and its matching allowBuilds entry, then:
 
   pnpm install
 

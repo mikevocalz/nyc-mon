@@ -1,7 +1,9 @@
 'use client';
 import { tv } from 'tailwind-variants';
-import { Modal } from 'react-native';
-import { View, Text, Pressable } from './tw';
+import Animated, { type CSSAnimationKeyframes } from 'react-native-reanimated';
+import { Modal } from './Modal';
+import { View, Text, Pressable, ScrollView } from './tw';
+import { useReducedMotion } from './backgrounds/use-reduced-motion';
 import { ScaleIn, SlideUp } from './motion';
 import { X } from './icons';
 import { Heading } from './html';
@@ -12,13 +14,18 @@ const dialog = tv({
   slots: {
     // Modal content is portal-rendered; the wrapper centers the surface.
     wrapper: 'flex-1 items-center justify-center p-6',
-    scrim: 'absolute inset-0 bg-ink-950/60 backdrop-blur-[2px]',
+    scrim: 'absolute inset-0',
     card: 'w-full max-w-content-form rounded-sheet border-2 border-border bg-surface-raised p-6 shadow-overlay',
     title: 'font-display text-xl font-semibold text-text',
     description: 'mt-2 text-base text-text-muted',
     body: 'mt-4',
     actions: 'mt-6 flex-row items-center justify-end gap-3',
   },
+  variants: {
+    overlay: { true: { scrim: 'bg-ink-950/70' }, false: { scrim: 'bg-transparent' } },
+    blur: { true: { scrim: 'backdrop-blur-[3px]' }, false: {} },
+  },
+  defaultVariants: { overlay: true, blur: true },
 });
 
 /**
@@ -38,10 +45,14 @@ const facade = tv({
     windows: 'flex-row gap-1.5 px-4 pt-3',
     window: 'h-3 flex-1 border border-ink-950',
     sign: 'mx-4 mt-3 flex-row items-center gap-2 border-2 border-ink-950 px-3 py-2',
-    title: 'my-0 flex-1 font-display text-xl leading-tight',
+    signText: 'flex-1 gap-0.5',
+    label: 'text-xs font-semibold',
+    title: 'my-0 font-display text-xl leading-tight',
     close: 'h-9 w-9 items-center justify-center rounded-xs border-2 border-ink-950 bg-ink-950/20',
     description: 'px-5 pt-3 text-base leading-snug text-silver-300',
     body: 'px-5 pt-4',
+    scroll: 'max-h-[55vh]',
+    divider: 'mx-5 mt-4 h-1',
     stoop: 'mt-5 flex-row flex-wrap items-center gap-3 border-t-4 bg-ink-950 px-5 py-4',
   },
   variants: {
@@ -65,6 +76,27 @@ const facade = tv({
 // Which windows are lit: a fixed pattern so the facade doesn't change between renders.
 const WINDOWS = [true, false, true, true, false, true, false, true];
 
+// NeonBlade's comet border beam, as a theatre marquee: a run of bright
+// windows chases along the row. Each window stays lit for `length` eighths
+// of the lap, so `length` windows glow at once. Reanimated 4 CSS keyframes,
+// cached per length so a re-render never restarts the chase.
+const MARQUEE_CACHE = new Map<number, CSSAnimationKeyframes>();
+function marqueeFrames(length: number): CSSAnimationKeyframes {
+  let frames = MARQUEE_CACHE.get(length);
+  if (!frames) {
+    const on = (length / WINDOWS.length) * 100;
+    frames = {
+      '0%': { opacity: 0 },
+      '3%': { opacity: 1 },
+      [`${on.toFixed(1)}%`]: { opacity: 1 },
+      [`${Math.min(99, on + 6).toFixed(1)}%`]: { opacity: 0 },
+      '100%': { opacity: 0 },
+    };
+    MARQUEE_CACHE.set(length, frames);
+  }
+  return frames;
+}
+
 export interface DialogCardProps {
   title: string;
   description?: string;
@@ -87,6 +119,26 @@ export interface DialogCardProps {
   footerAlign?: 'left' | 'center' | 'right' | 'between';
   /** neon: shows a close control on the sign when set. */
   onClose?: () => void;
+  /** neon: a small line over the title on the sign, e.g. the address. NeonBlade's `label`. */
+  label?: string;
+  /** neon: solid rules between the sign, the body and the stoop. Default false. */
+  dividers?: boolean;
+  /** neon: NeonBlade's border beam, drawn as a marquee light running along the window row. Default false. */
+  borderBeam?: boolean;
+  /** neon: seconds per marquee lap. Default 3. */
+  beamSpeed?: number;
+  /** neon: cap the body at 55% of the viewport and scroll it. Default false. */
+  scrollableBody?: boolean;
+  /** neon: how many windows the marquee lights at once (NeonBlade's beamLength). Default 1. */
+  beamLength?: number;
+  /** neon: glow strength; none drops it (overrides `glow`). Default medium. */
+  glowIntensity?: 'none' | 'low' | 'medium' | 'high';
+  /** neon: facade fill, any CSS colour (NeonBlade's bgColor). Default night. */
+  bgColor?: string;
+  /** neon: replaces the sign band with your own header. */
+  header?: React.ReactNode;
+  /** Accessible name when the title alone is not enough. Default the title. */
+  ariaLabel?: string;
 }
 
 /**
@@ -110,37 +162,73 @@ export function DialogCard(props: DialogCardProps) {
 function FacadeCard({
   title, description, children, actions, className,
   district = 'midtown', color, size = 'md', animation = 'scale', glow = true, footerAlign = 'right', onClose,
+  label, dividers = false, borderBeam = false, beamSpeed = 3, scrollableBody = false,
+  beamLength = 1, glowIntensity, bgColor, header, ariaLabel,
 }: DialogCardProps) {
+  const reduced = useReducedMotion();
   const toneName = resolveTone(district, color);
   const t = TONE_CLASSES[toneName];
   const a = TONE_CLASSES[resolveAccent(district, toneName)];
   const s = facade({ size, footerAlign });
-  const Shell = animation === 'slide' ? SlideUp : animation === 'scale' ? ScaleIn : View;
+  const Shell = reduced || animation === 'none' ? View : animation === 'slide' ? SlideUp : ScaleIn;
+  const marquee = borderBeam && !reduced;
+  const beam = marqueeFrames(Math.max(1, Math.min(4, Math.round(beamLength))));
+  const glowOn = glowIntensity ? glowIntensity !== 'none' : glow;
+  const lap = Math.max(0.6, beamSpeed) * 1000;
+  const body = children ? <View className={s.body()}>{children}</View> : null;
 
   return (
-    <Shell role="dialog" aria-modal aria-label={title} className={s.card({ className: `${glow ? t.glow : ''} ${className ?? ''}` })}>
+    <Shell role="dialog" aria-modal aria-label={ariaLabel ?? title} className={s.card({ className: `${glowOn ? t.glow : ''} ${className ?? ''}` })}>
       <View aria-hidden className={s.cornice({ className: t.side })} />
       <View aria-hidden className={s.dentils()}>
         {Array.from({ length: 12 }, (_, i) => (
           <View key={i} className={s.dentil({ className: t.deep })} />
         ))}
       </View>
-      <View className={s.face({ className: t.border })}>
+      <View
+        className={s.face({ className: t.border })}
+        // Runtime colour: bgColor takes any CSS colour.
+        style={bgColor ? { backgroundColor: bgColor } : undefined}
+      >
         <View aria-hidden className={s.windows()}>
           {WINDOWS.map((lit, i) => (
-            <View key={i} className={s.window({ className: lit ? t.light : 'bg-ink-800' })} />
+            <View key={i} className={s.window({ className: lit ? t.light : 'bg-ink-800' })}>
+              {marquee ? (
+                <Animated.View
+                  // Reanimated CSS animation: per-window delay staggers the chase along the row.
+                  style={{
+                    flex: 1,
+                    opacity: 0,
+                    animationName: beam,
+                    animationDuration: lap,
+                    animationDelay: (i / WINDOWS.length) * lap,
+                    animationIterationCount: 'infinite',
+                    animationTimingFunction: 'linear',
+                  }}
+                >
+                  <View className="flex-1 bg-white" />
+                </Animated.View>
+              ) : null}
+            </View>
           ))}
         </View>
+        {header ?? (
         <View className={s.sign({ className: a.face })}>
-          <Heading level={2} className={s.title({ className: a.on })}>{title}</Heading>
+          <View className={s.signText()}>
+            {label ? <Text className={s.label({ className: a.on })}>{label}</Text> : null}
+            <Heading level={2} className={s.title({ className: a.on })}>{title}</Heading>
+          </View>
           {onClose ? (
             <Pressable role="button" aria-label="Close" onPress={onClose} className={s.close()}>
               <X size={18} className={a.on} />
             </Pressable>
           ) : null}
         </View>
+        )}
         {description ? <Text className={s.description()}>{description}</Text> : null}
-        {children ? <View className={s.body()}>{children}</View> : null}
+        {dividers && (description || body) ? <View aria-hidden className={s.divider({ className: t.side })} /> : null}
+        {body && scrollableBody ? <ScrollView className={s.scroll()}>{body}</ScrollView> : body}
+        {dividers && actions ? <View aria-hidden className={s.divider({ className: t.side })} /> : null}
         {actions ? <View className={s.stoop({ className: t.border })}>{actions}</View> : <View className="h-5" />}
       </View>
     </Shell>
@@ -154,12 +242,31 @@ export interface DialogProps extends DialogCardProps {
   showCloseButton?: boolean;
   /** Close when the scrim is pressed. Default true. */
   closeOnBackdrop?: boolean;
+  /** Close on Escape (web) and the Android back button. Default true. */
+  closeOnEscape?: boolean;
+  /** Dim the page behind the dialog. Default true. */
+  backdropOverlay?: boolean;
+  /** Blur the page behind the dialog (web). Default true. */
+  backdropBlur?: boolean;
 }
 
-export function Dialog({ open, onClose, showCloseButton = true, closeOnBackdrop = true, ...cardProps }: DialogProps) {
-  const s = dialog();
+/**
+ * The modal: the kit Modal (react-native-web's Modal on web, which portals to
+ * the body, traps focus and closes on Escape) with a scrim and the card.
+ */
+export function Dialog({
+  open, onClose, showCloseButton = true, closeOnBackdrop = true, closeOnEscape = true,
+  backdropOverlay = true, backdropBlur = true, ...cardProps
+}: DialogProps) {
+  const reduced = useReducedMotion();
+  const s = dialog({ overlay: backdropOverlay, blur: backdropBlur });
   return (
-    <Modal transparent visible={open} animationType="fade" onRequestClose={onClose}>
+    <Modal
+      transparent
+      visible={open}
+      animationType={reduced ? 'none' : 'fade'}
+      onRequestClose={closeOnEscape ? onClose : () => {}}
+    >
       <View className={s.wrapper()}>
         <Pressable
           aria-label="Close dialog"

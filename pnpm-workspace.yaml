@@ -11,23 +11,23 @@ overrides:
   react-dom: 19.3.0
   "@expo/dom-webview": 58.0.2
 
-# Public Viro is retained only for web/Storybook/CI resolution in this public
-# repository. Native commands hard-require mikevocalz/viro via
-# apps/mobile/scripts/assert-viro-fork.mjs. This extension prevents the public
-# fallback's stale peer metadata from poisoning non-native CI resolution; it
-# must not be treated as native compatibility evidence.
+# @reactvision/react-viro comes from the mikevocalz/viro fork, pinned to a
+# merge commit on its main branch (catalog below). The fork commits its built
+# dist/, so pnpm installs it without running its build scripts. Its peer range
+# covers Expo 58 and React Native 0.88. apps/mobile/scripts/assert-viro-fork.mjs
+# still guards native commands against a resolution that drifts back to npm.
 # Known, accepted peer warnings (pnpm 12.8.1 ignored the packageExtensions that
 # used to sit here: removing them left the resolved graph unchanged, so they
 # were dropped on 2026-10-04).
-# - @reactvision/react-viro@3.0.2 (npm latest) declares expo <58 and
-#   react-native <0.87. Public Viro is only used for web/Storybook/CI here;
-#   native commands hard-require mikevocalz/viro via
-#   apps/mobile/scripts/assert-viro-fork.mjs.
 # - @rive-app/react-native@0.5.2 (npm latest) declares
 #   react-native-nitro-modules <0.37. This starter intentionally stays on
 #   Nitro 0.37.x (also npm latest).
 
 allowBuilds:
+  # false: install the fork's committed dist/ without running its prepare
+  # (tsc). pnpm refuses an unlisted git dependency that has build scripts.
+  # Bump the commit here together with the catalog pin.
+  "@reactvision/react-viro@git+https://github.com/mikevocalz/viro.git#5393d00744f448fc462ef13ee76b1346fc47512e": false
   sharp: true
   unrs-resolver: true
   esbuild: true
@@ -123,7 +123,7 @@ catalog:
   typegpu: 0.12.6
 
   # spatial / XR / Rive
-  "@reactvision/react-viro": 3.0.2
+  "@reactvision/react-viro": github:mikevocalz/viro#5393d00744f448fc462ef13ee76b1346fc47512e
   "@reactvision/viro-web-renderer": 1.0.1
   "@metavr/layout-compat": 1.0.0
   "@metavr/layout-window-compat": 1.0.0

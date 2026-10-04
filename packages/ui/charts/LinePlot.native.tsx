@@ -9,6 +9,11 @@ import { withAlpha } from '../neon/colors';
 import { View } from '../tw';
 import { keylineFor } from './district-tones';
 import type { LinePlotProps } from './LinePlot.types';
+import LinePlotSkia from './LinePlot.skia';
+
+// react-native-graph only draws its B-spline. Straight and stepped curves use
+// the Skia plot, the same drawing web uses.
+const SPLINE = new Set(['smooth', 'monotone', 'basis', undefined]);
 
 const SPRING = { mass: 1, stiffness: 900, damping: 50 } as const;
 
@@ -51,7 +56,12 @@ const toPoints = (values: number[]): GraphPoint[] => values.map((value, i) => ({
  * Only the first series takes the pan gesture; it renders last so it sits on
  * top for touches, and the rest ignore pointer events.
  */
-export function LinePlot({
+export function LinePlot(props: LinePlotProps) {
+  if (!SPLINE.has(props.curve)) return <LinePlotSkia {...props} />;
+  return <GraphPlot {...props} />;
+}
+
+function GraphPlot({
   series, range, strokeWidth, area, keylines, glow, selectable, indicator, onSelect, reduced, pad,
 }: LinePlotProps) {
   const count = series[0]?.values.length ?? 0;
