@@ -4,6 +4,8 @@ import type * as S from '../schemas/index.ts';
 export type LifecycleStage = z.infer<typeof S.LifecycleStageSchema>;
 export type IdleVignetteDef = z.infer<typeof S.IdleVignetteDefSchema>;
 export type BloodlineId = z.infer<typeof S.BloodlineIdSchema>;
+export type EvolutionNode = z.infer<typeof S.EvolutionNodeSchema>;
+export type Bloodline = z.infer<typeof S.BloodlineSchema>;
 export type MonSpeciesDef = z.infer<typeof S.MonSpeciesDefSchema>;
 export type MonInstance = z.infer<typeof S.MonInstanceSchema>;
 export type ConsentStatus = z.infer<typeof S.ConsentStatusSchema>;
