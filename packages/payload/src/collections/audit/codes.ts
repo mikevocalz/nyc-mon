@@ -30,6 +30,31 @@ export const AUDIT_ACTIONS = [
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
+/** Human-readable labels for every audit action; keys match `05-copy.md`. */
+export const AUDIT_ACTION_LABELS: Readonly<Record<AuditAction, string>> = {
+  'caller.value_shown': 'Showed a hidden value',
+  'caller.deletion_scheduled': 'Scheduled deletion',
+  'caller.deletion_cancelled': 'Cancelled deletion',
+  'caller.deleted': 'Deleted account',
+  'caller.signed_out_everywhere': 'Signed out everywhere',
+  'consent.email_sent': 'Sent consent email',
+  'consent.approved': 'Approved consent',
+  'consent.denied': 'Denied consent',
+  'consent.expired': 'Consent expired',
+  'consent.deleted': 'Deleted consent record',
+  'integrity.check_run': 'Ran integrity check',
+  'staff.added': 'Added staff',
+  'staff.role_changed': 'Changed staff role',
+  'staff.removed': 'Removed staff',
+  'audit.exported': 'Exported audit log',
+  'consent.requested': 'Requested guardian consent',
+  'consent.value_shown': 'Showed a hidden consent value',
+  'egg.value_shown': 'Showed a hidden egg value',
+  'egg.caller_changed': 'Moved egg to another Caller',
+  'mon.value_shown': 'Showed a hidden Mon value',
+  'mon.caller_changed': 'Moved Mon to another Caller',
+};
+
 /** What an audit event is about (08-handoff.md §4). */
 export const AUDIT_TARGET_TYPES = ['caller', 'consent', 'mon', 'egg', 'staff', 'audit', 'integrity'] as const;
 

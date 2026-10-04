@@ -1,6 +1,7 @@
 import { betterAuthStrategy } from '@delmaredigital/payload-better-auth';
 import type { Access, CollectionConfig, FieldAccess } from 'payload';
 import { hasStaffRole, readStaffRole, STAFF_ROLES } from './access/roles.ts';
+import { AUDIT_REASON_CODES } from './audit/codes.ts';
 
 // Better Auth owns sign-in (ADR 0001). This collection is Better Auth's `user`
 // model, written by hand so it can carry the Caller's birth year and consent
@@ -111,6 +112,21 @@ export const Users: CollectionConfig = {
       type: 'date',
       index: true,
       access: { update: canManageCallers },
+    },
+    {
+      // Staff member who scheduled the deletion. Set only by server code in the
+      // console deletion endpoint; no Caller sees it.
+      name: 'deletionScheduledBy',
+      type: 'relationship',
+      relationTo: 'users',
+      access: { create: canManageCallers, update: canManageCallers },
+    },
+    {
+      // Fixed reason chosen by the scheduling staff member, from the copy deck.
+      name: 'deletionReason',
+      type: 'select',
+      options: [...AUDIT_REASON_CODES],
+      access: { create: canManageCallers, update: canManageCallers },
     },
   ],
 };

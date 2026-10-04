@@ -12,8 +12,9 @@ import sharp from 'sharp';
 import { deleteDueCallersTask } from './auth/deletion';
 import { AUTH_BASE_PATH, PAYLOAD_API_ROUTE, PAYLOAD_ORIGINS, betterAuthOptions, sendMail } from './auth/options';
 import { accountMerge } from './auth/plugins/account-merge';
-import { STAFF_ROLES } from './collections/access/roles';
 import { adminComponents } from './admin/components';
+import { consoleEndpoints } from './admin/console/endpoints';
+import { STAFF_ROLES } from './collections/access/roles';
 import { Users } from './collections/Users';
 import { Media } from './collections/Media';
 import { AuditEvents } from './collections/AuditEvents';
@@ -39,6 +40,7 @@ export default buildConfig({
   routes: {
     api: PAYLOAD_API_ROUTE,
   },
+  endpoints: consoleEndpoints,
   collections: [Users, Media, GuardianConsents, Eggs, MonInstances, CareStates, AuditEvents, IntegrityRuns],
   plugins: [
     // Generates Better Auth's session, account, verification and passkey
@@ -88,6 +90,7 @@ export default buildConfig({
     },
     push: process.env.PAYLOAD_PUSH === 'true',
     schemaName: 'payload',
+    migrationDir: path.resolve(dirname, 'migrations'),
   }),
   jobs: {
     // Account deletion after the 7-day grace (ADR 0001 as amended by L3).

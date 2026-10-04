@@ -179,6 +179,18 @@ export interface User {
   displayUsername?: string | null;
   activeMonInstanceId?: string | null;
   deletionScheduledFor?: string | null;
+  deletionScheduledBy?: (number | null) | User;
+  deletionReason?:
+    | (
+        | 'support_request'
+        | 'parent_request'
+        | 'deletion_check'
+        | 'legal'
+        | 'caller_request'
+        | 'parent_withdrew'
+        | 'sent_in_error'
+      )
+    | null;
   updatedAt: string;
   createdAt: string;
   collection: 'users';
@@ -745,6 +757,8 @@ export interface UsersSelect<T extends boolean = true> {
   displayUsername?: T;
   activeMonInstanceId?: T;
   deletionScheduledFor?: T;
+  deletionScheduledBy?: T;
+  deletionReason?: T;
   updatedAt?: T;
   createdAt?: T;
 }

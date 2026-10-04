@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as V1GuardianConsentsRouteImport } from './routes/v1/guardian-consents'
 import { Route as PayloadRouteImport } from './routes/_payload'
 import { Route as PayloadAdminIndexRouteImport } from './routes/_payload/admin.index'
 import { Route as PayloadAdminSplatRouteImport } from './routes/_payload/admin.$'
@@ -18,6 +19,11 @@ import { Route as PayloadPayloadApiSplatRouteImport } from './routes/_payload/pa
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const V1GuardianConsentsRoute = V1GuardianConsentsRouteImport.update({
+  id: '/v1/guardian-consents',
+  path: '/v1/guardian-consents',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PayloadRoute = PayloadRouteImport.update({
@@ -42,12 +48,14 @@ const PayloadPayloadApiSplatRoute = PayloadPayloadApiSplatRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/v1/guardian-consents': typeof V1GuardianConsentsRoute
   '/admin/$': typeof PayloadAdminSplatRoute
   '/payload-api/$': typeof PayloadPayloadApiSplatRoute
   '/admin/': typeof PayloadAdminIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/v1/guardian-consents': typeof V1GuardianConsentsRoute
   '/admin/$': typeof PayloadAdminSplatRoute
   '/payload-api/$': typeof PayloadPayloadApiSplatRoute
   '/admin': typeof PayloadAdminIndexRoute
@@ -55,6 +63,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/v1/guardian-consents': typeof V1GuardianConsentsRoute
   '/_payload': typeof PayloadRouteWithChildren
   '/_payload/admin/$': typeof PayloadAdminSplatRoute
   '/_payload/payload-api/$': typeof PayloadPayloadApiSplatRoute
@@ -62,12 +71,13 @@ export interface FileRoutesById {
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/admin/$' | '/payload-api/$' | '/admin/'
+  fullPaths: '/' | '/v1/guardian-consents' | '/admin/$' | '/payload-api/$' | '/admin/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/admin/$' | '/payload-api/$' | '/admin'
+  to: '/' | '/v1/guardian-consents' | '/admin/$' | '/payload-api/$' | '/admin'
   id:
     | '__root__'
     | '/'
+    | '/v1/guardian-consents'
     | '/_payload'
     | '/_payload/admin/$'
     | '/_payload/payload-api/$'
@@ -76,6 +86,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  V1GuardianConsentsRoute: typeof V1GuardianConsentsRoute
   PayloadRoute: typeof PayloadRouteWithChildren
 }
 
@@ -86,6 +97,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/v1/guardian-consents': {
+      id: '/v1/guardian-consents'
+      path: '/v1/guardian-consents'
+      fullPath: '/v1/guardian-consents'
+      preLoaderRoute: typeof V1GuardianConsentsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_payload': {
@@ -136,6 +154,7 @@ const PayloadRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  V1GuardianConsentsRoute: V1GuardianConsentsRoute,
   PayloadRoute: PayloadRouteWithChildren,
 }
 export const routeTree = rootRouteImport

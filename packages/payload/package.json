@@ -6,8 +6,46 @@
   "main": "./src/payload.config.ts",
   "types": "./index.ts",
   "exports": {
-    ".": "./index.ts",
-    "./config": "./src/payload.config.ts"
+    ".": {
+      "types": "./index.ts",
+      "default": "./src/payload.config.ts"
+    },
+    "./config": {
+      "types": "./src/payload.config.ts",
+      "default": "./src/payload.config.ts"
+    },
+    "./admin/console/api": {
+      "types": "./src/admin/console/api.ts",
+      "default": "./src/admin/console/api.ts"
+    },
+    "./admin/console/features": {
+      "types": "./src/admin/console/features.ts",
+      "default": "./src/admin/console/features.ts"
+    },
+    "./admin/console/guardian-consent": {
+      "types": "./src/admin/console/guardian-consent.ts",
+      "default": "./src/admin/console/guardian-consent.ts"
+    },
+    "./admin/console/stores": {
+      "types": "./src/admin/console/stores/index.ts",
+      "default": "./src/admin/console/stores/index.ts"
+    },
+    "./admin/console/stores/*": {
+      "types": "./src/admin/console/stores/*.ts",
+      "default": "./src/admin/console/stores/*.ts"
+    },
+    "./auth/options": {
+      "types": "./src/auth/options.ts",
+      "default": "./src/auth/options.ts"
+    },
+    "./auth/templates": {
+      "types": "./src/auth/templates.ts",
+      "default": "./src/auth/templates.ts"
+    },
+    "./collections/core": {
+      "types": "./src/collections/core.ts",
+      "default": "./src/collections/core.ts"
+    }
   },
   "scripts": {
     "lint": "eslint",
@@ -28,7 +66,8 @@
     "react": "catalog:",
     "resend": "catalog:",
     "sharp": "catalog:",
-    "zod": "catalog:"
+    "zod": "catalog:",
+    "zustand": "catalog:"
   },
   "devDependencies": {
     "@acme/config": "workspace:*",
