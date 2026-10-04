@@ -38,6 +38,11 @@ export interface NycCarouselProps {
   /** Keyline in the slider tone around each card's cut shape. */
   keylineColor?: string;
   keylineWidth?: number;
+  /**
+   * Image cards: content drifts against the scroll inside the cut mask (iOS
+   * scrollTransition). Android's Material mask reveal gives the same effect.
+   */
+  parallax?: boolean;
   /** Spoken name per card, e.g. "Card 2 of 6" (iOS). */
   itemLabels?: string[];
   style?: StyleProp<ViewStyle>;
