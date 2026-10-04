@@ -1,10 +1,11 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { BlurMask, Canvas, Circle, Fill, Group, Line, Rect, vec, useClock } from '@shopify/react-native-skia';
 import { useDerivedValue } from 'react-native-reanimated';
 import { neon } from '@acme/theme';
 import { View } from '../tw';
+import { useLayoutSize } from '../use-layout-size';
 import { useReducedMotion } from './use-reduced-motion';
 import type { GlyphCityProps, GlyphCityVariant } from './GlyphCity.types';
 
@@ -171,7 +172,7 @@ export default function GlyphCitySkia({
   opacity = 0.92,
 }: GlyphCityProps) {
   const reducedMotion = useReducedMotion();
-  const [size, setSize] = useState({ width: 1, height: 1 });
+  const { size, onLayout } = useLayoutSize();
   const { width, height } = size;
   const buildings = useMemo(() => buildCity(width, height, variant), [height, variant, width]);
   const palette = [colorPrimary, colorSecondary, colorTertiary];
@@ -179,10 +180,7 @@ export default function GlyphCitySkia({
   return (
     <View
       className={`relative flex-1 overflow-hidden ${className ?? ''}`}
-      onLayout={(event) => {
-        const next = event.nativeEvent.layout;
-        if (next.width !== width || next.height !== height) setSize({ width: next.width, height: next.height });
-      }}
+      onLayout={onLayout}
     >
       <Canvas style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
         {backgroundColor !== 'transparent' ? <Fill color={backgroundColor} /> : null}

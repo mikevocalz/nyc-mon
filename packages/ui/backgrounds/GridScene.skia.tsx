@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
 import { BlurMask, Canvas, Fill, Group, Line, LinearGradient, vec, useClock } from '@shopify/react-native-skia';
 import { useDerivedValue } from 'react-native-reanimated';
 import { neon } from '@acme/theme';
 import { View } from '../tw';
+import { useLayoutSize } from '../use-layout-size';
 import { useReducedMotion } from './use-reduced-motion';
 import { useWebPhase } from './use-web-phase';
 import type { GridSceneProps } from './GridScene.types';
@@ -64,7 +64,7 @@ export default function GridSceneSkia({
   const reducedMotion = useReducedMotion();
   const effectiveSpeed = reducedMotion ? 0 : speed;
   const webPhase = useWebPhase(effectiveSpeed);
-  const [size, setSize] = useState({ width: 1, height: 1 });
+  const { size, onLayout } = useLayoutSize();
   const { width, height } = size;
   const horizonY = height * horizon;
   const halfGap = (height * gap) / 2;
@@ -92,10 +92,7 @@ export default function GridSceneSkia({
     <View
       className={`relative flex-1 overflow-hidden ${className ?? ''}`}
       style={{ backgroundColor }}
-      onLayout={(event) => {
-        const next = event.nativeEvent.layout;
-        if (next.width !== width || next.height !== height) setSize({ width: next.width, height: next.height });
-      }}
+      onLayout={onLayout}
     >
       <Canvas style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
         <Fill color={backgroundColor} />
