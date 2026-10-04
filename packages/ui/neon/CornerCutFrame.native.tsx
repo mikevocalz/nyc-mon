@@ -1,4 +1,4 @@
-import { BlurMask, Canvas, Path, Skia } from '@shopify/react-native-skia';
+import { BlurMask, Canvas, Path, Skia } from 'react-native-skia';
 import { useMemo } from 'react';
 import { View } from '../tw';
 import { useLayoutSize } from '../use-layout-size';

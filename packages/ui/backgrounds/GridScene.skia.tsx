@@ -1,6 +1,6 @@
 'use client';
 
-import { BlurMask, Canvas, Fill, Group, Line, LinearGradient, vec, useClock } from '@shopify/react-native-skia';
+import { BlurMask, Canvas, Fill, Group, Line, LinearGradient, vec, useClock } from 'react-native-skia';
 import { useDerivedValue } from 'react-native-reanimated';
 import { neon } from '@acme/theme';
 import { View } from '../tw';

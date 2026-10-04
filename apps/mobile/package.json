@@ -27,7 +27,6 @@
     "@react-navigation/native": "catalog:",
     "@reactvision/react-viro": "catalog:",
     "@rive-app/react-native": "catalog:",
-    "@shopify/react-native-skia": "catalog:",
     "@tanstack/react-pacer": "catalog:",
     "@tanstack/react-query": "catalog:",
     "canvaskit-wasm": "catalog:",
@@ -56,6 +55,7 @@
     "react-native-reanimated": "catalog:",
     "react-native-safe-area-context": "catalog:",
     "react-native-screens": "catalog:",
+    "react-native-skia": "catalog:",
     "react-native-svg": "catalog:",
     "react-native-web": "catalog:",
     "react-native-webgpu": "catalog:",
@@ -79,8 +79,7 @@
     "install": {
       "exclude": [
         "react",
-        "react-dom",
-        "@shopify/react-native-skia"
+        "react-dom"
       ]
     }
   }

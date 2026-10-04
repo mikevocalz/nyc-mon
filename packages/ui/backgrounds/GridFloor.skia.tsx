@@ -2,7 +2,7 @@
 
 import {
   BlurMask, Canvas, Fill, Group, Line, LinearGradient, Rect, vec, useClock,
-} from '@shopify/react-native-skia';
+} from 'react-native-skia';
 import { useDerivedValue } from 'react-native-reanimated';
 import { neon } from '@acme/theme';
 import { View } from '../tw';

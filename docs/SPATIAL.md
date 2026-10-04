@@ -3,7 +3,7 @@
 NYC-MON is a spatial-first Expo SDK 58 / Next starter with a deliberately layered renderer:
 
 - **Tailwind 4 + Uniwind** for ordinary product UI on native.
-- **React Native Skia 2.13** for universal GPU-drawn 2D scenes on iOS, Android and web.
+- **React Native Skia v3** (`react-native-skia@3.0.2`, Graphite by default, Android minSdk 26+) for GPU-drawn 2D scenes on iOS, Android and web (CanvasKit 0.41.0). `@shopify/react-native-skia` is a pnpm alias of the same install, so `react-native-graph` and our code share one native Skia.
 - **Rive** for interactive animated UI surfaces.
 - **Viro / OpenXR** for immersive 3D on Quest, Pico, web and supported native targets.
 

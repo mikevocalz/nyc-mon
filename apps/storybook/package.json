@@ -12,10 +12,10 @@
   "dependencies": {
     "@acme/theme": "workspace:*",
     "@acme/ui": "workspace:*",
-    "@shopify/react-native-skia": "catalog:",
     "canvaskit-wasm": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
+    "react-native-skia": "catalog:",
     "react-native-web": "catalog:"
   },
   "devDependencies": {

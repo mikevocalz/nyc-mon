@@ -1,7 +1,7 @@
 'use client';
 
 import { createElement, useEffect, type ComponentType, type ReactNode } from 'react';
-import { LoadSkiaWeb } from '@shopify/react-native-skia/lib/module/web';
+import { LoadSkiaWeb } from 'react-native-skia/lib/module/web';
 import { useInstanceStore, useStore } from '../use-instance-store';
 
 type ModuleWithDefault<P extends object> = { default: ComponentType<P> };

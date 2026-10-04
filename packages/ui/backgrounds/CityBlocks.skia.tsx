@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import {
   BlurMask, Canvas, Fill, Group, LinearGradient, Points, RadialGradient, Rect, vec, Vertices,
-} from '@shopify/react-native-skia';
+} from 'react-native-skia';
 import type { StoreApi } from 'zustand/vanilla';
 import { brand } from '@acme/theme';
 import { withAlpha } from '../neon/colors';

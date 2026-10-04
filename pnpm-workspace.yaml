@@ -37,6 +37,9 @@ allowBuilds:
 # selected Expo 58 family to install immediately.
 minimumReleaseAgeExclude:
   - '@shopify/*'
+  # Skia v3 and its Graphite binary packages (3.0.2 published 2026-10-03).
+  - react-native-skia
+  - 'react-native-skia-*'
   - 'canvaskit-wasm'
   - '@expo/*'
   - '@rive-app/*'
@@ -105,7 +108,12 @@ catalog:
   expo-drag-drop-content-view: 0.9.2
 
   # universal GPU graphics
-  "@shopify/react-native-skia": 2.14.0
+  # Skia v3 (Graphite by default; Android minSdk 26+). One package under two
+  # names: react-native-graph imports @shopify/react-native-skia, our code
+  # imports react-native-skia, and both resolve to the same 3.0.2 install.
+  react-native-skia: 3.0.2
+  "@shopify/react-native-skia": npm:react-native-skia@3.0.2
+  react-native-graph: 1.4.0
   canvaskit-wasm: 0.41.0
   react-native-webgpu: 0.10.4
   typegpu: 0.12.6

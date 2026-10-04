@@ -70,7 +70,7 @@ const nextConfig: NextConfig = {
     'react-native-gesture-handler',
     '@reactvision/react-viro',
     '@reactvision/viro-web-renderer',
-    '@shopify/react-native-skia',
+    'react-native-skia',
     '@rive-app/react-webgl2',
     'solito',
   ],

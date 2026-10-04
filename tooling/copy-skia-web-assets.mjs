@@ -12,11 +12,16 @@ const targets = [
   ['apps/mobile/package.json', 'apps/mobile/public/canvaskit'],
 ];
 
+// Resolve canvaskit-wasm through react-native-skia (v3), so the copied
+// CanvasKit is always the exact build Skia's web runtime was published with
+// (canvaskit-wasm 0.41.0 for react-native-skia 3.0.2), never a stray copy an
+// app happens to declare.
 for (const [manifest, destination] of targets) {
-  const req = createRequire(join(root, manifest));
+  const appRequire = createRequire(join(root, manifest));
   let source;
   try {
-    source = dirname(req.resolve('canvaskit-wasm/bin/full/canvaskit.wasm'));
+    const skiaRequire = createRequire(appRequire.resolve('react-native-skia/package.json'));
+    source = dirname(skiaRequire.resolve('canvaskit-wasm/bin/full/canvaskit.wasm'));
     await access(source);
   } catch {
     continue;

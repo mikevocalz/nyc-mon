@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { BlurMask, Canvas, Circle, Fill, Group, Line, Rect, vec, useClock } from '@shopify/react-native-skia';
+import { BlurMask, Canvas, Circle, Fill, Group, Line, Rect, vec, useClock } from 'react-native-skia';
 import { useDerivedValue } from 'react-native-reanimated';
 import { neon } from '@acme/theme';
 import { View } from '../tw';
