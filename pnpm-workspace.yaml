@@ -170,6 +170,7 @@ catalog:
   better-auth: 1.7.7
   "@better-auth/passkey": 1.7.7
   resend: 6.32.0
+  "@aws-sdk/client-sns": 3.1146.0
 
   # backend / cms
   payload: 4.0.0-canary.37
