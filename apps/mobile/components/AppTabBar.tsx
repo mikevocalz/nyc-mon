@@ -5,9 +5,12 @@ import { Pressable, Text, View } from '@acme/ui/tw';
 import { Home, Compass, Bell, User } from '@acme/ui/icons';
 import { MenuButton } from '@acme/app';
 import { haptics } from '@acme/ui/haptics';
+import { navChrome } from '@acme/theme';
 
 /** Material 3 navigation rail: 80dp wide, 56dp items. */
 export const RAIL_WIDTH = 80;
+/** Material 3 expanded rail (labels beside icons), from the theme's navChrome token. */
+export const RAIL_EXPANDED_WIDTH = Number.parseInt(navChrome.railExpanded, 10);
 const RAIL_ITEM_HEIGHT = 56;
 /** Gap between the menu button and the bottom edge, per the brief. */
 const MENU_BOTTOM_GAP = 10;
@@ -46,7 +49,10 @@ type RouteName = keyof typeof ICONS;
  * that would flip to a light bar under white labels. Measured in
  * packages/theme/contrast.ts as the "grid tab" rows.
  */
-export function AppTabBar({ state, emitter, navigateToTab, insets, rail }: BottomTabBarProps & { rail: boolean }) {
+export function AppTabBar({
+  state, emitter, navigateToTab, insets, rail, expanded = false,
+}: BottomTabBarProps & { rail: boolean; /** Extra-large windows: the wide rail with labels beside icons. */ expanded?: boolean }) {
+  const wide = rail && expanded;
   const gridMode = state.routes[state.index]?.name === 'index';
 
   const items = state.routes.map((route, index) => {
@@ -76,8 +82,8 @@ export function AppTabBar({ state, emitter, navigateToTab, insets, rail }: Botto
             so selection does not shift anything by the border's width. */}
         <View
           style={rail ? { height: RAIL_ITEM_HEIGHT } : undefined}
-          className={`items-center justify-center gap-0.5 rounded-none border-2 transition-colors duration-fast motion-reduce:transition-none ${
-            rail ? 'px-1' : 'px-3 py-1.5'
+          className={`rounded-none border-2 transition-colors duration-fast motion-reduce:transition-none ${
+            wide ? 'flex-row items-center justify-start gap-3 px-4' : `items-center justify-center gap-0.5 ${rail ? 'px-1' : 'px-3 py-1.5'}`
           } ${
             focused
               ? gridMode
@@ -102,7 +108,7 @@ export function AppTabBar({ state, emitter, navigateToTab, insets, rail }: Botto
           />
           <Text
             numberOfLines={1}
-            className={`text-xs font-semibold md:text-sm ${
+            className={`${wide ? 'text-sm' : 'text-xs md:text-sm'} font-semibold ${
               gridMode
                 ? focused
                   ? 'text-orange-400'
@@ -137,11 +143,11 @@ export function AppTabBar({ state, emitter, navigateToTab, insets, rail }: Botto
   return (
     <View
       style={{
-        width: RAIL_WIDTH,
+        width: wide ? RAIL_EXPANDED_WIDTH : RAIL_WIDTH,
         paddingTop: insets.top + 12,
         paddingBottom: insets.bottom + MENU_BOTTOM_GAP,
       }}
-      className={`h-full items-center gap-2 px-1.5 ${
+      className={`h-full gap-2 ${wide ? 'items-stretch px-3' : 'items-center px-1.5'} ${
         gridMode ? 'bg-ink-950' : 'bg-surface'
       }`}
     >

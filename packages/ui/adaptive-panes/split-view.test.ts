@@ -219,3 +219,8 @@ describe('selection', () => {
     assert.equal(reports.getState().selectedId, null);
   });
 });
+
+it('size-class bounds are the theme widthClassMinDp token', async () => {
+  const { widthClassMinDp } = await import('@acme/theme');
+  assert.deepEqual({ ...WINDOW_SIZE_CLASS_MIN_WIDTH_DP }, { ...widthClassMinDp });
+});

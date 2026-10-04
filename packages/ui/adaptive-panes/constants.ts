@@ -16,23 +16,18 @@
  * They answer different questions and are kept apart on purpose: merging them
  * would force every two-state consumer through a five-state matrix.
  *
- * The numbers live here until `@acme/theme` carries a `widthClassMinDp` token
- * (see README, "Token debt"); the theme package is owned elsewhere.
+ * The numbers are `@acme/theme`'s `widthClassMinDp` token.
  *
  * @see https://developer.android.com/develop/ui/compose/layouts/adaptive/use-window-size-classes
  */
 
+import { widthClassMinDp } from '@acme/theme';
+
 /**
- * Lower bound (inclusive, dp) of each class. Ordered widest-first so that
- * resolution is a `find`, not a chain of comparisons.
+ * Lower bound (inclusive, dp) of each class, read from the theme token.
+ * Resolution walks {@linkcode WINDOW_SIZE_CLASSES_BY_WIDTH}, widest first.
  */
-export const WINDOW_SIZE_CLASS_MIN_WIDTH_DP = {
-  extraLarge: 1600,
-  large: 1200,
-  expanded: 840,
-  medium: 600,
-  compact: 0,
-} as const;
+export const WINDOW_SIZE_CLASS_MIN_WIDTH_DP = widthClassMinDp;
 
 export type WindowSizeClass = keyof typeof WINDOW_SIZE_CLASS_MIN_WIDTH_DP;
 

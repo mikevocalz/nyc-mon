@@ -17,8 +17,8 @@ import { AppTabBar } from '../../../components/AppTabBar';
   full-width bottom bar starts wasting a wide window's vertical space.
 
   `placement.expanded` (extra-large windows) asks for Material's expanded rail
-  with labels beside icons; AppTabBar draws the 80dp rail at every width until
-  the theme carries a `railExpanded` token.
+  with labels beside icons; AppTabBar draws it at the theme's
+  `navChrome.railExpanded` width (240dp) and the 80dp rail otherwise.
 */
 
 /**
@@ -41,7 +41,7 @@ export default function TabLayout() {
         headerShown: false,
         tabBarPosition: placement.position,
       }}
-      tabBar={(props) => <AppTabBar {...props} rail={rail} />}
+      tabBar={(props) => <AppTabBar {...props} rail={rail} expanded={placement.expanded} />}
     >
       <Tabs.Screen name="index" options={{ title: 'Grid' }} />
       <Tabs.Screen name="explore" options={{ title: 'Explore' }} />

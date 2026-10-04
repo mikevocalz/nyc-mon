@@ -306,6 +306,31 @@ export const layout = {
   minTargetAndroidDp: 48,
 } as const;
 
+/**
+ * Window width classes, lower bound inclusive, in dp (points on iOS):
+ * Android's five current classes (Material 3 Adaptive / androidx.window
+ * WindowSizeClass). The kit's SplitView and navigation placement resolve a
+ * window's class from these.
+ * https://developer.android.com/develop/ui/compose/layouts/adaptive/use-window-size-classes
+ */
+export const widthClassMinDp = {
+  compact: 0,
+  medium: 600,
+  expanded: 840,
+  large: 1200,
+  extraLarge: 1600,
+} as const;
+
+/** Navigation chrome sizes the shells share. */
+export const navChrome = {
+  /**
+   * Material 3 expanded navigation rail (labels beside icons) on extra-large
+   * windows. Material allows 220-360 dp; 240 fits the longest tab label.
+   * https://m3.material.io/components/navigation-rail/specs
+   */
+  railExpanded: '240px',
+} as const;
+
 /** §8.2 content-width scale — width scales by adding columns, not stretching. */
 export const contentWidths = {
   'content-form': '28rem',

@@ -255,15 +255,14 @@ Folds are simulated with `ReservedRegionsOverride`, which feeds regions to the
 same `useReservedRegions` the native module feeds, so the shipped planner runs.
 A stripe marks each simulated hinge.
 
-## Token debt
+## Tokens
 
-These live as constants until `packages/theme/tokens.ts` (owned elsewhere)
-carries them:
+Both former constants are theme tokens in `packages/theme/tokens.ts`:
 
-- `widthClassMinDp = { compact: 0, medium: 600, expanded: 840, large: 1200, extraLarge: 1600 }`
-  — then `WINDOW_SIZE_CLASS_MIN_WIDTH_DP` reads it.
-- `navChrome.railExpanded = '240px'` (Material allows 220–360 dp) for the
-  expanded rail.
+- `widthClassMinDp` (`compact` 0, `medium` 600, `expanded` 840, `large` 1200,
+  `extraLarge` 1600): `WINDOW_SIZE_CLASS_MIN_WIDTH_DP` reads it.
+- `navChrome.railExpanded` (240px; Material allows 220–360 dp): the expanded
+  rail width AppTabBar draws when `placement.expanded` is set.
 
 ## Testing
 
