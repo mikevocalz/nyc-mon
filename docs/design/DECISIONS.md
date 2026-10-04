@@ -131,3 +131,18 @@ What `sim-core` built that differs from `screens/M01/08-handoff.md` § Data:
 1. **Signature and union.** `resolveBootRoute(snapshot: BootSnapshot)`, where the snapshot is `{ save, hasSession, ageAnswer, nowMs }`, replaces `(save, nowMs)`: the route also needs the session flag and the stored M04 answer. `readBootSave(raw)` builds `save` from the raw MMKV value (`missing` / `loaded` / `unreadable`). Beyond the handoff's six kinds, the union adds `restore`, `resume-onboarding` with `step: 'create-account' | 'guardian-consent' | 'caller-name' | 'egg-choice'`, and a `reason` on `save-recovered` for M22. `resume-onboarding` covers states the handoff left undefined: a Caller with no egg yet (M08), an age answer stored but no account (M03 create or M05), and a restored profile with no name (M07). The P1 guard runs inside it, so `create-account` is unreachable without a stored age answer, on boot as well as from M02 and M03 (`resolveCreateEntry`).
 2. **`isConsentRequired({ birthYear, nowMs })`**, not `(birthYear, currentYear)` as M04 § Data writes it. It takes the UTC year of `nowMs`, the year the server sign-up hook uses, and throws on a non-integer year instead of returning false.
 3. **`validateCallerName(raw, filter)`** takes the block list as a required second argument, so no build can call it without the M07 B4 filter wired. Reasons stay `'blank' | 'too-long' | 'characters' | 'blocked'`; `callerNameErrorCopyId(reason)` returns the matching `m07.error.*` id.
+
+## L3 — deleting an account never deletes a Mon
+
+- **Date:** 2026-10-04
+- **Decided by:** the lead. The conflict came from the X1 collections (`1a48313`).
+
+ADR 0001 said account deletion removes the Caller's Mons after the grace period. That breaks Law 8 and the "a Mon is not inventory" rule, and it contradicts canon Decision #15. So the rule is now this: after the 7-day grace, the Caller's personal data is deleted, and each Mon and egg passes into Dr. Santoro's care. Its `callerId` moves to a system sanctuary owner, its nickname is cleared, and its `monInstanceId` and history stay. Nothing is deleted. Decision #15 already does the same for a guardian's denial. The in-world presentation is TODO(canon).
+
+## L4 — `monInstanceId` follows core
+
+`monInstanceId = deriveMonInstanceId(eggId)`, as `@acme/core` defines it, and the collections enforce that. `eggId` is globally unique, so the id doesn't need the Caller. That also lets a merged account keep its Mons' ids. ADR 0001's `UUIDv5(callerId:eggId)` is superseded.
+
+## L5 — a guardian's email is never edited
+
+A corrected parent address means a new consent record. The old record stays as it was. Accepted from the X1 collections.
