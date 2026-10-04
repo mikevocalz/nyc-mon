@@ -131,6 +131,24 @@ web.push("[data-theme='light'] { color-scheme: light; }");
 web.push("[data-theme='dark'] { color-scheme: dark; }");
 web.push("[data-theme='system'] { color-scheme: light dark; }");
 web.push('');
+// Scheme scopes. light-dark() alone flips nothing below :root under Next:
+// Tailwind's lightningcss pass lowers each token to
+// `var(--lightningcss-light, A) var(--lightningcss-dark, B)`, and a custom
+// property holding var() is substituted on the element that declares it. The
+// tokens settle on :root with the page scheme and descendants inherit the
+// plain colour, so `scheme-dark` on a face (NIGHT_SCHEME, NightScope) changed
+// color-scheme and nothing else. Each scope redeclares every semantic token as
+// a literal at its own scheme, which resolves the same under lightningcss,
+// native light-dark() (Vite) and the admin console's scoped layer.
+for (const [cls, variant] of [['scheme-dark', 'dark'], ['scheme-light', 'light']]) {
+  web.push(`.${cls} {`);
+  web.push(`  color-scheme: ${variant};`);
+  for (const [name, values] of Object.entries(semantic)) {
+    web.push(`  --color-${name}: ${values[variant]};`);
+  }
+  web.push('}');
+}
+web.push('');
 web.push(BODY_TEXT_BASE);
 web.push(`
 /* @expo/ui BottomSheet (vaul) on web: the drawer hardcodes a white/black

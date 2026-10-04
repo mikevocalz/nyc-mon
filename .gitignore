@@ -20,3 +20,6 @@ storybook-static
 
 # OS
 .DS_Store
+
+# Native build caches
+.gradle

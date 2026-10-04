@@ -69,7 +69,7 @@ function tokenOn(el: Element, name: string): string {
 /**
  * Every night face must hold the dark value of every semantic colour, whatever
  * the page scheme. Next lowers light-dark() so the tokens settle at :root; the
- * face has to redeclare them (CARD_NIGHT_TOKENS) or a text-text heading comes
+ * face's scheme-dark redeclares them (theme.css) or a text-text heading comes
  * out black on night. This canvas keeps native light-dark(), so the test reads
  * the declared tokens, not the painted colour.
  */

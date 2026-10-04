@@ -18,7 +18,7 @@ The registry lives in `packages/theme/contrast.ts`; `packages/theme/contrast.tes
 
 <!-- contrast:summary:start -->
 
-- 405 measured rows: 376 pass, 0 fail, 29 exempt (decorative or disabled).
+- 402 measured rows: 374 pass, 0 fail, 28 exempt (decorative or disabled).
 
 <!-- contrast:summary:end -->
 - Semantic tokens are measured in light and dark. Palette steps (`orange-500`, `ink-950`) do not change with the theme and get one `both` row.
@@ -204,12 +204,12 @@ The test keeps these honest: each forbidden pair below must still measure under 
 | neutral badge label | dark | `text-secondary` #BEC0C2 | `surface-sunken` #000212 | 11.31 | text (4.5) | pass | `packages/ui/Badge.tsx:100` |
 | neutral badge edge | light | `border` #D2D4D6 | `bg` #F3F4F4 | 1.35 | decorative (0) | exempt | `packages/ui/Badge.tsx:98`; status chip, not a control; its text identifies it |
 | neutral badge edge | dark | `border` #1A2E6E | `bg` #00041C | 1.61 | decorative (0) | exempt | `packages/ui/Badge.tsx:98`; status chip, not a control; its text identifies it |
-| title on night | both | `ink-50` #F8F8F8 | `ink-950` #00041C | 19.12 | text (4.5) | pass | `packages/ui/Card.tsx:79`, `packages/ui/cards/neon-field.ts:15`, `packages/ui/ToastCard.tsx:37` |
+| title on night | both | `ink-50` #F8F8F8 | `ink-950` #00041C | 19.12 | text (4.5) | pass | `packages/ui/Card.tsx:48`, `packages/ui/cards/neon-field.ts:15`, `packages/ui/ToastCard.tsx:37` |
 | white on night | both | `white` #FFFFFF | `ink-950` #00041C | 20.31 | text (4.5) | pass | `packages/ui/charts/StatCard.tsx:54`, `packages/ui/nav/NavBar.tsx:88`, `packages/ui/nav/SiteFooter.tsx:79` |
 | table cell on stripe | both | `silver-100` #F6F6F6 | `ink-900` #14182E | 16.20 | text (4.5) | pass | `packages/ui/DataTable.tsx:44`, `packages/ui/DataTable.tsx:53` |
 | nav link on night | both | `silver-200` #ECECED | `ink-950` #00041C | 17.20 | text (4.5) | pass | `packages/ui/nav/NavBar.tsx:82`, `packages/ui/dropdown.ts:16` |
 | nav link on hover | both | `silver-200` #ECECED | `ink-800` #25293D | 12.16 | text (4.5) | pass | `packages/ui/dropdown.ts:14`, `packages/ui/nav/NavBar.tsx:83` |
-| body on night | both | `silver-300` #DFE0E1 | `ink-950` #00041C | 15.36 | text (4.5) | pass | `packages/ui/Card.tsx:79`, `packages/ui/Dialog.tsx:49`, `packages/ui/TabBar.tsx:36` |
+| body on night | both | `silver-300` #DFE0E1 | `ink-950` #00041C | 15.36 | text (4.5) | pass | `packages/ui/Card.tsx:48`, `packages/ui/Dialog.tsx:49`, `packages/ui/TabBar.tsx:36` |
 | table head on ink-900 | both | `silver-300` #DFE0E1 | `ink-900` #14182E | 13.24 | text (4.5) | pass | `packages/ui/DataTable.tsx:35`, `packages/ui/DataTable.tsx:38` |
 | caption on night | both | `silver-400` #CED0D1 | `ink-950` #00041C | 13.12 | text (4.5) | pass | `packages/ui/DataTable.tsx:47`, `packages/ui/charts/StatCard.tsx:57`, `packages/ui/nav/SiteFooter.tsx:80` |
 | pager text on ink-900 | both | `silver-400` #CED0D1 | `ink-900` #14182E | 11.31 | text (4.5) | pass | `packages/ui/DataTable.tsx:51` |
@@ -224,19 +224,19 @@ The test keeps these honest: each forbidden pair below must still measure under 
 | sort glyph carolina-300 | both | `carolina-300` #A5D4F8 | `ink-900` #14182E | 11.15 | ui (3) | pass | `packages/ui/DataTable.tsx:59` |
 | sort glyph leaf-300 | both | `leaf-300` #9FD79D | `ink-900` #14182E | 10.57 | ui (3) | pass | `packages/ui/DataTable.tsx:60` |
 | sort glyph apple-300 | both | `apple-300` #FC8080 | `ink-900` #14182E | 7.12 | ui (3) | pass | `packages/ui/DataTable.tsx:62` |
-| card themed heading on night face | both | `ink-50` #F8F8F8 | `ink-950` #00041C | 19.12 | text (4.5) | pass | `packages/ui/Card.tsx:42`, `packages/app/features/profile/profile-content.tsx:100`; text-text inside a cornerCut or beam Card resolves to ink-50 on the face |
-| card themed muted on night face | both | `silver-500` #BEC0C2 | `ink-950` #00041C | 11.13 | text (4.5) | pass | `packages/ui/Card.tsx:42`, `packages/ui/Card.tsx:43`, `packages/app/features/profile/profile-content.tsx:101`; text-muted and text-secondary inside the Card face resolve to silver-500 |
-| card themed primary on night face | both | `orange-500` #FC7C00 | `ink-950` #00041C | 7.76 | text (4.5) | pass | `packages/ui/Card.tsx:44` |
-| card themed accent on night face | both | `carolina-500` #4BA8F0 | `ink-950` #00041C | 7.89 | text (4.5) | pass | `packages/ui/Card.tsx:47`, `packages/ui/Card.tsx:52`; accent and info share carolina-500 on the face |
-| card themed success on night face | both | `leaf-500` #3FAE3A | `ink-950` #00041C | 7.09 | text (4.5) | pass | `packages/ui/Card.tsx:50` |
-| card themed danger on night face | both | `apple-400` #FA4040 | `ink-950` #00041C | 5.68 | text (4.5) | pass | `packages/ui/Card.tsx:51` |
-| card themed text on orange notch | both | `ink-950` #00041C | `orange-500` #FC7C00 | 7.76 | text (4.5) | pass | `packages/ui/Card.tsx:65` |
-| card themed text on carolina notch | both | `ink-950` #00041C | `carolina-500` #4BA8F0 | 7.89 | text (4.5) | pass | `packages/ui/Card.tsx:65` |
-| card themed text on leaf notch | both | `ink-950` #00041C | `leaf-500` #3FAE3A | 7.09 | text (4.5) | pass | `packages/ui/Card.tsx:65` |
-| card themed text on apple notch | both | `ink-950` #00041C | `apple-500` #F80000 | 4.83 | text (4.5) | pass | `packages/ui/Card.tsx:65` |
-| card themed text on white notch | both | `ink-950` #00041C | `ink-50` #F8F8F8 | 19.12 | text (4.5) | pass | `packages/ui/Card.tsx:65` |
-| card themed text on royal notch | both | `white` #FFFFFF | `royal-500` #0058F8 | 5.60 | text (4.5) | pass | `packages/ui/Card.tsx:67` |
-| card themed text on brick notch | both | `white` #FFFFFF | `orange-800` #884300 | 7.37 | text (4.5) | pass | `packages/ui/Card.tsx:67` |
+| card themed heading on night face | both | `ink-50` #F8F8F8 | `ink-950` #00041C | 19.12 | text (4.5) | pass | `packages/theme/theme.css:328`, `packages/app/features/profile/profile-content.tsx:100`; text-text inside a cornerCut or beam Card resolves to ink-50 on the face |
+| card themed muted on night face | both | `silver-500` #BEC0C2 | `ink-950` #00041C | 11.13 | text (4.5) | pass | `packages/theme/theme.css:329`, `packages/theme/theme.css:330`, `packages/app/features/profile/profile-content.tsx:101`; text-muted and text-secondary inside the Card face resolve to silver-500 |
+| card themed primary on night face | both | `orange-500` #FC7C00 | `ink-950` #00041C | 7.76 | text (4.5) | pass | `packages/theme/theme.css:332` |
+| card themed accent on night face | both | `carolina-500` #4BA8F0 | `ink-950` #00041C | 7.89 | text (4.5) | pass | `packages/theme/theme.css:338`, `packages/theme/theme.css:349`; accent and info share carolina-500 on the face |
+| card themed success on night face | both | `leaf-500` #3FAE3A | `ink-950` #00041C | 7.09 | text (4.5) | pass | `packages/theme/theme.css:345` |
+| card themed danger on night face | both | `apple-400` #FA4040 | `ink-950` #00041C | 5.68 | text (4.5) | pass | `packages/theme/theme.css:347` |
+| card themed text on orange notch | both | `ink-950` #00041C | `orange-500` #FC7C00 | 7.76 | text (4.5) | pass | `packages/ui/Card.tsx:34` |
+| card themed text on carolina notch | both | `ink-950` #00041C | `carolina-500` #4BA8F0 | 7.89 | text (4.5) | pass | `packages/ui/Card.tsx:34` |
+| card themed text on leaf notch | both | `ink-950` #00041C | `leaf-500` #3FAE3A | 7.09 | text (4.5) | pass | `packages/ui/Card.tsx:34` |
+| card themed text on apple notch | both | `ink-950` #00041C | `apple-500` #F80000 | 4.83 | text (4.5) | pass | `packages/ui/Card.tsx:34` |
+| card themed text on white notch | both | `ink-950` #00041C | `ink-50` #F8F8F8 | 19.12 | text (4.5) | pass | `packages/ui/Card.tsx:34` |
+| card themed text on royal notch | both | `white` #FFFFFF | `royal-500` #0058F8 | 5.60 | text (4.5) | pass | `packages/ui/Card.tsx:36` |
+| card themed text on brick notch | both | `white` #FFFFFF | `orange-800` #884300 | 7.37 | text (4.5) | pass | `packages/ui/Card.tsx:36` |
 | home headline on ink panel | both | `orange-500` #FC7C00 | `ink-800` #25293D | 5.48 | large-text (3) | pass | `packages/spatial/SpatialScreen.tsx:106`, `packages/ui/neon/SolidPanel.tsx:42`; Heading display-sm (30px web, 26px native at rem 14) on the SolidPanel tone="ink" face, which is night in both themes |
 | orange eyebrow on glass card | both | `orange-500` #FC7C00 | `concrete-50 + ink-950/85` #24283C | 5.55 | text (4.5) | pass | `packages/ui/future/GridCard.tsx:29`, `packages/ui/future/CircuitButton.tsx:49`; measured over a light page, the worst case for the 85% night glass |
 | carolina eyebrow on glass card | both | `carolina-500` #4BA8F0 | `concrete-50 + ink-950/85` #24283C | 5.64 | text (4.5) | pass | `packages/ui/future/GridCard.tsx:30`, `packages/ui/future/CircuitButton.tsx:50`; measured over a light page, the worst case for the 85% night glass |
@@ -313,9 +313,6 @@ The test keeps these honest: each forbidden pair below must still measure under 
 | hlynk: body on night page | both | `hlynk-core-body` #D50000 | `ink-950` #00041C | 3.70 | decorative (0) | exempt | `packages/theme/tokens.ts:188`; the shell is not a control; its edge needs no ratio (measures 3.70 anyway) |
 | hlynk: LED off in the black head | both | `led-off` #5E0000 | `hlynk-core-black` #000000 | 1.48 | decorative (0) | exempt | `packages/theme/tokens.ts:174`; the unlit lens; LED state is never conveyed by the LED alone (a text chip sits in the screen) |
 | hlynk: disabled key glyph | both | `hlynk-core-glyph-disabled` #484C51 | `hlynk-core-black` #000000 | 2.43 | disabled (0) | exempt | `packages/theme/tokens.ts:198`; inactive key |
-| hlynk: key and trackpad focus outline on body | both | `hlynk-core-ink` #FFFFFF | `hlynk-core-body` #D50000 | 5.48 | ui (3) | pass | `packages/ui/hlynk/HLynkKey.tsx:69`, `packages/ui/hlynk/Trackpad.web.tsx:48` |
-| hlynk: trackpad ring, booting or disabled | both | `led-off` #5E0000 | `hlynk-core-black` #000000 | 1.48 | disabled (0) | exempt | `packages/ui/hlynk/TrackpadFace.tsx:41`; inactive trackpad during boot (WCAG 1.4.11 inactive components) |
-| hlynk: reduced-motion LED cue in the black head | both | `led-on` #F80000 | `hlynk-core-black` #000000 | 4.99 | ui (3) | pass | `packages/ui/hlynk/ScannerLed.tsx:96`, `packages/ui/hlynk/ScannerLed.tsx:104`, `packages/ui/hlynk/ScannerLed.tsx:107`; tick row, filled dot and exclamation dot that stand in for the LED rhythm |
 | hlynk: key and trackpad focus outline on body | both | `hlynk-core-ink` #FFFFFF | `hlynk-core-body` #D50000 | 5.48 | ui (3) | pass | `packages/ui/hlynk/HLynkKey.tsx:69`, `packages/ui/hlynk/Trackpad.web.tsx:48` |
 | hlynk: trackpad ring, booting or disabled | both | `led-off` #5E0000 | `hlynk-core-black` #000000 | 1.48 | disabled (0) | exempt | `packages/ui/hlynk/TrackpadFace.tsx:41`; inactive trackpad during boot (WCAG 1.4.11 inactive components) |
 | hlynk: reduced-motion LED cue in the black head | both | `led-on` #F80000 | `hlynk-core-black` #000000 | 4.99 | ui (3) | pass | `packages/ui/hlynk/ScannerLed.tsx:96`, `packages/ui/hlynk/ScannerLed.tsx:104`, `packages/ui/hlynk/ScannerLed.tsx:107`; tick row, filled dot and exclamation dot that stand in for the LED rhythm |

@@ -8,8 +8,9 @@ import { ScopedTheme } from 'uniwind';
  * Content that screens drop into them (kit Text with `tone="muted"`, Switch
  * labels) reads theme tokens, so on a light page it would come out dark on
  * night. This scopes the dark theme to the surface:
- * - web: tokens are `light-dark()`, so the `scheme-dark` class on the face
- *   (NIGHT_SCHEME) flips them for everything inside; nothing to wrap.
+ * - web: the `scheme-dark` class on the face (NIGHT_SCHEME) redeclares every
+ *   semantic token at its dark value (@acme/theme theme.css), so everything
+ *   inside reads night; nothing to wrap.
  * - native: Uniwind's ScopedTheme resolves `dark` variables for the subtree.
  */
 export const NIGHT_SCHEME = 'scheme-dark';
