@@ -18,7 +18,7 @@ The registry lives in `packages/theme/contrast.ts`; `packages/theme/contrast.tes
 
 <!-- contrast:summary:start -->
 
-- 355 measured rows: 331 pass, 0 fail, 24 exempt (decorative or disabled).
+- 361 measured rows: 337 pass, 0 fail, 24 exempt (decorative or disabled).
 
 <!-- contrast:summary:end -->
 - Semantic tokens are measured in light and dark. Palette steps (`orange-500`, `ink-950`) do not change with the theme and get one `both` row.
@@ -190,6 +190,12 @@ The test keeps these honest: each forbidden pair below must still measure under 
 | field clear glyph (daylit) | light | `text-muted` #61656A | `surface-raised` #FFFFFF | 5.87 | ui (3) | pass | `packages/ui/TextField.tsx:118` |
 | field clear glyph (daylit) | dark | `text-muted` #BEC0C2 | `surface-raised` #0A1230 | 10.08 | ui (3) | pass | `packages/ui/TextField.tsx:118` |
 | field clear glyph (well) | both | `silver-300` #DFE0E1 | `ink-950` #00041C | 15.36 | ui (3) | pass | `packages/ui/TextField.tsx:118` |
+| system sheet title | light | `text` #000000 | `surface-raised` #FFFFFF | 21.00 | text (4.5) | pass | `packages/ui/BottomSheet.tsx:49` |
+| system sheet title | dark | `text` #F8F8F8 | `surface-raised` #0A1230 | 17.31 | text (4.5) | pass | `packages/ui/BottomSheet.tsx:49` |
+| system sheet close edge | light | `border-strong` #0058F8 | `surface-raised` #FFFFFF | 5.60 | ui (3) | pass | `packages/ui/BottomSheet.tsx:50` |
+| system sheet close edge | dark | `border-strong` #4082FA | `surface-raised` #0A1230 | 5.07 | ui (3) | pass | `packages/ui/BottomSheet.tsx:50` |
+| system sheet close glyph | light | `text` #000000 | `surface-raised` #FFFFFF | 21.00 | ui (3) | pass | `packages/ui/BottomSheet.tsx:51` |
+| system sheet close glyph | dark | `text` #F8F8F8 | `surface-raised` #0A1230 | 17.31 | ui (3) | pass | `packages/ui/BottomSheet.tsx:51` |
 | title on night | both | `ink-50` #F8F8F8 | `ink-950` #00041C | 19.12 | text (4.5) | pass | `packages/ui/Card.tsx:36`, `packages/ui/cards/neon-field.ts:15`, `packages/ui/ToastCard.tsx:37` |
 | white on night | both | `white` #FFFFFF | `ink-950` #00041C | 20.31 | text (4.5) | pass | `packages/ui/charts/StatCard.tsx:54`, `packages/ui/nav/NavBar.tsx:88`, `packages/ui/nav/SiteFooter.tsx:79` |
 | table cell on stripe | both | `silver-100` #F6F6F6 | `ink-900` #14182E | 16.20 | text (4.5) | pass | `packages/ui/DataTable.tsx:44`, `packages/ui/DataTable.tsx:53` |

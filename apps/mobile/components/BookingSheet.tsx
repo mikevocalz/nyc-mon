@@ -15,7 +15,7 @@ export function BookingSheet() {
   const closeBooking = useScheduleStore((state) => state.closeBooking);
 
   return (
-    <BottomSheet open={bookingOpen} onClose={closeBooking} title="New booking">
+    <BottomSheet open={bookingOpen} onClose={closeBooking} closeLabel="Close new booking" title="New booking">
       <BookingForm
         onDone={closeBooking}
         onOpenEditorSettings={() => {

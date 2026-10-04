@@ -11,6 +11,7 @@ const meta = {
   args: {
     open: true,
     onClose: () => {},
+    closeLabel: 'Close session details',
     title: 'Session details',
     children: null,
   },
@@ -52,7 +53,7 @@ export const Open: Story = {
 export const Surface: Story = {
   argTypes: { district: { control: 'inline-radio', options: DISTRICTS } },
   render: (args) => (
-    <SheetSurface title="Session details" district={args.district} onClose={() => {}}>
+    <SheetSurface title="Session details" district={args.district} onClose={() => {}} closeLabel="Close session details">
       <Text className="text-base text-text-muted">
         Everything you need for the session, in one place.
       </Text>
@@ -75,11 +76,27 @@ export const Districts: Story = {
     <View className="gap-6 md:flex-row md:flex-wrap">
       {DISTRICTS.map((d) => (
         <View key={d} className="h-56 md:w-96">
-          <SheetSurface title={`${DISTRICT_NAME[d]} booking`} district={d} onClose={() => {}}>
+          <SheetSurface title={`${DISTRICT_NAME[d]} booking`} district={d} onClose={() => {}} closeLabel="Close booking">
             <Text className="text-base text-text-muted">Pick a time and a room.</Text>
           </SheetSurface>
         </View>
       ))}
+    </View>
+  ),
+};
+
+/**
+ * `scheme="system"` follows the page: a white raised face with signage-black
+ * text in daylight, night after dark. The default `night` keeps the facade
+ * dark whatever the OS says. The close label comes from the caller.
+ */
+export const SystemScheme: Story = {
+  render: () => (
+    <View className="h-72 max-w-content-form">
+      <SheetSurface scheme="system" title="Session reminders" onClose={() => {}} closeLabel="Close session reminders">
+        <Text className="text-base text-text-muted">Get a reminder an hour before the session starts.</Text>
+        <Button title="Turn on" variant="primary" fullWidth className="mt-4" onPress={() => {}} />
+      </SheetSurface>
     </View>
   ),
 };

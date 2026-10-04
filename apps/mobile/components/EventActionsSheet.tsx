@@ -29,7 +29,7 @@ export function EventActionsSheet({
   ];
 
   return (
-    <BottomSheet open={open} onClose={onClose} title={eventTitle}>
+    <BottomSheet open={open} onClose={onClose} closeLabel={`Close ${eventTitle}`} title={eventTitle}>
       <View className="gap-3 py-2">
         {actions.map((action) => (
           <Pressable

@@ -21,41 +21,73 @@ const SNAP_POINTS = [{ fraction: 0.55 }, { fraction: 0.85 }];
  */
 const sheet = tv({
   slots: {
-    content: 'h-full flex-1 bg-ink-900',
+    content: 'h-full flex-1',
     cornice: 'h-3 items-center justify-center',
     handle: 'h-1 w-12',
     dentils: 'flex-row justify-between px-4',
     dentil: 'h-1.5 w-2',
     inner: 'flex-1 px-4 pb-6 pt-3',
     header: 'mb-3 min-h-11 flex-row items-center justify-between gap-3',
-    title: 'my-0 flex-1 font-display text-xl leading-tight text-ink-50 md:text-2xl',
+    title: 'my-0 flex-1 font-display text-xl leading-tight md:text-2xl',
     close:
-      'h-11 w-11 items-center justify-center border-2 border-ink-700 bg-ink-950 transition-colors duration-fast ' +
-      'hover:border-ink-400 active:opacity-80 motion-reduce:transition-none',
+      'h-11 w-11 items-center justify-center border-2 transition-colors duration-fast ' +
+      'active:opacity-80 motion-reduce:transition-none',
+    closeIcon: '',
   },
+  variants: {
+    // night: the facade in both schemes (scoped dark). system: the page's own
+    // scheme, white raised face in daylight, night after dark.
+    scheme: {
+      night: {
+        content: `${NIGHT_SCHEME} bg-ink-900`,
+        title: 'text-ink-50',
+        close: 'border-ink-700 bg-ink-950 hover:border-ink-400',
+        closeIcon: 'text-ink-50',
+      },
+      system: {
+        content: 'bg-surface-raised',
+        title: 'text-text',
+        close: 'border-border-strong bg-surface-raised hover:bg-surface-sunken',
+        closeIcon: 'text-text',
+      },
+    },
+  },
+  defaultVariants: { scheme: 'night' },
 });
 
-export interface SheetSurfaceProps {
+/** `night`: the night facade whatever the OS says (default). `system`: follows the page's light/dark scheme. */
+export type SheetScheme = 'night' | 'system';
+
+/** Close is all or nothing: a handler always comes with its spoken label. */
+type SheetClose =
+  | {
+      onClose: () => void;
+      /** Accessible name of the close control. The caller supplies the copy (i18n). */
+      closeLabel: string;
+    }
+  | { onClose?: undefined; closeLabel?: undefined };
+
+export type SheetSurfaceProps = SheetClose & {
   title?: string;
   children: React.ReactNode;
   className?: string;
-  onClose?: () => void;
+  /** Default `night`. */
+  scheme?: SheetScheme;
   /** Cornice colour by neighbourhood. Default midtown (orange). */
   district?: District;
   /** Cornice colour; overrides the district. */
   tone?: ControlTone;
-}
+};
 
 /**
  * The presentational sheet surface — exported separately so it can render
  * inline (e.g. in Storybook) without the sheet portal.
  */
-export function SheetSurface({ title, children, className, onClose, district, tone }: SheetSurfaceProps) {
+export function SheetSurface({ title, children, className, onClose, closeLabel, scheme = 'night', district, tone }: SheetSurfaceProps) {
   const t = TONE_CLASSES[resolveControlTone(tone, district)];
-  const s = sheet();
-  return (
-    <NightScope>
-      <View role="dialog" aria-label={title} className={s.content({ className: `${NIGHT_SCHEME} ${className ?? ''}` })}>
+  const s = sheet({ scheme });
+  const face = (
+    <View role="dialog" aria-label={title} className={s.content({ className })}>
         <View aria-hidden className={s.cornice({ className: t.face })}>
           <View className={s.handle({ className: t.side })} />
         </View>
@@ -66,8 +98,8 @@ export function SheetSurface({ title, children, className, onClose, district, to
           <View className={s.header()}>
             {title ? <Heading level={2} className={s.title()}>{title}</Heading> : <View className="flex-1" />}
             {onClose ? (
-              <Pressable onPress={onClose} accessibilityLabel="Close" role="button" className={s.close({ className: t.focusBorder })}>
-                <X size={18} className="text-ink-50" />
+              <Pressable onPress={onClose} accessibilityLabel={closeLabel} role="button" className={s.close({ className: t.focusBorder })}>
+                <X size={18} className={s.closeIcon()} />
               </Pressable>
             ) : null}
           </View>
@@ -79,20 +111,23 @@ export function SheetSurface({ title, children, className, onClose, district, to
             {children}
           </ScrollView>
         </View>
-      </View>
-    </NightScope>
+    </View>
   );
+  // Native needs the dark theme scoped for the night facade; `system` reads the page's scheme.
+  return scheme === 'night' ? <NightScope>{face}</NightScope> : face;
 }
 
-export interface BottomSheetProps extends SheetSurfaceProps {
+export type BottomSheetProps = Omit<SheetSurfaceProps, 'onClose' | 'closeLabel'> & {
   open: boolean;
   onClose: () => void;
-}
+  /** Accessible name of the close control. The caller supplies the copy (i18n). */
+  closeLabel: string;
+};
 
-export function BottomSheet({ open, onClose, ...surfaceProps }: BottomSheetProps) {
+export function BottomSheet({ open, onClose, closeLabel, ...surfaceProps }: BottomSheetProps) {
   return (
     <ExpoBottomSheet isPresented={open} onDismiss={onClose} snapPoints={SNAP_POINTS}>
-      <SheetSurface {...surfaceProps} onClose={onClose} />
+      <SheetSurface {...surfaceProps} onClose={onClose} closeLabel={closeLabel} />
     </ExpoBottomSheet>
   );
 }

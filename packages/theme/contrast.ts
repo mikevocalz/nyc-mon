@@ -258,6 +258,11 @@ const USAGE: Pair[] = [
   { id: 'field clear glyph (daylit)', fg: 'text-muted', bg: ['surface-raised'], role: 'ui', usedAt: ['packages/ui/TextField.tsx:118'] },
   { id: 'field clear glyph (well)', fg: 'silver-300', bg: NIGHT, role: 'ui', usedAt: ['packages/ui/TextField.tsx:118'] },
 
+  // -- SheetSurface scheme="system": the raised face follows the page scheme
+  { id: 'system sheet title', fg: 'text', bg: ['surface-raised'], role: 'text', usedAt: ['packages/ui/BottomSheet.tsx:49'] },
+  { id: 'system sheet close edge', fg: 'border-strong', bg: ['surface-raised'], role: 'ui', usedAt: ['packages/ui/BottomSheet.tsx:50'] },
+  { id: 'system sheet close glyph', fg: 'text', bg: ['surface-raised'], role: 'ui', usedAt: ['packages/ui/BottomSheet.tsx:51'] },
+
   // -- night facades (palette steps: mode-invariant) -------------------------
   { id: 'title on night', fg: 'ink-50', bg: NIGHT, role: 'text', usedAt: ['packages/ui/Card.tsx:36', 'packages/ui/cards/neon-field.ts:15', 'packages/ui/ToastCard.tsx:37'] },
   { id: 'white on night', fg: 'white', bg: NIGHT, role: 'text', usedAt: ['packages/ui/charts/StatCard.tsx:54', 'packages/ui/nav/NavBar.tsx:88', 'packages/ui/nav/SiteFooter.tsx:79'] },
