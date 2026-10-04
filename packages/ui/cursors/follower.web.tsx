@@ -57,6 +57,8 @@ export interface FollowerProps {
   containerRef?: RefObject<HTMLElement | null>;
   /** CSS filter for the accent glow. */
   filter?: string;
+  /** Grow over links and buttons and dip when pressed. Default true. */
+  interactive?: boolean;
   children: (state: FollowerState) => ReactNode;
 }
 
@@ -67,7 +69,7 @@ export interface FollowerProps {
  * (hot) and pressing do. Contained mode tracks inside `containerRef` and
  * hides when the pointer leaves it.
  */
-export function Follower({ anchor, size, hideNativeCursor, containerRef, filter, children }: FollowerProps) {
+export function Follower({ anchor, size, hideNativeCursor, containerRef, filter, interactive = true, children }: FollowerProps) {
   const reduced = useReducedMotion();
   const x = useSharedValue(-200);
   const y = useSharedValue(-200);
@@ -80,7 +82,12 @@ export function Follower({ anchor, size, hideNativeCursor, containerRef, filter,
     const container = containerRef?.current ?? null;
     const scope = container ?? document.documentElement;
     const target: HTMLElement | Window = container ?? window;
-    const origin = () => (container ? container.getBoundingClientRect() : { left: 0, top: 0 });
+    // Absolute children sit inside the container's border, so measure from its padding box.
+    const origin = () => {
+      if (!container) return { left: 0, top: 0 };
+      const r = container.getBoundingClientRect();
+      return { left: r.left + container.clientLeft, top: r.top + container.clientTop };
+    };
     const setScale = (v: number) => scale.set(reduced ? v : withSpring(v, { damping: 18, stiffness: 420 }));
     const move = (e: PointerEvent) => {
       if (e.pointerType === 'touch') return;
@@ -88,6 +95,7 @@ export function Follower({ anchor, size, hideNativeCursor, containerRef, filter,
       x.set(e.clientX - o.left - anchor.x);
       y.set(e.clientY - o.top - anchor.y);
       visible.set(1);
+      if (!interactive) return;
       const hot = e.target instanceof Element && e.target.closest(INTERACTIVE) !== null;
       if (hot !== store.getState().hot) {
         store.setState({ hot });
@@ -95,10 +103,12 @@ export function Follower({ anchor, size, hideNativeCursor, containerRef, filter,
       }
     };
     const down = () => {
+      if (!interactive) return;
       store.setState({ pressed: true });
       setScale(0.85);
     };
     const up = () => {
+      if (!interactive) return;
       store.setState({ pressed: false });
       setScale(store.getState().hot ? 1.15 : 1);
     };
@@ -115,7 +125,7 @@ export function Follower({ anchor, size, hideNativeCursor, containerRef, filter,
       scope.removeEventListener('pointerleave', leave);
       restore?.();
     };
-  }, [anchor.x, anchor.y, containerRef, hideNativeCursor, reduced, scale, store, visible, x, y]);
+  }, [anchor.x, anchor.y, containerRef, hideNativeCursor, interactive, reduced, scale, store, visible, x, y]);
 
   // Explicit dependencies: the web bundlers run without Reanimated's Babel plugin.
   const animated = useAnimatedStyle(

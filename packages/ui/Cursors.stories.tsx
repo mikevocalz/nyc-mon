@@ -1,20 +1,22 @@
 import { useRef } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Crosshair } from './cursors/Crosshair';
-import { CityMouse } from './cursors/mouse';
 import { MouseCursor } from './cursors/MouseCursor';
 import { PointerCursor } from './cursors/PointerCursor';
-import { CursorArrow, ReticleShape } from './cursors/shapes';
+import { CursorArrow, MouseFace, ReticleShape } from './cursors/shapes';
+import type { CursorGlow, MouseCursorProps } from './cursors/types';
 import { Button } from './Button';
-import { Heading, Link, Paragraph, Section } from './html';
+import type { ControlTone } from './cards/tones';
+import { Heading, Link, Paragraph, Section, Text } from './html';
 import { View } from './tw';
+import { useInstanceStore, useStore } from './use-instance-store';
 
 const meta: Meta = {
   title: 'Cursors',
   parameters: {
     layout: 'fullscreen',
     backgrounds: { disable: true },
-    docs: { description: { component: 'NeonBlade fox-cursor (Fox Cursor) is the city mouse; NeonBlade crosshair (Crosshair) is the reticle; the arrow pointer is a separate cursor.' } },
+    docs: { description: { component: 'NeonBlade fox-cursor (Fox Cursor) is the mouse face cursor; NeonBlade crosshair (Crosshair) is the reticle; the arrow pointer is a separate cursor.' } },
   },
 };
 export default meta;
@@ -51,7 +53,7 @@ export const All: StoryObj = {
   render: () => (
     <View className="min-h-screen gap-8 bg-ink-950 p-4 md:p-8">
       <View className="gap-6 md:flex-row">
-        <Arena title="City mouse" note="NeonBlade's fox cursor as a city mouse: it chases the pointer, then sits and nibbles its pizza.">
+        <Arena title="Mouse" note="NeonBlade's fox cursor with a mouse face, centred on the pointer.">
           {(ref) => <MouseCursor containerRef={ref} />}
         </Arena>
         <Arena title="Pointer" note="The NYC-MON arrow, orange on a royal outline.">
@@ -65,8 +67,8 @@ export const All: StoryObj = {
         <Heading level={2} className="my-0 font-display text-xl text-white">The drawings</Heading>
         <Paragraph className="my-0 text-sm text-silver-400">The same marks as plain drawings, which also render on native (for example at the end of an XR controller ray).</Paragraph>
         <View className="flex-row flex-wrap items-center gap-8">
-          <CityMouse size={64} pose="idle" />
-          <CityMouse size={64} pose="run" facingLeft />
+          <MouseFace size={64} />
+          <MouseFace size={64} color="carolina" />
           <CursorArrow size={48} />
           <CursorArrow size={48} color="white" outlineColor="orange" />
           <CursorArrow size={48} color="carolina" />
@@ -79,31 +81,94 @@ export const All: StoryObj = {
   ),
 };
 
-/** NeonBlade: Fox Cursor. The city mouse chases the pointer around the arena. */
+const MOUSE_COLORS: ControlTone[] = ['orange', 'carolina', 'apple', 'leaf'];
+
+function Variant({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <View className="min-w-36 flex-1 items-center gap-3 border-2 border-ink-700 bg-ink-900 px-4 py-6">
+      <View className="h-24 items-center justify-center">{children}</View>
+      <Text className="text-sm text-silver-400">{label}</Text>
+    </View>
+  );
+}
+
+function VariantRow({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <Section className="gap-3">
+      <Heading level={3} className="my-0 font-display text-lg text-white">{title}</Heading>
+      <View className="flex-row flex-wrap gap-4">{children}</View>
+    </Section>
+  );
+}
+
+/** NeonBlade's Fox Cursor demo page, with the mouse face. */
+function MouseDemo(args: MouseCursorProps) {
+  const ref = useRef<HTMLElement | null>(null);
+  const store = useInstanceStore<{ picked: ControlTone | null }>(() => ({ picked: null }));
+  const picked = useStore(store, (st) => st.picked);
+  const color = picked ?? args.color ?? 'orange';
+  const glows: CursorGlow[] = ['none', 'low', 'medium', 'high'];
+  return (
+    <View className="min-h-screen gap-8 bg-ink-950 p-4 md:p-8">
+      <Section className="gap-2">
+        <Heading level={2} className="my-0 font-display text-xl text-white">Move the mouse inside the box</Heading>
+        <View
+          ref={ref as never}
+          className="relative h-72 items-center justify-center gap-4 overflow-hidden border-2 border-ink-700 bg-ink-900"
+        >
+          <Text className="font-display text-lg tracking-wide text-silver-300">Move cursor here</Text>
+          <View className="flex-row flex-wrap justify-center gap-2">
+            {MOUSE_COLORS.map((c) => (
+              <Button
+                key={c}
+                title={c[0]!.toUpperCase() + c.slice(1)}
+                size="sm"
+                variant={c === color ? 'cornerCut' : 'ghost'}
+                tone={c}
+                onPress={() => store.setState({ picked: c })}
+              />
+            ))}
+          </View>
+          <MouseCursor {...args} color={color} containerRef={ref} />
+        </View>
+      </Section>
+      <VariantRow title="Colours">
+        {MOUSE_COLORS.map((c) => (
+          <Variant key={c} label={c[0]!.toUpperCase() + c.slice(1)}><MouseFace color={c} /></Variant>
+        ))}
+      </VariantRow>
+      <VariantRow title="Sizes">
+        <Variant label="Small, 36 px"><MouseFace color={color} size={36} /></Variant>
+        <Variant label="Default, 64 px"><MouseFace color={color} size={64} /></Variant>
+        <Variant label="Large, 96 px"><MouseFace color={color} size={96} /></Variant>
+      </VariantRow>
+      <VariantRow title="Glow">
+        {glows.map((g) => (
+          <Variant key={g} label={g[0]!.toUpperCase() + g.slice(1)}><MouseFace color={color} glowIntensity={g} /></Variant>
+        ))}
+      </VariantRow>
+      <VariantRow title="Fill">
+        <Variant label="No fill"><MouseFace color={color} fillOpacity={0} /></Variant>
+        <Variant label="Subtle fill"><MouseFace color={color} fillOpacity={0.4} /></Variant>
+        <Variant label="Full fill"><MouseFace color={color} fillOpacity={1} /></Variant>
+      </VariantRow>
+    </View>
+  );
+}
+
+/** NeonBlade: Fox Cursor. A geometric mouse face centred on the pointer. */
 export const Mouse: StoryObj<typeof MouseCursor> = {
-  name: 'City mouse (NeonBlade: Fox Cursor)',
-  args: { size: 48, follow: 'chase', speed: 8, idleAfter: 900, pizza: true, glowColor: 'royal', glowIntensity: 'low', hideNativeCursor: false, disabled: false },
+  name: 'Mouse cursor (NeonBlade: Fox Cursor)',
+  args: { color: 'orange', size: 64, strokeWidth: 2, glowIntensity: 'medium', fillOpacity: 0, hideNativeCursor: true, disabled: false },
   argTypes: {
-    follow: { control: 'inline-radio', options: ['chase', 'snap'] },
+    color: colorControl,
     glowColor: colorControl,
     glowIntensity: glowControl,
-    size: { control: { type: 'range', min: 24, max: 120, step: 4 } },
-    speed: { control: { type: 'range', min: 2, max: 30, step: 1 } },
-    idleAfter: { control: { type: 'range', min: 200, max: 4000, step: 100 } },
+    size: { control: { type: 'range', min: 24, max: 128, step: 4 } },
+    strokeWidth: { control: { type: 'range', min: 0.5, max: 6, step: 0.5 } },
+    fillOpacity: { control: { type: 'range', min: 0, max: 1, step: 0.05 } },
   },
-  render: (args) => (
-    <View className="min-h-screen gap-6 bg-ink-950 p-4 md:p-8">
-      <Arena title="City mouse" note="Move inside the box. It runs after the pointer, faces the way it runs, and sits down to eat when you stop. Reduced motion pins it to the pointer and holds it still.">
-        {(ref) => <MouseCursor {...args} containerRef={ref} />}
-      </Arena>
-      <View className="flex-row flex-wrap items-end gap-10">
-        <CityMouse size={96} pose="idle" />
-        <CityMouse size={96} pose="run" />
-        <CityMouse size={96} pose="run" facingLeft />
-        <CityMouse size={96} pose="idle" pizza={false} still />
-      </View>
-    </View>
-  ),
+  render: (args) => <MouseDemo {...args} />,
 };
 
 export const Pointer: StoryObj<typeof PointerCursor> = {
@@ -133,13 +198,14 @@ export const Reticle: StoryObj<typeof Crosshair> = {
   ),
 };
 
-/** The cursor drawings on their own: the city mouse running and sitting, and the reticle. */
+/** The cursor drawings on their own: the mouse face, the arrow and the reticle. */
 export const Drawings: StoryObj = {
   name: 'Drawings',
   render: () => (
     <View className="min-h-screen flex-row flex-wrap items-center gap-10 bg-ink-950 p-8">
-      <CityMouse size={150} pose="idle" />
-      <CityMouse size={150} pose="run" facingLeft />
+      <MouseFace size={150} />
+      <MouseFace size={150} color="carolina" glowIntensity="high" fillOpacity={0.4} />
+      <CursorArrow size={96} />
       <ReticleShape size={110} />
     </View>
   ),

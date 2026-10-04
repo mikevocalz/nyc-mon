@@ -7,6 +7,8 @@ import { tv } from 'tailwind-variants';
 import { neonColor, type NeonColorInput } from '../neon/colors';
 import { View } from '../tw';
 import { Arrow } from './arrow';
+import { Face } from './face';
+import type { CursorGlow } from './types';
 
 export interface CursorArrowProps {
   /** Height of the arrow in px. Default 28. */
@@ -122,6 +124,60 @@ export function ReticleShape({
         <View className={s.diamond()} style={{ borderColor: a }} />
       </Layer>
       <View className={s.dot()} style={{ backgroundColor: c, borderColor: o }} />
+    </View>
+  );
+}
+
+export interface MouseFaceProps {
+  /** Width and height of the face in px. Default 64. */
+  size?: number;
+  /** Line colour: a NeonBlade preset, a brand token or any CSS colour. Default orange. */
+  color?: NeonColorInput;
+  /** Glow colour. Default: the colour's paired glow (orange glows royal). */
+  glowColor?: NeonColorInput;
+  /** Line weight, in the same units as NeonBlade's fox. Default 2. */
+  strokeWidth?: number;
+  /** Glow around the lines. Default medium. */
+  glowIntensity?: CursorGlow;
+  /** Translucent face fill, 0 (lines only) to 1. Default 0. */
+  fillOpacity?: number;
+}
+
+/** Glow radius per intensity, in px: NeonBlade's fox values. */
+export const FACE_GLOW: Record<CursorGlow, number> = { none: 0, low: 3, medium: 6, high: 14 };
+
+/**
+ * The mouse face: NeonBlade's geometric fox face rebuilt as a mouse. Thin
+ * round-capped lines, two big octagon ears with inner-ear lines, a long
+ * pointed snout with a solid nose, eyes and whiskers, and a neon glow.
+ * Skia (CanvasKit on web), so it also draws on native.
+ */
+export function MouseFace({
+  size = 64,
+  color = 'orange',
+  glowColor,
+  strokeWidth = 2,
+  glowIntensity = 'medium',
+  fillOpacity = 0,
+}: MouseFaceProps) {
+  const c = neonColor(color, glowColor);
+  const glow = FACE_GLOW[glowIntensity];
+  // Room around the face for the halo, which Skia would otherwise clip.
+  const pad = Math.ceil(glow * 3) + 2;
+  return (
+    // Computed geometry: the face size and the glow margin are numeric props.
+    <View aria-hidden className="relative" style={{ width: size, height: size }}>
+      <View className="absolute" style={{ left: -pad, top: -pad }}>
+        <Face
+          size={size}
+          pad={pad}
+          strokeWidth={strokeWidth}
+          color={c.base}
+          glowColor={c.glow}
+          glow={glow}
+          fillOpacity={Math.min(1, Math.max(0, fillOpacity))}
+        />
+      </View>
     </View>
   );
 }
