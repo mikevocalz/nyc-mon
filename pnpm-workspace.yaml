@@ -188,3 +188,6 @@ catalog:
   "@eslint/eslintrc": ^3.3.7
   babel-plugin-react-compiler: 1.0.0
   turbo: 2.11.7
+
+patchedDependencies:
+  react-native-graph@1.4.0: patches/react-native-graph@1.4.0.patch
