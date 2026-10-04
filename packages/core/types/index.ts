@@ -10,6 +10,7 @@ export type MonSpeciesDef = z.infer<typeof S.MonSpeciesDefSchema>;
 export type MonInstance = z.infer<typeof S.MonInstanceSchema>;
 export type ConsentStatus = z.infer<typeof S.ConsentStatusSchema>;
 export type CallerProfile = z.infer<typeof S.CallerProfileSchema>;
+export type AgeAnswer = z.infer<typeof S.AgeAnswerSchema>;
 export type CareNeed = z.infer<typeof S.CareNeedSchema>;
 export type CareActivity = z.infer<typeof S.CareActivitySchema>;
 export type CareRequest = z.infer<typeof S.CareRequestSchema>;

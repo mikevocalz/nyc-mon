@@ -1,5 +1,6 @@
+export { AgeAnswerSchema, BirthYearSchema, MIN_BIRTH_YEAR } from './age.ts';
 export { BloodlineSchema, EvolutionNodeSchema } from './bloodline.ts';
-export { CallerProfileSchema, ConsentStatusSchema } from './caller.ts';
+export { CallerNameSchema, CallerProfileSchema, ConsentStatusSchema } from './caller.ts';
 export {
   CARE_NEEDS,
   CareActionSchema,

@@ -1,3 +1,4 @@
+export { readBootSave } from './boot-save.ts';
 export {
   createEmptySave,
   loadSave,
