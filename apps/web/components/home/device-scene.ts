@@ -79,6 +79,8 @@ export function createDeviceScene({ THREE, renderer }: ThreeContext, initial: De
   scene.add(rim);
 
   const device = buildDevice(THREE);
+  // Dropped a touch so the scanner beam's fade lives inside the frame.
+  device.group.position.y = -0.1;
   scene.add(device.group);
 
   const raycaster = new THREE.Raycaster();
@@ -118,6 +120,7 @@ export function createDeviceScene({ THREE, renderer }: ThreeContext, initial: De
         if (hit?.uv !== undefined) hover = hudRegionAt(hit.uv.x, hit.uv.y);
       }
       device.setHover(hover);
+      if (hover?.startsWith('nav-')) device.setTab(Number(hover.slice(4)) as HudTab);
       boost += ((hover === 'call' ? 1 : 0) - boost) * k;
       if (!frame.reducedMotion) device.beamTick(frame.time, boost);
     },
@@ -130,6 +133,7 @@ function buildDevice(THREE: Three): {
   group: Group;
   screen: Mesh;
   setHover: (region: HudRegion | null) => void;
+  setTab: (tab: HudTab) => void;
   beamTick: (time: number, boost: number) => void;
 } {
   const geometries: Geometry[] = [];
@@ -159,7 +163,8 @@ function buildDevice(THREE: Three): {
 
   /** Matte red shell: plastic sheen from the room env, no metal. */
   const body = mat(new THREE.MeshStandardMaterial({
-    color: CORE.body, roughness: 0.42, metalness: 0.04, envMapIntensity: 0.7,
+    // Blue shell variant — the token stays red for canon elsewhere.
+    color: '#1D4ED8', roughness: 0.42, metalness: 0.04, envMapIntensity: 0.7,
     bumpMap: grain, bumpScale: 0.0015,
   }));
   /** Black rubberised trim: head, bezel, keys — softer reflections. */
@@ -343,7 +348,7 @@ function buildDevice(THREE: Three): {
   box(rounded(0.032, 0.18, 0.1, 0.012), black, -W / 2 - 0.014, 0.28, 0);
 
   group.position.y = -0.15;
-  return { group, screen: screenMesh, setHover: hud.setHover, beamTick: beam.tick };
+  return { group, screen: screenMesh, setHover: hud.setHover, setTab: hud.setTab, beamTick: beam.tick };
 }
 
 /**
@@ -363,7 +368,7 @@ function buildBeam(
 ): { group: Group; tick: (time: number, boost: number) => void } {
   const { track, mat, tex } = ctx;
   const group = new THREE.Group();
-  const LENGTH = 0.52;
+  const LENGTH = 0.58;
   // Lean back a touch: it reads as projection, not a sticker, and the tip
   // clears the stage's top edge.
   group.rotation.x = -0.12;
@@ -402,7 +407,7 @@ function buildBeam(
   };
 
   // Wide wash → mid beam → hot core, back to front.
-  const wash = cone(0.5, 0.18, led.on, 0.45);
+  const wash = cone(0.38, 0.1, led.on, 0.45);
   const mid = cone(0.32, 0.1, led.on, 0.75);
   const core = cone(0.14, 0.045, '#FFD2D2', 0.95);
 
@@ -536,11 +541,18 @@ function beamGradientTexture(THREE: Three): CanvasTexture {
   const [canvas, ctx] = canvas2d(128, 512);
   const img = ctx.createImageData(128, 512);
   for (let y = 0; y < 512; y++) {
+    // Canvas row 0 is the texture's top (v=1) — the beam's apex. Row 511 is
+    // v=0, the mouth. The alpha climbs from the tip toward the mouth so the
+    // light dissolves instead of ending at the trapezoid's edge.
     const t = y / 511;
-    const vertical = Math.pow(1 - t, 1.6) + 0.02; // tip fades to nearly nothing
+    const vertical = Math.pow(t, 1.7);
     for (let x = 0; x < 128; x++) {
-      const edge = Math.sin((x / 127) * Math.PI); // soft round cross-section
-      const a = Math.round(255 * vertical * Math.pow(edge, 0.8));
+      // Feather to zero *inside* the trapezoid edge — a sine still leaves a
+      // visible silhouette on light backgrounds under additive blending.
+      const u = x / 127;
+      const m = Math.min(u, 1 - u) / 0.28;
+      const edge = m >= 1 ? 1 : m * m * (3 - 2 * m);
+      const a = Math.round(255 * vertical * edge);
       const i = (y * 128 + x) * 4;
       img.data[i] = 255;
       img.data[i + 1] = 255;
@@ -626,6 +638,8 @@ function textTexture(THREE: Three, text: string, { size = 48, weight = 700, colo
 
 /** The interactive areas of the HUD, in draw order. */
 type HudRegion = 'call' | `nav-${0 | 1 | 2 | 3 | 4}` | `chip-${0 | 1 | 2 | 3}`;
+/** The five screens behind the nav row: DEX, CREW, CARE, BAG, CITY. */
+type HudTab = 0 | 1 | 2 | 3 | 4;
 
 /** Screen UV → HUD region. UV v runs bottom-up; the canvas runs top-down. */
 function hudRegionAt(u: number, v: number): HudRegion | null {
@@ -648,18 +662,31 @@ function hudRegionAt(u: number, v: number): HudRegion | null {
  * The screen's UI as a live canvas: `setHover` redraws with the hovered
  * element lit, and the texture uploads only when the hover target moves.
  */
-function createHud(THREE: Three): { texture: CanvasTexture; setHover: (region: HudRegion | null) => void } {
+function createHud(THREE: Three): {
+  texture: CanvasTexture;
+  setHover: (region: HudRegion | null) => void;
+  setTab: (tab: HudTab) => void;
+} {
   const [canvas, ctx] = canvas2d(768, 1024);
   let hover: HudRegion | null = null;
-  drawHud(ctx, null);
+  let tab: HudTab = 2; // CARE, the reference's screen
+  drawHud(ctx, tab, hover);
   const texture = makeCanvasTexture(THREE, canvas);
+  const paint = () => {
+    drawHud(ctx, tab, hover);
+    texture.needsUpdate = true;
+  };
   return {
     texture,
     setHover: (region) => {
       if (region === hover) return;
       hover = region;
-      drawHud(ctx, hover);
-      texture.needsUpdate = true;
+      paint();
+    },
+    setTab: (next) => {
+      if (next === tab) return;
+      tab = next;
+      paint();
     },
   };
 }
@@ -669,7 +696,7 @@ function createHud(THREE: Three): { texture: CanvasTexture; setHover: (region: H
  * bar and the bottom nav — the reference's layout in the H-Lynk palette.
  * `hover` names the lit element.
  */
-function drawHud(ctx: CanvasRenderingContext2D, hover: HudRegion | null): void {
+function drawHud(ctx: CanvasRenderingContext2D, tab: HudTab, hover: HudRegion | null): void {
   const W = 768;
   const H = 1024;
   ctx.clearRect(0, 0, W, H);
@@ -708,6 +735,7 @@ function drawHud(ctx: CanvasRenderingContext2D, hover: HudRegion | null): void {
   ctx.stroke();
   ctx.fillRect(W - 114, 34, 36, 14);
 
+  if (tab === 2) {
   // --- mon card --------------------------------------------------------------
   ctx.textAlign = 'left';
   ctx.fillStyle = HUD.text;
@@ -842,6 +870,9 @@ function drawHud(ctx: CanvasRenderingContext2D, hover: HudRegion | null): void {
   ctx.fillStyle = HUD.text;
   ctx.font = font(40, 900);
   ctx.fillText('∿  CALL MON  ›', W / 2, 834);
+  } else {
+    drawTabScreen(ctx, tab, hover);
+  }
 
   // --- bottom nav --------------------------------------------------------------
   const nav: [string, string, boolean][] = [
@@ -849,13 +880,14 @@ function drawHud(ctx: CanvasRenderingContext2D, hover: HudRegion | null): void {
   ];
   const navY = 920;
   const navW = (W - 64) / 5;
-  nav.forEach(([icon, label, active], i) => {
+  nav.forEach(([icon, label], i) => {
     const lit = hover === `nav-${i}`;
+    const on = i === tab;
     const x = 32 + i * navW;
     roundedRect(x + 8, navY, navW - 16, 84, 16);
-    ctx.fillStyle = active || lit ? HUD.red : HUD.panel;
+    ctx.fillStyle = on || lit ? HUD.red : HUD.panel;
     ctx.fill();
-    ctx.strokeStyle = lit ? HUD.text : active ? HUD.red : HUD.line;
+    ctx.strokeStyle = lit ? HUD.text : on ? HUD.red : HUD.line;
     ctx.lineWidth = lit ? 3 : 2;
     ctx.stroke();
     ctx.fillStyle = HUD.text;
@@ -864,4 +896,224 @@ function drawHud(ctx: CanvasRenderingContext2D, hover: HudRegion | null): void {
     ctx.font = font(18, 800);
     ctx.fillText(label, x + navW / 2, navY + 62);
   });
+}
+
+const rr = (ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) => {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+};
+const hudFont = (size: number, weight = 700) => `${weight} ${size}px 'Space Grotesk', system-ui, sans-serif`;
+
+/** A screen header: big title left, dim subtitle right. */
+function screenHeader(ctx: CanvasRenderingContext2D, title: string, subtitle: string) {
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = HUD.text;
+  ctx.font = hudFont(52, 800);
+  ctx.fillText(title, 32, 112);
+  ctx.textAlign = 'right';
+  ctx.fillStyle = HUD.dim;
+  ctx.font = hudFont(26, 600);
+  ctx.fillText(subtitle, 736, 116);
+  ctx.textAlign = 'center';
+}
+
+/** A round Mon avatar: colour plate, ears, eyes. */
+function avatar(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, color: string, dark: string) {
+  ctx.fillStyle = color;
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = dark;
+  for (const ex of [-r * 0.7, r * 0.7]) {
+    ctx.beginPath(); ctx.arc(x + ex, y - r * 0.9, r * 0.34, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.fillStyle = '#1A1030';
+  ctx.beginPath(); ctx.arc(x - r * 0.26, y - r * 0.06, r * 0.08, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x + r * 0.26, y - r * 0.06, r * 0.08, 0, Math.PI * 2); ctx.fill();
+}
+
+/** The four non-CARE screens behind the nav row. */
+function drawTabScreen(ctx: CanvasRenderingContext2D, tab: HudTab, hover: HudRegion | null): void {
+  void hover; // tab screens highlight only via the nav row today
+  const W = 768;
+  if (tab === 0) {
+    // DEX: the caught list.
+    screenHeader(ctx, 'MON DEX', '12 CAUGHT');
+    const mons = [
+      ['Hood Ratti', 'Lv. 12', 'MIDTOWN', '#F4F4F6', '#2A2D3A'],
+      ['Squeaklet', 'Lv. 7', 'DOWNTOWN', '#E8C9A0', '#7A4A20'],
+      ['Kittee Cee', 'Lv. 5', 'HARLEM', '#C9D4F0', '#2A2D3A'],
+      ['Yotito', 'Lv. 4', 'MEGA CITY', '#BFE8C0', '#1E5A28'],
+      ['Boro Beetle', 'Lv. 9', 'QUEENS', '#F0C9C9', '#6A2A2A'],
+    ];
+    mons.forEach(([name, lv, district, color, dark], i) => {
+      const y = 170 + i * 130;
+      rr(ctx, 32, y, W - 64, 110, 16);
+      ctx.fillStyle = HUD.panel;
+      ctx.fill();
+      ctx.strokeStyle = HUD.line;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      avatar(ctx, 100, y + 55, 34, color, dark);
+      ctx.textAlign = 'left';
+      ctx.fillStyle = HUD.text;
+      ctx.font = hudFont(34, 800);
+      ctx.fillText(name, 160, y + 44);
+      ctx.fillStyle = HUD.dim;
+      ctx.font = hudFont(24, 600);
+      ctx.fillText(district, 160, y + 82);
+      ctx.textAlign = 'right';
+      ctx.fillStyle = HUD.cyan;
+      ctx.font = hudFont(28, 800);
+      ctx.fillText(lv, W - 60, y + 55);
+      ctx.textAlign = 'center';
+    });
+  } else if (tab === 1) {
+    // CREW: the active party grid.
+    screenHeader(ctx, 'THE CREW', '6 MONS');
+    const crew = [
+      ['Hood Ratti', 'BOND 88', '#F4F4F6', '#2A2D3A'],
+      ['Squeaklet', 'BOND 61', '#E8C9A0', '#7A4A20'],
+      ['Kittee Cee', 'BOND 54', '#C9D4F0', '#2A2D3A'],
+      ['Yotito', 'BOND 42', '#BFE8C0', '#1E5A28'],
+      ['Boro Beetle', 'BOND 37', '#F0C9C9', '#6A2A2A'],
+      ['Pigeon Punk', 'BOND 30', '#D0D0D8', '#3A3A50'],
+    ];
+    crew.forEach(([name, bond, color, dark], i) => {
+      const col = i % 2;
+      const row = Math.floor(i / 2);
+      const x = 32 + col * ((W - 64) / 2) + 12;
+      const y = 170 + row * 220;
+      const cw = (W - 64) / 2 - 24;
+      rr(ctx, x, y, cw, 200, 18);
+      ctx.fillStyle = HUD.panel;
+      ctx.fill();
+      ctx.strokeStyle = HUD.line;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      avatar(ctx, x + cw / 2, y + 84, 44, color, dark);
+      ctx.fillStyle = HUD.text;
+      ctx.font = hudFont(26, 800);
+      ctx.fillText(name, x + cw / 2, y + 148);
+      ctx.fillStyle = HUD.cyan;
+      ctx.font = hudFont(20, 700);
+      ctx.fillText(bond, x + cw / 2, y + 176);
+    });
+  } else if (tab === 3) {
+    // BAG: the item slots.
+    screenHeader(ctx, 'BAG', '8 ITEMS');
+    const items = [
+      ['CALL CAPSULE', 'x6', '#F80000'], ['MON SNACK', 'x12', '#FCB034'],
+      ['PATCH KIT', 'x3', '#4BA8F0'], ['ZAP CELL', 'x8', '#35D07F'],
+      ['DIM SUM', 'x5', '#E8C9A0'], ['METRO PASS', 'x1', '#BEC0C2'],
+      ['SIGNAL AMP', 'x2', '#C9D4F0'], ['LUCKY DICE', 'x1', '#F0C9C9'],
+    ];
+    items.forEach(([name, count, color], i) => {
+      const col = i % 4;
+      const row = Math.floor(i / 4);
+      const cw = (W - 64 - 36) / 4;
+      const x = 32 + col * (cw + 12);
+      const y = 180 + row * 260;
+      rr(ctx, x, y, cw, 240, 16);
+      ctx.fillStyle = HUD.panel;
+      ctx.fill();
+      ctx.strokeStyle = HUD.line;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      // The item: a rounded capsule block in the item colour.
+      rr(ctx, x + cw / 2 - 30, y + 34, 60, 90, 14);
+      ctx.fillStyle = color;
+      ctx.fill();
+      rr(ctx, x + cw / 2 - 30, y + 34, 60, 30, 12);
+      ctx.fillStyle = 'rgba(255,255,255,0.35)';
+      ctx.fill();
+      ctx.fillStyle = HUD.text;
+      ctx.font = hudFont(20, 800);
+      ctx.fillText(name, x + cw / 2, y + 168);
+      ctx.fillStyle = HUD.dim;
+      ctx.font = hudFont(22, 700);
+      ctx.fillText(count, x + cw / 2, y + 202);
+    });
+  } else {
+    // CITY: a wild encounter — the generated duel.
+    screenHeader(ctx, 'MIDTOWN', 'WILD ENCOUNTER');
+    // Sky.
+    const sky = ctx.createLinearGradient(0, 160, 0, 560);
+    sky.addColorStop(0, '#0B1B4A');
+    sky.addColorStop(1, '#1C0E3A');
+    ctx.fillStyle = sky;
+    rr(ctx, 32, 160, W - 64, 560, 18);
+    ctx.fill();
+    ctx.save();
+    rr(ctx, 32, 160, W - 64, 560, 18);
+    ctx.clip();
+    // Skyline silhouette.
+    ctx.fillStyle = '#060B24';
+    const skyline = [80, 130, 70, 150, 95, 120, 60, 140, 88, 110, 75, 135, 100, 65, 125, 92];
+    skyline.forEach((h, i) => ctx.fillRect(32 + i * 46, 560 - h, 42, h));
+    // Ground.
+    ctx.fillStyle = '#101738';
+    ctx.fillRect(32, 560, W - 64, 160);
+    ctx.strokeStyle = '#2A3A6E';
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(32, 560); ctx.lineTo(W - 32, 560); ctx.stroke();
+    // The duel: Hood Ratti on the left, a wild shadow Mon on the right.
+    // Ratti, lit side.
+    avatar(ctx, 210, 500, 70, '#F4F4F6', '#2A2D3A');
+    ctx.strokeStyle = '#F4F4F6';
+    ctx.lineWidth = 10;
+    ctx.beginPath(); ctx.arc(272, 530, 24, Math.PI * 0.7, Math.PI * 1.9); ctx.stroke();
+    // Wild mon: dark silhouette, spiky ears, red eyes.
+    ctx.fillStyle = '#12142A';
+    ctx.beginPath(); ctx.arc(560, 500, 76, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(516, 448); ctx.lineTo(496, 388); ctx.lineTo(546, 428); ctx.closePath(); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(604, 448); ctx.lineTo(624, 388); ctx.lineTo(574, 428); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = HUD.red;
+    ctx.beginPath(); ctx.arc(536, 488, 9, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(584, 488, 9, 0, Math.PI * 2); ctx.fill();
+    // The VS burst between them.
+    const burst = ctx.createRadialGradient(384, 470, 6, 384, 470, 90);
+    burst.addColorStop(0, 'rgba(252,124,0,0.9)');
+    burst.addColorStop(0.5, 'rgba(248,0,0,0.45)');
+    burst.addColorStop(1, 'rgba(248,0,0,0)');
+    ctx.fillStyle = burst;
+    ctx.beginPath(); ctx.arc(384, 470, 90, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = HUD.text;
+    ctx.font = hudFont(72, 900);
+    ctx.fillText('VS', 384, 474);
+    // HP plates under each fighter.
+    for (const [x, name, pct] of [[60, 'HOOD RATTI', 0.82], [W - 320, 'WILD MON', 1.0]] as const) {
+      rr(ctx, x, 600, 260, 84, 12);
+      ctx.fillStyle = 'rgba(4,10,32,0.85)';
+      ctx.fill();
+      ctx.fillStyle = HUD.text;
+      ctx.font = hudFont(24, 800);
+      ctx.fillText(name, x + 130, 628);
+      rr(ctx, x + 20, 648, 220, 12, 6);
+      ctx.fillStyle = HUD.line;
+      ctx.fill();
+      rr(ctx, x + 20, 648, 220 * pct, 12, 6);
+      ctx.fillStyle = pct > 0.5 ? HUD.green : HUD.amber;
+      ctx.fill();
+    }
+    ctx.restore();
+    // Action buttons.
+    for (const [x, label, red] of [[32, 'FIGHT', true], [W / 2 + 8, 'CALL', false]] as const) {
+      rr(ctx, x, 760, W / 2 - 40, 80, 40);
+      ctx.fillStyle = red ? HUD.red : HUD.panel;
+      ctx.fill();
+      ctx.strokeStyle = red ? HUD.red : HUD.line;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = HUD.text;
+      ctx.font = hudFont(36, 900);
+      ctx.fillText(label, x + (W / 2 - 40) / 2, 802);
+    }
+  }
 }
