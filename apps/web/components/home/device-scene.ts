@@ -1,5 +1,6 @@
 import { brand, hlynk, led } from '@acme/theme';
 import type { ThreeContext, ThreeFrame, ThreeScene } from '@acme/ui';
+import { playNextelChirp } from './nextel-chirp';
 
 /** What the stage hands the scene each frame. */
 export interface DeviceSceneParams {
@@ -86,6 +87,7 @@ export function createDeviceScene({ THREE, renderer }: ThreeContext, initial: De
   const raycaster = new THREE.Raycaster();
   const ndc = new THREE.Vector2();
   let boost = 0;
+  let wasPressed = false;
   let tiltX = 0;
   let tiltY = 0;
   let model = initial.model;
@@ -113,12 +115,18 @@ export function createDeviceScene({ THREE, renderer }: ThreeContext, initial: De
       // highlights whatever sits under it. Holding over CALL MON feeds
       // the beam.
       let hover: HudRegion | null = null;
+      let pttDown = false;
       if (frame.pointer.inside && !frame.reducedMotion) {
         ndc.set(frame.pointer.x, frame.pointer.y);
         raycaster.setFromCamera(ndc, camera);
         const hit = raycaster.intersectObject(device.screen, false)[0];
         if (hit?.uv !== undefined) hover = hudRegionAt(hit.uv.x, hit.uv.y);
+        // The side PTT key: press it and the lynk chirps, Nextel-style.
+        pttDown = raycaster.intersectObject(device.ptt, false).length > 0 && frame.pointer.pressed;
+        if (pttDown && !wasPressed) playNextelChirp();
       }
+      device.ptt.position.x = pttDown ? device.ptt.userData.restX + 0.014 : device.ptt.userData.restX;
+      wasPressed = frame.pointer.pressed;
       device.setHover(hover);
       if (hover?.startsWith('nav-')) device.setTab(Number(hover.slice(4)) as HudTab);
       boost += ((hover === 'call' ? 1 : 0) - boost) * k;
@@ -134,6 +142,7 @@ function buildDevice(THREE: Three): {
   screen: Mesh;
   setHover: (region: HudRegion | null) => void;
   setTab: (tab: HudTab) => void;
+  ptt: Mesh;
   beamTick: (time: number, boost: number) => void;
 } {
   const geometries: Geometry[] = [];
@@ -344,11 +353,12 @@ function buildDevice(THREE: Three): {
   }
   // Right edge, lower: a single round key.
   box(track(new THREE.CylinderGeometry(0.035, 0.035, 0.03, 24)), pianoBlack, W / 2 + 0.014, -0.05, 0).rotation.z = Math.PI / 2;
-  // Left edge: the long action key.
-  box(rounded(0.032, 0.18, 0.1, 0.012), black, -W / 2 - 0.014, 0.28, 0);
+  // Left edge: the long action key — the push-to-talk button.
+  const ptt = box(rounded(0.032, 0.18, 0.1, 0.012), black, -W / 2 - 0.014, 0.28, 0);
+  ptt.userData.restX = ptt.position.x;
 
   group.position.y = -0.15;
-  return { group, screen: screenMesh, setHover: hud.setHover, setTab: hud.setTab, beamTick: beam.tick };
+  return { group, screen: screenMesh, setHover: hud.setHover, setTab: hud.setTab, ptt, beamTick: beam.tick };
 }
 
 /**

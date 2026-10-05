@@ -95,7 +95,7 @@ export function ThreeCanvas<P>({
     sized: false,
     reducedMotion,
     queued: false,
-    pointer: { x: 0, y: 0, inside: false },
+    pointer: { x: 0, y: 0, inside: false, pressed: false },
   };
 
   // Pick the backend. WebGPU when it works; the WebGL2 backend on web when it
@@ -253,17 +253,28 @@ export function ThreeCanvas<P>({
     const x = rect && clientX !== undefined ? clientX - rect.left : locationX;
     const y = rect && clientY !== undefined ? clientY - rect.top : locationY;
     if (x === undefined || y === undefined) return;
-    rt.pointer = toNdc(x, y, size.width, size.height);
+    rt.pointer = { ...toNdc(x, y, size.width, size.height), pressed: rt.pointer.pressed };
+    invalidate();
+  };
+  const pressPointer = (event: PointerLike) => {
+    setPointer(event);
+    runtime.current!.pointer = { ...runtime.current!.pointer, pressed: true };
+    invalidate();
+  };
+  const liftPointer = (event: PointerLike) => {
+    const rt = runtime.current!;
+    rt.pointer = { ...rt.pointer, pressed: false };
+    if (event.nativeEvent.pointerType !== 'mouse') rt.pointer = { ...rt.pointer, inside: false };
     invalidate();
   };
   const releasePointer = () => {
-    runtime.current!.pointer = { ...runtime.current!.pointer, inside: false };
+    runtime.current!.pointer = { ...runtime.current!.pointer, inside: false, pressed: false };
     invalidate();
   };
   // Mouse hover on web; on native a finger down or dragging counts, and
   // lifting it lets the blocks settle back.
   const pointerHandlers = tracksPointer
-    ? { onPointerMove: setPointer, onPointerDown: setPointer, onPointerUp: (e: PointerLike) => (e.nativeEvent.pointerType === 'mouse' ? undefined : releasePointer()), onPointerLeave: releasePointer, onPointerCancel: releasePointer }
+    ? { onPointerMove: setPointer, onPointerDown: pressPointer, onPointerUp: liftPointer, onPointerLeave: releasePointer, onPointerCancel: releasePointer }
     : {};
 
   let surface = null;

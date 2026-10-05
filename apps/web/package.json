@@ -26,6 +26,7 @@
     "react": "catalog:",
     "react-dom": "catalog:",
     "react-native": "catalog:",
+    "react-native-audio-api": "catalog:",
     "react-native-css": "catalog:",
     "react-native-gesture-handler": "catalog:",
     "react-native-skia": "catalog:",

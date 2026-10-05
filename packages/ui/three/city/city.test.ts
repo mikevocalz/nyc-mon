@@ -108,8 +108,8 @@ test('palette comes from the district theme, accent overridable', () => {
 });
 
 test('pointer helpers', () => {
-  assert.deepEqual(toNdc(50, 25, 100, 50), { x: 0, y: 0, inside: true });
-  assert.deepEqual(toNdc(0, 0, 100, 50), { x: -1, y: 1, inside: true });
+  assert.deepEqual(toNdc(50, 25, 100, 50), { x: 0, y: 0, inside: true, pressed: false });
+  assert.deepEqual(toNdc(0, 0, 100, 50), { x: -1, y: 1, inside: true, pressed: false });
   assert.equal(toNdc(120, 10, 100, 50).inside, false);
   assert.equal(toNdc(1, 1, 0, 0).inside, false);
   // Same result at 30 and 60 fps over the same time.
