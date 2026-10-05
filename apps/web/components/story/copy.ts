@@ -13,7 +13,7 @@ export const STORY_COPY = {
   cleanCity: {
     eyebrow: 'THE CLEAN CITY ERA',
     title: 'The city that stopped looking',
-    body: 'It started with a sanitation campaign — sealed trash, cleared habitats, monitored parks. It worked. Over the decades, rat mitigation became pest management became species reduction, and New York grew up believing the old animal populations were gone for good. Nobody noticed the survivors slipping into the places the cleanup could not reach: abandoned tunnels, utility corridors, waterways, sealed buildings, forgotten industrial space.',
+    body: 'It started under the Mamdani administration — a sanitation campaign that actually worked: sealed trash, cleared habitats, monitored parks. Over the decades that followed, rat mitigation became pest management became species reduction, and New York grew up believing the old animal populations were gone for good. Nobody noticed the survivors slipping into the places the cleanup could not reach: abandoned tunnels, utility corridors, waterways, sealed buildings, forgotten industrial space.',
   },
 
   projectZero: {
