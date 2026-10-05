@@ -4,6 +4,7 @@ import { HOME_COPY } from '@acme/spatial/copy';
 /** Product-site pages, the marketing map from BUILD_PROMPT §5 — not the app's tabs. */
 const PAGES = [
   { label: 'Home', href: '/' },
+  { label: 'The Story', href: '/story' },
   { label: 'The Mons', href: '/mons' },
   { label: 'The City', href: '/city' },
   { label: 'How it works', href: '/how-it-works' },
@@ -34,6 +35,7 @@ export const FOOTER_GROUPS: FooterLinkGroup[] = [
     title: 'Explore',
     links: [
       { label: 'Home', href: '/' },
+      { label: 'The Story', href: '/story' },
       { label: 'The Mons', href: '/mons' },
       { label: 'The City', href: '/city' },
       { label: 'How it works', href: '/how-it-works' },
