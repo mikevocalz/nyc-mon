@@ -23,6 +23,15 @@ import { IntegrityRuns } from './collections/IntegrityRuns';
 import { MonInstances } from './collections/MonInstances';
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
+const bunnyConfigured = Boolean(
+  process.env.BUNNY_STORAGE_ZONE &&
+    process.env.BUNNY_STORAGE_PASSWORD &&
+    process.env.BUNNY_CDN_URL,
+);
+
+if (process.env.NODE_ENV === 'production' && !bunnyConfigured) {
+  throw new Error('Bunny Storage must be configured in production.');
+}
 
 export default buildConfig({
   admin: {
@@ -40,13 +49,7 @@ export default buildConfig({
   collections: [Users, Media, GuardianConsents, Eggs, MonInstances, CareStates, AuditEvents, IntegrityRuns],
   plugins: [
     cloudStoragePlugin({
-      enabled:
-        process.env.NODE_ENV !== 'production' ||
-        Boolean(
-          process.env.BUNNY_STORAGE_ZONE &&
-            process.env.BUNNY_STORAGE_PASSWORD &&
-            process.env.BUNNY_CDN_URL,
-        ),
+      enabled: bunnyConfigured,
       collections: {
         [Media.slug]: {
           adapter: bunnyStorage({
