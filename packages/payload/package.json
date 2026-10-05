@@ -21,7 +21,6 @@
     "@better-auth/passkey": "catalog:",
     "@delmaredigital/payload-better-auth": "catalog:",
     "@payloadcms/db-postgres": "catalog:",
-    "@payloadcms/plugin-cloud-storage": "catalog:",
     "@vercel/functions": "catalog:",
     "better-auth": "catalog:",
     "payload": "catalog:",
