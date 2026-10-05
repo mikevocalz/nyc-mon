@@ -82,6 +82,7 @@ export function createDeviceScene({ THREE, renderer }: ThreeContext, initial: De
   const device = buildDevice(THREE);
   // Dropped a touch so the scanner beam's fade lives inside the frame.
   device.group.position.y = -0.1;
+  device.group.scale.setScalar(1.25);
   scene.add(device.group);
 
   const raycaster = new THREE.Raycaster();
@@ -378,7 +379,7 @@ function buildBeam(
 ): { group: Group; tick: (time: number, boost: number) => void } {
   const { track, mat, tex } = ctx;
   const group = new THREE.Group();
-  const LENGTH = 0.58;
+  const LENGTH = 0.46;
   // Lean back a touch: it reads as projection, not a sticker, and the tip
   // clears the stage's top edge.
   group.rotation.x = -0.12;
