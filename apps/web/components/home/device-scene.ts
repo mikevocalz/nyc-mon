@@ -171,11 +171,16 @@ function buildDevice(THREE: Three): {
   /** Fine plastic grain: the shell isn't a render-flat surface up close. */
   const grain = tex(grainTexture(THREE));
 
-  /** Matte red shell: plastic sheen from the room env, no metal. */
-  const body = mat(new THREE.MeshStandardMaterial({
+  /** Matte shell with a clearcoat skin: injected-moulded gloss, not flat plastic. */
+  const body = mat(new THREE.MeshPhysicalMaterial({
     // Blue shell variant — the token stays red for canon elsewhere.
-    color: '#1D4ED8', roughness: 0.42, metalness: 0.04, envMapIntensity: 0.7,
+    color: '#1D4ED8', roughness: 0.38, metalness: 0.05, envMapIntensity: 0.9,
+    clearcoat: 0.7, clearcoatRoughness: 0.32,
     bumpMap: grain, bumpScale: 0.0015,
+  }));
+  /** Shell seam: the fine groove where the two shell halves meet. */
+  const groove = mat(new THREE.MeshStandardMaterial({
+    color: '#0B0F1E', roughness: 0.7, metalness: 0.1, envMapIntensity: 0.15,
   }));
   /** Black rubberised trim: head, bezel, keys — softer reflections. */
   const black = mat(new THREE.MeshStandardMaterial({
@@ -264,6 +269,19 @@ function buildDevice(THREE: Three): {
   box(rounded(W, H, D, 0.06), body, 0, 0, 0);
   // Chin under the control row: the slight lower bumper of the reference.
   box(rounded(W * 0.98, 0.1, D + 0.015, 0.04), body, 0, -top + 0.07, 0);
+  // Shell seams: hairline grooves where the front and back halves meet,
+  // just under the head and above the chin.
+  box(rounded(W * 1.004, 0.01, D + 0.006, 0.004), groove, 0, 0.62, 0);
+  box(rounded(W * 1.002, 0.008, D + 0.006, 0.003), groove, 0, -top + 0.16, 0);
+  // Speaker grille on the chin: a 9×2 field of drilled pinholes.
+  for (let i = 0; i < 9; i++) {
+    for (let j = 0; j < 2; j++) {
+      const hole = new THREE.Mesh(track(new THREE.CylinderGeometry(0.006, 0.006, 0.004, 10)), groove);
+      hole.rotation.x = Math.PI / 2;
+      hole.position.set(-0.14 + i * 0.035, -top + 0.05 + j * 0.035, front + 0.012);
+      group.add(hole);
+    }
+  }
 
   // --- scanner head --------------------------------------------------------
 
@@ -357,6 +375,34 @@ function buildDevice(THREE: Three): {
   // Left edge: the long action key — the push-to-talk button.
   const ptt = box(rounded(0.032, 0.18, 0.1, 0.012), black, -W / 2 - 0.014, 0.28, 0);
   ptt.userData.restX = ptt.position.x;
+
+  // Studio finishing: a soft contact shadow under the unit, a faint cool
+  // halo behind it, and a diagonal glare streak across the screen glass.
+  const shadow = new THREE.Sprite(mat(new THREE.SpriteMaterial({
+    map: tex(radialGlowTexture(THREE)), color: '#1A1F33', transparent: true,
+    opacity: 0.28, depthWrite: false,
+  })));
+  shadow.scale.set(1.5, 0.42, 1);
+  shadow.position.set(0, -top - 0.06, 0.1);
+  group.add(shadow);
+
+  const halo = new THREE.Sprite(mat(new THREE.SpriteMaterial({
+    map: tex(radialGlowTexture(THREE)), color: '#C7D4F0', transparent: true,
+    opacity: 0.4, depthWrite: false,
+  })));
+  halo.scale.set(2.6, 2.6, 1);
+  halo.position.set(0, 0.15, -0.45);
+  group.add(halo);
+
+  const glare = new THREE.Mesh(
+    track(new THREE.PlaneGeometry(0.8, 1.0)),
+    mat(new THREE.MeshBasicMaterial({
+      map: tex(glareTexture(THREE)), transparent: true, opacity: 0.55,
+      depthWrite: false, blending: THREE.AdditiveBlending,
+    })),
+  );
+  glare.position.set(0, screenY, front + 0.033);
+  group.add(glare);
 
   group.position.y = -0.15;
   return { group, screen: screenMesh, setHover: hud.setHover, setTab: hud.setTab, ptt, beamTick: beam.tick };
@@ -572,6 +618,23 @@ function beamGradientTexture(THREE: Three): CanvasTexture {
     }
   }
   ctx.putImageData(img, 0, 0);
+  return makeCanvasTexture(THREE, canvas);
+}
+
+/**
+ * A soft diagonal light streak for the screen glass — one angled band,
+ * soft both sides, the studio window catching the display.
+ */
+function glareTexture(THREE: Three): CanvasTexture {
+  const [canvas, ctx] = canvas2d(256, 320);
+  const grad = ctx.createLinearGradient(30, 300, 200, 20);
+  grad.addColorStop(0, 'rgba(255,255,255,0)');
+  grad.addColorStop(0.42, 'rgba(255,255,255,0.10)');
+  grad.addColorStop(0.5, 'rgba(255,255,255,0.22)');
+  grad.addColorStop(0.58, 'rgba(255,255,255,0.10)');
+  grad.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 256, 320);
   return makeCanvasTexture(THREE, canvas);
 }
 
