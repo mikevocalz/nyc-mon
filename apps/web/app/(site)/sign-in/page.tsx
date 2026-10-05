@@ -2,7 +2,7 @@
 
 import { Suspense } from 'react';
 import { SignInScreen } from '@acme/app/features/onboarding/SignInScreen.tsx';
-import { BrandWordmark, SkylineDivider, Text } from '@acme/ui';
+import { BrandLogo, BrandWordmark, SkylineDivider, Text } from '@acme/ui';
 import { View } from '@acme/ui/tw';
 
 /**
@@ -18,7 +18,7 @@ export default function SignInPage() {
         aria-hidden
         className="hidden flex-col justify-between overflow-hidden bg-ink-950 px-10 pb-0 pt-10 lg:flex"
       >
-        <BrandWordmark height={32} />
+        <BrandLogo size={168} />
         <View className="gap-3">
           <View className="h-1 w-10 bg-orange-500" aria-hidden />
           <Text className="font-display text-2xl font-bold text-ink-50">
@@ -31,6 +31,9 @@ export default function SignInPage() {
         </View>
       </View>
       <View className="flex-1">
+        <View className="px-4 pt-4 lg:hidden">
+          <BrandWordmark height={40} />
+        </View>
         <Suspense>
           <SignInScreen />
         </Suspense>
