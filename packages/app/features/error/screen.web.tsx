@@ -1,6 +1,7 @@
 'use client';
 import { brand } from '@acme/theme';
 import { Container, SceneSection, SignRain, SolidPanel, SubwayLines } from '@acme/ui';
+import { View } from '@acme/ui/tw';
 import { useRouter } from 'solito/navigation';
 import { ErrorMessageBlock, type ErrorScreenProps } from './screen.shared';
 
@@ -14,7 +15,7 @@ export function ErrorScreen(props: Omit<ErrorScreenProps, 'onGoHome'>) {
   const router = useRouter();
   const notFound = (props.kind ?? 'not-found') === 'not-found';
   return (
-    <Container width="full" className="w-full flex-1">
+    <View className="w-full flex-1">
       <SceneSection
         className="min-h-[80dvh] flex-1 justify-center"
         placeholderColor={brand.night}
@@ -32,6 +33,6 @@ export function ErrorScreen(props: Omit<ErrorScreenProps, 'onGoHome'>) {
           </SolidPanel>
         </Container>
       </SceneSection>
-    </Container>
+    </View>
   );
 }
