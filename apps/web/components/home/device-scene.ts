@@ -286,13 +286,13 @@ function buildDevice(THREE: Three): {
   // and rising sparks, the "a Mon is coming out" look. `beam.tick` pulses
   // it each frame; under reduced motion it stays a steady fan.
   const beam = buildBeam(THREE, { track, mat, tex });
-  beam.group.position.set(0.25, top, 0);
+  beam.group.position.set(0.08, top, 0);
   group.add(beam.group);
 
   // A hot glow right at the emitter mouth.
   const glowSprite = new THREE.Sprite(glow);
   glowSprite.scale.set(0.9, 0.4, 1);
-  glowSprite.position.set(0.25, top + 0.02, 0.05);
+  glowSprite.position.set(0.08, top + 0.02, 0.05);
   group.add(glowSprite);
 
   // --- face ----------------------------------------------------------------
