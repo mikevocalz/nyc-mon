@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useLocalSearchParams } from 'expo-router';
 import {
   Button,
+  Container,
   EmptyState,
   ErrorMessage,
   Heading,
@@ -73,18 +74,18 @@ export function ConsentScreen() {
 
   if (mode === 'denied') {
     return (
-      <View className="flex-1 items-center justify-center px-4 py-6">
+      <Container width="full" className="flex-1 items-center justify-center px-4 py-6">
         <EmptyState
           title={copy('m05.denied.title.no_mon')}
           description={copy('m05.denied.body.no_mon')}
         />
-      </View>
+      </Container>
     );
   }
 
   return (
     <KeyboardAwareScroll>
-      <View className="flex-1 px-4 py-6">
+      <Container width="full" className="flex-1 px-4 py-6">
         <Form className="mx-auto w-full max-w-content-form gap-6">
           {mode === 'sent' ? (
             <>
@@ -148,7 +149,7 @@ export function ConsentScreen() {
             </>
           )}
         </Form>
-      </View>
+      </Container>
     </KeyboardAwareScroll>
   );
 }
