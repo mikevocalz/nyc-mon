@@ -9,21 +9,19 @@ import {
   SidebarSection,
   SplitView,
   SwipeableRow,
-  isCollapsed,
   usePaneSearch,
   usePaneVisibility,
   useStickyHeader,
-  windowSizeClassForWidth,
 } from '@/src/navigation/split-view';
 import { useRef } from 'react';
-import { useWindowDimensions } from 'react-native';
 import { createStore, useStore } from 'zustand';
 import { EventActionsSheet } from '../../../components/EventActionsSheet';
 import { Pressable, View, Text } from '@acme/ui/tw';
-import { Avatar, Badge, BrandWordmark, EmptyState, IconButton, KeyboardAwareScroll, Menu, SafeArea, SegmentedControl } from '@acme/ui';
+import { Avatar, Badge, BrandWordmark, EmptyState, KeyboardAwareScroll, Menu, SafeArea, SegmentedControl } from '@acme/ui';
 import { Header } from '@acme/ui/primitives';
 import { Calendar, MoreHorizontal, Users } from '@acme/ui/icons';
 import {
+  applyOverrides,
   buildDemoDay,
   DEMO_DAY,
   DEMO_RESOURCES,
@@ -91,7 +89,10 @@ export default function SplitLayout() {
   const showMonth = useScheduleStore((state) => state.showMonth);
   const createdEvents = useScheduleStore((state) => state.createdEvents);
   const deletedEventIds = useScheduleStore((state) => state.deletedEventIds);
+  const overrides = useScheduleStore((state) => state.overrides);
   const deleteEvent = useScheduleStore((state) => state.deleteEvent);
+  const duplicateEvent = useScheduleStore((state) => state.duplicateEvent);
+  const openReschedule = useScheduleStore((state) => state.openReschedule);
   const calendarEventIds = useScheduleStore((state) => state.calendarEventIds);
   const notificationIds = useScheduleStore((state) => state.notificationIds);
 
@@ -110,8 +111,8 @@ export default function SplitLayout() {
   // is scroll-linked; see use-sticky-header for the Animated/Reanimated split.
   const listHeader = useStickyHeader();
   // The action sheet is a peer of the split view, not a child of the inspector:
-  // it must overlay the whole screen, and on compact the inspector itself is
-  // the only visible pane.
+  // it must overlay the whole screen, and at compact — where it is used — the
+  // inspector can never open at all.
   const actionsStore = useRef<ReturnType<typeof createActionsStore> | null>(null);
   actionsStore.current ??= createActionsStore();
   const actionsOpen = useStore(actionsStore.current, (state) => state.open);
@@ -125,8 +126,11 @@ export default function SplitLayout() {
 
   // The sidebar's own step down to a rail, resolved by the same rule the layout
   // uses so the two can never disagree about which mode is showing.
-  const { primaryNarrow: rail } = usePaneVisibility(2);
-  const compact = isCollapsed(windowSizeClassForWidth(useWindowDimensions().width));
+  // `inspector` is the resolved visibility of the inspector pane: it is false
+  // at compact (always) and at medium, and at any width where the caller hid
+  // it — exactly the cases where the inspector's own ⋯ menu is unreachable
+  // and the bottom sheet has to carry the event actions instead.
+  const { primaryNarrow: rail, inspector: inspectorVisible } = usePaneVisibility(2);
   const theme = useProfile((state) => state.theme);
   const setTheme = useProfile((state) => state.setTheme);
   const toggleResource = (resourceId: string) => {
@@ -147,7 +151,12 @@ export default function SplitLayout() {
       )
     : DEMO_RESOURCES;
 
-  const selectedEvent = scheduleDay.events.find((event) => event.id === selectedEventId);
+  // Overrides first: the inspector, the actions sheet and the reschedule
+  // prefill must all read the event's MOVED time, matching what the grid
+  // draws — `scheduleDay.events` alone still holds the fixture positions.
+  const selectedEvent = applyOverrides(scheduleDay.events, overrides).find(
+    (event) => event.id === selectedEventId,
+  );
   const eventResource = DEMO_RESOURCES.find(
     (resource) => resource.id === selectedEvent?.resourceId,
   );
@@ -158,6 +167,12 @@ export default function SplitLayout() {
     void removeEventIntegrations({ calendarEventId, notificationId });
     deleteEvent(selectedEvent.id);
     selectEvent(null);
+  };
+  const runEventAction = (id: string) => {
+    if (!selectedEvent) return;
+    if (id === 'duplicate') duplicateEvent(selectedEvent);
+    else if (id === 'reschedule') openReschedule(selectedEvent.id);
+    else if (id === 'delete') deleteSelectedEvent();
   };
 
   return (
@@ -183,6 +198,20 @@ export default function SplitLayout() {
             silently did nothing. A control that hides a pane can never live
             inside that pane. */}
         <PaneToggle pane="inspector" columnCount={2} />
+        {/* The event ⋯ menu lives inside the inspector, so whenever the
+            inspector cannot be on screen — compact always, medium, or a
+            hidden-inspector override — this header twin opens the same three
+            actions through the bottom sheet below. */}
+        {selectedEvent && !inspectorVisible ? (
+          <Pressable
+            role="button"
+            aria-label="Event actions"
+            onPress={() => setActionsOpen(true)}
+            className="h-11 w-11 items-center justify-center rounded-none border-2 border-border bg-surface-raised transition-colors duration-fast hover:bg-surface-sunken active:bg-surface-sunken motion-reduce:transition-none"
+          >
+            <MoreHorizontal size={20} className="text-accent" />
+          </Pressable>
+        ) : null}
       </Header>
 
       <SplitView topColumnForCollapsing="primary" showInspector={selectedEvent != null}>
@@ -362,14 +391,13 @@ export default function SplitLayout() {
               /* An ANCHORED menu, not the ⋯-opens-a-bottom-sheet pattern this
                  started as: on a tablet the sheet rose from the far edge of a
                  1280dp screen, nowhere near the button that summoned it. The
-                 sheet is kept for compact width, where the trigger really is
-                 near the bottom — see EventActionsSheet below. */
+                 sheet is kept for widths where this inspector cannot open —
+                 compact always — where its header twin calls it up instead:
+                 see EventActionsSheet below. */
               <Menu
                 title={selectedEvent.title}
                 actions={EVENT_ACTIONS}
-                onAction={(id) => {
-                  if (id === 'delete') deleteSelectedEvent();
-                }}
+                onAction={runEventAction}
               >
                 {/* NOT an IconButton: MenuView wraps its child in its own
                     Pressable to open the menu, so a pressable trigger swallows
@@ -413,16 +441,19 @@ export default function SplitLayout() {
       </SplitView.Inspector>
       </SplitView>
 
-      {/* Compact only: at that width the detail pane fills the screen and its
-          toolbar sits at the top, so a sheet rising from the bottom is the
-          reachable target. Wider layouts use the anchored menu above. */}
-      {selectedEvent && compact ? (
+      {/* Fallback for every width where the inspector cannot be on screen —
+          always compact, plus medium and any hidden-inspector override: the
+          detail pane fills the screen and its toolbar sits at the top, so a
+          sheet rising from the bottom is the reachable target. Opened by the
+          "Event actions" header button above; wider layouts with a visible
+          inspector use its anchored menu instead. */}
+      {selectedEvent && !inspectorVisible ? (
         <EventActionsSheet
           open={actionsOpen}
           onClose={() => setActionsOpen(false)}
           eventTitle={selectedEvent.title}
-          onDuplicate={() => {}}
-          onReschedule={() => {}}
+          onDuplicate={() => runEventAction('duplicate')}
+          onReschedule={() => runEventAction('reschedule')}
           onDelete={deleteSelectedEvent}
         />
       ) : null}

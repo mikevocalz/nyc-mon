@@ -36,7 +36,15 @@ export const auditIntegrityRun: CollectionAfterChangeHook = async ({ doc, operat
  */
 export const IntegrityRuns: CollectionConfig = {
   slug: INTEGRITY_RUNS_SLUG,
-  admin: { hidden: true },
+  admin: {
+    hidden: true,
+    components: {
+      views: {
+        list: { Component: { path: './admin/console/Redirects#CollectionRedirect', clientProps: { to: '/admin/integrity' } } },
+        edit: { root: { Component: { path: './admin/console/Redirects#CollectionRedirect', clientProps: { to: '/admin/integrity' } } } },
+      },
+    },
+  },
   access: {
     read: staffRoles(STAFF_ROLES),
     create: nobody,

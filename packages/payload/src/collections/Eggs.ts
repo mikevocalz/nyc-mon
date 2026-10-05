@@ -82,7 +82,16 @@ export const auditEggOwnerChange: CollectionAfterChangeHook = async ({ doc, oper
  */
 export const Eggs: CollectionConfig = {
   slug: EGGS_SLUG,
-  admin: { hidden: true, useAsTitle: 'eggId' },
+  admin: {
+    hidden: true,
+    useAsTitle: 'eggId',
+    components: {
+      views: {
+        list: { Component: { path: './admin/console/Redirects#CollectionRedirect', clientProps: { to: '/admin/mons' } } },
+        edit: { root: { Component: { path: './admin/console/Redirects#CollectionRedirect', clientProps: { to: '/admin/mons' } } } },
+      },
+    },
+  },
   access: {
     read: staffRoles(EGG_READERS),
     create: nobody,

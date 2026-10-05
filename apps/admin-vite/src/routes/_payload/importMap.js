@@ -1,3 +1,4 @@
+import { CollectionRedirect as CollectionRedirect_8c713bc6378ad4c5e1b81b689b57690a } from '../../../../../packages/payload/src/admin/console/Redirects'
 import { ConsoleNavFallback as ConsoleNavFallback_cd4eb3cc70eaa3aa9390e47175c29525 } from '../../../../../packages/payload/src/admin/console/Shell'
 import { LogoutButton as LogoutButton_aa8e4427b70b37c7820895ace344eb78 } from '@delmaredigital/payload-better-auth/components'
 import { ConsoleIcon as ConsoleIcon_b2dc090577a65eb908914d2ced8d0049 } from '../../../../../packages/payload/src/admin/console/Chrome'
@@ -21,6 +22,7 @@ import { RecentlyViewedCollectionsField as RecentlyViewedCollectionsField_3817bf
 
 /** @type import('payload').ImportMap */
 export const importMap = {
+  "./admin/console/Redirects#CollectionRedirect": CollectionRedirect_8c713bc6378ad4c5e1b81b689b57690a,
   "./admin/console/Shell#ConsoleNavFallback": ConsoleNavFallback_cd4eb3cc70eaa3aa9390e47175c29525,
   "@delmaredigital/payload-better-auth/components#LogoutButton": LogoutButton_aa8e4427b70b37c7820895ace344eb78,
   "./admin/console/Chrome#ConsoleIcon": ConsoleIcon_b2dc090577a65eb908914d2ced8d0049,

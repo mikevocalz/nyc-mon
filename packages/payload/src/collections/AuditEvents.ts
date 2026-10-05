@@ -50,7 +50,15 @@ export const guardAuditEvent: CollectionBeforeChangeHook = ({ data, operation })
  */
 export const AuditEvents: CollectionConfig = {
   slug: AUDIT_EVENTS_SLUG,
-  admin: { hidden: true },
+  admin: {
+    hidden: true,
+    components: {
+      views: {
+        list: { Component: { path: './admin/console/Redirects#CollectionRedirect', clientProps: { to: '/admin/audit' } } },
+        edit: { root: { Component: { path: './admin/console/Redirects#CollectionRedirect', clientProps: { to: '/admin/audit' } } } },
+      },
+    },
+  },
   access: {
     read: readAuditEvents,
     create: nobody,

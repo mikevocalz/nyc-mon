@@ -120,7 +120,15 @@ export const auditConsentDelete: CollectionAfterDeleteHook = async ({ id, req })
  */
 export const GuardianConsents: CollectionConfig = {
   slug: GUARDIAN_CONSENTS_SLUG,
-  admin: { hidden: true },
+  admin: {
+    hidden: true,
+    components: {
+      views: {
+        list: { Component: { path: './admin/console/Redirects#CollectionRedirect', clientProps: { to: '/admin/consent' } } },
+        edit: { root: { Component: { path: './admin/console/Redirects#CollectionRedirect', clientProps: { to: '/admin/consent' } } } },
+      },
+    },
+  },
   access: {
     read: staffRoles(CONSENT_READERS),
     create: nobody,

@@ -108,6 +108,12 @@ interface ScheduleState extends PersistedScheduleState {
   selectedDate: string | null;
   visibleMonth: string | null;
   bookingOpen: boolean;
+  /**
+   * Event the booking sheet is rescheduling, when it was opened through
+   * `openReschedule` rather than `openBooking`. Transient like `bookingOpen`:
+   * it identifies a form session, not schedule data.
+   */
+  rescheduleEventId: string | null;
 
   setView: (view: ScheduleView) => void;
   setResourceFilter: (resourceIds: string[]) => void;
@@ -119,7 +125,11 @@ interface ScheduleState extends PersistedScheduleState {
   showMonth: (month: string) => void;
   openBooking: () => void;
   closeBooking: () => void;
+  /** Open the booking sheet in reschedule mode for an existing event. */
+  openReschedule: (eventId: string) => void;
   createEvent: (event: ScheduleEvent) => void;
+  /** Store a copy of `event` under a new id and select it. */
+  duplicateEvent: (event: ScheduleEvent) => void;
   deleteEvent: (eventId: string) => void;
   setCalendarEventId: (eventId: string, calendarEventId?: string) => void;
   setNotificationId: (eventId: string, notificationId?: string) => void;
@@ -128,6 +138,10 @@ interface ScheduleState extends PersistedScheduleState {
 }
 
 const persisted = readPersisted();
+
+function idForEvent() {
+  return `mon-event-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
 
 export const useScheduleStore = create<ScheduleState>((set) => {
   const setPersisted = (
@@ -156,6 +170,7 @@ export const useScheduleStore = create<ScheduleState>((set) => {
     selectedDate: null,
     visibleMonth: null,
     bookingOpen: false,
+    rescheduleEventId: null,
 
     setView: (view) => set({ view }),
     setResourceFilter: (resourceFilter) => set({ resourceFilter }),
@@ -168,14 +183,31 @@ export const useScheduleStore = create<ScheduleState>((set) => {
       })),
     clearMoves: () => setPersisted(() => ({ overrides: {} })),
     showMonth: (visibleMonth) => set({ visibleMonth }),
-    openBooking: () => set({ bookingOpen: true }),
-    closeBooking: () => set({ bookingOpen: false }),
+    // Every path into the sheet resolves the mode in the same write, so a
+    // closed reschedule can never leak into the next "new booking" open.
+    openBooking: () => set({ bookingOpen: true, rescheduleEventId: null }),
+    closeBooking: () => set({ bookingOpen: false, rescheduleEventId: null }),
+    openReschedule: (eventId) => set({ bookingOpen: true, rescheduleEventId: eventId }),
 
     createEvent: (event) =>
       setPersisted((state) => ({
         createdEvents: { ...state.createdEvents, [event.id]: event },
         deletedEventIds: state.deletedEventIds.filter((id) => id !== event.id),
       })),
+    duplicateEvent: (event) => {
+      const copy: ScheduleEvent = {
+        ...event,
+        id: idForEvent(),
+        title: `${event.title} (copy)`,
+      };
+      setPersisted((state) => ({
+        createdEvents: { ...state.createdEvents, [copy.id]: copy },
+        deletedEventIds: state.deletedEventIds.filter((id) => id !== copy.id),
+      }));
+      // The copy, not the original: the action reads as "make me one of
+      // these", so the new event is what the inspector should now show.
+      set({ selectedEventId: copy.id });
+    },
     deleteEvent: (eventId) =>
       setPersisted((state) => {
         const createdEvents = { ...state.createdEvents };

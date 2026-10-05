@@ -21,6 +21,7 @@ export {
   type ScheduleRecurrence,
 } from './model';
 export { assignLanes, lanesByResource, type LaidOutEvent } from './lanes';
+export { applyOverrides, type EventOverride } from './reschedule';
 export {
   currentTimeOffset,
   eventRect,

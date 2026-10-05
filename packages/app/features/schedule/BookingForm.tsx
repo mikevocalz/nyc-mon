@@ -5,6 +5,7 @@ import { Section } from '@acme/ui/primitives';
 import { Avatar, Button, Container, notify, useAppForm, useFormStore } from '@acme/ui';
 import { buildDemoDay, DEMO_RESOURCES } from './fixtures.ts';
 import { slotsForResource } from './slots.ts';
+import { applyOverrides } from './reschedule.ts';
 import { formatTime } from './format.ts';
 import { useScheduleStore } from './store.ts';
 import { NotesEditor } from './NotesEditor.tsx';
@@ -76,7 +77,10 @@ export function BookingForm({ onDone, onOpenEditorSettings }: BookingFormProps) 
   const createdEvents = useScheduleStore((state) => state.createdEvents);
   const deletedEventIds = useScheduleStore((state) => state.deletedEventIds);
   const createEvent = useScheduleStore((state) => state.createEvent);
+  const moveEvent = useScheduleStore((state) => state.moveEvent);
   const selectEvent = useScheduleStore((state) => state.selectEvent);
+  const overrides = useScheduleStore((state) => state.overrides);
+  const rescheduleEventId = useScheduleStore((state) => state.rescheduleEventId);
   const syncPersonalCalendar = useScheduleStore((state) => state.syncPersonalCalendar);
   const setSyncPersonalCalendar = useScheduleStore((state) => state.setSyncPersonalCalendar);
   const remindersEnabled = useScheduleStore((state) => state.remindersEnabled);
@@ -86,6 +90,15 @@ export function BookingForm({ onDone, onOpenEditorSettings }: BookingFormProps) 
 
   const reference = selectedDate ? new Date(selectedDate) : new Date();
   const day = buildDemoDay(reference, Object.values(createdEvents), deletedEventIds);
+  // Pending moves layer over the day's events, so both the prefill and the
+  // slot list must read the moved positions, not the fixture ones.
+  const dayEvents = applyOverrides(day.events, overrides);
+  // Reschedule mode: `openReschedule` sets the id while opening this sheet.
+  // The event keeps its identity — submitting writes a `moveEvent` override
+  // rather than creating a second event.
+  const rescheduling = rescheduleEventId
+    ? dayEvents.find((event) => event.id === rescheduleEventId)
+    : undefined;
   const firstMon = DEMO_RESOURCES[0];
   const firstKind: ScheduleEventKind = 'breakfast';
   const selectedSlotTime =
@@ -97,18 +110,36 @@ export function BookingForm({ onDone, onOpenEditorSettings }: BookingFormProps) 
 
   const form = useAppForm({
     defaultValues: {
-      title: '',
-      resourceId: firstMon?.id ?? '',
-      kind: firstKind as ScheduleEventKind,
-      slot: firstSlot.toISOString(),
-      notes: '',
+      title: rescheduling?.title ?? '',
+      resourceId: rescheduling?.resourceId ?? firstMon?.id ?? '',
+      kind: (rescheduling?.kind ?? firstKind) as ScheduleEventKind,
+      slot: rescheduling ? rescheduling.start.toISOString() : firstSlot.toISOString(),
+      notes: rescheduling?.notes ?? '',
     },
     onSubmit: async ({ value }) => {
       const mon = DEMO_RESOURCES.find((candidate) => candidate.id === value.resourceId);
       if (!mon || !value.slot) return;
 
-      const kind = value.kind as ScheduleEventKind;
       const start = new Date(value.slot);
+
+      if (rescheduling) {
+        // A reschedule keeps the event's id, title, kind and DURATION — only
+        // the start (and optionally the Mon) changes, stored as an override
+        // like a drag would write.
+        const durationMs = rescheduling.end.getTime() - rescheduling.start.getTime();
+        moveEvent(rescheduling.id, {
+          start,
+          end: new Date(start.getTime() + durationMs),
+          resourceId: mon.id,
+        });
+        notify.success('Event rescheduled', {
+          description: `${rescheduling.title} · ${formatTime(start, day.timeZone)}`,
+        });
+        onDone();
+        return;
+      }
+
+      const kind = value.kind as ScheduleEventKind;
       const title = value.title.trim() || defaultScheduleEventTitle(kind, mon.name);
       const event: ScheduleEvent = {
         id: idForEvent(),
@@ -154,7 +185,7 @@ export function BookingForm({ onDone, onOpenEditorSettings }: BookingFormProps) 
     dayStart: day.dayStart,
     startHour: day.startHour,
     endHour: day.endHour,
-    events: day.events,
+    events: dayEvents,
     resourceId,
   });
 
@@ -170,9 +201,13 @@ export function BookingForm({ onDone, onOpenEditorSettings }: BookingFormProps) 
     <Container width="detail" className="flex-1 px-6 pb-10 pt-3">
       <View className="gap-7">
         <Section className="gap-1">
-          <Text className="font-display text-xl text-text">Add to Mon Calendar</Text>
+          <Text className="font-display text-xl text-text">
+            {rescheduling ? `Reschedule · ${rescheduling.title}` : 'Add to Mon Calendar'}
+          </Text>
           <Text className="text-sm text-text-muted">
-            Meals can repeat every day. Play dates and battles stay one-time unless you add another.
+            {rescheduling
+              ? 'Pick a new time — the event keeps its name, kind and length.'
+              : 'Meals can repeat every day. Play dates and battles stay one-time unless you add another.'}
           </Text>
         </Section>
 
@@ -200,44 +235,56 @@ export function BookingForm({ onDone, onOpenEditorSettings }: BookingFormProps) 
           </View>
         </Section>
 
-        <Section className="gap-2">
-          <Text className="text-sm font-medium text-text">What are you scheduling?</Text>
-          <View className="flex-row flex-wrap gap-2">
-            {MON_SCHEDULE_EVENT_KINDS.filter((kind) => kind !== 'care').map((kind) => {
-              const active = kind === selectedKind;
-              return (
-                <Pressable
-                  key={kind}
-                  onPress={() => pickKind(kind)}
-                  accessibilityState={{ selected: active }}
-                  className={`border-2 border-border px-3 py-2.5 ${active ? 'bg-primary' : 'bg-surface'}`}
-                >
-                  <Text className={`text-sm font-semibold ${active ? 'text-on-primary' : 'text-text'}`}>
-                    {scheduleKindLabel(kind)}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </Section>
+        {/* Kind, name, notes and reminder toggles stay hidden in reschedule
+            mode: `moveEvent` stores only start/end/resource, so showing them
+            would promise edits that silently don't persist. */}
+        {rescheduling ? null : (
+          <>
+            <Section className="gap-2">
+              <Text className="text-sm font-medium text-text">What are you scheduling?</Text>
+              <View className="flex-row flex-wrap gap-2">
+                {MON_SCHEDULE_EVENT_KINDS.filter((kind) => kind !== 'care').map((kind) => {
+                  const active = kind === selectedKind;
+                  return (
+                    <Pressable
+                      key={kind}
+                      onPress={() => pickKind(kind)}
+                      accessibilityState={{ selected: active }}
+                      className={`border-2 border-border px-3 py-2.5 ${active ? 'bg-primary' : 'bg-surface'}`}
+                    >
+                      <Text className={`text-sm font-semibold ${active ? 'text-on-primary' : 'text-text'}`}>
+                        {scheduleKindLabel(kind)}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </Section>
 
-        <form.AppField name="title">
-          {(field) => (
-            <field.TextField
-              label="Name (optional)"
-              placeholder={defaultScheduleEventTitle(
-                selectedKind,
-                DEMO_RESOURCES.find((mon) => mon.id === resourceId)?.name ?? 'Mon',
+            <form.AppField name="title">
+              {(field) => (
+                <field.TextField
+                  label="Name (optional)"
+                  placeholder={defaultScheduleEventTitle(
+                    selectedKind,
+                    DEMO_RESOURCES.find((mon) => mon.id === resourceId)?.name ?? 'Mon',
+                  )}
+                />
               )}
-            />
-          )}
-        </form.AppField>
+            </form.AppField>
+          </>
+        )}
 
         <Section className="gap-3">
           <View className="flex-row items-baseline justify-between">
             <Text className="text-sm font-medium text-text">Time</Text>
             <Text className="text-xs text-text-muted">
-              {eventDurationMinutes(selectedKind)} min
+              {rescheduling
+                ? Math.round(
+                    (rescheduling.end.getTime() - rescheduling.start.getTime()) / 60_000,
+                  )
+                : eventDurationMinutes(selectedKind)}{' '}
+              min
             </Text>
           </View>
 
@@ -273,6 +320,8 @@ export function BookingForm({ onDone, onOpenEditorSettings }: BookingFormProps) 
           })}
         </Section>
 
+        {rescheduling ? null : (
+        <>
         <Section className="gap-2">
           <Text className="text-sm font-medium text-text">Reminders & sync</Text>
           <View className="flex-row flex-wrap gap-2">
@@ -308,11 +357,13 @@ export function BookingForm({ onDone, onOpenEditorSettings }: BookingFormProps) 
             />
           )}
         </form.AppField>
+        </>
+        )}
 
         <View className="flex-row gap-3 border-t-2 border-border/20 pt-5">
           <Button variant="outline" title="Cancel" onPress={onDone} className="flex-1" />
           <form.AppForm>
-            <form.SubmitButton title="Add to calendar" className="flex-[2]" />
+            <form.SubmitButton title={rescheduling ? 'Reschedule' : 'Add to calendar'} className="flex-[2]" />
           </form.AppForm>
         </View>
       </View>

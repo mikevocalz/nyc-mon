@@ -13,6 +13,7 @@ export { useScheduleStore } from './features/schedule/store';
 export { MiniCalendar } from './features/schedule/MiniCalendar';
 export { BookingForm, type BookingFormProps } from './features/schedule/BookingForm';
 export { formatTimeRange } from './features/schedule/format';
+export { applyOverrides } from './features/schedule/reschedule';
 export { scheduleKindLabel } from './features/schedule/model';
 export type { ScheduleEvent, Resource } from './features/schedule/model';
 export { removeEventIntegrations } from './features/schedule/event-integrations';

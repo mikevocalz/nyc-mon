@@ -1,10 +1,12 @@
 'use client';
 import { useRouter } from '@payloadcms/ui';
-import { Banner, Button, Card, CheckRow, Checklist, ConfirmDestructive, CopyButton, DataTable, KeyValueList, MaskedValue, Pagination, SignageBand, Timestamp, type ColumnDef } from '@acme/ui/admin';
+import { useState } from 'react';
+import { Banner, Button, Card, CheckRow, Checklist, ConfirmDestructive, CopyButton, DataTable, ErrorMessage, KeyValueList, MaskedValue, Pagination, Select, SignageBand, TextField, Timestamp, type ColumnDef } from '@acme/ui/admin';
 import { Heading, Link, Paragraph, Section } from '@acme/ui/html';
-import { cancelCallerDeletion, deleteConsentRecord, removeStaff, resendConsentEmail, reveal, runIntegrityCheck, scheduleCallerDeletion } from '../api';
+import { cancelCallerDeletion, createStaff, deleteConsentRecord, removeStaff, resendConsentEmail, reveal, runIntegrityCheck, scheduleCallerDeletion } from '../api';
 import { consoleCopy, reasonOptions } from '../copy';
 import { useCallersStore, useConsentStore, useOverviewStore, useSettingsStore } from '../stores';
+import { STAFF_ROLES, type StaffRole } from '../../../collections/access/roles.ts';
 import { ConsoleShell } from '../Shell';
 
 const api = { baseUrl: '/payload-api' } as const;
@@ -35,10 +37,46 @@ type Mon = { id: string; eggId: string; species: string; caller: string; stage: 
 const monColumns: ColumnDef<Mon, unknown>[] = [{ accessorKey: 'id', header: 'Mon' }, { accessorKey: 'species', header: 'Species' }, { accessorKey: 'caller', header: 'Caller' }, { accessorKey: 'stage', header: 'Stage' }]; const eggColumns: ColumnDef<Egg, unknown>[] = [{ accessorKey: 'id', header: 'Egg' }, { accessorKey: 'species', header: 'Species' }, { accessorKey: 'caller', header: 'Caller' }, { accessorKey: 'hatched', header: 'Hatched' }];
 export function MonsViewClient({ mons, eggs, run }: { mons: Mon[]; eggs: Egg[]; run: Integrity | null }) { const router = useRouter(); return <ConsoleShell section="mons" heading={consoleCopy.mons.heading}><Banner tone="neutral" title={consoleCopy.mons.readonly} /><Heading level={2}>Mons</Heading><DataTable surface="page" caption="Mons" data={mons} columns={monColumns} getRowId={(row) => row.id} /><Heading level={2}>Eggs</Heading><DataTable surface="page" caption="Eggs" data={eggs} columns={eggColumns} getRowId={(row) => row.id} /><Heading level={2}>{consoleCopy.mons.integrity}</Heading><Checklist>{([['shared_egg', 'Mons sharing one egg', run?.sharedEgg], ['id_mismatch', "Mon ids that don't match their egg", run?.idMismatch], ['orphans', 'Hatched eggs with no Mon, or Mons whose egg isn’t hatched', run?.orphans], ['stale_ready', 'Eggs ready for more than 7 days', run?.staleReady]] as const).map(([key, label, count]) => <CheckRow key={key} label={label} result={count === undefined ? { kind: 'unavailable', reason: 'No check has run' } : count === 0 ? { kind: 'pass', count: 0 } : { kind: 'fail', count }} />)}</Checklist><Button title="Run check" onPress={async () => { const result = await runIntegrityCheck(api); if (result.ok) router.refresh(); }} /></ConsoleShell>; }
 
-export function ContentViewClient() { return <ConsoleShell section="content" heading={consoleCopy.content.heading}><Banner tone="info" title={consoleCopy.content.banner} /><Card surface="page" title="Bloodlines" description="Content records are read from the authored package at build time." /></ConsoleShell>; }
+type ContentForm = { id: string; dex: number | null; name: string | null; stage: string; culture: string | null; scale: number | null; affinity: string | null; clazz: string | null; rig: string | null; food: readonly string[] | null };
+type ContentBloodline = { id: string; name: string; forms: ContentForm[] };
+type ContentEgg = { id: string; name: string; hatches: string; bloodline: string };
+const pendingContent = () => consoleCopy.content.pending;
+const formColumns: ColumnDef<ContentForm, unknown>[] = [
+  { accessorKey: 'dex', header: consoleCopy.content.colDex, cell: ({ row }) => row.original.dex ?? pendingContent() },
+  { accessorKey: 'name', header: consoleCopy.content.colForm, cell: ({ row }) => row.original.name ?? pendingContent() },
+  { accessorKey: 'stage', header: consoleCopy.content.colStage },
+  { accessorKey: 'culture', header: consoleCopy.content.colCulture, cell: ({ row }) => row.original.culture ?? pendingContent() },
+  { accessorKey: 'scale', header: consoleCopy.content.colScale, cell: ({ row }) => row.original.scale ?? pendingContent() },
+  { accessorKey: 'affinity', header: consoleCopy.content.colAffinity, cell: ({ row }) => row.original.affinity ?? pendingContent() },
+  { accessorKey: 'clazz', header: consoleCopy.content.colClass, cell: ({ row }) => row.original.clazz ?? pendingContent() },
+  { accessorKey: 'rig', header: consoleCopy.content.colRig, cell: ({ row }) => row.original.rig ?? pendingContent() },
+  { accessorKey: 'food', header: consoleCopy.content.colFood, cell: ({ row }) => row.original.food?.join(', ') ?? pendingContent() },
+];
+const contentEggColumns: ColumnDef<ContentEgg, unknown>[] = [
+  { accessorKey: 'name', header: consoleCopy.content.colEgg },
+  { accessorKey: 'id', header: consoleCopy.content.colId },
+  { accessorKey: 'hatches', header: consoleCopy.content.colHatches },
+  { accessorKey: 'bloodline', header: consoleCopy.content.colBloodline },
+];
+export function ContentViewClient({ bloodlines, eggs, speciesCount }: { bloodlines: ContentBloodline[]; eggs: ContentEgg[]; speciesCount: number }) {
+  return <ConsoleShell section="content" heading={consoleCopy.content.heading}><Banner tone="info" title={consoleCopy.content.banner} /><Banner tone="neutral" title={consoleCopy.content.canon} /><Section className="grid gap-4 md:grid-cols-3"><Card surface="page" title={consoleCopy.content.bloodlines} description={String(bloodlines.length)} /><Card surface="page" title={consoleCopy.content.forms} description={String(speciesCount)} /><Card surface="page" title={consoleCopy.content.eggs} description={String(eggs.length)} /></Section>{bloodlines.map((bloodline) => <Section key={bloodline.id}><Heading level={2}>{bloodline.name}</Heading><DataTable surface="page" caption={bloodline.name} data={bloodline.forms} columns={formColumns} getRowId={(row) => row.id} /></Section>)}<Section><Heading level={2}>{consoleCopy.content.eggs}</Heading><DataTable surface="page" caption={consoleCopy.content.eggs} data={eggs} columns={contentEggColumns} getRowId={(row) => row.id} /></Section></ConsoleShell>;
+}
 
 type AuditRow = EventRow & { actor: string; reason: string }; const auditColumns: ColumnDef<AuditRow, unknown>[] = [{ accessorKey: 'at', header: 'When' }, { accessorKey: 'action', header: 'Action' }, { accessorKey: 'target', header: 'Target' }, { accessorKey: 'actor', header: 'Staff' }, { accessorKey: 'reason', header: 'Reason' }];
 export function AuditViewClient({ events, selectedId }: { events: AuditRow[]; selectedId: string | null }) { const selected = events.find((row) => row.id === selectedId); return <ConsoleShell section="audit" heading={consoleCopy.audit.heading}><Banner tone="neutral" title={consoleCopy.audit.rule} action={<Link href="/payload-api/console/audit/export">{consoleCopy.audit.export}</Link>} /><DataTable surface="page" caption={consoleCopy.audit.heading} data={events} columns={auditColumns} getRowId={(row) => row.id} getRowHref={(row) => `/admin/audit/${row.id}`} selectedRowId={selectedId ?? undefined} />{selected ? <KeyValueList items={[{ key: 'when', label: 'When', value: selected.at }, { key: 'who', label: 'Who', value: selected.actor }, { key: 'what', label: 'What', value: selected.action }, { key: 'why', label: 'Why', value: selected.reason }]} /> : null}</ConsoleShell>; }
 
 type Staff = { id: string; email: string; role: string }; const staffColumns: ColumnDef<Staff, unknown>[] = [{ accessorKey: 'email', header: 'Email' }, { accessorKey: 'role', header: 'Role' }];
-export function SettingsViewClient({ staff, isOps }: { staff: Staff[]; isOps: boolean }) { const router = useRouter(); const store = useSettingsStore(); const selected = staff.find((row) => row.id === store.selectedId); return <ConsoleShell section="settings" heading={consoleCopy.settings.heading}><Heading level={2}>{consoleCopy.settings.appearance}</Heading><Paragraph>Match system</Paragraph><Heading level={2}>{consoleCopy.settings.staff}</Heading><DataTable surface="page" caption={consoleCopy.settings.staff} data={staff} columns={staffColumns} getRowId={(row) => row.id} selection={isOps ? { selectedIds: store.selectedId ? [store.selectedId] : [], onSelectedIdsChange: (ids) => store.setSelectedId(ids[0] ?? null) } : undefined} />{selected && isOps ? <><Button title={consoleCopy.settings.remove} variant="danger" onPress={() => store.openDialog('remove')} /><ConfirmDestructive open={store.dialog === 'remove'} title="Remove staff access?" consequences={['This person can no longer use the console.']} confirmText={selected.id.slice(-6)} confirmLabel={consoleCopy.settings.remove} reasonOptions={reasonOptions} onClose={store.closeDialog} onConfirm={async ({ reasonCode }) => { if (!reasonCode) throw fail(); const result = await removeStaff(api, selected.id, { reasonCode }); if (!result.ok) throw fail(); store.setSelectedId(null); router.refresh(); }} /></> : null}</ConsoleShell>; }
+const staffRoleOptions = STAFF_ROLES.map((role) => ({ value: role, label: consoleCopy.roles[role] }));
+export function SettingsViewClient({ staff, isOps }: { staff: Staff[]; isOps: boolean }) {
+  const router = useRouter(); const store = useSettingsStore(); const selected = staff.find((row) => row.id === store.selectedId);
+  const [addError, setAddError] = useState<string>(); const [addPending, setAddPending] = useState(false);
+  const submitStaff = async () => {
+    setAddPending(true); setAddError(undefined);
+    try {
+      const result = await createStaff(api, { email: store.addEmail.trim(), role: store.addRole });
+      if (!result.ok) { setAddError(`${consoleCopy.errors.action} (${result.code})`); return; }
+      store.resetAddStaff(); router.refresh();
+    } finally { setAddPending(false); }
+  };
+  return <ConsoleShell section="settings" heading={consoleCopy.settings.heading}><Heading level={2}>{consoleCopy.settings.appearance}</Heading><Paragraph>Match system</Paragraph><Heading level={2}>{consoleCopy.settings.staff}</Heading><DataTable surface="page" caption={consoleCopy.settings.staff} data={staff} columns={staffColumns} getRowId={(row) => row.id} selection={isOps ? { selectedIds: store.selectedId ? [store.selectedId] : [], onSelectedIdsChange: (ids) => store.setSelectedId(ids[0] ?? null) } : undefined} />{selected && isOps ? <><Button title={consoleCopy.settings.remove} variant="danger" onPress={() => store.openDialog('remove')} /><ConfirmDestructive open={store.dialog === 'remove'} title="Remove staff access?" consequences={['This person can no longer use the console.']} confirmText={selected.id.slice(-6)} confirmLabel={consoleCopy.settings.remove} reasonOptions={reasonOptions} onClose={store.closeDialog} onConfirm={async ({ reasonCode }) => { if (!reasonCode) throw fail(); const result = await removeStaff(api, selected.id, { reasonCode }); if (!result.ok) throw fail(); store.setSelectedId(null); router.refresh(); }} /></> : null}{isOps ? <Section testID="add-staff"><Heading level={3}>{consoleCopy.settings.addStaff}</Heading><TextField label={consoleCopy.settings.addEmail} value={store.addEmail} onChangeText={store.setAddEmail} /><Select label={consoleCopy.settings.addRole} value={store.addRole} options={staffRoleOptions} onValueChange={(role) => store.setAddRole(role as StaffRole)} />{addError ? <ErrorMessage message={addError} /> : null}<Button title={consoleCopy.settings.addStaff} loading={addPending} onPress={() => void submitStaff()} /></Section> : null}</ConsoleShell>;
+}

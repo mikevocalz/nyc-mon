@@ -122,7 +122,16 @@ export const afterMonChange: CollectionAfterChangeHook = async ({ doc, operation
  */
 export const MonInstances: CollectionConfig = {
   slug: MON_INSTANCES_SLUG,
-  admin: { hidden: true, useAsTitle: 'monInstanceId' },
+  admin: {
+    hidden: true,
+    useAsTitle: 'monInstanceId',
+    components: {
+      views: {
+        list: { Component: { path: './admin/console/Redirects#CollectionRedirect', clientProps: { to: '/admin/mons' } } },
+        edit: { root: { Component: { path: './admin/console/Redirects#CollectionRedirect', clientProps: { to: '/admin/mons' } } } },
+      },
+    },
+  },
   access: {
     read: staffRoles(MON_READERS),
     create: nobody,

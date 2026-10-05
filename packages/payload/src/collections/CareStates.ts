@@ -88,7 +88,16 @@ export const validateCareState: CollectionBeforeChangeHook = async ({ data, oper
  */
 export const CareStates: CollectionConfig = {
   slug: CARE_STATES_SLUG,
-  admin: { hidden: true, useAsTitle: 'monInstanceId' },
+  admin: {
+    hidden: true,
+    useAsTitle: 'monInstanceId',
+    components: {
+      views: {
+        list: { Component: { path: './admin/console/Redirects#CollectionRedirect', clientProps: { to: '/admin/overview' } } },
+        edit: { root: { Component: { path: './admin/console/Redirects#CollectionRedirect', clientProps: { to: '/admin/overview' } } } },
+      },
+    },
+  },
   access: {
     read: staffRoles(CARE_READERS),
     create: nobody,

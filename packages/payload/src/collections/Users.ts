@@ -44,7 +44,17 @@ export const Users: CollectionConfig = {
     disableLocalStrategy: true,
     strategies: [betterAuthStrategy()],
   },
-  admin: { useAsTitle: 'email' },
+  admin: {
+    useAsTitle: 'email',
+    components: {
+      views: {
+        // Stock list and document views bounce to the console's Callers view;
+        // document views carry the record id across as the caller deep-link.
+        list: { Component: { path: './admin/console/Redirects#CollectionRedirect', clientProps: { to: '/admin/callers' } } },
+        edit: { root: { Component: { path: './admin/console/Redirects#CollectionRedirect', clientProps: { to: '/admin/callers' } } } },
+      },
+    },
+  },
   access: {
     // Accounts are created by Better Auth through the adapter (overrideAccess);
     // nobody creates one over REST. This is what lets `firstUserAdmin` stay off

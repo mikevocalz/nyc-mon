@@ -31,7 +31,8 @@ Read-only survey of `packages/app/features/schedule` and the routes that mount i
 | Pick a date in MiniCalendar | `_layout.tsx:254-260` | mobile split | Writes `selectedDate` / `visibleMonth`. The grid does not read either (see Known bugs) |
 | Search staff | `_layout.tsx:266-270` | mobile split | Debounced filter of the Studio list |
 | Swipe a staff row | `_layout.tsx:290-304` | mobile split | Toggles the instructor out of `resourceFilter`, which hides their grid column |
-| Event menu (Duplicate, Reschedule, Delete) | `_layout.tsx:46-50, 347-353` | mobile split | Only Delete does anything, and it only deselects |
+| Event menu (Duplicate, Reschedule, Delete) | `_layout.tsx:50-56, 171-180, 397-412` | mobile split | All three work. Duplicate calls `duplicateEvent` — a `createdEvents` copy with a new id and a " (copy)" title, then selects the copy. Reschedule calls `openReschedule`, reopening `BookingSheet` prefilled; submit writes a `moveEvent` override (start/end/resource only — duration, title and kind are preserved). Delete removes the event and its calendar/notification integrations |
+| Event actions on compact | `_layout.tsx:205-215, 450-459` | mobile split | Whenever the inspector cannot be on screen (compact always, medium width, a hidden-inspector override), an "Event actions" button in the screen header opens `EventActionsSheet`, which runs the same three actions |
 | New booking | `BookingForm.tsx` in `BookingSheet` | mobile | Title (required), instructor chips, available start-time chips grouped Morning/Afternoon, rich-text notes, Cancel / Create |
 | Notes with images | `NotesEditor.tsx`, `pick-note-image.*` | all | `react-native-enriched-html` editor (Fabric native, Tiptap web). Toolbar comes from `features/editor` and supports image, file, link/YouTube, audio recording, undo/redo. Images come from `expo-image-picker` on native and a hidden `<input type=file>` on web. Audio links render as `AudioPlayer`s under the field |
 | Compact slot booking | `BookingSurface.tsx:92-125` | phone | Selecting a slot stores its ISO time in `selectedEventId`; "Book appointment" calls `onBook`, which selects the slot again (`screen.tsx:23-27`). No booking is created |
@@ -107,8 +108,9 @@ One global zustand store, `useScheduleStore`, created with plain `create()`. **N
 | `hourHeight` | px per hour, steps `[48, 64, 88, 120]` | nothing (no zoom UI) | `ScheduleGrid` |
 | `selectedDate` | ISO date | `BookingSurface:58`, MiniCalendar in `_layout.tsx:258` | `BookingSurface`, `_layout` only |
 | `visibleMonth` | ISO month | MiniCalendar | `_layout` |
-| `overrides` | moved/created events keyed by id | `moveEvent` from grid and form | `ScheduleGrid` via `applyOverrides` |
-| `bookingOpen` | sheet presented | `openBooking`/`closeBooking` | `BookingSheet` |
+| `overrides` | moved events keyed by id | `moveEvent` from grid and the reschedule-mode form | `ScheduleGrid`, `_layout` selection lookup and `BookingForm` via `applyOverrides` |
+| `bookingOpen` | sheet presented | `openBooking`/`openReschedule`/`closeBooking` | `BookingSheet` |
+| `rescheduleEventId` | event the sheet reschedules; null = new booking | `openReschedule`, cleared by `openBooking`/`closeBooking` | `BookingSheet` (title + form remount), `BookingForm` (prefill, `moveEvent` submit) |
 
 Unused actions: `setHourHeight`, `clearMoves`. The `loading` prop on `Schedule` is never passed, so `LoadingSkeleton` never shows.
 
@@ -203,7 +205,7 @@ Both stay pressable, so they are held to text contrast, not exempted as disabled
 | Touch targets | Week strip day cells are `h-9 w-9` (36 dp, `BookingSurface.tsx:65`); calendar day squares are `h-7 w-7` (28 dp) inside a `flex-1` cell, so the pressable height is about 32 dp (`MiniCalendar.tsx:89-97`). Both are below 44 dp |
 | Short events | 15-min "Check-in" is clamped to 24 px tall with one line of text (`geometry.ts:31`); a 24 px drag target |
 | Hidden staff rows | Shown with `opacity-40` plus a "Hidden" text label (`_layout.tsx:307-322`), so state is not colour/opacity alone |
-| Event actions trigger | A non-pressable `View` with `aria-label` inside `Menu` (`_layout.tsx:358-363`); whether the label reaches the native menu's own Pressable was not verified |
+| Event actions trigger | A non-pressable `View` with `aria-label` inside `Menu` (`_layout.tsx:401-411`); whether the label reaches the native menu's own Pressable was not verified. Where the inspector can't open, a labelled "Event actions" `Pressable` in the screen header opens the sheet (`_layout.tsx:205-215`) |
 
 No on-device screen-reader pass was run for this map.
 
@@ -217,7 +219,7 @@ Found by reading code; none were reproduced on a device for this map.
 4. **Compact day strip is cosmetic.** Selecting a day highlights it, but slots always come from `day.dayStart` and `day.events` (`BookingSurface.tsx:37-43`). A date picked in MiniCalendar is stored at local midnight while strip days carry 8:00, so the ISO compare at `BookingSurface.tsx:53` never matches and no day appears selected.
 5. **Slot selection reuses `selectedEventId`.** Slot ISO strings go into the event-id field (`screen.tsx:26`, `BookingSurface.tsx:95`, `BookingForm.tsx:67`). The inspector lookup by id fails for these, so it stays closed, and "Book appointment" on a phone only re-selects the slot.
 6. **Drag is vertical only.** `rescheduleByOffset` accepts `resourceId` for cross-column moves, and a test covers it (`schedule.test.ts:279`), but `ScheduleGrid.tsx:139-150` never passes it and the pan has no X handling.
-7. **Event actions are stubs.** Duplicate and Reschedule do nothing; Delete only deselects (`_layout.tsx:350-352, 404-406`). On compact width the `EventActionsSheet` can never open: nothing calls `setActionsOpen(true)`.
+7. ~~Event actions are stubs.~~ **Fixed.** Duplicate, Reschedule and Delete all act: `runEventAction` (`_layout.tsx:171-180`) backs both the inspector's anchored `Menu` and the compact `EventActionsSheet`. Duplicate goes through a new `duplicateEvent` store action that persists a "(copy)" event and selects it. Reschedule reopens the booking sheet via `openReschedule`; `BookingForm` enters a reschedule mode (Mon + time chips only) that writes a `moveEvent` override, preserving id, title, kind and duration. On compact — and anywhere else the inspector can't open — an "Event actions" header button calls `setActionsOpen(true)`.
 8. **Moves and filters do not survive reload.** The store has no persistence (section 3), and `clearMoves` has no UI, so there is no undo for a drag either.
 9. **Web "New booking" is dead.** No `onNewBooking` is passed on `/schedule`, so the button calls `selectEvent(null)` (`screen.tsx:34`). Web has no booking sheet.
 10. **Fixture times assume the host is in New York.** `buildDemoDay` sets 8:00 with `startOfDay` in the host zone (`fixtures.ts:25`), but the grid draws in `America/New_York`. On a device in another zone the events shift on the grid and can fall outside 8-20.
