@@ -142,7 +142,7 @@ export function accountsMergedMail(movedMons: number): MailContent {
 export function guardianConsentMail(consentId: number, days: number, baseURL: string): MailContent {
   const yesUrl = `${baseURL}/guardian-consent/${consentId}?decision=approve`;
   const noUrl = `${baseURL}/guardian-consent/${consentId}?decision=deny`;
-  const noticeUrl = `${baseURL}/childrens-privacy`;
+  const noticeUrl = `${baseURL}/legal/childrens-privacy`;
   return render({
     subject: 'Your child asked to set up an NYC-MON account',
     paragraphs: [

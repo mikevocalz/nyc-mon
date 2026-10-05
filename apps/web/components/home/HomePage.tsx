@@ -1,4 +1,5 @@
-import { Main } from '@acme/ui/html';
+
+import { View } from '@acme/ui/tw';
 import { CareSection } from './CareSection';
 import { DistrictDivider } from './DistrictDivider';
 import { HatchBand } from './HatchBand';
@@ -11,7 +12,7 @@ import { StartersSection, starterCards } from './StartersSection';
 export function HomePage() {
   const cards = starterCards();
   return (
-    <Main className="w-full flex-1 bg-bg">
+    <View className="w-full flex-1 bg-bg">
       <HomeHero starters={cards.map((c) => c.babyName)} />
       <MarqueeBand />
       <DistrictDivider seed={3} />
@@ -20,6 +21,6 @@ export function HomePage() {
       <DistrictDivider seed={11} />
       <CareSection />
       <HatchBand />
-    </Main>
+    </View>
   );
 }

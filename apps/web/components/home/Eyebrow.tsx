@@ -8,7 +8,7 @@ export function Eyebrow({ children, night = false }: { children: string; night?:
   return (
     <View className="flex-row items-center gap-3" aria-hidden>
       <View className="h-0.5 w-8 bg-orange" />
-      <Text className={`text-xs font-extrabold uppercase tracking-[0.24em] ${night ? 'text-orange' : 'text-royal'}`}>
+      <Text className={`text-xs font-extrabold uppercase tracking-[0.24em] ${night ? 'text-orange-500' : 'text-royal-500'}`}>
         {children}
       </Text>
     </View>

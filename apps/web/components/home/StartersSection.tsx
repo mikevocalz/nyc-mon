@@ -6,7 +6,7 @@ import { Eyebrow } from './Eyebrow';
 import { W01_COPY } from './copy';
 
 /** Bloodline accent bars, one brand colour per starter slot. */
-const CARD_ACCENTS = ['bg-orange', 'bg-royal', 'bg-leaf'] as const;
+const CARD_ACCENTS = ['bg-orange-500', 'bg-royal-500', 'bg-leaf-500'] as const;
 
 export interface StarterCard {
   key: string;
