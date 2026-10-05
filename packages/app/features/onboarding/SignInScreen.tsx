@@ -2,9 +2,19 @@
 
 import { useEffect, useState } from 'react';
 import type { AuthError } from '@acme/auth';
-import { Button, Container, ErrorMessage, Heading, KeyboardAwareScroll, Text, TextField } from '@acme/ui';
+import {
+  AuthProviderButton,
+  Button,
+  Container,
+  ErrorMessage,
+  Heading,
+  KeyboardAwareScroll,
+  Text,
+  TextField,
+} from '@acme/ui';
+import { Fingerprint, Mail } from '@acme/ui/icons';
 import { Form } from '@acme/ui/primitives';
-import { View } from '@acme/ui/tw';
+import { Pressable, View } from '@acme/ui/tw';
 import { auth, isPasskeySupported } from './auth';
 import { copy, type OnboardingCopyId } from './copy';
 import { useOnboarding } from './onboarding.store';
@@ -47,7 +57,7 @@ function errorCopyId(error: AuthError): OnboardingCopyId | undefined {
  * shown raw, and a cancelled provider sheet shows nothing.
  */
 export function SignInScreen() {
-  const { intent, ageGatePath, homePath, replace } = useSignInNav();
+  const { intent, ageGatePath, homePath, signInPath, legalLinks, openLink, replace } = useSignInNav();
   const ageAnswer = useOnboarding((s) => s.ageAnswer);
   const setSession = useOnboarding((s) => s.setSession);
 
@@ -55,6 +65,7 @@ export function SignInScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [pendingCopy, setPendingCopy] = useState<string | undefined>();
+  const [pendingKind, setPendingKind] = useState<'email' | 'passkey' | undefined>();
   const [error, setError] = useState<string | undefined>();
   const [resent, setResent] = useState(false);
   const pending = pendingCopy !== undefined;
@@ -65,6 +76,7 @@ export function SignInScreen() {
 
   const fail = (raw: AuthError) => {
     setPendingCopy(undefined);
+    setPendingKind(undefined);
     // GUARDIAN_CONSENT_REQUIRED / INVALID_BIRTH_YEAR must never surface their
     // server text (m03.error.needs_age): route back to the gate silently.
     if (raw.code === 'GUARDIAN_CONSENT_REQUIRED' || raw.code === 'INVALID_BIRTH_YEAR') {
@@ -76,6 +88,7 @@ export function SignInScreen() {
 
   const signIn = async (kind: 'email' | 'passkey') => {
     setError(undefined);
+    setPendingKind(kind);
     setPendingCopy(copy(kind === 'passkey' ? 'm03.provider.passkey.loading' : 'm03.email.loading'));
     const result =
       kind === 'passkey'
@@ -101,6 +114,7 @@ export function SignInScreen() {
       }
       if (ageAnswer === undefined) return; // redirect is in flight
       setError(undefined);
+      setPendingKind('email');
       setPendingCopy(copy('m03.email.loading.create'));
       const result = await auth().signUp({
         email,
@@ -109,6 +123,7 @@ export function SignInScreen() {
         birthYear: ageAnswer.birthYear,
       });
       setPendingCopy(undefined);
+      setPendingKind(undefined);
       if (!result.ok) {
         fail(result.error);
         return;
@@ -152,7 +167,19 @@ export function SignInScreen() {
           <View className="gap-2">
             <Heading level={1} size="title">{title}</Heading>
             {mode === 'providers' || mode === 'email' ? (
-              <Text>{copy(intent === 'create' ? 'm03.subtitle.create' : 'm03.subtitle.sign_in')}</Text>
+              <>
+                <Text>{copy(intent === 'create' ? 'm03.subtitle.create' : 'm03.subtitle.sign_in')}</Text>
+                <View className="self-start">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    tone="royal"
+                    title={copy(intent === 'create' ? 'm03.switch.to_sign_in' : 'm03.switch.to_create')}
+                    disabled={pending}
+                    onPress={() => replace(intent === 'create' ? signInPath : ageGatePath)}
+                  />
+                </View>
+              </>
             ) : null}
           </View>
           {error !== undefined ? <ErrorMessage message={error} /> : null}
@@ -199,22 +226,23 @@ export function SignInScreen() {
               />
             </View>
           ) : (
-            <View className="gap-6">
+            <View className="gap-3">
               {intent === 'sign_in' && isPasskeySupported() ? (
-                <Button
-                  variant="outline"
-                  size="lg"
-                  fullWidth
-                  title={copy('m03.provider.passkey.label.sign_in')}
+                <AuthProviderButton
+                  provider="passkey"
+                  intent="sign-in"
+                  label={copy('m03.provider.passkey.label.sign_in')}
+                  icon={<Fingerprint className="size-5 text-text" />}
+                  loading={pending && pendingKind === 'passkey'}
                   disabled={pending}
                   onPress={() => void signIn('passkey')}
                 />
               ) : null}
-              <Button
-                variant={mode === 'email' ? 'ghost' : 'cta'}
-                size="lg"
-                fullWidth
-                title={copy('m03.provider.email.label')}
+              <AuthProviderButton
+                provider="email"
+                intent={intent === 'create' ? 'create' : 'sign-in'}
+                label={copy('m03.provider.email.label')}
+                icon={<Mail className="size-5 text-text" />}
                 disabled={pending || mode === 'email'}
                 onPress={() => {
                   setMode('email');
@@ -269,6 +297,29 @@ export function SignInScreen() {
               ) : null}
             </View>
           )}
+
+          {legalLinks.length > 0 ? (
+            <View className="flex-row items-center justify-center gap-x-1">
+              {legalLinks.map((link, i) => (
+                <View key={link.id} className="flex-row items-center gap-x-1">
+                  {i > 0 ? (
+                    <Text variant="caption" className="text-text-muted" aria-hidden>
+                      {'·'}
+                    </Text>
+                  ) : null}
+                  <Pressable
+                    onPress={() => openLink(link.href)}
+                    className="px-2 py-1"
+                    role="link"
+                  >
+                    <Text variant="caption" className="text-royal-600 underline">
+                      {copy(`m03.legal.${link.id}` as OnboardingCopyId)}
+                    </Text>
+                  </Pressable>
+                </View>
+              ))}
+            </View>
+          ) : null}
         </Form>
       </Container>
     </KeyboardAwareScroll>

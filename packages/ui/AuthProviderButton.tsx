@@ -57,6 +57,8 @@ export interface AuthProviderButtonProps {
   supported?: boolean;
   /** Optional brand- or product-supplied mark shown by {@linkcode AuthProviderButton}. */
   icon?: ReactNode;
+  /** Copy-deck label override; when unset the built-in provider wording is used. */
+  label?: string;
   /** Called when an enabled {@linkcode AuthProviderButton} is pressed. */
   onPress: () => void;
 }
@@ -72,13 +74,14 @@ export function AuthProviderButton({
   disabled = false,
   supported = true,
   icon,
+  label: labelProp,
   onPress,
 }: AuthProviderButtonProps) {
   if (!supported) return null;
 
   const off = disabled || loading;
   const styles = providerButton({ provider, disabled: off });
-  const label = AUTH_PROVIDER_LABELS[provider][intent];
+  const label = labelProp ?? AUTH_PROVIDER_LABELS[provider][intent];
 
   // TODO(assets): add packages/assets/apple-logo.svg and packages/assets/google-g-logo.svg;
   // until those brand-supplied files exist, Apple and Google intentionally remain text-only.

@@ -99,3 +99,6 @@ export const Pause = icon(L.Pause as React.ComponentType<object>, 'Pause');
 export const Plus = icon(L.Plus as React.ComponentType<object>, 'Plus');
 export const EyeOff = icon(L.EyeOff as React.ComponentType<object>, 'EyeOff');
 export const Minus = icon(L.Minus as React.ComponentType<object>, 'Minus');
+export const Mail = icon(L.Mail as React.ComponentType<object>, 'Mail');
+export const KeyRound = icon(L.KeyRound as React.ComponentType<object>, 'KeyRound');
+export const Fingerprint = icon(L.Fingerprint as React.ComponentType<object>, 'Fingerprint');
