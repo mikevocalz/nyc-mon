@@ -174,7 +174,6 @@ catalog:
 
   # backend / cms
   payload: 4.0.0-canary.37
-  "@payloadcms/plugin-cloud-storage": 4.0.0-canary.37
   "@payloadcms/db-postgres": 4.0.0-canary.37
   "@payloadcms/next": 4.0.0-canary.37
   "@payloadcms/ui": 4.0.0-canary.37
