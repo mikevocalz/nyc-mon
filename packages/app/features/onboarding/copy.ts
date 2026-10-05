@@ -1,8 +1,71 @@
 // Screen copy for M01–M07, keyed by docs/COPY_DECK.md ids and drafted in
 // docs/design/screens/Mxx/05-copy.md. Change a string there first, then here.
+// Shared namespaces: `m23.*` (the hatch notification, defined in M06),
+// `m11.*` (M11 status rows M06 triggers), `mail.*` (server email), `inbox.*`
+// (the notifications tab).
 
 export const ONBOARDING_COPY = {
   'm01.a11y.power_on': 'H-Lynk on',
+
+  // M06 — notification permission sheet over M10 (screens/M06/05-copy.md)
+  'm06.preview.app_name': 'NYC-MON',
+  'm06.preview.time': 'now',
+  'm06.preview.a11y.label': 'Example notification from NYC-MON: Your egg is ready to hatch.',
+  'm06.title': 'One notification when your egg is ready',
+  'm06.body.15': "That's in about 15 minutes. It's the only one we send, and your egg waits for you either way.",
+  'm06.body.30': "That's in about 30 minutes. It's the only one we send, and your egg waits for you either way.",
+  'm06.body.60': "That's in about an hour. It's the only one we send, and your egg waits for you either way.",
+  'm06.cta.allow': 'Turn on notifications',
+  'm06.cta.later': 'Not now',
+  'm06.grabber.a11y.label': 'Close',
+  'm06.granted.a11y.announce': 'Notifications on.',
+
+  // M23 — the one notification per egg, ever (screens/M06/05-copy.md)
+  'm23.notification.title': 'Your egg is ready to hatch',
+  'm23.notification.body': "Open NYC-MON whenever you're ready.",
+
+  // M11 status rows that M06 triggers (screens/M06/05-copy.md)
+  'm11.status.notify_off': 'Notifications are off. Open the app to check on your egg.',
+  'm11.status.notify_off.action.ask': 'Turn on',
+  'm11.status.notify_off.action.settings': 'Open Settings',
+  'm11.status.notify_off.action.settings.a11y.hint': "Opens NYC-MON in your phone's Settings",
+  'm11.status.schedule_failed': "We couldn't set the notification. Open the app to check on your egg.",
+
+  // The notifications tab (drawer + site). NYC-MON sends one notification
+  // per egg, so the honest inbox is empty until the first egg is ready.
+  'inbox.title': 'Notifications',
+  'inbox.unread': '{count} unread',
+  'inbox.mark_all_read': 'Mark all read',
+  'inbox.today': 'Today',
+  'inbox.earlier': 'Earlier',
+  'inbox.empty.title': 'Nothing yet',
+  'inbox.empty.body': 'When your egg is ready, it shows up here.',
+
+  'm02.carousel.label': 'Welcome',
+  'm02.skip': 'Skip',
+  'm02.skip.a11y.hint': 'Goes to the last page',
+  'm02.next': 'Next',
+  'm02.prev.a11y.label': 'Previous',
+  'm02.next.a11y.label': 'Next',
+  'm02.progress.a11y': 'Page {n} of 3',
+  'm02.p1.title': 'Mons live in New York, on the same blocks as you.',
+  'm02.p1.body': "They showed up less than ten years ago. The city's still figuring them out.",
+  'm02.p1.image.alt': 'A Harlem street of brownstones with stoops out front.',
+  'm02.p2.title': 'Three eggs. One of them hatches for you.',
+  'm02.p2.body': "Each comes from a Bloodline. Whoever's inside is their own person.",
+  'm02.p2.caption.f01': 'Hood Ratti Bloodline',
+  'm02.p2.caption.f02': 'Bodega Baddiee Cee Bloodline',
+  'm02.p2.caption.f12': 'Yote Bloodline',
+  'm02.p2.image.alt': 'Three eggs side by side: Metro Egg, Hood Ratti Bloodline. Corner Egg, Bodega Baddiee Cee Bloodline. Prism Egg, Yote Bloodline.',
+  'm02.p3.title': "You'd be their Caller.",
+  'm02.p3.body.a': "A Caller is a Mon's partner. Mons think for themselves, and they can say no.",
+  'm02.p3.body.b': "Scanning isn't recruiting. A Mon decides who it partners with.",
+  'm02.p3.image.alt': 'The H-Lynk: a red handheld with a black scanner along the top.',
+  'm02.p3.cta.primary': 'Get started',
+  'm02.p3.cta.primary.a11y.hint': 'Sets up a new account',
+  'm02.p3.cta.secondary': 'Already a Caller? Sign in',
+  'm02.p3.cta.secondary.a11y.hint': 'For players who already have an account',
+  'm02.status.offline': "You're offline. You won't need a connection until you sign in.",
 
   'm04.title': 'What year were you born?',
   'm04.why': 'We ask everyone this once.',

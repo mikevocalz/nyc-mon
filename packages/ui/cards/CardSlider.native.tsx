@@ -46,7 +46,7 @@ export function CardSlider({
   buttonPosition = 'sides', prevButtonCorner = 'bottom-left', nextButtonCorner = 'bottom-right',
   autoPlay = false, autoPlayInterval = 3000, showEdgeFades = false, edgeFadeColor,
   showCornerAccents = false, cornerAccentStyle = 'frame', scanLines = false, viewportClassName,
-  variant = 'uncontained', snap = true, itemCut = 0, onIndexChange,
+  variant = 'uncontained', snap = true, itemCut = 0, index: indexProp, onIndexChange,
 }: CardSliderNativeProps) {
   const slides = slidesOf(children);
   const { size, onLayout } = useLayoutSize({ width: 0, height: 0 });
@@ -55,15 +55,18 @@ export function CardSlider({
   const reduced = useReducedMotion();
   // playing: autoplay not paused by the user. Starts paused under reduced motion.
   const store = useInstanceStore(() => ({ index: 0, playing: !reduced }));
-  const index = Math.min(useStore(store, (s) => s.index), layout.maxIndex);
+  const controlled = indexProp !== undefined;
+  const storeIndex = useStore(store, (s) => s.index);
+  const index = Math.min(controlled ? indexProp : storeIndex, layout.maxIndex);
   const playing = useStore(store, (s) => s.playing);
   const resolved = sliderTone(tone, district);
   const paged = layout.maxIndex > 0;
   const sides = showButtons && paged && buttonPosition === 'sides';
 
   const go = (next: number) => {
-    if (next === store.getState().index) return;
-    store.setState({ index: next });
+    if (next === index) return;
+    // Controlled: report the request — the track scrolls when the prop updates.
+    if (!controlled) store.setState({ index: next });
     onIndexChange?.(next);
   };
 
@@ -72,7 +75,7 @@ export function CardSlider({
     interval: autoPlayInterval,
     enabled: playing,
     held: false,
-    getIndex: () => store.getState().index,
+    getIndex: () => (controlled ? (indexProp ?? 0) : store.getState().index),
     maxIndex: layout.maxIndex,
     loop,
     step: go,

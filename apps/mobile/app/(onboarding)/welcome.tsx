@@ -1,11 +1,8 @@
-import { Redirect } from 'expo-router';
+import { WelcomeScreen } from '@acme/app/features/onboarding/WelcomeScreen.tsx';
 
 /**
- * M02 welcome carousel is flagged off (B4: panel-2 egg captures are
- * `TODO(canon)`; placeholder art cannot ship). The route exists so the M01
- * first-run mapping stays spec-shaped; until the flag flips it forwards to
- * the same destination `bootPath` picks.
+ * M02 welcome carousel (three panels: the block, the three eggs, the Caller).
+ * Panel 2 ships canon-safe unmarked egg art — Q11's "no colours or markings"
+ * is the only approved look until 3d-lookdev's captures land (TODO(canon)).
  */
-export default function WelcomeRoute() {
-  return <Redirect href="/(auth)/age" />;
-}
+export default WelcomeScreen;

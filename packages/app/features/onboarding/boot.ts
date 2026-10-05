@@ -7,13 +7,12 @@ import { readAgeAnswer, readSessionFlag, SAVE_KEY } from './onboarding.store';
 import { saveStorage } from './storage';
 
 /**
- * M02 is flagged off: panel 2's egg captures are `TODO(canon)` (B4 in the
- * M02 handoff) and placeholder art cannot ship. While the flag is off,
- * `first-run` boots straight into the M04 age gate — the route the welcome
- * carousel's only required action takes anyway. Flip to `true` the day the
- * captures land and `/(onboarding)/welcome` is built.
+ * M02 ships with canon-safe art: the real egg captures are still pending
+ * (TODO(canon), B4 in the M02 handoff), so panel 2 draws unmarked egg
+ * silhouettes — Q11's only approved look is "no colours or markings" — and
+ * the captures swap in later without a layout change.
  */
-export const WELCOME_ROUTE_ENABLED = false;
+export const WELCOME_ROUTE_ENABLED = true;
 
 /** The app's shell destination while the M-screens it would deepen to (M08+) don't exist yet. */
 export const APP_HOME_PATH = '/home' as const;

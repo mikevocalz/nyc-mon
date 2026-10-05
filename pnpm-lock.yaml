@@ -1044,6 +1044,9 @@ importers:
       '@acme/auth':
         specifier: workspace:*
         version: link:../auth
+      '@acme/content':
+        specifier: workspace:*
+        version: link:../content
       '@acme/core':
         specifier: workspace:*
         version: link:../core
@@ -1255,6 +1258,31 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 5.0.3(@types/node@26.6.4)(@vitest/browser-playwright@5.0.3)(@vitest/coverage-v8@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.2(@types/node@26.6.4)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.77.4)(terser@5.46.0)(tsx@4.22.4)(yaml@2.8.2))
+
+  packages/mcp-server:
+    dependencies:
+      '@acme/core':
+        specifier: workspace:*
+        version: link:../core
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.5
+    devDependencies:
+      '@acme/config':
+        specifier: workspace:*
+        version: link:../config
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.4
+      eslint:
+        specifier: 'catalog:'
+        version: 9.39.5(jiti@2.7.0)(supports-color@8.1.1)
+      eslint-config-expo:
+        specifier: 'catalog:'
+        version: 58.0.4(eslint@9.39.5(jiti@2.7.0)(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
 
   packages/payload:
     dependencies:
