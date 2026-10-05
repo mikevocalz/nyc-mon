@@ -8,13 +8,11 @@ import {
 } from '@delmaredigital/payload-better-auth';
 import { betterAuth } from 'better-auth';
 import { buildConfig } from 'payload';
-import { cloudStoragePlugin } from '@payloadcms/plugin-cloud-storage';
 import sharp from 'sharp';
 import { AUTH_BASE_PATH, PAYLOAD_API_ROUTE, PAYLOAD_ORIGINS, betterAuthOptions } from './auth/options';
 import { adminComponents } from './admin/components';
 import { Users } from './collections/Users';
 import { Media } from './collections/Media';
-import { bunnyStorage } from './storage/bunnyStorage';
 import { AuditEvents } from './collections/AuditEvents';
 import { CareStates } from './collections/CareStates';
 import { Eggs } from './collections/Eggs';
@@ -48,16 +46,6 @@ export default buildConfig({
   },
   collections: [Users, Media, GuardianConsents, Eggs, MonInstances, CareStates, AuditEvents, IntegrityRuns],
   plugins: [
-    cloudStoragePlugin({
-      enabled: bunnyConfigured,
-      collections: {
-        [Media.slug]: {
-          adapter: bunnyStorage({
-            zone: process.env.BUNNY_STORAGE_ZONE || '',
-            accessKey: process.env.BUNNY_STORAGE_PASSWORD || '',
-            cdnUrl: process.env.BUNNY_CDN_URL || '',
-            region: process.env.BUNNY_STORAGE_REGION || 'ny',
-          }),
           disableLocalStorage: true,
           disablePayloadAccessControl: true,
         },
