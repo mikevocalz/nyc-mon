@@ -1,5 +1,6 @@
 import { Heading, Paragraph, Section } from '@acme/ui/html';
 import { View } from '@acme/ui/tw';
+import { Eyebrow } from './Eyebrow';
 import { W01_COPY } from './copy';
 
 /**
@@ -13,6 +14,7 @@ export function HatchBand() {
     <Section aria-labelledby="w01-hatch-title" data-testid="w01-hatch" className="w-full bg-ink-950">
       <View className="h-1 w-full bg-orange-500" aria-hidden />
       <View className="mx-auto w-full max-w-screen-xl gap-5 px-4 py-20 sm:px-6 md:py-28 lg:px-8">
+        <Eyebrow night>{copy.eyebrow}</Eyebrow>
         <Heading level={2} id="w01-hatch-title" className="my-0 max-w-3xl font-display text-4xl leading-tight text-orange-500 md:text-5xl">
           {copy.title}
         </Heading>

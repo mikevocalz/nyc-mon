@@ -6,6 +6,7 @@ import { Fieldset, Heading, Legend, List, ListItem, Paragraph } from '@acme/ui/h
 import { View } from '@acme/ui/tw';
 import { useDistrictStore } from '@acme/spatial';
 import { DISTRICT_COPY, DISTRICTS } from '@acme/spatial/copy';
+import { Eyebrow } from './Eyebrow';
 import { W01_COPY } from './copy';
 
 const DISTRICT_OPTIONS = DISTRICTS.map((value) => ({ value, label: DISTRICT_COPY[value].name }));
@@ -56,6 +57,7 @@ export function HomeHero({ starters }: HomeHeroProps) {
 
         <View className="w-full min-w-0 md:order-1 md:flex-[7_1_0%]">
           <SolidPanel surface="page" depth="lg" className="gap-6 px-5 py-7 md:px-8 md:py-9">
+            <Eyebrow>{copy.eyebrow}</Eyebrow>
             <Heading
               level={1}
               className="my-0 font-display text-[2.5rem] uppercase leading-[0.98] tracking-tight text-text sm:text-5xl lg:text-6xl"
