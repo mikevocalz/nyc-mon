@@ -22,8 +22,10 @@ export const isActive = (pathname: string, href: string) =>
 export const navItems = (pathname: string): NavItem[] =>
   PAGES.map((page) => ({ ...page, active: isActive(pathname, page.href) }));
 
-/** Spatial draws its own full-bleed city; the site header and footer stay off it. */
-export const showsSiteChrome = (pathname: string) => !pathname.startsWith('/spatial');
+/** Routes that draw no site header/footer: spatial's full-bleed city, and the auth screens' own chrome. */
+const CHROMELESS = ['/spatial', '/sign-in'];
+export const showsSiteChrome = (pathname: string) =>
+  !CHROMELESS.some((route) => pathname.startsWith(route));
 
 export const FOOTER_DESCRIPTION = HOME_COPY.intro;
 
