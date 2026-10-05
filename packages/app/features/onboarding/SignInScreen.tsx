@@ -1,17 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useLocalSearchParams, useRouter } from 'expo-router';
 import type { AuthError } from '@acme/auth';
 import { Button, Container, ErrorMessage, Heading, KeyboardAwareScroll, Text, TextField } from '@acme/ui';
 import { Form } from '@acme/ui/primitives';
 import { View } from '@acme/ui/tw';
 import { auth, isPasskeySupported } from './auth';
-import { APP_HOME_PATH } from './boot';
 import { copy, type OnboardingCopyId } from './copy';
 import { useOnboarding } from './onboarding.store';
+import { useSignInNav } from './sign-in-nav';
 
-type Intent = 'create' | 'sign_in';
 type Mode = 'providers' | 'email' | 'verify' | 'reset' | 'reset_sent';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -49,9 +47,7 @@ function errorCopyId(error: AuthError): OnboardingCopyId | undefined {
  * shown raw, and a cancelled provider sheet shows nothing.
  */
 export function SignInScreen() {
-  const router = useRouter();
-  const params = useLocalSearchParams<{ intent?: string }>();
-  const intent: Intent = params.intent === 'sign_in' ? 'sign_in' : 'create';
+  const { intent, ageGatePath, homePath, replace } = useSignInNav();
   const ageAnswer = useOnboarding((s) => s.ageAnswer);
   const setSession = useOnboarding((s) => s.setSession);
 
@@ -64,15 +60,15 @@ export function SignInScreen() {
   const pending = pendingCopy !== undefined;
 
   useEffect(() => {
-    if (intent === 'create' && ageAnswer === undefined) router.replace('/(auth)/age');
-  }, [intent, ageAnswer, router]);
+    if (intent === 'create' && ageAnswer === undefined) replace(ageGatePath);
+  }, [intent, ageAnswer, replace, ageGatePath]);
 
   const fail = (raw: AuthError) => {
     setPendingCopy(undefined);
     // GUARDIAN_CONSENT_REQUIRED / INVALID_BIRTH_YEAR must never surface their
     // server text (m03.error.needs_age): route back to the gate silently.
     if (raw.code === 'GUARDIAN_CONSENT_REQUIRED' || raw.code === 'INVALID_BIRTH_YEAR') {
-      router.replace('/(auth)/age');
+      replace(ageGatePath);
       return;
     }
     setError(copy(errorCopyId(raw) ?? 'm03.error.server'));
@@ -90,7 +86,7 @@ export function SignInScreen() {
       return;
     }
     setSession(true);
-    router.replace(APP_HOME_PATH);
+    replace(homePath);
   };
 
   const submitEmail = async () => {

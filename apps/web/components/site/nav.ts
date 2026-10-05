@@ -9,8 +9,8 @@ const PAGES = [
   { label: 'How it works', href: '/how-it-works' },
 ] as const;
 
-/** The header's one primary action: the district in 3D. */
-export const NAV_CTA: NavCta = { label: HOME_COPY.openCity, href: '/spatial' };
+/** The header's one primary action: sign in. */
+export const NAV_CTA: NavCta = { label: 'Log in', href: '/sign-in?intent=sign_in' };
 
 /** The id of the content wrapper the header's skip link jumps to. */
 export const CONTENT_ID = 'content';
