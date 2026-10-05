@@ -14,7 +14,7 @@ import { DEVICE_CAPTURE } from '../../../components/DeviceStage';
  */
 export default function SignInPage() {
   return (
-    <View className="grid flex-1 bg-bg lg:grid-cols-2">
+    <View className="grid min-h-[100dvh] auto-rows-fr flex-1 bg-bg lg:grid-cols-2">
       <View
         aria-hidden
         className="hidden flex-col justify-between overflow-hidden bg-ink-950 px-10 pb-0 pt-10 lg:flex"
