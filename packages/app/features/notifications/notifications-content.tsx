@@ -2,8 +2,11 @@
 // Notifications — mirrors the liquid-glass template (unread header + mark-all,
 // Today/Earlier groups, icon-well rows, tap to read) with Legend Motion.
 import { Section, View, Text as TWText, Pressable } from '@acme/ui/tw';
-import { Button, Heading, Text, FadeIn } from '@acme/ui';
+import { Button, Heading, StatusRow, Text, FadeIn } from '@acme/ui';
 import { WELL, INK } from '../home/home.data';
+import { useOnboarding } from '../onboarding/onboarding.store';
+import { notifyOffStatusItem } from '../onboarding/notify-status';
+import { useNotifyActions } from './notify-nav';
 import { useNotifications, type Notification } from './notifications.store';
 
 function NotificationRow({ item, index }: { item: Notification; index: number }) {
@@ -54,6 +57,8 @@ function Group({ label, items, offset }: { label: string; items: Notification[];
 export function NotificationsContent() {
   const items = useNotifications((s) => s.items);
   const markAllRead = useNotifications((s) => s.markAllRead);
+  const notifyOff = useOnboarding((s) => s.notifyOff);
+  const { ask, openSettings } = useNotifyActions();
   const unread = items.filter((n) => !n.read).length;
   const today = items.slice(0, 3);
   const earlier = items.slice(3);
@@ -71,6 +76,16 @@ export function NotificationsContent() {
           ) : null}
         </Section>
       </FadeIn>
+
+      {/* M06 → M11 follow-up: when notifications are off the row says how to
+          check on the egg and offers the way back (Turn on / Open Settings). */}
+      {notifyOff !== undefined ? (
+        <View testID="status-notify-off">
+          <StatusRow
+            items={[notifyOffStatusItem({ state: notifyOff, onAsk: ask, onOpenSettings: openSettings })]}
+          />
+        </View>
+      ) : null}
 
       <Group label="Today" items={today} offset={0} />
       <Group label="Earlier" items={earlier} offset={3} />

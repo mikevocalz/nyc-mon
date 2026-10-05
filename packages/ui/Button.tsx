@@ -104,6 +104,11 @@ export interface ButtonProps {
   loading?: boolean;
   className?: string;
   'aria-label'?: string;
+  /**
+   * Extra context read after the label ("Goes to the last page"). Native only
+   * where the platform honours it; on web it lands as aria-description.
+   */
+  accessibilityHint?: string;
 }
 
 export function Button({

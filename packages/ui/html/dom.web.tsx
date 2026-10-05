@@ -78,13 +78,15 @@ export interface PressBaseProps extends P {
   'aria-checked'?: boolean;
   'aria-hidden'?: boolean;
   accessibilityLabel?: string;
+  /** RN's hint prop; on web it lands as aria-description on the element. */
+  accessibilityHint?: string;
   accessibilityState?: { checked?: boolean; disabled?: boolean; selected?: boolean };
 }
 
 // RN views default to display:flex — raw DOM elements don't, so seed it
 // (callers' flex-row / items-* classes expect a flex container).
 export const ButtonBase = ({
-  onPress, accessibilityLabel, accessibilityState, role, className, style, ...props
+  onPress, accessibilityLabel, accessibilityHint, accessibilityState, role, className, style, ...props
 }: PressBaseProps) => (
   <button
     type="button"
@@ -94,6 +96,7 @@ export const ButtonBase = ({
     onClick={onPress}
     disabled={props.disabled ?? accessibilityState?.disabled}
     aria-label={props['aria-label'] ?? accessibilityLabel}
+    aria-description={accessibilityHint}
     {...toDom(`inline-flex flex-col ${className ?? ''}`, style)}
     {...props}
   />

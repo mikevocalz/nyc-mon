@@ -1,4 +1,5 @@
 import { tv } from 'tailwind-variants';
+import { hiddenA11y } from './hlynk/a11y';
 import { Text, View } from './tw';
 import { TYPE_SCALE_TV } from './type-scale';
 
@@ -12,8 +13,13 @@ export interface NotificationPreviewProps {
   title: string;
   /** The notification body. */
   body: string;
-  /** Timestamp shown in the header. */
+  /** Relative time as the OS would show it, e.g. "now". */
   time: string;
+  /**
+   * Spoken description of the whole card. Required: the card's text is hidden
+   * from assistive tech, so the label must carry the notification's content.
+   */
+  accessibilityLabel: string;
   /** The OS banner is the one kit component that is rounded. Default `true`. */
   rounded?: boolean;
   className?: string;
@@ -51,28 +57,33 @@ export function NotificationPreview({
   title,
   body,
   time,
+  accessibilityLabel,
   rounded = true,
   className,
 }: NotificationPreviewProps) {
   const s = preview({ rounded });
   return (
     <View
+      accessible
       accessibilityRole="image"
-      accessibilityLabel={`${appName} notification: ${title}. ${body}`}
+      accessibilityLabel={accessibilityLabel}
       className={s.root({ className })}
     >
-      <View className={s.header()}>
-        <Text numberOfLines={1} className={s.app()}>
-          {appName}
+      {/* The picture's text is decorative to assistive tech; the label reads it. */}
+      <View {...hiddenA11y(true)}>
+        <View className={s.header()}>
+          <Text numberOfLines={1} className={s.app()}>
+            {appName}
+          </Text>
+          <Text className={s.time()}>{time}</Text>
+        </View>
+        <Text numberOfLines={1} className={s.title()}>
+          {title}
         </Text>
-        <Text className={s.time()}>{time}</Text>
+        <Text numberOfLines={2} className={s.body()}>
+          {body}
+        </Text>
       </View>
-      <Text numberOfLines={1} className={s.title()}>
-        {title}
-      </Text>
-      <Text numberOfLines={2} className={s.body()}>
-        {body}
-      </Text>
     </View>
   );
 }

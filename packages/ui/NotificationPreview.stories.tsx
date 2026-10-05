@@ -7,9 +7,11 @@ const meta = {
   component: NotificationPreview,
   args: {
     appName: 'NYC-MON',
-    title: 'Someone is at the hatch',
-    body: 'Tap to answer.',
-    time: 'Now',
+    // The one notification the Caller ever gets per egg (M23, m23.notification.*).
+    title: 'Your egg is ready to hatch',
+    body: "Open NYC-MON whenever you're ready.",
+    time: 'now',
+    accessibilityLabel: 'Example notification from NYC-MON: Your egg is ready to hatch.',
   },
 } satisfies Meta<typeof NotificationPreview>;
 export default meta;
@@ -28,7 +30,7 @@ export const Default: Story = {
 export const LongBody: Story = {
   args: {
     body:
-      'Your Mon has been waiting at the 14th Street hatch for a while. Tap here to open the hatch and let them in before they get rained on.',
+      "Open NYC-MON whenever you're ready. Your egg keeps warm until you get there — no hurry, it waits for you either way.",
   },
   render: (args) => (
     <View className="p-4">
