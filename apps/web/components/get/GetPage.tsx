@@ -43,8 +43,11 @@ function WaitlistForm() {
     );
   }
 
+  // items-start + the label-height offset: the button aligns to the input
+  // band itself, so hint/error text growing below the field never shifts it.
+  // size sm puts the framed face at the input's min-h-11.
   return (
-    <View className="w-full max-w-xl gap-3 sm:flex-row sm:items-end">
+    <View className="w-full max-w-xl gap-3 sm:flex-row sm:items-start">
       <TextField
         surface="daylit"
         containerClassName="flex-1"
@@ -63,7 +66,13 @@ function WaitlistForm() {
         keyboardType="email-address"
         textContentType="emailAddress"
       />
-      <Button variant="cta" size="lg" title={copy.submit} onPress={submit} />
+      <Button
+        variant="cta"
+        size="sm"
+        title={copy.submit}
+        onPress={submit}
+        className="w-full sm:mt-6 sm:w-auto"
+      />
     </View>
   );
 }

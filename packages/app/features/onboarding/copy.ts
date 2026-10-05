@@ -153,6 +153,7 @@ export const ONBOARDING_COPY = {
   'm03.reset.sent': 'If that email has an account, the link is on its way. It works for one hour.',
   'm03.reset.unavailable': "Password reset isn't working right now. Try another way to sign in.",
   'm03.legal.notice.create': 'By making an account, you agree to the Terms and the Privacy Policy.',
+  'm03.back.a11y.label': 'Go back',
   'm03.legal.terms': 'Terms',
   'm03.legal.privacy': 'Privacy Policy',
   'm03.legal.children': "Children's privacy",

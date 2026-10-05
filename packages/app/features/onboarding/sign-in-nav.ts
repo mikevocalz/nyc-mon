@@ -31,6 +31,8 @@ export function useSignInNav(): {
   /** Opens a legal href: in-app router on web, the site on native. */
   openLink: (href: string) => void;
   replace: (path: string) => void;
+  /** The ‹ in the stack header (M03 direction): back to the previous route. */
+  back: () => void;
 } {
   const router = useRouter();
   const params = useLocalSearchParams<{ intent?: string }>();
@@ -49,5 +51,6 @@ export function useSignInNav(): {
     ],
     openLink: (href) => void Linking.openURL(`${SITE_URL}${href}`),
     replace: (path) => router.replace(path as never),
+    back: () => router.back(),
   };
 }

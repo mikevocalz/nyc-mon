@@ -8,11 +8,12 @@ import {
   Container,
   ErrorMessage,
   Heading,
+  IconButton,
   KeyboardAwareScroll,
   Text,
   TextField,
 } from '@acme/ui';
-import { Fingerprint, Mail } from '@acme/ui/icons';
+import { ChevronLeft, Fingerprint, Mail } from '@acme/ui/icons';
 import { Form } from '@acme/ui/primitives';
 import { Pressable, View } from '@acme/ui/tw';
 import { auth, isPasskeySupported } from './auth';
@@ -57,7 +58,7 @@ function errorCopyId(error: AuthError): OnboardingCopyId | undefined {
  * shown raw, and a cancelled provider sheet shows nothing.
  */
 export function SignInScreen() {
-  const { intent, ageGatePath, homePath, signInPath, legalLinks, openLink, replace } = useSignInNav();
+  const { intent, ageGatePath, homePath, signInPath, legalLinks, openLink, replace, back } = useSignInNav();
   const ageAnswer = useOnboarding((s) => s.ageAnswer);
   const setSession = useOnboarding((s) => s.setSession);
 
@@ -161,9 +162,20 @@ export function SignInScreen() {
         : copy(intent === 'create' ? 'm03.title.create' : 'm03.title.sign_in');
 
   return (
-    <KeyboardAwareScroll>
-      <Container width="full" className="flex-1 px-4 py-6">
-        <Form className="mx-auto w-full max-w-content-form gap-6">
+    <KeyboardAwareScroll contentContainerClassName="grow">
+      <Container width="full" className="flex-1 px-4 py-2">
+        <Form className="mx-auto w-full max-w-content-form flex-1 gap-6">
+          {/* M03's stack-header ‹ (03-direction): the screen's one header row. */}
+          <View className="-ml-2 flex-row items-center" testID="m03-back">
+            <IconButton
+              variant="ghost"
+              size="sm"
+              tone="royal"
+              aria-label={copy('m03.back.a11y.label')}
+              onPress={back}
+              icon={<ChevronLeft size={22} />}
+            />
+          </View>
           <View className="gap-2">
             <Heading level={1} size="title">{title}</Heading>
             {mode === 'providers' || mode === 'email' ? (
@@ -299,7 +311,7 @@ export function SignInScreen() {
           )}
 
           {legalLinks.length > 0 ? (
-            <View className="flex-row items-center justify-center gap-x-1">
+            <View className="mt-auto flex-row items-center justify-center gap-x-1 pb-2 pt-6">
               {legalLinks.map((link, i) => (
                 <View key={link.id} className="flex-row items-center gap-x-1">
                   {i > 0 ? (

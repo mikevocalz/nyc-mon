@@ -15,6 +15,7 @@ export function useSignInNav(): {
   legalLinks: SignInLegalLink[];
   openLink: (href: string) => void;
   replace: (path: string) => void;
+  back: () => void;
 } {
   const router = useRouter();
   const raw = useSearchParams()?.get('intent');
@@ -32,5 +33,6 @@ export function useSignInNav(): {
     ],
     openLink: router.push,
     replace: router.replace,
+    back: router.back,
   };
 }
