@@ -79,8 +79,11 @@ export function createDeviceScene({ THREE, renderer }: ThreeContext, initial: De
   scene.add(rim);
 
   const device = buildDevice(THREE);
-  scene.add(device);
+  scene.add(device.group);
 
+  const raycaster = new THREE.Raycaster();
+  const ndc = new THREE.Vector2();
+  let boost = 0;
   let tiltX = 0;
   let tiltY = 0;
   let model = initial.model;
@@ -103,15 +106,32 @@ export function createDeviceScene({ THREE, renderer }: ThreeContext, initial: De
       const k = frame.delta > 0 ? 1 - Math.exp(-frame.delta * 6) : 1;
       tiltX += (goalX - tiltX) * k;
       tiltY += (goalY - tiltY) * k;
-      device.rotation.set(tiltX, target + tiltY, 0);
-      if (!frame.reducedMotion) device.userData.beamTick?.(frame.time);
+      device.group.rotation.set(tiltX, target + tiltY, 0);
+      // Screen interactivity: the pointer ray hits the glass, the HUD
+      // highlights whatever sits under it. Holding over CALL MON feeds
+      // the beam.
+      let hover: HudRegion | null = null;
+      if (frame.pointer.inside && !frame.reducedMotion) {
+        ndc.set(frame.pointer.x, frame.pointer.y);
+        raycaster.setFromCamera(ndc, camera);
+        const hit = raycaster.intersectObject(device.screen, false)[0];
+        if (hit?.uv !== undefined) hover = hudRegionAt(hit.uv.x, hit.uv.y);
+      }
+      device.setHover(hover);
+      boost += ((hover === 'call' ? 1 : 0) - boost) * k;
+      if (!frame.reducedMotion) device.beamTick(frame.time, boost);
     },
-    dispose: () => device.userData.dispose(),
+    dispose: () => device.group.userData.dispose(),
   };
 }
 
 /** One tracked material/geometry bucket so `dispose` frees everything. */
-function buildDevice(THREE: Three): Group {
+function buildDevice(THREE: Three): {
+  group: Group;
+  screen: Mesh;
+  setHover: (region: HudRegion | null) => void;
+  beamTick: (time: number, boost: number) => void;
+} {
   const geometries: Geometry[] = [];
   const materials: Material[] = [];
   const textures: { dispose(): void }[] = [];
@@ -155,8 +175,9 @@ function buildDevice(THREE: Three): Group {
   const lensGlass = mat(new THREE.MeshStandardMaterial({
     color: '#0A1030', roughness: 0.05, metalness: 0.55, envMapIntensity: 1.4,
   }));
-  /** Screen glass running the HUD texture; the map doubles as the emitter. */
-  const hudTexture = tex(hudCanvasTexture(THREE));
+  /** Screen glass running the interactive HUD; the map doubles as the emitter. */
+  const hud = createHud(THREE);
+  const hudTexture = tex(hud.texture);
   const screen = mat(new THREE.MeshStandardMaterial({
     map: hudTexture,
     emissiveMap: hudTexture,
@@ -262,7 +283,6 @@ function buildDevice(THREE: Three): Group {
   const beam = buildBeam(THREE, { track, mat, tex });
   beam.group.position.set(0.25, top, 0);
   group.add(beam.group);
-  group.userData.beamTick = beam.tick;
 
   // A hot glow right at the emitter mouth.
   const glowSprite = new THREE.Sprite(glow);
@@ -280,7 +300,7 @@ function buildDevice(THREE: Three): Group {
   // Recessed bezel ring, then the screen glass itself.
   const screenY = 0.17;
   box(rounded(0.88, 1.08, 0.03, 0.03), black, 0, screenY, front + 0.012);
-  box(track(new THREE.PlaneGeometry(0.8, 1.0)), screen, 0, screenY, front + 0.029);
+  const screenMesh = box(track(new THREE.PlaneGeometry(0.8, 1.0)), screen, 0, screenY, front + 0.029);
 
   // "H-Lynk Core" printed under the screen.
   const wordmark = decal('H-Lynk Core', 0.3, { size: 40, weight: 700 });
@@ -322,8 +342,8 @@ function buildDevice(THREE: Three): Group {
   // Left edge: the long action key.
   box(rounded(0.032, 0.18, 0.1, 0.012), black, -W / 2 - 0.014, 0.28, 0);
 
-  group.position.y = -0.12;
-  return group;
+  group.position.y = -0.15;
+  return { group, screen: screenMesh, setHover: hud.setHover, beamTick: beam.tick };
 }
 
 /**
@@ -340,10 +360,13 @@ function buildBeam(
     mat: <M extends Material>(m: M) => M;
     tex: <T extends { dispose(): void }>(t: T) => T;
   },
-): { group: Group; tick: (time: number) => void } {
+): { group: Group; tick: (time: number, boost: number) => void } {
   const { track, mat, tex } = ctx;
   const group = new THREE.Group();
-  const LENGTH = 0.85;
+  const LENGTH = 0.52;
+  // Lean back a touch: it reads as projection, not a sticker, and the tip
+  // clears the stage's top edge.
+  group.rotation.x = -0.12;
 
   // Shared falloff: bright at the mouth, fading with height and toward
   // the beam's edge. A texture, not vertex alpha — TSL materials need it.
@@ -411,21 +434,24 @@ function buildBeam(
     group.add(sprite);
   }
 
-  const tick = (time: number) => {
-    // The beam breathes — a slow pulse like a scanner cycling.
-    const pulse = 0.82 + 0.18 * Math.sin(time * 2.1);
-    wash.opacity = 0.45 * pulse;
-    mid.opacity = 0.75 * (0.75 + 0.25 * pulse);
-    core.opacity = 0.95 * (0.85 + 0.15 * Math.sin(time * 3.7 + 1));
+  const tick = (time: number, boost: number) => {
+    // The beam breathes — a slow pulse like a scanner cycling. CALL MON
+    // hovering feeds it: brighter, longer, sparks run faster.
+    const amp = 1 + 0.55 * boost;
+    const pulse = 0.82 + 0.18 * Math.sin(time * (2.1 + boost));
+    wash.opacity = Math.min(1, 0.45 * pulse * amp);
+    mid.opacity = Math.min(1, 0.75 * (0.75 + 0.25 * pulse) * amp);
+    core.opacity = Math.min(1, 0.95 * (0.85 + 0.15 * Math.sin(time * 3.7 + 1)) * amp);
+    group.scale.y = 1 + 0.12 * boost;
     for (const s of sparks) {
-      const t = (s.y0 + time * s.speed) % 1;
+      const t = (s.y0 + time * s.speed * (1 + 1.4 * boost)) % 1;
       const y = t * LENGTH;
       // Cone widens with height; sparks wander inside it and twinkle.
       const r = (0.06 + (0.5 - 0.06) * t) * s.spread;
       const a = s.phase + time * 0.8;
       s.sprite.position.set(Math.cos(a) * r, y, Math.sin(a) * r * 0.6);
       const fade = Math.sin(t * Math.PI);
-      const scale = s.size * (0.6 + 0.6 * fade);
+      const scale = s.size * (0.6 + 0.6 * fade) * (1 + 0.5 * boost);
       s.sprite.scale.set(scale, scale, 1);
       s.sprite.material.opacity = fade * (0.6 + 0.4 * Math.sin(time * 5 + s.phase));
     }
@@ -511,7 +537,7 @@ function beamGradientTexture(THREE: Three): CanvasTexture {
   const img = ctx.createImageData(128, 512);
   for (let y = 0; y < 512; y++) {
     const t = y / 511;
-    const vertical = Math.pow(1 - t, 1.4) + 0.08; // keeps a faint tip
+    const vertical = Math.pow(1 - t, 1.6) + 0.02; // tip fades to nearly nothing
     for (let x = 0; x < 128; x++) {
       const edge = Math.sin((x / 127) * Math.PI); // soft round cross-section
       const a = Math.round(255 * vertical * Math.pow(edge, 0.8));
@@ -598,15 +624,55 @@ function textTexture(THREE: Three, text: string, { size = 48, weight = 700, colo
   return makeCanvasTexture(THREE, canvas);
 }
 
+/** The interactive areas of the HUD, in draw order. */
+type HudRegion = 'call' | `nav-${0 | 1 | 2 | 3 | 4}` | `chip-${0 | 1 | 2 | 3}`;
+
+/** Screen UV → HUD region. UV v runs bottom-up; the canvas runs top-down. */
+function hudRegionAt(u: number, v: number): HudRegion | null {
+  const W = 768;
+  const x = u * W;
+  const y = (1 - v) * 1024;
+  if (x >= 32 && x <= W - 32 && y >= 790 && y <= 876) return 'call';
+  if (x >= 32 && x <= W - 32 && y >= 920 && y <= 1004) {
+    return `nav-${Math.min(4, Math.floor((x - 32) / ((W - 64) / 5))) as 0 | 1 | 2 | 3 | 4}`;
+  }
+  const chipStart = (W - 170 * 4 - 12 * 3) / 2;
+  if (y >= 620 && y <= 750 && x >= chipStart && x <= chipStart + 170 * 4 + 12 * 3) {
+    const i = Math.floor((x - chipStart) / 182);
+    if ((x - chipStart) % 182 <= 170) return `chip-${i as 0 | 1 | 2 | 3}`;
+  }
+  return null;
+}
+
 /**
- * The screen's UI, drawn once to a 768×1024 canvas: status bar, mon card,
- * four stat chips, the CALL MON bar and the bottom nav — the reference's
- * layout in the H-Lynk palette.
+ * The screen's UI as a live canvas: `setHover` redraws with the hovered
+ * element lit, and the texture uploads only when the hover target moves.
  */
-function hudCanvasTexture(THREE: Three): CanvasTexture {
+function createHud(THREE: Three): { texture: CanvasTexture; setHover: (region: HudRegion | null) => void } {
+  const [canvas, ctx] = canvas2d(768, 1024);
+  let hover: HudRegion | null = null;
+  drawHud(ctx, null);
+  const texture = makeCanvasTexture(THREE, canvas);
+  return {
+    texture,
+    setHover: (region) => {
+      if (region === hover) return;
+      hover = region;
+      drawHud(ctx, hover);
+      texture.needsUpdate = true;
+    },
+  };
+}
+
+/**
+ * The screen's UI: status bar, mon card, four stat chips, the CALL MON
+ * bar and the bottom nav — the reference's layout in the H-Lynk palette.
+ * `hover` names the lit element.
+ */
+function drawHud(ctx: CanvasRenderingContext2D, hover: HudRegion | null): void {
   const W = 768;
   const H = 1024;
-  const [canvas, ctx] = canvas2d(W, H);
+  ctx.clearRect(0, 0, W, H);
 
   // Backdrop: deep navy lifting to royal at the top.
   const bg = ctx.createLinearGradient(0, 0, 0, H);
@@ -735,11 +801,12 @@ function hudCanvasTexture(THREE: Three): CanvasTexture {
   ctx.font = font(24, 700);
   stats.forEach(([icon, label, value, color], i) => {
     const x = startX + i * (chipW + gap);
+    const lit = hover === `chip-${i}`;
     roundedRect(x, chipY, chipW, chipH, 14);
-    ctx.fillStyle = HUD.panel;
+    ctx.fillStyle = lit ? '#12306B' : HUD.panel;
     ctx.fill();
-    ctx.strokeStyle = HUD.line;
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = lit ? HUD.text : HUD.line;
+    ctx.lineWidth = lit ? 3 : 2;
     ctx.stroke();
     ctx.fillStyle = color as string;
     ctx.font = font(26, 800);
@@ -761,12 +828,17 @@ function hudCanvasTexture(THREE: Three): CanvasTexture {
   });
 
   // --- CALL MON bar ----------------------------------------------------------
+  if (hover === 'call') {
+    ctx.shadowColor = 'rgba(248,60,60,0.9)';
+    ctx.shadowBlur = 32;
+  }
   roundedRect(32, 790, W - 64, 86, 43);
   const call = ctx.createLinearGradient(32, 0, W - 32, 0);
-  call.addColorStop(0, HUD.redDeep);
-  call.addColorStop(1, HUD.red);
+  call.addColorStop(0, hover === 'call' ? '#E02020' : HUD.redDeep);
+  call.addColorStop(1, hover === 'call' ? '#FF4040' : HUD.red);
   ctx.fillStyle = call;
   ctx.fill();
+  ctx.shadowBlur = 0;
   ctx.fillStyle = HUD.text;
   ctx.font = font(40, 900);
   ctx.fillText('∿  CALL MON  ›', W / 2, 834);
@@ -778,12 +850,13 @@ function hudCanvasTexture(THREE: Three): CanvasTexture {
   const navY = 920;
   const navW = (W - 64) / 5;
   nav.forEach(([icon, label, active], i) => {
+    const lit = hover === `nav-${i}`;
     const x = 32 + i * navW;
     roundedRect(x + 8, navY, navW - 16, 84, 16);
-    ctx.fillStyle = active ? HUD.red : HUD.panel;
+    ctx.fillStyle = active || lit ? HUD.red : HUD.panel;
     ctx.fill();
-    ctx.strokeStyle = active ? HUD.red : HUD.line;
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = lit ? HUD.text : active ? HUD.red : HUD.line;
+    ctx.lineWidth = lit ? 3 : 2;
     ctx.stroke();
     ctx.fillStyle = HUD.text;
     ctx.font = font(30, 700);
@@ -791,6 +864,4 @@ function hudCanvasTexture(THREE: Three): CanvasTexture {
     ctx.font = font(18, 800);
     ctx.fillText(label, x + navW / 2, navY + 62);
   });
-
-  return makeCanvasTexture(THREE, canvas);
 }
