@@ -6,7 +6,7 @@ import { twMerge } from 'tailwind-merge';
 import { tv } from 'tailwind-variants';
 import { BrandWordmark } from '../brand/BrandWordmark';
 import { districtTone, type ChartTone, type District } from '../district';
-import { controlLook, frameTone } from '../control-look';
+import { frameTone } from '../control-look';
 import { CornerCutFrame } from '../neon/CornerCutFrame';
 import { Header, Link, List, ListItem, Nav } from '../primitives';
 import { useInstanceStore, useStore } from '../use-instance-store';
@@ -91,10 +91,10 @@ const bar = tv({
     sheet: 'border-t-2 border-ink-800 bg-ink-950 px-3 pb-4 pt-2 md:hidden',
     sheetLink: 'flex min-h-12 flex-row items-center justify-between px-3 py-3',
     keyline: 'h-1 w-full',
-    // The CTA wears the kit's corner-cut face (Button/LinkButton's `cta`
-    // look): solid brand orange with the angled cut and depth plate.
+    // The nav CTA is the royal face with bold white text — the site Log in
+    // sits apart from the orange action CTAs Decision #7 reserves elsewhere.
     cta: 'inline-flex self-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus',
-    ctaText: 'font-display text-sm font-semibold tracking-wide text-on-cta',
+    ctaText: 'font-display text-sm font-bold tracking-wide text-white',
     skip: 'sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-3 focus:z-[60] focus:px-4 focus:py-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus',
   },
   variants: {
@@ -151,9 +151,9 @@ export function NavBar({
 }: NavBarProps) {
   const tone: ChartTone = color ? (PRESETS[color] ?? (color as ChartTone)) : districtTone(district);
   const s = bar({ tone, transparency, position, navAlign });
-  // The header's one action is the brand-orange CTA face whatever the
-  // district (control-look Decision #7), not the page's tone.
-  const ctaFaceTone = frameTone('solid', controlLook('cta').tone);
+  // The header's Log in wears royal, not the orange `cta` face the kit
+  // reserves for in-page actions (Decision #7).
+  const ctaFaceTone = frameTone('solid', 'royal');
   // The dropdown panel and rows are the kit's shared list (also Select's open list).
   const d = dropdownLook({ tone });
   const store = useInstanceStore(() => ({ sheet: false, dropdown: -1 }));
