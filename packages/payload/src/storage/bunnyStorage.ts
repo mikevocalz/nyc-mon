@@ -105,7 +105,7 @@ export const bunnyStorage = ({
           {
             headers: {
               AccessKey: accessKey,
-              Range: req.headers.get('range') || '',
+              ...(req.headers.get('range') ? { Range: req.headers.get('range')! } : {}),
             },
           },
         );
