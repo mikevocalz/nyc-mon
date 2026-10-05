@@ -67,3 +67,12 @@ The storage adapter must:
 - Bunny CDN handles media distribution instead of Neon Object Storage.
 - The app is not coupled to Supabase APIs.
 - Neon Managed Better Auth remains a deliberate follow-up rather than a risky auth rewrite that would remove NYC-Mon's current server-side policy enforcement.
+
+
+## Payload admin media behavior
+
+The Payload Admin `Media` collection is backed by Bunny Storage through Payload's cloud-storage adapter. Admin users can use the normal Payload media UI for upload, bulk upload, replacement, deletion, and thumbnail/list previews; uploaded file URLs resolve to the Bunny CDN.
+
+Payload does not persist media bytes locally in production. Bunny Storage is the source of truth for media objects, while Neon/Postgres stores Payload's media metadata.
+
+The Bunny storage credential is server-only. It must never be exposed to the browser or included in `NEXT_PUBLIC_*` / `EXPO_PUBLIC_*` variables.
