@@ -128,19 +128,24 @@ function buildDevice(THREE: Three): Group {
 
   const W = 1;
   const H = 1.78;
-  const D = 0.16;
+  const D = 0.21;
   const top = H / 2;
   const front = D / 2;
 
   // --- materials -----------------------------------------------------------
 
+  /** Fine plastic grain: the shell isn't a render-flat surface up close. */
+  const grain = tex(grainTexture(THREE));
+
   /** Matte red shell: plastic sheen from the room env, no metal. */
   const body = mat(new THREE.MeshStandardMaterial({
     color: CORE.body, roughness: 0.42, metalness: 0.04, envMapIntensity: 0.7,
+    bumpMap: grain, bumpScale: 0.0015,
   }));
   /** Black rubberised trim: head, bezel, keys — softer reflections. */
   const black = mat(new THREE.MeshStandardMaterial({
-    color: CORE.black, roughness: 0.5, metalness: 0.12, envMapIntensity: 0.6,
+    color: CORE.black, roughness: 0.58, metalness: 0.08, envMapIntensity: 0.3,
+    bumpMap: grain, bumpScale: 0.001,
   }));
   /** Glossy black plastic: lens barrel, trackpad face. */
   const pianoBlack = mat(new THREE.MeshStandardMaterial({
@@ -196,7 +201,7 @@ function buildDevice(THREE: Three): Group {
       bevelThickness: bevel,
       bevelSize: bevel,
       bevelSegments: 2,
-      curveSegments: 6,
+      curveSegments: 8,
     });
     geo.translate(0, 0, -(d - bevel * 2) / 2);
     return track(geo);
@@ -220,7 +225,7 @@ function buildDevice(THREE: Three): Group {
   // --- body ----------------------------------------------------------------
 
   // Shell: rounded slab, corner radius reads at the silhouette.
-  box(rounded(W, H, D, 0.055), body, 0, 0, 0);
+  box(rounded(W, H, D, 0.06), body, 0, 0, 0);
   // Chin under the control row: the slight lower bumper of the reference.
   box(rounded(W * 0.98, 0.1, D + 0.015, 0.04), body, 0, -top + 0.07, 0);
 
@@ -228,19 +233,22 @@ function buildDevice(THREE: Three): Group {
 
   const headH = 0.17;
   const headY = top - headH / 2 - 0.02;
-  box(rounded(0.9, headH, D + 0.05, 0.05), black, 0.04, headY, 0);
+  box(rounded(0.92, headH, D + 0.06, 0.05), black, 0.03, headY, 0);
+  // Head crown: a second, shallower step so the head reads moulded.
+  box(rounded(0.7, 0.06, D + 0.045, 0.02), black, 0.1, headY + headH / 2 + 0.01, 0);
 
-  // Camera lens on the head's left: barrel, glass and a spec dot.
-  box(track(new THREE.CylinderGeometry(0.052, 0.052, 0.03, 32)), pianoBlack, -0.28, headY, front + 0.035).rotation.x = Math.PI / 2;
-  box(track(new THREE.CylinderGeometry(0.038, 0.038, 0.032, 32)), lensGlass, -0.28, headY, front + 0.036).rotation.x = Math.PI / 2;
-  box(track(new THREE.CylinderGeometry(0.012, 0.012, 0.034, 20)), emitter, -0.28, headY, front + 0.037).rotation.x = Math.PI / 2;
+  // Camera lens on the head's left: red accent ring, barrel, glass, spec dot.
+  box(track(new THREE.CylinderGeometry(0.056, 0.056, 0.026, 32)), emitter, -0.3, headY, front + 0.04).rotation.x = Math.PI / 2;
+  box(track(new THREE.CylinderGeometry(0.05, 0.05, 0.03, 32)), pianoBlack, -0.3, headY, front + 0.042).rotation.x = Math.PI / 2;
+  box(track(new THREE.CylinderGeometry(0.036, 0.036, 0.032, 32)), lensGlass, -0.3, headY, front + 0.044).rotation.x = Math.PI / 2;
+  box(track(new THREE.CylinderGeometry(0.011, 0.011, 0.034, 20)), emitter, -0.3, headY, front + 0.045).rotation.x = Math.PI / 2;
 
   // Two red emitters in the head's centre.
-  for (const x of [0.16, 0.34]) {
-    box(track(new THREE.CylinderGeometry(0.028, 0.028, 0.022, 20)), emitter, x, headY, front + 0.03).rotation.x = Math.PI / 2;
+  for (const x of [0.14, 0.32]) {
+    box(track(new THREE.CylinderGeometry(0.028, 0.028, 0.024, 20)), emitter, x, headY, front + 0.035).rotation.x = Math.PI / 2;
   }
-  // Thin status slit between the emitters.
-  box(rounded(0.09, 0.014, 0.012, 0.006), emitter, 0.25, headY + 0.055, front + 0.028);
+  // The head's red lightbar — the lit slit of the reference.
+  box(rounded(0.16, 0.02, 0.014, 0.008), emitter, 0.23, headY + 0.058, front + 0.034);
 
   // Antenna, top left: barrel with a rounded cap.
   box(track(new THREE.CylinderGeometry(0.038, 0.045, 0.2, 24)), black, -0.4, top + 0.1, -0.01);
@@ -282,31 +290,37 @@ function buildDevice(THREE: Three): Group {
   // --- control row ----------------------------------------------------------
 
   const rowY = -0.64;
-  // Two keys each side of the trackpad, each with a printed glyph.
-  const keys: { x: number; glyph: string }[] = [
-    { x: -0.4, glyph: '⌂' }, { x: -0.26, glyph: '≡' },
-    { x: 0.26, glyph: '↺' }, { x: 0.4, glyph: '›' },
+  // Two keys each side of the trackpad. The home key's icon is red, the
+  // rest silver — the reference's control row.
+  const keys: { x: number; icon: 'home' | 'menu' | 'back' | 'next'; red?: boolean }[] = [
+    { x: -0.41, icon: 'home', red: true }, { x: -0.26, icon: 'menu' },
+    { x: 0.26, icon: 'back' }, { x: 0.41, icon: 'next' },
   ];
-  for (const { x, glyph } of keys) {
-    box(rounded(0.12, 0.13, 0.045, 0.02), pianoBlack, x, rowY, front + 0.02);
-    const g = decal(glyph, 0.07, { size: 52, weight: 700, color: '#BEC0C2' });
-    g.mesh.position.set(x, rowY, front + 0.045);
-    group.add(g.mesh);
+  for (const { x, icon, red } of keys) {
+    box(rounded(0.125, 0.14, 0.05, 0.022), pianoBlack, x, rowY, front + 0.02);
+    const t = tex(iconTexture(THREE, icon, red ? '#FF4040' : '#E8E9EA'));
+    const m = mat(new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false }));
+    const g = new THREE.Mesh(track(new THREE.PlaneGeometry(0.06, 0.06)), m);
+    g.position.set(x, rowY, front + 0.047);
+    group.add(g);
   }
-  // Trackpad: red ring on a gloss black pad.
-  box(rounded(0.27, 0.27, 0.032, 0.04), ring, 0, rowY, front + 0.015);
-  box(rounded(0.225, 0.225, 0.045, 0.03), pianoBlack, 0, rowY, front + 0.02);
+  // Trackpad: red ring on a gloss black pad, slightly proud of the row.
+  box(rounded(0.28, 0.28, 0.034, 0.045), ring, 0, rowY, front + 0.015);
+  box(rounded(0.23, 0.23, 0.05, 0.035), pianoBlack, 0, rowY, front + 0.02);
 
   // --- side keys -------------------------------------------------------------
-  // Right edge: two narrow keys with red accent slits between them.
-  for (const y of [0.36, 0.14]) {
-    box(rounded(0.03, 0.15, 0.09, 0.012), black, W / 2 + 0.012, y, 0);
+  // Right edge: two narrow keys, each carrying a red + / − mark.
+  for (const [y, glyph] of [[0.36, '+'], [0.14, '-']] as const) {
+    box(rounded(0.032, 0.15, 0.1, 0.012), black, W / 2 + 0.014, y, 0);
+    const g = decal(glyph, 0.05, { size: 64, weight: 800, color: '#FF4040' });
+    g.mesh.rotation.y = Math.PI / 2;
+    g.mesh.position.set(W / 2 + 0.032, y, 0);
+    group.add(g.mesh);
   }
-  box(rounded(0.008, 0.2, 0.05, 0.004), emitter, W / 2 + 0.028, 0.25, 0);
   // Right edge, lower: a single round key.
-  box(track(new THREE.CylinderGeometry(0.035, 0.035, 0.03, 24)), pianoBlack, W / 2 + 0.012, -0.05, 0).rotation.z = Math.PI / 2;
+  box(track(new THREE.CylinderGeometry(0.035, 0.035, 0.03, 24)), pianoBlack, W / 2 + 0.014, -0.05, 0).rotation.z = Math.PI / 2;
   // Left edge: the long action key.
-  box(rounded(0.03, 0.18, 0.09, 0.012), black, -W / 2 - 0.012, 0.28, 0);
+  box(rounded(0.032, 0.18, 0.1, 0.012), black, -W / 2 - 0.014, 0.28, 0);
 
   group.position.y = -0.12;
   return group;
@@ -510,6 +524,55 @@ function beamGradientTexture(THREE: Three): CanvasTexture {
   }
   ctx.putImageData(img, 0, 0);
   return makeCanvasTexture(THREE, canvas);
+}
+
+/** Small vector icons for the control keys — home, menu, back, next. */
+function iconTexture(THREE: Three, icon: 'home' | 'menu' | 'back' | 'next', color: string): CanvasTexture {
+  const [canvas, ctx] = canvas2d(128, 128);
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = 12;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  if (icon === 'home') {
+    ctx.beginPath();
+    ctx.moveTo(24, 68); ctx.lineTo(64, 32); ctx.lineTo(104, 68);
+    ctx.moveTo(36, 62); ctx.lineTo(36, 100); ctx.lineTo(92, 100); ctx.lineTo(92, 62);
+    ctx.stroke();
+  } else if (icon === 'menu') {
+    for (const y of [44, 64, 84]) {
+      ctx.beginPath(); ctx.moveTo(32, y); ctx.lineTo(96, y); ctx.stroke();
+    }
+  } else if (icon === 'back') {
+    ctx.beginPath();
+    ctx.moveTo(84, 44); ctx.lineTo(48, 64); ctx.lineTo(84, 84);
+    ctx.stroke();
+  } else {
+    ctx.beginPath();
+    ctx.moveTo(48, 44); ctx.lineTo(84, 64); ctx.lineTo(48, 84);
+    ctx.stroke();
+  }
+  return makeCanvasTexture(THREE, canvas);
+}
+
+/** Tiling fine noise — the moulded-plastic grain under the gloss. */
+function grainTexture(THREE: Three): CanvasTexture {
+  const [canvas, ctx] = canvas2d(128, 128);
+  const img = ctx.createImageData(128, 128);
+  const rand = mulberry(0xBEEF);
+  for (let i = 0; i < 128 * 128; i++) {
+    const v = 118 + Math.floor(rand() * 20);
+    img.data[i * 4] = v;
+    img.data[i * 4 + 1] = v;
+    img.data[i * 4 + 2] = v;
+    img.data[i * 4 + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+  const texture = makeCanvasTexture(THREE, canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(6, 10);
+  return texture;
 }
 
 /** Soft radial sprite used for the emitter glow. */
