@@ -3,14 +3,15 @@ import type { ThreeContext, ThreeFrame, ThreeScene } from '@acme/ui';
 
 /** What the stage hands the scene each frame. */
 export interface DeviceSceneParams {
-  /** `placeholder` is the box model below; `h-lynk-entry` swaps in the real model when it lands. */
+  /** `placeholder` is the procedural model below; `h-lynk-entry` swaps in the real GLB when it lands. */
   model: 'placeholder' | 'h-lynk-entry';
 }
 
 type Three = ThreeContext['THREE'];
 type Group = InstanceType<Three['Group']>;
 type Material = InstanceType<Three['Material']>;
-type Geometry = InstanceType<Three['BufferGeometry']>;
+type Geometry = NonNullable<ConstructorParameters<Three['Mesh']>[0]>;
+type Mesh = InstanceType<Three['Mesh']>;
 
 /** Idle yaw swing, radians, and its period, seconds. */
 const YAW = 0.32;
@@ -21,20 +22,35 @@ const MAX_TILT = (8 * Math.PI) / 180;
 const REST_YAW = -0.38;
 
 const CORE = hlynk.core;
+/** Palette for the on-screen HUD (the screen's own UI, drawn on canvas). */
+const HUD = {
+  bg0: '#02081F',
+  bg1: '#06265C',
+  panel: '#0A1E4A',
+  line: '#27498F',
+  text: '#F8F8F8',
+  dim: '#8FB3E8',
+  red: '#F80000',
+  redDeep: '#B00000',
+  green: '#35D07F',
+  cyan: '#4BA8F0',
+  amber: '#FCB034',
+};
 
 /**
- * The H-Lynk Core placeholder (canon Decision #16): a matte red body at the
- * unit's proportions, a black scanner head across the top with two red
- * emitters and a red fan of light above it, a black stub antenna top-left, a
- * dark bezel round a 3:4 screen, and the bottom control row of black keys
- * either side of a red-ringed square trackpad. Units are body widths.
+ * The H-Lynk Core procedural model (canon Decision #16): a matte red
+ * rounded body, a black scanner head across the top with a camera lens,
+ * two red emitters and a red fan of light above it, a stub antenna
+ * top-left, a glossy screen running the H-Lynk HUD, printed wordmarks,
+ * and the bottom control row either side of a red-ringed trackpad.
+ * Units are body widths.
  *
- * The real model replaces the group built by `buildPlaceholder`; framing,
+ * The real GLB replaces the group built by `buildDevice`; framing,
  * lighting and motion stay.
  */
 export function createDeviceScene({ THREE, renderer }: ThreeContext, initial: DeviceSceneParams): ThreeScene<DeviceSceneParams> {
   renderer.outputColorSpace = THREE.SRGBColorSpace;
-  // No tone curve: the body has to stay the measured hlynk.core.body red, not drift to orange.
+  // Filmic curve off: the body has to stay the measured hlynk.core.body red, not drift to orange.
   renderer.toneMapping = THREE.NoToneMapping;
 
   const scene = new THREE.Scene();
@@ -42,10 +58,16 @@ export function createDeviceScene({ THREE, renderer }: ThreeContext, initial: De
   camera.position.set(0, 0.12, 5.4);
   camera.lookAt(0, 0.05, 0);
 
-  const geometries: Geometry[] = [];
-  const materials: Material[] = [];
-  const track = <G extends Geometry>(g: G) => (geometries.push(g), g);
-  const mat = <M extends Material>(m: M) => (materials.push(m), m);
+  // A tiny studio environment — sky gradient plus two softbox cards — baked
+  // through PMREM. This is what sells the gloss: screen glare, plastic
+  // sheen, metal rings. Fails soft; the directional rig still stands alone.
+  try {
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    scene.environment = pmrem.fromScene(studioEnvironment(THREE), 0.04).texture;
+    pmrem.dispose();
+  } catch {
+    scene.environment = null;
+  }
 
   // Key from the upper left, a cool rim from behind right, soft fill.
   scene.add(new THREE.HemisphereLight(0xffffff, 0x1c1e21, 1.1));
@@ -56,7 +78,7 @@ export function createDeviceScene({ THREE, renderer }: ThreeContext, initial: De
   rim.position.set(4, 2, -4);
   scene.add(rim);
 
-  const device = buildPlaceholder(THREE, track, mat);
+  const device = buildDevice(THREE);
   scene.add(device);
 
   let tiltX = 0;
@@ -83,58 +105,154 @@ export function createDeviceScene({ THREE, renderer }: ThreeContext, initial: De
       tiltY += (goalY - tiltY) * k;
       device.rotation.set(tiltX, target + tiltY, 0);
     },
-    dispose: () => {
-      geometries.forEach((g) => g.dispose());
-      materials.forEach((m) => m.dispose());
-    },
+    dispose: () => device.userData.dispose(),
   };
 }
 
-function buildPlaceholder(
-  THREE: Three,
-  track: <G extends Geometry>(g: G) => G,
-  mat: <M extends Material>(m: M) => M,
-): Group {
+/** One tracked material/geometry bucket so `dispose` frees everything. */
+function buildDevice(THREE: Three): Group {
+  const geometries: Geometry[] = [];
+  const materials: Material[] = [];
+  const textures: { dispose(): void }[] = [];
+  const track = <G extends Geometry>(g: G) => (geometries.push(g), g);
+  const mat = <M extends Material>(m: M) => (materials.push(m), m);
+  const tex = <T extends { dispose(): void }>(t: T) => (textures.push(t), t);
+
   const group = new THREE.Group();
+  group.userData.dispose = () => {
+    geometries.forEach((g) => g.dispose());
+    materials.forEach((m) => m.dispose());
+    textures.forEach((t) => t.dispose());
+  };
+
   const W = 1;
   const H = 1.78;
   const D = 0.16;
+  const top = H / 2;
+  const front = D / 2;
 
-  const body = mat(new THREE.MeshStandardMaterial({ color: CORE.body, roughness: 0.62, metalness: 0.02 }));
-  const black = mat(new THREE.MeshStandardMaterial({ color: CORE.black, roughness: 0.45, metalness: 0.1 }));
-  const glass = mat(new THREE.MeshStandardMaterial({ color: brand.night, roughness: 0.22, metalness: 0.2, emissive: brand.royal, emissiveIntensity: 0.04 }));
-  const emitter = mat(new THREE.MeshStandardMaterial({ color: led.on, emissive: led.on, emissiveIntensity: 1.4 }));
-  const ring = mat(new THREE.MeshStandardMaterial({ color: CORE.ring, emissive: CORE.ring, emissiveIntensity: 0.5, roughness: 0.4 }));
-  // The fan fades out as it rises: per-vertex alpha, normal blending so it
-  // reads red on a daylit page as well as a night one.
-  const fan = mat(
-    new THREE.MeshBasicMaterial({ color: led.on, vertexColors: true, transparent: true, depthWrite: false, side: THREE.DoubleSide }),
-  );
+  // --- materials -----------------------------------------------------------
 
-  const box = (w: number, h: number, d: number, m: Material, x: number, y: number, z: number) => {
-    const mesh = new THREE.Mesh(track(new THREE.BoxGeometry(w, h, d)), m);
+  /** Matte red shell: plastic sheen from the room env, no metal. */
+  const body = mat(new THREE.MeshStandardMaterial({
+    color: CORE.body, roughness: 0.42, metalness: 0.04, envMapIntensity: 0.7,
+  }));
+  /** Black rubberised trim: head, bezel, keys — softer reflections. */
+  const black = mat(new THREE.MeshStandardMaterial({
+    color: CORE.black, roughness: 0.5, metalness: 0.12, envMapIntensity: 0.6,
+  }));
+  /** Glossy black plastic: lens barrel, trackpad face. */
+  const pianoBlack = mat(new THREE.MeshStandardMaterial({
+    color: CORE.black, roughness: 0.14, metalness: 0.3, envMapIntensity: 1.0,
+  }));
+  /** Camera lens glass. */
+  const lensGlass = mat(new THREE.MeshStandardMaterial({
+    color: '#0A1030', roughness: 0.05, metalness: 0.55, envMapIntensity: 1.4,
+  }));
+  /** Screen glass running the HUD texture; the map doubles as the emitter. */
+  const hudTexture = tex(hudCanvasTexture(THREE));
+  const screen = mat(new THREE.MeshStandardMaterial({
+    map: hudTexture,
+    emissiveMap: hudTexture,
+    emissive: '#FFFFFF',
+    emissiveIntensity: 0.62,
+    roughness: 0.18,
+    metalness: 0.3,
+    envMapIntensity: 1.1,
+  }));
+  const emitter = mat(new THREE.MeshStandardMaterial({
+    color: led.on, emissive: led.on, emissiveIntensity: 1.8, roughness: 0.25,
+  }));
+  const ring = mat(new THREE.MeshStandardMaterial({
+    color: CORE.ring, emissive: CORE.ring, emissiveIntensity: 0.5, roughness: 0.4,
+  }));
+  /** The fan fades as it rises: per-vertex alpha, normal blending so it
+   * reads red on a daylit page as well as a night one. */
+  const fan = mat(new THREE.MeshBasicMaterial({
+    color: led.on, vertexColors: true, transparent: true, depthWrite: false, side: THREE.DoubleSide,
+  }));
+  /** Additive glow at the fan's base. */
+  const glow = mat(new THREE.SpriteMaterial({
+    map: tex(radialGlowTexture(THREE)), color: led.on, transparent: true, depthWrite: false,
+    blending: THREE.AdditiveBlending, opacity: 0.85,
+  }));
+
+  // --- helpers -------------------------------------------------------------
+
+  /** Rounded slab: a rounded-rect face extruded with a small bevel. */
+  const rounded = (w: number, h: number, d: number, r: number) => {
+    const shape = new THREE.Shape();
+    const x = -w / 2;
+    const y = -h / 2;
+    shape.moveTo(x + r, y);
+    shape.lineTo(x + w - r, y);
+    shape.absarc(x + w - r, y + r, r, -Math.PI / 2, 0);
+    shape.lineTo(x + w, y + h - r);
+    shape.absarc(x + w - r, y + h - r, r, 0, Math.PI / 2);
+    shape.lineTo(x + r, y + h);
+    shape.absarc(x + r, y + h - r, r, Math.PI / 2, Math.PI);
+    shape.lineTo(x, y + r);
+    shape.absarc(x + r, y + r, r, Math.PI, Math.PI * 1.5);
+    const bevel = Math.min(0.012, d / 4);
+    const geo = new THREE.ExtrudeGeometry(shape, {
+      depth: d - bevel * 2,
+      bevelEnabled: true,
+      bevelThickness: bevel,
+      bevelSize: bevel,
+      bevelSegments: 2,
+      curveSegments: 6,
+    });
+    geo.translate(0, 0, -(d - bevel * 2) / 2);
+    return track(geo);
+  };
+
+  const box = (geo: Geometry, m: Material, x: number, y: number, z: number): Mesh => {
+    const mesh = new THREE.Mesh(geo, m);
     mesh.position.set(x, y, z);
     group.add(mesh);
     return mesh;
   };
 
-  const top = H / 2;
-  const front = D / 2;
+  /** Printed text on a transparent decal plane. */
+  const decal = (text: string, w: number, opts: { color?: string; weight?: number; size?: number } = {}) => {
+    const t = tex(textTexture(THREE, text, opts));
+    const m = mat(new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false }));
+    // textTexture draws into a 512×128 canvas.
+    return { mesh: new THREE.Mesh(track(new THREE.PlaneGeometry(w, w * 0.25)), m), h: w * 0.25 };
+  };
 
-  // Body.
-  box(W, H, D, body, 0, 0, 0);
-  // Scanner head across the top edge, proud of the body.
-  const headH = 0.14;
-  const headY = top - headH / 2 - 0.03;
-  box(0.86, headH, D + 0.04, black, 0.04, headY, 0);
-  // Two red emitters in the head.
-  for (const x of [0.2, 0.36]) {
-    const lens = new THREE.Mesh(track(new THREE.CylinderGeometry(0.026, 0.026, 0.02, 20)), emitter);
-    lens.rotation.x = Math.PI / 2;
-    lens.position.set(x, headY, front + 0.03);
-    group.add(lens);
+  // --- body ----------------------------------------------------------------
+
+  // Shell: rounded slab, corner radius reads at the silhouette.
+  box(rounded(W, H, D, 0.055), body, 0, 0, 0);
+  // Chin under the control row: the slight lower bumper of the reference.
+  box(rounded(W * 0.98, 0.1, D + 0.015, 0.04), body, 0, -top + 0.07, 0);
+
+  // --- scanner head --------------------------------------------------------
+
+  const headH = 0.17;
+  const headY = top - headH / 2 - 0.02;
+  box(rounded(0.9, headH, D + 0.05, 0.05), black, 0.04, headY, 0);
+
+  // Camera lens on the head's left: barrel, glass and a spec dot.
+  box(track(new THREE.CylinderGeometry(0.052, 0.052, 0.03, 32)), pianoBlack, -0.28, headY, front + 0.035).rotation.x = Math.PI / 2;
+  box(track(new THREE.CylinderGeometry(0.038, 0.038, 0.032, 32)), lensGlass, -0.28, headY, front + 0.036).rotation.x = Math.PI / 2;
+  box(track(new THREE.CylinderGeometry(0.012, 0.012, 0.034, 20)), emitter, -0.28, headY, front + 0.037).rotation.x = Math.PI / 2;
+
+  // Two red emitters in the head's centre.
+  for (const x of [0.16, 0.34]) {
+    box(track(new THREE.CylinderGeometry(0.028, 0.028, 0.022, 20)), emitter, x, headY, front + 0.03).rotation.x = Math.PI / 2;
   }
-  // The red fan of light the scanner projects upward.
+  // Thin status slit between the emitters.
+  box(rounded(0.09, 0.014, 0.012, 0.006), emitter, 0.25, headY + 0.055, front + 0.028);
+
+  // Antenna, top left: barrel with a rounded cap.
+  box(track(new THREE.CylinderGeometry(0.038, 0.045, 0.2, 24)), black, -0.4, top + 0.1, -0.01);
+  box(track(new THREE.SphereGeometry(0.041, 24, 16)), black, -0.4, top + 0.2, -0.01);
+  // Antenna base ring.
+  box(track(new THREE.CylinderGeometry(0.05, 0.055, 0.03, 24)), pianoBlack, -0.4, top + 0.005, -0.01);
+
+  // The red fan of light the scanner projects upward, plus its base glow.
   const fanShape = new THREE.Shape();
   fanShape.moveTo(-0.05, 0);
   fanShape.lineTo(0.05, 0);
@@ -149,23 +267,334 @@ function buildPlaceholder(
   }
   fanGeometry.setAttribute('color', new THREE.BufferAttribute(fanColors, 4));
   const fanMesh = new THREE.Mesh(fanGeometry, fan);
-  fanMesh.position.set(0.28, top, 0);
+  fanMesh.position.set(0.25, top, 0);
   group.add(fanMesh);
-  // Stub antenna, top left.
-  box(0.07, 0.15, 0.07, black, -0.38, top + 0.06, 0);
-  // Bezel and the 3:4 screen.
-  const screenY = 0.18;
-  box(0.86, 1.1, 0.02, black, 0, screenY, front + 0.01);
-  box(0.75, 1.0, 0.02, glass, 0, screenY, front + 0.02);
-  // Control row: home, menu | trackpad | back, forward.
-  const rowY = -0.66;
-  for (const x of [-0.39, -0.25, 0.25, 0.39]) box(0.11, 0.11, 0.04, black, x, rowY, front + 0.02);
-  box(0.26, 0.26, 0.03, ring, 0, rowY, front + 0.015);
-  box(0.22, 0.22, 0.045, black, 0, rowY, front + 0.02);
-  // Side keys: volume and power on the right, the action key on the left.
-  for (const y of [0.42, 0.26, 0.02]) box(0.03, 0.12, 0.08, black, W / 2 + 0.012, y, 0);
-  box(0.03, 0.16, 0.08, black, -W / 2 - 0.012, 0.3, 0);
+  const glowSprite = new THREE.Sprite(glow);
+  glowSprite.scale.set(0.9, 0.35, 1);
+  glowSprite.position.set(0.25, top + 0.02, 0.02);
+  group.add(glowSprite);
+
+  // --- face ----------------------------------------------------------------
+
+  // "EngineX" printed across the head.
+  const enginex = decal('EngineX', 0.34, { size: 44, weight: 800 });
+  enginex.mesh.position.set(0.02, headY + 0.015, front + 0.028);
+  group.add(enginex.mesh);
+
+  // Recessed bezel ring, then the screen glass itself.
+  const screenY = 0.17;
+  box(rounded(0.88, 1.08, 0.03, 0.03), black, 0, screenY, front + 0.012);
+  box(track(new THREE.PlaneGeometry(0.8, 1.0)), screen, 0, screenY, front + 0.029);
+
+  // "H-Lynk Core" printed under the screen.
+  const wordmark = decal('H-Lynk Core', 0.3, { size: 40, weight: 700 });
+  wordmark.mesh.position.set(0, -0.41, front + 0.012);
+  group.add(wordmark.mesh);
+
+  // --- control row ----------------------------------------------------------
+
+  const rowY = -0.64;
+  // Two keys each side of the trackpad, each with a printed glyph.
+  const keys: { x: number; glyph: string }[] = [
+    { x: -0.4, glyph: '⌂' }, { x: -0.26, glyph: '≡' },
+    { x: 0.26, glyph: '↺' }, { x: 0.4, glyph: '›' },
+  ];
+  for (const { x, glyph } of keys) {
+    box(rounded(0.12, 0.13, 0.045, 0.02), pianoBlack, x, rowY, front + 0.02);
+    const g = decal(glyph, 0.07, { size: 52, weight: 700, color: '#BEC0C2' });
+    g.mesh.position.set(x, rowY, front + 0.045);
+    group.add(g.mesh);
+  }
+  // Trackpad: red ring on a gloss black pad.
+  box(rounded(0.27, 0.27, 0.032, 0.04), ring, 0, rowY, front + 0.015);
+  box(rounded(0.225, 0.225, 0.045, 0.03), pianoBlack, 0, rowY, front + 0.02);
+
+  // --- side keys -------------------------------------------------------------
+  // Right edge: two narrow keys with red accent slits between them.
+  for (const y of [0.36, 0.14]) {
+    box(rounded(0.03, 0.15, 0.09, 0.012), black, W / 2 + 0.012, y, 0);
+  }
+  box(rounded(0.008, 0.2, 0.05, 0.004), emitter, W / 2 + 0.028, 0.25, 0);
+  // Right edge, lower: a single round key.
+  box(track(new THREE.CylinderGeometry(0.035, 0.035, 0.03, 24)), pianoBlack, W / 2 + 0.012, -0.05, 0).rotation.z = Math.PI / 2;
+  // Left edge: the long action key.
+  box(rounded(0.03, 0.18, 0.09, 0.012), black, -W / 2 - 0.012, 0.28, 0);
 
   group.position.y = -0.12;
   return group;
+}
+
+/**
+ * A minimal studio for PMREM: a gradient dome (bright zenith, dark floor)
+ * plus two white softbox cards where a product shoot would put them. The
+ * environment only exists long enough to be baked to a texture.
+ */
+function studioEnvironment(THREE: Three): InstanceType<Three['Scene']> {
+  const env = new THREE.Scene();
+  const dome = new THREE.Mesh(
+    new THREE.SphereGeometry(10, 24, 16),
+    new THREE.MeshBasicMaterial({ side: THREE.BackSide, vertexColors: true }),
+  );
+  const pos = dome.geometry.getAttribute('position');
+  const colors = new Float32Array(pos.count * 3);
+  for (let i = 0; i < pos.count; i++) {
+    const t = (pos.getY(i) / 10 + 1) / 2; // 0 floor → 1 zenith
+    colors.set([0.04 + t * 0.9, 0.05 + t * 0.92, 0.09 + t], i * 3);
+  }
+  dome.geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  env.add(dome);
+  // Softbox left of camera, a cooler card behind right — where the screen
+  // glare and the red shell's sheen come from.
+  const softbox = (w: number, h: number, color: number, intensity: number, px: number, py: number, pz: number) => {
+    const m = new THREE.Mesh(
+      new THREE.PlaneGeometry(w, h),
+      new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(intensity) }),
+    );
+    m.position.set(px, py, pz);
+    m.lookAt(0, 0, 0);
+    env.add(m);
+  };
+  softbox(6, 8, 0xffffff, 6, -6, 5, 4);
+  softbox(4, 6, 0x9fc8ff, 3, 6, 2, -5);
+  return env;
+}
+
+// ============================================================================
+// Canvas textures — all the printed/lit detail lives here.
+// ============================================================================
+
+type CanvasTexture = InstanceType<Three['CanvasTexture']>;
+
+function makeCanvasTexture(THREE: Three, canvas: HTMLCanvasElement): CanvasTexture {
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 4;
+  return texture;
+}
+
+function canvas2d(width: number, height: number): [HTMLCanvasElement, CanvasRenderingContext2D] {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  return [canvas, canvas.getContext('2d') as CanvasRenderingContext2D];
+}
+
+/** Soft radial sprite used for the emitter glow. */
+function radialGlowTexture(THREE: Three): CanvasTexture {
+  const [canvas, ctx] = canvas2d(256, 256);
+  const g = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
+  g.addColorStop(0, 'rgba(255,80,80,0.9)');
+  g.addColorStop(0.4, 'rgba(248,0,0,0.35)');
+  g.addColorStop(1, 'rgba(248,0,0,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 256, 256);
+  return makeCanvasTexture(THREE, canvas);
+}
+
+/** A single line of printed text on a transparent plate. */
+function textTexture(THREE: Three, text: string, { size = 48, weight = 700, color = '#FFFFFF' } = {}): CanvasTexture {
+  const [canvas, ctx] = canvas2d(512, 128);
+  ctx.font = `${weight} ${size}px 'Space Grotesk', system-ui, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = color;
+  ctx.fillText(text, 256, 64);
+  return makeCanvasTexture(THREE, canvas);
+}
+
+/**
+ * The screen's UI, drawn once to a 768×1024 canvas: status bar, mon card,
+ * four stat chips, the CALL MON bar and the bottom nav — the reference's
+ * layout in the H-Lynk palette.
+ */
+function hudCanvasTexture(THREE: Three): CanvasTexture {
+  const W = 768;
+  const H = 1024;
+  const [canvas, ctx] = canvas2d(W, H);
+
+  // Backdrop: deep navy lifting to royal at the top.
+  const bg = ctx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, HUD.bg1);
+  bg.addColorStop(0.35, HUD.bg0);
+  bg.addColorStop(1, HUD.bg0);
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  const font = (size: number, weight = 700) => `${weight} ${size}px 'Space Grotesk', system-ui, sans-serif`;
+  const roundedRect = (x: number, y: number, w: number, h: number, r: number) => {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  };
+
+  // --- status bar ----------------------------------------------------------
+  ctx.fillStyle = HUD.cyan;
+  ctx.font = font(26, 600);
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('⚡ H-Lynk Core', 28, 40);
+  // Signal bars + battery, right aligned.
+  ctx.fillStyle = HUD.dim;
+  for (let i = 0; i < 4; i++) ctx.fillRect(W - 200 + i * 12, 48 - i * 8, 8, 8 + i * 8);
+  roundedRect(W - 120, 28, 56, 26, 6);
+  ctx.strokeStyle = HUD.dim;
+  ctx.lineWidth = 3;
+  ctx.stroke();
+  ctx.fillRect(W - 114, 34, 36, 14);
+
+  // --- mon card --------------------------------------------------------------
+  ctx.textAlign = 'left';
+  ctx.fillStyle = HUD.text;
+  ctx.font = font(54, 800);
+  ctx.fillText('Hood Ratti', 32, 118);
+  ctx.fillStyle = HUD.dim;
+  ctx.font = font(30, 600);
+  ctx.fillText('Lv. 12', 34, 168);
+  // SCAN READY pill.
+  roundedRect(W - 250, 96, 220, 56, 28);
+  ctx.fillStyle = HUD.green;
+  ctx.fill();
+  ctx.fillStyle = '#04240F';
+  ctx.font = font(26, 800);
+  ctx.textAlign = 'center';
+  ctx.fillText('SCAN READY', W - 140, 124);
+
+  // Radar ring: outer circle, ticks, inner ring, mon silhouette.
+  const cx = W / 2;
+  const cy = 380;
+  const R = 175;
+  ctx.strokeStyle = HUD.line;
+  ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
+  ctx.strokeStyle = HUD.cyan;
+  ctx.globalAlpha = 0.7;
+  for (let i = 0; i < 36; i++) {
+    const a = (i / 36) * Math.PI * 2;
+    const inner = i % 3 === 0 ? R - 18 : R - 9;
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(a) * inner, cy + Math.sin(a) * inner);
+    ctx.lineTo(cx + Math.cos(a) * R, cy + Math.sin(a) * R);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  // Scan arc + brackets.
+  ctx.strokeStyle = HUD.red;
+  ctx.lineWidth = 6;
+  ctx.beginPath(); ctx.arc(cx, cy, R + 14, -0.9, -0.2); ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx, cy, R + 14, Math.PI - 0.9, Math.PI - 0.2); ctx.stroke();
+  // Inner dashed ring.
+  ctx.strokeStyle = HUD.line;
+  ctx.lineWidth = 2;
+  ctx.setLineDash([6, 10]);
+  ctx.beginPath(); ctx.arc(cx, cy, R - 34, 0, Math.PI * 2); ctx.stroke();
+  ctx.setLineDash([]);
+  // Mon silhouette: round-eared critter on a glowing plate.
+  const plate = ctx.createRadialGradient(cx, cy + 130, 10, cx, cy + 130, 120);
+  plate.addColorStop(0, 'rgba(248,0,0,0.55)');
+  plate.addColorStop(1, 'rgba(248,0,0,0)');
+  ctx.fillStyle = plate;
+  ctx.beginPath(); ctx.ellipse(cx, cy + 128, 118, 30, 0, 0, Math.PI * 2); ctx.fill();
+  // Body.
+  ctx.fillStyle = '#F4F4F6';
+  ctx.beginPath(); ctx.ellipse(cx, cy + 40, 62, 74, 0, 0, Math.PI * 2); ctx.fill();
+  // Hoodie.
+  ctx.fillStyle = '#2A2D3A';
+  ctx.beginPath(); ctx.ellipse(cx, cy + 62, 64, 52, 0, 0.15, Math.PI - 0.15); ctx.fill();
+  // Head + big round ears.
+  ctx.fillStyle = '#F4F4F6';
+  ctx.beginPath(); ctx.arc(cx, cy - 48, 58, 0, Math.PI * 2); ctx.fill();
+  for (const ex of [-52, 52]) {
+    ctx.beginPath(); ctx.arc(cx + ex, cy - 96, 26, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#F8B0B0';
+    ctx.beginPath(); ctx.arc(cx + ex, cy - 96, 14, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#F4F4F6';
+  }
+  // Eyes + nose.
+  ctx.fillStyle = HUD.redDeep;
+  ctx.beginPath(); ctx.arc(cx - 22, cy - 56, 7, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx + 22, cy - 56, 7, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#2A2D3A';
+  ctx.beginPath(); ctx.arc(cx, cy - 34, 6, 0, Math.PI * 2); ctx.fill();
+  // Tail curl.
+  ctx.strokeStyle = '#F4F4F6';
+  ctx.lineWidth = 12;
+  ctx.beginPath(); ctx.arc(cx + 92, cy + 80, 30, Math.PI * 0.7, Math.PI * 1.9); ctx.stroke();
+
+  // --- stat chips --------------------------------------------------------------
+  const stats = [
+    ['♥', 'HP', '82 / 82', HUD.red],
+    ['⚡', 'ENERGY', '74 / 100', HUD.cyan],
+    ['◕', 'FULLNESS', '68 / 100', HUD.amber],
+    ['☷', 'SOCIAL', '92 / 100', HUD.green],
+  ];
+  const chipW = 170;
+  const chipH = 130;
+  const gap = 12;
+  const startX = (W - chipW * 4 - gap * 3) / 2;
+  const chipY = 620;
+  ctx.font = font(24, 700);
+  stats.forEach(([icon, label, value, color], i) => {
+    const x = startX + i * (chipW + gap);
+    roundedRect(x, chipY, chipW, chipH, 14);
+    ctx.fillStyle = HUD.panel;
+    ctx.fill();
+    ctx.strokeStyle = HUD.line;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fillStyle = color as string;
+    ctx.font = font(26, 800);
+    ctx.fillText(icon as string, x + 16, chipY + 30);
+    ctx.fillStyle = HUD.dim;
+    ctx.font = font(18, 700);
+    ctx.fillText(label as string, x + 52, chipY + 30);
+    ctx.fillStyle = HUD.text;
+    ctx.font = font(22, 800);
+    ctx.fillText(value as string, x + 16, chipY + 66);
+    // Bar.
+    const fill = parseInt((value as string).split(' ')[0], 10) / parseInt((value as string).split(' ')[2], 10);
+    roundedRect(x + 16, chipY + 92, chipW - 32, 12, 6);
+    ctx.fillStyle = HUD.line;
+    ctx.fill();
+    roundedRect(x + 16, chipY + 92, (chipW - 32) * fill, 12, 6);
+    ctx.fillStyle = color as string;
+    ctx.fill();
+  });
+
+  // --- CALL MON bar ----------------------------------------------------------
+  roundedRect(32, 790, W - 64, 86, 43);
+  const call = ctx.createLinearGradient(32, 0, W - 32, 0);
+  call.addColorStop(0, HUD.redDeep);
+  call.addColorStop(1, HUD.red);
+  ctx.fillStyle = call;
+  ctx.fill();
+  ctx.fillStyle = HUD.text;
+  ctx.font = font(40, 900);
+  ctx.fillText('∿  CALL MON  ›', W / 2, 834);
+
+  // --- bottom nav --------------------------------------------------------------
+  const nav: [string, string, boolean][] = [
+    ['⌂', 'DEX', false], ['♢', 'CREW', false], ['♥', 'CARE', true], ['▣', 'BAG', false], ['◈', 'CITY', false],
+  ];
+  const navY = 920;
+  const navW = (W - 64) / 5;
+  nav.forEach(([icon, label, active], i) => {
+    const x = 32 + i * navW;
+    roundedRect(x + 8, navY, navW - 16, 84, 16);
+    ctx.fillStyle = active ? HUD.red : HUD.panel;
+    ctx.fill();
+    ctx.strokeStyle = active ? HUD.red : HUD.line;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fillStyle = HUD.text;
+    ctx.font = font(30, 700);
+    ctx.fillText(icon, x + navW / 2, navY + 32);
+    ctx.font = font(18, 800);
+    ctx.fillText(label, x + navW / 2, navY + 62);
+  });
+
+  return makeCanvasTexture(THREE, canvas);
 }
