@@ -25,7 +25,7 @@ export const bunnyStorage = ({
   const host = storageHost(region);
   const publicBase = cleanCdnUrl(cdnUrl);
 
-  return ({ prefix = '' }) => {
+  return ({ collection, prefix = '' }) => {
     const key = (filename: string) => path.posix.join(prefix, filename);
 
     return {
@@ -91,7 +91,7 @@ export const bunnyStorage = ({
       staticHandler: async (req, { params }) => {
         const resolvedPrefix = await getFilePrefix({
           req,
-          collection: { slug: 'media' } as never,
+          collection,
         });
         const objectKey = path.posix.join(
           resolvedPrefix || prefix,
