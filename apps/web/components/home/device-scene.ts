@@ -661,10 +661,11 @@ function hudRegionAt(u: number, v: number): HudRegion | null {
   if (x >= 32 && x <= W - 32 && y >= 920 && y <= 1004) {
     return `nav-${Math.min(4, Math.floor((x - 32) / ((W - 64) / 5))) as 0 | 1 | 2 | 3 | 4}`;
   }
-  const chipStart = (W - 170 * 4 - 12 * 3) / 2;
-  if (y >= 620 && y <= 750 && x >= chipStart && x <= chipStart + 170 * 4 + 12 * 3) {
-    const i = Math.floor((x - chipStart) / 182);
-    if ((x - chipStart) % 182 <= 170) return `chip-${i as 0 | 1 | 2 | 3}`;
+  const chipW = (W - 64 - 36) / 4;
+  const chipStride = chipW + 12;
+  if (y >= 620 && y <= 750 && x >= 32 && x <= 32 + chipStride * 4 - 12) {
+    const i = Math.floor((x - 32) / chipStride);
+    if ((x - 32) % chipStride <= chipW) return `chip-${i as 0 | 1 | 2 | 3}`;
   }
   return null;
 }
@@ -832,14 +833,15 @@ function drawHud(ctx: CanvasRenderingContext2D, tab: HudTab, hover: HudRegion | 
     ['◕', 'FULLNESS', '68 / 100', HUD.amber],
     ['☷', 'SOCIAL', '92 / 100', HUD.green],
   ];
-  const chipW = 170;
-  const chipH = 130;
+  // Chips sit on the same 32px rails as the CALL MON bar and the nav row.
   const gap = 12;
-  const startX = (W - chipW * 4 - gap * 3) / 2;
+  const chipW = (W - 64 - gap * 3) / 4;
+  const chipH = 130;
   const chipY = 620;
+  ctx.textAlign = 'left';
   ctx.font = font(24, 700);
   stats.forEach(([icon, label, value, color], i) => {
-    const x = startX + i * (chipW + gap);
+    const x = 32 + i * (chipW + gap);
     const lit = hover === `chip-${i}`;
     roundedRect(x, chipY, chipW, chipH, 14);
     ctx.fillStyle = lit ? '#12306B' : HUD.panel;
@@ -878,6 +880,7 @@ function drawHud(ctx: CanvasRenderingContext2D, tab: HudTab, hover: HudRegion | 
   ctx.fillStyle = call;
   ctx.fill();
   ctx.shadowBlur = 0;
+  ctx.textAlign = 'center';
   ctx.fillStyle = HUD.text;
   ctx.font = font(40, 900);
   ctx.fillText('∿  CALL MON  ›', W / 2, 834);
