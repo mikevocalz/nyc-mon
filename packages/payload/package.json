@@ -57,6 +57,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@acme/content": "workspace:*",
     "@acme/core": "workspace:*",
     "@acme/ui": "workspace:*",
     "@aws-sdk/client-sns": "catalog:",

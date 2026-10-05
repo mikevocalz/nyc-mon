@@ -21,6 +21,7 @@ import { AuditEvents } from './collections/AuditEvents';
 import { CareStates } from './collections/CareStates';
 import { Eggs } from './collections/Eggs';
 import { GuardianConsents } from './collections/GuardianConsents';
+import { IdempotencyRecords } from './collections/IdempotencyRecords';
 import { IntegrityRuns } from './collections/IntegrityRuns';
 import { MonInstances } from './collections/MonInstances';
 
@@ -41,7 +42,7 @@ export default buildConfig({
     api: PAYLOAD_API_ROUTE,
   },
   endpoints: consoleEndpoints,
-  collections: [Users, Media, GuardianConsents, Eggs, MonInstances, CareStates, AuditEvents, IntegrityRuns],
+  collections: [Users, Media, GuardianConsents, Eggs, MonInstances, CareStates, AuditEvents, IntegrityRuns, IdempotencyRecords],
   plugins: [
     // Generates Better Auth's session, account, verification and passkey
     // collections; `users` is written by hand in collections/Users.ts.

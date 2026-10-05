@@ -311,7 +311,18 @@ export async function up({ db, payload, req }: MigrateUpArgs): Promise<void> {
   	"created_at" timestamp(3) with time zone DEFAULT now() NOT NULL,
   	"updated_at" timestamp(3) with time zone DEFAULT now() NOT NULL
   );
-  
+
+  CREATE TABLE "payload"."idempotency_records" (
+  	"id" serial PRIMARY KEY NOT NULL,
+  	"key" varchar NOT NULL,
+  	"path" varchar NOT NULL,
+  	"status" numeric NOT NULL,
+  	"content_type" varchar NOT NULL,
+  	"body" varchar NOT NULL,
+  	"updated_at" timestamp(3) with time zone DEFAULT now() NOT NULL,
+  	"created_at" timestamp(3) with time zone DEFAULT now() NOT NULL
+  );
+
   CREATE TABLE "payload"."sessions" (
   	"id" serial PRIMARY KEY NOT NULL,
   	"expires_at" timestamp(3) with time zone NOT NULL,
@@ -569,6 +580,7 @@ export async function up({ db, payload, req }: MigrateUpArgs): Promise<void> {
   	"care_states_id" integer,
   	"audit_events_id" integer,
   	"integrity_runs_id" integer,
+  	"idempotency_records_id" integer,
   	"sessions_id" integer,
   	"accounts_id" integer,
   	"verifications_id" integer,
@@ -648,6 +660,7 @@ export async function up({ db, payload, req }: MigrateUpArgs): Promise<void> {
   ALTER TABLE "payload"."payload_locked_documents_rels" ADD CONSTRAINT "payload_locked_documents_rels_care_states_fk" FOREIGN KEY ("care_states_id") REFERENCES "payload"."care_states"("id") ON DELETE cascade ON UPDATE no action;
   ALTER TABLE "payload"."payload_locked_documents_rels" ADD CONSTRAINT "payload_locked_documents_rels_audit_events_fk" FOREIGN KEY ("audit_events_id") REFERENCES "payload"."audit_events"("id") ON DELETE cascade ON UPDATE no action;
   ALTER TABLE "payload"."payload_locked_documents_rels" ADD CONSTRAINT "payload_locked_documents_rels_integrity_runs_fk" FOREIGN KEY ("integrity_runs_id") REFERENCES "payload"."integrity_runs"("id") ON DELETE cascade ON UPDATE no action;
+  ALTER TABLE "payload"."payload_locked_documents_rels" ADD CONSTRAINT "payload_locked_documents_rels_idempotency_records_fk" FOREIGN KEY ("idempotency_records_id") REFERENCES "payload"."idempotency_records"("id") ON DELETE cascade ON UPDATE no action;
   ALTER TABLE "payload"."payload_locked_documents_rels" ADD CONSTRAINT "payload_locked_documents_rels_sessions_fk" FOREIGN KEY ("sessions_id") REFERENCES "payload"."sessions"("id") ON DELETE cascade ON UPDATE no action;
   ALTER TABLE "payload"."payload_locked_documents_rels" ADD CONSTRAINT "payload_locked_documents_rels_accounts_fk" FOREIGN KEY ("accounts_id") REFERENCES "payload"."accounts"("id") ON DELETE cascade ON UPDATE no action;
   ALTER TABLE "payload"."payload_locked_documents_rels" ADD CONSTRAINT "payload_locked_documents_rels_verifications_fk" FOREIGN KEY ("verifications_id") REFERENCES "payload"."verifications"("id") ON DELETE cascade ON UPDATE no action;
@@ -759,6 +772,10 @@ export async function up({ db, payload, req }: MigrateUpArgs): Promise<void> {
   CREATE INDEX "_integrity_runs_v_version_version_created_at_idx" ON "payload"."_integrity_runs_v" USING btree ("version_created_at");
   CREATE INDEX "_integrity_runs_v_created_at_idx" ON "payload"."_integrity_runs_v" USING btree ("created_at");
   CREATE INDEX "_integrity_runs_v_updated_at_idx" ON "payload"."_integrity_runs_v" USING btree ("updated_at");
+  CREATE UNIQUE INDEX "idempotency_records_key_idx" ON "payload"."idempotency_records" USING btree ("key");
+  CREATE INDEX "idempotency_records_path_idx" ON "payload"."idempotency_records" USING btree ("path");
+  CREATE INDEX "idempotency_records_updated_at_idx" ON "payload"."idempotency_records" USING btree ("updated_at");
+  CREATE INDEX "idempotency_records_created_at_idx" ON "payload"."idempotency_records" USING btree ("created_at");
   CREATE UNIQUE INDEX "sessions_token_idx" ON "payload"."sessions" USING btree ("token");
   CREATE INDEX "sessions_user_idx" ON "payload"."sessions" USING btree ("user_id");
   CREATE INDEX "sessions_updated_at_idx" ON "payload"."sessions" USING btree ("updated_at");
@@ -851,6 +868,7 @@ export async function up({ db, payload, req }: MigrateUpArgs): Promise<void> {
   CREATE INDEX "payload_locked_documents_rels_care_states_id_idx" ON "payload"."payload_locked_documents_rels" USING btree ("care_states_id");
   CREATE INDEX "payload_locked_documents_rels_audit_events_id_idx" ON "payload"."payload_locked_documents_rels" USING btree ("audit_events_id");
   CREATE INDEX "payload_locked_documents_rels_integrity_runs_id_idx" ON "payload"."payload_locked_documents_rels" USING btree ("integrity_runs_id");
+  CREATE INDEX "payload_locked_documents_rels_idempotency_records_id_idx" ON "payload"."payload_locked_documents_rels" USING btree ("idempotency_records_id");
   CREATE INDEX "payload_locked_documents_rels_sessions_id_idx" ON "payload"."payload_locked_documents_rels" USING btree ("sessions_id");
   CREATE INDEX "payload_locked_documents_rels_accounts_id_idx" ON "payload"."payload_locked_documents_rels" USING btree ("accounts_id");
   CREATE INDEX "payload_locked_documents_rels_verifications_id_idx" ON "payload"."payload_locked_documents_rels" USING btree ("verifications_id");
@@ -887,6 +905,7 @@ export async function down({ db, payload, req }: MigrateDownArgs): Promise<void>
   DROP TABLE "payload"."_audit_events_v" CASCADE;
   DROP TABLE "payload"."integrity_runs" CASCADE;
   DROP TABLE "payload"."_integrity_runs_v" CASCADE;
+  DROP TABLE "payload"."idempotency_records" CASCADE;
   DROP TABLE "payload"."sessions" CASCADE;
   DROP TABLE "payload"."_sessions_v" CASCADE;
   DROP TABLE "payload"."accounts" CASCADE;

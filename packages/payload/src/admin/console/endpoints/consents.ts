@@ -2,6 +2,12 @@ import type { PayloadRequest } from 'payload';
 import { sendMail } from '../../../auth/options.ts';
 import { guardianConsentMail } from '../../../auth/templates.ts';
 import { AUDIT_REASON_CONTEXT_KEY } from '../../../collections/audit/writeAuditEvent.ts';
+import {
+  applyConsentDecision,
+  consentBlock,
+  findConsentRecord,
+  isConsentDecision,
+} from '../consent-decision.ts';
 import { CONSENT_DECISIONS_ENABLED, CONSENT_RESEND_LOCKOUT_MS, CONSENT_RETENTION_DAYS } from '../features.ts';
 import { ConsoleError } from './errors.ts';
 import { idParam, readBody, readReasonCode, requireStaff, withTransaction } from './helpers.ts';
@@ -10,18 +16,11 @@ const CONSENT_MANAGER_ROLES = ['ops', 'consent'] as const;
 const baseURL = process.env.BETTER_AUTH_URL ?? 'http://localhost:5174';
 
 async function loadConsent(req: PayloadRequest, id: string): Promise<Record<string, unknown>> {
-  const numeric = Number(id);
-  const doc = await req.payload.findByID({
-    collection: 'guardian-consents',
-    id: Number.isNaN(numeric) ? id : numeric,
-    depth: 0,
-    overrideAccess: true,
-    req,
-  });
-  if (doc === null || doc === undefined) {
+  const doc = await findConsentRecord(req.payload, req, id);
+  if (doc === null) {
     throw new ConsoleError('NOT_FOUND', 404, 'Consent request not found.');
   }
-  return doc as unknown as Record<string, unknown>;
+  return doc;
 }
 
 function consentUpdatedAt(doc: Record<string, unknown>): string | undefined {
@@ -156,25 +155,20 @@ export async function decideConsent(req: PayloadRequest): Promise<Response> {
     assertUnchanged(consent, body?.expectedUpdatedAt);
 
     const decision = body?.decision;
-    if (decision !== 'approve' && decision !== 'deny') {
+    if (!isConsentDecision(decision)) {
       throw new ConsoleError('INVALID_RECORD', 400, 'decision must be "approve" or "deny".');
     }
-    if (consent.status !== 'pending' || consent.parentRequest !== 'review') {
+    // `consentBlock` is shared with the parent's email link, so a decided or
+    // lapsed request is closed to everyone; `parentRequest === 'review'` is
+    // the staff-only gate for the B3 needs-review lane.
+    if (consentBlock(consent) !== null || consent.parentRequest !== 'review') {
       throw new ConsoleError('NOT_REVIEWABLE', 409, 'This consent request is not awaiting a decision.');
     }
 
     const reasonCode = readReasonCode(body);
     setReasonContext(req, reasonCode);
 
-    const status = decision === 'approve' ? 'approved' : 'denied';
-    await req.payload.update({
-      collection: 'guardian-consents',
-      id: consent.id as string | number,
-      data: { status },
-      depth: 0,
-      overrideAccess: true,
-      req,
-    });
+    const status = await applyConsentDecision(req.payload, req, consent, decision);
 
     return Response.json({ status });
   });

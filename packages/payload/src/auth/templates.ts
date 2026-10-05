@@ -6,7 +6,7 @@ import type { AuthMail } from './email';
 /** A rendered mail without its recipient. */
 export type MailContent = Omit<AuthMail, 'to'>;
 
-function escapeHtml(value: string): string {
+export function escapeHtml(value: string): string {
   return value
     .replaceAll('&', '&amp;')
     .replaceAll('<', '&lt;')

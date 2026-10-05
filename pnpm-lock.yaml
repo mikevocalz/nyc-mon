@@ -1258,6 +1258,9 @@ importers:
 
   packages/payload:
     dependencies:
+      '@acme/content':
+        specifier: workspace:*
+        version: link:../content
       '@acme/core':
         specifier: workspace:*
         version: link:../core

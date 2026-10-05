@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useLocalSearchParams } from 'expo-router';
 import {
   Button,
@@ -25,6 +25,15 @@ type Mode = 'ask' | 'sent' | 'denied';
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
+ * One key per logical send (ADR 0001 §1.4): a retry after a network failure
+ * reuses it so the server replays the first response instead of creating a
+ * second consent record. Rotates when the email changes or a send completes.
+ */
+function newIdempotencyKey(): string {
+  return `consent-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+/**
  * M05 guardian consent. The ask form posts the parent email to the consent
  * endpoint hosted by the admin app (`/v1/guardian-consents`, ADR 0003); the
  * play path is never blocked while the request is pending, and the denied
@@ -43,6 +52,7 @@ export function ConsentScreen() {
   const [error, setError] = useState<string | undefined>();
   const [preview, setPreview] = useState(false);
   const [pending, setPending] = useState(false);
+  const idempotency = useRef({ key: newIdempotencyKey(), email: '' });
 
   const send = async () => {
     if (!EMAIL_PATTERN.test(parentEmail)) {
@@ -51,10 +61,16 @@ export function ConsentScreen() {
     }
     setPending(true);
     setError(undefined);
+    if (idempotency.current.email !== parentEmail) {
+      idempotency.current = { key: newIdempotencyKey(), email: parentEmail };
+    }
     try {
       const response = await fetch(`${AUTH_BASE_URL}/v1/guardian-consents`, {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: {
+          'content-type': 'application/json',
+          'idempotency-key': idempotency.current.key,
+        },
         body: JSON.stringify({ parentEmail, birthYear: ageAnswer?.birthYear }),
       });
       if (!response.ok) {
@@ -67,6 +83,7 @@ export function ConsentScreen() {
       setPending(false);
       return;
     }
+    idempotency.current = { key: newIdempotencyKey(), email: '' };
     writeConsentRequested();
     setPending(false);
     setMode('sent');

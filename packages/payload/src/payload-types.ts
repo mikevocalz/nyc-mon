@@ -75,6 +75,7 @@ export interface Config {
     'care-states': CareState;
     'audit-events': AuditEvent;
     'integrity-runs': IntegrityRun;
+    'idempotency-records': IdempotencyRecord;
     sessions: Session;
     accounts: Account;
     verifications: Verification;
@@ -98,6 +99,7 @@ export interface Config {
     'care-states': CareStatesSelect<false> | CareStatesSelect<true>;
     'audit-events': AuditEventsSelect<false> | AuditEventsSelect<true>;
     'integrity-runs': IntegrityRunsSelect<false> | IntegrityRunsSelect<true>;
+    'idempotency-records': IdempotencyRecordsSelect<false> | IdempotencyRecordsSelect<true>;
     sessions: SessionsSelect<false> | SessionsSelect<true>;
     accounts: AccountsSelect<false> | AccountsSelect<true>;
     verifications: VerificationsSelect<false> | VerificationsSelect<true>;
@@ -374,6 +376,20 @@ export interface IntegrityRun {
   idMismatch: number;
   orphans: number;
   staleReady: number;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "idempotency-records".
+ */
+export interface IdempotencyRecord {
+  id: number;
+  key: string;
+  path: string;
+  status: number;
+  contentType: string;
+  body: string;
   updatedAt: string;
   createdAt: string;
 }
@@ -667,6 +683,10 @@ export interface PayloadLockedDocument {
         value: number | IntegrityRun;
       } | null)
     | ({
+        relationTo: 'idempotency-records';
+        value: number | IdempotencyRecord;
+      } | null)
+    | ({
         relationTo: 'sessions';
         value: number | Session;
       } | null)
@@ -879,6 +899,19 @@ export interface IntegrityRunsSelect<T extends boolean = true> {
   idMismatch?: T;
   orphans?: T;
   staleReady?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "idempotency-records_select".
+ */
+export interface IdempotencyRecordsSelect<T extends boolean = true> {
+  key?: T;
+  path?: T;
+  status?: T;
+  contentType?: T;
+  body?: T;
   updatedAt?: T;
   createdAt?: T;
 }

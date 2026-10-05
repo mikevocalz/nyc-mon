@@ -19,6 +19,7 @@ import { CARE_STATES_SLUG, toCareState } from '../../../collections/CareStates.t
 import { EGGS_SLUG } from '../../../collections/Eggs.ts';
 import { parseRecord } from '../../../collections/guards.ts';
 import { MON_INSTANCES_SLUG, toMonInstance } from '../../../collections/MonInstances.ts';
+import { runIdempotent } from './idempotency.ts';
 
 export type V1ErrorCode =
   | 'UNAUTHORIZED'
@@ -155,10 +156,20 @@ export async function handleListMyMons(request: Request): Promise<Response> {
   return v1Ok({ mons: result });
 }
 
-/** POST /v1/eggs */
+/**
+ * POST /v1/eggs — mutating, so a request carrying `Idempotency-Key` replays
+ * the first response for `(caller, path, key)` instead of running twice
+ * (ADR 0001 §1.4).
+ */
 export async function handleCreateEgg(request: Request): Promise<Response> {
   const context = await buildContext(request);
   if (context instanceof Response) return context;
+  return runIdempotent(context.payload, { callerId: context.callerId }, request, () =>
+    createEgg(context, request),
+  );
+}
+
+async function createEgg(context: V1Context, request: Request): Promise<Response> {
   const { payload, callerId, req } = context;
 
   const body = await safeParseJSON(request);
@@ -224,10 +235,16 @@ export async function handleCreateEgg(request: Request): Promise<Response> {
   }
 }
 
-/** POST /v1/eggs/:id/hatch */
+/** POST /v1/eggs/:id/hatch — mutating; see {@link handleCreateEgg}. */
 export async function handleHatchEgg(request: Request, eggId: string): Promise<Response> {
   const context = await buildContext(request);
   if (context instanceof Response) return context;
+  return runIdempotent(context.payload, { callerId: context.callerId }, request, () =>
+    hatchEgg(context, eggId),
+  );
+}
+
+async function hatchEgg(context: V1Context, eggId: string): Promise<Response> {
   const { payload, callerId, req } = context;
 
   const eggResult = await payload.find({
@@ -301,10 +318,19 @@ export async function handleHatchEgg(request: Request, eggId: string): Promise<R
   }
 }
 
-/** POST /v1/mons/:id/care */
+/**
+ * PUT /v1/mons/:id/care (the ADR 0001 §1.4 contract; the route file also
+ * mounts POST as an alias) — mutating; see {@link handleCreateEgg}.
+ */
 export async function handleApplyCare(request: Request, monInstanceId: string): Promise<Response> {
   const context = await buildContext(request);
   if (context instanceof Response) return context;
+  return runIdempotent(context.payload, { callerId: context.callerId }, request, () =>
+    applyCare(context, request, monInstanceId),
+  );
+}
+
+async function applyCare(context: V1Context, request: Request, monInstanceId: string): Promise<Response> {
   const { payload, callerId, req } = context;
 
   const body = await safeParseJSON(request);
