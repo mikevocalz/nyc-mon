@@ -104,6 +104,7 @@ export function createDeviceScene({ THREE, renderer }: ThreeContext, initial: De
       tiltX += (goalX - tiltX) * k;
       tiltY += (goalY - tiltY) * k;
       device.rotation.set(tiltX, target + tiltY, 0);
+      if (!frame.reducedMotion) device.userData.beamTick?.(frame.time);
     },
     dispose: () => device.userData.dispose(),
   };
@@ -166,12 +167,7 @@ function buildDevice(THREE: Three): Group {
   const ring = mat(new THREE.MeshStandardMaterial({
     color: CORE.ring, emissive: CORE.ring, emissiveIntensity: 0.5, roughness: 0.4,
   }));
-  /** The fan fades as it rises: per-vertex alpha, normal blending so it
-   * reads red on a daylit page as well as a night one. */
-  const fan = mat(new THREE.MeshBasicMaterial({
-    color: led.on, vertexColors: true, transparent: true, depthWrite: false, side: THREE.DoubleSide,
-  }));
-  /** Additive glow at the fan's base. */
+  /** Additive glow at the beam's mouth. */
   const glow = mat(new THREE.SpriteMaterial({
     map: tex(radialGlowTexture(THREE)), color: led.on, transparent: true, depthWrite: false,
     blending: THREE.AdditiveBlending, opacity: 0.85,
@@ -252,26 +248,18 @@ function buildDevice(THREE: Three): Group {
   // Antenna base ring.
   box(track(new THREE.CylinderGeometry(0.05, 0.055, 0.03, 24)), pianoBlack, -0.4, top + 0.005, -0.01);
 
-  // The red fan of light the scanner projects upward, plus its base glow.
-  const fanShape = new THREE.Shape();
-  fanShape.moveTo(-0.05, 0);
-  fanShape.lineTo(0.05, 0);
-  fanShape.lineTo(0.42, 0.62);
-  fanShape.lineTo(-0.42, 0.62);
-  fanShape.closePath();
-  const fanGeometry = track(new THREE.ShapeGeometry(fanShape));
-  const fanPositions = fanGeometry.getAttribute('position');
-  const fanColors = new Float32Array(fanPositions.count * 4);
-  for (let i = 0; i < fanPositions.count; i++) {
-    fanColors.set([1, 1, 1, 0.5 * (1 - fanPositions.getY(i) / 0.62)], i * 4);
-  }
-  fanGeometry.setAttribute('color', new THREE.BufferAttribute(fanColors, 4));
-  const fanMesh = new THREE.Mesh(fanGeometry, fan);
-  fanMesh.position.set(0.25, top, 0);
-  group.add(fanMesh);
+  // The scan beam the head projects upward: layered cones with a hot core
+  // and rising sparks, the "a Mon is coming out" look. `beam.tick` pulses
+  // it each frame; under reduced motion it stays a steady fan.
+  const beam = buildBeam(THREE, { track, mat, tex });
+  beam.group.position.set(0.25, top, 0);
+  group.add(beam.group);
+  group.userData.beamTick = beam.tick;
+
+  // A hot glow right at the emitter mouth.
   const glowSprite = new THREE.Sprite(glow);
-  glowSprite.scale.set(0.9, 0.35, 1);
-  glowSprite.position.set(0.25, top + 0.02, 0.02);
+  glowSprite.scale.set(0.9, 0.4, 1);
+  glowSprite.position.set(0.25, top + 0.02, 0.05);
   group.add(glowSprite);
 
   // --- face ----------------------------------------------------------------
@@ -322,6 +310,126 @@ function buildDevice(THREE: Three): Group {
 
   group.position.y = -0.12;
   return group;
+}
+
+/**
+ * The scanner beam, built to read like a projection, not a decal: three
+ * nested cones (wide soft wash, mid beam, hot white-red core), each drawn
+ * twice as crossed planes so the cone has volume from any yaw, plus a
+ * column of sparks drifting up through the light. `tick` breathes the
+ * brightness and feeds the sparks.
+ */
+function buildBeam(
+  THREE: Three,
+  ctx: {
+    track: <G extends Geometry>(g: G) => G;
+    mat: <M extends Material>(m: M) => M;
+    tex: <T extends { dispose(): void }>(t: T) => T;
+  },
+): { group: Group; tick: (time: number) => void } {
+  const { track, mat, tex } = ctx;
+  const group = new THREE.Group();
+  const LENGTH = 0.85;
+
+  // Shared falloff: bright at the mouth, fading with height and toward
+  // the beam's edge. A texture, not vertex alpha — TSL materials need it.
+  const gradient = tex(beamGradientTexture(THREE));
+
+  /** One cone layer: a trapezoid with the gradient map, drawn as crossed planes. */
+  const cone = (halfBase: number, halfTop: number, color: string, peakAlpha: number) => {
+    const shape = new THREE.Shape();
+    shape.moveTo(-halfBase, 0);
+    shape.lineTo(halfBase, 0);
+    shape.lineTo(halfTop, LENGTH);
+    shape.lineTo(-halfTop, LENGTH);
+    shape.closePath();
+    const geo = track(new THREE.ShapeGeometry(shape));
+    // Normalise the UVs so the gradient spans the trapezoid edge to edge.
+    const pos = geo.getAttribute('position');
+    const uv = geo.getAttribute('uv');
+    for (let i = 0; i < pos.count; i++) {
+      const t = pos.getY(i) / LENGTH;
+      const half = halfBase + (halfTop - halfBase) * t;
+      uv.setXY(i, (pos.getX(i) / half + 1) / 2, t);
+    }
+    const material = mat(new THREE.MeshBasicMaterial({
+      color, map: gradient, transparent: true, opacity: peakAlpha,
+      depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending,
+    }));
+    for (const yaw of [0, Math.PI / 2]) {
+      const mesh = new THREE.Mesh(geo, material);
+      mesh.rotation.y = yaw;
+      group.add(mesh);
+    }
+    return material;
+  };
+
+  // Wide wash → mid beam → hot core, back to front.
+  const wash = cone(0.5, 0.18, led.on, 0.45);
+  const mid = cone(0.32, 0.1, led.on, 0.75);
+  const core = cone(0.14, 0.045, '#FFD2D2', 0.95);
+
+  // Sparks: small additive sprites seeded inside the cone volume.
+  const sparkTex = tex(radialGlowTexture(THREE));
+  const sparkMat = mat(new THREE.SpriteMaterial({
+    map: sparkTex, color: '#FF9B9B', transparent: true, depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  }));
+  const sparkMatHot = mat(new THREE.SpriteMaterial({
+    map: sparkTex, color: '#FFE8E8', transparent: true, depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  }));
+  interface Spark { sprite: InstanceType<Three['Sprite']>; y0: number; speed: number; phase: number; spread: number; size: number }
+  const sparks: Spark[] = [];
+  const rand = mulberry(0xC0FFEE);
+  for (let i = 0; i < 26; i++) {
+    // Per-spark material: the tick fades each sprite independently.
+    const sprite = new THREE.Sprite(mat((i % 3 === 0 ? sparkMatHot : sparkMat).clone()));
+    const spark: Spark = {
+      sprite,
+      y0: rand(),
+      speed: 0.35 + rand() * 0.5,
+      phase: rand() * Math.PI * 2,
+      spread: 0.25 + rand() * 0.75,
+      size: 0.02 + rand() * 0.045,
+    };
+    sparks.push(spark);
+    group.add(sprite);
+  }
+
+  const tick = (time: number) => {
+    // The beam breathes — a slow pulse like a scanner cycling.
+    const pulse = 0.82 + 0.18 * Math.sin(time * 2.1);
+    wash.opacity = 0.45 * pulse;
+    mid.opacity = 0.75 * (0.75 + 0.25 * pulse);
+    core.opacity = 0.95 * (0.85 + 0.15 * Math.sin(time * 3.7 + 1));
+    for (const s of sparks) {
+      const t = (s.y0 + time * s.speed) % 1;
+      const y = t * LENGTH;
+      // Cone widens with height; sparks wander inside it and twinkle.
+      const r = (0.06 + (0.5 - 0.06) * t) * s.spread;
+      const a = s.phase + time * 0.8;
+      s.sprite.position.set(Math.cos(a) * r, y, Math.sin(a) * r * 0.6);
+      const fade = Math.sin(t * Math.PI);
+      const scale = s.size * (0.6 + 0.6 * fade);
+      s.sprite.scale.set(scale, scale, 1);
+      s.sprite.material.opacity = fade * (0.6 + 0.4 * Math.sin(time * 5 + s.phase));
+    }
+  };
+
+  return { group, tick };
+}
+
+/** Deterministic PRNG so the sparks are the same on every mount. */
+function mulberry(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
 }
 
 /**
@@ -377,6 +485,31 @@ function canvas2d(width: number, height: number): [HTMLCanvasElement, CanvasRend
   canvas.width = width;
   canvas.height = height;
   return [canvas, canvas.getContext('2d') as CanvasRenderingContext2D];
+}
+
+/**
+ * The beam's alpha falloff: opaque white at the mouth's centre, fading
+ * upward and toward the edges. RGB is white so the material's own colour
+ * carries the tint; alpha does the shaping.
+ */
+function beamGradientTexture(THREE: Three): CanvasTexture {
+  const [canvas, ctx] = canvas2d(128, 512);
+  const img = ctx.createImageData(128, 512);
+  for (let y = 0; y < 512; y++) {
+    const t = y / 511;
+    const vertical = Math.pow(1 - t, 1.4) + 0.08; // keeps a faint tip
+    for (let x = 0; x < 128; x++) {
+      const edge = Math.sin((x / 127) * Math.PI); // soft round cross-section
+      const a = Math.round(255 * vertical * Math.pow(edge, 0.8));
+      const i = (y * 128 + x) * 4;
+      img.data[i] = 255;
+      img.data[i + 1] = 255;
+      img.data[i + 2] = 255;
+      img.data[i + 3] = a;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  return makeCanvasTexture(THREE, canvas);
 }
 
 /** Soft radial sprite used for the emitter glow. */
