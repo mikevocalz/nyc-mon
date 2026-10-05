@@ -40,6 +40,13 @@ export default buildConfig({
   collections: [Users, Media, GuardianConsents, Eggs, MonInstances, CareStates, AuditEvents, IntegrityRuns],
   plugins: [
     cloudStoragePlugin({
+      enabled:
+        process.env.NODE_ENV !== 'production' ||
+        Boolean(
+          process.env.BUNNY_STORAGE_ZONE &&
+            process.env.BUNNY_STORAGE_PASSWORD &&
+            process.env.BUNNY_CDN_URL,
+        ),
       collections: {
         [Media.slug]: {
           adapter: bunnyStorage({
