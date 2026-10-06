@@ -203,6 +203,7 @@ export interface User {
  */
 export interface Media {
   id: number;
+  bunnyUrl?: string | null;
   alt: string;
   updatedAt: string;
   createdAt: string;
@@ -787,6 +788,7 @@ export interface UsersSelect<T extends boolean = true> {
  * via the `definition` "media_select".
  */
 export interface MediaSelect<T extends boolean = true> {
+  bunnyUrl?: T;
   alt?: T;
   updatedAt?: T;
   createdAt?: T;

@@ -90,7 +90,7 @@ const uploadFile = async (file: IncomingFile) => {
       AccessKey: process.env.BUNNY_STORAGE_PASSWORD!,
       'Content-Type': file.mimeType || 'application/octet-stream',
     },
-    body: file.buffer,
+    body: new Uint8Array(file.buffer),
   });
 
   if (!response.ok) {
