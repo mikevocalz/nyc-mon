@@ -27,6 +27,15 @@ import { MonInstances } from './collections/MonInstances';
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 const isProduction = process.env.NODE_ENV === 'production';
+const bunnyConfigured = Boolean(
+  process.env.BUNNY_STORAGE_ZONE &&
+    process.env.BUNNY_STORAGE_PASSWORD &&
+    process.env.BUNNY_CDN_URL,
+);
+
+if (isProduction && !bunnyConfigured) {
+  throw new Error('Bunny Storage must be configured in production.');
+}
 
 export default buildConfig({
   admin: {
