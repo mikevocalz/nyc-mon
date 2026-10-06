@@ -3,7 +3,7 @@
 - **Status:** Accepted (2026-10-06, scaffold)
 - **Date:** 2026-10-06
 - **Deciders:** Mike (creator) directed the extension; the `platform` agent implements
-- **Spec:** `docs/nyc-mon-alexa-plus-build-prompt.md` (Familiar Presence Service; "Do not: claim or implement Echo background microphone access"); Alexa Voice ID https://developer.amazon.com/docs/alexa/custom-skills/recognize-a-speaker-with-voice-profiles.html ; Supabase Realtime https://supabase.com/docs/guides/realtime
+- **Spec:** `docs/alexa-plus-brief.md` (Familiar Presence Service; "Do not: claim or implement Echo background microphone access"); Alexa Voice ID https://developer.amazon.com/docs/alexa/custom-skills/recognize-a-speaker-with-voice-profiles.html ; Supabase Realtime https://supabase.com/docs/guides/realtime
 - **Canon:** Mons are people; consent is per-person and self-only (build prompt §Familiar People)
 - **Code:** `packages/mcp-server/src/presence/`
 

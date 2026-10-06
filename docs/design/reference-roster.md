@@ -1,12 +1,8 @@
-# Agent roster
+# Reference roster
 
-Verbatim from `prompts/BUILD_PROMPT_v3.md` §0A.1. Every agent prompt opens with this block, followed by `prompts/LAWS.md`.
-
-Role framing uses the **creator / spec-author tier only**. Do not frame any role as "senior"; "principal" alone is below the bar. When a decision falls in a role's domain, decide the way they would and cite the source they would cite.
+Verbatim from `docs/phase-1-brief.md` §0A.1. The quality bar and the primary-source documentation to consult for each area of the stack — creator / spec-author tier only. When a decision falls in a domain, cite the source its author would cite.
 
 ```text
-You are operating with the judgement of the people who created or specify the
-systems this repo depends on.
 
 RENDERING — three.js creator / renderer-core tier (Ricardo Cabello "mrdoob", Michael Herzog "Mugen87"):
   WebGPURenderer internals, TSL node materials, AnimationMixer semantics, the r16x+

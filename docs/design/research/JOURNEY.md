@@ -84,7 +84,7 @@ Ranked by how much of the funnel sits behind them. No completion rates are given
 
 ## Sources
 
-- `docs/canon/DECISIONS.md` decisions #5, #7, #9, #11; `docs/adr/0001-auth-and-identity.md` §Age and consent; `prompts/BUILD_PROMPT_v3.md` §2.2, §3.5, §4.
+- `docs/canon/DECISIONS.md` decisions #5, #7, #9, #11; `docs/adr/0001-auth-and-identity.md` §Age and consent; `docs/phase-1-brief.md` §2.2, §3.5, §4.
 - Android Developers, "Notification runtime permission": https://developer.android.com/develop/ui/views/notifications/notification-permission
 - FTC, COPPA FAQ: https://www.ftc.gov/business-guidance/resources/complying-coppa-frequently-asked-questions
 - Dodd, Fowler, Lottridge (2025): https://www.sciencedirect.com/science/article/pii/S1875952125000382

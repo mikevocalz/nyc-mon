@@ -1,8 +1,8 @@
-# BUILD PROMPT — NYC-MON · "H-LYNK" Phase 1 · Starter-Mon Companion (Tamagotchi loop) — v3
+# Phase 1 Brief — NYC-MON · "H-LYNK" · Starter-Mon Companion (Tamagotchi loop) — v3
 
-> **Paste this file, unabridged, as the opening system context for the lead agent.** Every subagent prompt begins with `prompts/ROSTER.md` (§0A.1) and the Laws (§0B), names its skills explicitly, and ends by writing its artifact to disk.
+> The Phase 1 product and craft spec: scope, canon rules, renderer and screen requirements, the per-screen design pipeline, workstream ownership, acceptance criteria and milestones. The repo laws (§0B) also live at `CONTRIBUTING.md`.
 >
-> **Canon authority:** `docs/canon/NYC_MON_Canon_and_Lore_Bible_v11.docx` (4 Oct 2026) is law. Latest explicit creator decisions outrank older drafts, concept-sheet lettering, generated art, and this prompt. Where this prompt and the Bible disagree, the Bible wins and you file an issue.
+> **Canon authority:** `docs/canon/NYC_MON_Canon_and_Lore_Bible_v11.docx` (4 Oct 2026) is law. Latest explicit creator decisions outrank older drafts, concept-sheet lettering, generated art, and this brief. Where this brief and the Bible disagree, the Bible wins — file an issue.
 
 ---
 
@@ -22,9 +22,9 @@
 
 ---
 
-## 0A. Agent roster and standing engineering standards
+## 0A. Reference roster and standing engineering standards
 
-### 0A.1 Roster — `prompts/ROSTER.md`, embedded in every agent prompt
+### 0A.1 Roster — also at `docs/design/reference-roster.md`
 
 Role framing uses the **creator / spec-author tier only**. Do not frame any role as "senior"; "principal" alone is below the bar. When a decision falls in a role's domain, decide the way they would and cite the source they would cite.
 
@@ -53,7 +53,7 @@ REACT NATIVE / EXPO — Expo SDK core-architect tier (Evan Bacon, Brent Vatne; F
   Expo Router + cross-platform routing). New Architecture only. Source: https://docs.expo.dev/
 
 NATIVE BOUNDARY — Marc Rousavy tier (Nitro Modules / JSI; react-native-vision-camera author).
-  Any native code is written with a Margelo react-native-skill loaded (§2.7).
+  Any native code is written against the applicable Margelo react-native-skills guide (§2.7).
   Source: https://nitro.margelo.com/ · https://github.com/margelo/react-native-skills
 
 STATE & DATA — Daishi Kato tier (Zustand) · Colin McDonnell tier (Zod) · Marc Rousavy tier (MMKV).
@@ -80,11 +80,11 @@ NARRATIVE — the NYC-MON Bible v11 is the showrunner. You do not invent canon. 
 
 - **TypeScript strict.** No `any`, no `as unknown as`, no `// @ts-ignore`. Exhaustive `switch` on every discriminated union (`LifecycleStage`, `CareNeed`, `HatchState`).
 - **Verify before writing.** Every third-party seam is read in `node_modules` (types + source) before a line of code targets it. Record what you read in the PR body.
-- **Skills and subagents are mandatory** (§6). The lead plans, dispatches, integrates. It does not do specialist work inline.
+- **Specialist workstreams are mandatory** (§6). The lead plans, dispatches, integrates — specialist work is not done inline.
 - **References carry URLs.** Every doc, ADR, and PR cites sources as full links, never as names alone.
 - **Reduced motion is a first-class variant**, not a fallback. Every animation has a reduced-motion sibling authored, not derived.
 - **Semantic HTML only on web, from `/ui/html`.** Every web page is built from the semantic primitives in `packages/ui/html` (`<header>`, `<nav>`, `<main>`, `<section aria-labelledby>`, `<article>`, `<figure>`/`<figcaption>`, `<footer>`, one `<h1>` per page, heading levels never skipped). No `<div>` soup, no `<div onClick>` buttons, no landmark emulated with ARIA that a native element provides. Lint: `eslint-plugin-jsx-a11y` strict + an axe pass in CI.
-- **Logos come from the repo.** NYC-MON wordmark, H-Lynk mark, and any partner/store badges are the files already in the monorepo (`packages/theme/assets/logos/*` or wherever the repo keeps them — read the repo, do not ask). Agents never regenerate, redraw, trace, or "clean up" a logo. SVG as-is; raster only where the source is raster.
+- **Logos come from the repo.** NYC-MON wordmark, H-Lynk mark, and any partner/store badges are the files already in the monorepo (`packages/theme/assets/logos/*` or wherever the repo keeps them — read the repo, do not ask). Never regenerate, redraw, trace, or "clean up" a logo. SVG as-is; raster only where the source is raster.
 - **Never ship placeholder content.** No "Lorem", no "Mon Name Here", no `#FF00FF` debug material in `main`.
 
 ---
@@ -139,8 +139,7 @@ packages/
   content/       Mon data, copy deck, evolution events — zod-validated at build
   render/        three.js/WebGPU creature runtime, TSL materials, TypeGPU compute
   auth/          provider abstraction (see §1.4)
-prompts/         ROSTER.md, LAWS.md, per-screen briefs
-docs/            canon/, design/, adr/, DESIGN_SYSTEM.md, COPY_DECK.md
+docs/            phase-1-brief.md, canon/, design/, adr/, DESIGN_SYSTEM.md, COPY_DECK.md
 ```
 
 NeonBlade UI (https://neonbladeui.neuronrush.com/ · https://github.com/vprix21/neonblade-ui) is the **ancestor** of `packages/ui`: clip-path edges, neon edge-glow, micro-animations, Tailwind-first. Treat it as a vocabulary, not a look to copy. The NYC-MON expression of it is the **H-Lynk**: a slim 3:4-screen handheld, central tactile trackpad, two side buttons each side, top antenna, a separate red scanner/emitter (Bible §H-Lynk). The mobile app chrome *is* an H-Lynk Entry-tier unit — plastic, matte, Knicks blue body, orange scanner LED — and it is the one memorable move the jury remembers.
@@ -328,9 +327,9 @@ Web hero canvas: `apps/web/components/DeviceStage.tsx` — one lightweight `thre
 
 ---
 
-## 6. Per-screen pipeline — skills, order, and the artifact each must produce
+## 6. Per-screen pipeline — steps, order, and the artifact each must produce
 
-Run this for **every** screen in §4 and §5. No screen is implemented until its `08-handoff.md` exists. Skills are named explicitly; each produces the file listed. Mobbin is consulted per screen and every reference is cited by its `mobbin.com/screens/...` URL in the brief — references inform hierarchy and flow, never pixels.
+Run this for **every** screen in §4 and §5. No screen is implemented until its `08-handoff.md` exists. Each step names its discipline and produces the file listed. Mobbin is consulted per screen and every reference is cited by its `mobbin.com/screens/...` URL in the brief — references inform hierarchy and flow, never pixels.
 
 | Step | Skill | Input | Output (under `docs/design/screens/<M##|W##>/`) |
 |---|---|---|---|
@@ -342,19 +341,19 @@ Run this for **every** screen in §4 and §5. No screen is implemented until its
 | 6 | `design-critique` | 03–05 | `06-critique.md` — scored against §0C; blockers must clear before 7 |
 | 7 | `accessibility-review` | 03–05 | `07-a11y.md` — contrast table, focus order, VoiceOver/TalkBack labels, reduced-motion map, Dynamic Type check |
 | 8 | `design-handoff` | all above | `08-handoff.md` — the implementation contract: layout spec, tokens, states, motion, empty/error, test IDs |
-| 9 | implementation (platform / render / native subagents) | `08-handoff.md` | code + Storybook/fixture + capture baseline |
-| 10 | `code-review` | the PR | `09-code-review.md` — must be a different agent than the author |
+| 9 | implementation (platform / render / native) | `08-handoff.md` | code + Storybook/fixture + capture baseline |
+| 10 | `code-review` | the PR | `09-code-review.md` — by a reviewer other than the author |
 | 11 | device verification | build on iPhone SE 3, iPhone 16 Pro Max, Pixel 8; Chrome/Safari mobile for web | `10-verification.md` — screenshots, fps, VoiceOver pass |
 
-For any native code (Nitro module, WebGPU surface tuning, notification category, haptic patterns beyond `expo-haptics`), the implementing subagent loads a **Margelo react-native-skill** from https://github.com/margelo/react-native-skills/tree/main/skills (`build-nitro-modules`, `swift`, `kotlin`, `cpp`, `api-design` as applicable) and cites which one in the PR.
+For any native code (Nitro module, WebGPU surface tuning, notification category, haptic patterns beyond `expo-haptics`), the implementation follows the applicable **Margelo react-native-skills** guide at https://github.com/margelo/react-native-skills/tree/main/skills (`build-nitro-modules`, `swift`, `kotlin`, `cpp`, `api-design`) and cites it in the PR.
 
 ---
 
-## 7. Subagent orchestration
+## 7. Workstreams and ownership
 
-The lead agent plans, dispatches, and integrates. Specialist work never happens inline. Every subagent prompt begins with `prompts/ROSTER.md` + `prompts/LAWS.md`, names its skills, and ends by writing its artifact.
+The lead plans, dispatches, and integrates. Specialist work never happens inline. Each workstream applies the roster (§0A.1) and the laws (§0B), and ends by writing its artifact.
 
-| Subagent | Skills loaded | Owns | Produces |
+| Workstream | Inputs | Owns | Produces |
 |---|---|---|---|
 | `canon-keeper` | (Bible v11 + `docs/canon/DECISIONS.md`) | every name, stage, meter, dialogue; `TODO(canon)` triage; Dex transcription for the three starters | `content/` PRs, `docs/canon/DECISIONS.md` |
 | `research-lead` | `user-research`, `research-synthesis` | personas, hallway tests, the 5-user hatch test | `01-research.md` per screen, `docs/design/research/*` |
@@ -374,7 +373,7 @@ Orchestration rules:
 3. `ux-writer` and `a11y-auditor` start per screen once `03-direction.md` exists.
 4. `08-handoff.md` is the gate: `platform`, `gpu-compute`, `native-modules` implement only from it.
 5. `verifier` runs on every PR and is never the author.
-6. Subagents return artifacts plus a short decision log; the lead resolves conflicts and records them in `docs/design/DECISIONS.md` with links.
+6. Workstreams return artifacts plus a short decision log; the lead resolves conflicts and records them in `docs/design/DECISIONS.md` with links.
 
 ---
 
@@ -402,7 +401,7 @@ Orchestration rules:
 
 | # | Milestone | Done when |
 |---|---|---|
-| 0 | Canon + foundations | `docs/REPO_MAP.md` written from the local `nyc-mon` repo (ui/html inventory, theme tokens, logo paths); Bible in repo; `DECISIONS.md` opened with decision #1 (starters); Dex records transcribed; `ROSTER.md`/`LAWS.md` committed; `packages/core` types for the full game; contrast table measured against repo tokens |
+| 0 | Canon + foundations | `docs/REPO_MAP.md` written from the local `nyc-mon` repo (ui/html inventory, theme tokens, logo paths); Bible in repo; `DECISIONS.md` opened with decision #1 (starters); Dex records transcribed; `reference-roster.md`/`CONTRIBUTING.md` committed; `packages/core` types for the full game; contrast table measured against repo tokens |
 | 1 | Shells | Mobile and web shells boot; auth provider chosen (ADR); header/footer on W01; M01–M07 through the full §6 pipeline and implemented |
 | 2 | Creature online | `WebGPURenderer` in RN; one placeholder rig with TSL material and idle scheduler at 60 fps on SE 3; TypeGPU motes; Skia rings bound to sim state |
 | 3 | Meeting → hatch | M08–M12 implemented; hatch idempotency suite green; notification deep link verified on both OSes |

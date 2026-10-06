@@ -1,6 +1,6 @@
 # NYC-MON canon decisions
 
-This file records explicit creator decisions, one numbered entry each, with the date and who made it. Law 1 (`prompts/LAWS.md`) lets a name, species label, stage, meter, device or line of dialogue into the code only if it traces to the v11 Bible or to an entry here. Entries are never edited to change their meaning; a later decision supersedes an earlier one by number.
+This file records explicit creator decisions, one numbered entry each, with the date and who made it. Law 1 (`CONTRIBUTING.md`) lets a name, species label, stage, meter, device or line of dialogue into the code only if it traces to the v11 Bible or to an entry here. Entries are never edited to change their meaning; a later decision supersedes an earlier one by number.
 
 ## Authority
 
@@ -40,7 +40,7 @@ Until those land, any field that would come from them stays `TODO(canon)`.
 
 - **Date:** 2026-10-04
 - **Decided by:** Mike (creator)
-- **Source:** `prompts/BUILD_PROMPT_v3.md` §2.2
+- **Source:** `docs/phase-1-brief.md` §2.2
 
 The Phase 1 starters are three species lines:
 
@@ -90,7 +90,7 @@ Resend (https://resend.com/docs) sends every auth email: verification, password 
 
 - **Date:** 2026-10-04
 - **Decided by:** Mike (creator)
-- **Source:** `prompts/BUILD_PROMPT_v3.md` §1.3 ("Dark surfaces are for night and the hatch; the default companion view is daylit.")
+- **Source:** `docs/phase-1-brief.md` §1.3 ("Dark surfaces are for night and the hatch; the default companion view is daylit.")
 
 The default theme is daylit. Dark surfaces appear at night and during the hatch. This overrides the repo's current dark-first theme in `packages/theme`.
 
@@ -103,7 +103,7 @@ The default theme is daylit. Dark surfaces appear at night and during the hatch.
 - **Date:** 2026-10-04
 - **Decided by:** Mike (creator)
 - **Answers:** `docs/canon/OPEN_QUESTIONS.md` Q1
-- **Overrides:** `prompts/BUILD_PROMPT_v3.md` M08 ("meet three living Mons")
+- **Overrides:** `docs/phase-1-brief.md` M08 ("meet three living Mons")
 
 The Caller is shown three eggs, one per starter line (Decision 1), and chooses one, in the Pokémon "Professor Oak" pattern. Dr. Alessandra Santoro presents the eggs; the v11 cast list makes her a chemistry teacher, former biochemist, and the H-Lynk's inventor and mentor. The chosen egg hatches into the individual. Naming happens after the hatch, so the naming ceremony names the hatched Baby, not the egg.
 
@@ -130,7 +130,7 @@ The three Baby names come from v7 and stay provisional until the v8 Dex in `NYC_
 - **Date:** 2026-10-04
 - **Decided by:** Mike (creator)
 - **Answers:** `docs/canon/OPEN_QUESTIONS.md` Q2
-- **Overrides:** every "orange scanner LED" mention in `prompts/BUILD_PROMPT_v3.md` (§1.1, §1.3, W01)
+- **Overrides:** every "orange scanner LED" mention in `docs/phase-1-brief.md` (§1.1, §1.3, W01)
 
 The H-Lynk scanner/emitter LED is red, per v11 (`V11 ¶63`). Orange stays the accent for the primary CTA and the hatch moment.
 
@@ -196,7 +196,7 @@ The starter card reads:
 
 In data the grouping is a bloodline: `bloodlineId` (`F01`, `F02`, `F12`, the roster's family numbers) and `bloodlineName` (`Hood Ratti`, `Bodega Baddiee Cee`, `Yote`). UI copy builds the label as `${bloodlineName} Bloodline`. The roster and the other source files keep saying "family"; quotes from them stay verbatim.
 
-**Note for `prompts/LAWS.md` Law 9 (language is canon):** add "`Bloodline` in UI and data for a Dex family" to its list. Recorded here; whoever owns `LAWS.md` makes the edit.
+**Note for `CONTRIBUTING.md` Law 9 (language is canon):** add "`Bloodline` in UI and data for a Dex family" to its list. Recorded here; whoever owns `LAWS.md` makes the edit.
 
 ## Decision 12 — A Mid evolves into exactly one of its Max forms
 

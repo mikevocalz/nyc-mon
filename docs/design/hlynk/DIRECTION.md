@@ -1,6 +1,6 @@
 # H-Lynk Core chrome: direction
 
-Owner: `design-director`. Written 2026-10-04, revised the same day for canon Decision #16 (commit 9609b0d). Status: proposal for the kit build queue. Nothing here is implemented; every part maps to an existing `@acme/ui` component or to a new kit component that needs a story before any screen uses it (repo law R3, `prompts/LAWS.md`).
+Owner: `design-director`. Written 2026-10-04, revised the same day for canon Decision #16 (commit 9609b0d). Status: proposal for the kit build queue. Nothing here is implemented; every part maps to an existing `@acme/ui` component or to a new kit component that needs a story before any screen uses it (repo law R3, `CONTRIBUTING.md`).
 
 ## Sources
 
@@ -15,7 +15,7 @@ Owner: `design-director`. Written 2026-10-04, revised the same day for canon Dec
 - `docs/canon/OPEN_QUESTIONS.md`:
   - Q40: the EngineX mark on the sheet. Not drawn.
   - Q41–Q42: the HP meter, tab labels and "CALL MON" are concept text, not canon.
-- `prompts/BUILD_PROMPT_v3.md` §1.1, §2.4, §4.
+- `docs/phase-1-brief.md` §1.1, §2.4, §4.
 - Contrast method: `docs/design/CONTRAST.md` (WCAG 2.2 relative luminance, 0.04045 threshold). Every ratio here was computed with that formula. `docs/DESIGN_SYSTEM.md` carries the full table.
 - The sheet image is not yet in `docs/canon/source/`, and the H-Lynk Bible is not in the repo. Exact proportions, emitter count and key glyph shapes are `TODO(canon)` until both land.
 

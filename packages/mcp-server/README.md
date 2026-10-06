@@ -2,7 +2,7 @@
 
 The NYC-MON × Alexa+ add-on: a self-hosted MCP server over **Streamable HTTP** (MCP spec **2025-11-25**), OAuth 2.1 + PKCE (S256) + RFC 9728 Protected Resource Metadata, exposing the care loop, Familiar People, and presence tools to Alexa+ and to the web simulator (`packages/web-sim`, TODO).
 
-Contract: `docs/nyc-mon-alexa-plus-build-prompt.md`. Design: `docs/architecture/system-design.md`, ADRs 0005–0009. This is an **extension of the existing stack** — auth stays Better Auth on admin-vite, Mon data stays behind `/v1` + Payload, sim state stays `@acme/core`, bloodlines stay `@acme/content`.
+Contract: `docs/alexa-plus-brief.md`. Design: `docs/architecture/system-design.md`, ADRs 0005–0009. This is an **extension of the existing stack** — auth stays Better Auth on admin-vite, Mon data stays behind `/v1` + Payload, sim state stays `@acme/core`, bloodlines stay `@acme/content`.
 
 ## Dev entrypoints
 

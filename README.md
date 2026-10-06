@@ -83,7 +83,7 @@ New code starts from the generators: `pnpm gen domain <name>`, `pnpm gen feature
 
 | Doc | What's in it |
 |---|---|
-| [prompts/LAWS.md](prompts/LAWS.md) | The repo laws every change follows. |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | The repo laws every change follows. |
 | [docs/REPO_MAP.md](docs/REPO_MAP.md) | Real paths, routes and versions. |
 | [docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md) | The proposed daylit token set and how NYC-Tron applies it. |
 | [docs/design/](docs/design/) | Screen designs, research, H-Lynk direction, contrast checks. |

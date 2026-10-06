@@ -1,6 +1,6 @@
 # Friction log — Amazon Devices Builder Tools & Alexa+ add-on path
 
-Hackathon requirement (`docs/nyc-mon-alexa-plus-build-prompt.md` §constraints): use the **Amazon Devices Builder Tools** (MCP server + Agent Skills for Amazon device knowledge, https://developer.amazon.com/docs/vega/0.24/mcp-server) inside the coding assistant from day one, and log every friction point. The hackathon explicitly solicits product feedback on the tools — up to a 10% judging bonus — so entries are written to be copy-pasteable into feedback/Devpost.
+Hackathon requirement (`docs/alexa-plus-brief.md` §constraints): use the **Amazon Devices Builder Tools** (MCP server + Agent Skills for Amazon device knowledge, https://developer.amazon.com/docs/vega/0.24/mcp-server) inside the coding assistant from day one, and log every friction point. The hackathon explicitly solicits product feedback on the tools — up to a 10% judging bonus — so entries are written to be copy-pasteable into feedback/Devpost.
 
 **Started:** 2026-10-06
 

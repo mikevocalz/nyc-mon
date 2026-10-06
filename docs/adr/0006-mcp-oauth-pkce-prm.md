@@ -3,7 +3,7 @@
 - **Status:** Accepted (2026-10-06, scaffold)
 - **Date:** 2026-10-06
 - **Deciders:** Mike (creator) directed the extension; the `platform` agent implements
-- **Spec:** `docs/nyc-mon-alexa-plus-build-prompt.md` ("OAuth 2.1 + PKCE (S256) with Protected Resource Metadata (RFC 9728)"); OAuth 2.1 https://oauth.net/2.1/ ; RFC 9728 https://www.rfc-editor.org/rfc/rfc9728 ; RFC 7636 https://www.rfc-editor.org/rfc/rfc7636 ; MCP authorization spec https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization
+- **Spec:** `docs/alexa-plus-brief.md` ("OAuth 2.1 + PKCE (S256) with Protected Resource Metadata (RFC 9728)"); OAuth 2.1 https://oauth.net/2.1/ ; RFC 9728 https://www.rfc-editor.org/rfc/rfc9728 ; RFC 7636 https://www.rfc-editor.org/rfc/rfc7636 ; MCP authorization spec https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization
 - **Builds on:** `docs/adr/0001-auth-and-identity.md` (Better Auth owns identity), `docs/adr/0003-admin-app-split.md` (auth host)
 - **Code:** `packages/mcp-server/src/auth/`
 

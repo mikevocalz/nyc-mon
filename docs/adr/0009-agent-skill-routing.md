@@ -3,7 +3,7 @@
 - **Status:** Accepted (2026-10-06, scaffold)
 - **Date:** 2026-10-06
 - **Deciders:** Mike (creator) directed the extension; the `platform` agent implements
-- **Spec:** `docs/nyc-mon-alexa-plus-build-prompt.md` ("the Agent Skill is the thing that actually carries Ratti's character"; "Hand-write an intent router in the simulator" is a listed **do not**); Agent Skills format https://agentskills.io ; MCP Apps guidance https://apps.extensions.modelcontextprotocol.io/api/#build-with-agent-skills
+- **Spec:** `docs/alexa-plus-brief.md` ("the Agent Skill is the thing that actually carries Ratti's character"; "Hand-write an intent router in the simulator" is a listed **do not**); Agent Skills format https://agentskills.io ; MCP Apps guidance https://apps.extensions.modelcontextprotocol.io/api/#build-with-agent-skills
 - **Code:** `.devin/skills/nyc-mon-alexa/SKILL.md` (the skill); `packages/web-sim` (consumer, TODO)
 
 ## Context

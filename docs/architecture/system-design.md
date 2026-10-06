@@ -2,7 +2,7 @@
 
 - **Status:** Scaffold (extension of the existing stack, not a parallel one)
 - **Date:** 2026-10-06
-- **Contract:** `docs/nyc-mon-alexa-plus-build-prompt.md`
+- **Contract:** `docs/alexa-plus-brief.md`
 - **ADRs:** `docs/adr/0005-alexa-mcp-transport.md` … `docs/adr/0009-agent-skill-routing.md`
 - **Builds on:** `docs/adr/0001-auth-and-identity.md` (Better Auth inside Payload), `docs/adr/0003-admin-app-split.md` (admin/API host), `docs/adr/0002-sim-core.md` (`@acme/core` sim), `docs/canon/DECISIONS.md`
 

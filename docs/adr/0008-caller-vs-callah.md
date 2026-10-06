@@ -3,8 +3,8 @@
 - **Status:** Accepted (2026-10-06, scaffold)
 - **Date:** 2026-10-06
 - **Deciders:** Mike (creator) — the rule is already canon; this ADR binds the extension to it
-- **Canon:** `docs/COPY_DECK.md` §Caller-and-Callah; `V11 ¶19`, `¶58`, `¶59`, `¶109`, `¶110`; Law 9 (`prompts/LAWS.md`); `docs/canon/DECISIONS.md`
-- **Spec:** `docs/nyc-mon-alexa-plus-build-prompt.md` ("Character voice rules")
+- **Canon:** `docs/COPY_DECK.md` §Caller-and-Callah; `V11 ¶19`, `¶58`, `¶59`, `¶109`, `¶110`; Law 9 (`CONTRIBUTING.md`); `docs/canon/DECISIONS.md`
+- **Spec:** `docs/alexa-plus-brief.md` ("Character voice rules")
 - **Code:** enforced in `packages/mcp-server` schemas and the Agent Skill
 
 ## Context

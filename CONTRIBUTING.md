@@ -1,6 +1,6 @@
 # Laws
 
-Verbatim from `prompts/BUILD_PROMPT_v3.md` §0B (Laws) and §0A.2 (standing standards), followed by the repo laws. Every agent prompt includes this file after `prompts/ROSTER.md`. A violation of any law here blocks merge.
+Verbatim from `docs/phase-1-brief.md` §0B (Laws) and §0A.2 (standing standards), followed by the repo laws. A violation of any law here blocks merge.
 
 ## Laws (§0B)
 
@@ -19,22 +19,22 @@ Verbatim from `prompts/BUILD_PROMPT_v3.md` §0B (Laws) and §0A.2 (standing stan
 
 - **TypeScript strict.** No `any`, no `as unknown as`, no `// @ts-ignore`. Exhaustive `switch` on every discriminated union (`LifecycleStage`, `CareNeed`, `HatchState`).
 - **Verify before writing.** Every third-party seam is read in `node_modules` (types + source) before a line of code targets it. Record what you read in the PR body.
-- **Skills and subagents are mandatory** (§6). The lead plans, dispatches, integrates. It does not do specialist work inline.
+- **The §6 pipeline is mandatory.** Each screen passes every step and the `08-handoff.md` gate before implementation; reviews are done by someone other than the author.
 - **References carry URLs.** Every doc, ADR, and PR cites sources as full links, never as names alone.
 - **Reduced motion is a first-class variant**, not a fallback. Every animation has a reduced-motion sibling authored, not derived.
 - **Semantic HTML only on web, from `/ui/html`.** Every web page is built from the semantic primitives in `packages/ui/html` (`<header>`, `<nav>`, `<main>`, `<section aria-labelledby>`, `<article>`, `<figure>`/`<figcaption>`, `<footer>`, one `<h1>` per page, heading levels never skipped). No `<div>` soup, no `<div onClick>` buttons, no landmark emulated with ARIA that a native element provides. Lint: `eslint-plugin-jsx-a11y` strict + an axe pass in CI.
-- **Logos come from the repo.** NYC-MON wordmark, H-Lynk mark, and any partner/store badges are the files already in the monorepo (`packages/theme/assets/logos/*` or wherever the repo keeps them — read the repo, do not ask). Agents never regenerate, redraw, trace, or "clean up" a logo. SVG as-is; raster only where the source is raster.
+- **Logos come from the repo.** NYC-MON wordmark, H-Lynk mark, and any partner/store badges are the files already in the monorepo (`packages/theme/assets/logos/*` or wherever the repo keeps them — read the repo, do not ask). Never regenerate, redraw, trace, or "clean up" a logo. SVG as-is; raster only where the source is raster.
 - **Never ship placeholder content.** No "Lorem", no "Mon Name Here", no `#FF00FF` debug material in `main`.
 
 ## Repo laws (nyc-mon)
 
-R1. **No git worktrees or extra checkouts; all work happens in the nyc-mon folder.** Several agents share `/Users/mikevocalz/nyc-mon` on `main`. Each one commits only its own files with explicit pathspecs (`git commit -- <paths>`), never `git add -A`.
+R1. **No git worktrees or extra checkouts; all work happens in the `nyc-mon` folder on `main`.** Commit only your own files with explicit pathspecs (`git commit -- <paths>`), never `git add -A`.
 
 R2. **Package scope stays `@acme/*`.** New packages (`packages/core`, `packages/content`, `packages/render`, `packages/auth`) are `@acme/core`, `@acme/content`, `@acme/render`, `@acme/auth`.
 
 R3. **Every screen and page is built from our NYC-Tron UI kit (`@acme/ui`, `packages/ui`) components.** A new visual pattern becomes a kit component or variant with a story first, then gets used; no one-off styled Views/divs in apps. The kit inventory is `docs/REPO_MAP.md` §5.
 
-R4. **Every task runs with its named skills loaded, through subagents, and passes the §6 handoff gate (`08-handoff.md`) before implementation.**
+R4. **Every screen passes the §6 pipeline and the `08-handoff.md` gate before implementation.**
 
-- **R5. API design uses Margelo's `api-design` skill** (https://github.com/margelo/react-native-skills/tree/main/skills/api-design) for every public surface: `@acme/*` exports, hooks, options objects, events, errors, and the `/v1` server contract.
-- **R6. Payload work uses the `payload` skill** (https://github.com/payloadcms/skills), checked against the installed Payload 4 canary source (Law 2).
+- **R5. API design follows Margelo's `api-design` guide** (https://github.com/margelo/react-native-skills/tree/main/skills/api-design) for every public surface: `@acme/*` exports, hooks, options objects, events, errors, and the `/v1` server contract.
+- **R6. Payload work follows the Payload skills guide** (https://github.com/payloadcms/skills), checked against the installed Payload 4 canary source (Law 2).

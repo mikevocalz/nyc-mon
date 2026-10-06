@@ -4,7 +4,7 @@
 - **Date:** 2026-10-04
 - **Deciders:** Mike (creator) decided; the `platform` agent implements
 - **Decisions recorded:** `docs/canon/DECISIONS.md` #2 (auth) and #3 (email)
-- **Spec:** `prompts/BUILD_PROMPT_v3.md` §1.4 (accounts and the server seam), §1.5 (age and consent), Laws 2, 5 and 6 in `prompts/LAWS.md`
+- **Spec:** `docs/phase-1-brief.md` §1.4 (accounts and the server seam), §1.5 (age and consent), Laws 2, 5 and 6 in `CONTRIBUTING.md`
 - **Repo evidence:** `docs/REPO_MAP.md` §8
 - **Hosting:** since 2026-10-04 Payload, Better Auth and `/v1` run in `apps/admin-vite`, not `apps/web`; see `docs/adr/0003-admin-app-split.md`. Paths below that name `apps/web` describe the original mount.
 

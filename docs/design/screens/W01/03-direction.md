@@ -1,6 +1,6 @@
 # W01 Home: direction
 
-Skill: `frontend-design:frontend-design`. Spec: `prompts/BUILD_PROMPT_v3.md` §5 W01 row and the "Web hero canvas" paragraph, treated as requirements.
+Skill: `frontend-design:frontend-design`. Spec: `docs/phase-1-brief.md` §5 W01 row and the "Web hero canvas" paragraph, treated as requirements.
 
 ## Mike's direction (2026-10-04) and how it fits the spec
 

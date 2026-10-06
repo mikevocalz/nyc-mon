@@ -3,7 +3,7 @@
 - **Status:** Proposed
 - **Date:** 2026-10-04
 - **Deciders:** Mike (creator) signs off; the `sim-core` agent implements
-- **Spec:** `prompts/BUILD_PROMPT_v3.md` §0 (expansion rule), §1.4 (server contract), §2.1 (lifecycle and care), §3.2 (idle vignettes), §8 (sim acceptance); Laws 3, 5, 6, 7 and 8
+- **Spec:** `docs/phase-1-brief.md` §0 (expansion rule), §1.4 (server contract), §2.1 (lifecycle and care), §3.2 (idle vignettes), §8 (sim acceptance); Laws 3, 5, 6, 7 and 8
 - **Canon:** `docs/canon/source/NYC_MON_Canon_and_Lore_Bible_v11.docx`, sections Lifecycle, Hatching and care, Cross-device companion continuity
 - **Code:** `packages/core` (`@acme/core`)
 

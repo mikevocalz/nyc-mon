@@ -2,7 +2,7 @@
 
 Owner: `design-director`. Written 2026-10-04. Status: **proposal**. No token in `packages/theme/tokens.ts` has changed. The diffs below are for whoever owns `@acme/theme` to land as a PR, with `packages/theme/contrast.ts` rows added in the same PR (Law 10: a token without a measurement does not exist).
 
-Inputs: `docs/canon/DECISIONS.md` #4 (daylit default; dark for night and the hatch), #7 (red LED; orange for CTA and hatch), #8 (H-Lynk chrome), #16 (the H-Lynk Core: matte red body, black scanner head, black controls); `prompts/BUILD_PROMPT_v3.md` §1.1, §1.3; `docs/REPO_MAP.md` §6; `docs/design/CONTRAST.md`; `docs/design/hlynk/DIRECTION.md`.
+Inputs: `docs/canon/DECISIONS.md` #4 (daylit default; dark for night and the hatch), #7 (red LED; orange for CTA and hatch), #8 (H-Lynk chrome), #16 (the H-Lynk Core: matte red body, black scanner head, black controls); `docs/phase-1-brief.md` §1.1, §1.3; `docs/REPO_MAP.md` §6; `docs/design/CONTRAST.md`; `docs/design/hlynk/DIRECTION.md`.
 
 ## What changes and what stays
 

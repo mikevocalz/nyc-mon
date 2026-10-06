@@ -3,7 +3,7 @@
 - **Status:** Accepted (2026-10-06, scaffold)
 - **Date:** 2026-10-06
 - **Deciders:** Mike (creator) directed the extension; the `platform` agent implements
-- **Spec:** `docs/nyc-mon-alexa-plus-build-prompt.md` (Alexa+ track: "a working MCP integration built on the open standards for Agent Skills and Streamable HTTP transport"); MCP spec 2025-11-25, https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#streamable-http
+- **Spec:** `docs/alexa-plus-brief.md` (Alexa+ track: "a working MCP integration built on the open standards for Agent Skills and Streamable HTTP transport"); MCP spec 2025-11-25, https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#streamable-http
 - **Builds on:** `docs/adr/0001-auth-and-identity.md`, `docs/adr/0003-admin-app-split.md`
 - **Code:** `packages/mcp-server` (`@acme/mcp-server`)
 

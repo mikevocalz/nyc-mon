@@ -1,4 +1,4 @@
-# NYC-Mon × Alexa+ Add-on — Build Prompt
+# NYC-Mon × Alexa+ Add-on — Build Brief
 
 ## Context
 NYC-Mon is a proprietary creature/companion game (Canon & Lore Bible v11). Phase 1 is a Tamagotchi loop: pick a starter (Hood Ratti, Bodega Cee, Yotes) → incubate → hatch → care. Rendering is three.js + WebGPU + TypeGPU. The repo is `nyc-mon` (local), with a Next.js product site, a shared cross-platform UI layer (NeonBlade-derived, Knicks-like palette), logos already in-repo, and a standing rule that all web markup uses the semantic HTML primitives in `/ui/html`.
