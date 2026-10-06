@@ -321,3 +321,42 @@ An account created through guardian consent can add a phone number and receive S
 - **Kind:** product
 
 Staff roles are `ops`, `support`, `consent` and `content`. If the auth adapter cannot store more than one role on a user, each staff member holds exactly one, and ADR 0004 records the limit until the plugin's configurable role field reaches the pinned fork.
+
+
+## Decision 23 — full native game; web is the Mon Space companion
+
+- **Date:** 2026-10-06
+- **Decided by:** Mike (creator)
+- **Kind:** product + canon
+
+NYC-MON is built out as the full native mobile/tablet game rather than splitting the product into a Tamagotchi-only V1 followed by a separate game V2. The **web surface is intentionally limited to the Tamagotchi-style Mon Space**.
+
+All surfaces use the same authoritative Mon instance and persistence. Web care, conversation, memories, bond and evolution progress carry into native. There is no separate “web Mon.”
+
+Native primary navigation is **HOME · GAME · H-LYNK · MONS · CALLER**. HOME is the entry/choice surface; GAME owns exploration and all normal battles; H-LYNK is the raised center device/action surface and entry to the bonded Mon's care experience; MONS is the species encyclopedia; CALLER is the player identity.
+
+See `docs/canon/GAMEPLAY_BIBLE_V12.md`.
+
+## Decision 24 — combat disciplines and Ultimate Battle
+
+- **Date:** 2026-10-06
+- **Decided by:** Mike (creator)
+- **Kind:** canon
+
+Default combat law: **humans battle humans; Mons battle Mons**. Caller combat uses futuristic cybernetic/power fighting gear. Championship Ultimate Battles use three rounds: Caller vs Caller, Mon vs Mon, then human-v-human with a dedicated Mon assist/sneak-attack mechanic as a special sanctioned final-round ruleset.
+
+## Decision 25 — battle progression is matchup-aware
+
+- **Date:** 2026-10-06
+- **Decided by:** Mike (creator)
+- **Kind:** gameplay canon
+
+Level alone does not determine match eligibility. A server-owned Battle Rating also considers evolution stage, stats, moves, Affinity/type matchup, condition and ruleset modifiers. A Lv 6 vs Lv 12 match is normally outside sanctioned eligibility; Lv 6 vs Lv 8 may be valid when the matchup supports it. Evolution is conditional and may incorporate bond, care, move mastery, battle history, environment and hidden authored requirements.
+
+## Decision 26 — Battle Grounds, battle memory, Stories and CMS LiveOps
+
+- **Date:** 2026-10-06
+- **Decided by:** Mike (creator)
+- **Kind:** product + gameplay canon
+
+Real NYC locations can become Battle Grounds with local rules, reputation, schedules and tournaments. Rucker Park and Union Square/14th Street are foundational examples. Battle outcomes create structured Mon memories and authoritative event logs. Those logs can drive approximately 60-second vertical battle Stories/replays. Payload can create/edit/schedule battle events and recurring cron-driven Battle Ground programming without a client rebuild.
