@@ -1,6 +1,6 @@
 # W01 Home: research
 
-Skill: `design:user-research`. Sources: `prompts/BUILD_PROMPT_v3.md` §0C, §5 (W01 row), `docs/design/research/PERSONAS.md`, `docs/canon/DECISIONS.md` #1, #4, #5, #6, #9, #11, #13, #14, #16. Mike's direction of 2026-10-04 (quoted in `03-direction.md`).
+Skill: `design:user-research`. Sources: `docs/phase-1-brief.md` §0C, §5 (W01 row), `docs/design/research/PERSONAS.md`, `docs/canon/DECISIONS.md` #1, #4, #5, #6, #9, #11, #13, #14, #16. Mike's direction of 2026-10-04 (quoted in `03-direction.md`).
 
 ## The page's job
 

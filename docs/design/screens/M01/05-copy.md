@@ -57,4 +57,4 @@ Shown on M02, not on M01 (`04-components.md`). Defined in `docs/design/screens/M
 
 ## Slopmonster gate
 
-`python3 ~/.claude/skills/slopmonster/tools/deslop.py --text "<all String cells above>"`: **5/5 CLEAN**. Rival-model cleanse (`tools/cleanse.sh`) not run; the strings are labels of one to four words.
+Copy lint on all String cells above: **5/5 CLEAN**. The rival-model cleanse pass has not been run; the strings are labels of one to four words.

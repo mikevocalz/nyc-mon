@@ -1,6 +1,6 @@
 'use client';
 import { brand } from '@acme/theme';
-import { Main, View } from '@acme/ui/tw';
+import { View } from '@acme/ui/tw';
 import { Container, GridFloor, SceneSection, SkylineDivider, SolidPanel } from '@acme/ui';
 import { ExploreFeatured, ExploreLead, ExploreResources } from './explore-content';
 
@@ -12,7 +12,7 @@ import { ExploreFeatured, ExploreLead, ExploreResources } from './explore-conten
  */
 export function ExploreScreen() {
   return (
-    <Main className="min-h-screen w-full flex-1 bg-surface pb-24">
+    <View className="mx-auto min-h-screen w-full flex-1 bg-surface pb-24">
       <SceneSection
         className="min-h-[560px] md:min-h-[600px]"
         placeholderColor={brand.night}
@@ -35,6 +35,6 @@ export function ExploreScreen() {
           <ExploreResources />
         </Container>
       </View>
-    </Main>
+    </View>
   );
 }

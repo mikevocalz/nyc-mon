@@ -6,6 +6,8 @@ import { twMerge } from 'tailwind-merge';
 import { tv } from 'tailwind-variants';
 import { BrandWordmark } from '../brand/BrandWordmark';
 import { districtTone, type ChartTone, type District } from '../district';
+import { frameTone } from '../control-look';
+import { CornerCutFrame } from '../neon/CornerCutFrame';
 import { Header, Link, List, ListItem, Nav } from '../primitives';
 import { useInstanceStore, useStore } from '../use-instance-store';
 import { Pressable, Text, View } from '../tw';
@@ -89,18 +91,20 @@ const bar = tv({
     sheet: 'border-t-2 border-ink-800 bg-ink-950 px-3 pb-4 pt-2 md:hidden',
     sheetLink: 'flex min-h-12 flex-row items-center justify-between px-3 py-3',
     keyline: 'h-1 w-full',
-    cta: 'flex min-h-11 flex-row items-center justify-center border-2 px-4 py-2 hover:bg-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus',
-    ctaText: 'text-sm font-semibold',
+    // The nav CTA is the royal face with bold white text — the site Log in
+    // sits apart from the orange action CTAs Decision #7 reserves elsewhere.
+    cta: 'inline-flex self-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus',
+    ctaText: 'font-display text-sm font-bold tracking-wide text-white',
     skip: 'sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-3 focus:z-[60] focus:px-4 focus:py-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus',
   },
   variants: {
     tone: {
       // CTA text uses the same tone steps as the footer's group titles on ink-950.
-      orange: { linkActive: 'bg-orange-500', keyline: 'bg-orange-500', cta: 'border-orange-500', ctaText: 'text-orange-400', skip: 'bg-orange-500' },
-      royal: { linkActive: 'bg-royal-500', keyline: 'bg-royal-500', linkActiveText: 'text-white', cta: 'border-royal-500', ctaText: 'text-royal-300', skip: 'bg-royal-500' },
-      carolina: { linkActive: 'bg-carolina-500', keyline: 'bg-carolina-500', cta: 'border-carolina-500', ctaText: 'text-carolina-400', skip: 'bg-carolina-500' },
-      leaf: { linkActive: 'bg-leaf-500', keyline: 'bg-leaf-500', cta: 'border-leaf-500', ctaText: 'text-leaf-400', skip: 'bg-leaf-500' },
-      apple: { linkActive: 'bg-apple-500', keyline: 'bg-apple-500', linkActiveText: 'text-ink-950', cta: 'border-apple-500', ctaText: 'text-apple-400', skip: 'bg-apple-500' },
+      orange: { linkActive: 'bg-orange-500', keyline: 'bg-orange-500', skip: 'bg-orange-500' },
+      royal: { linkActive: 'bg-royal-500', keyline: 'bg-royal-500', linkActiveText: 'text-white', skip: 'bg-royal-500' },
+      carolina: { linkActive: 'bg-carolina-500', keyline: 'bg-carolina-500', skip: 'bg-carolina-500' },
+      leaf: { linkActive: 'bg-leaf-500', keyline: 'bg-leaf-500', skip: 'bg-leaf-500' },
+      apple: { linkActive: 'bg-apple-500', keyline: 'bg-apple-500', linkActiveText: 'text-ink-950', skip: 'bg-apple-500' },
     },
     transparency: {
       solid: { root: 'bg-ink-950' },
@@ -147,6 +151,9 @@ export function NavBar({
 }: NavBarProps) {
   const tone: ChartTone = color ? (PRESETS[color] ?? (color as ChartTone)) : districtTone(district);
   const s = bar({ tone, transparency, position, navAlign });
+  // The header's Log in wears royal, not the orange `cta` face the kit
+  // reserves for in-page actions (Decision #7).
+  const ctaFaceTone = frameTone('solid', 'royal');
   // The dropdown panel and rows are the kit's shared list (also Select's open list).
   const d = dropdownLook({ tone });
   const store = useInstanceStore(() => ({ sheet: false, dropdown: -1 }));
@@ -232,8 +239,17 @@ export function NavBar({
           {cta
             ? anchor(
                 { ...cta, active: false },
-                <Text className={s.ctaText()}>{cta.label}</Text>,
-                twMerge(s.cta(), items.length ? 'hidden md:flex' : ''),
+                <CornerCutFrame
+                  tone={ctaFaceTone}
+                  variant="solid"
+                  corner="bottom-right"
+                  cut={10}
+                  depth={4}
+                  className="flex-row items-center justify-center px-5 py-2.5"
+                >
+                  <Text className={s.ctaText()}>{cta.label}</Text>
+                </CornerCutFrame>,
+                twMerge(s.cta(), items.length ? 'hidden md:inline-flex' : ''),
               )
             : null}
           {trailing}
@@ -273,7 +289,16 @@ export function NavBar({
               <ListItem className="pt-2">
                 {anchor(
                   { ...cta, active: false, onPress: () => { cta.onPress?.(); close(); } },
-                  <Text className={twMerge(s.ctaText(), 'text-base')}>{cta.label}</Text>,
+                  <CornerCutFrame
+                    tone={ctaFaceTone}
+                    variant="solid"
+                    corner="bottom-right"
+                    cut={10}
+                    depth={4}
+                    className="flex-row items-center justify-center px-5 py-2.5"
+                  >
+                    <Text className={twMerge(s.ctaText(), 'text-base')}>{cta.label}</Text>
+                  </CornerCutFrame>,
                   s.cta(),
                 )}
               </ListItem>

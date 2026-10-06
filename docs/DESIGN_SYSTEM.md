@@ -2,7 +2,7 @@
 
 Owner: `design-director`. Written 2026-10-04. Status: **proposal**. No token in `packages/theme/tokens.ts` has changed. The diffs below are for whoever owns `@acme/theme` to land as a PR, with `packages/theme/contrast.ts` rows added in the same PR (Law 10: a token without a measurement does not exist).
 
-Inputs: `docs/canon/DECISIONS.md` #4 (daylit default; dark for night and the hatch), #7 (red LED; orange for CTA and hatch), #8 (H-Lynk chrome), #16 (the H-Lynk Core: matte red body, black scanner head, black controls); `prompts/BUILD_PROMPT_v3.md` §1.1, §1.3; `docs/REPO_MAP.md` §6; `docs/design/CONTRAST.md`; `docs/design/hlynk/DIRECTION.md`.
+Inputs: `docs/canon/DECISIONS.md` #4 (daylit default; dark for night and the hatch), #7 (red LED; orange for CTA and hatch), #8 (H-Lynk chrome), #16 (the H-Lynk Core: matte red body, black scanner head, black controls); `docs/phase-1-brief.md` §1.1, §1.3; `docs/REPO_MAP.md` §6; `docs/design/CONTRAST.md`; `docs/design/hlynk/DIRECTION.md`.
 
 ## What changes and what stays
 
@@ -152,9 +152,6 @@ Method: WCAG 2.2 relative luminance, sRGB linearisation threshold 0.04045, as in
 | hlynk: body on night page | both | `hlynk-core-body` #D50000 | `ink-950` #00041C | 3.70 | decorative (0) | exempt | `packages/theme/tokens.ts:188`; the shell is not a control; its edge needs no ratio (measures 3.70 anyway) |
 | hlynk: LED off in the black head | both | `led-off` #5E0000 | `hlynk-core-black` #000000 | 1.48 | decorative (0) | exempt | `packages/theme/tokens.ts:174`; the unlit lens; LED state is never conveyed by the LED alone (a text chip sits in the screen) |
 | hlynk: disabled key glyph | both | `hlynk-core-glyph-disabled` #484C51 | `hlynk-core-black` #000000 | 2.43 | disabled (0) | exempt | `packages/theme/tokens.ts:198`; inactive key |
-| hlynk: key and trackpad focus outline on body | both | `hlynk-core-ink` #FFFFFF | `hlynk-core-body` #D50000 | 5.48 | ui (3) | pass | `packages/ui/hlynk/HLynkKey.tsx:69`, `packages/ui/hlynk/Trackpad.web.tsx:48` |
-| hlynk: trackpad ring, booting or disabled | both | `led-off` #5E0000 | `hlynk-core-black` #000000 | 1.48 | disabled (0) | exempt | `packages/ui/hlynk/TrackpadFace.tsx:41`; inactive trackpad during boot (WCAG 1.4.11 inactive components) |
-| hlynk: reduced-motion LED cue in the black head | both | `led-on` #F80000 | `hlynk-core-black` #000000 | 4.99 | ui (3) | pass | `packages/ui/hlynk/ScannerLed.tsx:96`, `packages/ui/hlynk/ScannerLed.tsx:104`, `packages/ui/hlynk/ScannerLed.tsx:107`; tick row, filled dot and exclamation dot that stand in for the LED rhythm |
 | hlynk: key and trackpad focus outline on body | both | `hlynk-core-ink` #FFFFFF | `hlynk-core-body` #D50000 | 5.48 | ui (3) | pass | `packages/ui/hlynk/HLynkKey.tsx:69`, `packages/ui/hlynk/Trackpad.web.tsx:48` |
 | hlynk: trackpad ring, booting or disabled | both | `led-off` #5E0000 | `hlynk-core-black` #000000 | 1.48 | disabled (0) | exempt | `packages/ui/hlynk/TrackpadFace.tsx:41`; inactive trackpad during boot (WCAG 1.4.11 inactive components) |
 | hlynk: reduced-motion LED cue in the black head | both | `led-on` #F80000 | `hlynk-core-black` #000000 | 4.99 | ui (3) | pass | `packages/ui/hlynk/ScannerLed.tsx:96`, `packages/ui/hlynk/ScannerLed.tsx:104`, `packages/ui/hlynk/ScannerLed.tsx:107`; tick row, filled dot and exclamation dot that stand in for the LED rhythm |

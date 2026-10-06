@@ -1,6 +1,6 @@
 # M01 Boot / power-on: handoff
 
-The implementation contract for `platform` (routing, shell wiring) and the kit build (`packages/ui`). Inputs: `01-research.md` to `07-a11y.md`, `docs/design/hlynk/DIRECTION.md`, `docs/DESIGN_SYSTEM.md`, `docs/design/DECISIONS.md` (P1, D1, D3, D8, D11), canon Decisions #4, #7, #8, #16, `docs/COPY_DECK.md`, `docs/DEVICE_CHECKS.md`. Laws: `prompts/LAWS.md` (R1–R5, Laws 2, 3, 9, 10).
+The implementation contract for `platform` (routing, shell wiring) and the kit build (`packages/ui`). Inputs: `01-research.md` to `07-a11y.md`, `docs/design/hlynk/DIRECTION.md`, `docs/DESIGN_SYSTEM.md`, `docs/design/DECISIONS.md` (P1, D1, D3, D8, D11), canon Decisions #4, #7, #8, #16, `docs/COPY_DECK.md`, `docs/DEVICE_CHECKS.md`. Laws: `CONTRIBUTING.md` (R1–R5, Laws 2, 3, 9, 10).
 
 ## Blockers before implementation
 

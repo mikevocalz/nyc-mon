@@ -33,7 +33,7 @@ Design and product decisions made by `design-director` or handed to it by the le
 ### D1 — H-Lynk chrome on M01 only among M01–M07
 
 - **Date:** 2026-10-04
-- **Reason:** the screen map (`prompts/BUILD_PROMPT_v3.md` §4.1) gives M01 the H-Lynk shell and M02–M07 none; §2.4 bars the bezel from auth and settings. M01 research asked to confirm the exception (`screens/M01/01-research.md`, risk "Canon and language").
+- **Reason:** the screen map (`docs/phase-1-brief.md` §4.1) gives M01 the H-Lynk shell and M02–M07 none; §2.4 bars the bezel from auth and settings. M01 research asked to confirm the exception (`screens/M01/01-research.md`, risk "Canon and language").
 - **Decision:** confirmed. Detail in `hlynk/DIRECTION.md` § "Where the chrome appears".
 
 ### D2 — Rear L/R, edge volume/power and the left action control are not drawn on mobile
@@ -107,7 +107,7 @@ Design and product decisions made by `design-director` or handed to it by the le
 ### D12 — W01: the seal keeps the hero's right column; the 3D H-Lynk Core gets its own section below
 
 - **Date:** 2026-10-04
-- **Reason:** `prompts/BUILD_PROMPT_v3.md` §5 puts a live H-Lynk canvas on the right of the home hero. Mike, the same day: "I love the logo on the right for home but it needs work. Leave the Mega City (district) options." His direction outranks the brief.
+- **Reason:** `docs/phase-1-brief.md` §5 puts a live H-Lynk canvas on the right of the home hero. Mike, the same day: "I love the logo on the right for home but it needs work. Leave the Mega City (district) options." His direction outranks the brief.
 - **Decision:**
   - The hero's right column is the NYC-MON seal (`BrandLogo`), unedited. The district selector stays and drives the city behind the hero.
   - `apps/web/components/DeviceStage.tsx` keeps every §5 requirement (`model: 'placeholder' | 'h-lynk-entry'`, `figure aria-label="H-Lynk device"`, static capture for no-script and reduced motion, slow idle yaw, pointer tilt of 8° or less, paused offscreen, mounted after LCP) and sits in its own section directly below the hero, before the starters.

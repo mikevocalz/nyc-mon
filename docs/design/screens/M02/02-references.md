@@ -1,6 +1,6 @@
 # M02 Welcome: references
 
-Mobbin queries (iOS, 2026-10-04): flow "Tolan onboarding" (named in `prompts/BUILD_PROMPT_v3.md` §4.1); screen "onboarding carousel panel with full-bleed illustration, short caption, page dots and visible skip button".
+Mobbin queries (iOS, 2026-10-04): flow "Tolan onboarding" (named in `docs/phase-1-brief.md` §4.1); screen "onboarding carousel panel with full-bleed illustration, short caption, page dots and visible skip button".
 
 | Ref | Take | Reject |
 |---|---|---|

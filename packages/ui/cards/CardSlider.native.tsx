@@ -42,11 +42,11 @@ export type { CardSliderNativeProps } from './card-slider-native.types';
  */
 export function CardSlider({
   children, label, visibleCount = 1, gap = 16, showButtons = true, showProgress = true,
-  progressStyle = 'bar', loop = false, tone, district, className, itemClassName,
+  progressStyle = 'bar', progressPosition = 'inset', loop = false, tone, district, className, itemClassName,
   buttonPosition = 'sides', prevButtonCorner = 'bottom-left', nextButtonCorner = 'bottom-right',
   autoPlay = false, autoPlayInterval = 3000, showEdgeFades = false, edgeFadeColor,
   showCornerAccents = false, cornerAccentStyle = 'frame', scanLines = false, viewportClassName,
-  variant = 'uncontained', snap = true, itemCut = 0, onIndexChange,
+  variant = 'uncontained', snap = true, itemCut = 0, index: indexProp, onIndexChange,
 }: CardSliderNativeProps) {
   const slides = slidesOf(children);
   const { size, onLayout } = useLayoutSize({ width: 0, height: 0 });
@@ -55,15 +55,18 @@ export function CardSlider({
   const reduced = useReducedMotion();
   // playing: autoplay not paused by the user. Starts paused under reduced motion.
   const store = useInstanceStore(() => ({ index: 0, playing: !reduced }));
-  const index = Math.min(useStore(store, (s) => s.index), layout.maxIndex);
+  const controlled = indexProp !== undefined;
+  const storeIndex = useStore(store, (s) => s.index);
+  const index = Math.min(controlled ? indexProp : storeIndex, layout.maxIndex);
   const playing = useStore(store, (s) => s.playing);
   const resolved = sliderTone(tone, district);
   const paged = layout.maxIndex > 0;
   const sides = showButtons && paged && buttonPosition === 'sides';
 
   const go = (next: number) => {
-    if (next === store.getState().index) return;
-    store.setState({ index: next });
+    if (next === index) return;
+    // Controlled: report the request — the track scrolls when the prop updates.
+    if (!controlled) store.setState({ index: next });
     onIndexChange?.(next);
   };
 
@@ -72,7 +75,7 @@ export function CardSlider({
     interval: autoPlayInterval,
     enabled: playing,
     held: false,
-    getIndex: () => store.getState().index,
+    getIndex: () => (controlled ? (indexProp ?? 0) : store.getState().index),
     maxIndex: layout.maxIndex,
     loop,
     step: go,
@@ -86,6 +89,24 @@ export function CardSlider({
       {showCornerAccents ? <CornerAccents tone={resolved} style={cornerAccentStyle} /> : null}
     </View>
   ));
+  const sliderControls = (
+    <SliderControls
+      index={index}
+      count={slides.length}
+      visible={layout.visible}
+      maxIndex={layout.maxIndex}
+      loop={loop}
+      tone={resolved}
+      showButtons={showButtons && paged}
+      showProgress={showProgress && paged}
+      progressStyle={progressStyle}
+      onGo={go}
+      buttonPosition={buttonPosition}
+      prevCorner={prevButtonCorner}
+      nextCorner={nextButtonCorner}
+      autoplay={autoPlay && paged ? { playing, onToggle: () => store.setState({ playing: !store.getState().playing }) } : undefined}
+    />
+  );
 
   return (
     <Section
@@ -143,23 +164,9 @@ export function CardSlider({
             onGo={go}
           />
         ) : null}
+        {progressPosition === 'inset' ? sliderControls : null}
       </View>
-      <SliderControls
-        index={index}
-        count={slides.length}
-        visible={layout.visible}
-        maxIndex={layout.maxIndex}
-        loop={loop}
-        tone={resolved}
-        showButtons={showButtons && paged}
-        showProgress={showProgress && paged}
-        progressStyle={progressStyle}
-        onGo={go}
-        buttonPosition={buttonPosition}
-        prevCorner={prevButtonCorner}
-        nextCorner={nextButtonCorner}
-        autoplay={autoPlay && paged ? { playing, onToggle: () => store.setState({ playing: !store.getState().playing }) } : undefined}
-      />
+      {progressPosition === 'below-content' ? sliderControls : null}
     </Section>
   );
 }

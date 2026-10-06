@@ -1,6 +1,6 @@
 'use client';
 import { brand } from '@acme/theme';
-import { Main, View } from '@acme/ui/tw';
+import { View } from '@acme/ui/tw';
 import { Container, GridFloor, SceneSection, SolidPanel } from '@acme/ui';
 import { ProfileDetails, ProfileIdentity, ProfileOverview } from './profile-content';
 
@@ -11,7 +11,7 @@ import { ProfileDetails, ProfileIdentity, ProfileOverview } from './profile-cont
  */
 export function ProfileScreen() {
   return (
-    <Main className="min-h-screen w-full flex-1 bg-surface pb-24">
+    <View className="mx-auto min-h-screen w-full flex-1 bg-surface pb-24">
       <SceneSection
         className="min-h-[480px] md:min-h-[520px]"
         placeholderColor={brand.night}
@@ -31,6 +31,6 @@ export function ProfileScreen() {
           <ProfileDetails />
         </View>
       </Container>
-    </Main>
+    </View>
   );
 }

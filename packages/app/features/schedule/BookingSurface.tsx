@@ -23,7 +23,7 @@ export interface BookingSurfaceProps {
  * proportional-height blocks squeezed into a phone gives every appointment a
  * few characters of width and turns the whole grid into a horizontal-scroll
  * puzzle. This replaces it with the task the user actually has on a phone:
- * pick a day, pick a time. Rationale in README.md.
+ * pick a day, pick a time, then add a Mon event. Rationale in README.md.
  */
 export function BookingSurface({ day, resource, onBook }: BookingSurfaceProps) {
   const selectedDate = useScheduleStore((state) => state.selectedDate);
@@ -108,7 +108,7 @@ export function BookingSurface({ day, resource, onBook }: BookingSurfaceProps) {
                 }`}
               >
                 {formatTimeRange(
-                  { ...slot, id: iso, resourceId: resource.id, title: '', kind: 'block' },
+                  { ...slot, id: iso, resourceId: resource.id, title: '', kind: 'custom' },
                   day.timeZone,
                 )}
               </Text>
@@ -119,7 +119,7 @@ export function BookingSurface({ day, resource, onBook }: BookingSurfaceProps) {
 
       <Button
         variant="primary"
-        title="Book appointment"
+        title="Add event at this time"
         disabled={!selectedSlot}
         onPress={selectedSlot ? () => onBook(selectedSlot) : undefined}
         fullWidth

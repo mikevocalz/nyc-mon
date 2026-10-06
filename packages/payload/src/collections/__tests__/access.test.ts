@@ -45,10 +45,10 @@ async function canReadField(collection: CollectionConfig, name: string, viewer: 
   return read({ req, collection: anyCollection } as FieldAccessArgs);
 }
 
-describe('staff role parsing (TODO(adr-0004) placeholders)', () => {
-  it('reads the placeholder roles and maps legacy admin to ops', () => {
+describe('staff role parsing (ADR 0004 §8)', () => {
+  it('reads the staff roles; the retired admin value is no role', () => {
     expect(readStaffRole(staff('support'))).toBe('support');
-    expect(readStaffRole(staff('admin'))).toBe('ops');
+    expect(readStaffRole(staff('admin'))).toBeUndefined();
   });
 
   it('gives Callers, anonymous requests and unknown roles no staff role', () => {
@@ -73,11 +73,11 @@ describe('collection writes: server code only', () => {
 
 describe('collection reads by role', () => {
   const matrix: [CollectionConfig, Viewer[]][] = [
-    [GuardianConsents, ['ops', 'consent', 'legacyAdmin']],
-    [Eggs, ['ops', 'support', 'legacyAdmin']],
-    [MonInstances, ['ops', 'support', 'legacyAdmin']],
-    [CareStates, ['ops', 'support', 'legacyAdmin']],
-    [IntegrityRuns, ['ops', 'support', 'consent', 'content', 'legacyAdmin']],
+    [GuardianConsents, ['ops', 'consent']],
+    [Eggs, ['ops', 'support']],
+    [MonInstances, ['ops', 'support']],
+    [CareStates, ['ops', 'support']],
+    [IntegrityRuns, ['ops', 'support', 'consent', 'content']],
   ];
   for (const [collection, allowed] of matrix) {
     it(`${collection.slug} is readable by ${allowed.join(', ')} only`, async () => {

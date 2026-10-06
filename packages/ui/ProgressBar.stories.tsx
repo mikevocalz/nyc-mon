@@ -44,3 +44,8 @@ export const Districts: Story = {
     </DistrictGrid>
   ),
 };
+
+/** G18: a level read off a scale (care meter, bond) — role="meter". */
+export const Meter: Story = {
+  args: { role: 'meter', value: 74, label: 'Bond', size: 'sm', showLabel: true },
+};

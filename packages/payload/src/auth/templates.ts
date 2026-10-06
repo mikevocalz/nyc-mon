@@ -6,7 +6,7 @@ import type { AuthMail } from './email';
 /** A rendered mail without its recipient. */
 export type MailContent = Omit<AuthMail, 'to'>;
 
-function escapeHtml(value: string): string {
+export function escapeHtml(value: string): string {
   return value
     .replaceAll('&', '&amp;')
     .replaceAll('<', '&lt;')
@@ -128,5 +128,37 @@ export function accountsMergedMail(movedMons: number): MailContent {
     subject: 'Your NYC-MON accounts were joined',
     paragraphs: [`Two NYC-MON accounts were joined into one. ${mons} moved over, and nothing was deleted.`],
     footer: "If you didn't do this, contact support right away.",
+  });
+}
+
+/**
+ * Guardian consent request. Sent to the parent or guardian's email address for
+ * an under-13 Caller (ADR 0001 § Age and consent). Plain text is the primary
+ * part; HTML is supplied so mail clients render links.
+ *
+ * The yes/no links are placeholders until counsel chooses the consent method
+ * (M05 B1); the endpoint uses whatever URLs the caller passes in.
+ */
+export function guardianConsentMail(consentId: number, days: number, baseURL: string): MailContent {
+  const yesUrl = `${baseURL}/guardian-consent/${consentId}?decision=approve`;
+  const noUrl = `${baseURL}/guardian-consent/${consentId}?decision=deny`;
+  const noticeUrl = `${baseURL}/legal/childrens-privacy`;
+  return render({
+    subject: 'Your child asked to set up an NYC-MON account',
+    paragraphs: [
+      'Hi. Someone entered this email address in the NYC-MON app and asked you to approve an account for a child under 13.',
+      'NYC-MON is a game set in New York. Players look after a creature called a Mon on their phone. The game calls players Callers.',
+      `If you say yes, we keep your child's birth year, the Caller name they choose and their Mon's progress, so the game works on a new phone.`,
+      "We show no ads based on what your child does, and the only notification is sent by the phone itself when an egg is ready.",
+      "If you say no, we delete your email address and everything your child saved with us. In the game, their Mon goes to stay with one of the characters, so your child doesn't see it deleted.",
+      `If you don't answer within ${days} days, we delete this request and your email address.`,
+      `Yes, set up the account: ${yesUrl}`,
+      `No thanks: ${noUrl}`,
+      `Read our children's privacy notice: ${noticeUrl}`,
+    ],
+    footer: "You got this email because someone typed your address into NYC-MON. If you don't know who, you can ignore it and we'll delete it in {days} days.".replace(
+      '{days}',
+      String(days),
+    ),
   });
 }

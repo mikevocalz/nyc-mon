@@ -85,5 +85,11 @@ export {
   AudioLines,
   Play,
   Pause,
+  Plus,
+  EyeOff,
+  Minus,
+  Mail,
+  KeyRound,
+  Fingerprint,
 } from 'lucide-react';
 export type { LucideProps as IconProps } from 'lucide-react';

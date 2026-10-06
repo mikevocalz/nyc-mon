@@ -12,7 +12,7 @@ import type {
 import { TONE_CLASSES, resolveTone, toneVariants, type ControlTone, type District, type ToneClasses } from './tones';
 
 export type {
-  CardSliderProps, CardSliderProgressStyle, CardSliderButtonPosition, CardSliderButtonVisibility,
+  CardSliderProps, CardSliderProgressStyle, CardSliderProgressPosition, CardSliderButtonPosition, CardSliderButtonVisibility,
   CardSliderCornerAccentStyle, ButtonCorner, CardSliderImageItemData, CardSliderImageSource,
   CardSliderImageFrame, CardSliderImageAspect,
 } from './card-slider.types';

@@ -21,6 +21,11 @@ export interface ProgressA11yInput {
   label?: string;
   /** Overrides the spoken value, e.g. "3 of 8 stops". */
   valueText?: string;
+  /**
+   * 'progressbar' (default) for something that will finish; 'meter' for a
+   * level read off a scale (care meters, bond) — G18.
+   */
+  role?: 'progressbar' | 'meter';
 }
 
 /**
@@ -29,12 +34,12 @@ export interface ProgressA11yInput {
  * which is how screen readers know there is no value to announce, and sets
  * aria-busy.
  */
-export function progressA11y({ value, max = 100, indeterminate, label, valueText }: ProgressA11yInput) {
+export function progressA11y({ value, max = 100, indeterminate, label, valueText, role = 'progressbar' }: ProgressA11yInput) {
   const busy = isIndeterminate(value, indeterminate);
   const safeMax = Number.isFinite(max) && max > 0 ? max : 100;
   const now = busy ? undefined : Math.round(progressFraction(value, safeMax) * safeMax * 100) / 100;
   return {
-    role: 'progressbar' as const,
+    role,
     'aria-label': label,
     'aria-valuemin': 0,
     'aria-valuemax': safeMax,

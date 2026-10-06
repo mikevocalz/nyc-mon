@@ -19,6 +19,8 @@ export interface ThreePointer {
   y: number;
   /** True while a mouse hovers or a finger touches the canvas. */
   inside: boolean;
+  /** True between pointerdown and pointerup — a click/tap in progress. */
+  pressed: boolean;
 }
 
 /** One frame's clock, size and input. Sizes are layout px (CSS px on web, dp on native). */

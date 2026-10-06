@@ -1,6 +1,6 @@
 # NYC-MON repo map
 
-Written 2026-10-04 for Milestone 0 of `prompts/BUILD_PROMPT_v3.md` (§1.1 says the repo wins where it differs from the expected shape; this file records the real paths). Every version below was read from the installed `node_modules/<pkg>/package.json`, resolved from the workspace that declares it, at commit `42c3273`. The single version source is the `catalog:` block in `pnpm-workspace.yaml`.
+Written 2026-10-04 for Milestone 0 of `docs/phase-1-brief.md` (§1.1 says the repo wins where it differs from the expected shape; this file records the real paths). Every version below was read from the installed `node_modules/<pkg>/package.json`, resolved from the workspace that declares it, at commit `42c3273`. The single version source is the `catalog:` block in `pnpm-workspace.yaml`.
 
 Package manager: pnpm 12.8.1. Node `>=24.15.0 <26`. Task runner: Turborepo 2.11.7 (`turbo.json`). Package scope: `@acme/*`.
 
@@ -24,7 +24,7 @@ Package manager: pnpm 12.8.1. Node `>=24.15.0 <26`. Task runner: Turborepo 2.11.
 | — | `packages/config` (`@acme/config`, eslint/prettier/tsconfig) | Extra |
 | — | `packages/payload` (`@acme/payload`, Payload CMS config + REST reader) | Extra |
 | — | `packages/spatial` (`@acme/spatial`, Viro/Rive XR scenes, site copy) | Extra |
-| `prompts/` ROSTER, LAWS | `prompts/BUILD_PROMPT_v3.md`, `ROSTER.md`, `LAWS.md` (this milestone) | Present |
+| `prompts/` ROSTER, LAWS | `docs/phase-1-brief.md`, `docs/design/reference-roster.md`, `CONTRIBUTING.md` (this milestone) | Present |
 | `docs/canon/`, `design/`, `adr/`, `DESIGN_SYSTEM.md`, `COPY_DECK.md` | `docs/canon/source/` (3 files), `docs/canon/DECISIONS.md` and `docs/adr/0001-*` (this milestone); no `design/`, `DESIGN_SYSTEM.md`, `COPY_DECK.md` | Partial |
 
 Other docs already in the repo: `docs/SPATIAL.md`, `docs/XR-PLATFORM-MATRIX.md`, `docs/toolchain-notes.md`, `docs/rn-087-upgrade-brief.md`. Tooling scripts: `tooling/copy-viro-web-assets.mjs`, `tooling/copy-skia-web-assets.mjs` (both run on `postinstall`), `tooling/verify-spatial-android.mjs`, `tooling/verify-typegpu-toolchain.mjs`, `tooling/generators/gen.mjs`.

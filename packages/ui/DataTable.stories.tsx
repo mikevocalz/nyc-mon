@@ -1,7 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { DataTable, type ColumnDef } from './DataTable';
+import * as React from 'react';
+import { DataTable, type ColumnDef, type SortState } from './DataTable';
 import { Badge } from './Badge';
-import { View } from './tw';
+import { Text, View } from './tw';
 import { DISTRICTS, DISTRICT_NAME } from './district';
 
 type Row = { name: string; role: string; status: 'Active' | 'Invited'; logins: number };
@@ -93,6 +94,182 @@ export const Neon: StoryObj<typeof DataTable<Legend>> = {
           </View>
         ))}
       </View>
+    </View>
+  ),
+};
+
+// ---- G1/G2: page surface, server mode, layouts, links, selection -----------
+
+type Caller = { callerId: string; email: string; consent: string; joined: string; mons: number };
+
+const CALLERS: Caller[] = [
+  { callerId: 'usr_01JX4K2', email: 'd•••@g•••.com', consent: 'Pending', joined: '12 Mar 2026', mons: 3 },
+  { callerId: 'usr_01JX9Q7', email: 'm•••@o•••.net', consent: 'Approved', joined: '28 Feb 2026', mons: 1 },
+  { callerId: 'usr_01JY2B4', email: 'p•••@m•••.org', consent: 'Not required', joined: '02 Feb 2026', mons: 5 },
+];
+
+const CALLER_COLUMNS: ColumnDef<Caller, unknown>[] = [
+  { accessorKey: 'callerId', header: 'Caller', meta: { priority: 1 } },
+  { accessorKey: 'email', header: 'Email', meta: { priority: 1 } },
+  { accessorKey: 'consent', header: 'Consent', meta: { priority: 2 } },
+  { accessorKey: 'joined', header: 'Joined', meta: { priority: 3 } },
+  { accessorKey: 'mons', header: 'Mons', meta: { priority: 4, align: 'end' } },
+];
+
+/** The daylit console face: raised surface, themed type, royal accents. */
+export const PageSurface: Story = {
+  render: () => (
+    <View className="max-w-3xl p-4">
+      <DataTable
+        surface="page"
+        caption="Callers"
+        data={CALLERS}
+        columns={CALLER_COLUMNS}
+        getRowId={(r) => r.callerId}
+      />
+    </View>
+  ),
+};
+
+/** Page surface under the night scheme. */
+export const PageSurfaceNight: Story = {
+  render: () => (
+    <View className="scheme-dark max-w-3xl bg-ink-950 p-4">
+      <DataTable
+        surface="page"
+        caption="Callers"
+        data={CALLERS}
+        columns={CALLER_COLUMNS}
+        getRowId={(r) => r.callerId}
+      />
+    </View>
+  ),
+};
+
+const ServerSortDemo = () => {
+  const [sort, setSort] = React.useState<SortState>({ columnId: 'joined', direction: 'desc' });
+  const rows = [...CALLERS].sort((a, b) => {
+    if (!sort) return 0;
+    const k = sort.columnId as keyof Caller;
+    return (sort.direction === 'asc' ? 1 : -1) * String(a[k]).localeCompare(String(b[k]));
+  });
+  return (
+    <View className="max-w-3xl p-4">
+      <DataTable
+        surface="page"
+        caption="Callers"
+        columns={CALLER_COLUMNS}
+        getRowId={(r) => r.callerId}
+        mode={{ kind: 'server', sort, onSortChange: setSort, rows }}
+      />
+    </View>
+  );
+};
+
+/** Server mode: rows and sort come from the screen; the header asks for the next sort. */
+export const ServerSort: Story = {
+  render: () => <ServerSortDemo />,
+};
+
+/** A resizable pane: record rows below 600 px, priority columns above. */
+export const PriorityColumns: Story = {
+  render: () => (
+    <View className="w-[420px] resize-x overflow-hidden border border-border p-4 md:w-[900px]">
+      <DataTable
+        surface="page"
+        layout="columns"
+        caption="Callers"
+        data={CALLERS}
+        columns={CALLER_COLUMNS}
+        getRowId={(r) => r.callerId}
+      />
+    </View>
+  ),
+};
+
+/** layout="records": every row a label/value card, header row visually hidden. */
+export const RecordRows: Story = {
+  render: () => (
+    <View className="max-w-md p-4">
+      <DataTable
+        surface="page"
+        layout="records"
+        caption="Callers"
+        data={CALLERS}
+        columns={CALLER_COLUMNS}
+        getRowId={(r) => r.callerId}
+      />
+    </View>
+  ),
+};
+
+/** Whole row is one link; the open record carries aria-current and the selection bar. */
+export const RowLinks: Story = {
+  render: () => (
+    <View className="max-w-3xl p-4">
+      <DataTable
+        surface="page"
+        caption="Callers"
+        data={CALLERS}
+        columns={CALLER_COLUMNS}
+        getRowId={(r) => r.callerId}
+        getRowHref={(r) => `/admin/callers/${r.callerId}`}
+        selectedRowId="usr_01JX9Q7"
+      />
+    </View>
+  ),
+};
+
+const SelectionDemo = () => {
+  const [ids, setIds] = React.useState<string[]>(['usr_01JX4K2']);
+  return (
+    <View className="max-w-3xl p-4">
+      <DataTable
+        surface="page"
+        caption="Callers"
+        data={CALLERS}
+        columns={CALLER_COLUMNS}
+        getRowId={(r) => r.callerId}
+        selection={{ selectedIds: ids, onSelectedIdsChange: setIds }}
+      />
+    </View>
+  );
+};
+
+/** A selection column for a bulk action. */
+export const Selection: Story = {
+  render: () => <SelectionDemo />,
+};
+
+/** emptyState and errorState replace the body. */
+export const EmptyAndError: Story = {
+  render: () => (
+    <View className="max-w-3xl gap-6 p-4">
+      <DataTable
+        surface="page"
+        caption="Callers"
+        data={[]}
+        columns={CALLER_COLUMNS}
+        getRowId={(r) => r.callerId}
+        emptyState={<Text className="p-4 text-text-muted">No Caller matches that search.</Text>}
+      />
+      <DataTable
+        surface="page"
+        caption="Callers"
+        data={[]}
+        columns={CALLER_COLUMNS}
+        getRowId={(r) => r.callerId}
+        errorState={<Text className="p-4 text-danger">Couldn&rsquo;t load Callers. Try again.</Text>}
+      />
+    </View>
+  ),
+};
+
+/** Skeleton rows with aria-busy. */
+export const Loading: Story = {
+  render: () => (
+    <View className="max-w-3xl p-4">
+      <DataTable surface="page" caption="Callers" columns={CALLER_COLUMNS} loading loadingRows={4} />
     </View>
   ),
 };

@@ -1,5 +1,5 @@
 'use client';
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
 import { Section } from '../html';
 import { ScrollView, View } from '../tw';
@@ -40,11 +40,11 @@ interface SliderState {
  */
 export function CardSlider({
   children, label, visibleCount = 1, gap = 16, showButtons = true, showProgress = true,
-  progressStyle = 'bar', loop = false, tone, district, className, itemClassName,
+  progressStyle = 'bar', progressPosition = 'inset', loop = false, tone, district, className, itemClassName,
   buttonPosition = 'sides', buttonVisibility = 'always', prevButtonCorner = 'bottom-left', nextButtonCorner = 'bottom-right',
   enableSwipe = true, swipeThreshold = 50, autoPlay = false, autoPlayInterval = 3000,
   showEdgeFades = false, edgeFadeColor, showCornerAccents = false, cornerAccentStyle = 'frame', scanLines = false,
-  viewportClassName,
+  viewportClassName, index: indexProp, onIndexChange,
 }: CardSliderProps) {
   const slides = slidesOf(children);
   const { size, onLayout } = useLayoutSize({ width: 0, height: 0 });
@@ -54,18 +54,33 @@ export function CardSlider({
     index: 0, playing: !reduced, hovered: false, focused: false, drag: null,
   }));
   const state = useStore(store);
-  const index = Math.min(state.index, m.maxIndex);
+  const controlled = indexProp !== undefined;
+  const index = Math.min(controlled ? indexProp : state.index, m.maxIndex);
   const scrollRef = useRef<ScrollHandle>(null);
   const resolved = sliderTone(tone, district);
 
   const go = (next: number) => {
+    if (controlled) {
+      // Controlled: the parent owns the index; the scroll follows its update.
+      if (next !== index) onIndexChange?.(next);
+      return;
+    }
     store.setState({ index: next });
     scrollRef.current?.scrollTo({ x: next * m.stride, animated: !reduced });
   };
+
+  // A controlled index change scrolls the track — the parent's update is the
+  // only thing that moves the slider (Skip-style jumps included).
+  useEffect(() => {
+    if (controlled) scrollRef.current?.scrollTo({ x: index * m.stride, animated: !reduced });
+  }, [controlled, index, m.stride, reduced]);
+
   const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     if (store.getState().drag) return;
     const next = indexAtOffset(e.nativeEvent.contentOffset.x, m.stride, m.maxIndex);
-    if (next !== store.getState().index) store.setState({ index: next });
+    if (controlled) {
+      if (next !== index) onIndexChange?.(next);
+    } else if (next !== store.getState().index) store.setState({ index: next });
   };
   const onKeyDown = (e: { key: string; preventDefault: () => void }) => {
     const next = indexForKey(e.key, index, m.maxIndex, loop);
@@ -79,7 +94,7 @@ export function CardSlider({
     interval: autoPlayInterval,
     enabled: state.playing,
     held: state.hovered || state.focused || state.drag !== null,
-    getIndex: () => store.getState().index,
+    getIndex: () => (controlled ? (indexProp ?? 0) : store.getState().index),
     maxIndex: m.maxIndex,
     loop,
     step: go,
@@ -137,6 +152,25 @@ export function CardSlider({
   const dragging = state.drag !== null;
   // Side buttons sit in gutters beside the track, so they never cover card text.
   const sides = showButtons && paged && buttonPosition === 'sides';
+  const sliderControls = (
+    <SliderControls
+      index={index}
+      count={slides.length}
+      visible={m.visible}
+      maxIndex={m.maxIndex}
+      loop={loop}
+      tone={resolved}
+      showButtons={showButtons && paged}
+      showProgress={showProgress && paged}
+      progressStyle={progressStyle}
+      onGo={go}
+      buttonPosition={buttonPosition}
+      prevCorner={prevButtonCorner}
+      nextCorner={nextButtonCorner}
+      buttonClassName={fade}
+      autoplay={autoPlay && paged ? { playing: state.playing, onToggle: () => store.setState({ playing: !store.getState().playing }) } : undefined}
+    />
+  );
 
   return (
     <Section
@@ -188,24 +222,9 @@ export function CardSlider({
             className={fade}
           />
         ) : null}
+        {progressPosition === 'inset' ? sliderControls : null}
       </View>
-      <SliderControls
-        index={index}
-        count={slides.length}
-        visible={m.visible}
-        maxIndex={m.maxIndex}
-        loop={loop}
-        tone={resolved}
-        showButtons={showButtons && paged}
-        showProgress={showProgress && paged}
-        progressStyle={progressStyle}
-        onGo={go}
-        buttonPosition={buttonPosition}
-        prevCorner={prevButtonCorner}
-        nextCorner={nextButtonCorner}
-        buttonClassName={fade}
-        autoplay={autoPlay && paged ? { playing: state.playing, onToggle: () => store.setState({ playing: !store.getState().playing }) } : undefined}
-      />
+      {progressPosition === 'below-content' ? sliderControls : null}
     </Section>
   );
 }

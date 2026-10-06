@@ -25,6 +25,22 @@ export { FormField, type FormFieldProps } from './FormField';
 export { ErrorMessage, type ErrorMessageProps } from './ErrorMessage';
 export { SearchBar, type SearchBarProps } from './SearchBar';
 export { DropZone, type DropZoneProps, type DropAsset } from './DropZone';
+export { AuthProviderButton, type AuthProviderButtonProps, type AuthProvider, type AuthIntent } from './AuthProviderButton';
+export { StatusRow, type StatusRowProps, type StatusRowItem, type StatusRowTone } from './StatusRow';
+export { SignagePlate, type SignagePlateProps } from './SignagePlate';
+export { SignageBand, type SignageBandProps } from './SignageBand';
+export { Banner, type BannerProps } from './Banner';
+export { Timestamp, type TimestampProps } from './Timestamp';
+export { Pagination, type PaginationProps } from './Pagination';
+export { FilterBar, FilterChip, type FilterBarProps, type FilterChipProps } from './FilterBar';
+export { KeyValueList, type KeyValueItem, type KeyValueListProps } from './KeyValueList';
+export { MaskedValue, type MaskedValueProps } from './MaskedValue';
+export { CopyButton, type CopyButtonProps } from './CopyButton';
+export { ConfirmDestructive, type ConfirmDestructiveProps } from './ConfirmDestructive';
+export { ResponsiveDialog, type ResponsiveDialogProps } from './ResponsiveDialog';
+export { Checklist, CheckRow, type ChecklistProps, type CheckResult, type CheckRowProps } from './Checklist';
+export { NotificationPreview, type NotificationPreviewProps } from './NotificationPreview';
+export { YearGrid, type YearGridProps, type YearGridStep } from './YearGrid';
 
 // feedback
 export { EmptyState, type EmptyStateProps } from './EmptyState';
@@ -45,7 +61,7 @@ export { TabBarAccessory, type TabBarAccessoryProps } from './TabBarAccessory';
 
 // data
 export { VirtualList, type VirtualListProps } from './VirtualList';
-export { DataTable, type DataTableProps, type ColumnDef } from './DataTable';
+export { DataTable, type DataTableProps, type ColumnDef, type DataTableMode, type DataTableSelection, type SortState } from './DataTable';
 export { useAppForm, withForm, useFieldContext, useFormContext, useFormStore } from './form';
 
 export { SafeArea, type SafeAreaProps } from './SafeArea';
@@ -87,6 +103,7 @@ export { LazyScene, type LazySceneProps, type LazySceneState } from './backgroun
 export { SceneSection, type SceneSectionProps } from './backgrounds/SceneSection';
 export { SkylineDivider, type SkylineDividerProps } from './backgrounds/SkylineDivider';
 export { useInView } from './backgrounds/use-in-view';
+export { useReducedMotion } from './backgrounds/use-reduced-motion';
 export type { InView, InViewOptions } from './backgrounds/use-in-view.types';
 // Districts and tones: one module for the whole kit.
 export {

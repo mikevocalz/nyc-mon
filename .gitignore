@@ -20,3 +20,12 @@ storybook-static
 
 # OS
 .DS_Store
+
+# Native build caches
+.gradle
+
+# Written by dev tooling on every run — regenerated locally, not source
+/AGENTS.md
+apps/web/AGENTS.md
+apps/web/CLAUDE.md
+/CLAUDE.md

@@ -29,8 +29,9 @@ describe.skipIf(url === undefined)('X1 collections on Postgres', () => {
   const monInstanceId = deriveMonInstanceId(eggId);
   const createdAtMs = 1_759_600_000_000;
 
-  // TODO(adr-0004): `users.role` cannot hold the staff roles yet, so the Local
-  // API gets the signed-in staff member as an object with the role it will have.
+  // `users.role` now holds the staff roles (DECISIONS #22), but the Local API
+  // call still needs the staff member passed as an object with the role and
+  // collection shape that `betterAuthStrategy` returns.
   const staffUser = (role: string): User & { collection: 'users' } => ({
     id: staffId,
     role: role as User['role'],
@@ -49,7 +50,7 @@ describe.skipIf(url === undefined)('X1 collections on Postgres', () => {
     payload = await getPayload({ config });
     const user = await payload.create({
       collection: 'users',
-      data: { email: `staff-${run}@example.com`, role: 'admin' },
+      data: { email: `staff-${run}@example.com`, role: 'ops' },
       overrideAccess: true,
     });
     staffId = user.id;

@@ -1,13 +1,13 @@
 # Ops console: research
 
-Owner: `design-director`. Written 2026-10-04. Surface: the NYC-MON Payload admin at `/admin` on `apps/admin-vite` (ADR 0003), replaced end to end by a custom console built from `@acme/ui` (LAWS R3). Inputs: `prompts/LAWS.md`, ADR 0001 (auth, age and consent), ADR 0003 (admin app split), `docs/canon/DECISIONS.md` #2, #3, #4, #11, #15, `packages/payload/src/collections/Users.ts`, `packages/core/schemas/*`, `@acme/content`.
+Owner: `design-director`. Written 2026-10-04. Surface: the NYC-MON Payload admin at `/admin` on `apps/admin-vite` (ADR 0003), replaced end to end by a custom console built from `@acme/ui` (LAWS R3). Inputs: `CONTRIBUTING.md`, ADR 0001 (auth, age and consent), ADR 0003 (admin app split), `docs/canon/DECISIONS.md` #2, #3, #4, #11, #15, `packages/payload/src/collections/Users.ts`, `packages/core/schemas/*`, `@acme/content`.
 
 ## Status: proto-personas
 
 Nobody has watched staff use this console; it does not exist yet. The people below come from the jobs ADR 0001 and the build prompt create (consent, deletion, hatch integrity, content), not from interviews. Claims are marked:
 
 - **Repo:** read from a file in this repo, with its path.
-- **Law / canon:** from `prompts/LAWS.md` or `docs/canon/DECISIONS.md`.
+- **Law / canon:** from `CONTRIBUTING.md` or `docs/canon/DECISIONS.md`.
 - **Regulation:** COPPA, 16 CFR Part 312 (https://www.ecfr.gov/current/title-16/chapter-I/subchapter-C/part-312) and the FTC COPPA FAQ (https://www.ftc.gov/business-guidance/resources/complying-coppa-frequently-asked-questions).
 - *(assumption)*: unverified; each one is a question for the first walkthrough with Mike.
 

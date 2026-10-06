@@ -273,12 +273,12 @@ const USAGE: Pair[] = [
   { id: 'neutral badge edge', fg: 'border', bg: ['bg'], role: 'decorative', usedAt: ['packages/ui/Badge.tsx:98'], reason: 'status chip, not a control; its text identifies it' },
 
   // -- night facades (palette steps: mode-invariant) -------------------------
-  { id: 'title on night', fg: 'ink-50', bg: NIGHT, role: 'text', usedAt: ['packages/ui/Card.tsx:79', 'packages/ui/cards/neon-field.ts:15', 'packages/ui/ToastCard.tsx:37'] },
+  { id: 'title on night', fg: 'ink-50', bg: NIGHT, role: 'text', usedAt: ['packages/ui/Card.tsx:48', 'packages/ui/cards/neon-field.ts:15', 'packages/ui/ToastCard.tsx:37'] },
   { id: 'white on night', fg: 'white', bg: NIGHT, role: 'text', usedAt: ['packages/ui/charts/StatCard.tsx:54', 'packages/ui/nav/NavBar.tsx:88', 'packages/ui/nav/SiteFooter.tsx:79'] },
   { id: 'table cell on stripe', fg: 'silver-100', bg: ['ink-900'], role: 'text', usedAt: ['packages/ui/DataTable.tsx:44', 'packages/ui/DataTable.tsx:53'] },
   { id: 'nav link on night', fg: 'silver-200', bg: NIGHT, role: 'text', usedAt: ['packages/ui/nav/NavBar.tsx:82', 'packages/ui/dropdown.ts:16'] },
   { id: 'nav link on hover', fg: 'silver-200', bg: ['ink-800'], role: 'text', usedAt: ['packages/ui/dropdown.ts:14', 'packages/ui/nav/NavBar.tsx:83'] },
-  { id: 'body on night', fg: 'silver-300', bg: NIGHT, role: 'text', usedAt: ['packages/ui/Card.tsx:79', 'packages/ui/Dialog.tsx:49', 'packages/ui/TabBar.tsx:36'] },
+  { id: 'body on night', fg: 'silver-300', bg: NIGHT, role: 'text', usedAt: ['packages/ui/Card.tsx:48', 'packages/ui/Dialog.tsx:49', 'packages/ui/TabBar.tsx:36'] },
   { id: 'table head on ink-900', fg: 'silver-300', bg: ['ink-900'], role: 'text', usedAt: ['packages/ui/DataTable.tsx:35', 'packages/ui/DataTable.tsx:38'] },
   { id: 'caption on night', fg: 'silver-400', bg: NIGHT, role: 'text', usedAt: ['packages/ui/DataTable.tsx:47', 'packages/ui/charts/StatCard.tsx:57', 'packages/ui/nav/SiteFooter.tsx:80'] },
   { id: 'pager text on ink-900', fg: 'silver-400', bg: ['ink-900'], role: 'text', usedAt: ['packages/ui/DataTable.tsx:51'] },
@@ -294,25 +294,26 @@ const USAGE: Pair[] = [
   { id: 'sort glyph leaf-300', fg: 'leaf-300', bg: ['ink-900'], role: 'ui', usedAt: ['packages/ui/DataTable.tsx:60'] },
   { id: 'sort glyph apple-300', fg: 'apple-300', bg: ['ink-900'], role: 'ui', usedAt: ['packages/ui/DataTable.tsx:62'] },
   // Kit Card night faces (cornerCut, beam) in both themes. Screen content on
-  // them uses themed classes (text-text, text-muted); the face redeclares each
-  // token at its dark palette step (CARD_NIGHT_TOKENS), so these rows measure
-  // those steps. Before that, Next settled the tokens at :root and a light page
-  // painted text-text black on night (/profile Account card, 1.06:1).
-  { id: 'card themed heading on night face', fg: 'ink-50', bg: NIGHT, role: 'text', usedAt: ['packages/ui/Card.tsx:42', 'packages/app/features/profile/profile-content.tsx:100'], reason: 'text-text inside a cornerCut or beam Card resolves to ink-50 on the face' },
-  { id: 'card themed muted on night face', fg: 'silver-500', bg: NIGHT, role: 'text', usedAt: ['packages/ui/Card.tsx:42', 'packages/ui/Card.tsx:43', 'packages/app/features/profile/profile-content.tsx:101'], reason: 'text-muted and text-secondary inside the Card face resolve to silver-500' },
-  { id: 'card themed primary on night face', fg: 'orange-500', bg: NIGHT, role: 'text', usedAt: ['packages/ui/Card.tsx:44'] },
-  { id: 'card themed accent on night face', fg: 'carolina-500', bg: NIGHT, role: 'text', usedAt: ['packages/ui/Card.tsx:47', 'packages/ui/Card.tsx:52'], reason: 'accent and info share carolina-500 on the face' },
-  { id: 'card themed success on night face', fg: 'leaf-500', bg: NIGHT, role: 'text', usedAt: ['packages/ui/Card.tsx:50'] },
-  { id: 'card themed danger on night face', fg: 'apple-400', bg: NIGHT, role: 'text', usedAt: ['packages/ui/Card.tsx:51'] },
+  // them uses themed classes (text-text, text-muted); the face carries
+  // scheme-dark, whose theme.css block redeclares each token at its dark value,
+  // so these rows measure those steps. Before that, Next settled the tokens at
+  // :root and a light page painted text-text black on night (/profile Account
+  // card, 1.06:1).
+  { id: 'card themed heading on night face', fg: 'ink-50', bg: NIGHT, role: 'text', usedAt: ['packages/theme/theme.css:328', 'packages/app/features/profile/profile-content.tsx:100'], reason: 'text-text inside a cornerCut or beam Card resolves to ink-50 on the face' },
+  { id: 'card themed muted on night face', fg: 'silver-500', bg: NIGHT, role: 'text', usedAt: ['packages/theme/theme.css:329', 'packages/theme/theme.css:330', 'packages/app/features/profile/profile-content.tsx:101'], reason: 'text-muted and text-secondary inside the Card face resolve to silver-500' },
+  { id: 'card themed primary on night face', fg: 'orange-500', bg: NIGHT, role: 'text', usedAt: ['packages/theme/theme.css:332'] },
+  { id: 'card themed accent on night face', fg: 'carolina-500', bg: NIGHT, role: 'text', usedAt: ['packages/theme/theme.css:338', 'packages/theme/theme.css:349'], reason: 'accent and info share carolina-500 on the face' },
+  { id: 'card themed success on night face', fg: 'leaf-500', bg: NIGHT, role: 'text', usedAt: ['packages/theme/theme.css:345'] },
+  { id: 'card themed danger on night face', fg: 'apple-400', bg: NIGHT, role: 'text', usedAt: ['packages/theme/theme.css:347'] },
   // The notch Card face is the tone in both themes; themed text on it takes the
   // tone's on-face step (NOTCH_ON_INK / NOTCH_ON_WHITE).
-  { id: 'card themed text on orange notch', fg: 'ink-950', bg: ['orange-500'], role: 'text', usedAt: ['packages/ui/Card.tsx:65'] },
-  { id: 'card themed text on carolina notch', fg: 'ink-950', bg: ['carolina-500'], role: 'text', usedAt: ['packages/ui/Card.tsx:65'] },
-  { id: 'card themed text on leaf notch', fg: 'ink-950', bg: ['leaf-500'], role: 'text', usedAt: ['packages/ui/Card.tsx:65'] },
-  { id: 'card themed text on apple notch', fg: 'ink-950', bg: ['apple-500'], role: 'text', usedAt: ['packages/ui/Card.tsx:65'] },
-  { id: 'card themed text on white notch', fg: 'ink-950', bg: ['ink-50'], role: 'text', usedAt: ['packages/ui/Card.tsx:65'] },
-  { id: 'card themed text on royal notch', fg: 'white', bg: ['royal-500'], role: 'text', usedAt: ['packages/ui/Card.tsx:67'] },
-  { id: 'card themed text on brick notch', fg: 'white', bg: ['orange-800'], role: 'text', usedAt: ['packages/ui/Card.tsx:67'] },
+  { id: 'card themed text on orange notch', fg: 'ink-950', bg: ['orange-500'], role: 'text', usedAt: ['packages/ui/Card.tsx:34'] },
+  { id: 'card themed text on carolina notch', fg: 'ink-950', bg: ['carolina-500'], role: 'text', usedAt: ['packages/ui/Card.tsx:34'] },
+  { id: 'card themed text on leaf notch', fg: 'ink-950', bg: ['leaf-500'], role: 'text', usedAt: ['packages/ui/Card.tsx:34'] },
+  { id: 'card themed text on apple notch', fg: 'ink-950', bg: ['apple-500'], role: 'text', usedAt: ['packages/ui/Card.tsx:34'] },
+  { id: 'card themed text on white notch', fg: 'ink-950', bg: ['ink-50'], role: 'text', usedAt: ['packages/ui/Card.tsx:34'] },
+  { id: 'card themed text on royal notch', fg: 'white', bg: ['royal-500'], role: 'text', usedAt: ['packages/ui/Card.tsx:36'] },
+  { id: 'card themed text on brick notch', fg: 'white', bg: ['orange-800'], role: 'text', usedAt: ['packages/ui/Card.tsx:36'] },
   { id: 'home headline on ink panel', fg: 'orange-500', bg: ['ink-800'], role: 'large-text', usedAt: ['packages/spatial/SpatialScreen.tsx:106', 'packages/ui/neon/SolidPanel.tsx:42'], reason: 'Heading display-sm (30px web, 26px native at rem 14) on the SolidPanel tone="ink" face, which is night in both themes' },
   { id: 'orange eyebrow on glass card', fg: 'orange-500', bg: ['concrete-50', 'ink-950/85'], role: 'text', usedAt: ['packages/ui/future/GridCard.tsx:29', 'packages/ui/future/CircuitButton.tsx:49'], reason: 'measured over a light page, the worst case for the 85% night glass' },
   { id: 'carolina eyebrow on glass card', fg: 'carolina-500', bg: ['concrete-50', 'ink-950/85'], role: 'text', usedAt: ['packages/ui/future/GridCard.tsx:30', 'packages/ui/future/CircuitButton.tsx:50'], reason: 'measured over a light page, the worst case for the 85% night glass' },
@@ -403,9 +404,6 @@ const USAGE: Pair[] = [
   { id: 'hlynk: key and trackpad focus outline on body', fg: 'hlynk-core-ink', bg: ['hlynk-core-body'], role: 'ui', usedAt: ['packages/ui/hlynk/HLynkKey.tsx:69', 'packages/ui/hlynk/Trackpad.web.tsx:48'] },
   { id: 'hlynk: trackpad ring, booting or disabled', fg: 'led-off', bg: ['hlynk-core-black'], role: 'disabled', usedAt: ['packages/ui/hlynk/TrackpadFace.tsx:41'], reason: 'inactive trackpad during boot (WCAG 1.4.11 inactive components)' },
   { id: 'hlynk: reduced-motion LED cue in the black head', fg: 'led-on', bg: ['hlynk-core-black'], role: 'ui', usedAt: ['packages/ui/hlynk/ScannerLed.tsx:96', 'packages/ui/hlynk/ScannerLed.tsx:104', 'packages/ui/hlynk/ScannerLed.tsx:107'], reason: 'tick row, filled dot and exclamation dot that stand in for the LED rhythm' },
-  { id: 'hlynk: key and trackpad focus outline on body', fg: 'hlynk-core-ink', bg: ['hlynk-core-body'], role: 'ui', usedAt: ['packages/ui/hlynk/HLynkKey.tsx:69', 'packages/ui/hlynk/Trackpad.web.tsx:48'] },
-  { id: 'hlynk: trackpad ring, booting or disabled', fg: 'led-off', bg: ['hlynk-core-black'], role: 'disabled', usedAt: ['packages/ui/hlynk/TrackpadFace.tsx:41'], reason: 'inactive trackpad during boot (WCAG 1.4.11 inactive components)' },
-  { id: 'hlynk: reduced-motion LED cue in the black head', fg: 'led-on', bg: ['hlynk-core-black'], role: 'ui', usedAt: ['packages/ui/hlynk/ScannerLed.tsx:96', 'packages/ui/hlynk/ScannerLed.tsx:104', 'packages/ui/hlynk/ScannerLed.tsx:107'], reason: 'tick row, filled dot and exclamation dot that stand in for the LED rhythm' },
 
   // -- text on the ink plate over a scene (SolidPanel tone="ink": ink-800 face in both themes)
   { id: 'scene plate headline', fg: 'orange-500', bg: ['ink-800'], role: 'large-text', usedAt: ['packages/app/features/explore/explore-content.tsx:22', 'packages/app/features/profile/profile-content.tsx:46', 'packages/app/features/error/screen.shared.tsx:25'], reason: 'display-sm heading and the display-xl 404 on the plate' },
@@ -417,6 +415,10 @@ const USAGE: Pair[] = [
   { id: 'scene plate selected tab label', fg: 'ink-950', bg: ['orange-500'], role: 'text', usedAt: ['packages/app/features/explore/explore-content.tsx:26'] },
   { id: 'scene plate selected tab face', fg: 'orange-500', bg: ['ink-800'], role: 'ui', usedAt: ['packages/app/features/explore/explore-content.tsx:24'] },
   { id: 'skyline divider keyline', fg: 'orange-500', bg: ['ink-950'], role: 'decorative', usedAt: ['packages/ui/backgrounds/SkylineDivider.tsx:35'], reason: 'aria-hidden band between sections; the section headings carry the structure' },
+
+  // -- admin console (08-handoff §9): signage bands and the page-surface cards -
+  { id: 'console: signage band headline', fg: 'signage-white', bg: ['signage-black'], role: 'text', usedAt: [] },
+  { id: 'console: signage band detail', fg: 'signage-white/85', bg: ['signage-black'], role: 'text', usedAt: [] },
 
   // -- disabled ---------------------------------------------------------------
   { id: 'disabled label', fg: 'ink-400', bg: NIGHT, role: 'disabled', usedAt: ['packages/ui/Button.tsx:48', 'packages/ui/IconButton.tsx:79', 'packages/ui/neon/NeonChevron.tsx:55', 'packages/ui/audio/PlayerShell.tsx:123'], reason: 'inactive control' },

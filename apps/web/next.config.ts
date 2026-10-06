@@ -66,6 +66,7 @@ const nextConfig: NextConfig = {
     'react-native-web',
     'react-native-enriched-html',
     'react-native-gesture-handler',
+    'react-native-audio-api',
     '@reactvision/react-viro',
     '@reactvision/viro-web-renderer',
     'react-native-skia',

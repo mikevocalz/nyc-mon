@@ -22,6 +22,7 @@ import type { Role } from 'react-native';
 import { ScrollView as RNScrollView } from 'react-native';
 import { css, type CN } from './html/css';
 import { ButtonBase, InputBase } from './html/dom';
+import { withBodyFace } from './html/body-font';
 import {
   Div as EDiv,
   Span as ESpan,
@@ -44,7 +45,7 @@ import {
  */
 function withBodyText<P extends object>(Component: React.FC<P & CN>, displayName: string) {
   const Wrapped = ({ className, ...props }: P & CN) => (
-    <Component className={`text-body-default ${className ?? ''}`} {...(props as P)} />
+    <Component className={withBodyFace(`text-body-default ${className ?? ''}`)} {...(props as P)} />
   );
   Wrapped.displayName = displayName;
   return Wrapped;

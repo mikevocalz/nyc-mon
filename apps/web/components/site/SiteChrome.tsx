@@ -2,9 +2,8 @@
 import type { ReactNode } from 'react';
 import { Link } from 'solito/link';
 import { usePathname } from 'solito/navigation';
-import { Avatar, NavBar, SiteFooter, type FooterLink, type NavItem } from '@acme/ui';
-import { AVATAR_URI, useProfile } from '@acme/app';
-import { CONTENT_ID, FOOTER_DESCRIPTION, FOOTER_GROUPS, NAV_CTA, PROFILE, isActive, navItems, showsSiteChrome } from './nav';
+import { BrandWordmark, NavBar, SiteFooter, type FooterLink, type NavItem } from '@acme/ui';
+import { CONTENT_ID, FOOTER_DESCRIPTION, FOOTER_GROUPS, NAV_CTA, navItems, showsSiteChrome } from './nav';
 
 // Client-side routing for the kit's links: solito's Link renders the anchor.
 const navLink = (item: NavItem, children: ReactNode, className: string) => (
@@ -24,12 +23,11 @@ const footerLink = (link: FooterLink, children: ReactNode, className: string) =>
   </Link>
 );
 
-/** The kit NavBar with this site's pages, the current route and the profile avatar. */
+/** The kit NavBar with the marketing pages and one CTA. The product site
+ *  carries no auth (ADR 0003) — there is no avatar slot here. */
 export function SiteNavBar() {
   const pathname = usePathname() ?? '/';
-  const name = useProfile((s) => s.name);
   if (!showsSiteChrome(pathname)) return null;
-  const profileActive = isActive(pathname, PROFILE.href);
 
   return (
     <NavBar
@@ -37,19 +35,8 @@ export function SiteNavBar() {
       cta={NAV_CTA}
       skipTo={CONTENT_ID}
       district="midtown"
+      logo={<BrandWordmark height={66} />}
       renderLink={navLink}
-      trailing={
-        <Link
-          href={PROFILE.href}
-          aria-label="Your profile and settings"
-          aria-current={profileActive ? 'page' : undefined}
-          className={`rounded-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
-            profileActive ? 'ring-2 ring-orange-500 ring-offset-2 ring-offset-ink-950' : 'hover:ring-2 hover:ring-silver-400'
-          }`}
-        >
-          <Avatar name={name} imageUri={AVATAR_URI} size="md" />
-        </Link>
-      }
     />
   );
 }

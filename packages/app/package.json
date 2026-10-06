@@ -14,13 +14,18 @@
     "test": "node --test '**/*.test.ts'"
   },
   "dependencies": {
+    "@acme/auth": "workspace:*",
+    "@acme/content": "workspace:*",
+    "@acme/core": "workspace:*",
     "@acme/theme": "workspace:*",
     "@acme/ui": "workspace:*",
     "@tanstack/react-query": "catalog:",
     "date-fns": "catalog:",
+    "expo-calendar": "catalog:",
     "expo-document-picker": "catalog:",
     "expo-file-system": "catalog:",
     "expo-image-picker": "catalog:",
+    "expo-notifications": "catalog:",
     "expo-router": "catalog:",
     "lucide-react": "catalog:",
     "lucide-react-native": "catalog:",

@@ -2,7 +2,7 @@
 
 Owner: `ux-writer`. Scope today: M01–M07 (boot, welcome, auth, age, consent, notification sheet, Caller name) plus the M23 notification and the H-Lynk status chip. Each screen's strings live in `docs/design/screens/M0n/05-copy.md`. This file holds the rules they follow, the canon glossary, and the index of every string ID.
 
-Authority: canon (`docs/canon/source/`, `docs/canon/DECISIONS.md`) outranks this deck. The lead's P rulings and the design D decisions (`docs/design/DECISIONS.md`) outrank screen-level choices. Laws: `prompts/LAWS.md`, especially Law 1 (no invented canon), Law 8 (faint is never death) and Law 9 (language is canon).
+Authority: canon (`docs/canon/source/`, `docs/canon/DECISIONS.md`) outranks this deck. The lead's P rulings and the design D decisions (`docs/design/DECISIONS.md`) outrank screen-level choices. Laws: `CONTRIBUTING.md`, especially Law 1 (no invented canon), Law 8 (faint is never death) and Law 9 (language is canon).
 
 ## Two voices
 
@@ -109,7 +109,7 @@ Limits in each `05-copy.md` are measured for iPhone SE (375 pt wide, 16 pt gutte
 
 ## Slopmonster gate
 
-Every screen's String cells pass `~/.claude/skills/slopmonster/tools/deslop.py` at 5/5: M01, M02, M03, M04, M05, M06, M07. This file's prose (above the index, code spans and URLs stripped) also scores 5/5. The rival-model cleanse step (`tools/cleanse.sh`) has not been run on any of them.
+Every screen's String cells pass the copy lint at 5/5: M01, M02, M03, M04, M05, M06, M07. This file's prose (above the index, code spans and URLs stripped) also scores 5/5. The rival-model cleanse step (`tools/cleanse.sh`) has not been run on any of them.
 
 ## String index
 

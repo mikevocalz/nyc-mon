@@ -1,19 +1,17 @@
 import type { FooterLinkGroup, NavCta, NavItem } from '@acme/ui';
 import { HOME_COPY } from '@acme/spatial/copy';
 
-/** Header pages, in route parity with the mobile shell's tabs. */
+/** Product-site pages, the marketing map from BUILD_PROMPT §5 — not the app's tabs. */
 const PAGES = [
   { label: 'Home', href: '/' },
-  { label: 'Explore', href: '/explore' },
-  { label: 'Schedule', href: '/schedule' },
-  { label: 'Notifications', href: '/notifications' },
+  { label: 'The Story', href: '/story' },
+  { label: 'The Mons', href: '/mons' },
+  { label: 'The City', href: '/city' },
+  { label: 'How it works', href: '/how-it-works' },
 ] as const;
 
-/** Profile (settings live inside it) takes the avatar slot, not a text link. */
-export const PROFILE = { label: 'Profile', href: '/profile' } as const;
-
-/** The header's one primary action: the district in 3D. */
-export const NAV_CTA: NavCta = { label: HOME_COPY.openCity, href: '/spatial' };
+/** The header's one primary action: sign in. */
+export const NAV_CTA: NavCta = { label: 'Log in', href: '/sign-in?intent=sign_in' };
 
 /** The id of the content wrapper the header's skip link jumps to. */
 export const CONTENT_ID = 'content';
@@ -25,27 +23,31 @@ export const isActive = (pathname: string, href: string) =>
 export const navItems = (pathname: string): NavItem[] =>
   PAGES.map((page) => ({ ...page, active: isActive(pathname, page.href) }));
 
-/** Home and Spatial draw their own full-bleed city; the site header and footer stay off them. */
-export const showsSiteChrome = (pathname: string) => pathname !== '/' && !pathname.startsWith('/spatial');
+/** Routes that draw no site header/footer: spatial's full-bleed city, and the auth screens' own chrome. */
+const CHROMELESS = ['/spatial', '/sign-in'];
+export const showsSiteChrome = (pathname: string) =>
+  !CHROMELESS.some((route) => pathname.startsWith(route));
 
 export const FOOTER_DESCRIPTION = HOME_COPY.intro;
 
 export const FOOTER_GROUPS: FooterLinkGroup[] = [
   {
-    title: 'Play',
+    title: 'Explore',
     links: [
       { label: 'Home', href: '/' },
-      { label: 'Explore', href: '/explore' },
-      { label: 'Schedule', href: '/schedule' },
-      { label: 'Spatial', href: '/spatial' },
+      { label: 'The Story', href: '/story' },
+      { label: 'The Mons', href: '/mons' },
+      { label: 'The City', href: '/city' },
+      { label: 'How it works', href: '/how-it-works' },
     ],
   },
   {
-    title: 'You',
+    title: 'Get NYC-MON',
     links: [
-      { label: 'Profile', href: '/profile' },
-      { label: 'Notifications', href: '/notifications' },
-      { label: 'Settings', href: '/settings' },
+      { label: 'Walk the district', href: '/spatial' },
+      { label: 'Join the waitlist', href: '/get' },
+      { label: 'Privacy', href: '/legal/privacy' },
+      { label: 'Terms', href: '/legal/terms' },
     ],
   },
 ];

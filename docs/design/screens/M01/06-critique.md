@@ -1,6 +1,6 @@
 # M01 Boot / power-on: critique
 
-Scored against `prompts/BUILD_PROMPT_v3.md` §0C. Stage: direction (no build yet). Reviewer: `design-director`; `verifier` co-signs at implementation.
+Scored against `docs/phase-1-brief.md` §0C. Stage: direction (no build yet). Reviewer: `design-director`; `verifier` co-signs at implementation.
 
 | §0C row | Score /10 | Evidence | Gap |
 |---|---:|---|---|

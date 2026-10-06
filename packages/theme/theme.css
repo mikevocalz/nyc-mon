@@ -319,6 +319,83 @@
 [data-theme='dark'] { color-scheme: dark; }
 [data-theme='system'] { color-scheme: light dark; }
 
+.scheme-dark {
+  color-scheme: dark;
+  --color-bg: #00041C;
+  --color-surface: #00041C;
+  --color-surface-raised: #0A1230;
+  --color-surface-sunken: #000212;
+  --color-text: #F8F8F8;
+  --color-text-muted: #BEC0C2;
+  --color-text-secondary: #BEC0C2;
+  --color-text-inverse: #00041C;
+  --color-primary: #FC7C00;
+  --color-primary-pressed: #FD9D40;
+  --color-on-primary: #00041C;
+  --color-cta: #FC7C00;
+  --color-cta-pressed: #FD9D40;
+  --color-on-cta: #00041C;
+  --color-accent: #4BA8F0;
+  --color-accent-pressed: #78BEF4;
+  --color-on-accent: #00041C;
+  --color-structure: #0058F8;
+  --color-border: #1A2E6E;
+  --color-border-strong: #4082FA;
+  --color-focus: #4BA8F0;
+  --color-success: #3FAE3A;
+  --color-on-success: #00041C;
+  --color-danger: #FA4040;
+  --color-on-danger: #00041C;
+  --color-info: #4BA8F0;
+  --color-on-info: #00041C;
+  --color-tone-orange-text: #FD9D40;
+  --color-tone-royal-text: #80ACFC;
+  --color-tone-carolina-text: #78BEF4;
+  --color-tone-leaf-text: #6FC26B;
+  --color-tone-apple-text: #FA4040;
+  --color-tone-brick-text: #FEBE80;
+  --color-glow: #0058F8A6;
+  --color-glow-hot: #FC7C0080;
+}
+.scheme-light {
+  color-scheme: light;
+  --color-bg: #F3F4F4;
+  --color-surface: #F3F4F4;
+  --color-surface-raised: #FFFFFF;
+  --color-surface-sunken: #EBECED;
+  --color-text: #000000;
+  --color-text-muted: #61656A;
+  --color-text-secondary: #484C51;
+  --color-text-inverse: #F8F8F8;
+  --color-primary: #A35100;
+  --color-primary-pressed: #884300;
+  --color-on-primary: #FFFFFF;
+  --color-cta: #FC7C00;
+  --color-cta-pressed: #FD9D40;
+  --color-on-cta: #000000;
+  --color-accent: #0058F8;
+  --color-accent-pressed: #004CD9;
+  --color-on-accent: #FFFFFF;
+  --color-structure: #0058F8;
+  --color-border: #D2D4D6;
+  --color-border-strong: #0058F8;
+  --color-focus: #0058F8;
+  --color-success: #2C7A29;
+  --color-on-success: #FFFFFF;
+  --color-danger: #D50000;
+  --color-on-danger: #FFFFFF;
+  --color-info: #295D8E;
+  --color-on-info: #FFFFFF;
+  --color-tone-orange-text: #884300;
+  --color-tone-royal-text: #004CD9;
+  --color-tone-carolina-text: #295D8E;
+  --color-tone-leaf-text: #225E1F;
+  --color-tone-apple-text: #AE0000;
+  --color-tone-brick-text: #602F00;
+  --color-glow: #0058F800;
+  --color-glow-hot: #FC7C0000;
+}
+
 @layer base {
   .text-body-default { color: var(--color-text); }
 }

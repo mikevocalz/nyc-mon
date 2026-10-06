@@ -4,8 +4,8 @@ import type { CardSliderVariant } from './card-slider-native-model.ts';
 /**
  * Props the native CardSlider takes on top of the shared CardSliderProps.
  * `variant` picks a native carousel strategy; web has one layout, the
- * uncontained one. `snap` and `onIndexChange` would be useful on web too,
- * and belong in card-slider.types.ts once the web fork takes them.
+ * uncontained one. `snap` would be useful on web too, and belongs in
+ * card-slider.types.ts once the web fork takes it.
  */
 export interface CardSliderNativeExtras {
   /** Native carousel strategy. Default uncontained, the web layout. */
@@ -18,8 +18,6 @@ export interface CardSliderNativeExtras {
    * framed slides (CardSliderImageItem) already draw their shape. Default 0.
    */
   itemCut?: number;
-  /** Fires when the slider settles on a new index: swipe, buttons, autoplay, or assistive tech. */
-  onIndexChange?: (index: number) => void;
 }
 
 export type CardSliderNativeProps = CardSliderProps & CardSliderNativeExtras;

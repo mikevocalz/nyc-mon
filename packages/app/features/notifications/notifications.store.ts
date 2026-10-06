@@ -1,7 +1,5 @@
 import { create } from 'zustand';
-import {
-  UserPlus, Package, MessageCircle, Wallet, Flag, Shield, BarChart3,
-} from '@acme/ui/icons';
+import { Bell } from '@acme/ui/icons';
 
 export interface Notification {
   id: string;
@@ -13,14 +11,20 @@ export interface Notification {
   read: boolean;
 }
 
+/**
+ * Canon seed: the only notification NYC-MON sends is local, one per egg
+ * (M23 / ADR 0001). Copy mirrors `m23.notification.*` in onboarding/copy.ts.
+ */
 const SEED: Notification[] = [
-  { id: '1', title: 'New follower', body: 'Sarah Chen started following you', time: '2m ago', icon: UserPlus, tone: 'primary', read: false },
-  { id: '2', title: 'Order shipped', body: 'Your order #1042 is on its way', time: '18m ago', icon: Package, tone: 'accent', read: false },
-  { id: '3', title: 'Comment on your post', body: 'alex: "Great work on the UI!"', time: '1h ago', icon: MessageCircle, tone: 'primary', read: false },
-  { id: '4', title: 'Payment received', body: '$149.00 · Invoice #1029', time: '3h ago', icon: Wallet, tone: 'gold', read: true },
-  { id: '5', title: 'Project milestone', body: 'Mobile app v2 reached 80%', time: 'Yesterday', icon: Flag, tone: 'accent', read: true },
-  { id: '6', title: 'Security alert', body: 'New sign-in from Safari on MacBook', time: 'Yesterday', icon: Shield, tone: 'primary', read: true },
-  { id: '7', title: 'Weekly digest', body: 'Your stats are up 12% this week', time: '2 days ago', icon: BarChart3, tone: 'gold', read: true },
+  {
+    id: 'egg-ready',
+    title: 'Your egg is ready to hatch',
+    body: "Open NYC-MON whenever you're ready.",
+    time: 'now',
+    icon: Bell,
+    tone: 'accent',
+    read: false,
+  },
 ];
 
 // Notification state — zustand always (repo rule).

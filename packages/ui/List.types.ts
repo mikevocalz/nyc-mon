@@ -21,4 +21,12 @@ export interface ListItemProps {
   className?: string;
   /** Marks the current row: tone accent bar and tint. Web only. */
   selected?: boolean;
+  /**
+   * The page this row points at is the one on screen (04-components.md G14):
+   * `aria-current="page"` plus the selected look. Nav items are Links —
+   * pair with `href`, not `onPress`.
+   */
+  current?: boolean;
+  /** A real link destination (web); nav items use this instead of onPress. */
+  href?: string;
 }

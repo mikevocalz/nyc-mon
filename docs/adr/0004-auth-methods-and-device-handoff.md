@@ -5,7 +5,7 @@
 - **Deciders:** Mike (creator) decided the method list, AWS SNS for SMS and the COPPA rule for phones on 2026-10-04; the `platform` agent designs and implements
 - **Builds on:** `docs/adr/0001-auth-and-identity.md` (Better Auth inside Payload, Resend, the `/v1` contract, age and consent), `docs/adr/0003-admin-app-split.md` (auth lives on the admin-vite host)
 - **Closes:** admin blocker X2 / B2 (staff roles) from `docs/design/admin/06-critique.md` and `docs/design/admin/01-research.md`
-- **Canon:** "A device session is a surface, not a new creature" (`docs/canon/source/NYC_MON_Canon_and_Lore_Bible_v11.docx`, Cross-device companion continuity); Laws 6 and 8 in `prompts/LAWS.md`; `docs/canon/DECISIONS.md` #15
+- **Canon:** "A device session is a surface, not a new creature" (`docs/canon/source/NYC_MON_Canon_and_Lore_Bible_v11.docx`, Cross-device companion continuity); Laws 6 and 8 in `CONTRIBUTING.md`; `docs/canon/DECISIONS.md` #15
 - **Implementation:** Phase B on branch `feat/auth-methods`. No code lands with this ADR.
 
 ## Context
@@ -296,7 +296,7 @@ Exact signatures are written in Phase B against the installed client types.
 
 ## Screens this adds (§6 pipeline)
 
-Each needs the full per-screen pipeline in `prompts/BUILD_PROMPT_v3.md` §6 (`01-research.md` through `08-handoff.md`) before any UI code. IDs continue after M23. Routes follow the §4 pattern and are proposals for the design pass.
+Each needs the full per-screen pipeline in `docs/phase-1-brief.md` §6 (`01-research.md` through `08-handoff.md`) before any UI code. IDs continue after M23. Routes follow the §4 pattern and are proposals for the design pass.
 
 | # | Screen | Route | Shell | Job | States |
 |---|---|---|---|---|---|

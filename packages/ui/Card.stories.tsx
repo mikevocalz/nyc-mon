@@ -69,7 +69,7 @@ function tokenOn(el: Element, name: string): string {
 /**
  * Every night face must hold the dark value of every semantic colour, whatever
  * the page scheme. Next lowers light-dark() so the tokens settle at :root; the
- * face has to redeclare them (CARD_NIGHT_TOKENS) or a text-text heading comes
+ * face's scheme-dark redeclares them (theme.css) or a text-text heading comes
  * out black on night. This canvas keeps native light-dark(), so the test reads
  * the declared tokens, not the painted colour.
  */
@@ -179,6 +179,18 @@ export const Rounded: Story = {
     <View className="gap-4 bg-ink-950 p-6 md:flex-row">
       <Card title="Square (default)" description="The corner-cut frame." className="md:flex-1" />
       <Card title="Rounded" description="rounded, opt-in." rounded className="md:flex-1" />
+    </View>
+  ),
+};
+
+/** G1: the daylit console face — raised surface, themed type, no frame or glow. */
+export const PageSurface: Story = {
+  render: () => (
+    <View className="max-w-md gap-4 p-4">
+      <Card surface="page" title="Console section" description="The page surface: a raised panel and a keyline." />
+      <View className="scheme-dark">
+        <Card surface="page" title="Night scheme" description="The same face follows the scheme." />
+      </View>
     </View>
   ),
 };

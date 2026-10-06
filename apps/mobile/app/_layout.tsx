@@ -4,10 +4,10 @@ import { StatusBar } from "expo-status-bar";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { withUniwind } from "uniwind";
-import { AppQueryProvider, SafeAreaProvider, useProfile } from "@acme/app";
+import { AppQueryProvider, AttachSheet, AudioRecorderSheet, SafeAreaProvider, UrlSheet, useProfile } from "@acme/app";
+import { hydrateOnboarding } from "@acme/app/features/onboarding/onboarding.store.ts";
 import { setThemePreference } from "@acme/theme/switch";
 import { BookingSheet } from "../components/BookingSheet";
-import { AttachSheet, AudioRecorderSheet, UrlSheet } from "@acme/app";
 import { Toaster } from "@acme/ui";
 import "../global.css";
 
@@ -23,6 +23,9 @@ const GestureRoot = withUniwind(GestureHandlerRootView);
 // NYC Mon is dark-first: apply the stored preference (default 'dark') before
 // the first frame instead of inheriting the OS appearance.
 setThemePreference(useProfile.getState().theme);
+
+// M01 boot reads these flags synchronously; hydrate before the first frame.
+hydrateOnboarding();
 
 export default function RootLayout() {
   return (
