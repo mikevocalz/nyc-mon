@@ -19,24 +19,20 @@ Media is intentionally separate from the database:
 
 Payload's local filesystem must remain a development fallback only. Production media must not be written to the app filesystem.
 
-## Neon Auth boundary
+## Better Auth on Neon
 
-Neon's current Managed Better Auth is powered by Better Auth and stores identity in the `neon_auth` schema, with auth state branching alongside the database.
+NYC-Mon already runs self-managed Better Auth through `@delmaredigital/payload-better-auth` and Payload. That is the correct identity architecture for this app because NYC-Mon depends on Better Auth plugins and server hooks that Neon Managed Auth does not expose: passkeys, two-factor, device authorization, one-time handoff tokens, phone verification, username auth, account merge hooks, custom fields, guardian-consent enforcement, and Payload admin integration.
 
-NYC-Mon currently has additional server-side identity requirements that are implemented through the Payload Better Auth integration: passkeys, custom `birthYear` fields, guardian-consent enforcement, and the Payload admin authentication strategy.
+Neon is the Postgres backing store for that Better Auth/Payload stack through the same server-only `DATABASE_URL`. Auth rows, sessions, accounts, verification records, passkeys and application records therefore live in the Neon-backed Payload schema and branch with the database.
 
-Neon's managed auth does not currently support arbitrary Better Auth plugins or custom server-side handlers. Therefore this PR moves the **database** to Neon and establishes the Neon Auth migration boundary, but does not silently remove the existing server-side consent/security controls.
+Do **not** provision Neon Managed Auth for NYC-Mon while these plugin requirements exist. Doing so would create a second identity system and regress the existing security contract.
 
-The follow-up Neon Auth migration must preserve:
+The supported identity path is:
 
-1. server-authoritative age/guardian enforcement;
-2. passkey support;
-3. stable Caller/user IDs used by Mon ownership;
-4. Payload admin authentication;
-5. Apple/Google sign-in;
-6. device/session handoff semantics.
-
-Until those are proven against Managed Better Auth, the existing Better Auth runtime remains the identity implementation, backed by the Neon Postgres database.
+1. Better Auth runtime in Payload;
+2. `@delmaredigital/payload-better-auth` for generated auth collections, adapter and Payload session strategy;
+3. Neon Postgres via `DATABASE_URL`;
+4. Bunny Storage/CDN for media bytes.
 
 ## Media contract
 
