@@ -7,7 +7,7 @@ export const W05_COPY = {
   hero: {
     eyebrow: 'The waitlist',
     title: 'Get NYC-MON',
-    body: "Phase 1 ships on iOS and Android. The store badges go up at launch, and until then the waitlist is how you'll hear the day it's out.",
+    body: "NYC-MON is coming to iOS and Android. Until it's out, the waitlist is how you'll hear the day it lands.",
   },
   stores: {
     label: 'The app stores',

@@ -14,8 +14,8 @@ export async function up({ db, payload, req }: MigrateUpArgs): Promise<void> {
   
   ALTER TABLE "payload"."rate_limits" ALTER COLUMN "last_request" SET DEFAULT 1791404476421;
   ALTER TABLE "payload"."_rate_limits_v" ALTER COLUMN "version_last_request" SET DEFAULT 1791404476421;
-  ALTER TABLE "payload"."media" ADD COLUMN "bunny_url" varchar;
-  ALTER TABLE "payload"."_media_v" ADD COLUMN "version_bunny_url" varchar;
+  ALTER TABLE "payload"."media" ADD COLUMN IF NOT EXISTS "bunny_url" varchar;
+  ALTER TABLE "payload"."_media_v" ADD COLUMN IF NOT EXISTS "version_bunny_url" varchar;
   ALTER TABLE "payload"."payload_locked_documents_rels" ADD COLUMN "waitlist_id" integer;
   CREATE UNIQUE INDEX "waitlist_email_idx" ON "payload"."waitlist" USING btree ("email");
   CREATE INDEX "waitlist_updated_at_idx" ON "payload"."waitlist" USING btree ("updated_at");
@@ -33,8 +33,6 @@ export async function down({ db, payload, req }: MigrateDownArgs): Promise<void>
   DROP INDEX "payload"."payload_locked_documents_rels_waitlist_id_idx";
   ALTER TABLE "payload"."rate_limits" ALTER COLUMN "last_request" SET DEFAULT 1791149819909;
   ALTER TABLE "payload"."_rate_limits_v" ALTER COLUMN "version_last_request" SET DEFAULT 1791149819909;
-  ALTER TABLE "payload"."media" DROP COLUMN "bunny_url";
-  ALTER TABLE "payload"."_media_v" DROP COLUMN "version_bunny_url";
   ALTER TABLE "payload"."payload_locked_documents_rels" DROP COLUMN "waitlist_id";
   DROP TYPE "payload"."enum_waitlist_district";`)
 }

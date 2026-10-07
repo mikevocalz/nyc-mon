@@ -55,9 +55,9 @@ export function MonsDetailPage({ starter }: { starter: MonsStarter }) {
               </List>
             </SolidPanel>
           </View>
-          <Paragraph className="my-0 text-sm leading-6 text-text-muted">
-            {starter.cultureNote ?? copy.cultureMissing}
-          </Paragraph>
+          {starter.cultureNote ? (
+            <Paragraph className="my-0 text-sm leading-6 text-text-muted">{starter.cultureNote}</Paragraph>
+          ) : null}
           <LinkButton title={copy.back} href={copy.backHref} testID={`w02-${starter.slug}-back`} />
         </Article>
       </Section>

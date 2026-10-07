@@ -42,7 +42,8 @@ export interface ArtFocalPoint {
 /** A caption the page currently prints with the art. */
 export interface ArtCaption {
   title: string;
-  place: string;
+  /** Cross streets; absent where canon gives no place (Mega City). */
+  place?: string;
 }
 
 export interface ArtEntry {

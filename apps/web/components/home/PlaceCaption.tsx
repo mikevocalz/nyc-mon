@@ -6,8 +6,8 @@ import { W01_COPY } from './copy';
 
 /**
  * A photograph's caption as a signage plate pinned to a corner of its frame:
- * the district's disc, then "District, cross streets". Renders nothing for
- * art without a district and a place.
+ * the district's disc, then "District, cross streets", or the district alone
+ * where canon gives no place. Renders nothing for art without a district.
  */
 export function PlaceCaption({ entry, className }: { entry: ArtEntry; className: string }) {
   if (!entry.district || !entry.caption) return null;

@@ -1,16 +1,25 @@
 /**
  * Every string on the legal pages (W06): privacy, terms and the children's
- * privacy notice. All `voice: "ui"` — plain language, honest about Phase-1
+ * privacy notice. All `voice: "ui"` — plain language, honest about first-release
  * scope. Facts follow the product's real rules: the age gate, the guardian-
  * consent email flow and the "no behavioural ads" promise in
  * packages/payload/src/auth (ADR 0001, COPPA).
  */
 
+/** A paragraph with one inline link: `before`, the link, then `after`. */
+export interface LegalLinkParagraph {
+  before: string;
+  link: { label: string; href: string };
+  after: string;
+}
+
+export type LegalParagraph = string | LegalLinkParagraph;
+
 export interface LegalSection {
   /** Anchor id — also the aria-labelledby target of the section wrapper. */
   id: string;
   title: string;
-  body: readonly string[];
+  body: readonly LegalParagraph[];
 }
 
 export interface LegalDocument {
@@ -36,7 +45,7 @@ const privacy: LegalDocument = {
       title: 'What this covers',
       body: [
         'This notice covers the NYC-MON companion app and this product site. NYC-MON is a game set in New York: you look after a creature called a Mon, and the game calls you a Caller.',
-        'Phase 1 is a phone app. When headsets and other surfaces arrive, this notice will say so before they ask you for anything new.',
+        'The first release is a phone app. When headsets and other surfaces arrive, this notice will say so before they ask you for anything new.',
       ],
     },
     {
@@ -44,7 +53,7 @@ const privacy: LegalDocument = {
       title: 'What we collect',
       body: [
         'An account needs three things: your email address, the Caller name you pick, and the birth year you enter at the age gate. The birth year is the only age question — we do not ask for a full date of birth.',
-        'We also keep your Mon and its progress, so your companion is the same one on every screen and survives a new phone.',
+        'We also keep your Mon and your Mon\u2019s progress, so your companion is the same one on every screen and survives a new phone.',
       ],
     },
     {
@@ -59,7 +68,7 @@ const privacy: LegalDocument = {
       id: 'w06-privacy-notifications',
       title: 'Notifications',
       body: [
-        'The only notification Phase 1 sends is the one your own phone schedules: a chirp when an egg is ready. It is set on the device and nothing leaves the phone to make it happen.',
+        'The only notification the first release sends is the one your own phone schedules: a chirp when an egg is ready. It is set on the device and nothing leaves the phone to make it happen.',
         'There is no marketing push channel. Account emails go only to the address you gave us, and only when something needs your answer — like a sign-in or a consent request.',
       ],
     },
@@ -75,7 +84,11 @@ const privacy: LegalDocument = {
       title: 'Your data, your call',
       body: [
         'You can review the email, Caller name and birth year on your account, ask for a copy of your data, or delete the account outright. Deleting the account removes its personal data; your Mon moves into Dr. Santoro\u2019s care.',
-        'Parents reviewing a child\u2019s account use the children\u2019s privacy notice at /legal/childrens-privacy — it lists what a parent can see and remove.',
+        {
+          before: 'Parents reviewing a child\u2019s account use the ',
+          link: { label: 'children\u2019s privacy notice', href: '/legal/childrens-privacy' },
+          after: ', which lists what a parent can see and remove.',
+        },
       ],
     },
     {
@@ -98,8 +111,8 @@ const terms: LegalDocument = {
       id: 'w06-terms-service',
       title: 'The service',
       body: [
-        'NYC-MON is a companion app set in New York plus this product site. You care for a Mon through an H-Lynk Core — feeding it, resting it and playing with it — and the site tells you about the world.',
-        'Phase 1 is the phone app and this site. Features named on the site but not yet in the app — the headset districts, store listings — are coming, not promised on a date.',
+        'NYC-MON is a companion app set in New York plus this product site. You care for a Mon on an H-Lynk Core through feeding, rest and play, and the site tells you about the world.',
+        'The first release is the phone app and this site. Features named on the site but not yet in the app — the headset districts, store listings — are coming, not promised on a date.',
       ],
     },
     {
@@ -130,7 +143,7 @@ const terms: LegalDocument = {
       id: 'w06-terms-warranty',
       title: 'No warranty',
       body: [
-        'NYC-MON is provided as is. It\u2019s a young service in Phase 1: it may have bugs, downtime or missing features, and we don\u2019t promise otherwise. When something breaks, the fix is honest work, not fine print.',
+        'NYC-MON is provided as is. It\u2019s a young service in its first release: it may have bugs, downtime or missing features, and we don\u2019t promise otherwise. When something breaks, the fix is honest work, not fine print.',
       ],
     },
     {
@@ -183,14 +196,14 @@ const childrens: LegalDocument = {
       title: 'Your consent, by email',
       body: [
         'There is no under-13 account without a parent or guardian\u2019s yes. The child enters your email address, and we send you one message explaining what the account holds, with approve and decline links.',
-        'Say no, or never answer, and we delete your address and everything saved with the request. In the game the child\u2019s Mon goes to stay with Dr. Santoro, so they never see it deleted.',
+        'Say no, or never answer, and we delete your address and everything saved with the request. In the game the child\u2019s Mon goes to stay with Dr. Santoro, so they never see that Mon deleted.',
       ],
     },
     {
       id: 'w06-coppa-kept',
       title: 'What we keep for a child',
       body: [
-        'With your consent, the account keeps the same three things as any Caller\u2019s: the consenting email, the Caller name the child picks and the birth year, plus their Mon and its progress. Nothing else is asked of a child.',
+        'With your consent, the account keeps the same three things as any Caller\u2019s: the consenting email, the Caller name the child picks and the birth year, plus their Mon and that Mon\u2019s progress. Nothing else is asked of a child.',
       ],
     },
     {

@@ -222,7 +222,6 @@ export function useHomeMotion() {
       armedHost.classList.add(ARMED_CLASS);
       const { fades, scrubs, triggers } = collectTargets(scope);
       const all = { ...fades, ...scrubs };
-      const desktop = window.matchMedia(DESKTOP).matches;
 
       // Hero entrance — authored load sequence, plays once, no trigger. Hero
       // markers are never pre-hidden (see globals.css): the hero is the LCP
@@ -239,12 +238,18 @@ export function useHomeMotion() {
           start: 'top 78%',
         });
       }
-      if (desktop && triggers.world && bindable(worldDrift, all)) {
-        attachScrollTrigger(createGsapTimeline(worldDrift, all), {
-          trigger: triggers.world,
-          start: 'top bottom',
-          end: 'bottom top',
-          scrub: SCRUB.loose,
+      // gsap.matchMedia binds the drift when the desktop query starts matching
+      // and reverts it when it stops, so a resize or rotation across md follows.
+      const media = gsap.matchMedia();
+      if (triggers.world && bindable(worldDrift, all)) {
+        const world = triggers.world;
+        media.add(DESKTOP, () => {
+          attachScrollTrigger(createGsapTimeline(worldDrift, all), {
+            trigger: world,
+            start: 'top bottom',
+            end: 'bottom top',
+            scrub: SCRUB.loose,
+          });
         });
       }
 
@@ -279,6 +284,7 @@ export function useHomeMotion() {
       }
 
       return () => {
+        media.revert();
         armedHost.classList.remove(ARMED_CLASS);
       };
     },

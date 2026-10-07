@@ -7,7 +7,7 @@ export const W02_COPY = {
   index: {
     eyebrow: 'The starters',
     title: 'The Mons',
-    body: 'Three Bloodlines hatch in this city, each from its own egg. Whoever hatches for you starts small and grows their own line — Baby to Small to Mid, then one of three Max forms. Meet them before one chooses you.',
+    body: 'Three Bloodlines hatch in this city, each from its own egg. Whoever hatches for you starts small and grows along the line: Baby to Small to Mid, then one of three Max forms. Meet them before one chooses you.',
     hatchesFrom: (egg: string) => `Hatches from the ${egg}`,
     dex: (dexId: number) => `No. ${String(dexId).padStart(3, '0')}`,
     cardHref: (slug: string) => `/mons/${slug}`,
@@ -19,7 +19,7 @@ export const W02_COPY = {
     bloodlineBody: (bloodline: string) =>
       `A Bloodline is a Dex family — the same roots under every form. The ${bloodline} grows Egg to Baby to Small to Mid, then the Mid becomes one of three Max forms. That choice is the Mon's own.`,
     eggBody: (egg: string, baby: string) =>
-      `${baby} hatches from the ${egg}. Incubation takes 15 minutes, 30 minutes or an hour — then the Mon makes its choice.`,
+      `${baby} hatches from the ${egg}. Incubation takes 15 minutes, 30 minutes or an hour. Then your Mon makes a choice too.`,
     /** One canon-flavored line per starter, keyed by the page's slug. */
     blurb: {
       'hood-ratti': 'Hood means free-living, not hostile — this line grew up on the block it still runs.',
@@ -28,8 +28,6 @@ export const W02_COPY = {
     } as Record<string, string>,
     lineTitle: 'Evolution line',
     unnamedForm: 'Unnamed form',
-    cultureMissing:
-      "The roster hasn't written this one's species note yet — the Dex leaves a blank line where the city's story goes.",
     back: 'Back to the Mons',
     backHref: '/mons',
   },

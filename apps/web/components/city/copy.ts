@@ -14,11 +14,11 @@ export const W03_COPY = {
   cast: {
     eyebrow: 'The cast',
     title: 'Who shares the streets',
-    body: 'Two kinds of neighbours, and the handheld that keeps them talking.',
+    body: 'Two kinds of neighbors, and the handheld that keeps them talking.',
     items: [
       {
         title: 'Callers',
-        line: 'People who bond with a Mon through the H-Lynk. A Mon chooses its Caller back — nobody owns anyone.',
+        line: 'People who bond with a Mon through the H-Lynk. A Mon chooses a Caller back, and nobody owns anyone.',
       },
       {
         title: 'Hood Mons',

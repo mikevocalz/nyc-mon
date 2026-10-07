@@ -60,9 +60,16 @@ const stopInternalLoop = (renderer: WebGPURenderer) => {
   }
   animation.stop();
 };
+let warnedNodeFrame = false;
+const warnNodeFrame = () => {
+  if (warnedNodeFrame) return;
+  warnedNodeFrame = true;
+  console.warn('[ThreeCanvas] three renamed Renderer._nodes.nodeFrame; node-time animation will not advance.');
+};
 // What Animation.start()'s loop did per frame besides the user callback.
 const advanceNodeFrame = (renderer: WebGPURenderer) => {
   const nodeFrame = (renderer as unknown as RendererInternals)._nodes?.nodeFrame;
+  if (typeof nodeFrame?.update !== 'function') warnNodeFrame();
   if (renderer.info.autoReset) renderer.info.reset();
   nodeFrame?.update?.();
   if (nodeFrame?.frameId !== undefined) (renderer.info as { frame: number }).frame = nodeFrame.frameId;

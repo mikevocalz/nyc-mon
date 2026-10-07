@@ -7,13 +7,13 @@ export const W04_COPY = {
   loop: {
     eyebrow: 'The loop',
     title: 'How it works',
-    body: 'Phase 1 is the companion loop. Five steps, from the day you meet your egg to everyday care.',
+    body: 'Five steps, from the day you meet your egg to everyday care.',
     listLabel: 'The five steps',
     steps: [
       { numeral: '01', verb: 'Meet', line: 'Dr. Santoro shows you three eggs. You pick one.' },
       { numeral: '02', verb: 'Name', line: 'You pick a Caller name — the one your Mon will know you by.' },
-      { numeral: '03', verb: 'Incubate', line: "15 minutes, 30 minutes or an hour — one notification when it's ready." },
-      { numeral: '04', verb: 'Hatch', line: 'The Mon makes its choice — its first look at you is how it says yes.' },
+      { numeral: '03', verb: 'Incubate', line: "15 minutes, 30 minutes or an hour, then one notification when it's ready." },
+      { numeral: '04', verb: 'Hatch', line: 'Your Mon chooses too. The first look your Mon gives you is the yes.' },
       { numeral: '05', verb: 'Care', line: 'Feed, Rest and Play raise Fullness, Energy and Social.' },
     ],
   },

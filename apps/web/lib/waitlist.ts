@@ -51,6 +51,15 @@ export interface JoinWaitlistOptions {
 /** Visitor IP admin-vite trusts only alongside {@link FORWARD_SECRET_HEADER}. */
 export const FORWARDED_CLIENT_IP_HEADER = 'x-nycmon-client-ip';
 
+// Without the secret every visitor shares one rate-limit bucket keyed on this
+// server's address, so a single script can lock real sign-ups out.
+let warnedMissingSecret = false;
+function warnMissingSecret() {
+  if (warnedMissingSecret) return;
+  warnedMissingSecret = true;
+  console.error('[waitlist] WAITLIST_FORWARD_SECRET is not set; all visitors share one rate-limit bucket.');
+}
+
 /** Carries `WAITLIST_FORWARD_SECRET`; mirrors the handler in @acme/payload. */
 export const FORWARD_SECRET_HEADER = 'x-nycmon-forward-secret';
 
@@ -98,6 +107,7 @@ export async function joinWaitlist(input: WaitlistInput, options: JoinWaitlistOp
   // Without the secret, admin-vite would ignore a vouched IP anyway, so send
   // neither header and let it key on this server's own address.
   const forwardSecret = options.forwardSecret ?? process.env.WAITLIST_FORWARD_SECRET ?? '';
+  if (forwardSecret === '' && process.env.NODE_ENV === 'production') warnMissingSecret();
   if (forwardSecret !== '' && input.clientIp !== undefined && input.clientIp !== '') {
     headers[FORWARDED_CLIENT_IP_HEADER] = input.clientIp;
     headers[FORWARD_SECRET_HEADER] = forwardSecret;

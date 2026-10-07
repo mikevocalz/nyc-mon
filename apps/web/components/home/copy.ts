@@ -23,12 +23,13 @@ if (TITLE_LINES.flat().join(' ') !== HOME_COPY.tagline) {
 }
 
 export const W01_COPY = {
-  /** A photograph's place caption: district, then cross streets. */
-  placeCaption: (district: District, place: string) => `${DISTRICT_COPY[district].name}, ${place}`,
+  /** A photograph's place caption: district, then cross streets when canon gives a place. */
+  placeCaption: (district: District, place?: string) =>
+    place ? `${DISTRICT_COPY[district].name}, ${place}` : DISTRICT_COPY[district].name,
   hero: {
     title: HOME_COPY.tagline,
     titleLines: TITLE_LINES,
-    body: 'Pick one of three eggs from Dr. Santoro. Be there when it hatches. Then look after your Mon on the same blocks you walk.',
+    body: 'Pick one of three eggs from Dr. Alessandra Santoro. Be there when it hatches. Then look after your Mon on the same blocks you walk.',
     cta: WAITLIST_CTA.label,
     ctaHref: WAITLIST_CTA.href,
     districtLabel: 'Pick a district',
@@ -79,7 +80,7 @@ export const W01_COPY = {
     title: "Three eggs on Dr. Santoro's table.",
     /** The egg names come from @acme/content, in starter slot order. */
     body: (eggNames: readonly string[]) =>
-      `${eggNames.slice(0, -1).join(', ')} and ${eggNames.at(-1) ?? ''}. Each holds a Mon from a different Bloodline. You pick an egg, and at the hatch your Mon makes a choice too.`,
+      `${eggNames.slice(0, -1).join(', ')} and ${eggNames.at(-1) ?? ''}. Each holds a Mon from a different Bloodline. You pick an egg. Your Mon decides the rest at the hatch.`,
     body2: 'Mons are people in this city. They think, they choose and they can say no.',
     hatchesFrom: (egg: string) => `Hatches from the ${egg}`,
     dex: (dexId: number) => `No. ${String(dexId).padStart(3, '0')}`,
