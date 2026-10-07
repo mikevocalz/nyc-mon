@@ -1,5 +1,5 @@
 import type { CollectionConfig } from 'payload';
-import { bunnyMediaAfterChange, bunnyMediaAfterDelete } from '../storage/bunnyMedia';
+import { bunnyMediaAfterChange, bunnyMediaAfterDelete, bunnyMediaAfterRead } from '../storage/bunnyMedia';
 
 export const Media: CollectionConfig = {
   slug: 'media',
@@ -22,6 +22,7 @@ export const Media: CollectionConfig = {
   },
   hooks: {
     afterChange: [bunnyMediaAfterChange],
+    afterRead: [bunnyMediaAfterRead],
     afterDelete: [bunnyMediaAfterDelete],
   },
   fields: [
