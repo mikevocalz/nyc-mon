@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { cycleFocusIndex, shouldReturnFocus } from './focus-cycle.ts';
+import { cycleFocusIndex, shouldReturnFocus, visibleRing } from './focus-cycle.ts';
 
 test('Tab moves forward through the ring and wraps from last to first', () => {
   assert.equal(cycleFocusIndex(0, 4, false), 1);
@@ -35,4 +35,18 @@ test('focus the user moved to a real control is left alone', () => {
   assert.equal(shouldReturnFocus({ tagName: 'INPUT' }), false);
   assert.equal(shouldReturnFocus({ tagName: 'BUTTON' }), false);
   assert.equal(shouldReturnFocus({ tagName: 'A' }), false);
+});
+
+const el = (name: string, rects: number) => ({ name, getClientRects: () => ({ length: rects }) });
+
+test('hidden ring members are dropped; a fully hidden ring is empty and Tab is left alone', () => {
+  const ring = [el('toggle', 0), el('home', 0), el('story', 0)];
+  const visible = visibleRing(ring);
+  assert.equal(visible.length, 0);
+  assert.equal(cycleFocusIndex(-1, visible.length, false), null);
+});
+
+test('only rendered members stay in the ring, in order', () => {
+  const ring = [el('toggle', 1), el('home', 0), el('story', 2)];
+  assert.deepEqual(visibleRing(ring).map((e) => e.name), ['toggle', 'story']);
 });

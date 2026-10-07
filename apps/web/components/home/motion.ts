@@ -10,7 +10,6 @@
  *                 on the page root, then brought in by a timeline.
  *   `mpx-<name>`  transform-only target — parallax/scrub, never pre-hidden.
  *   `trg-<name>`  ScrollTrigger anchor — the section root itself.
- *   ids in MAGNETIC_TARGETS get a ≤6px pointer-fine magnetic pull (CTAs).
  *
  * Timelines are declared as Kinetrell `defineMotion` documents (data, not
  * calls), compiled once, then bound to elements via `createGsapTimeline` +
@@ -29,7 +28,7 @@ import {
 import { breakpoints, pageMotion } from '@acme/theme';
 import { MOTION_MARKER_SELECTOR, parseMotionMarker } from './motion-markers';
 
-const { duration: D, ease: E, distance: Y, parallax: P, scale: S, tilt: T, scrub: SCRUB, magnet: M } = pageMotion;
+const { duration: D, ease: E, distance: Y, parallax: P, scale: S, tilt: T, scrub: SCRUB } = pageMotion;
 const ms = (seconds: number) => Math.round(seconds * 1000);
 const OUT = E.out.gsap;
 const IN_OUT = E.inOut.gsap;
@@ -38,9 +37,6 @@ const LINEAR = E.scrub.gsap;
 const SPAN_MS = 1000;
 
 export const ARMED_CLASS = 'motion-armed';
-
-/** Elements that get the small pointer-fine pull — the page's two CTAs. */
-const MAGNETIC_TARGETS = ['mfx-hero-cta', 'mfx-hatch-cta'] as const;
 
 interface Targets {
   fades: GsapTargetMap;
@@ -78,77 +74,58 @@ function bindable(motion: CompiledMotion, map: GsapTargetMap): boolean {
 // ---------------------------------------------------------------------------
 
 /**
- * Hero load: city art settles → headline resolves → seal stamps → CTA follows.
- * Transform-only on purpose: the hero holds the LCP surface, so no element
- * here ever goes transparent — a late hydration bind shifts geometry, never
- * paint timing (see globals.css: hero markers are excluded from the pre-hide).
+ * Hero load, one composed beat in four steps: the poster photograph settles
+ * (the environment), the headline plates resolve as one block, the seal lands
+ * like a stamp, then the CTA and district control are in place. No per-line
+ * stagger. Transform-only on purpose: the photograph is the LCP element, so
+ * nothing in the hero ever goes transparent, and a late bind skips the beat
+ * (globals.css keeps hero markers out of the pre-hide).
  */
 const heroEntrance = compileMotion(
   defineMotion({
     id: 'w01.hero.enter',
     initial: {
       'hero-art': { y: Y.reveal, scale: S.enter },
-      'hero-seal': { y: Y.step, rotate: -T.stamp },
-      'hero-eyebrow': { y: Y.nudge },
       'hero-title': { y: Y.rise },
       'hero-body': { y: Y.step },
-      'hero-starters': { y: Y.nudge },
-      'hero-cta': { y: Y.step },
-      'hero-districts': { y: Y.nudge },
+      'hero-seal': { y: Y.step, rotate: -T.stamp },
+      'hero-actions': { y: Y.step },
     },
     tracks: [
       { target: 'hero-art', to: { y: 0, scale: 1 }, atMs: 0, durationMs: ms(D.lg), ease: OUT },
-      { target: 'hero-eyebrow', to: { y: 0 }, atMs: 140, durationMs: ms(D.xs), ease: OUT },
-      { target: 'hero-title', to: { y: 0 }, atMs: 240, durationMs: ms(D.sm), ease: OUT },
-      { target: 'hero-body', to: { y: 0 }, atMs: 360, durationMs: ms(D.sm), ease: OUT },
-      { target: 'hero-seal', to: { y: 0, rotate: 0 }, atMs: 400, durationMs: ms(D.sm), ease: OUT },
-      { target: 'hero-starters', to: { y: 0 }, atMs: 500, durationMs: ms(D.xs), ease: OUT },
-      { target: 'hero-cta', to: { y: 0 }, atMs: 580, durationMs: ms(D.xs), ease: OUT },
-      { target: 'hero-districts', to: { y: 0 }, atMs: 680, durationMs: ms(D.xs), ease: OUT },
+      { target: 'hero-title', to: { y: 0 }, atMs: 160, durationMs: ms(D.sm), ease: OUT },
+      { target: 'hero-body', to: { y: 0 }, atMs: 160, durationMs: ms(D.sm), ease: OUT },
+      { target: 'hero-seal', to: { y: 0, rotate: 0 }, atMs: 420, durationMs: ms(D.sm), ease: OUT },
+      { target: 'hero-actions', to: { y: 0 }, atMs: 560, durationMs: ms(D.xs), ease: OUT },
     ],
   }),
 );
 
-/** Hero scroll-out: the plate and the art cluster drift at different rates. */
-const heroDrift = compileMotion(
-  defineMotion({
-    id: 'w01.hero.drift',
-    initial: { 'hero-cluster': { yPercent: 0 }, 'hero-panel': { yPercent: 0 } },
-    tracks: [
-      { target: 'hero-cluster', to: { yPercent: -P.max }, durationMs: SPAN_MS, ease: LINEAR },
-      { target: 'hero-panel', to: { yPercent: -P.near }, durationMs: SPAN_MS, ease: LINEAR },
-    ],
-  }),
-);
-
-/** World header reveal on entry. */
+/** World story tile resolves once as the section arrives. */
 const worldEntrance = compileMotion(
   defineMotion({
     id: 'w01.world.enter',
-    initial: { 'world-head': { opacity: 0, y: Y.reveal } },
-    tracks: [{ target: 'world-head', to: { opacity: 1, y: 0 }, durationMs: ms(D.md), ease: OUT }],
+    initial: { 'world-story': { opacity: 0, y: Y.reveal } },
+    tracks: [{ target: 'world-story', to: { opacity: 1, y: 0 }, durationMs: ms(D.md), ease: OUT }],
   }),
 );
 
 /**
- * World parallax: four frames at four rates, all vertical, transform only.
- * Smaller frames travel further — depth comes from rate difference, never
- * from lateral movement.
+ * World parallax (spatial context): the two photographs' image layers drift
+ * inside fixed frames at two rates, vertical only, transform only. The layer
+ * overhangs its frame by `parallax.max` (WorldSection.tsx), so neither rate
+ * can show an edge. The frames themselves never move, so the grid holds.
  */
 const worldDrift = compileMotion(
   defineMotion({
     id: 'w01.world.drift',
     initial: {
-      'world-a': { yPercent: P.near },
-      'world-b': { yPercent: P.far },
-      'world-c': { yPercent: P.mid },
-      'world-d': { yPercent: P.max },
+      'world-a': { yPercent: P.mid },
+      'world-b': { yPercent: P.near },
     },
     tracks: [
-      { target: 'world-a', to: { yPercent: -P.near }, durationMs: SPAN_MS, ease: LINEAR },
-      { target: 'world-b', to: { yPercent: -P.far }, durationMs: SPAN_MS, ease: LINEAR },
-      { target: 'world-c', to: { yPercent: -P.mid }, durationMs: SPAN_MS, ease: LINEAR },
-      { target: 'world-d', to: { yPercent: -P.far }, durationMs: SPAN_MS, ease: LINEAR },
+      { target: 'world-a', to: { yPercent: -P.mid }, durationMs: SPAN_MS, ease: LINEAR },
+      { target: 'world-b', to: { yPercent: -P.near }, durationMs: SPAN_MS, ease: LINEAR },
     ],
   }),
 );
@@ -236,35 +213,6 @@ const hatchReveal = compileMotion(
 // ---------------------------------------------------------------------------
 
 const DESKTOP = `(min-width: ${breakpoints.md})`;
-const FINE_POINTER = '(pointer: fine)';
-
-/** Small pull toward the pointer on desktop CTAs. Native geometry untouched. */
-function armMagnets(root: ParentNode): () => void {
-  if (!window.matchMedia(FINE_POINTER).matches) return () => {};
-  const off: Array<() => void> = [];
-  for (const id of MAGNETIC_TARGETS) {
-    const el = root.querySelector<HTMLElement>(`#${CSS.escape(id)}`);
-    if (!el) continue;
-    const moveX = gsap.quickTo(el, 'x', { duration: M.duration, ease: OUT });
-    const moveY = gsap.quickTo(el, 'y', { duration: M.duration, ease: OUT });
-    const onMove = (e: PointerEvent) => {
-      const r = el.getBoundingClientRect();
-      moveX(gsap.utils.clamp(-M.clamp, M.clamp, (e.clientX - (r.left + r.width / 2)) * M.factor));
-      moveY(gsap.utils.clamp(-M.clamp, M.clamp, (e.clientY - (r.top + r.height / 2)) * M.factor));
-    };
-    const onLeave = () => {
-      moveX(0);
-      moveY(0);
-    };
-    el.addEventListener('pointermove', onMove);
-    el.addEventListener('pointerleave', onLeave);
-    off.push(() => {
-      el.removeEventListener('pointermove', onMove);
-      el.removeEventListener('pointerleave', onLeave);
-    });
-  }
-  return () => off.forEach((fn) => fn());
-}
 
 /**
  * All W01 choreography, bound once for the home page. Marker ids are unique
@@ -289,16 +237,6 @@ export function useHomeMotion() {
       // flash-and-replay. Only replay the entrance when hydration was fast.
       if (bindable(heroEntrance, fades) && performance.now() < 1800) {
         createGsapTimeline(heroEntrance, fades).play();
-      }
-
-      // Hero scroll-out depth — desktop only.
-      if (desktop && triggers.hero && bindable(heroDrift, all)) {
-        attachScrollTrigger(createGsapTimeline(heroDrift, all), {
-          trigger: triggers.hero,
-          start: 'top top',
-          end: 'bottom top',
-          scrub: SCRUB.base,
-        });
       }
 
       // World header reveal + image parallax.
@@ -349,9 +287,7 @@ export function useHomeMotion() {
         });
       }
 
-      const offMagnets = armMagnets(scope);
       return () => {
-        offMagnets();
         armedHost.classList.remove(ARMED_CLASS);
       };
     },

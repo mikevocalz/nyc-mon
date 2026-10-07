@@ -5,6 +5,7 @@ import { View } from '@acme/ui/tw';
 import { art, starterSlot, type StarterId } from './art';
 import { Eyebrow } from './Eyebrow';
 import { W01_COPY } from './copy';
+import { sectionMarker } from './sections';
 
 export interface StarterCard {
   key: string;
@@ -37,6 +38,7 @@ export function StartersSection({ cards }: { cards: readonly StarterCard[] }) {
   const copy = W01_COPY.starters;
   return (
     <Section
+      {...sectionMarker('starters')}
       aria-labelledby="w01-starters-title"
       data-testid="w01-starters"
       id="trg-starters"

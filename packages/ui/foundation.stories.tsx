@@ -233,6 +233,7 @@ const TYPE_RAMP_CLASS: Record<keyof typeof typeRamp, string> = {
   'type-body': 'text-type-body',
   'type-body-strong': 'text-type-body-strong',
   'type-label': 'text-type-label',
+  'type-tag': 'text-type-tag',
   'type-caption': 'text-type-caption',
 };
 

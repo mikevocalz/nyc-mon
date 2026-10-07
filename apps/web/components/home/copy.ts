@@ -1,23 +1,46 @@
+import { DISTRICT_COPY, HOME_COPY } from '@acme/spatial/copy';
+import type { District } from '@acme/ui';
+import { WAITLIST_CTA } from '../site/nav';
+
 /**
  * Every string on the home page (W01). Source and voice for each line:
- * docs/design/screens/W01/05-copy.md. All `voice: "ui"`.
+ * docs/design/screens/W01/05-copy.md and PREMIUM_SITE_AUDIT.md §9. All
+ * `voice: "ui"`. The slogan is defined once, in `HOME_COPY.tagline`; the CTA
+ * once, in `WAITLIST_CTA`.
  */
+/**
+ * The hero headline's art-directed breaks, as words of the one slogan: two
+ * lines from `md` (outer arrays), four on a phone (inner arrays). The guard
+ * keeps the breaks honest if the slogan ever changes.
+ */
+const TITLE_LINES = [
+  ['Every', 'block'],
+  ['has a', 'legend.'],
+] as const;
+
+if (TITLE_LINES.flat().join(' ') !== HOME_COPY.tagline) {
+  throw new Error('W01 hero title breaks must spell HOME_COPY.tagline');
+}
+
 export const W01_COPY = {
+  /** A photograph's place caption: district, then cross streets. */
+  placeCaption: (district: District, place: string) => `${DISTRICT_COPY[district].name}, ${place}`,
   hero: {
-    title: 'Every block has a legend.',
-    body: "Mons live in New York, on the same blocks as you. They showed up less than ten years ago, and the city's still figuring them out.",
-    eyebrow: 'A companion for the city',
-    cta: 'Join the waitlist',
-    ctaHref: '/get',
-    marquee: 'Every block has a legend',
-    startersLabel: 'The three starters',
+    title: HOME_COPY.tagline,
+    titleLines: TITLE_LINES,
+    body: 'Pick one of three eggs from Dr. Santoro. Be there when it hatches. Then look after your Mon on the same blocks you walk.',
+    cta: WAITLIST_CTA.label,
+    ctaHref: WAITLIST_CTA.href,
     districtLabel: 'Pick a district',
     cityLabel: (district: string) => `${district} street grid, seen from above`,
   },
+  signage: {
+    title: 'Four districts',
+  },
   world: {
-    eyebrow: 'The world',
-    title: "The city isn't a backdrop. It's the world.",
-    body: 'Every district keeps its own hours, its own weather and its own legends. The Mons were already living here.',
+    title: 'New York is the world.',
+    body: "Mons live in New York, on the same blocks as you. They showed up less than ten years ago, and the city's still figuring them out.",
+    body2: 'Four districts, from Lenox Avenue to the World Trade Center.',
   },
   hlynk: {
     eyebrow: 'H-Lynk',
@@ -58,8 +81,8 @@ export const W01_COPY = {
     body: "Incubation takes 15 minutes, 30 minutes or an hour. You get one notification when it's ready.",
     body2: 'Then the Mon makes its choice. Its first look at you is how it says yes.',
     closing: 'Be there when it opens.',
-    cta: 'Join the waitlist',
-    ctaHref: '/get',
+    cta: WAITLIST_CTA.label,
+    ctaHref: WAITLIST_CTA.href,
     figureLabel: 'The district at night, during the hatch window',
   },
 } as const;

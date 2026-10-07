@@ -268,6 +268,10 @@ export const typeScale = {
   'display-sm': { size: '1.875rem', lineHeight: '1.2', tracking: '0' },
   /** the home hero headline below `sm` (art brief: mobile display 2.75–3.25rem, leading 0.9–0.95) */
   'display-hero': { size: '2.75rem', lineHeight: '0.95', tracking: '-0.01em' },
+  /** the home hero headline on a short landscape phone, where the first view is ~300px tall */
+  'display-hero-short': { size: '2.125rem', lineHeight: '0.95', tracking: '-0.01em' },
+  /** district names on the home signage board */
+  'display-board': { size: '2rem', lineHeight: '1', tracking: '-0.01em' },
 } as const;
 
 /**
@@ -403,6 +407,8 @@ export const contentWidths = {
 export const minHeights = {
   /** home hero below `md`: the framed art, seal and copy plate stack inside it */
   hero: '40rem',
+  /** home hero from `lg`: most of the first view below the sticky header */
+  'hero-wide': '85svh',
 } as const;
 
 /**
@@ -533,15 +539,6 @@ export const pageMotion = {
     tight: 0.5,
     base: 0.6,
     loose: 0.8,
-  },
-  /** pointer-fine pull on CTAs */
-  magnet: {
-    /** gsap.quickTo duration, seconds */
-    duration: 0.25,
-    /** max pull either axis, px */
-    clamp: 6,
-    /** share of the pointer's offset from centre */
-    factor: 0.18,
   },
 } as const;
 

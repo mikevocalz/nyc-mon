@@ -24,10 +24,9 @@ test('every page ease pairs a GSAP name with a CSS curve', () => {
   }
 });
 
-test('distance, parallax, magnet and scale groups exist', () => {
+test('distance, parallax and scale groups exist', () => {
   assert.ok(pageMotion.distance.reveal > 0);
   assert.ok(pageMotion.parallax.max >= pageMotion.parallax.near);
-  assert.deepEqual(Object.keys(pageMotion.magnet).sort(), ['clamp', 'duration', 'factor']);
   assert.ok(pageMotion.scale.hover > 1);
 });
 

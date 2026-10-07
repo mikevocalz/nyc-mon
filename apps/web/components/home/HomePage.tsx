@@ -4,28 +4,27 @@ import { DistrictDivider } from './DistrictDivider';
 import { HatchBand } from './HatchBand';
 import { HLynkSection } from './HLynkSection';
 import { HomeHero } from './HomeHero';
-import { MarqueeBand } from './MarqueeBand';
 import { MotionRoot } from './MotionRoot';
+import { SignageBoard } from './SignageBoard';
 import { StartersSection, starterCards } from './StartersSection';
 import { WorldSection } from './WorldSection';
 
 /**
  * W01, the product site's home page. Contract: docs/design/screens/W01/08-handoff.md.
- * Storyboard (§05): hero → signage band → world → H-Lynk → starters → care →
- * hatch → footer. MotionRoot wraps the whole page in the Kinetrell clock —
- * under reduced motion it renders the same tree with no choreography.
+ * Order: hero → district board → world → H-Lynk → starters → care → hatch →
+ * footer. MotionRoot wraps the page in the Kinetrell clock; under reduced
+ * motion it renders the same tree with no choreography.
  */
 export function HomePage() {
-  const cards = starterCards();
   return (
     <MotionRoot>
       <View className="w-full flex-1 bg-bg">
-        <HomeHero starters={cards.map((c) => c.babyName)} />
-        <MarqueeBand />
+        <HomeHero />
+        <SignageBoard />
         <WorldSection />
         <DistrictDivider seed={3} />
         <HLynkSection />
-        <StartersSection cards={cards} />
+        <StartersSection cards={starterCards()} />
         <DistrictDivider seed={11} />
         <CareSection />
         <HatchBand />

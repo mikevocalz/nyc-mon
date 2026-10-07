@@ -158,3 +158,62 @@ PS-001 to PS-007 answer `PREMIUM_SITE_AUDIT.md` §17, decided 2026-10-07 after P
 **Decision.** Radio-group semantics with roving tabindex and arrow/Home/End keys, wrapping to two rows in narrow containers. Fixed in `packages/ui` so every caller gets it.
 
 **Consequences.** Every `SegmentedControl` in the product now announces as a radio group; callers that relied on tab semantics were checked when the change landed.
+
+---
+
+## PS-013 — Hero: server HTML, two client islands, LCP is server-rendered content
+
+**Disposition:** decided and implemented (Phase 3).
+
+**Context.** `HomeHero.tsx` was a whole-file client component: copy, CTA, seal and photo hydrated with the district control. It imported `useDistrictStore` from the `@acme/spatial` barrel, which also exports the Viro and Rive scenes, so `/` shipped a 446,558-byte chunk (`StudioSceneNavigator`, Viro, Rive) that only `/spatial` needs. PS-008 set the boundary; this applies it.
+
+**Decision.**
+- `HomeHero.tsx` is a server component. Headline, support line, CTA, photograph, seal and caption are server HTML from `@acme/ui/html` and `@acme/ui`.
+- `HeroDistrictIsland.tsx` ('use client') holds the two pieces that read the store: `HeroCity` (the `SceneSection` that draws `CityBlocks` behind the server children, still `next/dynamic` with `ssr: false` and `paused` forwarded) and `HeroDistrictPicker` (the radio group).
+- The store is imported by module path, `@acme/spatial/district` (new export in `packages/spatial/package.json`), from the island and `DistrictDivider`. The Viro chunk no longer loads on `/` (checked in the served HTML's script list).
+- The photograph keeps `loading="eager"`, `fetchPriority="high"` and a `<link rel="preload" as="image">` rendered in the tree (React hoists it). `ReactDOM.preload()` from the server component reached only the flight payload, not the HTML, so the element stays.
+- LCP: on Lighthouse's mobile viewport (412×823) the measured LCP element is the support paragraph `#mfx-hero-body`, because the photograph now sits below the copy on phones. Both are server HTML with fixed boxes, so neither waits for hydration or the canvas. The canvas is never LCP: it mounts after hydration behind content that already reserves the section's height. CLS stays 0.
+
+**Alternatives.** Keep the photo above the copy on phones so it stays LCP: rejected, the headline has to be the first read and the CTA has to fit in the first 844px. Keep the hero client-side: rejected by PS-008.
+
+**Consequences.** Simulated LCP did not improve (5192 → 5486 ms median) because Lighthouse's simulated paint waits on main-thread JS, and the heavy JS on `/` is layout-level, loaded on every route (see QA §Phase 3 Perf). Those chains are outside the home sections and are the next perf step.
+
+---
+
+## PS-014 — Signage: a static district board replaces the slogan marquee
+
+**Disposition:** decided and implemented (Phase 3).
+
+**Context.** `MarqueeBand.tsx` repeated "Every block has a legend" six times with ✦ separators directly under the H1, cut words at 390, and was `aria-hidden`. The audit (§8, W12) and the art brief (§10 signage logic) call for a destination board.
+
+**Decision.** `SignageBoard.tsx`: a signage-black band with an `h2` ("Four districts") and a list of four stops in route order, Harlem → Midtown → Downtown → Mega City. Each stop is the district name at `display-board` with one real cross street under it (`DISTRICT_COPY[d].streets`, the corners of the bundled photographs) and a disc in the district tone sitting on one silver route line. Vertical on phones, one row from `lg`. Static; server-rendered; readable by screen readers. The kit's `SignagePlate` (single line, truncates, `role="text"`) and `SignageBand` (console alert with a live region) don't fit a four-stop list, so the board composes the same tokens (`signage-black`, `signage-white`) instead.
+
+**Alternatives.** A slow ticker: rejected, a moving band of place names reads as a crypto ticker and adds a motion owner with no purpose. Keeping the marquee static: rejected, it repeats the H1.
+
+**Consequences.** The slogan is now defined once (`HOME_COPY.tagline`) and printed by the H1 and the seal artwork only.
+
+---
+
+## PS-015 — WORLD is the first bento: one dominant photograph, three modules
+
+**Disposition:** decided and implemented (Phase 3).
+
+**Context.** WorldSection had four equal-weight landmark photos with numbered 01–04 captions under a binary-contrast headline. ARCHITECTURE §4 allows a bento here: one dominant module, at most four, DOM order equal to mobile order.
+
+**Decision.** 12-column grid from `md`: `world.primary` (Lenox Ave rowhouses) spans 7 columns and both rows; the story tile (h2, two short paragraphs) takes 5 columns in row 1; `world.secondary` (Wall Street) takes 5 columns in row 2. DOM order is photo → story → photo, which is the phone order. Two of three modules are photographs and they cover more than half the area. Captions are signage plates naming the district and cross streets (`PlaceCaption.tsx`). Hard 2px ink frames, no rounding, no numbers. The two image layers drift on desktop within `parallax.mid`/`parallax.near` inside fixed frames.
+
+The optional fourth tile was left out: the brief's candidates were a third photograph or a text proof, and neither carried information the other three don't. `world.detail` stays in the art map, reserved for the Mon-in-district art (PS-007). `world.extra` was removed from the union.
+
+**Consequences.** When creature art lands, `world.detail` becomes the fourth module (a Mon placed on a district street), which the art brief requires of World.
+
+---
+
+## PS-016 — NavBar collapse breakpoint is a prop; the site collapses below `lg`
+
+**Disposition:** decided and implemented (Phase 3), fixed in the kit.
+
+**Context.** At 768 the site header's links ran into the 198px wordmark (audit W9), and the waitlist CTA made the bar longer than "Log in" did. A review also found a keyboard trap: an open phone menu rotated past the breakpoint kept its Tab handler, but the toggle and links were `display: none`, so Tab never moved.
+
+**Decision.** `NavBar` takes `collapseBelow: 'md' | 'lg'` (default `md`, so other callers are unchanged); the site passes `lg`. The focus ring is built from rendered elements only (`visibleRing` in `focus-cycle.ts`, unit-tested), an empty ring leaves Tab alone, and the sheet closes when the collapse breakpoint's media query starts matching. The site wordmark drops from 66 to 40px on a landscape phone (`short:` variant).
+
+**Consequences.** Tablets from 768 to 1023 get the menu button instead of a crowded bar.

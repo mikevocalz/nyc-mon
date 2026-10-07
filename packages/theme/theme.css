@@ -187,6 +187,12 @@
   --text-display-hero: 2.75rem;
   --text-display-hero--line-height: 0.95;
   --text-display-hero--letter-spacing: -0.01em;
+  --text-display-hero-short: 2.125rem;
+  --text-display-hero-short--line-height: 0.95;
+  --text-display-hero-short--letter-spacing: -0.01em;
+  --text-display-board: 2rem;
+  --text-display-board--line-height: 1;
+  --text-display-board--letter-spacing: -0.01em;
   --color-led-on: #F80000;
   --color-led-off: #5E0000;
   --color-hlynk-core-body: #D50000;
@@ -236,6 +242,7 @@
   --container-pane-supplementary: 21rem;
   --container-pane-inspector: 20rem;
   --min-height-hero: 40rem;
+  --min-height-hero-wide: 85svh;
   --radius-xs: 0px;
   --radius-sm: 0px;
   --radius-md: 0px;

@@ -10,8 +10,14 @@ const PAGES = [
   { label: 'How it works', href: '/how-it-works' },
 ] as const;
 
-/** The header's one primary action: sign in. */
-export const NAV_CTA: NavCta = { label: 'Log in', href: '/sign-in?intent=sign_in' };
+/**
+ * The site's one call to action, repo-wide (prompt pack §9, PS-003). The
+ * header, the home hero and the hatch band all read it from here.
+ */
+export const WAITLIST_CTA = { label: 'Join the waitlist', href: '/get' } as const;
+
+/** The header's one primary action. "Log in" returns as a text link once the app is public (PS-003). */
+export const NAV_CTA: NavCta = WAITLIST_CTA;
 
 /** The id of the content wrapper the header's skip link jumps to. */
 export const CONTENT_ID = 'content';
@@ -45,7 +51,7 @@ export const FOOTER_GROUPS: FooterLinkGroup[] = [
     title: 'Get NYC-MON',
     links: [
       { label: 'Walk the district', href: '/spatial' },
-      { label: 'Join the waitlist', href: '/get' },
+      WAITLIST_CTA,
       { label: 'Privacy', href: '/legal/privacy' },
       { label: 'Terms', href: '/legal/terms' },
     ],

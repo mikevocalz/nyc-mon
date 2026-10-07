@@ -18,7 +18,6 @@ const EXPECTED = [
   'world.primary',
   'world.secondary',
   'world.detail',
-  'world.extra',
   'hlynk.static',
   'starter.1',
   'starter.2',
@@ -53,8 +52,13 @@ test('alt text is present unless the slot is decorative with a reason', () => {
   }
 });
 
-test('world slots are the four world frames in composition order', () => {
-  assert.deepEqual([...WORLD_SLOTS], ['world.primary', 'world.secondary', 'world.detail', 'world.extra']);
+test('world frames are the dominant frame then the supporting one, in DOM order', () => {
+  assert.deepEqual([...WORLD_SLOTS], ['world.primary', 'world.secondary']);
+});
+
+test('world sizes describe the grid columns each frame occupies', () => {
+  assert.match(art('world.primary').sizes, /47rem/);
+  assert.match(art('world.secondary').sizes, /33rem/);
 });
 
 test('starter slots key off @acme/content slot numbers', () => {

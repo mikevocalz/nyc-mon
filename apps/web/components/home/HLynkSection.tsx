@@ -3,6 +3,7 @@ import { View } from '@acme/ui/tw';
 import { DeviceStage } from '../DeviceStage';
 import { Eyebrow } from './Eyebrow';
 import { W01_COPY } from './copy';
+import { sectionMarker } from './sections';
 
 /**
  * The H-Lynk Core as a hardware reveal (W01 §04.D): the device stands on its
@@ -15,6 +16,7 @@ export function HLynkSection() {
   const copy = W01_COPY.hlynk;
   return (
     <Section
+      {...sectionMarker('hlynk')}
       aria-labelledby="w01-hlynk-title"
       data-testid="w01-hlynk"
       id="trg-hlynk"

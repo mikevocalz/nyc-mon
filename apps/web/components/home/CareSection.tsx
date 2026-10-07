@@ -3,6 +3,7 @@ import { Heading, List, ListItem, Paragraph, Section, Text } from '@acme/ui/html
 import { View } from '@acme/ui/tw';
 import { Eyebrow } from './Eyebrow';
 import { W01_COPY } from './copy';
+import { sectionMarker } from './sections';
 
 /**
  * Care as a relationship, not a dashboard (W01 §04.F): the verbs Feed / Rest /
@@ -14,6 +15,7 @@ export function CareSection() {
   const copy = W01_COPY.care;
   return (
     <Section
+      {...sectionMarker('care')}
       aria-labelledby="w01-care-title"
       data-testid="w01-care"
       id="trg-care"

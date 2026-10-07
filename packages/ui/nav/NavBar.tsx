@@ -14,7 +14,8 @@ import { Pressable, Text, View } from '../tw';
 import { SkylineBand } from './SkylineBand';
 import { NeonChevron } from '../neon/NeonChevron';
 import { dropdown as dropdownLook } from '../dropdown';
-import { cycleFocusIndex, FOCUSABLE_SELECTOR, shouldReturnFocus } from './focus-cycle';
+import { breakpoints } from '@acme/theme';
+import { cycleFocusIndex, FOCUSABLE_SELECTOR, shouldReturnFocus, visibleRing } from './focus-cycle';
 
 const isWeb = Platform.OS === 'web';
 
@@ -74,6 +75,12 @@ export interface NavBarProps {
   renderLink?: (item: NavItem, children: ReactNode, className: string) => ReactNode;
   /** Accessible name of the primary nav. Default "Primary". */
   label?: string;
+  /**
+   * The breakpoint where the links leave the bar for the phone menu. Default
+   * "md". A bar with a wide logo or a long CTA label passes "lg" so the links
+   * never run into the logo between the two.
+   */
+  collapseBelow?: 'md' | 'lg';
   className?: string;
 }
 
@@ -85,17 +92,18 @@ const bar = tv({
     // z-10: dropdowns paint over the keyline and skyline that follow.
     inner: 'relative z-10 mx-auto w-full max-w-screen-2xl flex-row items-center gap-4 px-4 py-3 md:px-6',
     logo: 'rounded-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus',
-    links: 'hidden flex-1 flex-row items-center gap-1 md:flex',
+    links: 'hidden min-w-0 flex-1 flex-row items-center gap-1',
     // `flex`: on web the Link primitive is an inline anchor, so flex-row alone does nothing.
     link: 'flex min-h-11 flex-row items-center gap-1.5 px-3.5 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus',
     linkText: 'text-sm font-semibold text-silver-200',
     linkIdle: 'hover:bg-ink-800',
     linkActive: '',
     linkActiveText: 'text-ink-950',
-    trailing: 'flex-row items-center gap-3',
-    toggle: 'h-11 w-11 items-center justify-center border-2 border-ink-700 md:hidden',
+    trailing: 'ml-auto flex-row items-center gap-3',
+    ctaWide: 'hidden',
+    toggle: 'h-11 w-11 items-center justify-center border-2 border-ink-700',
     toggleText: 'text-xl leading-none text-white',
-    sheet: 'border-t-2 border-ink-800 bg-ink-950 px-3 pb-4 pt-2 md:hidden',
+    sheet: 'border-t-2 border-ink-800 bg-ink-950 px-3 pb-4 pt-2',
     sheetLink: 'flex min-h-12 flex-row items-center justify-between px-3 py-3',
     keyline: 'h-1 w-full',
     // The nav CTA is the royal face with bold white text — the site Log in
@@ -123,6 +131,11 @@ const bar = tv({
       fixed: { root: 'fixed inset-x-0 top-0' },
       floating: { root: 'mx-auto mt-3 max-w-screen-xl border-2 border-ink-800', inner: 'px-3 md:px-4' },
       static: { root: 'relative' },
+    },
+    // Literal class strings so Tailwind sees both breakpoints.
+    collapseBelow: {
+      md: { links: 'md:flex', toggle: 'md:hidden', sheet: 'md:hidden', trailing: 'md:ml-0', ctaWide: 'md:inline-flex' },
+      lg: { links: 'lg:flex', toggle: 'lg:hidden', sheet: 'lg:hidden', trailing: 'lg:ml-0', ctaWide: 'lg:inline-flex' },
     },
     navAlign: {
       left: { links: 'justify-start' },
@@ -154,10 +167,11 @@ export function NavBar({
   skipLabel = 'Skip to content',
   renderLink,
   label = 'Primary',
+  collapseBelow = 'md',
   className,
 }: NavBarProps) {
   const tone: ChartTone = color ? (PRESETS[color] ?? (color as ChartTone)) : districtTone(district);
-  const s = bar({ tone, transparency, position, navAlign });
+  const s = bar({ tone, transparency, position, navAlign, collapseBelow });
   // The header's Log in wears royal, not the orange `cta` face the kit
   // reserves for in-page actions (Decision #7).
   const ctaFaceTone = frameTone('solid', 'royal');
@@ -190,7 +204,7 @@ export function NavBar({
       const toggle = document.getElementById(toggleId);
       const panel = document.getElementById(sheetId);
       if (!toggle || !panel) return;
-      const ring = [toggle, ...Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))];
+      const ring = visibleRing([toggle, ...Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))]);
       const next = cycleFocusIndex(ring.indexOf(document.activeElement as HTMLElement), ring.length, e.shiftKey);
       if (next === null) return;
       e.preventDefault();
@@ -201,6 +215,19 @@ export function NavBar({
     // toggleId/sheetId derive from a stable useId.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, store]);
+
+  // Rotating or resizing past the collapse breakpoint hides the toggle and
+  // the sheet; close the menu so no hidden sheet holds state or focus.
+  useEffect(() => {
+    if (!sheet || !isWeb || typeof window === 'undefined') return undefined;
+    const wide = window.matchMedia(`(min-width: ${breakpoints[collapseBelow]})`);
+    const onChange = () => {
+      if (wide.matches) store.setState({ sheet: false });
+    };
+    onChange();
+    wide.addEventListener('change', onChange);
+    return () => wide.removeEventListener('change', onChange);
+  }, [sheet, collapseBelow, store]);
 
   // However the phone menu closes (Escape, the toggle, a link in it), focus
   // that was inside the unmounted sheet returns to the toggle.
@@ -275,7 +302,7 @@ export function NavBar({
             ))}
           </List>
         </Nav>
-        <View className={`${s.trailing()} ml-auto md:ml-0`}>
+        <View className={s.trailing()}>
           {cta
             ? anchor(
                 { ...cta, active: false },
@@ -289,7 +316,7 @@ export function NavBar({
                 >
                   <Text className={s.ctaText()}>{cta.label}</Text>
                 </CornerCutFrame>,
-                twMerge(s.cta(), items.length ? 'hidden md:inline-flex' : ''),
+                twMerge(s.cta(), items.length ? s.ctaWide() : ''),
               )
             : null}
           {trailing}

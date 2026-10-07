@@ -10,6 +10,10 @@
 @source '../../../packages/app/features';
 @source '../../../packages/spatial';
 
+/* `short:` — a phone held sideways (844×390): the first view is ~300px
+   under the header, so the hero switches to its short composition. */
+@custom-variant short (@media (orientation: landscape) and (max-height: 30rem));
+
 /* Token-driven scrollbar — token-driven, no plugin */
 html {
   scrollbar-color: var(--color-royal-600) transparent;

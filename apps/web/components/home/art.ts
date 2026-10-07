@@ -8,7 +8,7 @@
  * `hlynk.static` and `care` are not rendered yet: they reserve the slots the
  * Phase 4 product stage fallback and Phase 5 care art fill.
  */
-import { breakpoints } from '@acme/theme';
+import { breakpoints, contentWidths } from '@acme/theme';
 import type { StarterBloodline } from '@acme/content';
 import { NYC_PHOTOS, type NycPhoto, type PhotoDistrict, type PhotoSource } from '@acme/assets/photos';
 
@@ -20,7 +20,6 @@ export type ArtSlot =
   | 'world.primary'
   | 'world.secondary'
   | 'world.detail'
-  | 'world.extra'
   | 'hlynk.static'
   | `starter.${StarterId}`
   | 'care'
@@ -58,7 +57,11 @@ export interface ArtEntry {
 }
 
 const MD_UP = `(min-width: ${breakpoints.md})`;
+const XL_UP = `(min-width: ${breakpoints.xl})`;
 const sizes = (desktopVw: number) => `${MD_UP} ${desktopVw}vw, 92vw`;
+/** Columns of the 12-column, 80rem-capped home grid: the true rendered width from `md`. */
+const gridSizes = (cols: number) =>
+  `${XL_UP} ${Math.round((80 * cols) / 12)}rem, ${MD_UP} ${Math.round((100 * cols) / 12)}vw, 100vw`;
 
 function photoById(id: string): NycPhoto {
   const photo = NYC_PHOTOS.find((p) => p.id === id);
@@ -81,11 +84,10 @@ function fromPhoto(id: string, slotSizes: string): ArtEntry {
 }
 
 const ART = {
-  hero: fromPhoto('midtown-chrysler-spire', sizes(34)),
-  'world.primary': fromPhoto('midtown-empire-sunset', sizes(56)),
-  'world.secondary': fromPhoto('harlem-apollo', sizes(40)),
-  'world.detail': fromPhoto('downtown-one-wtc', sizes(32)),
-  'world.extra': fromPhoto('harlem-lenox-rowhouses', sizes(40)),
+  hero: { ...fromPhoto('midtown-chrysler-spire', `(min-width: ${breakpoints.lg}) ${contentWidths['content-hero-art']}, 100vw`), focalPoint: { x: 0.5, y: 0.3 } },
+  'world.primary': { ...fromPhoto('harlem-lenox-rowhouses', gridSizes(7)), focalPoint: { x: 0.45, y: 0.55 } },
+  'world.secondary': { ...fromPhoto('downtown-nyse', gridSizes(5)), focalPoint: { x: 0.5, y: 0.5 } },
+  'world.detail': fromPhoto('harlem-apollo', gridSizes(4)),
   'hlynk.static': fromPhoto('downtown-nyse', sizes(40)),
   'starter.1': fromPhoto('harlem-brownstone-stoops', sizes(30)),
   'starter.2': fromPhoto('midtown-times-square', sizes(30)),
@@ -96,8 +98,17 @@ const ART = {
 
 export const ART_SLOTS = Object.keys(ART) as readonly ArtSlot[];
 
-/** World frames in composition order: the dominant frame, then its companions. */
-export const WORLD_SLOTS = ['world.primary', 'world.secondary', 'world.detail', 'world.extra'] as const satisfies readonly ArtSlot[];
+/**
+ * World frames in DOM (= mobile reading) order: the dominant frame, then the
+ * supporting one. `world.detail` is reserved for the Mon-in-district art (PS-007).
+ */
+export const WORLD_SLOTS = ['world.primary', 'world.secondary'] as const satisfies readonly ArtSlot[];
+
+/** The image's content position for a slot's focal point, so a crop keeps it in view. */
+export function artPosition(entry: ArtEntry): { left: `${number}%`; top: `${number}%` } | undefined {
+  const f = entry.focalPoint;
+  return f ? { left: `${Math.round(f.x * 100)}%`, top: `${Math.round(f.y * 100)}%` } : undefined;
+}
 
 export function art(slot: ArtSlot): ArtEntry {
   return ART[slot];

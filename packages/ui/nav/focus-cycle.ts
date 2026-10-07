@@ -16,6 +16,16 @@ export function cycleFocusIndex(current: number, count: number, backward: boolea
   return backward ? (current - 1 + count) % count : (current + 1) % count;
 }
 
+/**
+ * The ring members that are rendered. A responsive layout can hide the toggle
+ * and the sheet with `display: none` while the sheet is still open (a phone
+ * rotated past the breakpoint); `getClientRects()` is empty for those, and a
+ * ring of hidden elements would swallow Tab without moving focus anywhere.
+ */
+export function visibleRing<T extends { getClientRects(): { length: number } }>(elements: readonly T[]): T[] {
+  return elements.filter((el) => el.getClientRects().length > 0);
+}
+
 /** Elements a keyboard user can Tab to inside a container. */
 export const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';

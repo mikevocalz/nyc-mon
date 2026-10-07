@@ -4,6 +4,7 @@ import { View } from '@acme/ui/tw';
 import { art } from './art';
 import { Eyebrow } from './Eyebrow';
 import { W01_COPY } from './copy';
+import { sectionMarker } from './sections';
 
 /**
  * The page's one dark band: the hatch (Decision #4), the emotional climax.
@@ -16,7 +17,8 @@ export function HatchBand() {
   const copy = W01_COPY.hatch;
   const hatchArt = art('hatch');
   return (
-    <Section aria-labelledby="w01-hatch-title" data-testid="w01-hatch" id="trg-hatch" className="w-full bg-ink-950">
+    <Section
+      {...sectionMarker('hatch')} aria-labelledby="w01-hatch-title" data-testid="w01-hatch" id="trg-hatch" className="w-full bg-ink-950">
       <View className="h-1 w-full bg-orange-500" aria-hidden />
       <View className="mx-auto w-full max-w-screen-xl items-center gap-10 px-4 py-20 sm:px-6 md:flex-row md:gap-14 md:py-32 lg:px-8">
         <View id="mfx-hatch-copy" className="w-full min-w-0 gap-5 md:flex-[6_1_0%]">
