@@ -19,6 +19,8 @@ const EXPECTED = [
   'world.secondary',
   'world.detail',
   'hlynk.static',
+  'hlynk.scanner',
+  'hlynk.controls',
   'starter.1',
   'starter.2',
   'starter.3',

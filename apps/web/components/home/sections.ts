@@ -1,5 +1,5 @@
 /** Every home section, in page order. `site-qa` keys screenshots and axe scans on these. */
-export type HomeSectionId = 'hero' | 'signage' | 'world' | 'hlynk' | 'starters' | 'care' | 'hatch' | 'footer';
+export type HomeSectionId = 'hero' | 'signage' | 'world' | 'hlynk' | 'starters' | 'care' | 'hatch' | 'waitlist' | 'footer';
 
 /**
  * `data-section="<id>"` on a section root. react-native-web turns `dataSet`

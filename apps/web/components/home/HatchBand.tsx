@@ -1,59 +1,81 @@
-import { Image, LinkButton, type ImageProps } from '@acme/ui';
-import { Figure, Heading, Paragraph, Section } from '@acme/ui/html';
+import { Image, type ImageProps } from '@acme/ui';
+import { Figure, Heading, Paragraph, Section, Text } from '@acme/ui/html';
 import { View } from '@acme/ui/tw';
-import { art } from './art';
+import { art, artPosition } from './art';
 import { Eyebrow } from './Eyebrow';
 import { W01_COPY } from './copy';
+import { PlaceCaption } from './PlaceCaption';
 import { sectionMarker } from './sections';
 
 /**
- * The page's one dark band: the hatch (Decision #4), the emotional climax.
- * Night in both schemes, with fixed night palette steps. The darkest bundled
- * city frame (the `hatch` art slot: the lit bridge) sits opposite the copy like a
- * window into the district at night; the waitlist CTA closes the page.
- * `mfx-hatch-*` marks the quiet reveal authored in ./motion.ts.
+ * HATCH (PS-024): the page's one night band and its emotional high point.
+ * Server markup only. Composition, top to bottom: the headline at the
+ * largest section size on the page, a wide window onto the city at night
+ * (the `hatch` art slot; the lit bridge until the egg art lands), then the
+ * story and the closing line. The photograph's own lights are the only
+ * glow on the page; nothing pulses. No button here: the waitlist directly
+ * below carries the one action.
+ *
+ * Motion: `w01.hatch.reveal` (./motion.ts) brings the window up, then the
+ * headline, then the closing line. Under reduced motion all of it is
+ * static from first paint.
  */
 export function HatchBand() {
   const copy = W01_COPY.hatch;
   const hatchArt = art('hatch');
+  const [titleLead, titlePayoff] = copy.title;
   return (
     <Section
-      {...sectionMarker('hatch')} aria-labelledby="w01-hatch-title" data-testid="w01-hatch" id="trg-hatch" className="w-full bg-ink-950">
+      {...sectionMarker('hatch')}
+      aria-labelledby="w01-hatch-title"
+      data-testid="w01-hatch"
+      id="trg-hatch"
+      className="w-full bg-ink-950"
+    >
       <View className="h-1 w-full bg-orange-500" aria-hidden />
-      <View className="mx-auto w-full max-w-screen-xl items-center gap-10 px-4 py-20 sm:px-6 md:flex-row md:gap-14 md:py-32 lg:px-8">
-        <View id="mfx-hatch-copy" className="w-full min-w-0 gap-5 md:flex-[6_1_0%]">
+      <View className="mx-auto w-full max-w-screen-xl gap-10 px-4 pb-24 pt-20 sm:px-6 md:gap-14 md:pb-32 md:pt-28 lg:px-8">
+        <View id="mfx-hatch-copy" className="min-w-0 gap-6">
           <Eyebrow night>{copy.eyebrow}</Eyebrow>
           <Heading
             level={2}
             id="w01-hatch-title"
-            className="my-0 max-w-2xl font-display text-4xl uppercase leading-[0.98] tracking-tight text-orange-500 md:text-6xl"
+            className="my-0 font-display text-display-lg uppercase leading-display text-ink-50 md:text-display-xl md:leading-display lg:text-display-2xl lg:leading-display"
           >
-            {copy.title}
+            <Text className="block font-display">{titleLead}</Text>
+            <Text className="block font-display text-orange-500">{titlePayoff}</Text>
           </Heading>
-          <Paragraph className="my-0 max-w-2xl text-lg leading-8 text-ink-50">{copy.body}</Paragraph>
-          <Paragraph className="my-0 max-w-2xl text-lg leading-8 text-silver-300">{copy.body2}</Paragraph>
-          <Paragraph className="my-0 font-display text-lg uppercase tracking-tight text-ink-50 md:text-xl">
-            {copy.closing}
-          </Paragraph>
-          <View id="mfx-hatch-cta" className="pt-2">
-            <LinkButton title={copy.cta} href={copy.ctaHref} variant="cta" size="lg" />
-          </View>
         </View>
-        <View id="mfx-hatch-art" className="w-full min-w-0 md:flex-[5_1_0%]">
-          <Figure className="m-0">
+
+        <View id="mfx-hatch-art" className="w-full min-w-0">
+          <Figure className="relative m-0 aspect-[4/5] w-full overflow-hidden bg-ink-900 sm:aspect-[3/2] md:aspect-[21/9]">
             <Image
               src={hatchArt.src as ImageProps['src']}
               alt={hatchArt.alt}
               fill
-              district="megacity"
+              framed={false}
               sizes={hatchArt.sizes}
               loading="lazy"
               unoptimized
               placeholder="blur"
               blurDataURL={hatchArt.blurDataURL}
-              className="aspect-[4/3] w-full md:aspect-[5/4]"
+              contentPosition={artPosition(hatchArt)}
+              className="h-full w-full"
             />
+            <PlaceCaption entry={hatchArt} className="bottom-0 left-0" />
           </Figure>
+        </View>
+
+        {/* DOM (= phone) order: the story, then the closing line. From md the closing line sits left. */}
+        <View className="gap-8 md:flex-row-reverse md:items-start md:justify-between md:gap-14">
+          <View className="min-w-0 gap-5 md:flex-[6_1_0%]">
+            <Paragraph className="my-0 max-w-content-measure text-lg leading-8 text-ink-50">{copy.body}</Paragraph>
+            <Paragraph className="my-0 max-w-content-measure text-lg leading-8 text-silver-300">{copy.body2}</Paragraph>
+          </View>
+          <View id="mfx-hatch-cta" className="min-w-0 md:flex-[5_1_0%]">
+            <Paragraph className="my-0 font-display text-2xl uppercase leading-heading text-ink-50 md:text-3xl lg:text-4xl">
+              {copy.closing}
+            </Paragraph>
+          </View>
         </View>
       </View>
     </Section>

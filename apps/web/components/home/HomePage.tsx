@@ -7,12 +7,13 @@ import { HomeHero } from './HomeHero';
 import { MotionRoot } from './MotionRoot';
 import { SignageBoard } from './SignageBoard';
 import { StartersSection, starterCards } from './StartersSection';
+import { WaitlistSection } from './WaitlistSection';
 import { WorldSection } from './WorldSection';
 
 /**
  * W01, the product site's home page. Contract: docs/design/screens/W01/08-handoff.md.
  * Order: hero → district board → world → H-Lynk → starters → care → hatch →
- * footer. MotionRoot wraps the page in the Kinetrell clock; under reduced
+ * waitlist → footer. MotionRoot wraps the page in the Kinetrell clock; under reduced
  * motion it renders the same tree with no choreography.
  */
 export function HomePage() {
@@ -28,6 +29,7 @@ export function HomePage() {
         <DistrictDivider seed={11} />
         <CareSection />
         <HatchBand />
+        <WaitlistSection />
       </View>
     </MotionRoot>
   );

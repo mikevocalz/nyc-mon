@@ -2,23 +2,10 @@ import { Badge, SolidPanel } from '@acme/ui';
 import { Heading, List, ListItem, Paragraph, Section } from '@acme/ui/html';
 import { Text, View } from '@acme/ui/tw';
 import { Eyebrow } from '../home/Eyebrow';
+import { WaitlistForm } from '../waitlist/WaitlistForm';
 import { W05_COPY } from './copy';
 
-/**
- * Sign-ups need the waitlist endpoint (PREMIUM_SITE_DECISIONS.md PS-001). Until
- * it ships the page says so instead of rendering a form that stores nothing.
- */
-function WaitlistStatus() {
-  const copy = W05_COPY.status;
-  return (
-    <SolidPanel surface="page" depth="md" className="max-w-xl gap-2 px-5 py-6">
-      <Paragraph className="my-0 font-display text-xl text-text">{copy.title}</Paragraph>
-      <Paragraph className="my-0 text-base leading-7 text-text-secondary">{copy.body}</Paragraph>
-    </SolidPanel>
-  );
-}
-
-/** W05, the waitlist page. */
+/** W05, the waitlist page: the hero, the form (PS-023) and the stores it will ship to. */
 export function GetPage() {
   const copy = W05_COPY;
   return (
@@ -41,7 +28,7 @@ export function GetPage() {
             {copy.hero.body}
           </Paragraph>
         </View>
-        <WaitlistStatus />
+        <WaitlistForm source="get" />
         <List aria-label={copy.stores.label} className="m-0 list-none gap-6 p-0 sm:flex-row">
           {copy.stores.badges.map((badge) => (
             <ListItem key={badge.name} className="flex-1">

@@ -9,7 +9,6 @@ import { Footer, Heading, Link, List, ListItem, Nav, Paragraph } from '../primit
 import { Text, View } from '../tw';
 import { brand as brandColors } from '@acme/theme';
 import { LazyScene } from '../backgrounds/LazyScene';
-import { RiverTide } from '../backgrounds/RiverTide';
 import { SkylineBand } from './SkylineBand';
 
 export interface FooterLink {
@@ -96,6 +95,10 @@ const TIDE_HEIGHT: Record<NonNullable<SiteFooterProps['variant']>, string> = {
 // (and through them Reanimated), and only the mega variant or an explicit
 // showNewsletter renders it. The other footers ship none of that.
 const Newsletter = lazy(() => import('./SiteFooterNewsletter'));
+// The river is a canvas: split out too, so a footer with `scene="skyline"` or
+// `"none"` ships none of it, and a river-tide footer loads it only once
+// LazyScene sees the footer coming.
+const RiverTide = lazy(() => import('../backgrounds/RiverTide').then((m) => ({ default: m.RiverTide })));
 
 const foot = tv({
   slots: {
@@ -107,7 +110,7 @@ const foot = tv({
     description: 'my-0 text-sm leading-relaxed text-silver-400',
     columns: 'flex-row flex-wrap gap-x-12 gap-y-8',
     groupTitle: 'my-0 font-display text-sm',
-    link: 'flex min-h-11 flex-col justify-center rounded-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus md:min-h-0',
+    link: 'flex min-h-11 flex-col justify-center rounded-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus md:min-h-6',
     linkText: 'text-sm text-silver-300 hover:text-white',
     social: 'h-11 w-11 items-center justify-center border-2 border-ink-700 hover:bg-ink-800',
     legal: 'border-t-2 border-ink-800',
@@ -212,7 +215,9 @@ export function SiteFooter({
         <LazyScene className={TIDE_HEIGHT[variant]} placeholderColor={brandColors.night}>
           {({ paused }) => (
             // Shore raised to mid-band so the district skyline keeps its height in a short strip; calmer swell.
-            <RiverTide district={district} horizon={0.5} bands={5} amplitude={0.8} origin="bottom-left" paused={paused} className="flex-1" />
+            <Suspense fallback={null}>
+              <RiverTide district={district} horizon={0.5} bands={5} amplitude={0.8} origin="bottom-left" paused={paused} className="flex-1" />
+            </Suspense>
           )}
         </LazyScene>
       ) : null}

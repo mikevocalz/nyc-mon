@@ -31,7 +31,6 @@ import { MOTION_MARKER_SELECTOR, parseMotionMarker } from './motion-markers';
 const { duration: D, ease: E, distance: Y, parallax: P, scale: S, tilt: T, scrub: SCRUB } = pageMotion;
 const ms = (seconds: number) => Math.round(seconds * 1000);
 const OUT = E.out.gsap;
-const IN_OUT = E.inOut.gsap;
 const LINEAR = E.scrub.gsap;
 /** A scrubbed track spans the whole trigger range; ScrollTrigger maps it to scroll. */
 const SPAN_MS = 1000;
@@ -130,31 +129,25 @@ const worldDrift = compileMotion(
   }),
 );
 
-/** H-Lynk reveal: device settles into place, scan line sweeps, lines resolve. */
+/**
+ * H-Lynk (PS-018): one entrance, played once, never scrubbed. The stage is
+ * not a target: the three.js scene owns the object's motion (settle, turn,
+ * scanner flare, screen on), so ScrollTrigger and the render loop never both
+ * move it. The name block lands first; the two proof rows follow while the
+ * object finishes its turn, and all copy is in place by ~1.9 s.
+ */
 const hlynkReveal = compileMotion(
   defineMotion({
     id: 'w01.hlynk.reveal',
     initial: {
-      'hlynk-copy': { opacity: 0, y: Y.reveal },
-      'hlynk-device': { opacity: 0, y: Y.stage, rotationY: T.stage, transformPerspective: pageMotion.perspective, scale: S.stage },
-      'hlynk-scan': { opacity: 0, scaleX: 0 },
-      'hlynk-feat-0': { opacity: 0, y: Y.step },
-      'hlynk-feat-1': { opacity: 0, y: Y.step },
-      'hlynk-feat-2': { opacity: 0, y: Y.step },
+      'hlynk-head': { opacity: 0, y: Y.reveal },
+      'hlynk-proof-0': { opacity: 0, y: Y.step },
+      'hlynk-proof-1': { opacity: 0, y: Y.step },
     },
     tracks: [
-      { target: 'hlynk-copy', to: { opacity: 1, y: 0 }, atMs: 0, durationMs: ms(D.sm), ease: OUT },
-      {
-        target: 'hlynk-device',
-        to: { opacity: 1, y: 0, rotationY: 0, scale: 1 },
-        atMs: 120,
-        durationMs: ms(D.lg),
-        ease: OUT,
-      },
-      { target: 'hlynk-scan', to: { opacity: 1, scaleX: 1 }, atMs: 780, durationMs: ms(D.xs), ease: IN_OUT },
-      { target: 'hlynk-feat-0', to: { opacity: 1, y: 0 }, atMs: 420, durationMs: ms(D.xs), ease: OUT },
-      { target: 'hlynk-feat-1', to: { opacity: 1, y: 0 }, atMs: 540, durationMs: ms(D.xs), ease: OUT },
-      { target: 'hlynk-feat-2', to: { opacity: 1, y: 0 }, atMs: 660, durationMs: ms(D.xs), ease: OUT },
+      { target: 'hlynk-head', to: { opacity: 1, y: 0 }, atMs: 200, durationMs: ms(D.sm), ease: OUT },
+      { target: 'hlynk-proof-0', to: { opacity: 1, y: 0 }, atMs: 1100, durationMs: ms(D.xs), ease: OUT },
+      { target: 'hlynk-proof-1', to: { opacity: 1, y: 0 }, atMs: 1400, durationMs: ms(D.xs), ease: OUT },
     ],
   }),
 );
@@ -255,13 +248,11 @@ export function useHomeMotion() {
         });
       }
 
-      // H-Lynk device reveal — scrubbed so the hardware settles with scroll.
+      // H-Lynk — copy entrance once; the object's motion lives in the scene (PS-018).
       if (triggers.hlynk && bindable(hlynkReveal, all)) {
         attachScrollTrigger(createGsapTimeline(hlynkReveal, all), {
           trigger: triggers.hlynk,
-          start: 'top 82%',
-          end: 'center 55%',
-          scrub: SCRUB.tight,
+          start: 'top 70%',
         });
       }
 

@@ -217,3 +217,150 @@ The optional fourth tile was left out: the brief's candidates were a third photo
 **Decision.** `NavBar` takes `collapseBelow: 'md' | 'lg'` (default `md`, so other callers are unchanged); the site passes `lg`. The focus ring is built from rendered elements only (`visibleRing` in `focus-cycle.ts`, unit-tested), an empty ring leaves Tab alone, and the sheet closes when the collapse breakpoint's media query starts matching. The site wordmark drops from 66 to 40px on a landscape phone (`short:` variant).
 
 **Consequences.** Tablets from 768 to 1023 get the menu button instead of a crowded bar.
+
+---
+
+## PS-020 — STARTERS: three posters from `@acme/content`, art labelled as place
+
+**Disposition:** decided and implemented (Phase 5).
+
+**Context.** Audit W3: the starter cards were street photos under "Three eggs", with no creature, and the photo looked like it might be the Mon. The copy said "their own person" for a Mon (PS-005). No Baby render exists yet (PS-007).
+
+**Decision.**
+- Each starter is a poster: art plate first, then a Dex plate (`No. 002`), "Hatches from the Metro Egg", the Baby name in display type as the `h3`, and the Bloodline label on a ruled line. Every value comes from `starterCards()`, which reads `starterBloodlines` and `eggs` and nothing past the Baby node. The egg is matched by `bloodlineId`, not by array index.
+- The art plate shows a street and carries a `PlaceCaption` signage plate ("Harlem, Harlem side street"). The alt describes the street. Nothing on the page calls the photo the Mon. Slots: `starter.1` Harlem brownstone stoops (Hood Ratti; v7 encounter tags street, courtyard), `starter.2` Apollo Theater on 125th St (Bodega Baddiee Cee; v7 tag community_hub), `starter.3` Times Square (Yote; canon gives no habitat, so the pick is for the Prism Egg's light and is not a canon claim).
+- Layout: one column below `md`, side-on posters (art on the left half) from `md`, three side by side from `lg`. Nothing on the posters is interactive, so there is no hover state.
+- The body names all three eggs from content ("Metro Egg, Corner Egg and Prism Egg") so the count is in the text as well as the layout, and the list announces three items.
+
+**Alternatives.** A slider (PS-022). Making each poster a link to `/mons/[slug]`: rejected, the detail page lists the whole evolution line, which the home page must not lead into from a "no spoilers" introduction.
+
+**Consequences.** Baby renders drop into `starter.<slot>` with no layout change (HANDOFF §STARTERS has the render spec). The section has no creature until then.
+
+---
+
+## PS-021 — CARE: one care stage led by the verbs, not a bento
+
+**Disposition:** decided and implemented (Phase 5).
+
+**Context.** Audit W10: one dark readout with three identical meter rows and percentages read as a dashboard. The closing line "A relationship, not a streak." was a binary contrast that named streaks while rejecting them. The title used "it" for a Mon. Audit §11 allows a CARE bento only around a dominant Mon reaction image, and that art doesn't exist.
+
+**Decision.** One stage of three full-width rows on the daylight surface, separated by ink rules. In each row the verb (Feed, Rest, Play) is set at `display-lg`/`display-2xl` and is the visual; next to it, "Your Mon:" and the cue ("Asks for food.", "Gets sleepy.", "Comes closer."), then "You:" and the answer; last, the meter name and a small static 10-lot meter (`CareMeter`, plain markup with `role="meter"`; the kit `ProgressBar` was dropped because it brought Reanimated onto `/`). No percentage is printed. Each meter's accessible name is "Fullness, example level" and its value is announced as a percentage. A line under the stage says "Example levels, not a live reading." The closing line states the rule directly: "A low meter is a request. Nothing is lost while you are away." (orange-700, large text). Cues are drawn from v7 (food requests, sleepy contentment, the approach / step-back cue) and v11 ¶51; no cue is mapped to a specific sound or gesture.
+
+**Alternatives.** Asymmetric bento with the `care` photo as the dominant module: rejected, a stoop photo isn't a Mon reaction and would be decoration. Keep the night readout: rejected (W10, and night is reserved for the hatch).
+
+**Consequences.** When the Mon reaction art lands, CARE becomes the bento in audit §11: the reaction image dominant, the three rows beside it. Motion targets `mfx-care-head` and `mfx-care-readout` are unchanged.
+
+---
+
+## PS-022 — STARTERS: triptych, not a slider
+
+**Disposition:** decided (Phase 5).
+
+**Context.** The brief allowed one focused starter with a selector or `CardSlider` only if research proves it.
+
+**Decision.** Static triptych (PS-020). A slider hides two of three starters at any time, which works against "make it obvious there are exactly three", and adds a keyboard and swipe model to a section with nothing to choose on the marketing page (the choice happens in the app, M08). The Mobbin references for this phase (Duolingo ABC's three cards, Tolan's single-character frame) support showing the set at once and giving each character the frame.
+
+**Return condition.** If a hallway test shows people miss that the eggs are a choice, test a selector that changes nothing but emphasis, with `CardSlider`'s keyboard path.
+
+---
+
+## PS-017 — H-Lynk stage mount: capture until the first full frame, pipelines compiled off the frame path
+
+**Disposition:** decided and implemented (Phase 4).
+
+**Context.** Phase 1 measured 495ms from near-viewport to first frame and a 3.77s stall at 1280. On the Phase 3 build the stall didn't reproduce, but `DeviceStage` still removed the static capture the moment the canvas element existed, so the plate was empty for about 300ms, and mount ran as two long tasks (≈180 + 120ms) with a 300ms frame gap. A CPU profile put 139ms in node building and pipeline creation inside the first `render` and 53ms in PMREM. Reduced motion showed a capture with a light background inside the ink plate (W7).
+
+**Decision.**
+- The canvas mounts underneath the capture at 600px from the viewport (unchanged). `createDeviceScene` builds geometry and textures and returns. A second task bakes the studio environment and calls `renderer.compileAsync(scene, camera)`, which yields between objects. The device stays hidden until that resolves.
+- The scene calls `onReady` after its first full frame; only then does `DeviceStage` fade the capture out (400ms CSS transition, no frame loop).
+- Under reduced motion, or if neither WebGPU nor WebGL2 starts, the capture is all there is.
+- The capture is a render of the scene's rest pose on exact `ink-950`, 896×1120, under a versioned file name (`h-lynk-core-v2.png`), because image optimisers cache by URL.
+- Fallback order is unchanged: WebGPU, then WebGPURenderer's WebGL2 backend, then the capture.
+
+**Alternatives.**
+- `PMREMGenerator.fromSceneAsync`: deprecated in r181 and runs the same work.
+- Render in a worker on an OffscreenCanvas: `ThreeCanvas` has no worker path, and the kit owns that file; not worth it for one stage.
+- Keep the capture and skip the canvas on mobile: the object would be a flat picture on every phone; mount now costs ≈55ms tasks there too.
+
+**Consequences.** Long tasks fall to about 55ms each and the worst scroll frame gap to 50–67ms (`PREMIUM_SITE_QA.md` Phase 4 Perf). The real model (`h-lynk-entry`) inherits the same path. A WebGPU device loss rebuilds on WebGL2 without bringing the capture back; acceptable while the rebuild is short.
+
+---
+
+## PS-018 — H-Lynk motion: one intro owned by the scene, then rest; ScrollTrigger only moves copy
+
+**Disposition:** decided and implemented (Phase 4).
+
+**Context.** Two systems moved the object at once: a scroll-scrubbed GSAP tween rotated and scaled the stage's DOM wrapper while the three.js loop swung the model's yaw every frame, pulsed the beam and animated sparks. The loop ran whenever the stage was visible, so a still page cost frames. The brief asks for settle, a slow turn, one scanner flare, a readable screen, then copy at rest; no spin, no bob, tilt ≤ 8°.
+
+**Decision.**
+- The scene owns the object. One intro measured from its first frame: settle 0–1.0s, turn 0–1.8s, flare 1.0–1.9s, screen on 1.5–2.4s. Then it reports rest and `DeviceStage` pauses the loop. A pointer over the stage wakes it for the tilt (`pageMotion.tilt.stage`); when the tilt settles it pauses again. Offscreen it is paused.
+- `motion.ts` `w01.hlynk.reveal` targets only the name block and the two proof rows, played once at `top 70%`; it never touches the stage. No scrub, no pin.
+- So per frame there is at most one owner of the object's transform, and ScrollTrigger does no per-frame work in this section after the entrance.
+- Reduced motion: the capture shows the rest pose; copy is visible from the start (MotionRoot never arms).
+
+**Alternatives.** Scrub the intro with scroll (ScrollTrigger driving scene time through params): rejected, it ties the object to scroll velocity on phones and puts ScrollTrigger back into the render loop's frame. A continuous slow yaw: rejected as idle decoration that also keeps a canvas loop alive.
+
+**Consequences.** With the stage centred and idle, `site-qa:motion` sees no canvas loop. The intro replays only on a fresh mount. Proof rows land at 1.1s and 1.4s, before the object finishes turning, so no content waits on the canvas.
+
+---
+
+## PS-019 — Strike the push-to-talk chirp and the interactive HUD from the marketing stage
+
+**Disposition:** STRIKE (Phase 4).
+
+**Context.** Pressing the 3D left side key played a synthesised Nextel chirp (`nextel-chirp.ts`, `react-native-audio-api`), and hovering the 3D screen highlighted HUD buttons and switched tabs. Both needed a per-frame raycast. The key is a few pixels wide, nothing on the page points to it, it worked only with a pointer, and it presented "push to talk" and the HUD tabs as product facts that canon does not state (Decision #16 says "left action key"; Q42).
+
+**Decision.** Remove both. The screen is a static, canon-safe face (tier name, a starter's Baby name, "Your Mon"). The stage takes pointer input only for the tilt.
+
+**Return condition.** When canon names the action key's function and the page gives it a visible, keyboard-reachable control (with sound off by default and respecting reduced motion), a sound can come back as part of that control.
+
+**Consequences.** `nextel-chirp.ts` is deleted. `react-native-audio-api` is still declared in `apps/web/package.json` and transpiled in `next.config.ts` with no importer in `apps/web`; removing it belongs to the config owner.
+
+---
+
+## PS-023 — Waitlist UI: inline form on `/` and `/get`, one server action, progressive enhancement
+
+**Disposition:** decided and implemented (Phase 6). Builds on PS-001 (the backend, commit def0366).
+
+**Context.** PS-001 put capture in admin-vite (`POST /v1/waitlist`, Payload `waitlist` collection) and gave `apps/web` a server action, `joinWaitlistAction`, with an exhaustive `WaitlistResult`. Phase 2 had replaced the fake `/get` form with a static "Sign-ups open soon" notice. The header and hero CTAs link to `/get`.
+
+**Decision.**
+- **Placement.** Inline, twice: a WAITLIST section on `/` right after HATCH (`source=home`) and the same form on `/get` (`source=get`), which loses the "Sign-ups open soon" notice. No modal: a modal adds a focus trap and a client-only open state for one email field, and it can't work without JavaScript. Header and hero CTAs keep linking to `/get`, a real route that now holds the form.
+- **Boundary.** `WaitlistSection` and `GetPage` are server markup; `WaitlistForm` is the only client island. It renders a plain `<form>` from `@acme/ui/html` whose `action` is `useActionState(joinWaitlistAction)`. `useFormStatus` drives the pending button. No `useState`/`useReducer`; the district comes from the existing Zustand `useDistrictStore`. To type this, the web forks of the `/ui/html` primitives gained their native form attributes (`Form action`, `Input name/type/required/autoComplete/defaultChecked`, `Label htmlFor`, `Button type`); no behaviour changed.
+- **Progressive enhancement.** Before hydration (or with JavaScript off) the form posts to the action and the page renders the result; checked for joined and invalid.
+- **Validation and abuse.** All server-side, in the PS-001 handler: zod email check, honeypot `website` (a filled honeypot gets a quiet `joined`), per-IP hourly rate limit keyed on the visitor IP that the action vouches for with `WAITLIST_FORWARD_SECRET`. The browser adds `type=email`, `required` and `maxlength=254` as conveniences only.
+- **Idempotency.** A repeat email answers `joined`; the copy covers it ("Signed up before? Nothing changes, and you'll still get just the one.") without saying whether the address was already there.
+- **States.** Every `WaitlistResult` maps to one string through `waitlistMessage()` (exhaustive switch, unit-tested). Field errors are tied to the field; everything else goes to one polite `<output>`; joined moves focus to its heading.
+- **Data.** Emails land in Payload's `waitlist` collection. Required env: `ADMIN_API_URL`, `WAITLIST_FORWARD_SECRET` (both server-only). Unset `ADMIN_API_URL` shows the error state and logs `[waitlist] ADMIN_API_URL is not set`.
+
+**Alternatives.** `/get` only, with the home CTA linking there: one more page load at the moment of intent, and HATCH would end on a link. A footer newsletter field: a second form for the same thing (rejected in the FOOTER references). `useOptimistic` for joined: it would show success before the server said so, which is the W1 failure again.
+
+**Consequences.** The district field records `midtown` for anyone who never touches the hero picker, because that is the store's default; analysis should treat `midtown` as "default or Midtown". Component-level tests aren't possible without adding a React test framework, which the repo doesn't have; the state mapping is unit-tested and every state was exercised in a browser against a mock of the endpoint (QA §Phase 6).
+
+---
+
+## PS-024 — HATCH: one night band, headline over a wide window, no button
+
+**Disposition:** decided and implemented (Phase 6).
+
+**Context.** Audit W5: H-Lynk, Care and Hatch shared one split template, so the page had no climax. The hatch band was a 6/5 split of copy and a framed photo with its own CTA button. `hatch.body2` gave the Mon a pronoun ("its choice … how it says yes"), breaking PS-005.
+
+**Decision.** A single column on `ink-950`: the largest section headline on the page ("Pick a time." / "The egg waits.", the second line in orange), then the night photograph as a 21:9 window across the full grid (4:5 on phones), then the story and "Be there when it opens." No border, gradient, glow or pulse is added; the bridge and tower lights in the photo are the light source. The CTA button is removed because the waitlist sits directly below. The existing `w01.hatch.reveal` is the one motion moment; under reduced motion everything is at rest. New body copy: "Incubation takes 15 minutes, 30 minutes or an hour. Go about your day. You get one notification when it's ready." / "Then your Mon makes a choice too. The first look your Mon gives you is the yes, and sometimes that takes a moment." (Decision #14: the Mon chooses and may hesitate, never rejects.)
+
+**Alternatives.** Copy laid over a full-bleed photo: needs a scrim, which is a decorative gradient under the art-direction rules, and the type would fight the lights. A countdown or a 15/30/60 picker on the page: the choice happens in the app, and a timer is exactly what the hatch copy says isn't there.
+
+**Consequences.** HATCH reads as the high point because it is the only full-width image on the page and the only night band after H-Lynk. When the egg art lands it replaces the photo in the same box (HANDOFF §HATCH has the spec); nothing else changes.
+
+---
+
+## PS-025 — Footer scene: static skyline, RiverTide code-split
+
+**Disposition:** decided and implemented (Phase 6).
+
+**Context.** The footer ran `RiverTide`, a canvas, under the Harlem river. It already mounted lazily and paused offscreen, but its code shipped with the footer on every page, and after Phase 6 the page ends hatch → waitlist → footer: a moving scene right after the conversion form would pull the eye away from it and add a second night "moment" after the hatch.
+
+**Decision.** `scene="skyline"`: the static Harlem `SkylineBand` in plain views. In the kit, `SiteFooter` now imports `RiverTide` with `React.lazy`, so footers without the river ship none of its code; the `river-tide` scene keeps its old behaviour for other callers. Footer links get a 24px minimum target from `md` (A11Y F10).
+
+**Alternatives.** Keep `river-tide`: it meets the letter of the brief (lazy, paused offscreen, far from the H-Lynk stage) but competes with the form and the hatch. `none`: a bare keyline loses the city edge the references (IKEA, General Intelligence Company) show working.
+
+**Consequences.** `site-qa:motion` idle-at-bottom shows 0 canvas loops at both widths. If the footer ever gets the river back, it should be on pages without a form above it.

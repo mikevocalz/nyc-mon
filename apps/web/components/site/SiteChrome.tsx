@@ -61,7 +61,11 @@ export function SiteNavBar() {
   );
 }
 
-/** The kit SiteFooter with this site's page columns, the badge and Harlem's East River along the top. */
+/**
+ * The kit SiteFooter with this site's page columns, the badge and Harlem's
+ * skyline along the top (PS-025): a static band, so the page ends on the city
+ * without a second moving scene after the hatch, and no canvas code ships.
+ */
 export function SiteFooterBar() {
   const pathname = usePathname() ?? '/';
   if (!showsSiteChrome(pathname)) return null;
@@ -72,7 +76,7 @@ export function SiteFooterBar() {
       variant="columns"
       mark="badge"
       district="harlem"
-      scene="river-tide"
+      scene="skyline"
       description={FOOTER_DESCRIPTION}
       linkGroups={FOOTER_GROUPS}
       renderLink={footerLink}

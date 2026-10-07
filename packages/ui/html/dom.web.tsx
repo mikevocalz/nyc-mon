@@ -51,8 +51,8 @@ export const FigcaptionBase = dom('figcaption');
 export const AddressBase = dom('address');
 export const DetailsBase = dom<P & { open?: boolean }>('details');
 export const SummaryBase = dom('summary');
-export const FieldsetBase = dom<P & { disabled?: boolean }>('fieldset');
-export const LegendBase = dom('legend');
+export const FieldsetBase = dom<P & { disabled?: boolean; id?: string; 'aria-describedby'?: string }>('fieldset');
+export const LegendBase = dom<P & { id?: string }>('legend');
 export const SelectBase = (
   props: P & {
     value?: string;
@@ -77,6 +77,11 @@ export interface PressBaseProps extends P {
   'aria-disabled'?: boolean;
   'aria-checked'?: boolean;
   'aria-hidden'?: boolean;
+  'aria-busy'?: boolean;
+  'aria-describedby'?: string;
+  /** Web only. `submit` makes the button submit its form; the default stays `button`. */
+  type?: 'button' | 'submit' | 'reset';
+  id?: string;
   accessibilityLabel?: string;
   /** RN's hint prop; on web it lands as aria-description on the element. */
   accessibilityHint?: string;
@@ -133,6 +138,18 @@ export interface InputBaseProps extends P {
   role?: string;
   'aria-label'?: string;
   'aria-invalid'?: boolean;
+  'aria-describedby'?: string;
+  'aria-hidden'?: boolean;
+  // Native form attributes, so a field works in a plain <form> post (progressive enhancement).
+  id?: string;
+  name?: string;
+  /** The DOM input type (`email`, `checkbox`, `hidden`…). Overrides the text/password default. */
+  type?: string;
+  required?: boolean;
+  autoComplete?: string;
+  spellCheck?: boolean;
+  tabIndex?: number;
+  defaultChecked?: boolean;
 }
 
 const ENTER_KEY_HINT: Record<string, React.HTMLAttributes<HTMLElement>['enterKeyHint']> = {
@@ -201,9 +218,19 @@ export const TextareaBase = ({
   />
 );
 
-export const LabelBase = dom('label');
-const FormPlain = dom('form');
-export const FormBase = ({ className, ...props }: P) => (
+export const LabelBase = dom<P & { htmlFor?: string; id?: string }>('label');
+
+/** A `<form>`'s own props. `action` takes a URL or a React 19 / server action function. */
+export type FormBaseProps = P & {
+  action?: string | ((formData: FormData) => void | Promise<void>);
+  noValidate?: boolean;
+  id?: string;
+  'aria-labelledby'?: string;
+  'aria-describedby'?: string;
+  'aria-busy'?: boolean;
+};
+const FormPlain = dom<FormBaseProps>('form');
+export const FormBase = ({ className, ...props }: FormBaseProps) => (
   <FormPlain className={`flex flex-col ${className ?? ''}`} {...props} />
 );
 
@@ -235,7 +262,7 @@ export const SearchBase = flexDom<Labelled>('search', 'flex flex-col');
  * `<output>`: the live result of a calculation or check. Browsers expose it
  * as a polite live region (role="status").
  */
-export const OutputBase = dom<P & { id?: string; htmlFor?: string; 'aria-live'?: 'polite' | 'off' }>('output');
+export const OutputBase = dom<P & { id?: string; htmlFor?: string; 'aria-live'?: 'polite' | 'off'; tabIndex?: number }>('output');
 
 /**
  * Text read by assistive technology and invisible on screen: the clip pattern

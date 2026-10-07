@@ -57,24 +57,143 @@ Files: `apps/web/components/home/WorldSection.tsx`, `PlaceCaption.tsx` (server).
 
 ## H-LYNK
 
-_Filled in its phase._
+Files: `apps/web/components/home/HLynkSection.tsx` (server), `apps/web/components/DeviceStage.tsx` (client island), `apps/web/components/home/device-scene.ts` (three.js scene, loaded on demand). Copy: `W01_COPY.hlynk`. Art: `hlynk.static`, `hlynk.scanner`, `hlynk.controls`. Decisions: PS-002, PS-004, PS-017, PS-018, PS-019.
+
+- **Layout.**
+  - Below `lg`: one column in DOM order, which is the reading order: the ink stage, then the name block, then the two proof rows as a vertical list. No two-column mini grid on phones.
+  - From `lg`: 12 columns, `gap-x-12 gap-y-10`. The stage spans columns 1–7 and rows 1–2. The name block sits in columns 8–12 of row 1, aligned to the bottom; the proof list sits in columns 8–12 of row 2, aligned to the top.
+  - Section: `max-w-screen-xl`, `py-16` / `md:py-24`, `short:py-8` on a landscape phone.
+- **Stage sizing.** The ink plate (`bg-ink-950`, `scheme-dark`) fills its cell; the 4:5 stage box is centred in it and capped:
+
+  | Width | Stage box max width | Plate padding |
+  |---|---|---|
+  | < 768 | `max-w-sm` (24rem), else the column (326px at 390, 366px at 430) | `px-4 py-8`, `sm:px-8` |
+  | 768–1023 | `max-w-sm` (24rem) | `md:py-12` |
+  | landscape phone (`short:`, ≤ 30rem tall) | `max-w-44` (11rem, 220px tall box) | `short:py-4` |
+  | 1024–1279 | 28rem | `md:py-12` |
+  | ≥ 1280 | 32rem | `md:py-12` |
+
+  The canvas fills the box; its drawing buffer is capped at DPR 1.5. The caption sits under the box on ink.
+- **Proof rows.** Each row: a 2px `border-ink-950` top rule, `pt-4`, then a 4:3 crop of the render (`w-36`, `lg:w-48`, on `bg-ink-950`) beside an `h3` (`text-lg font-bold`) and one sentence (`text-sm` / `md:text-base`, `text-text-secondary`). Two rows: scanner head, control row. Facts trace to canon Decision #16 only.
+- **Tokens.**
+  - `h2`: `font-display text-display-lg uppercase leading-heading`, `xl:text-display-xl`. Lede: `text-xl font-semibold text-text`. Body: `text-base`/`md:text-lg`, `text-text-secondary`, `max-w-content-measure`. The bond line: `font-semibold text-text` with a 4px `border-ink-950` rule, the same treatment as World's second line.
+  - Scene (`@acme/theme`, no literals): body `hlynk.core.body` (apple-600); head, bezel, keys and trackpad face `hlynk.core.black`; trackpad ring `hlynk.core.ring`; key glyphs `hlynk.core.glyph`, the home glyph and side-key marks `palette.apple[400]`; emitters, lens ring and fan `led.on`, the fan's core `palette.apple[100]`; seams `palette.apple[900]`; lens glass `palette.ink[900]`; screen `hud.*`; lights `signage.white`, `concrete[900]` (ground), `silver[300]` (rim); floor pool `concrete[500]`; contact shadow `signage.black`; studio dome `ink[950]`→`signage.white`.
+- **States.**
+
+  | State | What shows |
+  |---|---|
+  | Server HTML, no JS, before the stage is within 600px | the capture |
+  | Canvas mounting and compiling | the capture, on top of the hidden canvas |
+  | First full frame drawn | the capture fades out over 400ms (CSS transition) |
+  | Intro (≈2.4s of scene time from the first frame) | settle, slow turn, scanner flare, screen on |
+  | At rest | still frame, loop paused |
+  | Pointer over the stage | loop runs; tilt follows the pointer, at most 8° |
+  | Offscreen | loop paused |
+  | Reduced motion | the capture only; no canvas is created |
+  | No WebGPU or WebGL2 backend | the capture stays; the canvas never reports ready |
+
+- **Motion.** The scene owns the object; the page timeline never transforms the stage (PS-018).
+
+  | Element | Trigger | Animation | Timing | Easing |
+  |---|---|---|---|---|
+  | H-Lynk (scene) | first frame after compile | drops 0.14 units into place | 0–1.0s | cubic out |
+  | H-Lynk (scene) | same | turns 0.42 rad to its three-quarter rest | 0–1.8s | cubic out |
+  | Fan and emitters (scene) | same | one flare: fan 0.3→1→0.3, emitter 1.4→3.2→1.4 | 1.0–1.9s | sine |
+  | Screen (scene) | same | emissive 0→0.62 | 1.5–2.4s | cubic out |
+  | Name block `mfx-hlynk-head` | ScrollTrigger `top 70%`, once | opacity 0→1, y `distance.reveal`→0 | 200ms, `duration.sm` | `ease.out` |
+  | Proof rows `mfx-hlynk-proof-0/1` | same timeline | opacity 0→1, y `distance.step`→0 | 1100ms / 1400ms, `duration.xs` | `ease.out` |
+  | Pointer tilt (scene) | pointer over the stage | rotation toward pointer, cap `pageMotion.tilt.stage` | exponential, rate 6/s | — |
+
+- **Static capture (asset spec).**
+  - `hlynk.static` = `/home/h-lynk-core-v2.png`, 896×1120 (4:5), opaque, background exactly `ink-950` (#00041C) edge to edge so it sits flush in the plate. It is a render of `device-scene.ts` at its rest pose: yaw −0.38 rad, no tilt, fan at 0.3, screen on.
+  - `hlynk.scanner` = `/home/h-lynk-scanner.png` and `hlynk.controls` = `/home/h-lynk-controls.png`, 640×480 (4:3) crops of the same render: the scanner head with the antenna and fan, and the control row with the trackpad.
+  - All three are decorative (`alt=""` with a reason in `art.ts`): the figure is named "H-Lynk Core" and captioned, and each proof row's text names its part.
+  - Regenerating: build and serve the site, open `/` in system Chrome (WebGPU) at 1440×1100 with `deviceScaleFactor: 1.5`, scroll the stage into view, wait for the capture to fade and 4s more for the rest pose, keep the pointer off the stage, hide `#mfx-hlynk-head` and the proof list, set the stage figure to `width: 896px !important; max-width: none !important`, and screenshot the 4:5 box at device scale (1344×1680). Trim 3px each side, resize to 896×1120 with Lanczos, and cut the crops from the 1344-wide render at (290, 20)–(1090, 620) and (290, 1080)–(1090, 1680), resized to 640×480. The Phase 4 script is `tooling/site-qa/out/phase4-after/capture.mjs` (ignored by git; the steps above are complete without it).
+  - Give every new render a new file name and update `art.ts`. Image optimisers cache by URL: overwriting `h-lynk-core.png` in place served the old blue capture from `.next/cache/images` during Phase 4.
+- **Final-render replacement list.** When the real H-Lynk Core model (`model: 'h-lynk-entry'`) or product photography lands:
+  1. `device-scene.ts` `buildDevice`: swap the procedural group for the GLB; keep camera, lights, intro and rest logic.
+  2. `hlynk.static`: re-render at the same 4:5, 896×1120 minimum, ink-950 ground, under a new file name.
+  3. `hlynk.scanner`, `hlynk.controls`: re-crop from the new render, 4:3, 640×480 minimum.
+  4. The backplate tier name, rear camera and rear status light (Decision #16) need a back view; out of scope until a rear angle is wanted.
+  5. EngineX: nothing is printed on the front until Q40 is answered.
+- **Edge cases.** A long Baby name on the screen: the name is drawn at 96px on a 768px-wide canvas, so about 12 characters fit; past that it needs a smaller size. A slow GPU: the capture stays until the first full frame, however long the compile takes. A WebGPU device loss: `ThreeCanvas` rebuilds on WebGL2; the capture does not reappear during the rebuild.
 
 ## STARTERS
 
-_Filled in its phase._
+Files: `apps/web/components/home/StartersSection.tsx` (server), `PlaceCaption.tsx`, `copy.ts` (`W01_COPY.starters`), `art.ts` (`starter.1|2|3`). Data: `starterCards()` reads `starterBloodlines` and `eggs` from `@acme/content` (Baby node only). Decisions: PS-020, PS-022.
+
+- **Layout.**
+  - <768: one column. Head (eyebrow, h2, body naming the three eggs, ruled personhood line), then three posters in slot order. Each poster: art plate 1:1, then the identity plate.
+  - 768–1023 (and 844×390): posters lie on their side, stacked. Art plate is half the poster width, `min-h-80`; the identity plate is bottom-aligned on the right with a 2px left rule.
+  - ≥1024: three posters side by side (`lg:flex-row`, `flex-1`, `gap-6`), art 4:5, identity plate under it. Section capped at `max-w-screen-xl`, `py-16`/`md:py-24`.
+- **Tokens.** h2: `text-display-md` → `lg:text-display-lg` → `xl:text-display-xl`, `leading-heading`. Baby name (h3): `text-display-md` → `xl:text-display-lg`, `break-words`. Dex plate: `bg-ink-950 font-display text-sm text-signage-white`. Egg line: `text-sm font-semibold text-text-secondary`. Bloodline: `font-semibold text-text` with `border-l-4 border-ink-950`. Poster: `border-2 border-ink-950 bg-surface-raised`, square corners.
+- **Components.** `List`/`ListItem` (three items), `Article aria-labelledby` the h3, `Figure` > `Image framed={false} fill loading="lazy" contentPosition={artPosition(...)}` + `PlaceCaption`.
+- **States.** Static. No hover or focus state, because nothing in the posters is interactive. Images lazy-load with blur placeholders inside fixed boxes. Reduced motion: final composition.
+- **Motion.** `w01.starters.enter`: head, then posters 0/1/2 at 160/300/440 ms (unchanged targets `mfx-starters-head`, `mfx-starter-0..2`). Transform and opacity only.
+- **Canon.** Every string on a poster is from `@acme/content` or the `copy.dex`/`copy.hatchesFrom` formatters: Squeaklet No. 002 / Hood Ratti Bloodline / Metro Egg; Kittee Cee No. 009 / Bodega Baddiee Cee Bloodline / Corner Egg; Yotito No. 062 / Yote Bloodline / Prism Egg. No Small, Mid or Max name is read.
+- **Art slots (today → final).** The swap is a `src` change in `art.ts`; alt moves from the street description to a description of the Mon.
+
+| Slot | Today | Final asset | Aspect / min px | Transparency | Focal point |
+|---|---|---|---|---|---|
+| `starter.1` | `harlem-brownstone-stoops`, focal (0.3, 0.6) | Squeaklet, Baby form, standing on a Harlem stoop or sidewalk | 4:5 master ≥ 1040×1300 (26rem at 2x = 832 wide; headroom for 1:1 and side-on crops) | Opaque, scene included (the plate is a poster, not a cut-out) | Mon's face at (0.5, 0.45); keep the bottom 20% clear for the place plate |
+| `starter.2` | `harlem-apollo`, focal (0.5, 0.35) | Kittee Cee, Baby form, at a bodega counter or community spot | same | Opaque | same |
+| `starter.3` | `midtown-times-square`, focal (0.5, 0.6) | Yotito, Baby form; street TODO(canon), no habitat for the Yote line yet | same | Opaque | same |
+
+All three need to read at 1:1 (phone), roughly 2:3 portrait at `md` side-on, and 4:5 at `lg`, so the Mon sits in the centre 60% of the master. If renders arrive as transparent cut-outs, composite them on street plates before they go in the slot; the frame has no background of its own.
 
 ## CARE
 
-_Filled in its phase._
+Files: `apps/web/components/home/CareSection.tsx` (server, no client code), `copy.ts` (`W01_COPY.care`). Decision: PS-021.
+
+- **Layout.**
+  - <768: head, then three rows, each stacked: verb, "Your Mon:" cue, "You:" answer, meter name, meter full width. Then the closing line and the example note.
+  - ≥768: each row is a 12-column grid aligned to the bottom: verb 4 columns, cue and answer 5, meter 3 (from `lg`: 5 / 4 / 3). Rows are separated by 2px ink rules, with a closing rule under the last row. The closing line and example note share one row (`justify-between`).
+- **Tokens.** h2 as STARTERS. Verb (h3): `text-display-lg` → `lg:text-display-2xl`, `leading-display`. Cue: `text-base text-text`; answer: `text-text-secondary` with a `font-semibold text-text` "You:" label. Meter name: `text-sm font-semibold text-text`. Closing: `font-display text-lg md:text-xl uppercase text-orange-700` (large text on concrete). Example note: `text-sm text-text-muted`.
+- **Components.** `CareMeter` (local): a `View role="meter"` with `aria-label={copy.meterLabel(meter)}`, `aria-valuemin/max/now` and `aria-valuetext`, and ten `h-5` lots. Lots up to the level are solid at the 700 step (orange / royal / leaf); lots above are hollow 2px `border-ink-950`, so filled versus empty reads without colour. No on-screen percentage. The kit `ProgressBar` is not used here: it imports Reanimated, and CARE was the only Reanimated path on `/` (64 KiB).
+- **States.** Static values (70 / 45 / 85), labelled as examples. No low-level warning colour exists; the page never reads a user's Mon. Reduced motion: final values from first paint (the meter is static server markup; there is no count-up).
+- **Motion.** `w01.care.enter`: head, then the stage at 160 ms (`mfx-care-head`, `mfx-care-readout`, unchanged). Meters don't animate separately and never pulse.
+- **Art slot `care`.** Reserved, not rendered. Final: one Mon reaction image (a Baby leaning in), 4:5 master ≥ 1100×1375, opaque, face at (0.5, 0.4). When it lands, CARE becomes the audit §11 bento: the image dominant over two rows, the three verb rows beside it (≤ 4 modules), DOM order image → rows.
 
 ## HATCH
 
-_Filled in its phase._
+Files: `apps/web/components/home/HatchBand.tsx` (server, no client code), `copy.ts` (`W01_COPY.hatch`), `art.ts` (`hatch` slot). Decision: PS-024.
+
+- **Layout** (one column at every width, max 80rem): eyebrow and headline; a wide window onto the city at night; then the story and the closing line. From `md` the closing line sits left (5 of 11 parts) and the two story paragraphs right (6 parts); DOM order is story then closing line, so phones read the story first.
+- **Headline.** Two lines from `copy.hatch.title`: "Pick a time." in `ink-50`, "The egg waits." in `orange-500`. `font-display uppercase`, `text-display-lg` → `md:text-display-xl` → `lg:text-display-2xl`, `leading-display`. The largest section headline on the page (the hero H1 is the only larger type).
+- **Window.** `Figure`, no border, `bg-ink-900` while loading. Aspect 4:5 (<640), 3:2 (640–767), 21:9 (≥768). `Image fill framed={false}`, lazy, blur placeholder, `contentPosition` from the slot's focal point (0.64, 0.55: the bridge tower and One World Trade). `PlaceCaption` bottom left ("Mega City, East River").
+- **Story.** `text-lg leading-8`, `ink-50` then `silver-300`, `max-w-content-measure`. Closing line `font-display uppercase text-2xl → md:text-3xl → lg:text-4xl`, `ink-50`.
+- **Surface.** `bg-ink-950` in both schemes, 4px `orange-500` rule along the top. No gradient, glow, border or pulse is added: the photograph's own lights are the band's light source.
+- **No button.** The waitlist directly below carries the one action (PS-023).
+- **Motion.** `w01.hatch.reveal` (unchanged): window opacity + scale from `S.enter` over `D.xl`, headline at 320 ms, closing line at 640 ms. That is the band's one moment. Reduced motion: everything at rest from first paint (`mfx-hatch-*` at opacity 1, checked in the shot run).
+- **Art slot `hatch` (final art spec).** Replace the bridge with the egg at night: one egg in its case on a stoop or sill at street level, mostly in shadow, lit low from one warm source (the egg's own crack light or a street lamp), the city out of focus behind. 21:9 master ≥ 2560×1097 plus a 4:5 phone crop ≥ 1080×1350 (`mobileSrc`), opaque WebP, egg at (0.62, 0.6), headroom dark enough for nothing to sit on it. No Mon visible and no hatch result: the page stops before the reveal. A later swap may be a short hatch loop (muted, `playsInline`, poster = the still, paused under reduced motion and offscreen); the slot's box and aspect stay, so no layout change.
 
 ## WAITLIST
 
-_Filled in its phase._
+Files: `apps/web/components/home/WaitlistSection.tsx` (server), `apps/web/components/waitlist/WaitlistForm.tsx` (client island), `apps/web/components/waitlist/copy.ts` (every string + `waitlistMessage`), `apps/web/components/get/GetPage.tsx` (`/get`, source `get`). Backend: `app/(site)/get/actions.ts` `joinWaitlistAction`, `lib/waitlist.ts`. Decisions: PS-001, PS-023.
+
+- **Layout, home.** Daylight `bg-bg`. <768: head (eyebrow, h2, one sentence) then the form, full width. ≥768: head 5 parts left, form 6 parts right, top-aligned. h2 `text-display-md` → `lg:text-display-lg`, `leading-heading`, uppercase.
+- **Form** (`max-w-xl`, `gap-6`): Email label (visible, `font-display uppercase`), input `h-14` (56px) full width, `border-2 border-text`, `bg-surface-raised`, `text-lg font-semibold`; Age fieldset with legend "Age", a 24px native checkbox (`accent-orange-600`) labelled "I'm 13 or older" and the hint "Younger than 13? A parent or guardian can join with their own email and follow along."; the submit button; the live result line; the privacy line with a link to `/legal/privacy`.
+- **Button.** Real `<button type="submit">` around `CornerCutFrame` (orange face, 4px depth, `min-h-14`). Full width below 640px, intrinsic from `sm`. Label `Join the waitlist`; pending `Joining…`.
+- **Fields sent:** `email` (type email, `autocomplete=email`, `inputmode=email`, no autocapitalize/autocorrect/spellcheck, `maxlength=254`, required), `ageConfirmed` (checkbox, required), `district` (hidden, from `useDistrictStore`; the hero picker's value, `midtown` when untouched), `source` (`home` | `get`), `website` (honeypot: off-screen, `aria-hidden`, `tabindex=-1`, `autocomplete=off`).
+
+| State | Trigger | What shows | Focus | Announced by |
+|---|---|---|---|---|
+| idle | first load | the form | none | — |
+| pending | submit | button "Joining…", disabled; `aria-busy` on the form | (button disabled) | button text |
+| joined | 200 `joined` (new or repeat email, or a bot) | form replaced: green 4px rule, h3 "You're on the list.", "We'll send one email when NYC-MON is out. Signed up before? Nothing changes, and you'll still get just the one." | the h3 (`tabindex=-1`), body via `aria-describedby` | focus |
+| under13 | 422 | "Nothing was saved. You need to be 13 or older to join. A parent or guardian can sign up with their own email and follow along with you." Email cleared, box unticked | submit button | `<output>` |
+| invalid | 400 | field border `danger`, error under the field: "Check the email address. It should look like name@example.com." Email and box kept | email field (`aria-invalid`, `aria-describedby` → error) | focus + description |
+| rate_limited | 429 | "Too many tries from this connection. Try again in an hour. Your email is still in the box." (semibold `danger`) | submit button | `<output>` |
+| error | 5xx, timeout, network, `ADMIN_API_URL` unset | "We couldn't reach the waitlist just now. Nothing you typed is lost, so try again in a moment." Retry is the same button | submit button | `<output>` |
+
+- **Without JavaScript** the same form posts to the server action and the page renders the result state (checked: joined and invalid with JS off).
+- **Env (Phase 7 deploy checklist):** `ADMIN_API_URL` (server only, admin-vite base URL), `WAITLIST_FORWARD_SECRET` (server only, shared with admin-vite so it rate-limits per visitor). Emails are stored in the Payload `waitlist` collection behind `POST /v1/waitlist` in admin-vite. Without `ADMIN_API_URL` every submit shows the error state; nothing pretends to succeed.
+- **Never:** counts, countdowns, "spots left", social proof, a second email field in the footer.
 
 ## FOOTER
 
-_Filled in its phase._
+Files: `apps/web/components/site/SiteChrome.tsx` (`SiteFooterBar`), `packages/ui/nav/SiteFooter.tsx`. Decision: PS-025.
+
+- `variant="columns"`, `mark="badge"`, `district="harlem"`, `scene="skyline"`: the Harlem `SkylineBand` (plain views, `h-12 md:h-16`), the district keyline, then the badge, tagline, description and the two link columns.
+- Link targets: `min-h-11` (44px) below `md`, `min-h-6` (24px) from `md` (was `md:min-h-0`, 20px; A11Y F10).
+- `RiverTide` is now `React.lazy` inside `SiteFooter`, so a footer with `scene="skyline"` or `"none"` ships none of the canvas code. Other callers that keep `river-tide` get it after `LazyScene` mounts, as before.

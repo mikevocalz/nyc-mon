@@ -5,8 +5,9 @@
  * Until NYC-MON key art, Baby Mon renders, egg art and H-Lynk product
  * photography exist, each slot holds a bundled, licensed NYC photograph from
  * `@acme/assets/photos` (1200x800 WebP with a blurDataURL; never hotlinked).
- * `hlynk.static` and `care` are not rendered yet: they reserve the slots the
- * Phase 4 product stage fallback and Phase 5 care art fill.
+ * The `hlynk.*` slots are renders of the H-Lynk Core scene, not photographs.
+ * `care` is not rendered yet: it reserves the slot the Mon reaction art for
+ * CARE fills.
  */
 import { breakpoints, contentWidths } from '@acme/theme';
 import type { StarterBloodline } from '@acme/content';
@@ -21,6 +22,8 @@ export type ArtSlot =
   | 'world.secondary'
   | 'world.detail'
   | 'hlynk.static'
+  | 'hlynk.scanner'
+  | 'hlynk.controls'
   | `starter.${StarterId}`
   | 'care'
   | 'hatch';
@@ -57,11 +60,15 @@ export interface ArtEntry {
 }
 
 const MD_UP = `(min-width: ${breakpoints.md})`;
+const LG_UP = `(min-width: ${breakpoints.lg})`;
 const XL_UP = `(min-width: ${breakpoints.xl})`;
 const sizes = (desktopVw: number) => `${MD_UP} ${desktopVw}vw, 92vw`;
 /** Columns of the 12-column, 80rem-capped home grid: the true rendered width from `md`. */
 const gridSizes = (cols: number) =>
   `${XL_UP} ${Math.round((80 * cols) / 12)}rem, ${MD_UP} ${Math.round((100 * cols) / 12)}vw, 100vw`;
+
+/** Starter posters: a third of the 80rem grid from `lg`, half the row as a side-on poster from `md`. */
+const starterSizes = `${LG_UP} 26rem, ${MD_UP} 50vw, 100vw`;
 
 function photoById(id: string): NycPhoto {
   const photo = NYC_PHOTOS.find((p) => p.id === id);
@@ -88,12 +95,48 @@ const ART = {
   'world.primary': { ...fromPhoto('harlem-lenox-rowhouses', gridSizes(7)), focalPoint: { x: 0.45, y: 0.55 } },
   'world.secondary': { ...fromPhoto('downtown-nyse', gridSizes(5)), focalPoint: { x: 0.5, y: 0.5 } },
   'world.detail': fromPhoto('harlem-apollo', gridSizes(4)),
-  'hlynk.static': fromPhoto('downtown-nyse', sizes(40)),
-  'starter.1': fromPhoto('harlem-brownstone-stoops', sizes(30)),
-  'starter.2': fromPhoto('midtown-times-square', sizes(30)),
-  'starter.3': fromPhoto('megacity-bridge-deck', sizes(30)),
+  // H-Lynk Core renders from device-scene.ts at its rest pose on ink-950 (PS-017; HANDOFF §H-LYNK
+  // "Static capture"). The stage box is 4:5: 32rem wide from `xl`, 28rem from `lg`, 24rem from `md`.
+  'hlynk.static': {
+    src: '/home/h-lynk-core-v2.png',
+    width: 896,
+    height: 1120,
+    alt: '',
+    decorative: { reason: 'The stage figure is named "H-Lynk Core" and captioned; the capture repeats it.' },
+    sizes: `${XL_UP} 32rem, ${LG_UP} 28rem, ${MD_UP} 24rem, 92vw`,
+  },
+  // Crops of the same render for the proof rows; each row's headline and line name the part shown.
+  'hlynk.scanner': {
+    src: '/home/h-lynk-scanner.png',
+    width: 640,
+    height: 480,
+    alt: '',
+    decorative: { reason: 'The proof row names the scanner head in its headline and line.' },
+    sizes: `${LG_UP} 12rem, 9rem`,
+  },
+  'hlynk.controls': {
+    src: '/home/h-lynk-controls.png',
+    width: 640,
+    height: 480,
+    alt: '',
+    decorative: { reason: 'The proof row names the control row in its headline and line.' },
+    sizes: `${LG_UP} 12rem, 9rem`,
+  },
+  // Starter posters (PS-020): a street that fits each Bloodline, captioned as a place, never as the Mon.
+  // Hood Ratti: v7 encounter tags street / courtyard. Bodega Baddiee Cee: community_hub. Yote: no
+  // canon habitat, so Times Square stands in for the Prism Egg's light, and HANDOFF says so.
+  'starter.1': { ...fromPhoto('harlem-brownstone-stoops', starterSizes), focalPoint: { x: 0.3, y: 0.6 } },
+  'starter.2': { ...fromPhoto('harlem-apollo', starterSizes), focalPoint: { x: 0.5, y: 0.35 } },
+  'starter.3': { ...fromPhoto('midtown-times-square', starterSizes), focalPoint: { x: 0.5, y: 0.6 } },
+  // Reserved for the Mon reaction art (audit §11 CARE); not rendered until it exists (PS-021).
   care: fromPhoto('harlem-brownstone-stoops', sizes(40)),
-  hatch: fromPhoto('megacity-brooklyn-bridge-night', sizes(40)),
+  // Stand-in until the egg art lands (HANDOFF §HATCH): the bundled night frame, shown as a wide
+  // window across the 80rem grid. Focal point on the bridge tower and One World Trade, whose lights
+  // are the band's one light source.
+  hatch: {
+    ...fromPhoto('megacity-brooklyn-bridge-night', `${XL_UP} 80rem, 100vw`),
+    focalPoint: { x: 0.64, y: 0.55 },
+  },
 } as const satisfies Record<ArtSlot, ArtEntry>;
 
 export const ART_SLOTS = Object.keys(ART) as readonly ArtSlot[];

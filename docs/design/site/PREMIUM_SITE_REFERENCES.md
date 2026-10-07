@@ -210,6 +210,40 @@ What we explicitly reject: The joke product, sticker art, and the burnt-orange g
 How it becomes NYC-MON (not a clone): This is the shape for the H-LYNK supporting proof cluster (permitted bento place 2): one dominant `DeviceStage` panel, one narrow panel showing the push-to-talk edge or the HUD close up, at most four modules total, at least one interactive or visual proof. Surfaces are solid, edges hard.
 Used in phase: 4
 
+Phase 4 added the four cards below from two fresh `search_sections` queries: "hardware product launch section with a single device large on a dark background and its product name in a big headline" and "product feature grid with close-up detail photos of hardware parts, each tile a cropped photo with a short headline". The Square seed `394464f3…` came back from the first query; its product image had not loaded in the preview, so it is not carded.
+
+### H-LYNK — Oryzo — one lit object in a dark field
+Source: https://mobbin.com/sites/sections/9d67f8ac-8069-4a4b-999a-8ae18e7debf0
+Problem it solves: The object is the only lit thing on a near-black page. One raking light from the upper left gives the cork its texture and a hard shadow side; a two-line claim sits left, one sentence right, both small next to the object.
+What we borrow: A single key light that shows material, the object at the centre of the composition, copy that steps back.
+What we explicitly reject: The warm brown field, the joke claim, the footnote asterisk.
+How it becomes NYC-MON (not a clone): The H-Lynk Core stands on an ink plate with a white key from the upper left and red as the only coloured light, from its own scanner head. The name sits beside the plate, not over it.
+Used in phase: 4
+
+### H-LYNK — Mews — name and one line over the device on a dark plate
+Source: https://mobbin.com/sites/sections/2e285ad6-ea7e-404a-9849-61c2bc6654e2
+Problem it solves: A dark inset plate holds the product name, one line about what it does, and the terminal itself, upright and centred.
+What we borrow: The plate as a stage with its own edge inside the page, and the object upright and whole.
+What we explicitly reject: The rounded plate, the pill button and the second, half-hidden screen beside the device.
+How it becomes NYC-MON (not a clone): The ink stage is a square-cornered plate inside the daylit section; the H-Lynk Core stands upright in it, whole, at 4:5.
+Used in phase: 4
+
+### H-LYNK — bella — detail crops with one-line physical labels
+Source: https://mobbin.com/sites/sections/ee1c7e61-ecd3-4865-95fa-f0641c6d5f2c
+Problem it solves: Each tile is the same toaster cropped to a different part (the slot, the dial), captioned with one physical fact ("6-setting browning shade control").
+What we borrow: Proof that is a crop of the real object plus one plain line naming the part.
+What we explicitly reject: The kitchen lifestyle set dressing and the horizontal carousel (WCAG 2.5.7 concerns, and the audit's "no slider" rule).
+How it becomes NYC-MON (not a clone): The two proof modules are crops of the H-Lynk Core render: the scanner head, and the control row with the red-ringed trackpad. Each gets a short headline and one sentence from Decision #16.
+Used in phase: 4
+
+### H-LYNK — Square — image and headline as stacked rows
+Source: https://mobbin.com/sites/sections/f30c6ed8-3388-4e8a-8273-bc4b900c018d
+Problem it solves: Features as a vertical list: image left, headline and two lines right, hairline between rows. Reads top to bottom on any width.
+What we borrow: The phone layout for proof: a vertical list of image-plus-line rows, not a two-column mini grid.
+What we explicitly reject: Lifestyle stock photography, "Learn more +" links, the four-row length.
+How it becomes NYC-MON (not a clone): Below `lg` the scanner and controls modules stack as full-width rows under the stage and the name, each with its crop on top and its line below.
+Used in phase: 4
+
 ## STARTERS
 
 ### STARTERS — Tolan — "Introducing" naming beat
@@ -244,6 +278,30 @@ What we explicitly reject: Pixel/mono novelty type (we have two families only), 
 How it becomes NYC-MON (not a clone): Dex ID uses the existing `W01_COPY.starters.dex` format ("No. 001") in Space Grotesk at annotation size above each starter name. The number is canon, so it is the only "collectible" signal we need.
 Used in phase: 5
 
+### STARTERS — Tolan — the companion alone in its world (Phase 5 search)
+Source: https://mobbin.com/screens/ffe464e5-482f-45a2-aa76-a231b802c4cd
+Problem it solves: The home screen is the character standing full height in its landscape, with three small glyph buttons along the bottom edge and nothing else.
+What we borrow: The character owns the frame. Chrome is pushed to the edges and kept small.
+What we explicitly reject: The pastel sky, the rounded 3D mascot style, app chrome.
+How it becomes NYC-MON (not a clone): Each starter poster is mostly art plate. When the Baby renders land in `starter.<slot>`, the Mon stands in its street at full poster height and the identity plate stays below the frame, not over the Mon.
+Used in phase: 5
+
+### STARTERS — Tolan — name the companion after you meet (Phase 5 search)
+Source: https://mobbin.com/screens/ea87eba0-3204-4373-b063-ad9e1d01c0dc
+Problem it solves: "Name your Tolan" over a glowing orb with the companion's silhouette half hidden behind it, and one name field.
+What we borrow: Naming comes after the meeting, and the companion is partly withheld until then.
+What we explicitly reject: The eclipse glow and the night backdrop in a daylight section.
+How it becomes NYC-MON (not a clone): Matches Decision #5 (naming after the hatch). The page names the species (Baby name from `@acme/content`), never a personal name, and shows nothing past Baby.
+Used in phase: 5
+
+### STARTERS — Duolingo ABC — three cards with one hidden (Phase 5 search)
+Source: https://mobbin.com/screens/6368e06d-5524-4353-b2f7-07d7e0e38fb1
+Problem it solves: Three character cards under the scene, the middle one a "?" tile, so the set reads as exactly three before any is chosen.
+What we borrow: Three as the visible count of the set, side by side at equal weight.
+What we explicitly reject: Star ratings, rounded candy tiles, the mystery-box framing (it implies a gacha draw).
+How it becomes NYC-MON (not a clone): Three posters in one row from `lg`, the egg names listed in the body copy, and a semantic list of three items. No ratings and nothing hidden behind a "?".
+Used in phase: 5
+
 ## CARE
 
 ### CARE — Abode — pet with two meters and three actions
@@ -268,6 +326,22 @@ Problem it solves: Keeps a pet on screen while tracking food: raccoon on top, fo
 What we borrow: Only that the pet stays above the data.
 What we explicitly reject: Hearts-as-health, the flame streak counter, calorie numerics. Streak mechanics are the guilt tone the copy laws and the existing closing line rule out.
 How it becomes NYC-MON (not a clone): Recorded as the boundary. If a CARE draft grows a counter, a flame, or a "days in a row" number, this card is the reason to cut it.
+Used in phase: 5
+
+### CARE — Tolan — the companion in its place, no meters on screen (Phase 5 search)
+Source: https://mobbin.com/screens/672c31d4-76ef-48cc-b55f-110f54475a91
+Problem it solves: The companion sits in a desert landscape with a notification badge on one button. Need is signalled by the companion and one badge, with no bars on screen.
+What we borrow: The creature's state shown by the creature, not a gauge.
+What we explicitly reject: The notification count badge (a count-as-pressure mechanic).
+How it becomes NYC-MON (not a clone): CARE leads each row with what your Mon does ("Asks for food.", "Comes closer.") before the meter, and the meter is small and labelled as an example. When the `care` reaction art lands, it becomes the dominant module.
+Used in phase: 5
+
+### CARE — MacroFactor — nutrition tiles with bars (counter-example, Phase 5 search)
+Source: https://mobbin.com/screens/33f12878-93d5-40bf-8c3c-52672ddc5eaa
+Problem it solves: Four equal tiles (Calories, Protein, Fat, Carbs), each a value and a thin bar, under a numeric header.
+What we borrow: Nothing visual. It shows what three equal meter tiles turn into.
+What we explicitly reject: Equal tiles with numbers as the main content. This is the dashboard the audit (W10) found in the old CARE readout.
+How it becomes NYC-MON (not a clone): Recorded as the boundary. No on-screen percentages; the verb, not the bar, carries each row.
 Used in phase: 5
 
 ## HATCH
@@ -304,6 +378,22 @@ What we explicitly reject: Sunburst rays, the cute misspelling, and the framing 
 How it becomes NYC-MON (not a clone): The marketing page stops before the reveal. We show the waiting egg and the promise, not the result, and never a form beyond baby.
 Used in phase: 6
 
+### HATCH — Daylight — single warm light on a near-black brand hero (Phase 6 search)
+Source: https://mobbin.com/sites/sections/e37787eb-35fe-4981-a18b-14a559a6e270
+Problem it solves: Opens Daylight's brand kit page. A dark photo of a hand lit orange from one light source fills the frame. "This is Daylight" sits in a large serif at upper left, a numbered index (00 Welcome through 07 Components) and two small outlined buttons ("Download kit", "Open in Figma") sit below it, and "A new kind of energy company" sits lower right.
+What we borrow: One warm light in an otherwise dark frame, with the type sitting in the dark areas so the light stays the subject. Secondary controls stay small so they don't compete with the headline.
+What we explicitly reject: The numbered index menu inside the hero. The thin serif display face. The hand used as a stand-in for the product.
+How it becomes NYC-MON (not a clone): The light comes from inside the Brooklyn Bridge night photo, shown as a wide window, and nothing else in the band is lit. "Pick a time. The egg waits." is set in Archivo Black on the ink above it. The band has no control at all; the waitlist below carries the action.
+Used in phase: 6
+
+### HATCH — Daylight — dusk photo with a headline split across the frame (Phase 6 search)
+Source: https://mobbin.com/sites/sections/4db3eb21-9348-4652-9e4e-e286971f8091
+Problem it solves: A thesis section on Daylight's site. A full-bleed photo of transmission towers against an orange-to-teal dusk sky carries a large serif headline split in two: "The grid has" at upper left and "no master" at lower right. A short paragraph sits in the dark lower-left corner.
+What we borrow: One sentence broken in two so the second half lands as the payoff.
+What we explicitly reject: Type over the photo (it would need a scrim), full bleed edge to edge, the manifesto tone.
+How it becomes NYC-MON (not a clone): The headline breaks into "Pick a time." and "The egg waits.", the second line in the hatch orange, set above the photo window instead of on it.
+Used in phase: 6
+
 ## WAITLIST
 
 ### WAITLIST — Grail — email field as the headline
@@ -330,6 +420,22 @@ What we explicitly reject: The countdown (contract asks for a countdown-free wai
 How it becomes NYC-MON (not a clone): If the waitlist sits on a photograph, it is a night NYC street that carries on from the hatch band, and the form stays a single field.
 Used in phase: 6
 
+### WAITLIST — Sketch — "Sketch 102 is coming" email field with a required consent checkbox (Phase 6 search)
+Source: https://mobbin.com/sites/sections/a1261905-a6ea-49f0-975e-1c72f23d5ace
+Problem it solves: A notify-me block above Sketch's footer: a small clock icon, "Sketch 102 is coming", one line about early access, one email field ("Your email address") with a "Notify me" button, and under them a checkbox labelled "I agree to receive educational emails from Sketch." on a light background.
+What we borrow: One field, one button and one checkbox with its own full-sentence label, on a light surface.
+What we explicitly reject: The decorative scatter icons, the placeholder as the only label, and using the checkbox for marketing consent.
+How it becomes NYC-MON (not a clone): The checkbox is the required "I'm 13 or older" under a legend "Age", with the parent-or-guardian line as its description. The button reads "Join the waitlist". Results are announced in one live line under the button.
+Used in phase: 6
+
+### WAITLIST — Hotjar — confirmation that repeats the submitted email (Phase 6 search)
+Source: https://mobbin.com/screens/5da1b53c-e17b-4153-9beb-0859bb07cd69
+Problem it solves: A post-submit card: a small night-sky illustration, "Thanks for applying to our research!", body text naming the address it will write to in bold ("preview@email.com"), and a "Send to another email" link.
+What we borrow: The confirmation replaces the form in place and says exactly what happens next.
+What we explicitly reject: The exclamation-mark heading, the evaluation language, the illustration. Repeating the address: the action drops the email from page state once the server confirms (ADR 0001 posture), so the joined state doesn't echo it.
+How it becomes NYC-MON (not a clone): "You're on the list." takes focus and says one email comes when the app is out. The retryable states (invalid, rate limited, error) keep what the person typed.
+Used in phase: 6
+
 ## FOOTER
 
 ### FOOTER — BAGGU — giant wordmark close
@@ -346,6 +452,14 @@ Problem it solves: A footer that is a scene: room furniture drawn as a single-co
 What we borrow: A single-colour silhouette band as the transition into the footer.
 What we explicitly reject: Furniture subject, blue/yellow brand colours.
 How it becomes NYC-MON (not a clone): The existing `SkylineBand` / `SkylineDivider` port plays this role: block-level building silhouettes (water towers, fire escapes, a bodega awning) in signage black on concrete, sitting on the footer.
+Used in phase: 6
+
+### FOOTER — General Intelligence Company — pixel-art New York scene as the footer band (Phase 6 search)
+Source: https://mobbin.com/sites/sections/0222c241-b0da-45eb-a95e-7ba703270a5d
+Problem it solves: A footer with a thin top row of text links, a "Get updates in your inbox" field and social icons, then a wide pixel-art band of a park path with lamp posts, joggers and a dog, Manhattan towers at the vanishing point, and the legal line in small text on the band.
+What we borrow: A static, wide city scene as the last band of the page.
+What we explicitly reject: The second email field (the waitlist already has one), the pastel palette, people and animals in the scene.
+How it becomes NYC-MON (not a clone): The kit SiteFooter on ink with the static Harlem `SkylineBand` and no animated canvas (PS-025).
 Used in phase: 6
 
 ## Non-Mobbin

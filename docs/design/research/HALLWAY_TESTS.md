@@ -197,6 +197,9 @@ Observe: whether they reach the waitlist without a prompt; where they hesitate; 
 - D5 "If you stopped playing for a week, what do you think would happen?" (H3)
 - D6 "What do you expect to happen after you join the waitlist?" (H6)
 - D7 Parents only: "Would you let your kid sign up? What would you want to know first?" (H3)
+- D8 Added in Phase 6, after HATCH and the waitlist: "What happens at the hatch?" Pass: they mention picking a time or one notification, and that the Mon chooses too. Log any "timer", "countdown", "it might reject me".
+- D9 "Was there anything that made you stop before joining?" Probe the age checkbox ("I'm 13 or older"): did it read as a barrier, as a gate for kids, or not at all? Note anyone under 13 who looked for a way in, and whether they found the parent-or-guardian line.
+- D10 Only if they joined: "What do you think you'll get, and how often?" Pass: "one email when it's out". Log any expectation of a launch date, a beta invite or a place in line.
 
 ### Scoring sheet (one per participant)
 
