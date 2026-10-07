@@ -139,14 +139,16 @@ export function SkiaQuadCanvas({ steps, width, height, background, running, wind
   /** Drop objects from the scene before freeing them, so no later frame draws a deleted one. */
   const detach = (patch: Partial<Scene>) => scene.set({ ...scene.get(), ...patch });
 
-  // Static meshes to SkVertices, once per steps.
-  const drawList = useMemo<DrawEntry[]>(() => {
+  // Static meshes to SkVertices, once per steps. The vertices are made in the
+  // effect that frees them, never in a memo: a page left by client navigation
+  // stays mounted in a hidden <Activity>, whose effect cleanups run on hide
+  // and whose effects run again on return, while memos survive. Vertices
+  // memoised and freed in the cleanup would be drawn deleted on return.
+  useEffect(() => {
     let index = 0;
-    return steps.map((step) =>
+    const drawList = steps.map<DrawEntry>((step) =>
       'chunks' in step ? { vertices: step.chunks.map(makeSkVertices), moving: -1 } : { vertices: null, moving: index++ },
     );
-  }, [steps]);
-  useEffect(() => {
     update({ list: drawList, width, height, window: windowRect, scale });
     return () => {
       // Web: free the WASM side now; pictures already recorded keep their own refs.
@@ -154,7 +156,7 @@ export function SkiaQuadCanvas({ steps, width, height, background, running, wind
       if (IS_WEB) for (const entry of drawList) entry.vertices?.forEach((v) => v.dispose());
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- update is a plain helper over stable shared values.
-  }, [drawList, width, height, windowRect, scale]);
+  }, [steps, width, height, windowRect, scale]);
 
   // The frame clock and recorder: UI thread on native, rAF on web.
   const frames = useFrameCallback((info) => {

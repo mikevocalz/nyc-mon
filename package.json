@@ -24,6 +24,7 @@
     "site-qa:axe": "node tooling/site-qa/axe.mjs",
     "site-qa:copy-lint": "node tooling/site-qa/copy-lint.mjs",
     "site-qa:motion": "node tooling/site-qa/motion.mjs",
+    "site-qa:backnav": "node tooling/site-qa/backnav.mjs",
     "site-qa:lhci": "node tooling/site-qa/lhci.mjs",
     "site-qa:all": "node tooling/site-qa/all.mjs"
   },

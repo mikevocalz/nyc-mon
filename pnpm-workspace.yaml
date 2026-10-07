@@ -237,6 +237,7 @@ catalog:
 
 patchedDependencies:
   react-native-graph@1.4.0: patches/react-native-graph@1.4.0.patch
+  react-native-skia@3.0.2: patches/react-native-skia@3.0.2.patch
   # Backports uniwind PR #706: the web resolver no longer cycles through
   # InputAccessoryView, which left `expo start --web` blank. Remove once
   # uniwind releases #706 (uni-stack/uniwind#704).
