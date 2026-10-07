@@ -28,6 +28,10 @@
     "./adaptive-panes": "./adaptive-panes/index.tsx",
     "./adaptive-panes/parts": "./adaptive-panes/parts.ts"
   },
+  "sideEffects": [
+    "./rn-globals-shim.ts",
+    "*.css"
+  ],
   "scripts": {
     "lint": "eslint",
     "typecheck": "tsc --noEmit",

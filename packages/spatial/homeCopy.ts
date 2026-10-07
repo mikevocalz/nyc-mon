@@ -18,13 +18,14 @@ export const HOME_COPY = {
 
 /**
  * `streets` is the real place a district board points to: the cross streets
- * of the bundled photography in @acme/assets/photos.
+ * of the bundled photography in @acme/assets/photos. Canon doesn't place Mega
+ * City on a map yet, so it has none.
  */
-export const DISTRICT_COPY: Record<District, { name: string; line: string; streets: string }> = {
+export const DISTRICT_COPY: Record<District, { name: string; line: string; streets: string | null }> = {
   downtown: { name: 'Downtown', line: 'Supertalls and spires packed down to the water.', streets: 'Wall St at Broad St' },
   midtown: { name: 'Midtown', line: 'Deco crowns and a water tank on every other roof.', streets: 'Lexington Ave at 42nd St' },
   harlem: { name: 'Harlem', line: 'Brownstone stoops, the projects and the towers behind them.', streets: 'Lenox Ave at 125th St' },
-  megacity: { name: 'Mega City', line: 'The New York the other three grow into.', streets: 'Brooklyn Bridge, East River' },
+  megacity: { name: 'Mega City', line: 'The New York the other three grow into.', streets: null },
 };
 
 export const DISTRICTS: readonly District[] = ['downtown', 'midtown', 'harlem', 'megacity'];

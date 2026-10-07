@@ -5,16 +5,20 @@ import type { GestureResponderEvent } from 'react-native';
 import { twMerge } from 'tailwind-merge';
 import { palette, brand } from '@acme/theme';
 import { GpuCanvas } from '../gpu/GpuCanvas';
-import type { GpuCanvasHandle } from '../gpu/types';
+import type { GpuCanvasHandle, GpuSetup } from '../gpu/types';
 import { withAlpha } from '../neon/colors';
 import { useInstanceStore } from '../use-instance-store';
 import { useSizeClass } from '../use-size-class';
 import { View } from '../tw';
 import { districtDefaults } from './city-blocks-model';
-import { createCityBlocksScene, type CityParams } from './CityBlocks.gpu';
+import type { CityParams } from './CityBlocks.gpu';
 import type { CityBlocksSkiaProps } from './CityBlocks.skia';
 import type { CityBlocksProps, CityPointer } from './CityBlocks.types';
 import { useReducedMotion } from './use-reduced-motion';
+
+// The TypeGPU scene (and TypeGPU itself) loads once a WebGPU root exists, not
+// with the page: GpuCanvas only calls setup on a working device.
+const createCityBlocksSceneLazy: GpuSetup<CityParams> = (gpu) => import('./CityBlocks.gpu').then((m) => m.createCityBlocksScene(gpu));
 
 type PointerLike = GestureResponderEvent & {
   currentTarget: { getBoundingClientRect?: () => { left: number; top: number } };
@@ -96,7 +100,7 @@ export function CityBlocksShell({
     >
       <GpuCanvas
         ref={gpu}
-        setup={createCityBlocksScene}
+        setup={createCityBlocksSceneLazy}
         params={params}
         forceFallback={forceFallback}
         paused={paused}

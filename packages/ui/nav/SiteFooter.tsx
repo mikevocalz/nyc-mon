@@ -1,11 +1,10 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { lazy, Suspense, type ReactNode } from 'react';
 import { tv } from 'tailwind-variants';
 import { BrandLogo } from '../brand/BrandLogo';
 import { BrandWordmark } from '../brand/BrandWordmark';
 import { districtTone, type ChartTone, type District } from '../district';
-import { useAppForm } from '../form';
 import { Footer, Heading, Link, List, ListItem, Nav, Paragraph } from '../primitives';
 import { Text, View } from '../tw';
 import { brand as brandColors } from '@acme/theme';
@@ -93,7 +92,10 @@ const TIDE_HEIGHT: Record<NonNullable<SiteFooterProps['variant']>, string> = {
   centered: 'h-32 md:h-44',
   mega: 'h-44 md:h-64',
 };
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// The sign-up form is code-split: it brings the kit's TanStack Form fields
+// (and through them Reanimated), and only the mega variant or an explicit
+// showNewsletter renders it. The other footers ship none of that.
+const Newsletter = lazy(() => import('./SiteFooterNewsletter'));
 
 const foot = tv({
   slots: {
@@ -129,33 +131,6 @@ const foot = tv({
     },
   },
 });
-
-function Newsletter({
-  placeholder, button, onSubmit, className,
-}: { placeholder: string; button: string; onSubmit?: (email: string) => void | Promise<void>; className: string }) {
-  const form = useAppForm({
-    defaultValues: { email: '' },
-    onSubmit: async ({ value, formApi }) => {
-      await onSubmit?.(value.email.trim());
-      formApi.reset();
-    },
-  });
-  return (
-    <View className={className}>
-      <form.AppField
-        name="email"
-        validators={{ onBlur: ({ value }) => (EMAIL.test(value.trim()) ? undefined : 'Enter an email address, like name@example.com') }}
-      >
-        {(field) => (
-          <field.TextField label="Block report by email" placeholder={placeholder} returnKeyType="send" onSubmitEditing={() => form.handleSubmit()} />
-        )}
-      </form.AppField>
-      <form.AppForm>
-        <form.SubmitButton title={button} />
-      </form.AppForm>
-    </View>
-  );
-}
 
 /**
  * NeonBlade's Footer as the NYC-MON city edge: the district's river at night
@@ -268,12 +243,14 @@ export function SiteFooter({
           </View>
         )}
         {newsletter ? (
-          <Newsletter
-            placeholder={newsletterPlaceholder}
-            button={newsletterButtonLabel}
-            onSubmit={onNewsletterSubmit}
-            className={`${s.newsletter()} ${variant === 'mega' ? 'md:w-full md:max-w-md' : ''}`}
-          />
+          <Suspense fallback={null}>
+            <Newsletter
+              placeholder={newsletterPlaceholder}
+              button={newsletterButtonLabel}
+              onSubmit={onNewsletterSubmit}
+              className={`${s.newsletter()} ${variant === 'mega' ? 'md:w-full md:max-w-md' : ''}`}
+            />
+          </Suspense>
         ) : null}
       </View>
       {variant === 'minimal' ? null : (

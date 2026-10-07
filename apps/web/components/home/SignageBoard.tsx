@@ -30,7 +30,7 @@ export function SignageBoard() {
         <Heading level={2} id="w01-signage-title" className="my-0 font-sans text-base font-semibold text-silver-200">
           {W01_COPY.signage.title}
         </Heading>
-        <List className="m-0 list-none p-0 lg:grid lg:grid-cols-4">
+        <List role="list" className="m-0 list-none p-0 lg:grid lg:grid-cols-4">
           {ROUTE.map((district, i) => {
             const copy = DISTRICT_COPY[district];
             const last = i === ROUTE.length - 1;
@@ -49,7 +49,7 @@ export function SignageBoard() {
                 />
                 <View className="min-w-0 gap-1">
                   <Text className="font-display text-display-board uppercase text-signage-white">{copy.name}</Text>
-                  <Text className="text-sm text-silver-200">{copy.streets}</Text>
+                  {copy.streets ? <Text className="text-sm text-silver-200">{copy.streets}</Text> : null}
                 </View>
               </ListItem>
             );

@@ -12,7 +12,6 @@ import { SceneSection, SegmentedControl } from '@acme/ui';
 import { Fieldset, Legend } from '@acme/ui/html';
 import { useDistrictStore } from '@acme/spatial/district';
 import { DISTRICT_COPY, DISTRICTS } from '@acme/spatial/copy';
-import { W01_COPY } from './copy';
 
 const DISTRICT_OPTIONS = DISTRICTS.map((value) => ({ value, label: DISTRICT_COPY[value].name }));
 
@@ -29,7 +28,7 @@ const CityBlocks = dynamic(
  * content. The section reserves its own height from the content, so the
  * canvas arriving never moves anything; it pauses while scrolled away.
  */
-export function HeroCity({ id, className, children }: { id: string; className: string; children: ReactNode }) {
+export function HeroCity({ id, cityLabels, className, children }: { id: string; cityLabels: Record<string, string>; className: string; children: ReactNode }) {
   const district = useDistrictStore((s) => s.district);
   return (
     <SceneSection
@@ -42,7 +41,7 @@ export function HeroCity({ id, className, children }: { id: string; className: s
           district={district}
           overlay
           className="absolute inset-0"
-          accessibilityLabel={W01_COPY.hero.cityLabel(DISTRICT_COPY[district].name)}
+          accessibilityLabel={cityLabels[district]}
         />
       )}
     >
@@ -52,14 +51,13 @@ export function HeroCity({ id, className, children }: { id: string; className: s
 }
 
 /** The district control: a radio group (PS-012), keyboard-complete, no drag. */
-export function HeroDistrictPicker() {
+export function HeroDistrictPicker({ label }: { label: string }) {
   const district = useDistrictStore((s) => s.district);
   const setDistrict = useDistrictStore((s) => s.setDistrict);
-  const label = W01_COPY.hero.districtLabel;
   return (
     <Fieldset data-testid="w01-district" className="m-0 gap-2 border-0 bg-ink-950 p-3">
       <Legend className="float-left mb-2 w-full p-0 text-sm font-semibold text-silver-100">{label}</Legend>
-      <SegmentedControl aria-label={label} options={DISTRICT_OPTIONS} value={district} onChange={setDistrict} district={district} />
+      <SegmentedControl options={DISTRICT_OPTIONS} value={district} onChange={setDistrict} district={district} />
     </Fieldset>
   );
 }

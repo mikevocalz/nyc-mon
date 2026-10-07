@@ -1,6 +1,6 @@
 'use client';
 import { useEffect } from 'react';
-import { tgpu, type TgpuRoot } from 'typegpu';
+import type { TgpuRoot } from 'typegpu';
 import { createStore } from 'zustand/vanilla';
 import { useStore } from 'zustand';
 import { loadWebGpu } from './load-webgpu';
@@ -36,7 +36,9 @@ async function start(): Promise<void> {
       gpuStore.setState({ support: 'unsupported' });
       return;
     }
-    const device = await adapter.requestDevice();
+    // TypeGPU (~110 KB gzip) loads only once a device exists: every page
+    // that mounts a canvas would otherwise ship it, WebGPU or not.
+    const [device, { tgpu }] = await Promise.all([adapter.requestDevice(), import('typegpu')]);
     const root = tgpu.initFromDevice({ device });
     gpuStore.setState({
       support: 'supported',
