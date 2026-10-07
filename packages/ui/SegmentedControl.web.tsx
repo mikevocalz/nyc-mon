@@ -55,6 +55,8 @@ export function SegmentedControl<T extends string>({
   // Arrow/Home/End: move DOM focus to the target radio and select it. The
   // radios are found from the group element so no per-item refs are needed.
   const onKeyDown = (index: number) => (event: KeyboardEvent<HTMLElement>) => {
+    // Alt/Cmd/Ctrl + arrow is browser navigation, not selection.
+    if (event.altKey || event.metaKey || event.ctrlKey) return;
     const next = nextRadioIndex(index, event.key, options.length);
     if (next === null) return;
     event.preventDefault();
@@ -81,7 +83,7 @@ export function SegmentedControl<T extends string>({
             aria-checked={active}
             accessibilityState={{ checked: active, selected: active }}
             onPress={() => select(option.value)}
-            onKeyDown={onKeyDown(index)}
+            onKeyDown={isWeb ? onKeyDown(index) : undefined}
             // Roving tabindex is a web keyboard concept; native screen readers
             // and Android focus navigation keep every radio reachable.
             {...(isWeb ? ({ tabIndex: rovingTabIndex(index, checkedIndex) } as object) : {})}

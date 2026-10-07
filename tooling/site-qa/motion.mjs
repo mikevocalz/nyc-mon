@@ -147,7 +147,9 @@ async function rafWindow(page, ms, during) {
   }
   const owners = loops.filter((l) => l.kind === 'owner' || (KEEPALIVE_COUNTS && l.kind === 'keepalive')).reduce((a, l) => a + l.instances, 0);
   const canvas = loops.filter((l) => l.kind === 'canvas').reduce((a, l) => a + l.instances, 0);
-  return { frames: n, maxPerFrame: Math.max(0, ...raw.frames.map((f) => f.length)), owners, canvas, loops };
+  // A canvas-library loop that draws nothing is three's internal Animation loop coming back (PS-010).
+  const canvasIdle = loops.filter((l) => l.kind === 'canvas-idle').reduce((a, l) => a + l.instances, 0);
+  return { frames: n, maxPerFrame: Math.max(0, ...raw.frames.map((f) => f.length)), owners, canvas, canvasIdle, loops };
 }
 
 async function scrollBurst(page, vp) {
@@ -243,6 +245,7 @@ for (const r of results) {
       loops: v.loops.map((l) => `${l.kind}:${l.name}${l.instances > 1 ? `×${l.instances}` : ''}`).join(', ') });
     if (v.owners > 1) failures.push(`${id} ${w}: ${v.owners} non-canvas RAF owners`);
     if (v.canvas > 1) failures.push(`${id} ${w}: ${v.canvas} canvas loops drawing`);
+    if (v.canvasIdle > 0) failures.push(`${id} ${w}: ${v.canvasIdle} idle canvas-library loop(s) running (three's internal Animation loop?)`);
   }
   if (r.deviceStageInView === false) failures.push(`${id}: DeviceStage was not in view for the idleDeviceStage window`);
   if (r.mount.st === null) failures.push(`${id}: ScrollTrigger count unreadable (no __nycmonMotion hook; chunk patch ${r.patched.st ? 'applied' : 'found no anchor'})`);

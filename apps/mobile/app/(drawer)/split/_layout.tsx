@@ -270,7 +270,7 @@ export default function SplitLayout() {
               open={appearanceOpen}
               onOpenChange={setAppearanceOpen}
             >
-              <SegmentedControl options={THEMES} value={theme} onChange={setTheme} />
+              <SegmentedControl aria-label="Theme" options={THEMES} value={theme} onChange={setTheme} />
             </SidebarSection>
           )}
         </View>

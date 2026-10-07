@@ -45,15 +45,28 @@ const isWeb = Platform.OS === 'web';
  * (three/src/renderers/common/Animation.js, r186). ThreeCanvas already owns a
  * frame loop gated on visibility, so the internal one is stopped after init and
  * each draw advances `nodeFrame` itself. Neither member is public API: if a
- * three upgrade renames them these calls become no-ops and the extra loop
- * returns, which the site-qa motion check catches.
+ * three upgrade renames them, `stopInternalLoop` warns and the site-qa motion
+ * check fails on the idle loop.
  */
 type RendererInternals = {
   _animation?: { stop?: () => void } | null;
-  _nodes?: { nodeFrame?: { update?: () => void } } | null;
+  _nodes?: { nodeFrame?: { update?: () => void; frameId?: number } } | null;
 };
-const stopInternalLoop = (renderer: WebGPURenderer) => (renderer as unknown as RendererInternals)._animation?.stop?.();
-const advanceNodeFrame = (renderer: WebGPURenderer) => (renderer as unknown as RendererInternals)._nodes?.nodeFrame?.update?.();
+const stopInternalLoop = (renderer: WebGPURenderer) => {
+  const animation = (renderer as unknown as RendererInternals)._animation;
+  if (typeof animation?.stop !== 'function') {
+    console.warn('[ThreeCanvas] three renamed Renderer._animation; its internal frame loop keeps running.');
+    return;
+  }
+  animation.stop();
+};
+// What Animation.start()'s loop did per frame besides the user callback.
+const advanceNodeFrame = (renderer: WebGPURenderer) => {
+  const nodeFrame = (renderer as unknown as RendererInternals)._nodes?.nodeFrame;
+  if (renderer.info.autoReset) renderer.info.reset();
+  nodeFrame?.update?.();
+  if (nodeFrame?.frameId !== undefined) (renderer.info as { frame: number }).frame = nodeFrame.frameId;
+};
 
 /**
  * A three.js canvas on WebGPURenderer, with one code path for web and native.
