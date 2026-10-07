@@ -360,3 +360,24 @@ Level alone does not determine match eligibility. A server-owned Battle Rating a
 - **Kind:** product + gameplay canon
 
 Real NYC locations can become Battle Grounds with local rules, reputation, schedules and tournaments. Rucker Park and Union Square/14th Street are foundational examples. Battle outcomes create structured Mon memories and authoritative event logs. Those logs can drive approximately 60-second vertical battle Stories/replays. Payload can create/edit/schedule battle events and recurring cron-driven Battle Ground programming without a client rebuild.
+
+
+## Decision 27 — React Native is the only application UI architecture
+
+- **Date:** 2026-10-06
+- **Decided by:** Mike (creator)
+- **Kind:** architecture
+
+All NYC-MON application screens/components are authored with React Native. Web uses React Native Web and shared features; there is no parallel raw-HTML/CSS implementation. The web Tamagotchi surface reuses the same Mon Space feature used by native H-Lynk.
+
+## Decision 28 — all shader effects run through WebGPU + TypeGPU
+
+- **Date:** 2026-10-06
+- **Decided by:** Mike (creator)
+- **Kind:** rendering architecture
+
+All NYC-MON shader/effect implementations target WebGPU through TypeGPU. React Native remains the application UI layer; Three.js remains the world/3D scene layer; TypeGPU/WebGPU owns shader/effect execution. Do not add CSS/WebGL/DOM effect duplicates.
+
+A shared typed effects package owns WGSL, TypeGPU pipelines, effect schemas, React Native surfaces, Three/@typegpu adapters, performance tiers, accessibility variants, resource lifetime and provenance. Gameplay/features request semantic effects rather than embedding loose WGSL.
+
+`shader-effects-inc/shaders` is approved as an effects reference/source subject to license/provenance review and adaptation through this shared pipeline.
