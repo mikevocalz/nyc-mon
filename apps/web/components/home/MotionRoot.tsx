@@ -1,9 +1,10 @@
 'use client';
 /**
- * The page's motion boundary. One `ReactLenis` (root mode — no wrapper div,
- * Lenis smooths window scroll but leaves touch scrolling native) owns the
- * frame clock; `connectGsapLenis` with `clock: 'external'` subscribes
- * ScrollTrigger to Lenis scroll events without adding a second RAF loop.
+ * The page's motion boundary. `gsap.ticker` is the only frame clock: Lenis
+ * runs with `autoRaf: false` and `connectGsapLenis` (clock `'kinetrell'`,
+ * kinetrell/dist/web/gsap-lenis.mjs) adds `lenis.raf` to the ticker. With
+ * `clock: 'external'` plus `autoRaf: true` Lenis and GSAP each ran a RAF
+ * loop (PREMIUM_SITE_BASELINE.md §2). Root mode leaves touch scroll native.
  *
  * Reduced motion renders the same children without Lenis and without
  * arming any choreography — every `mfx-*` target simply stays visible.
@@ -20,7 +21,7 @@ function GsapLenisBridge() {
   const lenis = useKinetrellLenis();
   useEffect(() => {
     if (!lenis) return;
-    return connectGsapLenis(lenis, { clock: 'external', refreshOnConnect: true });
+    return connectGsapLenis(lenis, { clock: 'kinetrell', refreshOnConnect: true });
   }, [lenis]);
   return null;
 }
@@ -36,7 +37,7 @@ export function MotionRoot({ children }: { children: ReactNode }) {
     return <View className="w-full flex-1">{children}</View>;
   }
   return (
-    <ReactLenis root options={{ autoRaf: true }}>
+    <ReactLenis root options={{ autoRaf: false }}>
       <GsapLenisBridge />
       <MotionFrame>{children}</MotionFrame>
     </ReactLenis>

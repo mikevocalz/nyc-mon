@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, type ReactNode } from 'react';
+import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { Platform } from 'react-native';
 import { twMerge } from 'tailwind-merge';
 import { tv } from 'tailwind-variants';
@@ -14,6 +14,13 @@ import { Pressable, Text, View } from '../tw';
 import { SkylineBand } from './SkylineBand';
 import { NeonChevron } from '../neon/NeonChevron';
 import { dropdown as dropdownLook } from '../dropdown';
+import { cycleFocusIndex, FOCUSABLE_SELECTOR, shouldReturnFocus } from './focus-cycle';
+
+const isWeb = Platform.OS === 'web';
+
+const focusById = (id: string) => {
+  if (typeof document !== 'undefined') document.getElementById(id)?.focus();
+};
 
 export interface NavItem {
   label: string;
@@ -160,18 +167,50 @@ export function NavBar({
   const sheet = useStore(store, (st) => st.sheet);
   const dropdown = useStore(store, (st) => st.dropdown);
   const close = () => store.setState({ sheet: false, dropdown: -1 });
-  const sheetId = `navbar-menu-${useId().replace(/:/g, '')}`;
+  const uid = useId().replace(/:/g, '');
+  const sheetId = `navbar-menu-${uid}`;
+  const toggleId = `navbar-toggle-${uid}`;
+  const triggerId = (i: number) => `navbar-trigger-${uid}-${i}`;
   const open = sheet || dropdown >= 0;
 
-  // Escape closes the phone menu or an open dropdown (web keyboards).
+  // Web keyboards. Escape closes the phone menu or an open dropdown and puts
+  // focus back on the control that opened it. While the phone menu is open,
+  // Tab and Shift+Tab cycle through the toggle and the sheet's links, so
+  // focus never lands on page content hidden behind the sheet (WCAG 2.4.11).
   useEffect(() => {
-    if (!open || Platform.OS !== 'web' || typeof document === 'undefined') return undefined;
+    if (!open || !isWeb || typeof document === 'undefined') return undefined;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') store.setState({ sheet: false, dropdown: -1 });
+      if (e.key === 'Escape') {
+        const { sheet: sheetOpen, dropdown: openDropdown } = store.getState();
+        store.setState({ sheet: false, dropdown: -1 });
+        focusById(sheetOpen ? toggleId : triggerId(openDropdown));
+        return;
+      }
+      if (e.key !== 'Tab' || !store.getState().sheet) return;
+      const toggle = document.getElementById(toggleId);
+      const panel = document.getElementById(sheetId);
+      if (!toggle || !panel) return;
+      const ring = [toggle, ...Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))];
+      const next = cycleFocusIndex(ring.indexOf(document.activeElement as HTMLElement), ring.length, e.shiftKey);
+      if (next === null) return;
+      e.preventDefault();
+      ring[next]?.focus();
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
+    // toggleId/sheetId derive from a stable useId.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, store]);
+
+  // However the phone menu closes (Escape, the toggle, a link in it), focus
+  // that was inside the unmounted sheet returns to the toggle.
+  const wasSheetOpen = useRef(sheet);
+  useEffect(() => {
+    const closed = wasSheetOpen.current && !sheet;
+    wasSheetOpen.current = sheet;
+    if (!closed || !isWeb || typeof document === 'undefined') return;
+    if (shouldReturnFocus(document.activeElement)) focusById(toggleId);
+  }, [sheet, toggleId]);
 
   const anchor = (item: NavItem, children: ReactNode, cls: string) =>
     renderLink ? (
@@ -187,7 +226,7 @@ export function NavBar({
 
   return (
     <Header className={s.root({ className })}>
-      {skipTo && Platform.OS === 'web' ? (
+      {skipTo && isWeb ? (
         <Link href={`#${skipTo}`} className={s.skip()}>
           <Text className={twMerge(s.linkText(), s.linkActiveText())}>{skipLabel}</Text>
         </Link>
@@ -205,6 +244,7 @@ export function NavBar({
                 {item.children?.length ? (
                   <>
                     <Pressable
+                      {...({ id: triggerId(i) } as object)}
                       role="button"
                       aria-expanded={dropdown === i}
                       aria-haspopup="menu"
@@ -255,6 +295,7 @@ export function NavBar({
           {trailing}
           {items.length ? (
             <Pressable
+              {...({ id: toggleId } as object)}
               role="button"
               aria-label={sheet ? 'Close menu' : 'Open menu'}
               aria-expanded={sheet}

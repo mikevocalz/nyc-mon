@@ -20,8 +20,9 @@ export const W01_COPY = {
     body: 'Every district keeps its own hours, its own weather and its own legends. The Mons were already living here.',
   },
   hlynk: {
-    eyebrow: 'The device',
+    eyebrow: 'H-Lynk',
     title: 'The H-Lynk Core',
+    stageLabel: 'H-Lynk Core',
     features: [
       'Twin-emitter scanner head — the beam calls them out',
       'A live HUD — Dex, Crew, Care, Bag, City',

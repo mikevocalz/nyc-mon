@@ -54,6 +54,7 @@
     "expo": "catalog:",
     "tailwindcss": "catalog:",
     "typescript": "catalog:",
-    "unplugin-typegpu": "catalog:"
+    "unplugin-typegpu": "catalog:",
+    "web-vitals": "6.2.3"
   }
 }

@@ -7,7 +7,7 @@ import { Fieldset, Figcaption, Figure, Heading, Legend, List, ListItem, Paragrap
 import { View } from '@acme/ui/tw';
 import { useDistrictStore } from '@acme/spatial';
 import { DISTRICT_COPY, DISTRICTS } from '@acme/spatial/copy';
-import { TEMP_HERO_ART } from './art';
+import { art, artHref } from './art';
 import { Eyebrow } from './Eyebrow';
 import { W01_COPY } from './copy';
 
@@ -41,18 +41,17 @@ export function HomeHero({ starters }: HomeHeroProps) {
   const copy = W01_COPY.hero;
   // The hero frame is the LCP image — preload it explicitly (SolitoImage
   // drops next/image's `priority`, so the link does the work instead).
-  const heroSrc =
-    typeof TEMP_HERO_ART.source === 'object' && TEMP_HERO_ART.source !== null && 'src' in TEMP_HERO_ART.source
-      ? (TEMP_HERO_ART.source as { src: string }).src
-      : String(TEMP_HERO_ART.source);
+  const heroArt = art('hero');
+  const heroSrc = artHref(heroArt);
 
   return (
     <SceneSection
-      className="min-h-[640px] md:min-h-[92dvh]"
+      className="min-h-hero md:min-h-[92dvh]"
       id="trg-hero"
       placeholderColor={brand.night}
-      scene={() => (
+      scene={({ paused }) => (
         <CityBlocks
+          paused={paused}
           district={district}
           overlay
           className="absolute inset-0"
@@ -67,18 +66,18 @@ export function HomeHero({ starters }: HomeHeroProps) {
       >
         <View id="mpx-hero-cluster" className="w-full min-w-0 md:order-2 md:flex-[5_1_0%]">
           <Figure id="mfx-hero-art" className="m-0 gap-2">
-            <View className="relative w-full md:ml-auto md:max-w-[420px]">
+            <View className="relative w-full md:ml-auto md:max-w-content-hero-art">
               <Image
-                src={TEMP_HERO_ART.source as ImageProps['src']}
-                alt={TEMP_HERO_ART.alt}
+                src={heroArt.src as ImageProps['src']}
+                alt={heroArt.alt}
                 fill
                 priority
                 loading="eager"
                 {...({ fetchPriority: 'high' } as object)}
-                sizes="(min-width: 768px) 34vw, 92vw"
+                sizes={heroArt.sizes}
                 unoptimized
                 placeholder="blur"
-                blurDataURL={TEMP_HERO_ART.blurDataURL}
+                blurDataURL={heroArt.blurDataURL}
                 district="midtown"
                 className="aspect-[16/10] w-full md:aspect-[4/5]"
               />
@@ -95,11 +94,11 @@ export function HomeHero({ starters }: HomeHeroProps) {
               </View>
             </View>
             <Figcaption className="m-0 mt-6 text-right">
-              <Text className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-200">
-                {TEMP_HERO_ART.title}
+              <Text className="text-type-tag font-semibold uppercase text-ink-200">
+                {heroArt.caption?.title}
               </Text>
-              <Text className="text-[11px] uppercase tracking-[0.18em] text-ink-400">
-                {` — ${TEMP_HERO_ART.place}`}
+              <Text className="text-type-tag font-normal uppercase text-ink-400">
+                {` — ${heroArt.caption?.place ?? ''}`}
               </Text>
             </Figcaption>
           </Figure>
@@ -113,11 +112,11 @@ export function HomeHero({ starters }: HomeHeroProps) {
             <Heading
               level={1}
               id="mfx-hero-title"
-              className="my-0 font-display text-[2.75rem] uppercase leading-[0.95] tracking-tight text-text sm:text-6xl lg:text-7xl"
+              className="my-0 font-display text-display-hero uppercase leading-display tracking-tight text-text sm:text-6xl lg:text-7xl"
             >
               {copy.title}
             </Heading>
-            <Paragraph id="mfx-hero-body" className="my-0 max-w-[38rem] text-base leading-7 text-text-secondary md:text-lg md:leading-8">
+            <Paragraph id="mfx-hero-body" className="my-0 max-w-content-measure text-base leading-7 text-text-secondary md:text-lg md:leading-8">
               {copy.body}
             </Paragraph>
             <View id="mfx-hero-cta">
@@ -143,7 +142,7 @@ export function HomeHero({ starters }: HomeHeroProps) {
             <View id="mfx-hero-districts">
               <Fieldset data-testid="w01-district" className="m-0 gap-2 border-0 p-0">
                 <Legend className="mb-2 p-0 text-sm font-semibold text-text">{copy.districtLabel}</Legend>
-                <SegmentedControl options={DISTRICT_OPTIONS} value={district} onChange={setDistrict} district={district} />
+                <SegmentedControl aria-label={copy.districtLabel} options={DISTRICT_OPTIONS} value={district} onChange={setDistrict} district={district} />
               </Fieldset>
             </View>
           </SolidPanel>

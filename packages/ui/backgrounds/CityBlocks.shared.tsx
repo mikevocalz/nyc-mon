@@ -44,6 +44,7 @@ export function CityBlocksShell({
   hoverColor = withAlpha(brand.orange, 0.35),
   overlay = false,
   forceFallback = false,
+  paused = false,
   accessibilityLabel,
   className,
   children,
@@ -98,8 +99,9 @@ export function CityBlocksShell({
         setup={createCityBlocksScene}
         params={params}
         forceFallback={forceFallback}
+        paused={paused}
         accessibilityLabel={accessibilityLabel}
-        fallback={renderFallback({ params, pointer, running: !reducedMotion })}
+        fallback={renderFallback({ params, pointer, running: !reducedMotion && !paused })}
       />
       {children}
     </View>

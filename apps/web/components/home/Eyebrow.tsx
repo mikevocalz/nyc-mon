@@ -7,8 +7,8 @@ import { Text, View } from '@acme/ui/tw';
 export function Eyebrow({ children, night = false }: { children: string; night?: boolean }) {
   return (
     <View className="flex-row items-center gap-3" aria-hidden>
-      <View className="h-0.5 w-8 bg-orange" />
-      <Text className={`text-xs font-extrabold uppercase tracking-[0.24em] ${night ? 'text-orange-500' : 'text-royal-500'}`}>
+      <View className="h-0.5 w-8 bg-orange-500" />
+      <Text className={`text-type-tag font-extrabold uppercase ${night ? 'text-orange-500' : 'text-royal-500'}`}>
         {children}
       </Text>
     </View>

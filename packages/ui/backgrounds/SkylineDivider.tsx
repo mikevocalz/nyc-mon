@@ -14,6 +14,8 @@ export interface SkylineDividerProps {
   size?: 'sm' | 'md' | 'lg';
   /** Layout seed: same seed, same buildings. Vary it so two dividers on a page differ. Default 1. */
   seed?: number;
+  /** Draw one frame and never loop, so the band costs nothing while a heavier scene is on screen. Default false. */
+  still?: boolean;
   /** Classes for the band (margins, bleed). */
   className?: string;
 }
@@ -50,13 +52,13 @@ const divider = tv({
  * LazyScene); traffic is off so a divider never competes with content, and
  * the beacons stop blinking under reduced motion.
  */
-export function SkylineDivider({ district = 'midtown', size = 'md', seed = 1, className }: SkylineDividerProps) {
+export function SkylineDivider({ district = 'midtown', size = 'md', seed = 1, still = false, className }: SkylineDividerProps) {
   const s = divider({ size, district });
   return (
     <View aria-hidden className={s.root({ className })}>
       <LazyScene className={s.scene()} placeholderColor={THEMES[district].sky[0]}>
         {({ paused }) => (
-          <CitySkyline district={district} seed={seed} depth={2} showVehicles={false} paused={paused} className="flex-1" />
+          <CitySkyline district={district} seed={seed} depth={2} showVehicles={false} paused={still || paused} className="flex-1" />
         )}
       </LazyScene>
       <View className={s.keyline()} />

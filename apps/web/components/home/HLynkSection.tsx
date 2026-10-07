@@ -25,11 +25,11 @@ export function HLynkSection() {
         <Heading
           level={2}
           id="w01-hlynk-title"
-          className="my-0 font-display text-3xl uppercase leading-[1.02] tracking-tight text-text md:text-5xl"
+          className="my-0 font-display text-3xl uppercase leading-heading tracking-tight text-text md:text-5xl"
         >
           {copy.title}
         </Heading>
-        <Paragraph className="my-0 max-w-[36rem] text-base leading-7 text-text-secondary md:text-lg md:leading-8">
+        <Paragraph className="my-0 max-w-content-measure text-base leading-7 text-text-secondary md:text-lg md:leading-8">
           {copy.body}
         </Paragraph>
         <List className="m-0 list-none gap-3 p-0">
@@ -40,13 +40,13 @@ export function HLynkSection() {
             </ListItem>
           ))}
         </List>
-        <Paragraph className="my-0 max-w-[36rem] text-sm leading-6 text-text-muted md:text-base">
+        <Paragraph className="my-0 max-w-content-measure text-sm leading-6 text-text-muted md:text-base">
           {copy.body2}
         </Paragraph>
       </View>
       <View className="w-full min-w-0 max-w-md md:flex-1">
-        <View id="mfx-hlynk-device" className="bg-ink-950 px-6 py-10 md:px-10 md:py-12">
-          <DeviceStage model="placeholder" caption={copy.caption} />
+        <View id="mfx-hlynk-device" className="scheme-dark bg-ink-950 px-6 py-10 md:px-10 md:py-12">
+          <DeviceStage model="placeholder" caption={copy.caption} label={copy.stageLabel} />
         </View>
         <View
           id="mfx-hlynk-scan"

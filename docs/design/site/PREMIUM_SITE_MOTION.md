@@ -7,26 +7,35 @@ The motion contract for the redesigned home page. Companion to
 
 ## 1. Architecture
 
-```
-ReactLenis (root, options.autoRaf)          ← owns the one RAF clock
+```text
+ReactLenis (root, autoRaf: false)            ← no Lenis RAF loop
   └─ GsapLenisBridge
        connectGsapLenis(lenis, {
-         clock: 'external',                 ← ReactLenis owns raf; kinetrell adds no ticker
+         clock: 'kinetrell',                 ← adds lenis.raf to gsap.ticker
          refreshOnConnect: true,
-       })                                   ← lenis 'scroll' → ScrollTrigger.update()
+       })                                    ← lenis 'scroll' → ScrollTrigger.update()
   └─ MotionFrame
-       useHomeMotion()                      ← binds all timelines + ScrollTriggers once
+       useHomeMotion()                       ← binds timelines + ScrollTriggers once
 ```
 
-- `Lenis` runs in root mode — it smooths **window** scroll. `syncTouch` stays
-  off (Lenis default), so touch scrolling keeps native feel; no scroll-jacking
-  on mobile.
-- No second RAF loop anywhere. `lenis.raf()` is never called by us.
-- All timelines are `defineMotion()` documents compiled by `compileMotion()`,
-  bound by `createGsapTimeline()`, scrolled by `attachScrollTrigger()` — the
-  Kinetrell GSAP adapters, not raw tween calls (the single sanctioned raw
-  `gsap` usage is `quickTo` for the magnetic CTA, inside `motion.ts` only;
-  eslint restricts `gsap` imports to that file).
+`gsap.ticker` is the only motion clock. Verified against the pinned Kinetrell (0.1.0-alpha.1 @ 344de515):
+
+| Symbol | Source | Behaviour relied on |
+|---|---|---|
+| `ReactLenis` | `kinetrell/dist/web/lenis.mjs:47` (re-export of `lenis/react`) | `autoRaf: false` means Lenis starts no RAF loop |
+| `useKinetrellLenis` | `lenis.mjs:43` | returns the root Lenis instance |
+| `connectGsapLenis` | `kinetrell/dist/web/gsap-lenis.mjs:6` | `clock: 'kinetrell'` registers `lenis.raf(t*1000)` on `gsap.ticker` (`:16-20`) and subscribes `ScrollTrigger.update` to Lenis scroll; the teardown removes both |
+| `createGsapTimeline` | `kinetrell/dist/web/gsap.mjs:32` | binds compiled motion documents |
+| `attachScrollTrigger` | `gsap.mjs:57` | one ScrollTrigger per timeline, killed with it |
+| `useBrowserReducedMotion` | `kinetrell/dist/web/react.mjs` | single reduced-motion source for the page |
+
+The previous setup (`autoRaf: true` with `clock: 'external'`) left Lenis and GSAP each running a RAF loop; Phase 1 measured up to 8 RAF callbacks in one frame while scrolling (`PREMIUM_SITE_BASELINE.md` §2).
+
+Canvases: `CityBlocks` (hero) and `DeviceStage` (H-Lynk) each loop only while on screen, and `ThreeCanvas` stops three's internal `Animation` loop after `init()` (PS-010). `site-qa:motion` asserts one motion clock and at most one live canvas loop.
+
+Refresh: `connectGsapLenis` refreshes on connect; sections that change layout after mount (the H-Lynk stage swapping capture for canvas, late images) call `ScrollTrigger.refresh()` through the timeline that owns them. Teardown: `useGSAP` reverts every timeline and trigger on unmount; `site-qa:motion` checks the trigger count returns to its post-mount value after a route away and back.
+
+Page motion values come from the `@acme/theme` page-motion tokens; no duration, ease or distance literal lives in `motion.ts`.
 
 ## 2. Targeting
 

@@ -40,6 +40,22 @@ interface Runtime<P> {
 const isWeb = Platform.OS === 'web';
 
 /**
+ * three's `Renderer.init()` starts `Animation.start()`, a requestAnimationFrame
+ * loop that runs until dispose and only advances `nodeFrame`
+ * (three/src/renderers/common/Animation.js, r186). ThreeCanvas already owns a
+ * frame loop gated on visibility, so the internal one is stopped after init and
+ * each draw advances `nodeFrame` itself. Neither member is public API: if a
+ * three upgrade renames them these calls become no-ops and the extra loop
+ * returns, which the site-qa motion check catches.
+ */
+type RendererInternals = {
+  _animation?: { stop?: () => void } | null;
+  _nodes?: { nodeFrame?: { update?: () => void } } | null;
+};
+const stopInternalLoop = (renderer: WebGPURenderer) => (renderer as unknown as RendererInternals)._animation?.stop?.();
+const advanceNodeFrame = (renderer: WebGPURenderer) => (renderer as unknown as RendererInternals)._nodes?.nodeFrame?.update?.();
+
+/**
  * A three.js canvas on WebGPURenderer, with one code path for web and native.
  *
  * - Web with WebGPU: WebGPURenderer's WebGPU backend on a canvas element,
@@ -131,6 +147,7 @@ export function ThreeCanvas<P>({
         { time: rt.time, delta, width: rt.width, height: rt.height, pixelRatio: rt.pixelRatio, reducedMotion: rt.reducedMotion, pointer: rt.pointer },
         rt.params,
       );
+      advanceNodeFrame(renderer);
       renderer.render(built.scene, built.camera);
       rt.surface?.present();
     } catch (error) {
@@ -174,6 +191,7 @@ export function ThreeCanvas<P>({
       if (cancelled || !surface) return;
       renderer = surface.createRenderer(THREE, { backend: using, device });
       await renderer.init();
+      stopInternalLoop(renderer);
       if (cancelled) return;
       built = setup({ THREE, renderer, backend: using, invalidate }, rt.params);
       rt.renderer = renderer;

@@ -89,6 +89,25 @@ export const WithAction: StoryObj<typeof NavBar> = {
   ),
 };
 
+/**
+ * Phone menu keyboard contract, at a 390px phone width. Open the menu, then:
+ * Tab and Shift+Tab cycle through the toggle and the menu links and never
+ * reach the page behind the sheet; Escape closes the menu and focus lands
+ * back on the toggle. Escape on an open desktop dropdown returns focus to
+ * its trigger.
+ */
+export const PhoneMenuKeyboard: StoryObj<typeof NavBar> = {
+  name: 'Phone menu keyboard',
+  parameters: { viewport: { defaultViewport: 'mobile2' } },
+  args: { items: ITEMS, district: 'midtown', position: 'static', cta: { label: 'Walk the district', href: '#walk' }, skipTo: 'story-main' },
+  render: (args) => (
+    <View className="min-h-screen bg-ink-900">
+      <NavBar {...args} />
+      <Page />
+    </View>
+  ),
+};
+
 /** The same bar in each district: skyline and accent follow the neighbourhood. */
 export const Districts: StoryObj = {
   render: () => (

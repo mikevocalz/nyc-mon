@@ -13,6 +13,9 @@
 /* Token-driven scrollbar — token-driven, no plugin */
 html {
   scrollbar-color: var(--color-royal-600) transparent;
+  /* The sticky NavBar plus its skyline strip is ~114px tall: keep focused and
+     skip-link targets clear of it (WCAG 2.4.11, contract §13). */
+  scroll-padding-top: calc(var(--spacing) * 32);
 }
 ::-webkit-scrollbar {
   width: 10px;

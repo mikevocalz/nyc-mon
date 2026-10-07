@@ -1,7 +1,7 @@
 import { Image, type ImageProps } from '@acme/ui';
 import { Figcaption, Figure, Heading, Paragraph, Section, Text } from '@acme/ui/html';
 import { View } from '@acme/ui/tw';
-import { TEMP_WORLD_ART } from './art';
+import { art, WORLD_SLOTS } from './art';
 import { Eyebrow } from './Eyebrow';
 import { W01_COPY } from './copy';
 
@@ -23,13 +23,6 @@ const SPANS = [
   'md:col-span-5 md:col-start-8 md:-mt-4 relative z-0',
 ] as const;
 
-const SIZES = [
-  '(min-width: 768px) 56vw, 92vw',
-  '(min-width: 768px) 40vw, 92vw',
-  '(min-width: 768px) 32vw, 92vw',
-  '(min-width: 768px) 40vw, 92vw',
-] as const;
-
 export function WorldSection() {
   const copy = W01_COPY.world;
   return (
@@ -44,22 +37,24 @@ export function WorldSection() {
         <Heading
           level={2}
           id="w01-world-title"
-          className="my-0 font-display text-3xl uppercase leading-[1.02] tracking-tight text-text md:text-5xl"
+          className="my-0 font-display text-3xl uppercase leading-heading tracking-tight text-text md:text-5xl"
         >
           {copy.title}
         </Heading>
-        <Paragraph className="my-0 max-w-[38rem] text-base leading-7 text-text-secondary md:text-lg md:leading-8">
+        <Paragraph className="my-0 max-w-content-measure text-base leading-7 text-text-secondary md:text-lg md:leading-8">
           {copy.body}
         </Paragraph>
       </View>
       <View className="gap-10 md:grid md:grid-cols-12 md:gap-x-8 md:gap-y-0">
-        {TEMP_WORLD_ART.map((photo, i) => (
-          <Figure key={photo.id} id={`mpx-world-${'abcd'[i]}`} className={`m-0 ${SPANS[i]}`}>
+        {WORLD_SLOTS.map((slot, i) => {
+          const photo = art(slot);
+          return (
+          <Figure key={slot} id={`mpx-world-${'abcd'[i]}`} className={`m-0 ${SPANS[i]}`}>
             <Image
-              src={photo.source as ImageProps['src']}
+              src={photo.src as ImageProps['src']}
               alt={photo.alt}
               fill
-              sizes={SIZES[i]}
+              sizes={photo.sizes}
               loading="lazy"
               unoptimized
               placeholder="blur"
@@ -67,13 +62,14 @@ export function WorldSection() {
               className="aspect-[3/2] w-full"
             />
             <Figcaption className="absolute bottom-3 left-3 z-10 m-0 bg-ink-900/85 px-2.5 py-1.5">
-              <Text className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-100">
+              <Text className="text-type-tag font-semibold uppercase text-ink-100">
                 <Text className="font-display text-orange-400">{String(i + 1).padStart(2, '0')}</Text>
-                {`  ${photo.title} — ${photo.place}`}
+                {`  ${photo.caption?.title ?? ''} — ${photo.caption?.place ?? ''}`}
               </Text>
             </Figcaption>
           </Figure>
-        ))}
+          );
+        })}
       </View>
     </Section>
   );

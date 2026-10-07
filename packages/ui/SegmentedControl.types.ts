@@ -16,4 +16,11 @@ export interface SegmentedControlProps<T extends string> {
   district?: District;
   /** Opt-in rounded corners (rounded-soft). Default false: square. */
   rounded?: boolean;
+  /**
+   * Accessible name of the radio group. Give this or `aria-labelledby`
+   * (the id of a visible label) unless an enclosing fieldset/legend names it.
+   */
+  'aria-label'?: string;
+  /** Id of the element whose text names the radio group. */
+  'aria-labelledby'?: string;
 }

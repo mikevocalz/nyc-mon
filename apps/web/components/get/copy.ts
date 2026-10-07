@@ -1,22 +1,17 @@
 /**
  * Every string on the waitlist page (W05). All `voice: "ui"` — the canon voice:
- * warm, plain and honest about scope. There is no backend on this site
- * (ADR 0003), so the form confirms in place instead of faking a POST.
+ * warm, plain and honest about scope. The email form returns with the waitlist
+ * endpoint (PREMIUM_SITE_DECISIONS.md PS-001); until then `status` says so.
  */
 export const W05_COPY = {
   hero: {
     eyebrow: 'The waitlist',
     title: 'Get NYC-MON',
-    body: 'Phase 1 ships on iOS and Android. The store badges go up at launch — until then, the waitlist is how you hear about it. Leave your email and we chirp you the day the doors open.',
+    body: "Phase 1 ships on iOS and Android. The store badges go up at launch, and until then the waitlist is how you'll hear the day it's out.",
   },
-  form: {
-    label: 'Email address',
-    placeholder: 'you@example.com',
-    hint: 'One email when the app is out. No ads, no newsletter drip.',
-    submit: 'Join the waitlist',
-    errorInvalid: "That doesn't look like an email address.",
-    confirmedTitle: "You're on the list — we'll chirp you.",
-    confirmedBody: 'One email at launch, when the App Store and Google Play badges go live. That is the whole deal.',
+  status: {
+    title: 'Sign-ups open soon.',
+    body: "The waitlist isn't taking emails yet. When it is, this is where you join, and you'll get one email when the app is out.",
   },
   stores: {
     label: 'The app stores',

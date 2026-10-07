@@ -1,16 +1,64 @@
 /**
- * Temporary art direction for the W01 home page (premium-site pass).
+ * The W01 art map (prompt pack 02 §5). Every image slot on the home page
+ * reads through `art(slot)`; the slot name is the contract final art replaces.
  *
- * Every image slot on the page reads through this one file. Until final
- * NYC-MON key art, Baby Mon renders, egg art and H-Lynk product photography
- * exist, each slot maps to a bundled, licensed NYC photograph from
- * `@acme/assets/photos` (1200x800 WebP, blurDataURL included — no hotlinks).
- *
- * To swap in final art later: replace the entry here. Components read only
- * `NycPhoto` fields (`source`, `alt`, `title`, `place`, `blurDataURL`),
- * so no layout changes are needed.
+ * Until NYC-MON key art, Baby Mon renders, egg art and H-Lynk product
+ * photography exist, each slot holds a bundled, licensed NYC photograph from
+ * `@acme/assets/photos` (1200x800 WebP with a blurDataURL; never hotlinked).
+ * `hlynk.static` and `care` are not rendered yet: they reserve the slots the
+ * Phase 4 product stage fallback and Phase 5 care art fill.
  */
-import { NYC_PHOTOS, type NycPhoto } from '@acme/assets/photos';
+import { breakpoints } from '@acme/theme';
+import type { StarterBloodline } from '@acme/content';
+import { NYC_PHOTOS, type NycPhoto, type PhotoDistrict, type PhotoSource } from '@acme/assets/photos';
+
+/** A starter's slot number from @acme/content (DECISIONS.md #1). */
+export type StarterId = StarterBloodline['slot'];
+
+export type ArtSlot =
+  | 'hero'
+  | 'world.primary'
+  | 'world.secondary'
+  | 'world.detail'
+  | 'world.extra'
+  | 'hlynk.static'
+  | `starter.${StarterId}`
+  | 'care'
+  | 'hatch';
+
+/** Decorative art renders with `alt=""`; the reason is required so the choice is reviewed. */
+export interface ArtDecorative {
+  reason: string;
+}
+
+/** A point in the frame to keep in view when cropping, 0–1 from the top left. */
+export interface ArtFocalPoint {
+  x: number;
+  y: number;
+}
+
+/** A caption the page currently prints with the art. */
+export interface ArtCaption {
+  title: string;
+  place: string;
+}
+
+export interface ArtEntry {
+  src: PhotoSource;
+  width: number;
+  height: number;
+  alt: string;
+  decorative?: ArtDecorative;
+  focalPoint?: ArtFocalPoint;
+  blurDataURL?: string;
+  mobileSrc?: PhotoSource;
+  sizes: string;
+  district?: PhotoDistrict;
+  caption?: ArtCaption;
+}
+
+const MD_UP = `(min-width: ${breakpoints.md})`;
+const sizes = (desktopVw: number) => `${MD_UP} ${desktopVw}vw, 92vw`;
 
 function photoById(id: string): NycPhoto {
   const photo = NYC_PHOTOS.find((p) => p.id === id);
@@ -18,30 +66,49 @@ function photoById(id: string): NycPhoto {
   return photo;
 }
 
-/** Hero: the environmental frame beside the seal — deco crown, city scale. */
-export const TEMP_HERO_ART: NycPhoto = photoById('midtown-chrysler-spire');
+function fromPhoto(id: string, slotSizes: string): ArtEntry {
+  const photo = photoById(id);
+  return {
+    src: photo.source,
+    width: photo.width,
+    height: photo.height,
+    alt: photo.alt,
+    blurDataURL: photo.blurDataURL,
+    sizes: slotSizes,
+    district: photo.district,
+    caption: { title: photo.title, place: photo.place },
+  };
+}
 
-/**
- * World: four districts as places, not features. Harlem, Midtown, Downtown
- * and the Mega City edge — one dominant frame plus offset companions.
- */
-export const TEMP_WORLD_ART: readonly NycPhoto[] = [
-  photoById('midtown-empire-sunset'),
-  photoById('harlem-apollo'),
-  photoById('downtown-one-wtc'),
-  photoById('harlem-lenox-rowhouses'),
-];
+const ART = {
+  hero: fromPhoto('midtown-chrysler-spire', sizes(34)),
+  'world.primary': fromPhoto('midtown-empire-sunset', sizes(56)),
+  'world.secondary': fromPhoto('harlem-apollo', sizes(40)),
+  'world.detail': fromPhoto('downtown-one-wtc', sizes(32)),
+  'world.extra': fromPhoto('harlem-lenox-rowhouses', sizes(40)),
+  'hlynk.static': fromPhoto('downtown-nyse', sizes(40)),
+  'starter.1': fromPhoto('harlem-brownstone-stoops', sizes(30)),
+  'starter.2': fromPhoto('midtown-times-square', sizes(30)),
+  'starter.3': fromPhoto('megacity-bridge-deck', sizes(30)),
+  care: fromPhoto('harlem-brownstone-stoops', sizes(40)),
+  hatch: fromPhoto('megacity-brooklyn-bridge-night', sizes(40)),
+} as const satisfies Record<ArtSlot, ArtEntry>;
 
-/**
- * Starters: one environment per egg, slot order. Harlem streets for the
- * Hood Ratti line, Midtown for the Bodega Baddiee Cee line, the Mega City
- * bridge deck for the Yote line. Stands in for Baby Mon renders.
- */
-export const TEMP_STARTER_ART: readonly NycPhoto[] = [
-  photoById('harlem-brownstone-stoops'),
-  photoById('midtown-times-square'),
-  photoById('megacity-bridge-deck'),
-];
+export const ART_SLOTS = Object.keys(ART) as readonly ArtSlot[];
 
-/** Hatch: the darkest bundled frame — the bridge lit at night. */
-export const TEMP_HATCH_ART: NycPhoto = photoById('megacity-brooklyn-bridge-night');
+/** World frames in composition order: the dominant frame, then its companions. */
+export const WORLD_SLOTS = ['world.primary', 'world.secondary', 'world.detail', 'world.extra'] as const satisfies readonly ArtSlot[];
+
+export function art(slot: ArtSlot): ArtEntry {
+  return ART[slot];
+}
+
+export function starterSlot(id: StarterId): `starter.${StarterId}` {
+  return `starter.${id}`;
+}
+
+/** A URL for `<link rel="preload">`: the bundler gives a string or StaticImageData. */
+export function artHref(entry: ArtEntry): string {
+  const { src } = entry;
+  return typeof src === 'object' ? src.src : String(src);
+}

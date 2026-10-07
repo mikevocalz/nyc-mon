@@ -19,9 +19,18 @@
     "skia:prepare-web": "node tooling/copy-skia-web-assets.mjs",
     "postinstall": "node tooling/copy-viro-web-assets.mjs && node tooling/copy-skia-web-assets.mjs",
     "spatial:verify-android": "node tooling/verify-spatial-android.mjs",
-    "spatial:verify-typegpu": "node tooling/verify-typegpu-toolchain.mjs"
+    "spatial:verify-typegpu": "node tooling/verify-typegpu-toolchain.mjs",
+    "site-qa:shots": "node tooling/site-qa/shots.mjs",
+    "site-qa:axe": "node tooling/site-qa/axe.mjs",
+    "site-qa:copy-lint": "node tooling/site-qa/copy-lint.mjs",
+    "site-qa:motion": "node tooling/site-qa/motion.mjs",
+    "site-qa:lhci": "node tooling/site-qa/lhci.mjs",
+    "site-qa:all": "node tooling/site-qa/all.mjs"
   },
   "devDependencies": {
+    "axe-core": "4.11.0",
+    "lighthouse": "13.5.0",
+    "playwright": "1.63.0",
     "turbo": "catalog:"
   }
 }

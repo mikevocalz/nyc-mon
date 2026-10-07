@@ -24,14 +24,14 @@ export function CareSection() {
         <Heading
           level={2}
           id="w01-care-title"
-          className="my-0 font-display text-3xl uppercase leading-[1.02] tracking-tight text-text md:text-5xl"
+          className="my-0 font-display text-3xl uppercase leading-heading tracking-tight text-text md:text-5xl"
         >
           {copy.title}
         </Heading>
-        <Paragraph className="my-0 max-w-[34rem] text-base leading-7 text-text-secondary md:text-lg md:leading-8">
+        <Paragraph className="my-0 max-w-content-measure text-base leading-7 text-text-secondary md:text-lg md:leading-8">
           {copy.body}
         </Paragraph>
-        <Paragraph className="my-0 font-display text-lg uppercase tracking-tight text-orange-600 md:text-xl">
+        <Paragraph className="my-0 font-display text-lg uppercase tracking-tight text-orange-700 md:text-xl">
           {copy.closing}
         </Paragraph>
       </View>
@@ -39,7 +39,7 @@ export function CareSection() {
         {/* Fixed night plate — the H-Lynk readout is dark in both schemes;
             scheme-dark rescopes the semantic tokens (text, meters) inside. */}
         <View className="scheme-dark gap-6 border-2 border-ink-950 bg-ink-950 px-5 py-6 md:px-7 md:py-8">
-          <Text className="text-[11px] font-extrabold uppercase tracking-[0.24em] text-ink-300">
+          <Text className="text-type-tag font-extrabold uppercase text-ink-300">
             {copy.panelLabel}
           </Text>
           <List className="m-0 list-none gap-6 p-0">
@@ -49,7 +49,7 @@ export function CareSection() {
                   <Heading level={3} className="my-0 font-display text-xl uppercase text-ink-50">
                     {item.verb}
                   </Heading>
-                  <Paragraph className="my-0 max-w-[16rem] text-right text-xs leading-5 text-silver-400">
+                  <Paragraph className="my-0 max-w-content-narrow text-right text-xs leading-5 text-silver-400">
                     {item.line}
                   </Paragraph>
                 </View>
@@ -67,7 +67,7 @@ export function CareSection() {
               </ListItem>
             ))}
           </List>
-          <Paragraph className="my-0 text-[11px] uppercase tracking-[0.18em] text-ink-400">{copy.example}</Paragraph>
+          <Paragraph className="my-0 text-type-tag font-normal uppercase text-ink-400">{copy.example}</Paragraph>
         </View>
       </View>
     </Section>

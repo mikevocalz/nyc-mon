@@ -92,3 +92,69 @@ PS-001 to PS-007 answer `PREMIUM_SITE_AUDIT.md` §17, decided 2026-10-07 after P
 **Decision.** Phase 2's `art.ts` defines every slot as an exhaustive union with aspect ratio, pixel sizes per breakpoint, alt ownership and mobile crop. Sections compose so they hold up without the creature art: type and photography, no stand-in creature and no placeholder text in the DOM (contract §14). Real art replaces slot contents without layout change.
 
 **Assets.** Mike confirmed on 2026-10-07 that he has or will produce all four sets: Baby-form renders for the three starters, three egg key art images (Metro, Corner, Prism), a red H-Lynk Core capture (after PS-002), and street-level photography of each district at the slot aspects.
+
+---
+
+## PS-008 — Rendering boundaries: server sections, small client islands
+
+**Disposition:** decided (Phase 2).
+
+**Context.** `HomeHero.tsx` is a whole-file client component because it reads `useDistrictStore`, renders `SegmentedControl`, and lazy-loads `CityBlocks` with `next/dynamic` (`ssr: false`). Phase 1 measured 1.4 s JS bootup and 664 KiB unused JS on the home route. Marquee, World, H-Lynk, Starters, Care and Hatch have no directive but render `View` from `@acme/ui/tw`, a client module.
+
+**Decision.** Section shells are server components built from `@acme/ui/html`. The hero splits: headline, support line, CTA, seal and photo are server HTML; a client island holds the district selector and the city canvas. `DeviceStage` stays the H-Lynk island. Phase 3 applies this to the hero; Phases 4–6 keep it for their sections.
+
+**Alternatives.** Keeping the hero client-side is simpler but ships its copy in the client bundle and ties first paint to hydration.
+
+**Consequences.** Server sections can't read the district store; anything that follows the picked district (the divider tint, hero city) stays inside the island or reads the store in its own small client component.
+
+---
+
+## PS-009 — One motion clock: `gsap.ticker` drives Lenis
+
+**Disposition:** decided and implemented (Phase 2).
+
+**Context.** `MotionRoot.tsx` ran `ReactLenis` with `autoRaf: true` and `connectGsapLenis(lenis, { clock: 'external' })`. In Kinetrell 0.1.0-alpha.1 `'external'` only subscribes `ScrollTrigger.update` to Lenis scroll (`gsap-lenis.mjs:15-20`), so Lenis and `gsap.ticker` each ran a RAF loop.
+
+**Decision.** `autoRaf: false` and `clock: 'kinetrell'`, which adds `lenis.raf` to `gsap.ticker`. Reduced motion still renders without Lenis.
+
+**Alternatives.** Lenis as the clock with GSAP's ticker driven from it (`gsap.ticker.remove(gsap.updateRoot)` + manual updates): not supported by the Kinetrell API, so it would be a second abstraction beside it (contract §10).
+
+**Consequences.** `site-qa:motion` asserts one motion clock. If Kinetrell changes the clock semantics, that check fails first.
+
+---
+
+## PS-010 — Canvases loop only while visible; three's internal loop is stopped
+
+**Disposition:** decided and implemented (Phase 2).
+
+**Context.** Phase 1 found 3 RAF loops idle and 5 with the H-Lynk stage on screen. The hero `CityBlocks` ignored `SceneSection`'s `paused` (the component had no such prop), and three's `Renderer.init()` starts `Animation.start()`, a RAF loop that runs until dispose even when `ThreeCanvas` has stopped drawing (`three/src/renderers/common/Animation.js`, r186).
+
+**Decision.** `CityBlocks` gains a `paused` prop forwarded to `GpuCanvas`; the hero passes `SceneSection`'s value. `ThreeCanvas` calls `renderer._animation.stop()` after `init()` and advances `renderer._nodes.nodeFrame` in its own `draw()`. Both are private three members, wrapped in two guarded helpers with a comment naming the source; a rename turns them into no-ops and `site-qa:motion` catches the returning loop.
+
+**Alternatives.** A global canvas coordinator store that grants one canvas at a time: unnecessary while the two canvases are a full section apart and each pauses offscreen. Revisit if two canvases ever share a viewport.
+
+**Consequences.** One live canvas loop at most; none when neither is on screen.
+
+---
+
+## PS-011 — Art map: typed slots, local assets, swap without layout change
+
+**Disposition:** decided and implemented (Phase 2).
+
+**Context.** `art.ts` exported `TEMP_*` constants of NYC photos, and photo titles/places rendered as captions. Final Mon, egg and H-Lynk art is coming (PS-007).
+
+**Decision.** `art(slot)` over an exhaustive `ArtSlot` union with dimensions, `sizes`, and alt or a decorative reason; a unit test enforces it. Details in `PREMIUM_SITE_ARCHITECTURE.md` §5.
+
+**Consequences.** Final art is a source swap per slot. The slot list and final-asset specs live in `PREMIUM_SITE_HANDOFF.md`.
+
+---
+
+## PS-012 — District selector is a radio group, fixed in the kit
+
+**Disposition:** decided and implemented (Phase 2).
+
+**Context.** `SegmentedControl.web.tsx` rendered `role="tablist"`/`role="tab"` with no tab panel and no arrow keys inside a fieldset with a legend, and overflowed its panel at 390 and 320 (WCAG 4.1.2, 1.4.10).
+
+**Decision.** Radio-group semantics with roving tabindex and arrow/Home/End keys, wrapping to two rows in narrow containers. Fixed in `packages/ui` so every caller gets it.
+
+**Consequences.** Every `SegmentedControl` in the product now announces as a radio group; callers that relied on tab semantics were checked when the change landed.

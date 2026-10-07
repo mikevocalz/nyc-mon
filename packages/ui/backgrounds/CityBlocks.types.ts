@@ -65,6 +65,8 @@ export interface CityBlocksProps {
 
   /** Draw with Skia even where WebGPU works. For stories and tests. */
   forceFallback?: boolean;
+  /** Stop the frame loop, holding the current frame. Pass `SceneSection`'s `paused` so an offscreen city costs nothing. Default false. */
+  paused?: boolean;
   /** Accessible description. Unset means decorative and hidden from assistive tech. */
   accessibilityLabel?: string;
   className?: string;

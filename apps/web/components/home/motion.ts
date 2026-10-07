@@ -26,7 +26,16 @@ import {
   ensureScrollTrigger,
   type GsapTargetMap,
 } from 'kinetrell/web/gsap';
+import { breakpoints, pageMotion } from '@acme/theme';
 import { MOTION_MARKER_SELECTOR, parseMotionMarker } from './motion-markers';
+
+const { duration: D, ease: E, distance: Y, parallax: P, scale: S, tilt: T, scrub: SCRUB, magnet: M } = pageMotion;
+const ms = (seconds: number) => Math.round(seconds * 1000);
+const OUT = E.out.gsap;
+const IN_OUT = E.inOut.gsap;
+const LINEAR = E.scrub.gsap;
+/** A scrubbed track spans the whole trigger range; ScrollTrigger maps it to scroll. */
+const SPAN_MS = 1000;
 
 export const ARMED_CLASS = 'motion-armed';
 
@@ -78,24 +87,24 @@ const heroEntrance = compileMotion(
   defineMotion({
     id: 'w01.hero.enter',
     initial: {
-      'hero-art': { y: 24, scale: 1.045 },
-      'hero-seal': { y: 18, rotate: -2 },
-      'hero-eyebrow': { y: 10 },
-      'hero-title': { y: 34 },
-      'hero-body': { y: 20 },
-      'hero-starters': { y: 8 },
-      'hero-cta': { y: 14 },
-      'hero-districts': { y: 12 },
+      'hero-art': { y: Y.reveal, scale: S.enter },
+      'hero-seal': { y: Y.step, rotate: -T.stamp },
+      'hero-eyebrow': { y: Y.nudge },
+      'hero-title': { y: Y.rise },
+      'hero-body': { y: Y.step },
+      'hero-starters': { y: Y.nudge },
+      'hero-cta': { y: Y.step },
+      'hero-districts': { y: Y.nudge },
     },
     tracks: [
-      { target: 'hero-art', to: { y: 0, scale: 1 }, atMs: 0, durationMs: 950, ease: 'power2.out' },
-      { target: 'hero-eyebrow', to: { y: 0 }, atMs: 140, durationMs: 420, ease: 'power2.out' },
-      { target: 'hero-title', to: { y: 0 }, atMs: 240, durationMs: 640, ease: 'power2.out' },
-      { target: 'hero-body', to: { y: 0 }, atMs: 360, durationMs: 560, ease: 'power2.out' },
-      { target: 'hero-seal', to: { y: 0, rotate: 0 }, atMs: 400, durationMs: 620, ease: 'power2.out' },
-      { target: 'hero-starters', to: { y: 0 }, atMs: 500, durationMs: 480, ease: 'power2.out' },
-      { target: 'hero-cta', to: { y: 0 }, atMs: 580, durationMs: 480, ease: 'power2.out' },
-      { target: 'hero-districts', to: { y: 0 }, atMs: 680, durationMs: 480, ease: 'power2.out' },
+      { target: 'hero-art', to: { y: 0, scale: 1 }, atMs: 0, durationMs: ms(D.lg), ease: OUT },
+      { target: 'hero-eyebrow', to: { y: 0 }, atMs: 140, durationMs: ms(D.xs), ease: OUT },
+      { target: 'hero-title', to: { y: 0 }, atMs: 240, durationMs: ms(D.sm), ease: OUT },
+      { target: 'hero-body', to: { y: 0 }, atMs: 360, durationMs: ms(D.sm), ease: OUT },
+      { target: 'hero-seal', to: { y: 0, rotate: 0 }, atMs: 400, durationMs: ms(D.sm), ease: OUT },
+      { target: 'hero-starters', to: { y: 0 }, atMs: 500, durationMs: ms(D.xs), ease: OUT },
+      { target: 'hero-cta', to: { y: 0 }, atMs: 580, durationMs: ms(D.xs), ease: OUT },
+      { target: 'hero-districts', to: { y: 0 }, atMs: 680, durationMs: ms(D.xs), ease: OUT },
     ],
   }),
 );
@@ -106,8 +115,8 @@ const heroDrift = compileMotion(
     id: 'w01.hero.drift',
     initial: { 'hero-cluster': { yPercent: 0 }, 'hero-panel': { yPercent: 0 } },
     tracks: [
-      { target: 'hero-cluster', to: { yPercent: -9 }, durationMs: 1000, ease: 'linear' },
-      { target: 'hero-panel', to: { yPercent: -4 }, durationMs: 1000, ease: 'linear' },
+      { target: 'hero-cluster', to: { yPercent: -P.max }, durationMs: SPAN_MS, ease: LINEAR },
+      { target: 'hero-panel', to: { yPercent: -P.near }, durationMs: SPAN_MS, ease: LINEAR },
     ],
   }),
 );
@@ -116,8 +125,8 @@ const heroDrift = compileMotion(
 const worldEntrance = compileMotion(
   defineMotion({
     id: 'w01.world.enter',
-    initial: { 'world-head': { opacity: 0, y: 26 } },
-    tracks: [{ target: 'world-head', to: { opacity: 1, y: 0 }, durationMs: 700, ease: 'power2.out' }],
+    initial: { 'world-head': { opacity: 0, y: Y.reveal } },
+    tracks: [{ target: 'world-head', to: { opacity: 1, y: 0 }, durationMs: ms(D.md), ease: OUT }],
   }),
 );
 
@@ -130,16 +139,16 @@ const worldDrift = compileMotion(
   defineMotion({
     id: 'w01.world.drift',
     initial: {
-      'world-a': { yPercent: 3 },
-      'world-b': { yPercent: 7 },
-      'world-c': { yPercent: 5 },
-      'world-d': { yPercent: 9 },
+      'world-a': { yPercent: P.near },
+      'world-b': { yPercent: P.far },
+      'world-c': { yPercent: P.mid },
+      'world-d': { yPercent: P.max },
     },
     tracks: [
-      { target: 'world-a', to: { yPercent: -3 }, durationMs: 1000, ease: 'linear' },
-      { target: 'world-b', to: { yPercent: -6 }, durationMs: 1000, ease: 'linear' },
-      { target: 'world-c', to: { yPercent: -4 }, durationMs: 1000, ease: 'linear' },
-      { target: 'world-d', to: { yPercent: -7 }, durationMs: 1000, ease: 'linear' },
+      { target: 'world-a', to: { yPercent: -P.near }, durationMs: SPAN_MS, ease: LINEAR },
+      { target: 'world-b', to: { yPercent: -P.far }, durationMs: SPAN_MS, ease: LINEAR },
+      { target: 'world-c', to: { yPercent: -P.mid }, durationMs: SPAN_MS, ease: LINEAR },
+      { target: 'world-d', to: { yPercent: -P.far }, durationMs: SPAN_MS, ease: LINEAR },
     ],
   }),
 );
@@ -149,26 +158,26 @@ const hlynkReveal = compileMotion(
   defineMotion({
     id: 'w01.hlynk.reveal',
     initial: {
-      'hlynk-copy': { opacity: 0, y: 24 },
-      'hlynk-device': { opacity: 0, y: 56, rotationY: 8, transformPerspective: 800, scale: 0.97 },
+      'hlynk-copy': { opacity: 0, y: Y.reveal },
+      'hlynk-device': { opacity: 0, y: Y.stage, rotationY: T.stage, transformPerspective: pageMotion.perspective, scale: S.stage },
       'hlynk-scan': { opacity: 0, scaleX: 0 },
-      'hlynk-feat-0': { opacity: 0, y: 16 },
-      'hlynk-feat-1': { opacity: 0, y: 16 },
-      'hlynk-feat-2': { opacity: 0, y: 16 },
+      'hlynk-feat-0': { opacity: 0, y: Y.step },
+      'hlynk-feat-1': { opacity: 0, y: Y.step },
+      'hlynk-feat-2': { opacity: 0, y: Y.step },
     },
     tracks: [
-      { target: 'hlynk-copy', to: { opacity: 1, y: 0 }, atMs: 0, durationMs: 620, ease: 'power2.out' },
+      { target: 'hlynk-copy', to: { opacity: 1, y: 0 }, atMs: 0, durationMs: ms(D.sm), ease: OUT },
       {
         target: 'hlynk-device',
         to: { opacity: 1, y: 0, rotationY: 0, scale: 1 },
         atMs: 120,
-        durationMs: 900,
-        ease: 'power2.out',
+        durationMs: ms(D.lg),
+        ease: OUT,
       },
-      { target: 'hlynk-scan', to: { opacity: 1, scaleX: 1 }, atMs: 780, durationMs: 420, ease: 'power2.inOut' },
-      { target: 'hlynk-feat-0', to: { opacity: 1, y: 0 }, atMs: 420, durationMs: 440, ease: 'power2.out' },
-      { target: 'hlynk-feat-1', to: { opacity: 1, y: 0 }, atMs: 540, durationMs: 440, ease: 'power2.out' },
-      { target: 'hlynk-feat-2', to: { opacity: 1, y: 0 }, atMs: 660, durationMs: 440, ease: 'power2.out' },
+      { target: 'hlynk-scan', to: { opacity: 1, scaleX: 1 }, atMs: 780, durationMs: ms(D.xs), ease: IN_OUT },
+      { target: 'hlynk-feat-0', to: { opacity: 1, y: 0 }, atMs: 420, durationMs: ms(D.xs), ease: OUT },
+      { target: 'hlynk-feat-1', to: { opacity: 1, y: 0 }, atMs: 540, durationMs: ms(D.xs), ease: OUT },
+      { target: 'hlynk-feat-2', to: { opacity: 1, y: 0 }, atMs: 660, durationMs: ms(D.xs), ease: OUT },
     ],
   }),
 );
@@ -178,16 +187,16 @@ const startersEntrance = compileMotion(
   defineMotion({
     id: 'w01.starters.enter',
     initial: {
-      'starters-head': { opacity: 0, y: 26 },
-      'starter-0': { opacity: 0, y: 40 },
-      'starter-1': { opacity: 0, y: 40 },
-      'starter-2': { opacity: 0, y: 40 },
+      'starters-head': { opacity: 0, y: Y.reveal },
+      'starter-0': { opacity: 0, y: Y.rise },
+      'starter-1': { opacity: 0, y: Y.rise },
+      'starter-2': { opacity: 0, y: Y.rise },
     },
     tracks: [
-      { target: 'starters-head', to: { opacity: 1, y: 0 }, atMs: 0, durationMs: 620, ease: 'power2.out' },
-      { target: 'starter-0', to: { opacity: 1, y: 0 }, atMs: 160, durationMs: 620, ease: 'power2.out' },
-      { target: 'starter-1', to: { opacity: 1, y: 0 }, atMs: 300, durationMs: 620, ease: 'power2.out' },
-      { target: 'starter-2', to: { opacity: 1, y: 0 }, atMs: 440, durationMs: 620, ease: 'power2.out' },
+      { target: 'starters-head', to: { opacity: 1, y: 0 }, atMs: 0, durationMs: ms(D.sm), ease: OUT },
+      { target: 'starter-0', to: { opacity: 1, y: 0 }, atMs: 160, durationMs: ms(D.sm), ease: OUT },
+      { target: 'starter-1', to: { opacity: 1, y: 0 }, atMs: 300, durationMs: ms(D.sm), ease: OUT },
+      { target: 'starter-2', to: { opacity: 1, y: 0 }, atMs: 440, durationMs: ms(D.sm), ease: OUT },
     ],
   }),
 );
@@ -197,12 +206,12 @@ const careEntrance = compileMotion(
   defineMotion({
     id: 'w01.care.enter',
     initial: {
-      'care-head': { opacity: 0, y: 24 },
-      'care-readout': { opacity: 0, y: 30 },
+      'care-head': { opacity: 0, y: Y.reveal },
+      'care-readout': { opacity: 0, y: Y.rise },
     },
     tracks: [
-      { target: 'care-head', to: { opacity: 1, y: 0 }, atMs: 0, durationMs: 620, ease: 'power2.out' },
-      { target: 'care-readout', to: { opacity: 1, y: 0 }, atMs: 160, durationMs: 680, ease: 'power2.out' },
+      { target: 'care-head', to: { opacity: 1, y: 0 }, atMs: 0, durationMs: ms(D.sm), ease: OUT },
+      { target: 'care-readout', to: { opacity: 1, y: 0 }, atMs: 160, durationMs: ms(D.sm), ease: OUT },
     ],
   }),
 );
@@ -212,36 +221,36 @@ const hatchReveal = compileMotion(
   defineMotion({
     id: 'w01.hatch.reveal',
     initial: {
-      'hatch-art': { opacity: 0, scale: 1.06 },
-      'hatch-copy': { opacity: 0, y: 30 },
-      'hatch-cta': { opacity: 0, y: 16 },
+      'hatch-art': { opacity: 0, scale: S.enter },
+      'hatch-copy': { opacity: 0, y: Y.rise },
+      'hatch-cta': { opacity: 0, y: Y.step },
     },
     tracks: [
-      { target: 'hatch-art', to: { opacity: 1, scale: 1 }, atMs: 0, durationMs: 1300, ease: 'power2.out' },
-      { target: 'hatch-copy', to: { opacity: 1, y: 0 }, atMs: 320, durationMs: 720, ease: 'power2.out' },
-      { target: 'hatch-cta', to: { opacity: 1, y: 0 }, atMs: 640, durationMs: 560, ease: 'power2.out' },
+      { target: 'hatch-art', to: { opacity: 1, scale: 1 }, atMs: 0, durationMs: ms(D.xl), ease: OUT },
+      { target: 'hatch-copy', to: { opacity: 1, y: 0 }, atMs: 320, durationMs: ms(D.md), ease: OUT },
+      { target: 'hatch-cta', to: { opacity: 1, y: 0 }, atMs: 640, durationMs: ms(D.sm), ease: OUT },
     ],
   }),
 );
 
 // ---------------------------------------------------------------------------
 
-const DESKTOP = '(min-width: 768px)';
+const DESKTOP = `(min-width: ${breakpoints.md})`;
 const FINE_POINTER = '(pointer: fine)';
 
-/** ≤6px pull toward the pointer on desktop CTAs. Native geometry untouched. */
+/** Small pull toward the pointer on desktop CTAs. Native geometry untouched. */
 function armMagnets(root: ParentNode): () => void {
   if (!window.matchMedia(FINE_POINTER).matches) return () => {};
   const off: Array<() => void> = [];
   for (const id of MAGNETIC_TARGETS) {
     const el = root.querySelector<HTMLElement>(`#${CSS.escape(id)}`);
     if (!el) continue;
-    const moveX = gsap.quickTo(el, 'x', { duration: 0.25, ease: 'power2.out' });
-    const moveY = gsap.quickTo(el, 'y', { duration: 0.25, ease: 'power2.out' });
+    const moveX = gsap.quickTo(el, 'x', { duration: M.duration, ease: OUT });
+    const moveY = gsap.quickTo(el, 'y', { duration: M.duration, ease: OUT });
     const onMove = (e: PointerEvent) => {
       const r = el.getBoundingClientRect();
-      moveX(gsap.utils.clamp(-6, 6, (e.clientX - (r.left + r.width / 2)) * 0.18));
-      moveY(gsap.utils.clamp(-6, 6, (e.clientY - (r.top + r.height / 2)) * 0.18));
+      moveX(gsap.utils.clamp(-M.clamp, M.clamp, (e.clientX - (r.left + r.width / 2)) * M.factor));
+      moveY(gsap.utils.clamp(-M.clamp, M.clamp, (e.clientY - (r.top + r.height / 2)) * M.factor));
     };
     const onLeave = () => {
       moveX(0);
@@ -288,7 +297,7 @@ export function useHomeMotion() {
           trigger: triggers.hero,
           start: 'top top',
           end: 'bottom top',
-          scrub: 0.6,
+          scrub: SCRUB.base,
         });
       }
 
@@ -304,7 +313,7 @@ export function useHomeMotion() {
           trigger: triggers.world,
           start: 'top bottom',
           end: 'bottom top',
-          scrub: 0.8,
+          scrub: SCRUB.loose,
         });
       }
 
@@ -314,7 +323,7 @@ export function useHomeMotion() {
           trigger: triggers.hlynk,
           start: 'top 82%',
           end: 'center 55%',
-          scrub: 0.5,
+          scrub: SCRUB.tight,
         });
       }
 

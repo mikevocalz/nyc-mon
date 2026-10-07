@@ -11,6 +11,8 @@ export interface DeviceStageProps {
   model?: DeviceSceneParams['model'];
   /** Visible caption under the stage. */
   caption: string;
+  /** Accessible name of the stage figure. */
+  label: string;
   /** Classes for the figure (width, aspect). */
   className?: string;
 }
@@ -40,7 +42,7 @@ function useReducedMotion() {
  * Offscreen the loop pauses. Under reduced motion the capture stays.
  * Slow idle yaw and a pointer tilt of 8 degrees or less live in the scene.
  */
-export function DeviceStage({ model = 'placeholder', caption, className }: DeviceStageProps) {
+export function DeviceStage({ model = 'placeholder', caption, label, className }: DeviceStageProps) {
   const { ref, hasBeenNear, isVisible } = useInView({ nearMarginPx: 600 });
   const reducedMotion = useReducedMotion();
   const live = hasBeenNear && !reducedMotion;
@@ -57,7 +59,7 @@ export function DeviceStage({ model = 'placeholder', caption, className }: Devic
   );
 
   return (
-    <Figure aria-label="H-Lynk device" data-testid="w01-device-stage" className={`m-0 w-full gap-3 ${className ?? ''}`}>
+    <Figure aria-label={label} data-testid="w01-device-stage" className={`m-0 w-full gap-3 ${className ?? ''}`}>
       <View ref={ref} className="relative aspect-[4/5] w-full">
         {live ? (
           <ThreeCanvas
