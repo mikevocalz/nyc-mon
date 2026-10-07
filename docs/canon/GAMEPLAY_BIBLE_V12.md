@@ -202,6 +202,52 @@ Build vertically, but target the complete native architecture:
 
 Web ships only the shared Mon Space slice while consuming the same production state contracts.
 
+
+## React Native UI + WebGPU/TypeGPU shader law
+
+These are hard architecture rules for every NYC-MON product surface.
+
+### React Native owns application UI
+
+All product screens and reusable UI are authored in **React Native**. Browser delivery uses **React Native Web** from the same feature/component system.
+
+Do not create parallel raw-HTML/CSS implementations of Home, Mon Space, H-Lynk, Mons, Caller, Stories, battle HUDs or other product screens. Platform-specific adapters are allowed only where a platform API requires them; they must not become a second UI architecture.
+
+The web Tamagotchi experience renders the same shared Mon Space feature used by native H-Lynk → Active Mon.
+
+### All shaders use WebGPU through TypeGPU
+
+Every NYC-MON shader/effect path targets **WebGPU + TypeGPU**. Do not create CSS/WebGL/DOM effect duplicates as an alternate visual-effects implementation.
+
+Canonical flow:
+
+`React Native feature → typed NYC Effect component/API → TypeGPU → WebGPU → GPU surface`
+
+Game-renderer flow:
+
+`Three.js scene → @typegpu/three / TypeGPU → WebGPU`
+
+Shader Effects Inc. `shader-effects-inc/shaders` is an approved source of visual references and, where license/provenance permits, compatible shader logic. External shader code must enter NYC-MON through the shared effects layer rather than being pasted/imported ad hoc into gameplay screens.
+
+### Shared effects package
+
+Create/maintain a shared package (target: `packages/effects`) that owns:
+- typed effect registry and parameter schemas
+- TypeGPU pipelines/bind groups/uniform contracts
+- WGSL modules and provenance/license metadata
+- React Native effect surfaces/components
+- Three.js/@typegpu/three adapters for world rendering
+- capability/performance tiers
+- deterministic seeds/timing where replay capture requires them
+- reduced-motion/accessibility variants
+- cleanup/resource lifetime rules and tests
+
+Initial semantic effects should include scanner/sweep, hologram, glitch/corruption, Mon aura/Affinity, hatch, evolution, impact/hit spark, LINK//GEAR energy, battle transition, weather/world atmosphere, Ultimate LINK and Story/replay transitions.
+
+Feature code requests semantic effects such as `ScanEffect`, `EvolutionEffect` or `ImpactEffect`; it should not own loose WGSL strings.
+
+Rive remains appropriate for authored interactive UI/character motion. When a Rive surface and a shader treatment are composed, the shader treatment still follows the WebGPU/TypeGPU effects pipeline rather than introducing a DOM/CSS effects layer.
+
 ## Non-negotiable product principle
 
 **Raise one persistent Mon; never maintain a “web Mon” and a “game Mon.”** Care, conversation, battles, memories, evolution and device handoff are chapters in the same creature's life.
