@@ -59,7 +59,6 @@ function StarterPoster({ card, index }: { card: StarterCard; index: number }) {
             framed={false}
             sizes={plate.sizes}
             loading="lazy"
-            unoptimized
             placeholder="blur"
             blurDataURL={plate.blurDataURL}
             contentPosition={artPosition(plate)}

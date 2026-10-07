@@ -55,7 +55,6 @@ export function HatchBand() {
               framed={false}
               sizes={hatchArt.sizes}
               loading="lazy"
-              unoptimized
               placeholder="blur"
               blurDataURL={hatchArt.blurDataURL}
               contentPosition={artPosition(hatchArt)}

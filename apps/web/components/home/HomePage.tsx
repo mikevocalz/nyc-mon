@@ -4,7 +4,7 @@ import { DistrictDivider } from './DistrictDivider';
 import { HatchBand } from './HatchBand';
 import { HLynkSection } from './HLynkSection';
 import { HomeHero } from './HomeHero';
-import { MotionRoot } from './MotionRoot';
+import { HomeMotion } from './HomeMotion';
 import { SignageBoard } from './SignageBoard';
 import { StartersSection, starterCards } from './StartersSection';
 import { WaitlistSection } from './WaitlistSection';
@@ -13,12 +13,13 @@ import { WorldSection } from './WorldSection';
 /**
  * W01, the product site's home page. Contract: docs/design/screens/W01/08-handoff.md.
  * Order: hero → district board → world → H-Lynk → starters → care → hatch →
- * waitlist → footer. MotionRoot wraps the page in the Kinetrell clock; under reduced
- * motion it renders the same tree with no choreography.
+ * waitlist → footer. The sections are server HTML; HomeMotion loads the
+ * Kinetrell clock after hydration and binds the choreography to them by id.
  */
 export function HomePage() {
   return (
-    <MotionRoot>
+    <>
+      <HomeMotion />
       <View className="w-full flex-1 bg-bg">
         <HomeHero />
         <SignageBoard />
@@ -31,6 +32,6 @@ export function HomePage() {
         <HatchBand />
         <WaitlistSection />
       </View>
-    </MotionRoot>
+    </>
   );
 }

@@ -6,14 +6,14 @@
  * `clock: 'external'` plus `autoRaf: true` Lenis and GSAP each ran a RAF
  * loop (PREMIUM_SITE_BASELINE.md §2). Root mode leaves touch scroll native.
  *
- * Reduced motion renders the same children without Lenis and without
- * arming any choreography — every `mfx-*` target simply stays visible.
+ * It renders nothing: the page is server HTML and this module binds to it by
+ * id. Reduced motion mounts no Lenis and arms no choreography, so every
+ * `mfx-*` target stays visible.
  */
-import { useEffect, type ReactNode } from 'react';
+import { useEffect } from 'react';
 import { ReactLenis, useKinetrellLenis } from 'kinetrell/web/lenis';
 import { connectGsapLenis } from 'kinetrell/web/gsap-lenis';
 import { useBrowserReducedMotion } from 'kinetrell/web/react';
-import { View } from '@acme/ui/tw';
 import { useHomeMotion } from './motion';
 
 /** Bridges the ReactLenis instance to ScrollTrigger once it exists. */
@@ -26,20 +26,18 @@ function GsapLenisBridge() {
   return null;
 }
 
-function MotionFrame({ children }: { children: ReactNode }) {
+function MotionFrame() {
   useHomeMotion();
-  return <View className="w-full flex-1">{children}</View>;
+  return null;
 }
 
-export function MotionRoot({ children }: { children: ReactNode }) {
+export default function MotionRoot() {
   const reduced = useBrowserReducedMotion();
-  if (reduced) {
-    return <View className="w-full flex-1">{children}</View>;
-  }
+  if (reduced) return null;
   return (
     <ReactLenis root options={{ autoRaf: false }}>
       <GsapLenisBridge />
-      <MotionFrame>{children}</MotionFrame>
+      <MotionFrame />
     </ReactLenis>
   );
 }

@@ -31,7 +31,6 @@ function WorldFrame({ slot, drift }: { slot: (typeof WORLD_SLOTS)[number]; drift
           framed={false}
           sizes={photo.sizes}
           loading="lazy"
-          unoptimized
           placeholder="blur"
           blurDataURL={photo.blurDataURL}
           contentPosition={artPosition(photo)}

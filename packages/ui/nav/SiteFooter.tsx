@@ -262,7 +262,6 @@ export function SiteFooter({
         <View className={s.legal()}>
           <View className={s.legalInner()}>
             <Text className={s.legalText()}>{copyright}</Text>
-            <Text className={s.legalText()}>{tagline}</Text>
           </View>
         </View>
       )}
