@@ -9,6 +9,7 @@
     "./tw": "./tw.tsx",
     "./primitives": "./primitives/index.tsx",
     "./html": "./html/index.tsx",
+    "./backgrounds/CityBlocks": "./backgrounds/CityBlocks.tsx",
     "./gpu": "./gpu/index.ts",
     "./three": "./three/index.ts",
     "./neon": "./neon/index.ts",

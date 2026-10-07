@@ -14,6 +14,11 @@ export const W01_COPY = {
     districtLabel: 'Pick a district',
     cityLabel: (district: string) => `${district} street grid, seen from above`,
   },
+  world: {
+    eyebrow: 'The world',
+    title: "The city isn't a backdrop. It's the world.",
+    body: 'Every district keeps its own hours, its own weather and its own legends. The Mons were already living here.',
+  },
   hlynk: {
     eyebrow: 'The device',
     title: 'The H-Lynk Core',
@@ -37,6 +42,8 @@ export const W01_COPY = {
     eyebrow: 'The loop',
     title: 'How care works',
     body: 'Three meters, three things you do. Your Mon tells you what it needs with a look, a sound or a reach.',
+    closing: 'A relationship, not a streak.',
+    panelLabel: 'H-Lynk care readout',
     example: 'Example meter levels',
     items: [
       { verb: 'Feed', meter: 'Fullness', line: 'Fills Fullness. Each Mon eats its own way.', value: 70, color: 'orange' },
@@ -49,5 +56,9 @@ export const W01_COPY = {
     title: 'Pick a time. The egg waits.',
     body: "Incubation takes 15 minutes, 30 minutes or an hour. You get one notification when it's ready.",
     body2: 'Then the Mon makes its choice. Its first look at you is how it says yes.',
+    closing: 'Be there when it opens.',
+    cta: 'Join the waitlist',
+    ctaHref: '/get',
+    figureLabel: 'The district at night, during the hatch window',
   },
 } as const;

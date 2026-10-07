@@ -29,3 +29,4 @@ storybook-static
 apps/web/AGENTS.md
 apps/web/CLAUDE.md
 /CLAUDE.md
+scripts/out/

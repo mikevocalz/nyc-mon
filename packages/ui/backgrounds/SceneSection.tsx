@@ -24,6 +24,8 @@ export interface SceneSectionProps {
   placeholderColor?: string;
   /** How close to the viewport, in CSS pixels, the scene mounts. Default 600. */
   nearMarginPx?: number;
+  /** DOM id for the section — anchors, aria-labelledby, motion targets. */
+  id?: string;
 }
 
 /**
@@ -42,11 +44,12 @@ export interface SceneSectionProps {
  *   <SolidPanel tone="ink">…</SolidPanel>
  * </SceneSection>
  */
-export function SceneSection({ scene, children, className, placeholderColor, nearMarginPx = 600 }: SceneSectionProps) {
+export function SceneSection({ scene, children, className, placeholderColor, nearMarginPx = 600, id }: SceneSectionProps) {
   const { ref, hasBeenNear, isVisible } = useInView({ nearMarginPx });
   return (
     <Section
       ref={ref}
+      id={id}
       className={twMerge('relative w-full overflow-hidden', className)}
       // Computed: the placeholder is a caller colour, not a theme token.
       style={placeholderColor ? { backgroundColor: placeholderColor } : undefined}

@@ -5,7 +5,8 @@
   "main": "./index.ts",
   "types": "./index.ts",
   "exports": {
-    ".": "./index.ts"
+    ".": "./index.ts",
+    "./photos": "./photos/index.ts"
   },
   "scripts": {
     "lint": "eslint",

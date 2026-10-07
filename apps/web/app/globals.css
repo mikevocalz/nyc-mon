@@ -3,6 +3,7 @@
    important flag puts utilities back on top. Native (NW5 runtime) unaffected. */
 @import 'tailwindcss' important;
 @import '@acme/theme/theme.css';
+@import 'lenis/dist/lenis.css';
 
 @source '../components';
 @source '../../../packages/ui';
@@ -95,5 +96,81 @@ body {
   ::view-transition-group(*) {
     animation-duration: 0s !important;
     animation-delay: 0s !important;
+  }
+}
+
+/* react-native-web injects its atomic base classes only on the client, so a
+   server-rendered tree paints them unstyled until hydration (the site header
+   stacked its links at 378px → 114px = the page's largest layout shift).
+   These rules mirror the atoms this RNW version emits — if the hashed names
+   ever stop matching, they degrade to no-ops and hydration still wins. */
+.css-g5y9jx {
+  align-content: flex-start;
+  align-items: stretch;
+  background-color: rgba(0, 0, 0, 0);
+  border: 0 solid black;
+  box-sizing: border-box;
+  display: flex;
+  flex-basis: auto;
+  flex-direction: column;
+  flex-shrink: 0;
+  list-style: none;
+  margin: 0;
+  min-height: 0;
+  min-width: 0;
+  padding: 0;
+  position: relative;
+  text-decoration: none;
+  z-index: 0;
+}
+.css-146c3p1 {
+  background-color: rgba(0, 0, 0, 0);
+  border: 0 solid black;
+  box-sizing: border-box;
+  color: rgb(0, 0, 0);
+  display: inline;
+  font: 14px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  position: relative;
+  text-align: start;
+  text-decoration: none;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+.css-1jxf684 {
+  background-color: rgba(0, 0, 0, 0);
+  border: 0 solid black;
+  box-sizing: border-box;
+  color: inherit;
+  display: inline;
+  font: inherit;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  position: relative;
+  text-align: inherit;
+  text-decoration: none;
+  white-space: inherit;
+  overflow-wrap: break-word;
+}
+.css-9pa8cd {
+  inset: 0;
+  height: 100%;
+  opacity: 0;
+  position: absolute;
+  width: 100%;
+  z-index: -1;
+}
+
+/* Kinetrell home-page choreography (components/home/motion.ts). While the
+   motion layer is armed, `mfx-*` targets start hidden so they can resolve on
+   their authored beats; timelines then drive inline opacity/transform. The
+   class is never set under prefers-reduced-motion — this media query is a
+   second safety net if it ever leaks. */
+@media (prefers-reduced-motion: no-preference) {
+  .motion-armed [id^='mfx-']:not([id^='mfx-hero-']) {
+    opacity: 0;
   }
 }

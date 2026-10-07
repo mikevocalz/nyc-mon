@@ -11,7 +11,7 @@ const eslintConfig = defineConfig([
   ...nextVitals,
   {
     files: ['**/*.ts', '**/*.tsx'],
-    ignores: ['components/site/Landing.tsx'],
+    ignores: ['components/site/Landing.tsx', 'components/home/motion.ts'],
     rules: {
       'no-restricted-imports': [
         'error',
@@ -33,7 +33,8 @@ const eslintConfig = defineConfig([
             },
             {
               group: ['gsap', 'gsap/*'],
-              message: 'GSAP is scoped to components/site/Landing.tsx for the public landing experience.',
+              message:
+                'GSAP is scoped to the Kinetrell adapters in components/home/motion.ts for the public landing experience.',
             },
           ],
         },
