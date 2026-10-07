@@ -1,0 +1,94 @@
+# Premium site decisions (ADR log)
+
+One entry per non-trivial decision on the W01 premium redesign. Format: context, decision, alternatives, consequences. Dispositions follow the build / strike / defer rule: build only on real data end to end, strike when the surface's precondition failed, defer when the blocker is a decision someone else owns.
+
+PS-001 to PS-007 answer `PREMIUM_SITE_AUDIT.md` §17, decided 2026-10-07 after Phase 1.
+
+---
+
+## PS-001 — Waitlist capture is `POST /v1/waitlist` in apps/admin-vite
+
+**Disposition:** BUILD (Phase 6). Interim: the fake confirmation must not reach production.
+
+**Context.** `/get` (`apps/web/components/get/GetPage.tsx`) checks the email with a regex, sets `useState`, and says "You're on the list" without sending or storing anything. ADR 0003 moved Payload, Better Auth and the `/v1` API to `apps/admin-vite`; `docs/REPO_MAP.md:66` says `apps/web` holds no database or auth secrets. admin-vite already serves an unauthenticated, pre-account POST in this shape: `apps/admin-vite/src/routes/v1/guardian-consents.ts` hands the request to `handleCreateGuardianConsent` in `@acme/payload`.
+
+**Decision.**
+- New Payload collection `waitlist` (email unique, district, source, createdAt) and handler in `@acme/payload`, mounted at `apps/admin-vite/src/routes/v1/waitlist.ts` following the guardian-consents route.
+- Validation, honeypot and rate limit run server-side in the handler. A repeat email returns the same success ("You're already on the list"), so the endpoint doesn't reveal who has signed up.
+- Age: the form asks "Are you 13 or older?". A "no" stores nothing and shows the guardian path from ADR 0001; no under-13 email is collected.
+- `apps/web` calls it from a server action. The admin base URL is a server-only env var; the browser never sees it. The form uses `useActionState` (contract §12) on `@acme/ui/html` `Form` / `Label` / `Input` / `Output`, with every state announced.
+- Until the endpoint ships, the confirmation copy is not shown as success. First change of Phase 2: either gate `/get` and its CTAs off in production, or replace the confirmation with an honest "Sign-ups open soon" state. No form may claim a signup it didn't store.
+
+**Alternatives.** A server action in `apps/web` with its own DB secret breaks ADR 0003's boundary. A third-party list (Resend audience, Mailchimp) adds a vendor and a second store of minors' data. Payload already holds consent records, so this keeps one store.
+
+**Consequences.** Phase 6 depends on admin-vite being deployed with a URL the web server can reach. Deploy checklist gains the env var, the collection migration and a rollback.
+
+---
+
+## PS-002 — H-Lynk Core colour
+
+**Disposition:** DEFER, waiting on Mike (canon and taste).
+
+**Context.** Decision #16 (`docs/canon/DECISIONS.md:242`) gives the Core a matte red body. Page copy says "a red handheld". `device-scene.ts:176-177` renders `#1D4ED8`. Commit 727428d (Mike, 2026-10-04) made it blue on purpose: "Blue shell variant; hlynk.core token stays red for canon".
+
+**Recommendation.** Red on the marketing page. It's the canon Core, the copy already says red, and red is the contract's hardware accent. Blue can stay as a variant inside the product if wanted.
+
+**Blocks.** Phase 4 and the regenerated static capture `/home/h-lynk-core.png`.
+
+---
+
+## PS-003 — Header CTA is "Join the waitlist"; "Log in" leaves the site nav
+
+**Disposition:** decided. STRIKE "Log in" from the marketing nav.
+
+**Context.** `apps/web/components/site/nav.ts:14` sets `NAV_CTA` to "Log in", the header's only filled button. `SiteChrome.tsx:26-27` says the product site carries no auth (ADR 0003). The contract's copy law is one CTA string site-wide, and the app isn't available to the public, so no visitor has an account to log in to.
+
+**Decision.** `NAV_CTA` becomes "Join the waitlist" → `/get`, sourced from the same copy constant as the hero and hatch CTAs. The `/sign-in` route stays where it is; only the nav entry goes.
+
+**Return condition.** "Log in" comes back as a secondary text link when the app is publicly available.
+
+---
+
+## PS-004 — DeviceStage label is "H-Lynk Core", from copy.ts
+
+**Disposition:** decided.
+
+**Context.** `DeviceStage.tsx:60` has `aria-label="H-Lynk device"` as a JSX literal. Screen-reader users hear it, so it falls under the rule that UI never calls the H-Lynk "the device" (COPY_DECK Law 9, contract §4).
+
+**Decision.** The label is "H-Lynk Core" and lives in `copy.ts`. The `"The device"` eyebrow (`copy.ts:23`) becomes "H-Lynk" in the same change.
+
+---
+
+## PS-005 — Mon pronouns
+
+**Disposition:** DEFER on canon open question Q14 (`docs/canon/OPEN_QUESTIONS.md:60`).
+
+**Context.** v11 says Mons have genders (¶54). v7 calls the rat line "he" and the cat line "she", and gives nothing for Yotes. Nothing says whether the player's own Mon has a fixed gender, a chosen one, or none stated in Phase 1. The current copy uses "it" for a Mon.
+
+**Decision until Q14 is answered.** Marketing copy doesn't use a pronoun for an individual Mon. It says "your Mon", names the starter, or restructures the sentence. This avoids both "it" (which canon's genders argue against) and guessing a gender.
+
+**Reopen when** Mike fills in Q14.
+
+---
+
+## PS-006 — Strike "its own weather" from World copy
+
+**Disposition:** STRIKE.
+
+**Context.** `copy.ts:20` says each district has "its own weather". A search for "weather" across `docs/canon`, `packages/content` and `packages/spatial` finds nothing. Canon Law 1: don't invent canon.
+
+**Decision.** Phase 3 drops the phrase. World copy uses what canon has: the four districts and their real streets.
+
+**Return condition.** Canon adds per-district weather.
+
+---
+
+## PS-007 — Final art: build the slots, wait for the assets
+
+**Disposition:** DEFER the art; BUILD the art map.
+
+**Context.** `packages/assets` holds the logo, wordmark, two fonts and NYC photos only. No Mon, egg or H-Lynk render exists in the repo (file search for the starter, Baby and egg names found nothing). The audit's main finding is that no creature appears on the page.
+
+**Decision.** Phase 2's `art.ts` defines every slot as an exhaustive union with aspect ratio, pixel sizes per breakpoint, alt ownership and mobile crop. Sections compose so they hold up without the creature art: type and photography, no stand-in creature and no placeholder text in the DOM (contract §14). Real art replaces slot contents without layout change.
+
+**Needs from Mike.** Baby-form renders for the three starters, three egg key art images (Metro, Corner, Prism), a red H-Lynk Core capture (after PS-002), and street-level photography of each district at the slot aspects.
