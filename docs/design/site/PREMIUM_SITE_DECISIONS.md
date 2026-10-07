@@ -25,15 +25,15 @@ PS-001 to PS-007 answer `PREMIUM_SITE_AUDIT.md` §17, decided 2026-10-07 after P
 
 ---
 
-## PS-002 — H-Lynk Core colour
+## PS-002 — H-Lynk Core colour is red
 
-**Disposition:** DEFER, waiting on Mike (canon and taste).
+**Disposition:** decided by Mike, 2026-10-07: red.
 
 **Context.** Decision #16 (`docs/canon/DECISIONS.md:242`) gives the Core a matte red body. Page copy says "a red handheld". `device-scene.ts:176-177` renders `#1D4ED8`. Commit 727428d (Mike, 2026-10-04) made it blue on purpose: "Blue shell variant; hlynk.core token stays red for canon".
 
-**Recommendation.** Red on the marketing page. It's the canon Core, the copy already says red, and red is the contract's hardware accent. Blue can stay as a variant inside the product if wanted.
+**Decision.** Red on the marketing page, and the static capture is regenerated in red. It's the canon Core, the copy already says red, and red is the contract's hardware accent. Blue can stay as a variant inside the product if wanted.
 
-**Blocks.** Phase 4 and the regenerated static capture `/home/h-lynk-core.png`.
+**Consequences.** Phase 4 changes the body material in `device-scene.ts` to the `hlynk.core` token and regenerates `/home/h-lynk-core.png`.
 
 ---
 
@@ -61,13 +61,13 @@ PS-001 to PS-007 answer `PREMIUM_SITE_AUDIT.md` §17, decided 2026-10-07 after P
 
 ## PS-005 — Mon pronouns
 
-**Disposition:** DEFER on canon open question Q14 (`docs/canon/OPEN_QUESTIONS.md:60`).
+**Disposition:** decided by Mike, 2026-10-07: the player's Mon's gender is unstated in Phase 1 (answers canon Q14, `docs/canon/OPEN_QUESTIONS.md:60`).
 
 **Context.** v11 says Mons have genders (¶54). v7 calls the rat line "he" and the cat line "she", and gives nothing for Yotes. Nothing says whether the player's own Mon has a fixed gender, a chosen one, or none stated in Phase 1. The current copy uses "it" for a Mon.
 
-**Decision until Q14 is answered.** Marketing copy doesn't use a pronoun for an individual Mon. It says "your Mon", names the starter, or restructures the sentence. This avoids both "it" (which canon's genders argue against) and guessing a gender.
+**Decision.** Marketing copy doesn't use a pronoun for an individual Mon. It says "your Mon", names the starter, or restructures the sentence. This avoids both "it" (which canon's genders argue against) and guessing a gender.
 
-**Reopen when** Mike fills in Q14.
+**Reopen when** a later phase of the game states a gender.
 
 ---
 
@@ -91,4 +91,4 @@ PS-001 to PS-007 answer `PREMIUM_SITE_AUDIT.md` §17, decided 2026-10-07 after P
 
 **Decision.** Phase 2's `art.ts` defines every slot as an exhaustive union with aspect ratio, pixel sizes per breakpoint, alt ownership and mobile crop. Sections compose so they hold up without the creature art: type and photography, no stand-in creature and no placeholder text in the DOM (contract §14). Real art replaces slot contents without layout change.
 
-**Needs from Mike.** Baby-form renders for the three starters, three egg key art images (Metro, Corner, Prism), a red H-Lynk Core capture (after PS-002), and street-level photography of each district at the slot aspects.
+**Assets.** Mike confirmed on 2026-10-07 that he has or will produce all four sets: Baby-form renders for the three starters, three egg key art images (Metro, Corner, Prism), a red H-Lynk Core capture (after PS-002), and street-level photography of each district at the slot aspects.

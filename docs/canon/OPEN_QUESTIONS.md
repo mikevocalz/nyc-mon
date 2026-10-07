@@ -58,6 +58,7 @@ The Bible outranks the build prompt (`IDX L7-L8`; BUILD_PROMPT_v3 §0B Law 1). E
 **Q13. Yotes scope.** Yes/no: "Yotes carry a Latino family identity" applies to every Yote, including the player's? (Contrast the explicit "not ethnically locked" rule for Ratti.)
 
 **Q14. Gender and pronouns.** v11: "Mons have genders." (`V11 ¶54`). v7 writes the rat line as "he" (`[v7] M7 L641`) and the cat line as "she" (`[v7] M7 L1405`); no pronoun for Yotes. Fill in: the player's starter's gender is ______ (fixed per line / chosen at naming / unstated in Phase 1).
+  **Answered 2026-10-07 (Mike): unstated in Phase 1.** Copy uses "your Mon" or the starter's name, no pronoun. See `docs/design/site/PREMIUM_SITE_DECISIONS.md` PS-005.
 
 **Q15. Personality per individual.** v7 gives one temperament line per family, repeated on every form (e.g. "Cheerfully improvises, boasts before admitting uncertainty …" for F01). v11 puts personality on the individual (`V11 ¶29`, `¶47`). Yes/no: v7's family temperament lines are the species default, and the player's individual can differ from them?
 

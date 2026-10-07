@@ -407,7 +407,7 @@ Mapped to causes:
 
 ## 17. Open decisions / unknowns
 
-**Dispositions (2026-10-07):** each question below has an entry in `PREMIUM_SITE_DECISIONS.md`. Decided: Q1 → PS-001 (build `POST /v1/waitlist` in admin-vite; the fake confirmation must not ship), Q3 → PS-003 (header CTA "Join the waitlist"), Q4 → PS-004 ("H-Lynk Core"), Q6 → PS-006 (strike "its own weather"). Waiting on Mike: Q2 → PS-002 (recommend red), Q5 → PS-005 (no pronoun until canon Q14), Q7 → PS-007 (art slots built, assets needed).
+**Dispositions (2026-10-07):** each question below has an entry in `PREMIUM_SITE_DECISIONS.md`. Decided: Q1 → PS-001 (build `POST /v1/waitlist` in admin-vite; the fake confirmation must not ship), Q3 → PS-003 (header CTA "Join the waitlist"), Q4 → PS-004 ("H-Lynk Core"), Q6 → PS-006 (strike "its own weather"). Mike decided: Q2 → PS-002 (red), Q5 → PS-005 (gender unstated in Phase 1, no pronoun), Q7 → PS-007 (he'll supply all four asset sets; Phase 2 builds the slots).
 
 Stop-and-ask items (contract §15). Phase 1 didn't need them; later phases do.
 
