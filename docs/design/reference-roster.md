@@ -47,3 +47,26 @@ ACCESSIBILITY — WCAG 2.2 working-group tier. Source: https://www.w3.org/TR/WCA
 
 NARRATIVE — the NYC-MON Bible v11 is the showrunner. You do not invent canon. Ever.
 ```
+
+## Marketing site (W01 premium redesign)
+
+Added 2026-10-07 for the premium site redesign; this is the one roster, so the site work cites this file. The question for each decision: would the person who wrote the spec, library, or standard sign off on this exact file. "Senior" and "principal" are below the bar.
+
+| Domain | Bar | Rejected on sight |
+|---|---|---|
+| RSC / App Router | Sebastian Markbåge, Tim Neutkens | A section made `"use client"` for convenience; hydration-dependent layout; `next/image` without real dimensions; client fetch of data the server had |
+| Authored motion (GSAP / ScrollTrigger) | Jack Doyle | Two RAF clocks; ScrollTriggers without `kill()` on cleanup; no `refresh()` after layout-affecting mounts; pinning that moves content on mobile; motion with no nameable purpose |
+| Smooth scroll (Lenis) | darkroom.engineering (Clément Roche) | Lenis auto-RAF alongside the GSAP ticker; touch smoothing that fights native scroll; ignoring `prefers-reduced-motion` |
+| Kinetrell | Mike W. Allen; the pinned version is the spec | Any API absent from the installed source; a second GSAP/Lenis abstraction beside it |
+| three.js / WebGPU | Ricardo Cabello; Renaud Rohlinger and sunag (WebGPURenderer / TSL); WebGPU WG editors Kai Ninomiya, Corentin Wallez, Brandon Jones | A canvas as LCP; uncapped DPR; a render loop running offscreen; R3F; no WebGL fallback; UA-string feature detection |
+| CSS layout | Rachel Andrew, Jen Simmons, Miriam Suzanne | Masonry JS or measured layout for bento; grid order that breaks mobile reading order; `100vh` on mobile; spacing outside `packages/theme` |
+| Responsive images | Eric Portis | Desktop hero bytes on a 390px phone; missing or lying `sizes`; hotlinked stock |
+| Web performance | Philip Walton, Annie Sullivan, Barry Pollard | One cherry-picked Lighthouse run; React state on RAF; long tasks during hero paint; font CLS |
+| Accessibility | Alastair Campbell (WCAG 2.2 editor); Adrian Roselli, Léonie Watson, Sara Soueidan, Heydon Pickering; Val Head for motion | Drag-only controls; hover-only information; focus under the sticky nav; state by color alone; wrong alt ownership; parallax surviving reduced motion |
+| Interface craft | Rauno Freiberg, Emil Kowalski | Springs on marketing copy; everything fading up; hover tilt on text; letter-by-letter gimmicks |
+| Type and signage | Massimo Vignelli (NYCTA Graphics Standards Manual, https://standardsmanual.com/); Michael Bierut | A third face; tiny caps labels everywhere; signage that reads as a crypto ticker; a serif "for luxury" |
+| Component vocabulary | NeuronRush (NeonBlade UI); the `@acme/ui` NYC-Tron port is canonical | NeonBlade installed as a dependency; a second copy of a primitive in app code; glow as a daylight border habit |
+| State | pmndrs (Zustand); React 19 `useActionState` / `useOptimistic` for the waitlist only | Bare `useState` / `useReducer` |
+| TypeScript | Anders Hejlsberg, Ryan Cavanaugh, Daniel Rosenwasser | `any`; non-exhaustive unions for section and art-slot ids; skipping `tsc --noEmit` |
+
+Primary sources: WCAG 2.2 https://www.w3.org/TR/WCAG22/ · Target Size 2.5.8 https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html · Animation from Interactions 2.3.3 https://www.w3.org/WAI/WCAG22/Understanding/animation-from-interactions.html · Web Vitals https://web.dev/articles/vitals (LCP, INP, CLS under /articles/) · `prefers-reduced-motion` and `content-visibility` on MDN · RSC https://react.dev/reference/rsc/server-components · `next/image` https://nextjs.org/docs/app/api-reference/components/image · ScrollTrigger https://gsap.com/docs/v3/Plugins/ScrollTrigger/ · Lenis https://github.com/darkroomengineering/lenis · WebGPU https://www.w3.org/TR/webgpu/ · Kinetrell https://github.com/mikevocalz/Kinetrell · axe-core https://github.com/dequelabs/axe-core · Playwright https://playwright.dev/ · Lighthouse CI https://github.com/GoogleChrome/lighthouse-ci · Mobbin https://mobbin.com

@@ -128,3 +128,121 @@ Re-run the hatch test with five new participants on the release candidate, plus 
 ## After each round
 
 Synthesize within 48 hours using the `research-synthesis` format: themes with "N of 5", verbatims, insight → opportunity table. File to `docs/design/research/rounds/<date>-<milestone>.md` and update `PERSONAS.md` assumptions that were confirmed or killed.
+
+---
+
+## Premium site — Phase 7 hallway script (2026-10-07)
+
+Owner: `research-lead`. For Mike to run against the redesigned home page (`/`) on `feat/premium-home-redesign` or its successor. It tests hypotheses H1–H6 in `docs/design/site/PREMIUM_SITE_AUDIT.md` §3. It replaces the milestone 6 script above for the home page. The privacy task from milestone 6 is kept as task F5.
+
+**Question:** does a first-time visitor understand NYC-MON in five seconds, and does each segment find its reason to join the waitlist before a store listing exists?
+
+### Setup
+
+- **Build:** a preview or production deploy of the Phase 7 page. Write the commit SHA and URL on every notes sheet. A finding from an unknown build is not a finding.
+- **Devices:** a phone browser at 390 px wide for every session (iPhone SE 3rd gen or Pixel 8, rotated across participants). In one session per round, turn on the OS reduced-motion setting and note it.
+- **State:** a fresh private browser tab, no cookies, sound off. Load the page and keep it covered or face-down until the timer starts.
+- **Waitlist form:** a participant never types their own email. Hand them a test address (for example `hallway+p3@<a domain you control>`) on the notes sheet. If the form cannot take a test address safely, stop the task at the form and log "reached form".
+- **Recording:** screen only. Faces and voices only with written consent, and never a minor's face or voice.
+
+### Consent
+
+- **Adults:** verbal consent to take part and to have the screen recorded, noted on the sheet.
+- **Teens, 13–17:** a guardian's written consent before the session, and the guardian may stay in the room (ground rules above). The teen also agrees out loud and can stop at any time.
+- **Under 13:** do not recruit for this round. NYC-MON's COPPA posture (`docs/adr/0001-auth-and-identity.md` §Age and consent; canon Decision #15) collects nothing from an under-13 without verified guardian consent. A hallway session must not be the exception. If an under-13 turns up with a parent, the parent is the participant and the child does not touch the form.
+- **Any participant under 18** follows the waitlist rule above: no personal data typed, test address only.
+
+Read aloud: "We're testing the website, not you. There are no wrong answers. Think out loud, and if you get stuck, say what you'd try."
+
+### 1. Five-second test (H1)
+
+1. "I'm going to show you a web page for five seconds, then hide it. Just look."
+2. Uncover the phone with the page at the top, no scrolling. Show it for five seconds by a timer. Cover it again.
+3. Ask, in this order, and write the answers down word for word:
+   - Q1 "What is this?"
+   - Q2 "What would you do with it?"
+   - Q3 "Can you get it today?"
+   - Q4 "What's the one thing the page wants you to do?"
+   - Q5 "What words or pictures do you remember?"
+4. Score Q1–Q4 on the sheet as **obvious** (correct, unprompted) · **inferable** (partly correct or hedged) · **missing** ("no idea") · **contradictory** (confidently wrong, for example "a phone game I can download now").
+
+Correct answers: Q1, Mons are creatures who live in New York; Q2, you look after one, or become its Caller; Q3, no, it's not out yet; Q4, join the waitlist.
+
+### 2. First-click tasks
+
+Start each task from the top of the page. Record the first tap target, the time to that tap, and whether it was correct. Do not scroll for them. Scrolling is allowed and counts.
+
+| # | Prompt | Correct first click | Hypothesis | Ask everyone? |
+|---|---|---|---|---|
+| F1 | "You want to be told when this comes out. What do you tap?" | Any "Join the waitlist" control | H6 | yes |
+| F2 | "Find out which Mon you could start with." | The starters section, or a nav link to it | H2 | yes |
+| F3 | "Find out what the H-Lynk is." | The H-Lynk section, or a nav link to it | H5 | yes |
+| F4 | "Find out what happens if you, or your kid, don't open it for a day." | The care or hatch section, where it says the egg waits | H3 | yes (required for parents) |
+| F5 | "Find out what it does with your kid's data." | The privacy page link | H3 | parents only |
+
+After F3, ask while the H-Lynk is on screen: "What is that thing? Could you hold one?" Log the word they use for it (Law 9 language check).
+
+### 3. Free look and join (H6)
+
+"Take a minute and look around like you would at home. If you'd want this, do what you'd do next." Do not mention the waitlist.
+
+Observe: whether they reach the waitlist without a prompt; where they hesitate; whether they look for an app-store button; what they read in the starters, care and hatch sections. If they reach the form, give them the test address (see Setup).
+
+### 4. Debrief (3 minutes)
+
+- D1 "Tell me what NYC-MON is, like you're telling a friend." (H1)
+- D2 "Who do you think this is for?" (H4. Listen for "kids", "me", "anyone".)
+- D3 "What does it remind you of?" (H4. Log any "Tamagotchi", "Pokémon", "Poké Ball" or "rip-off", word for word.)
+- D4 "What made you want it, if anything?" (H2. Note whether a starter name or the choice comes up unprompted.)
+- D5 "If you stopped playing for a week, what do you think would happen?" (H3)
+- D6 "What do you expect to happen after you join the waitlist?" (H6)
+- D7 Parents only: "Would you let your kid sign up? What would you want to know first?" (H3)
+
+### Scoring sheet (one per participant)
+
+```
+PREMIUM SITE HALLWAY — Phase 7
+Date:            Build SHA:            URL:
+Participant: P__   Segment: teen / adult (nostalgic|lapsed) / parent
+Device:            Reduced motion: on / off   Guardian present: y / n / n.a.
+
+FIVE-SECOND  (O obvious · I inferable · M missing · C contradictory)
+ Q1 What is it        [ ]   verbatim:
+ Q2 What you'd do     [ ]   verbatim:
+ Q3 Out today?        [ ]   verbatim:
+ Q4 One action        [ ]   verbatim:
+ Q5 Recalled words/images:
+
+FIRST CLICK  (target · seconds · correct y/n)
+ F1 waitlist       ______ · ___ s · _
+ F2 starters       ______ · ___ s · _
+ F3 H-Lynk         ______ · ___ s · _   word used for it: ______
+ F4 a day away     ______ · ___ s · _
+ F5 data (parent)  ______ · ___ s · _
+
+FREE LOOK
+ Reached waitlist unprompted: y / n    Looked for store button: y / n
+ Hesitations / surprises:
+
+DEBRIEF (verbatim)
+ D1                         D5
+ D2                         D6
+ D3                         D7 (parent)
+ D4
+
+LANGUAGE CHECK: words for player / Mon / H-Lynk / Bloodline:
+BLOCKERS: Poké Ball reading · "for little kids" · "it's out now" · other:
+```
+
+### Pass bar for the Phase 7 gate
+
+Per hypothesis, from `PREMIUM_SITE_AUDIT.md` §3:
+
+- **H1:** at least 4 of 5 score Q1 and Q4 obvious or inferable, and at least 3 of 5 do so on Q2. Fail if 2 or more of 5 score Q3 contradictory ("it's out now").
+- **H2:** at least 4 of 5 get F2 right on the first click, and at least 3 of 5 teens across rounds name a starter or the choice at D4.
+- **H3:** at least 2 of 3 parents across rounds answer F4 within 60 seconds and say it without words like "terms" or "policy".
+- **H4:** nobody frames it as a clone at D3, and at least 3 of 5 adults across rounds say at D2 that it is for them or for anyone. A Poké Ball reading is a blocker.
+- **H5:** at least 3 of 5 describe a physical handheld after F3, and at most 1 of 5 calls it a phone or an app.
+- **H6:** at least 3 of 5 adults reach the waitlist in the free look and can answer D6.
+
+These are qualitative design targets for rounds of five, not rates. Synthesize within 48 hours to `docs/design/research/rounds/<date>-premium-site.md`, as for every other round.
