@@ -1,6 +1,7 @@
 import { View } from '@acme/ui/tw';
 import { CareSection } from './CareSection';
 import { DistrictDivider } from './DistrictDivider';
+import { GridBand } from './GridBand';
 import { HatchBand } from './HatchBand';
 import { HLynkSection } from './HLynkSection';
 import { HomeHero } from './HomeHero';
@@ -27,7 +28,7 @@ export function HomePage() {
         <DistrictDivider seed={3} />
         <HLynkSection />
         <StartersSection cards={starterCards()} />
-        <DistrictDivider seed={11} />
+        <GridBand />
         <CareSection />
         <HatchBand />
         <WaitlistSection />
