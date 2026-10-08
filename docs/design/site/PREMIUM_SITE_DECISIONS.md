@@ -392,3 +392,79 @@ The optional fourth tile was left out: the brief's candidates were a third photo
 **Alternatives.** A site-wide "Pause motion" toggle stored in MMKV/Zustand: more surface and state for one canvas, and the page has no other auto-running motion after PS-025. A slower loop: still fails 2.2.2.
 
 **Consequences.** Verified on the :3110 build: hero pixel hashes stop changing by ~5 s, change again for ~1.5 s after picking Harlem, then hold. If a later scene loops past 5 s, a real pause control becomes necessary.
+
+---
+
+<!-- PS-028 is reserved for the art agent. -->
+
+## PS-029 — /mons names the Egg and the Baby, nothing later
+
+**Disposition:** STRIKE (2026-10-07).
+
+**Context.** Contract §4 (AUDIT C2) allows Baby forms only on public pages. `/mons` said "Baby to Small to Mid, then one of three Max forms", and every `/mons/[slug]` page listed the full evolution line from `walkChain`: Lil' Ratti, Hood Ratti (the #004 Mid form), Ratti Royale, Agua Ratti, Phantom Ratti and the matching Cee and Yote forms. The Hood Ratti blurb ("Hood means free-living, not hostile") also mixed up the v11 Hood Mon status with the family name.
+
+**Decision.** `starters.ts` filters the chain to the `Egg` and `Baby` stages before anything reaches a page, so later forms never enter the static HTML. The list is titled "Egg to Baby". Index and detail copy say a Mon hatches as a Baby and grows up with its Caller, with no form names; meta descriptions dropped "every form it can grow". The Hood Ratti blurb is gone. "Hood Ratti Bloodline" stays, since that is the canon label (Decision #11, Q39). Detail titles, Dex numbers, egg names and Bloodline labels are unchanged.
+
+**Return condition.** Later forms come back when a phase ships evolution and the contract lifts the spoiler rule for them. Delete the `PUBLIC_STAGES` filter at that point. The `/mons/bodega-cee` slug still matches the #011 Mid form's name; it is a stable URL id, left as is.
+
+---
+
+## PS-030 — /story: the Clean City era is the past, the Mons are now
+
+**Disposition:** BUILD (2026-10-07).
+
+**Context.** The story hero said "Decades from now, New York is cleaner…", which puts the reader in the past and the Mons in the future. Home says the Mons live "on the same blocks as you". The lore doc (`docs/NYC_MON_Clean_City_Legacy_and_Great_Miscalculation_v2.md`) starts the Clean City era decades before the present. EngineX's list named "tournament sponsorship", but Phase 1 has no battles. The copy also leaned on binary contrasts and em-dash clusters.
+
+**Decision.** Hero: "New York got cleaner, smarter, sealed." The Mamdani line stays; the lore doc names his administration as the historical inspiration point (§1, line 5). "Tournament sponsorship" became "corporate sponsorship". "They didn't appear. They returned." became "They came back."; the quote now reads "Mons are descendants, New York's hidden children, a new branch of living urban life."; "Partnership is not ownership." became "A Caller is a partner, never an owner." Each paragraph has at most one em dash (now zero in rendered copy).
+
+**Return condition.** Tournament language returns when a phase ships battles. If canon moves the story's present, re-anchor the hero and the eyebrows together.
+
+---
+
+## PS-031 — /spatial: no debug card on web, headsets announced as coming
+
+**Disposition:** BUILD (debug card and metadata), DEFER (headset claim) (2026-10-07).
+
+**Context.** `/spatial` on web showed a "Runtime / Spatial backend / Inline / Viro spatial fallback" card, which is a diagnostic, not copy. The route had no metadata of its own. The headset card said "Quest and PICO open the district you pick here", but the legal copy says the first release is a phone app and headset districts are "coming, not promised on a date".
+
+**Decision.** `SpatialScreen` passes no `panel` on web (`isWeb ? undefined : …`); native and headset builds keep the diagnostic panel unchanged. The route exports a title ("NYC-MON | Walk the district") and a description. The headset line now reads "Quest and PICO support is coming; the district you pick here will carry over." (`packages/spatial/homeCopy.ts`).
+
+**Return condition.** Restore a present-tense headset claim when a Quest or PICO build ships and the legal notice drops "coming".
+
+---
+
+## PS-032 — Legal pages carry a real date
+
+**Disposition:** BUILD (2026-10-07).
+
+**Context.** The privacy, terms and consent pages said "Last updated: 2026", which is not a date anyone can check a change against.
+
+**Decision.** `UPDATED` in `components/legal/copy.ts` is "Last updated: October 7, 2026", the day the copy last changed.
+
+**Return condition.** Bump the date in the same change as any edit to legal copy.
+
+---
+
+## PS-033 — /city and /how-it-works: em-dash clusters thinned
+
+**Disposition:** BUILD (2026-10-07).
+
+**Context.** The City meta description, "Mons live in New York — the real one, in four districts", and the H-Lynk line used em dashes as rhythm; the How it works naming step did the same.
+
+**Decision.** At most one em dash per paragraph; the rendered strings on both pages now use none. City: "Mons live in New York, the real one, across four districts." H-Lynk: "It helps with care and doesn't own anyone." Naming: "You pick a Caller name, the one your Mon will know you by."
+
+**Return condition.** None. New copy follows the same limit.
+
+---
+
+## PS-034 — /mons cards are kit notch cards with alternating notches
+
+**Disposition:** BUILD (2026-10-07).
+
+**Context.** The `/mons` index used `SolidPanel` cards with an accent bar, the same look as panels elsewhere on the site, so the three starters read as generic content blocks.
+
+**Decision.** Each starter is a `Card variant="notch"` in the slot's old accent colour: orange, royal, leaf. The notch alternates top, bottom, top. The notch face is the tone, so the accent bar is gone and the text uses Card's on-face colour: ink on orange 7.76:1, white on royal 5.60:1, ink on leaf 7.09:1 (`@acme/theme` contrast). The Dex number moved into the face as plain text, since the neutral `Badge` is a page-surface chip. A bottom notch gets `pb-7 md:pb-8`, mirroring Card's `notchTop` padding. The Link wrapper, its aria-label, the h2 and the 4px hover lift stay; the lift is off under reduced motion. `/mons/[slug]` keeps its `SolidPanel` list, which is a list container, not a card.
+
+**Verification.** Isolated build on :3112. Cards stack at 390 with no horizontal overflow and the notch visible; they sit in one row at 1440. `site-qa:axe` reports no violations on `/mons` and `/mons/bodega-cee`.
+
+**Return condition.** None.

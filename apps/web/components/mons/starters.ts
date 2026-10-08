@@ -12,7 +12,14 @@ const SLUG_BY_BLOODLINE_ID: Readonly<Record<string, string>> = {
   F12: 'yotes',
 };
 
-/** One node of the chain, flattened for the "Evolution line" list. */
+/**
+ * The stages a public page may name. Contract §4: Small, Mid and Max forms
+ * are spoilers, so the chain is cut to Egg → Baby before it reaches a page
+ * (PS-029).
+ */
+const PUBLIC_STAGES: ReadonlySet<string> = new Set(['Egg', 'Baby']);
+
+/** One node of the chain, flattened for the "Egg to Baby" list. */
 export interface MonsLineStep {
   key: string;
   stage: string;
@@ -25,6 +32,7 @@ export interface MonsStarter extends StarterCard {
   slug: string;
   /** The Baby form's species-card culture note — TODO(canon) when null. */
   cultureNote: string | null;
+  /** Egg and Baby only, never the later forms (PS-029). */
   line: readonly MonsLineStep[];
 }
 
@@ -35,7 +43,7 @@ export function slugFor(card: Pick<StarterCard, 'key'>): string {
   return slug;
 }
 
-/** The three starters in slot order, each with its slug and full chain. */
+/** The three starters in slot order, each with its slug and Egg → Baby line. */
 export function monsStarters(): readonly MonsStarter[] {
   const cards = starterCards();
   return starterBloodlines.map((starter) => {
@@ -47,12 +55,14 @@ export function monsStarters(): readonly MonsStarter[] {
       ...card,
       slug: slugFor(card),
       cultureNote: babyForm?.cultureNote ?? null,
-      line: walkChain(starter.bloodline.chain).map((node) => ({
-        key: node.speciesId,
-        stage: node.stage,
-        name: node.formName,
-        dexId: node.dexId,
-      })),
+      line: walkChain(starter.bloodline.chain)
+        .filter((node) => PUBLIC_STAGES.has(node.stage))
+        .map((node) => ({
+          key: node.speciesId,
+          stage: node.stage,
+          name: node.formName,
+          dexId: node.dexId,
+        })),
     };
   });
 }

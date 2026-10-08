@@ -1,13 +1,22 @@
 import { Link } from 'solito/link';
-import { Badge, SolidPanel } from '@acme/ui';
-import { Article, Heading, List, ListItem, Paragraph, Section } from '@acme/ui/html';
+import { Card, type CardProps, type ControlTone } from '@acme/ui';
+import { Heading, List, ListItem, Paragraph, Section } from '@acme/ui/html';
 import { View } from '@acme/ui/tw';
 import { Eyebrow } from '../home/Eyebrow';
 import { W02_COPY } from './copy';
 import { monsStarters } from './starters';
 
-/** Bloodline accent bars, one brand colour per starter slot (as W01). */
-const CARD_ACCENTS = ['bg-orange-500', 'bg-royal-500', 'bg-leaf-500'] as const;
+/**
+ * One kit tone per starter slot, the same order the old accent bars used
+ * (orange, royal, leaf). The notch face is the tone, so the bar is gone and
+ * the text takes Card's on-face step: ink on orange 7.76:1, white on royal
+ * 5.60:1, ink on leaf 7.09:1 (PS-034).
+ */
+const CARD_TONES: readonly ControlTone[] = ['orange', 'royal', 'leaf'];
+
+/** Notches alternate top, bottom, top so the row reads as three cards, not one strip. */
+type NotchSides = NonNullable<CardProps['notchSides']>;
+const notchFor = (i: number): NotchSides => (i % 2 === 0 ? ['top'] : ['bottom']);
 
 /** W02 index: the three starters, each card linking to its /mons/[slug] page. */
 export function MonsIndexPage() {
@@ -28,27 +37,33 @@ export function MonsIndexPage() {
           <Paragraph className="my-0 text-base leading-7 text-text-secondary md:text-lg md:leading-8">{copy.body}</Paragraph>
         </View>
         <List className="m-0 list-none gap-6 p-0 md:flex-row">
-          {starters.map((starter, i) => (
-            <ListItem key={starter.slug} className="flex-1">
-              <Link
-                href={copy.cardHref(starter.slug)}
-                aria-label={copy.cardLabel(starter.babyName)}
-                className="block h-full no-underline transition-transform duration-200 hover:-translate-y-1"
-              >
-                <SolidPanel surface="page" depth="md" className="h-full gap-3 overflow-hidden px-5 py-6">
-                  <View className={`-mx-5 -mt-6 mb-2 h-1.5 ${CARD_ACCENTS[i % CARD_ACCENTS.length]}`} aria-hidden />
-                  <Article className="gap-3">
-                    <Badge label={copy.dex(starter.dexId)} tone="neutral" size="sm" />
+          {starters.map((starter, i) => {
+            const notchSides = notchFor(i);
+            return (
+              <ListItem key={starter.slug} className="flex-1">
+                <Link
+                  href={copy.cardHref(starter.slug)}
+                  aria-label={copy.cardLabel(starter.babyName)}
+                  className="block h-full no-underline transition-transform duration-200 hover:-translate-y-1 motion-reduce:transition-none motion-reduce:hover:translate-y-0"
+                >
+                  {/* Card pads the top for a top notch; a bottom notch gets the same room here. */}
+                  <Card
+                    variant="notch"
+                    tone={CARD_TONES[i % CARD_TONES.length]}
+                    notchSides={notchSides}
+                    className={`gap-3 ${notchSides.includes('bottom') ? 'pb-7 md:pb-8' : ''}`}
+                  >
+                    <Paragraph className="my-0 text-sm font-semibold tracking-wide text-text">{copy.dex(starter.dexId)}</Paragraph>
                     <Heading level={2} className="my-0 font-display text-2xl leading-tight text-text">
                       {starter.babyName}
                     </Heading>
-                    <Paragraph className="my-0 text-base font-semibold text-text-secondary">{starter.bloodline}</Paragraph>
-                    <Paragraph className="my-0 text-sm text-text-muted">{copy.hatchesFrom(starter.eggName)}</Paragraph>
-                  </Article>
-                </SolidPanel>
-              </Link>
-            </ListItem>
-          ))}
+                    <Paragraph className="my-0 text-base font-semibold text-text">{starter.bloodline}</Paragraph>
+                    <Paragraph className="my-0 text-sm text-text">{copy.hatchesFrom(starter.eggName)}</Paragraph>
+                  </Card>
+                </Link>
+              </ListItem>
+            );
+          })}
         </List>
       </Section>
     </View>

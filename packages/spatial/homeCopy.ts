@@ -13,7 +13,8 @@ export const HOME_COPY = {
   openCity: 'Walk the district',
   closeCity: 'Leave the district',
   headsetTitle: 'Same city in the headset',
-  headsetBody: 'Quest and PICO open the district you pick here, at street level.',
+  // The first release is phone-only (legal), so headsets are announced, not promised (PS-031).
+  headsetBody: 'Quest and PICO support is coming; the district you pick here will carry over.',
 } as const;
 
 /**

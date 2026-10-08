@@ -138,3 +138,7 @@ Q6 has no canon source; it needs a product decision.
 - **Q40.** The concept sheet prints "EngineX" on the front of every H-Lynk. In v11, Dr. Santoro invented the H-Lynk and EngineX is the concealed eradication program. Is EngineX the manufacturer, which would be a story point and a possible spoiler, or should the device carry no EngineX mark in Phase 1?
 - **Q41.** The sheet shows an HP meter alongside Energy, Fullness and Social. v11 says Energy, Fullness and "one Social HP/social-need meter". Is combat HP a separate fourth stat, hidden in Phase 1, or does HP mean the Social meter?
 - **Q42.** The tab labels on the sheet (DEX, CREW, CARE, BAG, CITY) and "CALL MON": are any of them canon names for Phase 1 navigation?
+
+## H. Site note (2026-10-07)
+
+No question here is answered by this note. The public site (`apps/web`) no longer names any Small, Mid or Max form (PREMIUM_SITE_DECISIONS PS-029), so its copy no longer depends on Q35 (Max branching) or on Q39 beyond the "Hood Ratti Bloodline" label it already uses.

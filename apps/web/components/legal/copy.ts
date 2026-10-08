@@ -32,7 +32,7 @@ export interface LegalDocument {
   sections: readonly LegalSection[];
 }
 
-const UPDATED = 'Last updated: 2026';
+const UPDATED = 'Last updated: October 7, 2026';
 
 const privacy: LegalDocument = {
   eyebrow: 'Legal',
