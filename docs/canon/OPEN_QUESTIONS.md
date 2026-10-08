@@ -142,3 +142,15 @@ Q6 has no canon source; it needs a product decision.
 ## H. Site note (2026-10-07)
 
 No question here is answered by this note. The public site (`apps/web`) no longer names any Small, Mid or Max form (PREMIUM_SITE_DECISIONS PS-029), so its copy no longer depends on Q35 (Max branching) or on Q39 beyond the "Hood Ratti Bloodline" label it already uses.
+
+## I. Raised by the spatial contract (added 2026-10-08)
+
+The spatial contract (ADR 0010-0012, `docs/spatial/CONTRACT.md`) also waits on three questions already listed: **Q19** (care numbers), **Q20** (needs threshold, which sets when a mood turns to `needs-*`) and **Q29** (Baby height, which sets the Mon's real-world scale on a table or a floor). The questions below are new.
+
+**Q43. Lifecycle triggers.** v11 fixes the stages, Egg → Baby → Small → Mid → Max (`V11 ¶25`), and says a hatchling stays Baby until an authored evolution. No source says what moves a Mon from Baby to Small, Small to Mid, or Mid to one of its Max forms. `EvolutionEvent` holds only a bond floor, marked TODO(canon). Fill in: each stage change is triggered by ______ (bond / age / care history / a story event / other), and the Mid → Max branch is chosen by ______.
+
+**Q44. Starter behaviours in a room.** The spatial brief proposes room behaviours per starter: "Yotes perimeter/dawn-dusk", "Bodega Cee warm spot", "Hood Ratti low routes". No canon source describes how any starter moves through a room. Yes/no: are these canon behaviours for the Yote, Bodega Baddiee Cee and Hood Ratti Bloodlines? If yes, at which stages?
+
+**Q45. Origin block, habitats and active hours.** `MonInstance` now has empty Phase-2 slots `originBlock`, `habitatTags` and `activeHours`. Canon lists no blocks and no habitats and gives no active hours. Fill in: the list of blocks a Mon can come from = ______; the habitat list = ______; does a bloodline (or an individual) have active hours, and what are they for each starter = ______?
+
+**Q46. What a block legend is.** The slogan is "Every block has a legend." The scene contract reserves a `legend` field (null in Phase 1) for a block's legend. No source defines a legend as a record. Fill in: a legend is ______ (a story text / a Hood Mon / an event / other), and it belongs to ______ (a block / a Mon / both).

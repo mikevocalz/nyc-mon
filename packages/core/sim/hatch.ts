@@ -57,6 +57,9 @@ export function mintMonInstance(egg: EggRecord): MonInstance {
     bond: 0,
     stage: 'Baby',
     voiceLineageId: null,
+    originBlock: null,
+    habitatTags: [],
+    activeHours: null,
   };
 }
 
