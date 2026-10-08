@@ -19,7 +19,10 @@ const url = BASE + route;
 const runs = Number(process.env.SITE_QA_LH_RUNS ?? CONFIG.lighthouse.runs);
 const T = CONFIG.lighthouse;
 
-const chromePath = (process.env.SITE_QA_BROWSER !== 'bundled' && SYSTEM_CHROME) || chromium.executablePath();
+// Bundled chromium by default. The installed Chrome on this machine uses the
+// Meta XR Simulator as its OpenXR runtime, so launching it starts a Quest 3
+// simulator session. Opt in with SITE_QA_BROWSER=system.
+const chromePath = (process.env.SITE_QA_BROWSER === 'system' && SYSTEM_CHROME) || chromium.executablePath();
 const dir = outDir('lhci');
 console.log(`lighthouse ${LH_VERSION} · ${url} · ${runs} runs · chrome ${chromePath}`);
 console.log(`node ${process.version} · ${os.type()} ${os.release()} ${os.arch()} · ${os.cpus()[0]?.model} ×${os.cpus().length} · load ${os.loadavg().map((n) => n.toFixed(2)).join(' ')}`);

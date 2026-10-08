@@ -85,6 +85,10 @@ export const W01_COPY = {
     hatchesFrom: (egg: string) => `Hatches from the ${egg}`,
     dex: (dexId: number) => `No. ${String(dexId).padStart(3, '0')}`,
   },
+  grid: {
+    pause: 'Pause animation',
+    play: 'Play animation',
+  },
   care: {
     title: 'Your Mon asks. You answer.',
     body: 'A look, a sound or a reach is how your Mon asks for a meal, a quiet night or a game.',

@@ -20,7 +20,9 @@ export function outDir(...parts) {
 }
 
 /** `prefer`: 'system' (installed Chrome, real GPU, WebGPU) or 'bundled'
- *  (Playwright's chromium headless shell). SITE_QA_BROWSER overrides. */
+ *  (Playwright's chromium headless shell). SITE_QA_BROWSER overrides. Keep
+ *  'bundled' as the default: the installed Chrome here starts the Meta XR
+ *  Simulator (its OpenXR runtime) when launched. */
 export async function launch(prefer = 'bundled') {
   const want = process.env.SITE_QA_BROWSER ?? prefer;
   if (want === 'system' && SYSTEM_CHROME) {

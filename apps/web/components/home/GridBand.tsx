@@ -1,50 +1,50 @@
 'use client';
 
-import { useEffect } from 'react';
-import { GridScene, LazyScene, THEMES, useInstanceStore, useStore } from '@acme/ui';
+import { Button, GridFloor, LazyScene, THEMES, useInstanceStore, useStore } from '@acme/ui';
 import { View } from '@acme/ui/tw';
+import { W01_COPY } from './copy';
 
-// The Storybook Backgrounds/GridScene story, as-is: the Mega City deck over the
-// street grid at the story's default args.
-const DISTRICT = 'megacity';
+// The Storybook Backgrounds/GridFloor story, as-is: the district skyline on
+// top and the moving street grid below, at the story's default args.
+const DISTRICT = 'midtown';
 
-// Under WCAG 2.2.2 motion that starts on its own stops within 5 s, so the
-// grid runs while on screen and holds its last frame after this long (PS-027).
-const GRID_MOTION_MS = 4500;
-
-function MovingGrid({ paused }: { paused: boolean }) {
-  const motion = useInstanceStore(() => ({ settled: false }));
-  const settled = useStore(motion, (s) => s.settled);
-  useEffect(() => {
-    if (paused || settled) return;
-    const timer = setTimeout(() => motion.setState({ settled: true }), GRID_MOTION_MS);
-    return () => clearTimeout(timer);
-  }, [paused, settled, motion]);
-  return (
-    <GridScene
-      district={DISTRICT}
-      horizon={0.5}
-      gap={0.08}
-      columns={24}
-      rows={18}
-      speed={0.6}
-      opacity={1}
-      lineWidth={1}
-      showCeiling
-      showFloor
-      paused={paused || settled}
-      className="flex-1"
-    />
-  );
-}
-
-/** The grid scene between the starters and care, at the Storybook story's size and args. */
+/**
+ * The grid floor between the starters and care, at the Storybook story's size
+ * and args. It keeps moving while on screen; the pause button is what lets
+ * continuous motion pass WCAG 2.2.2. Reduced motion draws it still.
+ */
 export function GridBand() {
+  const control = useInstanceStore(() => ({ stopped: false }));
+  const stopped = useStore(control, (s) => s.stopped);
+  const copy = W01_COPY.grid;
   return (
-    <View aria-hidden className="h-svh min-h-[32.5rem] w-full">
-      <LazyScene className="flex-1" placeholderColor={THEMES[DISTRICT].sky[0]}>
-        {({ paused }) => <MovingGrid paused={paused} />}
-      </LazyScene>
+    <View className="relative h-svh min-h-[32.5rem] w-full">
+      <View aria-hidden className="absolute inset-0">
+        <LazyScene className="flex-1" placeholderColor={THEMES[DISTRICT].sky[0]}>
+          {({ paused }) => (
+            <GridFloor
+              district={DISTRICT}
+              horizon={0.45}
+              columns={24}
+              rows={18}
+              speed={0.6}
+              opacity={1}
+              lineWidth={1}
+              skyline
+              paused={paused || stopped}
+              className="flex-1"
+            />
+          )}
+        </LazyScene>
+      </View>
+      <View className="absolute bottom-4 right-4 md:bottom-6 md:right-6">
+        <Button
+          size="sm"
+          title={stopped ? copy.play : copy.pause}
+          aria-pressed={stopped}
+          onPress={() => control.setState({ stopped: !stopped })}
+        />
+      </View>
     </View>
   );
 }

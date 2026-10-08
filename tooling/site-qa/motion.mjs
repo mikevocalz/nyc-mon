@@ -54,6 +54,10 @@ function init() {
   wrap(window.WebGLRenderingContext?.prototype, draws);
   wrap(window.GPUQueue?.prototype, ['submit']);
   wrap(window.GPUCanvasContext?.prototype, ['getCurrentTexture']);
+  // Without WebGPU (bundled chromium) the Skia fallback paints CanvasKit
+  // frames through a 2D or bitmap context; count those as canvas draws too.
+  wrap(window.CanvasRenderingContext2D?.prototype, ['drawImage', 'putImageData']);
+  wrap(window.ImageBitmapRenderingContext?.prototype, ['transferFromImageBitmap']);
 }
 
 // Fallback when the app exposes no window.__nycmonMotion hook: patch the
@@ -181,7 +185,7 @@ const scenarios = [
   { label: 'mobile', vp: { width: 390, height: 844 } },
 ].filter((s) => !process.env.SITE_QA_VIEWPORTS || process.env.SITE_QA_VIEWPORTS.split(',').includes(String(s.vp.width)));
 
-const { browser, label } = await launch('system');
+const { browser, label } = await launch();
 console.log(`motion · ${label} · ${BASE}/ · away ${CONFIG.awayRoute} · keep-alive ${KEEPALIVE_COUNTS ? 'counted' : 'reported, not counted'}`);
 const results = [];
 for (const sc of scenarios) {
