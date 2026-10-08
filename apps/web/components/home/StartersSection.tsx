@@ -5,7 +5,6 @@ import { View } from '@acme/ui/tw';
 import { art, artPosition, starterSlot, type StarterId } from './art';
 import { Eyebrow } from './Eyebrow';
 import { W01_COPY } from './copy';
-import { PlaceCaption } from './PlaceCaption';
 import { sectionMarker } from './sections';
 
 export interface StarterCard {
@@ -35,7 +34,8 @@ export function starterCards(): StarterCard[] {
 }
 
 /**
- * One starter as a poster (PS-020): the art plate first, then the egg, the
+ * One starter as a poster (PS-020): the art plate first (the Baby form,
+ * PS-028; no place caption, because the picture is a Mon, not a street), then the egg, the
  * Dex plate, the Baby name large, and the Bloodline on a ruled line. Nothing
  * is interactive, so nothing changes on hover. Below `md` the poster is a
  * column; from `md` to `lg` it lies on its side (art the left half); from `lg` the
@@ -64,7 +64,6 @@ function StarterPoster({ card, index }: { card: StarterCard; index: number }) {
             contentPosition={artPosition(plate)}
             className="h-full w-full"
           />
-          <PlaceCaption entry={plate} className="bottom-0 left-0" />
         </Figure>
         <View className="min-w-0 flex-1 gap-3 border-t-2 border-ink-950 px-5 pb-6 pt-5 md:justify-end md:border-l-2 md:border-t-0 md:px-7 lg:border-l-0 lg:border-t-2 lg:px-6">
           <View className="flex-row flex-wrap items-center gap-x-4 gap-y-2">

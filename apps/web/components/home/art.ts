@@ -2,16 +2,19 @@
  * The W01 art map (prompt pack 02 §5). Every image slot on the home page
  * reads through `art(slot)`; the slot name is the contract final art replaces.
  *
- * Until NYC-MON key art, Baby Mon renders, egg art and H-Lynk product
- * photography exist, each slot holds a bundled, licensed NYC photograph from
- * `@acme/assets/photos` (1200x800 WebP with a blurDataURL; never hotlinked).
- * The `hlynk.*` slots are renders of the H-Lynk Core scene, not photographs.
+ * The starter posters and the hatch band hold generated concept art from
+ * `@acme/assets/creatures` (PS-028): the three Baby forms and the egg at
+ * night. It stands in for final renders (PS-007) and carries no caption,
+ * because a Mon is not a place. The other slots hold bundled, licensed NYC
+ * photographs from `@acme/assets/photos` (1200x800 WebP with a blurDataURL;
+ * never hotlinked). The `hlynk.*` slots are renders of the H-Lynk Core scene.
  * `care` is not rendered yet: it reserves the slot the Mon reaction art for
  * CARE fills.
  */
 import { breakpoints, contentWidths } from '@acme/theme';
 import type { StarterBloodline } from '@acme/content';
 import { NYC_PHOTOS, type NycPhoto, type PhotoDistrict, type PhotoSource } from '@acme/assets/photos';
+import { creatureArt } from '@acme/assets/creatures';
 
 /** A starter's slot number from @acme/content (DECISIONS.md #1). */
 export type StarterId = StarterBloodline['slot'];
@@ -91,6 +94,12 @@ function fromPhoto(id: string, slotSizes: string): ArtEntry {
   };
 }
 
+/** Generated creature art: no district and no caption, so `PlaceCaption` renders nothing. */
+function fromCreature(id: string, slotSizes: string, focalPoint: ArtFocalPoint): ArtEntry {
+  const a = creatureArt(id);
+  return { src: a.source, width: a.width, height: a.height, alt: a.alt, blurDataURL: a.blurDataURL, sizes: slotSizes, focalPoint };
+}
+
 const ART = {
   hero: { ...fromPhoto('midtown-chrysler-spire', `(min-width: ${breakpoints.lg}) ${contentWidths['content-hero-art']}, 100vw`), focalPoint: { x: 0.5, y: 0.3 } },
   'world.primary': { ...fromPhoto('harlem-lenox-rowhouses', gridSizes(7)), focalPoint: { x: 0.45, y: 0.55 } },
@@ -123,21 +132,18 @@ const ART = {
     decorative: { reason: 'The proof row names the control row in its headline and line.' },
     sizes: `${LG_UP} 12rem, 9rem`,
   },
-  // Starter posters (PS-020): a street that fits each Bloodline, captioned as a place, never as the Mon.
-  // Hood Ratti: v7 encounter tags street / courtyard. Bodega Baddiee Cee: community_hub. Yote: no
-  // canon habitat, so Times Square stands in for the Prism Egg's light, and HANDOFF says so.
-  'starter.1': { ...fromPhoto('harlem-brownstone-stoops', starterSizes), focalPoint: { x: 0.3, y: 0.6 } },
-  'starter.2': { ...fromPhoto('harlem-apollo', starterSizes), focalPoint: { x: 0.5, y: 0.35 } },
-  'starter.3': { ...fromPhoto('midtown-times-square', starterSizes), focalPoint: { x: 0.5, y: 0.6 } },
+  // Starter posters (PS-020, PS-028): each Baby form on a street of its Bloodline's home turf
+  // (Hood Ratti: Harlem stoop; Bodega Baddiee Cee: 125th St bodega; Yote: Times Square). Focal
+  // point is the Mon's face, so the 1:1 phone crop and the side-on crop keep it.
+  'starter.1': fromCreature('squeaklet', starterSizes, { x: 0.5, y: 0.3 }),
+  'starter.2': fromCreature('kittee-cee', starterSizes, { x: 0.5, y: 0.28 }),
+  'starter.3': fromCreature('yotito', starterSizes, { x: 0.55, y: 0.33 }),
   // Reserved for the Mon reaction art (audit §11 CARE); not rendered until it exists (PS-021).
   care: fromPhoto('harlem-brownstone-stoops', sizes(40)),
-  // Stand-in until the egg art lands (HANDOFF §HATCH): the bundled night frame, shown as a wide
-  // window across the 80rem grid. Focal point on the bridge tower and One World Trade, whose lights
-  // are the band's one light source.
-  hatch: {
-    ...fromPhoto('megacity-brooklyn-bridge-night', `${XL_UP} 80rem, 100vw`),
-    focalPoint: { x: 0.64, y: 0.55 },
-  },
+  // The egg waiting at night (HANDOFF §HATCH, PS-028): an open case on a Harlem stoop, lit only by
+  // the crack in the shell. Focal point on the egg, so the 4:5 phone crop keeps it; the dark left
+  // half carries no detail.
+  hatch: fromCreature('hatch-night', `${XL_UP} 80rem, 100vw`, { x: 0.7, y: 0.56 }),
 } as const satisfies Record<ArtSlot, ArtEntry>;
 
 export const ART_SLOTS = Object.keys(ART) as readonly ArtSlot[];

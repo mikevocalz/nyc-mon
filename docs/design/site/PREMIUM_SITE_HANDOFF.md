@@ -127,19 +127,21 @@ Files: `apps/web/components/home/StartersSection.tsx` (server), `PlaceCaption.ts
   - 768–1023 (and 844×390): posters lie on their side, stacked. Art plate is half the poster width, `min-h-80`; the identity plate is bottom-aligned on the right with a 2px left rule.
   - ≥1024: three posters side by side (`lg:flex-row`, `flex-1`, `gap-6`), art 4:5, identity plate under it. Section capped at `max-w-screen-xl`, `py-16`/`md:py-24`.
 - **Tokens.** h2: `text-display-md` → `lg:text-display-lg` → `xl:text-display-xl`, `leading-heading`. Baby name (h3): `text-display-md` → `xl:text-display-lg`, `break-words`. Dex plate: `bg-ink-950 font-display text-sm text-signage-white`. Egg line: `text-sm font-semibold text-text-secondary`. Bloodline: `font-semibold text-text` with `border-l-4 border-ink-950`. Poster: `border-2 border-ink-950 bg-surface-raised`, square corners.
-- **Components.** `List`/`ListItem` (three items), `Article aria-labelledby` the h3, `Figure` > `Image framed={false} fill loading="lazy" contentPosition={artPosition(...)}` + `PlaceCaption`.
+- **Components.** `List`/`ListItem` (three items), `Article aria-labelledby` the h3, `Figure` > `Image framed={false} fill loading="lazy" contentPosition={artPosition(...)}`. No `PlaceCaption`: the art is a Mon, not a place (PS-028).
 - **States.** Static. No hover or focus state, because nothing in the posters is interactive. Images lazy-load with blur placeholders inside fixed boxes. Reduced motion: final composition.
 - **Motion.** `w01.starters.enter`: head, then posters 0/1/2 at 160/300/440 ms (unchanged targets `mfx-starters-head`, `mfx-starter-0..2`). Transform and opacity only.
 - **Canon.** Every string on a poster is from `@acme/content` or the `copy.dex`/`copy.hatchesFrom` formatters: Squeaklet No. 002 / Hood Ratti Bloodline / Metro Egg; Kittee Cee No. 009 / Bodega Baddiee Cee Bloodline / Corner Egg; Yotito No. 062 / Yote Bloodline / Prism Egg. No Small, Mid or Max name is read.
-- **Art slots (today → final).** The swap is a `src` change in `art.ts`; alt moves from the street description to a description of the Mon.
+- **Art slots (filled 2026-10-07, PS-028).** Generated concept art from `@acme/assets/creatures`, made with Figma `generate_image` (model `gpt-image-2.5-sunburst`) on 2026-10-07. Each Baby stands on its Bloodline's home turf. Alt names the Baby form and describes it without a pronoun (PS-005). No caption.
 
-| Slot | Today | Final asset | Aspect / min px | Transparency | Focal point |
+| Slot | Today | File | Size | Focal point | Final asset still wanted |
 |---|---|---|---|---|---|
-| `starter.1` | `harlem-brownstone-stoops`, focal (0.3, 0.6) | Squeaklet, Baby form, standing on a Harlem stoop or sidewalk | 4:5 master ≥ 1040×1300 (26rem at 2x = 832 wide; headroom for 1:1 and side-on crops) | Opaque, scene included (the plate is a poster, not a cut-out) | Mon's face at (0.5, 0.45); keep the bottom 20% clear for the place plate |
-| `starter.2` | `harlem-apollo`, focal (0.5, 0.35) | Kittee Cee, Baby form, at a bodega counter or community spot | same | Opaque | same |
-| `starter.3` | `midtown-times-square`, focal (0.5, 0.6) | Yotito, Baby form; street TODO(canon), no habitat for the Yote line yet | same | Opaque | same |
+| `starter.1` | Squeaklet on a Harlem brownstone stoop | `creatures/squeaklet.webp` | 960×1200, 164,962 B | (0.5, 0.3), the face | Final render, 4:5 master ≥ 1040×1300 |
+| `starter.2` | Kittee Cee on a 125th St bodega step | `creatures/kittee-cee.webp` | 960×1200, 137,220 B | (0.5, 0.28) | same |
+| `starter.3` | Yotito on a Times Square sidewalk | `creatures/yotito.webp` | 960×1200, 125,432 B | (0.55, 0.33) | same |
 
-All three need to read at 1:1 (phone), roughly 2:3 portrait at `md` side-on, and 4:5 at `lg`, so the Mon sits in the centre 60% of the master. If renders arrive as transparent cut-outs, composite them on street plates before they go in the slot; the frame has no background of its own.
+The masters are below the 1040×1300 minimum because the model returns 960×1280 at most; they were cropped to 4:5. Each reads at 1:1 (phone), side-on at `md` and 4:5 at `lg`, with the Mon in the centre 60%. To replace one, save the new file under a new name and point the `@acme/assets/creatures` entry at it; optimisers cache by URL. If renders arrive as transparent cut-outs, composite them on street plates first; the frame has no background of its own.
+
+The three egg images (`metro-egg.webp`, `corner-egg.webp`, `prism-egg.webp`, 960×1200 each) are bundled but not rendered on `/`: the poster already names the egg, and a second picture per poster competes with the Mon at the phone crop (PS-028).
 
 ## CARE
 
@@ -160,12 +162,13 @@ Files: `apps/web/components/home/HatchBand.tsx` (server, no client code), `copy.
 
 - **Layout** (one column at every width, max 80rem): eyebrow and headline; a wide window onto the city at night; then the story and the closing line. From `md` the closing line sits left (5 of 11 parts) and the two story paragraphs right (6 parts); DOM order is story then closing line, so phones read the story first.
 - **Headline.** Two lines from `copy.hatch.title`: "Pick a time." in `ink-50`, "The egg waits." in `orange-500`. `font-display uppercase`, `text-display-lg` → `md:text-display-xl` → `lg:text-display-2xl`, `leading-display`. The largest section headline on the page (the hero H1 is the only larger type).
-- **Window.** `Figure`, no border, `bg-ink-900` while loading. Aspect 4:5 (<640), 3:2 (640–767), 21:9 (≥768). `Image fill framed={false}`, lazy, blur placeholder, `contentPosition` from the slot's focal point (0.64, 0.55: the bridge tower and One World Trade). `PlaceCaption` bottom left ("Mega City, East River").
+- **Window.** `Figure`, no border, `bg-ink-900` while loading. Aspect 4:5 (<640), 3:2 (640–767), 21:9 (≥768). `Image fill framed={false}`, lazy, blur placeholder, `contentPosition` from the slot's focal point (0.7, 0.56: the egg). `PlaceCaption` renders nothing, because the art has no caption (PS-028).
 - **Story.** `text-lg leading-8`, `ink-50` then `silver-300`, `max-w-content-measure`. Closing line `font-display uppercase text-2xl → md:text-3xl → lg:text-4xl`, `ink-50`.
-- **Surface.** `bg-ink-950` in both schemes, 4px `orange-500` rule along the top. No gradient, glow, border or pulse is added: the photograph's own lights are the band's light source.
+- **Surface.** `bg-ink-950` in both schemes, 4px `orange-500` rule along the top. No gradient, glow, border or pulse is added: the crack light in the egg is the band's one warm light.
 - **No button.** The waitlist directly below carries the one action (PS-023).
 - **Motion.** `w01.hatch.reveal` (unchanged): window opacity + scale from `S.enter` over `D.xl`, headline at 320 ms, closing line at 640 ms. That is the band's one moment. Reduced motion: everything at rest from first paint (`mfx-hatch-*` at opacity 1, checked in the shot run).
-- **Art slot `hatch` (final art spec).** Replace the bridge with the egg at night: one egg in its case on a stoop or sill at street level, mostly in shadow, lit low from one warm source (the egg's own crack light or a street lamp), the city out of focus behind. 21:9 master ≥ 2560×1097 plus a 4:5 phone crop ≥ 1080×1350 (`mobileSrc`), opaque WebP, egg at (0.62, 0.6), headroom dark enough for nothing to sit on it. No Mon visible and no hatch result: the page stops before the reveal. A later swap may be a short hatch loop (muted, `playsInline`, poster = the still, paused under reduced motion and offscreen); the slot's box and aspect stay, so no layout change.
+- **Art slot `hatch` (filled 2026-10-07, PS-028).** `creatures/hatch-night.webp`, 1536×1024 (3:2), 91,464 B, generated with Figma `generate_image` (`gpt-image-2.5-sunburst`): one egg in an open single-egg case on the bottom step of a Harlem stoop at night, lit only by the orange crack in its shell, the bridge and skyline out of focus on the dark left half. One file serves every aspect; the 4:5 and 21:9 crops come from the focal point. It is below the final size below, and there is no `mobileSrc` yet.
+- **Art slot `hatch` (final art spec).** The egg at night: one egg in its case on a stoop or sill at street level, mostly in shadow, lit low from one warm source (the egg's own crack light or a street lamp), the city out of focus behind. 21:9 master ≥ 2560×1097 plus a 4:5 phone crop ≥ 1080×1350 (`mobileSrc`), opaque WebP, egg at (0.62, 0.6), headroom dark enough for nothing to sit on it. No Mon visible and no hatch result: the page stops before the reveal. A later swap may be a short hatch loop (muted, `playsInline`, poster = the still, paused under reduced motion and offscreen); the slot's box and aspect stay, so no layout change.
 
 ## WAITLIST
 

@@ -7,7 +7,9 @@ import { W01_COPY } from './copy';
 /**
  * A photograph's caption as a signage plate pinned to a corner of its frame:
  * the district's disc, then "District, cross streets", or the district alone
- * where canon gives no place. Renders nothing for art without a district.
+ * where canon gives no place. Renders nothing for art without a district or
+ * caption, which is how creature art (PS-028) stays uncaptioned: a Mon is not
+ * a place.
  *
  * `landmark` drops the disc and the district name and prints "Landmark, cross
  * streets" instead. The hero uses it because it sits beside the district

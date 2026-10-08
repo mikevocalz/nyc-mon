@@ -6,7 +6,8 @@
   "types": "./index.ts",
   "exports": {
     ".": "./index.ts",
-    "./photos": "./photos/index.ts"
+    "./photos": "./photos/index.ts",
+    "./creatures": "./creatures/index.ts"
   },
   "scripts": {
     "lint": "eslint",

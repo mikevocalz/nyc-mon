@@ -395,7 +395,27 @@ The optional fourth tile was left out: the brief's candidates were a third photo
 
 ---
 
-<!-- PS-028 is reserved for the art agent. -->
+## PS-028 — Generated creature art fills the starter and hatch slots
+
+**Disposition:** BUILD (2026-10-07). Mike asked for creature images to be generated.
+
+**Context.** PS-007 deferred the creature art and built the slots. The starter posters still showed street photographs captioned as places, and the hatch band showed the Brooklyn Bridge. No Mon appeared on the page.
+
+**What canon gives.** Roster v11.1 (Decision #9) gives the names, Dex numbers and stages: #002 Squeaklet, #009 Kittee Cee, #062 Yotito, hatching from #001 Metro Egg, #008 Corner Egg and #061 Prism Egg. v11 gives no body data. The v7 dossiers (authority 5, not contradicted) give the species and the look, and the prompts follow them: Squeaklet is a seated charcoal rat with oversized round ears, a cream muzzle, a bare pink segmented tail and a small red nape mark, with no outfit. Kittee Cee is a round calico kitten with large paws and a short upright tail. Yotito is a sandy-gray coyote pup with long ears, big paws, a dark saddle hint and a furry tail, with no elemental mane. The Metro Egg is glossy red with white diagonal stripes and a small gold inset, the Corner Egg glossy pink with a white fur wrap, the Prism Egg glossy black with painted flames and a clear crystal inset. Pose, expression, setting and light are art direction, not canon.
+
+**Decision.**
+
+- `starter.1|2|3` hold the three Baby forms, each on its Bloodline's home turf as the page already placed them: Squeaklet on a Harlem stoop, Kittee Cee on a 125th Street bodega step, Yotito on a Times Square sidewalk. The hatch slot holds one egg in an open single-egg case on a Harlem stoop at night, lit only by the crack in its shell, with the bridge out of focus behind. No Mon is visible in the hatch art.
+- Creature art carries no place caption. A Mon is not a place, so the entries have no `district` or `caption`, `PlaceCaption` renders nothing, and `StartersSection` no longer mounts it.
+- Alt text names the Baby form and describes it without a pronoun (PS-005).
+- The three egg images are bundled in `@acme/assets/creatures` and not shown on `/`. The posters already say which egg each Baby hatches from, and a second picture per poster would compete with the Mon at the 1:1 phone crop. They are ready for the egg-choice screen (M08) or a later section.
+- `world.detail` stays reserved; no Mon-in-district tile was generated.
+
+**Source.** Figma `generate_image`, model `gpt-image-2.5-sunburst`, 2026-10-07. ElevenLabs was tried first and refused with a billing error on the account. The model returns 960×1280 and 1536×1024, below the HANDOFF minimums (1040×1300 for posters, 2560×1097 for the hatch). Posters are cropped to 960×1200 (4:5).
+
+**Consequences.** This is concept art, replaceable by final renders without a layout change: replace the file under a new name in `packages/assets/creatures/` and update its entry. Seven WebPs, 858,678 bytes in total. The images were picked by eye against the species traits above, style consistency and thumbnail readability; Yotito's first candidate was rejected as too photographic next to the other two, and Kittee Cee's first for legible snack packaging.
+
+**Return condition.** Final renders at the HANDOFF sizes, or a creator ruling that changes a Baby's look.
 
 ## PS-029 — /mons names the Egg and the Baby, nothing later
 

@@ -11,9 +11,10 @@ import { sectionMarker } from './sections';
  * HATCH (PS-024): the page's one night band and its emotional high point.
  * Server markup only. Composition, top to bottom: the headline at the
  * largest section size on the page, a wide window onto the city at night
- * (the `hatch` art slot; the lit bridge until the egg art lands), then the
- * story and the closing line. The photograph's own lights are the only
- * glow on the page; nothing pulses. No button here: the waitlist directly
+ * (the `hatch` art slot: an egg in its open case on a Harlem stoop, PS-028),
+ * then the story and the closing line. The crack light in the egg is the
+ * only warm light in the band; nothing pulses. The art has no caption, so
+ * `PlaceCaption` renders nothing here. No button here: the waitlist directly
  * below carries the one action.
  *
  * Motion: `w01.hatch.reveal` (./motion.ts) brings the window up, then the
