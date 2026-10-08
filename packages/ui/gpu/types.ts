@@ -57,9 +57,10 @@ export interface GpuScene<P> {
 /**
  * Builds the scene's pipelines and buffers. Keep it a module-level function
  * (a stable identity): a new function rebuilds the scene. Anything that
- * changes at runtime belongs in `params`.
+ * changes at runtime belongs in `params`. It may return a promise, so a
+ * setup can import its scene module (and TypeGPU with it) on demand.
  */
-export type GpuSetup<P> = (gpu: GpuContext) => GpuScene<P>;
+export type GpuSetup<P> = (gpu: GpuContext) => GpuScene<P> | Promise<GpuScene<P>>;
 
 export interface GpuCanvasHandle {
   /** Draw one frame now, even while the loop is stopped. */

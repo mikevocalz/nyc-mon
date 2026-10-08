@@ -14,6 +14,7 @@ import { Route as PayloadRouteImport } from './routes/_payload'
 import { Route as GuardianConsentIdRouteImport } from './routes/guardian-consent/$id'
 import { Route as V1EggsRouteImport } from './routes/v1/eggs'
 import { Route as V1GuardianConsentsRouteImport } from './routes/v1/guardian-consents'
+import { Route as V1WaitlistRouteImport } from './routes/v1/waitlist'
 import { Route as PayloadAdminIndexRouteImport } from './routes/_payload/admin.index'
 import { Route as PayloadAdminSplatRouteImport } from './routes/_payload/admin.$'
 import { Route as PayloadPayloadApiSplatRouteImport } from './routes/_payload/payload-api.$'
@@ -43,6 +44,11 @@ const V1EggsRoute = V1EggsRouteImport.update({
 const V1GuardianConsentsRoute = V1GuardianConsentsRouteImport.update({
   id: '/v1/guardian-consents',
   path: '/v1/guardian-consents',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const V1WaitlistRoute = V1WaitlistRouteImport.update({
+  id: '/v1/waitlist',
+  path: '/v1/waitlist',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PayloadAdminIndexRoute = PayloadAdminIndexRouteImport.update({
@@ -81,6 +87,7 @@ export interface FileRoutesByFullPath {
   '/guardian-consent/$id': typeof GuardianConsentIdRoute
   '/v1/eggs': typeof V1EggsRouteWithChildren
   '/v1/guardian-consents': typeof V1GuardianConsentsRoute
+  '/v1/waitlist': typeof V1WaitlistRoute
   '/admin/$': typeof PayloadAdminSplatRoute
   '/payload-api/$': typeof PayloadPayloadApiSplatRoute
   '/v1/me/mons': typeof V1MeMonsRoute
@@ -93,6 +100,7 @@ export interface FileRoutesByTo {
   '/guardian-consent/$id': typeof GuardianConsentIdRoute
   '/v1/eggs': typeof V1EggsRouteWithChildren
   '/v1/guardian-consents': typeof V1GuardianConsentsRoute
+  '/v1/waitlist': typeof V1WaitlistRoute
   '/admin/$': typeof PayloadAdminSplatRoute
   '/payload-api/$': typeof PayloadPayloadApiSplatRoute
   '/v1/me/mons': typeof V1MeMonsRoute
@@ -107,6 +115,7 @@ export interface FileRoutesById {
   '/guardian-consent/$id': typeof GuardianConsentIdRoute
   '/v1/eggs': typeof V1EggsRouteWithChildren
   '/v1/guardian-consents': typeof V1GuardianConsentsRoute
+  '/v1/waitlist': typeof V1WaitlistRoute
   '/_payload/admin/$': typeof PayloadAdminSplatRoute
   '/_payload/payload-api/$': typeof PayloadPayloadApiSplatRoute
   '/v1/me/mons': typeof V1MeMonsRoute
@@ -121,6 +130,7 @@ export interface FileRouteTypes {
     | '/guardian-consent/$id'
     | '/v1/eggs'
     | '/v1/guardian-consents'
+    | '/v1/waitlist'
     | '/admin/$'
     | '/payload-api/$'
     | '/v1/me/mons'
@@ -133,6 +143,7 @@ export interface FileRouteTypes {
     | '/guardian-consent/$id'
     | '/v1/eggs'
     | '/v1/guardian-consents'
+    | '/v1/waitlist'
     | '/admin/$'
     | '/payload-api/$'
     | '/v1/me/mons'
@@ -146,6 +157,7 @@ export interface FileRouteTypes {
     | '/guardian-consent/$id'
     | '/v1/eggs'
     | '/v1/guardian-consents'
+    | '/v1/waitlist'
     | '/_payload/admin/$'
     | '/_payload/payload-api/$'
     | '/v1/me/mons'
@@ -160,6 +172,7 @@ export interface RootRouteChildren {
   GuardianConsentIdRoute: typeof GuardianConsentIdRoute
   V1EggsRoute: typeof V1EggsRouteWithChildren
   V1GuardianConsentsRoute: typeof V1GuardianConsentsRoute
+  V1WaitlistRoute: typeof V1WaitlistRoute
   V1MeMonsRoute: typeof V1MeMonsRoute
   V1MonsIdCareRoute: typeof V1MonsIdCareRoute
 }
@@ -199,6 +212,13 @@ declare module '@tanstack/react-router' {
       path: '/v1/guardian-consents'
       fullPath: '/v1/guardian-consents'
       preLoaderRoute: typeof V1GuardianConsentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/v1/waitlist': {
+      id: '/v1/waitlist'
+      path: '/v1/waitlist'
+      fullPath: '/v1/waitlist'
+      preLoaderRoute: typeof V1WaitlistRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_payload/admin/': {
@@ -278,6 +298,7 @@ const rootRouteChildren: RootRouteChildren = {
   GuardianConsentIdRoute: GuardianConsentIdRoute,
   V1EggsRoute: V1EggsRouteWithChildren,
   V1GuardianConsentsRoute: V1GuardianConsentsRoute,
+  V1WaitlistRoute: V1WaitlistRoute,
   V1MeMonsRoute: V1MeMonsRoute,
   V1MonsIdCareRoute: V1MonsIdCareRoute,
 }

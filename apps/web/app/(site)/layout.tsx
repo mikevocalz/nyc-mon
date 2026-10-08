@@ -19,7 +19,7 @@ export default function SiteLayout({ children }: Readonly<{ children: React.Reac
   return (
     <Document>
       <SiteNavBar />
-      <Main id={CONTENT_ID} className="min-h-screen flex-1">
+      <Main id={CONTENT_ID} tabIndex={-1} className="min-h-screen flex-1 focus:outline-none">
         {children}
       </Main>
       <SiteFooterBar />

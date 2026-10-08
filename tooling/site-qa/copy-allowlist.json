@@ -1,0 +1,4 @@
+{
+  "_doc": "Canon exceptions for copy-lint. A hit is waived when term matches, route/scope match (when given), and the hit's snippet contains `context`. Every entry needs a `reason` naming the canon source.",
+  "entries": []
+}

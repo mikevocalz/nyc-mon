@@ -56,7 +56,9 @@ export function SpatialScreen({ enterImmersive }: SpatialScreenProps = {}) {
   const cityOpen = useDistrictStore((state) => state.cityOpen);
   const setCityOpen = useDistrictStore((state) => state.setCityOpen);
 
-  const tools = (
+  // Runtime diagnostic for headset builds. Web visitors never see it: it named
+  // the backend ("Inline / Viro spatial fallback"), which is debug, not copy (PS-031).
+  const tools = isWeb ? undefined : (
     <GridCard eyebrow="Runtime" title="Spatial backend">
       <Text className="text-sm text-white/75">
         {capabilities.metaSpatialWindows ? 'Meta Layout spatial window' : 'Inline / Viro spatial fallback'}
@@ -108,7 +110,7 @@ export function SpatialScreen({ enterImmersive }: SpatialScreenProps = {}) {
                 </Heading>
                 <Text className="max-w-2xl text-center text-ink-50 md:text-left">{HOME_COPY.intro}</Text>
                 <View className="items-center md:items-start">
-                  <SegmentedControl options={DISTRICT_OPTIONS} value={district} onChange={setDistrict} />
+                  <SegmentedControl aria-label="District" options={DISTRICT_OPTIONS} value={district} onChange={setDistrict} />
                 </View>
                 <View className="mt-2 flex-row flex-wrap justify-center gap-3 md:justify-start">
                   <CircuitButton tone="orange" variant="solid" onPress={async () => {

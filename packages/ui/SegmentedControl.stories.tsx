@@ -2,7 +2,8 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { SegmentedControl } from './SegmentedControl';
 import { useInstanceStore, useStore } from './use-instance-store';
 import { View } from './tw';
-import { CONTROL_TONES, DISTRICTS, type ControlTone, type District } from './district';
+import { CONTROL_TONES, DISTRICTS, DISTRICT_NAME, type ControlTone, type District } from './district';
+import { Heading } from './Heading';
 
 const RANGE = [
   { value: 'week', label: 'Week' },
@@ -56,4 +57,56 @@ export const Districts: Story = {
       ))}
     </View>
   ),
+};
+
+const DISTRICT_OPTIONS = DISTRICTS.map((value) => ({ value, label: DISTRICT_NAME[value] }));
+
+function LiveDistricts({ label }: { label: string }) {
+  const store = useInstanceStore<{ value: District }>(() => ({ value: 'megacity' }));
+  const value = useStore(store, (s) => s.value);
+  return (
+    <SegmentedControl
+      aria-label={label}
+      options={DISTRICT_OPTIONS}
+      value={value}
+      onChange={(v) => store.setState({ value: v })}
+      district={value}
+    />
+  );
+}
+
+/**
+ * Narrow parents: the well wraps onto a second row instead of clipping, so
+ * "Mega City" stays visible and tappable at a 280px phone panel. Keyboard:
+ * Tab reaches only the checked radio; arrows move and select with wrap,
+ * Home/End jump.
+ */
+export const Narrow: Story = {
+  render: () => (
+    <View className="gap-6 p-4">
+      <View className="w-[280px] gap-2 border-2 border-dashed border-ink-700 p-2">
+        <LiveDistricts label="District (280px)" />
+      </View>
+      <View className="w-[348px] gap-2 border-2 border-dashed border-ink-700 p-2">
+        <LiveDistricts label="District (348px)" />
+      </View>
+    </View>
+  ),
+};
+
+/** Named by a visible heading through aria-labelledby. */
+export const LabelledBy: Story = {
+  render: () => {
+    const Example = () => {
+      const store = useInstanceStore<{ value: Range }>(() => ({ value: 'month' }));
+      const value = useStore(store, (s) => s.value);
+      return (
+        <View className="gap-2 p-4">
+          <Heading level={3} id="range-heading">Range</Heading>
+          <SegmentedControl aria-labelledby="range-heading" options={RANGE} value={value} onChange={(v) => store.setState({ value: v })} />
+        </View>
+      );
+    };
+    return <Example />;
+  },
 };

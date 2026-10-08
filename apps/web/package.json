@@ -7,10 +7,12 @@
     "build": "node scripts/next.mjs build",
     "start": "node scripts/next.mjs start",
     "lint": "eslint",
+    "test": "node --test 'components/**/*.test.ts' 'lib/**/*.test.ts'",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@acme/app": "workspace:*",
+    "@acme/assets": "workspace:*",
     "@acme/content": "workspace:*",
     "@acme/spatial": "workspace:*",
     "@acme/theme": "workspace:*",
@@ -21,12 +23,15 @@
     "@rive-app/react-webgl2": "catalog:",
     "@tanstack/react-query": "catalog:",
     "canvaskit-wasm": "catalog:",
+    "@gsap/react": "catalog:",
+    "gsap": "catalog:",
+    "kinetrell": "catalog:",
+    "lenis": "catalog:",
     "next": "catalog:",
     "nextjs-toploader": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
     "react-native": "catalog:",
-    "react-native-audio-api": "catalog:",
     "react-native-css": "catalog:",
     "react-native-gesture-handler": "catalog:",
     "react-native-skia": "catalog:",
@@ -48,6 +53,7 @@
     "expo": "catalog:",
     "tailwindcss": "catalog:",
     "typescript": "catalog:",
-    "unplugin-typegpu": "catalog:"
+    "unplugin-typegpu": "catalog:",
+    "web-vitals": "6.2.3"
   }
 }

@@ -61,7 +61,7 @@ export function Schedule({
         {/* The platform's own segmented control (@expo/ui), not a hand-rolled
             row of pressables — same reasoning as every other native control in
             the kit. */}
-        <SegmentedControl options={VIEWS} value={view} onChange={setView} />
+        <SegmentedControl aria-label="Calendar view" options={VIEWS} value={view} onChange={setView} />
 
         <Button variant="primary" title="Add event" onPress={onNewBooking} />
       </View>

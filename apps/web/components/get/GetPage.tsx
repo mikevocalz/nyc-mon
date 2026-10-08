@@ -1,83 +1,11 @@
-'use client';
-
-import { useState } from 'react';
-import { Badge, Button, SolidPanel, TextField } from '@acme/ui';
+import { Badge, SolidPanel } from '@acme/ui';
 import { Heading, List, ListItem, Paragraph, Section } from '@acme/ui/html';
 import { Text, View } from '@acme/ui/tw';
 import { Eyebrow } from '../home/Eyebrow';
+import { WaitlistForm } from '../waitlist/WaitlistForm';
 import { W05_COPY } from './copy';
 
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-/**
- * The waitlist capture. This site has no backend (ADR 0003), so submit does no
- * POST — a valid email flips to the confirmation state in place.
- *
- * The fields sit in a plain View, not the Form primitive: inside a real <form>
- * the browser's implicit submission would reload the page on Enter, which is
- * the fake POST we're avoiding.
- */
-function WaitlistForm() {
-  const copy = W05_COPY.form;
-  const [email, setEmail] = useState('');
-  const [error, setError] = useState<string | undefined>();
-  const [joined, setJoined] = useState(false);
-
-  const submit = () => {
-    if (!EMAIL_PATTERN.test(email)) {
-      setError(copy.errorInvalid);
-      return;
-    }
-    setError(undefined);
-    setJoined(true);
-  };
-
-  if (joined) {
-    return (
-      <View role="status" aria-live="polite">
-        <SolidPanel surface="page" depth="md" className="max-w-xl gap-2 px-5 py-6">
-          <Paragraph className="my-0 font-display text-xl text-text">{copy.confirmedTitle}</Paragraph>
-          <Paragraph className="my-0 text-base leading-7 text-text-secondary">{copy.confirmedBody}</Paragraph>
-        </SolidPanel>
-      </View>
-    );
-  }
-
-  // items-start + the label-height offset: the button aligns to the input
-  // band itself, so hint/error text growing below the field never shifts it.
-  // size sm puts the framed face at the input's min-h-11.
-  return (
-    <View className="w-full max-w-xl gap-3 sm:flex-row sm:items-start">
-      <TextField
-        surface="daylit"
-        containerClassName="flex-1"
-        label={copy.label}
-        hint={copy.hint}
-        placeholder={copy.placeholder}
-        value={email}
-        error={error}
-        onChangeText={(text) => {
-          setEmail(text);
-          if (error !== undefined) setError(undefined);
-        }}
-        onSubmitEditing={submit}
-        autoCapitalize="none"
-        autoCorrect={false}
-        keyboardType="email-address"
-        textContentType="emailAddress"
-      />
-      <Button
-        variant="cta"
-        size="sm"
-        title={copy.submit}
-        onPress={submit}
-        className="w-full sm:mt-6 sm:w-auto"
-      />
-    </View>
-  );
-}
-
-/** W05, the waitlist page. */
+/** W05, the waitlist page: the hero, the form (PS-023) and the stores it will ship to. */
 export function GetPage() {
   const copy = W05_COPY;
   return (
@@ -100,7 +28,7 @@ export function GetPage() {
             {copy.hero.body}
           </Paragraph>
         </View>
-        <WaitlistForm />
+        <WaitlistForm source="get" />
         <List aria-label={copy.stores.label} className="m-0 list-none gap-6 p-0 sm:flex-row">
           {copy.stores.badges.map((badge) => (
             <ListItem key={badge.name} className="flex-1">

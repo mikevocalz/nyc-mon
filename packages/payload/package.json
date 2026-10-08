@@ -26,6 +26,10 @@
       "types": "./src/admin/console/guardian-consent.ts",
       "default": "./src/admin/console/guardian-consent.ts"
     },
+    "./admin/console/waitlist": {
+      "types": "./src/admin/console/waitlist.ts",
+      "default": "./src/admin/console/waitlist.ts"
+    },
     "./admin/console/v1-game": {
       "types": "./src/admin/console/v1/game.ts",
       "default": "./src/admin/console/v1/game.ts"

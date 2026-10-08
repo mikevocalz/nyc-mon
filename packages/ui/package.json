@@ -9,6 +9,7 @@
     "./tw": "./tw.tsx",
     "./primitives": "./primitives/index.tsx",
     "./html": "./html/index.tsx",
+    "./backgrounds/CityBlocks": "./backgrounds/CityBlocks.tsx",
     "./gpu": "./gpu/index.ts",
     "./three": "./three/index.ts",
     "./neon": "./neon/index.ts",
@@ -27,6 +28,10 @@
     "./adaptive-panes": "./adaptive-panes/index.tsx",
     "./adaptive-panes/parts": "./adaptive-panes/parts.ts"
   },
+  "sideEffects": [
+    "./rn-globals-shim.ts",
+    "*.css"
+  ],
   "scripts": {
     "lint": "eslint",
     "typecheck": "tsc --noEmit",

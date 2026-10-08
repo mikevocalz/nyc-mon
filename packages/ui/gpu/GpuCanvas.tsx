@@ -132,20 +132,34 @@ export function GpuCanvas<P>({
     if (!active || !hasSize || !root || !format) return;
     const rt = runtime.current!;
     let scene: GpuScene<P> | null = null;
+    let disposed = false;
+    const fail = (error: unknown) => {
+      console.error('[GpuCanvas] setup failed, switching to the fallback.', error);
+      failure.setState({ failed: true });
+    };
+    const attach = (built: GpuScene<P>) => {
+      if (disposed) {
+        built.dispose?.();
+        return;
+      }
+      scene = built;
+      rt.scene = built;
+      invalidate();
+    };
     try {
       const context = canvasRef.current?.getContext('webgpu');
       if (!context) return;
       context.configure({ device: root.device, format, alphaMode: 'premultiplied' });
       rt.context = context;
-      scene = setup({ root, device: root.device, context, format, invalidate });
-      rt.scene = scene;
+      const built = setup({ root, device: root.device, context, format, invalidate });
+      if (built instanceof Promise) built.then(attach, (error: unknown) => !disposed && fail(error));
+      else attach(built);
     } catch (error) {
-      console.error('[GpuCanvas] setup failed, switching to the fallback.', error);
-      failure.setState({ failed: true });
+      fail(error);
       return;
     }
-    invalidate();
     return () => {
+      disposed = true;
       scene?.dispose?.();
       rt.scene = null;
       rt.context?.unconfigure();

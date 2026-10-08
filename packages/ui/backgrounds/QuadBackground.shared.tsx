@@ -4,14 +4,18 @@ import { useMemo, useRef, type ReactNode } from 'react';
 import type { GestureResponderEvent } from 'react-native';
 import { twMerge } from 'tailwind-merge';
 import { GpuCanvas } from '../gpu/GpuCanvas';
-import type { GpuCanvasHandle } from '../gpu/types';
+import type { GpuCanvasHandle, GpuSetup } from '../gpu/types';
 import { parseColor } from '../neon/colors';
 import { useInstanceStore } from '../use-instance-store';
 import { View } from '../tw';
-import { createQuadScene, type QuadSceneParams } from './QuadScene.gpu';
+import type { QuadSceneParams } from './QuadScene.gpu';
 import type { QuadSceneSkiaProps } from './QuadScene.skia';
 import type { Layer, Pointer } from './quad-writer';
 import { useReducedMotion } from './use-reduced-motion';
+
+// The TypeGPU scene (and TypeGPU itself) loads once a WebGPU root exists, not
+// with the page: GpuCanvas only calls setup on a working device.
+const createQuadSceneLazy: GpuSetup<QuadSceneParams> = (gpu) => import('./QuadScene.gpu').then((m) => m.createQuadScene(gpu));
 
 type PointerLike = GestureResponderEvent & {
   currentTarget: { getBoundingClientRect?: () => { left: number; top: number } };
@@ -99,7 +103,7 @@ export function QuadBackgroundShell({
       >
         <GpuCanvas
           ref={gpu}
-          setup={createQuadScene}
+          setup={createQuadSceneLazy}
           params={params}
           forceFallback={forceFallback}
           paused={paused}

@@ -40,6 +40,42 @@ interface Runtime<P> {
 const isWeb = Platform.OS === 'web';
 
 /**
+ * three's `Renderer.init()` starts `Animation.start()`, a requestAnimationFrame
+ * loop that runs until dispose and only advances `nodeFrame`
+ * (three/src/renderers/common/Animation.js, r186). ThreeCanvas already owns a
+ * frame loop gated on visibility, so the internal one is stopped after init and
+ * each draw advances `nodeFrame` itself. Neither member is public API: if a
+ * three upgrade renames them, `stopInternalLoop` warns and the site-qa motion
+ * check fails on the idle loop.
+ */
+type RendererInternals = {
+  _animation?: { stop?: () => void } | null;
+  _nodes?: { nodeFrame?: { update?: () => void; frameId?: number } } | null;
+};
+const stopInternalLoop = (renderer: WebGPURenderer) => {
+  const animation = (renderer as unknown as RendererInternals)._animation;
+  if (typeof animation?.stop !== 'function') {
+    console.warn('[ThreeCanvas] three renamed Renderer._animation; its internal frame loop keeps running.');
+    return;
+  }
+  animation.stop();
+};
+let warnedNodeFrame = false;
+const warnNodeFrame = () => {
+  if (warnedNodeFrame) return;
+  warnedNodeFrame = true;
+  console.warn('[ThreeCanvas] three renamed Renderer._nodes.nodeFrame; node-time animation will not advance.');
+};
+// What Animation.start()'s loop did per frame besides the user callback.
+const advanceNodeFrame = (renderer: WebGPURenderer) => {
+  const nodeFrame = (renderer as unknown as RendererInternals)._nodes?.nodeFrame;
+  if (typeof nodeFrame?.update !== 'function') warnNodeFrame();
+  if (renderer.info.autoReset) renderer.info.reset();
+  nodeFrame?.update?.();
+  if (nodeFrame?.frameId !== undefined) (renderer.info as { frame: number }).frame = nodeFrame.frameId;
+};
+
+/**
  * A three.js canvas on WebGPURenderer, with one code path for web and native.
  *
  * - Web with WebGPU: WebGPURenderer's WebGPU backend on a canvas element,
@@ -131,6 +167,7 @@ export function ThreeCanvas<P>({
         { time: rt.time, delta, width: rt.width, height: rt.height, pixelRatio: rt.pixelRatio, reducedMotion: rt.reducedMotion, pointer: rt.pointer },
         rt.params,
       );
+      advanceNodeFrame(renderer);
       renderer.render(built.scene, built.camera);
       rt.surface?.present();
     } catch (error) {
@@ -174,6 +211,7 @@ export function ThreeCanvas<P>({
       if (cancelled || !surface) return;
       renderer = surface.createRenderer(THREE, { backend: using, device });
       await renderer.init();
+      stopInternalLoop(renderer);
       if (cancelled) return;
       built = setup({ THREE, renderer, backend: using, invalidate }, rt.params);
       rt.renderer = renderer;

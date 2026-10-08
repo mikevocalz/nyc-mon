@@ -29,6 +29,9 @@ allowBuilds:
   # false: the vendored tarball ships the fork's committed dist/; there is no
   # build to run. Bump the tarball together with the catalog pin.
   "@reactvision/react-viro@file:vendor/reactvision-react-viro-3.0.2-moyo.1.tgz": false
+  # kinetrell ships source for git consumers; its `prepare` runs tsdown to
+  # emit dist/ (the exports map only resolves against built files).
+  "kinetrell@https://codeload.github.com/mikevocalz/Kinetrell/tar.gz/344de51531ce050c4311d3feb70e4d596bdc8041": true
   sharp: true
   unrs-resolver: true
   esbuild: true
@@ -143,6 +146,15 @@ catalog:
   next: 16.3.8
   nextjs-toploader: 3.9.17
 
+  # cinematic web motion — Kinetrell is the one abstraction over GSAP,
+  # ScrollTrigger and Lenis (do not add a second animation library).
+  # Pinned to the known-good git commit; bump the SHA to upgrade.
+  kinetrell: github:mikevocalz/Kinetrell#344de51531ce050c4311d3feb70e4d596bdc8041
+  # Kinetrell's peer set for the web adapters (kinetrell/web/*).
+  gsap: 3.15.0
+  "@gsap/react": 2.1.2
+  lenis: 1.3.26
+
   # styling
   uniwind: 1.12.1
   tailwindcss: 4.3.3
@@ -225,6 +237,7 @@ catalog:
 
 patchedDependencies:
   react-native-graph@1.4.0: patches/react-native-graph@1.4.0.patch
+  react-native-skia@3.0.2: patches/react-native-skia@3.0.2.patch
   # Backports uniwind PR #706: the web resolver no longer cycles through
   # InputAccessoryView, which left `expo start --web` blank. Remove once
   # uniwind releases #706 (uni-stack/uniwind#704).

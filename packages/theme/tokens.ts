@@ -219,6 +219,25 @@ export const hlynk = {
 } as const;
 
 /**
+ * The H-Lynk screen's own UI, drawn on a canvas inside the 3D device
+ * (apps/web/components/home/device-scene.ts). Canvas can't read CSS variables,
+ * so these stay TS-only and are not emitted to theme.css.
+ */
+export const hud = {
+  bg0: '#02081F',
+  bg1: '#06265C',
+  panel: '#0A1E4A',
+  line: '#27498F',
+  text: brand.white,
+  dim: '#8FB3E8',
+  red: brand.apple,
+  redDeep: '#B00000',
+  green: '#35D07F',
+  cyan: brand.carolina,
+  amber: '#FCB034',
+} as const;
+
+/**
  * Neon tokens for canvas renderers (Skia grid floor, glyph city) — they can't
  * read CSS variables. NeonBlade's Grid Floor look in the NYC Mon palette.
  */
@@ -247,6 +266,24 @@ export const typeScale = {
   'display-lg': { size: '3rem', lineHeight: '1.1', tracking: '-0.01em' },
   'display-md': { size: '2.25rem', lineHeight: '1.15', tracking: '-0.01em' },
   'display-sm': { size: '1.875rem', lineHeight: '1.2', tracking: '0' },
+  /** the home hero headline below `sm` (art brief: mobile display 2.75–3.25rem, leading 0.9–0.95) */
+  'display-hero': { size: '2.75rem', lineHeight: '0.95', tracking: '-0.01em' },
+  /** the home hero headline on a short landscape phone, where the first view is ~300px tall */
+  'display-hero-short': { size: '2.125rem', lineHeight: '0.95', tracking: '-0.01em' },
+  /** district names on the home signage board */
+  'display-board': { size: '2rem', lineHeight: '1', tracking: '-0.01em' },
+} as const;
+
+/**
+ * Line heights for display type that hold across breakpoints. A `text-*` step
+ * resets line height at each breakpoint; `leading-display` pins it.
+ * Emitted as `--leading-<name>` (utility `leading-<name>`).
+ */
+export const leading = {
+  /** hero headline */
+  display: '0.95',
+  /** section headlines */
+  heading: '1.02',
 } as const;
 
 /**
@@ -269,6 +306,12 @@ export const typeRamp = {
   'type-label': { family: 'sans', sizePt: 15, lineHeightPt: 20, weight: 500 },
   /** legal links and hints; nothing is set smaller */
   'type-caption': { family: 'sans', sizePt: 13, lineHeightPt: 18, weight: 400 },
+  /**
+   * uppercase signage labels: section eyebrows, photo place tags, readout
+   * headers. 14 is the web label floor (PREMIUM_SITE_AUDIT §10), so tracked
+   * caps never drop to the old 11 px step.
+   */
+  'type-tag': { family: 'sans', sizePt: 14, lineHeightPt: 18, weight: 600, trackingEm: 0.18 },
 } as const satisfies Record<string, TypeStep>;
 
 /** One step of {@linkcode typeRamp}. */
@@ -279,6 +322,8 @@ export interface TypeStep {
   lineHeightPt: number;
   /** CSS font weight; Archivo Black has only 400 */
   weight: 400 | 500 | 600 | 700;
+  /** letter spacing in em, for tracked uppercase steps */
+  trackingEm?: number;
 }
 
 // ---- layout -----------------------------------------------------------------
@@ -339,6 +384,12 @@ export const contentWidths = {
   'content-detail': '48rem',
   'content-screen': '56rem',  // Tailwind 4xl — the default screen cap
   'content-wide': '72rem',
+  /** marketing body copy beside a headline (home sections) */
+  'content-measure': '36rem',
+  /** a short annotation set beside a label (care readout lines) */
+  'content-narrow': '16rem',
+  /** the framed hero photograph from `md` up */
+  'content-hero-art': '26.25rem',
   'screen-2xl': '96rem',  // outer cap for every screen (user rule)
 
   // Adaptive split-view panes. Leading panes are fixed-width and the detail
@@ -348,6 +399,16 @@ export const contentWidths = {
   'pane-primary-narrow': '16rem',
   'pane-supplementary': '21rem',
   'pane-inspector': '20rem',
+} as const;
+
+/**
+ * Layout floors. Emitted as `--min-height-<name>` (utility `min-h-<name>`).
+ */
+export const minHeights = {
+  /** home hero below `md`: the framed art, seal and copy plate stack inside it */
+  hero: '40rem',
+  /** home hero from `lg`: most of the first view below the sticky header */
+  'hero-wide': '85svh',
 } as const;
 
 /**
@@ -409,6 +470,80 @@ export const motion = {
     exit: 'cubic-bezier(0.4, 0, 1, 1)',
   },
 } as const;
+
+/**
+ * Page choreography for the marketing site (GSAP/Kinetrell timelines,
+ * docs/design/site/PREMIUM_SITE_MOTION.md). {@linkcode motion} stays the UI
+ * scale; these are the slower section beats. Seconds for durations (GSAP's
+ * unit), px for distances, percent of the element's own height for parallax.
+ * Each ease carries its GSAP name and the CSS curve that draws the same shape.
+ *
+ * Emitted as `--duration-page-<step>` (:root), `duration-page-<step>` and
+ * `ease-page-<name>` utilities, and `scale-page-hover`.
+ */
+export const pageMotion = {
+  duration: {
+    /** small text beats and feature lines */
+    xs: 0.44,
+    /** section heads, cards, CTAs */
+    sm: 0.62,
+    /** larger blocks: the care readout, hatch copy */
+    md: 0.72,
+    /** hero art settle, the product stage */
+    lg: 0.95,
+    /** the hatch art: the slowest beat on the page */
+    xl: 1.3,
+  },
+  ease: {
+    out: { gsap: 'power2.out', css: 'cubic-bezier(0.33, 1, 0.68, 1)' },
+    inOut: { gsap: 'power2.inOut', css: 'cubic-bezier(0.65, 0, 0.35, 1)' },
+    settle: { gsap: 'quad.out', css: 'cubic-bezier(0.5, 1, 0.89, 1)' },
+    /** scroll-scrubbed tracks: the scroll position is the easing */
+    scrub: { gsap: 'linear', css: 'linear' },
+  },
+  /** vertical travel into place, px */
+  distance: {
+    nudge: 10,
+    step: 16,
+    reveal: 24,
+    rise: 34,
+    /** the H-Lynk device settling onto its stage */
+    stage: 56,
+  },
+  /** scroll drift as yPercent; depth comes from rate difference */
+  parallax: {
+    near: 3,
+    mid: 5,
+    far: 7,
+    max: 9,
+  },
+  scale: {
+    /** art that settles from slightly large */
+    enter: 1.05,
+    /** the device rising to full size */
+    stage: 0.97,
+    /** art zoom on card hover */
+    hover: 1.03,
+  },
+  /** degrees */
+  tilt: {
+    /** the seal landing like a rubber stamp */
+    stamp: 2,
+    /** the device turning to face the reader */
+    stage: 8,
+  },
+  /** px, for the device's 3D turn */
+  perspective: 800,
+  /** ScrollTrigger scrub lag, seconds */
+  scrub: {
+    tight: 0.5,
+    base: 0.6,
+    loose: 0.8,
+  },
+} as const;
+
+export type PageEase = keyof typeof pageMotion.ease;
+export type PageDuration = keyof typeof pageMotion.duration;
 
 /** An easing in {@linkcode motion.easing}. */
 export type MotionEasing = keyof typeof motion.easing;

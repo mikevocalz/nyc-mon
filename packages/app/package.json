@@ -8,6 +8,9 @@
     ".": "./index.ts",
     "./features/*": "./features/*"
   },
+  "sideEffects": [
+    "*.css"
+  ],
   "scripts": {
     "lint": "eslint",
     "typecheck": "tsc --noEmit",

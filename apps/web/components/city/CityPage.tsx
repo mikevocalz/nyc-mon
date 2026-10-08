@@ -3,6 +3,7 @@ import { SolidPanel } from '@acme/ui';
 import { Article, Heading, List, ListItem, Paragraph, Section } from '@acme/ui/html';
 import { View } from '@acme/ui/tw';
 import { Eyebrow } from '../home/Eyebrow';
+import { StreetGridBand } from './StreetGridBand';
 import { W03_COPY } from './copy';
 
 /** District accent bars, one brand colour per card. */
@@ -42,6 +43,8 @@ export function CityPage() {
           ))}
         </List>
       </Section>
+
+      <StreetGridBand />
 
       <Section
         aria-labelledby="w03-cast-title"

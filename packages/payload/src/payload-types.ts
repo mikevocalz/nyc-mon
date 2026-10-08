@@ -76,6 +76,7 @@ export interface Config {
     'audit-events': AuditEvent;
     'integrity-runs': IntegrityRun;
     'idempotency-records': IdempotencyRecord;
+    waitlist: Waitlist;
     sessions: Session;
     accounts: Account;
     verifications: Verification;
@@ -100,6 +101,7 @@ export interface Config {
     'audit-events': AuditEventsSelect<false> | AuditEventsSelect<true>;
     'integrity-runs': IntegrityRunsSelect<false> | IntegrityRunsSelect<true>;
     'idempotency-records': IdempotencyRecordsSelect<false> | IdempotencyRecordsSelect<true>;
+    waitlist: WaitlistSelect<false> | WaitlistSelect<true>;
     sessions: SessionsSelect<false> | SessionsSelect<true>;
     accounts: AccountsSelect<false> | AccountsSelect<true>;
     verifications: VerificationsSelect<false> | VerificationsSelect<true>;
@@ -391,6 +393,18 @@ export interface IdempotencyRecord {
   status: number;
   contentType: string;
   body: string;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "waitlist".
+ */
+export interface Waitlist {
+  id: number;
+  email: string;
+  district?: ('downtown' | 'midtown' | 'harlem' | 'megacity') | null;
+  source?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -688,6 +702,10 @@ export interface PayloadLockedDocument {
         value: number | IdempotencyRecord;
       } | null)
     | ({
+        relationTo: 'waitlist';
+        value: number | Waitlist;
+      } | null)
+    | ({
         relationTo: 'sessions';
         value: number | Session;
       } | null)
@@ -914,6 +932,17 @@ export interface IdempotencyRecordsSelect<T extends boolean = true> {
   status?: T;
   contentType?: T;
   body?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "waitlist_select".
+ */
+export interface WaitlistSelect<T extends boolean = true> {
+  email?: T;
+  district?: T;
+  source?: T;
   updatedAt?: T;
   createdAt?: T;
 }

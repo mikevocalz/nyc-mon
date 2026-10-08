@@ -14,7 +14,7 @@ const THEME_OPTIONS: { value: ThemePreference; label: string }[] = [
 function ThemeSegment() {
   const theme = useProfile((s) => s.theme);
   const setTheme = useProfile((s) => s.setTheme);
-  return <SegmentedControl options={THEME_OPTIONS} value={theme} onChange={setTheme} className="self-start" />;
+  return <SegmentedControl aria-label="Theme" options={THEME_OPTIONS} value={theme} onChange={setTheme} className="self-start" />;
 }
 
 export function SettingsContent() {

@@ -2,6 +2,7 @@ import { Article, Heading, Paragraph, Section } from '@acme/ui/html';
 import { View } from '@acme/ui/tw';
 import { Eyebrow } from '../home/Eyebrow';
 import { LEGAL_COPY } from './copy';
+import { LegalParagraph, legalParagraphKey } from './LegalParagraph';
 
 /** W06 — the terms of use. Document sections are Sections inside an Article. */
 export function TermsPage() {
@@ -31,9 +32,7 @@ export function TermsPage() {
                 {section.title}
               </Heading>
               {section.body.map((paragraph) => (
-                <Paragraph key={paragraph} className="my-0 text-base leading-7 text-text-secondary">
-                  {paragraph}
-                </Paragraph>
+                <LegalParagraph key={legalParagraphKey(paragraph)} paragraph={paragraph} />
               ))}
             </Section>
           ))}

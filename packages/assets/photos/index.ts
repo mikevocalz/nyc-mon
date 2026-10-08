@@ -42,8 +42,11 @@ export interface NycPhoto {
   district: PhotoDistrict;
   /** The landmark or street. */
   title: string;
-  /** Where it is, short enough for one line. */
-  place: string;
+  /**
+   * Where it is, short enough for one line: cross streets as "X at Y". Absent
+   * for Mega City, which canon doesn't place on a map (PS-006).
+   */
+  place?: string;
   width: number;
   height: number;
   blurDataURL: string;
@@ -69,7 +72,7 @@ export const NYC_PHOTOS: readonly NycPhoto[] = [
     alt: 'The carved New York Stock Exchange sign on the marble facade on Wall Street, with an American flag above it',
     district: 'downtown',
     title: 'Wall Street',
-    place: 'Broad St at Wall St',
+    place: 'Wall St at Broad St',
     width: 1200,
     height: 800,
     blurDataURL: 'data:image/webp;base64,UklGRqQAAABXRUJQVlA4IJgAAAAQBACdASoYABAAPtFUo0uoJKMhsAgBABoJZQC2yBU6WAu4XaV2mICNgAD8gqV+3HVQxO9+fcv2FfOOOaalleRLQduV5+5Be2yxA6cenAMOojZH/mjbcA+GEINae/PSF34L9Fy2N+AWFz9oAWCO477CdznkkXFUc1r/WaMZM00PDK1nM4JIrmCanofwOLDZk3IJS594F4AAAA==',
@@ -81,7 +84,7 @@ export const NYC_PHOTOS: readonly NycPhoto[] = [
     alt: 'The Midtown skyline at sunset with the Empire State Building in the centre and the Chrysler Building to the right, under an orange sky',
     district: 'midtown',
     title: 'Empire State Building',
-    place: 'Fifth Ave and 34th St',
+    place: 'Fifth Ave at 34th St',
     width: 1200,
     height: 800,
     blurDataURL: 'data:image/webp;base64,UklGRrAAAABXRUJQVlA4IKQAAACwBACdASoYABAAPtFUo0uoJKMhsAgBABoJbACdMoRwAdCJBwPAZjGjkvJDQ8oAAP7oDTV8qgkKHcxlQtUnwmFavUSOGA8pcYc1AN1jVByJTnJqvKipU5ZTEGrGLB6x/Y2/2HdC16gio/LsIYm6o6q1Iz+WWcs8tvuKf2N2Wqj+S8WF83QUeWbN4RJFDvech+KQ6m6TMmfkV17mfmngffsw4mAAAA==',
@@ -93,7 +96,7 @@ export const NYC_PHOTOS: readonly NycPhoto[] = [
     alt: 'Times Square at sunset, crowds crossing the street between towers covered in lit billboards',
     district: 'midtown',
     title: 'Times Square',
-    place: 'Broadway and Seventh Ave',
+    place: 'Broadway at Seventh Ave',
     width: 1200,
     height: 800,
     blurDataURL: 'data:image/webp;base64,UklGRrAAAABXRUJQVlA4IKQAAABwBACdASoYABAAPtFUo0uoJKMhsAgBABoJQBUfbwAOKxWaNLDO/xbwnuFTSAD+7qZ7q7pf/RZL8FF94pH7DPRn38iKGdWNH8I41awBTRdSjA9G3AnROLg3n1bOkKx1PEkS1SjKRGMX3eWABgTLFJZybzZGdDjkeKzGe7i5P38flN4RBi7pefjeyBwtIg8BtQ742c7xDxnK4AL+K3olYd79ai4AAA==',
@@ -105,7 +108,7 @@ export const NYC_PHOTOS: readonly NycPhoto[] = [
     alt: "The Chrysler Building's stainless steel crown of stacked arches and triangular windows, rising to its spire against a blue sky",
     district: 'midtown',
     title: 'Chrysler Building',
-    place: 'Lexington Ave and 42nd St',
+    place: 'Lexington Ave at 42nd St',
     width: 1200,
     height: 800,
     blurDataURL: 'data:image/webp;base64,UklGRlwAAABXRUJQVlA4IFAAAACwAwCdASoYABAAPtFUo0uoJKMhsAgBABoJQBOmUABLZE/hb+/ugAD+nsV0H1apIPqbUvsfQAG561sZrlRUP2IfHfrD2oMqps2E7B5ucwAAAA==',
@@ -117,7 +120,7 @@ export const NYC_PHOTOS: readonly NycPhoto[] = [
     alt: 'The Apollo Theater on 125th Street, its tall red and white vertical APOLLO sign above the marquee and box office',
     district: 'harlem',
     title: 'Apollo Theater',
-    place: '125th St, Harlem',
+    place: '125th St',
     width: 1200,
     height: 800,
     blurDataURL: 'data:image/webp;base64,UklGRpYAAABXRUJQVlA4IIoAAAAwBACdASoYABAAPtFWo0uoJKMhsAgBABoJQBOgBCcxBdFJqUMmfrPYDgAA/c6J+F7VD8kLmjS8ZeMt8N87hXyyeFph0rjc4Di6S+cwKRSfIvkNdMS13GEOj3rJgSdEwXjAEDgqqOPz1/ngEu/49h5jGFsleKJ8H9UZNdfHYH3RzkyScjjuA43jAAA=',
@@ -129,7 +132,7 @@ export const NYC_PHOTOS: readonly NycPhoto[] = [
     alt: 'A row of Harlem brownstones with high stoops and black iron railings running down a tree-lined sidewalk',
     district: 'harlem',
     title: 'Brownstone row',
-    place: 'Harlem side street',
+    place: 'Brownstone row',
     width: 1200,
     height: 800,
     blurDataURL: 'data:image/webp;base64,UklGRrQAAABXRUJQVlA4IKgAAACQBACdASoYABAAPtFUo0uoJKMhsAgBABoJZACdMoACj7WO7BMpDara1s9oq5AA9rzCHufkw/TRIUc3WHLdb150agZDZMYyFZajakuh+G34qvCaPFRV2CrRq7hTgTlP1hnhZicnFx3rg0fbNdBkDSKlLJEEJbi26RnvyocLrX/y5Oz2YcZayVdRIjyvpAupFMr2udt1obM6zL6XrqCHBv0T7nf6UN0AAAA=',
@@ -153,7 +156,6 @@ export const NYC_PHOTOS: readonly NycPhoto[] = [
     alt: 'The Brooklyn Bridge lit at night, the Lower Manhattan skyline and One World Trade Center glowing behind it and reflected in the river',
     district: 'megacity',
     title: 'Brooklyn Bridge at night',
-    place: 'East River',
     width: 1200,
     height: 800,
     blurDataURL: 'data:image/webp;base64,UklGRpAAAABXRUJQVlA4IIQAAAAQBACdASoYABAAPtFWpEuoJKOhsAgBABoJYwDCgCHfZbL7p3WwG6rwcAD+6/EOK4O6I2jN5Vl5uLtkBFvM0k2irxIqn9RApSMjDiHfBISFqcMNKm0POJ1p8qt/jdxtsb3KsY9dgcwMGoswO94Dwok6h4AfCmPkOpY5CN/lmejEdAAo4AA=',
@@ -165,7 +167,6 @@ export const NYC_PHOTOS: readonly NycPhoto[] = [
     alt: 'Night traffic and yellow cabs on the Brooklyn Bridge roadway beneath red steel trusses, with the lit Manhattan skyline beyond',
     district: 'megacity',
     title: 'Bridge deck',
-    place: 'Brooklyn Bridge roadway',
     width: 1200,
     height: 800,
     blurDataURL: 'data:image/webp;base64,UklGRpQAAABXRUJQVlA4IIgAAACwAwCdASoYABAAPtFWo0uoJKMhsAgBABoJQBadBDs5VCH/Juc4HAD+9CBCGFHjST5moZYU/+4S/Cc4ZoUxG4uikyHJwjUubJpcMF0s7ux1StEw+CPMBviOaO5Gq1voq5qaQuA7ACQaQtsroUW14mXR8dDL6t/kJSwGolsgmxEFHN2YhEuRFgAA',

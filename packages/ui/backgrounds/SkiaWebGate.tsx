@@ -1,15 +1,19 @@
 'use client';
 
 import { createElement, useEffect, type ComponentType, type ReactNode } from 'react';
-import { LoadSkiaWeb } from 'react-native-skia/lib/module/web';
 import { useInstanceStore, useStore } from '../use-instance-store';
 
 type ModuleWithDefault<P extends object> = { default: ComponentType<P> };
 
 let skiaReady: Promise<void> | null = null;
 
+// The loader is imported on first use, not at module scope: it pulls in the
+// CanvasKit glue (~35 KB gzip), and every page that renders a gated scene
+// would otherwise ship it before the scene ever asks for Skia.
 function prepareSkia() {
-  skiaReady ??= LoadSkiaWeb({ locateFile: (file) => `/canvaskit/${file}` });
+  skiaReady ??= import('react-native-skia/lib/module/web').then(({ LoadSkiaWeb }) =>
+    LoadSkiaWeb({ locateFile: (file) => `/canvaskit/${file}` }),
+  );
   return skiaReady;
 }
 

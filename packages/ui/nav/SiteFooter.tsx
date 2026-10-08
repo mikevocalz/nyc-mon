@@ -1,16 +1,14 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { lazy, Suspense, type ReactNode } from 'react';
 import { tv } from 'tailwind-variants';
 import { BrandLogo } from '../brand/BrandLogo';
 import { BrandWordmark } from '../brand/BrandWordmark';
 import { districtTone, type ChartTone, type District } from '../district';
-import { useAppForm } from '../form';
 import { Footer, Heading, Link, List, ListItem, Nav, Paragraph } from '../primitives';
 import { Text, View } from '../tw';
 import { brand as brandColors } from '@acme/theme';
 import { LazyScene } from '../backgrounds/LazyScene';
-import { RiverTide } from '../backgrounds/RiverTide';
 import { SkylineBand } from './SkylineBand';
 
 export interface FooterLink {
@@ -82,6 +80,8 @@ export interface SiteFooterProps {
    */
   scene?: FooterScene;
   renderLink?: (link: FooterLink, children: ReactNode, className: string) => ReactNode;
+  /** Width and side padding of the content rows, so the footer can line up with the page it closes. Default `max-w-screen-2xl px-4 md:px-6`. */
+  containerClassName?: string;
   className?: string;
 }
 
@@ -93,7 +93,14 @@ const TIDE_HEIGHT: Record<NonNullable<SiteFooterProps['variant']>, string> = {
   centered: 'h-32 md:h-44',
   mega: 'h-44 md:h-64',
 };
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// The sign-up form is code-split: it brings the kit's TanStack Form fields
+// (and through them Reanimated), and only the mega variant or an explicit
+// showNewsletter renders it. The other footers ship none of that.
+const Newsletter = lazy(() => import('./SiteFooterNewsletter'));
+// The river is a canvas: split out too, so a footer with `scene="skyline"` or
+// `"none"` ships none of it, and a river-tide footer loads it only once
+// LazyScene sees the footer coming.
+const RiverTide = lazy(() => import('../backgrounds/RiverTide').then((m) => ({ default: m.RiverTide })));
 
 const foot = tv({
   slots: {
@@ -105,7 +112,7 @@ const foot = tv({
     description: 'my-0 text-sm leading-relaxed text-silver-400',
     columns: 'flex-row flex-wrap gap-x-12 gap-y-8',
     groupTitle: 'my-0 font-display text-sm',
-    link: 'flex min-h-11 flex-col justify-center rounded-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus md:min-h-0',
+    link: 'flex min-h-11 flex-col justify-center rounded-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus md:min-h-6',
     linkText: 'text-sm text-silver-300 hover:text-white',
     social: 'h-11 w-11 items-center justify-center border-2 border-ink-700 hover:bg-ink-800',
     legal: 'border-t-2 border-ink-800',
@@ -129,33 +136,6 @@ const foot = tv({
     },
   },
 });
-
-function Newsletter({
-  placeholder, button, onSubmit, className,
-}: { placeholder: string; button: string; onSubmit?: (email: string) => void | Promise<void>; className: string }) {
-  const form = useAppForm({
-    defaultValues: { email: '' },
-    onSubmit: async ({ value, formApi }) => {
-      await onSubmit?.(value.email.trim());
-      formApi.reset();
-    },
-  });
-  return (
-    <View className={className}>
-      <form.AppField
-        name="email"
-        validators={{ onBlur: ({ value }) => (EMAIL.test(value.trim()) ? undefined : 'Enter an email address, like name@example.com') }}
-      >
-        {(field) => (
-          <field.TextField label="Block report by email" placeholder={placeholder} returnKeyType="send" onSubmitEditing={() => form.handleSubmit()} />
-        )}
-      </form.AppField>
-      <form.AppForm>
-        <form.SubmitButton title={button} />
-      </form.AppForm>
-    </View>
-  );
-}
 
 /**
  * NeonBlade's Footer as the NYC-MON city edge: the district's river at night
@@ -181,6 +161,7 @@ export function SiteFooter({
   color,
   scene = 'river-tide',
   renderLink,
+  containerClassName,
   className,
 }: SiteFooterProps) {
   const tone: ChartTone = color ? (PRESETS[color] ?? (color as ChartTone)) : districtTone(district);
@@ -210,9 +191,9 @@ export function SiteFooter({
       <Link href={logoHref} aria-label="NYC-MON home" className={s.link()}>
         {logo ??
           (mark === 'badge' ? (
-            <BrandLogo size={variant === 'minimal' ? 72 : 112} />
+            <BrandLogo decorative size={variant === 'minimal' ? 72 : 112} />
           ) : (
-            <BrandWordmark height={variant === 'minimal' ? 28 : 44} />
+            <BrandWordmark decorative height={variant === 'minimal' ? 28 : 44} />
           ))}
       </Link>
       {variant === 'minimal' ? null : <Text className={s.tagline()}>{tagline}</Text>}
@@ -237,13 +218,15 @@ export function SiteFooter({
         <LazyScene className={TIDE_HEIGHT[variant]} placeholderColor={brandColors.night}>
           {({ paused }) => (
             // Shore raised to mid-band so the district skyline keeps its height in a short strip; calmer swell.
-            <RiverTide district={district} horizon={0.5} bands={5} amplitude={0.8} origin="bottom-left" paused={paused} className="flex-1" />
+            <Suspense fallback={null}>
+              <RiverTide district={district} horizon={0.5} bands={5} amplitude={0.8} origin="bottom-left" paused={paused} className="flex-1" />
+            </Suspense>
           )}
         </LazyScene>
       ) : null}
       {scene === 'skyline' ? <SkylineBand district={district} className={variant === 'mega' ? 'h-24 md:h-32' : 'h-12 md:h-16'} /> : null}
       <View aria-hidden className={s.keyline()} />
-      <View className={s.inner()}>
+      <View className={s.inner({ className: containerClassName })}>
         {brand}
         {flat ? (
           <Nav aria-label="Footer">
@@ -268,19 +251,20 @@ export function SiteFooter({
           </View>
         )}
         {newsletter ? (
-          <Newsletter
-            placeholder={newsletterPlaceholder}
-            button={newsletterButtonLabel}
-            onSubmit={onNewsletterSubmit}
-            className={`${s.newsletter()} ${variant === 'mega' ? 'md:w-full md:max-w-md' : ''}`}
-          />
+          <Suspense fallback={null}>
+            <Newsletter
+              placeholder={newsletterPlaceholder}
+              button={newsletterButtonLabel}
+              onSubmit={onNewsletterSubmit}
+              className={`${s.newsletter()} ${variant === 'mega' ? 'md:w-full md:max-w-md' : ''}`}
+            />
+          </Suspense>
         ) : null}
       </View>
       {variant === 'minimal' ? null : (
         <View className={s.legal()}>
-          <View className={s.legalInner()}>
+          <View className={s.legalInner({ className: containerClassName })}>
             <Text className={s.legalText()}>{copyright}</Text>
-            <Text className={s.legalText()}>{tagline}</Text>
           </View>
         </View>
       )}

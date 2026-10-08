@@ -19,6 +19,7 @@ import { writeFileSync } from 'node:fs';
 import {
   palette, semantic, fontFamilies, typeScale, typeRamp, contentWidths,
   radius, shadows, zIndex, motion, motionTokens, breakpoints, led, hlynk,
+  leading, minHeights, pageMotion,
 } from './tokens.ts';
 
 const HEADER = '/* GENERATED from tokens.ts — do not edit by hand. `node build-css.mjs` */';
@@ -62,11 +63,18 @@ const sharedThemeTokens = () => {
     out.push(`  --text-${name}: ${t.sizePt}px;`);
     out.push(`  --text-${name}--line-height: ${t.lineHeightPt}px;`);
     out.push(`  --text-${name}--font-weight: ${t.weight};`);
+    if (t.trackingEm !== undefined) out.push(`  --text-${name}--letter-spacing: ${t.trackingEm}em;`);
+  }
+  for (const [name, value] of Object.entries(leading)) {
+    out.push(`  --leading-${name}: ${value};`);
   }
 
   // content widths → max-w-content-* utilities
   for (const [name, width] of Object.entries(contentWidths)) {
     out.push(`  --container-${name}: ${width};`);
+  }
+  for (const [name, value] of Object.entries(minHeights)) {
+    out.push(`  --min-height-${name}: ${value};`);
   }
 
   for (const [name, value] of Object.entries(radius)) {
@@ -78,6 +86,18 @@ const sharedThemeTokens = () => {
   for (const [name, value] of Object.entries(motion.easing)) {
     out.push(`  --ease-${name}: ${value};`);
   }
+  // duration-<name> utilities read --transition-duration-*; the plain
+  // --duration-* vars below stay for hand-written CSS.
+  for (const [name, value] of Object.entries(motion.duration)) {
+    out.push(`  --transition-duration-${name}: ${value};`);
+  }
+  for (const [name, { css }] of Object.entries(pageMotion.ease)) {
+    out.push(`  --ease-page-${name.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}: ${css};`);
+  }
+  for (const [name, seconds] of Object.entries(pageMotion.duration)) {
+    out.push(`  --transition-duration-page-${name}: ${Math.round(seconds * 1000)}ms;`);
+  }
+  out.push(`  --scale-page-hover: ${pageMotion.scale.hover};`);
   for (const [name, value] of Object.entries(breakpoints)) {
     out.push(`  --breakpoint-${name}: ${value};`);
   }
@@ -92,6 +112,9 @@ const rootVars = () => {
   }
   for (const [name, value] of Object.entries(motion.duration)) {
     out.push(`  --duration-${name}: ${value};`);
+  }
+  for (const [name, seconds] of Object.entries(pageMotion.duration)) {
+    out.push(`  --duration-page-${name}: ${Math.round(seconds * 1000)}ms;`);
   }
   // Named motion: each tween and its reduced sibling (instant/absent → 0ms).
   const ms = (step) => (step.kind === 'tween' ? `${step.durationMs}ms` : step.kind === 'breathe' ? `${step.periodMs}ms` : null);

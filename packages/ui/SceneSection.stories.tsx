@@ -71,6 +71,21 @@ export const SignRainError: Story = {
   ),
 };
 
+/** `id` lands on the section — anchor targets, aria-labelledby, motion hooks. */
+export const Anchored: Story = {
+  args: { scene: () => null, children: null },
+  render: () => (
+    <SceneSection
+      id="hero-anchor"
+      className="min-h-[520px]"
+      placeholderColor={brand.night}
+      scene={({ paused }) => <GridFloor district="midtown" skyline horizon={0.42} paused={paused} className="absolute inset-0" />}
+    >
+      <Plate title="Explore" line="Templates and resources from every block." />
+    </SceneSection>
+  ),
+};
+
 /** A whole page: one strong background up top, skyline dividers between the sections below. */
 export const Page: Story = {
   args: { scene: () => null, children: null },

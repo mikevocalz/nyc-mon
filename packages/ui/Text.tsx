@@ -1,8 +1,7 @@
+import { lazy, Suspense } from 'react';
 import { tv, type VariantProps } from 'tailwind-variants';
 import { Text as TWText } from './tw';
 import { BlurText } from './text-effects/BlurText';
-import { GlitchText } from './text-effects/GlitchText';
-import { NeonGlowText } from './text-effects/NeonGlowText';
 import { OutlineText } from './text-effects/OutlineText';
 import type { TextEffectOptions } from './text-effects/types';
 import { DISTRICT_TONE, TONE_CLASSES, type ControlTone, type District } from './district';
@@ -103,6 +102,13 @@ const effectText = tv({
   },
 }, TYPE_SCALE_TV);
 
+// The two Reanimated-driven effects are code-split: Text renders on every
+// screen, and a static import put Reanimated in every page's first load
+// whether or not a glitch or neon heading appears. The server resolves the
+// import before streaming, so the HTML still carries the effect markup.
+const GlitchText = lazy(() => import('./text-effects/GlitchText').then((m) => ({ default: m.GlitchText })));
+const NeonGlowText = lazy(() => import('./text-effects/NeonGlowText').then((m) => ({ default: m.NeonGlowText })));
+
 const EFFECTS = {
   glitch: GlitchText,
   neonGlow: NeonGlowText,
@@ -144,14 +150,17 @@ export function Text({
   if (isEffect(variant)) {
     const Effect = EFFECTS[variant];
     const label = typeof children === 'string' ? children : (props['aria-label'] as string | undefined);
+    const effectClass = effectText({ variant, className });
     return (
-      <Effect
-        className={effectText({ variant, className })}
-        accessibilityLabel={label}
-        {...{ mode, colorA, colorB, intensity, speed, colors, glowColor, glowIntensity, animate, strokeColor, fillColor, strokeWidth, hoverStrokeColor, hoverFillColor }}
-      >
-        {children}
-      </Effect>
+      <Suspense fallback={<TWText className={effectClass}>{children}</TWText>}>
+        <Effect
+          className={effectClass}
+          accessibilityLabel={label}
+          {...{ mode, colorA, colorB, intensity, speed, colors, glowColor, glowIntensity, animate, strokeColor, fillColor, strokeWidth, hoverStrokeColor, hoverFillColor }}
+        >
+          {children}
+        </Effect>
+      </Suspense>
     );
   }
   return (

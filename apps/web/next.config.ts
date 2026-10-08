@@ -5,6 +5,9 @@ import type { NextConfig } from 'next'
 // forest. RN globals (__DEV__) come from a runtime shim imported in the root
 // layout instead of DefinePlugin.
 const nextConfig: NextConfig = {
+  // NEXT_DIST_DIR lets a second build (perf lanes, bisects) write beside the
+  // served `.next` without clobbering it. Must stay inside apps/web.
+  distDir: process.env.NEXT_DIST_DIR || '.next',
   // React Compiler — auto-memoization, same as the mobile app's
   // experiments.reactCompiler in app.config.ts.
   reactCompiler: true,
@@ -66,7 +69,6 @@ const nextConfig: NextConfig = {
     'react-native-web',
     'react-native-enriched-html',
     'react-native-gesture-handler',
-    'react-native-audio-api',
     '@reactvision/react-viro',
     '@reactvision/viro-web-renderer',
     'react-native-skia',

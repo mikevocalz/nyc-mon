@@ -1,22 +1,13 @@
 /**
- * Every string on the waitlist page (W05). All `voice: "ui"` — the canon voice:
- * warm, plain and honest about scope. There is no backend on this site
- * (ADR 0003), so the form confirms in place instead of faking a POST.
+ * The waitlist page's own strings (W05). All `voice: "ui"`: warm, plain and
+ * honest about scope. The form's strings live with the form in
+ * `components/waitlist/copy.ts`, shared with the home page (PS-023).
  */
 export const W05_COPY = {
   hero: {
     eyebrow: 'The waitlist',
     title: 'Get NYC-MON',
-    body: 'Phase 1 ships on iOS and Android. The store badges go up at launch — until then, the waitlist is how you hear about it. Leave your email and we chirp you the day the doors open.',
-  },
-  form: {
-    label: 'Email address',
-    placeholder: 'you@example.com',
-    hint: 'One email when the app is out. No ads, no newsletter drip.',
-    submit: 'Join the waitlist',
-    errorInvalid: "That doesn't look like an email address.",
-    confirmedTitle: "You're on the list — we'll chirp you.",
-    confirmedBody: 'One email at launch, when the App Store and Google Play badges go live. That is the whole deal.',
+    body: "NYC-MON is coming to iOS and Android. Until it's out, the waitlist is how you'll hear the day it lands.",
   },
   stores: {
     label: 'The app stores',

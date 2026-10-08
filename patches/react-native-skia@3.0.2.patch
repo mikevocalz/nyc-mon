@@ -1,0 +1,37 @@
+diff --git a/lib/module/views/SkiaView.web.js b/lib/module/views/SkiaView.web.js
+index 1f1ca89bb8a7eac0003f7d5925f20b1e07d833b6..9d2d782b7ffe3d71633bf7934f112b3e37abd5c3 100644
+--- a/lib/module/views/SkiaView.web.js
++++ b/lib/module/views/SkiaView.web.js
+@@ -266,8 +266,12 @@ export const SkiaView = props => {
+     };
+   }, [setPicture, getContext, getSize, redraw, makeImageSnapshot, measure, measureInWindow, nativeId]);
+ 
+-  // Let go of the recordings the view holds.
++  // Let go of the recordings the view holds, and of the picture: the
++  // <Canvas> that set it owns it and deletes it when it unmounts. Under a
++  // hidden <Activity> the view keeps its state, so a picture left here is
++  // painted again, already deleted, when the view is revealed.
+   useEffect(() => () => {
++    pictureRef.current = null;
+     queueRef.current.forEach(recording => recording.release());
+     queueRef.current = [];
+     shownRef.current.forEach(recording => recording.release());
+diff --git a/src/views/SkiaView.web.tsx b/src/views/SkiaView.web.tsx
+index 9dd9b4b5b22f4f84ffe6f66132bbdaaa42c4e4ae..37860e972716b0e7aca58794c7eeb0493164ccb1 100644
+--- a/src/views/SkiaView.web.tsx
++++ b/src/views/SkiaView.web.tsx
+@@ -379,9 +379,13 @@ export const SkiaView = (props: SkiaViewProps) => {
+     nativeId,
+   ]);
+ 
+-  // Let go of the recordings the view holds.
++  // Let go of the recordings the view holds, and of the picture: the
++  // <Canvas> that set it owns it and deletes it when it unmounts. Under a
++  // hidden <Activity> the view keeps its state, so a picture left here is
++  // painted again, already deleted, when the view is revealed.
+   useEffect(
+     () => () => {
++      pictureRef.current = null;
+       queueRef.current.forEach((recording) => recording.release());
+       queueRef.current = [];
+       shownRef.current.forEach((recording) => recording.release());
