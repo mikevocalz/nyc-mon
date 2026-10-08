@@ -5,6 +5,10 @@
  * "Hood" means free-living, the H-Lynk is never "the device".
  */
 export const W03_COPY = {
+  blocks: {
+    pause: 'Pause animation',
+    play: 'Play animation',
+  },
   districts: {
     eyebrow: 'The setting',
     title: 'The City',
