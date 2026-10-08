@@ -113,6 +113,12 @@ const NAMES = [
   [/this\._requestId=this\._context\.requestAnimationFrame/, 'three.js Animation loop'],
 ];
 const CANVAS_LIB = /this\._requestId=this\._context\.requestAnimationFrame/;
+// Without WebGPU the backgrounds draw through the Skia fallback: SkiaQuadCanvas's
+// tick (packages/ui/backgrounds/SkiaQuadCanvas.tsx) records a Picture each
+// frame, and Reanimated's frame-callback runner paints it. The pair is one
+// canvas, so the tick counts as a canvas loop and the runner as neither.
+const SKIA_FALLBACK = /\.current\.time\+=Math\.min\(/;
+const REANIMATED_RUNNER = /previousFrameTimestamp/;
 
 /** Records `ms` of frames, then classifies every site that ran in ≥ 30% of
  *  frames with a run of ≥ 10 consecutive frames as a loop. `instances` is the
@@ -146,7 +152,10 @@ async function rafWindow(page, ms, during) {
     const src = m?.src ?? '';
     const per = s.per.sort((a, b) => a - b);
     const gpu = raw.gpu.includes(key);
-    const kind = KEEPALIVE.test(src) ? 'keepalive' : gpu ? 'canvas' : CANVAS_LIB.test(src) ? 'canvas-idle' : 'owner';
+    const kind = KEEPALIVE.test(src) ? 'keepalive'
+      : gpu || SKIA_FALLBACK.test(src) ? 'canvas'
+      : REANIMATED_RUNNER.test(src) ? 'canvas-driver'
+      : CANVAS_LIB.test(src) ? 'canvas-idle' : 'owner';
     loops.push({ name: NAMES.find(([re]) => re.test(src))?.[1] ?? 'unnamed', kind, instances: per[per.length >> 1], frames: s.frames, of: n, site: m?.site ?? '?', src: src.slice(0, 70) });
   }
   const owners = loops.filter((l) => l.kind === 'owner' || (KEEPALIVE_COUNTS && l.kind === 'keepalive')).reduce((a, l) => a + l.instances, 0);
