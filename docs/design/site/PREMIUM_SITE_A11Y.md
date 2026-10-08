@@ -136,3 +136,74 @@ Server markup, no controls. Checked on the private Phase 6 build (`:3106`), axe 
 | 2.5.8 Target Size (F10) | Footer links were 20px tall from `md`; now `md:min-h-6` (24px), `min-h-11` (44px) below | Fixed | `SiteFooter.tsx` link slot | — |
 | 2.3.3 / motion | The scene is the static `SkylineBand`; no canvas, nothing moves. `site-qa:motion` idle-at-bottom: 0 canvas loops | Pass | motion run, both widths and modes | — |
 | 1.3.1 | Each link column is a `nav` named by its h2 | Pass (unchanged) | — | — |
+
+## Final
+
+Phase 7 a11y lane, WCAG 2.2 AA (contract §13, pack 07 §5). Target: the production build of e9012d5 served on http://localhost:3100, routes `/` and `/get`. This was an audit only. No repo files changed, and :3100 was not rebuilt or restarted. Date 2026-10-07. Engine: axe-core 4.11.0 on Playwright chromium 153.0.8010.12. File:line references are to e9012d5 (`git show HEAD:<path>`). The working tree has uncommitted edits to `NavBar.tsx`, `SiteChrome.tsx`, `HomeHero.tsx`, `HeroDistrictIsland.tsx` and `SegmentedControl.web.tsx`, and none of them are on :3100.
+Evidence was kept outside the repo (Phase 7 scratch): `axe-home.{txt,json}`, `axe-get.{txt,json}`, `manual.mjs` → `manual.json` + `tabs.txt` + `aria-*.yml`, `manual2.mjs` → `manual2.json`, `sig.mjs`, `op.mjs`, `spacing-check.mjs`, and PNGs (`reflow-*`, `spacing-*`, `form-error-*`, `signage-1280.png`).
+
+### axe-core (`pnpm site-qa:axe`, `SITE_QA_ROUTE=/get pnpm site-qa:axe`)
+
+The harness scrolls each section into view, waits for its reveal to settle, scans that section, and finally scans the whole document once.
+
+| Route | Width | Motion | Sections | Rules | Nodes | Unsettled |
+|---|---|---|---|---|---|---|
+| / | 390 | no-preference | 9 | 0 | 0 | signage |
+| / | 390 | reduce | 9 | 0 | 0 | - |
+| / | 768 | no-preference | 9 | 0 | 0 | - |
+| / | 768 | reduce | 9 | 0 | 0 | - |
+| / | 1280 | no-preference | 9 | 0 | 0 | signage |
+| / | 1280 | reduce | 9 | 0 | 0 | - |
+| /get | 390, 768, 1280 | both | 1 (footer) + document | 0 | 0 | - |
+
+**0 violations in 12 runs.** The "signage" unsettled flag does not come from the signage board. A pixel diff (`sig.mjs`) shows the only changing pixels sit at y 114–440, which is the hero city canvas still in the viewport above the board. The board itself is static. The section was still scanned.
+
+### Phase 1 findings re-checked
+
+| ID | Criterion | Phase 1 | Now | Evidence |
+|---|---|---|---|---|
+| F1 | 1.4.10 | District selector clipped at 390/320 | **Resolved** | The radiogroup wraps (`flex-wrap`). At 390 it is 334px wide in a 358px parent, on two rows. At 320×800 and 320×256 every radio is inside 34–286px. `scrollWidth` equals the viewport at 320, 640×400 and 844×390. |
+| F2 | 4.1.2 | tablist without tabpanels | **Resolved** | `role=radiogroup` / `radio` with `aria-checked`, roving tabindex (one stop). ArrowRight/Left/Up/Down move, select and wrap. Home/End work. Space/Enter keep the selection. Click selects. Tab leaves the group. See the new finding N3 on the group's name. |
+| F3 | 1.4.3 | Care line 3.14:1 | **Resolved** | Now `text-orange-700`. axe is clean in all runs. |
+| F4 | 1.4.3 | DeviceStage caption 3.46:1 | **Resolved** | `#mfx-hlynk-device` has `scheme-dark` (`HLynkSection.tsx:45`). axe is clean in reduce runs. |
+| F5 | 2.4.11 | Sticky nav covers Shift+Tab focus | **Resolved** | `html { scroll-padding-top: calc(var(--spacing)*32) }` = 128px against a 114px header (`globals.css:22`). Forward and Shift+Tab paths at 390/768/1280 on both routes: 0% of any stop under the header, and no stop's centre covered. |
+| F6 | 2.4.11 | Phone menu covers page focus; Escape lost focus | **Resolved** | While open, Tab/Shift+Tab cycle toggle → 5 links → CTA → toggle (`focus-cycle.ts`). Escape closes the menu and focus returns to "Open menu". Enter and Space open it. Closing with the toggle keeps focus on it. |
+| F7 | 2.4.1 | Skip link didn't move focus | **Resolved** | `<main id="content" tabIndex={-1}>`. After the skip link, `activeElement` is MAIN and the next Tab reaches the first main control at every width. |
+| F8 | 2.2.2 | Ambient canvases loop, no pause | **Partly resolved** | The footer is now static (identical hashes over 5.2s). The hero CityBlocks canvas still changes on every frame under normal motion (3 different hashes over 5.2s), and no pause control exists. It is still under N1. |
+| F9 | 1.4.10/1.4.4 | Nav eats short viewports | **Mostly resolved** | The header drops to 92px at short heights (`short:`). It is 36% of 320×256 and 23% of 640×400, and it stays sticky. At 640×400, 320×256 and 844×390, no Tab or Shift+Tab stop is under it. |
+| F10 | 2.5.8 | Footer links 20px tall | **Resolved for 2.5.8, below the 44 goal** | Now `min-h-11 md:min-h-6` (`SiteFooter.tsx:113`): 128×24 at ≥768 and 128×44 at 390. |
+| F11 | 1.3.1 | Unnamed hero region + dead canvas label | **Open** | The ARIA tree still shows an unnamed `region` first in main, and `cityLabels` is still passed to an `aria-hidden` canvas. See N2. |
+| F12 | 1.1.1 | Brand marks named repeatedly | **Partly resolved** | The hero seal is now `aria-hidden` (`HomeHero.tsx:93`). The header still reads link "NYC-MON" › img "NYC-MON" › img "NYC-MON". The footer reads link "NYC-MON home" › img › img. See N5. |
+
+### New findings
+
+| # | Criterion | Severity | Where (e9012d5) | Evidence | Fix |
+|---|---|---|---|---|---|
+| N1 | 2.2.2 Pause, Stop, Hide (A) | Medium | `apps/web/components/home/HeroDistrictIsland.tsx:31-51` (`HeroCity` → `CityBlocks`), `packages/ui/backgrounds/CityBlocks.shared.tsx` (`running: !reducedMotion`) | The hero city animates continuously for more than 5s beside the H1 and CTA, under normal motion. The only stop is the OS reduced-motion setting. It pauses off-screen but not on request. | Add a visible "Pause motion" toggle (Zustand + MMKV) that every scene reads together with `prefers-reduced-motion`. Or let the city settle to a still frame within 5s. |
+| N2 | 1.3.1 / 4.1.2 (carried F11) | Low | `packages/ui/backgrounds/SceneSection.tsx:50` (no label prop), `apps/web/components/home/HomeHero.tsx:33` | `<section id="trg-hero">` is exposed as an unnamed region. `copy.cityLabel` never reaches the accessibility tree. | Give `SceneSection` an `aria-labelledby` prop and pass `mfx-hero-title`. Delete `cityLabels`, since the art map treats the scene as decorative. |
+| N3 | 4.1.2 Name, Role, Value (A) | Low | `apps/web/components/home/HeroDistrictIsland.tsx:58-60`, `packages/ui/SegmentedControl.web.tsx:71` | `radiogroup` has no accessible name (ARIA 1.2 requires one). It sits inside `<fieldset>` "Pick a district", so the name is announced once, through the group. A naive fix (`aria-label` on the radiogroup) would announce it twice. | Drop the Fieldset/Legend. Render the label as text with an id and pass `aria-labelledby` to `SegmentedControl` (the prop already exists). |
+| N4 | 2.5.3 Label in Name / 1.3.1 | Low | `packages/ui/nav/NavBar.tsx:350` | The current page in the phone menu is announced "Home●". The marker text is inside the link name, and `aria-current="page"` already carries the state. | `aria-hidden` on the `●` Text. |
+| N5 | 1.1.1 / 3.2.4 Consistent Identification (AA) | Low | `apps/web/components/site/SiteChrome.tsx:11-20,32-38` (`navLink` drops `item.label`), `packages/ui/brand/BrandWordmark.tsx:20-23`, `BrandLogo.tsx:20` | Two links to `/` carry different names: header "NYC-MON" and footer "NYC-MON home". Each wraps a doubled `role=img` (RN-web `Image` emits a div[role=img] plus an inner img alt). | Pass `aria-label={item.label}` in `navLink`. Render the marks inside links as decorative (`alt=""`, no role). |
+| N6 | 2.4.3 Focus Order (A) | Low | `packages/ui/nav/NavBar.tsx:221-240` | When the phone menu is open with focus in the sheet and the viewport is resized past `lg`, the sheet closes and focus falls to BODY, because the toggle it tries to return to is `display:none`. The next Tab lands on the hero CTA and skips the skip link and header nav. There is no trap. | When the breakpoint closes the sheet, focus the logo link, or the first visible header link, whenever the toggle has no client rects. |
+| N7 | 3.3.1 Error Identification (A), 3.3.3 (AA) | Low | `apps/web/components/waitlist/WaitlistForm.tsx:149,175` (`required` with native validation) | Empty email, `foo@` and an unchecked age box are caught only by Chromium's validation bubble. Focus moves to the first invalid field and the message is read, but no persistent text or `aria-invalid` stays after the bubble closes. This passes 3.3.1 (the browser bubble identifies the error) but is fragile on mobile Safari and with magnifiers. | Add `noValidate` and run the same checks client-side through the existing `emailError` path, so every error renders as linked text with `aria-invalid`. |
+
+### Manual checks that passed
+
+- **Landmarks.** banner; nav "Primary" (≥lg only, collapsed below); main#content; named regions (Four districts, New York is the world., H-Lynk Core, Three eggs…, Your Mon asks…, Pick a time…, Get on the list…) plus the unnamed hero (N2); form "Join the waitlist"; contentinfo with navs "Explore" and "Get NYC-MON". `/get` has banner, main, region "Get NYC-MON", form and contentinfo. `lang="en"`. Titles are "NYC-MON | Every block has a legend." and "NYC-MON | Get NYC-MON".
+- **Heading outline on `/`:** H1 Every block has a legend. › H2 Four districts › H2 New York is the world. › H2 H-Lynk Core (H3 Scanner head, H3 Control row) › H2 Three eggs on Dr. Santoro's table. (H3 Squeaklet, Kittee Cee, Yotito) › H2 Your Mon asks. You answer. (H3 Feed, Rest, Play) › H2 Pick a time. The egg waits. › H2 Get on the list before the first hatch. › H2 Explore › H2 Get NYC-MON. No skipped levels.
+- **Heading outline on `/get`:** H1 Get NYC-MON › H2 Explore › H2 Get NYC-MON.
+- **Keyboard path at 1280 on `/`:** Skip › logo › Home › The Story › The Mons › The City › How it works › Join the waitlist (nav) › Join the waitlist (hero) › district radio (one stop) › Email › 13+ checkbox › Join the waitlist (submit) › Privacy › footer logo › 9 footer links › wraps to the browser. At 390 and 768, "Open menu" replaces the nav links. On `/get`, the same path minus the hero and district. Nothing is unreachable and nothing traps. Shift+Tab gives the exact reverse.
+- **2.4.7 and 1.4.11 focus ring.** Every stop matched `:focus-visible` and drew a box-shadow ring. The ring is royal-500 #0058F8: 3.63:1 on ink-950, 5.08:1 on bg #F3F4F4, 5.6:1 on white.
+- **2.5.8 target size.** No target is under 24px anywhere. Under 44: the age checkbox is 24×24, and its label extends the hit area. The inline "Privacy" link is 49×24. Footer links are 128×24 at ≥768. Primary and custom controls meet 44: nav links 44, menu toggle 44×44, hero CTA 60–72, radios 44, email field 56, submit 60–64.
+- **Alt text against the art map.** Hero and the World, Starters and Hatch photos carry descriptive alt text matching `@acme/assets/photos`. `hlynk.static`, `hlynk.scanner` and `hlynk.controls` are `alt=""` with the reasons recorded in `art.ts`. The figure "H-Lynk Core" is named by its caption. Canvases sit under `aria-hidden`. The two `opacity:0` brand `<img>` elements are RN-web's hidden twins under a background-image div, and the mark is visible.
+- **Contrast.** axe is clean everywhere. All 7 axe "incomplete" nodes per width are the place captions over photos (hero, World ×2, Starters ×3, Hatch). They were measured from pixels with the text hidden: white on solid signage-black plates gives a worst case of 21:1. The waitlist error text #D50000 is 4.98:1 on #F3F4F4.
+- **1.4.4 / 1.4.10 at 200% and 400%.** 320×800, 640×400, 320×256, 844×390 and 640×900 show no horizontal scroll, nothing off-canvas, and no clipped text.
+- **1.4.12 text spacing.** With the WCAG overrides there is no horizontal scroll and no lost text. Two World figures report overflow, but it is the photo crop. Their captions stay inside (bottom 446/448px and 237/239px).
+- **2.3.3 and reduced motion.** Under `reduce`, no running CSS or Web animations, the `lenis` and `motion-armed` classes are absent, there are 3 canvases instead of 4 (the DeviceStage scene does not start), and every section hashes identically over 5s. After a full scroll, no `mfx-`/`mpx-` target, heading, paragraph or content image sits below opacity 0.95 in either mode. Nothing flashes.
+- **Waitlist states on `/get@390` and `/@1280`.** ADMIN_API_URL is unset on :3100, so every server answer is `error`.
+  - Valid submit: "We couldn't reach the waitlist just now. Nothing you typed is lost, so try again in a moment." renders in the always-mounted `<output>` (implicit `role=status`, polite). A MutationObserver saw exactly one update. Focus returns to the submit button, which was disabled during the pending state, and the next Tab goes to Privacy. The email and checkbox keep their values, and the error uses text, not only colour.
+  - Not verified: the `invalid` (field error + focus to email + `aria-describedby`) and `under13` (status message) server branches. With no backend, the action returns `error` before any validation (`lib/waitlist.ts:100-103`), so those branches need a run against admin-vite.
+
+### Resolved after this audit (8d41ad9)
+
+N1 (2.2.2): the hero city settles to a still frame within 5 s (PS-027). N2: the hero section is named by its headline. N3: the district radio group is named once by a visible label. N4: the current-page dot is `aria-hidden`. N5: both links to `/` are named "NYC-MON home" with decorative marks. N6: focus moves to the logo when a resize hides the open menu. N7: the waitlist form validates on submit with linked, focused error text. Re-checked on the polish build: axe 0 violations on `/` and `/get`, keyboard probe of the menu, resize focus and form. Still unverified: the server's own `invalid` and `under13` answers, which need admin-vite running.

@@ -328,13 +328,46 @@ Self-review with a security focus (no separate reviewer lane ran):
 
 ## Phase 7
 
+Production build of 8d41ad9 on `:3100`, M3 Pro, system Chrome 154, Lighthouse 13.5.0 (simulated moto g power, 4x CPU). Machine load average ~16 during the Lighthouse runs.
+
+### Before and after (vs PREMIUM_SITE_BASELINE.md, 3f7ccfb)
+
+| Check | Baseline | Final |
+|---|---|---|
+| Lighthouse Perf (median of 5) | 76 | 90 |
+| Lighthouse A11y / BP / SEO | 100 / 100 / 100 | 100 / 100 / 100 |
+| LCP (simulated) | 5193 ms | 3540 ms |
+| LCP element | hero Chrysler `<img>` | hero support paragraph `#mfx-hero-body` (paints ~74 ms unthrottled) |
+| CLS | 0 | 0 |
+| TBT | 249 ms | 84 ms |
+| First-load JS on `/` (gzip) | 1,079 KiB at e40833d | 445 KiB at 65c2dd2; motion has since moved after paint |
+| Motion clocks | Lenis + GSAP + ScrollTrigger (3–5 loops) | GSAP ticker only; ≤1 live canvas; 0 idle canvas loops |
+| ScrollTrigger mount / away / back | 7/0/7 | 6/0/6 desktop, 5/0/5 mobile |
+| axe (per section, 390/768/1280 × motion) | color-contrast, 2 nodes | 0 violations on `/` and `/get` |
+| copy-lint | 2 hits | 0 |
+| Back to `/` without WebGPU | not checked | 12/12 (`site-qa:backnav`) |
+| Overflow / console errors, 9 viewports × 2 motion | 0 / 0 | 0 / 0 |
+| Logo / wordmark bytes (web) | 696 KB PNG / 77 KB PNG | 154 KB WebP / 53 KB WebP |
+
+LCP misses the 2.5 s target in simulation. The LCP paragraph paints within ~80 ms unthrottled; Lantern charges every request that starts before it (inline-CSS document, framework chunks, fonts, the hero photo), and the remaining floor is React DOM, Next and react-native-web. INP is not measurable in navigation mode.
+
 ### Critique
+
+Scored campaign critique (review lane, e9012d5, before polish): first impression 8, NYC specificity 9, creature/relationship desire 5, H-Lynk desirability 7, starter desirability 5, emotional pacing 7, hierarchy 7, originality 7, typography 7, art direction 6, conversion 8, mobile 7. Polish (below) addressed typography widows, reveal timing, CTA colour, repeated eyebrows, the hero caption and the phone picker layout. Creature desire, starter desire and pacing stay below 8 until the Mon, egg and hatch art lands (PS-007): every image on the page is still NYC photography.
 
 ### Code review
 
+Full diff `main..e9012d5`: approve, no CRITICAL or HIGH. Fixed: migration media columns now `IF NOT EXISTS` and untouched on rollback; one-time production error when `WAITLIST_FORWARD_SECRET` is unset; three `nodeFrame` rename warning; world drift through `gsap.matchMedia`. Deploy-checklist items: both apps behind Vercel's edge (the per-IP limit trusts the first `X-Forwarded-For` hop) and an optional global hourly ceiling.
+
+A Back-navigation crash without WebGPU (P0 from the critique lane) was two use-after-free bugs: react-native-skia 3.0.2's web `SkiaView` kept a deleted picture (patched, `patches/react-native-skia@3.0.2.patch`) and `SkiaQuadCanvas` freed memoised vertices. Fixed in 45e6570.
+
 ### Perf
 
+See the table. Self-hosted note: after the Lighthouse and screenshot load, `next start`'s image optimizer stopped answering one request (`downtown-nyse` at w=828) until restart; `sharp` itself encoded it in 56 ms. On Vercel the optimizer is a separate service.
+
 ### Canon
+
+copy-lint clean. The canon lane's fixes landed in db113bc (no pronoun for an individual Mon on any route, no "Phase 1" in public copy, no species-note placeholder, no invented Mega City place, full name for Dr. Alessandra Santoro). Open for Mike: `/mons` shows Small, Mid and Max forms; `/story` timeline ("decades from now" vs "decades ago"); the "Hood means free-living" line; `/spatial` debug card and headset claim; legal "Last updated: 2026".
 
 ### Phase 7 polish
 
