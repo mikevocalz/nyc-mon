@@ -1,7 +1,7 @@
 'use client';
 
 import { brand } from '@acme/theme';
-import type { NeonColorInput } from '../neon/colors';
+import { withAlpha, type NeonColorInput } from '../neon/colors';
 import { THEMES, type District } from './district-theme';
 import { QuadBackground } from './QuadBackground';
 import { useLayers, type SolidBackgroundBaseProps } from './QuadBackground.shared';
@@ -41,6 +41,10 @@ export interface StreetPulseProps extends SolidBackgroundBaseProps {
   seed?: number;
   /** Street colour. Default night. */
   bgColor?: string;
+  /** Light the block under the pointer. Default false, so existing uses don't change. */
+  hoverEffect?: boolean;
+  /** Hover plate colour. Default orange at 35%, as CityBlocks. */
+  hoverColor?: string;
 }
 
 export function StreetPulse({
@@ -56,6 +60,8 @@ export function StreetPulse({
   overlay = false,
   seed = 1,
   bgColor = brand.night,
+  hoverEffect = false,
+  hoverColor = withAlpha(brand.orange, 0.35),
   ...rest
 }: StreetPulseProps) {
   const theme = THEMES[district];
@@ -72,6 +78,8 @@ export function StreetPulse({
     spawnProbability,
     overlay,
     seed,
+    hoverEffect,
+    hoverColor,
   });
-  return <QuadBackground {...rest} layers={layers} background={bgColor} />;
+  return <QuadBackground {...rest} layers={layers} background={bgColor} tracksPointer={hoverEffect} />;
 }

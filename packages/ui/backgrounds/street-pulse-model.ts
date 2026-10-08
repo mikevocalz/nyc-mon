@@ -21,6 +21,10 @@ export interface StreetPulseOptions {
   spawnProbability: number;
   overlay: boolean;
   seed: number;
+  /** Light the block under the pointer. */
+  hoverEffect: boolean;
+  /** Plate colour for the block under the pointer. */
+  hoverColor: NeonColorInput;
 }
 
 /** A pulse's route through the grid: intersections from entry to exit. */
@@ -153,5 +157,22 @@ export function streetPulseLayers(o: StreetPulseOptions): Layer[] {
     },
   };
 
-  return [grid, pulses];
+  // The block under the pointer gets a lit plate and a bright kerb, the same
+  // read as CityBlocks' hover plate.
+  const hover: Layer = {
+    paint(w, f) {
+      if (!f.pointer.inside) return;
+      const gx = Math.floor(f.pointer.x / cell);
+      const gy = Math.floor(f.pointer.y / cell);
+      const size = cell - street;
+      const x = gx * cell + street / 2;
+      const y = gy * cell + street / 2;
+      // Streets between blocks stay dark: only a pointer over a plate lights it.
+      if (f.pointer.x < x || f.pointer.x > x + size || f.pointer.y < y || f.pointer.y > y + size) return;
+      w.rect(x, y, size, size, rgba(o.hoverColor));
+      w.rect(x, y, size, Math.max(1.5, size * 0.08), rgba(brand.orange));
+    },
+  };
+
+  return o.hoverEffect ? [grid, hover, pulses] : [grid, pulses];
 }

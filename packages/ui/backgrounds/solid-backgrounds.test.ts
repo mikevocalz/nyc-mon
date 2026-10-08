@@ -159,7 +159,7 @@ test('every background paints solid shapes in every district', () => {
       citySkylineLayers({ district, seed: 1, depth: 3, light: theme.light, vehicleColor: 'carolina', beaconColor: theme.beacon, skyColor: null, windowLights: true, showVehicles: true, blinkingLights: true, speed: 1 }),
       signRainLayers({ district, textColor: theme.accent, signColor: 'leaf', bgColor: '#00041C', fontSize: 18, speed: 33, characters: STREET_CHARACTERS, windowShare: 0.25, skyline: true, seed: 1 }),
       subwayLayers({ district, color: null, lineThickness: 2, dotSize: 3, dotType: 'filled', glowColor: 'white', glowIntensity: 'medium', trains: true, speed: 1, seed: 1 }),
-      streetPulseLayers({ district, lineColor: theme.accent, shadowColor: theme.accent, bgGridColor: theme.block, cellSize: 50, maxLines: 12, baseSpeed: 2, lineLength: 150, spawnProbability: 0.1, overlay: true, seed: 1 }),
+      streetPulseLayers({ district, lineColor: theme.accent, shadowColor: theme.accent, bgGridColor: theme.block, cellSize: 50, maxLines: 12, baseSpeed: 2, lineLength: 150, spawnProbability: 0.1, overlay: true, seed: 1, hoverEffect: true, hoverColor: 'orange' }),
       heightfieldLayers({ district, lineColor: theme.accent, bgColor: '#00041C', waveAmplitude: 0.8, waveFrequency: 1.5, waveSpeed: 1, bumpRadius: 3.5, bumpStrength: 2.5, gridSegments: 10, cameraHeight: 10, fog: true, hoverEffect: true, windowLights: true }),
       riverTideLayers({ district, colorA: null, colorB: null, bgColor: '#00041C', origin: 'top-right', speed: 0.5, amplitude: 1.2, frequency: 0.55, glow: 0.9, gloss: 0.6, bands: 7, shore: true, horizon: 0.34, hoverEffect: true, hoverRadius: 4, hoverStrength: 1.4, seed: 1 }),
       rainWindowLayers({ district, dropColor: 'carolina', dropCount: 150, speed: 12, angle: -15, dropMinLength: 15, dropMaxLength: 40, dropWidth: 1, opacity: 0.75, backgroundColor: '#00041C', frame: true, seed: 1 }),
@@ -173,4 +173,20 @@ test('every background paints solid shapes in every district', () => {
       for (let i = 0; i < w.count * QUAD_STRIDE; i++) assert.ok(Number.isFinite(w.data[i]), `${district} NaN at ${i}`);
     }
   }
+});
+
+test('street pulse lights the block under the pointer, and only when hovering a block', () => {
+  const opts = { district: 'midtown' as const, lineColor: 'orange', shadowColor: 'orange', bgGridColor: '#1f2a44', cellSize: 50, maxLines: 0, baseSpeed: 2, lineLength: 150, spawnProbability: 0.1, overlay: false, seed: 1, hoverColor: 'orange' };
+  const at = (layers: Layer[], x: number, y: number, inside = true) => {
+    const out = new QuadWriter();
+    composeLayers(out, layers, { width: 800, height: 500, time: 1, pointer: { x, y, inside } }, new WeakMap(), new QuadWriter());
+    return out.count;
+  };
+  const base = at(streetPulseLayers({ ...opts, hoverEffect: false }), 125, 125);
+  const hovering = streetPulseLayers({ ...opts, hoverEffect: true });
+  // Inside the block at column 2, row 2: two extra quads (plate and kerb).
+  assert.equal(at(hovering, 125, 125), base + 2);
+  // On the street between blocks, or with the pointer outside: no plate.
+  assert.equal(at(hovering, 100, 125), base);
+  assert.equal(at(hovering, 125, 125, false), base);
 });
