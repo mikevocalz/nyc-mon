@@ -133,8 +133,9 @@ const worldDrift = compileMotion(
  * H-Lynk (PS-018): one entrance, played once, never scrubbed. The stage is
  * not a target: the three.js scene owns the object's motion (settle, turn,
  * scanner flare, screen on), so ScrollTrigger and the render loop never both
- * move it. The name block lands first; the two proof rows follow while the
- * object finishes its turn, and all copy is in place by ~1.9 s.
+ * move it. The name block lands first and the two proof rows follow close
+ * behind: every scroll reveal starts within 300 ms of its trigger, so no copy
+ * is still hidden when the section is in view (Phase 7 critique).
  */
 const hlynkReveal = compileMotion(
   defineMotion({
@@ -146,8 +147,8 @@ const hlynkReveal = compileMotion(
     },
     tracks: [
       { target: 'hlynk-head', to: { opacity: 1, y: 0 }, atMs: 200, durationMs: ms(D.sm), ease: OUT },
-      { target: 'hlynk-proof-0', to: { opacity: 1, y: 0 }, atMs: 1100, durationMs: ms(D.xs), ease: OUT },
-      { target: 'hlynk-proof-1', to: { opacity: 1, y: 0 }, atMs: 1400, durationMs: ms(D.xs), ease: OUT },
+      { target: 'hlynk-proof-0', to: { opacity: 1, y: 0 }, atMs: 240, durationMs: ms(D.xs), ease: OUT },
+      { target: 'hlynk-proof-1', to: { opacity: 1, y: 0 }, atMs: 300, durationMs: ms(D.xs), ease: OUT },
     ],
   }),
 );
@@ -164,9 +165,9 @@ const startersEntrance = compileMotion(
     },
     tracks: [
       { target: 'starters-head', to: { opacity: 1, y: 0 }, atMs: 0, durationMs: ms(D.sm), ease: OUT },
-      { target: 'starter-0', to: { opacity: 1, y: 0 }, atMs: 160, durationMs: ms(D.sm), ease: OUT },
-      { target: 'starter-1', to: { opacity: 1, y: 0 }, atMs: 300, durationMs: ms(D.sm), ease: OUT },
-      { target: 'starter-2', to: { opacity: 1, y: 0 }, atMs: 440, durationMs: ms(D.sm), ease: OUT },
+      { target: 'starter-0', to: { opacity: 1, y: 0 }, atMs: 100, durationMs: ms(D.sm), ease: OUT },
+      { target: 'starter-1', to: { opacity: 1, y: 0 }, atMs: 200, durationMs: ms(D.sm), ease: OUT },
+      { target: 'starter-2', to: { opacity: 1, y: 0 }, atMs: 300, durationMs: ms(D.sm), ease: OUT },
     ],
   }),
 );
@@ -197,8 +198,8 @@ const hatchReveal = compileMotion(
     },
     tracks: [
       { target: 'hatch-art', to: { opacity: 1, scale: 1 }, atMs: 0, durationMs: ms(D.xl), ease: OUT },
-      { target: 'hatch-copy', to: { opacity: 1, y: 0 }, atMs: 320, durationMs: ms(D.md), ease: OUT },
-      { target: 'hatch-cta', to: { opacity: 1, y: 0 }, atMs: 640, durationMs: ms(D.sm), ease: OUT },
+      { target: 'hatch-copy', to: { opacity: 1, y: 0 }, atMs: 200, durationMs: ms(D.md), ease: OUT },
+      { target: 'hatch-cta', to: { opacity: 1, y: 0 }, atMs: 300, durationMs: ms(D.sm), ease: OUT },
     ],
   }),
 );
@@ -206,6 +207,12 @@ const hatchReveal = compileMotion(
 // ---------------------------------------------------------------------------
 
 const DESKTOP = `(min-width: ${breakpoints.md})`;
+/**
+ * Every entrance fires as a section's top edge clears the bottom tenth of the
+ * viewport, so on a tall screen the copy is already in place when the section
+ * scrolls into reading position.
+ */
+const REVEAL_START = 'top 90%';
 
 /**
  * All W01 choreography, bound once for the home page. Marker ids are unique
@@ -235,7 +242,7 @@ export function useHomeMotion() {
       if (triggers.world && bindable(worldEntrance, all)) {
         attachScrollTrigger(createGsapTimeline(worldEntrance, all), {
           trigger: triggers.world,
-          start: 'top 78%',
+          start: REVEAL_START,
         });
       }
       // gsap.matchMedia binds the drift when the desktop query starts matching
@@ -257,7 +264,7 @@ export function useHomeMotion() {
       if (triggers.hlynk && bindable(hlynkReveal, all)) {
         attachScrollTrigger(createGsapTimeline(hlynkReveal, all), {
           trigger: triggers.hlynk,
-          start: 'top 70%',
+          start: REVEAL_START,
         });
       }
 
@@ -265,13 +272,13 @@ export function useHomeMotion() {
       if (triggers.starters && bindable(startersEntrance, all)) {
         attachScrollTrigger(createGsapTimeline(startersEntrance, all), {
           trigger: triggers.starters,
-          start: 'top 78%',
+          start: REVEAL_START,
         });
       }
       if (triggers.care && bindable(careEntrance, all)) {
         attachScrollTrigger(createGsapTimeline(careEntrance, all), {
           trigger: triggers.care,
-          start: 'top 80%',
+          start: REVEAL_START,
         });
       }
 
@@ -279,7 +286,7 @@ export function useHomeMotion() {
       if (triggers.hatch && bindable(hatchReveal, all)) {
         attachScrollTrigger(createGsapTimeline(hatchReveal, all), {
           trigger: triggers.hatch,
-          start: 'top 72%',
+          start: REVEAL_START,
         });
       }
 

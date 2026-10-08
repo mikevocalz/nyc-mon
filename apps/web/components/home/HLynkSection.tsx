@@ -4,7 +4,6 @@ import { Heading, List, ListItem, Paragraph, Section } from '@acme/ui/html';
 import { View } from '@acme/ui/tw';
 import { DeviceStage } from '../DeviceStage';
 import { art } from './art';
-import { Eyebrow } from './Eyebrow';
 import { W01_COPY } from './copy';
 import { sectionMarker } from './sections';
 
@@ -56,7 +55,6 @@ export function HLynkSection() {
           id="mfx-hlynk-head"
           className="gap-5 lg:col-span-5 lg:col-start-8 lg:row-start-1 lg:self-end"
         >
-          <Eyebrow>{copy.eyebrow}</Eyebrow>
           <Heading
             level={2}
             id="w01-hlynk-title"

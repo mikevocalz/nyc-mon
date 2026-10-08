@@ -5,7 +5,7 @@ import { Platform } from 'react-native';
 import { twMerge } from 'tailwind-merge';
 import { tv } from 'tailwind-variants';
 import { BrandWordmark } from '../brand/BrandWordmark';
-import { districtTone, type ChartTone, type District } from '../district';
+import { districtTone, type ChartTone, type ControlTone, type District } from '../district';
 import { frameTone } from '../control-look';
 import { CornerCutFrame } from '../neon/CornerCutFrame';
 import { Header, Link, List, ListItem, Nav } from '../primitives';
@@ -52,6 +52,8 @@ export interface NavBarProps {
   district?: District;
   /** Show the district skyline under the bar. Default true. */
   skyline?: boolean;
+  /** Height and visibility classes for the skyline. Default "h-5". */
+  skylineClassName?: string;
   /** NeonBlade: where the links sit on wide screens. Default right. */
   navAlign?: 'left' | 'center' | 'right';
   /** Right of the links: an avatar, a button. Stays visible on phones. */
@@ -61,6 +63,11 @@ export interface NavBarProps {
    * screens, and the last row of the phone menu.
    */
   cta?: NavCta;
+  /**
+   * Face of the CTA. Default royal. A site whose header CTA is its primary
+   * action passes "orange", the brand CTA face (Decision #7).
+   */
+  ctaTone?: ControlTone;
   /**
    * Web only: the id of the main content. Adds a "Skip to content" link as
    * the first focus stop, hidden until it is focused.
@@ -106,10 +113,9 @@ const bar = tv({
     sheet: 'border-t-2 border-ink-800 bg-ink-950 px-3 pb-4 pt-2',
     sheetLink: 'flex min-h-12 flex-row items-center justify-between px-3 py-3',
     keyline: 'h-1 w-full',
-    // The nav CTA is the royal face with bold white text — the site Log in
-    // sits apart from the orange action CTAs Decision #7 reserves elsewhere.
+    // The nav CTA: a solid face (`ctaTone`, default royal) with bold text.
     cta: 'inline-flex self-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus',
-    ctaText: 'font-display text-sm font-bold tracking-wide text-white',
+    ctaText: 'font-display text-sm font-bold tracking-wide',
     skip: 'sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-3 focus:z-[60] focus:px-4 focus:py-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus',
   },
   variants: {
@@ -160,9 +166,11 @@ export function NavBar({
   color,
   district = 'midtown',
   skyline = true,
+  skylineClassName = 'h-5',
   navAlign = 'right',
   trailing,
   cta,
+  ctaTone = 'royal',
   skipTo,
   skipLabel = 'Skip to content',
   renderLink,
@@ -172,9 +180,10 @@ export function NavBar({
 }: NavBarProps) {
   const tone: ChartTone = color ? (PRESETS[color] ?? (color as ChartTone)) : districtTone(district);
   const s = bar({ tone, transparency, position, navAlign, collapseBelow });
-  // The header's Log in wears royal, not the orange `cta` face the kit
-  // reserves for in-page actions (Decision #7).
-  const ctaFaceTone = frameTone('solid', 'royal');
+  // Orange is the brand CTA face and carries the `on-cta` label, the same pair
+  // as Button's `cta` variant; any other tone keeps white text.
+  const ctaFaceTone = frameTone('solid', ctaTone);
+  const ctaLabel = ctaTone === 'orange' ? 'text-on-cta' : 'text-white';
   // The dropdown panel and rows are the kit's shared list (also Select's open list).
   const d = dropdownLook({ tone });
   const store = useInstanceStore(() => ({ sheet: false, dropdown: -1 }));
@@ -236,14 +245,28 @@ export function NavBar({
     const closed = wasSheetOpen.current && !sheet;
     wasSheetOpen.current = sheet;
     if (!closed || !isWeb || typeof document === 'undefined') return;
-    if (shouldReturnFocus(document.activeElement)) focusById(toggleId);
+    if (!shouldReturnFocus(document.activeElement)) return;
+    const toggle = document.getElementById(toggleId);
+    if (toggle && toggle.getClientRects().length > 0) {
+      toggle.focus();
+      return;
+    }
+    // Closed by a resize past the breakpoint: the toggle is display:none, so
+    // send focus to the first visible header control that isn't the skip link.
+    const header = toggle?.closest('header');
+    const first = header
+      ? visibleRing(Array.from(header.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))).find(
+          (el) => !(el.getAttribute('href') ?? '').startsWith('#'),
+        )
+      : undefined;
+    first?.focus();
   }, [sheet, toggleId]);
 
   const anchor = (item: NavItem, children: ReactNode, cls: string) =>
     renderLink ? (
       renderLink(item, children, cls)
     ) : (
-      <Link href={item.href} aria-current={item.active ? 'page' : undefined} onPress={item.onPress} className={cls}>
+      <Link href={item.href} aria-label={item.label} aria-current={item.active ? 'page' : undefined} onPress={item.onPress} className={cls}>
         {children}
       </Link>
     );
@@ -261,7 +284,7 @@ export function NavBar({
       <View className={s.inner()}>
         {anchor(
           { label: 'NYC-MON home', href: logoHref },
-          logo ?? <BrandWordmark height={36} />,
+          logo ?? <BrandWordmark decorative height={36} />,
           s.logo(),
         )}
         <Nav aria-label={label} className={s.links()}>
@@ -314,7 +337,7 @@ export function NavBar({
                   depth={4}
                   className="flex-row items-center justify-center px-5 py-2.5"
                 >
-                  <Text className={s.ctaText()}>{cta.label}</Text>
+                  <Text className={twMerge(s.ctaText(), ctaLabel)}>{cta.label}</Text>
                 </CornerCutFrame>,
                 twMerge(s.cta(), items.length ? s.ctaWide() : ''),
               )
@@ -347,7 +370,8 @@ export function NavBar({
                     { ...item, onPress: () => { item.onPress?.(); close(); } },
                     <>
                       <Text className={twMerge(textClass(item), 'text-base')}>{item.label}</Text>
-                      {item.active ? <Text className={textClass(item)}>●</Text> : null}
+                      {/* aria-current carries the state; the dot is visual only. */}
+                      {item.active ? <Text aria-hidden className={textClass(item)}>●</Text> : null}
                     </>,
                     `${s.sheetLink()} ${item.active ? s.linkActive() : ''}`,
                   )}
@@ -365,7 +389,7 @@ export function NavBar({
                     depth={4}
                     className="flex-row items-center justify-center px-5 py-2.5"
                   >
-                    <Text className={twMerge(s.ctaText(), 'text-base')}>{cta.label}</Text>
+                    <Text className={twMerge(s.ctaText(), ctaLabel, 'text-base')}>{cta.label}</Text>
                   </CornerCutFrame>,
                   s.cta(),
                 )}
@@ -376,7 +400,7 @@ export function NavBar({
       ) : null}
 
       <View aria-hidden className={s.keyline()} />
-      {skyline ? <SkylineBand district={district} className="h-5" /> : null}
+      {skyline ? <SkylineBand district={district} className={skylineClassName} /> : null}
     </Header>
   );
 }

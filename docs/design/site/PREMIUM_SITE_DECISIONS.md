@@ -364,3 +364,31 @@ The optional fourth tile was left out: the brief's candidates were a third photo
 **Alternatives.** Keep `river-tide`: it meets the letter of the brief (lazy, paused offscreen, far from the H-Lynk stage) but competes with the form and the hatch. `none`: a bare keyline loses the city edge the references (IKEA, General Intelligence Company) show working.
 
 **Consequences.** `site-qa:motion` idle-at-bottom shows 0 canvas loops at both widths. If the footer ever gets the river back, it should be on pages without a form above it.
+
+---
+
+## PS-026 — Hero caption names the landmark, not a district
+
+**Disposition:** decided and implemented (Phase 7 polish).
+
+**Context.** The hero poster is the Chrysler Building. Its caption plate read "Midtown, Lexington Ave at 42nd St" with the orange Midtown disc, and it sits directly above the district picker. Picking Harlem redrew the city behind the hero but left the plate saying Midtown, so the caption read as the picker's state and as a picker that didn't work (Phase 7 critique).
+
+**Decision.** The hero caption names the photo's real place: "Chrysler Building, Lexington Ave at 42nd St", with no district disc and no district name. `PlaceCaption` takes a `landmark` flag for this; every other caption on the page (World, Starters, Hatch) keeps the district disc and name, since nothing there is picked.
+
+**Alternatives.** Swap the hero photo per district: four LCP images, a layout shift risk on each pick, and the hero would be pre-loading three photos nobody asked for. Keep the district caption and add "Photo:": still shows a district name next to a district control. Drop the caption: loses the honest place label the art-direction rules require for photographs.
+
+**Consequences.** The picker owns the city canvas and the hero photo stays one fixed poster. If the hero ever gets one photo per district, the caption can go back to the district form and follow the store.
+
+---
+
+## PS-027 — Hero city holds still after 4.5 s
+
+**Disposition:** decided and implemented (Phase 7 polish, a11y N1).
+
+**Context.** The hero `CityBlocks` canvas animated for as long as the page was open, beside the H1 and the CTA, and the only way to stop it was the OS reduced-motion setting. WCAG 2.2.2 allows motion that starts on its own to run up to 5 s without a pause control.
+
+**Decision.** `HeroCity` passes `paused` to the city 4.5 s after mount, so it settles on a still frame. Picking a district restarts the same 4.5 s window, so the new city visibly arrives and then stops; that motion is the answer to the visitor's own action. Offscreen pausing is unchanged. The timer is a Zustand instance store, per the repo's no-`useState` rule. The canvas stays `aria-hidden`; its per-district `cityLabels` reached no assistive tech, so they are deleted and the hero `<section>` is named by its headline (`aria-labelledby="mfx-hero-title"`, new `SceneSection` prop).
+
+**Alternatives.** A site-wide "Pause motion" toggle stored in MMKV/Zustand: more surface and state for one canvas, and the page has no other auto-running motion after PS-025. A slower loop: still fails 2.2.2.
+
+**Consequences.** Verified on the :3110 build: hero pixel hashes stop changing by ~5 s, change again for ~1.5 s after picking Harlem, then hold. If a later scene loops past 5 s, a real pause control becomes necessary.

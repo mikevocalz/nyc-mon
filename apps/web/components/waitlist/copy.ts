@@ -9,7 +9,6 @@ import type { WaitlistStatus } from '../../lib/waitlist.ts';
 export const WAITLIST_COPY = {
   /** The home page's closing section; `/get` keeps its own hero above the same form. */
   section: {
-    eyebrow: 'The waitlist',
     title: 'Get on the list before the first hatch.',
     body: "NYC-MON is coming to iOS and Android. Leave your email and you'll hear the day it's out.",
   },
@@ -25,6 +24,10 @@ export const WAITLIST_COPY = {
     privacy: "One email when the app is out, and no ads. Under-13s can't sign up.",
     privacyLink: 'Privacy',
     privacyHref: '/legal/privacy',
+    /** Client-side checks, shown under the field before anything is sent. */
+    emailMissing: 'Enter your email address.',
+    emailInvalid: 'Check the email address. It should look like name@example.com.',
+    ageMissing: "Check the box to confirm you're 13 or older.",
     /** The honeypot's label; the field is hidden from people and from assistive technology. */
     honeypotLabel: 'Leave this field empty',
   },

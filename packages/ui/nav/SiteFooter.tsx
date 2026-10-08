@@ -80,6 +80,8 @@ export interface SiteFooterProps {
    */
   scene?: FooterScene;
   renderLink?: (link: FooterLink, children: ReactNode, className: string) => ReactNode;
+  /** Width and side padding of the content rows, so the footer can line up with the page it closes. Default `max-w-screen-2xl px-4 md:px-6`. */
+  containerClassName?: string;
   className?: string;
 }
 
@@ -159,6 +161,7 @@ export function SiteFooter({
   color,
   scene = 'river-tide',
   renderLink,
+  containerClassName,
   className,
 }: SiteFooterProps) {
   const tone: ChartTone = color ? (PRESETS[color] ?? (color as ChartTone)) : districtTone(district);
@@ -188,9 +191,9 @@ export function SiteFooter({
       <Link href={logoHref} aria-label="NYC-MON home" className={s.link()}>
         {logo ??
           (mark === 'badge' ? (
-            <BrandLogo size={variant === 'minimal' ? 72 : 112} />
+            <BrandLogo decorative size={variant === 'minimal' ? 72 : 112} />
           ) : (
-            <BrandWordmark height={variant === 'minimal' ? 28 : 44} />
+            <BrandWordmark decorative height={variant === 'minimal' ? 28 : 44} />
           ))}
       </Link>
       {variant === 'minimal' ? null : <Text className={s.tagline()}>{tagline}</Text>}
@@ -223,7 +226,7 @@ export function SiteFooter({
       ) : null}
       {scene === 'skyline' ? <SkylineBand district={district} className={variant === 'mega' ? 'h-24 md:h-32' : 'h-12 md:h-16'} /> : null}
       <View aria-hidden className={s.keyline()} />
-      <View className={s.inner()}>
+      <View className={s.inner({ className: containerClassName })}>
         {brand}
         {flat ? (
           <Nav aria-label="Footer">
@@ -260,7 +263,7 @@ export function SiteFooter({
       </View>
       {variant === 'minimal' ? null : (
         <View className={s.legal()}>
-          <View className={s.legalInner()}>
+          <View className={s.legalInner({ className: containerClassName })}>
             <Text className={s.legalText()}>{copyright}</Text>
           </View>
         </View>

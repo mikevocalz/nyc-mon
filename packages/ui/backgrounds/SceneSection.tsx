@@ -26,6 +26,11 @@ export interface SceneSectionProps {
   nearMarginPx?: number;
   /** DOM id for the section — anchors, aria-labelledby, motion targets. */
   id?: string;
+  /**
+   * Id of the heading that names the section. A `<section>` without a name is
+   * an unnamed region to assistive tech; pass the section's own headline.
+   */
+  'aria-labelledby'?: string;
 }
 
 /**
@@ -44,12 +49,15 @@ export interface SceneSectionProps {
  *   <SolidPanel tone="ink">…</SolidPanel>
  * </SceneSection>
  */
-export function SceneSection({ scene, children, className, placeholderColor, nearMarginPx = 600, id }: SceneSectionProps) {
+export function SceneSection({
+  scene, children, className, placeholderColor, nearMarginPx = 600, id, 'aria-labelledby': labelledBy,
+}: SceneSectionProps) {
   const { ref, hasBeenNear, isVisible } = useInView({ nearMarginPx });
   return (
     <Section
       ref={ref}
       id={id}
+      aria-labelledby={labelledBy}
       className={twMerge('relative w-full overflow-hidden', className)}
       // Computed: the placeholder is a caller colour, not a theme token.
       style={placeholderColor ? { backgroundColor: placeholderColor } : undefined}

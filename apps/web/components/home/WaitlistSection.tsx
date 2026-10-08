@@ -2,7 +2,6 @@ import { Heading, Paragraph, Section } from '@acme/ui/html';
 import { View } from '@acme/ui/tw';
 import { WAITLIST_COPY } from '../waitlist/copy';
 import { WaitlistForm } from '../waitlist/WaitlistForm';
-import { Eyebrow } from './Eyebrow';
 import { sectionMarker } from './sections';
 
 /**
@@ -23,7 +22,6 @@ export function WaitlistSection() {
     >
       <View className="mx-auto w-full max-w-screen-xl gap-10 px-4 py-20 sm:px-6 md:flex-row md:items-start md:justify-between md:gap-14 md:py-28 lg:px-8">
         <View className="min-w-0 gap-5 md:flex-[5_1_0%]">
-          <Eyebrow>{copy.eyebrow}</Eyebrow>
           <Heading
             level={2}
             id="w01-waitlist-title"

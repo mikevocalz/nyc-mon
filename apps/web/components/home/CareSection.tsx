@@ -1,6 +1,5 @@
 import { Heading, List, ListItem, Paragraph, Section, Text } from '@acme/ui/html';
 import { View } from '@acme/ui/tw';
-import { Eyebrow } from './Eyebrow';
 import { W01_COPY } from './copy';
 import { sectionMarker } from './sections';
 
@@ -102,7 +101,6 @@ export function CareSection() {
       className="mx-auto w-full max-w-screen-xl gap-10 px-4 py-16 sm:px-6 md:gap-12 md:py-24 lg:px-8"
     >
       <View id="mfx-care-head" className="gap-5 lg:max-w-4xl">
-        <Eyebrow>{copy.eyebrow}</Eyebrow>
         <Heading
           level={2}
           id="w01-care-title"

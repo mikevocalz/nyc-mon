@@ -3,7 +3,6 @@ import { Figure, Heading, Paragraph, Text } from '@acme/ui/html';
 import { View } from '@acme/ui/tw';
 import { art, artHref, artPosition } from './art';
 import { W01_COPY } from './copy';
-import { DISTRICT_COPY, DISTRICTS } from '@acme/spatial/copy';
 import { HeroCity, HeroDistrictPicker } from './HeroDistrictIsland';
 import { PlaceCaption } from './PlaceCaption';
 import { sectionMarker } from './sections';
@@ -30,7 +29,7 @@ export function HomeHero() {
     <View {...sectionMarker('hero')} className="w-full">
       {/* React hoists this into <head>; ReactDOM.preload() from a server component only reached the flight payload. */}
       <link rel="preload" as="image" href={artHref(heroArt)} fetchPriority="high" />
-      <HeroCity id="trg-hero" cityLabels={Object.fromEntries(DISTRICTS.map((d) => [d, copy.cityLabel(DISTRICT_COPY[d].name)]))} className="lg:min-h-hero-wide">
+      <HeroCity id="trg-hero" labelledBy="mfx-hero-title" className="lg:min-h-hero-wide">
         <View
           data-testid="w01-hero"
           className="mx-auto w-full max-w-screen-xl flex-1 gap-10 px-4 pb-16 pt-8 sm:px-6 md:py-14 lg:grid lg:grid-cols-12 lg:content-center lg:items-center lg:gap-x-8 lg:gap-y-0 lg:px-8 lg:py-20 short:grid short:grid-cols-12 short:items-center short:gap-x-6 short:gap-y-0 short:pb-4 short:pt-3"
@@ -96,8 +95,9 @@ export function HomeHero() {
                 <BrandLogo size={SEAL_SIZE} />
               </View>
             </View>
-            {/* A direct child of Figure so it captions the figure; pinned over the poster's top-right corner. */}
-            <PlaceCaption entry={heroArt} className="right-0 top-0 short:hidden" />
+            {/* A direct child of Figure so it captions the figure; pinned over the poster's top-right corner.
+                Names the landmark, not a district, so it never reads as the picker's state (PS-026). */}
+            <PlaceCaption entry={heroArt} landmark className="right-0 top-0 short:hidden" />
           </Figure>
         </View>
       </HeroCity>

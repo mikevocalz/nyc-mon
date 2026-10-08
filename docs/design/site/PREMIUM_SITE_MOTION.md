@@ -69,12 +69,12 @@ No section-wide "fade everything up."
 | moment | type | what it does |
 |---|---|---|
 | `w01.hero.enter` | played on load (~1.1s), skipped if hydration binds >1.8s | transform-only, one composed beat (Phase 3): poster photograph settles (scale 1.05→1, y 24→0) → headline plates and support line as one block (y 34→0) → seal stamps (y 16→0, rotate −2°→0) → CTA and district control (y 16→0). No per-line stagger |
-| `w01.world.enter` | played at `top 78%` | the World story tile (`mfx-world-story`) resolves once |
+| `w01.world.enter` | played at `top 90%` | the World story tile (`mfx-world-story`) resolves once |
 | `w01.world.drift` | scrub `top bottom→bottom top`, ≥768px only | the two World photographs' image layers drift inside fixed frames at `parallax.mid` and `parallax.near`; the layer overhangs its frame by `parallax.max`, so no edge shows. Frames never move |
-| `w01.hlynk.reveal` | scrub `top 82%→center 55%` | device settles (y 56→0, rotationY 8°→0, scale .97→1), then the scan line sweeps, then the three feature lines resolve in order |
-| `w01.starters.enter` | played at `top 78%` | header, then cards 0/1/2 at +140ms stagger |
-| `w01.care.enter` | played at `top 80%` | copy, then the readout plate |
-| `w01.hatch.reveal` | played at `top 72%` | night frame de-scales slowly (1.06→1, 1.3s) → copy → CTA — the quiet climax |
+| `w01.hlynk.reveal` | played at `top 90%` | name block, then the two proof rows; every beat starts within 300ms (Phase 7). The device motion lives in the three.js scene (PS-018) |
+| `w01.starters.enter` | played at `top 90%` | header, then cards 0/1/2 at +100ms stagger (last beat at 300ms) |
+| `w01.care.enter` | played at `top 90%` | copy, then the readout plate |
+| `w01.hatch.reveal` | played at `top 90%` | night frame de-scales slowly (1.06→1, 1.3s) → copy → CTA — the quiet climax |
 
 Deliberately absent: pinning (allowed but not needed — the drift gives depth
 without scroll-jacking), continuous rotation, parallax inside text columns,

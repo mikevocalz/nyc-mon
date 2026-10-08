@@ -335,3 +335,27 @@ Self-review with a security focus (no separate reviewer lane ran):
 ### Perf
 
 ### Canon
+
+### Phase 7 polish
+
+Build: working tree on `feat/premium-home-redesign` (db113bc + uncommitted polish), `NEXT_DIST_DIR=.next-b`, served on :3110. Shots in `tooling/site-qa/out/shots/<width>-<motion>-<section>.jpg`.
+
+| Item | Before (critique / a11y lane) | After (:3110) |
+|---|---|---|
+| Widows | "ANSWER." alone (care), "no." alone (starters quote), "walk." alone (hero), "DR. / SANTORO'S" split | `main h1–h3 { text-wrap: balance }`, `main p { text-wrap: pretty }`; NBSP after "Dr." in `copy.ts`. Care title sets "YOUR MON ASKS. / YOU ANSWER." (`1440-no-preference-care.jpg`); starters title keeps "DR. SANTORO'S TABLE." on one line (`1280-no-preference-starters.jpg`); hero ends "you walk." (`1440-no-preference-hero.jpg`). The starters quote at 1280 now ends "say no.", two words, not one |
+| Reveal timing | proof rows at 1100/1400 ms, triggers `top 70–80%` | every scroll beat starts ≤300 ms, all triggers `top 90%`. At 1440, 700 ms after scrolling each section to the top, H-Lynk proof rows and all three starters are at opacity 1.00 |
+| Header CTA | royal face | orange CTA face with `on-cta` text via new `NavBar ctaTone` (default royal for other callers); stale "Log in" comment replaced |
+| Eyebrows | 5 on the page, 3 repeating the headline | removed on H-Lynk, Care, Waitlist; kept on Starters and Hatch. Heading levels unchanged |
+| Hero caption | "Midtown, …" with the Midtown disc next to the picker | "Chrysler Building, Lexington Ave at 42nd St", no disc (PS-026) |
+| District radios <sm | 3 + 1 wrap | 2×2, each 159×44 at 390 (`390-no-preference-hero.jpg`); one row of four at ≥sm |
+| Header skyline | on every width | hidden below `md` and at `short:`; header 94px at 390, 72px at 844×390, 114px at 1280 (`844x390-no-preference-hero.jpg`) |
+| Footer at 1440 | content x=24 vs page x=112 | **not changed**: `SiteFooter` hard-codes `max-w-screen-2xl px-4 md:px-6` with no container prop. Needs a kit change |
+| N1 hero loop | animates indefinitely | settles by ~5 s; a district pick replays ~1.5 s then holds (PS-027) |
+| N2 hero region | unnamed region, dead `cityLabels` | `<section aria-labelledby="mfx-hero-title">` named "Every block has a legend."; `cityLabels` removed |
+| N3 radiogroup | named only via fieldset/legend | no fieldset; `aria-labelledby="w01-district-label"` → "Pick a district" |
+| N4 menu dot | "Home●" | dot `aria-hidden`; link name "Home" |
+| N5 logo links | header "NYC-MON" › img › img, footer "NYC-MON home" | both "NYC-MON home", marks decorative (0 role=img inside) |
+| N6 resize past lg | focus fell to BODY | focus goes to the logo link "NYC-MON home" |
+| N7 waitlist errors | browser bubbles only | `noValidate`; empty → "Enter your email address.", `foo@` → "Check the email address…", no age → "Check the box to confirm you're 13 or older.", each `aria-invalid` + `aria-describedby`, focus on the first bad field. A valid submit clears them and reaches the server (no backend here: the `error` status line renders) |
+
+Gates on :3110: web `typecheck` 0, eslint on source 0 (the package `lint` script also walks other agents' `.next-a`/`.next-perf` bundles and fails there), `test` 41/41, `site-qa:copy-lint` clean, `site-qa:axe` 0 violations on `/` (6 runs) and `/get`, `site-qa:motion` pass, `site-qa:shots` at 390/430/768/844x390/1280/1440 in both motion modes, 0 errors.

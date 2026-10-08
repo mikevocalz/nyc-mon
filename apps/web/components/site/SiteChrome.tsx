@@ -8,9 +8,12 @@ import { CONTENT_ID, FOOTER_DESCRIPTION, FOOTER_GROUPS, NAV_CTA, navItems, shows
 import { sectionMarker } from '../home/sections';
 
 // Client-side routing for the kit's links: solito's Link renders the anchor.
+// The item label names the link, so the logo link reads "NYC-MON home" here
+// and in the footer (WCAG 3.2.4) whatever mark it wraps.
 const navLink = (item: NavItem, children: ReactNode, className: string) => (
   <Link
     href={item.href ?? '/'}
+    aria-label={item.label}
     onClick={item.onPress}
     aria-current={item.active ? 'page' : undefined}
     className={className}
@@ -32,10 +35,10 @@ const footerLink = (link: FooterLink, children: ReactNode, className: string) =>
 const siteLogo = (
   <>
     <View className="flex short:hidden">
-      <BrandWordmark height={66} />
+      <BrandWordmark decorative height={66} />
     </View>
     <View className="hidden short:flex">
-      <BrandWordmark height={40} />
+      <BrandWordmark decorative height={40} />
     </View>
   </>
 );
@@ -43,7 +46,9 @@ const siteLogo = (
 /** The kit NavBar with the marketing pages and one CTA. The product site
  *  carries no auth (ADR 0003) — there is no avatar slot here. The links fold
  *  into the menu below `lg`: the full-height wordmark, five links and the
- *  waitlist CTA need about 900px. */
+ *  waitlist CTA need about 900px. The waitlist is the site's primary action,
+ *  so it wears the orange CTA face. The skyline strip shows from `md` and is
+ *  dropped on phones, upright or sideways, where height is scarce. */
 export function SiteNavBar() {
   const pathname = usePathname() ?? '/';
   if (!showsSiteChrome(pathname)) return null;
@@ -52,6 +57,8 @@ export function SiteNavBar() {
     <NavBar
       items={navItems(pathname)}
       cta={NAV_CTA}
+      ctaTone="orange"
+      skylineClassName="hidden h-5 md:flex short:hidden"
       skipTo={CONTENT_ID}
       district="midtown"
       logo={siteLogo}
@@ -80,6 +87,7 @@ export function SiteFooterBar() {
       description={FOOTER_DESCRIPTION}
       linkGroups={FOOTER_GROUPS}
       renderLink={footerLink}
+      containerClassName="max-w-screen-xl sm:px-6 lg:px-8"
     />
     </View>
   );

@@ -40,7 +40,7 @@ const segmented = tv({
 });
 
 export function SegmentedControl<T extends string>({
-  options, value, onChange, className, tone, district, rounded = false,
+  options, value, onChange, className, segmentClassName, tone, district, rounded = false,
   'aria-label': ariaLabel, 'aria-labelledby': ariaLabelledBy,
 }: SegmentedControlProps<T>) {
   const resolved = resolveControlTone(tone, district);
@@ -87,7 +87,7 @@ export function SegmentedControl<T extends string>({
             // Roving tabindex is a web keyboard concept; native screen readers
             // and Android focus navigation keep every radio reachable.
             {...(isWeb ? ({ tabIndex: rovingTabIndex(index, checkedIndex) } as object) : {})}
-            className={s.segment()}
+            className={s.segment({ className: segmentClassName })}
           >
             <Text className={s.label()}>{option.label}</Text>
           </Pressable>

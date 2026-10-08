@@ -26,14 +26,15 @@ export const W01_COPY = {
   /** A photograph's place caption: district, then cross streets when canon gives a place. */
   placeCaption: (district: District, place?: string) =>
     place ? `${DISTRICT_COPY[district].name}, ${place}` : DISTRICT_COPY[district].name,
+  /** The hero poster's caption: the landmark and its cross streets, never the picked district (PS-026). */
+  landmarkCaption: (title: string, place?: string) => (place ? `${title}, ${place}` : title),
   hero: {
     title: HOME_COPY.tagline,
     titleLines: TITLE_LINES,
-    body: 'Pick one of three eggs from Dr. Alessandra Santoro. Be there when it hatches. Then look after your Mon on the same blocks you walk.',
+    body: 'Pick one of three eggs from Dr.\u00a0Alessandra Santoro. Be there when it hatches. Then look after your Mon on the same blocks you walk.',
     cta: WAITLIST_CTA.label,
     ctaHref: WAITLIST_CTA.href,
     districtLabel: 'Pick a district',
-    cityLabel: (district: string) => `${district} street grid, seen from above`,
   },
   signage: {
     title: 'Four districts',
@@ -46,10 +47,9 @@ export const W01_COPY = {
   // Physical facts trace to canon Decision #16 only. No tab labels (Q42), no
   // EngineX (Q40), no recruiting verbs, no pronoun for a Mon (PS-005).
   hlynk: {
-    eyebrow: 'H-Lynk',
     title: 'H-Lynk Core',
     lede: 'Your line to your Mon.',
-    body: 'Dr. Santoro hands you an H-Lynk Core: matte red plastic with a black scanner across the top. It keeps you in touch with your Mon and helps you with care.',
+    body: 'Dr.\u00a0Santoro hands you an H-Lynk Core: matte red plastic with a black scanner across the top. It keeps you in touch with your Mon and helps you with care.',
     bond: "The bond is yours and your Mon's. The H-Lynk Core keeps you in reach of each other.",
     stageLabel: 'H-Lynk Core',
     caption: 'H-Lynk Core, the entry tier. Matte red body, black scanner head.',
@@ -77,7 +77,7 @@ export const W01_COPY = {
   },
   starters: {
     eyebrow: 'The starters',
-    title: "Three eggs on Dr. Santoro's table.",
+    title: "Three eggs on Dr.\u00a0Santoro's table.",
     /** The egg names come from @acme/content, in starter slot order. */
     body: (eggNames: readonly string[]) =>
       `${eggNames.slice(0, -1).join(', ')} and ${eggNames.at(-1) ?? ''}. Each holds a Mon from a different Bloodline. You pick an egg. Your Mon decides the rest at the hatch.`,
@@ -86,7 +86,6 @@ export const W01_COPY = {
     dex: (dexId: number) => `No. ${String(dexId).padStart(3, '0')}`,
   },
   care: {
-    eyebrow: 'Care',
     title: 'Your Mon asks. You answer.',
     body: 'A look, a sound or a reach is how your Mon asks for a meal, a quiet night or a game.',
     closing: 'A low meter is a request. Nothing is lost while you are away.',

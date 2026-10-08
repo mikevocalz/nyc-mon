@@ -224,6 +224,8 @@ export const LabelBase = dom<P & { htmlFor?: string; id?: string }>('label');
 export type FormBaseProps = P & {
   action?: string | ((formData: FormData) => void | Promise<void>);
   noValidate?: boolean;
+  /** Runs before `action`; `event.preventDefault()` stops the submit (client-side checks). */
+  onSubmit?: (event: React.FormEvent<HTMLFormElement>) => void;
   id?: string;
   'aria-labelledby'?: string;
   'aria-describedby'?: string;

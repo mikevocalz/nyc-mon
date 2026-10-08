@@ -10,6 +10,11 @@ export interface SegmentedControlProps<T extends string> {
   value: T;
   onChange: (value: T) => void;
   className?: string;
+  /**
+   * Classes for every segment, e.g. a flex-basis that sets how many fit on a
+   * row ("basis-[40%] sm:basis-auto" gives a 2x2 grid of four on phones).
+   */
+  segmentClassName?: string;
   /** Colour family of the active segment. Overrides `district`. */
   tone?: ControlTone;
   /** Theme by neighbourhood. Default Midtown (orange). */
