@@ -24,6 +24,7 @@ import { GuardianConsents } from './collections/GuardianConsents';
 import { IdempotencyRecords } from './collections/IdempotencyRecords';
 import { IntegrityRuns } from './collections/IntegrityRuns';
 import { MonInstances } from './collections/MonInstances';
+import { LanguageLexicon } from './collections/LanguageLexicon';
 import { Waitlist } from './collections/Waitlist';
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -52,7 +53,7 @@ export default buildConfig({
     api: PAYLOAD_API_ROUTE,
   },
   endpoints: consoleEndpoints,
-  collections: [Users, Media, GuardianConsents, Eggs, MonInstances, CareStates, AuditEvents, IntegrityRuns, IdempotencyRecords, Waitlist],
+  collections: [Users, Media, GuardianConsents, Eggs, MonInstances, CareStates, AuditEvents, IntegrityRuns, IdempotencyRecords, Waitlist, LanguageLexicon],
   plugins: [
     // Generates Better Auth's session, account, verification and passkey
     // collections; `users` is written by hand in collections/Users.ts.
