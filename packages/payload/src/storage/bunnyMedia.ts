@@ -215,7 +215,8 @@ function projectedSizeURL(publicURL: string, sourceFilename: string | undefined,
 }
 
 export const withBunnyMediaURLs = <T extends BunnyReadableMedia>(doc: T): T => {
-  if (typeof doc.bunnyUrl !== 'string' || doc.bunnyUrl.length === 0) return doc;
+  const publicURL = doc.bunnyUrl;
+  if (typeof publicURL !== 'string' || publicURL.length === 0) return doc;
 
   const sizes =
     doc.sizes && typeof doc.sizes === 'object'
@@ -227,7 +228,7 @@ export const withBunnyMediaURLs = <T extends BunnyReadableMedia>(doc: T): T => {
               'filename' in size &&
               typeof size.filename === 'string'
             ) {
-              return [name, { ...size, url: projectedSizeURL(doc.bunnyUrl, doc.filename, size.filename) }];
+              return [name, { ...size, url: projectedSizeURL(publicURL, doc.filename, size.filename) }];
             }
             return [name, size];
           }),
@@ -236,8 +237,8 @@ export const withBunnyMediaURLs = <T extends BunnyReadableMedia>(doc: T): T => {
 
   return {
     ...doc,
-    url: doc.bunnyUrl,
-    ...(doc.mimeType?.startsWith('image/') ? { thumbnailURL: doc.bunnyUrl } : {}),
+    url: publicURL,
+    ...(doc.mimeType?.startsWith('image/') ? { thumbnailURL: publicURL } : {}),
     ...(sizes ? { sizes } : {}),
   };
 };
