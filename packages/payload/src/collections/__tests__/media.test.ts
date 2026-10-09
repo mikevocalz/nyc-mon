@@ -41,6 +41,31 @@ describe('Bunny media URL projection', () => {
     expect(withBunnyMediaURLs(doc).url).toBe('/api/media/file/local.mp4');
   });
 
+  it('derives nested variant paths from the persisted CDN URL without an environment variable', () => {
+    const doc = {
+      id: 4,
+      alt: 'nested poster',
+      bunnyUrl: 'https://cdn.example.com/mon-art/hello%20world.jpg',
+      filename: 'mon-art/hello world.jpg',
+      mimeType: 'image/jpeg',
+      filesize: 1,
+      width: 1000,
+      height: 1000,
+      sizes: {
+        card: {
+          filename: 'mon-art/hello world-640.jpg',
+          width: 640,
+          height: 640,
+          mimeType: 'image/jpeg',
+          filesize: 1,
+          url: '/api/media/file/mon-art/hello-world-640.jpg',
+        },
+      },
+    };
+    expect(withBunnyMediaURLs(doc).sizes?.card?.url)
+      .toBe('https://cdn.example.com/mon-art/hello%20world-640.jpg');
+  });
+
   it('projects Bunny URLs for generated image sizes too', () => {
     const doc = {
       id: 3,
