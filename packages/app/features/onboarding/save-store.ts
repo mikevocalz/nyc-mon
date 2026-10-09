@@ -1,28 +1,25 @@
 'use client';
 
-import { createEmptySave, loadSave, SaveLoadError } from '@acme/core/save';
+import { createEmptySave } from '@acme/core/save';
 import type { CallerProfile, SaveCurrent } from '@acme/core/types';
 import { SAVE_KEY } from './onboarding.store';
+import { createSaveIO, type SaveIO } from './save-io';
 import { saveStorage } from './storage';
+
+/** The one binding of the save codec to MMKV `nyc-mon-save`. The Mon store writes through this too. */
+export const saveIO: SaveIO = createSaveIO(saveStorage, SAVE_KEY);
 
 /**
  * Reads the MMKV sim save. Returns `undefined` for a missing or unreadable
  * value; M22-style recovery is the boot route's job, not a screen's.
  */
 export function readSave(): SaveCurrent | undefined {
-  const raw = saveStorage.getString(SAVE_KEY);
-  if (raw === undefined) return undefined;
-  try {
-    return loadSave(raw);
-  } catch (error) {
-    if (error instanceof SaveLoadError) return undefined;
-    throw error;
-  }
+  return saveIO.read();
 }
 
 /** Persists a save back to the single MMKV value. */
 export function writeSave(save: SaveCurrent): void {
-  saveStorage.set(SAVE_KEY, JSON.stringify(save));
+  saveIO.write(save);
 }
 
 /** The stable id this device's write queue uses, persisted once. */

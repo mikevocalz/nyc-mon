@@ -53,3 +53,41 @@ export {
   type VignetteScheduleOptions,
   vignetteWeight,
 } from './vignettes.ts';
+export {
+  type ApproachConfig,
+  type ApproachEndReason,
+  type ApproachEvent,
+  type ApproachFrame,
+  type ApproachMachine,
+  type ApproachRadii,
+  type ApproachState,
+  type ApproachStep,
+  type ApproachSuppression,
+  type ApproachTarget,
+  type ApproachTier,
+  type ApproachViewer,
+  APPROACH_TIERS,
+  createApproachMachine,
+  DEFAULT_APPROACH_CONFIG,
+} from './approach.ts';
+export {
+  type ActionCue,
+  buildMonSceneInput,
+  deriveAnimationIntent,
+  deriveMonMood,
+  emptyModelSlots,
+  IDLE_PRESENCE,
+  MODEL_SLOT_STAGES,
+  type MonSceneSource,
+  type ScenePresence,
+} from './scene-input.ts';
+export {
+  type ResolvedSceneMode,
+  resolveSceneMode,
+  type SceneModeInput,
+  type SceneModeReason,
+  type ScenePlatform,
+  type ScenePreference,
+  type SceneRuntimeCapabilities,
+  usableAnchors,
+} from './scene-mode.ts';

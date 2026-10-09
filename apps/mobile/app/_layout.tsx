@@ -5,6 +5,7 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { withUniwind } from "uniwind";
 import { AppQueryProvider, AttachSheet, AudioRecorderSheet, SafeAreaProvider, UrlSheet, useProfile } from "@acme/app";
+import { hydrateMon } from "@acme/app/features/mon/mon.store.ts";
 import { hydrateOnboarding } from "@acme/app/features/onboarding/onboarding.store.ts";
 import { setThemePreference } from "@acme/theme/switch";
 import { BookingSheet } from "../components/BookingSheet";
@@ -26,6 +27,7 @@ setThemePreference(useProfile.getState().theme);
 
 // M01 boot reads these flags synchronously; hydrate before the first frame.
 hydrateOnboarding();
+hydrateMon();
 
 export default function RootLayout() {
   return (

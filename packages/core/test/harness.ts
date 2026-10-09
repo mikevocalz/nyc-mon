@@ -35,6 +35,9 @@ export function makeMon(overrides: Partial<MonInstance> = {}): MonInstance {
     bond: 0.3,
     stage: 'Baby',
     voiceLineageId: null,
+    originBlock: null,
+    habitatTags: [],
+    activeHours: null,
     ...overrides,
   };
 }
