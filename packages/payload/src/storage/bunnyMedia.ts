@@ -1,6 +1,7 @@
 import type {
   CollectionAfterChangeHook,
   CollectionAfterDeleteHook,
+  CollectionAfterReadHook,
   FileData,
   PayloadRequest,
   TypeWithID,
@@ -179,3 +180,52 @@ export const bunnyMediaAfterDelete: CollectionAfterDeleteHook<
 
   await Promise.all(filenamesFor(doc).map(deleteFile));
 };
+
+
+type BunnyReadableMedia = FileData &
+  TypeWithID & {
+    bunnyUrl?: string | null;
+    thumbnailURL?: string | null;
+    url?: string | null;
+  };
+
+/**
+ * Payload's built-in upload fields generate /api/media/file/:filename URLs.
+ * With disableLocalStorage those routes have no bytes unless a real storage
+ * adapter supplies a static handler. NYC-Mon serves Bunny media publicly, so
+ * expose the CDN URL as the canonical Payload `url` on read.
+ *
+ * This is especially important for video/audio previews, which consume
+ * `media.url` rather than `adminThumbnail`.
+ */
+export const withBunnyMediaURLs = <T extends BunnyReadableMedia>(doc: T): T => {
+  if (typeof doc.bunnyUrl !== 'string' || doc.bunnyUrl.length === 0) return doc;
+
+  const sizes =
+    doc.sizes && typeof doc.sizes === 'object'
+      ? Object.fromEntries(
+          Object.entries(doc.sizes).map(([name, size]) => {
+            if (
+              size &&
+              typeof size === 'object' &&
+              'filename' in size &&
+              typeof size.filename === 'string'
+            ) {
+              return [name, { ...size, url: objectURL(getKey(size.filename)) }];
+            }
+            return [name, size];
+          }),
+        )
+      : doc.sizes;
+
+  return {
+    ...doc,
+    url: doc.bunnyUrl,
+    ...(doc.mimeType?.startsWith('image/') ? { thumbnailURL: doc.bunnyUrl } : {}),
+    ...(sizes ? { sizes } : {}),
+  };
+};
+
+export const bunnyMediaAfterRead: CollectionAfterReadHook<BunnyReadableMedia> = ({
+  doc,
+}) => withBunnyMediaURLs(doc);
