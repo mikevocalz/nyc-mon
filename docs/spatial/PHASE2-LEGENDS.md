@@ -2,7 +2,7 @@
 
 - **Status:** Design only. Parked by `docs/adr/0013-phase2-legends-parked.md`. Nothing here is built, and nothing here is canon.
 - **Date:** 2026-10-08
-- **Branch:** `feat/spatial-contract`
+- **Branch:** `docs/phase2-legends` (merge after `feat/spatial-contract` PR #9)
 - **Depends on:** `docs/spatial/CONTRACT.md`, `docs/adr/0010-spatial-scene-contract.md`, `docs/adr/0011-mode-resolution.md`, `docs/adr/0012-approach-trigger.md`
 - **Canon authority:** `docs/canon/source/NYC_MON_CURRENT_CANON_INDEX_v11.md` order. `V11 ¶n` = n-th non-empty paragraph of the v11 Canon & Lore Bible, as `docs/canon/STARTERS_EXTRACT.md` defines it.
 
@@ -155,7 +155,7 @@ Everything below is typed in `docs/spatial/CONTRACT.md` and `docs/adr/0010-spati
 | Approach-trigger state machine | Same machine, new inputs: block binding, speed, crossing, quiet hours. Suppression is a guard, not a new state graph. |
 | Mode resolver | Adds `street`. Resolves only on phones, outdoors, with location permission granted and every §5 guard passing. Headsets can never resolve to it. |
 | Tabletop mode | Becomes the Block Diorama: `originBlock` rendered at table scale. |
-| Content fields | `originBlock`, `habitatTags`, `activeHours` on Mon/species content, typed now and empty. |
+| Content fields | `originBlock`, `habitatTags`, `activeHours` on each persisted `MonInstance`, typed now and empty. Shared species ecology defaults (if later approved) must be kept separate from each individual's origin and overrides. |
 
 ### 7.1 nitro-mapbox-ar as a map/terrain candidate
 
