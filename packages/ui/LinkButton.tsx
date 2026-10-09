@@ -33,7 +33,7 @@ const CUT_FACE = {
 } as const;
 
 /** Variants a link can take: the solid looks. Ghost and outline stay on Button. */
-export type LinkButtonVariant = Exclude<ButtonVariant, 'ghost' | 'outline'>;
+export type LinkButtonVariant = Exclude<ButtonVariant, 'ghost' | 'outline' | 'hlynk-care'>;
 
 export interface LinkButtonProps {
   title: string;

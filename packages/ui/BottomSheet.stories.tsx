@@ -100,3 +100,18 @@ export const SystemScheme: Story = {
     </View>
   ),
 };
+
+/**
+ * `placement="in-screen"` (M14 tray, M16 card): docked inside the H-Lynk
+ * screen, at most 85% of it, no OS scrim, not modal, so the trackpad and keys
+ * under it stay live. Shown inside a 3:4 screen-sized box. Story fixture copy.
+ */
+export const InScreen: Story = {
+  render: () => (
+    <View className="relative overflow-hidden bg-concrete-100" style={{ width: 351, height: 468 }}>
+      <SheetSurface placement="in-screen" title="Share a meal" onClose={() => {}} closeLabel="Close the meal tray" testID="m14-tray">
+        <Text className="text-base text-text-muted">The tray sits in the screen; the shell controls stay live.</Text>
+      </SheetSurface>
+    </View>
+  ),
+};

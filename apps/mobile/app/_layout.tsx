@@ -4,11 +4,11 @@ import { StatusBar } from "expo-status-bar";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { withUniwind } from "uniwind";
-import { AppQueryProvider, AttachSheet, AudioRecorderSheet, SafeAreaProvider, UrlSheet, useProfile } from "@acme/app";
+import { AppQueryProvider, SafeAreaProvider, useProfile } from "@acme/app";
 import { hydrateMon } from "@acme/app/features/mon/mon.store.ts";
 import { hydrateOnboarding } from "@acme/app/features/onboarding/onboarding.store.ts";
+import { useReadyNotificationRouting } from "@acme/app/features/onboarding/notify-hook.ts";
 import { setThemePreference } from "@acme/theme/switch";
-import { BookingSheet } from "../components/BookingSheet";
 import { Toaster } from "@acme/ui";
 import "../global.css";
 
@@ -30,6 +30,8 @@ hydrateOnboarding();
 hydrateMon();
 
 export default function RootLayout() {
+  // Hatch-ready notification tap → M12, cold start and warm (M12 B3).
+  useReadyNotificationRouting();
   return (
     <GestureRoot className="flex-1">
       <StatusBar style="auto" />
@@ -44,11 +46,9 @@ export default function RootLayout() {
         <SafeAreaProvider>
           <AppQueryProvider>
             <Slot />
-            {/* Global overlays/sheets are mounted once at the app root. */}
-            <BookingSheet />
-            <AttachSheet />
-            <AudioRecorderSheet />
-            <UrlSheet />
+            {/* Global overlays are mounted once at the app root. The starter's
+                booking/editor sheets went with the demo schedule route: nothing
+                on mobile opens them any more. */}
             <Toaster />
           </AppQueryProvider>
         </SafeAreaProvider>

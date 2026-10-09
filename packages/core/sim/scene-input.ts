@@ -31,12 +31,14 @@ export function deriveMonMood(care: CareState, tuning: CareTuning = DEFAULT_CARE
 }
 
 /**
- * A one-shot performance the renderer is playing (eat after a feed, play
- * after a play, evolve after an evolution). `untilMs` comes from the clip, so
- * core holds no animation lengths.
+ * A one-shot performance the renderer is playing: eat after a feed, play
+ * after a play, evolve after an evolution, hatch during M12's emerge,
+ * attention when the Caller taps the Mon or at the first look, refuse after
+ * a declined action. `untilMs` comes from the clip, so core holds no
+ * animation lengths.
  */
 export interface ActionCue {
-  readonly intent: Extract<AnimationIntent, 'eat' | 'play' | 'evolve'>;
+  readonly intent: Extract<AnimationIntent, 'eat' | 'play' | 'evolve' | 'hatch' | 'attention' | 'refuse'>;
   readonly untilMs: number;
 }
 
@@ -54,11 +56,14 @@ export const IDLE_PRESENCE: ScenePresence = { nowMs: 0, approachActive: false, c
 /**
  * Intent, first match wins: a running cue (`nowMs < untilMs`), sleep while
  * asleep, approach while the trigger is active, else idle. A sleeping Mon
- * never plays approach.
+ * never plays approach or attention: a tap on a sleeping Mon does not wake
+ * it, so an `attention` cue yields `sleep` while asleep.
  */
 export function deriveAnimationIntent(care: CareState, presence: ScenePresence): AnimationIntent {
-  if (presence.cue !== null && presence.nowMs < presence.cue.untilMs) return presence.cue.intent;
-  if (care.activity.kind === 'asleep') return 'sleep';
+  const asleep = care.activity.kind === 'asleep';
+  const cue = presence.cue;
+  if (cue !== null && presence.nowMs < cue.untilMs && !(asleep && cue.intent === 'attention')) return cue.intent;
+  if (asleep) return 'sleep';
   if (presence.approachActive) return 'approach';
   return 'idle';
 }
@@ -114,7 +119,17 @@ export function emptyModelSlots(bloodlineIds: readonly BloodlineId[]): readonly 
         bloodlineId,
         stage,
         glbUri: null,
-        clips: { idle: null, approach: null, eat: null, sleep: null, play: null, evolve: null },
+        clips: {
+          idle: null,
+          approach: null,
+          eat: null,
+          sleep: null,
+          play: null,
+          evolve: null,
+          hatch: null,
+          attention: null,
+          refuse: null,
+        },
       }),
     ),
   );

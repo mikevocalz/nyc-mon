@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { MonNameSchema } from './mon.ts';
 import { EpochMsSchema, IdSchema } from './primitives.ts';
 
 /** Bible v11: 15-minute, 30-minute or 1-hour incubation. */
@@ -21,7 +22,12 @@ export const EggRecordSchema = z.object({
    */
   hatchesIntoSpeciesId: IdSchema,
   callerId: IdSchema,
-  nickname: z.string().min(1).max(64).nullable(),
+  /**
+   * Always null when M10 creates the egg: the individual is named after the
+   * hatch (Decision #5, D-16f). Kept so the mint carries a name forward if a
+   * later flow ever names before hatch. Do not wire a name field to M10.
+   */
+  nickname: MonNameSchema.nullable(),
   incubationMinutes: IncubationMinutesSchema,
   createdAt: EpochMsSchema,
   incubationEndsAt: EpochMsSchema,

@@ -27,3 +27,8 @@ export interface ReadyNotification {
 export function scheduleReadyNotification(_input: ReadyNotification): Promise<boolean> {
   return Promise.resolve(false);
 }
+
+/** M12 cancels and dismisses the egg's ready notification on hatch; there is none on web. */
+export function clearReadyNotification(_eggId: string): Promise<void> {
+  return Promise.resolve();
+}

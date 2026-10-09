@@ -37,13 +37,26 @@ export const CareStateSchema = z.object({
   pendingRequest: CareRequestSchema.nullable(),
 });
 
+/**
+ * A named food a feed serves, once `content/food` exists (Q22–Q24). Both
+ * fields come from the food's content record, so they travel together.
+ */
+export const FoodPortionSchema = z.object({
+  foodClassId: IdSchema,
+  /** Fullness gained, from the food's content record. */
+  nutrition: UnitIntervalSchema,
+});
+
 /** Caller actions on the care loop. Server writes carry these (§1.4). */
 export const CareActionSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('feed'),
-    foodClassId: IdSchema,
-    /** Fullness gained, from the food's content record. */
-    nutrition: UnitIntervalSchema,
+    /**
+     * The food served. Absent means "Share a meal" (D-15e): Phase 1 ships no
+     * named foods, so M14 sends no food and the sim uses
+     * `CareTuning.sharedMealNutrition`. The food tray fills this in later.
+     */
+    food: FoodPortionSchema.optional(),
   }),
   z.object({ kind: z.literal('rest') }),
   z.object({ kind: z.literal('wake') }),

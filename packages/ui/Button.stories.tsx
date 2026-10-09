@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Button } from './Button';
+import { Heart } from './icons';
 import { View } from './tw';
 import { Text } from './Text';
 import { CONTROL_TONES, DISTRICTS, DISTRICT_NAME } from './district';
@@ -61,9 +62,48 @@ export const Sizes: Story = {
 };
 
 /**
+ * Every look and size, each found by its `testID` (no wrapper View). The
+ * press target is at least `min-h-target` (48 px) on every button; `sm` keeps
+ * its smaller face, centred in the full target. Labels use the mobile type
+ * ramp here (`text-type-label`, `text-type-body` at `lg`); a Quest or PICO
+ * build switches them to `text-xr-label` / `text-xr-body`.
+ */
+export const TargetFloor: Story = {
+  render: () => (
+    <View className="gap-4 bg-bg p-4">
+      {(['solid', 'outline', 'ghost'] as const).map((look) => (
+        <View key={look} className="flex-row flex-wrap items-center gap-4">
+          {(['sm', 'md', 'lg'] as const).map((size) => (
+            <Button
+              key={size}
+              testID={`target-${look}-${size}`}
+              title={`${look} ${size}`}
+              size={size}
+              variant={look === 'solid' ? undefined : look}
+              onPress={() => {}}
+            />
+          ))}
+        </View>
+      ))}
+    </View>
+  ),
+  play: ({ canvasElement }) => {
+    for (const look of ['solid', 'outline', 'ghost']) {
+      for (const size of ['sm', 'md', 'lg']) {
+        const el = canvasElement.querySelector(`[data-testid="target-${look}-${size}"]`);
+        if (!el) throw new Error(`target-${look}-${size}: testID did not reach the pressable`);
+        if (el.tagName !== 'BUTTON' && el.getAttribute('role') !== 'button') throw new Error(`target-${look}-${size} is a ${el.tagName}, not the button`);
+        const h = el.getBoundingClientRect().height;
+        if (h < 48) throw new Error(`target-${look}-${size} is ${h}px tall, under the 48px target`);
+      }
+    }
+  },
+};
+
+/**
  * Ghost has no frame, so its hit area is its whole size. Every ghost size is
- * at least 44 pt tall (48 dp on Android): `sm` keeps its tighter padding but
- * not a shorter target.
+ * at least `min-h-target` (48) tall: `sm` keeps its tighter padding but not a
+ * shorter target.
  */
 export const GhostSizes: Story = {
   render: () => (
@@ -179,6 +219,26 @@ export const Rounded: Story = {
       <Button title="Square (default)" />
       <Button title="Rounded" rounded />
       <Button title="Rounded outline" variant="outline" rounded />
+    </View>
+  ),
+};
+
+/**
+ * `hlynk-care`: the M13 care bar over the live scene. Signage-black face,
+ * `silver-300` glyph and label (15.89:1), 48 pt tall, the same in both schemes.
+ * Shown over a pure-white and a night plate, the two ends of any scene pixel.
+ */
+export const HlynkCare: Story = {
+  args: { title: 'Feed', variant: 'hlynk-care' },
+  render: () => (
+    <View className="gap-4">
+      {['bg-signage-white', 'bg-night'].map((bg) => (
+        <View key={bg} className={`flex-row flex-wrap gap-3 p-6 ${bg}`}>
+          <Button variant="hlynk-care" title="Feed" icon={<Heart size={16} className="text-silver-300" />} />
+          <Button variant="hlynk-care" title="Rest" />
+          <Button variant="hlynk-care" title="Play" disabled />
+        </View>
+      ))}
     </View>
   ),
 };

@@ -1,5 +1,12 @@
 export { assertNever } from './assert-never.ts';
-export { type BootRoute, type BootSave, type BootSnapshot, type OnboardingStep, resolveBootRoute } from './boot.ts';
+export {
+  type BootRoute,
+  type BootSave,
+  type BootSnapshot,
+  type OnboardingStep,
+  pendingEggs,
+  resolveBootRoute,
+} from './boot.ts';
 export {
   CALLER_NAME_MAX_LENGTH,
   type CallerNameErrorCopyId,
@@ -18,8 +25,37 @@ export {
   type CareOutcome,
   createInitialCareState,
   listUnmetNeeds,
+  mealNutrition,
+  wouldOverfeed,
 } from './care.ts';
-export { CONSENT_AGE_YEARS, type ConsentCheck, isConsentRequired, utcYearFromEpochMs } from './consent.ts';
+export {
+  CONSENT_AGE_YEARS,
+  type ConsentCheck,
+  isCallerUnder13,
+  isConsentRequired,
+  utcYearFromEpochMs,
+} from './consent.ts';
+export { deriveFirstLook, type FirstLook } from './first-look.ts';
+export {
+  appendCareToJournal,
+  appendJournalEntry,
+  countDaysTogether,
+  type JournalAppend,
+  journalEntryId,
+  journalKindForOutcome,
+} from './journal.ts';
+export {
+  isStoredMonName,
+  MON_NAME_MAX_LENGTH,
+  type MonNameErrorCopyId,
+  monNameErrorCopyId,
+  type MonNameFilter,
+  type MonNameRejection,
+  type MonNameResult,
+  RESERVED_MON_NAMES,
+  validateMonName,
+} from './mon-name.ts';
+export { PEEK_MIN_QUALITY, peekQuality } from './play.ts';
 export { applyEvolution, type EvolutionResult, type FeatureFlags, PHASE1_FEATURE_FLAGS } from './evolution.ts';
 export {
   createEggRecord,
@@ -33,12 +69,15 @@ export {
   transitionHatch,
 } from './hatch.ts';
 export {
+  acknowledgeEggCreate,
   acknowledgeWrites,
   applyCareWrites,
   createWriteQueue,
   enqueueCareWrite,
+  enqueueEggCreate,
   reconcileWithServer,
   type ServerCareRecord,
+  toCreateEggRequest,
 } from './queue.ts';
 export { type CreateEntry, type CreateEntryInput, resolveCreateEntry } from './onboarding.ts';
 export { createRandom, hash128, mixSeed } from './random.ts';

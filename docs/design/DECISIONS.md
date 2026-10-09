@@ -156,3 +156,35 @@ ADR 0001 said account deletion removes the Caller's Mons after the grace period.
 ## L5 — a guardian's email is never edited
 
 A corrected parent address means a new consent record. The old record stays as it was. Accepted from the X1 collections.
+
+## D-15. Phase 1 loop calls (2026-10-08)
+
+The lead took these on the creator's standing instruction to decide product calls and record them. Canon questions stay open in `docs/canon/OPEN_QUESTIONS.md`.
+
+| # | Call | Disposition | Why | Revisit when |
+|---|---|---|---|---|
+| a | Journal has no streaks. `StreakCalendar` becomes `DaysCalendar`: a "days together" count that only rises; missed days look like future days; absence is never logged. | STRIKE streaks | Site promise "A low meter is a request. Nothing is lost while you are away."; v7 Q21 absence proposals; under-13 Callers. | Never for pressure mechanics. |
+| b | Play (M16) is one shared game, "Peek": the Mon hides behind one of three spots. No score, no timer, nothing to lose; a wrong guess still counts. How each Bloodline hides stays `TODO(canon)` (Q44). | BUILD | Runs on the trackpad's existing flick and tap; needs no per-species art to ship. | Q44 answered. |
+| c | No care push notifications in Phase 1. The only notification is hatch-ready. No "while you were away" summary. A dark LED means nothing to report. | STRIKE | No dark-pattern return triggers. | A care-notification design passes the M23 review. |
+| d | Interim care tuning so needs-you is not the normal state: decay slows and meters get a return floor, judged on the after-meal value for overfeeding. Every number stays `TODO(canon)` against Q19–Q21 and Q25. | BUILD (interim) | With the current tuning Fullness reaches needs-you about 2 h after hatch. | Q19–Q21, Q25 answered. |
+| e | Feed (M14) ships without named foods: the action is "Share a meal" until `content/food` exists. No foods are invented. | DEFER food tray | `content/food` does not exist and every species has `foodClassIds: null` (Q22–Q24). | Food content lands. |
+| f | Care starts when the hatch completes, not at `incubationEndsAt`. `hatchedAt` keeps its deterministic value. | BUILD | A late Caller should not meet a Baby whose meters already dropped. | — |
+| g | The first look at the hatch leans in or hesitates (2:1); Callers under 13 always get lean-in. A hesitation never reads as refusal and changes no state. | BUILD | Canon's "the Mon chooses" (Decision #14) without an outcome a child can read as rejection. | Decision #14's source is fixed. |
+| h | The warm-the-case haptic stays visual and spoken on the Quest 2D window; no controller haptics in Phase 1. | DEFER | No haptics path reaches controllers from the 2D window yet. | Quest presence (PR C). |
+| i | Profile (M17) hides bond, likes and culture-note rows until Q26, Q24, Q12/Q13 are answered. Life stages read Egg ✓, Baby ●, then three unnamed ○. Photo mode is hidden until transparent capture works. | DEFER | No canon data; the concept art has painted backgrounds. | Those questions and transparent capture land. |
+
+## D-16. Egg choice, incubation and naming (M08–M10, 2026-10-08)
+
+Proposed by the M08–M10 design lane, accepted by the lead under the same standing instruction as D-15.
+
+| # | Call | Why |
+|---|---|---|
+| a | M08 is an egg choice: Metro, Corner and Prism Egg from `@acme/content` `eggs`, each with its egg number and "{bloodline} Bloodline". No Baby appears before the hatch. The brief's `refused` state is struck; `bonded` becomes `chosen`; `confirming` is added. | Canon Decision #5 (three eggs), #14 (no rejection), #8 (the bond lives on the Mon). |
+| b | No default egg and no default incubation time. | No steering. |
+| c | The egg choice is not saved until M10 confirms the incubation time. | One write per committed choice. |
+| d | Holding the trackpad commits directly; the button path asks to confirm. | The hold is already a deliberate act. |
+| e | One egg per Caller in Phase 1. | Scope. |
+| f | Naming (M09) comes after the hatch: M08 → M10 → M11 → M12 → M09 → M13. M09 lives at `/(home)/name` so the Mon stays mounted through the continuity transition from M12. Naming can't be skipped. M09 uses the night scheme. | Decision #5; the M12 continuity rule. Supersedes the brief's `/(onboarding)/name`. |
+| g | The H-Lynk shell switches to its compact layout while the keyboard is up. | The name field stays visible on short phones. |
+| h | No suggested names, no default name, no pronoun for the Mon. The reserved-name list ships empty. | Q17 is open; PS-005. |
+

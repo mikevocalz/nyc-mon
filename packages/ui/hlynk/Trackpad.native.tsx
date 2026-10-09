@@ -3,7 +3,7 @@ import type { AccessibilityActionEvent } from 'react-native';
 import { haptics } from '../haptics';
 import { View } from '../tw';
 import { HLYNK_COPY } from './copy';
-import { useTrackpadGesture } from './trackpad-gesture';
+import { useOneBreath, useTrackpadGesture } from './trackpad-gesture';
 import type { TrackpadProps } from './Trackpad.types';
 import { TrackpadFace, trackpadSize } from './TrackpadFace';
 import { resolveTier } from './tier';
@@ -18,15 +18,16 @@ export type { TrackpadProps };
 export function Trackpad(props: TrackpadProps) {
   const {
     tier = 'core', label, hint, onActivate, onStep, onPan, accent = 'ring', disabled = false,
-    reducedMotion, shape = 'square', sizePt, testID, onCommit, commitLabel,
+    reducedMotion, shape = 'square', sizePt, testID, onCommit, onHoldStart, onHoldEnd, commitLabel,
   } = props;
   resolveTier(tier, 'Trackpad');
-  const { responder, pressed } = useTrackpadGesture({ onActivate, onStep, onCommit, onPan }, disabled, true);
+  const { responder, pressed } = useTrackpadGesture({ onActivate, onStep, onCommit, onPan, onHoldStart, onHoldEnd }, disabled, true);
 
+  const breath = useOneBreath(onHoldStart, onHoldEnd);
   const actions = disabled
     ? []
     : [
-        ...(onActivate ? [{ name: 'activate' }] : []),
+        ...(onActivate || onHoldStart ? [{ name: 'activate' }] : []),
         ...(onStep ? [{ name: 'increment' }, { name: 'decrement' }] : []),
         ...(onCommit && commitLabel ? [{ name: 'commit', label: commitLabel }] : []),
       ];
@@ -34,7 +35,9 @@ export function Trackpad(props: TrackpadProps) {
     switch (e.nativeEvent.actionName) {
       case 'activate':
         haptics.tap();
-        return onActivate?.();
+        // A hold-only pad (no tap action): activate runs one breath of the hold,
+        // so a screen-reader user gets it without holding (M11 "trackpad hold").
+        return onActivate ? onActivate() : breath();
       case 'increment':
         haptics.selection();
         return onStep?.(1);

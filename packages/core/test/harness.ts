@@ -52,10 +52,11 @@ export function makeState(random?: () => number): SimState {
 }
 
 export function randomAction(random: () => number): CareAction {
-  const pick = Math.floor(random() * 4);
-  if (pick === 0) return { kind: 'feed', foodClassId: 'food-test', nutrition: random() };
+  const pick = Math.floor(random() * 5);
+  if (pick === 0) return { kind: 'feed', food: { foodClassId: 'food-test', nutrition: random() } };
   if (pick === 1) return { kind: 'rest' };
   if (pick === 2) return { kind: 'wake' };
+  if (pick === 3) return { kind: 'feed' };
   return { kind: 'play', quality: random() };
 }
 

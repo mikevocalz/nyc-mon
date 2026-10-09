@@ -20,6 +20,7 @@ export interface SignagePlateProps {
   /** Largest type step to try before stepping down. @default 'station' */
   maxSize?: SignagePlateSize;
   className?: string;
+  testID?: string;
 }
 
 const LONG_TEXT_THRESHOLD = 16;
@@ -45,10 +46,11 @@ function typeClassFor(maxSize: SignagePlateSize, text: string): `text-type-${str
  * finding 4); the `dark:` utility resolves against `data-theme`. It is never
  * a live region — callers announce changes themselves.
  */
-export function SignagePlate({ text, accessibilityLabel, maxSize = 'station', className }: SignagePlateProps) {
+export function SignagePlate({ text, accessibilityLabel, maxSize = 'station', className, testID }: SignagePlateProps) {
   if (!text) return null;
   return (
     <View
+      testID={testID}
       accessibilityRole="text"
       accessibilityLabel={accessibilityLabel}
       className={`w-full items-center justify-center overflow-hidden border border-transparent bg-signage-black px-4 py-3 dark:border-silver-300 ${className ?? ''}`}

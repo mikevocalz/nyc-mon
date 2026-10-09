@@ -4,4 +4,10 @@ export const haptics = {
   success: () => undefined,
   warning: () => undefined,
   selection: () => undefined,
+  warm: () => undefined,
+  hatchLatch: () => undefined,
+  hatchCrack: () => undefined,
+  hatchBloom: () => undefined,
+  hatchEmerge: () => undefined,
+  firstLook: () => undefined,
 };

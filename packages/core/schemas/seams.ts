@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { PeekRoundSchema } from './play.ts';
 import { EpochMsSchema, IdSchema } from './primitives.ts';
 
 /** TODO(canon): v11 names an eight-Affinity direction without listing the eight. */
@@ -34,4 +35,17 @@ export const HoodEncounterSchema = z.object({
   encounterId: IdSchema,
   speciesId: IdSchema,
   observedAt: EpochMsSchema,
+});
+
+/**
+ * Phase-2 shared play seam (M16 handoff, "Multiplayer seam"). Phase 1 writes
+ * nothing with it; it exists so a shared Peek reuses the solo round model.
+ * TODO(canon): how several Mons play together is not authored.
+ */
+export const PlaySessionSchema = z.object({
+  sessionId: IdSchema,
+  monInstanceIds: z.array(IdSchema).min(1),
+  participants: z.array(z.object({ callerId: IdSchema })).min(1),
+  startedAt: EpochMsSchema,
+  rounds: z.array(PeekRoundSchema),
 });

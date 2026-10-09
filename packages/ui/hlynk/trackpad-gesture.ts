@@ -2,6 +2,7 @@
 import { useEffect, useRef } from 'react';
 import type { GestureResponderEvent } from 'react-native';
 import { haptics } from '../haptics';
+import { LED_BREATH_PERIOD_MS } from './breath-clock';
 import { useInstanceStore, useStore } from '../use-instance-store';
 
 /** Thresholds for classifying a trackpad touch, in points and milliseconds. */
@@ -12,6 +13,11 @@ export const TRACKPAD_GESTURE = {
   flickPt: 24,
   /** hold to commit */
   holdMs: 600,
+  /**
+   * A still press this long becomes a hold (`onHoldStart`). Shorter is a tap,
+   * so a tap never also starts a hold.
+   */
+  holdStartMs: 150,
   /** a click arriving this soon after a gesture belongs to that gesture */
   clickSwallowMs: 400,
 } as const;
@@ -32,6 +38,8 @@ interface Handlers {
   onStep?: (direction: -1 | 1) => void;
   onCommit?: () => void;
   onPan?: (dxPt: number, dyPt: number) => void;
+  onHoldStart?: () => void;
+  onHoldEnd?: () => void;
 }
 
 /**
@@ -47,15 +55,29 @@ export function useTrackpadGesture(h: Handlers, disabled: boolean, activateOnTap
   useEffect(() => {
     latest.current = h;
   });
-  const t = useRef({ x0: 0, y0: 0, lx: 0, ly: 0, panning: false, committed: false, endedAt: 0, consumed: false });
+  const t = useRef({ x0: 0, y0: 0, lx: 0, ly: 0, panning: false, committed: false, holding: false, endedAt: 0, consumed: false });
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const holdTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
+  const endHold = () => {
+    if (holdTimer.current !== undefined) clearTimeout(holdTimer.current);
+    holdTimer.current = undefined;
+    if (!t.current.holding) return;
+    t.current.holding = false;
+    latest.current.onHoldEnd?.();
+  };
   const clear = () => {
     if (timer.current !== undefined) clearTimeout(timer.current);
     timer.current = undefined;
   };
+  // A hold that outlives the component (unmount mid-press) still ends.
+  useEffect(() => () => {
+    clear();
+    endHold();
+  }, []);
   const finish = (consumed: boolean) => {
     clear();
+    endHold();
     store.setState({ pressed: false });
     t.current.endedAt = Date.now();
     t.current.consumed = consumed;
@@ -69,14 +91,24 @@ export function useTrackpadGesture(h: Handlers, disabled: boolean, activateOnTap
         onResponderTerminationRequest: () => false,
         onResponderGrant: (e: GestureResponderEvent) => {
           const { pageX, pageY } = e.nativeEvent;
-          t.current = { ...t.current, x0: pageX, y0: pageY, lx: pageX, ly: pageY, panning: false, committed: false };
+          endHold();
+          t.current = { ...t.current, x0: pageX, y0: pageY, lx: pageX, ly: pageY, panning: false, committed: false, holding: false };
           store.setState({ pressed: true });
           clear();
+          if (latest.current.onHoldStart) {
+            holdTimer.current = setTimeout(() => {
+              holdTimer.current = undefined;
+              if (t.current.panning) return;
+              t.current.holding = true;
+              latest.current.onHoldStart?.();
+            }, TRACKPAD_GESTURE.holdStartMs);
+          }
           if (latest.current.onCommit) {
             timer.current = setTimeout(() => {
               timer.current = undefined;
               if (t.current.panning) return;
               t.current.committed = true;
+              endHold();
               haptics.success();
               latest.current.onCommit?.();
             }, TRACKPAD_GESTURE.holdMs);
@@ -86,7 +118,10 @@ export function useTrackpadGesture(h: Handlers, disabled: boolean, activateOnTap
           const { pageX, pageY } = e.nativeEvent;
           const s = t.current;
           const moved = Math.hypot(pageX - s.x0, pageY - s.y0) >= TRACKPAD_GESTURE.slopPt;
-          if (moved) clear();
+          if (moved) {
+            clear();
+            endHold();
+          }
           if (latest.current.onPan && moved) {
             s.panning = true;
             latest.current.onPan(pageX - s.lx, pageY - s.ly);
@@ -96,7 +131,7 @@ export function useTrackpadGesture(h: Handlers, disabled: boolean, activateOnTap
         },
         onResponderRelease: (e: GestureResponderEvent) => {
           const s = t.current;
-          if (s.committed || s.panning) return finish(true);
+          if (s.committed || s.panning || s.holding) return finish(true);
           const outcome = classifyRelease(e.nativeEvent.pageX - s.x0, e.nativeEvent.pageY - s.y0);
           switch (outcome) {
             case 'activate':
@@ -126,4 +161,31 @@ export function useTrackpadGesture(h: Handlers, disabled: boolean, activateOnTap
   };
 
   return { responder, pressed, shouldSwallowClick };
+}
+
+/**
+ * One breath of a hold, for the accessibility `activate` action on a pad that
+ * only holds: `onHoldStart`, then `onHoldEnd` one LED breath (4000 ms) later.
+ * A second call while a breath runs is ignored; unmount ends it.
+ */
+export function useOneBreath(onHoldStart?: () => void, onHoldEnd?: () => void) {
+  const latest = useRef({ onHoldStart, onHoldEnd });
+  useEffect(() => {
+    latest.current = { onHoldStart, onHoldEnd };
+  });
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => {
+    if (timer.current === undefined) return;
+    clearTimeout(timer.current);
+    timer.current = undefined;
+    latest.current.onHoldEnd?.();
+  }, []);
+  return () => {
+    if (timer.current !== undefined || !latest.current.onHoldStart) return;
+    latest.current.onHoldStart();
+    timer.current = setTimeout(() => {
+      timer.current = undefined;
+      latest.current.onHoldEnd?.();
+    }, LED_BREATH_PERIOD_MS);
+  };
 }

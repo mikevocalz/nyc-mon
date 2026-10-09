@@ -22,6 +22,10 @@ export interface TrackpadActionsProps {
   onCommit?: () => void;
   commitLabel?: string;
   disabled?: boolean;
+  /**
+   * Test id on the row. Each button gets `<testID>-back`, `-activate`,
+   * `-forward` or `-commit` on its own pressable.
+   */
   testID?: string;
 }
 
@@ -29,7 +33,9 @@ export interface TrackpadActionsProps {
  * Every trackpad gesture as a plain labelled control, for anyone who does not
  * discover gestures or cannot perform them (DIRECTION.md "Controls": every
  * trackpad action has an on-screen equivalent; WCAG 2.5.1). Screens place it
- * in or under the `HLynkScreen` status row.
+ * in or under the `HLynkScreen` status row. The buttons are `size="sm"` faces
+ * on full `min-h-target` press targets (Button), spaced by `target-gap` so two
+ * targets never share a controller ray's jitter.
  */
 export function TrackpadActions({
   onStepBack, stepBackLabel, onActivate, activateLabel, onStepForward, stepForwardLabel,
@@ -42,9 +48,17 @@ export function TrackpadActions({
     { key: 'commit', on: onCommit, label: commitLabel, variant: undefined },
   ].filter((i): i is typeof i & { on: () => void; label: string } => Boolean(i.on && i.label));
   return (
-    <View testID={testID} className="flex-row flex-wrap gap-2">
+    <View testID={testID} className="flex-row flex-wrap gap-target-gap">
       {items.map((i) => (
-        <Button key={i.key} title={i.label} onPress={i.on} variant={i.variant} size="sm" disabled={disabled} />
+        <Button
+          key={i.key}
+          testID={testID === undefined ? undefined : `${testID}-${i.key}`}
+          title={i.label}
+          onPress={i.on}
+          variant={i.variant}
+          size="sm"
+          disabled={disabled}
+        />
       ))}
     </View>
   );

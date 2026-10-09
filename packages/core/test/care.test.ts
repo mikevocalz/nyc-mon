@@ -83,14 +83,15 @@ describe('care actions', () => {
     const { events, state: after } = advanceCare(state, T0 + 3 * HOUR);
     const request = events.find((e) => e.type === 'food-requested');
     expect(request).toBeDefined();
-    // 0.5 → 0.4 at 1/8 per hour is 48 minutes.
-    expect(request?.at).toBe(T0 + 48 * MINUTE);
-    expect(after.care.pendingRequest).toEqual({ need: 'fullness', since: T0 + 48 * MINUTE });
+    // 0.5 → 0.4 at 1/20 per hour is 2 hours.
+    expect(request?.at).toBe(T0 + 2 * HOUR);
+    expect(after.care.pendingRequest).toEqual({ need: 'fullness', since: T0 + 2 * HOUR });
   });
 
   it('feeding clears the request and raises bond more when answering one', () => {
-    const hungry = advanceCare(makeState(), T0 + HOUR).state;
-    const fed = applyCareAction(hungry, { kind: 'feed', foodClassId: 'f', nutrition: 0.4 }, T0 + HOUR);
+    const hungry = advanceCare(makeState(), T0 + 3 * HOUR).state;
+    expect(hungry.care.pendingRequest).not.toBeNull();
+    const fed = applyCareAction(hungry, { kind: 'feed', food: { foodClassId: 'f', nutrition: 0.4 } }, T0 + 3 * HOUR);
     expect(fed.outcome).toEqual({ kind: 'eaten' });
     expect(fed.state.care.pendingRequest).toBeNull();
     expect(fed.state.mon.bond).toBeCloseTo(
@@ -101,11 +102,11 @@ describe('care actions', () => {
 
   it('overfeeding makes the Mon sluggish, never sick, and sluggishness ends on its own', () => {
     let s = makeState();
-    s = applyCareAction(s, { kind: 'feed', foodClassId: 'f', nutrition: 0.5 }, T0).state;
-    const over = applyCareAction(s, { kind: 'feed', foodClassId: 'f', nutrition: 0.5 }, T0 + MINUTE);
+    s = applyCareAction(s, { kind: 'feed', food: { foodClassId: 'f', nutrition: 0.5 } }, T0).state;
+    const over = applyCareAction(s, { kind: 'feed', food: { foodClassId: 'f', nutrition: 0.5 } }, T0 + MINUTE);
     expect(over.outcome.kind).toBe('overfed');
     expect(over.state.care.sluggishUntil).toBe(T0 + MINUTE + DEFAULT_CARE_TUNING.sluggishDurationMs);
-    const declined = applyCareAction(over.state, { kind: 'feed', foodClassId: 'f', nutrition: 0.1 }, T0 + 2 * MINUTE);
+    const declined = applyCareAction(over.state, { kind: 'feed', food: { foodClassId: 'f', nutrition: 0.1 } }, T0 + 2 * MINUTE);
     expect(declined.outcome).toEqual({ kind: 'declined', reason: 'sluggish' });
     const later = advanceCare(over.state, T0 + 2 * HOUR);
     expect(later.events.some((e) => e.type === 'sluggish-ended')).toBe(true);
