@@ -27,7 +27,7 @@ The user/player is the **Caller**. “Callah” is character voice/pronunciation
 
 ## Web experience
 
-Web opens directly into **Mon Space**, not the NYC world.
+The authenticated web companion opens directly into **Mon Space** at `/mon-space`, not the NYC world. This is separate from the public marketing site at `/` (W01 in `docs/phase-1-brief.md`), which keeps its hero, lore, and app-download/waitlist navigation.
 
 Primary web loop:
 **Hatch → Feed → Talk → Play → Care → Schedule → Bond → Train lightly → Observe evolution clues → Return later.**
@@ -80,11 +80,11 @@ Care, wins, close losses, training and meaningful battle events may progress dif
 
 ## Match eligibility
 
-Visible level is not sufficient to decide fairness. Matchmaking computes a server-owned **Battle Rating** from level, evolution stage, base stats, moves, type/Affinity matchup, condition and ruleset modifiers.
+Visible level is not sufficient to decide fairness. Matchmaking computes a server-owned **Battle Rating** from level, evolution stage, base stats, moves, eight-Affinity matchup (legacy ten-type fields excluded until an explicit canon migration map exists), condition and ruleset modifiers.
 
 Canon examples:
 - Lv 6 vs Lv 12: normally outside sanctioned eligibility.
-- Lv 6 vs Lv 8: may be eligible, including when the Lv 6 Mon has a favorable type/move matchup.
+- Lv 6 vs Lv 8: may be eligible, including when the Lv 6 Mon has a favorable Affinity/move matchup.
 
 Story/boss rules may explicitly override sanctioned matchmaking.
 
