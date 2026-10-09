@@ -49,3 +49,7 @@ test('cta is the orange solid face whatever the tone or district', () => {
   assert.deepEqual(controlLook('cta'), { look: 'solid', tone: 'orange' });
   assert.deepEqual(controlLook('cta', 'royal', 'downtown'), { look: 'solid', tone: 'orange' });
 });
+
+test('hlynk-care is a solid face (the black face is drawn by Button)', () => {
+  assert.deepEqual(controlLook('hlynk-care').look, 'solid');
+});

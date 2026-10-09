@@ -26,6 +26,9 @@ const egg = (eggId = 'egg-1', createdAt = T0) =>
     createdAt,
   });
 
+/** A hatched Mon after M09: boot sends a named Mon to the companion. */
+const namedMon = (e: ReturnType<typeof egg>, nickname = 'Pip') => ({ ...mintMonInstance(e), nickname });
+
 const loaded = (save: SaveCurrent): BootSave => ({ status: 'loaded', save });
 const withCaller = (overrides: Partial<SaveCurrent> = {}, consent: ConsentStatus = 'not-required'): SaveCurrent => ({
   ...createEmptySave('device-a', T0),
@@ -91,7 +94,7 @@ describe('resolveBootRoute (M01)', () => {
 
   it('a Mon in the save -> companion', () => {
     const e = egg();
-    const mon = mintMonInstance(e);
+    const mon = namedMon(e);
     const save = withCaller({ eggs: [e], hatches: [createHatchState(e)], mons: [mon] });
     expect(resolveBootRoute(snapshot({ save: loaded(save), nowMs: e.incubationEndsAt + 1 }))).toEqual({
       kind: 'companion',
@@ -101,7 +104,7 @@ describe('resolveBootRoute (M01)', () => {
 
   it('a hatched hatch state whose Mon is not in mons yet -> companion with that individual', () => {
     const e = egg();
-    const mon = mintMonInstance(e);
+    const mon = namedMon(e);
     const save = withCaller({
       eggs: [e],
       hatches: [{ kind: 'hatched', eggId: e.eggId, mon, serverConfirmed: false }],
@@ -112,10 +115,29 @@ describe('resolveBootRoute (M01)', () => {
     });
   });
 
+  it('a hatched Mon with no nickname resumes at naming (M09), never the companion', () => {
+    const e = egg();
+    const unnamed = mintMonInstance(e);
+    expect(unnamed.nickname).toBeNull();
+    const inMons = withCaller({ eggs: [e], hatches: [createHatchState(e)], mons: [unnamed] });
+    expect(resolveBootRoute(snapshot({ save: loaded(inMons), nowMs: e.incubationEndsAt + 1 }))).toEqual({
+      kind: 'resume-onboarding',
+      step: 'mon-name',
+    });
+    const onlyHatch = withCaller({
+      eggs: [e],
+      hatches: [{ kind: 'hatched', eggId: e.eggId, mon: unnamed, serverConfirmed: false }],
+    });
+    expect(resolveBootRoute(snapshot({ save: loaded(onlyHatch), nowMs: e.incubationEndsAt + 1 }))).toEqual({
+      kind: 'resume-onboarding',
+      step: 'mon-name',
+    });
+  });
+
   it('a Mon wins over another egg still incubating', () => {
     const first = egg('egg-1');
     const second = egg('egg-2', T0 + 60 * MINUTE);
-    const save = withCaller({ eggs: [first, second], mons: [mintMonInstance(first)] });
+    const save = withCaller({ eggs: [first, second], mons: [namedMon(first)] });
     expect(resolveBootRoute(snapshot({ save: loaded(save), nowMs: T0 + 61 * MINUTE })).kind).toBe('companion');
   });
 
@@ -139,7 +161,7 @@ describe('resolveBootRoute (M01)', () => {
 
   it('consent denied wins over every save content', () => {
     const e = egg();
-    const save = withCaller({ eggs: [e], mons: [mintMonInstance(e)] }, 'denied');
+    const save = withCaller({ eggs: [e], mons: [namedMon(e)] }, 'denied');
     expect(resolveBootRoute(snapshot({ save: loaded(save), hasSession: true }))).toEqual({ kind: 'consent-denied' });
   });
 
@@ -170,7 +192,7 @@ describe('resolveBootRoute (M01)', () => {
 
   it('after restore, a restored save routes like any returning save', () => {
     const e = egg();
-    const mon = mintMonInstance(e);
+    const mon = namedMon(e);
     const restored = withCaller({ eggs: [e], mons: [mon] });
     expect(resolveBootRoute(snapshot({ hasSession: true, save: loaded(restored) }))).toEqual({
       kind: 'companion',
@@ -274,7 +296,7 @@ function randomSnapshot(random: () => number): BootSnapshot {
     loaded(createEmptySave('d', T0)),
     loaded(withCaller({}, consent)),
     loaded(withCaller({ eggs: [e], hatches: [createHatchState(e)] }, consent)),
-    loaded(withCaller({ eggs: [e], mons: [mintMonInstance(e)] }, consent)),
+    loaded(withCaller({ eggs: [e], mons: [namedMon(e)] }, consent)),
   ];
   return {
     save: pick(saves),

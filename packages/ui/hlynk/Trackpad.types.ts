@@ -32,6 +32,15 @@ export type TrackpadProps = {
   onActivate?: () => void;
   /** Flick left (-1) or right (1); also VoiceOver decrement/increment and the arrow keys. */
   onStep?: (direction: -1 | 1) => void;
+  /**
+   * Press-and-hold that lasts as long as the press (M11 warm, M12 "Stay
+   * close", M08's hold ring). Fires once a still press passes
+   * `TRACKPAD_GESTURE.holdStartMs` (150 ms), so a tap never starts a hold.
+   * With `onCommit` set too, the commit at 600 ms ends the hold.
+   */
+  onHoldStart?: () => void;
+  /** The hold ended: release, drag away, cancel, commit or unmount. Always paired with one `onHoldStart`. */
+  onHoldEnd?: () => void;
   /** Drag, in points since the last call (M13 room pan only). While set, horizontal drags pan instead of stepping. */
   onPan?: (dxPt: number, dyPt: number) => void;
   /**

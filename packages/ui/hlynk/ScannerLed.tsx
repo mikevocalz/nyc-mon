@@ -1,8 +1,10 @@
 'use client';
 // RN globals (__DEV__) must exist before Reanimated evaluates on web.
 import '../rn-globals-shim';
-import { css as reanimatedCss, type CSSAnimationKeyframes } from 'react-native-reanimated';
-import { motionTokens } from '@acme/theme';
+import Animated, { css as reanimatedCss, useAnimatedStyle, type CSSAnimationKeyframes } from 'react-native-reanimated';
+import { led, motionTokens } from '@acme/theme';
+import { breathIntensity } from './breath-clock';
+import { useLedBreathPhase } from './use-led-breath-phase';
 import { AnimatedView } from '../progress/motion';
 import { View } from '../tw';
 import { hiddenA11y } from './a11y';
@@ -82,6 +84,21 @@ const FAN_SWEEP = reanimatedCss.keyframes({
   '45%': { opacity: 1, transform: [{ scaleY: 1 }] },
   '100%': { opacity: 0, transform: [{ scaleY: 1 }] },
 }) as unknown as CSSAnimationKeyframes;
+
+/**
+ * The breathing emitter reads the shared breath clock
+ * ({@linkcode useLedBreathPhase}) instead of running its own CSS loop, so the
+ * case pad and the warm haptic land on the LED's beat (M11 "Shared breath clock").
+ */
+function BreathingEmitter() {
+  const phase = useLedBreathPhase(true);
+  const style = useAnimatedStyle(() => ({ opacity: breathIntensity(phase.get()) }));
+  return (
+    <Animated.View
+      style={[{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: led.on }, style]}
+    />
+  );
+}
 
 /** The static shape standing in for a rhythm under reduced motion. Drawn in emitter red on black. */
 function Cue({ cue, progress, sizePt }: { cue: SteadyCue; progress: number; sizePt: number }) {
@@ -171,11 +188,15 @@ export function ScannerLed(props: ScannerLedProps) {
       >
         {cue ? <Cue cue={cue} progress={progress} sizePt={head.cuePt} /> : null}
         <View className="overflow-hidden rounded-full bg-led-off" style={{ width: head.lensW, height: head.lensH }}>
-          <AnimatedView
-            key={`${props.state}-${reducedMotion ? 'r' : 'f'}`}
-            className="absolute inset-0 bg-led-on"
-            style={lensStyle}
-          />
+          {rhythm.kind === 'breathe' ? (
+            <BreathingEmitter />
+          ) : (
+            <AnimatedView
+              key={`${props.state}-${reducedMotion ? 'r' : 'f'}`}
+              className="absolute inset-0 bg-led-on"
+              style={lensStyle}
+            />
+          )}
         </View>
       </View>
     </View>

@@ -19,7 +19,7 @@ import { writeFileSync } from 'node:fs';
 import {
   palette, semantic, fontFamilies, typeScale, typeRamp, contentWidths,
   radius, shadows, zIndex, motion, motionTokens, breakpoints, led, hlynk,
-  leading, minHeights, pageMotion,
+  leading, minHeights, pageMotion, xrTypeRamp, xrTargets,
 } from './tokens.ts';
 
 const HEADER = '/* GENERATED from tokens.ts — do not edit by hand. `node build-css.mjs` */';
@@ -58,8 +58,9 @@ const sharedThemeTokens = () => {
     }
   }
 
-  // mobile type ramp → text-type-* utilities (size + line height + weight)
-  for (const [name, t] of Object.entries(typeRamp)) {
+  // mobile type ramp → text-type-* utilities, headset ramp → text-xr-*
+  // (size + line height + weight; px so the native rem polyfill can't shrink them)
+  for (const [name, t] of Object.entries({ ...typeRamp, ...xrTypeRamp })) {
     out.push(`  --text-${name}: ${t.sizePt}px;`);
     out.push(`  --text-${name}--line-height: ${t.lineHeightPt}px;`);
     out.push(`  --text-${name}--font-weight: ${t.weight};`);
@@ -67,6 +68,10 @@ const sharedThemeTokens = () => {
   }
   for (const [name, value] of Object.entries(leading)) {
     out.push(`  --leading-${name}: ${value};`);
+  }
+  // Horizon pointer targets → size-target, min-h-target, gap-target-gap
+  for (const [name, px] of Object.entries(xrTargets)) {
+    out.push(`  --spacing-${name}: ${px}px;`);
   }
 
   // content widths → max-w-content-* utilities

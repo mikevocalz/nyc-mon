@@ -46,7 +46,7 @@ describe('offline write queue', () => {
 describe('server tie-break merge', () => {
   it('replaying the same batch (reconnect resend) applies nothing twice', () => {
     const writes = queueOf('device-a', [
-      { at: T0 + MINUTE, action: { kind: 'feed', foodClassId: 'f', nutrition: 0.2 } },
+      { at: T0 + MINUTE, action: { kind: 'feed', food: { foodClassId: 'f', nutrition: 0.2 } } },
       { at: T0 + 2 * MINUTE, action: { kind: 'play', quality: 1 } },
     ]).entries;
     const once = applyCareWrites(record(), writes);
@@ -95,7 +95,7 @@ describe('server tie-break merge', () => {
 
   it('client reconcile converges on the server state once every write is acked', () => {
     const q = queueOf('device-a', [
-      { at: T0 + MINUTE, action: { kind: 'feed', foodClassId: 'f', nutrition: 0.3 } },
+      { at: T0 + MINUTE, action: { kind: 'feed', food: { foodClassId: 'f', nutrition: 0.3 } } },
       { at: T0 + HOUR, action: { kind: 'play', quality: 0.5 } },
       { at: T0 + 2 * HOUR, action: { kind: 'rest' } },
     ]);

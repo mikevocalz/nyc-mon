@@ -116,3 +116,14 @@ export function measureShell(viewport: ShellViewport, force?: ShellLayout): Shel
 
 /** Height the standard control row needs: the trackpad plus its padding. */
 export const STANDARD_ROW_NEED_PT = HLYNK_GEOMETRY.trackpadPt + HLYNK_GEOMETRY.rowPadPt * 2;
+
+/**
+ * The layout to force on {@linkcode measureShell}. A screen's own `layout`
+ * wins; otherwise the shell goes compact while the software keyboard is up,
+ * so a text field on the screen stays visible on short phones (DECISIONS
+ * D-16g, M09 naming). `undefined` lets the shell measure. Pure.
+ */
+export function resolveForcedLayout(forced: ShellLayout | undefined, keyboardVisible: boolean): ShellLayout | undefined {
+  if (forced) return forced;
+  return keyboardVisible ? 'compact' : undefined;
+}

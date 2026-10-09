@@ -51,7 +51,10 @@ export interface HLynkShellProps {
   status?: HLynkStatus;
   /** From the sim-core adapter; drives every authored reduced sibling in the chrome. */
   reducedMotion: boolean;
-  /** Force a layout. Omitted: measured, compact when the control row would get under 120 pt. */
+  /**
+   * Force a layout. Omitted: measured, compact when the control row would get
+   * under 120 pt, and compact while the software keyboard is up (D-16g).
+   */
   layout?: ShellLayout;
   /** Contents of the screen. */
   screen: ReactNode;

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { CareActionSchema, CareStateSchema } from './care.ts';
 import { IncubationMinutesSchema } from './egg.ts';
-import { MonInstanceSchema } from './mon.ts';
+import { MonInstanceSchema, MonNameSchema } from './mon.ts';
 import { EpochMsSchema, IdSchema } from './primitives.ts';
 
 /** §1.4 server contract, version 1. Every payload is zod-parsed on both sides. */
@@ -15,7 +15,8 @@ export const CreateEggRequestSchema = z.object({
   speciesId: IdSchema,
   /** The Baby form it hatches into. The server checks this pair against content. */
   hatchesIntoSpeciesId: IdSchema,
-  nickname: z.string().min(1).max(64).nullable(),
+  /** Null from M10 (naming happens after the hatch, D-16f). */
+  nickname: MonNameSchema.nullable(),
   incubationMinutes: IncubationMinutesSchema,
 });
 export const CreateEggResponseSchema = z.object({

@@ -225,8 +225,25 @@
   --text-type-tag--line-height: 18px;
   --text-type-tag--font-weight: 600;
   --text-type-tag--letter-spacing: 0.18em;
+  --text-xr-caption: 14px;
+  --text-xr-caption--line-height: 20px;
+  --text-xr-caption--font-weight: 400;
+  --text-xr-label: 16px;
+  --text-xr-label--line-height: 22px;
+  --text-xr-label--font-weight: 500;
+  --text-xr-body: 18px;
+  --text-xr-body--line-height: 28px;
+  --text-xr-body--font-weight: 400;
+  --text-xr-title: 26px;
+  --text-xr-title--line-height: 32px;
+  --text-xr-title--font-weight: 700;
+  --text-xr-heading: 36px;
+  --text-xr-heading--line-height: 40px;
+  --text-xr-heading--font-weight: 400;
   --leading-display: 0.95;
   --leading-heading: 1.02;
+  --spacing-target: 48px;
+  --spacing-target-gap: 12px;
   --container-content-form: 28rem;
   --container-content-feed: 38rem;
   --container-content-prose: 65ch;
@@ -326,6 +343,7 @@
       --color-tone-brick-text: #602F00;
       --color-glow: #0058F800;
       --color-glow-hot: #FC7C0000;
+      --color-scrim-scene: #FFFFFFD9;
     }
     @variant dark {
       --color-bg: #00041C;
@@ -363,6 +381,7 @@
       --color-tone-brick-text: #FEBE80;
       --color-glow: #0058F8A6;
       --color-glow-hot: #FC7C0080;
+      --color-scrim-scene: #0A1230D9;
     }
   }
 }

@@ -1,5 +1,5 @@
 import { DrawerContentScrollView, type DrawerContentComponentProps } from 'expo-router/drawer';
-import { Calendar, Home, Compass, Bell, User, Settings } from '@acme/ui/icons';
+import { Home, Bell, User, Settings } from '@acme/ui/icons';
 // expo-router's router, NOT solito's, and only because this file is
 // mobile-only. solito's native useRouter goes through react-navigation's
 // useLinkTo, which resolves a path against a linking config that expo-router
@@ -12,18 +12,21 @@ import { Avatar } from '@acme/ui';
 import { AVATAR_URI, useProfile } from '@acme/app';
 
 
+/**
+ * Home is the `(home)` group (M11/M13), which sits beside this drawer rather
+ * than inside it: the H-Lynk shell draws its own chrome, so leaving for Home
+ * exits the drawer shell. The starter's Explore, Schedule and Spatial demos
+ * were struck from the app (Phase 1); their screens stay on web only.
+ */
 const MAIN_ITEMS = [
-  { label: 'Home', icon: Home, href: '/home' },
-  { label: 'Explore', icon: Compass, href: '/explore' },
-  { label: 'Schedule', icon: Calendar, href: '/split' },
-  { label: 'Spatial', icon: Compass, href: '/spatial' },
+  { label: 'Home', icon: Home, href: '/(home)' },
   { label: 'Notifications', icon: Bell, href: '/notifications' },
   { label: 'Profile', icon: User, href: '/profile' },
   { label: 'Settings', icon: Settings, href: '/settings' },
 ] as const;
 
 export function DrawerContent(props: DrawerContentComponentProps) {
-  const pathname = usePathname() ?? '/home';
+  const pathname = usePathname() ?? '/';
   // The signed-in user lives in the profile store; the drawer used to hardcode
   // a second copy of the name, so the two drifted apart.
   const profileName = useProfile((state) => state.name);
@@ -36,7 +39,7 @@ export function DrawerContent(props: DrawerContentComponentProps) {
   };
 
   const isActive = (href: string) =>
-    href === '/home' ? pathname === '/' || pathname === '' : pathname.startsWith(href);
+    href === '/(home)' ? pathname === '/' || pathname === '' : pathname.startsWith(href);
 
   return (
     <DrawerContentScrollView {...props} showsVerticalScrollIndicator={false}>

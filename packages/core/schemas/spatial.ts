@@ -26,8 +26,23 @@ export const HLynkSurfaceSchema = z.enum(H_LYNK_SURFACES);
 export const MON_MOODS = ['content', 'asleep', 'sluggish', 'needs-fullness', 'needs-energy', 'needs-social'] as const;
 export const MonMoodSchema = z.enum(MON_MOODS);
 
-/** What the rig should play next (`deriveAnimationIntent`). Model slots carry one clip name per intent. */
-export const ANIMATION_INTENTS = ['idle', 'approach', 'eat', 'sleep', 'play', 'evolve'] as const;
+/**
+ * What the rig should play next (`deriveAnimationIntent`). Model slots carry
+ * one clip name per intent. `hatch` is the M12 emerge, `attention` the head
+ * turn when the Caller taps the Mon (M13) and the first look (M12), `refuse`
+ * a declined care action (M14, M15). `evolve` stays for evolution only.
+ */
+export const ANIMATION_INTENTS = [
+  'idle',
+  'approach',
+  'eat',
+  'sleep',
+  'play',
+  'evolve',
+  'hatch',
+  'attention',
+  'refuse',
+] as const;
 export const AnimationIntentSchema = z.enum(ANIMATION_INTENTS);
 
 /** A point in metres. Every pose in the contract is in OpenXR LOCAL_FLOOR space: +Y up, floor at y = 0. */
@@ -155,6 +170,9 @@ export const ModelClipMapSchema = z.object({
   sleep: z.string().min(1).nullable(),
   play: z.string().min(1).nullable(),
   evolve: z.string().min(1).nullable(),
+  hatch: z.string().min(1).nullable(),
+  attention: z.string().min(1).nullable(),
+  refuse: z.string().min(1).nullable(),
 });
 
 /**

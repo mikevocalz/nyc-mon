@@ -6,6 +6,7 @@
     "dev": "node scripts/assert-viro-fork.mjs && expo start",
     "android": "node scripts/assert-viro-fork.mjs && expo run:android",
     "android:quest": "node scripts/assert-viro-fork.mjs && expo run:android --variant questDebug",
+    "quest": "node scripts/assert-viro-fork.mjs && expo prebuild --platform android --clean --no-install && node ../../tooling/verify-spatial-android.mjs && cd android && ./gradlew :app:assembleQuestDebug --no-daemon && node ../../../tooling/verify-spatial-android.mjs --quest-manifest",
     "android:pico": "node scripts/assert-viro-fork.mjs && expo run:android --variant picoDebug",
     "ios": "node scripts/assert-viro-fork.mjs && expo run:ios",
     "web": "expo start --web",

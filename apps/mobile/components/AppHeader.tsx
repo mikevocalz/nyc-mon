@@ -24,11 +24,10 @@ import { Bell } from '@acme/ui/icons';
  * "Home" no matter which tab was showing.
  */
 /** Routes rendered inside the tab navigator, and so behind the rail. */
-const TAB_PATHS = new Set(['/', '/explore', '/notifications', '/profile']);
+const TAB_PATHS = new Set(['/notifications', '/profile']);
 
-/** Page names shown after the wordmark. Home shows the wordmark alone. */
+/** Page names shown after the wordmark. */
 const TITLES: Record<string, string> = {
-  '/explore': 'Explore',
   '/notifications': 'Notifications',
   '/profile': 'Profile',
   '/settings': 'Settings',

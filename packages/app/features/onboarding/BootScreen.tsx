@@ -15,6 +15,7 @@ import {
 } from '@acme/ui';
 import { View } from '@acme/ui/tw';
 import { resolveBootPath } from './boot';
+import { deepLinkStore } from './notify-route';
 import { readSave } from './save-store';
 import { copy } from './copy';
 import { schemeForTime } from './time-scheme';
@@ -77,7 +78,14 @@ export function BootScreen() {
     const onTimer = setTimeout(() => setPower('on'), rampMs);
     // First run: the shell lowers away after the screen lights (SHELL_HANDOFF_MS).
     const exitMs = (reducedMotion ? 0 : HANDOFF_MS - POWER_ON_MS) + POWER_ON_MS + (firstRun ? SHELL_HANDOFF_MS[reducedMotion ? 'reduced' : 'full'] : 0);
-    const exitTimer = setTimeout(() => router.replace(path), exitMs);
+    const exitTimer = setTimeout(() => {
+      router.replace(path);
+      // A hatch-ready tap that arrived during boot is armed for the route it
+      // belongs on (M12 B3) and dropped for any other. The `(home)` layout
+      // pushes it from its mount, once this replace has committed, so the
+      // push never races the replace in the same tick.
+      deepLinkStore.resolveBoot(route.kind);
+    }, exitMs);
     return () => {
       clearTimeout(bootTimer);
       clearTimeout(onTimer);
