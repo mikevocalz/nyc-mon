@@ -322,6 +322,22 @@ describe('care, journal and days together', () => {
   });
 });
 
+describe('care replay with device clock rollback', () => {
+  it('persists effective timestamps in order while retaining journal order', () => {
+    const { save } = hatchedSave();
+    const { store, io } = setup(save);
+    const at = save.care[0]!.updatedAt + 4 * HOUR;
+    store.getState().applyCare({ kind: 'rest' }, at);
+    store.getState().applyCare({ kind: 'wake' }, at - 2 * HOUR);
+    const persisted = io.read();
+    assert.ok(persisted);
+    assert.deepEqual(persisted.queue.entries.map((w) => w.at), [at, at]);
+    assert.equal(persisted.savedAt, at);
+    assert.deepEqual(persisted.queue.entries.map((w) => w.action.kind), ['rest', 'wake']);
+    assert.equal(persisted.journal.at(-1)?.at, at);
+  });
+});
+
 describe('parseReadyNotificationData (Law 5)', () => {
   it('accepts the scheduled payload and reports anything else', () => {
     assert.deepEqual(parseReadyNotificationData({ eggId: 'egg-1', url: '/(home)/hatch' }), {
