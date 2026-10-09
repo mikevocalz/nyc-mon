@@ -80,10 +80,14 @@ export function createMonStore(io: SaveIO) {
         throw new Error('applyCare needs an active Mon with care state; hydrate the store first');
       }
       const result = applyCareAction({ mon, care }, action, atMs);
-      const { queue } = enqueueCareWrite(save.queue, { monInstanceId: mon.monInstanceId, at: atMs, action });
+      // The sim clamps backward device clocks to the last care timestamp.
+      // Persist that effective timestamp too, or the server can replay later
+      // same-device actions out of order during reconciliation.
+      const effectiveAt = result.state.care.updatedAt;
+      const { queue } = enqueueCareWrite(save.queue, { monInstanceId: mon.monInstanceId, at: effectiveAt, action });
       const next: SaveCurrent = {
         ...save,
-        savedAt: atMs,
+        savedAt: effectiveAt,
         mons: save.mons.map((m) => (m.monInstanceId === mon.monInstanceId ? result.state.mon : m)),
         care: save.care.map((c) => (c.monInstanceId === mon.monInstanceId ? result.state.care : c)),
         queue,
