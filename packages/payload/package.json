@@ -46,6 +46,14 @@
       "types": "./src/auth/options.ts",
       "default": "./src/auth/options.ts"
     },
+    "./auth/oauth": {
+      "types": "./src/auth/oauth/routes.ts",
+      "default": "./src/auth/oauth/routes.ts"
+    },
+    "./auth/oauth/ui": {
+      "types": "./src/auth/oauth/LinkPages.tsx",
+      "default": "./src/auth/oauth/LinkPages.tsx"
+    },
     "./auth/templates": {
       "types": "./src/auth/templates.ts",
       "default": "./src/auth/templates.ts"
@@ -65,6 +73,7 @@
     "@acme/core": "workspace:*",
     "@acme/ui": "workspace:*",
     "@aws-sdk/client-sns": "catalog:",
+    "@better-auth/oauth-provider": "catalog:",
     "@better-auth/passkey": "catalog:",
     "@delmaredigital/payload-better-auth": "catalog:",
     "@payloadcms/db-postgres": "catalog:",

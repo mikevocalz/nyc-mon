@@ -1,78 +1,54 @@
-import type { ActingVoice } from '../mcp/errors.ts';
-import type { FamiliarPerson } from '../presence/types.ts';
-import { presenceService } from '../presence/service.ts';
-import type { CallerData } from '../data/caller.ts';
+import type { FamiliarDirectory } from '../presence/fixtures.ts';
+import type { PresenceService } from '../presence/service.ts';
+import type { FamiliarPerson, Permission } from '../presence/types.ts';
 
 /**
- * Acting-voice resolution (build prompt §Permissions; ADR 0006 §5, ADR 0007 §5).
+ * Who is speaking on a turn (ADR 0006 §5, ADR 0007 §5, ADR 0008).
  *
- * Every mutating tool resolves who is speaking before it touches data:
- *   'trainer'  — the Caller (account-linked voice session, or enrolled match).
- *                Wire enum keeps the prompt's spelling; it means the Caller
- *                (ADR 0008).
- *   'familiar' — an enrolled FamiliarPerson, carrying per-person permissions.
- *   'unknown'  — no Voice ID hint, no fresh PresenceEvent. Still authenticated
- *                to the Caller's household, still refused Caller-only actions.
- *
- * Identity is never inferred from background audio: a familiar is only "the
- * speaker" when Alexa Voice ID supplies their linked personId, or when the
- * client passes a speakerHint corroborated by a fresh presence event.
+ * - `caller`: the linked account holder. Every turn on a real Alexa device
+ *   resolves here, because Alexa+ forwards no speaker identity to MCP servers
+ *   (PLATFORM-DOCS §2.14).
+ * - `familiar`: a seeded fictional person, only in dev and simulator mode,
+ *   and only when the client names them in `speakerHint` and a fresh presence
+ *   event corroborates it.
+ * - `unverified`: the client named someone other than the Caller, but no fresh
+ *   presence event or fixture backs it. Talking is allowed; care is not, so a
+ *   hint can only ever narrow what a turn may do.
  */
+export type ActingVoice =
+  | { readonly kind: 'caller' }
+  | { readonly kind: 'unverified'; readonly personId: string }
+  | { readonly kind: 'familiar'; readonly person: FamiliarPerson; readonly confidence: number };
+
+/** Simulator-only input: which familiar person the client believes is speaking. */
 export interface SpeakerHint {
-  readonly alexaVoiceId?: string;
-  readonly personId?: string;
+  readonly personId: string;
 }
 
-export interface ResolvedActor {
-  readonly voice: ActingVoice;
-  readonly person: FamiliarPerson | null;
+export interface ActorSources {
+  readonly familiar: FamiliarDirectory | undefined;
+  readonly presence: PresenceService;
 }
 
-export async function resolveActingVoice(
-  data: CallerData,
+export function resolveActingVoice(
+  sources: ActorSources,
   callerId: string,
   hint: SpeakerHint | undefined,
-  now: number = Date.now(),
-): Promise<ResolvedActor> {
-  // Path 1: Alexa Voice ID for the *direct speaker* (ADR 0007 §2). Maps only
-  // to a FamiliarPerson who self-enrolled and linked that Voice ID.
-  if (hint?.alexaVoiceId) {
-    const people = await data.listFamiliarPeople(callerId);
-    const match = people.find((p) => p.alexaVoiceIdHint === hint.alexaVoiceId) ?? null;
-    if (match) {
-      return { voice: { kind: 'familiar', callerId, personId: match.personId, confidence: 1 }, person: match };
-    }
-    // A Voice ID that maps to the Caller themselves resolves as trainer —
-    // TODO(voice-id): Caller-side Voice ID linkage isn't modeled yet.
-  }
-
-  // Path 2: client speakerHint corroborated by a fresh presence event.
-  if (hint?.personId) {
-    const event = presenceService.latestFor(callerId, hint.personId, now);
-    if (event) {
-      const person = await data.getFamiliarPerson(callerId, hint.personId);
-      if (person) {
-        return {
-          voice: { kind: 'familiar', callerId, personId: person.personId, confidence: event.confidence },
-          person,
-        };
-      }
-    }
-  }
-
-  // Path 3: no corroborated speaker. Voice sessions default to the Caller —
-  // the household owner is the overwhelmingly likely speaker — but the
-  // simulator can force 'unknown' for the refusal demo. TODO(demo-knob):
-  // make the default explicit per-session rather than a constant.
-  return { voice: { kind: 'trainer', callerId }, person: null };
+  now: number,
+): ActingVoice {
+  if (hint === undefined) return { kind: 'caller' };
+  const unverified = { kind: 'unverified', personId: hint.personId } as const;
+  if (sources.familiar === undefined) return unverified;
+  const event = sources.presence.latestFor(callerId, hint.personId, now);
+  if (event === null) return unverified;
+  const person = sources.familiar.getPerson(callerId, hint.personId);
+  if (person === undefined) return unverified;
+  return { kind: 'familiar', person, confidence: event.confidence };
 }
 
-/** Caller-only check for mutating tools. Familiar grants are per-action. */
-export function permitted(
-  actor: ResolvedActor,
-  action: 'talk' | 'play' | 'feed' | 'care',
-): boolean {
-  if (actor.voice.kind === 'trainer') return true;
-  if (actor.voice.kind === 'familiar' && actor.person) return actor.person.permissions[action];
-  return false;
+/** The Caller may do anything; a familiar person what their grants allow; an unverified voice may only talk. */
+export function permitted(actor: ActingVoice, action: keyof Permission): boolean {
+  if (actor.kind === 'caller') return true;
+  if (actor.kind === 'unverified') return action === 'talk';
+  return actor.person.permissions[action];
 }

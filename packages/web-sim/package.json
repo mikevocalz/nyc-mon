@@ -1,0 +1,47 @@
+{
+  "name": "@acme/web-sim",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "NYC-MON smart-display simulator: an MCP Apps host and MCP client with Claude on Amazon Bedrock as the agent.",
+  "scripts": {
+    "dev": "NODE_ENV=development node --env-file-if-exists=../../.env --env-file-if-exists=../../.env.local server/main.ts",
+    "build": "vite build",
+    "start": "NODE_ENV=production node --env-file-if-exists=../../.env --env-file-if-exists=../../.env.local server/main.ts",
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@acme/theme": "workspace:*",
+    "@acme/ui": "workspace:*",
+    "@anthropic-ai/bedrock-sdk": "catalog:",
+    "@anthropic-ai/sdk": "catalog:",
+    "@modelcontextprotocol/client": "catalog:",
+    "@modelcontextprotocol/ext-apps": "catalog:",
+    "canvaskit-wasm": "catalog:",
+    "jose": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "react-native-skia": "catalog:",
+    "react-native-web": "catalog:",
+    "zod": "catalog:",
+    "zustand": "catalog:"
+  },
+  "devDependencies": {
+    "@acme/config": "workspace:*",
+    "@tailwindcss/postcss": "catalog:",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
+    "eslint": "catalog:",
+    "eslint-config-expo": "catalog:",
+    "expo": "catalog:",
+    "playwright": "1.63.0",
+    "tailwindcss": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  }
+}

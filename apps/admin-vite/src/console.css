@@ -16,6 +16,7 @@
 
 @source '../../../packages/ui';
 @source '../../../packages/payload/src/admin/console';
+@source '../../../packages/payload/src/auth/oauth';
 
 /* Brand fonts, from the shared assets package (same as apps/storybook). */
 @font-face {

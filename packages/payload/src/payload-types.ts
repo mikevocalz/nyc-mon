@@ -83,6 +83,14 @@ export interface Config {
     passkeys: Passkey;
     twoFactors: TwoFactor;
     deviceCodes: DeviceCode;
+    jwks: Jwk;
+    oauthClients: OauthClient;
+    oauthResources: OauthResource;
+    oauthClientResources: OauthClientResource;
+    oauthRefreshTokens: OauthRefreshToken;
+    oauthAccessTokens: OauthAccessToken;
+    oauthConsents: OauthConsent;
+    oauthClientAssertions: OauthClientAssertion;
     rateLimits: RateLimit;
     'payload-kv': PayloadKv;
     'payload-jobs': PayloadJob;
@@ -108,6 +116,14 @@ export interface Config {
     passkeys: PasskeysSelect<false> | PasskeysSelect<true>;
     twoFactors: TwoFactorsSelect<false> | TwoFactorsSelect<true>;
     deviceCodes: DeviceCodesSelect<false> | DeviceCodesSelect<true>;
+    jwks: JwksSelect<false> | JwksSelect<true>;
+    oauthClients: OauthClientsSelect<false> | OauthClientsSelect<true>;
+    oauthResources: OauthResourcesSelect<false> | OauthResourcesSelect<true>;
+    oauthClientResources: OauthClientResourcesSelect<false> | OauthClientResourcesSelect<true>;
+    oauthRefreshTokens: OauthRefreshTokensSelect<false> | OauthRefreshTokensSelect<true>;
+    oauthAccessTokens: OauthAccessTokensSelect<false> | OauthAccessTokensSelect<true>;
+    oauthConsents: OauthConsentsSelect<false> | OauthConsentsSelect<true>;
+    oauthClientAssertions: OauthClientAssertionsSelect<false> | OauthClientAssertionsSelect<true>;
     rateLimits: RateLimitsSelect<false> | RateLimitsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-jobs': PayloadJobsSelect<false> | PayloadJobsSelect<true>;
@@ -518,6 +534,367 @@ export interface DeviceCode {
   createdAt: string;
 }
 /**
+ * Auto-generated from Better Auth schema (jwks)
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "jwks".
+ */
+export interface Jwk {
+  id: number;
+  publicKey: string;
+  privateKey: string;
+  expiresAt?: string | null;
+  alg?: string | null;
+  crv?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Auto-generated from Better Auth schema (oauthClient)
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "oauthClients".
+ */
+export interface OauthClient {
+  id: number;
+  clientId: string;
+  clientSecret?: string | null;
+  clientDiscoveryId?: string | null;
+  disabled?: boolean | null;
+  skipConsent?: boolean | null;
+  enableEndSession?: boolean | null;
+  subjectType?: string | null;
+  scopes?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  clientCredentialsScopes?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  user?: (number | null) | User;
+  name?: string | null;
+  uri?: string | null;
+  icon?: string | null;
+  contacts?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  tos?: string | null;
+  policy?: string | null;
+  softwareId?: string | null;
+  softwareVersion?: string | null;
+  softwareStatement?: string | null;
+  redirectUris:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  postLogoutRedirectUris?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  backchannelLogoutUri?: string | null;
+  backchannelLogoutSessionRequired?: boolean | null;
+  tokenEndpointAuthMethod?: string | null;
+  applicationType?: string | null;
+  jwks?: string | null;
+  jwksUri?: string | null;
+  grantTypes?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  responseTypes?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  requirePKCE?: boolean | null;
+  dpopBoundAccessTokens?: boolean | null;
+  referenceId?: string | null;
+  metadata?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Auto-generated from Better Auth schema (oauthResource)
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "oauthResources".
+ */
+export interface OauthResource {
+  id: number;
+  identifier: string;
+  name: string;
+  accessTokenTtl?: number | null;
+  refreshTokenTtl?: number | null;
+  signingAlgorithm?: string | null;
+  signingKeyId?: string | null;
+  allowedScopes?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  customClaims?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  dpopBoundAccessTokensRequired?: boolean | null;
+  disabled?: boolean | null;
+  policyVersion?: number | null;
+  metadata?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Auto-generated from Better Auth schema (oauthClientResource)
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "oauthClientResources".
+ */
+export interface OauthClientResource {
+  id: number;
+  clientId: string;
+  resourceId: string;
+  metadata?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Auto-generated from Better Auth schema (oauthRefreshToken)
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "oauthRefreshTokens".
+ */
+export interface OauthRefreshToken {
+  id: number;
+  token: string;
+  clientId: string;
+  session?: (number | null) | Session;
+  user: number | User;
+  referenceId?: string | null;
+  authorizationCodeId?: string | null;
+  resources?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  requestedUserInfoClaims?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  expiresAt?: string | null;
+  revoked?: string | null;
+  rotatedAt?: string | null;
+  rotationReplayResponse?: string | null;
+  rotationReplayExpiresAt?: string | null;
+  authTime?: string | null;
+  confirmation?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  scopes:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Auto-generated from Better Auth schema (oauthAccessToken)
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "oauthAccessTokens".
+ */
+export interface OauthAccessToken {
+  id: number;
+  token?: string | null;
+  clientId: string;
+  session?: (number | null) | Session;
+  user?: (number | null) | User;
+  referenceId?: string | null;
+  authorizationCodeId?: string | null;
+  resources?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  requestedUserInfoClaims?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  refresh?: (number | null) | OauthRefreshToken;
+  expiresAt?: string | null;
+  revoked?: string | null;
+  confirmation?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  scopes:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Auto-generated from Better Auth schema (oauthConsent)
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "oauthConsents".
+ */
+export interface OauthConsent {
+  id: number;
+  clientId: string;
+  user?: (number | null) | User;
+  referenceId?: string | null;
+  resources?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  requestedUserInfoClaims?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  scopes:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Auto-generated from Better Auth schema (oauthClientAssertion)
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "oauthClientAssertions".
+ */
+export interface OauthClientAssertion {
+  id: number;
+  expiresAt: string;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
  * Auto-generated from Better Auth schema (rateLimit)
  *
  * This interface was referenced by `Config`'s JSON-Schema
@@ -728,6 +1105,38 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'deviceCodes';
         value: number | DeviceCode;
+      } | null)
+    | ({
+        relationTo: 'jwks';
+        value: number | Jwk;
+      } | null)
+    | ({
+        relationTo: 'oauthClients';
+        value: number | OauthClient;
+      } | null)
+    | ({
+        relationTo: 'oauthResources';
+        value: number | OauthResource;
+      } | null)
+    | ({
+        relationTo: 'oauthClientResources';
+        value: number | OauthClientResource;
+      } | null)
+    | ({
+        relationTo: 'oauthRefreshTokens';
+        value: number | OauthRefreshToken;
+      } | null)
+    | ({
+        relationTo: 'oauthAccessTokens';
+        value: number | OauthAccessToken;
+      } | null)
+    | ({
+        relationTo: 'oauthConsents';
+        value: number | OauthConsent;
+      } | null)
+    | ({
+        relationTo: 'oauthClientAssertions';
+        value: number | OauthClientAssertion;
       } | null)
     | ({
         relationTo: 'rateLimits';
@@ -1039,6 +1448,159 @@ export interface DeviceCodesSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "jwks_select".
+ */
+export interface JwksSelect<T extends boolean = true> {
+  publicKey?: T;
+  privateKey?: T;
+  expiresAt?: T;
+  alg?: T;
+  crv?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "oauthClients_select".
+ */
+export interface OauthClientsSelect<T extends boolean = true> {
+  clientId?: T;
+  clientSecret?: T;
+  clientDiscoveryId?: T;
+  disabled?: T;
+  skipConsent?: T;
+  enableEndSession?: T;
+  subjectType?: T;
+  scopes?: T;
+  clientCredentialsScopes?: T;
+  user?: T;
+  name?: T;
+  uri?: T;
+  icon?: T;
+  contacts?: T;
+  tos?: T;
+  policy?: T;
+  softwareId?: T;
+  softwareVersion?: T;
+  softwareStatement?: T;
+  redirectUris?: T;
+  postLogoutRedirectUris?: T;
+  backchannelLogoutUri?: T;
+  backchannelLogoutSessionRequired?: T;
+  tokenEndpointAuthMethod?: T;
+  applicationType?: T;
+  jwks?: T;
+  jwksUri?: T;
+  grantTypes?: T;
+  responseTypes?: T;
+  requirePKCE?: T;
+  dpopBoundAccessTokens?: T;
+  referenceId?: T;
+  metadata?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "oauthResources_select".
+ */
+export interface OauthResourcesSelect<T extends boolean = true> {
+  identifier?: T;
+  name?: T;
+  accessTokenTtl?: T;
+  refreshTokenTtl?: T;
+  signingAlgorithm?: T;
+  signingKeyId?: T;
+  allowedScopes?: T;
+  customClaims?: T;
+  dpopBoundAccessTokensRequired?: T;
+  disabled?: T;
+  policyVersion?: T;
+  metadata?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "oauthClientResources_select".
+ */
+export interface OauthClientResourcesSelect<T extends boolean = true> {
+  clientId?: T;
+  resourceId?: T;
+  metadata?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "oauthRefreshTokens_select".
+ */
+export interface OauthRefreshTokensSelect<T extends boolean = true> {
+  token?: T;
+  clientId?: T;
+  session?: T;
+  user?: T;
+  referenceId?: T;
+  authorizationCodeId?: T;
+  resources?: T;
+  requestedUserInfoClaims?: T;
+  expiresAt?: T;
+  revoked?: T;
+  rotatedAt?: T;
+  rotationReplayResponse?: T;
+  rotationReplayExpiresAt?: T;
+  authTime?: T;
+  confirmation?: T;
+  scopes?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "oauthAccessTokens_select".
+ */
+export interface OauthAccessTokensSelect<T extends boolean = true> {
+  token?: T;
+  clientId?: T;
+  session?: T;
+  user?: T;
+  referenceId?: T;
+  authorizationCodeId?: T;
+  resources?: T;
+  requestedUserInfoClaims?: T;
+  refresh?: T;
+  expiresAt?: T;
+  revoked?: T;
+  confirmation?: T;
+  scopes?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "oauthConsents_select".
+ */
+export interface OauthConsentsSelect<T extends boolean = true> {
+  clientId?: T;
+  user?: T;
+  referenceId?: T;
+  resources?: T;
+  requestedUserInfoClaims?: T;
+  scopes?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "oauthClientAssertions_select".
+ */
+export interface OauthClientAssertionsSelect<T extends boolean = true> {
+  expiresAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "rateLimits_select".
  */
 export interface RateLimitsSelect<T extends boolean = true> {
@@ -1182,6 +1744,14 @@ export interface CollectionQueryWidget {
       | 'passkeys'
       | 'twoFactors'
       | 'deviceCodes'
+      | 'jwks'
+      | 'oauthClients'
+      | 'oauthResources'
+      | 'oauthClientResources'
+      | 'oauthRefreshTokens'
+      | 'oauthAccessTokens'
+      | 'oauthConsents'
+      | 'oauthClientAssertions'
       | 'rateLimits';
     where?:
       | {
@@ -1214,6 +1784,14 @@ export interface ActivityWidget {
           | 'passkeys'
           | 'twoFactors'
           | 'deviceCodes'
+          | 'jwks'
+          | 'oauthClients'
+          | 'oauthResources'
+          | 'oauthClientResources'
+          | 'oauthRefreshTokens'
+          | 'oauthAccessTokens'
+          | 'oauthConsents'
+          | 'oauthClientAssertions'
           | 'rateLimits'
         )[]
       | null;

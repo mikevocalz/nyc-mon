@@ -19,6 +19,8 @@ import { readAuthEnv } from './env';
 import { isAllowedSmsNumber, parseSmsCountries, passesPhoneGate } from './phone';
 import { assertFreshSession } from './plugins/fresh';
 import { handoff, hashHandoffToken } from './plugins/handoff';
+import { readOAuthConfig } from './oauth/config';
+import { alexaOAuthPlugins } from './oauth/plugins';
 import { createSmsSender } from './sms';
 import { consumeSmsQuota, MAX_SMS_PER_NUMBER_PER_DAY, MAX_SMS_PER_USER_PER_DAY } from './sms-quota';
 import { isSurface, SURFACE_HEADER, type Surface, surfaceForClientId, surfaceLabel } from './surface';
@@ -41,6 +43,8 @@ const env = readAuthEnv();
 export const sendMail = createAuthMailer(env);
 const smsSender = createSmsSender(env);
 const smsCountries = parseSmsCountries(env.sms?.allowedCountries);
+/** Alexa+ account linking (ADR 0016). Throws on a malformed redirect URI. */
+export const oauthConfig = readOAuthConfig();
 
 /** Minutes a 2FA one-time code stays valid. */
 const TWO_FACTOR_OTP_MINUTES = 5;
@@ -206,6 +210,7 @@ const plugins = [
     verificationUri: `${env.baseURL}/device`,
   }),
   bearer(),
+  ...alexaOAuthPlugins(oauthConfig),
   oneTimeToken({
     expiresIn: 2,
     disableSetSessionCookie: true,
@@ -222,7 +227,22 @@ export const betterAuthOptions = {
   trustedOrigins: [baseOrigin.origin, ...env.trustedOrigins],
   // The stock verify would hand the second device the phone's own session;
   // `/handoff/redeem` creates a new one. Phone numbers are never a password.
-  disabledPaths: ['/one-time-token/verify', '/sign-in/phone-number', '/phone-number/request-password-reset', '/phone-number/reset-password'],
+  // The OAuth provider's client CRUD and OIDC paths are off: clients are
+  // static (ADR 0016), and the jwt plugin's session `/token` is unused.
+  disabledPaths: [
+    '/one-time-token/verify',
+    '/sign-in/phone-number',
+    '/phone-number/request-password-reset',
+    '/phone-number/reset-password',
+    '/token',
+    '/oauth2/register',
+    '/oauth2/create-client',
+    '/oauth2/update-client',
+    '/oauth2/delete-client',
+    '/oauth2/client/rotate-secret',
+    '/oauth2/userinfo',
+    '/oauth2/end-session',
+  ],
   advanced: {
     database: { generateId: 'serial' },
     backgroundTasks: { handler: runInBackground },

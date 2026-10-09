@@ -1,0 +1,8 @@
+{
+  "extends": "@acme/config/typescript/react-library.json",
+  "compilerOptions": {
+    "types": ["vite/client", "node"]
+  },
+  "include": ["src", "server", "test", "vite.config.ts", "vitest.config.ts", "css.d.ts"],
+  "exclude": ["node_modules", "dist"]
+}

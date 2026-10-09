@@ -1,149 +1,169 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-// eslint-disable-next-line import/no-unresolved -- SDK not installed yet; ambient types in src/types/mcp-sdk.d.ts
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-// eslint-disable-next-line import/no-unresolved -- SDK not installed yet; ambient types in src/types/mcp-sdk.d.ts
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import type { Env } from '../env.ts';
+import { NodeStreamableHTTPServerTransport } from '@modelcontextprotocol/node';
+import { McpServer } from '@modelcontextprotocol/server';
+import { buildPrm, prmPathsFor } from '../auth/prm.ts';
+import { authenticateRequest, decideAccess, devBypassAuth, type RequestAuth } from '../auth/request-auth.ts';
+import type { TokenVerifier } from '../auth/verifier.ts';
 import type { CallerData } from '../data/caller.ts';
-import { presenceService } from '../presence/service.ts';
-import { authenticate, type AuthContext } from '../auth/oauth.ts';
-import { PRM_PATH, buildPrm } from '../auth/prm.ts';
-import type { SpeakerHint } from '../auth/actor.ts';
-import { tools, type ToolContext, type ToolResult } from './tools.ts';
+import type { FamiliarDirectory } from '../presence/fixtures.ts';
+import type { PresenceService } from '../presence/service.ts';
+import { registerTools, type ToolContext } from './tools.ts';
+import type { McpAppsRegistration } from './ui-seam.ts';
 
 /**
- * Streamable HTTP wiring (ADR 0005): one `/mcp` endpoint for POST (JSON-RPC),
- * GET (SSE stream) and DELETE (session close), plus the RFC 9728 well-known
- * document. Spec floor: 2025-11-25.
- *
- * NOTE: the SDK imports above resolve through `src/types/mcp-sdk.d.ts`, an
- * ambient stand-in — `@modelcontextprotocol/sdk` is not installed yet. The
- * call shapes below follow the documented TypeScript SDK API; delete the
- * .d.ts when the real package lands and reconcile any type drift.
+ * Handshake-era protocol versions served (PLATFORM-DOCS §3.1): Alexa+ sends
+ * `2025-03-26`, the Local Inspector `2025-06-18`, the spec floor is
+ * `2025-11-25`. The stateless 2026-07-28 revision is not served on this
+ * endpoint; a client offering an unknown version is answered with 2025-11-25.
  */
+export const SUPPORTED_PROTOCOL_VERSIONS = ['2025-11-25', '2025-06-18', '2025-03-26'] as const;
+
+const MAX_BODY_BYTES = 1_000_000;
 
 export interface ServerDeps {
-  readonly env: Env;
+  /** The exact `/mcp` URL: PRM `resource`, token audience, manifest URI. */
+  readonly resourceUrl: string;
+  /** The issuer listed first (and only) in PRM `authorization_servers`. */
+  readonly authorizationServer: string;
+  /** Exact browser origins allowed besides the resource URL's own origin. */
+  readonly allowedOrigins: readonly string[];
+  /** Token validation, or `dev-bypass` for local and simulator development only. */
+  readonly verifier: TokenVerifier | 'dev-bypass';
   readonly data: CallerData;
+  readonly presence: PresenceService;
+  /** Seeded fixtures; set only in dev mode, which also registers the dev tools. */
+  readonly familiar?: FamiliarDirectory;
+  /** Lane C's MCP Apps views. See `ui-seam.ts`. */
+  readonly ui?: McpAppsRegistration;
+  readonly now?: () => number;
 }
 
-function readBody(req: IncomingMessage): Promise<unknown> {
+class BodyError extends Error {
+  readonly status: number;
+  readonly rpcCode: number;
+
+  constructor(status: number, rpcCode: number, message: string) {
+    super(message);
+    this.status = status;
+    this.rpcCode = rpcCode;
+  }
+}
+
+function readJsonBody(req: IncomingMessage): Promise<unknown> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
-    req.on('data', (c: Buffer) => chunks.push(c));
+    let size = 0;
+    req.on('data', (chunk: Buffer) => {
+      size += chunk.length;
+      if (size > MAX_BODY_BYTES) {
+        reject(new BodyError(413, -32600, 'Request body too large'));
+        req.destroy();
+        return;
+      }
+      chunks.push(chunk);
+    });
     req.on('end', () => {
-      if (chunks.length === 0) return resolve(undefined);
       try {
         resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')));
-      } catch (err) {
-        reject(err);
+      } catch {
+        reject(new BodyError(400, -32700, 'Parse error'));
       }
     });
     req.on('error', reject);
   });
 }
 
-function json(res: ServerResponse, status: number, body: unknown): void {
+function sendJson(res: ServerResponse, status: number, body: unknown): void {
   res.writeHead(status, { 'content-type': 'application/json' });
   res.end(JSON.stringify(body));
 }
 
-/** Build one McpServer with every registered tool bound to a ToolContext. */
-function buildMcpServer(ctx: Omit<ToolContext, 'speakerHint'>): McpServer {
-  const server = new McpServer({ name: 'nyc-mon-alexa', version: '0.1.0' });
-  for (const tool of tools) {
-    server.registerTool(
-      tool.name,
-      {
-        description: tool.description,
-        // TODO(sdk): zod 4 shapes → SDK expects a ZodRawShape (the .shape of an
-        // object) or JSON Schema. For object schemas pass `inputSchema.shape`;
-        // for the odd non-object input, wrap or convert first.
-        inputSchema: (tool.inputSchema as unknown as { shape?: Record<string, unknown> }).shape as never,
-        annotations: tool.annotations,
-      },
-      async (args: unknown, extra: { authInfo?: unknown }) => {
-        // TODO(sdk): map extra.authInfo → SpeakerHint once the SDK surfaces
-        // per-request auth metadata; Alexa Voice ID arrives there.
-        const speakerHint = (extra.authInfo as { speakerHint?: SpeakerHint } | undefined)?.speakerHint;
-        const result: ToolResult = await tool.handler(args, { ...ctx, speakerHint });
-        return result;
-      },
-    );
-  }
-  return server;
-}
+/** Builds the `node:http` request handler for the MCP endpoint and its well-known documents. */
+export function createHandler(deps: ServerDeps): (req: IncomingMessage, res: ServerResponse) => Promise<void> {
+  const resource = new URL(deps.resourceUrl);
+  const prm = buildPrm({ resource: deps.resourceUrl, authorizationServer: deps.authorizationServer });
+  const prmPaths = new Set(prmPathsFor(deps.resourceUrl));
+  const allowedOrigins = new Set([resource.origin, ...deps.allowedOrigins.map((o) => new URL(o).origin)]);
+  const now = deps.now ?? Date.now;
 
-export function createHandler(deps: ServerDeps) {
-  const { env } = deps;
-  const prm = buildPrm({
-    resource: env.MCP_RESOURCE_ORIGIN,
-    authorizationServers: [env.AUTH_SERVER_ORIGIN],
-  });
+  return async function handle(req, res) {
+    const url = new URL(req.url ?? '/', resource.origin);
 
-  // Streamable HTTP sessions: transport per sessionId (spec 2025-11-25).
-  const sessions = new Map<string, { transport: StreamableHTTPServerTransport; server: McpServer }>();
-
-  return async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
-    const url = new URL(req.url ?? '/', env.MCP_RESOURCE_ORIGIN);
-
-    if (req.method === 'GET' && url.pathname === PRM_PATH) {
-      return json(res, 200, prm);
+    // MCP 2025-11-25 transports: validate Origin on every request; 403 when
+    // present and not allowed. Alexa's server-to-server calls send none.
+    const origin = req.headers.origin;
+    if (origin !== undefined) {
+      if (!allowedOrigins.has(origin)) return sendJson(res, 403, { error: 'forbidden_origin' });
+      res.setHeader('access-control-allow-origin', origin);
+      res.setHeader('vary', 'Origin');
+      res.setHeader('access-control-expose-headers', 'mcp-protocol-version');
     }
-    if (req.method === 'GET' && url.pathname === '/healthz') {
-      return json(res, 200, { ok: true });
-    }
-    if (url.pathname !== '/mcp') {
-      return json(res, 404, { error: 'not_found' });
-    }
+
+    if (req.method === 'GET' && prmPaths.has(url.pathname)) return sendJson(res, 200, prm);
+    if (req.method === 'GET' && url.pathname === '/healthz') return sendJson(res, 200, { ok: true });
+    if (url.pathname !== resource.pathname) return sendJson(res, 404, { error: 'not_found' });
+
     if (req.method === 'OPTIONS') {
       res.writeHead(204, {
-        'access-control-allow-origin': '*', // TODO(cors): tighten to sim + Alexa origins
         'access-control-allow-methods': 'GET, POST, DELETE, OPTIONS',
-        'access-control-allow-headers': 'content-type, authorization, mcp-session-id',
+        'access-control-allow-headers': 'authorization, content-type, accept, mcp-protocol-version, mcp-session-id, last-event-id',
+        'access-control-max-age': '600',
       });
       res.end();
       return;
     }
 
-    const auth: AuthContext | null = await authenticate(req, res, {
-      resourceOrigin: env.MCP_RESOURCE_ORIGIN,
-      devBypass: env.OAUTH_DEV_BYPASS === '1',
-    });
-    if (!auth) return; // 401 + WWW-Authenticate already written
-
-    const ctx: Omit<ToolContext, 'speakerHint'> = {
-      auth,
-      data: deps.data,
-      presence: presenceService,
-      devMode: env.MCP_DEV_MODE === '1',
-    };
-
-    try {
-      const body = req.method === 'POST' ? await readBody(req) : undefined;
-
-      // TODO(sdk): the real StreamableHTTPServerTransport pattern is —
-      //   const transport = new StreamableHTTPServerTransport({
-      //     sessionIdGenerator: () => randomUUID(),
-      //     onsessioninitialized: (id) => sessions.set(id, { transport, server }),
-      //   });
-      //   server.connect(transport) once per session; reuse by
-      //   `mcp-session-id` header thereafter. This scaffold creates a fresh
-      //   stateless pair per request until the SDK lands.
-      const sessionId = req.headers['mcp-session-id'];
-      const existing = typeof sessionId === 'string' ? sessions.get(sessionId) : undefined;
-      const pair = existing ?? { transport: new StreamableHTTPServerTransport(), server: buildMcpServer(ctx) };
-      if (!existing) {
-        // TODO(sdk): await pair.server.connect(pair.transport) — required in
-        // the real SDK before handleRequest.
-      }
-      await pair.transport.handleRequest(req, res, body);
-    } catch (err) {
-      if (!res.headersSent) {
-        json(res, 500, { error: 'internal', message: err instanceof Error ? err.message : String(err) });
-      } else {
-        res.end();
+    let body: unknown;
+    if (req.method === 'POST') {
+      try {
+        body = await readJsonBody(req);
+      } catch (error) {
+        if (error instanceof BodyError) {
+          return sendJson(res, error.status, { jsonrpc: '2.0', id: null, error: { code: error.rpcCode, message: error.message } });
+        }
+        throw error;
       }
     }
+
+    const auth: RequestAuth =
+      deps.verifier === 'dev-bypass' ? devBypassAuth(now()) : await authenticateRequest(req.headers.authorization, deps.verifier);
+    // Amazon: 401 with no WWW-Authenticate header (PLATFORM-DOCS §2.3). Clients
+    // find the PRM at the well-known path, which the MCP spec allows.
+    const decision = decideAccess(auth, body);
+    if (decision !== 'allow') {
+      return sendJson(res, decision, { error: decision === 401 ? 'unauthorized' : 'insufficient_scope' });
+    }
+
+    const ctx: ToolContext = {
+      callerId: auth.kind === 'user' ? auth.callerId : undefined,
+      birthYear: auth.kind === 'user' ? auth.birthYear : undefined,
+      data: deps.data,
+      presence: deps.presence,
+      familiar: deps.familiar,
+      now,
+    };
+
+    // Stateless Streamable HTTP: one server and transport per request. Alexa
+    // keeps conversation state itself and never relies on Mcp-Session-Id
+    // (PLATFORM-DOCS §2.6), and a per-request server binds this request's
+    // verified Caller into every tool with no shared mutable session.
+    const server = new McpServer(
+      { name: 'nyc-mon', title: 'NYC-MON', version: '0.1.0' },
+      {
+        supportedProtocolVersions: [...SUPPORTED_PROTOCOL_VERSIONS],
+        instructions:
+          "NYC-MON tools read and care for the Caller's Mon. Tools return data only; phrase every reply yourself. Never read ids or numbers from 0 to 1 aloud as-is.",
+      },
+    );
+    deps.ui?.registerResources(server);
+    registerTools(server, ctx, deps.ui);
+
+    const transport = new NodeStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
+    res.on('close', () => {
+      void transport.close();
+      void server.close();
+    });
+    await server.connect(transport);
+    await transport.handleRequest(req, res, body);
   };
 }
