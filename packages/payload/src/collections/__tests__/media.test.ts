@@ -13,8 +13,8 @@ describe('Bunny media URL projection', () => {
       filesize: 123,
       width: null,
       height: null,
-      focalX: null,
-      focalY: null,
+      focalX: undefined,
+      focalY: undefined,
       sizes: {},
     };
 
@@ -33,8 +33,8 @@ describe('Bunny media URL projection', () => {
       filesize: 123,
       width: null,
       height: null,
-      focalX: null,
-      focalY: null,
+      focalX: undefined,
+      focalY: undefined,
       sizes: {},
     };
 
