@@ -1,5 +1,22 @@
 # NYC-MON handoff, 2026-10-08
 
+## Continuation — 2026-10-09
+
+This section updates **branch and PR status**, not the original Oct 8 research and verification notes below.
+
+**Merged on `main`:** #4 (canon v12), #5 (language lexicon CMS), #6 (Bunny canonical media URLs), #7 (TraceSift), #9 (spatial scene/store contract), #10 (parked Phase 2 legends ADR) and #11 (Phase 1 mobile companion). They were corrected against review findings before merging. #21 subsequently fixed the generated-image variant URL regression found by the combined payload test and also merged. Do not replay or duplicate these branches.
+
+**Current Alexa branch:** #12 remains **draft** and is now based on `main`, rather than a stacked Phase 1 feature branch. Review fixes in the add-on include globally unique (optional retry-stable UUID) care idempotency, 401-triggered reauthentication, reversible OAuth migration ordering, a reliable headless WebGPU fallback test, and the Bunny variant integration fix from #21. Passing CI does **not** establish a real Bedrock inference, OAuth end-to-end, a production migration, a valid HTTPS deployment, an Echo device run, or latency compliance. All still require direct verification.
+
+**Original drafts retained and restacked:** #13 submission assets; #14 live deploy/verification; #15 conditional single-roundtrip care optimization (measure first); #16 presence/voice consent ADRs; #17 kit issues. #18 Quest presence was rebased onto merged `main` and remains blocked by external virocore anchors, the `@viro-external` packaging decision, approved GLBs and physical-device validation. Do not merge these as completed features simply because documentation CI passes.
+
+**New handoff-backed drafts:** #19 tracks creator canon rulings, creature art/rigs/clip supply, foods, speech, Baby scale and server-sync seams absent from the delivered screens. #20 defines the full native GAME buildout beyond the Phase 1 companion: NYC world, encounters, authoritative combat, live operations, Stories, EngineX and XR as separate implementation slices. Both are plans, not gameplay shipped.
+
+**Active checks before advancing drafts:** `main` CI; latest #12 commit's expanded MCP/web-sim/Payload tests; live AWS Bedrock call with allocated IAM permissions; real OAuth passkey/TOTP and 18+ denial; carefully reviewed `20261008_181202_alexa_oauth` migration up/down against a disposable database; production HTTPS/origins/secrets, and measured care latency. Never read or print `.env` credentials. The Oct 23 submission deadline remains, so the simulator must demonstrate **real** inference, not the mock. Scope all creator decisions to canon authority, and retain existing non-duplicate draft PRs.
+
+---
+
+
 Where the work stands, what's left, and what it was built from. Written for whoever picks this up next: a person or a new agent session.
 
 ## 1. Branches and PRs
