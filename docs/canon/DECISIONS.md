@@ -329,7 +329,7 @@ Staff roles are `ops`, `support`, `consent` and `content`. If the auth adapter c
 - **Decided by:** Mike (creator)
 - **Kind:** product + canon
 
-NYC-MON is built out as the full native mobile/tablet game rather than splitting the product into a Tamagotchi-only V1 followed by a separate game V2. The **web surface is intentionally limited to the Tamagotchi-style Mon Space**.
+NYC-MON is built out as the full native mobile/tablet game rather than splitting the product into a Tamagotchi-only V1 followed by a separate game V2. The **authenticated web companion** is intentionally limited to the Tamagotchi-style Mon Space at `/mon-space`. The public product-site homepage remains `/` (W01 in `docs/phase-1-brief.md`); this decision narrows the playable web experience, not the marketing site.
 
 All surfaces use the same authoritative Mon instance and persistence. Web care, conversation, memories, bond and evolution progress carry into native. There is no separate “web Mon.”
 
@@ -351,7 +351,7 @@ Default combat law: **humans battle humans; Mons battle Mons**. Caller combat us
 - **Decided by:** Mike (creator)
 - **Kind:** gameplay canon
 
-Level alone does not determine match eligibility. A server-owned Battle Rating also considers evolution stage, stats, moves, Affinity/type matchup, condition and ruleset modifiers. A Lv 6 vs Lv 12 match is normally outside sanctioned eligibility; Lv 6 vs Lv 8 may be valid when the matchup supports it. Evolution is conditional and may incorporate bond, care, move mastery, battle history, environment and hidden authored requirements.
+Level alone does not determine match eligibility. A server-owned Battle Rating also considers evolution stage, stats, moves, the eight-Affinity matchup (never the legacy ten-type fields until a canon migration map is approved), condition and ruleset modifiers. A Lv 6 vs Lv 12 match is normally outside sanctioned eligibility; Lv 6 vs Lv 8 may be valid when the matchup supports it. Evolution is conditional and may incorporate bond, care, move mastery, battle history, environment and hidden authored requirements.
 
 ## Decision 26 — Battle Grounds, battle memory, Stories and CMS LiveOps
 
