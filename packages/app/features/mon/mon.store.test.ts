@@ -89,6 +89,19 @@ describe('one Mon store', () => {
     assert.equal(seenA.at(-1), store.getState());
   });
 
+  it('queues the effective timestamp after a device-clock rollback', () => {
+    const { io, store } = setup();
+    store.getState().applyCare({ kind: 'rest' }, T0 + 60_000);
+    store.getState().applyCare({ kind: 'wake' }, T0 + 30_000);
+    const persisted = io.read();
+    assert.ok(persisted);
+    assert.equal(persisted.queue.entries.length, 2);
+    assert.equal(persisted.queue.entries[0]?.at, T0 + 60_000);
+    assert.equal(persisted.queue.entries[1]?.at, T0 + 60_000);
+    assert.equal(persisted.savedAt, persisted.care[0]?.updatedAt);
+    assert.equal(persisted.queue.entries[1]?.action.kind, 'wake');
+  });
+
   it('writes persist through the save, and a fresh store reads them back', () => {
     const { storage, io, store } = setup();
     const before = storage.writes;
