@@ -10,6 +10,7 @@ const targets = [
   ['apps/web/package.json', 'apps/web/public/canvaskit'],
   ['apps/storybook/package.json', 'apps/storybook/public/canvaskit'],
   ['apps/mobile/package.json', 'apps/mobile/public/canvaskit'],
+  ['packages/web-sim/package.json', 'packages/web-sim/public/canvaskit'],
 ];
 
 // Resolve canvaskit-wasm through react-native-skia (v3), so the copied

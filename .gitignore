@@ -30,3 +30,6 @@ apps/web/AGENTS.md
 apps/web/CLAUDE.md
 /CLAUDE.md
 scripts/out/
+
+# Copied by tooling/copy-skia-web-assets.mjs at postinstall (Storybook keeps the committed copy).
+packages/web-sim/public/canvaskit/

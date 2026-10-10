@@ -1,0 +1,5 @@
+{
+  "extends": "@acme/config/typescript/react-library.json",
+  "compilerOptions": { "strict": true, "noEmit": true, "allowImportingTsExtensions": true, "types": [] },
+  "include": ["**/*.ts", "**/*.tsx", "../../../../assets/photos/webp.d.ts"]
+}

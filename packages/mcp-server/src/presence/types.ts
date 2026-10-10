@@ -2,15 +2,15 @@ import { z } from 'zod';
 import { EpochMsSchema, IdSchema, UnitIntervalSchema } from '@acme/core';
 
 /**
- * Per-person grants the Caller sets on a FamiliarPerson. `care` covers
- * heal/inventory mutations; `feed` is separate because the demo hangs on it
- * (James may talk and play but cannot feed Mike's rare item).
+ * Per-person grants the Caller sets on a familiar person. `feed` is separate
+ * from `play` because the demo hangs on it: James may talk and play but
+ * cannot share a meal with Mike's Mon.
  */
 export const PermissionSchema = z.object({
   talk: z.boolean(),
   play: z.boolean(),
   feed: z.boolean(),
-  care: z.boolean(),
+  rest: z.boolean(),
 });
 export type Permission = z.infer<typeof PermissionSchema>;
 
@@ -18,14 +18,14 @@ export const DEFAULT_FAMILIAR_PERMISSIONS: Permission = {
   talk: true,
   play: true,
   feed: false,
-  care: false,
+  rest: false,
 };
 
 /**
- * A consented, self-enrolled voice in a Caller's circle. The embedding lives in
- * an encrypted store keyed by `voicePrintRef`; enrollment audio is never kept
- * (ADR 0007). Persistence lands in a `familiar-people` Payload collection —
- * TODO, deliberately not created in this scaffold.
+ * A familiar person in a Caller's circle. In the hackathon build every one is
+ * a seeded fictional fixture (ADR 0015 §2): nothing is enrolled, no voiceprint
+ * exists, and `fictional` is fixed to `true` so a real person cannot be
+ * represented by this type until a consent ADR replaces it.
  */
 export const FamiliarPersonSchema = z.object({
   personId: IdSchema,
@@ -34,24 +34,15 @@ export const FamiliarPersonSchema = z.object({
   displayName: z.string().min(1).max(64),
   relationship: z.string().max(64).nullable(),
   permissions: PermissionSchema,
-  enrolledAt: EpochMsSchema,
-  /** Self-enrollment only — never 'other' (build prompt, hard do-not). */
-  enrolledBy: z.literal('self'),
-  /** Opaque pointer to the encrypted speaker embedding, never audio. */
-  voicePrintRef: IdSchema,
-  /** Alexa Voice ID personId, only when the person linked it themselves. */
-  alexaVoiceIdHint: z.string().max(128).nullable(),
+  fictional: z.literal(true),
 });
 export type FamiliarPerson = z.infer<typeof FamiliarPersonSchema>;
 
-/** Where a presence signal came from. Echo ambient audio is never a source. */
-export const PresenceSourceSchema = z.enum(['app-vad', 'web-vad', 'alexa-voice-id']);
+/** Where a presence signal came from. Echo audio is never a source (ADR 0007). */
+export const PresenceSourceSchema = z.enum(['simulator', 'app-vad', 'web-vad']);
 export type PresenceSource = z.infer<typeof PresenceSourceSchema>;
 
-/**
- * One detection emitted by the NYC-Mon app/web presence pipeline and fanned out
- * over Supabase Realtime (ADR 0007).
- */
+/** One detection. In the hackathon build only the simulator injects these. */
 export const PresenceEventSchema = z.object({
   eventId: IdSchema,
   personId: IdSchema,
@@ -59,7 +50,7 @@ export const PresenceEventSchema = z.object({
   confidence: UnitIntervalSchema,
   ts: EpochMsSchema,
   source: PresenceSourceSchema,
-  /** The Mon the signal was heard near, when the app knows which is active. */
+  /** The Mon the signal was heard near, when known. */
   monInstanceId: IdSchema.nullable(),
 });
 export type PresenceEvent = z.infer<typeof PresenceEventSchema>;

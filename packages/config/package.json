@@ -5,6 +5,7 @@
   "exports": {
     "./typescript/*": "./typescript/*",
     "./eslint/*": "./eslint/*",
+    "./vite/*": "./vite/*",
     "./prettier": "./prettier/index.json",
     "./jest-rsc-preset.js": "./jest-rsc-preset.js"
   },
