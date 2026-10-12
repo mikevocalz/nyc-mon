@@ -43,7 +43,8 @@ const eslintConfig = defineConfig([
   },
   {
     files: ['app/(site)/**/*.tsx', 'components/site/**/*.tsx'],
-    ignores: ['components/site/Landing.tsx', 'app/Document.tsx'],
+    // opengraph-image renders through next/og (Satori), which takes plain elements only.
+    ignores: ['components/site/Landing.tsx', 'app/Document.tsx', 'app/(site)/opengraph-image.tsx'],
     rules: {
       'no-restricted-syntax': [
         'error',
