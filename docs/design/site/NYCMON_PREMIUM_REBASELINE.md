@@ -82,3 +82,19 @@ The 5-run median comes from `site-qa:lhci` against the local build. It's in the 
 | `NYC_MON_MANDATORY_SKILL_PACK.md` | Named by the superprompt | **Not available**: it wasn't supplied with the prompt and isn't in the repo |
 | Appllama, MotionSites.ai, CodeRabbit, Argent agent-device, expo/mattpocock/margelo skills | Named by the superprompt | **Not installed in this session**. Nothing is claimed for them |
 | Real-user 5-second tests | Required by the brief | **Not run**. No participants exist |
+
+### Lighthouse (lab), b584018, 2026-10-12
+
+Settings: `site-qa:lhci`, Lighthouse 13.5.0, mobile simulate (RTT 150 ms, 1.6 Mbps, CPU ×4), headless Chromium 141 `--no-sandbox`, 4-vCPU Xeon container. Benchmark index 1600–2120. Other agents' dev servers were running at the same time, so CPU was contended.
+
+| Metric | Median of 5 | Target | Result |
+|---|---|---|---|
+| Performance | 59 | ≥ 90 | **Fail** |
+| Accessibility / Best practices / SEO | 100 / 100 / 100 | ≥ 95 | Pass |
+| FCP | 1059 ms | — | |
+| LCP | 3575 ms (range 2237–3738) | ≤ 2500 | **Fail** |
+| CLS | 0 | ≤ 0.05 | Pass |
+| TBT | 17 142 ms | — | Very high |
+| INP | not measured (navigation mode) | ≤ 200 ms field | Unverified |
+
+**LCP element is the hero body paragraph `#mfx-hero-body`**, with an inline `transform` from the motion reveal. TTFB is 14 ms and render delay in the observed trace is 150 ms. Under simulated throttling the paragraph's paint is held back behind main-thread work. TBT this large in a headless container with no GPU points at software-rendered canvas work (the WebGPU → CanvasKit fallback) plus JS boot. That is a hypothesis to profile, not a finding. Next step for web-performance-profiler: trace with the hero canvas disabled to isolate its share, and keep the LCP text out of any entrance animation.
