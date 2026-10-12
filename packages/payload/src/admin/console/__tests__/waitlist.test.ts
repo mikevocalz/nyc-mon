@@ -75,7 +75,8 @@ function post(body: unknown, headers: Record<string, string> = {}): Request {
   });
 }
 
-const adult = { email: '  Kid.Grown@Example.COM ', ageConfirmed: true, district: 'harlem', source: 'get' };
+// NOW is in 2026: 2013 is the newest year that answers 13+, 2012..2026 any year that could be under 13.
+const adult = { email: '  Kid.Grown@Example.COM ', birthYear: 1990, district: 'harlem', source: 'get' };
 
 describe('handleJoinWaitlist', () => {
   it('stores a new sign-up lowercased and trimmed and answers joined', async () => {
@@ -133,18 +134,62 @@ describe('handleJoinWaitlist', () => {
     expect(rows(WAITLIST_SLUG)).toHaveLength(1);
   });
 
-  it('answers under13 with 422 and never looks up or stores the address', async () => {
-    const { payload, rows, find, create } = fakePayload();
-    const response = await handlerFor(payload)(post({ ...adult, ageConfirmed: false }));
+  it.each([2026, 2020, 2013])('answers under13 with 422 for %i and never looks up or stores the address', async (birthYear) => {
+    const { payload, rows, find, create, update } = fakePayload();
+    const response = await handlerFor(payload)(post({ ...adult, birthYear }));
 
     expect(response.status).toBe(422);
     expect(await response.json()).toEqual({ status: 'under13' });
     expect(rows(WAITLIST_SLUG)).toHaveLength(0);
     const touched = [...find.mock.calls, ...create.mock.calls].map((call) => call[0]?.collection);
     expect(touched).not.toContain(WAITLIST_SLUG);
-    // The only thing written is the limiter counter, which holds no address.
-    const written = JSON.stringify(create.mock.calls);
-    expect(written).not.toContain('example.com');
+    // The only thing written is the limiter counter, which holds no address and no birth year.
+    const writes = [...create.mock.calls, ...update.mock.calls].map((call) => call[0]);
+    expect(writes.map((args) => args?.collection)).toEqual(['verifications']);
+    expect(Object.keys((writes[0]?.data ?? {}) as object).sort()).toEqual(['expiresAt', 'identifier', 'value']);
+    expect(JSON.stringify(writes)).not.toContain('example.com');
+  });
+
+  it.each([2012, 1990, 1900])('treats %i as 13 or older', async (birthYear) => {
+    const { payload, rows } = fakePayload();
+    const response = await handlerFor(payload)(post({ ...adult, birthYear }));
+
+    expect(response.status).toBe(200);
+    expect(rows(WAITLIST_SLUG)).toHaveLength(1);
+  });
+
+  it('never stores the birth year with a sign-up', async () => {
+    const { payload, rows, create } = fakePayload();
+    await handlerFor(payload)(post({ ...adult, birthYear: 1987 }));
+
+    expect(rows(WAITLIST_SLUG)[0]).not.toHaveProperty('birthYear');
+    expect(JSON.stringify(create.mock.calls)).not.toContain('1987');
+  });
+
+  it.each([
+    ['a missing year', undefined],
+    ['a string year', '1990'],
+    ['a fractional year', 1990.5],
+    ['a year before 1900', 1899],
+    ['a future year', 2027],
+    ['null', null],
+  ])('answers invalid with field birthYear for %s, before reading the address', async (_label, birthYear) => {
+    const { payload, rows } = fakePayload();
+    const response = await handlerFor(payload)(post({ ...adult, email: 'not-an-email', birthYear }));
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ status: 'invalid', field: 'birthYear' });
+    expect(rows(WAITLIST_SLUG)).toHaveLength(0);
+  });
+
+  it('no longer lets the old ageConfirmed flag pass the age screen', async () => {
+    const { payload, rows } = fakePayload();
+    const { birthYear: _drop, ...legacy } = adult;
+    const response = await handlerFor(payload)(post({ ...legacy, ageConfirmed: true }));
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ status: 'invalid', field: 'birthYear' });
+    expect(rows(WAITLIST_SLUG)).toHaveLength(0);
   });
 
   it.each(['not-an-email', 'a@b', 'two@@example.com', 'sp ace@example.com', `${'x'.repeat(250)}@example.com`, ''])(
@@ -169,11 +214,10 @@ describe('handleJoinWaitlist', () => {
 
   it.each([
     ['an array', []],
-    ['a missing ageConfirmed', { email: 'a@example.com' }],
-    ['a string ageConfirmed', { email: 'a@example.com', ageConfirmed: 'yes' }],
-    ['an unknown district', { email: 'a@example.com', ageConfirmed: true, district: 'queens' }],
-    ['an oversized source', { email: 'a@example.com', ageConfirmed: true, source: 'x'.repeat(33) }],
-    ['a source with markup', { email: 'a@example.com', ageConfirmed: true, source: '<b>' }],
+    ['a missing email', { birthYear: 1990 }],
+    ['an unknown district', { email: 'a@example.com', birthYear: 1990, district: 'queens' }],
+    ['an oversized source', { email: 'a@example.com', birthYear: 1990, source: 'x'.repeat(33) }],
+    ['a source with markup', { email: 'a@example.com', birthYear: 1990, source: '<b>' }],
   ])('answers invalid for %s', async (_label, body) => {
     const { payload, rows } = fakePayload();
     const response = await handlerFor(payload)(post(body));
