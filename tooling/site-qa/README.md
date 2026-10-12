@@ -20,6 +20,7 @@ INP is not measured. Lighthouse navigation mode records no interactions. `apps/w
 | `BASE` | `http://localhost:3100` | Origin under test. |
 | `SITE_QA_BROWSER` | per script | `system` = installed Chrome with the real GPU and WebGPU; `bundled` = Playwright's chromium headless shell (no WebGPU, SwiftShader WebGL). Every script defaults to `bundled`. On the dev Mac the installed Chrome's OpenXR runtime is the Meta XR Simulator, so `system` starts a Quest 3 simulator session; use it only on purpose. Falls back to bundled when no Chrome is found. |
 | `CHROME_PATH` | auto | Chrome binary. Auto-detects `/Applications/Google Chrome.app` and `/usr/bin/google-chrome*`. |
+| `SITE_QA_CHROME_FLAGS` | none | Extra Chrome flags for `site-qa:lhci`, e.g. `--no-sandbox` when Chrome runs as root in a container. |
 | `SITE_QA_MOTION` | both | `no-preference` or `reduce` to run one motion mode. |
 | `SITE_QA_VIEWPORTS` | all | Comma list of viewport names (shots) or widths (motion: `1280`, `390`). |
 | `SITE_QA_ROUTE` | `/` | Route for shots, axe, lhci. |
