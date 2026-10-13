@@ -3,14 +3,14 @@
 import { useMemo, useRef, type ReactNode } from 'react';
 import type { GestureResponderEvent } from 'react-native';
 import { twMerge } from 'tailwind-merge';
-import { palette, brand } from '@acme/theme';
+import { palette, brand, signage } from '@acme/theme';
 import { GpuCanvas } from '../gpu/GpuCanvas';
 import type { GpuCanvasHandle, GpuSetup } from '../gpu/types';
 import { withAlpha } from '../neon/colors';
 import { useInstanceStore } from '../use-instance-store';
 import { useSizeClass } from '../use-size-class';
 import { View } from '../tw';
-import { districtDefaults } from './city-blocks-model';
+import { CITY_SKY, districtDefaults } from './city-blocks-model';
 import type { CityParams } from './CityBlocks.gpu';
 import type { CityBlocksSkiaProps } from './CityBlocks.skia';
 import type { CityBlocksProps, CityPointer } from './CityBlocks.types';
@@ -35,6 +35,7 @@ export function CityBlocksShell({
   blockSize,
   streetWidth = 10,
   seed = 1,
+  timeOfDay = 'day',
   windowLights = true,
   lightColor,
   accentColor,
@@ -42,8 +43,8 @@ export function CityBlocksShell({
   traffic = true,
   trafficDensity = 1,
   trafficSpeed = 1,
-  headlightColor = brand.white,
-  taillightColor = palette.apple[400],
+  headlightColor,
+  taillightColor,
   hoverEffect = true,
   hoverColor = withAlpha(brand.orange, 0.35),
   overlay = false,
@@ -60,18 +61,22 @@ export function CityBlocksShell({
   const resolvedBlock = blockSize ?? (sizeClass === 'regular' ? 56 : 44);
   const resolvedLight = lightColor ?? defaults.light;
   const resolvedAccent = accentColor ?? defaults.accent;
-  const resolvedStreet = streetColor ?? brand.night;
+  const resolvedStreet = streetColor ?? CITY_SKY[timeOfDay].street;
+  const day = timeOfDay === 'day';
+  // By day traffic is roofs, not lamps: white cars and taxi orange.
+  const resolvedHeadlight = headlightColor ?? (day ? signage.white : brand.white);
+  const resolvedTaillight = taillightColor ?? (day ? palette.orange[400] : palette.apple[400]);
 
   const pointer = useInstanceStore<CityPointer>(() => ({ x: 0, y: 0, inside: false }));
   const gpu = useRef<GpuCanvasHandle>(null);
 
   const city = useMemo(
-    () => ({ district, blockSize: resolvedBlock, streetWidth, seed, lightColor: resolvedLight, accentColor: resolvedAccent, windowLights }),
-    [district, resolvedBlock, streetWidth, seed, resolvedLight, resolvedAccent, windowLights],
+    () => ({ district, blockSize: resolvedBlock, streetWidth, seed, lightColor: resolvedLight, accentColor: resolvedAccent, windowLights, timeOfDay }),
+    [district, resolvedBlock, streetWidth, seed, resolvedLight, resolvedAccent, windowLights, timeOfDay],
   );
   const trafficOpts = useMemo(
-    () => ({ density: traffic ? trafficDensity : 0, speed: trafficSpeed, headlight: headlightColor, taillight: taillightColor }),
-    [traffic, trafficDensity, trafficSpeed, headlightColor, taillightColor],
+    () => ({ density: traffic ? trafficDensity : 0, speed: trafficSpeed, headlight: resolvedHeadlight, taillight: resolvedTaillight }),
+    [traffic, trafficDensity, trafficSpeed, resolvedHeadlight, resolvedTaillight],
   );
   const params = useMemo<CityParams>(
     () => ({ city, traffic: trafficOpts, hoverEffect, hoverColor, overlay, streetColor: resolvedStreet, pointer }),
@@ -93,7 +98,8 @@ export function CityBlocksShell({
 
   return (
     <View
-      className={twMerge('relative flex-1 overflow-hidden bg-ink-950', className)}
+      // The street colour as a class, so the box matches the canvas before it draws.
+      className={twMerge('relative flex-1 overflow-hidden', day ? 'bg-concrete-500' : 'bg-ink-950', className)}
       // Computed: streetColor is a caller colour prop, not a theme token.
       style={streetColor ? { backgroundColor: streetColor } : undefined}
       {...({ onPointerMove, onPointerLeave } as object)}

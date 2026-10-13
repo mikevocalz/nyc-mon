@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { parseColor } from '../neon/colors.ts';
 import {
-  blockAt, buildCity, packQuads, QUAD_FLOATS, QuadKind, trafficAt, trafficCapacity,
+  blockAt, buildCity, CITY_SKY, packQuads, QUAD_FLOATS, QuadKind, trafficAt, trafficCapacity, vignetteQuad,
   type CityInput, type District,
 } from './city-blocks-model.ts';
 
@@ -65,4 +66,20 @@ test('packQuads lays out 16 floats per quad: corners, colour, win', () => {
   const q = city.quads[3]!;
   assert.deepEqual(Array.from(out.slice(3 * 16, 3 * 16 + 8)), q.p.map((v) => Math.fround(v)));
   assert.deepEqual(Array.from(out.slice(3 * 16 + 8, 3 * 16 + 12)), q.color.map((v) => Math.fround(v)));
+});
+
+test('the city is daylit by default: no lit windows, cast shadows, a daylit fade', () => {
+  const facades = (q: ReturnType<typeof buildCity>['quads']) => q.filter((x) => x.win[0] > 0);
+  const day = buildCity(input('midtown'));
+  const night = buildCity(input('midtown', { timeOfDay: 'night' }));
+  // Day keeps the window grid (glass) but lights none of it.
+  assert.ok(facades(day.quads).length > 0);
+  assert.ok(facades(day.quads).every((q) => q.win[3] === 0));
+  assert.ok(facades(night.quads).some((q) => q.win[3] > 0));
+  // Translucent shadow plates exist only by day.
+  const shadows = (q: ReturnType<typeof buildCity>['quads']) => q.filter((x) => x.win[0] === QuadKind.FLAT && x.color[3] > 0 && x.color[3] < 1);
+  assert.ok(shadows(day.quads).length > 0);
+  assert.equal(shadows(night.quads).filter((x) => x.color[3] !== 0.55).length, 0);
+  assert.deepEqual(vignetteQuad(10, 10).color.slice(0, 3), parseColor(CITY_SKY.day.fade).slice(0, 3));
+  assert.deepEqual(vignetteQuad(10, 10, 'night').color, parseColor(CITY_SKY.night.fade));
 });

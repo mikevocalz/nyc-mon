@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
 import type { NeonColorInput } from '../neon/colors';
-import type { District } from './city-blocks-model';
+import type { District, TimeOfDay } from './city-blocks-model';
 
-export type { District };
+export type { District, TimeOfDay };
 
 /** Pointer position relative to the CityBlocks root, in layout px. */
 export interface CityPointer {
@@ -35,14 +35,20 @@ export interface CityBlocksProps {
   streetWidth?: number;
   /** Layout seed: same seed, same city. Default 1. */
   seed?: number;
+  /**
+   * day: concrete and limestone roofs in daylight, cast shadows, glass
+   * windows, no window lights (canon Decision #4: daylit by default).
+   * night: navy blocks with lit windows; for night scenes only. Default day.
+   */
+  timeOfDay?: TimeOfDay;
 
-  /** Lit windows on facades. Default true. */
+  /** Window grids on facades (lit at night, glass by day). Default true. */
   windowLights?: boolean;
   /** Window light colour. Default warm orange-300 (carolina-300 in Mega City). */
   lightColor?: NeonColorInput;
   /** Lane markings and Art Deco crowns. Default per district (orange in most). */
   accentColor?: NeonColorInput;
-  /** Street and avenue fill. Default night. */
+  /** Street and avenue fill. Default concrete-500 by day, night at night. */
   streetColor?: NeonColorInput;
 
   /** Moving headlights and taillights along the lanes. Default true. Stops under reduced motion. */
@@ -51,16 +57,16 @@ export interface CityBlocksProps {
   trafficDensity?: number;
   /** Traffic speed multiplier. Default 1. */
   trafficSpeed?: number;
-  /** Default white. */
+  /** Default white (signage white by day). */
   headlightColor?: NeonColorInput;
-  /** Default apple. */
+  /** Default apple-400 at night; taxi orange-400 by day. */
   taillightColor?: NeonColorInput;
 
   /** NeonBlade name: highlight the block under the pointer. Default true. */
   hoverEffect?: boolean;
   /** NeonBlade name: hover highlight colour. Default orange at 35%. */
   hoverColor?: string;
-  /** NeonBlade name: fade the edges to night. Default false. */
+  /** NeonBlade name: fade the edges, to the daylit page (concrete-50) by day or to night. Default false. */
   overlay?: boolean;
 
   /** Draw with Skia even where WebGPU works. For stories and tests. */

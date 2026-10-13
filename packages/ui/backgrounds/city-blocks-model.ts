@@ -1,5 +1,5 @@
-import { brand, palette } from '@acme/theme';
-import { parseColor, type NeonColorInput, type Rgba } from '../neon/colors.ts';
+import { brand, palette, signage } from '@acme/theme';
+import { mixColor, parseColor, type NeonColorInput, type Rgba } from '../neon/colors.ts';
 import { shadeSteps } from '../neon/shade.ts';
 
 /**
@@ -11,6 +11,27 @@ import { shadeSteps } from '../neon/shade.ts';
  */
 
 export type District = 'downtown' | 'midtown' | 'harlem' | 'megacity';
+
+/**
+ * The light the city is drawn in. Day is the default (canon Decision #4:
+ * daylit everywhere; night is for the hatch): concrete rooftops lit from
+ * above, sun-side faces, cast shadows on the sidewalk, glass windows and no
+ * window lights. Night is the original look: navy blocks, lit windows.
+ */
+export type TimeOfDay = 'day' | 'night';
+
+const { concrete } = palette;
+
+/**
+ * The colours around the buildings for each time of day: the street (the
+ * canvas clear colour, and the colour a host should show before the city
+ * draws) and the edge fade of the `overlay` vignette. Day fades to the
+ * daylit page (`bg`, concrete-50) so the hero runs into the next section.
+ */
+export const CITY_SKY: Record<TimeOfDay, { street: string; fade: string }> = {
+  day: { street: concrete[500], fade: concrete[50] },
+  night: { street: brand.night, fade: brand.night },
+};
 
 /**
  * Quad kinds, read by both renderers:
@@ -73,6 +94,8 @@ export interface CityInput {
   /** Lane-marking and accent colour. */
   accentColor: NeonColorInput;
   windowLights: boolean;
+  /** Default 'day'. */
+  timeOfDay?: TimeOfDay;
 }
 
 /** Screen offset per px of building height: up and to the right. */
@@ -99,6 +122,8 @@ interface DistrictSpec {
   /** Traffic sprites per 1000 px of lane. */
   traffic: number;
   litFraction: number;
+  /** Daylight stone and glass: the bodies and block ground by day. */
+  day: { bodies: string[]; ground: string };
 }
 
 const SPECS: Record<District, DistrictSpec> = {
@@ -107,24 +132,31 @@ const SPECS: Record<District, DistrictSpec> = {
     aspect: 1.5, lots: [1, 2], fill: 0.85, height: [0.9, 2.6], tiers: [2, 4],
     spire: 0.3, waterTower: 0, crown: 0.08,
     bodies: ['royal', 'royal', 'ink', 'carolina'], ground: palette.ink[900], traffic: 9, litFraction: 0.42,
+    // Sky-reflecting glass curtain walls among pale granite.
+    day: { bodies: [palette.carolina[300], concrete[300], palette.royal[200], concrete[200], palette.carolina[200]], ground: concrete[200] },
   },
   // Midtown: long avenue blocks, stepped Art Deco setbacks, rooftop water towers.
   midtown: {
     aspect: 2.5, lots: [2, 4], fill: 0.85, height: [0.4, 1.4], tiers: [2, 4],
     spire: 0.06, waterTower: 0.4, crown: 0.16,
     bodies: ['ink', 'ink', 'ink', 'royal', 'silver'], ground: palette.ink[900], traffic: 12, litFraction: 0.5,
+    // Limestone and brick setbacks, the odd glass slab.
+    day: { bodies: [concrete[200], concrete[100], concrete[300], concrete[200], palette.orange[100], palette.carolina[200]], ground: concrete[200] },
   },
   // Harlem: brownstone rows, project slabs on lawns, a few towers behind.
   harlem: {
     aspect: 2.6, lots: [3, 5], fill: 1, height: [0.24, 0.36], tiers: [1, 1],
     spire: 0, waterTower: 0.1, crown: 0,
     bodies: [palette.orange[900], palette.orange[950], palette.apple[900]], ground: palette.ink[900], traffic: 6, litFraction: 0.55,
+    // Brownstone and red brick rows.
+    day: { bodies: [palette.orange[700], palette.orange[800], palette.apple[800]], ground: concrete[200] },
   },
   // Mega City: future NYC, megastructures over merged blocks and sky bridges.
   megacity: {
     aspect: 2.0, lots: [1, 1], fill: 1, height: [1.8, 3.4], tiers: [3, 5],
     spire: 0.5, waterTower: 0, crown: 0.3,
     bodies: ['royal', 'ink', 'carolina'], ground: palette.ink[950], traffic: 16, litFraction: 0.6,
+    day: { bodies: [palette.carolina[200], palette.royal[300], palette.silver[200], palette.carolina[300]], ground: concrete[200] },
   },
 };
 
@@ -165,16 +197,31 @@ interface Box {
 
 const WINDOW_PITCH = 4.5;
 
+/**
+ * Daylight shade steps: the sun stands high to the south-east, so roofs
+ * catch the most light, south faces show the stone itself and west faces
+ * turn toward concrete-900. Unlit windows (0.55 of the face, in the shader)
+ * then read as glass, not as dark rooms.
+ */
+function dayShade(body: NeonColorInput) {
+  return {
+    top: mixColor(body, signage.white, 0.2),
+    side: mixColor(body, body, 0),
+    deep: mixColor(body, concrete[900], 0.42),
+  };
+}
+
 /** West face, south face and roof of one extruded box, back to front. */
-function boxQuads(b: Box, seed: number, lit: number, windowLights: boolean): Quad[] {
+function boxQuads(b: Box, seed: number, lit: number, windowLights: boolean, day: boolean): Quad[] {
   const [ex, ey] = EXTRUDE;
   const bx = ex * b.base;
   const by = ey * b.base;
   const tx = ex * b.top;
   const ty = ey * b.top;
-  const s = shadeSteps(b.shade);
+  const s = day ? dayShade(b.shade) : shadeSteps(b.shade);
   const rise = (b.top - b.base) * -ey;
-  const windows = windowLights && b.windows && rise > 6;
+  // By day a window grid only reads on the taller faces; on low ones it is noise.
+  const windows = windowLights && b.windows && rise > (day ? 16 : 6);
   const rows = Math.max(1, Math.round(rise / WINDOW_PITCH));
   const southCols = Math.max(1, Math.round((b.x1 - b.x0) / WINDOW_PITCH));
   const westCols = Math.max(1, Math.round((b.y1 - b.y0) / (WINDOW_PITCH * 1.6)));
@@ -206,10 +253,10 @@ function tower(
   r: () => number,
   spec: DistrictSpec,
   x0: number, y0: number, x1: number, y1: number,
-  height: number, order: number, accent: NeonColorInput,
+  height: number, order: number, accent: NeonColorInput, day = false,
 ): Box[] {
   const boxes: Box[] = [];
-  const body = pick(r, spec.bodies);
+  const body = pick(r, day ? spec.day.bodies : spec.bodies);
   const tiers = int(r, spec.tiers);
   let base = 0;
   let fx0 = x0, fy0 = y0, fx1 = x1, fy1 = y1;
@@ -238,7 +285,7 @@ function tower(
     // Wooden water tower on legs: a dark stand and a cedar tank.
     const wx = fx0 + (fx1 - fx0) * (0.2 + r() * 0.5);
     const wy = fy0 + (fy1 - fy0) * (0.2 + r() * 0.5);
-    boxes.push({ x0: wx - 2, y0: wy - 2, x1: wx + 2, y1: wy + 2, base, top: base + 4, shade: 'ink', windows: false, order });
+    boxes.push({ x0: wx - 2, y0: wy - 2, x1: wx + 2, y1: wy + 2, base, top: base + 4, shade: day ? concrete[700] : 'ink', windows: false, order });
     boxes.push({ x0: wx - 2.6, y0: wy - 2.6, x1: wx + 2.6, y1: wy + 2.6, base: base + 4, top: base + 10, shade: palette.orange[800], windows: false, order });
   }
   return boxes;
@@ -246,6 +293,7 @@ function tower(
 
 export function buildCity(input: CityInput): CityLayout {
   const { width, height, district, blockSize, streetWidth, seed } = input;
+  const day = (input.timeOfDay ?? 'day') === 'day';
   const spec = SPECS[district];
   const r = rng(seed * 9973 + district.length * 131);
   const accent = input.accentColor;
@@ -272,9 +320,9 @@ export function buildCity(input: CityInput): CityLayout {
   const boxes: Box[] = [];
   const blocks: BlockRect[] = [];
   const laneList: Lane[] = [];
-  const ground = parseColor(spec.ground);
-  const lawn = parseColor(palette.leaf[900]);
-  const curb = parseColor(palette.ink[800]);
+  const ground = parseColor(day ? spec.day.ground : spec.ground);
+  const lawn = parseColor(day ? palette.leaf[300] : palette.leaf[900]);
+  const curb = parseColor(day ? concrete[300] : palette.ink[800]);
 
   let order = 0;
   for (let row = 0; row < rows; row++) {
@@ -295,7 +343,7 @@ export function buildCity(input: CityInput): CityLayout {
       const ix0 = bx + pad, iy0 = by + pad, ix1 = bx + bw - pad, iy1 = by + blockH - pad;
 
       if (district === 'megacity') {
-        boxes.push(...tower(r, spec, ix0, iy0, ix1, iy1, range(r, spec.height) * scale, order++, accent));
+        boxes.push(...tower(r, spec, ix0, iy0, ix1, iy1, range(r, spec.height) * scale, order++, accent, day));
         continue;
       }
       if (isProjects) {
@@ -307,7 +355,7 @@ export function buildCity(input: CityInput): CityLayout {
           const sx1 = ix0 + (s + 1) * sw - sw * 0.18;
           const sy0 = iy0 + (iy1 - iy0) * 0.3;
           const sy1 = iy1 - (iy1 - iy0) * 0.25;
-          boxes.push({ x0: sx0, y0: sy0, x1: sx1, y1: sy1, base: 0, top: range(r, [0.9, 1.3]) * scale, shade: palette.apple[800], windows: true, order: order++ });
+          boxes.push({ x0: sx0, y0: sy0, x1: sx1, y1: sy1, base: 0, top: range(r, [0.9, 1.3]) * scale, shade: day ? palette.apple[700] : palette.apple[800], windows: true, order: order++ });
         }
         continue;
       }
@@ -325,9 +373,9 @@ export function buildCity(input: CityInput): CityLayout {
             const rx0 = ix0 + k * runW;
             const rx1 = rx0 + runW - 0.6;
             const top = range(r, spec.height) * scale;
-            const stone = pick(r, spec.bodies);
+            const stone = pick(r, day ? spec.day.bodies : spec.bodies);
             if (behind && k === 0) {
-              boxes.push(...tower(r, SPECS.midtown, rx0, ry0, rx1, ry1, range(r, [1.4, 2.2]) * scale, order++, accent));
+              boxes.push(...tower(r, SPECS.midtown, rx0, ry0, rx1, ry1, range(r, [1.4, 2.2]) * scale, order++, accent, day));
               continue;
             }
             boxes.push({ x0: rx0, y0: ry0, x1: rx1, y1: ry1, base: 0, top, shade: stone, windows: true, order });
@@ -348,7 +396,7 @@ export function buildCity(input: CityInput): CityLayout {
           const remaining = lots - k;
           const lw = k === lots - 1 ? ix1 - cursor : ((ix1 - cursor) / remaining) * (0.7 + r() * 0.6);
           if (r() < spec.fill && lw > 4) {
-            boxes.push(...tower(r, spec, cursor + 0.6, ry0, cursor + lw - 0.6, ry1, range(r, spec.height) * scale, order++, accent));
+            boxes.push(...tower(r, spec, cursor + 0.6, ry0, cursor + lw - 0.6, ry1, range(r, spec.height) * scale, order++, accent, day));
           }
           cursor += lw;
         }
@@ -392,12 +440,46 @@ export function buildCity(input: CityInput): CityLayout {
 
   const light = parseColor(input.lightColor);
   const quads: Quad[] = [...plates];
+  if (day) quads.push(...castShadows(boxes));
   const hoverSlot = quads.length;
   quads.push({ p: rect(0, 0, 0, 0), color: [0, 0, 0, 0], win: [QuadKind.FLAT, 0, 0, 0] });
   quads.push(...lanes);
-  boxes.forEach((b, i) => quads.push(...boxQuads(b, (seed * 31 + i) % 997, spec.litFraction, input.windowLights)));
+  // By day no window is lit: the facade grid stays as glass.
+  boxes.forEach((b, i) => quads.push(...boxQuads(b, (seed * 31 + i) % 997, day ? 0 : spec.litFraction, input.windowLights, day)));
 
   return { width, height, quads, hoverSlot, blocks, lanes: laneList, light };
+}
+
+/** Shadow cast per px of building height: north-west, onto the sidewalk to the left. */
+const SHADOW: readonly [number, number] = [-0.34, -0.12];
+const SHADOW_ALPHA = 0.28;
+/** Strength of the daylit edge fade (the vignette quad's alpha). */
+const DAY_FADE = 0.6;
+
+/**
+ * Daylight cast shadows, one translucent quad per building on the ground
+ * plates, under every face. Each spans the footprint and the footprint
+ * shifted along SHADOW by the building's full height, so the part that shows
+ * falls on the sidewalk west of the building, and neighbours' shadows overlap
+ * into a deeper tone the way they do on a street at noon.
+ */
+function castShadows(boxes: Box[]): Quad[] {
+  const height = new Map<number, number>();
+  const foot = new Map<number, Box>();
+  for (const b of boxes) {
+    height.set(b.order, Math.max(height.get(b.order) ?? 0, b.top));
+    if (b.base === 0 && !foot.has(b.order)) foot.set(b.order, b);
+  }
+  const [r, g, bl] = parseColor(concrete[900]);
+  const color: Rgba = [r, g, bl, SHADOW_ALPHA];
+  const out: Quad[] = [];
+  for (const [order, f] of foot) {
+    const h = height.get(order) ?? 0;
+    const dx = SHADOW[0] * h;
+    const dy = SHADOW[1] * h;
+    out.push({ p: [f.x0 + dx, f.y0 + dy, f.x1 + dx, f.y0 + dy, f.x1, f.y1, f.x0, f.y1], color, win: [QuadKind.FLAT, 0, 0, 0] });
+  }
+  return out;
 }
 
 /** Index of the block under a point, or -1. */
@@ -453,9 +535,11 @@ export function trafficAt(layout: CityLayout, district: District, time: number, 
   return out;
 }
 
-/** Full-screen fade to night at the edges (NeonBlade's `overlay`). */
-export function vignetteQuad(width: number, height: number): Quad {
-  return { p: rect(0, 0, width, height), color: parseColor(brand.night), win: [QuadKind.VIGNETTE, 0, 0, 0] };
+/** Full-screen fade at the edges (NeonBlade's `overlay`): to the daylit page by day, to night at night. */
+export function vignetteQuad(width: number, height: number, timeOfDay: TimeOfDay = 'day'): Quad {
+  const [r, g, b] = parseColor(CITY_SKY[timeOfDay].fade);
+  // By day a lighter hand: a full fade to concrete-50 reads as haze.
+  return { p: rect(0, 0, width, height), color: [r, g, b, timeOfDay === 'day' ? DAY_FADE : 1], win: [QuadKind.VIGNETTE, 0, 0, 0] };
 }
 
 /** Floats per quad when packed for the GPU: 4 corners, colour, win. */

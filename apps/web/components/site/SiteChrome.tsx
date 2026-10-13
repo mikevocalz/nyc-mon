@@ -47,8 +47,8 @@ const siteLogo = (
  *  carries no auth (ADR 0003) — there is no avatar slot here. The links fold
  *  into the menu below `lg`: the full-height wordmark, five links and the
  *  waitlist CTA need about 900px. The waitlist is the site's primary action,
- *  so it wears the orange CTA face. The skyline strip shows from `md` and is
- *  dropped on phones, upright or sideways, where height is scarce. */
+ *  so it wears the orange CTA face. The skyline strip shows from `md`, daylit
+ *  over the hero's daylit city, and is dropped on phones, upright or sideways, where height is scarce. */
 export function SiteNavBar() {
   const pathname = usePathname() ?? '/';
   if (!showsSiteChrome(pathname)) return null;
@@ -58,7 +58,10 @@ export function SiteNavBar() {
       items={navItems(pathname)}
       cta={NAV_CTA}
       ctaTone="orange"
-      skylineClassName="hidden h-5 md:flex short:hidden"
+      // A daylit skyline: concrete sky, no lit windows (canon Decision #4;
+      // night is for the hatch). The bar itself stays the kit's dark band.
+      skylineClassName="hidden h-5 bg-concrete-200 md:flex short:hidden"
+      skylineWindows={false}
       skipTo={CONTENT_ID}
       district="midtown"
       logo={siteLogo}
