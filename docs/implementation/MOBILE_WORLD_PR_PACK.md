@@ -78,3 +78,25 @@ The first Game milestone renders **only the NYC environment**. It must be visibl
 - No raw HTML UI; app/features feature boundaries enforced.
 - No invented assets or copyrighted source transplant without license verification.
 - PRs small and ordered; no merge before tests/review.
+
+## Future NYC visual layer — skyscrapers and holographic AdSurfaces
+
+Preserve the real NYC base map and recognizable borough identities. Author selected tall towers, retrofitted rooftops, elevated structures, neon signage and futuristic façades as a **separate optional world-decoration layer**, not replacements for OSM road/building geometry.
+
+Visual direction: near-future New York inspired by the atmosphere of Blade Runner and Ghost in the Shell, with original NYC-Mon designs. Harlem and the Bronx must retain their street-level cultural character. No wholesale copy of protected film designs, brands or signage.
+
+**Addressable AdSurface contract:** each eligible billboard/façade/holographic anchor gets a stable world-space ID, geo/borough/neighborhood metadata, orientation, dimensions, occlusion and visibility limits, permitted creative formats, LOD priority, and campaign placement eligibility. Keep inventory data-driven so ad content can change without rebuilding the city.
+
+**CMS pipeline:** Payload defines business, creative, campaign, schedule, daypart, target geography, approval/moderation, venue/POI link, community inventory and analytics. Bunny media delivery can be used for approved creative. Clear sponsorship labels and no pay-to-win effects. Community placements for nonprofits and small local businesses.
+
+**Rendering:** Three.js WebGPU + TypeGPU for scene geometry, shader-based holograms, emissive surfaces, volumetric-looking effects where performance permits, animated texture/video surfaces, projection/occlusion and distance-based quality tiers. React Native owns UI; no HTML-in-canvas ad UI or raw DOM overlay as a substitute for the world renderer. Avoid autoplaying high-cost media when offscreen.
+
+**Future PR sequence, after city-first visible frame:**
+1. Skyline art direction and building overlay registry.
+2. Authored futuristic towers/rooftop add-ons with spatial metadata.
+3. Holographic AdSurface component and WebGPU/TypeGPU effect presets.
+4. Payload campaign/creative/approval collections and API contracts.
+5. Local-business targeting, scheduling, fallback content and community inventory.
+6. Impression/interaction measurement, privacy safeguards, accessibility and device performance gates.
+
+The first city-rendering milestone remains **city only**. Do not gate the visible city on the CMS, advertisers, holograms or future tower assets.
