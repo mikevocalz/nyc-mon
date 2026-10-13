@@ -77,7 +77,7 @@ export function waitlistMessage(state: { status: WaitlistStatus | 'idle'; field?
     case 'under13':
       return {
         tone: 'notice',
-        body: "Thanks for wanting in. We can't add you to the waitlist, and nothing you typed was saved. A parent or guardian can join with their own email to hear when NYC-MON is out.",
+        body: "Thanks for wanting in. We can't add you to the waitlist, and nothing you typed was saved. Later, a parent or guardian can join from their own phone or computer to hear when NYC-MON is out.",
         link: { label: "For parents: children's privacy", href: '/legal/childrens-privacy' },
       };
     case 'invalid':
@@ -90,7 +90,7 @@ export function waitlistMessage(state: { status: WaitlistStatus | 'idle'; field?
     case 'rate_limited':
       return {
         tone: 'error',
-        body: 'Too many tries from this connection. Try again in an hour. Your email is still in the box.',
+        body: 'Too many tries from this connection. Try again in an hour. Your email is still in the box; enter your birth year again.',
       };
     case 'error':
       return {

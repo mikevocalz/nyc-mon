@@ -20,5 +20,13 @@ export function resolveSiteUrl(raw: string | undefined): string {
 
 /** The site's public base URL, e.g. `https://example.com` (no trailing slash). */
 export function siteUrl(): string {
-  return resolveSiteUrl(process.env.NEXT_PUBLIC_SITE_URL);
+  const url = resolveSiteUrl(process.env.NEXT_PUBLIC_SITE_URL);
+  if (process.env.NODE_ENV === 'production' && url === FALLBACK_SITE_URL && !warnedFallback) {
+    warnedFallback = true;
+    // Canonicals, og:image, robots.txt and the sitemap would all point at localhost.
+    console.warn('[site-url] NEXT_PUBLIC_SITE_URL is unset or invalid in a production build; using ' + FALLBACK_SITE_URL + '.');
+  }
+  return url;
 }
+
+let warnedFallback = false;

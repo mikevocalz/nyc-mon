@@ -73,7 +73,6 @@ export function GridBand() {
           <Button
             size="sm"
             title={settled ? copy.play : copy.pause}
-            aria-pressed={settled}
             onPress={() => motion.setState({ settled: !settled })}
           />
         </View>

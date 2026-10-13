@@ -42,7 +42,7 @@ test('invalid is tied to the email field and suggests a fix (WCAG 3.3.3)', () =>
 test('under13 says nothing was saved and offers the guardian path', () => {
   const message = waitlistMessage({ status: 'under13' });
   assert.match(message?.body ?? '', /nothing you typed was saved/);
-  assert.match(message?.body ?? '', /parent or guardian can join with their own email/);
+  assert.match(message?.body ?? '', /parent or guardian can join from their own phone or computer/);
   assert.equal(message?.link?.href, '/legal/childrens-privacy');
 });
 

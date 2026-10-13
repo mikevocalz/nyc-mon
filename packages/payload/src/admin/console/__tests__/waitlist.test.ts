@@ -75,7 +75,7 @@ function post(body: unknown, headers: Record<string, string> = {}): Request {
   });
 }
 
-// NOW is in 2026: 2013 is the newest year that answers 13+, 2012..2026 any year that could be under 13.
+// NOW is in 2026: 2012 is the newest year that answers 13+; 2013..2026 count as under 13 (isConsentRequired: 2026 - year <= 13).
 const adult = { email: '  Kid.Grown@Example.COM ', birthYear: 1990, district: 'harlem', source: 'get' };
 
 describe('handleJoinWaitlist', () => {

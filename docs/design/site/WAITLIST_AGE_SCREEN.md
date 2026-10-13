@@ -13,7 +13,7 @@ The form now uses the same approach as the app's M04 gate (ADR 0001):
 - **One question: birth year.** The field is labelled "Birth year" with the hint "We ask everyone. Four digits." It starts empty, has no placeholder year, and has `autocomplete=off`, so browser autofill on a shared family device can't fill in a passing answer. The app asks for a year only and never a month, so the web form does the same and both use one rule.
 - **Nothing before the answer names an age or the line.** The pre-answer copy has no "13", "older" or "younger". The browser checks only the shape of the year, using M04's wording: "Enter all four digits of the year.", "That year hasn't happened yet. Check the number." and "Check that year. It needs to be 1900 or later." None of them says which years can join. A unit test (`copy.test.ts`) fails if a threshold word or a sample year shows up in the form copy.
 - **The server decides.** admin-vite applies `isConsentRequired` from `@acme/core/sim`, the same function M04, M03's create guard and the sign-up hook use: `currentYear(UTC) - birthYear <= 13` counts as under 13. A year can't tell 12 from 13, so anyone born in `currentYear - 13` is treated as under 13. That leans protective and matches the app.
-- **The under-13 answer is kind and gives no way to retry.** The form is replaced by: "Thanks for wanting in. We can't add you to the waitlist, and nothing you typed was saved. A parent or guardian can join with their own email to hear when NYC-MON is out." A link follows: "For parents: children's privacy" → `/legal/childrens-privacy`. The note names no age, has no "try again" and doesn't suggest another year. Every claim in it is true today: nothing is stored, and any adult can join the waitlist with their own email.
+- **The under-13 answer is kind and gives no way to retry.** The form is replaced by: "Thanks for wanting in. We can't add you to the waitlist, and nothing you typed was saved. Later, a parent or guardian can join from their own phone or computer to hear when NYC-MON is out." A link follows: "For parents: children's privacy" → `/legal/childrens-privacy`. The note names no age, has no "try again" and doesn't suggest another year. Every claim in it is true today: nothing is stored, and any adult can join from their own device. The note says "later" and "their own phone or computer" because the one-hour hold cookie also answers a parent on the same browser during that hour (review finding, 2026-10-13).
 - **Retrying right away is blocked.** Two layers do this:
   1. The page stays in its result state. The `under13` branch renders no form, so the visitor can't pick another year on the same page.
   2. When admin-vite answers `under13`, the server action sets the cookie `nycmon_waitlist_hold=1`: `HttpOnly`, `SameSite=Lax`, `Secure` in production, `Path=/`, `Max-Age=3600`. While the cookie is set, any post to the action (after a reload or the back button, with or without JavaScript) gets `under13` straight back, and the email and year are never sent to admin-vite. The cookie holds no email, no year and no IP. It is in `apps/web/lib/waitlist-hold.ts`.
@@ -48,6 +48,9 @@ The `POST /v1/waitlist` contract: the body is `{ email, birthYear, district?, so
 - `apps/web/lib/waitlist.test.ts`: request body, mapping, `toBirthYear`
 
 ## Legal review: required, not done
+
+- The hold also blocks a parent on the same shared browser for one hour. Decide whether one hour, a session cookie or a shorter hold is right.
+
 
 Nothing here is legal advice, and none of it has been reviewed by counsel. Before launch, counsel should confirm:
 
