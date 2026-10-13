@@ -108,7 +108,7 @@ const ART = {
   // H-Lynk Core renders from device-scene.ts at its rest pose on ink-950 (PS-017; HANDOFF §H-LYNK
   // "Static capture"). The stage box is 4:5: 32rem wide from `xl`, 28rem from `lg`, 24rem from `md`.
   'hlynk.static': {
-    src: '/home/h-lynk-core-v2.png',
+    src: `${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/home/h-lynk-core-v2.png`,
     width: 896,
     height: 1120,
     alt: '',
@@ -117,7 +117,7 @@ const ART = {
   },
   // Crops of the same render for the proof rows; each row's headline and line name the part shown.
   'hlynk.scanner': {
-    src: '/home/h-lynk-scanner.png',
+    src: `${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/home/h-lynk-scanner.png`,
     width: 640,
     height: 480,
     alt: '',
@@ -125,7 +125,7 @@ const ART = {
     sizes: `${LG_UP} 12rem, 9rem`,
   },
   'hlynk.controls': {
-    src: '/home/h-lynk-controls.png',
+    src: `${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/home/h-lynk-controls.png`,
     width: 640,
     height: 480,
     alt: '',
