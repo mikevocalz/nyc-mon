@@ -1,6 +1,7 @@
 import { LinkButton, SolidPanel, Text } from '@acme/ui';
 import { Article, Heading, List, ListItem, Paragraph, Section } from '@acme/ui/html';
 import { View } from '@acme/ui/tw';
+import { siteHref } from '../../lib/site-href';
 import { Eyebrow } from '../home/Eyebrow';
 import { STORY_COPY } from './copy';
 
@@ -138,7 +139,7 @@ export function StoryPage() {
             {copy.footer.title}
           </Heading>
           <Text className="text-ink-300">{copy.footer.body}</Text>
-          <LinkButton title={copy.footer.cta.label} href={copy.footer.cta.href} variant="cta" size="lg" testID="story-cta" />
+          <LinkButton title={copy.footer.cta.label} href={siteHref(copy.footer.cta.href)} variant="cta" size="lg" testID="story-cta" />
         </View>
       </Section>
     </View>

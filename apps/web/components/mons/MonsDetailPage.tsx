@@ -1,6 +1,7 @@
 import { Badge, LinkButton, SolidPanel } from '@acme/ui';
 import { Article, Heading, List, ListItem, Paragraph, Section } from '@acme/ui/html';
 import { Text, View } from '@acme/ui/tw';
+import { siteHref } from '../../lib/site-href';
 import { Eyebrow } from '../home/Eyebrow';
 import { W02_COPY } from './copy';
 import type { MonsStarter } from './starters';
@@ -58,7 +59,7 @@ export function MonsDetailPage({ starter }: { starter: MonsStarter }) {
           {starter.cultureNote ? (
             <Paragraph className="my-0 text-sm leading-6 text-text-muted">{starter.cultureNote}</Paragraph>
           ) : null}
-          <LinkButton title={copy.back} href={copy.backHref} testID={`w02-${starter.slug}-back`} />
+          <LinkButton title={copy.back} href={siteHref(copy.backHref)} testID={`w02-${starter.slug}-back`} />
         </Article>
       </Section>
     </View>

@@ -1,6 +1,7 @@
 import { LinkButton, SolidPanel } from '@acme/ui';
 import { Heading, ListItem, OrderedList, Paragraph, Section } from '@acme/ui/html';
 import { Text, View } from '@acme/ui/tw';
+import { siteHref } from '../../lib/site-href';
 import { Eyebrow } from '../home/Eyebrow';
 import { W04_COPY } from './copy';
 
@@ -48,7 +49,7 @@ export function HowItWorksPage() {
             {cta.title}
           </Heading>
           <Paragraph className="my-0 max-w-2xl text-lg leading-8 text-ink-50">{cta.body}</Paragraph>
-          <LinkButton title={cta.cta} href={cta.ctaHref} variant="cta" size="lg" testID="w04-cta" />
+          <LinkButton title={cta.cta} href={siteHref(cta.ctaHref)} variant="cta" size="lg" testID="w04-cta" />
         </View>
       </Section>
     </View>
