@@ -4,13 +4,15 @@
 Native tabs: HOME | GAME | raised H-LYNK | MONS | CALLER. Home is landing/choice, Game is playable NYC, H-Lynk is device + care, Mons is species dex, Caller is player identity. No Battles tab. Web remains Mon Space companion only.
 
 ## Nonnegotiables
-- React Native screens under `apps/mobile/app/features/<feature>/` (or existing app/features root verified in repo); Expo Router route files only re-export/mount features.
+- React Native feature screens live under `packages/app/features/<feature>/`, imported through `@acme/app/features/*`. Expo Router files under `apps/mobile/app/` only re-export/mount those features; keep feature implementations outside that route tree.
 - Reuse existing `packages/ui`, theme tokens, and semantic components. No raw HTML screens, Tamagui, Bento, CSS-shader substitute, Unity.
 - Game uses Three.js WebGPU + react-native-webgpu + TypeGPU. Audit compatibility and exact installed package versions before edits; do not blindly upgrade.
 - Zustand for cross-feature state; Reanimated/Gesture Handler and Kinetrell for motion. No GSAP/Lenis directly.
 - Preserve current H-Lynk/care functionality and one persistent Mon.
 - Web never gets full Game screen.
 - Accessibility, safe areas, orientation, RTL, reduced motion, screen reader labels, touch target sizes, no regressions.
+
+Architecture reference: the existing [`apps/mobile/app/(home)/index.tsx`](https://github.com/mikevocalz/nyc-mon/blob/f794374f84912ebd01f1d68bba9bee5b862a1db8/apps/mobile/app/%28home%29/index.tsx) mounts `@acme/app/features/companion/HomeIndexScreen.tsx`; [`packages/app/package.json`](https://github.com/mikevocalz/nyc-mon/blob/f794374f84912ebd01f1d68bba9bee5b862a1db8/packages/app/package.json) exposes that feature path. [Expo Router requires non-navigation components to live outside its route directory](https://docs.expo.dev/router/basics/core-concepts/#6-non-navigation-components-live-outside-the-srcapp-directory).
 
 ## Mandatory skill roster (inspect actual skill files before implementation)
 - `expo/skills`
@@ -33,7 +35,7 @@ Principal React Native/Expo architect; Staff cross-platform navigation engineer;
 Spawn independent read-only discovery subagents for (A) repo architecture + dependencies, (B) Harlem Might foldable parity, (C) metro-live OSM/rendering architecture/license, (D) design/UX references, (E) device test matrix. Consolidate into a dependency graph before writing code. Use a separate integration reviewer to detect duplicate components and conflicts.
 
 ## Per-screen PRs — separate, independently testable
-**PR 1 — Native shell / navigation:** Home, Game, H-Lynk, Mons, Caller tab structure; Home launch; raised center action; deep linking; all feature ownership in app/features; preserve auth/care. Tests: navigation, tab persistence, safe areas.
+**PR 1 — Native shell / navigation:** Home, Game, H-Lynk, Mons, Caller tab structure; Home launch; raised center action; deep linking; all feature ownership in `packages/app/features/`; preserve auth/care. Tests: navigation, tab persistence, safe areas.
 
 **PR 2 — Home placeholder:** Named Home screen, a clear Enter Game action and no fabricated live content. Tests: launch and action route.
 
@@ -75,7 +77,7 @@ The first Game milestone renders **only the NYC environment**. It must be visibl
 - Baseline frame-time, memory and tile load metrics captured before optimization claims.
 - No unverified “60 FPS” or complete NYC assertions.
 - Foldable hinge-safe rail and Inspector parity verified on device/emulator.
-- No raw HTML UI; app/features feature boundaries enforced.
+- No raw HTML UI; `packages/app/features/` feature boundaries and thin `apps/mobile/app/` routes enforced.
 - No invented assets or copyrighted source transplant without license verification.
 - PRs small and ordered; no merge before tests/review.
 
