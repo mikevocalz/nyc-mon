@@ -488,3 +488,35 @@ The optional fourth tile was left out: the brief's candidates were a third photo
 **Verification.** Isolated build on :3112. Cards stack at 390 with no horizontal overflow and the notch visible; they sit in one row at 1440. `site-qa:axe` reports no violations on `/mons` and `/mons/bodega-cee`.
 
 **Return condition.** None.
+
+---
+
+## PS-035 — The hero headline and support line are never animated
+
+**Disposition:** decided and implemented (WEB perf pass, 2026-10-13).
+
+**Context.** Lighthouse mobile names the hero support line (`<p id="mfx-hero-body">`) as the LCP element, and the H1 is the other candidate. Both were targets of `w01.hero.enter` (y 34→0 and 16→0 at +160 ms), so the LCP element carried an inline GSAP transform and its final position depended on the motion chunk binding in time. PS-013 already made the hero server HTML; the entrance was the last thing that could move the LCP text.
+
+**Decision.** The headline and support line are not motion markers. They render with plain ids, `w01-hero-title` and `w01-hero-body` (`HERO_LCP_TEXT_IDS` in `motion-markers.ts`), so no timeline can target them; they paint in their final place from the server HTML and never wait on JS. `w01.hero.enter` moves only what surrounds them, and now lives as data in `hero-motion.ts`: the poster photograph settles (y 24→0, scale 1.05→1, 0–950 ms), the seal stamps (y 16→0, rotate −2°→0, 300–920 ms), the CTA and district control step in (y 16→0, 420–860 ms). Transform only, `power2.out`, page-motion tokens, same bind budget: skipped if the motion layer binds after 1800 ms (`HERO_ENTRANCE_BIND_BUDGET_MS`). Reduced motion is unchanged: no `MotionRoot`, no entrance. Kinetrell stays the only API and `gsap.ticker` the only clock. `hero-motion.test.ts` fails if a hero title/body target, an opacity track, or an `mfx-hero-title|body` id comes back.
+
+**Alternatives.** An already-visible, no-layout treatment on the text (a clip or colour beat): still a JS-driven change on the LCP element, for no stated purpose the headline needs. A CSS-only entrance on the text: same problem without JS, and a second motion system beside Kinetrell.
+
+**Consequences.** Measured on an isolated production build (Lighthouse 13.5 mobile, 5-run median, contended container): LCP is unchanged (3759 ms vs 3346 ms on the old :3100 build in the same session; runs are bimodal, 2.1–3.8 s, on both). The observed LCP paint is ~200 ms after navigation (TTFB ~15 ms, render delay ~120–190 ms); the simulated 3.7 s comes from Lantern's pessimistic graph counting the ~20 low-priority script chunks requested before that paint, and from the hero canvas (below). So the transform was not what held LCP; this change removes a risk, not the bottleneck. The bottlenecks are the JS requested before first paint and the hero `CityBlocks` canvas: with the canvas disabled TBT drops from ~15.9 s to 168 ms and Performance from 58 to 87; with the canvas paused from its first frame TBT is ~2.8 s (`canvaskit.wasm`, 3.2 MB, compile plus two 1.1–1.4 s draws). Those are separate decisions.
+
+**Return condition.** None. Any future hero text motion has to leave the LCP candidates static.
+
+---
+
+## PS-036 — The grid band settles like the hero city
+
+**Disposition:** decided and implemented (WEB perf pass, 2026-10-13).
+
+**Context.** `GridBand` (the Storybook GridFloor between Starters and Care, a full `svh` tall) moved for as long as it was on screen. It paused offscreen through `LazyScene`, so PS-010's "one live canvas" held, but it was continuous decorative motion with no decision behind it, passing WCAG 2.2.2 only through its pause button. PS-027 said the page had no other auto-running motion after PS-025, which this band contradicted.
+
+**Decision.** Keep it, with a stated purpose and a bounded run. Purpose: a spatial beat. The street running toward the reader carries them from the eggs on the table out into the city where care happens. It travels for 4.5 s from the first time it is actually on screen (not from mount: `LazyScene` mounts 600 px early), then holds a still frame, the PS-027 pattern with the same window and a Zustand instance store. Play replays the window (the visitor's own action), Pause stops it early. Offscreen it stays paused (PS-010). Under reduced motion the kit's `QuadBackground` draws it still and the button is not rendered, since it would control nothing.
+
+**Alternatives.** Delete the band: it is the page's only transition beat between the creature sections and the care section, and the purpose holds. A still frame only, no motion: loses the beat the band exists for. Keep the endless loop behind the button: no purpose needs motion past the arrival.
+
+**Consequences.** Verified on the isolated build at 1280×800: band pixels change for ~4.3 s after it scrolls into view, then hold; Play moves it again and it holds again ~5 s later; under reduced motion the pixels did not change across the sampled window. The reduced-motion button removal landed after that build and is checked by typecheck only. `site-qa:motion` passes (one owner, at most one drawing canvas per window). It costs nothing in the mobile Lighthouse run, which never scrolls to it.
+
+**Return condition.** If the band's purpose is dropped in a later section order, delete it rather than leave decorative motion.

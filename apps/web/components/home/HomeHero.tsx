@@ -4,6 +4,7 @@ import { View } from '@acme/ui/tw';
 import { art, artHref, artPosition } from './art';
 import { W01_COPY } from './copy';
 import { HeroCity, HeroDistrictPicker } from './HeroDistrictIsland';
+import { HERO_LCP_TEXT_IDS } from './motion-markers';
 import { PlaceCaption } from './PlaceCaption';
 import { sectionMarker } from './sections';
 
@@ -18,8 +19,10 @@ const SEAL_SIZE = 240;
  * poster with the seal stamped across its corner. The city canvas and the
  * district control are the only client islands.
  *
- * The photograph is the LCP element: eager, high priority, preloaded, in a
- * box whose aspect is fixed before it loads.
+ * The headline and the support line are the LCP candidates (the support line
+ * on phones), so they are never motion targets: plain ids, painted in place
+ * from the server HTML (PS-035). The photograph is eager, high priority,
+ * preloaded, in a box whose aspect is fixed before it loads.
  */
 export function HomeHero() {
   const copy = W01_COPY.hero;
@@ -29,7 +32,7 @@ export function HomeHero() {
     <View {...sectionMarker('hero')} className="w-full">
       {/* React hoists this into <head>; ReactDOM.preload() from a server component only reached the flight payload. */}
       <link rel="preload" as="image" href={artHref(heroArt)} fetchPriority="high" />
-      <HeroCity id="trg-hero" labelledBy="mfx-hero-title" className="lg:min-h-hero-wide">
+      <HeroCity id="trg-hero" labelledBy={HERO_LCP_TEXT_IDS.title} className="lg:min-h-hero-wide">
         <View
           data-testid="w01-hero"
           className="mx-auto w-full max-w-screen-xl flex-1 gap-10 px-4 pb-16 pt-8 sm:px-6 md:py-14 lg:grid lg:grid-cols-12 lg:content-center lg:items-center lg:gap-x-8 lg:gap-y-0 lg:px-8 lg:py-20 short:grid short:grid-cols-12 short:items-center short:gap-x-6 short:gap-y-0 short:pb-4 short:pt-3"
@@ -37,7 +40,7 @@ export function HomeHero() {
           <View className="min-w-0 items-start gap-5 lg:col-span-8 short:col-span-7 short:gap-2.5">
             <Heading
               level={1}
-              id="mfx-hero-title"
+              id={HERO_LCP_TEXT_IDS.title}
               className="my-0 flex flex-col items-start gap-2 font-display md:gap-4 text-display-hero uppercase leading-display text-signage-white md:text-display-2xl md:leading-display lg:text-display-xl lg:leading-display xl:text-display-2xl xl:leading-display short:gap-2 short:text-display-hero-short short:leading-display"
             >
               {copy.titleLines.map((segments, line) => (
@@ -58,7 +61,7 @@ export function HomeHero() {
               ))}
             </Heading>
             <Paragraph
-              id="mfx-hero-body"
+              id={HERO_LCP_TEXT_IDS.body}
               className="my-0 max-w-content-measure border-l-4 border-ink-950 bg-surface-raised px-4 py-3 text-base leading-7 text-text md:text-lg md:leading-8 short:py-1.5 short:text-sm short:leading-6"
             >
               {copy.body}

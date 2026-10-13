@@ -33,3 +33,10 @@ export function parseMotionMarker(id: string): MotionMarker | null {
 
 /** The selector that finds every marked element under a scope. */
 export const MOTION_MARKER_SELECTOR = '[id^="mfx-"], [id^="mpx-"], [id^="trg-"]';
+
+/**
+ * DOM ids of the hero headline and support line, the page's LCP candidates.
+ * Deliberately not markers: no timeline can target them, so they paint in
+ * their final place from the server HTML and never wait on JS (PS-035).
+ */
+export const HERO_LCP_TEXT_IDS = { title: 'w01-hero-title', body: 'w01-hero-body' } as const;

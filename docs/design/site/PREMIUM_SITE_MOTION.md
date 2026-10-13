@@ -31,7 +31,7 @@ ReactLenis (root, autoRaf: false)            ← no Lenis RAF loop
 
 The previous setup (`autoRaf: true` with `clock: 'external'`) left Lenis and GSAP each running a RAF loop; Phase 1 measured up to 8 RAF callbacks in one frame while scrolling (`PREMIUM_SITE_BASELINE.md` §2).
 
-Canvases: `CityBlocks` (hero) and `DeviceStage` (H-Lynk) each loop only while on screen, and `ThreeCanvas` stops three's internal `Animation` loop after `init()` (PS-010). `site-qa:motion` asserts one motion clock and at most one live canvas loop.
+Canvases: `CityBlocks` (hero), `DeviceStage` (H-Lynk) and `GridFloor` (grid band) each loop only while on screen; the hero city and the grid band also settle to a still frame 4.5 s after they start (PS-027, PS-036), and `ThreeCanvas` stops three's internal `Animation` loop after `init()` (PS-010). `site-qa:motion` asserts one motion clock and at most one live canvas loop.
 
 Refresh: `connectGsapLenis` refreshes on connect; sections that change layout after mount (the H-Lynk stage swapping capture for canvas, late images) call `ScrollTrigger.refresh()` through the timeline that owns them. Teardown: `useGSAP` reverts every timeline and trigger on unmount; `site-qa:motion` checks the trigger count returns to its post-mount value after a route away and back.
 
@@ -53,13 +53,17 @@ before first paint, so there is no flash — and only when the full motion
 path is active. The pre-hide CSS is additionally gated behind
 `prefers-reduced-motion: no-preference` as a second safety net.
 
-**LCP exception (measured, not guessed):** the hero holds the LCP element,
-so `mfx-hero-*` markers are excluded from the pre-hide
-(`globals.css`) and `w01.hero.enter` is transform-only (y/scale/rotate —
-nothing in the hero ever goes transparent). If hydration binds late
-(>1.8s), the entrance is skipped entirely and the static composition
-stands. Below-fold `mfx-*` markers keep the hide: their entrances are
-scroll-triggered, so they are not on the LCP path.
+**LCP exception (measured, not guessed):** the hero holds the LCP
+candidates, the headline and the support line (Lighthouse mobile names the
+support line). Since PS-035 they are not markers at all: they carry plain ids
+(`w01-hero-title`, `w01-hero-body`, `HERO_LCP_TEXT_IDS` in
+`motion-markers.ts`), so no timeline can target them and they paint in place
+from the server HTML. The remaining `mfx-hero-*` markers (art, seal, actions)
+are excluded from the pre-hide (`globals.css`) and `w01.hero.enter` is
+transform-only (y/scale/rotate, nothing in the hero ever goes transparent).
+If hydration binds late (>1.8s), the entrance is skipped entirely and the
+static composition stands. Below-fold `mfx-*` markers keep the hide: their
+entrances are scroll-triggered, so they are not on the LCP path.
 
 ## 3. The small vocabulary
 
@@ -68,13 +72,14 @@ No section-wide "fade everything up."
 
 | moment | type | what it does |
 |---|---|---|
-| `w01.hero.enter` | played on load (~1.1s), skipped if hydration binds >1.8s | transform-only, one composed beat (Phase 3): poster photograph settles (scale 1.05→1, y 24→0) → headline plates and support line as one block (y 34→0) → seal stamps (y 16→0, rotate −2°→0) → CTA and district control (y 16→0). No per-line stagger |
+| `w01.hero.enter` | played on load (~0.95s), skipped if hydration binds >1.8s | transform-only, one composed beat around static text (PS-035, `hero-motion.ts`): poster photograph settles (scale 1.05→1, y 24→0, 0–950ms) → seal stamps (y 16→0, rotate −2°→0, 300–920ms) → CTA and district control (y 16→0, 420–860ms). The headline and support line are the LCP text and never move. Fallback: late bind or reduced motion = the static server composition |
 | `w01.world.enter` | played at `top 90%` | the World story tile (`mfx-world-story`) resolves once |
 | `w01.world.drift` | scrub `top bottom→bottom top`, ≥768px only | the two World photographs' image layers drift inside fixed frames at `parallax.mid` and `parallax.near`; the layer overhangs its frame by `parallax.max`, so no edge shows. Frames never move |
 | `w01.hlynk.reveal` | played at `top 90%` | name block, then the two proof rows; every beat starts within 300ms (Phase 7). The device motion lives in the three.js scene (PS-018) |
 | `w01.starters.enter` | played at `top 90%` | header, then cards 0/1/2 at +100ms stagger (last beat at 300ms) |
 | `w01.care.enter` | played at `top 90%` | copy, then the readout plate |
 | `w01.hatch.reveal` | played at `top 90%` | night frame de-scales slowly (1.06→1, 1.3s) → copy → CTA — the quiet climax |
+| grid band (`GridBand.tsx`, canvas, not Kinetrell) | 4.5s from first on-screen, then still | the GridFloor street runs toward the reader as the spatial beat from Starters into Care, then holds a still frame (PS-036, the PS-027 pattern). Play replays the window, Pause stops it; paused offscreen; reduced motion = still frame, no button |
 
 Deliberately absent: pinning (allowed but not needed — the drift gives depth
 without scroll-jacking), continuous rotation, parallax inside text columns,
