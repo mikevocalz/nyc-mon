@@ -30,3 +30,33 @@ jobs:
       - run: pnpm spatial:verify-android
       - run: pnpm spatial:verify-typegpu
       - run: pnpm turbo build typecheck lint
+      - name: Verify City atlas responsive layout
+        timeout-minutes: 5
+        run: |
+          (
+            cd apps/web
+            exec node "$(node -p "require.resolve('next/dist/bin/next')")" start -p 3611 --hostname 127.0.0.1
+          ) &
+          server_pid=$!
+          cleanup() {
+            kill "$server_pid" 2>/dev/null || true
+            wait "$server_pid" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+          ready=false
+          for i in $(seq 1 60); do
+            if ! kill -0 "$server_pid" 2>/dev/null; then
+              echo '::error::City layout server exited before readiness'
+              exit 1
+            fi
+            if curl -sf --max-time 2 http://127.0.0.1:3611/city > /dev/null; then
+              ready=true
+              break
+            fi
+            sleep 1
+          done
+          if [ "$ready" != true ]; then
+            echo '::error::City layout server did not become ready'
+            exit 1
+          fi
+          BASE=http://127.0.0.1:3611 BASE_PATH='' node tooling/site-qa/city-layout.mjs

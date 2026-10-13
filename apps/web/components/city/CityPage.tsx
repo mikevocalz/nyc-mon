@@ -7,6 +7,7 @@ import { StreetGridBand } from './StreetGridBand';
 import { W03_COPY } from './copy';
 import { cityPhoto, cityPhotoHref } from './art';
 import { CityMotion } from './CityMotion';
+import { cityCardLayout } from './layout';
 
 /** District accent bars, one brand colour per card. */
 const CARD_ACCENTS = ['bg-orange-500', 'bg-royal-500', 'bg-carolina-500', 'bg-leaf-500'] as const;
@@ -37,7 +38,7 @@ export function CityPage() {
             const photo = cityPhoto(district);
             const leading = district === 'downtown';
             return (
-              <ListItem key={district} className={leading ? 'grid min-w-0 md:col-span-7 md:row-span-2' : district === 'megacity' ? 'grid min-w-0 md:col-span-12' : 'grid min-w-0 md:col-span-5'}>
+              <ListItem key={district} className={cityCardLayout(district)}>
                 <SolidPanel surface="page" depth="md" className="h-full overflow-hidden">
                   <Article aria-labelledby={`w03-${district}-title`} className="h-full">
                     {photo ? (
