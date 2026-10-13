@@ -49,6 +49,16 @@ Spawn independent read-only discovery subagents for (A) repo architecture + depe
 
 **PR 8 — Integration + Storybook + device gates:** Every screen has Storybook coverage, screenshot baselines and accessibility assertions; integration verifies Game renderer does not unmount on Inspector open/close or rotation unless intentional; native device smoke checks; no blank GPU screen; no duplicate navigation shell.
 
+## Immediate scope lock — City Renderer Only (2026-10-13)
+
+The first Game milestone renders **only the NYC environment**. It must be visible and explorable on mobile before any gameplay work.
+
+**In scope:** NYC-specific OSM geometry; one recognizable, geographically grounded NYC sample area; roads, sidewalks, building masses and a simple ground plane; camera orbit/pan/zoom and touch navigation; Three.js WebGPU + TypeGPU rendering in a React Native feature; tile streaming/LOD scaffolding; foldable/tablet viewport parity; loading/error/unsupported-GPU states; measured first-frame and memory diagnostics.
+
+**Explicitly out of scope for this milestone:** Mons, Caller characters, combat, encounter AI, spawning, multiplayer, NPCs, mission logic, trains in motion, MTA realtime, futuristic ad campaigns, EngineX robots, complex physics and interactive storefronts. Preserve interfaces for later additions but do not implement them now.
+
+**Definition of done:** Opening Game displays recognizable NYC geometry rather than a black/empty screen on supported physical iOS and Android devices; touch navigation works; phone/tablet/foldable resizing does not lose the camera/world position; no raw HTML UI; other tabs remain named placeholders. Validate upstream `vg-demos-all` license and adaptation boundaries before porting code. The first implementation PR should be the smallest working world renderer, not a city-wide content import.
+
 ## Game rendering stages after first skeleton
 1. OSM geometry compiler / NYC sample tile
 2. visible city scene + camera + Caller proxy
