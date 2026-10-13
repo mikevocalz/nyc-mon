@@ -1,10 +1,12 @@
 import { DISTRICTS, DISTRICT_COPY } from '@acme/spatial';
-import { SolidPanel } from '@acme/ui';
-import { Article, Heading, List, ListItem, Paragraph, Section } from '@acme/ui/html';
+import { Image, SolidPanel } from '@acme/ui';
+import { Article, Figure, Figcaption, Heading, List, ListItem, Paragraph, Section } from '@acme/ui/html';
 import { View } from '@acme/ui/tw';
 import { Eyebrow } from '../home/Eyebrow';
 import { StreetGridBand } from './StreetGridBand';
 import { W03_COPY } from './copy';
+import { cityPhoto, cityPhotoHref } from './art';
+import { CityMotion } from './CityMotion';
 
 /** District accent bars, one brand colour per card. */
 const CARD_ACCENTS = ['bg-orange-500', 'bg-royal-500', 'bg-carolina-500', 'bg-leaf-500'] as const;
@@ -14,10 +16,12 @@ export function CityPage() {
   const districts = W03_COPY.districts;
   const cast = W03_COPY.cast;
   return (
-    <View className="w-full flex-1 bg-bg">
+    <View id="w03-city" className="w-full flex-1 bg-bg">
+      <CityMotion />
       <Section
         aria-labelledby="w03-districts-title"
         data-testid="w03-districts"
+        data-section="city-districts"
         className="mx-auto w-full max-w-screen-xl gap-10 px-4 py-16 sm:px-6 md:py-24 lg:px-8"
       >
         <View className="max-w-2xl gap-4">
@@ -27,20 +31,42 @@ export function CityPage() {
           </Heading>
           <Paragraph className="my-0 text-base leading-7 text-text-secondary md:text-lg md:leading-8">{districts.body}</Paragraph>
         </View>
-        <List aria-label={districts.listLabel} className="m-0 grid list-none grid-cols-1 gap-6 p-0 sm:grid-cols-2">
-          {DISTRICTS.map((district, i) => (
-            <ListItem key={district}>
-              <SolidPanel surface="page" depth="md" className="h-full gap-3 overflow-hidden px-5 py-6">
-                <View className={`-mx-5 -mt-6 mb-2 h-1.5 ${CARD_ACCENTS[i % CARD_ACCENTS.length]}`} aria-hidden />
-                <Article className="gap-3">
-                  <Heading level={2} className="my-0 font-display text-2xl leading-tight text-text">
-                    {DISTRICT_COPY[district].name}
-                  </Heading>
-                  <Paragraph className="my-0 text-base leading-7 text-text-secondary">{DISTRICT_COPY[district].line}</Paragraph>
-                </Article>
-              </SolidPanel>
-            </ListItem>
-          ))}
+        <View id="w03-atlas-start" className="h-px w-full" aria-hidden />
+        <List id="w03-district-atlas" aria-label={districts.listLabel} className="m-0 grid list-none grid-cols-1 gap-6 p-0 md:grid-cols-12">
+          {DISTRICTS.map((district, i) => {
+            const photo = cityPhoto(district);
+            const leading = district === 'downtown';
+            return (
+              <ListItem key={district} className={leading ? 'grid min-w-0 md:col-span-7 md:row-span-2' : district === 'megacity' ? 'grid min-w-0 md:col-span-12' : 'grid min-w-0 md:col-span-5'}>
+                <SolidPanel surface="page" depth="md" className="h-full overflow-hidden">
+                  <Article aria-labelledby={`w03-${district}-title`} className="h-full">
+                    {photo ? (
+                      <Figure className={`m-0 ${leading ? 'flex-1' : ''}`}>
+                        <View className={`relative overflow-hidden bg-surface-sunken ${leading ? 'aspect-[4/5] md:aspect-auto md:min-h-96 md:flex-1' : 'aspect-[3/2]'}`}>
+                          <View id={`w03-photo-${district}`} data-testid={`w03-photo-${district}`} className="absolute inset-0">
+                            <Image
+                              src={cityPhotoHref(photo.source)} alt={photo.alt} fill framed={false}
+                              className="h-full w-full" sizes={photo.sizes}
+                              contentPosition={photo.position} loading={leading ? 'eager' : 'lazy'}
+                              placeholder="blur" blurDataURL={photo.blurDataURL}
+                            />
+                          </View>
+                        </View>
+                        <Figcaption className="bg-signage-black px-5 py-2 text-sm text-signage-white">{photo.title}</Figcaption>
+                      </Figure>
+                    ) : null}
+                    <View className="gap-3 px-5 py-6">
+                      <View className={`h-1.5 w-12 ${CARD_ACCENTS[i % CARD_ACCENTS.length]}`} aria-hidden />
+                      <Heading level={2} id={`w03-${district}-title`} className="my-0 font-display text-2xl leading-tight text-text">
+                        {DISTRICT_COPY[district].name}
+                      </Heading>
+                      <Paragraph className="my-0 text-base leading-7 text-text-secondary">{DISTRICT_COPY[district].line}</Paragraph>
+                    </View>
+                  </Article>
+                </SolidPanel>
+              </ListItem>
+            );
+          })}
         </List>
       </Section>
 
@@ -49,6 +75,7 @@ export function CityPage() {
       <Section
         aria-labelledby="w03-cast-title"
         data-testid="w03-cast"
+        data-section="city-cast"
         className="mx-auto w-full max-w-screen-xl gap-10 px-4 py-16 sm:px-6 md:py-24 lg:px-8"
       >
         <View className="max-w-2xl gap-4">

@@ -32,9 +32,10 @@ const eslintConfig = defineConfig([
               message: 'Platform UI belongs behind @acme/ui.',
             },
             {
-              group: ['gsap', 'gsap/*'],
+              // Anchor package names: bare 'gsap' also matches kinetrell/web/gsap.
+              group: ['/gsap', '/gsap/*'],
               message:
-                'GSAP is scoped to the Kinetrell adapters in components/home/motion.ts for the public landing experience.',
+                'Import the Kinetrell adapters for route motion; direct GSAP is scoped to home/motion.ts.',
             },
           ],
         },
