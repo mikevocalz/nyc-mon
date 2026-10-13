@@ -54,7 +54,7 @@ export default function CityBlocksSkia({ params, pointer, running }: CityBlocksS
         paint: (mesh, time) => appendCityQuads(mesh, trafficAt(city, params.city.district as District, time, params.traffic), city.light),
       });
     }
-    if (params.overlay) out.push(tessellate((mesh) => appendCityQuads(mesh, [vignetteQuad(width, height, params.city.timeOfDay)], city.light)));
+    if (params.overlay) out.push(tessellate((mesh) => appendCityQuads(mesh, [vignetteQuad(width, height)], city.light)));
     return out;
   }, [city, params.hoverEffect, params.hoverColor, params.traffic, params.city.district, params.overlay, pointer, width, height]);
 

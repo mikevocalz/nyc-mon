@@ -26,10 +26,9 @@ import {
   type GsapTargetMap,
 } from 'kinetrell/web/gsap';
 import { breakpoints, pageMotion } from '@acme/theme';
-import { HERO_ENTRANCE_BIND_BUDGET_MS, heroEntrance } from './hero-motion';
 import { MOTION_MARKER_SELECTOR, parseMotionMarker } from './motion-markers';
 
-const { duration: D, ease: E, distance: Y, parallax: P, scale: S, scrub: SCRUB } = pageMotion;
+const { duration: D, ease: E, distance: Y, parallax: P, scale: S, tilt: T, scrub: SCRUB } = pageMotion;
 const ms = (seconds: number) => Math.round(seconds * 1000);
 const OUT = E.out.gsap;
 const LINEAR = E.scrub.gsap;
@@ -72,6 +71,34 @@ function bindable(motion: CompiledMotion, map: GsapTargetMap): boolean {
 // Authored motions (PREMIUM_SITE_MOTION §3): each is one beat, not a blanket
 // fade. Transform/opacity only.
 // ---------------------------------------------------------------------------
+
+/**
+ * Hero load, one composed beat in four steps: the poster photograph settles
+ * (the environment), the headline plates resolve as one block, the seal lands
+ * like a stamp, then the CTA and district control are in place. No per-line
+ * stagger. Transform-only on purpose: the photograph is the LCP element, so
+ * nothing in the hero ever goes transparent, and a late bind skips the beat
+ * (globals.css keeps hero markers out of the pre-hide).
+ */
+const heroEntrance = compileMotion(
+  defineMotion({
+    id: 'w01.hero.enter',
+    initial: {
+      'hero-art': { y: Y.reveal, scale: S.enter },
+      'hero-title': { y: Y.rise },
+      'hero-body': { y: Y.step },
+      'hero-seal': { y: Y.step, rotate: -T.stamp },
+      'hero-actions': { y: Y.step },
+    },
+    tracks: [
+      { target: 'hero-art', to: { y: 0, scale: 1 }, atMs: 0, durationMs: ms(D.lg), ease: OUT },
+      { target: 'hero-title', to: { y: 0 }, atMs: 160, durationMs: ms(D.sm), ease: OUT },
+      { target: 'hero-body', to: { y: 0 }, atMs: 160, durationMs: ms(D.sm), ease: OUT },
+      { target: 'hero-seal', to: { y: 0, rotate: 0 }, atMs: 420, durationMs: ms(D.sm), ease: OUT },
+      { target: 'hero-actions', to: { y: 0 }, atMs: 560, durationMs: ms(D.xs), ease: OUT },
+    ],
+  }),
+);
 
 /** World story tile resolves once as the section arrives. */
 const worldEntrance = compileMotion(
@@ -203,12 +230,11 @@ export function useHomeMotion() {
       const { fades, scrubs, triggers } = collectTargets(scope);
       const all = { ...fades, ...scrubs };
 
-      // Hero entrance (hero-motion.ts, PS-035) — plays once, no trigger. It
-      // moves the art, seal and actions only; the headline and support line
-      // are the LCP text and are not markers, so they never move. Hero
-      // markers are never pre-hidden (globals.css), and on a slow bind the
-      // static composition stays instead of a flash-and-replay.
-      if (bindable(heroEntrance, fades) && performance.now() < HERO_ENTRANCE_BIND_BUDGET_MS) {
+      // Hero entrance — authored load sequence, plays once, no trigger. Hero
+      // markers are never pre-hidden (see globals.css): the hero is the LCP
+      // surface, so on a slow bind the static composition stays instead of a
+      // flash-and-replay. Only replay the entrance when hydration was fast.
+      if (bindable(heroEntrance, fades) && performance.now() < 1800) {
         createGsapTimeline(heroEntrance, fades).play();
       }
 

@@ -104,15 +104,6 @@ export const W01_COPY = {
       { verb: 'Play', meter: 'Social', cue: 'Comes closer.', answer: 'Play a short game. Stop when your Mon steps back.', value: 85, color: 'leaf' },
     ],
   },
-  // Proof of craft (PROOF_OF_CRAFT.md): only artifacts that exist, each labelled for what it is.
-  // No quotes, reviews, press or counts (HANDOFF §WAITLIST "Never"). The item copy lives in proof.ts.
-  proof: {
-    eyebrow: 'Inside NYC-MON',
-    title: 'The work so far.',
-    body: "NYC-MON isn't out yet. These are pieces from the build, each marked for what it is: a render, concept art or a design artifact.",
-    note: 'Stand-in art and models hold the place of final work. Dates show when each piece last changed.',
-    stripLabel: 'More from the build',
-  },
   // Canon: 15 / 30 / 60 minutes and one notification (V11 ¶49); the Mon chooses at the hatch and never
   // rejects the Caller (Decision #14). No pronoun for a Mon (PS-005). No timer, no countdown.
   hatch: {

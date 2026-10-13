@@ -5,11 +5,11 @@
   "deviceStageSelector": "[data-testid=\"w01-device-stage\"]",
   "fallbackSections": [
     { "name": "hero", "selectors": ["#trg-hero"] },
+    { "name": "marquee", "selectors": ["div[aria-hidden=\"true\"]"], "textIncludes": "✦" },
     { "name": "world", "selectors": ["#trg-world"] },
     { "name": "hlynk", "selectors": ["#trg-hlynk"] },
     { "name": "starters", "selectors": ["#trg-starters"] },
     { "name": "care", "selectors": ["#trg-care"] },
-    { "name": "proof", "selectors": ["#trg-proof"] },
     { "name": "hatch", "selectors": ["#trg-hatch"] },
     { "name": "waitlist", "selectors": ["#trg-waitlist", "section[aria-labelledby*=\"waitlist\"]"] },
     { "name": "footer", "selectors": ["footer"] }

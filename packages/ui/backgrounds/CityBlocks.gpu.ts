@@ -1,8 +1,9 @@
 import { d, std, tgpu, type StorageFlag, type TgpuBindGroup, type TgpuBuffer } from 'typegpu';
+import { brand } from '@acme/theme';
 import { parseColor } from '../neon/colors';
 import type { GpuContext, GpuScene } from '../gpu/types';
 import {
-  blockAt, buildCity, CITY_SKY, hoverQuad, packQuads, QUAD_FLOATS, trafficAt, trafficCapacity, vignetteQuad,
+  blockAt, buildCity, hoverQuad, packQuads, QUAD_FLOATS, trafficAt, trafficCapacity, vignetteQuad,
   type CityInput, type CityLayout, type District, type TrafficOptions,
 } from './city-blocks-model';
 import type { CityPointer } from './CityBlocks.types';
@@ -91,7 +92,7 @@ export function createCityBlocksScene(gpu: GpuContext): Scene {
       const windowColor = std.mix(std.mul(rgb, 0.55), params.$.light.xyz, lit);
       rgb = std.mix(rgb, windowColor, inWindow);
     } else if (kind < -2.5) {
-      // Vignette: fade to the quad colour (daylit page or night) at the edges, heavier at the bottom.
+      // Vignette: fade to night at the edges, heavier at the bottom.
       const radial = std.smoothstep(0.42, 0.8, std.distance(input.uv, d.vec2f(0.5, 0.5)));
       const vertical = std.max(std.smoothstep(0.6, 1.05, input.uv.y), std.smoothstep(0.32, -0.05, input.uv.y) * 0.8);
       alpha = std.clamp(std.max(radial, vertical), 0, 1) * input.color.w;
@@ -170,7 +171,7 @@ export function createCityBlocksScene(gpu: GpuContext): Scene {
         ensureCapacity(staticCount + trafficSlots + 1);
         data.fill(0);
         packQuads(city.quads, data);
-        packQuads([p.overlay ? vignetteQuad(width, height, p.city.timeOfDay) : { p: [0, 0, 0, 0, 0, 0, 0, 0], color: [0, 0, 0, 0], win: [0, 0, 0, 0] }], data, staticCount + trafficSlots);
+        packQuads([p.overlay ? vignetteQuad(width, height) : { p: [0, 0, 0, 0, 0, 0, 0, 0], color: [0, 0, 0, 0], win: [0, 0, 0, 0] }], data, staticCount + trafficSlots);
         upload(0, staticCount + trafficSlots + 1);
         hovered = -2;
         lastTrafficTime = -1;
@@ -203,7 +204,7 @@ export function createCityBlocksScene(gpu: GpuContext): Scene {
         light: d.vec4f(...city.light),
       });
 
-      const [r, g, b] = parseColor(p.streetColor || CITY_SKY[p.city.timeOfDay ?? 'day'].street);
+      const [r, g, b] = parseColor(p.streetColor || brand.night);
       pipeline
         .with(bindGroup!)
         .withColorAttachment({ view: context, loadOp: 'clear', storeOp: 'store', clearValue: [r, g, b, 1] })

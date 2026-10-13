@@ -7,7 +7,7 @@
  */
 import { useEffect, type ReactNode } from 'react';
 import dynamic from 'next/dynamic';
-import { palette } from '@acme/theme';
+import { brand } from '@acme/theme';
 import { SceneSection, SegmentedControl, useInstanceStore, useStore } from '@acme/ui';
 import { Text, View } from '@acme/ui/tw';
 import { useDistrictStore } from '@acme/spatial/district';
@@ -51,11 +51,9 @@ export function HeroCity({ id, labelledBy, className, children }: { id: string; 
       id={id}
       aria-labelledby={labelledBy}
       className={className}
-      // Daylit before JS and the canvas arrive (canon Decision #4): concrete-300
-      // sits between the city's sidewalks (200) and asphalt (500).
-      placeholderColor={palette.concrete[300]}
+      placeholderColor={brand.night}
       scene={({ paused }) => (
-        <CityBlocks paused={paused || settled} district={district} timeOfDay="day" overlay className="absolute inset-0" />
+        <CityBlocks paused={paused || settled} district={district} overlay className="absolute inset-0" />
       )}
     >
       {children}
@@ -74,7 +72,7 @@ export function HeroDistrictPicker({ label }: { label: string }) {
   const district = useDistrictStore((s) => s.district);
   const setDistrict = useDistrictStore((s) => s.setDistrict);
   return (
-    <View data-testid="w01-district" className="gap-2 bg-signage-black p-3">
+    <View data-testid="w01-district" className="gap-2 bg-ink-950 p-3">
       <Text {...({ id: PICKER_LABEL_ID } as object)} className="text-sm font-semibold text-silver-100">{label}</Text>
       {/* Below `sm` the four districts sit as a 2x2 grid instead of wrapping 3 + 1. */}
       <SegmentedControl

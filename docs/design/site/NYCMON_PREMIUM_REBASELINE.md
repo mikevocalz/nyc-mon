@@ -98,3 +98,14 @@ Settings: `site-qa:lhci`, Lighthouse 13.5.0, mobile simulate (RTT 150 ms, 1.6 Mb
 | INP | not measured (navigation mode) | ≤ 200 ms field | Unverified |
 
 **LCP element is the hero body paragraph `#mfx-hero-body`**, with an inline `transform` from the motion reveal. TTFB is 14 ms and render delay in the observed trace is 150 ms. Under simulated throttling the paragraph's paint is held back behind main-thread work. TBT this large in a headless container with no GPU points at software-rendered canvas work (the WebGPU → CanvasKit fallback) plus JS boot. That is a hypothesis to profile, not a finding. Next step for web-performance-profiler: trace with the hero canvas disabled to isolate its share, and keep the LCP text out of any entrance animation.
+
+## Creator decision, 2026-10-13: keep the current home page
+
+Mike reviewed the three hero directions (A canon-first, B companion-first, C city-first) and chose none of them: **"leave the old home page."** The home page stays exactly as it is on `main` at b584018. That covers the night hero city, the section order without a proof section, and the hero entrance motion. The work below was built, then removed from this branch:
+
+- the internal `/review/hero` route with directions A, B and C;
+- the daylit `CityBlocks` hero and header skyline;
+- the "Inside NYC-MON" proof-of-craft section;
+- the hero LCP motion change (PS-035) and the grid band settle (PS-036).
+
+Creator direction outranks canon in the authority order. So the P0 rows above for the **night hero** and for **no Mon above the fold** are closed as **won't change (creator decision)**, not left open. Changes off the home page stay on this branch: the neutral waitlist age screen, the production 404 for template screens and `/sign-in`, and SEO metadata. The lab findings still stand if the home page is revisited: about 99% of TBT comes from the hero city's CanvasKit fallback, and LCP is held back by script chunks.

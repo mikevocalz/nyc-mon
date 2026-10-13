@@ -54,8 +54,6 @@ export interface NavBarProps {
   skyline?: boolean;
   /** Height and visibility classes for the skyline. Default "h-5". */
   skylineClassName?: string;
-  /** Lit windows in the skyline (a night skyline). Pass false for a daylit one. Default true. */
-  skylineWindows?: boolean;
   /** NeonBlade: where the links sit on wide screens. Default right. */
   navAlign?: 'left' | 'center' | 'right';
   /** Right of the links: an avatar, a button. Stays visible on phones. */
@@ -169,7 +167,6 @@ export function NavBar({
   district = 'midtown',
   skyline = true,
   skylineClassName = 'h-5',
-  skylineWindows = true,
   navAlign = 'right',
   trailing,
   cta,
@@ -403,7 +400,7 @@ export function NavBar({
       ) : null}
 
       <View aria-hidden className={s.keyline()} />
-      {skyline ? <SkylineBand district={district} windows={skylineWindows} className={skylineClassName} /> : null}
+      {skyline ? <SkylineBand district={district} className={skylineClassName} /> : null}
     </Header>
   );
 }
