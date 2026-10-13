@@ -4,8 +4,10 @@ name: Pages preview
 # the waitlist form can't submit and links do full page loads. The real deploy
 # is unaffected. tooling/pages-snapshot.mjs has the details.
 #
-# One-time setup: Settings → Pages → Build and deployment → Source "Deploy from
-# a branch", branch `gh-pages`, folder `/ (root)`. This workflow writes that branch.
+# Works with either Pages source (Settings → Pages → Build and deployment):
+# "GitHub Actions" uses the deploy job below; "Deploy from a branch" uses the
+# gh-pages branch this workflow also writes. With "GitHub Actions", a branch
+# other than main must be allowed in Settings → Environments → github-pages.
 on:
   push:
     branches: [main, claude/jolly-dirac-dtzmjy]
@@ -13,6 +15,8 @@ on:
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 concurrency:
   group: pages-preview
@@ -49,3 +53,17 @@ jobs:
           git add -A
           git commit -qm "Pages preview of ${GITHUB_SHA::7} (${GITHUB_REF_NAME})"
           git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" gh-pages
+          rm -rf .git
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: pages-out
+
+  deploy:
+    needs: snapshot
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
