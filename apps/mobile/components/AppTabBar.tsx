@@ -2,7 +2,7 @@
 // from this stable export; do not reach into expo-router/build internals.
 import type { BottomTabBarProps } from 'expo-router/js-tabs';
 import { Pressable, Text, View } from '@acme/ui/tw';
-import { Bell, User } from '@acme/ui/icons';
+import { Bell, Compass, User } from '@acme/ui/icons';
 import { MenuButton } from '@acme/app';
 import { haptics } from '@acme/ui/haptics';
 import { navChrome } from '@acme/theme';
@@ -16,11 +16,13 @@ const RAIL_ITEM_HEIGHT = 56;
 const MENU_BOTTOM_GAP = 10;
 
 const ICONS = {
+  game: Compass,
   notifications: Bell,
   profile: User,
 } as const;
 
 const LABELS = {
+  game: 'Game',
   notifications: 'Alerts',
   profile: 'Profile',
 } as const;
