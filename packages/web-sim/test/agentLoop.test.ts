@@ -156,6 +156,60 @@ describe('runAgentTurn', () => {
   });
 });
 
+describe('runAgentTurn cancellation', () => {
+  const toolTurn = () => msg([{ type: 'tool_use', id: 'toolu_care', name: 'feed_mon', input: {} }], 'tool_use');
+
+  it('does not start a model turn after cancellation', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const streamTurn = vi.fn(async () => msg([], 'end_turn'));
+    const callTool = vi.fn(async () => STATUS);
+    await expect(runAgentTurn({ model: { streamTurn }, mcp: { callTool }, tools: TOOLS, history: [], userText: 'Feed', signal: controller.signal }))
+      .rejects.toMatchObject({ name: 'AbortError' });
+    expect(streamTurn).not.toHaveBeenCalled();
+    expect(callTool).not.toHaveBeenCalled();
+  });
+
+  it('ignores a model that completes and emits text after Stop', async () => {
+    const controller = new AbortController();
+    const events: AgentEvent[] = [];
+    const client: ModelClient = { async streamTurn(_req, onText) {
+      controller.abort();
+      onText('obsolete');
+      return toolTurn();
+    } };
+    const callTool = vi.fn(async () => STATUS);
+    await expect(runAgentTurn({ model: client, mcp: { callTool }, tools: TOOLS, history: [], userText: 'Feed', signal: controller.signal, onEvent: (event) => events.push(event) }))
+      .rejects.toMatchObject({ name: 'AbortError' });
+    expect(callTool).not.toHaveBeenCalled();
+    expect(events).toEqual([]);
+  });
+
+  it('honors Stop from the tool-start callback before dispatch', async () => {
+    const controller = new AbortController();
+    const callTool = vi.fn(async () => STATUS);
+    await expect(runAgentTurn({ model: scripted([toolTurn()]).client, mcp: { callTool }, tools: TOOLS, history: [], userText: 'Feed', signal: controller.signal, onEvent: (event) => {
+      if (event.type === 'tool-start') controller.abort();
+    } })).rejects.toMatchObject({ name: 'AbortError' });
+    expect(callTool).not.toHaveBeenCalled();
+  });
+
+  it.each(['resolve', 'reject'] as const)('discards a late tool %s without another model turn', async (outcome) => {
+    const controller = new AbortController();
+    const events: AgentEvent[] = [];
+    const streamTurn = vi.fn(async () => toolTurn());
+    const callTool = vi.fn(async () => {
+      controller.abort();
+      if (outcome === 'reject') throw new Error('late transport error');
+      return STATUS;
+    });
+    await expect(runAgentTurn({ model: { streamTurn }, mcp: { callTool }, tools: TOOLS, history: [], userText: 'Feed', signal: controller.signal, onEvent: (event) => events.push(event) }))
+      .rejects.toMatchObject({ name: 'AbortError' });
+    expect(streamTurn).toHaveBeenCalledOnce();
+    expect(events.map((event) => event.type)).toEqual(['step-done', 'tool-start']);
+  });
+});
+
 describe('toolResultContent', () => {
   it('uses structuredContent when no text mirrors it', () => {
     expect(toolResultContent({ content: [], structuredContent: { a: 1 } })).toEqual([{ type: 'text', text: '{"a":1}' }]);

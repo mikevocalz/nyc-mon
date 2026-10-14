@@ -54,6 +54,7 @@ export interface RunTurnOptions {
   readonly history: readonly Anthropic.MessageParam[];
   readonly userText: string;
   readonly onEvent?: (event: AgentEvent) => void;
+  /** Stop further model/tool dispatch and ignore results from already-started work. */
   readonly signal?: AbortSignal;
   /** Model turns allowed per utterance before the loop stops. */
   readonly maxSteps?: number;
@@ -111,12 +112,17 @@ export async function runAgentTurn(opts: RunTurnOptions): Promise<TurnResult> {
   const replyParts: string[] = [];
 
   for (let step = 0; step < maxSteps; step++) {
+    signal?.throwIfAborted();
     const message = await model.streamTurn(
       { messages: history, tools },
-      (delta) => onEvent?.({ type: 'text', delta }),
+      (delta) => {
+        if (!signal?.aborted) onEvent?.({ type: 'text', delta });
+      },
       signal,
     );
+    signal?.throwIfAborted();
     onEvent?.({ type: 'step-done', message });
+    signal?.throwIfAborted();
     // Append the assistant content exactly as returned (thinking blocks
     // included): later turns must replay it unedited.
     // An empty turn (a refusal with no text) is not replayable; leave it out.
@@ -134,8 +140,10 @@ export async function runAgentTurn(opts: RunTurnOptions): Promise<TurnResult> {
     // Run every call from this step, then return all results in one user message.
     const results = await Promise.all(
       toolUses.map(async (use): Promise<Anthropic.ToolResultBlockParam> => {
+        signal?.throwIfAborted();
         const input = (use.input ?? {}) as Record<string, unknown>;
         onEvent?.({ type: 'tool-start', id: use.id, name: use.name, input });
+        signal?.throwIfAborted();
         let result: CallToolResult;
         if (!tools.some((t) => t.name === use.name)) {
           result = errorResult(`No tool named ${use.name} is available.`);
@@ -143,9 +151,11 @@ export async function runAgentTurn(opts: RunTurnOptions): Promise<TurnResult> {
           try {
             result = await mcp.callTool(use.name, input);
           } catch (err) {
+            signal?.throwIfAborted();
             result = errorResult(err instanceof Error ? err.message : String(err));
           }
         }
+        signal?.throwIfAborted();
         onEvent?.({ type: 'tool-result', id: use.id, name: use.name, input, result });
         return {
           type: 'tool_result',
@@ -155,6 +165,7 @@ export async function runAgentTurn(opts: RunTurnOptions): Promise<TurnResult> {
         };
       }),
     );
+    signal?.throwIfAborted();
     history.push({ role: 'user', content: results });
   }
   return { history, reply: replyParts.join('\n'), outcome: 'step-limit' };
