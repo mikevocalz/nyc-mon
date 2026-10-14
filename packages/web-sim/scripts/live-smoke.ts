@@ -54,8 +54,10 @@ await check('oauth-metadata', async () => {
 
 await check('mcp-rejects-anonymous', async () => {
   const res = await mcp({ jsonrpc: '2.0', id: 1, method: 'tools/list' });
+  // Amazon wants a bare 401 (no WWW-Authenticate); clients find the PRM at the well-known path.
   assert(res.status === 401, `expected 401 without a token, got ${res.status}`);
-  assert(res.headers.get('www-authenticate')?.includes('resource_metadata'), '401 lacks a resource_metadata challenge');
+  const prm = await fetch(new URL('/.well-known/oauth-protected-resource', env.LIVE_MCP_URL));
+  assert(prm.ok, `protected-resource metadata HTTP ${prm.status}`);
 });
 
 await check('mcp-tools-list', async () => {
