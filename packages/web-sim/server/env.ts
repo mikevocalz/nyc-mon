@@ -60,6 +60,10 @@ export function loadSimEnv(source: Record<string, string | undefined> = process.
   if (env.SIM_AUTH_MODE === 'dev-bypass' && env.NODE_ENV !== 'development' && env.NODE_ENV !== 'test') {
     throw new Error('SIM_AUTH_MODE=dev-bypass needs NODE_ENV=development or test; refusing to start without sign-in.');
   }
+  // The scripted mock must never answer a real user or a judge (docs/alexa deploy + submission plans).
+  if (env.SIM_MODEL_BACKEND === 'mock' && env.NODE_ENV === 'production') {
+    throw new Error('SIM_MODEL_BACKEND=mock is refused with NODE_ENV=production; use bedrock.');
+  }
   if (new URL(env.SIM_PUBLIC_ORIGIN).origin === new URL(env.SIM_SANDBOX_ORIGIN).origin) {
     throw new Error('SIM_SANDBOX_ORIGIN must be a different origin from SIM_PUBLIC_ORIGIN.');
   }
