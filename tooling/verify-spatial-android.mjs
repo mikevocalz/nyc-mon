@@ -37,6 +37,15 @@ const viroPkg = JSON.parse(
 );
 const viroFork = viroPkg.version !== '3.0.2';
 
+// The pico flavor exists only when app.config.ts has an active (uncommented)
+// @expo-pico/core entry with a picoAppId. By default the block is commented
+// out and prebuild makes the mobile and quest flavors only.
+const appConfigSource = readFileSync(join(root, 'apps/mobile/app.config.ts'), 'utf8')
+  .split('\n')
+  .filter((line) => !line.trim().startsWith('//'))
+  .join('\n');
+const picoEnabled = appConfigSource.includes("'@expo-pico/core'");
+
 const checks = [
   ['settings.gradle', [
     "include ':react_viro', ':arcore_client', ':gvr_common', ':viro_renderer'",
@@ -50,7 +59,7 @@ const checks = [
       : []),
     'flavorDimensions += "device"',
     'mobile { dimension "device" }',
-    'pico {',
+    ...(picoEnabled ? ['pico {'] : []),
     'quest {',
     // The quest flavor must resolve expo-horizon-core's quest variant, or
     // ExpoHorizon.isHorizonBuild is false on the headset (HORIZON-LAYOUT.md, 1).
@@ -60,12 +69,12 @@ const checks = [
     'reactNativeArchitectures=arm64-v8a',
     'android.targetSdkVersion=34',
     'android.minSdkVersion=29',
-    'picoXrMode=pico-os5',
+    ...(picoEnabled ? ['picoXrMode=pico-os5'] : []),
   ]],
   [`${pkgDir}/MainApplication.kt`, [
     'ReactViroPackage.ViroPlatform.AR',
     'ReactViroPackage.ViroPlatform.QUEST',
-    ...(viroFork ? ['ReactViroPackage.ViroPlatform.PICO'] : []),
+    ...(viroFork && picoEnabled ? ['ReactViroPackage.ViroPlatform.PICO'] : []),
   ]],
   [`${pkgDir}/VRActivity.kt`, [
     'getMainComponentName(): String = "VRQuestScene"',
@@ -85,14 +94,14 @@ const checks = [
     'android:defaultWidth="1280dp"',
     'android:defaultHeight="800dp"',
   ]],
-  ['app/src/pico/AndroidManifest.xml', [
+  ...(picoEnabled ? [['app/src/pico/AndroidManifest.xml', [
     'com.pico.intent.category.VR',
     'org.khronos.openxr.intent.category.IMMERSIVE_HMD',
     'libopenxr_loader.so',
     'com.pico.xrMode" android:value="pico-os5"',
     'android:defaultWidth="1280dp"',
     'android:defaultHeight="800dp"',
-  ]],
+  ]]] : []),
   ['app/src/main/res/values/strings.xml', [
     '<string name="app_name">NYC-MON</string>',
   ]],
@@ -107,6 +116,15 @@ for (const [relative, needles] of checks) {
   const body = read(relative);
   for (const needle of needles) {
     if (!body.includes(needle)) failures.push(`${relative}: missing ${needle}`);
+  }
+}
+
+if (!picoEnabled) {
+  if (existsSync(join(android, 'app/src/pico'))) {
+    failures.push('app/src/pico: present although @expo-pico/core is commented out in app.config.ts');
+  }
+  if (/^\s*pico\s*\{/m.test(read('app/build.gradle'))) {
+    failures.push('app/build.gradle: declares a pico flavor although @expo-pico/core is commented out in app.config.ts');
   }
 }
 
@@ -183,5 +201,5 @@ if (failures.length) {
 }
 
 console.log(
-  `[spatial:verify-android] mobile, quest and pico flavors match the XR contract (Viro ${viroPkg.version}).`,
+  `[spatial:verify-android] ${picoEnabled ? 'mobile, quest and pico flavors' : 'mobile and quest flavors (pico commented out)'} match the XR contract (Viro ${viroPkg.version}).`,
 );
