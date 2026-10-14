@@ -34,10 +34,13 @@ export interface LegalDocument {
 
 const UPDATED = 'Last updated: October 7, 2026';
 
+/** The privacy notice gained the waitlist section; set this to the day it ships. */
+const PRIVACY_UPDATED = 'Last updated: October 14, 2026';
+
 const privacy: LegalDocument = {
   eyebrow: 'Legal',
   title: 'Privacy notice',
-  updated: UPDATED,
+  updated: PRIVACY_UPDATED,
   description: 'What NYC-MON collects, what it never does, and how to reach us.',
   sections: [
     {
@@ -54,6 +57,19 @@ const privacy: LegalDocument = {
       body: [
         'An account needs three things: your email address, the Caller name you pick, and the birth year you enter at the age gate. The birth year is the only age question — we do not ask for a full date of birth.',
         'We also keep your Mon and your Mon\u2019s progress, so your companion is the same one on every screen and survives a new phone.',
+      ],
+    },
+    {
+      // Each sentence matches the waitlist code: packages/payload/src/admin/console/waitlist.ts,
+      // packages/payload/src/collections/Waitlist.ts and apps/web/app/(site)/get/actions.ts.
+      // Change this section in the same commit as any of them.
+      id: 'w06-privacy-waitlist',
+      title: 'The waitlist on this site',
+      body: [
+        'The waitlist form asks for your email address and your birth year. When you join, we save your email address, the district the site\u2019s district picker was set to (Midtown unless you changed it), which page you signed up on, and the date. We keep that until you ask us to take you off the list. We use the address to send one email when NYC-MON is out.',
+        'Your birth year is used once, to check whether you can join, and then dropped. It is not saved or logged. If the year you enter means you could be under 13, we save nothing, and your email address is never read.',
+        'To stop one connection from flooding the form, we count sign-up attempts from each IP address per hour. The count is filed under a coded version of the address, made with a secret key, which can\u2019t be matched back to you without that key. The waitlist doesn\u2019t save the IP address itself, and each count is set to expire after two hours.',
+        'If the age check means we can\u2019t add you, the site sets one cookie, nycmon_waitlist_hold. Its value is 1 and it holds nothing about you; it only stops the form being tried again with a different year. Your browser deletes it when the browsing session ends, usually when you close the browser. The waitlist sets no other cookie.',
       ],
     },
     {
