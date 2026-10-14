@@ -50,7 +50,7 @@ cp .env.example .env
 
 ```sh
 pnpm dev                            # every app through Turborepo
-pnpm --filter mobile ios            # or: android, android:quest, android:pico
+pnpm --filter mobile ios            # or: android, android:quest
 pnpm --filter web dev               # product site
 pnpm --filter admin-vite dev        # Payload admin on http://localhost:5174/admin
 pnpm --filter storybook dev         # NYC-Tron on http://localhost:6006

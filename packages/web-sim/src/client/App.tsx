@@ -26,6 +26,7 @@ import {
 import { canListen, canSpeak, listen, speak, stopSpeaking, type Listening } from './speech.ts';
 import { useSetters } from './state.ts';
 import { currentScheme, type Scheme } from './theme.ts';
+import { createTurnToolCaller } from './turnTools.ts';
 
 export interface PublicConfig {
   readonly mcpUrl: string;
@@ -233,7 +234,7 @@ export function App({ config }: { config: PublicConfig }) {
           history,
           userText: text,
           signal: abort.signal,
-          mcp: { callTool: (name, args) => s.client.callTool({ name, arguments: args }) as Promise<CallToolResult> },
+          mcp: createTurnToolCaller({ client: s.client, signal: abort.signal }),
           onEvent: (e) => {
             if (e.type === 'text') setLive((prev) => prev + e.delta);
             if (e.type === 'step-done') setLive('');
