@@ -173,12 +173,28 @@ part to check on a device.
 the live hook `useAdaptiveNavigationPlacement()` decide where primary navigation
 goes:
 
-- **Android** (Material 3 Adaptive): compact → bottom bar; tabletop posture or a
-  window under 480 dp tall → bottom bar; otherwise a rail on the logical
-  leading edge; `extraLarge` → expanded rail (`placement.expanded`).
-- **iOS**: a hardware edge column (inset of 64 dp or more, iPhone Duo) wins and
-  stays on its PHYSICAL edge; compact → bottom; wider → leading sidebar.
-- **Other**: compact → bottom, otherwise a collapsed rail.
+Hardware family chooses the shell; window size chooses content panes.
+
+- **Native ordinary phone**: bottom tabs at every width, height and posture.
+- **Native foldable / dual-screen** (open, folded cover, book, tabletop),
+  **tablet** and **headset**: a rail on the PHYSICAL right, also in RTL;
+  `extraLarge` windows expand it (`placement.expanded`).
+- **Native, family unknown**: the bootstrap bottom tabs while it resolves.
+- **Web**: never a side rail.
+
+`../hardware-family.ts` derives the family from existing sources only:
+`isHeadsetAndroid` (Quest/PICO), iOS `Platform.isPad`, Android screen
+smallest width >= 600 dp (sw600, the physical screen, not the window), a
+ReservedRegions `division` (hinge), or an Apple hardware edge column. Nothing
+positively proves an ordinary phone, so detection answers `unknown` rather
+than `phone`. A verified family is retained for the process and never
+regresses, so a foldable folded to its cover keeps the rail once a hinge has
+reported. Gap: a foldable cold-started on its cover screen shows bottom tabs
+until it is first unfolded.
+
+`placement.position` is physical. `tabBarPositionForPlacement` maps it to
+the navigator's row slot (`left` under RTL, because the tab view's row
+mirrors).
 
 `apps/mobile/app/(drawer)/(tabs)/_layout.tsx` uses it for `tabBarPosition`.
 `AppTabBar` still draws its 80 dp rail at every width; the expanded rail needs
