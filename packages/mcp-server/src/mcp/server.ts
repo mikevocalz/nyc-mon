@@ -56,8 +56,12 @@ function readJsonBody(req: IncomingMessage): Promise<unknown> {
     req.on('data', (chunk: Buffer) => {
       size += chunk.length;
       if (size > MAX_BODY_BYTES) {
+        // Stop buffering but leave the socket open: destroying it here reset
+        // the connection before the 413 below could be written. The handler
+        // answers with Connection: close and drops the socket after that.
+        req.removeAllListeners('data');
+        req.pause();
         reject(new BodyError(413, -32600, 'Request body too large'));
-        req.destroy();
         return;
       }
       chunks.push(chunk);
@@ -119,6 +123,10 @@ export function createHandler(deps: ServerDeps): (req: IncomingMessage, res: Ser
         body = await readJsonBody(req);
       } catch (error) {
         if (error instanceof BodyError) {
+          if (error.status === 413) {
+            res.setHeader('connection', 'close');
+            res.on('finish', () => req.destroy());
+          }
           return sendJson(res, error.status, { jsonrpc: '2.0', id: null, error: { code: error.rpcCode, message: error.message } });
         }
         throw error;
