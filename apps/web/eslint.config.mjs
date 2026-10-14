@@ -11,7 +11,15 @@ const eslintConfig = defineConfig([
   ...nextVitals,
   {
     files: ['**/*.ts', '**/*.tsx'],
-    ignores: ['components/site/Landing.tsx', 'components/home/motion.ts'],
+    // The Kinetrell motion adapters (home and each site route's motion island)
+    // are the only files allowed to touch GSAP.
+    ignores: [
+      'components/site/Landing.tsx',
+      'components/home/motion.ts',
+      'components/*/motion.ts',
+      'components/*/route-motion.{ts,tsx}',
+      'components/*/*MotionRoot.tsx',
+    ],
     rules: {
       'no-restricted-imports': [
         'error',
@@ -34,7 +42,7 @@ const eslintConfig = defineConfig([
             {
               group: ['gsap', 'gsap/*'],
               message:
-                'GSAP is scoped to the Kinetrell adapters in components/home/motion.ts for the public landing experience.',
+                'GSAP is scoped to the Kinetrell motion adapters (components/home/motion.ts and each route\'s motion.ts, route-motion or *MotionRoot).',
             },
           ],
         },

@@ -17,7 +17,7 @@ export function StreetGridBand() {
   const stopped = useStore(control, (s) => s.stopped);
   const copy = W03_COPY.blocks;
   return (
-    <View className="relative h-svh min-h-[32.5rem] w-full">
+    <View className="relative h-[60svh] min-h-[24rem] w-full">
       <View aria-hidden className="absolute inset-0">
         <LazyScene className="flex-1" placeholderColor={THEMES[DISTRICT].sky[0]}>
           {({ paused }) => (
