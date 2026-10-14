@@ -203,7 +203,7 @@ function HatchBand() {
         </Figure>
         <View id="mfx-hatch-cta" className="gap-6 md:flex-row md:items-center md:justify-between">
           <Paragraph className="my-0 font-display text-2xl uppercase leading-heading text-ink-50 md:text-3xl">{copy.hatchClosing}</Paragraph>
-          <LinkButton title={copy.cta.label} href={siteHref(copy.cta.href)} variant="cta" size="lg" testID="w02-detail-cta" />
+          <LinkButton title={copy.cta.label} href={siteHref(copy.cta.href)} tone="royal" size="lg" testID="w02-detail-cta" />
         </View>
       </View>
     </Section>

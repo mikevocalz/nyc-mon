@@ -99,7 +99,7 @@ function RosterRow({ starter, index }: { starter: MonsStarter; index: number }) 
           <LinkButton
             title={copy.cardLabel(starter.babyName)}
             href={siteHref(copy.cardHref(starter.slug))}
-            tone={a.tone}
+            tone="royal"
             testID={`w02-roster-${starter.slug}-link`}
           />
         </View>
@@ -217,7 +217,7 @@ export function MonsIndexPage() {
               </Text>
             </Heading>
             <View id="mfx-close-cta">
-              <LinkButton title={copy.cta.label} href={siteHref(copy.cta.href)} variant="cta" size="lg" testID="w02-mons-cta" />
+              <LinkButton title={copy.cta.label} href={siteHref(copy.cta.href)} tone="royal" size="lg" testID="w02-mons-cta" />
             </View>
           </View>
         </Section>

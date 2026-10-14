@@ -420,7 +420,7 @@ function StoryOutro() {
           <Paragraph className="my-0 text-lg leading-8 text-silver-200 md:text-xl">{copy.body}</Paragraph>
         </View>
         <View id="mfx-outro-cta">
-          <LinkButton title={copy.cta.label} href={siteHref(copy.cta.href)} variant="cta" size="lg" testID="story-cta" />
+          <LinkButton title={copy.cta.label} href={siteHref(copy.cta.href)} tone="royal" size="lg" testID="story-cta" />
         </View>
       </View>
     </Section>

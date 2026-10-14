@@ -58,7 +58,7 @@ export function SiteNavBar() {
     <NavBar
       items={navItems(pathname)}
       cta={NAV_CTA}
-      ctaTone="orange"
+      ctaTone="royal"
       skylineClassName="hidden h-5 md:flex short:hidden"
       skipTo={CONTENT_ID}
       district="midtown"

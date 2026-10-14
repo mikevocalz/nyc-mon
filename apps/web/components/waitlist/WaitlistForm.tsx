@@ -44,14 +44,14 @@ function SubmitButton({ id }: { id: string }) {
       className="group w-full items-stretch self-stretch rounded-none no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-bg disabled:cursor-progress sm:w-auto sm:self-start"
     >
       <CornerCutFrame
-        tone="orange"
+        tone="royal"
         variant="solid"
         corner="bottom-right"
         cut={18}
         depth={4}
         className="min-h-14 flex-row items-center justify-center px-8 py-4 md:px-10"
       >
-        <Text className="whitespace-nowrap font-display text-base tracking-wide text-on-cta md:text-lg">
+        <Text className="whitespace-nowrap font-display text-base tracking-wide text-white md:text-lg">
           {pending ? copy.pending : copy.submit}
         </Text>
       </CornerCutFrame>

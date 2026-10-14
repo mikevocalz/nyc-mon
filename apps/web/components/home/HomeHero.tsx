@@ -65,7 +65,7 @@ export function HomeHero() {
               {copy.body}
             </Paragraph>
             <View id="mfx-hero-actions" className="w-full items-start gap-5 short:gap-3">
-              <LinkButton title={copy.cta} href={siteHref(copy.ctaHref)} variant="cta" size="lg" testID="w01-cta" />
+              <LinkButton title={copy.cta} href={siteHref(copy.ctaHref)} tone="royal" size="lg" testID="w01-cta" />
               <View className="w-full max-w-xl">
                 <HeroDistrictPicker label={copy.districtLabel} />
               </View>
