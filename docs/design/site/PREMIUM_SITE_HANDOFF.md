@@ -73,7 +73,11 @@ Files: `apps/web/components/home/HLynkSection.tsx` (server), `apps/web/component
   | 1024–1279 | 28rem | `md:py-12` |
   | ≥ 1280 | 32rem | `md:py-12` |
 
-  The canvas fills the box; its drawing buffer is capped at DPR 1.5. The caption sits under the box on ink.
+  The canvas fills the box; its drawing buffer is capped at DPR 1.5. Under the box, on ink, in DOM order (PS-037): the screen's tab control (`SegmentedControl`, `tone="apple"`, full width, five segments), the screen readout (`<output>`, `text-sm text-text`, `min-h-[4.5rem]` so a three-line caption doesn't shift the page at 390), a row with the "Side key chirp" `Button` (`outline`, `apple`, `sm`) and the "Sound" `Switch`, then the caption.
+- **Screen (PS-037).** Files: `hlynk-hud.ts` (tabs, hit regions, captions, store shape; pure), `hlynk-hud-content.ts` (the content, from `copy.ts` and `@acme/content`), `hud-draw.ts` (canvas drawing, `hud.*` tokens), `side-key-chirp.ts` (Web Audio). Tabs Dex, Crew, Care, Bag, City; opens on Crew (the Mon's name and "Your Mon", the capture's face). Dex: the three starters' Baby names with their Dex numbers. Care: Energy, Fullness, Social at the CARE section's example levels, with "Example levels, not a live reading." Bag: "Nothing to show on the site." City: the four district names and World's second line. The canvas is 768×1024; the tab bar is 720×96 at (24, 904), five 144px tabs.
+  - **State.** One Zustand store per stage (`useInstanceStore(initialHudState)`): `tab`, `hover`, `sound` (default on), `presses`, `taps`. The radio group is the accessible source of truth; the scene subscribes to the same store and repaints the canvas only when `tab` or `hover` changes (plus once when fonts load).
+  - **Input.** Raycasts run only on a frame whose pointer moved or that follows a press (the stage's `onPointerDown` bumps `taps`), never on an unchanged frame. A click or tap on a tab in the screen's bar selects it; hover lights the tab and sets `cursor-pointer`. A press on the left side key's hit box (an invisible box over the key and the shell strip beside it) dips the key 0.014 for 160ms and plays the chirp if Sound is on. The DOM button does the same.
+  - **Sound.** Synthesised two-tone chirp, Web Audio, no asset. Only from a direct press; the `AudioContext` is created inside the pointerdown or click handler, never on load. The Sound switch mutes it.
 - **Proof rows.** Each row: a 2px `border-ink-950` top rule, `pt-4`, then a 4:3 crop of the render (`w-36`, `lg:w-48`, on `bg-ink-950`) beside an `h3` (`text-lg font-bold`) and one sentence (`text-sm` / `md:text-base`, `text-text-secondary`). Two rows: scanner head, control row. Facts trace to canon Decision #16 only.
 - **Tokens.**
   - `h2`: `font-display text-display-lg uppercase leading-heading`, `xl:text-display-xl`. Lede: `text-xl font-semibold text-text`. Body: `text-base`/`md:text-lg`, `text-text-secondary`, `max-w-content-measure`. The bond line: `font-semibold text-text` with a 4px `border-ink-950` rule, the same treatment as World's second line.
@@ -87,10 +91,12 @@ Files: `apps/web/components/home/HLynkSection.tsx` (server), `apps/web/component
   | First full frame drawn | the capture fades out over 400ms (CSS transition) |
   | Intro (≈2.4s of scene time from the first frame) | settle, slow turn, scanner flare, screen on |
   | At rest | still frame, loop paused |
-  | Pointer over the stage | loop runs; tilt follows the pointer, at most 8° |
+  | Pointer over the stage | loop runs; tilt follows the pointer, at most 8°; a tab under the pointer lights |
+  | Tab picked (DOM or 3D) | the screen repaints once; the readout announces the new tab (polite) |
   | Offscreen | loop paused |
-  | Reduced motion | the capture only; no canvas is created |
-  | No WebGPU or WebGL2 backend | the capture stays; the canvas never reports ready |
+  | Reduced motion | the capture only; no canvas is created. The tab control, readout and side key still work; the readout carries the tab's content |
+  | No WebGPU or WebGL2 backend | the capture stays; the canvas never reports ready; controls and readout work |
+  | No JS | the capture, the control rendered on Crew, and the Crew readout as server text |
 
 - **Motion.** The scene owns the object; the page timeline never transforms the stage (PS-018).
 
@@ -105,8 +111,8 @@ Files: `apps/web/components/home/HLynkSection.tsx` (server), `apps/web/component
   | Pointer tilt (scene) | pointer over the stage | rotation toward pointer, cap `pageMotion.tilt.stage` | exponential, rate 6/s | — |
 
 - **Static capture (asset spec).**
-  - `hlynk.static` = `/home/h-lynk-core-v2.png`, 896×1120 (4:5), opaque, background exactly `ink-950` (#00041C) edge to edge so it sits flush in the plate. It is a render of `device-scene.ts` at its rest pose: yaw −0.38 rad, no tilt, fan at 0.3, screen on.
-  - `hlynk.scanner` = `/home/h-lynk-scanner.png` and `hlynk.controls` = `/home/h-lynk-controls.png`, 640×480 (4:3) crops of the same render: the scanner head with the antenna and fan, and the control row with the trackpad.
+  - `hlynk.static` = `/home/h-lynk-core-v3.png`, 896×1120 (4:5), opaque, background exactly `ink-950` (#00041C) edge to edge so it sits flush in the plate. It is a render of `device-scene.ts` at its rest pose: yaw −0.38 rad, no tilt, fan at 0.3, screen on, Crew tab (PS-037).
+  - `hlynk.scanner` = `/home/h-lynk-scanner-v2.png` (PS-037: fan inside the body width) and `hlynk.controls` = `/home/h-lynk-controls.png`, 640×480 (4:3) crops of the same render: the scanner head with the antenna and fan, and the control row with the trackpad.
   - All three are decorative (`alt=""` with a reason in `art.ts`): the figure is named "H-Lynk Core" and captioned, and each proof row's text names its part.
   - Regenerating: build and serve the site, open `/` in system Chrome (WebGPU) at 1440×1100 with `deviceScaleFactor: 1.5`, scroll the stage into view, wait for the capture to fade and 4s more for the rest pose, keep the pointer off the stage, hide `#mfx-hlynk-head` and the proof list, set the stage figure to `width: 896px !important; max-width: none !important`, and screenshot the 4:5 box at device scale (1344×1680). Trim 3px each side, resize to 896×1120 with Lanczos, and cut the crops from the 1344-wide render at (290, 20)–(1090, 620) and (290, 1080)–(1090, 1680), resized to 640×480. The Phase 4 script is `tooling/site-qa/out/phase4-after/capture.mjs` (ignored by git; the steps above are complete without it).
   - Give every new render a new file name and update `art.ts`. Image optimisers cache by URL: overwriting `h-lynk-core.png` in place served the old blue capture from `.next/cache/images` during Phase 4.
@@ -116,6 +122,8 @@ Files: `apps/web/components/home/HLynkSection.tsx` (server), `apps/web/component
   3. `hlynk.scanner`, `hlynk.controls`: re-crop from the new render, 4:3, 640×480 minimum.
   4. The backplate tier name, rear camera and rear status light (Decision #16) need a back view; out of scope until a rear angle is wanted.
   5. EngineX: nothing is printed on the front until Q40 is answered.
+  - PS-037 re-render: Playwright Chromium (SwiftShader WebGL2) at 1440×1000, `deviceScaleFactor: 3.5`, `maxPixelRatio` raised to 4 for the shot only, pointer off the stage; the 512×640 box (1796×2244) resized to 896×1120; the scanner crop is the render resized to 1174 wide and cut at (268, 40), 640×480, matching the v1 crop's framing. `h-lynk-core-v2.png` stays on disk because `/how-it-works` still uses it.
+- **Scanner fan (PS-037).** `FAN` in `device-scene.ts`: centred on the emitters (x 0.23), each layer opens upward from no wider than the emitters' span to at most ±0.22 at the tip, so the fan spans x 0.01–0.45 of the body's −0.5–0.5; the crossed plane is 0.45 as wide, inside the head's depth; lean −0.08 rad. The mouth glow sprite is 0.42×0.22 at the fan's x. `device-fan.test.ts` projects every fan corner at intro, rest and ±8° tilt poses and fails if one leaves the body's silhouette or hangs in front of the head.
 - **Edge cases.** A long Baby name on the screen: the name is drawn at 96px on a 768px-wide canvas, so about 12 characters fit; past that it needs a smaller size. A slow GPU: the capture stays until the first full frame, however long the compile takes. A WebGPU device loss: `ThreeCanvas` rebuilds on WebGL2; the capture does not reappear during the rebuild.
 
 ## STARTERS
@@ -175,19 +183,19 @@ Files: `apps/web/components/home/HatchBand.tsx` (server, no client code), `copy.
 Files: `apps/web/components/home/WaitlistSection.tsx` (server), `apps/web/components/waitlist/WaitlistForm.tsx` (client island), `apps/web/components/waitlist/copy.ts` (every string + `waitlistMessage`), `apps/web/components/get/GetPage.tsx` (`/get`, source `get`). Backend: `app/(site)/get/actions.ts` `joinWaitlistAction`, `lib/waitlist.ts`. Decisions: PS-001, PS-023.
 
 - **Layout, home.** Daylight `bg-bg`. <768: head (eyebrow, h2, one sentence) then the form, full width. ≥768: head 5 parts left, form 6 parts right, top-aligned. h2 `text-display-md` → `lg:text-display-lg`, `leading-heading`, uppercase.
-- **Form** (`max-w-xl`, `gap-6`): Email label (visible, `font-display uppercase`), input `h-14` (56px) full width, `border-2 border-text`, `bg-surface-raised`, `text-lg font-semibold`; Age fieldset with legend "Age", a 24px native checkbox (`accent-orange-600`) labelled "I'm 13 or older" and the hint "Younger than 13? A parent or guardian can join with their own email and follow along."; the submit button; the live result line; the privacy line with a link to `/legal/privacy`.
+- **Form** (`max-w-xl`, `gap-6`): Email label (visible, `font-display uppercase`), input `h-14` (56px) full width, `border-2 border-text`, `bg-surface-raised`, `text-lg font-semibold`; the neutral age screen (since 2026-10-12, see `WAITLIST_AGE_SCREEN.md`): label "Birth year", hint "We ask everyone. Four digits.", a `h-14 w-40` text input (`inputmode=numeric`, `maxlength=4`, `autocomplete=off`, empty, no placeholder); the submit button; the live result line; the privacy line with a link to `/legal/privacy`.
 - **Button.** Real `<button type="submit">` around `CornerCutFrame` (orange face, 4px depth, `min-h-14`). Full width below 640px, intrinsic from `sm`. Label `Join the waitlist`; pending `Joining…`.
-- **Fields sent:** `email` (type email, `autocomplete=email`, `inputmode=email`, no autocapitalize/autocorrect/spellcheck, `maxlength=254`, required), `ageConfirmed` (checkbox, required), `district` (hidden, from `useDistrictStore`; the hero picker's value, `midtown` when untouched), `source` (`home` | `get`), `website` (honeypot: off-screen, `aria-hidden`, `tabindex=-1`, `autocomplete=off`).
+- **Fields sent:** `email` (type email, `autocomplete=email`, `inputmode=email`, no autocapitalize/autocorrect/spellcheck, `maxlength=254`, required), `birthYear` (four digits, required; the server action sends it as a number or not at all, admin-vite applies the age rule and keeps nothing), `district` (hidden, from `useDistrictStore`; the hero picker's value, `midtown` when untouched), `source` (`home` | `get`), `website` (honeypot: off-screen, `aria-hidden`, `tabindex=-1`, `autocomplete=off`).
 
 | State | Trigger | What shows | Focus | Announced by |
 |---|---|---|---|---|
 | idle | first load | the form | none | — |
 | pending | submit | button "Joining…", disabled; `aria-busy` on the form | (button disabled) | button text |
 | joined | 200 `joined` (new or repeat email, or a bot) | form replaced: green 4px rule, h3 "You're on the list.", "We'll send one email when NYC-MON is out. Signed up before? Nothing changes, and you'll still get just the one." | the h3 (`tabindex=-1`), body via `aria-describedby` | focus |
-| under13 | 422 | "Nothing was saved. You need to be 13 or older to join. A parent or guardian can sign up with their own email and follow along with you." Email cleared, box unticked | submit button | `<output>` |
-| invalid | 400 | field border `danger`, error under the field: "Check the email address. It should look like name@example.com." Email and box kept | email field (`aria-invalid`, `aria-describedby` → error) | focus + description |
+| under13 | 422, or the action's hold cookie | form replaced (no way back to it on this page): grey 4px rule, "Thanks for wanting in. We can't add you to the waitlist, and nothing you typed was saved. A parent or guardian can join with their own email to hear when NYC-MON is out." and the link "For parents: children's privacy" → `/legal/childrens-privacy` | the note (`tabindex=-1`) | focus |
+| invalid | 400 | field border `danger`, error under the named field: email "Check the email address. It should look like name@example.com.", year "Enter the year you were born, as four digits." Email kept, year emptied | the named field (`aria-invalid`, `aria-describedby` → error) | focus + description |
 | rate_limited | 429 | "Too many tries from this connection. Try again in an hour. Your email is still in the box." (semibold `danger`) | submit button | `<output>` |
-| error | 5xx, timeout, network, `ADMIN_API_URL` unset | "We couldn't reach the waitlist just now. Nothing you typed is lost, so try again in a moment." Retry is the same button | submit button | `<output>` |
+| error | 5xx, timeout, network, `ADMIN_API_URL` unset | "We couldn't reach the waitlist just now. Your email is still in the box. Enter your birth year again, then try in a moment." Retry is the same button | submit button | `<output>` |
 
 - **Without JavaScript** the same form posts to the server action and the page renders the result state (checked: joined and invalid with JS off).
 - **Env (Phase 7 deploy checklist):** `ADMIN_API_URL` (server only, admin-vite base URL), `WAITLIST_FORWARD_SECRET` (server only, shared with admin-vite so it rate-limits per visitor). Emails are stored in the Payload `waitlist` collection behind `POST /v1/waitlist` in admin-vite. Without `ADMIN_API_URL` every submit shows the error state; nothing pretends to succeed.
