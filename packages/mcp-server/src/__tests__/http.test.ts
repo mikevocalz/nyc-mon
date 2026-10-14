@@ -308,16 +308,17 @@ describe('malformed JSON-RPC', () => {
     expect((await rpc(running, initialize('2025-11-25'), { token: 'service' })).status).toBe(200);
   });
 
-  it('gates every message in a batch: a hidden tools/call or care call fails the whole batch', async () => {
+  it('refuses JSON-RPC batches before any tool runs, whoever sends them', async () => {
     const v1 = fakeV1({ rows: [row('caller-adult')] });
     running = await start({ v1 });
-    const service = await postRaw(running, JSON.stringify([{ jsonrpc: '2.0', id: 1, method: 'tools/list' }, callTool('get_mon_status', {}, 2)]), 'service');
-    expect(service.status).toBe(401);
-    const readOnly = await postRaw(running, JSON.stringify([callTool('get_mon_status', {}, 1), callTool('feed_mon', {}, 2)]), 'read-only');
-    expect(readOnly.status).toBe(403);
+    const twoMeals = JSON.stringify([callTool('feed_mon', {}, 1), callTool('feed_mon', {}, 2)]);
+    for (const token of ['adult', 'service', 'read-only', undefined]) {
+      const { status, text } = await postRaw(running, twoMeals, token);
+      expect(status).toBe(400);
+      expect(JSON.parse(text)).toMatchObject({ jsonrpc: '2.0', id: null, error: { code: -32600 } });
+    }
+    expect((await postRaw(running, '[]', 'adult')).status).toBe(400);
     expect(v1.calls).toHaveLength(0);
-    const empty = await postRaw(running, '[]');
-    expect(empty.status).toBeLessThan(500);
   });
 });
 

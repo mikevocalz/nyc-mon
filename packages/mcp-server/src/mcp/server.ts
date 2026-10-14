@@ -131,6 +131,11 @@ export function createHandler(deps: ServerDeps): (req: IncomingMessage, res: Ser
         }
         throw error;
       }
+      // 2025-11-25 has no JSON-RPC batching (removed in 2025-06-18); a batch
+      // of care calls would otherwise apply every mutation in it.
+      if (Array.isArray(body)) {
+        return sendJson(res, 400, { jsonrpc: '2.0', id: null, error: { code: -32600, message: 'Batch requests are not supported' } });
+      }
     }
 
     const auth: RequestAuth =
