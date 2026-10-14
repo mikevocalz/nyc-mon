@@ -130,6 +130,12 @@ describe('server env', () => {
     expect(() => loadSimEnv({ SIM_AUTH_MODE: 'dev-bypass' })).toThrow(/development or test/);
     expect(() => loadSimEnv({ SIM_AUTH_MODE: 'dev-bypass', NODE_ENV: 'staging' })).toThrow(/development or test/);
   });
+
+  it('refuses the mock model backend in production', () => {
+    expect(() => loadSimEnv({ SIM_MODEL_BACKEND: 'mock', NODE_ENV: 'production' })).toThrow(/mock is refused/);
+    expect(loadSimEnv({ SIM_MODEL_BACKEND: 'mock', NODE_ENV: 'test' }).SIM_MODEL_BACKEND).toBe('mock');
+    expect(loadSimEnv({ NODE_ENV: 'production' }).SIM_MODEL_BACKEND).toBe('bedrock');
+  });
   it('refuses a sandbox on the same origin as the page', () => {
     expect(() => loadSimEnv({ SIM_SANDBOX_ORIGIN: 'http://localhost:5180' })).toThrow(/different origin/);
   });
