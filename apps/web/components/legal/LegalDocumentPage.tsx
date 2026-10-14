@@ -3,6 +3,7 @@ import { View } from '@acme/ui/tw';
 import { Eyebrow } from '../home/Eyebrow';
 import { LEGAL_COPY, type LegalDocument } from './copy';
 import { LegalParagraph, legalParagraphKey } from './LegalParagraph';
+import { siteHref } from '../../lib/site-href';
 
 // Kept apart so the contrast audit (packages/theme contrast §1.3) reads each pairing on its own:
 // the current tab is an orange CTA plate with the signage-black CTA label.
@@ -62,7 +63,7 @@ export function LegalDocumentPage({ doc, testId }: { doc: LegalDocument; testId:
                   return (
                     <ListItem key={href}>
                       <Link
-                        href={href}
+                        href={siteHref(href)}
                         aria-current={current ? 'page' : undefined}
                         className={`inline-flex min-h-11 items-center border-2 px-4 text-sm font-semibold no-underline ${FOCUS} focus-visible:ring-offset-ink-950 ${current ? TAB_CURRENT : TAB_OTHER}`}
                       >

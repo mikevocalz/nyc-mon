@@ -8,6 +8,7 @@ import { W02_COPY } from './copy';
 import { MonsMotion } from './MonsMotion';
 import { ArtFill, ConceptCaption, DexChip, RouteDisc, StreetFigure, dexDigits } from './parts';
 import { monsStarters, type MonsStarter } from './starters';
+import { siteHref } from '../../lib/site-href';
 
 /**
  * Bento placement per roster row. Even rows put the portrait on the left,
@@ -97,7 +98,7 @@ function RosterRow({ starter, index }: { starter: MonsStarter; index: number }) 
           </View>
           <LinkButton
             title={copy.cardLabel(starter.babyName)}
-            href={copy.cardHref(starter.slug)}
+            href={siteHref(copy.cardHref(starter.slug))}
             tone={a.tone}
             testID={`w02-roster-${starter.slug}-link`}
           />
@@ -172,7 +173,7 @@ export function MonsIndexPage() {
                   return (
                     <ListItem key={starter.slug}>
                       <Link
-                        href={copy.cardHref(starter.slug)}
+                        href={siteHref(copy.cardHref(starter.slug))}
                         aria-label={copy.cardLabel(starter.babyName)}
                         className="flex min-h-12 flex-row items-center gap-3 border-2 border-ink-700 bg-signage-black py-2 pl-2 pr-4 no-underline transition-colors duration-200 hover:border-orange-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus motion-reduce:transition-none"
                       >
@@ -216,7 +217,7 @@ export function MonsIndexPage() {
               </Text>
             </Heading>
             <View id="mfx-close-cta">
-              <LinkButton title={copy.cta.label} href={copy.cta.href} variant="cta" size="lg" testID="w02-mons-cta" />
+              <LinkButton title={copy.cta.label} href={siteHref(copy.cta.href)} variant="cta" size="lg" testID="w02-mons-cta" />
             </View>
           </View>
         </Section>

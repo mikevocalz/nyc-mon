@@ -8,6 +8,7 @@ import { eggArt, hatchNightArt, hlynkArt } from '../how-it-works/art';
 import { WaitlistForm } from '../waitlist/WaitlistForm';
 import { W05_COPY } from './copy';
 import { GetMotion } from './GetMotion';
+import { siteHref } from '../../lib/site-href';
 
 const MD_UP = `(min-width: ${breakpoints.md})`;
 const LG_UP = `(min-width: ${breakpoints.lg})`;
@@ -167,7 +168,7 @@ function Bento() {
               {copy.privacy.links.map((link) => (
                 <Link
                   key={link.href}
-                  href={link.href}
+                  href={siteHref(link.href)}
                   className="inline-flex min-h-11 items-center text-base font-semibold text-signage-white underline underline-offset-4"
                 >
                   {link.label}
@@ -186,7 +187,7 @@ function Bento() {
                 {copy.loop.title}
               </Heading>
               <Paragraph className="my-0 text-base leading-7 text-silver-300">{copy.loop.body}</Paragraph>
-              <LinkButton title={copy.loop.title} href={copy.loop.href} district="downtown" testID="w05-how" />
+              <LinkButton title={copy.loop.title} href={siteHref(copy.loop.href)} district="downtown" testID="w05-how" />
             </View>
             <List className="relative m-0 grid list-none grid-cols-5 gap-1 p-0 lg:col-span-8">
               <View aria-hidden className="absolute left-[10%] right-[10%] top-6 h-1 bg-orange-500 md:top-7" />

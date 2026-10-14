@@ -8,6 +8,7 @@ import { W02_COPY } from './copy';
 import { MonsMotion } from './MonsMotion';
 import { ArtFill, ConceptCaption, DexChip, RouteDisc, StreetFigure, dexDigits } from './parts';
 import { monsStarters, type MonsStarter } from './starters';
+import { siteHref } from '../../lib/site-href';
 
 /** Giant Dex numerals: the slot tone's face, decorative (the Dex chip carries the number as text). */
 // The giant Dex numerals use the 600 step: the 500 orange and leaf fall under 3:1 on light grounds.
@@ -38,7 +39,7 @@ function Hero({ starter }: { starter: MonsStarter }) {
     >
       <View className="mx-auto w-full max-w-screen-xl gap-12 px-4 pb-16 pt-10 sm:px-6 md:pt-14 lg:grid lg:grid-cols-12 lg:items-end lg:gap-x-10 lg:px-8 lg:pb-20 lg:pt-12">
         <Link
-          href={copy.backHref}
+          href={siteHref(copy.backHref)}
           className="-mb-6 self-start lg:col-span-12 lg:mb-2 text-sm font-semibold text-silver-200 underline decoration-orange-500 decoration-2 underline-offset-4 hover:text-signage-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
         >
           {copy.back}
@@ -202,7 +203,7 @@ function HatchBand() {
         </Figure>
         <View id="mfx-hatch-cta" className="gap-6 md:flex-row md:items-center md:justify-between">
           <Paragraph className="my-0 font-display text-2xl uppercase leading-heading text-ink-50 md:text-3xl">{copy.hatchClosing}</Paragraph>
-          <LinkButton title={copy.cta.label} href={copy.cta.href} variant="cta" size="lg" testID="w02-detail-cta" />
+          <LinkButton title={copy.cta.label} href={siteHref(copy.cta.href)} variant="cta" size="lg" testID="w02-detail-cta" />
         </View>
       </View>
     </Section>
@@ -217,7 +218,7 @@ function OtherCard({ starter, index }: { starter: MonsStarter; index: number }) 
   return (
     <ListItem id={`mfx-others-${index}`} className="min-w-0 md:flex-1">
       <Link
-        href={copy.cardHref(starter.slug)}
+        href={siteHref(copy.cardHref(starter.slug))}
         aria-label={copy.cardLabel(starter.babyName)}
         className="group flex h-full flex-col border-2 border-ink-950 bg-surface-raised no-underline transition-transform duration-200 hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 sm:flex-row motion-reduce:transition-none motion-reduce:hover:translate-y-0"
       >
@@ -250,7 +251,7 @@ function Others({ starter }: { starter: MonsStarter }) {
         <Heading level={2} id="w02-others-title" className="my-0 font-display text-display-md uppercase leading-heading text-text lg:text-display-lg lg:leading-heading">
           {copy.othersTitle}
         </Heading>
-        <LinkButton title={copy.back} href={copy.backHref} testID={`w02-${starter.slug}-back`} />
+        <LinkButton title={copy.back} href={siteHref(copy.backHref)} testID={`w02-${starter.slug}-back`} />
       </View>
       <List className="m-0 list-none gap-6 p-0 md:flex-row">
         {others.map((other, i) => (

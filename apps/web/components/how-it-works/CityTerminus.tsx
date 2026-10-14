@@ -5,6 +5,7 @@ import { View } from '@acme/ui/tw';
 import { ArtTile } from './ArtTile';
 import { photoArt } from './art';
 import { W04_COPY } from './copy';
+import { siteHref } from '../../lib/site-href';
 
 /** North to south, then Mega City: the order a rider reads them on a line map (as home's SignageBoard). */
 const ROUTE: readonly District[] = ['harlem', 'midtown', 'downtown', 'megacity'];
@@ -58,7 +59,7 @@ export function CityTerminus() {
               );
             })}
           </List>
-          <LinkButton title={copy.cta} href={copy.ctaHref} district="downtown" testID="w04-city-cta" />
+          <LinkButton title={copy.cta} href={siteHref(copy.ctaHref)} district="downtown" testID="w04-city-cta" />
         </View>
       </View>
     </Section>

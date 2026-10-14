@@ -20,8 +20,8 @@
  * Reduced motion never reaches this file: the frame renders nothing, the
  * `motion-armed` class is never set, and every target stays at rest.
  */
-import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
+import { createMediaScope, showUnbound, type MediaScope } from '../../lib/media-scope';
 import { compileMotion, defineMotion, type CompiledMotion } from 'kinetrell/core';
 import { attachScrollTrigger, createGsapTimeline, ensureScrollTrigger, type GsapTargetMap } from 'kinetrell/web/gsap';
 import { breakpoints, pageMotion } from '@acme/theme';
@@ -47,7 +47,7 @@ export interface RouteTargets {
   scrubs: Record<string, HTMLElement>;
   triggers: Record<string, HTMLElement>;
   /** Desktop/phone media scopes; reverted with the page. */
-  media: gsap.MatchMedia;
+  media: MediaScope;
 }
 
 /** A motion binds only when every named target exists; logs the missing ids in dev. */
@@ -134,7 +134,7 @@ export function useRouteMotion(special?: (targets: RouteTargets) => void) {
     const host = document.documentElement;
     host.classList.add(ARMED_CLASS);
     const { fades, scrubs, triggers } = collect();
-    const media = gsap.matchMedia();
+    const media = createMediaScope();
 
     // Group every fade by the section anchor it sits in, in DOM order.
     const groups = new Map<string, string[]>();
@@ -154,7 +154,7 @@ export function useRouteMotion(special?: (targets: RouteTargets) => void) {
       groups.set(marker.name, [...(groups.get(marker.name) ?? []), name]);
     }
     // Nothing marked may stay hidden: a fade outside any section just shows.
-    if (orphans.length) gsap.set(orphans, { opacity: 1 });
+    showUnbound(orphans);
 
     if (hero.length && performance.now() < 1800) {
       const enter = heroEntrance(hero);
@@ -170,7 +170,7 @@ export function useRouteMotion(special?: (targets: RouteTargets) => void) {
       }
     }
 
-    // Photo parallax, desktop only; gsap.matchMedia reverts it across md.
+    // Photo parallax, desktop only (bound for the viewport the page mounts in).
     const drifts = Object.keys(scrubs).filter((n) => n.endsWith('-drift'));
     media.add(DESKTOP, () => {
       drifts.forEach((name, i) => {

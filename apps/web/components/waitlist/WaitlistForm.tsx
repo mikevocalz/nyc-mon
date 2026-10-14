@@ -16,6 +16,7 @@ import {
 import { useInstanceStore, useStore } from '@acme/ui';
 import { View } from '@acme/ui/tw';
 import { useDistrictStore } from '@acme/spatial/district';
+import { siteHref } from '../../lib/site-href';
 import { joinWaitlistAction, type WaitlistFormState } from '../../app/(site)/get/actions';
 import { birthYearError, waitlistMessage, WAITLIST_COPY } from './copy';
 
@@ -177,7 +178,7 @@ export function WaitlistForm({ source, className }: { source: WaitlistSource; cl
         </Paragraph>
         {message.link ? (
           <Paragraph className="my-0 text-sm leading-6 text-text-secondary">
-            <Link href={message.link.href} className="inline-flex min-h-6 items-center text-text underline underline-offset-4">
+            <Link href={siteHref(message.link.href)} className="inline-flex min-h-6 items-center text-text underline underline-offset-4">
               {message.link.label}
             </Link>
           </Paragraph>
@@ -276,7 +277,7 @@ export function WaitlistForm({ source, className }: { source: WaitlistSource; cl
           </Output>
           <Paragraph id={ids.privacy} className="my-0 text-sm leading-6 text-text-secondary">
             {copy.privacy}{' '}
-            <Link href={copy.privacyHref} className="inline-flex min-h-6 items-center text-text underline underline-offset-4">
+            <Link href={siteHref(copy.privacyHref)} className="inline-flex min-h-6 items-center text-text underline underline-offset-4">
               {copy.privacyLink}
             </Link>
           </Paragraph>

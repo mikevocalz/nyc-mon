@@ -23,8 +23,8 @@
  */
 // The W02 routes run the home page's Kinetrell system (creator direction, 2026-10-13); the rule's
 // ignore list names components/home/motion.ts only, so the two adapter imports are allowed here.
-import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
+import { createMediaScope } from '../../lib/media-scope';
 import { compileMotion, defineMotion, type CompiledMotion } from 'kinetrell/core';
 import { attachScrollTrigger, createGsapTimeline, ensureScrollTrigger, type GsapTargetMap } from 'kinetrell/web/gsap';
 import { breakpoints, pageMotion } from '@acme/theme';
@@ -143,7 +143,7 @@ export function useMonsMotion() {
     }
 
     // Drifts: desktop only, scrubbed across their beat's anchor.
-    const media = gsap.matchMedia();
+    const media = createMediaScope();
     media.add(DESKTOP, () => {
       for (const [name, el] of Object.entries(scrubs)) {
         const motion = drift(name);

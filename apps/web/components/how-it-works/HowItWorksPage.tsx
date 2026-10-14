@@ -12,6 +12,7 @@ import { CareBento } from './CareBento';
 import { CityTerminus } from './CityTerminus';
 import { W04_COPY } from './copy';
 import { HowItWorksMotion } from './HowItWorksMotion';
+import { siteHref } from '../../lib/site-href';
 
 type Step = (typeof W04_COPY.loop.steps)[number];
 
@@ -278,7 +279,7 @@ export function HowItWorksPage() {
                 {cta.title}
               </Heading>
               <Paragraph className="my-0 max-w-content-measure text-lg leading-8 text-ink-50">{cta.body}</Paragraph>
-              <LinkButton title={cta.cta} href={cta.ctaHref} variant="cta" size="lg" testID="w04-cta" />
+              <LinkButton title={cta.cta} href={siteHref(cta.ctaHref)} variant="cta" size="lg" testID="w04-cta" />
             </View>
             <View id="mfx-hiw-cta-art" className="min-w-0 lg:col-span-5">
               <ArtTile art={eggArt(3, `${LG_UP} 28rem, 92vw`)} frame="aspect-[4/3] lg:aspect-[4/5]" />

@@ -11,15 +11,7 @@ const eslintConfig = defineConfig([
   ...nextVitals,
   {
     files: ['**/*.ts', '**/*.tsx'],
-    // The Kinetrell motion adapters (home and each site route's motion island)
-    // are the only files allowed to touch GSAP.
-    ignores: [
-      'components/site/Landing.tsx',
-      'components/home/motion.ts',
-      'components/*/motion.ts',
-      'components/*/route-motion.{ts,tsx}',
-      'components/*/*MotionRoot.tsx',
-    ],
+    ignores: ['components/site/Landing.tsx', 'components/home/motion.ts'],
     rules: {
       'no-restricted-imports': [
         'error',
@@ -40,9 +32,10 @@ const eslintConfig = defineConfig([
               message: 'Platform UI belongs behind @acme/ui.',
             },
             {
-              group: ['gsap', 'gsap/*'],
+              // Anchor package names: bare 'gsap' also matches kinetrell/web/gsap.
+              group: ['/gsap', '/gsap/*'],
               message:
-                'GSAP is scoped to the Kinetrell motion adapters (components/home/motion.ts and each route\'s motion.ts, route-motion or *MotionRoot).',
+                'Import the Kinetrell adapters for route motion; direct GSAP is scoped to home/motion.ts.',
             },
           ],
         },

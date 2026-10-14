@@ -20,8 +20,8 @@
 import { useEffect } from 'react';
 // The inner routes run the home page's Kinetrell system (creator direction, 2026-10-13); the rule's
 // ignore list names components/home/motion.ts only, so the adapter imports are allowed here.
-import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
+import { createMediaScope, showUnbound, type MediaScope } from '../../lib/media-scope';
 import type { CompiledMotion } from 'kinetrell/core';
 import { attachScrollTrigger, createGsapTimeline, ensureScrollTrigger, type GsapTargetMap } from 'kinetrell/web/gsap';
 import { ReactLenis, useKinetrellLenis } from 'kinetrell/web/lenis';
@@ -48,7 +48,7 @@ export interface RouteTargets {
 
 /** The marked elements on the page, by marker name. */
 export function collectTargets(root: ParentNode): RouteTargets {
-  const all: Record<string, gsap.TweenTarget> = {};
+  const all: Record<string, HTMLElement> = {};
   const triggers: Record<string, Element> = {};
   for (const el of root.querySelectorAll<HTMLElement>(MOTION_MARKER_SELECTOR)) {
     const marker = parseMotionMarker(el.id);
@@ -70,7 +70,7 @@ export function bindable(motion: CompiledMotion, map: GsapTargetMap): boolean {
 }
 
 /** Binds a route's choreography; returns the names of the targets it bound. */
-export type RouteBinder = (targets: RouteTargets, media: gsap.MatchMedia) => Iterable<string>;
+export type RouteBinder = (targets: RouteTargets, media: MediaScope) => Iterable<string>;
 
 /** Same class as home (globals.css pre-hides `mfx-*` under it, hero markers excepted). */
 const ARMED_CLASS = 'motion-armed';
@@ -102,12 +102,12 @@ function MotionFrame({ bind }: { bind: RouteBinder }) {
     if (!ensureScrollTrigger()) return;
     const root = document.documentElement;
     root.classList.add(ARMED_CLASS);
-    const media = gsap.matchMedia();
+    const media = createMediaScope();
     const targets = collectTargets(document);
     const bound = new Set(bind(targets, media));
     // A fade target no motion took (a missing sibling, a renamed id) must not stay pre-hidden.
     for (const [name, el] of Object.entries(targets.all)) {
-      if (!bound.has(name)) gsap.set(el, { opacity: 1 });
+      if (!bound.has(name)) showUnbound([el as Element]);
     }
     return () => {
       media.revert();
