@@ -68,7 +68,7 @@ export const hatchNightArt = (sizes: string) => creature('hatch-night', sizes, a
 
 /** The H-Lynk Core render at rest on ink (public/home, as on the home page's stage). */
 export const hlynkArt = (sizes: string): RouteArt => ({
-  src: `${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/home/h-lynk-core-v2.png`,
+  src: `${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/home/h-lynk-core-v3.png`,
   width: 896,
   height: 1120,
   alt: W01_COPY.hlynk.caption,

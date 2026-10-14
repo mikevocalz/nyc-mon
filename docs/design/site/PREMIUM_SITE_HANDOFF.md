@@ -73,7 +73,11 @@ Files: `apps/web/components/home/HLynkSection.tsx` (server), `apps/web/component
   | 1024–1279 | 28rem | `md:py-12` |
   | ≥ 1280 | 32rem | `md:py-12` |
 
-  The canvas fills the box; its drawing buffer is capped at DPR 1.5. The caption sits under the box on ink.
+  The canvas fills the box; its drawing buffer is capped at DPR 1.5. Under the box, on ink, in DOM order (PS-037): the screen's tab control (`SegmentedControl`, `tone="apple"`, full width, five segments), the screen readout (`<output>`, `text-sm text-text`, `min-h-[4.5rem]` so a three-line caption doesn't shift the page at 390), a row with the "Side key chirp" `Button` (`outline`, `apple`, `sm`) and the "Sound" `Switch`, then the caption.
+- **Screen (PS-037).** Files: `hlynk-hud.ts` (tabs, hit regions, captions, store shape; pure), `hlynk-hud-content.ts` (the content, from `copy.ts` and `@acme/content`), `hud-draw.ts` (canvas drawing, `hud.*` tokens), `side-key-chirp.ts` (Web Audio). Tabs Dex, Crew, Care, Bag, City; opens on Crew (the Mon's name and "Your Mon", the capture's face). Dex: the three starters' Baby names with their Dex numbers. Care: Energy, Fullness, Social at the CARE section's example levels, with "Example levels, not a live reading." Bag: "Nothing to show on the site." City: the four district names and World's second line. The canvas is 768×1024; the tab bar is 720×96 at (24, 904), five 144px tabs.
+  - **State.** One Zustand store per stage (`useInstanceStore(initialHudState)`): `tab`, `hover`, `sound` (default on), `presses`, `taps`. The radio group is the accessible source of truth; the scene subscribes to the same store and repaints the canvas only when `tab` or `hover` changes (plus once when fonts load).
+  - **Input.** Raycasts run only on a frame whose pointer moved or that follows a press (the stage's `onPointerDown` bumps `taps`), never on an unchanged frame. A click or tap on a tab in the screen's bar selects it; hover lights the tab and sets `cursor-pointer`. A press on the left side key's hit box (an invisible box over the key and the shell strip beside it) dips the key 0.014 for 160ms and plays the chirp if Sound is on. The DOM button does the same.
+  - **Sound.** Synthesised two-tone chirp, Web Audio, no asset. Only from a direct press; the `AudioContext` is created inside the pointerdown or click handler, never on load. The Sound switch mutes it.
 - **Proof rows.** Each row: a 2px `border-ink-950` top rule, `pt-4`, then a 4:3 crop of the render (`w-36`, `lg:w-48`, on `bg-ink-950`) beside an `h3` (`text-lg font-bold`) and one sentence (`text-sm` / `md:text-base`, `text-text-secondary`). Two rows: scanner head, control row. Facts trace to canon Decision #16 only.
 - **Tokens.**
   - `h2`: `font-display text-display-lg uppercase leading-heading`, `xl:text-display-xl`. Lede: `text-xl font-semibold text-text`. Body: `text-base`/`md:text-lg`, `text-text-secondary`, `max-w-content-measure`. The bond line: `font-semibold text-text` with a 4px `border-ink-950` rule, the same treatment as World's second line.
@@ -87,10 +91,12 @@ Files: `apps/web/components/home/HLynkSection.tsx` (server), `apps/web/component
   | First full frame drawn | the capture fades out over 400ms (CSS transition) |
   | Intro (≈2.4s of scene time from the first frame) | settle, slow turn, scanner flare, screen on |
   | At rest | still frame, loop paused |
-  | Pointer over the stage | loop runs; tilt follows the pointer, at most 8° |
+  | Pointer over the stage | loop runs; tilt follows the pointer, at most 8°; a tab under the pointer lights |
+  | Tab picked (DOM or 3D) | the screen repaints once; the readout announces the new tab (polite) |
   | Offscreen | loop paused |
-  | Reduced motion | the capture only; no canvas is created |
-  | No WebGPU or WebGL2 backend | the capture stays; the canvas never reports ready |
+  | Reduced motion | the capture only; no canvas is created. The tab control, readout and side key still work; the readout carries the tab's content |
+  | No WebGPU or WebGL2 backend | the capture stays; the canvas never reports ready; controls and readout work |
+  | No JS | the capture, the control rendered on Crew, and the Crew readout as server text |
 
 - **Motion.** The scene owns the object; the page timeline never transforms the stage (PS-018).
 
@@ -105,8 +111,8 @@ Files: `apps/web/components/home/HLynkSection.tsx` (server), `apps/web/component
   | Pointer tilt (scene) | pointer over the stage | rotation toward pointer, cap `pageMotion.tilt.stage` | exponential, rate 6/s | — |
 
 - **Static capture (asset spec).**
-  - `hlynk.static` = `/home/h-lynk-core-v2.png`, 896×1120 (4:5), opaque, background exactly `ink-950` (#00041C) edge to edge so it sits flush in the plate. It is a render of `device-scene.ts` at its rest pose: yaw −0.38 rad, no tilt, fan at 0.3, screen on.
-  - `hlynk.scanner` = `/home/h-lynk-scanner.png` and `hlynk.controls` = `/home/h-lynk-controls.png`, 640×480 (4:3) crops of the same render: the scanner head with the antenna and fan, and the control row with the trackpad.
+  - `hlynk.static` = `/home/h-lynk-core-v3.png`, 896×1120 (4:5), opaque, background exactly `ink-950` (#00041C) edge to edge so it sits flush in the plate. It is a render of `device-scene.ts` at its rest pose: yaw −0.38 rad, no tilt, fan at 0.3, screen on, Crew tab (PS-037).
+  - `hlynk.scanner` = `/home/h-lynk-scanner-v2.png` (PS-037: fan inside the body width) and `hlynk.controls` = `/home/h-lynk-controls.png`, 640×480 (4:3) crops of the same render: the scanner head with the antenna and fan, and the control row with the trackpad.
   - All three are decorative (`alt=""` with a reason in `art.ts`): the figure is named "H-Lynk Core" and captioned, and each proof row's text names its part.
   - Regenerating: build and serve the site, open `/` in system Chrome (WebGPU) at 1440×1100 with `deviceScaleFactor: 1.5`, scroll the stage into view, wait for the capture to fade and 4s more for the rest pose, keep the pointer off the stage, hide `#mfx-hlynk-head` and the proof list, set the stage figure to `width: 896px !important; max-width: none !important`, and screenshot the 4:5 box at device scale (1344×1680). Trim 3px each side, resize to 896×1120 with Lanczos, and cut the crops from the 1344-wide render at (290, 20)–(1090, 620) and (290, 1080)–(1090, 1680), resized to 640×480. The Phase 4 script is `tooling/site-qa/out/phase4-after/capture.mjs` (ignored by git; the steps above are complete without it).
   - Give every new render a new file name and update `art.ts`. Image optimisers cache by URL: overwriting `h-lynk-core.png` in place served the old blue capture from `.next/cache/images` during Phase 4.
@@ -116,6 +122,8 @@ Files: `apps/web/components/home/HLynkSection.tsx` (server), `apps/web/component
   3. `hlynk.scanner`, `hlynk.controls`: re-crop from the new render, 4:3, 640×480 minimum.
   4. The backplate tier name, rear camera and rear status light (Decision #16) need a back view; out of scope until a rear angle is wanted.
   5. EngineX: nothing is printed on the front until Q40 is answered.
+  - PS-037 re-render: Playwright Chromium (SwiftShader WebGL2) at 1440×1000, `deviceScaleFactor: 3.5`, `maxPixelRatio` raised to 4 for the shot only, pointer off the stage; the 512×640 box (1796×2244) resized to 896×1120; the scanner crop is the render resized to 1174 wide and cut at (268, 40), 640×480, matching the v1 crop's framing. `h-lynk-core-v2.png` stays on disk because `/how-it-works` still uses it.
+- **Scanner fan (PS-037).** `FAN` in `device-scene.ts`: centred on the emitters (x 0.23), each layer opens upward from no wider than the emitters' span to at most ±0.22 at the tip, so the fan spans x 0.01–0.45 of the body's −0.5–0.5; the crossed plane is 0.45 as wide, inside the head's depth; lean −0.08 rad. The mouth glow sprite is 0.42×0.22 at the fan's x. `device-fan.test.ts` projects every fan corner at intro, rest and ±8° tilt poses and fails if one leaves the body's silhouette or hangs in front of the head.
 - **Edge cases.** A long Baby name on the screen: the name is drawn at 96px on a 768px-wide canvas, so about 12 characters fit; past that it needs a smaller size. A slow GPU: the capture stays until the first full frame, however long the compile takes. A WebGPU device loss: `ThreeCanvas` rebuilds on WebGL2; the capture does not reappear during the rebuild.
 
 ## STARTERS
