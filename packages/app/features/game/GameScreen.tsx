@@ -121,7 +121,7 @@ export function GameScreen() {
     width,
     height,
     // The tab layout already pads for the bar/rail; the top inset is the screen's to clear.
-    insets: { top: insets.top, bottom: placement.rail ? insets.bottom : 0, left: railEdge === 'left' ? 0 : insets.left, right: railEdge === 'right' ? 0 : insets.right },
+    insets: { top: insets.top, bottom: placement.rail ? insets.bottom : 0, left: insets.left, right: railEdge === 'right' ? 0 : insets.right },
     folds,
     railEdge,
     isRTL: I18nManager.isRTL,
