@@ -3,7 +3,8 @@
 import type { Href } from 'expo-router';
 import { readBootSave } from '@acme/core/save';
 import { assertNever, type BootRoute, type BootSnapshot, resolveBootRoute } from '@acme/core/sim';
-import { readAgeAnswer, readSessionFlag, SAVE_KEY } from './onboarding.store';
+import { readAgeAnswer, readPermissionsPending, readSessionFlag, SAVE_KEY } from './onboarding.store';
+import { PERMISSION_CENTER_ROUTE } from './permission-center-model';
 import { saveStorage } from './storage';
 import { MEET_PATH, MON_HOME_PATH } from '../egg/egg-model.ts';
 
@@ -84,5 +85,8 @@ export function bootPath(route: BootRoute): Href {
 /** Convenience for the M01 route: snapshot → route → path, all synchronous. */
 export function resolveBootPath(nowMs: number): { route: BootRoute; path: Href } {
   const route = resolveBootRoute(buildBootSnapshot(nowMs));
-  return { route, path: bootPath(route) };
+  // Existing users have no pending marker. Only an interrupted new egg flow
+  // returns to the final (skippable) setup page after app process restart.
+  const inGame = route.kind === 'incubating' || route.kind === 'egg-ready' || route.kind === 'companion';
+  return { route, path: inGame && readPermissionsPending() ? PERMISSION_CENTER_ROUTE : bootPath(route) };
 }
