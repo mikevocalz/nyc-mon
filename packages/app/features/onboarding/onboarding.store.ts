@@ -15,6 +15,7 @@ export const ONBOARDING_KEYS = {
   hasSession: 'has-session',
   consentRequested: 'consent-requested',
   notifyOff: 'notify-off',
+  permissionsPending: 'permissions-pending',
 } as const;
 
 export const SAVE_KEY = 'save';
@@ -34,6 +35,11 @@ export function readAgeAnswer(): AgeAnswer | undefined {
 /** True when a local session flag exists. Written on sign-in / sign-out; never read over the network. */
 export function readSessionFlag(): boolean {
   return onboardingStorage.getString(ONBOARDING_KEYS.hasSession) === '1';
+}
+
+/** A newly-created egg still needs to show the final optional setup step. */
+export function readPermissionsPending(): boolean {
+  return onboardingStorage.getString(ONBOARDING_KEYS.permissionsPending) === '1';
 }
 
 /**
@@ -77,12 +83,14 @@ interface OnboardingState {
   hasSession: boolean;
   /** The M06 outcome the M11 status row and the inbox read. `undefined` = notifications fine or never asked. */
   notifyOff: NotifyOffState | undefined;
+  permissionsPending: boolean;
   /** Writes the M04 answer to MMKV and state (M04 Continue). */
   setAgeAnswer: (birthYear: number, nowMs: number) => void;
   /** Writes the local session flag (sign-in success / sign-out). */
   setSession: (present: boolean) => void;
   /** Records or clears the notifications-off state (M06 close paths). */
   setNotifyOff: (state: NotifyOffState | undefined) => void;
+  setPermissionsPending: (pending: boolean) => void;
 }
 
 /**
@@ -94,6 +102,7 @@ export const useOnboarding = create<OnboardingState>()((set) => ({
   ageAnswer: undefined,
   hasSession: false,
   notifyOff: undefined,
+  permissionsPending: false,
   setAgeAnswer: (birthYear, nowMs) => {
     const answer: AgeAnswer = { birthYear, answeredAtMs: nowMs };
     onboardingStorage.set(ONBOARDING_KEYS.ageAnswer, JSON.stringify(answer));
@@ -101,13 +110,21 @@ export const useOnboarding = create<OnboardingState>()((set) => ({
   },
   setSession: (present) => {
     if (present) onboardingStorage.set(ONBOARDING_KEYS.hasSession, '1');
-    else onboardingStorage.remove(ONBOARDING_KEYS.hasSession);
-    set({ hasSession: present });
+    else {
+      onboardingStorage.remove(ONBOARDING_KEYS.hasSession);
+      onboardingStorage.remove(ONBOARDING_KEYS.permissionsPending);
+    }
+    set({ hasSession: present, ...(!present ? { permissionsPending: false } : {}) });
   },
   setNotifyOff: (state) => {
     if (state === undefined) onboardingStorage.remove(ONBOARDING_KEYS.notifyOff);
     else onboardingStorage.set(ONBOARDING_KEYS.notifyOff, state);
     set({ notifyOff: state });
+  },
+  setPermissionsPending: (pending) => {
+    if (pending) onboardingStorage.set(ONBOARDING_KEYS.permissionsPending, '1');
+    else onboardingStorage.remove(ONBOARDING_KEYS.permissionsPending);
+    set({ permissionsPending: pending });
   },
 }));
 
@@ -117,5 +134,6 @@ export function hydrateOnboarding(): void {
     ageAnswer: readAgeAnswer(),
     hasSession: readSessionFlag(),
     notifyOff: readNotifyOff(),
+    permissionsPending: readPermissionsPending(),
   });
 }
