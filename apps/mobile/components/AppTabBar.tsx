@@ -1,6 +1,7 @@
 // Expo Router 58 exposes the JavaScript tab navigator and its public types
 // from this stable export; do not reach into expo-router/build internals.
 import type { BottomTabBarProps } from 'expo-router/js-tabs';
+import { I18nManager } from 'react-native';
 import { Pressable, Text, View } from '@acme/ui/tw';
 import { Bell, User } from '@acme/ui/icons';
 import { MenuButton } from '@acme/app';
@@ -104,25 +105,32 @@ export function AppTabBar({
     );
   }
 
+  // The rail sits on the physical right (packages/ui/adaptive-navigation.ts),
+  // where a landscape 3-button nav bar or cutout can be. Keep that inset as
+  // bare surface outside the items. Yoga mirrors `row` under RTL, so reverse
+  // it there to keep the spacer physically right.
   return (
-    <View
-      style={{
-        width: wide ? RAIL_EXPANDED_WIDTH : RAIL_WIDTH,
-        paddingTop: insets.top + 12,
-        paddingBottom: insets.bottom + MENU_BOTTOM_GAP,
-      }}
-      className={`h-full gap-2 bg-surface ${wide ? 'items-stretch px-3' : 'items-center px-1.5'}`}
-    >
-      {items}
-      {/* No trailing rule: the rail shares the screen's surface colour, so the
-          selected slab alone carries the edge. A border here read as a seam
-          between two panels that are actually one background.
+    <View className={`h-full bg-surface ${I18nManager.isRTL ? 'flex-row-reverse' : 'flex-row'}`}>
+      <View
+        style={{
+          width: wide ? RAIL_EXPANDED_WIDTH : RAIL_WIDTH,
+          paddingTop: insets.top + 12,
+          paddingBottom: insets.bottom + MENU_BOTTOM_GAP,
+        }}
+        className={`h-full gap-2 bg-surface ${wide ? 'items-stretch px-3' : 'items-center px-1.5'}`}
+      >
+        {items}
+        {/* No trailing rule: the rail shares the screen's surface colour, so the
+            selected slab alone carries the edge. A border here read as a seam
+            between two panels that are actually one background.
 
-          The drawer toggle lives at the foot of the rail on wide screens — a
-          rail has vertical room the bottom bar never did, and the bottom edge
-          is the reachable corner on a tablet held two-handed. */}
-      <View className="flex-1" />
-      <MenuButton className="h-14 w-14" outerClassName="self-center" iconSize={24} />
+            The drawer toggle lives at the foot of the rail on wide screens — a
+            rail has vertical room the bottom bar never did, and the bottom edge
+            is the reachable corner on a tablet held two-handed. */}
+        <View className="flex-1" />
+        <MenuButton className="h-14 w-14" outerClassName="self-center" iconSize={24} />
+      </View>
+      <View style={{ width: insets.right }} />
     </View>
   );
 }

@@ -1,24 +1,29 @@
 import { Tabs } from 'expo-router';
-import { useAdaptiveNavigationPlacement } from '@acme/ui/adaptive-panes';
+import { I18nManager } from 'react-native';
+import { tabBarPositionForPlacement, useAdaptiveNavigationPlacement } from '@acme/ui/adaptive-panes';
 import { AppTabBar } from '../../../components/AppTabBar';
 
 /*
-  WHERE THE BAR GOES is the kit's Material 3 Adaptive policy
-  (`resolveAdaptiveNavigationPlacement`, packages/ui/adaptive-navigation.ts),
-  fed by the window size class, the window height and the native fold posture:
+  WHERE THE BAR GOES is decided by HARDWARE FAMILY, not window size
+  (`resolveAdaptiveNavigationPlacement`, packages/ui/adaptive-navigation.ts;
+  family detection in packages/ui/hardware-family.ts):
 
-  - compact width (<600dp): bottom bar
-  - Android tabletop posture, or a window under 480dp tall: bottom bar, so a
-    half-open foldable or a landscape phone keeps its height for content
-  - otherwise: a rail on the logical leading edge (right in RTL)
+  - native ordinary phone: bottom tabs at every width, height and posture
+  - native foldable or dual-screen (open, folded cover, book, tabletop),
+    tablet and headset: a rail on the PHYSICAL right, also in RTL
+  - native, family still unknown: the bootstrap bottom tabs. A missing hinge
+    event never classifies a phone; once a family is verified it is kept for
+    the process, so folding to the cover screen keeps the rail
+  - web: never a side rail
 
-  This is NOT the kit's REGULAR_MIN_WIDTH (768). That constant governs when a
-  layout earns a second pane; the rail switches earlier, at the width where a
-  full-width bottom bar starts wasting a wide window's vertical space.
+  Window size chooses content panes independently (SplitView); here it only
+  picks Material's expanded rail with labels (`placement.expanded`,
+  extra-large windows), drawn at the theme's `navChrome.railExpanded` width
+  (240dp) and the 80dp rail otherwise.
 
-  `placement.expanded` (extra-large windows) asks for Material's expanded rail
-  with labels beside icons; AppTabBar draws it at the theme's
-  `navChrome.railExpanded` width (240dp) and the 80dp rail otherwise.
+  `tabBarPositionForPlacement` converts the physical edge into the navigator's
+  row slot: the tab view mirrors its row under RTL, so the physically-right
+  rail is passed as `left` there. RTL itself stays on for text and content.
 */
 
 /**
@@ -39,7 +44,7 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarPosition: placement.position,
+        tabBarPosition: tabBarPositionForPlacement(placement, I18nManager.isRTL),
       }}
       tabBar={(props) => <AppTabBar {...props} rail={rail} expanded={placement.expanded} />}
     >
