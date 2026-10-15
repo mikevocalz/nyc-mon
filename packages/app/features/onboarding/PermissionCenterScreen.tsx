@@ -1,6 +1,8 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
+import { useStore } from 'zustand';
+import { createStore } from 'zustand/vanilla';
 import { Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Button, Heading, SafeArea, Switch, Text } from '@acme/ui';
@@ -38,9 +40,14 @@ export function PermissionCenterScreen() {
   const pending = useMonStore(selectPendingEgg);
   const setNotifyOff = useOnboarding((s) => s.setNotifyOff);
   const setPermissionsPending = useOnboarding((s) => s.setPermissionsPending);
-  const [selected, setSelected] = useState<PermissionId[]>([...DEFAULT_SELECTED_PERMISSIONS]);
-  const [statuses, setStatuses] = useState<Partial<Record<PermissionId, PermissionAccess>>>({});
-  const [busy, setBusy] = useState(false);
+  const local = useMemo(() => createStore<{
+    selected: PermissionId[];
+    statuses: Partial<Record<PermissionId, PermissionAccess>>;
+    busy: boolean;
+  }>(() => ({ selected: [...DEFAULT_SELECTED_PERMISSIONS], statuses: {}, busy: false })), []);
+  const selected = useStore(local, (state) => state.selected);
+  const statuses = useStore(local, (state) => state.statuses);
+  const busy = useStore(local, (state) => state.busy);
   const inFlight = useRef(false);
 
   useEffect(() => {
@@ -54,10 +61,10 @@ export function PermissionCenterScreen() {
         }
       }),
     ).then((items) => {
-      if (live) setStatuses(Object.fromEntries(items) as Record<PermissionId, PermissionAccess>);
+      if (live) local.setState({ statuses: Object.fromEntries(items) as Record<PermissionId, PermissionAccess> });
     });
     return () => { live = false; };
-  }, []);
+  }, [local]);
 
   const finish = () => {
     setPermissionsPending(false);
@@ -66,9 +73,9 @@ export function PermissionCenterScreen() {
   };
 
   const choose = (id: PermissionId, checked: boolean) => {
-    setSelected((before) => checked
+    local.setState(({ selected: before }) => ({ selected: checked
       ? before.includes(id) ? before : [...before, id]
-      : before.filter((name) => name !== id));
+      : before.filter((name) => name !== id) }));
   };
 
   const finishNotifications = async (outcome: PermissionAccess) => {
@@ -91,7 +98,7 @@ export function PermissionCenterScreen() {
   const notNow = async () => {
     if (inFlight.current) return;
     inFlight.current = true;
-    setBusy(true);
+    local.setState({ busy: true });
     try {
       // OS read only: Skip never presents a native permission prompt.
       const notification = await getNotifyPermission();
@@ -106,10 +113,10 @@ export function PermissionCenterScreen() {
   const continueSetup = async () => {
     if (inFlight.current) return;
     inFlight.current = true;
-    setBusy(true);
+    local.setState({ busy: true });
     try {
       const results = await requestSelectedPermissions(selected, requestDevicePermission, (id, result) => {
-        setStatuses((before) => ({ ...before, [id]: result }));
+        local.setState(({ statuses: before }) => ({ statuses: { ...before, [id]: result } }));
       });
       if (selected.includes('notifications')) {
         await finishNotifications(results.notifications ?? 'unavailable');
@@ -182,7 +189,7 @@ export function PermissionCenterScreen() {
               onPress={() => { void notNow(); }}
             />
             <Text variant="caption" tone="muted">
-              Denying access won't block your Mon. You can enable permissions later in device settings or when you use a feature.
+              Denying access won’t block your Mon. You can enable permissions later in device settings or when you use a feature.
             </Text>
           </View>
         </View>
