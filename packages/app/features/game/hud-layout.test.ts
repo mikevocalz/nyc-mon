@@ -11,7 +11,7 @@ const vfold = (x: number, width: number, extra: Partial<FoldLayout> = {}): FoldL
 
 function assertSafe(input: GameHudLayoutInput) {
   const layout = resolveGameHudLayout(input);
-  for (const rect of [layout.controls, layout.attribution, layout.status, ...(layout.movePad ? [layout.movePad] : [])]) {
+  for (const rect of [layout.controls, layout.attribution, layout.status, layout.blocking, ...(layout.movePad ? [layout.movePad] : [])]) {
     assert.ok(insideOneRegion(rect, layout.regions), `rect ${JSON.stringify(rect)} straddles a fold or leaves the safe area`);
   }
   return layout;
@@ -73,4 +73,9 @@ test('safe-area insets are respected', () => {
   const l = assertSafe({ ...base, insets: { top: 59, right: 0, bottom: 34, left: 0 } });
   assert.ok(l.status.y >= 59);
   assert.ok(l.controls.y + l.controls.height <= 800 - 34);
+});
+
+test('blocking states sit on one side of a spanned dual-screen hinge', () => {
+  const l = assertSafe({ ...base, width: 840, folds: [vfold(400, 40, { occlusionType: 'full' })] });
+  assert.ok(l.blocking.x >= 440 || l.blocking.x + l.blocking.width <= 400);
 });

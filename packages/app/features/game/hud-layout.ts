@@ -50,6 +50,8 @@ export interface GameHudLayout {
   movePad: Rect | null;
   attribution: Rect;
   status: Rect;
+  /** The one usable region a blocking state's message and action sit in. */
+  blocking: Rect;
 }
 
 /** Kit IconButton md/lg is 44-48; reserve 48 so Android's 48dp floor fits. */
@@ -175,7 +177,7 @@ export function resolveGameHudLayout(input: GameHudLayoutInput): GameHudLayout {
     height: Math.min(STATUS_HEIGHT, Math.max(0, controlRegion.height - 2 * HUD_MARGIN)),
   };
 
-  return { regions, controls, movePad, attribution, status };
+  return { regions, controls, movePad, attribution, status, blocking: { ...controlRegion } };
 }
 
 /** Test helper and dev assertion: true when a rect lies wholly inside one usable region. */

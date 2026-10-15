@@ -172,7 +172,7 @@ export function GameScreen() {
       ) : null}
 
       <View className="absolute inset-0" pointerEvents="box-none">
-        <GameStatusLayer state={state} rect={hud.status} />
+        <GameStatusLayer state={state} rect={hud.status} region={hud.blocking} />
         {state === 'ready' || state === 'empty' ? <CameraControls layout={hud} /> : null}
         {city.ok && shouldMountCanvas(state) ? <MapAttribution source={city.dataset.source} rect={hud.attribution} /> : null}
       </View>

@@ -11,7 +11,7 @@ import type { Rect } from './hud-layout.ts';
 
 const backToStart = () => gameCameraStore.getState().move({ type: 'reset' });
 
-export function GameStatusLayer({ state, rect }: { state: GameViewState; rect: Rect }) {
+export function GameStatusLayer({ state, rect, region }: { state: GameViewState; rect: Rect; region: Rect }) {
   if (state === 'ready') return null;
   // Computed: banner rect from resolveGameHudLayout (shares the controls' region).
   const box = { left: rect.x, top: rect.y, width: rect.width };
@@ -39,7 +39,7 @@ export function GameStatusLayer({ state, rect }: { state: GameViewState; rect: R
     );
   }
 
-  // Blocking states fill the container with the kit EmptyState over the canvas background.
+  // Blocking states cover the canvas with the kit EmptyState.
   const blocking = {
     'data-error': {
       title: 'The Harlem map didn’t load',
@@ -58,9 +58,16 @@ export function GameStatusLayer({ state, rect }: { state: GameViewState; rect: R
     },
   }[state];
 
+  // The opaque cover spans the container; the message and its action sit in
+  // one usable region (computed by resolveGameHudLayout) so neither straddles a hinge.
   return (
-    <View className="absolute inset-0 items-center justify-center bg-surface px-4">
-      <EmptyState district="harlem" title={blocking.title} description={blocking.description} action={blocking.action ?? undefined} />
+    <View className="absolute inset-0 bg-surface">
+      <View
+        className="absolute items-center justify-center px-4"
+        style={{ left: region.x, top: region.y, width: region.width, height: region.height }}
+      >
+        <EmptyState district="harlem" title={blocking.title} description={blocking.description} action={blocking.action ?? undefined} />
+      </View>
     </View>
   );
 }
