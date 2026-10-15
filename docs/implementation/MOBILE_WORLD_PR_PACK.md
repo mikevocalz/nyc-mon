@@ -47,7 +47,7 @@ Spawn independent read-only discovery subagents for (A) repo architecture + depe
 
 **PR 6 — Caller placeholder:** Named identity screen, no mock ranking data. Tests: auth/guest states and navigation.
 
-**PR 7 — Foldable/tablet/rail parity:** Follow `AGENTS.md` and the mikevocalz-foldable-layouts skill (#24, implemented in #31): hardware family picks native navigation, not window width. Ordinary phones use bottom tabs; foldables (cover and tabletop included), tablets and headsets keep a rail on the physical right, also in RTL; an unproven family stays on bottom tabs. Usable space picks content panes independently. Keep the extra-large labeled rail, fold/hinge exclusion zones, book/tabletop postures, two-pane master-detail and trailing Inspector. Foldable Game retains uninterrupted world canvas while details occupy a hinge-safe secondary pane. Verify `react-native-arrangement-view` fit and native WindowManager posture signals. Tests: phone portrait/landscape, tablet, book fold, tabletop, trifold simulation, RTL, font scaling, rotate/unfold state retention.
+**PR 7 — Foldable/tablet/rail parity:** Follow `AGENTS.md` and the mikevocalz-foldable-layouts skill (#24; implementation in draft #31): hardware family picks native navigation, not window width. Ordinary phones use bottom tabs; foldables (cover and tabletop included), tablets and headsets keep a rail on the physical right, also in RTL; an unproven family stays on bottom tabs. Usable space picks content panes independently. Keep the extra-large labeled rail, fold/hinge exclusion zones, book/tabletop postures, two-pane master-detail and trailing Inspector. Foldable Game retains uninterrupted world canvas while details occupy a hinge-safe secondary pane. Verify `react-native-arrangement-view` fit and native WindowManager posture signals. Tests: phone portrait/landscape, tablet, book fold, tabletop, trifold simulation, RTL, font scaling, rotate/unfold state retention.
 
 **PR 8 — Integration + Storybook + device gates:** Every screen has Storybook coverage, screenshot baselines and accessibility assertions; integration verifies Game renderer does not unmount on Inspector open/close or rotation unless intentional; native device smoke checks; no blank GPU screen; no duplicate navigation shell.
 
@@ -87,6 +87,8 @@ Preserve the real NYC base map and recognizable borough identities. Author selec
 
 Visual direction: near-future New York inspired by the atmosphere of Blade Runner and Ghost in the Shell, with original NYC-Mon designs. Harlem and the Bronx must retain their street-level cultural character. No wholesale copy of protected film designs, brands or signage.
 
+Residential exception: public housing gets the NYCHA exterior facelift below. No arbitrary advertising on real residences (creator, 2026-10-13).
+
 **Addressable AdSurface contract:** each eligible billboard/façade/holographic anchor gets a stable world-space ID, geo/borough/neighborhood metadata, orientation, dimensions, occlusion and visibility limits, permitted creative formats, LOD priority, and campaign placement eligibility. Keep inventory data-driven so ad content can change without rebuilding the city.
 
 **CMS pipeline:** Payload defines business, creative, campaign, schedule, daypart, target geography, approval/moderation, venue/POI link, community inventory and analytics. Bunny media delivery can be used for approved creative. Clear sponsorship labels and no pay-to-win effects. Community placements for nonprofits and small local businesses.
@@ -102,3 +104,32 @@ Visual direction: near-future New York inspired by the atmosphere of Blade Runne
 6. Impression/interaction measurement, privacy safeguards, accessibility and device performance gates.
 
 The first city-rendering milestone remains **city only**. Do not gate the visible city on the CMS, advertisers, holograms or future tower assets.
+
+## Approved art direction: futuristic NYCHA exterior facelift (creator, 2026-10-13)
+
+Source: creator comment on PR #29 and PR #20, 2026-10-13. The concept render it approves is not committed yet. This section sets scope only; nothing here is implemented.
+
+The facelift is an additive styling layer on the existing NYC map and renderer. It replaces nothing.
+
+**Art direction**
+- Keep the real NYC footprint, road geometry, project massing, brick-and-concrete housing identity and neighborhood character.
+- Exteriors get a substantial modern facelift: refined red-brick and concrete palettes, charcoal window framing, modular facade panels, planted balconies and roof gardens, vertical architectural lighting, upgraded entrances, wayfinding, and landscaped ground-level courtyards.
+- Sci-fi elements are selective. The result stays believable and lived-in, not uniform neon cyberpunk.
+- Several NYCHA kits by building typology and borough, so blocks don't share one facade.
+- Train and transit visuals are creator-owned and out of scope. Leave integration hooks; don't add or alter train assets.
+- Project names and facade text in the generated concept are non-canonical. Don't import "Riverdale Homes", slogans or any generated label as a real NYC name without an authoritative source.
+
+**Constraints**
+1. Inspect the existing world renderer, metro-live integration, building IDs, LOD/instancing, materials and asset pipeline first. Do not rebuild the NYC dataset or world.
+2. Overlays are reversible and semantic, keyed by stable building IDs. Original OSM building shapes and topology stay unchanged.
+3. Classify housing against verified NYC/NYCHA datasets before targeting it. Appearance alone never marks a building as public housing.
+4. Kits (facade, roof, courtyard, entrance) follow the Kaiju-Tamagotchi-inspired skill workflow: concept → generation receipt → Blender mesh/material cleanup → GLB optimization → runtime integration → screenshot QA.
+5. Hold the Three.js WebGPU / TypeGPU / React Native budget, with visual and performance gates for near/mid/far LOD, device GPU memory, the fallback render and borough variety.
+6. No arbitrary advertising on real residences. Keep public pathways accessible and cultural identity intact.
+
+**Follow-on lanes** (after the city-only milestone, alongside stage 6 above)
+- FUT-01: verified NYC housing classification and the semantic attachment layer.
+- FUT-02: at least 3 facade kit families with material variants, rooftops and entrances.
+- FUT-03: vegetation, courtyards, warm lighting and resident-scale detail.
+- FUT-04: environment-generation skills and a reproducible Blender asset pipeline.
+- FUT-05: screenshot and performance gates on web, mobile and XR where supported.
