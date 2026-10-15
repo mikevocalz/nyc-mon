@@ -11,6 +11,7 @@
 //   backgrounds/SkiaWebGate.tsx -> react-native-skia), so a canvaskit chunk
 //   lands in the console build. Add it once the sparkline is split out (G1).
 // - AdaptivePanes: add when packages/ui/adaptive-panes is committed.
+export { AuthProviderButton, type AuthIntent, type AuthProvider, type AuthProviderButtonProps } from '../AuthProviderButton';
 export { Badge, type BadgeProps } from '../Badge';
 export { Banner, type BannerProps } from '../Banner';
 export { BottomSheet, SheetSurface, type BottomSheetProps } from '../BottomSheet';

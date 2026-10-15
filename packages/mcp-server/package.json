@@ -9,23 +9,49 @@
     ".": "./src/index.ts",
     "./tools": "./src/mcp/tools.ts",
     "./schemas": "./src/mcp/schemas.ts",
-    "./presence": "./src/presence/index.ts"
+    "./presence": "./src/presence/index.ts",
+    "./ui-seam": "./src/mcp/ui-seam.ts"
   },
   "scripts": {
-    "dev": "node --env-file-if-exists=../../.env --env-file-if-exists=../../.env.local src/main.ts",
-    "start": "node src/main.ts",
+    "dev": "node src/ui/build.ts && NODE_ENV=development node --env-file-if-exists=../../.env --env-file-if-exists=../../.env.local src/main.ts",
+    "start": "node src/ui/build.ts && node src/main.ts",
     "lint": "eslint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "build:ui": "node src/ui/build.ts"
   },
   "dependencies": {
+    "@acme/app": "workspace:*",
+    "@acme/content": "workspace:*",
     "@acme/core": "workspace:*",
+    "@modelcontextprotocol/ext-apps": "catalog:",
+    "@modelcontextprotocol/node": "catalog:",
+    "@modelcontextprotocol/server": "catalog:",
+    "jose": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@acme/assets": "workspace:*",
     "@acme/config": "workspace:*",
+    "@acme/theme": "workspace:*",
+    "@acme/ui": "workspace:*",
+    "@modelcontextprotocol/client": "catalog:",
+    "@tailwindcss/postcss": "catalog:",
     "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
     "eslint": "catalog:",
     "eslint-config-expo": "catalog:",
-    "typescript": "catalog:"
+    "playwright": "1.63.0",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "react-native-web": "catalog:",
+    "sharp": "0.35.5",
+    "tailwindcss": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vite-plugin-singlefile": "2.3.3",
+    "vitest": "catalog:",
+    "zustand": "catalog:"
   }
 }

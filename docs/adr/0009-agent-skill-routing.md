@@ -4,7 +4,7 @@
 - **Date:** 2026-10-06
 - **Deciders:** Mike (creator) directed the extension; the `platform` agent implements
 - **Spec:** `docs/alexa-plus-brief.md` ("the Agent Skill is the thing that actually carries Ratti's character"; "Hand-write an intent router in the simulator" is a listed **do not**); Agent Skills format https://agentskills.io ; MCP Apps guidance https://apps.extensions.modelcontextprotocol.io/api/#build-with-agent-skills
-- **Code:** `.devin/skills/nyc-mon-alexa/SKILL.md` (the skill); `packages/web-sim` (consumer, TODO)
+- **Code:** `skills/nyc-mon-companion/SKILL.md` (the skill); `packages/web-sim` (consumer, TODO)
 
 ## Context
 
@@ -12,7 +12,7 @@ The track text says the Alexa+ experience is simulated "via a web app using your
 
 ## Decision
 
-1. **A single Agent Skill teaches the Mon session.** `.devin/skills/nyc-mon-alexa/SKILL.md` follows the Agent Skills format: front matter (name, description) + instructions covering when to call which tool, the trainer/familiar/unknown permission model, confidence-tiered presence reactions, the Caller/Callah rule (ADR 0008), per-character voice profiles and the banned-word list.
+1. **A single Agent Skill teaches the Mon session.** `skills/nyc-mon-companion/SKILL.md` follows the Agent Skills format: front matter (name, description) + instructions covering when to call which tool, the trainer/familiar/unknown permission model, confidence-tiered presence reactions, the Caller/Callah rule (ADR 0008), per-character voice profiles and the banned-word list.
 2. **Tool routing is the model's job, informed by the skill.** The simulator loads the skill into the system context of a real model (Claude or Bedrock) connected to the MCP server as a client. There is no intent enum, no regex table, no `if (utterance.includes("hungry")) feed()`. Validation: the full demo script runs with the skill loaded and zero hand-written routing.
 3. **The MCP server stays characterless.** Tools return structured data and codes (ADR 0005 §4); the skill says how a Hood Ratti reacts to `PERMISSION_DENIED_NOT_CALLER` versus a `PRESENCE_REQUIRED`. Server-side canned dialogue would split the voice in two and make the skill decorative.
 4. **One skill, two brains.** The same SKILL.md drives the web simulator's model now and the real Alexa+ agent later — that's the hackathon's "Agent Skills" deliverable and the portability story for the write-up.

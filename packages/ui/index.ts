@@ -14,7 +14,8 @@ export { LinkButton, type LinkButtonProps, type LinkButtonVariant } from './Link
 export { IconButton, type IconButtonProps } from './IconButton';
 export { Card, type CardProps } from './Card';
 export { Badge, type BadgeProps } from './Badge';
-export { Avatar, AVATAR_GRADIENTS, type AvatarProps, type AvatarGradient, type AvatarGradientPreset, type AvatarVariant } from './Avatar';
+export { Avatar, type AvatarProps } from './Avatar';
+export { AVATAR_GRADIENTS, type AvatarGradient, type AvatarGradientPreset, type AvatarVariant } from './avatar-look';
 export { Image, type ImageProps } from './Image';
 
 // forms

@@ -5,14 +5,14 @@ import {
   MonInstanceSchema,
   PutCareRequestSchema,
 } from '@acme/core/schemas';
-import type { MonInstance } from '@acme/core/types';
+import type { EggRecord, MonInstance } from '@acme/core/types';
 import {
   applyCareWrites,
   createInitialCareState,
   deriveMonInstanceId,
   mintMonInstance,
 } from '@acme/core/sim';
-import { APIError, commitTransaction, createLocalReq, getPayload, initTransaction, killTransaction } from 'payload';
+import { APIError, NotFound, commitTransaction, createLocalReq, getPayload, initTransaction, killTransaction } from 'payload';
 import type { Payload, PayloadRequest, User } from 'payload';
 import type {} from '../../../payload-types.ts';
 import { CARE_STATES_SLUG, toCareState } from '../../../collections/CareStates.ts';
@@ -20,6 +20,7 @@ import { EGGS_SLUG } from '../../../collections/Eggs.ts';
 import { parseRecord } from '../../../collections/guards.ts';
 import { MON_INSTANCES_SLUG, toMonInstance } from '../../../collections/MonInstances.ts';
 import { runIdempotent } from './idempotency.ts';
+import { isAdultByBirthYear, isServiceRoute, readServiceCaller } from './service-caller.ts';
 
 export type V1ErrorCode =
   | 'UNAUTHORIZED'
@@ -27,6 +28,7 @@ export type V1ErrorCode =
   | 'INVALID_RECORD'
   | 'NOT_FOUND'
   | 'NOT_READY'
+  | 'ADULT_REQUIRED'
   | 'INTERNAL_ERROR';
 
 export function v1Error(code: V1ErrorCode, message: string, status: number): Response {
@@ -48,28 +50,91 @@ async function getPayloadInstance(): Promise<Payload> {
   return getPayload({ config });
 }
 
-async function buildContext(request: Request): Promise<V1Context | Response> {
-  const payload = await getPayloadInstance();
-  const { user } = await payload.auth({ headers: request.headers });
-  if (user === null) {
+/** The signed-in (or service-delegated) Caller behind a `/v1` request. */
+export interface V1Caller {
+  readonly callerId: string;
+  readonly user: Record<string, unknown>;
+}
+
+/** Test seams for {@link authenticateCaller}. */
+export interface AuthenticateCallerOptions {
+  /** `V1_MCP_SERVICE_KEY`; defaults to the process env. */
+  readonly serviceKey?: string;
+  readonly nowMs?: number;
+}
+
+async function loadUserById(payload: Payload, callerId: string): Promise<Record<string, unknown> | undefined> {
+  try {
+    return asRecord(
+      await payload.findByID({ collection: 'users', id: callerId, depth: 0, overrideAccess: true, disableErrors: true }),
+    );
+  } catch (error) {
+    // Only "no such user" means unauthenticated. Anything else (the database
+    // is down, a query failed) propagates so the route answers 5xx, not 401.
+    if (error instanceof NotFound) return undefined;
+    throw error;
+  }
+}
+
+/**
+ * Resolves who a `/v1` request acts for: the MCP server's on-behalf-of
+ * headers (`service-caller.ts`, adults only), else the session or bearer
+ * token Payload's auth strategy accepts. Consent is checked on both paths.
+ */
+export async function authenticateCaller(
+  payload: Payload,
+  request: Request,
+  options: AuthenticateCallerOptions = {},
+): Promise<V1Caller | Response> {
+  const service = readServiceCaller(request, options.serviceKey ?? process.env.V1_MCP_SERVICE_KEY);
+  let user: Record<string, unknown> | undefined;
+  if (service.kind === 'rejected') {
     return v1Error('UNAUTHORIZED', 'Sign in required.', 401);
   }
+  // The service key reaches only the routes the MCP server calls; on any other
+  // route the service headers are refused rather than ignored.
+  if (service.kind === 'caller' && !isServiceRoute(request)) {
+    return v1Error('UNAUTHORIZED', 'Sign in required.', 401);
+  }
+  if (service.kind === 'caller') {
+    user = await loadUserById(payload, service.callerId);
+    if (user === undefined) return v1Error('UNAUTHORIZED', 'Sign in required.', 401);
+    if (!isAdultByBirthYear(user.birthYear, options.nowMs ?? Date.now())) {
+      return v1Error('ADULT_REQUIRED', 'This account is not available here.', 403);
+    }
+  } else {
+    const auth = await payload.auth({ headers: request.headers });
+    user = asRecord(auth.user ?? undefined);
+    if (user === undefined) return v1Error('UNAUTHORIZED', 'Sign in required.', 401);
+  }
 
-  const callerId = String((user as { id?: string | number }).id ?? '');
+  const callerId = String(user.id ?? '');
   if (callerId === '') {
     return v1Error('INTERNAL_ERROR', 'Authenticated user has no id.', 500);
   }
 
-  const consentStatus = (user as { consentStatus?: string }).consentStatus;
+  const consentStatus = user.consentStatus;
   if (consentStatus === 'pending' || consentStatus === 'denied') {
     return v1Error('CONSENT_REQUIRED', 'Guardian consent is required.', 403);
   }
+  return { callerId, user };
+}
+
+async function buildContext(request: Request): Promise<V1Context | Response> {
+  const payload = await getPayloadInstance();
+  let caller: V1Caller | Response;
+  try {
+    caller = await authenticateCaller(payload, request);
+  } catch (error) {
+    return handleAPIError(error);
+  }
+  if (caller instanceof Response) return caller;
 
   const req = await createLocalReq(
-    { user: user as unknown as User, req: { headers: request.headers } as Partial<PayloadRequest> },
+    { user: caller.user as unknown as User, req: { headers: request.headers } as Partial<PayloadRequest> },
     payload,
   );
-  return { payload, callerId, req };
+  return { payload, callerId: caller.callerId, req };
 }
 
 async function withTransaction<T>(req: PayloadRequest, fn: () => Promise<T>): Promise<T> {
@@ -459,3 +524,64 @@ function toEggRecord(doc: Record<string, unknown>): unknown {
     incubationEndsAt: doc.incubationEndsAt,
   };
 }
+
+/** One egg the Caller is still incubating, as `GET /v1/me/eggs` returns it. */
+export interface IncubatingEgg {
+  readonly egg: EggRecord;
+  /** True once `incubationEndsAt` has passed; the hatch has not run yet. */
+  readonly readyToHatch: boolean;
+}
+
+/** Dependencies for {@link createListMyEggsHandler}; tests pass a fake Payload. */
+export interface ListMyEggsDeps {
+  readonly getPayload: () => Promise<Payload>;
+  readonly now?: () => number;
+  readonly serviceKey?: string;
+}
+
+/**
+ * `GET /v1/me/eggs`: the Caller's eggs that have not hatched into a Mon yet,
+ * soonest first. Read-only. An egg counts as hatched when a MonInstance with
+ * its `eggId` exists (the hatch route mints one and never flips `hatched`).
+ */
+export function createListMyEggsHandler(deps: ListMyEggsDeps): (request: Request) => Promise<Response> {
+  return async (request) => {
+    const payload = await deps.getPayload();
+    const nowMs = deps.now?.() ?? Date.now();
+    try {
+      const caller = await authenticateCaller(payload, request, { serviceKey: deps.serviceKey, nowMs });
+      if (caller instanceof Response) return caller;
+
+      const [eggDocs, monDocs] = await Promise.all([
+        payload.find({
+          collection: EGGS_SLUG,
+          where: { callerId: { equals: caller.callerId } },
+          limit: 0,
+          depth: 0,
+          overrideAccess: true,
+        }),
+        payload.find({
+          collection: MON_INSTANCES_SLUG,
+          where: { callerId: { equals: caller.callerId } },
+          limit: 0,
+          depth: 0,
+          overrideAccess: true,
+        }),
+      ]);
+      const hatchedEggIds = new Set(
+        monDocs.docs.map((doc) => asRecord(doc)?.eggId).filter((id): id is string => typeof id === 'string'),
+      );
+      const eggs: IncubatingEgg[] = eggDocs.docs
+        .map((doc) => parseRecord(EggRecordSchema, toEggRecord(asRecord(doc) ?? {}), 'egg'))
+        .filter((egg) => !hatchedEggIds.has(egg.eggId) && !hatchedEggIds.has(egg.monInstanceId))
+        .sort((a, b) => a.incubationEndsAt - b.incubationEndsAt)
+        .map((egg) => ({ egg, readyToHatch: egg.incubationEndsAt <= nowMs }));
+      return v1Ok({ eggs });
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  };
+}
+
+/** `GET /v1/me/eggs`, wired to the live Payload. */
+export const handleListMyEggs = createListMyEggsHandler({ getPayload: getPayloadInstance });

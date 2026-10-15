@@ -11,13 +11,18 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PayloadRouteImport } from './routes/_payload'
+import { Route as DotwellKnownOauthAuthorizationServerRouteImport } from './routes/[.]well-known/oauth-authorization-server'
 import { Route as GuardianConsentIdRouteImport } from './routes/guardian-consent/$id'
+import { Route as OauthConsentRouteImport } from './routes/oauth/consent'
+import { Route as OauthRefusedRouteImport } from './routes/oauth/refused'
+import { Route as OauthSignInRouteImport } from './routes/oauth/sign-in'
 import { Route as V1EggsRouteImport } from './routes/v1/eggs'
 import { Route as V1GuardianConsentsRouteImport } from './routes/v1/guardian-consents'
 import { Route as V1WaitlistRouteImport } from './routes/v1/waitlist'
 import { Route as PayloadAdminIndexRouteImport } from './routes/_payload/admin.index'
 import { Route as PayloadAdminSplatRouteImport } from './routes/_payload/admin.$'
 import { Route as PayloadPayloadApiSplatRouteImport } from './routes/_payload/payload-api.$'
+import { Route as V1MeEggsRouteImport } from './routes/v1/me/eggs'
 import { Route as V1MeMonsRouteImport } from './routes/v1/me/mons'
 import { Route as V1EggsIdHatchRouteImport } from './routes/v1/eggs/$id/hatch'
 import { Route as V1MonsIdCareRouteImport } from './routes/v1/mons/$id/care'
@@ -31,9 +36,30 @@ const PayloadRoute = PayloadRouteImport.update({
   id: '/_payload',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DotwellKnownOauthAuthorizationServerRoute =
+  DotwellKnownOauthAuthorizationServerRouteImport.update({
+    id: '/.well-known/oauth-authorization-server',
+    path: '/.well-known/oauth-authorization-server',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const GuardianConsentIdRoute = GuardianConsentIdRouteImport.update({
   id: '/guardian-consent/$id',
   path: '/guardian-consent/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OauthConsentRoute = OauthConsentRouteImport.update({
+  id: '/oauth/consent',
+  path: '/oauth/consent',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OauthRefusedRoute = OauthRefusedRouteImport.update({
+  id: '/oauth/refused',
+  path: '/oauth/refused',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OauthSignInRoute = OauthSignInRouteImport.update({
+  id: '/oauth/sign-in',
+  path: '/oauth/sign-in',
   getParentRoute: () => rootRouteImport,
 } as any)
 const V1EggsRoute = V1EggsRouteImport.update({
@@ -66,6 +92,11 @@ const PayloadPayloadApiSplatRoute = PayloadPayloadApiSplatRouteImport.update({
   path: '/payload-api/$',
   getParentRoute: () => PayloadRoute,
 } as any)
+const V1MeEggsRoute = V1MeEggsRouteImport.update({
+  id: '/v1/me/eggs',
+  path: '/v1/me/eggs',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const V1MeMonsRoute = V1MeMonsRouteImport.update({
   id: '/v1/me/mons',
   path: '/v1/me/mons',
@@ -84,12 +115,17 @@ const V1MonsIdCareRoute = V1MonsIdCareRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/.well-known/oauth-authorization-server': typeof DotwellKnownOauthAuthorizationServerRoute
   '/guardian-consent/$id': typeof GuardianConsentIdRoute
+  '/oauth/consent': typeof OauthConsentRoute
+  '/oauth/refused': typeof OauthRefusedRoute
+  '/oauth/sign-in': typeof OauthSignInRoute
   '/v1/eggs': typeof V1EggsRouteWithChildren
   '/v1/guardian-consents': typeof V1GuardianConsentsRoute
   '/v1/waitlist': typeof V1WaitlistRoute
   '/admin/$': typeof PayloadAdminSplatRoute
   '/payload-api/$': typeof PayloadPayloadApiSplatRoute
+  '/v1/me/eggs': typeof V1MeEggsRoute
   '/v1/me/mons': typeof V1MeMonsRoute
   '/admin/': typeof PayloadAdminIndexRoute
   '/v1/eggs/$id/hatch': typeof V1EggsIdHatchRoute
@@ -97,12 +133,17 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/.well-known/oauth-authorization-server': typeof DotwellKnownOauthAuthorizationServerRoute
   '/guardian-consent/$id': typeof GuardianConsentIdRoute
+  '/oauth/consent': typeof OauthConsentRoute
+  '/oauth/refused': typeof OauthRefusedRoute
+  '/oauth/sign-in': typeof OauthSignInRoute
   '/v1/eggs': typeof V1EggsRouteWithChildren
   '/v1/guardian-consents': typeof V1GuardianConsentsRoute
   '/v1/waitlist': typeof V1WaitlistRoute
   '/admin/$': typeof PayloadAdminSplatRoute
   '/payload-api/$': typeof PayloadPayloadApiSplatRoute
+  '/v1/me/eggs': typeof V1MeEggsRoute
   '/v1/me/mons': typeof V1MeMonsRoute
   '/admin': typeof PayloadAdminIndexRoute
   '/v1/eggs/$id/hatch': typeof V1EggsIdHatchRoute
@@ -112,12 +153,17 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_payload': typeof PayloadRouteWithChildren
+  '/.well-known/oauth-authorization-server': typeof DotwellKnownOauthAuthorizationServerRoute
   '/guardian-consent/$id': typeof GuardianConsentIdRoute
+  '/oauth/consent': typeof OauthConsentRoute
+  '/oauth/refused': typeof OauthRefusedRoute
+  '/oauth/sign-in': typeof OauthSignInRoute
   '/v1/eggs': typeof V1EggsRouteWithChildren
   '/v1/guardian-consents': typeof V1GuardianConsentsRoute
   '/v1/waitlist': typeof V1WaitlistRoute
   '/_payload/admin/$': typeof PayloadAdminSplatRoute
   '/_payload/payload-api/$': typeof PayloadPayloadApiSplatRoute
+  '/v1/me/eggs': typeof V1MeEggsRoute
   '/v1/me/mons': typeof V1MeMonsRoute
   '/_payload/admin/': typeof PayloadAdminIndexRoute
   '/v1/eggs/$id/hatch': typeof V1EggsIdHatchRoute
@@ -127,12 +173,17 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/.well-known/oauth-authorization-server'
     | '/guardian-consent/$id'
+    | '/oauth/consent'
+    | '/oauth/refused'
+    | '/oauth/sign-in'
     | '/v1/eggs'
     | '/v1/guardian-consents'
     | '/v1/waitlist'
     | '/admin/$'
     | '/payload-api/$'
+    | '/v1/me/eggs'
     | '/v1/me/mons'
     | '/admin/'
     | '/v1/eggs/$id/hatch'
@@ -140,12 +191,17 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/.well-known/oauth-authorization-server'
     | '/guardian-consent/$id'
+    | '/oauth/consent'
+    | '/oauth/refused'
+    | '/oauth/sign-in'
     | '/v1/eggs'
     | '/v1/guardian-consents'
     | '/v1/waitlist'
     | '/admin/$'
     | '/payload-api/$'
+    | '/v1/me/eggs'
     | '/v1/me/mons'
     | '/admin'
     | '/v1/eggs/$id/hatch'
@@ -154,12 +210,17 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/_payload'
+    | '/.well-known/oauth-authorization-server'
     | '/guardian-consent/$id'
+    | '/oauth/consent'
+    | '/oauth/refused'
+    | '/oauth/sign-in'
     | '/v1/eggs'
     | '/v1/guardian-consents'
     | '/v1/waitlist'
     | '/_payload/admin/$'
     | '/_payload/payload-api/$'
+    | '/v1/me/eggs'
     | '/v1/me/mons'
     | '/_payload/admin/'
     | '/v1/eggs/$id/hatch'
@@ -169,10 +230,15 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   PayloadRoute: typeof PayloadRouteWithChildren
+  DotwellKnownOauthAuthorizationServerRoute: typeof DotwellKnownOauthAuthorizationServerRoute
   GuardianConsentIdRoute: typeof GuardianConsentIdRoute
+  OauthConsentRoute: typeof OauthConsentRoute
+  OauthRefusedRoute: typeof OauthRefusedRoute
+  OauthSignInRoute: typeof OauthSignInRoute
   V1EggsRoute: typeof V1EggsRouteWithChildren
   V1GuardianConsentsRoute: typeof V1GuardianConsentsRoute
   V1WaitlistRoute: typeof V1WaitlistRoute
+  V1MeEggsRoute: typeof V1MeEggsRoute
   V1MeMonsRoute: typeof V1MeMonsRoute
   V1MonsIdCareRoute: typeof V1MonsIdCareRoute
 }
@@ -193,11 +259,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PayloadRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/.well-known/oauth-authorization-server': {
+      id: '/.well-known/oauth-authorization-server'
+      path: '/.well-known/oauth-authorization-server'
+      fullPath: '/.well-known/oauth-authorization-server'
+      preLoaderRoute: typeof DotwellKnownOauthAuthorizationServerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/guardian-consent/$id': {
       id: '/guardian-consent/$id'
       path: '/guardian-consent/$id'
       fullPath: '/guardian-consent/$id'
       preLoaderRoute: typeof GuardianConsentIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/oauth/consent': {
+      id: '/oauth/consent'
+      path: '/oauth/consent'
+      fullPath: '/oauth/consent'
+      preLoaderRoute: typeof OauthConsentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/oauth/refused': {
+      id: '/oauth/refused'
+      path: '/oauth/refused'
+      fullPath: '/oauth/refused'
+      preLoaderRoute: typeof OauthRefusedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/oauth/sign-in': {
+      id: '/oauth/sign-in'
+      path: '/oauth/sign-in'
+      fullPath: '/oauth/sign-in'
+      preLoaderRoute: typeof OauthSignInRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/v1/eggs': {
@@ -241,6 +335,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/payload-api/$'
       preLoaderRoute: typeof PayloadPayloadApiSplatRouteImport
       parentRoute: typeof PayloadRoute
+    }
+    '/v1/me/eggs': {
+      id: '/v1/me/eggs'
+      path: '/v1/me/eggs'
+      fullPath: '/v1/me/eggs'
+      preLoaderRoute: typeof V1MeEggsRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/v1/me/mons': {
       id: '/v1/me/mons'
@@ -295,10 +396,16 @@ const V1EggsRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   PayloadRoute: PayloadRouteWithChildren,
+  DotwellKnownOauthAuthorizationServerRoute:
+    DotwellKnownOauthAuthorizationServerRoute,
   GuardianConsentIdRoute: GuardianConsentIdRoute,
+  OauthConsentRoute: OauthConsentRoute,
+  OauthRefusedRoute: OauthRefusedRoute,
+  OauthSignInRoute: OauthSignInRoute,
   V1EggsRoute: V1EggsRouteWithChildren,
   V1GuardianConsentsRoute: V1GuardianConsentsRoute,
   V1WaitlistRoute: V1WaitlistRoute,
+  V1MeEggsRoute: V1MeEggsRoute,
   V1MeMonsRoute: V1MeMonsRoute,
   V1MonsIdCareRoute: V1MonsIdCareRoute,
 }

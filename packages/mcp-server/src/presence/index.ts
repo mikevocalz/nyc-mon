@@ -12,5 +12,7 @@ export {
   presenceTier,
 } from './types.ts';
 export type { FamiliarPerson, Permission, PresenceEvent, PresenceSource, PresenceTier } from './types.ts';
-export { PresenceService, presenceService } from './service.ts';
+export { PresenceService } from './service.ts';
 export type { PresentPerson } from './service.ts';
+export { FIXTURE_PEOPLE, FixtureFamiliarDirectory } from './fixtures.ts';
+export type { FamiliarDirectory, SharedMemory } from './fixtures.ts';

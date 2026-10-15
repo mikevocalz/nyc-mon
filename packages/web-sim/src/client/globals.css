@@ -1,0 +1,33 @@
+/* Same pipeline as apps/storybook/globals.css: Tailwind v4 with the important
+   flag (RNW's unlayered runtime styles otherwise win), the @acme/theme tokens,
+   and the kit sources scanned for classes. */
+@import 'tailwindcss' important;
+@import '@acme/theme/theme.css';
+
+@source '../../../ui';
+@source '../../src';
+
+@font-face {
+  font-family: 'Archivo Black';
+  src: url('../../../assets/fonts/ArchivoBlack-Regular.ttf') format('truetype');
+  font-weight: 400 900;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Space Grotesk';
+  src: url('../../../assets/fonts/SpaceGrotesk-Variable.ttf') format('truetype');
+  font-weight: 300 700;
+  font-display: swap;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+  margin: 0;
+  background: var(--color-bg);
+}
+#root {
+  display: flex;
+  flex-direction: column;
+}
