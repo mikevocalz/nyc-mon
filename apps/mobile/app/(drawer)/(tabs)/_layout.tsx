@@ -48,6 +48,7 @@ export default function TabLayout() {
       }}
       tabBar={(props) => <AppTabBar {...props} rail={rail} expanded={placement.expanded} />}
     >
+      <Tabs.Screen name="game" options={{ title: 'Game' }} />
       <Tabs.Screen name="notifications" options={{ title: 'Alerts' }} />
       <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
     </Tabs>
