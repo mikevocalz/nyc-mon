@@ -3,10 +3,9 @@
 import type { Href } from 'expo-router';
 import { readBootSave } from '@acme/core/save';
 import { assertNever, type BootRoute, type BootSnapshot, resolveBootRoute } from '@acme/core/sim';
-import { readAgeAnswer, readPermissionsPending, readSessionFlag, SAVE_KEY } from './onboarding.store';
-import { PERMISSION_CENTER_ROUTE } from './permission-center-model';
+import { readAgeAnswer, readPermissionReview, readSessionFlag, SAVE_KEY } from './onboarding.store';
 import { saveStorage } from './storage';
-import { MEET_PATH, MON_HOME_PATH } from '../egg/egg-model.ts';
+import { MEET_PATH, MON_HOME_PATH, PERMISSIONS_PATH } from '../egg/egg-model.ts';
 
 /**
  * M02 ships with canon-safe art: the real egg captures are still pending
@@ -68,8 +67,9 @@ export function bootPath(route: BootRoute): Href {
     case 'incubating':
     case 'egg-ready':
     case 'companion':
-      // M11 (egg) and M13 (Mon) both render at the `(home)` group index.
-      return MON_HOME_PATH;
+      // Resume the last first-run step after process death. Old installs have
+      // no checkpoint, so they continue straight to the companion as before.
+      return readPermissionReview() === 'pending' ? PERMISSIONS_PATH : MON_HOME_PATH;
     case 'consent-denied':
       return '/(auth)/consent?state=denied';
     case 'save-recovered':
@@ -85,8 +85,5 @@ export function bootPath(route: BootRoute): Href {
 /** Convenience for the M01 route: snapshot → route → path, all synchronous. */
 export function resolveBootPath(nowMs: number): { route: BootRoute; path: Href } {
   const route = resolveBootRoute(buildBootSnapshot(nowMs));
-  // Existing users have no pending marker. Only an interrupted new egg flow
-  // returns to the final (skippable) setup page after app process restart.
-  const inGame = route.kind === 'incubating' || route.kind === 'egg-ready' || route.kind === 'companion';
-  return { route, path: inGame && readPermissionsPending() ? PERMISSION_CENTER_ROUTE : bootPath(route) };
+  return { route, path: bootPath(route) };
 }

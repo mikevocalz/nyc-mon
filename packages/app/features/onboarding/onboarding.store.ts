@@ -16,9 +16,38 @@ export const ONBOARDING_KEYS = {
   consentRequested: 'consent-requested',
   notifyOff: 'notify-off',
   permissionsPending: 'permissions-pending',
+  permissionReview: 'permission-review',
 } as const;
 
 export const SAVE_KEY = 'save';
+
+/**
+ * First-run setup checkpoint. Only callers who actually start their first
+ * incubation enter this flow, so existing installs never get re-onboarded.
+ * Synchronous MMKV reads keep cold-start routing deterministic.
+ */
+export type PermissionReview = 'pending' | 'complete';
+
+export function readPermissionReview(): PermissionReview | undefined {
+  const raw = onboardingStorage.getString(ONBOARDING_KEYS.permissionReview);
+  if (raw === 'pending' || raw === 'complete') return raw;
+  return onboardingStorage.getString(ONBOARDING_KEYS.permissionsPending) === '1' ? 'pending' : undefined;
+}
+
+export function startPermissionReview(): void {
+  if (readPermissionReview() !== 'complete') {
+    onboardingStorage.set(ONBOARDING_KEYS.permissionReview, 'pending');
+    onboardingStorage.remove(ONBOARDING_KEYS.permissionsPending);
+    useOnboarding.setState({ permissionsPending: true });
+  }
+}
+
+export function completePermissionReview(): void {
+  onboardingStorage.set(ONBOARDING_KEYS.permissionReview, 'complete');
+  onboardingStorage.remove(ONBOARDING_KEYS.permissionsPending);
+  useOnboarding.setState({ permissionsPending: false });
+}
+
 
 /** Parses the stored M04 answer. A malformed value is treated as unanswered (Law 5 at the boundary). */
 export function readAgeAnswer(): AgeAnswer | undefined {
@@ -39,7 +68,7 @@ export function readSessionFlag(): boolean {
 
 /** A newly-created egg still needs to show the final optional setup step. */
 export function readPermissionsPending(): boolean {
-  return onboardingStorage.getString(ONBOARDING_KEYS.permissionsPending) === '1';
+  return readPermissionReview() === 'pending';
 }
 
 /**
@@ -113,6 +142,7 @@ export const useOnboarding = create<OnboardingState>()((set) => ({
     else {
       onboardingStorage.remove(ONBOARDING_KEYS.hasSession);
       onboardingStorage.remove(ONBOARDING_KEYS.permissionsPending);
+      onboardingStorage.remove(ONBOARDING_KEYS.permissionReview);
     }
     set({ hasSession: present, ...(!present ? { permissionsPending: false } : {}) });
   },
@@ -122,9 +152,8 @@ export const useOnboarding = create<OnboardingState>()((set) => ({
     set({ notifyOff: state });
   },
   setPermissionsPending: (pending) => {
-    if (pending) onboardingStorage.set(ONBOARDING_KEYS.permissionsPending, '1');
-    else onboardingStorage.remove(ONBOARDING_KEYS.permissionsPending);
-    set({ permissionsPending: pending });
+    if (pending) startPermissionReview();
+    else completePermissionReview();
   },
 }));
 

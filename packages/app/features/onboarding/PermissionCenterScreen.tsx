@@ -3,10 +3,12 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useStore } from 'zustand';
 import { createStore } from 'zustand/vanilla';
-import { Linking } from 'react-native';
+import { Linking, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Button, Heading, SafeArea, Switch, Text } from '@acme/ui';
 import { ScrollView, View } from '@acme/ui/tw';
+import { useReservedRegions } from '@acme/ui/adaptive-panes';
+import { permissionViewport } from './permissions-layout';
 import { selectPendingEgg, useMonStore } from '../mon/mon.store';
 import { copy } from './copy';
 import { getNotifyPermission, scheduleReadyNotification } from './notify-permission';
@@ -37,6 +39,9 @@ const STATUS: Record<PermissionAccess, string> = {
  */
 export function PermissionCenterScreen() {
   const router = useRouter();
+  const { width, height } = useWindowDimensions();
+  const regions = useReservedRegions();
+  const viewport = permissionViewport(width, height, regions);
   const pending = useMonStore(selectPendingEgg);
   const setNotifyOff = useOnboarding((s) => s.setNotifyOff);
   const setPermissionsPending = useOnboarding((s) => s.setPermissionsPending);
@@ -133,67 +138,71 @@ export function PermissionCenterScreen() {
   };
 
   return (
-    <SafeArea className="flex-1 bg-bg">
-      <ScrollView className="flex-1" contentContainerClassName="items-center gap-5 px-4 py-6">
-        <View className="w-full gap-5" style={{ maxWidth: 660 }} testID="onboarding-permissions">
-          <View className="gap-2">
-            <Text variant="caption" tone="muted">H-LYNK SETUP / FINAL STEP</Text>
-            <Heading level={1} size="display-sm">Ready for NYC?</Heading>
-            <Text tone="muted">Choose what to enable. Notifications are selected; everything else is your call.</Text>
-          </View>
-          <View className="gap-1 border-y border-concrete-400">
-            {PERMISSION_IDS.map((id) => {
-              const item = PERMISSION_COPY[id];
-              const status = statuses[id];
-              return (
-                <View key={id} className="gap-1 border-b border-concrete-400 py-4" testID={'permission-' + id}>
-                  <Switch
-                    value={selected.includes(id)}
-                    onChange={(checked) => choose(id, checked)}
-                    label={item.title}
-                    disabled={busy}
-                  />
-                  <Text variant="caption" tone="muted">{item.detail}</Text>
-                  {status ? <Text variant="caption" tone="muted">{STATUS[status]}</Text> : null}
-                  {status === 'blocked' ? (
-                    <View className="self-start">
-                      <Button
-                        variant="outline"
-                        title="Open device settings"
+    <View className="flex-1 bg-bg">
+      <View style={{ position: 'absolute', ...viewport }}>
+        <SafeArea className="flex-1">
+          <ScrollView className="flex-1" contentContainerClassName="items-center gap-5 px-4 py-6">
+            <View className="w-full gap-5" style={{ maxWidth: 660 }} testID="onboarding-permissions">
+              <View className="gap-2">
+                <Text variant="caption" tone="muted">H-LYNK SETUP / FINAL STEP</Text>
+                <Heading level={1} size="display-sm">Ready for NYC?</Heading>
+                <Text tone="muted">Choose what to enable. Notifications are selected; everything else is your call.</Text>
+              </View>
+              <View className="gap-1 border-y border-concrete-400">
+                {PERMISSION_IDS.map((id) => {
+                  const item = PERMISSION_COPY[id];
+                  const status = statuses[id];
+                  return (
+                    <View key={id} className="gap-1 border-b border-concrete-400 py-4" testID={'permission-' + id}>
+                      <Switch
+                        value={selected.includes(id)}
+                        onChange={(checked) => choose(id, checked)}
+                        label={item.title}
                         disabled={busy}
-                        onPress={() => { void Linking.openSettings().catch(() => {}); }}
                       />
+                      <Text variant="caption" tone="muted">{item.detail}</Text>
+                      {status ? <Text variant="caption" tone="muted">{STATUS[status]}</Text> : null}
+                      {status === 'blocked' ? (
+                        <View className="self-start">
+                          <Button
+                            variant="outline"
+                            title="Open device settings"
+                            disabled={busy}
+                            onPress={() => { void Linking.openSettings().catch(() => {}); }}
+                          />
+                        </View>
+                      ) : null}
                     </View>
-                  ) : null}
-                </View>
-              );
-            })}
-          </View>
-          <View className="gap-3">
-            <Button
-              title={selected.length === 0 ? 'Continue' : 'Continue with ' + selected.length + ' selected'}
-              variant="cta"
-              size="lg"
-              fullWidth
-              loading={busy}
-              testID="permissions-continue"
-              onPress={() => { void continueSetup(); }}
-            />
-            <Button
-              title="Not now"
-              variant="ghost"
-              size="lg"
-              fullWidth
-              disabled={busy}
-              testID="permissions-skip"
-              onPress={() => { void notNow(); }}
-            />
-            <Text variant="caption" tone="muted">
-              Denying access won’t block your Mon. You can enable permissions later in device settings or when you use a feature.
-            </Text>
-          </View>
-        </View>
-      </ScrollView>
-    </SafeArea>
+                  );
+                })}
+              </View>
+              <View className="gap-3">
+                <Button
+                  title={selected.length === 0 ? 'Continue' : 'Continue with ' + selected.length + ' selected'}
+                  variant="cta"
+                  size="lg"
+                  fullWidth
+                  loading={busy}
+                  testID="permissions-continue"
+                  onPress={() => { void continueSetup(); }}
+                />
+                <Button
+                  title="Not now"
+                  variant="ghost"
+                  size="lg"
+                  fullWidth
+                  disabled={busy}
+                  testID="permissions-skip"
+                  onPress={() => { void notNow(); }}
+                />
+                <Text variant="caption" tone="muted">
+                  Denying access won’t block your Mon. You can enable permissions later in device settings or when you use a feature.
+                </Text>
+              </View>
+            </View>
+          </ScrollView>
+        </SafeArea>
+      </View>
+    </View>
   );
 }
