@@ -4,6 +4,7 @@ import { Link } from 'solito/link';
 import { usePathname } from 'solito/navigation';
 import { BrandWordmark, NavBar, SiteFooter, type FooterLink, type NavItem } from '@acme/ui';
 import { View } from '@acme/ui/tw';
+import { siteHref } from '../../lib/site-href';
 import { CONTENT_ID, FOOTER_DESCRIPTION, FOOTER_GROUPS, NAV_CTA, navItems, showsSiteChrome } from './nav';
 import { sectionMarker } from '../home/sections';
 
@@ -57,7 +58,7 @@ export function SiteNavBar() {
     <NavBar
       items={navItems(pathname)}
       cta={NAV_CTA}
-      ctaTone="orange"
+      ctaTone="royal"
       skylineClassName="hidden h-5 md:flex short:hidden"
       skipTo={CONTENT_ID}
       district="midtown"
@@ -82,6 +83,7 @@ export function SiteFooterBar() {
     <SiteFooter
       variant="columns"
       mark="badge"
+      logoHref={siteHref('/')}
       district="harlem"
       scene="skyline"
       description={FOOTER_DESCRIPTION}

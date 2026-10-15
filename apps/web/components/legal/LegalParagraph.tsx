@@ -2,7 +2,7 @@ import { Link } from 'solito/link';
 import { Paragraph } from '@acme/ui/html';
 import type { LegalParagraph as LegalParagraphCopy } from './copy';
 
-const PARAGRAPH = 'my-0 text-base leading-7 text-text-secondary';
+const PARAGRAPH = 'my-0 text-base leading-8 text-text md:text-lg md:leading-8';
 
 /** A stable React key for a legal paragraph, plain or linked. */
 export function legalParagraphKey(paragraph: LegalParagraphCopy): string {
@@ -15,7 +15,7 @@ export function LegalParagraph({ paragraph }: { paragraph: LegalParagraphCopy })
   return (
     <Paragraph className={PARAGRAPH}>
       {paragraph.before}
-      <Link href={paragraph.link.href} className="text-text underline underline-offset-4">
+      <Link href={paragraph.link.href} className="font-semibold text-text underline underline-offset-4">
         {paragraph.link.label}
       </Link>
       {paragraph.after}
