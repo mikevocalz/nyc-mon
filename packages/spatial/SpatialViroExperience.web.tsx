@@ -21,7 +21,7 @@ export function SpatialViroExperience() {
     <View className="relative flex-1">
       <WebViro3DSceneNavigator
         initialScene={{ scene: DistrictScene }}
-        webRendererOptions={{ assetBaseUrl: '/viro/wasm/' }}
+        webRendererOptions={{ assetBaseUrl: `${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/viro/wasm/` }}
         // The mouse aims on web; the headset's centre gaze dot only covers
         // the street. False is the fork's web default, stated here on purpose.
         showReticle={false}

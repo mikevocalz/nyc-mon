@@ -5,6 +5,7 @@ import { STORY_COPY } from '../../../components/story/copy';
 export const metadata: Metadata = {
   title: { absolute: 'NYC-MON | The Story' },
   description: STORY_COPY.hero.body,
+  alternates: { canonical: '/story' },
 };
 
 export default function Page() {

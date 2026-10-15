@@ -1,15 +1,17 @@
 'use server';
 
-import { headers } from 'next/headers';
-import { joinWaitlist, toWaitlistDistrict } from '../../../lib/waitlist.ts';
+import { cookies, headers } from 'next/headers';
+import { joinWaitlist, toBirthYear, toWaitlistDistrict } from '../../../lib/waitlist.ts';
 import type { WaitlistResult } from '../../../lib/waitlist.ts';
+import { WAITLIST_AGE_HOLD_COOKIE, WAITLIST_AGE_HOLD_SECONDS } from '../../../lib/waitlist-hold.ts';
 
 /**
  * State for `useActionState(joinWaitlistAction, { status: 'idle', email: '' })`.
  * `email` echoes what was typed so the form can re-render it after an
  * `invalid`, `rate_limited` or `error` answer. After `joined` or `under13` it
  * is empty: a confirmed sign-up needs nothing re-shown, and an under-13
- * visitor's address is not kept even in page state (ADR 0001).
+ * visitor's address is not kept even in page state (ADR 0001). The birth year
+ * is never echoed: a retry starts from an empty field.
  */
 export type WaitlistFormState = (WaitlistResult | { status: 'idle' }) & { email: string };
 
@@ -31,20 +33,39 @@ function visitorIp(requestHeaders: Headers): string | undefined {
 
 /**
  * Server action behind the waitlist form (PS-001). Fields: `email`,
- * `ageConfirmed` (checkbox, checked = 13 or older), `district`, `source` and
- * the hidden honeypot `website`.
+ * `birthYear` (the neutral age screen: four digits, no default), `district`,
+ * `source` and the hidden honeypot `website`.
+ *
+ * Age screen (docs/design/site/WAITLIST_AGE_SCREEN.md): admin-vite decides
+ * under-13 from the year and stores nothing. When it answers `under13`, this
+ * action sets a short-lived, httpOnly hold cookie that carries no personal
+ * data; while it is present, a re-post (reload, back button, another year)
+ * gets the same `under13` answer without the year or address being sent
+ * anywhere. The form itself also stays in its result state.
  */
 export async function joinWaitlistAction(_previous: WaitlistFormState, formData: FormData): Promise<WaitlistFormState> {
+  const jar = await cookies();
+  if (jar.get(WAITLIST_AGE_HOLD_COOKIE) !== undefined) return { status: 'under13', email: '' };
+
   const email = formString(formData, 'email');
   const source = formString(formData, 'source').trim();
   const result = await joinWaitlist({
     email,
-    ageConfirmed: formData.get('ageConfirmed') !== null,
+    birthYear: toBirthYear(formData.get('birthYear')),
     district: toWaitlistDistrict(formString(formData, 'district')),
     source: source === '' ? undefined : source,
     website: formString(formData, 'website'),
     clientIp: visitorIp(await headers()),
   });
+  if (result.status === 'under13') {
+    jar.set(WAITLIST_AGE_HOLD_COOKIE, '1', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: WAITLIST_AGE_HOLD_SECONDS,
+    });
+  }
   const keepEmail = result.status === 'invalid' || result.status === 'rate_limited' || result.status === 'error';
   return { ...result, email: keepEmail ? email : '' };
 }
