@@ -8,9 +8,11 @@ import type { LegacyBadgeTone } from './surface-look';
 /**
  * The onboarding status tones understood by {@linkcode StatusRow}. They are
  * mapped onto {@linkcode Badge} tones so the chips stay semantic and brand-
- * aligned.
+ * aligned. `request` is a Mon's need on M13 to M16: neutral text with a
+ * filled dot, never the danger tone, because a low meter is a request and
+ * nothing is lost (product-decisions §4, D-15).
  */
-export type StatusRowTone = 'pending' | 'offline' | 'neutral';
+export type StatusRowTone = 'pending' | 'offline' | 'neutral' | 'request';
 
 /** One optional text action on a {@linkcode StatusRowItem}, e.g. "Open Settings". */
 export interface StatusRowAction {
@@ -60,6 +62,7 @@ const TONE_MAP: Record<StatusRowTone, LegacyBadgeTone> = {
   pending: 'neutral',
   offline: 'danger',
   neutral: 'neutral',
+  request: 'neutral',
 };
 
 /**
@@ -101,6 +104,7 @@ export function StatusRow({ items }: StatusRowProps) {
             key={item.id}
             label={item.label}
             tone={TONE_MAP[item.tone ?? 'neutral']}
+            dot={item.tone === 'request' ? 'solid' : 'none'}
             size="sm"
           />
         ),

@@ -306,7 +306,7 @@ The optional fourth tile was left out: the brief's candidates were a third photo
 
 ## PS-019 — Strike the push-to-talk chirp and the interactive HUD from the marketing stage
 
-**Disposition:** STRIKE (Phase 4).
+**Disposition:** STRIKE (Phase 4). Superseded by PS-037 (2026-10-14).
 
 **Context.** Pressing the 3D left side key played a synthesised Nextel chirp (`nextel-chirp.ts`, `react-native-audio-api`), and hovering the 3D screen highlighted HUD buttons and switched tabs. Both needed a per-frame raycast. The key is a few pixels wide, nothing on the page points to it, it worked only with a pointer, and it presented "push to talk" and the HUD tabs as product facts that canon does not state (Decision #16 says "left action key"; Q42).
 
@@ -488,3 +488,30 @@ The optional fourth tile was left out: the brief's candidates were a third photo
 **Verification.** Isolated build on :3112. Cards stack at 390 with no horizontal overflow and the notch visible; they sit in one row at 1440. `site-qa:axe` reports no violations on `/mons` and `/mons/bodega-cee`.
 
 **Return condition.** None.
+
+---
+
+## PS-037 — Creator reinstates the interactive H-Lynk screen (supersedes PS-019)
+
+**Disposition:** BUILD (2026-10-14). Creator direction (Mike): bring back the interactive H-Lynk screen GUI "but build it properly", with the tabs Dex, Crew, Care, Bag and City, keep the side key chirp, and fix the scanner light poking out past the top left of the H-Lynk.
+
+**Context.** PS-019 struck the Oct 4 HUD (commits 0621834, 727428d, d65a9d3) and the side key chirp (9b6a262) because they needed a per-frame raycast, worked only with a pointer, hung on a key a few pixels wide that nothing pointed to, and showed tab names (Q42) and "push to talk" as product facts. The Oct 4 tabs also carried invented stats, levels, items and a "wild encounter".
+
+**Decision.**
+- **Screen.** The screen is a 768×1024 canvas on the glass with a five-tab bar (Dex, Crew, Care, Bag, City), opening on Crew: the first starter's Baby name and "Your Mon", the face the capture already showed. Every string comes from approved sources: Dex lists the three starters' Baby names and Dex numbers from `@acme/content`; Care shows Energy, Fullness and Social at the CARE section's example levels with "Example levels, not a live reading."; Bag says "Nothing to show on the site."; City lists the four districts and World's second line. No HP, levels, items or encounters. Colours are `hud.*` tokens on the current red H-Lynk Core.
+- **One state, DOM first.** A `SegmentedControl` radio group under the stage (roving tabindex, arrows, Home/End, 44px targets) is the accessible source of truth. It and the scene share one per-stage Zustand store. A polite `<output>` under it reads the active tab's content as one sentence, server-rendered for Crew.
+- **Side key.** A visible "Side key chirp" button plays the chirp and dips the 3D key; the 3D key still works through a larger invisible hit box over the key and the shell beside it. A "Sound" switch mutes it. Web Audio directly (no `react-native-audio-api`), created inside the gesture.
+- **Beam.** The fan is centred on the emitters, opens upward from their span, and stays inside the body width and the head depth (see the beam fix below).
+
+**How each PS-019 concern is answered.**
+- *Pointer-only.* Keyboard and screen readers use the radio group and the button; touch can tap the 3D tabs and the side key too; reduced motion and no-GPU keep the capture and every control works.
+- *Per-frame raycast.* The scene raycasts only on a frame whose pointer moved or that follows a press, and repaints the canvas only when the tab or hover target changes. A still stage stays paused.
+- *Invisible, tiny key.* The key has a labelled DOM button beside the stage, and the 3D hit area is a box larger than the key.
+- *Q42 / canon.* The tab names are the creator's call for the marketing stage (this decision); Q42 stays open for the app's navigation, and the copy notes it. "Push to talk" is not claimed anywhere: the control is "Side key chirp". Tab content is limited to approved strings; `hlynk-hud.test.ts` checks every string against the banned list (device, wild, owner/trainer/user, catch/capture, Mon pronouns).
+- *Sound.* Never on load; only from a press on a control whose label says what it does, and the Sound switch mutes it. It defaults on, because the only triggers are those explicit presses.
+
+**Beam fix.** Root cause: each fan layer was drawn twice, a face plane and a plane crossed at 90°, both 0.76 wide at the mouth. The crossed plane therefore reached 0.38 in front of the body's centre plane, about 0.25 past the head's face, and at the −0.38 rad three-quarter turn that sheet projected as a red wedge over the head's left side and lens; the fan and its 0.9-wide glow sprite were also centred at x 0.08 instead of on the emitters (0.14 and 0.32), so the wash reached x −0.30 over the lens. 35f7410 had only moved the centre. Now: `FAN` centres on the emitters (0.23), each layer's mouth is no wider than the emitters' span, the tips are at most ±0.22, the crossed plane is 0.45 as wide (inside the head's depth), the lean is −0.08, and the glow sprite is 0.42 wide. `device-fan.test.ts` checks the bounds in model space and projects every fan corner at intro, rest and tilt poses against the body silhouette.
+
+**Consequences.** The capture is re-rendered as `h-lynk-core-v3.png` and the scanner crop as `h-lynk-scanner-v2.png` (new names; optimisers cache by URL). `/how-it-works` still shows `h-lynk-core-v2.png`. Under reduced motion the capture shows Crew whatever tab is picked; the readout carries the content. `react-native-audio-api` still has no importer in `apps/web` (PS-019 consequence stands).
+
+**Return condition.** If canon (Q42) names different tabs or rules out a screen GUI on the marketing site, revise this decision with the creator.

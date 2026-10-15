@@ -99,6 +99,7 @@ export const VoiceOverActions: Story = {
           <Trackpad label="Metro Egg, 1 of 3" onActivate={noop} onStep={noop} onCommit={noop} commitLabel="Choose this egg" reducedMotion={false} />
         </Body>
         <TrackpadActions
+          testID="actions"
           onStepBack={noop}
           stepBackLabel="Previous egg"
           onActivate={noop}
@@ -111,4 +112,34 @@ export const VoiceOverActions: Story = {
       </View>
     );
   },
+  // Each action is a full press target (Button's min-h-target, 48 px), found by its own test id.
+  play: ({ canvasElement }) => {
+    for (const key of ['back', 'activate', 'forward', 'commit']) {
+      const el = canvasElement.querySelector(`[data-testid="actions-${key}"]`);
+      if (!el) throw new Error(`actions-${key}: no button carries the test id`);
+      const h = el.getBoundingClientRect().height;
+      if (h < 48) throw new Error(`actions-${key} is ${h}px tall, under the 48px target`);
+    }
+  },
 };
+
+function Hold({ reducedMotion }: { reducedMotion: boolean }) {
+  const store = useInstanceStore(() => ({ holding: false, breaths: 0 }));
+  const { holding, breaths } = useStore(store);
+  return (
+    <View className="scheme-light gap-3 bg-bg p-4">
+      <Body>
+        <Trackpad
+          label="Warm the case"
+          reducedMotion={reducedMotion}
+          onHoldStart={() => store.setState({ holding: true, breaths: breaths + 1 })}
+          onHoldEnd={() => store.setState({ holding: false })}
+        />
+      </Body>
+      <Text variant="caption">{`${holding ? 'Holding' : 'Released'}. Holds: ${breaths}. Tap or Enter runs one 4 s breath.`}</Text>
+    </View>
+  );
+}
+
+/** M11 warm: `onHoldStart` after 150 ms still, `onHoldEnd` on release. A hold-only pad's activate runs one breath. */
+export const HoldToWarm: Story = { render: () => <Hold reducedMotion={false} /> };

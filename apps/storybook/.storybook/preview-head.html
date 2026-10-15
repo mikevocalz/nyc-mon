@@ -7,4 +7,8 @@
 <script>
   globalThis.process ??= { env: {} };
   globalThis.process.env ??= {};
+  // Same default as packages/ui/rn-globals-shim.ts, set before any story
+  // module runs: a story that imports react-native-reanimated ahead of tw.tsx
+  // (EggCase) would otherwise read __DEV__ before the shim defines it.
+  globalThis.__DEV__ ??= globalThis.process.env.NODE_ENV !== 'production';
 </script>

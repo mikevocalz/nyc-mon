@@ -35,6 +35,13 @@ const sheet = tv({
     closeIcon: '',
   },
   variants: {
+    // in-screen: docked to the bottom of the H-Lynk screen it is drawn in, at
+    // most 85% of it, with no OS sheet and no scrim, so the shell's trackpad
+    // and keys stay live under it (M14 tray, M16 intro/result card).
+    placement: {
+      sheet: {},
+      'in-screen': { content: 'absolute bottom-0 left-0 right-0 h-auto max-h-[85%] flex-none' },
+    },
     // night: the facade in both schemes (scoped dark). system: the page's own
     // scheme, white raised face in daylight, night after dark.
     scheme: {
@@ -52,7 +59,7 @@ const sheet = tv({
       },
     },
   },
-  defaultVariants: { scheme: 'night' },
+  defaultVariants: { scheme: 'night', placement: 'sheet' },
 });
 
 /** `night`: the night facade whatever the OS says (default). `system`: follows the page's light/dark scheme. */
@@ -77,24 +84,34 @@ export type SheetSurfaceProps = SheetClose & {
   district?: District;
   /** Cornice colour; overrides the district. */
   tone?: ControlTone;
+  /**
+   * `sheet`: the face inside the platform sheet (default). `in-screen`: drawn
+   * inside the H-Lynk screen, sized to it, no OS scrim, not modal, so the
+   * shell controls stay live under the tray (M14 04-components.md).
+   */
+  placement?: 'sheet' | 'in-screen';
+  testID?: string;
 };
 
 /**
  * The presentational sheet surface — exported separately so it can render
  * inline (e.g. in Storybook) without the sheet portal.
  */
-export function SheetSurface({ title, children, className, onClose, closeLabel, scheme = 'night', district, tone }: SheetSurfaceProps) {
+export function SheetSurface({
+  title, children, className, onClose, closeLabel, scheme = 'night', district, tone, placement = 'sheet', testID,
+}: SheetSurfaceProps) {
   const t = TONE_CLASSES[resolveControlTone(tone, district)];
-  const s = sheet({ scheme });
+  const s = sheet({ scheme, placement });
+  const inScreen = placement === 'in-screen';
   const face = (
-    <View role="dialog" aria-modal={true} aria-label={title} className={s.content({ className })}>
+    <View testID={testID} role="dialog" aria-modal={!inScreen} aria-label={title} className={s.content({ className })}>
         <View aria-hidden className={s.cornice({ className: t.face })}>
           <View className={s.handle({ className: t.side })} />
         </View>
         <View aria-hidden className={s.dentils()}>
           {Array.from({ length: 10 }, (_, i) => <View key={i} className={s.dentil({ className: t.side })} />)}
         </View>
-        <View className={s.inner()}>
+        <View className={inScreen ? 'px-4 pb-4 pt-3' : s.inner()}>
           <View className={s.header()}>
             {title ? <Heading level={2} className={s.title()}>{title}</Heading> : <View className="flex-1" />}
             {onClose ? (
@@ -117,7 +134,7 @@ export function SheetSurface({ title, children, className, onClose, closeLabel, 
   return scheme === 'night' ? <NightScope>{face}</NightScope> : face;
 }
 
-export type BottomSheetProps = Omit<SheetSurfaceProps, 'onClose' | 'closeLabel'> & {
+export type BottomSheetProps = Omit<SheetSurfaceProps, 'onClose' | 'closeLabel' | 'placement'> & {
   open: boolean;
   onClose: () => void;
   /** Accessible name of the close control. The caller supplies the copy (i18n). */

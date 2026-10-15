@@ -7,13 +7,18 @@ const HOUR_MS = 3_600_000;
 
 const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : v);
 
-function decay(value: number, curve: DecayCurve, dtMs: number, speed: number): number {
+/**
+ * Decays `value` along `curve`, never below `floor` (and never raising a
+ * value already below it). Composes exactly across split steps.
+ */
+function decay(value: number, curve: DecayCurve, dtMs: number, speed: number, floor: number): number {
   const hours = (dtMs / HOUR_MS) * speed;
+  const bottom = Math.min(value, floor);
   switch (curve.kind) {
     case 'linear':
-      return clamp01(value - curve.perHour * hours);
+      return clamp01(Math.max(bottom, value - curve.perHour * hours));
     case 'exponential':
-      return clamp01(value * 2 ** (-hours / curve.halfLifeHours));
+      return clamp01(Math.max(bottom, value * 2 ** (-hours / curve.halfLifeHours)));
     default:
       return assertNever(curve);
   }
@@ -69,7 +74,7 @@ function advanceSegment(
       continue;
     }
     const speed = need === 'energy' && sluggish ? tuning.sluggishEnergyDecayMultiplier : 1;
-    const value = decay(start, curve, dt, speed);
+    const value = decay(start, curve, dt, speed, tuning.returnFloor);
     next[need] = value;
     const crossAt = (threshold: number): number => {
       const ms = msUntil(start, threshold, curve, speed);
@@ -195,7 +200,8 @@ export function applyCareAction(
       if (care.activity.kind === 'asleep') return decline('asleep');
       if (isSluggishAt(care, t)) return decline('sluggish');
       const answered = care.pendingRequest !== null;
-      const overfed = care.fullness >= tuning.overfeedAtOrAbove;
+      const nutrition = mealNutrition(action, tuning);
+      const overfed = wouldOverfeed(care, nutrition, tuning);
       const bond = clamp01(mon.bond + tuning.feedBondGain + (answered ? tuning.answeredRequestBondGain : 0));
       const sluggishUntil = overfed ? t + tuning.sluggishDurationMs : null;
       if (sluggishUntil !== null) events.push({ type: 'became-sluggish', until: sluggishUntil, at: t });
@@ -204,7 +210,7 @@ export function applyCareAction(
           mon: { ...mon, bond },
           care: {
             ...care,
-            fullness: clamp01(care.fullness + action.nutrition),
+            fullness: clamp01(care.fullness + nutrition),
             lastFedAt: t,
             pendingRequest: null,
             sluggishUntil,
@@ -247,6 +253,21 @@ export function applyCareAction(
     default:
       return assertNever(action);
   }
+}
+
+/** Fullness a feed adds: the food's nutrition, or the shared meal's when no food is named (D-15e). */
+export function mealNutrition(action: Extract<CareAction, { kind: 'feed' }>, tuning: CareTuning = DEFAULT_CARE_TUNING): number {
+  return action.food?.nutrition ?? tuning.sharedMealNutrition;
+}
+
+/**
+ * True when a meal of `nutrition` would overfeed: Fullness after the meal,
+ * before clamping, above `overfeedAfterMealAbove` (D-15d). Pass care advanced
+ * to now (`selectCareNow`); M14 uses this to show its "full" state before the
+ * Caller feeds.
+ */
+export function wouldOverfeed(care: CareState, nutrition: number, tuning: CareTuning = DEFAULT_CARE_TUNING): boolean {
+  return care.fullness + nutrition > tuning.overfeedAfterMealAbove;
 }
 
 /** Fresh care state for a just-hatched individual. */

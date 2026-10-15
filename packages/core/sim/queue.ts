@@ -1,10 +1,56 @@
-import type { CareAction, CareWrite, MonInstance, CareState, WriteQueue } from '../types/index.ts';
+import type {
+  CareAction,
+  CareState,
+  CareWrite,
+  CreateEggRequest,
+  CreateEggResponse,
+  EggRecord,
+  MonInstance,
+  WriteQueue,
+} from '../types/index.ts';
 import { applyCareAction } from './care.ts';
+import { deriveMonInstanceId, HatchIntegrityError } from './hatch.ts';
 import type { SimState } from './state.ts';
 import { type CareTuning, DEFAULT_CARE_TUNING } from './tuning.ts';
 
 export function createWriteQueue(deviceId: string): WriteQueue {
-  return { deviceId, nextSeq: 1, entries: [] };
+  return { deviceId, nextSeq: 1, entries: [], eggCreates: [] };
+}
+
+/** The `POST /v1/eggs` body for an egg created on this device. Same `eggId`, so a replay reserves the same individual. */
+export function toCreateEggRequest(egg: EggRecord): CreateEggRequest {
+  return {
+    eggId: egg.eggId,
+    speciesId: egg.speciesId,
+    hatchesIntoSpeciesId: egg.hatchesIntoSpeciesId,
+    nickname: egg.nickname,
+    incubationMinutes: egg.incubationMinutes,
+  };
+}
+
+/**
+ * Queues an egg creation for `POST /v1/eggs` (M10 B4). Idempotent by
+ * `eggId`: queuing the same egg again returns the queue unchanged. The
+ * entry stays until {@linkcode acknowledgeEggCreate}; a failed send keeps it
+ * for the next reconnect, replayed with the same `eggId`.
+ */
+export function enqueueEggCreate(queue: WriteQueue, request: CreateEggRequest, queuedAt: number): WriteQueue {
+  if (queue.eggCreates.some((e) => e.request.eggId === request.eggId)) return queue;
+  return { ...queue, eggCreates: [...queue.eggCreates, { queuedAt, request }] };
+}
+
+/**
+ * Drops the queued creation the server answered. Throws
+ * `HatchIntegrityError` when the server reserved a different individual than
+ * the derived id (Law 6, a P0). An answer for an egg not in the queue is a no-op.
+ */
+export function acknowledgeEggCreate(queue: WriteQueue, response: CreateEggResponse): WriteQueue {
+  const expected = deriveMonInstanceId(response.eggId);
+  if (response.monInstanceId !== expected) {
+    throw new HatchIntegrityError(`Egg ${response.eggId} reserves ${expected}; server returned ${response.monInstanceId}`);
+  }
+  if (!queue.eggCreates.some((e) => e.request.eggId === response.eggId)) return queue;
+  return { ...queue, eggCreates: queue.eggCreates.filter((e) => e.request.eggId !== response.eggId) };
 }
 
 /** Appends a care write with the next monotonic `seq` for this device. */

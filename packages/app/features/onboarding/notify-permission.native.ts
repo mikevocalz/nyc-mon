@@ -6,6 +6,7 @@ import * as Notifications from 'expo-notifications';
 // `export *` from NotificationChannelManager.types.d.ts in this version.
 import { AndroidImportance } from 'expo-notifications';
 import type { ReadyNotification } from './notify-permission';
+import { readyNotificationId } from './notify-foreground';
 
 export type { ReadyNotification };
 export type NotifyPermission = 'undetermined' | 'granted' | 'denied' | 'unsupported';
@@ -54,7 +55,7 @@ export async function scheduleReadyNotification(input: ReadyNotification): Promi
       });
     }
     await Notifications.scheduleNotificationAsync({
-      identifier: `egg-ready-${input.eggId}`,
+      identifier: readyNotificationId(input.eggId),
       content: {
         title: input.title,
         body: input.body,
@@ -71,4 +72,19 @@ export async function scheduleReadyNotification(input: ReadyNotification): Promi
   } catch {
     return false;
   }
+}
+
+/**
+ * M12 housekeeping on the hatched edge: cancels the egg's ready notification
+ * if it has not fired and removes it from the tray if it has, so "one
+ * notification per egg, ever" holds when the Caller hatched before the banner.
+ * Both calls exist in expo-notifications 58.0.11 and resolve when there is
+ * nothing to remove; a failure is ignored because the hatch already committed.
+ */
+export async function clearReadyNotification(eggId: string): Promise<void> {
+  const id = readyNotificationId(eggId);
+  await Promise.allSettled([
+    Notifications.cancelScheduledNotificationAsync(id),
+    Notifications.dismissNotificationAsync(id),
+  ]);
 }

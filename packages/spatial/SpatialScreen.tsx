@@ -4,7 +4,7 @@ import { BrandLogo, CircuitButton, CityBlocks, GridCard, Heading, SegmentedContr
 import { List, ListItem } from '@acme/ui/html';
 import { Platform, useWindowDimensions } from 'react-native';
 import { Pressable, ScrollView, Section, View } from '@acme/ui/tw';
-import { ForkSpatialLayout, getSpatialForkCapabilities } from './ForkSpatialLayout';
+import { ForkSpatialLayout } from './ForkSpatialLayout';
 import { SpatialViroExperience } from './SpatialViroExperience';
 import { useDistrictStore, type District } from './districtStore';
 import { DISTRICT_COPY, DISTRICTS, HOME_COPY } from './homeCopy';
@@ -48,7 +48,6 @@ export interface SpatialScreenProps {
 }
 
 export function SpatialScreen({ enterImmersive }: SpatialScreenProps = {}) {
-  const capabilities = getSpatialForkCapabilities();
   const { height: windowHeight } = useWindowDimensions();
   const isWeb = Platform.OS === 'web';
   const district = useDistrictStore((state) => state.district);
@@ -56,18 +55,9 @@ export function SpatialScreen({ enterImmersive }: SpatialScreenProps = {}) {
   const cityOpen = useDistrictStore((state) => state.cityOpen);
   const setCityOpen = useDistrictStore((state) => state.setCityOpen);
 
-  // Runtime diagnostic for headset builds. Web visitors never see it: it named
-  // the backend ("Inline / Viro spatial fallback"), which is debug, not copy (PS-031).
-  const tools = isWeb ? undefined : (
-    <GridCard eyebrow="Runtime" title="Spatial backend">
-      <Text className="text-sm text-white/75">
-        {capabilities.metaSpatialWindows ? 'Meta Layout spatial window' : 'Inline / Viro spatial fallback'}
-      </Text>
-    </GridCard>
-  );
 
   return (
-    <ForkSpatialLayout panel={tools}>
+    <ForkSpatialLayout>
       {/* The district is the background: switching it redraws the city below
           the hero. On web the document scrolls, so the city is pinned to the
           viewport there and the inner ScrollView scrolls instead. */}

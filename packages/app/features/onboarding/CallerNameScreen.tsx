@@ -10,7 +10,7 @@ import { Form } from '@acme/ui/primitives';
 import { View } from '@acme/ui/tw';
 import { announcePolitely } from './announce';
 import { defaultCallerNameFilter } from './caller-name-filter';
-import { APP_HOME_PATH } from './boot';
+import { MEET_PATH } from '../egg/egg-model.ts';
 import { copy } from './copy';
 import { readConsentRequested, useOnboarding } from './onboarding.store';
 import { readSave, storeCallerProfile } from './save-store';
@@ -83,9 +83,8 @@ export function CallerNameScreen() {
     };
     storeCallerProfile(caller, nowMs);
     announcePolitely(copy('m07.confirmed.a11y.announce'));
-    // M08 (egg choice) is not built; the caller record is what the boot
-    // route reads next, so home is the honest next step.
-    router.replace(APP_HOME_PATH);
+    // M07 confirmed → M08 egg choice (M08 handoff "Route and intent").
+    router.replace(MEET_PATH);
   };
 
   return (

@@ -5,6 +5,7 @@ import { W04_COPY } from '../../../components/how-it-works/copy';
 export const metadata: Metadata = {
   title: { absolute: 'NYC-MON | How it works' },
   description: W04_COPY.loop.body,
+  alternates: { canonical: '/how-it-works' },
 };
 
 export default function Page() {

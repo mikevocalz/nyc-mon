@@ -61,4 +61,16 @@ export const haptics = {
   warning: guard((p) => p.System.notificationWarning),
   /** tab/segment/selection change */
   selection: guard((p) => p.System.selection),
+  /** warming the case: once per LED inhale while held, never faster than once per 4000 ms (M11) */
+  warm: guard((p) => p.breath),
+  /** hatch: the case lid releases (M12) */
+  hatchLatch: guard((p) => p.latch),
+  /** hatch: each of the three cracks (M12) */
+  hatchCrack: guard((p) => p.snap),
+  /** hatch: the burst peak (M12) */
+  hatchBloom: guard((p) => p.bloom),
+  /** hatch: the Baby emerges (M12) */
+  hatchEmerge: guard((p) => p.unfurl),
+  /** hatch: the lean-in first look (M12) */
+  firstLook: guard((p) => p.heartbeat),
 };

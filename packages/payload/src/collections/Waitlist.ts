@@ -51,9 +51,10 @@ export const validateWaitlistEntry: CollectionBeforeChangeHook = ({ data, operat
  * API with `overrideAccess: true`; no request may create or edit one. `ops`
  * reads the list and deletes a row on an erasure request.
  *
- * Every row belongs to someone who said they are 13 or older: an under-13
- * answer stores nothing (ADR 0001), so this collection never holds a child's
- * address. `versions: false` opts out of the canary's versions-by-default.
+ * Every row belongs to someone whose birth year at the neutral age screen
+ * put them at 13 or older: an under-13 answer stores nothing (ADR 0001), so
+ * this collection never holds a child's address. The birth year is checked
+ * and dropped; it is not a field here. `versions: false` opts out of the canary's versions-by-default.
  */
 export const Waitlist: CollectionConfig = {
   slug: WAITLIST_SLUG,

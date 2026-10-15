@@ -1,4 +1,6 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -35,6 +37,15 @@ const viroPkg = JSON.parse(
 );
 const viroFork = viroPkg.version !== '3.0.2';
 
+// The pico flavor exists only when app.config.ts has an active (uncommented)
+// @expo-pico/core entry with a picoAppId. By default the block is commented
+// out and prebuild makes the mobile and quest flavors only.
+const appConfigSource = readFileSync(join(root, 'apps/mobile/app.config.ts'), 'utf8')
+  .split('\n')
+  .filter((line) => !line.trim().startsWith('//'))
+  .join('\n');
+const picoEnabled = appConfigSource.includes("'@expo-pico/core'");
+
 const checks = [
   ['settings.gradle', [
     "include ':react_viro', ':arcore_client', ':gvr_common', ':viro_renderer'",
@@ -48,19 +59,22 @@ const checks = [
       : []),
     'flavorDimensions += "device"',
     'mobile { dimension "device" }',
-    'pico {',
+    ...(picoEnabled ? ['pico {'] : []),
     'quest {',
+    // The quest flavor must resolve expo-horizon-core's quest variant, or
+    // ExpoHorizon.isHorizonBuild is false on the headset (HORIZON-LAYOUT.md, 1).
+    "matchingFallbacks = ['mobile']",
   ]],
   ['gradle.properties', [
     'reactNativeArchitectures=arm64-v8a',
     'android.targetSdkVersion=34',
     'android.minSdkVersion=29',
-    'picoXrMode=pico-os5',
+    ...(picoEnabled ? ['picoXrMode=pico-os5'] : []),
   ]],
   [`${pkgDir}/MainApplication.kt`, [
     'ReactViroPackage.ViroPlatform.AR',
     'ReactViroPackage.ViroPlatform.QUEST',
-    ...(viroFork ? ['ReactViroPackage.ViroPlatform.PICO'] : []),
+    ...(viroFork && picoEnabled ? ['ReactViroPackage.ViroPlatform.PICO'] : []),
   ]],
   [`${pkgDir}/VRActivity.kt`, [
     'getMainComponentName(): String = "VRQuestScene"',
@@ -80,14 +94,14 @@ const checks = [
     'android:defaultWidth="1280dp"',
     'android:defaultHeight="800dp"',
   ]],
-  ['app/src/pico/AndroidManifest.xml', [
+  ...(picoEnabled ? [['app/src/pico/AndroidManifest.xml', [
     'com.pico.intent.category.VR',
     'org.khronos.openxr.intent.category.IMMERSIVE_HMD',
     'libopenxr_loader.so',
     'com.pico.xrMode" android:value="pico-os5"',
     'android:defaultWidth="1280dp"',
     'android:defaultHeight="800dp"',
-  ]],
+  ]]] : []),
   ['app/src/main/res/values/strings.xml', [
     '<string name="app_name">NYC-MON</string>',
   ]],
@@ -105,12 +119,25 @@ for (const [relative, needles] of checks) {
   }
 }
 
+if (!picoEnabled) {
+  if (existsSync(join(android, 'app/src/pico'))) {
+    failures.push('app/src/pico: present although @expo-pico/core is commented out in app.config.ts');
+  }
+  if (/^\s*pico\s*\{/m.test(read('app/build.gradle'))) {
+    failures.push('app/build.gradle: declares a pico flavor although @expo-pico/core is commented out in app.config.ts');
+  }
+}
+
 const manifest = read('app/src/main/AndroidManifest.xml');
 if (manifest.includes('android.permission.SYSTEM_ALERT_WINDOW') &&
   !read('app/src/quest/AndroidManifest.xml').includes(
     'android.permission.SYSTEM_ALERT_WINDOW" tools:node="remove"',
   )) {
   failures.push('SYSTEM_ALERT_WINDOW must be stripped from the Quest flavor');
+}
+
+if (/missingDimensionStrategy\s+"device"/.test(read('app/build.gradle'))) {
+  failures.push('app/build.gradle: missingDimensionStrategy "device" pins every flavor to expo-horizon-core\'s mobile variant; the quest flavor needs matchingFallbacks');
 }
 
 // One native Skia: the @shopify alias resolves to the same directory, and
@@ -120,6 +147,53 @@ if (!existsSync(rnConfig) || !readFileSync(rnConfig, 'utf8').includes("'@shopify
   failures.push('apps/mobile/react-native.config.js: must disable autolinking for the @shopify/react-native-skia alias');
 }
 
+// --quest-manifest: the questDebug manifest must carry no PICO entry and must
+// request MANAGE_APP_VOLUMETRIC_WINDOWS (Meta VR Layout SDK). Reads the APK
+// through aapt2 when assembleQuestDebug has run, otherwise the merged manifest
+// from :app:processQuestDebugMainManifest, and says which one it read.
+if (process.argv.includes('--quest-manifest')) {
+  const apk = join(android, 'app/build/outputs/apk/quest/debug/app-quest-debug.apk');
+  const merged = join(
+    android,
+    'app/build/intermediates/merged_manifest/questDebug/processQuestDebugMainManifest/AndroidManifest.xml',
+  );
+  let source;
+  let text;
+  if (existsSync(apk)) {
+    const sdk = process.env.ANDROID_HOME || process.env.ANDROID_SDK_ROOT || join(homedir(), 'Library/Android/sdk');
+    const tools = join(sdk, 'build-tools');
+    const newest = existsSync(tools)
+      ? readdirSync(tools)
+          .filter((name) => /^\d+(\.\d+)*$/.test(name))
+          .sort((a, b) => b.localeCompare(a, undefined, { numeric: true }))[0]
+      : undefined;
+    const dump = newest
+      ? spawnSync(join(tools, newest, 'aapt2'), ['dump', 'xmltree', '--file', 'AndroidManifest.xml', apk], { encoding: 'utf8' })
+      : undefined;
+    if (!dump || dump.status !== 0) {
+      failures.push(`quest manifest: aapt2 could not read ${apk} (build-tools under ${tools})`);
+    } else {
+      source = `aapt2 ${newest} on ${apk.replace(`${root}/`, '')}`;
+      text = dump.stdout;
+    }
+  } else if (existsSync(merged)) {
+    source = `merged manifest ${merged.replace(`${root}/`, '')}`;
+    text = readFileSync(merged, 'utf8');
+  } else {
+    failures.push('quest manifest: no questDebug APK or merged manifest; run ./gradlew :app:processQuestDebugMainManifest --no-daemon in apps/mobile/android');
+  }
+  if (text !== undefined) {
+    const leaks = text.split('\n').map((line) => line.trim()).filter((line) => /pico|pvr\./i.test(line));
+    for (const line of leaks) failures.push(`quest manifest (${source}): PICO entry ${line}`);
+    if (!text.includes('MANAGE_APP_VOLUMETRIC_WINDOWS')) {
+      failures.push(`quest manifest (${source}): missing horizonos.permission.MANAGE_APP_VOLUMETRIC_WINDOWS`);
+    }
+    if (failures.length === 0) {
+      console.log(`[spatial:verify-android] quest manifest: 0 pico/pvr entries, MANAGE_APP_VOLUMETRIC_WINDOWS present (${source}).`);
+    }
+  }
+}
+
 if (failures.length) {
   console.error('[spatial:verify-android] Android XR contract drift:');
   for (const failure of failures) console.error(` - ${failure}`);
@@ -127,5 +201,5 @@ if (failures.length) {
 }
 
 console.log(
-  `[spatial:verify-android] mobile, quest and pico flavors match the XR contract (Viro ${viroPkg.version}).`,
+  `[spatial:verify-android] ${picoEnabled ? 'mobile, quest and pico flavors' : 'mobile and quest flavors (pico commented out)'} match the XR contract (Viro ${viroPkg.version}).`,
 );

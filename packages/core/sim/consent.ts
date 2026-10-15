@@ -61,3 +61,17 @@ export function isConsentRequired({ birthYear, nowMs }: ConsentCheck): boolean {
   if (!Number.isInteger(birthYear)) throw new RangeError(`birthYear must be an integer, got ${birthYear}`);
   return utcYearFromEpochMs(nowMs) - birthYear <= CONSENT_AGE_YEARS;
 }
+
+/**
+ * True when the Caller must be treated as under 13: guardian consent is (or
+ * was) part of their account (`consentStatus` other than `not-required`), or
+ * their stored birth year could still belong to someone under 13 at `nowMs`.
+ * Errs toward under-13, the protective side. Reads `CallerProfile.birthYear`
+ * and `consentStatus` from the save (`packages/core/schemas/caller.ts`).
+ */
+export function isCallerUnder13(
+  caller: { readonly birthYear: number; readonly consentStatus: string },
+  nowMs: number,
+): boolean {
+  return caller.consentStatus !== 'not-required' || isConsentRequired({ birthYear: caller.birthYear, nowMs });
+}
