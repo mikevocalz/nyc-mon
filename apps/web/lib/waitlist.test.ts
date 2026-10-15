@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { joinWaitlist, mapWaitlistResponse, toWaitlistDistrict } from './waitlist.ts';
+import { joinWaitlist, mapWaitlistResponse, toBirthYear, toWaitlistDistrict } from './waitlist.ts';
 import type { WaitlistInput } from './waitlist.ts';
 
 const URL_BASE = 'https://admin.test/';
-const input: WaitlistInput = { email: 'a@example.com', ageConfirmed: true, district: 'harlem', source: 'get', clientIp: '203.0.113.7' };
+const input: WaitlistInput = { email: 'a@example.com', birthYear: 1990, district: 'harlem', source: 'get', clientIp: '203.0.113.7' };
 
 type Call = { url: string; init: RequestInit };
 
@@ -34,7 +34,7 @@ test('joined: posts the form to ADMIN_API_URL/v1/waitlist with the vouched visit
   assert.equal(sent.get('x-forwarded-for'), null);
   assert.deepEqual(JSON.parse(String(calls[0]?.init.body)), {
     email: 'a@example.com',
-    ageConfirmed: true,
+    birthYear: 1990,
     district: 'harlem',
     source: 'get',
   });
@@ -62,6 +62,10 @@ test('missing ADMIN_API_URL is an error and sends nothing', async () => {
 const cases: [string, number, unknown, unknown][] = [
   ['under13', 422, { status: 'under13' }, { status: 'under13' }],
   ['invalid email', 400, { status: 'invalid', field: 'email' }, { status: 'invalid', field: 'email' }],
+  ['invalid birth year', 400, { status: 'invalid', field: 'birthYear' }, { status: 'invalid', field: 'birthYear' }],
+  ['under13 on a 200', 200, { status: 'under13' }, { status: 'error' }],
+  ['joined on a 422', 422, { status: 'joined' }, { status: 'error' }],
+  ['joined on a 201', 201, { status: 'joined' }, { status: 'error' }],
   ['invalid shape', 400, { status: 'invalid' }, { status: 'invalid' }],
   ['rate limited', 429, { status: 'rate_limited' }, { status: 'rate_limited' }],
   ['rate limited without a JSON body', 429, 'Too Many Requests', { status: 'rate_limited' }],
@@ -104,6 +108,42 @@ test('a request past the timeout is aborted and is an error', async () => {
 
 test('mapWaitlistResponse ignores an unknown field value', () => {
   assert.deepEqual(mapWaitlistResponse(400, { status: 'invalid', field: 'district' }), { status: 'invalid' });
+});
+
+test('a missing birth year is sent as absent, never as a passing default', async () => {
+  const { fetchImpl, calls } = respond(400, { status: 'invalid', field: 'birthYear' });
+  const result = await joinWaitlist({ ...input, birthYear: undefined }, { adminApiUrl: URL_BASE, fetchImpl });
+
+  assert.deepEqual(result, { status: 'invalid', field: 'birthYear' });
+  const sent = JSON.parse(String(calls[0]?.init.body)) as Record<string, unknown>;
+  assert.equal('birthYear' in sent, false);
+  assert.equal('ageConfirmed' in sent, false);
+});
+
+test('only an explicit joined answer reads as joined', () => {
+  for (const [status, body] of [
+    [200, { status: 'joined' }],
+    [200, { status: 'joined', extra: true }],
+  ] as const) {
+    assert.deepEqual(mapWaitlistResponse(status, body), { status: 'joined' });
+  }
+  for (const [status, body] of [
+    [200, undefined],
+    [200, {}],
+    [200, { status: 'ok' }],
+    [204, { status: 'joined' }],
+    [422, { status: 'joined' }],
+  ] as const) {
+    assert.notEqual(mapWaitlistResponse(status, body).status, 'joined', JSON.stringify([status, body]));
+  }
+});
+
+test('toBirthYear takes exactly four digits', () => {
+  assert.equal(toBirthYear('1990'), 1990);
+  assert.equal(toBirthYear(' 2015 '), 2015);
+  for (const bad of ['', '199', '19900', '19.9', '-199', '１９９０', 'abcd', null, 1990]) {
+    assert.equal(toBirthYear(bad), undefined, String(bad));
+  }
 });
 
 test('toWaitlistDistrict narrows form values', () => {

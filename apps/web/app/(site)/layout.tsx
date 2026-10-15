@@ -6,6 +6,7 @@ import { CONTENT_ID } from '../../components/site/nav';
 import '../rn-globals';
 import '../globals.css';
 import { Main } from '@acme/ui/html';
+import { siteUrl } from '../../lib/site-url';
 
 export const metadata: Metadata = {
   title: {
@@ -13,6 +14,20 @@ export const metadata: Metadata = {
     template: '%s | NYC-MON',
   },
   description: SITE_DESCRIPTION,
+  // Resolves the relative canonicals and the opengraph-image URL; each page
+  // sets its own `alternates.canonical` (a layout canonical would leak to every child).
+  metadataBase: new URL(siteUrl()),
+  applicationName: 'NYC-MON',
+  // og:title / og:description fall back to each page's title and description;
+  // the image comes from app/opengraph-image.tsx and twitter inherits it.
+  openGraph: {
+    siteName: 'NYC-MON',
+    type: 'website',
+    locale: 'en_US',
+  },
+  twitter: {
+    card: 'summary_large_image',
+  },
 };
 
 export default function SiteLayout({ children }: Readonly<{ children: React.ReactNode }>) {

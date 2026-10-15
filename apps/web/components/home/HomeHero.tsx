@@ -1,6 +1,7 @@
 import { BrandLogo, Image, LinkButton, type ImageProps } from '@acme/ui';
 import { Figure, Heading, Paragraph, Text } from '@acme/ui/html';
 import { View } from '@acme/ui/tw';
+import { siteHref } from '../../lib/site-href';
 import { art, artHref, artPosition } from './art';
 import { W01_COPY } from './copy';
 import { HeroCity, HeroDistrictPicker } from './HeroDistrictIsland';
@@ -64,7 +65,7 @@ export function HomeHero() {
               {copy.body}
             </Paragraph>
             <View id="mfx-hero-actions" className="w-full items-start gap-5 short:gap-3">
-              <LinkButton title={copy.cta} href={copy.ctaHref} variant="cta" size="lg" testID="w01-cta" />
+              <LinkButton title={copy.cta} href={siteHref(copy.ctaHref)} tone="royal" size="lg" testID="w01-cta" />
               <View className="w-full max-w-xl">
                 <HeroDistrictPicker label={copy.districtLabel} />
               </View>
