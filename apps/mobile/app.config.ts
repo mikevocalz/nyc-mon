@@ -67,6 +67,32 @@ const config: ExpoConfig & { newArchEnabled: true } = {
       },
     ],
     'expo-notifications',
+    [
+      'expo-image-picker',
+      {
+        photosPermission: 'Allow NYC-MON to save Mon photos to your photo library.',
+        cameraPermission: 'Allow NYC-MON to scan objects and place Mons in AR.',
+      },
+    ],
+    [
+      'expo-audio',
+      {
+        microphonePermission: 'Allow NYC-MON to hear you when you choose to speak to your Mon.',
+        recordAudioAndroid: true,
+        enableBackgroundRecording: false,
+        enableBackgroundPlayback: false,
+      },
+    ],
+    [
+      'expo-location',
+      {
+        locationWhenInUsePermission: 'Allow NYC-MON to find encounters while you explore.',
+        isIosBackgroundLocationEnabled: false,
+        isAndroidBackgroundLocationEnabled: false,
+        isAndroidForegroundServiceEnabled: false,
+      },
+    ],
+    ['expo-sensors', { motionPermission: 'Allow NYC-MON to place AR objects with device motion.' }],
     'react-native-webgpu',
     // Adds the device flavors (mobile, quest) and the Quest manifest: VR
     // intent category, headtracking, hand tracking and supported devices.

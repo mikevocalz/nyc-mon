@@ -182,7 +182,7 @@ export function IncubateScreen() {
 
   const onCaseEnd = (end: 'closed' | 'open') => {
     const created = store.getState().egg;
-    if (end !== 'closed' || created === null) return;
+    if (end !== 'closed' || created === null || store.getState().caseState === 'closed') return;
     store.setState({ caseState: 'closed' });
     haptics.success();
     announcePolitely(eggCopy('m10.confirmed.a11y.announce', { time: formatClock(created.incubationEndsAt) }));
@@ -214,7 +214,7 @@ export function IncubateScreen() {
   };
   const keys = {
     back: { label: eggCopy('m10.back.a11y.label'), onPress: busy ? undefined : () => router.back() },
-    home: { onPress: s.caseState === 'closed' ? () => router.replace(MON_HOME_PATH) : undefined },
+    home: { onPress: s.caseState === 'closed' ? () => router.replace(readPermissionReview() === 'pending' ? PERMISSIONS_PATH : MON_HOME_PATH) : undefined },
   };
 
   const consentPending = readConsentRequested();

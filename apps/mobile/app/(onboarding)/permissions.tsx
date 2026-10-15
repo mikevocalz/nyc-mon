@@ -1,4 +1,4 @@
-import { PermissionsReviewScreen } from '@acme/app/features/onboarding/PermissionsReviewScreen.tsx';
+import { PermissionCenterScreen } from '@acme/app/features/onboarding/PermissionCenterScreen.tsx';
 
-/** Final first-run checkpoint after an egg starts incubating. */
-export default PermissionsReviewScreen;
+/** Final opt-in screen after incubation; UI stays in the shared feature. */
+export default PermissionCenterScreen;
