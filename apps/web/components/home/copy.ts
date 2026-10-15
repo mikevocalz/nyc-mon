@@ -1,6 +1,6 @@
 import { DISTRICT_COPY, HOME_COPY } from '@acme/spatial/copy';
 import type { District } from '@acme/ui';
-import { WAITLIST_CTA } from '../site/nav';
+import { WAITLIST_CTA } from '../site/nav.ts';
 
 /**
  * Every string on the home page (W01). Source and voice for each line:
@@ -44,7 +44,8 @@ export const W01_COPY = {
     body: "Mons live in New York, on the same blocks as you. They showed up less than ten years ago, and the city's still figuring them out.",
     body2: 'Four districts, from Lenox Avenue to the World Trade Center.',
   },
-  // Physical facts trace to canon Decision #16 only. No tab labels (Q42), no
+  // Physical facts trace to canon Decision #16 only. Tab labels only on the
+  // stage's screen (PS-037; Q42 stays open for the app), no
   // EngineX (Q40), no recruiting verbs, no pronoun for a Mon (PS-005).
   hlynk: {
     title: 'H-Lynk Core',
@@ -73,6 +74,18 @@ export const W01_COPY = {
     screen: {
       title: 'H-Lynk Core',
       note: 'Your Mon',
+      /**
+       * The screen's tabs, named by the creator (PS-037, supersedes PS-019).
+       * They name screens on the marketing stage only; Q42 still owns the app's navigation.
+       */
+      tabs: { dex: 'Dex', crew: 'Crew', care: 'Care', bag: 'Bag', city: 'City' },
+      /** Name of the DOM tab control under the stage. */
+      controlLabel: 'H-Lynk screen',
+      /** The Bag tab says plainly that the site shows nothing there. */
+      bag: 'Nothing to show on the site.',
+      /** The left side key: named for what it does, never "push to talk" (not canon). */
+      sideKey: 'Side key chirp',
+      sound: 'Sound',
     },
   },
   starters: {

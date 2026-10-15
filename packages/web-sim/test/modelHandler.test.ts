@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type Anthropic from '@anthropic-ai/sdk';
 import { createModelHandler, createRateLimiter, mockBackend, type ModelBackend } from '../server/model.ts';
-import { drainSse, httpModelClient } from '../src/client/modelClient.ts';
+import { ModelAuthExpiredError, drainSse, httpModelClient } from '../src/client/modelClient.ts';
 
 const ORIGIN = 'http://localhost:5180';
 const body = (extra: Record<string, unknown> = {}) =>
@@ -110,5 +110,15 @@ describe('/api/model', () => {
     );
     expect(deltas.join('')).toBe('Let me check.');
     expect(msg.stop_reason).toBe('tool_use');
+  });
+
+  it('a 401 asks for a new sign-in instead of a model retry', async () => {
+    const fetchFn = (async () => new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401 })) as typeof fetch;
+    await expect(
+      httpModelClient('/api/model', fetchFn).streamTurn(
+        { messages: [{ role: 'user', content: 'hi' }], tools: [{ name: 'check_on_mon', description: 'x', input_schema: { type: 'object' } }] },
+        () => {},
+      ),
+    ).rejects.toBeInstanceOf(ModelAuthExpiredError);
   });
 });

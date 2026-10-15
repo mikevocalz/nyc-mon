@@ -8,6 +8,17 @@ const nextConfig: NextConfig = {
   // NEXT_DIST_DIR lets a second build (perf lanes, bisects) write beside the
   // served `.next` without clobbering it. Must stay inside apps/web.
   distDir: process.env.NEXT_DIST_DIR || '.next',
+  // GitHub Pages preview (.github/workflows/pages.yml) serves a static
+  // snapshot under /<repo>. NEXT_BASE_PATH sets that prefix, and the snapshot
+  // has no image optimizer, so images are served as-is. Unset for real deploys.
+  ...(process.env.NEXT_BASE_PATH
+    ? {
+        basePath: process.env.NEXT_BASE_PATH,
+        images: { unoptimized: true },
+        // Hand-written public/ URLs (CanvasKit, Viro wasm, H-Lynk captures) read this.
+        env: { NEXT_PUBLIC_BASE_PATH: process.env.NEXT_BASE_PATH },
+      }
+    : {}),
   // React Compiler — auto-memoization, same as the mobile app's
   // experiments.reactCompiler in app.config.ts.
   reactCompiler: true,
