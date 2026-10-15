@@ -4,6 +4,7 @@ Browser checks for the marketing site. They run against a served build (`pnpm --
 
 | Script | What it does | Fails when |
 |---|---|---|
+| `node tooling/site-qa/city-layout.mjs` | City atlas geometry at 320, 390, 768, 1180 and 1280px with reduced motion. Defaults to `BASE=http://127.0.0.1:3611` and `BASE_PATH=/nyc-mon`; use `BASE_PATH=''` for an unprefixed build. Writes `out/city-layout.json`. | Horizontal overflow, district panels that fail to stretch, incorrect mobile order, or a leading desktop panel/photo that fails to fill its two-row span. |
 | `pnpm site-qa:shots` | Screenshot matrix of `/`: every viewport in `config.json` (390, 430, 768, 884, 1024, 1280, 1440, 1728, 844×390) × `prefers-reduced-motion` {no-preference, reduce}. One viewport shot per section, full-page shots at 390 and 1440. Writes `out/shots/*.jpg` and `report.json` (horizontal overflow, console errors, sections whose reveal did not settle). | Only with `SITE_QA_STRICT=1`, on overflow or console errors. |
 | `pnpm site-qa:axe` | axe-core with tags wcag2a, wcag2aa, wcag21a, wcag21aa, wcag22aa at 390/768/1280 × both motion modes. Scans each section after scrolling it under the header and letting its reveal settle, then scans the whole document once. Prints a rule / impact / WCAG / section / target table; full output in `out/axe/axe.json`. | Any violation. |
 | `pnpm site-qa:copy-lint` | Loads `/` and `/get` with JavaScript off and reads the server HTML: body text, `title`, meta description and OG/Twitter tags, and the `aria-label`, `alt`, `title`, `placeholder` attributes. Checks the contract §9 banned list (unlock, reimagine, seamless, next-generation, AI-powered, immersive experience, meet your new best friend, the future is here, elevate, supercharge, journey, with inflections). Inside the H-Lynk section (`config.json` `hlynkSelectors`) it also flags `device`/`devices` in text and attributes. | Any hit not in `copy-allowlist.json`, or no H-Lynk section found (exit 2). |
@@ -20,6 +21,7 @@ INP is not measured. Lighthouse navigation mode records no interactions. `apps/w
 | `BASE` | `http://localhost:3100` | Origin under test. |
 | `SITE_QA_BROWSER` | per script | `system` = installed Chrome with the real GPU and WebGPU; `bundled` = Playwright's chromium headless shell (no WebGPU, SwiftShader WebGL). Every script defaults to `bundled`. On the dev Mac the installed Chrome's OpenXR runtime is the Meta XR Simulator, so `system` starts a Quest 3 simulator session; use it only on purpose. Falls back to bundled when no Chrome is found. |
 | `CHROME_PATH` | auto | Chrome binary. Auto-detects `/Applications/Google Chrome.app` and `/usr/bin/google-chrome*`. |
+| `SITE_QA_CHROME_FLAGS` | none | Extra Chrome flags for `site-qa:lhci`, e.g. `--no-sandbox` when Chrome runs as root in a container. |
 | `SITE_QA_MOTION` | both | `no-preference` or `reduce` to run one motion mode. |
 | `SITE_QA_VIEWPORTS` | all | Comma list of viewport names (shots) or widths (motion: `1280`, `390`). |
 | `SITE_QA_ROUTE` | `/` | Route for shots, axe, lhci. |
@@ -88,4 +90,4 @@ Entry shape (the list starts empty):
 
 ## CI
 
-CI runs `pnpm --filter web test` (unit tests) and nothing from this directory. The browser checks need a served build and, for motion and Lighthouse, a real GPU and a quiet machine, so they run locally and their results are recorded in `docs/design/site/PREMIUM_SITE_QA.md`.
+CI runs the web, UI and theme unit tests, then runs `city-layout.mjs` against the production web build using its installed Chromium. The remaining browser checks need a served build and, for motion and Lighthouse, a real GPU and a quiet machine, so they run locally and their results are recorded in `docs/design/site/PREMIUM_SITE_QA.md`.

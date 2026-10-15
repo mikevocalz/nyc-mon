@@ -1,3 +1,6 @@
+import { W01_COPY } from '../home/copy';
+import { WAITLIST_CTA } from '../site/nav';
+
 /**
  * Every string on the /mons pages (W02). Dex data (Baby names, Dex numbers,
  * egg names) comes from @acme/content at render; only the voice lives here.
@@ -13,7 +16,12 @@ export const W02_COPY = {
     dex: (dexId: number) => `No. ${String(dexId).padStart(3, '0')}`,
     cardHref: (slug: string) => `/mons/${slug}`,
     cardLabel: (baby: string) => `Meet ${baby}`,
+    /** The closing band: the home page's hatch line, then the site's one CTA. */
+    closing: W01_COPY.hatch.closing,
+    cta: WAITLIST_CTA,
   },
+  /** Printed on every creature picture: the art stands in for final renders (PS-007, PS-028). */
+  conceptArt: 'Concept art',
   detail: {
     eyebrow: (bloodline: string) => bloodline,
     dex: (dexId: number) => `No. ${String(dexId).padStart(3, '0')}`,
@@ -23,19 +31,24 @@ export const W02_COPY = {
       `${baby} hatches from the ${egg}. Incubation takes 15 minutes, 30 minutes or an hour. Then your Mon makes a choice too.`,
     /** One canon-flavored line per starter, keyed by the page's slug. */
     blurb: {
-      'bodega-cee': 'Corner-store hours, corner-store loyalty. This line knows every regular on the avenue.',
-      yotes: 'Bright, loud and out late. This line treats the whole borough as its yard.',
+      'bodega-cee': 'Corner-store hours, corner-store loyalty. This Bloodline knows every regular on the avenue.',
+      yotes: 'Bright, loud and out late. This Bloodline treats the whole borough as its yard.',
     } as Record<string, string>,
     lineTitle: 'Egg to Baby',
     unnamedForm: 'Unnamed form',
     back: 'Back to the Mons',
     backHref: '/mons',
+    othersTitle: 'Meet the others',
+    /** The hatch band: the home page's hatch title and closing line, then the site's one CTA. */
+    hatchTitle: W01_COPY.hatch.title,
+    hatchClosing: W01_COPY.hatch.closing,
+    cta: WAITLIST_CTA,
   },
   meta: {
     indexDescription:
       'Meet the three NYC-MON starters: the eggs they hatch from and the Bloodlines they come from.',
     detailTitle: (baby: string) => `NYC-MON | The Mons | ${baby}`,
     detailDescription: (baby: string, bloodline: string) =>
-      `${baby}, Baby form of the ${bloodline}, and the egg it hatches from.`,
+      `${baby}, the Baby form of the ${bloodline}, and the egg ${baby} hatches from.`,
   },
 } as const;
