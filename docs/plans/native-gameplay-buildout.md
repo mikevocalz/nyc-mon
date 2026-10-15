@@ -7,6 +7,7 @@
 - Native tabs: HOME · GAME · H-LYNK · MONS · CALLER. GAME owns exploration and battles, without a separate Battles tab. Web remains the public marketing homepage plus focused authenticated Mon Space; don't ship the whole city game in web accidentally.
 - One authoritative Caller and Mon identity, care, bond, progression and memories across sessions and future XR; never fork a distinct battle Mon.
 - NYC world geometry is NYC-specific and georeferenced: compile legal NYC OpenStreetMap/open city geometry to a versioned runtime dataset, with boroughs, transit, streets, landmarks and named block identity. Follow the repo's Three.js WebGPU/TypeGPU architecture, LOD/instancing and camera/memory budgets; no Unity.
+- World styling follows the creator-approved futuristic NYCHA exterior facelift (2026-10-13), specified in `docs/implementation/MOBILE_WORLD_PR_PACK.md`: an additive overlay keyed by stable building IDs, housing classified against verified NYC/NYCHA data, train/transit visuals out of scope, no generated project names treated as canon. It leaves the OSM geometry G01 compiles unchanged.
 - Creature world renderer/effects through typed contracts. Viro/Eskiu spatial surfaces reuse existing #9 scene contract and #18 Quest plan; do not ship invented anchors or unsupported headset fallbacks.
 - For physical-world presence or outdoor game modes, Phase 2 is explicitly parked by ADR 0013 / PR #10; location permission, safety/counsel review, accuracy measurements and creator decisions are gates, not defaults.
 
