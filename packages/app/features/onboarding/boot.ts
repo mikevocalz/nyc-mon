@@ -3,9 +3,9 @@
 import type { Href } from 'expo-router';
 import { readBootSave } from '@acme/core/save';
 import { assertNever, type BootRoute, type BootSnapshot, resolveBootRoute } from '@acme/core/sim';
-import { readAgeAnswer, readSessionFlag, SAVE_KEY } from './onboarding.store';
+import { readAgeAnswer, readPermissionReview, readSessionFlag, SAVE_KEY } from './onboarding.store';
 import { saveStorage } from './storage';
-import { MEET_PATH, MON_HOME_PATH } from '../egg/egg-model.ts';
+import { MEET_PATH, MON_HOME_PATH, PERMISSIONS_PATH } from '../egg/egg-model.ts';
 
 /**
  * M02 ships with canon-safe art: the real egg captures are still pending
@@ -67,8 +67,9 @@ export function bootPath(route: BootRoute): Href {
     case 'incubating':
     case 'egg-ready':
     case 'companion':
-      // M11 (egg) and M13 (Mon) both render at the `(home)` group index.
-      return MON_HOME_PATH;
+      // Resume the last first-run step after process death. Old installs have
+      // no checkpoint, so they continue straight to the companion as before.
+      return readPermissionReview() === 'pending' ? PERMISSIONS_PATH : MON_HOME_PATH;
     case 'consent-denied':
       return '/(auth)/consent?state=denied';
     case 'save-recovered':

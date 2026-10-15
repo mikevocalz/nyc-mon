@@ -15,9 +15,33 @@ export const ONBOARDING_KEYS = {
   hasSession: 'has-session',
   consentRequested: 'consent-requested',
   notifyOff: 'notify-off',
+  permissionReview: 'permission-review',
 } as const;
 
 export const SAVE_KEY = 'save';
+
+/**
+ * First-run setup checkpoint. Only callers who actually start their first
+ * incubation enter this flow, so existing installs never get re-onboarded.
+ * Synchronous MMKV reads keep cold-start routing deterministic.
+ */
+export type PermissionReview = 'pending' | 'complete';
+
+export function readPermissionReview(): PermissionReview | undefined {
+  const raw = onboardingStorage.getString(ONBOARDING_KEYS.permissionReview);
+  return raw === 'pending' || raw === 'complete' ? raw : undefined;
+}
+
+export function startPermissionReview(): void {
+  if (readPermissionReview() !== 'complete') {
+    onboardingStorage.set(ONBOARDING_KEYS.permissionReview, 'pending');
+  }
+}
+
+export function completePermissionReview(): void {
+  onboardingStorage.set(ONBOARDING_KEYS.permissionReview, 'complete');
+}
+
 
 /** Parses the stored M04 answer. A malformed value is treated as unanswered (Law 5 at the boundary). */
 export function readAgeAnswer(): AgeAnswer | undefined {
