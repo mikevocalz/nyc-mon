@@ -72,7 +72,7 @@ export function HeroDistrictPicker({ label }: { label: string }) {
   const district = useDistrictStore((s) => s.district);
   const setDistrict = useDistrictStore((s) => s.setDistrict);
   return (
-    <View data-testid="w01-district" className="gap-2 bg-ink-950 p-3">
+    <View data-testid="w01-district" className="gap-2 bg-ink-950 p-3 sm:w-fit sm:self-start">
       <Text {...({ id: PICKER_LABEL_ID } as object)} className="text-sm font-semibold text-silver-100">{label}</Text>
       {/* Below `sm` the four districts sit as a 2x2 grid instead of wrapping 3 + 1. */}
       <SegmentedControl
