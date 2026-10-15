@@ -67,7 +67,7 @@ const privacy: LegalDocument = {
       title: 'The waitlist on this site',
       body: [
         'The waitlist form asks for your email address and your birth year. When you join, we save your email address, the district the site\u2019s district picker was set to (Midtown unless you changed it), which page you signed up on, and the date. We keep that until you ask us to take you off the list. We use the address to send one email when NYC-MON is out.',
-        'Your birth year is used once, to check whether you can join, and then dropped. It is not saved or logged. If the year you enter means you could be under 13, we save nothing, and your email address is never read.',
+        'Your birth year is used once, to check whether you can join, and then dropped. It is not saved or logged. If the year you enter means you could be under 13, we keep neither your email address nor your birth year. The address is sent with the form, but it is never checked, looked up or stored.',
         'To stop one connection from flooding the form, we count sign-up attempts from each IP address per hour. The count is filed under a coded version of the address, made with a secret key, which can\u2019t be matched back to you without that key. The waitlist doesn\u2019t save the IP address itself, and each count is set to expire after two hours.',
         'If the age check means we can\u2019t add you, the site sets one cookie, nycmon_waitlist_hold. Its value is 1 and it holds nothing about you; it only stops the form being tried again with a different year. Your browser deletes it when the browsing session ends, usually when you close the browser. The waitlist sets no other cookie.',
       ],
