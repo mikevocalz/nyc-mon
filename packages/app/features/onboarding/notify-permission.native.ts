@@ -12,7 +12,11 @@ export type { ReadyNotification };
 export type NotifyPermission = 'undetermined' | 'granted' | 'denied' | 'unsupported';
 
 function toNotifyPermission(status: Notifications.NotificationPermissionsStatus): NotifyPermission {
-  if (status.granted || status.status === Notifications.PermissionStatus.GRANTED) return 'granted';
+  if (
+    status.granted || status.status === Notifications.PermissionStatus.GRANTED ||
+    status.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL ||
+    status.ios?.status === Notifications.IosAuthorizationStatus.EPHEMERAL
+  ) return 'granted';
   return status.status === Notifications.PermissionStatus.DENIED ? 'denied' : 'undetermined';
 }
 
@@ -28,6 +32,8 @@ export async function getNotifyPermission(): Promise<NotifyPermission> {
 /** The M06 CTA: the real OS prompt. Anything that is not a grant is `denied`. */
 export async function requestNotifyPermission(): Promise<NotifyPermission> {
   try {
+    // Android 13 requires at least one channel before it can show the prompt.
+    if (Platform.OS === 'android') await ensureReadyChannel();
     const status = await Notifications.requestPermissionsAsync({
       ios: { allowAlert: true, allowSound: true, allowBadge: true },
     });
@@ -40,6 +46,13 @@ export async function requestNotifyPermission(): Promise<NotifyPermission> {
 /** Android needs a channel for any notification; iOS ignores it. */
 const ANDROID_CHANNEL_ID = 'egg-ready';
 
+async function ensureReadyChannel(): Promise<void> {
+  await Notifications.setNotificationChannelAsync(ANDROID_CHANNEL_ID, {
+    name: 'Egg ready',
+    importance: AndroidImportance.DEFAULT,
+  });
+}
+
 /**
  * Schedules the one M23 notification for an egg, fired at its
  * `incubationEndsAt`. The identifier derives from `eggId`, so a repeat call
@@ -49,10 +62,7 @@ const ANDROID_CHANNEL_ID = 'egg-ready';
 export async function scheduleReadyNotification(input: ReadyNotification): Promise<boolean> {
   try {
     if (Platform.OS === 'android') {
-      await Notifications.setNotificationChannelAsync(ANDROID_CHANNEL_ID, {
-        name: 'Egg ready',
-        importance: AndroidImportance.DEFAULT,
-      });
+      await ensureReadyChannel();
     }
     await Notifications.scheduleNotificationAsync({
       identifier: readyNotificationId(input.eggId),
