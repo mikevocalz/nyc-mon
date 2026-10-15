@@ -1,6 +1,8 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
+import { useStore } from 'zustand';
+import { createStore } from 'zustand/vanilla';
 import { Linking, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Button, Container, Heading, SafeArea, Text } from '@acme/ui';
@@ -42,25 +44,28 @@ export function PermissionsReviewScreen() {
   const regions = useReservedRegions();
   const viewport = permissionViewport(width, height, regions);
   const setNotifyOff = useOnboarding((state) => state.setNotifyOff);
-  const [status, setStatus] = useState<NotifyPermission | 'loading'>('loading');
-  const [busy, setBusy] = useState(false);
+  const local = useMemo(() => createStore<{ status: NotifyPermission | 'loading'; busy: boolean }>(() => ({
+    status: 'loading', busy: false,
+  })), []);
+  const status = useStore(local, (state) => state.status);
+  const busy = useStore(local, (state) => state.busy);
   const locked = useRef(false);
 
   useEffect(() => {
     let mounted = true;
     void getNotifyPermission().then((permission) => {
-      if (mounted) setStatus(permission);
+      if (mounted) local.setState({ status: permission });
     });
     return () => { mounted = false; };
-  }, []);
+  }, [local]);
 
   const enableNotifications = async () => {
     if (locked.current) return;
     locked.current = true;
-    setBusy(true);
+    local.setState({ busy: true });
     try {
       const result = await requestNotifyPermission();
-      setStatus(result);
+      local.setState({ status: result });
       if (result === 'granted') {
         setNotifyOff(undefined);
         announcePolitely(copy('m24.notifications.on'));
@@ -68,7 +73,7 @@ export function PermissionsReviewScreen() {
         setNotifyOff('denied');
       }
     } finally {
-      setBusy(false);
+      local.setState({ busy: false });
       locked.current = false;
     }
   };
@@ -76,15 +81,15 @@ export function PermissionsReviewScreen() {
   const finish = async () => {
     if (locked.current) return;
     locked.current = true;
-    setBusy(true);
+    local.setState({ busy: true });
     try {
       const permission = await getNotifyPermission();
-      const egg = selectPendingEgg(useMonStore.getState());
-      if (shouldScheduleEggReminder(permission, egg?.incubationEndsAt, Date.now())) {
+      const egg = selectPendingEgg(useMonStore.getState())?.egg;
+      if (egg && shouldScheduleEggReminder(permission, egg.incubationEndsAt, Date.now())) {
         // The notification ID is egg-derived, so retry/resume cannot duplicate it.
         const scheduled = await scheduleReadyNotification({
-          eggId: egg!.eggId,
-          endsAtMs: egg!.incubationEndsAt,
+          eggId: egg.eggId,
+          endsAtMs: egg.incubationEndsAt,
           title: copy('m23.notification.title'),
           body: copy('m23.notification.body'),
         });
@@ -98,7 +103,7 @@ export function PermissionsReviewScreen() {
       router.replace(MON_HOME_PATH);
     } finally {
       locked.current = false;
-      setBusy(false);
+      local.setState({ busy: false });
     }
   };
 
