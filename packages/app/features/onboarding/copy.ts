@@ -7,6 +7,33 @@
 export const ONBOARDING_COPY = {
   'm01.a11y.power_on': 'H-Lynk on',
 
+  // M24 — final first-run permission review. System prompts remain opt-in.
+  'm24.step': 'FINAL STEP / H-LYNK SETUP',
+  'm24.title': 'Get your H-Lynk ready',
+  'm24.intro': 'Your egg is incubating. Choose how the app can help — nothing here is required to keep playing.',
+  'm24.notifications.title': 'One egg-ready alert',
+  'm24.notifications.body': "The phone can tell you when your egg is ready. Just one alert for this egg, and your egg waits even if you say no.",
+  'm24.notifications.allow': 'Turn on egg alert',
+  'm24.notifications.settings': 'Open phone settings',
+  'm24.notifications.on': 'On',
+  'm24.notifications.off': 'Optional',
+  'm24.notifications.denied': 'Off',
+  'm24.notifications.unsupported': 'On phone only',
+  'm24.later.title': 'Only when you use them',
+  'm24.later.body': 'These features ask separately when you open them — not just because you made an account.',
+  'm24.camera.title': 'Camera and AR',
+  'm24.camera.body': "Scan the world or open an AR scene. We'll ask when you start a camera feature.",
+  'm24.camera.badge': 'Asked before your first scan',
+  'm24.mic.title': 'Talk to your Mon',
+  'm24.mic.body': "Voice is optional. The microphone stays off until you choose a voice feature.",
+  'm24.mic.badge': 'Asked before a voice session',
+  'm24.location.title': 'Find your block',
+  'm24.location.body': "Location is optional for map features. We'll ask for while-using access when you choose to locate yourself.",
+  'm24.location.badge': 'Foreground only; no background tracking',
+  'm24.privacy': "Photos, calendar, Bluetooth and other access are requested only by features that need them. Parental approval still applies where required.",
+  'm24.continue': 'Enter NYC-MON',
+  'm24.optional': 'All permissions are optional. You can change permissions in device settings later.',
+
   // M06 — notification permission sheet over M10 (screens/M06/05-copy.md)
   'm06.preview.app_name': 'NYC-MON',
   'm06.preview.time': 'now',

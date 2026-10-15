@@ -202,3 +202,11 @@ Open; no device yet.
 - [ ] Kill the app during the case animation: relaunch lands on M11 with one egg (boot `incubating`).
 - [ ] Airplane mode at Start: egg created, chip shows, server post replays later with the same `eggId`.
 - [ ] VoiceOver / TalkBack: stops read as radios; adjustable trackpad steps time.
+
+## 2026-10-15 addendum: M24 final permission review (supersedes M06 first-run handoff)
+
+P5 in `docs/design/DECISIONS.md` supersedes P2 **only for the first-run destination** after the case closes. M10 now writes the `pending` M24 permission checkpoint after `startIncubation` succeeds. Closing the case routes to `/(onboarding)/permissions`, not to the original M06 form sheet, regardless of current OS notification status. This is deliberate: the last onboarding screen also explains camera/AR, optional voice and foreground location.
+
+M24 owns the notification ask and, only if granted while the egg still incubates, schedules the existing unique local egg-ready reminder. M06 continues to serve an in-app later opt-in if needed.
+
+Updated device test: force-quit after Start, including during the case animation, relaunch and confirm **M24** appears with exactly one existing egg; completing M24 must land on M11 without creating another egg. Compact, large-text, Android book/tabletop/trifold, and iPhone Duo checks must verify all controls stay outside physical hinges. Historical M06 assertions above are retained as original handoff context, but are superseded for first-run.

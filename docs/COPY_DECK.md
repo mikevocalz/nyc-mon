@@ -319,3 +319,17 @@ Every string ID in M01–M07, generated from the screen files. Shared namespaces
 | `m07.error.characters` | `screens/M07/05-copy.md` | ui | drafted |
 | `m07.error.blocked` | `screens/M07/05-copy.md` | ui | drafted |
 | `m07.confirmed.a11y.announce` | `screens/M07/05-copy.md` | ui | drafted |
+
+
+## M24 — final permission review (first incubation only)
+
+The final step is **Get your H-Lynk ready**, after M10 starts the first egg.
+Only an explicit tap on **Turn on egg alert** opens a system prompt.
+Camera/AR, voice/microphone and foreground location are disclosed here but
+requested only when their respective experience is opened. Photos, calendar,
+Bluetooth and other privileged access are contextual. The Caller may finish
+with no permissions. A declined notification must never block hatching,
+gameplay, or the onboarding completion checkpoint. The egg-ready push stays
+one local notification per egg. Parental consent is a separate gate.
+
+Source of copy: `packages/app/features/onboarding/copy.ts`, `m24.*`.
