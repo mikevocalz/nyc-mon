@@ -27,11 +27,14 @@ const dir = outDir('lhci');
 console.log(`lighthouse ${LH_VERSION} · ${url} · ${runs} runs · chrome ${chromePath}`);
 console.log(`node ${process.version} · ${os.type()} ${os.release()} ${os.arch()} · ${os.cpus()[0]?.model} ×${os.cpus().length} · load ${os.loadavg().map((n) => n.toFixed(2)).join(' ')}`);
 
+// SITE_QA_CHROME_FLAGS appends launch flags, e.g. `--no-sandbox` when Chrome runs as root in a container.
+const chromeFlags = ['--headless=new', '--no-first-run', process.env.SITE_QA_CHROME_FLAGS].filter(Boolean).join(' ');
+
 const rows = [];
 for (let i = 1; i <= runs; i++) {
   const out = path.join(dir, `lh-${i}.json`);
   const res = spawnSync(process.execPath, [LH_CLI, url, `--chrome-path=${chromePath}`,
-    '--chrome-flags=--headless=new --no-first-run', '--output=json', `--output-path=${out}`, '--quiet'], { encoding: 'utf8' });
+    `--chrome-flags=${chromeFlags}`, '--output=json', `--output-path=${out}`, '--quiet'], { encoding: 'utf8' });
   if (res.status !== 0) {
     console.error(`run ${i} failed (exit ${res.status}):\n${res.stderr.slice(-2000)}`);
     process.exit(2);

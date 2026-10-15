@@ -31,7 +31,7 @@ ReactLenis (root, autoRaf: false)            ← no Lenis RAF loop
 
 The previous setup (`autoRaf: true` with `clock: 'external'`) left Lenis and GSAP each running a RAF loop; Phase 1 measured up to 8 RAF callbacks in one frame while scrolling (`PREMIUM_SITE_BASELINE.md` §2).
 
-Canvases: `CityBlocks` (hero) and `DeviceStage` (H-Lynk) each loop only while on screen, and `ThreeCanvas` stops three's internal `Animation` loop after `init()` (PS-010). `site-qa:motion` asserts one motion clock and at most one live canvas loop.
+Canvases: `CityBlocks` (hero) and `DeviceStage` (H-Lynk) each loop only while on screen (the H-Lynk also pauses at rest and wakes for pointer tilt or a 160ms side key dip; its screen repaints only on a tab or hover change, PS-037), and `ThreeCanvas` stops three's internal `Animation` loop after `init()` (PS-010). `site-qa:motion` asserts one motion clock and at most one live canvas loop.
 
 Refresh: `connectGsapLenis` refreshes on connect; sections that change layout after mount (the H-Lynk stage swapping capture for canvas, late images) call `ScrollTrigger.refresh()` through the timeline that owns them. Teardown: `useGSAP` reverts every timeline and trigger on unmount; `site-qa:motion` checks the trigger count returns to its post-mount value after a route away and back.
 
