@@ -2,9 +2,9 @@
 
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
-// Named import: the `import/namespace` resolver cannot see through the
-// `export *` from NotificationChannelManager.types.d.ts in this version.
-import { AndroidImportance } from 'expo-notifications';
+// Named imports: the namespace resolver cannot follow the notification
+// enums re-exported through the package’s type modules.
+import { AndroidImportance, IosAuthorizationStatus } from 'expo-notifications';
 import type { ReadyNotification } from './notify-permission';
 import { readyNotificationId } from './notify-foreground';
 
@@ -14,8 +14,8 @@ export type NotifyPermission = 'undetermined' | 'granted' | 'denied' | 'unsuppor
 function toNotifyPermission(status: Notifications.NotificationPermissionsStatus): NotifyPermission {
   if (
     status.granted || status.status === Notifications.PermissionStatus.GRANTED ||
-    status.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL ||
-    status.ios?.status === Notifications.IosAuthorizationStatus.EPHEMERAL
+    status.ios?.status === IosAuthorizationStatus.PROVISIONAL ||
+    status.ios?.status === IosAuthorizationStatus.EPHEMERAL
   ) return 'granted';
   return status.status === Notifications.PermissionStatus.DENIED ? 'denied' : 'undetermined';
 }
