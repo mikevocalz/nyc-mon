@@ -5,6 +5,7 @@ import { LEGAL_COPY } from '../../../../components/legal/copy';
 export const metadata: Metadata = {
   title: { absolute: 'NYC-MON | Terms of use' },
   description: LEGAL_COPY.terms.description,
+  alternates: { canonical: '/legal/terms' },
 };
 
 export default function Page() {

@@ -1,18 +1,11 @@
-import { starterBloodlines } from '@acme/content';
 import { Image, type ImageProps } from '@acme/ui';
 import { Heading, List, ListItem, Paragraph, Section } from '@acme/ui/html';
 import { View } from '@acme/ui/tw';
 import { DeviceStage } from '../DeviceStage';
 import { art } from './art';
 import { W01_COPY } from './copy';
+import { hudContent } from './hlynk-hud-content';
 import { sectionMarker } from './sections';
-
-/** The screen shows the first starter's Baby form (baby forms only on the marketing site). */
-function screenMon(): string {
-  const baby = starterBloodlines[0]?.forms.find((form) => form.stage === 'Baby');
-  if (!baby?.formName) throw new Error('@acme/content has no named Baby form for starter slot 1');
-  return baby.formName;
-}
 
 /**
  * H-LYNK (PS-017, PS-018): a hardware launch, then proof.
@@ -43,7 +36,8 @@ export function HLynkSection() {
       <View className="gap-10 lg:grid lg:grid-cols-12 lg:gap-x-12 lg:gap-y-10">
         <View className="scheme-dark items-center justify-center bg-ink-950 px-4 py-8 sm:px-8 md:py-12 short:py-4 lg:col-span-7 lg:row-span-2 lg:row-start-1">
           <DeviceStage
-            screen={{ ...copy.screen, mon: screenMon() }}
+            hud={hudContent()}
+            controls={{ tabs: copy.screen.controlLabel, sideKey: copy.screen.sideKey, sound: copy.screen.sound }}
             capture={{ src: String(capture.src), width: capture.width, height: capture.height, sizes: capture.sizes }}
             caption={copy.caption}
             label={copy.stageLabel}

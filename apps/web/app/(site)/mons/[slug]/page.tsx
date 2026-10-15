@@ -19,6 +19,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title: { absolute: W02_COPY.meta.detailTitle(starter.babyName) },
     description: W02_COPY.meta.detailDescription(starter.babyName, starter.bloodline),
+    alternates: { canonical: `/mons/${starter.slug}` },
   };
 }
 
