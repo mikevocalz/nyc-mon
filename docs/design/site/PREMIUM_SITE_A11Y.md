@@ -112,22 +112,24 @@ Server markup, no controls. Checked on the private Phase 6 build (`:3106`), axe 
 
 `WaitlistForm` on `/` (source `home`) and `/get` (source `get`). Every state exercised in Playwright against a mock of `POST /v1/waitlist` and once with `ADMIN_API_URL` unset; axe run on the submitted invalid, error, under13, joined and rate_limited states: 0 violations.
 
+**2026-10-12: the "I'm 13 or older" checkbox was replaced by a neutral birth-year field** (see `WAITLIST_AGE_SCREEN.md`). Rows marked *Re-test* changed with it; the Playwright/axe and screen-reader passes above were run on the checkbox version and have not been re-run on the new field.
+
 | Criterion | Check | Result | Evidence | Note |
 |---|---|---|---|---|
-| 1.3.1 Info and Relationships | Real `form` (accessible name "Join the waitlist"), `label for` on the email and the checkbox, `fieldset`/`legend` "Age" around the checkbox | Pass | served HTML | — |
-| 1.3.5 Identify Input Purpose | `type=email autocomplete=email` | Pass | DOM | — |
+| 1.3.1 Info and Relationships | Real `form` (accessible name "Join the waitlist"), `label for` on the email and on "Birth year"; the hint "We ask everyone. Four digits." is the year field's description | Re-test | `WaitlistForm.tsx` | — |
+| 1.3.5 Identify Input Purpose | `type=email autocomplete=email`. The year field is `autocomplete=off` on purpose: `bday-year` autofill on a shared family device would pre-answer the age screen | Pass (by design) | DOM | 1.3.5 lists `bday-year`; turning it off is a COPPA trade-off, see `WAITLIST_AGE_SCREEN.md` |
 | 1.4.3 Contrast | Labels `text` on `bg`; hint and privacy `text-secondary`; error `danger` 4.98:1 on concrete-50; joined rule `success` 4.86:1 | Pass | `contrast.ts` pairs; measured | — |
-| 1.4.11 Non-text Contrast | Input border is `text` (signage black) 2px; error border `danger`; checkbox face `accent-orange-600` 3.15:1 on the page | Pass | measured | — |
-| 2.1.1 Keyboard | Tab: email → checkbox → submit → Privacy link. The honeypot has `tabindex=-1` and `aria-hidden` | Pass | DOM | — |
-| 2.4.3 Focus Order | joined: focus to the "You're on the list." h3; invalid: to the email field; under13 / rate_limited / error: back to the submit button (the disabled pending button had dropped it) | Pass | `document.activeElement` after each state, logged | — |
-| 2.4.7 Focus Visible | 2px `focus` ring with 2px offset on the field, checkbox and button | Pass | shots | — |
-| 2.5.8 Target Size | Input 56px tall, button ≥56px (full width under 640px), checkbox 24×24 with its label also clickable, Privacy link `min-h-6` | Pass | DOM | — |
-| 3.3.1 Error Identification | Invalid: `aria-invalid=true`, red border, error text under the field and linked with `aria-describedby` | Pass | logged `aria-describedby` → "Check the email address. …" | — |
-| 3.3.2 Labels or Instructions | Visible labels; no placeholder; the age hint sits under the checkbox and is its description | Pass | — | — |
-| 3.3.3 Error Suggestion | "It should look like name@example.com." | Pass | — | — |
-| 4.1.3 Status Messages | One polite `<output>`, always mounted, carries under13, rate_limited and error; pending is the button text plus `aria-busy` on the form; joined is announced by moving focus to the heading (with the body as its description) | Pass (automated) | logged `<output>` text per state | VoiceOver / NVDA pass still to run |
-| Progressive enhancement | With JavaScript off the form posts and renders joined / invalid | Pass | Playwright `javaScriptEnabled: false` | — |
-| COPPA posture | The checkbox is required; an under13 answer keeps no email, even in page state | Pass | `actions.ts` clears `email` on under13 | — |
+| 1.4.11 Non-text Contrast | Input borders are `text` (signage black) 2px; error border `danger` | Re-test | — | The checkbox is gone |
+| 2.1.1 Keyboard | Tab: email → birth year → submit → Privacy link. The honeypot has `tabindex=-1` and `aria-hidden` | Re-test | DOM | — |
+| 2.4.3 Focus Order | joined: focus to the "You're on the list." h3; under13: to the note that replaces the form; invalid: to the field it names (email or birth year); rate_limited / error: back to the submit button (the disabled pending button had dropped it) | Re-test | `WaitlistForm.tsx` `useEffect` | — |
+| 2.4.7 Focus Visible | 2px `focus` ring with 2px offset on both fields and the button | Re-test | — | — |
+| 2.5.8 Target Size | Inputs 56px tall (year field 160px wide), button ≥56px (full width under 640px), Privacy and children's-privacy links `min-h-6` | Re-test | DOM | — |
+| 3.3.1 Error Identification | Invalid: `aria-invalid=true`, red border, error text under the field and linked with `aria-describedby` (year: error then hint) | Re-test | — | — |
+| 3.3.2 Labels or Instructions | Visible labels; no placeholder (a placeholder year would be a default that hints at an answer) | Re-test | — | — |
+| 3.3.3 Error Suggestion | Email: "It should look like name@example.com." Year: shape only ("Enter all four digits of the year.", "That year hasn't happened yet.", "It needs to be 1900 or later."), the app's M04 wording; never which years can join | Re-test | `copy.ts` `birthYearError` | — |
+| 4.1.3 Status Messages | One polite `<output>`, always mounted, carries rate_limited and error; pending is the button text plus `aria-busy` on the form; joined and under13 replace the form and are announced by moving focus to them | Re-test | — | VoiceOver / NVDA pass still to run |
+| Progressive enhancement | With JavaScript off the form posts and renders joined / invalid / under13; the year is checked on the server | Re-test | — | — |
+| COPPA posture | Neutral birth-year screen (no default, no threshold named before the answer); admin-vite computes under-13 and stores nothing, not even the year; the under13 note offers no retry, and an httpOnly hold cookie answers under13 again for an hour | Pass (unit tests) | `WAITLIST_AGE_SCREEN.md`; legal review **required, not done** | — |
 
 ## FOOTER
 
