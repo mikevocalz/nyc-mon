@@ -12,7 +12,7 @@ let skiaReady: Promise<void> | null = null;
 // would otherwise ship it before the scene ever asks for Skia.
 function prepareSkia() {
   skiaReady ??= import('react-native-skia/lib/module/web').then(({ LoadSkiaWeb }) =>
-    LoadSkiaWeb({ locateFile: (file) => `/canvaskit/${file}` }),
+    LoadSkiaWeb({ locateFile: (file) => `${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/canvaskit/${file}` }),
   );
   return skiaReady;
 }

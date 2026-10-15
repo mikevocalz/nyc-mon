@@ -1,146 +1,455 @@
-import { LinkButton, SolidPanel, Text } from '@acme/ui';
-import { Article, Heading, List, ListItem, Paragraph, Section } from '@acme/ui/html';
+import { breakpoints } from '@acme/theme';
+import { Image, LinkButton, SkylineDivider, TONE_CLASSES, type ImageProps, type Tone } from '@acme/ui';
+import { Figure, Heading, Link, List, ListItem, Nav, Paragraph, Section, Text } from '@acme/ui/html';
 import { View } from '@acme/ui/tw';
+import { artPosition } from '../home/art';
 import { Eyebrow } from '../home/Eyebrow';
+import { PlaceCaption } from '../home/PlaceCaption';
 import { STORY_COPY } from './copy';
+import { chapterNumber, placePhoto } from './editorial';
+import { ChapterNumeral, PhotoFrame, SignageHeadline } from './EditorialKit';
+import { StoryMotion } from './StoryMotion';
+import { siteHref } from '../../lib/site-href';
 
-/** District accent bars, one brand colour per card — same rotation as /city. */
-const CARD_ACCENTS = ['bg-orange-500', 'bg-royal-500', 'bg-carolina-500', 'bg-leaf-500'] as const;
+const MD_UP = `(min-width: ${breakpoints.md})`;
+const XL_UP = `(min-width: ${breakpoints.xl})`;
+/** Columns of the 80rem-capped 12-column grid, as rendered widths. */
+const cols = (n: number) => `${XL_UP} ${Math.round((80 * n) / 12)}rem, ${MD_UP} ${Math.round((100 * n) / 12)}vw, 100vw`;
 
-const sectionClass =
-  'mx-auto w-full max-w-screen-xl gap-10 px-4 py-16 sm:px-6 md:py-24 lg:px-8';
-const headClass = 'my-0 font-display text-3xl leading-tight text-text md:text-4xl';
-const bodyClass = 'my-0 text-base leading-7 text-text-secondary md:text-lg md:leading-8';
+/**
+ * Every photograph on the page, by role. Night photographs carry the dark
+ * chapters (the hero and the false extinction); daylight ones the city that
+ * thought it had won. Each prints its place caption.
+ */
+const PHOTOS = {
+  hero: placePhoto('megacity-brooklyn-bridge-night', '100vw', { x: 0.5, y: 0.6 }),
+  cleanCity: placePhoto('harlem-brownstone-stoops', cols(5), { x: 0.5, y: 0.5 }),
+  sunset: placePhoto('midtown-empire-sunset', '100vw', { x: 0.5, y: 0.45 }),
+  vale: placePhoto('harlem-apollo', cols(5), { x: 0.5, y: 0.4 }),
+  extinction: placePhoto('megacity-bridge-deck', '100vw', { x: 0.5, y: 0.5 }),
+  rooftops: placePhoto('midtown-chrysler-spire', cols(5), { x: 0.5, y: 0.3 }),
+  water: placePhoto('downtown-one-wtc', cols(4), { x: 0.5, y: 0.35 }),
+  returned: placePhoto('midtown-times-square', '100vw', { x: 0.5, y: 0.5 }),
+} as const;
 
-function SectionHead({ eyebrow, title, body, id }: { eyebrow: string; title: string; body?: string; id: string }) {
+/** The chapters in reading order: the hero's line map links to each one. */
+const CHAPTERS = [
+  { id: 'story-clean-city', label: STORY_COPY.cleanCity.eyebrow },
+  { id: 'story-project-zero', label: STORY_COPY.projectZero.eyebrow },
+  { id: 'story-vale', label: STORY_COPY.vale.eyebrow },
+  { id: 'story-extinction', label: STORY_COPY.extinction.eyebrow },
+  { id: 'story-cascade', label: STORY_COPY.cascade.eyebrow },
+  { id: 'story-returned', label: STORY_COPY.returned.eyebrow },
+  { id: 'story-enginex', label: STORY_COPY.enginex.eyebrow },
+] as const;
+
+const num = (id: (typeof CHAPTERS)[number]['id']) => chapterNumber(CHAPTERS.findIndex((c) => c.id === id));
+
+const shell = 'mx-auto w-full max-w-screen-xl px-4 sm:px-6 lg:px-8';
+const body = 'my-0 max-w-content-measure text-base leading-7 text-text-secondary md:text-lg md:leading-8';
+const nightBody = 'my-0 max-w-content-measure text-base leading-7 text-silver-200 md:text-lg md:leading-8';
+
+/**
+ * HERO: a night bridge, full bleed, with the confession set as two signage
+ * plates over it. The line map along the foot links to the seven chapters,
+ * like the stops on a line.
+ */
+function StoryHero() {
+  const copy = STORY_COPY.hero;
   return (
-    <View className="max-w-2xl gap-4">
-      <Eyebrow>{eyebrow}</Eyebrow>
-      <Heading level={2} id={id} className={headClass}>
-        {title}
-      </Heading>
-      {body !== undefined ? <Paragraph className={bodyClass}>{body}</Paragraph> : null}
-    </View>
-  );
-}
+    <Section aria-labelledby="story-title" data-testid="story-hero" className="relative w-full overflow-hidden bg-ink-950">
+      <Figure className="absolute inset-0 m-0">
+        <View id="mfx-hero-art" className="absolute inset-0">
+          <Image
+            src={PHOTOS.hero.src as ImageProps['src']}
+            alt={PHOTOS.hero.alt}
+            fill
+            framed={false}
+            priority
+            loading="eager"
+            sizes={PHOTOS.hero.sizes}
+            placeholder="blur"
+            blurDataURL={PHOTOS.hero.blurDataURL}
+            contentPosition={artPosition(PHOTOS.hero)}
+            className="h-full w-full"
+          />
+        </View>
+        <View aria-hidden className="absolute inset-0 bg-ink-950/55" />
+        <View aria-hidden className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-ink-950 to-transparent" />
+        <PlaceCaption entry={PHOTOS.hero} className="right-0 top-0" />
+      </Figure>
 
-/** A chapter: full-width panel, eyebrow + title + body. */
-function Chapter({ testID, id, eyebrow, title, body, quote }: {
-  testID: string; id: string; eyebrow: string; title: string; body: string; quote?: string;
-}) {
-  return (
-    <Section aria-labelledby={id} data-testid={testID} className={sectionClass}>
-      <View className="max-w-3xl gap-4">
-        <Eyebrow>{eyebrow}</Eyebrow>
-        <Heading level={2} id={id} className={headClass}>
-          {title}
-        </Heading>
-        <Paragraph className={bodyClass}>{body}</Paragraph>
-        {quote !== undefined ? (
-          <View className="border-l-4 border-orange-500 pl-4">
-            <Text className="font-display text-xl italic leading-8 text-text">{quote}</Text>
-          </View>
-        ) : null}
+      <View className={`${shell} relative min-h-hero justify-end gap-8 pb-10 pt-24 md:gap-10 md:pb-14 md:pt-40`}>
+        <View id="mfx-hero-title" className="items-start gap-6">
+          <Eyebrow night>{copy.eyebrow}</Eyebrow>
+          <SignageHeadline title={copy.title} level={1} id="story-title" tone="plate" size="hero" />
+        </View>
+        <Paragraph
+          id="mfx-hero-body"
+          className="my-0 max-w-content-measure border-l-4 border-orange-500 bg-surface-raised px-4 py-3 text-base leading-7 text-text md:text-lg md:leading-8"
+        >
+          {copy.body}
+        </Paragraph>
+
+        <Nav aria-label="Chapters" className="mt-4 w-full">
+          <List role="list" className="m-0 grid list-none grid-cols-1 gap-0 p-0 sm:grid-cols-2 lg:grid-cols-7">
+            {CHAPTERS.map((chapter, i) => (
+              <ListItem key={chapter.id} className="relative border-t-2 border-silver-500 lg:border-t-4">
+                <Link
+                  href={`#${chapter.id}`}
+                  className="flex flex-row items-center gap-3 py-3 pr-3 text-silver-100 no-underline hover:text-orange-400 focus:text-orange-400 lg:flex-col lg:items-start lg:gap-2 lg:pt-4"
+                >
+                  <Text aria-hidden className="font-display text-xl leading-none text-orange-500 lg:text-3xl">
+                    {chapterNumber(i)}
+                  </Text>
+                  <Text className="text-xs font-bold uppercase tracking-widest">{chapter.label}</Text>
+                </Link>
+              </ListItem>
+            ))}
+          </List>
+        </Nav>
       </View>
     </Section>
   );
 }
 
-/** The Story page: the Clean City Legacy through the return of the Mons. */
-export function StoryPage() {
-  const copy = STORY_COPY;
+/** 01, daylight: the cleanup that worked, set beside a sealed brownstone row. */
+function CleanCityChapter() {
+  const copy = STORY_COPY.cleanCity;
   return (
-    <View className="w-full flex-1 bg-bg">
-      {/* Hero — "We killed them." */}
-      <Section aria-labelledby="story-title" data-testid="story-hero" className={sectionClass}>
-        <View className="max-w-3xl gap-4">
-          <Eyebrow>{copy.hero.eyebrow}</Eyebrow>
-          <Heading level={1} id="story-title" className="my-0 font-display text-4xl leading-tight text-text md:text-6xl">
-            {copy.hero.title}
-          </Heading>
-          <Paragraph className={bodyClass}>{copy.hero.body}</Paragraph>
+    <Section aria-labelledby="story-clean-city-title" data-testid="story-clean-city" id="trg-clean" className="w-full bg-bg">
+      <View id="story-clean-city" className={`${shell} gap-10 py-20 md:grid md:grid-cols-12 md:gap-x-10 md:py-28`}>
+        <View className="min-w-0 gap-6 md:col-span-7">
+          <View id="mfx-clean-num" className="flex-row items-end gap-4">
+            <ChapterNumeral value={num('story-clean-city')} />
+          </View>
+          <View id="mfx-clean-head" className="items-start gap-5">
+            <Eyebrow>{copy.eyebrow}</Eyebrow>
+            <SignageHeadline title={copy.title} level={2} id="story-clean-city-title" tone="plate" />
+          </View>
+          <Paragraph id="mfx-clean-body" className={`${body} md:text-xl md:leading-9`}>
+            {copy.body}
+          </Paragraph>
         </View>
-      </Section>
-
-      <Chapter
-        testID="story-clean-city" id="story-clean-city-title"
-        eyebrow={copy.cleanCity.eyebrow} title={copy.cleanCity.title} body={copy.cleanCity.body}
-      />
-      <Chapter
-        testID="story-project-zero" id="story-project-zero-title"
-        eyebrow={copy.projectZero.eyebrow} title={copy.projectZero.title}
-        body={copy.projectZero.body} quote={copy.projectZero.quote}
-      />
-      <Chapter
-        testID="story-vale" id="story-vale-title"
-        eyebrow={copy.vale.eyebrow} title={copy.vale.title} body={copy.vale.body}
-      />
-      <Chapter
-        testID="story-extinction" id="story-extinction-title"
-        eyebrow={copy.extinction.eyebrow} title={copy.extinction.title} body={copy.extinction.body}
-      />
-
-      {/* The five lineages as cards. */}
-      <Section aria-labelledby="story-cascade-title" data-testid="story-cascade" className={sectionClass}>
-        <SectionHead
-          eyebrow={copy.cascade.eyebrow} title={copy.cascade.title}
-          body={copy.cascade.body} id="story-cascade-title"
+        <PhotoFrame
+          entry={PHOTOS.cleanCity}
+          driftId="mpx-clean-drift"
+          className="aspect-[4/5] border-2 border-ink-950 md:col-span-5 md:mt-24 md:aspect-auto md:min-h-[36rem]"
         />
-        <List aria-label={copy.cascade.title} className="m-0 grid list-none grid-cols-1 gap-6 p-0 sm:grid-cols-2 lg:grid-cols-3">
-          {copy.cascade.lineages.map((lineage, i) => (
-            <ListItem key={lineage.name}>
-              <SolidPanel surface="page" depth="md" className="h-full gap-3 overflow-hidden px-5 py-6">
-                <View className={`-mx-5 -mt-6 mb-2 h-1.5 ${CARD_ACCENTS[i % CARD_ACCENTS.length]}`} aria-hidden />
-                <Article className="gap-3">
-                  <Heading level={3} className="my-0 font-display text-2xl leading-tight text-text">
+      </View>
+    </Section>
+  );
+}
+
+/** 02, night: the serum. The quote is the chapter, set at display size. */
+function ProjectZeroChapter() {
+  const copy = STORY_COPY.projectZero;
+  return (
+    <Section aria-labelledby="story-project-zero-title" data-testid="story-project-zero" id="trg-zero" className="w-full bg-ink-950">
+      <View aria-hidden className="h-1 w-full bg-orange-500" />
+      <View id="story-project-zero" className={`${shell} gap-12 py-20 md:py-28`}>
+        <View className="gap-8 md:grid md:grid-cols-12 md:gap-x-10">
+          <View id="mfx-zero-num" className="md:col-span-4">
+            <ChapterNumeral value={num('story-project-zero')} night />
+          </View>
+          <View id="mfx-zero-head" className="min-w-0 items-start gap-6 md:col-span-8 md:pt-6">
+            <Eyebrow night>{copy.eyebrow}</Eyebrow>
+            <SignageHeadline title={copy.title} level={2} id="story-project-zero-title" tone="night" />
+            <Paragraph className={nightBody}>{copy.body}</Paragraph>
+          </View>
+        </View>
+        <Figure id="mfx-zero-quote" className="m-0 border-t-4 border-orange-500 pt-8 md:ml-[16%]">
+          <Text aria-hidden className="block font-display text-[5rem] leading-none text-orange-500 md:text-[7rem]">
+            {'“'}
+          </Text>
+          <Paragraph className="my-0 -mt-6 font-display text-2xl uppercase leading-heading text-ink-50 md:-mt-10 md:text-display-md md:leading-heading lg:text-display-lg lg:leading-heading">
+            {copy.quote}
+          </Paragraph>
+        </Figure>
+      </View>
+    </Section>
+  );
+}
+
+/** A full-bleed photograph between chapters: the city carrying on. */
+function PhotoBand({ entry, id }: { entry: (typeof PHOTOS)[keyof typeof PHOTOS]; id: string }) {
+  return (
+    <PhotoFrame entry={entry} driftId={id} className="aspect-[4/3] sm:aspect-[21/9] lg:aspect-[3/1]" captionAt="bottom-0 right-0" />
+  );
+}
+
+/** 03, daylight: Dr. Vale. Photograph left, the chapter right: the mirror of 01. */
+function ValeChapter() {
+  const copy = STORY_COPY.vale;
+  return (
+    <Section aria-labelledby="story-vale-title" data-testid="story-vale" id="trg-vale" className="w-full bg-bg">
+      <View id="story-vale" className={`${shell} gap-10 py-20 md:grid md:grid-cols-12 md:gap-x-10 md:py-28`}>
+        <PhotoFrame
+          entry={PHOTOS.vale}
+          driftId="mpx-vale-drift"
+          className="order-2 aspect-[4/5] border-2 border-ink-950 md:order-none md:col-span-5 md:aspect-auto md:min-h-[34rem]"
+        />
+        <View className="order-1 min-w-0 gap-6 md:order-none md:col-span-7 md:col-start-6 md:self-center">
+          <View id="mfx-vale-num" className="md:items-end">
+            <ChapterNumeral value={num('story-vale')} />
+          </View>
+          <View id="mfx-vale-head" className="items-start gap-5">
+            <Eyebrow>{copy.eyebrow}</Eyebrow>
+            <SignageHeadline title={copy.title} level={2} id="story-vale-title" tone="plate" />
+          </View>
+          <Paragraph id="mfx-vale-body" className={`${body} border-l-4 border-ink-950 pl-5 md:text-xl md:leading-9`}>
+            {copy.body}
+          </Paragraph>
+        </View>
+      </View>
+    </Section>
+  );
+}
+
+/**
+ * 04, night, pinned: the false extinction. A full-screen frame over the
+ * bridge at night. On desktop the scroll plays it (StoryMotionRoot.tsx); its
+ * resting state, which phones and reduced motion get, is this markup.
+ */
+function ExtinctionChapter() {
+  const copy = STORY_COPY.extinction;
+  return (
+    <Section aria-labelledby="story-extinction-title" data-testid="story-extinction" className="w-full bg-ink-950">
+      {/* The pinned element carries no position utility: utilities are !important (globals.css) and would beat the pin's inline position. */}
+      <View id="mpx-extinction-frame" className="w-full md:h-svh md:min-h-[44rem]">
+      <View className="relative h-full w-full overflow-hidden">
+        <Figure className="absolute inset-0 m-0">
+          <View id="mpx-extinction-art" className="absolute inset-0">
+            <Image
+              src={PHOTOS.extinction.src as ImageProps['src']}
+              alt={PHOTOS.extinction.alt}
+              fill
+              framed={false}
+              sizes={PHOTOS.extinction.sizes}
+              loading="lazy"
+              placeholder="blur"
+              blurDataURL={PHOTOS.extinction.blurDataURL}
+              contentPosition={artPosition(PHOTOS.extinction)}
+              className="h-full w-full"
+            />
+          </View>
+          <View id="mpx-extinction-scrim" aria-hidden className="absolute inset-0 bg-ink-950/70" />
+          <PlaceCaption entry={PHOTOS.extinction} className="bottom-0 right-0" />
+        </Figure>
+        <View id="story-extinction" className={`${shell} relative h-full justify-center gap-6 pb-20 pt-16 md:pb-12 md:pt-32`}>
+          <ChapterNumeral id="mpx-extinction-num" value={num('story-extinction')} night size="md" />
+          <Eyebrow night>{copy.eyebrow}</Eyebrow>
+          <SignageHeadline
+            title={copy.title}
+            level={2}
+            id="story-extinction-title"
+            tone="plate"
+            size="pin"
+            lineIds={['mpx-extinction-line-0', 'mpx-extinction-line-1']}
+          />
+          <Paragraph
+            id="mpx-extinction-body"
+            className="my-0 max-w-content-measure border-l-4 border-orange-500 bg-ink-950/85 px-4 py-3 text-base leading-7 text-ink-50 md:text-lg md:leading-8"
+          >
+            {copy.body}
+          </Paragraph>
+        </View>
+      </View>
+      </View>
+    </Section>
+  );
+}
+
+/**
+ * 05, the bento: the hidden decades. One night tile carries the chapter;
+ * the five lineages sit around it as tiles of mixed size and tone, broken by
+ * two photographs. Below `lg` it is one column in DOM order.
+ */
+const LINEAGE_TILES: readonly { tone: Tone | 'signage'; place: string }[] = [
+  { tone: 'signage', place: 'lg:col-span-5 lg:col-start-8 lg:row-start-2' },
+  { tone: 'leaf', place: 'lg:col-span-4 lg:row-start-3' },
+  { tone: 'carolina', place: 'lg:col-span-4 lg:row-start-3' },
+  { tone: 'royal', place: 'lg:col-span-5 lg:row-start-4' },
+  { tone: 'orange', place: 'lg:col-span-7 lg:row-start-4' },
+];
+
+function CascadeChapter() {
+  const copy = STORY_COPY.cascade;
+  return (
+    <Section aria-labelledby="story-cascade-title" data-testid="story-cascade" id="trg-cascade" className="w-full bg-bg">
+      <View id="story-cascade" className={`${shell} gap-4 py-20 md:py-28 lg:grid lg:grid-cols-12 lg:gap-4`}>
+        <View
+          id="mfx-cascade-head"
+          className="min-w-0 justify-between gap-8 bg-ink-950 p-6 md:p-10 lg:col-span-7 lg:row-span-2 lg:row-start-1"
+        >
+          <ChapterNumeral value={num('story-cascade')} night />
+          <View className="items-start gap-5">
+            <Eyebrow night>{copy.eyebrow}</Eyebrow>
+            <SignageHeadline title={copy.title} level={2} id="story-cascade-title" tone="night" />
+            <Paragraph className={nightBody}>{copy.body}</Paragraph>
+          </View>
+        </View>
+        <View id="mfx-cascade-photo" className="lg:col-span-5 lg:col-start-8 lg:row-start-1">
+          <PhotoFrame entry={PHOTOS.rooftops} className="aspect-[3/2] lg:aspect-[16/10]" captionAt="bottom-0 left-0" />
+        </View>
+
+        <List aria-label={copy.title} className="contents m-0 list-none p-0">
+          {copy.lineages.map((lineage, i) => {
+            const tile = LINEAGE_TILES[i]!;
+            const signage = tile.tone === 'signage';
+            const face = signage ? 'bg-signage-black' : TONE_CLASSES[tile.tone as Tone].face;
+            const on = signage ? 'text-signage-white' : TONE_CLASSES[tile.tone as Tone].on;
+            return (
+              <ListItem
+                key={lineage.name}
+                id={`mfx-cascade-tile-${i}`}
+                className={`mt-4 min-h-56 justify-between gap-6 p-6 md:p-8 lg:mt-0 ${face} ${tile.place}`}
+              >
+                <Text aria-hidden className={`font-display text-display-md leading-none ${on}`}>
+                  {`${num('story-cascade')}.${i + 1}`}
+                </Text>
+                <View className="gap-3">
+                  <Heading level={3} className={`my-0 font-display text-2xl uppercase leading-heading md:text-3xl ${on}`}>
                     {lineage.name}
                   </Heading>
-                  <Paragraph className="my-0 text-base leading-7 text-text-secondary">{lineage.line}</Paragraph>
-                </Article>
-              </SolidPanel>
-            </ListItem>
-          ))}
+                  <Paragraph className={`my-0 max-w-content-measure text-base font-semibold leading-7 ${on}`}>{lineage.line}</Paragraph>
+                </View>
+              </ListItem>
+            );
+          })}
         </List>
-      </Section>
+        <View id="mfx-cascade-water" className="mt-4 lg:col-span-4 lg:row-start-3 lg:mt-0">
+          <PhotoFrame entry={PHOTOS.water} className="aspect-[3/2] lg:aspect-auto lg:h-full lg:min-h-56" captionAt="bottom-0 left-0" />
+        </View>
+      </View>
+    </Section>
+  );
+}
 
-      <Chapter
-        testID="story-returned" id="story-returned-title"
-        eyebrow={copy.returned.eyebrow} title={copy.returned.title}
-        body={copy.returned.body} quote={copy.returned.quote}
-      />
+/** 06: the return. The headline at the page's largest size, the quote on an orange plate, then Times Square full bleed. */
+function ReturnedChapter() {
+  const copy = STORY_COPY.returned;
+  return (
+    <Section aria-labelledby="story-returned-title" data-testid="story-returned" id="trg-returned" className="w-full bg-bg">
+      <View id="story-returned" className={`${shell} gap-10 pb-16 pt-20 md:pb-20 md:pt-28`}>
+        <View id="mfx-returned-head" className="gap-5">
+          <View className="flex-row items-end gap-6">
+            <ChapterNumeral value={num('story-returned')} />
+          </View>
+          <Eyebrow>{copy.eyebrow}</Eyebrow>
+          <SignageHeadline title={copy.title} level={2} id="story-returned-title" tone="day" size="giant" />
+        </View>
+        <View className="gap-8 md:grid md:grid-cols-12 md:gap-x-10">
+          <Paragraph id="mfx-returned-body" className={`${body} md:col-span-6 md:text-xl md:leading-9`}>
+            {copy.body}
+          </Paragraph>
+          <Figure id="mfx-returned-quote" className="m-0 md:col-span-6 md:self-start">
+            <View className="relative mb-2 mr-2">
+              <View aria-hidden className="absolute -bottom-2 -right-2 left-2 top-2 bg-ink-950" />
+              <View className="relative bg-orange-500 p-6 md:p-8">
+              <Paragraph className="my-0 font-display text-xl uppercase leading-heading text-ink-950 md:text-2xl lg:text-3xl lg:leading-heading">
+                {copy.quote}
+              </Paragraph>
+              </View>
+            </View>
+          </Figure>
+        </View>
+      </View>
+      <PhotoBand entry={PHOTOS.returned} id="mpx-returned-drift" />
+    </Section>
+  );
+}
 
-      {/* EngineX's three eras. */}
-      <Section aria-labelledby="story-enginex-title" data-testid="story-enginex" className={sectionClass}>
-        <SectionHead
-          eyebrow={copy.enginex.eyebrow} title={copy.enginex.title} id="story-enginex-title"
-        />
-        <List className="m-0 list-none gap-6 p-0 md:flex-row">
-          {copy.enginex.eras.map((era, i) => (
-            <ListItem key={era.era} className="flex-1">
-              <SolidPanel surface="page" depth="md" className="h-full gap-3 overflow-hidden px-5 py-6">
-                <View className={`-mx-5 -mt-6 mb-2 h-1.5 ${CARD_ACCENTS[i % CARD_ACCENTS.length]}`} aria-hidden />
-                <Heading level={3} className="my-0 font-display text-xl leading-tight text-text">{era.era}</Heading>
-                <Paragraph className="my-0 text-base leading-7 text-text-secondary">{era.line}</Paragraph>
-              </SolidPanel>
-            </ListItem>
-          ))}
+/** 07, night: three eras of one company, as three giant numerals in a row. */
+function EngineXChapter() {
+  const copy = STORY_COPY.enginex;
+  // The closing sentence is the line the page lands on; the copy is unchanged, only set apart.
+  const sentences = copy.body.split(/(?<=\.)\s+/);
+  const closing = sentences.pop() ?? '';
+  return (
+    <Section aria-labelledby="story-enginex-title" data-testid="story-enginex" id="trg-enginex" className="w-full bg-ink-950">
+      <View aria-hidden className="h-1 w-full bg-orange-500" />
+      <View id="story-enginex" className={`${shell} gap-14 py-20 md:py-28`}>
+        <View id="mfx-enginex-head" className="gap-6 md:flex-row md:items-end md:justify-between">
+          <View className="items-start gap-5">
+            <Eyebrow night>{copy.eyebrow}</Eyebrow>
+            <SignageHeadline title={copy.title} level={2} id="story-enginex-title" tone="night" />
+          </View>
+          <ChapterNumeral value={num('story-enginex')} night className="md:text-right" />
+        </View>
+        <List className="m-0 list-none gap-0 p-0 md:grid md:grid-cols-3">
+          {copy.eras.map((era, i) => {
+            const numeral = era.era.split(':')[0]?.replace('Era ', '') ?? '';
+            return (
+              <ListItem
+                key={era.era}
+                id={`mfx-enginex-era-${i}`}
+                className="gap-4 border-t-2 border-silver-500 py-8 md:border-l-2 md:border-t-0 md:px-8 md:py-2 md:first:border-l-0 md:first:pl-0"
+              >
+                <Text aria-hidden className="font-display text-[5rem] leading-none text-orange-500 md:text-[7rem]">
+                  {numeral}
+                </Text>
+                <Heading level={3} className="my-0 text-sm font-bold uppercase tracking-widest text-silver-200">
+                  {era.era}
+                </Heading>
+                <Paragraph className="my-0 font-display text-2xl uppercase leading-heading text-ink-50 md:text-3xl">
+                  {era.line}
+                </Paragraph>
+              </ListItem>
+            );
+          })}
         </List>
-        <View className="max-w-3xl">
-          <Paragraph className={bodyClass}>{copy.enginex.body}</Paragraph>
+        <View id="mfx-enginex-body" className="gap-6 md:ml-[33%]">
+          <Paragraph className={nightBody}>{sentences.join(' ')}</Paragraph>
+          <Paragraph className="my-0 font-display text-2xl uppercase leading-heading text-orange-500 md:text-3xl">{closing}</Paragraph>
         </View>
-      </Section>
+      </View>
+    </Section>
+  );
+}
 
-      {/* Outro band — dark, like /how-it-works. */}
-      <Section data-testid="story-outro" className="w-full bg-ink-950">
-        <View className="mx-auto w-full max-w-screen-xl gap-6 px-4 py-16 sm:px-6 md:py-20 lg:px-8">
-          <View className="h-1 w-10 bg-orange-500" aria-hidden />
-          <Heading level={2} className="my-0 font-display text-3xl leading-tight text-ink-50 md:text-4xl">
-            {copy.footer.title}
-          </Heading>
-          <Text className="text-ink-300">{copy.footer.body}</Text>
-          <LinkButton title={copy.footer.cta.label} href={copy.footer.cta.href} variant="cta" size="lg" testID="story-cta" />
+/** The close: the slogan on two plates over a Harlem skyline, and the one action. */
+function StoryOutro() {
+  const copy = STORY_COPY.footer;
+  return (
+    <Section aria-labelledby="story-outro-title" data-testid="story-outro" id="trg-outro" className="w-full bg-ink-950">
+      <SkylineDivider district="harlem" seed={7} size="lg" still />
+      <View className={`${shell} items-start gap-8 py-20 md:py-28`}>
+        <View id="mfx-outro-head" className="items-start gap-6">
+          <SignageHeadline title={copy.title} level={2} id="story-outro-title" tone="night" size="giant" />
+          <Paragraph className="my-0 text-lg leading-8 text-silver-200 md:text-xl">{copy.body}</Paragraph>
         </View>
-      </Section>
-    </View>
+        <View id="mfx-outro-cta">
+          <LinkButton title={copy.cta.label} href={siteHref(copy.cta.href)} tone="royal" size="lg" testID="story-cta" />
+        </View>
+      </View>
+    </Section>
+  );
+}
+
+/**
+ * The Story page: the Clean City Legacy through the return of the Mons, as a
+ * chapter-by-chapter scroll. Daylight chapters alternate with night bands for
+ * the dark ones; full-bleed photographs sit between them; the hidden decades
+ * are a bento. Server HTML throughout; StoryMotion binds the Kinetrell beats.
+ */
+export function StoryPage() {
+  return (
+    <>
+      <StoryMotion />
+      <View className="w-full flex-1 bg-bg">
+        <StoryHero />
+        <SkylineDivider district="megacity" seed={3} size="md" still />
+        <CleanCityChapter />
+        <ProjectZeroChapter />
+        <PhotoBand entry={PHOTOS.sunset} id="mpx-sunset-drift" />
+        <ValeChapter />
+        <ExtinctionChapter />
+        <CascadeChapter />
+        <ReturnedChapter />
+        <EngineXChapter />
+        <StoryOutro />
+      </View>
+    </>
   );
 }
