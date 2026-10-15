@@ -14,17 +14,24 @@ export type WaitlistDistrict = (typeof WAITLIST_DISTRICTS)[number];
 export type WaitlistResult =
   | { status: 'joined' }
   | { status: 'under13' }
-  | { status: 'invalid'; field?: 'email' }
+  | { status: 'invalid'; field?: WaitlistField }
   | { status: 'rate_limited' }
   | { status: 'error' };
 
 export type WaitlistStatus = WaitlistResult['status'];
 
+/** The form fields an `invalid` answer can point at. */
+export type WaitlistField = 'email' | 'birthYear';
+
 /** What the form collected. */
 export interface WaitlistInput {
   email: string;
-  /** The visitor answered "13 or older". */
-  ageConfirmed: boolean;
+  /**
+   * The visitor's answer to the neutral age screen, or `undefined` when the
+   * field wasn't four digits. Forwarded once; admin-vite applies the age rule
+   * and keeps nothing (ADR 0001). Never logged or echoed here.
+   */
+  birthYear: number | undefined;
   district?: WaitlistDistrict;
   /** Which page the form sits on, e.g. `home` or `get`. */
   source?: string;
@@ -75,6 +82,18 @@ export function toWaitlistDistrict(value: unknown): WaitlistDistrict | undefined
 }
 
 /**
+ * Reads the birth-year field: exactly four ASCII digits (spaces around them
+ * allowed) become a number; anything else is `undefined`, which admin-vite
+ * answers with `invalid` / `birthYear`. Range checks (1900 to this year) and
+ * the age rule itself are the server's.
+ */
+export function toBirthYear(value: unknown): number | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return /^[0-9]{4}$/.test(trimmed) ? Number(trimmed) : undefined;
+}
+
+/**
  * Maps the admin response to a {@link WaitlistResult}. A body whose `status`
  * doesn't agree with the HTTP code is treated as an error, so a proxy page or
  * a changed contract never reads as a sign-up.
@@ -86,7 +105,7 @@ export function mapWaitlistResponse(httpStatus: number, body: unknown): Waitlist
   if (httpStatus === 422 && status === 'under13') return { status: 'under13' };
   if (httpStatus === 400 && status === 'invalid') {
     const field = (body as { field?: unknown }).field;
-    return field === 'email' ? { status: 'invalid', field: 'email' } : { status: 'invalid' };
+    return field === 'email' || field === 'birthYear' ? { status: 'invalid', field } : { status: 'invalid' };
   }
   return { status: 'error' };
 }
@@ -119,7 +138,7 @@ export async function joinWaitlist(input: WaitlistInput, options: JoinWaitlistOp
       headers,
       body: JSON.stringify({
         email: input.email,
-        ageConfirmed: input.ageConfirmed,
+        birthYear: input.birthYear,
         district: input.district,
         source: input.source,
         website: input.website,
