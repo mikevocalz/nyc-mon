@@ -188,3 +188,12 @@ Proposed by the M08–M10 design lane, accepted by the lead under the same stand
 | g | The H-Lynk shell switches to its compact layout while the keyboard is up. | The name field stays visible on short phones. |
 | h | No suggested names, no default name, no pronoun for the Mon. The reserved-name list ships empty. | Q17 is open; PS-005. |
 
+
+## P5 — Device permissions are the final first-run onboarding screen (2026-10-15)
+
+- **Ruled by:** lead, supersedes P2's placement and the M10 → M06 routing requirement.
+- **Scope:** after the Caller chooses the first egg and confirms incubation, M10 records an M24 permission-review checkpoint before the case animation. The next visible first-run screen is M24, **Get your H-Lynk ready**.
+- **Why:** introduce all relevant device capabilities in one coherent final step, without four consecutive unsolicited native permission prompts. The egg-ready notification is the only immediately useful grant; camera/AR, microphone and foreground location are explained but requested just-in-time upon feature entry.
+- **Decline:** all grants are optional and declining does not stop egg incubation or gameplay. If the Caller leaves during the transition or permission review, the persisted checkpoint resumes M24. Returning installs without a checkpoint are unaffected.
+- **Preserved:** P1 birth-year and guardian-consent ordering; P2's contextual/honest description of the **single local egg-ready notification**; signed-in and restored Caller behavior; permission settings re-entry. M06 remains for re-enabling notifications from the inbox/status.
+- **Implementation:** `packages/app/features/onboarding/PermissionsReviewScreen.tsx`, `permissions-layout.ts`, `onboarding.store.ts`, `packages/app/features/egg/IncubateScreen.tsx` and `docs/COPY_DECK.md`.
