@@ -107,8 +107,9 @@ const ART = {
   'world.detail': fromPhoto('harlem-apollo', gridSizes(4)),
   // H-Lynk Core renders from device-scene.ts at its rest pose on ink-950 (PS-017; HANDOFF §H-LYNK
   // "Static capture"). The stage box is 4:5: 32rem wide from `xl`, 28rem from `lg`, 24rem from `md`.
+  // v3 (PS-037): the screen's tab bar on Crew, and the scanner fan inside the body width.
   'hlynk.static': {
-    src: '/home/h-lynk-core-v2.png',
+    src: `${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/home/h-lynk-core-v3.png`,
     width: 896,
     height: 1120,
     alt: '',
@@ -117,7 +118,7 @@ const ART = {
   },
   // Crops of the same render for the proof rows; each row's headline and line name the part shown.
   'hlynk.scanner': {
-    src: '/home/h-lynk-scanner.png',
+    src: `${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/home/h-lynk-scanner-v2.png`,
     width: 640,
     height: 480,
     alt: '',
@@ -125,7 +126,7 @@ const ART = {
     sizes: `${LG_UP} 12rem, 9rem`,
   },
   'hlynk.controls': {
-    src: '/home/h-lynk-controls.png',
+    src: `${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/home/h-lynk-controls.png`,
     width: 640,
     height: 480,
     alt: '',

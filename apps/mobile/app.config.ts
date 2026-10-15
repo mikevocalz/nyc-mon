@@ -75,7 +75,8 @@ const config: ExpoConfig & { newArchEnabled: true } = {
       'expo-horizon-core',
       {
         // Horizon OS opens a 2D app at phone size unless the activity names a
-        // window size; 1280x800 is landscape 16:10, the same as the PICO window.
+        // window size; 1280x800 is landscape 16:10, the same as the commented PICO
+        // window below.
         defaultWidth: '1280dp',
         defaultHeight: '800dp',
         supportedDevices: 'quest2|questpro|quest3|quest3s',
@@ -91,7 +92,8 @@ const config: ExpoConfig & { newArchEnabled: true } = {
         rvProjectId: process.env.EXPO_PUBLIC_REACTVISION_PROJECT_ID,
         rvEndpoint: process.env.EXPO_PUBLIC_REACTVISION_ENDPOINT,
         android: {
-          xRMode: ['AR', 'QUEST', 'PICO'],
+          // Add 'PICO' back together with the @expo-pico/core block below.
+          xRMode: ['AR', 'QUEST'],
           questAppId:
             process.env.EXPO_PUBLIC_META_QUEST_APP_ID ??
             process.env.META_QUEST_APP_ID,
@@ -102,45 +104,39 @@ const config: ExpoConfig & { newArchEnabled: true } = {
         },
       },
     ],
-    // Adds the pico flavor: PICO OS 5 OpenXR runtime, VR launcher category on
-    // VRActivity, manifest and SDK levels. The 2D panel enters the district
-    // through enterImmersiveScene() (root registered in index.js).
-    // Build with `pnpm --filter mobile android:pico` (picoDebug).
-    [
-      '@expo-pico/core',
-      {
-        // PICO's developer-portal app id. Without it PICO OS shows an
-        // entitlement dialog and ends the process, so set PICO_APP_ID in
-        // .env.local before a headset build. The empty-string fallback (as in
-        // expo-pico's example) keeps R.string.pico_app_id defined; undefined
-        // makes prebuild fail with "Missing element text".
-        picoAppId: process.env.PICO_APP_ID ?? '',
-        buildVariant: 'pico',
-        xrMode: 'pico-os5',
-        appType: 'mr',
-        targetProfile: 'auto',
-        targetDevices: ['pico-4', 'pico-4-ultra'],
-        spatialMode: 'windowed',
-        defaultContainerMode: 'window-container',
-        defaultWidth: '1280dp',
-        defaultHeight: '800dp',
-        handTracking: true,
-        passthrough: true,
-        sceneUnderstanding: false,
-        highSamplingRateSensors: true,
-        refreshRates: [72, 90],
-        ndkAbiFilters: true,
-        // Declares the system OpenXR runtime library Viro loads.
-        openXrLoaderDeclaration: true,
-        // Public Viro 3.0.2 puts PICO's origin at eye level, so the street
-        // would sit at waist height. The overlay renderer moves it to the
-        // floor and maps controller B to back.
-        viroRendererOverlay: true,
-        developerTools: true,
-        enableEmulatorOptimizations: false,
-        targetSdkVersion: 34,
-      },
-    ],
+    // PICO: uncomment and set your PICO Developer Console app ID to add the pico flavor.
+    // The 2D panel enters the district through enterImmersiveScene() (root
+    // registered in index.js).
+    // [
+    //   '@expo-pico/core',
+    //   {
+    //     picoAppId: '1234567',
+    //     buildVariant: 'pico',
+    //     xrMode: 'pico-os5',
+    //     appType: 'mr',
+    //     targetProfile: 'auto',
+    //     targetDevices: ['pico-4', 'pico-4-ultra'],
+    //     spatialMode: 'windowed',
+    //     defaultContainerMode: 'window-container',
+    //     defaultWidth: '1280dp',
+    //     defaultHeight: '800dp',
+    //     handTracking: true,
+    //     passthrough: true,
+    //     sceneUnderstanding: false,
+    //     highSamplingRateSensors: true,
+    //     refreshRates: [72, 90],
+    //     ndkAbiFilters: true,
+    //     // Declares the system OpenXR runtime library Viro loads.
+    //     openXrLoaderDeclaration: true,
+    //     // Public Viro 3.0.2 puts PICO's origin at eye level, so the street
+    //     // would sit at waist height. The overlay renderer moves it to the
+    //     // floor and maps controller B to back.
+    //     viroRendererOverlay: true,
+    //     developerTools: true,
+    //     enableEmulatorOptimizations: false,
+    //     targetSdkVersion: 34,
+    //   },
+    // ],
   ],
   experiments: {
     typedRoutes: true,

@@ -5,6 +5,7 @@ import { W02_COPY } from '../../../components/mons/copy';
 export const metadata: Metadata = {
   title: { absolute: 'NYC-MON | The Mons' },
   description: W02_COPY.meta.indexDescription,
+  alternates: { canonical: '/mons' },
 };
 
 export default function Page() {

@@ -5,6 +5,7 @@ import { W05_COPY } from '../../../components/get/copy';
 export const metadata: Metadata = {
   title: { absolute: 'NYC-MON | Get NYC-MON' },
   description: W05_COPY.hero.body,
+  alternates: { canonical: '/get' },
 };
 
 export default function Page() {
