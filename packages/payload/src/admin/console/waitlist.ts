@@ -1,7 +1,9 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
+import { isConsentRequired, utcYearFromEpochMs } from '@acme/core/sim';
 import { getPayload } from 'payload';
 import type { Payload } from 'payload';
 import * as z from 'zod';
+import { parseBirthYear } from '../../auth/age.ts';
 import {
   normalizeWaitlistEmail,
   WAITLIST_DISTRICTS,
@@ -16,19 +18,30 @@ import type { V1Handler } from './v1/idempotency.ts';
  * Response bodies of `POST /v1/waitlist`. `status` is the stable discriminant
  * the web form maps to copy; nothing else in a body is part of the contract.
  *
- * | HTTP | body                                   | when                                    |
- * | ---- | -------------------------------------- | --------------------------------------- |
- * | 200  | `{ status: 'joined' }`                 | new row, repeat email, or honeypot hit  |
- * | 422  | `{ status: 'under13' }`                | `ageConfirmed: false`; nothing stored   |
- * | 400  | `{ status: 'invalid', field: 'email' }`| the address fails validation            |
- * | 400  | `{ status: 'invalid' }`                | bad JSON or body shape                  |
- * | 429  | `{ status: 'rate_limited' }`           | over the per-IP hourly budget           |
- * | 500  | `{ status: 'error' }`                  | anything unexpected; details only in logs|
+ * Request body: `{ email, birthYear, district?, source?, website? }`.
+ * `birthYear` is the visitor's answer to a neutral age screen (ADR 0001,
+ * "Age and consent"); the handler applies the same rule as the app's M04 gate
+ * (`isConsentRequired`: `currentYear - birthYear <= 13` is under 13), then
+ * drops the year. It is never stored, logged or echoed.
+ *
+ * | HTTP | body                                       | when                                         |
+ * | ---- | ------------------------------------------ | -------------------------------------------- |
+ * | 200  | `{ status: 'joined' }`                     | new row, repeat email, or honeypot hit       |
+ * | 422  | `{ status: 'under13' }`                    | the year could be under 13; nothing stored   |
+ * | 400  | `{ status: 'invalid', field: 'birthYear' }`| missing, non-integer, < 1900 or future year  |
+ * | 400  | `{ status: 'invalid', field: 'email' }`    | the address fails validation                 |
+ * | 400  | `{ status: 'invalid' }`                    | bad JSON or body shape                       |
+ * | 429  | `{ status: 'rate_limited' }`               | over the per-IP hourly budget                |
+ * | 500  | `{ status: 'error' }`                      | anything unexpected; details only in logs    |
+ *
+ * The old `ageConfirmed` checkbox flag is no longer accepted: a body without a
+ * valid `birthYear` answers `invalid` / `birthYear`, whatever `ageConfirmed`
+ * says, so no caller can pass the age screen with a yes/no flag.
  */
 export type WaitlistResponseBody =
   | { status: 'joined' }
   | { status: 'under13' }
-  | { status: 'invalid'; field?: 'email' }
+  | { status: 'invalid'; field?: 'email' | 'birthYear' }
   | { status: 'rate_limited' }
   | { status: 'error' };
 
@@ -58,7 +71,8 @@ export interface JoinWaitlistOptions {
 const BodySchema = z.object({
   // Checked separately below so a bad address can answer `field: 'email'`.
   email: z.string().max(1024),
-  ageConfirmed: z.boolean(),
+  // Narrowed by `parseBirthYear` below so a bad year can answer `field: 'birthYear'`.
+  birthYear: z.unknown().optional(),
   district: z.enum(WAITLIST_DISTRICTS).optional(),
   source: z
     .string()
@@ -196,9 +210,10 @@ async function emailExists(payload: Payload, email: string): Promise<boolean> {
 
 /**
  * Builds the `POST /v1/waitlist` handler. The order of checks is the
- * contract: rate limit, JSON, honeypot, shape, age, email, write. The age
- * answer is read before the address, so an under-13 email is never parsed,
- * looked up or stored (ADR 0001).
+ * contract: rate limit, JSON, honeypot, shape, birth year, age, email, write.
+ * The age answer is read before the address, so an under-13 email is never
+ * parsed, looked up or stored, and the birth year itself is only held in a
+ * local for the one comparison (ADR 0001).
  */
 export function createJoinWaitlistHandler(options: JoinWaitlistOptions = {}): V1Handler<[]> {
   const now = options.nowMs ?? Date.now;
@@ -236,7 +251,9 @@ export function createJoinWaitlistHandler(options: JoinWaitlistOptions = {}): V1
       const body = BodySchema.safeParse(raw);
       if (!body.success) return reply(400, { status: 'invalid' });
 
-      if (!body.data.ageConfirmed) return reply(422, { status: 'under13' });
+      const birthYear = parseBirthYear(body.data.birthYear, utcYearFromEpochMs(nowMs));
+      if (birthYear === undefined) return reply(400, { status: 'invalid', field: 'birthYear' });
+      if (isConsentRequired({ birthYear, nowMs })) return reply(422, { status: 'under13' });
 
       const email = EmailSchema.safeParse(body.data.email);
       if (!email.success) return reply(400, { status: 'invalid', field: 'email' });
