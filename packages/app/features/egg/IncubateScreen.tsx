@@ -30,19 +30,16 @@ import { ScrollView, View } from '@acme/ui/tw';
 import { selectActiveMon, selectPendingEgg, useMonStore } from '../mon/mon.store';
 import { announcePolitely } from '../onboarding/announce';
 import { copy as onboardingCopy } from '../onboarding/copy';
-import { getNotifyPermission, scheduleReadyNotification } from '../onboarding/notify-permission';
 import { readConsentRequested, useOnboarding } from '../onboarding/onboarding.store';
+import { PERMISSION_CENTER_ROUTE } from '../onboarding/permission-center-model';
 import { schemeForTime } from '../onboarding/time-scheme';
 import { useTextRamp } from './use-text-ramp';
 import { eggCopy, type EggCopyId } from './copy';
 import {
-  afterCaseClosed,
   buildEggViews,
   entryRedirect,
   ledChip,
   MEET_PATH,
-  MON_HOME_PATH,
-  NOTIFY_SHEET_PATH,
   parseBloodlineParam,
   readyAt,
   stepMinutes,
@@ -86,8 +83,8 @@ interface IncubateStore {
   readonly phase: IncubatePhase;
   readonly egg: EggRecord | null;
   readonly caseState: 'open' | 'closing' | 'closed';
-  /** The M06 sheet went up; the next focus is its dismissal, so go on to M11. */
-  readonly sheetShown: boolean;
+  /** The final permissions screen was entered after the case closed. */
+  readonly permissionCenterShown: boolean;
   readonly nowMs: number;
   readonly scheme: 'daylit' | 'night';
 }
@@ -96,8 +93,8 @@ interface IncubateStore {
  * M10 incubation choice (docs/design/screens/M10/08-handoff.md, D-16b/c/e).
  * 15, 30 or 60 minutes, no default. Start calls `startIncubation` once (the
  * only write in the M08 → M10 path), the case closes around the egg, and
- * from the close's end callback the M06 sheet rises when notification
- * permission is undecided; otherwise M11. Re-entry with an egg or a Mon goes
+ * after the close's end callback, the optional final permission center opens.
+ * It owns notification scheduling and the real Not now path to M11. Re-entry with an egg or a Mon goes
  * straight to `/(home)`; a bad `bloodline` param goes back to M08.
  */
 export function IncubateScreen() {
@@ -113,7 +110,7 @@ export function IncubateScreen() {
 
   const store = useInstanceStore<IncubateStore>(() => {
     const nowMs = Date.now();
-    return { minutes: null, phase: 'choose', egg: null, caseState: 'open', sheetShown: false, nowMs, scheme: schemeForTime(nowMs) };
+    return { minutes: null, phase: 'choose', egg: null, caseState: 'open', permissionCenterShown: false, nowMs, scheme: schemeForTime(nowMs) };
   });
   const s = useStore(store);
 
@@ -130,9 +127,9 @@ export function IncubateScreen() {
   // Guard on mount and on focus (handoff § States "already-incubating").
   useFocusEffect(
     useCallback(() => {
-      const { phase, sheetShown } = store.getState();
+      const { phase, permissionCenterShown } = store.getState();
       if (phase === 'confirmed') {
-        if (sheetShown) router.replace(MON_HOME_PATH);
+        if (permissionCenterShown) router.replace(PERMISSION_CENTER_ROUTE);
         return;
       }
       if (phase === 'starting') return;
@@ -173,6 +170,7 @@ export function IncubateScreen() {
     store.setState({ phase: 'starting' });
     try {
       const created = useMonStore.getState().startIncubation({ bloodlineId: egg.bloodlineId, minutes, atMs: eventNow() });
+      useOnboarding.getState().setPermissionsPending(true);
       store.setState({ phase: 'confirmed', egg: created, caseState: 'closing', nowMs: eventNow() });
     } catch {
       store.setState({ phase: 'error' });
@@ -181,32 +179,13 @@ export function IncubateScreen() {
 
   const onCaseEnd = (end: 'closed' | 'open') => {
     const created = store.getState().egg;
-    if (end !== 'closed' || created === null) return;
+    if (end !== 'closed' || created === null || store.getState().caseState === 'closed') return;
     store.setState({ caseState: 'closed' });
     haptics.success();
     announcePolitely(eggCopy('m10.confirmed.a11y.announce', { time: formatClock(created.incubationEndsAt) }));
-    const proceed = async () => {
-      const next = afterCaseClosed(await getNotifyPermission());
-      if (next === 'sheet') {
-        store.setState({ sheetShown: true });
-        router.push(
-          `${NOTIFY_SHEET_PATH}?mins=${created.incubationMinutes}&eggId=${encodeURIComponent(created.eggId)}&endsAtMs=${created.incubationEndsAt}`,
-        );
-        return;
-      }
-      if (next === 'schedule-then-home') {
-        const scheduled = await scheduleReadyNotification({
-          eggId: created.eggId,
-          endsAtMs: created.incubationEndsAt,
-          title: onboardingCopy('m23.notification.title'),
-          body: onboardingCopy('m23.notification.body'),
-        });
-        if (!scheduled) useOnboarding.getState().setNotifyOff('schedule-failed');
-      } else if (next === 'home') {
-        const permission = await getNotifyPermission();
-        if (permission === 'denied') useOnboarding.getState().setNotifyOff('denied');
-      }
-      router.replace(MON_HOME_PATH);
+    const proceed = () => {
+      store.setState({ permissionCenterShown: true });
+      router.replace(PERMISSION_CENTER_ROUTE);
     };
     if (closeTimer.current !== null) clearTimeout(closeTimer.current);
     closeTimer.current = setTimeout(() => void proceed(), reducedMotion ? 0 : AFTER_CLOSE_HOLD_MS);
@@ -232,7 +211,7 @@ export function IncubateScreen() {
   };
   const keys = {
     back: { label: eggCopy('m10.back.a11y.label'), onPress: busy ? undefined : () => router.back() },
-    home: { onPress: s.caseState === 'closed' ? () => router.replace(MON_HOME_PATH) : undefined },
+    home: { onPress: s.caseState === 'closed' ? () => router.replace(PERMISSION_CENTER_ROUTE) : undefined },
   };
 
   const consentPending = readConsentRequested();
