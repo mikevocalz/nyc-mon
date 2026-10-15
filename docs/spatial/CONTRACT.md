@@ -73,7 +73,7 @@ Wrist / hand: `wrist_panel` when `handTrackingAvailable`, else `hand_panel`. `st
 | `mon.stage` | `'Egg' \| 'Baby' \| 'Small' \| 'Mid' \| 'Max'` | `MonInstance` | `Baby` after hatch (Law 7) |
 | `mon.care` | `{ energy, fullness, social }`, each in [0, 1] | `CareState` as persisted | set |
 | `mon.mood` | `'content' \| 'asleep' \| 'sluggish' \| 'needs-fullness' \| 'needs-energy' \| 'needs-social'` | `deriveMonMood(care)` | set |
-| `mon.intent` | `'idle' \| 'approach' \| 'eat' \| 'sleep' \| 'play' \| 'evolve'` | `deriveAnimationIntent(care, presence)` | `evolve` unreachable while `evolutionEnabled` is false |
+| `mon.intent` | `'idle' \| 'approach' \| 'attention' \| 'eat' \| 'sleep' \| 'play' \| 'refuse' \| 'hatch' \| 'evolve'` | `deriveAnimationIntent(care, presence)` | `evolve` unreachable while `evolutionEnabled` is false |
 | `mode` | `'screen' \| 'tabletop' \| 'room' \| 'street' \| 'preview'` | `resolveSceneMode` | never `street` (unreachable by type) |
 | `placement` | `'table' \| 'floor' \| null` | `resolveSceneMode` | `null` in `screen` and `preview`; `floor` in `room` |
 | `anchors` | `{ space: 'local-floor', table?, floor?, wall? }`, each a `Pose` | anchors `resolveSceneMode` accepted | absent in flat modes and when dropped as stale |
@@ -88,7 +88,7 @@ Wrist / hand: `wrist_panel` when `handTrackingAvailable`, else `hand_panel`. `st
 
 ## Model slots
 
-`MonModelSlot = { bloodlineId, stage, glbUri: string | null, clips: { idle, approach, eat, sleep, play, evolve } }`. `MON_MODEL_SLOTS` has one slot per shipped bloodline × stage (3 × 5 = 15), every value `null` until Mike supplies the glb files.
+`MonModelSlot = { bloodlineId, stage, glbUri: string | null, clips: { idle, approach, attention, eat, sleep, play, refuse, hatch, evolve } }`. `MON_MODEL_SLOTS` has one slot per shipped bloodline × stage (3 × 5 = 15), every value `null` until Mike supplies the glb files.
 
 ## Phase-2 slots on `MonInstance`
 

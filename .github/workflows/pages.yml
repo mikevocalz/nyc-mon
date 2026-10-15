@@ -1,0 +1,51 @@
+name: Pages preview
+# A static snapshot of apps/web on GitHub Pages, so the site can be looked at
+# without a server: https://<owner>.github.io/<repo>/. Pages has no server, so
+# the waitlist form can't submit and links do full page loads. The real deploy
+# is unaffected. tooling/pages-snapshot.mjs has the details.
+#
+# Pages source: Settings → Pages → "Deploy from a branch", branch `gh-pages`,
+# folder `/ (root)`. This workflow rewrites that branch on every push.
+on:
+  push:
+    branches: [main, claude/jolly-dirac-dtzmjy]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pages-preview
+  cancel-in-progress: true
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    env:
+      NEXT_BASE_PATH: /${{ github.event.repository.name }}
+      NEXT_DIST_DIR: .next-pages
+      NEXT_PUBLIC_SITE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter web build
+      - name: Snapshot the running build
+        run: |
+          pnpm --filter web start -p 3600 &
+          for i in $(seq 1 60); do curl -sf "http://localhost:3600$NEXT_BASE_PATH" > /dev/null && break; sleep 1; done
+          BASE=http://localhost:3600 BASE_PATH="$NEXT_BASE_PATH" DIST=apps/web/.next-pages OUT=pages-out node tooling/pages-snapshot.mjs
+      - name: Publish to the gh-pages branch
+        run: |
+          cd pages-out
+          git init -q -b gh-pages
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -qm "Pages preview of ${GITHUB_SHA::7} (${GITHUB_REF_NAME})"
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" gh-pages

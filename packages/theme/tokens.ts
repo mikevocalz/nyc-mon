@@ -175,6 +175,13 @@ export const semantic = {
   // daylight: the light value is fully transparent (alpha 00).
   glow: { light: '#0058F800', dark: '#0058F8A6' },
   'glow-hot': { light: '#FC7C0000', dark: '#FC7C0080' },
+  /**
+   * Scrim behind text that sits on a live scene (the Mon's name and the care
+   * rings on M13 to M16): `surface-raised` at 85% (alpha D9). Measured in
+   * contrast.ts over a pure-white and a pure-black scene pixel, the two ends
+   * of anything the renderer can draw behind it.
+   */
+  'scrim-scene': { light: '#FFFFFFD9', dark: '#0A1230D9' },
 } as const;
 
 /**
@@ -313,6 +320,35 @@ export const typeRamp = {
    */
   'type-tag': { family: 'sans', sizePt: 14, lineHeightPt: 18, weight: 600, trackingEm: 0.18 },
 } as const satisfies Record<string, TypeStep>;
+
+/**
+ * Headset type ramp for Meta Horizon OS panels (docs/spatial/HORIZON-LAYOUT.md,
+ * lesson 6). A Quest panel is read from about a metre away, so every step is
+ * larger than its {@linkcode typeRamp} sibling. Emitted in px like the mobile
+ * ramp: Uniwind's rem polyfill is 14 (apps/mobile/metro.config.js), so a rem
+ * step (Tailwind's `text-sm` is 0.875rem = 12.25dp there) would shrink.
+ * Utility: `text-xr-<name>`. Screens pick these on quest builds
+ * (`ExpoHorizon.isHorizonBuild`), the mobile ramp elsewhere.
+ */
+export const xrTypeRamp = {
+  'xr-caption': { family: 'sans', sizePt: 14, lineHeightPt: 20, weight: 400 },
+  'xr-label': { family: 'sans', sizePt: 16, lineHeightPt: 22, weight: 500 },
+  'xr-body': { family: 'sans', sizePt: 18, lineHeightPt: 28, weight: 400 },
+  'xr-title': { family: 'sans', sizePt: 26, lineHeightPt: 32, weight: 700 },
+  /** the xr sibling of `type-station`: one per window */
+  'xr-heading': { family: 'display', sizePt: 36, lineHeightPt: 40, weight: 400 },
+} as const satisfies Record<string, TypeStep>;
+
+/**
+ * Pointer targets on Horizon OS. Meta's 2D-panel guidance sets 48dp as the
+ * minimum for controller rays and hand pinch; `target-gap` keeps two targets
+ * from sharing a ray's jitter. Emitted as `--spacing-<name>` in px, so
+ * `size-target`, `min-h-target` and `gap-target-gap` hold at the rem-14 polyfill.
+ */
+export const xrTargets = {
+  target: 48,
+  'target-gap': 12,
+} as const;
 
 /** One step of {@linkcode typeRamp}. */
 export interface TypeStep {

@@ -8,19 +8,26 @@ export {
   CareNeedSchema,
   CareRequestSchema,
   CareStateSchema,
+  FoodPortionSchema,
 } from './care.ts';
 export { EggRecordSchema, INCUBATION_MINUTES, IncubationMinutesSchema } from './egg.ts';
 export { EvolutionEventSchema } from './evolution.ts';
 export { HATCH_PRESENTATION_PHASES, HatchPresentationPhaseSchema, HatchStateSchema } from './hatch.ts';
+export { JOURNAL_ENTRY_KINDS, JournalEntryKindSchema, JournalEntrySchema } from './journal.ts';
 export { LIFECYCLE_STAGES, LifecycleStageSchema } from './lifecycle.ts';
-export { MonInstanceSchema } from './mon.ts';
+export { MonInstanceSchema, MonNameSchema } from './mon.ts';
+export { READY_NOTIFICATION_URL, ReadyNotificationDataSchema } from './notification.ts';
+export { PEEK_ROUNDS_PER_SESSION, PEEK_SPOTS, PeekResultSchema, PeekRoundSchema, PeekSpotSchema } from './play.ts';
 export { EpochMsSchema, IdSchema, UnitIntervalSchema } from './primitives.ts';
 export {
   CURRENT_SAVE_VERSION,
+  QueuedEggCreateSchema,
   SaveCurrentSchema,
   SaveEnvelopeSchema,
   SaveV1Schema,
+  SaveV2Schema,
   WriteQueueSchema,
+  WriteQueueV1Schema,
 } from './save.ts';
 export {
   AffinitySchema,
@@ -29,6 +36,7 @@ export {
   CombatClassSchema,
   CombatStatusSchema,
   HoodEncounterSchema,
+  PlaySessionSchema,
   SURFACE_KINDS,
   SurfaceKindSchema,
   VoiceLineageSchema,

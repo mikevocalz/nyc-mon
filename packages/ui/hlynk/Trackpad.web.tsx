@@ -5,7 +5,7 @@ import { haptics } from '../haptics';
 import { View } from '../tw';
 import { controlA11y, testIdProps } from './a11y';
 import { HLYNK_COPY } from './copy';
-import { useTrackpadGesture } from './trackpad-gesture';
+import { useOneBreath, useTrackpadGesture } from './trackpad-gesture';
 import type { TrackpadProps } from './Trackpad.types';
 import { TrackpadFace, trackpadSize } from './TrackpadFace';
 import { useShellHidden } from './hidden-context';
@@ -23,15 +23,16 @@ export type { TrackpadProps };
 export function Trackpad(props: TrackpadProps) {
   const {
     tier = 'core', label, hint, onActivate, onStep, onPan, accent = 'ring', disabled = false,
-    reducedMotion, shape = 'square', sizePt, testID, onCommit,
+    reducedMotion, shape = 'square', sizePt, testID, onCommit, onHoldStart, onHoldEnd,
   } = props;
   resolveTier(tier, 'Trackpad');
   const hiddenShell = useShellHidden();
   const { responder, pressed, shouldSwallowClick } = useTrackpadGesture(
-    { onActivate, onStep, onCommit, onPan },
+    { onActivate, onStep, onCommit, onPan, onHoldStart, onHoldEnd },
     disabled,
     false,
   );
+  const breath = useOneBreath(onHoldStart, onHoldEnd);
   const onKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
     if (disabled || !onStep) return;
     if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
@@ -51,7 +52,9 @@ export function Trackpad(props: TrackpadProps) {
         onPress={disabled ? undefined : () => {
           if (shouldSwallowClick()) return;
           haptics.tap();
-          onActivate?.();
+          // Hold-only pad: Enter / click runs one breath of the hold.
+          if (onActivate) onActivate();
+          else breath();
         }}
         {...(controlA11y({
           label: label || HLYNK_COPY['hlynk.trackpad.label'],

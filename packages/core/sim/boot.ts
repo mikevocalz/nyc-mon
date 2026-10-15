@@ -1,5 +1,5 @@
 import type { SaveLoadFailure } from '../save/migrate.ts';
-import type { AgeAnswer, EggRecord, HatchState, SaveCurrent } from '../types/index.ts';
+import type { AgeAnswer, EggRecord, HatchState, MonInstance, SaveCurrent } from '../types/index.ts';
 import { assertNever } from './assert-never.ts';
 import { resolveCreateEntry } from './onboarding.ts';
 
@@ -36,8 +36,9 @@ export interface BootSnapshot {
  * - `guardian-consent`: M05 (an age answer is stored and needs consent).
  * - `caller-name`: M07 (a session whose server profile, already restored, has no Caller name).
  * - `egg-choice`: M08 (a Caller exists but has no egg or Mon yet).
+ * - `mon-name`: M09 (the Mon has hatched but has no nickname; naming can't be skipped, D-16f).
  */
-export type OnboardingStep = 'create-account' | 'guardian-consent' | 'caller-name' | 'egg-choice';
+export type OnboardingStep = 'create-account' | 'guardian-consent' | 'caller-name' | 'egg-choice' | 'mon-name';
 
 /** Where M01 sends this session. Produced by {@linkcode resolveBootRoute}; map it with an exhaustive `switch`. */
 export type BootRoute =
@@ -56,7 +57,8 @@ export type BootRoute =
  * Order: unreadable save → `save-recovered` (M22); a session with no save on
  * this device → `restore` (the app fetches `GET /v1/me/mons` and the Caller
  * profile, writes the save, and calls this again); denied consent →
- * `consent-denied` (M05); a hatched Mon → `companion` (M13); an egg past
+ * `consent-denied` (M05); a hatched Mon with no nickname → `mon-name` (M09);
+ * a named Mon → `companion` (M13); an egg past
  * `incubationEndsAt` or mid-presentation → `egg-ready` (M11); an egg still
  * incubating → `incubating` (M11); a Caller with nothing yet → `egg-choice`;
  * no Caller → `caller-name` with a session (the restored profile had no
@@ -101,10 +103,14 @@ function routeLoadedSave(save: SaveCurrent, snapshot: BootSnapshot): BootRoute {
   if (caller === null) return routeWithoutCaller(snapshot);
   if (caller.consentStatus === 'denied') return { kind: 'consent-denied' };
 
-  const monInstanceId = save.mons[0]?.monInstanceId ?? hatchedMonId(save.hatches);
-  if (monInstanceId !== undefined) return { kind: 'companion', monInstanceId };
+  const mon = save.mons[0] ?? hatchedMon(save.hatches);
+  if (mon !== undefined) {
+    return mon.nickname === null
+      ? { kind: 'resume-onboarding', step: 'mon-name' }
+      : { kind: 'companion', monInstanceId: mon.monInstanceId };
+  }
 
-  const eggs = unhatchedEggs(save);
+  const eggs = pendingEggs(save);
   const ready = eggs.find((egg) => isEggReady(egg, save.hatches, snapshot.nowMs));
   if (ready !== undefined) return { kind: 'egg-ready', eggId: ready.eggId };
   const incubating = eggs[0];
@@ -114,18 +120,23 @@ function routeLoadedSave(save: SaveCurrent, snapshot: BootSnapshot): BootRoute {
 }
 
 /** A hatch that committed its individual but whose Mon has not been copied into `mons` yet. */
-function hatchedMonId(hatches: readonly HatchState[]): string | undefined {
+function hatchedMon(hatches: readonly HatchState[]): MonInstance | undefined {
   for (const hatch of hatches) {
-    if (hatch.kind === 'hatched') return hatch.mon.monInstanceId;
+    if (hatch.kind === 'hatched') return hatch.mon;
   }
   return undefined;
 }
 
-/** Eggs with no Mon yet, earliest `incubationEndsAt` first, ties by `eggId`. */
-function unhatchedEggs(save: SaveCurrent): EggRecord[] {
+/**
+ * Eggs that have not hatched: no Mon in `mons` and no `hatched` hatch state.
+ * Earliest `incubationEndsAt` first, ties by `eggId`. The one ordering boot
+ * and the Mon store's `selectPendingEgg` share.
+ */
+export function pendingEggs(save: Pick<SaveCurrent, 'eggs' | 'hatches' | 'mons'>): EggRecord[] {
   const minted = new Set(save.mons.map((mon) => mon.monInstanceId));
+  const hatched = new Set(save.hatches.filter((h) => h.kind === 'hatched').map((h) => h.eggId));
   return save.eggs
-    .filter((egg) => !minted.has(egg.monInstanceId))
+    .filter((egg) => !minted.has(egg.monInstanceId) && !hatched.has(egg.eggId))
     .sort((a, b) => a.incubationEndsAt - b.incubationEndsAt || (a.eggId < b.eggId ? -1 : a.eggId > b.eggId ? 1 : 0));
 }
 

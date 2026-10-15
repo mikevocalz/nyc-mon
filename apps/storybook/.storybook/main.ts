@@ -19,7 +19,39 @@ const legendMotionEsm = resolve(
   'lib/module/index.js',
 );
 
-const WEB_EXTENSIONS = ['.web.tsx', '.web.ts', '.web.jsx', '.web.js'];
+// Reanimated hooks need the worklets Babel plugin (apps/mobile/babel.config.js
+// runs it), or `useAnimatedStyle` without a dependency array throws in dev
+// (EggCase, ScannerLed, MonStillReaction, HatchSequence). plugin-react 6 has
+// no Babel step, so a pre-transform runs that one plugin over kit sources.
+// Resolved the same way as above: through the packages that depend on them.
+const requireFromReanimated = createRequire(requireFromUi.resolve('react-native-reanimated/package.json'));
+const workletsPlugin = requireFromReanimated.resolve('react-native-worklets/plugin');
+const babelCorePath = createRequire(requireFromReanimated.resolve('react-native-worklets/package.json')).resolve('@babel/core');
+const kitSources = resolve(here, '../../../packages');
+const WORKLET_HINT = /\b(useAnimatedStyle|useAnimatedProps|useDerivedValue|useAnimatedReaction|useFrameCallback|'worklet')/;
+
+function workletsTransform(): import('vite').Plugin {
+  return {
+    name: 'nyc-mon:worklets',
+    enforce: 'pre',
+    async transform(code, id) {
+      const file = id.split('?')[0] ?? id;
+      if (!file.startsWith(kitSources) || !/\.[jt]sx?$/.test(file) || !WORKLET_HINT.test(code)) return null;
+      const babel = (await import(pathToFileURL(babelCorePath).href)) as typeof import('@babel/core');
+      const out = await babel.transformAsync(code, {
+        filename: file,
+        babelrc: false,
+        configFile: false,
+        sourceMaps: true,
+        parserOpts: { plugins: ['jsx', 'typescript'] },
+        plugins: [workletsPlugin],
+      });
+      return out?.code ? { code: out.code, map: out.map } : null;
+    },
+  };
+}
+
+const WEB_EXTENSIONS =['.web.tsx', '.web.ts', '.web.jsx', '.web.js'];
 // Vite's built-in `resolve.extensions` default.
 const VITE_DEFAULT_EXTENSIONS = ['.mjs', '.js', '.mts', '.ts', '.jsx', '.tsx', '.json'];
 
@@ -53,6 +85,7 @@ const config: StorybookConfig = {
       typeof typegpuModule.default === 'function' ? typegpuModule.default : typegpuModule.default.default;
     viteConfig.plugins = [
       ...(viteConfig.plugins ?? []),
+      workletsTransform(),
       typegpu(),
       react(),
     ];
@@ -89,6 +122,15 @@ const config: StorybookConfig = {
         {
           find: /^react-native-web$/,
           replacement: resolve(here, '../node_modules/react-native-web/dist/index.js'),
+        },
+        // react-native-svg's resolveAssetUri imports
+        // `@react-native/assets-registry/registry`, which React Native 0.88
+        // no longer installs, so the svg dep fails to load (EggCase,
+        // IncubationRing). react-native-web ships the same registry
+        // (registerAsset / getAssetByID); point at it like the RNW aliases above.
+        {
+          find: /^@react-native\/assets-registry\/registry$/,
+          replacement: resolve(here, '../node_modules/react-native-web/dist/modules/AssetRegistry/index.js'),
         },
         { find: /^@legendapp\/motion$/, replacement: legendMotionEsm },
         {

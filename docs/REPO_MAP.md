@@ -52,10 +52,10 @@ The commit message calls these "the v7 canon sources", but the docx and the inde
 - Config: `apps/mobile/app.config.ts` — name `NYC-MON`, slug `nyc-mon`, scheme `nycmon`, iOS `com.nycmon.app`, Android `com.nycmon.app` (minSdk 29), `experiments.typedRoutes: true`, `experiments.reactCompiler: true`. Plugins include `expo-router`, `expo-build-properties`, `expo-splash-screen`, `expo-font`, `expo-image`, `expo-horizon-core`.
 - Router: **expo-router 58.0.13**, file routes under `apps/mobile/app/`:
   - `_layout.tsx`, `+not-found.tsx`
-  - `(drawer)/_layout.tsx`, `(drawer)/settings.tsx`, `(drawer)/spatial.tsx`, `(drawer)/editor-settings/index.tsx`, `(drawer)/split/_layout.tsx`, `(drawer)/split/index.tsx`
-  - `(drawer)/(tabs)/_layout.tsx`, `index.tsx`, `explore.tsx`, `notifications.tsx`, `profile.tsx`
-- None of the §4 routes (`(onboarding)`, `(auth)`, `(home)`, `(settings)`, `(system)`) exist. The current routes are the Solito starter's demo screens.
-- App-local chrome: `apps/mobile/components/AppHeader.tsx`, `AppTabBar.tsx`, `DrawerContent.tsx`, `BookingSheet.tsx`, `EventActionsSheet.tsx`; `apps/mobile/src/navigation/` (split view), `apps/mobile/src/xr/`.
+  - `(drawer)/_layout.tsx`, `(drawer)/settings.tsx`
+  - `(drawer)/(tabs)/_layout.tsx`, `notifications.tsx`, `profile.tsx`
+  - `(onboarding)`, `(auth)` and `(home)` exist; `(settings)` and `(system)` do not. The starter's demo routes (`/home` grid, `/explore`, `/split`, `/spatial`, `/editor-settings`) were removed from the app on 2026-10-08; explore, schedule and spatial still ship on web.
+- App-local chrome: `apps/mobile/components/AppHeader.tsx`, `AppTabBar.tsx`, `DrawerContent.tsx`; `apps/mobile/src/navigation/` (split view), `apps/mobile/src/xr/`.
 - Metro: `apps/mobile/metro.config.js`. Native projects are checked in (`apps/mobile/android/`).
 
 ### `apps/web`

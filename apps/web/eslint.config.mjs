@@ -32,9 +32,10 @@ const eslintConfig = defineConfig([
               message: 'Platform UI belongs behind @acme/ui.',
             },
             {
-              group: ['gsap', 'gsap/*'],
+              // Anchor package names: bare 'gsap' also matches kinetrell/web/gsap.
+              group: ['/gsap', '/gsap/*'],
               message:
-                'GSAP is scoped to the Kinetrell adapters in components/home/motion.ts for the public landing experience.',
+                'Import the Kinetrell adapters for route motion; direct GSAP is scoped to home/motion.ts.',
             },
           ],
         },
@@ -43,7 +44,8 @@ const eslintConfig = defineConfig([
   },
   {
     files: ['app/(site)/**/*.tsx', 'components/site/**/*.tsx'],
-    ignores: ['components/site/Landing.tsx', 'app/Document.tsx'],
+    // opengraph-image renders through next/og (Satori), which takes plain elements only.
+    ignores: ['components/site/Landing.tsx', 'app/Document.tsx', 'app/(site)/opengraph-image.tsx'],
     rules: {
       'no-restricted-syntax': [
         'error',
@@ -56,6 +58,7 @@ const eslintConfig = defineConfig([
   },
   globalIgnores([
     '.next/**',
+    '.next-*/**',
     'out/**',
     'build/**',
     'public/viro/**',

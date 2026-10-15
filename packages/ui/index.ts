@@ -8,6 +8,8 @@ export { Container, type ContainerProps } from './layout/Container';
 export { Text, type TextProps } from './Text';
 export { Heading, type HeadingProps } from './Heading';
 export { Button, type ButtonProps } from './Button';
+export { useIsHeadset } from './use-is-headset';
+export { isHeadsetAndroid } from './headset';
 export { LinkButton, type LinkButtonProps, type LinkButtonVariant } from './LinkButton';
 export { IconButton, type IconButtonProps } from './IconButton';
 export { Card, type CardProps } from './Card';
@@ -54,7 +56,7 @@ export type { NotifyOptions, NotifyVariant } from './notify.shared';
 export { Modal, type ModalProps } from './Modal';
 export { Dialog, DialogCard, type DialogProps } from './Dialog';
 export { Lightbox, type LightboxProps } from './Lightbox';
-export { BottomSheet, SheetSurface, type BottomSheetProps } from './BottomSheet';
+export { BottomSheet, SheetSurface, type BottomSheetProps, type SheetSurfaceProps } from './BottomSheet';
 export { TabBar, type TabBarProps } from './TabBar';
 export { Toolbar, type ToolbarProps } from './Toolbar';
 export { TabBarAccessory, type TabBarAccessoryProps } from './TabBarAccessory';
@@ -135,3 +137,7 @@ export type { TextEffectOptions, GlitchIntensity, GlitchSpeed, TextGlowLevel } f
 
 // H-Lynk chrome: shell, scanner head, screen, trackpad, keys.
 export * from './hlynk';
+
+// Phase 1 loop primitives: egg choice, case, incubation, hatch (M08–M12) and care (M13–M18).
+export * from './hatch';
+export * from './care';

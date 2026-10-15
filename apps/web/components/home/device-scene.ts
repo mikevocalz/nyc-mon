@@ -1,21 +1,23 @@
-import { fontFamilies, hlynk, hud, led, pageMotion, palette, signage } from '@acme/theme';
+import { fontFamilies, hlynk, led, pageMotion, palette, signage } from '@acme/theme';
 import type { ThreeContext, ThreeFrame, ThreeScene } from '@acme/ui';
+import type { StoreApi } from 'zustand/vanilla';
+import { HUD_SIZE, hudTabAt, type HudContent, type HudHover, type HudState } from './hlynk-hud.ts';
+import { drawHud } from './hud-draw.ts';
 
-/** The words on the H-Lynk's screen. They come from copy.ts, never from this file. */
-export interface DeviceScreenCopy {
-  /** status row, top left: the tier name */
-  title: string;
-  /** the Mon's name, large in the middle */
-  mon: string;
-  /** the small line under the name */
-  note: string;
-}
-
-/** What the stage hands the scene. Read in `update`; the screen copy is read once, at build. */
+/** What the stage hands the scene. Read in `update`; the content and the store are read once, at build. */
 export interface DeviceSceneParams {
   /** `placeholder` is the procedural model below; `h-lynk-entry` swaps in the real GLB when it lands. */
   model: 'placeholder' | 'h-lynk-entry';
-  screen: DeviceScreenCopy;
+  /** Everything the screen shows. Strings come from copy.ts and @acme/content, never from this file. */
+  hud: HudContent;
+  /**
+   * The stage's HUD store, shared with the DOM tab control (PS-037). The scene
+   * reads the tab from it and writes the tab and hover target to it; it
+   * redraws the screen only when they change.
+   */
+  store: StoreApi<HudState>;
+  /** A press on the 3D left side key. The stage plays the chirp (when sound is on) and counts the press. */
+  onSideKey?: () => void;
   /** Called once, after the first frame with the H-Lynk in it has been drawn. The stage drops its capture then. */
   onReady?: () => void;
   /**
@@ -34,9 +36,59 @@ type Mesh = InstanceType<Three['Mesh']>;
 type CanvasTexture = InstanceType<Three['CanvasTexture']>;
 
 /** Resting three-quarter turn so the side keys and depth read. */
-const REST_YAW = -0.38;
+export const REST_YAW = -0.38;
 /** Pointer tilt cap, from the page motion tokens (8 degrees). */
-const MAX_TILT = (pageMotion.tilt.stage * Math.PI) / 180;
+export const MAX_TILT = (pageMotion.tilt.stage * Math.PI) / 180;
+/** Placement of the model in the scene: drop, scale, camera. Shared with the beam test. */
+export const STAGE = { baseY: -0.1, scale: 1.25, camera: { y: 0.12, z: 5.4, lookY: 0.05, fov: 30 } } as const;
+
+/** Body size, body widths. */
+export const BODY = { W: 1, H: 1.78, D: 0.21 } as const;
+/** The two red emitters in the head, x centres and radius. The fan rises from between them. */
+export const EMITTERS = { x: [0.14, 0.32], r: 0.028 } as const;
+/** Head depth: the fan's crossed plane stays inside it so it never hangs in front of the face. */
+export const HEAD_DEPTH = BODY.D + 0.06;
+
+/**
+ * The scanner fan (PS-037 fix). Centred on the emitters, opening upward from
+ * their span, and never wider than the body: the widest layer's tip spans
+ * x 0.01..0.45 of the body's -0.5..0.5. The crossed plane that gives the fan
+ * volume is narrower than the head is deep, so no sheet of light hangs in
+ * front of the head's left side at the three-quarter turn.
+ */
+export const FAN = {
+  x: (EMITTERS.x[0] + EMITTERS.x[1]) / 2,
+  length: 0.42,
+  /** lean back, radians: reads as projection, and the tip fades before the stage's top edge */
+  lean: -0.08,
+  /** [half-width at the mouth, half-width at the tip, peak opacity] per layer: wash, beam, core */
+  layers: [
+    [0.115, 0.22, 0.55],
+    [0.09, 0.16, 0.8],
+    [0.035, 0.07, 0.95],
+  ],
+  /** the crossed plane's half-depth as a share of the face half-width */
+  depth: 0.45,
+} as const;
+
+/** Every corner of the fan's planes in the model's local space, for bounds checks. */
+export function fanCorners(): [number, number, number][] {
+  const points: [number, number, number][] = [];
+  const cos = Math.cos(FAN.lean);
+  const sin = Math.sin(FAN.lean);
+  for (const [base, tip] of FAN.layers) {
+    for (const [half, y] of [[base, 0], [tip, FAN.length]] as const) {
+      for (const sx of [-1, 1]) {
+        // The face plane spans x; the crossed plane spans z at FAN.depth of the width.
+        for (const [px, pz] of [[sx * half, 0], [0, sx * half * FAN.depth]] as const) {
+          // rotation.x by FAN.lean: y' = y cos - z sin, z' = y sin + z cos
+          points.push([FAN.x + px, BODY.H / 2 + y * cos - pz * sin, y * sin + pz * cos]);
+        }
+      }
+    }
+  }
+  return points;
+}
 
 /**
  * The intro, in seconds of scene time from the first frame after the
@@ -44,7 +96,7 @@ const MAX_TILT = (pageMotion.tilt.stage * Math.PI) / 180;
  * it settles into frame, turns slowly to its three-quarter rest, the scanner
  * catches the light once, and the screen comes up readable.
  */
-const INTRO = {
+export const INTRO = {
   settle: { from: 0, to: 1.0, drop: 0.14 },
   yaw: { from: 0, to: 1.8, turn: 0.42 },
   scanner: { from: 1.0, to: 1.9 },
@@ -57,6 +109,8 @@ const EMITTER_REST = 1.4;
 const EMITTER_PEAK = 3.2;
 /** Screen emissive once powered: bright enough to read, not a billboard. */
 const SCREEN_ON = 0.62;
+/** How long the side key stays down per press, seconds. */
+const SIDE_KEY_DIP_S = 0.16;
 
 const CORE = hlynk.core;
 const { apple, concrete, ink, silver } = palette;
@@ -92,9 +146,9 @@ export function createDeviceScene(
   renderer.toneMapping = THREE.NoToneMapping;
 
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 50);
-  camera.position.set(0, 0.12, 5.4);
-  camera.lookAt(0, 0.05, 0);
+  const camera = new THREE.PerspectiveCamera(STAGE.camera.fov, 1, 0.1, 50);
+  camera.position.set(0, STAGE.camera.y, STAGE.camera.z);
+  camera.lookAt(0, STAGE.camera.lookY, 0);
 
   // White key from the upper left, a neutral rim from behind right, soft
   // fill. Red is the only coloured light, and it comes from the scanner.
@@ -106,12 +160,41 @@ export function createDeviceScene(
   rim.position.set(4, 2, -4);
   scene.add(rim);
 
-  const device = buildDevice(THREE, initial.screen, invalidate);
-  const BASE_Y = -0.1;
+  const { store } = initial;
+  const device = buildDevice(THREE, initial.hud, store.getState(), invalidate);
+  const BASE_Y = STAGE.baseY;
   device.group.position.y = BASE_Y;
-  device.group.scale.setScalar(1.25);
+  device.group.scale.setScalar(STAGE.scale);
   device.group.rotation.y = REST_YAW;
   scene.add(device.group);
+
+  // The screen follows the store: a new tab or hover target repaints the
+  // canvas once and asks for one frame. Nothing repaints per frame. A side
+  // key press (from the DOM button or the 3D key) dips the key.
+  let dipFrom = -1; // scene time the current dip started; -1 none
+  let dipQueued = false;
+  let tapQueued = false;
+  const unsubscribe = store.subscribe((next, prev) => {
+    if (next.tab !== prev.tab || next.hover !== prev.hover) device.paint(next.tab, next.hover);
+    if (next.presses !== prev.presses) dipQueued = true;
+    if (next.taps !== prev.taps) tapQueued = true;
+    invalidate();
+  });
+
+  // Raycasts run only when the pointer moved or went down, never on a frame
+  // where the input is unchanged (PS-019's per-frame raycast).
+  const raycaster = new THREE.Raycaster();
+  const ndc = new THREE.Vector2();
+  const targets = [device.screen, device.sideKeyHit];
+  let lastPointer = { x: Number.NaN, y: Number.NaN, inside: false };
+  const pick = (): HudHover | null => {
+    device.group.updateMatrixWorld(true);
+    raycaster.setFromCamera(ndc, camera);
+    const hit = raycaster.intersectObjects(targets, false)[0];
+    if (!hit) return null;
+    if (hit.object === device.sideKeyHit) return 'side-key';
+    return hit.uv ? hudTabAt(hit.uv.x, hit.uv.y) : null;
+  };
 
   let disposed = false;
   let ready = false;
@@ -188,6 +271,36 @@ export function createDeviceScene(
       device.light(FAN_REST + (1 - FAN_REST) * flare, EMITTER_REST + (EMITTER_PEAK - EMITTER_REST) * flare);
       device.power(SCREEN_ON * power);
 
+      // Input: hover on a move, act on a press. The stage counts presses in
+      // the store from its pointerdown handler (so a click shorter than a
+      // frame still lands); the pointer already holds the press position.
+      // A touch tap arrives as a press with a position, so it switches tabs too.
+      const p = frame.pointer;
+      const moved = p.x !== lastPointer.x || p.y !== lastPointer.y || p.inside !== lastPointer.inside;
+      const pressed = tapQueued;
+      tapQueued = false;
+      lastPointer = { x: p.x, y: p.y, inside: p.inside };
+      if (moved || pressed) {
+        let hover: HudHover | null = null;
+        if ((p.inside || pressed) && t >= INTRO.screen.from) {
+          ndc.set(p.x, p.y);
+          hover = pick();
+        }
+        const state = store.getState();
+        if (hover !== state.hover) store.setState({ hover });
+        if (pressed && hover === 'side-key') params.onSideKey?.();
+        else if (pressed && hover !== null && hover !== 'side-key' && hover !== state.tab) store.setState({ tab: hover });
+      }
+
+      // The side key dips 0.014 into the shell for 160 ms per press.
+      if (dipQueued) {
+        dipQueued = false;
+        dipFrom = frame.time;
+      }
+      const dipping = dipFrom >= 0 && frame.time - dipFrom < SIDE_KEY_DIP_S;
+      if (!dipping) dipFrom = -1;
+      device.dipSideKey(dipping);
+
       if (!announced) {
         announced = true;
         // After this frame's render, which runs right after update returns.
@@ -196,7 +309,8 @@ export function createDeviceScene(
         }, 0);
       }
       const settled = Math.abs(tiltX - goalX) < 1e-3 && Math.abs(tiltY - goalY) < 1e-3;
-      const rest = t >= INTRO.end && !tracking && settled;
+      // A queued dip needs the loop for one more beat.
+      const rest = t >= INTRO.end && !tracking && settled && !dipping;
       if (rest !== resting) {
         resting = rest;
         params.onRest?.(rest);
@@ -204,6 +318,7 @@ export function createDeviceScene(
     },
     dispose: () => {
       disposed = true;
+      unsubscribe();
       clearTimeout(warm);
       device.group.userData.dispose();
     },
@@ -213,10 +328,19 @@ export function createDeviceScene(
 /** One tracked material/geometry bucket so `dispose` frees everything. */
 function buildDevice(
   THREE: Three,
-  screenCopy: DeviceScreenCopy,
+  content: HudContent,
+  initialState: HudState,
   invalidate: () => void,
 ): {
   group: Group;
+  /** the screen glass, raycast for the tab under the pointer */
+  screen: Mesh;
+  /** an invisible box over the left side key and the shell strip beside it: the key's hit area */
+  sideKeyHit: Mesh;
+  /** redraw the screen for a tab and hover target */
+  paint: (tab: HudState['tab'], hover: HudHover | null) => void;
+  /** press the left side key into the shell, or let it back out */
+  dipSideKey: (down: boolean) => void;
   /** fan opacity scale 0..1 and emitter emissive intensity */
   light: (fan: number, emitter: number) => void;
   /** screen emissive intensity */
@@ -238,9 +362,7 @@ function buildDevice(
     textures.forEach((t) => t.dispose());
   };
 
-  const W = 1;
-  const H = 1.78;
-  const D = 0.21;
+  const { W, H, D } = BODY;
   const top = H / 2;
   const front = D / 2;
 
@@ -273,7 +395,8 @@ function buildDevice(
     color: ink[900], roughness: 0.05, metalness: 0.55, envMapIntensity: 1.4,
   }));
   /** Screen glass; the drawn screen doubles as its own emitter so it reads in the dark. */
-  const screenTexture = tex(screenFaceTexture(THREE, screenCopy, invalidate));
+  const hudScreen = hudTexture(THREE, content, initialState, invalidate);
+  const screenTexture = tex(hudScreen.texture);
   const screen = mat(new THREE.MeshStandardMaterial({
     map: screenTexture,
     emissiveMap: screenTexture,
@@ -371,21 +494,23 @@ function buildDevice(
 
   // Red emitters in the head's centre and the lit slit above them.
   const emitterDot = track(new THREE.CylinderGeometry(0.028, 0.028, 0.024, 20));
-  for (const x of [0.14, 0.32]) box(emitterDot, emitter, x, headY, front + 0.035).rotation.x = Math.PI / 2;
-  box(rounded(0.16, 0.02, 0.014, 0.008), emitter, 0.23, headY + 0.058, front + 0.034);
+  for (const x of EMITTERS.x) box(emitterDot, emitter, x, headY, front + 0.035).rotation.x = Math.PI / 2;
+  box(rounded(0.16, 0.02, 0.014, 0.008), emitter, FAN.x, headY + 0.058, front + 0.034);
 
   // Stub antenna, top left: barrel, rounded cap, base ring.
   box(track(new THREE.CylinderGeometry(0.038, 0.045, 0.2, 24)), black, -0.4, top + 0.1, -0.01);
   box(track(new THREE.SphereGeometry(0.041, 24, 16)), black, -0.4, top + 0.2, -0.01);
   box(track(new THREE.CylinderGeometry(0.05, 0.055, 0.03, 24)), pianoBlack, -0.4, top + 0.005, -0.01);
 
-  // The red fan the head projects upward: three nested cones, steady at rest.
+  // The red fan the head projects upward, from the emitters only (FAN).
   const fan = buildFan(THREE, { track, mat, tex });
-  fan.group.position.set(0.08, top, 0);
+  fan.group.position.set(FAN.x, top, 0);
   group.add(fan.group);
+  // The mouth glow: a sprite always faces the camera, so it is sized to stay
+  // inside the emitters' half of the head (x 0.02..0.44) at any yaw.
   const glowSprite = new THREE.Sprite(glow);
-  glowSprite.scale.set(0.9, 0.4, 1);
-  glowSprite.position.set(0.08, top + 0.02, 0.05);
+  glowSprite.scale.set(0.42, 0.22, 1);
+  glowSprite.position.set(FAN.x, top + 0.02, 0.05);
   group.add(glowSprite);
 
   // --- face ----------------------------------------------------------------
@@ -393,7 +518,7 @@ function buildDevice(
   // Recessed bezel, then the screen glass.
   const screenY = 0.17;
   box(rounded(0.88, 1.08, 0.03, 0.03), black, 0, screenY, front + 0.012);
-  box(track(new THREE.PlaneGeometry(0.8, 1.0)), screen, 0, screenY, front + 0.029);
+  const screenMesh = box(track(new THREE.PlaneGeometry(0.8, 1.0)), screen, 0, screenY, front + 0.029);
 
   // --- control row ----------------------------------------------------------
 
@@ -419,17 +544,28 @@ function buildDevice(
   // --- side keys -------------------------------------------------------------
 
   // Right edge: volume + and −, each with a red mark, then the round power key.
-  const sideKey = rounded(0.032, 0.15, 0.1, 0.012);
+  const volumeKey = rounded(0.032, 0.15, 0.1, 0.012);
   for (const [y, glyph] of [[0.36, '+'], [0.14, '-']] as const) {
-    box(sideKey, black, W / 2 + 0.014, y, 0);
+    box(volumeKey, black, W / 2 + 0.014, y, 0);
     const g = decal(glyph, 0.05, apple[400]);
     g.rotation.y = Math.PI / 2;
     g.position.set(W / 2 + 0.032, y, 0);
     group.add(g);
   }
   box(track(new THREE.CylinderGeometry(0.035, 0.035, 0.03, 24)), pianoBlack, W / 2 + 0.014, -0.05, 0).rotation.z = Math.PI / 2;
-  // Left edge: the long action key.
-  box(rounded(0.032, 0.18, 0.1, 0.012), black, -W / 2 - 0.014, 0.28, 0);
+  // Left edge: the long action key. At the three-quarter rest it is a sliver
+  // past the silhouette, so its hit area is a larger invisible box that also
+  // covers the shell strip beside it on the face (left of the bezel). The DOM
+  // "Side key chirp" button is the primary control (PS-037).
+  const sideKey = box(rounded(0.032, 0.18, 0.1, 0.012), black, -W / 2 - 0.014, 0.28, 0);
+  const sideKeyRestX = sideKey.position.x;
+  const sideKeyHit = new THREE.Mesh(
+    track(new THREE.BoxGeometry(0.12, 0.3, D + 0.06)),
+    mat(new THREE.MeshBasicMaterial()),
+  );
+  sideKeyHit.position.set(-W / 2 + 0.01, 0.28, 0);
+  sideKeyHit.visible = false;
+  group.add(sideKeyHit);
 
   // --- studio finishing -------------------------------------------------------
 
@@ -461,6 +597,12 @@ function buildDevice(
 
   return {
     group,
+    screen: screenMesh,
+    sideKeyHit,
+    paint: hudScreen.paint,
+    dipSideKey: (down) => {
+      sideKey.position.x = down ? sideKeyRestX + 0.014 : sideKeyRestX;
+    },
     light: (level, intensity) => {
       fan.level(level);
       glow.opacity = 0.85 * level;
@@ -496,12 +638,11 @@ function buildFan(
 ): { group: Group; level: (level: number) => void } {
   const { track, mat, tex } = ctx;
   const group = new THREE.Group();
-  const LENGTH = 0.46;
-  // Lean back a touch: it reads as projection, and the tip clears the stage's top edge.
-  group.rotation.x = -0.12;
+  const LENGTH = FAN.length;
+  group.rotation.x = FAN.lean;
   const gradient = tex(beamGradientTexture(THREE));
 
-  const cone = (halfBase: number, halfTop: number, color: string, peak: number) => {
+  const plane = (halfBase: number, halfTop: number) => {
     const shape = new THREE.Shape();
     shape.moveTo(-halfBase, 0);
     shape.lineTo(halfBase, 0);
@@ -517,19 +658,27 @@ function buildFan(
       const half = halfBase + (halfTop - halfBase) * t;
       uv.setXY(i, (pos.getX(i) / half + 1) / 2, t);
     }
+    return geo;
+  };
+
+  // Each layer is a face plane across x and a crossed plane across z. The
+  // crossed plane is FAN.depth as wide, so it stays inside the head's depth;
+  // at full width (the old fan) it hung a sheet of red in front of the
+  // head's left side at the three-quarter turn.
+  const cone = (halfBase: number, halfTop: number, color: string, peak: number) => {
     const material = mat(new THREE.MeshBasicMaterial({
       color, map: gradient, transparent: true, opacity: peak,
       depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending,
     }));
-    for (const yaw of [0, Math.PI / 2]) {
-      const mesh = new THREE.Mesh(geo, material);
-      mesh.rotation.y = yaw;
-      group.add(mesh);
-    }
+    group.add(new THREE.Mesh(plane(halfBase, halfTop), material));
+    const crossed = new THREE.Mesh(plane(halfBase * FAN.depth, halfTop * FAN.depth), material);
+    crossed.rotation.y = Math.PI / 2;
+    group.add(crossed);
     return { material, peak };
   };
 
-  const layers = [cone(0.38, 0.1, led.on, 0.45), cone(0.32, 0.1, led.on, 0.75), cone(0.14, 0.045, apple[100], 0.95)];
+  const colors = [led.on, led.on, apple[100]] as const;
+  const layers = FAN.layers.map(([base, tip, peak], i) => cone(base, tip, colors[i] ?? led.on, peak));
   return {
     group,
     level: (level) => {
@@ -716,54 +865,31 @@ function textTexture(THREE: Three, text: string, color: string): CanvasTexture {
 }
 
 /**
- * The screen at rest: a status row with the tier name and signal bars, and
- * the Mon's name with one small line under it. Nothing else: the sheet's
- * tabs, stats and "CALL MON" are concept text, not canon (Q42). Colours are
- * the `hud` tokens. Redrawn once when the web fonts finish loading.
+ * The H-Lynk screen (PS-037): status row, the active tab's screen and the tab
+ * bar, drawn by hud-draw.ts in the `hud` tokens. `paint` redraws the canvas
+ * and flags one texture upload; it runs only when the tab or hover target
+ * changes, and once more when the web fonts finish loading. Never per frame.
  */
-function screenFaceTexture(THREE: Three, copy: DeviceScreenCopy, invalidate: () => void): CanvasTexture {
-  const [canvas, ctx] = canvas2d(768, 1024);
-  const W = 768;
-  const H = 1024;
-  const paint = () => {
-    const bg = ctx.createLinearGradient(0, 0, 0, H);
-    bg.addColorStop(0, hud.bg1);
-    bg.addColorStop(0.4, hud.bg0);
-    bg.addColorStop(1, hud.bg0);
-    ctx.fillStyle = bg;
-    ctx.fillRect(0, 0, W, H);
-
-    // Status row.
-    ctx.textBaseline = 'middle';
-    ctx.textAlign = 'left';
-    ctx.fillStyle = hud.dim;
-    ctx.font = font(30, 600);
-    ctx.fillText(copy.title, 40, 56);
-    for (let i = 0; i < 4; i++) {
-      const h = 10 + i * 7;
-      ctx.fillRect(W - 112 + i * 16, 70 - h, 10, h);
-    }
-    ctx.fillStyle = hud.line;
-    ctx.fillRect(40, 100, W - 80, 3);
-
-    // The Mon's name, centred, with the line under it.
-    ctx.textAlign = 'center';
-    ctx.fillStyle = hud.text;
-    ctx.font = font(96, 700);
-    ctx.fillText(copy.mon, W / 2, H * 0.47);
-    ctx.fillStyle = hud.dim;
-    ctx.font = font(36, 500);
-    ctx.fillText(copy.note, W / 2, H * 0.47 + 84);
-    // A short red rule above the name: the scanner's colour, once.
-    ctx.fillStyle = hud.red;
-    ctx.fillRect(W / 2 - 36, H * 0.47 - 104, 72, 6);
-  };
-  paint();
+function hudTexture(
+  THREE: Three,
+  content: HudContent,
+  initial: HudState,
+  invalidate: () => void,
+): { texture: CanvasTexture; paint: (tab: HudState['tab'], hover: HudHover | null) => void } {
+  const [canvas, ctx] = canvas2d(HUD_SIZE.width, HUD_SIZE.height);
+  let tab = initial.tab;
+  let hover = initial.hover;
+  drawHud(ctx, font, content, tab, hover);
   const texture = makeCanvasTexture(THREE, canvas);
-  void document.fonts?.ready.then(() => {
-    paint();
+  const paint = (nextTab: HudState['tab'], nextHover: HudHover | null) => {
+    tab = nextTab;
+    hover = nextHover;
+    drawHud(ctx, font, content, tab, hover);
     texture.needsUpdate = true;
+  };
+  void document.fonts?.ready.then(() => {
+    paint(tab, hover);
     invalidate();
   });
-  return texture;
+  return { texture, paint };
 }

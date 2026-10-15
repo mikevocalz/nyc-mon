@@ -191,31 +191,24 @@ const CONTRACT: Pair[] = [
 /** Pairs as the kit and app actually draw them. */
 const USAGE: Pair[] = [
   // -- semantic text on theme surfaces (themed: measured light and dark) ----
-  { id: 'text on surface', fg: 'text', bg: ['surface'], role: 'text', usedAt: ['packages/ui/Text.tsx:39', 'packages/ui/Heading.tsx:25', 'apps/mobile/components/EventActionsSheet.tsx:54'] },
-  { id: 'muted text on surface', fg: 'text-muted', bg: ['surface'], role: 'text', usedAt: ['packages/ui/Text.tsx:40', 'apps/mobile/components/AppTabBar.tsx:112', 'packages/app/features/schedule/BookingSurface.tsx:63'] },
-  { id: 'muted text on raised', fg: 'text-muted', bg: ['surface-raised'], role: 'text', usedAt: ['apps/mobile/components/EventActionsSheet.tsx:50', 'packages/app/features/home/home-content.tsx:76', 'packages/ui/Text.tsx:40'] },
+  { id: 'text on surface', fg: 'text', bg: ['surface'], role: 'text', usedAt: ['packages/ui/Text.tsx:39', 'packages/ui/Heading.tsx:25'] },
+  { id: 'muted text on surface', fg: 'text-muted', bg: ['surface'], role: 'text', usedAt: ['packages/ui/Text.tsx:40', 'apps/mobile/components/AppTabBar.tsx:86', 'packages/app/features/schedule/BookingSurface.tsx:63'] },
+  { id: 'muted text on raised', fg: 'text-muted', bg: ['surface-raised'], role: 'text', usedAt: ['packages/app/features/home/home-content.tsx:76', 'packages/ui/Text.tsx:40'] },
   { id: 'primary text on surface', fg: 'primary', bg: ['surface'], role: 'large-text', usedAt: ['packages/app/features/error/screen.shared.tsx:19'], reason: 'font-display text-display-xl (60px)' },
   { id: 'primary text on raised', fg: 'primary', bg: ['surface-raised'], role: 'text', usedAt: ['packages/ui/Text.tsx:42', 'packages/ui/Heading.tsx:27'] },
   { id: 'primary icon in primary/10 well', fg: 'primary', bg: ['surface-raised', 'primary/10'], role: 'ui', usedAt: ['packages/app/features/home/home.data.ts:28', 'packages/app/features/home/home.data.ts:33'] },
   { id: 'accent text on raised', fg: 'accent', bg: ['surface-raised'], role: 'text', usedAt: ['packages/ui/Text.tsx:41', 'packages/app/features/home/home-content.tsx:77', 'packages/app/features/editor/AttachSheet.tsx:88'] },
   { id: 'accent icon in accent/10 well', fg: 'accent', bg: ['surface-raised', 'accent/10'], role: 'ui', usedAt: ['packages/app/features/home/home.data.ts:29', 'packages/app/features/home/home.data.ts:34'] },
-  { id: 'accent bell icon on raised', fg: 'accent', bg: ['surface-raised'], role: 'ui', usedAt: ['apps/mobile/components/AppHeader.tsx:70'] },
-  { id: 'danger text on raised', fg: 'danger', bg: ['surface-raised'], role: 'text', usedAt: ['packages/ui/Text.tsx:44', 'packages/app/features/editor/AttachSheet.tsx:168', 'apps/mobile/components/EventActionsSheet.tsx:54'] },
-  { id: 'danger text on danger/10 hover', fg: 'danger', bg: ['surface-raised', 'danger/10'], role: 'text', usedAt: ['apps/mobile/components/EventActionsSheet.tsx:44', 'apps/mobile/components/EventActionsSheet.tsx:54'] },
-  { id: 'on-primary on primary', fg: 'on-primary', bg: ['primary'], role: 'text', usedAt: ['packages/app/features/home/home-content.tsx:48', 'packages/app/features/explore/explore.store.ts:17', 'apps/mobile/components/AppTabBar.tsx:111'] },
+  { id: 'accent bell icon on raised', fg: 'accent', bg: ['surface-raised'], role: 'ui', usedAt: ['apps/mobile/components/AppHeader.tsx:69'] },
+  { id: 'danger text on raised', fg: 'danger', bg: ['surface-raised'], role: 'text', usedAt: ['packages/ui/Text.tsx:44', 'packages/app/features/editor/AttachSheet.tsx:168'] },
+  { id: 'on-primary on primary', fg: 'on-primary', bg: ['primary'], role: 'text', usedAt: ['packages/app/features/home/home-content.tsx:48', 'packages/app/features/explore/explore.store.ts:17', 'apps/mobile/components/AppTabBar.tsx:86'] },
   { id: 'on-primary/90 on primary', fg: 'on-primary/90', bg: ['primary'], role: 'text', usedAt: ['packages/app/features/home/home-content.tsx:53', 'packages/app/features/home/home-content.tsx:54'] },
-  { id: 'on-primary on primary-pressed', fg: 'on-primary', bg: ['primary-pressed'], role: 'text', usedAt: ['packages/app/features/explore/explore.store.ts:18', 'apps/mobile/components/AppTabBar.tsx:85'] },
-  { id: 'on-accent on accent', fg: 'on-accent', bg: ['accent'], role: 'text', usedAt: ['packages/app/features/explore/explore.store.ts:19', 'apps/mobile/app/(drawer)/split/_layout.tsx:300'] },
+  { id: 'on-primary on primary-pressed', fg: 'on-primary', bg: ['primary-pressed'], role: 'text', usedAt: ['packages/app/features/explore/explore.store.ts:18', 'apps/mobile/components/AppTabBar.tsx:78'] },
+  { id: 'on-accent on accent', fg: 'on-accent', bg: ['accent'], role: 'text', usedAt: ['packages/app/features/explore/explore.store.ts:19'] },
   { id: 'inverse text on text', fg: 'text-inverse', bg: ['text'], role: 'text', usedAt: ['packages/ui/Text.tsx:43', 'packages/ui/Heading.tsx:29'] },
   { id: 'out-of-month day', fg: 'text-muted', bg: ['surface-raised'], role: 'text', usedAt: ['packages/app/features/schedule/MiniCalendar.tsx:111'], reason: 'days stay readable and pressable (onSelect); muted colour, not opacity, marks them as outside the month' },
   { id: 'past day', fg: 'text-muted', bg: ['surface-raised'], role: 'text', usedAt: ['packages/app/features/schedule/BookingSurface.tsx:74'], reason: 'past days still call selectDate (BookingSurface.tsx:58); the day strip sits in the bg-surface-raised panel (BookingSurface.tsx:48)' },
   { id: 'unavailable slot (muted/60)', fg: 'text-muted/60', bg: ['surface-sunken'], role: 'disabled', usedAt: ['packages/app/features/schedule/BookingSurface.tsx:107'], reason: 'accessibilityState disabled (BookingSurface.tsx:96)' },
-  // The grid tab bar is a night facade in both themes (palette steps, no themed
-  // tokens). The 95% bar is measured over a light page, its worst case.
-  { id: 'grid tab label idle', fg: 'silver-300', bg: ['concrete-50', 'ink-950/95'], role: 'text', usedAt: ['apps/mobile/components/AppTabBar.tsx:97', 'apps/mobile/components/AppTabBar.tsx:109', 'apps/mobile/components/AppTabBar.tsx:128'], reason: 'bar is bg-ink-950/95 in both themes; measured over a light page' },
-  { id: 'grid tab label active', fg: 'orange-400', bg: ['concrete-50', 'ink-950/95', 'orange-500/15'], role: 'text', usedAt: ['apps/mobile/components/AppTabBar.tsx:84', 'apps/mobile/components/AppTabBar.tsx:96', 'apps/mobile/components/AppTabBar.tsx:108'] },
-  { id: 'grid tab selected edge', fg: 'orange-500/60', bg: ['concrete-50', 'ink-950/95', 'orange-500/15'], role: 'ui', usedAt: ['apps/mobile/components/AppTabBar.tsx:84'] },
-  { id: 'grid rail label idle', fg: 'silver-300', bg: ['ink-950'], role: 'text', usedAt: ['apps/mobile/components/AppTabBar.tsx:109', 'apps/mobile/components/AppTabBar.tsx:145'] },
   { id: 'focus ring on offset band', fg: 'focus', bg: ['bg'], role: 'ui', usedAt: ['packages/ui/Button.tsx:23', 'packages/ui/IconButton.tsx:20', 'packages/ui/cards/NeonSwitch.tsx:19', 'packages/ui/cards/NeonCheckbox.tsx:13', 'packages/ui/cards/CardSlider.web.tsx:144'], reason: 'ring-offset-2 ring-offset-bg paints the page colour between the control and the ring' },
   { id: 'focus ring on night control', fg: 'focus', bg: ['ink-950'], role: 'ui', usedAt: ['packages/ui/SearchBar.tsx:26', 'packages/ui/SegmentedControl.web.tsx:16'], reason: 'no offset: the ring touches the night control face' },
   // The site header and footer are the kit NavBar and SiteFooter: night (ink-950) in both themes.
@@ -225,11 +218,10 @@ const USAGE: Pair[] = [
   { id: 'nav action edge', fg: 'orange-500', bg: NIGHT, role: 'ui', usedAt: ['packages/ui/nav/NavBar.tsx:92', 'packages/ui/nav/NavBar.tsx:99'] },
   { id: 'profile ring active', fg: 'orange-500', bg: NIGHT, role: 'ui', usedAt: ['apps/web/components/site/SiteChrome.tsx:47'], reason: 'ring-offset-ink-950 puts the night bar between the avatar and the ring' },
   { id: 'profile ring hover', fg: 'silver-400', bg: NIGHT, role: 'ui', usedAt: ['apps/web/components/site/SiteChrome.tsx:47'] },
-  { id: 'unread dot', fg: 'danger', bg: ['surface-raised'], role: 'ui', usedAt: ['apps/mobile/components/AppHeader.tsx:71'] },
-  { id: 'theme border', fg: 'border', bg: ['surface-raised'], role: 'decorative', usedAt: ['apps/mobile/components/EventActionsSheet.tsx:42', 'apps/mobile/components/AppHeader.tsx:68'], reason: 'frame on controls whose text label or icon identifies them; separators' },
+  { id: 'unread dot', fg: 'danger', bg: ['surface-raised'], role: 'ui', usedAt: ['apps/mobile/components/AppHeader.tsx:70'] },
+  { id: 'theme border', fg: 'border', bg: ['surface-raised'], role: 'decorative', usedAt: ['apps/mobile/components/AppHeader.tsx:67'], reason: 'frame on controls whose text label or icon identifies them; separators' },
   { id: 'neon glow', fg: 'glow', bg: ['bg'], role: 'decorative', usedAt: ['packages/theme/tokens.ts:340', 'packages/ui/district/tones.ts:132'], reason: 'box-shadow halo behind a surface that already has its own edge; fully transparent on daylit (no glow in daylight)' },
-  { id: 'hot glow', fg: 'glow-hot', bg: ['bg'], role: 'decorative', usedAt: ['packages/theme/tokens.ts:343', 'apps/mobile/components/AppTabBar.tsx:84'], reason: 'box-shadow halo behind a surface that already has its own edge; fully transparent on daylit (no glow in daylight)' },
-  { id: 'structure rule /40', fg: 'structure/40', bg: ['bg'], role: 'decorative', usedAt: ['apps/mobile/components/AppTabBar.tsx:128'], reason: 'section rule; no information' },
+  { id: 'hot glow', fg: 'glow-hot', bg: ['bg'], role: 'decorative', usedAt: ['packages/theme/tokens.ts:343'], reason: 'box-shadow halo behind a surface that already has its own edge; fully transparent on daylit (no glow in daylight)' },
 
   // -- tone text on the page (themed tone-*-text: night step dark, page step light)
   // Ghost Button / IconButton labels and the CardSlider counter sit straight on
@@ -239,7 +231,7 @@ const USAGE: Pair[] = [
     const at = [`packages/ui/district/tones.ts:${TONE_TEXT_LINE[t]}`, 'packages/ui/Button.tsx:73', 'packages/ui/IconButton.tsx:79'];
     return [
       { id: `${t} ghost label on page`, fg: `tone-${t}-text`, bg: ['bg'], role: 'text', usedAt: [...at, 'packages/ui/cards/CardSlider.shared.tsx:33'] },
-      { id: `${t} ghost label on hover tint`, fg: `tone-${t}-text`, bg: ['surface-sunken', TONE_SOFT[t]!], role: 'text', usedAt: [...at, 'packages/ui/Button.tsx:132'], reason: 'tint layer fades in on group-hover; measured on the sunken page surface' },
+      { id: `${t} ghost label on hover tint`, fg: `tone-${t}-text`, bg: ['surface-sunken', TONE_SOFT[t]!], role: 'text', usedAt: [...at, 'packages/ui/Button.tsx:107'], reason: 'tint layer fades in on group-hover; measured on the sunken page surface' },
     ];
   }),
   { id: 'disabled ghost label on page', fg: 'ink-400', bg: ['concrete-50'], role: 'disabled', usedAt: ['packages/ui/Button.tsx:48', 'packages/ui/IconButton.tsx:79'], reason: 'inactive control: aria-disabled, no press handler' },
@@ -314,7 +306,7 @@ const USAGE: Pair[] = [
   { id: 'card themed text on white notch', fg: 'ink-950', bg: ['ink-50'], role: 'text', usedAt: ['packages/ui/Card.tsx:34'] },
   { id: 'card themed text on royal notch', fg: 'white', bg: ['royal-500'], role: 'text', usedAt: ['packages/ui/Card.tsx:36'] },
   { id: 'card themed text on brick notch', fg: 'white', bg: ['orange-800'], role: 'text', usedAt: ['packages/ui/Card.tsx:36'] },
-  { id: 'home headline on ink panel', fg: 'orange-500', bg: ['ink-800'], role: 'large-text', usedAt: ['packages/spatial/SpatialScreen.tsx:106', 'packages/ui/neon/SolidPanel.tsx:42'], reason: 'Heading display-sm (30px web, 26px native at rem 14) on the SolidPanel tone="ink" face, which is night in both themes' },
+  { id: 'home headline on ink panel', fg: 'orange-500', bg: ['ink-800'], role: 'large-text', usedAt: ['packages/spatial/SpatialScreen.tsx:98', 'packages/ui/neon/SolidPanel.tsx:42'], reason: 'Heading display-sm (30px web, 26px native at rem 14) on the SolidPanel tone="ink" face, which is night in both themes' },
   { id: 'orange eyebrow on glass card', fg: 'orange-500', bg: ['concrete-50', 'ink-950/85'], role: 'text', usedAt: ['packages/ui/future/GridCard.tsx:29', 'packages/ui/future/CircuitButton.tsx:49'], reason: 'measured over a light page, the worst case for the 85% night glass' },
   { id: 'carolina eyebrow on glass card', fg: 'carolina-500', bg: ['concrete-50', 'ink-950/85'], role: 'text', usedAt: ['packages/ui/future/GridCard.tsx:30', 'packages/ui/future/CircuitButton.tsx:50'], reason: 'measured over a light page, the worst case for the 85% night glass' },
 
@@ -419,6 +411,15 @@ const USAGE: Pair[] = [
   // -- admin console (08-handoff §9): signage bands and the page-surface cards -
   { id: 'console: signage band headline', fg: 'signage-white', bg: ['signage-black'], role: 'text', usedAt: [] },
   { id: 'console: signage band detail', fg: 'signage-white/85', bg: ['signage-black'], role: 'text', usedAt: [] },
+
+  // -- Phase 1 loop: text and marks over a live scene (M13 to M16) -----------
+  // The scene behind `scrim-scene` can be any pixel, so each pair is measured
+  // over both ends: a pure-white and a pure-black scene pixel.
+  { id: 'care caption on scene scrim (white scene)', fg: 'text', bg: ['signage-white', 'scrim-scene'], role: 'text', usedAt: ['packages/ui/care/CareMeterRing.shared.tsx:31', 'packages/ui/care/CareMeterRingGroup.tsx:26'] },
+  { id: 'care caption on scene scrim (black scene)', fg: 'text', bg: ['signage-black', 'scrim-scene'], role: 'text', usedAt: ['packages/ui/care/CareMeterRing.shared.tsx:31', 'packages/ui/care/CareMeterRingGroup.tsx:26'] },
+  { id: 'care ring fill on scene scrim (white scene)', fg: 'accent', bg: ['signage-white', 'scrim-scene'], role: 'ui', usedAt: ['packages/ui/care/care-colors.ts:11'] },
+  { id: 'care ring fill on scene scrim (black scene)', fg: 'accent', bg: ['signage-black', 'scrim-scene'], role: 'ui', usedAt: ['packages/ui/care/care-colors.ts:11'] },
+  { id: 'hlynk-care label on black face', fg: 'silver-300', bg: ['signage-black'], role: 'text', usedAt: ['packages/ui/Button.tsx:82', 'packages/ui/Button.tsx:113'] },
 
   // -- disabled ---------------------------------------------------------------
   { id: 'disabled label', fg: 'ink-400', bg: NIGHT, role: 'disabled', usedAt: ['packages/ui/Button.tsx:48', 'packages/ui/IconButton.tsx:79', 'packages/ui/neon/NeonChevron.tsx:55', 'packages/ui/audio/PlayerShell.tsx:123'], reason: 'inactive control' },

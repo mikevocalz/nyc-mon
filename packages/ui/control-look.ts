@@ -15,7 +15,7 @@ export type ControlLook = 'solid' | 'outline' | 'ghost';
  * default. `cta` is the screen's one primary call to action: the brand orange
  * face in both schemes, labelled with the `on-cta` token (Decision #7).
  */
-export type ButtonVariant = 'cornerCut' | 'neon' | 'primary' | 'accent' | 'outline' | 'ghost' | 'danger' | 'cta';
+export type ButtonVariant = 'cornerCut' | 'neon' | 'primary' | 'accent' | 'outline' | 'ghost' | 'danger' | 'cta' | 'hlynk-care';
 /** Every variant name IconButton accepts. */
 export type IconButtonVariant = 'cornerCut' | 'neon' | 'primary' | 'outline' | 'ghost';
 
@@ -26,6 +26,7 @@ const LOOK: Record<ButtonVariant, ControlLook> = {
   accent: 'solid',
   danger: 'solid',
   cta: 'solid',
+  'hlynk-care': 'solid',
   outline: 'outline',
   ghost: 'ghost',
 };

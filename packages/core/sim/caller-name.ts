@@ -1,4 +1,5 @@
 import { assertNever } from './assert-never.ts';
+import { canonicaliseName, nameShapeRejection } from './name-rules.ts';
 
 // M07 Caller name rules: docs/design/screens/M07/05-copy.md § Name rules and
 // 08-handoff.md § Data. Digits stay out until COPY_DECK open question 2 is ruled.
@@ -10,10 +11,6 @@ import { assertNever } from './assert-never.ts';
  * `CallerProfile.callerName` agree.
  */
 export const CALLER_NAME_MAX_LENGTH = 16;
-
-/** Letters and combining marks in any script, plus space, hyphen, apostrophe (straight or curly) and period. */
-const ALLOWED_CHARACTERS = /^[\p{L}\p{M} \-'’.]*$/u;
-const HAS_LETTER = /\p{L}/u;
 
 /** Why {@linkcode validateCallerName} rejected a name. Map it to copy with {@linkcode callerNameErrorCopyId}. */
 export type CallerNameRejection = 'blank' | 'too-long' | 'characters' | 'blocked';
@@ -39,16 +36,8 @@ export type CallerNameErrorCopyId =
   | 'm07.error.characters'
   | 'm07.error.blocked';
 
-function canonicalise(raw: string): string {
-  return raw.normalize('NFC').trim();
-}
-
-function shapeRejection(name: string): Exclude<CallerNameRejection, 'blocked'> | undefined {
-  if (!HAS_LETTER.test(name)) return 'blank';
-  if (name.length > CALLER_NAME_MAX_LENGTH) return 'too-long';
-  if (!ALLOWED_CHARACTERS.test(name)) return 'characters';
-  return undefined;
-}
+const canonicalise = canonicaliseName;
+const shapeRejection = (name: string) => nameShapeRejection(name, CALLER_NAME_MAX_LENGTH);
 
 /**
  * Checks a typed Caller name (M07). The first failing rule wins, in this order:

@@ -44,3 +44,15 @@ export const Both: Story = {
     </View>
   ),
 };
+
+/** `request`: a Mon's need (M13–M16). Neutral text with a filled dot, never the danger tone. Story fixture copy. */
+export const Request: Story = {
+  args: {
+    items: [{ id: 'request-food', label: 'Hungry', tone: 'request' }],
+  },
+  render: (args) => (
+    <View className="p-4">
+      <StatusRow {...args} />
+    </View>
+  ),
+};

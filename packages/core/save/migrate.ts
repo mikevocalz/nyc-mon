@@ -1,4 +1,5 @@
 import { CURRENT_SAVE_VERSION, SaveCurrentSchema, SaveEnvelopeSchema } from '../schemas/save.ts';
+import { journalEntryId } from '../sim/journal.ts';
 import type { SaveCurrent } from '../types/index.ts';
 
 /** One step in the save migration table: version `from` → `from + 1`. */
@@ -7,11 +8,45 @@ export interface SaveMigration {
   readonly migrate: (blob: Record<string, unknown>) => Record<string, unknown>;
 }
 
+const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
+
+/** v1 `feed` carried its food at the top level; v2 nests it in `food` (D-15e). Other actions pass through. */
+function migrateCareActionV1(action: unknown): unknown {
+  if (!isRecord(action) || action['kind'] !== 'feed') return action;
+  const { foodClassId, nutrition, ...rest } = action;
+  return { ...rest, food: { foodClassId, nutrition } };
+}
+
 /**
- * The migration table. v1 is the first shipped shape, so the table is empty;
- * the v2 change appends `{ from: 1, migrate }` here and bumps CURRENT_SAVE_VERSION.
+ * v1 → v2. Lossless: every v1 field is kept as is. Adds the journal, seeded
+ * with one `hatched` entry per Mon at its `hatchedAt` (the only hatch time a
+ * v1 save holds), adds an empty egg-create queue, and nests feed writes' food.
+ * Malformed input passes through untouched so validation reports it.
  */
-export const SAVE_MIGRATIONS: readonly SaveMigration[] = [];
+function migrateV1ToV2(blob: Record<string, unknown>): Record<string, unknown> {
+  const mons = Array.isArray(blob['mons']) ? blob['mons'] : [];
+  const journal = mons.filter(isRecord).map((mon) => ({
+    entryId: journalEntryId(String(mon['monInstanceId']), 'hatched', Number(mon['hatchedAt'])),
+    monInstanceId: mon['monInstanceId'],
+    at: mon['hatchedAt'],
+    kind: 'hatched',
+    first: true,
+  }));
+  const queue = blob['queue'];
+  const nextQueue = isRecord(queue)
+    ? {
+        ...queue,
+        entries: Array.isArray(queue['entries'])
+          ? queue['entries'].map((w: unknown) => (isRecord(w) ? { ...w, action: migrateCareActionV1(w['action']) } : w))
+          : queue['entries'],
+        eggCreates: [],
+      }
+    : queue;
+  return { ...blob, queue: nextQueue, journal };
+}
+
+/** The migration table: one step per version. CURRENT_SAVE_VERSION is the last step's target. */
+export const SAVE_MIGRATIONS: readonly SaveMigration[] = [{ from: 1, migrate: migrateV1ToV2 }];
 
 export type SaveLoadFailure = 'corrupt' | 'future-version' | 'missing-migration' | 'invalid';
 
@@ -24,8 +59,6 @@ export class SaveLoadError extends Error {
     this.reason = reason;
   }
 }
-
-const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 
 /** Walks the migration chain from the blob's version up to `targetVersion`. Does not validate the result. */
 export function migrateSaveBlob(
@@ -69,6 +102,7 @@ export function createEmptySave(deviceId: string, savedAt: number): SaveCurrent 
     hatches: [],
     mons: [],
     care: [],
-    queue: { deviceId, nextSeq: 1, entries: [] },
+    queue: { deviceId, nextSeq: 1, entries: [], eggCreates: [] },
+    journal: [],
   };
 }

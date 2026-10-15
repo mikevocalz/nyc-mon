@@ -21,8 +21,7 @@ export default function DrawerLayout() {
     <Drawer
       drawerContent={(props) => <DrawerContent {...props} />}
       screenOptions={{
-        // Every drawer route gets the app bar. The split route opts out below:
-        // it fills the screen and draws its own header inside its safe area.
+        // Every drawer route gets the app bar.
         header: () => <AppHeader />,
         drawerType: 'front',
         drawerStyle: {
@@ -35,7 +34,6 @@ export default function DrawerLayout() {
       }}
     >
       <Drawer.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Drawer.Screen name="split" options={{ headerShown: false }} />
     </Drawer>
   );
 }

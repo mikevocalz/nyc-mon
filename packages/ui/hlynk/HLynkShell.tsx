@@ -16,10 +16,11 @@ import { HLYNK_COPY } from './copy';
 import { HLynkKey } from './HLynkKey';
 import { HLynkScreen } from './HLynkScreen';
 import type { HLynkShellProps, HLynkStatus, ShellKeyProps } from './HLynkShell.types';
-import { HLYNK_GEOMETRY, measureShell } from './layout';
+import { HLYNK_GEOMETRY, measureShell, resolveForcedLayout } from './layout';
 import { ScannerLed, type ScannerLedProps } from './ScannerLed';
 import { assertNever, isImplementedTier, resolveTier, type HLynkTier } from './tier';
 import { Trackpad } from './Trackpad';
+import { useKeyboardVisible } from './use-keyboard-visible';
 
 export type { HLynkShellProps, HLynkStatus };
 
@@ -83,9 +84,10 @@ export function HLynkShell({
   resolveTier(tier, 'HLynkShell');
   const id = (part: string) => (testIDPrefix ? `${testIDPrefix}-${part}` : undefined);
   const { size, onLayout } = useLayoutSize({ width: 375, height: 667 });
+  const keyboardVisible = useKeyboardVisible();
   const geo = measureShell(
     { widthPt: size.width, heightPt: size.height, safeTopPt: 0, safeBottomPt: 0 },
-    forcedLayout,
+    resolveForcedLayout(forcedLayout, keyboardVisible),
   );
   const compact = geo.layout === 'compact';
   const live = power === 'on';

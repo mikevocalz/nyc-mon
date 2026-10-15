@@ -5,6 +5,7 @@ import { CareStateSchema, MonInstanceSchema } from '../schemas/index.ts';
 import { applyCareAction } from '../sim/care.ts';
 import { applyEvolution, PHASE1_FEATURE_FLAGS } from '../sim/evolution.ts';
 import { step } from '../sim/step.ts';
+import { DEFAULT_CARE_TUNING } from '../sim/tuning.ts';
 import type { EvolutionEvent } from '../types/index.ts';
 import { forAll, HOUR, makeMon, makeState, randomAction, T0 } from './harness.ts';
 
@@ -89,10 +90,11 @@ describe('Law 8: faint is never death', () => {
   it('a fully neglected Mon still exists, keeps its id and stage, and can be cared for', () => {
     const neglected = step(makeState(), T0 + 365 * 24 * HOUR, 9).state;
     expect(neglected.mon.stage).toBe('Baby');
-    expect(neglected.care.fullness).toBe(0);
-    const fed = applyCareAction(neglected, { kind: 'feed', foodClassId: 'f', nutrition: 0.5 }, T0 + 365 * 24 * HOUR);
+    // A year away leaves the meters at the return floor (D-15d), never at a death state.
+    expect(neglected.care.fullness).toBe(DEFAULT_CARE_TUNING.returnFloor);
+    const fed = applyCareAction(neglected, { kind: 'feed', food: { foodClassId: 'f', nutrition: 0.5 } }, T0 + 365 * 24 * HOUR);
     expect(fed.outcome.kind).toBe('eaten');
-    expect(fed.state.care.fullness).toBe(0.5);
+    expect(fed.state.care.fullness).toBeCloseTo(DEFAULT_CARE_TUNING.returnFloor + 0.5, 12);
   });
 
   it('no sim source names a death, egg-reset or deletion path', () => {
