@@ -1,4 +1,4 @@
-import { exportJWK, generateKeyPair, SignJWT, createLocalJWKSet } from 'jose';
+import { exportJWK, generateKeyPair, SignJWT, UnsecuredJWT, createLocalJWKSet } from 'jose';
 import { describe, expect, it, vi } from 'vitest';
 import { authenticateRequest, decideAccess, isAdultByBirthYear } from '../auth/request-auth.ts';
 import { createIntrospectionVerifier, createJwtVerifier, InvalidTokenError } from '../auth/verifier.ts';
@@ -48,6 +48,48 @@ describe('JWT verifier', () => {
       InvalidTokenError,
     );
     await expect(verifier.verify(await sign(privateKey, { sub: 'u', scope: 'openid' }))).rejects.toBeInstanceOf(InvalidTokenError);
+  });
+
+  it('rejects an expired token and an audience with a trailing slash', async () => {
+    const { privateKey, jwks } = await keys();
+    const verifier = createJwtVerifier({ issuer: ISSUER, audience: AUDIENCE, jwks });
+    const expired = await new SignJWT({ sub: 'u', scope: 'mcp:caller mcp:care' })
+      .setProtectedHeader({ alg: 'ES256', kid: 'k1' })
+      .setIssuer(ISSUER)
+      .setAudience(AUDIENCE)
+      .setIssuedAt(Math.floor(Date.now() / 1000) - 7_200)
+      .setExpirationTime(Math.floor(Date.now() / 1000) - 3_600)
+      .sign(privateKey);
+    await expect(verifier.verify(expired)).rejects.toBeInstanceOf(InvalidTokenError);
+    await expect(verifier.verify(await sign(privateKey, { sub: 'u', scope: 'mcp:caller' }, `${AUDIENCE}/`))).rejects.toBeInstanceOf(InvalidTokenError);
+  });
+
+  it('rejects alg confusion: an unsigned alg=none token and an HS256 token keyed with the public key', async () => {
+    const { publicKey, privateKey } = await generateKeyPair('ES256', { extractable: true });
+    // A JWKS entry with no `alg`, so only the verifier's own allowlist stands between HS256 and acceptance.
+    const publicJwk = await exportJWK(publicKey);
+    const jwks = createLocalJWKSet({ keys: [{ ...publicJwk, kid: 'k1' }] });
+    const verifier = createJwtVerifier({ issuer: ISSUER, audience: AUDIENCE, jwks });
+    const claims = { sub: 'attacker', scope: 'mcp:caller mcp:care', client_id: 'alexa' };
+    expect(await verifier.verify(await sign(privateKey, claims))).toMatchObject({ callerId: 'attacker' });
+
+    const unsigned = new UnsecuredJWT(claims).setIssuer(ISSUER).setAudience(AUDIENCE).setIssuedAt().setExpirationTime('10m').encode();
+    await expect(verifier.verify(unsigned)).rejects.toBeInstanceOf(InvalidTokenError);
+
+    const hmacSecret = new TextEncoder().encode(JSON.stringify(publicJwk));
+    const hs256 = await new SignJWT(claims)
+      .setProtectedHeader({ alg: 'HS256', kid: 'k1' })
+      .setIssuer(ISSUER)
+      .setAudience(AUDIENCE)
+      .setIssuedAt()
+      .setExpirationTime('10m')
+      .sign(hmacSecret);
+    await expect(verifier.verify(hs256)).rejects.toBeInstanceOf(InvalidTokenError);
+
+    // Re-labelling a real ES256 signature as EdDSA must not verify either.
+    const [, body, signature] = (await sign(privateKey, claims)).split('.');
+    const relabelled = `${Buffer.from(JSON.stringify({ alg: 'EdDSA', kid: 'k1' })).toString('base64url')}.${body}.${signature}`;
+    await expect(verifier.verify(relabelled)).rejects.toBeInstanceOf(InvalidTokenError);
   });
 
   it('rejects a token signed by another key', async () => {

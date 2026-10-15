@@ -1,5 +1,7 @@
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
+import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT, UnsecuredJWT } from 'jose';
 import { afterEach, describe, expect, it } from 'vitest';
+import { createJwtVerifier, type TokenVerifier } from '../auth/verifier.ts';
 import { CORE_TOOL_NAMES, DEV_TOOL_NAMES } from '../mcp/tools.ts';
 import { ALLOWED_ORIGIN, callTool, fakeV1, initialize, row, rpc, start, type Running } from './harness.ts';
 
@@ -223,5 +225,153 @@ describe('dev-only tools', () => {
         declinedBecause: { enum: ['asleep', 'sluggish', 'already-asleep', 'already-awake', 'too-tired'] },
       },
     });
+  });
+});
+
+/** No stack frames, file paths or internal error names in a response body. */
+function expectNoLeak(text: string): void {
+  expect(text).not.toMatch(/\n\s+at |\.ts:\d+|node_modules|InvalidTokenError|ECONN|stack/);
+}
+
+async function postRaw(target: Running, body: string, token = 'adult'): Promise<{ status: number; text: string }> {
+  const response = await fetch(target.mcpUrl, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      accept: 'application/json, text/event-stream',
+      authorization: `Bearer ${token}`,
+      'mcp-protocol-version': '2025-11-25',
+    },
+    body,
+  });
+  return { status: response.status, text: await response.text() };
+}
+
+describe('malformed JSON-RPC', () => {
+  it('answers broken JSON, a wrong jsonrpc version and non-request shapes with 4xx, never 500, and leaks nothing', async () => {
+    const v1 = fakeV1({ rows: [row('caller-adult')] });
+    running = await start({ v1 });
+    const cases: [string, number, number][] = [
+      ['{"jsonrpc":', 400, -32700],
+      [JSON.stringify({ jsonrpc: '1.0', id: 1, method: 'tools/list' }), 400, -32700],
+      [JSON.stringify({ id: 1, method: 'tools/list' }), 400, -32700],
+      [JSON.stringify({ jsonrpc: '2.0', id: 1 }), 400, -32700],
+      [JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: 'feed_mon' }), 400, -32700],
+      ['42', 400, -32700],
+      ['null', 400, -32700],
+    ];
+    for (const [body, status, code] of cases) {
+      const { status: got, text } = await postRaw(running, body);
+      expect(got, body).toBe(status);
+      expect((JSON.parse(text) as { error: { code: number } }).error.code, body).toBe(code);
+      expectNoLeak(text);
+    }
+    expect(v1.calls).toHaveLength(0);
+  });
+
+  it('answers an unknown method and an unknown or removed tool as JSON-RPC errors', async () => {
+    const v1 = fakeV1({ rows: [row('caller-adult')] });
+    running = await start({ v1 });
+    const method = await postRaw(running, JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'admin/dump' }));
+    expect(method.status).toBe(200);
+    expect(JSON.parse(method.text)).toMatchObject({ error: { code: -32601 } });
+    for (const name of ['heal_mon', 'get_inventory', '__proto__']) {
+      const tool = await postRaw(running, JSON.stringify(callTool(name)));
+      expect(tool.status, name).toBe(200);
+      expect(JSON.parse(tool.text), name).toMatchObject({ error: { code: -32602 } });
+      expectNoLeak(tool.text);
+    }
+    expect(v1.calls).toHaveLength(0);
+  });
+
+  it('rejects wrongly typed tool arguments without touching /v1', async () => {
+    const v1 = fakeV1({ rows: [row('caller-adult')] });
+    running = await start({ v1 });
+    for (const call of [callTool('play_with_mon', { quality: 'lots' }), callTool('get_mon_status', { monId: { $ne: null } })]) {
+      const { status, text } = await postRaw(running, JSON.stringify(call));
+      expect(status).toBe(200);
+      expect(JSON.parse(text)).toMatchObject({ result: { isError: true } });
+      expectNoLeak(text);
+    }
+    expect(v1.calls.some((c) => c.method === 'PUT')).toBe(false);
+  });
+
+  it('answers a body over 1 MB with a 413 the client can read, before auth', async () => {
+    running = await start();
+    const big = JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: { pad: 'x'.repeat(1_100_000) } });
+    for (const token of ['adult', 'forged']) {
+      const { status, text } = await postRaw(running, big, token);
+      expect(status).toBe(413);
+      expect(JSON.parse(text)).toMatchObject({ jsonrpc: '2.0', id: null, error: { code: -32600 } });
+    }
+    // The listener still serves the next request.
+    expect((await rpc(running, initialize('2025-11-25'), { token: 'service' })).status).toBe(200);
+  });
+
+  it('refuses JSON-RPC batches before any tool runs, whoever sends them', async () => {
+    const v1 = fakeV1({ rows: [row('caller-adult')] });
+    running = await start({ v1 });
+    const twoMeals = JSON.stringify([callTool('feed_mon', {}, 1), callTool('feed_mon', {}, 2)]);
+    for (const token of ['adult', 'service', 'read-only', undefined]) {
+      const { status, text } = await postRaw(running, twoMeals, token);
+      expect(status).toBe(400);
+      expect(JSON.parse(text)).toMatchObject({ jsonrpc: '2.0', id: null, error: { code: -32600 } });
+    }
+    expect((await postRaw(running, '[]', 'adult')).status).toBe(400);
+    expect(v1.calls).toHaveLength(0);
+  });
+});
+
+describe('real JWT verification over HTTP', () => {
+  const ISSUER = 'http://127.0.0.1:5174';
+
+  async function jwtServer(v1 = fakeV1({ rows: [row('caller-adult')] })) {
+    const { privateKey, publicKey } = await generateKeyPair('EdDSA', { crv: 'Ed25519' });
+    const jwks = createLocalJWKSet({ keys: [{ ...(await exportJWK(publicKey)), kid: 'k1', alg: 'EdDSA' }] });
+    const holder: { audience?: string } = {};
+    const verifier: TokenVerifier = { verify: (t) => createJwtVerifier({ issuer: ISSUER, audience: holder.audience ?? '', jwks }).verify(t) };
+    running = await start({ v1, verifier });
+    holder.audience = running.mcpUrl;
+    const mint = (claims: Record<string, unknown>, opts: { exp?: number; aud?: string } = {}) =>
+      new SignJWT(claims)
+        .setProtectedHeader({ alg: 'EdDSA', kid: 'k1', typ: 'at+jwt' })
+        .setIssuer(ISSUER)
+        .setAudience(opts.aud ?? running!.mcpUrl)
+        .setIssuedAt()
+        .setExpirationTime(opts.exp ?? Math.floor(Date.now() / 1000) + 600)
+        .sign(privateKey);
+    return { v1, mint };
+  }
+
+  it('lets a client_credentials token discover tools but not read or change Caller data', async () => {
+    const { v1, mint } = await jwtServer();
+    const service = await mint({ sub: 'alexa', client_id: 'alexa', scope: 'mcp:service' });
+    expect((await rpc(running!, { jsonrpc: '2.0', id: 1, method: 'tools/list' }, { token: service })).status).toBe(200);
+    for (const name of ['get_mon_status', 'check_on_mon', 'check_incubation', 'feed_mon']) {
+      const response = await rpc(running!, callTool(name), { token: service });
+      expect(response.status, name).toBe(401);
+    }
+    // A service token that also names a user in `sub` is still a service token.
+    const spoofed = await mint({ sub: 'caller-adult', client_id: 'alexa', scope: 'mcp:service' });
+    expect((await rpc(running!, callTool('get_mon_status'), { token: spoofed })).status).toBe(401);
+    expect(v1.calls).toHaveLength(0);
+  });
+
+  it('answers 401 for an expired, wrong-audience or unsigned user token and never calls /v1', async () => {
+    const { v1, mint } = await jwtServer();
+    const user = { sub: 'caller-adult', client_id: 'alexa', scope: 'mcp:caller mcp:care', birth_year: 1990 };
+    expect((await rpc(running!, callTool('get_mon_status'), { token: await mint(user) })).status).toBe(200);
+    const readsBefore = v1.calls.length;
+    const bad = [
+      await mint(user, { exp: Math.floor(Date.now() / 1000) - 60 }),
+      await mint(user, { aud: `${running!.mcpUrl}/` }),
+      new UnsecuredJWT(user).setIssuer(ISSUER).setAudience(running!.mcpUrl).setExpirationTime('10m').encode(),
+    ];
+    for (const token of bad) {
+      const response = await rpc(running!, callTool('feed_mon'), { token });
+      expect(response.status).toBe(401);
+      expect(response.headers.get('www-authenticate')).toBeNull();
+    }
+    expect(v1.calls.length).toBe(readsBefore);
   });
 });
