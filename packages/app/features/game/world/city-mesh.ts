@@ -5,10 +5,16 @@
 // (metro-live's mergeByMaterial, applied while building).
 import type { Three } from '@acme/ui/three';
 import type { BuildingClass, CityBuilding, CityDatasetV2, CityLandmark, CityRoad, RoadClass } from '../city-dataset.ts';
-import { counterClockwise, hashUnit, mapArea, pairs, ribbon, VertexBuffer } from './geometry.ts';
+import { counterClockwise, hashUnit, mapArea, pairs, pointInRing, ribbon, VertexBuffer } from './geometry.ts';
+import {
+  bays, emitAwning, emitCornice, emitFireEscapeFloor, emitStoop, emitWaterTower, fireEscapeFloors, FLOOR_HEIGHT, hasFireEscape,
+  hasShopSign, hasStoop, hasWaterTower, shopWords, STOOP_REACH, STOOP_WIDTH, towerSpot, wallFrame,
+} from './facade-detail.ts';
+import { emitStackedText, emitText, textWidth, type TextFace } from './lettering.ts';
+import { BandedBuffer, box } from './parts.ts';
 import type { CityMaterials } from './materials.ts';
-import { WALKWAY_CLASSES } from './walkability.ts';
-import { CITY_COLORS, hexToRgb, type CityColor } from './palette.ts';
+import { createStreetClearance, WALKWAY_CLASSES, type StreetClearance } from './walkability.ts';
+import { AWNING_TONES, CITY_COLORS, hexToRgb, WALL_TONES, type CityColor } from './palette.ts';
 
 type Point = [number, number];
 type Mesh = InstanceType<Three['Mesh']>;
@@ -41,9 +47,6 @@ export function shadowBands(focusZ: number, minZ: number, bandCount: number): [n
 const rgb = (key: CityColor) => hexToRgb(CITY_COLORS[key]);
 const tint = (color: readonly number[], amount: number) => color.map((v) => Math.max(0, Math.min(1, v * amount)));
 
-const WALL_COLOR: Record<BuildingClass, CityColor> = {
-  brownstone: 'brownstone', brick: 'brick', glass: 'glass', nycha: 'nycha', church: 'church', civic: 'civic', plain: 'plain',
-};
 const CENTRE_LINE_MIN_WIDTH = 9;
 
 /** Triangulate a ring (with holes) and emit it facing up at height y, counter-clockwise on the map. */
@@ -171,21 +174,34 @@ function segmentDistance(x: number, z: number, ax: number, az: number, bx: numbe
   return Math.hypot(ax + dx * t - x, az + dz * t - z);
 }
 
-function landmarkAccents(buffer: VertexBuffer, landmark: CityLandmark, building: CityBuilding, ring: Point[], roads: readonly CityRoad[]): void {
+function landmarkAccents(buffer: VertexBuffer, text: VertexBuffer, landmark: CityLandmark, building: CityBuilding, ring: Point[], roads: readonly CityRoad[]): void {
   const face = streetFace(ring, roads);
   const h = building.heightMeters;
   switch (landmark.key) {
     case 'apollo-theater': {
       if (!face) return;
-      // Marquee band over the entrance and the tall blade sign beside it (no lettering).
+      // Marquee band over the entrance, and the tall blade sign standing out from the wall, both lettered APOLLO.
       const width = Math.min(face.length * 0.8, 16);
       const [mx, mz] = face.mid;
       const [ox, oz] = face.out;
       emitBox(buffer, mx + ox * 0.9, mz + oz * 0.9, face.out, width, 1.8, 4.2, 5.6, rgb('marquee'));
       emitBox(buffer, mx + ox * 1.85, mz + oz * 1.85, face.out, width + 0.2, 0.12, 4.35, 5.45, rgb('marqueeLights'));
+      const right: Point = [oz, -ox];
+      emitText(text, 'APOLLO', { x: mx + ox * 1.93, y: 4.9, z: mz + oz * 1.93, right, height: 0.8, color: rgb('marquee') });
       const across: Point = [-oz, ox];
       const side = width * 0.32;
-      emitBox(buffer, mx + across[0] * side + ox * 1.5, mz + across[1] * side + oz * 1.5, across, 0.5, 2.6, 6, Math.min(h + 2, 17), rgb('marquee'));
+      const top = Math.min(h + 2, 17);
+      const bx = mx + across[0] * side; const bz = mz + across[1] * side;
+      emitBox(buffer, bx + ox * 1.5, bz + oz * 1.5, face.out, 0.5, 2.6, 6, top, rgb('marquee'));
+      const letter = Math.min(1.3, (top - 6 - 0.8) / (6 * 1.18));
+      for (const s of [1, -1]) {
+        // Each face of the blade reads down the street it faces.
+        const n: Point = [across[0] * s, across[1] * s];
+        emitStackedText(text, 'APOLLO', {
+          x: bx + ox * 1.5 + n[0] * 0.27, y: (6 + top) / 2, z: bz + oz * 1.5 + n[1] * 0.27,
+          right: [n[1], -n[0]], height: letter, color: rgb('marqueeLights'),
+        });
+      }
       return;
     }
     case 'hotel-theresa':
@@ -198,7 +214,21 @@ function landmarkAccents(buffer: VertexBuffer, landmark: CityLandmark, building:
   }
 }
 
-export interface CityMeshStats { buildings: number; roads: number; areas: number; triangles: number; drawCalls: number; neonTrims: number; storefronts: number; billboards: number }
+export interface CityMeshStats {
+  buildings: number; roads: number; areas: number; triangles: number; drawCalls: number; neonTrims: number; storefronts: number; billboards: number;
+  cornices: number; stoops: number; fireEscapes: number; awnings: number; shopSigns: number; waterTowers: number;
+}
+
+/** Masonry fronts that carry a cornice. */
+const CORNICE_CLASSES: ReadonlySet<BuildingClass> = new Set(['brownstone', 'brick', 'nycha', 'civic', 'church', 'plain']);
+/** Lit shop-sign panels: brand faces under white lettering. */
+const SHOP_SIGN_TONES = ['awningRed', 'awningGreen', 'awningBlue', 'awningOrange', 'awningBlack'] as const satisfies readonly CityColor[];
+
+/** The wall tone for a building: one of its class's family, by a hash of its id. */
+export function wallTone(building: Pick<CityBuilding, 'id' | 'class'>): CityColor {
+  const family: readonly CityColor[] = WALL_TONES[building.class];
+  return family[Math.floor(hashUnit(`${building.id}:tone`) * family.length) % family.length]!;
+}
 
 /** Roads whose frontage gets storefront light bands and billboards: Harlem's commercial avenues and 125th Street. */
 const COMMERCIAL: ReadonlySet<RoadClass> = new Set(['primary', 'secondary', 'trunk']);
@@ -223,17 +253,22 @@ export function neonKeyFor(id: string): (typeof NEON_KEYS)[number] {
   return NEON_KEYS[Math.floor(hashUnit(`${id}:neon`) * NEON_KEYS.length) % NEON_KEYS.length]!;
 }
 
-export function buildCityMeshes(THREE: Three, dataset: CityDatasetV2, materials: CityMaterials, sunAway: Point) {
-  const masonry = new VertexBuffer();
+export function buildCityMeshes(THREE: Three, dataset: CityDatasetV2, materials: CityMaterials, sunAway: Point, clearance: StreetClearance = createStreetClearance(dataset)) {
+  const masonry = new VertexBuffer(262144);
   const glass = new VertexBuffer();
-  const roofs = new VertexBuffer();
-  const shadows = new VertexBuffer();
+  const roofs = new VertexBuffer(131072);
+  const shadows = new VertexBuffer(196608);
   const areas = new VertexBuffer();
-  const sidewalks = new VertexBuffer();
-  const roads = new VertexBuffer();
+  const sidewalks = new VertexBuffer(16384);
+  const roads = new VertexBuffer(16384);
   const accents = new VertexBuffer();
-  const neon = new VertexBuffer();
+  const neon = new VertexBuffer(65536);
   const billboards = new VertexBuffer();
+  // Street-level detail drawn only near the Caller: stoops, fire escapes, awnings.
+  const detail = new BandedBuffer();
+  const landmarkText = new VertexBuffer();
+  const texts: (TextFace & { text: string })[] = [];
+  let cornices = 0; let stoops = 0; let fireEscapes = 0; let awnings = 0; let shopSigns = 0; let waterTowers = 0;
   const landmarkByBuilding = new Map(dataset.landmarks.map((l) => [l.buildingId, l]));
   const shadowColor = rgb('shadow');
   const commercial = new SegmentGrid(dataset.roads.filter((r) => COMMERCIAL.has(r.class)));
@@ -257,11 +292,12 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV2, materials:
 
   for (const { building, band: buildingBand } of banded) {
     while (band < buildingBand) bandStart[++band] = shadows.vertexCount;
+    detail.mark(buildingBand);
     const ring = counterClockwise(pairs(building.ring));
     const holes = building.holes.map((hole) => counterClockwise(pairs(hole)).reverse());
     const landmark = landmarkByBuilding.get(building.id);
     const variation = 0.92 + hashUnit(building.id) * 0.16;
-    const wallKey: CityColor = landmark?.key === 'hotel-theresa' ? 'terracotta' : WALL_COLOR[building.class];
+    const wallKey: CityColor = landmark?.key === 'hotel-theresa' ? 'terracotta' : wallTone(building);
     const wall = tint(rgb(wallKey), variation);
     const target = building.class === 'glass' ? glass : masonry;
     const h = building.heightMeters;
@@ -270,7 +306,7 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV2, materials:
     const roofColor = tint(rgb('roof').map((v, i) => v * 0.8 + wall[i]! * 0.2), variation);
     emitFlat(THREE, roofs, ring, holes, h, roofColor);
     emitShadow(shadows, ring, Math.max(1.2, Math.min(5, h * 0.12)), sunAway, shadowColor);
-    if (landmark) { landmarkAccents(accents, landmark, building, ring, dataset.roads); continue; }
+    if (landmark) { landmarkAccents(accents, landmarkText, landmark, building, ring, dataset.roads); continue; }
 
     // The near-future layer: a neon roofline, storefront light bands and the odd billboard.
     const neonColor = rgb(neonKeyFor(building.id));
@@ -278,22 +314,72 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV2, materials:
       emitWalls(neon, ring, h - 0.32, h - 0.06, neonColor, 0.06);
       trims++;
     }
+    let stooped = false;
     for (let i = 0; i < ring.length; i++) {
       const [ax, az] = ring[i]!;
       const [bx, bz] = ring[(i + 1) % ring.length]!;
       const length = Math.hypot(bx - ax, bz - az);
-      if (length < 5 || h < 6) continue;
+      if (length < 4) continue;
       const out = normalOf(ax, az, bx, bz);
       const mid: Point = [(ax + bx) / 2, (az + bz) / 2];
-      if (commercial.nearest(mid[0] + out[0] * 6, mid[1] + out[1] * 6) > 14) continue;
-      // Storefront band: a lit fascia above the shop windows, inset from the corners.
-      const inset = Math.min(0.8, length * 0.08);
-      const ux = (bx - ax) / length; const uz = (bz - az) / length;
-      const off = 0.12;
-      const [sx, sz] = [ax + ux * inset + out[0] * off, az + uz * inset + out[1] * off];
-      const [ex, ez] = [bx - ux * inset + out[0] * off, bz - uz * inset + out[1] * off];
-      // One quad facing the street (emitWalls on a two-point ring would add a hidden back face).
-      neon.quad([sx, 3.15, sz], [ex, 3.15, ez], [ex, 3.45, ez], [sx, 3.45, sz], [out[0], 0, out[1]], tint(neonColor, 0.95));
+      const f = wallFrame([ax, az], [bx, bz], out);
+      const along: Point = [f.oz, -f.ox];
+      // A street face: a carriageway within about a sidewalk's width of the wall.
+      const facesStreet = clearance.kerbGap(mid[0] + out[0] * 3.5, mid[1] + out[1] * 3.5) < 7;
+      const onAvenue = length >= 5 && h >= 6 && commercial.nearest(mid[0] + out[0] * 6, mid[1] + out[1] * 6) <= 14;
+      if (!facesStreet && !onAvenue) continue;
+
+      // Cornice along the roof line of masonry street fronts.
+      if (CORNICE_CLASSES.has(building.class) && h < 45) {
+        emitCornice(masonry, f, length, h, tint(rgb('cornice').map((v, k) => v * 0.6 + wall[k]! * 0.4), 1));
+        cornices++;
+      }
+      // A brownstone's stoop, off one street face, when the sidewalk has room for it.
+      if (building.class === 'brownstone' && !onAvenue && !stooped && length >= 5 && hasStoop(building.id)) {
+        const at = (hashUnit(`${building.id}:door`) - 0.5) * Math.max(0, length - STOOP_WIDTH - 1.2);
+        const tip: Point = [mid[0] + along[0] * at + out[0] * (STOOP_REACH + 0.2), mid[1] + along[1] * at + out[1] * (STOOP_REACH + 0.2)];
+        if (clearance.standable(tip[0], tip[1])) {
+          emitStoop(detail.buffer, f, at, tint(wall, 0.9), rgb('iron'));
+          stooped = true;
+          stoops++;
+        }
+      }
+      // Zig-zag fire escape on a tenement front, one per face, over a central bay.
+      if (length >= 7 && hasFireEscape(building.id, i, h, building.class)) {
+        const floors = fireEscapeFloors(h);
+        const at = (hashUnit(`${building.id}:${i}:bay`) - 0.5) * Math.max(0, length - 4);
+        for (let k = 1; k <= floors; k++) emitFireEscapeFloor(detail.buffer, f, at, k * FLOOR_HEIGHT, rgb('iron'), k % 2 === 0);
+        fireEscapes++;
+      }
+      if (!onAvenue) continue;
+
+      // Storefronts: awnings over most bays, and either a lit shop sign or the plain fascia band.
+      for (const at of bays(length, 4.5)) {
+        if (hashUnit(`${building.id}:${i}:${at}:awning`) > 0.55) continue;
+        const tone = AWNING_TONES[Math.floor(hashUnit(`${building.id}:${i}:${at}:hue`) * AWNING_TONES.length) % AWNING_TONES.length]!;
+        emitAwning(detail.buffer, f, at, 3.8, rgb(tone));
+        awnings++;
+      }
+      if (hasShopSign(building.id, i)) {
+        const width = Math.min(length * 0.75, 9);
+        const panel = rgb(SHOP_SIGN_TONES[Math.floor(hashUnit(`${building.id}:${i}:panel`) * SHOP_SIGN_TONES.length) % SHOP_SIGN_TONES.length]!);
+        box(neon, f, [-width / 2, 3.15, 0], [width / 2, 4.05, 0.18], panel, { skip: ['back', 'bottom'] });
+        const words = shopWords(building.id, i);
+        const condense = Math.max(0.5, Math.min(1, (width - 0.4) / textWidth(words, 0.42)));
+        if (textWidth(words, 0.42, condense) <= width - 0.2) {
+          texts.push({ text: words, x: mid[0] + out[0] * 0.2, y: 3.6, z: mid[1] + out[1] * 0.2, right: along, height: 0.42, condense, color: rgb('signText') });
+        }
+        shopSigns++;
+      } else {
+        // Storefront band: a lit fascia above the shop windows, inset from the corners.
+        const inset = Math.min(0.8, length * 0.08);
+        const ux = (bx - ax) / length; const uz = (bz - az) / length;
+        const off = 0.12;
+        const [sx, sz] = [ax + ux * inset + out[0] * off, az + uz * inset + out[1] * off];
+        const [ex, ez] = [bx - ux * inset + out[0] * off, bz - uz * inset + out[1] * off];
+        // One quad facing the street (emitWalls on a two-point ring would add a hidden back face).
+        neon.quad([sx, 3.15, sz], [ex, 3.15, ez], [ex, 3.45, ez], [sx, 3.45, sz], [out[0], 0, out[1]], tint(neonColor, 0.95));
+      }
       fronts++;
       if (boards < MAX_BILLBOARDS && h >= 16 && length >= 8 && hashUnit(`${building.id}:${i}:board`) < 0.4) {
         const [top, bottom] = BILLBOARD_PAIRS[Math.floor(hashUnit(`${building.id}:pair`) * BILLBOARD_PAIRS.length) % BILLBOARD_PAIRS.length]!;
@@ -301,7 +387,17 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV2, materials:
         boards++;
       }
     }
+    // A wooden water tower on a share of the five-storey-and-up roofs.
+    if (hasWaterTower(building.id, h, building.class)) {
+      const scale = 0.85 + hashUnit(`${building.id}:tankScale`) * 0.35;
+      const spot = towerSpot(ring, (x, z) => pointInRing(x, z, ring), 1.9 * scale);
+      if (spot) {
+        emitWaterTower(roofs, spot[0], spot[1], h, scale, rgb('cedar'), rgb('towerSteel'), rgb('towerRoof'));
+        waterTowers++;
+      }
+    }
   }
+  const detailStart = detail.finish(bandCount);
   while (band < bandCount) bandStart[++band] = shadows.vertexCount;
 
   // Draw order inside one mesh follows array order at equal depth; each kind also sits on its own step.
@@ -344,6 +440,10 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV2, materials:
   add('city:landmarks', accents, materials.accents);
   add('city:neon', neon, materials.neon);
   add('city:billboards', billboards, materials.billboards);
+  // Same cel material as the roofs (vertex colour, no pattern); drawn by band near the Caller.
+  const detailMesh = add('city:street-detail', detail.buffer, materials.roofs);
+  if (detailMesh) detailMesh.frustumCulled = false;
+  add('city:landmark-lettering', landmarkText, materials.lettering);
   // Transparent, after the opaque city.
   const shadowMesh = add('city:contact-shadows', shadows, materials.shadows, 2);
   // The strip spans the tile; its draw range follows the Caller, so culling by bounds would be wrong.
@@ -353,19 +453,22 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV2, materials:
   const stats: CityMeshStats = {
     buildings: dataset.buildings.length, roads: dataset.roads.length, areas: dataset.areas.length,
     triangles, drawCalls: meshes.length, neonTrims: trims, storefronts: fronts, billboards: boards,
+    cornices, stoops, fireEscapes, awnings, shopSigns, waterTowers,
   };
   let shownBands: [number, number] = [-1, -1];
   return {
     meshes,
     stats,
+    /** Shop-sign lettering for the banded lettering mesh (street-furniture.ts). */
+    texts,
     /** Contact shadows only near the focus: a few z bands, one draw range, no allocation. */
     setFocus(_x: number, z: number) {
-      if (!shadowMesh) return;
       const [first, last] = shadowBands(z, minZ, bandCount);
       if (first === shownBands[0] && last === shownBands[1]) return;
       shownBands = [first, last];
       const start = bandStart[first]!;
-      shadowMesh.geometry.setDrawRange(start, bandStart[last + 1]! - start);
+      shadowMesh?.geometry.setDrawRange(start, bandStart[last + 1]! - start);
+      detailMesh?.geometry.setDrawRange(detailStart[first]!, detailStart[last + 1]! - detailStart[first]!);
     },
     dispose: () => { for (const mesh of meshes) mesh.geometry.dispose(); },
   };

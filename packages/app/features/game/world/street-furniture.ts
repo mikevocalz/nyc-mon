@@ -13,9 +13,11 @@
 import type { Three } from '@acme/ui/three';
 import type { CityDatasetV2 } from '../city-dataset.ts';
 import { shadowBands, SHADOW_BAND_METRES } from './city-mesh.ts';
-import { VertexBuffer } from './geometry.ts';
-import { linearColor, type CityMaterials } from './materials.ts';
-import { ATLAS_HEIGHT, ATLAS_WIDTH, atlasPixels, GLYPH_WIDTH, glyphUv, layoutText } from './pixel-font.ts';
+import { emitText, type TextFace } from './lettering.ts';
+import type { CityMaterials } from './materials.ts';
+import { CITY_COLORS, hexToRgb, type CityColor } from './palette.ts';
+import { BandedBuffer } from './parts.ts';
+import { layoutText } from './pixel-font.ts';
 import {
   BLADE_HEIGHT, findIntersections, LETTER_HEIGHT, LIGHT_POLE_HEIGHT, MAX_SIGNS, placeSigns, placeStreetlights,
   SIGN_POLE_HEIGHT, type SignBlade,
@@ -29,6 +31,8 @@ export const POOL_RADIUS = 110;
 export const POOL_CAP = 48;
 const BLADE_THICKNESS = 0.03;
 const PIXEL = LETTER_HEIGHT / 7;
+/** Vertex colours carry display values straight through (materials.ts). */
+const linearRgb = (key: CityColor) => hexToRgb(CITY_COLORS[key]);
 
 /** Metres of lettering for a blade's text at square pixels. */
 export const measureText = (text: string) => layoutText(text).width * PIXEL;
@@ -44,8 +48,9 @@ export function placeStreetFurniture(dataset: CityDatasetV2, clearance: StreetCl
 }
 
 export function buildStreetFurniture(
-  THREE: Three, dataset: CityDatasetV2, materials: Pick<CityMaterials, 'poles' | 'signBlades' | 'lampHeads' | 'lampPools'>,
+  THREE: Three, dataset: CityDatasetV2, materials: Pick<CityMaterials, 'poles' | 'signBlades' | 'lampHeads' | 'lampPools' | 'lettering'>,
   clearance: StreetClearance = createStreetClearance(dataset),
+  extraTexts: readonly (TextFace & { text: string })[] = [],
 ) {
   const { signs, lights, intersections } = placeStreetFurniture(dataset, clearance);
 
@@ -86,32 +91,23 @@ export function buildStreetFurniture(
   }
   blades.count = b;
 
-  // Lettering, in z bands so a draw range can follow the Caller.
+  // Lettering (street-name blades, plus the shop signs city-mesh.ts collected), in z bands so a draw range can follow the Caller.
   const minZ = -dataset.extentMeters - SHADOW_BAND_METRES;
   const bandCount = Math.max(1, Math.ceil((dataset.extentMeters * 2 + SHADOW_BAND_METRES * 2) / SHADOW_BAND_METRES) + 1);
   const bandOf = (z: number) => Math.max(0, Math.min(bandCount - 1, Math.floor((z - minZ) / SHADOW_BAND_METRES)));
-  const lettering = new VertexBuffer();
-  const bandStart = new Int32Array(bandCount + 1);
-  let band = -1;
-  for (const sign of [...signs].sort((s, t) => bandOf(s.z) - bandOf(t.z))) {
-    const signBand = bandOf(sign.z);
-    while (band < signBand) bandStart[++band] = lettering.vertexCount;
-    for (const blade of sign.blades) emitLettering(lettering, sign.x, sign.z, blade);
+  const faces: (TextFace & { text: string })[] = [...extraTexts];
+  const white = linearRgb('signText');
+  for (const sign of signs) for (const blade of sign.blades) faces.push(...bladeFaces(sign.x, sign.z, blade, white));
+  faces.sort((p, q) => bandOf(p.z) - bandOf(q.z));
+  const letteringBands = new BandedBuffer();
+  for (const face of faces) {
+    letteringBands.mark(bandOf(face.z));
+    emitText(letteringBands.buffer, face.text, face);
   }
-  while (band < bandCount) bandStart[++band] = lettering.vertexCount;
-
-  const atlas = new THREE.DataTexture(atlasPixels(), ATLAS_WIDTH, ATLAS_HEIGHT, THREE.RGBAFormat);
-  atlas.magFilter = THREE.NearestFilter;
-  atlas.minFilter = THREE.LinearMipmapLinearFilter;
-  atlas.generateMipmaps = true;
-  atlas.needsUpdate = true;
-  const T = THREE.TSL;
-  const letterMaterial = new THREE.MeshBasicNodeMaterial({ alphaTest: 0.5 });
-  // The sign's white, a touch under 1 so it does not clip under linear output.
-  letterMaterial.colorNode = T.vec4(T.color(linearColor(THREE, 'signText')).mul(0.92), 1);
-  letterMaterial.opacityNode = T.texture(atlas, T.uv()).a;
+  const bandStart = letteringBands.finish(bandCount);
+  const lettering = letteringBands.buffer;
   const letterGeometry = lettering.vertexCount > 0 ? lettering.toGeometry(THREE) : null;
-  const letters = letterGeometry ? new THREE.Mesh(letterGeometry, letterMaterial) : null;
+  const letters = letterGeometry ? new THREE.Mesh(letterGeometry, materials.lettering) : null;
   if (letters) {
     letters.name = 'city:sign-lettering';
     letters.frustumCulled = false;
@@ -154,6 +150,8 @@ export function buildStreetFurniture(
   const objects = [poles, blades, heads, pools, ...(letters ? [letters] : [])];
   return {
     objects,
+    signs,
+    lights,
     stats: { signs: signs.length, unsignedIntersections: intersections - signs.length, streetlights: lights.length, letterTriangles: lettering.vertexCount / 3 },
     /** Lettering bands and light pools follow the Caller. Allocation-free. */
     setFocus(x: number, z: number) {
@@ -188,36 +186,21 @@ export function buildStreetFurniture(
     dispose() {
       for (const g of [poleGeometry, bladeGeometry, headGeometry, poolGeometry]) g.dispose();
       letterGeometry?.dispose();
-      letterMaterial.dispose();
-      atlas.dispose();
       for (const mesh of [poles, blades, heads, pools]) mesh.dispose();
     },
   };
 }
 
-/** Glyph quads on both faces of one blade, each face reading left to right. */
-function emitLettering(buffer: VertexBuffer, x: number, z: number, blade: SignBlade): void {
-  const { glyphs, width } = layoutText(blade.text);
-  const px = PIXEL * blade.condense;
-  const total = width * px;
-  const white = [1, 1, 1] as const;
-  const yb = blade.y - LETTER_HEIGHT / 2;
-  const yt = blade.y + LETTER_HEIGHT / 2;
+/** Both faces of one blade, each reading left to right for a viewer in front of it. */
+function bladeFaces(x: number, z: number, blade: SignBlade, color: readonly number[]): (TextFace & { text: string })[] {
   const [dx, dz] = blade.dir;
-  for (const side of [1, -1]) {
-    // Face normal and reading direction: on the +normal face text runs along +dir, on the back along -dir.
+  const off = BLADE_THICKNESS / 2 + 0.003;
+  return [1, -1].map((side) => {
+    // Face normal (-dz, dx) * side; reading along dir * side keeps the text the right way round.
     const nx = -dz * side; const nz = dx * side;
-    const rx = dx * side; const rz = dz * side;
-    const off = BLADE_THICKNESS / 2 + 0.003;
-    const sx = x + nx * off - rx * (total / 2);
-    const sz = z + nz * off - rz * (total / 2);
-    for (const glyph of glyphs) {
-      const { u0, v0, u1, v1 } = glyphUv(glyph.index);
-      const a0 = glyph.x * px;
-      const a1 = a0 + GLYPH_WIDTH * px;
-      const x0 = sx + rx * a0; const z0 = sz + rz * a0;
-      const x1 = sx + rx * a1; const z1 = sz + rz * a1;
-      buffer.quad([x0, yb, z0], [x1, yb, z1], [x1, yt, z1], [x0, yt, z0], [nx, 0, nz], white, [[u0, v1], [u1, v1], [u1, v0], [u0, v0]]);
-    }
-  }
+    return {
+      text: blade.text, x: x + nx * off, y: blade.y, z: z + nz * off,
+      right: [dx * side, dz * side] as const, height: LETTER_HEIGHT, condense: blade.condense, color,
+    };
+  });
 }

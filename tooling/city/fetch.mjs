@@ -52,6 +52,9 @@ out geom tags;
 out geom;`,
   trees: `node["natural"="tree"](${BBOX});
 out;`,
+  // Street furniture the game draws from data: subway entrances and bus stops (shelter tag kept).
+  transit: `(node["railway"="subway_entrance"](${BBOX}); node["highway"="bus_stop"](${BBOX}););
+out;`,
   landmarks: `(nwr["name"~"Apollo Theater|Hotel Theresa|Theresa|Adam Clayton Powell"](${BBOX}););
 out center tags;`,
 };

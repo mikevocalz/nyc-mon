@@ -21,6 +21,7 @@ import { createCelMaterial, createCelRig, type CelMaterialOptions, type CelRig }
 import { cityCelRig } from './cel-rig.ts';
 import { CITY_COLORS, type CityColor } from './palette.ts';
 import { WINDOW_GRID } from './windows.ts';
+import { ATLAS_HEIGHT, ATLAS_WIDTH, atlasPixels } from './pixel-font.ts';
 import type { Node } from 'three/webgpu';
 
 type Mat = InstanceType<Three['Material']>;
@@ -55,8 +56,14 @@ export function createCityMaterials(THREE: Three, sunDirection: readonly [number
   const rig = createCelRig(THREE, cityCelRig(sunDirection));
   // Walls, roofs and trunks keep the rim sheen; flat ground seen at a
   // grazing angle would take it across its whole width, so it goes without.
-  const cel = (albedo: CelMaterialOptions['albedo'], rim: number, surface: CelSurface = {}) =>
-    createCelMaterial(THREE, { rig, albedo, rim, ...surface });
+  // Each cel material's TSL albedo, kept so node tests can compile the graph
+  // (the TypeGPU cel body itself only resolves under the Metro/Vite transform).
+  const albedoGraphs = new Map<Mat, CelMaterialOptions['albedo']>();
+  const cel = (albedo: CelMaterialOptions['albedo'], rim: number, surface: CelSurface = {}) => {
+    const material = createCelMaterial(THREE, { rig, albedo, rim, ...surface });
+    albedoGraphs.set(material, albedo);
+    return material;
+  };
 
   // Sky dome at dusk: dusty rose at the horizon through royal to brand night overhead,
   // a warm glow around the low sun, fog colour below the horizon.
@@ -81,23 +88,39 @@ export function createCityMaterials(THREE: Three, sunDirection: readonly [number
     const fy = T.fract(v.div(grid.floor));
     const fx = T.fract(u.div(grid.bay));
     const upper = T.step(3.6, v);
-    const pane = T.step(0.32, fy).mul(T.step(fy, 0.82)).mul(T.step(glassy ? 0.08 : 0.26, fx)).mul(T.step(fx, glassy ? 0.92 : 0.74)).mul(upper);
-    const shop = T.step(0.4, v).mul(T.step(v, 3.1)).mul(glassy ? 0.5 : 0.65);
-    const window = c('window');
-    const patterned = T.mix(T.mix(vertexRgb, window, pane.mul(glassy ? 0.7 : 0.82)), window, shop);
-    const average = T.mix(vertexRgb, window, glassy ? 0.35 : 0.18);
-    const near = detail(260, 700);
-    const material = cel(T.mix(average, patterned, near), 1);
+    const [paneLo, paneHi] = glassy ? [0.08, 0.92] : [0.26, 0.74];
+    const inX = (lo: number, hi: number) => T.step(lo, fx).mul(T.step(fx, hi));
+    const inY = (lo: number, hi: number) => T.step(lo, fy).mul(T.step(fy, hi));
+    const pane = inY(0.32, 0.82).mul(inX(paneLo, paneHi)).mul(upper);
+    // Relief by shading: a dark frame round each pane, a pale stone lintel over it
+    // and a sill under it (masonry); dark mullions and spandrels on glass.
+    const surround = inY(0.29, 0.85).mul(inX(paneLo - 0.035, paneHi + 0.035)).mul(upper).sub(pane);
+    const lintel = glassy ? T.float(0) : inY(0.86, 0.94).mul(inX(paneLo - 0.06, paneHi + 0.06)).mul(upper);
+    const sill = glassy ? T.float(0) : inY(0.25, 0.29).mul(inX(paneLo - 0.04, paneHi + 0.04)).mul(upper);
+    const shop = T.step(0.4, v).mul(T.step(v, 3.1));
     // Per-building seed from the wall colour (each wall varies by a hash of its id).
     const seed = T.fract(vertexRgb.x.mul(13.7).add(vertexRgb.y.mul(7.3))).mul(100);
     const column = T.floor(u.div(grid.bay));
     const row = T.floor(v.div(grid.floor));
     const hash = (a: typeof column, b: typeof column) => T.fract(T.sin(a.mul(12.9898).add(b.mul(78.233)).add(seed.mul(37.719))).mul(43758.5453));
+    // Roll-down gates on about a fifth of the shop bays: corrugated steel, ribs every 16 cm.
+    const gate = shop.mul(T.step(hash(column, T.float(-7)), 0.2));
+    const ribs = T.mix(c('gate'), c('gate').mul(0.72), T.step(0.5, T.fract(v.div(0.16))));
+    const window = c('window');
+    let patterned = T.mix(vertexRgb, vertexRgb.mul(0.55), surround.mul(glassy ? 0.9 : 0.75));
+    patterned = T.mix(patterned, c('lintel'), lintel.add(sill).mul(0.7));
+    patterned = T.mix(T.mix(patterned, window, pane.mul(glassy ? 0.7 : 0.82)), window, shop.mul(glassy ? 0.5 : 0.65));
+    patterned = T.mix(patterned, ribs, gate);
+    const average = T.mix(vertexRgb, window, glassy ? 0.35 : 0.18);
+    const near = detail(260, 700);
+    const material = cel(T.mix(average, patterned, near), 1);
     const density = T.float(0.25).add(T.fract(T.sin(seed.mul(7.31).mul(12.9898).add(3.7 * 78.233).add(1.13 * 37.719)).mul(43758.5453)).mul(0.5));
     const lit = T.step(hash(column, row), density).mul(T.step(1, row));
     const toneHash = hash(column.add(17.1), row.add(3.3));
     const tone = T.mix(T.mix(c('windowWarm'), c('windowAmber'), T.step(0.55, toneHash)), c('windowCool'), T.step(0.85, toneHash));
-    const glowNear = tone.mul(pane.mul(lit).mul(glassy ? 0.75 : 0.85));
+    // Open shops glow warm behind their glass; gated bays stay dark.
+    const shopGlow = c('windowWarm').mul(shop.mul(T.float(1).sub(gate)).mul(glassy ? 0.35 : 0.45));
+    const glowNear = tone.mul(pane.mul(lit).mul(glassy ? 0.75 : 0.85)).add(shopGlow);
     // Far off the panes are sub-pixel: glow at the average lit share instead of shimmering.
     const glowFar = tone.mul(density.mul(glassy ? 0.3 : 0.22));
     setEmissive(material, T.mix(glowFar, glowNear, near));
@@ -193,11 +216,26 @@ export function createCityMaterials(THREE: Three, sunDirection: readonly [number
     lampPools.colorNode = T.vec4(c('lampHalo').mul(fall.mul(fall).mul(0.32).mul(detail(80, 240))), 1);
   }
 
-  const all: Mat[] = [sky, masonry, glass, roofs, accents, neon, billboards, ground, areas, sidewalks, roads, shadows, trunks, poles, signBlades, lampHeads, lampPools];
+  // Pixel-font lettering (pixel-font.ts atlas, built in memory: no canvas on native). Ink is the vertex colour.
+  const atlas = new THREE.DataTexture(atlasPixels(), ATLAS_WIDTH, ATLAS_HEIGHT, THREE.RGBAFormat);
+  atlas.magFilter = THREE.NearestFilter;
+  atlas.minFilter = THREE.LinearMipmapLinearFilter;
+  atlas.generateMipmaps = true;
+  atlas.needsUpdate = true;
+  const lettering = new THREE.MeshBasicNodeMaterial({ alphaTest: 0.5 });
+  // A touch under 1 so white ink does not clip under linear output.
+  lettering.colorNode = T.vec4(vertexRgb.mul(0.92), 1);
+  lettering.opacityNode = T.texture(atlas, T.uv()).a;
+
+  // Parked cars: cel lit; vertices coloured below zero are body paint and take the instance's tone.
+  const carTone = T.attribute<'vec3'>(TONE_ATTRIBUTE, 'vec3');
+  const cars = cel(T.mix(vertexRgb, carTone, T.step(vertexRgb.x, -0.5)), 1);
+
+  const all: Mat[] = [lettering, cars, sky, masonry, glass, roofs, accents, neon, billboards, ground, areas, sidewalks, roads, shadows, trunks, poles, signBlades, lampHeads, lampPools];
   return {
     sky, masonry, glass, roofs, accents, neon, billboards, ground, areas, sidewalks, roads, shadows, trunks,
-    poles, signBlades, lampHeads, lampPools, rig,
-    dispose: () => { for (const material of all) material.dispose(); },
+    poles, signBlades, lampHeads, lampPools, lettering, cars, rig, albedoGraphs,
+    dispose: () => { for (const material of all) material.dispose(); atlas.dispose(); },
   };
 }
 

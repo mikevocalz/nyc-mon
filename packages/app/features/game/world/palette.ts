@@ -90,6 +90,65 @@ export const CITY_COLORS = {
   pole: ink[800],
   lampHead: mixHex(orange[50], carolina[100], 0.5),
   lampHalo: orange[200],
+  // Wall tone families, so a block is not one flat colour per class (WALL_TONES).
+  brownstoneWarm: mixHex(orange[800], concrete[600], 0.3),
+  sandstone: mixHex(orange[700], concrete[500], 0.45),
+  brickRed: mixHex(mixHex(apple[800], orange[700], 0.5), concrete[500], 0.2),
+  brickDark: mixHex(orange[900], apple[900], 0.5),
+  brickBuff: mixHex(orange[400], concrete[400], 0.55),
+  limestone: mixHex(concrete[100], orange[100], 0.35),
+  stucco: mixHex(concrete[300], orange[200], 0.2),
+  glassDark: mixHex(royal[800], carolina[700], 0.5),
+  glassTeal: mixHex(carolina[600], leaf[700], 0.3),
+  // Window surrounds: pale stone lintels and sills, dark frames.
+  lintel: mixHex(concrete[100], orange[100], 0.5),
+  // Roll-down shop gates.
+  gate: concrete[400],
+  // Cast iron: stoop railings, fire escapes, hydrant caps.
+  iron: ink[900],
+  cornice: mixHex(concrete[600], orange[900], 0.25),
+  // Shop awnings.
+  awningRed: apple[600],
+  awningGreen: leaf[700],
+  awningBlue: royal[600],
+  awningOrange: orange[600],
+  awningBlack: ink[800],
+  awningTeal: carolina[700],
+  // Water towers: weathered cedar staves, black steel, a tarred roof.
+  cedar: mixHex(orange[900], concrete[500], 0.35),
+  towerSteel: ink[800],
+  towerRoof: ink[700],
+  // Street things. The palette has no yellow: taxis take the orange steps the lane lines use.
+  taxi: mixHex(orange[300], orange[400], 0.4),
+  carSilver: concrete[300],
+  carDark: ink[800],
+  carBlue: royal[700],
+  carRed: apple[700],
+  carGrey: concrete[600],
+  carGreen: leaf[800],
+  carGlass: ink[900],
+  tyre: ink[950],
+  hydrant: apple[600],
+  hydrantCap: concrete[300],
+  basket: leaf[900],
+  subwayRail: leaf[900],
+  subwayGlobe: leaf[400],
+  shelterGlass: mixHex(carolina[800], ink[800], 0.4),
+  shelterFrame: concrete[600],
 } as const;
 
 export type CityColor = keyof typeof CITY_COLORS;
+
+/** Wall tones per material class, one picked per building by a hash of its id (city-mesh.ts). */
+export const WALL_TONES = {
+  brownstone: ['brownstone', 'brownstoneWarm', 'sandstone'],
+  brick: ['brick', 'brickRed', 'brickDark', 'brickBuff'],
+  nycha: ['nycha', 'brickDark'],
+  glass: ['glass', 'glassDark', 'glassTeal'],
+  civic: ['civic', 'limestone'],
+  church: ['church', 'limestone', 'sandstone'],
+  plain: ['plain', 'limestone', 'stucco'],
+} as const satisfies Record<string, readonly CityColor[]>;
+
+export const AWNING_TONES = ['awningRed', 'awningGreen', 'awningBlue', 'awningOrange', 'awningBlack', 'awningTeal'] as const satisfies readonly CityColor[];
+export const CAR_TONES = ['carSilver', 'carDark', 'carBlue', 'carRed', 'carGrey', 'carGreen', 'carDark', 'carSilver'] as const satisfies readonly CityColor[];

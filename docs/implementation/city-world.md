@@ -8,7 +8,7 @@ The techniques come from `metro-live` in [vg-demos-all](https://github.com/vietg
 
 | Step | File | What it does |
 | --- | --- | --- |
-| Fetch | `tooling/city/fetch.mjs` | Overpass queries for buildings, roads, areas, trees and landmark names in a bbox around the origin; cached in `tooling/city/.cache/` (git-ignored). Mirror retry ported from metro-live `scripts/osm/fetch.mjs`. |
+| Fetch | `tooling/city/fetch.mjs` | Overpass queries for buildings, roads, areas, trees, landmark names and transit nodes (subway entrances, bus stops) in a bbox around the origin; cached in `tooling/city/.cache/` (git-ignored). Mirror retry ported from metro-live `scripts/osm/fetch.mjs`. |
 | Build | `tooling/city/build.mjs` | Projects to local metres, simplifies (Douglas-Peucker), clips (Sutherland-Hodgman), assembles multipolygons, classifies, estimates, plants fill trees, finds landmarks. Writes `packages/app/features/game/data/harlem-apollo.json`. Geometry helpers ported from metro-live `scripts/osm/build.mjs`. |
 | Foliage | `tooling/city/bake-foliage.mjs` | Copies the alpha of the CC0 Quaternius leaf card out of metro-live's `data/foliage.json` into `world/leaf-alpha.ts`. No image decoder runs on the phone. |
 | Check | `tooling/city/print-counts.mjs` | Parses the baked file with the app's `parseCityDataset` and prints counts, size and parse time. |
@@ -28,6 +28,7 @@ The techniques come from `metro-live` in [vg-demos-all](https://github.com/vietg
 | `areas[]` | `id`, kind `k` (park, garden, grass, pitch, playground, plaza, parking, water, school), ring and holes. |
 | `trees` | `osm`: natural=tree nodes. `fill`: generated street and park planting, fixed seed. Fill trees are decoration, not map data. |
 | `landmarks[]` | `key` (apollo-theater, hotel-theresa, acp-state-office), OSM name, the building it attaches to, centroid. A landmark OSM does not name is left out, never invented. |
+| `transit` | `subway`: `railway=subway_entrance` nodes. `shelters`: `highway=bus_stop` nodes tagged `shelter=yes`. Flat x, z. Optional: tiles baked before 2026-10-16 parse with both empty. |
 
 Limits: 20 000 buildings, 10 000 roads, 4 000 areas, 25 000 trees, 600 000 points, 4 096 points per ring, 2 000 m tile radius. The scene caps features at 40 000; geometry is merged per material, so the cap bounds build time and memory rather than draw calls.
 
@@ -90,7 +91,7 @@ The scene now draws around the Caller (`world.setFocus`, called with the camera 
 - Contact shadows and sign lettering: buildings and signs are written in 50 m z bands, and one draw range shows the bands within 160 m.
 - Light pools: the 48 nearest lamps within 110 m.
 
-Visible triangles on the real tile at the Apollo spawn, chase 8 m, counted by `visibleTriangles` (index or vertex count / 3, times instance count, over visible meshes): 791 301 before (node, the same rule; the device's 857 559 includes the Caller and the HUD scene), about 186 000 after, with the futuristic layer and street furniture included. `world/budget.test.ts` keeps chase 8, 18 and 40 m and a 400 m walk along 125th Street under 200 000. 20 city meshes. None of this is a device frame time yet.
+Visible triangles on the real tile at the Apollo spawn, chase 8 m (before the street-level pass below), counted by `visibleTriangles` (index or vertex count / 3, times instance count, over visible meshes): 791 301 before (node, the same rule; the device's 857 559 includes the Caller and the HUD scene), about 186 000 after, with the futuristic layer and street furniture included. `world/budget.test.ts` keeps chase 8, 18 and 40 m and a 400 m walk along 125th Street under 200 000. 20 city meshes. None of this is a device frame time yet.
 
 ### Camera
 
@@ -158,6 +159,31 @@ The city is at dusk: the sun about 25 degrees up in the south-west, the cel key 
 
 No bloom: three's post-processing needs the output pass, which renders black on react-native-webgpu, and `packages/ui/three` has none to reuse.
 
+## Street level (D18)
+
+Where the camera lives (chase 8 m, eye about 4 m), Harlem now has the things that say New York. All of it is merged into existing buffers or instanced, and every base that reaches the sidewalk passes the street clearance below.
+
+| What | Where it comes from | How it is drawn |
+| --- | --- | --- |
+| Wall tones | `WALL_TONES` in `palette.ts`: brownstone, warm brownstone, sandstone; four bricks (red, dark, buff, the base); limestone and stucco on civic, church and plain fronts; three glass tints. One per building by a hash of its id, then the ±8 % brightness | vertex colour |
+| Window surrounds | Facade shader: a dark frame round each pane, a pale stone lintel above and a sill below (masonry), dark mullions on glass | 0 triangles |
+| Shopfronts | Facade shader: a fifth of the ground-floor bays have a corrugated roll-down gate; the rest glow warm behind the glass | 0 triangles |
+| Cornices | A projecting band and soffit under the roof line of every masonry street front under 45 m (4 725) | `walls-masonry` |
+| Stoops | Brownstones on side streets, 80 % of street fronts: landing, six steps, iron rails and newels; only where the foot of the stoop is clear of the carriageway (691) | `street-detail`, banded |
+| Fire escapes | Brick walk-ups of 12 to 32 m, 60 % of street faces 7 m and wider: a balcony, rail and zig-zag ladder per upper floor (747 facades) | `street-detail`, banded |
+| Awnings | Commercial frontage (the fascia walls): 55 % of 4.5 m bays, six brand-derived colours (1 460) | `street-detail`, banded |
+| Shop signs | 35 % of commercial frontages: a lit panel in place of the fascia band, with a generic trade in the pixel font (`DELI GROCERY`, `LAUNDROMAT`, `99 CENTS`; no brand names) (439) | `neon` panel, `sign-lettering` |
+| Water towers | 28 % of buildings of five storeys and up, not glass, where the roof fits the tank: legs, deck, staved tank, conical roof (409) | `roofs` |
+| Apollo | APOLLO in red on the marquee's light band, and stacked on both faces of the blade sign, which now stands out from the wall | `landmarks`, `landmark-lettering` |
+| Hydrants, litter baskets | Hydrants every 75 m along the kerbs, clear of streetlights (753); a basket by each sign pole and every 90 m on the avenues (283) | `street-props`, banded |
+| Parked cars, taxis | Parking lane of carriageways 10 m and wider, a slot every 6.4 m, 55 % filled, 20 % taxis; a slot stays empty when either end is on a crossing, within 3 m of another carriageway, or within 4.6 m of a hydrant (767, 143 taxis). The palette has no yellow, so taxis take the orange steps the lane lines use | `cars`, instanced, the nearest 220 within 200 m |
+| Subway entrances | OSM `railway=subway_entrance` (29 in the tile): stair well, green iron railings, two green globe lamps; moved up to 3 m onto the sidewalk and nudged up to 1 m to fit (27 placed, 2 dropped) | `transit`, `transit-lights` |
+| Bus shelters | OSM `highway=bus_stop` with `shelter=yes` (53): posts, roof, glass back and side, bench, a lit ad panel with no artwork (52 placed, 1 dropped) | `transit`, `transit-lights` |
+
+Banded meshes are written in 50 m z bands and drawn within 160 m of the Caller, like the contact shadows. Building the scene now takes about 450 ms in node (was 218 ms).
+
+Triangles at the Apollo spawn, chase 8 m: 283 553 (was 183 149), in 26 meshes. `world/budget.test.ts` holds chase 8, 18, 40 m and the 125th Street walk under 300 000. `world/parts.test.ts` checks that every triangle of every part, stoop, fire escape, awning, water tower and line of lettering faces its normal.
+
 ## Street clearance
 
 Nothing stands in the street. `createStreetClearance` (`world/walkability.ts`) is the one check for every tree, streetlight and sign pole: a carriageway is each non-walkway road segment (crossings and service roads included) buffered by the half width the road mesh draws plus a 0.3 m kerb margin. Sidewalk furniture stands in the band from 0.5 m past the kerb to the sidewalk width minus 0.3 m; where OSM maps the sidewalk as its own way, the band assumes 3 m. Building footprints (grown 0.2 m) are also off limits.
@@ -174,7 +200,7 @@ NYC street-name blades, white on green, two per pole (the lower names one street
 
 - **Data:** the bake already keeps OSM `name` as `n` on roads (480 named, 66 distinct carriageway names), so `tooling/city` is unchanged. `findIntersections` crosses every pair of differently named carriageway segments in a 40 m grid, skips near-parallel pairs, and merges crossings of the same two names within 30 m (divided avenues). The 2026-10-15 tile gives 218 intersections; 210 have a clear corner and get a sign.
 - **Placement:** the pole stands on the clear sidewalk corner nearest the Apollo, outside both carriageways (see Street clearance; setbacks are divided by the sine of the angle on skewed corners). Names print as Manhattan blades do: `West 125th Street` becomes `W 125 ST`; names too long for a 2.3 m blade condense to 55 % width, then middle words become initials (`ADAM C POWELL JR BLVD`).
-- **Lettering:** a 5 x 7 capital pixel font written into a 64 x 48 `DataTexture` at run time, one quad per letter on each face, nearest filtering. react-native-webgpu has no DOM canvas, so `CanvasTexture` and troika cannot run there, and the repo had no 3D text. Drawing lit pixels as merged quads came to 171 000 triangles for the tile; atlas quads are about 17 000, of which the near bands draw about 3 500.
+- **Lettering:** a 5 x 7 capital pixel font written into a 64 x 48 `DataTexture` at run time (one atlas and material, `materials.lettering`, shared with the shop signs and the Apollo), one quad per letter on each face, nearest filtering. react-native-webgpu has no DOM canvas, so `CanvasTexture` and troika cannot run there, and the repo had no 3D text. Drawing lit pixels as merged quads came to 171 000 triangles for the tile; atlas quads are about 17 000, of which the near bands draw about 3 500.
 - **Meshes:** poles (signs and streetlights share one InstancedMesh), blades (one InstancedMesh, two per sign), lettering (one merged mesh), lamp heads, light pools. Blades, lettering and pools hide past 320 m camera distance.
 
 ## Not done

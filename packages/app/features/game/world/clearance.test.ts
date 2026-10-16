@@ -5,6 +5,8 @@ import { parseCityDataset, type CityDatasetV2, type CityRoad } from '../city-dat
 import { CROWN_REACH, MAX_OVERHANG, treePlacements } from './foliage.ts';
 import { segmentDistanceSq } from './geometry.ts';
 import { placeStreetFurniture } from './street-furniture.ts';
+import { placeStreetProps } from './street-props.ts';
+import { CAR_LENGTH, HYDRANT_CLEAR, INTERSECTION_CLEAR } from './street-props-layout.ts';
 import { BAND_INNER, createStreetClearance, KERB_MARGIN, WALKWAY_CLASSES } from './walkability.ts';
 
 /** Brute force, no grid: the carriageway gap the road mesh draws (half width), over every road. */
@@ -24,7 +26,7 @@ function tile(roads: CityRoad[], osm: number[], fill: number[]): CityDatasetV2 {
   return {
     version: 2, id: 't', origin: [-73.95, 40.81], extentMeters: 200,
     source: { url: 'https://www.openstreetmap.org/copyright', attribution: 't', license: 'ODbL-1.0', retrievedAt: '2026-10-16T00:00:00Z' },
-    notes: [], buildings: [], areas: [], landmarks: [], roads, trees: { osm, fill },
+    notes: [], buildings: [], areas: [], landmarks: [], roads, trees: { osm, fill }, transit: { subway: [], shelters: [] },
   };
 }
 const road = (id: string, cls: CityRoad['class'], points: number[], width: number): CityRoad => ({
@@ -62,7 +64,12 @@ test('the real tile: no tree, pole or sign base inside any carriageway or crossi
   const clearance = createStreetClearance(dataset);
   const { trees, report } = treePlacements(dataset, clearance);
   const { signs, lights, intersections } = placeStreetFurniture(dataset, clearance);
+  const props = placeStreetProps(dataset, clearance, signs, lights);
   const bases: [string, number, number][] = [
+    ...props.hydrants.map((p) => ['hydrant', p.x, p.z] as [string, number, number]),
+    ...props.baskets.map((p) => ['basket', p.x, p.z] as [string, number, number]),
+    ...props.subway.map((p) => ['subway', p.x, p.z] as [string, number, number]),
+    ...props.shelters.map((p) => ['shelter', p.x, p.z] as [string, number, number]),
     ...trees.map((t) => ['tree', t.x, t.z] as [string, number, number]),
     ...signs.map((s) => ['sign', s.x, s.z] as [string, number, number]),
     ...lights.map((l) => ['light', l.x, l.z] as [string, number, number]),
@@ -76,6 +83,18 @@ test('the real tile: no tree, pole or sign base inside any carriageway or crossi
     assert.ok(gapTo(dataset.roads, x, z) >= KERB_MARGIN - 1e-9, `${kind} at ${x.toFixed(1)},${z.toFixed(1)}`);
   });
   for (const t of trees) assert.ok(CROWN_REACH * t.scale <= clearance.kerbGap(t.x, t.z) + MAX_OVERHANG + 1e-9);
+  // Parked cars stand in the parking lane, never on a crossing, at an intersection or by a hydrant.
+  for (const car of props.cars) {
+    for (const t of [-CAR_LENGTH / 2, 0, CAR_LENGTH / 2]) {
+      const x = car.x + car.dir[0] * t; const z = car.z + car.dir[1] * t;
+      assert.equal(clearance.inCrossing(x, z, 1), false, 'car on a crossing');
+      assert.ok(clearance.inCarriageway(x, z, 0), 'car off the road');
+    }
+    for (const h of props.hydrants) assert.ok(Math.hypot(h.x - car.x, h.z - car.z) >= HYDRANT_CLEAR - 1e-9, 'car at a hydrant');
+  }
+  assert.ok(props.cars.length > 300 && props.cars.some((c) => c.taxi));
+  assert.ok(INTERSECTION_CLEAR > 0);
+  console.log(`props: ${JSON.stringify({ hydrants: props.hydrants.length, baskets: props.baskets.length, cars: props.cars.length, subway: props.subway.length, shelters: props.shelters.length, ...props.report })}`);
   console.log(`clearance: ${JSON.stringify(report)}; trees ${trees.length} of ${dataset.trees.osm.length / 2 + dataset.trees.fill.length / 2}; signs ${signs.length} of ${intersections}; lights ${lights.length}`);
   assert.ok(signs.length > 100, `${signs.length} signs`);
   assert.ok(lights.length > 300, `${lights.length} lights`);

@@ -95,6 +95,12 @@ export interface CityDatasetV2 {
   /** `osm`: natural=tree nodes. `fill`: generated street and park trees (decoration, not data). */
   readonly trees: { readonly osm: FlatPoints; readonly fill: FlatPoints };
   readonly landmarks: readonly CityLandmark[];
+  /**
+   * OSM street furniture: `subway` = railway=subway_entrance nodes, `shelters`
+   * = highway=bus_stop nodes tagged shelter=yes. Flat [x, z, ...]. Empty on
+   * tiles baked before 2026-10-16.
+   */
+  readonly transit: { readonly subway: FlatPoints; readonly shelters: FlatPoints };
 }
 
 /** The PR #30 shape, kept so v1 tiles, fixtures and saves still type-check and migrate. */
@@ -161,6 +167,7 @@ const v2Schema = z.object({
   areas: z.array(z.object({ id: label, k: z.enum(AREA_KINDS), p: flat, i: z.array(flat).max(256).optional(), n: name })).max(MAX_AREAS),
   trees: z.object({ osm: z.array(z.number()).max(MAX_TREES * 2), fill: z.array(z.number()).max(MAX_TREES * 2) }),
   landmarks: z.array(z.object({ key: z.enum(LANDMARK_KEYS), name: label, buildingId: label, x: z.number(), z: z.number() })).max(16),
+  transit: z.object({ subway: z.array(z.number()).max(4000), shelters: z.array(z.number()).max(4000) }).optional(),
 });
 
 const v1Schema = z.object({
@@ -256,6 +263,7 @@ function parseV2(input: unknown): CityDatasetV2 {
   });
   for (const list of [data.trees.osm, data.trees.fill]) if (list.length > 0) budget(checkPoints(list, 1, 'Tree list'));
   if ((data.trees.osm.length + data.trees.fill.length) / 2 > MAX_TREES) throw new Error('City tree budget exceeded');
+  for (const list of [data.transit?.subway ?? [], data.transit?.shelters ?? []]) if (list.length > 0) budget(checkPoints(list, 1, 'Transit list'));
   const buildingIds = new Set(buildings.map((b) => b.id));
   const landmarks = data.landmarks.map((l): CityLandmark => {
     if (!buildingIds.has(l.buildingId)) throw new Error(`Landmark ${l.key} points at a missing building`);
@@ -267,6 +275,7 @@ function parseV2(input: unknown): CityDatasetV2 {
     version: 2, id: data.id, origin, extentMeters: data.extentMeters,
     source: { ...data.source }, notes: [...data.notes],
     buildings, roads, areas, trees: { osm: data.trees.osm, fill: data.trees.fill }, landmarks,
+    transit: { subway: data.transit?.subway ?? [], shelters: data.transit?.shelters ?? [] },
   };
 }
 
@@ -315,7 +324,7 @@ function migrateV1(input: unknown): CityDatasetV2 {
   return {
     version: 2, id: data.id, origin, extentMeters: Math.max(1, Math.ceil(extent)),
     source: { ...data.source }, notes: ['Migrated from a v1 tile: no classes, sidewalks, areas or trees.'],
-    buildings, roads, areas: [], trees: { osm: [], fill: [] }, landmarks: [],
+    buildings, roads, areas: [], trees: { osm: [], fill: [] }, landmarks: [], transit: { subway: [], shelters: [] },
   };
 }
 

@@ -16,6 +16,10 @@ const load = async (name) => JSON.parse(await readFile(join(CACHE, `${name}.json
 const [buildingEls, roadEls, areaEls, treeEls, landmarkEls] = await Promise.all(NAMES.map(load));
 const mtimes = await Promise.all(NAMES.map((n) => stat(join(CACHE, `${n}.json`)).then((s) => s.mtimeMs)));
 const retrievedAt = new Date(Math.max(...mtimes)).toISOString().replace(/\.\d+Z$/, 'Z');
+// Transit nodes (subway entrances, bus stops) came later (2026-10-16); a cache without them bakes empty lists.
+const transitFile = join(CACHE, 'transit.json');
+const transitEls = await readFile(transitFile, 'utf8').then((t) => JSON.parse(t).elements, () => null);
+const transitAt = transitEls ? new Date((await stat(transitFile)).mtimeMs).toISOString().replace(/\.\d+Z$/, 'Z') : null;
 
 // ---- Projection: must stay bit-for-bit identical to the app's formula ----
 const ORIGIN = [-73.94975, 40.81005];
@@ -704,6 +708,18 @@ for (const { key, re } of LANDMARKS) {
   landmarks.push({ key, name: found.name, buildingId: found.b.id, x: round(x), z: round(z) });
 }
 
+// ---- Transit: subway entrances and sheltered bus stops ----
+const subway = [];
+const shelters = [];
+for (const e of transitEls ?? []) {
+  if (e.type !== 'node' || !Number.isFinite(e.lat) || !Number.isFinite(e.lon)) continue;
+  const [x, z] = project(e);
+  if (Math.abs(x) > R || Math.abs(z) > R) continue;
+  if (e.tags?.railway === 'subway_entrance') subway.push(round(x), round(z));
+  else if (e.tags?.highway === 'bus_stop' && e.tags?.shelter === 'yes') shelters.push(round(x), round(z));
+}
+if (!transitEls) warnings.push('transit: no .cache/transit.json (run fetch.mjs); subway and shelter lists are empty');
+
 // ---- Assemble ----
 const dataset = {
   version: 2,
@@ -719,7 +735,8 @@ const dataset = {
       'Overpass bbox 40.801327,-73.961275,40.818773,-73.938225 (origin ±970 m): building ways/relations; highway ways; ' +
       'leisure park|garden|playground|pitch|track|nature_reserve|dog_park, landuse grass|recreation_ground|village_green|cemetery|religious, ' +
       'natural=water, waterway=riverbank, amenity=parking|school, place=square, highway=pedestrian+area=yes; natural=tree nodes; ' +
-      'named landmarks Apollo Theater|Theresa|Adam Clayton Powell',
+      'named landmarks Apollo Theater|Theresa|Adam Clayton Powell' +
+      (transitAt ? `; railway=subway_entrance and highway=bus_stop nodes (retrieved ${transitAt})` : ''),
   },
   notes: [
     'Coordinates are metres from origin: x = east, -z = north, rounded to 0.1 m.',
@@ -731,6 +748,7 @@ const dataset = {
     'Sidewalks are modelled as symmetric; a sidewalk tagged on one side only keeps the class width on both sides.',
     'Roads are clipped to the extent square plus 40 m; tunnels, steps, indoor and underground ways are dropped; bridges are drawn flat.',
     'Areas are clipped to the extent square; underground and multi-storey parking and landuse=religious are excluded.',
+    'transit.subway are railway=subway_entrance nodes; transit.shelters are highway=bus_stop nodes tagged shelter=yes. Both from OSM, positions only.',
     'trees.osm are natural=tree nodes from OSM. trees.fill are generated decoration with a fixed seed (street trees along sidewalks, park trees on a jittered 13 m grid), not OSM features.',
   ],
   buildings,
@@ -738,6 +756,7 @@ const dataset = {
   areas,
   trees: { osm: flat(osmTrees), fill: flat(fill) },
   landmarks,
+  transit: { subway, shelters },
 };
 
 // ---- Self-checks against the schema rules ----
@@ -777,5 +796,6 @@ console.log(
     ` · areas ${areas.length} ${JSON.stringify(countBy(areas, (a) => a.k))}` +
     ` · trees osm ${osmTrees.length} fill ${fill.length} (street ${streetCount}, park ${parkCount})` +
     ` · landmarks ${landmarks.length}/3 ${landmarks.map((l) => l.key).join(',')}` +
+    ` · subway entrances ${subway.length / 2} · bus shelters ${shelters.length / 2}` +
     ` · ${(Buffer.byteLength(text) / 1024).toFixed(0)} KB · retrievedAt ${retrievedAt}`
 );

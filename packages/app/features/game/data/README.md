@@ -6,7 +6,7 @@ Data © OpenStreetMap contributors, distributed under the [Open Database License
 
 ## Format (v2)
 
-Coordinates are local metres around `origin` (x east, z south, 0.1 m precision), the same projection as `projectCityPoint`. The file carries buildings with height and a material class, roads by class with carriageway and sidewalk widths, land-use areas, trees and a landmark list. `parseCityDataset` (Zod) validates every field and the tile radius before anything reaches the GPU, and still accepts the PR #30 v1 shape by migrating it. The full field list and the estimate rules live in `docs/implementation/city-world.md`; the `notes` array in the JSON repeats the rules that produced this file.
+Coordinates are local metres around `origin` (x east, z south, 0.1 m precision), the same projection as `projectCityPoint`. The file carries buildings with height and a material class, roads by class with carriageway and sidewalk widths, land-use areas, trees, a landmark list, and subway entrances and sheltered bus stops (`transit`, positions only). `parseCityDataset` (Zod) validates every field and the tile radius before anything reaches the GPU, and still accepts the PR #30 v1 shape by migrating it. The full field list and the estimate rules live in `docs/implementation/city-world.md`; the `notes` array in the JSON repeats the rules that produced this file.
 
 What is estimated, not measured:
 

@@ -123,7 +123,7 @@ export const ASSUMED_SIDEWALK = 3;
 /** How far past a carriageway the clearance grid looks (crown overhang queries reach this far). */
 const LOOK = 6;
 
-interface Carriageway { ax: number; az: number; bx: number; bz: number; half: number; sidewalk: number }
+interface Carriageway { ax: number; az: number; bx: number; bz: number; half: number; sidewalk: number; id: string; crossing: boolean }
 
 export interface StreetClearance {
   /**
@@ -143,7 +143,15 @@ export interface StreetClearance {
    * else null. A standable base comes back unchanged.
    */
   toSidewalk(x: number, z: number, maxMove: number): [number, number] | null;
+  /** The nearest carriageway within 6 m: its edge gap, unit direction along it, and the unit direction from it toward (x, z). */
+  nearest(x: number, z: number): NearestRoad | null;
+  /** Inside a crossing strip grown by `margin`. */
+  inCrossing(x: number, z: number, margin?: number): boolean;
+  /** At least `margin` metres outside every carriageway other than road `id` (crossings included). */
+  clearOfOthers(x: number, z: number, id: string, margin: number): boolean;
 }
+
+export interface NearestRoad { gap: number; dir: [number, number]; away: [number, number]; id: string; half: number }
 
 export function createStreetClearance(dataset: CityDatasetV2): StreetClearance {
   const roads = new Grid<Carriageway>();
@@ -157,7 +165,7 @@ export function createStreetClearance(dataset: CityDatasetV2): StreetClearance {
     const half = r.widthMeters / 2;
     const sidewalk = r.sidewalkMeters > 0 ? r.sidewalkMeters : ASSUMED_SIDEWALK;
     for (let i = 2; i < r.points.length; i += 2) {
-      const c = { ax: r.points[i - 2]!, az: r.points[i - 1]!, bx: r.points[i]!, bz: r.points[i + 1]!, half, sidewalk };
+      const c = { ax: r.points[i - 2]!, az: r.points[i - 1]!, bx: r.points[i]!, bz: r.points[i + 1]!, half, sidewalk, id: r.id, crossing: r.class === 'crossing' };
       const pad = half + LOOK;
       roads.add(c, Math.min(c.ax, c.bx) - pad, Math.min(c.az, c.bz) - pad, Math.max(c.ax, c.bx) + pad, Math.max(c.az, c.bz) + pad);
     }
@@ -210,5 +218,35 @@ export function createStreetClearance(dataset: CityDatasetV2): StreetClearance {
     }
     return best;
   };
-  return { kerbGap, inCarriageway, inBuilding, standable, toSidewalk };
+  const nearest = (x: number, z: number): NearestRoad | null => {
+    let best: NearestRoad | null = null;
+    for (const c of roads.at(x, z)) {
+      if (c.crossing) continue;
+      const dx = c.bx - c.ax; const dz = c.bz - c.az;
+      const len2 = dx * dx + dz * dz;
+      if (len2 < 1e-9) continue;
+      const t = Math.max(0, Math.min(1, ((x - c.ax) * dx + (z - c.az) * dz) / len2));
+      const fx = c.ax + dx * t; const fz = c.az + dz * t;
+      const d = Math.hypot(x - fx, z - fz);
+      const gap = d - c.half;
+      if (best && gap >= best.gap) continue;
+      const len = Math.sqrt(len2);
+      const away: [number, number] = d > 1e-6 ? [(x - fx) / d, (z - fz) / d] : [-dz / len, dx / len];
+      best = { gap, dir: [dx / len, dz / len], away, id: c.id, half: c.half };
+    }
+    return best;
+  };
+  const inCrossing = (x: number, z: number, margin = KERB_MARGIN) => {
+    for (const c of roads.at(x, z)) {
+      if (c.crossing && Math.sqrt(segmentDistanceSq(x, z, c.ax, c.az, c.bx, c.bz)) - c.half < margin) return true;
+    }
+    return false;
+  };
+  const clearOfOthers = (x: number, z: number, id: string, margin: number) => {
+    for (const c of roads.at(x, z)) {
+      if (c.id !== id && Math.sqrt(segmentDistanceSq(x, z, c.ax, c.az, c.bx, c.bz)) - c.half < margin) return false;
+    }
+    return true;
+  };
+  return { kerbGap, inCarriageway, inBuilding, standable, toSidewalk, nearest, inCrossing, clearOfOthers };
 }
