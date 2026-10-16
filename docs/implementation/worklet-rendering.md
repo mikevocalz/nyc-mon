@@ -188,3 +188,35 @@ The cycle is in the resolvers. Uniwind (outermost) redirects `react-native` to `
 With the two patches in, the lobby renders. START fails with `[Worklets] Unable to resolve worklet with hash 7699091469073` (also 12676968083120 and 6261070730378), then `world not ready: 20000 ms without progress`. Those three are the worklets in `render-runtime/worklet-host.ts` (start, running, stop). That module loads through `import()` in `render-thread-choice.ts`. Expo's dev bundle URL has `lazy=true`, so Metro puts an `import()` target in a separate chunk that only the RN runtime fetches; a worklet runtime evaluates the main bundle and nothing else. Checked against the running Metro: the `lazy=true` main bundle has none of the three module ids, the `worklet-host.bundle?…modulesOnly=true` chunk has all three, and the same main URL with `lazy=false` has all three and no chunk paths. Upstream: software-mansion/react-native-reanimated#10162; lazy chunks on worklet runtimes are PR #10711 (open).
 
 Fix, worklet mode only: `metro.config.js` wraps Expo's `server.rewriteRequestUrl` and turns `lazy=true` into `lazy=false`. Metro applies that rewrite to bundle requests and to HMR entry-point registration, so the URL the dev client already holds is covered. The dev bundle grows (28 MB to 34 MB on 2026-10-16) because every async dependency is in it. With the flag unset, URLs pass through unchanged. Tests are in `apps/mobile/src/bundler/bundle-mode-resolver.test.ts`.
+
+### Third device run: the runtime starts, `loadProgress` stays 0
+
+With lazy bundles off, START reaches the render runtime (logcat has `WebGPU [RuntimeContext] Created` for it) and then nothing: no milestone, no error, `WorldNotReadyError … without progress` after 20 s. Two causes, both found by reading the code, neither confirmed on the device yet:
+
+- **`renderer.init()` never settles.** three's `Renderer.init()` builds an `Animation` whose `_context` is `typeof self !== 'undefined' ? self : null`, then calls `_context.requestAnimationFrame`. React Native sets `self` in `setUpGlobals.js`, which runs from InitializeCore; a worklet runtime never runs that, so `self` is undefined there. The call throws inside init's async promise executor, the rejection is unhandled, and the promise stays pending. Worklet runtimes report neither, so the start went silent. `render-runtime/runtime-report.test.ts` reproduces it against the installed three (pending without `self`, resolved with it). Fix: `installFrameGlobals()` aliases `self` to the runtime global before the renderer is built, as `setUpGlobals.js` does on the RN runtime.
+- **`requested` and `moduleLoaded` were never reported in worklet mode.** The JS path reports them from `loadGameScene`, which the worklet canvas never calls, and the relay forwarded only `worldBuilt` and `firstRender`. Now the JS side reports `requested` when it hands the start to the runtime, the runtime reports `moduleLoaded` once `renderer.init()` resolves, and the relay accepts all four.
+
+Instrumentation, worklet mode only: every worklet entry (start, wake, setRunning, stop) and the frame tick catch and send `error` events with the stack; the start path sends `trace` breadcrumbs; `withFirstFrameSignal` takes an optional tracer for the compile (the JS path passes none, so its behaviour is unchanged). On the RN side they are console lines:
+
+```
+[GameRender] load stage: requested
+[GameRender] render runtime reached: start worklet entered
+[GameRender] render runtime reached: installWebGPU
+[GameRender] render runtime reached: startGameRender (session 1, device shared)
+[GameRender] render runtime reached: self aliased to the runtime global
+[GameRender] render runtime reached: city parsed
+[GameRender] render runtime reached: three loaded, renderer constructed; init pending
+[GameRender] render runtime reached: renderer init resolved
+[GameRender] load stage: moduleLoaded
+[GameRender] load stage: worldBuilt
+[GameRender] render runtime reached: compileAsync started
+[GameRender] render runtime reached: scene built
+[GameRender] render runtime reached: first draw presented
+[GameRender] render runtime reached: compileAsync resolved
+[GameRender] load stage: firstRender
+[GameRender] render runtime reached: second draw presented
+```
+
+The first draw usually lands before the compile resolves (the scene asks for a frame as soon as it is built), so those two lines can swap. The last line before a stall names the step that hung.
+
+A failure prints `[GameRender] render runtime error in <where>: <name>: <message>` with the stack on the following lines. `render-runtime/game-render.start.test.ts` runs the start path in node with no `self`, a 16 ms rAF and a fake device, and checks this sequence up to the compile plus the error relay.

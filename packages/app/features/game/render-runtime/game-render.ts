@@ -11,7 +11,9 @@
 // reads the latest array once per tick. The Caller proxy reads a mirror store
 // fed from that array, so character/ and world/ run here unchanged.
 //
-// Milestones and failures go back to the JS thread with scheduleOnRN.
+// Milestones, breadcrumbs and failures go back to the JS thread with
+// scheduleOnRN (runtime-report.ts routes them there). Nothing thrown on this
+// runtime reaches logcat or Metro by itself, so every entry point catches.
 import * as THREE from 'three/webgpu';
 import { scheduleOnRN, type Synchronizable } from 'react-native-worklets';
 import { advanceNodeFrame, stopInternalLoop } from '@acme/ui/three/internals';
@@ -22,9 +24,9 @@ import { createCallerProxyWith } from '../character/caller-proxy.ts';
 import type { CallerState } from '../character/caller-store.ts';
 import { withFirstFrameSignal, type GameSceneParams } from '../load-game-scene.ts';
 import { readCaller, readCamera, readView, snapshotVersion } from '../render-snapshot.ts';
+import { describeRuntimeError, installFrameGlobals, type GameRenderEventKind } from './runtime-report.ts';
 
-/** Events back to the JS thread. `detail` is a stage name or an error message. */
-export type GameRenderEventKind = 'backend' | 'stage' | 'firstFrame' | 'failed';
+export type { GameRenderEventKind } from './runtime-report.ts';
 
 export interface GameRenderArgs {
   session: number;
@@ -49,6 +51,8 @@ interface Session {
   running: boolean;
   scheduled: boolean;
   idleTicks: number;
+  /** Frames drawn; the first two leave a breadcrumb. */
+  drawn: number;
   time: number;
   last: number;
   width: number;
@@ -63,8 +67,11 @@ const emit = (s: Session, kind: GameRenderEventKind, detail = '') => {
   scheduleOnRN(s.args.emit, kind, detail);
 };
 
-const fail = (s: Session, error: unknown) => {
+const trace = (s: Session, stage: string) => emit(s, 'trace', stage);
+
+const fail = (s: Session, where: string, error: unknown) => {
   const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+  emit(s, 'error', describeRuntimeError(where, error));
   emit(s, 'failed', message);
   disposeSession(s);
 };
@@ -106,12 +113,20 @@ function draw(s: Session) {
   advanceNodeFrame(renderer);
   renderer.render(built.scene, built.camera);
   s.args.context.present();
+  if (s.drawn < 2) trace(s, s.drawn === 0 ? 'first draw presented' : 'second draw presented');
+  s.drawn++;
 }
 
 function schedule(s: Session) {
   if (s.scheduled || s.disposed) return;
   s.scheduled = true;
-  requestAnimationFrame(() => tick(s));
+  requestAnimationFrame(() => {
+    try {
+      tick(s);
+    } catch (error) {
+      if (!s.disposed) fail(s, 'frame tick', error);
+    }
+  });
 }
 
 // The loop runs while frames are wanted and parks itself after two quiet
@@ -131,7 +146,7 @@ function tick(s: Session) {
     try {
       draw(s);
     } catch (error) {
-      fail(s, error);
+      fail(s, 'draw', error);
       return;
     }
   } else {
@@ -156,7 +171,7 @@ function disposeSession(s: Session) {
     s.built?.dispose?.();
     s.renderer?.dispose();
   } catch (error) {
-    console.error('[GameRender] dispose failed.', error);
+    emit(s, 'error', describeRuntimeError('dispose', error));
   }
   s.built = null;
   s.renderer = null;
@@ -169,18 +184,22 @@ export function startGameRender(args: GameRenderArgs): void {
   const snapshot = args.snapshot.getDirty();
   const s: Session = {
     args, renderer: null, built: null, params: null, snapshot, caller: readCaller(snapshot),
-    drawnVersion: -1, wantFrame: true, running: args.running, scheduled: false, idleTicks: 0,
+    drawnVersion: -1, wantFrame: true, running: args.running, scheduled: false, idleTicks: 0, drawn: 0,
     time: 0, last: 0, width: 0, height: 0, pixelRatio: 1, disposed: false,
   };
   active = s;
+  trace(s, `startGameRender (session ${args.session}, device ${args.device ? 'shared' : 'none'})`);
   args.idle.setBlocking(false);
+  if (installFrameGlobals()) trace(s, 'self aliased to the runtime global');
   const city = bundledCity();
   if (!city.ok) {
-    fail(s, city.error);
+    fail(s, 'city parse', city.error);
     return;
   }
+  trace(s, 'city parsed');
   let renderer: InstanceType<typeof THREE.WebGPURenderer>;
   try {
+    // With inline requires (forced by Bundle Mode), this line is where three.js is first evaluated here.
     renderer = new THREE.WebGPURenderer({
       antialias: true,
       // react-native-webgpu's canvas is DOM-shaped enough for three; its types are not.
@@ -189,12 +208,15 @@ export function startGameRender(args: GameRenderArgs): void {
       ...(args.device ? { device: args.device } : {}),
     });
   } catch (error) {
-    fail(s, error);
+    fail(s, 'renderer construct', error);
     return;
   }
   s.renderer = renderer;
+  trace(s, 'three loaded, renderer constructed; init pending');
   renderer.init().then(() => {
     if (s.disposed) return;
+    trace(s, 'renderer init resolved');
+    emit(s, 'stage', 'moduleLoaded');
     stopInternalLoop(renderer);
     const mirror = { getState: () => s.caller };
     const params: GameSceneParams = {
@@ -203,7 +225,11 @@ export function startGameRender(args: GameRenderArgs): void {
       actors: [createCallerProxyWith(mirror)],
       onFirstFrame: () => emit(s, 'firstFrame'),
     };
-    const setup = withFirstFrameSignal(createCityScene, (stage) => emit(s, 'stage', stage));
+    const setup = withFirstFrameSignal(
+      createCityScene,
+      (stage) => emit(s, 'stage', stage),
+      (event) => trace(s, event),
+    );
     const invalidate = () => {
       s.wantFrame = true;
       s.args.idle.setBlocking(false);
@@ -211,10 +237,11 @@ export function startGameRender(args: GameRenderArgs): void {
     };
     s.params = params;
     s.built = setup({ THREE, renderer, backend: 'webgpu', invalidate }, params);
+    trace(s, 'scene built');
     emit(s, 'backend', 'webgpu');
     invalidate();
   }).catch((error: unknown) => {
-    if (!s.disposed) fail(s, error);
+    if (!s.disposed) fail(s, 'renderer init or scene build', error);
   });
 }
 

@@ -23,9 +23,16 @@ export interface GameSceneParams extends CitySceneParams {
 /** Where load milestones go. The JS path writes the screen store; the worklet render runtime relays to it. */
 export type LoadStageReporter = (stage: 'worldBuilt' | 'firstRender') => void;
 
+/**
+ * Breadcrumbs around the pipeline compile, for the worklet render runtime,
+ * where a compile failure is otherwise invisible. The JS path passes none.
+ */
+export type CompileTracer = (event: string) => void;
+
 export function withFirstFrameSignal(
   setup: ThreeSetup<CitySceneParams>,
   report: LoadStageReporter = gameScreenActions.loadStage,
+  trace?: CompileTracer,
 ): ThreeSetup<GameSceneParams> {
   return (context, initial) => {
     const built = setup(context, initial);
@@ -35,7 +42,21 @@ export function withFirstFrameSignal(
       compiled = true;
       context.invalidate();
     };
-    context.renderer.compileAsync(built.scene, built.camera).then(ready, ready);
+    if (trace) {
+      trace('compileAsync started');
+      context.renderer.compileAsync(built.scene, built.camera).then(
+        () => {
+          trace('compileAsync resolved');
+          ready();
+        },
+        (error: unknown) => {
+          trace(`compileAsync rejected: ${error instanceof Error ? `${error.name}: ${error.message}` : String(error)}`);
+          ready();
+        },
+      );
+    } else {
+      context.renderer.compileAsync(built.scene, built.camera).then(ready, ready);
+    }
     let signalled = false;
     return {
       ...built,
