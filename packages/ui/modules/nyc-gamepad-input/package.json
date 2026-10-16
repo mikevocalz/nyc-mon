@@ -1,0 +1,11 @@
+{
+  "name": "nyc-gamepad-input",
+  "version": "1.0.0",
+  "private": true,
+  "description": "NYC-MON hardware input: physical gamepads and hardware keyboards as one Nitro HybridObject. GameController on iOS, InputManager plus KeyEvent/MotionEvent on Android. Local Expo module, linked through apps/mobile's autolinking nativeModulesDir.",
+  "main": "src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "specs": "nitrogen --log-level=info"
+  }
+}
