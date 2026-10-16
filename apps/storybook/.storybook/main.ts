@@ -134,6 +134,20 @@ const config: StorybookConfig = {
           find: /^@react-native\/assets-registry\/registry$/,
           replacement: resolve(here, '../node_modules/react-native-web/dist/modules/AssetRegistry/index.js'),
         },
+        // react-native-skia 3.6's Platform.web requires `react-native/asset-registry`,
+        // falling back to `react-native/Libraries/Image/AssetRegistry`. On RN 0.88 both
+        // resolve to React Native's Flow source, which a web build can't parse
+        // (mcp-server's UI build failed on it). Same registry, web copy.
+        {
+          find: /^react-native\/(asset-registry|Libraries\/Image\/AssetRegistry)$/,
+          replacement: resolve(here, '../node_modules/react-native-web/dist/modules/AssetRegistry/index.js'),
+        },
+        // react-native-svg 15.16 statically reaches an Android-only TurboModule
+        // (lazy require behind Platform.OS === 'android'); give web a no-op.
+        {
+          find: /^.*\/fabric\/NativeSvgSoundModule(\.js)?$/,
+          replacement: resolve(here, './svg-sound-module.web.ts'),
+        },
         { find: /^@legendapp\/motion$/, replacement: legendMotionEsm },
         {
           find: /^react-native$/,
