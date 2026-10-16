@@ -1,0 +1,403 @@
+diff --git a/cpp/jsi/NativeObject.h b/cpp/jsi/NativeObject.h
+index 1c8f5a29cdd6982b8eaf117c70b3ea982b0ffd0b..90cce559bf5c8a77d8ea6fb210931e23f72c178a 100644
+--- a/cpp/jsi/NativeObject.h
++++ b/cpp/jsi/NativeObject.h
+@@ -180,6 +180,13 @@ private:
+  * - box(value): wraps the object into a BoxedWebGPUObject, branded with its
+  *   class name, for unbox() on the target runtime.
+  *
++ * - installConstructors(): installs the global constructor of every WebGPU
++ *   class on the CALLING runtime, skipping classes that already have one, and
++ *   returns how many it installed. installWebGPU() calls it so `instanceof`
++ *   works on a worklet runtime for classes whose objects never cross into it.
++ *   The list of classes lives in RNWebGPUManager::installConstructors and is
++ *   passed in, because this header cannot see the API classes.
++ *
+  * One instance is installed on the main runtime as
+  * globalThis.__webgpuWorkletHelpers and captured by the serializer's
+  * determine/pack worklets. Worklets hands a HostObject to every runtime by
+@@ -189,8 +196,26 @@ private:
+  */
+ class WebGPUWorkletHelpers : public jsi::HostObject {
+ public:
++  using ConstructorInstaller = std::function<size_t(jsi::Runtime &)>;
++
++  explicit WebGPUWorkletHelpers(ConstructorInstaller installConstructors)
++      : _installConstructors(std::move(installConstructors)) {}
++
+   jsi::Value get(jsi::Runtime &runtime, const jsi::PropNameID &name) override {
+     auto propName = name.utf8(runtime);
++    if (propName == "installConstructors") {
++      auto installer = _installConstructors;
++      return jsi::Function::createFromHostFunction(
++          runtime, name, 0,
++          [installer](jsi::Runtime &rt, const jsi::Value & /*thisVal*/,
++                      const jsi::Value * /*args*/,
++                      size_t /*count*/) -> jsi::Value {
++            if (!installer) {
++              return jsi::Value(0);
++            }
++            return jsi::Value(static_cast<double>(installer(rt)));
++          });
++    }
+     if (propName == "isNativeObject") {
+       return jsi::Function::createFromHostFunction(
+           runtime, name, 1,
+@@ -230,11 +255,15 @@ public:
+   std::vector<jsi::PropNameID>
+   getPropertyNames(jsi::Runtime &runtime) override {
+     std::vector<jsi::PropNameID> names;
+-    names.reserve(2);
++    names.reserve(3);
+     names.push_back(jsi::PropNameID::forUtf8(runtime, "isNativeObject"));
+     names.push_back(jsi::PropNameID::forUtf8(runtime, "box"));
++    names.push_back(jsi::PropNameID::forUtf8(runtime, "installConstructors"));
+     return names;
+   }
++
++private:
++  ConstructorInstaller _installConstructors;
+ };
+ 
+ /**
+diff --git a/cpp/rnwgpu/RNWebGPUManager.cpp b/cpp/rnwgpu/RNWebGPUManager.cpp
+index 58ca81e4cd38673b0821c4dda3d5b91684f736d2..34894206197830b3d88d4baf5df57eb51f5b461e 100644
+--- a/cpp/rnwgpu/RNWebGPUManager.cpp
++++ b/cpp/rnwgpu/RNWebGPUManager.cpp
+@@ -87,45 +87,7 @@ RNWebGPUManager::RNWebGPUManager(
+                                    RNWebGPU::create(*_jsRuntime, rnWebGPU));
+ 
+   // Install constructors for instanceof support
+-  GPU::installConstructor(*_jsRuntime);
+-  GPUAdapter::installConstructor(*_jsRuntime);
+-  GPUAdapterInfo::installConstructor(*_jsRuntime);
+-  GPUBindGroup::installConstructor(*_jsRuntime);
+-  GPUBindGroupLayout::installConstructor(*_jsRuntime);
+-  GPUBuffer::installConstructor(*_jsRuntime);
+-  GPUCanvasContext::installConstructor(*_jsRuntime);
+-  GPUCommandBuffer::installConstructor(*_jsRuntime);
+-  GPUCommandEncoder::installConstructor(*_jsRuntime);
+-  GPUCompilationInfo::installConstructor(*_jsRuntime);
+-  GPUCompilationMessage::installConstructor(*_jsRuntime);
+-  GPUComputePassEncoder::installConstructor(*_jsRuntime);
+-  GPUComputePipeline::installConstructor(*_jsRuntime);
+-  GPUDevice::installConstructor(*_jsRuntime);
+-  GPUDeviceLostInfo::installConstructor(*_jsRuntime);
+-  GPUError::installConstructor(*_jsRuntime);
+-  GPUExternalTexture::installConstructor(*_jsRuntime);
+-  GPUNativeBufferExternalTexture::installConstructor(*_jsRuntime);
+-  GPUNativeBufferTexture::installConstructor(*_jsRuntime);
+-  GPUInternalError::installConstructor(*_jsRuntime);
+-  GPUOutOfMemoryError::installConstructor(*_jsRuntime);
+-  GPUValidationError::installConstructor(*_jsRuntime);
+-  GPUUncapturedErrorEvent::installConstructor(*_jsRuntime);
+-  GPUPipelineLayout::installConstructor(*_jsRuntime);
+-  GPUQuerySet::installConstructor(*_jsRuntime);
+-  GPUQueue::installConstructor(*_jsRuntime);
+-  GPURenderBundle::installConstructor(*_jsRuntime);
+-  GPURenderBundleEncoder::installConstructor(*_jsRuntime);
+-  GPURenderPassEncoder::installConstructor(*_jsRuntime);
+-  GPURenderPipeline::installConstructor(*_jsRuntime);
+-  GPUSampler::installConstructor(*_jsRuntime);
+-  GPUSharedFence::installConstructor(*_jsRuntime);
+-  GPUSharedTextureMemory::installConstructor(*_jsRuntime);
+-  GPUShaderModule::installConstructor(*_jsRuntime);
+-  GPUSupportedLimits::installConstructor(*_jsRuntime);
+-  GPUTexture::installConstructor(*_jsRuntime);
+-  GPUTextureView::installConstructor(*_jsRuntime);
+-  VideoFrame::installConstructor(*_jsRuntime);
+-  VideoPlayer::installConstructor(*_jsRuntime);
++  installConstructors(*_jsRuntime, /*onlyMissing=*/false);
+ 
+   // Install constant objects as plain JS objects with own properties
+   _jsRuntime->global().setProperty(*_jsRuntime, "GPUBufferUsage",
+@@ -144,14 +106,87 @@ RNWebGPUManager::RNWebGPUManager(
+   installWebGPUWorkletHelpers(*_jsRuntime);
+ }
+ 
++namespace {
++
++template <typename Class>
++bool installConstructorOn(jsi::Runtime &runtime, bool onlyMissing) {
++  if (onlyMissing && runtime.global().hasProperty(runtime, Class::CLASS_NAME)) {
++    return false;
++  }
++  Class::installConstructor(runtime);
++  return true;
++}
++
++// The comma fold runs the installs in list order.
++template <typename... Classes>
++size_t installConstructorsOn(jsi::Runtime &runtime, bool onlyMissing) {
++  size_t installed = 0;
++  ((installed += installConstructorOn<Classes>(runtime, onlyMissing) ? 1 : 0),
++   ...);
++  return installed;
++}
++
++} // namespace
++
++size_t RNWebGPUManager::installConstructors(jsi::Runtime &runtime,
++                                            bool onlyMissing) {
++  // The one list of WebGPU classes with a global constructor. RNWebGPU is not
++  // in it: on the main runtime its global is the instance, not a constructor
++  // (see the RNWebGPUManager constructor).
++  return installConstructorsOn<
++    GPU,
++    GPUAdapter,
++    GPUAdapterInfo,
++    GPUBindGroup,
++    GPUBindGroupLayout,
++    GPUBuffer,
++    GPUCanvasContext,
++    GPUCommandBuffer,
++    GPUCommandEncoder,
++    GPUCompilationInfo,
++    GPUCompilationMessage,
++    GPUComputePassEncoder,
++    GPUComputePipeline,
++    GPUDevice,
++    GPUDeviceLostInfo,
++    GPUError,
++    GPUExternalTexture,
++    GPUNativeBufferExternalTexture,
++    GPUNativeBufferTexture,
++    GPUInternalError,
++    GPUOutOfMemoryError,
++    GPUValidationError,
++    GPUUncapturedErrorEvent,
++    GPUPipelineLayout,
++    GPUQuerySet,
++    GPUQueue,
++    GPURenderBundle,
++    GPURenderBundleEncoder,
++    GPURenderPassEncoder,
++    GPURenderPipeline,
++    GPUSampler,
++    GPUSharedFence,
++    GPUSharedTextureMemory,
++    GPUShaderModule,
++    GPUSupportedLimits,
++    GPUTexture,
++    GPUTextureView,
++    VideoFrame,
++    VideoPlayer>(runtime, onlyMissing);
++}
++
+ void RNWebGPUManager::installWebGPUWorkletHelpers(jsi::Runtime &runtime) {
+   // The serializer worklets capture this object by closure; worklets passes a
+   // HostObject to every runtime by reference, so installing it here, on the
+-  // main runtime, is enough (see WebGPUWorkletHelpers).
++  // main runtime, is enough (see WebGPUWorkletHelpers). installConstructors()
++  // runs on whichever runtime calls it (installWebGPU on a worklet runtime).
+   runtime.global().setProperty(
+       runtime, "__webgpuWorkletHelpers",
+       jsi::Object::createFromHostObject(
+-          runtime, std::make_shared<WebGPUWorkletHelpers>()));
++          runtime, std::make_shared<WebGPUWorkletHelpers>(
++                       [](jsi::Runtime &rt) {
++                         return installConstructors(rt, /*onlyMissing=*/true);
++                       })));
+ }
+ 
+ void RNWebGPUManager::flushPendingSurfaceTransition(
+diff --git a/cpp/rnwgpu/RNWebGPUManager.h b/cpp/rnwgpu/RNWebGPUManager.h
+index d7478c6bfae21f058cadd2c03f99738a0dfe3dcf..cb1ec6dbe6e3b10040d365065393820045560544 100644
+--- a/cpp/rnwgpu/RNWebGPUManager.h
++++ b/cpp/rnwgpu/RNWebGPUManager.h
+@@ -35,6 +35,22 @@ public:
+    */
+   static void installWebGPUWorkletHelpers(jsi::Runtime &runtime);
+ 
++  /**
++   * Installs the global constructor of every WebGPU class (GPUDevice,
++   * GPURenderBundleEncoder, ...) on `runtime`, for `instanceof` checks. The
++   * main runtime gets them in the RNWebGPUManager constructor. Worklet
++   * runtimes otherwise get a class's constructor only when an object of that
++   * class is unboxed there, so a class whose objects are only ever created on
++   * the worklet runtime (a render bundle encoder from
++   * device.createRenderBundleEncoder) has no global, and `x instanceof
++   * GPURenderBundleEncoder` throws a ReferenceError. installWebGPU() calls
++   * this through __webgpuWorkletHelpers.installConstructors().
++   *
++   * With onlyMissing, a class whose global already exists is skipped, so the
++   * call is idempotent. Returns the number of constructors installed.
++   */
++  static size_t installConstructors(jsi::Runtime &runtime, bool onlyMissing);
++
+   /**
+    * Applies a surface attach latched by the platform UI thread (see
+    * SurfaceInfo::applyPendingAttach) from the JS thread. Surface attaches are
+diff --git a/lib/commonjs/install.js b/lib/commonjs/install.js
+index 54eba10083dad928552211f274b9ad76b7e6b1e7..79266a46813cfe721241e1b9f3709ae186c9ebed 100644
+--- a/lib/commonjs/install.js
++++ b/lib/commonjs/install.js
+@@ -28,14 +28,24 @@ const constants = {
+ // runtime installs the GPU prototype there.
+ const gpu = typeof RNWebGPU === "undefined" ? undefined : RNWebGPU.gpu;
+ 
++// The native worklet helpers (WebGPUWorkletHelpers in cpp/jsi/NativeObject.h),
++// installed on the main runtime by the native module. A HostObject crosses
++// into a worklet by reference, so installWebGPU can call installConstructors()
++// on the runtime it runs on. Undefined on web and node. installConstructors is
++// missing on native binaries older than this function, and is then skipped.
++const helpers = globalThis.__webgpuWorkletHelpers;
++
+ /**
+  * Install WebGPU on the runtime that calls it.
+  *
+  * The native module sets up WebGPU on the main JS runtime, but worklet
+  * runtimes (Reanimated UI, dedicated worklet runtimes, Vision Camera frame
+- * processors) start without it: `navigator.gpu` and the flag constants
++ * processors) start without it: `navigator.gpu`, the flag constants
+  * (`GPUBufferUsage`, `GPUTextureUsage`, `GPUShaderStage`, `GPUColorWrite`,
+- * `GPUMapMode`) are all `undefined` there.
++ * `GPUMapMode`) and the class constructors (`GPUDevice`,
++ * `GPURenderBundleEncoder`, ...) are all `undefined` there. Without the
++ * constructors, `x instanceof GPURenderBundleEncoder` throws a ReferenceError
++ * on that runtime, as three.js's WebGPU backend does on every draw.
+  *
+  * Call `installWebGPU()` once at the top of a worklet to make them available:
+  *
+@@ -75,6 +85,9 @@ const installWebGPU = () => {
+   "worklet";
+ 
+   const g = globalThis;
++  // Global constructors for `instanceof`, on this runtime. Idempotent: classes
++  // that already have one (all of them on the main runtime) are skipped.
++  helpers?.installConstructors?.();
+   for (const [key, value] of Object.entries(constants)) {
+     if (g[key] === undefined) {
+       g[key] = value;
+diff --git a/lib/module/install.js b/lib/module/install.js
+index 157a8f7fa747043f32f1925d04d2ec03ceb10014..2718e0ca07fd2e83525f776bc2b625640f01ed4e 100644
+--- a/lib/module/install.js
++++ b/lib/module/install.js
+@@ -22,14 +22,24 @@ const constants = {
+ // runtime installs the GPU prototype there.
+ const gpu = typeof RNWebGPU === "undefined" ? undefined : RNWebGPU.gpu;
+ 
++// The native worklet helpers (WebGPUWorkletHelpers in cpp/jsi/NativeObject.h),
++// installed on the main runtime by the native module. A HostObject crosses
++// into a worklet by reference, so installWebGPU can call installConstructors()
++// on the runtime it runs on. Undefined on web and node. installConstructors is
++// missing on native binaries older than this function, and is then skipped.
++const helpers = globalThis.__webgpuWorkletHelpers;
++
+ /**
+  * Install WebGPU on the runtime that calls it.
+  *
+  * The native module sets up WebGPU on the main JS runtime, but worklet
+  * runtimes (Reanimated UI, dedicated worklet runtimes, Vision Camera frame
+- * processors) start without it: `navigator.gpu` and the flag constants
++ * processors) start without it: `navigator.gpu`, the flag constants
+  * (`GPUBufferUsage`, `GPUTextureUsage`, `GPUShaderStage`, `GPUColorWrite`,
+- * `GPUMapMode`) are all `undefined` there.
++ * `GPUMapMode`) and the class constructors (`GPUDevice`,
++ * `GPURenderBundleEncoder`, ...) are all `undefined` there. Without the
++ * constructors, `x instanceof GPURenderBundleEncoder` throws a ReferenceError
++ * on that runtime, as three.js's WebGPU backend does on every draw.
+  *
+  * Call `installWebGPU()` once at the top of a worklet to make them available:
+  *
+@@ -69,6 +79,9 @@ export const installWebGPU = () => {
+   "worklet";
+ 
+   const g = globalThis;
++  // Global constructors for `instanceof`, on this runtime. Idempotent: classes
++  // that already have one (all of them on the main runtime) are skipped.
++  helpers?.installConstructors?.();
+   for (const [key, value] of Object.entries(constants)) {
+     if (g[key] === undefined) {
+       g[key] = value;
+diff --git a/lib/typescript/src/external/reanimated/registerWebGPUForReanimated.d.ts b/lib/typescript/src/external/reanimated/registerWebGPUForReanimated.d.ts
+index 7c1cf549e9532ed5b6915fecc114a687deea012c..8451124557aff2fd5b3ffdc18c0c92341d335df7 100644
+--- a/lib/typescript/src/external/reanimated/registerWebGPUForReanimated.d.ts
++++ b/lib/typescript/src/external/reanimated/registerWebGPUForReanimated.d.ts
+@@ -1,6 +1,7 @@
+ interface WebGPUWorkletHelpers {
+     isNativeObject: (value: unknown) => boolean;
+     box: (value: object) => BoxedWebGPUObject;
++    installConstructors?: () => number;
+ }
+ interface BoxedWebGPUObject {
+     unbox: () => object;
+diff --git a/lib/typescript/src/install.d.ts b/lib/typescript/src/install.d.ts
+index 85d1e6ad1439722864ae37771b00685ffb4801b1..205e8a163cad8b67171777e2f49e3d9c7be67c76 100644
+--- a/lib/typescript/src/install.d.ts
++++ b/lib/typescript/src/install.d.ts
+@@ -3,9 +3,12 @@
+  *
+  * The native module sets up WebGPU on the main JS runtime, but worklet
+  * runtimes (Reanimated UI, dedicated worklet runtimes, Vision Camera frame
+- * processors) start without it: `navigator.gpu` and the flag constants
++ * processors) start without it: `navigator.gpu`, the flag constants
+  * (`GPUBufferUsage`, `GPUTextureUsage`, `GPUShaderStage`, `GPUColorWrite`,
+- * `GPUMapMode`) are all `undefined` there.
++ * `GPUMapMode`) and the class constructors (`GPUDevice`,
++ * `GPURenderBundleEncoder`, ...) are all `undefined` there. Without the
++ * constructors, `x instanceof GPURenderBundleEncoder` throws a ReferenceError
++ * on that runtime, as three.js's WebGPU backend does on every draw.
+  *
+  * Call `installWebGPU()` once at the top of a worklet to make them available:
+  *
+diff --git a/src/external/reanimated/registerWebGPUForReanimated.ts b/src/external/reanimated/registerWebGPUForReanimated.ts
+index f5a7f8314b4ec3234eaf67039b617709d3eacd27..b00bfb16c91c65f8dd3f4a137c1f34770d705995 100644
+--- a/src/external/reanimated/registerWebGPUForReanimated.ts
++++ b/src/external/reanimated/registerWebGPUForReanimated.ts
+@@ -10,6 +10,10 @@ interface WebGPUWorkletHelpers {
+   // WebGPU prototype are rejected, and no JS property is ever read.
+   isNativeObject: (value: unknown) => boolean;
+   box: (value: object) => BoxedWebGPUObject;
++  // Installs every WebGPU class constructor on the calling runtime, skipping
++  // those already there; returns how many it installed. Used by installWebGPU.
++  // Absent on native binaries that predate it.
++  installConstructors?: () => number;
+ }
+ 
+ interface BoxedWebGPUObject {
+diff --git a/src/install.ts b/src/install.ts
+index 2c1456c40008351781f7eaa606ab7cb184ca8131..27fd4e6393647add43cc6d4a99f04127beff96e4 100644
+--- a/src/install.ts
++++ b/src/install.ts
+@@ -29,14 +29,28 @@ const constants = {
+ const gpu: GPU | undefined =
+   typeof RNWebGPU === "undefined" ? undefined : RNWebGPU.gpu;
+ 
++// The native worklet helpers (WebGPUWorkletHelpers in cpp/jsi/NativeObject.h),
++// installed on the main runtime by the native module. A HostObject crosses
++// into a worklet by reference, so installWebGPU can call installConstructors()
++// on the runtime it runs on. Undefined on web and node. installConstructors is
++// missing on native binaries older than this function, and is then skipped.
++const helpers = (
++  globalThis as unknown as {
++    __webgpuWorkletHelpers?: { installConstructors?: () => number };
++  }
++).__webgpuWorkletHelpers;
++
+ /**
+  * Install WebGPU on the runtime that calls it.
+  *
+  * The native module sets up WebGPU on the main JS runtime, but worklet
+  * runtimes (Reanimated UI, dedicated worklet runtimes, Vision Camera frame
+- * processors) start without it: `navigator.gpu` and the flag constants
++ * processors) start without it: `navigator.gpu`, the flag constants
+  * (`GPUBufferUsage`, `GPUTextureUsage`, `GPUShaderStage`, `GPUColorWrite`,
+- * `GPUMapMode`) are all `undefined` there.
++ * `GPUMapMode`) and the class constructors (`GPUDevice`,
++ * `GPURenderBundleEncoder`, ...) are all `undefined` there. Without the
++ * constructors, `x instanceof GPURenderBundleEncoder` throws a ReferenceError
++ * on that runtime, as three.js's WebGPU backend does on every draw.
+  *
+  * Call `installWebGPU()` once at the top of a worklet to make them available:
+  *
+@@ -75,6 +89,9 @@ const gpu: GPU | undefined =
+ export const installWebGPU = () => {
+   "worklet";
+   const g = globalThis as unknown as Record<string, unknown>;
++  // Global constructors for `instanceof`, on this runtime. Idempotent: classes
++  // that already have one (all of them on the main runtime) are skipped.
++  helpers?.installConstructors?.();
+   for (const [key, value] of Object.entries(constants)) {
+     if (g[key] === undefined) {
+       g[key] = value;
