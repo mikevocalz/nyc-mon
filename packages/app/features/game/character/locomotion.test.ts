@@ -107,6 +107,25 @@ test('collision slides along a wall instead of stopping dead', () => {
   assert.ok(near(open.x, 3) && near(open.z, -4));
 });
 
+test('a push into a wall that runs off the scene axes slides along it', () => {
+  // A block face on Harlem's grid, 29° off the axes, 1 m from the start on the -x side.
+  const grid = (29 * Math.PI) / 180;
+  const nx = -Math.cos(grid); const nz = -Math.sin(grid);
+  const face = (x: number, z: number) => x * nx + z * nz < 1;
+  const push = (dx: number, dz: number) => {
+    let p = { x: 0, z: 0 };
+    for (let i = 0; i < 120; i++) p = slideMove(p.x, p.z, dx * 0.07, dz * 0.07, face);
+    return Math.hypot(p.x, p.z);
+  };
+  // Stick up at the spawn yaw (π/2): straight -x, with a z part of -6e-17 that once counted as a slide.
+  const up = cameraRelativeDirection(0, 1, Math.PI / 2)!;
+  assert.ok(push(up.x, up.z) > 3, `straight push stopped after ${push(up.x, up.z)} m`);
+  // A diagonal push whose x part and z part each run into the face on their own.
+  assert.ok(push(-0.6, -0.8) > 2, `diagonal push stopped after ${push(-0.6, -0.8)} m`);
+  // Straight at the face, nothing to slide along: it stops at the wall.
+  assert.ok(push(nx, nz) < 1.01);
+});
+
 test('a fast move cannot tunnel through a thin footprint', () => {
   const thinWall = (x: number) => !(x > 1.05 && x < 1.3);
   const moved = slideMove(0, 0, 5, 0, thinWall);

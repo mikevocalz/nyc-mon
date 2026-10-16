@@ -133,11 +133,24 @@ export function turnToward(current: number, target: number, maxStep: number): nu
 export type WalkableTest = (x: number, z: number) => boolean;
 
 /**
+ * Turns tried, each way, when a step and both its axis parts are blocked:
+ * the step swings this far off the push and shrinks to its projection
+ * (length times cos), so it runs along a wall at any angle.
+ */
+const SLIDE_TURNS = [10, 20, 30, 40, 50, 60, 70, 80].map((deg) => (deg * Math.PI) / 180);
+
+/**
  * Moves from (x, z) by (dx, dz) without entering an unwalkable point. A
  * blocked move slides along whichever axis stays clear (x first, then z), so
- * walking diagonally into a wall runs along it instead of sticking. Long
- * moves are split into {@linkcode MAX_COLLISION_STEP} steps so a fast frame
- * cannot tunnel through a thin footprint.
+ * walking diagonally into a wall runs along it instead of sticking. When both
+ * axis parts are blocked too, the step swings toward each side in turn, the
+ * smallest swing first, and takes its projection. Harlem's grid sits 29° off
+ * the scene axes, so a push straight along x or z into a block face has no
+ * clear axis part; without the swing the Caller stopped dead there
+ * (2026-10-16, holding up from the Apollo spawn stalled at (-86.38, 22)).
+ * Long moves are split into {@linkcode MAX_COLLISION_STEP} steps, and every
+ * move tests its midpoint as well as its end, so a fast frame cannot tunnel
+ * through a footprint thicker than half a step.
  */
 export function slideMove(x: number, z: number, dx: number, dz: number, isWalkable: WalkableTest): { x: number; z: number } {
   if (![x, z, dx, dz].every(Number.isFinite)) return { x, z };
@@ -146,13 +159,41 @@ export function slideMove(x: number, z: number, dx: number, dz: number, isWalkab
   const sz = dz / steps;
   let px = x;
   let pz = z;
+  // An axis part under half the step is no slide. At the spawn yaw (π/2) the
+  // z part of a straight push is -cos(π/2) = -6e-17: the z-only move "worked",
+  // moved nothing, and the swing below never ran.
+  const minAxis = Math.hypot(sx, sz) / 2;
   for (let i = 0; i < steps; i++) {
-    if (isWalkable(px + sx, pz + sz)) { px += sx; pz += sz; continue; }
-    if (sx !== 0 && isWalkable(px + sx, pz)) { px += sx; continue; }
-    if (sz !== 0 && isWalkable(px, pz + sz)) { pz += sz; continue; }
-    break;
+    if (clearMove(px, pz, sx, sz, isWalkable)) { px += sx; pz += sz; continue; }
+    if (Math.abs(sx) >= minAxis && clearMove(px, pz, sx, 0, isWalkable)) { px += sx; continue; }
+    if (Math.abs(sz) >= minAxis && clearMove(px, pz, 0, sz, isWalkable)) { pz += sz; continue; }
+    const swung = swingStep(px, pz, sx, sz, isWalkable);
+    if (swung === null) break;
+    px += swung.x;
+    pz += swung.z;
   }
   return { x: px, z: pz };
+}
+
+/** Both the midpoint and the end of the move (mx, mz) from (px, pz) are walkable. */
+function clearMove(px: number, pz: number, mx: number, mz: number, isWalkable: WalkableTest): boolean {
+  return isWalkable(px + mx / 2, pz + mz / 2) && isWalkable(px + mx, pz + mz);
+}
+
+/** The blocked step (sx, sz) swung by the smallest turn in SLIDE_TURNS that lands on walkable ground, either way; null when none does. */
+function swingStep(px: number, pz: number, sx: number, sz: number, isWalkable: WalkableTest): { x: number; z: number } | null {
+  if (sx === 0 && sz === 0) return null;
+  for (const turn of SLIDE_TURNS) {
+    const c = Math.cos(turn);
+    const s = Math.sin(turn);
+    for (const side of [1, -1]) {
+      // Rotate by side * turn, then scale by cos(turn): the step's projection on the swung direction.
+      const mx = (sx * c - sz * s * side) * c;
+      const mz = (sx * s * side + sz * c) * c;
+      if (clearMove(px, pz, mx, mz, isWalkable)) return { x: mx, z: mz };
+    }
+  }
+  return null;
 }
 
 /** Height above the ground and vertical speed. Both 0 while standing. */
