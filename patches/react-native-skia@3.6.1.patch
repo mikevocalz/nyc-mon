@@ -1,8 +1,11 @@
+diff --git a/android/README.md b/android/README.md
+deleted file mode 100644
+index ac2fbda377ad1213c02f090138f48054e5660547..0000000000000000000000000000000000000000
 diff --git a/lib/module/views/SkiaView.web.js b/lib/module/views/SkiaView.web.js
-index 1f1ca89bb8a7eac0003f7d5925f20b1e07d833b6..9d2d782b7ffe3d71633bf7934f112b3e37abd5c3 100644
+index 3c32ad569173fdd857ec19afd3fd6e02ed49892a..7c681cc3fa228858b1251ee01ce266ac692eedfe 100644
 --- a/lib/module/views/SkiaView.web.js
 +++ b/lib/module/views/SkiaView.web.js
-@@ -266,8 +266,12 @@ export const SkiaView = props => {
+@@ -262,8 +262,12 @@ export const SkiaView = props => {
      };
    }, [setPicture, getContext, getSize, redraw, makeImageSnapshot, measure, measureInWindow, nativeId]);
  
@@ -17,10 +20,10 @@ index 1f1ca89bb8a7eac0003f7d5925f20b1e07d833b6..9d2d782b7ffe3d71633bf7934f112b3e
      queueRef.current = [];
      shownRef.current.forEach(recording => recording.release());
 diff --git a/src/views/SkiaView.web.tsx b/src/views/SkiaView.web.tsx
-index 9dd9b4b5b22f4f84ffe6f66132bbdaaa42c4e4ae..37860e972716b0e7aca58794c7eeb0493164ccb1 100644
+index 71c1e7f00dd4afc1496acfc969ea3d4d180623d8..a63409546f099f9b0848727c4da65d209037ea82 100644
 --- a/src/views/SkiaView.web.tsx
 +++ b/src/views/SkiaView.web.tsx
-@@ -379,9 +379,13 @@ export const SkiaView = (props: SkiaViewProps) => {
+@@ -372,9 +372,13 @@ export const SkiaView = (props: SkiaViewProps) => {
      nativeId,
    ]);
  

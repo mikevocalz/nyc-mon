@@ -1,0 +1,15 @@
+diff --git a/android/src/new/java/com/rive/RiveReactNativeView.kt b/android/src/new/java/com/rive/RiveReactNativeView.kt
+index 36d0baf4de7e5c480a3179fb733b11f35b643427..a49438a323b9fd1fc2b2243c22dc8b0a67b7e800 100644
+--- a/android/src/new/java/com/rive/RiveReactNativeView.kt
++++ b/android/src/new/java/com/rive/RiveReactNativeView.kt
+@@ -206,7 +206,9 @@ class RiveReactNativeView(context: ThemedReactContext) : FrameLayout(context) {
+           if (!paused && !settled) {
+             worker.advanceStateMachine(sm, deltaTime)
+           }
+-          worker.draw(art, sm, rs, activeFit)
++          // NYC-MON patch: clear to transparent so artboards composite over the
++          // views behind them (game controls over the 3D world).
++          worker.draw(art, sm, rs, activeFit, android.graphics.Color.TRANSPARENT)
+           needsRedraw = false
+           frameCount++
+           val isFirstFrame = frameCount == 1L

@@ -15,7 +15,7 @@ const targets = [
 
 // Resolve canvaskit-wasm through react-native-skia (v3), so the copied
 // CanvasKit is always the exact build Skia's web runtime was published with
-// (canvaskit-wasm 0.41.0 for react-native-skia 3.0.2), never a stray copy an
+// (canvaskit-wasm 0.41.1 for react-native-skia 3.6.1), never a stray copy an
 // app happens to declare.
 for (const [manifest, destination] of targets) {
   const appRequire = createRequire(join(root, manifest));
