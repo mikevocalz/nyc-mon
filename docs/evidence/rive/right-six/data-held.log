@@ -1,0 +1,5 @@
+[23:07:28.610] rive  deferred replay: inline
+[23:07:28.660] rive  built /Users/mikevocalz/nyc-mon/packages/ui/rive/arcade-controls/right-six/build/right-six.riv (144444 bytes, 49ms, 0 errors, 0 warnings)
+[23:07:28.661] rive  data: buttons/a/state = held
+[23:07:28.661] rive  showing RightSix [1/2]
+[23:07:28.662] rive  wrote /Users/mikevocalz/nyc-mon/docs/evidence/rive/right-six/data-held.data.json

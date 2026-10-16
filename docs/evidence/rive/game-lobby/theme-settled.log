@@ -1,0 +1,8 @@
+[21:09:19.716] rive  deferred replay: inline
+[21:09:19.719] rive  compiling 5 markup files as one document: ../game-transition/scene.rml, ../leaderboard/scene.rml, ../start-angled/scene.rml, scene.rml, shared-vm.rml
+[21:09:19.851] rive  built packages/ui/rive/lobby/game-lobby/build/game-lobby.riv (614266 bytes, 134ms, 0 errors, 0 warnings)
+[21:09:19.853] rive  data: transition/phase = done
+[21:09:19.853] rive  data: theme/variant = daylit
+[21:09:19.854] rive  showing GameLobby [1/8]
+[21:09:19.856] rive  viewport 390x844 @1x
+[21:09:19.880] rive  wrote docs/evidence/rive/game-lobby/theme-settled.png

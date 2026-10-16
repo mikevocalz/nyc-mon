@@ -1,0 +1,8 @@
+[23:08:03.675] rive  deferred replay: inline
+[23:08:03.679] rive  compiling 5 markup files as one document: ../game-transition/scene.rml, ../leaderboard/scene.rml, ../start-angled/scene.rml, scene.rml, shared-vm.rml
+[23:08:03.864] rive  built /Users/mikevocalz/nyc-mon/packages/ui/rive/lobby/game-lobby/build/game-lobby.riv (614266 bytes, 187ms, 0 errors, 0 warnings)
+[23:08:03.866] rive  data: transition/phase = done
+[23:08:03.866] rive  data: layout/profile = fold-book
+[23:08:03.867] rive  showing GameLobby [1/8]
+[23:08:03.868] rive  viewport 884x844 @1x
+[23:08:03.905] rive  wrote /Users/mikevocalz/nyc-mon/docs/evidence/rive/game-lobby/fold-book.png

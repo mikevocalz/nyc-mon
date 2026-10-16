@@ -1,0 +1,8 @@
+[23:08:06.992] rive  deferred replay: inline
+[23:08:06.994] rive  compiling 5 markup files as one document: ../game-transition/scene.rml, ../leaderboard/scene.rml, ../start-angled/scene.rml, scene.rml, shared-vm.rml
+[23:08:07.203] rive  built /Users/mikevocalz/nyc-mon/packages/ui/rive/lobby/game-lobby/build/game-lobby.riv (614266 bytes, 209ms, 0 errors, 0 warnings)
+[23:08:07.204] rive  data: transition/phase = done
+[23:08:07.204] rive  data: theme/variant = daylit
+[23:08:07.205] rive  showing GameLobby [1/8]
+[23:08:07.207] rive  viewport 390x844 @1x
+[23:08:07.238] rive  wrote /Users/mikevocalz/nyc-mon/docs/evidence/rive/game-lobby/theme-fade-mid.png

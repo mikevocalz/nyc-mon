@@ -1,0 +1,7 @@
+[23:08:05.705] rive  deferred replay: inline
+[23:08:05.707] rive  compiling 5 markup files as one document: ../game-transition/scene.rml, ../leaderboard/scene.rml, ../start-angled/scene.rml, scene.rml, shared-vm.rml
+[23:08:05.876] rive  built /Users/mikevocalz/nyc-mon/packages/ui/rive/lobby/game-lobby/build/game-lobby.riv (614266 bytes, 171ms, 0 errors, 0 warnings)
+[23:08:05.878] rive  data: transition/phase = hold
+[23:08:05.879] rive  showing GameLobby [1/8]
+[23:08:05.881] rive  viewport 390x844 @1x
+[23:08:05.900] rive  wrote /Users/mikevocalz/nyc-mon/docs/evidence/rive/game-lobby/covered-hold.png

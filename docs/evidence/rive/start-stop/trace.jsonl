@@ -1,0 +1,4 @@
+{"schema": 1, "kind": "header", "artboard": "StartStop", "stateMachine": "Pill", "intervalFrames": 10}
+{"frame": 0, "time": 0, "full": true, "values": [{"path": "pill/state", "value": "start"}, {"path": "pill/pressed", "value": false}, {"path": "pill/focused", "value": false}, {"path": "pill/holdProgress", "value": 0}, {"path": "theme/variant", "value": "night"}, {"path": "layout/profile", "value": "phone-portrait"}, {"path": "a11y/reducedMotion", "value": false}]}
+{"frame": 10, "time": 0.166666672, "values": [{"path": "pill/focused", "value": true}]}
+{"frame": 120, "time": 1.99999881, "full": true, "values": [{"path": "pill/state", "value": "start"}, {"path": "pill/pressed", "value": false}, {"path": "pill/focused", "value": true}, {"path": "pill/holdProgress", "value": 0}, {"path": "theme/variant", "value": "night"}, {"path": "layout/profile", "value": "phone-portrait"}, {"path": "a11y/reducedMotion", "value": false}]}

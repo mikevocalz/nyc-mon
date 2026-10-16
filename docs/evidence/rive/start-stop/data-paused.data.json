@@ -1,0 +1,34 @@
+{
+  "schema": 1,
+  "artboard": "StartStop",
+  "stateMachine": "Pill",
+  "viewModel": {
+    "name": "Default",
+    "viewModel": "StartStop",
+    "properties": [
+      {
+        "name": "pill",
+        "path": "pill",
+        "type": "viewModel",
+        "value": {
+          "name": "Default",
+          "viewModel": "Pill",
+          "properties": [
+            {
+              "name": "state",
+              "path": "pill/state",
+              "type": "enum",
+              "enumType": "PillState",
+              "value": "paused",
+              "index": 2,
+              "values": ["start", "playing", "paused", "stopConfirm"],
+              "changed": true
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "globals": [],
+  "nested": []
+}

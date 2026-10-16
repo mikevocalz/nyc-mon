@@ -1,0 +1,7 @@
+[21:07:51.180] rive  deferred replay: inline
+[21:07:51.227] rive  built packages/ui/rive/arcade-controls/right-six/build/right-six.riv (144354 bytes, 46ms, 0 errors, 0 warnings)
+[21:07:51.228] rive  data: a11y/reducedMotion = true
+[21:07:51.228] rive  data: buttons/b/state = released
+[21:07:51.228] rive  showing RightSix [1/2]
+[21:07:51.228] rive  viewport 208x144 @1x
+[21:07:51.244] rive  wrote docs/evidence/rive/right-six/released-reduced-state.png

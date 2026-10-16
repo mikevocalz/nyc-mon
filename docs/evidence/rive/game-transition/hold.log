@@ -1,0 +1,7 @@
+[23:07:56.708] rive  deferred replay: inline
+[23:07:56.710] rive  compiling 2 markup files as one document: ../game-lobby/shared-vm.rml, scene.rml
+[23:07:56.763] rive  built /Users/mikevocalz/nyc-mon/packages/ui/rive/lobby/game-transition/build/game-transition.riv (234928 bytes, 54ms, 0 errors, 0 warnings)
+[23:07:56.764] rive  data: transition/phase = hold
+[23:07:56.764] rive  showing GameTransitionHost [1/2]
+[23:07:56.764] rive  viewport 390x844 @1x
+[23:07:56.788] rive  wrote /Users/mikevocalz/nyc-mon/docs/evidence/rive/game-transition/hold.png

@@ -1,0 +1,7 @@
+[23:07:51.603] rive  deferred replay: inline
+[23:07:51.604] rive  compiling 2 markup files as one document: ../game-lobby/shared-vm.rml, scene.rml
+[23:07:51.642] rive  built /Users/mikevocalz/nyc-mon/packages/ui/rive/lobby/start-angled/build/start-angled.riv (142704 bytes, 38ms, 0 errors, 0 warnings)
+[23:07:51.643] rive  data: lobby/start/state = disabled
+[23:07:51.643] rive  showing StartAngledHost [1/2]
+[23:07:51.643] rive  viewport 343x128 @1x
+[23:07:51.643] rive  wrote /Users/mikevocalz/nyc-mon/docs/evidence/rive/start-angled/semantics-disabled.semantics.json

@@ -1,0 +1,568 @@
+{
+  "schema": 1,
+  "artboard": "Leaderboard",
+  "stateMachine": "Host",
+  "viewModel": {
+    "name": "Default",
+    "viewModel": "Leaderboard",
+    "properties": [
+      {
+        "name": "leaderboard",
+        "path": "leaderboard",
+        "type": "viewModel",
+        "value": {
+          "name": "Default",
+          "viewModel": "LeaderboardPanel",
+          "properties": [
+            {
+              "name": "status",
+              "path": "leaderboard/status",
+              "type": "enum",
+              "enumType": "LeaderboardStatus",
+              "value": "ready",
+              "index": 1,
+              "values": ["loading", "ready", "empty", "stale", "error", "unavailable"],
+              "changed": false
+            },
+            {
+              "name": "rows",
+              "path": "leaderboard/rows",
+              "type": "list",
+              "size": 4,
+              "items": [
+                {
+                  "name": "Row 1",
+                  "viewModel": "Row",
+                  "properties": [
+                    {
+                      "name": "rank",
+                      "path": "leaderboard/rows[0]/rank",
+                      "type": "number",
+                      "value": 1,
+                      "changed": false
+                    },
+                    {
+                      "name": "name",
+                      "path": "leaderboard/rows[0]/name",
+                      "type": "string",
+                      "value": "Vesper",
+                      "changed": false
+                    },
+                    {
+                      "name": "score",
+                      "path": "leaderboard/rows[0]/score",
+                      "type": "number",
+                      "value": 48200,
+                      "changed": false
+                    },
+                    {
+                      "name": "isSelf",
+                      "path": "leaderboard/rows[0]/isSelf",
+                      "type": "boolean",
+                      "value": false,
+                      "changed": false
+                    }
+                  ]
+                },
+                {
+                  "name": "Row 2",
+                  "viewModel": "Row",
+                  "properties": [
+                    {
+                      "name": "rank",
+                      "path": "leaderboard/rows[1]/rank",
+                      "type": "number",
+                      "value": 2,
+                      "changed": false
+                    },
+                    {
+                      "name": "name",
+                      "path": "leaderboard/rows[1]/name",
+                      "type": "string",
+                      "value": "Nimbus",
+                      "changed": false
+                    },
+                    {
+                      "name": "score",
+                      "path": "leaderboard/rows[1]/score",
+                      "type": "number",
+                      "value": 41750,
+                      "changed": false
+                    },
+                    {
+                      "name": "isSelf",
+                      "path": "leaderboard/rows[1]/isSelf",
+                      "type": "boolean",
+                      "value": false,
+                      "changed": false
+                    }
+                  ]
+                },
+                {
+                  "name": "Row 3",
+                  "viewModel": "Row",
+                  "properties": [
+                    {
+                      "name": "rank",
+                      "path": "leaderboard/rows[2]/rank",
+                      "type": "number",
+                      "value": 3,
+                      "changed": false
+                    },
+                    {
+                      "name": "name",
+                      "path": "leaderboard/rows[2]/name",
+                      "type": "string",
+                      "value": "Kestrel",
+                      "changed": false
+                    },
+                    {
+                      "name": "score",
+                      "path": "leaderboard/rows[2]/score",
+                      "type": "number",
+                      "value": 39900,
+                      "changed": false
+                    },
+                    {
+                      "name": "isSelf",
+                      "path": "leaderboard/rows[2]/isSelf",
+                      "type": "boolean",
+                      "value": false,
+                      "changed": false
+                    }
+                  ]
+                },
+                {
+                  "name": "Row Self",
+                  "viewModel": "Row",
+                  "properties": [
+                    {
+                      "name": "rank",
+                      "path": "leaderboard/rows[3]/rank",
+                      "type": "number",
+                      "value": 17,
+                      "changed": false
+                    },
+                    {
+                      "name": "name",
+                      "path": "leaderboard/rows[3]/name",
+                      "type": "string",
+                      "value": "Sable",
+                      "changed": false
+                    },
+                    {
+                      "name": "score",
+                      "path": "leaderboard/rows[3]/score",
+                      "type": "number",
+                      "value": 12300,
+                      "changed": false
+                    },
+                    {
+                      "name": "isSelf",
+                      "path": "leaderboard/rows[3]/isSelf",
+                      "type": "boolean",
+                      "value": true,
+                      "changed": false
+                    }
+                  ]
+                }
+              ],
+              "changed": false
+            },
+            {
+              "name": "a11y",
+              "path": "leaderboard/a11y",
+              "type": "viewModel",
+              "value": {
+                "name": "Default",
+                "viewModel": "A11y",
+                "properties": [
+                  {
+                    "name": "reducedMotion",
+                    "path": "leaderboard/a11y/reducedMotion",
+                    "type": "boolean",
+                    "value": false,
+                    "changed": false
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "theme",
+        "path": "theme",
+        "type": "viewModel",
+        "value": {
+          "name": "Default",
+          "viewModel": "Theme",
+          "properties": [
+            {
+              "name": "variant",
+              "path": "theme/variant",
+              "type": "enum",
+              "enumType": "ThemeVariant",
+              "value": "night",
+              "index": 1,
+              "values": ["daylit", "night"],
+              "changed": false
+            }
+          ]
+        }
+      },
+      {
+        "name": "layout",
+        "path": "layout",
+        "type": "viewModel",
+        "value": {
+          "name": "Default",
+          "viewModel": "Layout",
+          "properties": [
+            {
+              "name": "profile",
+              "path": "layout/profile",
+              "type": "enum",
+              "enumType": "LayoutProfile",
+              "value": "phone-portrait",
+              "index": 0,
+              "values": ["phone-portrait", "phone-landscape", "fold-outer", "fold-book", "fold-tabletop", "tablet", "web"],
+              "changed": false
+            }
+          ]
+        }
+      },
+      {
+        "name": "a11y",
+        "path": "a11y",
+        "type": "viewModel",
+        "value": {
+          "name": "Default",
+          "viewModel": "A11y",
+          "properties": [
+            {
+              "name": "reducedMotion",
+              "path": "a11y/reducedMotion",
+              "type": "boolean",
+              "value": false,
+              "changed": false
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "globals": [],
+  "nested": [
+    {
+      "path": "Panel",
+      "artboard": "LeaderboardPanel",
+      "viewModels": [
+        {
+          "name": "Default",
+          "viewModel": "LeaderboardPanel",
+          "properties": [
+            {
+              "name": "status",
+              "path": "status",
+              "type": "enum",
+              "enumType": "LeaderboardStatus",
+              "value": "ready",
+              "index": 1,
+              "values": ["loading", "ready", "empty", "stale", "error", "unavailable"]
+            },
+            {
+              "name": "rows",
+              "path": "rows",
+              "type": "list",
+              "size": 4,
+              "items": [
+                {
+                  "name": "Row 1",
+                  "viewModel": "Row",
+                  "properties": [
+                    {
+                      "name": "rank",
+                      "path": "rows[0]/rank",
+                      "type": "number",
+                      "value": 1
+                    },
+                    {
+                      "name": "name",
+                      "path": "rows[0]/name",
+                      "type": "string",
+                      "value": "Vesper"
+                    },
+                    {
+                      "name": "score",
+                      "path": "rows[0]/score",
+                      "type": "number",
+                      "value": 48200
+                    },
+                    {
+                      "name": "isSelf",
+                      "path": "rows[0]/isSelf",
+                      "type": "boolean",
+                      "value": false
+                    }
+                  ]
+                },
+                {
+                  "name": "Row 2",
+                  "viewModel": "Row",
+                  "properties": [
+                    {
+                      "name": "rank",
+                      "path": "rows[1]/rank",
+                      "type": "number",
+                      "value": 2
+                    },
+                    {
+                      "name": "name",
+                      "path": "rows[1]/name",
+                      "type": "string",
+                      "value": "Nimbus"
+                    },
+                    {
+                      "name": "score",
+                      "path": "rows[1]/score",
+                      "type": "number",
+                      "value": 41750
+                    },
+                    {
+                      "name": "isSelf",
+                      "path": "rows[1]/isSelf",
+                      "type": "boolean",
+                      "value": false
+                    }
+                  ]
+                },
+                {
+                  "name": "Row 3",
+                  "viewModel": "Row",
+                  "properties": [
+                    {
+                      "name": "rank",
+                      "path": "rows[2]/rank",
+                      "type": "number",
+                      "value": 3
+                    },
+                    {
+                      "name": "name",
+                      "path": "rows[2]/name",
+                      "type": "string",
+                      "value": "Kestrel"
+                    },
+                    {
+                      "name": "score",
+                      "path": "rows[2]/score",
+                      "type": "number",
+                      "value": 39900
+                    },
+                    {
+                      "name": "isSelf",
+                      "path": "rows[2]/isSelf",
+                      "type": "boolean",
+                      "value": false
+                    }
+                  ]
+                },
+                {
+                  "name": "Row Self",
+                  "viewModel": "Row",
+                  "properties": [
+                    {
+                      "name": "rank",
+                      "path": "rows[3]/rank",
+                      "type": "number",
+                      "value": 17
+                    },
+                    {
+                      "name": "name",
+                      "path": "rows[3]/name",
+                      "type": "string",
+                      "value": "Sable"
+                    },
+                    {
+                      "name": "score",
+                      "path": "rows[3]/score",
+                      "type": "number",
+                      "value": 12300
+                    },
+                    {
+                      "name": "isSelf",
+                      "path": "rows[3]/isSelf",
+                      "type": "boolean",
+                      "value": true
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "name": "a11y",
+              "path": "a11y",
+              "type": "viewModel",
+              "value": {
+                "name": "Default",
+                "viewModel": "A11y",
+                "properties": [
+                  {
+                    "name": "reducedMotion",
+                    "path": "a11y/reducedMotion",
+                    "type": "boolean",
+                    "value": false
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "Panel/List[0]",
+      "artboard": "LeaderboardRow",
+      "viewModels": [
+        {
+          "name": "Row 1",
+          "viewModel": "Row",
+          "properties": [
+            {
+              "name": "rank",
+              "path": "rank",
+              "type": "number",
+              "value": 1
+            },
+            {
+              "name": "name",
+              "path": "name",
+              "type": "string",
+              "value": "Vesper"
+            },
+            {
+              "name": "score",
+              "path": "score",
+              "type": "number",
+              "value": 48200
+            },
+            {
+              "name": "isSelf",
+              "path": "isSelf",
+              "type": "boolean",
+              "value": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "Panel/List[1]",
+      "artboard": "LeaderboardRow",
+      "viewModels": [
+        {
+          "name": "Row 2",
+          "viewModel": "Row",
+          "properties": [
+            {
+              "name": "rank",
+              "path": "rank",
+              "type": "number",
+              "value": 2
+            },
+            {
+              "name": "name",
+              "path": "name",
+              "type": "string",
+              "value": "Nimbus"
+            },
+            {
+              "name": "score",
+              "path": "score",
+              "type": "number",
+              "value": 41750
+            },
+            {
+              "name": "isSelf",
+              "path": "isSelf",
+              "type": "boolean",
+              "value": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "Panel/List[2]",
+      "artboard": "LeaderboardRow",
+      "viewModels": [
+        {
+          "name": "Row 3",
+          "viewModel": "Row",
+          "properties": [
+            {
+              "name": "rank",
+              "path": "rank",
+              "type": "number",
+              "value": 3
+            },
+            {
+              "name": "name",
+              "path": "name",
+              "type": "string",
+              "value": "Kestrel"
+            },
+            {
+              "name": "score",
+              "path": "score",
+              "type": "number",
+              "value": 39900
+            },
+            {
+              "name": "isSelf",
+              "path": "isSelf",
+              "type": "boolean",
+              "value": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "Panel/List[3]",
+      "artboard": "LeaderboardRow",
+      "viewModels": [
+        {
+          "name": "Row Self",
+          "viewModel": "Row",
+          "properties": [
+            {
+              "name": "rank",
+              "path": "rank",
+              "type": "number",
+              "value": 17
+            },
+            {
+              "name": "name",
+              "path": "name",
+              "type": "string",
+              "value": "Sable"
+            },
+            {
+              "name": "score",
+              "path": "score",
+              "type": "number",
+              "value": 12300
+            },
+            {
+              "name": "isSelf",
+              "path": "isSelf",
+              "type": "boolean",
+              "value": true
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

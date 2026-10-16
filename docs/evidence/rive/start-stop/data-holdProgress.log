@@ -1,0 +1,6 @@
+[23:07:37.294] rive  deferred replay: inline
+[23:07:37.333] rive  built /Users/mikevocalz/nyc-mon/packages/ui/rive/arcade-controls/start-stop/build/start-stop.riv (142340 bytes, 38ms, 0 errors, 0 warnings)
+[23:07:37.333] rive  data: pill/state = stopConfirm
+[23:07:37.333] rive  data: pill/holdProgress = 0.5
+[23:07:37.334] rive  showing StartStop [1/1]
+[23:07:37.334] rive  wrote /Users/mikevocalz/nyc-mon/docs/evidence/rive/start-stop/data-holdProgress.data.json

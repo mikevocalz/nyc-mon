@@ -1,0 +1,649 @@
+{
+  "schema": 1,
+  "artboard": "RightSix",
+  "stateMachine": "Cluster",
+  "viewModel": {
+    "name": "Default",
+    "viewModel": "RightSix",
+    "properties": [
+      {
+        "name": "buttons",
+        "path": "buttons",
+        "type": "viewModel",
+        "value": {
+          "name": "Default",
+          "viewModel": "Buttons",
+          "properties": [
+            {
+              "name": "x",
+              "path": "buttons/x",
+              "type": "viewModel",
+              "value": {
+                "name": "X",
+                "viewModel": "Button",
+                "properties": [
+                  {
+                    "name": "state",
+                    "path": "buttons/x/state",
+                    "type": "enum",
+                    "enumType": "ButtonState",
+                    "value": "idle",
+                    "index": 0,
+                    "values": ["idle", "pressed", "held", "released", "disabled", "cooldown"],
+                    "changed": false
+                  },
+                  {
+                    "name": "label",
+                    "path": "buttons/x/label",
+                    "type": "string",
+                    "value": "X",
+                    "changed": false
+                  },
+                  {
+                    "name": "icon",
+                    "path": "buttons/x/icon",
+                    "type": "string",
+                    "value": "",
+                    "changed": false
+                  },
+                  {
+                    "name": "reducedMotion",
+                    "path": "buttons/x/reducedMotion",
+                    "type": "boolean",
+                    "value": false,
+                    "changed": false
+                  },
+                  {
+                    "name": "stateIndex",
+                    "path": "buttons/x/stateIndex",
+                    "type": "number",
+                    "value": 0,
+                    "changed": false
+                  }
+                ]
+              }
+            },
+            {
+              "name": "y",
+              "path": "buttons/y",
+              "type": "viewModel",
+              "value": {
+                "name": "Y",
+                "viewModel": "Button",
+                "properties": [
+                  {
+                    "name": "state",
+                    "path": "buttons/y/state",
+                    "type": "enum",
+                    "enumType": "ButtonState",
+                    "value": "idle",
+                    "index": 0,
+                    "values": ["idle", "pressed", "held", "released", "disabled", "cooldown"],
+                    "changed": false
+                  },
+                  {
+                    "name": "label",
+                    "path": "buttons/y/label",
+                    "type": "string",
+                    "value": "Y",
+                    "changed": false
+                  },
+                  {
+                    "name": "icon",
+                    "path": "buttons/y/icon",
+                    "type": "string",
+                    "value": "",
+                    "changed": false
+                  },
+                  {
+                    "name": "reducedMotion",
+                    "path": "buttons/y/reducedMotion",
+                    "type": "boolean",
+                    "value": false,
+                    "changed": false
+                  },
+                  {
+                    "name": "stateIndex",
+                    "path": "buttons/y/stateIndex",
+                    "type": "number",
+                    "value": 0,
+                    "changed": false
+                  }
+                ]
+              }
+            },
+            {
+              "name": "z",
+              "path": "buttons/z",
+              "type": "viewModel",
+              "value": {
+                "name": "Z",
+                "viewModel": "Button",
+                "properties": [
+                  {
+                    "name": "state",
+                    "path": "buttons/z/state",
+                    "type": "enum",
+                    "enumType": "ButtonState",
+                    "value": "idle",
+                    "index": 0,
+                    "values": ["idle", "pressed", "held", "released", "disabled", "cooldown"],
+                    "changed": false
+                  },
+                  {
+                    "name": "label",
+                    "path": "buttons/z/label",
+                    "type": "string",
+                    "value": "Z",
+                    "changed": false
+                  },
+                  {
+                    "name": "icon",
+                    "path": "buttons/z/icon",
+                    "type": "string",
+                    "value": "",
+                    "changed": false
+                  },
+                  {
+                    "name": "reducedMotion",
+                    "path": "buttons/z/reducedMotion",
+                    "type": "boolean",
+                    "value": false,
+                    "changed": false
+                  },
+                  {
+                    "name": "stateIndex",
+                    "path": "buttons/z/stateIndex",
+                    "type": "number",
+                    "value": 0,
+                    "changed": false
+                  }
+                ]
+              }
+            },
+            {
+              "name": "a",
+              "path": "buttons/a",
+              "type": "viewModel",
+              "value": {
+                "name": "A",
+                "viewModel": "Button",
+                "properties": [
+                  {
+                    "name": "state",
+                    "path": "buttons/a/state",
+                    "type": "enum",
+                    "enumType": "ButtonState",
+                    "value": "idle",
+                    "index": 0,
+                    "values": ["idle", "pressed", "held", "released", "disabled", "cooldown"],
+                    "changed": false
+                  },
+                  {
+                    "name": "label",
+                    "path": "buttons/a/label",
+                    "type": "string",
+                    "value": "A",
+                    "changed": false
+                  },
+                  {
+                    "name": "icon",
+                    "path": "buttons/a/icon",
+                    "type": "string",
+                    "value": "",
+                    "changed": false
+                  },
+                  {
+                    "name": "reducedMotion",
+                    "path": "buttons/a/reducedMotion",
+                    "type": "boolean",
+                    "value": false,
+                    "changed": false
+                  },
+                  {
+                    "name": "stateIndex",
+                    "path": "buttons/a/stateIndex",
+                    "type": "number",
+                    "value": 0,
+                    "changed": false
+                  }
+                ]
+              }
+            },
+            {
+              "name": "b",
+              "path": "buttons/b",
+              "type": "viewModel",
+              "value": {
+                "name": "B",
+                "viewModel": "Button",
+                "properties": [
+                  {
+                    "name": "state",
+                    "path": "buttons/b/state",
+                    "type": "enum",
+                    "enumType": "ButtonState",
+                    "value": "idle",
+                    "index": 0,
+                    "values": ["idle", "pressed", "held", "released", "disabled", "cooldown"],
+                    "changed": false
+                  },
+                  {
+                    "name": "label",
+                    "path": "buttons/b/label",
+                    "type": "string",
+                    "value": "B",
+                    "changed": false
+                  },
+                  {
+                    "name": "icon",
+                    "path": "buttons/b/icon",
+                    "type": "string",
+                    "value": "",
+                    "changed": false
+                  },
+                  {
+                    "name": "reducedMotion",
+                    "path": "buttons/b/reducedMotion",
+                    "type": "boolean",
+                    "value": false,
+                    "changed": false
+                  },
+                  {
+                    "name": "stateIndex",
+                    "path": "buttons/b/stateIndex",
+                    "type": "number",
+                    "value": 0,
+                    "changed": false
+                  }
+                ]
+              }
+            },
+            {
+              "name": "c",
+              "path": "buttons/c",
+              "type": "viewModel",
+              "value": {
+                "name": "C",
+                "viewModel": "Button",
+                "properties": [
+                  {
+                    "name": "state",
+                    "path": "buttons/c/state",
+                    "type": "enum",
+                    "enumType": "ButtonState",
+                    "value": "idle",
+                    "index": 0,
+                    "values": ["idle", "pressed", "held", "released", "disabled", "cooldown"],
+                    "changed": false
+                  },
+                  {
+                    "name": "label",
+                    "path": "buttons/c/label",
+                    "type": "string",
+                    "value": "C",
+                    "changed": false
+                  },
+                  {
+                    "name": "icon",
+                    "path": "buttons/c/icon",
+                    "type": "string",
+                    "value": "",
+                    "changed": false
+                  },
+                  {
+                    "name": "reducedMotion",
+                    "path": "buttons/c/reducedMotion",
+                    "type": "boolean",
+                    "value": false,
+                    "changed": false
+                  },
+                  {
+                    "name": "stateIndex",
+                    "path": "buttons/c/stateIndex",
+                    "type": "number",
+                    "value": 0,
+                    "changed": false
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "theme",
+        "path": "theme",
+        "type": "viewModel",
+        "value": {
+          "name": "Default",
+          "viewModel": "Theme",
+          "properties": [
+            {
+              "name": "variant",
+              "path": "theme/variant",
+              "type": "enum",
+              "enumType": "ThemeVariant",
+              "value": "night",
+              "index": 1,
+              "values": ["daylit", "night"],
+              "changed": false
+            }
+          ]
+        }
+      },
+      {
+        "name": "layout",
+        "path": "layout",
+        "type": "viewModel",
+        "value": {
+          "name": "Default",
+          "viewModel": "Layout",
+          "properties": [
+            {
+              "name": "profile",
+              "path": "layout/profile",
+              "type": "enum",
+              "enumType": "LayoutProfile",
+              "value": "phone-portrait",
+              "index": 0,
+              "values": ["phone-portrait", "phone-landscape", "fold-outer", "fold-book", "fold-tabletop", "tablet", "web"],
+              "changed": false
+            }
+          ]
+        }
+      },
+      {
+        "name": "a11y",
+        "path": "a11y",
+        "type": "viewModel",
+        "value": {
+          "name": "Default",
+          "viewModel": "A11y",
+          "properties": [
+            {
+              "name": "reducedMotion",
+              "path": "a11y/reducedMotion",
+              "type": "boolean",
+              "value": false,
+              "changed": false
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "globals": [],
+  "nested": [
+    {
+      "path": "X",
+      "artboard": "ArcadeButton",
+      "viewModels": [
+        {
+          "name": "X Instance",
+          "viewModel": "Button",
+          "properties": [
+            {
+              "name": "state",
+              "path": "state",
+              "type": "enum",
+              "enumType": "ButtonState",
+              "value": "idle",
+              "index": 0,
+              "values": ["idle", "pressed", "held", "released", "disabled", "cooldown"]
+            },
+            {
+              "name": "label",
+              "path": "label",
+              "type": "string",
+              "value": "X"
+            },
+            {
+              "name": "icon",
+              "path": "icon",
+              "type": "string",
+              "value": ""
+            },
+            {
+              "name": "reducedMotion",
+              "path": "reducedMotion",
+              "type": "boolean",
+              "value": false
+            },
+            {
+              "name": "stateIndex",
+              "path": "stateIndex",
+              "type": "number",
+              "value": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "Y",
+      "artboard": "ArcadeButton",
+      "viewModels": [
+        {
+          "name": "Y Instance",
+          "viewModel": "Button",
+          "properties": [
+            {
+              "name": "state",
+              "path": "state",
+              "type": "enum",
+              "enumType": "ButtonState",
+              "value": "idle",
+              "index": 0,
+              "values": ["idle", "pressed", "held", "released", "disabled", "cooldown"]
+            },
+            {
+              "name": "label",
+              "path": "label",
+              "type": "string",
+              "value": "Y"
+            },
+            {
+              "name": "icon",
+              "path": "icon",
+              "type": "string",
+              "value": ""
+            },
+            {
+              "name": "reducedMotion",
+              "path": "reducedMotion",
+              "type": "boolean",
+              "value": false
+            },
+            {
+              "name": "stateIndex",
+              "path": "stateIndex",
+              "type": "number",
+              "value": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "Z",
+      "artboard": "ArcadeButton",
+      "viewModels": [
+        {
+          "name": "Z Instance",
+          "viewModel": "Button",
+          "properties": [
+            {
+              "name": "state",
+              "path": "state",
+              "type": "enum",
+              "enumType": "ButtonState",
+              "value": "idle",
+              "index": 0,
+              "values": ["idle", "pressed", "held", "released", "disabled", "cooldown"]
+            },
+            {
+              "name": "label",
+              "path": "label",
+              "type": "string",
+              "value": "Z"
+            },
+            {
+              "name": "icon",
+              "path": "icon",
+              "type": "string",
+              "value": ""
+            },
+            {
+              "name": "reducedMotion",
+              "path": "reducedMotion",
+              "type": "boolean",
+              "value": false
+            },
+            {
+              "name": "stateIndex",
+              "path": "stateIndex",
+              "type": "number",
+              "value": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "A",
+      "artboard": "ArcadeButton",
+      "viewModels": [
+        {
+          "name": "A Instance",
+          "viewModel": "Button",
+          "properties": [
+            {
+              "name": "state",
+              "path": "state",
+              "type": "enum",
+              "enumType": "ButtonState",
+              "value": "idle",
+              "index": 0,
+              "values": ["idle", "pressed", "held", "released", "disabled", "cooldown"]
+            },
+            {
+              "name": "label",
+              "path": "label",
+              "type": "string",
+              "value": "A"
+            },
+            {
+              "name": "icon",
+              "path": "icon",
+              "type": "string",
+              "value": ""
+            },
+            {
+              "name": "reducedMotion",
+              "path": "reducedMotion",
+              "type": "boolean",
+              "value": false
+            },
+            {
+              "name": "stateIndex",
+              "path": "stateIndex",
+              "type": "number",
+              "value": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "B",
+      "artboard": "ArcadeButton",
+      "viewModels": [
+        {
+          "name": "B Instance",
+          "viewModel": "Button",
+          "properties": [
+            {
+              "name": "state",
+              "path": "state",
+              "type": "enum",
+              "enumType": "ButtonState",
+              "value": "idle",
+              "index": 0,
+              "values": ["idle", "pressed", "held", "released", "disabled", "cooldown"]
+            },
+            {
+              "name": "label",
+              "path": "label",
+              "type": "string",
+              "value": "B"
+            },
+            {
+              "name": "icon",
+              "path": "icon",
+              "type": "string",
+              "value": ""
+            },
+            {
+              "name": "reducedMotion",
+              "path": "reducedMotion",
+              "type": "boolean",
+              "value": false
+            },
+            {
+              "name": "stateIndex",
+              "path": "stateIndex",
+              "type": "number",
+              "value": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "C",
+      "artboard": "ArcadeButton",
+      "viewModels": [
+        {
+          "name": "C Instance",
+          "viewModel": "Button",
+          "properties": [
+            {
+              "name": "state",
+              "path": "state",
+              "type": "enum",
+              "enumType": "ButtonState",
+              "value": "idle",
+              "index": 0,
+              "values": ["idle", "pressed", "held", "released", "disabled", "cooldown"]
+            },
+            {
+              "name": "label",
+              "path": "label",
+              "type": "string",
+              "value": "C"
+            },
+            {
+              "name": "icon",
+              "path": "icon",
+              "type": "string",
+              "value": ""
+            },
+            {
+              "name": "reducedMotion",
+              "path": "reducedMotion",
+              "type": "boolean",
+              "value": false
+            },
+            {
+              "name": "stateIndex",
+              "path": "stateIndex",
+              "type": "number",
+              "value": 0
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -96,7 +96,8 @@ catalog:
   # apps/mobile/babel.config.js names this preset, so the app must declare it;
   # the Gradle JS bundle step resolves it from the app, not through expo.
   babel-preset-expo: 58.0.9
-  react-native-audio-api: audio-api-nightly
+  # Pinned 2026-10-15: the floating audio-api-nightly tag moved to 1.0.0-nightly-eb17d84-20261015, whose Android C++ does not compile (AndroidAudioPlayer constructor). Bump by exact version after a device build.
+  react-native-audio-api: 1.0.0-nightly-8588c31-20261007
   react-native-youtube-bridge: 2.2.3
   react-native-keyboard-controller: 1.22.4
   react-native-mmkv: 4.3.2
@@ -254,8 +255,10 @@ catalog:
   babel-plugin-react-compiler: 1.0.0
   turbo: 2.11.7
   vitest: 5.0.3
+  react-native-arrangement-view: 0.4.0
 
 patchedDependencies:
+  '@rive-app/react-native@0.5.2': patches/@rive-app__react-native@0.5.2.patch
   react-native-graph@1.4.0: patches/react-native-graph@1.4.0.patch
   react-native-skia@3.0.2: patches/react-native-skia@3.0.2.patch
   # Backports uniwind PR #706: the web resolver no longer cycles through

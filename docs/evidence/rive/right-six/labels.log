@@ -1,0 +1,7 @@
+[23:07:26.701] rive  deferred replay: inline
+[23:07:26.753] rive  built /Users/mikevocalz/nyc-mon/packages/ui/rive/arcade-controls/right-six/build/right-six.riv (144444 bytes, 52ms, 0 errors, 0 warnings)
+[23:07:26.754] rive  data: buttons/x/label = L1
+[23:07:26.754] rive  data: buttons/y/label = L2
+[23:07:26.755] rive  showing RightSix [1/2]
+[23:07:26.755] rive  viewport 209x204 @1x
+[23:07:26.774] rive  wrote /Users/mikevocalz/nyc-mon/docs/evidence/rive/right-six/labels.png
