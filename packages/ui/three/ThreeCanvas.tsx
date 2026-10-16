@@ -5,7 +5,7 @@ import { PixelRatio, Platform, type GestureResponderEvent } from 'react-native';
 import { twMerge } from 'tailwind-merge';
 import { useReducedMotion } from '../backgrounds/use-reduced-motion';
 import { useGpuState } from '../gpu/gpu-store';
-import { useInstanceStore, useStore } from '../use-instance-store';
+import { useInstance, useInstanceStore, useStore } from '../use-instance-store';
 import { useLayoutSize } from '../use-layout-size';
 import { View } from '../tw';
 import { loadThree } from './load-three';
@@ -64,14 +64,14 @@ const isWeb = Platform.OS === 'web';
  */
 export function ThreeCanvas<P>(props: ThreeCanvasProps<P>) {
   // Resolved once per mount: switching threads needs a remount (the caller keys the canvas).
-  const choice = useRef<ReturnType<typeof resolveRenderThread>>(null);
-  choice.current ??= resolveRenderThread({
-    requested: props.renderThread,
-    platform: Platform.OS,
-    hasHost: props.workletHost !== undefined,
-    hostAvailable: props.workletHost?.available() ?? false,
-  });
-  const { thread, reason } = choice.current;
+  const { thread, reason } = useInstance(() =>
+    resolveRenderThread({
+      requested: props.renderThread,
+      platform: Platform.OS,
+      hasHost: props.workletHost !== undefined,
+      hostAvailable: props.workletHost?.available() ?? false,
+    }),
+  );
   useEffect(() => {
     if (reason) console.warn(`[ThreeCanvas] renderThread="worklet" fell back to the JS thread (${reason}).`);
   }, [reason]);
@@ -185,6 +185,23 @@ function JsThreeCanvas<P>({
     invalidate();
   });
 
+  // Drawing buffer follows layout size and the capped device pixel ratio.
+  const applySize = () => {
+    const rt = runtime.current!;
+    const { renderer, built } = rt;
+    if (!renderer || !built || size.width <= 0 || size.height <= 0) return;
+    const pixelRatio = Math.min(PixelRatio.get(), maxPixelRatio);
+    if (rt.sized && rt.width === size.width && rt.height === size.height && rt.pixelRatio === pixelRatio) return;
+    rt.width = size.width;
+    rt.height = size.height;
+    rt.pixelRatio = pixelRatio;
+    renderer.setPixelRatio(pixelRatio);
+    // false: the canvas keeps its 100% CSS size; only the drawing buffer changes.
+    renderer.setSize(size.width, size.height, false);
+    built.resize?.(size.width, size.height);
+    rt.sized = true;
+  };
+
   // Build the renderer and scene once per backend, device and loader.
   useEffect(() => {
     if (pending || !backend || !hasSize) return;
@@ -227,22 +244,6 @@ function JsThreeCanvas<P>({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pending, hasSize, backend, device, load]);
 
-  // Drawing buffer follows layout size and the capped device pixel ratio.
-  const applySize = () => {
-    const rt = runtime.current!;
-    const { renderer, built } = rt;
-    if (!renderer || !built || size.width <= 0 || size.height <= 0) return;
-    const pixelRatio = Math.min(PixelRatio.get(), maxPixelRatio);
-    if (rt.sized && rt.width === size.width && rt.height === size.height && rt.pixelRatio === pixelRatio) return;
-    rt.width = size.width;
-    rt.height = size.height;
-    rt.pixelRatio = pixelRatio;
-    renderer.setPixelRatio(pixelRatio);
-    // false: the canvas keeps its 100% CSS size; only the drawing buffer changes.
-    renderer.setSize(size.width, size.height, false);
-    built.resize?.(size.width, size.height);
-    rt.sized = true;
-  };
   useEffect(() => {
     applySize();
     invalidate();

@@ -6,7 +6,7 @@ import {
   type EnrichedTextInputInstance,
 } from 'react-native-enriched-html';
 import { View, Text } from '@acme/ui/tw';
-import { AudioPlayer } from '@acme/ui';
+import { AudioPlayer, useInstance } from '@acme/ui';
 import { Section } from '@acme/ui/primitives';
 import { palette } from '@acme/theme';
 import {
@@ -91,16 +91,15 @@ export function NotesEditor({
   onOpenSettings,
 }: NotesEditorProps) {
   const ref = useRef<EnrichedTextInputInstance>(null);
-  const store = useRef<ReturnType<typeof createEditorStore> | null>(null);
-  store.current ??= createEditorStore();
+  const store = useInstance(createEditorStore);
 
-  const history = useStore(store.current, (state) => state.history);
-  const activeState = useStore(store.current, (state) => state.activeState);
-  const selection = useStore(store.current, (state) => state.selection);
+  const history = useStore(store, (state) => state.history);
+  const activeState = useStore(store, (state) => state.activeState);
+  const selection = useStore(store, (state) => state.selection);
   const requestAttachment = useAttachStore((state) => state.request);
   const requestRecording = useAudioStore((state) => state.request);
   const requestUrl = useUrlStore((state) => state.request);
-  const html = useStore(store.current, (state) => state.html);
+  const html = useStore(store, (state) => state.html);
 
   /**
    * Voice notes, surfaced as players beneath the field.
@@ -123,16 +122,15 @@ export function NotesEditor({
   const handleChangeHtml = useCallback(
     (html: string) => {
       onChangeHtml(html);
-      store.current?.getState().setHtml(html);
+      store.getState().setHtml(html);
       if (pending.current !== null) clearTimeout(pending.current);
       pending.current = setTimeout(() => {
-        const state = store.current?.getState();
-        if (state === undefined) return;
+        const state = store.getState();
         const { start, end } = state.selection;
         state.setHistory(commit(state.history, { html, selection: { start, end } }));
       }, COALESCE_MS);
     },
-    [onChangeHtml],
+    [onChangeHtml, store],
   );
 
   /**
@@ -141,14 +139,13 @@ export function NotesEditor({
    */
   const restore = useCallback((next: HistoryState) => {
     const snapshot = next.present;
-    store.current?.getState().setHistory(next);
+    store.getState().setHistory(next);
     if (snapshot === undefined || snapshot === null) return;
     ref.current?.setValue(snapshot.html);
     ref.current?.setSelection(snapshot.selection.start, snapshot.selection.end);
-  }, []);
+  }, [store]);
 
   const context = {
-    editor: ref.current as EnrichedTextInputInstance,
     pickImage: onPickImage,
     // The dialog knows which kind it is collecting, so the YouTube variant can
     // preview the video before it is inserted.
@@ -169,7 +166,7 @@ export function NotesEditor({
     <Section className="gap-2">
       <Text className="text-sm font-medium text-text">{label}</Text>
 
-      <EditorToolbar context={context} activeState={activeState} onOpenSettings={onOpenSettings} />
+      <EditorToolbar editor={ref} context={context} activeState={activeState} onOpenSettings={onOpenSettings} />
 
       <View className="rounded-none border-2 border-border bg-surface p-1">
         <EnrichedTextInput
@@ -178,10 +175,10 @@ export function NotesEditor({
           placeholder={placeholder}
           onChangeHtml={(event) => handleChangeHtml(event.nativeEvent.value)}
           onChangeState={(event) =>
-            store.current?.getState().setActiveState(event.nativeEvent)
+            store.getState().setActiveState(event.nativeEvent)
           }
           onChangeSelection={(event) =>
-            store.current?.getState().setSelection(event.nativeEvent)
+            store.getState().setSelection(event.nativeEvent)
           }
           cursorColor={palette.ink[950]}
           selectionColor={palette.burgundy[300]}

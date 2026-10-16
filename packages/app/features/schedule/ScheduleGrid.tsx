@@ -1,8 +1,8 @@
 'use client';
-import { useCallback, useRef } from 'react';
+import { useCallback } from 'react';
 import { View, Text, ScrollView } from '@acme/ui/tw';
 import { createStore, useStore } from 'zustand';
-import { Avatar } from '@acme/ui';
+import { Avatar, useInstance } from '@acme/ui';
 import { ACCENT_CLASSES } from './accent-classes.ts';
 import { EventBlock } from './EventBlock.tsx';
 import { formatHourLabel } from './format.ts';
@@ -166,12 +166,11 @@ export function ScheduleGrid({ day, now, onEventRescheduled }: ScheduleGridProps
   // schedule, or the control does nothing visible. RESOURCE_COLUMN_WIDTH stays
   // the floor, so a narrow pane still scrolls horizontally rather than
   // squeezing columns to an unreadable width.
-  // Per-instance vanilla store in a ref, not React state (repo rule). The grid
-  // can appear more than once, so the measurement cannot live in a module
+  // Per-instance vanilla store, not React state (repo rule). The grid can
+  // appear more than once, so the measurement cannot live in a module
   // singleton either.
-  const widthStore = useRef<ReturnType<typeof createWidthStore> | null>(null);
-  widthStore.current ??= createWidthStore();
-  const availableWidth = useStore(widthStore.current, (state) => state.width);
+  const widthStore = useInstance(createWidthStore);
+  const availableWidth = useStore(widthStore, (state) => state.width);
   const usableWidth = availableWidth - TIME_GUTTER_WIDTH;
   const columnWidth =
     columns.length > 0 && usableWidth > 0
@@ -182,7 +181,7 @@ export function ScheduleGrid({ day, now, onEventRescheduled }: ScheduleGridProps
   return (
     <View
       className="flex-1 overflow-hidden rounded-none border border-border bg-surface-raised"
-      onLayout={(event) => widthStore.current?.getState().measure(event.nativeEvent.layout.width)}
+      onLayout={(event) => widthStore.getState().measure(event.nativeEvent.layout.width)}
     >
       <ScrollView horizontal className="flex-1" contentContainerClassName="grow">
         <View style={{ width: gridWidth }} className="flex-1">

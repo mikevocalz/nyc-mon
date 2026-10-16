@@ -217,7 +217,7 @@ export function GameScreen({ focused = true }: GameScreenProps = {}) {
   const hud = resolveGameHudLayout({ width, height, insets: hudInsets, folds, railEdge, isRTL: I18nManager.isRTL });
 
   // The session and its save cadence, mounted once per Game screen.
-  const identity = useMemo(readLobbyIdentity, []);
+  const identity = useMemo(() => readLobbyIdentity(), []);
   const dataset = city.ok ? city.dataset : null;
   useWorldSaveLifecycle({ identity, dataset });
   const input = useGameInput({

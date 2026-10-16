@@ -1,7 +1,6 @@
 'use client';
-import { useRef } from 'react';
 import { createStore, useStore } from 'zustand';
-import { Button, DropZone, Modal, MotionView } from '@acme/ui';
+import { Button, DropZone, Modal, MotionView, useInstance } from '@acme/ui';
 import { Pressable, Text, View } from '@acme/ui/tw';
 import { CloudUpload, Paperclip, X } from '@acme/ui/icons';
 import { attach, IDLE_PROGRESS, type AttachProgress, type Attachment } from './attachment.ts';
@@ -40,13 +39,12 @@ export function AttachSheet() {
   const onClose = () => resolve(null);
   const onAttached = (attachment: Attachment) => resolve(attachment);
 
-  const store = useRef<ReturnType<typeof createProgressStore> | null>(null);
-  store.current ??= createProgressStore();
-  const progress = useStore(store.current, (state) => state.progress);
-  const hovering = useStore(store.current, (state) => state.hovering);
+  const store = useInstance(createProgressStore);
+  const progress = useStore(store, (state) => state.progress);
+  const hovering = useStore(store, (state) => state.hovering);
 
 
-  const report = (next: AttachProgress) => store.current?.getState().set(next);
+  const report = (next: AttachProgress) => store.getState().set(next);
 
   const run = async (source: { uri: string; name?: string }) => {
     const attachment = await attach(source, report);
@@ -104,11 +102,11 @@ export function AttachSheet() {
           active={hovering}
           title={hovering ? 'Release to attach' : 'Drag and drop a file here'}
           description="Or browse from your device. Images, documents and audio."
-          onEnter={() => store.current?.getState().setHovering(true)}
-          onExit={() => store.current?.getState().setHovering(false)}
+          onEnter={() => store.getState().setHovering(true)}
+          onExit={() => store.getState().setHovering(false)}
           className="h-64 p-4"
           onDrop={({ assets }) => {
-            store.current?.getState().setHovering(false);
+            store.getState().setHovering(false);
             const asset = assets[0];
             // A text-only drop carries no uri — there is nothing to attach.
             if (asset?.uri === undefined) return;

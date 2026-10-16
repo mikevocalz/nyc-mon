@@ -24,6 +24,12 @@ interface Runtime<P> {
   queued: boolean;
 }
 
+/** Sizes the canvas's drawing buffer in device pixels (never below 1). */
+function resizeDrawingBuffer(canvas: { width: number; height: number }, width: number, height: number, pixelRatio: number) {
+  canvas.width = Math.max(1, Math.round(width * pixelRatio));
+  canvas.height = Math.max(1, Math.round(height * pixelRatio));
+}
+
 /**
  * A WebGPU surface with one API on web and native.
  *
@@ -178,10 +184,7 @@ export function GpuCanvas<P>({
     rt.height = size.height;
     rt.pixelRatio = pixelRatio;
     const canvas = rt.context?.canvas as { width: number; height: number } | undefined;
-    if (canvas) {
-      canvas.width = Math.max(1, Math.round(size.width * pixelRatio));
-      canvas.height = Math.max(1, Math.round(size.height * pixelRatio));
-    }
+    if (canvas) resizeDrawingBuffer(canvas, size.width, size.height, pixelRatio);
     invalidate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, hasSize, size.width, size.height, maxPixelRatio, gpu.root]);
