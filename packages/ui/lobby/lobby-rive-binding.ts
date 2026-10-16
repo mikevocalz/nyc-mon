@@ -137,7 +137,13 @@ export function createLobbyRiveBinding(instance: LobbyViewModelInstance): LobbyR
     if (disposed || values.get(key) === value) return;
     const setter = handleOn<T>(target, kind, key, lookup);
     if (!setter) return;
-    setter.set(value);
+    // A closed native instance (remount, hot reload) throws RiveResourceClosedException: the binding is finished.
+    try {
+      setter.set(value);
+    } catch {
+      disposed = true;
+      return;
+    }
     values.set(key, value);
   }
 

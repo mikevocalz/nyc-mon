@@ -141,3 +141,15 @@ describe('C2: the built start-stop artboard defines every pill path the binding 
     assert.equal(wakes, 2, 'disposed');
   });
 });
+
+it('a closed native instance ends the binding instead of throwing', () => {
+  let calls = 0;
+  const closed = { set: () => { calls++; throw new Error('RiveResourceClosedException: ViewModelInstanceHandle(49) is closed'); } };
+  const instance = { numberProperty: () => closed, booleanProperty: () => closed, enumProperty: () => closed, stringProperty: () => closed, triggerProperty: () => closed } as never;
+  let woke = 0;
+  const binding = createArcadeRiveBinding(instance, { onDidWrite: () => { woke++; } });
+  assert.doesNotThrow(() => binding.setPillState('playing' as never));
+  assert.doesNotThrow(() => binding.setStick({ x: 1, y: 0, engaged: true } as never));
+  assert.equal(calls, 1, 'no writes after the first closed throw');
+  assert.equal(woke, 0);
+});
