@@ -9,6 +9,9 @@ import { useInstanceStore, useStore } from '../use-instance-store';
 import { useLayoutSize } from '../use-layout-size';
 import { View } from '../tw';
 import { loadThree } from './load-three';
+import { advanceNodeFrame, stopInternalLoop } from './renderer-internals';
+import { resolveRenderThread } from './render-thread';
+import { WorkletThreeCanvas } from './WorkletThreeCanvas';
 import { toNdc } from './pointer';
 import { ThreeSurface } from './surface';
 import type { ThreeBackend, ThreeCanvasProps, ThreePointer, ThreeScene, ThreeSurfaceHandle } from './types';
@@ -40,42 +43,6 @@ interface Runtime<P> {
 const isWeb = Platform.OS === 'web';
 
 /**
- * three's `Renderer.init()` starts `Animation.start()`, a requestAnimationFrame
- * loop that runs until dispose and only advances `nodeFrame`
- * (three/src/renderers/common/Animation.js, r186). ThreeCanvas already owns a
- * frame loop gated on visibility, so the internal one is stopped after init and
- * each draw advances `nodeFrame` itself. Neither member is public API: if a
- * three upgrade renames them, `stopInternalLoop` warns and the site-qa motion
- * check fails on the idle loop.
- */
-type RendererInternals = {
-  _animation?: { stop?: () => void } | null;
-  _nodes?: { nodeFrame?: { update?: () => void; frameId?: number } } | null;
-};
-const stopInternalLoop = (renderer: WebGPURenderer) => {
-  const animation = (renderer as unknown as RendererInternals)._animation;
-  if (typeof animation?.stop !== 'function') {
-    console.warn('[ThreeCanvas] three renamed Renderer._animation; its internal frame loop keeps running.');
-    return;
-  }
-  animation.stop();
-};
-let warnedNodeFrame = false;
-const warnNodeFrame = () => {
-  if (warnedNodeFrame) return;
-  warnedNodeFrame = true;
-  console.warn('[ThreeCanvas] three renamed Renderer._nodes.nodeFrame; node-time animation will not advance.');
-};
-// What Animation.start()'s loop did per frame besides the user callback.
-const advanceNodeFrame = (renderer: WebGPURenderer) => {
-  const nodeFrame = (renderer as unknown as RendererInternals)._nodes?.nodeFrame;
-  if (typeof nodeFrame?.update !== 'function') warnNodeFrame();
-  if (renderer.info.autoReset) renderer.info.reset();
-  nodeFrame?.update?.();
-  if (nodeFrame?.frameId !== undefined) (renderer.info as { frame: number }).frame = nodeFrame.frameId;
-};
-
-/**
  * A three.js canvas on WebGPURenderer, with one code path for web and native.
  *
  * - Web with WebGPU: WebGPURenderer's WebGPU backend on a canvas element,
@@ -91,8 +58,29 @@ const advanceNodeFrame = (renderer: WebGPURenderer) => {
  * without reduced motion (drawing one still frame otherwise), hands the scene
  * the pointer in normalised device coordinates, and disposes the renderer on
  * unmount.
+ *
+ * `renderThread="worklet"` (native, opt-in) hands the renderer and the scene
+ * to `workletHost` on a worklet runtime instead (WorkletThreeCanvas.tsx).
  */
-export function ThreeCanvas<P>({
+export function ThreeCanvas<P>(props: ThreeCanvasProps<P>) {
+  // Resolved once per mount: switching threads needs a remount (the caller keys the canvas).
+  const choice = useRef<ReturnType<typeof resolveRenderThread>>(null);
+  choice.current ??= resolveRenderThread({
+    requested: props.renderThread,
+    platform: Platform.OS,
+    hasHost: props.workletHost !== undefined,
+    hostAvailable: props.workletHost?.available() ?? false,
+  });
+  const { thread, reason } = choice.current;
+  useEffect(() => {
+    if (reason) console.warn(`[ThreeCanvas] renderThread="worklet" fell back to the JS thread (${reason}).`);
+  }, [reason]);
+  if (thread === 'worklet' && props.workletHost) return <WorkletThreeCanvas {...props} workletHost={props.workletHost} />;
+  return <JsThreeCanvas {...props} />;
+}
+
+/** The default path: three.js, the scene update and the draw on the JS thread. */
+function JsThreeCanvas<P>({
   load,
   params,
   forceWebGL = false,

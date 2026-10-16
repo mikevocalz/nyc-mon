@@ -20,10 +20,16 @@ export interface GameSceneParams extends CitySceneParams {
   onFirstFrame: () => void;
 }
 
-export function withFirstFrameSignal(setup: ThreeSetup<CitySceneParams>): ThreeSetup<GameSceneParams> {
+/** Where load milestones go. The JS path writes the screen store; the worklet render runtime relays to it. */
+export type LoadStageReporter = (stage: 'worldBuilt' | 'firstRender') => void;
+
+export function withFirstFrameSignal(
+  setup: ThreeSetup<CitySceneParams>,
+  report: LoadStageReporter = gameScreenActions.loadStage,
+): ThreeSetup<GameSceneParams> {
   return (context, initial) => {
     const built = setup(context, initial);
-    gameScreenActions.loadStage('worldBuilt');
+    report('worldBuilt');
     let compiled = false;
     const ready = () => {
       compiled = true;
@@ -37,7 +43,7 @@ export function withFirstFrameSignal(setup: ThreeSetup<CitySceneParams>): ThreeS
         built.update?.(frame, params);
         if (signalled || !compiled) return;
         signalled = true;
-        gameScreenActions.loadStage('firstRender');
+        report('firstRender');
         setTimeout(params.onFirstFrame, 0);
       },
     };

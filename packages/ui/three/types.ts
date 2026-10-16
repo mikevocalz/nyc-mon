@@ -1,6 +1,8 @@
 /// <reference types="@webgpu/types" />
 import type { ReactNode, Ref } from 'react';
 import type * as ThreeWebGpu from 'three/webgpu';
+import type { RenderThread } from './render-thread';
+import type { NativeCanvasContext, WorkletRenderHost } from './worklet-host';
 
 /** The `three/webgpu` module namespace, loaded on demand. */
 export type Three = typeof ThreeWebGpu;
@@ -103,6 +105,16 @@ export interface ThreeCanvasProps<P> {
   /** Laid over the canvas. */
   children?: ReactNode;
   ref?: Ref<ThreeCanvasHandle>;
+  /**
+   * Native only. `js` (default): three.js renders on the JS thread. `worklet`:
+   * `workletHost` renders on its own worklet runtime and `load`/`params` are
+   * not used (the host owns the scene). Falls back to `js`, with a warning,
+   * on web, without a host, or when the host reports it cannot run
+   * (worklets Bundle Mode off). See docs/implementation/worklet-rendering.md.
+   */
+  renderThread?: RenderThread;
+  /** The scene owner for `renderThread="worklet"`. */
+  workletHost?: WorkletRenderHost;
 }
 
 /** What the platform surface hands ThreeCanvas: a way to build a renderer on its canvas, and to present a frame. */
@@ -110,4 +122,6 @@ export interface ThreeSurfaceHandle {
   createRenderer: (THREE: Three, options: { backend: ThreeBackend; device: GPUDevice | null }) => ThreeWebGpu.WebGPURenderer;
   /** Native swaps the frame explicitly after each render; web presents on its own. */
   present: () => void;
+  /** Native only: the raw react-native-webgpu context, for a worklet render runtime. Null on web. */
+  getContext?: () => NativeCanvasContext | null;
 }

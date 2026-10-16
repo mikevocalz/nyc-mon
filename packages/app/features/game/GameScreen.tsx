@@ -63,6 +63,7 @@ import { gameCameraStore, gameScreenActions, gameScreenStore } from './game-sess
 import { resolveGameViewState, shouldMountCanvas } from './game-status.ts';
 import { resolveGameHudLayout } from './hud-layout.ts';
 import { loadGameScene, type GameSceneParams } from './load-game-scene.ts';
+import { useGameRenderThread } from './render-thread-choice.ts';
 import { readLobbyIdentity } from './lobby/lobby-identity.ts';
 import { lobbyStore } from './lobby/lobby.store.ts';
 import { gameInputRouter, useGameInput } from './use-game-input.ts';
@@ -193,6 +194,9 @@ export function GameScreen({ focused = true }: GameScreenProps = {}) {
     };
   }, [city]);
 
+  // Off by default; EXPO_PUBLIC_WORKLET_RENDER=1 renders on a worklet runtime (docs/implementation/worklet-rendering.md).
+  const renderThread = useGameRenderThread();
+
   const gestures = useCityCameraGestures({
     viewportHeight: () => geometry.getState().height,
     reducedMotion,
@@ -245,7 +249,7 @@ export function GameScreen({ focused = true }: GameScreenProps = {}) {
       accessibilityElementsHidden={!handedOver}
       importantForAccessibility={handedOver ? 'auto' : 'no-hide-descendants'}
     >
-      {params && shouldMountCanvas(state) ? (
+      {params && shouldMountCanvas(state) && renderThread.settled ? (
         <GestureDetector gesture={gestures}>
           <View
             className="flex-1"
@@ -261,6 +265,8 @@ export function GameScreen({ focused = true }: GameScreenProps = {}) {
               // Keyed on Retry only, never on size, posture or fold: resizing keeps the renderer and camera.
               key={`attempt-${screen.attempt}`}
               ref={canvas}
+              renderThread={renderThread.thread}
+              workletHost={renderThread.host}
               load={loadGameScene}
               params={params}
               paused

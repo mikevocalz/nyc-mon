@@ -55,6 +55,20 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
   return context.resolveRequest(context, moduleName, platform);
 };
 
+// Opt-in worklet render runtime (docs/implementation/worklet-rendering.md):
+// react-native-worklets Bundle Mode gives worklet runtimes the whole bundle,
+// so three.js can load on the render runtime. Must match babel.config.js.
+// Unset, the config is untouched. It wraps Expo's resolver (the vendored
+// navigation above keeps working) and forces inlineRequires on.
+const workletRender = /^(1|true|worklet)$/i.test((process.env.EXPO_PUBLIC_WORKLET_RENDER ?? "").trim());
+if (workletRender) {
+  const workletsDir = path.dirname(
+    require.resolve("react-native-worklets/package.json", { paths: [__dirname] }),
+  );
+  const { getBundleModeMetroConfig } = require(path.join(workletsDir, "bundleMode"));
+  getBundleModeMetroConfig(config);
+}
+
 // Uniwind remains the outermost Metro wrapper.
 module.exports = withUniwindConfig(config, {
   cssEntryFile: "./global.css",

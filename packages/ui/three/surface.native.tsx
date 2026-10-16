@@ -1,6 +1,7 @@
 import { useImperativeHandle, useRef, type Ref } from 'react';
 import { Canvas, type CanvasRef, type RNCanvasContext } from 'react-native-webgpu';
 import type { ThreeSurfaceHandle } from './types';
+import type { NativeCanvasContext } from './worklet-host';
 
 /**
  * Native: react-native-webgpu's Dawn-backed Canvas. Its `getContext('webgpu')`
@@ -25,6 +26,12 @@ export function ThreeSurface({ ref }: { ref?: Ref<ThreeSurfaceHandle> }) {
       });
     },
     present: () => contextRef.current?.present(),
+    // Worklet render mode: the context goes to the render runtime, which builds the renderer and presents.
+    getContext: () => {
+      const context = canvasRef.current?.getContext('webgpu') ?? null;
+      contextRef.current = context;
+      return context as unknown as NativeCanvasContext | null;
+    },
   }));
   // Transparent over the views behind it (TextureView on Android), so the
   // parent's opacity applies. GPU surface: the Canvas takes a style, not a className.
