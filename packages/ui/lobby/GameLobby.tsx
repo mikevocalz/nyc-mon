@@ -223,7 +223,7 @@ export function GameLobby({
 
   const wordmark = (
     <View {...(testIdProps(testID ? `${testID}-wordmark` : undefined) as object)} accessibilityRole="header">
-      <BrandWordmark height={28} />
+      <BrandWordmark height={44} />
     </View>
   );
 
