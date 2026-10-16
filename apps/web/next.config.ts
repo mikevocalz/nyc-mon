@@ -94,7 +94,13 @@ const nextConfig: NextConfig = {
       fs: { browser: './lib/skia-empty.ts' },
       path: { browser: './lib/skia-empty.ts' },
       os: { browser: './lib/skia-empty.ts' },
+      // Skia 3.6 tries `react-native/asset-registry` first; on RN 0.88 it is Flow source.
+      'react-native/asset-registry': 'react-native-web/dist/modules/AssetRegistry',
       'react-native/Libraries/Image/AssetRegistry': 'react-native-web/dist/modules/AssetRegistry',
+      // react-native-svg 15.16 statically reaches an Android-only TurboModule
+      // (lazy require behind Platform.OS === 'android'); the shared web stub.
+      'react-native-svg/lib/module/fabric/NativeSvgSoundModule': '../../packages/config/vite/svg-sound-module.web.ts',
+      'react-native-svg/lib/module/fabric/NativeSvgSoundModule.js': '../../packages/config/vite/svg-sound-module.web.ts',
       'react-native': 'react-native-web',
       // RNGH's compiled ESM uses explicit .js imports, which bypass platform
       // extension selection and pull native Fabric specs into Turbopack.
