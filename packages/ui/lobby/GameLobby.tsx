@@ -203,8 +203,9 @@ export function GameLobby({
     />
   );
 
-  const panel = (
+  const panelFor = (fill: boolean) => (
     <LeaderboardPanel
+      fill={fill}
       model={leaderboard}
       reducedMotion={reducedMotion}
       district={district}
@@ -215,6 +216,7 @@ export function GameLobby({
       testID={testID ? `${testID}-rank` : undefined}
     />
   );
+  const panel = panelFor(false);
 
   const wordmark = (
     <View {...(testIdProps(testID ? `${testID}-wordmark` : undefined) as object)} accessibilityRole="header">
@@ -255,7 +257,8 @@ export function GameLobby({
   const identityPane = (
     <View className="flex-1 gap-6 px-4 pb-4 pt-6">
       {wordmark}
-      <View className="flex-1">{panel}</View>
+      {/* Beside START the board runs the full height of its pane. */}
+      <View className="flex-1">{panelFor(true)}</View>
     </View>
   );
   const resumePane = (
