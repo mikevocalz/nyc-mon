@@ -13,7 +13,7 @@ Stacked draft on #46. The package subpath `@acme/core/realtime` now has a **work
 
 **Protocol target:** Colyseus 0.18 with `@colyseus/schema` v5's `schema({x:t.number(),...})` builder. Old schema strings are not supported as field definitions in this version.
 
-1. Pin `colyseus`, `@colyseus/schema`, `colyseus.js` using the monorepo's release-age policy and update its `pnpm-lock.yaml` in one reviewable PR. No npm lock changes were made here because this environment cannot install from npm.
+1. Pin `colyseus`, `@colyseus/schema`, `@colyseus/sdk` (current 0.18-era TypeScript client, not legacy `colyseus.js`) using the monorepo's release-age policy and update its `pnpm-lock.yaml` in one reviewable PR. No npm lock changes were made here because this environment cannot install from npm.
 2. Add `apps/game-server`: authenticate a Better Auth session server-side at Room authorization; verify current Caller/world ownership in existing Neon tables before calling `join()`. Never accept `callerId` or `startX/Z` from client room options. Resolve those from signed user/active world save.
 3. Use one Colyseus room per authorized, bounded district instance. Map `client.sessionId` to `DistrictAuthority`. `onMessage("move")` must parse a small finite `{seq,dx,dz,run}` intent before `submit()`; do not accept `{x,z}` teleports.
 4. Server fixed interval runs `authority.step()` at 20Hz (50 ms), updates the Colyseus schema state. On the client interpolate remote Caller/Mon positions in Three.js only; local player prediction/reconciliation needs a later explicit design, not a second truth store.
