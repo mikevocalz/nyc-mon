@@ -9,14 +9,28 @@
 // - The camera sits at target + (sin yaw, cos yaw) * distance (city-scene.ts),
 //   so a camera directly behind the Caller has yaw = heading + PI.
 
-/** Walking pace at the walk/run boundary, m/s. A brisk city walk. */
+/** Full walking pace, m/s. A brisk city walk. */
 export const WALK_SPEED = 1.6;
 /** Running pace, m/s. A jog, not a sprint: there is no stamina rule to pay for more. */
 export const RUN_SPEED = 4.2;
-/** Stick deflection (0..1) at and above which the Caller runs. */
-export const RUN_DEFLECTION = 0.6;
+/** Stick deflection (0..1) where the walk reaches {@linkcode WALK_SPEED}; below it the walk slows with the push. */
+export const FULL_WALK_DEFLECTION = 0.5;
+/**
+ * Stick deflection at and above which the Caller runs. Between
+ * {@linkcode FULL_WALK_DEFLECTION} and here the walk holds full pace, so a
+ * thumb resting near the threshold does not flicker between gaits.
+ */
+export const RUN_DEFLECTION = 0.75;
+/** Deflection where the run reaches {@linkcode RUN_SPEED}. The speed blends up from walking pace between the two. */
+export const FULL_RUN_DEFLECTION = 0.9;
 /** Below this deflection the stick reads as released; the router's dead zone already ran. */
 export const MIN_DEFLECTION = 0.05;
+/** How fast the Caller's pace follows the stick, 1/s: the gap to the target speed shrinks by e every 1/8 s. */
+export const PACE_EASE_RATE = 8;
+/** Ground metres per full walk cycle (left and right step) at walking pace. */
+export const CYCLE_METRES = 1.6;
+/** Ground metres per full cycle at running pace: a longer stride, so the cadence rises less than the speed. */
+export const RUN_CYCLE_METRES = 2.6;
 /** How fast the figure turns toward the stick direction, rad/s. */
 export const TURN_RATE = 10;
 /** Largest single move the collision test takes; longer frames are split into steps this long. */
@@ -42,16 +56,48 @@ export function angleDelta(from: number, to: number): number {
   return d > Math.PI ? d - TAU : d;
 }
 
+const smoothstep = (t: number) => t * t * (3 - 2 * t);
+const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
+
 /**
- * Gait and ground speed for a stick deflection. Walk speed grows with the
- * push up to {@linkcode RUN_DEFLECTION}; past it the Caller runs at
- * {@linkcode RUN_SPEED}. `runHeld` (the B cap) runs at any deflection.
+ * Gait and target ground speed for a stick deflection. The curve is
+ * continuous, so crossing a threshold never jumps the speed:
+ *
+ * | Deflection | Gait | Speed |
+ * | --- | --- | --- |
+ * | under 0.05 | idle | 0 |
+ * | 0.05 to 0.5 | walk | grows with the push up to 1.6 m/s |
+ * | 0.5 to 0.75 | walk | 1.6 m/s |
+ * | 0.75 to 0.9 | run | eases from 1.6 up to 4.2 m/s |
+ * | 0.9 and over | run | 4.2 m/s |
+ *
+ * `runHeld` (the B cap, Shift on a keyboard) runs at any deflection. The
+ * Caller's actual pace follows this target through {@linkcode easePace}.
  */
 export function deflectionToGait(deflection: number, runHeld: boolean): { gait: Gait; speed: number } {
   if (!Number.isFinite(deflection) || deflection < MIN_DEFLECTION) return { gait: 'idle', speed: 0 };
   const d = Math.min(deflection, 1);
-  if (runHeld || d >= RUN_DEFLECTION) return { gait: 'run', speed: RUN_SPEED };
-  return { gait: 'walk', speed: WALK_SPEED * (d / RUN_DEFLECTION) };
+  if (runHeld) return { gait: 'run', speed: RUN_SPEED };
+  if (d < RUN_DEFLECTION) return { gait: 'walk', speed: WALK_SPEED * Math.min(1, d / FULL_WALK_DEFLECTION) };
+  const t = smoothstep(clamp01((d - RUN_DEFLECTION) / (FULL_RUN_DEFLECTION - RUN_DEFLECTION)));
+  return { gait: 'run', speed: WALK_SPEED + (RUN_SPEED - WALK_SPEED) * t };
+}
+
+/**
+ * One frame of the pace easing toward `target`: exponential, so the result
+ * after a second is the same at 30, 60 or 120 frames per second.
+ */
+export function easePace(current: number, target: number, dt: number): number {
+  if (!Number.isFinite(target)) return 0;
+  const from = Number.isFinite(current) ? Math.max(0, current) : 0;
+  if (!(dt > 0)) return from;
+  return target + (from - target) * Math.exp(-PACE_EASE_RATE * dt);
+}
+
+/** Ground metres per gait cycle at a ground speed: walking stride at walking pace, stretching to the running stride. */
+export function cycleMetresFor(speed: number): number {
+  const run = clamp01((speed - WALK_SPEED) / (RUN_SPEED - WALK_SPEED));
+  return CYCLE_METRES + (RUN_CYCLE_METRES - CYCLE_METRES) * (Number.isFinite(run) ? run : 0);
 }
 
 /**

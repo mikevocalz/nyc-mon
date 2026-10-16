@@ -51,6 +51,24 @@ export const KEYBOARD_DIRECTION_KEYS: Readonly<Record<string, KeyboardDirection>
   ArrowRight: 'right',
 };
 
+/**
+ * Either Shift runs while a direction key is held. Shift is a modifier, not a
+ * mapped key: on its own it never marks the keyboard active or hides the
+ * touch controls ({@linkcode isMappedKeyCode} leaves it out).
+ */
+export const KEYBOARD_RUN_KEYS: ReadonlySet<string> = new Set(['ShiftLeft', 'ShiftRight']);
+
+export function isKeyboardRunKey(code: string): boolean {
+  return KEYBOARD_RUN_KEYS.has(code);
+}
+
+/**
+ * Stick deflection of a held direction key without Shift. A game reading
+ * the stick as walk below a run threshold (the Caller runs from 0.75) walks
+ * at full walking pace here; Shift publishes full deflection.
+ */
+export const KEYBOARD_WALK_DEFLECTION = 0.6;
+
 /** Enter and Escape short-press toggle pause/resume; Escape held is the stop request. */
 export const KEYBOARD_PAUSE_KEY = 'Enter';
 export const KEYBOARD_STOP_KEY = 'Escape';
@@ -66,17 +84,20 @@ export function isMappedKeyCode(code: string): boolean {
 }
 
 /**
- * Which direction keys are down and the last reading published. Two keys
- * on one axis (A and D together) cancel to 0, as a physical pad would.
+ * Which direction keys are down, which Shift keys are down, and the last
+ * reading published. Two keys on one axis (A and D together) cancel to 0,
+ * as a physical pad would.
  */
 export interface KeyboardStickState {
   readonly held: ReadonlySet<string>;
   readonly reading: StickReading;
+  /** Shift keys down. Optional so older callers' literals still type-check; absent means none. */
+  readonly runHeld?: ReadonlySet<string>;
 }
 
-export const IDLE_KEYBOARD_STICK: KeyboardStickState = { held: new Set(), reading: NEUTRAL_STICK };
+export const IDLE_KEYBOARD_STICK: KeyboardStickState = { held: new Set(), reading: NEUTRAL_STICK, runHeld: new Set() };
 
-function readingFor(held: ReadonlySet<string>): StickReading {
+function readingFor(held: ReadonlySet<string>, running: boolean): StickReading {
   let x = 0;
   let y = 0;
   for (const code of held) {
@@ -91,33 +112,39 @@ function readingFor(held: ReadonlySet<string>): StickReading {
   x = Math.sign(x);
   y = Math.sign(y);
   if (x === 0 && y === 0) return NEUTRAL_STICK;
-  // A diagonal keeps unit length so the game moves at one speed in every direction.
-  if (x !== 0 && y !== 0) {
-    x *= Math.SQRT1_2;
-    y *= Math.SQRT1_2;
-  }
+  // A diagonal keeps the same length as a straight push so the game moves at one speed in every direction.
+  const length = running ? 1 : KEYBOARD_WALK_DEFLECTION;
+  const scale = x !== 0 && y !== 0 ? length * Math.SQRT1_2 : length;
+  x *= scale;
+  y *= scale;
   return { x, y, engaged: true, direction: direction8(x, y) };
 }
 
 /**
- * Folds one key edge into the stick state. Non-direction keys change
- * nothing. A down for a key already held (auto-repeat that slipped through,
- * or a key down before the adapter mounted) and an up for a key not held
- * change nothing either, so the held set can never drift. The first engaged
- * reading is a `begin`, later changes `update`, the last key up one `end`.
+ * Folds one key edge into the stick state. Keys that are neither a direction
+ * nor Shift change nothing. A down for a key already held (auto-repeat that
+ * slipped through, or a key down before the adapter mounted) and an up for a
+ * key not held change nothing either, so the held sets can never drift. The
+ * first engaged reading is a `begin`, later changes `update` (Shift while a
+ * direction is held is one), the last direction key up one `end`. Shift with
+ * no direction held publishes nothing.
  */
 export function keyboardKeyToMove(
   state: KeyboardStickState,
   code: string,
   pressed: boolean,
 ): { readonly next: KeyboardStickState; readonly move: MoveCommand | null } {
-  if (KEYBOARD_DIRECTION_KEYS[code] === undefined) return { next: state, move: null };
-  if (pressed === state.held.has(code)) return { next: state, move: null };
+  const runKey = isKeyboardRunKey(code);
+  if (!runKey && KEYBOARD_DIRECTION_KEYS[code] === undefined) return { next: state, move: null };
+  const previousRun = state.runHeld ?? new Set<string>();
+  if (pressed === (runKey ? previousRun.has(code) : state.held.has(code))) return { next: state, move: null };
   const held = new Set(state.held);
-  if (pressed) held.add(code);
-  else held.delete(code);
-  const reading = readingFor(held);
-  const next = { held, reading };
+  const runHeld = new Set(previousRun);
+  const target = runKey ? runHeld : held;
+  if (pressed) target.add(code);
+  else target.delete(code);
+  const reading = readingFor(held, runHeld.size > 0);
+  const next = { held, reading, runHeld };
   if (isSameReading(state.reading, reading)) return { next, move: null };
   if (!state.reading.engaged) return { next, move: { x: reading.x, y: reading.y, phase: 'begin' } };
   if (!reading.engaged) return { next, move: { x: 0, y: 0, phase: 'end' } };

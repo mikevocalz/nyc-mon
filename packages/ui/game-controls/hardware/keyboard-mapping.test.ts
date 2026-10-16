@@ -6,6 +6,8 @@ import {
   IDLE_KEYBOARD_STICK,
   KEYBOARD_BUTTON_BINDINGS,
   KEYBOARD_DIRECTION_KEYS,
+  KEYBOARD_WALK_DEFLECTION,
+  isMappedKeyCode,
   keyCodeToButtonId,
   keyboardEscapeHeld,
   keyboardKeyToMove,
@@ -56,17 +58,17 @@ describe('WASD and arrows → eight-way stick', () => {
   it('begins on the first key, updates on the second, ends on the last release', () => {
     const { moves } = drive(IDLE_KEYBOARD_STICK, [['KeyW', true], ['KeyD', true], ['KeyW', false], ['KeyD', false]]);
     assert.deepEqual(moves.map((m) => m.phase), ['begin', 'update', 'update', 'end']);
-    assert.deepEqual({ x: moves[0]!.x, y: moves[0]!.y }, { x: 0, y: 1 });
-    close(moves[1]!.x, Math.SQRT1_2);
-    close(moves[1]!.y, Math.SQRT1_2);
-    assert.deepEqual({ x: moves[2]!.x, y: moves[2]!.y }, { x: 1, y: 0 });
+    assert.deepEqual({ x: moves[0]!.x, y: moves[0]!.y }, { x: 0, y: KEYBOARD_WALK_DEFLECTION });
+    close(moves[1]!.x, KEYBOARD_WALK_DEFLECTION * Math.SQRT1_2);
+    close(moves[1]!.y, KEYBOARD_WALK_DEFLECTION * Math.SQRT1_2);
+    assert.deepEqual({ x: moves[2]!.x, y: moves[2]!.y }, { x: KEYBOARD_WALK_DEFLECTION, y: 0 });
     assert.deepEqual(moves[3], { x: 0, y: 0, phase: 'end' });
   });
 
-  it('normalises diagonals to unit length in every quadrant', () => {
+  it('keeps diagonals the same length as a straight push in every quadrant', () => {
     for (const [a, b] of [['KeyW', 'KeyA'], ['KeyS', 'KeyD'], ['ArrowUp', 'ArrowRight'], ['ArrowDown', 'ArrowLeft']] as const) {
       const { state } = drive(IDLE_KEYBOARD_STICK, [[a, true], [b, true]]);
-      close(Math.hypot(state.reading.x, state.reading.y), 1);
+      close(Math.hypot(state.reading.x, state.reading.y), KEYBOARD_WALK_DEFLECTION);
       assert.ok(['ne', 'nw', 'se', 'sw'].includes(state.reading.direction));
     }
   });
@@ -82,6 +84,28 @@ describe('WASD and arrows → eight-way stick', () => {
     const { moves, state } = drive(IDLE_KEYBOARD_STICK, [['KeyW', true], ['KeyW', true], ['KeyS', false], ['KeyW', false], ['KeyW', false]]);
     assert.deepEqual(moves.map((m) => m.phase), ['begin', 'end']);
     assert.equal(state.held.size, 0);
+  });
+
+  it('walks without Shift and runs at full deflection with it, on press and release', () => {
+    const { moves, state } = drive(IDLE_KEYBOARD_STICK, [['KeyW', true], ['ShiftLeft', true], ['ShiftLeft', false], ['KeyW', false]]);
+    assert.ok(KEYBOARD_WALK_DEFLECTION < 0.75, 'below the Caller run threshold');
+    assert.deepEqual(moves, [
+      { x: 0, y: KEYBOARD_WALK_DEFLECTION, phase: 'begin' },
+      { x: 0, y: 1, phase: 'update' },
+      { x: 0, y: KEYBOARD_WALK_DEFLECTION, phase: 'update' },
+      { x: 0, y: 0, phase: 'end' },
+    ]);
+    assert.equal(state.runHeld?.size, 0);
+    // Shift first, then a direction: begins already running; a diagonal run is unit length.
+    const running = drive(IDLE_KEYBOARD_STICK, [['ShiftRight', true], ['KeyW', true], ['KeyD', true]]).state;
+    close(Math.hypot(running.reading.x, running.reading.y), 1);
+  });
+
+  it('Shift alone publishes nothing and is not a mapped key, so it never hides the touch controls', () => {
+    const { moves, state } = drive(IDLE_KEYBOARD_STICK, [['ShiftLeft', true], ['ShiftLeft', true], ['ShiftLeft', false], ['ShiftRight', false]]);
+    assert.deepEqual(moves, []);
+    assert.equal(state.runHeld?.size, 0);
+    assert.equal(isMappedKeyCode('ShiftLeft'), false);
   });
 
   it('leaves non-direction keys alone', () => {

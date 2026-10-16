@@ -5,17 +5,61 @@
 import { AccessibilityInfo } from 'react-native';
 import { describeCamera, ORBIT_STEP } from '../camera-input.ts';
 import { chaseCamera, nextChaseDistance } from '../city-camera.ts';
+import { bundledCity } from '../city-data.ts';
 import { gameCameraStore } from '../game-session.ts';
+import { NO_STREETS, createStreetAxisIndex, streetAxisLookupFor, type StreetAxisLookup } from '../street-axes.ts';
+import { withViewHeld } from './block-settle.ts';
 import { IDLE_CHASE, jumpCaller, recentreChase, spawnCaller, type ChaseState } from './caller-controller.ts';
 import { callerStore } from './caller-store.ts';
-import { cameraRelativeDirection, headingFor, slideMove } from './locomotion.ts';
+import { cameraRelativeDirection, cycleMetresFor, headingFor, slideMove, WALK_SPEED } from './locomotion.ts';
 import type { WorldQueries } from './walkability.ts';
 import { cityGroundHeight, isWalkable } from './world-queries.ts';
 
 export const worldQueries: WorldQueries = { isWalkable, groundHeight: cityGroundHeight };
 
-/** Camera work in flight (the recentre swing). Module scope with the stores; read and written by the frame loop. */
+/** Camera work in flight (the recentre swing, the block settle). Module scope with the stores; read and written by the frame loop. */
 export const chaseRef: { current: ChaseState } = { current: IDLE_CHASE };
+
+let streets: StreetAxisLookup | null = null;
+/**
+ * Street axes of the bundled tile, indexed on first use (the frame loop's
+ * first settle query, not at import). A tile that failed to parse never
+ * mounts the world; the settle then aligns to the Manhattan grid.
+ */
+export const streetAxes: StreetAxisLookup = (x, z, referenceYaw) => {
+  if (streets === null) {
+    const city = bundledCity();
+    streets = city.ok ? streetAxisLookupFor(createStreetAxisIndex(city.dataset.roads)) : NO_STREETS;
+  }
+  return streets(x, z, referenceYaw);
+};
+
+/** Starts the frame loop from outside it (a gesture ending). use-game-input.ts sets it while the router subscription lives. */
+export const frameWake: { current: (() => void) | null } = { current: null };
+
+const viewGestures = new Set<string>();
+
+/**
+ * A touch gesture began turning the view (the one-finger drag orbit, the
+ * twist). Any block settle in flight stops: the player owns the yaw.
+ */
+export function beginViewTurn(gesture: string): void {
+  viewGestures.add(gesture);
+  chaseRef.current = { ...chaseRef.current, settle: withViewHeld(chaseRef.current.settle, true) };
+}
+
+/** The gesture ended. When none is left, the next frame settles the view onto the block. */
+export function endViewTurn(gesture: string): void {
+  if (!viewGestures.delete(gesture) || viewGestures.size > 0) return;
+  chaseRef.current = { ...chaseRef.current, settle: withViewHeld(chaseRef.current.settle, false) };
+  frameWake.current?.();
+}
+
+/** Forgets held gestures (unmount, a fresh placement) so a lost finalize can never block the settle for good. */
+export function resetViewTurns(): void {
+  viewGestures.clear();
+  chaseRef.current = { ...chaseRef.current, settle: withViewHeld(chaseRef.current.settle, false) };
+}
 
 /**
  * Places the Caller at the walkable point nearest the camera's look-at and
@@ -26,6 +70,7 @@ export const chaseRef: { current: ChaseState } = { current: IDLE_CHASE };
 export function placeCaller(): void {
   const placed = spawnCaller(callerStore.getState(), gameCameraStore.getState().camera, worldQueries);
   if (placed === null) return;
+  viewGestures.clear();
   chaseRef.current = placed.chase;
   callerStore.setState(placed.caller, true);
   gameCameraStore.setState({ camera: placed.camera });
@@ -38,7 +83,7 @@ export function jump(): void {
 }
 
 export function recentre(): void {
-  chaseRef.current = recentreChase(callerStore.getState());
+  chaseRef.current = recentreChase(callerStore.getState(), chaseRef.current);
 }
 
 export function cycleZoom(): void {
@@ -60,7 +105,14 @@ function stepCaller(stickX: number, stickY: number): void {
   if (direction === null) return;
   const next = slideMove(caller.x, caller.z, direction.x * A11Y_STEP_METRES, direction.z * A11Y_STEP_METRES, worldQueries.isWalkable);
   const moved = Math.hypot(next.x - caller.x, next.z - caller.z);
-  const updated = { ...caller, ...next, groundY: worldQueries.groundHeight(next.x, next.z), heading: headingFor(direction), stride: caller.stride + moved };
+  const updated = {
+    ...caller,
+    ...next,
+    groundY: worldQueries.groundHeight(next.x, next.z),
+    heading: headingFor(direction),
+    stride: caller.stride + moved,
+    gaitPhase: caller.gaitPhase + moved / cycleMetresFor(WALK_SPEED),
+  };
   callerStore.setState(updated, true);
   gameCameraStore.setState({ camera: chaseCamera(camera, { x: updated.x, z: updated.z, heading: updated.heading, align: 0 }, 0, true) });
   if (moved < 0.01) AccessibilityInfo.announceForAccessibility('Blocked');

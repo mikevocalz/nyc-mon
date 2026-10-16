@@ -31,6 +31,7 @@ import {
   stepPanInertia,
   type PanInertia,
 } from './camera-input.ts';
+import { beginViewTurn, endViewTurn } from './character/caller-runtime.ts';
 import { callerStore } from './character/caller-store.ts';
 import { gameCameraStore } from './game-session.ts';
 
@@ -74,6 +75,9 @@ export function useCityCameraGestures({ viewportHeight, reducedMotion, enabled }
     // iOS tracks the centroid of all fingers, Android the newest one; average for parity.
     averageTouches: true,
     onBegin: () => stopInertia(),
+    // A drag that orbits holds the block settle off until the finger lifts (onFinalize).
+    onActivate: () => { if (callerStore.getState().spawned) beginViewTurn('pan'); },
+    onFinalize: () => endViewTurn('pan'),
     // With a Caller in the world a one-finger drag orbits around them (the
     // chase camera would pull a pan straight back); before the Caller spawns
     // it pans the map as it always did.
@@ -100,6 +104,8 @@ export function useCityCameraGestures({ viewportHeight, reducedMotion, enabled }
   const rotate = useRotationGesture({
     runOnJS: true,
     enabled,
+    onActivate: () => beginViewTurn('rotate'),
+    onFinalize: () => endViewTurn('rotate'),
     onUpdate: (e) => move(rotationToAction(e.rotationChange)),
   });
 

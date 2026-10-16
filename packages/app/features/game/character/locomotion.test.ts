@@ -1,21 +1,65 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
-  GROUNDED, JUMP_SPEED, RUN_DEFLECTION, RUN_SPEED, WALK_SPEED,
-  angleDelta, cameraRelativeDirection, deflectionToGait, findSpawn, headingFor, isAirborne,
+  CYCLE_METRES, FULL_RUN_DEFLECTION, FULL_WALK_DEFLECTION, GROUNDED, JUMP_SPEED, MAX_COLLISION_STEP, RUN_CYCLE_METRES,
+  RUN_DEFLECTION, RUN_SPEED, WALK_SPEED,
+  angleDelta, cameraRelativeDirection, cycleMetresFor, deflectionToGait, easePace, findSpawn, headingFor, isAirborne,
   slideMove, startJump, stepJump, turnToward, wrapAngle,
 } from './locomotion.ts';
 
 const near = (a: number, b: number, eps = 1e-9) => Math.abs(a - b) < eps;
 
-test('deflection below the run threshold walks, scaled; at and above it runs', () => {
+test('walk/run curve: a light push walks slowly, a normal push walks, past 0.75 it runs', () => {
   assert.deepEqual(deflectionToGait(0, false), { gait: 'idle', speed: 0 });
+  assert.deepEqual(deflectionToGait(0.04, false), { gait: 'idle', speed: 0 });
   assert.deepEqual(deflectionToGait(Number.NaN, false), { gait: 'idle', speed: 0 });
-  const half = deflectionToGait(RUN_DEFLECTION / 2, false);
-  assert.equal(half.gait, 'walk');
-  assert.ok(near(half.speed, WALK_SPEED / 2));
-  assert.deepEqual(deflectionToGait(RUN_DEFLECTION, false), { gait: 'run', speed: RUN_SPEED });
+  const light = deflectionToGait(FULL_WALK_DEFLECTION / 2, false);
+  assert.equal(light.gait, 'walk');
+  assert.ok(near(light.speed, WALK_SPEED / 2));
+  assert.deepEqual(deflectionToGait(0.6, false), { gait: 'walk', speed: WALK_SPEED });
+  assert.equal(RUN_DEFLECTION, 0.75);
+  const atThreshold = deflectionToGait(RUN_DEFLECTION, false);
+  assert.equal(atThreshold.gait, 'run');
+  assert.ok(near(atThreshold.speed, WALK_SPEED), 'crossing the threshold does not jump the speed');
+  const between = deflectionToGait((RUN_DEFLECTION + FULL_RUN_DEFLECTION) / 2, false);
+  assert.ok(between.speed > WALK_SPEED && between.speed < RUN_SPEED);
+  assert.deepEqual(deflectionToGait(FULL_RUN_DEFLECTION, false), { gait: 'run', speed: RUN_SPEED });
   assert.deepEqual(deflectionToGait(1.5, false), { gait: 'run', speed: RUN_SPEED });
+});
+
+test('the speed curve never falls as the push grows and has no step bigger than the sample spacing allows', () => {
+  let previous = 0;
+  for (let i = 0; i <= 1000; i++) {
+    const { speed } = deflectionToGait(i / 1000, false);
+    assert.ok(speed >= previous - 1e-12, `falls at ${i / 1000}`);
+    if (i > 50) assert.ok(speed - previous < 0.05, `jumps at ${i / 1000}: ${previous} -> ${speed}`);
+    previous = speed;
+  }
+});
+
+test('pace eases toward the target the same way at any frame rate', () => {
+  const run = (fps: number) => { let pace = WALK_SPEED; for (let i = 0; i < fps / 4; i++) pace = easePace(pace, RUN_SPEED, 1 / fps); return pace; };
+  const at40 = run(40);
+  const at120 = run(120);
+  assert.ok(at40 > WALK_SPEED && at40 < RUN_SPEED, 'a quarter second in, still easing');
+  assert.ok(Math.abs(at40 - at120) < 1e-9);
+  assert.equal(easePace(2, RUN_SPEED, 0), 2);
+  assert.equal(easePace(Number.NaN, RUN_SPEED, 0), 0);
+});
+
+test('a run takes longer strides than a walk', () => {
+  assert.equal(cycleMetresFor(WALK_SPEED), CYCLE_METRES);
+  assert.equal(cycleMetresFor(RUN_SPEED), RUN_CYCLE_METRES);
+  assert.equal(cycleMetresFor(0), CYCLE_METRES);
+  assert.ok(cycleMetresFor((WALK_SPEED + RUN_SPEED) / 2) > CYCLE_METRES);
+});
+
+test('a run-speed frame cannot tunnel through a thin wall', () => {
+  // A 0.1 m wall at z = -0.2; one 0.1 s frame at run pace travels 0.42 m.
+  const wall = (_x: number, z: number) => !(z < -0.15 && z > -0.25);
+  const moved = slideMove(0, 0, 0, -RUN_SPEED * 0.1, wall);
+  assert.ok(moved.z > -0.15, `tunnelled to ${moved.z}`);
+  assert.ok(MAX_COLLISION_STEP <= 0.25);
 });
 
 test('holding run runs at any deflection past the dead zone, never from a released stick', () => {

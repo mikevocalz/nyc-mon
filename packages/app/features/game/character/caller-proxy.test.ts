@@ -1,21 +1,21 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import * as THREE from 'three/webgpu';
-import { CYCLE_METRES, createCallerProxyWith, poseFor } from './caller-proxy.ts';
+import { createCallerProxyWith, poseFor } from './caller-proxy.ts';
 import { INITIAL_CALLER_STATE, createCallerStore } from './caller-store.ts';
 import { GROUNDED, RUN_SPEED, WALK_SPEED, startJump } from './locomotion.ts';
 
 const frame = { delta: 1 / 60, time: 0, reducedMotion: false };
 
 test('an idle Caller stands straight; walking swings legs against arms; running swings wider', () => {
-  assert.deepEqual(poseFor({ gait: 'idle', speed: 0, stride: 3, jump: GROUNDED }), { leg: 0, arm: 0, bob: 0, lean: 0 });
-  const quarter = CYCLE_METRES / 4;
-  const walk = poseFor({ gait: 'walk', speed: WALK_SPEED, stride: quarter, jump: GROUNDED });
-  const run = poseFor({ gait: 'run', speed: RUN_SPEED, stride: quarter, jump: GROUNDED });
+  assert.deepEqual(poseFor({ gait: 'idle', speed: 0, gaitPhase: 3, jump: GROUNDED }), { leg: 0, arm: 0, bob: 0, lean: 0 });
+  const quarter = 0.25;
+  const walk = poseFor({ gait: 'walk', speed: WALK_SPEED, gaitPhase: quarter, jump: GROUNDED });
+  const run = poseFor({ gait: 'run', speed: RUN_SPEED, gaitPhase: quarter, jump: GROUNDED });
   assert.ok(walk.leg > 0 && walk.arm < 0);
   assert.ok(run.leg > walk.leg && run.lean > walk.lean);
-  // One full cycle later the pose repeats: the swing follows distance, not time.
-  const later = poseFor({ gait: 'walk', speed: WALK_SPEED, stride: quarter + CYCLE_METRES, jump: GROUNDED });
+  // One full cycle later the pose repeats: the swing follows gait cycles walked, not time.
+  const later = poseFor({ gait: 'walk', speed: WALK_SPEED, gaitPhase: quarter + 1, jump: GROUNDED });
   assert.ok(Math.abs(later.leg - walk.leg) < 1e-9);
 });
 

@@ -42,3 +42,12 @@ describe('M6: the web keyboard filter', () => {
     assert.equal(isEditableTarget(null), false);
   });
 });
+
+describe('Shift runs on the web too', () => {
+  it('Shift is forwarded without preventDefault, and its up follows', () => {
+    const f = createKeyEventFilter();
+    assert.deepEqual(f.decide(ev({ code: 'ShiftLeft' })), { forward: true, preventDefault: false });
+    assert.deepEqual(f.decide(ev({ type: 'keyup', code: 'ShiftLeft' })), { forward: true, preventDefault: false });
+    assert.equal(f.decide(ev({ code: 'ShiftRight', editableTarget: true })).forward, false);
+  });
+});
