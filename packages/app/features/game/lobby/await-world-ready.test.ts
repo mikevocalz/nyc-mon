@@ -58,6 +58,30 @@ describe('awaitWorldReady', () => {
     store.setState({ firstFrame: true });
   });
 
+  it('restarts the clock at every load milestone, so a slow but moving load never times out', async () => {
+    const store = screenStore();
+    const { timers, pending, fire } = manualTimers();
+    const wait = awaitWorldReady(store, 1000, timers);
+    store.setState({ loadProgress: 35 });
+    assert.equal(pending.size, 1, 'one live timer after a milestone');
+    store.setState({ loadProgress: 75 });
+    store.setState({ loadProgress: 75 });
+    assert.equal(pending.size, 1);
+    store.setState({ firstFrame: true });
+    await wait;
+    assert.equal(pending.size, 0);
+    fire();
+  });
+
+  it('still times out when the load stalls after a milestone', async () => {
+    const store = screenStore();
+    const { timers, fire } = manualTimers();
+    const wait = awaitWorldReady(store, 1000, timers);
+    store.setState({ loadProgress: 75 });
+    fire();
+    await assert.rejects(wait, (e: unknown) => e instanceof WorldNotReadyError && e.reason === 'timeout');
+  });
+
   it('settles at once when the state is already decided', async () => {
     await awaitWorldReady(screenStore({ firstFrame: true }));
     await assert.rejects(awaitWorldReady(screenStore({ viewState: 'unsupported' })), WorldNotReadyError);
