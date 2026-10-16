@@ -3,14 +3,15 @@
 // binary), so the screen shows data-error rather than retrying.
 //
 // Static import: Metro inlines JSON, and the shared tsconfig has
-// resolveJsonModule. The tile is ~1000 lines; if bundle cost matters later,
-// move it behind the scene's dynamic import.
+// resolveJsonModule. The v2 tile is 985 KB of compact JSON (measured
+// 2026-10-15, docs/implementation/city-world.md); if first-chunk cost
+// matters, move it behind the scene's dynamic import.
 import raw from './data/harlem-apollo.json';
-import { parseCityDataset, type CityDataset } from './city-dataset.ts';
+import { parseCityDataset, type CityDatasetV2 } from './city-dataset.ts';
 import { cityDatasetBounds, type CityBounds } from './city-bounds.ts';
 
 export type BundledCity =
-  | { ok: true; dataset: CityDataset; bounds: CityBounds }
+  | { ok: true; dataset: CityDatasetV2; bounds: CityBounds }
   | { ok: false; error: Error };
 
 let cached: BundledCity | null = null;

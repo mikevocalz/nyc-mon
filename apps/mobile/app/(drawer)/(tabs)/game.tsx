@@ -1,6 +1,9 @@
-// Thin route: the feature owns the screen. PR 1 of #29 (native shell) may move
-// this into the canon HOME | GAME | H-LYNK | MONS | CALLER tab set.
-// Imported by path, not from the @acme/app index, so web never bundles the renderer.
-import { GameScreen } from '@acme/app/features/game/GameScreen.tsx';
+// Thin route: the feature owns the screen. GameTab opens the lobby first and
+// mounts GameScreen once START has resumed (directive §3). The route passes
+// tab focus so leaving the tab cancels held input (review finding M19).
+import { useIsFocused } from 'expo-router';
+import { GameTab } from '@acme/app/features/game/GameTab.tsx';
 
-export default GameScreen;
+export default function GameRoute() {
+  return <GameTab focused={useIsFocused()} />;
+}

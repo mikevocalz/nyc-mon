@@ -1,23 +1,28 @@
 // Where the bundled tile actually has geometry, in the scene's local metres.
-// The camera store clamps to +/-2000 m (city-camera.ts) and the ground plane is
-// 4200 m wide (city-scene.ts), so a player can pan onto bare ground long before
-// hitting a limit. That is the screen's "empty" state: an honest "nothing
-// mapped here" with a way back, not a blank plane.
-import { projectCityPoint, type CityDataset } from './city-dataset.ts';
+// The camera store clamps to +/-2000 m (city-camera.ts) and the ground plane
+// is wider than the tile (world/ground.ts), so a player can pan onto bare
+// ground long before hitting a limit. That is the screen's "empty" state: an
+// honest "nothing mapped here" with a way back, not a blank plane.
+import type { CityDatasetV2, FlatPoints } from './city-dataset.ts';
 import type { CityCamera } from './city-scene.ts';
 
 export interface CityBounds { minX: number; maxX: number; minZ: number; maxZ: number }
 
-export function cityDatasetBounds(dataset: CityDataset): CityBounds {
+export function cityDatasetBounds(dataset: CityDatasetV2): CityBounds {
   let minX = Infinity; let maxX = -Infinity; let minZ = Infinity; let maxZ = -Infinity;
-  for (const feature of dataset.features) {
-    for (const point of feature.points) {
-      const [x, z] = projectCityPoint(point, dataset.origin);
-      minX = Math.min(minX, x); maxX = Math.max(maxX, x);
-      minZ = Math.min(minZ, z); maxZ = Math.max(maxZ, z);
+  const add = (points: FlatPoints) => {
+    for (let i = 0; i < points.length; i += 2) {
+      const x = points[i]!; const z = points[i + 1]!;
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (z < minZ) minZ = z;
+      if (z > maxZ) maxZ = z;
     }
-  }
-  // parseCityDataset rejects empty feature lists, so the bounds are finite.
+  };
+  for (const b of dataset.buildings) add(b.ring);
+  for (const r of dataset.roads) add(r.points);
+  for (const a of dataset.areas) add(a.ring);
+  // parseCityDataset rejects tiles with no buildings, roads or areas, so the bounds are finite.
   return { minX, maxX, minZ, maxZ };
 }
 

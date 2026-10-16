@@ -6,7 +6,7 @@ import {
   rotationToAction, startPanInertia, stepPanInertia, type CameraCommand,
 } from './camera-input.ts';
 
-const camera = { ...INITIAL_CITY_CAMERA };
+const camera = { ...INITIAL_CITY_CAMERA, yaw: 0 };
 
 test('drag moves the world with the finger', () => {
   const right = moveCityCamera(camera, panToAction(100, 0, camera, 800));

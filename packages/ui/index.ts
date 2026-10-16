@@ -138,6 +138,7 @@ export type { TextEffectOptions, GlitchIntensity, GlitchSpeed, TextGlowLevel } f
 
 // H-Lynk chrome: shell, scanner head, screen, trackpad, keys.
 export * from './hlynk';
+export * from './arrangement';
 
 // Phase 1 loop primitives: egg choice, case, incubation, hatch (M08–M12) and care (M13–M18).
 export * from './hatch';
