@@ -5,6 +5,8 @@ import { HLYNK_COPY } from './hlynk/copy';
 import { HLynkShell, SHELL_HANDOFF_MS } from './hlynk/HLynkShell';
 import type { HLynkPower, HLynkShellProps, HLynkStatus } from './hlynk/HLynkShell.types';
 import { AnimatedView } from './progress/motion';
+import { ReservedRegionsOverride } from './reserved-regions-override';
+import type { ReservedRegion } from './reserved-regions.types';
 import { Text } from './Text';
 import { View } from './tw';
 import { useInstanceStore, useStore } from './use-instance-store';
@@ -217,5 +219,57 @@ export const TierPlaceholders: Story = {
         </Device>
       ))}
     </View>
+  ),
+};
+
+// ---- Decision H-2: wide and folded windows (docs/design/hlynk/ADAPTIVE.md) ----
+
+/** A Surface Duo hinge as the native module reports it, window-relative, in dp. */
+const hinge = (orientation: 'vertical' | 'horizontal', x: number, y: number, width: number, height: number): ReservedRegion => ({
+  kind: 'division', x, y, width, height, margins: { top: 0, left: 0, bottom: 0, right: 0 }, active: true,
+  orientation, state: 'flat', occlusionType: 'full', separating: true,
+});
+
+/** Tablet landscape, 1194 × 834: the NYC-MON pane on the left, the device on the right at phone size. */
+export const WideWindow: Story = {
+  render: (args) => (
+    <Device w={1194} h={834} top={24} bottom={20}>
+      {(insets) => shell({ reducedMotion: args.reducedMotion, insets, scheme: 'night' })}
+    </Device>
+  ),
+};
+
+/**
+ * Surface Duo spanned (book), 540 + 34 + 540 dp: the brand pane fills the
+ * left panel, the device sits wholly in the right one at the panel's
+ * height-fit width (414 pt), and nothing touches the hinge.
+ */
+export const DuoSpanned: Story = {
+  render: (args) => (
+    <ReservedRegionsOverride regions={[hinge('vertical', 541, 1, 34, 720)]}>
+      <Device w={1114} h={720} top={24} bottom={0}>
+        {(insets) => shell({ reducedMotion: args.reducedMotion, insets, scheme: 'night' })}
+      </Device>
+    </ReservedRegionsOverride>
+  ),
+};
+
+/** Surface Duo tabletop: the brand pane above the hinge, the device below it. */
+export const DuoTabletop: Story = {
+  render: (args) => (
+    <ReservedRegionsOverride regions={[hinge('horizontal', 1, 541, 720, 34)]}>
+      <Device w={720} h={1114} top={24} bottom={0}>
+        {(insets) => shell({ reducedMotion: args.reducedMotion, insets })}
+      </Device>
+    </ReservedRegionsOverride>
+  ),
+};
+
+/** Phone landscape, 844 × 390: too short for a standard device, so the compact device takes the full width and no brand pane. */
+export const PhoneLandscape: Story = {
+  render: (args) => (
+    <Device w={844} h={390} top={0} bottom={21}>
+      {(insets) => shell({ reducedMotion: args.reducedMotion, insets })}
+    </Device>
   ),
 };
