@@ -5,17 +5,24 @@
 // - The world canvas spans the whole screen container, hinge included. It is
 //   one workspace; splitting it into two cameras would break PR #29's
 //   "uninterrupted world canvas" rule.
-// - Every HUD cluster lives wholly inside one usable region. No control,
-//   banner or attribution link may straddle a separating fold or sit inside an
+// - Every HUD element lives wholly inside one usable region. No banner or
+//   attribution link may straddle a separating fold or sit inside an
 //   occluding hinge.
 // - Separating folds (Android isSeparating, iPhone Duo active division) and
 //   FULL occlusion split the container. A flat, non-separating, non-occluding
 //   crease does not: no fabricated dead strip.
 // - Every reported fold is processed, not only index zero (trifolds).
 // - Navigation chrome is drawn by the tab layout OUTSIDE this container. The
-//   hardware family picks rail vs bottom bar (separate agent's change to
-//   adaptive-navigation); this function only needs which physical edge the
-//   rail is on, so the camera controls can sit on the far edge from it.
+//   hardware family picks rail vs bottom bar (adaptive-navigation); this
+//   function only needs which physical edge the rail is on.
+//
+// The arcade controller (stick, six caps, START/STOP pill) is placed by
+// `AdaptiveControlLayout` in @acme/ui/game-controls, which reuses the same
+// `usableRegions` rule. Decision (2026-10-15, G01 08-handoff.md § Route):
+// the old camera column and move pad are retired; this file keeps only the
+// status banner, the attribution link and the blocking region. The
+// attribution sits in the controller region's top band, on the leading edge,
+// under the pill's band, so it never meets the stick or the cluster below.
 //
 // Coordinates: container-local layout units (dp / pt). The caller converts
 // window-space fold geometry once, subtracting the container's window origin
@@ -23,6 +30,7 @@
 // only converts x; horizontal (tabletop) folds keep window y, so the screen
 // uses foldLayoutsFromRegions + its own y offset instead.
 import type { FoldLayout } from '@acme/ui/adaptive-panes/parts';
+import { PILL_GEOMETRY_DP } from '@acme/ui/game-controls/parts';
 
 export interface Rect { x: number; y: number; width: number; height: number }
 export interface Insets { top: number; right: number; bottom: number; left: number }
@@ -37,29 +45,24 @@ export interface GameHudLayoutInput {
   /** Physical edge holding the navigation rail, or null for a bottom bar / none. */
   railEdge: 'left' | 'right' | null;
   isRTL: boolean;
-  /** Buttons in the camera column (zoom in/out, rotate left/right, compass, move toggle). */
-  controlCount: number;
-  /** Extra rows when the move pad is open (one 3x3 pad). */
-  movePadOpen: boolean;
 }
 
 export interface GameHudLayout {
   /** Usable regions after insets and folds, physical left-to-right then top-to-bottom. */
   regions: Rect[];
-  controls: Rect & { axis: 'vertical' | 'horizontal'; edge: 'left' | 'right' };
-  movePad: Rect | null;
+  /** The ODbL link: leading edge of the controller region, under the pill band. */
   attribution: Rect;
   status: Rect;
-  /** The one usable region a blocking state's message and action sit in. */
+  /** The one usable region a blocking state's message and action sit in; the controller's region too. */
   blocking: Rect;
 }
 
-/** Kit IconButton md/lg is 44-48; reserve 48 so Android's 48dp floor fits. */
-export const HUD_TARGET = 48;
 export const HUD_GAP = 8;
 export const HUD_MARGIN = 16;
 const ATTRIBUTION_HEIGHT = 44;
 const ATTRIBUTION_MAX_WIDTH = 280;
+/** The START/STOP pill's touch target height; the attribution starts below it. */
+const PILL_BAND_HEIGHT = PILL_GEOMETRY_DP.targetHeight;
 const STATUS_MAX_WIDTH = 420;
 const STATUS_HEIGHT = 120;
 
@@ -115,60 +118,29 @@ export function resolveGameHudLayout(input: GameHudLayoutInput): GameHudLayout {
   const fallback: Rect = { x: input.insets.left, y: input.insets.top, width: 0, height: 0 };
   const all = regions.length > 0 ? regions : [fallback];
 
-  // Controls go on the logical trailing edge (thumb side in the reading
-  // direction) unless the rail is there, then the opposite physical edge.
+  // The controller region is the lowest row (hands), on the logical trailing
+  // edge unless the rail is there, then the opposite physical edge. Blocking
+  // banners carry actions (Retry, Back to the Apollo), so they share it.
   const trailing: 'left' | 'right' = input.isRTL ? 'left' : 'right';
   const edge: 'left' | 'right' = input.railEdge === trailing ? (trailing === 'right' ? 'left' : 'right') : trailing;
-
   const bottomRow = Math.max(...all.map((r) => r.y));
   const lowest = all.filter((r) => r.y === bottomRow);
   const controlRegion = edge === 'right'
     ? lowest.reduce((a, b) => (b.x > a.x ? b : a))
     : lowest.reduce((a, b) => (b.x < a.x ? b : a));
-  const attributionRegion = edge === 'right'
-    ? lowest.reduce((a, b) => (b.x < a.x ? b : a))
-    : lowest.reduce((a, b) => (b.x > a.x ? b : a));
 
-  // Column if it fits above the attribution row; otherwise a row along the bottom.
-  const count = Math.max(1, input.controlCount);
-  const columnLength = count * HUD_TARGET + (count - 1) * HUD_GAP;
-  const columnFits = columnLength + 2 * HUD_MARGIN + ATTRIBUTION_HEIGHT <= controlRegion.height;
-  const axis: 'vertical' | 'horizontal' = columnFits ? 'vertical' : 'horizontal';
-  const cw = axis === 'vertical' ? HUD_TARGET : columnLength;
-  const ch = axis === 'vertical' ? columnLength : HUD_TARGET;
-  const cx = edge === 'right'
-    ? controlRegion.x + controlRegion.width - HUD_MARGIN - cw
-    : controlRegion.x + HUD_MARGIN;
-  const cy = controlRegion.y + controlRegion.height - HUD_MARGIN - ch
-    - (axis === 'horizontal' && attributionRegion === controlRegion ? ATTRIBUTION_HEIGHT : 0);
-  const controls = { x: cx, y: cy, width: cw, height: ch, axis, edge };
-
-  // Move pad: 3x3 grid beside the column, inside the same region.
-  const padSize = 3 * HUD_TARGET + 2 * HUD_GAP;
-  let movePad: Rect | null = null;
-  if (input.movePadOpen) {
-    const px = edge === 'right' ? cx - HUD_GAP - padSize : cx + cw + HUD_GAP;
-    const py = Math.max(controlRegion.y + HUD_MARGIN, cy + ch - padSize);
-    const fits = px >= controlRegion.x && px + padSize <= controlRegion.x + controlRegion.width && py + padSize <= controlRegion.y + controlRegion.height;
-    // Too narrow beside the column: stack the pad above it instead of crossing a fold.
-    movePad = fits
-      ? { x: px, y: py, width: padSize, height: padSize }
-      : { x: edge === 'right' ? controlRegion.x + controlRegion.width - HUD_MARGIN - padSize : controlRegion.x + HUD_MARGIN,
-          y: Math.max(controlRegion.y + HUD_MARGIN, cy - HUD_GAP - padSize), width: padSize, height: padSize };
-  }
-
-  const attributionWidth = Math.max(0, Math.min(ATTRIBUTION_MAX_WIDTH,
-    attributionRegion.width - 2 * HUD_MARGIN - (attributionRegion === controlRegion && axis === 'vertical' ? cw + HUD_GAP : 0)));
+  // Attribution: the leading edge (reading direction) of the controller
+  // region, under the pill band, so it meets neither the pill nor the groups.
+  const leading: 'left' | 'right' = input.isRTL ? 'right' : 'left';
+  const attributionWidth = Math.max(0, Math.min(ATTRIBUTION_MAX_WIDTH, controlRegion.width - 2 * HUD_MARGIN));
+  const attributionTop = controlRegion.y + HUD_MARGIN + PILL_BAND_HEIGHT + HUD_GAP;
   const attribution: Rect = {
-    x: edge === 'right' ? attributionRegion.x + HUD_MARGIN : attributionRegion.x + attributionRegion.width - HUD_MARGIN - attributionWidth,
-    y: attributionRegion.y + attributionRegion.height - HUD_MARGIN - ATTRIBUTION_HEIGHT,
+    x: leading === 'left' ? controlRegion.x + HUD_MARGIN : controlRegion.x + controlRegion.width - HUD_MARGIN - attributionWidth,
+    y: Math.min(attributionTop, Math.max(controlRegion.y, controlRegion.y + controlRegion.height - HUD_MARGIN - ATTRIBUTION_HEIGHT)),
     width: attributionWidth,
-    height: ATTRIBUTION_HEIGHT,
+    height: Math.min(ATTRIBUTION_HEIGHT, Math.max(0, controlRegion.height)),
   };
 
-  // Status banners carry actions (Retry, Back to the Apollo), so they share
-  // the controls' region: on a tabletop fold that is the lower half, where
-  // hands are.
   const statusWidth = Math.max(0, Math.min(STATUS_MAX_WIDTH, controlRegion.width - 2 * HUD_MARGIN));
   const status: Rect = {
     x: controlRegion.x + (controlRegion.width - statusWidth) / 2,
@@ -177,7 +149,7 @@ export function resolveGameHudLayout(input: GameHudLayoutInput): GameHudLayout {
     height: Math.min(STATUS_HEIGHT, Math.max(0, controlRegion.height - 2 * HUD_MARGIN)),
   };
 
-  return { regions, controls, movePad, attribution, status, blocking: { ...controlRegion } };
+  return { regions, attribution, status, blocking: { ...controlRegion } };
 }
 
 /** Test helper and dev assertion: true when a rect lies wholly inside one usable region. */

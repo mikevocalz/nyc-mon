@@ -31,6 +31,7 @@ import {
   stepPanInertia,
   type PanInertia,
 } from './camera-input.ts';
+import { callerStore } from './character/caller-store.ts';
 import { gameCameraStore } from './game-session.ts';
 
 export interface CityCameraGestureOptions {
@@ -73,9 +74,16 @@ export function useCityCameraGestures({ viewportHeight, reducedMotion, enabled }
     // iOS tracks the centroid of all fingers, Android the newest one; average for parity.
     averageTouches: true,
     onBegin: () => stopInertia(),
-    onUpdate: (e) => move(panToAction(e.changeX, e.changeY, camera(), viewportHeight())),
+    // With a Caller in the world a one-finger drag orbits around them (the
+    // chase camera would pull a pan straight back); before the Caller spawns
+    // it pans the map as it always did.
+    onUpdate: (e) => {
+      if (callerStore.getState().spawned) move({ type: 'orbit', radians: (-e.changeX * Math.PI) / Math.max(1, viewportHeight()) });
+      else move(panToAction(e.changeX, e.changeY, camera(), viewportHeight()));
+    },
     onDeactivate: (e) => {
       if (e.canceled) return;
+      if (callerStore.getState().spawned) return;
       const state = startPanInertia(e.velocityX, e.velocityY, reducedMotion);
       if (!state) return;
       inertia.current = { state, frame: requestAnimationFrame(glide), last: 0 };

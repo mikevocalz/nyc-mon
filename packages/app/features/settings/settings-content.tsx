@@ -1,9 +1,32 @@
 'use client';
 // Settings — reached from Profile. Preferences, appearance, and session
 // controls live here; identity stays on the profile screen.
+import { useRouter } from 'solito/navigation';
 import { Section, View } from '@acme/ui/tw';
 import { Button, Card, Heading, SegmentedControl, Switch, Text, FadeIn } from '@acme/ui';
 import { useProfile, type ThemePreference } from '../profile/profile.store';
+
+/** The game-control settings route (apps/mobile/app/(drawer)/game-controls.tsx). */
+const GAME_CONTROLS_PATH = '/game-controls';
+
+// Decision (2026-10-15, STRIKE on web): the Game tab never mounts on web
+// (GameScreen.tsx), so the row that opens its controls is native only; a
+// web row would land on a route that does not exist there.
+function GameControlsRow() {
+  const router = useRouter();
+  if (process.env.EXPO_OS === 'web') return null;
+  return (
+    <FadeIn delay={170}>
+      <Card className="gap-3">
+        <View className="gap-1">
+          <Text variant="heading">Game</Text>
+          <Text variant="caption" tone="muted">Stick, buttons, hand, haptics.</Text>
+        </View>
+        <Button title="Game controls" variant="outline" onPress={() => router.push(GAME_CONTROLS_PATH)} />
+      </Card>
+    </FadeIn>
+  );
+}
 
 const THEME_OPTIONS: { value: ThemePreference; label: string }[] = [
   { value: 'system', label: 'System' },
@@ -50,6 +73,8 @@ export function SettingsContent() {
           <ThemeSegment />
         </Card>
       </FadeIn>
+
+      <GameControlsRow />
 
       <FadeIn delay={200}>
         <Card className="gap-3">

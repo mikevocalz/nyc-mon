@@ -11,19 +11,22 @@ import {
   ChoiceTriptych,
   ErrorMessage,
   Heading,
+  HLynkFit,
   HLynkShell,
   StatusRow,
   Text,
   TrackpadActions,
   useInstanceStore,
-  useLayoutSize,
+  useIsHeadset,
   useReducedMotion,
   useStore,
   type ChoiceTriptychItem,
+  type FitStep,
+  type HLynkFitContext,
   type ShellTrackpadProps,
 } from '@acme/ui';
 import { haptics } from '@acme/ui/haptics';
-import { ScrollView, View } from '@acme/ui/tw';
+import { View } from '@acme/ui/tw';
 import { selectActiveMon, selectPendingEgg, useMonStore } from '../mon/mon.store';
 import { announcePolitely } from '../onboarding/announce';
 import { copy as onboardingCopy } from '../onboarding/copy';
@@ -44,7 +47,7 @@ import {
   type EggView,
   type MeetState,
 } from './egg-model';
-import { isAccessibilityTextSize, isLandscapeWindow } from './window-layout';
+import { isAccessibilityTextSize, isLandscapeWindow, meetFitBlocks } from './window-layout';
 
 /** Built once at import: a content parse failure surfaces as the route's error state. */
 function loadEggs(): { views: readonly EggView[] } | { error: true } {
@@ -78,8 +81,7 @@ export function MeetScreen() {
   // us, so a resized Horizon window or split view re-lays out live.
   const { fontScale } = useWindowDimensions();
   const listLayout = isAccessibilityTextSize(fontScale);
-  const { size: area, onLayout } = useLayoutSize({ width: 351, height: 468 });
-  const landscape = isLandscapeWindow(area.width, area.height);
+  const headset = useIsHeadset();
 
   const store = useInstanceStore<MeetStore>(() => ({
     ...MEET_INITIAL,
@@ -197,7 +199,7 @@ export function MeetScreen() {
 
   const card = egg === undefined ? null : (
     <Card variant="notch" surface="page" title={egg.eggName} titleLevel={2} padded={false} testID="m08-card">
-      <ScrollView className="max-h-full" contentContainerClassName="gap-2 p-3">
+      <View className="max-h-full gap-2 p-3">
         <Text
           className={`${t.strong} tabular-nums text-text`}
           accessibilityLabel={eggCopy('m08.card.number.a11y', { dexId: egg.dexId })}
@@ -235,7 +237,7 @@ export function MeetScreen() {
             </View>
           </View>
         )}
-      </ScrollView>
+      </View>
     </Card>
   );
 
@@ -257,53 +259,79 @@ export function MeetScreen() {
     </View>
   );
 
+  const titleText = eggCopy('m08.title');
+  const captionText = eggCopy('m08.santoro.caption');
+  const showHead = phase === 'browsing' || listLayout;
+  const head = (type: FitStep) => (
+    <View className="gap-1">
+      <Heading level={1} className={type.title.className} testID="m08-title">{titleText}</Heading>
+      <Text className={`${type.body.className} text-text-muted`} testID="m08-caption">{captionText}</Text>
+      {santoroLine !== '' ? <Text className={`${type.body.className} text-text`} testID="m08-santoro-line">{santoroLine}</Text> : null}
+    </View>
+  );
+
+  // Decision H-3: nothing in the H-Lynk screen scrolls; HLynkFit steps the type
+  // and spacing down until the step fits. The triptych is the flexible media.
+  const fitBlocks = (ctx: HLynkFitContext) => meetFitBlocks({
+    titleChars: titleText.length,
+    captionChars: captionText.length,
+    santoroChars: santoroLine.length,
+    headInScreen: showHead,
+    listLayout,
+    cardShown: card !== null,
+    confirming: phase === 'confirming',
+    actionsShown: phase !== 'confirming',
+    fontScale: ctx.fontScale,
+  });
+
   return shell(
-    <View onLayout={onLayout} className={`flex-1 gap-3 ${landscape ? 'p-6' : 'p-4'}`}>
-      {phase === 'browsing' || listLayout ? (
-        <View className="gap-1">
-          <Heading level={1} className={t.title} testID="m08-title">{eggCopy('m08.title')}</Heading>
-          <Text className={`${t.body} text-text-muted`} testID="m08-caption">{eggCopy('m08.santoro.caption')}</Text>
-          {santoroLine !== '' ? <Text className={`${t.body} text-text`} testID="m08-santoro-line">{santoroLine}</Text> : null}
-        </View>
-      ) : null}
-      {listLayout ? (
-        <ScrollView className="flex-1" contentContainerClassName="gap-3">
-          <ChoiceRows
-            rows={views.map((v, i) => ({
-              key: v.bloodlineId,
-              label: tileItems[i]!.label,
-              detail: v.bloodline,
-              accessibilityLabel: tileItems[i]!.accessibilityLabel,
-              media: <EggStill dexId={v.dexId} />,
-            }))}
-            value={focused}
-            onChange={(i) => set(meetFocus(store.getState(), i))}
-            accessibilityLabel={eggCopy('m08.title')}
-            testID="m08-triptych"
-            rowTestID={(row) => `m08-egg-${row.key}`}
-          />
-          {card}
-          {actions}
-        </ScrollView>
-      ) : (
-        <>
-          <View className="flex-1" style={landscape ? { maxWidth: 3 * 300 + 2 * 12, width: '100%', alignSelf: 'center' } : undefined}>
-            <ChoiceTriptych
-              items={tileItems}
-              focusedIndex={focused}
-              onFocusChange={(i) => set(meetFocus(store.getState(), i))}
-              accessibilityLabel={eggCopy('m08.title')}
-              focusedOverlay={card}
-              overlayPlacement={landscape ? 'trailing' : 'bottom'}
-              holding={holding}
-              reducedMotion={reducedMotion}
-              testID="m08-triptych"
-              itemTestID={(item) => `m08-egg-${item.key}`}
-            />
+    <HLynkFit testID="m08-fit" ramp={headset ? 'xr' : 'mobile'} blocks={fitBlocks}>
+      {(fit, ctx) => {
+        const landscape = isLandscapeWindow(ctx.widthPt, ctx.heightPt);
+        return (
+          <View style={{ flexGrow: 1, gap: fit.type.gapPt }}>
+            {showHead ? head(fit.type) : null}
+            {listLayout ? (
+              <View style={{ gap: fit.type.gapPt }}>
+                <ChoiceRows
+                  rows={views.map((v, i) => ({
+                    key: v.bloodlineId,
+                    label: tileItems[i]!.label,
+                    detail: v.bloodline,
+                    accessibilityLabel: tileItems[i]!.accessibilityLabel,
+                    media: <EggStill dexId={v.dexId} />,
+                  }))}
+                  value={focused}
+                  onChange={(i) => set(meetFocus(store.getState(), i))}
+                  accessibilityLabel={titleText}
+                  testID="m08-triptych"
+                  rowTestID={(row) => `m08-egg-${row.key}`}
+                />
+                {card}
+                {actions}
+              </View>
+            ) : (
+              <>
+                <View style={{ flexGrow: 1, minHeight: fit.mediaPt, ...(landscape ? { maxWidth: 3 * 300 + 2 * 12, width: '100%', alignSelf: 'center' } : null) }}>
+                  <ChoiceTriptych
+                    items={tileItems}
+                    focusedIndex={focused}
+                    onFocusChange={(i) => set(meetFocus(store.getState(), i))}
+                    accessibilityLabel={titleText}
+                    focusedOverlay={card}
+                    overlayPlacement={landscape ? 'trailing' : 'bottom'}
+                    holding={holding}
+                    reducedMotion={reducedMotion}
+                    testID="m08-triptych"
+                    itemTestID={(item) => `m08-egg-${item.key}`}
+                  />
+                </View>
+                {actions}
+              </>
+            )}
           </View>
-          {actions}
-        </>
-      )}
-    </View>,
+        );
+      }}
+    </HLynkFit>,
   );
 }

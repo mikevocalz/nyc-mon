@@ -22,11 +22,18 @@ export function writeSave(save: SaveCurrent): void {
   saveIO.write(save);
 }
 
+const DEVICE_ID_KEY = 'device-id';
+
 /** The stable id this device's write queue uses, persisted once. */
 export function deviceId(): string {
   const existing = readSave()?.queue.deviceId;
   if (existing !== undefined && existing !== '') return existing;
+  // Persist the minted id before any save exists, so two calls before the
+  // first save return the same device (review finding M2).
+  const minted = saveStorage.getString(DEVICE_ID_KEY);
+  if (minted !== undefined && minted !== '') return minted;
   const id = `device-${Date.now().toString(36)}`;
+  saveStorage.set(DEVICE_ID_KEY, id);
   return id;
 }
 

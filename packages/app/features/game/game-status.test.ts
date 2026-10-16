@@ -30,8 +30,8 @@ test('the real Apollo tile: start view is mapped, the clamp corner is not', () =
   const raw = readFileSync(new URL('./data/harlem-apollo.json', import.meta.url), 'utf8');
   const bounds = cityDatasetBounds(parseCityDataset(JSON.parse(raw)));
   assert.ok(isOverMappedArea(INITIAL_CITY_CAMERA, bounds));
-  assert.equal(isOverMappedArea({ ...INITIAL_CITY_CAMERA, x: 2000, z: 2000 }, bounds), false);
-  assert.equal(isOverMappedArea({ ...INITIAL_CITY_CAMERA, x: Number.NaN }, bounds), false);
+  assert.equal(isOverMappedArea({ ...INITIAL_CITY_CAMERA, yaw: 0, x: 2000, z: 2000 }, bounds), false);
+  assert.equal(isOverMappedArea({ ...INITIAL_CITY_CAMERA, yaw: 0, x: Number.NaN }, bounds), false);
 });
 
 test('first-frame signal fires once, after update, and passes updates through', async () => {

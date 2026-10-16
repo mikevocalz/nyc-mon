@@ -2,10 +2,11 @@
 // identity (ThreeCanvas rebuilds the renderer whenever `load` changes), and a
 // dynamic import so three.js and the scene stay out of the first chunk.
 //
-// PR #30's createCityScene is used unchanged. This wrapper only adds a
-// first-frame signal: ThreeCanvas calls update() and then renders in the same
-// synchronous draw, so a macrotask queued from the first update runs after
-// that render either succeeded or flipped the canvas to its failed state.
+// createCityScene (the Harlem world plus any actors in params) is used as
+// is. This wrapper only adds a first-frame signal: ThreeCanvas calls
+// update() and then renders in the same synchronous draw, so a macrotask
+// queued from the first update runs after that render either succeeded or
+// flipped the canvas to its failed state.
 // That is "frame submitted", NOT "nonblack pixels on glass"; PR #29's device
 // gate still needs a capture from physical hardware.
 import type { ThreeSetup } from '@acme/ui/three';

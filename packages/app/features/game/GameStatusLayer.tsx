@@ -52,8 +52,8 @@ export function GameStatusLayer({ state, rect, region }: { state: GameViewState;
       action: <Button district="harlem" title="Try again" onPress={gameScreenActions.retry} />,
     },
     unsupported: {
-      title: 'This device can’t show the 3D city',
-      description: 'The Game world needs WebGPU, which this device doesn’t offer. Your Mon and H-Lynk care still work.',
+      title: 'This H-Lynk can’t show the 3D city',
+      description: 'The Game world needs WebGPU, which this H-Lynk doesn’t offer. Your Mon and H-Lynk care still work.',
       action: null,
     },
   }[state];

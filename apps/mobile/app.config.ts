@@ -21,6 +21,15 @@ const config: ExpoConfig & { newArchEnabled: true } = {
   ios: {
     bundleIdentifier: 'com.nycmon.app',
     supportsTablet: true,
+    infoPlist: {
+      // Profiles the app handles. Every supported pad (Xbox, DualShock 4, DualSense,
+      // Switch Pro, Joy-Con pair, MFi) presents ExtendedGamepad; DirectionalGamepad
+      // covers d-pad-only MFi remotes. No MicroGamepad: the Siri Remote is not a game controller here.
+      GCSupportedGameControllers: [{ ProfileName: 'ExtendedGamepad' }, { ProfileName: 'DirectionalGamepad' }],
+      // false: the pad drives gameplay, not UIKit focus. true would let Start/A move and
+      // activate focus in the React Native view tree.
+      GCSupportsControllerUserInteraction: false,
+    },
   },
   android: {
     package: 'com.nycmon.app',
@@ -35,6 +44,9 @@ const config: ExpoConfig & { newArchEnabled: true } = {
     favicon: './assets/images/favicon.png',
   },
   plugins: [
+    // First in the list so it runs after expo-horizon-core, whose manifest
+    // plugin rebuilds `uses-feature` (docs/implementation/hardware-input.md §5).
+    './plugins/with-optional-gamepad',
     'expo-router',
     // Quest and PICO run Android 12+; Skia v3 (Graphite) needs 26+, and Meta's
     // layout library and react-native-webgpu's AHardwareBuffer use need 29.

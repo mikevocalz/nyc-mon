@@ -64,6 +64,8 @@ const config: StorybookConfig = {
   stories: [
     '../../../packages/ui/*.stories.@(ts|tsx)',
     '../../../packages/ui/primitives/*.stories.@(ts|tsx)',
+    '../../../packages/ui/game-controls/**/*.stories.@(ts|tsx)',
+    '../../../packages/ui/lobby/**/*.stories.@(ts|tsx)',
     // packages/app has no stories yet, and Storybook warns on every pattern
     // that matches nothing. Re-add this line when the first feature story
     // lands (features live at packages/app/features/<name>/, so the glob
