@@ -156,3 +156,17 @@ adb logcat -s ReactNativeJS:V | grep -E "ThreeCanvas|GameRender|Worklets"
 `--clear` is required on every switch. Check in the log that no `renderThread="worklet" fell back` warning appears; that warning means Bundle Mode was off and the run measured the JS path. A release comparison needs a release build made with the variable set in the environment, since Metro inlines `EXPO_PUBLIC_*` at bundle time.
 
 Watch for: a black canvas after START (context or present on the runtime), Reanimated or gesture worklets throwing (Bundle Mode side effects), and the load bar stuck at 75 (`compileAsync` on the runtime).
+
+## Device result, 2026-10-16 (Surface Duo, mobileDebug dev client)
+
+Worklet mode does not start yet. Two failures, in order:
+
+1. First bundle request: Metro `Failed to get the SHA-1` for `react-native-worklets/.worklets/<hash>.js`. Bundle Mode writes these files during transform, before Metro's file map has seen them. A reload after the files exist gets past it. 1,290 files were generated.
+2. Startup: `[runtime not ready]: TypeError: Cannot convert undefined value to object` in uniwind's `copyComponentProperties`, reached from `get Image`. In Bundle Mode a worklet runtime evaluates the whole bundle. Uniwind's component wrappers run there too, and on a worklet runtime the `react-native` component exports they copy statics from are undefined.
+
+So the blocker is Uniwind's module-scope component wrapping, not the render code. Options:
+- keep Uniwind modules off worklet runtimes;
+- lazy-load the wrappers on the RN runtime only;
+- or ask upstream (worklets / uniwind) for a guard.
+
+Until one of those lands, the flag stays off and the JS path is the only supported mode.
