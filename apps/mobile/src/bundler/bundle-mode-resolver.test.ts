@@ -45,7 +45,10 @@ function loadConfig(flag: string | undefined) {
   const configPath = appRequire.resolve('./metro.config.js');
   delete appRequire.cache[configPath];
   try {
-    return appRequire(configPath) as { resolver: { resolveRequest: (c: Context, name: string, platform: string) => Resolution } };
+    return appRequire(configPath) as {
+      resolver: { resolveRequest: (c: Context, name: string, platform: string) => Resolution };
+      server: { rewriteRequestUrl: (url: string) => string };
+    };
   } finally {
     if (previous === undefined) delete process.env.EXPO_PUBLIC_WORKLET_RENDER;
     else process.env.EXPO_PUBLIC_WORKLET_RENDER = previous;
@@ -89,4 +92,24 @@ test('the Metro that Expo runs skips the file map for .worklets files, only unde
   assert.match(graph, /if \(workletsBundleMode && mixedPath\.includes\(workletsDirPath\)\)/, `unpatched Metro at ${metroRoot}`);
   // Off unless the worklet render flag is set for the Metro process.
   assert.match(graph, /const workletsBundleMode = \/\^\(1\|true\|worklet\)\$\/i\.test\(/);
+});
+
+// The dev client's bundle URL, as the Expo manifest served it on 2026-10-16.
+const DEV_BUNDLE_URL =
+  'http://127.0.0.1:8081/apps/mobile/index.bundle?platform=android&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.bytecode=1&transform.routerRoot=app&transform.reactCompiler=true&unstable_transformProfile=hermes-stable';
+
+test('in worklet mode Metro serves eager bundles, so import() targets reach worklet runtimes', () => {
+  // Worklet runtimes evaluate only the bundle the app downloaded. With lazy=true
+  // the render host (an import() in render-thread-choice.ts) and its worklets
+  // sit in a chunk only the RN runtime fetches: "Unable to resolve worklet with hash".
+  const { server } = loadConfig('1');
+  const rewritten = server.rewriteRequestUrl(DEV_BUNDLE_URL);
+  assert.equal(rewritten, DEV_BUNDLE_URL.replace('lazy=true', 'lazy=false'));
+  assert.equal(server.rewriteRequestUrl('/index.bundle?lazy=true'), '/index.bundle?lazy=false');
+  assert.equal(server.rewriteRequestUrl('/index.bundle?platform=android&lazy=false'), '/index.bundle?platform=android&lazy=false');
+});
+
+test('with the flag unset bundle URLs keep lazy=true', () => {
+  const { server } = loadConfig(undefined);
+  assert.equal(server.rewriteRequestUrl(DEV_BUNDLE_URL), DEV_BUNDLE_URL);
 });
