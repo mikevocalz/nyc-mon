@@ -146,7 +146,7 @@ const config: StorybookConfig = {
         // (lazy require behind Platform.OS === 'android'); give web a no-op.
         {
           find: /^.*\/fabric\/NativeSvgSoundModule(\.js)?$/,
-          replacement: resolve(here, './svg-sound-module.web.ts'),
+          replacement: resolve(here, '../../../packages/config/vite/svg-sound-module.web.ts'),
         },
         { find: /^@legendapp\/motion$/, replacement: legendMotionEsm },
         {
