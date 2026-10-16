@@ -20,6 +20,16 @@ import { useEffect, useRef } from 'react';
 import { Fit, RiveView, Semantics, useViewModelInstance, type RiveError, type RiveViewRef } from '@rive-app/react-native';
 import { createArcadeRiveBinding, type ArcadeRiveBinding } from './rive-binding.ts';
 import { riveDiagnosticsStore } from './rive-diagnostics.ts';
+
+/**
+ * How long a control keeps playing after its last view model write. The
+ * longest authored timeline is 18 frames (0.3 s, start-stop `Pulse`); this is
+ * twice that. Past it the view is paused, so the Android render loop stops
+ * drawing: rive-android only stops on `paused`, and the settle signal never
+ * reached our handles (Surface Duo, 2026-10-16: four idle controls kept the UI
+ * thread at about 30–44 ms a frame). The next write's `playIfNeeded()` resumes it.
+ */
+export const RIVE_QUIET_MS = 600;
 import type { ArcadeRiveSurfaceProps } from './ArcadeRiveSurface.types.ts';
 
 export function ArcadeRiveSurface({ riveFile, artboardName, stateMachineName, onBinding, diagnosticsName, style }: ArcadeRiveSurfaceProps) {
@@ -30,6 +40,18 @@ export function ArcadeRiveSurface({ riveFile, artboardName, stateMachineName, on
   // events, play() or playIfNeeded()). Every write that changed a value calls
   // playIfNeeded so the stick rings, cap states and pill keep animating.
   const view = useRef<RiveViewRef | null>(null);
+  const quiet = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const parkLater = () => {
+    if (quiet.current) clearTimeout(quiet.current);
+    quiet.current = setTimeout(() => {
+      quiet.current = null;
+      const ref = view.current as { pause?: () => Promise<void> } | null;
+      if (typeof ref?.pause === 'function') void ref.pause();
+    }, RIVE_QUIET_MS);
+  };
+  useEffect(() => () => {
+    if (quiet.current) clearTimeout(quiet.current);
+  }, []);
   const surface = `arcade:${diagnosticsName ?? artboardName ?? 'arcade'}`;
 
   useEffect(() => {
@@ -44,10 +66,13 @@ export function ArcadeRiveSurface({ riveFile, artboardName, stateMachineName, on
         const ref = view.current as { playIfNeeded?: () => void; play?: () => void } | null;
         if (typeof ref?.playIfNeeded === 'function') ref.playIfNeeded();
         else if (typeof ref?.play === 'function') ref.play();
+        parkLater();
       },
     });
     binding.current = created;
     onBinding(created);
+    // The first pose plays in, then the view parks until a write.
+    parkLater();
     return () => {
       created.dispose();
       binding.current = null;
