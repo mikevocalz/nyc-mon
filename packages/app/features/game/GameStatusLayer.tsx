@@ -2,6 +2,7 @@
 // happened and what to do; none apologise. "No data" (empty) and "couldn't
 // draw" (render-error) are different sentences (product-decisions §2).
 import { Banner, Button, EmptyState } from '@acme/ui';
+import { LOBBY_COPY } from '@acme/ui/lobby';
 import { ProgressBar } from '@acme/ui/progress';
 import { useStore } from 'zustand';
 import { View } from '@acme/ui/tw';
@@ -82,8 +83,8 @@ function WorldLoader() {
           district="harlem"
           size="lg"
           showLabel
-          label={`Building ${BUNDLED_CITY_NAME}`}
-          accessibilityLabel={`Loading ${BUNDLED_CITY_NAME}`}
+          label={LOBBY_COPY.startLoading}
+          accessibilityLabel={LOBBY_COPY.startLoadingA11y}
         />
       </View>
     </View>

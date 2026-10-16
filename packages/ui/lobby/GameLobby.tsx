@@ -309,7 +309,8 @@ export function GameLobby({
           }
         />
       ) : null}
-      <GameTransition phase={transitionPhase} reducedMotion={reducedMotion} scheme={scheme} rive={rive?.transition} progress={loadProgress} progressLabel={LOBBY_COPY.startLoading} testID={testID ? `${testID}-transition` : undefined} />
+      <GameTransition phase={transitionPhase} reducedMotion={reducedMotion} scheme={scheme} rive={rive?.transition} progress={loadProgress} progressLabel={LOBBY_COPY.startLoading}
+        progressA11yLabel={LOBBY_COPY.startLoadingA11y} testID={testID ? `${testID}-transition` : undefined} />
     </SafeArea>
   );
 }

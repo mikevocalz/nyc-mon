@@ -31,6 +31,8 @@ export interface GameTransitionProps {
   readonly progress?: number;
   /** What is loading, for the bar's label and screen readers. @default 'Loading' */
   readonly progressLabel?: string;
+  /** Spoken label for the bar when `progressLabel` carries emoji. @default progressLabel */
+  readonly progressA11yLabel?: string;
   readonly testID?: string;
 }
 
@@ -40,7 +42,7 @@ export interface GameTransitionProps {
  *
  * @see {@linkcode GameTransitionProps}
  */
-export function GameTransition({ phase, reducedMotion, scheme = 'night', rive, progress, progressLabel = 'Loading', testID }: GameTransitionProps) {
+export function GameTransition({ phase, reducedMotion, scheme = 'night', rive, progress, progressLabel = 'Loading', progressA11yLabel, testID }: GameTransitionProps) {
   const binding = useLobbyRiveBinding((b) => {
     b.setTransitionPhase(phase);
     b.setTheme(scheme);
@@ -75,7 +77,7 @@ export function GameTransition({ phase, reducedMotion, scheme = 'night', rive, p
               <Text className={`text-sm font-semibold ${scheme === 'night' ? 'text-ink-50' : 'text-ink-950'}`}>{progressLabel}</Text>
               <Text className={`font-display text-sm ${scheme === 'night' ? 'text-ink-50' : 'text-ink-950'}`}>{percentLabel(progressFraction(progress, 100))}</Text>
             </View>
-            <ProgressBar value={progress} district="harlem" size="lg" accessibilityLabel={progressLabel} />
+            <ProgressBar value={progress} district="harlem" size="lg" accessibilityLabel={progressA11yLabel ?? progressLabel} />
           </View>
         </View>
       ) : null}
