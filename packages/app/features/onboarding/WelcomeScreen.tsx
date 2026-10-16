@@ -16,6 +16,7 @@ import {
 } from '@acme/ui';
 import { Figure, Main, Section } from '@acme/ui/primitives';
 import { View } from '@acme/ui/tw';
+import { ArrangementPanes } from '@acme/ui/arrangement';
 import { NYC_PHOTOS } from '../../../assets/photos';
 import { eggs } from '@acme/content';
 import { announcePolitely } from './announce';
@@ -97,9 +98,10 @@ function CornerCut() {
 }
 
 /** The framed panel visual: a keyed box, corner cut bottom-right, labelled as one image. */
-function PanelFigure({ testID, alt, height, children }: { testID: string; alt: string; height: number; children: React.ReactNode }) {
+function PanelFigure({ testID, alt, height, children }: { testID: string; alt: string; height?: number; children: React.ReactNode }) {
+  // No height: fill the pane (the photo pane beside the copy on a spanned foldable).
   return (
-    <View className="w-full" style={{ height }}>
+    <View className={height === undefined ? 'w-full flex-1' : 'w-full'} style={height === undefined ? undefined : { height }}>
       <Figure aria-label={alt} className="h-full w-full">
         <View
           testID={testID}
@@ -257,11 +259,12 @@ export function WelcomeScreen({ offline = false }: WelcomeScreenProps) {
 
   const pageLabel = copy('m02.progress.a11y', { n: page + 1 });
   const atLast = page === LAST;
+  const CurrentArt = ART[page] ?? CityArt;
+  const current = PANELS[page] ?? PANELS[0]!;
 
-  return (
-    <Main className="flex-1 bg-bg" testID="m02-main">
-      <SafeArea className="flex-1" edges={['top', 'bottom']}>
-        <Container width="full" className="flex-1">
+  // One column: Skip, the slider, the actions. `withFigure` false is the copy
+  // pane of a spanned foldable, whose photo sits in the left pane instead.
+  const column = (withFigure: boolean) => (
           <View className="mx-auto w-full max-w-[560px] flex-1 px-4">
             {/* Skip: top-right, 16 pt in — hidden on panel 3 (nothing to skip to). */}
             <View className="h-14 flex-row items-center justify-end pt-1">
@@ -321,9 +324,11 @@ export function WelcomeScreen({ offline = false }: WelcomeScreenProps) {
                         {copy(panel.bodyId)}
                       </Text>
                     </View>
-                    <PanelFigure testID={`m02-p${panel.n}-image`} alt={copy(panel.altId)} height={figureHeight}>
-                      <Art />
-                    </PanelFigure>
+                    {withFigure ? (
+                      <PanelFigure testID={`m02-p${panel.n}-image`} alt={copy(panel.altId)} height={figureHeight}>
+                        <Art />
+                      </PanelFigure>
+                    ) : null}
                   </Section>
                 );
               })}
@@ -375,6 +380,31 @@ export function WelcomeScreen({ offline = false }: WelcomeScreenProps) {
               )}
             </View>
           </View>
+  );
+
+  // Across a fold or on a regular-width window (foldable skill §9): the photo
+  // in the left pane, the copy, progress and actions centred in the right.
+  // The panel's own photo follows `page`, so swiping the copy turns both.
+  return (
+    <Main className="flex-1 bg-bg" testID="m02-main">
+      <SafeArea className="flex-1" edges={['top', 'bottom']}>
+        <Container width="full" className="flex-1">
+          <ArrangementPanes
+            arrangement="split"
+            primarySide="right"
+            testID="m02-arrangement"
+            primary={(paired) => (paired ? <View className="flex-1 justify-center">{column(false)}</View> : column(true))}
+            secondary={(shown) =>
+              shown ? (
+                <View className="flex-1 px-4 py-6">
+                  <PanelFigure testID={`m02-p${current.n}-image`} alt={copy(current.altId)}>
+                    <CurrentArt />
+                  </PanelFigure>
+                </View>
+              ) : null
+            }
+            fallback={() => column(true)}
+          />
         </Container>
       </SafeArea>
     </Main>
