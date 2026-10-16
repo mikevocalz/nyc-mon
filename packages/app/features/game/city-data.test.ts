@@ -44,7 +44,9 @@ test('the real tile bakes to a few finite meshes and disposes without a GPU', ()
     assert.ok(positions.count > 0, object.name);
     for (const value of positions.array as Float32Array) assert.ok(Number.isFinite(value), object.name);
   });
-  assert.ok(meshes <= 16, `draw calls stay flat: ${meshes} meshes`);
+  // 13 city and tree meshes plus 7 for neon, billboards and street furniture (2026-10-16).
+  // Triangles, not draw calls, bound the Duo: world/budget.test.ts holds those under 200k.
+  assert.ok(meshes <= 22, `draw calls stay flat: ${meshes} meshes`);
   built.dispose!(); assert.equal(built.scene.children.length, 0);
 });
 

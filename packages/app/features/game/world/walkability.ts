@@ -6,8 +6,11 @@
 //   blocked  everything else (back yards and unmapped lots inside blocks),
 //            and anywhere outside the tile
 // Ground is flat today: the tile carries no elevation, so height is 0.
-import type { CityDatasetV2, FlatPoints } from '../city-dataset.ts';
+import type { CityDatasetV2, FlatPoints, RoadClass } from '../city-dataset.ts';
 import { pairs, pointInRing, segmentDistanceSq } from './geometry.ts';
+
+/** Roads the road mesh draws as sidewalk, not carriageway (city-mesh.ts). Everything else, crossings included, is carriageway. */
+export const WALKWAY_CLASSES: ReadonlySet<RoadClass> = new Set(['footway', 'sidewalk', 'cycleway', 'pedestrian']);
 
 /** Half the Caller's shoulder width, metres: the figure stops this far from a wall. */
 export const BODY_RADIUS = 0.3;
@@ -98,4 +101,114 @@ export function createWalkQueries(dataset: CityDatasetV2): WalkQueries {
   };
   const groundHeight = (x: number, z: number): number => (Number.isFinite(x) && Number.isFinite(z) ? 0 : Number.NaN);
   return { isWalkable, groundHeight };
+}
+
+// ---- Street clearance: where furniture may stand ---------------------------
+//
+// One check for every tree, pole and sign. A carriageway is each road
+// segment's centreline buffered by the half width the road mesh draws
+// (`widthMeters / 2`; crossings are strips of their own width), plus a
+// kerb margin. Sidewalk furniture stands in the band from KERB + 0.5 m to
+// KERB + sidewalk width - 0.3 m. Most Harlem streets map their sidewalks as
+// separate ways (`sidewalkMeters` 0), so the band then assumes
+// ASSUMED_SIDEWALK.
+
+/** Margin past the painted carriageway edge that still counts as street. */
+export const KERB_MARGIN = 0.3;
+/** Sidewalk band, metres past the kerb: inner edge, and the gap kept from the band's outer edge. */
+export const BAND_INNER = 0.5;
+export const BAND_OUTER_GAP = 0.3;
+/** Sidewalk width assumed where OSM maps the sidewalk as its own way. */
+export const ASSUMED_SIDEWALK = 3;
+/** How far past a carriageway the clearance grid looks (crown overhang queries reach this far). */
+const LOOK = 6;
+
+interface Carriageway { ax: number; az: number; bx: number; bz: number; half: number; sidewalk: number }
+
+export interface StreetClearance {
+  /**
+   * Distance from (x, z) to the nearest carriageway edge, metres: negative
+   * inside the painted carriageway, Infinity when none is within 6 m.
+   */
+  kerbGap(x: number, z: number): number;
+  /** Inside a carriageway or crossing buffer (half width + `margin`). */
+  inCarriageway(x: number, z: number, margin?: number): boolean;
+  /** Inside a building footprint grown by `pad`. */
+  inBuilding(x: number, z: number, pad?: number): boolean;
+  /** Clear of every carriageway buffer and every building: a base may stand here. */
+  standable(x: number, z: number): boolean;
+  /**
+   * For a base inside a carriageway: the nearest point in a sidewalk band
+   * (just past BAND_INNER) that is standable and within `maxMove` metres,
+   * else null. A standable base comes back unchanged.
+   */
+  toSidewalk(x: number, z: number, maxMove: number): [number, number] | null;
+}
+
+export function createStreetClearance(dataset: CityDatasetV2): StreetClearance {
+  const roads = new Grid<Carriageway>();
+  const buildings = new Grid<Polygon>();
+  for (const b of dataset.buildings) {
+    const p = polygon(b.ring, b.holes);
+    buildings.add(p, p.minX - 1, p.minZ - 1, p.maxX + 1, p.maxZ + 1);
+  }
+  for (const r of dataset.roads) {
+    if (WALKWAY_CLASSES.has(r.class)) continue;
+    const half = r.widthMeters / 2;
+    const sidewalk = r.sidewalkMeters > 0 ? r.sidewalkMeters : ASSUMED_SIDEWALK;
+    for (let i = 2; i < r.points.length; i += 2) {
+      const c = { ax: r.points[i - 2]!, az: r.points[i - 1]!, bx: r.points[i]!, bz: r.points[i + 1]!, half, sidewalk };
+      const pad = half + LOOK;
+      roads.add(c, Math.min(c.ax, c.bx) - pad, Math.min(c.az, c.bz) - pad, Math.max(c.ax, c.bx) + pad, Math.max(c.az, c.bz) + pad);
+    }
+  }
+  const kerbGap = (x: number, z: number) => {
+    let gap = Infinity;
+    for (const c of roads.at(x, z)) {
+      const g = Math.sqrt(segmentDistanceSq(x, z, c.ax, c.az, c.bx, c.bz)) - c.half;
+      if (g < gap) gap = g;
+    }
+    return gap;
+  };
+  const inCarriageway = (x: number, z: number, margin = KERB_MARGIN) => kerbGap(x, z) < margin;
+  const inBuilding = (x: number, z: number, pad = 0.2) => {
+    for (const b of buildings.at(x, z)) if (contains(b, x, z, pad)) return true;
+    // `contains` takes the pad on the bounding box only; test the rim too.
+    if (pad > 0) {
+      for (const [ox, oz] of [[pad, 0], [-pad, 0], [0, pad], [0, -pad]] as const) {
+        for (const b of buildings.at(x + ox, z + oz)) if (contains(b, x + ox, z + oz)) return true;
+      }
+    }
+    return false;
+  };
+  const standable = (x: number, z: number) => Number.isFinite(x) && Number.isFinite(z) && !inCarriageway(x, z) && !inBuilding(x, z);
+  const toSidewalk = (x: number, z: number, maxMove: number): [number, number] | null => {
+    if (standable(x, z)) return [x, z];
+    // Candidates: off every nearby carriageway the point is in, to either side, just inside its sidewalk band.
+    let best: [number, number] | null = null;
+    let bestMove = Infinity;
+    for (const c of roads.at(x, z)) {
+      const dx = c.bx - c.ax; const dz = c.bz - c.az;
+      const len2 = dx * dx + dz * dz;
+      if (len2 < 1e-9) continue;
+      const t = Math.max(0, Math.min(1, ((x - c.ax) * dx + (z - c.az) * dz) / len2));
+      const fx = c.ax + dx * t; const fz = c.az + dz * t;
+      const len = Math.sqrt(len2);
+      let nx = x - fx; let nz = z - fz;
+      const nl = Math.hypot(nx, nz);
+      if (nl < 1e-6) { nx = -dz / len; nz = dx / len; } else { nx /= nl; nz /= nl; }
+      if (nl >= c.half + KERB_MARGIN) continue;
+      const reach = c.half + BAND_INNER + 0.2;
+      if (reach > c.half + c.sidewalk - BAND_OUTER_GAP) continue;
+      for (const side of [1, -1]) {
+        const px = fx + nx * side * reach; const pz = fz + nz * side * reach;
+        const move = Math.hypot(px - x, pz - z);
+        if (move > maxMove || move >= bestMove || !standable(px, pz)) continue;
+        best = [px, pz];
+        bestMove = move;
+      }
+    }
+    return best;
+  };
+  return { kerbGap, inCarriageway, inBuilding, standable, toSidewalk };
 }

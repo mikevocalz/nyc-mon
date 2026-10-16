@@ -20,12 +20,25 @@ import type { Three } from '@acme/ui/three';
 import { createCelMaterial, createCelRig, type CelMaterialOptions, type CelRig } from '@acme/ui/three/cel';
 import { cityCelRig } from './cel-rig.ts';
 import { CITY_COLORS, type CityColor } from './palette.ts';
+import { WINDOW_GRID } from './windows.ts';
+import type { Node } from 'three/webgpu';
 
 type Mat = InstanceType<Three['Material']>;
 type CelSurface = Omit<CelMaterialOptions, 'rig' | 'albedo' | 'rim'>;
 
 /** Instance colour for the tree crowns, read into the albedo (instanceColor would tint after the lighting). */
 export const TONE_ATTRIBUTE = 'instanceTone';
+
+/**
+ * Light added after the cel colour. NodeMaterial.setupLighting adds
+ * `emissiveNode` to the outgoing light of every node material, the unlit
+ * basic one included (three r186 NodeMaterial.js), so the glow sits on top
+ * of the cel bands instead of being banded by them; fog still applies after.
+ * Only MeshStandardNodeMaterial declares the field in the types.
+ */
+function setEmissive(material: InstanceType<Three['MeshBasicNodeMaterial']>, node: Node): void {
+  (material as unknown as { emissiveNode: Node }).emissiveNode = node;
+}
 
 export function linearColor(THREE: Three, key: CityColor): InstanceType<Three['Color']> {
   return new THREE.Color().setStyle(CITY_COLORS[key], THREE.LinearSRGBColorSpace);
@@ -45,38 +58,68 @@ export function createCityMaterials(THREE: Three, sunDirection: readonly [number
   const cel = (albedo: CelMaterialOptions['albedo'], rim: number, surface: CelSurface = {}) =>
     createCelMaterial(THREE, { rig, albedo, rim, ...surface });
 
-  // Sky dome: horizon to zenith, a warm glow towards the sun, fog colour below the horizon.
+  // Sky dome at dusk: dusty rose at the horizon through royal to brand night overhead,
+  // a warm glow around the low sun, fog colour below the horizon.
   const sky = new THREE.MeshBasicNodeMaterial({ side: THREE.BackSide, depthWrite: false, depthTest: false, fog: false });
   {
     const dir = T.normalize(T.positionLocal);
-    const up = T.smoothstep(0, 0.55, dir.y);
+    const low = T.smoothstep(0, 0.22, dir.y);
+    const high = T.smoothstep(0.18, 0.75, dir.y);
     const sun = T.vec3(sunDirection[0], sunDirection[1], sunDirection[2]).normalize();
-    const glow = T.pow(T.max(T.dot(dir, sun), 0), 6).mul(0.45);
-    const base = T.mix(c('skyHorizon'), c('skyZenith'), up);
+    const glow = T.pow(T.max(T.dot(dir, sun), 0), 5).mul(0.6);
+    const base = T.mix(T.mix(c('skyHorizon'), c('skyMid'), low), c('skyZenith'), high);
     sky.colorNode = T.mix(base, c('sunGlow'), glow);
   }
 
-  // Facades: floors of windows and a shopfront band, from wall uv (u = metres along, v = metres up).
-  const facade = (floor: number, bay: number, glassy: boolean) => {
+  // Facades: floors of windows and a shopfront band, from wall uv (u = metres
+  // along, v = metres up). Lit windows glow after the cel lighting
+  // (emissiveNode adds to the cel output), so the bands stay intact under
+  // them. The pattern is windows.ts, the same hash and density per window.
+  const facade = (grid: { floor: number; bay: number }, glassy: boolean) => {
     const u = T.uv().x;
     const v = T.uv().y;
-    const fy = T.fract(v.div(floor));
-    const fx = T.fract(u.div(bay));
+    const fy = T.fract(v.div(grid.floor));
+    const fx = T.fract(u.div(grid.bay));
     const upper = T.step(3.6, v);
     const pane = T.step(0.32, fy).mul(T.step(fy, 0.82)).mul(T.step(glassy ? 0.08 : 0.26, fx)).mul(T.step(fx, glassy ? 0.92 : 0.74)).mul(upper);
     const shop = T.step(0.4, v).mul(T.step(v, 3.1)).mul(glassy ? 0.5 : 0.65);
     const window = c('window');
     const patterned = T.mix(T.mix(vertexRgb, window, pane.mul(glassy ? 0.7 : 0.82)), window, shop);
     const average = T.mix(vertexRgb, window, glassy ? 0.35 : 0.18);
-    return cel(T.mix(average, patterned, detail(260, 700)), 1);
+    const near = detail(260, 700);
+    const material = cel(T.mix(average, patterned, near), 1);
+    // Per-building seed from the wall colour (each wall varies by a hash of its id).
+    const seed = T.fract(vertexRgb.x.mul(13.7).add(vertexRgb.y.mul(7.3))).mul(100);
+    const column = T.floor(u.div(grid.bay));
+    const row = T.floor(v.div(grid.floor));
+    const hash = (a: typeof column, b: typeof column) => T.fract(T.sin(a.mul(12.9898).add(b.mul(78.233)).add(seed.mul(37.719))).mul(43758.5453));
+    const density = T.float(0.25).add(T.fract(T.sin(seed.mul(7.31).mul(12.9898).add(3.7 * 78.233).add(1.13 * 37.719)).mul(43758.5453)).mul(0.5));
+    const lit = T.step(hash(column, row), density).mul(T.step(1, row));
+    const toneHash = hash(column.add(17.1), row.add(3.3));
+    const tone = T.mix(T.mix(c('windowWarm'), c('windowAmber'), T.step(0.55, toneHash)), c('windowCool'), T.step(0.85, toneHash));
+    const glowNear = tone.mul(pane.mul(lit).mul(glassy ? 0.75 : 0.85));
+    // Far off the panes are sub-pixel: glow at the average lit share instead of shimmering.
+    const glowFar = tone.mul(density.mul(glassy ? 0.3 : 0.22));
+    setEmissive(material, T.mix(glowFar, glowNear, near));
+    return material;
   };
-  const masonry = facade(3.2, 3.0, false);
-  const glass = facade(3.6, 1.6, true);
+  const masonry = facade(WINDOW_GRID.masonry, false);
+  const glass = facade(WINDOW_GRID.glass, true);
 
   const roofs = cel(vertexRgb, 1);
 
   // Unlit, vertex coloured: marquee, sign and rooftop bands stay bright in any light.
   const accents = new THREE.MeshBasicNodeMaterial({ vertexColors: true });
+  // Neon rooflines and storefront bands: unlit brand colour, fogged with distance like everything else.
+  const neon = new THREE.MeshBasicNodeMaterial({ vertexColors: true });
+  // LED billboards: the vertex gradient behind horizontal scan lines and a dot pitch, both fading out with distance.
+  const billboards = new THREE.MeshBasicNodeMaterial();
+  {
+    const lines = T.step(0.35, T.fract(T.uv().y.mul(5)));
+    const dots = T.step(0.25, T.fract(T.uv().x.mul(5)));
+    const pattern = T.mix(T.float(0.82), T.float(0.62).add(lines.mul(dots).mul(0.38)), detail(60, 220));
+    billboards.colorNode = T.vec4(vertexRgb.mul(pattern), 1);
+  }
 
   const flat = (offset: number) => cel(vertexRgb, 0, {
     side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -offset, polygonOffsetUnits: -offset * 2,
@@ -84,6 +127,15 @@ export function createCityMaterials(THREE: Three, sunDirection: readonly [number
   const ground = cel(c('ground'), 0, { side: THREE.DoubleSide });
   const areas = flat(1);
   const sidewalks = flat(2);
+  // A NeonBlade grid in the sidewalk slabs: thin carolina joints every 1.5 m,
+  // drawn from world position so slabs line up across separate ways, gone
+  // before the lines would alias.
+  {
+    const p = T.positionWorld.xz.div(1.5);
+    const f = T.abs(T.fract(p).sub(0.5));
+    const line = T.smoothstep(0.43, 0.48, T.max(f.x, f.y));
+    setEmissive(sidewalks, c('sidewalkGrid').mul(line.mul(0.32).mul(detail(25, 90))));
+  }
 
   // Asphalt with a double yellow centre line (vertex r = 1), a zebra crossing
   // (vertex g = 1) and a darker gutter; vertex b carries the width / 100.
@@ -99,7 +151,11 @@ export function createCityMaterials(THREE: Three, sunDirection: readonly [number
     const asphalt = T.mix(c('asphalt'), c('shadow'), gutter);
     const lined = T.mix(asphalt, c('laneYellow'), centre.mul(fade));
     const painted = T.mix(lined, c('laneWhite'), zebra.mul(T.mix(T.float(0.35), T.float(1), fade)));
-    return cel(painted, 0, { side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -6 });
+    const material = cel(painted, 0, { side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -6 });
+    // A royal light line along each kerb (not on crossings), like the edge glow of a NeonBlade panel.
+    const kerb = T.float(1).sub(vertexRgb.y).mul(T.step(T.abs(across.sub(width.mul(0.5).sub(0.35))), 0.07));
+    setEmissive(material, c('curbGlow').mul(kerb.mul(0.9).mul(detail(60, 260))));
+    return material;
   })();
 
   // Fake soft contact shadow under every building: a strip around the
@@ -117,9 +173,30 @@ export function createCityMaterials(THREE: Three, sunDirection: readonly [number
 
   const trunks = cel(c('trunk'), 1);
 
-  const all: Mat[] = [sky, masonry, glass, roofs, accents, ground, areas, sidewalks, roads, shadows, trunks];
+  // Street furniture (street-furniture.ts, which also owns the lettering
+  // material and its atlas). Poles are cel lit; the sign blade takes a little
+  // self light, like retroreflective sheeting under headlights; lamp heads are unlit.
+  const poles = cel(c('pole'), 1);
+  const signBlades = cel(c('signGreen'), 1);
+  setEmissive(signBlades, c('signGreen').mul(0.35));
+  const lampHeads = new THREE.MeshBasicNodeMaterial();
+  lampHeads.colorNode = T.vec4(c('lampHead'), 1);
+  // Light pools under the lamps: additive, radial falloff from the disc uv centre.
+  const lampPools = new THREE.MeshBasicNodeMaterial({
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false,
+    polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -8,
+  });
+  {
+    const r = T.uv().sub(0.5).length().mul(2);
+    const fall = T.float(1).sub(T.smoothstep(0, 1, r));
+    // No fog on an additive layer (it would add the haze colour); fade by distance instead.
+    lampPools.colorNode = T.vec4(c('lampHalo').mul(fall.mul(fall).mul(0.32).mul(detail(80, 240))), 1);
+  }
+
+  const all: Mat[] = [sky, masonry, glass, roofs, accents, neon, billboards, ground, areas, sidewalks, roads, shadows, trunks, poles, signBlades, lampHeads, lampPools];
   return {
-    sky, masonry, glass, roofs, accents, ground, areas, sidewalks, roads, shadows, trunks, rig,
+    sky, masonry, glass, roofs, accents, neon, billboards, ground, areas, sidewalks, roads, shadows, trunks,
+    poles, signBlades, lampHeads, lampPools, rig,
     dispose: () => { for (const material of all) material.dispose(); },
   };
 }

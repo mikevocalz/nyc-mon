@@ -197,3 +197,15 @@ Proposed by the M08–M10 design lane, accepted by the lead under the same stand
 - **Decline:** all grants are optional and declining does not stop egg incubation or gameplay. If the Caller leaves during the transition or permission review, the persisted checkpoint resumes M24. Returning installs without a checkpoint are unaffected.
 - **Preserved:** P1 birth-year and guardian-consent ordering; P2's contextual/honest description of the **single local egg-ready notification**; signed-in and restored Caller behavior; permission settings re-entry. M06 remains for re-enabling notifications from the inbox/status.
 - **Implementation:** `packages/app/features/onboarding/PermissionsReviewScreen.tsx`, `permissions-layout.ts`, `onboarding.store.ts`, `packages/app/features/egg/IncubateScreen.tsx` and `docs/COPY_DECK.md`.
+
+## D17 — The Game city is set at dusk, with a near-future layer (2026-10-16)
+
+- **Why:** Mike, testing on the Surface Duo: "why doesn't it look futuristic like the docs say". The brief sets "a near-future, unequal, spectacular New York", the lore says the city "built its futuristic success story" on the cleanup, and `DESIGN_SYSTEM.md` says glow belongs to night. A daylit afternoon gave the neon nowhere to show.
+- **Decision:** the Game world (not the H-Lynk shell or the site, which keep #4 and the clock rig) is fixed at dusk: a low south-west sun, a sky from dusty rose through royal to brand night, and brand-colour light added after the cel shading, so the bands stay. The street grid and the OSM buildings are unchanged; the layer sits on them:
+  - lit windows at a different density per building (warm, amber, a few cool), averaged to a flat glow past about 260 m so they do not shimmer;
+  - neon roofline trims in the brand 400/500 steps, likelier on taller buildings;
+  - lit storefront fascias and LED billboard panels (brand gradients, no logos or lettering) along the primary and secondary avenues and 125th Street;
+  - a carolina joint grid in the sidewalk slabs and a royal light line along each kerb;
+  - LED streetlights with light pools, and NYC street-name blades at named corners.
+- **Not done:** bloom. `react-native-webgpu` renders black through three's output pass (metro-live README; `city-scene.ts` sets linear output with no pass), and `packages/ui/three` has no post-processing to reuse, so glow is emissive colour only. Night, weather and animated billboards stay out: the canvas draws on demand.
+- **Implementation:** `packages/app/features/game/world/` (`palette.ts`, `materials.ts`, `city-mesh.ts`, `windows.ts`, `signage.ts`, `pixel-font.ts`, `street-furniture.ts`); `docs/implementation/city-world.md`.

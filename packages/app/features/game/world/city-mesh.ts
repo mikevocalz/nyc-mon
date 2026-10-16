@@ -7,13 +7,36 @@ import type { Three } from '@acme/ui/three';
 import type { BuildingClass, CityBuilding, CityDatasetV2, CityLandmark, CityRoad, RoadClass } from '../city-dataset.ts';
 import { counterClockwise, hashUnit, mapArea, pairs, ribbon, VertexBuffer } from './geometry.ts';
 import type { CityMaterials } from './materials.ts';
+import { WALKWAY_CLASSES } from './walkability.ts';
 import { CITY_COLORS, hexToRgb, type CityColor } from './palette.ts';
 
 type Point = [number, number];
 type Mesh = InstanceType<Three['Mesh']>;
 
 /** Ground-plane layers, metres. Small enough to vanish next to a 1.8 m Caller; polygon offset does the rest. */
-export const LAYER = { areas: 0.02, sidewalks: 0.04, roads: 0.06, shadows: 0.08 } as const;
+export const LAYER = { areas: 0.02, sidewalks: 0.045, roads: 0.06, crossings: 0.065, shadows: 0.08 } as const;
+/** Area kinds bottom to top: big lawns first so pitches and playgrounds sit on them. */
+export const AREA_ORDER = ['school', 'parking', 'park', 'garden', 'grass', 'plaza', 'pitch', 'playground', 'water'] as const;
+/**
+ * Height of an area kind. Each kind gets its own 2.5 mm step (was 0.01 mm per
+ * area, which no depth buffer resolves past a few metres), all below the
+ * sidewalks.
+ */
+export const AREA_STEP = 0.0025;
+export function areaLayer(kind: string): number {
+  const i = AREA_ORDER.indexOf(kind as (typeof AREA_ORDER)[number]);
+  return LAYER.areas + Math.max(0, i) * AREA_STEP;
+}
+/** Contact shadows draw only in z bands this tall, metres, around the Caller ... */
+export const SHADOW_BAND_METRES = 50;
+/** ... out to this distance north and south of them. */
+export const SHADOW_RADIUS = 160;
+/** The z bands to draw for a focus z: [first, last], inclusive, clamped to the tile. */
+export function shadowBands(focusZ: number, minZ: number, bandCount: number): [number, number] {
+  const first = Math.floor((focusZ - SHADOW_RADIUS - minZ) / SHADOW_BAND_METRES);
+  const last = Math.floor((focusZ + SHADOW_RADIUS - minZ) / SHADOW_BAND_METRES);
+  return [Math.max(0, Math.min(bandCount - 1, first)), Math.max(0, Math.min(bandCount - 1, last))];
+}
 
 const rgb = (key: CityColor) => hexToRgb(CITY_COLORS[key]);
 const tint = (color: readonly number[], amount: number) => color.map((v) => Math.max(0, Math.min(1, v * amount)));
@@ -21,7 +44,6 @@ const tint = (color: readonly number[], amount: number) => color.map((v) => Math
 const WALL_COLOR: Record<BuildingClass, CityColor> = {
   brownstone: 'brownstone', brick: 'brick', glass: 'glass', nycha: 'nycha', church: 'church', civic: 'civic', plain: 'plain',
 };
-const WALKWAY_CLASSES: ReadonlySet<RoadClass> = new Set(['footway', 'sidewalk', 'cycleway', 'pedestrian']);
 const CENTRE_LINE_MIN_WIDTH = 9;
 
 /** Triangulate a ring (with holes) and emit it facing up at height y, counter-clockwise on the map. */
@@ -176,7 +198,30 @@ function landmarkAccents(buffer: VertexBuffer, landmark: CityLandmark, building:
   }
 }
 
-export interface CityMeshStats { buildings: number; roads: number; areas: number; triangles: number; drawCalls: number }
+export interface CityMeshStats { buildings: number; roads: number; areas: number; triangles: number; drawCalls: number; neonTrims: number; storefronts: number; billboards: number }
+
+/** Roads whose frontage gets storefront light bands and billboards: Harlem's commercial avenues and 125th Street. */
+const COMMERCIAL: ReadonlySet<RoadClass> = new Set(['primary', 'secondary', 'trunk']);
+const NEON_KEYS = ['neonOrange', 'neonRoyal', 'neonCarolina', 'neonApple', 'neonLeaf'] as const satisfies readonly CityColor[];
+/** Billboard gradients, top to bottom, all brand pairs. */
+const BILLBOARD_PAIRS = [
+  ['neonOrange', 'neonApple'], ['neonRoyal', 'neonCarolina'], ['neonCarolina', 'neonLeaf'], ['neonApple', 'neonRoyal'], ['neonOrange', 'neonRoyal'],
+] as const satisfies readonly (readonly [CityColor, CityColor])[];
+export const MAX_BILLBOARDS = 48;
+
+/**
+ * Share of buildings of a height that carry a neon roofline trim. Taller
+ * buildings are likelier: the skyline is where the near-future city shows.
+ */
+export function neonTrimShare(heightMeters: number): number {
+  if (heightMeters < 9) return 0;
+  return Math.min(0.85, 0.18 + (heightMeters - 9) * 0.02);
+}
+
+/** Brand neon colour for a building, by a hash of its id. */
+export function neonKeyFor(id: string): (typeof NEON_KEYS)[number] {
+  return NEON_KEYS[Math.floor(hashUnit(`${id}:neon`) * NEON_KEYS.length) % NEON_KEYS.length]!;
+}
 
 export function buildCityMeshes(THREE: Three, dataset: CityDatasetV2, materials: CityMaterials, sunAway: Point) {
   const masonry = new VertexBuffer();
@@ -187,10 +232,31 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV2, materials:
   const sidewalks = new VertexBuffer();
   const roads = new VertexBuffer();
   const accents = new VertexBuffer();
+  const neon = new VertexBuffer();
+  const billboards = new VertexBuffer();
   const landmarkByBuilding = new Map(dataset.landmarks.map((l) => [l.buildingId, l]));
   const shadowColor = rgb('shadow');
+  const commercial = new SegmentGrid(dataset.roads.filter((r) => COMMERCIAL.has(r.class)));
 
-  for (const building of dataset.buildings) {
+  // Buildings in z bands, so the contact shadows of one band are one vertex range (drawn by distance).
+  const minZ = -dataset.extentMeters - SHADOW_BAND_METRES;
+  const bandCount = Math.max(1, Math.ceil((dataset.extentMeters * 2 + SHADOW_BAND_METRES * 2) / SHADOW_BAND_METRES) + 1);
+  const bandOf = (building: CityBuilding) => {
+    let z = 0;
+    const r = building.ring;
+    for (let i = 1; i < r.length; i += 2) z += r[i]!;
+    z /= Math.max(1, r.length / 2);
+    return Math.max(0, Math.min(bandCount - 1, Math.floor((z - minZ) / SHADOW_BAND_METRES)));
+  };
+  const banded = dataset.buildings.map((building) => ({ building, band: bandOf(building) })).sort((x, y) => x.band - y.band);
+  const bandStart = new Int32Array(bandCount + 1);
+  let band = -1;
+  let trims = 0;
+  let fronts = 0;
+  let boards = 0;
+
+  for (const { building, band: buildingBand } of banded) {
+    while (band < buildingBand) bandStart[++band] = shadows.vertexCount;
     const ring = counterClockwise(pairs(building.ring));
     const holes = building.holes.map((hole) => counterClockwise(pairs(hole)).reverse());
     const landmark = landmarkByBuilding.get(building.id);
@@ -204,21 +270,47 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV2, materials:
     const roofColor = tint(rgb('roof').map((v, i) => v * 0.8 + wall[i]! * 0.2), variation);
     emitFlat(THREE, roofs, ring, holes, h, roofColor);
     emitShadow(shadows, ring, Math.max(1.2, Math.min(5, h * 0.12)), sunAway, shadowColor);
-    if (landmark) landmarkAccents(accents, landmark, building, ring, dataset.roads);
-  }
+    if (landmark) { landmarkAccents(accents, landmark, building, ring, dataset.roads); continue; }
 
-  const areaColor: Record<string, CityColor> = {
-    park: 'park', garden: 'garden', grass: 'grass', pitch: 'pitch', playground: 'playground',
-    plaza: 'plaza', parking: 'parking', water: 'water', school: 'school',
-  };
-  // Draw order inside one mesh follows array order at equal depth; put big lawns first so pitches sit on them.
-  const order = ['school', 'parking', 'park', 'garden', 'grass', 'plaza', 'pitch', 'playground', 'water'];
-  const sortedAreas = [...dataset.areas].sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind));
-  sortedAreas.forEach((area, index) => {
+    // The near-future layer: a neon roofline, storefront light bands and the odd billboard.
+    const neonColor = rgb(neonKeyFor(building.id));
+    if (hashUnit(`${building.id}:trim`) < neonTrimShare(h)) {
+      emitWalls(neon, ring, h - 0.32, h - 0.06, neonColor, 0.06);
+      trims++;
+    }
+    for (let i = 0; i < ring.length; i++) {
+      const [ax, az] = ring[i]!;
+      const [bx, bz] = ring[(i + 1) % ring.length]!;
+      const length = Math.hypot(bx - ax, bz - az);
+      if (length < 5 || h < 6) continue;
+      const out = normalOf(ax, az, bx, bz);
+      const mid: Point = [(ax + bx) / 2, (az + bz) / 2];
+      if (commercial.nearest(mid[0] + out[0] * 6, mid[1] + out[1] * 6) > 14) continue;
+      // Storefront band: a lit fascia above the shop windows, inset from the corners.
+      const inset = Math.min(0.8, length * 0.08);
+      const ux = (bx - ax) / length; const uz = (bz - az) / length;
+      const off = 0.12;
+      const [sx, sz] = [ax + ux * inset + out[0] * off, az + uz * inset + out[1] * off];
+      const [ex, ez] = [bx - ux * inset + out[0] * off, bz - uz * inset + out[1] * off];
+      // One quad facing the street (emitWalls on a two-point ring would add a hidden back face).
+      neon.quad([sx, 3.15, sz], [ex, 3.15, ez], [ex, 3.45, ez], [sx, 3.45, sz], [out[0], 0, out[1]], tint(neonColor, 0.95));
+      fronts++;
+      if (boards < MAX_BILLBOARDS && h >= 16 && length >= 8 && hashUnit(`${building.id}:${i}:board`) < 0.4) {
+        const [top, bottom] = BILLBOARD_PAIRS[Math.floor(hashUnit(`${building.id}:pair`) * BILLBOARD_PAIRS.length) % BILLBOARD_PAIRS.length]!;
+        emitBillboard(billboards, mid, out, Math.min(length * 0.55, 9), Math.min(h * 0.32, 7), h - 2.2, rgb(top), rgb(bottom));
+        boards++;
+      }
+    }
+  }
+  while (band < bandCount) bandStart[++band] = shadows.vertexCount;
+
+  // Draw order inside one mesh follows array order at equal depth; each kind also sits on its own step.
+  const sortedAreas = [...dataset.areas].sort((a, b) => areaLayer(a.kind) - areaLayer(b.kind));
+  for (const area of sortedAreas) {
     const ring = counterClockwise(pairs(area.ring));
     const holes = area.holes.map((hole) => pairs(hole));
-    emitFlat(THREE, areas, ring, holes, LAYER.areas + index * 1e-5, rgb(areaColor[area.kind] ?? 'grass'));
-  });
+    emitFlat(THREE, areas, ring, holes, areaLayer(area.kind), rgb(AREA_COLOR[area.kind] ?? 'grass'));
+  }
 
   for (const road of dataset.roads) {
     const points = pairs(road.points);
@@ -230,19 +322,18 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV2, materials:
     if (road.sidewalkMeters > 0) strip(sidewalks, points, road.widthMeters / 2 + road.sidewalkMeters, LAYER.sidewalks, rgb('sidewalk'));
     const zebra = road.class === 'crossing' ? 1 : 0;
     const centre = !zebra && road.widthMeters >= CENTRE_LINE_MIN_WIDTH ? 1 : 0;
-    // Crossings sit a hair above the street they cross.
-    const y = LAYER.roads + (zebra ? 0.005 : 0);
-    strip(roads, points, road.widthMeters / 2, y, [centre, zebra, road.widthMeters / 100]);
+    strip(roads, points, road.widthMeters / 2, zebra ? LAYER.crossings : LAYER.roads, [centre, zebra, road.widthMeters / 100]);
   }
 
   const meshes: Mesh[] = [];
   const add = (name: string, buffer: VertexBuffer, material: InstanceType<Three['Material']>, renderOrder = 0) => {
-    if (buffer.vertexCount === 0) return;
+    if (buffer.vertexCount === 0) return null;
     const mesh = new THREE.Mesh(buffer.toGeometry(THREE), material);
     mesh.name = name;
     mesh.renderOrder = renderOrder;
     mesh.matrixAutoUpdate = false;
     meshes.push(mesh);
+    return mesh;
   };
   add('city:areas', areas, materials.areas);
   add('city:sidewalks', sidewalks, materials.sidewalks);
@@ -251,20 +342,96 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV2, materials:
   add('city:walls-glass', glass, materials.glass);
   add('city:roofs', roofs, materials.roofs);
   add('city:landmarks', accents, materials.accents);
+  add('city:neon', neon, materials.neon);
+  add('city:billboards', billboards, materials.billboards);
   // Transparent, after the opaque city.
-  add('city:contact-shadows', shadows, materials.shadows, 2);
+  const shadowMesh = add('city:contact-shadows', shadows, materials.shadows, 2);
+  // The strip spans the tile; its draw range follows the Caller, so culling by bounds would be wrong.
+  if (shadowMesh) shadowMesh.frustumCulled = false;
 
   const triangles = meshes.reduce((sum, m) => sum + m.geometry.getAttribute('position').count / 3, 0);
   const stats: CityMeshStats = {
     buildings: dataset.buildings.length, roads: dataset.roads.length, areas: dataset.areas.length,
-    triangles, drawCalls: meshes.length,
+    triangles, drawCalls: meshes.length, neonTrims: trims, storefronts: fronts, billboards: boards,
   };
+  let shownBands: [number, number] = [-1, -1];
   return {
     meshes,
     stats,
+    /** Contact shadows only near the focus: a few z bands, one draw range, no allocation. */
+    setFocus(_x: number, z: number) {
+      if (!shadowMesh) return;
+      const [first, last] = shadowBands(z, minZ, bandCount);
+      if (first === shownBands[0] && last === shownBands[1]) return;
+      shownBands = [first, last];
+      const start = bandStart[first]!;
+      shadowMesh.geometry.setDrawRange(start, bandStart[last + 1]! - start);
+    },
     dispose: () => { for (const mesh of meshes) mesh.geometry.dispose(); },
   };
 }
+
+/** An LED panel standing off a facade: gradient top to bottom, uv for the scan lines. */
+function emitBillboard(buffer: VertexBuffer, mid: Point, out: Point, width: number, height: number, top: number, upper: readonly number[], lower: readonly number[]): void {
+  const across: Point = [-out[1], out[0]];
+  const off = 0.3;
+  const hw = width / 2;
+  const cx = mid[0] + out[0] * off; const cz = mid[1] + out[1] * off;
+  const l: Point = [cx - across[0] * hw, cz - across[1] * hw];
+  const r: Point = [cx + across[0] * hw, cz + across[1] * hw];
+  const bottom = top - height;
+  // Counter-clockwise seen from the street: l-bottom, r-bottom, r-top, l-top with `across` to the viewer's right.
+  const corners: [Point, number, readonly number[], number, number][] = [
+    [r, bottom, lower, 0, 0], [l, bottom, lower, 1, 0], [l, top, upper, 1, 1], [r, top, upper, 0, 1],
+  ];
+  for (const k of [0, 1, 2, 0, 2, 3]) {
+    const [[x, z], y, color, u, v] = corners[k]!;
+    buffer.vertex(x, y, z, out[0], 0, out[1], color, u * width, v * height);
+  }
+}
+
+/** Road segments bucketed in 32 m cells, for "how far is the nearest road" from a facade. */
+class SegmentGrid {
+  private readonly cells = new Map<number, number[]>();
+  private static readonly CELL = 32;
+  constructor(roads: readonly CityRoad[]) {
+    for (const road of roads) {
+      const p = road.points;
+      for (let k = 2; k < p.length; k += 2) {
+        const ax = p[k - 2]!; const az = p[k - 1]!; const bx = p[k]!; const bz = p[k + 1]!;
+        const pad = road.widthMeters / 2;
+        const x0 = Math.floor((Math.min(ax, bx) - pad) / SegmentGrid.CELL); const x1 = Math.floor((Math.max(ax, bx) + pad) / SegmentGrid.CELL);
+        const z0 = Math.floor((Math.min(az, bz) - pad) / SegmentGrid.CELL); const z1 = Math.floor((Math.max(az, bz) + pad) / SegmentGrid.CELL);
+        for (let cx = x0; cx <= x1; cx++) for (let cz = z0; cz <= z1; cz++) {
+          const key = cx * 65_536 + cz;
+          let cell = this.cells.get(key);
+          if (!cell) { cell = []; this.cells.set(key, cell); }
+          cell.push(ax, az, bx, bz, pad);
+        }
+      }
+    }
+  }
+
+  /** Distance from (x, z) to the nearest road edge in its cell and the 8 around it; Infinity if none. */
+  nearest(x: number, z: number): number {
+    const cx = Math.floor(x / SegmentGrid.CELL); const cz = Math.floor(z / SegmentGrid.CELL);
+    let best = Infinity;
+    for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
+      const cell = this.cells.get((cx + i) * 65_536 + cz + j);
+      if (!cell) continue;
+      for (let k = 0; k < cell.length; k += 5) {
+        const d = segmentDistance(x, z, cell[k]!, cell[k + 1]!, cell[k + 2]!, cell[k + 3]!) - cell[k + 4]!;
+        if (d < best) best = d;
+      }
+    }
+    return Math.max(0, best);
+  }
+}
+
+const AREA_COLOR: Record<string, CityColor> = {
+  park: 'park', garden: 'garden', grass: 'grass', pitch: 'pitch', playground: 'playground',
+  plaza: 'plaza', parking: 'parking', water: 'water', school: 'school',
+};
 
 /** A flat ribbon along a polyline; u runs across (0..1), v along in metres. */
 function strip(buffer: VertexBuffer, points: Point[], half: number, y: number, color: readonly number[]): void {

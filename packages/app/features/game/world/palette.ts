@@ -5,7 +5,7 @@
 // import, so node tests can pin the values.
 import { palette } from '@acme/theme';
 
-const { orange, royal, carolina, leaf, apple, ink, concrete } = palette;
+const { orange, royal, carolina, leaf, apple, ink, concrete, signage } = palette;
 
 function channels(hex: string): [number, number, number] {
   const value = Number.parseInt(hex.slice(1, 7), 16);
@@ -28,13 +28,14 @@ export function hexToRgb(hex: string): [number, number, number] {
 }
 
 export const CITY_COLORS = {
-  // Sky and air: a warm afternoon over Harlem.
-  skyZenith: mixHex(carolina[400], royal[300], 0.25),
-  skyHorizon: mixHex(carolina[100], orange[50], 0.55),
-  sunGlow: orange[100],
-  sun: orange[50],
-  hemiSky: carolina[100],
-  hemiGround: concrete[400],
+  // Sky and air: dusk over Harlem, the zenith going to brand night, a dusty rose haze at the horizon.
+  skyZenith: mixHex(royal[900], ink[950], 0.35),
+  skyMid: mixHex(royal[600], carolina[700], 0.4),
+  skyHorizon: mixHex(orange[300], royal[300], 0.35),
+  sunGlow: orange[400],
+  sun: orange[200],
+  hemiSky: mixHex(carolina[300], royal[300], 0.4),
+  hemiGround: concrete[500],
   // Ground and land use.
   ground: mixHex(concrete[200], orange[100], 0.25),
   park: mixHex(leaf[400], leaf[500], 0.35),
@@ -72,6 +73,23 @@ export const CITY_COLORS = {
   marqueeLights: orange[200],
   terracotta: concrete[50],
   beacon: royal[400],
+  // The near-future layer: brand neon (the 400 steps where the 500 is too dark to glow), lit windows, street furniture.
+  neonOrange: orange[500],
+  neonRoyal: royal[400],
+  neonCarolina: carolina[400],
+  neonApple: apple[400],
+  neonLeaf: leaf[400],
+  windowWarm: orange[200],
+  windowAmber: orange[300],
+  windowCool: carolina[200],
+  sidewalkGrid: carolina[400],
+  curbGlow: royal[400],
+  // NYC street-name blade: white on green (leaf 800 sits near the MUTCD sign green).
+  signGreen: leaf[800],
+  signText: signage.white,
+  pole: ink[800],
+  lampHead: mixHex(orange[50], carolina[100], 0.5),
+  lampHalo: orange[200],
 } as const;
 
 export type CityColor = keyof typeof CITY_COLORS;

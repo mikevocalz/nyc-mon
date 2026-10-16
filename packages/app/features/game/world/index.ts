@@ -6,17 +6,27 @@
 import type { Three } from '@acme/ui/three';
 import type { CityDatasetV2 } from '../city-dataset.ts';
 import { buildCityMeshes, type CityMeshStats } from './city-mesh.ts';
-import { buildTrees } from './foliage.ts';
+import { buildTrees, type TreeReport } from './foliage.ts';
+import { buildStreetFurniture } from './street-furniture.ts';
+import { createStreetClearance } from './walkability.ts';
 import { createCityMaterials, linearColor } from './materials.ts';
 
-/** Afternoon sun from the south-west, high enough that walls on both sides read. Unit vector, scene axes. */
-const SUN: readonly [number, number, number] = (() => {
-  const v = [-0.45, 0.78, 0.43];
+/**
+ * Dusk sun, low in the south-west (about 25 degrees up): long light on the
+ * west and south walls, the rest of the city in the cel mid band, where the
+ * neon and the lit windows read. Unit vector, scene axes.
+ */
+export const SUN: readonly [number, number, number] = (() => {
+  const v = [-0.62, 0.45, 0.64];
   const l = Math.hypot(v[0]!, v[1]!, v[2]!);
   return [v[0]! / l, v[1]! / l, v[2]! / l] as const;
 })();
 
-export interface CityWorldStats extends CityMeshStats { trees: number }
+export interface CityWorldStats extends CityMeshStats {
+  trees: number; signs: number; streetlights: number;
+  /** Trees the street clearance moved, shrank or dropped. */
+  treeClearance: TreeReport;
+}
 
 export function buildCityWorld(THREE: Three, dataset: CityDatasetV2) {
   const materials = createCityMaterials(THREE, SUN);
@@ -41,17 +51,24 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV2) {
   ground.name = 'city:ground';
 
   const city = buildCityMeshes(THREE, dataset, materials, away);
-  const trees = buildTrees(THREE, dataset, materials);
+  // One street-clearance index for every tree, pole and sign.
+  const clearance = createStreetClearance(dataset);
+  const trees = buildTrees(THREE, dataset, materials, clearance);
+  const furniture = buildStreetFurniture(THREE, dataset, materials, clearance);
 
   const hemi = new THREE.HemisphereLight(linearColor(THREE, 'hemiSky'), linearColor(THREE, 'hemiGround'), 1.6);
   const sun = new THREE.DirectionalLight(linearColor(THREE, 'sun'), 2.2);
   sun.position.set(SUN[0] * 1000, SUN[1] * 1000, SUN[2] * 1000);
-  group.add(ground, ...city.meshes, ...trees.objects, hemi, sun, sun.target);
+  group.add(ground, ...city.meshes, ...trees.objects, ...furniture.objects, hemi, sun, sun.target);
 
   const horizon = linearColor(THREE, 'skyHorizon');
   const fog = new THREE.Fog(horizon, 600, 2500);
 
-  const stats: CityWorldStats = { ...city.stats, trees: trees.count, drawCalls: city.stats.drawCalls + 4 };
+  const stats: CityWorldStats = {
+    ...city.stats, trees: trees.count, signs: furniture.stats.signs, streetlights: furniture.stats.streetlights, treeClearance: trees.report,
+    drawCalls: city.stats.drawCalls + trees.objects.length + furniture.objects.length + 2,
+  };
+  let viewDistance = 220;
   return {
     group,
     sky,
@@ -60,13 +77,25 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV2) {
     stats,
     /** Level of detail and air from the camera's distance to its target, metres. */
     setViewDistance(distance: number, far: number) {
-      trees.setDistance(distance);
+      viewDistance = distance;
+      furniture.setDistance(distance);
       fog.near = distance * 1.4 + 250;
       fog.far = Math.max(fog.near + 400, Math.min(far * 0.9, distance * 5 + 1600));
+    },
+    /**
+     * The Caller (the camera's look-at point). Trees, contact shadows, sign
+     * lettering and light pools draw around it; each refresh is
+     * allocation-free and only runs after it has moved about 10 m.
+     */
+    setFocus(x: number, z: number) {
+      trees.update(x, z, viewDistance);
+      city.setFocus(x, z);
+      furniture.setFocus(x, z);
     },
     dispose() {
       city.dispose();
       trees.dispose();
+      furniture.dispose();
       skyGeometry.dispose();
       groundGeometry.dispose();
       materials.dispose();

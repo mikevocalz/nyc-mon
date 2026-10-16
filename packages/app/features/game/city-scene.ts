@@ -106,6 +106,8 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
       camera.updateProjectionMatrix();
     }
     world.setViewDistance(pose.distance, far);
+    // After the distance: tree LOD reads it.
+    world.setFocus(value.x, value.z);
     world.sky.position.copy(camera.position);
     world.sky.scale.setScalar(far * 0.9);
   }

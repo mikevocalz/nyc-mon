@@ -18,9 +18,11 @@ export function atLuminanceOf(color: Rgb, reference: Rgb, level = 1): [number, n
 /**
  * The key's share of the studio rig's level. Under linear output with no
  * tone mapping, the full studio key plus fills pushes the pale palette steps
- * (plaza, civic, ground) past 1 on sunlit roofs; 0.75 keeps them just under.
+ * (plaza, civic, ground) past 1 on sunlit roofs; 0.75 kept them just under.
+ * At dusk (D17) the key drops to 0.62 so the lit windows and neon, added
+ * after the cel colour, read against the walls.
  */
-export const KEY_LEVEL = 0.75;
+export const KEY_LEVEL = 0.62;
 /** Ramp stand-in (in ramp u): shadow/mid edge at the terminator, mid/lit edge near N.L 0.55, a hair of softening. */
 export const CITY_RAMP = [0.5, 0.68, 0.006] as const;
 export const CITY_BANDS = [0.12, 0.55, 1] as const;
