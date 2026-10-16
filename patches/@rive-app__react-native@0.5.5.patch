@@ -1,8 +1,22 @@
 diff --git a/android/src/new/java/com/rive/RiveReactNativeView.kt b/android/src/new/java/com/rive/RiveReactNativeView.kt
-index 36d0baf4de7e5c480a3179fb733b11f35b643427..a49438a323b9fd1fc2b2243c22dc8b0a67b7e800 100644
+index 36d0baf4de7e5c480a3179fb733b11f35b643427..d73c444465b0aeb2f5767d19281f0cdbba24c0b2 100644
 --- a/android/src/new/java/com/rive/RiveReactNativeView.kt
 +++ b/android/src/new/java/com/rive/RiveReactNativeView.kt
-@@ -206,7 +206,9 @@ class RiveReactNativeView(context: ThemedReactContext) : FrameLayout(context) {
+@@ -169,7 +169,12 @@ class RiveReactNativeView(context: ThemedReactContext) : FrameLayout(context) {
+     override fun doFrame(frameTimeNanos: Long) {
+       if (!renderLoopRunning || disposed) return
+ 
+-      if (paused && !needsRedraw) {
++      // NYC-MON patch: a settled state machine draws nothing new either, so it
++      // skips the draw like a paused one. Without this every settled view
++      // redrew its texture on every vsync forever (four idle game controls held
++      // the Surface Duo's UI thread at ~44 ms a frame). playIfNeeded() and
++      // configure() clear `settled` / set `needsRedraw`, so input still animates.
++      if ((paused || settled) && !needsRedraw) {
+         // Keep the timebase fresh so resuming advances by one frame, not by
+         // the whole pause span.
+         lastFrameTimeNs = frameTimeNanos
+@@ -206,7 +211,9 @@ class RiveReactNativeView(context: ThemedReactContext) : FrameLayout(context) {
            if (!paused && !settled) {
              worker.advanceStateMachine(sm, deltaTime)
            }
