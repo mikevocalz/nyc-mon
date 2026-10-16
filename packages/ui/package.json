@@ -12,6 +12,7 @@
     "./backgrounds/CityBlocks": "./backgrounds/CityBlocks.tsx",
     "./gpu": "./gpu/index.ts",
     "./three": "./three/index.ts",
+    "./three/cel": "./three/cel/index.ts",
     "./neon": "./neon/index.ts",
     "./elements": "./elements/index.ts",
     "./progress": "./progress/index.ts",

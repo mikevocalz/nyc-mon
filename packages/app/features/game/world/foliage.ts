@@ -12,7 +12,7 @@ import type { BufferGeometry } from 'three/webgpu';
 import type { CityDatasetV2 } from '../city-dataset.ts';
 import { LEAF_ALPHA as LEAF } from './leaf-alpha.ts';
 import { mulberry32 } from './geometry.ts';
-import { createFarCrownMaterial, createLeafMaterial, linearColor } from './materials.ts';
+import { createFarCrownMaterial, createLeafMaterial, linearColor, TONE_ATTRIBUTE, type CityMaterials } from './materials.ts';
 
 type Geometry = BufferGeometry;
 
@@ -147,17 +147,17 @@ export function treePlacements(dataset: CityDatasetV2): { x: number; z: number; 
 export const TREE_NEAR_LOD_METRES = 450;
 export const TREE_HIDE_METRES = 1600;
 
-export function buildTrees(THREE: Three, dataset: CityDatasetV2) {
+export function buildTrees(THREE: Three, dataset: CityDatasetV2, materials: Pick<CityMaterials, 'rig' | 'trunks'>) {
   const placements = treePlacements(dataset);
   const count = Math.max(1, placements.length);
   const texture = leafTexture(THREE);
   const crownGeometry = leafCrownGeometry(THREE);
   const farGeometry = new THREE.IcosahedronGeometry(1.15 * CROWN_SCALE, 0).translate(0, 1.5 * CROWN_SCALE, 0);
   const trunkGeometry = new THREE.CylinderGeometry(0.16, 0.24, 2.8, 6).translate(0, 1.4, 0);
-  const leafMaterial = createLeafMaterial(THREE, texture);
-  const farMaterial = createFarCrownMaterial(THREE);
-  const trunkMaterial = new THREE.MeshStandardNodeMaterial({ roughness: 1, metalness: 0 });
-  trunkMaterial.colorNode = THREE.TSL.color(linearColor(THREE, 'trunk'));
+  const leafMaterial = createLeafMaterial(THREE, materials.rig, texture);
+  const farMaterial = createFarCrownMaterial(THREE, materials.rig);
+  // Shared with the city materials, which dispose it.
+  const trunkMaterial = materials.trunks;
   const near = new THREE.InstancedMesh(crownGeometry, leafMaterial, count);
   const far = new THREE.InstancedMesh(farGeometry, farMaterial, count);
   const trunks = new THREE.InstancedMesh(trunkGeometry, trunkMaterial, count);
@@ -172,6 +172,10 @@ export function buildTrees(THREE: Three, dataset: CityDatasetV2) {
   const light = linearColor(THREE, 'leafLight');
   const dark = linearColor(THREE, 'leafDark');
   const tone = new THREE.Color();
+  // One tone per tree, shared by both crown geometries; the cel albedo reads it before lighting.
+  const tones = new THREE.InstancedBufferAttribute(new Float32Array(count * 3), 3);
+  crownGeometry.setAttribute(TONE_ATTRIBUTE, tones);
+  farGeometry.setAttribute(TONE_ATTRIBUTE, tones);
   placements.forEach((tree, i) => {
     rotation.setFromAxisAngle(up, tree.tone * Math.PI * 2);
     position.set(tree.x, 0, tree.z);
@@ -181,13 +185,11 @@ export function buildTrees(THREE: Three, dataset: CityDatasetV2) {
     far.setMatrixAt(i, matrix);
     trunks.setMatrixAt(i, matrix);
     tone.copy(dark).lerp(light, tree.tone);
-    near.setColorAt(i, tone);
-    far.setColorAt(i, tone);
+    tones.setXYZ(i, tone.r, tone.g, tone.b);
   });
   for (const mesh of [near, far, trunks]) {
     mesh.count = placements.length;
     mesh.instanceMatrix.needsUpdate = true;
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     // The batch spans the whole tile; per-instance culling is not worth it at this count.
     mesh.frustumCulled = false;
   }
@@ -204,7 +206,7 @@ export function buildTrees(THREE: Three, dataset: CityDatasetV2) {
     },
     dispose() {
       for (const g of [crownGeometry, farGeometry, trunkGeometry]) g.dispose();
-      for (const m of [leafMaterial, farMaterial, trunkMaterial]) m.dispose();
+      for (const m of [leafMaterial, farMaterial]) m.dispose();
       texture.dispose();
       for (const mesh of [near, far, trunks]) mesh.dispose();
     },

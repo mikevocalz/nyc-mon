@@ -41,7 +41,7 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV2) {
   ground.name = 'city:ground';
 
   const city = buildCityMeshes(THREE, dataset, materials, away);
-  const trees = buildTrees(THREE, dataset);
+  const trees = buildTrees(THREE, dataset, materials);
 
   const hemi = new THREE.HemisphereLight(linearColor(THREE, 'hemiSky'), linearColor(THREE, 'hemiGround'), 1.6);
   const sun = new THREE.DirectionalLight(linearColor(THREE, 'sun'), 2.2);
