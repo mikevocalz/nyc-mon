@@ -2,7 +2,7 @@ import type { ExpoConfig } from 'expo/config';
 import { loadProjectEnv } from '@expo/env';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { palette } from '@acme/theme';
+import { brand } from '@acme/theme';
 
 const appDir = dirname(fileURLToPath(import.meta.url));
 loadProjectEnv(join(appDir, '../..'), { silent: true, force: true });
@@ -18,6 +18,9 @@ const config: ExpoConfig & { newArchEnabled: true } = {
   orientation: 'default',
   icon: './assets/images/icon.png',
   userInterfaceStyle: 'automatic',
+  // Root window background (expo-system-ui): brand night, so the gap between the
+  // system splash and the first JS frame is never black.
+  backgroundColor: brand.night,
   ios: {
     bundleIdentifier: 'com.nycmon.app',
     supportsTablet: true,
@@ -35,7 +38,7 @@ const config: ExpoConfig & { newArchEnabled: true } = {
     package: 'com.nycmon.app',
     adaptiveIcon: {
       foregroundImage: './assets/images/adaptive-icon.png',
-      backgroundColor: palette.ink[50],
+      backgroundColor: brand.night,
     },
   },
   web: {
@@ -55,10 +58,11 @@ const config: ExpoConfig & { newArchEnabled: true } = {
       'expo-splash-screen',
       {
         image: './assets/images/splash-icon.png',
+        // The NYC-MON seal on the brand night; the animated splash (components/splash) picks up from this frame.
         imageWidth: 200,
         resizeMode: 'contain',
-        backgroundColor: palette.ink[50],
-        dark: { backgroundColor: palette.ink[50] },
+        backgroundColor: brand.night,
+        dark: { backgroundColor: brand.night },
       },
     ],
     [

@@ -10,6 +10,7 @@ import { hydrateOnboarding } from "@acme/app/features/onboarding/onboarding.stor
 import { useReadyNotificationRouting } from "@acme/app/features/onboarding/notify-hook.ts";
 import { setThemePreference } from "@acme/theme/switch";
 import { Toaster } from "@acme/ui";
+import { NycMonSplash } from "../components/splash/NycMonSplash";
 import "../global.css";
 
 // className-capable gesture root (third-party component → withUniwind).
@@ -50,6 +51,8 @@ export default function RootLayout() {
                 booking/editor sheets went with the demo schedule route: nothing
                 on mobile opens them any more. */}
             <Toaster />
+            {/* Above everything until it fades; it hides the native splash itself. */}
+            <NycMonSplash />
           </AppQueryProvider>
         </SafeAreaProvider>
       </KeyboardProvider>
