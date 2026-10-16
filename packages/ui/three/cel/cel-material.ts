@@ -85,8 +85,8 @@ export function createCelRig(THREE: Three, values: CelRigValues) {
 export type CelRig = ReturnType<typeof createCelRig>;
 
 type NodeMaterialParameters = NonNullable<ConstructorParameters<Three['MeshBasicNodeMaterial']>[0]>;
-/** toTSL's result, typed as the vec3 celBody returns. */
-type Vec3Node = Node<'vec3'>;
+/** toTSL's result: celBody's colour widened to the vec4 colorNode takes. */
+type Vec4Node = Node<'vec4'>;
 
 export interface CelMaterialOptions extends NodeMaterialParameters {
   rig: CelRig;
@@ -138,11 +138,16 @@ export function createCelMaterial(THREE: Three, { rig, albedo, rim = 1, ...param
     const normal = std.normalize(normalIn.$);
     const sh = evalSH9(normal, s0.$, s1.$, s2.$, s3.$, s4.$, s5.$, s6.$, s7.$, s8.$);
     const rimIn = d.vec4f(rimColor.$.xyz, rimScale.$);
-    return celBody(
-      albedoIn.$, normal, toEyeIn.$, sh,
-      key.$, keyColor.$, fill1.$, fill1Color.$, fill2.$, fill2Color.$,
-      ramp.$, bands.$, cool.$, rimIn, rimBase.$, flat.$,
+    // colorNode is the material's diffuse colour, a vec4: alpha stays 1 here and
+    // opacityNode / alphaTest still decide coverage (Dawn rejects a vec3).
+    return d.vec4f(
+      celBody(
+        albedoIn.$, normal, toEyeIn.$, sh,
+        key.$, keyColor.$, fill1.$, fill1Color.$, fill2.$, fill2Color.$,
+        ramp.$, bands.$, cool.$, rimIn, rimBase.$, flat.$,
+      ),
+      1,
     );
-  }) as unknown as Vec3Node;
+  }) as unknown as Vec4Node;
   return material;
 }
