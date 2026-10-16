@@ -281,6 +281,7 @@ catalog:
   react-native-arrangement-view: 0.4.0
 
 patchedDependencies:
+  '@reactvision/react-viro': patches/@reactvision__react-viro.patch
   '@rive-app/react-native@0.5.5': patches/@rive-app__react-native@0.5.5.patch
   react-native-graph@1.4.0: patches/react-native-graph@1.4.0.patch
   react-native-skia@3.6.1: patches/react-native-skia@3.6.1.patch
