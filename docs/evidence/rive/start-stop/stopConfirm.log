@@ -1,0 +1,6 @@
+[23:07:33.269] rive  deferred replay: inline
+[23:07:33.308] rive  built /Users/mikevocalz/nyc-mon/packages/ui/rive/arcade-controls/start-stop/build/start-stop.riv (142340 bytes, 38ms, 0 errors, 0 warnings)
+[23:07:33.308] rive  data: pill/state = stopConfirm
+[23:07:33.308] rive  showing StartStop [1/1]
+[23:07:33.309] rive  viewport 128x52 @1x
+[23:07:33.320] rive  wrote /Users/mikevocalz/nyc-mon/docs/evidence/rive/start-stop/stopConfirm.png

@@ -1,0 +1,5 @@
+[23:07:17.761] rive  deferred replay: inline
+[23:07:17.795] rive  built /Users/mikevocalz/nyc-mon/packages/ui/rive/arcade-controls/left-stick/build/left-stick.riv (5517 bytes, 33ms, 0 errors, 0 warnings)
+[23:07:17.796] rive  showing LeftStick [1/2]
+[23:07:17.796] rive  viewport 144x144 @1x
+[23:07:17.811] rive  wrote /Users/mikevocalz/nyc-mon/docs/evidence/rive/left-stick/released.png

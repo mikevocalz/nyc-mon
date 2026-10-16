@@ -58,6 +58,7 @@
     "react": "catalog:",
     "react-dom": "catalog:",
     "react-native": "catalog:",
+    "react-native-arrangement-view": "catalog:",
     "react-native-audio-api": "catalog:",
     "react-native-gesture-handler": "catalog:",
     "react-native-keyboard-controller": "catalog:",

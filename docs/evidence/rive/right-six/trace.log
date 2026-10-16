@@ -1,0 +1,4 @@
+[23:07:23.297] rive  deferred replay: inline
+[23:07:23.360] rive  built /Users/mikevocalz/nyc-mon/packages/ui/rive/arcade-controls/right-six/build/right-six.riv (144444 bytes, 62ms, 0 errors, 0 warnings)
+[23:07:23.361] rive  showing RightSix [1/2]
+[23:07:23.362] rive  wrote /Users/mikevocalz/nyc-mon/docs/evidence/rive/right-six/trace.jsonl

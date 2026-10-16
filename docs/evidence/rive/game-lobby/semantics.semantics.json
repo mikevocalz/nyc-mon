@@ -1,0 +1,124 @@
+{
+  "schema": 1,
+  "artboard": "GameLobby",
+  "roots": [
+    {
+      "id": 3,
+      "role": "text",
+      "roleValue": 7,
+      "label": "Loading your game",
+      "value": "",
+      "hint": "",
+      "headingLevel": 0,
+      "stateFlags": 512,
+      "traitFlags": 0,
+      "bounds": {"x": 125.449219, "y": 436.925049, "width": 139.101562, "height": 19.1381836},
+      "children": []
+    },
+    {
+      "id": 1,
+      "role": "text",
+      "roleValue": 7,
+      "label": "NYC-MON",
+      "value": "",
+      "hint": "",
+      "headingLevel": 1,
+      "stateFlags": 0,
+      "traitFlags": 0,
+      "bounds": {"x": 16, "y": 24, "width": 147.601562, "height": 30.4609375},
+      "children": []
+    },
+    {
+      "id": 7,
+      "role": "text",
+      "roleValue": 7,
+      "label": "NYC Rank",
+      "value": "",
+      "hint": "",
+      "headingLevel": 2,
+      "stateFlags": 0,
+      "traitFlags": 0,
+      "bounds": {"x": 32, "y": 89.5297852, "width": 85.9941406, "height": 17.8623047},
+      "children": []
+    },
+    {
+      "id": 6,
+      "role": "list",
+      "roleValue": 10,
+      "label": "NYC Rank",
+      "value": "",
+      "hint": "",
+      "headingLevel": 0,
+      "stateFlags": 0,
+      "traitFlags": 0,
+      "bounds": {"x": 16, "y": 118.460938, "width": 343, "height": 224},
+      "children": [
+        {
+          "id": 11,
+          "role": "listItem",
+          "roleValue": 11,
+          "label": "Vesper",
+          "value": "48200",
+          "hint": "",
+          "headingLevel": 0,
+          "stateFlags": 0,
+          "traitFlags": 64,
+          "bounds": {"x": 16, "y": 135.615967, "width": 343, "height": 38.8449707},
+          "children": []
+        },
+        {
+          "id": 13,
+          "role": "listItem",
+          "roleValue": 11,
+          "label": "Nimbus",
+          "value": "41750",
+          "hint": "",
+          "headingLevel": 0,
+          "stateFlags": 0,
+          "traitFlags": 64,
+          "bounds": {"x": 16, "y": 191.615967, "width": 343, "height": 38.8449707},
+          "children": []
+        },
+        {
+          "id": 15,
+          "role": "listItem",
+          "roleValue": 11,
+          "label": "Kestrel",
+          "value": "39900",
+          "hint": "",
+          "headingLevel": 0,
+          "stateFlags": 0,
+          "traitFlags": 64,
+          "bounds": {"x": 16, "y": 247.615967, "width": 343, "height": 38.8449707},
+          "children": []
+        },
+        {
+          "id": 17,
+          "role": "listItem",
+          "roleValue": 11,
+          "label": "Sable",
+          "value": "12300",
+          "hint": "",
+          "headingLevel": 0,
+          "stateFlags": 0,
+          "traitFlags": 64,
+          "bounds": {"x": 16, "y": 286.460938, "width": 343, "height": 56},
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "role": "button",
+      "roleValue": 1,
+      "label": "Start a new game",
+      "value": "",
+      "hint": "Starts the game",
+      "headingLevel": 0,
+      "stateFlags": 128,
+      "traitFlags": 96,
+      "bounds": {"x": 16, "y": 764, "width": 343, "height": 64},
+      "children": []
+    }
+  ]
+}

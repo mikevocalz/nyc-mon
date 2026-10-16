@@ -1,0 +1,7 @@
+[21:06:33.541] rive  deferred replay: inline
+[21:06:33.576] rive  built packages/ui/rive/arcade-controls/start-stop/build/start-stop.riv (142340 bytes, 34ms, 0 errors, 0 warnings)
+[21:06:33.576] rive  data: pill/state = playing
+[21:06:33.577] rive  data: pill/holdProgress = 0.5
+[21:06:33.577] rive  showing StartStop [1/1]
+[21:06:33.577] rive  viewport 512x208 @1x
+[21:06:33.593] rive  wrote docs/evidence/rive/start-stop/holdProgress-playing.png

@@ -1,0 +1,8 @@
+[23:07:23.607] rive  deferred replay: inline
+[23:07:23.608] rive  baking release scripts, as a publish ships them, with watchdog checks
+[23:07:23.660] rive  built /Users/mikevocalz/nyc-mon/packages/ui/rive/arcade-controls/right-six/build/right-six.riv (144444 bytes, 52ms, 0 errors, 0 warnings)
+[23:07:23.661] rive  showing RightSix [1/2]
+[23:07:23.661] rive  viewport 209x204 @1x
+[23:07:23.841] rive  bench advance: mean 0.003ms p50 0.002ms p95 0.013ms max 0.067ms
+[23:07:23.841] rive  bench render: mean 0.182ms p50 0.118ms p95 0.496ms max 2.176ms
+[23:07:23.841] rive  bench memory: 0 -> 0 wasm pages (+0) over 600 frames

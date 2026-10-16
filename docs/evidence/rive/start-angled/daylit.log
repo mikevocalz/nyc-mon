@@ -1,0 +1,7 @@
+[23:07:49.766] rive  deferred replay: inline
+[23:07:49.768] rive  compiling 2 markup files as one document: ../game-lobby/shared-vm.rml, scene.rml
+[23:07:49.807] rive  built /Users/mikevocalz/nyc-mon/packages/ui/rive/lobby/start-angled/build/start-angled.riv (142704 bytes, 40ms, 0 errors, 0 warnings)
+[23:07:49.808] rive  data: theme/variant = daylit
+[23:07:49.808] rive  showing StartAngledHost [1/2]
+[23:07:49.808] rive  viewport 343x128 @1x
+[23:07:49.821] rive  wrote /Users/mikevocalz/nyc-mon/docs/evidence/rive/start-angled/daylit.png

@@ -1,0 +1,85 @@
+{
+  "schema": 1,
+  "artboard": "Leaderboard",
+  "roots": [
+    {
+      "id": 4,
+      "role": "text",
+      "roleValue": 7,
+      "label": "NYC Rank",
+      "value": "",
+      "hint": "",
+      "headingLevel": 2,
+      "stateFlags": 0,
+      "traitFlags": 0,
+      "bounds": {"x": 16, "y": 11.0688477, "width": 85.9941406, "height": 17.8623047},
+      "children": []
+    },
+    {
+      "id": 3,
+      "role": "list",
+      "roleValue": 10,
+      "label": "NYC Rank",
+      "value": "",
+      "hint": "",
+      "headingLevel": 0,
+      "stateFlags": 0,
+      "traitFlags": 0,
+      "bounds": {"x": 0, "y": 40, "width": 343, "height": 224},
+      "children": [
+        {
+          "id": 6,
+          "role": "listItem",
+          "roleValue": 11,
+          "label": "Vesper",
+          "value": "48200",
+          "hint": "",
+          "headingLevel": 0,
+          "stateFlags": 0,
+          "traitFlags": 64,
+          "bounds": {"x": 0, "y": 57.1550293, "width": 343, "height": 38.8449707},
+          "children": []
+        },
+        {
+          "id": 8,
+          "role": "listItem",
+          "roleValue": 11,
+          "label": "Nimbus",
+          "value": "41750",
+          "hint": "",
+          "headingLevel": 0,
+          "stateFlags": 0,
+          "traitFlags": 64,
+          "bounds": {"x": 0, "y": 113.155029, "width": 343, "height": 38.8449707},
+          "children": []
+        },
+        {
+          "id": 10,
+          "role": "listItem",
+          "roleValue": 11,
+          "label": "Kestrel",
+          "value": "39900",
+          "hint": "",
+          "headingLevel": 0,
+          "stateFlags": 0,
+          "traitFlags": 64,
+          "bounds": {"x": 0, "y": 169.155029, "width": 343, "height": 38.8449707},
+          "children": []
+        },
+        {
+          "id": 12,
+          "role": "listItem",
+          "roleValue": 11,
+          "label": "Sable",
+          "value": "12300",
+          "hint": "",
+          "headingLevel": 0,
+          "stateFlags": 0,
+          "traitFlags": 64,
+          "bounds": {"x": 0, "y": 208, "width": 343, "height": 56},
+          "children": []
+        }
+      ]
+    }
+  ]
+}

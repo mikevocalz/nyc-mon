@@ -1,0 +1,613 @@
+<Rive version="1" kind="fragment">
+    <!-- NYC-MON angled START (Master Directive v2 §3, §8; G02 handoff).
+         The top block is the resume status: the title follows
+         lobby/resume/eligible, the district line follows lobby/resume/district.
+         The button below is the kit's CornerCutFrame corner="all" shape (cuts
+         on the top-left and bottom-right, packages/ui/neon/corner-cut.ts) in
+         orange-500 with a black legend. lobby/start/state is the host's state;
+         pressed, focused and activate are the control's own pointer, keyboard
+         and screen-reader plumbing. Client id 3: the game-lobby project
+         symlinks this file in beside its own, so ids must not collide.
+         Colours are ARGB token hexes from packages/theme/tokens.ts. -->
+    <Artboard defaultStateMachineId="3:17" viewModelId="3:40" viewModelInstanceId="3:41"
+              x="0" y="400" width="343" height="128" styleId="3:5" name="StartAngledHost" id="3:2">
+        <LayoutComponentStyle name="Artboard Style" id="3:5"/>
+        <!-- The component receives the host's lobby instance through
+             dataBindPathIds; a nested artboard gets no view model otherwise. -->
+        <NestedArtboard artboardId="3:30" dataBindPathIds="3:40-3:42" x="0" y="0" name="Start" id="3:3">
+            <NestedStateMachine animationId="3:7" name="Machine"/>
+        </NestedArtboard>
+        <StateMachine name="Host" id="3:17">
+            <StateMachineLayer name="L" id="3:18">
+                <AnyState x="200" y="-120"/>
+                <ExitState x="400" y="-120"/>
+                <EntryState><StateTransition stateToId="3:19"/></EntryState>
+                <AnimationState x="200" animationId="3:16" id="3:19"/>
+            </StateMachineLayer>
+        </StateMachine>
+        <LinearAnimation duration="1" name="Rest" id="3:16"/>
+    </Artboard>
+
+    <!-- The control. Bound to the Lobby view model, so game-lobby nests it the
+         same way with its own root's lobby property. -->
+    <Artboard isComponent="true" defaultStateMachineId="3:7" viewModelId="3:50" viewModelInstanceId="3:51"
+              x="400" y="400" width="343" height="128" styleId="3:35" name="StartAngled" id="3:30">
+        <LayoutComponentStyle name="Component Style" id="3:35"/>
+
+        <!-- Resume status. Title keyed per eligibility; district bound. Neither
+             text carries SemanticData: the button below speaks the title's
+             sentence as its label and the district as its value.
+             Decision: BUILD the district as the button's semantic value
+             (finding L11); as its own text node it was an empty, 0 x 0 node
+             whenever no district was set. -->
+        <Text x="0" y="0" sizingValue="autoWidth" name="Title" id="3:100">
+            <TextStylePaint fontSize="24" fontAssetId="3:900" familyName="Space Grotesk" styleName="Bold" name="Title Style" id="3:104">
+                <Fill name="Fill"><SolidColor colorValue="FFF8F8F8" name="C" id="3:102"/></Fill>
+                <TextStyleAxis tag="2003265652" axisValue="700" name="Weight"/>
+            </TextStylePaint>
+            <TextValueRun styleId="3:104" text="Start a new game" name="Run" id="3:103"/>
+        </Text>
+        <Text x="0" y="30" sizingValue="autoWidth" name="District" id="3:110">
+            <TextStylePaint fontSize="15" fontAssetId="3:900" familyName="Space Grotesk" styleName="Regular" name="District Style" id="3:114">
+                <Fill name="Fill"><SolidColor colorValue="FFBEC0C2" name="C" id="3:112"/></Fill>
+                <TextStyleAxis tag="2003265652" axisValue="400" name="Weight"/>
+            </TextStylePaint>
+            <TextValueRun styleId="3:114" text="" name="Run" id="3:113">
+                <DataBindContext sourcePathIds="3:50-3:45-3:62" propertyKey="268"/>
+            </TextValueRun>
+        </Text>
+
+        <!-- Keyboard focus ring, outside the button so it does not compress. -->
+        <Shape x="171.5" y="96" opacity="0" name="FocusRing" id="3:150">
+            <PointsPath isClosed="true" isClockwise="true" name="Path">
+                <StraightVertex x="-174.5" y="-10.2"/>
+                <StraightVertex x="-149.7" y="-35"/>
+                <StraightVertex x="174.5" y="-35"/>
+                <StraightVertex x="174.5" y="10.2"/>
+                <StraightVertex x="149.7" y="35"/>
+                <StraightVertex x="-174.5" y="35"/>
+            </PointsPath>
+            <Stroke thickness="2" join="round" name="Ring"><SolidColor colorValue="FF4BA8F0" name="C"/></Stroke>
+        </Shape>
+
+        <!-- The button. Everything inside compresses on press. -->
+        <Node x="171.5" y="96" name="Button" id="3:190">
+            <Text x="0" y="0" originX="0.5" originY="0.5" sizingValue="autoWidth" name="Legend" id="3:200">
+                <TextStylePaint fontSize="14" letterSpacing="2.5" fontAssetId="3:900" familyName="Space Grotesk" styleName="Bold" name="Legend Style" id="3:201">
+                    <Fill name="Fill"><SolidColor colorValue="FF000000" name="C" id="3:202"/></Fill>
+                    <TextStyleAxis tag="2003265652" axisValue="700" name="Weight"/>
+                </TextStylePaint>
+                <TextValueRun styleId="3:201" text="START" name="Run" id="3:203"/>
+            </Text>
+
+            <!-- Energy trace: a trimmed segment that travels the outline. -->
+            <Shape opacity="0" name="Trace" id="3:230">
+                <PointsPath isClosed="true" isClockwise="true" name="Path">
+                    <StraightVertex x="-171.5" y="-8"/>
+                    <StraightVertex x="-147.5" y="-32"/>
+                    <StraightVertex x="171.5" y="-32"/>
+                    <StraightVertex x="171.5" y="8"/>
+                    <StraightVertex x="147.5" y="32"/>
+                    <StraightVertex x="-171.5" y="32"/>
+                </PointsPath>
+                <Stroke thickness="3" cap="round" join="round" name="Segment">
+                    <SolidColor colorValue="FF4BA8F0" name="C"/>
+                    <TrimPath start="0" end="0.18" offset="0" name="Trim" id="3:231"/>
+                </Stroke>
+            </Shape>
+
+            <!-- Reduced-motion rim: steady, shown instead of the trace. -->
+            <Shape opacity="0" name="ReducedRim" id="3:240">
+                <PointsPath isClosed="true" isClockwise="true" name="Path">
+                    <StraightVertex x="-171.5" y="-8"/>
+                    <StraightVertex x="-147.5" y="-32"/>
+                    <StraightVertex x="171.5" y="-32"/>
+                    <StraightVertex x="171.5" y="8"/>
+                    <StraightVertex x="147.5" y="32"/>
+                    <StraightVertex x="-171.5" y="32"/>
+                </PointsPath>
+                <Stroke thickness="2" join="round" name="Rim"><SolidColor colorValue="FF4BA8F0" name="C" id="3:241"/></Stroke>
+            </Shape>
+
+            <!-- Structure keyline: feathered glow under a crisp 2 dp line. The
+                 glow thickness swells on activate. Colour follows theme/variant. -->
+            <Shape name="Keyline" id="3:220">
+                <PointsPath isClosed="true" isClockwise="true" name="Path">
+                    <StraightVertex x="-171.5" y="-8"/>
+                    <StraightVertex x="-147.5" y="-32"/>
+                    <StraightVertex x="171.5" y="-32"/>
+                    <StraightVertex x="171.5" y="8"/>
+                    <StraightVertex x="147.5" y="32"/>
+                    <StraightVertex x="-171.5" y="32"/>
+                </PointsPath>
+                <Stroke thickness="4" join="round" name="Glow" id="3:221">
+                    <SolidColor colorValue="FF0058F8" name="C" id="3:222"/>
+                    <Feather strength="8" name="Soft"/>
+                </Stroke>
+                <Stroke thickness="2" join="round" name="Crisp">
+                    <SolidColor colorValue="FF0058F8" name="C" id="3:223"/>
+                </Stroke>
+            </Shape>
+
+            <!-- Press tint over the face: orange-400, keyed by the Press layer. -->
+            <Shape opacity="0" name="PressTint" id="3:215">
+                <PointsPath isClosed="true" isClockwise="true" name="Path">
+                    <StraightVertex x="-171.5" y="-8"/>
+                    <StraightVertex x="-147.5" y="-32"/>
+                    <StraightVertex x="171.5" y="-32"/>
+                    <StraightVertex x="171.5" y="8"/>
+                    <StraightVertex x="147.5" y="32"/>
+                    <StraightVertex x="-171.5" y="32"/>
+                </PointsPath>
+                <Fill name="Fill"><SolidColor colorValue="FFFD9D40" name="C"/></Fill>
+            </Shape>
+
+            <!-- Face: the control. Owns focus, semantics and every listener. -->
+            <Shape name="Face" id="3:210">
+                <FocusData name="Focus"/>
+                <SemanticData role="button" label="Start a new game" hint="Starts the game" name="Semantics" id="3:211">
+                    <DataBindContext sourcePathIds="3:50-3:45-3:62" propertyKey="984"/>
+                </SemanticData>
+                <PointsPath isClosed="true" isClockwise="true" name="Path">
+                    <StraightVertex x="-171.5" y="-8"/>
+                    <StraightVertex x="-147.5" y="-32"/>
+                    <StraightVertex x="171.5" y="-32"/>
+                    <StraightVertex x="171.5" y="8"/>
+                    <StraightVertex x="147.5" y="32"/>
+                    <StraightVertex x="-171.5" y="32"/>
+                </PointsPath>
+                <Fill name="Fill"><SolidColor colorValue="FFFC7C00" name="C" id="3:212"/></Fill>
+            </Shape>
+        </Node>
+
+        <Event name="startActivated" id="3:300"/>
+
+        <!-- Resume layer timelines: title text and the button's spoken name -->
+        <LinearAnimation duration="1" name="NewGame" id="3:400">
+            <KeyedObject objectId="3:103"><KeyedProperty property="text"><KeyFrameString value="Start a new game" interpolationType="hold"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="3:211"><KeyedProperty property="label"><KeyFrameString value="Start a new game" interpolationType="hold"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+        <LinearAnimation duration="1" name="Continue" id="3:401">
+            <KeyedObject objectId="3:103"><KeyedProperty property="text"><KeyFrameString value="Continue your game" interpolationType="hold"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="3:211"><KeyedProperty property="label"><KeyFrameString value="Continue your game" interpolationType="hold"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+
+        <!-- Theme layer timelines -->
+        <LinearAnimation duration="1" name="Night" id="3:410">
+            <KeyedObject objectId="3:102"><KeyedProperty property="colorValue"><KeyFrameColor value="FFF8F8F8" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="3:112"><KeyedProperty property="colorValue"><KeyFrameColor value="FFBEC0C2" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="3:222"><KeyedProperty property="colorValue"><KeyFrameColor value="FF0058F8" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="3:223"><KeyedProperty property="colorValue"><KeyFrameColor value="FF0058F8" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="3:241"><KeyedProperty property="colorValue"><KeyFrameColor value="FF4BA8F0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+        <LinearAnimation duration="1" name="Daylit" id="3:411">
+            <KeyedObject objectId="3:102"><KeyedProperty property="colorValue"><KeyFrameColor value="FF000000" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="3:112"><KeyedProperty property="colorValue"><KeyFrameColor value="FF61656A" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="3:222"><KeyedProperty property="colorValue"><KeyFrameColor value="FF3C1E00" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="3:223"><KeyedProperty property="colorValue"><KeyFrameColor value="FF3C1E00" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="3:241"><KeyedProperty property="colorValue"><KeyFrameColor value="FF0058F8" interpolationType="linear"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+
+        <!-- State layer timelines: face, legend, semantic disabled bit -->
+        <LinearAnimation duration="1" name="Idle" id="3:420">
+            <KeyedObject objectId="3:212"><KeyedProperty property="colorValue"><KeyFrameColor value="FFFC7C00" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="3:202"><KeyedProperty property="colorValue"><KeyFrameColor value="FF000000" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="3:211"><KeyedProperty property="isDisabled"><KeyFrameBool value="false" interpolationType="hold"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+        <!-- pressed, as the host states it: the orange-400 face -->
+        <LinearAnimation duration="1" name="Pressed" id="3:421">
+            <KeyedObject objectId="3:212"><KeyedProperty property="colorValue"><KeyFrameColor value="FFFD9D40" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="3:202"><KeyedProperty property="colorValue"><KeyFrameColor value="FF000000" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="3:211"><KeyedProperty property="isDisabled"><KeyFrameBool value="false" interpolationType="hold"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+        <!-- loading: the face holds the pressed shade so the change reads
+             without motion; the trace loops in the Trace layer -->
+        <LinearAnimation duration="1" name="Loading" id="3:422">
+            <KeyedObject objectId="3:212"><KeyedProperty property="colorValue"><KeyFrameColor value="FFFD9D40" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="3:202"><KeyedProperty property="colorValue"><KeyFrameColor value="FF000000" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="3:211"><KeyedProperty property="isDisabled"><KeyFrameBool value="false" interpolationType="hold"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+        <LinearAnimation duration="1" name="Disabled" id="3:423">
+            <KeyedObject objectId="3:212"><KeyedProperty property="colorValue"><KeyFrameColor value="FF303337" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="3:202"><KeyedProperty property="colorValue"><KeyFrameColor value="FF484C51" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="3:211"><KeyedProperty property="isDisabled"><KeyFrameBool value="true" interpolationType="hold"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+
+        <!-- Trace layer timelines. TraceRun: one pass in 72 frames (1.2 s),
+             then the segment is gone. Loop: the pass repeats while loading.
+             Still / ReducedStill: nothing moves. -->
+        <LinearAnimation duration="72" name="TraceRun" id="3:430">
+            <KeyedObject objectId="3:230"><KeyedProperty property="opacity">
+                <KeyFrameDouble value="1" frame="0" interpolationType="hold"/>
+                <KeyFrameDouble value="1" frame="60" interpolationType="linear"/>
+                <KeyFrameDouble value="0" frame="72" interpolationType="linear"/>
+            </KeyedProperty></KeyedObject>
+            <KeyedObject objectId="3:231"><KeyedProperty property="offset">
+                <KeyFrameDouble value="0" frame="0" interpolationType="cubic"><CubicEaseInterpolator x1="0.2" y1="0" x2="0.2" y2="1"/></KeyFrameDouble>
+                <KeyFrameDouble value="1" frame="72" interpolationType="linear"/>
+            </KeyedProperty></KeyedObject>
+            <KeyedObject objectId="3:240"><KeyedProperty property="opacity"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+        <LinearAnimation duration="72" loopValue="loop" name="TraceLoop" id="3:432">
+            <KeyedObject objectId="3:230"><KeyedProperty property="opacity"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="3:231"><KeyedProperty property="offset">
+                <KeyFrameDouble value="0" frame="0" interpolationType="linear"/>
+                <KeyFrameDouble value="1" frame="72" interpolationType="linear"/>
+            </KeyedProperty></KeyedObject>
+            <KeyedObject objectId="3:240"><KeyedProperty property="opacity"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+        <LinearAnimation duration="1" name="Still" id="3:431">
+            <KeyedObject objectId="3:230"><KeyedProperty property="opacity"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="3:240"><KeyedProperty property="opacity"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+        <!-- reduced motion: no trace, a steady 2 dp rim instead -->
+        <LinearAnimation duration="1" name="ReducedStill" id="3:433">
+            <KeyedObject objectId="3:230"><KeyedProperty property="opacity"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="3:240"><KeyedProperty property="opacity"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+
+        <!-- Press layer timelines: compression, and its reduced sibling (tint only) -->
+        <LinearAnimation duration="1" name="Rest" id="3:440">
+            <KeyedObject objectId="3:190">
+                <KeyedProperty property="scaleX"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty>
+                <KeyedProperty property="scaleY"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="3:215"><KeyedProperty property="opacity"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+        <LinearAnimation duration="1" name="Compressed" id="3:441">
+            <KeyedObject objectId="3:190">
+                <KeyedProperty property="scaleX"><KeyFrameDouble value="0.97" interpolationType="linear"/></KeyedProperty>
+                <KeyedProperty property="scaleY"><KeyFrameDouble value="0.97" interpolationType="linear"/></KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="3:215"><KeyedProperty property="opacity"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+        <LinearAnimation duration="1" name="CompressedReduced" id="3:442">
+            <KeyedObject objectId="3:190">
+                <KeyedProperty property="scaleX"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty>
+                <KeyedProperty property="scaleY"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="3:215"><KeyedProperty property="opacity"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+
+        <!-- Pulse layer timelines: the glow swells on activate (18 frames);
+             the reduced sibling holds one brighter step for 12 frames. -->
+        <LinearAnimation duration="1" name="GlowRest" id="3:450">
+            <KeyedObject objectId="3:221"><KeyedProperty property="thickness"><KeyFrameDouble value="4" interpolationType="linear"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+        <LinearAnimation duration="18" name="Pulse" id="3:451">
+            <KeyedObject objectId="3:221"><KeyedProperty property="thickness">
+                <KeyFrameDouble value="4" frame="0" interpolationType="cubic"><CubicEaseInterpolator x1="0" y1="0" x2="0.58" y2="1"/></KeyFrameDouble>
+                <KeyFrameDouble value="16" frame="6" interpolationType="cubic"><CubicEaseInterpolator x1="0.42" y1="0" x2="0.58" y2="1"/></KeyFrameDouble>
+                <KeyFrameDouble value="4" frame="18" interpolationType="linear"/>
+            </KeyedProperty></KeyedObject>
+        </LinearAnimation>
+        <LinearAnimation duration="12" name="PulseReduced" id="3:452">
+            <KeyedObject objectId="3:221"><KeyedProperty property="thickness">
+                <KeyFrameDouble value="10" frame="0" interpolationType="hold"/>
+                <KeyFrameDouble value="4" frame="12" interpolationType="hold"/>
+            </KeyedProperty></KeyedObject>
+        </LinearAnimation>
+
+        <!-- Focus layer timelines -->
+        <LinearAnimation duration="1" name="Blurred" id="3:460">
+            <KeyedObject objectId="3:150"><KeyedProperty property="opacity"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+        <LinearAnimation duration="1" name="Focused" id="3:461">
+            <KeyedObject objectId="3:150"><KeyedProperty property="opacity"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+
+        <StateMachine name="Start" id="3:7">
+            <StateMachineListenerSingle targetId="3:210" listenerTypeValue="down" name="Face Down" id="3:500">
+                <ListenerViewModelChange><BindablePropertyBoolean propertyValue="true"><DataBindContext sourcePathIds="3:50-3:46-3:67" propertyKey="634" direction="true"/></BindablePropertyBoolean></ListenerViewModelChange>
+            </StateMachineListenerSingle>
+            <StateMachineListenerSingle targetId="3:210" listenerTypeValue="up" name="Face Up" id="3:501">
+                <ListenerViewModelChange><BindablePropertyBoolean propertyValue="false"><DataBindContext sourcePathIds="3:50-3:46-3:67" propertyKey="634" direction="true"/></BindablePropertyBoolean></ListenerViewModelChange>
+            </StateMachineListenerSingle>
+            <StateMachineListenerSingle targetId="3:210" listenerTypeValue="exit" name="Face Exit" id="3:502">
+                <ListenerViewModelChange><BindablePropertyBoolean propertyValue="false"><DataBindContext sourcePathIds="3:50-3:46-3:67" propertyKey="634" direction="true"/></BindablePropertyBoolean></ListenerViewModelChange>
+            </StateMachineListenerSingle>
+            <!-- activate: click, enter/space, screen-reader tap -->
+            <StateMachineListener targetId="3:210" name="Activate" id="3:503">
+                <ListenerInputType listenerTypeValue="click"/>
+                <ListenerInputTypeKeyboard listenerTypeValue="keyboard">
+                    <KeyboardInput keyType="enter" keyPhase="1"/>
+                    <KeyboardInput keyType="kpEnter" keyPhase="1"/>
+                    <KeyboardInput keyType="space" keyPhase="1"/>
+                </ListenerInputTypeKeyboard>
+                <ListenerInputTypeSemantic listenerTypeValue="semanticAction">
+                    <SemanticInput actionType="tap"/>
+                </ListenerInputTypeSemantic>
+                <ListenerFireEvent eventId="3:300"/>
+                <ListenerViewModelChange>
+                    <BindablePropertyTrigger propertyValue="1"><DataBindContext sourcePathIds="3:50-3:46-3:69" propertyKey="686" direction="true"/></BindablePropertyTrigger>
+                </ListenerViewModelChange>
+            </StateMachineListener>
+            <!-- gamepad south (W3C 0) and start (9) on their own listener: grouped
+                 with the input types above a gamepad trigger never fired in the
+                 start-stop pill, alone it does -->
+            <StateMachineListener targetId="3:210" name="Activate Pad" id="3:506">
+                <ListenerInputTypeGamepad listenerTypeValue="gamepad">
+                    <GamepadInput kind="button" mapping="standard" inputIndex="0" buttonPhase="1"/>
+                    <GamepadInput kind="button" mapping="standard" inputIndex="9" buttonPhase="1"/>
+                </ListenerInputTypeGamepad>
+                <ListenerFireEvent eventId="3:300"/>
+                <ListenerViewModelChange>
+                    <BindablePropertyTrigger propertyValue="1"><DataBindContext sourcePathIds="3:50-3:46-3:69" propertyKey="686" direction="true"/></BindablePropertyTrigger>
+                </ListenerViewModelChange>
+            </StateMachineListener>
+            <StateMachineListener targetId="3:210" name="Got Focus" id="3:504">
+                <ListenerInputType listenerTypeValue="focus"/>
+                <ListenerViewModelChange><BindablePropertyBoolean propertyValue="true"><DataBindContext sourcePathIds="3:50-3:46-3:68" propertyKey="634" direction="true"/></BindablePropertyBoolean></ListenerViewModelChange>
+            </StateMachineListener>
+            <StateMachineListener targetId="3:210" name="Lost Focus" id="3:505">
+                <ListenerInputType listenerTypeValue="blur"/>
+                <ListenerViewModelChange><BindablePropertyBoolean propertyValue="false"><DataBindContext sourcePathIds="3:50-3:46-3:68" propertyKey="634" direction="true"/></BindablePropertyBoolean></ListenerViewModelChange>
+            </StateMachineListener>
+
+            <!-- Resume layer: new game / continue, from lobby/resume/eligible -->
+            <StateMachineLayer name="Resume" id="3:8">
+                <AnyState x="500" y="-120"/>
+                <ExitState x="700" y="-120"/>
+                <EntryState x="0" y="0"><StateTransition stateToId="3:600"/></EntryState>
+                <AnimationState x="160" y="0" animationId="3:400" id="3:600">
+                    <StateTransition stateToId="3:601" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="3:50-3:45-3:61" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="true"/></TransitionViewModelCondition>
+                    </StateTransition>
+                </AnimationState>
+                <AnimationState x="360" y="0" animationId="3:401" id="3:601">
+                    <StateTransition stateToId="3:600" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="3:50-3:45-3:61" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="false"/></TransitionViewModelCondition>
+                    </StateTransition>
+                </AnimationState>
+            </StateMachineLayer>
+
+            <!-- Theme layer: night / daylit -->
+            <StateMachineLayer name="Theme" id="3:9">
+                <AnyState x="500" y="-120"/>
+                <ExitState x="700" y="-120"/>
+                <EntryState x="0" y="0"><StateTransition stateToId="3:610"/></EntryState>
+                <AnimationState x="160" y="0" animationId="3:410" id="3:610">
+                    <StateTransition stateToId="3:611" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="3:50-3:47-9:62" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="9:111"/></TransitionViewModelCondition>
+                    </StateTransition>
+                </AnimationState>
+                <AnimationState x="360" y="0" animationId="3:411" id="3:611">
+                    <StateTransition stateToId="3:610" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="3:50-3:47-9:62" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="9:112"/></TransitionViewModelCondition>
+                    </StateTransition>
+                </AnimationState>
+            </StateMachineLayer>
+
+            <!-- State layer: idle / pressed / loading / disabled, every state
+                 reaches every other, conditioned on lobby/start/state -->
+            <StateMachineLayer name="State" id="3:10">
+                <AnyState x="900" y="-200"/>
+                <ExitState x="1100" y="-200"/>
+                <EntryState x="0" y="0"><StateTransition stateToId="3:620"/></EntryState>
+                <AnimationState x="160" y="0" animationId="3:420" id="3:620">
+                    <StateTransition stateToId="3:621" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="3:50-3:46-3:66" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="3:92"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="3:622" duration="120">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="3:50-3:46-3:66" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="3:93"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="3:623" duration="120">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="3:50-3:46-3:66" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="3:94"/></TransitionViewModelCondition>
+                    </StateTransition>
+                </AnimationState>
+                <AnimationState x="400" y="-160" animationId="3:421" id="3:621">
+                    <StateTransition stateToId="3:620" duration="120">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="3:50-3:46-3:66" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="3:91"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="3:622" duration="120">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="3:50-3:46-3:66" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="3:93"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="3:623" duration="120">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="3:50-3:46-3:66" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="3:94"/></TransitionViewModelCondition>
+                    </StateTransition>
+                </AnimationState>
+                <AnimationState x="640" y="0" animationId="3:422" id="3:622">
+                    <StateTransition stateToId="3:620" duration="120">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="3:50-3:46-3:66" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="3:91"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="3:621" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="3:50-3:46-3:66" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="3:92"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="3:623" duration="120">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="3:50-3:46-3:66" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="3:94"/></TransitionViewModelCondition>
+                    </StateTransition>
+                </AnimationState>
+                <AnimationState x="400" y="160" animationId="3:423" id="3:623">
+                    <StateTransition stateToId="3:620" duration="120">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="3:50-3:46-3:66" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="3:91"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="3:621" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="3:50-3:46-3:66" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="3:92"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="3:622" duration="120">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="3:50-3:46-3:66" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="3:93"/></TransitionViewModelCondition>
+                    </StateTransition>
+                </AnimationState>
+            </StateMachineLayer>
+
+            <!-- Trace layer: one pass on enter, then still; loops while loading;
+                 the reduced sibling shows a steady rim and never moves -->
+            <StateMachineLayer name="Trace" id="3:11">
+                <AnyState x="900" y="-200"/>
+                <ExitState x="1100" y="-200"/>
+                <EntryState x="0" y="0">
+                    <StateTransition stateToId="3:633" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="3:50-3:48-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="true"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="3:630"/>
+                </EntryState>
+                <AnimationState x="160" y="0" animationId="3:430" reset="true" id="3:630">
+                    <StateTransition stateToId="3:633" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="3:50-3:48-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="true"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="3:632" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="3:50-3:46-3:66" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="3:93"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="3:631" enableExitTime="true" exitTimeIsPercetange="true" exitTime="100"/>
+                </AnimationState>
+                <AnimationState x="400" y="0" animationId="3:431" id="3:631">
+                    <StateTransition stateToId="3:633" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="3:50-3:48-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="true"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="3:632" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="3:50-3:46-3:66" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="3:93"/></TransitionViewModelCondition>
+                    </StateTransition>
+                </AnimationState>
+                <AnimationState x="640" y="0" animationId="3:432" reset="true" id="3:632">
+                    <StateTransition stateToId="3:633" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="3:50-3:48-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="true"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="3:631" duration="120">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="3:50-3:46-3:66" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="3:91"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="3:631" duration="120">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="3:50-3:46-3:66" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="3:92"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="3:631" duration="120">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="3:50-3:46-3:66" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="3:94"/></TransitionViewModelCondition>
+                    </StateTransition>
+                </AnimationState>
+                <AnimationState x="400" y="160" animationId="3:433" id="3:633">
+                    <StateTransition stateToId="3:631" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="3:50-3:48-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="false"/></TransitionViewModelCondition>
+                    </StateTransition>
+                </AnimationState>
+            </StateMachineLayer>
+
+            <!-- Press layer -->
+            <StateMachineLayer name="Press" id="3:12">
+                <AnyState x="700" y="-120"/>
+                <ExitState x="900" y="-120"/>
+                <EntryState x="0" y="0"><StateTransition stateToId="3:640"/></EntryState>
+                <AnimationState x="160" y="0" animationId="3:440" id="3:640">
+                    <!-- focus the face on entry so keys and the pad reach it headless -->
+                    <FocusActionTarget targetId="3:210"/>
+                    <StateTransition stateToId="3:641" duration="120">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="3:50-3:46-3:67" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="true"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="3:50-3:48-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="false"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="3:642" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="3:50-3:46-3:67" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="true"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="3:50-3:48-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="true"/></TransitionViewModelCondition>
+                    </StateTransition>
+                </AnimationState>
+                <AnimationState x="400" y="-100" animationId="3:441" id="3:641">
+                    <StateTransition stateToId="3:640" duration="120">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="3:50-3:46-3:67" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="false"/></TransitionViewModelCondition>
+                    </StateTransition>
+                </AnimationState>
+                <AnimationState x="400" y="100" animationId="3:442" id="3:642">
+                    <StateTransition stateToId="3:640" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="3:50-3:46-3:67" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="false"/></TransitionViewModelCondition>
+                    </StateTransition>
+                </AnimationState>
+            </StateMachineLayer>
+
+            <!-- Pulse layer: the activate trigger fires the confirmation pulse -->
+            <StateMachineLayer name="Pulse" id="3:13">
+                <AnyState x="700" y="-120"/>
+                <ExitState x="900" y="-120"/>
+                <EntryState x="0" y="0"><StateTransition stateToId="3:650"/></EntryState>
+                <AnimationState x="160" y="0" animationId="3:450" id="3:650">
+                    <StateTransition stateToId="3:651" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyTrigger><DataBindContext sourcePathIds="3:50-3:46-3:69" propertyKey="686"/></BindablePropertyTrigger></TransitionPropertyViewModelComparator><TransitionValueTriggerComparator/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="3:50-3:48-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="false"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="3:652" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyTrigger><DataBindContext sourcePathIds="3:50-3:46-3:69" propertyKey="686"/></BindablePropertyTrigger></TransitionPropertyViewModelComparator><TransitionValueTriggerComparator/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="3:50-3:48-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="true"/></TransitionViewModelCondition>
+                    </StateTransition>
+                </AnimationState>
+                <AnimationState x="400" y="-100" animationId="3:451" reset="true" id="3:651">
+                    <StateTransition stateToId="3:650" enableExitTime="true" exitTimeIsPercetange="true" exitTime="100"/>
+                </AnimationState>
+                <AnimationState x="400" y="100" animationId="3:452" reset="true" id="3:652">
+                    <StateTransition stateToId="3:650" enableExitTime="true" exitTimeIsPercetange="true" exitTime="100"/>
+                </AnimationState>
+            </StateMachineLayer>
+
+            <!-- Focus layer -->
+            <StateMachineLayer name="Focus" id="3:14">
+                <AnyState x="500" y="-120"/>
+                <ExitState x="700" y="-120"/>
+                <EntryState x="0" y="0"><StateTransition stateToId="3:660"/></EntryState>
+                <AnimationState x="160" y="0" animationId="3:460" id="3:660">
+                    <StateTransition stateToId="3:661" duration="80">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="3:50-3:46-3:68" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="true"/></TransitionViewModelCondition>
+                    </StateTransition>
+                </AnimationState>
+                <AnimationState x="360" y="0" animationId="3:461" id="3:661">
+                    <StateTransition stateToId="3:660" duration="80">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="3:50-3:46-3:68" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="false"/></TransitionViewModelCondition>
+                    </StateTransition>
+                </AnimationState>
+            </StateMachineLayer>
+        </StateMachine>
+    </Artboard>
+    <ComponentAsset artboardId="3:30" name="StartAngled"/>
+
+    <FontAsset file="../../../../assets/fonts/SpaceGrotesk-Variable.ttf" name="Space Grotesk" id="3:900"/>
+
+    <DataEnumCustom name="StartState" id="3:90">
+        <DataEnumValue key="idle" value="Idle" id="3:91"/>
+        <DataEnumValue key="pressed" value="Pressed" id="3:92"/>
+        <DataEnumValue key="loading" value="Loading" id="3:93"/>
+        <DataEnumValue key="disabled" value="Disabled" id="3:94"/>
+    </DataEnumCustom>
+    <!-- View models. Host paths: lobby/resume/eligible, lobby/resume/district,
+         lobby/start/state, theme/variant, layout/profile, a11y/reducedMotion.
+         lobby/start/pressed, focused and activate are the control's own. -->
+    <ViewModel defaultInstanceId="3:63" name="Resume" id="3:60">
+        <ViewModelPropertyBoolean name="eligible" id="3:61"/>
+        <ViewModelPropertyString name="district" id="3:62"/>
+        <ViewModelInstance exports="true" name="Default" id="3:63">
+            <ViewModelInstanceBoolean propertyValue="false" viewModelPropertyId="3:61"/>
+            <ViewModelInstanceString propertyValue="" viewModelPropertyId="3:62"/>
+        </ViewModelInstance>
+    </ViewModel>
+    <ViewModel defaultInstanceId="3:64" name="Start" id="3:65">
+        <ViewModelPropertyEnumCustom enumId="3:90" componentProps="1" name="state" id="3:66"/>
+        <ViewModelPropertyBoolean name="pressed" id="3:67"/>
+        <ViewModelPropertyBoolean name="focused" id="3:68"/>
+        <ViewModelPropertyTrigger name="activate" id="3:69"/>
+        <ViewModelInstance exports="true" name="Default" id="3:64">
+            <ViewModelInstanceEnum propertyValue="3:91" viewModelPropertyId="3:66"/>
+            <ViewModelInstanceBoolean propertyValue="false" viewModelPropertyId="3:67"/>
+            <ViewModelInstanceBoolean propertyValue="false" viewModelPropertyId="3:68"/>
+            <ViewModelInstanceTrigger viewModelPropertyId="3:69"/>
+        </ViewModelInstance>
+    </ViewModel>
+    <!-- Lobby: what the component binds. theme and a11y point at the shared
+         instances in shared-vm.rml (client 9). -->
+    <ViewModel defaultInstanceId="3:51" name="Lobby" id="3:50">
+        <ViewModelPropertyViewModel viewModelReferenceId="3:60" name="resume" id="3:45"/>
+        <ViewModelPropertyViewModel viewModelReferenceId="3:65" name="start" id="3:46"/>
+        <ViewModelPropertyViewModel viewModelReferenceId="9:60" name="theme" id="3:47"/>
+        <ViewModelPropertyViewModel viewModelReferenceId="9:80" name="a11y" id="3:48"/>
+        <ViewModelInstance exports="true" name="Default" id="3:51">
+            <ViewModelInstanceViewModel propertyValue="3:63" viewModelPropertyId="3:45"/>
+            <ViewModelInstanceViewModel propertyValue="3:64" viewModelPropertyId="3:46"/>
+            <ViewModelInstanceViewModel propertyValue="9:61" viewModelPropertyId="3:47"/>
+            <ViewModelInstanceViewModel propertyValue="9:81" viewModelPropertyId="3:48"/>
+        </ViewModelInstance>
+    </ViewModel>
+    <!-- Root of the standalone host: the §8 paths lobby/..., theme/variant,
+         layout/profile, a11y/reducedMotion. -->
+    <ViewModel defaultInstanceId="3:41" name="StartAngledRoot" id="3:40">
+        <ViewModelPropertyViewModel viewModelReferenceId="3:50" name="lobby" id="3:42"/>
+        <ViewModelPropertyViewModel viewModelReferenceId="9:60" name="theme" id="3:43"/>
+        <ViewModelPropertyViewModel viewModelReferenceId="9:70" name="layout" id="3:44"/>
+        <ViewModelPropertyViewModel viewModelReferenceId="9:80" name="a11y" id="3:49"/>
+        <ViewModelInstance exports="true" name="Default" id="3:41">
+            <ViewModelInstanceViewModel propertyValue="3:51" viewModelPropertyId="3:42"/>
+            <ViewModelInstanceViewModel propertyValue="9:61" viewModelPropertyId="3:43"/>
+            <ViewModelInstanceViewModel propertyValue="9:71" viewModelPropertyId="3:44"/>
+            <ViewModelInstanceViewModel propertyValue="9:81" viewModelPropertyId="3:49"/>
+        </ViewModelInstance>
+    </ViewModel>
+</Rive>

@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "artboard": "StartStop",
+  "roots": [
+    {
+      "id": 1,
+      "role": "button",
+      "roleValue": 1,
+      "label": "Resume",
+      "value": "",
+      "hint": "Starts the game. In play, press to pause; hold to stop.",
+      "headingLevel": 0,
+      "stateFlags": 128,
+      "traitFlags": 96,
+      "bounds": {"x": 4, "y": 4, "width": 120, "height": 44},
+      "children": []
+    }
+  ]
+}

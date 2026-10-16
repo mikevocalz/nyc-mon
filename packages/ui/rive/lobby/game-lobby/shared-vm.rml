@@ -1,0 +1,41 @@
+<Rive version="1" kind="fragment">
+    <!-- Shared by the four lobby projects. This file lives in game-lobby/ and
+         is symlinked into leaderboard/, start-angled/ and game-transition/
+         so every project builds the same Theme, Layout and A11y view models
+         with the same ids (client 9). game-lobby also symlinks the three
+         sibling scene.rml files, and the nested artboards keep resolving
+         theme/variant, layout/profile and a11y/reducedMotion because they
+         all bind the one shared instance. -->
+    <DataEnumCustom name="ThemeVariant" id="9:110">
+        <DataEnumValue key="daylit" value="Daylit" id="9:111"/>
+        <DataEnumValue key="night" value="Night" id="9:112"/>
+    </DataEnumCustom>
+    <DataEnumCustom name="LayoutProfile" id="9:113">
+        <DataEnumValue key="phone-portrait" value="Phone portrait" id="9:114"/>
+        <DataEnumValue key="phone-landscape" value="Phone landscape" id="9:115"/>
+        <DataEnumValue key="fold-outer" value="Fold outer" id="9:116"/>
+        <DataEnumValue key="fold-book" value="Fold book" id="9:117"/>
+        <DataEnumValue key="fold-tabletop" value="Fold tabletop" id="9:118"/>
+        <DataEnumValue key="tablet" value="Tablet" id="9:119"/>
+        <DataEnumValue key="web" value="Web" id="9:120"/>
+    </DataEnumCustom>
+
+    <ViewModel defaultInstanceId="9:61" name="Theme" id="9:60">
+        <ViewModelPropertyEnumCustom enumId="9:110" name="variant" id="9:62"/>
+        <ViewModelInstance exports="true" name="Default" id="9:61">
+            <ViewModelInstanceEnum propertyValue="9:112" viewModelPropertyId="9:62"/>
+        </ViewModelInstance>
+    </ViewModel>
+    <ViewModel defaultInstanceId="9:71" name="Layout" id="9:70">
+        <ViewModelPropertyEnumCustom enumId="9:113" name="profile" id="9:72"/>
+        <ViewModelInstance exports="true" name="Default" id="9:71">
+            <ViewModelInstanceEnum propertyValue="9:114" viewModelPropertyId="9:72"/>
+        </ViewModelInstance>
+    </ViewModel>
+    <ViewModel defaultInstanceId="9:81" name="A11y" id="9:80">
+        <ViewModelPropertyBoolean name="reducedMotion" id="9:82"/>
+        <ViewModelInstance exports="true" name="Default" id="9:81">
+            <ViewModelInstanceBoolean propertyValue="false" viewModelPropertyId="9:82"/>
+        </ViewModelInstance>
+    </ViewModel>
+</Rive>

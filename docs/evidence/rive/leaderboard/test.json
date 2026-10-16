@@ -1,0 +1,5 @@
+[23:07:38.184] rive  compiling 2 markup files as one document: ../game-lobby/shared-vm.rml, scene.rml
+[23:07:38.244] rive  built (145346 bytes, 61ms, 0 errors, 0 warnings)
+[23:07:38.244] rive  no Tests scripts found. A script qualifies by returning the Tests protocol, not by filename.
+[23:07:38.244] rive    no protocol scripts in this project at all
+{"success": true, "command": "test", "data": {"passed": 0, "failed": 0, "noTestsFound": true, "failures": []}, "errors": [], "warnings": []}
