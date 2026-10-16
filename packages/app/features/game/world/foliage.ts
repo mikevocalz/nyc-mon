@@ -1,5 +1,5 @@
-// Street and park trees: instanced leaf crowns near the camera, plain crowns
-// far away, hidden beyond that. Ported from vg-demos-all
+// Street and park trees: instanced leaf crowns near the Caller, plain crowns
+// farther out, nothing beyond (tree-lod.ts picks the sets). Ported from vg-demos-all
 // src/demos/metro-live/world/foliage.ts (MIT; notice in geometry.ts and
 // docs/implementation/city-world.md): base64 decode, the leaf-card crown
 // (one core and 10 cards here instead of two cores and 30, so 7 500
@@ -12,7 +12,9 @@ import type { BufferGeometry } from 'three/webgpu';
 import type { CityDatasetV2 } from '../city-dataset.ts';
 import { LEAF_ALPHA as LEAF } from './leaf-alpha.ts';
 import { mulberry32 } from './geometry.ts';
-import { createFarCrownMaterial, createLeafMaterial, linearColor } from './materials.ts';
+import { NEAR_TREE_CAP, TreeLod } from './tree-lod.ts';
+import { createStreetClearance, type StreetClearance } from './walkability.ts';
+import { createFarCrownMaterial, createLeafMaterial, linearColor, TONE_ATTRIBUTE, type CityMaterials } from './materials.ts';
 
 type Geometry = BufferGeometry;
 
@@ -129,38 +131,86 @@ export function leafCrownGeometry(THREE: Three, cards = 10): Geometry {
   return merged;
 }
 
-/** Where trees stand: OSM trees first, then the generated fill. */
-export function treePlacements(dataset: CityDatasetV2): { x: number; z: number; scale: number; tone: number; osm: boolean }[] {
+/** Horizontal reach of a crown at scale 1 at trunk height (2.8 m), metres: the core plus the inner leaf cards. */
+export const CROWN_REACH = 2.6;
+/** A crown may reach this far over the carriageway edge at trunk height. */
+export const MAX_OVERHANG = 1.5;
+/** Crowns that would have to shrink below this scale to clear the road are dropped instead. */
+export const MIN_TREE_SCALE = 0.6;
+/** An OSM tree in a carriageway moves to the sidewalk only if the band is this close. */
+export const TREE_MAX_MOVE = 3;
+
+export interface TreePlacement { x: number; z: number; scale: number; tone: number; osm: boolean }
+export interface TreeReport { osmMoved: number; osmDropped: number; fillDropped: number; shrunk: number; overhangDropped: number }
+
+/**
+ * Where trees stand: OSM trees first, then the generated fill, each kept
+ * out of the street (walkability.ts `createStreetClearance`, the road
+ * mesh's widths plus the kerb margin). An OSM tree inside a carriageway or
+ * crossing moves to the nearest sidewalk-band point within 3 m, else it is
+ * dropped; a generated tree there is dropped. A crown reaching more than
+ * 1.5 m over the carriageway edge shrinks, or drops below scale 0.6.
+ */
+export function treePlacements(dataset: CityDatasetV2, clearance: StreetClearance = createStreetClearance(dataset)): { trees: TreePlacement[]; report: TreeReport } {
   const rand = mulberry32(1931);
-  const out: { x: number; z: number; scale: number; tone: number; osm: boolean }[] = [];
+  const trees: TreePlacement[] = [];
+  const report: TreeReport = { osmMoved: 0, osmDropped: 0, fillDropped: 0, shrunk: 0, overhangDropped: 0 };
   const push = (list: readonly number[], osm: boolean) => {
     for (let i = 0; i + 1 < list.length; i += 2) {
-      out.push({ x: list[i]!, z: list[i + 1]!, scale: osm ? 1 + rand() * 0.3 : 0.8 + rand() * 0.45, tone: rand(), osm });
+      // Draw the random numbers first so a dropped tree does not reshuffle its neighbours.
+      let scale = osm ? 1 + rand() * 0.3 : 0.8 + rand() * 0.45;
+      const tone = rand();
+      let x = list[i]!;
+      let z = list[i + 1]!;
+      if (!clearance.standable(x, z)) {
+        const moved = osm ? clearance.toSidewalk(x, z, TREE_MAX_MOVE) : null;
+        if (!moved) { if (osm) report.osmDropped++; else report.fillDropped++; continue; }
+        [x, z] = moved;
+        report.osmMoved++;
+      }
+      const room = clearance.kerbGap(x, z) + MAX_OVERHANG;
+      if (CROWN_REACH * scale > room) {
+        const fit = room / CROWN_REACH;
+        if (fit < MIN_TREE_SCALE) { report.overhangDropped++; continue; }
+        scale = fit;
+        report.shrunk++;
+      }
+      trees.push({ x, z, scale, tone, osm });
     }
   };
   push(dataset.trees.osm, true);
   push(dataset.trees.fill, false);
-  return out;
+  return { trees, report };
 }
 
-/** Above these camera distances (metres) the near crowns swap to plain ones, then all trees hide. */
-export const TREE_NEAR_LOD_METRES = 450;
-export const TREE_HIDE_METRES = 1600;
+export { TREE_HIDE_METRES, TREE_NEAR_LOD_METRES } from './tree-lod.ts';
 
-export function buildTrees(THREE: Three, dataset: CityDatasetV2) {
-  const placements = treePlacements(dataset);
+/**
+ * Trees as three instanced meshes whose instance lists follow the Caller:
+ * leaf crowns and trunks within NEAR_TREE_RADIUS (capped), plain far crowns
+ * out to the far radius, nothing beyond. Each tree's matrix and tone are
+ * computed once into source arrays; a refresh copies rows into the
+ * preallocated instance buffers and sets `count`, so walking allocates
+ * nothing and React never re-renders.
+ */
+export function buildTrees(
+  THREE: Three, dataset: CityDatasetV2, materials: Pick<CityMaterials, 'rig' | 'trunks'>,
+  clearance: StreetClearance = createStreetClearance(dataset),
+) {
+  const { trees: placements, report } = treePlacements(dataset, clearance);
   const count = Math.max(1, placements.length);
   const texture = leafTexture(THREE);
   const crownGeometry = leafCrownGeometry(THREE);
   const farGeometry = new THREE.IcosahedronGeometry(1.15 * CROWN_SCALE, 0).translate(0, 1.5 * CROWN_SCALE, 0);
   const trunkGeometry = new THREE.CylinderGeometry(0.16, 0.24, 2.8, 6).translate(0, 1.4, 0);
-  const leafMaterial = createLeafMaterial(THREE, texture);
-  const farMaterial = createFarCrownMaterial(THREE);
-  const trunkMaterial = new THREE.MeshStandardNodeMaterial({ roughness: 1, metalness: 0 });
-  trunkMaterial.colorNode = THREE.TSL.color(linearColor(THREE, 'trunk'));
-  const near = new THREE.InstancedMesh(crownGeometry, leafMaterial, count);
+  const leafMaterial = createLeafMaterial(THREE, materials.rig, texture);
+  const farMaterial = createFarCrownMaterial(THREE, materials.rig);
+  // Shared with the city materials, which dispose it.
+  const trunkMaterial = materials.trunks;
+  const nearCapacity = Math.min(count, NEAR_TREE_CAP);
+  const near = new THREE.InstancedMesh(crownGeometry, leafMaterial, nearCapacity);
   const far = new THREE.InstancedMesh(farGeometry, farMaterial, count);
-  const trunks = new THREE.InstancedMesh(trunkGeometry, trunkMaterial, count);
+  const trunks = new THREE.InstancedMesh(trunkGeometry, trunkMaterial, nearCapacity);
   near.name = 'city:trees-near';
   far.name = 'city:trees-far';
   trunks.name = 'city:tree-trunks';
@@ -172,39 +222,71 @@ export function buildTrees(THREE: Three, dataset: CityDatasetV2) {
   const light = linearColor(THREE, 'leafLight');
   const dark = linearColor(THREE, 'leafDark');
   const tone = new THREE.Color();
+  // Source rows, one per tree, built once.
+  const sourceMatrices = new Float32Array(count * 16);
+  const sourceTones = new Float32Array(count * 3);
+  const xs = new Float32Array(placements.length);
+  const zs = new Float32Array(placements.length);
   placements.forEach((tree, i) => {
     rotation.setFromAxisAngle(up, tree.tone * Math.PI * 2);
     position.set(tree.x, 0, tree.z);
     scale.setScalar(tree.scale);
     matrix.compose(position, rotation, scale);
-    near.setMatrixAt(i, matrix);
-    far.setMatrixAt(i, matrix);
-    trunks.setMatrixAt(i, matrix);
+    matrix.toArray(sourceMatrices, i * 16);
     tone.copy(dark).lerp(light, tree.tone);
-    near.setColorAt(i, tone);
-    far.setColorAt(i, tone);
+    sourceTones[i * 3] = tone.r; sourceTones[i * 3 + 1] = tone.g; sourceTones[i * 3 + 2] = tone.b;
+    xs[i] = tree.x;
+    zs[i] = tree.z;
   });
+  // The cel albedo reads the tone before lighting, so each crown mesh keeps its own tone list.
+  const nearTones = new THREE.InstancedBufferAttribute(new Float32Array(nearCapacity * 3), 3);
+  const farTones = new THREE.InstancedBufferAttribute(new Float32Array(count * 3), 3);
+  crownGeometry.setAttribute(TONE_ATTRIBUTE, nearTones);
+  farGeometry.setAttribute(TONE_ATTRIBUTE, farTones);
   for (const mesh of [near, far, trunks]) {
-    mesh.count = placements.length;
-    mesh.instanceMatrix.needsUpdate = true;
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-    // The batch spans the whole tile; per-instance culling is not worth it at this count.
+    mesh.count = 0;
+    // The lists change as the Caller walks; one bounding volume for the tile would never cull.
     mesh.frustumCulled = false;
   }
-  far.visible = false;
+  const lod = new TreeLod(xs, zs);
+  const copy = (ids: Int32Array, n: number, targets: InstanceType<Three['InstancedMesh']>[], tones: InstanceType<Three['InstancedBufferAttribute']>) => {
+    const toneArray = tones.array as Float32Array;
+    for (let k = 0; k < n; k++) {
+      const i = ids[k]!;
+      const row = sourceMatrices.subarray(i * 16, i * 16 + 16);
+      for (const mesh of targets) (mesh.instanceMatrix.array as Float32Array).set(row, k * 16);
+      toneArray[k * 3] = sourceTones[i * 3]!;
+      toneArray[k * 3 + 1] = sourceTones[i * 3 + 1]!;
+      toneArray[k * 3 + 2] = sourceTones[i * 3 + 2]!;
+    }
+    for (const mesh of targets) {
+      mesh.count = n;
+      mesh.instanceMatrix.clearUpdateRanges();
+      if (n > 0) mesh.instanceMatrix.addUpdateRange(0, n * 16);
+      mesh.instanceMatrix.needsUpdate = true;
+    }
+    tones.clearUpdateRanges();
+    if (n > 0) tones.addUpdateRange(0, n * 3);
+    tones.needsUpdate = true;
+  };
   return {
     objects: [near, far, trunks],
     count: placements.length,
-    /** Near/far crown swap by camera distance. */
-    setDistance(distance: number) {
-      const hide = distance > TREE_HIDE_METRES || placements.length === 0;
-      near.visible = !hide && distance <= TREE_NEAR_LOD_METRES;
-      far.visible = !hide && distance > TREE_NEAR_LOD_METRES;
-      trunks.visible = !hide && distance <= TREE_NEAR_LOD_METRES * 1.5;
+    /** How many trees the street clearance moved, shrank or dropped. */
+    report,
+    lod,
+    /** Refresh the instance lists around the focus; cheap to call every frame. */
+    update(x: number, z: number, cameraDistance: number) {
+      if (placements.length === 0 || !lod.update(x, z, cameraDistance)) return false;
+      copy(lod.near, lod.nearCount, [near, trunks], nearTones);
+      copy(lod.far, lod.farCount, [far], farTones);
+      near.visible = trunks.visible = lod.nearCount > 0;
+      far.visible = lod.farCount > 0;
+      return true;
     },
     dispose() {
       for (const g of [crownGeometry, farGeometry, trunkGeometry]) g.dispose();
-      for (const m of [leafMaterial, farMaterial, trunkMaterial]) m.dispose();
+      for (const m of [leafMaterial, farMaterial]) m.dispose();
       texture.dispose();
       for (const mesh of [near, far, trunks]) mesh.dispose();
     },

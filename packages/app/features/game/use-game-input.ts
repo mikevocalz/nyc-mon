@@ -43,7 +43,7 @@ import {
 } from '@acme/ui/game-controls/hardware';
 import { commandToAction } from './camera-input.ts';
 import { RELEASED_CONTROLS, NOTHING_TO_INTERACT, stepGameFrame, type CallerControls } from './character/caller-controller.ts';
-import { chaseRef, cycleZoom, jump, placeCaller, recentre, worldQueries } from './character/caller-runtime.ts';
+import { chaseRef, cycleZoom, frameWake, jump, placeCaller, recentre, resetViewTurns, streetAxes, worldQueries } from './character/caller-runtime.ts';
 import { callerStore } from './character/caller-store.ts';
 import type { CityDataset } from './city-dataset.ts';
 import {
@@ -87,7 +87,7 @@ export interface GameInputOptions {
   readonly foldSignature: string;
   /** Changes when the container resizes: every input is dropped with `layout-change`. */
   readonly layoutSignature: string;
-  /** OS reduced motion: the chase camera snaps to the Caller instead of easing, and never swings by itself. */
+  /** OS reduced motion: the chase camera snaps to the Caller and the block settle lands in one frame instead of easing. */
   readonly reducedMotion?: boolean;
 }
 
@@ -178,7 +178,7 @@ export function useGameInput(options: GameInputOptions): GameInput {
         return;
       }
       const before = { caller: callerStore.getState(), camera: camera.getState().camera, chase: chaseRef.current };
-      const next = stepGameFrame(before, controls, dt, latest.current.reducedMotion ?? false, worldQueries);
+      const next = stepGameFrame(before, controls, dt, latest.current.reducedMotion ?? false, worldQueries, streetAxes);
       chaseRef.current = next.chase;
       if (next.caller !== before.caller) callerStore.setState(next.caller, true);
       if (next.camera !== before.camera) camera.setState({ camera: next.camera });
@@ -190,6 +190,8 @@ export function useGameInput(options: GameInputOptions): GameInput {
       lastFrameMs = 0;
       frame = requestAnimationFrame(step);
     };
+    // A drag or twist ending outside the loop wakes it, so the view settles onto the block.
+    frameWake.current = startLoop;
 
     const clearRepeat = (button: ButtonId): void => {
       const timer = repeats.get(button);
@@ -222,6 +224,8 @@ export function useGameInput(options: GameInputOptions): GameInput {
       if (isHoldAction(action)) {
         const held = down || router.heldButtons.has(button);
         controls = action === 'run' ? { ...controls, run: held } : { ...controls, look: held };
+        // Letting go of Z settles the view onto the block, which needs a frame even with the stick at rest.
+        startLoop();
         return true;
       }
       if (!down || !acceptsGameplayInput(worldSessionStore.getState().session)) return true;
@@ -285,6 +289,8 @@ export function useGameInput(options: GameInputOptions): GameInput {
       appState.remove();
       subscription.remove();
       stopLoop();
+      frameWake.current = null;
+      resetViewTurns();
       for (const button of [...repeats.keys()]) clearRepeat(button);
     };
   }, [enabled]);

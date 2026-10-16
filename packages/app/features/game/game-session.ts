@@ -27,7 +27,26 @@ export interface GameScreenState {
    * fails the start instead of holding the cover forever (review finding C1).
    */
   viewState: GameViewState | null;
+  /**
+   * World load, 0..100, set at real milestones of the current attempt
+   * (LOAD_STAGES): never estimated from time. 100 once the first frame lands.
+   */
+  loadProgress: number;
 }
+
+/** Where each load milestone puts the bar. Ordered; progress never moves backwards. */
+export const LOAD_STAGES = {
+  /** The scene module import has started. */
+  requested: 5,
+  /** three.js and the scene module are loaded. */
+  moduleLoaded: 35,
+  /** The city meshes, materials and actors are built. */
+  worldBuilt: 75,
+  /** Shader pipelines are compiled and a frame using them was drawn. */
+  firstRender: 90,
+  /** The first frame landed. */
+  done: 100,
+} as const;
 
 export const gameScreenStore = createStore<GameScreenState>(() => ({
   canvasFailed: false,
@@ -35,6 +54,7 @@ export const gameScreenStore = createStore<GameScreenState>(() => ({
   attempt: 0,
   announcedReady: false,
   viewState: null,
+  loadProgress: 0,
 }));
 
 export const gameScreenActions = {
@@ -42,10 +62,15 @@ export const gameScreenActions = {
     gameScreenStore.setState({ canvasFailed: backend === null });
   },
   firstFrame() {
-    if (!gameScreenStore.getState().firstFrame) gameScreenStore.setState({ firstFrame: true });
+    if (!gameScreenStore.getState().firstFrame) gameScreenStore.setState({ firstFrame: true, loadProgress: LOAD_STAGES.done });
+  },
+  /** Advance the load bar to a milestone; an earlier milestone after a later one is ignored. */
+  loadStage(stage: keyof typeof LOAD_STAGES) {
+    const value = LOAD_STAGES[stage];
+    if (gameScreenStore.getState().loadProgress < value) gameScreenStore.setState({ loadProgress: value });
   },
   retry() {
-    gameScreenStore.setState((s) => ({ canvasFailed: false, firstFrame: false, attempt: s.attempt + 1 }));
+    gameScreenStore.setState((s) => ({ canvasFailed: false, firstFrame: false, loadProgress: 0, attempt: s.attempt + 1 }));
   },
   markAnnounced() {
     gameScreenStore.setState({ announcedReady: true });
@@ -56,7 +81,7 @@ export const gameScreenActions = {
    * count. Keeps `attempt` and `announcedReady`.
    */
   resetForMount() {
-    gameScreenStore.setState({ canvasFailed: false, firstFrame: false, viewState: null });
+    gameScreenStore.setState({ canvasFailed: false, firstFrame: false, viewState: null, loadProgress: 0 });
   },
   viewStateChanged(viewState: GameViewState | null) {
     if (gameScreenStore.getState().viewState !== viewState) gameScreenStore.setState({ viewState });

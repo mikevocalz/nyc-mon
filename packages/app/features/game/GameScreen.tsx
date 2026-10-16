@@ -63,6 +63,7 @@ import { gameCameraStore, gameScreenActions, gameScreenStore } from './game-sess
 import { resolveGameViewState, shouldMountCanvas } from './game-status.ts';
 import { resolveGameHudLayout } from './hud-layout.ts';
 import { loadGameScene, type GameSceneParams } from './load-game-scene.ts';
+import { useGameRenderThread } from './render-thread-choice.ts';
 import { readLobbyIdentity } from './lobby/lobby-identity.ts';
 import { lobbyStore } from './lobby/lobby.store.ts';
 import { gameInputRouter, useGameInput } from './use-game-input.ts';
@@ -157,8 +158,21 @@ export function GameScreen({ focused = true }: GameScreenProps = {}) {
   // survive the cover's removal (seen on Surface Duo, 2026-10-15: dark canvas
   // until the first camera move). The camera is already restored, so this
   // frame is still the resumed view.
+  // The redraw waits two animation frames: `game` and the cover's `done` land
+  // in the same commit, so a redraw in this effect still ran under the cover
+  // and the loader lifted onto a dark canvas (Surface Duo, 2026-10-16). By the
+  // second frame the native cover view is gone.
   useEffect(() => {
-    if (lobbyPhase === 'game') canvas.current?.invalidate();
+    if (lobbyPhase !== 'game') return;
+    let second = 0;
+    const first = requestAnimationFrame(() => {
+      canvas.current?.invalidate();
+      second = requestAnimationFrame(() => canvas.current?.invalidate());
+    });
+    return () => {
+      cancelAnimationFrame(first);
+      cancelAnimationFrame(second);
+    };
   }, [lobbyPhase]);
 
   // "Success": one polite announcement when the world first appears this session.
@@ -180,6 +194,9 @@ export function GameScreen({ focused = true }: GameScreenProps = {}) {
     };
   }, [city]);
 
+  // Off by default; EXPO_PUBLIC_WORKLET_RENDER=1 renders on a worklet runtime (docs/implementation/worklet-rendering.md).
+  const renderThread = useGameRenderThread();
+
   const gestures = useCityCameraGestures({
     viewportHeight: () => geometry.getState().height,
     reducedMotion,
@@ -200,7 +217,7 @@ export function GameScreen({ focused = true }: GameScreenProps = {}) {
   const hud = resolveGameHudLayout({ width, height, insets: hudInsets, folds, railEdge, isRTL: I18nManager.isRTL });
 
   // The session and its save cadence, mounted once per Game screen.
-  const identity = useMemo(readLobbyIdentity, []);
+  const identity = useMemo(() => readLobbyIdentity(), []);
   const dataset = city.ok ? city.dataset : null;
   useWorldSaveLifecycle({ identity, dataset });
   const input = useGameInput({
@@ -232,7 +249,7 @@ export function GameScreen({ focused = true }: GameScreenProps = {}) {
       accessibilityElementsHidden={!handedOver}
       importantForAccessibility={handedOver ? 'auto' : 'no-hide-descendants'}
     >
-      {params && shouldMountCanvas(state) ? (
+      {params && shouldMountCanvas(state) && renderThread.settled ? (
         <GestureDetector gesture={gestures}>
           <View
             className="flex-1"
@@ -248,6 +265,8 @@ export function GameScreen({ focused = true }: GameScreenProps = {}) {
               // Keyed on Retry only, never on size, posture or fold: resizing keeps the renderer and camera.
               key={`attempt-${screen.attempt}`}
               ref={canvas}
+              renderThread={renderThread.thread}
+              workletHost={renderThread.host}
               load={loadGameScene}
               params={params}
               paused

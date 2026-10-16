@@ -34,6 +34,7 @@ import type { HardwareInputStore } from './hardware-input.store.ts';
 import { STOP_HOLD_MS, type HoldState } from './hold-to-stop.ts';
 import {
   IDLE_KEYBOARD_STICK,
+  isKeyboardRunKey,
   isMappedKeyCode,
   keyCodeToButtonId,
   keyboardEscapeHeld,
@@ -249,6 +250,16 @@ export function createHardwareInputAdapter(options: HardwareInputAdapterOptions)
     }),
 
     source.addOnKeyListener((code, pressed, timestampMs) => {
+      // Shift only changes a held direction from walk to run. On its own it
+      // publishes nothing and leaves the touch controls up.
+      if (isKeyboardRunKey(code)) {
+        const stick = keyboardKeyToMove(keyboardStick, code, pressed);
+        keyboardStick = stick.next;
+        if (stick.move === null) return;
+        markActive('keyboard', timestampMs);
+        publishMove('keyboard', stick.move, timestampMs);
+        return;
+      }
       if (!isMappedKeyCode(code)) return;
       markActive('keyboard', timestampMs);
       const stick = keyboardKeyToMove(keyboardStick, code, pressed);

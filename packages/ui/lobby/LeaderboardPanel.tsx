@@ -48,6 +48,8 @@ export interface LeaderboardPanelProps {
   readonly nowMs: number;
   /** Stops the artboard's render loop while the lobby is covered or backgrounded (review finding M15). @default false */
   readonly paused?: boolean;
+  /** Fill the parent's height (the lobby's rank pane beside START); rows stay top-aligned. @default false */
+  readonly fill?: boolean;
   readonly testID?: string;
 }
 
@@ -65,7 +67,7 @@ export const PANEL_ROWS_RESERVED = 4;
  *
  * @see {@linkcode LeaderboardPanelProps}
  */
-export function LeaderboardPanel({ model, reducedMotion, district, onRetry, rive, nowMs, paused = false, testID }: LeaderboardPanelProps) {
+export function LeaderboardPanel({ model, reducedMotion, district, onRetry, rive, nowMs, paused = false, fill = false, testID }: LeaderboardPanelProps) {
   const rows = panelRowsOf(model);
   const now = nowMs;
 
@@ -154,8 +156,8 @@ export function LeaderboardPanel({ model, reducedMotion, district, onRetry, rive
   })();
 
   return (
-    <View {...(testIdProps(testID) as object)} testID={testID} className="w-full">
-      <SolidPanel tone="ink" depth="sm" className="w-full">
+    <View {...(testIdProps(testID) as object)} testID={testID} className={fill ? 'w-full flex-1' : 'w-full'}>
+      <SolidPanel tone="ink" depth="sm" className="w-full" fill={fill}>
         <View
           className={`flex-row items-center border-b-2 px-4 ${keyline}`}
           // Computed: the header band is 40 pt (08-handoff.md § Layout).
@@ -169,7 +171,7 @@ export function LeaderboardPanel({ model, reducedMotion, district, onRetry, rive
           <Text variant="label" className="text-ink-50 tracking-wide">{LOBBY_COPY.rankTitle}</Text>
         </View>
         <View
-          className="relative w-full"
+          className={fill ? 'relative w-full flex-1' : 'relative w-full'}
           // Computed: four 56 pt rows reserved in every state so the panel never collapses.
           style={{ minHeight: PANEL_ROW_PT * PANEL_ROWS_RESERVED }}
         >

@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { useRouter, type Href } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'expo-router';
 import { listUnmetNeeds, type BootRoute } from '@acme/core/sim';
 import {
   FadeIn,
@@ -9,6 +9,7 @@ import {
   HLynkShell,
   SHELL_HANDOFF_MS,
   SafeArea,
+  useInstance,
   useReducedMotion,
   type HLynkPower,
   type HLynkStatus,
@@ -64,12 +65,13 @@ export function BootScreen() {
   const router = useRouter();
   const reducedMotion = useReducedMotion();
   const [power, setPower] = useState<HLynkPower>('off');
-  const resolved = useRef<{ route: BootRoute; path: Href; scheme: 'daylit' | 'night' } | null>(null);
-  if (resolved.current === null) {
+  // Resolved once per mount, all from one clock reading, so the route, the
+  // colour scheme and the LED status describe the same moment.
+  const { route, path, scheme, status } = useInstance(() => {
     const nowMs = Date.now();
-    resolved.current = { ...resolveBootPath(nowMs), scheme: schemeForTime(nowMs) };
-  }
-  const { route, path, scheme } = resolved.current;
+    const boot = resolveBootPath(nowMs);
+    return { ...boot, scheme: schemeForTime(nowMs), status: destinationStatus(boot.route, nowMs) };
+  });
   const firstRun = route.kind === 'first-run';
 
   useEffect(() => {
@@ -94,7 +96,6 @@ export function BootScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const status = destinationStatus(route, Date.now());
   return (
     <SafeArea className="flex-1 bg-bg">
       <FadeIn reducedMotion={reducedMotion} className="flex-1">

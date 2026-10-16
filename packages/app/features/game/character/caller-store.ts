@@ -20,10 +20,22 @@ export interface CallerState {
   /** Facing as a three.js rotation.y (locomotion.ts conventions). */
   readonly heading: number;
   readonly gait: Gait;
-  /** Ground speed this frame, m/s. */
+  /** Ground speed this frame, m/s, as measured after collision. */
   readonly speed: number;
-  /** Metres walked since spawn. The proxy's limb swing is a function of it, so animation follows distance, not the clock. */
+  /**
+   * The pace the Caller is moving at before collision, m/s. It eases toward
+   * the stick's target speed (locomotion.ts `easePace`), so walk to run and
+   * back never snaps; a wall slows `speed`, not this.
+   */
+  readonly pace: number;
+  /** Metres walked since spawn. */
   readonly stride: number;
+  /**
+   * Gait cycles walked since spawn. Grows by distance over the cycle length
+   * for the current pace, so the limb swing follows ground travel at any
+   * frame rate and a run takes longer strides than a walk.
+   */
+  readonly gaitPhase: number;
   readonly jump: JumpState;
 }
 
@@ -35,7 +47,9 @@ export const INITIAL_CALLER_STATE: CallerState = Object.freeze({
   heading: Math.PI,
   gait: 'idle',
   speed: 0,
+  pace: 0,
   stride: 0,
+  gaitPhase: 0,
   jump: GROUNDED,
 });
 

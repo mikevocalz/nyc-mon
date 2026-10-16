@@ -150,3 +150,16 @@ describe('dispose', () => {
     assert.deepEqual([...router.heldButtons], ['y']);
   });
 });
+
+describe('keyboard walk and Shift run', () => {
+  it('W walks, Shift+W runs at full deflection, letting go of Shift walks again', () => {
+    const { router, fake, active } = setup();
+    fake.key('KeyW', true, 1);
+    assert.ok(router.stick.engaged && router.stick.y > 0 && router.stick.y < 0.75, `walk ${router.stick.y}`);
+    fake.key('ShiftLeft', true, 2);
+    assert.equal(router.stick.y, 1);
+    fake.key('ShiftLeft', false, 3);
+    assert.ok(router.stick.y < 0.75);
+    assert.equal(active(), 'keyboard');
+  });
+});

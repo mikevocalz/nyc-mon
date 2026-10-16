@@ -13,7 +13,9 @@ export const LOBBY_COPY = {
   startA11yContinue: 'Continue your game',
   startHintNew: "Creates your Caller's first game",
   startHintContinue: 'Picks up exactly where you left off',
-  startLoading: 'Opening the city',
+  startLoading: 'Getting you the keys🔑 to the City🏙️',
+  /** Spoken form of `startLoading`: screen readers would read the emoji aloud. */
+  startLoadingA11y: 'Getting you the keys to the City',
   startA11yRecover: 'Fix your last save',
   resumeTitleContinue: 'Continue your game',
   resumeTitleNew: 'Start a new game',

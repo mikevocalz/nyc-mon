@@ -21,6 +21,11 @@ export function licenseLabel(license: string): string {
   return license.replace(/^ODbL-/, 'ODbL ');
 }
 
+/** The short on-map credit OSM's attribution guidelines accept ("© OpenStreetMap", linked); the full line is the a11y label. */
+export function shortCredit(attribution: string): string {
+  return attribution.replace(/\s+contributors$/i, '');
+}
+
 export function MapAttribution({ source, rect }: { source: CityDataset['source']; rect: Rect }) {
   const label = `${source.attribution}, ${licenseLabel(source.license)}`;
   return (
@@ -33,11 +38,18 @@ export function MapAttribution({ source, rect }: { source: CityDataset['source']
       <Pressable
         role="link"
         aria-label={`${label}. Opens the OpenStreetMap copyright page`}
-        // 44pt tall hit area even though the text is small.
-        className="min-h-11 self-start justify-center rounded-soft bg-surface/80 px-2"
+        // 44pt tall hit area even though the text is small. A quiet map credit, not a panel:
+        // no backdrop, muted text with a shadow so it reads over sky and street alike.
+        className="min-h-11 self-start justify-center px-1"
         onPress={() => void Linking.openURL(OSM_COPYRIGHT_URL)}
       >
-        <Text className="text-xs text-text underline" numberOfLines={2}>{label}</Text>
+        <Text
+          className="text-[11px] text-ink-50/70"
+          numberOfLines={1}
+          style={{ textShadowColor: 'rgba(0,4,28,0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }}
+        >
+          {shortCredit(source.attribution)}
+        </Text>
       </Pressable>
     </View>
   );

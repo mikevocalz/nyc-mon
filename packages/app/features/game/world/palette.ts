@@ -5,7 +5,7 @@
 // import, so node tests can pin the values.
 import { palette } from '@acme/theme';
 
-const { orange, royal, carolina, leaf, apple, ink, concrete } = palette;
+const { orange, royal, carolina, leaf, apple, ink, concrete, signage } = palette;
 
 function channels(hex: string): [number, number, number] {
   const value = Number.parseInt(hex.slice(1, 7), 16);
@@ -28,13 +28,14 @@ export function hexToRgb(hex: string): [number, number, number] {
 }
 
 export const CITY_COLORS = {
-  // Sky and air: a warm afternoon over Harlem.
-  skyZenith: mixHex(carolina[400], royal[300], 0.25),
-  skyHorizon: mixHex(carolina[100], orange[50], 0.55),
-  sunGlow: orange[100],
-  sun: orange[50],
-  hemiSky: carolina[100],
-  hemiGround: concrete[400],
+  // Sky and air: dusk over Harlem, the zenith going to brand night, a dusty rose haze at the horizon.
+  skyZenith: mixHex(royal[900], ink[950], 0.35),
+  skyMid: mixHex(royal[600], carolina[700], 0.4),
+  skyHorizon: mixHex(orange[300], royal[300], 0.35),
+  sunGlow: orange[400],
+  sun: orange[200],
+  hemiSky: mixHex(carolina[300], royal[300], 0.4),
+  hemiGround: concrete[500],
   // Ground and land use.
   ground: mixHex(concrete[200], orange[100], 0.25),
   park: mixHex(leaf[400], leaf[500], 0.35),
@@ -72,6 +73,82 @@ export const CITY_COLORS = {
   marqueeLights: orange[200],
   terracotta: concrete[50],
   beacon: royal[400],
+  // The near-future layer: brand neon (the 400 steps where the 500 is too dark to glow), lit windows, street furniture.
+  neonOrange: orange[500],
+  neonRoyal: royal[400],
+  neonCarolina: carolina[400],
+  neonApple: apple[400],
+  neonLeaf: leaf[400],
+  windowWarm: orange[200],
+  windowAmber: orange[300],
+  windowCool: carolina[200],
+  sidewalkGrid: carolina[400],
+  curbGlow: royal[400],
+  // NYC street-name blade: white on green (leaf 800 sits near the MUTCD sign green).
+  signGreen: leaf[800],
+  signText: signage.white,
+  pole: ink[800],
+  lampHead: mixHex(orange[50], carolina[100], 0.5),
+  lampHalo: orange[200],
+  // Wall tone families, so a block is not one flat colour per class (WALL_TONES).
+  brownstoneWarm: mixHex(orange[800], concrete[600], 0.3),
+  sandstone: mixHex(orange[700], concrete[500], 0.45),
+  brickRed: mixHex(mixHex(apple[800], orange[700], 0.5), concrete[500], 0.2),
+  brickDark: mixHex(orange[900], apple[900], 0.5),
+  brickBuff: mixHex(orange[400], concrete[400], 0.55),
+  limestone: mixHex(concrete[100], orange[100], 0.35),
+  stucco: mixHex(concrete[300], orange[200], 0.2),
+  glassDark: mixHex(royal[800], carolina[700], 0.5),
+  glassTeal: mixHex(carolina[600], leaf[700], 0.3),
+  // Window surrounds: pale stone lintels and sills, dark frames.
+  lintel: mixHex(concrete[100], orange[100], 0.5),
+  // Roll-down shop gates.
+  gate: concrete[400],
+  // Cast iron: stoop railings, fire escapes, hydrant caps.
+  iron: ink[900],
+  cornice: mixHex(concrete[600], orange[900], 0.25),
+  // Shop awnings.
+  awningRed: apple[600],
+  awningGreen: leaf[700],
+  awningBlue: royal[600],
+  awningOrange: orange[600],
+  awningBlack: ink[800],
+  awningTeal: carolina[700],
+  // Water towers: weathered cedar staves, black steel, a tarred roof.
+  cedar: mixHex(orange[900], concrete[500], 0.35),
+  towerSteel: ink[800],
+  towerRoof: ink[700],
+  // Street things. The palette has no yellow: taxis take the orange steps the lane lines use.
+  taxi: mixHex(orange[300], orange[400], 0.4),
+  carSilver: concrete[300],
+  carDark: ink[800],
+  carBlue: royal[700],
+  carRed: apple[700],
+  carGrey: concrete[600],
+  carGreen: leaf[800],
+  carGlass: ink[900],
+  tyre: ink[950],
+  hydrant: apple[600],
+  hydrantCap: concrete[300],
+  basket: leaf[900],
+  subwayRail: leaf[900],
+  subwayGlobe: leaf[400],
+  shelterGlass: mixHex(carolina[800], ink[800], 0.4),
+  shelterFrame: concrete[600],
 } as const;
 
 export type CityColor = keyof typeof CITY_COLORS;
+
+/** Wall tones per material class, one picked per building by a hash of its id (city-mesh.ts). */
+export const WALL_TONES = {
+  brownstone: ['brownstone', 'brownstoneWarm', 'sandstone'],
+  brick: ['brick', 'brickRed', 'brickDark', 'brickBuff'],
+  nycha: ['nycha', 'brickDark'],
+  glass: ['glass', 'glassDark', 'glassTeal'],
+  civic: ['civic', 'limestone'],
+  church: ['church', 'limestone', 'sandstone'],
+  plain: ['plain', 'limestone', 'stucco'],
+} as const satisfies Record<string, readonly CityColor[]>;
+
+export const AWNING_TONES = ['awningRed', 'awningGreen', 'awningBlue', 'awningOrange', 'awningBlack', 'awningTeal'] as const satisfies readonly CityColor[];
+export const CAR_TONES = ['carSilver', 'carDark', 'carBlue', 'carRed', 'carGrey', 'carGreen', 'carDark', 'carSilver'] as const satisfies readonly CityColor[];

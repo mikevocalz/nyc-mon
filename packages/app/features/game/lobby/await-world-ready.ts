@@ -5,10 +5,13 @@ import type { GameViewState } from '../game-status.ts';
 // The wait between the lobby's `hold` and the session start (review finding
 // C1). Resolves on the world's first frame; rejects when GameScreen reports a
 // state that can never draw (`data-error`, `render-error`, `unsupported`) or
-// when nothing happens within FIRST_FRAME_TIMEOUT_MS. Every path removes the
+// when the load makes no progress for FIRST_FRAME_TIMEOUT_MS. The clock
+// restarts at every load milestone (`loadProgress`): a slow device that is
+// still building the world is not a failure, a stalled one is (Surface Duo,
+// 2026-10-16: a 14 s world build used to time out a healthy start). Every path removes the
 // subscription and the timer, so a failed START leaves nothing running.
 
-/** How long START holds the cover for a first frame before it gives up. */
+/** How long START waits without a new load milestone before it gives up. */
 export const FIRST_FRAME_TIMEOUT_MS = 20_000;
 
 /** The view states that end the wait with a failure: none of them can reach a first frame without the Caller acting. */
@@ -40,7 +43,7 @@ const REAL_TIMERS: WaitTimers = {
 /**
  * Waits for `firstFrame` on `store`.
  *
- * @throws {WorldNotReadyError} `world-failed` when `viewState` turns terminal, `timeout` after `timeoutMs`.
+ * @throws {WorldNotReadyError} `world-failed` when `viewState` turns terminal, `timeout` after `timeoutMs` with no load progress.
  */
 export function awaitWorldReady(
   store: Pick<StoreApi<GameScreenState>, 'getState' | 'subscribe'>,
@@ -65,11 +68,18 @@ export function awaitWorldReady(
       timers.clearTimeout(timer);
       outcome();
     };
+    const expire = () => finish(() => reject(new WorldNotReadyError('timeout', `${timeoutMs} ms without progress`)));
+    let timer = timers.setTimeout(expire, timeoutMs);
+    let progress = initial.loadProgress;
     const unsubscribe = store.subscribe((state) => {
       const result = settled(state);
       if (result === 'ready') finish(resolve);
       else if (result === 'failed') finish(() => reject(new WorldNotReadyError('world-failed', String(state.viewState))));
+      else if (state.loadProgress > progress) {
+        progress = state.loadProgress;
+        timers.clearTimeout(timer);
+        timer = timers.setTimeout(expire, timeoutMs);
+      }
     });
-    const timer = timers.setTimeout(() => finish(() => reject(new WorldNotReadyError('timeout', `${timeoutMs} ms`))), timeoutMs);
   });
 }

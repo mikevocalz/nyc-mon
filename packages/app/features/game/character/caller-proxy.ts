@@ -7,9 +7,10 @@
 // black scanner head, red LED: DECISIONS 7 and 16). A carolina ring on the
 // ground marks the Caller from the 30 m chase distance.
 //
-// Animation is procedural and driven by distance walked (`stride`), so limb
-// swing matches ground speed at any frame rate and an idle Caller costs no
-// frames: update() reports motion only while walking, running or airborne.
+// Animation is procedural and driven by gait cycles walked (`gaitPhase`,
+// distance over a stride that lengthens from walk to run), so limb swing
+// matches ground speed at any frame rate and an idle Caller costs no frames:
+// update() reports motion only while walking, running or airborne.
 //
 // Decision: BUILD primitives, DEFER a baked CC0 rig (Quaternius). A baked
 // skinned mesh plus clips is a few hundred KB of TS and an unverified
@@ -21,8 +22,7 @@ import type { ActorFrame, SceneActor, SceneActorFactory } from '../scene-actor.t
 import { callerStore, type CallerState } from './caller-store.ts';
 import { RUN_SPEED, WALK_SPEED, isAirborne } from './locomotion.ts';
 
-/** Ground metres per full walk cycle (left and right step). */
-export const CYCLE_METRES = 1.6;
+export { CYCLE_METRES } from './locomotion.ts';
 const LEG_SWING_WALK = 0.45;
 const LEG_SWING_RUN = 0.85;
 
@@ -40,12 +40,12 @@ export interface CallerPose {
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
 
 /** The figure's pose for a Caller state. Pure, so the gait reads are testable without a renderer. */
-export function poseFor(state: Pick<CallerState, 'gait' | 'speed' | 'stride' | 'jump'>): CallerPose {
+export function poseFor(state: Pick<CallerState, 'gait' | 'speed' | 'gaitPhase' | 'jump'>): CallerPose {
   if (isAirborne(state.jump)) return { leg: -0.5, arm: -0.6, bob: 0, lean: 0.1 };
   if (state.gait === 'idle' || state.speed <= 0) return { leg: 0, arm: 0, bob: 0, lean: 0 };
   const run = clamp01((state.speed - WALK_SPEED) / (RUN_SPEED - WALK_SPEED));
   const amplitude = (LEG_SWING_WALK + (LEG_SWING_RUN - LEG_SWING_WALK) * run) * clamp01(state.speed / WALK_SPEED);
-  const phase = (state.stride / CYCLE_METRES) * Math.PI * 2;
+  const phase = state.gaitPhase * Math.PI * 2;
   const swing = Math.sin(phase);
   return {
     leg: swing * amplitude,

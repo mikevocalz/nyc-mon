@@ -34,22 +34,61 @@ export function hashUnit(id: string): number {
   return (h >>> 0) / 4294967296;
 }
 
-/** Non-indexed triangles with position, normal, colour and uv, grown in chunks. */
+/**
+ * Non-indexed triangles with position, normal, colour and uv, in typed
+ * arrays that double as they fill. The city writes about a million
+ * vertices at scene build; `number[]` pushes and the copy into
+ * Float32BufferAttribute were most of the build time (and on Hermes, which
+ * has no JIT, far more), so this writes floats in place and hands three
+ * one exact-length copy. Bounds are tracked as it goes, so toGeometry sets
+ * the bounding sphere without another pass.
+ */
 export class VertexBuffer {
-  positions: number[] = [];
-  normals: number[] = [];
-  colors: number[] = [];
-  uvs: number[] = [];
+  private pos: Float32Array;
+  private nor: Float32Array;
+  private col: Float32Array;
+  private tex: Float32Array;
+  private count = 0;
+
+  /** `capacity` in vertices: the big city buffers pass a size near their final one to skip regrowth. */
+  constructor(capacity = 1024) {
+    const n = Math.max(16, capacity);
+    this.pos = new Float32Array(3 * n);
+    this.nor = new Float32Array(3 * n);
+    this.col = new Float32Array(3 * n);
+    this.tex = new Float32Array(2 * n);
+  }
+  private minX = Infinity; private minY = Infinity; private minZ = Infinity;
+  private maxX = -Infinity; private maxY = -Infinity; private maxZ = -Infinity;
 
   get vertexCount(): number {
-    return this.positions.length / 3;
+    return this.count;
+  }
+
+  /** Views of the written floats (tests and inspection; do not keep across writes). */
+  get positions(): Float32Array { return this.pos.subarray(0, this.count * 3); }
+  get normals(): Float32Array { return this.nor.subarray(0, this.count * 3); }
+  get colors(): Float32Array { return this.col.subarray(0, this.count * 3); }
+  get uvs(): Float32Array { return this.tex.subarray(0, this.count * 2); }
+
+  private grow(): void {
+    const next = (a: Float32Array) => { const b = new Float32Array(a.length * 2); b.set(a); return b; };
+    this.pos = next(this.pos); this.nor = next(this.nor); this.col = next(this.col); this.tex = next(this.tex);
   }
 
   vertex(x: number, y: number, z: number, nx: number, ny: number, nz: number, rgb: readonly number[], u = 0, v = 0): void {
-    this.positions.push(x, y, z);
-    this.normals.push(nx, ny, nz);
-    this.colors.push(rgb[0]!, rgb[1]!, rgb[2]!);
-    this.uvs.push(u, v);
+    if ((this.count + 1) * 3 > this.pos.length) this.grow();
+    const i = this.count * 3;
+    const p = this.pos; const n = this.nor; const c = this.col;
+    p[i] = x; p[i + 1] = y; p[i + 2] = z;
+    n[i] = nx; n[i + 1] = ny; n[i + 2] = nz;
+    c[i] = rgb[0]!; c[i + 1] = rgb[1]!; c[i + 2] = rgb[2]!;
+    const t = this.count * 2;
+    this.tex[t] = u; this.tex[t + 1] = v;
+    this.count++;
+    if (x < this.minX) this.minX = x; if (x > this.maxX) this.maxX = x;
+    if (y < this.minY) this.minY = y; if (y > this.maxY) this.maxY = y;
+    if (z < this.minZ) this.minZ = z; if (z > this.maxZ) this.maxZ = z;
   }
 
   /** Quad a-b-c-d (counter-clockwise seen from the normal side) as two triangles. */
@@ -57,18 +96,31 @@ export class VertexBuffer {
     a: readonly number[], b: readonly number[], c: readonly number[], d: readonly number[],
     n: readonly number[], rgb: readonly number[], uv?: readonly (readonly number[])[],
   ): void {
-    const corners = [a, b, c, a, c, d];
-    const uvOrder = uv ? [uv[0]!, uv[1]!, uv[2]!, uv[0]!, uv[2]!, uv[3]!] : null;
-    corners.forEach((p, k) => this.vertex(p[0]!, p[1]!, p[2]!, n[0]!, n[1]!, n[2]!, rgb, uvOrder?.[k]?.[0] ?? 0, uvOrder?.[k]?.[1] ?? 0));
+    const nx = n[0]!; const ny = n[1]!; const nz = n[2]!;
+    const ua = uv?.[0]; const ub = uv?.[1]; const uc = uv?.[2]; const ud = uv?.[3];
+    this.vertex(a[0]!, a[1]!, a[2]!, nx, ny, nz, rgb, ua?.[0] ?? 0, ua?.[1] ?? 0);
+    this.vertex(b[0]!, b[1]!, b[2]!, nx, ny, nz, rgb, ub?.[0] ?? 0, ub?.[1] ?? 0);
+    this.vertex(c[0]!, c[1]!, c[2]!, nx, ny, nz, rgb, uc?.[0] ?? 0, uc?.[1] ?? 0);
+    this.vertex(a[0]!, a[1]!, a[2]!, nx, ny, nz, rgb, ua?.[0] ?? 0, ua?.[1] ?? 0);
+    this.vertex(c[0]!, c[1]!, c[2]!, nx, ny, nz, rgb, uc?.[0] ?? 0, uc?.[1] ?? 0);
+    this.vertex(d[0]!, d[1]!, d[2]!, nx, ny, nz, rgb, ud?.[0] ?? 0, ud?.[1] ?? 0);
   }
 
   toGeometry(THREE: Three): BufferGeometry {
     const geometry: BufferGeometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(this.positions, 3));
-    geometry.setAttribute('normal', new THREE.Float32BufferAttribute(this.normals, 3));
-    geometry.setAttribute('color', new THREE.Float32BufferAttribute(this.colors, 3));
-    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(this.uvs, 2));
-    geometry.computeBoundingSphere();
+    const n = this.count;
+    geometry.setAttribute('position', new THREE.BufferAttribute(this.pos.slice(0, n * 3), 3));
+    geometry.setAttribute('normal', new THREE.BufferAttribute(this.nor.slice(0, n * 3), 3));
+    geometry.setAttribute('color', new THREE.BufferAttribute(this.col.slice(0, n * 3), 3));
+    geometry.setAttribute('uv', new THREE.BufferAttribute(this.tex.slice(0, n * 2), 2));
+    if (n > 0) {
+      // The box's circumsphere: a little larger than three's fit, and no extra pass over the vertices.
+      const centre = new THREE.Vector3((this.minX + this.maxX) / 2, (this.minY + this.maxY) / 2, (this.minZ + this.maxZ) / 2);
+      const radius = Math.hypot(this.maxX - this.minX, this.maxY - this.minY, this.maxZ - this.minZ) / 2;
+      geometry.boundingSphere = new THREE.Sphere(centre, radius);
+    } else {
+      geometry.computeBoundingSphere();
+    }
     return geometry;
   }
 }

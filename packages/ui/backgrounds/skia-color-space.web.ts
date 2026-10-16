@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef, type RefObject } from 'react';
+import { useEffect, useEffectEvent, type RefObject } from 'react';
 
 /** Frames to wait for react-native-skia to create the canvas's WebGL context. */
 const MAX_WAIT_FRAMES = 120;
@@ -17,8 +17,7 @@ const MAX_WAIT_FRAMES = 120;
  * getContext returns its context instead of creating one.
  */
 export function useSrgbDrawingBuffer(host: RefObject<unknown>, redraw: () => void) {
-  const latest = useRef(redraw);
-  latest.current = redraw;
+  const onFixed = useEffectEvent(redraw);
   useEffect(() => {
     let frame = 0;
     let tries = 0;
@@ -29,7 +28,7 @@ export function useSrgbDrawingBuffer(host: RefObject<unknown>, redraw: () => voi
         const gl = (canvas.getContext('webgl2') ?? canvas.getContext('webgl')) as WebGLRenderingContext | null;
         if (gl && gl.drawingBufferColorSpace !== 'srgb') {
           gl.drawingBufferColorSpace = 'srgb';
-          latest.current();
+          onFixed();
         }
         return;
       }

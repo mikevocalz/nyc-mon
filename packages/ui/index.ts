@@ -83,7 +83,7 @@ export {
   type MotionViewProps, type MotionTextProps, type MotionPresetProps,
 } from './motion';
 export { PressScale, type PressScaleProps } from './press-scale';
-export { useInstanceStore, useStore } from './use-instance-store';
+export { useInstance, useInstanceStore, useStore } from './use-instance-store';
 export * from './audio';
 
 export { GridFloor, type GridFloorProps } from './backgrounds/GridFloor';

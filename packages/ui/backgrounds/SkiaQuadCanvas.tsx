@@ -80,7 +80,7 @@ const WINDOW_CLOCK_HZ = 20;
  * Storybook) lack: the derived value never updated there.
  */
 export function SkiaQuadCanvas({ steps, width, height, background, running, windowRect, invalidate }: SkiaQuadCanvasProps) {
-  const effect = useMemo(quadEffect, []);
+  const effect = useMemo(() => quadEffect(), []);
   const blank = useMemo(() => {
     const recorder = Skia.PictureRecorder();
     recorder.beginRecording();
@@ -95,7 +95,7 @@ export function SkiaQuadCanvas({ steps, width, height, background, running, wind
   const drawn = useSharedValue({ time: -1, version: -1 });
   const clock = useSharedValue(0);
   // Web frees the previous frame's picture by hand (WASM memory is invisible to the GC).
-  const holder = useMemo(() => ({ last: null as SkPicture | null }), []);
+  const lastPicture = useRef<SkPicture | null>(null);
 
   const record = useMemo(() => {
     const fn = (time: number) => {
@@ -122,12 +122,12 @@ export function SkiaQuadCanvas({ steps, width, height, background, running, wind
         shader.dispose();
         paint.dispose();
         recorder.dispose();
-        holder.last?.dispose();
-        holder.last = result;
+        lastPicture.current?.dispose();
+        lastPicture.current = result;
       }
     };
     return fn;
-  }, [scene, effect, drawn, picture, holder]);
+  }, [scene, effect, drawn, picture]);
 
   const update = (patch: Partial<Scene>) => {
     const s = scene.get();

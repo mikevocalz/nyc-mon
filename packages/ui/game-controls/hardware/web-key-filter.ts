@@ -6,10 +6,12 @@
 // - A key down with Ctrl, Meta or Alt held is dropped: browser and OS chords
 //   (Cmd+K, Ctrl+L, Alt+arrows) keep their meaning. Shift is allowed.
 // - Only mapped codes are forwarded, and those get `preventDefault` so arrows
-//   and Space do not scroll the page.
+//   and Space do not scroll the page. Shift is forwarded too (it turns a held
+//   direction into a run) but keeps its default: Shift+click and text
+//   selection still work.
 // - A key up is forwarded whenever its down was, whatever the target or
 //   modifiers are by then, so a key can never stay held in the adapter.
-import { isMappedKeyCode } from './keyboard-mapping.ts';
+import { isKeyboardRunKey, isMappedKeyCode } from './keyboard-mapping.ts';
 
 /** The fields of a `KeyboardEvent` the filter reads. */
 export interface KeyEventLike {
@@ -59,10 +61,14 @@ export function createKeyEventFilter(): KeyEventFilter {
       if (event.repeat || event.code === '') return DROP;
       if (event.type === 'keyup') {
         if (!down.delete(event.code)) return DROP;
-        return { forward: true, preventDefault: !event.editableTarget };
+        return { forward: true, preventDefault: !event.editableTarget && !isKeyboardRunKey(event.code) };
       }
       if (event.type !== 'keydown') return DROP;
       if (event.editableTarget || event.ctrlKey || event.metaKey || event.altKey) return DROP;
+      if (isKeyboardRunKey(event.code)) {
+        down.add(event.code);
+        return { forward: true, preventDefault: false };
+      }
       if (!isMappedKeyCode(event.code)) return DROP;
       down.add(event.code);
       return { forward: true, preventDefault: true };

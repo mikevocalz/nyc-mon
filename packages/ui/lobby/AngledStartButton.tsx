@@ -92,7 +92,7 @@ export function AngledStartButton({
   useEffect(() => {
     if (previous.current === state) return;
     previous.current = state;
-    if (state === 'loading') AccessibilityInfo.announceForAccessibility(LOBBY_COPY.startLoading);
+    if (state === 'loading') AccessibilityInfo.announceForAccessibility(LOBBY_COPY.startLoadingA11y);
   }, [state]);
 
   const pressIn = () => binding.write((b) => b.setStartPressed(true));

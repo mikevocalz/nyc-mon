@@ -65,6 +65,8 @@ export interface GameLobbyProps {
   readonly startState: AngledStartState;
   /** The cover's phase; `done` shows the lobby. */
   readonly transitionPhase: TransitionPhase;
+  /** World load, 0..100, drawn on the cover while it holds. */
+  readonly loadProgress?: number;
   /** START pressed with a `none`, `eligible` or `offline` resume. */
   readonly onStart: () => void;
   /** A recovery chosen from the dialog. The app runs it; the old save stays until it confirms. */
@@ -123,6 +125,7 @@ export function GameLobby({
   scheme = 'night',
   startState,
   transitionPhase,
+  loadProgress,
   onStart,
   onRecover,
   recoveryChoices = ALL_RECOVERY_CHOICES,
@@ -203,8 +206,9 @@ export function GameLobby({
     />
   );
 
-  const panel = (
+  const panelFor = (fill: boolean) => (
     <LeaderboardPanel
+      fill={fill}
       model={leaderboard}
       reducedMotion={reducedMotion}
       district={district}
@@ -215,10 +219,11 @@ export function GameLobby({
       testID={testID ? `${testID}-rank` : undefined}
     />
   );
+  const panel = panelFor(false);
 
   const wordmark = (
     <View {...(testIdProps(testID ? `${testID}-wordmark` : undefined) as object)} accessibilityRole="header">
-      <BrandWordmark height={28} />
+      <BrandWordmark height={44} />
     </View>
   );
 
@@ -255,7 +260,8 @@ export function GameLobby({
   const identityPane = (
     <View className="flex-1 gap-6 px-4 pb-4 pt-6">
       {wordmark}
-      <View className="flex-1">{panel}</View>
+      {/* Beside START the board runs the full height of its pane. */}
+      <View className="flex-1">{panelFor(true)}</View>
     </View>
   );
   const resumePane = (
@@ -303,7 +309,8 @@ export function GameLobby({
           }
         />
       ) : null}
-      <GameTransition phase={transitionPhase} reducedMotion={reducedMotion} scheme={scheme} rive={rive?.transition} testID={testID ? `${testID}-transition` : undefined} />
+      <GameTransition phase={transitionPhase} reducedMotion={reducedMotion} scheme={scheme} rive={rive?.transition} progress={loadProgress} progressLabel={LOBBY_COPY.startLoading}
+        progressA11yLabel={LOBBY_COPY.startLoadingA11y} testID={testID ? `${testID}-transition` : undefined} />
     </SafeArea>
   );
 }

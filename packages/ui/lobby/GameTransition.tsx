@@ -12,6 +12,8 @@
 import { useEffect } from 'react';
 import { testIdProps } from '../hlynk/a11y';
 import { View } from '../tw';
+import { ProgressBar, percentLabel, progressFraction } from '../progress';
+import { Text } from '../Text';
 import type { ArcadeRiveSource } from '../game-controls/ArcadeRiveSurface.types.ts';
 import type { ThemeVariant, TransitionPhase } from './lobby-contract.ts';
 import { LobbyRiveSurface } from './LobbyRiveSurface';
@@ -25,6 +27,12 @@ export interface GameTransitionProps {
   readonly scheme?: ThemeVariant;
   /** The `game-transition` artboard. Absent: a solid cover. */
   readonly rive?: ArcadeRiveSource;
+  /** World load, 0..100, shown as the skyline bar with its percentage while the cover holds. Absent: no bar. */
+  readonly progress?: number;
+  /** What is loading, for the bar's label and screen readers. @default 'Loading' */
+  readonly progressLabel?: string;
+  /** Spoken label for the bar when `progressLabel` carries emoji. @default progressLabel */
+  readonly progressA11yLabel?: string;
   readonly testID?: string;
 }
 
@@ -34,7 +42,7 @@ export interface GameTransitionProps {
  *
  * @see {@linkcode GameTransitionProps}
  */
-export function GameTransition({ phase, reducedMotion, scheme = 'night', rive, testID }: GameTransitionProps) {
+export function GameTransition({ phase, reducedMotion, scheme = 'night', rive, progress, progressLabel = 'Loading', progressA11yLabel, testID }: GameTransitionProps) {
   const binding = useLobbyRiveBinding((b) => {
     b.setTransitionPhase(phase);
     b.setTheme(scheme);
@@ -61,6 +69,18 @@ export function GameTransition({ phase, reducedMotion, scheme = 'night', rive, t
         onBinding={binding.onBinding}
         style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 }}
       />
+      {phase === 'hold' && progress !== undefined ? (
+        <View className="absolute inset-0 items-center justify-center px-8" pointerEvents="none">
+          <View className="w-full max-w-[420px] gap-2">
+            {/* The cover is painted by its own scheme, not the app theme, so the label takes the cover's ink directly. */}
+            <View className="flex-row justify-between" aria-hidden>
+              <Text className={`text-sm font-semibold ${scheme === 'night' ? 'text-ink-50' : 'text-ink-950'}`}>{progressLabel}</Text>
+              <Text className={`font-display text-sm ${scheme === 'night' ? 'text-ink-50' : 'text-ink-950'}`}>{percentLabel(progressFraction(progress, 100))}</Text>
+            </View>
+            <ProgressBar value={progress} district="harlem" size="lg" accessibilityLabel={progressA11yLabel ?? progressLabel} />
+          </View>
+        </View>
+      ) : null}
     </View>
   );
 }

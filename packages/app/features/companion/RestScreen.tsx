@@ -107,10 +107,13 @@ export function RestScreen() {
   }, []);
 
   const asleep = care?.activity.kind === 'asleep';
-  if (asleep) sawAsleep.current = true;
   // Natural wake on a clock tick: the sim's state, no absence copy.
   useEffect(() => {
-    if (sawAsleep.current && care !== undefined && !asleep) {
+    if (asleep) {
+      sawAsleep.current = true;
+      return;
+    }
+    if (sawAsleep.current && care !== undefined) {
       announcePolitely(c('m15.woke.rested.a11y', { name }));
       leave();
     }

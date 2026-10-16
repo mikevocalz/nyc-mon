@@ -7,7 +7,7 @@ import { awaitWorldReady, FIRST_FRAME_TIMEOUT_MS, WorldNotReadyError, type WaitT
 // Review finding C1: START used to wait on `firstFrame` with no failure path and no timeout.
 
 function screenStore(initial: Partial<GameScreenState> = {}) {
-  return createStore<GameScreenState>(() => ({ canvasFailed: false, firstFrame: false, attempt: 0, announcedReady: false, viewState: null, ...initial }));
+  return createStore<GameScreenState>(() => ({ canvasFailed: false, firstFrame: false, attempt: 0, announcedReady: false, viewState: null, loadProgress: 0, ...initial }));
 }
 
 function manualTimers() {
@@ -56,6 +56,30 @@ describe('awaitWorldReady', () => {
     await assert.rejects(wait, (error: unknown) => error instanceof WorldNotReadyError && error.reason === 'timeout');
     // A late first frame after the timeout changes nothing (the promise already settled).
     store.setState({ firstFrame: true });
+  });
+
+  it('restarts the clock at every load milestone, so a slow but moving load never times out', async () => {
+    const store = screenStore();
+    const { timers, pending, fire } = manualTimers();
+    const wait = awaitWorldReady(store, 1000, timers);
+    store.setState({ loadProgress: 35 });
+    assert.equal(pending.size, 1, 'one live timer after a milestone');
+    store.setState({ loadProgress: 75 });
+    store.setState({ loadProgress: 75 });
+    assert.equal(pending.size, 1);
+    store.setState({ firstFrame: true });
+    await wait;
+    assert.equal(pending.size, 0);
+    fire();
+  });
+
+  it('still times out when the load stalls after a milestone', async () => {
+    const store = screenStore();
+    const { timers, fire } = manualTimers();
+    const wait = awaitWorldReady(store, 1000, timers);
+    store.setState({ loadProgress: 75 });
+    fire();
+    await assert.rejects(wait, (e: unknown) => e instanceof WorldNotReadyError && e.reason === 'timeout');
   });
 
   it('settles at once when the state is already decided', async () => {

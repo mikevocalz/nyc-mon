@@ -51,7 +51,8 @@ export function AppHeader() {
           instead, with the orange as its bottom keyline. */}
       <Header className="flex-row items-center gap-3 border-b-2 border-primary bg-ink-950 px-4 py-2">
         {railHasMenu ? null : <MenuButton />}
-        <BrandWordmark height={36} />
+        {/* Full header height: the row is sized by its 44 pt controls, so the wordmark matches them. */}
+        <BrandWordmark height={44} />
         <Text numberOfLines={1} className="flex-1 text-lg font-semibold text-ink-50 md:text-xl">
           {TITLES[pathname] ?? ''}
         </Text>

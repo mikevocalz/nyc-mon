@@ -34,13 +34,23 @@ test('the real Apollo tile: start view is mapped, the clamp corner is not', () =
   assert.equal(isOverMappedArea({ ...INITIAL_CITY_CAMERA, yaw: 0, x: Number.NaN }, bounds), false);
 });
 
-test('first-frame signal fires once, after update, and passes updates through', async () => {
-  let updates = 0; let signals = 0;
+test('first-frame signal waits for compiled pipelines, then fires once after update', async () => {
+  let updates = 0; let signals = 0; let invalidated = 0;
+  let compile!: () => void;
+  const renderer = { compileAsync: () => new Promise<void>((resolve) => { compile = resolve; }) };
+  const context = { renderer, invalidate: () => { invalidated++; } } as never;
   const setup = withFirstFrameSignal(() => ({ scene: {} as never, camera: {} as never, update: () => { updates++; } }));
   const params = { dataset: {} as never, camera: INITIAL_CITY_CAMERA, onFirstFrame: () => { signals++; } };
-  const built = setup({} as never, params);
+  const built = setup(context, params);
+  // Dawn's first draw only compiles: no signal while pipelines are pending.
+  built.update!({} as never, params);
+  await new Promise((r) => setTimeout(r, 5));
+  assert.equal(signals, 0, 'no signal before the pipelines compile');
+  compile();
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(invalidated, 1, 'a compiled scene asks for one more frame');
   built.update!({} as never, params); built.update!({} as never, params);
-  assert.equal(updates, 2);
+  assert.equal(updates, 3);
   assert.equal(signals, 0, 'signal waits for the render that follows update');
   await new Promise((r) => setTimeout(r, 5));
   assert.equal(signals, 1);

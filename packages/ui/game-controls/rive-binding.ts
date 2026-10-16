@@ -126,7 +126,15 @@ export function createArcadeRiveBinding(instance: ArcadeViewModelInstance, optio
     if (values.get(path) === value) return false;
     const setter = handle<T>(kind, path);
     if (!setter) return false;
-    setter.set(value);
+    // The native instance can close under a live binding (remount, fold, a
+    // hot reload): rive-android then throws RiveResourceClosedException. That
+    // binding is finished; stop writing instead of throwing through React.
+    try {
+      setter.set(value);
+    } catch {
+      disposed = true;
+      return false;
+    }
     values.set(path, value);
     return true;
   }
