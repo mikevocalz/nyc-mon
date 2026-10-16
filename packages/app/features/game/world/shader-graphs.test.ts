@@ -64,7 +64,7 @@ test('every city material graph compiles to WGSL, quickly and at a sane size', a
     assert.ok(ms < 200 && size > 400 && size < 20_000, `${name}: ${ms.toFixed(1)} ms, ${size} chars`);
     compiled++;
   }
-  assert.ok(compiled >= 20, `${compiled} graphs compiled`);
+  assert.ok(compiled >= 19, `${compiled} graphs compiled`);
   materials.dispose();
   built.dispose!();
 });

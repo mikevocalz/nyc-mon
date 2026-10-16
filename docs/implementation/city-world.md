@@ -180,7 +180,11 @@ Where the camera lives (chase 8 m, eye about 4 m), Harlem now has the things tha
 | Subway entrances | OSM `railway=subway_entrance` (29 in the tile): stair well, green iron railings, two green globe lamps; moved up to 3 m onto the sidewalk and nudged up to 1 m to fit (27 placed, 2 dropped) | `transit`, `transit-lights` |
 | Bus shelters | OSM `highway=bus_stop` with `shelter=yes` (53): posts, roof, glass back and side, bench, a lit ad panel with no artwork (52 placed, 1 dropped) | `transit`, `transit-lights` |
 
-Banded meshes are written in 50 m z bands and drawn within 160 m of the Caller, like the contact shadows. Building the scene now takes about 450 ms in node (was 218 ms).
+Banded meshes are written in 50 m z bands and drawn within 160 m of the Caller, like the contact shadows.
+
+**Build cost.** The first version of this pass built in about 450 ms in node, and on the Duo START then stalled after "world built" and hit its 20 s timeout (the committed build loaded in about 16 s, so there was little room). The time went to `VertexBuffer` pushing into `number[]` and copying into `Float32BufferAttribute`, then garbage collection and bounding spheres; Hermes has no JIT and is slowest at exactly this. `VertexBuffer` now writes into growable `Float32Array`s, hands three one exact-length copy, and sets the bounding sphere from bounds tracked while writing; `box` computes its eight corners once; hydrant lookups use a 10 m grid. The scene now builds in about 190 ms in node, fastest of three builds, below the 218 ms of the build before this pass. `world/budget.test.ts` fails above 400 ms.
+
+**Shader graphs.** `world/shader-graphs.test.ts` compiles every material's TSL graph to WGSL with three's own `WGSLNodeBuilder` in node (masonry is about 4.4 KB of fragment WGSL, built in about 2 ms). The TypeGPU cel body only resolves under the Metro/Vite transform, so cel materials are compiled as their TSL albedo and emissive graphs (`materials.albedoGraphs`); the lettering and leaf materials need a GPU texture backend and are not covered; scene fog is left out.
 
 Triangles at the Apollo spawn, chase 8 m: 283 553 (was 183 149), in 26 meshes. `world/budget.test.ts` holds chase 8, 18, 40 m and the 125th Street walk under 300 000. `world/parts.test.ts` checks that every triangle of every part, stoop, fire escape, awning, water tower and line of lettering faces its normal.
 

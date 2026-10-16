@@ -48,7 +48,7 @@ test('stoops, cornices, fire escapes, awnings and water towers face outward', ()
   // The stoop stays within its reach of the wall.
   const s = new VertexBuffer();
   emitStoop(s, frame(0, 0, [0, 1]), 0, grey, grey);
-  for (let i = 2; i < s.positions.length; i += 3) assert.ok(s.positions[i]! <= STOOP_REACH + 1e-9 && s.positions[i]! >= -1e-9);
+  for (let i = 2; i < s.positions.length; i += 3) assert.ok(s.positions[i]! <= STOOP_REACH + 1e-5 && s.positions[i]! >= -1e-5); // float32 positions
 });
 
 test('lettering faces its viewer and reads left to right', () => {
