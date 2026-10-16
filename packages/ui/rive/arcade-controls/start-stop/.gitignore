@@ -1,2 +1,3 @@
 build/*
 !build/*.riv
+!build/*.data.json
