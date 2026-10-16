@@ -3,14 +3,18 @@
 // dynamic import so three.js and the scene stay out of the first chunk.
 //
 // createCityScene (the Harlem world plus any actors in params) is used as
-// is. This wrapper only adds a first-frame signal: ThreeCanvas calls
-// update() and then renders in the same synchronous draw, so a macrotask
-// queued from the first update runs after that render either succeeded or
-// flipped the canvas to its failed state.
-// That is "frame submitted", NOT "nonblack pixels on glass"; PR #29's device
-// gate still needs a capture from physical hardware.
+// is. This wrapper adds the load milestones and a first-frame signal.
+//
+// The canvas is `paused`: it draws only when something invalidates it. On
+// Dawn the first draw of a new scene spends itself compiling pipelines and
+// shows nothing, and with no second draw the loader used to lift onto an
+// empty frame (measured on the Surface Duo, 2026-10-16). So the scene's
+// pipelines compile first (renderer.compileAsync), then one more frame is
+// asked for, and only a frame drawn after that signals. A failed compile
+// still lets the draw run, so the canvas's own error path decides.
 import type { ThreeSetup } from '@acme/ui/three';
 import type { CitySceneParams } from './city-scene.ts';
+import { gameScreenActions } from './game-session.ts';
 
 export interface GameSceneParams extends CitySceneParams {
   onFirstFrame: () => void;
@@ -19,18 +23,31 @@ export interface GameSceneParams extends CitySceneParams {
 export function withFirstFrameSignal(setup: ThreeSetup<CitySceneParams>): ThreeSetup<GameSceneParams> {
   return (context, initial) => {
     const built = setup(context, initial);
+    gameScreenActions.loadStage('worldBuilt');
+    let compiled = false;
+    const ready = () => {
+      compiled = true;
+      context.invalidate();
+    };
+    context.renderer.compileAsync(built.scene, built.camera).then(ready, ready);
     let signalled = false;
     return {
       ...built,
       update: (frame, params) => {
         built.update?.(frame, params);
-        if (signalled) return;
+        if (signalled || !compiled) return;
         signalled = true;
+        gameScreenActions.loadStage('firstRender');
         setTimeout(params.onFirstFrame, 0);
       },
     };
   };
 }
 
-export const loadGameScene = (): Promise<ThreeSetup<GameSceneParams>> =>
-  import('./city-scene.ts').then((m) => withFirstFrameSignal(m.createCityScene));
+export const loadGameScene = (): Promise<ThreeSetup<GameSceneParams>> => {
+  gameScreenActions.loadStage('requested');
+  return import('./city-scene.ts').then((m) => {
+    gameScreenActions.loadStage('moduleLoaded');
+    return withFirstFrameSignal(m.createCityScene);
+  });
+};

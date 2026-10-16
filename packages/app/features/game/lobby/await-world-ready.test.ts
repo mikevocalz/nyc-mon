@@ -7,7 +7,7 @@ import { awaitWorldReady, FIRST_FRAME_TIMEOUT_MS, WorldNotReadyError, type WaitT
 // Review finding C1: START used to wait on `firstFrame` with no failure path and no timeout.
 
 function screenStore(initial: Partial<GameScreenState> = {}) {
-  return createStore<GameScreenState>(() => ({ canvasFailed: false, firstFrame: false, attempt: 0, announcedReady: false, viewState: null, ...initial }));
+  return createStore<GameScreenState>(() => ({ canvasFailed: false, firstFrame: false, attempt: 0, announcedReady: false, viewState: null, loadProgress: 0, ...initial }));
 }
 
 function manualTimers() {

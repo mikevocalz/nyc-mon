@@ -2,10 +2,11 @@
 // happened and what to do; none apologise. "No data" (empty) and "couldn't
 // draw" (render-error) are different sentences (product-decisions §2).
 import { Banner, Button, EmptyState } from '@acme/ui';
-import { ArrowLoader } from '@acme/ui/progress';
+import { ProgressBar } from '@acme/ui/progress';
+import { useStore } from 'zustand';
 import { View } from '@acme/ui/tw';
 import { BUNDLED_CITY_NAME } from './city-data.ts';
-import { gameCameraStore, gameScreenActions } from './game-session.ts';
+import { gameCameraStore, gameScreenActions, gameScreenStore } from './game-session.ts';
 import type { GameViewState } from './game-status.ts';
 import type { Rect } from './hud-layout.ts';
 
@@ -16,14 +17,7 @@ export function GameStatusLayer({ state, rect, region }: { state: GameViewState;
   // Computed: banner rect from resolveGameHudLayout (shares the controls' region).
   const box = { left: rect.x, top: rect.y, width: rect.width };
 
-  if (state === 'loading') {
-    return (
-      <View className="absolute items-center gap-2" style={box} pointerEvents="none">
-        {/* ArrowLoader stops its CSS animation under reduced motion and keeps role=progressbar. */}
-        <ArrowLoader district="harlem" accessibilityLabel={`Loading ${BUNDLED_CITY_NAME}`} />
-      </View>
-    );
-  }
+  if (state === 'loading') return <WorldLoader />;
 
   if (state === 'empty') {
     // Non-blocking: the world stays live and touchable under a small banner.
@@ -67,6 +61,30 @@ export function GameStatusLayer({ state, rect, region }: { state: GameViewState;
         style={{ left: region.x, top: region.y, width: region.width, height: region.height }}
       >
         <EmptyState district="harlem" title={blocking.title} description={blocking.description} action={blocking.action ?? undefined} />
+      </View>
+    </View>
+  );
+}
+
+/**
+ * The world's load gate: an opaque night cover with the kit's skyline bar and
+ * its percentage, until the first frame lands. The value is the store's staged
+ * `loadProgress` (LOAD_STAGES), never a timer. Swallows touches so nothing is
+ * pressed on a half-built world.
+ */
+function WorldLoader() {
+  const progress = useStore(gameScreenStore, (s) => s.loadProgress);
+  return (
+    <View className="absolute inset-0 items-center justify-center bg-ink-950 px-8">
+      <View className="w-full max-w-[420px]">
+        <ProgressBar
+          value={progress}
+          district="harlem"
+          size="lg"
+          showLabel
+          label={`Building ${BUNDLED_CITY_NAME}`}
+          accessibilityLabel={`Loading ${BUNDLED_CITY_NAME}`}
+        />
       </View>
     </View>
   );

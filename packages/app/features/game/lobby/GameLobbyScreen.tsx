@@ -147,6 +147,7 @@ export function GameLobbyScreen() {
   };
   const startState = useStore(lobbyStore, (s) => s.startState);
   const transitionPhase = useStore(lobbyStore, (s) => s.transitionPhase);
+  const loadProgress = useStore(gameScreenStore, (s) => s.loadProgress);
   const openedAtMs = useStore(lobbyStore, (s) => s.openedAtMs);
   const startFailed = useStore(lobbyStore, (s) => s.startError !== null);
 
@@ -176,6 +177,7 @@ export function GameLobbyScreen() {
         scheme={schemeForHour(new Date(openedAtMs).getHours())}
         startState={web ? 'disabled' : startState}
         transitionPhase={transitionPhase}
+        loadProgress={loadProgress}
         nowMs={openedAtMs}
         onStart={() => { void startLobbySession(); }}
         onRecover={recoverLobby}

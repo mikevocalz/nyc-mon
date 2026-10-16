@@ -157,8 +157,21 @@ export function GameScreen({ focused = true }: GameScreenProps = {}) {
   // survive the cover's removal (seen on Surface Duo, 2026-10-15: dark canvas
   // until the first camera move). The camera is already restored, so this
   // frame is still the resumed view.
+  // The redraw waits two animation frames: `game` and the cover's `done` land
+  // in the same commit, so a redraw in this effect still ran under the cover
+  // and the loader lifted onto a dark canvas (Surface Duo, 2026-10-16). By the
+  // second frame the native cover view is gone.
   useEffect(() => {
-    if (lobbyPhase === 'game') canvas.current?.invalidate();
+    if (lobbyPhase !== 'game') return;
+    let second = 0;
+    const first = requestAnimationFrame(() => {
+      canvas.current?.invalidate();
+      second = requestAnimationFrame(() => canvas.current?.invalidate());
+    });
+    return () => {
+      cancelAnimationFrame(first);
+      cancelAnimationFrame(second);
+    };
   }, [lobbyPhase]);
 
   // "Success": one polite announcement when the world first appears this session.
