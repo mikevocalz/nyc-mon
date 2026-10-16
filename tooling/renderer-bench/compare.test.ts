@@ -20,7 +20,10 @@ test('same GPU/backend/scene/fidelity yields comparable sample statistics',()=>{
 test('reject comparison of different pixel ratio, geometry, lighting or backend',()=>{
   for(const key of ['devicePixelRatio','triangles','qualitySignature','backend','datasetDigest'] as const){
     const a=sample('three-webgpu'),b=sample('pixijs3d');
-    (b as any)[key]=key==='qualitySignature'?'bloom=1':key==='backend'?'webgl2':key==='datasetDigest'?'other':0;
+    (b as any)[key]=key==='qualitySignature'?'bloom=1':
+      key==='backend'?'webgl2':
+      key==='datasetDigest'?'other':
+      key==='triangles'?283001:1.5;
     assert.throws(()=>compareCaptures(a,b),new RegExp('Not comparable'));
   }
 });
