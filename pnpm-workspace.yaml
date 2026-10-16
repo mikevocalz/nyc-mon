@@ -105,7 +105,7 @@ catalog:
   expo-build-properties: 58.0.11
   # apps/mobile/babel.config.js names this preset, so the app must declare it;
   # the Gradle JS bundle step resolves it from the app, not through expo.
-  babel-preset-expo: 58.0.16
+  babel-preset-expo: 58.0.17
   # Pinned 2026-10-15: the floating audio-api-nightly tag moved to 1.0.0-nightly-eb17d84-20261015, whose Android C++ does not compile (AndroidAudioPlayer constructor). Bump by exact version after a device build.
   react-native-audio-api: 1.0.0-nightly-8588c31-20261007
   react-native-youtube-bridge: 2.2.3
