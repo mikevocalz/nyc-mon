@@ -19,6 +19,10 @@ Each pack carries the upstream LICENSE and a `SOURCE.md` with the repo URL, the 
 | `margelo/api-design`, `cpp`, `swift`, `kotlin`, `build-nitro-modules` | https://github.com/margelo/react-native-skills | `1e9e17b` | Public API review for every `@acme/*` surface (repo law R5), native boundary design, Nitro HybridObjects for any C++ | C, E |
 | `expo/expo-overview`, `expo-animation`, `expo-native-ui`, `expo-router` | https://github.com/expo/skills | `d4f4840` | Expo-correct native UI, routing and animation patterns, cited to the installed SDK | D |
 | `mikevocalz-foldable-layouts/` | Michael's 2026-10-15 copy (upstream https://github.com/mikevocalz/universal-spatial-starter `256a97b`) | blob `d60f539` | The tailored foldable, dual-screen, tablet and Inspector layout rules AGENTS.md pins; adds §9 Arrangement View (see SOURCE.md) | A, D, every UI lane |
+| `three-agent-skills/three-best-practices`, `r3f-best-practices` | https://github.com/emalorenzo/three-agent-skills | `f950f95` | Three.js performance and best-practice rules (WebGL/WebGPU, TSL, instancing, memory). `r3f-best-practices` is vendored with the pack but intentionally unused — R3F is rejected in this repo | E |
+| `threejs-skills/threejs-*` (10 skills) | https://github.com/CloudAI-X/threejs-skills | `b1c6230` | Per-topic Three.js guides: fundamentals, geometry, materials, textures, lighting, shaders, animation, interaction, loaders, postprocessing | E |
+| `pixijs-skills/pixijs*` (26 skills) | https://github.com/pixijs/pixijs-skills | `83760c6` | PixiJS v8, entry point `pixijs/SKILL.md` routes to the specialized skill (scene graph, rendering, assets, filters, performance, accessibility, v8 migration) | E, F |
+| `colyseus/` | https://github.com/colyseus/skill | `9e3ce13` | Colyseus 0.18 multiplayer rooms, Schema state sync, netcode and client SDK; pins agents away from pre-0.17 APIs | E |
 | `nyc-mon-companion/` | this repo | n/a | The project's own skill; not a pack | all |
 
 ## Not copied
