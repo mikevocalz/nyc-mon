@@ -117,7 +117,7 @@ test('flag on swaps only the cars material, flag off keeps the default path', ()
   // even where no slot placed — and it keeps the suite's wall-clock budget
   // test out of the neighbours' load.
   const tile = () => parseCityDataset(syntheticTileV2());
-  const off = buildCityWorld(THREE, tile());
+  const off = buildCityWorld(THREE, tile(), { carPbr: false });
   const offCars = carMesh(off).material as { isMeshPhysicalNodeMaterial?: boolean; isMeshStandardNodeMaterial?: boolean };
   assert.ok(!offCars.isMeshPhysicalNodeMaterial, 'default cars stay on the lane body');
   off.dispose();
@@ -143,7 +143,7 @@ test('flag on swaps only the cars material, flag off keeps the default path', ()
   celLane.dispose();
 
   // The L2 flag alone does not upgrade cars to physical.
-  const pbrOnly = buildCityWorld(THREE, tile(), { pbr: true });
+  const pbrOnly = buildCityWorld(THREE, tile(), { pbr: true, carPbr: false });
   const pbrCars = carMesh(pbrOnly).material as { isMeshPhysicalNodeMaterial?: boolean; isMeshStandardNodeMaterial?: boolean };
   assert.ok(pbrCars.isMeshStandardNodeMaterial && !pbrCars.isMeshPhysicalNodeMaterial, 'L2 cars are standard, not physical');
   pbrOnly.dispose();
