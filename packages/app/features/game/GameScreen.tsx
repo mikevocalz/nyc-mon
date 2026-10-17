@@ -8,7 +8,8 @@
 //   └─ HUD overlay (box-none, siblings of the detector)
 //       ├─ GameStatusLayer    loading / empty / errors / unsupported
 //       ├─ paused scrim       over the world while the session is paused
-//       └─ ArcadeController   stick, six caps, START/STOP pill (G01)
+//       ├─ ArcadeController   stick, six caps, START/STOP pill (G01)
+//       └─ MapAttribution     ODbL, always while the dataset exists
 //
 // Rendering is on demand: the city is static, so ThreeCanvas runs `paused`
 // and every camera change calls invalidate() once. No idle frame loop burns
@@ -51,6 +52,7 @@ import {
 import { View } from '@acme/ui/tw';
 import { brand } from '@acme/theme';
 import { GameStatusLayer } from './GameStatusLayer.tsx';
+import { MapAttribution } from './MapAttribution.tsx';
 import { commandToAction, describeCamera, type CameraCommand } from './camera-input.ts';
 import { isOverMappedArea } from './city-bounds.ts';
 import { bundledCity, BUNDLED_CITY_NAME } from './city-data.ts';
@@ -61,6 +63,7 @@ import { gameCameraStore, gameScreenActions, gameScreenStore } from './game-sess
 import { resolveGameViewState, shouldMountCanvas } from './game-status.ts';
 import { resolveGameHudLayout } from './hud-layout.ts';
 import { loadGameScene, type GameSceneParams } from './load-game-scene.ts';
+import { cinematicCameraStore } from './camera/cinematic-camera.store.ts';
 import { useGameRenderThread } from './render-thread-choice.ts';
 import { readLobbyIdentity } from './lobby/lobby-identity.ts';
 import { lobbyStore } from './lobby/lobby.store.ts';
@@ -148,6 +151,8 @@ export function GameScreen({ focused = true }: GameScreenProps = {}) {
 
   // Camera -> one redraw, outside React render (no per-event re-render of ThreeCanvas).
   useEffect(() => gameCameraStore.subscribe(() => canvas.current?.invalidate()), []);
+  // Battle/encounter camera shot changes redraw only the scene, never React.
+  useEffect(() => cinematicCameraStore.subscribe(() => canvas.current?.invalidate()), []);
   // The Caller moving (a jump in place moves no camera) -> one redraw, outside React render.
   useEffect(() => callerStore.subscribe(() => canvas.current?.invalidate()), []);
 
@@ -187,6 +192,7 @@ export function GameScreen({ focused = true }: GameScreenProps = {}) {
     return {
       dataset: city.dataset,
       get camera() { return gameCameraStore.getState().camera; },
+      get cinematicShot() { return cinematicCameraStore.getState().shot; },
       actors: CALLER_ACTORS,
       onFirstFrame: gameScreenActions.firstFrame,
     };
@@ -311,6 +317,7 @@ export function GameScreen({ focused = true }: GameScreenProps = {}) {
             onStopReleased={input.cancelStopConfirm}
           />
         ) : null}
+        {city.ok && shouldMountCanvas(state) ? <MapAttribution source={city.dataset.source} rect={hud.attribution} /> : null}
         {handedOver ? (
           // Leave the city: pause (the session saves on pause), then back to
           // the lobby, which offers "Continue your game". The rail is hidden
