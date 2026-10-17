@@ -1,0 +1,22 @@
+name: NYC-Mon Klipp shot contract
+on:
+  pull_request:
+    paths:
+      - 'packages/app/features/game/camera/**'
+      - 'packages/app/features/game/city-scene.ts'
+      - 'packages/app/features/game/city-scene.test.ts'
+      - 'docs/implementation/klipp-camera-2026-10-16.md'
+      - '.github/workflows/nycmon-klipp-camera.yml'
+permissions:
+  contents: read
+jobs:
+  klipp-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: node --test packages/app/features/game/camera/klipp-shot-bridge.test.ts

@@ -6,6 +6,7 @@ import type { ThreeContext, ThreeScene } from '@acme/ui/three';
 import type { CityDatasetV2 } from './city-dataset.ts';
 import type { ActorFrame, SceneActor, SceneActorFactory } from './scene-actor.ts';
 import { buildCityWorld } from './world/index.ts';
+import { applyKlippShot, type KlippCameraShot } from './camera/klipp-shot-bridge.ts';
 
 export interface CityCamera {
   x: number;
@@ -16,6 +17,8 @@ export interface CityCamera {
 export interface CitySceneParams {
   dataset: CityDatasetV2;
   camera: CityCamera;
+  /** Optional validated shot output from Klipp; no change to saved player camera. */
+  cinematicShot?: KlippCameraShot | null;
   /** Created once from the first params with the scene's THREE; later changes need a remount, like the dataset. */
   actors?: readonly SceneActorFactory[];
 }
@@ -92,26 +95,31 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
     throw error;
   }
 
-  function positionCamera(value: CityCamera) {
+  function positionCamera(value: CityCamera, cinematicShot?: KlippCameraShot | null) {
     if (![value.x, value.z, value.yaw, value.distance].every(Number.isFinite)) throw new Error('Invalid city camera');
     const pose = cameraPose(value);
-    camera.position.set(...pose.position);
-    camera.lookAt(...pose.target);
-    // Near and far follow the zoom so depth precision holds from 8 m to 3 km.
-    const near = Math.max(0.1, Math.min(5, pose.distance * 0.02));
-    const far = Math.max(3000, pose.distance * 6);
-    if (camera.near !== near || camera.far !== far) {
-      camera.near = near;
-      camera.far = far;
-      camera.updateProjectionMatrix();
+    if (!applyKlippShot(camera, cinematicShot)) {
+      // Default exploration camera remains authoritative unless an explicit
+      // Klipp shot was validated. Clearing the shot restores the lens too.
+      camera.position.set(...pose.position);
+      camera.lookAt(...pose.target);
+      const near = Math.max(0.1, Math.min(5, pose.distance * 0.02));
+      const far = Math.max(3000, pose.distance * 6);
+      if (camera.near !== near || camera.far !== far || camera.fov !== 50) {
+        camera.near = near;
+        camera.far = far;
+        camera.fov = 50;
+        camera.updateProjectionMatrix();
+      }
     }
+    const far = camera.far;
     world.setViewDistance(pose.distance, far);
     // After the distance: tree LOD reads it.
     world.setFocus(value.x, value.z);
     world.sky.position.copy(camera.position);
     world.sky.scale.setScalar(far * 0.9);
   }
-  positionCamera(initial.camera);
+  positionCamera(initial.camera, initial.cinematicShot);
 
   // The canvas clock stands still while it is paused (on demand), so actors keep their own.
   let actorTime = 0;
@@ -136,7 +144,7 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
         moving = anyMoving;
       }
       // After the actors: a chase camera reads the Caller's position in this frame's params.
-      positionCamera(params.camera);
+      positionCamera(params.camera, params.cinematicShot);
       if (moving) invalidate?.();
     },
     resize: (width, height) => {
