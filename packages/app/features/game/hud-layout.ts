@@ -6,7 +6,8 @@
 //   one workspace; splitting it into two cameras would break PR #29's
 //   "uninterrupted world canvas" rule.
 // - Every HUD element lives wholly inside one usable region. No banner or
-//   interactive control may straddle a separating fold or occluding hinge.
+//   attribution link may straddle a separating fold or sit inside an
+//   occluding hinge.
 // - Separating folds (Android isSeparating, iPhone Duo active division) and
 //   FULL occlusion split the container. A flat, non-separating, non-occluding
 //   crease does not: no fabricated dead strip.
@@ -19,8 +20,9 @@
 // `AdaptiveControlLayout` in @acme/ui/game-controls, which reuses the same
 // `usableRegions` rule. Decision (2026-10-15, G01 08-handoff.md § Route):
 // the old camera column and move pad are retired; this file keeps only the
-// status banner and the blocking region. Map-data credits are in Settings,
-// outside the gameplay HUD.
+// status banner, the attribution link and the blocking region. The
+// attribution sits in the controller region's top band, on the leading edge,
+// under the pill's band, so it never meets the stick or the cluster below.
 //
 // Coordinates: container-local layout units (dp / pt). The caller converts
 // window-space fold geometry once, subtracting the container's window origin
@@ -28,6 +30,7 @@
 // only converts x; horizontal (tabletop) folds keep window y, so the screen
 // uses foldLayoutsFromRegions + its own y offset instead.
 import type { FoldLayout } from '@acme/ui/adaptive-panes/parts';
+import { PILL_GEOMETRY_DP } from '@acme/ui/game-controls/parts';
 
 export interface Rect { x: number; y: number; width: number; height: number }
 export interface Insets { top: number; right: number; bottom: number; left: number }
@@ -47,12 +50,19 @@ export interface GameHudLayoutInput {
 export interface GameHudLayout {
   /** Usable regions after insets and folds, physical left-to-right then top-to-bottom. */
   regions: Rect[];
+  /** The ODbL link: leading edge of the controller region, under the pill band. */
+  attribution: Rect;
   status: Rect;
   /** The one usable region a blocking state's message and action sit in; the controller's region too. */
   blocking: Rect;
 }
 
+export const HUD_GAP = 8;
 export const HUD_MARGIN = 16;
+const ATTRIBUTION_HEIGHT = 44;
+const ATTRIBUTION_MAX_WIDTH = 280;
+/** The START/STOP pill's touch target height; the attribution starts below it. */
+const PILL_BAND_HEIGHT = PILL_GEOMETRY_DP.targetHeight;
 const STATUS_MAX_WIDTH = 420;
 const STATUS_HEIGHT = 120;
 
@@ -119,6 +129,18 @@ export function resolveGameHudLayout(input: GameHudLayoutInput): GameHudLayout {
     ? lowest.reduce((a, b) => (b.x > a.x ? b : a))
     : lowest.reduce((a, b) => (b.x < a.x ? b : a));
 
+  // Attribution: the leading edge (reading direction) of the controller
+  // region, under the pill band, so it meets neither the pill nor the groups.
+  const leading: 'left' | 'right' = input.isRTL ? 'right' : 'left';
+  const attributionWidth = Math.max(0, Math.min(ATTRIBUTION_MAX_WIDTH, controlRegion.width - 2 * HUD_MARGIN));
+  const attributionTop = controlRegion.y + HUD_MARGIN + PILL_BAND_HEIGHT + HUD_GAP;
+  const attribution: Rect = {
+    x: leading === 'left' ? controlRegion.x + HUD_MARGIN : controlRegion.x + controlRegion.width - HUD_MARGIN - attributionWidth,
+    y: Math.min(attributionTop, Math.max(controlRegion.y, controlRegion.y + controlRegion.height - HUD_MARGIN - ATTRIBUTION_HEIGHT)),
+    width: attributionWidth,
+    height: Math.min(ATTRIBUTION_HEIGHT, Math.max(0, controlRegion.height)),
+  };
+
   const statusWidth = Math.max(0, Math.min(STATUS_MAX_WIDTH, controlRegion.width - 2 * HUD_MARGIN));
   const status: Rect = {
     x: controlRegion.x + (controlRegion.width - statusWidth) / 2,
@@ -127,7 +149,7 @@ export function resolveGameHudLayout(input: GameHudLayoutInput): GameHudLayout {
     height: Math.min(STATUS_HEIGHT, Math.max(0, controlRegion.height - 2 * HUD_MARGIN)),
   };
 
-  return { regions, status, blocking: { ...controlRegion } };
+  return { regions, attribution, status, blocking: { ...controlRegion } };
 }
 
 /** Test helper and dev assertion: true when a rect lies wholly inside one usable region. */
