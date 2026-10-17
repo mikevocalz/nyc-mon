@@ -9,8 +9,8 @@
 //                                            what a browser produces on a default load)
 //   client/src/city/tk/tkOverrides.js       (TW_TOWERS — colour/style pushes only)
 //
-// Copyright (c) 2026 Mehmet Kerem Turkcan. MIT License — see upstream valdrada/LICENSE;
-// tile bytes are ODbL 1.0, see upstream LICENSING.md.
+// Copyright (c) 2026 Mehmet Kerem Turkcan. MIT License — full upstream text in
+// LICENSE.valdrada beside this file; tile bytes are ODbL 1.0, see upstream LICENSING.md.
 //
 // Coordinates: bldgXZ / roadVerts / furniture x,z are TILE-LOCAL; +header.origin gives
 // Valdrada world metres (east +x, south +z); `toScene` goes WGS84 via geo.js inverse then
