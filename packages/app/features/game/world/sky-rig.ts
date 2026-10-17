@@ -452,10 +452,13 @@ export function createSkyRig(THREE: Three, request: SkyRigRequest = {}) {
 
     // Env input: the HDR downsampled to 1k (→ PMREM 256 cube), else the baked
     // SH equirect — either way the env comes from this one sky asset.
-    const envSource = equirect
-      ? downsampleEquirect(THREE, equirect, SKY_RIG.envWidth)
-      : { texture: bakeSkyEquirect(THREE, sky), owned: true };
+    // Construction lives inside the try so a bake/downsample throw degrades
+    // like every other stage instead of rejecting the whole promise.
+    let envSource: { texture: TextureT; owned?: boolean } | null = null;
     try {
+      envSource = equirect
+        ? downsampleEquirect(THREE, equirect, SKY_RIG.envWidth)
+        : { texture: bakeSkyEquirect(THREE, sky), owned: true };
       const pmrem = new THREE.PMREMGenerator(renderer);
       const rt = pmrem.fromEquirectangular(envSource.texture);
       pmrem.dispose();
@@ -469,7 +472,7 @@ export function createSkyRig(THREE: Three, request: SkyRigRequest = {}) {
     } catch {
       return false; // PMREM needs an initialised WebGPU backend — device-pending
     } finally {
-      if (envSource.owned) envSource.texture.dispose();
+      if (envSource?.owned) envSource.texture.dispose();
     }
   };
 
