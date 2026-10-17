@@ -5,6 +5,7 @@ import {
   AMAZON_PROVIDER_ID,
   AMAZON_SCOPES,
   AMAZON_TOKEN_URL,
+  amazonOAuthPlugin,
   fetchAmazonProfile,
 } from '../amazon';
 
@@ -59,6 +60,26 @@ describe('Login with Amazon profile mapping', () => {
   it('fails closed when Amazon profile retrieval fails', async () => {
     const fetchImpl = vi.fn(async () => new Response('nope', { status: 401 }));
     await expect(fetchAmazonProfile('token-123', fetchImpl)).resolves.toBeNull();
+  });
+
+  it('disables implicit sign-up and keys accounts by Amazon user_id', async () => {
+    const plugin = amazonOAuthPlugin({ clientId: 'client-id', clientSecret: 'client-secret' });
+    expect(plugin).toBeDefined();
+    const config = (plugin as unknown as {
+      options: {
+        config: Array<{
+          disableImplicitSignUp?: boolean;
+          accountSubject?: (context: { profile: Record<string, unknown>; tokens: Record<string, unknown> }) => string | number | Promise<string | number>;
+        }>;
+      };
+    }).options.config[0];
+    expect(config?.disableImplicitSignUp).toBe(true);
+    await expect(
+      config?.accountSubject?.({
+        profile: { user_id: 'amzn1.account.STABLE' },
+        tokens: {},
+      }),
+    ).resolves.toBe('amzn1.account.STABLE');
   });
 
   it('pins the LWA endpoints and profile scope used by the provider', () => {
