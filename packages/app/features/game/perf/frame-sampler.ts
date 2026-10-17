@@ -47,7 +47,7 @@ export class FrameSampleWindow {
       } else this.parkedCount++;
     }
     if (this.sampleCount !== FRAME_SAMPLE_CAP) return null;
-    const values = Array.from(this.cpu).sort((a,b)=>a-b);
+    const values = Array.from(this.cpu).sort((a, b) => a - b);
     const report: FrameTimingSummary = {
       samples: this.sampleCount,
       activeIntervals: this.intervalCount,
