@@ -11,6 +11,7 @@ import { buildTrees, type TreeReport } from './foliage.ts';
 import { buildStreetFurniture } from './street-furniture.ts';
 import { createStreetClearance } from './walkability.ts';
 import { createCityMaterials, linearColor } from './materials.ts';
+import { createSkyRig, EXPERIMENTAL_SKY_RIG, type SkyName } from './sky-rig.ts';
 
 /**
  * Dusk sun, low in the south-west (about 25 degrees up): long light on the
@@ -30,19 +31,36 @@ export interface CityWorldStats extends CityMeshStats {
   props: ReturnType<typeof buildStreetProps>['stats'];
 }
 
-export function buildCityWorld(THREE: Three, dataset: CityDatasetV2) {
-  const materials = createCityMaterials(THREE, SUN);
+export interface CityWorldOptions {
+  /**
+   * Lane L1 "one light" rig: dome, sun, exp² fog and env from one committed
+   * sky JSON. Defaults to EXPO_PUBLIC_WORLD_SKY_RIG — off unless set.
+   */
+  skyRig?: boolean;
+  /** Which sky preset when skyRig is on; default 'dusk'. */
+  sky?: SkyName;
+}
+
+export function buildCityWorld(THREE: Three, dataset: CityDatasetV2, options: CityWorldOptions = {}) {
+  const skyRig = (options.skyRig ?? EXPERIMENTAL_SKY_RIG)
+    ? createSkyRig(THREE, { sky: options.sky })
+    : null;
+  // One sun direction feeds everything: the rig's JSON sunDirection when
+  // flagged, the hardcoded dusk SUN otherwise — the cel key, the contact
+  // shadows and the DirectionalLight all stay consistent either way.
+  const sunDirection = skyRig?.sunDirection ?? SUN;
+  const materials = createCityMaterials(THREE, sunDirection);
   const group = new THREE.Group();
   group.name = 'city:world';
   // Contact shadows lean away from the sun, along the ground.
   const away: [number, number] = (() => {
-    const l = Math.hypot(SUN[0], SUN[2]) || 1;
-    return [-SUN[0] / l, -SUN[2] / l];
+    const l = Math.hypot(sunDirection[0], sunDirection[2]) || 1;
+    return [-sunDirection[0] / l, -sunDirection[2] / l];
   })();
 
   // Big unlit dome around the camera; city-scene.ts keeps it centred and sized to the far plane.
   const skyGeometry = new THREE.SphereGeometry(1, 32, 16);
-  const sky = new THREE.Mesh(skyGeometry, materials.sky);
+  const sky = new THREE.Mesh(skyGeometry, skyRig?.dome ?? materials.sky);
   sky.name = 'city:sky';
   sky.renderOrder = -10;
   sky.frustumCulled = false;
@@ -62,12 +80,12 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV2) {
   const bandCount = Math.max(1, Math.ceil((dataset.extentMeters * 2 + SHADOW_BAND_METRES * 2) / SHADOW_BAND_METRES) + 1);
 
   const hemi = new THREE.HemisphereLight(linearColor(THREE, 'hemiSky'), linearColor(THREE, 'hemiGround'), 1.6);
-  const sun = new THREE.DirectionalLight(linearColor(THREE, 'sun'), 2.2);
-  sun.position.set(SUN[0] * 1000, SUN[1] * 1000, SUN[2] * 1000);
+  const sun = skyRig?.sun ?? new THREE.DirectionalLight(linearColor(THREE, 'sun'), 2.2);
+  if (!skyRig) sun.position.set(SUN[0] * 1000, SUN[1] * 1000, SUN[2] * 1000);
   group.add(ground, ...city.meshes, ...trees.objects, ...furniture.objects, ...props.objects, hemi, sun, sun.target);
 
-  const horizon = linearColor(THREE, 'skyHorizon');
-  const fog = new THREE.Fog(horizon, 600, 2500);
+  const horizon = skyRig?.horizon ?? linearColor(THREE, 'skyHorizon');
+  const fog = skyRig?.fog ?? new THREE.Fog(horizon, 600, 2500);
 
   const stats: CityWorldStats = {
     ...city.stats, trees: trees.count, signs: furniture.stats.signs, streetlights: furniture.stats.streetlights, treeClearance: trees.report,
@@ -80,14 +98,19 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV2) {
     sky,
     fog,
     horizon,
+    /** The L1 rig when flagged, else null — city-scene uses it to attach env. */
+    skyRig,
     stats,
     /** Level of detail and air from the camera's distance to its target, metres. */
     setViewDistance(distance: number, far: number) {
       viewDistance = distance;
       furniture.setDistance(distance);
       props.setDistance(distance);
-      fog.near = distance * 1.4 + 250;
-      fog.far = Math.max(fog.near + 400, Math.min(far * 0.9, distance * 5 + 1600));
+      if (fog instanceof THREE.Fog) {
+        // FogExp2 has no near/far — the rigged fog's density is constant.
+        fog.near = distance * 1.4 + 250;
+        fog.far = Math.max(fog.near + 400, Math.min(far * 0.9, distance * 5 + 1600));
+      }
     },
     /**
      * The Caller (the camera's look-at point). Trees, contact shadows, sign
@@ -108,6 +131,7 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV2) {
       props.dispose();
       skyGeometry.dispose();
       groundGeometry.dispose();
+      skyRig?.dispose();
       materials.dispose();
     },
   };

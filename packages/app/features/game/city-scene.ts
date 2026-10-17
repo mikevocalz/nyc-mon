@@ -6,6 +6,7 @@ import type { ThreeContext, ThreeScene } from '@acme/ui/three';
 import type { CityDatasetV2 } from './city-dataset.ts';
 import type { ActorFrame, SceneActor, SceneActorFactory } from './scene-actor.ts';
 import { buildCityWorld } from './world/index.ts';
+import type { SkyName } from './world/sky-rig.ts';
 
 export interface CityCamera {
   x: number;
@@ -18,6 +19,8 @@ export interface CitySceneParams {
   camera: CityCamera;
   /** Created once from the first params with the scene's THREE; later changes need a remount, like the dataset. */
   actors?: readonly SceneActorFactory[];
+  /** L1 sky pick (morning/dusk/night) — only read when the sky rig flag is on. */
+  sky?: SkyName;
 }
 
 /** Camera distance clamp, metres. The floor is chase range for a 1.8 m Caller. */
@@ -66,7 +69,7 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(50, 1, 0.5, 10_000);
-  const world = buildCityWorld(THREE, dataset);
+  const world = buildCityWorld(THREE, dataset, { sky: initial.sky });
   scene.add(world.sky, world.group);
   scene.fog = world.fog;
   // react-native-webgpu renders black through three's output pass, shadow
@@ -77,6 +80,15 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
     renderer.toneMapping = THREE.NoToneMapping;
     renderer.shadowMap.enabled = false;
     renderer.setClearColor(world.horizon, 1);
+  }
+  // The rig's async stage: HDR fetch + PMREM env. It resolves off the build
+  // path — the fallback dome already renders, and a landed env invalidates
+  // one redraw. Failure (float upload unverified on rn-webgpu) keeps the JSON
+  // dome and bakes the env from it.
+  if (renderer && world.skyRig) {
+    void world.skyRig.attachEnvironment(renderer, scene).then((applied) => {
+      if (applied) invalidate?.();
+    });
   }
 
   const actors: SceneActor[] = [];

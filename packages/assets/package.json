@@ -7,7 +7,8 @@
   "exports": {
     ".": "./index.ts",
     "./photos": "./photos/index.ts",
-    "./creatures": "./creatures/index.ts"
+    "./creatures": "./creatures/index.ts",
+    "./skies": "./skies/index.ts"
   },
   "scripts": {
     "lint": "eslint",
