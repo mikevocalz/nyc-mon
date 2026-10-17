@@ -133,6 +133,23 @@ describe('startIncubation (M10)', () => {
     assert.equal(storage.writes, before);
   });
 
+  it('mints a fallback eggId when the runtime lacks crypto.randomUUID (release Hermes)', () => {
+    const storage = memoryStorage();
+    const io = createSaveIO(storage, KEY);
+    io.write(withCaller());
+    const store = createMonStore(io);
+    store.getState().hydrate();
+    const cryptoDesc = Object.getOwnPropertyDescriptor(globalThis, 'crypto');
+    Object.defineProperty(globalThis, 'crypto', { value: undefined, configurable: true });
+    try {
+      const egg = store.getState().startIncubation({ bloodlineId: metroEgg!.bloodlineId, minutes: 15, atMs: T0 });
+      assert.match(egg.eggId, /^egg-[0-9a-z]+-[0-9a-z]{10}$/);
+      assert.ok(egg.eggId.length >= 1 && egg.eggId.length <= 128);
+    } finally {
+      if (cryptoDesc) Object.defineProperty(globalThis, 'crypto', cryptoDesc);
+    }
+  });
+
   it('throws with no Caller, with a Mon, or for an unknown Bloodline', () => {
     assert.throws(() => setup(createEmptySave('d', T0)).store.getState().startIncubation({ bloodlineId: 'F01', minutes: 15, atMs: T0 }), /Caller/);
     assert.throws(() => setup(hatchedSave().save).store.getState().startIncubation({ bloodlineId: 'F01', minutes: 15, atMs: T0 }), /already has a Mon/);
