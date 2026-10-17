@@ -2,7 +2,9 @@
 
 `harlem-apollo.json` is an offline OpenStreetMap extract of Harlem in a square about 1.7 km across, centred near the Apollo Theater on West 125th Street. It is real map geometry, not a decorative generated city. It is not a five-borough map, routing service, safety map or authoritative building survey.
 
-Data © OpenStreetMap contributors, distributed under the [Open Database License 1.0](https://opendatacommons.org/licenses/odbl/1-0/). See [OSM copyright and attribution requirements](https://www.openstreetmap.org/copyright). Any map surface must visibly display the attribution and license link. This data license is separate from the code license.
+Data © OpenStreetMap contributors, distributed under the [Open Database License 1.0](https://opendatacommons.org/licenses/odbl/1-0/). See [OSM copyright and attribution requirements](https://www.openstreetmap.org/copyright). This data license is separate from the code license.
+
+The native game's custom 3D world credits this bundled extract in **Settings → Legal & credits → Map data**, where the contributor credit and copyright/ODbL link are visible. The gameplay HUD has no persistent OpenStreetMap label. This uses the [OpenStreetMap Foundation's computer-game attribution guidance](https://osmfoundation.org/wiki/Licence/Attribution_Guidelines#Computer_games_and_simulations), which permits credit in a game menu or credits screen. Keep that menu credit available to players. Do not extend this HUD policy to live OSM map tiles or third-party map providers: those may require on-map attribution, including when they render OSM data.
 
 ## Format (v2)
 
