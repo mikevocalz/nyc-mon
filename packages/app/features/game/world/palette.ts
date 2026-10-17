@@ -135,6 +135,25 @@ export const CITY_COLORS = {
   subwayGlobe: leaf[400],
   shelterGlass: mixHex(carolina[800], ink[800], 0.4),
   shelterFrame: concrete[600],
+  // Time-of-day sky tones for the realism pass (look.ts). The originals
+  // above stay the dusk set; these cover a clear morning and a sodium-lit
+  // night. All TODO(tune) against Mike's Apollo-block photos before ship.
+  morningZenith: mixHex(carolina[700], royal[600], 0.4),
+  morningMid: mixHex(carolina[400], concrete[100], 0.3),
+  morningHorizon: mixHex(orange[100], carolina[200], 0.45),
+  morningGlow: orange[200],
+  morningSun: mixHex(concrete[50], orange[100], 0.4),
+  morningHemiSky: mixHex(carolina[200], concrete[100], 0.4),
+  morningHemiGround: concrete[400],
+  nightZenith: mixHex(ink[950], royal[900], 0.3),
+  nightMid: mixHex(royal[800], ink[900], 0.5),
+  // Harlem's light pollution: the skyline never goes black, it goes sodium.
+  nightHorizon: mixHex(ink[800], orange[700], 0.25),
+  nightGlow: mixHex(orange[500], ink[800], 0.4),
+  // The night key is the moon, not the sun.
+  nightMoon: mixHex(carolina[100], concrete[50], 0.5),
+  nightHemiSky: mixHex(royal[700], ink[800], 0.4),
+  nightHemiGround: ink[700],
 } as const;
 
 export type CityColor = keyof typeof CITY_COLORS;
