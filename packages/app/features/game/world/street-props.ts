@@ -209,7 +209,7 @@ export function buildStreetProps(
   objects.push(cars);
   let lastX = Number.NaN;
   let lastZ = Number.NaN;
-  let shown: [number, number] = [-1, -1];
+  const shown: [number, number] = [-1, -1];
 
   return {
     objects,
@@ -219,7 +219,8 @@ export function buildStreetProps(
     },
     setFocus(x: number, z: number, first: number, last: number) {
       if (propMesh && (first !== shown[0] || last !== shown[1])) {
-        shown = [first, last];
+        shown[0] = first;
+        shown[1] = last;
         propMesh.geometry.setDrawRange(propStart[first]!, propStart[last + 1]! - propStart[first]!);
       }
       if (n === 0 || Math.hypot(x - lastX, z - lastZ) <= TREE_REFRESH_METRES) return;

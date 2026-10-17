@@ -40,23 +40,34 @@ export const MAX_SCENE_FEATURES = 40_000;
 
 const smooth = (t: number) => t * t * (3 - 2 * t);
 
+export interface CameraPose {
+  position: [number, number, number];
+  target: [number, number, number];
+  pitch: number;
+  distance: number;
+}
+
 /**
  * Where the camera sits for a CityCamera. Horizontal offset `distance`
  * behind the target along (sin yaw, cos yaw), height `distance * tan(pitch)`,
  * so from 220 m out it matches the original framing (height 0.8 x distance)
- * that camera-input.ts's pan maths assumes. Pure, for tests.
+ * that camera-input.ts's pan maths assumes. Pure, for tests; `out` reuses the
+ * caller's pose object so the frame loop allocates nothing.
  */
-export function cameraPose(value: CityCamera): { position: [number, number, number]; target: [number, number, number]; pitch: number; distance: number } {
+export function cameraPose(value: CityCamera, out: CameraPose = { position: [0, 0, 0], target: [0, 0, 0], pitch: 0, distance: 0 }): CameraPose {
   const distance = Math.max(CAMERA_MIN_DISTANCE, Math.min(CAMERA_MAX_DISTANCE, value.distance));
   const t = smooth(Math.max(0, Math.min(1, (distance - CAMERA_MIN_DISTANCE) / (OVERVIEW_DISTANCE - CAMERA_MIN_DISTANCE))));
   const pitch = CHASE_PITCH + (OVERVIEW_PITCH - CHASE_PITCH) * t;
   const lookY = CHASE_LOOK_HEIGHT * (1 - t);
-  return {
-    position: [value.x + Math.sin(value.yaw) * distance, lookY + distance * Math.tan(pitch), value.z + Math.cos(value.yaw) * distance],
-    target: [value.x, lookY, value.z],
-    pitch,
-    distance,
-  };
+  out.position[0] = value.x + Math.sin(value.yaw) * distance;
+  out.position[1] = lookY + distance * Math.tan(pitch);
+  out.position[2] = value.z + Math.cos(value.yaw) * distance;
+  out.target[0] = value.x;
+  out.target[1] = lookY;
+  out.target[2] = value.z;
+  out.pitch = pitch;
+  out.distance = distance;
+  return out;
 }
 
 export function createCityScene(context: ThreeContext, initial: CitySceneParams): ThreeScene<CitySceneParams> {
@@ -142,11 +153,17 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
     throw error;
   }
 
+  // Per-frame scratch: the pose, the actor frame and the camera write into
+  // preallocated objects, so the update loop allocates nothing.
+  const pose: CameraPose = { position: [0, 0, 0], target: [0, 0, 0], pitch: 0, distance: 0 };
+  const actorFrame: { -readonly [K in keyof ActorFrame]: ActorFrame[K] } = { delta: 0, time: 0, reducedMotion: false };
+
   function positionCamera(value: CityCamera) {
     if (![value.x, value.z, value.yaw, value.distance].every(Number.isFinite)) throw new Error('Invalid city camera');
-    const pose = cameraPose(value);
-    camera.position.set(...pose.position);
-    camera.lookAt(...pose.target);
+    cameraPose(value, pose);
+    // No spreads in the frame loop: each would materialise an arguments array.
+    camera.position.set(pose.position[0], pose.position[1], pose.position[2]);
+    camera.lookAt(pose.target[0], pose.target[1], pose.target[2]);
     // Near and far follow the zoom so depth precision holds from 8 m to 3 km.
     const near = Math.max(0.1, Math.min(5, pose.distance * 0.02));
     const far = Math.max(3000, pose.distance * 6);
@@ -184,7 +201,9 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
         if (delta === 0 && moving && lastActorTick > 0) delta = Math.min(Math.max((now - lastActorTick) / 1000, 0), 0.1);
         lastActorTick = now;
         actorTime += delta;
-        const actorFrame: ActorFrame = { delta, time: actorTime, reducedMotion: frame.reducedMotion === true };
+        actorFrame.delta = delta;
+        actorFrame.time = actorTime;
+        actorFrame.reducedMotion = frame.reducedMotion === true;
         let anyMoving = false;
         for (const actor of actors) if (actor.update(actorFrame)) anyMoving = true;
         moving = anyMoving;

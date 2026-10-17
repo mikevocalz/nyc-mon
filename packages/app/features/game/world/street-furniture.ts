@@ -146,7 +146,8 @@ export function buildStreetFurniture(
 
   let lastX = Number.NaN;
   let lastZ = Number.NaN;
-  let shownBands: [number, number] = [-1, -1];
+  const shownBands: [number, number] = [-1, -1];
+  const bands: [number, number] = [0, 0];
   const objects = [poles, blades, heads, pools, ...(letters ? [letters] : [])];
   return {
     objects,
@@ -156,10 +157,11 @@ export function buildStreetFurniture(
     /** Lettering bands and light pools follow the Caller. Allocation-free. */
     setFocus(x: number, z: number) {
       if (letterGeometry) {
-        const [first, last] = shadowBands(z, minZ, bandCount);
-        if (first !== shownBands[0] || last !== shownBands[1]) {
-          shownBands = [first, last];
-          letterGeometry.setDrawRange(bandStart[first]!, bandStart[last + 1]! - bandStart[first]!);
+        shadowBands(z, minZ, bandCount, bands);
+        if (bands[0] !== shownBands[0] || bands[1] !== shownBands[1]) {
+          shownBands[0] = bands[0];
+          shownBands[1] = bands[1];
+          letterGeometry.setDrawRange(bandStart[bands[0]]!, bandStart[bands[1] + 1]! - bandStart[bands[0]]!);
         }
       }
       if (Math.hypot(x - lastX, z - lastZ) <= TREE_REFRESH_METRES) return;

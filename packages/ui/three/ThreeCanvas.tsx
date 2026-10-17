@@ -39,6 +39,9 @@ interface Runtime<P> {
   reducedMotion: boolean;
   queued: boolean;
   pointer: ThreePointer;
+  frame: { time: number; delta: number; width: number; height: number; pixelRatio: number; reducedMotion: boolean; pointer: ThreePointer };
+  /** Reused when onFrameTiming is set: the opt-in probe allocates nothing per frame either. */
+  probe: { cpuMs: number; intervalMs: number | null; backend: 'webgl2' | 'webgpu' };
 }
 
 const isWeb = Platform.OS === 'web';
@@ -123,6 +126,8 @@ function JsThreeCanvas<P>({
     reducedMotion,
     queued: false,
     pointer: { x: 0, y: 0, inside: false, pressed: false },
+    frame: { time: 0, delta: 0, width: 0, height: 0, pixelRatio: 1, reducedMotion, pointer: { x: 0, y: 0, inside: false, pressed: false } },
+    probe: { cpuMs: 0, intervalMs: null, backend: 'webgpu' },
   };
 
   // Pick the backend. WebGPU when it works; the WebGL2 backend on web when it
@@ -157,20 +162,26 @@ function JsThreeCanvas<P>({
       rt.last = now;
     }
     try {
-      built.update?.(
-        { time: rt.time, delta, width: rt.width, height: rt.height, pixelRatio: rt.pixelRatio, reducedMotion: rt.reducedMotion, pointer: rt.pointer },
-        rt.params,
-      );
+      // The frame object is reused: zero allocation per frame.
+      const frame = rt.frame;
+      frame.time = rt.time;
+      frame.delta = delta;
+      frame.width = rt.width;
+      frame.height = rt.height;
+      frame.pixelRatio = rt.pixelRatio;
+      frame.reducedMotion = rt.reducedMotion;
+      frame.pointer = rt.pointer;
+      built.update?.(frame, rt.params);
       advanceNodeFrame(renderer);
       renderer.render(built.scene, built.camera);
       rt.surface?.present();
       if (onFrameTiming) {
         try {
-          onFrameTiming({
-            cpuMs: Math.max(0, performance.now() - probeStart),
-            intervalMs: probeInterval,
-            backend: (renderer.backend as { isWebGLBackend?: boolean }).isWebGLBackend ? 'webgl2' : 'webgpu',
-          });
+          const probe = rt.probe;
+          probe.cpuMs = Math.max(0, performance.now() - probeStart);
+          probe.intervalMs = probeInterval;
+          probe.backend = (renderer.backend as { isWebGLBackend?: boolean }).isWebGLBackend ? 'webgl2' : 'webgpu';
+          onFrameTiming(probe);
         } catch (error) {
           // A diagnostics callback must never take down the game renderer.
           console.warn('[ThreeCanvas] frame diagnostics failed', error);

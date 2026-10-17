@@ -36,24 +36,31 @@ export interface CallerPose {
   /** Forward lean, radians. */
   readonly lean: number;
 }
+/** A CallerPose the caller reuses across frames (the actor keeps one; the proxy owns it). */
+export type MutableCallerPose = { -readonly [K in keyof CallerPose]: CallerPose[K] };
 
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
 
-/** The figure's pose for a Caller state. Pure, so the gait reads are testable without a renderer. */
-export function poseFor(state: Pick<CallerState, 'gait' | 'speed' | 'gaitPhase' | 'jump'>): CallerPose {
-  if (isAirborne(state.jump)) return { leg: -0.5, arm: -0.6, bob: 0, lean: 0.1 };
-  if (state.gait === 'idle' || state.speed <= 0) return { leg: 0, arm: 0, bob: 0, lean: 0 };
+/** The figure's pose for a Caller state. Pure, so the gait reads are testable without a renderer; `out` reuses the caller's pose object. */
+export function poseFor(state: Pick<CallerState, 'gait' | 'speed' | 'gaitPhase' | 'jump'>, out: MutableCallerPose = { leg: 0, arm: 0, bob: 0, lean: 0 }): CallerPose {
+  if (isAirborne(state.jump)) {
+    out.leg = -0.5; out.arm = -0.6; out.bob = 0; out.lean = 0.1;
+    return out;
+  }
+  if (state.gait === 'idle' || state.speed <= 0) {
+    out.leg = 0; out.arm = 0; out.bob = 0; out.lean = 0;
+    return out;
+  }
   const run = clamp01((state.speed - WALK_SPEED) / (RUN_SPEED - WALK_SPEED));
   const amplitude = (LEG_SWING_WALK + (LEG_SWING_RUN - LEG_SWING_WALK) * run) * clamp01(state.speed / WALK_SPEED);
   const phase = state.gaitPhase * Math.PI * 2;
   const swing = Math.sin(phase);
-  return {
-    leg: swing * amplitude,
-    arm: -swing * amplitude * 0.8,
-    // Two bobs per cycle, one per footfall.
-    bob: Math.abs(Math.cos(phase)) * (0.02 + 0.04 * run),
-    lean: 0.05 + 0.12 * run,
-  };
+  out.leg = swing * amplitude;
+  out.arm = -swing * amplitude * 0.8;
+  // Two bobs per cycle, one per footfall.
+  out.bob = Math.abs(Math.cos(phase)) * (0.02 + 0.04 * run);
+  out.lean = 0.05 + 0.12 * run;
+  return out;
 }
 
 type CallerStoreLike = { getState: () => CallerState };
@@ -136,13 +143,14 @@ export function createCallerProxyWith(store: CallerStoreLike): SceneActorFactory
     leftArm.add(mesh(geometry(new THREE.BoxGeometry(0.05, 0.035, 0.05)), hlynkHead, 0.05, -0.415, 0));
     leftArm.add(mesh(geometry(new THREE.SphereGeometry(0.01, 6, 4)), led, 0.077, -0.415, 0));
 
+    const pose: MutableCallerPose = { leg: 0, arm: 0, bob: 0, lean: 0 };
     const apply = (state: CallerState): boolean => {
       root.visible = state.spawned;
       if (!state.spawned) return false;
       root.position.set(state.x, state.groundY, state.z);
       root.rotation.y = state.heading;
       figure.position.y = state.jump.height;
-      const pose = poseFor(state);
+      poseFor(state, pose);
       leftLeg.rotation.x = pose.leg;
       rightLeg.rotation.x = -pose.leg;
       leftArm.rotation.x = pose.arm;

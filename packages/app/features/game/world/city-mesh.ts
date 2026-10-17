@@ -42,11 +42,13 @@ export function areaLayer(kind: string): number {
 export const SHADOW_BAND_METRES = 50;
 /** ... out to this distance north and south of them. */
 export const SHADOW_RADIUS = 160;
-/** The z bands to draw for a focus z: [first, last], inclusive, clamped to the tile. */
-export function shadowBands(focusZ: number, minZ: number, bandCount: number): [number, number] {
+/** The z bands to draw for a focus z: [first, last], inclusive, clamped to the tile. `out` reuses the caller's tuple so per-frame callers allocate nothing. */
+export function shadowBands(focusZ: number, minZ: number, bandCount: number, out: [number, number] = [0, 0]): [number, number] {
   const first = Math.floor((focusZ - SHADOW_RADIUS - minZ) / SHADOW_BAND_METRES);
   const last = Math.floor((focusZ + SHADOW_RADIUS - minZ) / SHADOW_BAND_METRES);
-  return [Math.max(0, Math.min(bandCount - 1, first)), Math.max(0, Math.min(bandCount - 1, last))];
+  out[0] = Math.max(0, Math.min(bandCount - 1, first));
+  out[1] = Math.max(0, Math.min(bandCount - 1, last));
+  return out;
 }
 
 const rgb = (key: CityColor) => hexToRgb(CITY_COLORS[key]);
@@ -479,7 +481,8 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV2, materials:
     triangles, drawCalls: meshes.length, neonTrims: trims, storefronts: fronts, billboards: boards,
     cornices, stoops, fireEscapes, awnings, shopSigns, waterTowers,
   };
-  let shownBands: [number, number] = [-1, -1];
+  const shownBands: [number, number] = [-1, -1];
+  const bands: [number, number] = [0, 0];
   return {
     meshes,
     stats,
@@ -487,9 +490,11 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV2, materials:
     texts,
     /** Contact shadows only near the focus: a few z bands, one draw range, no allocation. */
     setFocus(_x: number, z: number) {
-      const [first, last] = shadowBands(z, minZ, bandCount);
+      shadowBands(z, minZ, bandCount, bands);
+      const first = bands[0], last = bands[1];
       if (first === shownBands[0] && last === shownBands[1]) return;
-      shownBands = [first, last];
+      shownBands[0] = first;
+      shownBands[1] = last;
       const start = bandStart[first]!;
       shadowMesh?.geometry.setDrawRange(start, bandStart[last + 1]! - start);
       detailMesh?.geometry.setDrawRange(detailStart[first]!, detailStart[last + 1]! - detailStart[first]!);
