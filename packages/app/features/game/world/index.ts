@@ -12,6 +12,7 @@ import { buildStreetFurniture } from './street-furniture.ts';
 import { createStreetClearance } from './walkability.ts';
 import { createCityMaterials, linearColor } from './materials.ts';
 import { createPbrCityMaterials, EXPERIMENTAL_WORLD_PBR } from './pbr-materials.ts';
+import { applyCarPbrMaterial, EXPERIMENTAL_WORLD_CAR_PBR } from './car-materials.ts';
 import { createSkyRig, EXPERIMENTAL_SKY_RIG, type SkyName } from './sky-rig.ts';
 
 /**
@@ -47,6 +48,15 @@ export interface CityWorldOptions {
    * per-vertex surface attributes are shared either way.
    */
   pbr?: boolean;
+  /**
+   * Lane L4 "cars": the parked-car/taxi material becomes a flagged
+   * MeshPhysicalNodeMaterial — clearcoat paint, tinted-clearcoat glass,
+   * chrome bumpers and emissive lamps that light on dusk/night skies
+   * (car-materials.ts). Defaults to EXPO_PUBLIC_WORLD_CAR_PBR — off unless
+   * set. The lamp switch reads the resolved sky pick (the rig's name, dusk
+   * when unflagged). Works over either lane's other materials.
+   */
+  carPbr?: boolean;
 }
 
 export function buildCityWorld(THREE: Three, dataset: CityDatasetV2, options: CityWorldOptions = {}) {
@@ -59,6 +69,11 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV2, options: Ci
   const sunDirection = skyRig?.sunDirection ?? SUN;
   const pbr = options.pbr ?? EXPERIMENTAL_WORLD_PBR;
   const materials = pbr ? createPbrCityMaterials(THREE, { sunDirection }) : createCityMaterials(THREE, sunDirection);
+  // Lane L4: the same InstancedMesh keeps its paint-marker contract; only
+  // the material changes. The lamp switch seeds off the resolved sky pick.
+  const carPbr = (options.carPbr ?? EXPERIMENTAL_WORLD_CAR_PBR)
+    ? applyCarPbrMaterial(THREE, materials, { sky: skyRig?.name })
+    : null;
   const group = new THREE.Group();
   group.name = 'city:world';
   // Contact shadows lean away from the sun, along the ground.
@@ -141,6 +156,7 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV2, options: Ci
       skyGeometry.dispose();
       groundGeometry.dispose();
       skyRig?.dispose();
+      carPbr?.dispose();
       materials.dispose();
     },
   };
