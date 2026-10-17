@@ -63,6 +63,20 @@ export const CITY_COLORS = {
   plain: concrete[200],
   roof: concrete[600],
   window: mixHex(ink[800], carolina[900], 0.4),
+  // The rooms behind the glass (L3): warm plaster walls, a wood floor, an
+  // acoustic-tile ceiling with a lit panel, dark silhouettes for furniture
+  // and doors, venetian blinds and the sill AC. Read at emissive level, so
+  // they sit a step or two lighter than the surfaces they stand for.
+  roomWall: mixHex(concrete[100], orange[100], 0.35),
+  roomWallSide: mixHex(concrete[200], orange[100], 0.3),
+  roomFloor: mixHex(orange[900], ink[800], 0.35),
+  roomCeiling: concrete[50],
+  roomPanel: mixHex(orange[50], concrete[50], 0.5),
+  roomDark: mixHex(ink[800], carolina[900], 0.35),
+  roomFurniture: mixHex(ink[800], orange[900], 0.2),
+  roomDoor: mixHex(orange[900], ink[900], 0.45),
+  blind: mixHex(concrete[100], orange[100], 0.3),
+  acUnit: concrete[400],
   // Trees and shadow.
   leafLight: leaf[500],
   leafDark: leaf[700],

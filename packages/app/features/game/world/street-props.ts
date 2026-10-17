@@ -20,6 +20,7 @@ import type { LightPlacement, SignPlacement } from './signage.ts';
 import {
   CAR_LENGTH, CAR_WIDTH, placeAtKerb, placeBaskets, placeHydrants, placeParkedCars, type CarPlacement, type PropPlacement,
 } from './street-props-layout.ts';
+import { SURFACES, surfaceMid } from './surfaces.ts';
 import { pickWithin, TREE_REFRESH_METRES } from './tree-lod.ts';
 import type { StreetClearance } from './walkability.ts';
 
@@ -71,6 +72,7 @@ export function placeStreetProps(dataset: CityDatasetV2, clearance: StreetCleara
 
 function emitHydrant(buffer: VertexBuffer, p: PropPlacement): void {
   const f = frame(p.x, p.z, p.toRoad);
+  buffer.surface(...SURFACES.iron);
   const body = rgb('hydrant');
   const cap = rgb('hydrantCap');
   cylinder(buffer, f, 0, 0, 0.13, 0, 0.62, 6, body);
@@ -81,6 +83,7 @@ function emitHydrant(buffer: VertexBuffer, p: PropPlacement): void {
 
 function emitBasket(buffer: VertexBuffer, p: PropPlacement): void {
   const f = frame(p.x, p.z, p.toRoad);
+  buffer.surface(...SURFACES.iron);
   cylinder(buffer, f, 0, 0, 0.27, 0, 0.82, 8, rgb('basket'));
   cylinder(buffer, f, 0, 0, 0.3, 0.78, 0.86, 8, rgb('iron'));
 }
@@ -89,7 +92,9 @@ function emitBasket(buffer: VertexBuffer, p: PropPlacement): void {
 function emitSubwayEntrance(structure: VertexBuffer, lights: VertexBuffer, p: PropPlacement): void {
   const f: Frame = frame(p.x, p.z, p.toRoad);
   const rail = rgb('subwayRail');
+  structure.surface(...SURFACES.stone);
   box(structure, f, [-2.0, 0, -0.8], [2.0, 0.03, 0.8], rgb('shadow'), { skip: ['bottom'] });
+  structure.surface(...SURFACES.iron);
   for (const z of [-0.85, 0.85]) box(structure, f, [-2.0, 0, z - 0.04], [1.9, 1.0, z + 0.04], rail, { skip: ['bottom'] });
   box(structure, f, [-2.05, 0, -0.85], [-1.97, 1.0, 0.85], rail, { skip: ['bottom'] });
   for (const z of [-0.85, 0.85]) {
@@ -104,10 +109,13 @@ function emitShelter(structure: VertexBuffer, lights: VertexBuffer, p: PropPlace
   const f: Frame = frame(p.x, p.z, p.toRoad);
   const steel = rgb('shelterFrame');
   const glassTone = rgb('shelterGlass');
+  structure.surface(...SURFACES.iron);
   for (const x of [-1.85, 1.85]) for (const z of [-0.72, 0.62]) box(structure, f, [x - 0.04, 0, z - 0.04], [x + 0.04, 2.4, z + 0.04], steel, { skip: ['bottom', 'top'] });
   box(structure, f, [-1.95, 2.4, -0.82], [1.95, 2.52, 0.8], steel, {});
+  structure.surface(...surfaceMid('storefront'));
   box(structure, f, [-1.8, 0.15, -0.73], [1.8, 2.3, -0.69], glassTone, { skip: ['bottom', 'top'] });
   box(structure, f, [-1.87, 0.15, -0.68], [-1.83, 2.3, 0.45], glassTone, { skip: ['bottom', 'top'] });
+  structure.surface(...SURFACES.iron);
   box(structure, f, [-1.4, 0.42, -0.65], [1.0, 0.48, -0.3], steel, { skip: ['bottom'] });
   box(lights, f, [1.8, 0.25, -0.68], [1.9, 2.15, 0.45], rgb('neonCarolina'), { skip: ['bottom', 'top'] });
 }
@@ -117,9 +125,15 @@ function carGeometry(THREE: Three) {
   const buffer = new VertexBuffer();
   const f = frame(0, 0, [0, 1]);
   const hl = CAR_LENGTH / 2; const hw = CAR_WIDTH / 2;
+  // Paint, glasshouse and tyres are different surfaces — the PBR lane reads
+  // them off the aRoughMetal attribute the boxes are stamped with.
+  buffer.surface(...SURFACES.carPaint);
   box(buffer, f, [-hl, 0.32, -hw], [hl, 0.95, hw], PAINT, { skip: ['bottom'] });
+  buffer.surface(...SURFACES.carGlass);
   box(buffer, f, [-1.15, 0.95, -hw + 0.12], [1.05, 1.45, hw - 0.12], rgb('carGlass'), { skip: ['bottom'] });
+  buffer.surface(...SURFACES.carPaint);
   box(buffer, f, [-0.25, 1.45, -0.2], [0.25, 1.6, 0.2], PAINT, { skip: ['bottom'] });
+  buffer.surface(...SURFACES.tyre);
   for (const x of [-1.45, 1.45]) for (const s of [-1, 1]) {
     box(buffer, f, [x - 0.33, 0, s > 0 ? hw - 0.24 : -hw - 0.02], [x + 0.33, 0.64, s > 0 ? hw + 0.02 : -hw + 0.24], rgb('tyre'), { skip: ['bottom', 'top'] });
   }

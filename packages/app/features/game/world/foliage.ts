@@ -14,7 +14,7 @@ import { LEAF_ALPHA as LEAF } from './leaf-alpha.ts';
 import { mulberry32 } from './geometry.ts';
 import { NEAR_TREE_CAP, TreeLod } from './tree-lod.ts';
 import { createStreetClearance, type StreetClearance } from './walkability.ts';
-import { createFarCrownMaterial, createLeafMaterial, linearColor, TONE_ATTRIBUTE, type CityMaterials } from './materials.ts';
+import { linearColor, TONE_ATTRIBUTE, type CityMaterials } from './materials.ts';
 
 type Geometry = BufferGeometry;
 
@@ -194,7 +194,7 @@ export { TREE_HIDE_METRES, TREE_NEAR_LOD_METRES } from './tree-lod.ts';
  * nothing and React never re-renders.
  */
 export function buildTrees(
-  THREE: Three, dataset: CityDatasetV2, materials: Pick<CityMaterials, 'rig' | 'trunks'>,
+  THREE: Three, dataset: CityDatasetV2, materials: Pick<CityMaterials, 'leaf' | 'farCrown' | 'trunks'>,
   clearance: StreetClearance = createStreetClearance(dataset),
 ) {
   const { trees: placements, report } = treePlacements(dataset, clearance);
@@ -203,8 +203,9 @@ export function buildTrees(
   const crownGeometry = leafCrownGeometry(THREE);
   const farGeometry = new THREE.IcosahedronGeometry(1.15 * CROWN_SCALE, 0).translate(0, 1.5 * CROWN_SCALE, 0);
   const trunkGeometry = new THREE.CylinderGeometry(0.16, 0.24, 2.8, 6).translate(0, 1.4, 0);
-  const leafMaterial = createLeafMaterial(THREE, materials.rig, texture);
-  const farMaterial = createFarCrownMaterial(THREE, materials.rig);
+  // The materials object owns which lighting body the crowns run (cel or the flagged PBR lane).
+  const leafMaterial = materials.leaf(texture);
+  const farMaterial = materials.farCrown();
   // Shared with the city materials, which dispose it.
   const trunkMaterial = materials.trunks;
   const nearCapacity = Math.min(count, NEAR_TREE_CAP);
