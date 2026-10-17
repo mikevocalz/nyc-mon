@@ -16,9 +16,21 @@ sha256 is pinned in `manifest.json`.
 | `qwantani_morning_puresky` | https://polyhaven.com/a/qwantani_morning_puresky — Jarod Guest; "clear high-contrast morning sky"; whitebalance 5313, captured at Qwantani (−28.485, 29.013) |
 | `qwantani_dusk_1_puresky` | https://polyhaven.com/a/qwantani_dusk_1_puresky — Greg Zaal (photography), Jarod Guest (processing); "soft dusk light with low-contrast cool blues, a gentle sunset glow" |
 | `qwantani_night_puresky` | https://polyhaven.com/a/qwantani_night_puresky — Greg Zaal (photography), Jarod Guest (processing); "clear, low-contrast night sky with Milky Way and cool distant glows" |
+| `qwantani_dusk_2_puresky` | https://polyhaven.com/a/qwantani_dusk_2_puresky — Greg Zaal, Jarod Guest; `time_of_day: dusk`; "warm sunset glow, thin clouds" — added as a dusk alternate |
+| `qwantani_sunset_puresky` | https://polyhaven.com/a/qwantani_sunset_puresky — Greg Zaal, Jarod Guest; `time_of_day: sunset`; "calm, partly cloudy sunset with warm sun glow" — added as a dusk alternate |
+| `qwantani_moonrise_puresky` | https://polyhaven.com/a/qwantani_moonrise_puresky — Greg Zaal, Jarod Guest; `time_of_day: night`; "clear moonrise night with crisp stars and high-contrast cool-blue light" — added as a night alternate |
+| `qwantani_moon_noon_puresky` | https://polyhaven.com/a/qwantani_moon_noon_puresky — Greg Zaal, Jarod Guest; `time_of_day: night`; "pure, clear moonlit sky … soft horizon glow" — added as a night alternate |
 
-All three candidate ids existed and are HDRIs, so no `_puresky` substitutes
-were needed. Resolution fetched: **2k** (2048×1024 Radiance .hdr, ≈ 4–5.5 MB
+All three original candidate ids existed and are HDRIs, so no substitutes were
+needed for them. After measurement showed `dusk_1` has no sun disc and
+`night`'s brightest cluster is a star, four real `*_puresky` alternates were
+fetched through the same pipeline (all existed; none skipped). The measured
+verdict, per `sunClusterSpreadDeg` in each JSON: **`qwantani_sunset_puresky`**
+is the dusk pick (sun disc, spread 0.21°, elev 6.1°) and
+**`qwantani_moonrise_puresky`** the night pick (moon disc, spread 0.28°,
+elev 13.8°); `dusk_2` is another disc-free glow (spread 15.9°) and
+`moon_noon` a valid but near-overhead moon (elev 60.7°). Full table:
+`packages/assets/skies/README.md`. Resolution fetched: **2k** (2048×1024 Radiance .hdr, ≈ 4–5.5 MB
 each) — enough for a 0.2° sun disc and meaningless to the order-2 SH beyond
 that; `--resolution` flag bumps it if L1 wants a reflection bake.
 
@@ -52,10 +64,13 @@ that; `--resolution` flag bumps it if L1 wants a reflection bake.
 
 ## Known gaps / honesty notes
 
-- `qwantani_dusk_1_puresky`'s sun is below the horizon: the "sun" fields are
-  the sunset-glow centroid (spread 15.4°, peak luma ≈ 4), not a disc.
+- `qwantani_dusk_1_puresky`'s and `qwantani_dusk_2_puresky`'s suns are below
+  the horizon: their "sun" fields are sunset-glow centroids (spread ≈ 15–16°,
+  peak luma ≈ 4–5.5), not discs. `qwantani_sunset_puresky` is the dusk-slot
+  candidate that does have a disc.
 - `qwantani_night_puresky`'s brightest cluster is a 2-pixel star at ~84°
-  elevation, not the moon. `sunDirection` for night = brightest point source.
+  elevation, not the moon. `sunDirection` for that asset = brightest point
+  source; `moonrise`/`moon_noon` carry the real moon discs.
 - Equirect azimuth is self-consistent but not compass-aligned; L1 should
   rotate `sunAzimuthDeg` to the game's compass.
 - react-native-webgpu float texture upload is unverified (no device); see the
