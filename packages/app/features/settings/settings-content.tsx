@@ -85,7 +85,7 @@ export function SettingsContent() {
             <Text variant="caption" tone="muted">Map data</Text>
             <Text>{CITY_MAP_ATTRIBUTION}</Text>
             <Text variant="caption" tone="muted">
-              NYC-Mon's 3D city uses OpenStreetMap data under the Open Database License ({CITY_MAP_LICENSE.replace('ODbL-', 'ODbL ')}).
+              NYC-Mon&apos;s 3D city uses OpenStreetMap data under the Open Database License ({CITY_MAP_LICENSE.replace('ODbL-', 'ODbL ')}).
             </Text>
           </View>
           <Button
