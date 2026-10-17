@@ -20,6 +20,26 @@ Stacked on the existing #46 world. Camera project: [pmndrs/klipp](https://github
 6. Set test scenarios at Apollo Theater: walking/chasing, scan target near wall, wild Mon encounter, turn-based battle, mounted Mon, resume after cancel, rotated Surface Duo, foldable hinge, XR.
 7. Add camera frustum/collision tests, snapshot continuity and compositor frame timing. No camera shake at rest; accessible reduced motion.
 
+## Lane F rebuild plan — verified against the 0.14.0 tarball (2026-10-16)
+
+The package was fetched straight from the registry (`npm view` tarball) without installing, so every signature below is real. Install is still gated on pnpm `minimumReleaseAge` — `math@0.0.0-canary-20260930-56e1c4d3` (Klipp's only runtime dep) is already past the window.
+
+**Entry point:** `@pmndrs/klipp/three` — `new KlippThree(camera, options)`. All four peers (`react`, `@react-three/fiber`, `camera-controls`, `three`) are `optional` in `peerDependenciesMeta`; the `/three` entry needs only `three` (repo has 0.186.1 ≥ the `>=0.156` floor). No R3F, no DOM input sources required.
+
+**What the in-tree seam becomes:**
+
+| Now (stand-in) | Real Klipp |
+| --- | --- |
+| `CameraWithKlippPose` + `applyKlippShot` + `validKlippShot` | gone — `KlippThree.write()` owns transform+lens writes to the real camera; `CameraState` uses typed `Vec3`/`Quat` fields so the tuple validator and clamps are unnecessary. Lens safety moves to per-camera `initialState` / blend config |
+| `chooseCameraShot(triggers)` + `cinematicCameraStore` (Zustand) | five `VirtualCameraThree`s with fixed priorities (explore 10, ride 15, scan 20, encounter 30, battle 40); triggers toggle `camera.active`/`setPriority` — Klipp arbitrates and blends. `subscribeActiveId`/`subscribeLiveId` replace the store for UI listeners |
+| manual viewOffset gap | `CameraState.viewOffset` is a native field — the offset framing the Duo hinge needs is a lens field, not a workaround |
+| `recordCityFrame`-style frame gating | `klipp.update(dt)` returns `true` while anything still moves → drives the on-demand canvas invalidate directly |
+| manual input precedence | `klipp.whileOnScreen(cam, start)` connects player look-around only while that camera is live; `mode = 'standby'` freezes writes on tab blur |
+
+**Per-camera pieces** (from `dist/three`): `FollowBodyThree`/`OrbitFollowBodyThree`/`HardLockToTargetBodyThree` bodies, `HardLookAtAimThree`/`RotateWithFollowTargetAimThree`/`PanTiltAimThree` aims, `GroupFramingExtensionThree` + `TargetGroup` for the scan/encounter compositions, `BasicMultiChannelPerlinNoiseThree` for shot texture. Targets bind as `Object3D`s through `klipp.targets` (read once per frame — Caller and nearby Mons register there, never React state).
+
+**Still required from the original plan:** collision/occlusion safety (Klipp does not do it — keep the existing near-wall clamp as a `CameraPiece` after the body), reduced-motion blend overrides (`setCustomBlends`), `setSize(w,h)` on canvas resize, session lifecycle (one Klipp per game session, `mode='disabled'` on exit), and the worklet-snapshot mirror in step 5.
+
 ## Reviewer roster and skills
 
 - Distinguished gameplay camera engineer — Klipp v0.14 lifecycle, shot priorities, blend interruption, returning control.
