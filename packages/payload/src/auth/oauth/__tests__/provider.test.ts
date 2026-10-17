@@ -507,7 +507,16 @@ describe('linking page data', () => {
       clientName: 'Alexa',
       scopes: ['mcp:caller', 'mcp:care', 'offline_access'],
     });
-    expect(await loadLinkPage('sign-in', consentUrl.search, options)).toEqual({ kind: 'sign-in', clientName: 'Alexa' });
+    expect(await loadLinkPage('sign-in', consentUrl.search, { ...options, amazonEnabled: false })).toEqual({
+      kind: 'sign-in',
+      clientName: 'Alexa',
+      amazonEnabled: false,
+    });
+    expect(await loadLinkPage('sign-in', consentUrl.search, { ...options, amazonEnabled: true })).toEqual({
+      kind: 'sign-in',
+      clientName: 'Alexa',
+      amazonEnabled: true,
+    });
 
     const forged = new URL(consentUrl);
     forged.searchParams.set('redirect_uri', 'https://evil.test/cb');
