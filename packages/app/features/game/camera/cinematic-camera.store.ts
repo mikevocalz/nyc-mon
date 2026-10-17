@@ -12,13 +12,13 @@ interface CinematicState {
   clear: () => void;
 }
 export const cinematicCameraStore = createStore<CinematicState>((set) => ({
-  shot:null,
-  name:null,
-  setShot:(name,shot)=>{
-    const validated=validKlippShot(shot);
+  shot: null,
+  name: null,
+  setShot: (name, shot) => {
+    const validated = validKlippShot(shot);
     if (!validated) return false;
-    set({name,shot:validated});
+    set({ name, shot: validated });
     return true;
   },
-  clear:()=>set({name:null,shot:null}),
+  clear: () => set({ name: null, shot: null }),
 }));

@@ -104,21 +104,21 @@ test('rejects invalid cameras before allocating meshes', () => {
   assert.throws(() => createCityScene(context(), input), /camera/);
 });
 
-test('external Klipp-compatible shot overrides a frame and restores the exploration lens',()=>{
-  const input=params();
-  const built=createCityScene(context(),input);
-  const camera=built.camera as THREE.PerspectiveCamera;
-  const before=camera.position.clone();
-  const shot={
-    position:[55,4,32] as [number,number,number],
-    quaternion:[0,0,0,1] as [number,number,number,number],
-    near:.2,far:2000,fov:60,
+test('external Klipp-compatible shot overrides a frame and restores the exploration lens', () => {
+  const input = params();
+  const built = createCityScene(context(), input);
+  const camera = built.camera as THREE.PerspectiveCamera;
+  const before = camera.position.clone();
+  const shot = {
+    position: [55, 4, 32] as [number, number, number],
+    quaternion: [0, 0, 0, 1] as [number, number, number, number],
+    near: .2, far: 2000, fov: 60,
   };
-  built.update!(frame(),{...input,cinematicShot:shot});
-  assert.deepEqual(camera.position.toArray(),[55,4,32]);
-  assert.equal(camera.fov,60);
-  built.update!(frame(),{...input,cinematicShot:null});
+  built.update!(frame(), { ...input, cinematicShot: shot });
+  assert.deepEqual(camera.position.toArray(), [55, 4, 32]);
+  assert.equal(camera.fov, 60);
+  built.update!(frame(), { ...input, cinematicShot: null });
   assert.ok(camera.position.equals(before));
-  assert.equal(camera.fov,50);
+  assert.equal(camera.fov, 50);
   built.dispose?.();
 });
