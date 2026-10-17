@@ -64,6 +64,29 @@ export function arcadeRiveFromFiles(files: { stick?: RiveFile; cluster?: RiveFil
   };
 }
 
+/**
+ * The artboard names inside the merged `arcade.riv` — generated from the
+ * three sibling projects by `packages/ui/rive/arcade-controls/arcade/
+ * merge.mjs` and verified byte-identical to the per-file builds.
+ */
+export const MERGED_STICK_ARTBOARD = 'LeftStick';
+export const MERGED_CLUSTER_ARTBOARD = 'RightSix';
+export const MERGED_PILL_ARTBOARD = 'StartStop';
+
+/**
+ * Shares one already-loaded merged file across the three controls: one
+ * `useRiveFile` parse instead of three. The Thumbpad surface keeps its own
+ * hardcoded artboard/state-machine names, so it is not listed here.
+ */
+export function arcadeRiveFromFile(file: RiveFile | undefined): ArcadeControllerRive {
+  if (!file) return {};
+  return {
+    stick: { file, artboardName: MERGED_STICK_ARTBOARD },
+    cluster: { file, artboardName: MERGED_CLUSTER_ARTBOARD },
+    pill: { file, artboardName: MERGED_PILL_ARTBOARD },
+  };
+}
+
 /** Props of {@linkcode ArcadeController}. */
 export interface ArcadeControllerProps
   extends Pick<AdaptiveControlLayoutProps, 'savedLayouts' | 'insets' | 'hardwareFamily' | 'runtime' | 'hideTouchControls' | 'onLayoutResolved'> {
