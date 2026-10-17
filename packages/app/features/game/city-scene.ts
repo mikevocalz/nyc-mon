@@ -3,7 +3,7 @@
 // it. The canvas draws on demand; while any actor reports motion the scene
 // asks for the next frame itself.
 import type { ThreeContext, ThreeScene } from '@acme/ui/three';
-import type { CityDatasetV2 } from './city-dataset.ts';
+import type { CityDatasetV3 } from './city-dataset.ts';
 import type { ActorFrame, SceneActor, SceneActorFactory } from './scene-actor.ts';
 import { buildCityWorld } from './world/index.ts';
 import { EXPERIMENTAL_WORLD_POST, mountCityPostPipeline, resolvePostOptions } from './post/pipeline.ts';
@@ -18,7 +18,7 @@ export interface CityCamera {
   distance: number;
 }
 export interface CitySceneParams {
-  dataset: CityDatasetV2;
+  dataset: CityDatasetV3;
   camera: CityCamera;
   /** Created once from the first params with the scene's THREE; later changes need a remount, like the dataset. */
   actors?: readonly SceneActorFactory[];
@@ -75,8 +75,8 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
   if (![initial.camera.x, initial.camera.z, initial.camera.yaw, initial.camera.distance].every(Number.isFinite)) throw new Error('Invalid city camera');
   // The dataset arrives parsed (city-data.ts runs parseCityDataset once per runtime); only check the shape here.
   const dataset = initial.dataset;
-  if (dataset?.version !== 2 || !Array.isArray(dataset.buildings) || !Array.isArray(dataset.roads) || !Array.isArray(dataset.areas)) {
-    throw new Error('City scene needs a parsed v2 dataset');
+  if (dataset?.version !== 3 || !Array.isArray(dataset.buildings) || !Array.isArray(dataset.roads) || !Array.isArray(dataset.areas)) {
+    throw new Error('City scene needs a parsed v3 dataset');
   }
   const featureCount = dataset.buildings.length + dataset.roads.length + dataset.areas.length;
   if (featureCount > MAX_SCENE_FEATURES) throw new Error('City scene feature budget exceeded');

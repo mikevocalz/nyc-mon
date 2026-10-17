@@ -6,7 +6,7 @@
 //   blocked  everything else (back yards and unmapped lots inside blocks),
 //            and anywhere outside the tile
 // Ground is flat today: the tile carries no elevation, so height is 0.
-import type { CityDatasetV2, FlatPoints, RoadClass } from '../city-dataset.ts';
+import type { CityDatasetV3, FlatPoints, RoadClass } from '../city-dataset.ts';
 import { pairs, pointInRing, segmentDistanceSq } from './geometry.ts';
 
 /** Roads the road mesh draws as sidewalk, not carriageway (city-mesh.ts). Everything else, crossings included, is carriageway. */
@@ -23,6 +23,9 @@ export interface WalkQueries {
 
 interface Polygon { ring: [number, number][]; holes: [number, number][][]; minX: number; maxX: number; minZ: number; maxZ: number }
 interface Segment { ax: number; az: number; bx: number; bz: number; reach: number }
+
+/** Padding added to each path buffer so buffered centrelines that nearly touch still join. */
+const PATH_SEAM_PAD = 0.15;
 
 function polygon(ring: FlatPoints, holes: readonly FlatPoints[]): Polygon {
   const points = pairs(ring);
@@ -57,7 +60,7 @@ class Grid<T> {
   }
 }
 
-export function createWalkQueries(dataset: CityDatasetV2): WalkQueries {
+export function createWalkQueries(dataset: CityDatasetV3): WalkQueries {
   const buildings = new Grid<Polygon>();
   const water = new Grid<Polygon>();
   const open = new Grid<Polygon>();
@@ -78,7 +81,12 @@ export function createWalkQueries(dataset: CityDatasetV2): WalkQueries {
     (a.kind === 'water' ? water : open).add(p, p.minX, p.minZ, p.maxX, p.maxZ);
   }
   for (const r of dataset.roads) {
-    const reach = r.widthMeters / 2 + r.sidewalkMeters;
+    // Buffered centrelines must touch where they meet: two neighbouring ways
+    // (sidewalk to sidewalk, sidewalk to street) can stop a few centimetres
+    // short of each other, and an unpadded union leaves an unwalkable slit
+    // the Caller can slide into but never out of. The v3 tile carries such a
+    // seam beside the corner of osm:way:271805697 at (-345.9, 130.2).
+    const reach = r.widthMeters / 2 + r.sidewalkMeters + PATH_SEAM_PAD;
     for (let i = 2; i < r.points.length; i += 2) {
       const s = { ax: r.points[i - 2]!, az: r.points[i - 1]!, bx: r.points[i]!, bz: r.points[i + 1]!, reach };
       minX = Math.min(minX, s.ax, s.bx); maxX = Math.max(maxX, s.ax, s.bx);
@@ -153,7 +161,7 @@ export interface StreetClearance {
 
 export interface NearestRoad { gap: number; dir: [number, number]; away: [number, number]; id: string; half: number }
 
-export function createStreetClearance(dataset: CityDatasetV2): StreetClearance {
+export function createStreetClearance(dataset: CityDatasetV3): StreetClearance {
   const roads = new Grid<Carriageway>();
   const buildings = new Grid<Polygon>();
   for (const b of dataset.buildings) {
