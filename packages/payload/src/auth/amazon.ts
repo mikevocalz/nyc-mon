@@ -26,15 +26,17 @@ interface AmazonProfileResponse {
 }
 
 export interface AmazonProfile {
-  readonly id: string;
+  readonly user_id: string;
   readonly email: string;
   readonly name: string;
 }
 
+export type AmazonFetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
+
 /** Fetches the LWA profile and rejects incomplete identities. */
 export async function fetchAmazonProfile(
   accessToken: string,
-  fetchImpl: typeof fetch = fetch,
+  fetchImpl: AmazonFetch = fetch,
 ): Promise<AmazonProfile | null> {
   const response = await fetchImpl(AMAZON_PROFILE_URL, {
     headers: {
@@ -52,7 +54,7 @@ export async function fetchAmazonProfile(
   if (id === '' || email === '') return null;
 
   return {
-    id,
+    user_id: id,
     email,
     name: name || email.split('@')[0] || 'Caller',
   };
@@ -83,14 +85,30 @@ export function amazonOAuthPlugin(client: AmazonOAuthClient | undefined) {
         pkce: true,
         authentication: 'basic',
         disableImplicitSignUp: true,
+        // Better Auth 1.7 no longer lets mapped local-user fields define the
+        // provider identity. Amazon's immutable subject is `user_id`, not
+        // plain OAuth's default `id`, so bind the account row explicitly.
+        accountSubject: ({ profile }) => {
+          const subject = profile.user_id;
+          if (typeof subject !== 'string' || subject.trim() === '') {
+            throw new Error('Login with Amazon returned no stable user_id.');
+          }
+          return subject;
+        },
         getUserInfo: async (tokens) => {
+          if (tokens.accessToken === undefined) return null;
           const profile = await fetchAmazonProfile(tokens.accessToken);
           return profile === null
             ? null
             : {
-                id: profile.id,
+                id: undefined,
+                user_id: profile.user_id,
                 email: profile.email,
                 name: profile.name,
+                // LWA's profile response does not carry a verified-email flag.
+                // NYC-MON does not upgrade local verification from this value.
+                emailVerified: false,
+                image: undefined,
               };
         },
       },
