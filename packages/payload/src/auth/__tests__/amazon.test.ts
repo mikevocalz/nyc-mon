@@ -10,7 +10,7 @@ import {
 
 describe('Login with Amazon profile mapping', () => {
   it('uses the stable Amazon user_id as the Better Auth account identity', async () => {
-    const fetchImpl = vi.fn<typeof fetch>(async () =>
+    const fetchImpl = vi.fn(async () =>
       new Response(
         JSON.stringify({
           user_id: 'amzn1.account.TEST',
@@ -22,7 +22,7 @@ describe('Login with Amazon profile mapping', () => {
     );
 
     await expect(fetchAmazonProfile('token-123', fetchImpl)).resolves.toEqual({
-      id: 'amzn1.account.TEST',
+      user_id: 'amzn1.account.TEST',
       email: 'caller@example.com',
       name: 'Caller Example',
     });
@@ -46,7 +46,7 @@ describe('Login with Amazon profile mapping', () => {
     ];
 
     for (const body of responses) {
-      const fetchImpl = vi.fn<typeof fetch>(async () =>
+      const fetchImpl = vi.fn(async () =>
         new Response(JSON.stringify(body), {
           status: 200,
           headers: { 'content-type': 'application/json' },
@@ -57,7 +57,7 @@ describe('Login with Amazon profile mapping', () => {
   });
 
   it('fails closed when Amazon profile retrieval fails', async () => {
-    const fetchImpl = vi.fn<typeof fetch>(async () => new Response('nope', { status: 401 }));
+    const fetchImpl = vi.fn(async () => new Response('nope', { status: 401 }));
     await expect(fetchAmazonProfile('token-123', fetchImpl)).resolves.toBeNull();
   });
 
