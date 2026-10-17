@@ -148,6 +148,7 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV2, options: Ci
     drawCalls: city.stats.drawCalls + trees.objects.length + furniture.objects.length + props.objects.length + 2,
   };
   let viewDistance = 220;
+  const bands: [number, number] = [0, 0];
   return {
     group,
     sky,
@@ -176,8 +177,8 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV2, options: Ci
       trees.update(x, z, viewDistance);
       city.setFocus(x, z);
       furniture.setFocus(x, z);
-      const [first, last] = shadowBands(z, bandMinZ, bandCount);
-      props.setFocus(x, z, first, last);
+      shadowBands(z, bandMinZ, bandCount, bands);
+      props.setFocus(x, z, bands[0], bands[1]);
     },
     dispose() {
       city.dispose();
