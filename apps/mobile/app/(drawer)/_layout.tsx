@@ -1,6 +1,8 @@
+import { Redirect } from 'expo-router';
 import { Drawer } from 'expo-router/drawer';
 import { useColorScheme } from 'react-native';
 import { palette } from '@acme/theme';
+import { readSave } from '@acme/app/features/onboarding/save-store.ts';
 import { DrawerContent } from '../../components/DrawerContent';
 import { AppHeader } from '../../components/AppHeader';
 import { horizontalGesturesEnabled, usePaneSearchStore } from '@/src/navigation/split-view';
@@ -16,6 +18,12 @@ export default function DrawerLayout() {
    */
   const searches = usePaneSearchStore((state) => state.panes);
   const swipeEnabled = horizontalGesturesEnabled(Object.values(searches));
+
+  // Boot (`/`) decides where a player belongs; a deep link (nycmon:///game)
+  // skips it. Without a Caller the lobby's START has no identity to start a
+  // session with and silently does nothing, so send the player back through
+  // boot, which resumes onboarding at the step they still owe.
+  if (!readSave()?.caller) return <Redirect href="/" />;
 
   return (
     <Drawer
