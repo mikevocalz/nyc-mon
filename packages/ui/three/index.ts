@@ -9,5 +9,5 @@ export { parseRenderThreadFlag, resolveRenderThread, type RenderThread, type Ren
 export { installWebGPUOnRuntime } from './install-webgpu';
 export type { NativeCanvasContext, WorkletRenderEvent, WorkletRenderHost, WorkletRenderSession, WorkletRenderStart } from './worklet-host';
 export type {
-  Three, ThreeBackend, ThreeCanvasHandle, ThreeCanvasProps, ThreeContext, ThreeFrame, ThreePointer, ThreeScene, ThreeSetup,
+  Three, ThreeBackend, ThreeFrameTiming, ThreeCanvasHandle, ThreeCanvasProps, ThreeContext, ThreeFrame, ThreePointer, ThreeScene, ThreeSetup,
 } from './types';
