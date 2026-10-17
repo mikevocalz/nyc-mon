@@ -87,3 +87,14 @@ test('window starts fresh after a completed report',()=>{
   assert.equal(out?.cpuP50Ms,1);
   assert.equal(out?.slowIntervals,0);
 });
+test('counter percentiles ignore -1 "unknown" samples instead of counting them as zero',()=>{
+  const sampler = new FrameSampleWindow();
+  let r=null;
+  for (let i=0;i<FRAME_SAMPLE_CAP;i++) {
+    const hasCounters=i%2===0;
+    r=sampler.push({cpuMs:10,intervalMs:16,renderMs:10,drawCalls:hasCounters?40:-1,triangles:hasCounters?298000:-1});
+  }
+  assert.ok(r?.stages);
+  assert.equal(r.stages.drawCallsP50,40);
+  assert.equal(r.stages.trianglesP50,298000);
+});

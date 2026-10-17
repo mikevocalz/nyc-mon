@@ -78,6 +78,7 @@ export class FrameSampleWindow {
   private readonly tris = new Float32Array(FRAME_SAMPLE_CAP);
   private sampleCount = 0;
   private stageCount = 0;
+  private counterCount = 0;
   private intervalCount = 0;
   private parkedCount = 0;
   private slowCount = 0;
@@ -100,9 +101,14 @@ export class FrameSampleWindow {
       this.node[i] = valid(sample.nodeMs) ? sample.nodeMs : 0;
       this.render[i] = sample.renderMs;
       this.present[i] = valid(sample.presentMs) ? sample.presentMs : 0;
-      this.drawCalls[i] = valid(sample.drawCalls) ? sample.drawCalls : 0;
-      this.tris[i] = valid(sample.triangles) ? sample.triangles : 0;
-      this.trisMax = Math.max(this.trisMax, this.tris[i]!);
+      // Counters use -1 as an "unknown" sentinel — keep only real values so a
+      // partially instrumented run doesn't report a bogus p50 of zero.
+      if (valid(sample.drawCalls)) {
+        this.drawCalls[this.counterCount] = sample.drawCalls;
+        this.tris[this.counterCount] = valid(sample.triangles) ? sample.triangles : 0;
+        this.trisMax = Math.max(this.trisMax, this.tris[this.counterCount]!);
+        this.counterCount++;
+      }
       if (valid(sample.bufferW)) this.lastBufferW = sample.bufferW;
       if (valid(sample.bufferH)) this.lastBufferH = sample.bufferH;
     }
@@ -120,7 +126,8 @@ export class FrameSampleWindow {
       const sorted = (a: Float32Array) => Array.from(a.subarray(0, this.sampleCount)).sort((a,b)=>a-b);
       const u = sorted(this.update); const n = sorted(this.node);
       const r = sorted(this.render); const p = sorted(this.present);
-      const dc = sorted(this.drawCalls); const t = sorted(this.tris);
+      const dc = sorted(this.drawCalls.subarray(0, this.counterCount));
+      const t = sorted(this.tris.subarray(0, this.counterCount));
       stages = {
         updateP50Ms: percentile(u, .5), updateP90Ms: percentile(u, .9),
         nodeP50Ms: percentile(n, .5), nodeP90Ms: percentile(n, .9),
@@ -148,6 +155,7 @@ export class FrameSampleWindow {
   reset(): void {
     this.sampleCount = 0;
     this.stageCount = 0;
+    this.counterCount = 0;
     this.intervalCount = 0;
     this.parkedCount = 0;
     this.slowCount = 0;
