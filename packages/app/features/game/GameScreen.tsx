@@ -61,6 +61,7 @@ import { gameCameraStore, gameScreenActions, gameScreenStore } from './game-sess
 import { resolveGameViewState, shouldMountCanvas } from './game-status.ts';
 import { resolveGameHudLayout } from './hud-layout.ts';
 import { loadGameScene, type GameSceneParams } from './load-game-scene.ts';
+import { CITY_FRAME_PROBE_ENABLED, recordCityFrame } from './perf/record-city-frame.ts';
 import { useGameRenderThread } from './render-thread-choice.ts';
 import { readLobbyIdentity } from './lobby/lobby-identity.ts';
 import { lobbyStore } from './lobby/lobby.store.ts';
@@ -276,6 +277,7 @@ export function GameScreen({ focused = true }: GameScreenProps = {}) {
               background={brand.night}
               // No accessibilityLabel: the canvas layer stays hidden; the wrapping View is the named, actionable element.
               onBackendChange={gameScreenActions.backendChanged}
+              onFrameTiming={CITY_FRAME_PROBE_ENABLED ? recordCityFrame : undefined}
             />
           </View>
         </GestureDetector>
