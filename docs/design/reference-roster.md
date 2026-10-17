@@ -70,3 +70,55 @@ Added 2026-10-07 for the premium site redesign; this is the one roster, so the s
 | TypeScript | Anders Hejlsberg, Ryan Cavanaugh, Daniel Rosenwasser | `any`; non-exhaustive unions for section and art-slot ids; skipping `tsc --noEmit` |
 
 Primary sources: WCAG 2.2 https://www.w3.org/TR/WCAG22/ · Target Size 2.5.8 https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html · Animation from Interactions 2.3.3 https://www.w3.org/WAI/WCAG22/Understanding/animation-from-interactions.html · Web Vitals https://web.dev/articles/vitals (LCP, INP, CLS under /articles/) · `prefers-reduced-motion` and `content-visibility` on MDN · RSC https://react.dev/reference/rsc/server-components · `next/image` https://nextjs.org/docs/app/api-reference/components/image · ScrollTrigger https://gsap.com/docs/v3/Plugins/ScrollTrigger/ · Lenis https://github.com/darkroomengineering/lenis · WebGPU https://www.w3.org/TR/webgpu/ · Kinetrell https://github.com/mikevocalz/Kinetrell · axe-core https://github.com/dequelabs/axe-core · Playwright https://playwright.dev/ · Lighthouse CI https://github.com/GoogleChrome/lighthouse-ci · Mobbin https://mobbin.com
+
+## City data (dataset v3)
+
+### Engineers (creator / spec-author tier)
+
+| Domain | Bar | Source |
+|---|---|---|
+| Valdrada tile format, compiler, overrides | Mehmet Kerem Turkcan, Valdrada author | https://github.com/mkturkcan · docs: https://mkturkcan.github.io/valdrada/ |
+| Geodesy and projection | Charles Karney, GeographicLib (the memory-standard "GeographicLib-level geodesy") | https://geographiclib.sourceforge.io/ |
+| Polygon triangulation and simplification | Volodymyr Agafonkin, earcut author. three's `ShapeUtils.triangulateShape`, which `city-mesh.ts` L64 uses, is its port (`three/src/extras/Earcut.js`) | https://github.com/mourner · https://github.com/mapbox/earcut |
+| Geometry upload, `BufferGeometry` merge, WebGPURenderer | Ricardo Cabello (https://github.com/mrdoob), Michael Herzog (https://github.com/Mugen87), sunag (https://github.com/sunag), Renaud Rohlinger (https://github.com/RenaudRohlinger) | https://threejs.org/docs/ |
+| Schema and parse boundary | Colin McDonnell (Zod) | https://zod.dev/ |
+| TypeScript | Anders Hejlsberg, Ryan Cavanaugh, Daniel Rosenwasser | `tsc --noEmit` |
+| Native boundary (only if §6.6 triggers) | Marc Rousavy | https://github.com/mrousavy · https://nitro.margelo.com/ |
+| Simulator asset lineage (models Valdrada ships; not imported here) | CARLA Simulator team | https://carla.org/ |
+
+### Designers
+
+| Name | Why they are the bar | Source |
+|---|---|---|
+| Massimo Vignelli (roster) | NYC street-information discipline: transit and signage placement must be true to the street | https://standardsmanual.com/ |
+| Michael Bierut, Pentagram (roster) | WalkNYC: legible NYC street furniture and wayfinding | https://www.pentagram.com/work/walknyc |
+| Kevin Lynch | *The Image of the City*. Paths, edges, districts, nodes and landmarks are the test for whether v3 Harlem reads as Harlem | https://mitpress.mit.edu/9780262620017/the-image-of-the-city/ |
+| Justin K. Thompson | Stylised NYC that stays recognisable (Spider-Verse production design) | https://www.cartoonbrew.com/feature-film/spider-man-into-the-spider-verse-production-design-is-about-character-not-style-168137.html |
+| Syd Mead | The "futuristic touch" layered on a real city without erasing it | https://sydmead.com/ |
+
+### Design agencies
+
+| Agency | Take | Source |
+|---|---|---|
+| Pentagram | WalkNYC system thinking for furniture, credit and map UI | https://www.pentagram.com/ · https://www.pentagram.com/work/walknyc |
+| Sony Pictures Imageworks | Stylised-NYC production reference | https://www.imageworks.com/node/1371 |
+| Chromosphere | Flat-shape city colour scripting | https://chromosphere.studio/ |
+
+### Dev agencies
+
+| Agency | Role here | Source |
+|---|---|---|
+| Software Mansion | TypeGPU and the cel body the city renders through | https://swmansion.com/ |
+| Callstack | Measured bundle, TTI and frame cost of the bigger dataset | https://www.callstack.com/ · https://github.com/callstackincubator/agent-skills |
+| Margelo | `api-design` on exported `@acme/*` surfaces; native only behind §6.6 | https://margelo.com/ · https://github.com/margelo/react-native-skills/tree/main/skills |
+| Utsubo | WebGPU/TSL production work | https://www.utsubo.com/ |
+| Active Theory · Lusion · 14islands (roster) | Real-time city craft bar | https://activetheory.net/ · https://lusion.co/ · https://14islands.com/ |
+
+### Rejected on sight
+
+- Shipping or streaming Valdrada's raw tiles on the phone.
+- Offsetting and scaling Valdrada metres into nyc-mon metres without unprojecting first.
+- Dropping Valdrada's read-time overrides (that drop puts the Hotel Theresa on the wrong footprint).
+- A procedural flag recorded as a fact.
+- Importing Valdrada's GLSL materials or its photoreal (MetaHuman) pedestrians.
+- Colours outside the palette.

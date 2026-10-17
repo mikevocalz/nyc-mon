@@ -172,7 +172,12 @@ export const CITY_COLORS = {
 
 export type CityColor = keyof typeof CITY_COLORS;
 
-/** Wall tones per material class, one picked per building by a hash of its id (city-mesh.ts). */
+/**
+ * Wall tones per material class, one picked per building by a hash of its id
+ * (city-mesh.ts). Dataset v3 derives `class` from Valdrada's STYLE id by the
+ * table in docs/DESIGN_SYSTEM.md §City; STYLE ids land on these seven classes,
+ * so this map needs no new keys.
+ */
 export const WALL_TONES = {
   brownstone: ['brownstone', 'brownstoneWarm', 'sandstone'],
   brick: ['brick', 'brickRed', 'brickDark', 'brickBuff'],
