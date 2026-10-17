@@ -369,3 +369,45 @@ Notes:
 - **Render scale is explained, not buried.** The note sits under the
   control so a Caller on Performance knows the softness is the setting
   working, not a broken screen.
+
+## Battery and frame rate (game settings)
+
+The performance pass adds two controls beside Graphics on the same
+settings surface (PR 4's frame-rate request, PR 5's heat handling). Every
+string is `voice: "ui"`, namespaces `settings.framerate.*` and
+`settings.battery.*`. The Graphics section's rules apply: sentence case,
+lead with what the Caller can do, promise only what ships, status is
+never colour alone.
+
+| ID | String | Voice | Status |
+|---|---|---|---|
+| `settings.framerate.label` | Frame rate | ui | drafted |
+| `settings.framerate.caption` | How often the screen draws a new frame. Higher looks smoother and uses more battery. | ui | drafted |
+| `settings.framerate.auto` | Match the screen | ui | drafted |
+| `settings.framerate.auto.desc` | Asks for the fastest rate the city can hold steady. Never above it — swinging frames feel worse than a steady one. | ui | drafted |
+| `settings.framerate.sixty` | 60 fps | ui | drafted |
+| `settings.framerate.sixty.desc` | A steady 60 on any screen. The battery-friendlier pick on fast displays. | ui | drafted |
+| `settings.battery.label` | Battery | ui | drafted |
+| `settings.battery.caption` | Lighter detail and a lower frame rate use less power and keep the phone cooler. | ui | drafted |
+| `settings.battery.saver` | Battery saver | ui | drafted |
+| `settings.battery.saver.desc` | Holds the city on the lighter tier and a steady 60 frames a second. | ui | drafted |
+| `settings.battery.thermal.note` | The phone is running warm, so the city eased off to keep the frame steady. | ui | drafted |
+
+Notes:
+
+- **"The phone", never "device"** for the hardware; "H-Lynk" stays for
+  the in-fiction unit (Law 9, same as `g03.haptics.unsupported`).
+- **No rate the city can't hold.** The auto option describes the spec's
+  rule — request only rates the build holds — without promising a number
+  the Duo 1 can't reach. No option names 90 or 120; the screen decides
+  (PR 4).
+- **The thermal note is a status, not a warning.** It follows the
+  `settings.graphics.reduced.*` StatusRow pattern: it appears only while
+  the OS reports the phone is warm (PR 5's Thermal API step-down), names
+  what happened and why, and carries no action — there's nothing for the
+  Caller to do.
+- **Battery saver is one switch, not a second tier picker.** It composes
+  the existing settings (lighter tier, capped rate) rather than adding a
+  fourth graphics tier — the Graphics section keeps three.
+- **Reduced motion never changes copy** — these strings are identical
+  under reduced motion.
