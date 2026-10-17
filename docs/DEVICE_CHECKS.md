@@ -21,6 +21,21 @@ The device record above and the release-build performance baseline in `docs/perf
 
 Target matrix (BUILD_PROMPT_v3 §0C, §6 step 11): iPhone SE 3, iPhone 16 Pro Max, Pixel 8, plus one Android foldable (Pixel Fold or Galaxy Z Fold) and one Android tablet.
 
+## F1 — Harlem city dataset v3 on the bench Duo (2026-10-17)
+
+Lane `lane-v3e3` @ `23ec560`, release build verified on the physical Surface
+Duo above (same method and honesty bar as the M0 baseline). Full report:
+`docs/performance/v3-f1-2026-10-17.md`; artifacts:
+`/Users/mikevocalz/nyc-mon-artifacts/f1-duo/`.
+
+- [x] **v3 tile runs on hardware:** `harlem-apollo-20261017` confirmed inside the shipped bundle; city renders with no crash over an 84 s scripted walk.
+- [x] **Frame timing at the walk window:** p50 36 ms / p90 48 / p95 53 / p99 61, janky 44.3 % (n = 3 457) — p50 identical to the v2 M0 baseline, p90+ ~5 ms better; janky share is window-sensitive, see report.
+- [x] **Memory:** PSS 395 MB lobby → 630 MB scene start → 651 MB after walk (v2: 378 → 602 → 649).
+- [x] **Load path:** cold start TotalTime median 1 472 ms (3 runs); START → first frame ≤ ~15 s fresh-install, ~6.4–7.0 s warm.
+- [ ] **Device parse ms / city build ms, split:** PENDING — only a 1 617 ms combined worst frame is instrumented (needs a finer probe; not added in this lane).
+- [ ] **Landmark identification in captured frames (Apollo marquee, E3):** PENDING — frames captured, visual ID belongs to the F3 critique pass.
+- [ ] **iPhone SE 3 class run (spec D2):** PENDING — the Duo is the only bench device.
+
 ## Rendering
 
 - [ ] **HolographicTerrain, NeonTide, CityHeightfield on native** (react-native-webgpu): render, present, touch lift, AppState pause. The iOS bundle includes `three/webgpu`, but nothing has rendered on a device. Android hasn't been bundled at all.
