@@ -14,7 +14,7 @@ import { resolveRenderThread } from './render-thread';
 import { WorkletThreeCanvas } from './WorkletThreeCanvas';
 import { toNdc } from './pointer';
 import { ThreeSurface } from './surface';
-import type { ThreeBackend, ThreeCanvasProps, ThreePointer, ThreeScene, ThreeSurfaceHandle } from './types';
+import type { ThreeBackend, ThreeCanvasProps, ThreeFrameTiming, ThreePointer, ThreeScene, ThreeSurfaceHandle } from './types';
 import type { WebGPURenderer } from 'three/webgpu';
 import { useOnScreen } from './use-on-screen';
 
@@ -41,7 +41,7 @@ interface Runtime<P> {
   pointer: ThreePointer;
   frame: { time: number; delta: number; width: number; height: number; pixelRatio: number; reducedMotion: boolean; pointer: ThreePointer };
   /** Reused when onFrameTiming is set: the opt-in probe allocates nothing per frame either. */
-  probe: { cpuMs: number; intervalMs: number | null; backend: 'webgl2' | 'webgpu' };
+  probe: ThreeFrameTiming;
 }
 
 const isWeb = Platform.OS === 'web';
@@ -171,16 +171,33 @@ function JsThreeCanvas<P>({
       frame.pixelRatio = rt.pixelRatio;
       frame.reducedMotion = rt.reducedMotion;
       frame.pointer = rt.pointer;
+      // Stage attribution for the opt-in probe (G1): four extra clock reads
+      // per frame only while onFrameTiming is set; the flag-off path is
+      // unchanged and the staged sample keeps cpuMs = the whole draw.
+      const t0 = onFrameTiming ? performance.now() : 0;
       built.update?.(frame, rt.params);
+      const t1 = onFrameTiming ? performance.now() : 0;
       advanceNodeFrame(renderer);
+      const t2 = onFrameTiming ? performance.now() : 0;
       renderer.render(built.scene, built.camera);
+      const t3 = onFrameTiming ? performance.now() : 0;
       rt.surface?.present();
       if (onFrameTiming) {
         try {
+          const t4 = performance.now();
           const probe = rt.probe;
-          probe.cpuMs = Math.max(0, performance.now() - probeStart);
+          probe.cpuMs = Math.max(0, t4 - probeStart);
           probe.intervalMs = probeInterval;
           probe.backend = (renderer.backend as { isWebGLBackend?: boolean }).isWebGLBackend ? 'webgl2' : 'webgpu';
+          probe.updateMs = t1 - t0;
+          probe.nodeMs = t2 - t1;
+          probe.renderMs = t3 - t2;
+          probe.presentMs = t4 - t3;
+          const info = renderer.info?.render;
+          probe.drawCalls = info?.drawCalls ?? -1;
+          probe.triangles = info?.triangles ?? -1;
+          probe.bufferW = renderer.domElement?.width ?? -1;
+          probe.bufferH = renderer.domElement?.height ?? -1;
           onFrameTiming(probe);
         } catch (error) {
           // A diagnostics callback must never take down the game renderer.
