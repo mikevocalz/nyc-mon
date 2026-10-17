@@ -119,9 +119,13 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
   // one redraw. Failure (float upload unverified on rn-webgpu) keeps the JSON
   // dome and bakes the env from it.
   if (renderer && world.skyRig) {
-    void world.skyRig.attachEnvironment(renderer, scene).then((applied) => {
-      if (applied) invalidate?.();
-    });
+    void world.skyRig.attachEnvironment(renderer, scene)
+      .then((applied) => {
+        if (applied) invalidate?.();
+      })
+      .catch(() => {
+        // Degraded env keeps the fallback dome — the rig never black-frames.
+      });
   }
 
   const actors: SceneActor[] = [];
