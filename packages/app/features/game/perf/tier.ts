@@ -42,7 +42,7 @@ export function parseWorldTier(value: string | undefined | null): WorldTier {
 export const WORLD_TIER = parseWorldTier(process.env.EXPO_PUBLIC_WORLD_TIER);
 
 /** True only when the env var was actually set — gates the bundle so default builds stay byte-identical. */
-export const WORLD_TIER_SELECTED = process.env.EXPO_PUBLIC_WORLD_TIER != null;
+export const WORLD_TIER_SELECTED = process.env.EXPO_PUBLIC_WORLD_TIER?.trim() !== undefined && process.env.EXPO_PUBLIC_WORLD_TIER.trim() !== '';
 
 export interface TierBundle {
   /**
