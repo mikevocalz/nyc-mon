@@ -65,8 +65,9 @@ export async function fetchAmazonProfile(
  *
  * - Authorization Code + PKCE (LWA supports S256).
  * - HTTP Basic at the token endpoint.
- * - No implicit sign-up: a Caller must already have a NYC-MON account and
- *   explicitly link Amazon first, so LWA cannot create an age-unknown account.
+ * - No sign-up: a Caller must already have a NYC-MON account and explicitly
+ *   link Amazon first, so LWA cannot create an age-unknown account through
+ *   either implicit or explicit social sign-up.
  */
 export function amazonOAuthPlugin(client: AmazonOAuthClient | undefined) {
   if (client === undefined) return undefined;
@@ -85,6 +86,9 @@ export function amazonOAuthPlugin(client: AmazonOAuthClient | undefined) {
         pkce: true,
         authentication: 'basic',
         disableImplicitSignUp: true,
+        // No client-side requestSignUp escape hatch: Amazon identity is
+        // existing-account/link-only for NYC-MON.
+        disableSignUp: true,
         // Better Auth 1.7 no longer lets mapped local-user fields define the
         // provider identity. Amazon's immutable subject is `user_id`, not
         // plain OAuth's default `id`, so bind the account row explicitly.
