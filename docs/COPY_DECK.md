@@ -333,3 +333,39 @@ gameplay, or the onboarding completion checkpoint. The egg-ready push stays
 one local notification per egg. Parental consent is a separate gate.
 
 Source of copy: `packages/app/features/onboarding/copy.ts`, `m24.*`.
+
+## Graphics quality (game settings)
+
+The world renders at one of three tiers; the setting lives on the game's
+settings surface next to Game controls (G03's sibling). Every string is
+`voice: "ui"`, namespace `settings.graphics.*`. Rules that apply: sentence
+case, lead with what the Caller can do, promise only what ships, status is
+never colour alone.
+
+| ID | String | Voice | Status |
+|---|---|---|---|
+| `settings.graphics.label` | Graphics | ui | drafted |
+| `settings.graphics.caption` | How the city looks and how hard the phone works to draw it. | ui | drafted |
+| `settings.graphics.auto` | Auto | ui | drafted |
+| `settings.graphics.performance` | Performance | ui | drafted |
+| `settings.graphics.quality` | Quality | ui | drafted |
+| `settings.graphics.auto.desc` | Follows what the phone can hold steady. The city stays detailed until the frame rate drops. | ui | drafted |
+| `settings.graphics.performance.desc` | Lighter detail and a lower render scale, for the smoothest frame. | ui | drafted |
+| `settings.graphics.quality.desc` | Full detail, reflections and lit rooms. May run slower on older phones. | ui | drafted |
+| `settings.graphics.render_scale.note` | In Auto the city can draw at a lower resolution to keep the frame steady. It never drops below half. | ui | drafted |
+| `settings.graphics.reduced.note` | Reduced motion is on. Animated glow and shimmer stay off. | ui | drafted |
+| `settings.graphics.reduced.action` | Change | ui | drafted |
+| `settings.graphics.reduced.action.a11y.hint` | Opens system settings | ui | drafted |
+
+Notes:
+
+- **Reduced motion is honoured, not offered.** There is no in-app motion
+  toggle; the `settings.graphics.reduced.*` status row appears only when the
+  OS reports reduced motion, the same pattern as `g03.reduced.*`. Reduced
+  motion never changes copy.
+- **No pressure in the descriptions.** The tiers say what each does, not
+  which is best. Auto is the default and the recommended row carries no
+  badge, star or "best" label.
+- **Render scale is explained, not buried.** The note sits under the
+  control so a Caller on Performance knows the softness is the setting
+  working, not a broken screen.
