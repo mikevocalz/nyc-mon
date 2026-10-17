@@ -11,6 +11,7 @@ import { buildTrees, type TreeReport } from './foliage.ts';
 import { buildStreetFurniture } from './street-furniture.ts';
 import { createStreetClearance } from './walkability.ts';
 import { createCityMaterials, linearColor } from './materials.ts';
+import { createPbrCityMaterials, EXPERIMENTAL_WORLD_PBR } from './pbr-materials.ts';
 import { createSkyRig, EXPERIMENTAL_SKY_RIG, type SkyName } from './sky-rig.ts';
 
 /**
@@ -39,6 +40,13 @@ export interface CityWorldOptions {
   skyRig?: boolean;
   /** Which sky preset when skyRig is on; default 'dusk'. */
   sky?: SkyName;
+  /**
+   * Lane L2 "real surfaces": the city's lit materials become
+   * MeshStandardNodeMaterial (pbr-materials.ts). Defaults to
+   * EXPO_PUBLIC_WORLD_PBR — off unless set. Unlit layers, the graphs and the
+   * per-vertex surface attributes are shared either way.
+   */
+  pbr?: boolean;
 }
 
 export function buildCityWorld(THREE: Three, dataset: CityDatasetV2, options: CityWorldOptions = {}) {
@@ -47,9 +55,10 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV2, options: Ci
     : null;
   // One sun direction feeds everything: the rig's JSON sunDirection when
   // flagged, the hardcoded dusk SUN otherwise — the cel key, the contact
-  // shadows and the DirectionalLight all stay consistent either way.
+  // shadows, the DirectionalLight and the PBR dome glow all stay consistent.
   const sunDirection = skyRig?.sunDirection ?? SUN;
-  const materials = createCityMaterials(THREE, sunDirection);
+  const pbr = options.pbr ?? EXPERIMENTAL_WORLD_PBR;
+  const materials = pbr ? createPbrCityMaterials(THREE, { sunDirection }) : createCityMaterials(THREE, sunDirection);
   const group = new THREE.Group();
   group.name = 'city:world';
   // Contact shadows lean away from the sun, along the ground.

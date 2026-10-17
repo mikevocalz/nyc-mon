@@ -2,7 +2,11 @@
 // (masonry and glass), roofs, contact shadows, land-use areas, sidewalks,
 // roads and landmark accents. Every building, road and area lands in a
 // shared vertex buffer, so draw calls stay flat as the feature count grows
-// (metro-live's mergeByMaterial, applied while building).
+// (metro-live's mergeByMaterial, applied while building). Beside colour,
+// each vertex carries its surface family — aRoughMetal from the surfaces.ts
+// ranges by a building/road id hash, and aOcclusion from the contact-shadow
+// field — which only the flagged PBR materials read; the cel lane ignores
+// the extra attributes entirely.
 import type { Three } from '@acme/ui/three';
 import type { BuildingClass, CityBuilding, CityDatasetV2, CityLandmark, CityRoad, RoadClass } from '../city-dataset.ts';
 import { counterClockwise, hashUnit, mapArea, pairs, pointInRing, ribbon, VertexBuffer } from './geometry.ts';
@@ -15,6 +19,7 @@ import { BandedBuffer, box } from './parts.ts';
 import type { CityMaterials } from './materials.ts';
 import { createStreetClearance, WALKWAY_CLASSES, type StreetClearance } from './walkability.ts';
 import { AWNING_TONES, CITY_COLORS, hexToRgb, WALL_TONES, type CityColor } from './palette.ts';
+import { buildingSurface, ContactField, contactReach, surfacePick, SURFACES, wallAo } from './surfaces.ts';
 
 type Point = [number, number];
 type Mesh = InstanceType<Three['Mesh']>;
@@ -49,8 +54,8 @@ const tint = (color: readonly number[], amount: number) => color.map((v) => Math
 
 const CENTRE_LINE_MIN_WIDTH = 9;
 
-/** Triangulate a ring (with holes) and emit it facing up at height y, counter-clockwise on the map. */
-function emitFlat(THREE: Three, buffer: VertexBuffer, ring: Point[], holes: Point[][], y: number, color: readonly number[]): void {
+/** Triangulate a ring (with holes) and emit it facing up at height y, counter-clockwise on the map. `ao` bakes per-corner occlusion when given. */
+function emitFlat(THREE: Three, buffer: VertexBuffer, ring: Point[], holes: Point[][], y: number, color: readonly number[], ao?: (x: number, z: number) => number): void {
   const contour = ring.map(([x, z]) => new THREE.Vector2(x, z));
   const holeVectors = holes.map((hole) => hole.map(([x, z]) => new THREE.Vector2(x, z)));
   const all = [...ring, ...holes.flat()];
@@ -59,12 +64,12 @@ function emitFlat(THREE: Three, buffer: VertexBuffer, ring: Point[], holes: Poin
     let [a, b, c] = face.map((i) => all[i]!) as [Point, Point, Point];
     if (!a || !b || !c) continue;
     if (mapArea([a, b, c]) < 0) [b, c] = [c, b];
-    for (const [x, z] of [a, b, c]) buffer.vertex(x, y, z, 0, 1, 0, color, x, z);
+    for (const [x, z] of [a, b, c]) buffer.vertex(x, y, z, 0, 1, 0, color, x, z, ao?.(x, z));
   }
 }
 
-/** Walls around a ring. Outer rings counter-clockwise on the map, holes clockwise, so normals face out of the solid. */
-function emitWalls(buffer: VertexBuffer, ring: Point[], bottom: number, top: number, color: readonly number[], outward = 0): void {
+/** Walls around a ring. Outer rings counter-clockwise on the map, holes clockwise, so normals face out of the solid. `ao` is the [bottom, top] occlusion pair. */
+function emitWalls(buffer: VertexBuffer, ring: Point[], bottom: number, top: number, color: readonly number[], outward = 0, ao?: readonly [number, number]): void {
   let along = 0;
   for (let i = 0; i < ring.length; i++) {
     const [ax, az] = ring[i]!;
@@ -80,6 +85,7 @@ function emitWalls(buffer: VertexBuffer, ring: Point[], bottom: number, top: num
       [ax + ox, bottom, az + oz], [bx + ox, bottom, bz + oz], [bx + ox, top, bz + oz], [ax + ox, top, az + oz],
       [nx, 0, nz], color,
       [[along, bottom], [along + length, bottom], [along + length, top], [along, top]],
+      ao && [ao[0], ao[0], ao[1], ao[1]],
     );
     along += length;
   }
@@ -272,6 +278,10 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV2, materials:
   const landmarkByBuilding = new Map(dataset.landmarks.map((l) => [l.buildingId, l]));
   const shadowColor = rgb('shadow');
   const commercial = new SegmentGrid(dataset.roads.filter((r) => COMMERCIAL.has(r.class)));
+  // Baked occlusion: footprints collect into the contact-shadow field as the
+  // banded loop runs, and the ground layers emit after it queries them.
+  const field = new ContactField();
+  const occlude = (x: number, z: number) => field.occlusion(x, z);
 
   // Buildings in z bands, so the contact shadows of one band are one vertex range (drawn by distance).
   const minZ = -dataset.extentMeters - SHADOW_BAND_METRES;
@@ -301,8 +311,16 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV2, materials:
     const wall = tint(rgb(wallKey), variation);
     const target = building.class === 'glass' ? glass : masonry;
     const h = building.heightMeters;
-    emitWalls(target, ring, 0, h, wall);
-    for (const hole of holes) emitWalls(target, hole, 0, h, wall);
+    // Surface family per building id, and the wall-base occlusion ramp over
+    // this building's shadow reach (surfaces.ts). Cornices written into the
+    // same buffer inherit the wall pick — stone trim belongs to the family.
+    target.surface(...buildingSurface(building.class, building.id));
+    const reach = contactReach(h);
+    const wallOcclusion: [number, number] = [wallAo(0, reach), wallAo(h, reach)];
+    field.add(ring, h);
+    emitWalls(target, ring, 0, h, wall, 0, wallOcclusion);
+    for (const hole of holes) emitWalls(target, hole, 0, h, wall, 0, wallOcclusion);
+    roofs.surface(...SURFACES.tarRoof);
     const roofColor = tint(rgb('roof').map((v, i) => v * 0.8 + wall[i]! * 0.2), variation);
     emitFlat(THREE, roofs, ring, holes, h, roofColor);
     emitShadow(shadows, ring, Math.max(1.2, Math.min(5, h * 0.12)), sunAway, shadowColor);
@@ -405,20 +423,26 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV2, materials:
   for (const area of sortedAreas) {
     const ring = counterClockwise(pairs(area.ring));
     const holes = area.holes.map((hole) => pairs(hole));
-    emitFlat(THREE, areas, ring, holes, areaLayer(area.kind), rgb(AREA_COLOR[area.kind] ?? 'grass'));
+    areas.surface(...areaSurface(area.kind, hashUnit(`${area.id}:surf`)));
+    emitFlat(THREE, areas, ring, holes, areaLayer(area.kind), rgb(AREA_COLOR[area.kind] ?? 'grass'), occlude);
   }
 
   for (const road of dataset.roads) {
     const points = pairs(road.points);
     if (WALKWAY_CLASSES.has(road.class)) {
       const color = road.class === 'pedestrian' ? rgb('plaza') : rgb('sidewalk');
-      strip(sidewalks, points, road.widthMeters / 2, LAYER.sidewalks, color);
+      sidewalks.surface(...surfacePick('masonry', hashUnit(`${road.id}:walk`)));
+      strip(sidewalks, points, road.widthMeters / 2, LAYER.sidewalks, color, occlude);
       continue;
     }
-    if (road.sidewalkMeters > 0) strip(sidewalks, points, road.widthMeters / 2 + road.sidewalkMeters, LAYER.sidewalks, rgb('sidewalk'));
+    if (road.sidewalkMeters > 0) {
+      sidewalks.surface(...surfacePick('masonry', hashUnit(`${road.id}:walk`)));
+      strip(sidewalks, points, road.widthMeters / 2 + road.sidewalkMeters, LAYER.sidewalks, rgb('sidewalk'), occlude);
+    }
     const zebra = road.class === 'crossing' ? 1 : 0;
     const centre = !zebra && road.widthMeters >= CENTRE_LINE_MIN_WIDTH ? 1 : 0;
-    strip(roads, points, road.widthMeters / 2, zebra ? LAYER.crossings : LAYER.roads, [centre, zebra, road.widthMeters / 100]);
+    roads.surface(...surfacePick('asphalt', hashUnit(`${road.id}:surf`)));
+    strip(roads, points, road.widthMeters / 2, zebra ? LAYER.crossings : LAYER.roads, [centre, zebra, road.widthMeters / 100], occlude);
   }
 
   const meshes: Mesh[] = [];
@@ -536,8 +560,17 @@ const AREA_COLOR: Record<string, CityColor> = {
   plaza: 'plaza', parking: 'parking', water: 'water', school: 'school',
 };
 
-/** A flat ribbon along a polyline; u runs across (0..1), v along in metres. */
-function strip(buffer: VertexBuffer, points: Point[], half: number, y: number, color: readonly number[]): void {
+/** Surface family per area kind: planted kinds read as foliage, hard ground as masonry, water gets its own flat pick. */
+const AREA_FAMILY: Record<string, 'foliage' | 'masonry'> = {
+  park: 'foliage', garden: 'foliage', grass: 'foliage', pitch: 'foliage',
+};
+function areaSurface(kind: string, seed: number): readonly [number, number] {
+  if (kind === 'water') return SURFACES.water;
+  return surfacePick(AREA_FAMILY[kind] ?? 'masonry', seed);
+}
+
+/** A flat ribbon along a polyline; u runs across (0..1), v along in metres. `ao` bakes per-corner occlusion when given. */
+function strip(buffer: VertexBuffer, points: Point[], half: number, y: number, color: readonly number[], ao?: (x: number, z: number) => number): void {
   if (points.length < 2) return;
   const { left, right, v } = ribbon(points, half);
   for (let i = 1; i < points.length; i++) {
@@ -551,6 +584,7 @@ function strip(buffer: VertexBuffer, points: Point[], half: number, y: number, c
     buffer.quad(
       [ordered[0][0], y, ordered[0][1]], [ordered[1][0], y, ordered[1][1]], [ordered[2][0], y, ordered[2][1]], [ordered[3][0], y, ordered[3][1]],
       [0, 1, 0], color, orderedUv,
+      ao && ordered.map(([x, z]) => ao(x, z)),
     );
   }
 }
