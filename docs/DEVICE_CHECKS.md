@@ -1,6 +1,23 @@
 # Device checks
 
-Everything below has passed typecheck, unit tests and web/Storybook screenshots, but has **not been run on a phone, tablet, foldable or simulator**. No device is set up yet. Do these checks before the matching milestone closes. Every `08-handoff.md` links back here.
+## Device record
+
+Measured 2026-10-17 on the bench device (USB adb serial `913949703467`). Commands run against the live device; values are verbatim.
+
+| Fact | Value | How measured |
+| --- | --- | --- |
+| Model | Microsoft Surface Duo (1st gen), `ro.product.device` = `duo`, hardware `surfaceduo` | `adb shell getprop ro.product.model` → `Surface Duo`; `ro.product.manufacturer` → `Microsoft` |
+| Android version | 14 (`ro.build.version.release`), SDK 34 (`ro.build.version.sdk`) | `adb shell getprop` |
+| Build | `treble_arm64_bgN-userdebug 14 UP1A.231105.003.A1` — a Project Treble GSI, not stock Duo 12L (vendor fingerprint `surface/duo/duo:12/2022.902.48`) | `adb shell getprop ro.build.display.id` / `ro.build.fingerprint` |
+| SoC / GPU | Snapdragon 855 platform (`ro.board.platform` = `msmnile`), Adreno 640 (`GLES: Qualcomm, Adreno (TM) 640, OpenGL ES 3.2 V@0502.0`) | `getprop`; `adb shell dumpsys SurfaceFlinger` GLES block |
+| Display | "Built-in Screen" 2700×1800 (unfolded dual-panel), 400 dpi, single mode `2700×1800 @ 60.000004 Hz`; no alternative refresh rates | `adb shell dumpsys display` → `supportedModes`, `renderFrameRate 60.000004` |
+| Frame deadline | 16,666,666 ns present deadline, appVsyncOff 1,000,000 ns | `dumpsys display` DisplayDeviceInfo |
+| RAM | 5,647,472 kB total (~5.4 GiB usable) | `adb shell cat /proc/meminfo` → `MemTotal` |
+| App package | `com.nycmon.app`, versionName 0.1.0, versionCode 1, minSdk 29, targetSdk 34 | `adb shell pm dump com.nycmon.app` |
+
+Two consequences for the performance pass: the Duo has exactly one display mode, so 60 Hz is the only cadence it can present at (the pass's "more than 60 fps" goal needs different hardware), and the userdebug GSI keeps `adb shell perfetto` and `dumpsys` fully available without root.
+
+The device record above and the release-build performance baseline in `docs/performance/baseline-duo-2026-10-17.md` were measured on this physical Surface Duo. Everything below still lists checks that remain unverified on hardware; most predate the baseline and cover screens the baseline did not touch. Do these checks before the matching milestone closes. Every `08-handoff.md` links back here.
 
 Target matrix (BUILD_PROMPT_v3 §0C, §6 step 11): iPhone SE 3, iPhone 16 Pro Max, Pixel 8, plus one Android foldable (Pixel Fold or Galaxy Z Fold) and one Android tablet.
 

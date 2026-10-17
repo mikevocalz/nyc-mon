@@ -31,6 +31,7 @@ interface Runtime<P> {
   running: boolean;
   time: number;
   last: number;
+  lastProbeStart: number;
   width: number;
   height: number;
   pixelRatio: number;
@@ -93,6 +94,7 @@ function JsThreeCanvas<P>({
   opacity = 1,
   background,
   onBackendChange,
+  onFrameTiming,
   children,
   ref,
 }: ThreeCanvasProps<P>) {
@@ -113,6 +115,7 @@ function JsThreeCanvas<P>({
     running: false,
     time: 0,
     last: 0,
+    lastProbeStart: 0,
     width: 0,
     height: 0,
     pixelRatio: 1,
@@ -143,6 +146,9 @@ function JsThreeCanvas<P>({
     const { renderer, built } = rt;
     if (!renderer || !built || !rt.sized) return;
     const now = performance.now();
+    const probeStart = onFrameTiming ? now : 0;
+    const probeInterval = onFrameTiming && rt.lastProbeStart > 0 ? probeStart - rt.lastProbeStart : null;
+    if (onFrameTiming) rt.lastProbeStart = probeStart;
     let delta = 0;
     if (rt.running) {
       // Clamp so a backgrounded tab doesn't jump the scene forward.
@@ -158,6 +164,18 @@ function JsThreeCanvas<P>({
       advanceNodeFrame(renderer);
       renderer.render(built.scene, built.camera);
       rt.surface?.present();
+      if (onFrameTiming) {
+        try {
+          onFrameTiming({
+            cpuMs: Math.max(0, performance.now() - probeStart),
+            intervalMs: probeInterval,
+            backend: (renderer.backend as { isWebGLBackend?: boolean }).isWebGLBackend ? 'webgl2' : 'webgpu',
+          });
+        } catch (error) {
+          // A diagnostics callback must never take down the game renderer.
+          console.warn('[ThreeCanvas] frame diagnostics failed', error);
+        }
+      }
     } catch (error) {
       console.error('[ThreeCanvas] render failed.', error);
       status.setState((s) => ({ failed: [...s.failed, (renderer.backend as { isWebGLBackend?: boolean }).isWebGLBackend ? 'webgl2' : 'webgpu'] }));
@@ -239,6 +257,7 @@ function JsThreeCanvas<P>({
       rt.renderer = null;
       rt.built = null;
       rt.surface = null;
+      rt.lastProbeStart = 0;
     };
     // invalidate, applySize and status are stable per instance; hasSize gates the first build only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
