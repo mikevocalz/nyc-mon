@@ -8,6 +8,7 @@ import type { ActorFrame, SceneActor, SceneActorFactory } from './scene-actor.ts
 import { buildCityWorld } from './world/index.ts';
 import { EXPERIMENTAL_WORLD_POST, mountCityPostPipeline, resolvePostOptions } from './post/pipeline.ts';
 import { EXPERIMENTAL_WORLD_RENDER_SCALE, mountRenderScale } from './perf/render-scale.ts';
+import { EXPERIMENTAL_WORLD_THERMAL, thermalSignal, thermalWorsened } from './perf/thermal.ts';
 import { tierBundle, WORLD_TIER, WORLD_TIER_SELECTED } from './perf/tier.ts';
 import type { SkyName } from './world/sky-rig.ts';
 
@@ -129,6 +130,13 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
     renderer && EXPERIMENTAL_WORLD_RENDER_SCALE && bundle
       ? mountRenderScale(renderer, { band: bundle.scale.band, floor: bundle.scale.floor })
       : null;
+  // Last consumed thermalSignal sample — the monitor (perf/thermal.ts,
+  // flag-gated) bumps seq on each poll; a move to a worse level forces a
+  // render-scale down-step so the tier drops before the device throttles.
+  // Seeded from the signal as it stands, so a remount never replays a
+  // sample an earlier scene already acted on.
+  let thermalSeqSeen = thermalSignal.seq;
+  let thermalLevelSeen = thermalSignal.level;
   // The rig's async stage: HDR fetch + PMREM env. It resolves off the build
   // path — the fallback dome already renders, and a landed env invalidates
   // one redraw. Failure (float upload unverified on rn-webgpu) keeps the JSON
@@ -199,6 +207,19 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
       // calls is the draw cadence — JS submission pacing, not GPU or UI
       // thread time (perf/render-scale.ts header says what it is not).
       renderScale?.frame(now, frame.pixelRatio);
+      // PR5.1: thermal pressure is a forced down-step on the scale
+      // controller — the early warning frame pacing would only see too late.
+      if (renderScale && EXPERIMENTAL_WORLD_THERMAL && thermalSignal.seq !== thermalSeqSeen) {
+        thermalSeqSeen = thermalSignal.seq;
+        const worsened = thermalWorsened(thermalLevelSeen, thermalSignal.level);
+        thermalLevelSeen = thermalSignal.level;
+        if (worsened) {
+          renderScale.forceDown(
+            now,
+            `thermal ${thermalSignal.level} (status ${thermalSignal.status}, headroom ${thermalSignal.headroom ?? 'n/a'})`,
+          );
+        }
+      }
       if (actors.length > 0) {
         let delta = frame.delta > 0 ? frame.delta : 0;
         // A redraw requested by a moving actor: measure the gap ourselves. The first frame after rest moves nothing.
