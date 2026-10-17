@@ -135,6 +135,11 @@ export const CITY_COLORS = {
   subwayGlobe: leaf[400],
   shelterGlass: mixHex(carolina[800], ink[800], 0.4),
   shelterFrame: concrete[600],
+  // Toon look candidates (docs/design/toon-look-spec.md §4): the shade-side
+  // hue, the rim accent and the optional cool fill. All to be tuned on device.
+  toonShadow: mixHex(ink[800], royal[700], 0.45),
+  toonRim: carolina[300],
+  toonFill: mixHex(carolina[400], ink[900], 0.5),
 } as const;
 
 export type CityColor = keyof typeof CITY_COLORS;
