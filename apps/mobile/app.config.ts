@@ -32,6 +32,10 @@ const config: ExpoConfig & { newArchEnabled: true } = {
       // false: the pad drives gameplay, not UIKit focus. true would let Start/A move and
       // activate focus in the React Native view tree.
       GCSupportsControllerUserInteraction: false,
+      // ProMotion: without this key Core Animation clamps the app's frame
+      // interval at 1/60 s, so CADisplayLink-driven content can never reach
+      // 120 Hz on ProMotion iPhones. The system still picks the actual rate.
+      CADisableMinimumFrameDurationOnPhone: true,
     },
   },
   android: {

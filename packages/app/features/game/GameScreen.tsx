@@ -61,7 +61,8 @@ import { gameCameraStore, gameScreenActions, gameScreenStore } from './game-sess
 import { resolveGameViewState, shouldMountCanvas } from './game-status.ts';
 import { resolveGameHudLayout } from './hud-layout.ts';
 import { loadGameScene, type GameSceneParams } from './load-game-scene.ts';
-import { CITY_FRAME_PROBE_ENABLED, recordCityFrame } from './perf/record-city-frame.ts';
+import { CITY_FRAME_SINK_ENABLED, onCityFrame } from './perf/on-city-frame.ts';
+import { useGamePerfMounts } from './perf/use-game-perf.ts';
 import { useGameRenderThread } from './render-thread-choice.ts';
 import { readLobbyIdentity } from './lobby/lobby-identity.ts';
 import { lobbyStore } from './lobby/lobby.store.ts';
@@ -219,6 +220,10 @@ export function GameScreen({ focused = true }: GameScreenProps = {}) {
   const identity = useMemo(() => readLobbyIdentity(), []);
   const dataset = city.ok ? city.dataset : null;
   useWorldSaveLifecycle({ identity, dataset });
+  // Flag-gated platform perf mounts: display-rate vote, thermal headroom
+  // monitor, ADPF hint session (performance-pass PR4.2 / PR5.1-2). Only while
+  // the Game tab is focused: the tab stays mounted when the player leaves it.
+  useGamePerfMounts(worldReady && focused);
   const input = useGameInput({
     enabled: gameplayInputEnabled(worldReady, lobbyPhase),
     focused,
@@ -277,7 +282,7 @@ export function GameScreen({ focused = true }: GameScreenProps = {}) {
               background={brand.night}
               // No accessibilityLabel: the canvas layer stays hidden; the wrapping View is the named, actionable element.
               onBackendChange={gameScreenActions.backendChanged}
-              onFrameTiming={CITY_FRAME_PROBE_ENABLED ? recordCityFrame : undefined}
+              onFrameTiming={CITY_FRAME_SINK_ENABLED ? onCityFrame : undefined}
             />
           </View>
         </GestureDetector>

@@ -224,3 +224,31 @@ test('the mount applies base×scale through setPixelRatio, self-heals on resize,
   assert.equal(renderer.ratio, before, 'a disposed mount touches nothing');
   mount.dispose(); // idempotent
 });
+
+test('forceDown steps immediately, bypasses the window cadence, and damps the climb back', () => {
+  const c = createRenderScaleController({ band: BAND });
+  // Mid-window: pacing frames have not closed a window yet, so only an
+  // external input (thermal) can move the scale here.
+  c.frame(0);
+  c.frame(40);
+  const step = c.forceDown(80, 'thermal warm (status 2, headroom 0.75)');
+  assert.equal(step.verdict, 'down');
+  assert.equal(step.to, 0.9);
+  assert.equal(c.decisions.length, 1, 'forced steps join the same audit log');
+
+  // A clamped step at the floor records a 'hold' — the request is audited,
+  // not silently dropped.
+  const floor = createRenderScaleController({ band: BAND, floor: 0.9, startScale: 0.9 });
+  const clamped = floor.forceDown(0, 'thermal hot');
+  assert.equal(clamped.verdict, 'hold');
+  assert.match(clamped.reason, /clamped at floor/);
+
+  // The forced step marks lastMoved='down', so the next 'up' verdict must
+  // persist reversalWindows times — thermal steps do not bounce back.
+  let t = 100;
+  const first = windowAt(c, t, 25); // 40 fps → above the band, wants up
+  assert.equal(first.decision.verdict, 'hold');
+  assert.match(first.decision.reason, /reversal 1\/2 after down/);
+  const second = windowAt(c, first.next, 25);
+  assert.equal(second.decision.verdict, 'up');
+});
