@@ -200,7 +200,9 @@ export function createToonMaterial(THREE: Three, rig: ToonRig, options: ToonMate
   const occlusion = (options.occlusion ?? float(1)) as Node<'float'>; // §5: nothing baked -> 1
 
   const material = new THREE.MeshBasicNodeMaterial({ fog: true });
-  if (options.albedo === undefined && !options.color) material.vertexColors = true;
+  // vertexColors must stay false: NodeMaterial would multiply this colorNode
+  // by vertexColor() again, tinting the rim. vertexColor() in the graph reads
+  // the `color` attribute on its own.
   // emissiveNode is added after the color sum by the node material (D17);
   // the slot exists at runtime but is not in the type declarations.
   if (options.emissive) (material as unknown as { emissiveNode: Node }).emissiveNode = options.emissive;
