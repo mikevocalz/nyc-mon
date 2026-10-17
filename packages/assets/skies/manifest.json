@@ -1,0 +1,98 @@
+{
+  "$schema": "nyc-mon/sky-asset-manifest/v1",
+  "generatedBy": "fetch-skies.mjs — build-time fetch; .hdr payloads are gitignored under .cache/",
+  "resolution": "2k",
+  "license": {
+    "code": "CC0-1.0",
+    "name": "Creative Commons Zero (public domain dedication)",
+    "url": "https://polyhaven.com/license"
+  },
+  "assets": {
+    "qwantani_morning_puresky": {
+      "id": "qwantani_morning_puresky",
+      "name": "Qwantani Morning (Pure Sky)",
+      "timeOfDay": "morning",
+      "authors": [
+        "Jarod Guest"
+      ],
+      "assetPage": "https://polyhaven.com/a/qwantani_morning_puresky",
+      "apiInfoUrl": "https://api.polyhaven.com/assets?t=hdris",
+      "apiFilesUrl": "https://api.polyhaven.com/files/qwantani_morning_puresky",
+      "file": {
+        "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/2k/qwantani_morning_puresky_2k.hdr",
+        "resolution": "2k",
+        "format": "hdr",
+        "bytes": 4459710,
+        "md5": "87dfe2068bbf9ad2dc9b4ee1c95ce30c",
+        "sha256": "d8e603573f9e26d3e2783e0bbd136bfdb74f1ef7d8cf306365b7ab8fdfccbd07",
+        "path": ".cache/qwantani_morning_puresky_2k.hdr",
+        "fetchedAt": "2026-10-17T02:18:12.704Z"
+      },
+      "tonemappedPreview": "previews/qwantani_morning_puresky.png",
+      "license": {
+        "code": "CC0-1.0",
+        "name": "Creative Commons Zero (public domain dedication)",
+        "url": "https://polyhaven.com/license",
+        "recordedAt": "2026-10-17T02:18:12.705Z"
+      }
+    },
+    "qwantani_dusk_1_puresky": {
+      "id": "qwantani_dusk_1_puresky",
+      "name": "Qwantani Dusk 1 (Pure Sky)",
+      "timeOfDay": "dusk",
+      "authors": [
+        "Greg Zaal",
+        "Jarod Guest"
+      ],
+      "assetPage": "https://polyhaven.com/a/qwantani_dusk_1_puresky",
+      "apiInfoUrl": "https://api.polyhaven.com/assets?t=hdris",
+      "apiFilesUrl": "https://api.polyhaven.com/files/qwantani_dusk_1_puresky",
+      "file": {
+        "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/2k/qwantani_dusk_1_puresky_2k.hdr",
+        "resolution": "2k",
+        "format": "hdr",
+        "bytes": 3858804,
+        "md5": "3aef40e5b288049a9c1b6ca1cb043f17",
+        "sha256": "d28f81e36723852cb5dc15c82611e5be094c2a9bcbf0b279f265647b1cc11e17",
+        "path": ".cache/qwantani_dusk_1_puresky_2k.hdr",
+        "fetchedAt": "2026-10-17T02:18:13.180Z"
+      },
+      "tonemappedPreview": "previews/qwantani_dusk_1_puresky.png",
+      "license": {
+        "code": "CC0-1.0",
+        "name": "Creative Commons Zero (public domain dedication)",
+        "url": "https://polyhaven.com/license",
+        "recordedAt": "2026-10-17T02:18:13.180Z"
+      }
+    },
+    "qwantani_night_puresky": {
+      "id": "qwantani_night_puresky",
+      "name": "Qwantani Night (Pure Sky)",
+      "timeOfDay": "night",
+      "authors": [
+        "Greg Zaal",
+        "Jarod Guest"
+      ],
+      "assetPage": "https://polyhaven.com/a/qwantani_night_puresky",
+      "apiInfoUrl": "https://api.polyhaven.com/assets?t=hdris",
+      "apiFilesUrl": "https://api.polyhaven.com/files/qwantani_night_puresky",
+      "file": {
+        "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/2k/qwantani_night_puresky_2k.hdr",
+        "resolution": "2k",
+        "format": "hdr",
+        "bytes": 5461210,
+        "md5": "a2ef5b92f49f77b5bad15add5dad4feb",
+        "sha256": "d458fe7f20969d89eedbb7ae12d346abf68c86d844235696e7d70baad3e04cf0",
+        "path": ".cache/qwantani_night_puresky_2k.hdr",
+        "fetchedAt": "2026-10-17T02:18:13.859Z"
+      },
+      "tonemappedPreview": "previews/qwantani_night_puresky.png",
+      "license": {
+        "code": "CC0-1.0",
+        "name": "Creative Commons Zero (public domain dedication)",
+        "url": "https://polyhaven.com/license",
+        "recordedAt": "2026-10-17T02:18:13.859Z"
+      }
+    }
+  }
+}
