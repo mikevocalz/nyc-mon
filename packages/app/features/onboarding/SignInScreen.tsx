@@ -19,6 +19,7 @@ import { Pressable, View } from '@acme/ui/tw';
 import { auth, isPasskeySupported } from './auth';
 import { copy, type OnboardingCopyId } from './copy';
 import { useOnboarding } from './onboarding.store';
+import { startSaveForNewAccount } from './save-store';
 import { useSignInNav } from './sign-in-nav';
 
 type Mode = 'providers' | 'email' | 'verify' | 'reset' | 'reset_sent';
@@ -129,6 +130,7 @@ export function SignInScreen() {
         fail(result.error);
         return;
       }
+      startSaveForNewAccount(Date.now());
       // Verification gate: the server may or may not require the mail first.
       setMode('verify');
       return;

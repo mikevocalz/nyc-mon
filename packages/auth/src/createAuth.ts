@@ -11,11 +11,14 @@ import { toAuthResult } from './toAuthResult.ts';
 export interface CreateAuthOptions {
   /** Origin of apps/admin-vite, the host that serves `/payload-api/auth` (docs/adr/0003-admin-app-split.md). */
   baseURL: string;
+  /** Native only: the Origin header to send ({@link APP_ORIGIN}). Browsers set their own. */
+  appOrigin?: string;
 }
 
-function buildClient(baseURL: string) {
+function buildClient(baseURL: string, appOrigin: string | undefined) {
   return createAuthClient({
     baseURL: `${baseURL}${AUTH_BASE_PATH}`,
+    ...(appOrigin === undefined ? {} : { fetchOptions: { headers: { origin: appOrigin } } }),
     plugins: [
       passkeyClient(),
       inferAdditionalFields({
@@ -30,8 +33,8 @@ function buildClient(baseURL: string) {
  * directly. Every call resolves to an {@link AuthResult}; none throws on an
  * auth failure.
  */
-export function createAuth({ baseURL }: CreateAuthOptions) {
-  const client = buildClient(baseURL);
+export function createAuth({ baseURL, appOrigin }: CreateAuthOptions) {
+  const client = buildClient(baseURL, appOrigin);
 
   async function signIn(request: SignInRequest): Promise<AuthResult> {
     switch (request.method) {
