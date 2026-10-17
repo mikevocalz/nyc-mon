@@ -21,11 +21,20 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
-/** The three time-of-day skies lane R0 standardised on (verified HDRI, type 0, via /assets?t=hdris). */
+/**
+ * The sky candidates lane R0 fetched (verified HDRI, type 0, via /assets?t=hdris).
+ * `slot` is the time-of-day the asset competes for; `role` marks the original
+ * three vs the alternates added after the first pass found dusk_1 has no sun
+ * disc and night's brightest cluster is a star, not the moon.
+ */
 const SKIES = [
-  { id: 'qwantani_morning_puresky', timeOfDay: 'morning' },
-  { id: 'qwantani_dusk_1_puresky', timeOfDay: 'dusk' },
-  { id: 'qwantani_night_puresky', timeOfDay: 'night' },
+  { id: 'qwantani_morning_puresky', slot: 'morning', role: 'primary' },
+  { id: 'qwantani_dusk_1_puresky', slot: 'dusk', role: 'primary' },
+  { id: 'qwantani_night_puresky', slot: 'night', role: 'primary' },
+  { id: 'qwantani_dusk_2_puresky', slot: 'dusk', role: 'alternate' },
+  { id: 'qwantani_sunset_puresky', slot: 'dusk', role: 'alternate' },
+  { id: 'qwantani_moonrise_puresky', slot: 'night', role: 'alternate' },
+  { id: 'qwantani_moon_noon_puresky', slot: 'night', role: 'alternate' },
 ];
 
 const LICENSE = {
@@ -112,7 +121,8 @@ const main = async () => {
     assets[sky.id] = {
       id: sky.id,
       name: meta.name,
-      timeOfDay: sky.timeOfDay,
+      timeOfDay: sky.slot,
+      role: sky.role,
       authors: Object.keys(meta.authors ?? {}),
       assetPage: `https://polyhaven.com/a/${sky.id}`,
       apiInfoUrl: 'https://api.polyhaven.com/assets?t=hdris',

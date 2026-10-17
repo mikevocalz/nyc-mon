@@ -57,11 +57,35 @@ record it anyway and surface it in the app's attribution surface.
 | `qwantani_morning_puresky` | Qwantani Morning (Pure Sky) | Jarod Guest | <https://polyhaven.com/a/qwantani_morning_puresky> |
 | `qwantani_dusk_1_puresky` | Qwantani Dusk 1 (Pure Sky) | Greg Zaal (photography), Jarod Guest (processing) | <https://polyhaven.com/a/qwantani_dusk_1_puresky> |
 | `qwantani_night_puresky` | Qwantani Night (Pure Sky) | Greg Zaal (photography), Jarod Guest (processing) | <https://polyhaven.com/a/qwantani_night_puresky> |
+| `qwantani_dusk_2_puresky` | Qwantani Dusk 2 (Pure Sky) | Greg Zaal, Jarod Guest | <https://polyhaven.com/a/qwantani_dusk_2_puresky> |
+| `qwantani_sunset_puresky` | Qwantani Sunset (Pure Sky) | Greg Zaal, Jarod Guest | <https://polyhaven.com/a/qwantani_sunset_puresky> |
+| `qwantani_moonrise_puresky` | Qwantani Moonrise (Pure Sky) | Greg Zaal, Jarod Guest | <https://polyhaven.com/a/qwantani_moonrise_puresky> |
+| `qwantani_moon_noon_puresky` | Qwantani Moon Noon (Pure Sky) | Greg Zaal, Jarod Guest | <https://polyhaven.com/a/qwantani_moon_noon_puresky> |
 
-Attribution text for the app's attribution surface:
+Attribution text for the app's attribution surface (trim to whichever assets
+ship):
 
-> Skies: "Qwantani Morning (Pure Sky)", "Qwantani Dusk 1 (Pure Sky)" and
-> "Qwantani Night (Pure Sky)" by Poly Haven (polyhaven.com), licensed CC0.
+> Skies: "Qwantani" HDRI series by Poly Haven (polyhaven.com), licensed CC0.
+
+## Recommendation for L1 (measured, from the committed JSONs)
+
+The brief asked for one dusk candidate with a real sun disc (cluster spread
+< ~3°, elevation > 0°) and one night candidate whose brightest cluster is the
+moon. `sunClusterSpreadDeg` is the discriminator.
+
+| Slot | Candidate | elev | spread | peak luma | Verdict |
+| --- | --- | --- | --- | --- | --- |
+| morning | `qwantani_morning_puresky` | 20.2° | 0.22° | 1.4×10⁵ | **pick** — real unclipped sun disc |
+| dusk | `qwantani_sunset_puresky` | 6.1° | 0.21° | 5.9×10⁴ | **pick** — real disc, warm orange key (#FF9F2B), warm horizon #FFDEB9 |
+| dusk | `qwantani_dusk_2_puresky` | 15.4° | 15.9° | 5.5 | fallback — no disc, broad warm glow; pinkest horizon (#FFD3E5) if L1 wants post-sunset light |
+| dusk | `qwantani_dusk_1_puresky` | 28.4° | 15.4° | 4.0 | fallback — no disc, coolest/dimmest |
+| night | `qwantani_moonrise_puresky` | 13.8° | 0.28° | 1.1×10⁵ | **pick** — moon disc low in the sky (PH labels the asset night/moonrise), raking key light like the existing SUN vector |
+| night | `qwantani_moon_noon_puresky` | 60.7° | 0.27° | 1.0×10⁵ | fallback — moon disc but nearly overhead; darkest sky of the set |
+| night | `qwantani_night_puresky` | 84.1° | 0° (2 px) | 368 | fallback — no moon; brightest cluster is a star |
+
+So: **morning / `qwantani_sunset_puresky` / `qwantani_moonrise_puresky`** is
+the recommended trio — every slot gets a compact, high-radiance key disc
+(spread < 0.3°) plus full-range SH ambient and a plausible horizon.
 
 ## What the numbers mean (read before wiring a rig)
 
@@ -77,16 +101,18 @@ Attribution text for the app's attribution surface:
     a key light.
   - **night** — 0°, 2 pixels, radiance ≈ 310, elevation ≈ 84°. The brightest
     cluster is a single star, not the moon. Treat `sunDirection` as
-    "brightest point source", not a moon position. If the rig wants a moon,
-    `qwantani_moonrise_puresky` / `qwantani_moon_noon_puresky` exist.
+    "brightest point source", not a moon position. The fetched alternates
+    `qwantani_moonrise_puresky` / `qwantani_moon_noon_puresky` do carry a real
+    moon disc — see the recommendation table above.
 - `horizonColor` is the mean linear radiance within ±5° of the horizon,
   averaged over all azimuths. dusk_1's is cool blue (#DFE9FF normalised) —
   the warm sunset glow only occupies a ~30° azimuth wedge (peak wedge
   radiance ≈ 1.1 vs ≈ 0.5 elsewhere), so the all-azimuth mean is not warm.
-- Elevation ordering measured: dusk glow centroid 28.4° > morning sun 20.2°,
-  night point source 84.1°. The expected "morning sun highest, dusk sun
-  lowest" ordering does not hold because dusk_1's sun is below the horizon and
-  night's cluster is a star — see `sunClusterSpreadDeg` before ordering rigs.
+- Elevation ordering for the original three, measured: dusk glow centroid
+  28.4° > morning sun 20.2°, night point source 84.1°. The expected "morning
+  sun highest, dusk sun lowest" ordering does not hold for `dusk_1`/`night`
+  because one sun is below the horizon and the other cluster is a star — the
+  alternates fix this: `sunset` has its disc at 6.1° and `moonrise` at 13.8°.
 
 ## HDR-format decision (UNVERIFIED on device — L1 decides)
 
