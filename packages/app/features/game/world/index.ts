@@ -12,6 +12,7 @@ import { buildStreetFurniture } from './street-furniture.ts';
 import { createStreetClearance } from './walkability.ts';
 import { createCityMaterials, linearColor } from './materials.ts';
 import { createPbrCityMaterials, EXPERIMENTAL_WORLD_PBR } from './pbr-materials.ts';
+import { createGlassCityMaterials, EXPERIMENTAL_WORLD_GLASS, type GlassTier } from './glass.ts';
 import { createSkyRig, EXPERIMENTAL_SKY_RIG, type SkyName } from './sky-rig.ts';
 
 /**
@@ -47,6 +48,17 @@ export interface CityWorldOptions {
    * per-vertex surface attributes are shared either way.
    */
   pbr?: boolean;
+  /**
+   * Lane L3 "glass and rooms": the two wall materials become window glass
+   * with interior-mapped rooms (glass.ts). Defaults to
+   * EXPO_PUBLIC_WORLD_GLASS — off unless set. With `pbr` it composes over
+   * the L2 material set; alone it sits on the unflagged city.
+   */
+  glass?: boolean;
+  /** L3 interior tier — 'full' maps room boxes, 'flat' is the cheap phone path. Default 'full'. */
+  glassTier?: GlassTier;
+  /** L3 lit-room share by time of day, 0 = day … 1 = night. Default comes from `sky`. */
+  timeOfDay?: number;
 }
 
 export function buildCityWorld(THREE: Three, dataset: CityDatasetV2, options: CityWorldOptions = {}) {
@@ -58,7 +70,20 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV2, options: Ci
   // shadows, the DirectionalLight and the PBR dome glow all stay consistent.
   const sunDirection = skyRig?.sunDirection ?? SUN;
   const pbr = options.pbr ?? EXPERIMENTAL_WORLD_PBR;
-  const materials = pbr ? createPbrCityMaterials(THREE, { sunDirection }) : createCityMaterials(THREE, sunDirection);
+  const glass = options.glass ?? EXPERIMENTAL_WORLD_GLASS;
+  // Lit-room share follows the sky preset when no override is given:
+  // morning light leaves interiors dark, dusk and night turn them on.
+  const TOD_BY_SKY: Record<SkyName, number> = { morning: 0.15, dusk: 0.8, night: 1 };
+  const materials = glass
+    ? createGlassCityMaterials(THREE, {
+        sunDirection,
+        pbr,
+        tier: options.glassTier,
+        timeOfDay: options.timeOfDay ?? TOD_BY_SKY[skyRig ? (options.sky ?? 'dusk') : 'dusk'],
+      })
+    : pbr
+      ? createPbrCityMaterials(THREE, { sunDirection })
+      : createCityMaterials(THREE, sunDirection);
   const group = new THREE.Group();
   group.name = 'city:world';
   // Contact shadows lean away from the sun, along the ground.

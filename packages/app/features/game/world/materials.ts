@@ -84,6 +84,35 @@ export function createSkyMaterial(THREE: Three, sunDirection: readonly [number, 
   return sky;
 }
 
+/**
+ * The window grid as the facade pattern computes it, handed to the L3
+ * window layer (glass.ts) so room mapping, blinds and AC units stay on the
+ * same cells, seeds and lit pattern — one pattern, two lanes. Every node is
+ * raw (no distance fade); the layer applies its own pixel-size fade.
+ */
+export interface FacadeWindowGraphs {
+  /** Pane coverage inside upper-floor cells (0/1 bands, unfaded). */
+  pane: Node<'float'>;
+  /** Storefront band coverage (0/1, unfaded). */
+  shop: Node<'float'>;
+  /** Roll-down gate coverage inside the shop band (0/1, unfaded). */
+  gate: Node<'float'>;
+  /** fract() position inside the bay/floor cell (x across the bay, y up the floor). */
+  cell: Node<'vec2'>;
+  /** Bay and floor indices of the cell. */
+  column: Node<'float'>;
+  row: Node<'float'>;
+  /** Per-building seed 0..100 derived from the wall vertex colour. */
+  seed: Node<'float'>;
+  /** The building's lit share (windows.ts litDensity, 0.25..0.75). */
+  density: Node<'float'>;
+  /** The windows.ts shader hash of the cell, offset by (dx, dy) — same formula as the CPU `windowHash`. */
+  hash(dx: number, dy: number): Node<'float'>;
+  /** Wall uv in metres (x along the wall, y up it). */
+  u: Node<'float'>;
+  v: Node<'float'>;
+}
+
 export interface FacadeGraphs {
   /** Albedo with the distance fade folded in (near pattern → far average). */
   albedo: Node<'vec3'> | Node<'color'>;
@@ -95,6 +124,8 @@ export interface FacadeGraphs {
   shops: Node<'float'>;
   /** Roll-down steel gate coverage × the near fade. */
   gates: Node<'float'>;
+  /** Raw window-grid internals for the L3 layer (glass.ts); see FacadeWindowGraphs. */
+  window: FacadeWindowGraphs;
 }
 
 /**
@@ -152,6 +183,13 @@ export function facadeGraphs(THREE: Three, grid: { floor: number; bay: number },
     panes: pane.mul(near),
     shops: shop.mul(near),
     gates: gate.mul(near),
+    window: {
+      pane, shop, gate,
+      cell: T.vec2(fx, fy),
+      column, row, seed, density,
+      hash: (dx, dy) => hash(column.add(dx), row.add(dy)),
+      u, v,
+    },
   };
 }
 
