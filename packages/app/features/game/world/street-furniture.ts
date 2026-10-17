@@ -11,7 +11,7 @@
 // - light pools: additive discs under the nearest lamps, refreshed as the
 //   Caller walks (preallocated, no allocation per refresh)
 import type { Three } from '@acme/ui/three';
-import type { CityDatasetV2 } from '../city-dataset.ts';
+import type { CityDatasetV3 } from '../city-dataset.ts';
 import { shadowBands, SHADOW_BAND_METRES } from './city-mesh.ts';
 import { emitText, type TextFace } from './lettering.ts';
 import type { CityMaterials } from './materials.ts';
@@ -38,7 +38,7 @@ const linearRgb = (key: CityColor) => hexToRgb(CITY_COLORS[key]);
 export const measureText = (text: string) => layoutText(text).width * PIXEL;
 
 /** Signs and streetlights for a tile, every base outside the carriageways (walkability.ts clearance). Pure apart from the clearance. */
-export function placeStreetFurniture(dataset: CityDatasetV2, clearance: StreetClearance) {
+export function placeStreetFurniture(dataset: CityDatasetV3, clearance: StreetClearance) {
   const apollo = dataset.landmarks.find((l) => l.key === 'apollo-theater');
   const centre: [number, number] = apollo ? [apollo.x, apollo.z] : [0, 0];
   const crosses = findIntersections(dataset.roads);
@@ -48,7 +48,7 @@ export function placeStreetFurniture(dataset: CityDatasetV2, clearance: StreetCl
 }
 
 export function buildStreetFurniture(
-  THREE: Three, dataset: CityDatasetV2, materials: Pick<CityMaterials, 'poles' | 'signBlades' | 'lampHeads' | 'lampPools' | 'lettering'>,
+  THREE: Three, dataset: CityDatasetV3, materials: Pick<CityMaterials, 'poles' | 'signBlades' | 'lampHeads' | 'lampPools' | 'lettering'>,
   clearance: StreetClearance = createStreetClearance(dataset),
   extraTexts: readonly (TextFace & { text: string })[] = [],
 ) {

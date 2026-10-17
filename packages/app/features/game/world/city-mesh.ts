@@ -8,7 +8,7 @@
 // field — which only the flagged PBR materials read; the cel lane ignores
 // the extra attributes entirely.
 import type { Three } from '@acme/ui/three';
-import type { BuildingClass, CityBuilding, CityDatasetV2, CityLandmark, CityRoad, RoadClass } from '../city-dataset.ts';
+import type { BuildingClass, CityBuilding, CityDatasetV3, CityLandmark, CityRoad, RoadClass } from '../city-dataset.ts';
 import { counterClockwise, hashUnit, mapArea, pairs, pointInRing, ribbon, VertexBuffer } from './geometry.ts';
 import {
   bays, emitAwning, emitCornice, emitFireEscapeFloor, emitStoop, emitWaterTower, fireEscapeFloors, FLOOR_HEIGHT, hasFireEscape,
@@ -261,7 +261,7 @@ export function neonKeyFor(id: string): (typeof NEON_KEYS)[number] {
   return NEON_KEYS[Math.floor(hashUnit(`${id}:neon`) * NEON_KEYS.length) % NEON_KEYS.length]!;
 }
 
-export function buildCityMeshes(THREE: Three, dataset: CityDatasetV2, materials: CityMaterials, sunAway: Point, clearance: StreetClearance = createStreetClearance(dataset)) {
+export function buildCityMeshes(THREE: Three, dataset: CityDatasetV3, materials: CityMaterials, sunAway: Point, clearance: StreetClearance = createStreetClearance(dataset)) {
   const masonry = new VertexBuffer(262144);
   const glass = new VertexBuffer();
   const roofs = new VertexBuffer(131072);
