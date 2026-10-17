@@ -76,12 +76,11 @@ describe('Login with Amazon profile mapping', () => {
     }).options.config[0];
     expect(config?.disableImplicitSignUp).toBe(true);
     expect(config?.disableSignUp).toBe(true);
-    await expect(
-      config?.accountSubject?.({
-        profile: { user_id: 'amzn1.account.STABLE' },
-        tokens: {},
-      }),
-    ).resolves.toBe('amzn1.account.STABLE');
+    const subject = await config?.accountSubject?.({
+      profile: { user_id: 'amzn1.account.STABLE' },
+      tokens: {},
+    });
+    expect(subject).toBe('amzn1.account.STABLE');
   });
 
   it('pins the LWA endpoints and profile scope used by the provider', () => {
