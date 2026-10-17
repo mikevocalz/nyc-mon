@@ -40,6 +40,19 @@ export const SNAPSHOT_LENGTH = 21;
 
 const GAITS: readonly Gait[] = ['idle', 'walk', 'run'];
 
+// `out` arrives with unknown contents — seed it from `previous` so a skipped
+// non-finite slot and the version bump continue the last snapshot instead of
+// the buffer's stale data.
+function seedSnapshot(target: number[], previous: readonly number[]): void {
+  'worklet';
+  if (previous.length === SNAPSHOT_LENGTH) {
+    for (let i = 0; i < SNAPSHOT_LENGTH; i++) target[i] = previous[i]!;
+  } else {
+    target.fill(0);
+    target[SNAPSHOT_SLOTS.pixelRatio] = 1;
+  }
+}
+
 export interface SnapshotView {
   width: number;
   height: number;
@@ -68,6 +81,7 @@ export function emptySnapshot(): number[] {
 export function packSnapshot(previous: readonly number[], camera: CityCamera, caller: CallerState, view: SnapshotView, out?: number[]): number[] {
   'worklet';
   const target = out ?? (previous.length === SNAPSHOT_LENGTH ? previous.slice() : emptySnapshot());
+  if (out !== undefined) seedSnapshot(target, previous);
   const put = (slot: number, value: number) => {
     if (Number.isFinite(value)) target[slot] = value;
   };
@@ -99,6 +113,7 @@ export function packSnapshot(previous: readonly number[], camera: CityCamera, ca
 export function bumpSnapshot(previous: readonly number[], out?: number[]): number[] {
   'worklet';
   const target = out ?? (previous.length === SNAPSHOT_LENGTH ? previous.slice() : emptySnapshot());
+  if (out !== undefined) seedSnapshot(target, previous);
   target[SNAPSHOT_SLOTS.version] = (target[SNAPSHOT_SLOTS.version] ?? 0) + 1;
   return target;
 }
