@@ -1,22 +1,22 @@
 import { create } from 'zustand';
 import { setThemePreference, type ThemePreference } from '@acme/theme/switch';
+import { readSave } from '../onboarding/save-store';
 
 // Profile + settings state — zustand always (repo rule).
-// Same pinned-avatar scheme as the schedule roster (see fixtures.ts).
-export const AVATAR_URI =
-  'https://api.dicebear.com/9.x/avataaars/png?size=256&eyes=default&mouth=smile&eyebrows=default' +
-  '&seed=nina&top=curly&hairColor=2c1b18&skinColor=d08b5b&clothing=blazerAndShirt';
+//
+// `name` is the Caller's name from the save (M07), the only identity the
+// device holds. The starter's demo person (name, @handle, email, avatar
+// photo) was STRUCK 2026-10-17: every player saw "Nina Alvarez". Handle,
+// email and a photo return when a backing source exists (the auth session
+// for email; nothing yet for handle or photo). Avatar falls back to initials.
 
 interface ProfileState {
   name: string;
-  handle: string;
-  email: string;
   notifications: boolean;
   digest: boolean;
   publicProfile: boolean;
   theme: ThemePreference;
   setName: (name: string) => void;
-  setEmail: (email: string) => void;
   setNotifications: (v: boolean) => void;
   setDigest: (v: boolean) => void;
   setPublicProfile: (v: boolean) => void;
@@ -24,15 +24,12 @@ interface ProfileState {
 }
 
 export const useProfile = create<ProfileState>((set) => ({
-  name: 'Nina Alvarez',
-  handle: '@nina',
-  email: 'nina@example.com',
+  name: readSave()?.caller?.callerName ?? '',
   notifications: true,
   digest: false,
   publicProfile: true,
   theme: 'dark', // NYC Mon is dark-first
   setName: (name) => set({ name }),
-  setEmail: (email) => set({ email }),
   setNotifications: (notifications) => set({ notifications }),
   setDigest: (digest) => set({ digest }),
   setPublicProfile: (publicProfile) => set({ publicProfile }),
