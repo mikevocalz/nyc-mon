@@ -1,12 +1,10 @@
 'use client';
 // Settings — reached from Profile. Preferences, appearance, and session
 // controls live here; identity stays on the profile screen.
-import { Linking } from 'react-native';
 import { useRouter } from 'solito/navigation';
 import { Section, View } from '@acme/ui/tw';
 import { Button, Card, Heading, SegmentedControl, Switch, Text, FadeIn } from '@acme/ui';
 import { useProfile, type ThemePreference } from '../profile/profile.store';
-import { CITY_MAP_ATTRIBUTION, CITY_MAP_LICENSE, CITY_MAP_LICENSE_URL } from '../game/map-data-credit';
 
 /** The game-control settings route (apps/mobile/app/(drawer)/game-controls.tsx). */
 const GAME_CONTROLS_PATH = '/game-controls';
@@ -79,24 +77,6 @@ export function SettingsContent() {
       <GameControlsRow />
 
       <FadeIn delay={200}>
-        <Card className="gap-3">
-          <View className="gap-1">
-            <Text variant="heading">Legal &amp; credits</Text>
-            <Text variant="caption" tone="muted">Map data</Text>
-            <Text>{CITY_MAP_ATTRIBUTION}</Text>
-            <Text variant="caption" tone="muted">
-              NYC-Mon&apos;s 3D city uses OpenStreetMap data under the Open Database License ({CITY_MAP_LICENSE.replace('ODbL-', 'ODbL ')}).
-            </Text>
-          </View>
-          <Button
-            title="View map data license"
-            variant="outline"
-            onPress={() => void Linking.openURL(CITY_MAP_LICENSE_URL)}
-          />
-        </Card>
-      </FadeIn>
-
-      <FadeIn delay={240}>
         <Card className="gap-3">
           <View className="gap-1">
             <Text variant="heading">Session</Text>
