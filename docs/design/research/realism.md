@@ -2,7 +2,7 @@
 
 Owner: `user-researcher`. Written for the realism lane (docs-only): the Flying Roadster look — one sky light, reflective glass, occupied windows, photoscanned surfaces, filmic finish — applied to the baked OSM Harlem tile (`docs/implementation/city-world.md`). Inputs: the Flying Roadster measurement notes, now pinned as named constants in `packages/app/features/game/world/look.ts`; the city palette (`world/palette.ts`); the window pattern (`world/windows.ts`). Companion outputs: `../handoff/realism.md`, `../review/realism-a11y.md`, the Graphics section of `docs/COPY_DECK.md`.
 
-Two things are still missing and everything that depends on them is marked PENDING, not guessed: Mike's photo set of the Apollo block, and the Mobbin card links (below).
+One thing is still missing and everything that depends on it is marked PENDING, not guessed: Mike's photo set of the Apollo block. (Mobbin cards are in, below.)
 
 ## What the measurements already decide
 
@@ -68,21 +68,28 @@ The pass is done when captures from the game sit beside Mike's Apollo-block phot
 
 **Device:** captures on the target phone (the 27–38 fps band) and, for the hinge-line check in `../review/realism-a11y.md`, a foldable in book posture. Simulator/browser captures are labelled as such and never counted as device passes.
 
-## Mobbin cards — PENDING
+## Mobbin cards
 
-The coordinator will paste the real card links in a follow-up commit. Each set below names the screen its cards cover; do not write findings from placeholders.
+Collected 2026-10-16 via Mobbin search (iOS). Each card tagged borrow or reject.
 
 ### Game HUD over the 3D world
 
-<!-- MOBBIN: Game HUD over 3D world — card links pending -->
+- [Tolan — 3D world with edge icon row](https://mobbin.com/screens/06ee91af-d314-4713-b15c-afea6aba596c) — **borrow**: chrome-free HUD, icons parked at the edges, the scene owns the frame; nothing competes with the world.
+- [Starlink — dark scene with central ring + corner compass](https://mobbin.com/screens/5ee07936-271f-4ffc-96ac-7f8964fdfcfc) — **borrow**: one high-contrast element reads instantly over a dark 3D field; compass sits quietly in a corner.
+- [Best Buy — AR view with floating pills](https://mobbin.com/screens/de210925-0c2f-4764-8f9f-05025a2d916a) — **borrow** the floating-pill grouping over a live view; **reject** the top-center 3D/AR segmented control, which crowds the middle of the frame.
 
 ### Settings: graphics quality tiers
 
-<!-- MOBBIN: Settings graphics tiers — card links pending -->
+- [NBA — Video Quality with "Automatic (recommended)"](https://mobbin.com/screens/f3fe1242-7bf7-4f1e-9346-bb9ef21b9e97) — **borrow**: radio list leading with an automatic default, each option carrying a consequence line.
+- [Riveo — export sheet with fps pills](https://mobbin.com/screens/2ccc629d-680d-4e03-8767-fc649fbe3cae) — **borrow**: compact segmented pills (25/30/50 fps) with a descriptor under the row — the density our tier picker needs.
+- [Prime Video — streaming quality with per-option cost](https://mobbin.com/screens/df1e14b5-42ec-4ef5-8203-ff3e20338e56) — **borrow**: each tier states its cost (GB/hr); ours states render scale / battery impact the same way.
+- [Ultrahuman — battery mode cards](https://mobbin.com/screens/520b63e7-7755-4288-9a47-737fe3541ab2) — **reject** the heavy card chrome for a settings row; **borrow** the per-tier consequence label ("High Battery Usage").
 
 ### Loader progress over the world build
 
-<!-- MOBBIN: Loader progress — card links pending -->
+- [QUITTR — dark ring, large %, status sublabel](https://mobbin.com/screens/e44d9c81-e261-4322-9bcb-7ca8ac2c03ca) — **borrow**: near-black scene with a ring, a big percent and a "Building…" line — the shape a shader-compile wait wants.
+- [Flo — ring + percent on light](https://mobbin.com/screens/3878bc48-a6d7-427a-ae5a-492504ca84c1) — **borrow** the percent-forward treatment; **reject** the light background (the game loader sits over the world build, which is dark).
+- [MyDyson — thin indeterminate ring on black](https://mobbin.com/screens/3f80714b-8587-4412-b9b5-5f415cda53b1) — **reject**: an indeterminate spinner with no number gives no affordance for a multi-second compile.
 
 ## Mike's photos — PENDING
 
