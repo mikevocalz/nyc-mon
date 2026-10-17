@@ -30,10 +30,21 @@ const ARCADE_MERGED_RIVE = TRUTHY_FLAG.has(
  * load is left out, so that control renders its accessible hit target with no
  * artwork rather than a stand-in drawing.
  */
-export function useArcadeRiveFiles(): ArcadeControllerRive {
-  const merged = useRiveFile(ARCADE_MERGED_RIVE ? MERGED : undefined).riveFile ?? undefined;
-  const stick = useRiveFile(ARCADE_MERGED_RIVE ? undefined : STICK).riveFile ?? undefined;
-  const cluster = useRiveFile(ARCADE_MERGED_RIVE ? undefined : CLUSTER).riveFile ?? undefined;
-  const pill = useRiveFile(ARCADE_MERGED_RIVE ? undefined : PILL).riveFile ?? undefined;
-  return ARCADE_MERGED_RIVE ? arcadeRiveFromFile(merged) : arcadeRiveFromFiles({ stick, cluster, pill });
+function useMergedRiveFile(): ArcadeControllerRive {
+  const merged = useRiveFile(MERGED).riveFile ?? undefined;
+  return arcadeRiveFromFile(merged);
 }
+
+function useSeparateRiveFiles(): ArcadeControllerRive {
+  const stick = useRiveFile(STICK).riveFile ?? undefined;
+  const cluster = useRiveFile(CLUSTER).riveFile ?? undefined;
+  const pill = useRiveFile(PILL).riveFile ?? undefined;
+  return arcadeRiveFromFiles({ stick, cluster, pill });
+}
+
+// The flag is a module constant, so exactly one hook set is ever installed
+// — useRiveFile(undefined) would settle into a 'No Rive file input
+// provided.' error state for every disabled asset.
+export const useArcadeRiveFiles: () => ArcadeControllerRive = ARCADE_MERGED_RIVE
+  ? useMergedRiveFile
+  : useSeparateRiveFiles;

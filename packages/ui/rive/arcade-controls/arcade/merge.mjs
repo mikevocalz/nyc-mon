@@ -20,7 +20,7 @@
 // Usage: node merge.mjs [--check]
 //   (no flag)  writes stick.rml, cluster.rml and pill.rml
 //   --check    regenerates and exits non-zero if the committed files differ
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -102,7 +102,7 @@ export function generate() {
 }
 
 const checkOnly = process.argv.includes('--check');
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+if (process.argv[1] && realpathSync(fileURLToPath(import.meta.url)) === realpathSync(process.argv[1])) {
   let drift = 0;
   for (const { out, text } of generate()) {
     const path = join(HERE, out);
