@@ -19,6 +19,20 @@ export interface ThreeFrameTiming {
   cpuMs: number;
   intervalMs: number | null;
   backend: ThreeBackend;
+  /** Scene update() cost — G1 stage attribution, set when the probe timed stages. */
+  updateMs?: number;
+  /** advanceNodeFrame() cost (info.reset + nodeFrame.update). */
+  nodeMs?: number;
+  /** renderer.render() cost: traversal, node/binding updates, encode + queue submit. */
+  renderMs?: number;
+  /** Surface present() cost — the swapchain hand-off; can block on buffer availability. */
+  presentMs?: number;
+  /** renderer.info.render.drawCalls / .triangles for this frame. */
+  drawCalls?: number;
+  triangles?: number;
+  /** Drawing-buffer pixels after this frame's pixel ratio (canvas.width/height). */
+  bufferW?: number;
+  bufferH?: number;
 }
 
 /** The pointer over the canvas, in normalised device coordinates (-1..1, y up). */

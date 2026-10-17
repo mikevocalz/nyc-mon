@@ -25,7 +25,7 @@ import type { CallerState } from '../character/caller-store.ts';
 import { withFirstFrameSignal, type GameSceneParams } from '../load-game-scene.ts';
 import { readCaller, readCamera, readView, snapshotVersion, type MutableCallerState } from '../render-snapshot.ts';
 import { describeRuntimeError, installFrameGlobals, type GameRenderEventKind } from './runtime-report.ts';
-import { FrameSampleWindow } from '../perf/frame-sampler.ts';
+import { FrameSampleWindow, type MutableFrameTimingSample } from '../perf/frame-sampler.ts';
 
 export type { GameRenderEventKind } from './runtime-report.ts';
 
@@ -63,7 +63,7 @@ interface Session {
   frame: ThreeFrame;
   probe: FrameSampleWindow | null;
   /** Reused probe sample: the opt-in perf path allocates nothing per frame either. */
-  probeSample: { cpuMs: number; intervalMs: number | null };
+  probeSample: MutableFrameTimingSample;
   lastDrawStart: number;
   drawnVersion: number;
   wantFrame: boolean;
@@ -136,13 +136,29 @@ function draw(s: Session) {
   frame.height = s.height;
   frame.pixelRatio = s.pixelRatio;
   frame.reducedMotion = s.view.reducedMotion;
+  // Same stage attribution as the JS path (ThreeCanvas.tsx): four extra
+  // clock reads per frame only while the probe is on.
+  const t0 = s.probe ? performance.now() : 0;
   built.update?.(frame, params);
+  const t1 = s.probe ? performance.now() : 0;
   advanceNodeFrame(renderer);
+  const t2 = s.probe ? performance.now() : 0;
   renderer.render(built.scene, built.camera);
+  const t3 = s.probe ? performance.now() : 0;
   s.args.context.present();
   if (s.probe) {
-    s.probeSample.cpuMs = Math.max(0, performance.now() - probeStart);
+    const t4 = performance.now();
+    s.probeSample.cpuMs = Math.max(0, t4 - probeStart);
     s.probeSample.intervalMs = probeInterval;
+    s.probeSample.updateMs = t1 - t0;
+    s.probeSample.nodeMs = t2 - t1;
+    s.probeSample.renderMs = t3 - t2;
+    s.probeSample.presentMs = t4 - t3;
+    const info = renderer.info?.render;
+    s.probeSample.drawCalls = info?.drawCalls ?? -1;
+    s.probeSample.triangles = info?.triangles ?? -1;
+    s.probeSample.bufferW = renderer.domElement?.width ?? -1;
+    s.probeSample.bufferH = renderer.domElement?.height ?? -1;
     const summary = s.probe.push(s.probeSample);
     if (summary) emit(s, 'perf', JSON.stringify(summary));
   }

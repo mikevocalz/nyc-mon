@@ -485,6 +485,13 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV2, materials:
   const bands: [number, number] = [0, 0];
   return {
     meshes,
+    /**
+     * The meshes whose draw state changes at run time: setFocus re-ranges
+     * both by z band around the Caller. A WebGPU render bundle freezes
+     * recorded draw parameters, so these must stay outside one
+     * (world/index.ts EXPERIMENTAL_WORLD_BUNDLES).
+     */
+    mutableMeshes: ([detailMesh, shadowMesh] as (Mesh | null)[]).filter((m): m is Mesh => m !== null),
     stats,
     /** Shop-sign lettering for the banded lettering mesh (street-furniture.ts). */
     texts,
