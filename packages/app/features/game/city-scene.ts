@@ -6,6 +6,7 @@ import type { ThreeContext, ThreeScene } from '@acme/ui/three';
 import type { CityDatasetV2 } from './city-dataset.ts';
 import type { ActorFrame, SceneActor, SceneActorFactory } from './scene-actor.ts';
 import { buildCityWorld } from './world/index.ts';
+import { EXPERIMENTAL_WORLD_POST, mountCityPostPipeline } from './post/pipeline.ts';
 import type { SkyName } from './world/sky-rig.ts';
 
 export interface CityCamera {
@@ -81,6 +82,13 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
     renderer.shadowMap.enabled = false;
     renderer.setClearColor(world.horizon, 1);
   }
+  // L5 "finishing pass": flagged post stack on the renderer — the mount
+  // swaps renderer.render for the RenderPipeline's quad path (post/pipeline.ts).
+  // Flag OFF mounts nothing and the direct path stays byte-identical.
+  const post =
+    renderer && EXPERIMENTAL_WORLD_POST
+      ? mountCityPostPipeline(THREE, { renderer, scene, camera })
+      : null;
   // The rig's async stage: HDR fetch + PMREM env. It resolves off the build
   // path — the fallback dome already renders, and a landed env invalidates
   // one redraw. Failure (float upload unverified on rn-webgpu) keeps the JSON
@@ -159,6 +167,7 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
     dispose: () => {
       if (disposed) return;
       disposed = true;
+      post?.dispose();
       for (const actor of actors) actor.dispose();
       world.dispose();
       scene.clear();
