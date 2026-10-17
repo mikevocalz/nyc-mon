@@ -69,11 +69,13 @@ describe('Login with Amazon profile mapping', () => {
       options: {
         config: Array<{
           disableImplicitSignUp?: boolean;
+          disableSignUp?: boolean;
           accountSubject?: (context: { profile: Record<string, unknown>; tokens: Record<string, unknown> }) => string | number | Promise<string | number>;
         }>;
       };
     }).options.config[0];
     expect(config?.disableImplicitSignUp).toBe(true);
+    expect(config?.disableSignUp).toBe(true);
     await expect(
       config?.accountSubject?.({
         profile: { user_id: 'amzn1.account.STABLE' },
