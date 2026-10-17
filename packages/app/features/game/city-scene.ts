@@ -136,6 +136,7 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
       scene.add(actor.object as InstanceType<typeof THREE.Object3D>);
     }
   } catch (error) {
+    post?.dispose();
     for (const actor of actors) actor.dispose();
     world.dispose();
     throw error;
