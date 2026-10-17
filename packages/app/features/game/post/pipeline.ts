@@ -142,17 +142,29 @@ const DEFAULT_POST_OPTIONS: Required<CityPostOptions> = {
  * Reads the per-effect env flags — each default-off, each independent. The
  * master flag gates the mount itself in city-scene.ts; these only shape the
  * chain. Injectable env keeps the truth tables testable.
+ *
+ * `base` is the L6 tier bundle's contribution (perf/tier.ts): flags are
+ * force-ON over it (a truthy flag wins; there is no force-off flag, the
+ * same truthy-only convention as the lanes), and the selectors override
+ * only when their env var is actually set.
  */
 export function resolvePostOptions(
   env: { [key: string]: string | undefined } = process.env,
+  base: CityPostOptions = {},
 ): Required<CityPostOptions> {
   return {
-    bloom: parseSkyRigFlag(env.EXPO_PUBLIC_WORLD_POST_BLOOM),
-    ao: parseSkyRigFlag(env.EXPO_PUBLIC_WORLD_POST_AO),
-    aa: parseSkyRigFlag(env.EXPO_PUBLIC_WORLD_POST_AA),
-    grade: parseSkyRigFlag(env.EXPO_PUBLIC_WORLD_POST_GRADE),
-    tier: parsePostTier(env.EXPO_PUBLIC_WORLD_POST_TIER),
-    toneMapping: parsePostToneMapping(env.EXPO_PUBLIC_WORLD_POST_TONEMAPPING),
+    bloom: parseSkyRigFlag(env.EXPO_PUBLIC_WORLD_POST_BLOOM) || base.bloom === true,
+    ao: parseSkyRigFlag(env.EXPO_PUBLIC_WORLD_POST_AO) || base.ao === true,
+    aa: parseSkyRigFlag(env.EXPO_PUBLIC_WORLD_POST_AA) || base.aa === true,
+    grade: parseSkyRigFlag(env.EXPO_PUBLIC_WORLD_POST_GRADE) || base.grade === true,
+    tier:
+      env.EXPO_PUBLIC_WORLD_POST_TIER !== undefined
+        ? parsePostTier(env.EXPO_PUBLIC_WORLD_POST_TIER)
+        : (base.tier ?? 'phone'),
+    toneMapping:
+      env.EXPO_PUBLIC_WORLD_POST_TONEMAPPING !== undefined
+        ? parsePostToneMapping(env.EXPO_PUBLIC_WORLD_POST_TONEMAPPING)
+        : (base.toneMapping ?? 'none'),
   };
 }
 

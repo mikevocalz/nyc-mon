@@ -6,7 +6,9 @@ import type { ThreeContext, ThreeScene } from '@acme/ui/three';
 import type { CityDatasetV2 } from './city-dataset.ts';
 import type { ActorFrame, SceneActor, SceneActorFactory } from './scene-actor.ts';
 import { buildCityWorld } from './world/index.ts';
-import { EXPERIMENTAL_WORLD_POST, mountCityPostPipeline } from './post/pipeline.ts';
+import { EXPERIMENTAL_WORLD_POST, mountCityPostPipeline, resolvePostOptions } from './post/pipeline.ts';
+import { EXPERIMENTAL_WORLD_RENDER_SCALE, mountRenderScale } from './perf/render-scale.ts';
+import { tierBundle, WORLD_TIER, WORLD_TIER_SELECTED } from './perf/tier.ts';
 import type { SkyName } from './world/sky-rig.ts';
 
 export interface CityCamera {
@@ -70,7 +72,15 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(50, 1, 0.5, 10_000);
-  const world = buildCityWorld(THREE, dataset, { sky: initial.sky });
+  // L6 "holding frame rate": the tier bundle contributes the option
+  // defaults the lower lanes expose (env size, glass tier, post picks)
+  // when the selector is set or the render-scale controller is on — with
+  // neither, every lane keeps its own defaults (perf/tier.ts).
+  const bundle = WORLD_TIER_SELECTED || EXPERIMENTAL_WORLD_RENDER_SCALE ? tierBundle(WORLD_TIER) : null;
+  const world = buildCityWorld(THREE, dataset, {
+    sky: initial.sky,
+    ...(bundle ? { glassTier: bundle.glassTier, envWidth: bundle.envWidth } : {}),
+  });
   scene.add(world.sky, world.group);
   scene.fog = world.fog;
   // react-native-webgpu renders black through three's output pass, shadow
@@ -87,7 +97,22 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
   // Flag OFF mounts nothing and the direct path stays byte-identical.
   const post =
     renderer && EXPERIMENTAL_WORLD_POST
-      ? mountCityPostPipeline(THREE, { renderer, scene, camera })
+      ? mountCityPostPipeline(THREE, {
+          renderer,
+          scene,
+          camera,
+          // The bundle's post picks are the base; the per-effect env
+          // flags force on over it (resolvePostOptions).
+          options: resolvePostOptions(process.env, bundle?.post ?? {}),
+        })
+      : null;
+  // The render-scale controller samples draw pacing from this scene's
+  // update clock and steps the drawing buffer through the pixel ratio.
+  // It cannot fix the UI-thread/Rive ceiling — GPU-side gains are
+  // reported separately on device (perf/render-scale.ts header).
+  const renderScale =
+    renderer && EXPERIMENTAL_WORLD_RENDER_SCALE && bundle
+      ? mountRenderScale(renderer, { band: bundle.scale.band, floor: bundle.scale.floor })
       : null;
   // The rig's async stage: HDR fetch + PMREM env. It resolves off the build
   // path — the fallback dome already renders, and a landed env invalidates
@@ -143,8 +168,12 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
     camera,
     update: (frame, params) => {
       if (params.dataset !== initial.dataset) throw new Error('Remount city scene when changing datasets');
+      const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      // Frame pacing for the scale controller: the interval between these
+      // calls is the draw cadence — JS submission pacing, not GPU or UI
+      // thread time (perf/render-scale.ts header says what it is not).
+      renderScale?.frame(now, frame.pixelRatio);
       if (actors.length > 0) {
-        const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
         let delta = frame.delta > 0 ? frame.delta : 0;
         // A redraw requested by a moving actor: measure the gap ourselves. The first frame after rest moves nothing.
         if (delta === 0 && moving && lastActorTick > 0) delta = Math.min(Math.max((now - lastActorTick) / 1000, 0), 0.1);
@@ -163,10 +192,13 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
       if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return;
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
+      // The canvas just re-stamped the raw device pixel ratio — re-apply the scale.
+      renderScale?.resized();
     },
     dispose: () => {
       if (disposed) return;
       disposed = true;
+      renderScale?.dispose();
       post?.dispose();
       for (const actor of actors) actor.dispose();
       world.dispose();

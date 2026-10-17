@@ -280,10 +280,15 @@ export function createSkyDomeMaterial(
  * v = asin(y)/π + 0.5 sampling matches without depending on the WebGPU
  * backend's flipY pass.
  */
-export function bakeSkyEquirect(THREE: Three, sky: SkyLighting): DataTextureT {
+export function bakeSkyEquirect(
+  THREE: Three,
+  sky: SkyLighting,
+  width: number = SKY_RIG.envWidth,
+  height: number = SKY_RIG.envHeight,
+): DataTextureT {
   assertSkyLighting(sky);
-  const w = SKY_RIG.envWidth;
-  const h = SKY_RIG.envHeight;
+  const w = width;
+  const h = height;
   const data = new Uint16Array(w * h * 4);
   const toHalf = THREE.DataUtils.toHalfFloat;
   const sun = sunKeyLight(sky);
@@ -377,6 +382,13 @@ export interface SkyRigRequest {
   equirect?: TextureT | null;
   /** Equirect loader override — tests inject a stub so nothing hits the network. */
   loadEquirect?: (THREE: Three, sky: SkyLighting) => Promise<TextureT | null>;
+  /**
+   * Environment equirect width in px — the L6 tier's env-size pick.
+   * PMREM cube = width/4 (PMREMGenerator.fromEquirectangular), so 1024 is
+   * the 256px phone env and 2048 the 512px high env. Height is width/2.
+   * Default SKY_RIG.envWidth.
+   */
+  envWidth?: number;
 }
 
 /**
@@ -388,6 +400,9 @@ export interface SkyRigRequest {
 export function createSkyRig(THREE: Three, request: SkyRigRequest = {}) {
   const name = request.sky ?? 'dusk';
   const sky = SKY_PRESETS[name];
+  // The tier's env-size pick (L6): equirect width → PMREM cube = width/4.
+  const envWidth = request.envWidth ?? SKY_RIG.envWidth;
+  const envHeight = Math.max(2, Math.floor(envWidth / 2));
   assertSkyLighting(sky);
   const key = sunKeyLight(sky);
 
@@ -450,11 +465,12 @@ export function createSkyRig(THREE: Three, request: SkyRigRequest = {}) {
       }
     }
 
-    // Env input: the HDR downsampled to 1k (→ PMREM 256 cube), else the baked
-    // SH equirect — either way the env comes from this one sky asset.
+    // Env input: the HDR downsampled to envWidth (→ PMREM envWidth/4 cube;
+    // 1k → 256 on the phone tier), else the baked SH equirect — either way
+    // the env comes from this one sky asset.
     const envSource = equirect
-      ? downsampleEquirect(THREE, equirect, SKY_RIG.envWidth)
-      : { texture: bakeSkyEquirect(THREE, sky), owned: true };
+      ? downsampleEquirect(THREE, equirect, envWidth)
+      : { texture: bakeSkyEquirect(THREE, sky, envWidth, envHeight), owned: true };
     try {
       const pmrem = new THREE.PMREMGenerator(renderer);
       const rt = pmrem.fromEquirectangular(envSource.texture);

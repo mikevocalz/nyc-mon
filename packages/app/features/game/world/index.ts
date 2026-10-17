@@ -57,13 +57,19 @@ export interface CityWorldOptions {
   glass?: boolean;
   /** L3 interior tier — 'full' maps room boxes, 'flat' is the cheap phone path. Default 'full'. */
   glassTier?: GlassTier;
+  /**
+   * L6 tier pick: the sky rig's environment equirect width (PMREM cube =
+   * width/4 — 1024 → 256px, 2048 → 512px). Only read while `skyRig` is
+   * on; default SKY_RIG.envWidth.
+   */
+  envWidth?: number;
   /** L3 lit-room share by time of day, 0 = day … 1 = night. Default comes from `sky`. */
   timeOfDay?: number;
 }
 
 export function buildCityWorld(THREE: Three, dataset: CityDatasetV2, options: CityWorldOptions = {}) {
   const skyRig = (options.skyRig ?? EXPERIMENTAL_SKY_RIG)
-    ? createSkyRig(THREE, { sky: options.sky })
+    ? createSkyRig(THREE, { sky: options.sky, envWidth: options.envWidth })
     : null;
   // One sun direction feeds everything: the rig's JSON sunDirection when
   // flagged, the hardcoded dusk SUN otherwise — the cel key, the contact
