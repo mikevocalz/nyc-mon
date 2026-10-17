@@ -14,7 +14,16 @@ import { createCityMaterials, linearColor } from './materials.ts';
 import { createPbrCityMaterials, EXPERIMENTAL_WORLD_PBR } from './pbr-materials.ts';
 import { createGlassCityMaterials, EXPERIMENTAL_WORLD_GLASS, type GlassTier } from './glass.ts';
 import { applyCarPbrMaterial, EXPERIMENTAL_WORLD_CAR_PBR } from './car-materials.ts';
-import { createSkyRig, EXPERIMENTAL_SKY_RIG, type SkyName } from './sky-rig.ts';
+import { createSkyRig, EXPERIMENTAL_SKY_RIG, parseSkyRigFlag, type SkyName } from './sky-rig.ts';
+
+/**
+ * Lane G1 "GPU budget": record the immutable city into one WebGPU render
+ * bundle (three r186 `BundleGroup`, renderers/common/BundleGroup.js), so its
+ * draws are encoded once and replayed via `executeBundles` instead of
+ * re-encoded through JSI every frame. Defaults to
+ * EXPO_PUBLIC_WORLD_BUNDLES — off unless set.
+ */
+export const EXPERIMENTAL_WORLD_BUNDLES = parseSkyRigFlag(process.env.EXPO_PUBLIC_WORLD_BUNDLES);
 
 /**
  * Dusk sun, low in the south-west (about 25 degrees up): long light on the
@@ -75,6 +84,11 @@ export interface CityWorldOptions {
    * when unflagged). Works over either lane's other materials.
    */
   carPbr?: boolean;
+  /**
+   * Lane G1: record the static city into a WebGPU render bundle
+   * (EXPERIMENTAL_WORLD_BUNDLES). See buildCityWorld for what stays out.
+   */
+  bundles?: boolean;
 }
 
 export function buildCityWorld(THREE: Three, dataset: CityDatasetV2, options: CityWorldOptions = {}) {
@@ -137,7 +151,33 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV2, options: Ci
   const hemi = new THREE.HemisphereLight(linearColor(THREE, 'hemiSky'), linearColor(THREE, 'hemiGround'), 1.6);
   const sun = skyRig?.sun ?? new THREE.DirectionalLight(linearColor(THREE, 'sun'), 2.2);
   if (!skyRig) sun.position.set(SUN[0] * 1000, SUN[1] * 1000, SUN[2] * 1000);
-  group.add(ground, ...city.meshes, ...trees.objects, ...furniture.objects, ...props.objects, hemi, sun, sun.target);
+  const bundles = options.bundles ?? EXPERIMENTAL_WORLD_BUNDLES;
+  if (bundles) {
+    // WebGPU render bundles (three r186 BundleGroup): the immutable meshes
+    // record once and replay as one executeBundles call per frame. Bundles
+    // execute before the scene's opaque and transparent lists
+    // (renderers/common/Renderer.js: bundles, then opaque, then
+    // transparents), which forces two membership decisions:
+    //
+    // - The sky dome must record WITH them. It is depthTest:false and draws
+    //   first only thanks to renderOrder -10 — left outside, the bundle would
+    //   draw the city and the dome would then paint over it. Inside the
+    //   bundle its own renderOrder still leads the bundle's list, and the
+    //   per-frame SHARED refresh keeps its camera-following uniforms
+    //   (NodeMaterialObserver.needsRefresh, materials/nodes/manager).
+    // - The meshes setFocus re-ranges per move (contact shadows, street
+    //   detail) and every instanced set whose count or visibility changes
+    //   (trees, furniture, props) stay out: a static bundle freezes the draw
+    //   parameters recorded at first render. Lights are not allowed inside a
+    //   BundleGroup at all.
+    const bundle = new THREE.BundleGroup();
+    bundle.name = 'city:bundle';
+    const mutable = new Set(city.mutableMeshes);
+    bundle.add(sky, ground, ...city.meshes.filter((m) => !mutable.has(m)));
+    group.add(bundle, ...city.mutableMeshes, ...trees.objects, ...furniture.objects, ...props.objects, hemi, sun, sun.target);
+  } else {
+    group.add(ground, ...city.meshes, ...trees.objects, ...furniture.objects, ...props.objects, hemi, sun, sun.target);
+  }
 
   const horizon = skyRig?.horizon ?? linearColor(THREE, 'skyHorizon');
   const fog = skyRig?.fog ?? new THREE.Fog(horizon, 600, 2500);
@@ -152,6 +192,8 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV2, options: Ci
   return {
     group,
     sky,
+    /** True when the sky dome records into the render bundle: it is then a child of `group`, not the scene. */
+    skyBundled: bundles,
     fog,
     horizon,
     /** The L1 rig when flagged, else null — city-scene uses it to attach env. */

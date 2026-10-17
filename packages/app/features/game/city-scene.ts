@@ -92,7 +92,11 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
     sky: initial.sky,
     ...(bundle ? { glassTier: bundle.glassTier, envWidth: bundle.envWidth } : {}),
   });
-  scene.add(world.sky, world.group);
+  // With render bundles on, the sky dome records into the bundle (it must
+  // draw first and bundles execute before the opaque list) — it is then a
+  // child of world.group already (world/index.ts).
+  if (world.skyBundled) scene.add(world.group);
+  else scene.add(world.sky, world.group);
   scene.fog = world.fog;
   // react-native-webgpu renders black through three's output pass, shadow
   // maps and Color backgrounds (metro-live README): linear output, no tone
