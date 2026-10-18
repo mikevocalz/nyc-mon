@@ -176,6 +176,12 @@ export interface PedSpawnSpec {
   readonly xwalk?: string;
   /** Post-cross stroll distance before turning back for the next crossing ('loop'). Default 14–38 m seeded. */
   readonly strollMetres?: number;
+  /**
+   * PR09: marks an auto-populated crowd member (the spawner sets it).
+   * Tier step-downs may retire ambient peds; scripted scenario spawns
+   * never carry the flag and are never culled.
+   */
+  readonly ambient?: boolean;
 }
 
 export interface PedSimOptions {
@@ -361,6 +367,15 @@ interface Ped {
   prevYaw: number;
   age: number;
   flags: number;
+  /** PR09: auto-spawned crowd member — the tier caps may retire it early. */
+  ambient: boolean;
+  /**
+   * PR09: tier step-down marked this ambient ped for removal — it is
+   * culled by the spawner pass once it sits beyond the anti-pop distance
+   * (`spawnMinDistance`), so the crowd thins off-camera rather than
+   * popping mid-sidewalk.
+   */
+  retiring: boolean;
 }
 
 export class PedSim {
@@ -372,7 +387,8 @@ export class PedSim {
   private readonly peds: Ped[] = [];
   private nextPedId = 1;
   private spawnAcc = 0;
-  private readonly targetPeds: number;
+  /** PR09: mutable — the tier system retargets the ambient population live. */
+  private targetPeds: number;
   private readonly spawnMinDistance: number;
   private readonly despawnDistance: number;
   private readonly advanceSignals: boolean;
@@ -419,6 +435,33 @@ export class PedSim {
   setFocus(x: number, z: number): void {
     this.focusX = x;
     this.focusZ = z;
+  }
+
+  /**
+   * PR09: retarget the crowd cap live (the actor-tier step-down). Raising
+   * the target lets the spawner refill; lowering it retires the excess
+   * *ambient* peds — farthest from focus first — which the spawner pass
+   * despawns once they sit beyond the anti-pop distance. Scripted slice
+   * spawns are never marked, so a target below the scripted count leaves
+   * the scenario untouched.
+   */
+  setTargetPeds(target: number): void {
+    this.targetPeds = Math.max(0, Math.floor(target));
+    for (const p of this.peds) p.retiring = false;
+    let excess = this.peds.length - this.targetPeds;
+    if (excess <= 0) return;
+    const ambient = this.peds.filter((p) => p.ambient);
+    if (Number.isFinite(this.focusX)) {
+      ambient.sort(
+        (a, b) =>
+          Math.hypot(b.x - this.focusX, b.z - this.focusZ) - Math.hypot(a.x - this.focusX, a.z - this.focusZ),
+      );
+    }
+    for (const p of ambient) {
+      if (excess <= 0) break;
+      p.retiring = true;
+      excess--;
+    }
   }
 
   // --- Static indexes ---------------------------------------------------------------
@@ -721,6 +764,8 @@ export class PedSim {
       prevYaw: 0,
       age: 0,
       flags: 0,
+      ambient: spec.ambient === true,
+      retiring: false,
     };
     this.poseOnBand(ped, ped.element, ped.s, ped.lat);
     if (plan === 'loop') {
@@ -1424,8 +1469,13 @@ export class PedSim {
     this.spawnAcc = 0;
     if (Number.isFinite(this.focusX)) {
       for (const p of [...this.peds]) {
-        if (Math.hypot(p.x - this.focusX, p.z - this.focusZ) > this.despawnDistance) this.despawn(p);
+        const d = Math.hypot(p.x - this.focusX, p.z - this.focusZ);
+        // PR09: retiring ambient peds are culled past the anti-pop radius
+        // so the lower tier actually sheds its cost without a visible pop.
+        if (d > this.despawnDistance || (p.retiring && d > this.spawnMinDistance)) this.despawn(p);
       }
+    } else {
+      for (const p of [...this.peds]) if (p.retiring) this.despawn(p);
     }
     if (this.peds.length >= this.targetPeds || this.spawnCandidates.length === 0) return;
     const band = this.spawnCandidates[Math.floor(this.rng() * this.spawnCandidates.length)]!;
@@ -1437,7 +1487,7 @@ export class PedSim {
     for (const p of this.peds) {
       if (Math.hypot(p.x - SCRATCH.x, p.z - SCRATCH.z) < PED_SPAWN_HEAD_CLEARANCE) return;
     }
-    this.spawn({ kind: this.autoSpawnKind(), walk: band.id, s, plan: 'wander', dir: this.rng() < 0.5 ? 1 : -1 });
+    this.spawn({ kind: this.autoSpawnKind(), walk: band.id, s, plan: 'wander', dir: this.rng() < 0.5 ? 1 : -1, ambient: true });
   }
 
   // --- Views ----------------------------------------------------------------------------

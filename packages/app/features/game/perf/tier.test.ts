@@ -10,7 +10,18 @@ import { resolvePostOptions } from '../post/pipeline.ts';
 import { buildCityWorld } from '../world/index.ts';
 import { bakeSkyEquirect, SKY_RIG } from '../world/sky-rig.ts';
 import { syntheticTileV2 } from '../world/synthetic-tile.ts';
-import { parseWorldTier, TIER, tierBundle, WORLD_TIER } from './tier.ts';
+import {
+  createLivingCityAdaptive,
+  LIVING_CITY_ADAPTIVE_SCALE,
+  LIVING_CITY_CAPS,
+  livingCityCapsFor,
+  parseLivingCityTier,
+  parseWorldTier,
+  resolveLivingCityTier,
+  TIER,
+  tierBundle,
+  WORLD_TIER,
+} from './tier.ts';
 import { RENDER_SCALE_FLOOR } from './render-scale.ts';
 
 test('the selector only honours "high"; everything else is the phone tier', () => {
@@ -97,4 +108,68 @@ test('buildCityWorld accepts the bundle options without changing the flags', () 
   });
   assert.ok(world.skyRig, 'the sky rig still mounts behind its flag');
   world.dispose();
+});
+
+// --- PR09: Living City actor/LOD caps -------------------------------------------------
+
+test('PR09: every world tier names a living-city rung', () => {
+  assert.equal(tierBundle('phone').livingCity, 'medium');
+  assert.equal(tierBundle('high').livingCity, 'high');
+});
+
+test('PR09: the living-city selector honours the four rungs, rejects the rest', () => {
+  for (const t of ['low', 'LOW', ' Low ', 'medium', 'MEDIUM', 'high', ' High', 'xr', 'XR']) {
+    assert.ok(parseLivingCityTier(t) !== null, t);
+  }
+  assert.equal(parseLivingCityTier('low'), 'low');
+  assert.equal(parseLivingCityTier('medium'), 'medium');
+  assert.equal(parseLivingCityTier('high'), 'high');
+  assert.equal(parseLivingCityTier('xr'), 'xr');
+  for (const bad of [undefined, null, '', '  ', 'ultra', '0', 'phone']) {
+    assert.equal(parseLivingCityTier(bad), null, String(bad));
+  }
+});
+
+test('PR09: the xr rung is the authored ceiling — reserved for a headset measurement', () => {
+  // 'xr' deliberately equals 'high': there is no measured headset budget to
+  // raise counts into, so the rung reserves the selector name only.
+  assert.deepEqual(livingCityCapsFor('xr'), livingCityCapsFor('high'));
+});
+
+test('PR09: with nothing selected the living city keeps the authored counts', () => {
+  // Neither EXPO_PUBLIC_LIVING_CITY_TIER nor EXPO_PUBLIC_WORLD_TIER is set
+  // in this test process — the resolution must land on 'high', which the
+  // living-city tests pin against the authored PR05–07 constants.
+  assert.equal(resolveLivingCityTier(), 'high');
+  const high = livingCityCapsFor('high');
+  assert.equal(high.vehicles, 12);
+  assert.equal(high.peds, 16);
+  assert.equal(high.lampGlow, true);
+  // And the ordering is monotone where it matters.
+  assert.ok(LIVING_CITY_CAPS.low.vehicles < LIVING_CITY_CAPS.medium.vehicles);
+  assert.ok(LIVING_CITY_CAPS.medium.vehicles < LIVING_CITY_CAPS.high.vehicles);
+  assert.ok(LIVING_CITY_CAPS.low.peds < LIVING_CITY_CAPS.medium.peds);
+  assert.ok(LIVING_CITY_CAPS.medium.peds < LIVING_CITY_CAPS.high.peds);
+  assert.equal(LIVING_CITY_CAPS.low.lampGlow, false);
+  assert.ok(LIVING_CITY_CAPS.low.signalHeadCap < LIVING_CITY_CAPS.high.signalHeadCap);
+});
+
+test('PR09: the adaptive stepper walks high→medium→low on surrendering scale, never back up', () => {
+  const a = createLivingCityAdaptive();
+  assert.equal(a.frame(1, 'high'), null, 'full resolution — nothing to do');
+  assert.equal(a.frame(LIVING_CITY_ADAPTIVE_SCALE + 0.01, 'high'), null, 'above the mark');
+  assert.equal(a.frame(LIVING_CITY_ADAPTIVE_SCALE, 'high'), 'medium', 'first mark → medium');
+  assert.equal(a.frame(0.74, 'medium'), null, 'same scale again — the mark moved');
+  assert.equal(a.frame(LIVING_CITY_ADAPTIVE_SCALE * 0.75, 'medium'), 'low', 'second mark → low');
+  assert.equal(a.frame(0.3, 'low'), null, 'floored at low — stops evaluating');
+  // A second stepper shows the rule never steps up.
+  const b = createLivingCityAdaptive();
+  assert.equal(b.frame(0.5, 'high'), 'medium');
+  assert.equal(b.frame(1, 'medium'), null, 'recovered scale does not re-fill');
+  // 'low' as the starting tier never steps.
+  const c = createLivingCityAdaptive();
+  assert.equal(c.frame(0.2, 'low'), null);
+  // 'xr' sits above 'high' in the walk: it steps down through it.
+  const d = createLivingCityAdaptive();
+  assert.equal(d.frame(0.5, 'xr'), 'high');
 });

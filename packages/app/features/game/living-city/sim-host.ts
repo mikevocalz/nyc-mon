@@ -191,6 +191,18 @@ export class LivingCityHost {
     this.sinks.delete(sink);
   }
 
+  /**
+   * PR09: retarget the ambient populations live — the actor-tier
+   * step-down. Population caps are the only tier knob that can move after
+   * mount (the viz near-field caps and the lamp actor are baked per
+   * scene); the sims converge gracefully — see
+   * VehicleSim.setTargetVehicles / PedSim.setTargetPeds.
+   */
+  setPopulationCaps(caps: { readonly vehicles?: number; readonly peds?: number }): void {
+    if (caps.vehicles !== undefined) this.sim.setTargetVehicles(caps.vehicles);
+    if (caps.peds !== undefined) this.pedSim.setTargetPeds(caps.peds);
+  }
+
   /** A renderer started consuming: start ticking when the first arrives. */
   attach(): void {
     this.consumers++;
