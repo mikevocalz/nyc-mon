@@ -36,6 +36,26 @@ Duo above (same method and honesty bar as the M0 baseline). Full report:
 - [ ] **Landmark identification in captured frames (Apollo marquee, E3):** PENDING — frames captured, visual ID belongs to the F3 critique pass.
 - [ ] **iPhone SE 3 class run (spec D2):** PENDING — the Duo is the only bench device.
 
+## PR09 — Living City perf + adaptive quality on the bench Duo (2026-10-17)
+
+Lane `lane-lc-perf`, release build with `EXPO_PUBLIC_GAME_PERF=1` +
+`EXPO_PUBLIC_LIVING_CITY=1` verified on the physical Surface Duo above
+(same method and honesty bar as M0/F1). Full report:
+`docs/living-city/pr09-perf.md`; artifacts:
+`/Users/mikevocalz/nyc-mon-artifacts/pr09-duo/`.
+
+- [x] **Living city runs on hardware:** flag-on release build mounted the full actor set (vehicles, peds, signal heads/ped displays, lamp glows) — draw calls 53–54 vs F1's 40–41, triangles ~319–335 k vs ~310 k, consistent with the PR07 arithmetic budget.
+- [x] **Scripted drive near ACP:** ~86 s stick-held drive (35 s north + 50 s east) from the Apollo spawn; gfxinfo p50 15 ms / p90 30 / p95 34 / p99 40, janky 33.3 % (n = 3 713) — at/below the 36 ms M0/F1 baseline; window composition caveats in the report (not claimed as an improvement).
+- [x] **JS submission under living-city load:** `[NYC-Mon/perf]` cpuP50 ~10.4 ms during drive windows (F1: 17.3) — submission cost, not GPU completion.
+- [x] **Adaptive render scale:** controller held buffer at 2160×1440 (0.80×) the entire session — engaged before scene build, never oscillated.
+- [x] **Actor/LOD tiers landed:** `EXPO_PUBLIC_LIVING_CITY_TIER` = low/medium/high/xr over the world-tier row, default `high` = byte-identical authored counts; ambient population retargets live via `setTargetVehicles`/`setTargetPeds` (scripted spawns never culled; off-camera retirement).
+- [x] **Posture cycle:** `cmd device_state` overrides OPENED→HALF_OPENED→FOLDED→CLOSED→OPENED — scene alive at every posture, no crash/ANR/restart, controller pill re-laid out.
+- [x] **Background/foreground:** HOME parked the process (perf windows gapped ~21 s), `nycmon://game` resume on same PID, no duplicate ticker, state continuous.
+- [ ] **Physical hinge fold:** PENDING — `cmd device_state` overrides the reported posture but did not change display geometry on this unit; a real fold needs hands on the device.
+- [ ] **Crowd step-down observed live:** PENDING — scale held 0.80 ≥ the 0.75 trigger mark; stepper is node-test covered but never fired on device.
+- [ ] **Memory growth attribution:** PENDING — PSS rose 735,846 → 916,798 kB over the session (F1: +20 MB over its walk); needs a heap breakdown.
+- [ ] **GPU completion timing:** PENDING — capped 4 950 ms histogram tail bucket, timestamp queries still unenabled (inherited from M0/F1).
+
 ## Rendering
 
 - [ ] **HolographicTerrain, NeonTide, CityHeightfield on native** (react-native-webgpu): render, present, touch lift, AppState pause. The iOS bundle includes `three/webgpu`, but nothing has rendered on a device. Android hasn't been bundled at all.

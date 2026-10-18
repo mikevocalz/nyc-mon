@@ -141,6 +141,12 @@ export interface SpawnSpec {
   readonly route?: readonly string[];
   /** Vehicle holds position until this sim-time (a stalled queue / double-parked stand-in for tests). */
   readonly holdUntil?: number;
+  /**
+   * PR09: marks an auto-populated fleet member (the spawner sets it).
+   * Tier step-downs may retire ambient vehicles; scripted scenario spawns
+   * never carry the flag and are never culled.
+   */
+  readonly ambient?: boolean;
 }
 
 export interface VehicleSimOptions {
@@ -306,6 +312,15 @@ interface Vehicle {
   age: number;
   /** Route exhausted at the element end: despawn when the element finishes. */
   leaving: boolean;
+  /** PR09: auto-spawned fleet member — the tier caps may retire it early. */
+  ambient: boolean;
+  /**
+   * PR09: tier step-down marked this ambient vehicle for removal — it is
+   * culled by the spawner pass once it sits beyond the anti-pop distance,
+   * so the crowd thins off-camera rather than popping on screen and never
+   * runs a signal it should have read.
+   */
+  retiring: boolean;
   /** Last computed VFLAG bits for the snapshot. */
   flagsCache: number;
 }
@@ -326,7 +341,8 @@ export class VehicleSim {
   private readonly vehicles: Vehicle[] = [];
   private nextVehicleId = 1;
   private spawnAcc = 0;
-  private readonly targetVehicles: number;
+  /** PR09: mutable — the tier system retargets the ambient population live. */
+  private targetVehicles: number;
   private readonly spawnMinDistance: number;
   private readonly despawnDistance: number;
   private focusX = Number.NaN;
@@ -380,6 +396,33 @@ export class VehicleSim {
    */
   setEnvironment(env: SimEnvironment): void {
     this.env = env;
+  }
+
+  /**
+   * PR09: retarget the fleet cap live (the actor-tier step-down). Raising
+   * the target just lets the spawner refill; lowering it retires the
+   * excess *ambient* vehicles — farthest from focus first — which the
+   * spawner pass then despawns once they sit beyond the anti-pop distance
+   * (`spawnMinDistance`). Scripted slice spawns are never marked, so a
+   * target below the scripted count leaves the scenario untouched.
+   */
+  setTargetVehicles(target: number): void {
+    this.targetVehicles = Math.max(0, Math.floor(target));
+    for (const v of this.vehicles) v.retiring = false;
+    let excess = this.vehicles.length - this.targetVehicles;
+    if (excess <= 0) return;
+    const ambient = this.vehicles.filter((v) => v.ambient);
+    if (Number.isFinite(this.focusX)) {
+      ambient.sort(
+        (a, b) =>
+          Math.hypot(b.x - this.focusX, b.z - this.focusZ) - Math.hypot(a.x - this.focusX, a.z - this.focusZ),
+      );
+    }
+    for (const v of ambient) {
+      if (excess <= 0) break;
+      v.retiring = true;
+      excess--;
+    }
   }
 
   // --- Element geometry -----------------------------------------------------------
@@ -547,6 +590,8 @@ export class VehicleSim {
       prevYaw: 0,
       age: 0,
       leaving: false,
+      ambient: spec.ambient === true,
+      retiring: false,
       flagsCache: 0,
     };
     this.poseAt(v.element, 'lane', v.s - v.len / 2, SCRATCH_POSE);
@@ -896,12 +941,20 @@ export class VehicleSim {
     // target check below must see the freed slots or the fleet stalls.
     if (Number.isFinite(this.focusX)) {
       for (const v of [...this.vehicles]) {
-        if (Math.hypot(v.x - this.focusX, v.z - this.focusZ) > this.despawnDistance) this.despawn(v);
+        const d = Math.hypot(v.x - this.focusX, v.z - this.focusZ);
+        // PR09: retiring ambient vehicles are culled past the anti-pop
+        // radius — invisible (or nearly so), and sooner than the
+        // retention distance so the lower tier actually sheds its cost.
+        if (d > this.despawnDistance || (v.retiring && d > this.spawnMinDistance)) this.despawn(v);
       }
+    } else {
+      // No focus yet: retiring marks still apply — cull them outright,
+      // nothing is rendering to pop.
+      for (const v of [...this.vehicles]) if (v.retiring) this.despawn(v);
     }
     if (this.vehicles.length >= this.targetVehicles) return;
     const lane = this.autoSpawnLane();
-    if (lane) this.spawn({ kind: this.autoSpawnKind(), lane: lane.id, s: 0 });
+    if (lane) this.spawn({ kind: this.autoSpawnKind(), lane: lane.id, s: 0, ambient: true });
   }
 
   // --- Views ------------------------------------------------------------------------

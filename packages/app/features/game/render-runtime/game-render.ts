@@ -21,10 +21,10 @@ import type { NativeCanvasContext, ThreeFrame, ThreeScene } from '@acme/ui/three
 import { bundledCity } from '../city-data.ts';
 import { createCityScene } from '../city-scene.ts';
 import { createCallerProxyWith } from '../character/caller-proxy.ts';
-import type { CallerState } from '../character/caller-store.ts';
 import { withFirstFrameSignal, type GameSceneParams } from '../load-game-scene.ts';
 import { bundledSignals } from '../living-city/bundled-signals.ts';
 import { bundledTopology } from '../living-city/bundled-topology.ts';
+import { livingCityCaps } from '../living-city/bundled-host.ts';
 import { createLampActor, lampPlacements } from '../living-city/lamp-viz.ts';
 import { createPedActor } from '../living-city/ped-actor.ts';
 import { createSignalActor } from '../living-city/signal-viz.ts';
@@ -324,15 +324,25 @@ export function startGameRender(args: GameRenderArgs): void {
               const signals = bundledSignals();
               const focus = () => ({ x: s.camera.x, z: s.camera.z });
               const read = () => args.vehicles?.getDirty();
+              // PR09: the same resolved caps as the JS path — the tier is
+              // resolved identically on this runtime (env is inlined at
+              // bundle time), so both render paths mount the same set.
+              const caps = livingCityCaps();
               return [
                 createVehicleActor({ read }),
                 createPedActor({ read }),
-                ...(topology && signals ? [createSignalActor({ read, signals, topology, focus })] : []),
-                createLampActor({
-                  read,
-                  placements: lampPlacements(city.dataset, createStreetClearance(city.dataset)),
-                  focus,
-                }),
+                ...(topology && signals
+                  ? [createSignalActor({ read, signals, topology, focus, headCap: caps.signalHeadCap, pedCap: caps.pedBoxCap })]
+                  : []),
+                ...(caps.lampGlow
+                  ? [
+                      createLampActor({
+                        read,
+                        placements: lampPlacements(city.dataset, createStreetClearance(city.dataset)),
+                        focus,
+                      }),
+                    ]
+                  : []),
               ];
             })()
           : []),
