@@ -6,12 +6,13 @@ import { PressScale } from './press-scale';
 import { Text, View } from './tw';
 
 /** A provider rendered by {@linkcode AuthProviderButton}. */
-export type AuthProvider = 'apple' | 'google' | 'passkey' | 'email';
+export type AuthProvider = 'amazon' | 'apple' | 'google' | 'passkey' | 'email';
 
 /** The account flow whose wording is rendered by {@linkcode AuthProviderButton}. */
 export type AuthIntent = 'create' | 'sign-in';
 
 const AUTH_PROVIDER_LABELS = {
+  amazon: { create: 'Create account with Amazon', 'sign-in': 'Sign in with Amazon' },
   apple: { create: 'Create account with Apple', 'sign-in': 'Sign in with Apple' },
   google: { create: 'Create account with Google', 'sign-in': 'Sign in with Google' },
   passkey: { create: 'Create a passkey', 'sign-in': 'Sign in with a passkey' },
@@ -32,6 +33,7 @@ const providerButton = tv({
   variants: {
     provider: {
       // Semantic text/background tokens invert with the active scheme: black/white by day, white/black at night.
+      amazon: { root: 'border-orange-700 bg-surface-raised', label: 'text-text' },
       apple: { root: 'border-text bg-text', label: 'text-bg' },
       google: { root: 'border-concrete-300 bg-surface-raised', label: 'text-text' },
       passkey: { root: 'border-text-muted bg-surface-raised', label: 'text-text' },
@@ -83,8 +85,8 @@ export function AuthProviderButton({
   const styles = providerButton({ provider, disabled: off });
   const label = labelProp ?? AUTH_PROVIDER_LABELS[provider][intent];
 
-  // TODO(assets): add packages/assets/apple-logo.svg and packages/assets/google-g-logo.svg;
-  // until those brand-supplied files exist, Apple and Google intentionally remain text-only.
+  // TODO(assets): add provider-approved Apple, Google and Amazon marks.
+  // Until those brand-supplied files exist, those providers intentionally remain text-only.
   return (
     <PressScale
       onPress={off ? undefined : onPress}

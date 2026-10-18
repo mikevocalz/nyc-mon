@@ -17,7 +17,7 @@ export type LinkPageKind = 'sign-in' | 'consent' | 'refused';
 /** What a linking page renders. `expired` covers a missing, forged or expired `oauth_query`. */
 export type LinkPageData =
   | { kind: 'expired' }
-  | { kind: 'sign-in'; clientName: string }
+  | { kind: 'sign-in'; clientName: string; amazonEnabled: boolean }
   | { kind: 'consent'; clientName: string; scopes: string[] }
   | { kind: 'refused'; clientName: string | undefined; backHref: string | undefined };
 
@@ -27,6 +27,8 @@ export interface LinkPageOptions {
   config: OAuthServerConfig;
   /** Better Auth's secret; the provider signs `oauth_query` with it. Defaults to BETTER_AUTH_SECRET. */
   secret?: string | undefined;
+  /** Lets tests or alternate hosts override whether Login with Amazon is available. */
+  amazonEnabled?: boolean | undefined;
 }
 
 /** Returns the signed query, or `undefined` when it is missing, forged or expired. */
@@ -69,7 +71,11 @@ export async function loadLinkPage(kind: LinkPageKind, search: string, options: 
   const name = clientName(options.config, query.get('client_id'));
   switch (kind) {
     case 'sign-in':
-      return { kind, clientName: name ?? 'Alexa' };
+      return {
+        kind,
+        clientName: name ?? 'Alexa',
+        amazonEnabled: options.amazonEnabled ?? readAuthEnv().amazon !== undefined,
+      };
     case 'consent':
       return { kind, clientName: name ?? 'Alexa', scopes: (query.get('scope') ?? '').split(' ').filter((scope) => scope !== '') };
     case 'refused':

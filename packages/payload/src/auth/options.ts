@@ -14,6 +14,7 @@ import { twoFactor } from 'better-auth/plugins/two-factor';
 import { username } from 'better-auth/plugins/username';
 import { waitUntil } from '@vercel/functions';
 import { parseBirthYear } from './age';
+import { amazonOAuthPlugin } from './amazon';
 import { createAuthMailer } from './email';
 import { readAuthEnv } from './env';
 import { isAllowedSmsNumber, parseSmsCountries, passesPhoneGate } from './phone';
@@ -161,6 +162,7 @@ async function sendTwoFactorCode(
 }
 
 const canSendTwoFactorCode = sendMail !== undefined || smsSender !== undefined;
+const amazonPlugin = amazonOAuthPlugin(env.amazon);
 
 const plugins = [
   passkey({
@@ -217,6 +219,7 @@ const plugins = [
     verificationUri: `${env.baseURL}/device`,
   }),
   bearer(),
+  ...(amazonPlugin === undefined ? [] : [amazonPlugin]),
   ...alexaOAuthPlugins(oauthConfig),
   oneTimeToken({
     expiresIn: 2,
