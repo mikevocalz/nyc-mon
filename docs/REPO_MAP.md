@@ -85,7 +85,7 @@ The commit message calls these "the v7 canon sources", but the docx and the inde
 | `packages/ui` | `@acme/ui` | The NYC-Tron UI kit (section 5). Entry points: `.`, `./tw`, `./primitives`, `./html`, `./gpu`, `./three`, `./neon`, `./elements`, `./progress`, `./haptics`, `./icons`, `./native`. Also holds the WebGPU/three.js canvases (`three/`, `gpu/`) and one Expo native module (`modules/nyc-carousel`). |
 | `packages/theme` | `@acme/theme` | Tokens. `tokens.ts` is the only file with hexes; `build-css.mjs` generates `theme.css` (Tailwind v4 `@theme` with `light-dark()`) and `theme-native.css` (Uniwind). `contrast.mjs` is a WCAG ratio script (section 6). |
 | `packages/assets` | `@acme/assets` | `brand/` logo PNGs, `fonts/ArchivoBlack-Regular.ttf`, `fonts/SpaceGrotesk-Variable.ttf`, `photos/*.webp` (ten NYC photos keyed by district: downtown, midtown, harlem, megacity). |
-| `packages/app` | `@acme/app` | Solito feature screens from the starter: `features/{editor,error,explore,home,notifications,profile,schedule,settings}`, `providers/` (React Query, safe area). Zustand stores per feature; MMKV in `features/editor/preferences.store.native.ts`. Nothing NYC-MON-specific. |
+| `packages/app` | `@acme/app` | Solito feature screens from the starter: `features/{editor,error,explore,home,notifications,profile,schedule,settings}`, `providers/` (React Query, safe area). Zustand stores per feature; MMKV in `features/editor/preferences.store.native.ts`. *(Oct-4 note predates the game lanes — `features/game/` is now the NYC-MON city; see §12.)* |
 | `packages/payload` | `@acme/payload` | Payload CMS 4.0.0-canary.37 config (`src/payload.config.ts`), collections `Users` (auth) and `Media`, Better Auth options (`src/auth/`), generated `src/payload-types.ts`, and a typed REST reader in `index.ts`. Hosted by `apps/admin-vite`. |
 | `packages/spatial` | `@acme/spatial` | Viro (fork `@reactvision/react-viro` 3.0.2-moyo.1) and Rive XR scenes, district scene, spatial audio, and the site copy constants (`homeCopy.ts`, exported as `@acme/spatial/copy`). Out of Phase 1 scope except that `apps/web` reads its copy. |
 | `packages/config` | `@acme/config` | `eslint/base.mjs`, `eslint/boundaries.mjs` (keeps platform UI behind `@acme/ui`), `prettier/index.json`, `typescript/{base,nextjs,react-library}.json`, `jest-rsc-preset.js`. |
@@ -379,3 +379,39 @@ The §1.2 floor holds: three r186 ≥ r168, RN 0.88 ≥ 0.81, New Architecture o
 10. Web header/footer use `@acme/ui/tw`, not `@acme/ui/html`, and duplicate the kit's `NavBar` / `SiteFooter`.
 11. None of the §4 or §5 routes exist; current routes are the starter's demo screens.
 12. No H-Lynk kit components (section 5.5).
+
+## 12. Living City module (`@acme/app`, `features/game/living-city/`) — added 2026-10-18
+
+This map was written 2026-10-04 at `42c3273`, before the Harlem game lanes
+landed; `features/game/` is absent from §4–§11 rather than documented
+wrongly. The Living City program (`docs/plans/living-city-prompt.md`,
+PRs 01–10) added a deterministic traffic/pedestrian/signal/lamp/clock
+simulation under `packages/app/features/game/living-city/` (34 files,
+~11 k lines incl. 15 test files) on the `lane-lc-handoff` integration
+branch. It is **docs-and-module only**: the game feature itself
+(`city-scene`, `world/`, `character/`, `render-runtime/`, `perf/`,
+`game-session`) predates the program and is documented in
+`docs/implementation/city-world.md` and `docs/implementation/worklet-rendering.md`.
+
+- **Seams it uses (nothing duplicated):** `SceneActorFactory` actor mount
+  (`scene-actor.ts`), the flat `number[]` + `Synchronizable` snapshot
+  channel (`render-snapshot.ts` pattern), `createStreetClearance` +
+  `placeStreetFurniture` placements (`world/walkability.ts`,
+  `world/street-furniture.ts`), `game-session.ts` module-scope stores,
+  `perf/tier.ts` (`LIVING_CITY_CAPS`), the bundled v3 tile
+  (`city-data.ts bundledCity()`).
+- **External touchpoints (the only files outside `living-city/` it
+  edits):** `GameScreen.tsx` (actors + sky pick),
+  `render-runtime/worklet-host.ts` (second `Synchronizable`),
+  `render-runtime/game-render.ts` (worklet actor mounts),
+  `city-scene.ts` (adaptive-bridge call), `perf/tier.ts` (tier section).
+- **Flags:** `EXPO_PUBLIC_LIVING_CITY` (default off, zero-diff) and
+  `EXPO_PUBLIC_LIVING_CITY_TIER` (`low|medium|high|xr`).
+- **Docs:** architecture `docs/architecture/LIVING_CITY.md`; program
+  audit/scouts/reports `docs/living-city/` (PR01 `EXISTING_SYSTEMS_AUDIT.md`
+  + four scout files + `asset-ledger.md`, PR02–PR09 reports, PR10
+  `scenario-matrix.md`, `source-index.md`, `pr10-handoff.md`);
+  license chain `docs/living-city/ASSET_NOTICES.md` +
+  `docs/licenses/provenance-2026-10-17.md`.
+- **Tests:** `node --test 'features/game/living-city/*.test.ts'` — 124
+  cases; `tsc`/`eslint` clean. Not covered by CI (see pr10-handoff §CI).
