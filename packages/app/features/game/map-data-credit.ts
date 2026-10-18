@@ -70,3 +70,24 @@ export const CITY_MAP_SOURCES: readonly CityMapSourceCredit[] = [
     licenseUrl: 'https://data.ny.gov/',
   },
 ];
+
+// Bundled model/texture assets, separate from the map-data records above:
+// the vd lane ships compiled tree models and baked textures (vd-trees.ts,
+// vd-textures.ts). CC BY requires the author credit in-app.
+export const CITY_MAP_ASSETS: readonly CityMapSourceCredit[] = [
+  {
+    attribution: 'Street tree models (Valdrada bxtrees), M. K. Turkcan',
+    license: 'CC BY 4.0',
+    licenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
+  },
+  {
+    attribution: 'Leaf textures (ambientCG), via Valdrada',
+    license: 'CC0 1.0',
+    licenseUrl: 'https://creativecommons.org/publicdomain/zero/1.0/',
+  },
+  {
+    attribution: 'Wall and ground surface textures, via Valdrada',
+    license: 'CC0 1.0',
+    licenseUrl: 'https://creativecommons.org/publicdomain/zero/1.0/',
+  },
+];
