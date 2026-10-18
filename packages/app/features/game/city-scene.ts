@@ -246,7 +246,11 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
       }
       // After the actors: a chase camera reads the Caller's position in this frame's params.
       positionCamera(params.camera);
-      if (moving) invalidate?.();
+      // Precipitation animates on the shader clock — while rain or snow is
+      // live the loop must keep drawing, or the on-demand canvas freezes
+      // the weather with the world.
+      const precip = world.weather;
+      if (moving || (precip !== null && Math.max(precip.wet.value, precip.snow.value) > 0.01)) invalidate?.();
     },
     resize: (width, height) => {
       if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return;
