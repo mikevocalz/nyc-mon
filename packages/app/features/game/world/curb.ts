@@ -4,4 +4,6 @@
 // the ground; every other lane keeps the flat city it was tuned on.
 import { parseSkyRigFlag } from './sky-rig.ts';
 
-export const CURB_HEIGHT = parseSkyRigFlag(process.env.EXPO_PUBLIC_WORLD_VD) ? 0.14 : 0;
+/** The vd lane is on (EXPO_PUBLIC_WORLD_VD): world geometry that only that lane draws keys off this. */
+export const VD_LANE = parseSkyRigFlag(process.env.EXPO_PUBLIC_WORLD_VD);
+export const CURB_HEIGHT = VD_LANE ? 0.14 : 0;

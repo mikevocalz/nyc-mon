@@ -20,7 +20,8 @@ import type { CityMaterials } from './materials.ts';
 import { WINDOW_GRID } from './windows.ts';
 import { createStreetClearance, WALKWAY_CLASSES, type StreetClearance } from './walkability.ts';
 import { AWNING_TONES, CITY_COLORS, hexToRgb, WALL_TONES, type CityColor } from './palette.ts';
-import { CURB_HEIGHT } from './curb.ts';
+import { CURB_HEIGHT, VD_LANE } from './curb.ts';
+import { VD_STOREFRONTS } from './vd-storefronts.ts';
 import { facadePhoto } from './vd-facades.ts';
 import { buildingSurface, ContactField, contactReach, surfacePick, SURFACES, wallAo } from './surfaces.ts';
 
@@ -320,6 +321,9 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV3, materials:
   const landmarkByBuilding = new Map(dataset.landmarks.map((l) => [l.buildingId, l]));
   const shadowColor = rgb('shadow');
   const commercial = new SegmentGrid(dataset.roads.filter((r) => COMMERCIAL.has(r.class)));
+  // vd lane: Valdrada's measured 125th Street storefronts, by nyc-mon building id.
+  const storefronts = new Map<string, (typeof VD_STOREFRONTS)[number][]>();
+  if (VD_LANE) for (const front of VD_STOREFRONTS) storefronts.set(front.b, [...(storefronts.get(front.b) ?? []), front]);
   // Baked occlusion: footprints collect into the contact-shadow field as the
   // banded loop runs, and the ground layers emit after it queries them.
   const field = new ContactField();
@@ -393,6 +397,14 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV3, materials:
       trims++;
     }
     let stooped = false;
+    const measured = storefronts.get(building.id);
+    if (measured) {
+      for (const front of measured) {
+        const counts = emitMeasuredFront(front, neon, detail.buffer, texts);
+        shopSigns += counts.signs;
+        awnings += counts.awnings;
+      }
+    }
     let escaped = false;
     // v3 facts: `d` bit-gates each detail feature, `f`/`fh` set the escape's
     // floor count and pitch, `ww` the storefront bays, `sh` the band height.
@@ -460,6 +472,7 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV3, materials:
       // Storefronts: awnings over most bays, and either a lit shop sign or the plain fascia band.
       // Canopies sit on the shader's own column lattice — column centres in
       // edge-local metres — so a roll-down gate reads inside its canopy.
+      if (measured) { fronts++; continue; }
       if (mask === undefined || (mask & DETAIL.storefront) !== 0) {
         const pitch = building.windowWidthMeters ?? grid.bay;
         const inset = 0.6;
@@ -689,6 +702,58 @@ const AREA_FAMILY: Record<string, 'foliage' | 'masonry'> = {
 function areaSurface(kind: string, seed: number): readonly [number, number] {
   if (kind === 'water') return SURFACES.water;
   return surfacePick(AREA_FAMILY[kind] ?? 'masonry', seed);
+}
+
+/**
+ * One of Valdrada's measured storefronts: per bay, the sign it recorded
+ * (a panel or lightbox board in its background colour with the name in its
+ * letter colour, or bare channel letters on the wall) and its awning. Bay
+ * and sign spans are metres from the face's left end as seen from the
+ * street; the frame's local +x runs that way (facade-detail.ts wallFrame).
+ */
+function emitMeasuredFront(
+  front: (typeof VD_STOREFRONTS)[number], boards: VertexBuffer, canopies: VertexBuffer, texts: (TextFace & { text: string })[],
+): { signs: number; awnings: number } {
+  const a: Point = [front.ax, front.az];
+  const b: Point = [front.ax + front.dx * front.len, front.az + front.dz * front.len];
+  const f = wallFrame(a, b, [front.nx, front.nz]);
+  const along: Point = [front.dx, front.dz];
+  const half = front.len / 2;
+  let signs = 0; let awnings = 0;
+  for (const bay of front.bays) {
+    const sign = 'sign' in bay ? bay.sign : undefined;
+    if (sign) {
+      const x0 = Math.max(0, sign.u0) - half; const x1 = Math.min(front.len, sign.u1) - half;
+      const width = x1 - x0;
+      if (width > 0.4) {
+        const board = sign.bg !== null;
+        if (board) boards.surface(...SURFACES.iron);
+        if (board) box(boards, f, [x0, sign.y, 0.02], [x1, sign.y + sign.h, sign.k === 'lightbox' ? 0.24 : 0.1], sign.bg, { skip: ['back', 'bottom'] });
+        let height = Math.min(sign.h * 0.62, 0.7);
+        let condense = Math.max(0.45, Math.min(1, (width - 0.3) / textWidth(sign.t, height)));
+        while (textWidth(sign.t, height, condense) > width - 0.15 && height > 0.12) height *= 0.9;
+        if (textWidth(sign.t, height, condense) <= width - 0.1) {
+          const centre = (x0 + x1) / 2;
+          const lift = board ? (sign.k === 'lightbox' ? 0.26 : 0.12) : 0.06;
+          texts.push({
+            text: sign.t,
+            x: f.x + along[0] * centre + front.nx * lift, y: sign.y + sign.h / 2, z: f.z + along[1] * centre + front.nz * lift,
+            right: along, height, condense, color: sign.fg,
+          });
+        }
+        signs++;
+      }
+    }
+    const awning = 'aw' in bay ? bay.aw : undefined;
+    if (awning) {
+      const u0 = Math.max(0, bay.u0); const u1 = Math.min(front.len, bay.u1);
+      if (u1 - u0 > 0.8) {
+        emitAwning(canopies, f, (u0 + u1) / 2 - half, u1 - u0 - 0.1, awning.c, awning.top, awning.proj);
+        awnings++;
+      }
+    }
+  }
+  return { signs, awnings };
 }
 
 /**

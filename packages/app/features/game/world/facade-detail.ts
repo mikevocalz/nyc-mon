@@ -123,11 +123,11 @@ export function emitFireEscapeFloor(buffer: VertexBuffer, f: Frame, at: number, 
 }
 
 /** A shop awning at local x `at`: a sloping canopy, its valance and two side cheeks. */
-export function emitAwning(buffer: VertexBuffer, f: Frame, at: number, width: number, color: Rgb): void {
+export function emitAwning(buffer: VertexBuffer, f: Frame, at: number, width: number, color: Rgb, top = 3.05, reach = 1.3): void {
   buffer.surface(...SURFACES.fabric);
   const p = (lx: number, ly: number, lz: number) => [f.x + f.oz * lx + f.ox * lz, f.y + ly, f.z - f.ox * lx + f.oz * lz] as const;
   const x0 = at - width / 2; const x1 = at + width / 2;
-  const top = 3.05; const low = 2.55; const reach = 1.3; const valance = 0.28;
+  const low = top - 0.5 * (reach / 1.3); const valance = 0.28;
   const slope = Math.atan2(top - low, reach);
   const n = [f.ox * Math.sin(slope), Math.cos(slope), f.oz * Math.sin(slope)] as const;
   buffer.quad(p(x0, low, reach), p(x1, low, reach), p(x1, top, 0), p(x0, top, 0), n, color);

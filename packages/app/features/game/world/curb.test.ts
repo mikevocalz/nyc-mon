@@ -74,3 +74,17 @@ test('vd lane: near trees are the three Valdrada species, filled around the Call
   assert.ok(Math.abs(new THREE.Vector3().setFromMatrixPosition(row).y - 0.14) < 1e-6);
   world.dispose();
 });
+
+test('vd lane: Valdrada’s measured 125th Street shops reach the sign lettering', async () => {
+  const { parseCityDataset } = await import('../city-dataset.ts');
+  const { buildCityMeshes } = await import('./city-mesh.ts');
+  const { createCityMaterials } = await import('./materials.ts');
+  const { VD_STOREFRONTS } = await import('./vd-storefronts.ts');
+  const dataset = parseCityDataset(JSON.parse(readFileSync(new URL('../data/harlem-apollo.json', import.meta.url), 'utf8')));
+  const materials = createCityMaterials(THREE as never, [0.5, 0.5, 0.7]);
+  const city = buildCityMeshes(THREE as never, dataset, materials, [1, 0]);
+  const words = new Set(city.texts.map((t) => t.text));
+  for (const name of ['CHIPOTLE', 'POPEYES', 'CAPITAL ONE BANK']) assert.ok(words.has(name), `${name} is on a sign`);
+  assert.ok(VD_STOREFRONTS.length > 100);
+  city.dispose(); materials.dispose();
+});
