@@ -182,7 +182,9 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
     // An orthographic shadow box that follows the Caller (setFocus); the
     // whole tile would spread 2048 texels over 1.7 km.
     sun.castShadow = true;
-    sun.shadow.mapSize.set(2048, 2048);
+    // 1024 over the 140 m caller-centred box: ~14 cm texels, soft but
+    // readable for trees/props; halves the shadow pass fill on the Duo.
+    sun.shadow.mapSize.set(1024, 1024);
     const cam = sun.shadow.camera;
     cam.left = -VD_SHADOW_HALF; cam.right = VD_SHADOW_HALF; cam.top = VD_SHADOW_HALF; cam.bottom = -VD_SHADOW_HALF;
     cam.near = 1; cam.far = 600;
