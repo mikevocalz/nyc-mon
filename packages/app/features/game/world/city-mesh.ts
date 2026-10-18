@@ -286,6 +286,13 @@ const BILLBOARD_PAIRS = [
   ['neonOrange', 'neonApple'], ['neonRoyal', 'neonCarolina'], ['neonCarolina', 'neonLeaf'], ['neonApple', 'neonRoyal'], ['neonOrange', 'neonRoyal'],
 ] as const satisfies readonly (readonly [CityColor, CityColor])[];
 export const MAX_BILLBOARDS = 48;
+/**
+ * Top edge a hologram can mount at, metres. The chase camera never pitches
+ * to a roofline, so boards clamp into the band a player sees: above the
+ * storefront signs (~4 m), below the second storey. Taller facades still
+ * qualify — only their mount height drops.
+ */
+export const BILLBOARD_TOP = 12;
 
 /**
  * Share of buildings of a height that carry a neon roofline trim. Taller
@@ -511,7 +518,7 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV3, materials:
       }
       if (boards < MAX_BILLBOARDS && h >= 16 && length >= 8 && hashUnit(`${building.id}:${i}:board`) < 0.4) {
         const [top, bottom] = BILLBOARD_PAIRS[Math.floor(hashUnit(`${building.id}:pair`) * BILLBOARD_PAIRS.length) % BILLBOARD_PAIRS.length]!;
-        emitBillboard(billboards, mid, out, Math.min(length * 0.55, 9), Math.min(h * 0.32, 7), h - 2.2, rgb(top), rgb(bottom));
+        emitBillboard(billboards, mid, out, Math.min(length * 0.55, 9), Math.min(Math.min(h * 0.32, 7), BILLBOARD_TOP - 4.6), Math.min(h - 2.2, BILLBOARD_TOP), rgb(top), rgb(bottom));
         boards++;
       }
     }
