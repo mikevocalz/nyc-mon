@@ -15,6 +15,8 @@ import { createPbrCityMaterials, EXPERIMENTAL_WORLD_PBR } from './pbr-materials.
 import { createGlassCityMaterials, EXPERIMENTAL_WORLD_GLASS, type GlassTier } from './glass.ts';
 import { applyCarPbrMaterial, EXPERIMENTAL_WORLD_CAR_PBR } from './car-materials.ts';
 import { createSkyRig, EXPERIMENTAL_SKY_RIG, parseSkyRigFlag, type SkyName } from './sky-rig.ts';
+import { createVdCityMaterials, EXPERIMENTAL_WORLD_VD, type VdWeather } from './vd-materials.ts';
+import { buildPrecipitation } from './vd-weather.ts';
 
 /**
  * Lane G1 "GPU budget": record the immutable city into one WebGPU render
@@ -85,6 +87,12 @@ export interface CityWorldOptions {
    */
   carPbr?: boolean;
   /**
+   * The vd lane: Valdrada's facades, ground and weather ported to TSL over
+   * the PBR body (vd-materials.ts). Defaults to EXPO_PUBLIC_WORLD_VD — off
+   * unless set. Takes precedence over `pbr` and `glass`.
+   */
+  vd?: boolean;
+  /**
    * Lane G1: record the static city into a WebGPU render bundle
    * (EXPERIMENTAL_WORLD_BUNDLES). See buildCityWorld for what stays out.
    */
@@ -108,7 +116,9 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
   // authored dusk share regardless of the sky the clock picked.
   const TOD_BY_SKY: Record<SkyName, number> = { morning: 0.15, dusk: 0.8, night: 1 };
   const tod = options.timeOfDay ?? TOD_BY_SKY[skyRig ? (options.sky ?? 'dusk') : 'dusk'];
-  const materials = glass
+  const vd = options.vd ?? EXPERIMENTAL_WORLD_VD;
+  const vdMaterials = vd ? createVdCityMaterials(THREE, { sunDirection, timeOfDay: tod }) : null;
+  const materials = vdMaterials ?? (glass
     ? createGlassCityMaterials(THREE, {
         sunDirection,
         pbr,
@@ -117,7 +127,7 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
       })
     : pbr
       ? createPbrCityMaterials(THREE, { sunDirection, timeOfDay: tod })
-      : createCityMaterials(THREE, sunDirection, { timeOfDay: tod });
+      : createCityMaterials(THREE, sunDirection, { timeOfDay: tod }));
   // Lane L4: the same InstancedMesh keeps its paint-marker contract; only
   // the material changes. The lamp switch seeds off the resolved sky pick.
   const carPbr = (options.carPbr ?? EXPERIMENTAL_WORLD_CAR_PBR)
@@ -152,8 +162,14 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
   const bandMinZ = -dataset.extentMeters - SHADOW_BAND_METRES;
   const bandCount = Math.max(1, Math.ceil((dataset.extentMeters * 2 + SHADOW_BAND_METRES * 2) / SHADOW_BAND_METRES) + 1);
 
-  const hemi = new THREE.HemisphereLight(linearColor(THREE, 'hemiSky'), linearColor(THREE, 'hemiGround'), 1.6);
-  const sun = skyRig?.sun ?? new THREE.DirectionalLight(linearColor(THREE, 'sun'), 2.2);
+  // vd: Valdrada keys sun 5 over hemi ≈0.6, but it also has an env map,
+  // a warm bounce light and an SH probe. With hemi as the only fill, shade
+  // walls went near-black on the Duo (2026-10-18), so the fill stays high.
+  // TODO(tune) on the Duo.
+  const hemi = new THREE.HemisphereLight(linearColor(THREE, 'hemiSky'), linearColor(THREE, 'hemiGround'), vd ? 2.6 : 1.6);
+  const sun = skyRig?.sun ?? new THREE.DirectionalLight(linearColor(THREE, 'sun'), vd ? 3.2 : 2.2);
+  const precipitation = vdMaterials ? buildPrecipitation(THREE, vdMaterials.weather) : null;
+  precipitation?.update();
   if (!skyRig) sun.position.set(SUN[0] * 1000, SUN[1] * 1000, SUN[2] * 1000);
   const bundles = options.bundles ?? EXPERIMENTAL_WORLD_BUNDLES;
   if (bundles) {
@@ -182,6 +198,7 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
   } else {
     group.add(ground, ...city.meshes, ...trees.objects, ...furniture.objects, ...props.objects, hemi, sun, sun.target);
   }
+  if (precipitation) group.add(precipitation.mesh);
 
   const horizon = skyRig?.horizon ?? linearColor(THREE, 'skyHorizon');
   const fog = skyRig?.fog ?? new THREE.Fog(horizon, 600, 2500);
@@ -202,6 +219,15 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
     horizon,
     /** The L1 rig when flagged, else null — city-scene uses it to attach env. */
     skyRig,
+    /** vd lane weather levels, null on the other lanes. */
+    weather: (vdMaterials?.weather ?? null) as VdWeather | null,
+    /** Rain and snow, 0..1 each; a no-op off the vd lane. */
+    setWeather(rain: number, snowLevel: number) {
+      if (!vdMaterials) return;
+      vdMaterials.weather.wet.value = Math.max(0, Math.min(1, rain));
+      vdMaterials.weather.snow.value = Math.max(0, Math.min(1, snowLevel));
+      precipitation?.update();
+    },
     stats,
     /** Level of detail and air from the camera's distance to its target, metres. */
     setViewDistance(distance: number, far: number) {
@@ -235,6 +261,7 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
       groundGeometry.dispose();
       skyRig?.dispose();
       carPbr?.dispose();
+      precipitation?.dispose();
       materials.dispose();
     },
   };

@@ -20,6 +20,7 @@ import type { CityMaterials } from './materials.ts';
 import { WINDOW_GRID } from './windows.ts';
 import { createStreetClearance, WALKWAY_CLASSES, type StreetClearance } from './walkability.ts';
 import { AWNING_TONES, CITY_COLORS, hexToRgb, WALL_TONES, type CityColor } from './palette.ts';
+import { facadePhoto } from './vd-facades.ts';
 import { buildingSurface, ContactField, contactReach, surfacePick, SURFACES, wallAo } from './surfaces.ts';
 
 type Point = [number, number];
@@ -364,6 +365,7 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV3, materials:
     // this building's shadow reach (surfaces.ts). Cornices written into the
     // same buffer inherit the wall pick — stone trim belongs to the family.
     target.surface(...buildingSurface(building.class, building.id));
+    target.facade(...facadePhoto(building));
     const reach = contactReach(h);
     const wallOcclusion: [number, number] = [wallAo(0, reach), wallAo(h, reach)];
     field.add(ring, h);

@@ -36,6 +36,9 @@ export const CITY_COLORS = {
   sun: orange[200],
   hemiSky: mixHex(carolina[300], royal[300], 0.4),
   hemiGround: concrete[500],
+  // Weather (vd lane, vd-weather.ts): settled snow, rain streaks, puddle sheen.
+  snow: mixHex(concrete[50], carolina[50], 0.2),
+  rain: mixHex(concrete[300], carolina[200], 0.4),
   // Ground and land use.
   ground: mixHex(concrete[200], orange[100], 0.25),
   park: mixHex(leaf[400], leaf[500], 0.35),
