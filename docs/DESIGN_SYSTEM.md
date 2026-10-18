@@ -257,7 +257,7 @@ Risk the theme owner must check: kit components that rely on `text` being `night
 
 The 3D city's colours live in `packages/app/features/game/world/palette.ts`. Every `CITY_COLORS` entry is a palette step or a fixed `mixHex` of steps — no raw hex in the file — and `WALL_TONES` gives each building class a small family of tones that `city-mesh.ts` picks between by a hash of the building id. That rule holds for dataset v3: Valdrada ships a per-building `rgb`, and it is **not imported** (gate G3). What arrives from Valdrada is `vs`, the record-derived `STYLE` id; the nyc-mon `class` comes from the mapping below, and the wall colour comes from the class's `WALL_TONES` family as today.
 
-Two different provenances meet here, so the table keeps them separate: `STYLE` is record-backed (the compiler's classification of real attributes — PLUTO class, year, FISP material; the mapping's record-vs-rule detail is in `docs/design/handoff/harlem-v3.md`), while `STYLE → class` is this document's own design mapping and carries the estimate bit. A class is a *look*, not a claim about the building.
+Two different provenances meet here, so the table keeps them separate: `STYLE` is record-derived (the compiler's classification of real attributes — PLUTO class, year, FISP material — shipped on the record as `vs`; the mapping's record-vs-rule detail is in `docs/design/handoff/harlem-v3.md`), while `STYLE → class` is this document's own design mapping and carries the estimate bit. A class is a *look*, not a claim about the building.
 
 | Valdrada `vs` | STYLE name | What it is on 125th | nyc-mon `class` | `WALL_TONES` family |
 |---:|---|---|---|---|

@@ -112,7 +112,9 @@ export class CityClock {
 
   /** Jump to a local hour (dev inspector / scenario set-up) — deterministic given the same call stream. */
   setTimeOfDay(hour: number): void {
-    this.baseHour = ((hour % 24) + 24) % 24;
+    // Back out the accumulated elapsed time so the next state() reports the
+    // requested hour even after the clock has already advanced.
+    this.baseHour = (((hour - this.elapsedSeconds * this.rate) % 24) + 24) % 24;
   }
 
   /** Weather overlay slot: rain intensity 0–1. */
