@@ -11,7 +11,7 @@ import type { Three } from '@acme/ui/three';
 import type { BuildingClass, CityBuilding, CityDatasetV3, CityLandmark, CityRoad, RoadClass } from '../city-dataset.ts';
 import { counterClockwise, hashUnit, mapArea, pairs, pointInRing, ribbon, VertexBuffer } from './geometry.ts';
 import {
-  bays, emitAwning, emitCornice, emitFireEscapeFloor, emitParapet, emitStoop, emitWaterTower, fireEscapeFloors, FLOOR_HEIGHT,
+  emitAwning, emitCornice, emitFireEscapeFloor, emitParapet, emitStoop, emitWaterTower, fireEscapeFloors, FLOOR_HEIGHT,
   hasFireEscape, hasShopSign, hasStoop, hasWaterTower, shopWords, STOOP_REACH, STOOP_WIDTH, towerSpot, wallFrame,
 } from './facade-detail.ts';
 import { emitStackedText, emitText, textWidth, type TextFace } from './lettering.ts';
@@ -399,10 +399,18 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV3, materials:
     const floorPitch = building.floorHeightMeters ?? FLOOR_HEIGHT;
     const escapeFloors = building.floors !== undefined ? Math.max(0, building.floors - 1) : fireEscapeFloors(h);
     const shopTop = building.storefrontHeightMeters !== undefined && building.storefrontHeightMeters > 0 ? building.storefrontHeightMeters : undefined;
+    // The wall uv's `u` is metres along the ring, continuous from vertex 0 —
+    // the facade shader's column grid (gates, window panes) keys on it, so
+    // storefront geometry must sit on the same lattice, not on edge-centred
+    // bays: column `c` covers metres [c*pitch, (c+1)*pitch) of `u`.
+    let u0 = 0;
     for (let i = 0; i < ring.length; i++) {
       const [ax, az] = ring[i]!;
       const [bx, bz] = ring[(i + 1) % ring.length]!;
       const length = Math.hypot(bx - ax, bz - az);
+      if (length < 1e-6) continue;
+      const edgeStart = u0;
+      u0 += length;
       if (length < 4) continue;
       const out = normalOf(ax, az, bx, bz);
       const mid: Point = [(ax + bx) / 2, (az + bz) / 2];
@@ -447,12 +455,18 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV3, materials:
       if (!onAvenue) continue;
 
       // Storefronts: awnings over most bays, and either a lit shop sign or the plain fascia band.
+      // Canopies sit on the shader's own column lattice — column centres in
+      // edge-local metres — so a roll-down gate reads inside its canopy.
       if (mask === undefined || (mask & DETAIL.storefront) !== 0) {
-        const bay = building.windowWidthMeters ?? 4.5;
-        for (const at of bays(length, bay)) {
-          if (hashUnit(`${building.id}:${i}:${at}:awning`) > 0.55) continue;
-          const tone = AWNING_TONES[Math.floor(hashUnit(`${building.id}:${i}:${at}:hue`) * AWNING_TONES.length) % AWNING_TONES.length]!;
-          emitAwning(detail.buffer, f, at, Math.min(3.8, bay - 0.2), rgb(tone));
+        const pitch = building.windowWidthMeters ?? grid.bay;
+        const inset = 0.6;
+        const c0 = Math.ceil((edgeStart + inset) / pitch - 0.5);
+        const c1 = Math.floor((edgeStart + length - inset) / pitch - 0.5);
+        for (let cIdx = c0; cIdx <= c1; cIdx++) {
+          if (hashUnit(`${building.id}:${i}:${cIdx}:awning`) > 0.55) continue;
+          const at = (cIdx + 0.5) * pitch - edgeStart - length / 2;
+          const tone = AWNING_TONES[Math.floor(hashUnit(`${building.id}:${i}:${cIdx}:hue`) * AWNING_TONES.length) % AWNING_TONES.length]!;
+          emitAwning(detail.buffer, f, at, Math.min(3.8, pitch - 0.2), rgb(tone));
           awnings++;
         }
         if (hasShopSign(building.id, i)) {

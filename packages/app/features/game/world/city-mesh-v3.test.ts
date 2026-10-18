@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import * as THREE from 'three/webgpu';
 import { parseCityDataset } from '../city-dataset.ts';
 import { buildCityMeshes } from './city-mesh.ts';
-import { bays, hasFireEscape, hasStoop, hasWaterTower } from './facade-detail.ts';
+import { hasFireEscape, hasStoop, hasWaterTower } from './facade-detail.ts';
 import { hashUnit } from './geometry.ts';
 import { createPbrCityMaterials } from './pbr-materials.ts';
 import { syntheticTileV2, syntheticTileV3 } from './synthetic-tile.ts';
@@ -197,14 +197,25 @@ test('the storefront bit gates the shop front; sh sets its band and ww its bays'
   assert.equal(off.built.stats.shopSigns, 0);
   off.dispose();
 
-  // Bit set: awnings on the recorded 1.8 m bay module, not the 4.5 m default.
-  // The avenue sits within 14 m of edges 0 (south, 20 m), 1 (east, 15 m) and
-  // 3 (west, 15 m); only the rear edge stays bare.
+  // Bit set: awnings on the recorded 1.8 m bay module — on the shader's own
+  // column lattice (gates and panes share it), centred per column, not on
+  // edge-centred bays. The avenue sits within 14 m of edges 0 (south, 20 m),
+  // 1 (east, 15 m) and 3 (west, 15 m); only the rear edge stays bare.
   const on = build(shopTile({ d: 16, sh: 4.5, ww: 1.8 }));
-  const expectedAwnings = [0, 1, 3].reduce(
-    (sum, i) => sum + bays(i === 0 ? 20 : 15, 1.8).filter((at) => hashUnit(`s:1:${i}:${at}:awning`) <= 0.55).length,
-    0,
-  );
+  const pitch = 1.8;
+  const inset = 0.6;
+  // Ring edges in order: (start-u, length) pairs accumulating like emitWalls.
+  const edgeStarts = [0, 20, 35, 55];
+  const edgeLengths = [20, 15, 20, 15];
+  const expectedAwnings = [0, 1, 3].reduce((sum, i) => {
+    const u0 = edgeStarts[i]!;
+    const len = edgeLengths[i]!;
+    let count = 0;
+    for (let cIdx = Math.ceil((u0 + inset) / pitch - 0.5); cIdx <= Math.floor((u0 + len - inset) / pitch - 0.5); cIdx++) {
+      if (hashUnit(`s:1:${i}:${cIdx}:awning`) <= 0.55) count++;
+    }
+    return sum + count;
+  }, 0);
   assert.equal(on.built.stats.awnings, expectedAwnings);
   assert.ok(expectedAwnings > 0);
   // The shop band caps at the recorded storefront height, not 3.45/4.05.
