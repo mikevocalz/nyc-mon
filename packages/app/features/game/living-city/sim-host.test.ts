@@ -5,6 +5,7 @@ import { buildSignalSystem } from './signal-controller.ts';
 import { LivingCityHost } from './sim-host.ts';
 import { buildLaneTopology, type LaneTopology } from './topology.ts';
 import { SIM_DT, vehicleSnapshotCount, vehicleSnapshotVersion } from './vehicle-sim.ts';
+import { pedSnapshotCount } from './ped-sim.ts';
 
 function tile(roads: CityRoad[], id = 't'): CityDatasetV3 {
   return {
@@ -109,4 +110,52 @@ test('attach/detach ref-counts the ticker; the sim clock keeps state while parke
   fire();
   assert.ok(manual.stats().ticksRun > ticks, 'resume keeps sim state, never re-seeds');
   manual.stop();
+});
+
+// --- PR06: the pedestrian crowd rides the same publish --------------------------------------
+
+test('combined snapshot: the ped section rides the same publish, host stats report the crowd', () => {
+  const topology = crossTopology();
+  const band = topology.walks[0]!;
+  const h = new LivingCityHost({
+    topology,
+    signals: buildSignalSystem(topology),
+    seed: 5,
+    vehicles: [],
+    peds: { seed: 5, peds: [{ kind: 'adult', walk: band.id, s: 2 }] },
+    now: (() => { let t = 0; return () => (t += 4); })(),
+    maxFrameSeconds: 5,
+  });
+  const seen: number[][] = [];
+  h.addSink((snap) => seen.push(snap));
+  assert.equal(pedSnapshotCount(seen[0]!), 0, 'the pre-tick replay carries an empty ped section');
+  h.step(SIM_DT);
+  h.step(SIM_DT);
+  assert.equal(pedSnapshotCount(seen[2]!), 1, 'the crowd travels inside the same snapshot array');
+  const stats = h.stats();
+  assert.equal(stats.pedestrians, 1);
+  assert.ok(stats.lastPedTickMs >= 0, 'ped tick cost is metered');
+});
+
+test('host determinism: equal seeds and equal step streams pack identical combined snapshots', () => {
+  const mk = () => {
+    const topology = crossTopology();
+    const band = topology.walks[0]!;
+    return new LivingCityHost({
+      topology,
+      signals: buildSignalSystem(topology),
+      seed: 9,
+      vehicles: [{ lane: topology.lanes[0]!.id, s: 4 }],
+      peds: { seed: 9, peds: [{ kind: 'adult', walk: band.id, s: 2 }, { kind: 'kid', walk: band.id, s: 5 }] },
+      now: (() => { let t = 0; return () => (t += 4); })(),
+      maxFrameSeconds: 5,
+    });
+  };
+  const a = mk();
+  const b = mk();
+  for (let i = 0; i < 240; i++) {
+    a.step(SIM_DT);
+    b.step(SIM_DT);
+  }
+  assert.deepEqual(a.latestSnapshot(), b.latestSnapshot(), 'same seed + same frames → identical world state');
 });

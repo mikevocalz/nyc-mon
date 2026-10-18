@@ -5,9 +5,14 @@
 // directly; the worklet render host mirrors each publish into a
 // Synchronizable (render-runtime/worklet-host.ts).
 //
+// PR06: the host now also owns the pedestrian sim — same tick, same publish.
+// The packed layout is EXTENDED, not forked: the vehicle header/records are
+// untouched and a ped section is appended (ped-sim.ts), so every consumer
+// keeps reading the vehicle channel exactly as before.
+//
 // Two rules come straight from render-snapshot.ts:
 //
-//  - Fresh arrays every write. packVehicleSnapshot already allocates a new
+//  - Fresh arrays every write. packActorSnapshot already allocates a new
 //    array per call and nothing mutates it afterwards, so handing the same
 //    reference to a Synchronizable is safe (the identity-cache bug measured
 //    on the Duo, 2026-10-17, only bites buffers that get re-serialized).
@@ -20,13 +25,12 @@
 // the host only burns rAF while something renders it, and sim state
 // survives scene remounts like the module-scope session stores do.
 
+import { PedSim, emptyActorSnapshot, packActorSnapshot, type PedSimOptions } from './ped-sim.ts';
 import type { SignalSystem } from './signal-controller.ts';
 import type { LaneTopology } from './topology.ts';
 import {
   SIM_DT,
   VehicleSim,
-  emptyVehicleSnapshot,
-  packVehicleSnapshot,
   type VehicleSimMetrics,
   type VehicleSimOptions,
 } from './vehicle-sim.ts';
@@ -37,6 +41,8 @@ export type VehicleSnapshotSink = (snapshot: number[]) => void;
 export interface LivingCityHostOptions extends VehicleSimOptions {
   readonly topology: LaneTopology;
   readonly signals: SignalSystem;
+  /** Pedestrian sim options — scripted crowd, ambient target, obstacles, seed. Omit for an empty crowd. */
+  readonly peds?: PedSimOptions;
   /**
    * Frame-clock source in ms — default performance.now() with a Date.now()
    * fallback. Injected in tests.
@@ -56,12 +62,17 @@ export interface LivingCityHostStats extends VehicleSimMetrics {
   readonly ticksRun: number;
   /** Wall-clock ms spent in sim.step on the last tick (diagnostics only). */
   readonly lastTickMs: number;
+  /** Wall-clock ms spent in pedSim.step on the last tick (diagnostics only). */
+  readonly lastPedTickMs: number;
+  /** Live pedestrian count on the last tick. */
+  readonly pedestrians: number;
   readonly consumers: number;
   readonly running: boolean;
 }
 
 export class LivingCityHost {
   readonly sim: VehicleSim;
+  readonly pedSim: PedSim;
   readonly signals: SignalSystem;
   private readonly now: () => number;
   private readonly schedule: (cb: () => void) => unknown;
@@ -69,7 +80,7 @@ export class LivingCityHost {
   private readonly focus: (() => { x: number; z: number } | null) | undefined;
   private readonly maxFrameSeconds: number;
   private readonly sinks = new Set<VehicleSnapshotSink>();
-  private latest: number[] = emptyVehicleSnapshot();
+  private latest: number[] = emptyActorSnapshot();
   private version = 0;
   private consumers = 0;
   private running = false;
@@ -78,6 +89,7 @@ export class LivingCityHost {
   private acc = 0;
   private ticksRun = 0;
   private lastTickMs = 0;
+  private lastPedTickMs = 0;
 
   constructor(options: LivingCityHostOptions) {
     this.signals = options.signals;
@@ -96,8 +108,17 @@ export class LivingCityHost {
           : clearTimeout(h as ReturnType<typeof setTimeout>));
     this.focus = options.focus;
     this.maxFrameSeconds = options.maxFrameSeconds ?? 0.25;
-    const { topology: _t, signals: _s, now: _n, schedule: _sc, cancel: _c, focus: _f, maxFrameSeconds: _m, ...simOptions } = options;
+    const { topology: _t, signals: _s, now: _n, schedule: _sc, cancel: _c, focus: _f, maxFrameSeconds: _m, peds, ...simOptions } = options;
     this.sim = new VehicleSim(options.topology, options.signals, simOptions);
+    // The vehicle sim owns the signal clock (it steps signals itself); the
+    // ped sim shares the same tick but never double-steps the controllers.
+    // The fleet view is wired so uncontrolled crosswalks can gap-check —
+    // signalized kerbs don't need it, the solver serializes those.
+    this.pedSim = new PedSim(options.topology, options.signals, {
+      ...peds,
+      advanceSignals: false,
+      vehicles: peds?.vehicles ?? (() => this.sim.vehiclesView()),
+    });
   }
 
   /** The most recently published snapshot (never mutated after publish). */
@@ -113,6 +134,9 @@ export class LivingCityHost {
       const t0 = this.now();
       this.sim.step(SIM_DT);
       this.lastTickMs = this.now() - t0;
+      const t1 = this.now();
+      this.pedSim.step(SIM_DT);
+      this.lastPedTickMs = this.now() - t1;
       this.ticksRun++;
       this.publish();
     }
@@ -159,7 +183,15 @@ export class LivingCityHost {
   }
 
   stats(): LivingCityHostStats {
-    return { ...this.sim.metrics, ticksRun: this.ticksRun, lastTickMs: this.lastTickMs, consumers: this.consumers, running: this.running };
+    return {
+      ...this.sim.metrics,
+      ticksRun: this.ticksRun,
+      lastTickMs: this.lastTickMs,
+      lastPedTickMs: this.lastPedTickMs,
+      pedestrians: this.pedSim.metrics.pedestrians,
+      consumers: this.consumers,
+      running: this.running,
+    };
   }
 
   private drive(): void {
@@ -171,7 +203,10 @@ export class LivingCityHost {
       this.last = t;
       if (this.focus) {
         const f = this.focus();
-        if (f) this.sim.setFocus(f.x, f.z);
+        if (f) {
+          this.sim.setFocus(f.x, f.z);
+          this.pedSim.setFocus(f.x, f.z);
+        }
       }
       this.step(dt);
       this.drive();
@@ -180,7 +215,7 @@ export class LivingCityHost {
 
   private publish(): void {
     this.version++;
-    this.latest = packVehicleSnapshot(this.version, this.sim);
+    this.latest = packActorSnapshot(this.version, this.sim, this.pedSim);
     for (const sink of this.sinks) sink(this.latest);
   }
 }

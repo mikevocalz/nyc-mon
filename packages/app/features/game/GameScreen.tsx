@@ -67,7 +67,7 @@ import { useGameRenderThread } from './render-thread-choice.ts';
 import { readLobbyIdentity } from './lobby/lobby-identity.ts';
 import { lobbyStore } from './lobby/lobby.store.ts';
 import { gameInputRouter, useGameInput } from './use-game-input.ts';
-import { livingCityVehicleActorFactories } from './living-city/bundled-host.ts';
+import { livingCityActorFactories } from './living-city/bundled-host.ts';
 import { useCityCameraGestures } from './use-city-camera-gestures.ts';
 import { useWorldSaveLifecycle } from './world-resume/use-world-save-lifecycle.ts';
 import type { SceneActorFactory } from './scene-actor.ts';
@@ -190,9 +190,10 @@ export function GameScreen({ focused = true }: GameScreenProps = {}) {
     return {
       dataset: city.dataset,
       get camera() { return gameCameraStore.getState().camera; },
-      // PR05 Living City (EXPO_PUBLIC_LIVING_CITY=1, default off): the flag
-      // contributes the vehicle fleet factory; off, the list is byte-identical.
-      actors: [...CALLER_ACTORS, ...livingCityVehicleActorFactories()],
+      // PR05/PR06 Living City (EXPO_PUBLIC_LIVING_CITY=1, default off): the
+      // flag contributes the vehicle + pedestrian factories; off, the list is
+      // byte-identical.
+      actors: [...CALLER_ACTORS, ...livingCityActorFactories()],
       onFirstFrame: gameScreenActions.firstFrame,
     };
   }, [city]);
