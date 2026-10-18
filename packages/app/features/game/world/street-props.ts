@@ -10,7 +10,7 @@
 //
 // Layout and the clearance rules are street-props-layout.ts.
 import type { Three } from '@acme/ui/three';
-import type { CityDatasetV2 } from '../city-dataset.ts';
+import type { CityDatasetV3 } from '../city-dataset.ts';
 import { SHADOW_BAND_METRES } from './city-mesh.ts';
 import { VertexBuffer } from './geometry.ts';
 import { TONE_ATTRIBUTE, type CityMaterials } from './materials.ts';
@@ -32,7 +32,7 @@ export const CAR_RADIUS = 200;
 export const CAR_CAP = 220;
 
 /** Every street prop for a tile, after the clearance. Pure apart from the clearance. */
-export function placeStreetProps(dataset: CityDatasetV2, clearance: StreetClearance, signs: readonly SignPlacement[], lights: readonly LightPlacement[]) {
+export function placeStreetProps(dataset: CityDatasetV3, clearance: StreetClearance, signs: readonly SignPlacement[], lights: readonly LightPlacement[]) {
   const hydrants = placeHydrants(dataset, clearance, lights);
   const baskets = placeBaskets(dataset, clearance, signs);
   const cars = placeParkedCars(dataset, clearance, hydrants);
@@ -141,7 +141,7 @@ function carGeometry(THREE: Three) {
 }
 
 export function buildStreetProps(
-  THREE: Three, dataset: CityDatasetV2, materials: Pick<CityMaterials, 'roofs' | 'neon' | 'cars'>,
+  THREE: Three, dataset: CityDatasetV3, materials: Pick<CityMaterials, 'roofs' | 'neon' | 'cars'>,
   clearance: StreetClearance, signs: readonly SignPlacement[], lights: readonly LightPlacement[],
 ) {
   const placed = placeStreetProps(dataset, clearance, signs, lights);

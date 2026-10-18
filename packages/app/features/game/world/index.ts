@@ -4,7 +4,7 @@
 // walkability.ts (pure) and bundled-queries.ts (bound to the bundled tile),
 // not re-exported here, so the scene chunk never pulls the tile JSON twice.
 import type { Three } from '@acme/ui/three';
-import type { CityDatasetV2 } from '../city-dataset.ts';
+import type { CityDatasetV3 } from '../city-dataset.ts';
 import { buildCityMeshes, SHADOW_BAND_METRES, shadowBands, type CityMeshStats } from './city-mesh.ts';
 import { buildStreetProps } from './street-props.ts';
 import { buildTrees, type TreeReport } from './foliage.ts';
@@ -91,7 +91,7 @@ export interface CityWorldOptions {
   bundles?: boolean;
 }
 
-export function buildCityWorld(THREE: Three, dataset: CityDatasetV2, options: CityWorldOptions = {}) {
+export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: CityWorldOptions = {}) {
   const skyRig = (options.skyRig ?? EXPERIMENTAL_SKY_RIG)
     ? createSkyRig(THREE, { sky: options.sky, envWidth: options.envWidth })
     : null;

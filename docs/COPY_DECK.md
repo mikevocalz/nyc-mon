@@ -411,3 +411,80 @@ Notes:
   fourth graphics tier — the Graphics section keeps three.
 - **Reduced motion never changes copy** — these strings are identical
   under reduced motion.
+
+## City data credits (dataset v3)
+
+The "Legal & credits" card in Settings (`settings-content.tsx`) gains rows
+when the bundled tile is v3: `map-data-credit.ts` becomes a list derived
+from the tile's `sources`, and each source renders name, what it supplied
+and its licence link. Every string is `voice: "ui"`, namespace
+`settings.legal.*`. Status: **drafted** — this is the G7 draft; Mike
+reviews before it ships. Rules that apply: sentence case, lead with what
+the reader can do, promise only what the record backs.
+
+| ID | String | Voice | Status |
+|---|---|---|---|
+| `settings.legal.title` | Legal & credits | ui | shipped |
+| `settings.legal.citydata.group` | City data | ui | drafted |
+| `settings.legal.citydata.attribution` | © OpenStreetMap contributors | ui | shipped |
+| `settings.legal.citydata.body` | NYC-Mon's 3D city uses OpenStreetMap data under the Open Database License (ODbL 1.0). | ui | shipped |
+| `settings.legal.citydata.valdrada.name` | Valdrada | ui | drafted |
+| `settings.legal.citydata.valdrada.line` | A real-data, real-time digital twin of New York City, maintained by Mehmet Kerem Turkcan. | ui | drafted |
+| `settings.legal.citydata.valdrada.cite` | Turkcan, M. K. (2026). Valdrada: a real-data, real-time digital twin of New York City (version 0.4.0). | ui | drafted |
+| `settings.legal.citydata.sources.lead` | Valdrada compiles these NYC records: | ui | drafted |
+| `settings.legal.citydata.src.footprints` | Building Footprints — building shapes, roof heights, ground elevation | ui | drafted |
+| `settings.legal.citydata.src.pluto` | PLUTO — floor counts, year built, building class | ui | drafted |
+| `settings.legal.citydata.src.fisp` | DOB NOW safety filings — facade materials | ui | drafted |
+| `settings.legal.citydata.src.cscl` | Street Centerlines — road shape, width, lanes, names | ui | drafted |
+| `settings.legal.citydata.src.trees` | 2015 Street Tree Census — street trees | ui | drafted |
+| `settings.legal.citydata.src.hydrants` | Hydrants — hydrant locations | ui | drafted |
+| `settings.legal.citydata.src.shelters` | Bus Stop Shelters — shelter locations | ui | drafted |
+| `settings.legal.citydata.src.linknyc` | LinkNYC — kiosk locations | ui | drafted |
+| `settings.legal.citydata.src.subway` | MTA subway entrances — station stairs | ui | drafted |
+| `settings.legal.citydata.src.bikeracks` | CityRacks — bike rack locations | ui | drafted |
+| `settings.legal.citydata.link.osm` | View OpenStreetMap copyright | ui | drafted |
+| `settings.legal.citydata.link.odbl` | View the ODbL 1.0 licence | ui | drafted |
+| `settings.legal.citydata.link.valdrada` | View the Valdrada repository | ui | drafted |
+| `settings.legal.citydata.link.dataset` | View the record on NYC Open Data | ui | drafted |
+
+The BibTeX for Valdrada, verbatim from its README — for docs and the
+citation link target, not rendered in the UI:
+
+```bibtex
+@software{turkcan2026valdrada,
+  author  = {Turkcan, Mehmet Kerem},
+  title   = {{Valdrada}: a real-data, real-time digital twin of New York City},
+  year    = {2026},
+  version = {0.4.0},
+  url     = {https://github.com/mkturkcan/valdrada}
+}
+```
+
+Notes:
+
+- **The group label changes with the tile.** "City data" replaces the
+  existing "Map data" caption only when the bundled tile is v3; the v1/v2
+  copy above (`attribution`, `body`) is untouched and stays what older
+  tiles show. `settings.legal.citydata.attribution`/`body` are the shipped
+  strings — they are still accurate on v3 (OSM data is inside the Valdrada
+  tile), so they are repeated here rather than rewritten.
+- **Records are named by what they gave us.** Each `src.*` row says what
+  the tile took from that record set — nothing more. The FISP row says
+  "facade materials", not "wall types" or "fire risk"; the PLUTO row says
+  "floor counts", not "storeys" or "use". What a source did not supply is
+  never implied. Source ids and URLs live in `map-data-credit.ts` and the
+  tile's `sources`, not in the strings.
+- **No claim about style.** STYLE ids are a classification over records,
+  not a record — no credit row says "architecture" or "facade style comes
+  from the city". The `e` provenance bits carry that distinction in data;
+  the credit copy does not try to.
+- **Link labels are verb-first** ("View …"), sentence case, one per
+  licence or source. Every row's link gets a screen-reader label; the
+  a11y review (§6.1 #6) checks targets and contrast.
+- **MTA's entrances live on data.ny.gov**, not NYC Open Data — the shared
+  `link.dataset` label reads "NYC Open Data" and the MTA row needs its own
+  variant at implementation ("View the record on NY Open Data") or the
+  shared label generalises. Flagged for the implementer; not decided here.
+- **No lobby loading copy ships from this deck.** G5 keeps the dataset
+  bundled, so the lobby's existing progress state stays; if G5 moves it to
+  a fetch, lobby strings land then, not preemptively.

@@ -167,13 +167,25 @@ function screen(candidate: ResumeCandidate, input: ResolveResumeInput): Screened
  */
 function migrateToDataset(save: WorldSave, input: ResolveResumeInput): WorldSave | undefined {
   const { dataset } = input;
-  if (save.dataset.datasetId !== dataset.datasetId) return undefined;
-  // Same dataset, same origin: the save is already in this scene space. Return
-  // it untouched so reopening never moves a double by even one ulp (fixture 3).
-  if (save.dataset.datasetVersion === dataset.datasetVersion && sameOrigin(save.dataset.originRef, dataset.originRef)) return save;
+  const migrations = input.datasetMigrations ?? [];
+  if (save.dataset.datasetId !== dataset.datasetId) {
+    // A re-bake can rename the dataset (the tile id is dated): the save still
+    // resumes when a migration step names the old id in `fromDatasetIds` and
+    // starts the chain at the save's version. No step, no resume.
+    const bridge = migrations.find(
+      (m) =>
+        m.datasetId === dataset.datasetId
+        && m.fromDatasetIds?.includes(save.dataset.datasetId) === true
+        && m.fromDatasetVersion === save.dataset.datasetVersion,
+    );
+    if (bridge === undefined) return undefined;
+  } else if (save.dataset.datasetVersion === dataset.datasetVersion && sameOrigin(save.dataset.originRef, dataset.originRef)) {
+    // Same dataset, same origin: the save is already in this scene space. Return
+    // it untouched so reopening never moves a double by even one ulp (fixture 3).
+    return save;
+  }
   let position = save.position;
   let version = save.dataset.datasetVersion;
-  const migrations = input.datasetMigrations ?? [];
   while (version !== dataset.datasetVersion) {
     const step = migrations.find((m) => m.datasetId === dataset.datasetId && m.fromDatasetVersion === version);
     if (step === undefined) return undefined;
