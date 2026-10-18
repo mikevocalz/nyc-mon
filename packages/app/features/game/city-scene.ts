@@ -6,7 +6,7 @@ import type { ThreeContext, ThreeScene } from '@acme/ui/three';
 import type { CityDatasetV2 } from './city-dataset.ts';
 import type { ActorFrame, SceneActor, SceneActorFactory } from './scene-actor.ts';
 import { buildCityWorld } from './world/index.ts';
-import { applyKlippShot, type KlippCameraShot } from './camera/klipp-shot-bridge.ts';
+import { createKlippShotRig, type KlippCameraShot } from './camera/klipp-shot-bridge.ts';
 
 export interface CityCamera {
   x: number;
@@ -17,7 +17,7 @@ export interface CityCamera {
 export interface CitySceneParams {
   dataset: CityDatasetV2;
   camera: CityCamera;
-  /** Optional validated shot output from Klipp; no change to saved player camera. */
+  /** Optional shot output for the Klipp rig; no change to the saved player camera. */
   cinematicShot?: KlippCameraShot | null;
   /** Created once from the first params with the scene's THREE; later changes need a remount, like the dataset. */
   actors?: readonly SceneActorFactory[];
@@ -69,6 +69,10 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(50, 1, 0.5, 10_000);
+  // Klipp owns every write to the camera: `explore` replays the chase pose,
+  // `shot` takes over while a cinematic shot is fed, and Klipp blends between
+  // them (a cut under reduced motion). Nothing else may move the camera.
+  const shots = createKlippShotRig(camera);
   const world = buildCityWorld(THREE, dataset);
   scene.add(world.sky, world.group);
   scene.fog = world.fog;
@@ -95,31 +99,34 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
     throw error;
   }
 
-  function positionCamera(value: CityCamera, cinematicShot?: KlippCameraShot | null) {
+  /**
+   * Feeds the chase pose and this frame's shot to the Klipp rig, then keys
+   * LOD, fog and the sky to the blended output — the camera that actually
+   * renders — not the chase params. Returns true while a blend still moves.
+   */
+  function positionCamera(value: CityCamera, cinematicShot: KlippCameraShot | null | undefined, delta: number, reducedMotion: boolean) {
     if (![value.x, value.z, value.yaw, value.distance].every(Number.isFinite)) throw new Error('Invalid city camera');
     const pose = cameraPose(value);
-    if (!applyKlippShot(camera, cinematicShot)) {
-      // Default exploration camera remains authoritative unless an explicit
-      // Klipp shot was validated. Clearing the shot restores the lens too.
-      camera.position.set(...pose.position);
-      camera.lookAt(...pose.target);
-      const near = Math.max(0.1, Math.min(5, pose.distance * 0.02));
-      const far = Math.max(3000, pose.distance * 6);
-      if (camera.near !== near || camera.far !== far || camera.fov !== 50) {
-        camera.near = near;
-        camera.far = far;
-        camera.fov = 50;
-        camera.updateProjectionMatrix();
-      }
-    }
-    const far = camera.far;
-    world.setViewDistance(pose.distance, far);
+    const near = Math.max(0.1, Math.min(5, pose.distance * 0.02));
+    const far = Math.max(3000, pose.distance * 6);
+    shots.setChase(pose.position, pose.target, near, far);
+    shots.setShot(cinematicShot);
+    shots.setReducedMotion(reducedMotion);
+    const moving = shots.update(delta);
+    const out = shots.shot;
+    const focusX = out.hasLookAtTarget ? out.lookAtTarget[0] : camera.position.x;
+    const focusZ = out.hasLookAtTarget ? out.lookAtTarget[2] : camera.position.z;
+    const viewDistance = out.hasLookAtTarget
+      ? Math.hypot(camera.position.x - focusX, camera.position.y - out.lookAtTarget[1], camera.position.z - focusZ)
+      : pose.distance;
+    world.setViewDistance(viewDistance, camera.far);
     // After the distance: tree LOD reads it.
-    world.setFocus(value.x, value.z);
+    world.setFocus(focusX, focusZ);
     world.sky.position.copy(camera.position);
-    world.sky.scale.setScalar(far * 0.9);
+    world.sky.scale.setScalar(camera.far * 0.9);
+    return moving;
   }
-  positionCamera(initial.camera, initial.cinematicShot);
+  positionCamera(initial.camera, initial.cinematicShot, 0, false);
 
   // The canvas clock stands still while it is paused (on demand), so actors keep their own.
   let actorTime = 0;
@@ -144,17 +151,20 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
         moving = anyMoving;
       }
       // After the actors: a chase camera reads the Caller's position in this frame's params.
-      positionCamera(params.camera, params.cinematicShot);
-      if (moving) invalidate?.();
+      const cameraMoving = positionCamera(params.camera, params.cinematicShot, frame.delta, frame.reducedMotion === true);
+      if (moving || cameraMoving) invalidate?.();
     },
     resize: (width, height) => {
       if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return;
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
+      // Klipp converts normalised viewOffset to pixels with this size.
+      shots.setSize(width, height);
     },
     dispose: () => {
       if (disposed) return;
       disposed = true;
+      shots.dispose();
       for (const actor of actors) actor.dispose();
       world.dispose();
       scene.clear();

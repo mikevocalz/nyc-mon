@@ -1151,6 +1151,9 @@ importers:
       '@acme/ui':
         specifier: workspace:*
         version: link:../ui
+      '@pmndrs/klipp':
+        specifier: 0.14.0
+        version: 0.14.0(react@19.3.0)(three@0.186.1)
       '@tanstack/react-query':
         specifier: 'catalog:'
         version: 5.104.3(react@19.3.0)
@@ -4348,6 +4351,23 @@ packages:
 
   '@pinojs/redact@0.4.0':
     resolution: {integrity: sha512-k2ENnmBugE/rzQfEcdWHcCY+/FM3VLzH9cYEsbdsoqrvzAKRhUZeRNhAZvB8OitQJ1TBed3yqWtdjzS6wJKBwg==}
+
+  '@pmndrs/klipp@0.14.0':
+    resolution: {integrity: sha512-XTLKq/1HOZSi4QSIDYs7O4KdljfaIwmYRWvZD3KH49b118h8UQqAwf1c3G8ALA1a/27MEmGdwwjWYabJjbgBgw==}
+    peerDependencies:
+      '@react-three/fiber': ^9.7.0
+      camera-controls: ^3.1.2
+      react: 19.3.0
+      three: '>=0.156.0'
+    peerDependenciesMeta:
+      '@react-three/fiber':
+        optional: true
+      camera-controls:
+        optional: true
+      react:
+        optional: true
+      three:
+        optional: true
 
   '@polka/url@1.0.0-next.29':
     resolution: {integrity: sha512-wwQAWhWSuHaag8c4q/KN/vCoeOJYshAIvMQwD4GpSb3OiZklFfvAgmj0VCBBImRpuF/aFgIRzllXlVX93Jevww==}
@@ -8651,6 +8671,9 @@ packages:
   math-intrinsics@1.1.0:
     resolution: {integrity: sha512-/IXtbwEk5HTPyEwyKX6hGkYXxM9nbj64B+ilVJnC/R6B0pH5G4V3b0pVbL7DBj4tkhBAppbQUlf6F6Xl9LHu1g==}
     engines: {node: '>= 0.4'}
+
+  math@0.0.0-canary-20260930-56e1c4d3:
+    resolution: {integrity: sha512-bmBQ5+CJ07Ti4KNc1/OTJ17ZanLSzi0TMcI4eyDNBWdmPYtG5+dFozvzZiXL3VSYWvUXnFqa6HZ2lHYFdkJ2Fw==}
 
   md5@2.3.0:
     resolution: {integrity: sha512-T1GITYmFaKuO91vxyoQMFETst+O71VUPEU3ze5GNzDm0OWdP8v1ziTaAEPUr/3kLsY3Sftgz242A1SetQiDL7g==}
@@ -14011,6 +14034,13 @@ snapshots:
 
   '@pinojs/redact@0.4.0': {}
 
+  '@pmndrs/klipp@0.14.0(react@19.3.0)(three@0.186.1)':
+    dependencies:
+      math: 0.0.0-canary-20260930-56e1c4d3
+    optionalDependencies:
+      react: 19.3.0
+      three: 0.186.1
+
   '@polka/url@1.0.0-next.29': {}
 
   '@puppeteer/browsers@3.2.3':
@@ -18939,6 +18969,8 @@ snapshots:
 
   math-intrinsics@1.1.0: {}
 
+  math@0.0.0-canary-20260930-56e1c4d3: {}
+
   md5@2.3.0:
     dependencies:
       charenc: 0.0.2
@@ -20667,15 +20699,6 @@ snapshots:
       webpack: 5.108.4(esbuild@0.28.1)(lightningcss@1.30.1)(postcss@8.5.30)
       webpack-sources: 3.5.1
     optional: true
-
-  react-server-dom-webpack@19.2.7(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(webpack@5.108.4(lightningcss@1.30.1)(postcss@8.5.30)):
-    dependencies:
-      acorn-loose: 8.5.2
-      neo-async: 2.6.2
-      react: 19.3.0
-      react-dom: 19.3.0(react@19.3.0)
-      webpack: 5.108.4(esbuild@0.28.1)(lightningcss@1.30.1)(postcss@8.5.30)
-      webpack-sources: 3.5.1
 
   react-transition-group@4.4.5(react-dom@19.3.0(react@19.3.0))(react@19.3.0):
     dependencies:

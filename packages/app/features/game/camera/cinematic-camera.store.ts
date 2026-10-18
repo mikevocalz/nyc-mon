@@ -1,24 +1,24 @@
 import { createStore } from 'zustand/vanilla';
-import { validKlippShot, type KlippCameraShot, type NycMonShot } from './klipp-shot-bridge.ts';
+import { sanitizeKlippShot, type KlippCameraShot } from './klipp-shot-bridge.ts';
 
 /**
- * Temporary seam for a future @pmndrs/klipp v0.14 coordinator. Never touches
- * player's authoritative world position or the stored resume camera.
+ * JS-side seam for shot requests. The scene's Klipp rig reads `shot` through
+ * the params getter; the store only holds and sanitises the request — the
+ * camera write itself is KlippThree's. Never touches the player's
+ * authoritative world position or the stored resume camera.
  */
-interface CinematicState {
+interface CinematicCameraState {
   shot: KlippCameraShot | null;
-  name: NycMonShot | null;
-  setShot: (name: NycMonShot, shot: KlippCameraShot | null) => boolean;
+  setShot: (shot: KlippCameraShot) => boolean;
   clear: () => void;
 }
-export const cinematicCameraStore = createStore<CinematicState>((set) => ({
+export const cinematicCameraStore = createStore<CinematicCameraState>((set) => ({
   shot: null,
-  name: null,
-  setShot: (name, shot) => {
-    const validated = validKlippShot(shot);
-    if (!validated) return false;
-    set({ name, shot: validated });
+  setShot: (shot) => {
+    const clean = sanitizeKlippShot(shot);
+    if (!clean) return false;
+    set({ shot: clean });
     return true;
   },
-  clear: () => set({ name: null, shot: null }),
+  clear: () => set({ shot: null }),
 }));

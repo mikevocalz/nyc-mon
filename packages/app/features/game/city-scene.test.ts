@@ -7,7 +7,7 @@ import { parseCityDataset } from './city-dataset.ts';
 import { syntheticTileV2 as fixtureV2 } from './world/synthetic-tile.ts';
 import type { SceneActorFactory } from './scene-actor.ts';
 
-const frame = (delta = 0) => ({ delta, time: 0, reducedMotion: false } as unknown as ThreeFrame);
+const frame = (delta = 0, reducedMotion = false) => ({ delta, time: 0, reducedMotion } as unknown as ThreeFrame);
 function context(invalidations = { count: 0 }) {
   // Scene construction does not create a GPU renderer.
   return { THREE, invalidate: () => { invalidations.count++; } } as unknown as ThreeContext;
@@ -104,21 +104,50 @@ test('rejects invalid cameras before allocating meshes', () => {
   assert.throws(() => createCityScene(context(), input), /camera/);
 });
 
-test('external Klipp-compatible shot overrides a frame and restores the exploration lens', () => {
+test('a Klipp shot lands through the rig, follows its own look point, and hands back to the chase camera', () => {
   const input = params();
-  const built = createCityScene(context(), input);
+  const invalidations = { count: 0 };
+  const built = createCityScene(context(invalidations), input);
   const camera = built.camera as THREE.PerspectiveCamera;
   const before = camera.position.clone();
   const shot = {
     position: [55, 4, 32] as [number, number, number],
     quaternion: [0, 0, 0, 1] as [number, number, number, number],
     near: .2, far: 2000, fov: 60,
+    lookAt: [0, 1, 0] as [number, number, number],
   };
-  built.update!(frame(), { ...input, cinematicShot: shot });
+  // Blends advance on real time; dt 1 lands the shot blend in one frame.
+  built.update!(frame(1), { ...input, cinematicShot: shot });
   assert.deepEqual(camera.position.toArray(), [55, 4, 32]);
   assert.equal(camera.fov, 60);
-  built.update!(frame(), { ...input, cinematicShot: null });
-  assert.ok(camera.position.equals(before));
+  // LOD and fog follow the shot's own look distance, not the chase radius.
+  const fog = built.scene.fog as THREE.Fog;
+  const shotDistance = Math.hypot(55 - 0, 4 - 1, 32 - 0);
+  assert.ok(Math.abs(fog.near - (shotDistance * 1.4 + 250)) < 1e-6, `fog.near ${fog.near}`);
+  built.update!(frame(1), { ...input, cinematicShot: null });
+  assert.ok(camera.position.equals(before), 'the blend lands back on the chase pose');
   assert.equal(camera.fov, 50);
+  built.dispose?.();
+});
+
+test('an out-of-range shot clamps its lens mid-flight; reduced motion cuts', () => {
+  const input = params();
+  const built = createCityScene(context(), input);
+  const camera = built.camera as THREE.PerspectiveCamera;
+  const telephoto = {
+    position: [55, 4, 32] as [number, number, number],
+    quaternion: [0, 0, 0, 1] as [number, number, number, number],
+    near: .2, far: 2000, fov: 8,
+  };
+  built.update!(frame(1), { ...input, cinematicShot: telephoto });
+  assert.deepEqual(camera.position.toArray(), [55, 4, 32]);
+  assert.equal(camera.fov, 20, 'clamped into the lens range instead of rejected');
+  const still = {
+    position: [1, 200, 60] as [number, number, number],
+    quaternion: [0, 0, 0, 1] as [number, number, number, number],
+    near: .2, far: 2000, fov: 60,
+  };
+  built.update!(frame(0, true), { ...input, cinematicShot: still });
+  assert.deepEqual(camera.position.toArray(), [1, 200, 60], 'reduced motion: the shot cuts in one frame');
   built.dispose?.();
 });
