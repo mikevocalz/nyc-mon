@@ -23,6 +23,7 @@ import { createCityScene } from '../city-scene.ts';
 import { createCallerProxyWith } from '../character/caller-proxy.ts';
 import type { CallerState } from '../character/caller-store.ts';
 import { withFirstFrameSignal, type GameSceneParams } from '../load-game-scene.ts';
+import { createVehicleActor } from '../living-city/vehicle-actor.ts';
 import { readCaller, readCamera, readView, snapshotVersion, type MutableCallerState } from '../render-snapshot.ts';
 import { describeRuntimeError, installFrameGlobals, type GameRenderEventKind } from './runtime-report.ts';
 import { FrameSampleWindow, type MutableFrameTimingSample } from '../perf/frame-sampler.ts';
@@ -42,6 +43,8 @@ export interface GameRenderArgs {
   context: NativeCanvasContext;
   device: GPUDevice | null;
   snapshot: Synchronizable<number[]>;
+  /** Living City PR05: the packed vehicle channel — null/absent when the flag is off (flag-off = zero-diff). */
+  vehicles?: Synchronizable<number[]> | null;
   /** True while this loop is stopped; the JS side wakes it with wakeGameRender. */
   idle: Synchronizable<boolean>;
   running: boolean;
@@ -298,7 +301,12 @@ export function startGameRender(args: GameRenderArgs): void {
     const params: GameSceneParams = {
       dataset: city.dataset,
       get camera() { return readCamera(s.snapshot, s.camera); },
-      actors: [createCallerProxyWith(mirror)],
+      // PR05: the vehicle fleet reads its own packed Synchronizable — the sim
+      // stays JS-authoritative and only the snapshot crosses runtimes.
+      actors: [
+        createCallerProxyWith(mirror),
+        ...(args.vehicles ? [createVehicleActor({ read: () => args.vehicles?.getDirty() })] : []),
+      ],
       onFirstFrame: () => emit(s, 'firstFrame'),
     };
     const setup = withFirstFrameSignal(
