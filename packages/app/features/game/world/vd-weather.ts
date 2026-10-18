@@ -43,29 +43,39 @@ export function buildPrecipitation(THREE: Three, levels: { wet: { value: number 
   const box = T.vec3(BOX[0], BOX[1], BOX[2]);
   const snowing = T.step(0.5, snow.sub(wet).add(0.5));
   // Rain falls at 21 m/s (Valdrada), snow at 1.2 m/s with a sine wobble.
-  const speed = T.mix(T.float(21), T.float(1.2), snowing);
+  // Per-drop speed variance (0.75–1.25×) — a uniform curtain reads as strobing rods.
+  const speed = T.mix(T.float(21).mul(T.float(0.75).add(seed.x.mul(0.5))), T.float(1.2), snowing);
   const wobble = T.vec3(T.sin(T.time.mul(1.3).add(seed.x.mul(40))), 0, T.cos(T.time.mul(1.1).add(seed.z.mul(40)))).mul(snowing.mul(0.35));
-  const fall = T.vec3(0, T.time.mul(speed).negate(), 0);
+  // Valdrada uWind (2.2, 1.1): rain drifts and the streak leans off vertical.
+  const fall = T.vec3(T.time.mul(2.2), T.time.mul(speed).negate(), T.time.mul(1.1));
   const origin = T.cameraPosition.sub(box.mul(0.5));
   // Floored modulo: WGSL's float % keeps the dividend's sign and would break the wrap below zero.
   const rel = seed.mul(box).add(fall).add(wobble).sub(origin);
   const centre = rel.sub(box.mul(T.floor(rel.div(box)))).add(origin);
-  // Streak: 1.35 m by 1.6 cm for rain, an 8 cm flake for snow, facing the camera about the fall axis.
-  const length = T.mix(T.float(1.35), T.float(0.08), snowing);
-  const width = T.mix(T.float(0.016), T.float(0.08), snowing);
+  // Streak: ~1.35 m by 1.6 cm for rain (per-drop length variance 0.7–1.3×),
+  // an 8.5 cm flake for snow, facing the camera about the velocity axis.
+  const length = T.mix(T.float(1.35).mul(T.float(0.7).add(seed.x.mul(0.6))), T.float(0.085), snowing);
+  const width = T.mix(T.float(0.016), T.float(0.085), snowing);
+  const vel = T.normalize(T.vec3(2.2, speed.negate(), 1.1));
   const toCam = T.normalize(T.cameraPosition.sub(centre));
-  const side = T.normalize(T.cross(T.vec3(0, 1, 0), toCam));
+  const side = T.normalize(T.cross(vel, toCam));
   const level = T.max(wet, snow);
   // Streaks past the level's share collapse to a point, and so do the ones
   // inside 1.5 m of the lens, which would otherwise smear across the frame.
   const shown = T.step(seed.y, level).mul(T.step(1.5, T.distance(centre, T.cameraPosition)));
-  const streak = centre.add(side.mul(corner.x.mul(width))).add(T.vec3(0, corner.y.mul(length), 0));
+  const streak = centre.add(side.mul(corner.x.mul(width))).add(vel.mul(corner.y.mul(length)));
   const position = T.mix(centre, streak, shown);
 
   const material = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, fog: true });
   material.blending = THREE.AdditiveBlending;
   material.positionNode = position;
-  const alpha = T.mix(T.float(0.42), T.float(0.8), snowing).mul(T.float(1).sub(T.abs(corner.x).mul(1.6)));
+  // Taper both axes like Valdrada's fragment shader: soft edges across the
+  // streak and soft ends along it — without `along` every drop draws as a
+  // hard-edged rod. Plus per-drop brightness variance.
+  const u = corner.x.add(0.5);
+  const across = T.smoothstep(0, 0.5, u).mul(T.smoothstep(1, 0.5, u));
+  const along = T.smoothstep(0, 0.3, corner.y).mul(T.smoothstep(1, 0.55, corner.y));
+  const alpha = T.mix(T.float(0.42), T.float(0.85), snowing).mul(across).mul(along).mul(T.float(0.6).add(seed.z.mul(0.4)));
   material.colorNode = T.vec4(T.mix(c('rain'), c('snow'), snowing), alpha);
   const mesh = new THREE.Mesh(geometry, material);
   mesh.name = 'city:precipitation';
