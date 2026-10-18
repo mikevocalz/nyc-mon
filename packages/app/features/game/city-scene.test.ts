@@ -142,6 +142,7 @@ test('an out-of-range shot clamps its lens mid-flight; reduced motion cuts', () 
   built.update!(frame(1), { ...input, cinematicShot: telephoto });
   assert.deepEqual(camera.position.toArray(), [55, 4, 32]);
   assert.equal(camera.fov, 20, 'clamped into the lens range instead of rejected');
+  built.update!(frame(1), { ...input, cinematicShot: null });
   const still = {
     position: [1, 200, 60] as [number, number, number],
     quaternion: [0, 0, 0, 1] as [number, number, number, number],

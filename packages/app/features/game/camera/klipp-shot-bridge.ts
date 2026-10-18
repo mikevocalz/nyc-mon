@@ -131,7 +131,6 @@ export function createKlippShotRig(camera: PerspectiveCamera): KlippShotRig {
   const chaseFov = klipp.initialCameraState.fov;
   let held: KlippCameraShot | null = null;
   let stillMoving = false;
-  let pendingTransition = false;
   let lastTick = 0;
   let reduced = false;
 
@@ -166,7 +165,7 @@ export function createKlippShotRig(camera: PerspectiveCamera): KlippShotRig {
       out.quaternion[2] = q[2] / qlen;
       out.quaternion[3] = q[3] / qlen;
       if (finite(s.fov)) out.fov = clamp(s.fov, SHOT_MIN_FOV, SHOT_MAX_FOV);
-      if (finite(s.near)) out.near = Math.max(s.near, SHOT_MIN_NEAR);
+      if (finite(s.near)) out.near = clamp(s.near, SHOT_MIN_NEAR, SHOT_MAX_FAR - SHOT_MIN_GAP);
       if (finite(s.far)) out.far = Math.min(Math.max(s.far, out.near + SHOT_MIN_GAP), SHOT_MAX_FAR);
       out.viewOffset[0] = s.viewOffset && finite(s.viewOffset[0]) ? clamp(s.viewOffset[0], -1, 1) : 0;
       out.viewOffset[1] = s.viewOffset && finite(s.viewOffset[1]) ? clamp(s.viewOffset[1], -1, 1) : 0;
@@ -206,7 +205,6 @@ export function createKlippShotRig(camera: PerspectiveCamera): KlippShotRig {
       held = next;
       const active = next !== null && writableShot(next);
       if (shotCamera.active !== active) shotCamera.active = active;
-      pendingTransition = true;
     },
     setReducedMotion(reducedMotion) {
       if (reducedMotion === reduced) return;
@@ -220,11 +218,10 @@ export function createKlippShotRig(camera: PerspectiveCamera): KlippShotRig {
       const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
       // The canvas is on demand, so a parked frame arrives with dt 0. Blends
       // still need real elapsed time, measured the way actors measure theirs.
-      if (!(dt > 0) && (pendingTransition || stillMoving || klipp.isBlending) && lastTick > 0) {
+      if (!(dt > 0) && (stillMoving || klipp.isBlending) && lastTick > 0) {
         dt = Math.min(Math.max((now - lastTick) / 1000, 0), 0.1);
       }
       lastTick = now;
-      pendingTransition = false;
       stillMoving = klipp.update(dt);
       return stillMoving || klipp.isBlending;
     },
