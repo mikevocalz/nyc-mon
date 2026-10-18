@@ -41,6 +41,7 @@ import { lampPlacements, createLampActor } from './lamp-viz.ts';
 import { createPedActor } from './ped-actor.ts';
 import { createSignalActor } from './signal-viz.ts';
 import { LivingCityHost } from './sim-host.ts';
+import { livingCityAdaptiveBridge } from './adaptive-bridge.ts';
 import { EXPERIMENTAL_LIVING_CITY, createVehicleActor, livingCityFactoriesFor } from './vehicle-actor.ts';
 import { livingCityPedSlice, livingCityVerticalSlice, type LivingCityPedSlice, type LivingCitySlice } from './vertical-slice.ts';
 
@@ -112,6 +113,11 @@ export function livingCityAdaptiveFrame(scale: number): LivingCityTier | null {
   globalThis.console?.info?.('[NYC-Mon/perf] living-city crowd tier', { tier: next, scale: Number(scale.toFixed(3)) });
   return next;
 }
+
+// Register for the scene's per-frame call through the import-free bridge —
+// this module only evaluates via flag-gated call sites, so `frame` being set
+// is itself the flag-on proof (living-city/adaptive-bridge.ts).
+livingCityAdaptiveBridge.frame = livingCityAdaptiveFrame;
 /**
  * The world clock's starting hour — early dusk (18:40) so the slice opens
  * mid-transition: lamps fading up, headlights on, a dusk sky. The clock

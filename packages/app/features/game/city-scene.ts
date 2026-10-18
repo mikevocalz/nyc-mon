@@ -7,7 +7,7 @@ import type { CityDatasetV3 } from './city-dataset.ts';
 import type { ActorFrame, SceneActor, SceneActorFactory } from './scene-actor.ts';
 import { buildCityWorld } from './world/index.ts';
 import { EXPERIMENTAL_WORLD_POST, mountCityPostPipeline, resolvePostOptions } from './post/pipeline.ts';
-import { EXPERIMENTAL_LIVING_CITY, livingCityAdaptiveFrame } from './living-city/bundled-host.ts';
+import { livingCityAdaptiveBridge } from './living-city/adaptive-bridge.ts';
 import { EXPERIMENTAL_WORLD_RENDER_SCALE, mountRenderScale } from './perf/render-scale.ts';
 import { EXPERIMENTAL_WORLD_THERMAL, thermalSignal, thermalWorsened } from './perf/thermal.ts';
 import { tierBundle, WORLD_TIER, WORLD_TIER_SELECTED } from './perf/tier.ts';
@@ -210,9 +210,9 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
       renderScale?.frame(now, frame.pixelRatio);
       // PR09: adaptive living-city crowd caps — once the controller has
       // surrendered real fill rate, thin the ambient population one tier
-      // (living-city/bundled-host.ts owns the marks; one-way). Dead call
-      // unless both the render-scale and living-city flags are on.
-      if (renderScale && EXPERIMENTAL_LIVING_CITY) livingCityAdaptiveFrame(renderScale.scale);
+      // (living-city/bundled-host.ts owns the marks; one-way). The bridge
+      // stays null unless a flag-gated path evaluated bundled-host.
+      if (renderScale) livingCityAdaptiveBridge.frame?.(renderScale.scale);
       // PR5.1: thermal pressure is a forced down-step on the scale
       // controller — the early warning frame pacing would only see too late.
       if (renderScale && EXPERIMENTAL_WORLD_THERMAL && thermalSignal.seq !== thermalSeqSeen) {
