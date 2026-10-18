@@ -25,6 +25,7 @@ import {
 import { installWebGPUOnRuntime, type WorkletRenderHost, type WorkletRenderSession, type WorkletRenderStart } from '@acme/ui/three';
 import { callerStore } from '../character/caller-store.ts';
 import { gameCameraStore, gameScreenActions } from '../game-session.ts';
+import { EXPERIMENTAL_LIVING_CITY, livingCityHost } from '../living-city/bundled-host.ts';
 import { emptySnapshot, bumpSnapshot, packSnapshot, type SnapshotView } from '../render-snapshot.ts';
 import { parseSkyRigFlag } from '../world/sky-rig.ts';
 import {
@@ -192,6 +193,27 @@ function start(options: WorkletRenderStart): WorkletRenderSession {
   const unsubscribeCamera = gameCameraStore.subscribe(mirror);
   const unsubscribeCaller = callerStore.subscribe(mirror);
 
+  // Living City PR05 (EXPO_PUBLIC_LIVING_CITY=1): the JS-authoritative host
+  // publishes one fresh packed array per sim tick. This is the camera
+  // channel's write() shape again: each publish goes straight into the
+  // vehicle Synchronizable (packVehicleSnapshot returns a new array — the
+  // identity-cache rule below holds), and a parked loop is woken once per
+  // publish so a moving fleet redraws even while the city camera is still.
+  const lcHost = EXPERIMENTAL_LIVING_CITY ? livingCityHost() : null;
+  const vehicles: Synchronizable<number[]> | null = lcHost ? createSynchronizable<number[]>([...lcHost.latestSnapshot()]) : null;
+  let stopVehicles: (() => void) | null = null;
+  if (lcHost && vehicles) {
+    lcHost.attach();
+    stopVehicles = lcHost.addSink((snap) => {
+      if (disposed) return;
+      vehicles.setBlocking(snap);
+      if (idle.getDirty()) {
+        idle.setBlocking(false);
+        scheduleOnRuntime(target, wakeOnRuntime, session, onRuntimeEvent);
+      }
+    });
+  }
+
   // The JS path reports `requested` when the scene import starts (loadGameScene);
   // here the equivalent is handing the start to the runtime.
   routeRenderEvent('stage', 'requested', consoleSinks);
@@ -200,6 +222,7 @@ function start(options: WorkletRenderStart): WorkletRenderSession {
     context: options.context,
     device: options.device,
     snapshot,
+    vehicles,
     idle,
     running: false,
     pacing: VSYNC_PACED ? 'vsync' : 'poll',
@@ -226,6 +249,8 @@ function start(options: WorkletRenderStart): WorkletRenderSession {
       driving?.setBlocking(false);
       unsubscribeCamera();
       unsubscribeCaller();
+      stopVehicles?.();
+      lcHost?.detach();
       scheduleOnRuntime(target, stopOnRuntime, session, onRuntimeEvent);
     },
   };
