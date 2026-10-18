@@ -23,7 +23,7 @@ import type { Three } from '@acme/ui/three';
 import { createCelMaterial, createCelRig, type CelMaterialOptions, type CelRig } from '@acme/ui/three/cel';
 import { cityCelRig } from './cel-rig.ts';
 import { CITY_COLORS, type CityColor } from './palette.ts';
-import { WINDOW_GRID } from './windows.ts';
+import { LIT_SHARE_CAP, LIT_SHARE_DAY, LIT_SHARE_GAIN, LIT_SHARE_TOD, WINDOW_GRID } from './windows.ts';
 import { ATLAS_HEIGHT, ATLAS_WIDTH, atlasPixels } from './pixel-font.ts';
 import type { Node } from 'three/webgpu';
 
@@ -136,7 +136,7 @@ export interface FacadeGraphs {
  * The coverage masks come back alongside the albedo so the PBR lane can
  * steer roughness/metalness per pixel without re-deriving the pattern.
  */
-export function facadeGraphs(THREE: Three, grid: { floor: number; bay: number }, glassy: boolean): FacadeGraphs {
+export function facadeGraphs(THREE: Three, grid: { floor: number; bay: number }, glassy: boolean, tod = LIT_SHARE_TOD): FacadeGraphs {
   const { T, c, detail, vertexRgb } = cityShaderTools(THREE);
   const u = T.uv().x;
   const v = T.uv().y;
@@ -169,14 +169,20 @@ export function facadeGraphs(THREE: Three, grid: { floor: number; bay: number },
   const average = T.mix(vertexRgb, window, glassy ? 0.35 : 0.18);
   const near = detail(260, 700);
   const density = T.float(0.25).add(T.fract(T.sin(seed.mul(7.31).mul(12.9898).add(3.7 * 78.233).add(1.13 * 37.719)).mul(43758.5453)).mul(0.5));
-  const lit = T.step(hash(column, row), density).mul(T.step(1, row));
+  // The daypart dims the lit share — windows.ts litShareAt, the same
+  // formula the L3 room layer applies: a quarter of dusk density by day,
+  // all of it by night. The shop glow stays full — storefront lights are
+  // on at noon too — and FacadeWindowGraphs.density stays raw so glass.ts
+  // can scale its own tod.
+  const share = T.min(T.float(LIT_SHARE_CAP), density.mul(LIT_SHARE_DAY + LIT_SHARE_GAIN * tod));
+  const lit = T.step(hash(column, row), share).mul(T.step(1, row));
   const toneHash = hash(column.add(17.1), row.add(3.3));
   const tone = T.mix(T.mix(c('windowWarm'), c('windowAmber'), T.step(0.55, toneHash)), c('windowCool'), T.step(0.85, toneHash));
   // Open shops glow warm behind their glass; gated bays stay dark.
   const shopGlow = c('windowWarm').mul(shop.mul(T.float(1).sub(gate)).mul(glassy ? 0.35 : 0.45));
   const glowNear = tone.mul(pane.mul(lit).mul(glassy ? 0.75 : 0.85)).add(shopGlow);
   // Far off the panes are sub-pixel: glow at the average lit share instead of shimmering.
-  const glowFar = tone.mul(density.mul(glassy ? 0.3 : 0.22));
+  const glowFar = tone.mul(share.mul(glassy ? 0.3 : 0.22));
   return {
     albedo: T.mix(average, patterned, near),
     emissive: T.mix(glowFar, glowNear, near),
@@ -366,9 +372,20 @@ export interface CityMaterials {
  * Walls, roofs and trunks keep the rim sheen; flat ground seen at a grazing
  * angle would take it across its whole width, so it goes without.
  */
+export interface CityMaterialOptions {
+  /**
+   * Daypart lit share 0 = day … 1 = night (windows.ts `litShareAt`): the
+   * lit-window share of the facade emissive. The world resolves it once at
+   * mount from the sky pick (index.ts); default LIT_SHARE_TOD (dusk). The
+   * storefront glow stays lit at every tod — shop lights are on at noon.
+   */
+  timeOfDay?: number;
+}
+
 export function createCityMaterials(
   THREE: Three,
   sunDirection: readonly [number, number, number],
+  options: CityMaterialOptions = {},
 ): CityMaterials & { rig: CelRig; albedoGraphs: Map<Mat, CelMaterialOptions['albedo']> } {
   const { T, c, vertexRgb } = cityShaderTools(THREE);
   const rig = createCelRig(THREE, cityCelRig(sunDirection));
@@ -383,7 +400,7 @@ export function createCityMaterials(
   const unlit = createUnlitLayers(THREE, sunDirection);
 
   const facade = (grid: { floor: number; bay: number }, glassy: boolean) => {
-    const graphs = facadeGraphs(THREE, grid, glassy);
+    const graphs = facadeGraphs(THREE, grid, glassy, options.timeOfDay ?? LIT_SHARE_TOD);
     const material = cel(graphs.albedo, 1);
     setEmissive(material, graphs.emissive);
     return material;

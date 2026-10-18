@@ -25,6 +25,24 @@ export function litDensity(seed: number): number {
   return 0.25 + h * 0.5;
 }
 
+/**
+ * How the daypart scales the lit share — the world clock's `dayFactor`
+ * (PR07, living-city/clock.ts) reaches the facades as `tod` (0 day …
+ * 1 night): a quarter of the dusk density by day, all of it by night,
+ * capped under certainty so some rooms always stay dark. The facade
+ * shader applies the same formula to its emissive mask (materials.ts);
+ * the L3 interior layer uses it per window (glass.ts `litShare`).
+ */
+export const LIT_SHARE_DAY = 0.25;
+export const LIT_SHARE_GAIN = 0.95;
+export const LIT_SHARE_CAP = 0.95;
+/** The authored default: the unflagged city stands at dusk (materials.ts). */
+export const LIT_SHARE_TOD = 0.8;
+export function litShareAt(density: number, tod: number): number {
+  const t = Math.min(1, Math.max(0, tod));
+  return Math.min(LIT_SHARE_CAP, density * (LIT_SHARE_DAY + LIT_SHARE_GAIN * t));
+}
+
 /** Whether the window at (column, row) of a building with this seed is lit. Ground-floor shopfronts are handled apart. */
 export function windowLit(column: number, row: number, seed: number): boolean {
   if (row < 1) return false;
