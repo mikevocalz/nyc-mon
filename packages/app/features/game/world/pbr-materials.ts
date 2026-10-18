@@ -51,7 +51,7 @@ import {
   type CityMaterials,
   type FacadeGraphs,
 } from './materials.ts';
-import { WINDOW_GRID } from './windows.ts';
+import { LIT_SHARE_TOD, WINDOW_GRID } from './windows.ts';
 import { CITY_COLORS, type CityColor } from './palette.ts';
 import { parseSkyRigFlag } from './sky-rig.ts';
 import { surfaceMid } from './surfaces.ts';
@@ -68,6 +68,8 @@ export const EXPERIMENTAL_WORLD_PBR = parseSkyRigFlag(process.env.EXPO_PUBLIC_WO
 export interface PbrCityOptions {
   /** Sun for the unlit dome's glow disc (index.ts passes the resolved direction). */
   sunDirection: readonly [number, number, number];
+  /** Daypart lit share 0 = day … 1 = night (index.ts resolves it from the sky pick). Default dusk. */
+  timeOfDay?: number;
 }
 
 /**
@@ -109,7 +111,7 @@ export function createPbrCityMaterials(THREE: Three, options: PbrCityOptions): C
   // all fading out with the pattern's own near mask so the far LOD keeps the
   // flat vertex values.
   const facade = (grid: { floor: number; bay: number }, glassy: boolean): StdMat => {
-    const graphs: FacadeGraphs = facadeGraphs(THREE, grid, glassy);
+    const graphs: FacadeGraphs = facadeGraphs(THREE, grid, glassy, options.timeOfDay ?? LIT_SHARE_TOD);
     const material = attr();
     material.colorNode = T.vec4(graphs.albedo, 1);
     // On a curtain wall the panes ARE the curtain — the vertex metal stays;

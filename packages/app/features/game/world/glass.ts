@@ -57,7 +57,7 @@ import {
 } from './materials.ts';
 import { createPbrCityMaterials } from './pbr-materials.ts';
 import { parseSkyRigFlag } from './sky-rig.ts';
-import { litDensity, WINDOW_GRID, windowHash } from './windows.ts';
+import { LIT_SHARE_CAP, LIT_SHARE_DAY, LIT_SHARE_GAIN, litDensity, litShareAt, WINDOW_GRID, windowHash } from './windows.ts';
 import { surfaceMid } from './surfaces.ts';
 import type { Node } from 'three/webgpu';
 
@@ -146,7 +146,7 @@ export function glassFadeWeights(px: number): { detail: number; bands: number } 
  * the same formula on FacadeWindowGraphs.density.
  */
 export function litShare(seed: number, tod: number): number {
-  return Math.min(0.95, litDensity(seed) * (0.25 + 0.95 * clamp01(tod)));
+  return litShareAt(litDensity(seed), tod);
 }
 
 /** Whether the room behind (column, row) of this building is lit — windowLit with the tod-scaled share. */
@@ -262,7 +262,7 @@ function windowLayer(
   const coverageB = coverage.mul(bandsW);
 
   // Lit share scaled by time of day; ground floor stays dark, open shops glow.
-  const densityEff = T.min(T.float(0.95), win.density.mul(0.25 + 0.95 * opts.tod));
+  const densityEff = T.min(T.float(LIT_SHARE_CAP), win.density.mul(LIT_SHARE_DAY + LIT_SHARE_GAIN * opts.tod));
   const litPane = T.step(win.hash(0, 0), densityEff).mul(T.step(1, win.row));
   const lit = T.mix(litPane, T.float(1), shop);
 

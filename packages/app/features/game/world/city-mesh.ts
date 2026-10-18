@@ -11,8 +11,8 @@ import type { Three } from '@acme/ui/three';
 import type { BuildingClass, CityBuilding, CityDatasetV3, CityLandmark, CityRoad, RoadClass } from '../city-dataset.ts';
 import { counterClockwise, hashUnit, mapArea, pairs, pointInRing, ribbon, VertexBuffer } from './geometry.ts';
 import {
-  bays, emitAwning, emitCornice, emitFireEscapeFloor, emitStoop, emitWaterTower, fireEscapeFloors, FLOOR_HEIGHT, hasFireEscape,
-  hasShopSign, hasStoop, hasWaterTower, shopWords, STOOP_REACH, STOOP_WIDTH, towerSpot, wallFrame,
+  bays, emitAwning, emitCornice, emitFireEscapeFloor, emitParapet, emitStoop, emitWaterTower, fireEscapeFloors, FLOOR_HEIGHT,
+  hasFireEscape, hasShopSign, hasStoop, hasWaterTower, shopWords, STOOP_REACH, STOOP_WIDTH, towerSpot, wallFrame,
 } from './facade-detail.ts';
 import { emitStackedText, emitText, textWidth, type TextFace } from './lettering.ts';
 import { BandedBuffer, box } from './parts.ts';
@@ -252,6 +252,7 @@ function landmarkAccents(buffer: VertexBuffer, text: VertexBuffer, landmark: Cit
 export interface CityMeshStats {
   buildings: number; roads: number; areas: number; triangles: number; drawCalls: number; neonTrims: number; storefronts: number; billboards: number;
   cornices: number; stoops: number; fireEscapes: number; awnings: number; shopSigns: number; waterTowers: number;
+  parapets: number;
 }
 
 /**
@@ -313,6 +314,7 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV3, materials:
   const landmarkText = new VertexBuffer();
   const texts: (TextFace & { text: string })[] = [];
   let cornices = 0; let stoops = 0; let fireEscapes = 0; let awnings = 0; let shopSigns = 0; let waterTowers = 0;
+  let parapets = 0;
   const landmarkByBuilding = new Map(dataset.landmarks.map((l) => [l.buildingId, l]));
   const shadowColor = rgb('shadow');
   const commercial = new SegmentGrid(dataset.roads.filter((r) => COMMERCIAL.has(r.class)));
@@ -413,10 +415,15 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV3, materials:
       // The recorded front edge: single-face details land there when the tile says which face is the front.
       const onFront = frontEdge < 0 || i === frontEdge;
 
-      // Cornice along the roof line of masonry street fronts.
+      // Cornice along the roof line of masonry street fronts, with the
+      // brick parapet lip it crowns — the roofline a New York block reads
+      // on. The lip goes to the near-field detail band; at overview range
+      // the cornice still carries the line.
       if (mask === undefined ? CORNICE_CLASSES.has(building.class) && h < 45 : (mask & DETAIL.cornice) !== 0) {
         emitCornice(masonry, f, length, h, tint(rgb('cornice').map((v, k) => v * 0.6 + wall[k]! * 0.4), 1));
+        emitParapet(detail.buffer, f, length, h, tint(wall, 0.82));
         cornices++;
+        parapets++;
       }
       // A brownstone's stoop, off one street face, when the sidewalk has room for it.
       const wantsStoop = mask === undefined ? building.class === 'brownstone' && hasStoop(building.id) : (mask & DETAIL.stoop) !== 0 && onFront;
@@ -550,7 +557,7 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV3, materials:
   const stats: CityMeshStats = {
     buildings: dataset.buildings.length, roads: dataset.roads.length, areas: dataset.areas.length,
     triangles, drawCalls: meshes.length, neonTrims: trims, storefronts: fronts, billboards: boards,
-    cornices, stoops, fireEscapes, awnings, shopSigns, waterTowers,
+    cornices, stoops, fireEscapes, awnings, shopSigns, waterTowers, parapets,
   };
   const shownBands: [number, number] = [-1, -1];
   const bands: [number, number] = [0, 0];
