@@ -67,7 +67,7 @@ import { useGameRenderThread } from './render-thread-choice.ts';
 import { readLobbyIdentity } from './lobby/lobby-identity.ts';
 import { lobbyStore } from './lobby/lobby.store.ts';
 import { gameInputRouter, useGameInput } from './use-game-input.ts';
-import { livingCityActorFactories } from './living-city/bundled-host.ts';
+import { livingCityActorFactories, livingCitySky } from './living-city/bundled-host.ts';
 import { useCityCameraGestures } from './use-city-camera-gestures.ts';
 import { useWorldSaveLifecycle } from './world-resume/use-world-save-lifecycle.ts';
 import type { SceneActorFactory } from './scene-actor.ts';
@@ -194,6 +194,9 @@ export function GameScreen({ focused = true }: GameScreenProps = {}) {
       // flag contributes the vehicle + pedestrian factories; off, the list is
       // byte-identical.
       actors: [...CALLER_ACTORS, ...livingCityActorFactories()],
+      // PR07: the world clock picks the sky preset (dusk at the slice's
+      // starting hour). Flag off → undefined → the world's own default.
+      sky: livingCitySky(),
       onFirstFrame: gameScreenActions.firstFrame,
     };
   }, [city]);
