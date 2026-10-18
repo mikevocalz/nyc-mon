@@ -56,8 +56,9 @@ export function buildPrecipitation(THREE: Three, levels: { wet: { value: number 
   const toCam = T.normalize(T.cameraPosition.sub(centre));
   const side = T.normalize(T.cross(T.vec3(0, 1, 0), toCam));
   const level = T.max(wet, snow);
-  // Streaks past the level's share collapse to a point.
-  const shown = T.step(seed.y, level);
+  // Streaks past the level's share collapse to a point, and so do the ones
+  // inside 1.5 m of the lens, which would otherwise smear across the frame.
+  const shown = T.step(seed.y, level).mul(T.step(1.5, T.distance(centre, T.cameraPosition)));
   const streak = centre.add(side.mul(corner.x.mul(width))).add(T.vec3(0, corner.y.mul(length), 0));
   const position = T.mix(centre, streak, shown);
 
