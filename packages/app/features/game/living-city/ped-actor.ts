@@ -128,6 +128,8 @@ export interface PedActorOptions {
   readonly onUnmount?: () => void;
   /** Instance capacity per ped kind (default 192). */
   readonly capacity?: number;
+  /** Ground under a ped's feet (curb height on the sidewalk, 0 in the street); default flat 0. */
+  readonly groundY?: (x: number, z: number) => number;
 }
 
 /**
@@ -221,7 +223,7 @@ export function createPedActor(options: PedActorOptions): SceneActorFactory {
             // Feet pivot: y lifts only for the stride bob while walking.
             const bob = speed > 0.1 ? Math.abs(Math.sin((frame.time ?? 0) * speed * Math.PI)) * BOB_METRES : 0;
             quat.setFromAxisAngle(up, pose.yaw);
-            pos.set(pose.x, bob, pose.z);
+            pos.set(pose.x, bob + (options.groundY?.(pose.x, pose.z) ?? 0), pose.z);
             scale.set(grow, grow, grow);
             matrix.compose(pos, quat, scale);
             km.mesh.setMatrixAt(slot, matrix);

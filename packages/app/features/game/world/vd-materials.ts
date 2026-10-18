@@ -370,6 +370,17 @@ export function createVdCityMaterials(THREE: Three, options: PbrCityOptions): Vd
     let albedo = vertexRgb.mul(groundGrain(photo, GND.paving, fp, 0.7)).mul(T.mix(T.float(1), tone, near)) as V3;
     albedo = albedo.mul(T.float(1).sub(joint.mul(0.74).mul(near))) as V3;
     albedo = snowCap(albedo.mul(w.dark) as V3, T.float(1).sub(joint.mul(0.5)));
+    // Curb faces share this buffer: granite blocks 1.2-2.1 m long with a
+    // dark gutter foot and a bright top arris (Valdrada matId 2), not flags.
+    const face = T.float(1).sub(T.smoothstep(0.5, 0.9, T.normalWorld.y));
+    const blockU = T.uv().x.div(1.65);
+    const blockJoint = T.float(1).sub(pcov(blockU as F, 0.02, 1, T.max(T.fwidth(blockU), 1e-4).mul(1.25)));
+    const blockTone = T.float(0.85).add(hash12(T.vec2(T.floor(blockU), 3.1)).mul(0.25));
+    const faceH = T.uv().y as F;
+    const foot = T.smoothstep(0.06, 0.11, faceH);
+    const arris = T.smoothstep(0.17, 0.185, faceH).mul(0.25);
+    const granite = vertexRgb.mul(blockTone).mul(T.mix(T.float(0.45), T.float(1), foot)).mul(T.float(1).sub(blockJoint.mul(0.4))).add(arris) as V3;
+    albedo = T.mix(albedo, granite.mul(w.dark), face) as V3;
     material.colorNode = T.vec4(albedo, 1);
     const n = T.texture(normals, tuv).depth(T.float(NRM.paving)).rgb as V3;
     material.normalNode = perturb(flatFrame(), n, near.mul(0.6).mul(T.float(1).sub(w.puddle)));
@@ -389,6 +400,10 @@ export function createVdCityMaterials(THREE: Three, options: PbrCityOptions): Vd
   };
   concreteGrain(base.roofs as StdMat, vertexRgb as unknown as V3, 1);
   concreteGrain(base.areas as StdMat, vertexRgb as unknown as V3, 0.9);
+
+  // No painted light pools: in Valdrada the lamps light the street through
+  // the shader, and the decal read as a bright patch mid-sidewalk at noon.
+  base.lampPools.visible = false;
 
   return {
     ...base,

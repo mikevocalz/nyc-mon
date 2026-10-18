@@ -38,6 +38,7 @@
 // pauses when it pauses.
 
 import type { Three } from '@acme/ui/three';
+import { CURB_HEIGHT } from '../world/curb.ts';
 import type { ActorFrame, SceneActor, SceneActorFactory } from '../scene-actor.ts';
 import { pickWithin, TREE_REFRESH_METRES } from '../world/tree-lod.ts';
 import {
@@ -355,6 +356,45 @@ export function pedBoxPlacements(topology: LaneTopology, signals: SignalSystem, 
   return out;
 }
 
+/** Heads and ped boxes within this many metres of a mast mount on it instead of standing their own pole. */
+export const MAST_SHARE_METRES = 6;
+
+/**
+ * One pole per corner, the way NYC builds it and Valdrada compiles it
+ * (client/tools/pipeline/compile.mjs: the SIGNAL_MAST stands on the
+ * STREET_SIGN's corner point). Each head snaps to the nearest existing
+ * mast within MAST_SHARE_METRES (the street-sign poles first, then
+ * masts earlier heads founded) or founds one; ped boxes snap the same
+ * way and keep their own post only where no mast is near.
+ */
+export function mountOnMasts(
+  heads: readonly SignalHeadPlacement[],
+  boxes: readonly PedBoxPlacement[],
+  anchors: readonly { x: number; z: number }[] = [],
+): { heads: SignalHeadPlacement[]; boxes: PedBoxPlacement[] } {
+  const masts = anchors.map((a) => [a.x, a.z] as [number, number]);
+  const nearest = (x: number, z: number): [number, number] | null => {
+    let best: [number, number] | null = null;
+    let bestD = MAST_SHARE_METRES;
+    for (const m of masts) {
+      const d = Math.hypot(m[0] - x, m[1] - z);
+      if (d < bestD) { bestD = d; best = m; }
+    }
+    return best;
+  };
+  const outHeads = heads.map((h) => {
+    const m = nearest(h.x, h.z);
+    if (m) return { ...h, x: m[0], z: m[1] };
+    masts.push([h.x, h.z]);
+    return h;
+  });
+  const outBoxes = boxes.map((b) => {
+    const m = nearest(b.x, b.z);
+    return m ? { ...b, x: m[0], z: m[1] } : b;
+  });
+  return { heads: outHeads, boxes: outBoxes };
+}
+
 // --- Primitive geometry (the `proc:` registry recipes) -------------------------------
 
 export interface VizGeometryData {
@@ -515,6 +555,8 @@ export interface SignalActorOptions {
   /** Instance caps (tests shrink them; the budgets document the defaults). */
   readonly headCap?: number;
   readonly pedCap?: number;
+  /** Street-sign pole positions: heads and ped boxes near one mount on it (mountOnMasts). */
+  readonly mastAnchors?: readonly { x: number; z: number }[];
   readonly headRadius?: number;
   readonly pedRadius?: number;
 }
@@ -532,8 +574,11 @@ export function createSignalActor(options: SignalActorOptions): SceneActorFactor
     const roster = signalRoster(options.signals);
     const rosterIndex = new Map<string, number>();
     roster.forEach((entry, i) => rosterIndex.set(entry.element, i));
-    const heads = signalHeadPlacements(options.topology, options.signals, options.clearance);
-    const boxes = pedBoxPlacements(options.topology, options.signals, options.clearance);
+    const { heads, boxes } = mountOnMasts(
+      signalHeadPlacements(options.topology, options.signals, options.clearance),
+      pedBoxPlacements(options.topology, options.signals, options.clearance),
+      options.mastAnchors,
+    );
     const headCap = options.headCap ?? SIGNAL_HEAD_CAP;
     const pedCap = options.pedCap ?? PED_BOX_CAP;
     const headRadius = options.headRadius ?? SIGNAL_HEAD_RADIUS;
@@ -637,7 +682,7 @@ export function createSignalActor(options: SignalActorOptions): SceneActorFactor
         const h = heads[headIds[k]!]!;
         activeHeads[k] = headIds[k]!;
         quat.setFromAxisAngle(up, h.yaw);
-        matrix.compose(pos.set(h.x, 0, h.z), quat, scale.set(1, 1, 1));
+        matrix.compose(pos.set(h.x, CURB_HEIGHT, h.z), quat, scale.set(1, 1, 1));
         headMesh.setMatrixAt(k, matrix);
         // Lens anchors → world matrices (static per placement).
         for (let l = 0; l < LENSES_PER_HEAD; l++) {
@@ -648,7 +693,7 @@ export function createSignalActor(options: SignalActorOptions): SceneActorFactor
           // Local offset rotated by the head yaw.
           const wx = h.x + Math.sin(h.yaw) * lz + Math.cos(h.yaw) * lx;
           const wz = h.z + Math.cos(h.yaw) * lz - Math.sin(h.yaw) * lx;
-          matrix.compose(pos.set(wx, ly, wz), quat, scale.set(LENS_RADIUS * 2, LENS_RADIUS * 2, 1));
+          matrix.compose(pos.set(wx, ly + CURB_HEIGHT, wz), quat, scale.set(LENS_RADIUS * 2, LENS_RADIUS * 2, 1));
           lensMesh.setMatrixAt(k * LENSES_PER_HEAD + l, matrix);
         }
       }
@@ -660,7 +705,7 @@ export function createSignalActor(options: SignalActorOptions): SceneActorFactor
         const b = boxes[boxIds[k]!]!;
         activeBoxes[k] = boxIds[k]!;
         quat.setFromAxisAngle(up, b.yaw);
-        matrix.compose(pos.set(b.x, 0, b.z), quat, scale.set(1, 1, 1));
+        matrix.compose(pos.set(b.x, CURB_HEIGHT, b.z), quat, scale.set(1, 1, 1));
         boxMesh.setMatrixAt(k, matrix);
         for (let l = 0; l < LENSES_PER_BOX; l++) {
           const a = boxData.lensAnchors;
@@ -669,7 +714,7 @@ export function createSignalActor(options: SignalActorOptions): SceneActorFactor
           const lz = a[l * 3 + 2]!;
           const wx = b.x + Math.sin(b.yaw) * lz + Math.cos(b.yaw) * lx;
           const wz = b.z + Math.cos(b.yaw) * lz - Math.sin(b.yaw) * lx;
-          matrix.compose(pos.set(wx, ly, wz), quat, scale.set(LENS_RADIUS * 2.2, LENS_RADIUS * 2.2, 1));
+          matrix.compose(pos.set(wx, ly + CURB_HEIGHT, wz), quat, scale.set(LENS_RADIUS * 2.2, LENS_RADIUS * 2.2, 1));
           lensMesh.setMatrixAt(headCap * LENSES_PER_HEAD + k * LENSES_PER_BOX + l, matrix);
         }
       }

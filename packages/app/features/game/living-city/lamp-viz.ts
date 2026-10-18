@@ -23,6 +23,7 @@
 // docs/living-city/pr07-viz.md).
 
 import type { Three } from '@acme/ui/three';
+import { CURB_HEIGHT } from '../world/curb.ts';
 import type { ActorFrame, SceneActor, SceneActorFactory } from '../scene-actor.ts';
 import type { CityDatasetV3 } from '../city-dataset.ts';
 import { LIGHT_POLE_HEIGHT } from '../world/signage.ts';
@@ -66,7 +67,7 @@ export function lampPlacements(dataset: CityDatasetV3, clearance?: StreetClearan
     faceX: l.face[0],
     faceZ: l.face[1],
     glowX: l.x + l.face[0] * 0.6,
-    glowY: LIGHT_POLE_HEIGHT - 0.05,
+    glowY: LIGHT_POLE_HEIGHT - 0.05 + CURB_HEIGHT,
     glowZ: l.z + l.face[1] * 0.6,
     poolX: l.x + l.face[0] * 1.8,
     poolZ: l.z + l.face[1] * 1.8,

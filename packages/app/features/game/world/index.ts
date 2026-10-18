@@ -17,6 +17,7 @@ import { applyCarPbrMaterial, EXPERIMENTAL_WORLD_CAR_PBR } from './car-materials
 import { createSkyRig, EXPERIMENTAL_SKY_RIG, parseSkyRigFlag, type SkyName } from './sky-rig.ts';
 import { createVdCityMaterials, EXPERIMENTAL_WORLD_VD, type VdWeather } from './vd-materials.ts';
 import { buildPrecipitation } from './vd-weather.ts';
+import { CURB_HEIGHT } from './curb.ts';
 
 /**
  * Lane G1 "GPU budget": record the immutable city into one WebGPU render
@@ -152,11 +153,17 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
   const groundGeometry = new THREE.PlaneGeometry(groundSize, groundSize).rotateX(-Math.PI / 2);
   const ground = new THREE.Mesh(groundGeometry, materials.ground);
   ground.name = 'city:ground';
+  if (CURB_HEIGHT > 0) {
+    // The ground is the raised block level; see city-mesh.ts for the underlay order.
+    ground.position.y = CURB_HEIGHT;
+    ground.renderOrder = -4;
+    (materials.ground as InstanceType<Three['Material']>).depthWrite = false;
+  }
 
   // One street-clearance index for every tree, pole, sign, stoop and prop.
   const clearance = createStreetClearance(dataset);
   const city = buildCityMeshes(THREE, dataset, materials, away, clearance);
-  const trees = buildTrees(THREE, dataset, materials, clearance);
+  const trees = buildTrees(THREE, dataset, materials, clearance, vd);
   const furniture = buildStreetFurniture(THREE, dataset, materials, clearance, city.texts);
   const props = buildStreetProps(THREE, dataset, materials, clearance, furniture.signs, furniture.lights);
   const bandMinZ = -dataset.extentMeters - SHADOW_BAND_METRES;

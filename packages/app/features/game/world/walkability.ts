@@ -7,6 +7,7 @@
 //            and anywhere outside the tile
 // Ground is flat today: the tile carries no elevation, so height is 0.
 import type { CityDatasetV3, FlatPoints, RoadClass } from '../city-dataset.ts';
+import { CURB_HEIGHT } from './curb.ts';
 import { pairs, pointInRing, segmentDistanceSq } from './geometry.ts';
 
 /** Roads the road mesh draws as sidewalk, not carriageway (city-mesh.ts). Everything else, crossings included, is carriageway. */
@@ -107,7 +108,12 @@ export function createWalkQueries(dataset: CityDatasetV3): WalkQueries {
     for (const a of open.at(x, z)) if (contains(a, x, z)) return true;
     return false;
   };
-  const groundHeight = (x: number, z: number): number => (Number.isFinite(x) && Number.isFinite(z) ? 0 : Number.NaN);
+  // Raised sidewalks (vd lane): curb height everywhere off the carriageway, road level on it.
+  const kerb = CURB_HEIGHT > 0 ? createStreetClearance(dataset) : null;
+  const groundHeight = (x: number, z: number): number => {
+    if (!Number.isFinite(x) || !Number.isFinite(z)) return Number.NaN;
+    return kerb && !kerb.inCarriageway(x, z, 0) ? CURB_HEIGHT : 0;
+  };
   return { isWalkable, groundHeight };
 }
 

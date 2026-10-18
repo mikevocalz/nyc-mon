@@ -20,6 +20,7 @@ import type { CityMaterials } from './materials.ts';
 import { WINDOW_GRID } from './windows.ts';
 import { createStreetClearance, WALKWAY_CLASSES, type StreetClearance } from './walkability.ts';
 import { AWNING_TONES, CITY_COLORS, hexToRgb, WALL_TONES, type CityColor } from './palette.ts';
+import { CURB_HEIGHT } from './curb.ts';
 import { facadePhoto } from './vd-facades.ts';
 import { buildingSurface, ContactField, contactReach, surfacePick, SURFACES, wallAo } from './surfaces.ts';
 
@@ -520,7 +521,7 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV3, materials:
     const ring = counterClockwise(pairs(area.ring));
     const holes = area.holes.map((hole) => pairs(hole));
     areas.surface(...areaSurface(area.kind, hashUnit(`${area.id}:surf`)));
-    emitFlat(THREE, areas, ring, holes, areaLayer(area.kind), rgb(AREA_COLOR[area.kind] ?? 'grass'), occlude);
+    emitFlat(THREE, areas, ring, holes, areaLayer(area.kind) + CURB_HEIGHT, rgb(AREA_COLOR[area.kind] ?? 'grass'), occlude);
   }
 
   for (const road of dataset.roads) {
@@ -528,12 +529,16 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV3, materials:
     if (WALKWAY_CLASSES.has(road.class)) {
       const color = road.class === 'pedestrian' ? rgb('plaza') : rgb('sidewalk');
       sidewalks.surface(...surfacePick('masonry', hashUnit(`${road.id}:walk`)));
-      strip(sidewalks, points, road.widthMeters / 2, LAYER.sidewalks, color, occlude);
+      strip(sidewalks, points, road.widthMeters / 2, LAYER.sidewalks + CURB_HEIGHT, color, occlude);
       continue;
     }
     if (road.sidewalkMeters > 0) {
       sidewalks.surface(...surfacePick('masonry', hashUnit(`${road.id}:walk`)));
-      strip(sidewalks, points, road.widthMeters / 2 + road.sidewalkMeters, LAYER.sidewalks, rgb('sidewalk'), occlude);
+      strip(sidewalks, points, road.widthMeters / 2 + road.sidewalkMeters, LAYER.sidewalks + CURB_HEIGHT, rgb('sidewalk'), occlude);
+    }
+    if (CURB_HEIGHT > 0 && road.class !== 'crossing') {
+      sidewalks.surface(...SURFACES.stone);
+      curbFaces(sidewalks, points, road.widthMeters / 2, LAYER.roads, LAYER.sidewalks + CURB_HEIGHT, rgb('curb'), clearance);
     }
     const zebra = road.class === 'crossing' ? 1 : 0;
     const centre = !zebra && road.widthMeters >= CENTRE_LINE_MIN_WIDTH ? 1 : 0;
@@ -551,8 +556,19 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV3, materials:
     meshes.push(mesh);
     return mesh;
   };
-  add('city:areas', areas, materials.areas);
-  add('city:sidewalks', sidewalks, materials.sidewalks);
+  const areaMesh = add('city:areas', areas, materials.areas);
+  const walkMesh = add('city:sidewalks', sidewalks, materials.sidewalks);
+  if (CURB_HEIGHT > 0) {
+    // Raised ground drawn as an underlay: lots and sidewalks sit at curb
+    // height but write no depth and draw before the roads, so the
+    // carriageway (and the attached-sidewalk ribbons it overlaps) still
+    // reads on top, sunk below the curb faces.
+    for (const [mesh, order] of [[areaMesh, -3], [walkMesh, -2]] as const) {
+      if (!mesh) continue;
+      mesh.renderOrder = order;
+      (mesh.material as InstanceType<Three['Material']>).depthWrite = false;
+    }
+  }
   add('city:roads', roads, materials.roads);
   add('city:walls-masonry', masonry, materials.masonry);
   add('city:walls-glass', glass, materials.glass);
@@ -673,6 +689,32 @@ const AREA_FAMILY: Record<string, 'foliage' | 'masonry'> = {
 function areaSurface(kind: string, seed: number): readonly [number, number] {
   if (kind === 'water') return SURFACES.water;
   return surfacePick(AREA_FAMILY[kind] ?? 'masonry', seed);
+}
+
+/**
+ * Granite curb faces along both carriageway edges, from road level up to
+ * the sidewalk top, facing the road. A face whose outside lands in another
+ * carriageway (a junction mouth, a crossing) is left out, as Valdrada's
+ * emitter skips faces inside `inCarriageway` (compile.mjs ~L2985).
+ */
+function curbFaces(buffer: VertexBuffer, points: Point[], half: number, y0: number, y1: number, color: readonly number[], clearance: StreetClearance): void {
+  if (points.length < 2) return;
+  const { left, right, v } = ribbon(points, half);
+  for (const edge of [left, right]) {
+    for (let i = 1; i < points.length; i++) {
+      const a = edge[i - 1]!; const b = edge[i]!;
+      const mx = (a[0] + b[0]) / 2; const mz = (a[1] + b[1]) / 2;
+      const cx = (points[i - 1]![0] + points[i]![0]) / 2; const cz = (points[i - 1]![1] + points[i]![1]) / 2;
+      const len = Math.hypot(mx - cx, mz - cz);
+      if (len < 1e-6) continue;
+      // Unit normal toward the road centre.
+      const nx = (cx - mx) / len; const nz = (cz - mz) / len;
+      if (clearance.inCarriageway(mx - nx * 0.6, mz - nz * 0.6, 0)) continue;
+      const u0 = v[i - 1]!; const u1 = v[i]!;
+      buffer.quad([a[0], y0, a[1]], [b[0], y0, b[1]], [b[0], y1, b[1]], [a[0], y1, a[1]], [nx, 0, nz], color,
+        [[u0, y0], [u1, y0], [u1, y1], [u0, y1]]);
+    }
+  }
 }
 
 /** A flat ribbon along a polyline; u runs across (0..1), v along in metres. `ao` bakes per-corner occlusion when given. */

@@ -8,34 +8,20 @@
 // alpha comes from the CC0 Quaternius nature pack, baked into
 // world/leaf-alpha.ts by tooling/city/bake-foliage.mjs.
 import type { Three } from '@acme/ui/three';
+import { CURB_HEIGHT } from './curb.ts';
 import type { BufferGeometry } from 'three/webgpu';
 import type { CityDatasetV3 } from '../city-dataset.ts';
 import { LEAF_ALPHA as LEAF } from './leaf-alpha.ts';
+import { decodeBase64 } from './foliage-decode.ts';
 import { mulberry32 } from './geometry.ts';
 import { NEAR_TREE_CAP, TreeLod } from './tree-lod.ts';
+import { buildVdTreeMeshes, VD_NEAR_TREE_CAP, VD_TREE_SCALE, vdSpecies } from './vd-trees-mesh.ts';
 import { createStreetClearance, type StreetClearance } from './walkability.ts';
 import { linearColor, TONE_ATTRIBUTE, type CityMaterials } from './materials.ts';
 
 type Geometry = BufferGeometry;
 
-const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-export function decodeBase64(base64: string): Uint8Array {
-  const lookup = new Uint8Array(128);
-  for (let i = 0; i < B64.length; i++) lookup[B64.charCodeAt(i)] = i;
-  const clean = base64.replace(/=+$/, '');
-  const out = new Uint8Array(Math.floor((clean.length * 3) / 4));
-  let o = 0;
-  for (let i = 0; i < clean.length; i += 4) {
-    const a = lookup[clean.charCodeAt(i)]!;
-    const b = lookup[clean.charCodeAt(i + 1)]!;
-    const c = lookup[clean.charCodeAt(i + 2)] ?? 0;
-    const d = lookup[clean.charCodeAt(i + 3)] ?? 0;
-    out[o++] = (a << 2) | (b >> 4);
-    if (o < out.length) out[o++] = ((b & 15) << 4) | (c >> 2);
-    if (o < out.length) out[o++] = ((c & 3) << 6) | d;
-  }
-  return out;
-}
+export { decodeBase64 } from './foliage-decode.ts';
 
 /** Metres: the crown is about 6 m across with its centre 3.8 m up, a NYC street tree. */
 const CROWN_SCALE = 2.6;
@@ -197,6 +183,8 @@ export { TREE_HIDE_METRES, TREE_NEAR_LOD_METRES } from './tree-lod.ts';
 export function buildTrees(
   THREE: Three, dataset: CityDatasetV3, materials: Pick<CityMaterials, 'leaf' | 'farCrown' | 'trunks'>,
   clearance: StreetClearance = createStreetClearance(dataset),
+  /** vd lane: near trees are Valdrada's modelled street trees (vd-trees-mesh.ts) instead of leaf-card crowns. */
+  modelTrees = false,
 ) {
   const { trees: placements, report } = treePlacements(dataset, clearance);
   const count = Math.max(1, placements.length);
@@ -231,7 +219,7 @@ export function buildTrees(
   const zs = new Float32Array(placements.length);
   placements.forEach((tree, i) => {
     rotation.setFromAxisAngle(up, tree.tone * Math.PI * 2);
-    position.set(tree.x, 0, tree.z);
+    position.set(tree.x, CURB_HEIGHT, tree.z);
     scale.setScalar(tree.scale);
     matrix.compose(position, rotation, scale);
     matrix.toArray(sourceMatrices, i * 16);
@@ -240,6 +228,18 @@ export function buildTrees(
     xs[i] = tree.x;
     zs[i] = tree.z;
   });
+  // vd lane: one species per tree and its own matrix at the model's scale.
+  const vd = modelTrees ? buildVdTreeMeshes(THREE, Math.min(count, VD_NEAR_TREE_CAP)) : null;
+  const vdSpeciesOf = new Uint8Array(placements.length);
+  const vdMatrices = vd ? new Float32Array(placements.length * 16) : null;
+  if (vd && vdMatrices) {
+    placements.forEach((tree, i) => {
+      vdSpeciesOf[i] = vdSpecies(Math.abs(Math.sin(i * 12.9898 + tree.x * 0.37 + tree.z * 0.11) * 43758.5453) % 1);
+      rotation.setFromAxisAngle(up, tree.tone * Math.PI * 2);
+      matrix.compose(position.set(tree.x, CURB_HEIGHT, tree.z), rotation, scale.setScalar(tree.scale * VD_TREE_SCALE));
+      matrix.toArray(vdMatrices, i * 16);
+    });
+  }
   // The cel albedo reads the tone before lighting, so each crown mesh keeps its own tone list.
   const nearTones = new THREE.InstancedBufferAttribute(new Float32Array(nearCapacity * 3), 3);
   const farTones = new THREE.InstancedBufferAttribute(new Float32Array(count * 3), 3);
@@ -272,7 +272,7 @@ export function buildTrees(
     tones.needsUpdate = true;
   };
   return {
-    objects: [near, far, trunks],
+    objects: vd ? [near, far, trunks, ...vd.objects] : [near, far, trunks],
     count: placements.length,
     /** How many trees the street clearance moved, shrank or dropped. */
     report,
@@ -280,7 +280,32 @@ export function buildTrees(
     /** Refresh the instance lists around the focus; cheap to call every frame. */
     update(x: number, z: number, cameraDistance: number) {
       if (placements.length === 0 || !lod.update(x, z, cameraDistance)) return false;
-      copy(lod.near, lod.nearCount, [near, trunks], nearTones);
+      if (vd && vdMatrices) {
+        // Model trees take the nearest VD_NEAR_TREE_CAP of the near set, split by species.
+        for (const s of vd.species) s.count = 0;
+        const n = Math.min(lod.nearCount, VD_NEAR_TREE_CAP);
+        for (let k = 0; k < n; k++) {
+          const i = lod.near[k]!;
+          const s = vd.species[vdSpeciesOf[i]!]!;
+          const slot = s.count++;
+          const row = vdMatrices.subarray(i * 16, i * 16 + 16);
+          (s.bark.instanceMatrix.array as Float32Array).set(row, slot * 16);
+          (s.leaf.instanceMatrix.array as Float32Array).set(row, slot * 16);
+        }
+        for (const s of vd.species) {
+          for (const mesh of [s.bark, s.leaf]) {
+            mesh.count = s.count;
+            mesh.visible = s.count > 0;
+            mesh.instanceMatrix.clearUpdateRanges();
+            if (s.count > 0) mesh.instanceMatrix.addUpdateRange(0, s.count * 16);
+            mesh.instanceMatrix.needsUpdate = true;
+          }
+        }
+        // Past the model cap the leaf-card crowns carry on.
+        copy(lod.near.subarray(n), lod.nearCount - n, [near, trunks], nearTones);
+      } else {
+        copy(lod.near, lod.nearCount, [near, trunks], nearTones);
+      }
       copy(lod.far, lod.farCount, [far], farTones);
       near.visible = trunks.visible = lod.nearCount > 0;
       far.visible = lod.farCount > 0;
@@ -291,6 +316,7 @@ export function buildTrees(
       for (const m of [leafMaterial, farMaterial]) m.dispose();
       texture.dispose();
       for (const mesh of [near, far, trunks]) mesh.dispose();
+      vd?.dispose();
     },
   };
 }
