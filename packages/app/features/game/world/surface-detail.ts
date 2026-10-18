@@ -44,6 +44,11 @@ export const SURFACE_DETAIL = {
     grainDark: 0.96,
     grainLight: 1.04,
     cellMetres: 0.18,
+    // Cell-hash constants, shared with the shader (materials.ts) so the test
+    // samples the same grain values the GPU draws.
+    hashDotX: 127.1,
+    hashDotZ: 311.7,
+    hashScale: 43758.5453,
     fadeNearMetres: 4,
     fadeFarMetres: 32,
   },
@@ -62,6 +67,16 @@ export function surfaceDetailWeight(metres: number, near: number, far: number): 
     near < 0 || far <= near) return 0;
   const t = Math.max(0, Math.min(1,(metres - near) / (far - near)));
   return 1 - t*t*(3-2*t);
+}
+
+/**
+ * CPU mirror of the per-cell asphalt grain hash (integer cell indices in,
+ * 0..1 out), so tests can check the spread of the values the shader draws.
+ */
+export function asphaltGrainHash(cellX: number, cellZ: number): number {
+  const { hashDotX, hashDotZ, hashScale } = SURFACE_DETAIL.asphalt;
+  const s = Math.sin(cellX * hashDotX + cellZ * hashDotZ) * hashScale;
+  return s - Math.floor(s);
 }
 
 export const EXPERIMENTAL_SURFACE_DETAIL = parseSurfaceDetailFlag(

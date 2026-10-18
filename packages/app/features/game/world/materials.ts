@@ -229,8 +229,8 @@ export function createCityMaterials(
       const a = SURFACE_DETAIL.asphalt;
       const cell = T.floor(T.positionWorld.xz.div(a.cellMetres));
       const grain = T.fract(T.sin(
-        cell.x.mul(127.1).add(cell.y.mul(311.7)),
-      ).mul(43758.5453));
+        cell.x.mul(a.hashDotX).add(cell.y.mul(a.hashDotZ)),
+      ).mul(a.hashScale));
       const grit = T.mix(T.float(a.grainDark), T.float(a.grainLight), grain);
       painted = painted.mul(T.mix(
         T.float(1), grit, detail(a.fadeNearMetres, a.fadeFarMetres),
