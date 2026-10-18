@@ -94,6 +94,17 @@ export function emitCornice(buffer: VertexBuffer, f: Frame, length: number, top:
   box(buffer, f, [-hl, top - 0.75, 0], [hl, top - 0.15, 0.45], color, { skip: ['back', 'left', 'right', 'top'] });
 }
 
+/**
+ * The brick parapet the cornice crowns: the wall continued a few courses
+ * past the roof line, a touch proud of the facade — the roofline lip a New
+ * York block reads on from the street. Front and top faces only; the ends
+ * meet the neighbours' parapets.
+ */
+export function emitParapet(buffer: VertexBuffer, f: Frame, length: number, top: number, color: Rgb): void {
+  const hl = length / 2;
+  box(buffer, f, [-hl, top - 0.08, -0.02], [hl, top + 0.34, 0.12], color, { skip: ['bottom', 'back', 'left', 'right'] });
+}
+
 /** One floor of a zig-zag fire escape: balcony, front rail, posts and the ladder down to the floor below. */
 export function emitFireEscapeFloor(buffer: VertexBuffer, f: Frame, at: number, floorY: number, iron: Rgb, flip: boolean): void {
   const w = 3.0; const d = 0.85;

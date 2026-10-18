@@ -1,14 +1,21 @@
 // The small street things, as merged and instanced meshes:
 //
-// - city:street-props: hydrants and wire litter baskets, merged and written
-//   in z bands, drawn only near the Caller (one draw range)
+// - city:street-props: hydrants, wire litter baskets and bike racks, merged
+//   and written in z bands, drawn only near the Caller (one draw range)
 // - city:transit and city:transit-lights: subway entrances (iron railings,
-//   the stair well, the green globe lamps) and bus shelters (posts, roof,
-//   glass, a lit ad panel with no artwork) at their OSM positions
+//   the stair well, the green globe lamps), bus shelters (posts, roof,
+//   glass, a lit ad panel with no artwork) and LinkNYC kiosks (a slim
+//   monolith with two lit faces) at their record positions
 // - city:cars: parked cars and taxis, one InstancedMesh whose instance list
 //   follows the Caller (preallocated, rebuilt after a 10 m move)
 //
-// Layout and the clearance rules are street-props-layout.ts.
+// Layout and the clearance rules are street-props-layout.ts. Where the v3
+// tile carries record furniture (`dataset.furniture`), the records place
+// the props: the rule-spaced hydrants below are the fallback for tiles
+// without records — the same record-or-hash rule city-mesh.ts follows.
+// The pedestrian sim already avoids these points as obstacles
+// (living-city/bundled-host.ts bundledObstacles), so drawing them also
+// makes the crowd's detours legible.
 import type { Three } from '@acme/ui/three';
 import type { CityDatasetV3 } from '../city-dataset.ts';
 import { SHADOW_BAND_METRES } from './city-mesh.ts';
@@ -18,7 +25,8 @@ import { CAR_TONES, CITY_COLORS, hexToRgb, type CityColor } from './palette.ts';
 import { BandedBuffer, box, cone, cylinder, frame, type Frame } from './parts.ts';
 import type { LightPlacement, SignPlacement } from './signage.ts';
 import {
-  CAR_LENGTH, CAR_WIDTH, placeAtKerb, placeBaskets, placeHydrants, placeParkedCars, type CarPlacement, type PropPlacement,
+  CAR_LENGTH, CAR_WIDTH, placeAtKerb, placeBaskets, placeHydrants, placeParkedCars, placeRecordProps, type CarPlacement,
+  type PropPlacement,
 } from './street-props-layout.ts';
 import { SURFACES, surfaceMid } from './surfaces.ts';
 import { pickWithin, TREE_REFRESH_METRES } from './tree-lod.ts';
@@ -33,11 +41,19 @@ export const CAR_CAP = 220;
 
 /** Every street prop for a tile, after the clearance. Pure apart from the clearance. */
 export function placeStreetProps(dataset: CityDatasetV3, clearance: StreetClearance, signs: readonly SignPlacement[], lights: readonly LightPlacement[]) {
-  const hydrants = placeHydrants(dataset, clearance, lights);
+  // Hydrants: the DOT records where the tile carries them, the kerb-spacing
+  // rule where it does not. Records still clear the streetlight poles.
+  const recordHydrants = dataset.furniture.hydrant.length >= 3 ? placeRecordProps(dataset.furniture.hydrant, clearance, 2.5) : null;
+  const hydrants = recordHydrants
+    ? recordHydrants.placed.filter((p) => !lights.some((l) => Math.abs(l.x - p.x) < 2 && Math.abs(l.z - p.z) < 2))
+    : placeHydrants(dataset, clearance, lights);
+  const hydrantLampDrops = recordHydrants ? recordHydrants.placed.length - hydrants.length : 0;
   const baskets = placeBaskets(dataset, clearance, signs);
   const cars = placeParkedCars(dataset, clearance, hydrants);
   const subway = placeAtKerb(dataset.transit.subway, clearance);
   const shelters = placeAtKerb(dataset.transit.shelters, clearance);
+  const linknyc = placeRecordProps(dataset.furniture.linknyc, clearance, 3);
+  const bikeRacks = placeRecordProps(dataset.furniture.bikeRack, clearance, 2.5);
   // A shelter needs its whole footprint on the sidewalk; one that cannot fit is left out.
   const fits = (p: PropPlacement, halfLength: number, depth: number) => {
     const f = frame(p.x, p.z, p.toRoad);
@@ -60,12 +76,19 @@ export function placeStreetProps(dataset: CityDatasetV3, clearance: StreetCleara
   };
   const subwayFit = settle(subway.placed, 2.1, 0.9);
   const shelterFit = settle(shelters.placed, 1.95, 0.85);
+  const linknycFit = settle(linknyc.placed, 0.65, 0.3);
+  const rackFit = settle(bikeRacks.placed, 0.45, 0.2);
   return {
     hydrants, baskets, cars,
-    subway: subwayFit, shelters: shelterFit,
+    subway: subwayFit, shelters: shelterFit, linknyc: linknycFit, bikeRacks: rackFit,
     report: {
       subwayMoved: subway.moved, subwayDropped: subway.dropped + subway.placed.length - subwayFit.length,
       sheltersMoved: shelters.moved, sheltersDropped: shelters.dropped + shelters.placed.length - shelterFit.length,
+      linknycMoved: linknyc.moved, linknycDropped: linknyc.dropped + linknyc.placed.length - linknycFit.length,
+      bikeRacksMoved: bikeRacks.moved, bikeRacksDropped: bikeRacks.dropped + bikeRacks.placed.length - rackFit.length,
+      hydrantsFromRecords: recordHydrants !== null,
+      recordHydrantsMoved: recordHydrants?.moved ?? 0,
+      recordHydrantsDropped: (recordHydrants?.dropped ?? 0) + hydrantLampDrops,
     },
   };
 }
@@ -102,6 +125,33 @@ function emitSubwayEntrance(structure: VertexBuffer, lights: VertexBuffer, p: Pr
     cylinder(lights, f, 1.91, z, 0.17, 2.5, 2.82, 8, rgb('subwayGlobe'));
     cone(lights, f, 1.91, z, 0.17, 2.82, 2.96, 8, rgb('subwayGlobe'));
   }
+}
+
+/**
+ * A LinkNYC kiosk at its record spot: the slim steel monolith (~3.1 m, a
+ * metre wide along the kerb) with its two lit display faces — one toward
+ * the carriageway, one toward the sidewalk. Structure lands in the transit
+ * mesh, the lit faces in the shared neon-lit buffer (no new draw calls).
+ */
+function emitLinkNyc(structure: VertexBuffer, glow: VertexBuffer, p: PropPlacement): void {
+  const f: Frame = frame(p.x, p.z, p.toRoad);
+  const steel = rgb('shelterFrame');
+  structure.surface(...SURFACES.iron);
+  box(structure, f, [-0.6, 0, -0.14], [0.6, 2.92, 0.14], steel, { skip: ['bottom'] });
+  box(structure, f, [-0.63, 2.92, -0.17], [0.63, 3.08, 0.17], steel, { skip: ['bottom'] });
+  box(structure, f, [-0.44, 0, -0.09], [0.44, 0.09, 0.09], rgb('iron'), { skip: ['top'] });
+  // The two display panels sit proud of the slab, lit like the shelter's ad face.
+  box(glow, f, [-0.5, 0.95, -0.175], [0.5, 2.6, -0.14], rgb('neonCarolina'), { skip: ['front', 'left', 'right', 'top', 'bottom'] });
+  box(glow, f, [-0.5, 0.95, 0.14], [0.5, 2.6, 0.175], rgb('neonCarolina'), { skip: ['back', 'left', 'right', 'top', 'bottom'] });
+}
+
+/** A DOT bike rack — the standard inverted-U hoop — standing along the kerb. */
+function emitBikeRack(buffer: VertexBuffer, p: PropPlacement): void {
+  const f = frame(p.x, p.z, p.toRoad);
+  const steel = rgb('shelterFrame');
+  buffer.surface(...SURFACES.iron);
+  for (const x of [-0.35, 0.35]) box(buffer, f, [x - 0.03, 0, -0.03], [x + 0.03, 0.78, 0.03], steel, { skip: ['bottom'] });
+  box(buffer, f, [-0.38, 0.78, -0.03], [0.38, 0.86, 0.03], steel, { skip: ['bottom'] });
 }
 
 /** A glass bus shelter with its back to the buildings, a bench and a lit ad panel at one end. */
@@ -153,6 +203,7 @@ export function buildStreetProps(
   const kerb = [
     ...placed.hydrants.map((p) => ({ p, emit: emitHydrant })),
     ...placed.baskets.map((p) => ({ p, emit: emitBasket })),
+    ...placed.bikeRacks.map((p) => ({ p, emit: emitBikeRack })),
   ].sort((a, b) => bandOf(a.p.z) - bandOf(b.p.z));
   const props = new BandedBuffer();
   for (const { p, emit } of kerb) { props.mark(bandOf(p.z)); emit(props.buffer, p); }
@@ -162,6 +213,7 @@ export function buildStreetProps(
   const glow = new VertexBuffer();
   for (const p of placed.subway) emitSubwayEntrance(structure, glow, p);
   for (const p of placed.shelters) emitShelter(structure, glow, p);
+  for (const p of placed.linknyc) emitLinkNyc(structure, glow, p);
 
   const objects: InstanceType<Three['Mesh']>[] = [];
   const mesh = (name: string, buffer: VertexBuffer, material: InstanceType<Three['Material']>) => {
@@ -215,7 +267,8 @@ export function buildStreetProps(
     objects,
     stats: {
       hydrants: placed.hydrants.length, baskets: placed.baskets.length, cars: n, taxis: placed.cars.filter((c) => c.taxi).length,
-      subwayEntrances: placed.subway.length, busShelters: placed.shelters.length, ...placed.report,
+      subwayEntrances: placed.subway.length, busShelters: placed.shelters.length,
+      linknyc: placed.linknyc.length, bikeRacks: placed.bikeRacks.length, ...placed.report,
     },
     setFocus(x: number, z: number, first: number, last: number) {
       if (propMesh && (first !== shown[0] || last !== shown[1])) {
