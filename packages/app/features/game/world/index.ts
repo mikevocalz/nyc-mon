@@ -225,6 +225,15 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
     //   (trees, furniture, props) stay out: a static bundle freezes the draw
     //   parameters recorded at first render. Lights are not allowed inside a
     //   BundleGroup at all.
+    //
+    // KNOWN BUG (device-verified 2026-10-18): the replay freezes the camera
+    // transform too — the bundled city renders from the camera pose recorded
+    // on the first frame (the 220 m reveal aerial) no matter how the camera
+    // moves afterwards. Walking, orbiting and zooming all draw correctly for
+    // the direct-pass meshes while the bundled city stays pinned to the
+    // record-time view. Do not ship this flag on a moving-camera build until
+    // the bundle stops capturing camera state (or re-records on camera
+    // change, which forfeits the submission win).
     const bundle = new THREE.BundleGroup();
     bundle.name = 'city:bundle';
     const mutable = new Set(city.mutableMeshes);
