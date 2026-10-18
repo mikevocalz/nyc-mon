@@ -351,7 +351,13 @@ export class ConflictSolver {
   request(entity: string, element: string, ctx: GateContext): GrantResult {
     const existing = this.claims.get(entity);
     if (existing && existing.element === element) {
-      if (existing.held) return 'granted';
+      // A re-request on a held claim is a heartbeat: an entity actively
+      // asking to keep its element is not stale — only entities that stop
+      // asking (despawned, crashed, done) hit the stale-after expiry.
+      if (existing.held) {
+        existing.heldAt = this.clock;
+        return 'granted';
+      }
       return this.evaluate(existing, ctx);
     }
     if (existing) this.drop(existing);

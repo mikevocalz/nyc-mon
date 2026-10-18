@@ -184,14 +184,15 @@ export function mulberry32(seed: number): () => number {
 
 // --- Path geometry (lane centrelines + connector beziers, arc-length indexed) ----
 
-interface PathGeom {
+/** An arc-length indexed polyline — lane centrelines, connector beziers and (PR06) walk bands/crossing paths share the maths. */
+export interface PathGeom {
   readonly points: FlatPoints;
   /** Cumulative arc length per vertex (same index space as points/2). */
   readonly cum: Float64Array;
   readonly length: number;
 }
 
-function cumulative(points: FlatPoints): { cum: Float64Array; length: number } {
+export function cumulative(points: FlatPoints): { cum: Float64Array; length: number } {
   const n = points.length / 2;
   const cum = new Float64Array(n);
   for (let i = 1; i < n; i++) {

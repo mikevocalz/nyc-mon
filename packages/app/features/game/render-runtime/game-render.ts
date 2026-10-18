@@ -23,6 +23,7 @@ import { createCityScene } from '../city-scene.ts';
 import { createCallerProxyWith } from '../character/caller-proxy.ts';
 import type { CallerState } from '../character/caller-store.ts';
 import { withFirstFrameSignal, type GameSceneParams } from '../load-game-scene.ts';
+import { createPedActor } from '../living-city/ped-actor.ts';
 import { createVehicleActor } from '../living-city/vehicle-actor.ts';
 import { readCaller, readCamera, readView, snapshotVersion, type MutableCallerState } from '../render-snapshot.ts';
 import { describeRuntimeError, installFrameGlobals, type GameRenderEventKind } from './runtime-report.ts';
@@ -303,9 +304,16 @@ export function startGameRender(args: GameRenderArgs): void {
       get camera() { return readCamera(s.snapshot, s.camera); },
       // PR05: the vehicle fleet reads its own packed Synchronizable — the sim
       // stays JS-authoritative and only the snapshot crosses runtimes.
+      // PR06: the crowd reads the SAME channel — the ped section is appended
+      // to that array, so no second Synchronizable crosses the bridge.
       actors: [
         createCallerProxyWith(mirror),
-        ...(args.vehicles ? [createVehicleActor({ read: () => args.vehicles?.getDirty() })] : []),
+        ...(args.vehicles
+          ? [
+              createVehicleActor({ read: () => args.vehicles?.getDirty() }),
+              createPedActor({ read: () => args.vehicles?.getDirty() }),
+            ]
+          : []),
       ],
       onFirstFrame: () => emit(s, 'firstFrame'),
     };
