@@ -231,7 +231,7 @@ adb shell dumpsys gfxinfo com.nycmon.app reset      # before a scripted drive
 adb shell dumpsys gfxinfo com.nycmon.app            # histogram after
 adb shell dumpsys gfxinfo com.nycmon.app framestats # PROFILEDATA
 adb shell dumpsys meminfo com.nycmon.app            # PSS over the session
-adb shell cmd device_state state 0|1|2|3            # posture overrides (not a real fold)
+for s in 0 1 2 3; do adb shell cmd device_state state "$s"; done  # posture overrides (not a real fold)
 adb shell input keyevent KEYCODE_HOME               # background; relaunch via nycmon://game
 ```
 

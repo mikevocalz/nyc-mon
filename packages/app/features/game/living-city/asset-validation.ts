@@ -219,7 +219,7 @@ export function validateRegistry(registry: WorldAssetRegistry): ValidationIssue[
   const seen = new Map<string, WorldAssetEntry>();
   for (const entry of registry.entries) {
     issues.push(...validateEntry(entry));
-    const key = `${entry.id}${entry.variant}`;
+    const key = `${entry.id} ${entry.variant}`;
     const first = seen.get(key);
     if (first) {
       issues.push(error(entry, 'registry', `duplicate candidate (id '${entry.id}', variant '${entry.variant}')`));

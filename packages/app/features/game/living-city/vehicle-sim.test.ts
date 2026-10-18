@@ -180,6 +180,56 @@ test('blocked exit: a full exit lane keeps the box clear even on green', () => {
   assert.ok(blockedSeen, 'vehicle reported a blocked exit');
 });
 
+// --- Claim lifecycle (solver heartbeat + despawn release) --------------------------------
+
+test('a committed claim held at the line outlives the solver stale window', () => {
+  const r = rig(5);
+  const lane = approaches(r.topo, r.nodeId, 'ew-w')[0]!;
+  const conn = throughConn(r.topo, lane.id);
+  const solver = r.signals.controllerForElement(conn.id)!.solver;
+  // A parked stand-in just past the stop line keeps the claimant stopped
+  // inside claim range while it holds the grant.
+  r.sim.spawn({ kind: 'bus', lane: lane.id, s: lane.lengthMeters - 3, holdUntil: 1e9 });
+  const id = r.sim.spawn({ kind: 'sedan', lane: lane.id, s: lane.lengthMeters - 40, route: [conn.out] });
+  assert.ok(id > 0);
+  const entity = `veh:${id}`;
+  let claimed = false;
+  for (let i = 0; i < 4800 && !claimed; i++) {
+    r.sim.step(SIM_DT);
+    claimed = solver.holdersOf(conn.id).includes(entity);
+  }
+  assert.ok(claimed, 'vehicle claimed the connector');
+  // Hold well past the solver's 30 s stale-claim expiry.
+  run(r, Math.round(40 / SIM_DT));
+  const v = r.sim.vehicleView(id);
+  assert.ok(v && v.element === lane.id, 'still stopped behind the parked stand-in');
+  assert.ok(solver.holdersOf(conn.id).includes(entity), 'heartbeat kept the held claim alive');
+});
+
+test('a despawned vehicle releases a queued claim, not just a held one', () => {
+  const r = rig(5);
+  const lane = approaches(r.topo, r.nodeId, 'ns-s')[0]!;
+  const conn = throughConn(r.topo, lane.id);
+  const solver = r.signals.controllerForElement(conn.id)!.solver;
+  // Park the run on the red phase so the claim can only queue, never grant.
+  for (let i = 0; i < 4800 && aspect(r, conn) !== 'R'; i++) r.signals.step(SIM_DT);
+  assert.equal(aspect(r, conn), 'R', 'red phase reached');
+  const id = r.sim.spawn({ kind: 'sedan', lane: lane.id, s: lane.lengthMeters - 8, route: [conn.out], ambient: true });
+  assert.ok(id > 0);
+  const entity = `veh:${id}`;
+  r.sim.step(SIM_DT);
+  assert.ok(solver.queueOf(conn.id).includes(entity), 'claim queued on red');
+  // Retire the ambient vehicle — with no focus set it despawns on the next
+  // spawner pass (0.4 s cadence).
+  r.sim.setTargetVehicles(0);
+  run(r, 24);
+  assert.deepEqual(
+    [...solver.queueOf(conn.id), ...solver.holdersOf(conn.id)].filter((e) => e === entity),
+    [],
+    'queued claim released on despawn',
+  );
+});
+
 // --- Pedestrian claim seam --------------------------------------------------------------
 
 test('pedClaimAt surfaces solver claims on a crosswalk', () => {

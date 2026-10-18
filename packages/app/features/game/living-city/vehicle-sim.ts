@@ -519,11 +519,13 @@ export class VehicleSim {
   private request(v: Vehicle, conn: LaneConnector): GrantResult {
     const result = this.signals.requestGrant(v.entity, conn.id);
     if (result === 'granted') v.claimed = conn.id;
+    else v.claimed = '';
     return result;
   }
 
   private releaseClaim(v: Vehicle): void {
-    if (v.claimed === '') return;
+    // Unconditional: a queued claim leaves `claimed` empty but still sits in
+    // the solver's FIFO — skip the release and it blocks the junction forever.
     this.signals.release(v.entity);
     v.claimed = '';
   }
@@ -755,6 +757,11 @@ export class VehicleSim {
       const lookahead = Math.max(24, v.v * 2.2 + (v.v * v.v) / (2 * IDM.bComf) + 10);
       if (remaining <= lookahead + CLAIM_RANGE_METRES) this.ensureRoute(v);
       const conn = v.conn;
+      // Heartbeat a held claim once per tick: the solver expires grants that
+      // stop re-requesting, so a committed vehicle held at the line (ped
+      // yield, blocked exit, leader jam) must keep its claim alive — otherwise
+      // it eventually proceeds on a claim that no longer exists.
+      if (conn && v.claimed === conn.id) this.request(v, conn);
       if (conn && remaining <= lookahead) {
         const aspect = this.vehicleAspect(conn);
         const stop = this.stopLineOf(lane);

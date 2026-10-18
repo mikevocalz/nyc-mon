@@ -246,10 +246,16 @@ Nothing in living-city imports React; only the actor files touch
 
 ## 10. Rollback
 
-Per-PR rollback plans are in each `docs/living-city/pr0*.md`. The whole
-feature is one env flag: unset `EXPO_PUBLIC_LIVING_CITY` and nothing
-mounts — the actors array, the worklet args, the sky param and the
-adaptive bridge all revert to pre-program behaviour (test-pinned
-zero-diff). `git revert` of the lane removes only `living-city/`,
-`docs/living-city/`, the four small touchpoint edits listed in §2, and
-`perf/tier.ts`'s appended section.
+Per-PR rollback plans are in each `docs/living-city/pr0*.md`. Two levels:
+
+- **Disable the simulation actors** — unset `EXPO_PUBLIC_LIVING_CITY` and
+  nothing mounts: the actors array, the worklet args, the sky param and
+  the adaptive bridge all revert to pre-program behaviour (test-pinned
+  zero-diff). PR08's streetscape additions are static-world work, not
+  actors — they stay either way.
+- **Restore the pre-program city entirely** — `git revert` of the lane
+  stack removes `living-city/`, `docs/living-city/`, the four small
+  touchpoint edits listed in §2, `perf/tier.ts`'s appended section, and
+  PR08's direct world changes: record-furniture placement and parapet
+  strips (`street-furniture.ts`, `facade-detail.ts`) plus the facade
+  daypart consumer (`litShareAt` feeding cel/PBR/glass `tod`).

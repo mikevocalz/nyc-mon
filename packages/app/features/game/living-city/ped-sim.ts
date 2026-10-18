@@ -590,7 +590,8 @@ export class PedSim {
   }
 
   private releaseClaim(ped: Ped): void {
-    if (ped.claimXwalk === '') return;
+    // Unconditional: a queued claim leaves `claimXwalk` empty but still sits
+    // in the solver's FIFO — skip the release and it blocks the zebra forever.
     this.signals.release(ped.entity);
     ped.claimXwalk = '';
   }
