@@ -59,16 +59,20 @@ Files: `perf/frame-sampler.ts` (+`.test.ts`), `perf/record-city-frame.ts`,
 
 three@0.186.1 `renderers/common/BundleGroup.js` records a group's draws into a
 WebGPU render bundle once and replays them via `executeBundles`, skipping
-per-frame re-encoding. In `world/index.ts` a `BundleGroup` gets `sky`, `ground`,
+per-frame re-encoding. In `world/index.ts` a `BundleGroup` gets `ground`
 and every `city.meshes` entry except the two `mutableMeshes` (contact-shadow +
 detail meshes `setFocus` re-ranges per move — a recorded bundle freezes draw
 parameters). Trees/furniture/props stay out (instanced sets whose counts/
 visibility change), lights stay out (BundleGroup forbids non-renderable
 children), the Caller stays out.
 
-The sky dome goes *in* deliberately: bundles execute before the scene's opaque
-list, and a `depthTest:false` dome left outside would paint over the city.
-`city-scene.ts` adds `world.group` only when `world.skyBundled`.
+The sky dome stays *out*: `executeBundles` replays at the END of the render
+pass (`WebGPUBackend.finishRender`), so a `depthTest:false` dome inside the
+bundle would repaint over every direct draw, and the bundled city would then
+fail depth wherever a non-bundled object wrote nearer — canopy-shaped sky
+holes (the Duo's white-tree bug, fixed 2026-11). Outside the bundle the dome
+still leads the opaque list via renderOrder -10. `world.skyBundled` means the
+dome rides inside `world.group`, so `city-scene.ts` adds `world.group` only.
 
 ### Device results — same walk, bundles ON vs OFF
 

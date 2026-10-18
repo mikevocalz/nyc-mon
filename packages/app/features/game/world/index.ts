@@ -202,17 +202,24 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
   const bundles = options.bundles ?? EXPERIMENTAL_WORLD_BUNDLES;
   if (bundles) {
     // WebGPU render bundles (three r186 BundleGroup): the immutable meshes
-    // record once and replay as one executeBundles call per frame. Bundles
-    // execute before the scene's opaque and transparent lists
-    // (renderers/common/Renderer.js: bundles, then opaque, then
-    // transparents), which forces two membership decisions:
+    // record once and replay as one executeBundles call per frame. The
+    // replay is appended at the END of the render pass — _renderBundles only
+    // records/queues (renderers/common/Renderer.js), and WebGPUBackend's
+    // finishRender calls pass.executeBundles AFTER the opaque and
+    // transparent lists are already encoded
+    // (renderers/webgpu/WebGPUBackend.js finishRender). Bundle contents
+    // therefore draw over the direct pass, resolved by the shared depth
+    // buffer. That drives the membership split:
     //
-    // - The sky dome must record WITH them. It is depthTest:false and draws
-    //   first only thanks to renderOrder -10 — left outside, the bundle would
-    //   draw the city and the dome would then paint over it. Inside the
-    //   bundle its own renderOrder still leads the bundle's list, and the
-    //   per-frame SHARED refresh keeps its camera-following uniforms
-    //   (NodeMaterialObserver.needsRefresh, materials/nodes/manager).
+    // - The sky dome stays OUT of the bundle (a child of `group` instead, so
+    //   city-scene still adds only `world.group`). It is depthTest:false, so
+    //   inside the bundle it repainted the whole frame over the direct
+    //   draws; the bundled city then failed depth wherever a tree, prop or
+    //   mutable mesh had already written nearer, leaving their silhouettes
+    //   as holes filled with the sky gradient — the Duo's "white canopies"
+    //   (2026-11). Outside the bundle, renderOrder -10 still leads the
+    //   direct opaque list and the replayed city covers it like any other
+    //   surface.
     // - The meshes setFocus re-ranges per move (contact shadows, street
     //   detail) and every instanced set whose count or visibility changes
     //   (trees, furniture, props) stay out: a static bundle freezes the draw
@@ -221,8 +228,8 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
     const bundle = new THREE.BundleGroup();
     bundle.name = 'city:bundle';
     const mutable = new Set(city.mutableMeshes);
-    bundle.add(sky, ground, ...city.meshes.filter((m) => !mutable.has(m)));
-    group.add(bundle, ...city.mutableMeshes, ...trees.objects, ...furniture.objects, ...props.objects, hemi, sun, sun.target);
+    bundle.add(ground, ...city.meshes.filter((m) => !mutable.has(m)));
+    group.add(bundle, sky, ...city.mutableMeshes, ...trees.objects, ...furniture.objects, ...props.objects, hemi, sun, sun.target);
   } else {
     group.add(ground, ...city.meshes, ...trees.objects, ...furniture.objects, ...props.objects, hemi, sun, sun.target);
   }
@@ -241,7 +248,7 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
   return {
     group,
     sky,
-    /** True when the sky dome records into the render bundle: it is then a child of `group`, not the scene. */
+    /** True on the bundles lane, where the sky dome is already a child of `group` — the scene then adds only `world.group`. */
     skyBundled: bundles,
     fog,
     horizon,
