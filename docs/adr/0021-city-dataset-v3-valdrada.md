@@ -4,7 +4,7 @@
 - **Date:** 2026-10-17
 - **Deciders:** Mike (creator) signs off; lane E2 (Schema and bake) implements
 - **Builds on:** ADR 0020 (world save and exact resume), `docs/design/handoff/harlem-v3.md` (A1), `docs/implementation/harlem-v3-p0-findings.md` (E1), `docs/plans/harlem-v3-valdrada-prompt.md` §7
-- **Sources:** Valdrada v0.4.0, commit `2724c79` (<https://huggingface.co/datasets/mehmetkeremturkcan/valdrada>), which itself aggregates the NYC open records listed in the baked `sources[]` (DOITT footprints, MapPLUTO, DOB NOW/FISP, CSCL, Parks Tree Census, DEP hydrants, bus shelters, LinkNYC, DOT CityRacks, MTA entrances) beside the tile's existing OSM extract (<https://www.openstreetmap.org/copyright>, ODbL 1.0)
+- **Sources:** Valdrada v0.4.0, commit `2724c79` (<https://huggingface.co/datasets/mehmetkeremturkcan/valdrada>), which itself aggregates the NYC open records listed in the baked `sources[]` (DOITT footprints, PLUTO, DOB NOW/FISP, CSCL, Parks Tree Census, DEP hydrants, bus shelters, LinkNYC, DOT CityRacks, MTA entrances) beside the tile's existing OSM extract (<https://www.openstreetmap.org/copyright>, ODbL 1.0)
 - **Code:** `tooling/city/build.mjs`, `tooling/city/valdrada/*`, `tooling/city/print-counts.mjs`, `packages/app/features/game/city-dataset.ts`, `packages/app/features/game/data/harlem-apollo.json`, `packages/app/features/game/map-data-credit.ts`, `packages/core/world/{migrate,resume}.ts`
 
 ## Context

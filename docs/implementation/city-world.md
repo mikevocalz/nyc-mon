@@ -244,4 +244,4 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-OpenStreetMap data © OpenStreetMap contributors, ODbL 1.0. The Game screen shows the attribution (`MapAttribution.tsx`).
+OpenStreetMap data © OpenStreetMap contributors, ODbL 1.0. Attribution surfaces in Settings under "Legal & credits", rendered from `map-data-credit.ts` (`CITY_MAP_SOURCES`) — the test in `map-data-credit.test.ts` keeps that list equal to the bundled tile's `sources` and asserts the game screen mounts no attribution HUD.

@@ -25,7 +25,7 @@ export const CITY_MAP_SOURCES: readonly CityMapSourceCredit[] = [
     licenseUrl: 'https://opendata.cityofnewyork.us/overview/',
   },
   {
-    attribution: 'MapPLUTO (NYC Planning), via Valdrada',
+    attribution: 'PLUTO (NYC Planning), via Valdrada',
     license: 'NYC Open Data Terms of Use',
     licenseUrl: 'https://opendata.cityofnewyork.us/overview/',
   },

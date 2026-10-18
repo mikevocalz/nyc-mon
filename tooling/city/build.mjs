@@ -1005,7 +1005,7 @@ const dataset = {
     },
     {
       url: 'https://data.cityofnewyork.us/d/64uk-42ks',
-      attribution: 'MapPLUTO (NYC Planning), via Valdrada',
+      attribution: 'PLUTO (NYC Planning), via Valdrada',
       license: 'NYC Open Data Terms of Use',
       licenseUrl: 'https://opendata.cityofnewyork.us/overview/',
       retrievedAt: vdRetrievedAt,
