@@ -3,7 +3,7 @@
 // checked against the street clearance (walkability.ts); parked cars are the
 // one thing that stands in the carriageway, in the parking lane, and never
 // on a crossing, at an intersection or by a hydrant.
-import type { CityDatasetV2, FlatPoints, RoadClass } from '../city-dataset.ts';
+import type { CityDatasetV3, FlatPoints, RoadClass } from '../city-dataset.ts';
 import { hashUnit } from './geometry.ts';
 import { LIGHT_CLASSES, type LightPlacement, type SignPlacement } from './signage.ts';
 import type { StreetClearance } from './walkability.ts';
@@ -46,7 +46,7 @@ function along(points: FlatPoints, spacing: number, phase: number, visit: (x: nu
 }
 
 /** Hydrants along the kerbs, sides alternating, clear of the streetlights. */
-export function placeHydrants(dataset: CityDatasetV2, clearance: StreetClearance, lights: readonly LightPlacement[]): PropPlacement[] {
+export function placeHydrants(dataset: CityDatasetV3, clearance: StreetClearance, lights: readonly LightPlacement[]): PropPlacement[] {
   const out: PropPlacement[] = [];
   for (const road of dataset.roads) {
     if (!LIGHT_CLASSES.has(road.class)) continue;
@@ -64,7 +64,7 @@ export function placeHydrants(dataset: CityDatasetV2, clearance: StreetClearance
 }
 
 /** A wire litter basket by each sign pole, and every 90 m along the commercial avenues. */
-export function placeBaskets(dataset: CityDatasetV2, clearance: StreetClearance, signs: readonly SignPlacement[]): PropPlacement[] {
+export function placeBaskets(dataset: CityDatasetV3, clearance: StreetClearance, signs: readonly SignPlacement[]): PropPlacement[] {
   const out: PropPlacement[] = [];
   for (const sign of signs) {
     const [dx, dz] = sign.blades[0].dir;
@@ -95,7 +95,7 @@ export function placeBaskets(dataset: CityDatasetV2, clearance: StreetClearance,
  * empty when either end of the car is on a crossing, within 3 m of another
  * carriageway (an intersection), or within 4.6 m of a hydrant.
  */
-export function placeParkedCars(dataset: CityDatasetV2, clearance: StreetClearance, hydrants: readonly PropPlacement[]): CarPlacement[] {
+export function placeParkedCars(dataset: CityDatasetV3, clearance: StreetClearance, hydrants: readonly PropPlacement[]): CarPlacement[] {
   const out: CarPlacement[] = [];
   // Hydrants in 10 m cells, so each slot checks its own cell and the eight around it.
   const cells = new Map<number, PropPlacement[]>();
@@ -134,6 +134,37 @@ export function placeParkedCars(dataset: CityDatasetV2, clearance: StreetClearan
     }
   }
   return out;
+}
+
+/**
+ * v3 record furniture (`dataset.furniture` — DOT hydrant, LinkNYC and
+ * bike-rack [x, z, rot] triplets) settled onto the sidewalk: a point that
+ * is not standable nudges to the nearest sidewalk band within `maxMove`
+ * metres, else drops. `dir`/`toRoad` come from the nearest carriageway,
+ * the same convention `placeAtKerb` gives the transit records — the
+ * record `rot` is carried in the tile but its bake semantics are
+ * unverified (handoff PENDING E1), so orientation stays kerb-derived.
+ */
+export function placeRecordProps(
+  triplets: FlatPoints,
+  clearance: StreetClearance,
+  maxMove = 3,
+): { placed: PropPlacement[]; moved: number; dropped: number } {
+  const placed: PropPlacement[] = [];
+  let moved = 0;
+  let dropped = 0;
+  for (let i = 0; i + 2 < triplets.length; i += 3) {
+    const x = triplets[i]!;
+    const z = triplets[i + 1]!;
+    const spot = clearance.toSidewalk(x, z, maxMove);
+    if (!spot) { dropped++; continue; }
+    if (spot[0] !== x || spot[1] !== z) moved++;
+    const road = clearance.nearest(spot[0], spot[1]);
+    const dir: Point = road ? road.dir : [1, 0];
+    const toRoad: Point = road ? [-road.away[0], -road.away[1]] : [0, 1];
+    placed.push({ x: spot[0], z: spot[1], dir, toRoad });
+  }
+  return { placed, moved, dropped };
 }
 
 /**

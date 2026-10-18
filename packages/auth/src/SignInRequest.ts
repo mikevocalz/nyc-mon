@@ -1,5 +1,5 @@
 /** Social providers enabled on the server (ADR 0001). */
-export type SocialProvider = 'apple' | 'google';
+export type SocialProvider = 'amazon' | 'apple' | 'google';
 
 /**
  * One sign-in attempt, by method. Passed to `signIn` on the object returned by

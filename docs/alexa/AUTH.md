@@ -19,6 +19,23 @@ Everything below was checked by `packages/payload/src/auth/oauth/__tests__/provi
 
 The PRM document's `authorization_servers` must be `["{issuer}"]`, with no path and no trailing slash. `/.well-known/openid-configuration` answers 404: there is no OIDC.
 
+## Login with Amazon is a sign-in layer, not the Alexa client
+
+There are two separate Amazon-facing identities in this architecture:
+
+1. **`alexa` OAuth client** — the confidential client Alexa+ uses to obtain NYC-MON MCP access/refresh tokens. This is the account-linking protocol described below.
+2. **`amazon` social provider** — optional Login with Amazon (LWA) inside Better Auth. It lets an existing NYC-MON Caller attach an Amazon identity and later use **Continue with Amazon** on the Alexa linking page.
+
+LWA never replaces the `alexa` client and never receives NYC-MON MCP scopes.
+
+The LWA provider is enabled only when `AMAZON_LWA_CLIENT_ID` and `AMAZON_LWA_CLIENT_SECRET` are configured. Its registered return URL is:
+
+`{issuer}/payload-api/auth/callback/amazon`
+
+The provider requests Amazon's `profile` scope, maps the immutable Amazon `user_id` through Better Auth 1.7's `accountSubject`, and keeps implicit sign-up disabled. A person must first have a NYC-MON account and explicitly link Amazon; LWA cannot create an account that bypasses NYC-MON's birth-year/guardian flow.
+
+If LWA is unavailable or unlinked, email/password and passkey remain valid Alexa-linking paths.
+
 ## Access tokens
 
 JWTs signed by Better Auth's `jwt` plugin.
@@ -66,10 +83,11 @@ A user tool called with no token, an expired token or an `mcp:service` token ans
 | `MCP_RESOURCE_URI` | both: the resource admin-vite accepts, the `aud` the MCP server expects |
 | `OAUTH_ALEXA_CLIENT_ID`, `OAUTH_ALEXA_CLIENT_SECRET`, `OAUTH_ALEXA_REDIRECT_URIS` | admin-vite |
 | `OAUTH_SIM_CLIENT_ID`, `OAUTH_SIM_CLIENT_SECRET`, `OAUTH_SIM_REDIRECT_URIS` | admin-vite |
+| `AMAZON_LWA_CLIENT_ID`, `AMAZON_LWA_CLIENT_SECRET` | Better Auth Login with Amazon provider |
 | `AUTH_JWKS_URL` | MCP server: `{issuer}/payload-api/auth/jwks` |
 
 ## Known gaps
 
-- The linking page signs in with email and password (plus TOTP). Passkey and Apple/Google accounts cannot link from it yet.
+- The linking page supports email/password, TOTP and passkey. Login with Amazon is available only after LWA credentials are configured and the Caller has explicitly linked Amazon to the existing NYC-MON account.
 - Migration `20261008_181202_alexa_oauth` is generated but not applied anywhere.
 - Not checked against Amazon: whether Better Auth's origin checks accept Amazon's server-to-server token request.

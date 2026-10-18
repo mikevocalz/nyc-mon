@@ -14,6 +14,7 @@ import { twoFactor } from 'better-auth/plugins/two-factor';
 import { username } from 'better-auth/plugins/username';
 import { waitUntil } from '@vercel/functions';
 import { parseBirthYear } from './age';
+import { amazonOAuthPlugin } from './amazon';
 import { createAuthMailer } from './email';
 import { readAuthEnv } from './env';
 import { isAllowedSmsNumber, parseSmsCountries, passesPhoneGate } from './phone';
@@ -92,6 +93,13 @@ if (env.apple !== undefined) {
 const baseOrigin = new URL(env.baseURL);
 
 /**
+ * The native app's origin, trusted on every deployment: it is first-party,
+ * and React Native sends no Origin of its own (the client sends this one).
+ * Must match `APP_ORIGIN` in `packages/auth/src/paths.ts`.
+ */
+const NATIVE_APP_ORIGIN = 'nycmon://';
+
+/**
  * Origins Payload accepts for CORS and CSRF: the admin/API host itself, the
  * product site (apps/web reads published content over REST), and the extra
  * Better Auth origins. docs/adr/0003-admin-app-split.md.
@@ -154,6 +162,7 @@ async function sendTwoFactorCode(
 }
 
 const canSendTwoFactorCode = sendMail !== undefined || smsSender !== undefined;
+const amazonPlugin = amazonOAuthPlugin(env.amazon);
 
 const plugins = [
   passkey({
@@ -210,6 +219,7 @@ const plugins = [
     verificationUri: `${env.baseURL}/device`,
   }),
   bearer(),
+  ...(amazonPlugin === undefined ? [] : [amazonPlugin]),
   ...alexaOAuthPlugins(oauthConfig),
   oneTimeToken({
     expiresIn: 2,
@@ -224,7 +234,7 @@ export const betterAuthOptions = {
   baseURL: env.baseURL,
   basePath: `${PAYLOAD_API_ROUTE}${AUTH_BASE_PATH}`,
   secret: env.secret,
-  trustedOrigins: [baseOrigin.origin, ...env.trustedOrigins],
+  trustedOrigins: [baseOrigin.origin, NATIVE_APP_ORIGIN, ...env.trustedOrigins],
   // The stock verify would hand the second device the phone's own session;
   // `/handoff/redeem` creates a new one. Phone numbers are never a password.
   // The OAuth provider's client CRUD and OIDC paths are off: clients are

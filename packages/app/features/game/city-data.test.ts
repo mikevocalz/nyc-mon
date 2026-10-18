@@ -15,14 +15,16 @@ const raw = readFileSync(file, 'utf8');
 const data = parseCityDataset(JSON.parse(raw));
 
 test('the Harlem tile keeps provenance, stable OSM ids and the three landmarks', () => {
-  assert.equal(data.version, 2);
-  assert.equal(data.id, 'harlem-apollo-20261014');
+  assert.equal(data.version, 3);
+  assert.equal(data.id, 'harlem-apollo-20261017');
   assert.deepEqual(data.origin, [-73.94975, 40.81005]);
-  assert.equal(data.source.license, 'ODbL-1.0');
-  assert.match(data.source.attribution, /OpenStreetMap/);
+  assert.equal(data.sources[0]?.license, 'ODbL-1.0');
+  assert.match(data.sources[0]?.attribution ?? '', /OpenStreetMap/);
+  assert.ok(data.sources.some((s) => s.attribution.includes('Valdrada')), 'Valdrada source');
+  assert.ok(data.sources.some((s) => s.url.includes('inkn-q76z')), 'CSCL source');
   assert.doesNotMatch(raw, /"(?:user|uid|changeset|email|phone)"\s*:/);
   assert.ok(data.buildings.some((b) => b.id === 'osm:way:271798914'), 'Apollo Theater footprint');
-  assert.ok(data.roads.some((r) => r.name?.includes('125th')), 'West 125th Street');
+  assert.ok(data.roads.some((r) => r.name?.includes('125 ST')), 'West 125th Street (CSCL "W 125 ST")');
   assert.deepEqual(data.landmarks.map((l) => l.key).sort(), ['acp-state-office', 'apollo-theater', 'hotel-theresa']);
 });
 
@@ -30,7 +32,8 @@ test('the tile reads as a neighbourhood and stays inside the bundle budget', () 
   assert.ok(data.buildings.length > 1000, `buildings ${data.buildings.length}`);
   assert.ok(data.roads.length > 300, `roads ${data.roads.length}`);
   assert.ok(data.areas.some((a) => a.kind === 'park'));
-  assert.ok(data.trees.osm.length + data.trees.fill.length > 0);
+  assert.ok(data.trees.census.length + data.trees.fill.length > 0);
+  assert.ok(data.furniture.hydrant.length > 0, 'record furniture present');
   assert.ok(statSync(file).size < 3 * 1024 * 1024, 'baked JSON under 3 MB');
 });
 
@@ -57,6 +60,6 @@ test('start view is mapped, the clamp corner is not, and the Apollo frontage is 
   const walk = createWalkQueries(data);
   const apollo = data.landmarks.find((l) => l.key === 'apollo-theater')!;
   assert.equal(walk.isWalkable(apollo.x, apollo.z), false, 'inside the theatre');
-  const street = data.roads.find((r) => r.name?.includes('125th') && r.class !== 'sidewalk')!;
+  const street = data.roads.find((r) => r.name?.includes('125 ST') && r.class !== 'sidewalk')!;
   assert.equal(walk.isWalkable(street.points[0]!, street.points[1]!), true, 'on 125th Street');
 });

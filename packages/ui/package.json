@@ -26,6 +26,10 @@
       "default": "./icons.web.ts"
     },
     "./native": "./native.ts",
+    "./game-perf": {
+      "react-native": "./game-perf.native.ts",
+      "default": "./game-perf.ts"
+    },
     "./admin": "./admin/index.ts",
     "./game-controls": "./game-controls/index.ts",
     "./game-controls/parts": "./game-controls/parts.ts",

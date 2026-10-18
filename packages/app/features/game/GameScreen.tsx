@@ -61,10 +61,13 @@ import { gameCameraStore, gameScreenActions, gameScreenStore } from './game-sess
 import { resolveGameViewState, shouldMountCanvas } from './game-status.ts';
 import { resolveGameHudLayout } from './hud-layout.ts';
 import { loadGameScene, type GameSceneParams } from './load-game-scene.ts';
+import { CITY_FRAME_SINK_ENABLED, onCityFrame } from './perf/on-city-frame.ts';
+import { useGamePerfMounts } from './perf/use-game-perf.ts';
 import { useGameRenderThread } from './render-thread-choice.ts';
 import { readLobbyIdentity } from './lobby/lobby-identity.ts';
 import { lobbyStore } from './lobby/lobby.store.ts';
 import { gameInputRouter, useGameInput } from './use-game-input.ts';
+import { livingCityActorFactories, livingCitySky } from './living-city/bundled-host.ts';
 import { useCityCameraGestures } from './use-city-camera-gestures.ts';
 import { useWorldSaveLifecycle } from './world-resume/use-world-save-lifecycle.ts';
 import type { SceneActorFactory } from './scene-actor.ts';
@@ -187,7 +190,13 @@ export function GameScreen({ focused = true }: GameScreenProps = {}) {
     return {
       dataset: city.dataset,
       get camera() { return gameCameraStore.getState().camera; },
-      actors: CALLER_ACTORS,
+      // PR05/PR06 Living City (EXPO_PUBLIC_LIVING_CITY=1, default off): the
+      // flag contributes the vehicle + pedestrian factories; off, the list is
+      // byte-identical.
+      actors: [...CALLER_ACTORS, ...livingCityActorFactories()],
+      // PR07: the world clock picks the sky preset (dusk at the slice's
+      // starting hour). Flag off → undefined → the world's own default.
+      sky: livingCitySky(),
       onFirstFrame: gameScreenActions.firstFrame,
     };
   }, [city]);
@@ -218,6 +227,10 @@ export function GameScreen({ focused = true }: GameScreenProps = {}) {
   const identity = useMemo(() => readLobbyIdentity(), []);
   const dataset = city.ok ? city.dataset : null;
   useWorldSaveLifecycle({ identity, dataset });
+  // Flag-gated platform perf mounts: display-rate vote, thermal headroom
+  // monitor, ADPF hint session (performance-pass PR4.2 / PR5.1-2). Only while
+  // the Game tab is focused: the tab stays mounted when the player leaves it.
+  useGamePerfMounts(worldReady && focused);
   const input = useGameInput({
     enabled: gameplayInputEnabled(worldReady, lobbyPhase),
     focused,
@@ -276,6 +289,7 @@ export function GameScreen({ focused = true }: GameScreenProps = {}) {
               background={brand.night}
               // No accessibilityLabel: the canvas layer stays hidden; the wrapping View is the named, actionable element.
               onBackendChange={gameScreenActions.backendChanged}
+              onFrameTiming={CITY_FRAME_SINK_ENABLED ? onCityFrame : undefined}
             />
           </View>
         </GestureDetector>
@@ -309,6 +323,7 @@ export function GameScreen({ focused = true }: GameScreenProps = {}) {
             onStart={input.startSession}
             onStopHoldStart={input.beginStopConfirm}
             onStopReleased={input.cancelStopConfirm}
+            onStopShortPress={input.shortPressFromStopConfirm}
           />
         ) : null}
         {handedOver ? (

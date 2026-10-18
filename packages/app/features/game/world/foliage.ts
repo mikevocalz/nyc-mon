@@ -9,12 +9,12 @@
 // world/leaf-alpha.ts by tooling/city/bake-foliage.mjs.
 import type { Three } from '@acme/ui/three';
 import type { BufferGeometry } from 'three/webgpu';
-import type { CityDatasetV2 } from '../city-dataset.ts';
+import type { CityDatasetV3 } from '../city-dataset.ts';
 import { LEAF_ALPHA as LEAF } from './leaf-alpha.ts';
 import { mulberry32 } from './geometry.ts';
 import { NEAR_TREE_CAP, TreeLod } from './tree-lod.ts';
 import { createStreetClearance, type StreetClearance } from './walkability.ts';
-import { createFarCrownMaterial, createLeafMaterial, linearColor, TONE_ATTRIBUTE, type CityMaterials } from './materials.ts';
+import { linearColor, TONE_ATTRIBUTE, type CityMaterials } from './materials.ts';
 
 type Geometry = BufferGeometry;
 
@@ -137,36 +137,37 @@ export const CROWN_REACH = 2.6;
 export const MAX_OVERHANG = 1.5;
 /** Crowns that would have to shrink below this scale to clear the road are dropped instead. */
 export const MIN_TREE_SCALE = 0.6;
-/** An OSM tree in a carriageway moves to the sidewalk only if the band is this close. */
+/** A record tree in a carriageway moves to the sidewalk only if the band is this close. */
 export const TREE_MAX_MOVE = 3;
 
-export interface TreePlacement { x: number; z: number; scale: number; tone: number; osm: boolean }
-export interface TreeReport { osmMoved: number; osmDropped: number; fillDropped: number; shrunk: number; overhangDropped: number }
+export interface TreePlacement { x: number; z: number; scale: number; tone: number; record: boolean }
+export interface TreeReport { recordMoved: number; recordDropped: number; fillDropped: number; shrunk: number; overhangDropped: number }
 
 /**
- * Where trees stand: OSM trees first, then the generated fill, each kept
- * out of the street (walkability.ts `createStreetClearance`, the road
- * mesh's widths plus the kerb margin). An OSM tree inside a carriageway or
- * crossing moves to the nearest sidewalk-band point within 3 m, else it is
- * dropped; a generated tree there is dropped. A crown reaching more than
- * 1.5 m over the carriageway edge shrinks, or drops below scale 0.6.
+ * Where trees stand: record trees first (the census list), then the
+ * generated fill, each kept out of the street (walkability.ts
+ * `createStreetClearance`, the road mesh's widths plus the kerb margin). A
+ * record tree inside a carriageway or crossing moves to the nearest
+ * sidewalk-band point within 3 m, else it is dropped; a generated tree
+ * there is dropped. A crown reaching more than 1.5 m over the carriageway
+ * edge shrinks, or drops below scale 0.6.
  */
-export function treePlacements(dataset: CityDatasetV2, clearance: StreetClearance = createStreetClearance(dataset)): { trees: TreePlacement[]; report: TreeReport } {
+export function treePlacements(dataset: CityDatasetV3, clearance: StreetClearance = createStreetClearance(dataset)): { trees: TreePlacement[]; report: TreeReport } {
   const rand = mulberry32(1931);
   const trees: TreePlacement[] = [];
-  const report: TreeReport = { osmMoved: 0, osmDropped: 0, fillDropped: 0, shrunk: 0, overhangDropped: 0 };
-  const push = (list: readonly number[], osm: boolean) => {
+  const report: TreeReport = { recordMoved: 0, recordDropped: 0, fillDropped: 0, shrunk: 0, overhangDropped: 0 };
+  const push = (list: readonly number[], record: boolean) => {
     for (let i = 0; i + 1 < list.length; i += 2) {
       // Draw the random numbers first so a dropped tree does not reshuffle its neighbours.
-      let scale = osm ? 1 + rand() * 0.3 : 0.8 + rand() * 0.45;
+      let scale = record ? 1 + rand() * 0.3 : 0.8 + rand() * 0.45;
       const tone = rand();
       let x = list[i]!;
       let z = list[i + 1]!;
       if (!clearance.standable(x, z)) {
-        const moved = osm ? clearance.toSidewalk(x, z, TREE_MAX_MOVE) : null;
-        if (!moved) { if (osm) report.osmDropped++; else report.fillDropped++; continue; }
+        const moved = record ? clearance.toSidewalk(x, z, TREE_MAX_MOVE) : null;
+        if (!moved) { if (record) report.recordDropped++; else report.fillDropped++; continue; }
         [x, z] = moved;
-        report.osmMoved++;
+        report.recordMoved++;
       }
       const room = clearance.kerbGap(x, z) + MAX_OVERHANG;
       if (CROWN_REACH * scale > room) {
@@ -175,10 +176,10 @@ export function treePlacements(dataset: CityDatasetV2, clearance: StreetClearanc
         scale = fit;
         report.shrunk++;
       }
-      trees.push({ x, z, scale, tone, osm });
+      trees.push({ x, z, scale, tone, record });
     }
   };
-  push(dataset.trees.osm, true);
+  push(dataset.trees.census, true);
   push(dataset.trees.fill, false);
   return { trees, report };
 }
@@ -194,7 +195,7 @@ export { TREE_HIDE_METRES, TREE_NEAR_LOD_METRES } from './tree-lod.ts';
  * nothing and React never re-renders.
  */
 export function buildTrees(
-  THREE: Three, dataset: CityDatasetV2, materials: Pick<CityMaterials, 'rig' | 'trunks'>,
+  THREE: Three, dataset: CityDatasetV3, materials: Pick<CityMaterials, 'leaf' | 'farCrown' | 'trunks'>,
   clearance: StreetClearance = createStreetClearance(dataset),
 ) {
   const { trees: placements, report } = treePlacements(dataset, clearance);
@@ -203,8 +204,9 @@ export function buildTrees(
   const crownGeometry = leafCrownGeometry(THREE);
   const farGeometry = new THREE.IcosahedronGeometry(1.15 * CROWN_SCALE, 0).translate(0, 1.5 * CROWN_SCALE, 0);
   const trunkGeometry = new THREE.CylinderGeometry(0.16, 0.24, 2.8, 6).translate(0, 1.4, 0);
-  const leafMaterial = createLeafMaterial(THREE, materials.rig, texture);
-  const farMaterial = createFarCrownMaterial(THREE, materials.rig);
+  // The materials object owns which lighting body the crowns run (cel or the flagged PBR lane).
+  const leafMaterial = materials.leaf(texture);
+  const farMaterial = materials.farCrown();
   // Shared with the city materials, which dispose it.
   const trunkMaterial = materials.trunks;
   const nearCapacity = Math.min(count, NEAR_TREE_CAP);

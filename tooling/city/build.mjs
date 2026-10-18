@@ -1,25 +1,41 @@
-// Bakes the cached Overpass download (tooling/city/fetch.mjs) into the dataset the game loads:
-// packages/app/features/game/data/harlem-apollo.json, schema version 2, in metres on a local plane
+// Bakes the city dataset the game loads:
+// packages/app/features/game/data/harlem-apollo.json, schema version 3, in metres on a local plane
 // around the Apollo Theater (+x east, -z north).
+//
+// v3 merge (docs/plans/harlem-v3-valdrada-prompt.md §5.1): Valdrada v0.4.0 tiles
+// (tooling/city/valdrada/decode.mjs, cached by fetch.mjs there) are the source
+// for buildings, roads, landmarks, transit and record-placed furniture. The
+// OpenStreetMap/Overpass cache (tooling/city/fetch.mjs) stays the source for
+// areas, for sidewalk/crossing/cycleway/footway classes CSCL does not carry,
+// and for building ids and names where a footprint match lands (G1(b)).
+// trees.fill generation is unchanged. Every estimate rule is in `notes`.
+//
 // Run: node tooling/city/build.mjs
-// Adapted from vg-demos-all scripts/osm/{fetch,build}.mjs (MIT, see LICENSE in https://github.com/vietgangzz/vg-demos-all)
-// Data © OpenStreetMap contributors, ODbL. https://www.openstreetmap.org/copyright
-import { readFile, stat, writeFile } from 'node:fs/promises';
+// Valdrada tiles © OpenStreetMap contributors + Mehmet Kerem Turkcan, ODbL 1.0.
+// OSM data © OpenStreetMap contributors, ODbL. https://www.openstreetmap.org/copyright
+import { readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { BF, decodeTile, FURN, LANDMARKS, RECORD_FURN, STYLE, tileIdsForSquare } from './valdrada/decode.mjs';
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
 const CACHE = join(ROOT, '.cache');
+const VD_DIR = join(CACHE, 'valdrada');
 const OUT = join(ROOT, '../../packages/app/features/game/data/harlem-apollo.json');
-const NAMES = ['buildings', 'roads', 'areas', 'trees', 'landmarks'];
+// trees.json is fetched but no longer read: the census list replaces OSM tree nodes in v3.
+const NAMES = ['buildings', 'roads', 'areas', 'landmarks'];
 const load = async (name) => JSON.parse(await readFile(join(CACHE, `${name}.json`), 'utf8')).elements;
-const [buildingEls, roadEls, areaEls, treeEls, landmarkEls] = await Promise.all(NAMES.map(load));
+const [buildingEls, roadEls, areaEls, landmarkEls] = await Promise.all(NAMES.map(load));
 const mtimes = await Promise.all(NAMES.map((n) => stat(join(CACHE, `${n}.json`)).then((s) => s.mtimeMs)));
 const retrievedAt = new Date(Math.max(...mtimes)).toISOString().replace(/\.\d+Z$/, 'Z');
-// Transit nodes (subway entrances, bus stops) came later (2026-10-16); a cache without them bakes empty lists.
-const transitFile = join(CACHE, 'transit.json');
-const transitEls = await readFile(transitFile, 'utf8').then((t) => JSON.parse(t).elements, () => null);
-const transitAt = transitEls ? new Date((await stat(transitFile)).mtimeMs).toISOString().replace(/\.\d+Z$/, 'Z') : null;
+// Valdrada pins: tag/commit and when the tiles were fetched (fetch.mjs records retrievedAt per file).
+const pins = JSON.parse(await readFile(join(ROOT, 'valdrada/pins.json'), 'utf8'));
+const vdRetrievedAt = Object.values(pins.files)
+  .map((f) => f.retrievedAt)
+  .filter(Boolean)
+  .sort()
+  .at(-1)
+  ?.replace(/\.\d+Z$/, 'Z') ?? retrievedAt;
 
 // ---- Projection: must stay bit-for-bit identical to the app's formula ----
 const ORIGIN = [-73.94975, 40.81005];
@@ -32,6 +48,7 @@ const project = ({ lat, lon }) => [
   -(lat - lat0) * RADIANS * EARTH,
 ];
 const round = (v) => Math.round(v * 10) / 10;
+const round2 = (v) => Math.round(v * 100) / 100;
 const flat = (pts) => pts.flatMap(([x, z]) => [x, z]);
 const inSquare = ([x, z], r = R) => Math.abs(x) <= r && Math.abs(z) <= r;
 
@@ -305,7 +322,49 @@ const num = (v) => {
 };
 const nameOf = (t) => (typeof t.name === 'string' && t.name.trim() ? t.name.trim().slice(0, 120) : undefined);
 
-// ---- Buildings ----
+// ---- Valdrada decode ----------------------------------------------------------
+const tileFiles = (await readdir(VD_DIR)).filter((f) => f.endsWith('.bin')).sort();
+const vdTiles = [];
+for (const f of tileFiles) {
+  const buf = await readFile(join(VD_DIR, f));
+  const tile = decodeTile(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
+  vdTiles.push(tile);
+}
+const expectedTiles = new Set(tileIdsForSquare());
+const missingTiles = [...expectedTiles].filter((id) => !vdTiles.some((t) => t.key === id));
+if (missingTiles.length) {
+  console.warn(`WARN valdrada: missing tiles ${missingTiles.join(', ')} (run tooling/city/valdrada/fetch.mjs)`);
+}
+
+const RING_MIN_AREA = 4; // same footprint floor v2 used for buildings
+const withinReach = (ring) => ring.every(([x, z]) => Math.hypot(x, z) <= 1900);
+
+const vdBuildings = []; // { tileKey, i, ring, holes:[[pt]], height, floors, style, floorH, winW, storeH, frontIdx, flags, landmarkId }
+for (const t of vdTiles) {
+  for (const b of t.buildings) {
+    const ring = cleanRing(b.ring);
+    if (ring.length < 3 || Math.abs(area(ring)) < RING_MIN_AREA) continue;
+    if (!inSquare(centroid(ring)) || !withinReach(ring)) continue;
+    const holes = (b.holes ?? [])
+      .map((h) => cleanRing(h.ring))
+      .filter((r) => r.length >= 3 && Math.abs(area(r)) >= 1);
+    // frontIdx addresses the raw ring; remap it onto the cleaned vertices so
+    // `fi` stays inside `p` after duplicate removal (schema cross-check).
+    let frontIdx = -1;
+    if (b.frontIdx >= 0 && b.ring[b.frontIdx]) {
+      const fv = [round(b.ring[b.frontIdx][0]), round(b.ring[b.frontIdx][1])];
+      frontIdx = ring.findIndex(([x, z]) => x === fv[0] && z === fv[1]);
+    }
+    vdBuildings.push({
+      tileKey: t.key, index: b.i, ring, holes,
+      height: b.height, floors: b.floors, style: b.style, floorH: b.floorH,
+      winW: b.winW, storeH: b.storeH, frontIdx, flags: b.flags,
+      landmarkId: Math.abs(b.landmarkId),
+    });
+  }
+}
+
+// ---- OSM building rings: the G1(b) id/name donors ----------------------------
 const SKIP_BUILDING = new Set(['no', 'construction', 'proposed', 'demolished', 'roof', 'destroyed']);
 function skipBuilding(t) {
   if (!t.building || SKIP_BUILDING.has(t.building)) return true;
@@ -315,120 +374,162 @@ function skipBuilding(t) {
   return false;
 }
 
-function parseHeight(raw) {
-  if (raw == null) return undefined;
-  const s = String(raw).trim().toLowerCase();
-  const feet = s.match(/^(\d+(?:\.\d+)?)\s*(?:'|ft|feet)\s*(?:(\d+(?:\.\d+)?)\s*(?:"|in))?$/);
-  if (feet) return Number(feet[1]) * 0.3048 + (feet[2] ? Number(feet[2]) * 0.0254 : 0);
-  const m = s.match(/^(\d+(?:[.,]\d+)?)\s*(?:m|metres|meters)?$/);
-  return m ? Number(m[1].replace(',', '.')) : undefined;
-}
-
-const TYPE_HEIGHT = [
-  [['house', 'terrace', 'detached', 'semidetached_house'], 12],
-  [['residential', 'apartments'], 18],
-  [['brownstone', 'townhouse'], 13],
-  [['commercial', 'retail'], 10],
-  [['office'], 30],
-  [['hotel'], 30],
-  [['church', 'cathedral', 'chapel'], 18],
-  [['school', 'university', 'college'], 16],
-  [['hospital'], 24],
-  [['civic', 'public', 'government'], 20],
-  [['garage', 'garages', 'shed', 'hut', 'kiosk'], 4],
-  [['industrial', 'warehouse'], 9],
-];
-const typeHeight = (b) => TYPE_HEIGHT.find(([k]) => k.includes(b))?.[1] ?? 10;
-
-const RELIGIOUS = ['church', 'cathedral', 'chapel', 'mosque', 'synagogue', 'temple', 'religious'];
-const CIVIC_B = ['government', 'public', 'civic', 'school', 'university', 'college', 'hospital', 'train_station', 'fire_station'];
-const CIVIC_A = ['school', 'townhall', 'courthouse', 'library', 'hospital', 'police', 'fire_station'];
-const RESIDENTIALISH = ['house', 'terrace', 'residential', 'apartments', 'detached', 'semidetached_house', 'brownstone', 'townhouse'];
-const COMMERCIALISH = ['commercial', 'retail', 'hotel', 'office'];
-const PLAIN = ['garage', 'garages', 'shed', 'industrial', 'warehouse', 'kiosk', 'hut'];
-const NYCHA = /New York City Housing Authority|NYCHA/i;
-// Stable per-id hash (Knuth multiplicative, 32-bit) so reruns pick the same brownstones
-const hash100 = (id) => (Math.imul(id >>> 0, 2654435761 | 0) >>> 0) % 100;
-
-function classify(t, h, id) {
-  const b = t.building;
-  const mat = t['building:material'] ?? '';
-  const facade = t['building:facade:material'] ?? t['facade:material'] ?? '';
-  if (RELIGIOUS.includes(b) || t.amenity === 'place_of_worship') return ['church', false];
-  if (NYCHA.test(t.operator ?? '') || NYCHA.test(t.owner ?? '')) return ['nycha', false];
-  if (CIVIC_B.includes(b) || CIVIC_A.includes(t.amenity) || t.office === 'government') return ['civic', false];
-  if (mat === 'glass' || facade === 'glass') return ['glass', false];
-  if (['office', 'commercial', 'hotel', 'yes'].includes(b) && h >= 45) return ['glass', false];
-  if ((mat === 'stone' || mat === 'sandstone') && h <= 22) return ['brownstone', false];
-  if (mat === 'brick') return ['brick', false];
-  if (RESIDENTIALISH.includes(b) || (b === 'yes' && h <= 22)) {
-    if (h <= 18) return [hash100(id) < 55 ? 'brownstone' : 'brick', true];
-    return ['brick', true];
-  }
-  if (COMMERCIALISH.includes(b) && h < 45) return ['brick', true];
-  if (PLAIN.includes(b)) return ['plain', true];
-  return ['plain', true];
-}
-
-function buildingProps(t, id) {
-  let h = parseHeight(t.height);
-  let heightEstimated = false;
-  if (!(h > 0)) {
-    const levels = num(t['building:levels']);
-    if (levels > 0) h = levels * 3.2 + 1.0;
-    else {
-      h = typeHeight(t.building);
-      heightEstimated = true;
-    }
-  }
-  h = Math.min(600, Math.max(2, round(h)));
-  const [c, classEstimated] = classify(t, h, id);
-  return { h, c, e: (heightEstimated ? 1 : 0) | (classEstimated ? 2 : 0) };
-}
-
 const prepRing = (geom, tol) => cleanRing(simplify(geom.map(project), tol));
 const ringOk = (r, minArea) => r.length >= 3 && Math.abs(area(r)) >= minArea;
-const withinReach = (ring) => ring.every(([x, z]) => Math.hypot(x, z) <= 1900);
 
-const buildings = [];
-const buildingRings = []; // parallel: projected ring for each output building
-const keepBuilding = (id, ring, holes, t) => {
+const osmBuildings = []; // { id, ring, t }
+const osmKeep = (id, ring, t) => {
   if (!inSquare(centroid(ring)) || !withinReach(ring)) return;
-  const props = buildingProps(t, Number(String(id).split(':')[2]));
-  const out = { id, p: flat(ring) };
-  if (holes.length) out.i = holes.map(flat);
-  out.h = props.h;
-  out.c = props.c;
-  out.e = props.e;
-  const n = nameOf(t);
-  if (n) out.n = n;
-  buildings.push(out);
-  buildingRings.push(ring);
+  osmBuildings.push({ id, ring, t });
 };
-
 for (const el of buildingEls) {
   const t = el.tags ?? {};
   if (skipBuilding(t)) continue;
   if (el.type === 'way') {
     if (!el.geometry || !isClosed(el.geometry)) continue;
     const ring = prepRing(el.geometry.slice(0, -1), 0.3);
-    if (!ringOk(ring, 4)) continue;
-    keepBuilding(`osm:way:${el.id}`, ring, [], t);
+    if (!ringOk(ring, RING_MIN_AREA)) continue;
+    osmKeep(`osm:way:${el.id}`, ring, t);
   } else if (el.type === 'relation' && el.members) {
-    const ofRole = (role) =>
-      assembleRings(el.members.filter((m) => m.type === 'way' && (m.role || 'outer') === role && m.geometry).map((m) => m.geometry))
-        .map((g) => prepRing(g.slice(0, -1), 0.3))
-        .filter((r) => ringOk(r, 4));
-    const outers = ofRole('outer');
-    const inners = ofRole('inner');
-    outers.forEach((outer, k) => {
-      const holes = inners.filter((r) => inside(centroid(r), outer));
-      keepBuilding(k === 0 ? `osm:relation:${el.id}` : `osm:relation:${el.id}:${k}`, outer, holes, t);
-    });
+    const outers = assembleRings(el.members.filter((m) => m.type === 'way' && (m.role || 'outer') === 'outer' && m.geometry).map((m) => m.geometry))
+      .map((g) => prepRing(g.slice(0, -1), 0.3))
+      .filter((r) => ringOk(r, RING_MIN_AREA));
+    outers.forEach((outer, k) => osmKeep(k === 0 ? `osm:relation:${el.id}` : `osm:relation:${el.id}:${k}`, outer, t));
   }
 }
 
-// ---- Roads ----
+// G1(b): match each Valdrada footprint to the v2 OSM way it most overlaps.
+// Footprint sources differ (DOITT vs OSM), so the match is by sampled overlap
+// on a 1 m grid over each ring, scored against the smaller ring; ≥0.5 of the
+// smaller covered wins, one OSM id per Valdrada building and vice versa.
+function ringCells(ring) {
+  const [minX, minZ, maxX, maxZ] = bboxOf(ring);
+  const cells = new Set();
+  for (let gx = Math.floor(minX); gx <= Math.floor(maxX); gx++) {
+    for (let gz = Math.floor(minZ); gz <= Math.floor(maxZ); gz++) {
+      if (inside([gx + 0.5, gz + 0.5], ring)) cells.add((gx + 2048) * 4096 + (gz + 2048));
+    }
+  }
+  return cells;
+}
+const osmCellSets = osmBuildings.map((b) => ringCells(b.ring));
+const osmGrid = new Grid(30);
+osmBuildings.forEach((b, i) => {
+  const [a, c, d, e] = bboxOf(b.ring);
+  osmGrid.insert(i, a, c, d, e);
+});
+const matchScores = new Map(); // vdIdx -> { osmIdx, score }
+{
+  const pairs = [];
+  vdBuildings.forEach((vb, vi) => {
+    const vc = ringCells(vb.ring);
+    if (!vc.size) return;
+    const [minX, minZ, maxX, maxZ] = bboxOf(vb.ring);
+    const seen = new Set();
+    for (const i of osmGrid.near([(minX + maxX) / 2, (minZ + maxZ) / 2], Math.hypot(maxX - minX, maxZ - minZ) / 2 + 1)) {
+      if (seen.has(i)) continue;
+      seen.add(i);
+      const oc = osmCellSets[i];
+      if (!oc.size) continue;
+      let shared = 0;
+      for (const cell of vc) if (oc.has(cell)) shared++;
+      const score = shared / Math.min(vc.size, oc.size);
+      if (score >= 0.5) pairs.push([score, vi, i]);
+    }
+  });
+  pairs.sort((x, y) => y[0] - x[0]);
+  const taken = new Set();
+  for (const [score, vi, i] of pairs) {
+    if (matchScores.has(vi) || taken.has(i)) continue;
+    matchScores.set(vi, { osmIdx: i, score });
+    taken.add(i);
+  }
+}
+
+// STYLE -> class: docs/design/handoff/harlem-v3.md "STYLE → class mapping"
+// (lane A1): brick 0,1,2,7,10 · glass 3,11 · civic 4,8 · brownstone 5 ·
+// plain 6,13,14,15 · church 9 · nycha 12. All seven classes are existing;
+// no palette tokens were added and Valdrada rgb is not imported (G3).
+const STYLE_CLASS = {
+  [STYLE.TENEMENT]: 'brick', [STYLE.PREWAR_APT]: 'brick', [STYLE.POSTWAR_BRICK]: 'brick',
+  [STYLE.MODERN_GLASS]: 'glass', [STYLE.DECO_MASONRY]: 'civic', [STYLE.ROWHOUSE]: 'brownstone',
+  [STYLE.LOFT_CASTIRON]: 'plain', [STYLE.INDUSTRIAL]: 'brick', [STYLE.CIVIC_STONE]: 'civic',
+  [STYLE.CHURCH]: 'church', [STYLE.RETAIL_STRIP]: 'brick', [STYLE.GLASS_TOWER_BLUE]: 'glass',
+  [STYLE.PROJECT_BRICK]: 'nycha', [STYLE.RETAIL_MODERN]: 'plain', [STYLE.FRAME_HOUSE]: 'plain',
+  [STYLE.CONDO_NEW]: 'plain',
+};
+
+// BF flags -> `d` bitset in nyc-mon's order (handoff "flags → d bit order"):
+// cornice, fire escape, stoop, water tower, storefront, setbacks, gable.
+const detailMask = (flags) =>
+  (flags & BF.CORNICE ? 1 : 0) | (flags & BF.FIRE_ESCAPE ? 2 : 0) | (flags & BF.STOOP ? 4 : 0)
+  | (flags & BF.WATERTOWER ? 8 : 0) | (flags & BF.STOREFRONT ? 16 : 0) | (flags & BF.SETBACKS ? 32 : 0)
+  | (flags & BF.GABLE ? 64 : 0);
+
+// Record-or-rule on the wire `e` (v3 semantics: set = a named record supplied
+// the field; E1 record-vs-rule table, docs/implementation/harlem-v3-p0-findings.md §2).
+// height: DOITT height_roof unless the `4 + hash*4` fallback band [4,8) ran
+// (compile.mjs L406) or the building is an OSM gap-fill whose height came from
+// levels/typical rules (compile.mjs L535-540). floors: PLUTO numfloors unless
+// the written value equals what classify would derive without it
+// (classify.mjs L86-89). vs, class and d are always rules: bits stay clear.
+const OSM_TYPICAL_HEIGHTS = new Set([11, 12, 15, 18, 20]); // compile.mjs L540 untagged gap-fill table
+function heightIsRecord(vb, match) {
+  const h = vb.height;
+  if (h < 8) return false; // `4 + hash2(cx,cz) * 4` fallback band covers every procedural height
+  if (match && match.score >= 0.85) {
+    const t = osmBuildings[match.osmIdx].t;
+    if (t.height != null) return true; // the OSM height tag is itself a record
+    if (t['building:levels'] != null) return false; // levels * 3.4 + 1 is a rule over a record
+    if (OSM_TYPICAL_HEIGHTS.has(h)) return false; // untagged gap-fill typical
+  }
+  return true;
+}
+function floorsIsRecord(vb) {
+  const h = vb.height;
+  const derived = new Set([
+    Math.max(1, Math.round(h / 3.2)),
+    Math.max(1, Math.round(h / 3.6)),
+    Math.max(1, Math.round(h / 3.0)),
+  ]);
+  return !derived.has(vb.floors);
+}
+
+const buildings = [];
+const buildingRings = []; // parallel: projected ring per output building
+const vdLandmarks = new Map(); // landmarkId -> [buildingIdx]
+let matchedCount = 0;
+vdBuildings.forEach((vb, vi) => {
+  const match = matchScores.get(vi);
+  const osm = match ? osmBuildings[match.osmIdx] : null;
+  const id = osm ? osm.id : `vd:${pins.tag}:${vb.tileKey}:${vb.index}`;
+  if (osm) matchedCount++;
+  const out = { id, p: flat(vb.ring) };
+  if (vb.holes.length) out.i = vb.holes.map(flat);
+  out.h = round(Math.min(600, Math.max(2, vb.height)));
+  out.c = STYLE_CLASS[vb.style] ?? 'plain';
+  const e = (heightIsRecord(vb, match) ? 1 : 0) | (floorsIsRecord(vb) ? 4 : 0);
+  if (e) out.e = e;
+  const n = osm ? nameOf(osm.t) : undefined;
+  if (n) out.n = n;
+  if (vb.floors > 0) out.f = vb.floors;
+  if (vb.floorH > 0) out.fh = round2(vb.floorH);
+  out.vs = vb.style;
+  if (vb.storeH > 0) out.sh = round2(vb.storeH);
+  if (vb.winW > 0) out.ww = round2(vb.winW);
+  if (vb.frontIdx >= 0) out.fi = vb.frontIdx;
+  const d = detailMask(vb.flags);
+  if (d) out.d = d;
+  buildings.push(out);
+  buildingRings.push(vb.ring);
+  if (vb.landmarkId) {
+    const list = vdLandmarks.get(vb.landmarkId) ?? [];
+    list.push(buildings.length - 1);
+    vdLandmarks.set(vb.landmarkId, list);
+  }
+});
+
+// ---- Roads: Valdrada (CSCL) + OSM classes CSCL does not carry --------------
 const ROAD_CLASS = {
   motorway: 'motorway', trunk: 'trunk', primary: 'primary', secondary: 'secondary', tertiary: 'tertiary',
   residential: 'residential', unclassified: 'residential', living_street: 'living', service: 'service',
@@ -438,10 +539,109 @@ const ROAD_WIDTH = {
   motorway: 20, trunk: 18, primary: 18, secondary: 14, tertiary: 12, residential: 9, living: 6, service: 5,
   pedestrian: 6, footway: 2.5, sidewalk: 2.5, crossing: 3, cycleway: 2,
 };
-const SIDEWALK = { primary: 6, trunk: 6, secondary: 5, tertiary: 4.5, residential: 4.5, living: 2 };
+const SIDEWALK = { primary: 6, trunk: 6, secondary: 5, tertiary: 4.5, residential: 4.5, living: 2, pedestrian: 3 };
 const EXCLUDED_HIGHWAY = new Set(['steps', 'corridor', 'elevator', 'proposed', 'construction', 'platform', 'bus_stop', 'raceway']);
 
+// Valdrada rclass -> class (mapping rule, recorded in notes): rclass 1 street
+// -> residential; 2 wide (>=13.5 m CSCL curb-to-curb) -> primary; 3 highway
+// (rw 2) -> trunk; 4 bridge (rw 9) -> primary; 5 pedPath -> footway;
+// 6 alley (rw 10) -> service. pedStreet (noTraffic) -> pedestrian.
+const VD_ROAD_CLASS = { 1: 'residential', 2: 'primary', 3: 'trunk', 4: 'primary', 5: 'footway', 6: 'service' };
+// CSCL width rules whose outputs mark `e` (width estimated): blank streetwidth
+// defaults 60/30/10 ft (compile.mjs L619), pedStreet plaza width 18.3 (L653),
+// pedPath cap 3.5 (L680). After 0.1 m rounding these are the values to mark.
+const RULE_WIDTHS = new Set([18.3, 9.1, 3.0, 3.5]);
+
 const roads = [];
+const roadIds = new Set();
+// Stitch pieces of one CSCL segment cut at a tile boundary back together.
+const vdPiecesBySeg = new Map();
+for (const t of vdTiles) {
+  for (const r of t.roads) {
+    const pts = r.pts.map(([x, , z]) => [x, z]);
+    if (pts.length < 2) continue;
+    const list = vdPiecesBySeg.get(r.segId) ?? [];
+    list.push({ pts, r });
+    vdPiecesBySeg.set(r.segId, list);
+  }
+}
+const END_JOIN = 0.5;
+const nearPt = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]) <= END_JOIN;
+function stitch(pieces) {
+  const lines = pieces.map((p) => p.pts);
+  let joined = true;
+  while (joined) {
+    joined = false;
+    outer: for (let i = 0; i < lines.length; i++) {
+      for (let j = i + 1; j < lines.length; j++) {
+        const a = lines[i], b = lines[j];
+        let merged = null;
+        if (nearPt(a[a.length - 1], b[0])) merged = a.concat(b.slice(1));
+        else if (nearPt(a[a.length - 1], b[b.length - 1])) merged = a.concat(b.slice(0, -1).reverse());
+        else if (nearPt(a[0], b[b.length - 1])) merged = b.concat(a.slice(1));
+        else if (nearPt(a[0], b[0])) merged = a.slice(1).reverse().concat(b);
+        if (merged) {
+          lines.splice(j, 1);
+          lines[i] = merged;
+          joined = true;
+          break outer;
+        }
+      }
+    }
+  }
+  return lines;
+}
+for (const [segId, pieces] of vdPiecesBySeg) {
+  const r = pieces[0].r;
+  let k = 0;
+  for (const line of stitch(pieces)) {
+    for (const piece of clipPolyline(line, R + 40)) {
+      const pts = cleanLine(piece);
+      if (pts.length < 2 || lineLength(pts) < 2) continue;
+      const c = r.noTraffic && (r.rclass === 1 || r.rclass === 2) ? 'pedestrian' : (VD_ROAD_CLASS[r.rclass] ?? 'residential');
+      const w = round(r.width);
+      const road = {
+        id: k === 0 && !roadIds.has(`cscl:${segId}`) ? `cscl:${segId}` : `cscl:${segId}:${k}`,
+        c, w, s: SIDEWALK[c] ?? 0, p: flat(pts),
+      };
+      roadIds.add(road.id);
+      k++;
+      if (RULE_WIDTHS.has(w)) road.e = 1;
+      if (r.name) road.n = r.name;
+      if (r.lanes > 0) road.l = r.lanes;
+      if (r.oneway !== 0) road.ow = r.oneway;
+      road.sp = r.speed;
+      road.sid = segId;
+      roads.push(road);
+    }
+  }
+}
+
+// OSM ways in classes CSCL has no record for. Plain footways are dropped when
+// a Valdrada pedPath (rclass 5) traces the same line, so paths are not drawn twice.
+const OSM_ONLY_CLASSES = new Set(['sidewalk', 'crossing', 'cycleway', 'footway']);
+const vdPathSegs = []; // segments of Valdrada pedPaths for the footway dedupe
+const vdPathGrid = new Grid(20);
+for (const [segId, pieces] of vdPiecesBySeg) {
+  if (pieces[0].r.rclass !== 5) continue;
+  for (const line of stitch(pieces)) {
+    for (let i = 1; i < line.length; i++) {
+      const a = line[i - 1], b = line[i];
+      vdPathSegs.push([a, b]);
+      vdPathGrid.insert(vdPathSegs.length - 1, Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.max(a[0], b[0]), Math.max(a[1], b[1]));
+    }
+  }
+}
+const nearVdPath = (p, r) => {
+  for (const i of vdPathGrid.near(p, r)) if (segDist(p, vdPathSegs[i][0], vdPathSegs[i][1]) < r) return true;
+  return false;
+};
+const footwayIsDuplicate = (pts) => {
+  let covered = 0;
+  for (const p of pts) if (nearVdPath(p, 4)) covered++;
+  return pts.length > 0 && covered / pts.length >= 0.5;
+};
+let osmRoadsKept = 0, footwaysDropped = 0;
 for (const w of roadEls) {
   const t = w.tags ?? {};
   if (w.type !== 'way' || !w.geometry || w.geometry.length < 2) continue;
@@ -455,6 +655,7 @@ for (const w of roadEls) {
   if (!c) continue;
   if (hw === 'footway' && t.footway === 'sidewalk') c = 'sidewalk';
   else if (hw === 'footway' && t.footway === 'crossing') c = 'crossing';
+  if (!OSM_ONLY_CLASSES.has(c)) continue;
 
   let width = parseHeight(t.width);
   let estimated = false;
@@ -474,16 +675,30 @@ for (const w of roadEls) {
   for (const piece of clipPolyline(pts, R + 40)) {
     const line = cleanLine(piece);
     if (line.length < 2 || lineLength(line) < 2) continue;
+    if (c === 'footway' && footwayIsDuplicate(line)) {
+      footwaysDropped++;
+      continue;
+    }
     const road = { id: k === 0 ? `osm:way:${w.id}` : `osm:way:${w.id}:${k}`, c, w: width, s, p: flat(line) };
     if (estimated) road.e = 1;
     const n = nameOf(t);
     if (n) road.n = n;
     roads.push(road);
+    osmRoadsKept++;
     k++;
   }
 }
 
-// ---- Areas ----
+function parseHeight(raw) {
+  if (raw == null) return undefined;
+  const s = String(raw).trim().toLowerCase();
+  const feet = s.match(/^(\d+(?:\.\d+)?)\s*(?:'|ft|feet)\s*(?:(\d+(?:\.\d+)?)\s*(?:"|in))?$/);
+  if (feet) return Number(feet[1]) * 0.3048 + (feet[2] ? Number(feet[2]) * 0.0254 : 0);
+  const m = s.match(/^(\d+(?:[.,]\d+)?)\s*(?:m|metres|meters)?$/);
+  return m ? Number(m[1].replace(',', '.')) : undefined;
+}
+
+// ---- Areas (unchanged: OSM stays the source) --------------------------------
 function areaKind(t) {
   const L = t.leisure;
   if (L === 'garden') return 'garden';
@@ -535,13 +750,14 @@ for (const el of areaEls) {
   }
 }
 
-// ---- Trees ----
-const osmTrees = [];
-for (const n of treeEls) {
-  if (n.type !== 'node') continue;
-  const [x, z] = project(n);
-  const p = [round(x), round(z)];
-  if (inSquare(p)) osmTrees.push(p);
+// ---- Trees: census records (Valdrada FURN.TREE p2==1) + generated fill -------
+const censusTrees = [];
+for (const t of vdTiles) {
+  for (const f of t.furniture) {
+    if (f.k !== FURN.TREE || f.p2 !== 1) continue;
+    const p = [round(f.x), round(f.z)];
+    if (inSquare(p)) censusTrees.push(p);
+  }
 }
 
 const buildingGrid = new Grid(20);
@@ -557,9 +773,9 @@ const nearBuilding = (p, margin) => {
   return false;
 };
 const treeGrid = new Grid(10);
-osmTrees.forEach((p, i) => treeGrid.insert(i, p[0], p[1], p[0], p[1]));
-const nearOsmTree = (p, r) => {
-  for (const i of treeGrid.near(p, r)) if (Math.hypot(osmTrees[i][0] - p[0], osmTrees[i][1] - p[1]) < r) return true;
+censusTrees.forEach((p, i) => treeGrid.insert(i, p[0], p[1], p[0], p[1]));
+const nearCensusTree = (p, r) => {
+  for (const i of treeGrid.near(p, r)) if (Math.hypot(censusTrees[i][0] - p[0], censusTrees[i][1] - p[1]) < r) return true;
   return false;
 };
 const areaGrid = new Grid(40);
@@ -635,7 +851,7 @@ for (const r of roads) {
       const tz = (bz - az) / l;
       const p = [ax + (bx - ax) * u - tz * offset * side, az + (bz - az) * u + tx * offset * side];
       if (!inSquare(p)) continue;
-      if (nearOsmTree(p, 6) || nearFill(p, 4)) continue;
+      if (nearCensusTree(p, 6) || nearFill(p, 4)) continue;
       if (nearBuilding(p, 1.5) || inAreaKind(p, ['water'])) continue;
       addFill(p);
       streetCount++;
@@ -654,32 +870,55 @@ for (const a of areaRings) {
       const p = [x + (rng() * 2 - 1) * 4.5, z + (rng() * 2 - 1) * 4.5];
       if (!inside(p, a.outer) || a.holes.some((h) => inside(p, h)) || !inSquare(p)) continue;
       if (inAreaKind(p, PARK_SKIP) || nearBuilding(p, 3) || nearPath(p, 4)) continue;
-      if (nearOsmTree(p, 3) || nearFill(p, 4)) continue;
+      if (nearCensusTree(p, 3) || nearFill(p, 4)) continue;
       addFill(p);
       parkCount++;
     }
   }
 }
 
-// ---- Landmarks ----
-const LANDMARKS = [
-  { key: 'apollo-theater', re: /Apollo Theat/i },
-  { key: 'hotel-theresa', re: /Theresa/i },
-  { key: 'acp-state-office', re: /Adam Clayton Powell.*State Office|State Office Building/i },
+// ---- Landmarks ---------------------------------------------------------------
+// Valdrada is the source (spec §5.1): landmarkSpec.js ids 8/9/10, after the
+// AR32C read-time overrides the decoder applies, name the same three keys v2
+// shipped. OSM stays the fallback, as v2's query did.
+const LANDMARK_TARGETS = [
+  { key: 'apollo-theater', landmarkId: 8, re: /Apollo Theat/i },
+  { key: 'hotel-theresa', landmarkId: 9, re: /Theresa/i },
+  { key: 'acp-state-office', landmarkId: 10, re: /Adam Clayton Powell.*State Office|State Office Building/i },
 ];
+const specById = new Map(LANDMARKS.map((l) => [l.id, l]));
 const landmarks = [];
 const warnings = [];
-for (const { key, re } of LANDMARKS) {
-  const candidates = landmarkEls.filter((e) => re.test(e.tags?.name ?? ''));
+for (const { key, landmarkId, re } of LANDMARK_TARGETS) {
+  const spec = specById.get(landmarkId);
+  const indices = vdLandmarks.get(landmarkId) ?? [];
   let found = null;
-  // Prefer a named building footprint; when several match, the one nearest the origin wins
+  if (indices.length && spec) {
+    const at = project({ lat: spec.lat, lon: spec.lon });
+    let best = Infinity;
+    for (const i of indices) {
+      const d = Math.hypot(...centroid(buildingRings[i]).map((v, k) => v - at[k]));
+      if (d < best) {
+        best = d;
+        found = i;
+      }
+    }
+  }
+  if (found !== null) {
+    const b = buildings[found];
+    const [x, z] = centroid(buildingRings[found]);
+    landmarks.push({ key, name: b.n ?? spec.name, buildingId: b.id, x: round(x), z: round(z) });
+    continue;
+  }
+  // OSM fallback, as v2: a named building footprint first (nearest the origin
+  // wins), else the landmark query's elements by containment or proximity.
   const named = buildings
     .map((b, i) => ({ b, i }))
     .filter(({ b }) => b.n && re.test(b.n))
     .sort((u, v) => Math.hypot(...centroid(buildingRings[u.i])) - Math.hypot(...centroid(buildingRings[v.i])));
   if (named.length) found = { ...named[0], name: named[0].b.n };
   if (!found) {
-    for (const e of candidates) {
+    for (const e of landmarkEls.filter((el) => re.test(el.tags?.name ?? ''))) {
       const at = e.center ?? (e.lat != null ? { lat: e.lat, lon: e.lon } : null);
       if (!at) continue;
       const p = project(at);
@@ -701,62 +940,162 @@ for (const { key, re } of LANDMARKS) {
     }
   }
   if (!found) {
-    warnings.push(`landmark ${key}: not found in buildings or landmark query, omitted`);
+    warnings.push(`landmark ${key}: not found in Valdrada or OSM, omitted`);
     continue;
   }
   const [x, z] = centroid(buildingRings[found.i]);
   landmarks.push({ key, name: found.name, buildingId: found.b.id, x: round(x), z: round(z) });
 }
 
-// ---- Transit: subway entrances and sheltered bus stops ----
+// ---- Transit and record-placed furniture (Valdrada FURN kinds, G2 set) -------
 const subway = [];
 const shelters = [];
-for (const e of transitEls ?? []) {
-  if (e.type !== 'node' || !Number.isFinite(e.lat) || !Number.isFinite(e.lon)) continue;
-  const [x, z] = project(e);
-  if (Math.abs(x) > R || Math.abs(z) > R) continue;
-  if (e.tags?.railway === 'subway_entrance') subway.push(round(x), round(z));
-  else if (e.tags?.highway === 'bus_stop' && e.tags?.shelter === 'yes') shelters.push(round(x), round(z));
+const hydrants = [];
+const linknyc = [];
+const bikeRacks = [];
+for (const t of vdTiles) {
+  for (const f of t.furniture) {
+    if (!RECORD_FURN.includes(f.k)) continue;
+    if (!inSquare([f.x, f.z])) continue;
+    const x = round(f.x), z = round(f.z), rot = round2(f.rot);
+    if (f.k === FURN.SUBWAY_ENTRANCE) subway.push(x, z);
+    else if (f.k === FURN.BUS_SHELTER) shelters.push(x, z);
+    else if (f.k === FURN.HYDRANT) hydrants.push(x, z, rot);
+    else if (f.k === FURN.LINKNYC) linknyc.push(x, z, rot);
+    else if (f.k === FURN.BIKE_RACK) bikeRacks.push(x, z, rot);
+  }
 }
-if (!transitEls) warnings.push('transit: no .cache/transit.json (run fetch.mjs); subway and shelter lists are empty');
-
-// ---- Assemble ----
+// ---- Assemble -----------------------------------------------------------------
 const dataset = {
-  version: 2,
-  id: 'harlem-apollo-20261014',
+  version: 3,
+  id: 'harlem-apollo-20261017',
   origin: ORIGIN,
   extentMeters: R,
-  source: {
-    url: 'https://overpass-api.de/api/interpreter',
-    attribution: '© OpenStreetMap contributors',
-    license: 'ODbL-1.0',
-    retrievedAt,
-    query:
-      'Overpass bbox 40.801327,-73.961275,40.818773,-73.938225 (origin ±970 m): building ways/relations; highway ways; ' +
-      'leisure park|garden|playground|pitch|track|nature_reserve|dog_park, landuse grass|recreation_ground|village_green|cemetery|religious, ' +
-      'natural=water, waterway=riverbank, amenity=parking|school, place=square, highway=pedestrian+area=yes; natural=tree nodes; ' +
-      'named landmarks Apollo Theater|Theresa|Adam Clayton Powell' +
-      (transitAt ? `; railway=subway_entrance and highway=bus_stop nodes (retrieved ${transitAt})` : ''),
-  },
+  sources: [
+    {
+      url: 'https://overpass-api.de/api/interpreter',
+      attribution: '© OpenStreetMap contributors',
+      license: 'ODbL-1.0',
+      licenseUrl: 'https://www.openstreetmap.org/copyright',
+      retrievedAt,
+      query:
+        'Overpass bbox 40.801327,-73.961275,40.818773,-73.938225 (origin ±970 m): building ways/relations (id and name donors); ' +
+        'highway ways in sidewalk/crossing/cycleway/footway classes; leisure park|garden|playground|pitch|track|nature_reserve|dog_park, ' +
+        'landuse grass|recreation_ground|village_green|cemetery|religious, natural=water, waterway=riverbank, amenity=parking|school, ' +
+        'place=square, highway=pedestrian+area=yes; named landmarks Apollo Theater|Theresa|Adam Clayton Powell (fallback)',
+    },
+    {
+      url: 'https://huggingface.co/datasets/mehmetkeremturkcan/valdrada',
+      attribution: `Valdrada ${pins.tag} (commit ${pins.commit}), Mehmet Kerem Turkcan`,
+      license: 'ODbL-1.0',
+      licenseUrl: 'https://opendatacommons.org/licenses/odbl/1-0/',
+      retrievedAt: vdRetrievedAt,
+      query:
+        `Content/tiles ${tileFiles.map((f) => f.replace('.bin', '')).join(' ')} + manifest.json at tag ${pins.tag}, sha256 pinned in ` +
+        'tooling/city/valdrada/pins.json. Buildings, roads, landmarks, transit and record furniture are decoded from these tiles. ' +
+        'Citation: Turkcan, M.K. Valdrada: a real-data, real-time digital twin of New York City (software), 2026.',
+    },
+    {
+      url: 'https://data.cityofnewyork.us/d/5zhs-2jue',
+      attribution: 'NYC Building Footprints (DOITT), via Valdrada',
+      license: 'NYC Open Data Terms of Use',
+      licenseUrl: 'https://opendata.cityofnewyork.us/overview/',
+      retrievedAt: vdRetrievedAt,
+      query: 'Building footprint polygons and height_roof, compiled into the Valdrada tiles',
+    },
+    {
+      url: 'https://data.cityofnewyork.us/d/64uk-42ks',
+      attribution: 'PLUTO (NYC Planning), via Valdrada',
+      license: 'NYC Open Data Terms of Use',
+      licenseUrl: 'https://opendata.cityofnewyork.us/overview/',
+      retrievedAt: vdRetrievedAt,
+      query: 'numfloors and classification inputs (bldgclass, yearbuilt, histdist)',
+    },
+    {
+      url: 'https://data.cityofnewyork.us/d/xubg-57si',
+      attribution: 'DOB NOW Facades compliance filings (FISP/Local Law 11), via Valdrada',
+      license: 'NYC Open Data Terms of Use',
+      licenseUrl: 'https://opendata.cityofnewyork.us/overview/',
+      retrievedAt: vdRetrievedAt,
+      query: 'Exterior wall material, an input to the Valdrada facade typology carried in vs',
+    },
+    {
+      url: 'https://data.cityofnewyork.us/d/inkn-q76z',
+      attribution: 'NYC Street Centerline (CSCL), via Valdrada',
+      license: 'NYC Open Data Terms of Use',
+      licenseUrl: 'https://opendata.cityofnewyork.us/overview/',
+      retrievedAt: vdRetrievedAt,
+      query: 'Road geometry, streetwidth, travel lanes, trafdir, posted_speed, street names, physicalid',
+    },
+    {
+      url: 'https://data.cityofnewyork.us/d/uvpi-gqnh',
+      attribution: '2015 Street Tree Census (NYC Parks), via Valdrada',
+      license: 'NYC Open Data Terms of Use',
+      licenseUrl: 'https://opendata.cityofnewyork.us/overview/',
+      retrievedAt: vdRetrievedAt,
+      query: 'trees.census positions (Valdrada TREE records with p2==1: census rows and census-derived infill)',
+    },
+    {
+      url: 'https://data.cityofnewyork.us/d/5bgh-vtsn',
+      attribution: 'NYCDEP Citywide Hydrants, via Valdrada',
+      license: 'NYC Open Data Terms of Use',
+      licenseUrl: 'https://opendata.cityofnewyork.us/overview/',
+      retrievedAt: vdRetrievedAt,
+      query: 'furniture.hydrant positions',
+    },
+    {
+      url: 'https://data.cityofnewyork.us/d/t4f2-8md7',
+      attribution: 'NYC Bus Stop Shelters, via Valdrada',
+      license: 'NYC Open Data Terms of Use',
+      licenseUrl: 'https://opendata.cityofnewyork.us/overview/',
+      retrievedAt: vdRetrievedAt,
+      query: 'transit.shelters positions',
+    },
+    {
+      url: 'https://data.cityofnewyork.us/d/s4kf-3yrf',
+      attribution: 'LinkNYC Kiosks, via Valdrada',
+      license: 'NYC Open Data Terms of Use',
+      licenseUrl: 'https://opendata.cityofnewyork.us/overview/',
+      retrievedAt: vdRetrievedAt,
+      query: 'furniture.linknyc positions',
+    },
+    {
+      url: 'https://data.cityofnewyork.us/d/592z-n7dk',
+      attribution: 'NYC DOT Bicycle Parking (CityRacks), via Valdrada',
+      license: 'NYC Open Data Terms of Use',
+      licenseUrl: 'https://opendata.cityofnewyork.us/overview/',
+      retrievedAt: vdRetrievedAt,
+      query: 'furniture.bikeRack positions',
+    },
+    {
+      url: 'https://data.ny.gov/d/i9wp-a4ja',
+      attribution: 'MTA Subway Entrances and Exits (2024), via Valdrada',
+      license: 'NY Open Data Terms of Use',
+      licenseUrl: 'https://data.ny.gov/',
+      retrievedAt: vdRetrievedAt,
+      query: 'transit.subway positions',
+    },
+  ],
   notes: [
     'Coordinates are metres from origin: x = east, -z = north, rounded to 0.1 m.',
-    'Building h: OSM height tag (feet converted); else building:levels x 3.2 m + 1.0 m roof allowance; else a building-type estimate (e bit 1).',
-    'Building c: church, nycha, civic, glass and material-based classes come from tags; residential and other untagged classes are estimated (e bit 2), with about 55% of low residential buildings drawn as brownstone by a stable id hash.',
-    'A building is nycha only when its operator or owner tag names the New York City Housing Authority; appearance or name never marks public housing.',
-    'Buildings are not clipped; one is kept when its footprint centroid lies inside the extent square.',
-    'Road w: OSM width tag; else lanes x 3.3 m; else a road-class estimate (e = 1). Road s is an estimated sidewalk width per side by class, 0 when the sidewalk is tagged no, none or separate on both sides.',
-    'Sidewalks are modelled as symmetric; a sidewalk tagged on one side only keeps the class width on both sides.',
-    'Roads are clipped to the extent square plus 40 m; tunnels, steps, indoor and underground ways are dropped; bridges are drawn flat.',
-    'Areas are clipped to the extent square; underground and multi-storey parking and landuse=religious are excluded.',
-    'transit.subway are railway=subway_entrance nodes; transit.shelters are highway=bus_stop nodes tagged shelter=yes. Both from OSM, positions only.',
-    'trees.osm are natural=tree nodes from OSM. trees.fill are generated decoration with a fixed seed (street trees along sidewalks, park trees on a jittered 13 m grid), not OSM features.',
+    'v3: buildings, roads, landmarks, transit and record-placed furniture come from Valdrada v0.4.0 tiles (DOITT/PLUTO/CSCL/DOT/MTA records via its compile); OSM stays the source for areas, for sidewalk/crossing/cycleway/footway classes CSCL does not carry, and for building ids and names where a footprint overlap match lands (G1b).',
+    'Building e bits are record flags (set = a named record supplies the field): bit 0 height (DOITT height_roof), bit 2 floors (PLUTO numfloors). Bits 1 class, 3 style and 4 detail stay clear: class is derived from vs through the design-handoff STYLE table, and vs and d are compiler rules (Valdrada classify.mjs), never records.',
+    'Building h is record height where the e bit 0 is set; cleared where Valdrada fell back (the 4+hash*4 band under 8 m, compile.mjs L406) or where the footprint matches an untagged OSM gap-fill at a typical height (compile.mjs L535-540).',
+    'Building f is record floors where e bit 2 is set; cleared where the count equals what classify derives from height alone (classify.mjs L86-89). fh, sh, ww and fi are compiler style rules; d remaps the compiler BF flags into nyc-mon order: cornice, fire escape, stoop, water tower, storefront, setbacks, gable.',
+    'Roads: geometry, w, l (lanes), ow (oneway), sp (posted_speed, mph) and sid (CSCL physicalid) are CSCL records via Valdrada; class is a mapping rule over rclass, s an estimated sidewalk width per side by class, and e=1 marks the CSCL default widths (60/30/10 ft) and the pedStreet/pedPath widths (18.3/3.5 m).',
+    'OSM ways kept only in sidewalk, crossing, cycleway and footway classes; a footway within 4 m of a CSCL path over half its length is dropped as a duplicate.',
+    'trees.census are 2015 Street Tree Census positions via Valdrada (TREE records with p2==1, which also covers census-derived avenue infill). trees.fill are generated decoration with a fixed seed (street trees along sidewalks, park trees on a jittered 13 m grid), not records.',
+    'transit.subway are MTA entrance records; transit.shelters are DOT shelter records; furniture.hydrant/linknyc/bikeRack are DEP/LinkNYC/DOT records with a rotation (flat [x, z, rot radians]). Procedural Valdrada furniture kinds (lamps, signage, stoops, fire escapes, water towers, etc.) are not imported (G2).',
+    'landmarks come from Valdrada landmarkSpec ids 8/9/10 after its read-time footprint corrections; the OSM name and landmark query stay as fallback.',
+    'Buildings are not clipped; one is kept when its footprint centroid lies inside the extent square. Roads are clipped to the extent square plus 40 m.',
   ],
   buildings,
   roads,
   areas,
-  trees: { osm: flat(osmTrees), fill: flat(fill) },
+  trees: { census: flat(censusTrees), fill: flat(fill) },
   landmarks,
   transit: { subway, shelters },
+  furniture: { hydrant: hydrants, linknyc, bikeRack: bikeRacks },
 };
 
 // ---- Self-checks against the schema rules ----
@@ -791,11 +1130,12 @@ await writeFile(OUT, text);
 const countBy = (list, f) => list.reduce((m, x) => ((m[f(x)] = (m[f(x)] ?? 0) + 1), m), {});
 for (const w of warnings) console.warn(`WARN ${w}`);
 console.log(
-  `buildings ${buildings.length} ${JSON.stringify(countBy(buildings, (b) => b.c))} heightEstimated ${buildings.filter((b) => b.e & 1).length}` +
-    ` · roads ${roads.length} ${JSON.stringify(countBy(roads, (r) => r.c))}` +
+  `buildings ${buildings.length} ${JSON.stringify(countBy(buildings, (b) => b.c))} id-matched ${matchedCount} (${((100 * matchedCount) / buildings.length).toFixed(1)}%) ` +
+    `height record ${buildings.filter((b) => b.e & 1).length} floors record ${buildings.filter((b) => b.e & 4).length}` +
+    ` · roads ${roads.length} ${JSON.stringify(countBy(roads, (r) => r.c))} (osm kept ${osmRoadsKept}, footways dropped ${footwaysDropped})` +
     ` · areas ${areas.length} ${JSON.stringify(countBy(areas, (a) => a.k))}` +
-    ` · trees osm ${osmTrees.length} fill ${fill.length} (street ${streetCount}, park ${parkCount})` +
+    ` · trees census ${censusTrees.length} fill ${fill.length} (street ${streetCount}, park ${parkCount})` +
     ` · landmarks ${landmarks.length}/3 ${landmarks.map((l) => l.key).join(',')}` +
-    ` · subway entrances ${subway.length / 2} · bus shelters ${shelters.length / 2}` +
+    ` · subway ${subway.length / 2} · shelters ${shelters.length / 2} · hydrants ${hydrants.length / 3} · linknyc ${linknyc.length / 3} · racks ${bikeRacks.length / 3}` +
     ` · ${(Buffer.byteLength(text) / 1024).toFixed(0)} KB · retrievedAt ${retrievedAt}`
 );
