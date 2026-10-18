@@ -118,6 +118,13 @@ export interface ArcadeControllerProps
   readonly onStopHoldStart?: () => void;
   /** The hold ended before completing; nothing was requested. */
   readonly onStopReleased?: () => void;
+  /**
+   * A release inside the tap window while the pill is in `stopConfirm`: the
+   * press meant pause/resume, so the owner cancels the confirm and toggles.
+   * Not a router request — each request kind re-evaluates the session, so a
+   * pause-request+resume-request pair would toggle twice and net zero.
+   */
+  readonly onStopShortPress?: () => void;
   /** Optional content over the clear sightline; never a control. */
   readonly stage?: (slot: Parameters<NonNullable<AdaptiveControlLayoutProps['stage']>>[0]) => ReactNode;
   readonly testID?: string;
@@ -160,6 +167,7 @@ export function ArcadeController({
   onStart,
   onStopHoldStart,
   onStopReleased,
+  onStopShortPress,
   stage,
   savedLayouts,
   insets,
@@ -263,6 +271,7 @@ export function ArcadeController({
           ...common,
           state: 'playing' as const,
           onPause: () => { haptics.toggle(); router.pauseRequest(source); },
+          onShortPress: onStopShortPress,
           onStopHoldStart,
           onStopHoldComplete: () => { haptics.stopConfirm(); router.stopRequest(source); },
           onStopReleased,
@@ -272,6 +281,7 @@ export function ArcadeController({
           ...common,
           state: 'paused' as const,
           onResume: () => { haptics.toggle(); router.resumeRequest(source); },
+          onShortPress: onStopShortPress,
           onStopHoldStart,
           onStopHoldComplete: () => { haptics.stopConfirm(); router.stopRequest(source); },
           onStopReleased,
@@ -283,14 +293,7 @@ export function ArcadeController({
           progress: stopProgress,
           onStopHoldComplete: () => { haptics.stopConfirm(); router.stopRequest(source); },
           onStopReleased: onStopReleased ?? (() => undefined),
-          // A release inside the tap window still means pause/resume: cancel
-          // the confirm first, then let each request pair itself to the state
-          // the cancel restored (playing → pause-request, paused → resume).
-          onShortPress: () => {
-            (onStopReleased ?? (() => undefined))();
-            router.pauseRequest(source);
-            router.resumeRequest(source);
-          },
+          onShortPress: onStopShortPress ?? (onStopReleased ?? (() => undefined)),
         };
       case 'disabled':
         return { ...common, state: 'disabled' as const };

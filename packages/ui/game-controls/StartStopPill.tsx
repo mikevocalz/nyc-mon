@@ -94,6 +94,15 @@ export type StartStopPillProps = CommonPillProps &
     | {
         readonly state: 'playing';
         readonly onPause: () => void;
+        /**
+         * This touch armed the hold on down (the session entered `stop-confirm`)
+         * and released inside the tap window, but this component's props may not
+         * have flushed `stopConfirm` yet — the press meant pause/resume, so the
+         * owner should cancel the confirm and toggle. Without it an armed short
+         * press falls back to `onPause`, whose session event `stop-confirm`
+         * ignores: the latch.
+         */
+        readonly onShortPress?: () => void;
         readonly onStopHoldStart?: () => void;
         readonly onStopHoldComplete: () => void;
         readonly onStopReleased?: () => void;
@@ -103,6 +112,15 @@ export type StartStopPillProps = CommonPillProps &
     | {
         readonly state: 'paused';
         readonly onResume: () => void;
+        /**
+         * This touch armed the hold on down (the session entered `stop-confirm`)
+         * and released inside the tap window, but this component's props may not
+         * have flushed `stopConfirm` yet — the press meant pause/resume, so the
+         * owner should cancel the confirm and toggle. Without it an armed short
+         * press falls back to `onResume`, whose session event `stop-confirm`
+         * ignores: the latch.
+         */
+        readonly onShortPress?: () => void;
         readonly onStopHoldStart?: () => void;
         readonly onStopHoldComplete: () => void;
         readonly onStopReleased?: () => void;
@@ -185,8 +203,17 @@ export function StartStopPill(props: StartStopPillProps) {
   });
 
   // JS side of the gesture. Stable identities; the worklets call these through runOnJS.
-  const tap = useRef(() => {
+  // `armed` = the touch already dispatched holdStart, so the session is in
+  // stop-confirm even if these props still show the pre-touch state — a release
+  // in the tap window must go down the cancel-and-toggle path, never onPause /
+  // onResume (whose pillPress stop-confirm ignores: the original latch bug).
+  const tap = useRef((armed: boolean) => {
     const p = latest.current;
+    if (armed) {
+      if (p.state === 'stopConfirm') (p.onShortPress ?? p.onStopReleased)();
+      else if (p.state === 'playing' || p.state === 'paused') (p.onShortPress ?? p.onStopReleased ?? (() => undefined))();
+      return;
+    }
     if (p.state === 'start') p.onStart();
     else if (p.state === 'playing') p.onPause();
     else if (p.state === 'paused') p.onResume();
@@ -232,6 +259,9 @@ export function StartStopPill(props: StartStopPillProps) {
   const sink = useSharedValue(0);
   const progress = useSharedValue(0);
   const completed = useSharedValue(false);
+  // 1 while a live touch already dispatched holdStart — set on the UI thread
+  // where `holdable` is read, so a release never depends on flushed props.
+  const armed = useSharedValue(0);
 
   const gesture = useManualGesture({
     enabled: !disabled,
@@ -246,6 +276,7 @@ export function StartStopPill(props: StartStopPillProps) {
       sink.set(reducedMotion ? 1 : withTiming(1, { duration: PRESS_MS }));
       GestureStateManager.activate(e.handlerTag);
       if (!holdable) return;
+      armed.set(1);
       progress.set(
         withTiming(1, { duration: holdMs, easing: Easing.linear }, (finished) => {
           'worklet';
@@ -262,13 +293,15 @@ export function StartStopPill(props: StartStopPillProps) {
       const current = owner.get();
       if (current === -1 || !e.changedTouches.some((t) => t.id === current)) return;
       const heldMs = Date.now() - downAt.get();
+      const wasArmed = armed.get();
+      armed.set(0);
       owner.set(-1);
       sink.set(reducedMotion ? 0 : withTiming(0, { duration: PRESS_MS }));
       cancelAnimation(progress);
       progress.set(reducedMotion ? 0 : withTiming(0, { duration: UNWIND_MS }));
       if (e.numberOfTouches === 0) GestureStateManager.deactivate(e.handlerTag);
       if (completed.get()) return;
-      if (heldMs <= PILL_TAP_MAX_MS) runOnJS(tap)();
+      if (heldMs <= PILL_TAP_MAX_MS) runOnJS(tap)(wasArmed === 1);
       else if (holdable) runOnJS(holdReleased)();
     },
     onTouchesCancel: (e: GestureTouchEvent) => {
@@ -276,6 +309,7 @@ export function StartStopPill(props: StartStopPillProps) {
       const current = owner.get();
       if (current === -1 || !e.changedTouches.some((t) => t.id === current)) return;
       owner.set(-1);
+      armed.set(0);
       sink.set(0);
       cancelAnimation(progress);
       progress.set(0);
@@ -285,6 +319,7 @@ export function StartStopPill(props: StartStopPillProps) {
       'worklet';
       if (owner.get() === -1) return;
       owner.set(-1);
+      armed.set(0);
       sink.set(0);
       cancelAnimation(progress);
       progress.set(0);
@@ -321,7 +356,7 @@ export function StartStopPill(props: StartStopPillProps) {
           onAccessibilityAction={(event) => {
             if (disabled) return;
             const name = event.nativeEvent.actionName;
-            if (name === 'activate') tap();
+            if (name === 'activate') tap(false);
             else if (name === 'stop') confirm.setState({ confirmOpen: true });
           }}
           className="items-center justify-center"

@@ -323,6 +323,7 @@ export function GameScreen({ focused = true }: GameScreenProps = {}) {
             onStart={input.startSession}
             onStopHoldStart={input.beginStopConfirm}
             onStopReleased={input.cancelStopConfirm}
+            onStopShortPress={input.shortPressFromStopConfirm}
           />
         ) : null}
         {handedOver ? (
