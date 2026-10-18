@@ -291,8 +291,8 @@ const USAGE: Pair[] = [
   // so these rows measure those steps. Before that, Next settled the tokens at
   // :root and a light page painted text-text black on night (/profile Account
   // card, 1.06:1).
-  { id: 'card themed heading on night face', fg: 'ink-50', bg: NIGHT, role: 'text', usedAt: ['packages/theme/theme.css:328', 'packages/app/features/profile/profile-content.tsx:100'], reason: 'text-text inside a cornerCut or beam Card resolves to ink-50 on the face' },
-  { id: 'card themed muted on night face', fg: 'silver-500', bg: NIGHT, role: 'text', usedAt: ['packages/theme/theme.css:329', 'packages/theme/theme.css:330', 'packages/app/features/profile/profile-content.tsx:101'], reason: 'text-muted and text-secondary inside the Card face resolve to silver-500' },
+  { id: 'card themed heading on night face', fg: 'ink-50', bg: NIGHT, role: 'text', usedAt: ['packages/theme/theme.css:328', 'packages/app/features/game/controls-settings/ControlsSettingsScreen.tsx:328'], reason: 'text-text inside a cornerCut or beam Card resolves to ink-50 on the face' },
+  { id: 'card themed muted on night face', fg: 'silver-500', bg: NIGHT, role: 'text', usedAt: ['packages/theme/theme.css:329', 'packages/theme/theme.css:330', 'packages/app/features/game/controls-settings/ControlsSettingsScreen.tsx:329'], reason: 'text-muted and text-secondary inside the Card face resolve to silver-500' },
   { id: 'card themed primary on night face', fg: 'orange-500', bg: NIGHT, role: 'text', usedAt: ['packages/theme/theme.css:332'] },
   { id: 'card themed accent on night face', fg: 'carolina-500', bg: NIGHT, role: 'text', usedAt: ['packages/theme/theme.css:338', 'packages/theme/theme.css:349'], reason: 'accent and info share carolina-500 on the face' },
   { id: 'card themed success on night face', fg: 'leaf-500', bg: NIGHT, role: 'text', usedAt: ['packages/theme/theme.css:345'] },
@@ -398,10 +398,10 @@ const USAGE: Pair[] = [
   { id: 'hlynk: reduced-motion LED cue in the black head', fg: 'led-on', bg: ['hlynk-core-black'], role: 'ui', usedAt: ['packages/ui/hlynk/ScannerLed.tsx:96', 'packages/ui/hlynk/ScannerLed.tsx:104', 'packages/ui/hlynk/ScannerLed.tsx:107'], reason: 'tick row, filled dot and exclamation dot that stand in for the LED rhythm' },
 
   // -- text on the ink plate over a scene (SolidPanel tone="ink": ink-800 face in both themes)
-  { id: 'scene plate headline', fg: 'orange-500', bg: ['ink-800'], role: 'large-text', usedAt: ['packages/app/features/explore/explore-content.tsx:22', 'packages/app/features/profile/profile-content.tsx:46', 'packages/app/features/error/screen.shared.tsx:25'], reason: 'display-sm heading and the display-xl 404 on the plate' },
+  { id: 'scene plate headline', fg: 'orange-500', bg: ['ink-800'], role: 'large-text', usedAt: ['packages/app/features/explore/explore-content.tsx:22', 'packages/app/features/profile/profile-content.tsx:34', 'packages/app/features/error/screen.shared.tsx:25'], reason: 'display-sm heading and the display-xl 404 on the plate' },
   { id: 'scene plate title', fg: 'ink-50', bg: ['ink-800'], role: 'large-text', usedAt: ['packages/app/features/error/screen.shared.tsx:29'] },
-  { id: 'scene plate body', fg: 'silver-200', bg: ['ink-800'], role: 'text', usedAt: ['packages/app/features/profile/profile-content.tsx:47', 'packages/app/features/error/screen.shared.tsx:32'] },
-  { id: 'scene plate line', fg: 'silver-300', bg: ['ink-800'], role: 'text', usedAt: ['packages/app/features/explore/explore-content.tsx:43', 'packages/app/features/profile/profile-content.tsx:45'] },
+  { id: 'scene plate body', fg: 'silver-200', bg: ['ink-800'], role: 'text', usedAt: ['packages/app/features/error/screen.shared.tsx:32'] },
+  { id: 'scene plate line', fg: 'silver-300', bg: ['ink-800'], role: 'text', usedAt: ['packages/app/features/explore/explore-content.tsx:43', 'packages/app/features/profile/profile-content.tsx:33'] },
   { id: 'scene plate tab label', fg: 'silver-200', bg: ['ink-900'], role: 'text', usedAt: ['packages/app/features/explore/explore-content.tsx:25'] },
   { id: 'scene plate tab edge', fg: 'ink-400', bg: ['ink-800'], role: 'ui', usedAt: ['packages/app/features/explore/explore-content.tsx:23'] },
   { id: 'scene plate selected tab label', fg: 'ink-950', bg: ['orange-500'], role: 'text', usedAt: ['packages/app/features/explore/explore-content.tsx:26'] },

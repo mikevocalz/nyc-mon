@@ -153,6 +153,16 @@ export interface RenderScaleController {
    * else null.
    */
   frame(now: number): RenderScaleDecision | null;
+  /**
+   * External down-step input (e.g. thermal pressure): applies one down
+   * factor immediately, bypassing the window cadence — thermal pressure
+   * is the early warning the pacing window would only see too late.
+   * Reversal damping still applies afterwards: the step marks
+   * lastMoved='down', so a later 'up' verdict must persist
+   * reversalWindows times. Clamped at the floor like a pacing step; the
+   * decision is always recorded (as 'hold' when the clamp stops it).
+   */
+  forceDown(now: number, reason: string): RenderScaleDecision;
   /** Current scale, in [floor, ceiling]. */
   readonly scale: number;
   /** Bounded log of every evaluated window — the audit for the device gate. */
@@ -300,6 +310,21 @@ export function createRenderScaleController(
       intervalCount = 0;
       return decision;
     },
+    forceDown(now: number, reason: string): RenderScaleDecision {
+      const from = scale;
+      const fps = intervalCount > 0 ? (intervalCount * 1000) / intervalSum : null;
+      apply('down');
+      const clamped = scale === from;
+      return record({
+        at: now,
+        fps,
+        frames: intervalCount,
+        verdict: clamped ? 'hold' : 'down',
+        from,
+        to: scale,
+        reason: clamped ? `${reason}; clamped at floor ${scale}` : reason,
+      });
+    },
     get scale() {
       return scale;
     },
@@ -329,6 +354,12 @@ export interface RenderScaleMount {
    * scale multiplies it, it is never the scaled value itself.
    */
   frame(now: number, basePixelRatio: number): void;
+  /**
+   * Forced down-step from an external input (thermal pressure). Same
+   * timestamp clock as frame(); the decision rides the same log channel.
+   * Returns null after dispose or on a non-finite timestamp.
+   */
+  forceDown(now: number, reason: string): RenderScaleDecision | null;
   /** After a canvas resize re-asserted the raw device ratio — re-applies the scale. */
   resized(): void;
   readonly scale: number;
@@ -377,6 +408,13 @@ export function mountRenderScale(
       const decision = controller.frame(now);
       if (decision) log(decision);
       assertRatio();
+    },
+    forceDown(now: number, reason: string): RenderScaleDecision | null {
+      if (disposed || !Number.isFinite(now)) return null;
+      const decision = controller.forceDown(now, reason);
+      log(decision);
+      assertRatio();
+      return decision;
     },
     resized(): void {
       assertRatio();
