@@ -51,7 +51,7 @@ export const CREATURE_ART: readonly CreatureArt[] = [
     kind: 'baby',
     dexId: 2,
     source: squeaklet,
-    alt: 'Squeaklet, a young charcoal-furred rat Mon with big round pink ears and a long pink tail, sitting on a sunny Harlem brownstone stoop and grinning at the viewer',
+    alt: 'Squeaklet, a charcoal-furred rat Mon with pink ears and tail, sitting on a sunny Harlem brownstone stoop.',
     width: 960,
     height: 1200,
     blurDataURL:
@@ -63,7 +63,7 @@ export const CREATURE_ART: readonly CreatureArt[] = [
     kind: 'baby',
     dexId: 9,
     source: kitteeCee,
-    alt: 'Kittee Cee, a young calico cat Mon with big soft paws, sitting upright on a Harlem bodega step beside a fruit stand, chin raised and calm',
+    alt: 'Kittee Cee, a calico cat Mon with soft paws, sitting on a Harlem bodega step beside a fruit stand.',
     width: 960,
     height: 1200,
     blurDataURL:
@@ -75,7 +75,7 @@ export const CREATURE_ART: readonly CreatureArt[] = [
     kind: 'baby',
     dexId: 62,
     source: yotito,
-    alt: 'Yotito, a young sandy-gray coyote Mon with tall pointed ears and big paws, standing on a Times Square sidewalk under bright screens and looking at the viewer',
+    alt: 'Yotito, a sandy-gray coyote Mon with tall ears and big paws, standing on a bright Times Square sidewalk.',
     width: 960,
     height: 1200,
     blurDataURL:
@@ -87,7 +87,7 @@ export const CREATURE_ART: readonly CreatureArt[] = [
     kind: 'egg',
     dexId: 1,
     source: metroEgg,
-    alt: 'The Metro Egg, a glossy red egg with white diagonal stripes and a small round gold inset, resting on a Harlem brownstone step',
+    alt: 'The Metro Egg, glossy red with white diagonal stripes and a gold inset, on a Harlem brownstone step.',
     width: 960,
     height: 1200,
     blurDataURL:
@@ -99,7 +99,7 @@ export const CREATURE_ART: readonly CreatureArt[] = [
     kind: 'egg',
     dexId: 8,
     source: cornerEgg,
-    alt: 'The Corner Egg, a glossy pink egg wrapped in a band of white fur with a tiny gold heart, resting on a bodega step',
+    alt: 'The Corner Egg, glossy pink with a white fur band and tiny gold heart, resting on a bodega step.',
     width: 960,
     height: 1200,
     blurDataURL:
@@ -111,7 +111,7 @@ export const CREATURE_ART: readonly CreatureArt[] = [
     kind: 'egg',
     dexId: 61,
     source: prismEgg,
-    alt: 'The Prism Egg, a glossy black egg with painted red, orange and yellow flames and a clear crystal inset, resting on a ledge in Times Square',
+    alt: 'The Prism Egg, glossy black with painted flames and a clear crystal inset, on a Times Square ledge.',
     width: 960,
     height: 1200,
     blurDataURL:
@@ -122,7 +122,7 @@ export const CREATURE_ART: readonly CreatureArt[] = [
     id: 'hatch-night',
     kind: 'scene',
     source: hatchNight,
-    alt: 'Night on a Harlem stoop: an egg rests in an open metal case on the bottom step, a thin crack in its shell glowing orange, with a lit bridge and skyline blurred behind',
+    alt: 'Night on a Harlem stoop: an egg in an open metal case, a thin shell crack glowing orange against a blurred skyline.',
     width: 1536,
     height: 1024,
     blurDataURL:

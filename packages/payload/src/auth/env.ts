@@ -67,6 +67,8 @@ export interface AuthEnv {
   requireEmailVerification: boolean;
   google: OAuthClient | undefined;
   apple: AppleClient | undefined;
+  /** Login with Amazon. Used as a social provider; Alexa itself remains a separate OAuth client. */
+  amazon: OAuthClient | undefined;
 }
 
 function oauthClient(rawId: string | undefined, rawSecret: string | undefined): OAuthClient | undefined {
@@ -81,6 +83,7 @@ export function readAuthEnv(): AuthEnv {
   // rule rejects dynamic access.
   const google = oauthClient(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET);
   const appleClient = oauthClient(process.env.APPLE_CLIENT_ID, process.env.APPLE_CLIENT_SECRET);
+  const amazon = oauthClient(process.env.AMAZON_LWA_CLIENT_ID, process.env.AMAZON_LWA_CLIENT_SECRET);
 
   const transport = smsTransport(process.env.AUTH_SMS_TRANSPORT);
   const deviceClientIds = list(process.env.AUTH_DEVICE_CLIENT_IDS);
@@ -111,5 +114,6 @@ export function readAuthEnv(): AuthEnv {
       appleClient === undefined
         ? undefined
         : { ...appleClient, appBundleIdentifier: clean(process.env.APPLE_APP_BUNDLE_IDENTIFIER) },
+    amazon,
   };
 }
