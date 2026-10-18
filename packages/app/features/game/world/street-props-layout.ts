@@ -137,6 +137,37 @@ export function placeParkedCars(dataset: CityDatasetV3, clearance: StreetClearan
 }
 
 /**
+ * v3 record furniture (`dataset.furniture` — DOT hydrant, LinkNYC and
+ * bike-rack [x, z, rot] triplets) settled onto the sidewalk: a point that
+ * is not standable nudges to the nearest sidewalk band within `maxMove`
+ * metres, else drops. `dir`/`toRoad` come from the nearest carriageway,
+ * the same convention `placeAtKerb` gives the transit records — the
+ * record `rot` is carried in the tile but its bake semantics are
+ * unverified (handoff PENDING E1), so orientation stays kerb-derived.
+ */
+export function placeRecordProps(
+  triplets: FlatPoints,
+  clearance: StreetClearance,
+  maxMove = 3,
+): { placed: PropPlacement[]; moved: number; dropped: number } {
+  const placed: PropPlacement[] = [];
+  let moved = 0;
+  let dropped = 0;
+  for (let i = 0; i + 2 < triplets.length; i += 3) {
+    const x = triplets[i]!;
+    const z = triplets[i + 1]!;
+    const spot = clearance.toSidewalk(x, z, maxMove);
+    if (!spot) { dropped++; continue; }
+    if (spot[0] !== x || spot[1] !== z) moved++;
+    const road = clearance.nearest(spot[0], spot[1]);
+    const dir: Point = road ? road.dir : [1, 0];
+    const toRoad: Point = road ? [-road.away[0], -road.away[1]] : [0, 1];
+    placed.push({ x: spot[0], z: spot[1], dir, toRoad });
+  }
+  return { placed, moved, dropped };
+}
+
+/**
  * OSM points (subway entrances, bus shelters) placed against the nearest
  * street: moved onto the sidewalk band when they fall in the carriageway
  * (within 3 m), dropped otherwise, turned to run along the kerb.

@@ -103,17 +103,21 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
   const glass = options.glass ?? EXPERIMENTAL_WORLD_GLASS;
   // Lit-room share follows the sky preset when no override is given:
   // morning light leaves interiors dark, dusk and night turn them on.
+  // PR08: the same pick feeds every material lane — before, only the
+  // flagged glass lane consumed it and the cel/PBR facades glowed at the
+  // authored dusk share regardless of the sky the clock picked.
   const TOD_BY_SKY: Record<SkyName, number> = { morning: 0.15, dusk: 0.8, night: 1 };
+  const tod = options.timeOfDay ?? TOD_BY_SKY[skyRig ? (options.sky ?? 'dusk') : 'dusk'];
   const materials = glass
     ? createGlassCityMaterials(THREE, {
         sunDirection,
         pbr,
         tier: options.glassTier,
-        timeOfDay: options.timeOfDay ?? TOD_BY_SKY[skyRig ? (options.sky ?? 'dusk') : 'dusk'],
+        timeOfDay: tod,
       })
     : pbr
-      ? createPbrCityMaterials(THREE, { sunDirection })
-      : createCityMaterials(THREE, sunDirection);
+      ? createPbrCityMaterials(THREE, { sunDirection, timeOfDay: tod })
+      : createCityMaterials(THREE, sunDirection, { timeOfDay: tod });
   // Lane L4: the same InstancedMesh keeps its paint-marker contract; only
   // the material changes. The lamp switch seeds off the resolved sky pick.
   const carPbr = (options.carPbr ?? EXPERIMENTAL_WORLD_CAR_PBR)

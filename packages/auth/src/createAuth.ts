@@ -3,7 +3,7 @@ import { inferAdditionalFields } from 'better-auth/client/plugins';
 import { createAuthClient } from 'better-auth/react';
 import type { AuthResult } from './AuthResult.ts';
 import { AUTH_BASE_PATH } from './paths.ts';
-import type { SignInRequest } from './SignInRequest.ts';
+import type { SignInRequest, SocialProvider } from './SignInRequest.ts';
 import type { SignUpRequest } from './SignUpRequest.ts';
 import { toAuthResult } from './toAuthResult.ts';
 
@@ -74,6 +74,11 @@ export function createAuth({ baseURL, appOrigin }: CreateAuthOptions) {
     return toAuthResult(await client.signOut());
   }
 
+  /** Explicitly links a social identity to the already signed-in Caller. */
+  async function linkSocial(provider: SocialProvider, callbackURL: string): Promise<AuthResult> {
+    return toAuthResult(await client.linkSocial({ provider, callbackURL }));
+  }
+
   /** M03 "Forgot password?": always resolves ok on the client so the answer never reveals whether the email exists. */
   async function requestPasswordReset(email: string): Promise<AuthResult> {
     return toAuthResult(await client.requestPasswordReset({ email }));
@@ -88,6 +93,7 @@ export function createAuth({ baseURL, appOrigin }: CreateAuthOptions) {
     signIn,
     signUp,
     signOut,
+    linkSocial,
     requestPasswordReset,
     resendVerification,
     /** React hook: the current session, or `null` when signed out. */
