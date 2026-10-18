@@ -50,19 +50,26 @@ test('vd lane: ground, lots and sidewalks ride the curb, faces stand along the c
   world.dispose();
 });
 
-test('vd lane: near trees are the three Valdrada species, filled around the Caller and under the triangle budget', async () => {
+test('vd lane: near trees are Valdrada’s census species, filled around the Caller and under the triangle budget', async () => {
   const { parseCityDataset } = await import('../city-dataset.ts');
   const { buildCityWorld } = await import('./index.ts');
-  const { VD_NEAR_TREE_CAP, vdSpecies } = await import('./vd-trees-mesh.ts');
-  assert.deepEqual([vdSpecies(0), vdSpecies(0.5), vdSpecies(0.99)], [0, 1, 2]);
+  const { VD_NEAR_TREE_CAP, vdCensusTree } = await import('./vd-trees-mesh.ts');
+  const { VD_CENSUS_SPECIES } = await import('./vd-tree-species.ts');
+  const { decodeBase64 } = await import('./foliage-decode.ts');
+  // Census species map onto the baked models: honeylocust (2) -> 1, oak (5) -> 2, pear (3) -> 3.
+  const sp = decodeBase64(VD_CENSUS_SPECIES);
+  const first = (id: number) => sp.indexOf(id);
+  assert.equal(vdCensusTree(first(2)).model, 1);
+  assert.equal(vdCensusTree(first(5)).model, 2);
+  assert.equal(vdCensusTree(first(3)).model, 3);
   const dataset = parseCityDataset(JSON.parse(readFileSync(new URL('../data/harlem-apollo.json', import.meta.url), 'utf8')));
   const world = buildCityWorld(THREE as never, dataset, { vd: true });
   world.setViewDistance(8, 2000);
   world.setFocus(-28, 22);
   const leaves = world.group.children.filter((o) => o.name.startsWith('city:trees-vd-leaf-')) as THREE.InstancedMesh[];
   const barks = world.group.children.filter((o) => o.name.startsWith('city:trees-vd-bark-')) as THREE.InstancedMesh[];
-  assert.equal(leaves.length, 3);
-  assert.equal(barks.length, 3);
+  assert.equal(leaves.length, 6);
+  assert.equal(barks.length, 6);
   const shown = leaves.reduce((n, m) => n + m.count, 0);
   assert.ok(shown > 10 && shown <= VD_NEAR_TREE_CAP, `${shown} model trees near the Apollo`);
   let tris = 0;

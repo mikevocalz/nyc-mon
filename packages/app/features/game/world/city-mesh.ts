@@ -729,6 +729,12 @@ function emitMeasuredFront(
         const board = sign.bg !== null;
         if (board) boards.surface(...SURFACES.iron);
         if (board) box(boards, f, [x0, sign.y, 0.02], [x1, sign.y + sign.h, sign.k === 'lightbox' ? 0.24 : 0.1], sign.bg, { skip: ['back', 'bottom'] });
+        if (board) {
+          // Near-future layer: LED strips along the board's top and bottom edges, lit in the sign's letter colour.
+          const d = (sign.k === 'lightbox' ? 0.24 : 0.1) + 0.012;
+          const led = sign.fg.map((v) => Math.min(1, v * 0.6 + 0.4));
+          for (const yy of [sign.y, sign.y + sign.h - 0.045]) box(boards, f, [x0, yy, d - 0.01], [x1, yy + 0.045, d], led, { skip: ['back', 'bottom', 'top'] });
+        }
         let height = Math.min(sign.h * 0.62, 0.7);
         let condense = Math.max(0.45, Math.min(1, (width - 0.3) / textWidth(sign.t, height)));
         while (textWidth(sign.t, height, condense) > width - 0.15 && height > 0.12) height *= 0.9;

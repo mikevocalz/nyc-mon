@@ -2,14 +2,22 @@
 // first use. Kept apart from walkability.ts so node tests of the pure maths
 // never import the tile JSON.
 import { bundledCity } from '../city-data.ts';
-import { createWalkQueries, type WalkQueries } from './walkability.ts';
+import { buildObstacles } from './obstacles.ts';
+import { createStreetClearance, createWalkQueries, type WalkQueries } from './walkability.ts';
 
 let bundled: WalkQueries | null = null;
 function queries(): WalkQueries {
   if (bundled) return bundled;
   const city = bundledCity();
   // A tile that failed to parse never mounts the world, so nothing is walkable.
-  bundled = city.ok ? createWalkQueries(city.dataset) : { isWalkable: () => false, groundHeight: () => 0 };
+  if (!city.ok) {
+    bundled = { isWalkable: () => false, groundHeight: () => 0 };
+    return bundled;
+  }
+  // Ground and buildings from the walk queries; poles, trunks, hydrants and parked cars block too.
+  const walk = createWalkQueries(city.dataset);
+  const obstacles = buildObstacles(city.dataset, createStreetClearance(city.dataset));
+  bundled = { isWalkable: (x, z) => walk.isWalkable(x, z) && !obstacles.blocked(x, z), groundHeight: walk.groundHeight };
   return bundled;
 }
 

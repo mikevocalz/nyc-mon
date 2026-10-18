@@ -31,13 +31,14 @@
 import type { Three } from '@acme/ui/three';
 import type { Node } from 'three/webgpu';
 import { decodeBase64 } from './foliage.ts';
-import { cityShaderTools, roadsGraphs, type CityMaterials } from './materials.ts';
+import { cityShaderTools, roadsGraphs, TONE_ATTRIBUTE, type CityMaterials } from './materials.ts';
 import { createPbrCityMaterials, type PbrCityOptions } from './pbr-materials.ts';
 import { parseSkyRigFlag } from './sky-rig.ts';
 import { LIT_SHARE_CAP, LIT_SHARE_DAY, LIT_SHARE_GAIN, LIT_SHARE_TOD, WINDOW_GRID } from './windows.ts';
 import {
   VD_GROUND_MEANS, VD_GROUND_RGB, VD_NORMAL_LAYERS, VD_NORMALS_XY, VD_TEXTURE_SIZE, VD_WALL_LAYERS, VD_WALL_MEANS, VD_WALLS_RGB,
 } from './vd-textures.ts';
+import { VD_TREES } from './vd-trees.ts';
 
 type StdMat = InstanceType<Three['MeshStandardNodeMaterial']>;
 type F = Node<'float'>;
@@ -405,8 +406,45 @@ export function createVdCityMaterials(THREE: Three, options: PbrCityOptions): Vd
   // the shader, and the decal read as a bright patch mid-sidewalk at noon.
   base.lampPools.visible = false;
 
+  // ---------------------------------------------------------- near future
+  // The D17 / MOBILE_WORLD_PR_PACK "Future NYC visual layer" on Valdrada's
+  // real street: the light is added, nothing real is replaced. Values run
+  // past 1 on purpose: AgX rolls them into a glow (no bloom pass on rn-webgpu).
+  const vrgb = T.attribute<'vec3'>('color', 'vec3');
+  // Sign letters and LED edge strips burn like lit acrylic.
+  (base.lettering as StdMat).colorNode = T.vec4(vrgb.mul(2.1), 1);
+  // Roofline neon and sign boards.
+  (base.neon as StdMat).colorNode = T.vec4(vrgb.mul(1.7), 1);
+  // Holographic ad surfaces: the brand gradient as a translucent projection
+  // with drifting scan bands, a bright rim and a slow shimmer.
+  {
+    const holo = base.billboards as StdMat;
+    holo.transparent = true;
+    holo.depthWrite = false;
+    holo.blending = THREE.AdditiveBlending;
+    holo.side = THREE.DoubleSide;
+    // uv is metres across and up the panel (city-mesh.ts emitBillboard).
+    const hv = T.uv().y as F;
+    const hu = T.uv().x as F;
+    const band = T.smoothstep(0.35, 0.5, T.fract(hv.mul(4).sub(T.time.mul(0.6)))).mul(0.45).add(0.55);
+    const sweep = T.smoothstep(0.9, 1, T.fract(hv.mul(0.12).sub(T.time.mul(0.25)))).mul(1.4);
+    const shimmer = T.float(0.85).add(T.sin(T.time.mul(3.1).add(hu.mul(1.3))).mul(0.15));
+    holo.colorNode = T.vec4(vrgb.mul(band.add(sweep)).mul(shimmer).mul(1.8), 1);
+    holo.opacityNode = T.float(0.85);
+  }
+
+  // Far crowns in the model trees' own leaf colour (atlas mean), varied a little per tree.
+  const leafMean = VD_TREES.reduce((acc, t) => acc.map((v, i) => v + t.leafTone[i]! / VD_TREES.length), [0, 0, 0]);
+  const farCrown = () => {
+    const m = new THREE.MeshStandardNodeMaterial({ roughness: 0.85, metalness: 0 });
+    const tone = T.attribute<'vec3'>(TONE_ATTRIBUTE, 'vec3');
+    m.colorNode = T.vec4(T.vec3(leafMean[0]!, leafMean[1]!, leafMean[2]!).mul(T.float(0.8).add(tone.g.mul(0.4))), 1);
+    return m;
+  };
+
   return {
     ...base,
+    farCrown,
     masonry,
     roads,
     sidewalks,

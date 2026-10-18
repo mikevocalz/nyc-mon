@@ -5,13 +5,35 @@
 import type { Three } from '@acme/ui/three';
 import { decodeBase64 } from './foliage-decode.ts';
 import { VD_TREE_ATLAS_RGBA, VD_TREE_ATLAS_SIZE, VD_TREES } from './vd-trees.ts';
+import { VD_CENSUS_DBH, VD_CENSUS_SPECIES } from './vd-tree-species.ts';
 
-/** Species share of the street trees, in VD_TREES order: plane, honeylocust, oak (London plane is NYC's commonest). */
-export const VD_TREE_SHARE = [0.45, 0.3, 0.25] as const;
+/** Species share for unrecorded (park fill) trees, in VD_TREES order: plane, honeylocust, oak, pear, linden, zelkova. */
+export const VD_TREE_SHARE = [0.3, 0.2, 0.15, 0.1, 0.15, 0.1] as const;
+
+/**
+ * Census species id (Valdrada compile.mjs: 1 plane, 2 honeylocust, 3 pear, 4 ginkgo, 5 oak,
+ * 6 linden, 7 maple, 8 cherry, 9 sophora, 10 zelkova, 11 ash, 12 elm, 0 unknown) to the
+ * nearest baked model: plane 0, honeylocust 1, oak 2, pear 3, linden 4, zelkova 5.
+ * Sophora and ash take the honeylocust's fine compound leaf, ginkgo and elm the
+ * zelkova's upright vase, maple the linden, cherry the pear.
+ */
+const MODEL_FOR_SPECIES = [0, 0, 1, 3, 5, 2, 4, 4, 3, 1, 5, 1, 5] as const;
+let censusSpecies: Uint8Array | null = null;
+let censusDbh: Uint8Array | null = null;
+/** The recorded model and size of census tree `i`: scale grows with trunk diameter, a 16 in trunk is about full size. */
+export function vdCensusTree(i: number): { model: number; scale: number } {
+  censusSpecies ??= decodeBase64(VD_CENSUS_SPECIES);
+  censusDbh ??= decodeBase64(VD_CENSUS_DBH);
+  const sp = censusSpecies[i] ?? 0;
+  const dbh = censusDbh[i] || 8;
+  return { model: MODEL_FOR_SPECIES[sp] ?? 0, scale: Math.max(0.45, Math.min(1.1, 0.4 + dbh * 0.033)) };
+}
 /** Model metres to scene: the baked trees stand 10-12.6 m; Harlem's street trees read nearer 7-9 m. */
 export const VD_TREE_SCALE = 0.7;
 /** Near cap for the model trees (about 5k triangles each). TODO(tune) against the Duo frame budget. */
 export const VD_NEAR_TREE_CAP = 90;
+/** Mid-level trees past the near set (a twelfth of the cards on a plain trunk, about 900 triangles). TODO(tune) on the Duo. */
+export const VD_MID_TREE_CAP = 330;
 
 /** Species index for tree `i` from a 0..1 hash: deterministic, weighted by VD_TREE_SHARE. */
 export function vdSpecies(h: number): number {
@@ -28,7 +50,7 @@ const u16 = (b64: string) => { const u = decodeBase64(b64); return new Uint16Arr
 // Display-space value of a linear bark albedo: the city feeds palette values straight to the screen.
 const toDisplay = (c: number) => Math.pow(Math.max(0, c), 1 / 2.2);
 
-export function buildVdTreeMeshes(THREE: Three, capacity: number) {
+export function buildVdTreeMeshes(THREE: Three, capacity: number, midCapacity = 0) {
   const T = THREE.TSL;
   const atlas = new THREE.DataArrayTexture(decodeBase64(VD_TREE_ATLAS_RGBA), VD_TREE_ATLAS_SIZE, VD_TREE_ATLAS_SIZE, VD_TREES.length);
   atlas.format = THREE.RGBAFormat;
@@ -70,22 +92,36 @@ export function buildVdTreeMeshes(THREE: Three, capacity: number) {
     leafMaterial.emissiveNode = sample.rgb.mul(0.08);
     materials.push(barkMaterial, leafMaterial);
 
+    const midLeaf = new THREE.BufferGeometry();
+    midLeaf.setAttribute('position', new THREE.BufferAttribute(f32(tree.mid.position), 3));
+    midLeaf.setAttribute('normal', new THREE.BufferAttribute(f32(tree.mid.normal), 3));
+    midLeaf.setAttribute('uv', new THREE.BufferAttribute(f32(tree.mid.uv), 2));
+    midLeaf.setAttribute('aShade', new THREE.BufferAttribute(f32(tree.mid.shade), 1));
+    midLeaf.setIndex(new THREE.BufferAttribute(u16(tree.mid.index), 1));
+    // A plain trunk to the crown base (the model's crowns start about 4 m up).
+    const midTrunk = new THREE.CylinderGeometry(0.14, 0.24, 4.4, 6).translate(0, 2.2, 0);
+    geometries.push(midLeaf, midTrunk);
+    const midLeafMesh = new THREE.InstancedMesh(midLeaf, leafMaterial, Math.max(1, midCapacity));
+    const midTrunkMesh = new THREE.InstancedMesh(midTrunk, barkMaterial, Math.max(1, midCapacity));
+    midLeafMesh.name = `city:trees-vd-mid-${tree.id}`;
+    midTrunkMesh.name = `city:trees-vd-midtrunk-${tree.id}`;
+    for (const mesh of [midLeafMesh, midTrunkMesh]) { mesh.count = 0; mesh.frustumCulled = false; }
     const barkMesh = new THREE.InstancedMesh(bark, barkMaterial, capacity);
     const leafMesh = new THREE.InstancedMesh(leaf, leafMaterial, capacity);
     barkMesh.name = `city:trees-vd-bark-${tree.id}`;
     leafMesh.name = `city:trees-vd-leaf-${tree.id}`;
     for (const mesh of [barkMesh, leafMesh]) { mesh.count = 0; mesh.frustumCulled = false; }
-    return { bark: barkMesh, leaf: leafMesh, ids: new Int32Array(capacity), count: 0 };
+    return { bark: barkMesh, leaf: leafMesh, midLeaf: midLeafMesh, midTrunk: midTrunkMesh, count: 0, midCount: 0 };
   });
 
   return {
     species,
-    objects: species.flatMap((s) => [s.bark, s.leaf]),
+    objects: species.flatMap((s) => [s.bark, s.leaf, s.midLeaf, s.midTrunk]),
     dispose() {
       for (const g of geometries) g.dispose();
       for (const m of materials) m.dispose();
       atlas.dispose();
-      for (const s of species) { s.bark.dispose(); s.leaf.dispose(); }
+      for (const s of species) for (const m of [s.bark, s.leaf, s.midLeaf, s.midTrunk]) m.dispose();
     },
   };
 }
