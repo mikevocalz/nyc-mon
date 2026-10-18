@@ -6,7 +6,7 @@ import { useRouter } from 'solito/navigation';
 import { Section, View } from '@acme/ui/tw';
 import { Button, Card, Heading, SegmentedControl, Switch, Text, FadeIn } from '@acme/ui';
 import { useProfile, type ThemePreference } from '../profile/profile.store';
-import { CITY_MAP_ATTRIBUTION, CITY_MAP_LICENSE, CITY_MAP_LICENSE_URL } from '../game/map-data-credit';
+import { CITY_MAP_SOURCES } from '../game/map-data-credit';
 
 /** The game-control settings route (apps/mobile/app/(drawer)/game-controls.tsx). */
 const GAME_CONTROLS_PATH = '/game-controls';
@@ -82,17 +82,23 @@ export function SettingsContent() {
         <Card className="gap-3">
           <View className="gap-1">
             <Text variant="heading">Legal &amp; credits</Text>
+            {/* Interim UX copy (sentence case, pending A1 copy): one row per
+                record source in the bundled city dataset. */}
             <Text variant="caption" tone="muted">Map data</Text>
-            <Text>{CITY_MAP_ATTRIBUTION}</Text>
-            <Text variant="caption" tone="muted">
-              NYC-Mon&apos;s 3D city uses OpenStreetMap data under the Open Database License ({CITY_MAP_LICENSE.replace('ODbL-', 'ODbL ')}).
-            </Text>
+            {CITY_MAP_SOURCES.map((source) => (
+              <View key={source.attribution} className="gap-0.5">
+                <Text variant="caption">{source.attribution}</Text>
+                <Text
+                  variant="caption"
+                  tone="muted"
+                  onPress={() => void Linking.openURL(source.licenseUrl)}
+                  accessibilityRole="link"
+                >
+                  {source.license}
+                </Text>
+              </View>
+            ))}
           </View>
-          <Button
-            title="View map data license"
-            variant="outline"
-            onPress={() => void Linking.openURL(CITY_MAP_LICENSE_URL)}
-          />
         </Card>
       </FadeIn>
 

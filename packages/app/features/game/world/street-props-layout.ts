@@ -3,7 +3,7 @@
 // checked against the street clearance (walkability.ts); parked cars are the
 // one thing that stands in the carriageway, in the parking lane, and never
 // on a crossing, at an intersection or by a hydrant.
-import type { CityDatasetV2, FlatPoints, RoadClass } from '../city-dataset.ts';
+import type { CityDatasetV3, FlatPoints, RoadClass } from '../city-dataset.ts';
 import { hashUnit } from './geometry.ts';
 import { LIGHT_CLASSES, type LightPlacement, type SignPlacement } from './signage.ts';
 import type { StreetClearance } from './walkability.ts';
@@ -46,7 +46,7 @@ function along(points: FlatPoints, spacing: number, phase: number, visit: (x: nu
 }
 
 /** Hydrants along the kerbs, sides alternating, clear of the streetlights. */
-export function placeHydrants(dataset: CityDatasetV2, clearance: StreetClearance, lights: readonly LightPlacement[]): PropPlacement[] {
+export function placeHydrants(dataset: CityDatasetV3, clearance: StreetClearance, lights: readonly LightPlacement[]): PropPlacement[] {
   const out: PropPlacement[] = [];
   for (const road of dataset.roads) {
     if (!LIGHT_CLASSES.has(road.class)) continue;
@@ -64,7 +64,7 @@ export function placeHydrants(dataset: CityDatasetV2, clearance: StreetClearance
 }
 
 /** A wire litter basket by each sign pole, and every 90 m along the commercial avenues. */
-export function placeBaskets(dataset: CityDatasetV2, clearance: StreetClearance, signs: readonly SignPlacement[]): PropPlacement[] {
+export function placeBaskets(dataset: CityDatasetV3, clearance: StreetClearance, signs: readonly SignPlacement[]): PropPlacement[] {
   const out: PropPlacement[] = [];
   for (const sign of signs) {
     const [dx, dz] = sign.blades[0].dir;
@@ -95,7 +95,7 @@ export function placeBaskets(dataset: CityDatasetV2, clearance: StreetClearance,
  * empty when either end of the car is on a crossing, within 3 m of another
  * carriageway (an intersection), or within 4.6 m of a hydrant.
  */
-export function placeParkedCars(dataset: CityDatasetV2, clearance: StreetClearance, hydrants: readonly PropPlacement[]): CarPlacement[] {
+export function placeParkedCars(dataset: CityDatasetV3, clearance: StreetClearance, hydrants: readonly PropPlacement[]): CarPlacement[] {
   const out: CarPlacement[] = [];
   // Hydrants in 10 m cells, so each slot checks its own cell and the eight around it.
   const cells = new Map<number, PropPlacement[]>();
