@@ -36,6 +36,8 @@ const COPY = {
     body: (client: string, passkey: boolean) =>
       `${passkey ? 'Use your passkey, or sign in with your email and password below.' : 'Sign in with your email and password.'} Linking NYC-MON to ${client} is for adults (18+).`,
     passkey: 'Sign in with a passkey',
+    amazon: 'Continue with Amazon',
+    amazonLoading: 'Opening Amazon…',
     emailHeading: 'Sign in with email',
     email: 'Email',
     password: 'Password',
@@ -65,6 +67,7 @@ const COPY = {
   },
   error: {
     passkey: "That passkey didn't work. Try again, or sign in with your email.",
+    amazon: "That Amazon account isn't linked to NYC-MON yet. Link Amazon from NYC-MON Settings first, or sign in another way.",
     credentials: "That email and password don't match. Check both, or reset your password.",
     code: "That code didn't work. Check your authenticator app and try again.",
     adultsOnly: 'NYC-MON on Alexa is for adults (18+) only.',
@@ -125,7 +128,7 @@ function Status({ message }: { message: string | undefined }) {
   );
 }
 
-function SignInPage({ clientName }: { clientName: string }) {
+function SignInPage({ clientName, amazonEnabled }: { clientName: string; amazonEnabled: boolean }) {
   const copy = COPY.signIn;
   const { email, password, code, needsCode, pending, error, passkeySupported } = useLinkSignInStore();
   const { setEmail, setPassword, setCode, setNeedsCode, setPending, setError, setPasskeySupported, reset } = useLinkSignInStore();
@@ -136,13 +139,19 @@ function SignInPage({ clientName }: { clientName: string }) {
     setPasskeySupported(typeof globalThis.PublicKeyCredential !== 'undefined');
   }, [reset, setPasskeySupported]);
 
-  async function run(kind: 'email' | 'passkey' | 'code', failure: string): Promise<void> {
+  async function run(kind: 'amazon' | 'email' | 'passkey' | 'code', failure: string): Promise<void> {
     setError(undefined);
     setPending(kind);
     try {
       const auth = authClient();
       const result =
-        kind === 'passkey'
+        kind === 'amazon'
+          ? await auth.signIn.social({
+              provider: 'amazon',
+              // Preserve the provider-signed Alexa oauth_query across the LWA round trip.
+              callbackURL: window.location.href,
+            })
+          : kind === 'passkey'
           ? await auth.signIn.passkey()
           : kind === 'code'
           ? await auth.$fetch('/two-factor/verify-totp', { method: 'POST', body: { code: code.trim() } })
@@ -173,6 +182,16 @@ function SignInPage({ clientName }: { clientName: string }) {
         <Section className="gap-3">
           <Heading level={1}>{copy.heading}</Heading>
           <Paragraph className="my-0 text-base text-text">{copy.body(clientName, passkeySupported && !needsCode)}</Paragraph>
+          {amazonEnabled && !needsCode ? (
+            <AuthProviderButton
+              provider="amazon"
+              intent="sign-in"
+              label={COPY.signIn.amazon}
+              loading={pending === 'amazon'}
+              disabled={pending !== undefined}
+              onPress={() => void run('amazon', COPY.error.amazon)}
+            />
+          ) : null}
           {passkeySupported && !needsCode ? (
             <AuthProviderButton
               provider="passkey"
@@ -305,7 +324,7 @@ function ExpiredPage() {
 export function LinkPage({ data }: { data: LinkPageData }) {
   switch (data.kind) {
     case 'sign-in':
-      return <SignInPage clientName={data.clientName} />;
+      return <SignInPage clientName={data.clientName} amazonEnabled={data.amazonEnabled} />;
     case 'consent':
       return <ConsentPage clientName={data.clientName} scopes={data.scopes} />;
     case 'refused':
