@@ -22,6 +22,8 @@
 import type { Three } from '@acme/ui/three';
 import { createCelMaterial, createCelRig, type CelMaterialOptions, type CelRig } from '@acme/ui/three/cel';
 import { cityCelRig } from './cel-rig.ts';
+import { createToonMaterial, createToonRig } from './toon-material.ts';
+import { parseSkyRigFlag } from './sky-rig.ts';
 import { CITY_COLORS, type CityColor } from './palette.ts';
 import { LIT_SHARE_CAP, LIT_SHARE_DAY, LIT_SHARE_GAIN, LIT_SHARE_TOD, WINDOW_GRID } from './windows.ts';
 import { ATLAS_HEIGHT, ATLAS_WIDTH, atlasPixels } from './pixel-font.ts';
@@ -34,6 +36,9 @@ type CelSurface = Omit<CelMaterialOptions, 'rig' | 'albedo' | 'rim'>;
 
 /** Instance colour for the tree crowns, read into the albedo (instanceColor would tint after the lighting). */
 export const TONE_ATTRIBUTE = 'instanceTone';
+
+/** Opt-in lane flag — default OFF, matching the other experimental world lanes. `EXPO_PUBLIC_WORLD_TOON=1`. */
+export const EXPERIMENTAL_WORLD_TOON = parseSkyRigFlag(process.env.EXPO_PUBLIC_WORLD_TOON);
 
 /**
  * Light added after the material's own colour. NodeMaterial.setupLighting
@@ -389,10 +394,18 @@ export function createCityMaterials(
 ): CityMaterials & { rig: CelRig; albedoGraphs: Map<Mat, CelMaterialOptions['albedo']> } {
   const { T, c, vertexRgb } = cityShaderTools(THREE);
   const rig = createCelRig(THREE, cityCelRig(sunDirection));
+  const toonRig = EXPERIMENTAL_WORLD_TOON ? createToonRig(THREE, { sunDirection: sunDirection as [number, number, number] }) : null;
+  const toonAo = T.attribute<'float'>('aOcclusion', 'float');
   // Each cel material's TSL albedo, kept so node tests can compile the graph
   // (the TypeGPU cel body itself only resolves under the Metro/Vite transform).
   const albedoGraphs = new Map<Mat, CelMaterialOptions['albedo']>();
   const cel = (albedo: CelMaterialOptions['albedo'], rim: number, surface: CelSurface = {}) => {
+    if (toonRig) {
+      const toon = createToonMaterial(THREE, toonRig, { albedo: albedo as Node, rim: rim > 0, occlusion: toonAo });
+      Object.assign(toon.material, surface);
+      albedoGraphs.set(toon.material, albedo);
+      return toon.material;
+    }
     const material = createCelMaterial(THREE, { rig, albedo, rim, ...surface });
     albedoGraphs.set(material, albedo);
     return material;
