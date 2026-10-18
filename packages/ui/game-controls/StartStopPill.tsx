@@ -115,6 +115,14 @@ export type StartStopPillProps = CommonPillProps &
         readonly progress: number;
         readonly onStopHoldComplete: () => void;
         readonly onStopReleased: () => void;
+        /**
+         * A release inside the tap window while the confirm is open. Touch-down
+         * enters `stop-confirm` the moment a holdable touch lands, so a short
+         * press arrives here — not on `playing`/`paused` — and must cancel the
+         * confirm AND deliver the pause/resume the tap was for, else the
+         * session latches in `stop-confirm` with no way out but a hold.
+         */
+        readonly onShortPress?: () => void;
         /** Hold needed to stop, in ms. @default {@linkcode STOP_HOLD_MS} (1000) */
         readonly holdMs?: number;
       }
@@ -182,6 +190,7 @@ export function StartStopPill(props: StartStopPillProps) {
     if (p.state === 'start') p.onStart();
     else if (p.state === 'playing') p.onPause();
     else if (p.state === 'paused') p.onResume();
+    else if (p.state === 'stopConfirm') (p.onShortPress ?? p.onStopReleased)();
   }).current;
   const holdStart = useRef(() => {
     const p = latest.current;

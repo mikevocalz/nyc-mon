@@ -283,6 +283,14 @@ export function ArcadeController({
           progress: stopProgress,
           onStopHoldComplete: () => { haptics.stopConfirm(); router.stopRequest(source); },
           onStopReleased: onStopReleased ?? (() => undefined),
+          // A release inside the tap window still means pause/resume: cancel
+          // the confirm first, then let each request pair itself to the state
+          // the cancel restored (playing → pause-request, paused → resume).
+          onShortPress: () => {
+            (onStopReleased ?? (() => undefined))();
+            router.pauseRequest(source);
+            router.resumeRequest(source);
+          },
         };
       case 'disabled':
         return { ...common, state: 'disabled' as const };
