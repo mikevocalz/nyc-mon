@@ -30,10 +30,10 @@ export function vdCensusTree(i: number): { model: number; scale: number } {
 }
 /** Model metres to scene: the baked trees stand 10-12.6 m; Harlem's street trees read nearer 7-9 m. */
 export const VD_TREE_SCALE = 0.7;
-/** Near cap for the model trees (about 5k triangles each). TODO(tune) against the Duo frame budget. */
-export const VD_NEAR_TREE_CAP = 90;
-/** Mid-level trees past the near set (a twelfth of the cards on a plain trunk, about 900 triangles). TODO(tune) on the Duo. */
-export const VD_MID_TREE_CAP = 330;
+/** Near cap for the model trees (about 5k triangles each). Duo measured (2026-10-18, release): 90 full + 330 mid put ~2.0M triangles through the shadow pass for a p50 of 62 ms; halving the caps keeps the street lined with models inside ~40 m. */
+export const VD_NEAR_TREE_CAP = 48;
+/** Mid-level trees past the near set (a twelfth of the cards on a plain trunk, about 900 triangles). Duo-tuned with the near cap. */
+export const VD_MID_TREE_CAP = 160;
 
 /** Species index for tree `i` from a 0..1 hash: deterministic, weighted by VD_TREE_SHARE. */
 export function vdSpecies(h: number): number {

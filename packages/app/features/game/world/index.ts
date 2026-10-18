@@ -192,7 +192,7 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
     const casters = new Set(['city:walls-masonry', 'city:walls-glass', 'city:roofs', 'city:landmarks', 'city:street-detail', 'city:poles']);
     const receivers = new Set(['city:ground', 'city:areas', 'city:sidewalks', 'city:roads', 'city:walls-masonry', 'city:walls-glass', 'city:roofs']);
     for (const o of [ground, ...city.meshes, ...trees.objects, ...furniture.objects, ...props.objects]) {
-      const tree = o.name.startsWith('city:trees-vd-');
+      const tree = o.name.startsWith('city:trees-vd-') && !o.name.startsWith('city:trees-vd-mid');
       o.castShadow = casters.has(o.name) || tree;
       o.receiveShadow = receivers.has(o.name);
     }
