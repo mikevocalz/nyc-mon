@@ -328,17 +328,20 @@ export function startGameRender(args: GameRenderArgs): void {
               // resolved identically on this runtime (env is inlined at
               // bundle time), so both render paths mount the same set.
               const caps = livingCityCaps();
+              // One clearance index for both actors: heads/boxes nudge to
+              // the sidewalk, lamp glows reuse the same kerb math.
+              const streetClearance = createStreetClearance(city.dataset);
               return [
                 createVehicleActor({ read }),
                 createPedActor({ read }),
                 ...(topology && signals
-                  ? [createSignalActor({ read, signals, topology, focus, headCap: caps.signalHeadCap, pedCap: caps.pedBoxCap })]
+                  ? [createSignalActor({ read, signals, topology, focus, clearance: streetClearance, headCap: caps.signalHeadCap, pedCap: caps.pedBoxCap })]
                   : []),
                 ...(caps.lampGlow
                   ? [
                       createLampActor({
                         read,
-                        placements: lampPlacements(city.dataset, createStreetClearance(city.dataset)),
+                        placements: lampPlacements(city.dataset, streetClearance),
                         focus,
                       }),
                     ]

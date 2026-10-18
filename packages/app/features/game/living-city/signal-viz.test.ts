@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import type { CityDatasetV3, CityRoad } from '../city-dataset.ts';
+import { parseCityDataset, type CityDatasetV3, type CityRoad } from '../city-dataset.ts';
+import { createStreetClearance } from '../world/walkability.ts';
 import { CityClock, packEnvSection, readEnvSection } from './clock.ts';
 import { PSNAP_HEADER, PSNAP_STRIDE } from './ped-sim.ts';
 import { buildSignalSystem, type SignalSystem } from './signal-controller.ts';
@@ -174,6 +176,21 @@ test('ped boxes: two per signalized crosswalk, bound to the xwalk element', () =
   }
   assert.equal(boxes.length, xwalkIds.size * 2, 'every xwalk end gets a serving box');
   for (const b of boxes) assert.ok(xwalkIds.has(b.element));
+});
+
+// The pole-in-the-street regression: on the real tile the geometric
+// candidates mostly landed inside a carriageway or crossing strip. With
+// the world's clearance index passed, every surviving base is standable.
+test('heads and ped boxes respect street clearance: no pole stands in the street (real tile)', () => {
+  const dataset = parseCityDataset(JSON.parse(readFileSync(new URL('../data/harlem-apollo.json', import.meta.url), 'utf8')));
+  const clearance = createStreetClearance(dataset);
+  const topo = buildLaneTopology(dataset);
+  const signals = buildSignalSystem(topo);
+  const heads = signalHeadPlacements(topo, signals, clearance);
+  const boxes = pedBoxPlacements(topo, signals, clearance);
+  assert.ok(heads.length > 0 && boxes.length > 0, 'clearance pruning keeps a working set');
+  for (const h of heads) assert.ok(clearance.standable(h.x, h.z), `head standable at ${h.x},${h.z}`);
+  for (const b of boxes) assert.ok(clearance.standable(b.x, b.z), `ped box standable at ${b.x},${b.z}`);
 });
 
 // --- Lens state mapping --------------------------------------------------------------

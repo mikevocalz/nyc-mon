@@ -52,6 +52,7 @@ import { PSNAP, PSNAP_HEADER, PSNAP_STRIDE, packPedSection, pedSectionOffset } f
 import type { PedSim } from './ped-sim.ts';
 import type { SignalSystem } from './signal-controller.ts';
 import type { LaneTopology } from './topology.ts';
+import type { StreetClearance } from '../world/walkability.ts';
 import {
   VSNAP,
   VSNAP_HEADER,
@@ -223,6 +224,21 @@ export const SIGNAL_POLE_HEIGHT = 5.6;
 /** Ped-signal box height and kerb offset. */
 const PED_BOX_HEIGHT = 2.6;
 const PED_BOX_SIDE_OFFSET = 1.7;
+/** A head that lands in asphalt may slide to the nearest sidewalk band this far, else it tries the other corner, else it is dropped. */
+const HEAD_NUDGE_METRES = 4;
+const PED_BOX_NUDGE_METRES = 2.5;
+
+/**
+ * Kerb-pole discipline: when a StreetClearance is supplied a candidate
+ * base must be standable or nudgeable to a sidewalk band within
+ * `maxMove`, else null. Without one (tests, pure-math callers) the raw
+ * point passes — the caller owns kerb validity.
+ */
+function kerbSpot(x: number, z: number, clearance: StreetClearance | undefined, maxMove: number): [number, number] | null {
+  if (!clearance) return [x, z];
+  if (clearance.standable(x, z)) return [x, z];
+  return clearance.toSidewalk(x, z, maxMove);
+}
 
 export interface SignalHeadPlacement {
   readonly node: string;
@@ -254,8 +270,14 @@ export interface PedBoxPlacement {
  * (the first `through` connector, else the smallest id) — every
  * connector departing the leg shares the leg's phase group, so the
  * pick cannot disagree with the aspect the drivers read on screen.
+ *
+ * The geometric candidate assumes the mouth sits inside the junction
+ * box — where it lands in a carriageway or crossing (the usual case:
+ * the cross street's strip overlaps the corner) `clearance` nudges the
+ * pole to the nearest sidewalk band, mirrors it to the opposite
+ * corner, or drops the head rather than plant a pole in the street.
  */
-export function signalHeadPlacements(topology: LaneTopology, signals: SignalSystem): SignalHeadPlacement[] {
+export function signalHeadPlacements(topology: LaneTopology, signals: SignalSystem, clearance?: StreetClearance): SignalHeadPlacement[] {
   const out: SignalHeadPlacement[] = [];
   for (const [nodeId, controller] of signals.nodes) {
     const node = topology.nodeById.get(nodeId);
@@ -276,10 +298,14 @@ export function signalHeadPlacements(topology: LaneTopology, signals: SignalSyst
       const rx = Math.sin(az);
       const rz = -Math.cos(az);
       const off = leg.widthMeters / 2 + HEAD_KERB_OFFSET_METRES;
-      const x = leg.mouth[0] + Math.cos(az) * HEAD_PULLBACK_METRES + rx * off;
-      const z = leg.mouth[1] + Math.sin(az) * HEAD_PULLBACK_METRES + rz * off;
+      const px = leg.mouth[0] + Math.cos(az) * HEAD_PULLBACK_METRES;
+      const pz = leg.mouth[1] + Math.sin(az) * HEAD_PULLBACK_METRES;
+      const spot =
+        kerbSpot(px + rx * off, pz + rz * off, clearance, HEAD_NUDGE_METRES) ??
+        kerbSpot(px - rx * off, pz - rz * off, clearance, HEAD_NUDGE_METRES);
+      if (!spot) continue;
       const yaw = Math.atan2(-Math.cos(az), -Math.sin(az));
-      out.push({ node: nodeId, element: bound.id, leg: legIndex, x, z, yaw });
+      out.push({ node: nodeId, element: bound.id, leg: legIndex, x: spot[0], z: spot[1], yaw });
     }
   }
   return out;
@@ -289,9 +315,11 @@ export function signalHeadPlacements(topology: LaneTopology, signals: SignalSyst
  * Ped-signal boxes at each signalized crosswalk: one box per waiting
  * end, mounted on the far corner facing back across the zebra (the NYC
  * convention — you read the display you are walking toward). Bound to
- * the xwalk's own ped aspect.
+ * the xwalk's own ped aspect. A mouth that lands in the carriageway
+ * (zebra ends sit on the crossed road's kerb, often still within its
+ * strip) nudges to the sidewalk via `clearance`, mirrors, or drops.
  */
-export function pedBoxPlacements(topology: LaneTopology, signals: SignalSystem): PedBoxPlacement[] {
+export function pedBoxPlacements(topology: LaneTopology, signals: SignalSystem, clearance?: StreetClearance): PedBoxPlacement[] {
   const out: PedBoxPlacement[] = [];
   for (const [nodeId, controller] of signals.nodes) {
     const node = topology.nodeById.get(nodeId);
@@ -315,10 +343,12 @@ export function pedBoxPlacements(topology: LaneTopology, signals: SignalSystem):
         // back toward them.
         const far = end === 0 ? n - 2 : 0;
         const side = end === 0 ? 1 : -1;
-        const bx = p[far]! + rx * side * PED_BOX_SIDE_OFFSET;
-        const bz = p[far + 1]! + rz * side * PED_BOX_SIDE_OFFSET;
+        const spot =
+          kerbSpot(p[far]! + rx * side * PED_BOX_SIDE_OFFSET, p[far + 1]! + rz * side * PED_BOX_SIDE_OFFSET, clearance, PED_BOX_NUDGE_METRES) ??
+          kerbSpot(p[far]! - rx * side * PED_BOX_SIDE_OFFSET, p[far + 1]! - rz * side * PED_BOX_SIDE_OFFSET, clearance, PED_BOX_NUDGE_METRES);
+        if (!spot) continue;
         const yaw = Math.atan2(end === 0 ? -ux : ux, end === 0 ? -uz : uz);
-        out.push({ node: nodeId, element: x.id, servingEnd: end, x: bx, z: bz, yaw });
+        out.push({ node: nodeId, element: x.id, servingEnd: end, x: spot[0], z: spot[1], yaw });
       }
     }
   }
@@ -477,6 +507,8 @@ export interface SignalActorOptions {
   readonly topology: LaneTopology;
   /** Camera look-at point for the near-field caps — injected so the actor stays thread-agnostic. */
   readonly focus?: () => { x: number; z: number } | null;
+  /** Kerb clearance from the world's own index — heads/boxes nudge to the sidewalk rather than stand in the street. */
+  readonly clearance?: StreetClearance;
   /** Host lifecycle hooks — attach/detach the sim ticker on the JS path. */
   readonly onMount?: () => void;
   readonly onUnmount?: () => void;
@@ -500,8 +532,8 @@ export function createSignalActor(options: SignalActorOptions): SceneActorFactor
     const roster = signalRoster(options.signals);
     const rosterIndex = new Map<string, number>();
     roster.forEach((entry, i) => rosterIndex.set(entry.element, i));
-    const heads = signalHeadPlacements(options.topology, options.signals);
-    const boxes = pedBoxPlacements(options.topology, options.signals);
+    const heads = signalHeadPlacements(options.topology, options.signals, options.clearance);
+    const boxes = pedBoxPlacements(options.topology, options.signals, options.clearance);
     const headCap = options.headCap ?? SIGNAL_HEAD_CAP;
     const pedCap = options.pedCap ?? PED_BOX_CAP;
     const headRadius = options.headRadius ?? SIGNAL_HEAD_RADIUS;

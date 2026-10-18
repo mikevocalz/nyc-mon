@@ -210,21 +210,24 @@ function create(): LivingCityBundle {
   const vehicleFactory = createVehicleActor({ read, onMount: attach, onUnmount: detach });
   const pedFactory = createPedActor({ read, onMount: attach, onUnmount: detach });
   // PR07: signal heads + ped displays read the packed signal section —
-  // the same controller aspects the solver acts on. Lamp glows re-run the
-  // world's own streetlight placement (same clearance index the world
-  // built, so halos land on the rendered poles exactly).
+  // the same controller aspects the solver acts on. Pole/box bases run
+  // through the world's own clearance index so nothing stands in the
+  // carriageway. Lamp glows re-run the world's own streetlight placement
+  // (same index, so halos land on the rendered poles exactly).
+  const city = bundledCity();
+  const clearance = city.ok ? createStreetClearance(city.dataset) : undefined;
   const signalFactory = createSignalActor({
     read,
     signals,
     topology,
     focus,
+    clearance,
     onMount: attach,
     onUnmount: detach,
     headCap: caps.signalHeadCap,
     pedCap: caps.pedBoxCap,
   });
-  const city = bundledCity();
-  const placements = city.ok ? lampPlacements(city.dataset, createStreetClearance(city.dataset)) : [];
+  const placements = city.ok ? lampPlacements(city.dataset, clearance) : [];
   // PR09: the lamp glow/pool layer is the cosmetic rung — 'low' leaves it unmounted.
   const lampFactory = caps.lampGlow
     ? createLampActor({ read, placements, focus, onMount: attach, onUnmount: detach })
