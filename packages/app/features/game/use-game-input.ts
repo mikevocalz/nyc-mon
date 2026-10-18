@@ -166,7 +166,20 @@ export function useGameInput(options: GameInputOptions): GameInput {
     const lifecycleInput = (): WorldSaveLifecycleInput => ({ identity: latest.current.identity, dataset: latest.current.dataset });
 
     // Gameplay input turning on is the hand-over: put the Caller where the camera looks.
+    // A null placement (nothing walkable in reach of the look-at) leaves the
+    // Caller unspawned at the 220 m overview with every control dead, so the
+    // placement retries on a short timer until it takes or the input unmounts.
     placeCaller();
+    let placementTimer: ReturnType<typeof setTimeout> | null = null;
+    let placementTries = 0;
+    const retryPlacement = (): void => {
+      placementTimer = null;
+      if (callerStore.getState().spawned || placementTries >= 20) return;
+      placementTries += 1;
+      placeCaller();
+      if (!callerStore.getState().spawned) placementTimer = setTimeout(retryPlacement, 250);
+    };
+    if (!callerStore.getState().spawned) placementTimer = setTimeout(retryPlacement, 250);
 
     const stopLoop = (): void => {
       if (frame) cancelAnimationFrame(frame);
@@ -294,6 +307,7 @@ export function useGameInput(options: GameInputOptions): GameInput {
       router.cancelAll('screen-transition');
       appState.remove();
       subscription.remove();
+      if (placementTimer) clearTimeout(placementTimer);
       stopLoop();
       frameWake.current = null;
       resetViewTurns();
