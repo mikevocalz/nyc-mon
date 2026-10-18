@@ -10,6 +10,14 @@
 // untouched and a ped section is appended (ped-sim.ts), so every consumer
 // keeps reading the vehicle channel exactly as before.
 //
+// PR07: the host also owns the authoritative world clock (clock.ts) and
+// packs two more sections onto the same array — the signal section
+// (every controlled element's aspect, signal-viz.ts) and the env
+// section (hour/dayFactor/lampLevel/headlights/rain). Every visual
+// consumer — signal heads, ped displays, lamp glows, vehicle lights —
+// reads the same bytes the sims act on; nothing outside the snapshot
+// can disagree with what the AI saw.
+//
 // Two rules come straight from render-snapshot.ts:
 //
 //  - Fresh arrays every write. packActorSnapshot already allocates a new
@@ -25,8 +33,15 @@
 // the host only burns rAF while something renders it, and sim state
 // survives scene remounts like the module-scope session stores do.
 
-import { PedSim, emptyActorSnapshot, packActorSnapshot, type PedSimOptions } from './ped-sim.ts';
+import { CityClock } from './clock.ts';
+import { PedSim, type PedSimOptions } from './ped-sim.ts';
 import type { SignalSystem } from './signal-controller.ts';
+import {
+  emptyWorldSnapshot,
+  packWorldSnapshot,
+  signalRoster,
+  type SignalRosterEntry,
+} from './signal-viz.ts';
 import type { LaneTopology } from './topology.ts';
 import {
   SIM_DT,
@@ -55,6 +70,10 @@ export interface LivingCityHostOptions extends VehicleSimOptions {
   readonly focus?: () => { x: number; z: number } | null;
   /** Clamp on real time per frame so a backgrounded app resumes without a catch-up burst. */
   readonly maxFrameSeconds?: number;
+  /** PR07: the world clock's starting hour (0–24). Default is the clock's own noon-less default — see clock.ts. */
+  readonly timeOfDayHours?: number;
+  /** PR07: game hours per sim second — 1/3600 real time, 1/60 makes a session see a dusk transition. */
+  readonly hoursPerSimSecond?: number;
 }
 
 export interface LivingCityHostStats extends VehicleSimMetrics {
@@ -66,6 +85,8 @@ export interface LivingCityHostStats extends VehicleSimMetrics {
   readonly lastPedTickMs: number;
   /** Live pedestrian count on the last tick. */
   readonly pedestrians: number;
+  /** PR07: the authoritative world hour-of-day (0–24) the env section carries. */
+  readonly timeOfDay: number;
   readonly consumers: number;
   readonly running: boolean;
 }
@@ -74,13 +95,16 @@ export class LivingCityHost {
   readonly sim: VehicleSim;
   readonly pedSim: PedSim;
   readonly signals: SignalSystem;
+  /** PR07: the authoritative day/night clock — stepped in lockstep with the sim tick. */
+  readonly clock: CityClock;
   private readonly now: () => number;
   private readonly schedule: (cb: () => void) => unknown;
   private readonly cancel: (handle: unknown) => void;
   private readonly focus: (() => { x: number; z: number } | null) | undefined;
   private readonly maxFrameSeconds: number;
   private readonly sinks = new Set<VehicleSnapshotSink>();
-  private latest: number[] = emptyActorSnapshot();
+  private readonly roster: readonly SignalRosterEntry[];
+  private latest: number[] = emptyWorldSnapshot();
   private version = 0;
   private consumers = 0;
   private running = false;
@@ -108,7 +132,15 @@ export class LivingCityHost {
           : clearTimeout(h as ReturnType<typeof setTimeout>));
     this.focus = options.focus;
     this.maxFrameSeconds = options.maxFrameSeconds ?? 0.25;
-    const { topology: _t, signals: _s, now: _n, schedule: _sc, cancel: _c, focus: _f, maxFrameSeconds: _m, peds, ...simOptions } = options;
+    this.clock = new CityClock({
+      startHour: options.timeOfDayHours,
+      ...(options.hoursPerSimSecond !== undefined ? { hoursPerSimSecond: options.hoursPerSimSecond } : {}),
+    });
+    // PR07: the canonical signal roster — packed aspects bind to this
+    // ordering, which any runtime rebuilds identically from the same
+    // deterministic topology (signal-viz.ts).
+    this.roster = signalRoster(options.signals);
+    const { topology: _t, signals: _s, now: _n, schedule: _sc, cancel: _c, focus: _f, maxFrameSeconds: _m, timeOfDayHours: _h, hoursPerSimSecond: _r, peds, ...simOptions } = options;
     this.sim = new VehicleSim(options.topology, options.signals, simOptions);
     // The vehicle sim owns the signal clock (it steps signals itself); the
     // ped sim shares the same tick but never double-steps the controllers.
@@ -132,6 +164,12 @@ export class LivingCityHost {
     while (this.acc >= SIM_DT) {
       this.acc -= SIM_DT;
       const t0 = this.now();
+      // PR07: the world clock moves in lockstep with the sim tick; the
+      // sim reads the env it stamped (headlight/rain flags) — never the
+      // other way round, so a dusk flip cannot reorder traffic.
+      this.clock.step(SIM_DT);
+      const env = this.clock.state();
+      this.sim.setEnvironment({ headlights: env.headlights === 1, rain: env.rain });
       this.sim.step(SIM_DT);
       this.lastTickMs = this.now() - t0;
       const t1 = this.now();
@@ -189,6 +227,7 @@ export class LivingCityHost {
       lastTickMs: this.lastTickMs,
       lastPedTickMs: this.lastPedTickMs,
       pedestrians: this.pedSim.metrics.pedestrians,
+      timeOfDay: this.clock.state().hour,
       consumers: this.consumers,
       running: this.running,
     };
@@ -215,7 +254,7 @@ export class LivingCityHost {
 
   private publish(): void {
     this.version++;
-    this.latest = packActorSnapshot(this.version, this.sim, this.pedSim);
+    this.latest = packWorldSnapshot(this.version, this.sim, this.pedSim, this.signals, this.clock.state(), this.roster);
     for (const sink of this.sinks) sink(this.latest);
   }
 }

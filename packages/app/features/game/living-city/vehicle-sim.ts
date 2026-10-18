@@ -109,7 +109,23 @@ export const VFLAG = {
   inJunction: 16,
   yielding: 32,
   blockedExit: 64,
+  /** PR07: headlights required by the world clock (dusk/night/rain) — set from the env the host injects. */
+  headlights: 128,
 } as const;
+
+/**
+ * The world-clock environment the sim reads once per tick (PR07). The
+ * host writes it from the authoritative CityClock before `step(dt)`;
+ * pure data in, flag bits out — behaviour is untouched.
+ */
+export interface SimEnvironment {
+  /** Vehicles show headlights/taillights (dusk, night or rain). */
+  readonly headlights: boolean;
+  /** Rain intensity 0–1 — reserved for surface/speed effects in a later PR. */
+  readonly rain: number;
+}
+
+const DEFAULT_SIM_ENVIRONMENT: SimEnvironment = { headlights: false, rain: 0 };
 
 // --- Public types ----------------------------------------------------------------
 
@@ -315,6 +331,7 @@ export class VehicleSim {
   private readonly despawnDistance: number;
   private focusX = Number.NaN;
   private focusZ = Number.NaN;
+  private env: SimEnvironment = DEFAULT_SIM_ENVIRONMENT;
 
   // --- Static lookups built once ----------------------------------------------
   private readonly connsFrom = new Map<string, LaneConnector[]>();
@@ -353,6 +370,16 @@ export class VehicleSim {
   setFocus(x: number, z: number): void {
     this.focusX = x;
     this.focusZ = z;
+  }
+
+  /**
+   * PR07: the world-clock environment for the next ticks. The host calls
+   * this before `step(dt)`; it only feeds the VFLAG.headlights bit in the
+   * snapshot, never driving behaviour — a day/night flag flip cannot
+   * reorder traffic.
+   */
+  setEnvironment(env: SimEnvironment): void {
+    this.env = env;
   }
 
   // --- Element geometry -----------------------------------------------------------
@@ -667,7 +694,7 @@ export class VehicleSim {
       v.accel = 0;
       v.braking = true;
       v.waitReason = 'queue';
-      v.flagsCache = VFLAG.braking;
+      v.flagsCache = VFLAG.braking | (this.env.headlights ? VFLAG.headlights : 0);
       return;
     }
 
@@ -811,6 +838,7 @@ export class VehicleSim {
     if (v.braking) flags |= VFLAG.braking;
     if (v.blink < 0) flags |= VFLAG.blinkLeft;
     else if (v.blink > 0) flags |= VFLAG.blinkRight;
+    if (this.env.headlights) flags |= VFLAG.headlights;
     v.flagsCache = flags;
   }
 

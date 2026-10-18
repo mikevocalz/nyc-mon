@@ -6,6 +6,8 @@ import { LivingCityHost } from './sim-host.ts';
 import { buildLaneTopology, type LaneTopology } from './topology.ts';
 import { SIM_DT, vehicleSnapshotCount, vehicleSnapshotVersion } from './vehicle-sim.ts';
 import { pedSnapshotCount } from './ped-sim.ts';
+import { readEnvSection } from './clock.ts';
+import { envSectionOffset, signalRoster, signalSectionCount } from './signal-viz.ts';
 
 function tile(roads: CityRoad[], id = 't'): CityDatasetV3 {
   return {
@@ -158,4 +160,30 @@ test('host determinism: equal seeds and equal step streams pack identical combin
     b.step(SIM_DT);
   }
   assert.deepEqual(a.latestSnapshot(), b.latestSnapshot(), 'same seed + same frames → identical world state');
+});
+
+// --- PR07: signal + env sections ride the same publish --------------------------------
+
+test('world snapshot: the signal and env sections append behind the ped section', () => {
+  const topology = crossTopology();
+  const signals = buildSignalSystem(topology);
+  const h = new LivingCityHost({
+    topology,
+    signals,
+    seed: 5,
+    vehicles: [],
+    timeOfDayHours: 20.0,
+    now: (() => { let t = 0; return () => (t += 4); })(),
+    maxFrameSeconds: 5,
+  });
+  h.step(SIM_DT);
+  const snap = h.latestSnapshot();
+  assert.equal(signalSectionCount(snap), signalRoster(signals).length, 'every roster element is packed');
+  const env = readEnvSection(snap, envSectionOffset(snap), 0);
+  assert.ok(Math.abs(env.hour - 20.0) < 0.01, `the env carries the clock (got ${env.hour})`);
+  assert.ok(env.lampLevel > 0.5, 'a 20:00 start has the lamps up');
+  assert.equal(env.headlights, 1, 'a 20:00 start wants headlights');
+  // The earlier sections are untouched: header fields and the ped count decode as before.
+  assert.equal(vehicleSnapshotVersion(snap), 1);
+  assert.equal(pedSnapshotCount(snap), 0);
 });

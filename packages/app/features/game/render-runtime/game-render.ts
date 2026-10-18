@@ -23,9 +23,14 @@ import { createCityScene } from '../city-scene.ts';
 import { createCallerProxyWith } from '../character/caller-proxy.ts';
 import type { CallerState } from '../character/caller-store.ts';
 import { withFirstFrameSignal, type GameSceneParams } from '../load-game-scene.ts';
+import { bundledSignals } from '../living-city/bundled-signals.ts';
+import { bundledTopology } from '../living-city/bundled-topology.ts';
+import { createLampActor, lampPlacements } from '../living-city/lamp-viz.ts';
 import { createPedActor } from '../living-city/ped-actor.ts';
+import { createSignalActor } from '../living-city/signal-viz.ts';
 import { createVehicleActor } from '../living-city/vehicle-actor.ts';
 import { readCaller, readCamera, readView, snapshotVersion, type MutableCallerState } from '../render-snapshot.ts';
+import { createStreetClearance } from '../world/walkability.ts';
 import { describeRuntimeError, installFrameGlobals, type GameRenderEventKind } from './runtime-report.ts';
 import { FrameSampleWindow, type MutableFrameTimingSample } from '../perf/frame-sampler.ts';
 
@@ -306,13 +311,30 @@ export function startGameRender(args: GameRenderArgs): void {
       // stays JS-authoritative and only the snapshot crosses runtimes.
       // PR06: the crowd reads the SAME channel — the ped section is appended
       // to that array, so no second Synchronizable crosses the bridge.
+      // PR07: signal heads + lamp glows read the SAME channel again — the
+      // signal and env sections are appended after the peds. Topology and
+      // signals are deterministic pure builds, so this runtime rebuilds the
+      // identical roster the JS host packed against (index → element binds
+      // on both sides with nothing extra crossing the bridge).
       actors: [
         createCallerProxyWith(mirror),
         ...(args.vehicles
-          ? [
-              createVehicleActor({ read: () => args.vehicles?.getDirty() }),
-              createPedActor({ read: () => args.vehicles?.getDirty() }),
-            ]
+          ? (() => {
+              const topology = bundledTopology();
+              const signals = bundledSignals();
+              const focus = () => ({ x: s.camera.x, z: s.camera.z });
+              const read = () => args.vehicles?.getDirty();
+              return [
+                createVehicleActor({ read }),
+                createPedActor({ read }),
+                ...(topology && signals ? [createSignalActor({ read, signals, topology, focus })] : []),
+                createLampActor({
+                  read,
+                  placements: lampPlacements(city.dataset, createStreetClearance(city.dataset)),
+                  focus,
+                }),
+              ];
+            })()
           : []),
       ],
       onFirstFrame: () => emit(s, 'firstFrame'),

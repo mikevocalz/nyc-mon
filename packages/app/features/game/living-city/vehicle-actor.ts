@@ -27,10 +27,13 @@ import {
   type WorldAssetEntry,
   type WorldAssetRegistry,
 } from './asset-registry.ts';
+import { readEnvSection } from './clock.ts';
 import { SEED_ASSETS } from './seed-assets.ts';
+import { envSectionOffset } from './signal-viz.ts';
 import {
   VEHICLE_KINDS,
   VEHICLE_SEMANTIC_ID,
+  VFLAG,
   VSNAP,
   VSNAP_HEADER,
   VSNAP_STRIDE,
@@ -150,6 +153,85 @@ export function vehiclePaint(id: number): string {
   return VEHICLE_PAINTS[vehiclePaintIndex(id)]!;
 }
 
+// --- PR07 vehicle lights ----------------------------------------------------
+//
+// The spec's "responsive brake/headlight effects": every vehicle gets a
+// fixed block of light quads in ONE extra InstancedMesh — headlamp pair,
+// tail pair, front/rear indicator pairs. The packed `flags` byte is the
+// only authority: VFLAG.headlights (world clock), VFLAG.braking
+// (deceleration), VFLAG.blinkLeft/blinkRight (turn intent) — exactly the
+// bits the sim stamped this tick. Colours go in instanceColor on an
+// additive glow material, so a flag change is a colour write, never a
+// geometry rebuild, and day vehicles cost near-invisible instances.
+
+/** Light slots per vehicle: headL/R, tailL/R, front indicators L/R, rear indicators L/R. */
+export const LIGHT_SLOTS_PER_VEHICLE = 8;
+/** Slot order inside a vehicle's block — tests and docs reference this. */
+export const VLIGHT = { headL: 0, headR: 1, tailL: 2, tailR: 3, indFL: 4, indFR: 5, indRL: 6, indRR: 7 } as const;
+
+/** Indicator cadence, ~1.4 Hz square wave on the sim clock (packs with the snapshot, never wall time). */
+export function indicatorBlink(simTime: number): boolean {
+  return ((simTime * 1.4) % 1 + 1) % 1 < 0.55;
+}
+
+export const VEHICLE_LIGHT_COLORS = {
+  head: [1.0, 0.95, 0.78],
+  tail: [0.55, 0.05, 0.06],
+  brake: [1.0, 0.1, 0.08],
+  amber: [1.0, 0.55, 0.08],
+  off: [0.012, 0.012, 0.014],
+} as const;
+export type VehicleLightColorKey = keyof typeof VEHICLE_LIGHT_COLORS;
+
+/**
+ * The eight slot colours for a vehicle's packed flags — pure, so the
+ * node tests assert the mapping without three. `blinkOn` is the
+ * indicator parity for this frame's sim time.
+ */
+export function vehicleLightKeys(flags: number, blinkOn: boolean): readonly VehicleLightColorKey[] {
+  const keys: VehicleLightColorKey[] = ['off', 'off', 'off', 'off', 'off', 'off', 'off', 'off'];
+  const headlights = (flags & VFLAG.headlights) !== 0;
+  const braking = (flags & VFLAG.braking) !== 0;
+  if (headlights) {
+    keys[VLIGHT.headL] = 'head';
+    keys[VLIGHT.headR] = 'head';
+    keys[VLIGHT.tailL] = 'tail';
+    keys[VLIGHT.tailR] = 'tail';
+  }
+  if (braking) {
+    keys[VLIGHT.tailL] = 'brake';
+    keys[VLIGHT.tailR] = 'brake';
+  }
+  if (blinkOn && (flags & VFLAG.blinkLeft) !== 0) {
+    keys[VLIGHT.indFL] = 'amber';
+    keys[VLIGHT.indRL] = 'amber';
+  }
+  if (blinkOn && (flags & VFLAG.blinkRight) !== 0) {
+    keys[VLIGHT.indFR] = 'amber';
+    keys[VLIGHT.indRR] = 'amber';
+  }
+  return keys;
+}
+
+/** Quad size (metres) — a NYC 4×4-inch lamp read, grown slightly so the glow registers. */
+const LIGHT_QUAD_SIZE = 0.22;
+
+/**
+ * Light mounts in vehicle-local space — [halfWidth multiplier, extra height,
+ * halfLength multiplier, faces +Z?]. Forward is +Z (registry contract); rear
+ * lights and rear indicators face back. Indicators sit on the outer corners.
+ */
+const LIGHT_MOUNTS: readonly (readonly [number, number, number, boolean])[] = [
+  [-0.62, 0.0, 1.02, true],   // headL
+  [0.62, 0.0, 1.02, true],    // headR
+  [-0.62, 0.0, -1.02, false], // tailL
+  [0.62, 0.0, -1.02, false],  // tailR
+  [-0.9, 0.0, 0.98, true],    // indFL
+  [0.9, 0.0, 0.98, true],     // indFR
+  [-0.9, 0.0, -0.98, false],  // indRL
+  [0.9, 0.0, -0.98, false],   // indRR
+];
+
 export interface VehicleActorOptions {
   /** Latest packed snapshot (host's `latestSnapshot()` on JS, a Synchronizable `getDirty()` on the render runtime). */
   readonly read: () => readonly number[] | null | undefined;
@@ -181,13 +263,18 @@ export function createVehicleActor(options: VehicleActorOptions): SceneActorFact
       geometry: { dispose(): void };
       material: InstanceType<typeof THREE.MeshStandardMaterial>;
       capacity: number;
+      /** Declared bounds — the light quads mount against them. */
+      lengthM: number;
+      widthM: number;
+      heightM: number;
     }
     const kindMeshes = new Map<VehicleKind, KindMesh>();
     const colors = new Map<number, InstanceType<typeof THREE.Color>>();
     for (const kind of VEHICLE_KINDS) {
       const entry = resolveVehicleEntry(registry, VEHICLE_SEMANTIC_ID[kind]);
       if (!entry) continue;
-      const data = boxCarGeometryData(entry.bounds ?? { lengthM: 4.6, widthM: 1.9, heightM: 1.5 });
+      const bounds = entry.bounds ?? { lengthM: 4.6, widthM: 1.9, heightM: 1.5 };
+      const data = boxCarGeometryData(bounds);
       const geometry = new THREE.BufferGeometry();
       geometry.setAttribute('position', new THREE.Float32BufferAttribute(data.positions, 3));
       geometry.setAttribute('normal', new THREE.Float32BufferAttribute(data.normals, 3));
@@ -198,14 +285,45 @@ export function createVehicleActor(options: VehicleActorOptions): SceneActorFact
       mesh.count = 0;
       mesh.frustumCulled = false;
       group.add(mesh);
-      kindMeshes.set(kind, { kind, mesh, geometry, material, capacity });
+      kindMeshes.set(kind, {
+        kind, mesh, geometry, material, capacity,
+        lengthM: bounds.lengthM, widthM: bounds.widthM, heightM: bounds.heightM,
+      });
     }
+
+    // PR07: one instanced quad mesh for every vehicle light — 8 slots per
+    // vehicle (VLIGHT). Additive radial-falloff glow with per-instance
+    // colour; depthWrite off and no fog, matching the world's own additive
+    // layers (street-furniture.ts lamp pools, the signal lenses).
+    const T = THREE.TSL;
+    const lightGeometry = new THREE.PlaneGeometry(1, 1);
+    const lightMaterial = new THREE.MeshBasicNodeMaterial({
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      fog: false,
+      side: THREE.DoubleSide,
+    });
+    {
+      const r = T.uv().sub(0.5).length().mul(2);
+      const fall = T.float(1).sub(T.smoothstep(0, 1, r));
+      lightMaterial.colorNode = T.vec4(T.float(1), T.float(1), T.float(1), 1);
+      lightMaterial.opacityNode = fall.mul(fall).mul(0.95);
+    }
+    const lightCapacity = capacity * LIGHT_SLOTS_PER_VEHICLE;
+    const lightMesh = new THREE.InstancedMesh(lightGeometry, lightMaterial, Math.max(1, lightCapacity));
+    lightMesh.name = 'living-city:vehicle-lights';
+    lightMesh.renderOrder = 5;
+    lightMesh.count = 0;
+    lightMesh.frustumCulled = false;
+    group.add(lightMesh);
 
     const matrix = new THREE.Matrix4();
     const quat = new THREE.Quaternion();
     const up = new THREE.Vector3(0, 1, 0);
     const pos = new THREE.Vector3();
     const scale = new THREE.Vector3();
+    const lightColor = new THREE.Color();
     const pose = { x: 0, z: 0, yaw: 0 };
     const counts = new Map<VehicleKind, number>();
     let lastVersion = -1;
@@ -229,8 +347,12 @@ export function createVehicleActor(options: VehicleActorOptions): SceneActorFact
         const tickDt = snap && snap.length >= VSNAP_HEADER ? (snap[VSNAP.tickDt] ?? 0) : 0;
         const alpha = tickDt > 0 ? Math.min(1, tSince / tickDt) : 1;
         const count = snap && snap.length >= VSNAP_HEADER ? (snap[VSNAP.count] ?? 0) : 0;
+        // PR07: the env section carries the sim clock the indicators blink on.
+        const env = readEnvSection(snap, envSectionOffset(snap), snap && snap.length >= VSNAP_HEADER ? (snap[VSNAP.simTime] ?? 0) : 0);
+        const blinkOn = indicatorBlink(env.simTime);
         for (const kind of VEHICLE_KINDS) counts.set(kind, 0);
         let moving = false;
+        let lightSlot = 0;
         if (snap && version >= 0) {
           for (let i = 0; i < count; i++) {
             const o = VSNAP_HEADER + i * VSNAP_STRIDE;
@@ -243,6 +365,7 @@ export function createVehicleActor(options: VehicleActorOptions): SceneActorFact
             if (slot >= km.capacity) continue;
             interpolateVehiclePose(snap, i, alpha, pose);
             const speed = snap[o + 8] ?? 0;
+            const flags = snap[o + 9] ?? 0;
             const age = snap[o + 10] ?? 99;
             if (speed > 0.05) moving = true;
             // Spawn grow-in: a mid-block spawn eases from 30 % scale over ~0.7 s instead of popping.
@@ -259,7 +382,45 @@ export function createVehicleActor(options: VehicleActorOptions): SceneActorFact
             }
             km.mesh.setColorAt(slot, color);
             counts.set(kind, slot + 1);
+
+            // PR07: the light block — the packed flags are the only
+            // authority. Local mounts ride the declared bounds so vans,
+            // sedans and buses light their own corners; forward is +Z.
+            if (lightSlot + LIGHT_SLOTS_PER_VEHICLE <= lightCapacity) {
+              const keys = vehicleLightKeys(flags, blinkOn);
+              const sy = Math.sin(pose.yaw);
+              const cy = Math.cos(pose.yaw);
+              const hl = km.lengthM / 2;
+              const hw = km.widthM / 2;
+              const hy = Math.min(1.05, Math.max(0.5, km.heightM * 0.45));
+              // [localX, localY, localZ, faces-forward?] per slot.
+              const mount = LIGHT_MOUNTS;
+              for (let s = 0; s < LIGHT_SLOTS_PER_VEHICLE; s++) {
+                const m = mount[s]!;
+                const lx = m[0] * hw;
+                const ly = hy + m[1];
+                const lz = m[2] * hl;
+                const wx = pose.x + sy * lz + cy * lx;
+                const wz = pose.z + cy * lz - sy * lx;
+                quat.setFromAxisAngle(up, m[3] ? pose.yaw : pose.yaw + Math.PI);
+                matrix.compose(
+                  pos.set(wx, ly, wz),
+                  quat,
+                  scale.set(LIGHT_QUAD_SIZE, LIGHT_QUAD_SIZE, 1),
+                );
+                const slotIndex = lightSlot + s;
+                lightMesh.setMatrixAt(slotIndex, matrix);
+                const c = VEHICLE_LIGHT_COLORS[keys[s]!];
+                lightMesh.setColorAt(slotIndex, lightColor.setRGB(c[0], c[1], c[2]));
+              }
+              lightSlot += LIGHT_SLOTS_PER_VEHICLE;
+            }
           }
+        }
+        lightMesh.count = lightSlot;
+        if (lightSlot > 0) {
+          lightMesh.instanceMatrix.needsUpdate = true;
+          if (lightMesh.instanceColor) lightMesh.instanceColor.needsUpdate = true;
         }
         for (const km of kindMeshes.values()) {
           const c = counts.get(km.kind) ?? 0;
@@ -281,6 +442,9 @@ export function createVehicleActor(options: VehicleActorOptions): SceneActorFact
           km.material.dispose();
           km.mesh.dispose();
         }
+        lightGeometry.dispose();
+        lightMaterial.dispose();
+        lightMesh.dispose();
         group.clear();
       },
     };
