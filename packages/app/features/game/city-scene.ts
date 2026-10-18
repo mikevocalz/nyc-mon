@@ -2,7 +2,7 @@
 // orbits its look-at point, and the actors (the Caller first) that live in
 // it. The canvas draws on demand; while any actor reports motion the scene
 // asks for the next frame itself.
-import { VD_SHADOWS } from './world/curb.ts';
+import { VD_SHADOWS, VD_TONEMAP } from './world/curb.ts';
 import type { ThreeContext, ThreeScene } from '@acme/ui/three';
 import type { CityDatasetV3 } from './city-dataset.ts';
 import type { ActorFrame, SceneActor, SceneActorFactory } from './scene-actor.ts';
@@ -106,7 +106,11 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
   // mapping, no shadow maps, and the clear colour as the sky's fallback.
   if (renderer) {
     renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
-    renderer.toneMapping = THREE.NoToneMapping;
+    renderer.toneMapping = VD_TONEMAP === 'agx' ? THREE.AgXToneMapping
+      : VD_TONEMAP === 'aces' ? THREE.ACESFilmicToneMapping
+        : VD_TONEMAP === 'neutral' ? THREE.NeutralToneMapping : THREE.NoToneMapping;
+    // AgX compresses highlights and pulls mids down; a lift keeps the palette's daylight read.
+    renderer.toneMappingExposure = VD_TONEMAP ? 1.6 : 1;
     renderer.shadowMap.enabled = VD_SHADOWS;
     renderer.setClearColor(world.horizon, 1);
   }
