@@ -2,7 +2,7 @@
 // orbits its look-at point, and the actors (the Caller first) that live in
 // it. The canvas draws on demand; while any actor reports motion the scene
 // asks for the next frame itself.
-import { VD_SHADOWS, VD_TONEMAP } from './world/curb.ts';
+import { VD_LANE, VD_SHADOWS, VD_TONEMAP } from './world/curb.ts';
 import type { ThreeContext, ThreeScene } from '@acme/ui/three';
 import type { CityDatasetV3 } from './city-dataset.ts';
 import type { ActorFrame, SceneActor, SceneActorFactory } from './scene-actor.ts';
@@ -12,7 +12,7 @@ import { livingCityAdaptiveBridge } from './living-city/adaptive-bridge.ts';
 import { EXPERIMENTAL_WORLD_RENDER_SCALE, mountRenderScale } from './perf/render-scale.ts';
 import { EXPERIMENTAL_WORLD_THERMAL, thermalSignal, thermalWorsened } from './perf/thermal.ts';
 import { tierBundle, WORLD_TIER, WORLD_TIER_SELECTED } from './perf/tier.ts';
-import type { SkyName } from './world/sky-rig.ts';
+import { parseSkyRigFlag, type SkyName } from './world/sky-rig.ts';
 
 export interface CityCamera {
   x: number;
@@ -132,9 +132,15 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
   // update clock and steps the drawing buffer through the pixel ratio.
   // It cannot fix the UI-thread/Rive ceiling — GPU-side gains are
   // reported separately on device (perf/render-scale.ts header).
+  // The vd lane implies the controller: without it the Duo measured
+  // ~16 fps (2026-10-18) — unplayable. An explicit
+  // EXPO_PUBLIC_WORLD_RENDER_SCALE=0 still turns it off.
+  const renderScaleEnv = process.env.EXPO_PUBLIC_WORLD_RENDER_SCALE;
+  const renderScaleOff =
+    renderScaleEnv != null && renderScaleEnv.trim() !== '' && !parseSkyRigFlag(renderScaleEnv);
   const renderScale =
-    renderer && EXPERIMENTAL_WORLD_RENDER_SCALE && bundle
-      ? mountRenderScale(renderer, { band: bundle.scale.band, floor: bundle.scale.floor })
+    renderer && !renderScaleOff && (EXPERIMENTAL_WORLD_RENDER_SCALE || VD_LANE)
+      ? mountRenderScale(renderer, (bundle ?? tierBundle(WORLD_TIER)).scale)
       : null;
   // Last consumed thermalSignal sample — the monitor (perf/thermal.ts,
   // flag-gated) bumps seq on each poll; a move to a worse level forces a
