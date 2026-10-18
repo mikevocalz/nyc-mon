@@ -17,7 +17,7 @@ import { applyCarPbrMaterial, EXPERIMENTAL_WORLD_CAR_PBR } from './car-materials
 import { createSkyRig, EXPERIMENTAL_SKY_RIG, parseSkyRigFlag, type SkyName } from './sky-rig.ts';
 import { createVdCityMaterials, EXPERIMENTAL_WORLD_VD, type VdWeather } from './vd-materials.ts';
 import { buildPrecipitation } from './vd-weather.ts';
-import { CURB_HEIGHT } from './curb.ts';
+import { CURB_HEIGHT, VD_SHADOWS, VD_SHADOW_HALF } from './curb.ts';
 
 /**
  * Lane G1 "GPU budget": record the immutable city into one WebGPU render
@@ -178,6 +178,25 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
   const precipitation = vdMaterials ? buildPrecipitation(THREE, vdMaterials.weather) : null;
   precipitation?.update();
   if (!skyRig) sun.position.set(SUN[0] * 1000, SUN[1] * 1000, SUN[2] * 1000);
+  if (VD_SHADOWS) {
+    // An orthographic shadow box that follows the Caller (setFocus); the
+    // whole tile would spread 2048 texels over 1.7 km.
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    const cam = sun.shadow.camera;
+    cam.left = -VD_SHADOW_HALF; cam.right = VD_SHADOW_HALF; cam.top = VD_SHADOW_HALF; cam.bottom = -VD_SHADOW_HALF;
+    cam.near = 1; cam.far = 600;
+    sun.shadow.bias = -0.0005;
+    sun.shadow.normalBias = 0.04;
+    cam.updateProjectionMatrix();
+    const casters = new Set(['city:walls-masonry', 'city:walls-glass', 'city:roofs', 'city:landmarks', 'city:street-detail', 'city:poles']);
+    const receivers = new Set(['city:ground', 'city:areas', 'city:sidewalks', 'city:roads', 'city:walls-masonry', 'city:walls-glass', 'city:roofs']);
+    for (const o of [ground, ...city.meshes, ...trees.objects, ...furniture.objects, ...props.objects]) {
+      const tree = o.name.startsWith('city:trees-vd-');
+      o.castShadow = casters.has(o.name) || tree;
+      o.receiveShadow = receivers.has(o.name);
+    }
+  }
   const bundles = options.bundles ?? EXPERIMENTAL_WORLD_BUNDLES;
   if (bundles) {
     // WebGPU render bundles (three r186 BundleGroup): the immutable meshes
@@ -253,6 +272,13 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
      * allocation-free and only runs after it has moved about 10 m.
      */
     setFocus(x: number, z: number) {
+      if (VD_SHADOWS) {
+        // Keep the shadow box centred on the Caller, the sun 400 m out along its direction.
+        sun.target.position.set(x, 0, z);
+        sun.position.set(x + sunDirection[0] * 400, sunDirection[1] * 400, z + sunDirection[2] * 400);
+        sun.target.updateMatrixWorld();
+        sun.updateMatrixWorld();
+      }
       trees.update(x, z, viewDistance);
       city.setFocus(x, z);
       furniture.setFocus(x, z);

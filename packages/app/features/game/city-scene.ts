@@ -2,6 +2,7 @@
 // orbits its look-at point, and the actors (the Caller first) that live in
 // it. The canvas draws on demand; while any actor reports motion the scene
 // asks for the next frame itself.
+import { VD_SHADOWS } from './world/curb.ts';
 import type { ThreeContext, ThreeScene } from '@acme/ui/three';
 import type { CityDatasetV3 } from './city-dataset.ts';
 import type { ActorFrame, SceneActor, SceneActorFactory } from './scene-actor.ts';
@@ -106,7 +107,7 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
   if (renderer) {
     renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
     renderer.toneMapping = THREE.NoToneMapping;
-    renderer.shadowMap.enabled = false;
+    renderer.shadowMap.enabled = VD_SHADOWS;
     renderer.setClearColor(world.horizon, 1);
   }
   // L5 "finishing pass": flagged post stack on the renderer — the mount
