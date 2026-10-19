@@ -27,6 +27,7 @@
 // `livingCityHost()` returns null, so nothing is built, spawned or
 // subscribed — the scene is byte-identical to today.
 
+import { callerStore, selectCallerTransform } from '../character/caller-store.ts';
 import { bundledCity } from '../city-data.ts';
 import { CURB_HEIGHT } from '../world/curb.ts';
 import type { FlatPoints } from '../city-dataset.ts';
@@ -202,6 +203,10 @@ function create(): LivingCityBundle {
       const { x, z } = gameCameraStore.getState().camera;
       return { x, z };
     },
+    // The Caller is a live traffic obstacle: vehicles hold behind it
+    // mid-lane. Same module-scope store the render loop packs each frame —
+    // unspawned returns null and the channel stays closed.
+    caller: () => selectCallerTransform(callerStore.getState()),
   });
   const read = () => host.latestSnapshot();
   const attach = () => host.attach();

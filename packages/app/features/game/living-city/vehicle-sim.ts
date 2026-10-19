@@ -64,6 +64,8 @@ const SPAWN_HEAD_CLEARANCE = 2.0;
 const DEFAULT_SPAWN_MIN_FOCUS_METRES = 130;
 const DEFAULT_DESPAWN_FOCUS_METRES = 500;
 /** Vehicles are dropped once they are this far from focus — far past any readable view. */
+/** The Caller's collision footprint — vehicles hold its near edge like a stop line. */
+const CALLER_RADIUS_METRES = 1.2;
 
 // --- Vehicle classes -----------------------------------------------------------
 
@@ -71,6 +73,8 @@ export type VehicleKind = 'sedan' | 'taxi' | 'van' | 'bus';
 export const VEHICLE_KINDS: readonly VehicleKind[] = ['sedan', 'taxi', 'van', 'bus'];
 /** Bumper-to-bumper length per class, metres (parked-car spec uses 4.6 m for sedans). */
 export const VEHICLE_LENGTH: Record<VehicleKind, number> = { sedan: 4.6, taxi: 4.6, van: 5.0, bus: 12.0 };
+/** Width per class, metres — the caller corridor sweeps half of this around the path centreline. */
+export const VEHICLE_WIDTH: Record<VehicleKind, number> = { sedan: 1.8, taxi: 1.8, van: 1.9, bus: 2.55 };
 /** The semantic id the renderer resolves for each class — sim never names a mesh. */
 export const VEHICLE_SEMANTIC_ID: Record<VehicleKind, string> = {
   sedan: 'vehicle.sedan',
@@ -129,7 +133,7 @@ const DEFAULT_SIM_ENVIRONMENT: SimEnvironment = { headlights: false, rain: 0 };
 
 // --- Public types ----------------------------------------------------------------
 
-export type WaitReason = 'signal' | 'yield' | 'ped' | 'blocked' | 'queue' | null;
+export type WaitReason = 'signal' | 'yield' | 'ped' | 'blocked' | 'queue' | 'caller' | null;
 
 export interface SpawnSpec {
   readonly kind?: VehicleKind;
@@ -276,6 +280,30 @@ export function polylineCrossS(a: FlatPoints, b: FlatPoints): number {
   return -1;
 }
 
+/** Arc s and lateral distance of the polyline point nearest (x, z) — the caller-projection query. */
+function nearestAlong(geom: PathGeom, x: number, z: number, out: { s: number; d: number }): void {
+  let best = Infinity;
+  let bestS = 0;
+  const p = geom.points;
+  for (let i = 2; i < p.length; i += 2) {
+    const ax = p[i - 2]!;
+    const az = p[i - 1]!;
+    const bx = p[i]!;
+    const bz = p[i + 1]!;
+    const dx = bx - ax;
+    const dz = bz - az;
+    const l2 = dx * dx + dz * dz;
+    const t = l2 > 0 ? Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / l2)) : 0;
+    const d2 = (ax + dx * t - x) ** 2 + (az + dz * t - z) ** 2;
+    if (d2 < best) {
+      best = d2;
+      bestS = geom.cum[i / 2 - 1]! + Math.sqrt(l2) * t;
+    }
+  }
+  out.s = bestS;
+  out.d = Math.sqrt(best);
+}
+
 // --- The sim ---------------------------------------------------------------------
 
 interface Vehicle {
@@ -326,6 +354,7 @@ interface Vehicle {
 }
 
 const SCRATCH_POSE = { x: 0, z: 0, yaw: 0 };
+const SCRATCH_HIT = { s: 0, d: 0 };
 
 /**
  * The vehicle fleet over one lane topology + signal system. Step it with a
@@ -347,6 +376,9 @@ export class VehicleSim {
   private readonly despawnDistance: number;
   private focusX = Number.NaN;
   private focusZ = Number.NaN;
+  /** Live Caller position — NaN while unspawned/absent (channel closed, zero behaviour change). */
+  private callerX = Number.NaN;
+  private callerZ = Number.NaN;
   private env: SimEnvironment = DEFAULT_SIM_ENVIRONMENT;
 
   // --- Static lookups built once ----------------------------------------------
@@ -386,6 +418,23 @@ export class VehicleSim {
   setFocus(x: number, z: number): void {
     this.focusX = x;
     this.focusZ = z;
+  }
+
+  /**
+   * The Caller obstacle channel: the host feeds the Caller's live world
+   * position once per frame; a vehicle whose planned path sweeps the
+   * Caller's footprint inside its braking lookahead holds behind it like a
+   * stop line. `clearCaller()` closes the channel — with no Caller spawned
+   * the sim is byte-identical to before.
+   */
+  setCaller(x: number, z: number): void {
+    this.callerX = x;
+    this.callerZ = z;
+  }
+
+  clearCaller(): void {
+    this.callerX = Number.NaN;
+    this.callerZ = Number.NaN;
   }
 
   /**
@@ -825,9 +874,18 @@ export class VehicleSim {
     // ---- Leader obstacle (car-following along the planned path) ----------------
     const lookahead = Math.max(24, v.v * 2.2 + (v.v * v.v) / (2 * IDM.bComf) + 10);
     const leader = this.leader(v, lookahead);
+    const caller = this.callerGap(v, lookahead);
     let accel = this.idm(v.v, v0, Infinity, 0);
     if (leader) accel = Math.min(accel, this.idm(v.v, v0, leader.gap, leader.v));
     if (stopS < Infinity) accel = Math.min(accel, this.idm(v.v, v0, stopS - v.s, 0));
+    if (caller < Infinity) {
+      accel = Math.min(accel, this.idm(v.v, v0, caller, 0));
+      if (caller <= Math.min(stopS - v.s, leader?.gap ?? Infinity)) {
+        // The Caller — not a signal, ped claim or queue — is the binding hold.
+        v.waitReason = 'caller';
+        want |= VFLAG.yielding;
+      }
+    }
     accel = Math.max(IDM.decMax, accel);
 
     // ---- Integrate -------------------------------------------------------------
@@ -883,7 +941,8 @@ export class VehicleSim {
     v.x = SCRATCH_POSE.x;
     v.z = SCRATCH_POSE.z;
     v.yaw = SCRATCH_POSE.yaw;
-    v.holdS = stopS === Infinity ? -1 : stopS;
+    v.holdS = Math.min(stopS, caller === Infinity ? Infinity : v.s + Math.max(0, caller));
+    v.holdS = v.holdS === Infinity ? -1 : v.holdS;
 
     // Flags for the snapshot.
     let flags = want;
@@ -929,6 +988,53 @@ export class VehicleSim {
       travelled += geom.length;
     }
     return null;
+  }
+
+  /**
+   * The gap from the front bumper to the Caller's near edge measured along
+   * the planned path — the same chain `leader()` walks (current element →
+   * pending connector → route lanes, 4 hops). The Caller only counts while
+   * its footprint sits inside the swept corridor (radius + half the
+   * vehicle's width off the path centreline), so a Caller on the sidewalk
+   * never brakes traffic; a Caller fully behind the front bumper is
+   * ignored so nothing brakes retroactively. Infinity = no constraint.
+   */
+  private callerGap(v: Vehicle, lookahead: number): number {
+    if (!Number.isFinite(this.callerX)) return Infinity;
+    const corridor = CALLER_RADIUS_METRES + VEHICLE_WIDTH[v.kind] / 2;
+    let best = Infinity;
+    const current = this.geomOf(v.element, v.elementKind);
+    if (current) {
+      nearestAlong(current, this.callerX, this.callerZ, SCRATCH_HIT);
+      if (SCRATCH_HIT.d <= corridor && SCRATCH_HIT.s + CALLER_RADIUS_METRES >= v.s) {
+        const gap = SCRATCH_HIT.s - CALLER_RADIUS_METRES - v.s;
+        if (gap < lookahead) best = gap;
+      }
+    }
+    let travelled = (current?.length ?? 0) - v.s;
+    let routeIdx = 0;
+    let pendingConn: LaneConnector | null = v.elementKind === 'lane' ? v.conn : null;
+    for (let hop = 0; hop < 4 && travelled < lookahead; hop++) {
+      let geom: PathGeom | undefined;
+      if (pendingConn) {
+        geom = this.connGeom(pendingConn);
+        pendingConn = null;
+      } else {
+        const laneId = v.route[routeIdx];
+        if (laneId === undefined) break;
+        geom = this.laneGeom(laneId);
+        routeIdx++;
+        pendingConn = (this.connsFrom.get(laneId) ?? []).find((c) => c.out === v.route[routeIdx]) ?? null;
+      }
+      if (!geom) break;
+      nearestAlong(geom, this.callerX, this.callerZ, SCRATCH_HIT);
+      if (SCRATCH_HIT.d <= corridor) {
+        const gap = travelled + SCRATCH_HIT.s - CALLER_RADIUS_METRES;
+        if (gap < best && gap < lookahead) best = gap;
+      }
+      travelled += geom.length;
+    }
+    return best;
   }
 
   /** Treiber IDM acceleration toward v0 with an obstacle `gap` metres ahead moving at `vLead`. */
