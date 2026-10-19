@@ -16,6 +16,7 @@ import { decodeBase64 } from './foliage-decode.ts';
 import { mulberry32 } from './geometry.ts';
 import { NEAR_TREE_CAP, TreeLod } from './tree-lod.ts';
 import { VD_LEAN, VD_LEAN_NEAR_TREE_CAP } from './vd-lean.ts';
+import { VD_LEANDRAW } from './vd-leandraw.ts';
 import { VD_LEANMAT } from './vd-leanmat.ts';
 import { buildVdTreeMeshes, VD_MID_TREE_CAP, VD_NEAR_TREE_CAP, VD_TREE_SCALE, vdCensusTree, vdSpecies } from './vd-trees-mesh.ts';
 import { VD_FAR_TREE_CAP, VdTreeTiers } from './vd-tree-tiers.ts';
@@ -194,6 +195,8 @@ export function buildTrees(
   lean = VD_LEAN,
   /** vd lane, overridable for tests: the lean material bodies (vd-leanmat.ts). Defaults to the flag. */
   leanMat = VD_LEANMAT,
+  /** vd lane, overridable for tests: the merged cross-species draws (vd-leandraw.ts). Defaults to the flag. */
+  leanDraw = VD_LEANDRAW,
 ) {
   const { trees: placements, report } = treePlacements(dataset, clearance);
   const count = Math.max(1, placements.length);
@@ -244,7 +247,7 @@ export function buildTrees(
   // Lean halves the near set and folds the mid tier into the far imposter
   // pool, so that pool has to hold midCap + farCap rows (vd-lean.ts).
   const vdNearCap = lean ? VD_LEAN_NEAR_TREE_CAP : VD_NEAR_TREE_CAP;
-  const vd = modelTrees ? buildVdTreeMeshes(THREE, Math.min(count, vdNearCap), Math.min(count, VD_MID_TREE_CAP), Math.min(count, lean ? VD_MID_TREE_CAP + VD_FAR_TREE_CAP : VD_FAR_TREE_CAP), leanMat) : null;
+  const vd = modelTrees ? buildVdTreeMeshes(THREE, Math.min(count, vdNearCap), Math.min(count, VD_MID_TREE_CAP), Math.min(count, lean ? VD_MID_TREE_CAP + VD_FAR_TREE_CAP : VD_FAR_TREE_CAP), leanMat, leanDraw) : null;
   const vdTiers = vd ? new VdTreeTiers(xs, zs, { nearCap: vdNearCap }) : null;
   const vdSpeciesOf = new Uint8Array(placements.length);
   const vdMatrices = vd ? new Float32Array(placements.length * 16) : null;
@@ -311,29 +314,53 @@ export function buildTrees(
         for (const s of vd.species) { s.count = 0; s.midCount = 0; }
         let midTrunkCount = 0;
         let farCount = 0;
+        // leandraw: the near and mid tiers write the merged cross-species
+        // meshes under one cursor each, and the folded far mesh keeps the
+        // plain tree matrix — the crown box and base height ride aCrown/aBase.
+        let nearMergedCount = 0;
+        let midMergedCount = 0;
+        const m = vd.merged;
         const midTrunkRows = vd.midTrunk.instanceMatrix.array as Float32Array;
         const farLeafRows = vd.farLeaf.instanceMatrix.array as Float32Array;
         const farTrunkRows = vd.farTrunk.instanceMatrix.array as Float32Array;
         const farLayer = vd.farLayer.array as Float32Array;
         const farRep = vd.farRep.array as Float32Array;
+        const mergedBarkRows = m ? (m.bark.instanceMatrix.array as Float32Array) : null;
+        const mergedLeafRows = m ? (m.leaf.instanceMatrix.array as Float32Array) : null;
+        const mergedMidRows = m ? (m.mid.instanceMatrix.array as Float32Array) : null;
+        const mergedBarkSp = m ? (m.barkSpecies.array as Float32Array) : null;
+        const mergedLeafSp = m ? (m.leafSpecies.array as Float32Array) : null;
+        const mergedMidSp = m ? (m.midSpecies.array as Float32Array) : null;
+        const mergedCrown = m ? (m.farCrown.array as Float32Array) : null;
+        const mergedBase = m ? (m.farBase.array as Float32Array) : null;
         // One imposter row: the unit crown box takes the species' extents in
         // the matrix (the basis columns scale by hw, hh, hw and the origin
         // moves to the crown's base centre — M · translate(cx, y0, cz) ·
         // scale(hw, hh, hw)); the unit trunk cross reaches the crown base
-        // through its Y column alone.
+        // through its Y column alone. Leandraw's folded mesh keeps the plain
+        // matrix and writes the box into aCrown/aBase instead.
         const imposter = (f: NonNullable<typeof vd>['species'][number]['far'], row: Float32Array) => {
           const o = farCount * 16;
-          farLeafRows[o] = row[0]! * f.hw; farLeafRows[o + 1] = row[1]! * f.hw; farLeafRows[o + 2] = row[2]! * f.hw; farLeafRows[o + 3] = 0;
-          farLeafRows[o + 4] = row[4]! * f.hh; farLeafRows[o + 5] = row[5]! * f.hh; farLeafRows[o + 6] = row[6]! * f.hh; farLeafRows[o + 7] = 0;
-          farLeafRows[o + 8] = row[8]! * f.hw; farLeafRows[o + 9] = row[9]! * f.hw; farLeafRows[o + 10] = row[10]! * f.hw; farLeafRows[o + 11] = 0;
-          farLeafRows[o + 12] = row[0]! * f.cx + row[4]! * f.y0 + row[8]! * f.cz + row[12]!;
-          farLeafRows[o + 13] = row[1]! * f.cx + row[5]! * f.y0 + row[9]! * f.cz + row[13]!;
-          farLeafRows[o + 14] = row[2]! * f.cx + row[6]! * f.y0 + row[10]! * f.cz + row[14]!;
-          farLeafRows[o + 15] = 1;
-          farTrunkRows.set(row, o);
-          farTrunkRows[o + 4] = row[4]! * f.y0;
-          farTrunkRows[o + 5] = row[5]! * f.y0;
-          farTrunkRows[o + 6] = row[6]! * f.y0;
+          if (mergedCrown && mergedBase) {
+            farLeafRows.set(row, o);
+            mergedCrown[farCount * 4] = f.cx;
+            mergedCrown[farCount * 4 + 1] = f.cz;
+            mergedCrown[farCount * 4 + 2] = f.hw;
+            mergedCrown[farCount * 4 + 3] = f.hh;
+            mergedBase[farCount] = f.y0;
+          } else {
+            farLeafRows[o] = row[0]! * f.hw; farLeafRows[o + 1] = row[1]! * f.hw; farLeafRows[o + 2] = row[2]! * f.hw; farLeafRows[o + 3] = 0;
+            farLeafRows[o + 4] = row[4]! * f.hh; farLeafRows[o + 5] = row[5]! * f.hh; farLeafRows[o + 6] = row[6]! * f.hh; farLeafRows[o + 7] = 0;
+            farLeafRows[o + 8] = row[8]! * f.hw; farLeafRows[o + 9] = row[9]! * f.hw; farLeafRows[o + 10] = row[10]! * f.hw; farLeafRows[o + 11] = 0;
+            farLeafRows[o + 12] = row[0]! * f.cx + row[4]! * f.y0 + row[8]! * f.cz + row[12]!;
+            farLeafRows[o + 13] = row[1]! * f.cx + row[5]! * f.y0 + row[9]! * f.cz + row[13]!;
+            farLeafRows[o + 14] = row[2]! * f.cx + row[6]! * f.y0 + row[10]! * f.cz + row[14]!;
+            farLeafRows[o + 15] = 1;
+            farTrunkRows.set(row, o);
+            farTrunkRows[o + 4] = row[4]! * f.y0;
+            farTrunkRows[o + 5] = row[5]! * f.y0;
+            farTrunkRows[o + 6] = row[6]! * f.y0;
+          }
           farLayer[farCount] = f.layer;
           farRep[farCount * 2] = f.repU;
           farRep[farCount * 2 + 1] = f.repV;
@@ -341,8 +368,15 @@ export function buildTrees(
         };
         for (let k = 0; k < vdTiers.nearCount; k++) {
           const i = vdTiers.near[k]!;
-          const s = vd.species[vdSpeciesOf[i]!]!;
           const row = vdMatrices.subarray(i * 16, i * 16 + 16);
+          if (mergedBarkRows && mergedLeafRows && mergedBarkSp && mergedLeafSp) {
+            const slot = nearMergedCount++;
+            mergedBarkRows.set(row, slot * 16);
+            mergedLeafRows.set(row, slot * 16);
+            mergedBarkSp[slot] = mergedLeafSp[slot] = vdSpeciesOf[i]!;
+            continue;
+          }
+          const s = vd.species[vdSpeciesOf[i]!]!;
           const slot = s.count++;
           (s.bark.instanceMatrix.array as Float32Array).set(row, slot * 16);
           (s.leaf.instanceMatrix.array as Float32Array).set(row, slot * 16);
@@ -354,6 +388,13 @@ export function buildTrees(
           // Lean: the mid level draws through the shared imposter pool, so the
           // per-species card meshes and the mid trunk stay at count 0.
           if (lean) { imposter(s.far, row); continue; }
+          if (mergedMidRows && mergedMidSp) {
+            const slot = midMergedCount++;
+            mergedMidRows.set(row, slot * 16);
+            mergedMidSp[slot] = vdSpeciesOf[i]!;
+            midTrunkRows.set(row, midTrunkCount++ * 16);
+            continue;
+          }
           const slot = s.midCount++;
           (s.midLeaf.instanceMatrix.array as Float32Array).set(row, slot * 16);
           midTrunkRows.set(row, midTrunkCount++ * 16);
@@ -372,7 +413,7 @@ export function buildTrees(
             mesh.instanceMatrix.needsUpdate = true;
           }
         }
-        for (const [mesh, c] of [[vd.midTrunk, midTrunkCount], [vd.farLeaf, farCount], [vd.farTrunk, farCount]] as const) {
+        for (const [mesh, c] of [[vd.midTrunk, midTrunkCount], [vd.farLeaf, farCount], [vd.farTrunk, m ? 0 : farCount]] as const) {
           mesh.count = c;
           mesh.visible = c > 0;
           mesh.instanceMatrix.clearUpdateRanges();
@@ -383,6 +424,20 @@ export function buildTrees(
           attr.clearUpdateRanges();
           if (n > 0) attr.addUpdateRange(0, n);
           attr.needsUpdate = true;
+        }
+        if (m) {
+          for (const [mesh, c] of [[m.bark, nearMergedCount], [m.leaf, nearMergedCount], [m.mid, midMergedCount]] as const) {
+            mesh.count = c;
+            mesh.visible = c > 0;
+            mesh.instanceMatrix.clearUpdateRanges();
+            if (c > 0) mesh.instanceMatrix.addUpdateRange(0, c * 16);
+            mesh.instanceMatrix.needsUpdate = true;
+          }
+          for (const [attr, n] of [[m.barkSpecies, nearMergedCount], [m.leafSpecies, nearMergedCount], [m.midSpecies, midMergedCount], [m.farCrown, farCount * 4], [m.farBase, farCount]] as const) {
+            attr.clearUpdateRanges();
+            if (n > 0) attr.addUpdateRange(0, n);
+            attr.needsUpdate = true;
+          }
         }
         // The card crowns step aside on this lane; the far balls take what is left.
         copy(vdTiers.over, 0, [near, trunks], nearTones);

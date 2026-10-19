@@ -17,6 +17,7 @@ import { applyCarPbrMaterial, EXPERIMENTAL_WORLD_CAR_PBR } from './car-materials
 import { createSkyRig, EXPERIMENTAL_SKY_RIG, type SkyName } from './sky-rig.ts';
 import { createVdCityMaterials, EXPERIMENTAL_WORLD_VD, type VdWeather } from './vd-materials.ts';
 import { VD_LEAN } from './vd-lean.ts';
+import { VD_LEANDRAW } from './vd-leandraw.ts';
 import { VD_LEANMAT } from './vd-leanmat.ts';
 import { buildPrecipitation } from './vd-weather.ts';
 import { CURB_HEIGHT, VD_SHADOWS, VD_SHADOW_HALF } from './curb.ts';
@@ -112,6 +113,14 @@ export interface CityWorldOptions {
    */
   leanMat?: boolean;
   /**
+   * vd lane "lean draws": the near and mid tree tiers merge across species
+   * into one draw each and the far trunk cross folds into the far leaf mesh
+   * (vd-leandraw.ts) — the world drops under the ~40-draw floor the Duo's
+   * per-draw submit encode needs. Defaults to EXPO_PUBLIC_WORLD_VD_LEANDRAW
+   * — off unless set. Only read while `vd` is on.
+   */
+  leanDraw?: boolean;
+  /**
    * The future layer: roofscape furniture, the NYCHA facelift kit and the
    * addressable ad-surface inventory (EXPERIMENTAL_WORLD_FUTURE). The
    * overlays are merged into the shared buffers, so draw calls stay flat.
@@ -138,6 +147,7 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
   const tod = options.timeOfDay ?? TOD_BY_SKY[skyRig ? (options.sky ?? 'dusk') : 'dusk'];
   const vd = options.vd ?? EXPERIMENTAL_WORLD_VD;
   const leanMat = options.leanMat ?? VD_LEANMAT;
+  const leanDraw = options.leanDraw ?? VD_LEANDRAW;
   const vdMaterials = vd ? createVdCityMaterials(THREE, { sunDirection, timeOfDay: tod }, leanMat) : null;
   const materials = vdMaterials ?? (glass
     ? createGlassCityMaterials(THREE, {
@@ -183,7 +193,7 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
   // One street-clearance index for every tree, pole, sign, stoop and prop.
   const clearance = createStreetClearance(dataset);
   const city = buildCityMeshes(THREE, dataset, materials, away, clearance, options.future ?? EXPERIMENTAL_WORLD_FUTURE);
-  const trees = buildTrees(THREE, dataset, materials, clearance, vd, VD_LEAN, leanMat);
+  const trees = buildTrees(THREE, dataset, materials, clearance, vd, VD_LEAN, leanMat, leanDraw);
   const furniture = buildStreetFurniture(THREE, dataset, materials, clearance, city.texts);
   const props = buildStreetProps(THREE, dataset, materials, clearance, furniture.signs, furniture.lights);
   const bandMinZ = -dataset.extentMeters - SHADOW_BAND_METRES;
