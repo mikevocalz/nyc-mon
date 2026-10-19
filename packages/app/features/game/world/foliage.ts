@@ -295,8 +295,17 @@ export function buildTrees(
         // full models, the next VD_MID_TREE_CAP inside VD_FAR_TREE_RADIUS as the thinned
         // mid level, the rest as cross-card imposters up to VD_FAR_TREE_CAP and plain far
         // crowns past it. One sort per refresh (every ~10 m of travel), no allocation.
+        // The mid trunks and both far meshes are merged across species, so they
+        // pack into single buffers under their own write cursors.
         vdTiers.update(x, z, lod);
-        for (const s of vd.species) { s.count = 0; s.midCount = 0; s.farCount = 0; }
+        for (const s of vd.species) { s.count = 0; s.midCount = 0; }
+        let midTrunkCount = 0;
+        let farCount = 0;
+        const midTrunkRows = vd.midTrunk.instanceMatrix.array as Float32Array;
+        const farLeafRows = vd.farLeaf.instanceMatrix.array as Float32Array;
+        const farTrunkRows = vd.farTrunk.instanceMatrix.array as Float32Array;
+        const farLayer = vd.farLayer.array as Float32Array;
+        const farRep = vd.farRep.array as Float32Array;
         for (let k = 0; k < vdTiers.nearCount; k++) {
           const i = vdTiers.near[k]!;
           const s = vd.species[vdSpeciesOf[i]!]!;
@@ -311,24 +320,54 @@ export function buildTrees(
           const row = vdMatrices.subarray(i * 16, i * 16 + 16);
           const slot = s.midCount++;
           (s.midLeaf.instanceMatrix.array as Float32Array).set(row, slot * 16);
-          (s.midTrunk.instanceMatrix.array as Float32Array).set(row, slot * 16);
+          midTrunkRows.set(row, midTrunkCount++ * 16);
         }
         for (let k = 0; k < vdTiers.farCount; k++) {
           const i = vdTiers.far[k]!;
           const s = vd.species[vdSpeciesOf[i]!]!;
           const row = vdMatrices.subarray(i * 16, i * 16 + 16);
-          const slot = s.farCount++;
-          (s.farLeaf.instanceMatrix.array as Float32Array).set(row, slot * 16);
-          (s.farTrunk.instanceMatrix.array as Float32Array).set(row, slot * 16);
+          const f = s.far;
+          const o = farCount * 16;
+          // The unit crown box takes the species' extents in the matrix: the
+          // basis columns scale by (hw, hh, hw) and the origin moves to the
+          // crown's base centre — M · translate(cx, y0, cz) · scale(hw, hh, hw).
+          farLeafRows[o] = row[0]! * f.hw; farLeafRows[o + 1] = row[1]! * f.hw; farLeafRows[o + 2] = row[2]! * f.hw; farLeafRows[o + 3] = 0;
+          farLeafRows[o + 4] = row[4]! * f.hh; farLeafRows[o + 5] = row[5]! * f.hh; farLeafRows[o + 6] = row[6]! * f.hh; farLeafRows[o + 7] = 0;
+          farLeafRows[o + 8] = row[8]! * f.hw; farLeafRows[o + 9] = row[9]! * f.hw; farLeafRows[o + 10] = row[10]! * f.hw; farLeafRows[o + 11] = 0;
+          farLeafRows[o + 12] = row[0]! * f.cx + row[4]! * f.y0 + row[8]! * f.cz + row[12]!;
+          farLeafRows[o + 13] = row[1]! * f.cx + row[5]! * f.y0 + row[9]! * f.cz + row[13]!;
+          farLeafRows[o + 14] = row[2]! * f.cx + row[6]! * f.y0 + row[10]! * f.cz + row[14]!;
+          farLeafRows[o + 15] = 1;
+          // The unit trunk cross reaches the species' crown base through its Y column alone.
+          farTrunkRows.set(row, o);
+          farTrunkRows[o + 4] = row[4]! * f.y0;
+          farTrunkRows[o + 5] = row[5]! * f.y0;
+          farTrunkRows[o + 6] = row[6]! * f.y0;
+          farLayer[farCount] = f.layer;
+          farRep[farCount * 2] = f.repU;
+          farRep[farCount * 2 + 1] = f.repV;
+          farCount++;
         }
         for (const s of vd.species) {
-          for (const [mesh, c] of [[s.bark, s.count], [s.leaf, s.count], [s.midLeaf, s.midCount], [s.midTrunk, s.midCount], [s.farLeaf, s.farCount], [s.farTrunk, s.farCount]] as const) {
+          for (const [mesh, c] of [[s.bark, s.count], [s.leaf, s.count], [s.midLeaf, s.midCount]] as const) {
             mesh.count = c;
             mesh.visible = c > 0;
             mesh.instanceMatrix.clearUpdateRanges();
             if (c > 0) mesh.instanceMatrix.addUpdateRange(0, c * 16);
             mesh.instanceMatrix.needsUpdate = true;
           }
+        }
+        for (const [mesh, c] of [[vd.midTrunk, midTrunkCount], [vd.farLeaf, farCount], [vd.farTrunk, farCount]] as const) {
+          mesh.count = c;
+          mesh.visible = c > 0;
+          mesh.instanceMatrix.clearUpdateRanges();
+          if (c > 0) mesh.instanceMatrix.addUpdateRange(0, c * 16);
+          mesh.instanceMatrix.needsUpdate = true;
+        }
+        for (const [attr, n] of [[vd.farLayer, farCount], [vd.farRep, farCount * 2]] as const) {
+          attr.clearUpdateRanges();
+          if (n > 0) attr.addUpdateRange(0, n);
+          attr.needsUpdate = true;
         }
         // The card crowns step aside on this lane; the far balls take what is left.
         copy(vdTiers.over, 0, [near, trunks], nearTones);
