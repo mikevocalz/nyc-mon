@@ -229,3 +229,33 @@ sub-0.5 floor changes pixels, not the frame cap. The only remaining 60
 fps lever is getting render() under ~12 ms — roughly half the current
 work: mid-tier imposters (611k → ~300k tris) or a cheaper material path
 for the merged tree draws.
+
+### Lean tier + free-run — the last 1.4 ms (same device, `25db337`+`253326e`)
+
+`VD_LEAN` (`25db337`) halves the near cap to 24 and writes every mid-tree
+through the shared far cross-card pool (~8 tris a tree instead of ~900,
+mid meshes idle at count 0). Measured walking, AHB + free-run, shadows
+off, living city on, scale at the 0.5 floor (1275×850):
+
+| | default tiers | `VD_LEAN` |
+| --- | --- | --- |
+| trianglesP50 | ~611k | **~422k** |
+| drawCallsP50 | ~60 | **48** |
+| renderP50 / P90 | 21.8 / 23.5 ms | **18.0 / 19.0 ms** |
+| cpuP50 / worst | 22.3 / ~28 ms | **18.5 / 22.7 ms** |
+| intervalP50 / P90 | 33.33 / 33.71 ms | **33.35 / 33.73 ms** |
+| presentP90 | 0.08 ms | 0.13 ms |
+
+The triangle cut is real (−31%) and render() dropped ~4 ms — but the
+producer still locks onto exactly two vsyncs: **render() ≈ 18 ms misses
+the 16.7 ms gate by ~1.4 ms**, so every frame lands on the second vsync
+→ stable 30 fps. Not a jitter wall; a binary one. Under the rAF pacing
+the same build reads intervalP50 ~23 ms (producer ~43 fps — the mailbox
+drops the surplus, display stays ~30).
+
+The remaining encode isn't triangle-bound (cuts didn't scale it
+linearly) — it's the ~48 draws of TSL node-material encode, of which the
+six-species near pool (24 full models, 12 draws) is the biggest slice we
+can still trade away. `EXPO_PUBLIC_WORLD_VD_LEAN_NEAR` (`253326e`) makes
+the lean near cap build-time probe-able; a near=12 run tests whether the
+last ~1.4 ms is in that pool.
