@@ -214,3 +214,18 @@ scheduling: (a) render-scale floor below 0.5 (product call — buffer is
 1275×850 now), (b) a cheaper material stack for the merged far/mid tree
 meshes (the TSL node path is the encode cost), (c) mid-tier imposters
 pushing visible tris well under 500k.
+
+### N1 soak (same build, ~2 min sustained walk)
+
+intervalP50 **33.33 ms / P90 33.71** — the producer locks onto exactly two
+60 Hz vsyncs. renderP50 21.8 / P90 23.5 at the 0.5 scale floor
+(1080×720 buffer, 611k tris), presentP90 0.1 ms, cpuP50 22.3 / worst ~28,
+zero parked intervals, zero thermal verdicts. Steady ~30–31 fps with no
+jank spikes — a stable half-vsync cadence, not a degrading one.
+
+This also settles the render-scale question empirically: even at the 0.5
+floor the pipeline is encode-bound (render() ≈ 22 ms > one vsync), so a
+sub-0.5 floor changes pixels, not the frame cap. The only remaining 60
+fps lever is getting render() under ~12 ms — roughly half the current
+work: mid-tier imposters (611k → ~300k tris) or a cheaper material path
+for the merged tree draws.
