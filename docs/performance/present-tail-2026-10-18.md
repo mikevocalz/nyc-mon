@@ -259,3 +259,21 @@ six-species near pool (24 full models, 12 draws) is the biggest slice we
 can still trade away. `EXPO_PUBLIC_WORLD_VD_LEAN_NEAR` (`253326e`) makes
 the lean near cap build-time probe-able; a near=12 run tests whether the
 last ~1.4 ms is in that pool.
+
+### near=12 probe — the encode floor isn't in the near pool
+
+Same build with `EXPO_PUBLIC_WORLD_VD_LEAN_NEAR=12` (24 → 12 full
+models): triangles 422k → 366k, draws 48 → 44, renderP50 **18.9 ms** —
+no better than near=24's 18.0. The ~18 ms floor is spread across the
+remaining ~44 draws of TSL node-material encode, not concentrated in
+the near-tree pool.
+
+**Lane verdict.** VD_LEAN + AHB + free-run is the best measured config:
+a clean, sustained 30 fps (intervalP50 33.35, P90 33.73, zero parked
+frames, cpu worst 22.7 ms, no thermal verdicts over ~2 min of
+continuous walking) — or a ~43 fps free-running producer if jitter is
+acceptable. Sustained 60 needs render() under 16.7 ms, and the last
+~1.4–2 ms is TSL encode across the whole draw set: the remaining lever
+is a cheaper material stack for the static city / tree meshes, not
+more geometry cuts. Keep `VD_LEAN` opt-in — near=24 preserves the
+street look the record-backed trees were built for.
