@@ -105,14 +105,13 @@ export interface CityWorldOptions {
    */
   vd?: boolean;
   /**
-  /**
    * vd lane "lean materials": unlit MeshBasicNodeMaterial bodies on the
    * city's lit surfaces and the tree pools (vd-leanmat.ts). Defaults to
    * EXPO_PUBLIC_WORLD_VD_LEANMAT — off unless set. Only read while `vd`
    * is on.
    */
   leanMat?: boolean;
-  /** (feat(world): opt-in lean material path — unlit bodies on the vd draws)
+  /**
    * The future layer: roofscape furniture, the NYCHA facelift kit and the
    * addressable ad-surface inventory (EXPERIMENTAL_WORLD_FUTURE). The
    * overlays are merged into the shared buffers, so draw calls stay flat.
