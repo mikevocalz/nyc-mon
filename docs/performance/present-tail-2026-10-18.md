@@ -277,3 +277,38 @@ acceptable. Sustained 60 needs render() under 16.7 ms, and the last
 is a cheaper material stack for the static city / tree meshes, not
 more geometry cuts. Keep `VD_LEAN` opt-in — near=24 preserves the
 street look the record-backed trees were built for.
+
+### LEANMAT measured — the savings bought resolution, not fps
+
+`EXPO_PUBLIC_WORLD_VD_LEANMAT=1` (`9f8d1c3`) swaps every vd draw's
+TSL lit body for an unlit `MeshBasicNodeMaterial` (`lights = false`,
+same colour graphs — atlas `aLayer`/`aRep`, `aShade`, alphaTest,
+species tones all preserved). Measured walking, AHB + free-run +
+VD_LEAN, release build on the Duo:
+
+| | VD_LEAN (lit) | VD_LEAN + LEANMAT |
+| --- | --- | --- |
+| buffer | 1275×850 (0.5 floor) | **2160×1440 (~0.85)** |
+| renderP50 / P90 | 18.0 / 19.0 ms | 17.2 / 32.0 ms |
+| intervalP50 | 33.35 ms (2-vsync lock) | 25.0 ms free-run |
+| cpuP50 | 18.5 ms | 17.7 ms |
+| draws / tris | 48 / 422k | 47 / 441k |
+
+Two reads. (1) The material swap works as designed — per-material WGSL
+build time fell ~10–20× (masonry 23 ms → 1.3 ms at graph build), and
+the frame got ~1 ms cheaper at **2.4× the pixels**: the render-scale
+controller correctly spent the headroom on resolution (0.5 → 0.85,
+held through the window) instead of fps. (2) The 60fps gate still
+misses: render() ≈ 17 ms at ~47 draws means the remaining cost is the
+per-draw JSI submit encode itself, not shader-graph size — the same
+conclusion the near-cap probe reached from the geometry side. The
+unlit look is a real visual trade (no window lattice, no lane paint,
+no wet ground); `VD_LEANMAT` stays opt-in.
+
+Every cheap lever is now measured end-to-end: AHB present (0.08 ms),
+free-run pacing (no rAF wait), −31% triangles, −24 draws, unlit
+materials. render() ≈ 17–18 ms is the floor this stack gives at this
+draw count on this device. 60 needs render() < 16.7: deeper draw
+consolidation (~47 → <40) or a faster submission path — both lanes,
+not patches. Default recommendation for the Duo stays VD + shadows
+off + living city at ~30 fps, or VD_LEAN for headroom/thermals.
