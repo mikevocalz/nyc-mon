@@ -25,6 +25,7 @@ import { cityCelRig } from './cel-rig.ts';
 import { createToonMaterial, createToonRig } from './toon-material.ts';
 import { parseSkyRigFlag } from './sky-rig.ts';
 import { CITY_COLORS, type CityColor } from './palette.ts';
+import { EXPERIMENTAL_SURFACE_DETAIL, SURFACE_DETAIL } from './surface-detail.ts';
 import { LIT_SHARE_CAP, LIT_SHARE_DAY, LIT_SHARE_GAIN, LIT_SHARE_TOD, WINDOW_GRID } from './windows.ts';
 import { ATLAS_HEIGHT, ATLAS_WIDTH, atlasPixels } from './pixel-font.ts';
 import type { Node } from 'three/webgpu';
@@ -141,7 +142,7 @@ export interface FacadeGraphs {
  * The coverage masks come back alongside the albedo so the PBR lane can
  * steer roughness/metalness per pixel without re-deriving the pattern.
  */
-export function facadeGraphs(THREE: Three, grid: { floor: number; bay: number }, glassy: boolean, tod = LIT_SHARE_TOD): FacadeGraphs {
+export function facadeGraphs(THREE: Three, grid: { floor: number; bay: number }, glassy: boolean, tod = LIT_SHARE_TOD, surfaceDetail = EXPERIMENTAL_SURFACE_DETAIL): FacadeGraphs {
   const { T, c, detail, vertexRgb } = cityShaderTools(THREE);
   const u = T.uv().x;
   const v = T.uv().y;
@@ -171,6 +172,40 @@ export function facadeGraphs(THREE: Three, grid: { floor: number; bay: number },
   patterned = T.mix(patterned, c('lintel'), lintel.add(sill).mul(0.7));
   patterned = T.mix(T.mix(patterned, window, pane.mul(glassy ? 0.7 : 0.82)), window, shop.mul(glassy ? 0.5 : 0.65));
   patterned = T.mix(patterned, ribs, gate);
+  // Experimental close-up masonry breakup (surface-detail.ts lane). This adds
+  // shader ALU only; it never changes geometry, world positions or distant
+  // silhouettes. No extra draw pass; fade before courses become subpixel on
+  // phones. Lives in facadeGraphs so the cel and PBR lanes share it.
+  if (surfaceDetail && !glassy) {
+    const m = SURFACE_DETAIL.mortar;
+    const t = m.treatments;
+    // Harlem walls mix brownstone, brick and limestone: the per-building
+    // facade seed picks one treatment so a wall is a single material.
+    const pick = T.fract(seed.mul(0.6173).add(0.2917));
+    const ashlar = T.step(1 / 3, pick);
+    const stone = T.step(2 / 3, pick);
+    const sel = (brick: number, brownstone: number, limestone: number) =>
+      T.mix(T.mix(T.float(brick), T.float(brownstone), ashlar), T.float(limestone), stone);
+    const courses = sel(t.brick.coursesPerMetre, t.brownstone.coursesPerMetre, t.limestone.coursesPerMetre);
+    const bays = sel(t.brick.baysPerMetre, t.brownstone.baysPerMetre, t.limestone.baysPerMetre);
+    const jointV = sel(t.brick.verticalJoint, t.brownstone.verticalJoint, t.limestone.verticalJoint);
+    const jointH = sel(t.brick.horizontalJoint, t.brownstone.horizontalJoint, t.limestone.horizontalJoint);
+    const dark = sel(t.brick.darkness, t.brownstone.darkness, t.limestone.darkness);
+    const tint = sel(t.brick.tone, t.brownstone.tone, t.limestone.tone);
+    // Staggered coursing: every other course is offset by half a unit.
+    const course = T.floor(v.mul(courses));
+    const mortarU = T.fract(u.mul(bays).add(course.mul(0.5)));
+    const mortarV = T.fract(v.mul(courses));
+    const joints = T.max(T.step(mortarU, jointV), T.step(mortarV, jointH));
+    // Joints belong to the masonry only: never across the window panes,
+    // the shopfront band, the roll-down gates or the stone dressing.
+    const field = T.saturate(
+      T.float(1).sub(pane).sub(shop).sub(gate).sub(lintel).sub(sill).sub(surround),
+    );
+    const close = detail(m.fadeNearMetres, m.fadeFarMetres);
+    patterned = patterned.mul(T.float(1).sub(joints.mul(field).mul(dark).mul(close)));
+    patterned = patterned.mul(T.mix(T.float(1), tint, field.mul(close)));
+  }
   const average = T.mix(vertexRgb, window, glassy ? 0.35 : 0.18);
   const near = detail(260, 700);
   const density = T.float(0.25).add(T.fract(T.sin(seed.mul(7.31).mul(12.9898).add(3.7 * 78.233).add(1.13 * 37.719)).mul(43758.5453)).mul(0.5));
@@ -217,7 +252,7 @@ export interface RoadsGraphs {
  * Asphalt with a double yellow centre line (vertex r = 1), a zebra crossing
  * (vertex g = 1) and a darker gutter; vertex b carries the width / 100.
  */
-export function roadsGraphs(THREE: Three): RoadsGraphs {
+export function roadsGraphs(THREE: Three, surfaceDetail = EXPERIMENTAL_SURFACE_DETAIL): RoadsGraphs {
   const { T, c, detail, vertexRgb } = cityShaderTools(THREE);
   const u = T.uv().x;
   const v = T.uv().y;
@@ -229,7 +264,22 @@ export function roadsGraphs(THREE: Three): RoadsGraphs {
   const fade = detail(220, 600);
   const asphalt = T.mix(c('asphalt'), c('shadow'), gutter);
   const lined = T.mix(asphalt, c('laneYellow'), centre.mul(fade));
-  const painted = T.mix(lined, c('laneWhite'), zebra.mul(T.mix(T.float(0.35), T.float(1), fade)));
+  let painted = T.mix(lined, c('laneWhite'), zebra.mul(T.mix(T.float(0.35), T.float(1), fade)));
+  if (surfaceDetail) {
+    // Stable world-space asphalt grain avoids a repeating UV stamp between
+    // OSM road segments. Snap to 2-D cells before hashing: a hash of one
+    // linear combination of x and z is constant along a diagonal, so the
+    // grain would read as stripes. Its short distance LOD avoids moire.
+    const a = SURFACE_DETAIL.asphalt;
+    const cell = T.floor(T.positionWorld.xz.div(a.cellMetres));
+    const grain = T.fract(T.sin(
+      cell.x.mul(a.hashDotX).add(cell.y.mul(a.hashDotZ)),
+    ).mul(a.hashScale));
+    const grit = T.mix(T.float(a.grainDark), T.float(a.grainLight), grain);
+    painted = painted.mul(T.mix(
+      T.float(1), grit, detail(a.fadeNearMetres, a.fadeFarMetres),
+    ));
+  }
   // A royal light line along each kerb (not on crossings), like the edge glow of a NeonBlade panel.
   const kerb = T.float(1).sub(vertexRgb.y).mul(T.step(T.abs(across.sub(width.mul(0.5).sub(0.35))), 0.07));
   return {
@@ -385,6 +435,11 @@ export interface CityMaterialOptions {
    * storefront glow stays lit at every tod — shop lights are on at noon.
    */
   timeOfDay?: number;
+  /**
+   * Opt-in mortar and asphalt close-up detail. Defaults to the env flag read
+   * at module load; pass it explicitly to build both variants (shader tests).
+   */
+  surfaceDetail?: boolean;
 }
 
 export function createCityMaterials(
@@ -392,6 +447,7 @@ export function createCityMaterials(
   sunDirection: readonly [number, number, number],
   options: CityMaterialOptions = {},
 ): CityMaterials & { rig: CelRig; albedoGraphs: Map<Mat, CelMaterialOptions['albedo']> } {
+  const surfaceDetail = options.surfaceDetail ?? EXPERIMENTAL_SURFACE_DETAIL;
   const { T, c, vertexRgb } = cityShaderTools(THREE);
   const rig = createCelRig(THREE, cityCelRig(sunDirection));
   const toonRig = EXPERIMENTAL_WORLD_TOON ? createToonRig(THREE, { sunDirection: sunDirection as [number, number, number] }) : null;
@@ -413,7 +469,7 @@ export function createCityMaterials(
   const unlit = createUnlitLayers(THREE, sunDirection);
 
   const facade = (grid: { floor: number; bay: number }, glassy: boolean) => {
-    const graphs = facadeGraphs(THREE, grid, glassy, options.timeOfDay ?? LIT_SHARE_TOD);
+    const graphs = facadeGraphs(THREE, grid, glassy, options.timeOfDay ?? LIT_SHARE_TOD, surfaceDetail);
     const material = cel(graphs.albedo, 1);
     setEmissive(material, graphs.emissive);
     return material;
@@ -432,7 +488,7 @@ export function createCityMaterials(
   setEmissive(sidewalks, sidewalkGlow(THREE));
 
   const roads = (() => {
-    const graphs = roadsGraphs(THREE);
+    const graphs = roadsGraphs(THREE, surfaceDetail);
     const material = cel(graphs.albedo, 0, { side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -6 });
     setEmissive(material, graphs.emissive);
     return material;

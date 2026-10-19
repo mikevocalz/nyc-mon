@@ -36,7 +36,7 @@ test('the shared Settings screen renders every map-data source and licence link'
   assert.match(settings, /licenseUrl/);
 });
 
-test('the 3D game screen does not mount an OpenStreetMap HUD label', () => {
+test('the 3D game screen mounts the on-map attribution (data/README: any map surface displays it)', () => {
   const game = readFileSync(new URL('./GameScreen.tsx', import.meta.url), 'utf8');
-  assert.doesNotMatch(game, /MapAttribution/);
+  assert.match(game, /MapAttribution/);
 });
