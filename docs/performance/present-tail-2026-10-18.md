@@ -312,3 +312,56 @@ draw count on this device. 60 needs render() < 16.7: deeper draw
 consolidation (~47 → <40) or a faster submission path — both lanes,
 not patches. Default recommendation for the Duo stays VD + shadows
 off + living city at ~30 fps, or VD_LEAN for headroom/thermals.
+
+## VD_LEANDRAW + stacked flags — the gate crossed at p50, scheduling is the wall (2026-10-19)
+
+`EXPO_PUBLIC_WORLD_VD_LEANDRAW` (commit f99dcc8) folds the remaining
+per-species vd draws into merged instanced meshes: near tier 12 → 2,
+mid leaf 6 → 1, far trunk+leaf 2 → 1 (per-vertex `aSp` collapses
+non-matching species to a degenerate point; per-instance `aSpecies`
+selects). World draws 44 → ~26 on the tile; on-device total 48 → **40**.
+
+Measured walking, release build on the Duo, LEAN + LEANDRAW + AHB +
+free-run + shadows off, then the same with LEANMAT stacked:
+
+| | LEAN+LEANDRAW | + LEANMAT |
+| --- | --- | --- |
+| draws | **40** | **40** |
+| renderP50 / P90 | 16.45 / 17.22 ms | **15.63 / 29.37 ms** |
+| intervalP50 | 33.37 ms | **29.76 ms** |
+| cpuP50 | 16.93 ms | 16.09 ms |
+| buffer | 1147×765 (~0.53) | **2160×1440 (~0.85)** |
+
+Three findings:
+
+1. **The one-vsync gate is crossed at p50.** render 15.63 + update 0.3
+   ≈ 15.9 ms < 16.7 ms — for the first time the measured work fits the
+   budget. And it got faster at ~3.5× the pixels, closing the
+   fill-vs-encode question: the bottleneck was always per-draw submit
+   encode.
+2. **The producer floor is now scheduling, not rendering.** cpuP50
+   16.1 ms against intervalP50 29.8 ms means ~14 ms per cycle is spent
+   in JS event-loop/timer latency between submissions — equal to the
+   render cost itself. `setTimeout` free-run does not free-run at
+   vsync rate; rAF pacing lands the same ~30 ms by construction.
+3. **Sustained 60 needs the pump off JS timers.** More draw cuts
+   cannot beat a ~14 ms scheduling floor. The remaining lane is a
+   native vsync-driven submit (the UI-runtime worklet path exists —
+   measured earlier: render moves to the UI thread and pays
+   Choreographer stall warnings — so the real fix is a native
+   submit pump, not more world-side consolidation).
+
+The deferred city-batch merges (`street-detail`/`roofs`,
+`transit`/`roofs`, `transit-lights`/`neon`, landmark lettering) are
+recorded in `vd-leandraw.ts` but were not run: the evidence says they
+cannot cross the remaining gate — they shave render(), which is
+already under the vsync line at p50, while the wall is scheduling.
+
+`trianglesP50` reads ~1.1 M under LEANDRAW — the merged near draws
+submit every species' vertices and collapse non-matching ones
+degenerately; the counter charges them before rasterisation, so the
+figure is inflated ~6× on the merged near tier by design.
+
+Status: VD_LEANDRAW merged to main (opt-in, default off). The stacked
+configuration is the recommended perf build for the Duo pending the
+native-pump lane.
