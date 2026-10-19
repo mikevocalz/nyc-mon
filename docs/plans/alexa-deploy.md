@@ -2,7 +2,9 @@
 
 Draft runbook. Get the three services on HTTPS, apply the OAuth migration, and prove the parts PR #12 could only test against mocks. Judges may look from Oct 26 (rules prevail over the FAQ date) and judging runs to Nov 20; everything stays up until then. Nothing in this file has been deployed or run yet; the status table at the end says what has.
 
-## Current state (2026-10-15, `main` at `311ab58`)
+## Current state (first read 2026-10-15, `main` at `311ab58`; lane merged to `main` `670e05f` on 2026-10-18)
+
+The snapshot below is the 2026-10-15 reading and is still accurate where marked. The 2026-10-18 merge brought the lane level with `main`; the only file this lane adds on top is this document. All nine `alexa-readiness.yml` stages were re-run locally against the merge (`f1fe90c`, dirty) and passed — see the status table.
 
 | Service | Package | Where it runs today | Deployed? |
 |---|---|---|---|
@@ -21,7 +23,7 @@ Draft runbook. Get the three services on HTTPS, apply the OAuth migration, and p
 Facts that constrain the choice:
 
 - admin-vite is built for Vercel (`nitro({ preset: 'vercel' })`, `vercel.json` with `cd ../.. && pnpm --filter admin-vite... build`). Its Vercel project needs Root Directory `apps/admin-vite`, framework "Other", production branch `main`. The server function measured 35 MB in ADR 0003.
-- The MCP server and the simulator are long-running Node processes (`node src/main.ts`, `node server/main.ts`) that bind a port and expect a TLS proxy in front (`listenHostFor` binds all interfaces outside the dev bypass). They do not fit Vercel functions without a rewrite, which is out of scope.
+- The MCP server and the simulator are long-running Node processes (`pnpm start`: `src/ui/build.ts` then `src/main.ts` for the MCP server, `server/main.ts` for the simulator) that bind a port and expect a TLS proxy in front (`listenHostFor` binds all interfaces outside the dev bypass). They do not fit Vercel functions without a rewrite, which is out of scope.
 - The simulator needs **two origins** (page and sandbox; `loadSimEnv` refuses the same origin) and an AWS identity with `bedrock-mantle:CreateInference`. The AWS SDK's default chain finds an instance or task role, so no AWS keys go into env.
 - Running the two Node services on AWS also backs the AWS Builder entry (`docs/aws-builder.md`).
 
@@ -96,7 +98,8 @@ Production env, by name (`vercel env add NAME production < file`, one file per v
 | `OAUTH_ALEXA_CLIENT_ID`, `OAUTH_ALEXA_CLIENT_SECRET`, `OAUTH_ALEXA_REDIRECT_URIS` | the real values if Mike has the `alexa-ai` CLI output; otherwise a 32+ char secret and a placeholder https redirect URI so the service-token checks in 8b can run, or unset (the boot logs one warning) |
 | `V1_MCP_SERVICE_KEY` | 32+ chars; same value on the MCP server |
 | `BETTER_AUTH_TRUSTED_ORIGINS` | include `https://sim.<domain>`: the simulator exchanges its PKCE code from the browser, cross-origin |
-| `BUNNY_STORAGE_ZONE`, `BUNNY_STORAGE_PASSWORD`, `BUNNY_STORAGE_REGION`, `BUNNY_CDN_URL` | required: production boot throws without them |
+| `BUNNY_STORAGE_ZONE`, `BUNNY_STORAGE_PASSWORD`, `BUNNY_CDN_URL` | required: production boot throws without them (`packages/payload/src/payload.config.ts`) |
+| `BUNNY_STORAGE_REGION` | optional: picks the storage hostname only; unset is a valid default |
 | `AUTH_REQUIRE_EMAIL_VERIFICATION` | `false` unless `RESEND_API_KEY` and `AUTH_EMAIL_FROM` are set (lockout guard) |
 | `NEXT_PUBLIC_SITE_URL` | the product site origin, for Payload CORS |
 
@@ -295,6 +298,16 @@ From the PR body, mapped to the offline proof that already exists on `main` and 
 
 Passkey on the linking page is not built, so "passkey sign-in on the linking page" cannot pass in this deploy and is recorded as such.
 
+## Hackathon checklist (submissions close Fri 2026-10-23, 12:00 pm PT)
+
+What must be true on the 23rd. Citations are in `docs/alexa/HACKATHON.md`.
+
+- **Invocation name: none exists.** Hackathon participants get no `alexa-ai` CLI and no developer-console access, so no add-on or skill is ever registered with Amazon and there is nothing to invoke by name. The demo entry points are the simulator page (`https://sim.<domain>`) and the MCP endpoint (`https://mcp.<domain>/mcp`, Streamable HTTP, spec `2025-11-25`). The Agent Skill artifact in the repo is `skills/nyc-mon-companion/SKILL.md` (`name: nyc-mon-companion`); the simulator loads it as the system prompt.
+- **If live hosting is up, these must answer:** `GET https://mcp.<domain>/healthz` → 200; `GET https://sim.<domain>/api/config` → `authMode: "oauth"`, `modelBackend: "bedrock"`; `GET https://auth.<domain>/.well-known/oauth-authorization-server` → metadata; the step-8b `tools/list` exchange on `https://mcp.<domain>/mcp`. Env names that must be set are exactly the step-3 Vercel table plus the step-5 `mcp.env`/`sim.env` blocks — `AUTH_ISSUER`, `MCP_RESOURCE_URI` and `SIM_MCP_URL` byte-identical across hosts, `BETTER_AUTH_TRUSTED_ORIGINS` including the sim origin, the three required `BUNNY_*` vars for the admin-vite production boot.
+- **If live hosting is not up, the offline fallback still submits.** The rules do not require hosting: "a locally runnable public repo plus your demo video is enough" (FQ). The fully local, no-credentials demo is the SIMULATOR.md offline recipe — `NODE_ENV=development MCP_ALLOWED_ORIGINS=http://localhost:5180 OAUTH_DEV_BYPASS=1 MCP_DEV_MODE=1 pnpm --filter @acme/mcp-server dev` plus `SIM_AUTH_MODE=dev-bypass SIM_DEV_MODE=1 SIM_MODEL_BACKEND=mock pnpm --filter @acme/web-sim dev`, then open `http://localhost:5180`. Every reply is labelled "Scripted test model"; with AWS credentials on the laptop, dropping `SIM_MODEL_BACKEND=mock` gives a real Bedrock turn locally. The mock can never serve production (`loadSimEnv` throws under `NODE_ENV=production`).
+- **Demo video is the hard requirement either way**: under three minutes, shows the MCP server or simulated experience working, public on YouTube or Vimeo, English.
+- **Offline evidence on the merged lane:** all nine `alexa-readiness.yml` stages PASSED locally on 2026-10-18 (`f1fe90c`, `.alexa-readiness/report.json`). Live smoke remains `NOT RUN` — it needs the `alexa-live` GitHub environment and its secrets (step 8f).
+
 ## Needs Mike
 
 1. **Hosting**: Option A (EC2 + Caddy) was STRUCK 2026-10-16 — no AWS account is available. The hosting choice reopens when this lane resumes; non-AWS candidates are the Option-B container shape on a non-AWS host (Fly/Render-style) or a self-managed box with the same Caddy+systemd layout — both still need a Bedrock credential path (see item 5).
@@ -328,4 +341,4 @@ Lane state: **parked** — steps 3+ blocked on a domain and a non-AWS hosting de
 | 8g real Bedrock turn, beats 3 and 4 | not yet run | |
 | 9 latency p95 | not yet run | |
 | 10 availability through 2026-11-20 | not yet run | |
-| offline contracts (`alexa-readiness.yml`) | run on PR branches only, never on `main` | run 38753217250 success; run 38777570759 failure, not investigated |
+| offline contracts (`alexa-readiness.yml`) | run on PR branches only, never on `main` | run 38753217250 success; run 38777570759 failure, not investigated; re-run locally on the 2026-10-18 merge (`f1fe90c`): all nine stages PASSED |
