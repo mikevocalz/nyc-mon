@@ -15,6 +15,11 @@ import {
   hasFireEscape, hasShopSign, hasStoop, hasWaterTower, shopWords, STOOP_REACH, STOOP_WIDTH, towerSpot, wallFrame,
 } from './facade-detail.ts';
 import { emitStackedText, emitText, textWidth, type TextFace } from './lettering.ts';
+import {
+  adSurface, emitBulkhead, emitChimneyPots, emitNychaBalcony, emitNychaEntrance, emitNychaLightStrip, emitNychaPanels,
+  emitRoofAc, emitStandpipe, emptyFutureStats, FUTURE_LAYER, hasNychaBalcony, isNychaTower, NYCHA_BALCONY_TOP,
+  roofscapePlan, scaledRing, type AdSurface, type FutureLayerStats,
+} from './future-layer.ts';
 import { BandedBuffer, box } from './parts.ts';
 import type { CityMaterials } from './materials.ts';
 import { WINDOW_GRID } from './windows.ts';
@@ -256,6 +261,8 @@ export interface CityMeshStats {
   buildings: number; roads: number; areas: number; triangles: number; drawCalls: number; neonTrims: number; storefronts: number; billboards: number;
   cornices: number; stoops: number; fireEscapes: number; awnings: number; shopSigns: number; waterTowers: number;
   parapets: number;
+  /** The flagged future layer (future-layer.ts): all zero when FUTURE_LAYER is off. */
+  future: FutureLayerStats;
 }
 
 /**
@@ -308,7 +315,7 @@ export function neonKeyFor(id: string): (typeof NEON_KEYS)[number] {
   return NEON_KEYS[Math.floor(hashUnit(`${id}:neon`) * NEON_KEYS.length) % NEON_KEYS.length]!;
 }
 
-export function buildCityMeshes(THREE: Three, dataset: CityDatasetV3, materials: CityMaterials, sunAway: Point, clearance: StreetClearance = createStreetClearance(dataset)) {
+export function buildCityMeshes(THREE: Three, dataset: CityDatasetV3, materials: CityMaterials, sunAway: Point, clearance: StreetClearance = createStreetClearance(dataset), future = FUTURE_LAYER) {
   const masonry = new VertexBuffer(262144);
   const glass = new VertexBuffer();
   const roofs = new VertexBuffer(131072);
@@ -323,6 +330,8 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV3, materials:
   const detail = new BandedBuffer();
   const landmarkText = new VertexBuffer();
   const texts: (TextFace & { text: string })[] = [];
+  const adSurfaces: AdSurface[] = [];
+  const futureStats = emptyFutureStats();
   let cornices = 0; let stoops = 0; let fireEscapes = 0; let awnings = 0; let shopSigns = 0; let waterTowers = 0;
   let parapets = 0;
   const landmarkByBuilding = new Map(dataset.landmarks.map((l) => [l.buildingId, l]));
@@ -413,6 +422,7 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV3, materials:
       }
     }
     let escaped = false;
+    let entranced = false;
     // v3 facts: `d` bit-gates each detail feature, `f`/`fh` set the escape's
     // floor count and pitch, `ww` the storefront bays, `sh` the band height.
     // Where the mask is absent (v2 tiles, unmatched records) the hash rules
@@ -441,6 +451,30 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV3, materials:
       // A street face: a carriageway within about a sidewalk's width of the wall.
       const facesStreet = clearance.kerbGap(mid[0] + out[0] * 3.5, mid[1] + out[1] * 3.5) < 7;
       const onAvenue = length >= 5 && h >= 6 && commercial.nearest(mid[0] + out[0] * 6, mid[1] + out[1] * 6) <= 14;
+      // NYCHA facelift (future-layer.ts, PR pack art direction): the modular
+      // panel grid, planted balconies and vertical light go on every long
+      // edge — the towers stand in campuses, so the kit does not wait for a
+      // street face. The upgraded entrance lands on the recorded front.
+      if (future && isNychaTower(building) && length >= 8) {
+        emitNychaPanels(detail.buffer, f, length, h, floorPitch, rgb('iron'), tint(rgb('civic'), 0.8));
+        futureStats.nychaPanels++;
+        emitNychaLightStrip(neon, f, length, h, rgb('windowWarm'));
+        futureStats.lightStrips++;
+        const balconyTop = Math.floor((h * NYCHA_BALCONY_TOP) / floorPitch);
+        for (let k = 2; k <= balconyTop; k++) {
+          if (!hasNychaBalcony(building.id, i, k)) continue;
+          const at = (hashUnit(`${building.id}:${i}:${k}:balcAt`) - 0.5) * Math.max(0, length - 5);
+          emitNychaBalcony(detail.buffer, f, at, k * floorPitch, rgb('curb'), rgb('iron'), rgb('leafDark'));
+          futureStats.nychaBalconies++;
+        }
+        const onNychaFront = frontEdge < 0 || i === frontEdge;
+        if (onNychaFront && !entranced) {
+          const at = (hashUnit(`${building.id}:${i}:doorAt`) - 0.5) * Math.max(0, length - 8);
+          emitNychaEntrance(detail.buffer, neon, f, at, rgb('limestone'), rgb('windowWarm'), rgb('cedar'), rgb('leafDark'));
+          entranced = true;
+          futureStats.nychaEntrances++;
+        }
+      }
       if (!facesStreet && !onAvenue) continue;
       // The recorded front edge: single-face details land there when the tile says which face is the front.
       const onFront = frontEdge < 0 || i === frontEdge;
@@ -518,8 +552,14 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV3, materials:
       }
       if (boards < MAX_BILLBOARDS && h >= 16 && length >= 8 && hashUnit(`${building.id}:${i}:board`) < 0.4) {
         const [top, bottom] = BILLBOARD_PAIRS[Math.floor(hashUnit(`${building.id}:pair`) * BILLBOARD_PAIRS.length) % BILLBOARD_PAIRS.length]!;
-        emitBillboard(billboards, mid, out, Math.min(length * 0.55, 9), Math.min(Math.min(h * 0.32, 7), BILLBOARD_TOP - 4.6), Math.min(h - 2.2, BILLBOARD_TOP), rgb(top), rgb(bottom));
+        const bw = Math.min(length * 0.55, 9);
+        const bh = Math.min(Math.min(h * 0.32, 7), BILLBOARD_TOP - 4.6);
+        const btop = Math.min(h - 2.2, BILLBOARD_TOP);
+        emitBillboard(billboards, mid, out, bw, bh, btop, rgb(top), rgb(bottom));
         boards++;
+        // The addressable AdSurface row the CMS pipeline reads (future-layer.ts):
+        // the same numbers the emitter drew, keyed by a stable world-space id.
+        adSurfaces.push(adSurface(building, i, mid[0] + out[0] * 0.3, mid[1] + out[1] * 0.3, out, bw, bh, btop, dataset));
       }
     }
     // A wooden water tower on a share of the five-storey-and-up roofs.
@@ -529,6 +569,41 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV3, materials:
       if (spot) {
         emitWaterTower(roofs, spot[0], spot[1], h, scale, rgb('cedar'), rgb('towerSteel'), rgb('towerRoof'));
         waterTowers++;
+      }
+    }
+    if (future) {
+      // Roof furniture (future-layer.ts): Valdrada's roofscape kinds —
+      // bulkhead, packaged AC, chimney pots, standpipe — on id-hash rules.
+      // Into the banded detail buffer, so only the roofs near the Caller pay.
+      for (const piece of roofscapePlan(building, ring)) {
+        switch (piece.kind) {
+          case 'bulkhead':
+            emitBulkhead(detail.buffer, piece.x, piece.z, h, piece.dir, 0.9 + hashUnit(`${building.id}:bhScale`) * 0.3, tint(wall, 0.95), rgb('cornice'), rgb('roomDoor'));
+            futureStats.bulkheads++;
+            break;
+          case 'roofAc':
+            emitRoofAc(detail.buffer, piece.x, piece.z, h, rgb('carGrey'), rgb('iron'));
+            futureStats.acUnits++;
+            break;
+          case 'chimneyPot':
+            emitChimneyPots(detail.buffer, piece.x, piece.z, h, piece.dir, piece.count, rgb('brickRed'), rgb('cornice'));
+            futureStats.chimneyPots += piece.count;
+            break;
+          case 'standpipe':
+            emitStandpipe(detail.buffer, piece.x, piece.z, h, rgb('iron'), rgb('gate'));
+            futureStats.standpipes++;
+            break;
+        }
+      }
+      // The facelift's roof garden: the planted patch and its low planter
+      // wall on the tower roof (always drawn — it reads in the aerials).
+      if (isNychaTower(building)) {
+        futureStats.nychaTowers++;
+        const garden = scaledRing(ring, 0.55);
+        roofs.surface(...SURFACES.wood);
+        emitFlat(THREE, roofs, garden, [], h + 0.06, rgb('garden'));
+        emitWalls(roofs, garden, h, h + 0.45, rgb('curb'));
+        futureStats.roofGardens++;
       }
     }
   }
@@ -610,6 +685,7 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV3, materials:
     buildings: dataset.buildings.length, roads: dataset.roads.length, areas: dataset.areas.length,
     triangles, drawCalls: meshes.length, neonTrims: trims, storefronts: fronts, billboards: boards,
     cornices, stoops, fireEscapes, awnings, shopSigns, waterTowers, parapets,
+    future: futureStats,
   };
   const shownBands: [number, number] = [-1, -1];
   const bands: [number, number] = [0, 0];
@@ -625,6 +701,8 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV3, materials:
     stats,
     /** Shop-sign lettering for the banded lettering mesh (street-furniture.ts). */
     texts,
+    /** The AdSurface registry rows for the panels this build drew (future-layer.ts). */
+    adSurfaces,
     /** Contact shadows only near the focus: a few z bands, one draw range, no allocation. */
     setFocus(_x: number, z: number) {
       shadowBands(z, minZ, bandCount, bands);

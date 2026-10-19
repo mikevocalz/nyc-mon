@@ -18,6 +18,7 @@ import { createSkyRig, EXPERIMENTAL_SKY_RIG, parseSkyRigFlag, type SkyName } fro
 import { createVdCityMaterials, EXPERIMENTAL_WORLD_VD, type VdWeather } from './vd-materials.ts';
 import { buildPrecipitation } from './vd-weather.ts';
 import { CURB_HEIGHT, VD_SHADOWS, VD_SHADOW_HALF } from './curb.ts';
+import { FUTURE_LAYER, type AdSurface } from './future-layer.ts';
 
 /**
  * Lane G1 "GPU budget": record the immutable city into one WebGPU render
@@ -27,6 +28,14 @@ import { CURB_HEIGHT, VD_SHADOWS, VD_SHADOW_HALF } from './curb.ts';
  * EXPO_PUBLIC_WORLD_BUNDLES — off unless set.
  */
 export const EXPERIMENTAL_WORLD_BUNDLES = parseSkyRigFlag(process.env.EXPO_PUBLIC_WORLD_BUNDLES);
+
+/**
+ * The optional "future layer" (future-layer.ts): NYC roof furniture, the
+ * NYCHA exterior facelift kit and the AdSurface inventory, as an additive
+ * overlay on the record city (docs/implementation/MOBILE_WORLD_PR_PACK.md).
+ * Defaults to EXPO_PUBLIC_WORLD_FUTURE — off unless set.
+ */
+export const EXPERIMENTAL_WORLD_FUTURE = FUTURE_LAYER;
 
 /**
  * Dusk sun, low in the south-west (about 25 degrees up): long light on the
@@ -98,6 +107,12 @@ export interface CityWorldOptions {
    * (EXPERIMENTAL_WORLD_BUNDLES). See buildCityWorld for what stays out.
    */
   bundles?: boolean;
+  /**
+   * The future layer: roofscape furniture, the NYCHA facelift kit and the
+   * addressable ad-surface inventory (EXPERIMENTAL_WORLD_FUTURE). The
+   * overlays are merged into the shared buffers, so draw calls stay flat.
+   */
+  future?: boolean;
 }
 
 export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: CityWorldOptions = {}) {
@@ -162,7 +177,7 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
 
   // One street-clearance index for every tree, pole, sign, stoop and prop.
   const clearance = createStreetClearance(dataset);
-  const city = buildCityMeshes(THREE, dataset, materials, away, clearance);
+  const city = buildCityMeshes(THREE, dataset, materials, away, clearance, options.future ?? EXPERIMENTAL_WORLD_FUTURE);
   const trees = buildTrees(THREE, dataset, materials, clearance, vd);
   const furniture = buildStreetFurniture(THREE, dataset, materials, clearance, city.texts);
   const props = buildStreetProps(THREE, dataset, materials, clearance, furniture.signs, furniture.lights);
@@ -274,6 +289,12 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
       precipitation?.update();
     },
     stats,
+    /**
+     * The AdSurface inventory for the LED panels this build drew
+     * (future-layer.ts): stable ids, geo, orientation, dimensions and
+     * campaign eligibility — the data-driven registry the CMS fills later.
+     */
+    adSurfaces: city.adSurfaces as readonly AdSurface[],
     /** Level of detail and air from the camera's distance to its target, metres. */
     setViewDistance(distance: number, far: number) {
       viewDistance = distance;
