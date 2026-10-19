@@ -26,6 +26,8 @@ export function recordCityFrame(sample: ThreeFrameTiming): void {
     activeIntervals: result.activeIntervals,
     slowIntervals: result.slowIntervals,
     parkedIntervals: result.parkedIntervals,
+    intervalP50Ms: result.intervalP50Ms === null ? null : round2(result.intervalP50Ms),
+    intervalP90Ms: result.intervalP90Ms === null ? null : round2(result.intervalP90Ms),
     stages: result.stages === null ? null : {
       updateP50Ms: round2(result.stages.updateP50Ms),
       updateP90Ms: round2(result.stages.updateP90Ms),

@@ -145,6 +145,17 @@ function JsThreeCanvas<P>({
   const live = !pending && backend !== null;
   const running = live && !paused && !reducedMotion && onScreen;
 
+  // One-shot pacing diagnostic: pairs the flag votes with the sampler's
+  // intervalMs so a build's actual cadence is attributable from logcat.
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      console.info('[NYC-Mon/perf] canvas pacing', {
+        freeRun,
+        surface: androidSurfaceType ?? 'auto',
+      });
+    }
+  }, [freeRun, androidSurfaceType]);
+
   // Draws one frame. The clock advances only while the loop runs, so a still
   // canvas redraws the same moment.
   const draw = () => {
