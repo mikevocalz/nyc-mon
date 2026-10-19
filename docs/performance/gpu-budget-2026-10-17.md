@@ -55,20 +55,32 @@ object and the 120-frame window are reused).
 Files: `perf/frame-sampler.ts` (+`.test.ts`), `perf/record-city-frame.ts`,
 `render-runtime/game-render.ts`, `ui/three/types.ts`, `ui/three/ThreeCanvas.tsx`.
 
-### BundleGroup for the static city — `EXPO_PUBLIC_WORLD_BUNDLES` (default OFF)
+### BundleGroup for the static city — `EXPO_PUBLIC_WORLD_BUNDLES` — REMOVED 2026-11 (lane-bundlefix)
+
+The flag and the bundle path were deleted from `world/index.ts`: the replay
+kept the record-frame camera pose forever — three r186 never re-uploads the
+shared camera UBO for bundled render objects (upstream "missing binding
+updates" for static bundles, mrdoob/three.js#30701, needs a renderer
+refactor) — and re-recording on camera moves costs the whole encode the
+bundle exists to skip. The measured win below was real but small; the lane
+is recorded here as tried-and-rejected, not parked.
 
 three@0.186.1 `renderers/common/BundleGroup.js` records a group's draws into a
 WebGPU render bundle once and replays them via `executeBundles`, skipping
-per-frame re-encoding. In `world/index.ts` a `BundleGroup` gets `sky`, `ground`,
-and every `city.meshes` entry except the two `mutableMeshes` (contact-shadow +
+per-frame re-encoding. In `world/index.ts` a `BundleGroup` gets `ground`
+and every `city.meshes` entry except the two mutable meshes (contact-shadow +
 detail meshes `setFocus` re-ranges per move — a recorded bundle freezes draw
 parameters). Trees/furniture/props stay out (instanced sets whose counts/
 visibility change), lights stay out (BundleGroup forbids non-renderable
 children), the Caller stays out.
 
-The sky dome goes *in* deliberately: bundles execute before the scene's opaque
-list, and a `depthTest:false` dome left outside would paint over the city.
-`city-scene.ts` adds `world.group` only when `world.skyBundled`.
+The sky dome stays *out*: `executeBundles` replays at the END of the render
+pass (`WebGPUBackend.finishRender`), so a `depthTest:false` dome inside the
+bundle would repaint over every direct draw, and the bundled city would then
+fail depth wherever a non-bundled object wrote nearer — canopy-shaped sky
+holes (the Duo's white-tree bug, fixed 2026-11). Outside the bundle the dome
+still leads the opaque list via renderOrder -10. `world.skyBundled` means the
+dome rides inside `world.group`, so `city-scene.ts` adds `world.group` only.
 
 ### Device results — same walk, bundles ON vs OFF
 

@@ -68,6 +68,12 @@ export interface LivingCityHostOptions extends VehicleSimOptions {
   readonly cancel?: (handle: unknown) => void;
   /** Spawn/despawn zone centre — the render camera's look-at point, injected so the sim stays thread-agnostic. */
   readonly focus?: () => { x: number; z: number } | null;
+  /**
+   * The Caller's live world position — read once per frame from the same
+   * store the render loop uses; null while unspawned. Feeds the vehicle
+   * sim's caller channel (cars hold behind a mid-lane Caller).
+   */
+  readonly caller?: () => { x: number; z: number } | null;
   /** Clamp on real time per frame so a backgrounded app resumes without a catch-up burst. */
   readonly maxFrameSeconds?: number;
   /** PR07: the world clock's starting hour (0–24). Default is the clock's own noon-less default — see clock.ts. */
@@ -101,6 +107,7 @@ export class LivingCityHost {
   private readonly schedule: (cb: () => void) => unknown;
   private readonly cancel: (handle: unknown) => void;
   private readonly focus: (() => { x: number; z: number } | null) | undefined;
+  private readonly caller: (() => { x: number; z: number } | null) | undefined;
   private readonly maxFrameSeconds: number;
   private readonly sinks = new Set<VehicleSnapshotSink>();
   private readonly roster: readonly SignalRosterEntry[];
@@ -131,6 +138,7 @@ export class LivingCityHost {
           ? cancelAnimationFrame(h as number)
           : clearTimeout(h as ReturnType<typeof setTimeout>));
     this.focus = options.focus;
+    this.caller = options.caller;
     this.maxFrameSeconds = options.maxFrameSeconds ?? 0.25;
     this.clock = new CityClock({
       startHour: options.timeOfDayHours,
@@ -140,7 +148,7 @@ export class LivingCityHost {
     // ordering, which any runtime rebuilds identically from the same
     // deterministic topology (signal-viz.ts).
     this.roster = signalRoster(options.signals);
-    const { topology: _t, signals: _s, now: _n, schedule: _sc, cancel: _c, focus: _f, maxFrameSeconds: _m, timeOfDayHours: _h, hoursPerSimSecond: _r, peds, ...simOptions } = options;
+    const { topology: _t, signals: _s, now: _n, schedule: _sc, cancel: _c, focus: _f, caller: _ca, maxFrameSeconds: _m, timeOfDayHours: _h, hoursPerSimSecond: _r, peds, ...simOptions } = options;
     this.sim = new VehicleSim(options.topology, options.signals, simOptions);
     // The vehicle sim owns the signal clock (it steps signals itself); the
     // ped sim shares the same tick but never double-steps the controllers.
@@ -258,6 +266,13 @@ export class LivingCityHost {
           this.sim.setFocus(f.x, f.z);
           this.pedSim.setFocus(f.x, f.z);
         }
+      }
+      // The caller channel rides the same per-frame read as focus; a null
+      // (unspawned Caller) closes it so traffic runs exactly as before.
+      if (this.caller) {
+        const c = this.caller();
+        if (c) this.sim.setCaller(c.x, c.z);
+        else this.sim.clearCaller();
       }
       this.step(dt);
       this.drive();

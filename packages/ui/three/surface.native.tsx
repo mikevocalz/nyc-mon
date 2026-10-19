@@ -1,6 +1,6 @@
 import { useImperativeHandle, useRef, type Ref } from 'react';
 import { Canvas, type CanvasRef, type RNCanvasContext } from 'react-native-webgpu';
-import type { ThreeSurfaceHandle } from './types';
+import type { AndroidSurfaceType, ThreeSurfaceHandle } from './types';
 import type { NativeCanvasContext } from './worklet-host';
 
 /**
@@ -9,7 +9,7 @@ import type { NativeCanvasContext } from './worklet-host';
  * stubs), which is all WebGPURenderer needs. Frames are presented explicitly
  * after each render. There is no WebGL2 backend on native.
  */
-export function ThreeSurface({ ref }: { ref?: Ref<ThreeSurfaceHandle> }) {
+export function ThreeSurface({ ref, androidSurfaceType }: { ref?: Ref<ThreeSurfaceHandle>; androidSurfaceType?: AndroidSurfaceType }) {
   const canvasRef = useRef<CanvasRef>(null);
   const contextRef = useRef<RNCanvasContext | null>(null);
   useImperativeHandle(ref, () => ({
@@ -33,7 +33,10 @@ export function ThreeSurface({ ref }: { ref?: Ref<ThreeSurfaceHandle> }) {
       return context as unknown as NativeCanvasContext | null;
     },
   }));
-  // Transparent over the views behind it (TextureView on Android), so the
-  // parent's opacity applies. GPU surface: the Canvas takes a style, not a className.
-  return <Canvas ref={canvasRef} opaque={false} style={{ flex: 1 }} />;
+  // Transparent over the views behind it (TextureView on Android by default),
+  // so the parent's opacity applies. `androidSurfaceType` can instead pick the
+  // AHB-pool HardwareBufferView (mailbox present — never stalls the producer
+  // on the window queue) or a SurfaceView; see AndroidSurfaceType. GPU surface:
+  // the Canvas takes a style, not a className.
+  return <Canvas ref={canvasRef} opaque={false} android={{ surfaceType: androidSurfaceType }} style={{ flex: 1 }} />;
 }

@@ -11,13 +11,13 @@ import type { ThreeFrameTiming } from '@acme/ui/three';
 import { FrameSampleWindow } from './frame-sampler.ts';
 
 export const CITY_FRAME_PROBE_ENABLED = process.env.EXPO_PUBLIC_GAME_PERF === '1';
-const window = new FrameSampleWindow();
+const sampler = new FrameSampleWindow();
 
 const round2 = (v: number) => Number(v.toFixed(2));
 
 export function recordCityFrame(sample: ThreeFrameTiming): void {
   if (!CITY_FRAME_PROBE_ENABLED) return;
-  const result = window.push(sample);
+  const result = sampler.push(sample);
   if (result) console.info('[NYC-Mon/perf] JS render submission', {
     backend: sample.backend,
     cpuP50Ms: round2(result.cpuP50Ms),
@@ -26,6 +26,8 @@ export function recordCityFrame(sample: ThreeFrameTiming): void {
     activeIntervals: result.activeIntervals,
     slowIntervals: result.slowIntervals,
     parkedIntervals: result.parkedIntervals,
+    intervalP50Ms: result.intervalP50Ms === null ? null : round2(result.intervalP50Ms),
+    intervalP90Ms: result.intervalP90Ms === null ? null : round2(result.intervalP90Ms),
     stages: result.stages === null ? null : {
       updateP50Ms: round2(result.stages.updateP50Ms),
       updateP90Ms: round2(result.stages.updateP90Ms),

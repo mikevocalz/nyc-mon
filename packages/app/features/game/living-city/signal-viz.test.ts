@@ -214,3 +214,22 @@ test('ped lens mapping: WALK walker, steady hand on DONT WALK, hand flashes on F
   for (let t = 0; t < 2; t += 0.05) parities.add(fdwBlink(t) ? 1 : 0);
   assert.equal(parities.size, 2, 'the FDW blink flips within two sim seconds');
 });
+
+test('mountOnMasts: one pole per corner — heads and boxes share the sign pole or the first head’s mast', async () => {
+  const { mountOnMasts, MAST_SHARE_METRES } = await import('./signal-viz.ts');
+  const head = (x: number, z: number, leg: number) => ({ node: 'n', element: `e${leg}`, leg, x, z, yaw: 0 });
+  const box = (x: number, z: number) => ({ node: 'n', element: 'x', servingEnd: 0 as const, x, z, yaw: 0 });
+  const { heads, boxes } = mountOnMasts(
+    [head(1, 1, 0), head(2, 2, 1), head(40, 40, 2), head(41, 39, 3)],
+    [box(0.5, 0.5), box(100, 100)],
+    [{ x: 0, z: 0 }],
+  );
+  // The first two heads mount on the sign pole at the origin.
+  assert.deepEqual([heads[0]!.x, heads[0]!.z, heads[1]!.x, heads[1]!.z], [0, 0, 0, 0]);
+  // Far heads found one mast and the next shares it.
+  assert.deepEqual([heads[2]!.x, heads[2]!.z, heads[3]!.x, heads[3]!.z], [40, 40, 40, 40]);
+  assert.deepEqual([boxes[0]!.x, boxes[0]!.z], [0, 0]);
+  // A box with no mast within reach keeps its own post.
+  assert.deepEqual([boxes[1]!.x, boxes[1]!.z], [100, 100]);
+  assert.ok(MAST_SHARE_METRES >= 4 && MAST_SHARE_METRES <= 8);
+});

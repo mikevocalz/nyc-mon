@@ -58,6 +58,9 @@ export interface FrameTimingSummary {
   readonly cpuWorstMs: number;
   /** Gaps past one 60 Hz frame while drawing, not independently verified missed vsyncs. */
   readonly slowIntervals: number;
+  /** Median/p90 draw-to-draw gap for active intervals; null before any pair. */
+  readonly intervalP50Ms: number | null;
+  readonly intervalP90Ms: number | null;
   /** Per-stage attribution; null when every sample came from an old probe. */
   readonly stages: FrameStageSummary | null;
 }
@@ -82,6 +85,7 @@ export class FrameSampleWindow {
   private intervalCount = 0;
   private parkedCount = 0;
   private slowCount = 0;
+  private readonly intervals = new Float32Array(FRAME_SAMPLE_CAP);
   private worst = 0;
   private trisMax = 0;
   private lastBufferW = 0;
@@ -115,6 +119,7 @@ export class FrameSampleWindow {
     const dt = sample.intervalMs;
     if (typeof dt === 'number' && Number.isFinite(dt) && dt > 0) {
       if (dt <= ACTIVE_INTERVAL_MAX_MS) {
+        this.intervals[this.intervalCount] = dt;
         this.intervalCount++;
         if (dt > SIXTY_HZ_BUDGET_MS) this.slowCount++;
       } else this.parkedCount++;
@@ -138,6 +143,9 @@ export class FrameSampleWindow {
         bufferW: this.lastBufferW, bufferH: this.lastBufferH,
       };
     }
+    const sortedIntervals = this.intervalCount > 0
+      ? Array.from(this.intervals.subarray(0, this.intervalCount)).sort((a,b)=>a-b)
+      : null;
     const report: FrameTimingSummary = {
       samples: this.sampleCount,
       activeIntervals: this.intervalCount,
@@ -146,6 +154,8 @@ export class FrameSampleWindow {
       cpuP90Ms: percentile(values, .9),
       cpuWorstMs: this.worst,
       slowIntervals: this.slowCount,
+      intervalP50Ms: sortedIntervals === null ? null : percentile(sortedIntervals, .5),
+      intervalP90Ms: sortedIntervals === null ? null : percentile(sortedIntervals, .9),
       stages,
     };
     this.reset();

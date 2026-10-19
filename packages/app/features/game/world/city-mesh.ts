@@ -15,11 +15,19 @@ import {
   hasFireEscape, hasShopSign, hasStoop, hasWaterTower, shopWords, STOOP_REACH, STOOP_WIDTH, towerSpot, wallFrame,
 } from './facade-detail.ts';
 import { emitStackedText, emitText, textWidth, type TextFace } from './lettering.ts';
+import {
+  adSurface, emitBulkhead, emitChimneyPots, emitNychaBalcony, emitNychaEntrance, emitNychaLightStrip, emitNychaPanels,
+  emitRoofAc, emitStandpipe, emptyFutureStats, FUTURE_LAYER, hasNychaBalcony, isNychaTower, NYCHA_BALCONY_TOP,
+  roofscapePlan, scaledRing, type AdSurface, type FutureLayerStats,
+} from './future-layer.ts';
 import { BandedBuffer, box } from './parts.ts';
 import type { CityMaterials } from './materials.ts';
 import { WINDOW_GRID } from './windows.ts';
 import { createStreetClearance, WALKWAY_CLASSES, type StreetClearance } from './walkability.ts';
 import { AWNING_TONES, CITY_COLORS, hexToRgb, WALL_TONES, type CityColor } from './palette.ts';
+import { CURB_HEIGHT, VD_LANE } from './curb.ts';
+import { VD_STOREFRONTS } from './vd-storefronts.ts';
+import { facadePhoto } from './vd-facades.ts';
 import { buildingSurface, ContactField, contactReach, surfacePick, SURFACES, wallAo } from './surfaces.ts';
 
 type Point = [number, number];
@@ -253,6 +261,8 @@ export interface CityMeshStats {
   buildings: number; roads: number; areas: number; triangles: number; drawCalls: number; neonTrims: number; storefronts: number; billboards: number;
   cornices: number; stoops: number; fireEscapes: number; awnings: number; shopSigns: number; waterTowers: number;
   parapets: number;
+  /** The flagged future layer (future-layer.ts): all zero when FUTURE_LAYER is off. */
+  future: FutureLayerStats;
 }
 
 /**
@@ -283,6 +293,13 @@ const BILLBOARD_PAIRS = [
   ['neonOrange', 'neonApple'], ['neonRoyal', 'neonCarolina'], ['neonCarolina', 'neonLeaf'], ['neonApple', 'neonRoyal'], ['neonOrange', 'neonRoyal'],
 ] as const satisfies readonly (readonly [CityColor, CityColor])[];
 export const MAX_BILLBOARDS = 48;
+/**
+ * Top edge a hologram can mount at, metres. The chase camera never pitches
+ * to a roofline, so boards clamp into the band a player sees: above the
+ * storefront signs (~4 m), below the second storey. Taller facades still
+ * qualify — only their mount height drops.
+ */
+export const BILLBOARD_TOP = 12;
 
 /**
  * Share of buildings of a height that carry a neon roofline trim. Taller
@@ -298,7 +315,7 @@ export function neonKeyFor(id: string): (typeof NEON_KEYS)[number] {
   return NEON_KEYS[Math.floor(hashUnit(`${id}:neon`) * NEON_KEYS.length) % NEON_KEYS.length]!;
 }
 
-export function buildCityMeshes(THREE: Three, dataset: CityDatasetV3, materials: CityMaterials, sunAway: Point, clearance: StreetClearance = createStreetClearance(dataset)) {
+export function buildCityMeshes(THREE: Three, dataset: CityDatasetV3, materials: CityMaterials, sunAway: Point, clearance: StreetClearance = createStreetClearance(dataset), future = FUTURE_LAYER) {
   const masonry = new VertexBuffer(262144);
   const glass = new VertexBuffer();
   const roofs = new VertexBuffer(131072);
@@ -313,11 +330,16 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV3, materials:
   const detail = new BandedBuffer();
   const landmarkText = new VertexBuffer();
   const texts: (TextFace & { text: string })[] = [];
+  const adSurfaces: AdSurface[] = [];
+  const futureStats = emptyFutureStats();
   let cornices = 0; let stoops = 0; let fireEscapes = 0; let awnings = 0; let shopSigns = 0; let waterTowers = 0;
   let parapets = 0;
   const landmarkByBuilding = new Map(dataset.landmarks.map((l) => [l.buildingId, l]));
   const shadowColor = rgb('shadow');
   const commercial = new SegmentGrid(dataset.roads.filter((r) => COMMERCIAL.has(r.class)));
+  // vd lane: Valdrada's measured 125th Street storefronts, by nyc-mon building id.
+  const storefronts = new Map<string, (typeof VD_STOREFRONTS)[number][]>();
+  if (VD_LANE) for (const front of VD_STOREFRONTS) storefronts.set(front.b, [...(storefronts.get(front.b) ?? []), front]);
   // Baked occlusion: footprints collect into the contact-shadow field as the
   // banded loop runs, and the ground layers emit after it queries them.
   const field = new ContactField();
@@ -364,6 +386,7 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV3, materials:
     // this building's shadow reach (surfaces.ts). Cornices written into the
     // same buffer inherit the wall pick — stone trim belongs to the family.
     target.surface(...buildingSurface(building.class, building.id));
+    target.facade(...facadePhoto(building));
     const reach = contactReach(h);
     const wallOcclusion: [number, number] = [wallAo(0, reach), wallAo(h, reach)];
     field.add(ring, h);
@@ -390,7 +413,16 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV3, materials:
       trims++;
     }
     let stooped = false;
+    const measured = storefronts.get(building.id);
+    if (measured) {
+      for (const front of measured) {
+        const counts = emitMeasuredFront(front, neon, detail.buffer, texts);
+        shopSigns += counts.signs;
+        awnings += counts.awnings;
+      }
+    }
     let escaped = false;
+    let entranced = false;
     // v3 facts: `d` bit-gates each detail feature, `f`/`fh` set the escape's
     // floor count and pitch, `ww` the storefront bays, `sh` the band height.
     // Where the mask is absent (v2 tiles, unmatched records) the hash rules
@@ -419,6 +451,30 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV3, materials:
       // A street face: a carriageway within about a sidewalk's width of the wall.
       const facesStreet = clearance.kerbGap(mid[0] + out[0] * 3.5, mid[1] + out[1] * 3.5) < 7;
       const onAvenue = length >= 5 && h >= 6 && commercial.nearest(mid[0] + out[0] * 6, mid[1] + out[1] * 6) <= 14;
+      // NYCHA facelift (future-layer.ts, PR pack art direction): the modular
+      // panel grid, planted balconies and vertical light go on every long
+      // edge — the towers stand in campuses, so the kit does not wait for a
+      // street face. The upgraded entrance lands on the recorded front.
+      if (future && isNychaTower(building) && length >= 8) {
+        emitNychaPanels(detail.buffer, f, length, h, floorPitch, rgb('iron'), tint(rgb('civic'), 0.8));
+        futureStats.nychaPanels++;
+        emitNychaLightStrip(neon, f, length, h, rgb('windowWarm'));
+        futureStats.lightStrips++;
+        const balconyTop = Math.floor((h * NYCHA_BALCONY_TOP) / floorPitch);
+        for (let k = 2; k <= balconyTop; k++) {
+          if (!hasNychaBalcony(building.id, i, k)) continue;
+          const at = (hashUnit(`${building.id}:${i}:${k}:balcAt`) - 0.5) * Math.max(0, length - 5);
+          emitNychaBalcony(detail.buffer, f, at, k * floorPitch, rgb('curb'), rgb('iron'), rgb('leafDark'));
+          futureStats.nychaBalconies++;
+        }
+        const onNychaFront = frontEdge < 0 || i === frontEdge;
+        if (onNychaFront && !entranced) {
+          const at = (hashUnit(`${building.id}:${i}:doorAt`) - 0.5) * Math.max(0, length - 8);
+          emitNychaEntrance(detail.buffer, neon, f, at, rgb('limestone'), rgb('windowWarm'), rgb('cedar'), rgb('leafDark'));
+          entranced = true;
+          futureStats.nychaEntrances++;
+        }
+      }
       if (!facesStreet && !onAvenue) continue;
       // The recorded front edge: single-face details land there when the tile says which face is the front.
       const onFront = frontEdge < 0 || i === frontEdge;
@@ -457,6 +513,7 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV3, materials:
       // Storefronts: awnings over most bays, and either a lit shop sign or the plain fascia band.
       // Canopies sit on the shader's own column lattice — column centres in
       // edge-local metres — so a roll-down gate reads inside its canopy.
+      if (measured) { fronts++; continue; }
       if (mask === undefined || (mask & DETAIL.storefront) !== 0) {
         const pitch = building.windowWidthMeters ?? grid.bay;
         const inset = 0.6;
@@ -495,8 +552,14 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV3, materials:
       }
       if (boards < MAX_BILLBOARDS && h >= 16 && length >= 8 && hashUnit(`${building.id}:${i}:board`) < 0.4) {
         const [top, bottom] = BILLBOARD_PAIRS[Math.floor(hashUnit(`${building.id}:pair`) * BILLBOARD_PAIRS.length) % BILLBOARD_PAIRS.length]!;
-        emitBillboard(billboards, mid, out, Math.min(length * 0.55, 9), Math.min(h * 0.32, 7), h - 2.2, rgb(top), rgb(bottom));
+        const bw = Math.min(length * 0.55, 9);
+        const bh = Math.min(Math.min(h * 0.32, 7), BILLBOARD_TOP - 4.6);
+        const btop = Math.min(h - 2.2, BILLBOARD_TOP);
+        emitBillboard(billboards, mid, out, bw, bh, btop, rgb(top), rgb(bottom));
         boards++;
+        // The addressable AdSurface row the CMS pipeline reads (future-layer.ts):
+        // the same numbers the emitter drew, keyed by a stable world-space id.
+        adSurfaces.push(adSurface(building, i, mid[0] + out[0] * 0.3, mid[1] + out[1] * 0.3, out, bw, bh, btop, dataset));
       }
     }
     // A wooden water tower on a share of the five-storey-and-up roofs.
@@ -506,6 +569,41 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV3, materials:
       if (spot) {
         emitWaterTower(roofs, spot[0], spot[1], h, scale, rgb('cedar'), rgb('towerSteel'), rgb('towerRoof'));
         waterTowers++;
+      }
+    }
+    if (future) {
+      // Roof furniture (future-layer.ts): Valdrada's roofscape kinds —
+      // bulkhead, packaged AC, chimney pots, standpipe — on id-hash rules.
+      // Into the banded detail buffer, so only the roofs near the Caller pay.
+      for (const piece of roofscapePlan(building, ring)) {
+        switch (piece.kind) {
+          case 'bulkhead':
+            emitBulkhead(detail.buffer, piece.x, piece.z, h, piece.dir, 0.9 + hashUnit(`${building.id}:bhScale`) * 0.3, tint(wall, 0.95), rgb('cornice'), rgb('roomDoor'));
+            futureStats.bulkheads++;
+            break;
+          case 'roofAc':
+            emitRoofAc(detail.buffer, piece.x, piece.z, h, rgb('carGrey'), rgb('iron'));
+            futureStats.acUnits++;
+            break;
+          case 'chimneyPot':
+            emitChimneyPots(detail.buffer, piece.x, piece.z, h, piece.dir, piece.count, rgb('brickRed'), rgb('cornice'));
+            futureStats.chimneyPots += piece.count;
+            break;
+          case 'standpipe':
+            emitStandpipe(detail.buffer, piece.x, piece.z, h, rgb('iron'), rgb('gate'));
+            futureStats.standpipes++;
+            break;
+        }
+      }
+      // The facelift's roof garden: the planted patch and its low planter
+      // wall on the tower roof (always drawn — it reads in the aerials).
+      if (isNychaTower(building)) {
+        futureStats.nychaTowers++;
+        const garden = scaledRing(ring, 0.55);
+        roofs.surface(...SURFACES.wood);
+        emitFlat(THREE, roofs, garden, [], h + 0.06, rgb('garden'));
+        emitWalls(roofs, garden, h, h + 0.45, rgb('curb'));
+        futureStats.roofGardens++;
       }
     }
   }
@@ -518,7 +616,7 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV3, materials:
     const ring = counterClockwise(pairs(area.ring));
     const holes = area.holes.map((hole) => pairs(hole));
     areas.surface(...areaSurface(area.kind, hashUnit(`${area.id}:surf`)));
-    emitFlat(THREE, areas, ring, holes, areaLayer(area.kind), rgb(AREA_COLOR[area.kind] ?? 'grass'), occlude);
+    emitFlat(THREE, areas, ring, holes, areaLayer(area.kind) + CURB_HEIGHT, rgb(AREA_COLOR[area.kind] ?? 'grass'), occlude);
   }
 
   for (const road of dataset.roads) {
@@ -526,12 +624,16 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV3, materials:
     if (WALKWAY_CLASSES.has(road.class)) {
       const color = road.class === 'pedestrian' ? rgb('plaza') : rgb('sidewalk');
       sidewalks.surface(...surfacePick('masonry', hashUnit(`${road.id}:walk`)));
-      strip(sidewalks, points, road.widthMeters / 2, LAYER.sidewalks, color, occlude);
+      strip(sidewalks, points, road.widthMeters / 2, LAYER.sidewalks + CURB_HEIGHT, color, occlude);
       continue;
     }
     if (road.sidewalkMeters > 0) {
       sidewalks.surface(...surfacePick('masonry', hashUnit(`${road.id}:walk`)));
-      strip(sidewalks, points, road.widthMeters / 2 + road.sidewalkMeters, LAYER.sidewalks, rgb('sidewalk'), occlude);
+      strip(sidewalks, points, road.widthMeters / 2 + road.sidewalkMeters, LAYER.sidewalks + CURB_HEIGHT, rgb('sidewalk'), occlude);
+    }
+    if (CURB_HEIGHT > 0 && road.class !== 'crossing') {
+      sidewalks.surface(...SURFACES.stone);
+      curbFaces(sidewalks, points, road.widthMeters / 2, LAYER.roads, LAYER.sidewalks + CURB_HEIGHT, rgb('curb'), clearance);
     }
     const zebra = road.class === 'crossing' ? 1 : 0;
     const centre = !zebra && road.widthMeters >= CENTRE_LINE_MIN_WIDTH ? 1 : 0;
@@ -549,8 +651,19 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV3, materials:
     meshes.push(mesh);
     return mesh;
   };
-  add('city:areas', areas, materials.areas);
-  add('city:sidewalks', sidewalks, materials.sidewalks);
+  const areaMesh = add('city:areas', areas, materials.areas);
+  const walkMesh = add('city:sidewalks', sidewalks, materials.sidewalks);
+  if (CURB_HEIGHT > 0) {
+    // Raised ground drawn as an underlay: lots and sidewalks sit at curb
+    // height but write no depth and draw before the roads, so the
+    // carriageway (and the attached-sidewalk ribbons it overlaps) still
+    // reads on top, sunk below the curb faces.
+    for (const [mesh, order] of [[areaMesh, -3], [walkMesh, -2]] as const) {
+      if (!mesh) continue;
+      mesh.renderOrder = order;
+      (mesh.material as InstanceType<Three['Material']>).depthWrite = false;
+    }
+  }
   add('city:roads', roads, materials.roads);
   add('city:walls-masonry', masonry, materials.masonry);
   add('city:walls-glass', glass, materials.glass);
@@ -572,21 +685,17 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV3, materials:
     buildings: dataset.buildings.length, roads: dataset.roads.length, areas: dataset.areas.length,
     triangles, drawCalls: meshes.length, neonTrims: trims, storefronts: fronts, billboards: boards,
     cornices, stoops, fireEscapes, awnings, shopSigns, waterTowers, parapets,
+    future: futureStats,
   };
   const shownBands: [number, number] = [-1, -1];
   const bands: [number, number] = [0, 0];
   return {
     meshes,
-    /**
-     * The meshes whose draw state changes at run time: setFocus re-ranges
-     * both by z band around the Caller. A WebGPU render bundle freezes
-     * recorded draw parameters, so these must stay outside one
-     * (world/index.ts EXPERIMENTAL_WORLD_BUNDLES).
-     */
-    mutableMeshes: ([detailMesh, shadowMesh] as (Mesh | null)[]).filter((m): m is Mesh => m !== null),
     stats,
     /** Shop-sign lettering for the banded lettering mesh (street-furniture.ts). */
     texts,
+    /** The AdSurface registry rows for the panels this build drew (future-layer.ts). */
+    adSurfaces,
     /** Contact shadows only near the focus: a few z bands, one draw range, no allocation. */
     setFocus(_x: number, z: number) {
       shadowBands(z, minZ, bandCount, bands);
@@ -671,6 +780,90 @@ const AREA_FAMILY: Record<string, 'foliage' | 'masonry'> = {
 function areaSurface(kind: string, seed: number): readonly [number, number] {
   if (kind === 'water') return SURFACES.water;
   return surfacePick(AREA_FAMILY[kind] ?? 'masonry', seed);
+}
+
+/**
+ * One of Valdrada's measured storefronts: per bay, the sign it recorded
+ * (a panel or lightbox board in its background colour with the name in its
+ * letter colour, or bare channel letters on the wall) and its awning. Bay
+ * and sign spans are metres from the face's left end as seen from the
+ * street; the frame's local +x runs that way (facade-detail.ts wallFrame).
+ */
+function emitMeasuredFront(
+  front: (typeof VD_STOREFRONTS)[number], boards: VertexBuffer, canopies: VertexBuffer, texts: (TextFace & { text: string })[],
+): { signs: number; awnings: number } {
+  const a: Point = [front.ax, front.az];
+  const b: Point = [front.ax + front.dx * front.len, front.az + front.dz * front.len];
+  const f = wallFrame(a, b, [front.nx, front.nz]);
+  const along: Point = [front.dx, front.dz];
+  const half = front.len / 2;
+  let signs = 0; let awnings = 0;
+  for (const bay of front.bays) {
+    const sign = 'sign' in bay ? bay.sign : undefined;
+    if (sign) {
+      const x0 = Math.max(0, sign.u0) - half; const x1 = Math.min(front.len, sign.u1) - half;
+      const width = x1 - x0;
+      if (width > 0.4) {
+        const board = sign.bg !== null;
+        if (board) boards.surface(...SURFACES.iron);
+        if (board) box(boards, f, [x0, sign.y, 0.02], [x1, sign.y + sign.h, sign.k === 'lightbox' ? 0.24 : 0.1], sign.bg, { skip: ['back', 'bottom'] });
+        if (board) {
+          // Near-future layer: LED strips along the board's top and bottom edges, lit in the sign's letter colour.
+          const d = (sign.k === 'lightbox' ? 0.24 : 0.1) + 0.012;
+          const led = sign.fg.map((v) => Math.min(1, v * 0.6 + 0.4));
+          for (const yy of [sign.y, sign.y + sign.h - 0.045]) box(boards, f, [x0, yy, d - 0.01], [x1, yy + 0.045, d], led, { skip: ['back', 'bottom', 'top'] });
+        }
+        let height = Math.min(sign.h * 0.62, 0.7);
+        let condense = Math.max(0.45, Math.min(1, (width - 0.3) / textWidth(sign.t, height)));
+        while (textWidth(sign.t, height, condense) > width - 0.15 && height > 0.12) height *= 0.9;
+        if (textWidth(sign.t, height, condense) <= width - 0.1) {
+          const centre = (x0 + x1) / 2;
+          const lift = board ? (sign.k === 'lightbox' ? 0.26 : 0.12) : 0.06;
+          texts.push({
+            text: sign.t,
+            x: f.x + along[0] * centre + front.nx * lift, y: sign.y + sign.h / 2, z: f.z + along[1] * centre + front.nz * lift,
+            right: along, height, condense, color: sign.fg,
+          });
+        }
+        signs++;
+      }
+    }
+    const awning = 'aw' in bay ? bay.aw : undefined;
+    if (awning) {
+      const u0 = Math.max(0, bay.u0); const u1 = Math.min(front.len, bay.u1);
+      if (u1 - u0 > 0.8) {
+        emitAwning(canopies, f, (u0 + u1) / 2 - half, u1 - u0 - 0.1, awning.c, awning.top, awning.proj);
+        awnings++;
+      }
+    }
+  }
+  return { signs, awnings };
+}
+
+/**
+ * Granite curb faces along both carriageway edges, from road level up to
+ * the sidewalk top, facing the road. A face whose outside lands in another
+ * carriageway (a junction mouth, a crossing) is left out, as Valdrada's
+ * emitter skips faces inside `inCarriageway` (compile.mjs ~L2985).
+ */
+function curbFaces(buffer: VertexBuffer, points: Point[], half: number, y0: number, y1: number, color: readonly number[], clearance: StreetClearance): void {
+  if (points.length < 2) return;
+  const { left, right, v } = ribbon(points, half);
+  for (const edge of [left, right]) {
+    for (let i = 1; i < points.length; i++) {
+      const a = edge[i - 1]!; const b = edge[i]!;
+      const mx = (a[0] + b[0]) / 2; const mz = (a[1] + b[1]) / 2;
+      const cx = (points[i - 1]![0] + points[i]![0]) / 2; const cz = (points[i - 1]![1] + points[i]![1]) / 2;
+      const len = Math.hypot(mx - cx, mz - cz);
+      if (len < 1e-6) continue;
+      // Unit normal toward the road centre.
+      const nx = (cx - mx) / len; const nz = (cz - mz) / len;
+      if (clearance.inCarriageway(mx - nx * 0.6, mz - nz * 0.6, 0)) continue;
+      const u0 = v[i - 1]!; const u1 = v[i]!;
+      buffer.quad([a[0], y0, a[1]], [b[0], y0, b[1]], [b[0], y1, b[1]], [a[0], y1, a[1]], [nx, 0, nz], color,
+        [[u0, y0], [u1, y0], [u1, y1], [u0, y1]]);
+    }
+  }
 }
 
 /** A flat ribbon along a polyline; u runs across (0..1), v along in metres. `ao` bakes per-corner occlusion when given. */

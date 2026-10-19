@@ -27,12 +27,16 @@
 // `livingCityHost()` returns null, so nothing is built, spawned or
 // subscribed — the scene is byte-identical to today.
 
+import { callerStore, selectCallerTransform } from '../character/caller-store.ts';
 import { bundledCity } from '../city-data.ts';
+import { CURB_HEIGHT } from '../world/curb.ts';
 import type { FlatPoints } from '../city-dataset.ts';
 import { gameCameraStore } from '../game-session.ts';
 import { createLivingCityAdaptive, LIVING_CITY_CAPS, resolveLivingCityTier, type LivingCityCaps, type LivingCityTier } from '../perf/tier.ts';
 import type { SceneActorFactory } from '../scene-actor.ts';
 import type { SkyName } from '../world/sky-rig.ts';
+import { placeStreetFurniture } from '../world/street-furniture.ts';
+import { EXPERIMENTAL_WORLD_VD } from '../world/vd-materials.ts';
 import { createStreetClearance } from '../world/walkability.ts';
 import { bundledSignals } from './bundled-signals.ts';
 import { bundledTopology } from './bundled-topology.ts';
@@ -199,6 +203,10 @@ function create(): LivingCityBundle {
       const { x, z } = gameCameraStore.getState().camera;
       return { x, z };
     },
+    // The Caller is a live traffic obstacle: vehicles hold behind it
+    // mid-lane. Same module-scope store the render loop packs each frame —
+    // unspawned returns null and the channel stays closed.
+    caller: () => selectCallerTransform(callerStore.getState()),
   });
   const read = () => host.latestSnapshot();
   const attach = () => host.attach();
@@ -208,7 +216,12 @@ function create(): LivingCityBundle {
     return { x, z };
   };
   const vehicleFactory = createVehicleActor({ read, onMount: attach, onUnmount: detach });
-  const pedFactory = createPedActor({ read, onMount: attach, onUnmount: detach });
+  const city0 = bundledCity();
+  const walkClearance = city0.ok && CURB_HEIGHT > 0 ? createStreetClearance(city0.dataset) : null;
+  const pedFactory = createPedActor({
+    read, onMount: attach, onUnmount: detach,
+    ...(walkClearance ? { groundY: (x: number, z: number) => (walkClearance.inCarriageway(x, z, 0) ? 0 : CURB_HEIGHT) } : {}),
+  });
   // PR07: signal heads + ped displays read the packed signal section —
   // the same controller aspects the solver acts on. Pole/box bases run
   // through the world's own clearance index so nothing stands in the
@@ -222,6 +235,8 @@ function create(): LivingCityBundle {
     topology,
     focus,
     clearance,
+    // One pole per corner: heads and ped boxes mount on the street-sign pole when one stands there.
+    mastAnchors: city.ok && clearance ? placeStreetFurniture(city.dataset, clearance).signs : [],
     onMount: attach,
     onUnmount: detach,
     headCap: caps.signalHeadCap,
@@ -230,7 +245,11 @@ function create(): LivingCityBundle {
   const placements = city.ok ? lampPlacements(city.dataset, clearance) : [];
   // PR09: the lamp glow/pool layer is the cosmetic rung — 'low' leaves it unmounted.
   const lampFactory = caps.lampGlow
-    ? createLampActor({ read, placements, focus, onMount: attach, onUnmount: detach })
+    ? createLampActor({
+        read, placements, focus, onMount: attach, onUnmount: detach,
+        // The vd lane draws no light pools on the pavement (Valdrada lights the street, it does not paint it).
+        ...(EXPERIMENTAL_WORLD_VD ? { poolCap: 0 } : {}),
+      })
     : null;
   return { host, vehicleFactory, pedFactory, signalFactory, lampFactory, slice, pedSlice };
 }
