@@ -13,5 +13,9 @@ import { parseSkyRigFlag } from './sky-rig.ts';
 /** Opt-in lean tree LOD — default OFF, the same truthy set the other world lanes use. */
 export const VD_LEAN = parseSkyRigFlag(process.env.EXPO_PUBLIC_WORLD_VD_LEAN);
 
-/** Near cap under VD_LEAN: half of VD_NEAR_TREE_CAP — two dozen full models still ring the Caller. */
-export const VD_LEAN_NEAR_TREE_CAP = 24;
+/** Near cap under VD_LEAN: half of VD_NEAR_TREE_CAP — two dozen full models still ring the Caller.
+ *  EXPO_PUBLIC_WORLD_VD_LEAN_NEAR overrides it (a positive integer); unset keeps 24. */
+export const VD_LEAN_NEAR_TREE_CAP = (() => {
+  const raw = Number(process.env.EXPO_PUBLIC_WORLD_VD_LEAN_NEAR);
+  return Number.isFinite(raw) && raw > 0 ? Math.min(Math.floor(raw), 48) : 24;
+})();
