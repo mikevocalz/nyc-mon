@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "summary": true,
+  "problems": [],
+  "artboards": [
+    {"name": "GameTransition", "objects": 888, "types": {"AnimationState": 10, "AnyState": 2, "Artboard": 1, "BindablePropertyBoolean": 58, "BindablePropertyEnum": 58, "CubicEaseInterpolator": 5, "DataBindContext": 116, "EntryState": 2, "ExitState": 2, "Fill": 5, "KeyFrameColor": 22, "KeyFrameDouble": 40, "KeyedObject": 38, "KeyedProperty": 54, "LayoutComponent": 5, "LayoutComponentStyle": 6, "LayoutParticipant": 2, "LinearAnimation": 10, "PointsPath": 4, "SemanticData": 1, "Shape": 4, "SolidColor": 9, "StateMachine": 1, "StateMachineLayer": 2, "StateTransition": 61, "StraightVertex": 10, "Stroke": 4, "Text": 2, "TextStyleAxis": 1, "TextStylePaint": 2, "TextValueRun": 2, "TransitionPropertyViewModelComparator": 116, "TransitionValueBooleanComparator": 58, "TransitionValueEnumComparator": 58, "TransitionViewModelCondition": 116, "TrimPath": 1}},
+    {"name": "GameTransitionHost", "objects": 14, "types": {"AnimationState": 1, "AnyState": 1, "Artboard": 1, "EntryState": 1, "ExitState": 1, "LayoutComponent": 1, "LayoutComponentStyle": 2, "LinearAnimation": 1, "NestedArtboardLayout": 1, "NestedStateMachine": 1, "StateMachine": 1, "StateMachineLayer": 1, "StateTransition": 1}}
+  ],
+  "roots": {"objects": 50, "types": {"Backboard": 1, "ComponentAsset": 1, "DataEnumCustom": 3, "DataEnumValue": 13, "FontAsset": 2, "ViewModel": 5, "ViewModelInstance": 5, "ViewModelInstanceBoolean": 1, "ViewModelInstanceEnum": 3, "ViewModelInstanceViewModel": 6, "ViewModelPropertyBoolean": 1, "ViewModelPropertyEnumCustom": 3, "ViewModelPropertyViewModel": 6}}
+}

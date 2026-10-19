@@ -1,4 +1,6 @@
 'use client';
+import type { RefObject } from 'react';
+import type { EnrichedTextInputInstance } from 'react-native-enriched-html';
 import { Pressable, Text, View } from '@acme/ui/tw';
 import { Settings2 } from '@acme/ui/icons';
 import { CAPABILITY_BY_ID, type CapabilityContext, type EditorStateKey } from './capabilities.ts';
@@ -7,7 +9,12 @@ import { visibleToolbarIds } from './preferences.ts';
 import { useEditorPreferences } from './preferences.store';
 
 export interface EditorToolbarProps {
-  context: CapabilityContext;
+  /**
+   * The editor the buttons act on. A ref, read when a button is pressed: the
+   * instance does not exist until the editor mounts, after the first render.
+   */
+  editor: RefObject<EnrichedTextInputInstance | null>;
+  context: Omit<CapabilityContext, 'editor'>;
   /** Active formatting at the caret, from the editor's `onChangeState`. */
   activeState?: Partial<Record<EditorStateKey, { isActive: boolean }>>;
   /**
@@ -30,7 +37,7 @@ export interface EditorToolbarProps {
  * toolbar hides its own contents, and a user who has arranged their buttons
  * should be able to see all of them at once.
  */
-export function EditorToolbar({ context, activeState, onOpenSettings }: EditorToolbarProps) {
+export function EditorToolbar({ editor, context, activeState, onOpenSettings }: EditorToolbarProps) {
   const preferences = useEditorPreferences((state) => state.preferences);
   const ids = visibleToolbarIds(preferences);
 
@@ -54,7 +61,8 @@ export function EditorToolbar({ context, activeState, onOpenSettings }: EditorTo
             aria-pressed={isActive}
             aria-disabled={!isEnabled}
             onPress={() => {
-              if (isEnabled) void capability.run?.(context);
+              const instance = editor.current;
+              if (isEnabled && instance !== null) void capability.run?.({ ...context, editor: instance });
             }}
             className={`h-11 w-11 items-center justify-center rounded-none border-2 transition-colors duration-fast motion-reduce:transition-none ${
               isActive

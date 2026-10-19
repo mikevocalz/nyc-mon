@@ -1,0 +1,112 @@
+{
+  "tag": "v0.4.0",
+  "commit": "2724c79",
+  "repo": "https://huggingface.co/datasets/mehmetkeremturkcan/valdrada",
+  "files": {
+    "Content/tiles/manifest.json": {
+      "sha256": "97a67f69d7789d0f4bbd9d6b6ea3e6a7cd9da6b28b2a23abf121084eec72e997",
+      "bytes": 195382
+    },
+    "Content/tiles/t_1_-8.bin": {
+      "sha256": "62ae0b7b6c512a06a45ecbeed674aac04cb6278134eeaeb1dde9b80448568e91",
+      "bytes": 2525012,
+      "retrievedAt": "2026-10-17T14:11:27.581Z"
+    },
+    "Content/tiles/t_1_-7.bin": {
+      "sha256": "67209803fea3fbdb1ff1ac9599358ce4bc32b59f73fc6db63b228b763daa6193",
+      "bytes": 2605792,
+      "retrievedAt": "2026-10-17T14:11:28.790Z"
+    },
+    "Content/tiles/t_1_-6.bin": {
+      "sha256": "d5ec4f6edc8972aaf726d3caa4645e9870de64f529687c8201f2365f72377c6c",
+      "bytes": 1677412,
+      "retrievedAt": "2026-10-17T14:11:29.325Z"
+    },
+    "Content/tiles/t_1_-5.bin": {
+      "sha256": "d385e72ab3fa5ba20d8d0f8c3fe311b0c17e09a20c14d0a3e288e07b6ff86d66",
+      "bytes": 869988,
+      "retrievedAt": "2026-10-17T14:11:29.974Z"
+    },
+    "Content/tiles/t_2_-8.bin": {
+      "sha256": "ce6caec40a32f246ae13f2bc829ff8cb42921f116d61bfb388fdc93272f858b7",
+      "bytes": 789272,
+      "retrievedAt": "2026-10-17T14:11:30.611Z"
+    },
+    "Content/tiles/t_2_-7.bin": {
+      "sha256": "a6eb34f8855483456c10e075e9ec015a8e5dbf6b09295340c95edb6b5c4d1fe1",
+      "bytes": 1157924,
+      "retrievedAt": "2026-10-17T14:11:30.951Z"
+    },
+    "Content/tiles/t_2_-6.bin": {
+      "sha256": "ac1d6cb16a4e297a593fb245e0730d8149214b199ac651b7fb530d97cae966f9",
+      "bytes": 1551624,
+      "retrievedAt": "2026-10-17T14:11:31.323Z"
+    },
+    "Content/tiles/t_2_-5.bin": {
+      "sha256": "3ab92a169c72080c8db57ce056f17bb77bffe5ec8357ca814362290399efc39e",
+      "bytes": 1026408,
+      "retrievedAt": "2026-10-17T14:11:31.618Z"
+    },
+    "Content/tiles/t_3_-8.bin": {
+      "sha256": "c462123e49289bffa129a831e9b154d11ea03f466b6fc5a13c51dbc719ea071b",
+      "bytes": 1441588,
+      "retrievedAt": "2026-10-17T14:11:32.506Z"
+    },
+    "Content/tiles/t_3_-7.bin": {
+      "sha256": "1dacdccd4835ecdf657651d3a9d31808bd17b229b4538afc078907ae731da6f7",
+      "bytes": 1065324,
+      "retrievedAt": "2026-10-17T14:11:32.881Z"
+    },
+    "Content/tiles/t_3_-6.bin": {
+      "sha256": "e75dcb1adc92058bf3b4a4afa20328108329166cf2f4b3ff5d05649d6772577d",
+      "bytes": 1445800,
+      "retrievedAt": "2026-10-17T14:11:33.253Z"
+    },
+    "Content/tiles/t_3_-5.bin": {
+      "sha256": "5f1b411d2d9d5ccef9b0b33fa0e5733597b3481ce615600dc129b700f952eaed",
+      "bytes": 1089176,
+      "retrievedAt": "2026-10-17T14:11:33.776Z"
+    },
+    "Content/tiles/t_4_-8.bin": {
+      "sha256": "06551a462a297aaa36eda54ecda06613b5c8b12f1db7c55c529c20e00c5de8a6",
+      "bytes": 990744,
+      "retrievedAt": "2026-10-17T14:11:34.393Z"
+    },
+    "Content/tiles/t_4_-7.bin": {
+      "sha256": "17131d8f30db40fc4b98f30c31ec50e6819b62bde9a17b7754d52dec38ced876",
+      "bytes": 939436,
+      "retrievedAt": "2026-10-17T14:11:34.737Z"
+    },
+    "Content/tiles/t_4_-6.bin": {
+      "sha256": "2fb6fa16dc9266bdac82d9975df4ab29d56da2487e9ddc73950ab2ebb9289f0a",
+      "bytes": 1182460,
+      "retrievedAt": "2026-10-17T14:11:35.111Z"
+    },
+    "Content/tiles/t_4_-5.bin": {
+      "sha256": "cf3281f81c02c00feafb00de68719b8a7e41558e4f855e6ff6609e87f86be634",
+      "bytes": 983924,
+      "retrievedAt": "2026-10-17T14:11:35.475Z"
+    },
+    "Content/tiles/t_5_-8.bin": {
+      "sha256": "6fed84c00f3ff47c10c80def272998d46bc43b1cd4d8bafa12febc53eebbb9d3",
+      "bytes": 855880,
+      "retrievedAt": "2026-10-17T14:11:36.064Z"
+    },
+    "Content/tiles/t_5_-7.bin": {
+      "sha256": "7f13e14b0eba42023815b214282427c0283dfc1a8c48485da22da18bc0cba7c1",
+      "bytes": 747308,
+      "retrievedAt": "2026-10-17T14:11:36.331Z"
+    },
+    "Content/tiles/t_5_-6.bin": {
+      "sha256": "0b2782b0a2190a8a51571fe7fe63424047d855efea51d35cb26f65a599f7f740",
+      "bytes": 879612,
+      "retrievedAt": "2026-10-17T14:11:36.565Z"
+    },
+    "Content/tiles/t_5_-5.bin": {
+      "sha256": "e3799fbd7ac80fafff53898c6c5b08b47ecbcdd18bcabd00ee414bb1fa2148c2",
+      "bytes": 1085860,
+      "retrievedAt": "2026-10-17T14:11:36.871Z"
+    }
+  },
+  "manifestTiles": 3532
+}

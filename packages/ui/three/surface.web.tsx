@@ -29,6 +29,8 @@ export function ThreeSurface({ ref }: { ref?: Ref<ThreeSurfaceHandle> }) {
       });
     },
     present: () => {},
+    // Web never renders from a worklet runtime.
+    getContext: () => null,
   }));
   const attach = (canvas: HTMLCanvasElement | null) => node.setState({ canvas });
   return createElement('canvas', {

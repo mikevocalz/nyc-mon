@@ -1,0 +1,8 @@
+[23:07:58.548] rive  deferred replay: inline
+[23:07:58.550] rive  compiling 2 markup files as one document: ../game-lobby/shared-vm.rml, scene.rml
+[23:07:58.601] rive  built /Users/mikevocalz/nyc-mon/packages/ui/rive/lobby/game-transition/build/game-transition.riv (234928 bytes, 52ms, 0 errors, 0 warnings)
+[23:07:58.602] rive  data: theme/variant = daylit
+[23:07:58.602] rive  data: transition/phase = hold
+[23:07:58.603] rive  showing GameTransitionHost [1/2]
+[23:07:58.603] rive  viewport 390x844 @1x
+[23:07:58.623] rive  wrote /Users/mikevocalz/nyc-mon/docs/evidence/rive/game-transition/daylit.png

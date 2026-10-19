@@ -38,6 +38,29 @@ describe('/api/model', () => {
     expect(res.status).toBe(403);
   });
 
+  it('refuses a missing Origin, the opaque "null" Origin of a sandboxed frame, the sandbox origin and look-alikes', async () => {
+    let backendCalls = 0;
+    const counting: ModelBackend = { label: 'x', stream: (p, onText, signal) => ((backendCalls += 1), mockBackend().stream(p, onText, signal)) };
+    const { h } = handler(counting);
+    const noOrigin = new Request(`${ORIGIN}/api/model`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: body() });
+    expect((await h(noOrigin, 'ip')).status).toBe(403);
+    for (const origin of ['null', 'http://localhost:5181', 'https://localhost:5180', 'http://localhost:51800', 'http://127.0.0.1:5180', `${ORIGIN}.evil.example`]) {
+      const res = await h(post(body(), origin), 'ip');
+      expect(res.status, origin).toBe(403);
+      expect(res.headers.get('access-control-allow-origin'), origin).toBeNull();
+    }
+    expect(backendCalls).toBe(0);
+  });
+
+  it('answers a CORS preflight with 405 and grants no cross-origin access', async () => {
+    const res = await handler().h(
+      new Request(`${ORIGIN}/api/model`, { method: 'OPTIONS', headers: { origin: 'https://evil.example', 'access-control-request-method': 'POST' } }),
+      'ip',
+    );
+    expect(res.status).toBe(405);
+    expect(res.headers.get('access-control-allow-origin')).toBeNull();
+  });
+
   it('rejects malformed bodies and oversized tool lists', async () => {
     expect((await handler().h(post('{'), 'ip')).status).toBe(400);
     const tools = Array.from({ length: 65 }, (_, i) => ({ name: `t${i}`, description: '', input_schema: { type: 'object' } }));

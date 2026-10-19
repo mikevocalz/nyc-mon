@@ -71,6 +71,13 @@ export interface HLynkShellProps {
   accessibilityHidden?: boolean;
   /** Safe-area insets in points. Omitted: read from the platform. Stories pass them to show a device. */
   insets?: { topPt: number; bottomPt: number };
+  /**
+   * Width of a navigation rail the route draws INSIDE the shell's host on its
+   * physical right edge (foldables and tablets, skill §2). The device never
+   * overlaps it. 0 when the rail sits outside the host or there is none.
+   * @default 0
+   */
+  railRightPt?: number;
   /** Prefix for part test IDs: `-shell`, `-led`, `-screen`, `-trackpad`, `-key-home` and so on (`m01` gives `m01-shell`). */
   testIDPrefix?: string;
 }

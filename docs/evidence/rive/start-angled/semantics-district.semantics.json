@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "artboard": "StartAngledHost",
+  "roots": [
+    {
+      "id": 2,
+      "role": "button",
+      "roleValue": 1,
+      "label": "Continue your game",
+      "value": "Harlem",
+      "hint": "Starts the game",
+      "headingLevel": 0,
+      "stateFlags": 128,
+      "traitFlags": 96,
+      "bounds": {"x": 0, "y": 64, "width": 343, "height": 64},
+      "children": []
+    }
+  ]
+}

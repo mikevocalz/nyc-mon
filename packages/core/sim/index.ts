@@ -80,7 +80,7 @@ export {
   toCreateEggRequest,
 } from './queue.ts';
 export { type CreateEntry, type CreateEntryInput, resolveCreateEntry } from './onboarding.ts';
-export { createRandom, hash128, mixSeed } from './random.ts';
+export { createRandom, hash128, mixSeed, toHex32 } from './random.ts';
 export type { ActivitySpan, CareEvent, SimState } from './state.ts';
 export { step, type StepOptions, type StepResult } from './step.ts';
 export { type CareTuning, type DecayCurve, DEFAULT_CARE_TUNING, HATCHLING_CARE } from './tuning.ts';

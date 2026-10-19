@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useWindowDimensions } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { bloodlines, eggs } from '@acme/content';
@@ -11,44 +11,45 @@ import {
   ChoiceRows,
   EggCase,
   ErrorMessage,
+  FIT_SIDE_GAP_PT,
   Heading,
+  HLynkFit,
   HLynkShell,
   IncubationRing,
   StatusRow,
   Text,
   TrackpadActions,
   useInstanceStore,
-  useLayoutSize,
+  useIsHeadset,
   useReducedMotion,
   useStore,
+  type FitStep,
+  type HLynkFitContext,
   type HLynkStatus,
   type IncubationRingStop,
   type ShellTrackpadProps,
 } from '@acme/ui';
 import { haptics } from '@acme/ui/haptics';
-import { ScrollView, View } from '@acme/ui/tw';
+import { View } from '@acme/ui/tw';
 import { selectActiveMon, selectPendingEgg, useMonStore } from '../mon/mon.store';
 import { announcePolitely } from '../onboarding/announce';
 import { copy as onboardingCopy } from '../onboarding/copy';
-import { getNotifyPermission, scheduleReadyNotification } from '../onboarding/notify-permission';
-import { readConsentRequested, useOnboarding } from '../onboarding/onboarding.store';
+import { readConsentRequested, readPermissionReview, startPermissionReview } from '../onboarding/onboarding.store';
 import { schemeForTime } from '../onboarding/time-scheme';
-import { useTextRamp } from './use-text-ramp';
 import { eggCopy, type EggCopyId } from './copy';
 import {
-  afterCaseClosed,
   buildEggViews,
   entryRedirect,
   ledChip,
   MEET_PATH,
   MON_HOME_PATH,
-  NOTIFY_SHEET_PATH,
+  PERMISSIONS_PATH,
   parseBloodlineParam,
   readyAt,
   stepMinutes,
 } from './egg-model';
 import { EggStill } from './EggStill';
-import { isAccessibilityTextSize, isLandscapeWindow, ringSizeDp } from './window-layout';
+import { incubateArrangement, incubateFitBlocks, isAccessibilityTextSize } from './window-layout';
 
 const OPTION_ID: Record<IncubationMinutes, { label: EggCopyId; a11y: EggCopyId }> = {
   15: { label: 'm10.option.15', a11y: 'm10.option.15.a11y' },
@@ -86,8 +87,8 @@ interface IncubateStore {
   readonly phase: IncubatePhase;
   readonly egg: EggRecord | null;
   readonly caseState: 'open' | 'closing' | 'closed';
-  /** The M06 sheet went up; the next focus is its dismissal, so go on to M11. */
-  readonly sheetShown: boolean;
+  /** The final review route was entered; re-focus resolves to its saved checkpoint. */
+  readonly permissionsShown: boolean;
   readonly nowMs: number;
   readonly scheme: 'daylit' | 'night';
 }
@@ -96,8 +97,9 @@ interface IncubateStore {
  * M10 incubation choice (docs/design/screens/M10/08-handoff.md, D-16b/c/e).
  * 15, 30 or 60 minutes, no default. Start calls `startIncubation` once (the
  * only write in the M08 → M10 path), the case closes around the egg, and
- * from the close's end callback the M06 sheet rises when notification
- * permission is undecided; otherwise M11. Re-entry with an egg or a Mon goes
+ * after the case closes the final permissions review opens. First-run
+ * notification scheduling belongs there, never during the animation.
+ * Re-entry with an egg or a Mon goes
  * straight to `/(home)`; a bad `bloodline` param goes back to M08.
  */
 export function IncubateScreen() {
@@ -105,15 +107,13 @@ export function IncubateScreen() {
   const params = useLocalSearchParams<{ bloodline?: string }>();
   const egg = parseBloodlineParam(params.bloodline, VIEWS);
   const reducedMotion = useReducedMotion();
-  const t = useTextRamp();
   const { fontScale } = useWindowDimensions();
   const listLayout = isAccessibilityTextSize(fontScale);
-  const { size: area, onLayout } = useLayoutSize({ width: 351, height: 468 });
-  const landscape = isLandscapeWindow(area.width, area.height);
+  const headset = useIsHeadset();
 
   const store = useInstanceStore<IncubateStore>(() => {
     const nowMs = Date.now();
-    return { minutes: null, phase: 'choose', egg: null, caseState: 'open', sheetShown: false, nowMs, scheme: schemeForTime(nowMs) };
+    return { minutes: null, phase: 'choose', egg: null, caseState: 'open', permissionsShown: false, nowMs, scheme: schemeForTime(nowMs) };
   });
   const s = useStore(store);
 
@@ -130,9 +130,9 @@ export function IncubateScreen() {
   // Guard on mount and on focus (handoff § States "already-incubating").
   useFocusEffect(
     useCallback(() => {
-      const { phase, sheetShown } = store.getState();
+      const { phase, permissionsShown } = store.getState();
       if (phase === 'confirmed') {
-        if (sheetShown) router.replace(MON_HOME_PATH);
+        if (permissionsShown) router.replace(readPermissionReview() === 'pending' ? PERMISSIONS_PATH : MON_HOME_PATH);
         return;
       }
       if (phase === 'starting') return;
@@ -173,6 +173,8 @@ export function IncubateScreen() {
     store.setState({ phase: 'starting' });
     try {
       const created = useMonStore.getState().startIncubation({ bloodlineId: egg.bloodlineId, minutes, atMs: eventNow() });
+      // Persist before the case-close animation; a force quit still resumes M24.
+      startPermissionReview();
       store.setState({ phase: 'confirmed', egg: created, caseState: 'closing', nowMs: eventNow() });
     } catch {
       store.setState({ phase: 'error' });
@@ -181,35 +183,16 @@ export function IncubateScreen() {
 
   const onCaseEnd = (end: 'closed' | 'open') => {
     const created = store.getState().egg;
-    if (end !== 'closed' || created === null) return;
+    if (end !== 'closed' || created === null || store.getState().caseState === 'closed') return;
     store.setState({ caseState: 'closed' });
     haptics.success();
     announcePolitely(eggCopy('m10.confirmed.a11y.announce', { time: formatClock(created.incubationEndsAt) }));
-    const proceed = async () => {
-      const next = afterCaseClosed(await getNotifyPermission());
-      if (next === 'sheet') {
-        store.setState({ sheetShown: true });
-        router.push(
-          `${NOTIFY_SHEET_PATH}?mins=${created.incubationMinutes}&eggId=${encodeURIComponent(created.eggId)}&endsAtMs=${created.incubationEndsAt}`,
-        );
-        return;
-      }
-      if (next === 'schedule-then-home') {
-        const scheduled = await scheduleReadyNotification({
-          eggId: created.eggId,
-          endsAtMs: created.incubationEndsAt,
-          title: onboardingCopy('m23.notification.title'),
-          body: onboardingCopy('m23.notification.body'),
-        });
-        if (!scheduled) useOnboarding.getState().setNotifyOff('schedule-failed');
-      } else if (next === 'home') {
-        const permission = await getNotifyPermission();
-        if (permission === 'denied') useOnboarding.getState().setNotifyOff('denied');
-      }
-      router.replace(MON_HOME_PATH);
-    };
+    store.setState({ permissionsShown: true });
     if (closeTimer.current !== null) clearTimeout(closeTimer.current);
-    closeTimer.current = setTimeout(() => void proceed(), reducedMotion ? 0 : AFTER_CLOSE_HOLD_MS);
+    closeTimer.current = setTimeout(
+      () => router.replace(readPermissionReview() === 'pending' ? PERMISSIONS_PATH : MON_HOME_PATH),
+      reducedMotion ? 0 : AFTER_CLOSE_HOLD_MS,
+    );
   };
 
   const ready = s.minutes === null ? undefined : readyAt(s.nowMs, s.minutes, formatClock);
@@ -232,7 +215,7 @@ export function IncubateScreen() {
   };
   const keys = {
     back: { label: eggCopy('m10.back.a11y.label'), onPress: busy ? undefined : () => router.back() },
-    home: { onPress: s.caseState === 'closed' ? () => router.replace(MON_HOME_PATH) : undefined },
+    home: { onPress: s.caseState === 'closed' ? () => router.replace(readPermissionReview() === 'pending' ? PERMISSIONS_PATH : MON_HOME_PATH) : undefined },
   };
 
   const consentPending = readConsentRequested();
@@ -240,7 +223,6 @@ export function IncubateScreen() {
     <StatusRow items={[{ id: 'status-consent-pending', label: onboardingCopy('m05.badge.pending'), tone: 'pending' }]} />
   ) : undefined;
 
-  const ringSize = ringSizeDp(area.width, area.height);
   const eggLabel = eggCopy('m10.egg.a11y.label', { eggName: egg.eggName });
   const eggCase = (sizePt: number) => (
     <EggCase
@@ -259,16 +241,22 @@ export function IncubateScreen() {
     </EggCase>
   );
 
-  const head = (
+  const titleText = eggCopy('m10.title');
+  const bodyText = eggCopy('m10.body');
+  const readyText = ready === undefined ? '' : eggCopy(ready.id, { time: ready.time });
+  const errorTitle = eggCopy('m10.error.title');
+  const errorBody = eggCopy('m10.error.body');
+
+  const head = (type: FitStep) => (
     <View className="gap-1">
-      <Heading level={1} className={t.title} testID="m10-title">{eggCopy('m10.title')}</Heading>
-      <Text className={`${t.body} text-text-muted`} testID="m10-body">{eggCopy('m10.body')}</Text>
+      <Heading level={1} className={type.title.className} testID="m10-title">{titleText}</Heading>
+      <Text className={`${type.body.className} text-text-muted`} testID="m10-body">{bodyText}</Text>
     </View>
   );
 
-  const choice: ReactNode = listLayout ? (
-    <View className="gap-3">
-      <View className="items-center">{eggCase(120)}</View>
+  const choice = (mediaPt: number) => listLayout ? (
+    <View style={{ gap: 8 }}>
+      <View className="items-center">{eggCase(mediaPt)}</View>
       <ChoiceRows
         rows={STOPS.map((stop) => ({ key: String(stop.value), label: stop.accessibilityLabel, accessibilityLabel: stop.accessibilityLabel }))}
         value={s.minutes === null ? null : INCUBATION_MINUTES.indexOf(s.minutes)}
@@ -285,8 +273,8 @@ export function IncubateScreen() {
         value={s.minutes}
         onChange={busy ? undefined : choose}
         accessibilityLabel={eggCopy('m10.ring.a11y.label')}
-        centre={eggCase(Math.round(ringSize * 0.5))}
-        sizePt={ringSize}
+        centre={eggCase(Math.round(mediaPt * 0.5))}
+        sizePt={mediaPt}
         scheme={s.scheme}
         reducedMotion={reducedMotion}
         testID="m10-ring"
@@ -295,10 +283,8 @@ export function IncubateScreen() {
     </View>
   );
 
-  const readyLine = ready === undefined ? null : (
-    <Text className={`${t.strong} tabular-nums text-text`} testID="m10-ready">
-      {eggCopy(ready.id, { time: ready.time })}
-    </Text>
+  const readyLine = (type: FitStep) => ready === undefined ? null : (
+    <Text className={`${type.strong.className} tabular-nums text-text`} testID="m10-ready">{readyText}</Text>
   );
 
   const startButton = (
@@ -327,39 +313,62 @@ export function IncubateScreen() {
     </View>
   );
 
-  const error = s.phase === 'error' ? (
-    <View className="gap-2" testID="m10-error">
-      <Text className={`${t.strong} text-text`}>{eggCopy('m10.error.title')}</Text>
-      <ErrorMessage message={eggCopy('m10.error.body')} />
+  const error = (type: FitStep) => s.phase === 'error' ? (
+    <View style={{ gap: type.gapPt }} testID="m10-error">
+      <Text className={`${type.strong.className} text-text`}>{errorTitle}</Text>
+      <ErrorMessage message={errorBody} />
       <View testID="m10-retry">
         <Button variant="outline" title={eggCopy('m10.error.retry')} onPress={start} />
       </View>
     </View>
   ) : null;
 
-  const screen = landscape && !listLayout ? (
-    <View onLayout={onLayout} className="flex-1 flex-row gap-6 p-6">
-      <ScrollView className="flex-1" contentContainerClassName="gap-4">
-        {head}
-        {readyLine}
-        {error}
-        {actions}
-        {startButton}
-      </ScrollView>
-      <View className="flex-1 items-center justify-center">{choice}</View>
-    </View>
-  ) : (
-    <View onLayout={onLayout} className="flex-1 p-4">
-      <ScrollView className="flex-1" contentContainerClassName="gap-3 pb-3">
-        {head}
-        {choice}
-        {readyLine}
-        {error}
-        {actions}
-      </ScrollView>
-      {/* Start stays pinned to the screen's bottom edge, above the scroll (07-a11y.md XXL). */}
-      {startButton}
-    </View>
+  // Decision H-3: nothing in the H-Lynk screen scrolls. HLynkFit measures the
+  // screen, shrinks the ring first, then steps the type and spacing down.
+  const fitParts = (ctx: HLynkFitContext) => ({
+    titleChars: titleText.length,
+    bodyChars: bodyText.length,
+    headInScreen: true,
+    listLayout,
+    readyChars: readyText.length,
+    actionsShown: !busy,
+    error: s.phase === 'error' ? { titleChars: errorTitle.length, bodyChars: errorBody.length } : null,
+    fontScale: ctx.fontScale,
+    widthDp: ctx.widthPt,
+  });
+  const arrangementFor = (ctx: HLynkFitContext) => incubateArrangement(ctx.widthPt, ctx.heightPt, listLayout);
+
+  const screen = (
+    <HLynkFit
+      testID="m10-fit"
+      ramp={headset ? 'xr' : 'mobile'}
+      arrangement={arrangementFor}
+      blocks={(ctx) => incubateFitBlocks(fitParts(ctx), arrangementFor(ctx) === 'side')}
+    >
+      {(fit, ctx) => arrangementFor(ctx) === 'side' ? (
+        <View className="flex-row" style={{ flexGrow: 1, gap: FIT_SIDE_GAP_PT }}>
+          <View className="flex-1 justify-center" style={{ gap: fit.type.gapPt }}>
+            {head(fit.type)}
+            {readyLine(fit.type)}
+            {error(fit.type)}
+            {actions}
+            {startButton}
+          </View>
+          <View className="items-center justify-center" style={{ width: fit.mediaPt }}>{choice(fit.mediaPt)}</View>
+        </View>
+      ) : (
+        // flexGrow, not flex-1: an auto basis lets HLynkFit measure a real overflow.
+        <View style={{ flexGrow: 1, gap: fit.type.gapPt }}>
+          {head(fit.type)}
+          {choice(fit.mediaPt)}
+          {readyLine(fit.type)}
+          {error(fit.type)}
+          {actions}
+          {/* Start sits on the screen's bottom edge (07-a11y.md XXL). */}
+          <View className="justify-end" style={{ flexGrow: 1 }}>{startButton}</View>
+        </View>
+      )}
+    </HLynkFit>
   );
 
   return (

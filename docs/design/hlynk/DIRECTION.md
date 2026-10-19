@@ -62,7 +62,7 @@ Measured fit (points, portrait):
 | iPhone 16 Pro Max | 440 × 956 | 62 / 34 | 416 × 555 | 956 − 62 − 40 − 555 − 34 = 265 |
 | Pixel 8 | 412 × 915 | 24 / 24 (gesture nav, approx.) | 388 × 517 | 915 − 24 − 40 − 517 − 24 = 310 |
 
-Width check on SE: 351 pt between the rails holds 4 keys × 48 pt plus the 112 pt trackpad (304 pt) with four gaps of about 11 pt. Height: 112 pt pad plus 12 pt top and bottom = 136 pt, inside 139. SE is the tightest case and it fits. Anything shorter (landscape, split view, iPad slide-over) drops to the compact layout: the screen goes full-bleed, the head shrinks to a 24 pt strip, and the control row becomes a 72 pt bar with the trackpad as a wide pill. Phase 1 is portrait-only on phones.
+Width check on SE: 351 pt between the rails holds 4 keys × 48 pt plus the 112 pt trackpad (304 pt) with four gaps of about 11 pt. Height: 112 pt pad plus 12 pt top and bottom = 136 pt, inside 139. SE is the tightest case and it fits. Anything shorter (landscape, split view, iPad slide-over) drops to the compact layout: the screen goes full-bleed, the head shrinks to a 24 pt strip, and the control row becomes a 72 pt bar with the trackpad as a wide pill. Phase 1 is portrait-only on phones. Windows wider than a phone, folded windows and the no-scroll rule for the screen's content are in `ADAPTIVE.md` (Decisions H-1 to H-3); they replace the 440 pt cap on medium windows.
 
 The whole control row sits in the bottom 40% of the window on every device in the table, which meets the thumb-reach rule in §4.
 

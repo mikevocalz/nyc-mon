@@ -55,6 +55,36 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
   return context.resolveRequest(context, moduleName, platform);
 };
 
+// Opt-in worklet render runtime (docs/implementation/worklet-rendering.md):
+// react-native-worklets Bundle Mode gives worklet runtimes the whole bundle,
+// so three.js can load on the render runtime. Must match babel.config.js.
+// Unset, the config is untouched. It wraps Expo's resolver (the vendored
+// navigation above keeps working), forces inlineRequires on and turns off
+// lazy bundling (below).
+const workletRender = /^(1|true|worklet)$/i.test((process.env.EXPO_PUBLIC_WORKLET_RENDER ?? "").trim());
+if (workletRender) {
+  const workletsDir = path.dirname(
+    require.resolve("react-native-worklets/package.json", { paths: [__dirname] }),
+  );
+  const { getBundleModeMetroConfig } = require(path.join(workletsDir, "bundleMode"));
+  getBundleModeMetroConfig(config);
+
+  // Worklet runtimes evaluate the bundle the app downloaded and nothing else.
+  // With Expo's default `lazy=true`, an `import()` target is a separate chunk
+  // that only the RN runtime fetches, so worklets defined there (the render
+  // host, loaded by render-thread-choice.ts) are missing on the runtime:
+  // "Unable to resolve worklet with hash …" (software-mansion/react-native-
+  // reanimated#10162; lazy chunks on worklet runtimes are upstream PR #10711,
+  // unmerged). Serve eager bundles instead, so every async dependency is in the
+  // one bundle both runtimes load. Rewriting here also covers the URL the dev
+  // client already holds and the HMR server, which applies the same rewrite.
+  const rewriteExpoRequestUrl = config.server.rewriteRequestUrl;
+  config.server.rewriteRequestUrl = (url) => {
+    const rewritten = rewriteExpoRequestUrl ? rewriteExpoRequestUrl(url) : url;
+    return rewritten.replace(/([?&])lazy=true(?=&|#|$)/, "$1lazy=false");
+  };
+}
+
 // Uniwind remains the outermost Metro wrapper.
 module.exports = withUniwindConfig(config, {
   cssEntryFile: "./global.css",

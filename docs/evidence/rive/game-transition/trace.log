@@ -1,0 +1,5 @@
+[23:07:55.653] rive  deferred replay: inline
+[23:07:55.657] rive  compiling 2 markup files as one document: ../game-lobby/shared-vm.rml, scene.rml
+[23:07:55.711] rive  built /Users/mikevocalz/nyc-mon/packages/ui/rive/lobby/game-transition/build/game-transition.riv (234928 bytes, 57ms, 0 errors, 0 warnings)
+[23:07:55.712] rive  showing GameTransitionHost [1/2]
+[23:07:55.713] rive  wrote /Users/mikevocalz/nyc-mon/docs/evidence/rive/game-transition/trace.jsonl

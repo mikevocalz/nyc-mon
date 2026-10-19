@@ -1,0 +1,2 @@
+[23:07:13.560] rive  built /Users/mikevocalz/nyc-mon/packages/ui/rive/arcade-controls/left-stick/build/left-stick.riv (5517 bytes, 33ms, 0 errors, 0 warnings)
+{"success": true, "command": "build", "data": {"riv": "/Users/mikevocalz/nyc-mon/packages/ui/rive/arcade-controls/left-stick/build/left-stick.riv", "bytes": 5517, "buildMs": 33.6, "problems": []}, "errors": [], "warnings": []}

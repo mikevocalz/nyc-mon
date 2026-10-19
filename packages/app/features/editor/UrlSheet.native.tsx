@@ -1,8 +1,7 @@
 'use client';
-import { useRef } from 'react';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { createStore, useStore } from 'zustand';
-import { Button, Modal, TextField } from '@acme/ui';
+import { Button, Modal, TextField, useInstance } from '@acme/ui';
 import { Pressable, Text, View } from '@acme/ui/tw';
 import { Link as LinkIcon, Video, X } from '@acme/ui/icons';
 import { YouTubeEmbed } from './YouTubeEmbed';
@@ -32,16 +31,15 @@ export function UrlSheet() {
   const kind = useUrlStore((state) => state.kind);
   const resolve = useUrlStore((state) => state.resolve);
 
-  const draft = useRef<ReturnType<typeof createDraftStore> | null>(null);
-  draft.current ??= createDraftStore();
-  const value = useStore(draft.current, (state) => state.value);
+  const draft = useInstance(createDraftStore);
+  const value = useStore(draft, (state) => state.value);
 
   const isYouTube = kind === 'youtube';
   const videoId = isYouTube ? youTubeVideoId(value) : null;
   const canInsert = isYouTube ? videoId !== null : value.trim().length > 0;
 
   const close = (url: string | null) => {
-    draft.current?.getState().set('');
+    draft.getState().set('');
     resolve(url);
   };
 
@@ -78,7 +76,7 @@ export function UrlSheet() {
           <TextField
             label={isYouTube ? 'Video URL' : 'URL'}
             value={value}
-            onChangeText={(next) => draft.current?.getState().set(next)}
+            onChangeText={(next) => draft.getState().set(next)}
             placeholder={isYouTube ? 'https://youtu.be/…' : 'https://…'}
             returnKeyType="done"
             onSubmitEditing={() => {

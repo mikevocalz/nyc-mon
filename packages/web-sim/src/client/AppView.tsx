@@ -1,7 +1,7 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useEffectEvent, useRef } from 'react';
 import type { CallToolResult, Client, Tool } from '@modelcontextprotocol/client';
 import { AppBridge, PostMessageTransport, isToolVisibilityModelOnly, type McpUiResourceCsp } from '@modelcontextprotocol/ext-apps/app-bridge';
-import { useInstanceStore, useStore } from '@acme/ui';
+import { Button, useInstanceStore, useStore } from '@acme/ui';
 import { Paragraph } from '@acme/ui/html';
 import { View } from '@acme/ui/tw';
 import { HOST_ONLY_TOOLS } from '../shared/toolSpec.ts';
@@ -76,11 +76,23 @@ export function AppView(props: AppViewProps) {
     available: number;
     status: 'loading' | 'ready' | 'error';
     error: string;
-  }>(() => ({ src: null, height: 320, available: 0, status: 'loading', error: '' }));
-  const { src, height, available, status, error } = useStore(store);
-  const { src: setSrc, height: setHeight, available: setAvailable, status: setStatus, error: setError } = useSetters(store);
-  const latest = useRef(props);
-  latest.current = props;
+    attempt: number;
+  }>(() => ({ src: null, height: 320, available: 0, status: 'loading', error: '', attempt: 0 }));
+  const { src, height, available, status, error, attempt } = useStore(store);
+  const {
+    src: setSrc,
+    height: setHeight,
+    available: setAvailable,
+    status: setStatus,
+    error: setError,
+    attempt: setAttempt,
+  } = useSetters(store);
+  // The bridge's handlers live as long as the view; these read the props of
+  // the latest render, not the render that created the bridge.
+  const requestDisplayMode = useEffectEvent((next: DisplayMode) => props.onDisplayModeChange(next));
+  const reportViewMessage = useEffectEvent((text: string) => props.onViewMessage(text));
+  const ownsResource = useEffectEvent((uri: string) => uri === props.resourceUri);
+  const findTool = useEffectEvent((name: string) => props.tools.find((t) => t.name === name));
 
   useEffect(() => {
     let disposed = false;
@@ -130,7 +142,7 @@ export function AppView(props: AppViewProps) {
 
       bridge.onrequestdisplaymode = async ({ mode }) => {
         const next: DisplayMode = mode === 'fullscreen' ? 'fullscreen' : 'inline';
-        latest.current.onDisplayModeChange(next);
+        requestDisplayMode(next);
         return { mode: next };
       };
       bridge.onsizechange = ({ height: h }) => {
@@ -145,19 +157,19 @@ export function AppView(props: AppViewProps) {
           .map((c) => (c.type === 'text' ? c.text : ''))
           .join(' ')
           .trim();
-        if (text) latest.current.onViewMessage(text.slice(0, 500));
+        if (text) reportViewMessage(text.slice(0, 500));
         return {};
       };
       bridge.onupdatemodelcontext = async () => ({});
       // A view reads only its own resource, not every resource on the server.
       bridge.onreadresource = async (params) => {
-        if (params.uri !== latest.current.resourceUri) throw new Error('This view can only read its own resource.');
+        if (!ownsResource(params.uri)) throw new Error('This view can only read its own resource.');
         return props.client.readResource(params);
       };
       // A view may call app-visible tools only: never the dev presence hook,
       // never a tool the server marked model-only (MCP Apps visibility).
       bridge.oncalltool = async (params) => {
-        const target = latest.current.tools.find((t) => t.name === params.name);
+        const target = findTool(params.name);
         if (!target || HOST_ONLY_TOOLS.has(params.name) || isToolVisibilityModelOnly(target)) {
           return { content: [{ type: 'text', text: `This view can't call ${params.name}.` }], isError: true };
         }
@@ -191,7 +203,7 @@ export function AppView(props: AppViewProps) {
     };
     // The view is keyed by tool call; a new call mounts a new AppView.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [props.client, props.resourceUri, props.sandboxOrigin]);
+  }, [props.client, props.resourceUri, props.sandboxOrigin, attempt]);
 
   // Track the stage space so the inline frame never runs past the display.
   useEffect(() => {
@@ -218,9 +230,23 @@ export function AppView(props: AppViewProps) {
   return (
     <View className="relative min-h-0 flex-1 overflow-y-auto">
       {status === 'error' ? (
-        <Paragraph role="alert" className="my-0 p-4 text-sm text-danger">
-          This view didn’t load: {error}
-        </Paragraph>
+        <View className="gap-3 p-4">
+          <Paragraph role="alert" className="my-0 text-sm text-danger">
+            This card didn’t load: {error}
+          </Paragraph>
+          <View className="flex-row">
+            <Button
+              variant="outline"
+              size="sm"
+              title="Try card again"
+              onPress={() => {
+                setError('');
+                setStatus('loading');
+                setAttempt((value) => value + 1);
+              }}
+            />
+          </View>
+        </View>
       ) : null}
       <ViewFrame
         ref={iframeRef}

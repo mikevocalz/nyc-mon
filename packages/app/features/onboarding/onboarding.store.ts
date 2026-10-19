@@ -15,9 +15,39 @@ export const ONBOARDING_KEYS = {
   hasSession: 'has-session',
   consentRequested: 'consent-requested',
   notifyOff: 'notify-off',
+  permissionsPending: 'permissions-pending',
+  permissionReview: 'permission-review',
 } as const;
 
 export const SAVE_KEY = 'save';
+
+/**
+ * First-run setup checkpoint. Only callers who actually start their first
+ * incubation enter this flow, so existing installs never get re-onboarded.
+ * Synchronous MMKV reads keep cold-start routing deterministic.
+ */
+export type PermissionReview = 'pending' | 'complete';
+
+export function readPermissionReview(): PermissionReview | undefined {
+  const raw = onboardingStorage.getString(ONBOARDING_KEYS.permissionReview);
+  if (raw === 'pending' || raw === 'complete') return raw;
+  return onboardingStorage.getString(ONBOARDING_KEYS.permissionsPending) === '1' ? 'pending' : undefined;
+}
+
+export function startPermissionReview(): void {
+  if (readPermissionReview() !== 'complete') {
+    onboardingStorage.set(ONBOARDING_KEYS.permissionReview, 'pending');
+    onboardingStorage.remove(ONBOARDING_KEYS.permissionsPending);
+    useOnboarding.setState({ permissionsPending: true });
+  }
+}
+
+export function completePermissionReview(): void {
+  onboardingStorage.set(ONBOARDING_KEYS.permissionReview, 'complete');
+  onboardingStorage.remove(ONBOARDING_KEYS.permissionsPending);
+  useOnboarding.setState({ permissionsPending: false });
+}
+
 
 /** Parses the stored M04 answer. A malformed value is treated as unanswered (Law 5 at the boundary). */
 export function readAgeAnswer(): AgeAnswer | undefined {
@@ -34,6 +64,11 @@ export function readAgeAnswer(): AgeAnswer | undefined {
 /** True when a local session flag exists. Written on sign-in / sign-out; never read over the network. */
 export function readSessionFlag(): boolean {
   return onboardingStorage.getString(ONBOARDING_KEYS.hasSession) === '1';
+}
+
+/** A newly-created egg still needs to show the final optional setup step. */
+export function readPermissionsPending(): boolean {
+  return readPermissionReview() === 'pending';
 }
 
 /**
@@ -77,12 +112,14 @@ interface OnboardingState {
   hasSession: boolean;
   /** The M06 outcome the M11 status row and the inbox read. `undefined` = notifications fine or never asked. */
   notifyOff: NotifyOffState | undefined;
+  permissionsPending: boolean;
   /** Writes the M04 answer to MMKV and state (M04 Continue). */
   setAgeAnswer: (birthYear: number, nowMs: number) => void;
   /** Writes the local session flag (sign-in success / sign-out). */
   setSession: (present: boolean) => void;
   /** Records or clears the notifications-off state (M06 close paths). */
   setNotifyOff: (state: NotifyOffState | undefined) => void;
+  setPermissionsPending: (pending: boolean) => void;
 }
 
 /**
@@ -94,6 +131,7 @@ export const useOnboarding = create<OnboardingState>()((set) => ({
   ageAnswer: undefined,
   hasSession: false,
   notifyOff: undefined,
+  permissionsPending: false,
   setAgeAnswer: (birthYear, nowMs) => {
     const answer: AgeAnswer = { birthYear, answeredAtMs: nowMs };
     onboardingStorage.set(ONBOARDING_KEYS.ageAnswer, JSON.stringify(answer));
@@ -101,13 +139,21 @@ export const useOnboarding = create<OnboardingState>()((set) => ({
   },
   setSession: (present) => {
     if (present) onboardingStorage.set(ONBOARDING_KEYS.hasSession, '1');
-    else onboardingStorage.remove(ONBOARDING_KEYS.hasSession);
-    set({ hasSession: present });
+    else {
+      onboardingStorage.remove(ONBOARDING_KEYS.hasSession);
+      onboardingStorage.remove(ONBOARDING_KEYS.permissionsPending);
+      onboardingStorage.remove(ONBOARDING_KEYS.permissionReview);
+    }
+    set({ hasSession: present, ...(!present ? { permissionsPending: false } : {}) });
   },
   setNotifyOff: (state) => {
     if (state === undefined) onboardingStorage.remove(ONBOARDING_KEYS.notifyOff);
     else onboardingStorage.set(ONBOARDING_KEYS.notifyOff, state);
     set({ notifyOff: state });
+  },
+  setPermissionsPending: (pending) => {
+    if (pending) startPermissionReview();
+    else completePermissionReview();
   },
 }));
 
@@ -117,5 +163,6 @@ export function hydrateOnboarding(): void {
     ageAnswer: readAgeAnswer(),
     hasSession: readSessionFlag(),
     notifyOff: readNotifyOff(),
+    permissionsPending: readPermissionsPending(),
   });
 }

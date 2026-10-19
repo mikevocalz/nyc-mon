@@ -1,0 +1,9 @@
+[23:07:40.683] rive  deferred replay: inline
+[23:07:40.684] rive  baking release scripts, as a publish ships them, with watchdog checks
+[23:07:40.685] rive  compiling 2 markup files as one document: ../game-lobby/shared-vm.rml, scene.rml
+[23:07:40.740] rive  built /Users/mikevocalz/nyc-mon/packages/ui/rive/lobby/leaderboard/build/leaderboard.riv (145346 bytes, 56ms, 0 errors, 0 warnings)
+[23:07:40.742] rive  showing Leaderboard [1/3]
+[23:07:40.742] rive  viewport 343x264 @1x
+[23:07:40.885] rive  bench advance: mean 0.001ms p50 0.001ms p95 0.001ms max 0.003ms
+[23:07:40.885] rive  bench render: mean 0.130ms p50 0.099ms p95 0.349ms max 0.849ms
+[23:07:40.885] rive  bench memory: 0 -> 0 wasm pages (+0) over 600 frames

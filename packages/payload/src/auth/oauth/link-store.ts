@@ -4,7 +4,7 @@
 // page mounts so a later visit starts clean.
 import { create } from 'zustand';
 
-type SignInPending = 'email' | 'passkey' | 'code';
+type SignInPending = 'amazon' | 'email' | 'passkey' | 'code';
 type ConsentPending = 'link' | 'cancel';
 
 interface SignInStore {

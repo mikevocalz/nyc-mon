@@ -11,6 +11,7 @@ import { Text, View } from '@acme/ui/tw';
 import { AppView, type DisplayMode } from './AppView.tsx';
 import { DevPanel } from './DevPanel.tsx';
 import { GridBand, GridBandBoundary } from './GridBand.tsx';
+import { judgeStage } from './judgeStatus.ts';
 import { SignInRequired, beginSignIn, completeSignIn, connectMcp, type McpSession } from './mcp.ts';
 import { ModelAuthExpiredError, ModelTurnError, httpModelClient } from './modelClient.ts';
 import {
@@ -54,6 +55,7 @@ interface AppState {
   listening: Listening | null;
   heard: string;
   activeViewId: string | null;
+  activeToolTitle: string | null;
   displayMode: DisplayMode;
   scheme: Scheme;
   readAloud: boolean;
@@ -101,6 +103,7 @@ export function App({ config }: { config: PublicConfig }) {
     listening: null,
     heard: '',
     activeViewId: [...initial.items].reverse().find((i) => i.kind === 'tool' && i.resourceUri)?.id ?? null,
+    activeToolTitle: null,
     displayMode: 'inline',
     scheme: currentScheme(),
     readAloud: (() => {
@@ -112,7 +115,7 @@ export function App({ config }: { config: PublicConfig }) {
     })(),
     time: clock(),
   }));
-  const { items, auth, conn, busy, live, draft, listening, heard, activeViewId, displayMode, scheme, readAloud, time } = useStore(store);
+  const { items, auth, conn, busy, live, draft, listening, heard, activeViewId, activeToolTitle, displayMode, scheme, readAloud, time } = useStore(store);
   const {
     items: setItems,
     auth: setAuth,
@@ -123,6 +126,7 @@ export function App({ config }: { config: PublicConfig }) {
     listening: setListening,
     heard: setHeard,
     activeViewId: setActiveViewId,
+    activeToolTitle: setActiveToolTitle,
     displayMode: setDisplayMode,
     scheme: setScheme,
     readAloud: setReadAloud,
@@ -220,6 +224,7 @@ export function App({ config }: { config: PublicConfig }) {
       setHeard('');
       setBusy(true);
       setLive('');
+      setActiveToolTitle(null);
       push({ kind: 'user', id: newId('u'), text, at: Date.now() });
 
       const { history, restarted } = historyForNextTurn(historyRef.current);
@@ -236,8 +241,12 @@ export function App({ config }: { config: PublicConfig }) {
           signal: abort.signal,
           mcp: createTurnToolCaller({ client: s.client, signal: abort.signal }),
           onEvent: (e) => {
-            if (e.type === 'text') setLive((prev) => prev + e.delta);
+            if (e.type === 'text') {
+              setActiveToolTitle(null);
+              setLive((prev) => prev + e.delta);
+            }
             if (e.type === 'step-done') setLive('');
+            if (e.type === 'tool-start') setActiveToolTitle(toolTitle(toolsByName.get(e.name), e.name));
             if (e.type === 'tool-result') {
               const tool = toolsByName.get(e.name);
               const uri = (tool ? getToolUiResourceUri(tool) : undefined) ?? resultUiUri(e.result);
@@ -284,11 +293,12 @@ export function App({ config }: { config: PublicConfig }) {
         }
       } finally {
         setLive('');
+        setActiveToolTitle(null);
         setBusy(false);
         abortRef.current = null;
       }
     },
-    [busy, conn, model, notice, provider, push, readAloud, toolsByName, setActiveViewId, setAuth, setBusy, setConn, setDisplayMode, setDraft, setHeard, setLive],
+    [busy, conn, model, notice, provider, push, readAloud, toolsByName, setActiveToolTitle, setActiveViewId, setAuth, setBusy, setConn, setDisplayMode, setDraft, setHeard, setLive],
   );
 
   function startListening() {
@@ -319,6 +329,7 @@ export function App({ config }: { config: PublicConfig }) {
     clearSession(local);
     setItems([]);
     setActiveViewId(null);
+    setActiveToolTitle(null);
     setDisplayMode('inline');
   }
 
@@ -340,7 +351,7 @@ export function App({ config }: { config: PublicConfig }) {
   }, [displayMode, setDisplayMode]);
 
   const lastMon = [...items].reverse().find((i) => i.kind === 'mon');
-  const headline = live || (busy ? '' : lastMon?.kind === 'mon' ? lastMon.text : '');
+  const lastReply = lastMon?.kind === 'mon' ? lastMon.text : '';
   const activeView = items.find((i): i is Extract<TranscriptItem, { kind: 'tool' }> => i.id === activeViewId && i.kind === 'tool');
   const voiceIn = canListen();
   const signedIn = auth.kind === 'dev-bypass' || auth.kind === 'signed-in';
@@ -356,6 +367,16 @@ export function App({ config }: { config: PublicConfig }) {
   const connTone = conn.kind === 'connected' ? 'success' : conn.kind === 'failed' ? 'danger' : 'neutral';
   const canTalk = conn.kind === 'connected';
   const fullscreen = displayMode === 'fullscreen';
+  const stage = judgeStage({
+    authKind: auth.kind,
+    connectionKind: conn.kind,
+    listening: listening !== null,
+    busy,
+    activeToolTitle,
+    heard,
+    live,
+    lastReply,
+  });
 
   function startSignIn() {
     setAuth({ kind: 'signing-in' });
@@ -407,11 +428,17 @@ export function App({ config }: { config: PublicConfig }) {
               <View
                 aria-label="Smart display"
                 role="region"
+                data-judge-state={stage.kind}
                 className="relative min-h-[560px] w-full overflow-hidden md:aspect-[16/10] md:min-h-0"
               >
-                <View className="flex-row items-center justify-between px-5 pt-4">
+                <View className="flex-row items-center justify-between gap-3 px-5 pt-4">
                   <Text className="text-xr-caption text-text-muted">{time}</Text>
-                  <Badge label={connLabel} tone={connTone} />
+                  <View className="flex-row flex-wrap items-center justify-end gap-2">
+                    {conn.kind === 'connected' ? null : <Badge label={connLabel} tone={connTone} />}
+                    <View role="status" aria-live="polite" aria-atomic="true">
+                      <Badge label={stage.label} tone={stage.tone} />
+                    </View>
+                  </View>
                 </View>
 
                 {!signedIn ? (
@@ -428,8 +455,8 @@ export function App({ config }: { config: PublicConfig }) {
                   <View className="min-h-0 flex-1 gap-4 px-5 py-4 md:flex-row">
                     <View className="min-h-0 flex-1 gap-3 md:basis-1/2">
                       <Card variant="notch" district="midtown">
-                        <Text aria-live="polite" className="text-xr-body text-text">
-                          {headline || (busy ? 'Your Mon is thinking…' : 'Say or type something to your Mon.')}
+                        <Text aria-live="polite" aria-atomic="true" className="text-xr-body text-text">
+                          {stage.headline}
                         </Text>
                       </Card>
                       {items.length === 0 && canTalk ? (
@@ -495,7 +522,12 @@ export function App({ config }: { config: PublicConfig }) {
                           />
                         </>
                       ) : (
-                        <Card variant="notch" district="downtown" title="Your Mon’s card" description="Ask how your Mon is doing and its card shows up here." />
+                        <Card
+                          variant="notch"
+                          district="downtown"
+                          title="Your Mon’s card"
+                          description="Ask about care, status, or what your Mon just did. The matching live card opens here."
+                        />
                       )}
                     </View>
                   </View>

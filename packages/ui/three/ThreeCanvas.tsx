@@ -5,13 +5,16 @@ import { PixelRatio, Platform, type GestureResponderEvent } from 'react-native';
 import { twMerge } from 'tailwind-merge';
 import { useReducedMotion } from '../backgrounds/use-reduced-motion';
 import { useGpuState } from '../gpu/gpu-store';
-import { useInstanceStore, useStore } from '../use-instance-store';
+import { useInstance, useInstanceStore, useStore } from '../use-instance-store';
 import { useLayoutSize } from '../use-layout-size';
 import { View } from '../tw';
 import { loadThree } from './load-three';
+import { advanceNodeFrame, stopInternalLoop } from './renderer-internals';
+import { resolveRenderThread } from './render-thread';
+import { WorkletThreeCanvas } from './WorkletThreeCanvas';
 import { toNdc } from './pointer';
 import { ThreeSurface } from './surface';
-import type { ThreeBackend, ThreeCanvasProps, ThreePointer, ThreeScene, ThreeSurfaceHandle } from './types';
+import type { ThreeBackend, ThreeCanvasProps, ThreeFrameTiming, ThreePointer, ThreeScene, ThreeSurfaceHandle } from './types';
 import type { WebGPURenderer } from 'three/webgpu';
 import { useOnScreen } from './use-on-screen';
 
@@ -28,6 +31,7 @@ interface Runtime<P> {
   running: boolean;
   time: number;
   last: number;
+  lastProbeStart: number;
   width: number;
   height: number;
   pixelRatio: number;
@@ -35,45 +39,12 @@ interface Runtime<P> {
   reducedMotion: boolean;
   queued: boolean;
   pointer: ThreePointer;
+  frame: { time: number; delta: number; width: number; height: number; pixelRatio: number; reducedMotion: boolean; pointer: ThreePointer };
+  /** Reused when onFrameTiming is set: the opt-in probe allocates nothing per frame either. */
+  probe: ThreeFrameTiming;
 }
 
 const isWeb = Platform.OS === 'web';
-
-/**
- * three's `Renderer.init()` starts `Animation.start()`, a requestAnimationFrame
- * loop that runs until dispose and only advances `nodeFrame`
- * (three/src/renderers/common/Animation.js, r186). ThreeCanvas already owns a
- * frame loop gated on visibility, so the internal one is stopped after init and
- * each draw advances `nodeFrame` itself. Neither member is public API: if a
- * three upgrade renames them, `stopInternalLoop` warns and the site-qa motion
- * check fails on the idle loop.
- */
-type RendererInternals = {
-  _animation?: { stop?: () => void } | null;
-  _nodes?: { nodeFrame?: { update?: () => void; frameId?: number } } | null;
-};
-const stopInternalLoop = (renderer: WebGPURenderer) => {
-  const animation = (renderer as unknown as RendererInternals)._animation;
-  if (typeof animation?.stop !== 'function') {
-    console.warn('[ThreeCanvas] three renamed Renderer._animation; its internal frame loop keeps running.');
-    return;
-  }
-  animation.stop();
-};
-let warnedNodeFrame = false;
-const warnNodeFrame = () => {
-  if (warnedNodeFrame) return;
-  warnedNodeFrame = true;
-  console.warn('[ThreeCanvas] three renamed Renderer._nodes.nodeFrame; node-time animation will not advance.');
-};
-// What Animation.start()'s loop did per frame besides the user callback.
-const advanceNodeFrame = (renderer: WebGPURenderer) => {
-  const nodeFrame = (renderer as unknown as RendererInternals)._nodes?.nodeFrame;
-  if (typeof nodeFrame?.update !== 'function') warnNodeFrame();
-  if (renderer.info.autoReset) renderer.info.reset();
-  nodeFrame?.update?.();
-  if (nodeFrame?.frameId !== undefined) (renderer.info as { frame: number }).frame = nodeFrame.frameId;
-};
 
 /**
  * A three.js canvas on WebGPURenderer, with one code path for web and native.
@@ -91,8 +62,29 @@ const advanceNodeFrame = (renderer: WebGPURenderer) => {
  * without reduced motion (drawing one still frame otherwise), hands the scene
  * the pointer in normalised device coordinates, and disposes the renderer on
  * unmount.
+ *
+ * `renderThread="worklet"` (native, opt-in) hands the renderer and the scene
+ * to `workletHost` on a worklet runtime instead (WorkletThreeCanvas.tsx).
  */
-export function ThreeCanvas<P>({
+export function ThreeCanvas<P>(props: ThreeCanvasProps<P>) {
+  // Resolved once per mount: switching threads needs a remount (the caller keys the canvas).
+  const { thread, reason } = useInstance(() =>
+    resolveRenderThread({
+      requested: props.renderThread,
+      platform: Platform.OS,
+      hasHost: props.workletHost !== undefined,
+      hostAvailable: props.workletHost?.available() ?? false,
+    }),
+  );
+  useEffect(() => {
+    if (reason) console.warn(`[ThreeCanvas] renderThread="worklet" fell back to the JS thread (${reason}).`);
+  }, [reason]);
+  if (thread === 'worklet' && props.workletHost) return <WorkletThreeCanvas {...props} workletHost={props.workletHost} />;
+  return <JsThreeCanvas {...props} />;
+}
+
+/** The default path: three.js, the scene update and the draw on the JS thread. */
+function JsThreeCanvas<P>({
   load,
   params,
   forceWebGL = false,
@@ -105,6 +97,7 @@ export function ThreeCanvas<P>({
   opacity = 1,
   background,
   onBackendChange,
+  onFrameTiming,
   children,
   ref,
 }: ThreeCanvasProps<P>) {
@@ -125,6 +118,7 @@ export function ThreeCanvas<P>({
     running: false,
     time: 0,
     last: 0,
+    lastProbeStart: 0,
     width: 0,
     height: 0,
     pixelRatio: 1,
@@ -132,6 +126,8 @@ export function ThreeCanvas<P>({
     reducedMotion,
     queued: false,
     pointer: { x: 0, y: 0, inside: false, pressed: false },
+    frame: { time: 0, delta: 0, width: 0, height: 0, pixelRatio: 1, reducedMotion, pointer: { x: 0, y: 0, inside: false, pressed: false } },
+    probe: { cpuMs: 0, intervalMs: null, backend: 'webgpu' },
   };
 
   // Pick the backend. WebGPU when it works; the WebGL2 backend on web when it
@@ -155,6 +151,9 @@ export function ThreeCanvas<P>({
     const { renderer, built } = rt;
     if (!renderer || !built || !rt.sized) return;
     const now = performance.now();
+    const probeStart = onFrameTiming ? now : 0;
+    const probeInterval = onFrameTiming && rt.lastProbeStart > 0 ? probeStart - rt.lastProbeStart : null;
+    if (onFrameTiming) rt.lastProbeStart = probeStart;
     let delta = 0;
     if (rt.running) {
       // Clamp so a backgrounded tab doesn't jump the scene forward.
@@ -163,13 +162,48 @@ export function ThreeCanvas<P>({
       rt.last = now;
     }
     try {
-      built.update?.(
-        { time: rt.time, delta, width: rt.width, height: rt.height, pixelRatio: rt.pixelRatio, reducedMotion: rt.reducedMotion, pointer: rt.pointer },
-        rt.params,
-      );
+      // The frame object is reused: zero allocation per frame.
+      const frame = rt.frame;
+      frame.time = rt.time;
+      frame.delta = delta;
+      frame.width = rt.width;
+      frame.height = rt.height;
+      frame.pixelRatio = rt.pixelRatio;
+      frame.reducedMotion = rt.reducedMotion;
+      frame.pointer = rt.pointer;
+      // Stage attribution for the opt-in probe (G1): four extra clock reads
+      // per frame only while onFrameTiming is set; the flag-off path is
+      // unchanged and the staged sample keeps cpuMs = the whole draw.
+      const t0 = onFrameTiming ? performance.now() : 0;
+      built.update?.(frame, rt.params);
+      const t1 = onFrameTiming ? performance.now() : 0;
       advanceNodeFrame(renderer);
+      const t2 = onFrameTiming ? performance.now() : 0;
       renderer.render(built.scene, built.camera);
+      const t3 = onFrameTiming ? performance.now() : 0;
       rt.surface?.present();
+      if (onFrameTiming) {
+        try {
+          const t4 = performance.now();
+          const probe = rt.probe;
+          probe.cpuMs = Math.max(0, t4 - probeStart);
+          probe.intervalMs = probeInterval;
+          probe.backend = (renderer.backend as { isWebGLBackend?: boolean }).isWebGLBackend ? 'webgl2' : 'webgpu';
+          probe.updateMs = t1 - t0;
+          probe.nodeMs = t2 - t1;
+          probe.renderMs = t3 - t2;
+          probe.presentMs = t4 - t3;
+          const info = renderer.info?.render;
+          probe.drawCalls = info?.drawCalls ?? -1;
+          probe.triangles = info?.triangles ?? -1;
+          probe.bufferW = renderer.domElement?.width ?? -1;
+          probe.bufferH = renderer.domElement?.height ?? -1;
+          onFrameTiming(probe);
+        } catch (error) {
+          // A diagnostics callback must never take down the game renderer.
+          console.warn('[ThreeCanvas] frame diagnostics failed', error);
+        }
+      }
     } catch (error) {
       console.error('[ThreeCanvas] render failed.', error);
       status.setState((s) => ({ failed: [...s.failed, (renderer.backend as { isWebGLBackend?: boolean }).isWebGLBackend ? 'webgl2' : 'webgpu'] }));
@@ -196,6 +230,23 @@ export function ThreeCanvas<P>({
     rt.reducedMotion = reducedMotion;
     invalidate();
   });
+
+  // Drawing buffer follows layout size and the capped device pixel ratio.
+  const applySize = () => {
+    const rt = runtime.current!;
+    const { renderer, built } = rt;
+    if (!renderer || !built || size.width <= 0 || size.height <= 0) return;
+    const pixelRatio = Math.min(PixelRatio.get(), maxPixelRatio);
+    if (rt.sized && rt.width === size.width && rt.height === size.height && rt.pixelRatio === pixelRatio) return;
+    rt.width = size.width;
+    rt.height = size.height;
+    rt.pixelRatio = pixelRatio;
+    renderer.setPixelRatio(pixelRatio);
+    // false: the canvas keeps its 100% CSS size; only the drawing buffer changes.
+    renderer.setSize(size.width, size.height, false);
+    built.resize?.(size.width, size.height);
+    rt.sized = true;
+  };
 
   // Build the renderer and scene once per backend, device and loader.
   useEffect(() => {
@@ -234,27 +285,12 @@ export function ThreeCanvas<P>({
       rt.renderer = null;
       rt.built = null;
       rt.surface = null;
+      rt.lastProbeStart = 0;
     };
     // invalidate, applySize and status are stable per instance; hasSize gates the first build only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pending, hasSize, backend, device, load]);
 
-  // Drawing buffer follows layout size and the capped device pixel ratio.
-  const applySize = () => {
-    const rt = runtime.current!;
-    const { renderer, built } = rt;
-    if (!renderer || !built || size.width <= 0 || size.height <= 0) return;
-    const pixelRatio = Math.min(PixelRatio.get(), maxPixelRatio);
-    if (rt.sized && rt.width === size.width && rt.height === size.height && rt.pixelRatio === pixelRatio) return;
-    rt.width = size.width;
-    rt.height = size.height;
-    rt.pixelRatio = pixelRatio;
-    renderer.setPixelRatio(pixelRatio);
-    // false: the canvas keeps its 100% CSS size; only the drawing buffer changes.
-    renderer.setSize(size.width, size.height, false);
-    built.resize?.(size.width, size.height);
-    rt.sized = true;
-  };
   useEffect(() => {
     applySize();
     invalidate();

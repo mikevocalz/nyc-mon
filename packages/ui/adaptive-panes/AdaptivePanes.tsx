@@ -28,7 +28,7 @@ import {
   useRef,
 } from 'react';
 import { Freeze } from './pane-freeze';
-import { useInstanceStore } from '../use-instance-store';
+import { useInstance, useInstanceStore } from '../use-instance-store';
 import { I18nManager, View as NativeView, type LayoutChangeEvent, useWindowDimensions } from 'react-native';
 import { useStore } from 'zustand';
 import { View } from '../tw';
@@ -42,7 +42,7 @@ import { PaneToggle } from './PaneToggle';
 import { PANE_WIDTH_DP } from './pane-widths';
 import { usePaneOverrideStore } from './pane-overrides.store';
 import { useWindowSizeClass } from './use-window-size-class';
-import { createAdaptivePanesStore, type AdaptivePanesStore } from './store';
+import { createAdaptivePanesStore } from './store';
 import { AdaptivePanesContext } from './context';
 import { useSplitViewBack } from './use-split-view-back';
 import { PaneDivider } from './PaneDivider';
@@ -152,9 +152,7 @@ function AdaptivePanesNavigator({
   // PER-INSTANCE store, held in a ref (the kit's vanilla-store pattern —
   // see ../use-instance-store.ts): each mounted host scopes its own column,
   // width and selection, so two hosts never share a selection. Provided to panes, divider and detail via context below.
-  const storeRef = useRef<AdaptivePanesStore | null>(null);
-  storeRef.current ??= createAdaptivePanesStore();
-  const store = storeRef.current;
+  const store = useInstance(createAdaptivePanesStore);
 
   const storedColumn = useStore(store, (state) => state.column);
   const setColumn = useStore(store, (state) => state.setColumn);

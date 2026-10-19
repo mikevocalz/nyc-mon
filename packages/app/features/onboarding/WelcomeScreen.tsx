@@ -16,6 +16,7 @@ import {
 } from '@acme/ui';
 import { Figure, Main, Section } from '@acme/ui/primitives';
 import { View } from '@acme/ui/tw';
+import { ArrangementPanes } from '@acme/ui/arrangement';
 import { NYC_PHOTOS } from '../../../assets/photos';
 import { eggs } from '@acme/content';
 import { announcePolitely } from './announce';
@@ -84,26 +85,27 @@ function EggShape({ w, h }: { w: number; h: number }) {
   );
 }
 
-/** Page-colored square rotated over the bottom-right corner: the hard corner cut. */
+/** Page-colored square rotated over the bottom-right corner: the visual itself is the angled shape, no frame around it. */
 function CornerCut() {
   return (
     <View
       aria-hidden
       pointerEvents="none"
       className="absolute bg-bg"
-      style={{ right: -16, bottom: -16, width: 32, height: 32, transform: [{ rotate: '45deg' }] }}
+      style={{ right: -24, bottom: -24, width: 48, height: 48, transform: [{ rotate: '45deg' }] }}
     />
   );
 }
 
-/** The framed panel visual: a keyed box, corner cut bottom-right, labelled as one image. */
-function PanelFigure({ testID, alt, height, children }: { testID: string; alt: string; height: number; children: React.ReactNode }) {
+/** The panel visual, corner cut bottom-right, labelled as one image. */
+function PanelFigure({ testID, alt, height, children }: { testID: string; alt: string; height?: number; children: React.ReactNode }) {
+  // No height: fill the pane (the photo pane beside the copy on a spanned foldable).
   return (
-    <View className="w-full" style={{ height }}>
+    <View className={height === undefined ? 'w-full flex-1' : 'w-full'} style={height === undefined ? undefined : { height }}>
       <Figure aria-label={alt} className="h-full w-full">
         <View
           testID={testID}
-          className="relative h-full w-full overflow-hidden border-2 border-concrete-400 bg-surface-sunken"
+          className="relative h-full w-full overflow-hidden"
           // RNW maps accessibilityRole="image" to role="img" on web; on web the
           // <figure> above already carries the label, so the native group label
           // stays off the DOM tree to avoid a double announcement.
@@ -257,31 +259,34 @@ export function WelcomeScreen({ offline = false }: WelcomeScreenProps) {
 
   const pageLabel = copy('m02.progress.a11y', { n: page + 1 });
   const atLast = page === LAST;
+  const CurrentArt = ART[page] ?? CityArt;
+  const current = PANELS[page] ?? PANELS[0]!;
 
-  return (
-    <Main className="flex-1 bg-bg" testID="m02-main">
-      <SafeArea className="flex-1" edges={['top', 'bottom']}>
-        <Container width="full" className="flex-1">
+  const skip = atLast ? null : (
+    <View testID="m02-skip">
+      <Button
+        variant="ghost"
+        size="md"
+        tone="royal"
+        title={copy('m02.skip')}
+        aria-label={copy('m02.skip')}
+        accessibilityHint={copy('m02.skip.a11y.hint')}
+        onPress={() => setPage(LAST)}
+      />
+    </View>
+  );
+
+  // One column: Skip, the slider, the actions. `withFigure` false is the copy
+  // pane of a spanned foldable, whose photo sits in the left pane instead.
+  const column = (withFigure: boolean) => (
           <View className="mx-auto w-full max-w-[560px] flex-1 px-4">
-            {/* Skip: top-right, 16 pt in — hidden on panel 3 (nothing to skip to). */}
-            <View className="h-14 flex-row items-center justify-end pt-1">
-              {!atLast ? (
-                <View testID="m02-skip">
-                  <Button
-                    variant="ghost"
-                    size="md"
-                    tone="royal"
-                    title={copy('m02.skip')}
-                    aria-label={copy('m02.skip')}
-                    accessibilityHint={copy('m02.skip.a11y.hint')}
-                    onPress={() => setPage(LAST)}
-                  />
-                </View>
-              ) : null}
-            </View>
+            {/* Top gutter: Skip lives in the bottom row beside Next (hidden on panel 3, nothing to skip to). */}
+            {withFigure ? <View className="h-6" /> : null}
 
             {/* The panels: figure on top, caption band below, dots and arrows
-                between the band and the actions (progressPosition below-content). */}
+                between the band and the actions (progressPosition below-content).
+                In the copy pane the slider sits vertically centred above the actions. */}
+            <View className={withFigure ? 'flex-1' : 'flex-1 justify-center'}>
             <CardSlider
               label={copy('m02.carousel.label')}
               index={page}
@@ -295,7 +300,7 @@ export function WelcomeScreen({ offline = false }: WelcomeScreenProps) {
               loop={false}
               autoPlay={false}
               tone="royal"
-              className="flex-1"
+              className={withFigure ? 'flex-1' : undefined}
             >
               {PANELS.map((panel) => {
                 const Art = ART[panel.n - 1] ?? CityArt;
@@ -321,13 +326,16 @@ export function WelcomeScreen({ offline = false }: WelcomeScreenProps) {
                         {copy(panel.bodyId)}
                       </Text>
                     </View>
-                    <PanelFigure testID={`m02-p${panel.n}-image`} alt={copy(panel.altId)} height={figureHeight}>
-                      <Art />
-                    </PanelFigure>
+                    {withFigure ? (
+                      <PanelFigure testID={`m02-p${panel.n}-image`} alt={copy(panel.altId)} height={figureHeight}>
+                        <Art />
+                      </PanelFigure>
+                    ) : null}
                   </Section>
                 );
               })}
             </CardSlider>
+            </View>
 
             {/* Offline first run: no network is needed until sign-in. */}
             {offline ? (
@@ -339,15 +347,18 @@ export function WelcomeScreen({ offline = false }: WelcomeScreenProps) {
             {/* Actions, pinned below the progress row: Next on 1–2; the two intents on 3 (P1). */}
             <View className="mt-4 pb-4" aria-label={pageLabel}>
               {!atLast ? (
-                <View testID="m02-next">
-                  <Button
-                    variant="ghost"
-                    size="md"
-                    fullWidth
-                    tone="royal"
-                    title={copy('m02.next')}
-                    onPress={() => setPage((p) => Math.min(LAST, p + 1))}
-                  />
+                <View className="flex-row items-center justify-between">
+                  {/* Skip left, Next right, folded and spanned alike. */}
+                  {skip}
+                  <View testID="m02-next" className="ml-auto">
+                    <Button
+                      variant="ghost"
+                      size="md"
+                      tone="royal"
+                      title={copy('m02.next')}
+                      onPress={() => setPage((p) => Math.min(LAST, p + 1))}
+                    />
+                  </View>
                 </View>
               ) : (
                 <View className="gap-3">
@@ -375,6 +386,31 @@ export function WelcomeScreen({ offline = false }: WelcomeScreenProps) {
               )}
             </View>
           </View>
+  );
+
+  // Across a fold or on a regular-width window (foldable skill §9): the photo
+  // in the left pane, the copy, progress and actions centred in the right.
+  // The panel's own photo follows `page`, so swiping the copy turns both.
+  return (
+    <Main className="flex-1 bg-bg" testID="m02-main">
+      <SafeArea className="flex-1" edges={['top', 'bottom']}>
+        <Container width="full" className="flex-1">
+          <ArrangementPanes
+            arrangement="split"
+            primarySide="right"
+            testID="m02-arrangement"
+            primary={(paired) => column(!paired)}
+            secondary={(shown) =>
+              shown ? (
+                <View className="flex-1 px-4 py-6">
+                  <PanelFigure testID={`m02-p${current.n}-image`} alt={copy(current.altId)}>
+                    <CurrentArt />
+                  </PanelFigure>
+                </View>
+              ) : null
+            }
+            fallback={() => column(true)}
+          />
         </Container>
       </SafeArea>
     </Main>

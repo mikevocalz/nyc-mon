@@ -1,0 +1,40 @@
+diff --git a/android/README.md b/android/README.md
+deleted file mode 100644
+index ac2fbda377ad1213c02f090138f48054e5660547..0000000000000000000000000000000000000000
+diff --git a/lib/module/views/SkiaView.web.js b/lib/module/views/SkiaView.web.js
+index 3c32ad569173fdd857ec19afd3fd6e02ed49892a..7c681cc3fa228858b1251ee01ce266ac692eedfe 100644
+--- a/lib/module/views/SkiaView.web.js
++++ b/lib/module/views/SkiaView.web.js
+@@ -262,8 +262,12 @@ export const SkiaView = props => {
+     };
+   }, [setPicture, getContext, getSize, redraw, makeImageSnapshot, measure, measureInWindow, nativeId]);
+ 
+-  // Let go of the recordings the view holds.
++  // Let go of the recordings the view holds, and of the picture: the
++  // <Canvas> that set it owns it and deletes it when it unmounts. Under a
++  // hidden <Activity> the view keeps its state, so a picture left here is
++  // painted again, already deleted, when the view is revealed.
+   useEffect(() => () => {
++    pictureRef.current = null;
+     queueRef.current.forEach(recording => recording.release());
+     queueRef.current = [];
+     shownRef.current.forEach(recording => recording.release());
+diff --git a/src/views/SkiaView.web.tsx b/src/views/SkiaView.web.tsx
+index 71c1e7f00dd4afc1496acfc969ea3d4d180623d8..a63409546f099f9b0848727c4da65d209037ea82 100644
+--- a/src/views/SkiaView.web.tsx
++++ b/src/views/SkiaView.web.tsx
+@@ -372,9 +372,13 @@ export const SkiaView = (props: SkiaViewProps) => {
+     nativeId,
+   ]);
+ 
+-  // Let go of the recordings the view holds.
++  // Let go of the recordings the view holds, and of the picture: the
++  // <Canvas> that set it owns it and deletes it when it unmounts. Under a
++  // hidden <Activity> the view keeps its state, so a picture left here is
++  // painted again, already deleted, when the view is revealed.
+   useEffect(
+     () => () => {
++      pictureRef.current = null;
+       queueRef.current.forEach((recording) => recording.release());
+       queueRef.current = [];
+       shownRef.current.forEach((recording) => recording.release());

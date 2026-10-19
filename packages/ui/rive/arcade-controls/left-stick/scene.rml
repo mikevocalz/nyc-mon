@@ -1,0 +1,759 @@
+<Rive version="1" kind="fragment">
+    <!-- NYC-MON left stick (Master Directive v2 §2A, §8).
+         Data binding only: the native input adapter writes stick/x, stick/y
+         and stick/engaged; the settings store writes stick/mode; the OS
+         writes a11y/reducedMotion. Rive reflects, it never owns input.
+         Two artboards share the LeftStick view model. LeftStick (the
+         default) is the housing, well, rings, indicators and the D-pad gate.
+         Thumbpad is the cap; the host moves it on the UI thread, because a
+         view model write from the JS thread reaches the artboard a frame or
+         more late and, on the Android runtime, only once something wakes the
+         settled state machine.
+         Geometry is docs/design/research/arcade-ergonomics.md §8 at scale
+         1.0: housing Ø128, well Ø112, thumbpad Ø56, pad centre travel 36
+         (well radius 56 minus pad radius 28, plus the 8 the pad may show
+         past the well edge), eight indicators on a 96 circle. LeftStick is
+         144 x 144: the Ø128 housing plus an 8 dp glow margin, and the host
+         draws it that much larger than the housing so one artboard unit is
+         one dp. Colours are the handoff tokens
+         (docs/design/screens/G01-arcade-controller/08-handoff.md), ARGB from
+         packages/theme/tokens.ts; scripts/rive/check-colors.mjs enforces that.
+         Indicator lighting: each cardinal tick's opacity follows its axis
+         through a range mapper (0.5..1 of travel lights it); each diagonal
+         follows min() of both axes through a formula converter. In D-pad
+         mode the diagonals and an octagonal gate fade in. -->
+    <Artboard defaultStateMachineId="0:7" viewModelId="0:40" viewModelInstanceId="0:41"
+              width="144" height="144" styleId="0:5" name="LeftStick" id="0:2">
+        <LayoutComponentStyle name="Artboard Style" id="0:5"/>
+
+
+        <!-- Four cardinal indicators on the 96 circle, royal-300 at rest. Each
+             tick's opacity is bound to its axis: 0.45 at rest, 1 at full travel. -->
+        <Node x="72" y="72" name="Cardinals" id="0:220">
+            <Shape x="0" y="-48" name="N" id="0:221">
+                <DataBindContext sourcePathIds="0:40-0:45-0:53" propertyKey="18" converterId="0:120"/>
+                <Rectangle width="3" height="10" cornerRadiusTL="1" name="Path"/>
+                <Fill name="Fill"><SolidColor colorValue="FF80ACFC" name="C"/></Fill>
+            </Shape>
+            <Shape x="48" y="0" rotation="1.5707964" name="E" id="0:222">
+                <DataBindContext sourcePathIds="0:40-0:45-0:52" propertyKey="18" converterId="0:120"/>
+                <Rectangle width="3" height="10" cornerRadiusTL="1" name="Path"/>
+                <Fill name="Fill"><SolidColor colorValue="FF80ACFC" name="C"/></Fill>
+            </Shape>
+            <Shape x="0" y="48" name="S" id="0:223">
+                <DataBindContext sourcePathIds="0:40-0:45-0:53" propertyKey="18" converterId="0:121"/>
+                <Rectangle width="3" height="10" cornerRadiusTL="1" name="Path"/>
+                <Fill name="Fill"><SolidColor colorValue="FF80ACFC" name="C"/></Fill>
+            </Shape>
+            <Shape x="-48" y="0" rotation="1.5707964" name="W" id="0:224">
+                <DataBindContext sourcePathIds="0:40-0:45-0:52" propertyKey="18" converterId="0:121"/>
+                <Rectangle width="3" height="10" cornerRadiusTL="1" name="Path"/>
+                <Fill name="Fill"><SolidColor colorValue="FF80ACFC" name="C"/></Fill>
+            </Shape>
+        </Node>
+
+        <!-- Four diagonal indicators: only shown in stick/mode = dpad (eight-way).
+             Each lights from min() of its two axes. -->
+        <Node x="72" y="72" opacity="0" name="Diagonals" id="0:230">
+            <!-- D-pad gate: an octagon inscribed in the well, one vertex per
+                 direction, so the eight snapped pad positions read as notches. -->
+            <Shape name="Gate" id="0:235">
+                <Polygon points="8" width="112" height="112" name="Path"/>
+                <Stroke thickness="1.5" name="Crisp"><SolidColor colorValue="FF4BA8F0" name="C"/></Stroke>
+            </Shape>
+            <Shape x="33.94" y="-33.94" rotation="0.7853982" name="NE" id="0:231">
+                <DataBindContext sourcePathIds="0:40-0:45-0:52" propertyKey="18" converterId="0:126"/>
+                <Rectangle width="3" height="8" cornerRadiusTL="1" name="Path"/>
+                <Fill name="Fill"><SolidColor colorValue="FF4BA8F0" name="C"/></Fill>
+            </Shape>
+            <Shape x="33.94" y="33.94" rotation="-0.7853982" name="SE" id="0:232">
+                <DataBindContext sourcePathIds="0:40-0:45-0:52" propertyKey="18" converterId="0:127"/>
+                <Rectangle width="3" height="8" cornerRadiusTL="1" name="Path"/>
+                <Fill name="Fill"><SolidColor colorValue="FF4BA8F0" name="C"/></Fill>
+            </Shape>
+            <Shape x="-33.94" y="33.94" rotation="0.7853982" name="SW" id="0:233">
+                <DataBindContext sourcePathIds="0:40-0:45-0:52" propertyKey="18" converterId="0:128"/>
+                <Rectangle width="3" height="8" cornerRadiusTL="1" name="Path"/>
+                <Fill name="Fill"><SolidColor colorValue="FF4BA8F0" name="C"/></Fill>
+            </Shape>
+            <Shape x="-33.94" y="-33.94" rotation="-0.7853982" name="NW" id="0:234">
+                <DataBindContext sourcePathIds="0:40-0:45-0:52" propertyKey="18" converterId="0:129"/>
+                <Rectangle width="3" height="8" cornerRadiusTL="1" name="Path"/>
+                <Fill name="Fill"><SolidColor colorValue="FF4BA8F0" name="C"/></Fill>
+            </Shape>
+        </Node>
+
+        <!-- Concentric illumination rings at the well edge (112), the indicator
+             circle (96) and the inner step (64). The outer ring's glow opacity
+             and colour are keyed per state: royal-400 keyline at rest,
+             carolina-500 while engaged. -->
+        <Shape x="72" y="72" opacity="0.35" name="RingGlow" id="0:240">
+            <Ellipse width="112" height="112" name="Path"/>
+            <Stroke thickness="5" name="Glow">
+                <SolidColor colorValue="FF4082FA" name="C" id="0:245"/>
+                <Feather strength="10" name="Soft"/>
+            </Stroke>
+        </Shape>
+        <Shape x="72" y="72" name="RingOuter" id="0:241">
+            <Ellipse width="112" height="112" name="Path"/>
+            <Stroke thickness="1.5" name="Crisp"><SolidColor colorValue="FF4082FA" name="C" id="0:244"/></Stroke>
+        </Shape>
+        <Shape x="72" y="72" name="RingMid" id="0:242">
+            <Ellipse width="96" height="96" name="Path"/>
+            <Stroke thickness="1" name="Crisp"><SolidColor colorValue="FF003FB6" name="C" id="0:246"/></Stroke>
+        </Shape>
+        <Shape x="72" y="72" name="RingInner" id="0:243">
+            <Ellipse width="64" height="64" name="Path"/>
+            <Stroke thickness="1" name="Crisp"><SolidColor colorValue="FF484C51" name="C"/></Stroke>
+        </Shape>
+
+        <!-- Recessed well: signage black at the centre to the concrete-900 plate at the edge -->
+        <Shape x="72" y="72" name="Well" id="0:301">
+            <Ellipse width="112" height="112" name="Path"/>
+            <Fill name="Recess">
+                <RadialGradient startX="0" startY="0" endX="0" endY="56" name="Recess">
+                    <GradientStop colorValue="FF000000" position="0"/>
+                    <GradientStop colorValue="FF000000" position="0.6"/>
+                    <GradientStop colorValue="FF1C1E21" position="1"/>
+                </RadialGradient>
+            </Fill>
+        </Shape>
+
+        <!-- Housing plate. Semantics live here: one slider node for the
+             screen reader, and the target every gamepad / semantic listener
+             points at (the target must own the SemanticData directly). -->
+        <Shape x="72" y="72" name="Housing" id="0:300">
+            <SemanticData role="slider" label="Movement stick"
+                          hint="Drag to move. Left and right steer, up and down walk."
+                          name="Semantics"/>
+            <Ellipse width="128" height="128" name="Path"/>
+            <Fill name="Plate"><SolidColor colorValue="FF1C1E21" name="C"/></Fill>
+            <Stroke thickness="2" name="Bezel"><SolidColor colorValue="FF61656A" name="C"/></Stroke>
+        </Shape>
+
+        <!-- Timelines: one hold key per state; transitions cross-fade them. -->
+        <LinearAnimation duration="1" name="Idle" id="0:400">
+            <KeyedObject objectId="0:240">
+                <KeyedProperty property="opacity"><KeyFrameDouble value="0.35" interpolationType="linear"/></KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:244"><KeyedProperty property="colorValue"><KeyFrameColor value="FF4082FA" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="0:245"><KeyedProperty property="colorValue"><KeyFrameColor value="FF4082FA" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="0:246"><KeyedProperty property="colorValue"><KeyFrameColor value="FF003FB6" interpolationType="linear"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+        <!-- Engaged: the deflection rings light carolina (the cap compresses in Thumbpad) -->
+        <LinearAnimation duration="1" name="Engaged" id="0:401">
+            <KeyedObject objectId="0:240">
+                <KeyedProperty property="opacity"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:244"><KeyedProperty property="colorValue"><KeyFrameColor value="FF4BA8F0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="0:245"><KeyedProperty property="colorValue"><KeyFrameColor value="FF4BA8F0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="0:246"><KeyedProperty property="colorValue"><KeyFrameColor value="FF4BA8F0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+        <!-- Released: spring overshoot back to rest, 14 frames -->
+        <LinearAnimation duration="14" name="Released" id="0:402">
+            <KeyedObject objectId="0:240">
+                <KeyedProperty property="opacity">
+                    <KeyFrameDouble value="1" frame="0" interpolationType="linear"/>
+                    <KeyFrameDouble value="0.35" frame="14" interpolationType="linear"/>
+                </KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:244"><KeyedProperty property="colorValue">
+                <KeyFrameColor value="FF4BA8F0" frame="0" interpolationType="linear"/>
+                <KeyFrameColor value="FF4082FA" frame="14" interpolationType="linear"/>
+            </KeyedProperty></KeyedObject>
+            <KeyedObject objectId="0:245"><KeyedProperty property="colorValue">
+                <KeyFrameColor value="FF4BA8F0" frame="0" interpolationType="linear"/>
+                <KeyFrameColor value="FF4082FA" frame="14" interpolationType="linear"/>
+            </KeyedProperty></KeyedObject>
+            <KeyedObject objectId="0:246"><KeyedProperty property="colorValue">
+                <KeyFrameColor value="FF4BA8F0" frame="0" interpolationType="linear"/>
+                <KeyFrameColor value="FF003FB6" frame="14" interpolationType="linear"/>
+            </KeyedProperty></KeyedObject>
+        </LinearAnimation>
+        <!-- Engaged, reduced motion: an authored sibling. No compression, no
+             glow ramp; the rim and ring change colour in one frame
+             (tokens.ts motion-tap.reduced: colour, not scale). -->
+        <LinearAnimation duration="1" name="EngagedReduced" id="0:403">
+            <KeyedObject objectId="0:240">
+                <KeyedProperty property="opacity"><KeyFrameDouble value="0.35" interpolationType="linear"/></KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:244"><KeyedProperty property="colorValue"><KeyFrameColor value="FF4BA8F0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="0:245"><KeyedProperty property="colorValue"><KeyFrameColor value="FF4082FA" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="0:246"><KeyedProperty property="colorValue"><KeyFrameColor value="FF4BA8F0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+        <LinearAnimation duration="1" name="ModeAnalog" id="0:410">
+            <KeyedObject objectId="0:230">
+                <KeyedProperty property="opacity"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty>
+            </KeyedObject>
+        </LinearAnimation>
+        <LinearAnimation duration="1" name="ModeDpad" id="0:411">
+            <KeyedObject objectId="0:230">
+                <KeyedProperty property="opacity"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty>
+            </KeyedObject>
+        </LinearAnimation>
+
+        <StateMachine name="Stick" id="0:7">
+            <!-- Pointer proof for the CLI (--pointer=down/up on the housing). In the
+                 app the gesture thread writes stick/engaged; this is the same
+                 property, so the two never fight. -->
+            <StateMachineListenerSingle targetId="0:300" listenerTypeValue="down" name="Pad Down" id="0:500">
+                <ListenerViewModelChange>
+                    <BindablePropertyBoolean propertyValue="true">
+                        <DataBindContext sourcePathIds="0:40-0:45-0:54" propertyKey="634" direction="true"/>
+                    </BindablePropertyBoolean>
+                </ListenerViewModelChange>
+            </StateMachineListenerSingle>
+            <StateMachineListenerSingle targetId="0:300" listenerTypeValue="up" name="Pad Up" id="0:501">
+                <ListenerViewModelChange>
+                    <BindablePropertyBoolean propertyValue="false">
+                        <DataBindContext sourcePathIds="0:40-0:45-0:54" propertyKey="634" direction="true"/>
+                    </BindablePropertyBoolean>
+                </ListenerViewModelChange>
+            </StateMachineListenerSingle>
+
+            <!-- Gamepad listeners for CLI simulation only (§8). Real pads enter
+                 through the semantic command layer. W3C standard slots:
+                 dpadUp 12, dpadDown 13, dpadLeft 14, dpadRight 15. -->
+            <StateMachineListener targetId="0:300" name="Pad Left Down" id="0:510">
+                <ListenerInputTypeGamepad listenerTypeValue="gamepad">
+                    <GamepadInput kind="button" mapping="standard" inputIndex="14" buttonPhase="1"/>
+                </ListenerInputTypeGamepad>
+                <ListenerViewModelChange>
+                    <BindablePropertyNumber propertyValue="-1">
+                        <DataBindContext sourcePathIds="0:40-0:45-0:52" propertyKey="636" direction="true"/>
+                    </BindablePropertyNumber>
+                </ListenerViewModelChange>
+                <ListenerViewModelChange>
+                    <BindablePropertyBoolean propertyValue="true">
+                        <DataBindContext sourcePathIds="0:40-0:45-0:54" propertyKey="634" direction="true"/>
+                    </BindablePropertyBoolean>
+                </ListenerViewModelChange>
+            </StateMachineListener>
+            <StateMachineListener targetId="0:300" name="Pad Right Down" id="0:511">
+                <ListenerInputTypeGamepad listenerTypeValue="gamepad">
+                    <GamepadInput kind="button" mapping="standard" inputIndex="15" buttonPhase="1"/>
+                </ListenerInputTypeGamepad>
+                <ListenerViewModelChange>
+                    <BindablePropertyNumber propertyValue="1">
+                        <DataBindContext sourcePathIds="0:40-0:45-0:52" propertyKey="636" direction="true"/>
+                    </BindablePropertyNumber>
+                </ListenerViewModelChange>
+                <ListenerViewModelChange>
+                    <BindablePropertyBoolean propertyValue="true">
+                        <DataBindContext sourcePathIds="0:40-0:45-0:54" propertyKey="634" direction="true"/>
+                    </BindablePropertyBoolean>
+                </ListenerViewModelChange>
+            </StateMachineListener>
+            <StateMachineListener targetId="0:300" name="Pad Up Down" id="0:512">
+                <ListenerInputTypeGamepad listenerTypeValue="gamepad">
+                    <GamepadInput kind="button" mapping="standard" inputIndex="12" buttonPhase="1"/>
+                </ListenerInputTypeGamepad>
+                <ListenerViewModelChange>
+                    <BindablePropertyNumber propertyValue="1">
+                        <DataBindContext sourcePathIds="0:40-0:45-0:53" propertyKey="636" direction="true"/>
+                    </BindablePropertyNumber>
+                </ListenerViewModelChange>
+                <ListenerViewModelChange>
+                    <BindablePropertyBoolean propertyValue="true">
+                        <DataBindContext sourcePathIds="0:40-0:45-0:54" propertyKey="634" direction="true"/>
+                    </BindablePropertyBoolean>
+                </ListenerViewModelChange>
+            </StateMachineListener>
+            <StateMachineListener targetId="0:300" name="Pad Down Down" id="0:513">
+                <ListenerInputTypeGamepad listenerTypeValue="gamepad">
+                    <GamepadInput kind="button" mapping="standard" inputIndex="13" buttonPhase="1"/>
+                </ListenerInputTypeGamepad>
+                <ListenerViewModelChange>
+                    <BindablePropertyNumber propertyValue="-1">
+                        <DataBindContext sourcePathIds="0:40-0:45-0:53" propertyKey="636" direction="true"/>
+                    </BindablePropertyNumber>
+                </ListenerViewModelChange>
+                <ListenerViewModelChange>
+                    <BindablePropertyBoolean propertyValue="true">
+                        <DataBindContext sourcePathIds="0:40-0:45-0:54" propertyKey="634" direction="true"/>
+                    </BindablePropertyBoolean>
+                </ListenerViewModelChange>
+            </StateMachineListener>
+            <!-- any d-pad release neutralises: x=0, y=0, engaged=false -->
+            <StateMachineListener targetId="0:300" name="Pad Release" id="0:514">
+                <ListenerInputTypeGamepad listenerTypeValue="gamepad">
+                    <GamepadInput kind="button" mapping="standard" inputIndex="12" buttonPhase="2"/>
+                    <GamepadInput kind="button" mapping="standard" inputIndex="13" buttonPhase="2"/>
+                    <GamepadInput kind="button" mapping="standard" inputIndex="14" buttonPhase="2"/>
+                    <GamepadInput kind="button" mapping="standard" inputIndex="15" buttonPhase="2"/>
+                </ListenerInputTypeGamepad>
+                <ListenerViewModelChange>
+                    <BindablePropertyNumber propertyValue="0">
+                        <DataBindContext sourcePathIds="0:40-0:45-0:52" propertyKey="636" direction="true"/>
+                    </BindablePropertyNumber>
+                </ListenerViewModelChange>
+                <ListenerViewModelChange>
+                    <BindablePropertyNumber propertyValue="0">
+                        <DataBindContext sourcePathIds="0:40-0:45-0:53" propertyKey="636" direction="true"/>
+                    </BindablePropertyNumber>
+                </ListenerViewModelChange>
+                <ListenerViewModelChange>
+                    <BindablePropertyBoolean propertyValue="false">
+                        <DataBindContext sourcePathIds="0:40-0:45-0:54" propertyKey="634" direction="true"/>
+                    </BindablePropertyBoolean>
+                </ListenerViewModelChange>
+            </StateMachineListener>
+
+            <!-- Screen-reader actions on the slider: increase/decrease nudge x,
+                 tap neutralises. -->
+            <StateMachineListener targetId="0:300" name="A11y Increase" id="0:520">
+                <ListenerInputTypeSemantic listenerTypeValue="semanticAction">
+                    <SemanticInput actionType="increase"/>
+                </ListenerInputTypeSemantic>
+                <ListenerViewModelChange>
+                    <BindablePropertyNumber propertyValue="1">
+                        <DataBindContext sourcePathIds="0:40-0:45-0:52" propertyKey="636" direction="true"/>
+                    </BindablePropertyNumber>
+                </ListenerViewModelChange>
+                <ListenerViewModelChange>
+                    <BindablePropertyBoolean propertyValue="true">
+                        <DataBindContext sourcePathIds="0:40-0:45-0:54" propertyKey="634" direction="true"/>
+                    </BindablePropertyBoolean>
+                </ListenerViewModelChange>
+            </StateMachineListener>
+            <StateMachineListener targetId="0:300" name="A11y Decrease" id="0:521">
+                <ListenerInputTypeSemantic listenerTypeValue="semanticAction">
+                    <SemanticInput actionType="decrease"/>
+                </ListenerInputTypeSemantic>
+                <ListenerViewModelChange>
+                    <BindablePropertyNumber propertyValue="-1">
+                        <DataBindContext sourcePathIds="0:40-0:45-0:52" propertyKey="636" direction="true"/>
+                    </BindablePropertyNumber>
+                </ListenerViewModelChange>
+                <ListenerViewModelChange>
+                    <BindablePropertyBoolean propertyValue="true">
+                        <DataBindContext sourcePathIds="0:40-0:45-0:54" propertyKey="634" direction="true"/>
+                    </BindablePropertyBoolean>
+                </ListenerViewModelChange>
+            </StateMachineListener>
+            <StateMachineListener targetId="0:300" name="A11y Neutral" id="0:522">
+                <ListenerInputTypeSemantic listenerTypeValue="semanticAction">
+                    <SemanticInput actionType="tap"/>
+                </ListenerInputTypeSemantic>
+                <ListenerViewModelChange>
+                    <BindablePropertyNumber propertyValue="0">
+                        <DataBindContext sourcePathIds="0:40-0:45-0:52" propertyKey="636" direction="true"/>
+                    </BindablePropertyNumber>
+                </ListenerViewModelChange>
+                <ListenerViewModelChange>
+                    <BindablePropertyNumber propertyValue="0">
+                        <DataBindContext sourcePathIds="0:40-0:45-0:53" propertyKey="636" direction="true"/>
+                    </BindablePropertyNumber>
+                </ListenerViewModelChange>
+                <ListenerViewModelChange>
+                    <BindablePropertyBoolean propertyValue="false">
+                        <DataBindContext sourcePathIds="0:40-0:45-0:54" propertyKey="634" direction="true"/>
+                    </BindablePropertyBoolean>
+                </ListenerViewModelChange>
+            </StateMachineListener>
+
+            <!-- Engage layer: Idle / Engaged / Released / EngagedReduced -->
+            <StateMachineLayer name="Engage" id="0:8">
+                <AnyState x="700" y="-120"/>
+                <ExitState x="900" y="-120"/>
+                <EntryState x="0" y="0"><StateTransition stateToId="0:600"/></EntryState>
+
+                <AnimationState x="160" y="0" animationId="0:400" id="0:600">
+                    <!-- Gamepad and keyboard listeners only receive events through
+                         the focused node (proved with --gamepad: no focus, no write).
+                         The housing is the one focusable, so focus it on entry. -->
+                    <FocusActionTarget targetId="0:300"/>
+                    <!-- engaged and full motion: 80 ms compression -->
+                    <StateTransition stateToId="0:601" duration="80">
+                        <TransitionViewModelCondition>
+                            <TransitionPropertyViewModelComparator>
+                                <BindablePropertyBoolean><DataBindContext sourcePathIds="0:40-0:45-0:54" propertyKey="634"/></BindablePropertyBoolean>
+                            </TransitionPropertyViewModelComparator>
+                            <TransitionValueBooleanComparator value="true"/>
+                        </TransitionViewModelCondition>
+                        <TransitionViewModelCondition>
+                            <TransitionPropertyViewModelComparator>
+                                <BindablePropertyBoolean><DataBindContext sourcePathIds="0:40-0:48-0:82" propertyKey="634"/></BindablePropertyBoolean>
+                            </TransitionPropertyViewModelComparator>
+                            <TransitionValueBooleanComparator value="false"/>
+                        </TransitionViewModelCondition>
+                    </StateTransition>
+                    <!-- engaged and reduced motion: snap to the colour sibling -->
+                    <StateTransition stateToId="0:603" duration="0">
+                        <TransitionViewModelCondition>
+                            <TransitionPropertyViewModelComparator>
+                                <BindablePropertyBoolean><DataBindContext sourcePathIds="0:40-0:45-0:54" propertyKey="634"/></BindablePropertyBoolean>
+                            </TransitionPropertyViewModelComparator>
+                            <TransitionValueBooleanComparator value="true"/>
+                        </TransitionViewModelCondition>
+                        <TransitionViewModelCondition>
+                            <TransitionPropertyViewModelComparator>
+                                <BindablePropertyBoolean><DataBindContext sourcePathIds="0:40-0:48-0:82" propertyKey="634"/></BindablePropertyBoolean>
+                            </TransitionPropertyViewModelComparator>
+                            <TransitionValueBooleanComparator value="true"/>
+                        </TransitionViewModelCondition>
+                    </StateTransition>
+                </AnimationState>
+
+                <AnimationState x="360" y="-100" animationId="0:401" id="0:601">
+                    <StateTransition stateToId="0:602" duration="0">
+                        <TransitionViewModelCondition>
+                            <TransitionPropertyViewModelComparator>
+                                <BindablePropertyBoolean><DataBindContext sourcePathIds="0:40-0:45-0:54" propertyKey="634"/></BindablePropertyBoolean>
+                            </TransitionPropertyViewModelComparator>
+                            <TransitionValueBooleanComparator value="false"/>
+                        </TransitionViewModelCondition>
+                    </StateTransition>
+                </AnimationState>
+
+                <!-- Released plays its spring once, then returns to Idle -->
+                <AnimationState x="560" y="0" animationId="0:402" reset="true" id="0:602">
+                    <StateTransition stateToId="0:600" enableExitTime="true" exitTimeIsPercetange="true" exitTime="100"/>
+                    <!-- re-engaged mid-spring (interrupted): go straight back -->
+                    <StateTransition stateToId="0:601" duration="80">
+                        <TransitionViewModelCondition>
+                            <TransitionPropertyViewModelComparator>
+                                <BindablePropertyBoolean><DataBindContext sourcePathIds="0:40-0:45-0:54" propertyKey="634"/></BindablePropertyBoolean>
+                            </TransitionPropertyViewModelComparator>
+                            <TransitionValueBooleanComparator value="true"/>
+                        </TransitionViewModelCondition>
+                    </StateTransition>
+                </AnimationState>
+
+                <AnimationState x="360" y="100" animationId="0:403" id="0:603">
+                    <StateTransition stateToId="0:600" duration="0">
+                        <TransitionViewModelCondition>
+                            <TransitionPropertyViewModelComparator>
+                                <BindablePropertyBoolean><DataBindContext sourcePathIds="0:40-0:45-0:54" propertyKey="634"/></BindablePropertyBoolean>
+                            </TransitionPropertyViewModelComparator>
+                            <TransitionValueBooleanComparator value="false"/>
+                        </TransitionViewModelCondition>
+                    </StateTransition>
+                </AnimationState>
+            </StateMachineLayer>
+
+            <!-- Mode layer: analog hides the diagonals, dpad shows all eight -->
+            <StateMachineLayer name="Mode" id="0:9">
+                <AnyState x="500" y="-120"/>
+                <ExitState x="700" y="-120"/>
+                <EntryState x="0" y="0"><StateTransition stateToId="0:610"/></EntryState>
+                <AnimationState x="160" y="0" animationId="0:410" id="0:610">
+                    <StateTransition stateToId="0:611" duration="120">
+                        <TransitionViewModelCondition>
+                            <TransitionPropertyViewModelComparator>
+                                <BindablePropertyEnum><DataBindContext sourcePathIds="0:40-0:45-0:55" propertyKey="637"/></BindablePropertyEnum>
+                            </TransitionPropertyViewModelComparator>
+                            <TransitionValueEnumComparator value="0:92"/>
+                        </TransitionViewModelCondition>
+                    </StateTransition>
+                </AnimationState>
+                <AnimationState x="360" y="0" animationId="0:411" id="0:611">
+                    <StateTransition stateToId="0:610" duration="120">
+                        <TransitionViewModelCondition>
+                            <TransitionPropertyViewModelComparator>
+                                <BindablePropertyEnum><DataBindContext sourcePathIds="0:40-0:45-0:55" propertyKey="637"/></BindablePropertyEnum>
+                            </TransitionPropertyViewModelComparator>
+                            <TransitionValueEnumComparator value="0:91"/>
+                        </TransitionViewModelCondition>
+                    </StateTransition>
+                </AnimationState>
+            </StateMachineLayer>
+        </StateMachine>
+    </Artboard>
+
+    <!-- Thumbpad: the cap alone, 72 x 72 (pad 56 plus an 8 dp shadow margin).
+         The host draws it in its own view above the LeftStick artboard and
+         moves that view with a Reanimated transform on the UI thread, so the
+         pad tracks the finger at frame rate. Rive keeps the look: the dome,
+         the highlight that counter-slides with stick/x and stick/y, and the
+         engage compression. Bound to the same LeftStick view model, so one
+         default instance drives both artboards. -->
+    <Artboard defaultStateMachineId="0:707" viewModelId="0:40" viewModelInstanceId="0:41"
+              x="200" y="0" width="72" height="72" styleId="0:705" name="Thumbpad" id="0:702">
+        <LayoutComponentStyle name="Thumbpad Style" id="0:705"/>
+        <Node x="36" y="36" name="Thumbpad" id="0:200">
+
+            <!-- specular highlight slides opposite the tilt: perceived convexity -->
+            <Shape x="-6" y="-7" name="Highlight" id="0:210">
+                <DataBindContext sourcePathIds="0:40-0:45-0:52" propertyKey="13" converterId="0:116"/>
+                <DataBindContext sourcePathIds="0:40-0:45-0:53" propertyKey="14" converterId="0:117"/>
+                <Ellipse width="26" height="17" name="Path"/>
+                <Fill fillRule="clockwise" name="Fill">
+                    <SolidColor colorValue="66DFE0E1" name="C"/>
+                    <Feather strength="7" name="Soft"/>
+                </Fill>
+            </Shape>
+
+            <!-- convex cap: concrete-600 crown to concrete-800 face, concrete-900 edge -->
+            <Shape name="Cap" id="0:205">
+                <Ellipse width="56" height="56" name="Path"/>
+                <Fill name="Fill">
+                    <RadialGradient startX="-8" startY="-10" endX="27" endY="23" name="Dome">
+                        <GradientStop colorValue="FF61656A" position="0"/>
+                        <GradientStop colorValue="FF303337" position="0.55"/>
+                        <GradientStop colorValue="FF1C1E21" position="1"/>
+                    </RadialGradient>
+                </Fill>
+                <Stroke thickness="1.5" name="Rim" id="0:206">
+                    <SolidColor colorValue="FFB8BBBE" name="C" id="0:207"/>
+                </Stroke>
+            </Shape>
+
+            <!-- contact shadow under the cap -->
+            <Shape x="0" y="4" name="Shadow" id="0:208">
+                <Ellipse width="58" height="58" name="Path"/>
+                <Fill fillRule="clockwise" name="Fill">
+                    <SolidColor colorValue="B3000000" name="C"/>
+                    <Feather strength="6" name="Soft"/>
+                </Fill>
+            </Shape>
+        </Node>
+        <LinearAnimation duration="1" name="PadIdle" id="0:720">
+            <KeyedObject objectId="0:200">
+                <KeyedProperty property="scaleX"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty>
+                <KeyedProperty property="scaleY"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:207">
+                <KeyedProperty property="colorValue"><KeyFrameColor value="FFB8BBBE" interpolationType="linear"/></KeyedProperty>
+            </KeyedObject>
+        </LinearAnimation>
+        <LinearAnimation duration="1" name="PadEngaged" id="0:721">
+            <KeyedObject objectId="0:200">
+                <KeyedProperty property="scaleX"><KeyFrameDouble value="0.94" interpolationType="linear"/></KeyedProperty>
+                <KeyedProperty property="scaleY"><KeyFrameDouble value="0.94" interpolationType="linear"/></KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:207">
+                <KeyedProperty property="colorValue"><KeyFrameColor value="FF4BA8F0" interpolationType="linear"/></KeyedProperty>
+            </KeyedObject>
+        </LinearAnimation>
+        <LinearAnimation duration="14" name="PadReleased" id="0:722">
+            <KeyedObject objectId="0:200">
+                <KeyedProperty property="scaleX">
+                    <KeyFrameDouble value="0.94" frame="0" interpolationType="cubic"><CubicEaseInterpolator x1="0" y1="0" x2="0.58" y2="1"/></KeyFrameDouble>
+                    <KeyFrameDouble value="1.04" frame="6" interpolationType="cubic"><CubicEaseInterpolator x1="0.42" y1="0" x2="0.58" y2="1"/></KeyFrameDouble>
+                    <KeyFrameDouble value="1" frame="14" interpolationType="linear"/>
+                </KeyedProperty>
+                <KeyedProperty property="scaleY">
+                    <KeyFrameDouble value="0.94" frame="0" interpolationType="cubic"><CubicEaseInterpolator x1="0" y1="0" x2="0.58" y2="1"/></KeyFrameDouble>
+                    <KeyFrameDouble value="1.04" frame="6" interpolationType="cubic"><CubicEaseInterpolator x1="0.42" y1="0" x2="0.58" y2="1"/></KeyFrameDouble>
+                    <KeyFrameDouble value="1" frame="14" interpolationType="linear"/>
+                </KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:207">
+                <KeyedProperty property="colorValue">
+                    <KeyFrameColor value="FF4BA8F0" frame="0" interpolationType="linear"/>
+                    <KeyFrameColor value="FFB8BBBE" frame="14" interpolationType="linear"/>
+                </KeyedProperty>
+            </KeyedObject>
+        </LinearAnimation>
+        <LinearAnimation duration="1" name="PadEngagedReduced" id="0:723">
+            <KeyedObject objectId="0:200">
+                <KeyedProperty property="scaleX"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty>
+                <KeyedProperty property="scaleY"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:207">
+                <KeyedProperty property="colorValue"><KeyFrameColor value="FF4BA8F0" interpolationType="linear"/></KeyedProperty>
+            </KeyedObject>
+        </LinearAnimation>
+        <StateMachine name="Pad" id="0:707">
+            <!-- Same Engage graph as the LeftStick machine, on the cap alone. -->
+            <StateMachineLayer name="Engage" id="0:708">
+                <AnyState x="700" y="-120"/>
+                <ExitState x="900" y="-120"/>
+                <EntryState x="0" y="0"><StateTransition stateToId="0:730"/></EntryState>
+                <AnimationState x="160" y="0" animationId="0:720" id="0:730">
+                    <StateTransition stateToId="0:731" duration="80">
+                        <TransitionViewModelCondition>
+                            <TransitionPropertyViewModelComparator>
+                                <BindablePropertyBoolean><DataBindContext sourcePathIds="0:40-0:45-0:54" propertyKey="634"/></BindablePropertyBoolean>
+                            </TransitionPropertyViewModelComparator>
+                            <TransitionValueBooleanComparator value="true"/>
+                        </TransitionViewModelCondition>
+                        <TransitionViewModelCondition>
+                            <TransitionPropertyViewModelComparator>
+                                <BindablePropertyBoolean><DataBindContext sourcePathIds="0:40-0:48-0:82" propertyKey="634"/></BindablePropertyBoolean>
+                            </TransitionPropertyViewModelComparator>
+                            <TransitionValueBooleanComparator value="false"/>
+                        </TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="0:733" duration="0">
+                        <TransitionViewModelCondition>
+                            <TransitionPropertyViewModelComparator>
+                                <BindablePropertyBoolean><DataBindContext sourcePathIds="0:40-0:45-0:54" propertyKey="634"/></BindablePropertyBoolean>
+                            </TransitionPropertyViewModelComparator>
+                            <TransitionValueBooleanComparator value="true"/>
+                        </TransitionViewModelCondition>
+                        <TransitionViewModelCondition>
+                            <TransitionPropertyViewModelComparator>
+                                <BindablePropertyBoolean><DataBindContext sourcePathIds="0:40-0:48-0:82" propertyKey="634"/></BindablePropertyBoolean>
+                            </TransitionPropertyViewModelComparator>
+                            <TransitionValueBooleanComparator value="true"/>
+                        </TransitionViewModelCondition>
+                    </StateTransition>
+                </AnimationState>
+                <AnimationState x="360" y="-100" animationId="0:721" id="0:731">
+                    <StateTransition stateToId="0:732" duration="0">
+                        <TransitionViewModelCondition>
+                            <TransitionPropertyViewModelComparator>
+                                <BindablePropertyBoolean><DataBindContext sourcePathIds="0:40-0:45-0:54" propertyKey="634"/></BindablePropertyBoolean>
+                            </TransitionPropertyViewModelComparator>
+                            <TransitionValueBooleanComparator value="false"/>
+                        </TransitionViewModelCondition>
+                    </StateTransition>
+                </AnimationState>
+                <AnimationState x="560" y="0" animationId="0:722" reset="true" id="0:732">
+                    <StateTransition stateToId="0:730" enableExitTime="true" exitTimeIsPercetange="true" exitTime="100"/>
+                    <StateTransition stateToId="0:731" duration="80">
+                        <TransitionViewModelCondition>
+                            <TransitionPropertyViewModelComparator>
+                                <BindablePropertyBoolean><DataBindContext sourcePathIds="0:40-0:45-0:54" propertyKey="634"/></BindablePropertyBoolean>
+                            </TransitionPropertyViewModelComparator>
+                            <TransitionValueBooleanComparator value="true"/>
+                        </TransitionViewModelCondition>
+                    </StateTransition>
+                </AnimationState>
+                <AnimationState x="360" y="100" animationId="0:723" id="0:733">
+                    <StateTransition stateToId="0:730" duration="0">
+                        <TransitionViewModelCondition>
+                            <TransitionPropertyViewModelComparator>
+                                <BindablePropertyBoolean><DataBindContext sourcePathIds="0:40-0:45-0:54" propertyKey="634"/></BindablePropertyBoolean>
+                            </TransitionPropertyViewModelComparator>
+                            <TransitionValueBooleanComparator value="false"/>
+                        </TransitionViewModelCondition>
+                    </StateTransition>
+                </AnimationState>
+            </StateMachineLayer>
+        </StateMachine>
+    </Artboard>
+
+    <!-- highlight counter-slides: light stays top-left as the pad tilts -->
+    <DataConverterRangeMapper minInput="-1" maxInput="1" minOutput="-1" maxOutput="-11"
+                              clampLower="true" clampUpper="true" name="HighlightX" id="0:116"/>
+    <DataConverterRangeMapper minInput="-1" maxInput="1" minOutput="-12" maxOutput="-2"
+                              clampLower="true" clampUpper="true" name="HighlightY" id="0:117"/>
+
+    <!-- Indicator lighting. A cardinal tick reads its own axis: 0.5..1 of
+         travel maps to opacity 0.45..1, clamped, so it rests at 0.45. -->
+    <DataConverterRangeMapper minInput="0.5" maxInput="1" minOutput="0.45" maxOutput="1"
+                              clampLower="true" clampUpper="true" name="TickPositive" id="0:120"/>
+    <DataConverterRangeMapper minInput="-0.5" maxInput="-1" minOutput="0.45" maxOutput="1"
+                              clampLower="true" clampUpper="true" name="TickNegative" id="0:121"/>
+    <!-- A diagonal reads min() of its two axes (the bound source is stick/x;
+         the second token reads stick/y, negated where the quadrant needs it),
+         then the same 0.5..1 mapper. -->
+    <DataConverterFormula name="MinXY" id="0:122">
+        <FormulaTokenFunction functionType="0"/>
+        <FormulaTokenInput/>
+        <FormulaTokenArgumentSeparator/>
+        <FormulaTokenValue><DataBindContext sourcePathIds="0:40-0:45-0:53" propertyKey="777"/></FormulaTokenValue>
+        <FormulaTokenParenthesisClose/>
+    </DataConverterFormula>
+    <DataConverterFormula name="MinXNegY" id="0:123">
+        <FormulaTokenFunction functionType="0"/>
+        <FormulaTokenInput/>
+        <FormulaTokenArgumentSeparator/>
+        <FormulaTokenValue operationValue="0"/>
+        <FormulaTokenOperation operationType="1"/>
+        <FormulaTokenValue><DataBindContext sourcePathIds="0:40-0:45-0:53" propertyKey="777"/></FormulaTokenValue>
+        <FormulaTokenParenthesisClose/>
+    </DataConverterFormula>
+    <DataConverterFormula name="MinNegXNegY" id="0:124">
+        <FormulaTokenFunction functionType="0"/>
+        <FormulaTokenValue operationValue="0"/>
+        <FormulaTokenOperation operationType="1"/>
+        <FormulaTokenInput/>
+        <FormulaTokenArgumentSeparator/>
+        <FormulaTokenValue operationValue="0"/>
+        <FormulaTokenOperation operationType="1"/>
+        <FormulaTokenValue><DataBindContext sourcePathIds="0:40-0:45-0:53" propertyKey="777"/></FormulaTokenValue>
+        <FormulaTokenParenthesisClose/>
+    </DataConverterFormula>
+    <DataConverterFormula name="MinNegXY" id="0:125">
+        <FormulaTokenFunction functionType="0"/>
+        <FormulaTokenValue operationValue="0"/>
+        <FormulaTokenOperation operationType="1"/>
+        <FormulaTokenInput/>
+        <FormulaTokenArgumentSeparator/>
+        <FormulaTokenValue><DataBindContext sourcePathIds="0:40-0:45-0:53" propertyKey="777"/></FormulaTokenValue>
+        <FormulaTokenParenthesisClose/>
+    </DataConverterFormula>
+    <DataConverterGroup name="TickNE" id="0:126">
+        <DataConverterGroupItem converterId="0:122"/>
+        <DataConverterGroupItem converterId="0:120"/>
+    </DataConverterGroup>
+    <DataConverterGroup name="TickSE" id="0:127">
+        <DataConverterGroupItem converterId="0:123"/>
+        <DataConverterGroupItem converterId="0:120"/>
+    </DataConverterGroup>
+    <DataConverterGroup name="TickSW" id="0:128">
+        <DataConverterGroupItem converterId="0:124"/>
+        <DataConverterGroupItem converterId="0:120"/>
+    </DataConverterGroup>
+    <DataConverterGroup name="TickNW" id="0:129">
+        <DataConverterGroupItem converterId="0:125"/>
+        <DataConverterGroupItem converterId="0:120"/>
+    </DataConverterGroup>
+
+    <DataEnumCustom name="StickMode" id="0:90">
+        <DataEnumValue key="analog" value="Analog" id="0:91"/>
+        <DataEnumValue key="dpad" value="D-pad" id="0:92"/>
+    </DataEnumCustom>
+    <DataEnumCustom name="ThemeVariant" id="0:93">
+        <DataEnumValue key="daylit" value="Daylit" id="0:94"/>
+        <DataEnumValue key="night" value="Night" id="0:95"/>
+    </DataEnumCustom>
+    <DataEnumCustom name="LayoutProfile" id="0:96">
+        <DataEnumValue key="phone-portrait" value="Phone portrait" id="0:97"/>
+        <DataEnumValue key="phone-landscape" value="Phone landscape" id="0:98"/>
+        <DataEnumValue key="fold-outer" value="Fold outer" id="0:99"/>
+        <DataEnumValue key="fold-book" value="Fold book" id="0:100"/>
+        <DataEnumValue key="fold-tabletop" value="Fold tabletop" id="0:101"/>
+        <DataEnumValue key="tablet" value="Tablet" id="0:102"/>
+        <DataEnumValue key="web" value="Web" id="0:103"/>
+    </DataEnumCustom>
+
+    <!-- View models. Paths the host writes: stick/x, stick/y, stick/engaged,
+         stick/mode, theme/variant, layout/profile, a11y/reducedMotion. -->
+    <ViewModel defaultInstanceId="0:51" name="Stick" id="0:50">
+        <ViewModelPropertyNumber name="x" id="0:52"/>
+        <ViewModelPropertyNumber name="y" id="0:53"/>
+        <ViewModelPropertyBoolean name="engaged" id="0:54"/>
+        <ViewModelPropertyEnumCustom enumId="0:90" name="mode" id="0:55"/>
+        <ViewModelInstance exports="true" name="Default" id="0:51">
+            <ViewModelInstanceNumber propertyValue="0" viewModelPropertyId="0:52"/>
+            <ViewModelInstanceNumber propertyValue="0" viewModelPropertyId="0:53"/>
+            <ViewModelInstanceBoolean propertyValue="false" viewModelPropertyId="0:54"/>
+            <ViewModelInstanceEnum propertyValue="0:91" viewModelPropertyId="0:55"/>
+        </ViewModelInstance>
+    </ViewModel>
+    <ViewModel defaultInstanceId="0:61" name="Theme" id="0:60">
+        <ViewModelPropertyEnumCustom enumId="0:93" name="variant" id="0:62"/>
+        <ViewModelInstance exports="true" name="Default" id="0:61">
+            <ViewModelInstanceEnum propertyValue="0:95" viewModelPropertyId="0:62"/>
+        </ViewModelInstance>
+    </ViewModel>
+    <ViewModel defaultInstanceId="0:71" name="Layout" id="0:70">
+        <ViewModelPropertyEnumCustom enumId="0:96" name="profile" id="0:72"/>
+        <ViewModelInstance exports="true" name="Default" id="0:71">
+            <ViewModelInstanceEnum propertyValue="0:97" viewModelPropertyId="0:72"/>
+        </ViewModelInstance>
+    </ViewModel>
+    <ViewModel defaultInstanceId="0:81" name="A11y" id="0:80">
+        <ViewModelPropertyBoolean name="reducedMotion" id="0:82"/>
+        <ViewModelInstance exports="true" name="Default" id="0:81">
+            <ViewModelInstanceBoolean propertyValue="false" viewModelPropertyId="0:82"/>
+        </ViewModelInstance>
+    </ViewModel>
+    <ViewModel defaultInstanceId="0:41" name="LeftStick" id="0:40">
+        <ViewModelPropertyViewModel viewModelReferenceId="0:50" name="stick" id="0:45"/>
+        <ViewModelPropertyViewModel viewModelReferenceId="0:60" name="theme" id="0:46"/>
+        <ViewModelPropertyViewModel viewModelReferenceId="0:70" name="layout" id="0:47"/>
+        <ViewModelPropertyViewModel viewModelReferenceId="0:80" name="a11y" id="0:48"/>
+        <ViewModelInstance exports="true" name="Default" id="0:41">
+            <ViewModelInstanceViewModel propertyValue="0:51" viewModelPropertyId="0:45"/>
+            <ViewModelInstanceViewModel propertyValue="0:61" viewModelPropertyId="0:46"/>
+            <ViewModelInstanceViewModel propertyValue="0:71" viewModelPropertyId="0:47"/>
+            <ViewModelInstanceViewModel propertyValue="0:81" viewModelPropertyId="0:48"/>
+        </ViewModelInstance>
+    </ViewModel>
+</Rive>

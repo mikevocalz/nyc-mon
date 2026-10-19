@@ -83,7 +83,7 @@ export {
   type MotionViewProps, type MotionTextProps, type MotionPresetProps,
 } from './motion';
 export { PressScale, type PressScaleProps } from './press-scale';
-export { useInstanceStore, useStore } from './use-instance-store';
+export { useInstance, useInstanceStore, useStore } from './use-instance-store';
 export * from './audio';
 
 export { GridFloor, type GridFloorProps } from './backgrounds/GridFloor';
@@ -138,6 +138,7 @@ export type { TextEffectOptions, GlitchIntensity, GlitchSpeed, TextGlowLevel } f
 
 // H-Lynk chrome: shell, scanner head, screen, trackpad, keys.
 export * from './hlynk';
+export * from './arrangement';
 
 // Phase 1 loop primitives: egg choice, case, incubation, hatch (M08–M12) and care (M13–M18).
 export * from './hatch';

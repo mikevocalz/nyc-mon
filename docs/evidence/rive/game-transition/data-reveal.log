@@ -1,0 +1,6 @@
+[23:07:58.842] rive  deferred replay: inline
+[23:07:58.844] rive  compiling 2 markup files as one document: ../game-lobby/shared-vm.rml, scene.rml
+[23:07:58.892] rive  built /Users/mikevocalz/nyc-mon/packages/ui/rive/lobby/game-transition/build/game-transition.riv (234928 bytes, 48ms, 0 errors, 0 warnings)
+[23:07:58.893] rive  data: transition/phase = reveal
+[23:07:58.893] rive  showing GameTransitionHost [1/2]
+[23:07:58.893] rive  wrote /Users/mikevocalz/nyc-mon/docs/evidence/rive/game-transition/data-reveal.data.json

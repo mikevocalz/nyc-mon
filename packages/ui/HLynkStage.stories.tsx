@@ -7,11 +7,11 @@ import { Text } from './Text';
 import { View } from './tw';
 
 /**
- * The shell with side panes (M13–M16 on the Quest 2D window, 1280 × 800 dp
- * by default, resizable 360–1280). From 840 dp wide the stage opens a leading
- * and a trailing pane at `content-form` width; the shell keeps the centre and
- * its 440 pt cap. Narrower, the panes are gone and the screen draws the same
- * panel inside the shell. Resize the canvas to see the switch.
+ * The companion loop's shell host. Since Decision H-2
+ * (docs/design/hlynk/ADAPTIVE.md) the side panes are struck: `leading` and
+ * `trailing` are ignored, and from 600 dp the shell itself draws the NYC-MON
+ * pane on the left and the device on the right. These stories keep the old
+ * pane props to show that they no longer render.
  */
 const meta = {
   title: 'H-Lynk/HLynkStage',

@@ -1,0 +1,2 @@
+[23:07:20.823] rive  built /Users/mikevocalz/nyc-mon/packages/ui/rive/arcade-controls/right-six/build/right-six.riv (144444 bytes, 73ms, 0 errors, 0 warnings)
+{"success": true, "command": "build", "data": {"riv": "/Users/mikevocalz/nyc-mon/packages/ui/rive/arcade-controls/right-six/build/right-six.riv", "bytes": 144444, "buildMs": 73.9, "problems": []}, "errors": [], "warnings": []}

@@ -1,0 +1,7 @@
+[23:07:42.525] rive  deferred replay: inline
+[23:07:42.526] rive  compiling 2 markup files as one document: ../game-lobby/shared-vm.rml, scene.rml
+[23:07:42.578] rive  built /Users/mikevocalz/nyc-mon/packages/ui/rive/lobby/leaderboard/build/leaderboard.riv (145346 bytes, 52ms, 0 errors, 0 warnings)
+[23:07:42.579] rive  data: leaderboard/status = error
+[23:07:42.579] rive  showing Leaderboard [1/3]
+[23:07:42.580] rive  viewport 343x264 @1x
+[23:07:42.593] rive  wrote /Users/mikevocalz/nyc-mon/docs/evidence/rive/leaderboard/error.png

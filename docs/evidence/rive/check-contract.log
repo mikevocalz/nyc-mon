@@ -1,0 +1,7 @@
+== semantics content
+== path names: arcade (hard)
+arcade: 27 path/artboard pair(s) checked
+== path names: lobby (report-only)
+WARN: lobby row property rows[${index}] missing from packages/ui/rive/lobby/leaderboard/build/leaderboard.data.json
+lobby: 11 path(s) checked, 1 miss(es) (report-only)
+check-contract.sh: ok (all)

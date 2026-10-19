@@ -128,8 +128,10 @@ export function cssAnimation(
 export function cssTransition(reduced: boolean, durationMs = 320) {
   if (reduced) return undefined;
   return {
-    transitionProperty: ['transform', 'opacity'],
-    transitionDuration: `${durationMs}ms`,
-    transitionTimingFunction: 'ease-out',
-  } as const;
+    // A fresh mutable array: Reanimated types the property as `T[]`, which a
+    // readonly `as const` tuple does not satisfy.
+    transitionProperty: ['transform', 'opacity'] as ('transform' | 'opacity')[],
+    transitionDuration: `${durationMs}ms` as const,
+    transitionTimingFunction: 'ease-out' as const,
+  };
 }

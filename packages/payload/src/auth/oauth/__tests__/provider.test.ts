@@ -308,6 +308,49 @@ describe('Alexa+ authorization server', () => {
       expect(response.status).toBeLessThan(500);
     });
 
+    it('refuses a code exchange with no code_verifier, and the code stays unusable afterwards', async () => {
+      const cookie = await signUp(auth, 'adult-noverifier@example.com', ADULT_YEAR);
+      const { verifier, challenge } = await pkcePair();
+      const code = await obtainCode(auth, cookie, challenge);
+      const missing = await token(
+        auth,
+        { grant_type: 'authorization_code', code, redirect_uri: ALEXA_REDIRECT, resource: RESOURCE },
+        basic('alexa', ALEXA_SECRET),
+      );
+      expect(missing.status).toBeGreaterThanOrEqual(400);
+      expect(missing.status).toBeLessThan(500);
+      const body = (await missing.json()) as Record<string, unknown>;
+      expect(body.access_token).toBeUndefined();
+      expect(['invalid_request', 'invalid_grant']).toContain(body.error);
+      // The verifier that matches the challenge is no rescue once the code was presented without it.
+      const retried = await token(
+        auth,
+        { grant_type: 'authorization_code', code, code_verifier: verifier, redirect_uri: ALEXA_REDIRECT, resource: RESOURCE },
+        basic('alexa', ALEXA_SECRET),
+      );
+      expect(retried.status).toBeGreaterThanOrEqual(400);
+      expect(retried.status).toBeLessThan(500);
+    });
+
+    it("refuses another client's refresh token without revoking the real holder's", async () => {
+      const cookie = await signUp(auth, 'adult-crossclient@example.com', ADULT_YEAR);
+      const { verifier, challenge } = await pkcePair();
+      const code = await obtainCode(auth, cookie, challenge);
+      const exchanged = await token(
+        auth,
+        { grant_type: 'authorization_code', code, code_verifier: verifier, redirect_uri: ALEXA_REDIRECT, resource: RESOURCE },
+        basic('alexa', ALEXA_SECRET),
+      );
+      const refresh = String(((await exchanged.json()) as Record<string, unknown>).refresh_token);
+      const stolen = await token(auth, { grant_type: 'refresh_token', client_id: 'nyc-mon-sim', refresh_token: refresh });
+      expect(stolen.status).toBeGreaterThanOrEqual(400);
+      expect(stolen.status).toBeLessThan(500);
+      expect(((await stolen.json()) as Record<string, unknown>).access_token).toBeUndefined();
+      const legit = await token(auth, { grant_type: 'refresh_token', refresh_token: refresh }, basic('alexa', ALEXA_SECRET));
+      // The foreign attempt does not burn the family, so it cannot be used to unlink someone.
+      expect(legit.status).toBe(200);
+    });
+
     it('refuses the plain challenge method and a missing challenge', async () => {
       const cookie = await signUp(auth, 'adult3@example.com', ADULT_YEAR);
       const plain = await authorize(auth, cookie, alexaAuthorizeParams('a'.repeat(43), { code_challenge_method: 'plain' }));
@@ -464,7 +507,16 @@ describe('linking page data', () => {
       clientName: 'Alexa',
       scopes: ['mcp:caller', 'mcp:care', 'offline_access'],
     });
-    expect(await loadLinkPage('sign-in', consentUrl.search, options)).toEqual({ kind: 'sign-in', clientName: 'Alexa' });
+    expect(await loadLinkPage('sign-in', consentUrl.search, { ...options, amazonEnabled: false })).toEqual({
+      kind: 'sign-in',
+      clientName: 'Alexa',
+      amazonEnabled: false,
+    });
+    expect(await loadLinkPage('sign-in', consentUrl.search, { ...options, amazonEnabled: true })).toEqual({
+      kind: 'sign-in',
+      clientName: 'Alexa',
+      amazonEnabled: true,
+    });
 
     const forged = new URL(consentUrl);
     forged.searchParams.set('redirect_uri', 'https://evil.test/cb');

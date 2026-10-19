@@ -42,7 +42,7 @@
     "@types/react-dom": "catalog:",
     "eslint": "catalog:",
     "eslint-config-expo": "catalog:",
-    "playwright": "1.63.0",
+    "playwright": "1.64.1",
     "react": "catalog:",
     "react-dom": "catalog:",
     "react-native-web": "catalog:",

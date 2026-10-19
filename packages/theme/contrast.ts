@@ -291,8 +291,8 @@ const USAGE: Pair[] = [
   // so these rows measure those steps. Before that, Next settled the tokens at
   // :root and a light page painted text-text black on night (/profile Account
   // card, 1.06:1).
-  { id: 'card themed heading on night face', fg: 'ink-50', bg: NIGHT, role: 'text', usedAt: ['packages/theme/theme.css:328', 'packages/app/features/profile/profile-content.tsx:100'], reason: 'text-text inside a cornerCut or beam Card resolves to ink-50 on the face' },
-  { id: 'card themed muted on night face', fg: 'silver-500', bg: NIGHT, role: 'text', usedAt: ['packages/theme/theme.css:329', 'packages/theme/theme.css:330', 'packages/app/features/profile/profile-content.tsx:101'], reason: 'text-muted and text-secondary inside the Card face resolve to silver-500' },
+  { id: 'card themed heading on night face', fg: 'ink-50', bg: NIGHT, role: 'text', usedAt: ['packages/theme/theme.css:328', 'packages/app/features/game/controls-settings/ControlsSettingsScreen.tsx:328'], reason: 'text-text inside a cornerCut or beam Card resolves to ink-50 on the face' },
+  { id: 'card themed muted on night face', fg: 'silver-500', bg: NIGHT, role: 'text', usedAt: ['packages/theme/theme.css:329', 'packages/theme/theme.css:330', 'packages/app/features/game/controls-settings/ControlsSettingsScreen.tsx:329'], reason: 'text-muted and text-secondary inside the Card face resolve to silver-500' },
   { id: 'card themed primary on night face', fg: 'orange-500', bg: NIGHT, role: 'text', usedAt: ['packages/theme/theme.css:332'] },
   { id: 'card themed accent on night face', fg: 'carolina-500', bg: NIGHT, role: 'text', usedAt: ['packages/theme/theme.css:338', 'packages/theme/theme.css:349'], reason: 'accent and info share carolina-500 on the face' },
   { id: 'card themed success on night face', fg: 'leaf-500', bg: NIGHT, role: 'text', usedAt: ['packages/theme/theme.css:345'] },
@@ -398,10 +398,10 @@ const USAGE: Pair[] = [
   { id: 'hlynk: reduced-motion LED cue in the black head', fg: 'led-on', bg: ['hlynk-core-black'], role: 'ui', usedAt: ['packages/ui/hlynk/ScannerLed.tsx:96', 'packages/ui/hlynk/ScannerLed.tsx:104', 'packages/ui/hlynk/ScannerLed.tsx:107'], reason: 'tick row, filled dot and exclamation dot that stand in for the LED rhythm' },
 
   // -- text on the ink plate over a scene (SolidPanel tone="ink": ink-800 face in both themes)
-  { id: 'scene plate headline', fg: 'orange-500', bg: ['ink-800'], role: 'large-text', usedAt: ['packages/app/features/explore/explore-content.tsx:22', 'packages/app/features/profile/profile-content.tsx:46', 'packages/app/features/error/screen.shared.tsx:25'], reason: 'display-sm heading and the display-xl 404 on the plate' },
+  { id: 'scene plate headline', fg: 'orange-500', bg: ['ink-800'], role: 'large-text', usedAt: ['packages/app/features/explore/explore-content.tsx:22', 'packages/app/features/profile/profile-content.tsx:34', 'packages/app/features/error/screen.shared.tsx:25'], reason: 'display-sm heading and the display-xl 404 on the plate' },
   { id: 'scene plate title', fg: 'ink-50', bg: ['ink-800'], role: 'large-text', usedAt: ['packages/app/features/error/screen.shared.tsx:29'] },
-  { id: 'scene plate body', fg: 'silver-200', bg: ['ink-800'], role: 'text', usedAt: ['packages/app/features/profile/profile-content.tsx:47', 'packages/app/features/error/screen.shared.tsx:32'] },
-  { id: 'scene plate line', fg: 'silver-300', bg: ['ink-800'], role: 'text', usedAt: ['packages/app/features/explore/explore-content.tsx:43', 'packages/app/features/profile/profile-content.tsx:45'] },
+  { id: 'scene plate body', fg: 'silver-200', bg: ['ink-800'], role: 'text', usedAt: ['packages/app/features/error/screen.shared.tsx:32'] },
+  { id: 'scene plate line', fg: 'silver-300', bg: ['ink-800'], role: 'text', usedAt: ['packages/app/features/explore/explore-content.tsx:43', 'packages/app/features/profile/profile-content.tsx:33'] },
   { id: 'scene plate tab label', fg: 'silver-200', bg: ['ink-900'], role: 'text', usedAt: ['packages/app/features/explore/explore-content.tsx:25'] },
   { id: 'scene plate tab edge', fg: 'ink-400', bg: ['ink-800'], role: 'ui', usedAt: ['packages/app/features/explore/explore-content.tsx:23'] },
   { id: 'scene plate selected tab label', fg: 'ink-950', bg: ['orange-500'], role: 'text', usedAt: ['packages/app/features/explore/explore-content.tsx:26'] },
@@ -424,6 +424,27 @@ const USAGE: Pair[] = [
   // -- disabled ---------------------------------------------------------------
   { id: 'disabled label', fg: 'ink-400', bg: NIGHT, role: 'disabled', usedAt: ['packages/ui/Button.tsx:48', 'packages/ui/IconButton.tsx:79', 'packages/ui/neon/NeonChevron.tsx:55', 'packages/ui/audio/PlayerShell.tsx:123'], reason: 'inactive control' },
   { id: 'disabled slider icon', fg: 'ink-700', bg: NIGHT, role: 'disabled', usedAt: ['packages/ui/cards/CardSlider.shared.tsx:159'], reason: 'inactive control' },
+
+  // -- arcade controller (G01 08-handoff §Tokens): scheme-invariant hardware --
+  // The caps, plate and wells are the same graphite in both schemes, so each
+  // row is `both`. Rows are measured now so the kit can ship the look (Law 10).
+  { id: 'arcade: cap glyph idle on graphite cap', fg: 'silver-300', bg: ['concrete-800'], role: 'text', usedAt: ['packages/ui/game-controls/StartStopPill.tsx:299', 'packages/ui/rive/arcade-controls/right-six/scene.rml:250'] },
+  { id: 'arcade: cap glyph pressed on graphite cap', fg: 'signage-white', bg: ['concrete-800'], role: 'text', usedAt: ['packages/ui/rive/arcade-controls/right-six/scene.rml:339'] },
+  { id: 'arcade: structure keyline on housing plate', fg: 'royal-400', bg: ['concrete-900'], role: 'ui', usedAt: ['packages/ui/rive/arcade-controls/left-stick/scene.rml:128'] },
+  { id: 'arcade: structure keyline on graphite cap', fg: 'royal-400', bg: ['concrete-800'], role: 'ui', usedAt: ['packages/ui/rive/arcade-controls/right-six/scene.rml:290'] },
+  { id: 'arcade: held and focus ring in a well', fg: 'carolina-500', bg: ['signage-black'], role: 'ui', usedAt: ['packages/ui/game-controls/ArcadeActionButton.tsx:200', 'packages/ui/rive/arcade-controls/start-stop/scene.rml:40'] },
+  { id: 'arcade: stop hold ring in a well', fg: 'apple-500', bg: ['signage-black'], role: 'ui', usedAt: ['packages/ui/rive/arcade-controls/start-stop/scene.rml:81', 'packages/ui/rive/arcade-controls/start-stop/scene.rml:98'] },
+  { id: 'arcade: cap glyph disabled on graphite cap', fg: 'concrete-700', bg: ['concrete-800'], role: 'disabled', usedAt: ['packages/ui/rive/arcade-controls/right-six/scene.rml:378'], reason: 'inactive control; accessibilityState.disabled and the isDisabled semantic flag carry the state' },
+
+  // -- NYC Rank panel (G02): keylines on the SolidPanel tone="ink" face, ink-800 in both schemes.
+  // Review finding H3: royal-500 (2.56:1) and orange-700 (2.55:1) failed here; each district now uses
+  // the lightest step of its family that clears 3:1 on ink-800.
+  { id: 'rank panel: downtown and default header keyline on ink face', fg: 'royal-400', bg: ['ink-800'], role: 'ui', usedAt: ['packages/ui/lobby/leaderboard-style.ts:17', 'packages/ui/lobby/leaderboard-style.ts:27'] },
+  { id: 'rank panel: midtown header keyline on ink face', fg: 'orange-500', bg: ['ink-800'], role: 'ui', usedAt: ['packages/ui/lobby/leaderboard-style.ts:19'] },
+  { id: 'rank panel: harlem brick header keyline on ink face', fg: 'orange-600', bg: ['ink-800'], role: 'ui', usedAt: ['packages/ui/lobby/leaderboard-style.ts:21'] },
+  { id: 'rank panel: megacity header keyline on ink face', fg: 'carolina-500', bg: ['ink-800'], role: 'ui', usedAt: ['packages/ui/lobby/leaderboard-style.ts:23'] },
+  { id: 'rank panel: own-row marker on ink face', fg: 'carolina-500', bg: ['ink-800'], role: 'ui', usedAt: ['packages/ui/lobby/leaderboard-style.ts:33'] },
+  { id: 'rank panel: row divider on ink face', fg: 'royal-500/40', bg: ['ink-800'], role: 'decorative', usedAt: ['packages/ui/lobby/leaderboard-style.ts:30'], reason: 'divider between rows; each row is identified by its rank and name text' },
 ];
 
 export const PAIRS: readonly Pair[] = [...CONTRACT, ...USAGE];
@@ -462,6 +483,9 @@ export const FORBIDDEN: readonly Forbidden[] = [
   { id: 'concrete-900 keys on Core body', fg: 'concrete-900', bg: 'hlynk-core-body', role: 'ui', floor: 3.5, rule: 'Passes 3:1 by 0.05; too thin a margin for key edges. Core keys are pure black.' },
   { id: 'black keys on apple-700', fg: 'signage-black', bg: 'apple-700', role: 'ui', rule: 'Why the body is not the deeper red.' },
   { id: 'brick face on night', fg: 'orange-800', bg: 'ink-950', role: 'ui', rule: 'Brick (orange-800) is a face colour; its control edge on night is orange-700.' },
+  { id: 'royal keyline on ink panel', fg: 'royal-500', bg: 'ink-800', role: 'ui', rule: 'Royal-500 measures 2.56:1 on the SolidPanel ink face; keylines there use royal-400.' },
+  { id: 'brick keyline on ink panel', fg: 'orange-700', bg: 'ink-800', role: 'ui', rule: 'Orange-700 measures 2.55:1 on the SolidPanel ink face; brick keylines there use orange-600.' },
+  { id: 'royal on housing plate', fg: 'royal-500', bg: 'concrete-900', role: 'ui', rule: 'Royal-500 measures 2.98:1 on the arcade housing plate; structure keylines on graphite use royal-400.' },
 ];
 
 // ---- measuring --------------------------------------------------------------

@@ -252,3 +252,38 @@ led: { on: apple[500], off: apple[900] },
 ```
 
 Risk the theme owner must check: kit components that rely on `text` being `night` (#00041C) for a royal-tinted black. The swap to pure black is a visual change, not a contrast one (19.06 vs 19.12 on the page).
+
+## City
+
+The 3D city's colours live in `packages/app/features/game/world/palette.ts`. Every `CITY_COLORS` entry is a palette step or a fixed `mixHex` of steps — no raw hex in the file — and `WALL_TONES` gives each building class a small family of tones that `city-mesh.ts` picks between by a hash of the building id. That rule holds for dataset v3: Valdrada ships a per-building `rgb`, and it is **not imported** (gate G3). What arrives from Valdrada is `vs`, the record-derived `STYLE` id; the nyc-mon `class` comes from the mapping below, and the wall colour comes from the class's `WALL_TONES` family as today.
+
+Two different provenances meet here, so the table keeps them separate: `STYLE` is record-derived (the compiler's classification of real attributes — PLUTO class, year, FISP material — shipped on the record as `vs`; the mapping's record-vs-rule detail is in `docs/design/handoff/harlem-v3.md`), while `STYLE → class` is this document's own design mapping and carries the estimate bit. A class is a *look*, not a claim about the building.
+
+| Valdrada `vs` | STYLE name | What it is on 125th | nyc-mon `class` | `WALL_TONES` family |
+|---:|---|---|---|---|
+| 0 | TENEMENT | Pre-war brick walk-ups | `brick` | brick, brickRed, brickDark, brickBuff |
+| 1 | PREWAR_APT | Elevated-floor apartment blocks | `brick` | brick, brickRed, brickDark, brickBuff |
+| 2 | POSTWAR_BRICK | Post-war infill brick | `brick` | brick, brickRed, brickDark, brickBuff |
+| 3 | MODERN_GLASS | Curtain-wall commercial | `glass` | glass, glassDark, glassTeal |
+| 4 | DECO_MASONRY | Deco stone offices (the State Office slab's era) | `civic` | civic, limestone |
+| 5 | ROWHOUSE | The brownstone blocks | `brownstone` | brownstone, brownstoneWarm, sandstone |
+| 6 | LOFT_CASTIRON | Painted cast-iron fronts | `plain` | plain, limestone, stucco |
+| 7 | INDUSTRIAL | Warehouse and utility brick | `brick` | brick, brickRed, brickDark, brickBuff |
+| 8 | CIVIC_STONE | Institutional stone | `civic` | civic, limestone |
+| 9 | CHURCH | Churches | `church` | church, limestone, sandstone |
+| 10 | RETAIL_STRIP | One- and two-storey shop rows | `brick` | brick, brickRed, brickDark, brickBuff |
+| 11 | GLASS_TOWER_BLUE | New glass towers | `glass` | glass, glassDark, glassTeal |
+| 12 | PROJECT_BRICK | NYCHA-plan towers | `nycha` | nycha, brickDark |
+| 13 | RETAIL_MODERN | Panelled big-box retail | `plain` | plain, limestone, stucco |
+| 14 | FRAME_HOUSE | Sided frame houses | `plain` | plain, limestone, stucco |
+| 15 | CONDO_NEW | Post-2000 condos | `plain` | plain, limestone, stucco |
+
+Palette notes:
+
+- All seven classes are used; no STYLE id needs a new class, so **no new palette tokens** ship with this mapping. If a later tile needs one, it arrives with its `CITY_COLORS`/`WALL_TONES` tokens in the same PR (the G3 rule).
+- `plain` absorbs the pale/panelled styles (6, 13–15): cast iron, rainscreen panels and sided houses are all painted or panelled surfaces, and `plain`'s family (`plain`, `limestone`, `stucco`) is the one that reads painted rather than masonry.
+- `brick` absorbs five styles (0, 1, 2, 7, 10). They differ by detail bits — cornice, fire escape, storefront — not by wall colour, which is what the class controls. The `d` bitset, not the class, carries that detail.
+- `PROJECT_BRICK → nycha` is the only one-to-one fit; the class exists for exactly this stock.
+- `hotel-theresa` keeps its `terracotta` accent lookup (`city-mesh.ts` L312): landmark treatment is keyed on the landmark, not the class, so the mapping never touches it.
+- FISP facade-material records can still disagree with the family a class implies (a "masonry" filing on a glass-class tower). The class stays the gate; a mismatch is a data question for E1/F2, not a palette exception.
+- Landmark accents, neon trims, shop signs and furniture colours are unchanged by this mapping — they already read palette keys.

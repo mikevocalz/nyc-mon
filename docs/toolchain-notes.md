@@ -62,3 +62,12 @@ React Native 0.87 / Metro 0.87:
 - [Upgrade Helper](https://react-native-community.github.io/upgrade-helper/) ·
   [Upgrading docs](https://reactnative.dev/docs/upgrading) ·
   [RN support policy](https://github.com/reactwg/react-native-releases/blob/main/docs/support.md)
+
+## Skill packs (2026-10-15)
+
+The directive §6 skill packs live in `skills/` as a repo copy, one folder per pack, each with its
+upstream LICENSE and a `SOURCE.md` naming the repo, commit, date and subpaths. `skills/README.md`
+is the index: pack, source, commit, purpose, and which directive lane (A–F) loads it, plus the
+packs that were deliberately not copied (everything-claude-code is a plugin; CodeRabbit is a
+workflow; Margelo's `native-module-helper` has no upstream). `~/.claude/skills` is the per-machine
+user copy and is not what a lane cites.

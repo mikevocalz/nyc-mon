@@ -14,6 +14,8 @@ export const MEET_PATH = '/(onboarding)/meet' as const;
 export const INCUBATE_PATH = '/(onboarding)/incubate' as const;
 /** M06 form sheet over M10. */
 export const NOTIFY_SHEET_PATH = '/(onboarding)/notify' as const;
+/** Final first-run permissions review, after the first incubation begins. */
+export const PERMISSIONS_PATH = '/(onboarding)/permissions' as const;
 
 /** One egg as M08 and M10 show it. Every field comes from `@acme/content`; nothing is typed by hand. */
 export interface EggView {

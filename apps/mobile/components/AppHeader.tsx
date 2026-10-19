@@ -3,7 +3,7 @@ import { usePathname } from 'expo-router';
 import { BrandWordmark, SafeArea } from '@acme/ui';
 import { Header } from '@acme/ui/primitives';
 import { Text } from '@acme/ui/tw';
-import { AVATAR_URI, MenuButton, useProfile } from '@acme/app';
+import { MenuButton, useProfile } from '@acme/app';
 import { useRouter } from 'expo-router';
 import { Avatar } from '@acme/ui';
 import { Pressable, View } from '@acme/ui/tw';
@@ -51,7 +51,8 @@ export function AppHeader() {
           instead, with the orange as its bottom keyline. */}
       <Header className="flex-row items-center gap-3 border-b-2 border-primary bg-ink-950 px-4 py-2">
         {railHasMenu ? null : <MenuButton />}
-        <BrandWordmark height={36} />
+        {/* Full header height: the row is sized by its 44 pt controls, so the wordmark matches them. */}
+        <BrandWordmark height={44} />
         <Text numberOfLines={1} className="flex-1 text-lg font-semibold text-ink-50 md:text-xl">
           {TITLES[pathname] ?? ''}
         </Text>
@@ -75,7 +76,7 @@ export function AppHeader() {
           onPress={() => router.push('/profile')}
           className="rounded-none"
         >
-          <Avatar name={profileName} imageUri={AVATAR_URI} />
+          <Avatar name={profileName} />
         </Pressable>
       </Header>
     </SafeArea>

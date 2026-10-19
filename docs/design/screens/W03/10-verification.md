@@ -1,6 +1,6 @@
 # W03 City: local verification
 
-Baseline: `b4080307965d541069ac2544ae03a818961d32f9`, PR #28. Verification date: 2026-10-13. Local-only candidate; no remote branch, deployment or live form submission was changed.
+Baseline: `b4080307965d541069ac2544ae03a818961d32f9`, PR #28. Verification date: 2026-10-13. The checks ran locally; no deployment or live form submission was part of them.
 
 ## Passed
 
@@ -13,7 +13,7 @@ Baseline: `b4080307965d541069ac2544ae03a818961d32f9`, PR #28. Verification date:
 - City server HTML: district reading order, one h1, three expected photograph targets, no invented Mega City photo and no armed homepage class. All three photograph URLs returned 200 with image content types and nonempty bodies.
 - Independent source review and `git diff --check`.
 
-Use the repository-pinned pnpm 12.8.1. The HTTP contract expects a locally running production server, accepts `BASE` and `BASE_PATH`, writes its JSON report to ignored `tooling/site-qa/out/pages-contract.json`, and never publishes or submits a form. It includes City-specific checks and therefore belongs to this draft, not to the independently reviewable URL-only patch.
+Use the repository-pinned pnpm 12.8.1. The HTTP contract expects a locally running production server, accepts `BASE` and `BASE_PATH`, writes its JSON report to ignored `tooling/site-qa/out/pages-contract.json`, and never publishes or submits a form. It includes City-specific checks, so it ships with the City work rather than the URL-only patch.
 
 ## Not run / open gates
 
@@ -23,7 +23,7 @@ Use the repository-pinned pnpm 12.8.1. The HTTP contract expects a locally runni
 - Fresh per-screen Mobbin queries; only the repository's committed reference research was reused.
 - Hardware/GPU performance or device acceptance, native world rendering and form/server-action behavior on static Pages.
 
-Local Playwright could not launch the installed Chromium because `socket()` was denied by the execution environment, including on an approved execution retry. No browser security flags were changed. The separate cloud browser inspected the published baseline but could not reach this isolated local server. Published baseline screenshots are not after-change evidence.
+Local Playwright could not launch the installed Chromium: the sandbox denied `socket()`, including on a retry. No browser security flags were changed. A cloud browser inspected the published baseline but could not reach the local server. Published baseline screenshots are not after-change evidence.
 
 The local build and HTTP checks do not certify the output of GitHub Pages deployment or browser hydration. Do not label the design pipeline, accessibility review or full acceptance complete until the open gates are satisfied.
 
@@ -31,4 +31,4 @@ The local build and HTTP checks do not certify the output of GitHub Pages deploy
 
 Home composition, choreography, shared home motion and global styling are unchanged. The separately packaged URL correction only adjusts its CTA and shared footer destinations, plus affected non-home plain anchors. StreetPulse, district/cast/story copy, consent logic, asset binaries and dependencies are unchanged.
 
-The active source branch `claude/jolly-dirac-dtzmjy` has a Pages workflow triggered by pushes. After the local checks above, the user explicitly authorized publication to PR #28 with that automatic Pages update disclosed. The branch head was rechecked at 20:33 UTC and remained at the tested baseline b408030; publication uses an expected-head check without force. Post-publication CI, deployment and live-browser results must be verified separately. The separately paused Three lifecycle patch was not included or retried.
+The PR #28 source branch published the Pages preview on every push. The checks above ran at b408030, before publication. CI, the Pages deployment and live-browser results after publication were not part of this run and need their own check. The Three lifecycle patch is not part of this change.

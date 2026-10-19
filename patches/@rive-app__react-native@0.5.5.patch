@@ -1,0 +1,175 @@
+diff --git a/android/src/new/java/com/rive/RiveReactNativeView.kt b/android/src/new/java/com/rive/RiveReactNativeView.kt
+index 36d0baf..43feddc 100644
+--- a/android/src/new/java/com/rive/RiveReactNativeView.kt
++++ b/android/src/new/java/com/rive/RiveReactNativeView.kt
+@@ -3,6 +3,7 @@ package com.rive
+ import android.annotation.SuppressLint
+ import android.graphics.SurfaceTexture
+ import android.os.Build
++import android.os.Looper
+ import android.util.Log
+ import android.view.Choreographer
+ import android.view.MotionEvent
+@@ -137,6 +138,10 @@ class RiveReactNativeView(context: ThemedReactContext) : FrameLayout(context) {
+             resizeArtboardIfLayout()
+           }
+         }
++        // NYC-MON repost-skip: a fresh surface has no content — the view must
++        // draw once even while parked, so mark dirty and re-arm the loop.
++        this@RiveReactNativeView.needsRedraw = true
++        this@RiveReactNativeView.wakeRenderLoop()
+       }
+ 
+       override fun onSurfaceTextureDestroyed(st: SurfaceTexture): Boolean {
+@@ -155,6 +160,9 @@ class RiveReactNativeView(context: ThemedReactContext) : FrameLayout(context) {
+         // RiveSurface.resize() is internal to the SDK, so only the artboard
+         // is resized here (same behavior as before the 11.7.2 bump).
+         resizeArtboardIfLayout()
++        // NYC-MON repost-skip: a parked view has no callback in flight —
++        // re-arm so the resize actually draws.
++        this@RiveReactNativeView.wakeRenderLoop()
+       }
+ 
+       override fun onSurfaceTextureUpdated(st: SurfaceTexture) {}
+@@ -167,13 +175,23 @@ class RiveReactNativeView(context: ThemedReactContext) : FrameLayout(context) {
+ 
+   private val renderCallback = object : Choreographer.FrameCallback {
+     override fun doFrame(frameTimeNanos: Long) {
++      frameCallbackPending = false
+       if (!renderLoopRunning || disposed) return
+ 
+-      if (paused && !needsRedraw) {
++      // NYC-MON patch: a settled state machine draws nothing new either, so it
++      // skips the draw like a paused one. Without this every settled view
++      // redrew its texture on every vsync forever (four idle game controls held
++      // the Surface Duo's UI thread at ~44 ms a frame). playIfNeeded() and
++      // configure() clear `settled` / set `needsRedraw`, so input still animates.
++      if ((paused || settled) && !needsRedraw) {
+         // Keep the timebase fresh so resuming advances by one frame, not by
+         // the whole pause span.
+         lastFrameTimeNs = frameTimeNanos
+-        Choreographer.getInstance().postFrameCallback(this)
++        // NYC-MON repost-skip: a parked view does NOT repost — an in-flight
++        // no-op doFrame per vsync is a pure wake (~0.03 ms of PollMessages +
++        // a scheduling hit each). wakeRenderLoop() re-arms on every event
++        // that can unpark the view: play()/playIfNeeded(), configure(),
++        // pointer input, data binding, surface available/resize.
+         return
+       }
+ 
+@@ -185,7 +203,7 @@ class RiveReactNativeView(context: ThemedReactContext) : FrameLayout(context) {
+       ) {
+         // Skip without touching lastFrameTimeNs: the eventual advance must
+         // cover the full elapsed time so capped playback keeps wall-clock speed.
+-        Choreographer.getInstance().postFrameCallback(this)
++        postRenderFrame()
+         return
+       }
+ 
+@@ -206,7 +224,9 @@ class RiveReactNativeView(context: ThemedReactContext) : FrameLayout(context) {
+           if (!paused && !settled) {
+             worker.advanceStateMachine(sm, deltaTime)
+           }
+-          worker.draw(art, sm, rs, activeFit)
++          // NYC-MON patch: clear to transparent so artboards composite over the
++          // views behind them (game controls over the 3D world).
++          worker.draw(art, sm, rs, activeFit, android.graphics.Color.TRANSPARENT)
+           needsRedraw = false
+           frameCount++
+           val isFirstFrame = frameCount == 1L
+@@ -219,23 +239,45 @@ class RiveReactNativeView(context: ThemedReactContext) : FrameLayout(context) {
+       }
+ 
+       if (!disposed) {
+-        Choreographer.getInstance().postFrameCallback(this)
++        postRenderFrame()
+       }
+     }
+   }
+ 
++  // NYC-MON repost-skip: whether a doFrame callback is in flight. A parked
++  // loop stops reposting, and wakeRenderLoop() uses this to re-arm exactly
++  // once instead of double-posting.
++  private var frameCallbackPending = false
++
++  private fun postRenderFrame() {
++    if (disposed || !renderLoopRunning || frameCallbackPending) return
++    frameCallbackPending = true
++    Choreographer.getInstance().postFrameCallback(renderCallback)
++  }
++
++  // Re-arms a parked loop. Choreographer is thread-local and callers may be
++  // off-main (play()/playIfNeeded() run on a coroutine), so hop when needed.
++  private fun wakeRenderLoop() {
++    if (Looper.myLooper() == Looper.getMainLooper()) {
++      postRenderFrame()
++    } else {
++      UiThreadUtil.runOnUiThread { postRenderFrame() }
++    }
++  }
++
+   private fun startRenderLoop() {
+     if (renderLoopRunning) return
+     renderLoopRunning = true
+     lastFrameTimeNs = 0L
+     updateFrameRateHint()
+-    Choreographer.getInstance().postFrameCallback(renderCallback)
++    postRenderFrame()
+   }
+ 
+   private fun stopRenderLoop() {
+     renderLoopRunning = false
+     updateFrameRateHint()
+     Choreographer.getInstance().removeFrameCallback(renderCallback)
++    frameCallbackPending = false
+   }
+ 
+   // Advisory platform hint (upstream applies the same one inside its Compose
+@@ -308,6 +350,11 @@ class RiveReactNativeView(context: ThemedReactContext) : FrameLayout(context) {
+     if (dataBindingChanged || initialUpdate || reload) {
+       applyDataBinding(config.bindData, config.riveFile)
+     }
++
++    // NYC-MON repost-skip: configure() always dirties the view; a parked loop
++    // has no callback in flight, so re-arm it here. No-op while the loop is
++    // stopped (startRenderLoop posts its own first frame).
++    wakeRenderLoop()
+   }
+ 
+   private fun observeSettled(worker: CommandQueue, handle: StateMachineHandle) {
+@@ -382,6 +429,9 @@ class RiveReactNativeView(context: ThemedReactContext) : FrameLayout(context) {
+       // A pointer event may move the state machine off rest; resume advancing
+       // so the render loop actually applies its effect.
+       settled = false
++      // NYC-MON repost-skip: re-arm the parked loop so the pointer's effect
++      // draws this vsync instead of waiting for an external wake.
++      wakeRenderLoop()
+     } catch (e: Exception) {
+       Log.e(TAG, "Pointer event failed", e)
+     }
+@@ -463,6 +513,9 @@ class RiveReactNativeView(context: ThemedReactContext) : FrameLayout(context) {
+       worker.bindViewModelInstance(smHandle, instance.instanceHandle)
+       needsRedraw = true
+       settled = false
++      // NYC-MON repost-skip: a (re)bound instance changes what the next frame
++      // draws — re-arm the parked loop.
++      wakeRenderLoop()
+     } else {
+       Log.w(TAG, "Cannot bind VMI: worker or state machine handle not available")
+     }
+@@ -472,6 +525,7 @@ class RiveReactNativeView(context: ThemedReactContext) : FrameLayout(context) {
+     paused = false
+     settled = false
+     updateFrameRateHint()
++    wakeRenderLoop()
+   }
+ 
+   fun pause() {
+@@ -488,6 +542,7 @@ class RiveReactNativeView(context: ThemedReactContext) : FrameLayout(context) {
+     paused = false
+     settled = false
+     updateFrameRateHint()
++    wakeRenderLoop()
+   }
+ 
+   fun setNumberInputValue(name: String, value: Double, path: String?) {
