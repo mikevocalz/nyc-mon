@@ -25,15 +25,20 @@
 // sign atlas, hex tiling, ground parallax, the city AO bake, GTAO/SSR/haze
 // post passes, photometric lamps and clouds.
 //
+// EXPO_PUBLIC_WORLD_VD_LEANMAT (vd-leanmat.ts) skips all of this and
+// returns the unlit lean set in createLeanVdCityMaterials instead.
+//
 // Colour space: the city feeds palette hex as linear and outputs linear
 // (city-scene.ts), so texture bytes are used raw — no sRGB decode — and land
 // on screen as the photo.
 import type { Three } from '@acme/ui/three';
 import type { Node } from 'three/webgpu';
 import { decodeBase64 } from './foliage.ts';
-import { cityShaderTools, roadsGraphs, TONE_ATTRIBUTE, type CityMaterials } from './materials.ts';
+import { cityShaderTools, createUnlitLayers, leafGraphs, roadsGraphs, TONE_ATTRIBUTE, type CityMaterials } from './materials.ts';
 import { createPbrCityMaterials, type PbrCityOptions } from './pbr-materials.ts';
+import type { CityColor } from './palette.ts';
 import { parseSkyRigFlag } from './sky-rig.ts';
+import { VD_LEANMAT } from './vd-leanmat.ts';
 import { LIT_SHARE_CAP, LIT_SHARE_DAY, LIT_SHARE_GAIN, LIT_SHARE_TOD, WINDOW_GRID } from './windows.ts';
 import {
   VD_GROUND_MEANS, VD_GROUND_RGB, VD_NORMAL_LAYERS, VD_NORMALS_XY, VD_TEXTURE_SIZE, VD_WALL_LAYERS, VD_WALL_MEANS, VD_WALLS_RGB,
@@ -41,6 +46,10 @@ import {
 import { VD_TREES } from './vd-trees.ts';
 
 type StdMat = InstanceType<Three['MeshStandardNodeMaterial']>;
+type BasicMat = InstanceType<Three['MeshBasicNodeMaterial']>;
+type BasicParams = ConstructorParameters<Three['MeshBasicNodeMaterial']>[0];
+type Mat = InstanceType<Three['Material']>;
+type TextureT = InstanceType<Three['Texture']>;
 type F = Node<'float'>;
 type V3 = Node<'vec3'>;
 
@@ -61,6 +70,9 @@ export interface VdWeather {
 }
 
 export type VdCityMaterials = CityMaterials & { weather: VdWeather };
+
+/** Lean lane (vd-leanmat.ts): unlit output lands near the dusk-lit level the PBR bodies produce. */
+const LEAN_DUSK = 0.8;
 
 // Tuning knobs, each a starting value for the Duo eyeball pass.
 const TUNE = {
@@ -106,7 +118,12 @@ function pickMean(T: Three['TSL'], means: readonly (readonly number[])[], layer:
   return out;
 }
 
-export function createVdCityMaterials(THREE: Three, options: PbrCityOptions): VdCityMaterials {
+export function createVdCityMaterials(
+  THREE: Three, options: PbrCityOptions,
+  /** Overridable for tests: the lean material bodies (vd-leanmat.ts). Defaults to the flag. */
+  leanMat = VD_LEANMAT,
+): VdCityMaterials {
+  if (leanMat) return createLeanVdCityMaterials(THREE, options);
   const base = createPbrCityMaterials(THREE, options);
   const { T, c, vertexRgb } = cityShaderTools(THREE);
   const tod = options.timeOfDay ?? LIT_SHARE_TOD;
@@ -450,5 +467,94 @@ export function createVdCityMaterials(THREE: Three, options: PbrCityOptions): Vd
     sidewalks,
     weather: { wet, snow },
     dispose: () => { base.dispose(); walls.dispose(); groundMaps.dispose(); normals.dispose(); },
+  };
+}
+
+/**
+ * Lean vd materials (vd-leanmat.ts): every lit surface becomes an unlit
+ * MeshBasicNodeMaterial — vertex colour or a flat palette tone, times
+ * LEAN_DUSK so the raw output sits near the dusk-lit level the PBR bodies
+ * produce. The wall and ground photo arrays, the window lattice, the
+ * weather grain, the normals and the holo time uniforms all go away; the
+ * meshes, polygon offsets, alpha tests and fog stay, so each draw encodes
+ * a handful of colour nodes instead of the graphs above. Rain and snow
+ * still move the weather uniforms for the precipitation mesh — the ground
+ * just no longer reads wet. `lights = false` keeps the node builder from
+ * wrapping the output in a lighting context (NodeMaterial.setupLighting).
+ */
+function createLeanVdCityMaterials(THREE: Three, options: PbrCityOptions): VdCityMaterials {
+  const { T, c, vertexRgb } = cityShaderTools(THREE);
+  const unlit = createUnlitLayers(THREE, options.sunDirection);
+  const initial = weatherFromEnv();
+  const wet = T.uniform(initial.rain);
+  const snow = T.uniform(initial.snow);
+  const flat = (params?: BasicParams): BasicMat => {
+    const m = new THREE.MeshBasicNodeMaterial(params);
+    m.lights = false;
+    return m;
+  };
+  const vertex = (params?: BasicParams): BasicMat => {
+    const m = flat(params);
+    m.colorNode = T.vec4(vertexRgb.mul(LEAN_DUSK), 1);
+    return m;
+  };
+  const tone = (key: CityColor, params?: BasicParams): BasicMat => {
+    const m = flat(params);
+    m.colorNode = T.vec4(c(key).mul(LEAN_DUSK), 1);
+    return m;
+  };
+  // The same ground-lane offsets the lit bodies carry (city-mesh draw order).
+  const offset = (n: number): BasicParams => ({
+    side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -n, polygonOffsetUnits: -n * 2,
+  });
+
+  const masonry = vertex();
+  const glass = vertex();
+  const roofs = vertex();
+  const ground = tone('ground', { side: THREE.DoubleSide });
+  const areas = vertex(offset(1));
+  const sidewalks = vertex(offset(2));
+  // The road vertex colour is data (lane paint + width markers), not a tone — flat asphalt.
+  const roads = tone('asphalt', offset(3));
+  const trunks = tone('trunk');
+  const poles = tone('pole');
+  const signBlades = tone('signGreen');
+  // Retroreflective self-light, same as the lit lanes; emissiveNode is only
+  // declared on the standard/physical types (materials.ts setEmissive).
+  (signBlades as unknown as { emissiveNode: Node }).emissiveNode = c('signGreen').mul(0.35);
+  // Parked cars keep the body-paint/instance-tone contract so each car keeps its tone.
+  const carTone = T.attribute<'vec3'>(TONE_ATTRIBUTE, 'vec3');
+  const cars = flat();
+  cars.colorNode = T.vec4(T.mix(vertexRgb, carTone, T.step(vertexRgb.x, -0.5)).mul(LEAN_DUSK), 1);
+
+  const leaf = (map: TextureT) => {
+    const graphs = leafGraphs(THREE, map);
+    const m = flat({ alphaTest: 0.5 });
+    m.colorNode = T.vec4(graphs.albedo, 1);
+    m.opacityNode = graphs.opacity;
+    return m;
+  };
+  // Far crowns in the model trees' mean leaf colour, varied per tree — the
+  // same tone formula the lit lane uses, on the unlit body.
+  const leafMean = VD_TREES.reduce((acc, t) => acc.map((v, i) => v + t.leafTone[i]! / VD_TREES.length), [0, 0, 0]);
+  const farCrown = () => {
+    const m = flat();
+    const toneAttr = T.attribute<'vec3'>(TONE_ATTRIBUTE, 'vec3');
+    m.colorNode = T.vec4(T.vec3(leafMean[0]!, leafMean[1]!, leafMean[2]!).mul(T.float(0.8).add(toneAttr.g.mul(0.4))), 1);
+    return m;
+  };
+  // No painted light pools, same call as the lit vd lane.
+  unlit.lampPools.visible = false;
+  const all: Mat[] = [
+    unlit.lettering, cars, unlit.sky, masonry, glass, roofs, unlit.accents, unlit.neon, unlit.billboards,
+    ground, areas, sidewalks, roads, unlit.shadows, trunks, poles, signBlades, unlit.lampHeads, unlit.lampPools,
+  ];
+  return {
+    sky: unlit.sky, masonry, glass, roofs, accents: unlit.accents, neon: unlit.neon, billboards: unlit.billboards,
+    ground, areas, sidewalks, roads, shadows: unlit.shadows, trunks,
+    poles, signBlades, lampHeads: unlit.lampHeads, lampPools: unlit.lampPools, lettering: unlit.lettering, cars,
+    leaf, farCrown,
+    weather: { wet, snow },
+    dispose: () => { for (const material of all) material.dispose(); unlit.atlas.dispose(); },
   };
 }

@@ -3,9 +3,13 @@
 // one leaf InstancedMesh per species, a thinned mid level whose trunks merge
 // into a single mesh, and a far cross-card tier drawn as one leaf mesh and
 // one trunk mesh across all species. foliage.ts hands each tree a species
-// and fills these from the tier lists vd-tree-tiers.ts picks.
+// and fills these from the tier lists vd-tree-tiers.ts picks. The lean
+// material flag (vd-leanmat.ts) swaps every body here for an unlit basic
+// one; the colour graphs and the draw consolidation stay.
 import type { Three } from '@acme/ui/three';
+import type { Node } from 'three/webgpu';
 import { decodeBase64 } from './foliage-decode.ts';
+import { VD_LEANMAT } from './vd-leanmat.ts';
 import { VD_TREE_ATLAS_RGBA, VD_TREE_ATLAS_SIZE, VD_TREES } from './vd-trees.ts';
 import { VD_CENSUS_DBH, VD_CENSUS_SPECIES } from './vd-tree-species.ts';
 
@@ -52,8 +56,30 @@ const u16 = (b64: string) => { const u = decodeBase64(b64); return new Uint16Arr
 // Display-space value of a linear bark albedo: the city feeds palette values straight to the screen.
 const toDisplay = (c: number) => Math.pow(Math.max(0, c), 1 / 2.2);
 
-export function buildVdTreeMeshes(THREE: Three, capacity: number, midCapacity = 0, farCapacity = 0) {
+type BasicMat = InstanceType<Three['MeshBasicNodeMaterial']>;
+type BasicParams = ConstructorParameters<Three['MeshBasicNodeMaterial']>[0];
+
+export function buildVdTreeMeshes(
+  THREE: Three, capacity: number, midCapacity = 0, farCapacity = 0,
+  /** Overridable for tests: the lean material bodies (vd-leanmat.ts). Defaults to the flag. */
+  leanMat = VD_LEANMAT,
+) {
   const T = THREE.TSL;
+  // Lean bodies (vd-leanmat.ts): the same colour graphs on an unlit basic
+  // body. `lights = false` keeps the node builder from wrapping the output
+  // in a lighting context at all — the draw encodes the colour nodes and
+  // fog and nothing else, which is what the ~18 ms Duo encode floor pays
+  // for on every standard-body material.
+  const leanBody = (params?: BasicParams): BasicMat => {
+    const m = new THREE.MeshBasicNodeMaterial(params);
+    m.lights = false;
+    return m;
+  };
+  // emissiveNode is declared on the standard/physical types only; the
+  // runtime field exists on every NodeMaterial (materials.ts setEmissive).
+  const setEmissive = (m: BasicMat | InstanceType<Three['MeshStandardNodeMaterial']>, node: Node) => {
+    (m as unknown as { emissiveNode: Node }).emissiveNode = node;
+  };
   const atlas = new THREE.DataArrayTexture(decodeBase64(VD_TREE_ATLAS_RGBA), VD_TREE_ATLAS_SIZE, VD_TREE_ATLAS_SIZE, VD_TREES.length);
   atlas.format = THREE.RGBAFormat;
   atlas.magFilter = THREE.LinearFilter;
@@ -71,7 +97,9 @@ export function buildVdTreeMeshes(THREE: Three, capacity: number, midCapacity = 
   // species' bark tints — all within ~0.2 of this mean — are not perceivable,
   // so twelve per-species trunk meshes collapse into two.
   const meanBark = [0, 0, 0].map((c) => VD_TREES.reduce((sum, t) => sum + t.barkColor[c]!, 0) / VD_TREES.length);
-  const trunkMaterial = new THREE.MeshStandardNodeMaterial({ roughness: 0.92, metalness: 0 });
+  const trunkMaterial = leanMat
+    ? leanBody()
+    : new THREE.MeshStandardNodeMaterial({ roughness: 0.92, metalness: 0 });
   const trunkStreak = T.fract(T.sin(T.positionLocal.x.mul(17.1).add(T.positionLocal.z.mul(11.3))).mul(43758.5453)).mul(0.25).add(0.85);
   trunkMaterial.colorNode = T.vec4(T.vec3(toDisplay(meanBark[0]!), toDisplay(meanBark[1]!), toDisplay(meanBark[2]!)).mul(trunkStreak), 1);
   materials.push(trunkMaterial);
@@ -79,12 +107,14 @@ export function buildVdTreeMeshes(THREE: Three, capacity: number, midCapacity = 
   // The far imposter leaves likewise share one material: the atlas layer and
   // the card tiling arrive per instance (aLayer, aRep) instead of baking into
   // six materials, so all six species draw in one call.
-  const farLeafMaterial = new THREE.MeshStandardNodeMaterial({ side: THREE.DoubleSide, alphaTest: 0.5, roughness: 0.6, metalness: 0 });
+  const farLeafMaterial = leanMat
+    ? leanBody({ side: THREE.DoubleSide, alphaTest: 0.5 })
+    : new THREE.MeshStandardNodeMaterial({ side: THREE.DoubleSide, alphaTest: 0.5, roughness: 0.6, metalness: 0 });
   const farSample = T.texture(atlas, T.uv().mul(T.attribute<'vec2'>('aRep', 'vec2'))).depth(T.attribute<'float'>('aLayer', 'float'));
   const farShade = T.attribute<'float'>('aShade', 'float');
   farLeafMaterial.colorNode = T.vec4(farSample.rgb.mul(T.mix(T.float(0.55), T.float(1.1), farShade)), 1);
   farLeafMaterial.opacityNode = farSample.a;
-  farLeafMaterial.emissiveNode = farSample.rgb.mul(0.08);
+  setEmissive(farLeafMaterial, farSample.rgb.mul(0.08));
   materials.push(farLeafMaterial);
 
   const species = VD_TREES.map((tree, layer) => {
@@ -101,7 +131,9 @@ export function buildVdTreeMeshes(THREE: Three, capacity: number, midCapacity = 
     leaf.setIndex(new THREE.BufferAttribute(u16(tree.leaf.index), 1));
     geometries.push(bark, leaf);
 
-    const barkMaterial = new THREE.MeshStandardNodeMaterial({ roughness: 0.92, metalness: 0 });
+    const barkMaterial = leanMat
+      ? leanBody()
+      : new THREE.MeshStandardNodeMaterial({ roughness: 0.92, metalness: 0 });
     const [r, g, b] = tree.barkColor;
     // Bark: the scan's tone with low-frequency streaks up the trunk, in place of the bark photo.
     const streak = T.fract(T.sin(T.positionLocal.x.mul(17.1).add(T.positionLocal.z.mul(11.3))).mul(43758.5453)).mul(0.25).add(0.85);
@@ -111,12 +143,14 @@ export function buildVdTreeMeshes(THREE: Three, capacity: number, midCapacity = 
     // interior by the baked per-card shade, with Valdrada's back-light share
     // (bxTrees.js: 0.22 of the sun through a leaf whose back faces it) as a
     // flat lift.
-    const leafMaterial = new THREE.MeshStandardNodeMaterial({ side: THREE.DoubleSide, alphaTest: 0.5, roughness: 0.6, metalness: 0 });
+    const leafMaterial = leanMat
+      ? leanBody({ side: THREE.DoubleSide, alphaTest: 0.5 })
+      : new THREE.MeshStandardNodeMaterial({ side: THREE.DoubleSide, alphaTest: 0.5, roughness: 0.6, metalness: 0 });
     const sample = T.texture(atlas, T.uv()).depth(T.float(layer));
     const shade = T.attribute<'float'>('aShade', 'float');
     leafMaterial.colorNode = T.vec4(sample.rgb.mul(T.mix(T.float(0.55), T.float(1.1), shade)), 1);
     leafMaterial.opacityNode = sample.a;
-    leafMaterial.emissiveNode = sample.rgb.mul(0.08);
+    setEmissive(leafMaterial, sample.rgb.mul(0.08));
     materials.push(barkMaterial, leafMaterial);
 
     const midLeaf = new THREE.BufferGeometry();

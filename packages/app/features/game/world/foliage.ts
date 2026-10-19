@@ -16,6 +16,7 @@ import { decodeBase64 } from './foliage-decode.ts';
 import { mulberry32 } from './geometry.ts';
 import { NEAR_TREE_CAP, TreeLod } from './tree-lod.ts';
 import { VD_LEAN, VD_LEAN_NEAR_TREE_CAP } from './vd-lean.ts';
+import { VD_LEANMAT } from './vd-leanmat.ts';
 import { buildVdTreeMeshes, VD_MID_TREE_CAP, VD_NEAR_TREE_CAP, VD_TREE_SCALE, vdCensusTree, vdSpecies } from './vd-trees-mesh.ts';
 import { VD_FAR_TREE_CAP, VdTreeTiers } from './vd-tree-tiers.ts';
 import { createStreetClearance, type StreetClearance } from './walkability.ts';
@@ -191,6 +192,8 @@ export function buildTrees(
   modelTrees = false,
   /** vd lane, overridable for tests: the lean tier swap (vd-lean.ts). Defaults to the flag. */
   lean = VD_LEAN,
+  /** vd lane, overridable for tests: the lean material bodies (vd-leanmat.ts). Defaults to the flag. */
+  leanMat = VD_LEANMAT,
 ) {
   const { trees: placements, report } = treePlacements(dataset, clearance);
   const count = Math.max(1, placements.length);
@@ -241,7 +244,7 @@ export function buildTrees(
   // Lean halves the near set and folds the mid tier into the far imposter
   // pool, so that pool has to hold midCap + farCap rows (vd-lean.ts).
   const vdNearCap = lean ? VD_LEAN_NEAR_TREE_CAP : VD_NEAR_TREE_CAP;
-  const vd = modelTrees ? buildVdTreeMeshes(THREE, Math.min(count, vdNearCap), Math.min(count, VD_MID_TREE_CAP), Math.min(count, lean ? VD_MID_TREE_CAP + VD_FAR_TREE_CAP : VD_FAR_TREE_CAP)) : null;
+  const vd = modelTrees ? buildVdTreeMeshes(THREE, Math.min(count, vdNearCap), Math.min(count, VD_MID_TREE_CAP), Math.min(count, lean ? VD_MID_TREE_CAP + VD_FAR_TREE_CAP : VD_FAR_TREE_CAP), leanMat) : null;
   const vdTiers = vd ? new VdTreeTiers(xs, zs, { nearCap: vdNearCap }) : null;
   const vdSpeciesOf = new Uint8Array(placements.length);
   const vdMatrices = vd ? new Float32Array(placements.length * 16) : null;
