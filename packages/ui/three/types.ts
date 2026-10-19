@@ -137,6 +137,14 @@ export interface ThreeCanvasProps<P> {
    * is non-opaque. Ignored on web and iOS.
    */
   androidSurfaceType?: AndroidSurfaceType;
+  /**
+   * Native only: pace the running loop on a zero-delay timer instead of
+   * requestAnimationFrame. Only useful on a superseding present path
+   * (androidSurfaceType 'HardwareBufferView'); on a fifo surface the present
+   * stall throttles the loop the same way rAF pacing does. Ignored on web
+   * and on the worklet thread.
+   */
+  freeRun?: boolean;
   /** Called with the backend once the renderer is up, or null when falling back. */
   onBackendChange?: (backend: ThreeBackend | null) => void;
   /** Opt-in JS renderer metrics. Worklet runtimes use their own reporting channel. */
