@@ -123,7 +123,7 @@ Verified in `packages/app/node_modules/three@0.186.1` (also `packages/ui`):
 | Capability | Present | Verdict |
 |---|---|---|
 | `BatchedMesh` (`src/objects/BatchedMesh.js`) | ✅ | **Available but not automatically a win** — our static world already merges by material and instances props. BatchedMesh's value is many distinct geometries in one draw *with per-geometry culling* — could suit signal heads/blades if per-approach culling matters. Measure before adopting; the merged-static path already delivers ~40 draw calls. |
-| `BundleGroup` (`src/renderers/common/BundleGroup.js`) | ✅ | **Already in use** behind `EXPO_PUBLIC_WORLD_BUNDLES` (G1). Dynamic actors stay *outside* the bundle — actor meshes are mutable by design. No action. |
+| `BundleGroup` (`src/renderers/common/BundleGroup.js`) | ✅ | **Tried and removed** (G1, deleted 2026-11 lane-bundlefix): r186 replay froze the camera transform — the shared camera UBO is never re-uploaded for bundled objects (upstream "missing binding updates", mrdoob/three.js#30701). Measured win was ~1 ms even working. Revisit only after a three release fixes replay. |
 | `SkinnedMesh` + `nodes/accessors/Skinning.js` | ✅ | GPU skinning exists in-node-graph (computeSkinning). **PENDING native validation** — official skinned-instancing/crowd demos (webgpu_compute_skinning etc.) are compatibility *research*, not proof; rn-webgpu has never run them. Plan A for crowd stays unrigged instanced bodies (fable's vertex-shader walk, PersonGenerator); plan B rigged hero peds = at most a handful of SkinnedMeshes, validated on Duo before scaling. |
 | City generators (`examples/jsm/generators/…`) | ✅ all | TSL-native — see scout-B §3. |
 | `GLTFLoader` | ✅ in three | Never used in the game feature today; `react-native-webgpu` provides `createImageBitmap` global → texture decode path is *plausible*; full GLB texture + skinning round-trip is **PENDING device test**. Keep registry fallback (procedural) mandatory. |
@@ -188,6 +188,6 @@ Consequences:
 5. **Adaptive density** belongs in `perf/tier.ts` knobs (maxVehicles,
    maxPeds, draw distance) with graceful degradation — the sim stays
    correct at reduced population, it never drops frames to look busy.
-6. **BundleGroup**: static world stays bundled; actor meshes must remain
-   out-of-bundle (mutable). Verify the G1 split still holds after actors
-   join — report before/after in the same docs/performance format.
+6. ~~**BundleGroup**~~: the G1 bundle lane was deleted 2026-11 (frozen
+   camera on replay, ~1 ms win). No bundle-membership rule applies to
+   actors until upstream fixes replay.

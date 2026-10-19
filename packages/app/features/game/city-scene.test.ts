@@ -99,26 +99,6 @@ test('disposes every geometry and material exactly once', () => {
   assert.equal(count, resources.size); assert.equal(built.scene.children.length, 0);
 });
 
-test('bundles lane: the sky dome stays out of the BundleGroup', async () => {
-  // executeBundles replays at the END of the render pass
-  // (WebGPUBackend.finishRender), so a depthTest:false dome inside the
-  // bundle repaints over every direct draw and the replayed city leaves
-  // non-bundled silhouettes as sky holes — the Duo's white canopies.
-  const { buildCityWorld } = await import('./world/index.ts');
-  const world = buildCityWorld(THREE, parseCityDataset(fixtureV2()), { bundles: true });
-  const bundle = world.group.getObjectByName('city:bundle') as THREE.BundleGroup;
-  assert.ok(bundle?.isBundleGroup);
-  assert.equal(world.skyBundled, true, 'the dome rides inside world.group — the scene adds only the group');
-  assert.equal(world.sky.parent, world.group);
-  assert.ok(!bundle.getObjectByName('city:sky'), 'the depthTest:false dome never records into the bundle');
-  assert.ok(bundle.getObjectByName('city:ground'));
-  assert.ok(bundle.getObjectByName('city:walls-masonry'));
-  assert.ok(!bundle.getObjectByName('city:street-detail'), 'mutable draw ranges stay out');
-  assert.ok(!bundle.getObjectByName('city:contact-shadows'), 'mutable draw ranges stay out');
-  assert.ok(!bundle.getObjectByName('city:trees-near') && !bundle.getObjectByName('city:trees-far'), 'instanced sets stay out');
-  world.dispose();
-});
-
 test('rejects invalid cameras before allocating meshes', () => {
   const input = params(); input.camera.x = Number.NaN;
   assert.throws(() => createCityScene(context(), input), /camera/);

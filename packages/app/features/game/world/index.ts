@@ -14,20 +14,20 @@ import { createCityMaterials, linearColor } from './materials.ts';
 import { createPbrCityMaterials, EXPERIMENTAL_WORLD_PBR } from './pbr-materials.ts';
 import { createGlassCityMaterials, EXPERIMENTAL_WORLD_GLASS, type GlassTier } from './glass.ts';
 import { applyCarPbrMaterial, EXPERIMENTAL_WORLD_CAR_PBR } from './car-materials.ts';
-import { createSkyRig, EXPERIMENTAL_SKY_RIG, parseSkyRigFlag, type SkyName } from './sky-rig.ts';
+import { createSkyRig, EXPERIMENTAL_SKY_RIG, type SkyName } from './sky-rig.ts';
 import { createVdCityMaterials, EXPERIMENTAL_WORLD_VD, type VdWeather } from './vd-materials.ts';
 import { buildPrecipitation } from './vd-weather.ts';
 import { CURB_HEIGHT, VD_SHADOWS, VD_SHADOW_HALF } from './curb.ts';
 import { FUTURE_LAYER, type AdSurface } from './future-layer.ts';
 
-/**
- * Lane G1 "GPU budget": record the immutable city into one WebGPU render
- * bundle (three r186 `BundleGroup`, renderers/common/BundleGroup.js), so its
- * draws are encoded once and replayed via `executeBundles` instead of
- * re-encoded through JSI every frame. Defaults to
- * EXPO_PUBLIC_WORLD_BUNDLES — off unless set.
- */
-export const EXPERIMENTAL_WORLD_BUNDLES = parseSkyRigFlag(process.env.EXPO_PUBLIC_WORLD_BUNDLES);
+// Lane G1 "GPU budget" (EXPO_PUBLIC_WORLD_BUNDLES) was deleted 2026-11: the
+// recorded bundle replayed the record-frame camera pose forever — three r186
+// never re-uploads the shared camera UBO for bundled render objects
+// (upstream issue 30701, "missing binding updates" for static bundles) —
+// and the working flag bought only ~1 ms of encode anyway
+// (docs/performance/gpu-budget-2026-10-17.md). Re-recording on camera moves
+// costs the whole encode the bundle exists to skip, so there is no honest
+// BundleGroup lane here until upstream fixes replay.
 
 /**
  * The optional "future layer" (future-layer.ts): NYC roof furniture, the
@@ -102,11 +102,6 @@ export interface CityWorldOptions {
    * unless set. Takes precedence over `pbr` and `glass`.
    */
   vd?: boolean;
-  /**
-   * Lane G1: record the static city into a WebGPU render bundle
-   * (EXPERIMENTAL_WORLD_BUNDLES). See buildCityWorld for what stays out.
-   */
-  bundles?: boolean;
   /**
    * The future layer: roofscape furniture, the NYCHA facelift kit and the
    * addressable ad-surface inventory (EXPERIMENTAL_WORLD_FUTURE). The
@@ -215,49 +210,7 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
       o.receiveShadow = receivers.has(o.name);
     }
   }
-  const bundles = options.bundles ?? EXPERIMENTAL_WORLD_BUNDLES;
-  if (bundles) {
-    // WebGPU render bundles (three r186 BundleGroup): the immutable meshes
-    // record once and replay as one executeBundles call per frame. The
-    // replay is appended at the END of the render pass — _renderBundles only
-    // records/queues (renderers/common/Renderer.js), and WebGPUBackend's
-    // finishRender calls pass.executeBundles AFTER the opaque and
-    // transparent lists are already encoded
-    // (renderers/webgpu/WebGPUBackend.js finishRender). Bundle contents
-    // therefore draw over the direct pass, resolved by the shared depth
-    // buffer. That drives the membership split:
-    //
-    // - The sky dome stays OUT of the bundle (a child of `group` instead, so
-    //   city-scene still adds only `world.group`). It is depthTest:false, so
-    //   inside the bundle it repainted the whole frame over the direct
-    //   draws; the bundled city then failed depth wherever a tree, prop or
-    //   mutable mesh had already written nearer, leaving their silhouettes
-    //   as holes filled with the sky gradient — the Duo's "white canopies"
-    //   (2026-11). Outside the bundle, renderOrder -10 still leads the
-    //   direct opaque list and the replayed city covers it like any other
-    //   surface.
-    // - The meshes setFocus re-ranges per move (contact shadows, street
-    //   detail) and every instanced set whose count or visibility changes
-    //   (trees, furniture, props) stay out: a static bundle freezes the draw
-    //   parameters recorded at first render. Lights are not allowed inside a
-    //   BundleGroup at all.
-    //
-    // KNOWN BUG (device-verified 2026-10-18): the replay freezes the camera
-    // transform too — the bundled city renders from the camera pose recorded
-    // on the first frame (the 220 m reveal aerial) no matter how the camera
-    // moves afterwards. Walking, orbiting and zooming all draw correctly for
-    // the direct-pass meshes while the bundled city stays pinned to the
-    // record-time view. Do not ship this flag on a moving-camera build until
-    // the bundle stops capturing camera state (or re-records on camera
-    // change, which forfeits the submission win).
-    const bundle = new THREE.BundleGroup();
-    bundle.name = 'city:bundle';
-    const mutable = new Set(city.mutableMeshes);
-    bundle.add(ground, ...city.meshes.filter((m) => !mutable.has(m)));
-    group.add(bundle, sky, ...city.mutableMeshes, ...trees.objects, ...furniture.objects, ...props.objects, hemi, sun, sun.target);
-  } else {
-    group.add(ground, ...city.meshes, ...trees.objects, ...furniture.objects, ...props.objects, hemi, sun, sun.target);
-  }
+  group.add(ground, ...city.meshes, ...trees.objects, ...furniture.objects, ...props.objects, hemi, sun, sun.target);
   if (precipitation) group.add(precipitation.mesh);
 
   const horizon = skyRig?.horizon ?? linearColor(THREE, 'skyHorizon');
@@ -273,8 +226,6 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
   return {
     group,
     sky,
-    /** True on the bundles lane, where the sky dome is already a child of `group` — the scene then adds only `world.group`. */
-    skyBundled: bundles,
     fog,
     horizon,
     /** The L1 rig when flagged, else null — city-scene uses it to attach env. */

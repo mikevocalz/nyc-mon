@@ -55,12 +55,20 @@ object and the 120-frame window are reused).
 Files: `perf/frame-sampler.ts` (+`.test.ts`), `perf/record-city-frame.ts`,
 `render-runtime/game-render.ts`, `ui/three/types.ts`, `ui/three/ThreeCanvas.tsx`.
 
-### BundleGroup for the static city — `EXPO_PUBLIC_WORLD_BUNDLES` (default OFF)
+### BundleGroup for the static city — `EXPO_PUBLIC_WORLD_BUNDLES` — REMOVED 2026-11 (lane-bundlefix)
+
+The flag and the bundle path were deleted from `world/index.ts`: the replay
+kept the record-frame camera pose forever — three r186 never re-uploads the
+shared camera UBO for bundled render objects (upstream "missing binding
+updates" for static bundles, mrdoob/three.js#30701, needs a renderer
+refactor) — and re-recording on camera moves costs the whole encode the
+bundle exists to skip. The measured win below was real but small; the lane
+is recorded here as tried-and-rejected, not parked.
 
 three@0.186.1 `renderers/common/BundleGroup.js` records a group's draws into a
 WebGPU render bundle once and replays them via `executeBundles`, skipping
 per-frame re-encoding. In `world/index.ts` a `BundleGroup` gets `ground`
-and every `city.meshes` entry except the two `mutableMeshes` (contact-shadow +
+and every `city.meshes` entry except the two mutable meshes (contact-shadow +
 detail meshes `setFocus` re-ranges per move — a recorded bundle freezes draw
 parameters). Trees/furniture/props stay out (instanced sets whose counts/
 visibility change), lights stay out (BundleGroup forbids non-renderable
