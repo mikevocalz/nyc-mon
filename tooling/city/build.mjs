@@ -1076,6 +1076,14 @@ const dataset = {
       query: 'transit.subway positions',
     },
   ],
+  // ODbL §4.4(a): the baked tile is a Derivative Database of the ODbL
+  // Valdrada tiles and OSM — the file must itself say what it is offered
+  // under (docs/licenses/provenance-2026-10-17.md §3).
+  license: 'ODbL-1.0',
+  licenseUrl: 'https://opendatacommons.org/licenses/odbl/1-0/',
+  licenseNotice:
+    'harlem-apollo-20261017 is a Derivative Database of the ODbL-licensed Valdrada v0.4.0 tiles and OpenStreetMap data; ' +
+    'it is made available under the Open Database License (ODbL 1.0).',
   notes: [
     'Coordinates are metres from origin: x = east, -z = north, rounded to 0.1 m.',
     'v3: buildings, roads, landmarks, transit and record-placed furniture come from Valdrada v0.4.0 tiles (DOITT/PLUTO/CSCL/DOT/MTA records via its compile); OSM stays the source for areas, for sidewalk/crossing/cycleway/footway classes CSCL does not carry, and for building ids and names where a footprint overlap match lands (G1b).',

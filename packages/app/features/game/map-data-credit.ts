@@ -71,6 +71,16 @@ export const CITY_MAP_SOURCES: readonly CityMapSourceCredit[] = [
   },
 ];
 
+// ODbL §4.4(a): the bundled tile is itself a Derivative Database of the
+// ODbL sources above — its own licence grant sits beside the source
+// licences. map-data-credit.test.ts asserts this equals the tile's
+// top-level licence fields.
+export const CITY_MAP_DERIVED: CityMapSourceCredit = {
+  attribution: 'harlem-apollo-20261017 (Derivative Database)',
+  license: 'ODbL-1.0',
+  licenseUrl: 'https://opendatacommons.org/licenses/odbl/1-0/',
+};
+
 // Bundled model/texture assets, separate from the map-data records above:
 // the vd lane ships compiled tree models and baked textures (vd-trees.ts,
 // vd-textures.ts). CC BY requires the author credit in-app.
