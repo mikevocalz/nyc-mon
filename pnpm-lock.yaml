@@ -580,7 +580,7 @@ overrides:
   '@expo/dom-webview': 58.0.2
 
 patchedDependencies:
-  '@reactvision/react-viro': e393f1a4f339ad8a9298abb7d6a9560203b0bd336d94f7abfc99aa77b886ed4c
+  '@reactvision/react-viro': 7d33314216d1fb2ac3838b9a2ee7dc1868f02138407e44da2a8606a37fa917ca
   '@rive-app/react-native@0.5.5': 072a64be5cbbeeba2044c856f45e5bff2db3ec6dcdf6dec6598ee83884420472
   metro@0.87.1: 2223cc1edc91e99c4054761e89a3d2ca1325ece5d36d469e355270271d1ce8f0
   react-native-graph@1.4.0: 817c01ec21140fc22e67c1da43ef7844c07853ee7c7ac50e331e2fa27e4c3f33
@@ -748,7 +748,7 @@ importers:
         version: 7.5.1(react-native@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0)
       '@reactvision/react-viro':
         specifier: 'catalog:'
-        version: file:vendor/reactvision-react-viro-3.0.2-moyo.1.tgz(patch_hash=e393f1a4f339ad8a9298abb7d6a9560203b0bd336d94f7abfc99aa77b886ed4c)(@metavr/layout-compat@1.0.0(react-native@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0))(@metavr/layout-window-compat@1.0.0(react-native@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0))(@reactvision/viro-web-renderer@1.0.1)(@types/react@19.3.0)(expo@58.0.14)(react-native-web@0.21.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-native@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0)(supports-color@8.1.1)(use-sync-external-store@1.6.0(react@19.3.0))
+        version: file:vendor/reactvision-react-viro-3.0.2-moyo.1.tgz(patch_hash=7d33314216d1fb2ac3838b9a2ee7dc1868f02138407e44da2a8606a37fa917ca)(@metavr/layout-compat@1.0.0(react-native@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0))(@metavr/layout-window-compat@1.0.0(react-native@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0))(@reactvision/viro-web-renderer@1.0.1)(@types/react@19.3.0)(expo@58.0.14)(react-native-web@0.21.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-native@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0)(supports-color@8.1.1)(use-sync-external-store@1.6.0(react@19.3.0))
       '@rive-app/react-native':
         specifier: 'catalog:'
         version: 0.5.5(patch_hash=072a64be5cbbeeba2044c856f45e5bff2db3ec6dcdf6dec6598ee83884420472)(react-native-nitro-modules@0.37.1(react-native@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0))(react-native@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0)
@@ -1029,7 +1029,7 @@ importers:
         version: 16.4.2
       '@reactvision/react-viro':
         specifier: 'catalog:'
-        version: file:vendor/reactvision-react-viro-3.0.2-moyo.1.tgz(patch_hash=e393f1a4f339ad8a9298abb7d6a9560203b0bd336d94f7abfc99aa77b886ed4c)(@metavr/layout-compat@1.0.0(react-native@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0))(@metavr/layout-window-compat@1.0.0(react-native@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0))(@reactvision/viro-web-renderer@1.0.1)(@types/react@19.3.0)(expo@58.0.14)(react-native-web@0.21.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-native@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0)(supports-color@8.1.1)(use-sync-external-store@1.6.0(react@19.3.0))
+        version: file:vendor/reactvision-react-viro-3.0.2-moyo.1.tgz(patch_hash=7d33314216d1fb2ac3838b9a2ee7dc1868f02138407e44da2a8606a37fa917ca)(@metavr/layout-compat@1.0.0(react-native@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0))(@metavr/layout-window-compat@1.0.0(react-native@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0))(@reactvision/viro-web-renderer@1.0.1)(@types/react@19.3.0)(expo@58.0.14)(react-native-web@0.21.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-native@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0)(supports-color@8.1.1)(use-sync-external-store@1.6.0(react@19.3.0))
       '@reactvision/viro-web-renderer':
         specifier: 'catalog:'
         version: 1.0.1
@@ -1555,7 +1555,7 @@ importers:
         version: link:../ui
       '@reactvision/react-viro':
         specifier: 'catalog:'
-        version: file:vendor/reactvision-react-viro-3.0.2-moyo.1.tgz(patch_hash=e393f1a4f339ad8a9298abb7d6a9560203b0bd336d94f7abfc99aa77b886ed4c)(@metavr/layout-compat@1.0.0(react-native@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0))(@metavr/layout-window-compat@1.0.0(react-native@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0))(@reactvision/viro-web-renderer@1.0.1)(@types/react@19.3.0)(expo@58.0.14)(react-native-web@0.21.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-native@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0)(supports-color@8.1.1)(use-sync-external-store@1.6.0(react@19.3.0))
+        version: file:vendor/reactvision-react-viro-3.0.2-moyo.1.tgz(patch_hash=7d33314216d1fb2ac3838b9a2ee7dc1868f02138407e44da2a8606a37fa917ca)(@metavr/layout-compat@1.0.0(react-native@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0))(@metavr/layout-window-compat@1.0.0(react-native@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0))(@reactvision/viro-web-renderer@1.0.1)(@types/react@19.3.0)(expo@58.0.14)(react-native-web@0.21.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-native@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0)(supports-color@8.1.1)(use-sync-external-store@1.6.0(react@19.3.0))
       '@reactvision/viro-web-renderer':
         specifier: 'catalog:'
         version: 1.0.1
@@ -14319,7 +14319,7 @@ snapshots:
     dependencies:
       nanoid: 3.3.20
 
-  ? '@reactvision/react-viro@file:vendor/reactvision-react-viro-3.0.2-moyo.1.tgz(patch_hash=e393f1a4f339ad8a9298abb7d6a9560203b0bd336d94f7abfc99aa77b886ed4c)(@metavr/layout-compat@1.0.0(react-native@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0))(@metavr/layout-window-compat@1.0.0(react-native@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0))(@reactvision/viro-web-renderer@1.0.1)(@types/react@19.3.0)(expo@58.0.14)(react-native-web@0.21.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-native@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0)(supports-color@8.1.1)(use-sync-external-store@1.6.0(react@19.3.0))'
+  ? '@reactvision/react-viro@file:vendor/reactvision-react-viro-3.0.2-moyo.1.tgz(patch_hash=7d33314216d1fb2ac3838b9a2ee7dc1868f02138407e44da2a8606a37fa917ca)(@metavr/layout-compat@1.0.0(react-native@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0))(@metavr/layout-window-compat@1.0.0(react-native@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0))(@reactvision/viro-web-renderer@1.0.1)(@types/react@19.3.0)(expo@58.0.14)(react-native-web@0.21.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-native@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0)(supports-color@8.1.1)(use-sync-external-store@1.6.0(react@19.3.0))'
   : dependencies:
       '@babel/parser': 7.29.9
       '@babel/traverse': 7.29.7(supports-color@8.1.1)
@@ -20667,15 +20667,6 @@ snapshots:
       webpack: 5.108.4(esbuild@0.28.1)(lightningcss@1.30.1)(postcss@8.5.30)
       webpack-sources: 3.5.1
     optional: true
-
-  react-server-dom-webpack@19.2.7(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(webpack@5.108.4(lightningcss@1.30.1)(postcss@8.5.30)):
-    dependencies:
-      acorn-loose: 8.5.2
-      neo-async: 2.6.2
-      react: 19.3.0
-      react-dom: 19.3.0(react@19.3.0)
-      webpack: 5.108.4(esbuild@0.28.1)(lightningcss@1.30.1)(postcss@8.5.30)
-      webpack-sources: 3.5.1
 
   react-transition-group@4.4.5(react-dom@19.3.0(react@19.3.0))(react@19.3.0):
     dependencies:
