@@ -182,3 +182,35 @@ by it, so production cadence stops compounding consumer misses.
 - Device: **unrun** — `EXPO_PUBLIC_GAME_SURFACE=ahb` needs the Duo walk +
   probe + `gfxinfo` to confirm the predicted presentMs collapse and the
   feature gate.
+
+## 2026-10-18 continuation — AHB + free-run on the Duo (measured)
+
+Device verification done (Surface Duo, release build, VD + shadows off +
+living city, GAME_PERF=1):
+
+| Path | fps | cpuP50 | renderP50/P90 | presentP50/P90 | intervalP50 |
+|---|---|---|---|---|---|
+| TextureView + rAF | ~32 | ~16 | 11.4 / 13.8 | ~0.4 / 16–20 | ~31 |
+| AHB + rAF | ~31.7 | 11.8 | 10.9 / 15.6 | 0.03 / 0.05 | ~31 |
+| **AHB + free-run** (`GAME_FREERUN=1`) | **~30.7** | 22.5 | 22.0 / 37.2 | 0.04 / 0.08 | **30.06** |
+
+The present tail is gone for real (0.08 ms p90) — but free-running the
+producer buys **zero fps**: with the fifo gate removed, the ~30 ms/frame
+stall re-materialises inside `renderer.render` itself (encode + queue
+submit + swapchain texture acquire: renderP50 11.4 → 17 → 22 ms as the
+producer is unthrottled). The cadence is a pipeline-throughput wall —
+Dawn + driver + the 5-slot AHB pool at 570k tris / ~60 draws / 1275×850 —
+not the scheduler. rAF, worklet-vsync and setTimeout pacing all converge
+on ~30–33 fps on this hardware.
+
+Verdict on pacing flags: `GAME_FREERUN` stays off by default (it only
+moves the stall and burns CPU doing it), `GAME_SURFACE=ahb` stays opt-in
+until proven on more devices. The instrumentation for this verdict —
+interval p50/p90 in the submission report and the one-shot `canvas
+pacing` vote log — ships in the sampler (`080153b`).
+
+Remaining honest paths to 60 on the Duo, all work-reduction not
+scheduling: (a) render-scale floor below 0.5 (product call — buffer is
+1275×850 now), (b) a cheaper material stack for the merged far/mid tree
+meshes (the TSL node path is the encode cost), (c) mid-tier imposters
+pushing visible tris well under 500k.
