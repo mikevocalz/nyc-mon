@@ -96,6 +96,7 @@ function JsThreeCanvas<P>({
   className,
   opacity = 1,
   background,
+  androidSurfaceType,
   onBackendChange,
   onFrameTiming,
   children,
@@ -355,7 +356,7 @@ function JsThreeCanvas<P>({
   if (live) {
     // A backend change needs a fresh canvas: one element can't hold both a
     // webgpu and a webgl2 context.
-    surface = <ThreeSurface key={`${backend}-${device ? 'shared' : 'own'}`} ref={surfaceRef} />;
+    surface = <ThreeSurface key={`${backend}-${device ? 'shared' : 'own'}`} ref={surfaceRef} androidSurfaceType={androidSurfaceType} />;
   } else if (!pending) {
     surface = fallback;
   }

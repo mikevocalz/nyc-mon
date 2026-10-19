@@ -4,6 +4,17 @@ import type * as ThreeWebGpu from 'three/webgpu';
 import type { RenderThread } from './render-thread';
 import type { NativeCanvasContext, WorkletRenderHost } from './worklet-host';
 
+/**
+ * The Android view react-native-webgpu backs the canvas with — the values of
+ * its `android.surfaceType` prop. 'auto' (the default, spelled by leaving the
+ * prop unset) picks SurfaceView for an opaque canvas and TextureView for a
+ * non-opaque one. 'HardwareBufferView' (API 29+, experimental upstream)
+ * presents through an AHardwareBuffer pool instead of the surface swapchain:
+ * mailbox semantics — the producer never blocks on the window's buffer queue,
+ * and the view draws the latest GPU-finished frame.
+ */
+export type AndroidSurfaceType = 'SurfaceView' | 'TextureView' | 'HardwareBufferView';
+
 /** The `three/webgpu` module namespace, loaded on demand. */
 export type Three = typeof ThreeWebGpu;
 
@@ -120,6 +131,12 @@ export interface ThreeCanvasProps<P> {
   opacity?: number;
   /** The fill behind the canvas, visible before the first frame. */
   background?: string;
+  /**
+   * Native only: which Android view backs the canvas (see AndroidSurfaceType).
+   * Unset keeps the default auto choice — TextureView for this canvas, which
+   * is non-opaque. Ignored on web and iOS.
+   */
+  androidSurfaceType?: AndroidSurfaceType;
   /** Called with the backend once the renderer is up, or null when falling back. */
   onBackendChange?: (backend: ThreeBackend | null) => void;
   /** Opt-in JS renderer metrics. Worklet runtimes use their own reporting channel. */

@@ -62,6 +62,7 @@ import { resolveGameViewState, shouldMountCanvas } from './game-status.ts';
 import { resolveGameHudLayout } from './hud-layout.ts';
 import { loadGameScene, type GameSceneParams } from './load-game-scene.ts';
 import { CITY_FRAME_SINK_ENABLED, onCityFrame } from './perf/on-city-frame.ts';
+import { GAME_SURFACE_TYPE } from './perf/surface-type.ts';
 import { useGamePerfMounts } from './perf/use-game-perf.ts';
 import { useGameRenderThread } from './render-thread-choice.ts';
 import { readLobbyIdentity } from './lobby/lobby-identity.ts';
@@ -278,6 +279,9 @@ export function GameScreen({ focused = true }: GameScreenProps = {}) {
               ref={canvas}
               renderThread={renderThread.thread}
               workletHost={renderThread.host}
+              // Off by default; EXPO_PUBLIC_GAME_SURFACE=ahb presents through the
+              // AHB pool (mailbox semantics) instead of the TextureView queue.
+              androidSurfaceType={GAME_SURFACE_TYPE}
               load={loadGameScene}
               params={params}
               paused
