@@ -1,5 +1,7 @@
 import { Slot } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { DarkTheme, DefaultTheme, ThemeProvider, type Theme } from "@react-navigation/native";
+import { useColorScheme } from "react-native";
 
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -8,6 +10,7 @@ import { AppQueryProvider, SafeAreaProvider, useProfile } from "@acme/app";
 import { hydrateMon } from "@acme/app/features/mon/mon.store.ts";
 import { hydrateOnboarding } from "@acme/app/features/onboarding/onboarding.store.ts";
 import { useReadyNotificationRouting } from "@acme/app/features/onboarding/notify-hook.ts";
+import { semantic } from "@acme/theme";
 import { setThemePreference } from "@acme/theme/switch";
 import { Toaster } from "@acme/ui";
 import { NycMonSplash } from "../components/splash/NycMonSplash";
@@ -30,7 +33,25 @@ setThemePreference(useProfile.getState().theme);
 hydrateOnboarding();
 hydrateMon();
 
+// The navigator paints every screen's card. Left on its default theme it
+// stays light (#F2F2F2) while the kit text follows the dark preference, so
+// any screen without its own background (M04 age gate, M03 sign-up) drew
+// white text on light grey. The card now uses the same semantic tokens.
+function navTheme(base: Theme, scheme: "light" | "dark"): Theme {
+  return {
+    ...base,
+    colors: {
+      ...base.colors,
+      background: semantic.bg[scheme],
+      card: semantic.surface[scheme],
+      text: semantic.text[scheme],
+    },
+  };
+}
+const NAV_THEME = { light: navTheme(DefaultTheme, "light"), dark: navTheme(DarkTheme, "dark") };
+
 export default function RootLayout() {
+  const scheme = useColorScheme() === "light" ? "light" : "dark";
   // Hatch-ready notification tap → M12, cold start and warm (M12 B3).
   useReadyNotificationRouting();
   return (
@@ -46,7 +67,9 @@ export default function RootLayout() {
       <KeyboardProvider>
         <SafeAreaProvider>
           <AppQueryProvider>
-            <Slot />
+            <ThemeProvider value={NAV_THEME[scheme]}>
+              <Slot />
+            </ThemeProvider>
             {/* Global overlays are mounted once at the app root. The starter's
                 booking/editor sheets went with the demo schedule route: nothing
                 on mobile opens them any more. */}

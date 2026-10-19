@@ -63,6 +63,20 @@ export const CITY_COLORS = {
   plain: concrete[200],
   roof: concrete[600],
   window: mixHex(ink[800], carolina[900], 0.4),
+  // The rooms behind the glass (L3): warm plaster walls, a wood floor, an
+  // acoustic-tile ceiling with a lit panel, dark silhouettes for furniture
+  // and doors, venetian blinds and the sill AC. Read at emissive level, so
+  // they sit a step or two lighter than the surfaces they stand for.
+  roomWall: mixHex(concrete[100], orange[100], 0.35),
+  roomWallSide: mixHex(concrete[200], orange[100], 0.3),
+  roomFloor: mixHex(orange[900], ink[800], 0.35),
+  roomCeiling: concrete[50],
+  roomPanel: mixHex(orange[50], concrete[50], 0.5),
+  roomDark: mixHex(ink[800], carolina[900], 0.35),
+  roomFurniture: mixHex(ink[800], orange[900], 0.2),
+  roomDoor: mixHex(orange[900], ink[900], 0.45),
+  blind: mixHex(concrete[100], orange[100], 0.3),
+  acUnit: concrete[400],
   // Trees and shadow.
   leafLight: leaf[500],
   leafDark: leaf[700],
@@ -135,11 +149,40 @@ export const CITY_COLORS = {
   subwayGlobe: leaf[400],
   shelterGlass: mixHex(carolina[800], ink[800], 0.4),
   shelterFrame: concrete[600],
+  // Toon look candidates (docs/design/toon-look-spec.md §4): the shade-side
+  // hue, the rim accent and the optional cool fill. All to be tuned on device.
+  toonShadow: mixHex(ink[800], royal[700], 0.45),
+  toonRim: carolina[300],
+  toonFill: mixHex(carolina[400], ink[900], 0.5),
+  // Time-of-day sky tones for the realism pass (look.ts). The originals
+  // above stay the dusk set; these cover a clear morning and a sodium-lit
+  // night. All TODO(tune) against Mike's Apollo-block photos before ship.
+  morningZenith: mixHex(carolina[700], royal[600], 0.4),
+  morningMid: mixHex(carolina[400], concrete[100], 0.3),
+  morningHorizon: mixHex(orange[100], carolina[200], 0.45),
+  morningGlow: orange[200],
+  morningSun: mixHex(concrete[50], orange[100], 0.4),
+  morningHemiSky: mixHex(carolina[200], concrete[100], 0.4),
+  morningHemiGround: concrete[400],
+  nightZenith: mixHex(ink[950], royal[900], 0.3),
+  nightMid: mixHex(royal[800], ink[900], 0.5),
+  // Harlem's light pollution: the skyline never goes black, it goes sodium.
+  nightHorizon: mixHex(ink[800], orange[700], 0.25),
+  nightGlow: mixHex(orange[500], ink[800], 0.4),
+  // The night key is the moon, not the sun.
+  nightMoon: mixHex(carolina[100], concrete[50], 0.5),
+  nightHemiSky: mixHex(royal[700], ink[800], 0.4),
+  nightHemiGround: ink[700],
 } as const;
 
 export type CityColor = keyof typeof CITY_COLORS;
 
-/** Wall tones per material class, one picked per building by a hash of its id (city-mesh.ts). */
+/**
+ * Wall tones per material class, one picked per building by a hash of its id
+ * (city-mesh.ts). Dataset v3 derives `class` from Valdrada's STYLE id by the
+ * table in docs/DESIGN_SYSTEM.md §City; STYLE ids land on these seven classes,
+ * so this map needs no new keys.
+ */
 export const WALL_TONES = {
   brownstone: ['brownstone', 'brownstoneWarm', 'sandstone'],
   brick: ['brick', 'brickRed', 'brickDark', 'brickBuff'],

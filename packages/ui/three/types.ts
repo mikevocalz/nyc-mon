@@ -14,6 +14,26 @@ export type Three = typeof ThreeWebGpu;
  * WebGL2 path.
  */
 export type ThreeBackend = 'webgpu' | 'webgl2';
+/** JS-thread submission cost, not GPU completion or Android UI frame time. */
+export interface ThreeFrameTiming {
+  cpuMs: number;
+  intervalMs: number | null;
+  backend: ThreeBackend;
+  /** Scene update() cost — G1 stage attribution, set when the probe timed stages. */
+  updateMs?: number;
+  /** advanceNodeFrame() cost (info.reset + nodeFrame.update). */
+  nodeMs?: number;
+  /** renderer.render() cost: traversal, node/binding updates, encode + queue submit. */
+  renderMs?: number;
+  /** Surface present() cost — the swapchain hand-off; can block on buffer availability. */
+  presentMs?: number;
+  /** renderer.info.render.drawCalls / .triangles for this frame. */
+  drawCalls?: number;
+  triangles?: number;
+  /** Drawing-buffer pixels after this frame's pixel ratio (canvas.width/height). */
+  bufferW?: number;
+  bufferH?: number;
+}
 
 /** The pointer over the canvas, in normalised device coordinates (-1..1, y up). */
 export interface ThreePointer {
@@ -102,6 +122,8 @@ export interface ThreeCanvasProps<P> {
   background?: string;
   /** Called with the backend once the renderer is up, or null when falling back. */
   onBackendChange?: (backend: ThreeBackend | null) => void;
+  /** Opt-in JS renderer metrics. Worklet runtimes use their own reporting channel. */
+  onFrameTiming?: (sample: ThreeFrameTiming) => void;
   /** Laid over the canvas. */
   children?: ReactNode;
   ref?: Ref<ThreeCanvasHandle>;

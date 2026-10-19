@@ -41,6 +41,34 @@ Limits: 20 000 buildings, 10 000 roads, 4 000 areas, 25 000 trees, 600 000 point
 - **NYCHA rule.** `nycha` comes only from an OSM `operator` or `owner` tag naming the New York City Housing Authority. Appearance never marks public housing (MOBILE_WORLD_PR_PACK, NYCHA constraint 3). OSM is not the verified NYCHA development dataset, so the class only picks a facade colour; no facelift or overlay is keyed on it until FUT-01 checks it against that dataset.
 - Roads: `width` tag, else `lanes` × 3.3 m, else a class default (primary 18 m, secondary 14 m, tertiary 12 m, residential 9 m). Sidewalks are symmetric class defaults (primary 6 m, secondary 5 m, tertiary and residential 4.5 m), dropped where OSM maps the sidewalk separately.
 
+## Dataset v3 (current) — Valdrada records
+
+Since PRs #74–#87 the tile is baked from **Valdrada** binary records
+(pinned tag `v0.4.0`, commit `2724c79`, MIT — `tooling/city/valdrada/LICENSE.valdrada`)
+matched to OSM way footprints. The pipeline lives in `tooling/city/`
+(README there; format and decisions in `docs/adr/0021-city-dataset-v3-valdrada.md`).
+Current tile: `harlem-apollo-20261017`, ~1.2 MB, 5 267 buildings, 1 255 roads,
+23 635 furniture pieces; 98% of buildings keep `osm:way:N` ids.
+
+v3 adds per-building record facts, each consumed by the renderer or honestly
+marked `estimate` when rule-derived:
+
+| Field | Content |
+| --- | --- |
+| `f`, `fh` | Recorded frontage / facade height facts |
+| `d` | Detail bits: cornice, fire escape, stoop, water tower, storefront (bits 0–4). Bits 5–6 (setbacks, gable) are recorded but data-only — no mesh feature consumes them |
+| `sh`, `ww` | Storefront height / window pitch — drive the existing shader window grid via `uvScale`, no new materials |
+| `fi` | Recorded front-face index — re-aims landmark details (e.g. the Apollo marquee) at the real front |
+| `vs` | Valdrada `STYLE` id — record-derived compiler classification; `STYLE → class` stays a design estimate (DESIGN_SYSTEM §City) |
+| `e` | Estimate flags, preserved verbatim |
+| `l`, `ow`, `sp`, `sid` | Roads: lanes, one-way, speed, `segId` (CSCL physicalid) — the lane-graph anchors Living City consumes |
+| `sources[]` | 12-entry provenance list driving the Settings credits; audited in `docs/licenses/provenance-2026-10-17.md` |
+
+**Migration.** v2 saves keep their position: `resolveResume` applies the
+v2→v3 identity-position migration via `CITY_DATASET_MIGRATIONS`, and v3
+records absent a field fall back byte-identically to the v2 hash path
+(asserted in `city-mesh-v3.test.ts`).
+
 ## The baked tile (2026-10-15)
 
 Output of `node tooling/city/print-counts.mjs`, which parses the file with the app's own `parseCityDataset`:
@@ -244,4 +272,4 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-OpenStreetMap data © OpenStreetMap contributors, ODbL 1.0. The Game screen shows the attribution (`MapAttribution.tsx`).
+OpenStreetMap data © OpenStreetMap contributors, ODbL 1.0. Attribution surfaces in Settings under "Legal & credits", rendered from `map-data-credit.ts` (`CITY_MAP_SOURCES`) — the test in `map-data-credit.test.ts` keeps that list equal to the bundled tile's `sources` and asserts the game screen mounts no attribution HUD.

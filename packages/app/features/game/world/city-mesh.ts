@@ -2,19 +2,25 @@
 // (masonry and glass), roofs, contact shadows, land-use areas, sidewalks,
 // roads and landmark accents. Every building, road and area lands in a
 // shared vertex buffer, so draw calls stay flat as the feature count grows
-// (metro-live's mergeByMaterial, applied while building).
+// (metro-live's mergeByMaterial, applied while building). Beside colour,
+// each vertex carries its surface family — aRoughMetal from the surfaces.ts
+// ranges by a building/road id hash, and aOcclusion from the contact-shadow
+// field — which only the flagged PBR materials read; the cel lane ignores
+// the extra attributes entirely.
 import type { Three } from '@acme/ui/three';
-import type { BuildingClass, CityBuilding, CityDatasetV2, CityLandmark, CityRoad, RoadClass } from '../city-dataset.ts';
+import type { BuildingClass, CityBuilding, CityDatasetV3, CityLandmark, CityRoad, RoadClass } from '../city-dataset.ts';
 import { counterClockwise, hashUnit, mapArea, pairs, pointInRing, ribbon, VertexBuffer } from './geometry.ts';
 import {
-  bays, emitAwning, emitCornice, emitFireEscapeFloor, emitStoop, emitWaterTower, fireEscapeFloors, FLOOR_HEIGHT, hasFireEscape,
-  hasShopSign, hasStoop, hasWaterTower, shopWords, STOOP_REACH, STOOP_WIDTH, towerSpot, wallFrame,
+  emitAwning, emitCornice, emitFireEscapeFloor, emitParapet, emitStoop, emitWaterTower, fireEscapeFloors, FLOOR_HEIGHT,
+  hasFireEscape, hasShopSign, hasStoop, hasWaterTower, shopWords, STOOP_REACH, STOOP_WIDTH, towerSpot, wallFrame,
 } from './facade-detail.ts';
 import { emitStackedText, emitText, textWidth, type TextFace } from './lettering.ts';
 import { BandedBuffer, box } from './parts.ts';
 import type { CityMaterials } from './materials.ts';
+import { WINDOW_GRID } from './windows.ts';
 import { createStreetClearance, WALKWAY_CLASSES, type StreetClearance } from './walkability.ts';
 import { AWNING_TONES, CITY_COLORS, hexToRgb, WALL_TONES, type CityColor } from './palette.ts';
+import { buildingSurface, ContactField, contactReach, surfacePick, SURFACES, wallAo } from './surfaces.ts';
 
 type Point = [number, number];
 type Mesh = InstanceType<Three['Mesh']>;
@@ -37,11 +43,13 @@ export function areaLayer(kind: string): number {
 export const SHADOW_BAND_METRES = 50;
 /** ... out to this distance north and south of them. */
 export const SHADOW_RADIUS = 160;
-/** The z bands to draw for a focus z: [first, last], inclusive, clamped to the tile. */
-export function shadowBands(focusZ: number, minZ: number, bandCount: number): [number, number] {
+/** The z bands to draw for a focus z: [first, last], inclusive, clamped to the tile. `out` reuses the caller's tuple so per-frame callers allocate nothing. */
+export function shadowBands(focusZ: number, minZ: number, bandCount: number, out: [number, number] = [0, 0]): [number, number] {
   const first = Math.floor((focusZ - SHADOW_RADIUS - minZ) / SHADOW_BAND_METRES);
   const last = Math.floor((focusZ + SHADOW_RADIUS - minZ) / SHADOW_BAND_METRES);
-  return [Math.max(0, Math.min(bandCount - 1, first)), Math.max(0, Math.min(bandCount - 1, last))];
+  out[0] = Math.max(0, Math.min(bandCount - 1, first));
+  out[1] = Math.max(0, Math.min(bandCount - 1, last));
+  return out;
 }
 
 const rgb = (key: CityColor) => hexToRgb(CITY_COLORS[key]);
@@ -49,8 +57,8 @@ const tint = (color: readonly number[], amount: number) => color.map((v) => Math
 
 const CENTRE_LINE_MIN_WIDTH = 9;
 
-/** Triangulate a ring (with holes) and emit it facing up at height y, counter-clockwise on the map. */
-function emitFlat(THREE: Three, buffer: VertexBuffer, ring: Point[], holes: Point[][], y: number, color: readonly number[]): void {
+/** Triangulate a ring (with holes) and emit it facing up at height y, counter-clockwise on the map. `ao` bakes per-corner occlusion when given. */
+function emitFlat(THREE: Three, buffer: VertexBuffer, ring: Point[], holes: Point[][], y: number, color: readonly number[], ao?: (x: number, z: number) => number): void {
   const contour = ring.map(([x, z]) => new THREE.Vector2(x, z));
   const holeVectors = holes.map((hole) => hole.map(([x, z]) => new THREE.Vector2(x, z)));
   const all = [...ring, ...holes.flat()];
@@ -59,12 +67,15 @@ function emitFlat(THREE: Three, buffer: VertexBuffer, ring: Point[], holes: Poin
     let [a, b, c] = face.map((i) => all[i]!) as [Point, Point, Point];
     if (!a || !b || !c) continue;
     if (mapArea([a, b, c]) < 0) [b, c] = [c, b];
-    for (const [x, z] of [a, b, c]) buffer.vertex(x, y, z, 0, 1, 0, color, x, z);
+    for (const [x, z] of [a, b, c]) buffer.vertex(x, y, z, 0, 1, 0, color, x, z, ao?.(x, z));
   }
 }
 
-/** Walls around a ring. Outer rings counter-clockwise on the map, holes clockwise, so normals face out of the solid. */
-function emitWalls(buffer: VertexBuffer, ring: Point[], bottom: number, top: number, color: readonly number[], outward = 0): void {
+/**
+ * Walls around a ring. Outer rings counter-clockwise on the map, holes clockwise, so normals face out of the solid. `ao` is the [bottom, top] occlusion pair.
+ * `uvScale` rescales the metre uv the facade shader grids over: the v3 bake's floor height and window width land the shader's fixed rows and columns on the real pitch.
+ */
+function emitWalls(buffer: VertexBuffer, ring: Point[], bottom: number, top: number, color: readonly number[], outward = 0, ao?: readonly [number, number], uvScale: readonly [number, number] = [1, 1]): void {
   let along = 0;
   for (let i = 0; i < ring.length; i++) {
     const [ax, az] = ring[i]!;
@@ -79,7 +90,11 @@ function emitWalls(buffer: VertexBuffer, ring: Point[], bottom: number, top: num
     buffer.quad(
       [ax + ox, bottom, az + oz], [bx + ox, bottom, bz + oz], [bx + ox, top, bz + oz], [ax + ox, top, az + oz],
       [nx, 0, nz], color,
-      [[along, bottom], [along + length, bottom], [along + length, top], [along, top]],
+      [
+        [along * uvScale[0], bottom * uvScale[1]], [(along + length) * uvScale[0], bottom * uvScale[1]],
+        [(along + length) * uvScale[0], top * uvScale[1]], [along * uvScale[0], top * uvScale[1]],
+      ],
+      ao && [ao[0], ao[0], ao[1], ao[1]],
     );
     along += length;
   }
@@ -167,6 +182,26 @@ function streetFace(ring: Point[], roads: readonly CityRoad[]): { mid: Point; ou
   return best;
 }
 
+/**
+ * The front face a v3 building carries as `fi` (the stored ring's edge index), in the
+ * same shape `streetFace` returns. Right of travel is outward only on a
+ * counter-clockwise ring, so a stored clockwise ring flips the normal.
+ */
+function recordedFace(building: CityBuilding): { mid: Point; out: Point; length: number } | null {
+  const i = building.frontEdgeIndex;
+  if (i === undefined || i < 0) return null;
+  const pts = pairs(building.ring);
+  const n = pts.length;
+  if (i >= n) return null;
+  const a = pts[i]!;
+  const b = pts[(i + 1) % n]!;
+  const length = Math.hypot(b[0] - a[0], b[1] - a[1]);
+  if (length < 1e-6) return null;
+  const [ox, oz] = normalOf(a[0], a[1], b[0], b[1]);
+  const out: Point = mapArea(pts) < 0 ? [-ox, -oz] : [ox, oz];
+  return { mid: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], out, length };
+}
+
 function segmentDistance(x: number, z: number, ax: number, az: number, bx: number, bz: number): number {
   const dx = bx - ax; const dz = bz - az;
   const len = dx * dx + dz * dz;
@@ -175,7 +210,7 @@ function segmentDistance(x: number, z: number, ax: number, az: number, bx: numbe
 }
 
 function landmarkAccents(buffer: VertexBuffer, text: VertexBuffer, landmark: CityLandmark, building: CityBuilding, ring: Point[], roads: readonly CityRoad[]): void {
-  const face = streetFace(ring, roads);
+  const face = recordedFace(building) ?? streetFace(ring, roads);
   const h = building.heightMeters;
   switch (landmark.key) {
     case 'apollo-theater': {
@@ -217,7 +252,17 @@ function landmarkAccents(buffer: VertexBuffer, text: VertexBuffer, landmark: Cit
 export interface CityMeshStats {
   buildings: number; roads: number; areas: number; triangles: number; drawCalls: number; neonTrims: number; storefronts: number; billboards: number;
   cornices: number; stoops: number; fireEscapes: number; awnings: number; shopSigns: number; waterTowers: number;
+  parapets: number;
 }
+
+/**
+ * The `d` detail bitset (city-dataset.ts §5.2 order: cornice, fire escape,
+ * stoop, water tower, storefront, setbacks, gable). Where the bake carries a
+ * mask, each bit replaces the v2 hash outright. Bits 5 (setbacks) and 6
+ * (gable) are data only for now: the mesh has no setback or gable feature
+ * for them to drive, and `e` provenance bits never reach the renderer.
+ */
+const DETAIL = { cornice: 1, fireEscape: 2, stoop: 4, waterTower: 8, storefront: 16 } as const;
 
 /** Masonry fronts that carry a cornice. */
 const CORNICE_CLASSES: ReadonlySet<BuildingClass> = new Set(['brownstone', 'brick', 'nycha', 'civic', 'church', 'plain']);
@@ -253,7 +298,7 @@ export function neonKeyFor(id: string): (typeof NEON_KEYS)[number] {
   return NEON_KEYS[Math.floor(hashUnit(`${id}:neon`) * NEON_KEYS.length) % NEON_KEYS.length]!;
 }
 
-export function buildCityMeshes(THREE: Three, dataset: CityDatasetV2, materials: CityMaterials, sunAway: Point, clearance: StreetClearance = createStreetClearance(dataset)) {
+export function buildCityMeshes(THREE: Three, dataset: CityDatasetV3, materials: CityMaterials, sunAway: Point, clearance: StreetClearance = createStreetClearance(dataset)) {
   const masonry = new VertexBuffer(262144);
   const glass = new VertexBuffer();
   const roofs = new VertexBuffer(131072);
@@ -269,9 +314,14 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV2, materials:
   const landmarkText = new VertexBuffer();
   const texts: (TextFace & { text: string })[] = [];
   let cornices = 0; let stoops = 0; let fireEscapes = 0; let awnings = 0; let shopSigns = 0; let waterTowers = 0;
+  let parapets = 0;
   const landmarkByBuilding = new Map(dataset.landmarks.map((l) => [l.buildingId, l]));
   const shadowColor = rgb('shadow');
   const commercial = new SegmentGrid(dataset.roads.filter((r) => COMMERCIAL.has(r.class)));
+  // Baked occlusion: footprints collect into the contact-shadow field as the
+  // banded loop runs, and the ground layers emit after it queries them.
+  const field = new ContactField();
+  const occlude = (x: number, z: number) => field.occlusion(x, z);
 
   // Buildings in z bands, so the contact shadows of one band are one vertex range (drawn by distance).
   const minZ = -dataset.extentMeters - SHADOW_BAND_METRES;
@@ -293,7 +343,16 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV2, materials:
   for (const { building, band: buildingBand } of banded) {
     while (band < buildingBand) bandStart[++band] = shadows.vertexCount;
     detail.mark(buildingBand);
-    const ring = counterClockwise(pairs(building.ring));
+    // The ccw ring and whether the stored order flipped: `fi` indexes the
+    // stored ring, so a stored clockwise ring shifts the recorded front edge.
+    const flat = pairs(building.ring);
+    const reversed = mapArea(flat) < 0;
+    const ring = reversed ? [...flat].reverse() : flat;
+    const n = ring.length;
+    const frontEdge =
+      building.frontEdgeIndex !== undefined && building.frontEdgeIndex >= 0 && building.frontEdgeIndex < n
+        ? reversed ? (((n - 2 - building.frontEdgeIndex) % n) + n) % n : building.frontEdgeIndex
+        : -1;
     const holes = building.holes.map((hole) => counterClockwise(pairs(hole)).reverse());
     const landmark = landmarkByBuilding.get(building.id);
     const variation = 0.92 + hashUnit(building.id) * 0.16;
@@ -301,8 +360,24 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV2, materials:
     const wall = tint(rgb(wallKey), variation);
     const target = building.class === 'glass' ? glass : masonry;
     const h = building.heightMeters;
-    emitWalls(target, ring, 0, h, wall);
-    for (const hole of holes) emitWalls(target, hole, 0, h, wall);
+    // Surface family per building id, and the wall-base occlusion ramp over
+    // this building's shadow reach (surfaces.ts). Cornices written into the
+    // same buffer inherit the wall pick — stone trim belongs to the family.
+    target.surface(...buildingSurface(building.class, building.id));
+    const reach = contactReach(h);
+    const wallOcclusion: [number, number] = [wallAo(0, reach), wallAo(h, reach)];
+    field.add(ring, h);
+    // v3 facts: `fh` and `ww` rescale the wall uv so the facade shader's
+    // fixed window grid lands on the real floor pitch and bay module
+    // (scale 1 on v2 buildings — the emitted bytes are unchanged there).
+    const grid = building.class === 'glass' ? WINDOW_GRID.glass : WINDOW_GRID.masonry;
+    const uvScale: [number, number] = [
+      grid.bay / (building.windowWidthMeters ?? grid.bay),
+      grid.floor / (building.floorHeightMeters ?? grid.floor),
+    ];
+    emitWalls(target, ring, 0, h, wall, 0, wallOcclusion, uvScale);
+    for (const hole of holes) emitWalls(target, hole, 0, h, wall, 0, wallOcclusion, uvScale);
+    roofs.surface(...SURFACES.tarRoof);
     const roofColor = tint(rgb('roof').map((v, i) => v * 0.8 + wall[i]! * 0.2), variation);
     emitFlat(THREE, roofs, ring, holes, h, roofColor);
     emitShadow(shadows, ring, Math.max(1.2, Math.min(5, h * 0.12)), sunAway, shadowColor);
@@ -315,10 +390,27 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV2, materials:
       trims++;
     }
     let stooped = false;
+    let escaped = false;
+    // v3 facts: `d` bit-gates each detail feature, `f`/`fh` set the escape's
+    // floor count and pitch, `ww` the storefront bays, `sh` the band height.
+    // Where the mask is absent (v2 tiles, unmatched records) the hash rules
+    // below run exactly as before.
+    const mask = building.detailMask;
+    const floorPitch = building.floorHeightMeters ?? FLOOR_HEIGHT;
+    const escapeFloors = building.floors !== undefined ? Math.max(0, building.floors - 1) : fireEscapeFloors(h);
+    const shopTop = building.storefrontHeightMeters !== undefined && building.storefrontHeightMeters > 0 ? building.storefrontHeightMeters : undefined;
+    // The wall uv's `u` is metres along the ring, continuous from vertex 0 —
+    // the facade shader's column grid (gates, window panes) keys on it, so
+    // storefront geometry must sit on the same lattice, not on edge-centred
+    // bays: column `c` covers metres [c*pitch, (c+1)*pitch) of `u`.
+    let u0 = 0;
     for (let i = 0; i < ring.length; i++) {
       const [ax, az] = ring[i]!;
       const [bx, bz] = ring[(i + 1) % ring.length]!;
       const length = Math.hypot(bx - ax, bz - az);
+      if (length < 1e-6) continue;
+      const edgeStart = u0;
+      u0 += length;
       if (length < 4) continue;
       const out = normalOf(ax, az, bx, bz);
       const mid: Point = [(ax + bx) / 2, (az + bz) / 2];
@@ -328,14 +420,22 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV2, materials:
       const facesStreet = clearance.kerbGap(mid[0] + out[0] * 3.5, mid[1] + out[1] * 3.5) < 7;
       const onAvenue = length >= 5 && h >= 6 && commercial.nearest(mid[0] + out[0] * 6, mid[1] + out[1] * 6) <= 14;
       if (!facesStreet && !onAvenue) continue;
+      // The recorded front edge: single-face details land there when the tile says which face is the front.
+      const onFront = frontEdge < 0 || i === frontEdge;
 
-      // Cornice along the roof line of masonry street fronts.
-      if (CORNICE_CLASSES.has(building.class) && h < 45) {
+      // Cornice along the roof line of masonry street fronts, with the
+      // brick parapet lip it crowns — the roofline a New York block reads
+      // on. The lip goes to the near-field detail band; at overview range
+      // the cornice still carries the line.
+      if (mask === undefined ? CORNICE_CLASSES.has(building.class) && h < 45 : (mask & DETAIL.cornice) !== 0) {
         emitCornice(masonry, f, length, h, tint(rgb('cornice').map((v, k) => v * 0.6 + wall[k]! * 0.4), 1));
+        emitParapet(detail.buffer, f, length, h, tint(wall, 0.82));
         cornices++;
+        parapets++;
       }
       // A brownstone's stoop, off one street face, when the sidewalk has room for it.
-      if (building.class === 'brownstone' && !onAvenue && !stooped && length >= 5 && hasStoop(building.id)) {
+      const wantsStoop = mask === undefined ? building.class === 'brownstone' && hasStoop(building.id) : (mask & DETAIL.stoop) !== 0 && onFront;
+      if (wantsStoop && !onAvenue && !stooped && length >= 5) {
         const at = (hashUnit(`${building.id}:door`) - 0.5) * Math.max(0, length - STOOP_WIDTH - 1.2);
         const tip: Point = [mid[0] + along[0] * at + out[0] * (STOOP_REACH + 0.2), mid[1] + along[1] * at + out[1] * (STOOP_REACH + 0.2)];
         if (clearance.standable(tip[0], tip[1])) {
@@ -344,43 +444,55 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV2, materials:
           stoops++;
         }
       }
-      // Zig-zag fire escape on a tenement front, one per face, over a central bay.
-      if (length >= 7 && hasFireEscape(building.id, i, h, building.class)) {
-        const floors = fireEscapeFloors(h);
+      // Zig-zag fire escape on a tenement front, one per building on its recorded front, over a central bay.
+      const wantsEscape = mask === undefined ? hasFireEscape(building.id, i, h, building.class) : (mask & DETAIL.fireEscape) !== 0 && onFront && !escaped;
+      if (length >= 7 && wantsEscape && escapeFloors > 0) {
         const at = (hashUnit(`${building.id}:${i}:bay`) - 0.5) * Math.max(0, length - 4);
-        for (let k = 1; k <= floors; k++) emitFireEscapeFloor(detail.buffer, f, at, k * FLOOR_HEIGHT, rgb('iron'), k % 2 === 0);
+        for (let k = 1; k <= escapeFloors; k++) emitFireEscapeFloor(detail.buffer, f, at, k * floorPitch, rgb('iron'), k % 2 === 0);
+        escaped = true;
         fireEscapes++;
       }
       if (!onAvenue) continue;
 
       // Storefronts: awnings over most bays, and either a lit shop sign or the plain fascia band.
-      for (const at of bays(length, 4.5)) {
-        if (hashUnit(`${building.id}:${i}:${at}:awning`) > 0.55) continue;
-        const tone = AWNING_TONES[Math.floor(hashUnit(`${building.id}:${i}:${at}:hue`) * AWNING_TONES.length) % AWNING_TONES.length]!;
-        emitAwning(detail.buffer, f, at, 3.8, rgb(tone));
-        awnings++;
-      }
-      if (hasShopSign(building.id, i)) {
-        const width = Math.min(length * 0.75, 9);
-        const panel = rgb(SHOP_SIGN_TONES[Math.floor(hashUnit(`${building.id}:${i}:panel`) * SHOP_SIGN_TONES.length) % SHOP_SIGN_TONES.length]!);
-        box(neon, f, [-width / 2, 3.15, 0], [width / 2, 4.05, 0.18], panel, { skip: ['back', 'bottom'] });
-        const words = shopWords(building.id, i);
-        const condense = Math.max(0.5, Math.min(1, (width - 0.4) / textWidth(words, 0.42)));
-        if (textWidth(words, 0.42, condense) <= width - 0.2) {
-          texts.push({ text: words, x: mid[0] + out[0] * 0.2, y: 3.6, z: mid[1] + out[1] * 0.2, right: along, height: 0.42, condense, color: rgb('signText') });
+      // Canopies sit on the shader's own column lattice — column centres in
+      // edge-local metres — so a roll-down gate reads inside its canopy.
+      if (mask === undefined || (mask & DETAIL.storefront) !== 0) {
+        const pitch = building.windowWidthMeters ?? grid.bay;
+        const inset = 0.6;
+        const c0 = Math.ceil((edgeStart + inset) / pitch - 0.5);
+        const c1 = Math.floor((edgeStart + length - inset) / pitch - 0.5);
+        for (let cIdx = c0; cIdx <= c1; cIdx++) {
+          if (hashUnit(`${building.id}:${i}:${cIdx}:awning`) > 0.55) continue;
+          const at = (cIdx + 0.5) * pitch - edgeStart - length / 2;
+          const tone = AWNING_TONES[Math.floor(hashUnit(`${building.id}:${i}:${cIdx}:hue`) * AWNING_TONES.length) % AWNING_TONES.length]!;
+          emitAwning(detail.buffer, f, at, Math.min(3.8, pitch - 0.2), rgb(tone));
+          awnings++;
         }
-        shopSigns++;
-      } else {
-        // Storefront band: a lit fascia above the shop windows, inset from the corners.
-        const inset = Math.min(0.8, length * 0.08);
-        const ux = (bx - ax) / length; const uz = (bz - az) / length;
-        const off = 0.12;
-        const [sx, sz] = [ax + ux * inset + out[0] * off, az + uz * inset + out[1] * off];
-        const [ex, ez] = [bx - ux * inset + out[0] * off, bz - uz * inset + out[1] * off];
-        // One quad facing the street (emitWalls on a two-point ring would add a hidden back face).
-        neon.quad([sx, 3.15, sz], [ex, 3.15, ez], [ex, 3.45, ez], [sx, 3.45, sz], [out[0], 0, out[1]], tint(neonColor, 0.95));
+        if (hasShopSign(building.id, i)) {
+          const width = Math.min(length * 0.75, 9);
+          const panel = rgb(SHOP_SIGN_TONES[Math.floor(hashUnit(`${building.id}:${i}:panel`) * SHOP_SIGN_TONES.length) % SHOP_SIGN_TONES.length]!);
+          const signTop = shopTop ?? 4.05;
+          box(neon, f, [-width / 2, signTop - 0.9, 0], [width / 2, signTop, 0.18], panel, { skip: ['back', 'bottom'] });
+          const words = shopWords(building.id, i);
+          const condense = Math.max(0.5, Math.min(1, (width - 0.4) / textWidth(words, 0.42)));
+          if (textWidth(words, 0.42, condense) <= width - 0.2) {
+            texts.push({ text: words, x: mid[0] + out[0] * 0.2, y: signTop - 0.45, z: mid[1] + out[1] * 0.2, right: along, height: 0.42, condense, color: rgb('signText') });
+          }
+          shopSigns++;
+        } else {
+          // Storefront band: a lit fascia above the shop windows, inset from the corners.
+          const bandTop = shopTop ?? 3.45;
+          const inset = Math.min(0.8, length * 0.08);
+          const ux = (bx - ax) / length; const uz = (bz - az) / length;
+          const off = 0.12;
+          const [sx, sz] = [ax + ux * inset + out[0] * off, az + uz * inset + out[1] * off];
+          const [ex, ez] = [bx - ux * inset + out[0] * off, bz - uz * inset + out[1] * off];
+          // One quad facing the street (emitWalls on a two-point ring would add a hidden back face).
+          neon.quad([sx, bandTop - 0.3, sz], [ex, bandTop - 0.3, ez], [ex, bandTop, ez], [sx, bandTop, sz], [out[0], 0, out[1]], tint(neonColor, 0.95));
+        }
+        fronts++;
       }
-      fronts++;
       if (boards < MAX_BILLBOARDS && h >= 16 && length >= 8 && hashUnit(`${building.id}:${i}:board`) < 0.4) {
         const [top, bottom] = BILLBOARD_PAIRS[Math.floor(hashUnit(`${building.id}:pair`) * BILLBOARD_PAIRS.length) % BILLBOARD_PAIRS.length]!;
         emitBillboard(billboards, mid, out, Math.min(length * 0.55, 9), Math.min(h * 0.32, 7), h - 2.2, rgb(top), rgb(bottom));
@@ -388,7 +500,7 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV2, materials:
       }
     }
     // A wooden water tower on a share of the five-storey-and-up roofs.
-    if (hasWaterTower(building.id, h, building.class)) {
+    if (mask === undefined ? hasWaterTower(building.id, h, building.class) : (mask & DETAIL.waterTower) !== 0) {
       const scale = 0.85 + hashUnit(`${building.id}:tankScale`) * 0.35;
       const spot = towerSpot(ring, (x, z) => pointInRing(x, z, ring), 1.9 * scale);
       if (spot) {
@@ -405,20 +517,26 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV2, materials:
   for (const area of sortedAreas) {
     const ring = counterClockwise(pairs(area.ring));
     const holes = area.holes.map((hole) => pairs(hole));
-    emitFlat(THREE, areas, ring, holes, areaLayer(area.kind), rgb(AREA_COLOR[area.kind] ?? 'grass'));
+    areas.surface(...areaSurface(area.kind, hashUnit(`${area.id}:surf`)));
+    emitFlat(THREE, areas, ring, holes, areaLayer(area.kind), rgb(AREA_COLOR[area.kind] ?? 'grass'), occlude);
   }
 
   for (const road of dataset.roads) {
     const points = pairs(road.points);
     if (WALKWAY_CLASSES.has(road.class)) {
       const color = road.class === 'pedestrian' ? rgb('plaza') : rgb('sidewalk');
-      strip(sidewalks, points, road.widthMeters / 2, LAYER.sidewalks, color);
+      sidewalks.surface(...surfacePick('masonry', hashUnit(`${road.id}:walk`)));
+      strip(sidewalks, points, road.widthMeters / 2, LAYER.sidewalks, color, occlude);
       continue;
     }
-    if (road.sidewalkMeters > 0) strip(sidewalks, points, road.widthMeters / 2 + road.sidewalkMeters, LAYER.sidewalks, rgb('sidewalk'));
+    if (road.sidewalkMeters > 0) {
+      sidewalks.surface(...surfacePick('masonry', hashUnit(`${road.id}:walk`)));
+      strip(sidewalks, points, road.widthMeters / 2 + road.sidewalkMeters, LAYER.sidewalks, rgb('sidewalk'), occlude);
+    }
     const zebra = road.class === 'crossing' ? 1 : 0;
     const centre = !zebra && road.widthMeters >= CENTRE_LINE_MIN_WIDTH ? 1 : 0;
-    strip(roads, points, road.widthMeters / 2, zebra ? LAYER.crossings : LAYER.roads, [centre, zebra, road.widthMeters / 100]);
+    roads.surface(...surfacePick('asphalt', hashUnit(`${road.id}:surf`)));
+    strip(roads, points, road.widthMeters / 2, zebra ? LAYER.crossings : LAYER.roads, [centre, zebra, road.widthMeters / 100], occlude);
   }
 
   const meshes: Mesh[] = [];
@@ -453,19 +571,29 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV2, materials:
   const stats: CityMeshStats = {
     buildings: dataset.buildings.length, roads: dataset.roads.length, areas: dataset.areas.length,
     triangles, drawCalls: meshes.length, neonTrims: trims, storefronts: fronts, billboards: boards,
-    cornices, stoops, fireEscapes, awnings, shopSigns, waterTowers,
+    cornices, stoops, fireEscapes, awnings, shopSigns, waterTowers, parapets,
   };
-  let shownBands: [number, number] = [-1, -1];
+  const shownBands: [number, number] = [-1, -1];
+  const bands: [number, number] = [0, 0];
   return {
     meshes,
+    /**
+     * The meshes whose draw state changes at run time: setFocus re-ranges
+     * both by z band around the Caller. A WebGPU render bundle freezes
+     * recorded draw parameters, so these must stay outside one
+     * (world/index.ts EXPERIMENTAL_WORLD_BUNDLES).
+     */
+    mutableMeshes: ([detailMesh, shadowMesh] as (Mesh | null)[]).filter((m): m is Mesh => m !== null),
     stats,
     /** Shop-sign lettering for the banded lettering mesh (street-furniture.ts). */
     texts,
     /** Contact shadows only near the focus: a few z bands, one draw range, no allocation. */
     setFocus(_x: number, z: number) {
-      const [first, last] = shadowBands(z, minZ, bandCount);
+      shadowBands(z, minZ, bandCount, bands);
+      const first = bands[0], last = bands[1];
       if (first === shownBands[0] && last === shownBands[1]) return;
-      shownBands = [first, last];
+      shownBands[0] = first;
+      shownBands[1] = last;
       const start = bandStart[first]!;
       shadowMesh?.geometry.setDrawRange(start, bandStart[last + 1]! - start);
       detailMesh?.geometry.setDrawRange(detailStart[first]!, detailStart[last + 1]! - detailStart[first]!);
@@ -536,8 +664,17 @@ const AREA_COLOR: Record<string, CityColor> = {
   plaza: 'plaza', parking: 'parking', water: 'water', school: 'school',
 };
 
-/** A flat ribbon along a polyline; u runs across (0..1), v along in metres. */
-function strip(buffer: VertexBuffer, points: Point[], half: number, y: number, color: readonly number[]): void {
+/** Surface family per area kind: planted kinds read as foliage, hard ground as masonry, water gets its own flat pick. */
+const AREA_FAMILY: Record<string, 'foliage' | 'masonry'> = {
+  park: 'foliage', garden: 'foliage', grass: 'foliage', pitch: 'foliage',
+};
+function areaSurface(kind: string, seed: number): readonly [number, number] {
+  if (kind === 'water') return SURFACES.water;
+  return surfacePick(AREA_FAMILY[kind] ?? 'masonry', seed);
+}
+
+/** A flat ribbon along a polyline; u runs across (0..1), v along in metres. `ao` bakes per-corner occlusion when given. */
+function strip(buffer: VertexBuffer, points: Point[], half: number, y: number, color: readonly number[], ao?: (x: number, z: number) => number): void {
   if (points.length < 2) return;
   const { left, right, v } = ribbon(points, half);
   for (let i = 1; i < points.length; i++) {
@@ -551,6 +688,7 @@ function strip(buffer: VertexBuffer, points: Point[], half: number, y: number, c
     buffer.quad(
       [ordered[0][0], y, ordered[0][1]], [ordered[1][0], y, ordered[1][1]], [ordered[2][0], y, ordered[2][1]], [ordered[3][0], y, ordered[3][1]],
       [0, 1, 0], color, orderedUv,
+      ao && ordered.map(([x, z]) => ao(x, z)),
     );
   }
 }

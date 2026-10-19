@@ -3,12 +3,12 @@
 // is wider than the tile (world/ground.ts), so a player can pan onto bare
 // ground long before hitting a limit. That is the screen's "empty" state: an
 // honest "nothing mapped here" with a way back, not a blank plane.
-import type { CityDatasetV2, FlatPoints } from './city-dataset.ts';
+import type { CityDatasetV3, FlatPoints } from './city-dataset.ts';
 import type { CityCamera } from './city-scene.ts';
 
 export interface CityBounds { minX: number; maxX: number; minZ: number; maxZ: number }
 
-export function cityDatasetBounds(dataset: CityDatasetV2): CityBounds {
+export function cityDatasetBounds(dataset: CityDatasetV3): CityBounds {
   let minX = Infinity; let maxX = -Infinity; let minZ = Infinity; let maxZ = -Infinity;
   const add = (points: FlatPoints) => {
     for (let i = 0; i < points.length; i += 2) {

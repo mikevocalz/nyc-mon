@@ -106,6 +106,12 @@ export interface GameInput {
   readonly beginStopConfirm: () => void;
   /** The hold ended early: back to where the player was. */
   readonly cancelStopConfirm: () => void;
+  /**
+   * A release inside the tap window while `stop-confirm` is open: the press was
+   * a short-press (pause/resume), so cancel the confirm then toggle with one
+   * `pillPress` — it lands on whatever `resumeTo` the cancel restored.
+   */
+  readonly shortPressFromStopConfirm: () => void;
 }
 
 interface StopProgressState {
@@ -349,8 +355,14 @@ export function useGameInput(options: GameInputOptions): GameInput {
   const cancelStopConfirm = useCallback(() => {
     dispatchSession({ type: 'cancelStop', at: Date.now() }, lifecycleInputOf(latest.current));
   }, []);
+  const shortPressFromStopConfirm = useCallback(() => {
+    const now = Date.now();
+    const input = lifecycleInputOf(latest.current);
+    dispatchSession({ type: 'cancelStop', at: now }, input);
+    dispatchSession({ type: 'pillPress', at: now }, input);
+  }, []);
 
-  return { session, pill, stopProgress, hideTouchControls, startSession, beginStopConfirm, cancelStopConfirm };
+  return { session, pill, stopProgress, hideTouchControls, startSession, beginStopConfirm, cancelStopConfirm, shortPressFromStopConfirm };
 }
 
 function lifecycleInputOf(options: GameInputOptions): WorldSaveLifecycleInput {
