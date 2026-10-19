@@ -16,6 +16,7 @@ import { decodeBase64 } from './foliage-decode.ts';
 import { mulberry32 } from './geometry.ts';
 import { NEAR_TREE_CAP, TreeLod } from './tree-lod.ts';
 import { buildVdTreeMeshes, VD_MID_TREE_CAP, VD_NEAR_TREE_CAP, VD_TREE_SCALE, vdCensusTree, vdSpecies } from './vd-trees-mesh.ts';
+import { VD_FAR_TREE_CAP, VdTreeTiers } from './vd-tree-tiers.ts';
 import { createStreetClearance, type StreetClearance } from './walkability.ts';
 import { linearColor, TONE_ATTRIBUTE, type CityMaterials } from './materials.ts';
 
@@ -234,10 +235,8 @@ export function buildTrees(
     zs[i] = tree.z;
   });
   // vd lane: one species per tree and its own matrix at the model's scale.
-  const vd = modelTrees ? buildVdTreeMeshes(THREE, Math.min(count, VD_NEAR_TREE_CAP), Math.min(count, VD_MID_TREE_CAP)) : null;
-  const vdOrder = new Int32Array(count);
-  const vdD2 = new Float32Array(count);
-  const vdTake = new Int32Array(count);
+  const vd = modelTrees ? buildVdTreeMeshes(THREE, Math.min(count, VD_NEAR_TREE_CAP), Math.min(count, VD_MID_TREE_CAP), Math.min(count, VD_FAR_TREE_CAP)) : null;
+  const vdTiers = vd ? new VdTreeTiers(xs, zs) : null;
   const vdSpeciesOf = new Uint8Array(placements.length);
   const vdMatrices = vd ? new Float32Array(placements.length * 16) : null;
   if (vd && vdMatrices) {
@@ -291,34 +290,39 @@ export function buildTrees(
     /** Refresh the instance lists around the focus; cheap to call every frame. */
     update(x: number, z: number, cameraDistance: number) {
       if (placements.length === 0 || !lod.update(x, z, cameraDistance)) return false;
-      if (vd && vdMatrices) {
+      if (vd && vdMatrices && vdTiers) {
         // Near and far sets together, nearest first: the closest VD_NEAR_TREE_CAP draw as
-        // full models, the next VD_MID_TREE_CAP as the thinned mid level, the rest as the
-        // far crowns. One sort per refresh (every ~10 m of travel), no allocation.
-        let n = 0;
-        for (let k = 0; k < lod.nearCount; k++) vdOrder[n++] = lod.near[k]!;
-        for (let k = 0; k < lod.farCount; k++) vdOrder[n++] = lod.far[k]!;
-        for (let k = 0; k < n; k++) { const i = vdOrder[k]!; vdD2[i] = (xs[i]! - x) ** 2 + (zs[i]! - z) ** 2; }
-        vdOrder.subarray(0, n).sort((a, b) => vdD2[a]! - vdD2[b]!);
-        for (const s of vd.species) { s.count = 0; s.midCount = 0; }
-        const full = Math.min(n, VD_NEAR_TREE_CAP);
-        const mid = Math.min(n - full, VD_MID_TREE_CAP);
-        for (let k = 0; k < full + mid; k++) {
-          const i = vdOrder[k]!;
+        // full models, the next VD_MID_TREE_CAP inside VD_FAR_TREE_RADIUS as the thinned
+        // mid level, the rest as cross-card imposters up to VD_FAR_TREE_CAP and plain far
+        // crowns past it. One sort per refresh (every ~10 m of travel), no allocation.
+        vdTiers.update(x, z, lod);
+        for (const s of vd.species) { s.count = 0; s.midCount = 0; s.farCount = 0; }
+        for (let k = 0; k < vdTiers.nearCount; k++) {
+          const i = vdTiers.near[k]!;
           const s = vd.species[vdSpeciesOf[i]!]!;
           const row = vdMatrices.subarray(i * 16, i * 16 + 16);
-          if (k < full) {
-            const slot = s.count++;
-            (s.bark.instanceMatrix.array as Float32Array).set(row, slot * 16);
-            (s.leaf.instanceMatrix.array as Float32Array).set(row, slot * 16);
-          } else {
-            const slot = s.midCount++;
-            (s.midLeaf.instanceMatrix.array as Float32Array).set(row, slot * 16);
-            (s.midTrunk.instanceMatrix.array as Float32Array).set(row, slot * 16);
-          }
+          const slot = s.count++;
+          (s.bark.instanceMatrix.array as Float32Array).set(row, slot * 16);
+          (s.leaf.instanceMatrix.array as Float32Array).set(row, slot * 16);
+        }
+        for (let k = 0; k < vdTiers.midCount; k++) {
+          const i = vdTiers.mid[k]!;
+          const s = vd.species[vdSpeciesOf[i]!]!;
+          const row = vdMatrices.subarray(i * 16, i * 16 + 16);
+          const slot = s.midCount++;
+          (s.midLeaf.instanceMatrix.array as Float32Array).set(row, slot * 16);
+          (s.midTrunk.instanceMatrix.array as Float32Array).set(row, slot * 16);
+        }
+        for (let k = 0; k < vdTiers.farCount; k++) {
+          const i = vdTiers.far[k]!;
+          const s = vd.species[vdSpeciesOf[i]!]!;
+          const row = vdMatrices.subarray(i * 16, i * 16 + 16);
+          const slot = s.farCount++;
+          (s.farLeaf.instanceMatrix.array as Float32Array).set(row, slot * 16);
+          (s.farTrunk.instanceMatrix.array as Float32Array).set(row, slot * 16);
         }
         for (const s of vd.species) {
-          for (const [mesh, c] of [[s.bark, s.count], [s.leaf, s.count], [s.midLeaf, s.midCount], [s.midTrunk, s.midCount]] as const) {
+          for (const [mesh, c] of [[s.bark, s.count], [s.leaf, s.count], [s.midLeaf, s.midCount], [s.midTrunk, s.midCount], [s.farLeaf, s.farCount], [s.farTrunk, s.farCount]] as const) {
             mesh.count = c;
             mesh.visible = c > 0;
             mesh.instanceMatrix.clearUpdateRanges();
@@ -327,12 +331,10 @@ export function buildTrees(
           }
         }
         // The card crowns step aside on this lane; the far balls take what is left.
-        copy(vdTake, 0, [near, trunks], nearTones);
-        const rest = n - full - mid;
-        for (let k = 0; k < rest; k++) vdTake[k] = vdOrder[full + mid + k]!;
-        copy(vdTake, rest, [far], farTones);
+        copy(vdTiers.over, 0, [near, trunks], nearTones);
+        copy(vdTiers.over, vdTiers.overCount, [far], farTones);
         near.visible = trunks.visible = false;
-        far.visible = rest > 0;
+        far.visible = vdTiers.overCount > 0;
         return true;
       } else {
         copy(lod.near, lod.nearCount, [near, trunks], nearTones);

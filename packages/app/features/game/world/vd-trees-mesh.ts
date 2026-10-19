@@ -1,7 +1,8 @@
 // The vd lane's near street trees: Valdrada's London plane, honeylocust and
 // pin oak (vd-trees.ts, baked by tooling/city/bake-trees.mjs) as one bark and
-// one leaf InstancedMesh per species. foliage.ts hands each tree a species and
-// fills these from the same near list the cel crowns use.
+// one leaf InstancedMesh per species, plus a thinned mid level and a far
+// cross-card tier that share the same materials. foliage.ts hands each tree a
+// species and fills these from the tier lists vd-tree-tiers.ts picks.
 import type { Three } from '@acme/ui/three';
 import { decodeBase64 } from './foliage-decode.ts';
 import { VD_TREE_ATLAS_RGBA, VD_TREE_ATLAS_SIZE, VD_TREES } from './vd-trees.ts';
@@ -50,13 +51,16 @@ const u16 = (b64: string) => { const u = decodeBase64(b64); return new Uint16Arr
 // Display-space value of a linear bark albedo: the city feeds palette values straight to the screen.
 const toDisplay = (c: number) => Math.pow(Math.max(0, c), 1 / 2.2);
 
-export function buildVdTreeMeshes(THREE: Three, capacity: number, midCapacity = 0) {
+export function buildVdTreeMeshes(THREE: Three, capacity: number, midCapacity = 0, farCapacity = 0) {
   const T = THREE.TSL;
   const atlas = new THREE.DataArrayTexture(decodeBase64(VD_TREE_ATLAS_RGBA), VD_TREE_ATLAS_SIZE, VD_TREE_ATLAS_SIZE, VD_TREES.length);
   atlas.format = THREE.RGBAFormat;
   atlas.magFilter = THREE.LinearFilter;
   atlas.minFilter = THREE.LinearMipmapLinearFilter;
   atlas.generateMipmaps = true;
+  // The far cross-cards tile their leaf card a few times a side; the model and
+  // mid UVs stay inside 0..1, so wrapping changes nothing for them.
+  atlas.wrapS = atlas.wrapT = THREE.RepeatWrapping;
   atlas.needsUpdate = true;
 
   const geometries: InstanceType<Three['BufferGeometry']>[] = [];
@@ -67,7 +71,8 @@ export function buildVdTreeMeshes(THREE: Three, capacity: number, midCapacity = 
     bark.setAttribute('normal', new THREE.BufferAttribute(f32(tree.bark.normal), 3));
     bark.setIndex(new THREE.BufferAttribute(u16(tree.bark.index), 1));
     const leaf = new THREE.BufferGeometry();
-    leaf.setAttribute('position', new THREE.BufferAttribute(f32(tree.leaf.position), 3));
+    const leafPos = f32(tree.leaf.position);
+    leaf.setAttribute('position', new THREE.BufferAttribute(leafPos, 3));
     leaf.setAttribute('normal', new THREE.BufferAttribute(f32(tree.leaf.normal), 3));
     leaf.setAttribute('uv', new THREE.BufferAttribute(f32(tree.leaf.uv), 2));
     leaf.setAttribute('aShade', new THREE.BufferAttribute(f32(tree.leaf.shade), 1));
@@ -106,22 +111,69 @@ export function buildVdTreeMeshes(THREE: Three, capacity: number, midCapacity = 
     midLeafMesh.name = `city:trees-vd-mid-${tree.id}`;
     midTrunkMesh.name = `city:trees-vd-midtrunk-${tree.id}`;
     for (const mesh of [midLeafMesh, midTrunkMesh]) { mesh.count = 0; mesh.frustumCulled = false; }
+
+    // The far tier (vd-tree-tiers.ts): two crossed quads over the crown's
+    // bounding box plus a plain trunk cross — 8 triangles a tree. The canopy
+    // tiles the species' atlas card about every 4.5 m, so at distance it
+    // reads as the same foliage mass the mid cards show; the crown's upward
+    // normals keep both quads lit evenly, and the baked card scale comes from
+    // the leaf geometry's own extent.
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+    for (let i = 0; i + 2 < leafPos.length; i += 3) {
+      x0 = Math.min(x0, leafPos[i]!); x1 = Math.max(x1, leafPos[i]!);
+      y0 = Math.min(y0, leafPos[i + 1]!); y1 = Math.max(y1, leafPos[i + 1]!);
+      z0 = Math.min(z0, leafPos[i + 2]!); z1 = Math.max(z1, leafPos[i + 2]!);
+    }
+    const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+    const hw = Math.max(x1 - x0, z1 - z0) / 2;
+    const repU = Math.max(2, Math.round((hw * 2) / 4.5));
+    const repV = Math.max(2, Math.round((y1 - y0) / 4.5));
+    const farLeaf = new THREE.BufferGeometry();
+    farLeaf.setAttribute('position', new THREE.Float32BufferAttribute([
+      cx - hw, y0, cz, cx + hw, y0, cz, cx + hw, y1, cz, cx - hw, y1, cz,
+      cx, y0, cz - hw, cx, y0, cz + hw, cx, y1, cz + hw, cx, y1, cz - hw,
+    ], 3));
+    farLeaf.setAttribute('normal', new THREE.Float32BufferAttribute(new Array(24).fill(0).map((_, i) => (i % 3 === 1 ? 1 : 0)), 3));
+    farLeaf.setAttribute('uv', new THREE.Float32BufferAttribute([
+      0, 0, repU, 0, repU, repV, 0, repV,
+      0, 0, repU, 0, repU, repV, 0, repV,
+    ], 2));
+    // Top of the cross reads a touch brighter, like the crowns around it.
+    farLeaf.setAttribute('aShade', new THREE.Float32BufferAttribute([0.85, 0.85, 1, 1, 0.85, 0.85, 1, 1], 1));
+    farLeaf.setIndex([0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7]);
+    const tw = 0.18;
+    const farTrunk = new THREE.BufferGeometry();
+    farTrunk.setAttribute('position', new THREE.Float32BufferAttribute([
+      -tw, 0, 0, tw, 0, 0, tw, y0, 0, -tw, y0, 0,
+      0, 0, -tw, 0, 0, tw, 0, y0, tw, 0, y0, -tw,
+    ], 3));
+    farTrunk.setAttribute('normal', new THREE.Float32BufferAttribute([
+      0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1,
+      1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0,
+    ], 3));
+    farTrunk.setIndex([0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7]);
+    geometries.push(farLeaf, farTrunk);
+    const farLeafMesh = new THREE.InstancedMesh(farLeaf, leafMaterial, Math.max(1, farCapacity));
+    const farTrunkMesh = new THREE.InstancedMesh(farTrunk, barkMaterial, Math.max(1, farCapacity));
+    farLeafMesh.name = `city:trees-vd-far-${tree.id}`;
+    farTrunkMesh.name = `city:trees-vd-fartrunk-${tree.id}`;
+    for (const mesh of [farLeafMesh, farTrunkMesh]) { mesh.count = 0; mesh.frustumCulled = false; }
     const barkMesh = new THREE.InstancedMesh(bark, barkMaterial, capacity);
     const leafMesh = new THREE.InstancedMesh(leaf, leafMaterial, capacity);
     barkMesh.name = `city:trees-vd-bark-${tree.id}`;
     leafMesh.name = `city:trees-vd-leaf-${tree.id}`;
     for (const mesh of [barkMesh, leafMesh]) { mesh.count = 0; mesh.frustumCulled = false; }
-    return { bark: barkMesh, leaf: leafMesh, midLeaf: midLeafMesh, midTrunk: midTrunkMesh, count: 0, midCount: 0 };
+    return { bark: barkMesh, leaf: leafMesh, midLeaf: midLeafMesh, midTrunk: midTrunkMesh, farLeaf: farLeafMesh, farTrunk: farTrunkMesh, count: 0, midCount: 0, farCount: 0 };
   });
 
   return {
     species,
-    objects: species.flatMap((s) => [s.bark, s.leaf, s.midLeaf, s.midTrunk]),
+    objects: species.flatMap((s) => [s.bark, s.leaf, s.midLeaf, s.midTrunk, s.farLeaf, s.farTrunk]),
     dispose() {
       for (const g of geometries) g.dispose();
       for (const m of materials) m.dispose();
       atlas.dispose();
-      for (const s of species) for (const m of [s.bark, s.leaf, s.midLeaf, s.midTrunk]) m.dispose();
+      for (const s of species) for (const m of [s.bark, s.leaf, s.midLeaf, s.midTrunk, s.farLeaf, s.farTrunk]) m.dispose();
     },
   };
 }
