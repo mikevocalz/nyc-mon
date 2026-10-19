@@ -101,14 +101,16 @@ Facts (ODbL 1.0 text + Valdrada's own `LICENSING.md` reading, which matches):
   live in the tile's `sources[]` metadata. **VERIFIED.**
 - **§4.4(a) share-alike** — a Derivative Database must itself be made
   available under ODbL 1.0 (or a compatible licence) with a notice saying so.
-  Nothing in the tile JSON, the credits, or the repo states that
-  `harlem-apollo.json` *itself* is ODbL — `sources[]` declares the *inputs'*
-  licences only. Upstream `LICENSING.md` states the requirement plainly:
-  "Redistributions and derived databases must carry the notice … and remain
-  under the ODbL." A minimal compliance step would be a dataset-level
-  declaration (e.g. a `license` note on the tile or a line in this directory)
-  that the derived database is offered under ODbL 1.0. **PENDING-MIKE** —
-  G9 assigns the legal call to him.
+  ~~Nothing in the tile JSON states that `harlem-apollo.json` *itself* is
+  ODbL~~ — **DONE 2026-10-18**: the tile now carries top-level `license`,
+  `licenseUrl` and `licenseNotice` fields declaring it a Derivative Database
+  offered under ODbL 1.0 (`build.mjs` emits them so every future bake keeps
+  the declaration; `city-dataset.ts` schema+type carry them; the Settings
+  credit renders a `CITY_MAP_DERIVED` row asserted equal to the tile fields
+  in `map-data-credit.test.ts`). The grant is what ODbL requires for shipping
+  the derived tile at all — the alternative to declaring it is not shipping
+  the dataset. Mike should still ratify the licence position; the Produced
+  Works question below remains his.
 - **Produced Works** (screenshots, videos, rendered frames) need
   "© OpenStreetMap contributors" in a notice "reasonably calculated" to reach
   viewers. The Settings-only credit is a defensible but thin reading — the

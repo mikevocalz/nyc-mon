@@ -132,6 +132,10 @@ export interface CityDatasetV3 {
   readonly origin: GeoPoint;
   readonly extentMeters: number;
   readonly sources: readonly CitySource[];
+  /** ODbL §4.4(a): the derived database's own licence grant. Absent on tiles baked before the declaration. */
+  readonly license?: string;
+  readonly licenseUrl?: string;
+  readonly licenseNotice?: string;
   readonly notes: readonly string[];
   readonly buildings: readonly CityBuilding[];
   readonly roads: readonly CityRoad[];
@@ -219,6 +223,9 @@ const v3Schema = z.object({
   origin: geoPoint,
   extentMeters: z.number().positive().max(MAX_TILE_RADIUS_METERS),
   sources: z.array(source).min(1).max(16),
+  license: label.optional(),
+  licenseUrl: https.optional(),
+  licenseNotice: z.string().max(1000).optional(),
   notes: z.array(z.string().max(1000)).max(64).default([]),
   buildings: z.array(z.object({
     id: label, p: flat, i: z.array(flat).max(64).optional(),

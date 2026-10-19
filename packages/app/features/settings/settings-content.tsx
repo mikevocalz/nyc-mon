@@ -8,7 +8,7 @@ import { Section, View } from '@acme/ui/tw';
 import { AuthProviderButton, Button, Card, ErrorMessage, Heading, SegmentedControl, Switch, Text, FadeIn } from '@acme/ui';
 import { useProfile, type ThemePreference } from '../profile/profile.store';
 import { auth } from '../onboarding/auth';
-import { CITY_MAP_SOURCES } from '../game/map-data-credit';
+import { CITY_MAP_ASSETS, CITY_MAP_DERIVED, CITY_MAP_SOURCES } from '../game/map-data-credit';
 
 /** The game-control settings route (apps/mobile/app/(drawer)/game-controls.tsx). */
 const GAME_CONTROLS_PATH = '/game-controls';
@@ -134,6 +134,33 @@ export function SettingsContent() {
                 record source in the bundled city dataset. */}
             <Text variant="caption" tone="muted">Map data</Text>
             {CITY_MAP_SOURCES.map((source) => (
+              <View key={source.attribution} className="gap-0.5">
+                <Text variant="caption">{source.attribution}</Text>
+                <Text
+                  variant="caption"
+                  tone="muted"
+                  onPress={() => void Linking.openURL(source.licenseUrl)}
+                  accessibilityRole="link"
+                >
+                  {source.license}
+                </Text>
+              </View>
+            ))}
+            {/* ODbL §4.4(a): the bundled tile's own licence grant, beside
+                the source licences. */}
+            <View className="gap-0.5">
+              <Text variant="caption">{CITY_MAP_DERIVED.attribution}</Text>
+              <Text
+                variant="caption"
+                tone="muted"
+                onPress={() => void Linking.openURL(CITY_MAP_DERIVED.licenseUrl)}
+                accessibilityRole="link"
+              >
+                {CITY_MAP_DERIVED.license}
+              </Text>
+            </View>
+            <Text variant="caption" tone="muted">Models &amp; textures</Text>
+            {CITY_MAP_ASSETS.map((source) => (
               <View key={source.attribution} className="gap-0.5">
                 <Text variant="caption">{source.attribution}</Text>
                 <Text

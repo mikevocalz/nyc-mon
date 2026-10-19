@@ -64,6 +64,8 @@ import { resolveGameViewState, shouldMountCanvas } from './game-status.ts';
 import { resolveGameHudLayout } from './hud-layout.ts';
 import { loadGameScene, type GameSceneParams } from './load-game-scene.ts';
 import { CITY_FRAME_SINK_ENABLED, onCityFrame } from './perf/on-city-frame.ts';
+import { GAME_SURFACE_TYPE } from './perf/surface-type.ts';
+import { GAME_FREERUN } from './perf/frame-pacing.ts';
 import { useGamePerfMounts } from './perf/use-game-perf.ts';
 import { useGameRenderThread } from './render-thread-choice.ts';
 import { readLobbyIdentity } from './lobby/lobby-identity.ts';
@@ -280,6 +282,12 @@ export function GameScreen({ focused = true }: GameScreenProps = {}) {
               ref={canvas}
               renderThread={renderThread.thread}
               workletHost={renderThread.host}
+              // Off by default; EXPO_PUBLIC_GAME_SURFACE=ahb presents through the
+              // AHB pool (mailbox semantics) instead of the TextureView queue.
+              androidSurfaceType={GAME_SURFACE_TYPE}
+              // Off by default; EXPO_PUBLIC_GAME_FREERUN=1 lets the on-demand
+              // loop outpace vsync — only meaningful on the superseding surface.
+              freeRun={GAME_FREERUN}
               load={loadGameScene}
               params={params}
               paused

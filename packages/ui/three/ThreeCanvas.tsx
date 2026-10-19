@@ -96,6 +96,8 @@ function JsThreeCanvas<P>({
   className,
   opacity = 1,
   background,
+  androidSurfaceType,
+  freeRun = false,
   onBackendChange,
   onFrameTiming,
   children,
@@ -142,6 +144,17 @@ function JsThreeCanvas<P>({
   const hasSize = size.width > 0 && size.height > 0;
   const live = !pending && backend !== null;
   const running = live && !paused && !reducedMotion && onScreen;
+
+  // One-shot pacing diagnostic: pairs the flag votes with the sampler's
+  // intervalMs so a build's actual cadence is attributable from logcat.
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      console.info('[NYC-Mon/perf] canvas pacing', {
+        freeRun,
+        surface: androidSurfaceType ?? 'auto',
+      });
+    }
+  }, [freeRun, androidSurfaceType]);
 
   // Draws one frame. The clock advances only while the loop runs, so a still
   // canvas redraws the same moment.
@@ -214,7 +227,12 @@ function JsThreeCanvas<P>({
     const rt = runtime.current!;
     if (rt.running || rt.queued) return;
     rt.queued = true;
-    requestAnimationFrame(draw);
+    // freeRun: on a superseding present path the next frame queues on a
+    // zero-delay timer instead of a vsync-locked rAF, so an on-demand loop
+    // (paused canvas kept alive by invalidate) is not capped near 30 fps by
+    // rAF delivery plus draw time.
+    if (freeRun) setTimeout(draw, 0);
+    else requestAnimationFrame(draw);
   };
 
   useImperativeHandle(ref, () => ({ invalidate }));
@@ -307,13 +325,17 @@ function JsThreeCanvas<P>({
       return;
     }
     let frame = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     const tick = () => {
       draw();
-      frame = requestAnimationFrame(tick);
+      if (freeRun) timer = setTimeout(tick, 0);
+      else frame = requestAnimationFrame(tick);
     };
-    frame = requestAnimationFrame(tick);
+    if (freeRun) timer = setTimeout(tick, 0);
+    else frame = requestAnimationFrame(tick);
     return () => {
       cancelAnimationFrame(frame);
+      if (timer !== undefined) clearTimeout(timer);
       rt.running = false;
       rt.last = 0;
     };
@@ -355,7 +377,7 @@ function JsThreeCanvas<P>({
   if (live) {
     // A backend change needs a fresh canvas: one element can't hold both a
     // webgpu and a webgl2 context.
-    surface = <ThreeSurface key={`${backend}-${device ? 'shared' : 'own'}`} ref={surfaceRef} />;
+    surface = <ThreeSurface key={`${backend}-${device ? 'shared' : 'own'}`} ref={surfaceRef} androidSurfaceType={androidSurfaceType} />;
   } else if (!pending) {
     surface = fallback;
   }

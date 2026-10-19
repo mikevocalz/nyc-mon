@@ -8,34 +8,23 @@
 // alpha comes from the CC0 Quaternius nature pack, baked into
 // world/leaf-alpha.ts by tooling/city/bake-foliage.mjs.
 import type { Three } from '@acme/ui/three';
+import { CURB_HEIGHT, VD_LANE } from './curb.ts';
 import type { BufferGeometry } from 'three/webgpu';
 import type { CityDatasetV3 } from '../city-dataset.ts';
 import { LEAF_ALPHA as LEAF } from './leaf-alpha.ts';
+import { decodeBase64 } from './foliage-decode.ts';
 import { mulberry32 } from './geometry.ts';
 import { NEAR_TREE_CAP, TreeLod } from './tree-lod.ts';
+import { VD_LEAN, VD_LEAN_NEAR_TREE_CAP } from './vd-lean.ts';
+import { VD_LEANMAT } from './vd-leanmat.ts';
+import { buildVdTreeMeshes, VD_MID_TREE_CAP, VD_NEAR_TREE_CAP, VD_TREE_SCALE, vdCensusTree, vdSpecies } from './vd-trees-mesh.ts';
+import { VD_FAR_TREE_CAP, VdTreeTiers } from './vd-tree-tiers.ts';
 import { createStreetClearance, type StreetClearance } from './walkability.ts';
 import { linearColor, TONE_ATTRIBUTE, type CityMaterials } from './materials.ts';
 
 type Geometry = BufferGeometry;
 
-const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-export function decodeBase64(base64: string): Uint8Array {
-  const lookup = new Uint8Array(128);
-  for (let i = 0; i < B64.length; i++) lookup[B64.charCodeAt(i)] = i;
-  const clean = base64.replace(/=+$/, '');
-  const out = new Uint8Array(Math.floor((clean.length * 3) / 4));
-  let o = 0;
-  for (let i = 0; i < clean.length; i += 4) {
-    const a = lookup[clean.charCodeAt(i)]!;
-    const b = lookup[clean.charCodeAt(i + 1)]!;
-    const c = lookup[clean.charCodeAt(i + 2)] ?? 0;
-    const d = lookup[clean.charCodeAt(i + 3)] ?? 0;
-    out[o++] = (a << 2) | (b >> 4);
-    if (o < out.length) out[o++] = ((b & 15) << 4) | (c >> 2);
-    if (o < out.length) out[o++] = ((c & 3) << 6) | d;
-  }
-  return out;
-}
+export { decodeBase64 } from './foliage-decode.ts';
 
 /** Metres: the crown is about 6 m across with its centre 3.8 m up, a NYC street tree. */
 const CROWN_SCALE = 2.6;
@@ -140,7 +129,7 @@ export const MIN_TREE_SCALE = 0.6;
 /** A record tree in a carriageway moves to the sidewalk only if the band is this close. */
 export const TREE_MAX_MOVE = 3;
 
-export interface TreePlacement { x: number; z: number; scale: number; tone: number; record: boolean }
+export interface TreePlacement { x: number; z: number; scale: number; tone: number; record: boolean; /** Index into trees.census, -1 for generated fill. */ census: number }
 export interface TreeReport { recordMoved: number; recordDropped: number; fillDropped: number; shrunk: number; overhangDropped: number }
 
 /**
@@ -158,6 +147,8 @@ export function treePlacements(dataset: CityDatasetV3, clearance: StreetClearanc
   const report: TreeReport = { recordMoved: 0, recordDropped: 0, fillDropped: 0, shrunk: 0, overhangDropped: 0 };
   const push = (list: readonly number[], record: boolean) => {
     for (let i = 0; i + 1 < list.length; i += 2) {
+      // vd lane: Valdrada plants only recorded trees along streets; generated fill stays only off the street (parks, lots).
+      if (!record && VD_LANE && clearance.kerbGap(list[i]!, list[i + 1]!) < 8) { rand(); rand(); continue; }
       // Draw the random numbers first so a dropped tree does not reshuffle its neighbours.
       let scale = record ? 1 + rand() * 0.3 : 0.8 + rand() * 0.45;
       const tone = rand();
@@ -176,7 +167,7 @@ export function treePlacements(dataset: CityDatasetV3, clearance: StreetClearanc
         scale = fit;
         report.shrunk++;
       }
-      trees.push({ x, z, scale, tone, record });
+      trees.push({ x, z, scale, tone, record, census: record ? i / 2 : -1 });
     }
   };
   push(dataset.trees.census, true);
@@ -197,12 +188,21 @@ export { TREE_HIDE_METRES, TREE_NEAR_LOD_METRES } from './tree-lod.ts';
 export function buildTrees(
   THREE: Three, dataset: CityDatasetV3, materials: Pick<CityMaterials, 'leaf' | 'farCrown' | 'trunks'>,
   clearance: StreetClearance = createStreetClearance(dataset),
+  /** vd lane: near trees are Valdrada's modelled street trees (vd-trees-mesh.ts) instead of leaf-card crowns. */
+  modelTrees = false,
+  /** vd lane, overridable for tests: the lean tier swap (vd-lean.ts). Defaults to the flag. */
+  lean = VD_LEAN,
+  /** vd lane, overridable for tests: the lean material bodies (vd-leanmat.ts). Defaults to the flag. */
+  leanMat = VD_LEANMAT,
 ) {
   const { trees: placements, report } = treePlacements(dataset, clearance);
   const count = Math.max(1, placements.length);
   const texture = leafTexture(THREE);
   const crownGeometry = leafCrownGeometry(THREE);
-  const farGeometry = new THREE.IcosahedronGeometry(1.15 * CROWN_SCALE, 0).translate(0, 1.5 * CROWN_SCALE, 0);
+  // vd lane: the far ball takes the model trees' crown (about 7 m across, 2.8-8.8 m up) so the mid-level swap holds its shape.
+  const farGeometry = modelTrees
+    ? new THREE.IcosahedronGeometry(1, 1).scale(3.5 * VD_TREE_SCALE / 0.7, 3.0 * VD_TREE_SCALE / 0.7, 3.5 * VD_TREE_SCALE / 0.7).translate(0, 5.8 * VD_TREE_SCALE / 0.7, 0)
+    : new THREE.IcosahedronGeometry(1.15 * CROWN_SCALE, 0).translate(0, 1.5 * CROWN_SCALE, 0);
   const trunkGeometry = new THREE.CylinderGeometry(0.16, 0.24, 2.8, 6).translate(0, 1.4, 0);
   // The materials object owns which lighting body the crowns run (cel or the flagged PBR lane).
   const leafMaterial = materials.leaf(texture);
@@ -231,7 +231,7 @@ export function buildTrees(
   const zs = new Float32Array(placements.length);
   placements.forEach((tree, i) => {
     rotation.setFromAxisAngle(up, tree.tone * Math.PI * 2);
-    position.set(tree.x, 0, tree.z);
+    position.set(tree.x, CURB_HEIGHT, tree.z);
     scale.setScalar(tree.scale);
     matrix.compose(position, rotation, scale);
     matrix.toArray(sourceMatrices, i * 16);
@@ -240,6 +240,25 @@ export function buildTrees(
     xs[i] = tree.x;
     zs[i] = tree.z;
   });
+  // vd lane: one species per tree and its own matrix at the model's scale.
+  // Lean halves the near set and folds the mid tier into the far imposter
+  // pool, so that pool has to hold midCap + farCap rows (vd-lean.ts).
+  const vdNearCap = lean ? VD_LEAN_NEAR_TREE_CAP : VD_NEAR_TREE_CAP;
+  const vd = modelTrees ? buildVdTreeMeshes(THREE, Math.min(count, vdNearCap), Math.min(count, VD_MID_TREE_CAP), Math.min(count, lean ? VD_MID_TREE_CAP + VD_FAR_TREE_CAP : VD_FAR_TREE_CAP), leanMat) : null;
+  const vdTiers = vd ? new VdTreeTiers(xs, zs, { nearCap: vdNearCap }) : null;
+  const vdSpeciesOf = new Uint8Array(placements.length);
+  const vdMatrices = vd ? new Float32Array(placements.length * 16) : null;
+  if (vd && vdMatrices) {
+    placements.forEach((tree, i) => {
+      // A census tree is its recorded species at its trunk's size; park fill picks by hash.
+      const recorded = tree.census >= 0 ? vdCensusTree(tree.census) : null;
+      vdSpeciesOf[i] = recorded?.model ?? vdSpecies(Math.abs(Math.sin(i * 12.9898 + tree.x * 0.37 + tree.z * 0.11) * 43758.5453) % 1);
+      rotation.setFromAxisAngle(up, tree.tone * Math.PI * 2);
+      const size = recorded ? Math.min(tree.scale, recorded.scale) : tree.scale * VD_TREE_SCALE;
+      matrix.compose(position.set(tree.x, CURB_HEIGHT, tree.z), rotation, scale.setScalar(size));
+      matrix.toArray(vdMatrices, i * 16);
+    });
+  }
   // The cel albedo reads the tone before lighting, so each crown mesh keeps its own tone list.
   const nearTones = new THREE.InstancedBufferAttribute(new Float32Array(nearCapacity * 3), 3);
   const farTones = new THREE.InstancedBufferAttribute(new Float32Array(count * 3), 3);
@@ -272,7 +291,7 @@ export function buildTrees(
     tones.needsUpdate = true;
   };
   return {
-    objects: [near, far, trunks],
+    objects: vd ? [near, far, trunks, ...vd.objects] : [near, far, trunks],
     count: placements.length,
     /** How many trees the street clearance moved, shrank or dropped. */
     report,
@@ -280,7 +299,100 @@ export function buildTrees(
     /** Refresh the instance lists around the focus; cheap to call every frame. */
     update(x: number, z: number, cameraDistance: number) {
       if (placements.length === 0 || !lod.update(x, z, cameraDistance)) return false;
-      copy(lod.near, lod.nearCount, [near, trunks], nearTones);
+      if (vd && vdMatrices && vdTiers) {
+        // Near and far sets together, nearest first: the closest vdNearCap draw as
+        // full models, the next VD_MID_TREE_CAP inside VD_FAR_TREE_RADIUS as the thinned
+        // mid level (lean: the same imposter pool as the far tier), the rest as
+        // cross-card imposters up to VD_FAR_TREE_CAP and plain far crowns past it.
+        // One sort per refresh (every ~10 m of travel), no allocation.
+        // The mid trunks and both far meshes are merged across species, so they
+        // pack into single buffers under their own write cursors.
+        vdTiers.update(x, z, lod);
+        for (const s of vd.species) { s.count = 0; s.midCount = 0; }
+        let midTrunkCount = 0;
+        let farCount = 0;
+        const midTrunkRows = vd.midTrunk.instanceMatrix.array as Float32Array;
+        const farLeafRows = vd.farLeaf.instanceMatrix.array as Float32Array;
+        const farTrunkRows = vd.farTrunk.instanceMatrix.array as Float32Array;
+        const farLayer = vd.farLayer.array as Float32Array;
+        const farRep = vd.farRep.array as Float32Array;
+        // One imposter row: the unit crown box takes the species' extents in
+        // the matrix (the basis columns scale by hw, hh, hw and the origin
+        // moves to the crown's base centre — M · translate(cx, y0, cz) ·
+        // scale(hw, hh, hw)); the unit trunk cross reaches the crown base
+        // through its Y column alone.
+        const imposter = (f: NonNullable<typeof vd>['species'][number]['far'], row: Float32Array) => {
+          const o = farCount * 16;
+          farLeafRows[o] = row[0]! * f.hw; farLeafRows[o + 1] = row[1]! * f.hw; farLeafRows[o + 2] = row[2]! * f.hw; farLeafRows[o + 3] = 0;
+          farLeafRows[o + 4] = row[4]! * f.hh; farLeafRows[o + 5] = row[5]! * f.hh; farLeafRows[o + 6] = row[6]! * f.hh; farLeafRows[o + 7] = 0;
+          farLeafRows[o + 8] = row[8]! * f.hw; farLeafRows[o + 9] = row[9]! * f.hw; farLeafRows[o + 10] = row[10]! * f.hw; farLeafRows[o + 11] = 0;
+          farLeafRows[o + 12] = row[0]! * f.cx + row[4]! * f.y0 + row[8]! * f.cz + row[12]!;
+          farLeafRows[o + 13] = row[1]! * f.cx + row[5]! * f.y0 + row[9]! * f.cz + row[13]!;
+          farLeafRows[o + 14] = row[2]! * f.cx + row[6]! * f.y0 + row[10]! * f.cz + row[14]!;
+          farLeafRows[o + 15] = 1;
+          farTrunkRows.set(row, o);
+          farTrunkRows[o + 4] = row[4]! * f.y0;
+          farTrunkRows[o + 5] = row[5]! * f.y0;
+          farTrunkRows[o + 6] = row[6]! * f.y0;
+          farLayer[farCount] = f.layer;
+          farRep[farCount * 2] = f.repU;
+          farRep[farCount * 2 + 1] = f.repV;
+          farCount++;
+        };
+        for (let k = 0; k < vdTiers.nearCount; k++) {
+          const i = vdTiers.near[k]!;
+          const s = vd.species[vdSpeciesOf[i]!]!;
+          const row = vdMatrices.subarray(i * 16, i * 16 + 16);
+          const slot = s.count++;
+          (s.bark.instanceMatrix.array as Float32Array).set(row, slot * 16);
+          (s.leaf.instanceMatrix.array as Float32Array).set(row, slot * 16);
+        }
+        for (let k = 0; k < vdTiers.midCount; k++) {
+          const i = vdTiers.mid[k]!;
+          const s = vd.species[vdSpeciesOf[i]!]!;
+          const row = vdMatrices.subarray(i * 16, i * 16 + 16);
+          // Lean: the mid level draws through the shared imposter pool, so the
+          // per-species card meshes and the mid trunk stay at count 0.
+          if (lean) { imposter(s.far, row); continue; }
+          const slot = s.midCount++;
+          (s.midLeaf.instanceMatrix.array as Float32Array).set(row, slot * 16);
+          midTrunkRows.set(row, midTrunkCount++ * 16);
+        }
+        for (let k = 0; k < vdTiers.farCount; k++) {
+          const i = vdTiers.far[k]!;
+          const s = vd.species[vdSpeciesOf[i]!]!;
+          imposter(s.far, vdMatrices.subarray(i * 16, i * 16 + 16));
+        }
+        for (const s of vd.species) {
+          for (const [mesh, c] of [[s.bark, s.count], [s.leaf, s.count], [s.midLeaf, s.midCount]] as const) {
+            mesh.count = c;
+            mesh.visible = c > 0;
+            mesh.instanceMatrix.clearUpdateRanges();
+            if (c > 0) mesh.instanceMatrix.addUpdateRange(0, c * 16);
+            mesh.instanceMatrix.needsUpdate = true;
+          }
+        }
+        for (const [mesh, c] of [[vd.midTrunk, midTrunkCount], [vd.farLeaf, farCount], [vd.farTrunk, farCount]] as const) {
+          mesh.count = c;
+          mesh.visible = c > 0;
+          mesh.instanceMatrix.clearUpdateRanges();
+          if (c > 0) mesh.instanceMatrix.addUpdateRange(0, c * 16);
+          mesh.instanceMatrix.needsUpdate = true;
+        }
+        for (const [attr, n] of [[vd.farLayer, farCount], [vd.farRep, farCount * 2]] as const) {
+          attr.clearUpdateRanges();
+          if (n > 0) attr.addUpdateRange(0, n);
+          attr.needsUpdate = true;
+        }
+        // The card crowns step aside on this lane; the far balls take what is left.
+        copy(vdTiers.over, 0, [near, trunks], nearTones);
+        copy(vdTiers.over, vdTiers.overCount, [far], farTones);
+        near.visible = trunks.visible = false;
+        far.visible = vdTiers.overCount > 0;
+        return true;
+      } else {
+        copy(lod.near, lod.nearCount, [near, trunks], nearTones);
+      }
       copy(lod.far, lod.farCount, [far], farTones);
       near.visible = trunks.visible = lod.nearCount > 0;
       far.visible = lod.farCount > 0;
@@ -291,6 +403,7 @@ export function buildTrees(
       for (const m of [leafMaterial, farMaterial]) m.dispose();
       texture.dispose();
       for (const mesh of [near, far, trunks]) mesh.dispose();
+      vd?.dispose();
     },
   };
 }

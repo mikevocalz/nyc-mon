@@ -4,7 +4,7 @@ import type { CityDatasetV3, CityRoad } from '../city-dataset.ts';
 import { buildSignalSystem } from './signal-controller.ts';
 import { LivingCityHost } from './sim-host.ts';
 import { buildLaneTopology, type LaneTopology } from './topology.ts';
-import { SIM_DT, vehicleSnapshotCount, vehicleSnapshotVersion } from './vehicle-sim.ts';
+import { SIM_DT, cumulative, poseAlong, vehicleSnapshotCount, vehicleSnapshotVersion } from './vehicle-sim.ts';
 import { pedSnapshotCount } from './ped-sim.ts';
 import { readEnvSection } from './clock.ts';
 import { envSectionOffset, signalRoster, signalSectionCount } from './signal-viz.ts';
@@ -160,6 +160,47 @@ test('host determinism: equal seeds and equal step streams pack identical combin
     b.step(SIM_DT);
   }
   assert.deepEqual(a.latestSnapshot(), b.latestSnapshot(), 'same seed + same frames → identical world state');
+});
+
+// --- The Caller channel: the host feeds the live position into the vehicle sim ------------
+
+test('caller channel: the injected getter feeds the sim each frame, null closes it', () => {
+  const topology = crossTopology();
+  const lane = topology.lanes[0]!;
+  const { cum, length } = cumulative(lane.points);
+  const pose = { x: 0, z: 0, yaw: 0 };
+  poseAlong({ points: lane.points, cum, length }, 24, pose);
+  let callerPos: { x: number; z: number } | null = { x: pose.x, z: pose.z };
+  let pending: (() => void) | null = null;
+  let now = 0;
+  const h = new LivingCityHost({
+    topology,
+    signals: buildSignalSystem(topology),
+    seed: 3,
+    vehicles: [{ lane: lane.id, s: 4, speed: 6 }],
+    caller: () => callerPos,
+    now: () => (now += 50),
+    schedule: (cb) => {
+      pending = cb;
+      return 1;
+    },
+    cancel: () => {
+      pending = null;
+    },
+  });
+  h.attach();
+  const fire = () => {
+    assert.ok(pending, 'a frame is armed');
+    pending();
+  };
+  for (let i = 0; i < 240; i++) fire();
+  const held = h.sim.vehicleView(1)!;
+  assert.ok(held.speed < 0.1, `traffic held for the Caller (v=${held.speed.toFixed(2)})`);
+  assert.ok(held.s < 24 - 1.0, `held behind the Caller's spot (s=${held.s.toFixed(2)})`);
+  callerPos = null;
+  for (let i = 0; i < 240; i++) fire();
+  assert.ok((h.sim.vehicleView(1)?.s ?? 0) > 24 || h.sim.vehicleView(1)?.element !== lane.id, 'traffic resumed once unspawned');
+  h.stop();
 });
 
 // --- PR07: signal + env sections ride the same publish --------------------------------

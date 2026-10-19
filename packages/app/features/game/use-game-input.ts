@@ -165,8 +165,7 @@ export function useGameInput(options: GameInputOptions): GameInput {
 
     const lifecycleInput = (): WorldSaveLifecycleInput => ({ identity: latest.current.identity, dataset: latest.current.dataset });
 
-    // Gameplay input turning on is the hand-over: put the Caller where the camera looks.
-    placeCaller();
+    let placementTimer: ReturnType<typeof setTimeout> | null = null;
 
     const stopLoop = (): void => {
       if (frame) cancelAnimationFrame(frame);
@@ -198,6 +197,34 @@ export function useGameInput(options: GameInputOptions): GameInput {
     };
     // A drag or twist ending outside the loop wakes it, so the view settles onto the block.
     frameWake.current = startLoop;
+
+    // Gameplay input turning on is the hand-over: put the Caller where the camera looks.
+    // A null placement (nothing walkable in reach of the look-at) leaves the
+    // Caller unspawned at the 220 m overview with every control dead, so the
+    // placement retries on a short timer until it takes or the input unmounts.
+    placeCaller();
+    startLoop();
+    let placementTries = 0;
+    const retryPlacement = (): void => {
+      placementTimer = null;
+      if (callerStore.getState().spawned || placementTries >= 20) return;
+      placementTries += 1;
+      placeCaller();
+      startLoop();
+      if (!callerStore.getState().spawned) placementTimer = setTimeout(retryPlacement, 250);
+    };
+    if (!callerStore.getState().spawned) placementTimer = setTimeout(retryPlacement, 250);
+    // The resume sequence restores the camera during `hold` — a placement made
+    // before `start-session` can be undone by that write, stranding the camera
+    // at the overview while the Caller waits at street level. Re-place once
+    // the session accepts input so the last word belongs to gameplay.
+    let placedForSession = acceptsGameplayInput(worldSessionStore.getState().session);
+    const sessionSubscription = worldSessionStore.subscribe((state) => {
+      if (placedForSession || !acceptsGameplayInput(state.session)) return;
+      placedForSession = true;
+      placeCaller();
+      startLoop();
+    });
 
     const clearRepeat = (button: ButtonId): void => {
       const timer = repeats.get(button);
@@ -294,6 +321,8 @@ export function useGameInput(options: GameInputOptions): GameInput {
       router.cancelAll('screen-transition');
       appState.remove();
       subscription.remove();
+      sessionSubscription();
+      if (placementTimer) clearTimeout(placementTimer);
       stopLoop();
       frameWake.current = null;
       resetViewTurns();

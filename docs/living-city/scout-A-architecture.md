@@ -120,10 +120,12 @@ From `harlem-apollo.json` + `build.mjs:431-484`:
 | 18 OPEN | `draft/quest-presence` | XR presentation; living-city actors must keep working when the world is presented on Quest — keep sim renderer-agnostic. |
 | in-flight | `lane-v3e1`, `lane-v3a1` | Valdrada v3 dataset — see §2. Lane graph consumes `l/ow/sp/sid` when it lands; don't bake v2-only assumptions into the graph schema. |
 
-Merged-recent context to not regress: G1 BundleGroup (`world/index.ts`,
-`EXPO_PUBLIC_WORLD_BUNDLES`), R1 vsync worklet pacing, U1 UI-thread
+Merged-recent context to not regress: R1 vsync worklet pacing, U1 UI-thread
 attribution, L1–L6 realism lanes (sky rig, PBR, glass, car PBR, post,
-tiers, render scale — all behind env flags).
+tiers, render scale — all behind env flags). G1's BundleGroup
+(`EXPO_PUBLIC_WORLD_BUNDLES`) was deleted 2026-11 — the r186 replay froze
+the camera transform (upstream missing binding updates) — so actors have
+no bundle-membership rule to keep; the whole scene is one direct pass.
 
 ## 5. A living-city lane must NOT duplicate
 

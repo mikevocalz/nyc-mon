@@ -60,11 +60,15 @@ export class VertexBuffer {
   private tex: Float32Array;
   private rm: Float32Array;
   private occ: Float32Array;
+  private fac: Float32Array;
   private count = 0;
   /** Stamped on every vertex until the next `surface()` call; dullest default so a missed write never shines. */
   private curRough = 0.95;
   private curMetal = 0;
   private curAo = 1;
+  /** vd lane wall photo [layer, 1 / tile metres]; layer -1 means none. */
+  private curFacade0 = -1;
+  private curFacade1 = 0;
 
   /** `capacity` in vertices: the big city buffers pass a size near their final one to skip regrowth. */
   constructor(capacity = 1024) {
@@ -75,6 +79,7 @@ export class VertexBuffer {
     this.tex = new Float32Array(2 * n);
     this.rm = new Float32Array(2 * n);
     this.occ = new Float32Array(n);
+    this.fac = new Float32Array(2 * n);
   }
   private minX = Infinity; private minY = Infinity; private minZ = Infinity;
   private maxX = -Infinity; private maxY = -Infinity; private maxZ = -Infinity;
@@ -99,10 +104,16 @@ export class VertexBuffer {
     this.curAo = ao;
   }
 
+  /** Wall photo layer and its tile rate, stamped until the next call (vd-materials.ts reads `aFacade`). */
+  facade(layer: number, perMetre: number): void {
+    this.curFacade0 = layer;
+    this.curFacade1 = perMetre;
+  }
+
   private grow(): void {
     const next = (a: Float32Array) => { const b = new Float32Array(a.length * 2); b.set(a); return b; };
     this.pos = next(this.pos); this.nor = next(this.nor); this.col = next(this.col); this.tex = next(this.tex);
-    this.rm = next(this.rm); this.occ = next(this.occ);
+    this.rm = next(this.rm); this.occ = next(this.occ); this.fac = next(this.fac);
   }
 
   vertex(x: number, y: number, z: number, nx: number, ny: number, nz: number, rgb: readonly number[], u = 0, v = 0, ao?: number): void {
@@ -115,6 +126,7 @@ export class VertexBuffer {
     const t = this.count * 2;
     this.tex[t] = u; this.tex[t + 1] = v;
     this.rm[t] = this.curRough; this.rm[t + 1] = this.curMetal;
+    this.fac[t] = this.curFacade0; this.fac[t + 1] = this.curFacade1;
     this.occ[this.count] = ao ?? this.curAo;
     this.count++;
     if (x < this.minX) this.minX = x; if (x > this.maxX) this.maxX = x;
@@ -146,6 +158,7 @@ export class VertexBuffer {
     geometry.setAttribute('uv', new THREE.BufferAttribute(this.tex.slice(0, n * 2), 2));
     geometry.setAttribute('aRoughMetal', new THREE.BufferAttribute(this.rm.slice(0, n * 2), 2));
     geometry.setAttribute('aOcclusion', new THREE.BufferAttribute(this.occ.slice(0, n), 1));
+    geometry.setAttribute('aFacade', new THREE.BufferAttribute(this.fac.slice(0, n * 2), 2));
     if (n > 0) {
       // The box's circumsphere: a little larger than three's fit, and no extra pass over the vertices.
       const centre = new THREE.Vector3((this.minX + this.maxX) / 2, (this.minY + this.maxY) / 2, (this.minZ + this.maxZ) / 2);

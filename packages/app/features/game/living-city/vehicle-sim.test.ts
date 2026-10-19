@@ -6,13 +6,17 @@ import { buildSignalSystem, type SignalSystem } from './signal-controller.ts';
 import { buildLaneTopology, type LaneConnector, type LaneTopology } from './topology.ts';
 import {
   SIM_DT,
+  VFLAG,
   VSNAP,
   VSNAP_HEADER,
   VSNAP_STRIDE,
   VehicleSim,
+  cumulative,
   packVehicleSnapshot,
+  poseAlong,
   vehicleSnapshotCount,
   vehicleSnapshotVersion,
+  type PathGeom,
   type SpawnSpec,
 } from './vehicle-sim.ts';
 import { livingCityVerticalSlice } from './vertical-slice.ts';
@@ -279,6 +283,101 @@ test('amber: too far stops at the line; too close clears through', () => {
   if (stopperEntryAspect !== null) assert.equal(stopperEntryAspect, 'G', `far vehicle entered on ${stopperEntryAspect}`);
   assert.ok(clearerEntered !== null, 'close vehicle cleared the dilemma zone');
   assert.notEqual(clearerAspect, 'R', `clearer left on ${clearerAspect}`);
+});
+
+// --- The Caller channel: a live obstacle on the planned path ------------------------------
+
+/** World (x, z) at arc position s on an element's polyline — where the Caller's feet would be. */
+function worldAt(points: readonly number[], s: number): { x: number; z: number } {
+  const { cum, length } = cumulative(points);
+  const geom: PathGeom = { points, cum, length };
+  const pose = { x: 0, z: 0, yaw: 0 };
+  poseAlong(geom, s, pose);
+  return pose;
+}
+
+test('caller mid-lane: an approaching vehicle brakes and holds behind the Caller', () => {
+  const r = rig(11);
+  const lane = approaches(r.topo, r.nodeId, 'ew-w')[0]!;
+  const conn = throughConn(r.topo, lane.id);
+  const callerS = 30;
+  const pos = worldAt(lane.points, callerS);
+  r.sim.spawn({ kind: 'sedan', lane: lane.id, s: 5, speed: 7, route: [conn.out] });
+  r.sim.setCaller(pos.x, pos.z);
+  let maxS = 0;
+  let heldForCaller = false;
+  run(r, 480, () => {
+    const v = r.sim.vehicleView(1);
+    if (!v) return;
+    maxS = Math.max(maxS, v.s);
+    if (v.waitReason === 'caller' && v.speed < 0.1) heldForCaller = true;
+    if (v.waitReason === 'caller') assert.ok((v.flags & VFLAG.yielding) !== 0, 'yield flag while holding for the Caller');
+  });
+  const v = r.sim.vehicleView(1)!;
+  assert.ok(v.speed < 0.1, `vehicle stopped (v=${v.speed.toFixed(2)})`);
+  assert.ok(heldForCaller, 'vehicle reported the Caller as its wait reason');
+  // The front bumper never reaches the Caller's footprint near edge (callerS - 1.2).
+  assert.ok(maxS < callerS - 1.0, `bumper stayed off the Caller (maxS=${maxS.toFixed(2)})`);
+  // And it holds close — an honest stop, not a stall metres back.
+  assert.ok(v.s > callerS - 8, `held just behind the Caller (s=${v.s.toFixed(2)})`);
+});
+
+test('caller on the sidewalk: outside the swept corridor, traffic flows past', () => {
+  const r = rig(12);
+  const lane = approaches(r.topo, r.nodeId, 'ew-w')[0]!;
+  const conn = throughConn(r.topo, lane.id);
+  const walk = r.topo.walks.find((w) => w.roadId === 'ew-w')!;
+  const pos = worldAt(walk.points, 30);
+  r.sim.spawn({ kind: 'sedan', lane: lane.id, s: 5, speed: 7, route: [conn.out] });
+  r.sim.setCaller(pos.x, pos.z);
+  let callerReasonSeen = false;
+  let passed = false;
+  run(r, 360, () => {
+    const v = r.sim.vehicleView(1);
+    if (!v) return;
+    if (v.waitReason === 'caller') callerReasonSeen = true;
+    if (v.element === lane.id && v.s > 34) passed = true;
+    else if (v.element !== lane.id) passed = true;
+  });
+  assert.ok(passed, 'vehicle drove past the sidewalk Caller');
+  assert.ok(!callerReasonSeen, 'sidewalk Caller never became a wait reason');
+});
+
+test('caller clears: a held vehicle resumes once the channel empties', () => {
+  const r = rig(13);
+  const lane = approaches(r.topo, r.nodeId, 'ew-w')[0]!;
+  const conn = throughConn(r.topo, lane.id);
+  const callerS = 30;
+  const pos = worldAt(lane.points, callerS);
+  r.sim.spawn({ kind: 'sedan', lane: lane.id, s: 5, speed: 7, route: [conn.out] });
+  r.sim.setCaller(pos.x, pos.z);
+  run(r, 480);
+  assert.ok(r.sim.vehicleView(1)!.speed < 0.1, 'held behind the Caller');
+  // The Caller steps off the carriageway — or despawns: the channel closes.
+  r.sim.clearCaller();
+  let passed = false;
+  run(r, 600, () => {
+    const v = r.sim.vehicleView(1);
+    if (v && (v.element !== lane.id || v.s > callerS + 1)) passed = true;
+  });
+  assert.ok(passed, 'vehicle resumed past the vacated spot');
+});
+
+test('no caller channel: identical traffic to before (unspawned Caller)', () => {
+  const r = rig(11);
+  const lane = approaches(r.topo, r.nodeId, 'ew-w')[0]!;
+  const conn = throughConn(r.topo, lane.id);
+  r.sim.spawn({ kind: 'sedan', lane: lane.id, s: 5, speed: 7, route: [conn.out] });
+  let maxS = 0;
+  let callerReasonSeen = false;
+  run(r, 480, () => {
+    const v = r.sim.vehicleView(1);
+    if (!v) return;
+    maxS = Math.max(maxS, v.s);
+    if (v.waitReason === 'caller') callerReasonSeen = true;
+  });
+  assert.ok(maxS > 30, 'nothing held the vehicle mid-lane without a Caller');
+  assert.ok(!callerReasonSeen, 'the caller reason is unreachable while unspawned');
 });
 
 // --- Snapshot codec ----------------------------------------------------------------------

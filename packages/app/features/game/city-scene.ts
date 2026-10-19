@@ -2,6 +2,7 @@
 // orbits its look-at point, and the actors (the Caller first) that live in
 // it. The canvas draws on demand; while any actor reports motion the scene
 // asks for the next frame itself.
+import { VD_LANE, VD_SHADOWS, VD_TONEMAP } from './world/curb.ts';
 import type { ThreeContext, ThreeScene } from '@acme/ui/three';
 import type { CityDatasetV3 } from './city-dataset.ts';
 import type { ActorFrame, SceneActor, SceneActorFactory } from './scene-actor.ts';
@@ -11,7 +12,7 @@ import { livingCityAdaptiveBridge } from './living-city/adaptive-bridge.ts';
 import { EXPERIMENTAL_WORLD_RENDER_SCALE, mountRenderScale } from './perf/render-scale.ts';
 import { EXPERIMENTAL_WORLD_THERMAL, thermalSignal, thermalWorsened } from './perf/thermal.ts';
 import { tierBundle, WORLD_TIER, WORLD_TIER_SELECTED } from './perf/tier.ts';
-import type { SkyName } from './world/sky-rig.ts';
+import { parseSkyRigFlag, type SkyName } from './world/sky-rig.ts';
 
 export interface CityCamera {
   x: number;
@@ -94,19 +95,19 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
     sky: initial.sky,
     ...(bundle ? { glassTier: bundle.glassTier, envWidth: bundle.envWidth } : {}),
   });
-  // With render bundles on, the sky dome records into the bundle (it must
-  // draw first and bundles execute before the opaque list) — it is then a
-  // child of world.group already (world/index.ts).
-  if (world.skyBundled) scene.add(world.group);
-  else scene.add(world.sky, world.group);
+  scene.add(world.sky, world.group);
   scene.fog = world.fog;
   // react-native-webgpu renders black through three's output pass, shadow
   // maps and Color backgrounds (metro-live README): linear output, no tone
   // mapping, no shadow maps, and the clear colour as the sky's fallback.
   if (renderer) {
     renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
-    renderer.toneMapping = THREE.NoToneMapping;
-    renderer.shadowMap.enabled = false;
+    renderer.toneMapping = VD_TONEMAP === 'agx' ? THREE.AgXToneMapping
+      : VD_TONEMAP === 'aces' ? THREE.ACESFilmicToneMapping
+        : VD_TONEMAP === 'neutral' ? THREE.NeutralToneMapping : THREE.NoToneMapping;
+    // AgX compresses highlights and pulls mids down; a lift keeps the palette's daylight read.
+    renderer.toneMappingExposure = VD_TONEMAP ? 1.6 : 1;
+    renderer.shadowMap.enabled = VD_SHADOWS;
     renderer.setClearColor(world.horizon, 1);
   }
   // L5 "finishing pass": flagged post stack on the renderer — the mount
@@ -127,9 +128,15 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
   // update clock and steps the drawing buffer through the pixel ratio.
   // It cannot fix the UI-thread/Rive ceiling — GPU-side gains are
   // reported separately on device (perf/render-scale.ts header).
+  // The vd lane implies the controller: without it the Duo measured
+  // ~16 fps (2026-10-18) — unplayable. An explicit
+  // EXPO_PUBLIC_WORLD_RENDER_SCALE=0 still turns it off.
+  const renderScaleEnv = process.env.EXPO_PUBLIC_WORLD_RENDER_SCALE;
+  const renderScaleOff =
+    renderScaleEnv != null && renderScaleEnv.trim() !== '' && !parseSkyRigFlag(renderScaleEnv);
   const renderScale =
-    renderer && EXPERIMENTAL_WORLD_RENDER_SCALE && bundle
-      ? mountRenderScale(renderer, { band: bundle.scale.band, floor: bundle.scale.floor })
+    renderer && !renderScaleOff && (EXPERIMENTAL_WORLD_RENDER_SCALE || VD_LANE)
+      ? mountRenderScale(renderer, (bundle ?? tierBundle(WORLD_TIER)).scale)
       : null;
   // Last consumed thermalSignal sample — the monitor (perf/thermal.ts,
   // flag-gated) bumps seq on each poll; a move to a worse level forces a
@@ -241,7 +248,11 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
       }
       // After the actors: a chase camera reads the Caller's position in this frame's params.
       positionCamera(params.camera);
-      if (moving) invalidate?.();
+      // Precipitation animates on the shader clock — while rain or snow is
+      // live the loop must keep drawing, or the on-demand canvas freezes
+      // the weather with the world.
+      const precip = world.weather;
+      if (moving || (precip !== null && Math.max(precip.wet.value, precip.snow.value) > 0.01)) invalidate?.();
     },
     resize: (width, height) => {
       if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return;

@@ -77,6 +77,7 @@ export interface Config {
     'integrity-runs': IntegrityRun;
     'idempotency-records': IdempotencyRecord;
     waitlist: Waitlist;
+    'language-lexicon': LanguageLexicon;
     sessions: Session;
     accounts: Account;
     verifications: Verification;
@@ -110,6 +111,7 @@ export interface Config {
     'integrity-runs': IntegrityRunsSelect<false> | IntegrityRunsSelect<true>;
     'idempotency-records': IdempotencyRecordsSelect<false> | IdempotencyRecordsSelect<true>;
     waitlist: WaitlistSelect<false> | WaitlistSelect<true>;
+    'language-lexicon': LanguageLexiconSelect<false> | LanguageLexiconSelect<true>;
     sessions: SessionsSelect<false> | SessionsSelect<true>;
     accounts: AccountsSelect<false> | AccountsSelect<true>;
     verifications: VerificationsSelect<false> | VerificationsSelect<true>;
@@ -421,6 +423,51 @@ export interface Waitlist {
   email: string;
   district?: ('downtown' | 'midtown' | 'harlem' | 'megacity') | null;
   source?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * NYC-Mon voice/dialect lexicon. Identity-linked language is opt-in/persona-driven only; never infer identity from a Caller.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "language-lexicon".
+ */
+export interface LanguageLexicon {
+  id: number;
+  key: string;
+  entryType: 'lexicon' | 'pronunciation_rule' | 'grammar_rule' | 'call_response' | 'ballroom_term' | 'style_rule';
+  canonicalText: string;
+  spokenForm?: string | null;
+  meaning: string;
+  category: string;
+  subcategory?: string | null;
+  /**
+   * Pipe-delimited tags, e.g. Black NYC English|AAE|NYC
+   */
+  communityTags?: string | null;
+  /**
+   * Pipe-delimited borough/neighborhood tags or all
+   */
+  boroughTags?: string | null;
+  register?: string | null;
+  tone?: string | null;
+  ageMin?: number | null;
+  usageFrequency?: ('low' | 'medium' | 'high') | null;
+  mirrorStrength?: ('none' | 'low' | 'medium' | 'high') | null;
+  ttsPronunciation?: string | null;
+  pronunciationNotes?: string | null;
+  grammarNotes?: string | null;
+  triggerText?: string | null;
+  responseText?: string | null;
+  relationshipGate?: string | null;
+  activationPolicy: string;
+  avoidWhen?: string | null;
+  identityInference: string;
+  profanity: 'none';
+  sourceBasis?: string | null;
+  sourceUrl?: string | null;
+  editorNotes?: string | null;
+  active: boolean;
   updatedAt: string;
   createdAt: string;
 }
@@ -1083,6 +1130,10 @@ export interface PayloadLockedDocument {
         value: number | Waitlist;
       } | null)
     | ({
+        relationTo: 'language-lexicon';
+        value: number | LanguageLexicon;
+      } | null)
+    | ({
         relationTo: 'sessions';
         value: number | Session;
       } | null)
@@ -1352,6 +1403,42 @@ export interface WaitlistSelect<T extends boolean = true> {
   email?: T;
   district?: T;
   source?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "language-lexicon_select".
+ */
+export interface LanguageLexiconSelect<T extends boolean = true> {
+  key?: T;
+  entryType?: T;
+  canonicalText?: T;
+  spokenForm?: T;
+  meaning?: T;
+  category?: T;
+  subcategory?: T;
+  communityTags?: T;
+  boroughTags?: T;
+  register?: T;
+  tone?: T;
+  ageMin?: T;
+  usageFrequency?: T;
+  mirrorStrength?: T;
+  ttsPronunciation?: T;
+  pronunciationNotes?: T;
+  grammarNotes?: T;
+  triggerText?: T;
+  responseText?: T;
+  relationshipGate?: T;
+  activationPolicy?: T;
+  avoidWhen?: T;
+  identityInference?: T;
+  profanity?: T;
+  sourceBasis?: T;
+  sourceUrl?: T;
+  editorNotes?: T;
+  active?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1738,6 +1825,7 @@ export interface CollectionQueryWidget {
     relatedCollection:
       | 'users'
       | 'media'
+      | 'language-lexicon'
       | 'sessions'
       | 'accounts'
       | 'verifications'
@@ -1778,6 +1866,7 @@ export interface ActivityWidget {
       | (
           | 'users'
           | 'media'
+          | 'language-lexicon'
           | 'sessions'
           | 'accounts'
           | 'verifications'

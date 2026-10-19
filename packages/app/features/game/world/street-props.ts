@@ -17,6 +17,7 @@
 // (living-city/bundled-host.ts bundledObstacles), so drawing them also
 // makes the crowd's detours legible.
 import type { Three } from '@acme/ui/three';
+import { CURB_HEIGHT } from './curb.ts';
 import type { CityDatasetV3 } from '../city-dataset.ts';
 import { SHADOW_BAND_METRES } from './city-mesh.ts';
 import { VertexBuffer } from './geometry.ts';
@@ -56,7 +57,7 @@ export function placeStreetProps(dataset: CityDatasetV3, clearance: StreetCleara
   const bikeRacks = placeRecordProps(dataset.furniture.bikeRack, clearance, 2.5);
   // A shelter needs its whole footprint on the sidewalk; one that cannot fit is left out.
   const fits = (p: PropPlacement, halfLength: number, depth: number) => {
-    const f = frame(p.x, p.z, p.toRoad);
+    const f = frame(p.x, p.z, p.toRoad, CURB_HEIGHT);
     for (const [lx, lz] of [[-halfLength, -depth], [halfLength, -depth], [-halfLength, depth], [halfLength, depth]] as const) {
       const x = f.x + f.oz * lx + f.ox * lz; const z = f.z - f.ox * lx + f.oz * lz;
       if (!clearance.standable(x, z)) return false;
@@ -94,7 +95,7 @@ export function placeStreetProps(dataset: CityDatasetV3, clearance: StreetCleara
 }
 
 function emitHydrant(buffer: VertexBuffer, p: PropPlacement): void {
-  const f = frame(p.x, p.z, p.toRoad);
+  const f = frame(p.x, p.z, p.toRoad, CURB_HEIGHT);
   buffer.surface(...SURFACES.iron);
   const body = rgb('hydrant');
   const cap = rgb('hydrantCap');
@@ -105,7 +106,7 @@ function emitHydrant(buffer: VertexBuffer, p: PropPlacement): void {
 }
 
 function emitBasket(buffer: VertexBuffer, p: PropPlacement): void {
-  const f = frame(p.x, p.z, p.toRoad);
+  const f = frame(p.x, p.z, p.toRoad, CURB_HEIGHT);
   buffer.surface(...SURFACES.iron);
   cylinder(buffer, f, 0, 0, 0.27, 0, 0.82, 8, rgb('basket'));
   cylinder(buffer, f, 0, 0, 0.3, 0.78, 0.86, 8, rgb('iron'));
@@ -113,7 +114,7 @@ function emitBasket(buffer: VertexBuffer, p: PropPlacement): void {
 
 /** Stairs down along the kerb, iron railings round three sides, green globe lamps on the open end. */
 function emitSubwayEntrance(structure: VertexBuffer, lights: VertexBuffer, p: PropPlacement): void {
-  const f: Frame = frame(p.x, p.z, p.toRoad);
+  const f: Frame = frame(p.x, p.z, p.toRoad, CURB_HEIGHT);
   const rail = rgb('subwayRail');
   structure.surface(...SURFACES.stone);
   box(structure, f, [-2.0, 0, -0.8], [2.0, 0.03, 0.8], rgb('shadow'), { skip: ['bottom'] });
@@ -134,7 +135,7 @@ function emitSubwayEntrance(structure: VertexBuffer, lights: VertexBuffer, p: Pr
  * mesh, the lit faces in the shared neon-lit buffer (no new draw calls).
  */
 function emitLinkNyc(structure: VertexBuffer, glow: VertexBuffer, p: PropPlacement): void {
-  const f: Frame = frame(p.x, p.z, p.toRoad);
+  const f: Frame = frame(p.x, p.z, p.toRoad, CURB_HEIGHT);
   const steel = rgb('shelterFrame');
   structure.surface(...SURFACES.iron);
   box(structure, f, [-0.6, 0, -0.14], [0.6, 2.92, 0.14], steel, { skip: ['bottom'] });
@@ -147,7 +148,7 @@ function emitLinkNyc(structure: VertexBuffer, glow: VertexBuffer, p: PropPlaceme
 
 /** A DOT bike rack — the standard inverted-U hoop — standing along the kerb. */
 function emitBikeRack(buffer: VertexBuffer, p: PropPlacement): void {
-  const f = frame(p.x, p.z, p.toRoad);
+  const f = frame(p.x, p.z, p.toRoad, CURB_HEIGHT);
   const steel = rgb('shelterFrame');
   buffer.surface(...SURFACES.iron);
   for (const x of [-0.35, 0.35]) box(buffer, f, [x - 0.03, 0, -0.03], [x + 0.03, 0.78, 0.03], steel, { skip: ['bottom'] });
@@ -156,7 +157,7 @@ function emitBikeRack(buffer: VertexBuffer, p: PropPlacement): void {
 
 /** A glass bus shelter with its back to the buildings, a bench and a lit ad panel at one end. */
 function emitShelter(structure: VertexBuffer, lights: VertexBuffer, p: PropPlacement): void {
-  const f: Frame = frame(p.x, p.z, p.toRoad);
+  const f: Frame = frame(p.x, p.z, p.toRoad, CURB_HEIGHT);
   const steel = rgb('shelterFrame');
   const glassTone = rgb('shelterGlass');
   structure.surface(...SURFACES.iron);

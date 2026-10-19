@@ -34,12 +34,14 @@ const frame = { delta: 0, time: 0, reducedMotion: false } as unknown as ThreeFra
  * the gate is wall-clock, so it needs parallel-load headroom. On the v3
  * tile solo stays ~190–310 ms but the parallel suite peaked at 784 ms
  * (the corner-sweep test hogs the same cores), so the cap moves to 900:
- * still ~4× over solo and far under the 20 s START window.
+ * still ~4× over solo and far under the 20 s START window. GitHub runners
+ * are slower still: 971–1011 ms measured there 2026-10-19 under suite load,
+ * so the cap moves to 1 400 — under the window, over the noise.
  * TODO: the device-side Hermes build time is unmeasured (needs an
  * on-device probe; the Android `gfxinfo` baseline is in
  * docs/performance/baseline-duo-2026-10-17.md).
  */
-const BUILD_BUDGET_MS = 900;
+const BUILD_BUDGET_MS = 1400;
 
 test('the real tile stays under the triangle budget at the Apollo spawn and while walking', () => {
   const dataset = parseCityDataset(JSON.parse(readFileSync(new URL('../data/harlem-apollo.json', import.meta.url), 'utf8')));

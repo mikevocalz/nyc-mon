@@ -14,16 +14,30 @@ import { createCityMaterials, linearColor } from './materials.ts';
 import { createPbrCityMaterials, EXPERIMENTAL_WORLD_PBR } from './pbr-materials.ts';
 import { createGlassCityMaterials, EXPERIMENTAL_WORLD_GLASS, type GlassTier } from './glass.ts';
 import { applyCarPbrMaterial, EXPERIMENTAL_WORLD_CAR_PBR } from './car-materials.ts';
-import { createSkyRig, EXPERIMENTAL_SKY_RIG, parseSkyRigFlag, type SkyName } from './sky-rig.ts';
+import { createSkyRig, EXPERIMENTAL_SKY_RIG, type SkyName } from './sky-rig.ts';
+import { createVdCityMaterials, EXPERIMENTAL_WORLD_VD, type VdWeather } from './vd-materials.ts';
+import { VD_LEAN } from './vd-lean.ts';
+import { VD_LEANMAT } from './vd-leanmat.ts';
+import { buildPrecipitation } from './vd-weather.ts';
+import { CURB_HEIGHT, VD_SHADOWS, VD_SHADOW_HALF } from './curb.ts';
+import { FUTURE_LAYER, type AdSurface } from './future-layer.ts';
+
+// Lane G1 "GPU budget" (EXPO_PUBLIC_WORLD_BUNDLES) was deleted 2026-11: the
+// recorded bundle replayed the record-frame camera pose forever — three r186
+// never re-uploads the shared camera UBO for bundled render objects
+// (upstream issue 30701, "missing binding updates" for static bundles) —
+// and the working flag bought only ~1 ms of encode anyway
+// (docs/performance/gpu-budget-2026-10-17.md). Re-recording on camera moves
+// costs the whole encode the bundle exists to skip, so there is no honest
+// BundleGroup lane here until upstream fixes replay.
 
 /**
- * Lane G1 "GPU budget": record the immutable city into one WebGPU render
- * bundle (three r186 `BundleGroup`, renderers/common/BundleGroup.js), so its
- * draws are encoded once and replayed via `executeBundles` instead of
- * re-encoded through JSI every frame. Defaults to
- * EXPO_PUBLIC_WORLD_BUNDLES — off unless set.
+ * The optional "future layer" (future-layer.ts): NYC roof furniture, the
+ * NYCHA exterior facelift kit and the AdSurface inventory, as an additive
+ * overlay on the record city (docs/implementation/MOBILE_WORLD_PR_PACK.md).
+ * Defaults to EXPO_PUBLIC_WORLD_FUTURE — off unless set.
  */
-export const EXPERIMENTAL_WORLD_BUNDLES = parseSkyRigFlag(process.env.EXPO_PUBLIC_WORLD_BUNDLES);
+export const EXPERIMENTAL_WORLD_FUTURE = FUTURE_LAYER;
 
 /**
  * Dusk sun, low in the south-west (about 25 degrees up): long light on the
@@ -85,10 +99,24 @@ export interface CityWorldOptions {
    */
   carPbr?: boolean;
   /**
-   * Lane G1: record the static city into a WebGPU render bundle
-   * (EXPERIMENTAL_WORLD_BUNDLES). See buildCityWorld for what stays out.
+   * The vd lane: Valdrada's facades, ground and weather ported to TSL over
+   * the PBR body (vd-materials.ts). Defaults to EXPO_PUBLIC_WORLD_VD — off
+   * unless set. Takes precedence over `pbr` and `glass`.
    */
-  bundles?: boolean;
+  vd?: boolean;
+  /**
+   * vd lane "lean materials": unlit MeshBasicNodeMaterial bodies on the
+   * city's lit surfaces and the tree pools (vd-leanmat.ts). Defaults to
+   * EXPO_PUBLIC_WORLD_VD_LEANMAT — off unless set. Only read while `vd`
+   * is on.
+   */
+  leanMat?: boolean;
+  /**
+   * The future layer: roofscape furniture, the NYCHA facelift kit and the
+   * addressable ad-surface inventory (EXPERIMENTAL_WORLD_FUTURE). The
+   * overlays are merged into the shared buffers, so draw calls stay flat.
+   */
+  future?: boolean;
 }
 
 export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: CityWorldOptions = {}) {
@@ -108,7 +136,10 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
   // authored dusk share regardless of the sky the clock picked.
   const TOD_BY_SKY: Record<SkyName, number> = { morning: 0.15, dusk: 0.8, night: 1 };
   const tod = options.timeOfDay ?? TOD_BY_SKY[skyRig ? (options.sky ?? 'dusk') : 'dusk'];
-  const materials = glass
+  const vd = options.vd ?? EXPERIMENTAL_WORLD_VD;
+  const leanMat = options.leanMat ?? VD_LEANMAT;
+  const vdMaterials = vd ? createVdCityMaterials(THREE, { sunDirection, timeOfDay: tod }, leanMat) : null;
+  const materials = vdMaterials ?? (glass
     ? createGlassCityMaterials(THREE, {
         sunDirection,
         pbr,
@@ -117,7 +148,7 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
       })
     : pbr
       ? createPbrCityMaterials(THREE, { sunDirection, timeOfDay: tod })
-      : createCityMaterials(THREE, sunDirection, { timeOfDay: tod });
+      : createCityMaterials(THREE, sunDirection, { timeOfDay: tod }));
   // Lane L4: the same InstancedMesh keeps its paint-marker contract; only
   // the material changes. The lamp switch seeds off the resolved sky pick.
   const carPbr = (options.carPbr ?? EXPERIMENTAL_WORLD_CAR_PBR)
@@ -142,46 +173,55 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
   const groundGeometry = new THREE.PlaneGeometry(groundSize, groundSize).rotateX(-Math.PI / 2);
   const ground = new THREE.Mesh(groundGeometry, materials.ground);
   ground.name = 'city:ground';
+  if (CURB_HEIGHT > 0) {
+    // The ground is the raised block level; see city-mesh.ts for the underlay order.
+    ground.position.y = CURB_HEIGHT;
+    ground.renderOrder = -4;
+    (materials.ground as InstanceType<Three['Material']>).depthWrite = false;
+  }
 
   // One street-clearance index for every tree, pole, sign, stoop and prop.
   const clearance = createStreetClearance(dataset);
-  const city = buildCityMeshes(THREE, dataset, materials, away, clearance);
-  const trees = buildTrees(THREE, dataset, materials, clearance);
+  const city = buildCityMeshes(THREE, dataset, materials, away, clearance, options.future ?? EXPERIMENTAL_WORLD_FUTURE);
+  const trees = buildTrees(THREE, dataset, materials, clearance, vd, VD_LEAN, leanMat);
   const furniture = buildStreetFurniture(THREE, dataset, materials, clearance, city.texts);
   const props = buildStreetProps(THREE, dataset, materials, clearance, furniture.signs, furniture.lights);
   const bandMinZ = -dataset.extentMeters - SHADOW_BAND_METRES;
   const bandCount = Math.max(1, Math.ceil((dataset.extentMeters * 2 + SHADOW_BAND_METRES * 2) / SHADOW_BAND_METRES) + 1);
 
-  const hemi = new THREE.HemisphereLight(linearColor(THREE, 'hemiSky'), linearColor(THREE, 'hemiGround'), 1.6);
-  const sun = skyRig?.sun ?? new THREE.DirectionalLight(linearColor(THREE, 'sun'), 2.2);
+  // vd: Valdrada keys sun 5 over hemi ≈0.6, but it also has an env map,
+  // a warm bounce light and an SH probe. With hemi as the only fill, shade
+  // walls went near-black on the Duo (2026-10-18), so the fill stays high.
+  // TODO(tune) on the Duo.
+  const hemi = new THREE.HemisphereLight(linearColor(THREE, 'hemiSky'), linearColor(THREE, 'hemiGround'), vd ? 2.6 : 1.6);
+  const sun = skyRig?.sun ?? new THREE.DirectionalLight(linearColor(THREE, 'sun'), vd ? 3.2 : 2.2);
+  const precipitation = vdMaterials ? buildPrecipitation(THREE, vdMaterials.weather) : null;
+  precipitation?.update();
   if (!skyRig) sun.position.set(SUN[0] * 1000, SUN[1] * 1000, SUN[2] * 1000);
-  const bundles = options.bundles ?? EXPERIMENTAL_WORLD_BUNDLES;
-  if (bundles) {
-    // WebGPU render bundles (three r186 BundleGroup): the immutable meshes
-    // record once and replay as one executeBundles call per frame. Bundles
-    // execute before the scene's opaque and transparent lists
-    // (renderers/common/Renderer.js: bundles, then opaque, then
-    // transparents), which forces two membership decisions:
-    //
-    // - The sky dome must record WITH them. It is depthTest:false and draws
-    //   first only thanks to renderOrder -10 — left outside, the bundle would
-    //   draw the city and the dome would then paint over it. Inside the
-    //   bundle its own renderOrder still leads the bundle's list, and the
-    //   per-frame SHARED refresh keeps its camera-following uniforms
-    //   (NodeMaterialObserver.needsRefresh, materials/nodes/manager).
-    // - The meshes setFocus re-ranges per move (contact shadows, street
-    //   detail) and every instanced set whose count or visibility changes
-    //   (trees, furniture, props) stay out: a static bundle freezes the draw
-    //   parameters recorded at first render. Lights are not allowed inside a
-    //   BundleGroup at all.
-    const bundle = new THREE.BundleGroup();
-    bundle.name = 'city:bundle';
-    const mutable = new Set(city.mutableMeshes);
-    bundle.add(sky, ground, ...city.meshes.filter((m) => !mutable.has(m)));
-    group.add(bundle, ...city.mutableMeshes, ...trees.objects, ...furniture.objects, ...props.objects, hemi, sun, sun.target);
-  } else {
-    group.add(ground, ...city.meshes, ...trees.objects, ...furniture.objects, ...props.objects, hemi, sun, sun.target);
+  if (VD_SHADOWS) {
+    // An orthographic shadow box that follows the Caller (setFocus); the
+    // whole tile would spread 2048 texels over 1.7 km.
+    sun.castShadow = true;
+    // 1024 over the 140 m caller-centred box: ~14 cm texels, soft but
+    // readable for trees/props; halves the shadow pass fill on the Duo.
+    sun.shadow.mapSize.set(1024, 1024);
+    const cam = sun.shadow.camera;
+    cam.left = -VD_SHADOW_HALF; cam.right = VD_SHADOW_HALF; cam.top = VD_SHADOW_HALF; cam.bottom = -VD_SHADOW_HALF;
+    cam.near = 1; cam.far = 600;
+    sun.shadow.bias = -0.0005;
+    sun.shadow.normalBias = 0.04;
+    cam.updateProjectionMatrix();
+    const casters = new Set(['city:walls-masonry', 'city:walls-glass', 'city:roofs', 'city:landmarks', 'city:street-detail', 'city:poles']);
+    const receivers = new Set(['city:ground', 'city:areas', 'city:sidewalks', 'city:roads', 'city:walls-masonry', 'city:walls-glass', 'city:roofs']);
+    for (const o of [ground, ...city.meshes, ...trees.objects, ...furniture.objects, ...props.objects]) {
+      // Only the full tree models cast; the mid level, the far cross-cards and the plain crowns do not.
+      const tree = o.name.startsWith('city:trees-vd-bark-') || o.name.startsWith('city:trees-vd-leaf-');
+      o.castShadow = casters.has(o.name) || tree;
+      o.receiveShadow = receivers.has(o.name);
+    }
   }
+  group.add(ground, ...city.meshes, ...trees.objects, ...furniture.objects, ...props.objects, hemi, sun, sun.target);
+  if (precipitation) group.add(precipitation.mesh);
 
   const horizon = skyRig?.horizon ?? linearColor(THREE, 'skyHorizon');
   const fog = skyRig?.fog ?? new THREE.Fog(horizon, 600, 2500);
@@ -196,13 +236,26 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
   return {
     group,
     sky,
-    /** True when the sky dome records into the render bundle: it is then a child of `group`, not the scene. */
-    skyBundled: bundles,
     fog,
     horizon,
     /** The L1 rig when flagged, else null — city-scene uses it to attach env. */
     skyRig,
+    /** vd lane weather levels, null on the other lanes. */
+    weather: (vdMaterials?.weather ?? null) as VdWeather | null,
+    /** Rain and snow, 0..1 each; a no-op off the vd lane. */
+    setWeather(rain: number, snowLevel: number) {
+      if (!vdMaterials) return;
+      vdMaterials.weather.wet.value = Math.max(0, Math.min(1, rain));
+      vdMaterials.weather.snow.value = Math.max(0, Math.min(1, snowLevel));
+      precipitation?.update();
+    },
     stats,
+    /**
+     * The AdSurface inventory for the LED panels this build drew
+     * (future-layer.ts): stable ids, geo, orientation, dimensions and
+     * campaign eligibility — the data-driven registry the CMS fills later.
+     */
+    adSurfaces: city.adSurfaces as readonly AdSurface[],
     /** Level of detail and air from the camera's distance to its target, metres. */
     setViewDistance(distance: number, far: number) {
       viewDistance = distance;
@@ -220,6 +273,13 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
      * allocation-free and only runs after it has moved about 10 m.
      */
     setFocus(x: number, z: number) {
+      if (VD_SHADOWS) {
+        // Keep the shadow box centred on the Caller, the sun 400 m out along its direction.
+        sun.target.position.set(x, 0, z);
+        sun.position.set(x + sunDirection[0] * 400, sunDirection[1] * 400, z + sunDirection[2] * 400);
+        sun.target.updateMatrixWorld();
+        sun.updateMatrixWorld();
+      }
       trees.update(x, z, viewDistance);
       city.setFocus(x, z);
       furniture.setFocus(x, z);
@@ -235,6 +295,7 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
       groundGeometry.dispose();
       skyRig?.dispose();
       carPbr?.dispose();
+      precipitation?.dispose();
       materials.dispose();
     },
   };
