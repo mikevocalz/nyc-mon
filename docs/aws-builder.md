@@ -74,3 +74,27 @@ Draft. Fill in after the live run.
 - **Needs work:** [pending live verification: model-access request flow, IAM action discovery, first-call latency, quota errors.]
 - **Zero to hello world:** [pending live verification: time from a fresh account to the first `bedrock-turn` PASSED.]
 - **Would we build with it again:** [CREATOR: Yes/No and why.]
+
+## Account state and decisions, 2026-10-19
+
+Account `142366489572`, `us-east-1`. Checked with the AWS MCP server and the Anthropic Bedrock SDK on 2026-10-19.
+
+What exists:
+
+- GitHub OIDC provider and role `nyc-mon-alexa-live-bedrock`. Only the `alexa-live` environment of `mikevocalz/nyc-mon` can assume it. Its inline policy allows `bedrock-mantle:CreateInference` (plus `Get*` and `List*`) on `project/*`. The `alexa-live` environment has `AWS_BEDROCK_ROLE_ARN`, `AWS_REGION=us-east-1` and `SIM_BEDROCK_MODEL_ID=anthropic.claude-opus-5-5`.
+- Budget `nyc-mon-monthly`: $25 a month, with email alerts at 50, 80 and 100 percent of actual spend.
+- The IAM action is confirmed: the AWS managed policy `AmazonBedrockMantleInferenceAccess` grants `bedrock-mantle:CreateInference` on `arn:aws:bedrock-mantle:*:*:project/*`.
+
+What blocks a real model turn:
+
+1. Every Anthropic model on `bedrock-runtime` returns `404 Model use case details have not been submitted for this account`. `GetUseCaseForModelAccess` returns `ResourceNotFoundException`. On the first evening, `us.anthropic.claude-sonnet-4-6` and `us.anthropic.claude-opus-4-6-v1` answered for a short time and then started returning this error.
+2. Claude Opus 5.5 on `bedrock-mantle` returns `permission_error: anthropic.claude-opus-5-5 is not available for this account`. The account's applied quota is 0 for both `L-1BD3E8A2` (input TPM) and `L-612AE448` (output TPM), against AWS defaults of 20,000,000 and 2,000,000. Service Quotas refuses any increase request at or below the default, so only AWS Support can lift this.
+
+| Item | Decision | Condition to revisit |
+|---|---|---|
+| Anthropic use-case form | BUILD, by the creator in the Bedrock console | Needed for every Claude model on this account. Retry 15 minutes after submitting. |
+| Opus 5.5 on `bedrock-mantle` (current code path) | DEFER | Blocked by the account's restriction, not by code. Reopen when an AWS Support case moves the applied quota off 0. Do not file a Service Quotas increase: the API rejects it. |
+| `bedrock-runtime` backend for Claude 4.6 in `server/model.ts` | DEFER | It would only route around blocker 2. Build it if the form clears blocker 1 but Support has not cleared blocker 2 by 2026-10-21. The CI role would then need `bedrock:InvokeModel` and `bedrock:InvokeModelWithResponseStream` on the inference profile and foundation-model ARNs. |
+| Live smoke workflow | DEFER | Also needs `LIVE_MCP_URL`, `AUTH_ISSUER`, `LIVE_MON_ID` and the `LIVE_ACCESS_TOKEN` secret, which exist only once the MCP server, admin-vite and the simulator are on HTTPS. |
+| SMS codes through SNS | STRIKE for the hackathon | No registered toll-free or 10DLC origination number exists, and registration takes longer than the deadline. With `AUTH_SMS_TRANSPORT` unset, codes go by email. |
+| Login with Amazon | Out of scope for AWS | It is configured in the Amazon Developer console, not in this account. |
