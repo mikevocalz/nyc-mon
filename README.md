@@ -16,6 +16,10 @@
 
 NYC-MON is a near-future New York where intelligent Mons live alongside people. Phase 1 builds the H-Lynk companion loop on iOS and Android (meet three starters, pick an egg, hatch it, care for the Baby Mon in real time) plus the product site on Next.js.
 
+## Alexa+ hackathon entry
+
+The Alexa+ add-on is an MCP server (`packages/mcp-server`), an Agent Skill (`skills/nyc-mon-companion`) and a smart-display simulator (`packages/web-sim`) that runs Claude Sonnet 4.6 on Amazon Bedrock. Run it locally with [docs/alexa/SIMULATOR.md](docs/alexa/SIMULATOR.md). The AWS setup and measured cost are in [docs/aws-builder.md](docs/aws-builder.md).
+
 ## Monorepo
 
 | Path | Package | What it is |

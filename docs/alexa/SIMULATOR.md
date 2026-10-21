@@ -55,7 +55,7 @@ Mon status needs the `/v1` game API on admin-vite (`V1_BASE_URL`, default `http:
 
 ### 2. With Claude on Amazon Bedrock
 
-Same as above, minus `SIM_MODEL_BACKEND=mock`. The simulator server finds AWS credentials through the standard AWS chain (environment, `~/.aws`, SSO, role). The identity needs `bedrock-mantle:CreateInference` on the model, and the account needs Bedrock model access for it.
+Same as above, minus `SIM_MODEL_BACKEND=mock`. The simulator server finds AWS credentials through the standard AWS chain (environment, `~/.aws`, SSO, role). The default model is Claude Sonnet 4.6 through the US cross-region inference profile (`us.anthropic.claude-sonnet-4-6`) on bedrock-runtime. The identity needs `bedrock:InvokeModel` and `bedrock:InvokeModelWithResponseStream` on that profile and its foundation models, and the account must have filed Anthropic's first-time use case form (`aws bedrock put-use-case-for-model-access`). To use Claude Opus 5.5 on bedrock-mantle instead, set `SIM_BEDROCK_MODEL_ID=anthropic.claude-opus-5-5`. That path needs `bedrock-mantle:CreateInference` and a nonzero mantle quota, which the creator's account does not have.
 
 ```sh
 SIM_AUTH_MODE=dev-bypass SIM_DEV_MODE=1 SIM_BEDROCK_REGION=us-east-1 \
@@ -101,7 +101,7 @@ Simulator server (`packages/web-sim/server/env.ts`):
 | `SIM_AUTH_MODE` | `oauth` | `oauth` or `dev-bypass` |
 | `SIM_DEV_MODE` | `0` | `1` shows the dev panel |
 | `SIM_MODEL_BACKEND` | `bedrock` | `bedrock` or `mock` |
-| `SIM_BEDROCK_MODEL_ID` | `anthropic.claude-opus-5-5` | Model on Claude in Amazon Bedrock |
+| `SIM_BEDROCK_MODEL_ID` | `us.anthropic.claude-sonnet-4-6` | Bedrock model id. A geo-prefixed profile goes to bedrock-runtime, a bare `anthropic.*` id to bedrock-mantle |
 | `SIM_BEDROCK_REGION` | `AWS_REGION` | Region of the Bedrock endpoint |
 | `SIM_MODEL_EFFORT` | `low` | `low`, `medium` or `high` |
 | `SIM_MAX_OUTPUT_TOKENS` | `4096` | Output cap per model turn |
@@ -137,4 +137,4 @@ pnpm --filter @acme/web-sim build
 4. As James, ask to use the Caller's rare item: the Mon refuses in its own voice.
 5. Reload the page: the conversation is still there, and the Mon's state comes back from the server.
 
-Beats 1, 2 and 5 were run locally with the scripted model against the MCP server and a stand-in `/v1`. Beats 3 and 4 depend on Claude following the skill; they were not run against Bedrock in this build, and their wording varies run to run. No Alexa logo or Amazon device imagery appears in the UI.
+Beats 1, 2 and 5 were run locally with the scripted model against the MCP server and a stand-in `/v1`. Beats 3 and 4 depend on Claude following the skill, and their wording varies run to run. On 2026-10-21 they ran against Claude Sonnet 4.6 on Bedrock (`docs/aws-builder.md`, "Measured cost per session"). The Mon greeted James at 0.93 and hedged at 0.75. In beat 4 it refused James, but in a system voice rather than the Mon's, and it questioned who was speaking although a fresh 0.93 detection was on record. No Alexa logo or Amazon device imagery appears in the UI.

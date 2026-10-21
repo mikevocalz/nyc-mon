@@ -33,7 +33,7 @@ Four parts, all in the public repo.
 1. **MCP server** (`packages/mcp-server`). Streamable HTTP on the MCP TypeScript SDK v2. It answers the 2025-11-25 handshake and negotiates down to the 2025-03-26 version Amazon's lifecycle sample sends. Eight care and status tools are always registered. Six familiar-people and presence tools, including `inject_presence_event`, exist only in dev and simulator builds, so a production `tools/list` holds only tools that work. Care calls are idempotent per intent, so a retried "feed" never feeds twice. The server makes no model calls, which keeps it inside Alexa+'s 500 ms round-trip limit. [Pending live verification: latency against the real database.]
 2. **MCP Apps views.** The status card and the full-screen room are `ui://` HTML resources, one self-contained file each, rendered by the host in a sandboxed iframe. Every button calls the same tool the model would, and everything on the card is also in the tool data, so a speaker with no screen loses nothing.
 3. **Account linking.** An OAuth 2.1 authorization server built on Better Auth's OAuth provider, shaped to Amazon's account-linking rules: client credentials for discovery, authorization code with PKCE S256 for user tools, a refresh token with every access token, `resource` pinned to the MCP URL, no OpenID Connect. Under-18 accounts are refused at sign-in, at consent, and on every token issue. [Pending live verification: end-to-end against a deployed issuer.]
-4. **Agent Skill and simulator.** `skills/nyc-mon-companion/SKILL.md` teaches the session: which tool answers which request, how a Baby Mon sounds, how to read a declined meal, how to hedge at 0.75 presence confidence and greet at 0.93. The simulator (`packages/web-sim`) is a smart-display page that acts as a real MCP client. It loads the skill as the system prompt for Claude Opus 5.5 on Amazon Bedrock, and no code in it picks tools: the model reads the skill and the tool descriptions and decides. Push-to-talk and read-aloud use the browser's speech APIs.
+4. **Agent Skill and simulator.** `skills/nyc-mon-companion/SKILL.md` teaches the session: which tool answers which request, how a Baby Mon sounds, how to read a declined meal, how to hedge at 0.75 presence confidence and greet at 0.93. The simulator (`packages/web-sim`) is a smart-display page that acts as a real MCP client. It loads the skill as the system prompt for Claude Sonnet 4.6 on Amazon Bedrock, and no code in it picks tools: the model reads the skill and the tool descriptions and decides. Push-to-talk and read-aloud use the browser's speech APIs.
 
 On a real Echo, Alexa's own model writes the reply from the same tool data. The character then comes through structured fields (mood, decline reasons) and the MCP Apps views. The skill drives the voice fully in our simulator and in any MCP agent that loads it.
 
@@ -46,10 +46,10 @@ NYC-MON already runs on the Caller's phone. On Alexa+ the same Mon carries over:
 ## How we built it
 
 - MCP TypeScript SDK v2 (`@modelcontextprotocol/server`, `client`, `node`) and the MCP Apps SDK (`@modelcontextprotocol/ext-apps`).
-- Claude on Amazon Bedrock through the Anthropic Bedrock SDK's Mantle client. Details in `docs/aws-builder.md`.
+- Claude Sonnet 4.6 on Amazon Bedrock (bedrock-runtime, US cross-region inference profile) through the Anthropic Bedrock SDK, with the Agent Skill as a cached prompt prefix. One demo session costs about $0.06. Details in `docs/aws-builder.md`.
 - Better Auth with `@better-auth/oauth-provider`, on Payload CMS and Neon Postgres.
 - The NYC-MON kit (Storybook-documented components) for the views and the linking pages.
-- Tests: 103 MCP server tests and 61 simulator tests at the Oct 8 checkpoint. 68 simulator tests after the Oct 13 cancellation fix. A red-team suite covers token forgery (alg=none, HS256 keyed with the public key), audience tricks, oversized bodies, JSON-RPC batches, look-alike origins and sandbox message spoofing. [Update counts from the final CI run.]
+- Tests: 113 MCP server tests and 84 simulator tests pass at `58956b6`, along with the nine offline stages of `alexa-readiness.yml`. A red-team suite covers token forgery (alg=none, HS256 keyed with the public key), audience tricks, oversized bodies, JSON-RPC batches, look-alike origins and sandbox message spoofing.
 
 ## Before and after the submission period
 
@@ -69,9 +69,9 @@ The full log with commits is in `docs/FRICTION-LOG.md`. Three that shaped the bu
 
 ## Testing instructions
 
-- Simulator URL: [pending live verification: deployed HTTPS URL]
-- Test account: [pending live verification: an adult account with one hatched Mon, from `docs/alexa/SIMULATOR.md`]
-- Run locally: `docs/alexa/SIMULATOR.md`, "Run it". Without AWS, the scripted test model checks wiring only and is labelled as such on screen. It refuses to start in production.
+- Simulator URL: none. The services are not hosted. The rules accept a locally runnable public repo plus the demo video.
+- Test account: none needed locally. The dev sign-in bypass in `docs/alexa/SIMULATOR.md` skips linking. Mon status needs the `/v1` API on admin-vite and its database; without them the status tools say "NYC-MON can't reach your Mon right now", while presence and familiar-people beats still work.
+- Run locally: `docs/alexa/SIMULATOR.md`, "Run it". With AWS credentials and Bedrock access, the default model is `us.anthropic.claude-sonnet-4-6`. Without AWS, the scripted test model checks wiring only and is labelled as such on screen. It refuses to start in production.
 
 ## Video
 

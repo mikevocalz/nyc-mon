@@ -2,7 +2,7 @@
 
 The hackathon rules give up to a 10% bonus for friction log entries, each with "specific task attempted, steps taken, expected vs. actual result, severity rating, workaround used, and actionable suggestion" (`docs/alexa/HACKATHON.md`, submission checklist). Every entry below names the tool and points at a commit, a test or a captured doc. Anything not yet run against real infrastructure says **pending live verification**.
 
-**Started:** 2026-10-06. **Last filled:** 2026-10-14.
+**Started:** 2026-10-06. **Last filled:** 2026-10-21.
 
 ## Severity
 
@@ -140,6 +140,41 @@ Newest first.
 - **Evidence:** 6bd5ae1, `docs/adr/0005-alexa-mcp-transport.md`, `packages/mcp-server/`.
 - **Status:** superseded.
 
+## Amazon Bedrock
+
+### 2026-10-21: No console page links the Anthropic use-case form
+- **Tool:** Amazon Bedrock console and docs, "Request access to models"
+- **Task:** file Anthropic's first-time use case form so Claude models answer on a new account.
+- **Steps:** opened Claude Sonnet 4.6 in the model catalog and in the playground, opened the Model access page, and read the docs page, which says to open an Anthropic model from the catalog or the Anthropic providers page and complete the form.
+- **Expected / actual:** a form or a link to it. The playground showed only `ResourceNotFoundException: Model use case details have not been submitted for this account`. The Model access page says it "has been retired", and the providers URL redirected to the catalog with "The requested model was not found."
+- **Severity:** Blocker.
+- **Workaround:** `aws bedrock put-use-case-for-model-access` with base64 JSON, then `get-foundation-model-availability` reported `AVAILABLE`.
+- **Suggestion:** put the form, or a link to it, in the error the playground shows.
+- **Evidence:** `docs/aws-builder.md`, "Account state and decisions, 2026-10-19" and "First real Bedrock turns, 2026-10-21".
+- **Status:** worked around.
+
+### 2026-10-19: Claude worked for about an hour, then every Anthropic model returned 404
+- **Tool:** Amazon Bedrock, bedrock-runtime
+- **Task:** first real model turn for the simulator.
+- **Steps:** called `us.anthropic.claude-sonnet-4-6` and `us.anthropic.claude-opus-4-6-v1` on a new account.
+- **Expected / actual:** either access or a clear refusal from the start. Two calls succeeded. Later calls returned `404 Model use case details have not been submitted for this account`, which read like a wrong model id.
+- **Severity:** High.
+- **Workaround:** filed the use-case form (entry above).
+- **Suggestion:** return 403 with the form's name, and don't serve a grace window that ends without warning.
+- **Evidence:** `docs/aws-builder.md`, blocker 1.
+- **Status:** worked around.
+
+### 2026-10-19: Opus 5.5 on bedrock-mantle has an applied quota of 0, and Service Quotas refuses to raise it
+- **Tool:** Amazon Bedrock (bedrock-mantle), Service Quotas
+- **Task:** run the simulator on `anthropic.claude-opus-5-5` through the Messages-API endpoint.
+- **Steps:** called the model, read the quotas, tried a quota increase.
+- **Expected / actual:** the AWS default of 20M input and 2M output tokens per minute. The call returned `permission_error: ... is not available for this account`. Both applied quotas were 0, and `RequestServiceQuotaIncrease` rejects any value at or below the default.
+- **Severity:** Blocker for Opus 5.5.
+- **Workaround:** a bedrock-runtime path for inference-profile ids (48f54a6). The simulator now defaults to Claude Sonnet 4.6 (58fb23d).
+- **Suggestion:** say in the error that the account is restricted and that only a Support case lifts it.
+- **Evidence:** `docs/aws-builder.md`, blocker 2; `packages/web-sim/server/model.ts` (`usesBedrockRuntime`).
+- **Status:** worked around; Opus 5.5 still blocked.
+
 ## MCP SDKs and the libraries around them
 
 ### 2026-10-14: An oversized body reset the connection instead of answering 413
@@ -213,6 +248,6 @@ Newest first.
 <!--
 Append real friction as it happens: every failed tool call, doc
 contradiction, missing capability or confusing UX counts, including
-"worked but surprising". Live runs still owed: Bedrock, deployed OAuth,
+"worked but surprising". Live runs still owed: deployed OAuth,
 the migration on a real database, care latency, the demo video.
 -->
