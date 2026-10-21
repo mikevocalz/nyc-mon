@@ -310,11 +310,11 @@ What must be true on the 23rd. Citations are in `docs/alexa/HACKATHON.md`.
 
 ## Needs Mike
 
-1. **Hosting**: Option A (EC2 + Caddy) was STRUCK 2026-10-16 — no AWS account is available. The hosting choice reopens when this lane resumes; non-AWS candidates are the Option-B container shape on a non-AWS host (Fly/Render-style) or a self-managed box with the same Caddy+systemd layout — both still need a Bedrock credential path (see item 5).
+1. **Hosting**: Option A was STRUCK 2026-10-16 because no AWS account existed. One exists since 2026-10-19 (account state in `docs/aws-builder.md`), so Option A is open again. Still blocked on item 2 (domain).
 2. **Domain and hostnames** for `auth.`, `mcp.`, `sim.`, `sandbox.`; DNS access. No domain yet as of 2026-10-16 — one must be registered first. Lane DEFERRED 2026-10-16: the deploy is parked and the hackathon demo runs without live services until a domain and hosting exist.
 3. **GitHub**: set the default branch to `main` (step 1); create the `alexa-live` environment and its variables and secret (8f); approve the AWS OIDC role for Actions.
 4. **Vercel**: create the admin-vite project (step 3) and set the env names listed there. Bunny storage credentials are among them and are required for production boot.
-5. **AWS**: STRUCK 2026-10-16 — no AWS account. If hosting resumes off-AWS, Bedrock still needs credentials: either reopen an AWS account (instance/task role as originally planned) or fall back to a static access-key pair in env, which changes the "no AWS keys in env" constraint in the hosting section. `anthropic.claude-opus-5-5` model access and the credit situation (Amazon stopped issuing hackathon credits on Oct 7) still apply if AWS reopens.
+5. **AWS**: account `142366489572` exists since 2026-10-19, with the GitHub OIDC role and the `alexa-live` variables set. No Claude model answers yet: the Anthropic use-case form is unfiled, and Opus 5.5 on mantle has a 0 quota. Since 2026-10-21 the simulator can use a `us.anthropic.claude-*-4-6` id on bedrock-runtime once the form clears. See the decisions table in `docs/aws-builder.md`.
 6. **Amazon developer console**: nothing to do; participants get no `alexa-ai` CLI. Decided 2026-10-16 — the `alexa` client gets a placeholder registration (secret + unused https redirect) so the 8b service-token checks can run.
 7. **Test Callers**: who owns the adult and under-18 accounts, and the TOTP secret for the adult.
 8. The three secrets generated on the laptop (`PAYLOAD_SECRET`, `BETTER_AUTH_SECRET`, `V1_MCP_SERVICE_KEY`) go only into Vercel and `/etc/nyc-mon/*.env`.
