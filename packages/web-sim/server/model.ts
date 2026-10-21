@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { AnthropicBedrockMantle } from '@anthropic-ai/bedrock-sdk';
+import { AnthropicBedrock, AnthropicBedrockMantle } from '@anthropic-ai/bedrock-sdk';
 import { z } from 'zod';
 import type { ModelAuthCheck } from './model-auth.ts';
 
@@ -38,15 +38,28 @@ export interface BedrockOptions {
 
 /**
  * Claude on Amazon Bedrock through the Messages-API endpoint
- * (`bedrock-mantle.<region>.api.aws/anthropic/v1/messages`), SigV4-signed by
- * the Anthropic Bedrock SDK from the default AWS credential chain.
+ * (`bedrock-mantle.<region>.api.aws/anthropic/v1/messages`), or bedrock-runtime
+ * InvokeModel for inference-profile ids, SigV4-signed by the Anthropic Bedrock
+ * SDK from the default AWS credential chain.
  */
 /** The slice of the Bedrock client this backend uses; tests pass a fake. */
 export type BedrockMessagesClient = Pick<AnthropicBedrockMantle, 'messages'>;
 
+/**
+ * Inference-profile ids (`us.anthropic.claude-sonnet-4-6`) only exist on
+ * bedrock-runtime; bare ids (`anthropic.claude-opus-5-5`) go to mantle.
+ */
+export function usesBedrockRuntime(modelId: string): boolean {
+  return /^(us|eu|apac|jp|au|global)\.anthropic\./.test(modelId);
+}
+
 export function bedrockBackend(opts: BedrockOptions, injected?: BedrockMessagesClient): ModelBackend {
   let client: BedrockMessagesClient | null = injected ?? null;
-  const getClient = () => (client ??= new AnthropicBedrockMantle({ awsRegion: opts.region }));
+  // ponytail: runtime path exists because this account's mantle quota for Opus 5.5 is 0 (docs/aws-builder.md); drop it once Support lifts that.
+  const getClient = () =>
+    (client ??= usesBedrockRuntime(opts.modelId)
+      ? (new AnthropicBedrock({ awsRegion: opts.region }) as unknown as BedrockMessagesClient)
+      : new AnthropicBedrockMantle({ awsRegion: opts.region }));
   return {
     label: opts.modelId,
     async stream({ system, messages, tools }, onText, signal) {

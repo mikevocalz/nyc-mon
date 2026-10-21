@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type Anthropic from '@anthropic-ai/sdk';
 import type { CallToolResult } from '@modelcontextprotocol/client';
 import { runAgentTurn, toolResultContent, type AgentEvent, type ModelClient } from '../src/shared/agentLoop.ts';
-import { bedrockBackend, type BedrockMessagesClient } from '../server/model.ts';
+import { bedrockBackend, usesBedrockRuntime, type BedrockMessagesClient } from '../server/model.ts';
 
 const TOOLS: Anthropic.Tool[] = [
   { name: 'get_mon_status', description: 'Status', input_schema: { type: 'object', properties: {} } },
@@ -284,5 +284,13 @@ describe('bedrockBackend with a mocked Bedrock client', () => {
     const out = await runAgentTurn({ model, mcp: { callTool }, tools: TOOLS, history: [], userText: 'Hungry?' });
     expect(callTool).toHaveBeenCalledOnce();
     expect(out.reply).toBe('Belly’s low. Feed me?');
+  });
+});
+
+describe('usesBedrockRuntime', () => {
+  it('sends inference-profile ids to bedrock-runtime and bare ids to mantle', () => {
+    expect(usesBedrockRuntime('us.anthropic.claude-sonnet-4-6')).toBe(true);
+    expect(usesBedrockRuntime('global.anthropic.claude-opus-4-6-v1')).toBe(true);
+    expect(usesBedrockRuntime('anthropic.claude-opus-5-5')).toBe(false);
   });
 });
