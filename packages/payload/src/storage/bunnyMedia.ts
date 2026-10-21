@@ -83,8 +83,12 @@ const getIncomingFiles = (
   return files;
 };
 
-const uploadFile = async (file: IncomingFile) => {
-  const filename = getKey(file.filename);
+/** Media keeps the zone root; every other upload collection gets its own folder so filenames never collide. */
+const keyFor = (slug: string, filename: string) =>
+  slug === 'media' ? getKey(filename) : `${slug}/${getKey(filename)}`;
+
+const uploadFile = async (slug: string, file: IncomingFile) => {
+  const filename = keyFor(slug, file.filename);
   const response = await fetch(storageURL(filename), {
     method: 'PUT',
     headers: {
@@ -104,8 +108,8 @@ const uploadFile = async (file: IncomingFile) => {
   return objectURL(filename);
 };
 
-const deleteFile = async (filename: string) => {
-  const response = await fetch(storageURL(getKey(filename)), {
+const deleteFile = async (slug: string, filename: string) => {
+  const response = await fetch(storageURL(keyFor(slug, filename)), {
     method: 'DELETE',
     headers: { AccessKey: process.env.BUNNY_STORAGE_PASSWORD! },
   });
@@ -135,13 +139,13 @@ const filenamesFor = (doc: Partial<FileData>) => {
 
 export const bunnyMediaAfterChange: CollectionAfterChangeHook<
   FileData & TypeWithID
-> = async ({ doc, operation, previousDoc, req }) => {
+> = async ({ collection, doc, operation, previousDoc, req }) => {
   if (req.context?.skipBunnyMedia || !configured) return doc;
 
   const files = getIncomingFiles(doc, req);
   if (files.length === 0) return doc;
 
-  const uploaded = await Promise.all(files.map(uploadFile));
+  const uploaded = await Promise.all(files.map((file) => uploadFile(collection.slug, file)));
   const mainURL = uploaded[0];
 
   req.context.skipBunnyMedia = true;
@@ -150,7 +154,7 @@ export const bunnyMediaAfterChange: CollectionAfterChangeHook<
 
   try {
     await req.payload.update({
-      collection: 'media',
+      collection: collection.slug as 'media',
       id: doc.id,
       data: { bunnyUrl: mainURL },
       depth: 0,
@@ -163,10 +167,14 @@ export const bunnyMediaAfterChange: CollectionAfterChangeHook<
   if (previousDoc && operation === 'update') {
     const previousFiles = filenamesFor(previousDoc);
     const newFiles = new Set(filenamesFor(doc));
+    // Best effort: the new file and row are already saved, so a failed delete
+    // leaves an orphan on Bunny instead of rolling back the replacement.
     await Promise.all(
       previousFiles
         .filter((filename) => !newFiles.has(filename))
-        .map(deleteFile),
+        .map((filename) => deleteFile(collection.slug, filename).catch((error: unknown) => {
+          req.payload.logger.warn({ err: error, filename }, 'Bunny Storage delete of a replaced file failed');
+        })),
     );
   }
 
@@ -175,10 +183,10 @@ export const bunnyMediaAfterChange: CollectionAfterChangeHook<
 
 export const bunnyMediaAfterDelete: CollectionAfterDeleteHook<
   FileData & TypeWithID
-> = async ({ doc }) => {
+> = async ({ collection, doc }) => {
   if (!configured) return;
 
-  await Promise.all(filenamesFor(doc).map(deleteFile));
+  await Promise.all(filenamesFor(doc).map((filename) => deleteFile(collection.slug, filename)));
 };
 
 

@@ -25,6 +25,7 @@ export { ConfirmDestructive, type ConfirmDestructiveProps } from '../ConfirmDest
 export { CopyButton, type CopyButtonProps } from '../CopyButton';
 export { DataTable, type ColumnDef, type DataTableMode, type DataTableProps, type DataTableSelection, type SortState } from '../DataTable';
 export { Dialog, DialogCard, type DialogProps } from '../Dialog';
+export { DropZone, type DropAsset, type DropZoneProps } from '../DropZone';
 export { EmptyState, type EmptyStateProps } from '../EmptyState';
 export { ErrorMessage, type ErrorMessageProps } from '../ErrorMessage';
 export { FieldGroup, type FieldGroupProps, type FieldSectionProps } from '../FieldGroup';
@@ -49,6 +50,7 @@ export { SignageBand, type SignageBandProps } from '../SignageBand';
 export { Switch, type SwitchProps } from '../Switch';
 export { TabBar, type TabBarProps } from '../TabBar';
 export { Text, type TextProps } from '../Text';
+export { Textarea, type TextareaProps } from '../Textarea';
 export { TextField, type TextFieldProps } from '../TextField';
 export { Timeline, type TimelineItemData, type TimelineProps } from '../elements/Timeline';
 export { Timestamp, type TimestampProps } from '../Timestamp';

@@ -78,6 +78,7 @@ export interface Config {
     'idempotency-records': IdempotencyRecord;
     waitlist: Waitlist;
     'language-lexicon': LanguageLexicon;
+    'mon-models': MonModel;
     sessions: Session;
     accounts: Account;
     verifications: Verification;
@@ -112,6 +113,7 @@ export interface Config {
     'idempotency-records': IdempotencyRecordsSelect<false> | IdempotencyRecordsSelect<true>;
     waitlist: WaitlistSelect<false> | WaitlistSelect<true>;
     'language-lexicon': LanguageLexiconSelect<false> | LanguageLexiconSelect<true>;
+    'mon-models': MonModelsSelect<false> | MonModelsSelect<true>;
     sessions: SessionsSelect<false> | SessionsSelect<true>;
     accounts: AccountsSelect<false> | AccountsSelect<true>;
     verifications: VerificationsSelect<false> | VerificationsSelect<true>;
@@ -470,6 +472,103 @@ export interface LanguageLexicon {
   active: boolean;
   updatedAt: string;
   createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "mon-models".
+ */
+export interface MonModel {
+  id: number;
+  speciesId:
+    | 'dex-001'
+    | 'dex-002'
+    | 'dex-003'
+    | 'dex-004'
+    | 'dex-005'
+    | 'dex-006'
+    | 'dex-007'
+    | 'dex-008'
+    | 'dex-009'
+    | 'dex-010'
+    | 'dex-011'
+    | 'dex-012'
+    | 'dex-013'
+    | 'dex-014'
+    | 'dex-061'
+    | 'dex-062'
+    | 'dex-063'
+    | 'dex-064'
+    | 'dex-065'
+    | 'dex-066'
+    | 'dex-067';
+  stage?: string | null;
+  bloodlineId?: string | null;
+  /**
+   * Only approved models reach the game. Uploading a new file sets this back to In review.
+   */
+  status: 'in-review' | 'approved';
+  bunnyUrl?: string | null;
+  /**
+   * Uniform scale applied in every scene. 1 keeps the exported size.
+   */
+  scale: number;
+  /**
+   * Moves the model so its feet sit on the floor at the origin.
+   */
+  position: {
+    x: number;
+    y: number;
+    z: number;
+  };
+  /**
+   * Turns the model so it faces the camera (+Z).
+   */
+  rotation: {
+    x: number;
+    y: number;
+    z: number;
+  };
+  /**
+   * Which clip in the file plays for each moment. Clip names come from the uploaded file.
+   */
+  animations?:
+    | {
+        role: 'idle' | 'asleep' | 'feed' | 'rest' | 'wake' | 'play' | 'hatch' | 'evolve';
+        clip: string;
+        loop?: boolean | null;
+        id?: string | null;
+      }[]
+    | null;
+  animationClips?:
+    | {
+        name?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  morphTargets?:
+    | {
+        name?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  heightMeters?: number | null;
+  credit?: {
+    author?: string | null;
+    license?: ('owned' | 'cc0' | 'cc-by-4.0' | 'other') | null;
+    sourceUrl?: string | null;
+  };
+  notes?: string | null;
+  updatedAt: string;
+  createdAt: string;
+  url?: string | null;
+  thumbnailURL?: string | null;
+  filename?: string | null;
+  mimeType?: string | null;
+  filesize?: number | null;
+  width?: number | null;
+  height?: number | null;
+  focalX?: number | null;
+  focalY?: number | null;
 }
 /**
  * Auto-generated from Better Auth schema (session)
@@ -1134,6 +1233,10 @@ export interface PayloadLockedDocument {
         value: number | LanguageLexicon;
       } | null)
     | ({
+        relationTo: 'mon-models';
+        value: number | MonModel;
+      } | null)
+    | ({
         relationTo: 'sessions';
         value: number | Session;
       } | null)
@@ -1441,6 +1544,72 @@ export interface LanguageLexiconSelect<T extends boolean = true> {
   active?: T;
   updatedAt?: T;
   createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "mon-models_select".
+ */
+export interface MonModelsSelect<T extends boolean = true> {
+  speciesId?: T;
+  stage?: T;
+  bloodlineId?: T;
+  status?: T;
+  bunnyUrl?: T;
+  scale?: T;
+  position?:
+    | T
+    | {
+        x?: T;
+        y?: T;
+        z?: T;
+      };
+  rotation?:
+    | T
+    | {
+        x?: T;
+        y?: T;
+        z?: T;
+      };
+  animations?:
+    | T
+    | {
+        role?: T;
+        clip?: T;
+        loop?: T;
+        id?: T;
+      };
+  animationClips?:
+    | T
+    | {
+        name?: T;
+        id?: T;
+      };
+  morphTargets?:
+    | T
+    | {
+        name?: T;
+        id?: T;
+      };
+  heightMeters?: T;
+  credit?:
+    | T
+    | {
+        author?: T;
+        license?: T;
+        sourceUrl?: T;
+      };
+  notes?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  url?: T;
+  thumbnailURL?: T;
+  filename?: T;
+  mimeType?: T;
+  filesize?: T;
+  width?: T;
+  height?: T;
+  focalX?: T;
+  focalY?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -1826,6 +1995,7 @@ export interface CollectionQueryWidget {
       | 'users'
       | 'media'
       | 'language-lexicon'
+      | 'mon-models'
       | 'sessions'
       | 'accounts'
       | 'verifications'
@@ -1867,6 +2037,7 @@ export interface ActivityWidget {
           | 'users'
           | 'media'
           | 'language-lexicon'
+          | 'mon-models'
           | 'sessions'
           | 'accounts'
           | 'verifications'

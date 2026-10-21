@@ -1,9 +1,11 @@
+export { Viro3DObject } from '@reactvision/react-viro/dist/components/Viro3DObject.web';
 export { Viro3DSceneNavigator } from '@reactvision/react-viro/dist/components/Viro3DSceneNavigator.web';
 export { ViroAmbientLight } from '@reactvision/react-viro/dist/components/ViroAmbientLight.web';
 export { ViroBox } from '@reactvision/react-viro/dist/components/ViroBox.web';
 export { ViroDirectionalLight } from '@reactvision/react-viro/dist/components/ViroDirectionalLight.web';
 export { ViroGameLoop } from '@reactvision/react-viro/dist/components/ViroGameLoop.web';
 export { ViroNode } from '@reactvision/react-viro/dist/components/ViroNode.web';
+export { ViroOrbitCamera } from '@reactvision/react-viro/dist/components/ViroOrbitCamera.web';
 export { ViroPolyline } from '@reactvision/react-viro/dist/components/ViroPolyline.web';
 export { ViroQuad } from '@reactvision/react-viro/dist/components/ViroQuad.web';
 export { ViroScene } from '@reactvision/react-viro/dist/components/ViroScene.web';

@@ -7,14 +7,15 @@ import {
   payloadAdapter,
 } from '@delmaredigital/payload-better-auth';
 import { betterAuth } from 'better-auth';
-import { buildConfig } from 'payload';
+import { mcpPlugin } from '@payloadcms/plugin-mcp';
+import { APIError, buildConfig } from 'payload';
 import sharp from 'sharp';
 import { deleteDueCallersTask } from './auth/deletion';
 import { AUTH_BASE_PATH, PAYLOAD_API_ROUTE, PAYLOAD_ORIGINS, betterAuthOptions, sendMail } from './auth/options';
 import { accountMerge } from './auth/plugins/account-merge';
 import { adminComponents } from './admin/components';
 import { consoleEndpoints } from './admin/console/endpoints';
-import { STAFF_ROLES } from './collections/access/roles';
+import { hasStaffRole, STAFF_ROLES } from './collections/access/roles';
 import { Users } from './collections/Users';
 import { Media } from './collections/Media';
 import { AuditEvents } from './collections/AuditEvents';
@@ -24,6 +25,7 @@ import { GuardianConsents } from './collections/GuardianConsents';
 import { IdempotencyRecords } from './collections/IdempotencyRecords';
 import { IntegrityRuns } from './collections/IntegrityRuns';
 import { MonInstances } from './collections/MonInstances';
+import { MonModels } from './collections/MonModels';
 import { LanguageLexicon } from './collections/LanguageLexicon';
 import { Waitlist } from './collections/Waitlist';
 
@@ -53,8 +55,31 @@ export default buildConfig({
     api: PAYLOAD_API_ROUTE,
   },
   endpoints: consoleEndpoints,
-  collections: [Users, Media, GuardianConsents, Eggs, MonInstances, CareStates, AuditEvents, IntegrityRuns, IdempotencyRecords, Waitlist, LanguageLexicon],
+  collections: [Users, Media, GuardianConsents, Eggs, MonInstances, CareStates, AuditEvents, IntegrityRuns, IdempotencyRecords, Waitlist, LanguageLexicon, MonModels],
   plugins: [
+    // POST /payload-api/mcp, staff only. Collection access still decides what
+    // each role may do (ops and content edit). Files are uploaded in the
+    // console, so MCP gets no create or delete.
+    mcpPlugin({
+      // Replaces the default resolver, which admits any signed-in user and
+      // honours ?overrideAccess=true in development.
+      overrideGetAuthorizedMCP: async ({ pluginConfig, req }) => {
+        const headers = new Headers(req.headers);
+        headers.set('DisableAutologin', 'true');
+        req.user = (await req.payload.auth({ headers, req })).user;
+        if (!hasStaffRole(req, STAFF_ROLES)) throw new APIError('The MCP endpoint is for NYC-MON staff.', 403);
+        // The plugin registers its built-in tools on every collection; this
+        // endpoint exists for Mon models only.
+        const items = pluginConfig.items.filter((item) => item.type !== 'collectionTool' || item.collectionSlug === 'mon-models');
+        return { items, overrideAccess: false };
+      },
+      collections: {
+        'mon-models': {
+          description: 'One 3D model (GLB) per Mon form, keyed by speciesId. Only approved models reach the game.',
+          tools: { create: false, delete: false },
+        },
+      },
+    }),
     // Generates Better Auth's session, account, verification and passkey
     // collections; `users` is written by hand in collections/Users.ts.
     betterAuthCollections({

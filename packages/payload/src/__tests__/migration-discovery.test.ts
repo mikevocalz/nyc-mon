@@ -33,6 +33,7 @@ describe('native Node Payload migration discovery', () => {
         { name: '20261004_213700', up: 'function', down: 'function' },
         { name: '20261007_202116_waitlist', up: 'function', down: 'function' },
         { name: '20261008_181202_alexa_oauth', up: 'function', down: 'function' },
+        { name: '20261021_195853_mon_models', up: 'function', down: 'function' },
       ]);
     }, 35_000);
   }
