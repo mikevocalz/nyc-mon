@@ -98,3 +98,16 @@ What blocks a real model turn:
 | Live smoke workflow | DEFER | Also needs `LIVE_MCP_URL`, `AUTH_ISSUER`, `LIVE_MON_ID` and the `LIVE_ACCESS_TOKEN` secret, which exist only once the MCP server, admin-vite and the simulator are on HTTPS. |
 | SMS codes through SNS | STRIKE for the hackathon | No registered toll-free or 10DLC origination number exists, and registration takes longer than the deadline. With `AUTH_SMS_TRANSPORT` unset, codes go by email. |
 | Login with Amazon | Out of scope for AWS | It is configured in the Amazon Developer console, not in this account. |
+
+## First real Bedrock turns, 2026-10-21
+
+The Anthropic use-case form is on file, so `GetFoundationModelAvailability` reports `anthropic.claude-sonnet-4-6` as `AVAILABLE` / `AUTHORIZED`. The simulator's `bedrockBackend` went through bedrock-runtime with `us.anthropic.claude-sonnet-4-6`, `us-east-1`, effort `low` and a 256-token cap, at commit `aea433a`. Credentials came from the creator's laptop session, not the CI role.
+
+| Run | System prompt | Latency | Input | Cache write | Cache read | Output |
+|---|---|---|---|---|---|---|
+| 1 | `skills/nyc-mon-companion/SKILL.md` | 2087 ms | 11 | 2805 | 0 | 12 |
+| 2 | same, a few seconds later | 2177 ms | 11 | 0 | 2805 | 12 |
+
+The Agent Skill is cached on Bedrock: the second turn read all 2805 skill tokens from the cache. No tools were sent, so this is not a full agent-loop turn. Cost per demo session is still unmeasured.
+
+Still open: Opus 5.5 on bedrock-mantle (account restriction, needs AWS Support); `SIM_BEDROCK_MODEL_ID` in the `alexa-live` environment still names `anthropic.claude-opus-5-5`, so the live smoke job would use mantle until it is changed to `us.anthropic.claude-sonnet-4-6`. The CI role has `bedrock:InvokeModel*` on the 4.6 profiles (inline policy `bedrock-runtime-claude-46`) but has not made a call yet.
