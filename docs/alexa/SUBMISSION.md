@@ -49,7 +49,7 @@ NYC-MON already runs on the Caller's phone. On Alexa+ the same Mon carries over:
 - Claude Sonnet 4.6 on Amazon Bedrock (bedrock-runtime, US cross-region inference profile) through the Anthropic Bedrock SDK, with the Agent Skill as a cached prompt prefix. One demo session costs about $0.06. Details in `docs/aws-builder.md`.
 - Better Auth with `@better-auth/oauth-provider`, on Payload CMS and Neon Postgres.
 - The NYC-MON kit (Storybook-documented components) for the views and the linking pages.
-- Tests: 113 MCP server tests and 84 simulator tests pass at `58956b6`, along with the nine offline stages of `alexa-readiness.yml`. A red-team suite covers token forgery (alg=none, HS256 keyed with the public key), audience tricks, oversized bodies, JSON-RPC batches, look-alike origins and sandbox message spoofing.
+- Tests: 113 MCP server tests and 88 simulator tests pass at `f516bda`. The nine offline stages of `alexa-readiness.yml` passed in CI on `main` at `58956b6` (run 39635606354). A red-team suite covers token forgery (alg=none, HS256 keyed with the public key), audience tricks, oversized bodies, JSON-RPC batches, look-alike origins and sandbox message spoofing.
 
 ## Before and after the submission period
 
