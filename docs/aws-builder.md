@@ -110,4 +110,4 @@ The Anthropic use-case form is on file, so `GetFoundationModelAvailability` repo
 
 The Agent Skill is cached on Bedrock: the second turn read all 2805 skill tokens from the cache. No tools were sent, so this is not a full agent-loop turn. Cost per demo session is still unmeasured.
 
-Still open: Opus 5.5 on bedrock-mantle (account restriction, needs AWS Support); `SIM_BEDROCK_MODEL_ID` in the `alexa-live` environment still names `anthropic.claude-opus-5-5`, so the live smoke job would use mantle until it is changed to `us.anthropic.claude-sonnet-4-6`. The CI role has `bedrock:InvokeModel*` on the 4.6 profiles (inline policy `bedrock-runtime-claude-46`) but has not made a call yet.
+Still open: Opus 5.5 on bedrock-mantle (account restriction, needs AWS Support); `SIM_BEDROCK_MODEL_ID` in the `alexa-live` environment is `us.anthropic.claude-sonnet-4-6` since 2026-10-21. The CI role has `bedrock:InvokeModel*` on the 4.6 profiles (inline policy `bedrock-runtime-claude-46`) but has not made a call yet.
