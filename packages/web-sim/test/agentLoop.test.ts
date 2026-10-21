@@ -214,6 +214,17 @@ describe('toolResultContent', () => {
   it('uses structuredContent when no text mirrors it', () => {
     expect(toolResultContent({ content: [], structuredContent: { a: 1 } })).toEqual([{ type: 'text', text: '{"a":1}' }]);
   });
+  it('adds structuredContent to an error even when text is present', () => {
+    const out = toolResultContent({
+      content: [{ type: 'text', text: 'Only the Mon’s Caller can do that.' }],
+      structuredContent: { reason: 'not-permitted' },
+      isError: true,
+    });
+    expect(out).toEqual([
+      { type: 'text', text: 'Only the Mon’s Caller can do that.' },
+      { type: 'text', text: '{"reason":"not-permitted"}' },
+    ]);
+  });
   it('keeps supported images and drops unsupported ones', () => {
     const out = toolResultContent({
       content: [

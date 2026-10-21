@@ -91,7 +91,8 @@ export function listen(handlers: {
 export function speak(text: string): void {
   if (!canSpeak() || !text.trim()) return;
   globalThis.speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(text);
+  // The skill writes stage directions as *short huff*; some voices read the asterisks out.
+  const u = new SpeechSynthesisUtterance(text.replace(/\*/g, ''));
   u.lang = 'en-US';
   u.rate = 1.02;
   globalThis.speechSynthesis.speak(u);

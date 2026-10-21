@@ -22,7 +22,7 @@ NYC-MON is a creature game set in New York. Each player, the Caller, raises a Mo
 
 Say "how's my Mon doing?" and [CREATOR: Mon demo name] answers with a chirp and one thing it needs. A card shows its picture, its Bloodline and three care rings: Energy, Fullness, Social. Ask to share a meal, or tap the button on the card, and the same MCP tool runs either way. The rings move. Put it to bed, wake it, play Peek. If the Mon is asleep or still full, it declines, and says why in plain words.
 
-Familiar people get their own rules. In the demo, James is a fictional friend with a synthetic voice who may talk and play with the Mon but may not feed it. When James asks for something only the Caller can do, the Mon turns away with a huff and says so. [Pending live verification: this beat needs the real model.]
+Familiar people get their own rules. In the demo, James is a fictional friend with a synthetic voice who may talk and play with the Mon but may not feed it. When James asks for something only the Caller can do, the Mon turns away with a huff and says so. Verified against Claude Sonnet 4.6 on Bedrock on 2026-10-21, three runs out of three.
 
 Nothing is lost while the Caller is away. There are no streaks and no guilt messages. The add-on links only 18+ accounts.
 

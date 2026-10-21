@@ -27,7 +27,7 @@ import {
 import { canListen, canSpeak, listen, speak, stopSpeaking, type Listening } from './speech.ts';
 import { useSetters } from './state.ts';
 import { currentScheme, type Scheme } from './theme.ts';
-import { createTurnToolCaller } from './turnTools.ts';
+import { createTurnToolCaller, hintedToolNames, withPresenceLine } from './turnTools.ts';
 
 export interface PublicConfig {
   readonly mcpUrl: string;
@@ -60,6 +60,9 @@ interface AppState {
   scheme: Scheme;
   readAloud: boolean;
   time: string;
+  /** Dev panel: '' is the Caller, otherwise the familiar person the simulator says is speaking. */
+  speakerId: string;
+  speakerName: string;
 }
 
 const SUGGESTIONS = ['How’s my Mon doing?', 'Are you hungry?', 'Who’s here right now?'];
@@ -114,8 +117,10 @@ export function App({ config }: { config: PublicConfig }) {
       }
     })(),
     time: clock(),
+    speakerId: '',
+    speakerName: '',
   }));
-  const { items, auth, conn, busy, live, draft, listening, heard, activeViewId, activeToolTitle, displayMode, scheme, readAloud, time } = useStore(store);
+  const { items, auth, conn, busy, live, draft, listening, heard, activeViewId, activeToolTitle, displayMode, scheme, readAloud, time, speakerId } = useStore(store);
   const {
     items: setItems,
     auth: setAuth,
@@ -131,6 +136,8 @@ export function App({ config }: { config: PublicConfig }) {
     scheme: setScheme,
     readAloud: setReadAloud,
     time: setTime,
+    speakerId: setSpeakerId,
+    speakerName: setSpeakerName,
   } = useSetters(store);
   const historyRef = useRef<Anthropic.MessageParam[]>(initial.history);
   const abortRef = useRef<AbortController | null>(null);
@@ -237,9 +244,14 @@ export function App({ config }: { config: PublicConfig }) {
           model,
           tools: conversion.tools,
           history,
-          userText: text,
+          userText: withPresenceLine(text, store.getState().speakerName),
           signal: abort.signal,
-          mcp: createTurnToolCaller({ client: s.client, signal: abort.signal }),
+          mcp: createTurnToolCaller({
+            client: s.client,
+            signal: abort.signal,
+            speakerId: store.getState().speakerId,
+            hintedTools: hintedToolNames(s.tools),
+          }),
           onEvent: (e) => {
             if (e.type === 'text') {
               setActiveToolTitle(null);
@@ -298,7 +310,7 @@ export function App({ config }: { config: PublicConfig }) {
         abortRef.current = null;
       }
     },
-    [busy, conn, model, notice, provider, push, readAloud, toolsByName, setActiveToolTitle, setActiveViewId, setAuth, setBusy, setConn, setDisplayMode, setDraft, setHeard, setLive],
+    [busy, conn, model, store, notice, provider, push, readAloud, toolsByName, setActiveToolTitle, setActiveViewId, setAuth, setBusy, setConn, setDisplayMode, setDraft, setHeard, setLive],
   );
 
   function startListening() {
@@ -585,6 +597,11 @@ export function App({ config }: { config: PublicConfig }) {
                 injectTool={toolsByName.get('inject_presence_event')}
                 conversion={conn.kind === 'connected' ? conn.conversion : null}
                 onNotice={notice}
+                speakerId={speakerId}
+                onSpeakerChange={(id, name) => {
+                  setSpeakerId(id);
+                  setSpeakerName(name);
+                }}
               />
             </View>
           ) : null}
