@@ -24,9 +24,12 @@ export const SimEnvSchema = z.object({
   SIM_DEV_MODE: z.enum(['0', '1']).default('0'),
   /** 'bedrock' calls Claude on Amazon Bedrock; 'mock' is the scripted stand-in for tests and offline runs. */
   SIM_MODEL_BACKEND: z.enum(['bedrock', 'mock']).default('bedrock'),
-  /** Bedrock model id (Claude in Amazon Bedrock, Messages API endpoint). */
-  SIM_BEDROCK_MODEL_ID: z.string().min(1).default('anthropic.claude-opus-5-5'),
-  /** AWS region of the bedrock-mantle endpoint. Falls back to AWS_REGION. */
+  /**
+   * Bedrock model id. A geo-prefixed inference profile (`us.anthropic.…`) goes
+   * to bedrock-runtime; a bare id (`anthropic.claude-opus-5-5`) goes to mantle.
+   */
+  SIM_BEDROCK_MODEL_ID: z.string().min(1).default('us.anthropic.claude-sonnet-4-6'),
+  /** AWS region of the Bedrock endpoint. Falls back to AWS_REGION. */
   SIM_BEDROCK_REGION: z.string().optional(),
   /** Thinking/effort depth. Low keeps voice replies quick. */
   SIM_MODEL_EFFORT: z.enum(['low', 'medium', 'high']).default('low'),

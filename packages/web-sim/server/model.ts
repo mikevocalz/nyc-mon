@@ -279,7 +279,7 @@ export function clientKey(remoteAddress: string | undefined, forwardedFor: strin
 export function describeModelError(err: unknown): { message: string; retry: boolean } {
   if (err instanceof Anthropic.RateLimitError) return { message: 'The model is busy. Try again in a few seconds.', retry: true };
   if (err instanceof Anthropic.AuthenticationError || err instanceof Anthropic.PermissionDeniedError) {
-    return { message: 'This server can’t reach Claude on Bedrock: its AWS credentials were refused.', retry: false };
+    return { message: 'Bedrock refused this request. Check the AWS credentials and that this account has access to the configured model.', retry: false };
   }
   if (err instanceof Anthropic.NotFoundError) return { message: 'The configured Bedrock model id wasn’t found in this region.', retry: false };
   if (err instanceof Anthropic.BadRequestError) return { message: 'The model rejected this request. Start a new conversation and try again.', retry: false };
