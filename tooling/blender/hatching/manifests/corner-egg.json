@@ -8,11 +8,11 @@
   "babyName": "Kittee Cee",
   "bloodlineId": "F02",
   "source": {
-    "mesh": "packages/assets/eggs/corner-egg/source/Bodega-Egg.glb",
+    "mesh": "packages/assets/eggs/corner-egg/source/Corner-Egg.glb",
     "meshSha256": "7a1c6306a20a95d961eaa7414ef0973db67a161052d4ee48f0b6bff089fbe3ea",
     "sourceRevision": "creator upload 2026-10-21, optimized GLB",
     "approval": "pending creator review",
-    "mapping": "Bodega-Egg.glb -> #008 Corner Egg: inferred from canon skin text and file name, not stated by the creator; confirm."
+    "canonMatch": "Bible skin (v7, STARTERS_EXTRACT:306): glossy pink egg with a soft white fur wrap. Supplied as Bodega-Egg.glb, renamed to its canon name."
   },
   "baby": {
     "model": null,

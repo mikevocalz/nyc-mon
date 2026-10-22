@@ -8,11 +8,11 @@
   "babyName": "Yotito",
   "bloodlineId": "F12",
   "source": {
-    "mesh": "packages/assets/eggs/prism-egg/source/Fuego-Egg.glb",
+    "mesh": "packages/assets/eggs/prism-egg/source/Prism-Egg.glb",
     "meshSha256": "b624de189d56444d76f66607a847e270656720773deb4fdb0d2c199814b0e0b2",
     "sourceRevision": "creator upload 2026-10-21, optimized GLB",
     "approval": "pending creator review",
-    "mapping": "Fuego-Egg.glb -> #061 Prism Egg: inferred from canon skin text and file name, not stated by the creator; confirm."
+    "canonMatch": "Bible skin (v7, STARTERS_EXTRACT:404): glossy black egg with red-orange-yellow flame motifs and a clear crystal. Supplied as Fuego-Egg.glb, renamed to its canon name."
   },
   "baby": {
     "model": null,
@@ -129,6 +129,6 @@
       -0.0996,
       0.0
     ],
-    "glbBytes": 1412472
+    "glbBytes": 1412400
   }
 }

@@ -10,10 +10,13 @@
   "source": {
     "mesh": "packages/assets/eggs/metro-egg/source/Metro-Egg.glb",
     "meshSha256": "8715d82626dd4fe5d5667b0301090ea20ad2e60032c6856cd40ee6f0127ef362",
+    "sourceRevision": "creator upload 2026-10-21, optimized GLB (40k tris, 1024 JPEG textures)",
+    "approval": "pending creator review",
     "reference": "packages/assets/eggs/metro-egg/source/reference-front.png",
     "referenceSha256": "cf8e3e79b795480f9131ef10b1905f5125109176860ed5e07c21887a85dcdcd6",
-    "sourceRevision": "creator upload 2026-10-21, optimized GLB (40k tris, 1024 JPEG textures)",
-    "approval": "pending creator review"
+    "referenceAlt": "packages/assets/eggs/metro-egg/source/reference-racing.png",
+    "referenceAltSha256": "59e007c825c00cface3fa155914f054bb74bb4aec59321be39768991e2a6db50",
+    "canonMatch": "Bible skin (v7, STARTERS_EXTRACT:194): glossy vivid red egg with white stripes. The red spotted egg with white bands (reference-front.png, reference-racing.png) is this egg."
   },
   "baby": {
     "model": null,
@@ -130,6 +133,6 @@
       -0.0996,
       0.0
     ],
-    "glbBytes": 1336140
+    "glbBytes": 1336100
   }
 }

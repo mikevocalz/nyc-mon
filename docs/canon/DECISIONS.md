@@ -404,3 +404,19 @@ The hatch keeps six presentation phases. The first two, `case-open` and `scanner
 The Glossy Red Polka-Dot Racing Egg is the LanternFye bloodline's egg, #020 Signal Egg, which hatches into #021 Fye Dot. No Bible or roster file in the repo described the Signal Egg's look before this.
 
 When a shell cracks, its inside is the egg's own colour, never white: Metro Egg red, Corner Egg pink, Signal Egg light grey, Prism Egg charcoal.
+
+## Decision 31 — which supplied egg is which
+
+- **Date:** 2026-10-21
+- **Decided by:** Mike (creator)
+- **Kind:** canon (art)
+- **Amends:** Decision 30, first paragraph
+
+The four supplied egg meshes match the eggs by their Bible skins, and the files now carry the canon names:
+
+- `Metro-Egg.glb` is #001 Metro Egg: glossy red with white stripes (v7). Both red spotted, white-banded images ("Glossy Spotted Red Egg with White Bands" and "Glossy Red Polka-Dot Racing Egg") are Metro Egg art.
+- `Corner-Egg.glb` (supplied as `Bodega-Egg.glb`) is #008 Corner Egg: glossy pink with a white fur wrap (v7).
+- `Prism-Egg.glb` (supplied as `Fuego-Egg.glb`) is #061 Prism Egg: glossy black with flames and a clear crystal (v7).
+- `Signal-Egg.glb` (supplied as `Fye-Egg.glb`, image "Glossy Spotted Alien Egg Asset") is #020 Signal Egg, the LanternFye bloodline's polka-dotted egg: tan with black and red dots, like a spotted lanternfly.
+
+Decision 30's inner-shell colours stand.
