@@ -39,7 +39,8 @@
     "./lobby": "./lobby/index.ts",
     "./adaptive-panes": "./adaptive-panes/index.tsx",
     "./arrangement": "./arrangement/index.ts",
-    "./adaptive-panes/parts": "./adaptive-panes/parts.ts"
+    "./adaptive-panes/parts": "./adaptive-panes/parts.ts",
+    "./three/hatch": "./three/hatch/index.ts"
   },
   "sideEffects": [
     "./rn-globals-shim.ts",

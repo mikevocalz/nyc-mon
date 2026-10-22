@@ -1,8 +1,10 @@
+import { HATCH_PRESENTATION_PHASES } from '../schemas/hatch.ts';
 import type { EggRecord, HatchPresentationPhase, HatchState, IncubationMinutes, MonInstance } from '../types/index.ts';
 import { assertNever } from './assert-never.ts';
 import { hash128, toHex32 } from './random.ts';
 
-const PHASES: readonly HatchPresentationPhase[] = ['case-open', 'scanner', 'crack', 'burst', 'emerge', 'attention'];
+/** Phase order comes from the schema, the single source (Decision 29). */
+const PHASES: readonly HatchPresentationPhase[] = HATCH_PRESENTATION_PHASES;
 
 /** Thrown when two different individuals claim one egg. A P0 (Law 6). */
 export class HatchIntegrityError extends Error {
@@ -103,7 +105,7 @@ export function transitionHatch(state: HatchState, event: HatchEvent, egg: EggRe
     case 'open': {
       const ticked = transitionHatch(state, { type: 'tick', now: event.now }, egg);
       return ticked.kind === 'ready'
-        ? { kind: 'presenting', eggId: ticked.eggId, mon: mintMonInstance(egg), phase: 'case-open', serverConfirmed: false }
+        ? { kind: 'presenting', eggId: ticked.eggId, mon: mintMonInstance(egg), phase: HATCH_PRESENTATION_PHASES[0], serverConfirmed: false }
         : ticked;
     }
     case 'advance': {

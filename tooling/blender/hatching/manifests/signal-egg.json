@@ -1,0 +1,82 @@
+{
+  "runtimeVersion": 1,
+  "eggId": "signal-egg",
+  "eggSpeciesId": "dex-020",
+  "eggName": "Signal Egg",
+  "dexId": 20,
+  "hatchesIntoSpeciesId": "dex-021",
+  "babyName": "Fye Dot",
+  "bloodlineId": "F04",
+  "source": {
+    "mesh": "packages/assets/eggs/signal-egg/source/Fye-Egg.glb",
+    "meshSha256": "b3d0da5a18e0eb2465d6df3da38530236dd1c0034b2c026d47835e2cfe8d0a0b",
+    "sourceRevision": "creator upload 2026-10-21, optimized GLB",
+    "approval": "blocked: mesh does not match the creator reference",
+    "mapping": "Fye-Egg.glb is the beige Spotted Alien egg, which does not match the polka-dot reference. Signal Egg needs a polka-dot mesh from the creator; the current build is a pipeline placeholder.",
+    "reference": "packages/assets/eggs/signal-egg/source/reference-polka-dot.png",
+    "referenceSha256": "59e007c825c00cface3fa155914f054bb74bb4aec59321be39768991e2a6db50",
+    "referenceRuling": "Creator, 2026-10-21: the Glossy Red Polka-Dot Racing Egg is the LanternFye bloodline egg (#020 Signal Egg). Not written in the v11 Lore Bible, v12 Gameplay Bible or roster v11.1 on disk; recorded as Decision 30.",
+    "meshMatchesReference": false
+  },
+  "baby": {
+    "model": null,
+    "proxy": true,
+    "note": "No Fye Dot model or rig exists. The build uses a labeled proxy for pipeline tests only."
+  },
+  "fractureSeed": 1020,
+  "fracture": {
+    "capShards": 5,
+    "waist": 0.5,
+    "waistWobble": 0.07,
+    "edgeNoise": 0.22,
+    "shellThickness": 0.0016,
+    "innerColorSource": "creator 2026-10-21: metro red, corner pink, signal light grey, prism charcoal",
+    "innerColorSrgb": "#9C9EA3"
+  },
+  "gooProfile": {
+    "color": [
+      0.96,
+      0.9,
+      0.62,
+      0.78
+    ],
+    "emissiveFleck": [
+      0.55,
+      0.06,
+      0.04
+    ],
+    "drips": 3,
+    "dripRadius": 0.0028,
+    "puddleRadius": 0.05
+  },
+  "timing": {
+    "fps": 30,
+    "phases": {
+      "stir": [
+        0.0,
+        1.0
+      ],
+      "pressure": [
+        1.0,
+        1.8
+      ],
+      "crack": [
+        1.8,
+        4.2
+      ],
+      "burst": [
+        4.2,
+        4.7
+      ],
+      "emerge": [
+        4.7,
+        6.5
+      ]
+    },
+    "crackBeats": [
+      0.25,
+      0.55,
+      0.85
+    ]
+  }
+}

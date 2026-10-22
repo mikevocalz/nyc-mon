@@ -3,10 +3,10 @@
 import { useEffect, useRef } from 'react';
 import { Linking } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useAnimatedReaction, useDerivedValue, useSharedValue, withTiming } from 'react-native-reanimated';
+import { useAnimatedReaction, useSharedValue, withTiming } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 import {
-  CaptureCase, HLYNK_COPY, IncubationRing, StatusRow, TrackpadActions, inhaleStarted, padGlowAt,
+  HLYNK_COPY, IncubationRing, StatusRow, TrackpadActions, inhaleStarted,
   useInstanceStore, useLedBreathPhase, useReducedMotion, useStore, type HLynkStatus, type StatusRowItem,
 } from '@acme/ui';
 import { haptics } from '@acme/ui/haptics';
@@ -20,12 +20,15 @@ import { schemeForTime } from '../onboarding/time-scheme';
 import { useHomeStage } from '../companion/home-stage.store';
 import { useMinuteClock } from '../companion/minute-clock';
 import { eggIdentity } from '../companion/mon-identity';
+import { EggStill } from '../egg/EggStill';
 import { hatchCopy } from './copy';
 import { detailLine, incubationProgress, incubationView, minutesLeft, timeLine } from './incubation-model';
 
 /** One warm announcement per this window at most (M11 copy). */
 const WARM_ANNOUNCE_MS = 10_000;
-/** The "resting in its case" caption shows only when the egg was just created (first arrival from M10). */
+/** Egg size, matching M12's `HatchEgg` so the egg does not jump between M11 and M12. */
+const EGG_PT = 120;
+/** The "resting" caption shows only when the egg was just created (first arrival from M10). */
 const FIRST_ARRIVAL_MS = 5 * 60_000;
 const captionSeen = new Set<string>();
 
@@ -41,10 +44,11 @@ interface LocalState {
 }
 
 /**
- * M11 Incubating, rendered at `/(home)` while the egg is in its case. Writes
- * nothing: readiness is the hatch state ticked to the minute clock, not
- * persisted (Law 6); the only commit is M12's `open`. "Warm the case" is
- * haptic and visual only, with no sim effect (a reviewer should reject any
+ * M11 Incubating, rendered at `/(home)` while the egg incubates. The egg sits
+ * in the scene on its own, with no case (Decision 29). Writes nothing:
+ * readiness is the hatch state ticked to the minute clock, not persisted
+ * (Law 6); the only commit is M12's `open`. "Keep it warm" is haptic and
+ * announced only, with no sim effect (a reviewer should reject any
  * `applyCare` or bond change wired to it).
  */
 export function IncubatingScreen({ pending }: { pending: PendingEgg }) {
@@ -115,13 +119,12 @@ export function IncubatingScreen({ pending }: { pending: PendingEgg }) {
     if (warmTimer.current !== null) clearTimeout(warmTimer.current);
   }, []);
 
-  // Pad glow follows the shared breath clock while held; the warm haptic lands on each inhale.
+  // While held, the warm haptic lands on each inhale of the shared breath clock.
   const breath = useLedBreathPhase(s.holding && !reducedMotion);
   const holding = useSharedValue(0);
   useEffect(() => {
     holding.set(s.holding ? 1 : withTiming(0, { duration: reducedMotion ? 0 : 200 }));
   }, [s.holding, reducedMotion, holding]);
-  const padGlow = useDerivedValue(() => holding.get() * padGlowAt(breath.get(), reducedMotion));
   useAnimatedReaction(
     () => breath.get(),
     (phase, prev) => {
@@ -176,7 +179,7 @@ export function IncubatingScreen({ pending }: { pending: PendingEgg }) {
 
   const scheme = schemeForTime(nowMs);
   const detail = detailLine(view, id.eggName, egg.incubationEndsAt, nowMs);
-  const caseLabel = hatchCopy(ready ? 'm11.case.a11y.label.ready' : 'm11.case.a11y.label', { eggName: id.eggName });
+  const eggLabel = hatchCopy(ready ? 'm11.egg.a11y.label.ready' : 'm11.egg.a11y.label', { eggName: id.eggName });
 
   useHomeStage({
     chrome: {
@@ -210,15 +213,16 @@ export function IncubatingScreen({ pending }: { pending: PendingEgg }) {
             <StatusRow items={notifyRows} />
           </View>
         ) : <View />}
-        <CaptureCase
-          testID="m11-case"
-          lid="closed"
-          padGlow={padGlow}
-          seam={ready ? 'lit' : 'off'}
-          scheme={scheme}
-          reducedMotion={reducedMotion}
-          accessibilityLabel={caseLabel}
-        />
+        <View
+          testID="m11-egg"
+          accessible
+          accessibilityRole="image"
+          accessibilityLabel={eggLabel}
+          aria-label={eggLabel}
+          style={{ width: EGG_PT, height: EGG_PT }}
+        >
+          {id.eggDexId === null ? null : <EggStill dexId={id.eggDexId} decorative />}
+        </View>
         <View className="w-full items-center gap-2 bg-scrim-scene px-4 py-3" style={{ minHeight: 96 }}>
           <View className="flex-row items-center gap-3">
             {view === 'counting' ? (

@@ -42,3 +42,5 @@ scratchpad/
 
 # Valdrada tile cache written by tooling/city/valdrada/fetch.mjs (bytes are ODbL 1.0 — not committed).
 tooling/city/.cache/
+__pycache__/
+*.blend1

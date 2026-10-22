@@ -28,6 +28,8 @@ export type IncubationMinutes = z.infer<typeof S.IncubationMinutesSchema>;
 export type EggRecord = z.infer<typeof S.EggRecordSchema>;
 export type HatchPresentationPhase = z.infer<typeof S.HatchPresentationPhaseSchema>;
 export type HatchState = z.infer<typeof S.HatchStateSchema>;
+/** A hatch state as saves v1 and v2 stored it (legacy phase labels). */
+export type HatchStateV2 = z.infer<typeof S.HatchStateV2Schema>;
 export type EvolutionEvent = z.infer<typeof S.EvolutionEventSchema>;
 export type Affinity = z.infer<typeof S.AffinitySchema>;
 export type CombatClass = z.infer<typeof S.CombatClassSchema>;
@@ -48,6 +50,7 @@ export type WriteQueue = z.infer<typeof S.WriteQueueSchema>;
 export type QueuedEggCreate = z.infer<typeof S.QueuedEggCreateSchema>;
 export type SaveV1 = z.infer<typeof S.SaveV1Schema>;
 export type SaveV2 = z.infer<typeof S.SaveV2Schema>;
+export type SaveV3 = z.infer<typeof S.SaveV3Schema>;
 export type SaveCurrent = z.infer<typeof S.SaveCurrentSchema>;
 export type SceneMode = z.infer<typeof S.SceneModeSchema>;
 export type Phase1SceneMode = z.infer<typeof S.Phase1SceneModeSchema>;

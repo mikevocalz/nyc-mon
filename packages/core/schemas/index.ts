@@ -12,7 +12,13 @@ export {
 } from './care.ts';
 export { EggRecordSchema, INCUBATION_MINUTES, IncubationMinutesSchema } from './egg.ts';
 export { EvolutionEventSchema } from './evolution.ts';
-export { HATCH_PRESENTATION_PHASES, HatchPresentationPhaseSchema, HatchStateSchema } from './hatch.ts';
+export {
+  HATCH_PRESENTATION_PHASES,
+  HATCH_PRESENTATION_PHASES_V2,
+  HatchPresentationPhaseSchema,
+  HatchStateSchema,
+  HatchStateV2Schema,
+} from './hatch.ts';
 export { JOURNAL_ENTRY_KINDS, JournalEntryKindSchema, JournalEntrySchema } from './journal.ts';
 export * from './leaderboard.ts';
 export { LIFECYCLE_STAGES, LifecycleStageSchema } from './lifecycle.ts';
@@ -27,6 +33,7 @@ export {
   SaveEnvelopeSchema,
   SaveV1Schema,
   SaveV2Schema,
+  SaveV3Schema,
   WriteQueueSchema,
   WriteQueueV1Schema,
 } from './save.ts';

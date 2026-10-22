@@ -8,7 +8,8 @@
     ".": "./index.ts",
     "./photos": "./photos/index.ts",
     "./creatures": "./creatures/index.ts",
-    "./skies": "./skies/index.ts"
+    "./skies": "./skies/index.ts",
+    "./eggs": "./eggs/index.ts"
   },
   "scripts": {
     "lint": "eslint",
