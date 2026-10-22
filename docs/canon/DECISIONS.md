@@ -410,13 +410,12 @@ When a shell cracks, its inside is the egg's own colour, never white: Metro Egg 
 - **Date:** 2026-10-21
 - **Decided by:** Mike (creator)
 - **Kind:** canon (art)
-- **Amends:** Decision 30, first paragraph
 
-The four supplied egg meshes match the eggs by their Bible skins, and the files now carry the canon names:
+The supplied egg files carry their canon names and match the eggs by their Bible skins:
 
-- `Metro-Egg.glb` is #001 Metro Egg: glossy red with white stripes (v7). Both red spotted, white-banded images ("Glossy Spotted Red Egg with White Bands" and "Glossy Red Polka-Dot Racing Egg") are Metro Egg art.
+- `Metro-Egg.glb` is #001 Metro Egg: glossy red with white stripes (v7). Its reference is the "Glossy Spotted Red Egg with White Bands" image.
 - `Corner-Egg.glb` (supplied as `Bodega-Egg.glb`) is #008 Corner Egg: glossy pink with a white fur wrap (v7).
 - `Prism-Egg.glb` (supplied as `Fuego-Egg.glb`) is #061 Prism Egg: glossy black with flames and a clear crystal (v7).
-- `Signal-Egg.glb` (supplied as `Fye-Egg.glb`, image "Glossy Spotted Alien Egg Asset") is #020 Signal Egg, the LanternFye bloodline's polka-dotted egg: tan with black and red dots, like a spotted lanternfly.
+- The "Glossy Red Polka-Dot Racing Egg" image is #020 Signal Egg, the LanternFye bloodline's egg (as Decision 30 says). No 3D mesh has been made from it yet.
 
-Decision 30's inner-shell colours stand.
+`Fye-Egg.glb` (the tan "Glossy Spotted Alien Egg") is not assigned to any egg.

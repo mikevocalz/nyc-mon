@@ -9,7 +9,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../../.."
 G="npx -y @gltf-transform/cli@4.5.1"
 eggs=("$@")
-[ ${#eggs[@]} -eq 0 ] && eggs=(metro-egg corner-egg prism-egg signal-egg)
+[ ${#eggs[@]} -eq 0 ] && eggs=(metro-egg corner-egg prism-egg)
 for egg in "${eggs[@]}"; do
   f="packages/assets/eggs/$egg/$egg-hatch.glb"
   $G dedup "$f" "$f.1.glb" >/dev/null

@@ -82,7 +82,7 @@ def check(egg, playback_dir):
 def main(argv):
     pb = argv[argv.index("--playback") + 1] if "--playback" in argv else "playback-out"
     root = os.path.join(REPO, "packages/assets/eggs")
-    eggs = [a for a in argv if not a.startswith("--") and a != pb] or sorted(e for e in os.listdir(root) if os.path.exists(os.path.join(root, e, "hatch.manifest.json")))
+    eggs = [a for a in argv if not a.startswith("--") and a != pb] or sorted(e for e in os.listdir(root) if os.path.exists(os.path.join(root, e, "hatch.manifest.json")) and json.load(open(os.path.join(root, e, "hatch.manifest.json")))["source"].get("mesh"))
     failed = 0
     for egg in eggs:
         results, m = check(egg, pb)

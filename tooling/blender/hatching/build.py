@@ -43,6 +43,8 @@ def _lip(cup, azimuth_deg):
 def run(manifest_path, export=True):
     m = common.load_manifest(manifest_path)
     egg_id = m["eggId"]
+    if not m["source"].get("mesh"):
+        raise RuntimeError(f"{egg_id}: no source mesh yet ({m['source'].get('approval')}); nothing to build")
     out_dir = common.repo_path(f"packages/assets/eggs/{egg_id}")
     scene = common.fresh_scene(f"Hatch_{egg_id}")
     scene.render.fps = m["timing"]["fps"]

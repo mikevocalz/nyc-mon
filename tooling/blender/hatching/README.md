@@ -62,6 +62,8 @@ Each build writes `packages/assets/eggs/<egg>/`:
 
 ## Known limits
 
+- Signal Egg (#020) has no mesh. Its reference is the red polka-dot egg
+  (Decision 31); `build.py` refuses to build an egg whose manifest has no mesh.
 - Every Baby is a proxy. The real Squeaklet, Kittee Cee, Yotito and Fye Dot
   models and rigs don't exist, so `baby.proxy` is `true` in every manifest.
 - Corner Egg keeps its full 72k triangles: its fur band is real geometry, and

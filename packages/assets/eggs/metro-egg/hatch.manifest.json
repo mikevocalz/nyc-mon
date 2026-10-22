@@ -14,9 +14,7 @@
     "approval": "pending creator review",
     "reference": "packages/assets/eggs/metro-egg/source/reference-front.png",
     "referenceSha256": "cf8e3e79b795480f9131ef10b1905f5125109176860ed5e07c21887a85dcdcd6",
-    "referenceAlt": "packages/assets/eggs/metro-egg/source/reference-racing.png",
-    "referenceAltSha256": "59e007c825c00cface3fa155914f054bb74bb4aec59321be39768991e2a6db50",
-    "canonMatch": "Bible skin (v7, STARTERS_EXTRACT:194): glossy vivid red egg with white stripes. The red spotted egg with white bands (reference-front.png, reference-racing.png) is this egg."
+    "canonMatch": "Bible skin (v7, STARTERS_EXTRACT:194): glossy vivid red egg with white stripes. Reference: the Glossy Spotted Red Egg with White Bands."
   },
   "baby": {
     "model": null,

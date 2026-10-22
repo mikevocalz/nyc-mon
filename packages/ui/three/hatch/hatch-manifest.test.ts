@@ -7,7 +7,12 @@ import {
 
 const EGGS_DIR = new URL('../../../assets/eggs/', import.meta.url);
 const read = (eggId: string): unknown => JSON.parse(readFileSync(new URL(`${eggId}/hatch.manifest.json`, EGGS_DIR), 'utf8'));
-const eggIds = readdirSync(EGGS_DIR, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name);
+// An egg folder ships once its build has written a `runtime` block. A folder
+// can hold reference art and a blocked manifest first (Signal Egg, no mesh yet).
+const eggIds = readdirSync(EGGS_DIR, { withFileTypes: true })
+  .filter((e) => e.isDirectory())
+  .map((e) => e.name)
+  .filter((id) => (read(id) as { runtime?: unknown }).runtime !== undefined);
 const metro = parseEggHatchManifest(read('metro-egg'));
 const CLIPS = [
   { name: 'egg_idle', duration: 2 },
