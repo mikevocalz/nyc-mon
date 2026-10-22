@@ -81,6 +81,9 @@ def frames(scene, out_dir, prefix, frame_list, target=(0, -0.02, 0.06), directio
 
 def _render(scene):
     win = bpy.context.window
+    if win is None:  # headless: render the scene directly
+        bpy.ops.render.render(write_still=True, scene=scene.name)
+        return
     prev = win.scene
     win.scene = scene
     try:

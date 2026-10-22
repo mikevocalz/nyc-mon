@@ -25,6 +25,8 @@ export interface HatchEgg3DProps {
   progress?: number | null;
   /** Real-time length of `phase` in ms; unset uses the length the clip authors. */
   phaseMs?: number;
+  /** Date.now() when the screen entered `phase`. If the egg finishes loading late, it starts the phase that far in, so it stays in step with the screen. */
+  phaseStartedAt?: number;
   /** The attention clip for `phase === 'attention'`: the first-look outcome, or `lean-in` once a hesitation is resolved. */
   firstLook: EggAttention;
   /** Each phase holds its end pose: no wobble, no playback. */
@@ -67,6 +69,7 @@ export function HatchEgg3D({
   phase,
   progress = null,
   phaseMs,
+  phaseStartedAt,
   firstLook,
   reducedMotion,
   showProxyBaby = false,
@@ -110,13 +113,14 @@ export function HatchEgg3D({
       phase,
       progress,
       phaseSeconds: phaseMs === undefined ? null : phaseMs / 1000,
+      phaseStartedAt: phaseStartedAt ?? null,
       attention: firstLook,
       reducedMotion,
       showProxyBaby,
       onError: stable.onError,
       onReady: stable.onReady,
     }),
-    [eggId, source, phase, progress, phaseMs, firstLook, reducedMotion, showProxyBaby, stable],
+    [eggId, source, phase, progress, phaseMs, phaseStartedAt, firstLook, reducedMotion, showProxyBaby, stable],
   );
 
   if (failedEggId === eggId) return <>{fallback}</>;

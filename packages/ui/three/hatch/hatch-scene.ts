@@ -14,6 +14,8 @@ export interface EggHatchSceneParams {
   readonly progress: number | null;
   /** Real-time phase length in seconds; null uses the authored length. */
   readonly phaseSeconds: number | null;
+  /** Date.now() when the screen entered `phase`; a late load starts that far in. */
+  readonly phaseStartedAt: number | null;
   readonly attention: EggAttention;
   readonly reducedMotion: boolean;
   readonly showProxyBaby: boolean;
@@ -138,7 +140,10 @@ export function createEggHatchScene({ renderer, invalidate }: ThreeContext, init
     if (reduced) current.holdPhaseEnd(params.phase, params.attention);
     else if (params.phase === null) current.idle();
     else if (params.progress !== null) current.seek(params.phase, params.progress, params.attention);
-    else current.playPhase(params.phase, params.phaseSeconds ?? undefined, params.attention);
+    else {
+      current.playPhase(params.phase, params.phaseSeconds ?? undefined, params.attention);
+      if (params.phaseStartedAt !== null) current.update(Math.max(0, (Date.now() - params.phaseStartedAt) / 1000));
+    }
     return true;
   };
 

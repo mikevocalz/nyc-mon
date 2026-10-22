@@ -248,6 +248,13 @@ export function HatchScreen() {
   const eggArt = eggId0?.eggArt;
   // The Blender-built hatch GLB for this egg, when one exists; HatchEgg stays the fallback.
   const egg3d = egg === undefined ? undefined : eggHatchAssetForSpecies(egg.speciesId);
+  // The 3D shell stays through emerge and attention: its pieces part and settle,
+  // goo pools and the creature layer's Baby climbs out over it. The flat egg
+  // has no open state, so it still leaves at emerge.
+  const showEggScene = showEgg || (egg3d !== undefined && s.stage === 'show' && (phase === 'emerge' || phase === 'attention'));
+  // When the screen entered this phase; a late GLB load starts the clip this far in.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const phaseStartedAt = useMemo(() => Date.now(), [phase, s.stage]);
   const flatEgg = egg === undefined ? null : (
     <Animated.View style={eggPose}>
       <HatchEgg
@@ -272,6 +279,7 @@ export function HatchScreen() {
       source={egg3d}
       phase={phase ?? null}
       phaseMs={phase === undefined ? undefined : durations[phase]}
+      phaseStartedAt={phase === undefined ? undefined : phaseStartedAt}
       firstLook={hesitating ? 'hesitate' : 'lean-in'}
       reducedMotion={reducedMotion}
       fallback={flatEgg}
@@ -311,7 +319,7 @@ export function HatchScreen() {
     screen:
       s.stage === 'entering' || s.stage === 'leaving' ? null : (
         <View testID={`m12-phase-${s.stage === 'show' ? (phase ?? 'hatched') : s.stage}`} className="flex-1">
-          {showEgg ? (
+          {showEggScene ? (
             <View className="flex-1 items-center justify-center">
               <View
                 testID="m12-egg-scene"

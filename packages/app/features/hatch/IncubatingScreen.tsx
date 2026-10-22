@@ -3,11 +3,12 @@
 import { useEffect, useRef } from 'react';
 import { Linking } from 'react-native';
 import { useRouter } from 'expo-router';
+import { eggHatchAssetForSpecies } from '@acme/assets/eggs';
 import { useAnimatedReaction, useSharedValue, withTiming } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 import {
   HLYNK_COPY, IncubationRing, StatusRow, TrackpadActions, inhaleStarted,
-  useInstanceStore, useLedBreathPhase, useReducedMotion, useStore, type HLynkStatus, type StatusRowItem,
+  preloadEggHatch, useInstanceStore, useLedBreathPhase, useReducedMotion, useStore, type HLynkStatus, type StatusRowItem,
 } from '@acme/ui';
 import { haptics } from '@acme/ui/haptics';
 import { Text, View } from '@acme/ui/tw';
@@ -57,6 +58,11 @@ export function IncubatingScreen({ pending }: { pending: PendingEgg }) {
   const nowMs = useMinuteClock((s) => s.nowMs);
   const { egg, hatch } = pending;
   const id = eggIdentity(egg);
+  // Fetch and parse the hatch GLB while the egg incubates, so M12 starts on time.
+  useEffect(() => {
+    const asset = eggHatchAssetForSpecies(egg.speciesId);
+    if (asset) preloadEggHatch(asset.eggId, asset);
+  }, [egg.speciesId]);
 
   const local = useInstanceStore<LocalState>(() => {
     const entryMs = Date.now();

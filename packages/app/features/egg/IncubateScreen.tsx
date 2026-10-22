@@ -174,15 +174,18 @@ export function IncubateScreen() {
       return;
     }
     store.setState({ phase: 'starting' });
+    let created: EggRecord;
     try {
-      const created = useMonStore.getState().startIncubation({ bloodlineId: egg.bloodlineId, minutes, atMs: eventNow() });
-      // Persist before the confirmation hold; a force quit still resumes M24.
-      startPermissionReview();
-      store.setState({ phase: 'confirmed', egg: created, nowMs: eventNow() });
-      confirmed(created);
+      created = useMonStore.getState().startIncubation({ bloodlineId: egg.bloodlineId, minutes, atMs: eventNow() });
     } catch {
       store.setState({ phase: 'error' });
+      return;
     }
+    // The egg exists from here on. Nothing below may route to the error state,
+    // or a retry would start a second egg.
+    startPermissionReview();
+    store.setState({ phase: 'confirmed', egg: created, nowMs: eventNow() });
+    confirmed(created);
   };
 
   const confirmed = (created: EggRecord) => {

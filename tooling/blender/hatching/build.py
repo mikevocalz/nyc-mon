@@ -90,6 +90,7 @@ def run(manifest_path, export=True):
         _rest_pose(root, pieces, info, membrane, drips, strands, puddle, baby)
 
         bpy.data.objects.remove(egg, do_unlink=True)
+        common.tag_scene(scene)
         report = {"pieces": [i for i in info], "landing": list(landing), "landingClearance": clearance, "crackers": [c["name"] for c in p["crackers"]],
                   "frames": {k: list(v) for k, v in p["phases"].items()}, "beats": p["beats"]}
         if export:
@@ -164,7 +165,42 @@ def _rest_pose(root, pieces, info, membrane, drips, strands, puddle, baby):
         e.scale = (1, 1, 1)
 
 
+CLIPS = ("egg_idle", "hatch", "attention_lean_in", "attention_hesitate")
+
+
+def _claim_clip_names():
+    """glTF animation names come from action names. If an action we didn't make
+    holds a clip name, park it under a temporary name for the export (and give
+    ours the plain name); `_release` puts every name back."""
+    parked, ours = [], []
+    for clip in CLIPS:
+        other = bpy.data.actions.get(clip)
+        if other is not None and not other.get(common.TAG):
+            other.name = f"{clip}__parked_by_hatch_export"
+            parked.append((other, clip))
+        mine = next((a for a in bpy.data.actions if a.get(common.TAG) and (a.name == clip or a.name.startswith(clip + "."))), None)
+        if mine is not None and mine.name != clip:
+            ours.append((mine, mine.name))
+            mine.name = clip
+    return parked, ours
+
+
+def _release(parked, ours):
+    for mine, old in ours:
+        mine.name = old
+    for other, clip in parked:
+        other.name = clip
+
+
 def _export(scene, path):
+    parked, ours = _claim_clip_names()
+    try:
+        _export_now(scene, path)
+    finally:
+        _release(parked, ours)
+
+
+def _export_now(scene, path):
     win = bpy.context.window
     with bpy.context.temp_override(window=win, scene=scene):
         for ob in scene.objects:

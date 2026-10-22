@@ -1,6 +1,5 @@
 import * as THREE from 'three/webgpu';
 import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
-import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { fetchEggBytes } from './egg-bytes';
 import { eggTexturePlugin } from './egg-texture-plugin';
@@ -60,11 +59,9 @@ async function loadEgg(eggId: string, source: EggHatchSource): Promise<LoadedEgg
   }
   const bytes = await bytesFor(eggId, source);
   const loader = new GLTFLoader();
-  // The shipped GLBs require EXT_meshopt_compression. The decoder is
-  // WebAssembly; where WebAssembly is missing it reports supported: false and
-  // the parse below fails with a clear error, which the caller turns into
-  // the static egg art.
-  loader.setMeshoptDecoder(MeshoptDecoder);
+  // The GLBs use KHR_mesh_quantization only, which GLTFLoader reads with no
+  // decoder. Meshopt and Draco are off the table: both decoders need
+  // WebAssembly, which Hermes doesn't have.
   if (eggTexturePlugin) loader.register(eggTexturePlugin);
   let gltf: GLTF;
   try {

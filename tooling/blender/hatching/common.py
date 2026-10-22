@@ -32,25 +32,45 @@ def rng(manifest, salt):
     return random.Random(f"{manifest['fractureSeed']}:{salt}")
 
 
+TAG = "nycmon_hatch"
+
+
+def tag(*ids):
+    """Mark data as this pipeline's. Cleanup only ever touches tagged data."""
+    for i in ids:
+        if i is not None:
+            i[TAG] = True
+    return ids[0] if ids else None
+
+
+def tag_scene(scene):
+    """Tag every object, mesh, light, camera, material and shape-key set the build made."""
+    tag(scene)
+    for ob in scene.collection.all_objects:
+        tag(ob, ob.data)
+        if getattr(ob.data, "shape_keys", None):
+            tag(ob.data.shape_keys)
+        for slot in getattr(ob, "material_slots", []):
+            if slot.material and slot.material.name.startswith("HATCH_"):
+                tag(slot.material)
+
+
 def fresh_scene(name):
     """Start an egg's scene from nothing. Object names are global in Blender and
-    become glTF node names, so every earlier `Hatch_*` scene this pipeline made
-    is removed first (each egg's .blend is already saved by then). Scenes the
-    user made are never touched."""
-    for old in [s for s in bpy.data.scenes if s.name.startswith("Hatch_")]:
-        for ob in list(old.collection.all_objects):
-            if ob.name != "LD_Cam" or len(ob.users_scene) == 1:
-                bpy.data.objects.remove(ob, do_unlink=True)
-        for col in list(old.collection.children_recursive):
+    become glTF node names, so every earlier scene this pipeline built (tagged
+    `nycmon_hatch`) is removed first; each egg's .blend is already saved. Only
+    tagged objects and data are deleted, never anything the user made."""
+    for old in [s for s in bpy.data.scenes if s.get(TAG)]:
+        for ob in [o for o in old.collection.all_objects if o.get(TAG) and len(o.users_scene) <= 1]:
+            bpy.data.objects.remove(ob, do_unlink=True)
+        for col in [c for c in old.collection.children_recursive if not c.all_objects]:
             bpy.data.collections.remove(col)
         bpy.data.scenes.remove(old)
-    # Free this pipeline's own leftovers so rebuilds keep clean names
-    # (Shell_Cup, not Shell_Cup.027). Only unused data with our prefixes.
-    ours = ("Shell_", "Goo_", "Membrane", "PROXY_", "Egg_Source", "LD_Ground")
-    for coll in (bpy.data.meshes, bpy.data.lights, bpy.data.cameras):
-        for data in [d for d in coll if d.users == 0 and d.name.startswith(ours + ("LD_",))]:
+    for coll in (bpy.data.meshes, bpy.data.lights, bpy.data.cameras, bpy.data.materials):
+        for data in [d for d in coll if d.users == 0 and d.get(TAG)]:
             coll.remove(data)
     scene = bpy.data.scenes.new(name)
+    tag(scene)
     scene.unit_settings.system = "METRIC"
     scene.unit_settings.scale_length = 1.0
     return scene
@@ -70,8 +90,15 @@ def link(col, ob):
 
 
 def material(name, color, roughness=0.5, metallic=0.0, emission=None, emission_strength=0.0, alpha=1.0):
-    """Principled material using only inputs the glTF exporter maps (no procedural nodes)."""
-    mat = bpy.data.materials.get(name) or bpy.data.materials.new(name)
+    """Principled material using only inputs the glTF exporter maps (no procedural nodes).
+
+    Names get a `HATCH_` prefix so a rebuild reuses this pipeline's material and
+    never edits one of the user's with the same name."""
+    name = name if name.startswith("HATCH_") else f"HATCH_{name}"
+    mat = bpy.data.materials.get(name)
+    if mat is not None and not mat.get(TAG):
+        mat = None
+    mat = mat or tag(bpy.data.materials.new(name))
     nodes = mat.node_tree.nodes
     bsdf = next(n for n in nodes if n.type == "BSDF_PRINCIPLED")
     bsdf.inputs["Base Color"].default_value = (*color[:3], 1.0)
@@ -118,9 +145,9 @@ def merge_clip(owners, clip):
     """
     from bpy_extras import anim_utils
 
-    for old in [a for a in bpy.data.actions if a.name == clip or a.name.startswith(clip + ".")]:
-        bpy.data.actions.remove(old)  # a rebuild replaces the clip, never renames it clip.001
-    act = bpy.data.actions.new(clip)
+    for old in [a for a in bpy.data.actions if a.get(TAG) and (a.name == clip or a.name.startswith(clip + "."))]:
+        bpy.data.actions.remove(old)  # a rebuild replaces its own clip; a user's action keeps its name
+    act = tag(bpy.data.actions.new(clip))
     act.use_fake_user = True
     # Blender 5 keys an object and its shape keys into one action with two
     # slots, so sources are removed only after every owner is merged.
