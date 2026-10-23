@@ -36,6 +36,7 @@ export type CombatClass = z.infer<typeof S.CombatClassSchema>;
 export type CombatStatus = z.infer<typeof S.CombatStatusSchema>;
 export type BattleClipId = z.infer<typeof S.BattleClipIdSchema>;
 export type SurfaceKind = z.infer<typeof S.SurfaceKindSchema>;
+export type MonGender = z.infer<typeof S.MonGenderSchema>;
 export type VoiceStage = z.infer<typeof S.VoiceStageSchema>;
 export type VoiceLineage = z.infer<typeof S.VoiceLineageSchema>;
 export type HoodEncounter = z.infer<typeof S.HoodEncounterSchema>;

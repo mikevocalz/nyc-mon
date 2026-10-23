@@ -79,6 +79,13 @@ export {
   type ServerCareRecord,
   toCreateEggRequest,
 } from './queue.ts';
+export {
+  deriveMonGender,
+  deriveVoiceLineageId,
+  type ParsedVoiceLineage,
+  parseVoiceLineageId,
+  VOICE_SLOTS_PER_GENDER,
+} from './voice.ts';
 export { type CreateEntry, type CreateEntryInput, resolveCreateEntry } from './onboarding.ts';
 export { createRandom, hash128, mixSeed, toHex32 } from './random.ts';
 export type { ActivitySpan, CareEvent, SimState } from './state.ts';

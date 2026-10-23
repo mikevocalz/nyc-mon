@@ -44,6 +44,8 @@ export {
   CombatClassSchema,
   CombatStatusSchema,
   HoodEncounterSchema,
+  MON_GENDERS,
+  MonGenderSchema,
   PlaySessionSchema,
   SURFACE_KINDS,
   SurfaceKindSchema,

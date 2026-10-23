@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { isStoredMonName, MON_NAME_MAX_LENGTH } from '../sim/mon-name.ts';
 import { LifecycleStageSchema } from './lifecycle.ts';
+import { MonGenderSchema } from './seams.ts';
 import { EpochMsSchema, IdSchema, UnitIntervalSchema } from './primitives.ts';
 import { ActiveHoursSchema, HabitatTagSchema, OriginBlockIdSchema } from './spatial.ts';
 
@@ -27,7 +28,13 @@ export const MonInstanceSchema = z.object({
   hatchedAt: EpochMsSchema,
   bond: UnitIntervalSchema,
   stage: LifecycleStageSchema,
-  /** Reserved for VoiceStudio; one lineage per individual for life. Null in Phase 1. */
+  /** Assigned at hatch from the egg id (Bible v11 ¶54). Null for a Mon hatched before genders; a save without the key parses to null. */
+  gender: MonGenderSchema.nullable().default(null),
+  /**
+   * One voice for life (Bible v11 ¶56): set at hatch and never changed, so the
+   * voice matures with the Mon instead of switching actors at each evolution.
+   * Null for a Mon hatched before lineages were assigned.
+   */
   voiceLineageId: IdSchema.nullable(),
   /** Phase 2: the block this Mon comes from. Null in Phase 1; a save without the key parses to null. */
   originBlock: OriginBlockIdSchema.nullable().default(null),
