@@ -116,6 +116,25 @@ function mockMessage(content: Anthropic.ContentBlock[], stop: Anthropic.StopReas
  * once and then reads the result back. It exists so the MCP path, the views
  * and the transcript can be exercised without AWS.
  */
+/** A tool result's text when it reads as speech; undefined for JSON or empty. */
+function spokenText(body: string): string | undefined {
+  const t = body.trim();
+  if (t === '' || t.startsWith('{') || t.startsWith('[')) return undefined;
+  return t.slice(0, 240);
+}
+
+/** The plain-language message inside an error result, never its code or JSON. */
+function spokenError(body: string): string {
+  try {
+    const parsed: unknown = JSON.parse(body);
+    const message = (parsed as { error?: { message?: unknown } } | null)?.error?.message;
+    if (typeof message === 'string' && message.trim() !== '') return message.trim().slice(0, 240);
+  } catch {
+    /* not JSON */
+  }
+  return spokenText(body) ?? 'That didn’t go through. Try again in a minute.';
+}
+
 export function mockBackend(): ModelBackend {
   return {
     label: 'mock',
@@ -125,15 +144,14 @@ export function mockBackend(): ModelBackend {
         ? last.content.filter((b): b is Anthropic.ToolResultBlockParam => b.type === 'tool_result')
         : [];
       if (results.length > 0) {
-        const calls = messages.at(-2)?.content;
-        const called = Array.isArray(calls) ? calls.find((b): b is Anthropic.ToolUseBlockParam => b.type === 'tool_use')?.name : undefined;
         const first = results[0];
         const body = Array.isArray(first?.content)
           ? first.content.map((c) => (c.type === 'text' ? c.text : '')).join(' ')
           : String(first?.content ?? '');
-        const text = first?.is_error
-          ? `Scripted test reply. ${called ?? 'The tool'} came back with an error: ${body.slice(0, 160)}`
-          : `Scripted test reply. ${called ?? 'The tool'} answered; the card shows what it returned.`;
+        // The display is customer-facing: no tool names, codes or JSON on it
+        // (Alexa+ functional requirements §2). Tool text is written to be
+        // spoken (voice-only must stand on its own), so read that back.
+        const text = first?.is_error ? spokenError(body) : spokenText(body) ?? 'Here’s your Mon.';
         onText(text);
         return mockMessage([{ type: 'text', text, citations: null } as Anthropic.TextBlock], 'end_turn');
       }
@@ -141,7 +159,7 @@ export function mockBackend(): ModelBackend {
         MOCK_TOOL_PREFERENCE.map((n) => tools.find((t) => t.name === n)).find((t) => t && needsNoArgs(t)) ??
         tools.find(needsNoArgs);
       if (!tool) {
-        const text = 'Scripted test reply. The server offered no tool I can call without arguments.';
+        const text = 'I can’t check on your Mon right now. Try again in a minute.';
         onText(text);
         return mockMessage([{ type: 'text', text, citations: null } as Anthropic.TextBlock], 'end_turn');
       }

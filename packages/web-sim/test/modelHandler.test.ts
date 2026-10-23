@@ -122,3 +122,34 @@ describe('/api/model', () => {
     ).rejects.toBeInstanceOf(ModelAuthExpiredError);
   });
 });
+
+describe('mockBackend replies', () => {
+  const tools = [{ name: 'get_mon_status', description: 'x', input_schema: { type: 'object' as const, properties: {} } }];
+  const turn = (content: string, isError = false) =>
+    mockBackend().stream(
+      {
+        system: '',
+        tools,
+        messages: [
+          { role: 'user', content: 'hi' },
+          { role: 'assistant', content: [{ type: 'tool_use', id: 't1', name: 'get_mon_status', input: {} }] },
+          { role: 'user', content: [{ type: 'tool_result', tool_use_id: 't1', is_error: isError, content: [{ type: 'text', text: content }] }] },
+        ],
+      } as never,
+      () => {},
+      new AbortController().signal,
+    );
+  const text = async (p: ReturnType<typeof turn>) => ((await p).content[0] as Anthropic.TextBlock).text;
+
+  it('reads back the tool’s spoken text and never names the tool', async () => {
+    const t = await text(turn('Lil’ Ratti is full and slow.'));
+    expect(t).toBe('Lil’ Ratti is full and slow.');
+    expect(t).not.toMatch(/get_mon_status|Scripted/);
+  });
+
+  it('speaks only the message of an error, never its code or JSON', async () => {
+    const t = await text(turn(JSON.stringify({ error: { reason: 'unavailable', message: 'NYC-MON can’t reach your Mon right now.' } }), true));
+    expect(t).toBe('NYC-MON can’t reach your Mon right now.');
+    expect(t).not.toMatch(/[{}]|unavailable/);
+  });
+});
