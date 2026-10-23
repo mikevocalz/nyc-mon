@@ -98,10 +98,12 @@ export function MonModel3D({ url, clips = NO_CLIPS, width, height, label, onErro
         root.add(model);
         scene.add(root);
         // Fit the cylinder the turntable sweeps, so tails and arms never clip.
+        // Half the radius on top of the centre-plane fit covers the near edge
+        // of the sweep; a full radius left the body small in its box.
         const radius = Math.hypot(size.x, size.z) / 2;
         const vHalf = (camera.fov * Math.PI) / 360;
         const hHalf = Math.atan(Math.tan(vHalf) * camera.aspect);
-        const dist = Math.max(size.y / 2 / Math.tan(vHalf), radius / Math.tan(hHalf)) * 1.08 + radius;
+        const dist = Math.max(size.y / 2 / Math.tan(vHalf), radius / Math.tan(hHalf)) * 1.08 + radius * 0.5;
         camera.position.set(0, size.y * 0.08, dist);
         camera.lookAt(0, 0, 0);
         const clip = clipsRef.current.map((n) => THREE.AnimationClip.findByName(gltf.animations, n)).find(Boolean);

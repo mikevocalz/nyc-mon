@@ -96,7 +96,8 @@ function resolveZoom(host: McpUiHostContext, layout: 'card' | 'room', frameWidth
   const width = Math.min(frameWidth, typeof host.maxWidth === 'number' ? host.maxWidth : Infinity);
   const maxHeight = typeof host.maxHeight === 'number' ? host.maxHeight : window.innerHeight;
   if (host.isMobile === true || width < BASE_WIDTH) return 'fluid';
-  const byHeight = layout === 'room' && maxHeight > 0 ? maxHeight / BASE_HEIGHT : Infinity;
+  // Both layouts fit the frame's height: the display never scrolls.
+  const byHeight = maxHeight > 0 ? maxHeight / BASE_HEIGHT : Infinity;
   const fit = Math.max(1, Math.min(2.5, width / BASE_WIDTH, byHeight));
   const surface = SURFACES.find((s) => s.match.test(deviceClass));
   if (surface) return surface.zoom === 'fit' ? fit : surface.zoom;
@@ -159,20 +160,28 @@ function Root() {
   const modes = host.availableDisplayModes;
   const canExpand = Array.isArray(modes) && modes.includes('fullscreen');
   const fitted = zoom !== 'fluid';
-  const canvasHeight = (typeof host.maxHeight === 'number' ? Math.min(host.maxHeight, window.innerHeight) : window.innerHeight) / (fitted ? zoom : 1);
+  // Fullscreen: the frame is the display, so its own height. Inline: the host
+  // sizes the frame to what the view reports, so the view takes the height the
+  // host allows (maxHeight) rather than the frame's current, smaller one.
+  const allowed =
+    mode === 'fullscreen'
+      ? typeof host.maxHeight === 'number' ? Math.min(host.maxHeight, window.innerHeight) : window.innerHeight
+      : typeof host.maxHeight === 'number' ? host.maxHeight : BASE_HEIGHT;
+  const canvasHeight = allowed / (fitted ? zoom : 1);
   // Below this content width the status and rings stack under the Mon.
   const narrow = !fitted && frameWidth - 24 < NARROW_BELOW;
-  // A narrow room scrolls as one column rather than fitting a fixed height.
-  const style = fitted ? { zoom, width: BASE_WIDTH, height: layout === 'room' ? canvasHeight : undefined } : undefined;
+  // Fitted, the view is exactly the frame and never scrolls. Fluid (a narrow
+  // host), it takes its content height and reports it so the host grows the frame.
+  const style = fitted ? { zoom, width: BASE_WIDTH, height: canvasHeight } : undefined;
   return (
-    <div style={style} className={`bg-bg p-3 ${layout === 'room' ? 'relative flex flex-col' : ''}`}>
+    <div style={style} className={`relative flex flex-col bg-bg p-3 ${fitted ? 'overflow-hidden' : ''}`}>
       {__GRID_BACKDROP__ && layout === 'room' && GridBackdrop ? (
         <BackdropBoundary>
           <GridBackdrop />
         </BackdropBoundary>
       ) : null}
       {vm ? (
-        <main aria-label={spokenSummary(vm)} className={layout === 'room' ? 'relative flex min-h-0 flex-1 flex-col' : undefined}>
+        <main aria-label={spokenSummary(vm)} className="relative flex min-h-0 flex-1 flex-col">
           <MonView
             vm={vm}
             layout={layout}

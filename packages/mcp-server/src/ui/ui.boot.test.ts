@@ -108,7 +108,10 @@ const echoShow8 = (mode: 'inline' | 'fullscreen', theme: 'light' | 'dark') => ({
   hostContext: { theme, displayMode: mode, availableDisplayModes: ['inline', 'fullscreen'], deviceClass: 'echo-show-8', maxWidth: 1280, maxHeight: 800 },
 });
 
-describe('built views boot in a spec host (bundled Chromium)', () => {
+// boot() allows a view 15 s to render; the default 5 s test timeout undercut it.
+// Headless Chromium draws the 3D Mon's WebGL in software, so a click waits on
+// slow frames before the page counts as stable.
+describe('built views boot in a spec host (bundled Chromium)', { timeout: 20_000 }, () => {
   for (const [speciesId, form] of [['dex-002', 'Squeaklet'], ['dex-009', 'Kittee Cee'], ['dex-062', 'Yotito']] as const) {
     for (const theme of ['light', 'dark'] as const) {
       it(`card: ${form}, ${theme}`, async () => {

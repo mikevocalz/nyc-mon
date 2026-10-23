@@ -17,7 +17,7 @@ import { Image, type ImageProps } from '../../../../ui/Image';
 import { StatusRow } from '../../../../ui/StatusRow';
 import { Text } from '../../../../ui/Text';
 import { MonModel3D } from '../../../../ui/three/mon/MonModel3D';
-import { ScrollView, View } from '../../../../ui/tw';
+import { View } from '../../../../ui/tw';
 import type { ActionId, MonViewModel } from '../contract.ts';
 
 /**
@@ -62,7 +62,7 @@ const MON_MODELS: Readonly<Record<number, { file: string; clips: readonly string
 };
 
 /** The Mon in 3D (three.js) when its model exists; otherwise HomeLayout's still with a Coming Soon badge. */
-function Still({ vm, width }: { vm: MonViewModel; width: number }) {
+function Still({ vm, width, height = Math.round(width * 1.25) }: { vm: MonViewModel; width: number; height?: number }) {
   const dex = vm.identity.dexId;
   const model = dex === null ? undefined : MON_MODELS[dex];
   const [failed, setFailed] = useState(false);
@@ -73,7 +73,7 @@ function Still({ vm, width }: { vm: MonViewModel; width: number }) {
         url={`${typeof __MON_MODEL_ORIGIN__ === 'string' ? __MON_MODEL_ORIGIN__ : ''}/mons/${model.file}.glb`}
         clips={model.clips}
         width={width}
-        height={Math.round(width * 1.25)}
+        height={height}
         label={vm.name}
         onError={() => setFailed(true)}
       />
@@ -108,12 +108,12 @@ function Stage({ vm, stillWidth }: { vm: MonViewModel; stillWidth: number }) {
   );
 }
 
-function Care({ vm, theme }: { vm: MonViewModel; theme: 'light' | 'dark' }) {
+function Care({ vm, theme, status = true }: { vm: MonViewModel; theme: 'light' | 'dark'; status?: boolean }) {
   const care = vm.care;
   const scheme = theme === 'dark' ? 'night' : 'daylit';
   return (
     <View className="gap-4">
-      {vm.status ? <StatusRow items={[{ id: 'status', label: vm.status.text, tone: vm.status.tone }]} /> : null}
+      {status && vm.status ? <StatusRow items={[{ id: 'status', label: vm.status.text, tone: vm.status.tone }]} /> : null}
       {care ? (
         <View className="self-start">
           <CareMeterRingGroup accessibilityLabel={companionCopy('m13.rings.a11y.label')}>
@@ -138,7 +138,7 @@ function Care({ vm, theme }: { vm: MonViewModel; theme: 'light' | 'dark' }) {
 
 /**
  * M13's bar. The action the Mon is asking for is the Cta story's button
- * (`variant="cta" size="lg" fullWidth`); every other action is the outline
+ * (`variant="cta" size="sm" fullWidth`), small so the Mon keeps the height; every other action is the outline
  * button from FullWidthWraps. hlynk-care is drawn over the live scene and
  * reads black-on-navy here, where there is no scene.
  */
@@ -158,7 +158,7 @@ function Bar({ vm, layout, canExpand, narrow, onAction, onToggleRoom }: MonViewP
       {items.map(([id, label, onPress]) => (
         // Narrow: two per row, so labels never squeeze below the button's own size.
         <View key={id} style={narrow ? { flexBasis: '45%', flexGrow: 1 } : { flex: 1 }}>
-          <Button variant={id === vm.suggested ? 'cta' : 'outline'} size="lg" fullWidth title={label} onPress={onPress} />
+          <Button variant={id === vm.suggested ? 'cta' : 'outline'} size="sm" fullWidth title={label} onPress={onPress} />
         </View>
       ))}
     </View>
@@ -195,59 +195,48 @@ function Journal({ vm, nowMs }: { vm: MonViewModel; nowMs: number }) {
   );
 }
 
-/** Stage column width: wide enough for "Bodega Baddiee Cee Bloodline" on one line. */
-const STAGE_WIDTH = 320;
-
 export function MonView(props: MonViewProps) {
   const { vm, layout, theme, nowMs } = props;
+  const height = props.canvasHeight ?? 456;
   if (props.narrow) {
-    // Stacked: the Mon, then the status and rings, then the bar.
+    // Stacked at content height: the Mon, then the status and rings, then the
+    // bar. A narrow host grows the frame to fit (main.tsx), so nothing clips.
     return (
       <View className="gap-4">
         <Stage vm={vm} stillWidth={220} />
-        {layout === 'room' ? (
-          <View className="gap-4">
-            <Care vm={vm} theme={theme} />
-            <Journal vm={vm} nowMs={nowMs} />
-          </View>
-        ) : (
-          <Care vm={vm} theme={theme} />
-        )}
+        <Care vm={vm} theme={theme} />
+        {layout === 'room' ? <Journal vm={vm} nowMs={nowMs} /> : null}
         <Bar {...props} />
       </View>
     );
   }
-  if (layout === 'room') {
-    // Base px: the bar is about 64 tall with a 16 gap, the name and Bloodline
-    // about 60; the Mon's box is 4:5 and takes the rest of the height.
-    const height = props.canvasHeight ?? 456;
-    const stillWidth = Math.max(160, Math.min(STAGE_WIDTH, Math.round(((height - 64 - 16 - 60) * 4) / 5)));
-    return (
-      <View className="gap-4" style={{ height }}>
-        <View className="min-h-0 flex-1 flex-row items-end gap-6">
-          <View style={{ width: STAGE_WIDTH }}>
-            <Stage vm={vm} stillWidth={stillWidth} />
-          </View>
-          <ScrollView className="min-h-0 flex-1 self-stretch" contentContainerClassName="gap-4">
-            <Care vm={vm} theme={theme} />
-            <Journal vm={vm} nowMs={nowMs} />
-          </ScrollView>
-        </View>
-        <Bar {...props} />
-      </View>
-    );
-  }
+  // The Mon stands on the right in a square box at 90% of the frame's height
+  // (the turntable sweeps the tail out to the sides, so a narrow box would
+  // shrink it); name, rings and the bar stack on the left.
+  const stillSize = Math.max(160, Math.round(height * 0.9));
+  // The 768 canvas less its 24 px padding and the 24 px gap: four small
+  // buttons fit in one row from about 480 px ("Journal" wraps below that).
+  const twoRowBar = 720 - stillSize < 480;
   return (
-    <View className="gap-4">
-      <View className="flex-row items-center gap-6">
-        <View style={{ width: STAGE_WIDTH }}>
-          <Stage vm={vm} stillWidth={240} />
+    <View className="flex-row gap-6" style={{ height }}>
+      <View className="min-h-0 flex-1 justify-between gap-3">
+        {/* Name, Bloodline and status share one row so the rings keep their height. */}
+        <View className="gap-1">
+          <Heading level={1} size="title">{vm.name}</Heading>
+          <View className="flex-row flex-wrap items-center gap-3">
+            {vm.identity.bloodlineLabel ? <Text variant="caption" tone="muted">{vm.identity.bloodlineLabel}</Text> : null}
+            {vm.status ? <StatusRow items={[{ id: 'status', label: vm.status.text, tone: vm.status.tone }]} /> : null}
+          </View>
         </View>
-        <View className="flex-1">
-          <Care vm={vm} theme={theme} />
+        <View className="min-h-0 flex-1 justify-center gap-4 overflow-hidden">
+          <Care vm={vm} theme={theme} status={false} />
+          {layout === 'room' ? <Journal vm={vm} nowMs={nowMs} /> : null}
         </View>
+        <Bar {...props} narrow={twoRowBar} />
       </View>
-      <Bar {...props} />
+      <View className="justify-end">
+        <Still vm={vm} width={stillSize} height={stillSize} />
+      </View>
     </View>
   );
 }
