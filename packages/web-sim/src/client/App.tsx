@@ -393,6 +393,60 @@ export function App({ config }: { config: PublicConfig }) {
     lastReply,
   });
 
+  // Voice is the way in. Typing is for testers (dev mode) or a browser with no speech recognition.
+  const typing = config.devMode || !voiceIn;
+  // Without the log on screen, a notice (an error, "Stopped.") has to reach the caption or it's lost.
+  const lastItem = items.at(-1);
+  const caption = stage.kind !== 'ready' ? stage.headline : lastItem?.kind === 'notice' ? lastItem.text : lastReply;
+  const typingPanel = (
+    <SolidPanel surface="page" depth="lg">
+      <Section aria-labelledby="typing-title" className="gap-4 px-5 py-6">
+        <Heading level={2} id="typing-title" className="my-0 font-display text-xl leading-tight text-text">
+          {config.devMode ? 'Type instead' : 'Type to your Mon'}
+        </Heading>
+        {voiceIn ? null : (
+          <Paragraph className="my-0 text-sm text-text-secondary">This browser can’t hear you, so type what you’d say.</Paragraph>
+        )}
+        <Form onSubmit={() => void send(draft)}>
+          <View className="gap-3">
+            <TextField
+              surface="daylit"
+              label="Message to your Mon"
+              placeholder={listening ? 'Listening…' : 'Type to your Mon'}
+              value={listening ? heard : draft}
+              onChangeText={setDraft}
+              onSubmitEditing={() => void send(draft)}
+              disabled={!canTalk || !!listening}
+            />
+            <View className="flex-row">
+              <Button variant="outline" title="Send" disabled={!draft.trim() || !canTalk || busy} onPress={() => void send(draft)} />
+            </View>
+          </View>
+        </Form>
+        {items.length === 0 && canTalk ? (
+          <View aria-label="Try saying" role="group" className="flex-row flex-wrap gap-2">
+            {SUGGESTIONS.map((sug) => (
+              <Button key={sug} variant="outline" size="sm" title={sug} disabled={busy} onPress={() => void send(sug)} />
+            ))}
+          </View>
+        ) : null}
+        <View role="log" aria-label="Conversation" className="max-h-96 gap-3 overflow-y-auto pb-1">
+          {items.map((item) => (
+            <LogItem
+              key={item.id}
+              item={item}
+              active={item.id === activeViewId}
+              onShow={() => {
+                setActiveViewId(item.id);
+                setDisplayMode('inline');
+              }}
+            />
+          ))}
+        </View>
+      </Section>
+    </SolidPanel>
+  );
+
   function startSignIn() {
     setAuth({ kind: 'signing-in' });
     beginSignIn(config.mcpUrl, provider).catch((err: unknown) =>
@@ -410,7 +464,7 @@ export function App({ config }: { config: PublicConfig }) {
               Talk to your Mon
             </Heading>
             <Paragraph className="my-0 text-base leading-7 text-text-secondary md:text-lg md:leading-8">
-              A smart display running the NYC-MON add-on. Say or type something; your Mon answers out loud.
+              A smart display running the NYC-MON add-on. Tap Talk and ask; your Mon answers out loud.
             </Paragraph>
           </View>
           <View className="flex-row flex-wrap items-center gap-3">
@@ -438,7 +492,7 @@ export function App({ config }: { config: PublicConfig }) {
         </Header>
 
         <View className="gap-6 lg:flex-row lg:items-start">
-          <View className="min-w-0 flex-1 gap-3">
+          <View className="min-w-0 flex-1 gap-4">
             <SolidPanel surface="page" depth="lg">
               <View
                 aria-label="Smart display"
@@ -452,7 +506,8 @@ export function App({ config }: { config: PublicConfig }) {
                     {conn.kind === 'connected' ? null : <Badge label={connLabel} tone={connTone} />}
                     {signedIn ? (
                       <View role="status" aria-live="polite" aria-atomic="true">
-                        <Badge label={stage.label} tone={stage.tone} />
+                        {/* Ready needs no badge; the display shows state only while it changes. */}
+                        {stage.kind === 'ready' ? null : <Badge label={stage.label} tone={stage.tone} />}
                       </View>
                     ) : null}
                   </View>
@@ -470,58 +525,11 @@ export function App({ config }: { config: PublicConfig }) {
                     </View>
                   </View>
                 ) : (
-                  <View className="min-h-0 flex-1 gap-4 px-5 py-4 md:flex-row">
-                    <View className="min-h-0 flex-1 gap-3 md:basis-1/2">
-                      <Card variant="notch" district="midtown">
-                        <Text aria-live="polite" aria-atomic="true" className="text-xr-body text-text">
-                          {stage.headline}
-                        </Text>
-                      </Card>
-                      {items.length === 0 && canTalk ? (
-                        <View aria-label="Try saying" role="group" className="flex-row flex-wrap gap-2">
-                          {SUGGESTIONS.map((sug) => (
-                            <Button key={sug} variant="outline" size="sm" title={sug} disabled={busy} onPress={() => void send(sug)} />
-                          ))}
-                        </View>
-                      ) : null}
-                      <View role="log" aria-label="Conversation" className="min-h-0 flex-1 gap-3 overflow-y-auto pb-1">
-                        {/* The latest reply is already in the card above; list it only once. */}
-                        {items.filter((item) => !(item.kind === 'mon' && item.id === lastMon?.id && !live)).map((item) => (
-                          <LogItem
-                            key={item.id}
-                            item={item}
-                            active={item.id === activeViewId}
-                            onShow={() => {
-                              setActiveViewId(item.id);
-                              setDisplayMode('inline');
-                            }}
-                          />
-                        ))}
-                      </View>
-                      {conn.kind === 'failed' ? (
-                        <View className="gap-2">
-                          <Banner tone="danger" title="Can’t reach the NYC-MON server" description={conn.message} />
-                          <View className="flex-row">
-                            <Button variant="outline" size="sm" title="Retry" onPress={() => void connect()} />
-                          </View>
-                        </View>
-                      ) : null}
-                    </View>
-
-                    <View
-                      className={fullscreen ? 'absolute inset-0 z-10 gap-3 bg-surface-raised p-4' : 'min-h-[280px] gap-3 md:min-h-0 md:basis-1/2'}
-                    >
+                  <>
+                    {/* Alexa+ speaks the reply; the screen belongs to the add-on's view. */}
+                    <View className="min-h-0 flex-1 px-5 py-3">
                       {activeView && activeView.resourceUri && session ? (
-                        <>
-                          <View className="flex-row items-center justify-between gap-3">
-                            <Badge label={activeView.title} tone="info" />
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              title={fullscreen ? 'Exit full screen' : 'Full screen'}
-                              onPress={() => setDisplayMode(fullscreen ? 'inline' : 'fullscreen')}
-                            />
-                          </View>
+                        <View className={fullscreen ? 'absolute inset-0 z-10 bg-surface-raised p-4' : 'min-h-0 flex-1'}>
                           <AppView
                             key={activeView.id}
                             client={session.client}
@@ -536,60 +544,56 @@ export function App({ config }: { config: PublicConfig }) {
                             displayMode={displayMode}
                             scheme={scheme}
                             onDisplayModeChange={setDisplayMode}
-                            onViewMessage={(t) => setDraft(t)}
+                            onViewMessage={(t) => (typing ? setDraft(t) : void send(t))}
                           />
-                        </>
-                      ) : (
-                        <Card
-                          variant="notch"
-                          district="downtown"
-                          title="Your Mon’s card"
-                          description="Ask about care, status, or what your Mon just did. The matching live card opens here."
-                        />
-                      )}
+                        </View>
+                      ) : conn.kind === 'failed' ? (
+                        <View className="flex-1 justify-center gap-2">
+                          <Banner tone="danger" title="Can’t reach the NYC-MON server" description={conn.message} />
+                          <View className="flex-row">
+                            <Button variant="outline" size="sm" title="Retry" onPress={() => void connect()} />
+                          </View>
+                        </View>
+                      ) : canTalk && !caption ? (
+                        <View className="flex-1 items-center justify-center">
+                          <Text className="text-center text-xr-body text-text-secondary">
+                            {voiceIn ? 'Tap Talk and ask about your Mon.' : 'Type a message to ask about your Mon.'}
+                          </Text>
+                        </View>
+                      ) : null}
                     </View>
-                  </View>
+                    {/* On-screen captions, as on an Echo Show: the latest line only. */}
+                    <View aria-live="polite" aria-atomic="true" className="px-5 pb-4">
+                      {caption ? (
+                        <Text numberOfLines={2} className="text-center text-xr-body text-text">
+                          {caption}
+                        </Text>
+                      ) : null}
+                    </View>
+                  </>
                 )}
-
-                {signedIn ? (
-                  <Form onSubmit={() => void send(draft)}>
-                    <View className="gap-3 px-5 pb-5 pt-2 md:flex-row md:items-end">
-                      <View className="min-w-0 md:flex-1">
-                        <TextField
-                          surface="daylit"
-                          label="Message to your Mon"
-                          placeholder={listening ? 'Listening…' : 'Type to your Mon'}
-                          value={listening ? heard : draft}
-                          onChangeText={setDraft}
-                          onSubmitEditing={() => void send(draft)}
-                          disabled={!canTalk || !!listening}
-                        />
-                      </View>
-                      <View className="flex-row flex-wrap gap-3">
-                        {busy ? (
-                          <Button variant="outline" title="Stop" onPress={() => abortRef.current?.abort()} />
-                        ) : (
-                          <Button variant="outline" title="Send" disabled={!draft.trim() || !canTalk} onPress={() => void send(draft)} />
-                        )}
-                        <Button
-                          variant="cta"
-                          title={listening ? 'Done talking' : 'Talk'}
-                          accessibilityHint={
-                            voiceIn
-                              ? listening
-                                ? 'Sends what you said.'
-                                : 'Starts listening. Tap again when you finish.'
-                              : 'Voice input isn’t available in this browser. Type instead.'
-                          }
-                          disabled={!voiceIn || !canTalk || busy}
-                          onPress={listening ? stopListening : startListening}
-                        />
-                      </View>
-                    </View>
-                  </Form>
-                ) : null}
               </View>
             </SolidPanel>
+
+            {signedIn ? (
+              <View className="flex-row flex-wrap items-center justify-center gap-3">
+                <Button
+                  variant="cta"
+                  title={listening ? 'Done talking' : 'Talk'}
+                  accessibilityHint={
+                    voiceIn
+                      ? listening
+                        ? 'Sends what you said.'
+                        : 'Starts listening. Tap again when you finish.'
+                      : 'Voice input isn’t available in this browser. Type instead.'
+                  }
+                  disabled={!voiceIn || !canTalk || busy}
+                  onPress={listening ? stopListening : startListening}
+                />
+                {busy ? <Button variant="outline" title="Stop" onPress={() => abortRef.current?.abort()} /> : null}
+              </View>
+            ) : null}
+            {signedIn && typing && !config.devMode ? typingPanel : null}
             <Text className="text-center text-xr-caption text-text-muted">
               {config.modelLabel}
               {auth.kind === 'dev-bypass' ? '. Dev sign-in bypass is on.' : '.'}
@@ -597,7 +601,7 @@ export function App({ config }: { config: PublicConfig }) {
           </View>
 
           {config.devMode ? (
-            <View className="w-full lg:w-80">
+            <View className="w-full gap-6 lg:w-80">
               <DevPanel
                 client={session?.client ?? null}
                 injectTool={toolsByName.get('inject_presence_event')}
@@ -609,6 +613,7 @@ export function App({ config }: { config: PublicConfig }) {
                   setSpeakerName(name);
                 }}
               />
+              {signedIn ? typingPanel : null}
             </View>
           ) : null}
         </View>
