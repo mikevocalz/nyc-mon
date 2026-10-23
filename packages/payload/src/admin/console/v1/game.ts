@@ -351,6 +351,8 @@ async function hatchEgg(context: V1Context, eggId: string): Promise<Response> {
     const minted = mintMonInstance(eggRecord);
     const monToCreate = {
       ...minted,
+      // MonInstances' validate hook derives the id from eggId and refuses a Mon without it.
+      eggId: eggRecord.eggId,
       stage: 'Baby' as const,
       serverConfirmedAt: new Date(),
     };
