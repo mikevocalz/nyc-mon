@@ -38,6 +38,12 @@ export interface AppViewProps {
   readonly onDisplayModeChange: (mode: DisplayMode) => void;
   /** A view proposed text for the conversation (ui/message); the person sends it. */
   readonly onViewMessage: (text: string) => void;
+  /**
+   * Called before "Try card again" reloads the view, so the host can re-list
+   * the server's tools. A rebuilt server serves its views under new URIs; the
+   * retry then loads whatever resourceUri the host passes next.
+   */
+  readonly onRetry?: () => Promise<void>;
 }
 
 interface LoadedResource {
@@ -240,7 +246,9 @@ export function AppView(props: AppViewProps) {
               onPress={() => {
                 setError('');
                 setStatus('loading');
-                setAttempt((value) => value + 1);
+                void (props.onRetry?.() ?? Promise.resolve())
+                  .catch(() => {})
+                  .finally(() => setAttempt((value) => value + 1));
               }}
             />
           </View>

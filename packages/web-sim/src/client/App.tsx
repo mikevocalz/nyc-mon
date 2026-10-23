@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type Anthropic from '@anthropic-ai/sdk';
-import { UnauthorizedError, type CallToolResult, type Tool } from '@modelcontextprotocol/client';
-import { getToolUiResourceUri } from '@modelcontextprotocol/ext-apps/app-bridge';
+import { UnauthorizedError, type Tool } from '@modelcontextprotocol/client';
 import { runAgentTurn } from '../shared/agentLoop.ts';
 import { SimOAuthProvider, parseCallback, resolveAuthState, type AuthState } from '../shared/auth.ts';
 import { mcpToolsToClaude, type ConversionResult } from '../shared/toolSpec.ts';
@@ -12,7 +11,7 @@ import { Text, View } from '@acme/ui/tw';
 import { AppView, type DisplayMode } from './AppView.tsx';
 import { DevPanel } from './DevPanel.tsx';
 import { judgeStage } from './judgeStatus.ts';
-import { SignInRequired, beginSignIn, completeSignIn, connectMcp, type McpSession } from './mcp.ts';
+import { SignInRequired, beginSignIn, completeSignIn, connectMcp, listAllTools, type McpSession } from './mcp.ts';
 import { ModelAuthExpiredError, ModelTurnError, httpModelClient } from './modelClient.ts';
 import {
   clearSession,
@@ -28,6 +27,7 @@ import { canListen, canSpeak, listen, speak, stopSpeaking, type Listening } from
 import { useSetters } from './state.ts';
 import { currentScheme, type Scheme } from './theme.ts';
 import { createTurnToolCaller, hintedToolNames, withPresenceLine } from './turnTools.ts';
+import { currentViewUri, liveViewUri } from './viewUri.ts';
 
 export interface PublicConfig {
   readonly mcpUrl: string;
@@ -72,11 +72,6 @@ const LIL_RATTI_CLIPS = ['up_idle', 'up_breathe', 'quad_idle_sniff'] as const;
 
 function toolTitle(tool: Tool | undefined, name: string): string {
   return tool?.annotations?.title ?? tool?.title ?? name.replace(/_/g, ' ');
-}
-
-function resultUiUri(result: CallToolResult): string | null {
-  const ui = (result._meta as { ui?: { resourceUri?: unknown } } | undefined)?.ui;
-  return typeof ui?.resourceUri === 'string' ? ui.resourceUri : null;
 }
 
 function clock(): string {
@@ -224,6 +219,22 @@ export function App({ config }: { config: PublicConfig }) {
   const session = conn.kind === 'connected' ? conn.session : null;
   const toolsByName = useMemo(() => new Map((session?.tools ?? []).map((t) => [t.name, t])), [session]);
 
+  /**
+   * "Try card again": the server may have been rebuilt since it listed its
+   * tools, and view URIs change with every build. Re-list the tools so the card
+   * resolves against the server as it is now; reconnect if the old session is gone.
+   */
+  const refreshTools = useCallback(async () => {
+    const current = store.getState().conn;
+    if (current.kind !== 'connected') return;
+    try {
+      const tools = await listAllTools(current.session.client);
+      setConn({ kind: 'connected', session: { ...current.session, tools }, conversion: mcpToolsToClaude(tools) });
+    } catch {
+      await connect();
+    }
+  }, [connect, setConn, store]);
+
   const send = useCallback(
     async (raw: string) => {
       const text = raw.trim();
@@ -263,7 +274,7 @@ export function App({ config }: { config: PublicConfig }) {
             if (e.type === 'tool-start') setActiveToolTitle(toolTitle(toolsByName.get(e.name), e.name));
             if (e.type === 'tool-result') {
               const tool = toolsByName.get(e.name);
-              const uri = (tool ? getToolUiResourceUri(tool) : undefined) ?? resultUiUri(e.result);
+              const uri = liveViewUri(tool, e.result);
               const id = newId('t');
               push({
                 kind: 'tool',
@@ -367,6 +378,8 @@ export function App({ config }: { config: PublicConfig }) {
   const lastMon = [...items].reverse().find((i) => i.kind === 'mon');
   const lastReply = lastMon?.kind === 'mon' ? lastMon.text : '';
   const activeView = items.find((i): i is Extract<TranscriptItem, { kind: 'tool' }> => i.id === activeViewId && i.kind === 'tool');
+  // Never the URI saved with the item: it names a view from the server build that made it.
+  const activeViewUri = activeView ? currentViewUri(activeView, toolsByName) : null;
   const voiceIn = canListen();
   const signedIn = auth.kind === 'dev-bypass' || auth.kind === 'signed-in';
 
@@ -435,6 +448,7 @@ export function App({ config }: { config: PublicConfig }) {
               key={item.id}
               item={item}
               active={item.id === activeViewId}
+              hasView={item.kind === 'tool' && currentViewUri(item, toolsByName) !== null}
               onShow={() => {
                 setActiveViewId(item.id);
                 setDisplayMode('inline');
@@ -528,7 +542,7 @@ export function App({ config }: { config: PublicConfig }) {
                     {/* Alexa+ speaks the reply; the screen belongs to the add-on's view. */}
                     {/* The view brings its own padding; the display adds only the side inset. */}
                     <View className="min-h-0 flex-1 px-3">
-                      {activeView && activeView.resourceUri && session ? (
+                      {activeView && activeViewUri && session ? (
                         <View className={fullscreen ? 'absolute inset-0 z-10 bg-surface-raised p-4' : 'min-h-0 flex-1'}>
                           <AppView
                             key={activeView.id}
@@ -537,7 +551,8 @@ export function App({ config }: { config: PublicConfig }) {
                             tools={session.tools}
                             toolName={activeView.name}
                             title={activeView.title}
-                            resourceUri={activeView.resourceUri}
+                            resourceUri={activeViewUri}
+                            onRetry={refreshTools}
                             input={activeView.input}
                             result={activeView.result}
                             sandboxOrigin={config.sandboxOrigin}
@@ -630,7 +645,7 @@ function SignedOutMon() {
   return <MonModel3D url="/mons/lil-ratti.glb" clips={LIL_RATTI_CLIPS} width={260} height={325} label="Lil' Ratti" onError={() => setFailed(true)} />;
 }
 
-function LogItem({ item, active, onShow }: { item: TranscriptItem; active: boolean; onShow: () => void }) {
+function LogItem({ item, active, hasView, onShow }: { item: TranscriptItem; active: boolean; hasView: boolean; onShow: () => void }) {
   switch (item.kind) {
     case 'user':
       return (
@@ -644,7 +659,7 @@ function LogItem({ item, active, onShow }: { item: TranscriptItem; active: boole
       return (
         <View className="flex-row flex-wrap items-center gap-3">
           <Badge label={item.result.isError ? `${item.title} didn’t go through` : item.title} tone={item.result.isError ? 'danger' : 'info'} />
-          {item.resourceUri && !active ? <Button variant="ghost" size="sm" title="Show card" onPress={onShow} /> : null}
+          {hasView && !active ? <Button variant="ghost" size="sm" title="Show card" onPress={onShow} /> : null}
         </View>
       );
     case 'notice':
