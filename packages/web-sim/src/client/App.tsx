@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type Anthropic from '@anthropic-ai/sdk';
 import { UnauthorizedError, type CallToolResult, type Tool } from '@modelcontextprotocol/client';
 import { getToolUiResourceUri } from '@modelcontextprotocol/ext-apps/app-bridge';
@@ -7,6 +7,7 @@ import { SimOAuthProvider, parseCallback, resolveAuthState, type AuthState } fro
 import { mcpToolsToClaude, type ConversionResult } from '../shared/toolSpec.ts';
 import { Badge, Banner, BrandWordmark, Button, Card, ErrorMessage, SolidPanel, Switch, TextField, useInstanceStore, useStore } from '@acme/ui';
 import { Form, Header, Heading, Paragraph, Section } from '@acme/ui/html';
+import { MonModel3D } from '@acme/ui/three/mon';
 import { Text, View } from '@acme/ui/tw';
 import { AppView, type DisplayMode } from './AppView.tsx';
 import { DevPanel } from './DevPanel.tsx';
@@ -67,6 +68,8 @@ interface AppState {
 
 const SUGGESTIONS = ['How’s my Mon doing?', 'Are you hungry?', 'Who’s here right now?'];
 const CALLBACK_PATH = '/oauth/callback';
+/** Same clip order as the MCP Mon card (mcp-server MonView MON_MODELS[3]). */
+const LIL_RATTI_CLIPS = ['up_idle', 'up_breathe', 'quad_idle_sniff'] as const;
 
 function toolTitle(tool: Tool | undefined, name: string): string {
   return tool?.annotations?.title ?? tool?.title ?? name.replace(/_/g, ' ');
@@ -456,7 +459,8 @@ export function App({ config }: { config: PublicConfig }) {
                 </View>
 
                 {!signedIn ? (
-                  <View className="flex-1 justify-center px-5 py-6 md:px-10">
+                  <View className="flex-1 items-center justify-center gap-6 px-5 py-6 md:flex-row md:px-10">
+                    <SignedOutMon />
                     <View className="max-w-xl gap-3">
                       <Card variant="notch" district="midtown" title="Meet your Mon here" description="Sign in with your NYC-MON account. The add-on is for adults 18 and over." />
                       <ErrorMessage message={auth.kind === 'error' ? auth.message : undefined} />
@@ -615,6 +619,13 @@ export function App({ config }: { config: PublicConfig }) {
       </GridBandBoundary>
     </View>
   );
+}
+
+/** Lil' Ratti on the signed-out display, from the same-origin /mons route (server/main.ts). Hidden if the GLB fails, leaving the card. */
+function SignedOutMon() {
+  const [failed, setFailed] = useState(false);
+  if (failed) return null;
+  return <MonModel3D url="/mons/lil-ratti.glb" clips={LIL_RATTI_CLIPS} width={260} height={325} label="Lil' Ratti" onError={() => setFailed(true)} />;
 }
 
 function LogItem({ item, active, onShow }: { item: TranscriptItem; active: boolean; onShow: () => void }) {
