@@ -13,14 +13,6 @@ const base = {
 };
 
 describe('judgeStage', () => {
-  it('keeps a signed-in Amazon account separate from an unconnected Mon', () => {
-    expect(judgeStage({ ...base, authKind: 'signed-out', accountSignedIn: true, connectionKind: 'idle' }))
-      .toMatchObject({ kind: 'signed-in', label: 'Signed in', tone: 'success' });
-    expect(judgeStage({ ...base, authKind: 'error', accountSignedIn: true, connectionKind: 'idle' }))
-      .toMatchObject({ kind: 'signed-in', label: 'Connection issue' });
-    expect(judgeStage({ ...base, authKind: 'signing-in', accountSignedIn: true, connectionKind: 'idle' }))
-      .toMatchObject({ kind: 'connecting', label: 'Connecting' });
-  });
   it('makes the idle judge state explicitly ready', () => {
     expect(judgeStage(base)).toMatchObject({ kind: 'ready', label: 'Ready', tone: 'success' });
   });

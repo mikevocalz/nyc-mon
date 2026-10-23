@@ -93,24 +93,6 @@ if (env.apple !== undefined) {
 const baseOrigin = new URL(env.baseURL);
 
 /**
- * The Alexa+ smart-display simulator (packages/web-sim) starts Login with
- * Amazon from its own origin and reads the session back over credentialed
- * CORS, so its origin must be trusted. SIM_PUBLIC_ORIGIN sets it; outside
- * development it defaults to the simulator's dev origin.
- */
-function simOrigin(raw: string | undefined): string | undefined {
-  const value = raw?.trim() || (process.env.NODE_ENV === 'development' ? 'http://localhost:5180' : undefined);
-  if (!value) return undefined;
-  try {
-    const url = new URL(value);
-    return /^https?:$/.test(url.protocol) ? url.origin : undefined;
-  } catch {
-    return undefined;
-  }
-}
-const SIM_ORIGIN: string | undefined = simOrigin(process.env.SIM_PUBLIC_ORIGIN);
-
-/**
  * The native app's origin, trusted on every deployment: it is first-party,
  * and React Native sends no Origin of its own (the client sends this one).
  * Must match `APP_ORIGIN` in `packages/auth/src/paths.ts`.
@@ -124,7 +106,7 @@ const NATIVE_APP_ORIGIN = 'nycmon://';
  */
 export const PAYLOAD_ORIGINS: string[] = [
   ...new Set(
-    [baseOrigin.origin, env.siteURL, SIM_ORIGIN, ...env.trustedOrigins]
+    [baseOrigin.origin, env.siteURL, ...env.trustedOrigins]
       .filter((origin): origin is string => origin !== undefined)
       .filter((origin) => /^https?:\/\//.test(origin))
       .map((origin) => new URL(origin).origin),
@@ -257,7 +239,7 @@ export const betterAuthOptions = {
   baseURL: env.baseURL,
   basePath: `${PAYLOAD_API_ROUTE}${AUTH_BASE_PATH}`,
   secret: env.secret,
-  trustedOrigins: [baseOrigin.origin, NATIVE_APP_ORIGIN, ...(SIM_ORIGIN === undefined ? [] : [SIM_ORIGIN]), ...env.trustedOrigins],
+  trustedOrigins: [baseOrigin.origin, NATIVE_APP_ORIGIN, ...env.trustedOrigins],
   // The stock verify would hand the second device the phone's own session;
   // `/handoff/redeem` creates a new one. Phone numbers are never a password.
   // The OAuth provider's client CRUD and OIDC paths are off: clients are
