@@ -96,10 +96,19 @@ const baseOrigin = new URL(env.baseURL);
  * The Alexa+ smart-display simulator (packages/web-sim) starts Login with
  * Amazon from its own origin and reads the session back over credentialed
  * CORS, so its origin must be trusted. SIM_PUBLIC_ORIGIN sets it; outside
- * production it defaults to the simulator's dev origin.
+ * development it defaults to the simulator's dev origin.
  */
-const SIM_ORIGIN: string | undefined =
-  process.env.SIM_PUBLIC_ORIGIN?.trim() || (env.isProduction ? undefined : 'http://localhost:5180');
+function simOrigin(raw: string | undefined): string | undefined {
+  const value = raw?.trim() || (process.env.NODE_ENV === 'development' ? 'http://localhost:5180' : undefined);
+  if (!value) return undefined;
+  try {
+    const url = new URL(value);
+    return /^https?:$/.test(url.protocol) ? url.origin : undefined;
+  } catch {
+    return undefined;
+  }
+}
+const SIM_ORIGIN: string | undefined = simOrigin(process.env.SIM_PUBLIC_ORIGIN);
 
 /**
  * The native app's origin, trusted on every deployment: it is first-party,

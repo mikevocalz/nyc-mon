@@ -29,6 +29,8 @@ export interface AmazonLocalDevelopment {
 /** An explicit localhost-only demo option; deployed environments stay link-only. */
 function isLocalDevelopment(local: AmazonLocalDevelopment | undefined): boolean {
   if (local?.nodeEnv !== 'development') return false;
+  // A hosted build is never local, whatever NODE_ENV and BETTER_AUTH_URL say.
+  if (process.env.VERCEL || process.env.VERCEL_ENV || process.env.CI) return false;
   try {
     const url = new URL(local.baseURL);
     return ['http:', 'https:'].includes(url.protocol)
@@ -92,6 +94,7 @@ export function amazonOAuthPlugin(client: AmazonOAuthClient | undefined, local?:
   if (client === undefined) return undefined;
   const localDevelopment = isLocalDevelopment(local);
   const localSignUp = localDevelopment && local?.allowSignUp === true;
+  if (localSignUp) console.warn('[auth] AMAZON_LWA_LOCAL_SIGNUP: Login with Amazon can create accounts without the birth-year gate (local development only).');
 
   return genericOAuth({
     config: [

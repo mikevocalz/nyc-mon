@@ -8,7 +8,7 @@ import { brand, palette, semantic } from '@acme/theme';
 import { CARE_COLORS } from '../../../ui/care/care-colors.ts';
 import { buildUi } from './build.ts';
 import { careOutcomeText, spokenSummary, toMonViewModel } from './contract.ts';
-import { getUiResources, mcpAppsRegistration, parseUiManifest, UI_MIME_TYPE, UI_TOOL_LINKS, type UiResource } from './index.ts';
+import { getUiResources, MON_MODEL_ORIGIN, mcpAppsRegistration, parseUiManifest, UI_MIME_TYPE, UI_TOOL_LINKS, type UiResource } from './index.ts';
 
 /**
  * Budgets per view, measured 2026-10-08. The card is about 1398 KiB raw,
@@ -20,8 +20,9 @@ import { getUiResources, mcpAppsRegistration, parseUiManifest, UI_MIME_TYPE, UI_
  * content-hashed bundle.
  */
 const BUDGET: Readonly<Record<string, { raw: number; gzip: number }>> = {
-  'mon-card': { raw: 1500 * 1024, gzip: 520 * 1024 },
-  'mon-room': { raw: 2400 * 1024, gzip: 780 * 1024 },
+  // three.js for the 3D Mon (Dex 2 and 3) adds about 640 KB raw.
+  'mon-card': { raw: 2150 * 1024, gzip: 700 * 1024 },
+  'mon-room': { raw: 2900 * 1024, gzip: 920 * 1024 },
 };
 
 /**
@@ -46,6 +47,7 @@ const IDENTIFIER_URL = [
   /^https:\/\/docs\.swmansion\.com\//,
   /^https:\/\/dev\.to\/li\/how-to-requestpermission/,
   /^https:\/\/tailwindcss\.com$/,
+  /^https:\/\/jcgt\.org\/published\//,
 ];
 
 let resources: readonly UiResource[];
@@ -62,7 +64,7 @@ describe('built MCP App views', () => {
       expect(r.mimeType).toBe('text/html;profile=mcp-app');
       expect(r.mimeType).toBe(UI_MIME_TYPE);
       expect(r.uri).toMatch(new RegExp(`^ui://nyc-mon/${r.id}-[0-9a-f]{8}\\.html$`));
-      expect(r.csp).toEqual({ connectDomains: [], resourceDomains: ['data:'] });
+      expect(r.csp).toEqual({ connectDomains: [MON_MODEL_ORIGIN], resourceDomains: ['data:'] });
     }
   });
 
@@ -123,7 +125,7 @@ describe('built MCP App views', () => {
     expect(registered.every((r) => r.config.mimeType === 'text/html;profile=mcp-app')).toBe(true);
     const read = (await registered[0]!.read()) as { contents: { mimeType: string; text: string; _meta: unknown }[] };
     expect(read.contents[0]?.text).toBe(resources[0]!.html);
-    expect(read.contents[0]?._meta).toEqual({ ui: { csp: { connectDomains: [], resourceDomains: ['data:'] }, prefersBorder: false } });
+    expect(read.contents[0]?._meta).toEqual({ ui: { csp: { connectDomains: [MON_MODEL_ORIGIN], resourceDomains: ['data:'] }, prefersBorder: false } });
     expect(Object.keys(reg.toolResourceUris).sort()).toEqual(['feed_mon', 'get_mon_status', 'play_with_mon', 'rest_mon', 'wake_mon']);
     expect(UI_TOOL_LINKS.get_mon_status).toBe('mon-card');
   });

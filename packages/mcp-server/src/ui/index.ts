@@ -4,6 +4,7 @@ import { z } from 'zod';
 import type { McpAppsRegistration } from '../mcp/ui-seam.ts';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { MON_MODEL_ORIGIN } from './model-origin.ts';
 import { UI_VIEWS, type UiViewId } from './views.ts';
 
 /**
@@ -43,11 +44,7 @@ export interface UiResource {
   readonly prefersBorder: false;
 }
 
-/**
- * Where the view fetches Mon GLBs (`/mons/<id>.glb`, served by the web-sim host).
- * NYC_MON_MODEL_ORIGIN for a deployed host; the sim's local origin otherwise.
- */
-export const MON_MODEL_ORIGIN = new URL(process.env.NYC_MON_MODEL_ORIGIN ?? 'http://localhost:5180').origin;
+export { MON_MODEL_ORIGIN };
 
 export const UI_CSP: UiCsp = { connectDomains: [MON_MODEL_ORIGIN], resourceDomains: ['data:'] };
 
@@ -103,6 +100,13 @@ export function getUiResources(): readonly UiResource[] {
     throw new Error('MCP App views are not built. Run `pnpm --filter @acme/mcp-server build:ui`.');
   }
   const manifest = parseUiManifest(raw);
+  // The origin is baked into the bundle; a different one at run time would break the CSP.
+  const built = (raw as { modelOrigin?: unknown }).modelOrigin;
+  if (built !== undefined && built !== MON_MODEL_ORIGIN) {
+    throw new Error(
+      `MCP App views were built for model origin ${String(built)}, but NYC_MON_MODEL_ORIGIN resolves to ${MON_MODEL_ORIGIN}. Rebuild with \`pnpm --filter @acme/mcp-server build:ui\`.`,
+    );
+  }
   cache = (Object.keys(UI_VIEWS) as UiViewId[]).map((id) => {
     const entry = manifest[id];
     return {

@@ -126,3 +126,22 @@ describe('Login with Amazon profile mapping', () => {
     expect(config?.disableSignUp).toBe(true);
   });
 });
+
+describe('amazonOAuthPlugin on a hosted build', () => {
+  it('stays link-only on Vercel even with a local-looking environment', () => {
+    const previous = process.env.VERCEL;
+    process.env.VERCEL = '1';
+    try {
+      const plugin = amazonOAuthPlugin(
+        { clientId: 'id', clientSecret: 'secret' },
+        { allowSignUp: true, nodeEnv: 'development', baseURL: 'http://localhost:5174' },
+      );
+      const config = (plugin as unknown as { options: { config: { disableSignUp: boolean; disableImplicitSignUp: boolean }[] } }).options.config[0]!;
+      expect(config.disableSignUp).toBe(true);
+      expect(config.disableImplicitSignUp).toBe(true);
+    } finally {
+      if (previous === undefined) delete process.env.VERCEL;
+      else process.env.VERCEL = previous;
+    }
+  });
+});

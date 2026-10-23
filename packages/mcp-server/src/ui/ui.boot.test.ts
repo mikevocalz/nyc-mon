@@ -208,7 +208,8 @@ describe('built views boot in a spec host (bundled Chromium)', () => {
     const roomResult = { mon: monFor('dex-002'), care };
     const probe = (frame: Frame) =>
       frame.evaluate(() => ({
-        canvases: document.querySelectorAll('canvas').length,
+        // The 3D Mon's three.js canvas is not the backdrop.
+        canvases: document.querySelectorAll('canvas:not([data-engine^="three.js"])').length,
         pause: [...document.querySelectorAll('[role=button], button')].some((e) => e.textContent?.includes('Pause animation')),
       }));
 

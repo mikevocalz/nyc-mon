@@ -25,9 +25,17 @@ function useStageWidth() {
   const [w, setW] = useState(320);
   useEffect(() => {
     const fit = () => setW(Math.max(260, Math.min(420, window.innerWidth - 48)));
+    let t: ReturnType<typeof setTimeout> | undefined;
+    const onResize = () => {
+      clearTimeout(t);
+      t = setTimeout(fit, 150); // settle before resizing the WebGL stages
+    };
     fit();
-    window.addEventListener('resize', fit);
-    return () => window.removeEventListener('resize', fit);
+    window.addEventListener('resize', onResize);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener('resize', onResize);
+    };
   }, []);
   return w;
 }

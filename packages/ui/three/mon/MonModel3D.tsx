@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
@@ -17,18 +17,38 @@ export interface MonModel3DProps {
   readonly height: number;
   readonly label: string;
   readonly onError?: (error: unknown) => void;
+  /** Shown in the box when the GLB fails to load; defaults to a short label. */
+  readonly fallback?: ReactNode;
 }
 
-export function MonModel3D({ url, clips = [], width, height, label, onError }: MonModel3DProps) {
+const NO_CLIPS: readonly string[] = [];
+
+export function MonModel3D({ url, clips = NO_CLIPS, width, height, label, onError, fallback }: MonModel3DProps) {
   const host = useRef<HTMLDivElement | null>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
 
+  // Latest props for the load callback, without re-running the GLB effect.
+  const clipsRef = useRef(clips);
+  const onErrorRef = useRef(onError);
+  const sizeRef = useRef({ width, height });
+  // Declared first so it runs before the GLB effect below.
+  useEffect(() => {
+    clipsRef.current = clips;
+    onErrorRef.current = onError;
+    sizeRef.current = { width, height };
+  });
+
+  const stage = useRef<{ renderer: THREE.WebGLRenderer; camera: THREE.PerspectiveCamera } | null>(null);
+
+  // Renderer, scene and GLB: once per url (the files are 26-34 MB).
   useEffect(() => {
     const el = host.current;
     if (!el) return;
+    setState('loading');
+    const { width: w, height: h } = sizeRef.current;
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    renderer.setSize(width, height);
+    renderer.setSize(w, h);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     el.appendChild(renderer.domElement);
@@ -41,13 +61,15 @@ export function MonModel3D({ url, clips = [], width, height, label, onError }: M
     const rim = new THREE.DirectionalLight(0xff5a5a, 0.8);
     rim.position.set(-2, 2, -2);
     scene.add(rim);
-    const camera = new THREE.PerspectiveCamera(30, width / height, 0.01, 50);
+    const camera = new THREE.PerspectiveCamera(30, w / h, 0.01, 50);
+    stage.current = { renderer, camera };
 
     let mixer: THREE.AnimationMixer | null = null;
     let root: THREE.Object3D | null = null;
     let frame = 0;
     let disposed = false;
-    const clock = new THREE.Clock();
+    const timer = new THREE.Timer();
+    timer.connect(document); // zero delta while the tab is hidden
 
     new GLTFLoader().load(
       url,
@@ -65,7 +87,7 @@ export function MonModel3D({ url, clips = [], width, height, label, onError }: M
         const dist = tall / (2 * Math.tan((camera.fov * Math.PI) / 360)) * 1.15;
         camera.position.set(centre.x + dist * 0.25, centre.y + tall * 0.08, centre.z + dist);
         camera.lookAt(centre);
-        const clip = clips.map((n) => THREE.AnimationClip.findByName(gltf.animations, n)).find(Boolean);
+        const clip = clipsRef.current.map((n) => THREE.AnimationClip.findByName(gltf.animations, n)).find(Boolean);
         if (clip) {
           mixer = new THREE.AnimationMixer(root);
           mixer.clipAction(clip).play();
@@ -76,13 +98,14 @@ export function MonModel3D({ url, clips = [], width, height, label, onError }: M
       (error) => {
         if (disposed) return;
         setState('error');
-        onError?.(error);
+        onErrorRef.current?.(error);
       },
     );
 
-    const tick = () => {
+    const tick = (now?: number) => {
       frame = requestAnimationFrame(tick);
-      const dt = Math.min(clock.getDelta(), 0.05);
+      timer.update(now);
+      const dt = Math.min(timer.getDelta(), 0.05);
       mixer?.update(dt);
       if (root) root.rotation.y += dt * 0.35; // slow turntable
       renderer.render(scene, camera);
@@ -91,7 +114,9 @@ export function MonModel3D({ url, clips = [], width, height, label, onError }: M
 
     return () => {
       disposed = true;
+      stage.current = null;
       cancelAnimationFrame(frame);
+      timer.dispose();
       mixer?.stopAllAction();
       scene.traverse((o) => {
         const m = o as THREE.Mesh;
@@ -107,9 +132,46 @@ export function MonModel3D({ url, clips = [], width, height, label, onError }: M
       renderer.dispose();
       renderer.domElement.remove();
     };
-  }, [url, width, height]);
+  }, [url]);
 
+  // Resize in place: no new context, no re-download.
+  useEffect(() => {
+    const s = stage.current;
+    if (!s) return;
+    s.renderer.setSize(width, height);
+    s.camera.aspect = width / height;
+    s.camera.updateProjectionMatrix();
+  }, [width, height]);
+
+  const failed = state === 'error';
   return (
-    <div ref={host} role="img" aria-label={label} aria-busy={state === 'loading'} style={{ width, height, position: 'relative' }} />
+    <div
+      ref={host}
+      role="img"
+      aria-label={failed ? `${label}, model unavailable` : label}
+      aria-busy={state === 'loading'}
+      style={{ width, height, position: 'relative' }}
+    >
+      {failed ? (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16,
+            border: '2px dashed rgba(150, 150, 160, 0.45)',
+            background: 'rgba(150, 150, 160, 0.08)',
+            color: 'rgb(150, 150, 160)',
+            fontSize: 14,
+            fontWeight: 600,
+            textAlign: 'center',
+          }}
+        >
+          {fallback ?? 'Model unavailable'}
+        </div>
+      ) : null}
+    </div>
   );
 }
