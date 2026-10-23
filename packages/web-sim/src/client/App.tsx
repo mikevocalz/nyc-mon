@@ -447,9 +447,11 @@ export function App({ config }: { config: PublicConfig }) {
                   <Text className="text-xr-caption text-text-muted">{time}</Text>
                   <View className="flex-row flex-wrap items-center justify-end gap-2">
                     {conn.kind === 'connected' ? null : <Badge label={connLabel} tone={connTone} />}
-                    <View role="status" aria-live="polite" aria-atomic="true">
-                      <Badge label={stage.label} tone={stage.tone} />
-                    </View>
+                    {signedIn ? (
+                      <View role="status" aria-live="polite" aria-atomic="true">
+                        <Badge label={stage.label} tone={stage.tone} />
+                      </View>
+                    ) : null}
                   </View>
                 </View>
 
