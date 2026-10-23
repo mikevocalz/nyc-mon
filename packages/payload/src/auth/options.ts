@@ -20,7 +20,7 @@ import { readAuthEnv } from './env';
 import { isAllowedSmsNumber, parseSmsCountries, passesPhoneGate } from './phone';
 import { assertFreshSession } from './plugins/fresh';
 import { handoff, hashHandoffToken } from './plugins/handoff';
-import { readOAuthConfig } from './oauth/config';
+import { browserClientOrigins, readOAuthConfig } from './oauth/config';
 import { alexaOAuthPlugins } from './oauth/plugins';
 import { createSmsSender } from './sms';
 import { consumeSmsQuota, MAX_SMS_PER_NUMBER_PER_DAY, MAX_SMS_PER_USER_PER_DAY } from './sms-quota';
@@ -112,6 +112,12 @@ export const PAYLOAD_ORIGINS: string[] = [
       .map((origin) => new URL(origin).origin),
   ),
 ];
+
+/**
+ * CORS only, not CSRF: a public OAuth client such as the web simulator posts to
+ * the token endpoint from its own origin, with no cookies to protect.
+ */
+export const PAYLOAD_CORS_ORIGINS: string[] = [...new Set([...PAYLOAD_ORIGINS, ...browserClientOrigins(oauthConfig)])];
 
 function readField(record: unknown, field: string): unknown {
   return typeof record === 'object' && record !== null && field in record ? (record as Record<string, unknown>)[field] : undefined;

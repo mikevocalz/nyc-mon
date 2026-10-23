@@ -11,7 +11,7 @@ import { mcpPlugin } from '@payloadcms/plugin-mcp';
 import { APIError, buildConfig } from 'payload';
 import sharp from 'sharp';
 import { deleteDueCallersTask } from './auth/deletion';
-import { AUTH_BASE_PATH, PAYLOAD_API_ROUTE, PAYLOAD_ORIGINS, betterAuthOptions, sendMail } from './auth/options';
+import { AUTH_BASE_PATH, PAYLOAD_API_ROUTE, PAYLOAD_CORS_ORIGINS, PAYLOAD_ORIGINS, betterAuthOptions, sendMail } from './auth/options';
 import { accountMerge } from './auth/plugins/account-merge';
 import { adminComponents } from './admin/components';
 import { consoleEndpoints } from './admin/console/endpoints';
@@ -134,7 +134,7 @@ export default buildConfig({
     // Account deletion after the 7-day grace (ADR 0001 as amended by L3).
     tasks: [deleteDueCallersTask],
   },
-  cors: PAYLOAD_ORIGINS,
+  cors: PAYLOAD_CORS_ORIGINS,
   csrf: PAYLOAD_ORIGINS,
   secret: process.env.PAYLOAD_SECRET || '',
   sharp,
