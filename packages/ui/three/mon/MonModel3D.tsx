@@ -71,7 +71,17 @@ export function MonModel3D({ url, clips = NO_CLIPS, width, height, label, onErro
     const timer = new THREE.Timer();
     timer.connect(document); // zero delta while the tab is hidden
 
-    new GLTFLoader().load(
+    // Embedded textures decode from blob: URLs. GLTFLoader's ImageBitmapLoader
+    // fetch()es them, which connect-src governs, and an MCP Apps host only puts
+    // declared origins there, so the Mon renders untextured in the Alexa card.
+    // TextureLoader decodes through <img> under img-src, which allows blob:
+    // (the path GLTFLoader already takes on older Safari).
+    new GLTFLoader()
+      .register((parser) => {
+        parser.textureLoader = new THREE.TextureLoader(parser.options.manager);
+        return { name: 'NYC_MON_IMG_TEXTURES' };
+      })
+      .load(
       url,
       (gltf) => {
         if (disposed) return;

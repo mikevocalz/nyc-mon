@@ -10,10 +10,8 @@ import { artFor } from '@acme/app/features/companion/mon-identity.ts';
 // passes it; otherwise plain layout Views go around them.
 import { Badge } from '../../../../ui/Badge';
 import { Button } from '../../../../ui/Button';
-import { Card } from '../../../../ui/Card';
 import { CareMeterRing } from '../../../../ui/care/CareMeterRing';
 import { CareMeterRingGroup } from '../../../../ui/care/CareMeterRingGroup';
-import type { ControlTone } from '../../../../ui/district';
 import { Heading } from '../../../../ui/Heading';
 import { Image, type ImageProps } from '../../../../ui/Image';
 import { StatusRow } from '../../../../ui/StatusRow';
@@ -24,27 +22,17 @@ import type { ActionId, MonViewModel } from '../contract.ts';
 
 /**
  * The Mon views, composed from kit stories and the companion screens:
- *  - Card: the Notch story (`variant="notch"`, `notchSides={['top']}`,
- *    `title`, `description`), toned per starter slot as W02 does
- *    (MonsIndexPage: orange, royal, leaf). It holds the Baby still, drawn as
- *    HomeLayout's `renderStill` draws it.
- *  - Status and rings sit on the page next to the Card, as the StatusRow and
- *    CareMeterRing stories show them, with `scheme` following the page (the
- *    GroupDaylit / GroupNight stories). They stay off the tone face: the kit's
- *    notch Card overrides themed text for its children, which leaves the chip
- *    and the ring plate unreadable on orange and leaf after dark.
+ *  - Stage: the Mon standing on the view, as virtual pets stand in their
+ *    world, with its name and Bloodline as plain text above it. No card: the
+ *    Mon is the screen, not an item on it.
+ *  - Status and rings sit beside the Mon, as the StatusRow and CareMeterRing
+ *    stories show them, with `scheme` following the page (the GroupDaylit /
+ *    GroupNight stories).
  *  - Bar: M13's Feed, Rest or Wake, Play, and Journal (card) or Close
  *    (room): the asked-for action as the Cta story's button, the rest outline.
  *  - Room: the same, larger, plus M18's timeline rows (JournalScreen).
  * Every string is from packages/app/features/companion/copy.ts.
  */
-
-/** W02's tones in starter-slot order. */
-const SLOT_TONE: Readonly<Record<string, ControlTone>> = {
-  'Hood Ratti': 'orange',
-  'Bodega Baddiee Cee': 'royal',
-  Yote: 'leaf',
-};
 
 export interface MonViewProps {
   readonly vm: MonViewModel;
@@ -53,7 +41,7 @@ export interface MonViewProps {
   /** The page theme; ring colours follow it as in the GroupDaylit / GroupNight stories. */
   readonly theme: 'light' | 'dark';
   readonly nowMs: number;
-  /** Narrow frame (under about 600 px): the status and rings stack under the Card. */
+  /** Narrow frame (under about 600 px): the status and rings stack under the Mon. */
   readonly narrow?: boolean;
   /** Room only: the canvas height in base px, so the room fills it. */
   readonly canvasHeight?: number;
@@ -104,12 +92,19 @@ function Still({ vm, width }: { vm: MonViewModel; width: number }) {
   );
 }
 
-function MonCard({ vm, stillWidth }: { vm: MonViewModel; stillWidth: number }) {
-  const tone = SLOT_TONE[vm.identity.bloodlineName ?? ''] ?? 'orange';
+/**
+ * The Mon on its stage, the way virtual pets stand in their world (no card
+ * around it): name and Bloodline as plain text above, the Mon itself below.
+ */
+function Stage({ vm, stillWidth }: { vm: MonViewModel; stillWidth: number }) {
   return (
-    <Card variant="notch" tone={tone} notchSides={['top']} title={vm.name} description={vm.identity.bloodlineLabel ?? undefined}>
+    <View className="items-center gap-2">
+      <View className="items-center">
+        <Heading level={1} size="title">{vm.name}</Heading>
+        {vm.identity.bloodlineLabel ? <Text variant="caption" tone="muted">{vm.identity.bloodlineLabel}</Text> : null}
+      </View>
       <Still vm={vm} width={stillWidth} />
-    </Card>
+    </View>
   );
 }
 
@@ -200,16 +195,16 @@ function Journal({ vm, nowMs }: { vm: MonViewModel; nowMs: number }) {
   );
 }
 
-/** Card column width: wide enough for "Bodega Baddiee Cee Bloodline" on one line. */
-const CARD_WIDTH = 300;
+/** Stage column width: wide enough for "Bodega Baddiee Cee Bloodline" on one line. */
+const STAGE_WIDTH = 320;
 
 export function MonView(props: MonViewProps) {
   const { vm, layout, theme, nowMs } = props;
   if (props.narrow) {
-    // Stacked: the Card, then the status and rings on the page, then the bar.
+    // Stacked: the Mon, then the status and rings, then the bar.
     return (
       <View className="gap-4">
-        <MonCard vm={vm} stillWidth={160} />
+        <Stage vm={vm} stillWidth={220} />
         {layout === 'room' ? (
           <View className="gap-4">
             <Care vm={vm} theme={theme} />
@@ -223,16 +218,15 @@ export function MonView(props: MonViewProps) {
     );
   }
   if (layout === 'room') {
-    // Base px: the bar is about 64 tall with a 16 gap; the notch card adds its
-    // top notch padding, title, description, gaps and bottom padding (about
-    // 190) to the still, whose box is 4:5.
+    // Base px: the bar is about 64 tall with a 16 gap, the name and Bloodline
+    // about 60; the Mon's box is 4:5 and takes the rest of the height.
     const height = props.canvasHeight ?? 456;
-    const stillWidth = Math.max(140, Math.min(CARD_WIDTH - 48, Math.round(((height - 64 - 16 - 190) * 4) / 5)));
+    const stillWidth = Math.max(160, Math.min(STAGE_WIDTH, Math.round(((height - 64 - 16 - 60) * 4) / 5)));
     return (
       <View className="gap-4" style={{ height }}>
-        <View className="min-h-0 flex-1 flex-row items-start gap-6">
-          <View style={{ width: CARD_WIDTH }}>
-            <MonCard vm={vm} stillWidth={stillWidth} />
+        <View className="min-h-0 flex-1 flex-row items-end gap-6">
+          <View style={{ width: STAGE_WIDTH }}>
+            <Stage vm={vm} stillWidth={stillWidth} />
           </View>
           <ScrollView className="min-h-0 flex-1 self-stretch" contentContainerClassName="gap-4">
             <Care vm={vm} theme={theme} />
@@ -245,9 +239,9 @@ export function MonView(props: MonViewProps) {
   }
   return (
     <View className="gap-4">
-      <View className="flex-row items-start gap-6">
-        <View style={{ width: CARD_WIDTH }}>
-          <MonCard vm={vm} stillWidth={160} />
+      <View className="flex-row items-center gap-6">
+        <View style={{ width: STAGE_WIDTH }}>
+          <Stage vm={vm} stillWidth={240} />
         </View>
         <View className="flex-1">
           <Care vm={vm} theme={theme} />

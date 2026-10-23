@@ -160,7 +160,7 @@ function Root() {
   const canExpand = Array.isArray(modes) && modes.includes('fullscreen');
   const fitted = zoom !== 'fluid';
   const canvasHeight = (typeof host.maxHeight === 'number' ? Math.min(host.maxHeight, window.innerHeight) : window.innerHeight) / (fitted ? zoom : 1);
-  // Below this content width the status and rings stack under the Card.
+  // Below this content width the status and rings stack under the Mon.
   const narrow = !fitted && frameWidth - 24 < NARROW_BELOW;
   // A narrow room scrolls as one column rather than fitting a fixed height.
   const style = fitted ? { zoom, width: BASE_WIDTH, height: layout === 'room' ? canvasHeight : undefined } : undefined;
