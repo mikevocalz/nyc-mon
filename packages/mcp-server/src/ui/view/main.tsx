@@ -7,7 +7,7 @@
  * room. State is one zustand store.
  */
 import './view.css';
-import { Component, type ReactNode } from 'react';
+import { Component, useEffect, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { create } from 'zustand';
 import { App, type McpUiHostContext } from '@modelcontextprotocol/ext-apps/app-with-deps';
@@ -112,7 +112,8 @@ const app = new App(
 
 async function runAction(id: ActionId): Promise<void> {
   const { vm, busy } = useView.getState();
-  if (!vm || busy) return;
+  // An egg has no care actions; the card shows none, so this is a guard only.
+  if (!vm || busy || vm.egg) return;
   useView.setState({ busy: id, notice: null, failed: false });
   try {
     const result = await app.callServerTool({ name: ACTION_TOOLS[id], arguments: actionArguments(id, vm.monInstanceId) });
@@ -152,6 +153,13 @@ function Root() {
   const notice = useView((s) => s.notice);
   const failed = useView((s) => s.failed);
   const nowMs = useView((s) => s.nowMs);
+  const incubating = vm?.egg != null;
+  // An egg's time left counts down on screen without a new tool result.
+  useEffect(() => {
+    if (!incubating) return;
+    const id = window.setInterval(() => useView.setState({ nowMs: Date.now() }), 15_000);
+    return () => window.clearInterval(id);
+  }, [incubating]);
   const theme: 'light' | 'dark' =
     host.theme === 'dark' || (host.theme === undefined && window.matchMedia?.('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
   const mode = displayMode(host);

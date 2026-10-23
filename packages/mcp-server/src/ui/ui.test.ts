@@ -7,7 +7,7 @@ import { brand, palette, semantic } from '@acme/theme';
 // Read from the kit source file (as the views import kit files), so the test tracks it.
 import { CARE_COLORS } from '../../../ui/care/care-colors.ts';
 import { buildUi } from './build.ts';
-import { careOutcomeText, spokenSummary, toMonViewModel } from './contract.ts';
+import { careOutcomeText, eggDetailText, eggTimeText, spokenSummary, toMonViewModel } from './contract.ts';
 import { getUiResources, MON_MODEL_ORIGIN, mcpAppsRegistration, parseUiManifest, UI_MIME_TYPE, UI_TOOL_LINKS, type UiResource } from './index.ts';
 
 /**
@@ -126,7 +126,7 @@ describe('built MCP App views', () => {
     const read = (await registered[0]!.read()) as { contents: { mimeType: string; text: string; _meta: unknown }[] };
     expect(read.contents[0]?.text).toBe(resources[0]!.html);
     expect(read.contents[0]?._meta).toEqual({ ui: { csp: { connectDomains: [MON_MODEL_ORIGIN], resourceDomains: ['data:'] }, prefersBorder: false } });
-    expect(Object.keys(reg.toolResourceUris).sort()).toEqual(['feed_mon', 'get_mon_status', 'play_with_mon', 'rest_mon', 'wake_mon']);
+    expect(Object.keys(reg.toolResourceUris).sort()).toEqual(['check_incubation', 'feed_mon', 'get_mon_status', 'play_with_mon', 'rest_mon', 'wake_mon']);
     expect(UI_TOOL_LINKS.get_mon_status).toBe('mon-card');
   });
 });
@@ -186,6 +186,31 @@ describe('view model (adapter onto the companion models)', () => {
       journal: [{ at: 1, kind: 'hatched', first: true }, { at: 2, kind: 'not-a-kind' }, { at: 3, kind: 'fed', first: true }],
     });
     expect(vm?.journal.map((e) => e.kind)).toEqual(['hatched', 'fed']);
+  });
+
+  it("reads check_incubation's eggs as the Metro Egg with M11's time left", () => {
+    const at = Date.now();
+    const vm = toMonViewModel({
+      incubating: true,
+      eggs: [
+        { eggId: 'egg_late', speciesId: 'dex-001', incubationEndsAt: at + 60 * 60_000, minutesRemaining: 60, readyToHatch: false },
+        { eggId: 'egg_1', speciesId: 'dex-001', incubationEndsAt: at + 12 * 60_000, minutesRemaining: 12, readyToHatch: false },
+      ],
+    });
+    expect(vm?.monInstanceId).toBe('egg_1');
+    expect(vm?.name).toBe('Metro Egg');
+    expect(vm?.identity.dexId).toBe(1);
+    expect(vm?.care).toBeNull();
+    expect(vm?.suggested).toBeNull();
+    expect(vm?.status).toEqual({ text: '12 min left', tone: 'neutral' });
+    expect(eggTimeText(vm!.egg!, at)).toBe('12 min left');
+    expect(eggDetailText(vm!.egg!, vm!.name, at)).toMatch(/^Metro Egg · ready at /);
+    // Past its end time on this clock it reads ready, even before a new result.
+    expect(eggTimeText(vm!.egg!, at + 13 * 60_000)).toBe('Ready to hatch');
+    const ready = toMonViewModel({ incubating: true, eggs: [{ eggId: 'e', speciesId: 'dex-001', incubationEndsAt: at - 1, minutesRemaining: 0, readyToHatch: true }] });
+    expect(ready?.status).toEqual({ text: 'Ready to hatch', tone: 'request' });
+    expect(toMonViewModel({ incubating: false, eggs: [] })).toBeNull();
+    expect(toMonViewModel({ mon: { monId: 'm1', speciesId: 'dex-002' }, care: careView })?.egg).toBeNull();
   });
 
   it('words care outcomes with the M14–M16 strings', () => {

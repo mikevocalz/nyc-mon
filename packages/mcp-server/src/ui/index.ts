@@ -53,12 +53,15 @@ export const UI_CSP: UiCsp = { connectDomains: [MON_MODEL_ORIGIN], resourceDomai
  * renders them natively or by voice (hydrated / voice-only modes).
  * `check_on_mon` is left out on purpose: its result has no `care`, so the
  * card would open without meters. Add it here if it starts returning `care`.
+ * `check_incubation` opens the card too: while the companion is still an
+ * egg, the card shows the egg and its time left instead of meters.
  * `mon-room` has no tool of its own yet: any tool that returns `journal`
  * entries next to `mon` and `care` should link it. Until one exists, the card's
  * own expand control is the way into fullscreen.
  */
 export const UI_TOOL_LINKS = {
   get_mon_status: 'mon-card',
+  check_incubation: 'mon-card',
   feed_mon: 'mon-card',
   rest_mon: 'mon-card',
   wake_mon: 'mon-card',

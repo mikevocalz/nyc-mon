@@ -138,10 +138,15 @@ describe('built views boot in a spec host (bundled Chromium)', { timeout: 20_000
     try {
       const m = await b.frame.evaluate(() => ({
         text: document.getElementById('root')!.innerText,
+        journal: document.querySelector('[aria-label="Squeaklet and you"]') !== null,
+        rings: document.querySelectorAll('[role=progressbar]').length,
         scroll: document.documentElement.scrollHeight,
         inner: window.innerHeight,
       }));
-      expect(m.text).toContain('Squeaklet and you');
+      // The room shows the journal where the card has its rings, labelled with M18's heading.
+      expect(m.journal).toBe(true);
+      expect(m.rings).toBe(0);
+      expect(m.text).toContain("Squeaklet's first meal");
       expect(m.text).toContain('Close');
       expect(m.scroll).toBeLessThanOrEqual(m.inner);
       expect(b.errors).toEqual([]);
@@ -170,7 +175,8 @@ describe('built views boot in a spec host (bundled Chromium)', { timeout: 20_000
     try {
       const text = await b.frame.evaluate(() => document.getElementById('root')!.innerText);
       expect(text).toContain('Pip');
-      expect(text).toContain('Pip and you');
+      expect(await b.frame.locator('[aria-label="Pip and you"]').count()).toBe(1);
+      expect(text).toContain('Pip ate');
       expect(text).toContain('Feed');
       expect(b.errors).toEqual([]);
     } finally {
@@ -271,6 +277,103 @@ describe('built views boot in a spec host (bundled Chromium)', { timeout: 20_000
         await b.close();
       }
     }, 60_000);
+  });
+
+  describe('egg (check_incubation result)', () => {
+    const eggResult = (minutes: number) => ({
+      incubating: true,
+      eggs: [{ eggId: 'egg_demo', speciesId: 'dex-001', incubationEndsAt: now + minutes * 60_000, minutesRemaining: minutes, readyToHatch: minutes === 0 }],
+    });
+    const probe = (frame: Frame) =>
+      frame.evaluate(() => ({
+        text: document.getElementById('root')!.innerText,
+        buttons: [...document.querySelectorAll('button, [role=button]')].map((e) => (e.textContent ?? '').trim()),
+        rings: document.querySelectorAll('[role=progressbar]').length,
+        model: document.querySelector('[role=img][aria-label*="Metro Egg"]')?.getAttribute('aria-label') ?? null,
+        scrollW: document.documentElement.scrollWidth,
+        scrollH: document.documentElement.scrollHeight,
+        innerW: window.innerWidth,
+        innerH: window.innerHeight,
+      }));
+
+    for (const theme of ['light', 'dark'] as const) {
+      it(`card, ${theme}: the Metro Egg in 3D with its time left, no meters or care buttons, no overflow`, async () => {
+        const b = await boot('mon-card', { ...echoShow8('inline', theme), result: eggResult(12) });
+        try {
+          const m = await probe(b.frame);
+          expect(m.text).toContain('Metro Egg');
+          expect(m.text).toContain('12 min left');
+          expect(m.model).toBe('Metro Egg, incubating');
+          expect(m.rings).toBe(0);
+          expect(m.buttons).toEqual([]);
+          expect(m.scrollW).toBeLessThanOrEqual(m.innerW);
+          expect(m.scrollH).toBeLessThanOrEqual(m.innerH);
+          expect(b.errors).toEqual([]);
+        } finally {
+          await b.close();
+        }
+      });
+    }
+
+    it('card: a ready egg says so', async () => {
+      const b = await boot('mon-card', { ...echoShow8('inline', 'light'), result: eggResult(0) });
+      try {
+        const m = await probe(b.frame);
+        expect(m.text).toContain('Ready to hatch');
+        expect(m.model).toBe('Metro Egg, ready to hatch');
+        expect(b.errors).toEqual([]);
+      } finally {
+        await b.close();
+      }
+    });
+
+    it('room: only Close in the bar', async () => {
+      const b = await boot('mon-room', { ...echoShow8('fullscreen', 'dark'), result: eggResult(12) });
+      try {
+        const m = await probe(b.frame);
+        expect(m.buttons).toEqual(['Close']);
+        expect(m.scrollH).toBeLessThanOrEqual(m.innerH);
+      } finally {
+        await b.close();
+      }
+    });
+  });
+
+  it('room in a short frame (348 px) shows whole journal rows instead of the rings, newest first', async () => {
+    const journal = Array.from({ length: 12 }, (_, i) => ({ at: now - (i + 1) * 36e5, kind: i % 2 ? 'fed' : 'played', first: i === 11 }));
+    const b = await boot('mon-room', {
+      width: 1000,
+      height: 348,
+      hostContext: { theme: 'dark', displayMode: 'fullscreen', availableDisplayModes: ['inline', 'fullscreen'], deviceClass: 'echo-show-8', maxWidth: 1000, maxHeight: 348 },
+      result: { mon: monFor('dex-002'), care, journal },
+    });
+    try {
+      const m = await b.frame.evaluate(() => {
+        const all = [...document.querySelectorAll<HTMLElement>('[data-testid="journal-row"]')];
+        const box = all[0]?.closest('[aria-label="Squeaklet and you"]')?.getBoundingClientRect();
+        // Rows that did not fit wrap into a column past the box's right edge, clipped.
+        const rows = all.filter((r) => box !== undefined && r.getBoundingClientRect().left < box.right);
+        return {
+          rings: document.querySelectorAll('[role=progressbar]').length,
+          rows: rows.map((r) => r.innerText),
+          cut: rows.filter((r) => box !== undefined && r.getBoundingClientRect().bottom > box.bottom + 0.5).length,
+          text: document.getElementById('root')!.innerText,
+          scrollH: document.documentElement.scrollHeight,
+          innerH: window.innerHeight,
+        };
+      });
+      expect(m.rings).toBe(0);
+      expect(m.rows.length).toBeGreaterThan(0);
+      expect(m.rows.length).toBeLessThan(12);
+      expect(m.cut).toBe(0);
+      // Newest first: the most recent entry (played, an hour ago) leads.
+      expect(m.rows[0]).toContain('Squeaklet played Peek with you');
+      expect(m.text).toContain('Close');
+      expect(m.scrollH).toBeLessThanOrEqual(m.innerH);
+      expect(b.errors).toEqual([]);
+    } finally {
+      await b.close();
+    }
   });
 
   it('a failed care call shows and announces a plain-language notice', async () => {
