@@ -1,0 +1,93 @@
+diff --git a/dist/adapter/index.js b/dist/adapter/index.js
+index 9d821e4a7ce880608c67aaf2fc1c29b01124a635..78bcc67d24d32c8ae2a2e8c4ef48c92a93ae469d 100644
+--- a/dist/adapter/index.js
++++ b/dist/adapter/index.js
+@@ -24,6 +24,38 @@
+  * with a pointer to here.
+  */ const _adapterImplementsCustomAdapter = true;
+ void _adapterImplementsCustomAdapter;
++/**
++ * Payload's base `APIError` and better-call's `APIError` share the name
++ * "APIError", and better-call's `isAPIError` matches on the name. When a
++ * Payload APIError escapes an adapter method, better-call renders it as its
++ * own: `status` comes from `statusCode` (absent on Payload's, so the Response
++ * defaults to 200), `statusText` from `status.toString()` (Payload's numeric
++ * 500 becomes "500") and the body from `body` (absent, so empty). The request
++ * answers `200 500` with no body and nothing is logged.
++ *
++ * Rethrow it as a plain Error so better-call takes its unknown-error path:
++ * it logs `# SERVER_ERROR:` with the cause and answers a real 500.
++ */ function toAdapterError(method, model, error) {
++    if (error instanceof Error && error.name === 'APIError' && typeof error.statusCode !== 'number') {
++        return new Error(`[payload-adapter] ${method} on '${model}' failed: ${error.message}`, {
++            cause: error
++        });
++    }
++    return error;
++}
++function withPayloadErrorTranslation(methods) {
++    const wrapped = {};
++    for (const [method, fn] of Object.entries(methods)){
++        wrapped[method] = async (args)=>{
++            try {
++                return await fn(args);
++            } catch (error) {
++                throw toAdapterError(method, args?.model, error);
++            }
++        };
++    }
++    return wrapped;
++}
+ /**
+  * Detect the database type from the Payload instance.
+  */ export function detectDbType(payload) {
+@@ -233,7 +265,7 @@ void _adapterImplementsCustomAdapter;
+         // The factory handles all schema-aware transformations for us
+         const adapterFactory = createAdapterFactory({
+             config: factoryConfig,
+-            adapter: ({ schema, getModelName, debugLog })=>{
++            adapter: ({ schema, getModelName, getDefaultModelName, debugLog })=>{
+                 // Set fieldName on reference fields so the factory maps userId→user, etc.
+                 // Payload uses relationship fields without the Id suffix.
+                 // Only do this for references to 'id' (primary key). Non-PK references
+@@ -301,10 +333,21 @@ void _adapterImplementsCustomAdapter;
+                 // Uses factory's getModelName which respects BetterAuthOptions.modelName config
+                 // Fix: Better Auth's getModelName blindly appends 's' even when name already ends in 's'
+                 // (e.g., 'jwks' becomes 'jwkss'). We normalize to prevent double-s slugs.
++                //
++                // The factory calls adapter methods with the RESOLVED name
++                // (`getModelName(modelKey)`, so 'jwkss'), not the schema key. The
++                // double-s test must look at the schema key: testing `model` itself
++                // is always true for 'jwkss', which left the slug unfixed.
+                 const getCollection = (model)=>{
+                     const name = getModelName(model);
++                    let key = model;
++                    try {
++                        key = getDefaultModelName(model);
++                    } catch  {
++                    // Not a schema model; keep the name as given.
++                    }
+                     // Fix double-s from naive pluralization (e.g., jwkss → jwks)
+-                    if (name.endsWith('ss') && !model.endsWith('ss')) {
++                    if (name.endsWith('ss') && !key.endsWith('ss')) {
+                         return name.slice(0, -1);
+                     }
+                     return name;
+@@ -380,7 +423,7 @@ void _adapterImplementsCustomAdapter;
+                 // We cast at the interface boundary - this is standard practice
+                 // when implementing generic interfaces with concrete implementations.
+                 // The official Better Auth adapters do the same (visible in compiled .mjs).
+-                return {
++                return withPayloadErrorTranslation({
+                     create: async ({ model, data })=>{
+                         const payload = await getPayload();
+                         const collection = getCollection(model);
+@@ -840,7 +883,7 @@ void _adapterImplementsCustomAdapter;
+                         });
+                         return result.totalDocs;
+                     }
+-                };
++                });
+             }
+         });
+         return adapterFactory(options);

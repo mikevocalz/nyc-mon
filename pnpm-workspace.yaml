@@ -283,8 +283,11 @@ catalog:
   react-native-arrangement-view: 0.4.0
 
 patchedDependencies:
+  '@better-auth/core@1.7.10': patches/@better-auth__core@1.7.10.patch
+  '@delmaredigital/payload-better-auth@0.13.1': patches/@delmaredigital__payload-better-auth@0.13.1.patch
   '@reactvision/react-viro': patches/@reactvision__react-viro.patch
   '@rive-app/react-native@0.5.5': patches/@rive-app__react-native@0.5.5.patch
+  better-call@1.4.2: patches/better-call@1.4.2.patch
   metro@0.87.1: patches/metro@0.87.1.patch
   react-native-graph@1.4.0: patches/react-native-graph@1.4.0.patch
   react-native-skia@3.6.1: patches/react-native-skia@3.6.1.patch
