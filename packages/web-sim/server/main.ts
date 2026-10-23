@@ -111,6 +111,7 @@ const MIME: Record<string, string> = {
   '.svg': 'image/svg+xml',
   '.json': 'application/json',
   '.wasm': 'application/wasm',
+  '.glb': 'model/gltf-binary',
 };
 
 function serveStatic(req: IncomingMessage, res: ServerResponse): void {
@@ -160,6 +161,22 @@ async function main(): Promise<void> {
       const forwarded = req.headers['x-forwarded-for'];
       const key = clientKey(req.socket.remoteAddress, typeof forwarded === 'string' ? forwarded : null, env.SIM_TRUST_PROXY === '1');
       return void handleModel(toRequest(req), key).then((r) => sendResponse(res, r)).catch(fail);
+    }
+    // Mon GLBs: fetched by the view from the sandbox origin, so they carry CORS.
+    const glb = /^\/mons\/([a-z0-9-]+)\.glb$/.exec(url.pathname);
+    if (glb && req.method === 'GET') {
+      const file = join(root, 'public', 'mons', `${glb[1]}.glb`);
+      if (!existsSync(file)) {
+        res.writeHead(404, { 'content-type': 'text/plain' });
+        return void res.end('No such model.');
+      }
+      res.writeHead(200, {
+        'content-type': 'model/gltf-binary',
+        'access-control-allow-origin': '*',
+        'cache-control': 'public, max-age=3600',
+        'x-content-type-options': 'nosniff',
+      });
+      return void createReadStream(file).on('error', () => res.destroy()).pipe(res);
     }
     if (url.pathname.startsWith('/api/')) {
       res.writeHead(404, { 'content-type': 'application/json' });

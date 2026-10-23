@@ -93,6 +93,15 @@ if (env.apple !== undefined) {
 const baseOrigin = new URL(env.baseURL);
 
 /**
+ * The Alexa+ smart-display simulator (packages/web-sim) starts Login with
+ * Amazon from its own origin and reads the session back over credentialed
+ * CORS, so its origin must be trusted. SIM_PUBLIC_ORIGIN sets it; outside
+ * production it defaults to the simulator's dev origin.
+ */
+const SIM_ORIGIN: string | undefined =
+  process.env.SIM_PUBLIC_ORIGIN?.trim() || (env.isProduction ? undefined : 'http://localhost:5180');
+
+/**
  * The native app's origin, trusted on every deployment: it is first-party,
  * and React Native sends no Origin of its own (the client sends this one).
  * Must match `APP_ORIGIN` in `packages/auth/src/paths.ts`.
@@ -106,7 +115,7 @@ const NATIVE_APP_ORIGIN = 'nycmon://';
  */
 export const PAYLOAD_ORIGINS: string[] = [
   ...new Set(
-    [baseOrigin.origin, env.siteURL, ...env.trustedOrigins]
+    [baseOrigin.origin, env.siteURL, SIM_ORIGIN, ...env.trustedOrigins]
       .filter((origin): origin is string => origin !== undefined)
       .filter((origin) => /^https?:\/\//.test(origin))
       .map((origin) => new URL(origin).origin),
@@ -162,7 +171,12 @@ async function sendTwoFactorCode(
 }
 
 const canSendTwoFactorCode = sendMail !== undefined || smsSender !== undefined;
-const amazonPlugin = amazonOAuthPlugin(env.amazon);
+const amazonPlugin = amazonOAuthPlugin(env.amazon, {
+  allowSignUp: process.env.AMAZON_LWA_LOCAL_SIGNUP === 'true',
+  useLegacyCallback: process.env.AMAZON_LWA_LOCAL_LEGACY_CALLBACK === 'true',
+  nodeEnv: process.env.NODE_ENV,
+  baseURL: env.baseURL,
+});
 
 const plugins = [
   passkey({
@@ -234,7 +248,7 @@ export const betterAuthOptions = {
   baseURL: env.baseURL,
   basePath: `${PAYLOAD_API_ROUTE}${AUTH_BASE_PATH}`,
   secret: env.secret,
-  trustedOrigins: [baseOrigin.origin, NATIVE_APP_ORIGIN, ...env.trustedOrigins],
+  trustedOrigins: [baseOrigin.origin, NATIVE_APP_ORIGIN, ...(SIM_ORIGIN === undefined ? [] : [SIM_ORIGIN]), ...env.trustedOrigins],
   // The stock verify would hand the second device the phone's own session;
   // `/handoff/redeem` creates a new one. Phone numbers are never a password.
   // The OAuth provider's client CRUD and OIDC paths are off: clients are

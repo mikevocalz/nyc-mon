@@ -141,7 +141,7 @@ describe('server env', () => {
   });
   it('tells the browser nothing secret, and the client id from one variable', () => {
     const cfg = publicConfig(loadSimEnv({ AWS_REGION: 'us-east-1', SIM_SKILL_PATH: 'x', OAUTH_SIM_CLIENT_ID: 'sim-staging' }));
-    expect(Object.keys(cfg).sort()).toEqual(['authMode', 'clientId', 'devMode', 'mcpUrl', 'modelBackend', 'modelLabel', 'sandboxOrigin']);
+    expect(Object.keys(cfg).sort()).toEqual(['authIssuer', 'authMode', 'clientId', 'devMode', 'mcpUrl', 'modelBackend', 'modelLabel', 'sandboxOrigin']);
     expect(cfg.clientId).toBe('sim-staging');
     expect(publicConfig(loadSimEnv({})).clientId).toBe('nyc-mon-sim');
   });

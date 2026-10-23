@@ -2,6 +2,7 @@ import type { AuthState } from '../shared/auth.ts';
 
 export type JudgeStageKind =
   | 'signed-out'
+  | 'signed-in'
   | 'signing-in'
   | 'connecting'
   | 'offline'
@@ -21,6 +22,7 @@ export interface JudgeStage {
 
 export function judgeStage(input: {
   readonly authKind: AuthState['kind'];
+  readonly accountSignedIn?: boolean;
   readonly connectionKind: 'idle' | 'connecting' | 'connected' | 'failed';
   readonly listening: boolean;
   readonly busy: boolean;
@@ -30,9 +32,20 @@ export function judgeStage(input: {
   readonly lastReply: string;
 }): JudgeStage {
   if (input.authKind === 'signing-in') {
+    if (input.accountSignedIn) {
+      return { kind: 'connecting', label: 'Connecting', tone: 'info', headline: 'Connecting your Mon…' };
+    }
     return { kind: 'signing-in', label: 'Signing in', tone: 'info', headline: 'Opening your NYC-MON account…' };
   }
   if (input.authKind === 'signed-out' || input.authKind === 'error') {
+    if (input.accountSignedIn) {
+      return {
+        kind: 'signed-in',
+        label: input.authKind === 'error' ? 'Connection issue' : 'Signed in',
+        tone: input.authKind === 'error' ? 'danger' : 'success',
+        headline: 'Your account is signed in. Connect your Mon to start a conversation.',
+      };
+    }
     return {
       kind: 'signed-out',
       label: input.authKind === 'error' ? 'Sign-in issue' : 'Sign in',

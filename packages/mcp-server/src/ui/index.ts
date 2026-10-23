@@ -43,7 +43,13 @@ export interface UiResource {
   readonly prefersBorder: false;
 }
 
-export const UI_CSP: UiCsp = { connectDomains: [], resourceDomains: ['data:'] };
+/**
+ * Where the view fetches Mon GLBs (`/mons/<id>.glb`, served by the web-sim host).
+ * NYC_MON_MODEL_ORIGIN for a deployed host; the sim's local origin otherwise.
+ */
+export const MON_MODEL_ORIGIN = new URL(process.env.NYC_MON_MODEL_ORIGIN ?? 'http://localhost:5180').origin;
+
+export const UI_CSP: UiCsp = { connectDomains: [MON_MODEL_ORIGIN], resourceDomains: ['data:'] };
 
 /**
  * Which view each tool opens. Tools not listed return data only, and Alexa

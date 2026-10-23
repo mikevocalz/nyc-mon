@@ -23,6 +23,7 @@
  *      node_modules/@payloadcms/tanstack-start/dist/utilities/handleAPIRoute.server.js
  */
 import { createFileRoute } from '@tanstack/react-router';
+import { legacyAmazonCallback } from '../../legacy-amazon-callback';
 
 // The adapter declares this shape as a local, unexported type in
 // dist/routes/apiRoute.d.ts.
@@ -37,6 +38,8 @@ const PRIVATE_HEADERS: Readonly<Record<string, string>> = {
 };
 
 const handler: ApiRouteHandler = async ({ request }) => {
+  const legacyCallback = legacyAmazonCallback(request);
+  if (legacyCallback) return legacyCallback;
   const { handleEndpoints } = await import('payload');
   const response = await handleEndpoints({
     config: (await import('@payload-config')).default,

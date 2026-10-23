@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { companionCopy } from '@acme/app/features/companion/copy.ts';
 import { NEED_RING, isLow } from '@acme/app/features/companion/home-model.ts';
 import { groupJournalByDay, journalEntryCopyId, showsFirstBadge, type DayHeading } from '@acme/app/features/companion/journal-model.ts';
@@ -17,6 +18,7 @@ import { Heading } from '../../../../ui/Heading';
 import { Image, type ImageProps } from '../../../../ui/Image';
 import { StatusRow } from '../../../../ui/StatusRow';
 import { Text } from '../../../../ui/Text';
+import { MonModel3D } from '../../../../ui/three/mon/MonModel3D';
 import { ScrollView, View } from '../../../../ui/tw';
 import type { ActionId, MonViewModel } from '../contract.ts';
 
@@ -59,13 +61,45 @@ export interface MonViewProps {
   readonly onToggleRoom: () => void;
 }
 
-/** HomeLayout's renderStill, as written there: a sized box, the bare image filling it. */
+declare const __MON_MODEL_ORIGIN__: string;
+
+/**
+ * Forms with a finished, rigged model (Dex number -> GLB on the sim host and
+ * the clip to loop). Every other Mon shows its still with "Coming Soon";
+ * their models arrive through the Payload console (mon-models).
+ */
+const MON_MODELS: Readonly<Record<number, { file: string; clips: readonly string[] }>> = {
+  2: { file: 'squeaklet', clips: ['tail_swish', 'rat_run'] },
+  3: { file: 'lil-ratti', clips: ['up_idle', 'up_breathe', 'quad_idle_sniff'] },
+};
+
+/** The Mon in 3D (three.js) when its model exists; otherwise HomeLayout's still with a Coming Soon badge. */
 function Still({ vm, width }: { vm: MonViewModel; width: number }) {
-  const art = artFor('baby', vm.identity.dexId);
-  if (!art) return null;
+  const dex = vm.identity.dexId;
+  const model = dex === null ? undefined : MON_MODELS[dex];
+  const [failed, setFailed] = useState(false);
+  const art = artFor('baby', dex);
+  if (model && !failed) {
+    return (
+      <MonModel3D
+        url={`${typeof __MON_MODEL_ORIGIN__ === 'string' ? __MON_MODEL_ORIGIN__ : ''}/mons/${model.file}.glb`}
+        clips={model.clips}
+        width={width}
+        height={Math.round(width * 1.25)}
+        label={vm.name}
+        onError={() => setFailed(true)}
+      />
+    );
+  }
+  if (!art) return <Badge label="Coming Soon" tone="neutral" />;
   return (
     <View style={{ width, aspectRatio: art.width / art.height }}>
       <Image src={art.source as ImageProps['src']} alt={art.alt} fill framed={false} unoptimized className="h-full w-full" />
+      {model ? null : (
+        <View className="absolute left-2 top-2">
+          <Badge label="Coming Soon" tone="neutral" />
+        </View>
+      )}
     </View>
   );
 }

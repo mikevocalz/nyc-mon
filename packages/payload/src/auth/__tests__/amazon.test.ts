@@ -90,4 +90,39 @@ describe('Login with Amazon profile mapping', () => {
     expect(AMAZON_PROFILE_URL).toBe('https://api.amazon.com/user/profile');
     expect(AMAZON_SCOPES).toEqual(['profile']);
   });
+
+  it.each([
+    ['development', 'http://localhost:5174', true, false],
+    ['development', 'http://127.0.0.1:5174', true, false],
+    ['development', 'http://[::1]:5174', true, false],
+    ['development', 'http://localhost:5174', false, true],
+    ['production', 'http://localhost:5174', true, true],
+    ['test', 'http://localhost:5174', true, true],
+    [undefined, 'http://localhost:5174', true, true],
+    ['development', 'https://admin.example.com', true, true],
+    ['development', 'https://localhost.example.com', true, true],
+    ['development', 'invalid-url', true, true],
+  ])('keeps signup guarded for %s / %s / opt-in=%s', (nodeEnv, baseURL, allowSignUp, disabled) => {
+    const plugin = amazonOAuthPlugin({ clientId: 'client-id', clientSecret: 'client-secret' }, {
+      nodeEnv, baseURL, allowSignUp,
+    });
+    const config = (plugin as unknown as {
+      options: { config: Array<{ disableImplicitSignUp: boolean; disableSignUp: boolean }> };
+    }).options.config[0];
+    expect(config?.disableImplicitSignUp).toBe(disabled);
+    expect(config?.disableSignUp).toBe(disabled);
+  });
+
+  it.each(['development', 'production'])('uses a registered legacy callback only in local development (%s)', (nodeEnv) => {
+    const plugin = amazonOAuthPlugin({ clientId: 'client-id', clientSecret: 'client-secret' }, {
+      nodeEnv, baseURL: 'http://localhost:5174', allowSignUp: false, useLegacyCallback: true,
+    });
+    const config = (plugin as unknown as {
+      options: { config: Array<{ redirectURI?: string; disableSignUp: boolean }> };
+    }).options.config[0];
+    expect(config?.redirectURI).toBe(nodeEnv === 'development'
+      ? 'http://localhost:5174/payload-api/auth/oauth2/callback/amazon'
+      : undefined);
+    expect(config?.disableSignUp).toBe(true);
+  });
 });

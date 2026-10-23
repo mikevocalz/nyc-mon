@@ -5,9 +5,10 @@ import { getToolUiResourceUri } from '@modelcontextprotocol/ext-apps/app-bridge'
 import { runAgentTurn } from '../shared/agentLoop.ts';
 import { SimOAuthProvider, parseCallback, resolveAuthState, type AuthState } from '../shared/auth.ts';
 import { mcpToolsToClaude, type ConversionResult } from '../shared/toolSpec.ts';
-import { Badge, Banner, BrandWordmark, Button, Card, ErrorMessage, SolidPanel, Switch, TextField, useInstanceStore, useStore } from '@acme/ui';
+import { AuthProviderButton, Badge, Banner, BrandWordmark, Button, Card, ErrorMessage, SolidPanel, Switch, TextField, useInstanceStore, useStore } from '@acme/ui';
 import { Form, Header, Heading, Paragraph, Section } from '@acme/ui/html';
 import { Text, View } from '@acme/ui/tw';
+import { amazonErrorFromUrl, getAmazonUser, signOutAmazon, startAmazonSignIn, type AmazonUser } from './amazonAuth.ts';
 import { AppView, type DisplayMode } from './AppView.tsx';
 import { DevPanel } from './DevPanel.tsx';
 import { GridBand, GridBandBoundary } from './GridBand.tsx';
@@ -37,6 +38,7 @@ export interface PublicConfig {
   readonly devMode: boolean;
   readonly modelBackend: 'bedrock' | 'mock';
   readonly modelLabel: string;
+  readonly authIssuer: string;
 }
 
 type Connection =
@@ -63,6 +65,10 @@ interface AppState {
   /** Dev panel: '' is the Caller, otherwise the familiar person the simulator says is speaking. */
   speakerId: string;
   speakerName: string;
+  /** Login with Amazon: the Better Auth session on AUTH_ISSUER. */
+  amazonUser: AmazonUser | null;
+  amazonBusy: boolean;
+  amazonError: string | null;
 }
 
 const SUGGESTIONS = ['How’s my Mon doing?', 'Are you hungry?', 'Who’s here right now?'];
@@ -119,6 +125,9 @@ export function App({ config }: { config: PublicConfig }) {
     time: clock(),
     speakerId: '',
     speakerName: '',
+    amazonUser: null,
+    amazonBusy: false,
+    amazonError: null,
   }));
   const { items, auth, conn, busy, live, draft, listening, heard, activeViewId, activeToolTitle, displayMode, scheme, readAloud, time, speakerId } = useStore(store);
   const {
@@ -138,7 +147,11 @@ export function App({ config }: { config: PublicConfig }) {
     time: setTime,
     speakerId: setSpeakerId,
     speakerName: setSpeakerName,
+    amazonUser: setAmazonUser,
+    amazonBusy: setAmazonBusy,
+    amazonError: setAmazonError,
   } = useSetters(store);
+  const { amazonUser, amazonBusy, amazonError } = useStore(store);
   const historyRef = useRef<Anthropic.MessageParam[]>(initial.history);
   const abortRef = useRef<AbortController | null>(null);
   const model = useMemo(
@@ -176,6 +189,19 @@ export function App({ config }: { config: PublicConfig }) {
     const log = document.querySelector<HTMLElement>('[role="log"]');
     if (log) log.scrollTop = log.scrollHeight;
   }, [items, live]);
+
+  // Login with Amazon: read the issuer session, and any error Better Auth sent back.
+  useEffect(() => {
+    if (window.location.pathname === CALLBACK_PATH) return;
+    const err = amazonErrorFromUrl(window.location.search);
+    if (err) {
+      setAmazonError(err);
+      window.history.replaceState(null, '', '/');
+    }
+    getAmazonUser(config.authIssuer)
+      .then(setAmazonUser)
+      .catch(() => setAmazonUser(null));
+  }, [config.authIssuer, setAmazonError, setAmazonUser]);
 
   // OAuth redirect back from the authorization server.
   useEffect(() => {
@@ -375,12 +401,13 @@ export function App({ config }: { config: PublicConfig }) {
         ? 'Connecting'
         : conn.kind === 'failed'
           ? 'Offline'
-          : 'Signed out';
+          : amazonUser ? 'Mon not connected' : 'Signed out';
   const connTone = conn.kind === 'connected' ? 'success' : conn.kind === 'failed' ? 'danger' : 'neutral';
   const canTalk = conn.kind === 'connected';
   const fullscreen = displayMode === 'fullscreen';
   const stage = judgeStage({
     authKind: auth.kind,
+    accountSignedIn: amazonUser !== null,
     connectionKind: conn.kind,
     listening: listening !== null,
     busy,
@@ -390,18 +417,41 @@ export function App({ config }: { config: PublicConfig }) {
     lastReply,
   });
 
+  function startAmazon() {
+    setAmazonBusy(true);
+    setAmazonError(null);
+    startAmazonSignIn(config.authIssuer, `${window.location.origin}/`).catch((err: unknown) => {
+      setAmazonBusy(false);
+      setAmazonError(err instanceof Error ? err.message : String(err));
+    });
+  }
+
+  function signOutOfAmazon() {
+    setAmazonBusy(true);
+    setAmazonError(null);
+    void signOutAmazon(config.authIssuer)
+      .then(() => {
+        signOut();
+        setAmazonUser(null);
+      })
+      .catch(() => setAmazonError('Couldn’t sign out. Please try again.'))
+      .finally(() => setAmazonBusy(false));
+  }
+
   function startSignIn() {
     setAuth({ kind: 'signing-in' });
     beginSignIn(config.mcpUrl, provider).catch((err: unknown) =>
-      setAuth({ kind: 'error', message: `Sign-in couldn’t start: ${err instanceof Error ? err.message : String(err)}` }),
+      setAuth({ kind: 'error', message: amazonUser
+        ? 'Your account is signed in, but your Mon couldn’t connect. Please try again when the NYC-MON server is available.'
+        : `Sign-in couldn’t start: ${err instanceof Error ? err.message : String(err)}` }),
     );
   }
 
   return (
     <View className="w-full flex-1 bg-bg">
       <Section aria-labelledby="sim-title" className="mx-auto w-full max-w-screen-xl gap-8 px-4 py-10 sm:px-6 md:py-14 lg:px-8">
-        <Header className="flex-col gap-4 md:flex-row md:items-end md:justify-between">
-          <View className="max-w-2xl gap-3">
+        <Header className="w-full min-w-0 flex-col gap-5">
+          <View className="w-full max-w-2xl gap-3">
             <BrandWordmark height={40} />
             <Heading level={1} id="sim-title" className="my-0 font-display text-3xl leading-tight text-text md:text-4xl">
               Talk to your Mon
@@ -410,7 +460,7 @@ export function App({ config }: { config: PublicConfig }) {
               A smart display running the NYC-MON add-on. Say or type something; your Mon answers out loud.
             </Paragraph>
           </View>
-          <View className="flex-row flex-wrap items-center gap-3">
+          <View className="w-full min-w-0 flex-row flex-wrap items-center gap-x-3 gap-y-4">
             {canSpeak() ? (
               <View className="w-60">
                 <Switch
@@ -430,9 +480,19 @@ export function App({ config }: { config: PublicConfig }) {
             ) : null}
             <Button variant="ghost" size="sm" title={scheme === 'dark' ? 'Daylight' : 'Night'} onPress={toggleTheme} />
             <Button variant="ghost" size="sm" title="New conversation" onPress={newConversation} disabled={items.length === 0} />
-            {auth.kind === 'signed-in' ? <Button variant="ghost" size="sm" title="Sign out" onPress={signOut} /> : null}
+            {auth.kind === 'signed-in' && !amazonUser ? <Button variant="ghost" size="sm" title="Sign out" onPress={signOut} /> : null}
+            {amazonUser ? (
+              <View className="min-w-0 max-w-full flex-row flex-wrap items-center gap-3">
+                <View role="status" aria-live="polite" className="min-w-0 gap-1">
+                  <Badge label="Signed in with Amazon" tone="success" />
+                  {amazonUser.name ? <Text numberOfLines={1} className="max-w-48 text-xr-caption text-text-muted">{amazonUser.name}</Text> : null}
+                </View>
+                <Button variant="ghost" size="sm" title="Sign out" loading={amazonBusy} onPress={signOutOfAmazon} />
+              </View>
+            ) : null}
           </View>
         </Header>
+        <ErrorMessage message={amazonError ?? undefined} />
 
         <View className="gap-6 lg:flex-row lg:items-start">
           <View className="min-w-0 flex-1 gap-3">
@@ -456,11 +516,14 @@ export function App({ config }: { config: PublicConfig }) {
                 {!signedIn ? (
                   <View className="flex-1 justify-center px-5 py-6 md:px-10">
                     <View className="max-w-xl gap-3">
-                      <Card variant="notch" district="midtown" title="Meet your Mon here" description="Sign in with your NYC-MON account. The add-on is for adults 18 and over." />
+                      <Card variant="notch" district="midtown" title={amazonUser ? 'You’re signed in' : 'Meet your Mon here'} description={amazonUser ? 'Connect your Mon to start a conversation.' : 'Sign in with your NYC-MON account. The add-on is for adults 18 and over.'} />
                       <ErrorMessage message={auth.kind === 'error' ? auth.message : undefined} />
                       <View className="flex-row">
-                        <Button variant="cta" title="Sign in" loading={auth.kind === 'signing-in'} onPress={startSignIn} />
+                        <Button variant="cta" title={amazonUser ? 'Connect your Mon' : 'Sign in'} loading={auth.kind === 'signing-in'} onPress={startSignIn} />
                       </View>
+                      {!amazonUser ? (
+                        <AuthProviderButton provider="amazon" intent="sign-in" loading={amazonBusy} onPress={startAmazon} />
+                      ) : null}
                     </View>
                   </View>
                 ) : (

@@ -87,6 +87,8 @@ export interface PublicConfig {
   readonly devMode: boolean;
   readonly modelBackend: 'bedrock' | 'mock';
   readonly modelLabel: string;
+  /** Origin of the Better Auth server (AUTH_ISSUER), for Login with Amazon. */
+  readonly authIssuer: string;
 }
 
 export function publicConfig(env: SimEnv): PublicConfig {
@@ -98,5 +100,6 @@ export function publicConfig(env: SimEnv): PublicConfig {
     devMode: env.SIM_DEV_MODE === '1',
     modelBackend: env.SIM_MODEL_BACKEND,
     modelLabel: env.SIM_MODEL_BACKEND === 'mock' ? 'Scripted test model' : `Claude on Amazon Bedrock (${env.SIM_BEDROCK_MODEL_ID})`,
+    authIssuer: new URL(env.AUTH_ISSUER).origin,
   };
 }

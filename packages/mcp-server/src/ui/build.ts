@@ -21,6 +21,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import sharp from 'sharp';
 import { build, type InlineConfig, type Plugin } from 'vite';
 import { viteSingleFile } from 'vite-plugin-singlefile';
+import { MON_MODEL_ORIGIN } from './index.ts';
 import { UI_VIEWS, type UiViewId } from './views.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -82,6 +83,7 @@ async function buildView(view: UiViewId): Promise<string> {
       // The room carries the GridBand backdrop; the inline card does not.
       __GRID_BACKDROP__: JSON.stringify(view === 'mon-room'),
       'process.env.NODE_ENV': JSON.stringify('production'),
+      __MON_MODEL_ORIGIN__: JSON.stringify(MON_MODEL_ORIGIN),
     },
     build: {
       outDir,

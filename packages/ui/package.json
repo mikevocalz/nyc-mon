@@ -40,7 +40,8 @@
     "./adaptive-panes": "./adaptive-panes/index.tsx",
     "./arrangement": "./arrangement/index.ts",
     "./adaptive-panes/parts": "./adaptive-panes/parts.ts",
-    "./three/hatch": "./three/hatch/index.ts"
+    "./three/hatch": "./three/hatch/index.ts",
+    "./three/mon": "./three/mon/MonModel3D.tsx"
   },
   "sideEffects": [
     "./rn-globals-shim.ts",
