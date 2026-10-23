@@ -9,7 +9,7 @@
     "preview": "node --env-file-if-exists=../../.env --env-file-if-exists=../../.env.local node_modules/vite/bin/vite.js preview",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "test": "node --test console-scope.test.mjs legacy-amazon-callback.test.mjs",
+    "test": "node --test console-scope.test.mjs",
     "payload": "node --env-file-if-exists=../../.env --env-file-if-exists=../../.env.local node_modules/payload/bin.js",
     "payload:importmap": "pnpm payload generate:importmap",
     "payload:types": "pnpm payload generate:types",

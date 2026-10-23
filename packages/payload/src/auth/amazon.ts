@@ -23,7 +23,6 @@ export interface AmazonLocalDevelopment {
   readonly allowSignUp: boolean;
   readonly nodeEnv: string | undefined;
   readonly baseURL: string;
-  readonly useLegacyCallback?: boolean;
 }
 
 /** An explicit localhost-only demo option; deployed environments stay link-only. */
@@ -92,8 +91,7 @@ export async function fetchAmazonProfile(
  */
 export function amazonOAuthPlugin(client: AmazonOAuthClient | undefined, local?: AmazonLocalDevelopment) {
   if (client === undefined) return undefined;
-  const localDevelopment = isLocalDevelopment(local);
-  const localSignUp = localDevelopment && local?.allowSignUp === true;
+  const localSignUp = isLocalDevelopment(local) && local?.allowSignUp === true;
   if (localSignUp) console.warn('[auth] AMAZON_LWA_LOCAL_SIGNUP: Login with Amazon can create accounts without the birth-year gate (local development only).');
 
   return genericOAuth({
@@ -107,11 +105,6 @@ export function amazonOAuthPlugin(client: AmazonOAuthClient | undefined, local?:
         userInfoUrl: AMAZON_PROFILE_URL,
         scopes: [...AMAZON_SCOPES],
         responseType: 'code',
-        // Keep an already-registered local callback working across Better Auth's
-        // genericOAuth endpoint migration. The admin forwards it to the core callback.
-        ...(localDevelopment && local?.useLegacyCallback
-          ? { redirectURI: new URL('/payload-api/auth/oauth2/callback/amazon', local.baseURL).href }
-          : {}),
         pkce: true,
         authentication: 'basic',
         disableImplicitSignUp: !localSignUp,

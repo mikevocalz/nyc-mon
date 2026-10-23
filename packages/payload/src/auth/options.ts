@@ -164,7 +164,6 @@ async function sendTwoFactorCode(
 const canSendTwoFactorCode = sendMail !== undefined || smsSender !== undefined;
 const amazonPlugin = amazonOAuthPlugin(env.amazon, {
   allowSignUp: process.env.AMAZON_LWA_LOCAL_SIGNUP === 'true',
-  useLegacyCallback: process.env.AMAZON_LWA_LOCAL_LEGACY_CALLBACK === 'true',
   nodeEnv: process.env.NODE_ENV,
   baseURL: env.baseURL,
 });

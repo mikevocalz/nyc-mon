@@ -112,19 +112,6 @@ describe('Login with Amazon profile mapping', () => {
     expect(config?.disableImplicitSignUp).toBe(disabled);
     expect(config?.disableSignUp).toBe(disabled);
   });
-
-  it.each(['development', 'production'])('uses a registered legacy callback only in local development (%s)', (nodeEnv) => {
-    const plugin = amazonOAuthPlugin({ clientId: 'client-id', clientSecret: 'client-secret' }, {
-      nodeEnv, baseURL: 'http://localhost:5174', allowSignUp: false, useLegacyCallback: true,
-    });
-    const config = (plugin as unknown as {
-      options: { config: Array<{ redirectURI?: string; disableSignUp: boolean }> };
-    }).options.config[0];
-    expect(config?.redirectURI).toBe(nodeEnv === 'development'
-      ? 'http://localhost:5174/payload-api/auth/oauth2/callback/amazon'
-      : undefined);
-    expect(config?.disableSignUp).toBe(true);
-  });
 });
 
 describe('amazonOAuthPlugin on a hosted build', () => {
