@@ -75,21 +75,28 @@ export function MonModel3D({ url, clips = NO_CLIPS, width, height, label, onErro
       url,
       (gltf) => {
         if (disposed) return;
-        root = gltf.scene;
-        root.traverse((o) => {
+        gltf.scene.traverse((o) => {
           if ((o as THREE.Mesh).isMesh) o.frustumCulled = false;
         });
-        scene.add(root);
-        const box = new THREE.Box3().setFromObject(root);
+        const model = gltf.scene;
+        const box = new THREE.Box3().setFromObject(model);
         const size = box.getSize(new THREE.Vector3());
         const centre = box.getCenter(new THREE.Vector3());
-        const tall = Math.max(size.y, size.x * 0.8);
-        const dist = tall / (2 * Math.tan((camera.fov * Math.PI) / 360)) * 1.15;
-        camera.position.set(centre.x + dist * 0.25, centre.y + tall * 0.08, centre.z + dist);
-        camera.lookAt(centre);
+        // Spin about the model's own centre, not the file origin.
+        model.position.set(-centre.x, -centre.y, -centre.z);
+        root = new THREE.Group();
+        root.add(model);
+        scene.add(root);
+        // Fit the cylinder the turntable sweeps, so tails and arms never clip.
+        const radius = Math.hypot(size.x, size.z) / 2;
+        const vHalf = (camera.fov * Math.PI) / 360;
+        const hHalf = Math.atan(Math.tan(vHalf) * camera.aspect);
+        const dist = Math.max(size.y / 2 / Math.tan(vHalf), radius / Math.tan(hHalf)) * 1.08 + radius;
+        camera.position.set(0, size.y * 0.08, dist);
+        camera.lookAt(0, 0, 0);
         const clip = clipsRef.current.map((n) => THREE.AnimationClip.findByName(gltf.animations, n)).find(Boolean);
         if (clip) {
-          mixer = new THREE.AnimationMixer(root);
+          mixer = new THREE.AnimationMixer(model);
           mixer.clipAction(clip).play();
         }
         setState('ready');
