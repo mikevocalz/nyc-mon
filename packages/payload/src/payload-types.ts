@@ -288,6 +288,7 @@ export interface MonInstance {
   hatchedAt: number;
   bond: number;
   stage: 'Baby' | 'Small' | 'Mid' | 'Max';
+  gender?: ('female' | 'male') | null;
   voiceLineageId?: string | null;
   serverConfirmedAt?: string | null;
   updatedAt: string;
@@ -1429,6 +1430,7 @@ export interface MonInstancesSelect<T extends boolean = true> {
   hatchedAt?: T;
   bond?: T;
   stage?: T;
+  gender?: T;
   voiceLineageId?: T;
   serverConfirmedAt?: T;
   updatedAt?: T;

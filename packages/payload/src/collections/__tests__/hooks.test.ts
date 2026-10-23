@@ -122,6 +122,28 @@ describe('mon-instances (Laws 6, 8)', () => {
     }
   });
 
+  it('refuses a Mon whose gender or voice lineage is not the one minted from its egg', async () => {
+    const minted = validMonDoc();
+    const otherGender = minted.gender === 'female' ? 'male' : 'female';
+    for (const patch of [{ gender: otherGender }, { gender: null }, { voiceLineageId: 'dex-001/female/9' }, { voiceLineageId: null }]) {
+      const { req } = withEgg(validEggDoc());
+      const code = await codeOf(change(validateMonInstance, { data: validMonDoc(patch), operation: 'create' }, req));
+      expect(code, JSON.stringify(patch)).toBe('INVALID_RECORD');
+    }
+  });
+
+  it('lets a pre-voice Mon gain its gender and lineage once, then keeps them for life', async () => {
+    const legacy = validMonDoc({ gender: null, voiceLineageId: null });
+    const backfill = { gender: validMonDoc().gender, voiceLineageId: validMonDoc().voiceLineageId };
+    expect(await codeOf(change(validateMonInstance, { data: backfill, operation: 'update', originalDoc: legacy }))).toBeUndefined();
+    const stored = validMonDoc();
+    const otherGender = stored.gender === 'female' ? 'male' : 'female';
+    for (const patch of [{ gender: otherGender }, { voiceLineageId: 'dex-001/male/1' }, { gender: null }]) {
+      const code = await codeOf(change(validateMonInstance, { data: patch, operation: 'update', originalDoc: stored }));
+      expect(code, JSON.stringify(patch)).toBe('IMMUTABLE_FIELD');
+    }
+  });
+
   it('never stores a Mon as an Egg and never moves a stage back (Law 8)', async () => {
     const { req } = withEgg(validEggDoc());
     const asEgg = change(validateMonInstance, { data: validMonDoc({ stage: 'Egg' }), operation: 'create' }, req);
