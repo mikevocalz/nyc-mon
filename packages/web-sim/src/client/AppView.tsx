@@ -68,20 +68,18 @@ async function readView(client: Client, uri: string): Promise<LoadedResource> {
 export function AppView(props: AppViewProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const bridgeRef = useRef<AppBridge | null>(null);
-  // src: the sandbox proxy URL. height: the content height the view reports
-  // (ui/notifications/size-changed). available: the display's height, the cap.
+  // src: the sandbox proxy URL. available: the display slot's height, sent as
+  // maxHeight so an inline view fills the display without overflowing it.
   const store = useInstanceStore<{
     src: string | null;
-    height: number;
     available: number;
     status: 'loading' | 'ready' | 'error';
     error: string;
     attempt: number;
-  }>(() => ({ src: null, height: 320, available: 0, status: 'loading', error: '', attempt: 0 }));
-  const { src, height, available, status, error, attempt } = useStore(store);
+  }>(() => ({ src: null, available: 0, status: 'loading', error: '', attempt: 0 }));
+  const { src, available, status, error, attempt } = useStore(store);
   const {
     src: setSrc,
-    height: setHeight,
     available: setAvailable,
     status: setStatus,
     error: setError,
@@ -133,6 +131,7 @@ export function AppView(props: AppViewProps) {
             platform: 'web',
             displayMode: props.displayMode,
             availableDisplayModes: ['inline', 'fullscreen'],
+            ...(store.getState().available > 0 ? { maxHeight: store.getState().available } : {}),
             styles: { variables: hostStyleVariables(props.scheme) },
             ...(props.tool ? { toolInfo: { tool: props.tool } } : {}),
           } as never,
@@ -144,9 +143,6 @@ export function AppView(props: AppViewProps) {
         const next: DisplayMode = mode === 'fullscreen' ? 'fullscreen' : 'inline';
         requestDisplayMode(next);
         return { mode: next };
-      };
-      bridge.onsizechange = ({ height: h }) => {
-        if (typeof h === 'number' && h > 0) setHeight(Math.ceil(h));
       };
       bridge.onopenlink = async ({ url }) => {
         if (/^https:\/\//.test(url)) window.open(url, '_blank', 'noopener,noreferrer');
@@ -205,16 +201,18 @@ export function AppView(props: AppViewProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.client, props.resourceUri, props.sandboxOrigin, attempt]);
 
-  // Track the stage space so the inline frame never runs past the display.
+  // The slot around the frame is the display's free space; report it as it changes.
   useEffect(() => {
-    // The canvas is the display itself; the slot around the frame scrolls when
-    // the view is taller than the space beside the reply.
-    const el = (iframeRef.current?.closest('[aria-label="Smart display"]') as HTMLElement | null) ?? null;
+    const el = iframeRef.current?.parentElement;
     if (!el || typeof ResizeObserver === 'undefined') return;
     const ro = new ResizeObserver(([entry]) => setAvailable(Math.floor(entry?.contentRect.height ?? 0)));
     ro.observe(el);
     return () => ro.disconnect();
   }, [setAvailable]);
+
+  useEffect(() => {
+    if (available > 0) void bridgeRef.current?.sendHostContextChange({ maxHeight: available } as never);
+  }, [available]);
 
   useEffect(() => {
     void bridgeRef.current?.sendHostContextChange({ displayMode: props.displayMode });
@@ -228,7 +226,7 @@ export function AppView(props: AppViewProps) {
   }, [props.scheme]);
 
   return (
-    <View className="relative min-h-0 flex-1 overflow-y-auto">
+    <View className="relative min-h-0 flex-1 overflow-hidden">
       {status === 'error' ? (
         <View className="gap-3 p-4">
           <Paragraph role="alert" className="my-0 text-sm text-danger">
@@ -254,7 +252,8 @@ export function AppView(props: AppViewProps) {
         src={src ?? undefined}
         hidden={status === 'error'}
         status={status}
-        style={{ height: props.displayMode === 'inline' ? (available > 0 ? Math.min(height, available) : height) : '100%' }}
+        // The view fits whatever height it is given (MonView), so the frame fills its slot and nothing scrolls.
+        style={{ height: '100%' }}
       />
       {status === 'loading' ? <Paragraph className="my-0 p-4 text-sm text-text-secondary">Loading view…</Paragraph> : null}
     </View>

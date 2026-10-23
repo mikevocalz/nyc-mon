@@ -11,7 +11,6 @@ import { MonModel3D } from '@acme/ui/three/mon';
 import { Text, View } from '@acme/ui/tw';
 import { AppView, type DisplayMode } from './AppView.tsx';
 import { DevPanel } from './DevPanel.tsx';
-import { GridBand, GridBandBoundary } from './GridBand.tsx';
 import { judgeStage } from './judgeStatus.ts';
 import { SignInRequired, beginSignIn, completeSignIn, connectMcp, type McpSession } from './mcp.ts';
 import { ModelAuthExpiredError, ModelTurnError, httpModelClient } from './modelClient.ts';
@@ -455,19 +454,19 @@ export function App({ config }: { config: PublicConfig }) {
   }
 
   return (
-    <View className="w-full flex-1 bg-bg">
-      <Section aria-labelledby="sim-title" className="mx-auto w-full max-w-screen-xl gap-8 px-4 py-10 sm:px-6 md:py-14 lg:px-8">
-        <Header className="flex-col gap-4 md:flex-row md:items-end md:justify-between">
-          <View className="max-w-2xl gap-3">
-            <BrandWordmark height={40} />
-            <Heading level={1} id="sim-title" className="my-0 font-display text-3xl leading-tight text-text md:text-4xl">
+    // One screen, like the device it stands in for: the page never scrolls.
+    // h-dvh is the ceiling and overflow-hidden holds it; each column below
+    // takes min-h-0 so it shrinks to the space instead of measuring content.
+    <View className="h-dvh w-full overflow-hidden bg-bg">
+      <Section aria-labelledby="sim-title" className="mx-auto flex h-full w-full max-w-screen-xl flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8">
+        <Header className="flex-row flex-wrap items-center justify-between gap-x-6 gap-y-2">
+          <View className="flex-row items-center gap-4">
+            <BrandWordmark height={28} />
+            <Heading level={1} id="sim-title" className="my-0 font-display text-xl leading-tight text-text">
               Talk to your Mon
             </Heading>
-            <Paragraph className="my-0 text-base leading-7 text-text-secondary md:text-lg md:leading-8">
-              A smart display running the NYC-MON add-on. Tap Talk and ask; your Mon answers out loud.
-            </Paragraph>
           </View>
-          <View className="flex-row flex-wrap items-center gap-3">
+          <View className="min-w-0 flex-row flex-wrap items-center justify-end gap-3">
             {canSpeak() ? (
               <View className="w-60">
                 <Switch
@@ -491,14 +490,14 @@ export function App({ config }: { config: PublicConfig }) {
           </View>
         </Header>
 
-        <View className="gap-6 lg:flex-row lg:items-start">
-          <View className="min-w-0 flex-1 gap-4">
-            <SolidPanel surface="page" depth="lg">
+        <View className="min-h-0 flex-1 gap-6 lg:flex-row">
+          <View className="min-h-0 min-w-0 flex-1 gap-3">
+            <SolidPanel surface="page" depth="lg" fill>
               <View
                 aria-label="Smart display"
                 role="region"
                 data-judge-state={stage.kind}
-                className="relative min-h-[560px] w-full overflow-hidden md:aspect-[16/10] md:min-h-0"
+                className="relative h-full w-full overflow-hidden"
               >
                 <View className="flex-row items-center justify-between gap-3 px-5 pt-4">
                   <Text className="text-xr-caption text-text-muted">{time}</Text>
@@ -527,7 +526,8 @@ export function App({ config }: { config: PublicConfig }) {
                 ) : (
                   <>
                     {/* Alexa+ speaks the reply; the screen belongs to the add-on's view. */}
-                    <View className="min-h-0 flex-1 px-5 py-3">
+                    {/* The view brings its own padding; the display adds only the side inset. */}
+                    <View className="min-h-0 flex-1 px-3">
                       {activeView && activeView.resourceUri && session ? (
                         <View className={fullscreen ? 'absolute inset-0 z-10 bg-surface-raised p-4' : 'min-h-0 flex-1'}>
                           <AppView
@@ -563,7 +563,7 @@ export function App({ config }: { config: PublicConfig }) {
                       ) : null}
                     </View>
                     {/* On-screen captions, as on an Echo Show: the latest line only. */}
-                    <View aria-live="polite" aria-atomic="true" className="px-5 pb-4">
+                    <View aria-live="polite" aria-atomic="true" className="px-5 pb-3 pt-1">
                       {caption ? (
                         <Text numberOfLines={2} className="text-center text-xr-body text-text">
                           {caption}
@@ -601,7 +601,8 @@ export function App({ config }: { config: PublicConfig }) {
           </View>
 
           {config.devMode ? (
-            <View className="w-full gap-6 lg:w-80">
+            // Tester tools, not the device: this column scrolls inside itself so the page doesn't.
+            <View className="min-h-0 w-full gap-6 overflow-y-auto lg:w-80">
               <DevPanel
                 client={session?.client ?? null}
                 injectTool={toolsByName.get('inject_presence_event')}
@@ -618,10 +619,6 @@ export function App({ config }: { config: PublicConfig }) {
           ) : null}
         </View>
       </Section>
-      {/* The site's grid floor, as on the home page: a full-bleed band of its own. */}
-      <GridBandBoundary>
-        <GridBand />
-      </GridBandBoundary>
     </View>
   );
 }
