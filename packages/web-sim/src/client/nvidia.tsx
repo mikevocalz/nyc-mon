@@ -110,7 +110,7 @@ function Companion({ config }: { config:Config }) {
     const url=URL.createObjectURL(new Blob([JSON.stringify(state.memory,null,2)],{type:'application/json'}));
     const link=document.createElement('a');link.href=url;link.download='nyc-mon-memory.json';link.click();URL.revokeObjectURL(url);
   }
-  return <Section className="mx-auto w-full gap-target-gap p-4 md:p-6">
+  return <Section className="mx-auto w-full gap-target-gap">
     <Heading>NYC-Mon Personal Companion</Heading>
     <Paragraph>{config.modelLabel}. Live services only; no scripted fallback.</Paragraph>
     {!state.connected ? <Button title="Sign in as an adult Caller" onPress={() => { void beginSignIn(config.mcpUrl,provider).catch(showError); }}/> : <Button title="Sign out" variant="outline" onPress={signOut}/>}
