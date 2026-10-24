@@ -83,3 +83,14 @@ describe('voice registry', () => {
     expect(stageDirectionsToTags('no directions')).toBe('no directions');
   });
 });
+
+describe('pronounceForVoice', () => {
+  it('says Callah and Caller as Call-uh, whole words only, plurals and case kept', async () => {
+    const { pronounceForVoice } = await import('../voices.ts');
+    expect(pronounceForVoice("Yeah Callah, I'm good.")).toBe("Yeah Call-uh, I'm good.");
+    expect(pronounceForVoice('Hey Caller!')).toBe('Hey Call-uh!');
+    expect(pronounceForVoice('all the callers and Callahs')).toBe('all the call-uhz and Call-uhz');
+    expect(pronounceForVoice('CALLER')).toBe('CALL-UH');
+    expect(pronounceForVoice('Callaway and recaller')).toBe('Callaway and recaller');
+  });
+});

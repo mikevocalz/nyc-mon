@@ -1,6 +1,6 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { Readable } from 'node:stream';
-import { resolveVoice, stageDirectionsToTags, voiceDelivery, voicePitchFactor } from '@acme/content/voices';
+import { pronounceForVoice, resolveVoice, stageDirectionsToTags, voiceDelivery, voicePitchFactor } from '@acme/content/voices';
 import { IdSchema, LifecycleStageSchema, MonMoodSchema } from '@acme/core/schemas';
 import { z } from 'zod';
 import type { CharacterAlignment, FaceTrack } from '@acme/ui/three/mon/lipsync';
@@ -84,7 +84,8 @@ const AUDIO_TAG = /\[[a-z][a-z ]*\]/i;
  * stacked on one word. The mood's voice settings apply either way.
  */
 export function spokenLine(text: string, mood: z.infer<typeof MonMoodSchema> | undefined): string {
-  const line = stageDirectionsToTags(text);
+  // Everything here is the Mon's voice: canon pronunciations apply (Caller is "Call-uh").
+  const line = pronounceForVoice(stageDirectionsToTags(text));
   const { tag } = voiceDelivery(mood);
   return tag === undefined || AUDIO_TAG.test(line) ? line : `${tag} ${line}`;
 }

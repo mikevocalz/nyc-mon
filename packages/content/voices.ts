@@ -170,3 +170,24 @@ export function stageDirectionsToTags(text: string): string {
     .replace(/[ \t]{2,}/g, ' ')
     .trim();
 }
+
+/**
+ * How the Mon's voice says canon words that ElevenLabs reads wrong (ADR 0008,
+ * alexa-plus-brief, SKILL.md). The screen always spells "Caller"; the voice
+ * says "Call-uh". Whole words only, plurals included, case kept.
+ */
+const LEXICON: readonly (readonly [RegExp, string])[] = [[/\b(Call)(?:ah|er)(s?)\b/gi, 'uh']];
+
+function matchCase(source: string, replacement: string): string {
+  if (source === source.toUpperCase()) return replacement.toUpperCase();
+  return replacement;
+}
+
+/** Applies {@link LEXICON} to a line before it goes to the voice. Captions keep the original text. */
+export function pronounceForVoice(text: string): string {
+  return LEXICON.reduce(
+    (line, [pattern, ending]) =>
+      line.replace(pattern, (whole: string, call: string, plural: string) => `${call}-${matchCase(whole, ending)}${plural ? matchCase(whole, 'z') : ''}`),
+    text,
+  );
+}

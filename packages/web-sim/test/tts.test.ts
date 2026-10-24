@@ -132,6 +132,15 @@ describe('/api/tts', () => {
     expect(sentBody(fetchFn)).toEqual({ text: spoken, model_id: 'eleven_v4_turbo', voice_settings: { stability, similarity_boost: 0.8 } });
   });
 
+  it.each([
+    ["Yeah Callah, I'm good.", "Yeah Call-uh, I'm good."],
+    ['Hey Caller! Wanna play?', 'Hey Call-uh! Wanna play?'],
+  ])('says the canon name as Call-uh: %s', async (text, spoken) => {
+    const fetchFn = fakeFetch();
+    await handler({ fetchFn })(post({ text, lineageId: LINEAGE, stage: 'Small' }), 'ip');
+    expect(sentBody(fetchFn)).toMatchObject({ text: spoken });
+  });
+
   it('strips *yawn*, which has no documented ElevenLabs tag, and then leads with the mood tag', async () => {
     const fetchFn = fakeFetch();
     const res = await handler({ fetchFn })(post({ text: '*yawn* Night night', lineageId: LINEAGE, stage: 'Small', mood: 'asleep' }), 'ip');
