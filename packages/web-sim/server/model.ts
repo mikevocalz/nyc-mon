@@ -155,7 +155,10 @@ export function mockBackend(): ModelBackend {
         onText(text);
         return mockMessage([{ type: 'text', text, citations: null } as Anthropic.TextBlock], 'end_turn');
       }
+      // A tool named in the request ("hatch my egg" -> hatch_egg) wins, so the mock can drive any no-argument tool.
+      const said = typeof last?.content === 'string' ? last.content.toLowerCase() : '';
       const tool =
+        tools.find((t) => needsNoArgs(t) && said.includes(t.name.split('_')[0]!)) ??
         MOCK_TOOL_PREFERENCE.map((n) => tools.find((t) => t.name === n)).find((t) => t && needsNoArgs(t)) ??
         tools.find(needsNoArgs);
       if (!tool) {

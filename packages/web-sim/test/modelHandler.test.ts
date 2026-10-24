@@ -147,6 +147,12 @@ describe('mockBackend replies', () => {
     expect(t).not.toMatch(/get_mon_status|Scripted/);
   });
 
+  it('calls the tool the request names', async () => {
+    const two = [...tools, { name: 'hatch_egg', description: 'x', input_schema: { type: 'object' as const, properties: {} } }];
+    const reply = await mockBackend().stream({ system: '', tools: two, messages: [{ role: 'user', content: 'Hatch my egg' }] } as never, () => {}, new AbortController().signal);
+    expect(reply.content.find((b) => b.type === 'tool_use')).toMatchObject({ name: 'hatch_egg' });
+  });
+
   it('speaks only the message of an error, never its code or JSON', async () => {
     const t = await text(turn(JSON.stringify({ error: { reason: 'unavailable', message: 'NYC-MON can’t reach your Mon right now.' } }), true));
     expect(t).toBe('NYC-MON can’t reach your Mon right now.');

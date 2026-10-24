@@ -55,6 +55,8 @@ export interface MonViewProps {
   readonly narrow?: boolean;
   /** Room only: the canvas height in base px, so the room fills it. */
   readonly canvasHeight?: number;
+  /** Content width of a fitted canvas (768 less padding unless the frame is wider). */
+  readonly canvasWidth?: number;
   readonly onAction: (id: ActionId) => void;
   readonly onToggleRoom: () => void;
   /**
@@ -439,9 +441,9 @@ export function MonView(props: MonViewProps) {
   // (the turntable sweeps the tail out to the sides, so a narrow box would
   // shrink it); name, rings and the bar stack on the left.
   const stillSize = Math.max(160, Math.round(height * 0.9));
-  // The 768 canvas less its 24 px padding and the 24 px gap: four small
-  // buttons fit in one row from about 480 px ("Journal" wraps below that).
-  const twoRowBar = 720 - stillSize < 480;
+  // The canvas less its padding and the 24 px gap: four small buttons fit in
+  // one row from about 480 px ("Journal" wraps below that).
+  const twoRowBar = (props.canvasWidth ?? 744) - 24 - stillSize < 480;
   // The room shows the journal where the card has its rings (the rings and a
   // journal do not both fit one screen); a room with no journal yet keeps the rings.
   const journalInstead = layout === 'room' && vm.journal.length > 0;
