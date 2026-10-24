@@ -1,4 +1,4 @@
-import { CARE_NEEDS, EpochMsSchema, IdSchema, LifecycleStageSchema, MonMoodSchema, UnitIntervalSchema } from '@acme/core';
+import { CARE_NEEDS, EpochMsSchema, IdSchema, LifecycleStageSchema, MonGenderSchema, MonMoodSchema, UnitIntervalSchema } from '@acme/core';
 import { z } from 'zod';
 import { PermissionSchema, PresenceEventSchema, PresenceTierSchema } from '../presence/types.ts';
 
@@ -64,6 +64,14 @@ export const MonViewSchema = z.object({
   stage: LifecycleStageSchema,
   bond: UnitIntervalSchema,
   hatchedAt: EpochMsSchema,
+  gender: MonGenderSchema.nullable().describe('Set at hatch. Null for a Mon hatched before genders. Never use a pronoun for a Mon.'),
+  voice: z
+    .object({
+      lineageId: IdSchema.describe('The one voice this Mon keeps for life.'),
+      stage: LifecycleStageSchema.describe('Pitch follows the stage: higher when young, lower when grown. An Egg is silent.'),
+    })
+    .nullable()
+    .describe('For clients that voice the Mon themselves. Null for a Mon hatched before voice lineages.'),
 });
 
 export const CareViewSchema = z.object({

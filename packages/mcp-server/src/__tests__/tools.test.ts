@@ -40,6 +40,24 @@ describe('read tools', () => {
     expect(JSON.parse(result.content[0]?.text ?? '')).toEqual(result.structuredContent);
   });
 
+  it('exposes the Mon gender and voice lineage in structured content, with the voice stage', async () => {
+    running = await start({ v1: fakeV1({ rows: [row(ADULT)] }) });
+    for (const tool of ['get_mon_status', 'check_on_mon']) {
+      const result = await call(tool);
+      expect(result.structuredContent.mon, tool).toMatchObject({
+        gender: 'female',
+        voice: { lineageId: 'dex-001/female/3', stage: 'Baby' },
+      });
+    }
+  });
+
+  it('reports gender and voice as null for a Mon hatched before either existed', async () => {
+    running = await start({ v1: fakeV1({ rows: [row(ADULT, {}, { gender: null, voiceLineageId: null })] }) });
+    const result = await call('get_mon_status');
+    expect(result.isError).toBeFalsy();
+    expect(result.structuredContent.mon).toMatchObject({ gender: null, voice: null });
+  });
+
   it('check_on_mon suggests the care that helps most', async () => {
     running = await start({ v1: fakeV1({ rows: [row(ADULT, { fullness: 0.1, social: 0.1 })] }) });
     const result = await call('check_on_mon');

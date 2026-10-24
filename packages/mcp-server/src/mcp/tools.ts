@@ -107,6 +107,11 @@ async function guarded(fn: () => Promise<CallToolResult>): Promise<CallToolResul
   }
 }
 
+/**
+ * The Mon as tools report it. `gender` and `voice` are for a client that voices
+ * the Mon itself (the web simulator); Alexa reads replies in its own voice
+ * (PLATFORM-DOCS §2.8) and copy never uses a pronoun for a Mon (PS-005).
+ */
 function monView(mon: MonInstance) {
   return {
     monId: mon.monInstanceId,
@@ -115,6 +120,8 @@ function monView(mon: MonInstance) {
     stage: mon.stage,
     bond: mon.bond,
     hatchedAt: mon.hatchedAt,
+    gender: mon.gender,
+    voice: mon.voiceLineageId === null ? null : { lineageId: mon.voiceLineageId, stage: mon.stage },
   };
 }
 
