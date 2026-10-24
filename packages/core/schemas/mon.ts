@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { isStoredMonName, MON_NAME_MAX_LENGTH } from '../sim/mon-name.ts';
+import { isStoredMonName, LEGACY_MON_NAME_MAX_LENGTH, MON_NAME_MAX_LENGTH } from '../sim/mon-name.ts';
 import { LifecycleStageSchema } from './lifecycle.ts';
 import { MonGenderSchema } from './seams.ts';
 import { EpochMsSchema, IdSchema, UnitIntervalSchema } from './primitives.ts';
@@ -15,6 +15,14 @@ export const MonNameSchema = z
   .max(MON_NAME_MAX_LENGTH)
   .refine(isStoredMonName, { message: 'Mon name fails the M09 name rule' });
 
+/**
+ * The nickname on a stored Mon record: an M09 name, or a name a pre-M09 save
+ * already held (1 to 64 characters, any content). Read-side only. A new name
+ * goes through `validateMonName`, and a write that changes a stored nickname is
+ * checked with `isAllowedMonNicknameWrite`, both capped at 16.
+ */
+export const StoredMonNicknameSchema = z.union([MonNameSchema, z.string().min(1).max(LEGACY_MON_NAME_MAX_LENGTH)]);
+
 /** One individual Mon. Evolution keeps the same `monInstanceId` (Bible v11 §Lifecycle). */
 export const MonInstanceSchema = z.object({
   monInstanceId: IdSchema,
@@ -23,7 +31,7 @@ export const MonInstanceSchema = z.object({
   // Saves from the pre-M09 app allowed arbitrary 1–64 character nicknames.
   // Preserve those on migration and re-save; only *new* naming input is
   // constrained by MonNameSchema and validateMonName.
-  nickname: z.union([MonNameSchema, z.string().min(1).max(64)]).nullable(),
+  nickname: StoredMonNicknameSchema.nullable(),
   callerId: IdSchema,
   hatchedAt: EpochMsSchema,
   bond: UnitIntervalSchema,

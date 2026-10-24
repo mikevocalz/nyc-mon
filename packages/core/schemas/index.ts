@@ -22,7 +22,7 @@ export {
 export { JOURNAL_ENTRY_KINDS, JournalEntryKindSchema, JournalEntrySchema } from './journal.ts';
 export * from './leaderboard.ts';
 export { LIFECYCLE_STAGES, LifecycleStageSchema } from './lifecycle.ts';
-export { MonInstanceSchema, MonNameSchema } from './mon.ts';
+export { MonInstanceSchema, MonNameSchema, StoredMonNicknameSchema } from './mon.ts';
 export { READY_NOTIFICATION_URL, ReadyNotificationDataSchema } from './notification.ts';
 export { PEEK_ROUNDS_PER_SESSION, PEEK_SPOTS, PeekResultSchema, PeekRoundSchema, PeekSpotSchema } from './play.ts';
 export { EpochMsSchema, IdSchema, UnitIntervalSchema } from './primitives.ts';

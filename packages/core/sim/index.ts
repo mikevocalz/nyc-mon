@@ -45,7 +45,9 @@ export {
   journalKindForOutcome,
 } from './journal.ts';
 export {
+  isAllowedMonNicknameWrite,
   isStoredMonName,
+  LEGACY_MON_NAME_MAX_LENGTH,
   MON_NAME_MAX_LENGTH,
   type MonNameErrorCopyId,
   monNameErrorCopyId,
