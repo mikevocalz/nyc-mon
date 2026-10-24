@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { createHatchLight, whitener, type HatchLightTheme } from './hatch-light.ts';
+import { standFraming } from './framing.ts';
 import { createHatchSound } from './hatch-sound.ts';
 import { hatchDuration, hatchFrame, soundCues, type HatchPhase } from './hatch-timeline.ts';
 
@@ -75,7 +76,7 @@ function documentTheme(): HatchLightTheme {
 /** The silhouette's egg shape: the Baby squeezed narrow and a little tall. */
 const EGG_SHAPE = new THREE.Vector2(0.5, 1.12);
 
-/** MonModel3D's framing: fits the turntable's sweep, camera slightly above centre. */
+/** The egg's framing: room round it for the shakes, shards and light, camera slightly above centre. */
 function framing(size: THREE.Vector3, camera: THREE.PerspectiveCamera): THREE.Vector3 {
   const radius = Math.hypot(size.x, size.z) / 2;
   const vHalf = (camera.fov * Math.PI) / 360;
@@ -273,7 +274,7 @@ export function HatchSequence3D({ eggUrl, monUrl, monClips, width, height, label
       }
       const fade = fader(model);
       fade(0);
-      mon = { mixer, root, fade, white: whitener(model), cam: framing(size, camera), fit: 1, size };
+      mon = { mixer, root, fade, white: whitener(model), cam: standFraming(size, camera), fit: 1, size };
     });
     Promise.all([eggLoad, monLoad]).then(
       () => {
