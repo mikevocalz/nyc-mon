@@ -129,6 +129,13 @@ const echoShow8 = (mode: 'inline' | 'fullscreen', theme: 'light' | 'dark') => ({
 // runner beside the other packages' suites a card boot took 14-16 s, so a 20 s
 // budget killed tests that were still progressing, with no step named.
 const CLICK = { timeout: 15_000 };
+/**
+ * WebGL unavailable in the view: MonModel3D must fall back to the still, not
+ * crash. Also used by the care-flow tests, which test the bridge, not 3D: on
+ * CI's software GL a rendering Mon starves the main thread and input stalls.
+ */
+const NO_WEBGL = `(() => { const g = HTMLCanvasElement.prototype.getContext; HTMLCanvasElement.prototype.getContext = function (t, ...a) { return /webgl/i.test(String(t)) ? null : g.call(this, t, ...a); }; })();`;
+
 describe('built views boot in a spec host (bundled Chromium)', { timeout: 60_000 }, () => {
   for (const [speciesId, form] of [['dex-002', 'Squeaklet'], ['dex-009', 'Kittee Cee'], ['dex-062', 'Yotito']] as const) {
     for (const theme of ['light', 'dark'] as const) {
@@ -398,13 +405,25 @@ describe('built views boot in a spec host (bundled Chromium)', { timeout: 60_000
   });
 
   it('a failed care call shows and announces a plain-language notice', async () => {
-    const b = await boot('mon-card', { ...echoShow8('inline', 'light'), result: { mon: monFor('dex-002'), care }, callFails: true });
+    const b = await boot('mon-card', { ...echoShow8('inline', 'light'), result: { mon: monFor('dex-002'), care }, callFails: true, preScript: NO_WEBGL });
     try {
       await b.frame.getByRole('button', { name: 'Feed' }).click(CLICK);
       await b.frame.waitForFunction(() => (document.querySelector('[role=status]')?.textContent ?? '') !== '', null, { timeout: 5000 });
       const live = await b.frame.locator('[role=status]').textContent();
       expect(live).toBe("NYC-MON can't reach your Mon right now. Try again in a minute.");
       expect(await b.frame.evaluate(() => document.getElementById('root')!.innerText)).toContain("can't reach your Mon");
+    } finally {
+      await b.close();
+    }
+  });
+
+  it('without WebGL the card shows the still and stays usable (no crash)', async () => {
+    const b = await boot('mon-card', { ...echoShow8('inline', 'light'), result: { mon: monFor('dex-002'), care }, preScript: NO_WEBGL });
+    try {
+      await b.frame.getByRole('button', { name: 'Feed' }).waitFor({ timeout: 15_000 });
+      expect(await b.frame.locator('canvas[data-engine^="three.js"]').count()).toBe(0);
+      expect(await b.frame.evaluate(() => document.getElementById('root')!.innerText)).toContain('Squeaklet');
+      expect(b.errors.filter((e) => !/webgl/i.test(e))).toEqual([]);
     } finally {
       await b.close();
     }
@@ -561,7 +580,7 @@ describe('built views boot in a spec host (bundled Chromium)', { timeout: 60_000
   });
 
   it('a care button calls its tool through the bridge', async () => {
-    const b = await boot('mon-card', { ...echoShow8('inline', 'light'), result: { mon: monFor('dex-002'), care } });
+    const b = await boot('mon-card', { ...echoShow8('inline', 'light'), result: { mon: monFor('dex-002'), care }, preScript: NO_WEBGL });
     try {
       await b.frame.getByRole('button', { name: 'Feed' }).click(CLICK);
       await b.frame.page().waitForFunction(() => window.calls.length > 0, null, { timeout: 5000 });

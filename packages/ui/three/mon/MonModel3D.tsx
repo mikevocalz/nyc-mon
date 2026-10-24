@@ -320,7 +320,16 @@ export function MonModel3D({
     if (!el) return;
     setState('loading');
     const { width: w, height: h } = sizeRef.current;
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    // No WebGL (blocked, lost, or an old webview) must fall back to the caller's
+    // still, not throw inside the effect and take the whole view down.
+    let renderer: THREE.WebGLRenderer;
+    try {
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    } catch (error) {
+      setState('error');
+      onErrorRef.current?.(error);
+      return;
+    }
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.setSize(w, h);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
