@@ -1,4 +1,4 @@
-import { voicePlaybackRate, webSpeechPitch } from '@acme/content/voices';
+import { voicePitchFactor, webSpeechPitch } from '@acme/content/voices';
 import type { MonVoice } from './monVoice.ts';
 
 /**
@@ -128,19 +128,17 @@ export interface SpeakAsOptions {
  * Speaks `text` as the current Mon. Simulator only: on a real Echo, Alexa reads
  * replies in its own voice (PLATFORM-DOCS §2.8).
  *
- * With a voice, it fetches the Mon's lineage voice from /api/tts and plays it at
- * the stage's playback rate with `preservesPitch = false`, so the same voice
- * sounds younger or older. That also changes tempo; a server-side pitch shift
- * is the upgrade that keeps tempo. On 204 or any error it falls back to Web
- * Speech with `utterance.pitch` from the same stage table. An Egg is silent.
- * Without a voice it is plain `speak`.
+ * With a voice, it fetches the Mon's lineage voice from /api/tts, which bakes
+ * the stage's pitch in without changing duration and picks the delivery from
+ * the mood, and plays it at rate 1. On 204 or any error it falls back to Web
+ * Speech with `utterance.pitch` from the same stage table (Web Speech pitch
+ * leaves the rate alone). An Egg is silent. Without a voice it is plain `speak`.
  */
 export async function speakAs(text: string, voice: MonVoice | undefined, opts: SpeakAsOptions = {}): Promise<void> {
   stopSpeaking();
   if (!text.trim()) return;
   if (voice === undefined) return speak(text);
-  const rate = voicePlaybackRate(voice.stage);
-  if (rate === null) return;
+  if (voicePitchFactor(voice.stage) === null) return;
   const fallback = () => speak(text, webSpeechPitch(voice.stage) ?? undefined);
   if (typeof Audio === 'undefined') return fallback();
 
@@ -151,7 +149,12 @@ export async function speakAs(text: string, voice: MonVoice | undefined, opts: S
     const res = await (opts.fetchFn ?? fetch)(opts.endpoint ?? '/api/tts', {
       method: 'POST',
       headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) },
-      body: JSON.stringify({ text: text.slice(0, 400), lineageId: voice.lineageId, stage: voice.stage }),
+      body: JSON.stringify({
+        text: text.slice(0, 400),
+        lineageId: voice.lineageId,
+        stage: voice.stage,
+        ...(voice.mood === undefined ? {} : { mood: voice.mood }),
+      }),
       signal: abort.signal,
     });
     if (abort.signal.aborted) return;
@@ -159,9 +162,8 @@ export async function speakAs(text: string, voice: MonVoice | undefined, opts: S
     const blob = await res.blob();
     if (abort.signal.aborted) return;
     const url = URL.createObjectURL(blob);
+    // The pitch is already in the clip; playback rate stays 1 so tempo is the voice's own.
     const audio = new Audio(url);
-    audio.preservesPitch = false;
-    audio.playbackRate = rate;
     audio.onended = () => {
       if (playing?.audio === audio) stopAudio();
     };

@@ -1,7 +1,7 @@
-import { deriveVoiceLineageId, LIFECYCLE_STAGES, MON_GENDERS, parseVoiceLineageId, VOICE_SLOTS_PER_GENDER } from '@acme/core';
+import { deriveVoiceLineageId, LIFECYCLE_STAGES, MON_GENDERS, MON_MOODS, parseVoiceLineageId, VOICE_SLOTS_PER_GENDER } from '@acme/core';
 import { describe, expect, it } from 'vitest';
 import { bloodlines, hoodRattiBloodline } from '../index.ts';
-import { resolveVoice, voicePlaybackRate, voicePools, webSpeechPitch } from '../voices.ts';
+import { resolveVoice, stageDirectionsToTags, voiceDelivery, voicePitchFactor, voicePools, webSpeechPitch } from '../voices.ts';
 
 const RATTI_KEY = hoodRattiBloodline.chain.speciesId;
 
@@ -50,8 +50,8 @@ describe('voice registry', () => {
   });
 
   it('keeps the Egg silent and lowers the voice as the Mon grows', () => {
-    expect(voicePlaybackRate('Egg')).toBeNull();
-    const rates = LIFECYCLE_STAGES.filter((s) => s !== 'Egg').map(voicePlaybackRate);
+    expect(voicePitchFactor('Egg')).toBeNull();
+    const rates = LIFECYCLE_STAGES.filter((s) => s !== 'Egg').map(voicePitchFactor);
     expect(rates).toEqual([1.3, 1.15, 1, 0.92]);
     for (const stage of LIFECYCLE_STAGES) {
       const pitch = webSpeechPitch(stage);
@@ -59,5 +59,27 @@ describe('voice registry', () => {
       else expect(pitch).toBeGreaterThanOrEqual(0);
       if (pitch !== null) expect(pitch).toBeLessThanOrEqual(2);
     }
+  });
+
+  it('gives every mood a documented audio tag and in-range settings, steadier when tired', () => {
+    for (const mood of MON_MOODS) {
+      const { tag, settings } = voiceDelivery(mood);
+      expect(tag).toMatch(/^\[[a-z ]+\]$/);
+      expect(settings.stability).toBeGreaterThanOrEqual(0);
+      expect(settings.stability).toBeLessThanOrEqual(1);
+      expect(settings.similarity_boost).toBe(0.8);
+    }
+    expect(voiceDelivery('content').settings.stability).toBeLessThan(voiceDelivery('asleep').settings.stability);
+    expect(voiceDelivery('asleep').tag).toBe('[whispers]');
+    expect(voiceDelivery(undefined).tag).toBeUndefined();
+  });
+
+  it('maps known stage directions to audio tags and drops the rest', () => {
+    expect(stageDirectionsToTags('Hey *short huff* you')).toBe('Hey [sighs] you');
+    expect(stageDirectionsToTags('*chuckles* hi')).toBe('[laughs] hi');
+    expect(stageDirectionsToTags('*whispers* secret')).toBe('[whispers] secret');
+    expect(stageDirectionsToTags('Hi *scritchy chirp* there')).toBe('Hi there');
+    expect(stageDirectionsToTags('stray * star')).toBe('stray star');
+    expect(stageDirectionsToTags('no directions')).toBe('no directions');
   });
 });

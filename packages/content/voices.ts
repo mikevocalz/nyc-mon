@@ -1,4 +1,4 @@
-import { type BloodlineId, type LifecycleStage, type MonGender, parseVoiceLineageId } from '@acme/core';
+import { type BloodlineId, type LifecycleStage, type MonGender, type MonMood, parseVoiceLineageId } from '@acme/core';
 import { bloodlines, hoodRattiBloodline } from './mons/index.ts';
 
 /**
@@ -82,13 +82,14 @@ export function resolveVoice(lineageId: string): LineageVoice | null {
 }
 
 /**
- * Playback rate per stage: same voice, higher when young, lower when grown.
- * Null means silent: an Egg does not speak. The sim applies it as
- * `HTMLAudioElement.playbackRate` with `preservesPitch = false`, which moves
- * tempo with pitch, so a Baby also talks 30% faster. That is the ceiling of a
- * client-side shift; the upgrade is a server-side pitch shift that keeps tempo.
+ * Pitch factor per stage: the same voice sounds higher when young and lower
+ * when grown. Null means silent: an Egg does not speak.
+ *
+ * /api/tts bakes this into the audio with a duration-preserving shift
+ * (resample by the factor, then time-stretch back), so a Baby sounds young
+ * without talking faster. The browser plays the result at rate 1.
  */
-const PLAYBACK_RATE: Readonly<Record<LifecycleStage, number | null>> = {
+const PITCH_FACTOR: Readonly<Record<LifecycleStage, number | null>> = {
   Egg: null,
   Baby: 1.3,
   Small: 1.15,
@@ -96,12 +97,81 @@ const PLAYBACK_RATE: Readonly<Record<LifecycleStage, number | null>> = {
   Max: 0.92,
 };
 
-export function voicePlaybackRate(stage: LifecycleStage): number | null {
-  return PLAYBACK_RATE[stage];
+/** Frequency multiplier for a stage's voice, or null when that stage is silent. */
+export function voicePitchFactor(stage: LifecycleStage): number | null {
+  return PITCH_FACTOR[stage];
 }
+
+/**
+ * @deprecated The client no longer changes playback rate; use {@linkcode voicePitchFactor}.
+ * Kept so the package root's re-export still resolves.
+ */
+export const voicePlaybackRate = voicePitchFactor;
 
 /** The same table as a Web Speech `utterance.pitch` (range 0 to 2, 1 is the voice's default). */
 export function webSpeechPitch(stage: LifecycleStage): number | null {
-  const rate = PLAYBACK_RATE[stage];
-  return rate === null ? null : Math.min(2, Math.max(0, rate));
+  const factor = PITCH_FACTOR[stage];
+  return factor === null ? null : Math.min(2, Math.max(0, factor));
+}
+
+/** ElevenLabs voice settings the expressive model reads (Eleven v4 takes these two only). */
+export interface VoiceSettings {
+  /** 0 to 1. Lower gives a wider emotional range; higher sounds steadier and flatter. */
+  readonly stability: number;
+  /** 0 to 1. How closely the output keeps to the library voice. */
+  readonly similarity_boost: number;
+}
+
+/** How a Mon in one mood delivers a line: a leading audio tag plus voice settings. */
+export interface MoodDelivery {
+  /** An audio tag such as `[happily]`, prepended to the line; undefined adds none. */
+  readonly tag: string | undefined;
+  readonly settings: VoiceSettings;
+}
+
+/**
+ * Same voice across moods, so similarity stays put; stability carries the
+ * mood. 0.35 for a content Mon gives the bounciest read, 0.4 for a Mon that
+ * wants something, 0.55 to 0.6 for a tired or sleeping one, which should sound
+ * flat and low-energy. Tags are the ones ElevenLabs documents for v3/v4.
+ */
+const MOOD_DELIVERY: Readonly<Record<MonMood, MoodDelivery>> = {
+  content: { tag: '[happily]', settings: { stability: 0.35, similarity_boost: 0.8 } },
+  asleep: { tag: '[whispers]', settings: { stability: 0.6, similarity_boost: 0.8 } },
+  sluggish: { tag: '[slow]', settings: { stability: 0.55, similarity_boost: 0.8 } },
+  'needs-fullness': { tag: '[curious]', settings: { stability: 0.4, similarity_boost: 0.8 } },
+  'needs-energy': { tag: '[sighs]', settings: { stability: 0.55, similarity_boost: 0.8 } },
+  'needs-social': { tag: '[sad]', settings: { stability: 0.4, similarity_boost: 0.8 } },
+};
+
+/** Without a mood: no leading tag, a middle stability. */
+const DEFAULT_DELIVERY: MoodDelivery = { tag: undefined, settings: { stability: 0.45, similarity_boost: 0.8 } };
+
+export function voiceDelivery(mood: MonMood | undefined): MoodDelivery {
+  return mood === undefined ? DEFAULT_DELIVERY : MOOD_DELIVERY[mood];
+}
+
+/**
+ * The skill writes stage directions as `*short huff*`. Ones with a matching
+ * audio tag become that tag; the rest are dropped so nobody reads them out.
+ * First keyword match wins.
+ */
+const STAGE_DIRECTION_TAGS: readonly (readonly [RegExp, string])[] = [
+  [/laugh|chuckl|giggl|snicker|cackl/i, '[laughs]'],
+  [/huff|sigh/i, '[sighs]'],
+  [/whisper|murmur/i, '[whispers]'],
+  [/shout|yell/i, '[shouts]'],
+  [/clears? (its |his |her )?throat|ahem/i, '[clears throat]'],
+];
+
+/** Turns `*stage directions*` into audio tags or removes them, and drops stray asterisks. */
+export function stageDirectionsToTags(text: string): string {
+  return text
+    .replace(/\*([^*\n]{1,60})\*/g, (_, direction: string) => {
+      const hit = STAGE_DIRECTION_TAGS.find(([pattern]) => pattern.test(direction));
+      return hit ? hit[1] : '';
+    })
+    .replace(/\*/g, '')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim();
 }

@@ -35,4 +35,11 @@ describe('currentMonVoice', () => {
     const items = [tool('a', { mon: { voice: { lineageId: 'dex-001/male/1', stage: 'Baby' } } }), tool('b', { mon: { voice: null } })];
     expect(currentMonVoice(items)).toBeUndefined();
   });
+
+  it("carries the result's mood when it is a known one", () => {
+    const voice = { lineageId: 'dex-001/female/3', stage: 'Small' };
+    expect(currentMonVoice([tool('a', { mon: { voice }, mood: 'asleep' })])).toEqual({ ...voice, mood: 'asleep' });
+    expect(currentMonVoice([tool('a', { mon: { voice }, mood: 'grumpy' })])).toEqual(voice);
+    expect(currentMonVoice([tool('a', { mon: { voice } })])).toEqual(voice);
+  });
 });
