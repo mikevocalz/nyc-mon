@@ -15,6 +15,16 @@ import { bloodlines, hoodRattiBloodline } from './mons/index.ts';
  * pool to the slot count before a line ships.
  */
 
+/**
+ * How one voice performs: the ElevenLabs `style` (how strongly the voice's own
+ * delivery is exaggerated, 0 to 1) and `speed` (1 is the voice's natural pace,
+ * 0.7 to 1.2). A mood scales these down when the Mon is tired.
+ */
+export interface VoiceExpression {
+  readonly style: number;
+  readonly speed: number;
+}
+
 /** One ElevenLabs voice bound to one lineage slot. */
 export interface LineageVoice {
   /** The lineage id this entry serves, `<lineKey>/<gender>/<slot>`. */
@@ -22,6 +32,7 @@ export interface LineageVoice {
   readonly elevenLabsVoiceId: string;
   /** ElevenLabs library name, for people reading this file. */
   readonly name: string;
+  readonly expression: VoiceExpression;
 }
 
 /** A bloodline's voices, split by gender. */
@@ -32,25 +43,37 @@ export interface LineVoicePools {
   readonly pools: Readonly<Record<MonGender, readonly LineageVoice[]>>;
 }
 
-type VoiceSeed = readonly [elevenLabsVoiceId: string, name: string];
+type VoiceSeed = readonly [elevenLabsVoiceId: string, name: string, expression: VoiceExpression];
 
 function pool(lineKey: string, gender: MonGender, seeds: readonly VoiceSeed[]): readonly LineageVoice[] {
-  return seeds.map(([elevenLabsVoiceId, name], i) => ({ lineageId: `${lineKey}/${gender}/${i + 1}`, elevenLabsVoiceId, name }));
+  return seeds.map(([elevenLabsVoiceId, name, expression], i) => ({ lineageId: `${lineKey}/${gender}/${i + 1}`, elevenLabsVoiceId, name, expression }));
 }
 
-/** Owner's picks, 2026-10-23. Hood Ratti line, dex-001..007. */
+/**
+ * Hood Ratti line, dex-001..007. Recast by the owner on 2026-10-23: the
+ * Caller's Hood Ratti-line Mon is Black American, from NYC, with swagger
+ * (docs/canon/OPEN_QUESTIONS.md Q12; SKILL.md "Hood Ratti line"). Every voice
+ * here is an ElevenLabs library voice labelled African American / Black
+ * American. Style sits at 0.45 to 0.6 for a confident, rhythmic read; the
+ * calmer voices get the lower style so they stay smooth instead of shouty.
+ *
+ * The recast keeps the slot order, so an existing Mon keeps its lineage id and
+ * gets the new actor in that slot. Changing a live Mon's voice once is
+ * acceptable before launch. After launch, never re-cast a slot: append a new
+ * pool or a new line instead (Bible v11 ¶56, one voice for life).
+ */
 const HOOD_RATTI_VOICES: Readonly<Record<MonGender, readonly VoiceSeed[]>> = {
   male: [
-    ['ataV0GNgfIus2NWdTJP0', 'Louie the Legend'],
-    ['OwEAPhTFInN6VSRT9QXm', 'Jordan - Warm & Gritty'],
-    ['2t3wubVNRseKNVjtlWx1', 'Quinn - Soft Nerd Boy'],
-    ['r6wl0leuE6uvo1N05wP7', 'Ben - Relaxed reader, NY'],
+    ['RI6PDnjA72WXqF0pmJ4i', 'Jax - Calm, Chill, Fresh', { style: 0.45, speed: 1.0 }],
+    ['zm9E2qHSmW6HZXdIYeV9', "Tre's USA Voice", { style: 0.5, speed: 1.03 }],
+    ['1cuDPO8sIMatoOE4Z2Zv', 'Dan - African American calm & friendly', { style: 0.45, speed: 1.02 }],
+    ['ataV0GNgfIus2NWdTJP0', 'Louie the Legend', { style: 0.55, speed: 1.03 }],
   ],
   female: [
-    ['b8JMPeNuVrqqWExQc8e9', 'Ayla - Bubbly'],
-    ['o9B86nZP8mMLaT5FBEzP', 'Kathie - Sassy & Playful'],
-    ['wIzYfKZE8c87XZD7bDLH', 'Zibby - Quirky'],
-    ['d8WcCpplp8meHt10UhL8', 'Emily - Bright'],
+    ['zWoalRDt5TZrmW4ROIA7', 'Brooklyn - African American New Yorker', { style: 0.55, speed: 1.03 }],
+    ['BeKZH03brdNaVyYtd97H', 'Michelle - West Coast Flow Light Soulful', { style: 0.5, speed: 1.0 }],
+    ['iotvXRdCltpsT7ekz022', 'Tasha - Urban, Southern, Modern', { style: 0.5, speed: 1.02 }],
+    ['N5oldAAfj8TlzCKVVyLS', 'Keke Sharice', { style: 0.55, speed: 1.03 }],
   ],
 };
 
@@ -144,6 +167,39 @@ const DEFAULT_DELIVERY: MoodDelivery = { tag: undefined, settings: { stability: 
 
 export function voiceDelivery(mood: MonMood | undefined): MoodDelivery {
   return mood === undefined ? DEFAULT_DELIVERY : MOOD_DELIVERY[mood];
+}
+
+/** {@link VoiceSettings} plus the expressive fields a voice carries. */
+export interface ExpressiveVoiceSettings extends VoiceSettings {
+  readonly style: number;
+  readonly speed: number;
+}
+
+/**
+ * A tired or sleeping Mon keeps its own voice but drops the swagger: half the
+ * style, and a touch slower than natural pace.
+ */
+const LOW_ENERGY_MOODS: ReadonlySet<MonMood> = new Set<MonMood>(['asleep', 'sluggish', 'needs-energy']);
+const LOW_ENERGY_STYLE_FACTOR = 0.5;
+const LOW_ENERGY_SPEED = 0.95;
+
+/**
+ * Full ElevenLabs `voice_settings` for one voice in one mood: the mood's
+ * stability and similarity plus the voice's style and speed.
+ *
+ * Not yet sent by /api/tts, which posts `voiceDelivery(mood).settings` (the
+ * two fields the comment above says Eleven v4 reads). ElevenLabs documents
+ * `style` and `speed` for its other TTS models and says speed is not available
+ * on Eleven v3; whether `eleven_v4_turbo` accepts or ignores them has not been
+ * checked. Send this only after one live call against the current model
+ * confirms it does not reject the extra fields.
+ */
+export function expressiveVoiceSettings(voice: LineageVoice, mood: MonMood | undefined): ExpressiveVoiceSettings {
+  const { settings } = voiceDelivery(mood);
+  if (mood !== undefined && LOW_ENERGY_MOODS.has(mood)) {
+    return { ...settings, style: voice.expression.style * LOW_ENERGY_STYLE_FACTOR, speed: Math.min(voice.expression.speed, LOW_ENERGY_SPEED) };
+  }
+  return { ...settings, style: voice.expression.style, speed: voice.expression.speed };
 }
 
 /**

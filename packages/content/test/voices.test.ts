@@ -1,7 +1,7 @@
 import { deriveVoiceLineageId, LIFECYCLE_STAGES, MON_GENDERS, MON_MOODS, parseVoiceLineageId, VOICE_SLOTS_PER_GENDER } from '@acme/core';
 import { describe, expect, it } from 'vitest';
 import { bloodlines, hoodRattiBloodline } from '../index.ts';
-import { resolveVoice, stageDirectionsToTags, voiceDelivery, voicePitchFactor, voicePools, webSpeechPitch } from '../voices.ts';
+import { expressiveVoiceSettings, resolveVoice, stageDirectionsToTags, voiceDelivery, voicePitchFactor, voicePools, webSpeechPitch } from '../voices.ts';
 
 const RATTI_KEY = hoodRattiBloodline.chain.speciesId;
 
@@ -40,6 +40,59 @@ describe('voice registry', () => {
       const pool = voicePools.find((p) => p.lineKey === RATTI_KEY)?.pools[gender ?? 'female'];
       expect(pool).toContain(voice);
     }
+  });
+
+  it('casts the Hood Ratti line from the owner-approved voices, in lineage slot order (2026-10-23)', () => {
+    const ratti = voicePools.find((p) => p.lineKey === RATTI_KEY);
+    expect(ratti?.pools.male.map((v) => v.elevenLabsVoiceId)).toEqual([
+      'RI6PDnjA72WXqF0pmJ4i',
+      'zm9E2qHSmW6HZXdIYeV9',
+      '1cuDPO8sIMatoOE4Z2Zv',
+      'ataV0GNgfIus2NWdTJP0',
+    ]);
+    expect(ratti?.pools.female.map((v) => v.elevenLabsVoiceId)).toEqual([
+      'zWoalRDt5TZrmW4ROIA7',
+      'BeKZH03brdNaVyYtd97H',
+      'iotvXRdCltpsT7ekz022',
+      'N5oldAAfj8TlzCKVVyLS',
+    ]);
+  });
+
+  it('keeps a lineage on the same voice every time it resolves', () => {
+    expect(resolveVoice(`${RATTI_KEY}/male/1`)?.elevenLabsVoiceId).toBe('RI6PDnjA72WXqF0pmJ4i');
+    expect(resolveVoice(`${RATTI_KEY}/female/4`)?.elevenLabsVoiceId).toBe('N5oldAAfj8TlzCKVVyLS');
+    for (let i = 0; i < 50; i++) {
+      const lineage = deriveVoiceLineageId({ eggId: `egg-${i}`, speciesId: RATTI_KEY });
+      expect(resolveVoice(lineage)).toEqual(resolveVoice(lineage));
+    }
+  });
+
+  it('gives every Hood Ratti voice swagger settings: style 0.45 to 0.6, speed 1.0 to 1.05', () => {
+    const ratti = voicePools.find((p) => p.lineKey === RATTI_KEY);
+    for (const gender of MON_GENDERS) {
+      for (const voice of ratti?.pools[gender] ?? []) {
+        expect(voice.expression.style).toBeGreaterThanOrEqual(0.45);
+        expect(voice.expression.style).toBeLessThanOrEqual(0.6);
+        expect(voice.expression.speed).toBeGreaterThanOrEqual(1);
+        expect(voice.expression.speed).toBeLessThanOrEqual(1.05);
+      }
+    }
+  });
+
+  it('merges the mood and the voice into full settings, playful moods loose and tired ones steady', () => {
+    const voice = resolveVoice(`${RATTI_KEY}/female/1`);
+    if (voice === null) throw new Error('slot 1 must resolve');
+    const content = expressiveVoiceSettings(voice, 'content');
+    expect(content).toEqual({ ...voiceDelivery('content').settings, style: voice.expression.style, speed: voice.expression.speed });
+    for (const mood of ['content', 'needs-social', 'needs-fullness'] as const) {
+      const { stability } = expressiveVoiceSettings(voice, mood);
+      expect(stability).toBeGreaterThanOrEqual(0.3);
+      expect(stability).toBeLessThanOrEqual(0.4);
+    }
+    // A tired or sleeping Mon keeps its voice but drops the swagger.
+    expect(expressiveVoiceSettings(voice, 'asleep').style).toBeLessThan(content.style);
+    expect(expressiveVoiceSettings(voice, 'asleep').speed).toBeLessThanOrEqual(1);
+    expect(expressiveVoiceSettings(voice, undefined).style).toBe(voice.expression.style);
   });
 
   it('resolves to null for a line without voices, an unknown line, or a malformed id', () => {

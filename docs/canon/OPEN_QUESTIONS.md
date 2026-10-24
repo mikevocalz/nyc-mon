@@ -17,7 +17,7 @@ These block the most downstream work (Dex cards, `content/mons/*.ts` schemas, cl
 3. **Q9** (answered → Decision #9) Dex numbers: roster v11.1 keeps v7's #001-#007, #008-#014 and #061-#067.
 4. **Q2** (answered → Decision #7) Scanner LED: red (v11) or orange (build prompt)?
 5. **Q3** (answered → Decision #8) Is the app itself an H-Lynk, given v11 says the H-Lynk is optional?
-6. **Q12** Culture notes for the player's three starters.
+6. **Q12** Culture notes for the player's three starters. (Partly answered 2026-10-23 for the Hood Ratti line's voice; see Q12.)
 7. **Q18** Meter name: "Social" or "Social HP"?
 8. **Q19** Are v7's care numbers canon?
 9. **Q22** Food classes: does any species-level food restriction exist?
@@ -54,6 +54,7 @@ The Bible outranks the build prompt (`IDX L7-L8`; BUILD_PROMPT_v3 §0B Law 1). E
 **Q11. Egg forms.** **Egg names answered by the roster** (Decision #9): #001 Metro Egg, #008 Corner Egg, #061 Prism Egg (`ROSTER L24`, `L25`, `L35`). The roster says nothing about egg skins, so the yes/no below is still open. v7 gives each line its own egg: #001 Metro Egg (red, white stripes), #008 Corner Egg (pink, white fur wrap), #061 Prism Egg (black, flames, clear crystal). Yes/no: the player's egg uses its line's egg skin inside the case?
 
 **Q12. Culture notes.** The M08 and M17 Dex cards show a "culture note (from canon)". v11 has: Malik's Ratti is Black American / NYC Black, and "The Ratti species is not ethnically locked" (`V11 ¶53`); "Yotes carry a Latino family identity" (`V11 ¶53`); nothing for Bodega Cee. v11 also says culture "belong[s] to the individual" (`V11 ¶44`). Fill in, per starter: species card culture note = ______; the player's individual's culture = ______ (fixed by canon / chosen by the player / left blank in Phase 1).
+  **Partly answered 2026-10-23 (Mike), voice only, Hood Ratti line:** the Caller's Hood Ratti-line Mon is Black American, from NYC, and speaks with swagger: confident, playful, rhythmic, code-switching, with African American English features used naturally (habitual "be", copula drop in casual lines, "ain't", "y'all", "bet", "say less", "word", "my G" for familiar people, "deadass" at most once a session). No caricature spelling, no slurs, no profanity, no stereotypes, warmth over attitude. Mike's reason: the previous voices "have no swag and don't sound ethnic/black". This is the individual's voice, not the species' (`V11 ¶53`), and `V11 ¶60` still applies. PS-005 (no pronoun for a Mon), "Callah" only in character lines, and the ban on reusing Malik's Ratti's refusal line all stand. Rules and the palette: `skills/nyc-mon-companion/SKILL.md` "Hood Ratti line". Voices: `packages/content/voices.ts`, recast to ElevenLabs library voices labelled African American / Black American. Still open: the Dex card culture note text for all three starters, and the Bodega Baddiee Cee and Yote individuals' culture.
 
 **Q13. Yotes scope.** Yes/no: "Yotes carry a Latino family identity" applies to every Yote, including the player's? (Contrast the explicit "not ethnically locked" rule for Ratti.)
 
@@ -99,6 +100,7 @@ The Bible outranks the build prompt (`IDX L7-L8`; BUILD_PROMPT_v3 §0B Law 1). E
 **Q31. Refusal at Baby stage.** v11 requires "listening/talking/refusal performance" for conversation (`V11 ¶97`) and says Mons "refuse" (`V11 ¶43`). The prompt's `refuse` clip plays in M08 and M14. v7's Baby notes give only an "approach/step-back cue" (`[v7] M7 L509`). Yes/no: a Baby's refusal is a step-back/turn-away body cue with no speech?
 
 **Q32. Baby voice.** v11: "Hatchlings may use baby-talk/gibberish, then limited speech, then full speech." (`V11 ¶56`). v7 gives species sounds (scritchy chirps; chirrup and purr; yips and a short rally howl). Yes/no: Phase 1 Babies use only species sounds, no baby-talk words?
+  **Partly answered 2026-10-23 (Mike), Hood Ratti line only:** a Squeaklet uses the family sound plus at most two words ("Bet!", "Food?"), never a sentence, and no "Callah" yet. Open for the other two lines.
 
 **Q33. Type field.** v7 types all three Babies "Neutral". The index calls type fields "legacy data until the explicit migration map is authored" (`IDX L41`); v11 lists that map as open (`V11 ¶101`). Yes/no: Phase 1 content omits type/Affinity entirely?
 
