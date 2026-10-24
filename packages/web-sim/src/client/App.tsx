@@ -26,11 +26,9 @@ import {
 } from './session.ts';
 import { IDLE, isBargeIn, nextConversation, openEar, type ConversationEvent, type ConversationMode, type Ear } from './handsFree.ts';
 import { monSpeechPort } from './monSpeechPort.ts';
-import type { MonVoice } from './monVoice.ts';
 import { createSentenceSplitter } from './sentenceStream.ts';
 import { loadVoice, sameVoice, saveVoice, stickyVoice, type RememberedVoice } from './sessionVoice.ts';
-import * as speech from './speech.ts';
-import { canListen, canSpeak, listen, stopSpeaking } from './speech.ts';
+import { canListen, canSpeak, listen, setSessionVoice, stopSpeaking } from './speech.ts';
 import { addSpeechCueListener } from './speechCues.ts';
 import { createSpeechQueue, type SpeechQueue } from './speechQueue.ts';
 import { useSetters } from './state.ts';
@@ -174,8 +172,7 @@ export function App({ config }: { config: PublicConfig }) {
       if (sameVoice(next, voiceRef.current)) return;
       voiceRef.current = next;
       saveVoice(local, next);
-      // speech.ts gains setSessionVoice in a parallel change; call it once it exists.
-      (speech as unknown as { setSessionVoice?: (v: MonVoice | undefined) => void }).setSessionVoice?.(next?.voice);
+      setSessionVoice(next?.voice);
     },
     [local],
   );
@@ -183,7 +180,7 @@ export function App({ config }: { config: PublicConfig }) {
   useEffect(() => {
     voiceRef.current = stickyVoice(loadVoice(local), initial.items);
     saveVoice(local, voiceRef.current);
-    (speech as unknown as { setSessionVoice?: (v: MonVoice | undefined) => void }).setSessionVoice?.(voiceRef.current?.voice);
+    setSessionVoice(voiceRef.current?.voice);
   }, [initial.items, local]);
 
   // ---- Hands-free conversation (handsFree.ts) and sentence-streamed speech (speechQueue.ts).
