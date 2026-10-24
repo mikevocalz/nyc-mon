@@ -187,12 +187,9 @@ const LOW_ENERGY_SPEED = 0.95;
  * Full ElevenLabs `voice_settings` for one voice in one mood: the mood's
  * stability and similarity plus the voice's style and speed.
  *
- * Not yet sent by /api/tts, which posts `voiceDelivery(mood).settings` (the
- * two fields the comment above says Eleven v4 reads). ElevenLabs documents
- * `style` and `speed` for its other TTS models and says speed is not available
- * on Eleven v3; whether `eleven_v4_turbo` accepts or ignores them has not been
- * checked. Send this only after one live call against the current model
- * confirms it does not reject the extra fields.
+ * /api/tts sends this on both ElevenLabs calls. A live call to
+ * `eleven_v4_turbo` with all four fields answered 200 with audio (2026-10-23);
+ * how much `speed` changes the sound has not been judged by ear.
  */
 export function expressiveVoiceSettings(voice: LineageVoice, mood: MonMood | undefined): ExpressiveVoiceSettings {
   const { settings } = voiceDelivery(mood);
