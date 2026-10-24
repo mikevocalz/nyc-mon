@@ -1,3 +1,4 @@
+import type { Authorize } from './freshToken.ts';
 import type { MonVoice } from './monVoice.ts';
 import { playMonClip, prepareMonClip, type MonClip, type SpeakAsOptions } from './speech.ts';
 import type { VoicePort } from './speechQueue.ts';
@@ -12,7 +13,7 @@ import type { VoicePort } from './speechQueue.ts';
  */
 export interface MonSpeechPortDeps {
   readonly voice: () => MonVoice | undefined;
-  readonly getToken?: () => string | undefined;
+  readonly authorize?: Authorize;
   readonly endpoint?: string;
   readonly fetchFn?: typeof fetch;
   readonly prepare?: typeof prepareMonClip;
@@ -23,7 +24,7 @@ export function monSpeechPort(deps: MonSpeechPortDeps): VoicePort<MonClip> {
   const prepare = deps.prepare ?? prepareMonClip;
   const play = deps.play ?? playMonClip;
   const opts: SpeakAsOptions = {
-    ...(deps.getToken ? { getToken: deps.getToken } : {}),
+    ...(deps.authorize ? { authorize: deps.authorize } : {}),
     ...(deps.endpoint ? { endpoint: deps.endpoint } : {}),
     ...(deps.fetchFn ? { fetchFn: deps.fetchFn } : {}),
   };

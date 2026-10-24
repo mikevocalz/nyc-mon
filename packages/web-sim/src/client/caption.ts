@@ -14,8 +14,36 @@ export function captionText(text: string): string {
     .replace(/[ \t]{2,}/g, ' ')
     .replace(/ +([.,!?])/g, '$1')
     .replace(/^[ \t]+|[ \t]+$/gm, '')
-    .trim();
-  return unwrapQuotes(cleaned);
+    .trim()
+    // One flowing line: a paragraph break in a two-line caption box left an
+    // empty second line that the clamp drew as a lone "…".
+    .replace(/\s*\n+\s*/g, ' ');
+  return dropUnmatchedQuotes(unwrapQuotes(cleaned));
+}
+
+const OPENERS = new Set(['"', '“']);
+const CLOSERS_OF: Record<string, readonly string[]> = { '"': ['"', '”'], '“': ['”', '"'] };
+
+/**
+ * A streamed reply arrives one sentence at a time, so a quoted line shows as
+ * `“Say less, Caller.` then `That hit.”`: each end carries half of a pair.
+ * Per sentence, a double quote mark at the start with no closer later in that
+ * sentence goes, and so does one at the end with no opener earlier in it.
+ * Single marks stay: ’Cause and goin’ are words.
+ */
+export function dropUnmatchedQuotes(text: string): string {
+  return text
+    .split(/(?<=[.!?…]["”’']?)\s+/u)
+    .map((sentence) => {
+      let s = sentence;
+      const first = s[0] ?? '';
+      if (OPENERS.has(first) && !CLOSERS_OF[first]!.some((c) => s.indexOf(c, 1) !== -1)) s = s.slice(1).trimStart();
+      const last = s.at(-1) ?? '';
+      if ((last === '”' || last === '"') && !/["“]/.test(s.slice(0, -1))) s = s.slice(0, -1).trimEnd();
+      return s;
+    })
+    .filter((s) => s !== '')
+    .join(' ');
 }
 
 /**

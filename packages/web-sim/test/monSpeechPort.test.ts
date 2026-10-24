@@ -1,3 +1,4 @@
+import type { Authorize } from '../src/client/freshToken.ts';
 import { describe, expect, it, vi } from 'vitest';
 import { monSpeechPort } from '../src/client/monSpeechPort.ts';
 import type { MonVoice } from '../src/client/monVoice.ts';
@@ -10,8 +11,8 @@ describe('monSpeechPort', () => {
   it('fetches each sentence in the voice current at that moment, with the sign-in token', async () => {
     let voice = baby;
     const prepare = vi.fn<typeof prepareMonClip>(async (): Promise<MonClip> => ({ kind: 'silent' }));
-    const getToken = () => 'tok';
-    const port = monSpeechPort({ voice: () => voice, getToken, prepare });
+    const authorize: Authorize = (call) => call('tok');
+    const port = monSpeechPort({ voice: () => voice, authorize, prepare });
     const signal = new AbortController().signal;
     await port.prepare('One.', signal);
     voice = small; // a tool result mid-reply
@@ -20,7 +21,7 @@ describe('monSpeechPort', () => {
       ['One.', baby],
       ['Two.', small],
     ]);
-    expect(prepare.mock.calls[0]?.[2]).toEqual({ getToken });
+    expect(prepare.mock.calls[0]?.[2]).toEqual({ authorize });
     expect(prepare.mock.calls[0]?.[3]).toBe(signal);
   });
 

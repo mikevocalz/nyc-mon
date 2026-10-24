@@ -1,6 +1,8 @@
 import { voicePitchFactor, webSpeechPitch } from '@acme/content/voices';
-import { amplitudeEnvelope, pickSpeechTrack, type CharacterAlignment, type FaceTrack, type SpeechTrack } from '@acme/ui/three/mon/lipsync';
+import { gestureFor } from '@acme/ui/three/mon/idle';
+import { amplitudeEnvelope, pickSpeechTrack, type CharacterAlignment, type FaceTrack, type MonGesture, type SpeechTrack } from '@acme/ui/three/mon/lipsync';
 import type { MonVoice } from './monVoice.ts';
+import { bearer, noAuthorize, type Authorize } from './freshToken.ts';
 import { emitSpeechCue } from './speechCues.ts';
 
 /**
@@ -156,12 +158,9 @@ const FACE_ID = /^[0-9a-f-]{36}$/;
 async function fetchFace(faceId: string, opts: SpeakAsOptions, signal: AbortSignal): Promise<FaceTrack | null> {
   if (!FACE_ID.test(faceId)) return null;
   try {
-    const token = opts.getToken?.();
-    const res = await (opts.fetchFn ?? fetch)(`${opts.endpoint ?? '/api/tts'}/face/${faceId}`, {
-      method: 'GET',
-      headers: token ? { authorization: `Bearer ${token}` } : {},
-      signal,
-    });
+    const res = await (opts.authorize ?? noAuthorize)((token) =>
+      (opts.fetchFn ?? fetch)(`${opts.endpoint ?? '/api/tts'}/face/${faceId}`, { method: 'GET', headers: bearer(token), signal }),
+    );
     if (res.status !== 200) return null;
     const body = (await res.json()) as { face?: FaceTrack };
     return body.face ?? null;
@@ -202,8 +201,8 @@ function trackDurationMs(track: SpeechTrack): number {
 }
 
 export interface SpeakAsOptions {
-  /** The person's MCP access token in OAuth mode; /api/tts checks it like /api/model. */
-  readonly getToken?: () => string | undefined;
+  /** Calls /api/tts with the person's MCP access token in OAuth mode, refreshed as needed (freshToken.ts). */
+  readonly authorize?: Authorize;
   readonly endpoint?: string;
   readonly fetchFn?: typeof fetch;
   /**
@@ -224,6 +223,8 @@ export type MonClip =
       readonly track: SpeechTrack | null;
       /** Audio2Face frames still rendering; the clip plays on `track` and swaps to these mid-line. */
       readonly face: Promise<FaceTrack | null> | null;
+      /** The sentence's upper-body gesture class (idle/gestures.ts), sent on its start cue. */
+      readonly gesture?: MonGesture;
     }
   /** The server has no ElevenLabs voice (204): the session's one browser voice reads it. */
   | { readonly kind: 'browser'; readonly text: string; readonly pitch: number | undefined }
@@ -262,18 +263,19 @@ export async function prepareMonClip(text: string, voice: MonVoice | undefined, 
     if (attempt > 0) await new Promise((r) => setTimeout(r, opts.retryDelayMs ?? 300));
     if (signal.aborted) return { kind: 'silent' };
     try {
-      const token = opts.getToken?.();
-      const res = await (opts.fetchFn ?? fetch)(opts.endpoint ?? '/api/tts', {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          // JSON carries the clip with its lip-sync timing; plain audio still works.
-          accept: 'application/json, audio/mpeg',
-          ...(token ? { authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ text: text.slice(0, 400), lineageId: v.lineageId, stage: v.stage, ...(v.mood === undefined ? {} : { mood: v.mood }) }),
-        signal,
-      });
+      const res = await (opts.authorize ?? noAuthorize)((token) =>
+        (opts.fetchFn ?? fetch)(opts.endpoint ?? '/api/tts', {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            // JSON carries the clip with its lip-sync timing; plain audio still works.
+            accept: 'application/json, audio/mpeg',
+            ...bearer(token),
+          },
+          body: JSON.stringify({ text: text.slice(0, 400), lineageId: v.lineageId, stage: v.stage, ...(v.mood === undefined ? {} : { mood: v.mood }) }),
+          signal,
+        }),
+      );
       if (res.status === 204) return { kind: 'browser', text, pitch: webSpeechPitch(v.stage) ?? undefined };
       if (res.status !== 200) {
         lastStatus = String(res.status);
@@ -301,7 +303,8 @@ export async function prepareMonClip(text: string, voice: MonVoice | undefined, 
       }
       // Best source first: Audio2Face frames, character timing, then the clip's own loudness.
       const amplitude = face || alignment ? null : await envelopeOf(bytes.buffer);
-      return { kind: 'audio', bytes, contentType, track: pickSpeechTrack({ face: face ?? null, alignment: alignment ?? null, amplitude }), face: later };
+      const gesture = gestureFor(text);
+      return { kind: 'audio', bytes, contentType, track: pickSpeechTrack({ face: face ?? null, alignment: alignment ?? null, amplitude }), face: later, ...(gesture ? { gesture } : {}) };
     } catch (err) {
       if (signal.aborted) return { kind: 'silent' };
       if (!(err instanceof TtsFailure)) lastStatus = 'network';
@@ -353,14 +356,15 @@ export async function playMonClip(clip: MonClip, signal: AbortSignal): Promise<v
         if (current !== entry || !track || !cueId) return;
         const seconds = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : trackDurationMs(track) / 1000;
         const elapsed = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
-        emitSpeechCue({ kind: 'start', id: cueId, elapsedMs: elapsed * 1000, durationMs: Math.max(1, seconds * 1000), track });
+        const gesture = clip.gesture ? { gesture: clip.gesture } : {};
+        emitSpeechCue({ kind: 'start', id: cueId, elapsedMs: elapsed * 1000, durationMs: Math.max(1, seconds * 1000), track, ...gesture });
         // The face arrives mid-line: the same utterance id with the face track,
         // stamped with where the audio is now, so the view switches on the clip's clock.
         void clip.face?.then((frames) => {
           const faceTrack = frames ? pickSpeechTrack({ face: frames, alignment: null, amplitude: null }) : null;
           if (!faceTrack || current !== entry || audio.ended) return;
           const at = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
-          emitSpeechCue({ kind: 'start', id: cueId, elapsedMs: at * 1000, durationMs: Math.max(1, seconds * 1000), track: faceTrack });
+          emitSpeechCue({ kind: 'start', id: cueId, elapsedMs: at * 1000, durationMs: Math.max(1, seconds * 1000), track: faceTrack, ...gesture });
         });
       },
       () => {

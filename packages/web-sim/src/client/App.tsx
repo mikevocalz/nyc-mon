@@ -29,11 +29,12 @@ import { monSpeechPort } from './monSpeechPort.ts';
 import { createSentenceSplitter } from './sentenceStream.ts';
 import { loadVoice, sameVoice, saveVoice, stickyVoice, type RememberedVoice } from './sessionVoice.ts';
 import { canListen, canSpeak, listen, setSessionVoice, stopSpeaking } from './speech.ts';
-import { addSpeechCueListener } from './speechCues.ts';
+import { addSpeechCueListener, emitSpeechCue } from './speechCues.ts';
 import { createSpeechQueue, type SpeechQueue } from './speechQueue.ts';
 import { useSetters } from './state.ts';
 import { currentScheme, type Scheme } from './theme.ts';
-import { createTurnToolCaller, hintedToolNames, withPresenceLine } from './turnTools.ts';
+import { createAuthorize, noAuthorize, sdkRefresh } from './freshToken.ts';
+import { createTurnToolCaller, hintedToolNames, latestMonState, withMonState, withPresenceLine } from './turnTools.ts';
 import { currentViewUri, liveViewUri } from './viewUri.ts';
 
 export interface PublicConfig {
@@ -158,11 +159,19 @@ export function App({ config }: { config: PublicConfig }) {
   } = useSetters(store);
   const historyRef = useRef<Anthropic.MessageParam[]>(initial.history);
   const abortRef = useRef<AbortController | null>(null);
-  const accessToken = useCallback(
-    () => (config.authMode === 'oauth' ? (provider.tokens() as { access_token?: string } | undefined)?.access_token : undefined),
-    [config.authMode, provider],
+  // /api/model and /api/tts carry the MCP access token, refreshed before it lapses (freshToken.ts).
+  const authorize = useMemo(
+    () =>
+      config.authMode === 'oauth'
+        ? createAuthorize({
+            store: provider,
+            refresh: sdkRefresh(config.mcpUrl, provider),
+            onSignedOut: () => setAuth({ kind: 'signed-out' }),
+          })
+        : noAuthorize,
+    [config.authMode, config.mcpUrl, provider, setAuth],
   );
-  const model = useMemo(() => httpModelClient('/api/model', fetch, accessToken), [accessToken]);
+  const model = useMemo(() => httpModelClient('/api/model', fetch, authorize), [authorize]);
 
   // ---- The Mon's voice: one voice for the whole conversation (sessionVoice.ts).
   const voiceRef = useRef<RememberedVoice | null>(null);
@@ -215,6 +224,11 @@ export function App({ config }: { config: PublicConfig }) {
     speakingRef.current = '';
     setSpeaking('');
   }, [setSpeaking]);
+
+  // The Mon looks and listens while the microphone is open (up_look_listen in the view).
+  useEffect(() => {
+    emitSpeechCue({ kind: 'listen', id: 'mic', on: listening });
+  }, [listening]);
 
   // The first audible moment of each clip: drives the barge-in holdoff and the latency log.
   useEffect(
@@ -274,9 +288,13 @@ export function App({ config }: { config: PublicConfig }) {
     }
     setAuth({ kind: 'signing-in' });
     completeSignIn(config.mcpUrl, provider, parsed.code, parsed.iss)
-      .then(() => setAuth(resolveAuthState(config.authMode, provider)))
+      .then(() => {
+        setAuth(resolveAuthState(config.authMode, provider));
+        // Signed in again: the "sign-in expired" notice is history, not the caption.
+        setItems((prev) => prev.filter((i) => !(i.kind === 'notice' && i.text === SIGN_IN_EXPIRED)));
+      })
       .catch((err: unknown) => setAuth({ kind: 'error', message: err instanceof Error ? err.message : String(err) }));
-  }, [config.authMode, config.mcpUrl, provider, setAuth]);
+  }, [config.authMode, config.mcpUrl, provider, setAuth, setItems]);
 
   const connect = useCallback(async () => {
     setConn({ kind: 'connecting' });
@@ -392,7 +410,7 @@ export function App({ config }: { config: PublicConfig }) {
       const splitter = createSentenceSplitter();
       const queue = readAloud
         ? createSpeechQueue({
-            port: monSpeechPort({ voice: () => voiceRef.current?.voice, getToken: accessToken }),
+            port: monSpeechPort({ voice: () => voiceRef.current?.voice, authorize }),
             onSentence: (sentence, index) => {
               speakingRef.current = sentence;
               setSpeaking(sentence);
@@ -442,7 +460,11 @@ export function App({ config }: { config: PublicConfig }) {
           model,
           tools: conversion.tools,
           history,
-          userText: withPresenceLine(text, store.getState().speakerName),
+          // The card's fresh state rides along, so small talk needs no check_on_mon step first.
+          userText: withMonState(
+            withPresenceLine(text, store.getState().speakerName),
+            latestMonState(store.getState().items, store.getState().standing, Date.now()),
+          ),
           signal: abort.signal,
           mcp: createTurnToolCaller({
             client: s.client,
@@ -512,7 +534,7 @@ export function App({ config }: { config: PublicConfig }) {
           provider.invalidateCredentials('tokens');
           setAuth({ kind: 'signed-out' });
           setConn({ kind: 'idle' });
-          notice('Your sign-in expired. Sign in again to keep talking.', 'error');
+          notice(SIGN_IN_EXPIRED, 'error');
         } else if (err instanceof ModelTurnError) {
           notice(err.message, 'error');
         } else {
@@ -525,7 +547,7 @@ export function App({ config }: { config: PublicConfig }) {
         abortRef.current = null;
       }
     },
-    [accessToken, busy, conn, model, store, notice, provider, push, readAloud, toolsByName, closeEar, dispatch, learnVoice, openMic, stopVoice, setActiveToolTitle, setActiveViewId, setAuth, setBusy, setConn, setDisplayMode, setDraft, setHeard, setLive, setSpeaking],
+    [authorize, busy, conn, model, store, notice, provider, push, readAloud, toolsByName, closeEar, dispatch, learnVoice, openMic, stopVoice, setActiveToolTitle, setActiveViewId, setAuth, setBusy, setConn, setDisplayMode, setDraft, setHeard, setLive, setSpeaking],
   );
   useEffect(() => {
     sendRef.current = send;
@@ -946,6 +968,8 @@ function LogItem({ item, active, hasView, onShow }: { item: TranscriptItem; acti
  * One line per turn in the console, and the same numbers on `window.__monLatency`
  * for a headless run: end of the person's speech to the first audible Mon audio.
  */
+const SIGN_IN_EXPIRED = 'Your sign-in expired. Sign in again to keep talking.';
+
 function logLatency(m: { speechEnd: number; firstText?: number; firstSentence?: number; firstAudio?: number }) {
   const rel = (t: number | undefined) => (t === undefined ? null : Math.round(t - m.speechEnd));
   const row = { firstTextMs: rel(m.firstText), firstSentenceMs: rel(m.firstSentence), firstAudioMs: rel(m.firstAudio) };

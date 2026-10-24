@@ -3,7 +3,7 @@ import { captionText, spokenText, unwrapQuotes } from '../src/client/caption.ts'
 
 describe('captionText', () => {
   it('drops stage directions the voice performs', () => {
-    expect(captionText('I’ll let your Mon answer that.\n*chuckle* Yeah Callah, I’m good.')).toBe('I’ll let your Mon answer that.\nYeah Caller, I’m good.');
+    expect(captionText('I’ll let your Mon answer that.\n*chuckle* Yeah Callah, I’m good.')).toBe('I’ll let your Mon answer that. Yeah Caller, I’m good.');
     expect(captionText('*short huff, Squeaklet turns back to the Caller.* Only the Caller can share a meal.')).toBe('Only the Caller can share a meal.');
   });
 
@@ -29,10 +29,11 @@ describe('quote marks', () => {
     expect(captionText("*yawn* 'Five more minutes.'")).toBe('Five more minutes.');
   });
 
-  it('keeps quotes that do not wrap the line, and unmatched pairs', () => {
+  it('keeps quotes that do not wrap the line, and pairs closed inside the sentence', () => {
     expect(captionText('It said "feed me" twice.')).toBe('It said "feed me" twice.');
     expect(captionText('"Feed me,” it said.')).toBe('"Feed me,” it said.');
-    expect(captionText('“Hold up')).toBe('“Hold up');
+    // A streamed sentence's lone opener is half of a pair split across sentences.
+    expect(captionText('“Hold up')).toBe('Hold up');
     expect(unwrapQuotes('"a" and "b"')).toBe('"a" and "b"');
   });
 
@@ -40,5 +41,26 @@ describe('quote marks', () => {
     expect(spokenText('"Hold up Callah… my stomach')).toBe('Hold up Callah… my stomach');
     expect(spokenText('louder than I am right now.”')).toBe('louder than I am right now.');
     expect(spokenText("It's \"fine\" *huff*")).toBe("It's fine *huff*");
+  });
+});
+
+describe('streamed sentences', () => {
+  it('drops the half of a quote pair a sentence carries alone', () => {
+    expect(captionText('“Say less, Callah.')).toBe('Say less, Caller.');
+    expect(captionText('That hit.”')).toBe('That hit.');
+    expect(captionText('"Say less, Callah. That hit."')).toBe('Say less, Caller. That hit.');
+    expect(captionText('*chuckle* “Callah, I be right here.')).toBe('Caller, I be right here.');
+    expect(captionText('“Say less, Callah. That hit.” We good.')).toBe('Say less, Caller. That hit. We good.');
+  });
+
+  it('keeps quotes matched inside a sentence, and single marks that are words', () => {
+    expect(captionText('It said “feed me” twice.')).toBe('It said “feed me” twice.');
+    expect(captionText('’Cause I’m hungry, Callah.')).toBe('’Cause I’m hungry, Caller.');
+    expect(captionText('We goin’ out.')).toBe('We goin’ out.');
+  });
+
+  it('shows one line, never a blank second line', () => {
+    expect(captionText('“Say less, Callah. That hit.”\n\n*chuckle* Next')).toBe('Say less, Caller. That hit. Next');
+    expect(captionText('Bet!\n\nLil’ Ratti is good.')).toBe('Bet! Lil’ Ratti is good.');
   });
 });
