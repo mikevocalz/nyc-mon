@@ -9,7 +9,7 @@ import { Form, Header, Heading, Paragraph, Section } from '@acme/ui/html';
 import { MonModel3D } from '@acme/ui/three/mon';
 import { Text, View } from '@acme/ui/tw';
 import { AppView, type DisplayMode } from './AppView.tsx';
-import { captionText } from './caption.ts';
+import { captionText, spokenText } from './caption.ts';
 import { DevPanel } from './DevPanel.tsx';
 import { judgeStage } from './judgeStatus.ts';
 import { SignInRequired, beginSignIn, completeSignIn, connectMcp, listAllTools, type McpSession } from './mcp.ts';
@@ -68,6 +68,8 @@ interface AppState {
   talkMode: ConversationMode;
   /** The sentence the Mon is saying right now (raw; the caption cleans it). */
   speaking: string;
+  /** The Caller's Mon card from the quiet get_mon_status: shown when no turn has a view up. */
+  standing: Extract<TranscriptItem, { kind: 'tool' }> | null;
   activeViewId: string | null;
   activeToolTitle: string | null;
   displayMode: DisplayMode;
@@ -118,6 +120,7 @@ export function App({ config }: { config: PublicConfig }) {
     heard: '',
     talkMode: 'idle',
     speaking: '',
+    standing: null,
     activeViewId: [...initial.items].reverse().find((i) => i.kind === 'tool' && i.resourceUri)?.id ?? null,
     activeToolTitle: null,
     displayMode: 'inline',
@@ -133,7 +136,7 @@ export function App({ config }: { config: PublicConfig }) {
     speakerId: '',
     speakerName: '',
   }));
-  const { items, auth, conn, busy, live, draft, listening, heard, talkMode, speaking, activeViewId, activeToolTitle, displayMode, scheme, readAloud, time, speakerId } = useStore(store);
+  const { items, auth, conn, busy, live, draft, listening, heard, talkMode, speaking, standing, activeViewId, activeToolTitle, displayMode, scheme, readAloud, time, speakerId } = useStore(store);
   const {
     items: setItems,
     auth: setAuth,
@@ -145,6 +148,7 @@ export function App({ config }: { config: PublicConfig }) {
     heard: setHeard,
     talkMode: setTalkMode,
     speaking: setSpeaking,
+    standing: setStanding,
     activeViewId: setActiveViewId,
     activeToolTitle: setActiveToolTitle,
     displayMode: setDisplayMode,
@@ -407,7 +411,10 @@ export function App({ config }: { config: PublicConfig }) {
       queueRef.current = queue;
       let spokeAny = false;
       const say = (sentences: string[]) => {
-        for (const s of sentences) {
+        for (const raw of sentences) {
+          // Quote marks are never spoken (and never captioned): the voice gets the words only.
+          const s = spokenText(raw);
+          if (!s) continue;
           if (marksRef.current && marksRef.current.firstSentence === undefined) marksRef.current.firstSentence = performance.now();
           spokeAny = true;
           queue?.push(s);
@@ -549,22 +556,44 @@ export function App({ config }: { config: PublicConfig }) {
     dispatch({ type: 'stop' });
   }
 
-  // Before the first reply: learn the Mon's voice once, quietly (no transcript line, no card).
-  const voiceProbed = useRef(false);
+  /**
+   * The standing display: voice-first, so the screen always shows the Caller's
+   * Mon. On connect and after New conversation, one quiet get_mon_status (no
+   * transcript line) supplies its card and the Mon's voice before the first
+   * reply. A later tool with its own view replaces the card; one without a
+   * view leaves it up.
+   */
+  const probedRef = useRef(false);
+  const probeMon = useCallback(
+    (s: McpSession) => {
+      const tool = s.tools.find((t) => t.name === 'get_mon_status');
+      if (!tool) return;
+      probedRef.current = true;
+      s.client
+        .callTool({ name: 'get_mon_status', arguments: {} })
+        .then((result) => {
+          const item: Extract<TranscriptItem, { kind: 'tool' }> = {
+            kind: 'tool',
+            id: newId('standing'),
+            name: tool.name,
+            title: toolTitle(tool, tool.name),
+            input: {},
+            result,
+            resourceUri: liveViewUri(tool, result) ?? null,
+            at: Date.now(),
+          };
+          learnVoice([item]);
+          if (!result.isError && item.resourceUri) setStanding(item);
+        })
+        .catch(() => {
+          probedRef.current = false;
+        });
+    },
+    [learnVoice, setStanding],
+  );
   useEffect(() => {
-    if (conn.kind !== 'connected' || voiceRef.current || voiceProbed.current) return;
-    if (!conn.session.tools.some((t) => t.name === 'get_mon_status')) return;
-    voiceProbed.current = true;
-    conn.session.client
-      .callTool({ name: 'get_mon_status', arguments: {} })
-      .then((result) => {
-        const probe: TranscriptItem = { kind: 'tool', id: 'voice-probe', name: 'get_mon_status', title: '', input: {}, result: result as never, resourceUri: null, at: 0 };
-        learnVoice([probe]);
-      })
-      .catch(() => {
-        voiceProbed.current = false;
-      });
-  }, [conn, learnVoice]);
+    if (conn.kind === 'connected' && !probedRef.current) probeMon(conn.session);
+  }, [conn, probeMon]);
 
   // Leaving the page or the session: nothing keeps listening or talking.
   useEffect(() => () => {
@@ -580,6 +609,8 @@ export function App({ config }: { config: PublicConfig }) {
 
   function newConversation() {
     stopAll();
+    // The Mon stays on screen: fetch its card again for the empty conversation.
+    if (session) probeMon(session);
     historyRef.current = [];
     clearSession(local);
     setItems([]);
@@ -607,7 +638,8 @@ export function App({ config }: { config: PublicConfig }) {
 
   const lastMon = [...items].reverse().find((i) => i.kind === 'mon');
   const lastReply = lastMon?.kind === 'mon' ? lastMon.text : '';
-  const activeView = items.find((i): i is Extract<TranscriptItem, { kind: 'tool' }> => i.id === activeViewId && i.kind === 'tool');
+  const activeView =
+    items.find((i): i is Extract<TranscriptItem, { kind: 'tool' }> => i.id === activeViewId && i.kind === 'tool') ?? standing ?? undefined;
   // Never the URI saved with the item: it names a view from the server build that made it.
   const activeViewUri = activeView ? currentViewUri(activeView, toolsByName) : null;
   const voiceIn = canListen();

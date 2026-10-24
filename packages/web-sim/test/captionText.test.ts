@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { captionText } from '../src/client/caption.ts';
+import { captionText, spokenText, unwrapQuotes } from '../src/client/caption.ts';
 
 describe('captionText', () => {
   it('drops stage directions the voice performs', () => {
@@ -16,5 +16,29 @@ describe('captionText', () => {
     expect(captionText('You my Callah, for real.')).toBe('You my Caller, for real.');
     expect(captionText('Callahs gotta eat.')).toBe('Callers gotta eat.');
     expect(captionText('Callahan Street')).toBe('Callahan Street');
+  });
+});
+
+describe('quote marks', () => {
+  it('drops one matching pair of quotes around the whole line', () => {
+    expect(captionText('"Hold up Callah… my stomach is talking louder than I am right now."')).toBe(
+      'Hold up Caller… my stomach is talking louder than I am right now.',
+    );
+    expect(captionText('“Feed me, Callah.”')).toBe('Feed me, Caller.');
+    expect(captionText('‘Night night.’')).toBe('Night night.');
+    expect(captionText("*yawn* 'Five more minutes.'")).toBe('Five more minutes.');
+  });
+
+  it('keeps quotes that do not wrap the line, and unmatched pairs', () => {
+    expect(captionText('It said "feed me" twice.')).toBe('It said "feed me" twice.');
+    expect(captionText('"Feed me,” it said.')).toBe('"Feed me,” it said.');
+    expect(captionText('“Hold up')).toBe('“Hold up');
+    expect(unwrapQuotes('"a" and "b"')).toBe('"a" and "b"');
+  });
+
+  it('sends no double quote marks to the voice', () => {
+    expect(spokenText('"Hold up Callah… my stomach')).toBe('Hold up Callah… my stomach');
+    expect(spokenText('louder than I am right now.”')).toBe('louder than I am right now.');
+    expect(spokenText("It's \"fine\" *huff*")).toBe("It's fine *huff*");
   });
 });

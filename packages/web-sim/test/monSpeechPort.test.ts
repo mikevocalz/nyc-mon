@@ -1,94 +1,38 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { MonSpeechCue } from '@acme/ui/three/mon/lipsync';
-import { monSpeechPort, ttsBody } from '../src/client/monSpeechPort.ts';
+import { describe, expect, it, vi } from 'vitest';
+import { monSpeechPort } from '../src/client/monSpeechPort.ts';
 import type { MonVoice } from '../src/client/monVoice.ts';
-import type { SpeakAsOptions } from '../src/client/speech.ts';
+import type { MonClip, prepareMonClip } from '../src/client/speech.ts';
 
-const voice: MonVoice = { lineageId: 'dex-001/male/1', stage: 'Baby' };
-const egg: MonVoice = { lineageId: 'dex-001/male/1', stage: 'Egg' };
-const tick = () => new Promise((r) => setTimeout(r, 0));
-
-function harness(v: MonVoice | undefined = voice) {
-  const listeners = new Set<(c: MonSpeechCue) => void>();
-  const emit = (c: MonSpeechCue) => listeners.forEach((l) => l(c));
-  const network: string[] = [];
-  const fetchFn = vi.fn(async (_input: unknown, init?: RequestInit) => {
-    network.push(String(init?.body));
-    return new Response('{"audio":"","audioContentType":"audio/mpeg"}', { status: 200, headers: { 'content-type': 'application/json' } });
-  }) as unknown as typeof fetch;
-  let cue = 0;
-  const speakCalls: string[] = [];
-  /** Stands in for speakAs: fetches through the injected fetchFn, then starts a clip. */
-  const speak = vi.fn(async (text: string, vv: MonVoice | undefined, opts: SpeakAsOptions) => {
-    speakCalls.push(text);
-    if (vv) await opts.fetchFn!('/api/tts', { method: 'POST', body: ttsBody(text, vv) });
-    emit({ kind: 'start', id: `c${++cue}`, elapsedMs: 0, durationMs: 1000, track: { kind: 'amplitude', fps: 60, values: [] } } as MonSpeechCue);
-  });
-  const stop = vi.fn(() => emit({ kind: 'stop', id: `c${cue}` }));
-  const port = monSpeechPort({
-    voice: () => v,
-    fetchFn,
-    speak,
-    stop,
-    onCue: (l) => {
-      listeners.add(l);
-      return () => listeners.delete(l);
-    },
-    synthesizerBusy: () => false,
-  });
-  return { port, emit, network, speak, speakCalls, stop, current: () => `c${cue}` };
-}
-
-afterEach(() => vi.unstubAllGlobals());
+const baby: MonVoice = { lineageId: 'dex-001/male/1', stage: 'Baby' };
+const small: MonVoice = { lineageId: 'dex-001/male/1', stage: 'Small', mood: 'asleep' };
 
 describe('monSpeechPort', () => {
-  it('prefetches the line once and plays from the prefetched answer', async () => {
-    vi.stubGlobal('Audio', class {});
-    const h = harness();
-    const abort = new AbortController();
-    const line = await h.port.prepare('Hey, Callah.', abort.signal);
-    expect(h.network).toEqual([ttsBody('Hey, Callah.', voice)]);
-    const done = h.port.play(line, abort.signal);
-    await tick();
-    expect(h.network).toHaveLength(1); // no second request
-    let finished = false;
-    void done.then(() => (finished = true));
-    await tick();
-    expect(finished).toBe(false); // still speaking
-    h.emit({ kind: 'stop', id: h.current() });
-    await done;
+  it('fetches each sentence in the voice current at that moment, with the sign-in token', async () => {
+    let voice = baby;
+    const prepare = vi.fn<typeof prepareMonClip>(async (): Promise<MonClip> => ({ kind: 'silent' }));
+    const getToken = () => 'tok';
+    const port = monSpeechPort({ voice: () => voice, getToken, prepare });
+    const signal = new AbortController().signal;
+    await port.prepare('One.', signal);
+    voice = small; // a tool result mid-reply
+    await port.prepare('Two.', signal);
+    expect(prepare.mock.calls.map((c) => [c[0], c[1]])).toEqual([
+      ['One.', baby],
+      ['Two.', small],
+    ]);
+    expect(prepare.mock.calls[0]?.[2]).toEqual({ getToken });
+    expect(prepare.mock.calls[0]?.[3]).toBe(signal);
   });
 
-  it('resolves when the clip is cut off by a barge-in', async () => {
-    vi.stubGlobal('Audio', class {});
-    const h = harness();
-    const abort = new AbortController();
-    const line = await h.port.prepare('A long line about pizza.', abort.signal);
-    const done = h.port.play(line, abort.signal);
-    await tick();
-    abort.abort();
-    await done;
-    expect(h.stop).toHaveBeenCalled();
-  });
-
-  it('an Egg is silent: nothing is fetched or played', async () => {
-    vi.stubGlobal('Audio', class {});
-    const h = harness(egg);
-    const abort = new AbortController();
-    const line = await h.port.prepare('…', abort.signal);
-    await h.port.play(line, abort.signal);
-    expect(h.network).toEqual([]);
-    expect(h.speakCalls).toEqual([]);
-  });
-
-  it('a failed prefetch still plays: speakAs fetches for itself', async () => {
-    vi.stubGlobal('Audio', class {});
-    const h = harness();
-    const abort = new AbortController();
-    const failing = monSpeechPort({ voice: () => voice, fetchFn: (async () => { throw new Error('down'); }) as typeof fetch, speak: async (t, v, o) => { try { await h.speak(t, v, o); } catch { /* speakAs catches its own fetch errors */ } }, onCue: () => () => {}, synthesizerBusy: () => false, sleep: async () => {} });
-    const line = await failing.prepare('Hi there friend.', abort.signal);
-    expect(line.response).toBeNull();
-    await failing.play(line, abort.signal);
-    expect(h.speakCalls).toEqual(['Hi there friend.']);
+  it('play waits for the clip to finish', async () => {
+    let finish!: () => void;
+    const play = vi.fn(() => new Promise<void>((r) => (finish = r)));
+    const port = monSpeechPort({ voice: () => baby, play });
+    let done = false;
+    void port.play({ kind: 'silent' }, new AbortController().signal).then(() => (done = true));
+    await Promise.resolve();
+    expect(done).toBe(false);
+    finish();
+    await vi.waitFor(() => expect(done).toBe(true));
   });
 });
