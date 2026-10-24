@@ -1,6 +1,7 @@
 import { spawn, spawnSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { Readable } from 'node:stream';
-import { pronounceForVoice, resolveVoice, stageDirectionsToTags, voiceDelivery, voicePitchFactor } from '@acme/content/voices';
+import { expressiveVoiceSettings, pronounceForVoice, resolveVoice, stageDirectionsToTags, voiceDelivery, voicePitchFactor } from '@acme/content/voices';
 import { IdSchema, LifecycleStageSchema, MonMoodSchema } from '@acme/core/schemas';
 import { z } from 'zod';
 import type { CharacterAlignment, FaceTrack } from '@acme/ui/three/mon/lipsync';
@@ -31,12 +32,13 @@ import type { ModelAuthCheck } from './model-auth.ts';
  *
  * Lip-sync: a client that sends `Accept: application/json` gets one JSON body
  * instead of streamed mp3: `{ audio (base64 mp3), audioContentType, pitch,
- * alignment?, face? }`. `alignment` is ElevenLabs' per-character timing
+ * alignment?, faceId? }`. `alignment` is ElevenLabs' per-character timing
  * (`/with-timestamps`); the pitch shift keeps duration, so it still fits the
- * shifted clip. `face` is Audio2Face-3D's frames from that same shifted clip,
- * when an NVIDIA key is configured and the call answers in time. Buffering
- * costs no first-audio latency: the browser already waited for the whole clip
- * before playing it. Either field may be missing; the clip always plays.
+ * shifted clip. The answer never waits for Audio2Face-3D (1.5 to 3 s): with an
+ * NVIDIA key it carries `faceId`, and GET /api/tts/face/:id answers
+ * `{ face }` once the frames from that same shifted clip are ready, or 204 if
+ * they never come. The browser plays on the character timing and swaps the
+ * face in mid-line. Either field may be missing; the clip always plays.
  */
 
 export const MAX_TTS_TEXT = 400;
@@ -179,11 +181,59 @@ function streamOf(bytes: Uint8Array): ReadableStream<Uint8Array> {
   });
 }
 
+/** How long a deferred face waits to be collected before it is dropped. */
+export const FACE_TTL_MS = 60_000;
+const FACE_PATH = /^\/api\/tts\/face\/([0-9a-f-]{36})$/;
+
 export function createTtsHandler(deps: TtsHandlerDeps) {
+  /**
+   * Audio2Face takes 1.5 to 3 s per clip. The JSON answer goes out as soon as
+   * the clip and its character timing exist; the face is rendered after, keyed
+   * by a random id the browser collects from GET /api/tts/face/:id and swaps
+   * in mid-line. Each face is handed out once and forgotten after FACE_TTL_MS.
+   */
+  const faces = new Map<string, { readonly face: Promise<FaceTrack | null>; readonly timer: ReturnType<typeof setTimeout> }>();
+  const forget = (id: string) => {
+    const job = faces.get(id);
+    if (!job) return;
+    clearTimeout(job.timer);
+    faces.delete(id);
+  };
+  const startFace = (render: FaceRenderer, audio: Uint8Array, mood: z.infer<typeof MonMoodSchema> | undefined): string => {
+    const id = randomUUID();
+    const face = render({ audio, signal: AbortSignal.timeout(FACE_TTL_MS), ...(mood === undefined ? {} : { mood }) }).catch(() => null);
+    const timer = setTimeout(() => faces.delete(id), FACE_TTL_MS);
+    (timer as { unref?: () => void }).unref?.();
+    faces.set(id, { face, timer });
+    return id;
+  };
+
   return async function handle(req: Request, clientKey: string): Promise<Response> {
     const json = (status: number, body: unknown) =>
       new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
     const silent = () => new Response(null, { status: 204, headers: { 'cache-control': 'no-store' } });
+
+    const facePath = FACE_PATH.exec(new URL(req.url).pathname);
+    if (facePath) {
+      if (req.method !== 'GET') return json(405, { error: 'method_not_allowed' });
+      // Browsers leave Origin off a same-origin GET; Sec-Fetch-Site says the same thing.
+      const origin = req.headers.get('origin');
+      const sameOrigin = origin === deps.allowedOrigin || (origin === null && req.headers.get('sec-fetch-site') === 'same-origin');
+      if (!sameOrigin) return json(403, { error: 'forbidden_origin' });
+      if (deps.auth) {
+        try {
+          await deps.auth(req.headers.get('authorization'));
+        } catch {
+          return json(401, { error: 'Sign in again to keep talking.' });
+        }
+      }
+      const id = facePath[1]!;
+      const job = faces.get(id);
+      if (!job) return silent();
+      forget(id);
+      const face = await job.face;
+      return face ? json(200, { face }) : silent();
+    }
 
     if (req.method !== 'POST') return json(405, { error: 'method_not_allowed' });
     // Same-origin only: another site can't spend this server's ElevenLabs credits.
@@ -212,7 +262,9 @@ export function createTtsHandler(deps: TtsHandlerDeps) {
     const voice = resolveVoice(parsed.lineageId);
     if (voice === null) return silent();
 
-    const delivery = voiceDelivery(parsed.mood);
+    // The mood's stability and similarity plus the voice's own style and speed.
+    // Checked live 2026-10-23: eleven_v4_turbo answers 200 with all four fields.
+    const settings = expressiveVoiceSettings(voice, parsed.mood);
     const spoken = spokenLine(parsed.text, parsed.mood);
     const shifter = deps.pitchShift === undefined ? systemPitchShifter() : deps.pitchShift;
 
@@ -222,7 +274,7 @@ export function createTtsHandler(deps: TtsHandlerDeps) {
         const res = await deps.fetch(`${ELEVENLABS_URL}/${voice.elevenLabsVoiceId}/with-timestamps?output_format=mp3_44100_128`, {
           method: 'POST',
           headers: { 'xi-api-key': deps.apiKey, 'content-type': 'application/json', accept: 'application/json' },
-          body: JSON.stringify({ text: spoken, model_id: ELEVENLABS_TTS_MODEL, voice_settings: delivery.settings }),
+          body: JSON.stringify({ text: spoken, model_id: ELEVENLABS_TTS_MODEL, voice_settings: settings }),
           signal: req.signal,
         });
         if (!res.ok) {
@@ -247,16 +299,16 @@ export function createTtsHandler(deps: TtsHandlerDeps) {
         }
       }
       const alignment = readAlignment(timed.alignment);
-      // The face comes from the bytes the browser will play, after the shift.
-      let face: FaceTrack | null = null;
-      if (deps.face) face = await deps.face({ audio, signal: req.signal, ...(parsed.mood === undefined ? {} : { mood: parsed.mood }) });
+      // The face comes from the bytes the browser will play, after the shift; it
+      // renders while the clip already plays (see `faces` above).
+      const faceId = deps.face ? startFace(deps.face, audio, parsed.mood) : undefined;
       return new Response(
         JSON.stringify({
           audio: Buffer.from(audio).toString('base64'),
           audioContentType: 'audio/mpeg',
           pitch: applied,
           ...(alignment ? { alignment } : {}),
-          ...(face ? { face } : {}),
+          ...(faceId ? { faceId } : {}),
         }),
         { status: 200, headers: { 'content-type': 'application/json', 'cache-control': 'no-store', 'x-mon-pitch': String(applied) } },
       );
@@ -267,7 +319,7 @@ export function createTtsHandler(deps: TtsHandlerDeps) {
       upstream = await deps.fetch(`${ELEVENLABS_URL}/${voice.elevenLabsVoiceId}/stream?output_format=mp3_44100_128`, {
         method: 'POST',
         headers: { 'xi-api-key': deps.apiKey, 'content-type': 'application/json', accept: 'audio/mpeg' },
-        body: JSON.stringify({ text: spoken, model_id: ELEVENLABS_TTS_MODEL, voice_settings: delivery.settings }),
+        body: JSON.stringify({ text: spoken, model_id: ELEVENLABS_TTS_MODEL, voice_settings: settings }),
         signal: req.signal,
       });
     } catch (err) {

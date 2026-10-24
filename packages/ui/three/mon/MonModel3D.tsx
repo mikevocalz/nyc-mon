@@ -28,8 +28,9 @@ export interface MonModel3DProps {
   readonly mouth?: MouthRig;
   /**
    * The latest speech cue from the host. A new `start` id begins an
-   * utterance, aligned to the audio by its `elapsedMs`; `stop` (or reaching
-   * `durationMs`) relaxes the mouth back to the clip.
+   * utterance, aligned to the audio by its `elapsedMs`; a `start` with the
+   * same id and a different track (the face arriving mid-line) swaps the track
+   * in place; `stop` (or reaching `durationMs`) relaxes the mouth back to the clip.
    */
   readonly speech?: MonSpeechCue | null;
 }
@@ -488,7 +489,11 @@ export function MonModel3D({
       if (utterance.current?.cue.id === cue.id) utterance.current = null;
       return;
     }
-    if (utterance.current?.cue.id === cue.id) return;
+    // The same utterance again is a repeat unless it brings a different track:
+    // the Audio2Face face arriving mid-line. That one replaces the track and
+    // re-anchors to the audio position the host stamped, without restarting.
+    const playing = utterance.current;
+    if (playing?.cue.id === cue.id && playing.cue.track.kind === cue.track.kind) return;
     utterance.current = { cue, receivedAt: performance.now() };
   }, [speech]);
 

@@ -10,10 +10,15 @@ import {
   pitchShiftArgs,
   type TtsFetch,
 } from '../server/tts.ts';
+import { expressiveVoiceSettings, resolveVoice } from '@acme/content/voices';
 
 const ORIGIN = 'http://localhost:5180';
 const LINEAGE = 'dex-001/female/1';
-const AYLA = 'b8JMPeNuVrqqWExQc8e9';
+/** The ElevenLabs voice behind LINEAGE, from the registry, so a recast doesn't strand the tests. */
+const VOICE = resolveVoice(LINEAGE)!;
+const AYLA = VOICE.elevenLabsVoiceId;
+/** The voice's own style and speed ride along with the mood's stability. */
+const expressive = { style: expect.any(Number), speed: expect.any(Number) };
 
 const post = (body: unknown, origin: string | null = ORIGIN) =>
   new Request(`${ORIGIN}/api/tts`, {
@@ -93,7 +98,7 @@ describe('/api/tts', () => {
     expect(sentBody(fetchFn)).toEqual({
       text: 'Hey there [sighs]',
       model_id: 'eleven_v4_turbo',
-      voice_settings: { stability: 0.45, similarity_boost: 0.8 },
+      voice_settings: { stability: 0.45, similarity_boost: 0.8, ...expressive },
     });
   });
 
@@ -114,7 +119,7 @@ describe('/api/tts', () => {
     expect(sentBody(fetchFn)).toEqual({
       text: `${tag} Hi friend`,
       model_id: 'eleven_v4_turbo',
-      voice_settings: { stability, similarity_boost: 0.8 },
+      voice_settings: { stability, similarity_boost: 0.8, ...expressive },
     });
   });
 
@@ -129,7 +134,7 @@ describe('/api/tts', () => {
     const res = await handler({ fetchFn })(post({ text, lineageId: LINEAGE, stage: 'Small', mood }), 'ip');
     expect(res.status).toBe(200);
     // One tag only, and the mood still sets stability.
-    expect(sentBody(fetchFn)).toEqual({ text: spoken, model_id: 'eleven_v4_turbo', voice_settings: { stability, similarity_boost: 0.8 } });
+    expect(sentBody(fetchFn)).toEqual({ text: spoken, model_id: 'eleven_v4_turbo', voice_settings: { stability, similarity_boost: 0.8, ...expressive } });
   });
 
   it.each([
@@ -139,6 +144,14 @@ describe('/api/tts', () => {
     const fetchFn = fakeFetch();
     await handler({ fetchFn })(post({ text, lineageId: LINEAGE, stage: 'Small' }), 'ip');
     expect(sentBody(fetchFn)).toMatchObject({ text: spoken });
+  });
+
+  it('sends the voice’s style and speed with the mood, damped for a low-energy Mon', async () => {
+    for (const mood of ['content', 'asleep', undefined] as const) {
+      const fetchFn = fakeFetch();
+      await handler({ fetchFn })(post({ text: 'Hi', lineageId: LINEAGE, stage: 'Small', ...(mood ? { mood } : {}) }), 'ip');
+      expect((sentBody(fetchFn) as { voice_settings: unknown }).voice_settings).toEqual(expressiveVoiceSettings(VOICE, mood));
+    }
   });
 
   it('strips *yawn*, which has no documented ElevenLabs tag, and then leads with the mood tag', async () => {
@@ -269,37 +282,71 @@ describe('/api/tts JSON (lip-sync)', () => {
     expect(body).toEqual({ audio: Buffer.from([1, 2, 3]).toString('base64'), audioContentType: 'audio/mpeg', pitch: 1, alignment });
   });
 
-  it('shifts the pitch on the buffered clip and sends Audio2Face the SAME bytes it returns', async () => {
-    const face = vi.fn(async () => ({ fps: 30, names: ['jawOpen'], frames: [[0.2]] }));
-    const res = await createTtsHandler({
+  const getFace = (id: string, headers: Record<string, string> = { origin: ORIGIN }) =>
+    new Request(`${ORIGIN}/api/tts/face/${id}`, { method: 'GET', headers });
+
+  it('answers the clip at once and renders the face from the SAME shifted bytes afterwards', async () => {
+    let finishFace!: (f: unknown) => void;
+    const face = vi.fn(() => new Promise((r) => (finishFace = r)));
+    const h = createTtsHandler({
       allowedOrigin: ORIGIN,
       rateLimit: createRateLimiter(100),
       apiKey: 'k',
       fetch: timed(),
       pitchShift: markShifter(),
-      face,
-    })(postJson({ text: 'Hi', lineageId: LINEAGE, stage: 'Baby', mood: 'content' }), 'ip');
-    const body = (await res.json()) as { audio: string; pitch: number; face: unknown };
+      face: face as never,
+    });
+    // The face has not finished, and the clip is already answered.
+    const res = await h(postJson({ text: 'Hi', lineageId: LINEAGE, stage: 'Baby', mood: 'content' }), 'ip');
+    const body = (await res.json()) as { audio: string; pitch: number; face?: unknown; faceId: string; alignment: unknown };
     expect(body.pitch).toBe(1.3);
     expect([...Buffer.from(body.audio, 'base64')]).toEqual([1, 2, 3, 9]);
+    expect(body.face).toBeUndefined();
+    expect(body.alignment).toEqual(alignment);
+    expect(body.faceId).toMatch(/^[0-9a-f-]{36}$/);
     const sent = (face.mock.calls[0] as unknown as [{ audio: Uint8Array; mood: string }])[0];
     expect([...sent.audio]).toEqual([1, 2, 3, 9]);
     expect(sent.mood).toBe('content');
-    expect(body.face).toEqual({ fps: 30, names: ['jawOpen'], frames: [[0.2]] });
+
+    const pending = h(getFace(body.faceId), 'ip');
+    finishFace({ fps: 30, names: ['jawOpen'], frames: [[0.2]] });
+    const got = await pending;
+    expect(got.status).toBe(200);
+    expect(await got.json()).toEqual({ face: { fps: 30, names: ['jawOpen'], frames: [[0.2]] } });
+    // Handed out once.
+    expect((await h(getFace(body.faceId), 'ip')).status).toBe(204);
   });
 
-  it('a failed face leaves the face out and still answers the clip with its alignment', async () => {
-    const res = await createTtsHandler({
+  it('a face that fails or an unknown id answers 204; the clip still has its alignment', async () => {
+    const h = createTtsHandler({
       allowedOrigin: ORIGIN,
       rateLimit: createRateLimiter(100),
       apiKey: 'k',
       fetch: timed(),
       pitchShift: null,
       face: async () => null,
-    })(postJson({ text: 'Hi', lineageId: LINEAGE, stage: 'Mid' }), 'ip');
-    const body = (await res.json()) as Record<string, unknown>;
-    expect(body.face).toBeUndefined();
+    });
+    const body = (await (await h(postJson({ text: 'Hi', lineageId: LINEAGE, stage: 'Mid' }), 'ip')).json()) as { faceId: string; alignment: unknown };
     expect(body.alignment).toEqual(alignment);
+    expect((await h(getFace(body.faceId), 'ip')).status).toBe(204);
+    expect((await h(getFace('00000000-0000-4000-8000-000000000000'), 'ip')).status).toBe(204);
+  });
+
+  it('the face route takes same-origin requests only, and checks sign-in', async () => {
+    const auth = vi.fn(async (header: string | null) => {
+      if (header !== 'Bearer ok') throw new Error('no');
+    });
+    const h = createTtsHandler({ allowedOrigin: ORIGIN, rateLimit: createRateLimiter(100), apiKey: 'k', fetch: timed(), pitchShift: null, face: async () => null, auth: auth as never });
+    const id = '00000000-0000-4000-8000-000000000000';
+    expect((await h(getFace(id, { origin: 'https://evil.example', authorization: 'Bearer ok' }), 'ip')).status).toBe(403);
+    expect((await h(getFace(id, { 'sec-fetch-site': 'cross-site', authorization: 'Bearer ok' }), 'ip')).status).toBe(403);
+    expect((await h(getFace(id, { 'sec-fetch-site': 'same-origin' }), 'ip')).status).toBe(401);
+    expect((await h(getFace(id, { 'sec-fetch-site': 'same-origin', authorization: 'Bearer ok' }), 'ip')).status).toBe(204);
+  });
+
+  it('without Audio2Face there is no faceId', async () => {
+    const body = (await (await handler({ fetchFn: timed(), pitchShift: null })(postJson({ text: 'Hi', lineageId: LINEAGE, stage: 'Mid' }), 'ip')).json()) as Record<string, unknown>;
+    expect(body.faceId).toBeUndefined();
   });
 
   it('drops a malformed alignment and reports an upstream failure as 502', async () => {

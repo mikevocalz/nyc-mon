@@ -44,13 +44,19 @@ function stubWebSpeech() {
     rate = 1;
     pitch = 1;
     voice: { name: string } | undefined;
+    onend: (() => void) | null = null;
+    onerror: (() => void) | null = null;
     constructor(readonly text: string) {}
   }
   vi.stubGlobal('SpeechSynthesisUtterance', Utterance);
   vi.stubGlobal('speechSynthesis', {
     cancel: vi.fn(),
     getVoices: () => [{ name: 'Samantha', lang: 'en-US', default: true }, { name: 'Daniel', lang: 'en-GB', default: false }],
-    speak: (u: Utterance) => spoken.push({ text: u.text, pitch: u.pitch, rate: u.rate, voice: u.voice?.name }),
+    // A browser fires onend when the line has been read; here, right away.
+    speak: (u: Utterance) => {
+      spoken.push({ text: u.text, pitch: u.pitch, rate: u.rate, voice: u.voice?.name });
+      queueMicrotask(() => u.onend?.());
+    },
   });
   return spoken;
 }
@@ -220,6 +226,61 @@ describe('speakAs lip-sync cues', () => {
     // Plain mp3 and no WebAudio in Node: no source, so no cue; the clip still plays.
     await started('Hi', { lineageId: 'dex-001/male/2', stage: 'Mid' }, { fetchFn: fakeFetch(mp3).fn });
     expect(cues).toEqual([]);
+    off();
+  });
+
+  it('plays at once on character timing, then swaps in the deferred face mid-line under the same id', async () => {
+    vi.stubGlobal('Audio', FakeAudio);
+    const { cues, off } = listen();
+    const faceId = '0f8f5a3e-1111-4222-8333-444455556666';
+    let releaseFace!: () => void;
+    const faceReady = new Promise<void>((r) => (releaseFace = r));
+    const urls: string[] = [];
+    const fn = (async (input: unknown, init?: RequestInit) => {
+      urls.push(String(input));
+      if (String(input).endsWith(`/face/${faceId}`)) {
+        expect(init?.method).toBe('GET');
+        await faceReady;
+        return new Response(JSON.stringify({ face: { fps: 30, names: ['jawOpen'], frames: [[0.1], [0.3]] } }), { status: 200, headers: { 'content-type': 'application/json' } });
+      }
+      return performance({ alignment, faceId })();
+    }) as typeof fetch;
+    const audio = await started('Hi mom', { lineageId: 'dex-001/male/2', stage: 'Mid' }, { fetchFn: fn });
+    await vi.waitFor(() => expect(cues).toHaveLength(1));
+    const first = cues[0]!;
+    if (first.kind !== 'start') throw new Error('expected a start cue');
+    expect(first.track.kind).toBe('visemes'); // no wait for the face
+    expect(urls).toEqual(['/api/tts', `/api/tts/face/${faceId}`]);
+    audio.currentTime = 0.42;
+    releaseFace();
+    await vi.waitFor(() => expect(cues).toHaveLength(2));
+    const upgrade = cues[1]!;
+    if (upgrade.kind !== 'start') throw new Error('expected a second start cue');
+    expect(upgrade.id).toBe(first.id);
+    expect(upgrade.track.kind).toBe('face');
+    expect(upgrade.elapsedMs).toBeCloseTo(420);
+    off();
+  });
+
+  it('a face that comes after the clip ended is dropped', async () => {
+    vi.stubGlobal('Audio', FakeAudio);
+    const { cues, off } = listen();
+    const faceId = '0f8f5a3e-1111-4222-8333-444455556667';
+    let releaseFace!: () => void;
+    const faceReady = new Promise<void>((r) => (releaseFace = r));
+    const fn = (async (input: unknown) => {
+      if (String(input).endsWith(`/face/${faceId}`)) {
+        await faceReady;
+        return new Response(JSON.stringify({ face: { fps: 30, names: ['jawOpen'], frames: [[0.1]] } }), { status: 200, headers: { 'content-type': 'application/json' } });
+      }
+      return performance({ alignment, faceId })();
+    }) as typeof fetch;
+    const audio = await started('Hi mom', { lineageId: 'dex-001/male/2', stage: 'Mid' }, { fetchFn: fn });
+    await vi.waitFor(() => expect(cues).toHaveLength(1));
+    audio.end();
+    releaseFace();
+    await new Promise((r) => setTimeout(r, 10));
+    expect(cues.map((c) => c.kind)).toEqual(['start', 'stop']);
     off();
   });
 });

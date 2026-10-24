@@ -189,7 +189,8 @@ async function main(): Promise<void> {
       const key = clientKey(req.socket.remoteAddress, typeof forwarded === 'string' ? forwarded : null, env.SIM_TRUST_PROXY === '1');
       return void handleModel(toRequest(req), key).then((r) => sendResponse(res, r)).catch(fail);
     }
-    if (url.pathname === '/api/tts') {
+    // POST /api/tts, and GET /api/tts/face/:id for the deferred Audio2Face frames.
+    if (url.pathname === '/api/tts' || url.pathname.startsWith('/api/tts/face/')) {
       const forwarded = req.headers['x-forwarded-for'];
       const key = clientKey(req.socket.remoteAddress, typeof forwarded === 'string' ? forwarded : null, env.SIM_TRUST_PROXY === '1');
       return void handleTts(toRequest(req), key).then((r) => sendResponse(res, r)).catch(fail);

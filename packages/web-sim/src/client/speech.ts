@@ -121,8 +121,9 @@ function sessionBrowserVoice(): SpeechSynthesisVoice | undefined {
   return v;
 }
 
-export function speak(text: string, pitch?: number): void {
-  if (!canSpeak() || !text.trim()) return;
+/** Speaks with Web Speech; resolves when the utterance ends, fails, or is cancelled. */
+export function speak(text: string, pitch?: number): Promise<void> {
+  if (!canSpeak() || !text.trim()) return Promise.resolve();
   globalThis.speechSynthesis.cancel();
   // The skill writes stage directions as *short huff*; some voices read the asterisks out.
   const u = new SpeechSynthesisUtterance(text.replace(/\*/g, ''));
@@ -131,7 +132,12 @@ export function speak(text: string, pitch?: number): void {
   const v = sessionBrowserVoice();
   if (v) u.voice = v;
   if (pitch !== undefined) u.pitch = pitch;
+  const ended = new Promise<void>((resolve) => {
+    u.onend = () => resolve();
+    u.onerror = () => resolve();
+  });
   globalThis.speechSynthesis.speak(u);
+  return ended;
 }
 
 /** /api/tts's JSON answer: the clip plus whatever timing the server could get for it. */
@@ -140,6 +146,28 @@ interface TtsPerformance {
   readonly audioContentType: string;
   readonly alignment?: CharacterAlignment;
   readonly face?: FaceTrack;
+  /** Audio2Face renders after the answer; GET <endpoint>/face/<faceId> collects it. */
+  readonly faceId?: string;
+}
+
+const FACE_ID = /^[0-9a-f-]{36}$/;
+
+/** The deferred Audio2Face frames for one clip, or null (none configured, too slow, failed). */
+async function fetchFace(faceId: string, opts: SpeakAsOptions, signal: AbortSignal): Promise<FaceTrack | null> {
+  if (!FACE_ID.test(faceId)) return null;
+  try {
+    const token = opts.getToken?.();
+    const res = await (opts.fetchFn ?? fetch)(`${opts.endpoint ?? '/api/tts'}/face/${faceId}`, {
+      method: 'GET',
+      headers: token ? { authorization: `Bearer ${token}` } : {},
+      signal,
+    });
+    if (res.status !== 200) return null;
+    const body = (await res.json()) as { face?: FaceTrack };
+    return body.face ?? null;
+  } catch {
+    return null;
+  }
 }
 
 function isPerformance(v: unknown): v is TtsPerformance {
@@ -189,7 +217,14 @@ export interface SpeakAsOptions {
 
 /** One sentence of the Mon's voice, fetched and ready to play. */
 export type MonClip =
-  | { readonly kind: 'audio'; readonly bytes: Uint8Array<ArrayBuffer>; readonly contentType: string; readonly track: SpeechTrack | null }
+  | {
+      readonly kind: 'audio';
+      readonly bytes: Uint8Array<ArrayBuffer>;
+      readonly contentType: string;
+      readonly track: SpeechTrack | null;
+      /** Audio2Face frames still rendering; the clip plays on `track` and swaps to these mid-line. */
+      readonly face: Promise<FaceTrack | null> | null;
+    }
   /** The server has no ElevenLabs voice (204): the session's one browser voice reads it. */
   | { readonly kind: 'browser'; readonly text: string; readonly pitch: number | undefined }
   /** Nothing to play: an Egg, an empty line, or the voice failed twice (the caption carries the words). */
@@ -248,6 +283,7 @@ export async function prepareMonClip(text: string, voice: MonVoice | undefined, 
       let contentType = 'audio/mpeg';
       let face: FaceTrack | undefined;
       let alignment: CharacterAlignment | undefined;
+      let later: Promise<FaceTrack | null> | null = null;
       if ((res.headers.get('content-type') ?? '').startsWith('application/json')) {
         const body: unknown = await res.json();
         if (!isPerformance(body)) {
@@ -258,12 +294,14 @@ export async function prepareMonClip(text: string, voice: MonVoice | undefined, 
         contentType = body.audioContentType;
         face = body.face;
         alignment = body.alignment;
+        // Start collecting the face now, so it is often ready by the time this clip plays.
+        if (!face && body.faceId) later = fetchFace(body.faceId, opts, signal);
       } else {
         bytes = new Uint8Array(await res.arrayBuffer());
       }
       // Best source first: Audio2Face frames, character timing, then the clip's own loudness.
       const amplitude = face || alignment ? null : await envelopeOf(bytes.buffer);
-      return { kind: 'audio', bytes, contentType, track: pickSpeechTrack({ face: face ?? null, alignment: alignment ?? null, amplitude }) };
+      return { kind: 'audio', bytes, contentType, track: pickSpeechTrack({ face: face ?? null, alignment: alignment ?? null, amplitude }), face: later };
     } catch (err) {
       if (signal.aborted) return { kind: 'silent' };
       if (!(err instanceof TtsFailure)) lastStatus = 'network';
@@ -316,6 +354,14 @@ export async function playMonClip(clip: MonClip, signal: AbortSignal): Promise<v
         const seconds = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : trackDurationMs(track) / 1000;
         const elapsed = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
         emitSpeechCue({ kind: 'start', id: cueId, elapsedMs: elapsed * 1000, durationMs: Math.max(1, seconds * 1000), track });
+        // The face arrives mid-line: the same utterance id with the face track,
+        // stamped with where the audio is now, so the view switches on the clip's clock.
+        void clip.face?.then((frames) => {
+          const faceTrack = frames ? pickSpeechTrack({ face: frames, alignment: null, amplitude: null }) : null;
+          if (!faceTrack || current !== entry || audio.ended) return;
+          const at = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
+          emitSpeechCue({ kind: 'start', id: cueId, elapsedMs: at * 1000, durationMs: Math.max(1, seconds * 1000), track: faceTrack });
+        });
       },
       () => {
         console.warn('[web-sim] Mon voice could not play (autoplay or decode); the caption carries the reply.');
