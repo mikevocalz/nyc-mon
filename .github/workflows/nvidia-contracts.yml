@@ -1,0 +1,61 @@
+name: NVIDIA companion contracts
+on:
+  pull_request:
+    paths:
+      - 'packages/web-sim/**'
+      - 'packages/payload/**'
+      - 'apps/admin-vite/**'
+      - '.github/workflows/nvidia-contracts.yml'
+      - 'tooling/nvidia/**'
+      - 'pnpm-lock.yaml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: disposable-ci-only
+          POSTGRES_DB: nycmon_nvidia_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Provider and integration contracts (not live inference)
+        run: pnpm --filter @acme/web-sim exec vitest run test/nebius.test.ts test/nvidia-integration.test.ts
+      - name: Memory ownership, consent and deletion unit tests
+        run: pnpm --filter @acme/payload exec vitest run src/admin/console/v1/__tests__/companion-memory.test.ts
+      - name: Real disposable PostgreSQL persistence and concurrency
+        env:
+          NVIDIA_TEST_DATABASE_URL: postgresql://postgres:disposable-ci-only@127.0.0.1:5432/nycmon_nvidia_test
+        run: pnpm --filter @acme/payload exec vitest run src/admin/console/v1/__tests__/companion-memory.pg.test.ts
+      - name: Simulator typecheck (baseline errors are not silently waived)
+        run: pnpm --filter @acme/web-sim typecheck
+      - name: Build both simulator entry points
+        run: pnpm --filter @acme/web-sim build
+      - name: Confirm live proof refuses missing credentials
+        shell: bash
+        run: |
+          set +e
+          pnpm --filter @acme/web-sim exec node scripts/nvidia-live.ts
+          code=$?
+          set -e
+          test "$code" -ne 0
+          node --input-type=module -e 'import fs from "node:fs"; const r=JSON.parse(fs.readFileSync("packages/web-sim/.nvidia-readiness/live.json","utf8")); if(r.status!=="NOT_RUN"||r.receipts.length!==0) process.exit(1);'

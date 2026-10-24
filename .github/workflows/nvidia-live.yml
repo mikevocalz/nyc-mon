@@ -1,0 +1,60 @@
+name: NVIDIA live qualification proof
+on:
+  workflow_dispatch:
+    inputs:
+      full:
+        description: 'Run full test-account mutation and continuity checks (explicit consent; requires two real user tokens)'
+        type: boolean
+        required: true
+        default: false
+permissions:
+  contents: read
+jobs:
+  proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Configure required reviewers here before the first run. No PR-triggered secret access.
+    environment: nvidia-live
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Run real Nebius proof; missing secrets fail NOT_RUN
+        env:
+          NEBIUS_API_KEY: ${{ secrets.NEBIUS_API_KEY }}
+          NEBIUS_BASE_URL: ${{ vars.NEBIUS_BASE_URL }}
+          SIM_NEBIUS_MODEL_ID: ${{ vars.SIM_NEBIUS_MODEL_ID }}
+          NODE_ENV: production
+          SIM_PUBLIC_ORIGIN: ${{ vars.SIM_PUBLIC_ORIGIN }}
+          SIM_MCP_URL: ${{ vars.SIM_MCP_URL }}
+          AUTH_ISSUER: ${{ vars.AUTH_ISSUER }}
+          OAUTH_SIM_CLIENT_ID: ${{ vars.OAUTH_SIM_CLIENT_ID }}
+          V1_BASE_URL: ${{ vars.V1_BASE_URL }}
+          V1_MCP_SERVICE_KEY: ${{ secrets.V1_MCP_SERVICE_KEY }}
+          LIVE_ACCESS_TOKEN: ${{ secrets.LIVE_ACCESS_TOKEN }}
+          LIVE_ACCESS_TOKEN_SECOND_SESSION: ${{ secrets.LIVE_ACCESS_TOKEN_SECOND_SESSION }}
+          LIVE_MON_ID: ${{ vars.LIVE_MON_ID }}
+          NVIDIA_TEST_CALLER_ID: ${{ vars.NVIDIA_TEST_CALLER_ID }}
+          FULL: ${{ inputs.full }}
+        shell: bash
+        run: |
+          if [ "$FULL" = "true" ]; then
+            export NVIDIA_ALLOW_TEST_ACCOUNT_MUTATION=yes
+            pnpm --filter @acme/web-sim exec node scripts/nvidia-live.ts --full
+          else
+            pnpm --filter @acme/web-sim exec node scripts/nvidia-live.ts
+          fi
+      - name: Preserve redacted pass/fail/not-run evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: nvidia-runtime-${{ github.sha }}
+          path: packages/web-sim/.nvidia-readiness/live.json
+          if-no-files-found: error
+          retention-days: 14
