@@ -3,7 +3,8 @@ import { askRoute, homeStatus } from '@acme/app/features/companion/home-model.ts
 import { hatchCopy } from '@acme/app/features/hatch/copy.ts';
 import { detailLine, timeLine } from '@acme/app/features/hatch/incubation-model.ts';
 import { allSpecies, bloodlineLabel, bloodlines } from '@acme/content';
-import type { CareState, JournalEntry } from '@acme/core/types';
+import { deriveMonMood } from '@acme/core/sim';
+import type { CareState, JournalEntry, MonMood } from '@acme/core/types';
 
 /**
  * The data adapter between a tool result and the existing companion
@@ -51,6 +52,8 @@ export interface MonViewModel {
   readonly care: CareState | null;
   readonly status: { readonly text: string; readonly tone: 'neutral' | 'request' } | null;
   readonly asleep: boolean;
+  /** The result's `mood`, else derived from the meters (`deriveMonMood`); null when neither is there. */
+  readonly mood: MonMood | null;
   /** The action that answers the Mon's ask (M13 `askRoute`), or null when nothing is asked. */
   readonly suggested: ActionId | null;
   readonly journal: readonly JournalEntry[];
@@ -103,6 +106,20 @@ function statusFromMood(mood: unknown): MonViewModel['status'] {
     case 'needs-social': return { text: companionCopy('m13.status.social'), tone: 'request' };
     default: return null;
   }
+}
+
+/** Exhaustive over core's MON_MOODS: a new mood fails the type check here. */
+const MOODS: Readonly<Record<MonMood, true>> = {
+  content: true,
+  asleep: true,
+  sluggish: true,
+  'needs-fullness': true,
+  'needs-energy': true,
+  'needs-social': true,
+};
+
+function readMood(value: unknown): MonMood | null {
+  return typeof value === 'string' && Object.hasOwn(MOODS, value) ? (value as MonMood) : null;
 }
 
 const speciesById = new Map(allSpecies.map((s) => [s.speciesId, s]));
@@ -200,6 +217,7 @@ function eggViewModel(eggs: unknown[]): MonViewModel | null {
     care: null,
     status: { text, tone: ready ? 'request' : 'neutral' },
     asleep: false,
+    mood: null,
     suggested: null,
     journal: [],
     egg,
@@ -226,6 +244,7 @@ export function toMonViewModel(structured: unknown): MonViewModel | null {
     care,
     status: status ? { text: status.text, tone: status.tone } : null,
     asleep: care ? care.activity.kind === 'asleep' : structured.mood === 'asleep',
+    mood: readMood(structured.mood) ?? (care ? deriveMonMood(care) : null),
     suggested: suggestedAction(care, structured.mood),
     journal: readJournal(structured.journal, monInstanceId),
     egg: null,
@@ -269,4 +288,44 @@ export function careOutcomeText(structured: unknown, vm: MonViewModel): string |
     case 'played': return companionCopy('m16.result.body', { name });
     default: return null;
   }
+}
+
+/**
+ * The loop each rigged form plays, by mood (first match wins in MonModel3D).
+ * Only clips that exist in the GLBs (apps/web/public/mons/*.glb, listed
+ * 2026-10-23). Neither file has a sleep or lie-down clip, so an asleep
+ * Squeaklet holds its bind pose (an empty list) and an asleep Lil' Ratti
+ * plays `emote_tired`. A mood with no entry plays the form's idle.
+ */
+export const MON_CLIPS: Readonly<Record<number, { readonly idle: readonly string[]; readonly byMood: Partial<Record<MonMood, readonly string[]>> }>> = {
+  // Metro Egg: the hatch rig on its idle wobble. An egg has no mood.
+  1: { idle: ['egg_idle'], byMood: {} },
+  // Squeaklet: jaw_chomp, mouth_close, rat_run, tail_swish, blink.
+  2: {
+    idle: ['tail_swish', 'rat_run'],
+    byMood: {
+      asleep: [],
+      'needs-fullness': ['jaw_chomp', 'tail_swish'],
+      'needs-social': ['rat_run', 'tail_swish'],
+    },
+  },
+  // Lil' Ratti: full-body emotes and up/quad locomotion.
+  3: {
+    idle: ['up_idle', 'up_breathe', 'quad_idle_sniff'],
+    byMood: {
+      asleep: ['emote_tired', 'up_breathe'],
+      sluggish: ['up_breathe', 'up_idle'],
+      'needs-energy': ['emote_tired', 'up_breathe'],
+      'needs-fullness': ['quad_idle_sniff', 'up_idle'],
+      'needs-social': ['beckon', 'emote_curious', 'up_idle'],
+    },
+  },
+};
+
+/** The clip list for a rigged form in this mood (asleep wins over `mood`), or null when the form has no model. */
+export function clipsFor(dexId: number | null, mood: MonMood | null, asleep: boolean): readonly string[] | null {
+  const entry = dexId === null ? undefined : MON_CLIPS[dexId];
+  if (!entry) return null;
+  const key: MonMood | null = asleep ? 'asleep' : mood;
+  return (key === null ? undefined : entry.byMood[key]) ?? entry.idle;
 }

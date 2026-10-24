@@ -7,7 +7,8 @@ import { brand, palette, semantic } from '@acme/theme';
 // Read from the kit source file (as the views import kit files), so the test tracks it.
 import { CARE_COLORS } from '../../../ui/care/care-colors.ts';
 import { buildUi } from './build.ts';
-import { careOutcomeText, eggDetailText, eggTimeText, spokenSummary, toMonViewModel } from './contract.ts';
+import { readFileSync } from 'node:fs';
+import { careOutcomeText, clipsFor, eggDetailText, eggTimeText, MON_CLIPS, spokenSummary, toMonViewModel } from './contract.ts';
 import { getUiResources, MON_MODEL_ORIGIN, mcpAppsRegistration, parseUiManifest, UI_MIME_TYPE, UI_TOOL_LINKS, type UiResource } from './index.ts';
 
 /**
@@ -220,6 +221,47 @@ describe('view model (adapter onto the companion models)', () => {
       'Biscuit is asleep. Food can wait until Biscuit wakes up.',
     );
     expect(careOutcomeText({ applied: true, effect: 'played' }, vm)).toBe('Biscuit had fun playing with you.');
+  });
+});
+
+describe('mood on screen (MonModel3D clip by mood)', () => {
+  const careView = { energy: 0.72, fullness: 0.31, social: 0.58, activity: 'awake', sluggish: false, wantsFood: true, lastFedAt: null };
+  const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..');
+  const glbClips = (file: string): Set<string> => {
+    const b = readFileSync(join(repoRoot, 'apps/web/public/mons', `${file}.glb`));
+    const json = JSON.parse(b.subarray(20, 20 + b.readUInt32LE(12)).toString('utf8')) as { animations?: { name: string }[] };
+    return new Set((json.animations ?? []).map((a) => a.name));
+  };
+
+  it('reads mood from the result, else derives it from the meters', () => {
+    expect(toMonViewModel({ mon: { monId: 'm', speciesId: 'dex-002' }, mood: 'needs-social' })?.mood).toBe('needs-social');
+    expect(toMonViewModel({ mon: { monId: 'm', speciesId: 'dex-002' }, care: careView })?.mood).toBe('needs-fullness');
+    expect(toMonViewModel({ mon: { monId: 'm', speciesId: 'dex-002' }, mood: 'grumpy' })?.mood).toBeNull();
+  });
+
+  it('maps each mood to an existing clip and keeps the idle otherwise', () => {
+    expect(clipsFor(2, 'content', false)).toEqual(['tail_swish', 'rat_run']);
+    expect(clipsFor(2, 'needs-fullness', false)?.[0]).toBe('jaw_chomp');
+    expect(clipsFor(2, 'needs-social', false)?.[0]).toBe('rat_run');
+    expect(clipsFor(2, 'needs-energy', false)).toEqual(['tail_swish', 'rat_run']);
+    // No sleep clip in the Squeaklet file: an asleep Squeaklet holds still.
+    expect(clipsFor(2, 'content', true)).toEqual([]);
+    expect(clipsFor(3, 'asleep', false)?.[0]).toBe('emote_tired');
+    expect(clipsFor(3, 'needs-fullness', false)?.[0]).toBe('quad_idle_sniff');
+    expect(clipsFor(3, 'needs-social', false)?.[0]).toBe('beckon');
+    expect(clipsFor(3, 'sluggish', false)?.[0]).toBe('up_breathe');
+    expect(clipsFor(3, null, false)).toEqual(['up_idle', 'up_breathe', 'quad_idle_sniff']);
+    expect(clipsFor(1, null, false)).toEqual(['egg_idle']);
+    expect(clipsFor(9, 'content', false)).toBeNull();
+    expect(clipsFor(null, 'content', false)).toBeNull();
+  });
+
+  it('names only clips the GLBs carry', () => {
+    const files: Record<number, string> = { 1: 'metro-egg', 2: 'squeaklet', 3: 'lil-ratti' };
+    for (const [dex, entry] of Object.entries(MON_CLIPS)) {
+      const have = glbClips(files[Number(dex)]!);
+      for (const name of [...entry.idle, ...Object.values(entry.byMood).flat()]) expect(have, `${files[Number(dex)]}: ${name}`).toContain(name);
+    }
   });
 });
 

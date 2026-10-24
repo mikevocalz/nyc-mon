@@ -19,7 +19,7 @@ import { StatusRow } from '../../../../ui/StatusRow';
 import { Text } from '../../../../ui/Text';
 import { MonModel3D } from '../../../../ui/three/mon/MonModel3D';
 import { View } from '../../../../ui/tw';
-import { eggDetailText, eggReady, eggTimeText, type ActionId, type MonViewModel } from '../contract.ts';
+import { clipsFor, eggDetailText, eggReady, eggTimeText, type ActionId, type MonViewModel } from '../contract.ts';
 
 /**
  * The Mon views, composed from kit stories and the companion screens:
@@ -57,15 +57,16 @@ export interface MonViewProps {
 declare const __MON_MODEL_ORIGIN__: string;
 
 /**
- * Forms with a finished, rigged model (Dex number -> GLB on the sim host and
- * the clip to loop). Every other Mon shows its still with "Coming Soon";
- * their models arrive through the Payload console (mon-models).
+ * Forms with a finished, rigged model (Dex number -> GLB on the sim host).
+ * The clip each one loops follows the Mon's mood (`clipsFor`, contract.ts).
+ * Every other Mon shows its still with "Coming Soon"; their models arrive
+ * through the Payload console (mon-models).
  */
-const MON_MODELS: Readonly<Record<number, { file: string; clips: readonly string[] }>> = {
-  // The Egg form: the hatch rig (packages/assets/eggs/metro-egg), held on its idle wobble.
-  1: { file: 'metro-egg', clips: ['egg_idle'] },
-  2: { file: 'squeaklet', clips: ['tail_swish', 'rat_run'] },
-  3: { file: 'lil-ratti', clips: ['up_idle', 'up_breathe', 'quad_idle_sniff'] },
+const MON_MODELS: Readonly<Record<number, { file: string }>> = {
+  // The Egg form: the hatch rig (packages/assets/eggs/metro-egg).
+  1: { file: 'metro-egg' },
+  2: { file: 'squeaklet' },
+  3: { file: 'lil-ratti' },
 };
 
 /** The Mon in 3D (three.js) when its model exists; otherwise HomeLayout's still with a Coming Soon badge. */
@@ -78,10 +79,13 @@ function Still({ vm, width, nowMs, height = Math.round(width * 1.25) }: { vm: Mo
     const label = vm.egg
       ? hatchCopy(eggReady(vm.egg, nowMs) ? 'm11.egg.a11y.label.ready' : 'm11.egg.a11y.label', { eggName: vm.name })
       : vm.name;
+    const clips = clipsFor(dex, vm.mood, vm.asleep) ?? [];
     return (
+      // MonModel3D picks its clip when the GLB loads, so a mood change re-keys it to play the new one.
       <MonModel3D
+        key={clips.join(',') || 'still'}
         url={`${typeof __MON_MODEL_ORIGIN__ === 'string' ? __MON_MODEL_ORIGIN__ : ''}/mons/${model.file}.glb`}
-        clips={model.clips}
+        clips={clips}
         width={width}
         height={height}
         label={label}
