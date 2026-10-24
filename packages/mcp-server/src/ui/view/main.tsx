@@ -18,6 +18,7 @@ import { StatusRow } from '../../../../ui/StatusRow';
 import { View } from '../../../../ui/tw';
 import { GridBackdrop as RoomBackdrop } from './GridBackdrop.tsx';
 import { parseSpeechCue, SPEECH_CONTEXT_KEY } from '../../../../ui/three/mon/lipsync/cue.ts';
+import { HATCH_START_LOGGER, setHatchStartReporter } from '../../../../ui/three/mon/hatch-sound.ts';
 
 /**
  * Keeps a backdrop failure from taking the room with it: if the grid floor
@@ -110,6 +111,12 @@ const app = new App(
   { availableDisplayModes: ['inline', 'fullscreen'] },
   { autoResize: true },
 );
+
+// The hatch tells the host when it starts and whether this frame's audio runs,
+// so exactly one of the two plays its sound (the host covers the voice path).
+setHatchStartReporter(({ sound, elapsedMs }) => {
+  void app.sendLog({ level: 'info', logger: HATCH_START_LOGGER, data: { event: 'hatch-start', sound, elapsedMs } }).catch(() => {});
+});
 
 async function runAction(id: ActionId): Promise<void> {
   const { vm, busy } = useView.getState();

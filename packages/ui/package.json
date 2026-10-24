@@ -43,6 +43,8 @@
     "./three/hatch": "./three/hatch/index.ts",
     "./three/mon": "./three/mon/MonModel3D.tsx",
     "./three/mon/lipsync": "./three/mon/lipsync/index.ts",
+    "./three/mon/hatch-sound": "./three/mon/hatch-sound.ts",
+    "./three/mon/hatch-timeline": "./three/mon/hatch-timeline.ts",
     "./three/mon/idle": "./three/mon/idle/index.ts"
   },
   "sideEffects": [

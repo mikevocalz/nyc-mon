@@ -315,6 +315,15 @@ export async function prepareMonClip(text: string, voice: MonVoice | undefined, 
 }
 
 let utterances = 0;
+/** The Mon's voice level: 1, or lower while something louder plays over it (the hatch's white-out). */
+let duckLevel = 1;
+
+/** Scales the Mon's voice now and for every clip until called again with 1. Web Speech cannot change mid-line and is left as is. */
+export function setSpeechDuck(level: number): void {
+  duckLevel = Math.max(0, Math.min(1, level));
+  if (current) current.audio.volume = duckLevel;
+}
+
 /** The clip playing now, so stopSpeaking can cut it off and send the view its stop cue. */
 let current: { readonly audio: HTMLAudioElement; readonly url: string; readonly cueId: string | null; readonly done: () => void } | null = null;
 
@@ -340,6 +349,7 @@ export async function playMonClip(clip: MonClip, signal: AbortSignal): Promise<v
   const url = URL.createObjectURL(new Blob([clip.bytes], { type: clip.contentType }));
   // The pitch is already in the clip; playback rate stays 1 so tempo is the voice's own.
   const audio = new Audio(url);
+  audio.volume = duckLevel;
   const track = clip.track;
   const cueId = track ? `u${++utterances}-${Date.now().toString(36)}` : null;
   await new Promise<void>((resolve) => {

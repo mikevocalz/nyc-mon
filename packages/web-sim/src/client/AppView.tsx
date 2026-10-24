@@ -12,6 +12,8 @@ import { hostStyleVariables, type Scheme } from './theme.ts';
 import { useSetters } from './state.ts';
 import { ViewFrame } from './ViewFrame.tsx';
 import { addSpeechCueListener, currentSpeechCue, listeningNow } from './speechCues.ts';
+import { createHostHatchSound, isFreshHatch, pageAudioContext, parseHatchStart } from './hatchSound.ts';
+import { setSpeechDuck } from './speech.ts';
 
 /**
  * Hosts one MCP Apps view (spec 2026-01-26): reads the ui:// resource, loads
@@ -46,6 +48,8 @@ export interface AppViewProps {
    * retry then loads whatever resourceUri the host passes next.
    */
   readonly onRetry?: () => Promise<void>;
+  /** "Read replies aloud": with it off the host plays no hatch sound either. */
+  readonly soundOn?: boolean;
 }
 
 interface LoadedResource {
@@ -99,12 +103,22 @@ export function AppView(props: AppViewProps) {
   const reportViewMessage = useEffectEvent((text: string) => props.onViewMessage(text));
   const ownsResource = useEffectEvent((uri: string) => uri === props.resourceUri);
   const findTool = useEffectEvent((name: string) => props.tools.find((t) => t.name === name));
+  const soundOn = useEffectEvent(() => props.soundOn ?? true);
+  const isHatchResult = useEffectEvent(() => isFreshHatch(props.toolName, props.result));
 
   useEffect(() => {
     let disposed = false;
     const iframe = iframeRef.current;
     if (!iframe) return;
     setStatus('loading');
+    // The hatch's sound, when the view cannot play it (hatchSound.ts).
+    const hatchSound = createHostHatchSound({
+      audio: pageAudioContext,
+      soundOn,
+      reducedMotion: () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true,
+      duckSpeech: setSpeechDuck,
+    });
+    if (isHatchResult()) hatchSound.arm();
 
     (async () => {
       const view = await readView(props.client, props.resourceUri);
@@ -132,7 +146,7 @@ export function AppView(props: AppViewProps) {
       const bridge = new AppBridge(
         props.client,
         { name: 'nyc-mon-simulator', version: '0.1.0' },
-        { openLinks: {}, serverTools: caps?.tools, serverResources: caps?.resources, message: { text: {} } },
+        { openLinks: {}, serverTools: caps?.tools, serverResources: caps?.resources, message: { text: {} }, logging: {} },
         {
           hostContext: {
             theme: props.scheme,
@@ -165,6 +179,11 @@ export function AppView(props: AppViewProps) {
         return {};
       };
       bridge.onupdatemodelcontext = async () => ({});
+      // The view says when its hatch starts and whether it plays the sound itself.
+      bridge.addEventListener('loggingmessage', (params) => {
+        const report = parseHatchStart(params);
+        if (report && !disposed) void hatchSound.onViewStart(report);
+      });
       // A view reads only its own resource, not every resource on the server.
       bridge.onreadresource = async (params) => {
         if (!ownsResource(params.uri)) throw new Error('This view can only read its own resource.');
@@ -177,7 +196,10 @@ export function AppView(props: AppViewProps) {
         if (!target || HOST_ONLY_TOOLS.has(params.name) || isToolVisibilityModelOnly(target)) {
           return { content: [{ type: 'text', text: `This view can't call ${params.name}.` }], isError: true };
         }
-        return (await props.client.callTool(params)) as never;
+        const result = await props.client.callTool(params);
+        // The Hatch button: the view had the tap, so it normally plays; the host covers it if it cannot.
+        if (isFreshHatch(params.name, result as never)) hatchSound.arm();
+        return result as never;
       };
 
       const initialized = new Promise<void>((resolve) => {
@@ -199,6 +221,7 @@ export function AppView(props: AppViewProps) {
 
     return () => {
       disposed = true;
+      hatchSound.dispose();
       const bridge = bridgeRef.current;
       bridgeRef.current = null;
       if (bridge) {

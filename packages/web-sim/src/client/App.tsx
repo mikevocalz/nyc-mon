@@ -848,6 +848,7 @@ export function App({ config }: { config: PublicConfig }) {
                             title={activeView.title}
                             resourceUri={activeViewUri}
                             onRetry={refreshTools}
+                            soundOn={readAloud}
                             input={activeView.input}
                             result={activeView.result}
                             sandboxOrigin={config.sandboxOrigin}
