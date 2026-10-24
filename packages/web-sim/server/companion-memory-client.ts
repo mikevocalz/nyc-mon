@@ -1,4 +1,4 @@
-import { MemorySnapshotSchema, MemoryWriteSchema, MemoryDeleteSchema, type MemorySnapshot } from '../../payload/src/admin/console/v1/companion-memory-store.ts';
+import { MemorySnapshotSchema, MemoryWriteSchema, MemoryDeleteSchema, type MemorySnapshot } from '@acme/core/schemas';
 import type { ModelAuthCheck } from './model-auth.ts';
 import type { ModelBackend, TurnParams } from './model.ts';
 
