@@ -80,9 +80,10 @@ export function createMemoryProxy(options: { origin: string; auth: ModelAuthChec
       if (!request.headers.get('content-type')?.startsWith('application/json')) return reply(400, { error: 'invalid_record' });
       let raw: unknown;
       try { raw = JSON.parse(await readLimited(request, 8192)); } catch { return reply(400, { error: 'invalid_record' }); }
-      const parsed = request.method === 'PUT' ? MemoryWriteSchema.safeParse(raw) : MemoryDeleteSchema.safeParse(raw);
+      const method = request.method === 'PUT' ? 'PUT' : 'DELETE';
+      const parsed = method === 'PUT' ? MemoryWriteSchema.safeParse(raw) : MemoryDeleteSchema.safeParse(raw);
       if (!parsed.success) return reply(400, { error: 'invalid_record' });
-      return reply(200, { ok: true, data: await options.memory.change(callerId, request.method, parsed.data, request.signal) });
+      return reply(200, { ok: true, data: await options.memory.change(callerId, method, parsed.data, request.signal) });
     } catch (error) {
       return reply(error instanceof CompanionMemoryError ? error.status : 503, { error: error instanceof CompanionMemoryError && error.status === 409 ? 'revision_conflict' : 'memory_unavailable' });
     }
