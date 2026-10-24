@@ -9,6 +9,7 @@ import { build } from 'vite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { buildUi } from './build.ts';
 import { getUiResources, type UiResource } from './index.ts';
+import { MON_MODEL_ORIGIN } from './model-origin.ts';
 
 /**
  * Boots each built view in Playwright's bundled Chromium (never the system
@@ -20,6 +21,7 @@ import { getUiResources, type UiResource } from './index.ts';
  */
 
 const here = dirname(fileURLToPath(import.meta.url));
+const MONS_DIR = join(here, '../../../../apps/web/public/mons');
 const now = Date.now();
 const care = { energy: 0.7, fullness: 0.22, social: 0.55, activity: 'awake', sluggish: false, wantsFood: true, lastFedAt: null };
 const monFor = (speciesId: string) => ({ monId: 'mon_demo', name: null, speciesId, stage: 'Baby' });
@@ -86,6 +88,17 @@ async function boot(view: 'mon-card' | 'mon-room', opts: {
   const built = resources.find((r) => r.id === view)!.html;
   const html = opts.preScript ? built.replace('<head>', `<head><script>${opts.preScript}</script>`) : built;
   const ctx = await (opts.gpu ? gpuBrowser : browser).newContext({ viewport: { width: opts.width + 40, height: opts.height + 40 } });
+  // The view fetches Mon GLBs from the sim host. Serve them here so the suite
+  // never depends on a dev server being up (it passed locally only because one was).
+  await ctx.route(`${MON_MODEL_ORIGIN}/mons/*.glb`, async (route) => {
+    const name = new URL(route.request().url()).pathname.split('/').pop()!;
+    try {
+      const body = await readFile(join(MONS_DIR, name));
+      await route.fulfill({ status: 200, body, headers: { 'content-type': 'model/gltf-binary', 'access-control-allow-origin': '*' } });
+    } catch {
+      await route.fulfill({ status: 404, body: 'No such model.' });
+    }
+  });
   const page = await ctx.newPage();
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));
