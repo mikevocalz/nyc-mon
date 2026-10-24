@@ -107,15 +107,36 @@ describe('/api/tts', () => {
   ] as const)('delivers a %s Mon with %s and stability %s', async (mood, tag, stability) => {
     const fetchFn = fakeFetch();
     const res = await handler({ fetchFn })(
-      post({ text: 'Hi *chuckles* friend *scritchy chirp*', lineageId: LINEAGE, stage: 'Small', mood }),
+      post({ text: 'Hi friend *scritchy chirp*', lineageId: LINEAGE, stage: 'Small', mood }),
       'ip',
     );
     expect(res.status).toBe(200);
     expect(sentBody(fetchFn)).toEqual({
-      text: `${tag} Hi [laughs] friend`,
+      text: `${tag} Hi friend`,
       model_id: 'eleven_v4_turbo',
       voice_settings: { stability, similarity_boost: 0.8 },
     });
+  });
+
+  it.each([
+    ['content', '*chuckle* Hi friend', '[laughs] Hi friend', 0.35],
+    ['asleep', '*whisper* Shh, sleepy', '[whispers] Shh, sleepy', 0.6],
+    ['needs-energy', '*sighs* So tired', '[sighs] So tired', 0.55],
+    ['needs-social', '*huff* Where were you', '[sighs] Where were you', 0.4],
+    ['content', '*laughs* Again!', '[laughs] Again!', 0.35],
+  ] as const)('a %s line that opens with its own direction (%s) gets no second, mood tag', async (mood, text, spoken, stability) => {
+    const fetchFn = fakeFetch();
+    const res = await handler({ fetchFn })(post({ text, lineageId: LINEAGE, stage: 'Small', mood }), 'ip');
+    expect(res.status).toBe(200);
+    // One tag only, and the mood still sets stability.
+    expect(sentBody(fetchFn)).toEqual({ text: spoken, model_id: 'eleven_v4_turbo', voice_settings: { stability, similarity_boost: 0.8 } });
+  });
+
+  it('strips *yawn*, which has no documented ElevenLabs tag, and then leads with the mood tag', async () => {
+    const fetchFn = fakeFetch();
+    const res = await handler({ fetchFn })(post({ text: '*yawn* Night night', lineageId: LINEAGE, stage: 'Small', mood: 'asleep' }), 'ip');
+    expect(res.status).toBe(200);
+    expect(sentBody(fetchFn)).toMatchObject({ text: '[whispers] Night night', voice_settings: { stability: 0.6 } });
   });
 
   it('rejects an unknown mood', async () => {

@@ -62,6 +62,22 @@ export function pitchFilter(factor: number): string {
   return `asetrate=${shiftedRate},aresample=${SAMPLE_RATE},atempo=${tempo.toFixed(6)}`;
 }
 
+/** An ElevenLabs audio tag such as `[laughs]` or `[clears throat]`. */
+const AUDIO_TAG = /\[[a-z][a-z ]*\]/i;
+
+/**
+ * The text ElevenLabs reads. The skill opens character lines with a stage
+ * direction picked from the mood (`*chuckle*`, `*sighs*`), and the mood also
+ * has a lead tag (`[happily]`). When the line already carries a tag from its
+ * own direction, the mood tag is left off: two tags read as two performances
+ * stacked on one word. The mood's voice settings apply either way.
+ */
+export function spokenLine(text: string, mood: z.infer<typeof MonMoodSchema> | undefined): string {
+  const line = stageDirectionsToTags(text);
+  const { tag } = voiceDelivery(mood);
+  return tag === undefined || AUDIO_TAG.test(line) ? line : `${tag} ${line}`;
+}
+
 /** ffmpeg arguments for a streaming mp3-in, mp3-out pitch shift. */
 export function pitchShiftArgs(factor: number): string[] {
   return ['-hide_banner', '-loglevel', 'error', '-f', 'mp3', '-i', 'pipe:0', '-af', pitchFilter(factor), '-f', 'mp3', '-b:a', '128k', 'pipe:1'];
@@ -155,8 +171,7 @@ export function createTtsHandler(deps: TtsHandlerDeps) {
     if (voice === null) return silent();
 
     const delivery = voiceDelivery(parsed.mood);
-    const line = stageDirectionsToTags(parsed.text);
-    const spoken = delivery.tag === undefined ? line : `${delivery.tag} ${line}`;
+    const spoken = spokenLine(parsed.text, parsed.mood);
 
     let upstream: Response;
     try {
