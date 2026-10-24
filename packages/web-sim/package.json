@@ -13,6 +13,8 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@acme/content": "workspace:*",
+    "@acme/core": "workspace:*",
     "@acme/theme": "workspace:*",
     "@acme/ui": "workspace:*",
     "@anthropic-ai/bedrock-sdk": "catalog:",

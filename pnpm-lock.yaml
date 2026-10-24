@@ -1813,6 +1813,12 @@ importers:
 
   packages/web-sim:
     dependencies:
+      '@acme/content':
+        specifier: workspace:*
+        version: link:../content
+      '@acme/core':
+        specifier: workspace:*
+        version: link:../core
       '@acme/theme':
         specifier: workspace:*
         version: link:../theme

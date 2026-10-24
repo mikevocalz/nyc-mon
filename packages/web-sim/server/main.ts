@@ -8,10 +8,11 @@ import { createModelAuth } from './model-auth.ts';
 import { bedrockBackend, clientKey, createModelHandler, createRateLimiter, mockBackend } from './model.ts';
 import { sandboxDocument, sandboxHeaders } from './sandbox.ts';
 import { createSkillLoader, resolveSkillPath } from './skill.ts';
+import { createTtsHandler } from './tts.ts';
 
 /**
  * Two listeners:
- *  - the simulator page + /api (SIM_PORT): page assets, /api/config, /api/model
+ *  - the simulator page + /api (SIM_PORT): page assets, /api/config, /api/model, /api/tts
  *  - the MCP Apps sandbox proxy (SIM_SANDBOX_PORT), a separate origin by spec
  * In dev the page is served through Vite middleware; in production from dist/.
  */
@@ -34,22 +35,30 @@ const backend =
         effort: env.SIM_MODEL_EFFORT,
         maxTokens: env.SIM_MAX_OUTPUT_TOKENS,
       });
+const modelAuth =
+  env.SIM_AUTH_MODE === 'oauth'
+    ? createModelAuth({
+        issuer: env.AUTH_ISSUER.replace(/\/+$/, ''),
+        audience: env.SIM_MCP_URL,
+        clientId: env.OAUTH_SIM_CLIENT_ID,
+        jwks: jwksUrl(env),
+      })
+    : undefined;
 const handleModel = createModelHandler({
   backend,
   system: createSkillLoader(skillPath),
   allowedOrigin: hostOrigin,
   rateLimit: createRateLimiter(env.SIM_RATE_LIMIT_PER_MIN, { globalPerMinute: env.SIM_GLOBAL_RATE_LIMIT_PER_MIN }),
   // With sign-in on, a model turn needs the person's MCP token (issued to this client).
-  ...(env.SIM_AUTH_MODE === 'oauth'
-    ? {
-        auth: createModelAuth({
-          issuer: env.AUTH_ISSUER.replace(/\/+$/, ''),
-          audience: env.SIM_MCP_URL,
-          clientId: env.OAUTH_SIM_CLIENT_ID,
-          jwks: jwksUrl(env),
-        }),
-      }
-    : {}),
+  ...(modelAuth ? { auth: modelAuth } : {}),
+});
+
+const handleTts = createTtsHandler({
+  allowedOrigin: hostOrigin,
+  rateLimit: createRateLimiter(env.SIM_TTS_RATE_LIMIT_PER_MIN, { globalPerMinute: env.SIM_GLOBAL_RATE_LIMIT_PER_MIN }),
+  apiKey: env.ELEVENLABS_API_KEY,
+  fetch,
+  ...(modelAuth ? { auth: modelAuth } : {}),
 });
 
 function toRequest(req: IncomingMessage): Request {
@@ -92,6 +101,8 @@ const PAGE_CSP = [
   "script-src 'self' 'wasm-unsafe-eval'",
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob:",
+  // The Mon's voice from /api/tts plays from a blob: URL.
+  "media-src 'self' blob:",
   "font-src 'self' data:",
   // The MCP server and the authorization server (OAuth discovery, token exchange).
   `connect-src 'self' ${mcpOrigin} ${issuerOrigin}`,
@@ -161,6 +172,11 @@ async function main(): Promise<void> {
       const forwarded = req.headers['x-forwarded-for'];
       const key = clientKey(req.socket.remoteAddress, typeof forwarded === 'string' ? forwarded : null, env.SIM_TRUST_PROXY === '1');
       return void handleModel(toRequest(req), key).then((r) => sendResponse(res, r)).catch(fail);
+    }
+    if (url.pathname === '/api/tts') {
+      const forwarded = req.headers['x-forwarded-for'];
+      const key = clientKey(req.socket.remoteAddress, typeof forwarded === 'string' ? forwarded : null, env.SIM_TRUST_PROXY === '1');
+      return void handleTts(toRequest(req), key).then((r) => sendResponse(res, r)).catch(fail);
     }
     // Mon GLBs: fetched by the view from the sandbox origin, so they carry CORS.
     const glb = /^\/mons\/([a-z0-9-]+)\.glb$/.exec(url.pathname);

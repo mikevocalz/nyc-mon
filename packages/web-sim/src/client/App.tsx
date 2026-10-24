@@ -23,7 +23,8 @@ import {
   saveSession,
   type TranscriptItem,
 } from './session.ts';
-import { canListen, canSpeak, listen, speak, stopSpeaking, type Listening } from './speech.ts';
+import { currentMonVoice } from './monVoice.ts';
+import { canListen, canSpeak, listen, speakAs, stopSpeaking, type Listening } from './speech.ts';
 import { useSetters } from './state.ts';
 import { currentScheme, type Scheme } from './theme.ts';
 import { createTurnToolCaller, hintedToolNames, withPresenceLine } from './turnTools.ts';
@@ -138,13 +139,11 @@ export function App({ config }: { config: PublicConfig }) {
   } = useSetters(store);
   const historyRef = useRef<Anthropic.MessageParam[]>(initial.history);
   const abortRef = useRef<AbortController | null>(null);
-  const model = useMemo(
-    () =>
-      httpModelClient('/api/model', fetch, () =>
-        config.authMode === 'oauth' ? (provider.tokens() as { access_token?: string } | undefined)?.access_token : undefined,
-      ),
+  const accessToken = useCallback(
+    () => (config.authMode === 'oauth' ? (provider.tokens() as { access_token?: string } | undefined)?.access_token : undefined),
     [config.authMode, provider],
   );
+  const model = useMemo(() => httpModelClient('/api/model', fetch, accessToken), [accessToken]);
 
   const push = useCallback((item: TranscriptItem) => setItems((prev) => [...prev, item]), [setItems]);
   const notice = useCallback(
@@ -300,7 +299,8 @@ export function App({ config }: { config: PublicConfig }) {
             : turn.reply.trim() || (turn.outcome === 'step-limit' ? 'That took too many steps. Ask again more simply.' : '');
         if (reply) {
           push({ kind: 'mon', id: newId('m'), text: reply, at: Date.now() });
-          if (readAloud) speak(reply);
+          // The Mon's own voice, from the latest tool result that carries the Mon.
+          if (readAloud) void speakAs(reply, currentMonVoice(store.getState().items), { getToken: accessToken });
         }
         if (turn.outcome === 'truncated') notice('The reply was cut off before a tool call finished. Ask again.', 'error');
       } catch (err) {
@@ -323,7 +323,7 @@ export function App({ config }: { config: PublicConfig }) {
         abortRef.current = null;
       }
     },
-    [busy, conn, model, store, notice, provider, push, readAloud, toolsByName, setActiveToolTitle, setActiveViewId, setAuth, setBusy, setConn, setDisplayMode, setDraft, setHeard, setLive],
+    [accessToken, busy, conn, model, store, notice, provider, push, readAloud, toolsByName, setActiveToolTitle, setActiveViewId, setAuth, setBusy, setConn, setDisplayMode, setDraft, setHeard, setLive],
   );
 
   function startListening() {

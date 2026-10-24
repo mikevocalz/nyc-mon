@@ -52,6 +52,14 @@ export const SimEnvSchema = z.object({
   AUTH_JWKS_URL: z.string().url().optional(),
   /** The simulator's OAuth client id. Same variable admin-vite registers the client from. */
   OAUTH_SIM_CLIENT_ID: z.string().min(1).default('nyc-mon-sim'),
+  /**
+   * ElevenLabs key for /api/tts, the Mon's own voice in the simulator. Optional:
+   * unset (or empty), the route answers 204 and the page uses Web Speech. Read
+   * only by this process; never sent to the browser.
+   */
+  ELEVENLABS_API_KEY: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).optional()),
+  /** Speech requests per minute per client address. */
+  SIM_TTS_RATE_LIMIT_PER_MIN: z.coerce.number().int().positive().default(30),
   AWS_REGION: z.string().optional(),
   NODE_ENV: z.string().optional(),
 });

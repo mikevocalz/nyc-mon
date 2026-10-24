@@ -108,6 +108,8 @@ Simulator server (`packages/web-sim/server/env.ts`):
 | `SIM_SKILL_PATH` | `skills/nyc-mon-companion/SKILL.md` | Agent Skill used as the system prompt (repo-relative) |
 | `SIM_RATE_LIMIT_PER_MIN` | `30` | Model turns per sliding minute per client |
 | `SIM_GLOBAL_RATE_LIMIT_PER_MIN` | `120` | Model turns per sliding minute across all clients |
+| `ELEVENLABS_API_KEY` | unset | Server-only key for `/api/tts`, the Mon's own voice. Unset, the route answers 204 and the page speaks with Web Speech |
+| `SIM_TTS_RATE_LIMIT_PER_MIN` | `30` | Speech requests per sliding minute per client (the global ceiling is `SIM_GLOBAL_RATE_LIMIT_PER_MIN`) |
 | `SIM_TRUST_PROXY` | `0` | `1` keys the rate limit on the first `X-Forwarded-For` hop (behind your own proxy only) |
 | `AUTH_ISSUER` | `http://localhost:5174` | The authorization server (admin-vite). Shared with the MCP server and admin-vite |
 | `AUTH_JWKS_URL` | `{AUTH_ISSUER}/payload-api/auth/jwks` | Keys for verifying the bearer token on `/api/model` |
@@ -115,6 +117,8 @@ Simulator server (`packages/web-sim/server/env.ts`):
 | `NODE_ENV` | — | `development` or `test` is required for `SIM_AUTH_MODE=dev-bypass`; `production` serves the built page |
 
 The production page CSP allows connections to its own origin, the MCP server's origin and `AUTH_ISSUER`'s origin only, and `'wasm-unsafe-eval'` for CanvasKit.
+
+**Mon voice (simulator only).** Each Mon has one voice lineage for life, minted at hatch (`mon.voice.lineageId` in tool results). The page posts each reply to `/api/tts` with that lineage and the Mon's stage; the server picks the ElevenLabs voice from `@acme/content/voices` and streams `audio/mpeg` back. The page plays it with `playbackRate` from the stage table (Baby 1.30, Small 1.15, Mid 1.0, Max 0.92; an Egg is silent) and `preservesPitch = false`, so tempo moves with pitch. A server-side pitch shift that keeps tempo is the upgrade. On 204 or an error the page falls back to Web Speech with the same table as `utterance.pitch`. `/api/tts` has the same Origin check, sign-in check and rate limiting as `/api/model`. A real Echo ignores all of this: Alexa reads replies in its own voice (PLATFORM-DOCS §2.8).
 
 MCP server settings the simulator depends on (`packages/mcp-server/src/env.ts`): `MCP_ALLOWED_ORIGINS` must include the simulator origin; `OAUTH_DEV_BYPASS=1` pairs with `SIM_AUTH_MODE=dev-bypass`; `MCP_DEV_MODE=1` registers the presence tools the dev panel uses; `MCP_PORT` and `MCP_RESOURCE_URI` must agree with `SIM_MCP_URL`.
 
