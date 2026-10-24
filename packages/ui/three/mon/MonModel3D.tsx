@@ -40,10 +40,18 @@ export interface MonModel3DProps {
  */
 export interface MouthRig {
   readonly jawBone: string;
-  /** The jaw angle with the mouth shut. */
+  /** The jaw angle with the mouth shut: the rest pose whenever the clip does not move the jaw. */
   readonly jawClosedRad: number;
   /** The jaw angle at full speech opening. */
   readonly jawOpenRad: number;
+  /**
+   * Morph weights that make this model's resting face, by target name. A
+   * file whose neutral geometry has the mouth open (Lil' Ratti: every weight
+   * 0 is an open mouth) needs `{ mouthClose: … }` here. Applied to every
+   * channel the playing clip does not move; speech opens the mouth from it
+   * and returns to it.
+   */
+  readonly rest: Readonly<Record<string, number>>;
 }
 
 const NO_CLIPS: readonly string[] = [];
@@ -54,9 +62,10 @@ const X_AXIS = new THREE.Vector3(1, 0, 0);
 const MOUTH_RATE = 24;
 const FACE_RATE = 40;
 const ENVELOPE_IN = 14;
-const ENVELOPE_OUT = 6;
+/** Back to the rest pose within about 150 ms of the audio ending (time constant 50 ms). */
+const ENVELOPE_OUT = 20;
 /** Speech keeps owning the mouth this long after the audio's end, so the last syllable closes. */
-const TAIL_MS = 250;
+const TAIL_MS = 120;
 
 const REST_TARGETS: RigTargets = { ...mouthToRig({ open: 0, wide: 0, round: 0, upper: 0 }) };
 const DRIVEN = [...SPEECH_CHANNELS, ...EXPRESSION_CHANNELS].filter((c) => c !== 'jaw');
@@ -74,12 +83,56 @@ interface Rig {
   readonly jawBind: THREE.Quaternion;
   /** Every mesh slot per morph name (a multi-primitive body has one mesh per primitive). */
   readonly morphs: ReadonlyMap<string, readonly MorphSlot[]>;
+  /** Morph names by index, the order animation tracks list their values in. */
+  readonly morphNames: readonly string[];
+}
+
+/** What the playing clip actually moves: anything it leaves still is held at the rig's rest. */
+interface ClipMotion {
+  readonly jaw: boolean;
+  readonly morphs: ReadonlySet<string>;
 }
 
 interface AnimationState {
   readonly mixer: THREE.AnimationMixer;
   readonly animations: readonly THREE.AnimationClip[];
   action: THREE.AnimationAction | null;
+  motion: ClipMotion;
+}
+
+const STILL: ClipMotion = { jaw: false, morphs: new Set() };
+const EPS = 1e-3;
+
+/**
+ * Which channels a clip moves. A track whose keys never change (Squeaklet's
+ * idle clips hold the jaw at its ajar bind angle) counts as still, so the
+ * rest pose wins over it.
+ */
+function clipMotion(clip: THREE.AnimationClip | null, rig: Rig, jawBone: string | undefined): ClipMotion {
+  if (!clip) return STILL;
+  const jawNode = jawBone === undefined ? null : THREE.PropertyBinding.sanitizeNodeName(jawBone);
+  let jaw = false;
+  const morphs = new Set<string>();
+  for (const track of clip.tracks) {
+    const { nodeName, propertyName } = THREE.PropertyBinding.parseTrackName(track.name);
+    const v = track.values;
+    if (propertyName === 'quaternion' && nodeName === jawNode) {
+      for (let i = 4; i < v.length && !jaw; i++) if (Math.abs((v[i] ?? 0) - (v[i % 4] ?? 0)) > EPS) jaw = true;
+    } else if (propertyName === 'morphTargetInfluences') {
+      const width = v.length / Math.max(1, track.times.length);
+      for (let n = 0; n < width; n++) {
+        const name = rig.morphNames[n];
+        if (name === undefined || morphs.has(name)) continue;
+        for (let k = 1; k < track.times.length; k++) {
+          if (Math.abs((v[k * width + n] ?? 0) - (v[n] ?? 0)) > EPS) {
+            morphs.add(name);
+            break;
+          }
+        }
+      }
+    }
+  }
+  return { jaw, morphs };
 }
 
 function pickClip(animations: readonly THREE.AnimationClip[], names: readonly string[]): THREE.AnimationClip | null {
@@ -96,17 +149,19 @@ function clipAnimatesMorphs(clip: THREE.AnimationClip | undefined): boolean {
 
 function readRig(model: THREE.Object3D, mouth: MouthRig | undefined): Rig {
   const morphs = new Map<string, MorphSlot[]>();
+  const morphNames: string[] = [];
   model.traverse((o) => {
     const m = o as THREE.Mesh;
     if (!m.morphTargetDictionary || !m.morphTargetInfluences) return;
     for (const [name, index] of Object.entries(m.morphTargetDictionary)) {
+      morphNames[index] ??= name;
       const list = morphs.get(name) ?? [];
       list.push({ influences: m.morphTargetInfluences, index, initial: m.morphTargetInfluences[index] ?? 0 });
       morphs.set(name, list);
     }
   });
   const jaw = mouth ? (model.getObjectByName(mouth.jawBone) ?? null) : null;
-  return { jaw, jawBind: jaw ? jaw.quaternion.clone() : new THREE.Quaternion(), morphs };
+  return { jaw, jawBind: jaw ? jaw.quaternion.clone() : new THREE.Quaternion(), morphs, morphNames };
 }
 
 function readMorph(rig: Rig, name: string): number {
@@ -159,6 +214,7 @@ export function MonModel3D({
 
   const stage = useRef<{ renderer: THREE.WebGLRenderer; camera: THREE.PerspectiveCamera } | null>(null);
   const anim = useRef<AnimationState | null>(null);
+  const rigRef = useRef<Rig | null>(null);
   /** The utterance in progress: its track and when (performance.now) its audio started. */
   const utterance = useRef<{ cue: Extract<MonSpeechCue, { kind: 'start' }>; receivedAt: number } | null>(null);
 
@@ -198,7 +254,8 @@ export function MonModel3D({
     // Speech state, smoothed per channel.
     const current: Record<string, number> = { ...REST_TARGETS };
     let envelope = 0;
-    let shownOpen = -1;
+    let shown = '';
+    const closedQuat = new THREE.Quaternion();
     let nextBlinkAt = 1.5 + Math.random() * 2;
     let blinkStart = -1;
     let clock = 0;
@@ -245,7 +302,8 @@ export function MonModel3D({
         const clip = pickClip(gltf.animations, clipsRef.current);
         const action = clip ? mixer.clipAction(clip) : null;
         action?.play();
-        anim.current = { mixer, animations: gltf.animations, action };
+        anim.current = { mixer, animations: gltf.animations, action, motion: clipMotion(clip, rig, mouthRef.current?.jawBone) };
+        rigRef.current = rig;
         setState('ready');
       },
       undefined,
@@ -261,6 +319,15 @@ export function MonModel3D({
       r.jaw?.quaternion.copy(r.jawBind);
       for (const name of DRIVEN) resetMorph(r, name);
       for (const name of BLINK_CHANNELS) resetMorph(r, name);
+    };
+
+    /** Holds every channel the clip leaves still at the rig's rest pose (jaw shut, lips together). */
+    const applyRest = (r: Rig) => {
+      const m = mouthRef.current;
+      if (!m) return;
+      const motion = anim.current?.motion ?? STILL;
+      if (r.jaw && !motion.jaw) r.jaw.quaternion.copy(r.jawBind).multiply(jawDelta.setFromAxisAngle(X_AXIS, m.jawClosedRad));
+      for (const [name, value] of Object.entries(m.rest)) if (!motion.morphs.has(name)) writeMorph(r, name, value);
     };
 
     const applySpeech = (r: Rig, dt: number) => {
@@ -285,13 +352,7 @@ export function MonModel3D({
       for (const ch of [...SPEECH_CHANNELS, ...EXPRESSION_CHANNELS]) {
         current[ch] = damp(current[ch] ?? 0, targets[ch] ?? REST_TARGETS[ch] ?? 0, rate, dt);
       }
-      if (envelope < 1e-3) {
-        if (shownOpen !== 0) {
-          canvas.dataset.mouthOpen = '0';
-          shownOpen = 0;
-        }
-        return;
-      }
+      if (envelope < 1e-3) return;
       if (r.jaw) {
         const angle = m.jawClosedRad + (m.jawOpenRad - m.jawClosedRad) * (current.jaw ?? 0);
         jawTarget.copy(r.jawBind).multiply(jawDelta.setFromAxisAngle(X_AXIS, angle));
@@ -299,19 +360,33 @@ export function MonModel3D({
       }
       for (const ch of SPEECH_CHANNELS) {
         if (ch === 'jaw') continue;
-        const clipValue = readMorph(r, ch);
-        writeMorph(r, ch, clipValue + ((current[ch] ?? 0) - clipValue) * envelope);
+        const base = readMorph(r, ch);
+        // Speech opens the lips from the rig's own rest closure, not from 1.
+        const target = ch === 'mouthClose' ? (current[ch] ?? 1) * (m.rest.mouthClose ?? 1) : (current[ch] ?? 0);
+        writeMorph(r, ch, base + (target - base) * envelope);
       }
       // Expressions merge by per-channel max: an emote keeps its brows while the Mon talks.
       for (const ch of EXPRESSION_CHANNELS) {
         writeMorph(r, ch, Math.max(readMorph(r, ch), (current[ch] ?? 0) * envelope));
       }
-      const open = Math.round((current.jaw ?? 0) * envelope * 1000) / 1000;
-      if (Math.abs(open - shownOpen) >= 0.005) {
-        // Read-only debug hook for the boot test: how far speech has the jaw open.
-        canvas.dataset.mouthOpen = String(open);
-        shownOpen = open;
-      }
+    };
+
+    /**
+     * Read-only debug hook for the boot test, read off the rig itself:
+     * `data-mouth-open` is the jaw's opening from its shut angle (0..1 of the
+     * speech range), `data-mouth-close` the mouthClose influence.
+     */
+    const report = (r: Rig) => {
+      const m = mouthRef.current;
+      if (!m || !r.jaw) return;
+      closedQuat.copy(r.jawBind).multiply(jawDelta.setFromAxisAngle(X_AXIS, m.jawClosedRad));
+      const range = Math.abs(m.jawOpenRad - m.jawClosedRad) || 1;
+      const open = Math.min(1, r.jaw.quaternion.angleTo(closedQuat) / range);
+      const next = `${open.toFixed(2)} ${readMorph(r, 'mouthClose').toFixed(2)}`;
+      if (next === shown) return;
+      shown = next;
+      canvas.dataset.mouthOpen = open.toFixed(2);
+      canvas.dataset.mouthClose = readMorph(r, 'mouthClose').toFixed(2);
     };
 
     /** Idle blinks, only while the playing clip does not animate the face itself. */
@@ -337,8 +412,10 @@ export function MonModel3D({
       if (rig) restoreBase(rig);
       anim.current?.mixer.update(dt);
       if (rig) {
+        applyRest(rig);
         applySpeech(rig, dt);
         applyBlink(rig);
+        report(rig);
       }
       if (root) root.rotation.y += dt * 0.35; // slow turntable
       renderer.render(scene, camera);
@@ -352,6 +429,7 @@ export function MonModel3D({
       timer.dispose();
       anim.current?.mixer.stopAllAction();
       anim.current = null;
+      rigRef.current = null;
       scene.traverse((o) => {
         const m = o as THREE.Mesh;
         m.geometry?.dispose();
@@ -384,6 +462,7 @@ export function MonModel3D({
       a.action?.fadeOut(CROSSFADE_S);
     }
     a.action = next;
+    a.motion = rigRef.current ? clipMotion(clip, rigRef.current, mouthRef.current?.jawBone) : STILL;
   }, [clipsKey]);
 
   // Speech cues: a new start id aligns to the audio; stop ends it early.

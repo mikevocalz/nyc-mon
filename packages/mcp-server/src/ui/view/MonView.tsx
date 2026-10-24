@@ -74,9 +74,13 @@ const MON_MODELS: Readonly<Record<number, { file: string; mouth?: MouthRig }>> =
   // Jaw angles read off the files' own clips (about the jaw's local X, from
   // bind): Squeaklet binds with the mouth ajar and its mouth_close clip shuts
   // it at +0.357; jaw_chomp opens to -0.286. Lil' Ratti binds shut;
-  // face_pose_sweep's widest frame is -0.312.
-  2: { file: 'squeaklet', mouth: { jawBone: 'jaw', jawClosedRad: 0.357, jawOpenRad: -0.15 } },
-  3: { file: 'lil-ratti', mouth: { jawBone: 'jaw', jawClosedRad: 0, jawOpenRad: -0.3 } },
+  // face_pose_sweep's widest frame is -0.312. Rest: Lil' Ratti's neutral
+  // geometry (all weights 0) has the mouth open, so its resting face is
+  // mouthClose 1, the value its own emote clips rest on; frames at 0, 0.7 and
+  // 1 showed lips meeting only at 1, without crushing. Squeaklet rests on
+  // its mouth_close pose (jaw shut, mouthClose 1).
+  2: { file: 'squeaklet', mouth: { jawBone: 'jaw', jawClosedRad: 0.357, jawOpenRad: -0.15, rest: { mouthClose: 1 } } },
+  3: { file: 'lil-ratti', mouth: { jawBone: 'jaw', jawClosedRad: 0, jawOpenRad: -0.3, rest: { mouthClose: 1 } } },
 };
 
 /** The Mon in 3D (three.js) when its model exists; otherwise HomeLayout's still with a Coming Soon badge. */

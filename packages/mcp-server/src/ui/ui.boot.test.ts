@@ -407,7 +407,11 @@ describe('built views boot in a spec host (bundled Chromium)', { timeout: 20_000
     try {
       const canvas = b.frame.locator('canvas[data-engine^="three.js"]');
       await b.frame.waitForFunction(() => document.querySelector('[role=img][aria-busy="false"]') !== null, null, { timeout: 15_000 });
-      await b.frame.waitForFunction(() => document.querySelector('canvas')?.dataset.mouthOpen === '0', null, { timeout: 5000 });
+      // At rest the jaw is shut and the lips are closed (Lil' Ratti's neutral geometry is open-mouthed).
+      await b.frame.waitForFunction(() => {
+        const d = document.querySelector('canvas')?.dataset;
+        return d?.mouthOpen === '0.00' && d.mouthClose === '1.00';
+      }, null, { timeout: 5000 });
       // "Hello Mon, wanna play?" as visemes over 1.6 s: open vowels, a closure, a pause.
       const keys = [
         { v: 'mid', startMs: 0, endMs: 120 },
@@ -423,9 +427,15 @@ describe('built views boot in a spec host (bundled Chromium)', { timeout: 20_000
       await b.frame.page().evaluate((c) => window.sendHostContext({ nycMonSpeech: c }), cue);
       // Mid-utterance the jaw is open; read it a few times since frames are slow in software GL.
       await b.frame.waitForFunction(() => Number(document.querySelector('canvas')?.dataset.mouthOpen ?? 0) > 0.15, null, { timeout: 2000 });
-      // After the audio ends the mouth relaxes back to the clip.
-      await b.frame.waitForFunction(() => Number(document.querySelector('canvas')?.dataset.mouthOpen ?? 1) < 0.02, null, { timeout: 5000 });
+      // Speech opened the lips too.
+      expect(Number(await canvas.getAttribute('data-mouth-close'))).toBeLessThan(1);
+      // After the audio ends the face returns to the rest pose: jaw shut, lips closed.
+      await b.frame.waitForFunction(() => {
+        const d = document.querySelector('canvas')?.dataset;
+        return Number(d?.mouthOpen ?? 1) < 0.02 && Number(d?.mouthClose ?? 0) > 0.98;
+      }, null, { timeout: 5000 });
       expect(Number(await canvas.getAttribute('data-mouth-open'))).toBeLessThan(0.02);
+      expect(Number(await canvas.getAttribute('data-mouth-close'))).toBeGreaterThan(0.98);
       expect(b.errors).toEqual([]);
     } finally {
       await b.close();
