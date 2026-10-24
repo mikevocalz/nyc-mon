@@ -33,6 +33,7 @@ export { FilterBar, FilterChip, type FilterBarProps, type FilterChipProps } from
 export { FormField, type FormFieldProps } from '../FormField';
 export { Heading, type HeadingProps } from '../Heading';
 export { IconButton, type IconButtonProps } from '../IconButton';
+export { Image, type ImageProps } from '../Image';
 export { KeyValueList, type KeyValueItem, type KeyValueListProps } from '../KeyValueList';
 export { List, ListItem, type ListItemProps, type ListProps } from '../List';
 export { LoadingSkeleton, type LoadingSkeletonProps } from '../LoadingSkeleton';

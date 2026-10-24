@@ -13,11 +13,16 @@
  * 2026-10-07. The model returned 960×1280 (3:4) and 1536×1024 (3:2); the 3:4
  * frames are cropped to 4:5 (960×1200). `blurDataURL` is a 20×25 (24×16 for
  * the wide frame) WebP of the same crop.
+ *
+ * Lil' Ratti is the exception: a render of apps/web/public/mons/lil-ratti.glb
+ * (three.js, `up_idle` at 0.4 s, front three-quarter, transparent background)
+ * at 960×1200, so the 34 MB model is never needed where one picture will do.
  */
 
 import cornerEgg from './corner-egg.webp';
 import hatchNight from './hatch-night.webp';
 import kitteeCee from './kittee-cee.webp';
+import lilRatti from './lil-ratti.webp';
 import metroEgg from './metro-egg.webp';
 import prismEgg from './prism-egg.webp';
 import squeaklet from './squeaklet.webp';
@@ -26,7 +31,7 @@ import yotito from './yotito.webp';
 export type CreatureSource = string | number | { src: string; width: number; height: number };
 
 /** Which canon record the art depicts. `scene` is the hatch night, which shows an egg but no particular one. */
-export type CreatureArtKind = 'baby' | 'egg' | 'scene';
+export type CreatureArtKind = 'baby' | 'small' | 'egg' | 'scene';
 
 export interface CreatureArt {
   id: string;
@@ -44,6 +49,7 @@ export interface CreatureArt {
 }
 
 const GENERATED = { tool: 'Figma generate_image', model: 'gpt-image-2.5-sunburst', date: '2026-10-07' } as const;
+const RENDERED_LIL_RATTI = { tool: 'three.js render of lil-ratti.glb', model: 'lil-ratti.glb up_idle', date: '2026-10-23' } as const;
 
 export const CREATURE_ART: readonly CreatureArt[] = [
   {
@@ -81,6 +87,18 @@ export const CREATURE_ART: readonly CreatureArt[] = [
     blurDataURL:
       'data:image/webp;base64,UklGRgABAABXRUJQVlA4IPQAAADwBQCdASoUABkAPu1qqFAppiOiqA1RMB2JaACdMs8+RTAOukRuAT8RhaMpSYZM0OMGnnTQ4hmVQADhH3kJrvbHtHUL3IIve4ZZNIhwSiCACTCtUpbcrt5JFAaHUqly2kr/yQk+x/fjQr0AKQc/gYeiF8g5D9fvZ8a8DNcwSEKPVrV3QKgtg3hMbKJnbx0yaHevxVb8EgVvfg5thBS4IoCTA/uDxxR0yfs/2VMYS0NbfFQhb3cP+pUr1ZyvaY9ZO7XxT4i8swgZyhVw6Yy5vxvZ1PKLNu9vkoSPcJH+a41BAKDh5fPllo49o8P7mIiKn5kJmAAA',
     generatedWith: GENERATED,
+  },
+  {
+    id: 'lil-ratti',
+    kind: 'small',
+    dexId: 3,
+    source: lilRatti,
+    alt: 'Lil’ Ratti, a charcoal rat Mon with big pink ears, in a red hoodie, black shorts and red high-tops.',
+    width: 960,
+    height: 1200,
+    blurDataURL:
+      'data:image/webp;base64,UklGRrABAABXRUJQVlA4WAoAAAAQAAAAEwAAGAAAQUxQSMoAAAABgKtt//nl81e2jdnY3O6aeABdzY3/Ldfkdts2J9vGAdh445tOICImQP6lfVIgF7oRogi8BDKoThzVrQK402W28fmLETP+RZV8rTYMvvtQGKFi9Bxqn3BVrCusSk+VAjzejlAiMgUAA9/wwMdbW8pw5MMZ0qkgPAN4wTTVVlEOYGGmnZoumAZw03tOxV4Dj4A2gRKz2a340StD4a0OWhQB8OAUWtxIKjqolD4ArvFoZtxegIfTgFwsMhIY7asW2QPcmc/D02KU3yMBVlA4IMAAAADQBACdASoUABkAPtFYpEyoJSOiKA1RABoJbAC93BUCIeC8uYWxS+pI5Z0HX2NGoAD+y1fz30twXdehxreVebZxZ0761PA7vfpOVIczEyMisnOcqR51kcc3fSPEuyh1J576rrtwfzevwoj9aYBEV0+pwwm7PsGNB/8nkDTR/V8v/mYRRMraE8mE1s3aML0wz/f9dZ0pV1Fv6wQEpfNza+eZIMO+hfMJM31pEa38P/BMdn1/S4qxHjL8MVCsf9apkAA=',
+    generatedWith: RENDERED_LIL_RATTI,
   },
   {
     id: 'metro-egg',

@@ -1474,6 +1474,9 @@ importers:
 
   packages/payload:
     dependencies:
+      '@acme/assets':
+        specifier: workspace:*
+        version: link:../assets
       '@acme/content':
         specifier: workspace:*
         version: link:../content
