@@ -214,3 +214,11 @@ test('face frames land on the audio clock: frame k at k / fps, from the cue\'s o
     assert.ok(Math.abs(jaw - Math.min(1, (k / 29) * 1.6)) < 1e-9, `frame ${k}`);
   }
 });
+
+test('a start cue carries a known gesture class and drops an unknown one; a listen cue parses', () => {
+  const base = { kind: 'start', id: 'g1', elapsedMs: 0, durationMs: 800, track: { kind: 'amplitude', fps: 60, values: [0.4] } };
+  assert.equal((parseSpeechCue({ ...base, gesture: 'greet' }) as { gesture?: string }).gesture, 'greet');
+  assert.equal('gesture' in (parseSpeechCue({ ...base, gesture: 'moonwalk' }) ?? {}), false);
+  assert.deepEqual(parseSpeechCue({ kind: 'listen', id: 'mic', on: true }), { kind: 'listen', id: 'mic', on: true });
+  assert.equal(parseSpeechCue({ kind: 'listen', id: 'mic' }), null);
+});

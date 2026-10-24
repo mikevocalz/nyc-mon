@@ -1,4 +1,4 @@
-import { mkdtemp, readFile } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -447,6 +447,74 @@ describe('built views boot in a spec host (bundled Chromium)', { timeout: 20_000
       }, null, { timeout: 5000 });
       expect(Number(await canvas.getAttribute('data-mouth-open'))).toBeLessThan(0.02);
       expect(Number(await canvas.getAttribute('data-mouth-close'))).toBeGreaterThan(0.98);
+      expect(b.errors).toEqual([]);
+    } finally {
+      await b.close();
+    }
+  });
+
+  it("Lil' Ratti idles without spinning, stays on its stage, and faces the viewer through a three-sentence reply", { timeout: 90_000 }, async () => {
+    const b = await boot('mon-card', { ...echoShow8(process.env.MON_BOOT_MODE === 'fullscreen' ? 'fullscreen' : 'inline', 'light'), result: { mon: monFor('dex-003'), care } });
+    // Set MON_BOOT_FRAMES to a directory to keep a frame strip of the run for review.
+    const framesDir = process.env.MON_BOOT_FRAMES;
+    const shoot = async (name: string, headOnly = false) => {
+      if (!framesDir) return;
+      const box = await b.frame.locator('canvas').first().boundingBox();
+      if (!box) return;
+      const clip = headOnly ? { x: box.x + box.width * 0.2, y: box.y, width: box.width * 0.6, height: box.height * 0.45 } : box;
+      await b.frame.page().screenshot({ path: join(framesDir, `${name}.png`), clip });
+    };
+    const read = () =>
+      b.frame.evaluate(() => {
+        const d = document.querySelector('canvas')?.dataset;
+        return { facing: Number(d?.facing ?? 9), x: Number(d?.rootX ?? 0), bound: Number(d?.boundX ?? 0), clip: d?.clip ?? '' };
+      });
+    try {
+      await b.frame.waitForFunction(() => document.querySelector('[role=img][aria-busy="false"]') !== null, null, { timeout: 15_000 });
+      // About 20 s of idle: never a free spin, never off the stage.
+      const idle: Awaited<ReturnType<typeof read>>[] = [];
+      for (let i = 0; i < 40; i++) {
+        const r = await read();
+        idle.push(r);
+        expect(Math.abs(r.x)).toBeLessThanOrEqual(r.bound + 1e-3);
+        if (i % 2 === 0) await shoot(`idle-${String(i / 2).padStart(2, '0')}`);
+        await new Promise((done) => setTimeout(done, 500));
+      }
+      if (framesDir) await writeFile(join(framesDir, 'idle.json'), JSON.stringify(idle));
+      // Facing the viewer most of the time (a look-away or a step turns it a quarter for a few seconds).
+      expect(idle.filter((r) => r.facing < 0.6).length).toBeGreaterThan(idle.length * 0.5);
+
+      // A reply: three sentences, 150 ms apart, as the voice player sends them.
+      const sentence = (id: string, gesture?: string) => ({ ...helloCue, id, ...(gesture ? { gesture } : {}) });
+      const t0 = Date.now();
+      const say = async (id: string, gesture?: string) => b.frame.page().evaluate((c) => window.sendHostContext({ nycMonSpeech: c }), sentence(id, gesture));
+      const stop = async (id: string) => b.frame.page().evaluate((c) => window.sendHostContext({ nycMonSpeech: c }), { kind: 'stop', id });
+      const schedule = [
+        { at: 0, run: () => say('reply-1', 'greet') },
+        { at: 1600, run: () => stop('reply-1') },
+        { at: 1750, run: () => say('reply-2') },
+        { at: 3350, run: () => stop('reply-2') },
+        { at: 3500, run: () => say('reply-3', 'self') },
+        { at: 5100, run: () => stop('reply-3') },
+      ];
+      const during: (Awaited<ReturnType<typeof read>> & { t: number })[] = [];
+      let next = 0;
+      let shots = 0;
+      while (Date.now() - t0 < 6200) {
+        const t = Date.now() - t0;
+        while (next < schedule.length && t >= schedule[next]!.at) await schedule[next++]!.run();
+        during.push({ t, ...(await read()) });
+        if (t > 400 && shots < 6 && t > shots * 950 + 400) await shoot(`speech-head-${shots++}`, true);
+        await new Promise((done) => setTimeout(done, 100));
+      }
+      if (framesDir) await writeFile(join(framesDir, 'speech.json'), JSON.stringify(during));
+      // If the reply caught it turned away, one turn clip brings it round (1 s of clip, at software-GL frame rates).
+      const settled = during.filter((r) => r.t > 1500);
+      expect(settled.length).toBeGreaterThan(3);
+      for (const r of settled) {
+        expect(r.facing, `facing at ${r.t} ms (${r.clip})`).toBeLessThan(0.2);
+        expect(Math.abs(r.x)).toBeLessThanOrEqual(r.bound + 1e-3);
+      }
       expect(b.errors).toEqual([]);
     } finally {
       await b.close();

@@ -1,11 +1,13 @@
 export { amplitudeEnvelope, sampleAmplitude, type AmplitudeTrack } from './amplitude.ts';
 export {
+  MON_GESTURES,
   parseSpeechCue,
   pickSpeechTrack,
   sampleSpeechTrack,
   SPEECH_CONTEXT_KEY,
   utteranceTimeMs,
   type FaceTrack,
+  type MonGesture,
   type MonSpeechCue,
   type SampleSpeechOptions,
   type SpeechSources,

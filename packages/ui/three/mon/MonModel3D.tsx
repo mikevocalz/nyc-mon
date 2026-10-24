@@ -6,6 +6,8 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { parseSpeechCue, sampleSpeechTrack, utteranceTimeMs, type MonSpeechCue } from './lipsync/cue.ts';
 import { EXPRESSION_CHANNELS, mouthToRig, SPEECH_CHANNELS, type RigTargets } from './lipsync/retarget.ts';
 import { damp } from './lipsync/smoothing.ts';
+import { idleConfig } from './idle/config.ts';
+import { createIdleEngine, resolveIdleClips, type IdleAction, type IdleEngine, type IdleFrame } from './idle/engine.ts';
 
 /**
  * One Mon GLB on a small lit stage, drawn with three.js (WebGL). Plays the
@@ -55,11 +57,31 @@ export interface MouthRig {
   readonly rest: Readonly<Record<string, number>>;
 }
 
-/** How quickly the Mon turns to face the viewer when it starts to speak (per second, critically damped). */
-const FACE_TURN_RATE = 6;
+/**
+ * How long the Mon keeps facing the viewer after an utterance ends. A reply is
+ * spoken one sentence per utterance with a short gap between clips (the next
+ * one's audio still decoding, or its TTS still on the way); without the hold
+ * the turntable resumed in every gap and the Mon swung away mid-reply.
+ */
+const FACE_HOLD_MS = 1200;
+/** The spine-to-head chain the idle engine's upper-body yaw is spread over, with each bone's share. */
+const BODY_YAW_CHAIN: readonly (readonly [string, number])[] = [
+  ['spine_01', 0.15],
+  ['spine_02', 0.15],
+  ['spine_03', 0.2],
+  ['chest', 0.2],
+  ['neck', 0.15],
+  ['head', 0.15],
+];
+const Y_AXIS = new THREE.Vector3(0, 1, 0);
+/** A stable seed per model file, so a Mon moves the same way each time it loads. */
+function seedOf(text: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 0x01000193);
+  return h >>> 0;
+}
 
 const NO_CLIPS: readonly string[] = [];
-const CROSSFADE_S = 0.4;
 const X_AXIS = new THREE.Vector3(1, 0, 0);
 
 /** Smoothing rates (per second): the mouth follows syllables, the envelope eases in and out. */
@@ -100,8 +122,16 @@ interface ClipMotion {
 interface AnimationState {
   readonly mixer: THREE.AnimationMixer;
   readonly animations: readonly THREE.AnimationClip[];
+  /** The clip the eye sees most: the engine's action while one plays, else the base loop. */
   action: THREE.AnimationAction | null;
   motion: ClipMotion;
+  /** The idle engine (idle/engine.ts) decides what plays; this file only writes it. */
+  engine: IdleEngine;
+  base: string | null;
+  actionId: number;
+  actionKind: IdleAction['kind'] | null;
+  /** How far the root may step either side of centre, model units. */
+  boundX: number;
 }
 
 const STILL: ClipMotion = { jaw: false, morphs: new Set() };
@@ -189,6 +219,64 @@ function blinkCurve(t: number): number {
   return 1 - (t - 0.12) / 0.14;
 }
 
+/**
+ * Lil' Ratti's up_turn_L / up_turn_R keep the head on the camera while the
+ * body turns (measured: the head's world yaw goes 0.32 → 0 while chest, hips
+ * and feet go 0 → ±π/2), so each one ends with the head a quarter turn round
+ * from the body, and the cut to the idle at the new heading snapped it back,
+ * or showed the back of the head on the way round. Holding the head and neck
+ * at their bind rotation for these clips turns the Mon as one piece.
+ */
+function holdHeadInTurns(animations: readonly THREE.AnimationClip[], model: THREE.Object3D): void {
+  const held = ['neck', 'head']
+    .map((name) => model.getObjectByName(name))
+    .filter((o): o is THREE.Object3D => o !== undefined);
+  for (const clip of animations) {
+    if (!/^up_turn_[LR]$/.test(clip.name)) continue;
+    clip.tracks = clip.tracks.map((track) => {
+      const { nodeName, propertyName } = THREE.PropertyBinding.parseTrackName(track.name);
+      const bone = held.find((b) => THREE.PropertyBinding.sanitizeNodeName(b.name) === nodeName);
+      if (!bone || propertyName !== 'quaternion') return track;
+      const q = bone.quaternion;
+      return new THREE.QuaternionKeyframeTrack(track.name, [0, clip.duration], [q.x, q.y, q.z, q.w, q.x, q.y, q.z, q.w]);
+    });
+  }
+}
+
+/**
+ * How far the body reaches either side of its centre on screen, in any pose
+ * the idle engine can leave it in: facing front in the base loop (bones' x),
+ * and side-on after a quarter turn or mid-walk, when its depth (bones' z,
+ * tail included) becomes its width. Plus a margin for the mesh around the bones.
+ */
+function bodyHalfSpan(model: THREE.Object3D, mixer: THREE.AnimationMixer, animations: readonly THREE.AnimationClip[], base: string | null, fallback: number): number {
+  const centre = new THREE.Vector3();
+  model.parent?.getWorldPosition(centre);
+  const p = new THREE.Vector3();
+  let span = 0;
+  const measure = (name: string | null, axes: readonly ('x' | 'z')[]) => {
+    const clip = name ? pickClip(animations, [name]) : null;
+    if (!clip) return;
+    const action = mixer.clipAction(clip);
+    action.play();
+    for (const f of [0, 0.25, 0.5, 0.75]) {
+      action.time = f * clip.duration;
+      mixer.update(0);
+      model.updateMatrixWorld(true);
+      model.traverse((o) => {
+        if (!(o as THREE.Bone).isBone) return;
+        o.getWorldPosition(p);
+        for (const axis of axes) span = Math.max(span, Math.abs(p[axis] - centre[axis]));
+      });
+    }
+    action.stop();
+  };
+  measure(base, ['x', 'z']);
+  measure('up_walk', ['z']);
+  // Hoodie, sneakers and paws sit outside their bones by about this much (Lil’ Ratti; checked on the boot frame strip).
+  return span > 0 ? Math.min(fallback, span + 0.08) : fallback;
+}
+
 export function MonModel3D({
   url,
   clips = NO_CLIPS,
@@ -221,6 +309,10 @@ export function MonModel3D({
   const rigRef = useRef<Rig | null>(null);
   /** The utterance in progress: its track and when (performance.now) its audio started. */
   const utterance = useRef<{ cue: Extract<MonSpeechCue, { kind: 'start' }>; receivedAt: number } | null>(null);
+  /** performance.now() until which the Mon holds its face to the viewer after the last utterance ended. */
+  const faceHoldUntil = useRef(0);
+  /** The host's microphone is open: the Mon looks and listens. */
+  const listening = useRef(false);
 
   // Renderer, scene and GLB: once per url (the files are 26-34 MB).
   useEffect(() => {
@@ -249,6 +341,13 @@ export function MonModel3D({
 
     let rig: Rig | null = null;
     let root: THREE.Object3D | null = null;
+    let bodyChain: { bone: THREE.Object3D; share: number }[] = [];
+    let shoulders: [THREE.Object3D | null, THREE.Object3D | null] = [null, null];
+    const qParent = new THREE.Quaternion();
+    const qDelta = new THREE.Quaternion();
+    const qYaw = new THREE.Quaternion();
+    const vL = new THREE.Vector3();
+    const vR = new THREE.Vector3();
     let frame = 0;
     let disposed = false;
     const timer = new THREE.Timer();
@@ -302,11 +401,23 @@ export function MonModel3D({
         camera.position.set(0, size.y * 0.08, dist);
         camera.lookAt(0, 0, 0);
         rig = readRig(model, mouthRef.current);
+        holdHeadInTurns(gltf.animations, model);
         const mixer = new THREE.AnimationMixer(model);
-        const clip = pickClip(gltf.animations, clipsRef.current);
-        const action = clip ? mixer.clipAction(clip) : null;
-        action?.play();
-        anim.current = { mixer, animations: gltf.animations, action, motion: clipMotion(clip, rig, mouthRef.current?.jawBone) };
+        const durations = Object.fromEntries(gltf.animations.map((a) => [a.name, a.duration]));
+        const engine = createIdleEngine(resolveIdleClips(clipsRef.current, durations), seedOf(url));
+        // Steps stay inside 90% of the frame with the whole body in view, facing front.
+        // The box above is the bind pose (arms out); the body stands narrower
+        // facing front, and reaches further side-on (the tail trails a walk).
+        const visibleHalf = dist * Math.tan(hHalf);
+        const boundX = Math.max(0, visibleHalf * 0.9 - bodyHalfSpan(model, mixer, gltf.animations, resolveIdleClips(clipsRef.current, durations).base, radius));
+        anim.current = { mixer, animations: gltf.animations, action: null, motion: STILL, engine, base: null, actionId: 0, actionKind: null, boundX };
+        bodyChain = BODY_YAW_CHAIN.flatMap(([name, share]) => {
+          const bone = model.getObjectByName(name);
+          return bone ? [{ bone, share }] : [];
+        });
+        const total = bodyChain.reduce((a, b) => a + b.share, 0) || 1;
+        bodyChain = bodyChain.map((b) => ({ ...b, share: b.share / total }));
+        shoulders = [model.getObjectByName('shoulder_L') ?? null, model.getObjectByName('shoulder_R') ?? null];
         rigRef.current = rig;
         setState('ready');
       },
@@ -346,6 +457,7 @@ export function MonModel3D({
         const t = utteranceTimeMs(u.cue, u.receivedAt, now);
         if (t > u.cue.durationMs + TAIL_MS) {
           utterance.current = null;
+          faceHoldUntil.current = now + FACE_HOLD_MS;
         } else {
           speaking = true;
           targets = t <= u.cue.durationMs ? sampleSpeechTrack(u.cue.track, t, { amplitude: gain, vary: !reduced?.matches }) : REST_TARGETS;
@@ -387,8 +499,6 @@ export function MonModel3D({
       const range = Math.abs(m.jawOpenRad - m.jawClosedRad) || 1;
       const open = Math.min(1, r.jaw.quaternion.angleTo(closedQuat) / range);
       const next = `${open.toFixed(2)} ${readMorph(r, 'mouthClose').toFixed(2)}`;
-      // How far the Mon is turned from the viewer, in radians (0 = facing).
-      if (root) canvas.dataset.facing = Math.abs(Math.atan2(Math.sin(root.rotation.y), Math.cos(root.rotation.y))).toFixed(2);
       if (next === shown) return;
       shown = next;
       canvas.dataset.mouthOpen = open.toFixed(2);
@@ -410,30 +520,115 @@ export function MonModel3D({
       }
     };
 
+    /** Plays what the engine asks for: a base loop, and over it at most one action. */
+    const writeClips = (a: AnimationState, f: IdleFrame) => {
+      const clipAction = (name: string | null) => {
+        const clip = name ? pickClip(a.animations, [name]) : null;
+        return clip ? a.mixer.clipAction(clip) : null;
+      };
+      const actionChanged = (f.action?.id ?? 0) !== a.actionId;
+      const baseChanged = f.base !== a.base;
+      if (!actionChanged && !baseChanged) return;
+      const prevKind = a.actionKind;
+      const prevAction = a.actionId !== 0 ? a.action : null;
+      const base = clipAction(f.base);
+      const next = f.action ? clipAction(f.action.clip) : null;
+      // A turn clip ends a quarter turn round, and the engine hands that turn to
+      // the root on this frame: cut, never blend, or the body swings back.
+      const cut = actionChanged && prevKind === 'turn';
+      const show = next ?? base;
+      const fadeS = next ? f.action!.fadeS : prevKind === null ? idleConfig.crossfadeS : idleConfig.actionFadeS;
+      for (const other of [prevAction, a.base !== f.base ? clipAction(a.base) : null]) {
+        if (!other || other === show) continue;
+        if (cut || fadeS === 0) other.stop();
+        else other.fadeOut(fadeS);
+      }
+      if (next) {
+        next.reset();
+        next.setLoop(f.action!.loop ? THREE.LoopRepeat : THREE.LoopOnce, Infinity);
+        next.clampWhenFinished = true;
+        if (base && base !== next) base.fadeOut(cut || fadeS === 0 ? 0.001 : fadeS);
+      } else if (base && actionChanged) {
+        base.reset();
+      }
+      if (show) {
+        show.enabled = true; // a finished fade-out disables an action
+        show.setEffectiveTimeScale(1).play();
+        if (cut || fadeS === 0) show.stopFading().setEffectiveWeight(1);
+        else show.fadeIn(fadeS);
+      }
+      a.base = f.base;
+      a.actionId = f.action?.id ?? 0;
+      a.actionKind = f.action?.kind ?? null;
+      a.action = show;
+      a.motion = rig ? clipMotion(show?.getClip() ?? null, rig, mouthRef.current?.jawBone) : STILL;
+    };
+
+    /** The engine's upper-body yaw, spread from spine to head about the world's up axis, so the feet stay planted. */
+    const writeBodyYaw = (yaw: number) => {
+      if (Math.abs(yaw) < 1e-4) return;
+      // Rotations about one world axis commute, so each bone's share uses its
+      // parent's orientation from before any of them moved.
+      const parents = bodyChain.map(({ bone }) => (bone.parent ? bone.parent.getWorldQuaternion(new THREE.Quaternion()) : new THREE.Quaternion()));
+      bodyChain.forEach(({ bone, share }, i) => {
+        qParent.copy(parents[i]!);
+        qYaw.setFromAxisAngle(Y_AXIS, yaw * share);
+        qDelta.copy(qParent).invert().multiply(qYaw).multiply(qParent);
+        bone.quaternion.premultiply(qDelta);
+      });
+    };
+
+    /** How far the chest is turned from the camera, radians, from the shoulder line (0 = square on). */
+    const facingNow = (): number | null => {
+      const [l, r] = shoulders;
+      if (!l || !r || !root) return null;
+      root.updateMatrixWorld(true);
+      l.getWorldPosition(vL);
+      r.getWorldPosition(vR);
+      const chest = Math.atan2(-(vL.z - vR.z), vL.x - vR.x);
+      const toCamera = Math.atan2(camera.position.x - (vL.x + vR.x) / 2, camera.position.z - (vL.z + vR.z) / 2);
+      const d = chest - toCamera;
+      return Math.abs(Math.atan2(Math.sin(d), Math.cos(d)));
+    };
+
     const tick = (now?: number) => {
       frame = requestAnimationFrame(tick);
       timer.update(now);
       const dt = Math.min(timer.getDelta(), 0.05);
       clock += dt;
-      if (rig) restoreBase(rig);
-      anim.current?.mixer.update(dt);
+      const a = anim.current;
+      if (a && root) {
+        const u = utterance.current;
+        const f = a.engine.step(dt, {
+          speaking: u !== null || performance.now() < faceHoldUntil.current,
+          utteranceId: u?.cue.id ?? null,
+          gesture: u?.cue.gesture ?? null,
+          utteranceS: u ? u.cue.durationMs / 1000 : 0,
+          listening: listening.current,
+          reduced: reduced?.matches ?? false,
+          boundX: a.boundX,
+        });
+        writeClips(a, f);
+        // The root never spins: its heading only changes when a turn clip hands one over.
+        root.rotation.y = f.rootYaw;
+        root.position.x = f.rootX;
+        canvas.dataset.rootX = f.rootX.toFixed(3);
+        canvas.dataset.boundX = a.boundX.toFixed(3);
+        canvas.dataset.clip = a.action?.getClip().name ?? '';
+        if (rig) restoreBase(rig);
+        a.mixer.update(dt);
+        writeBodyYaw(f.bodyYaw);
+      } else if (rig) {
+        restoreBase(rig);
+      }
       if (rig) {
         applyRest(rig);
         applySpeech(rig, dt);
         applyBlink(rig);
         report(rig);
       }
-      if (root) {
-        // Slow turntable while idle. While the Mon speaks it turns to face the
-        // viewer by the shortest way round and holds there, so the mouth is seen.
-        const facing = utterance.current !== null;
-        if (facing) {
-          const off = Math.atan2(Math.sin(root.rotation.y), Math.cos(root.rotation.y));
-          root.rotation.y -= off - damp(off, 0, FACE_TURN_RATE, dt);
-        } else {
-          root.rotation.y += dt * 0.35;
-        }
-      }
+      const facing = facingNow();
+      if (facing !== null) canvas.dataset.facing = facing.toFixed(2);
       renderer.render(scene, camera);
     };
     tick();
@@ -462,31 +657,27 @@ export function MonModel3D({
     };
   }, [url]);
 
-  // A new clip list cross-fades on the loaded model: no new context, no re-download.
+  // A new clip list (the mood changed) goes to the engine, which cross-fades the base on its next step.
   const clipsKey = clips.join('\n');
   useEffect(() => {
     const a = anim.current;
     if (!a) return; // still loading: the load callback reads clipsRef
-    const clip = pickClip(a.animations, clipsRef.current);
-    if (clip === (a.action?.getClip() ?? null)) return;
-    const next = clip ? a.mixer.clipAction(clip) : null;
-    if (next) {
-      next.reset().setEffectiveTimeScale(1).setEffectiveWeight(1).play();
-      if (a.action) a.action.crossFadeTo(next, CROSSFADE_S, false);
-      else next.fadeIn(CROSSFADE_S);
-    } else {
-      a.action?.fadeOut(CROSSFADE_S);
-    }
-    a.action = next;
-    a.motion = rigRef.current ? clipMotion(clip, rigRef.current, mouthRef.current?.jawBone) : STILL;
+    a.engine.setClips(resolveIdleClips(clipsRef.current, Object.fromEntries(a.animations.map((c) => [c.name, c.duration]))));
   }, [clipsKey]);
 
   // Speech cues: a new start id aligns to the audio; stop ends it early.
   useEffect(() => {
     const cue = parseSpeechCue(speech);
     if (!cue) return;
+    if (cue.kind === 'listen') {
+      listening.current = cue.on;
+      return;
+    }
     if (cue.kind === 'stop') {
-      if (utterance.current?.cue.id === cue.id) utterance.current = null;
+      if (utterance.current?.cue.id === cue.id) {
+        utterance.current = null;
+        faceHoldUntil.current = performance.now() + FACE_HOLD_MS;
+      }
       return;
     }
     // The same utterance again is a repeat unless it brings a different track:

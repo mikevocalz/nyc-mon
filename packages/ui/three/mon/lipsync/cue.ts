@@ -33,8 +33,16 @@ export type MonSpeechCue =
       readonly elapsedMs: number;
       readonly durationMs: number;
       readonly track: SpeechTrack;
+      /** What the sentence does, for the body: one upper-body gesture at most (idle/gestures.ts). */
+      readonly gesture?: MonGesture;
     }
-  | { readonly kind: 'stop'; readonly id: string };
+  | { readonly kind: 'stop'; readonly id: string }
+  /** The host's microphone opened (`on`) or closed: the Mon looks and listens. */
+  | { readonly kind: 'listen'; readonly id: string; readonly on: boolean };
+
+/** A sentence's gesture class, chosen by the host from the words it speaks. */
+export type MonGesture = 'greet' | 'question' | 'self' | 'excited' | 'agree' | 'deny';
+export const MON_GESTURES: readonly MonGesture[] = ['greet', 'question', 'self', 'excited', 'agree', 'deny'];
 
 /** The host-context key that carries the latest cue. */
 export const SPEECH_CONTEXT_KEY = 'nycMonSpeech';
@@ -143,7 +151,10 @@ function parseTrack(t: unknown): SpeechTrack | null {
 export function parseSpeechCue(value: unknown): MonSpeechCue | null {
   if (!isRecord(value) || typeof value.id !== 'string' || value.id === '' || value.id.length > 64) return null;
   if (value.kind === 'stop') return { kind: 'stop', id: value.id };
+  if (value.kind === 'listen') return typeof value.on === 'boolean' ? { kind: 'listen', id: value.id, on: value.on } : null;
   if (value.kind !== 'start' || !isNum(value.elapsedMs) || !isNum(value.durationMs) || value.durationMs <= 0) return null;
   const track = parseTrack(value.track);
-  return track ? { kind: 'start', id: value.id, elapsedMs: Math.max(0, value.elapsedMs), durationMs: value.durationMs, track } : null;
+  if (!track) return null;
+  const gesture = (MON_GESTURES as readonly unknown[]).includes(value.gesture) ? (value.gesture as MonGesture) : undefined;
+  return { kind: 'start', id: value.id, elapsedMs: Math.max(0, value.elapsedMs), durationMs: value.durationMs, track, ...(gesture ? { gesture } : {}) };
 }
