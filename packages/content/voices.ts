@@ -102,11 +102,6 @@ export function voicePitchFactor(stage: LifecycleStage): number | null {
   return PITCH_FACTOR[stage];
 }
 
-/**
- * @deprecated The client no longer changes playback rate; use {@linkcode voicePitchFactor}.
- * Kept so the package root's re-export still resolves.
- */
-export const voicePlaybackRate = voicePitchFactor;
 
 /** The same table as a Web Speech `utterance.pitch` (range 0 to 2, 1 is the voice's default). */
 export function webSpeechPitch(stage: LifecycleStage): number | null {
