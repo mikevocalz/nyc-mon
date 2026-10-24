@@ -402,6 +402,27 @@ describe('built views boot in a spec host (bundled Chromium)', { timeout: 20_000
     }
   });
 
+  // "Hello Mon, wanna play?" as visemes over 1.6 s: open vowels, a closure, a pause.
+  const helloCue = {
+    kind: 'start',
+    id: 'boot-1',
+    elapsedMs: 0,
+    durationMs: 1600,
+    track: {
+      kind: 'visemes',
+      keys: [
+        { v: 'mid', startMs: 0, endMs: 120 },
+        { v: 'wide', startMs: 120, endMs: 300 },
+        { v: 'round', startMs: 300, endMs: 520 },
+        { v: 'closed', startMs: 520, endMs: 600 },
+        { v: 'open', startMs: 600, endMs: 900 },
+        { v: 'rest', startMs: 900, endMs: 1050 },
+        { v: 'round', startMs: 1050, endMs: 1250 },
+        { v: 'open', startMs: 1250, endMs: 1600 },
+      ],
+    },
+  };
+
   it("Lil' Ratti lip-syncs a speech cue from the host context, then closes to rest", async () => {
     const b = await boot('mon-card', { ...echoShow8('inline', 'light'), result: { mon: monFor('dex-003'), care } });
     try {
@@ -412,19 +433,7 @@ describe('built views boot in a spec host (bundled Chromium)', { timeout: 20_000
         const d = document.querySelector('canvas')?.dataset;
         return d?.mouthOpen === '0.00' && d.mouthClose === '1.00';
       }, null, { timeout: 5000 });
-      // "Hello Mon, wanna play?" as visemes over 1.6 s: open vowels, a closure, a pause.
-      const keys = [
-        { v: 'mid', startMs: 0, endMs: 120 },
-        { v: 'wide', startMs: 120, endMs: 300 },
-        { v: 'round', startMs: 300, endMs: 520 },
-        { v: 'closed', startMs: 520, endMs: 600 },
-        { v: 'open', startMs: 600, endMs: 900 },
-        { v: 'rest', startMs: 900, endMs: 1050 },
-        { v: 'round', startMs: 1050, endMs: 1250 },
-        { v: 'open', startMs: 1250, endMs: 1600 },
-      ];
-      const cue = { kind: 'start', id: 'boot-1', elapsedMs: 0, durationMs: 1600, track: { kind: 'visemes', keys } };
-      await b.frame.page().evaluate((c) => window.sendHostContext({ nycMonSpeech: c }), cue);
+      await b.frame.page().evaluate((c) => window.sendHostContext({ nycMonSpeech: c }), helloCue);
       // Mid-utterance the jaw is open; read it a few times since frames are slow in software GL.
       await b.frame.waitForFunction(() => Number(document.querySelector('canvas')?.dataset.mouthOpen ?? 0) > 0.15, null, { timeout: 2000 });
       // Speech opened the lips too.
@@ -432,6 +441,37 @@ describe('built views boot in a spec host (bundled Chromium)', { timeout: 20_000
       // And the turntable has brought the face round to the viewer.
       await b.frame.waitForFunction(() => Number(document.querySelector('canvas')?.dataset.facing ?? 9) < 0.2, null, { timeout: 2000 });
       // After the audio ends the face returns to the rest pose: jaw shut, lips closed.
+      await b.frame.waitForFunction(() => {
+        const d = document.querySelector('canvas')?.dataset;
+        return Number(d?.mouthOpen ?? 1) < 0.02 && Number(d?.mouthClose ?? 0) > 0.98;
+      }, null, { timeout: 5000 });
+      expect(Number(await canvas.getAttribute('data-mouth-open'))).toBeLessThan(0.02);
+      expect(Number(await canvas.getAttribute('data-mouth-close'))).toBeGreaterThan(0.98);
+      expect(b.errors).toEqual([]);
+    } finally {
+      await b.close();
+    }
+  });
+
+  it('Squeaklet lip-syncs a speech cue from the host context, then closes to rest', async () => {
+    // Fed, so Squeaklet loops its idle clips. Hungry it plays jaw_chomp
+    // (MON_CLIPS needs-fullness), which moves the jaw and so owns it over the rest pose.
+    const fed = { ...care, fullness: 0.9, wantsFood: false };
+    const b = await boot('mon-card', { ...echoShow8('inline', 'light'), result: { mon: monFor('dex-002'), care: fed } });
+    try {
+      const canvas = b.frame.locator('canvas[data-engine^="three.js"]');
+      await b.frame.waitForFunction(() => document.querySelector('[role=img][aria-busy="false"]') !== null, null, { timeout: 15_000 });
+      // Squeaklet binds with the mouth ajar. At rest the jaw sits on its mouth_close
+      // pose (jawClosedRad 0.357 in MON_MODELS, where data-mouth-open reads 0) and
+      // mouthClose holds its rest value of 1.
+      await b.frame.waitForFunction(() => {
+        const d = document.querySelector('canvas')?.dataset;
+        return d?.mouthOpen === '0.00' && d.mouthClose === '1.00';
+      }, null, { timeout: 5000 });
+      await b.frame.page().evaluate((c) => window.sendHostContext({ nycMonSpeech: c }), { ...helloCue, id: 'boot-squeaklet' });
+      await b.frame.waitForFunction(() => Number(document.querySelector('canvas')?.dataset.mouthOpen ?? 0) > 0.15, null, { timeout: 2000 });
+      expect(Number(await canvas.getAttribute('data-mouth-close'))).toBeLessThan(1);
+      await b.frame.waitForFunction(() => Number(document.querySelector('canvas')?.dataset.facing ?? 9) < 0.2, null, { timeout: 2000 });
       await b.frame.waitForFunction(() => {
         const d = document.querySelector('canvas')?.dataset;
         return Number(d?.mouthOpen ?? 1) < 0.02 && Number(d?.mouthClose ?? 0) > 0.98;
