@@ -7,7 +7,7 @@
 ```
  browser (simulator page, :5180)                         simulator server            MCP server (:8788)
  ───────────────────────────────                         ────────────────            ──────────────────
- you speak or type
+ you hold Talk and speak (or type in the dev panel)
    │
    ├─ agent loop ── POST /api/model {messages, tools} ──▶ adds the Agent Skill as
    │                                                       system prompt, model id,
@@ -21,15 +21,21 @@
    │     iframe on the sandbox origin (:5181) with the view's CSP as an HTTP header
    │     └─ inner iframe: the MCP Apps view, talking to the page over AppBridge
    │
-   └─ loop until Claude answers in text → shown in large type, read aloud
+   └─ loop until Claude answers in text → caption along the bottom,
+         spoken in the Mon's voice: POST /api/tts ──────────▶ ElevenLabs, pitched by
+                                                            stage through ffmpeg
 ```
 
 - The browser runs the MCP client (`@modelcontextprotocol/client`) and the agent loop. AWS credentials, the model id and the system prompt stay on the simulator server.
 - No code in the simulator picks tools. Claude reads the skill and the tool descriptions and decides (ADR 0009).
-- MCP Apps views render inline next to the reply. Full screen is the same view grown to fill the screen, so it keeps its state; Escape or "Exit full screen" returns. A view can ask for full screen itself.
+- The display is voice first, as an Alexa+ device is (eb16896): the screen holds the active MCP Apps view edge to edge, with no chat log, text box or title badge. Before any view opens it shows one line inviting the person to tap Talk. The latest reply runs as a caption along the bottom, with stage directions such as *chuckle* left out (2d3f204), and a status badge appears only while the state changes (listening, thinking, connecting, offline). Talk and, during a turn, Stop sit below the display.
+- The page is one screen (836a7cc): `h-dvh`, no page scroll, a one-row header, the display filling the rest. The display slot reports its height to the view as `maxHeight` and the view fits it. Tester tools scroll inside their own column.
+- A view asks for full screen itself (the card's Journal button opens the room); Escape returns. The view keeps its state, since full screen is the same view grown.
+- Saved cards are resolved against the server that is running now (59528bf). The MCP server puts a content hash in each `ui://` URI, so a rebuilt server changes them; the page derives the view URI at render time from the tool the connected server lists, and "Try card again" re-lists the tools first.
 - The transcript and the model history survive a reload (browser storage). The Mon's state lives on the MCP server, so a new browser meets the same Mon.
-- Push-to-talk uses the browser's Web Speech API: hold the orange mic button, or hold Space or Enter while it has focus. Browsers without speech recognition get a disabled mic with a note, and typing works everywhere. Replies are read aloud with speech synthesis; "Read replies aloud" turns that off.
+- Push-to-talk uses the browser's Web Speech API: hold Talk, or hold Space or Enter while it has focus. Typing lives in a "Type instead" panel under the dev panel, with the text box, Send, suggestion chips and the conversation log. Outside dev mode that panel, titled "Type to your Mon", shows only when the browser has no speech recognition, so the sim stays usable without a mic. "Read replies aloud" turns speech off.
 - Dev mode adds a panel to seed presence events for the fictional people in the MCP server's fixtures, and lists the tools Claude was given. Nobody's voice is recorded.
+- Signed out, the display shows Lil' Ratti in 3D (`MonModel3D`, from the sim's own `/mons` route), with one Sign in that hands off to the Alexa linking pages (276c6e8, 31b1c98).
 
 ## Run it
 
@@ -64,7 +70,7 @@ SIM_AUTH_MODE=dev-bypass SIM_DEV_MODE=1 SIM_BEDROCK_REGION=us-east-1 \
 
 ### 3. With sign-in
 
-Run admin-vite with the `nyc-mon-sim` client registered (lane B; its redirect URI is `http://localhost:5180/oauth/callback`), run the MCP server without `OAUTH_DEV_BYPASS`, and leave `SIM_AUTH_MODE` unset. "Sign in" sends you to the authorization server with PKCE (S256), `client_id=nyc-mon-sim`, `resource` set to the MCP endpoint, and the server's user scopes. Only accounts 18 and over can link (ADR 0015).
+Run admin-vite with the `nyc-mon-sim` client registered (lane B; its redirect URI is `http://localhost:5180/oauth/callback`), run the MCP server without `OAUTH_DEV_BYPASS`, and leave `SIM_AUTH_MODE` unset. "Sign in" sends you to the authorization server with PKCE (S256), `client_id=nyc-mon-sim`, `resource` set to the MCP endpoint, and the server's user scopes. You land on the same linking pages Alexa uses (`/oauth/sign-in`: Continue with Amazon, passkey, email). Only accounts 18 and over can link (ADR 0015). The sim is a public client, so the browser posts the code exchange itself; admin-vite's CORS list includes public clients' redirect origins for that (22b58d5, `docs/alexa/AUTH.md`).
 
 ### Production build
 
@@ -109,6 +115,7 @@ Simulator server (`packages/web-sim/server/env.ts`):
 | `SIM_RATE_LIMIT_PER_MIN` | `30` | Model turns per sliding minute per client |
 | `SIM_GLOBAL_RATE_LIMIT_PER_MIN` | `120` | Model turns per sliding minute across all clients |
 | `ELEVENLABS_API_KEY` | unset | Server-only key for `/api/tts`, the Mon's own voice. Unset, the route answers 204 and the page speaks with Web Speech |
+| `FFMPEG_PATH` | `ffmpeg` on `PATH` | The binary `/api/tts` pitches each clip with. With none, clips keep the voice's own pitch and the server logs it once |
 | `SIM_TTS_RATE_LIMIT_PER_MIN` | `30` | Speech requests per sliding minute per client (the global ceiling is `SIM_GLOBAL_RATE_LIMIT_PER_MIN`) |
 | `SIM_TRUST_PROXY` | `0` | `1` keys the rate limit on the first `X-Forwarded-For` hop (behind your own proxy only) |
 | `AUTH_ISSUER` | `http://localhost:5174` | The authorization server (admin-vite). Shared with the MCP server and admin-vite |
@@ -118,7 +125,9 @@ Simulator server (`packages/web-sim/server/env.ts`):
 
 The production page CSP allows connections to its own origin, the MCP server's origin and `AUTH_ISSUER`'s origin only, and `'wasm-unsafe-eval'` for CanvasKit.
 
-**Mon voice (simulator only).** Each Mon has one voice lineage for life, minted at hatch (`mon.voice.lineageId` in tool results). The page posts each reply to `/api/tts` with that lineage and the Mon's stage; the server picks the ElevenLabs voice from `@acme/content/voices` and streams `audio/mpeg` back. The page plays it with `playbackRate` from the stage table (Baby 1.30, Small 1.15, Mid 1.0, Max 0.92; an Egg is silent) and `preservesPitch = false`, so tempo moves with pitch. A server-side pitch shift that keeps tempo is the upgrade. On 204 or an error the page falls back to Web Speech with the same table as `utterance.pitch`. `/api/tts` has the same Origin check, sign-in check and rate limiting as `/api/model`. A real Echo ignores all of this: Alexa reads replies in its own voice (PLATFORM-DOCS §2.8).
+**Mon voice (simulator only).** Each Mon has a gender and one voice lineage for life, both minted at hatch from a salted hash of the egg id (Bible v11 ¶54 and ¶56; 6a88241). The lineage id reads `<egg form speciesId>/<gender>/<slot>`, for example `dex-001/female/2`, and tool results carry it as `mon.voice.lineageId` with the Mon's stage (963adbd). Payload stores both and refuses to change them once set (8e9aa13). The page posts each reply to `/api/tts` with `{ text, lineageId, stage, mood }` (text up to 400 characters); the server picks the ElevenLabs voice from `@acme/content/voices` (Hood Ratti pools filled, other lines TODO(canon), which resolve to no voice and get a 204), calls `eleven_v4_turbo` on `/stream`, and streams `audio/mpeg` back. Pitch per stage is done on the server, since ElevenLabs has no pitch setting: ffmpeg runs `asetrate` by the stage factor (Baby 1.30, Small 1.15, Mid 1.0, Max 0.92; an Egg is silent), resamples to 44.1 kHz, then `atempo` by the inverse, so pitch moves and length stays (63bf7a3). The page plays at rate 1. The mood adds a leading audio tag and a stability (content `[happily]`, asleep `[whispers]`, and so on), and stage directions with a matching tag become that tag. On 204 or an error the page falls back to Web Speech with the same table as `utterance.pitch`. `/api/tts` has the same Origin check, sign-in check and rate limiting as `/api/model`, and never logs the key or the text. A real Echo ignores all of this: Alexa reads replies in its own voice (PLATFORM-DOCS §2.8).
+
+Lip sync for the 3D Mon is in progress; it is not on this branch yet.
 
 MCP server settings the simulator depends on (`packages/mcp-server/src/env.ts`): `MCP_ALLOWED_ORIGINS` must include the simulator origin; `OAUTH_DEV_BYPASS=1` pairs with `SIM_AUTH_MODE=dev-bypass`; `MCP_DEV_MODE=1` registers the presence tools the dev panel uses; `MCP_PORT` and `MCP_RESOURCE_URI` must agree with `SIM_MCP_URL`.
 
