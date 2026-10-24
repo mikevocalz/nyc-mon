@@ -326,9 +326,17 @@ export function MonModel3D({
     try {
       renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     } catch (error) {
-      setState('error');
-      onErrorRef.current?.(error);
-      return;
+      // Report on the next microtask, like the GLB loader's error path, rather
+      // than setting state synchronously inside the effect.
+      let cancelled = false;
+      queueMicrotask(() => {
+        if (cancelled) return;
+        setState('error');
+        onErrorRef.current?.(error);
+      });
+      return () => {
+        cancelled = true;
+      };
     }
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.setSize(w, h);
