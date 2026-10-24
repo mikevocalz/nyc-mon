@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { nebiusBackend, NebiusError, NVIDIA_MODELS, toNebiusRequest } from '../server/nebius.ts';
+import { nebiusBackend, NebiusError, NebiusOptionsSchema, NVIDIA_MODELS, toNebiusRequest } from '../server/nebius.ts';
 import type { TurnParams } from '../server/model.ts';
 
 const input: TurnParams = { system: 'Use only permitted care tools.', messages: [{ role: 'user', content: 'Check my Mon.' }],
@@ -7,7 +7,10 @@ const input: TurnParams = { system: 'Use only permitted care tools.', messages: 
 const completion = (overrides: Record<string, unknown> = {}) => ({ id: 'chatcmpl_test', model: NVIDIA_MODELS[0],
   choices: [{ finish_reason: 'stop', message: { role: 'assistant', content: 'Here is the state.' } }],
   usage: { prompt_tokens: 12, completion_tokens: 8 }, ...overrides });
-const transport = (body: unknown, status = 200) => vi.fn<typeof fetch>(async () => Response.json(body, { status }));
+// `unknown` accepts all DOM, Node and React Native fetch input overloads without a cast.
+const transport = (body: unknown, status = 200) => vi.fn<(input: unknown, init?: RequestInit) => Promise<Response>>(
+  async () => Response.json(body, { status }),
+);
 const signal = () => new AbortController().signal;
 
 describe('Nebius NVIDIA adapter (mock transport; not live qualification)', () => {
@@ -42,10 +45,10 @@ describe('Nebius NVIDIA adapter (mock transport; not live qualification)', () =>
     expect(() => toNebiusRequest({ ...input, messages: [{ role: 'assistant', content: [{ type: 'tool_use', id: 'toolu_a', name: 'get_mon_status', input: {} }] }] })).toThrow(NebiusError);
   });
   it('rejects a model outside the reviewed NVIDIA catalog', () => {
-    expect(() => nebiusBackend({ apiKey: 'key', modelId: 'claude' as never })).toThrow(NebiusError);
+    expect(NebiusOptionsSchema.safeParse({ apiKey: 'key', modelId: 'claude' }).success).toBe(false);
   });
   it('does not permit an arbitrary host to receive the key', () => {
-    expect(() => nebiusBackend({ apiKey: 'key', baseUrl: 'https://example.com/v1' as never })).toThrow(NebiusError);
+    expect(NebiusOptionsSchema.safeParse({ apiKey: 'key', baseUrl: 'https://example.com/v1' }).success).toBe(false);
   });
   it('requires a nonempty key', () => expect(() => nebiusBackend({ apiKey: ' ' })).toThrow(NebiusError));
   it('does not accept another returned model', async () => {
