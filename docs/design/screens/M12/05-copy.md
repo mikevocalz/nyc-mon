@@ -31,6 +31,7 @@ The show is visual; these make it followable without sight. One line per phase, 
 | `m12.a11y.pressure` | Light glows through the shell. | `pressure` |
 | `m12.a11y.crack` | Your egg is cracking. | first crack only |
 | `m12.a11y.emerge` | {babyName} hatched. | `emerge` |
+| `m12.a11y.hatched_from` | {babyName} hatched from the {eggName}. | the reveal resolves into colour (HatchSequence3D `resolve`), or the reduced-motion cross-fade |
 | `m12.a11y.first_look.lean_in` | {babyName} looks at you and leans in. | lean-in |
 | `m12.a11y.first_look.hesitate` | {babyName} looks at you, then peeks out from the shell. | hesitate starts |
 | `m12.a11y.first_look.resolved` | {babyName} comes closer and leans in. | hesitate resolved by the Caller |

@@ -14,8 +14,10 @@ import { MON_MODEL_ORIGIN } from './model-origin.ts';
 /**
  * The hatch moment, booted in Playwright's bundled Chromium on the ext-apps
  * AppBridge (the same spec host as ui.boot.test.ts): hatch_egg's result plays
- * the Metro Egg cracking open, then the card ends on Squeaklet's own
- * MonModel3D with no console error. The touch path starts from a ready egg's
+ * the Metro Egg's three shakes and cracks, the white-out and the silhouette
+ * reveal, then the card ends on Squeaklet's own MonModel3D with no console
+ * error. Only the two GLBs are fetched: the evolution light is drawn in the
+ * view (no .riv, no WebAssembly, which the MCP Apps CSP refuses). The touch path starts from a ready egg's
  * "Hatch your egg" button.
  */
 
@@ -109,24 +111,32 @@ async function watchPhases(frame: Frame, timeoutMs: number): Promise<string[]> {
   throw new Error(`hatch did not finish; saw ${seen.join(' > ')}`);
 }
 
+/**
+ * CI renders WebGL in software on 4 vCPUs: a 3D card boots in 14-16 s under
+ * parallel load and the hatch runs about 3x slow. Each wait has its own bound;
+ * the describe budget (300 s) covers the longest test's sum (boot 60 + phases
+ * 120 + hand-over 60).
+ */
 const endsOnSqueaklet = (frame: Frame) =>
   frame.waitForFunction(
     () =>
       document.querySelector('[data-testid="hatch-sequence"]') === null &&
       document.querySelector('[role=img][aria-label="Squeaklet"][aria-busy="false"] canvas') !== null,
     null,
-    { timeout: 30_000 },
+    { timeout: 60_000 },
   );
 
-describe('the hatch moment (bundled Chromium)', { timeout: 180_000 }, () => {
+describe('the hatch moment (bundled Chromium)', { timeout: 300_000 }, () => {
   it("hatch_egg's result cracks the egg, then shows Squeaklet, with no console error", async () => {
     const b = await boot({ result: hatchResult, reducedMotion: 'no-preference' });
     try {
-      const phases = await watchPhases(b.frame, 150_000);
+      const phases = await watchPhases(b.frame, 120_000);
       // Frames are slow in software GL, so a short phase may be skipped between samples.
-      const order = ['loading', 'stir', 'pressure', 'crack', 'burst', 'emerge', 'done'];
+      const order = ['loading', 'intro', 'shake1', 'shake2', 'shake3', 'tension', 'whiteout', 'reveal', 'silhouette', 'resolve', 'done'];
+      expect(phases.every((p) => order.includes(p))).toBe(true);
       expect(phases.map((p) => order.indexOf(p))).toEqual([...phases.map((p) => order.indexOf(p))].sort((x, y) => x - y));
-      expect(phases).toContain('crack');
+      expect(phases).toContain('tension');
+      expect(phases).toContain('silhouette');
       expect(phases).not.toContain('crossfade');
       await endsOnSqueaklet(b.frame);
       const text = await b.frame.evaluate(() => document.getElementById('root')!.innerText);
@@ -142,7 +152,7 @@ describe('the hatch moment (bundled Chromium)', { timeout: 180_000 }, () => {
     const b = await boot({ result: hatchResult, reducedMotion: 'reduce' });
     try {
       const phases = await watchPhases(b.frame, 120_000);
-      expect(phases).not.toContain('crack');
+      expect(phases.some((p) => p.startsWith('shake') || p === 'whiteout' || p === 'silhouette')).toBe(false);
       expect(phases.some((p) => p === 'crossfade' || p === 'done')).toBe(true);
       await endsOnSqueaklet(b.frame);
       expect(b.errors).toEqual([]);
@@ -155,11 +165,11 @@ describe('the hatch moment (bundled Chromium)', { timeout: 180_000 }, () => {
     const b = await boot({ result: readyEgg, callResult: hatchResult, reducedMotion: 'reduce' });
     try {
       const button = b.frame.getByRole('button', { name: 'Hatch your egg' });
-      await button.waitFor({ timeout: 15_000 });
+      await button.waitFor({ timeout: 45_000 });
       const buttons = await b.frame.evaluate(() => [...document.querySelectorAll('button, [role=button]')].map((e) => (e.textContent ?? '').trim()));
       expect(buttons).toEqual(['Hatch your egg']);
       await button.click();
-      await b.frame.waitForSelector('[data-testid="hatch-sequence"]', { timeout: 10_000 });
+      await b.frame.waitForSelector('[data-testid="hatch-sequence"]', { timeout: 30_000 });
       const calls = await b.page.evaluate(() => window.calls);
       expect(calls).toHaveLength(1);
       expect(calls[0]).toMatchObject({ name: 'hatch_egg', arguments: { eggId: 'egg_metro' } });

@@ -21,9 +21,12 @@ import { getUiResources, MON_MODEL_ORIGIN, mcpAppsRegistration, parseUiManifest,
  * content-hashed bundle.
  */
 const BUDGET: Readonly<Record<string, { raw: number; gzip: number }>> = {
-  // three.js for the 3D Mon (Dex 2 and 3) adds about 640 KB raw.
-  'mon-card': { raw: 2150 * 1024, gzip: 700 * 1024 },
-  'mon-room': { raw: 2900 * 1024, gzip: 920 * 1024 },
+  // three.js for the 3D Mon (Dex 2 and 3) adds about 640 KB raw. The hatch's
+  // evolution light, shards and synthesized sound (hatch-light.ts,
+  // hatch-sound.ts, 2026-10-23) add about 37 KB raw, 12 KB gzip: drawn in
+  // three.js because the MCP Apps CSP refuses the Rive runtime's WebAssembly.
+  'mon-card': { raw: 2200 * 1024, gzip: 700 * 1024 },
+  'mon-room': { raw: 2950 * 1024, gzip: 920 * 1024 },
 };
 
 /**

@@ -38,6 +38,7 @@ export const HATCH_COPY = {
   'm12.a11y.pressure': 'Light glows through the shell.',
   'm12.a11y.crack': 'Your egg is cracking.',
   'm12.a11y.emerge': '{babyName} hatched.',
+  'm12.a11y.hatched_from': '{babyName} hatched from the {eggName}.',
   'm12.a11y.first_look.lean_in': '{babyName} looks at you and leans in.',
   'm12.a11y.first_look.hesitate': '{babyName} looks at you, then peeks out from the shell.',
   'm12.a11y.first_look.resolved': '{babyName} comes closer and leans in.',

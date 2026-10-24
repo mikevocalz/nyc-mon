@@ -3,15 +3,21 @@
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { hatchDuration, hatchFrame, type HatchPhase } from './hatch-timeline.ts';
+import { createHatchLight, whitener } from './hatch-light.ts';
+import { createHatchSound } from './hatch-sound.ts';
+import { hatchDuration, hatchFrame, soundCues, type HatchPhase } from './hatch-timeline.ts';
 
 /**
- * The hatch moment on one small stage (three.js): the egg rig plays its own
- * `hatch` clip (wobble, three cracks, the shell bursting), then the Baby
- * fades in where the egg stood, facing the viewer, and plays its idle.
- * Timing comes from `hatch-timeline.ts`. When the moment ends it calls
- * `onDone` and keeps showing the Baby, so the caller can mount MonModel3D
- * underneath and drop this once that has loaded: the hand-over has no gap.
+ * The hatch moment on one small stage (three.js), staged like a Pokémon egg
+ * hatch with the evolution reveal (hatch-timeline.ts has the beats): the
+ * stage dims, the egg shakes three times and cracks, light leaks through the
+ * cracks and builds while sparkles spiral in, one white-out throws the shards
+ * off, and the Baby comes out as a white silhouette that pulses between egg
+ * shape and its own before resolving into colour. The evolution light
+ * (hatch-light.ts) is the in-view twin of the Rive file
+ * packages/assets/rive/hatch-evolve. When the moment ends it calls `onDone`
+ * and keeps showing the Baby, so the caller can mount MonModel3D underneath
+ * and drop this once that has loaded: the hand-over has no gap.
  *
  * Built apart from MonModel3D on purpose: same lights and the same framing
  * rule, so the last frame here matches MonModel3D's first.
@@ -30,6 +36,8 @@ export interface HatchSequence3DProps {
   readonly announcements?: Partial<Record<HatchPhase, string>>;
   /** Reduced motion; defaults to the browser's `prefers-reduced-motion`. */
   readonly reducedMotion?: boolean;
+  /** Original synthesized sound (crack, shimmer, whoosh, chime). On by default; plays only where the browser allows audio. */
+  readonly sound?: boolean;
   /** The moment ended (or a model failed to load, so there is nothing to play). */
   readonly onDone?: () => void;
 }
@@ -38,6 +46,17 @@ export interface HatchSequence3DProps {
 const PROXY_NODE = 'PROXY_Baby';
 /** The rig's inside: membrane and goo, shown only once the shell is open. */
 const INSIDE_NODES = ['Membrane', 'Goo_Puddle', 'Goo_Strand_01', 'Goo_Strand_02', 'Goo_Drip_01', 'Goo_Drip_02', 'Goo_Drip_03'];
+/** Shell materials that glow when light leaks through the cracks: edge and inside strongly, the outside a little. */
+const CRACK_GLOW: Readonly<Record<string, number>> = {
+  'HATCH_M_metro-egg_ShellEdge': 4,
+  'HATCH_M_metro-egg_ShellInner': 2.5,
+  'Material_0.082': 0.08,
+};
+const CRACK_COLOR = new THREE.Color('#FD9D40');
+/** Night (brand.night), the colour the stage dims toward. */
+const NIGHT = '0, 4, 28';
+/** The silhouette's egg shape: the Baby squeezed narrow and a little tall. */
+const EGG_SHAPE = new THREE.Vector2(0.5, 1.12);
 
 /** MonModel3D's framing: fits the turntable's sweep, camera slightly above centre. */
 function framing(size: THREE.Vector3, camera: THREE.PerspectiveCamera): THREE.Vector3 {
@@ -90,6 +109,23 @@ function fader(model: THREE.Object3D, keepDepth = false): (opacity: number) => v
   };
 }
 
+/** The shell's crack glow: emissive orange on the edge, inside and (faintly) outside materials. */
+function crackGlow(model: THREE.Object3D): (level: number) => void {
+  const mats: { mat: THREE.MeshStandardMaterial; gain: number }[] = [];
+  model.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    for (const mat of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+      const gain = CRACK_GLOW[mat.name];
+      if (gain && (mat as THREE.MeshStandardMaterial).isMeshStandardMaterial) mats.push({ mat: mat as THREE.MeshStandardMaterial, gain });
+    }
+  });
+  for (const { mat } of mats) mat.emissive = CRACK_COLOR.clone();
+  return (level) => {
+    for (const { mat, gain } of mats) mat.emissiveIntensity = level * gain;
+  };
+}
+
 function loadGlb(url: string): Promise<GLTF> {
   // Same texture path as MonModel3D: <img> decoding, which an MCP Apps CSP allows for blob:.
   return new GLTFLoader()
@@ -100,14 +136,16 @@ function loadGlb(url: string): Promise<GLTF> {
     .loadAsync(url);
 }
 
-export function HatchSequence3D({ eggUrl, monUrl, monClips, width, height, label, announcements, reducedMotion, onDone }: HatchSequence3DProps) {
+export function HatchSequence3D({ eggUrl, monUrl, monClips, width, height, label, announcements, reducedMotion, sound = true, onDone }: HatchSequence3DProps) {
   const host = useRef<HTMLDivElement | null>(null);
+  const dimRef = useRef<HTMLDivElement | null>(null);
+  const whiteRef = useRef<HTMLDivElement | null>(null);
   const [phase, setPhase] = useState<HatchPhase | 'loading'>('loading');
   /** The last phase line said; a phase with no line keeps the previous one, so nothing is re-read. */
   const [said, setSaid] = useState('');
-  const latest = useRef({ onDone, monClips, reducedMotion, width, height, announcements });
+  const latest = useRef({ onDone, monClips, reducedMotion, width, height, announcements, sound });
   useEffect(() => {
-    latest.current = { onDone, monClips, reducedMotion, width, height, announcements };
+    latest.current = { onDone, monClips, reducedMotion, width, height, announcements, sound };
   });
 
   useEffect(() => {
@@ -115,13 +153,14 @@ export function HatchSequence3D({ eggUrl, monUrl, monClips, width, height, label
     if (!el) return;
     const { width: w, height: h } = latest.current;
     const reduced = latest.current.reducedMotion ?? window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, premultipliedAlpha: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.setSize(w, h);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    el.appendChild(renderer.domElement);
     const canvas = renderer.domElement;
+    canvas.style.position = 'relative';
+    el.appendChild(canvas);
     canvas.dataset.hatchPhase = 'loading';
 
     const scene = new THREE.Scene();
@@ -140,13 +179,17 @@ export function HatchSequence3D({ eggUrl, monUrl, monClips, width, height, label
     let shown: HatchPhase | 'loading' = 'loading';
     const timer = new THREE.Timer();
     timer.connect(document);
-    let egg: { mixer: THREE.AnimationMixer; action: THREE.AnimationAction | null; fade: (o: number) => void; cam: THREE.Vector3 } | null = null;
+    type Egg = { mixer: THREE.AnimationMixer; action: THREE.AnimationAction | null; fade: (o: number) => void; white: (a: number) => void; glow: (l: number) => void; pivot: THREE.Group; cam: THREE.Vector3; size: THREE.Vector3 };
+    let egg: Egg | null = null;
     /**
      * `fit` scales the Baby into the egg's camera: a Baby file is many times
      * the egg's size, so at fit 1 it would fill the frame. Scaled by the ratio
      * of the two framing distances, it stands at the size MonModel3D gives it.
      */
-    let mon: { mixer: THREE.AnimationMixer; root: THREE.Group; fade: (o: number) => void; cam: THREE.Vector3; fit: number } | null = null;
+    let mon: { mixer: THREE.AnimationMixer; root: THREE.Group; fade: (o: number) => void; white: (a: number) => void; cam: THREE.Vector3; fit: number; size: THREE.Vector3 } | null = null;
+    let light: ReturnType<typeof createHatchLight> | null = null;
+    const audio = latest.current.sound ? createHatchSound() : null;
+    let cues = soundCues(reduced).slice();
     let started = -1;
     let clock = 0;
     const camPos = new THREE.Vector3();
@@ -164,9 +207,12 @@ export function HatchSequence3D({ eggUrl, monUrl, monClips, width, height, label
       const proxy = model.getObjectByName(PROXY_NODE);
       if (proxy) proxy.visible = false;
       const size = centre(model);
-      const root = new THREE.Group();
-      root.add(model);
-      scene.add(root);
+      // Pivot at the egg's base, so the shakes rock it on the ground.
+      const pivot = new THREE.Group();
+      pivot.position.y = -size.y / 2;
+      model.position.y += size.y / 2;
+      pivot.add(model);
+      scene.add(pivot);
       const mixer = new THREE.AnimationMixer(model);
       const clip = THREE.AnimationClip.findByName(gltf.animations, 'hatch');
       // Reduced motion still poses the egg on the clip's first frame (the whole
@@ -185,9 +231,12 @@ export function HatchSequence3D({ eggUrl, monUrl, monClips, width, height, label
           if (node) node.visible = false;
         }
       }
-      egg = { mixer, action, fade: fader(model, true), cam: framing(size, camera) };
+      const fade = fader(model, true);
+      egg = { mixer, action, fade, white: whitener(model), glow: crackGlow(model), pivot, cam: framing(size, camera), size };
       camera.position.copy(egg.cam);
       camera.lookAt(0, 0, 0);
+      light = createHatchLight(size.y);
+      scene.add(light.group);
     });
     const monLoad = loadGlb(monUrl).then((gltf) => {
       if (disposed) return;
@@ -206,7 +255,7 @@ export function HatchSequence3D({ eggUrl, monUrl, monClips, width, height, label
       }
       const fade = fader(model);
       fade(0);
-      mon = { mixer, root, fade, cam: framing(size, camera), fit: 1 };
+      mon = { mixer, root, fade, white: whitener(model), cam: framing(size, camera), fit: 1, size };
     });
     Promise.all([eggLoad, monLoad]).then(
       () => {
@@ -215,6 +264,7 @@ export function HatchSequence3D({ eggUrl, monUrl, monClips, width, height, label
         // Scaled into egg units, the Baby's own framing differs from the egg's only in height.
         mon.cam.multiplyScalar(mon.fit);
         started = clock;
+        if (audio) void audio.start();
       },
       () => {
         // Nothing to play without both models: hand straight over to the Mon.
@@ -222,6 +272,7 @@ export function HatchSequence3D({ eggUrl, monUrl, monClips, width, height, label
       },
     );
 
+    const eggSquash = new THREE.Vector2(1, 1);
     const tick = (now?: number) => {
       frame = requestAnimationFrame(tick);
       timer.update(now);
@@ -234,14 +285,26 @@ export function HatchSequence3D({ eggUrl, monUrl, monClips, width, height, label
           egg.action.time = Math.min(f.clipTime ?? 0, egg.action.getClip().duration);
           egg.mixer.update(0);
         }
+        egg.pivot.rotation.z = f.eggTilt;
         egg.fade(f.eggOpacity);
+        egg.white(f.silhouette);
+        egg.glow(f.crackLight);
         mon.fade(f.monOpacity);
-        mon.root.scale.setScalar(f.monScale * mon.fit);
+        mon.white(f.silhouette);
+        // Silhouette shape: squeeze the Baby toward the egg's narrow, tall outline and back.
+        eggSquash.set(EGG_SHAPE.x, EGG_SHAPE.y);
+        const s = f.monScale * mon.fit;
+        mon.root.scale.set(s * THREE.MathUtils.lerp(1, eggSquash.x, f.monShape), s * THREE.MathUtils.lerp(1, eggSquash.y, f.monShape), s);
+        mon.root.position.y = -f.monDrop * 0.12 * egg.size.y;
         if (f.monOpacity > 0) mon.mixer.update(dt);
         camPos.lerpVectors(egg.cam, mon.cam, f.camera);
         camera.position.copy(camPos);
         camera.lookAt(0, 0, 0);
-        rim.intensity = 0.8 + 1.6 * f.glow;
+        rim.intensity = 0.8 + 1.2 * f.glow;
+        light?.update(f, t, renderer.getPixelRatio() * h / (2 * Math.tan((camera.fov * Math.PI) / 360)));
+        if (dimRef.current) dimRef.current.style.opacity = String(0.85 * f.dim);
+        if (whiteRef.current) whiteRef.current.style.opacity = String(f.white);
+        while (cues.length && cues[0]!.t <= t) audio?.play(cues.shift()!.cue);
         if (f.phase !== shown) {
           shown = f.phase;
           canvas.dataset.hatchPhase = f.phase;
@@ -257,8 +320,11 @@ export function HatchSequence3D({ eggUrl, monUrl, monClips, width, height, label
 
     return () => {
       disposed = true;
+      cues = [];
       cancelAnimationFrame(frame);
       timer.dispose();
+      audio?.dispose();
+      light?.dispose();
       scene.traverse((o) => {
         const m = o as THREE.Mesh;
         m.geometry?.dispose();
@@ -283,6 +349,19 @@ export function HatchSequence3D({ eggUrl, monUrl, monClips, width, height, label
       data-testid="hatch-sequence"
       style={{ width, height, position: 'relative' }}
     >
+      {/* The stage dims behind the egg, as the hatch begins. */}
+      <div
+        ref={dimRef}
+        aria-hidden
+        style={{ position: 'absolute', inset: 0, opacity: 0, pointerEvents: 'none', background: `radial-gradient(closest-side, rgba(${NIGHT}, 0.95), rgba(${NIGHT}, 0.6) 70%, rgba(${NIGHT}, 0))` }}
+      />
+      {/* The one white-out, over everything. */}
+      <div
+        ref={whiteRef}
+        aria-hidden
+        data-testid="hatch-white"
+        style={{ position: 'absolute', inset: 0, zIndex: 1, opacity: 0, pointerEvents: 'none', background: 'radial-gradient(closest-side, #FFFFFF, #FFFDF7 60%, rgba(255, 237, 219, 0.92))' }}
+      />
       <p role="status" aria-live="polite" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clipPath: 'inset(50%)', margin: 0 }}>
         {said}
       </p>

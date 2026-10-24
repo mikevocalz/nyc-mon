@@ -151,12 +151,11 @@ function HatchStage({
             height={height}
             label={hatchCopy('m12.a11y.crack')}
             announcements={{
-              stir: hatchCopy('m12.a11y.stir'),
-              pressure: hatchCopy('m12.a11y.pressure'),
-              crack: hatchCopy('m12.a11y.crack'),
-              emerge: hatchCopy('m12.a11y.emerge', { babyName: vm.name }),
-              crossfade: hatchCopy('m12.a11y.emerge', { babyName: vm.name }),
-              done: hatchCopy('m12.a11y.emerge', { babyName: vm.name }),
+              intro: hatchCopy('m12.a11y.stir'),
+              shake1: hatchCopy('m12.a11y.crack'),
+              tension: hatchCopy('m12.a11y.pressure'),
+              resolve: hatchCopy('m12.a11y.hatched_from', { babyName: vm.name, eggName: vm.hatching?.eggName ?? '' }),
+              crossfade: hatchCopy('m12.a11y.hatched_from', { babyName: vm.name, eggName: vm.hatching?.eggName ?? '' }),
             }}
             onDone={() => {
               setStage((s) => (s === 'playing' ? 'handing-over' : s));
