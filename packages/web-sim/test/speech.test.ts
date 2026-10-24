@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { MonSpeechCue } from '@acme/ui/three/mon/lipsync';
 import { speakAs, stopSpeaking } from '../src/client/speech.ts';
+import { addSpeechCueListener } from '../src/client/speechCues.ts';
 
 /** Records what speakAs does to the element; Node has no HTMLAudioElement. */
 class FakeAudio {
@@ -10,6 +12,8 @@ class FakeAudio {
   constructor(readonly src: string) {
     FakeAudio.created.push(this);
   }
+  currentTime = 0.03;
+  duration = 1.5;
   play = vi.fn(async () => {});
   pause = vi.fn();
 }
@@ -78,5 +82,48 @@ describe('speakAs', () => {
     await speakAs('hi', { lineageId: 'dex-001/male/2', stage: 'Baby' }, { fetchFn: fn });
     expect(spoken).toEqual([{ pitch: 1.3, rate: 1.02 }]);
     expect(FakeAudio.created).toHaveLength(0);
+  });
+});
+
+describe('speakAs lip-sync cues', () => {
+  const alignment = { characters: [...'Hi mom'], character_start_times_seconds: [0, 0.1, 0.2, 0.3, 0.4, 0.5], character_end_times_seconds: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6] };
+  const performance = (extra: Record<string, unknown>) => () =>
+    new Response(JSON.stringify({ audio: 'AQID', audioContentType: 'audio/mpeg', ...extra }), { status: 200, headers: { 'content-type': 'application/json' } });
+  const listen = () => {
+    const cues: MonSpeechCue[] = [];
+    const off = addSpeechCueListener((c) => cues.push(c));
+    return { cues, off };
+  };
+
+  it('asks for JSON and cues the face when the server sent Audio2Face frames', async () => {
+    vi.stubGlobal('Audio', FakeAudio);
+    const { cues, off } = listen();
+    const { fn, inits } = fakeFetch(performance({ alignment, face: { fps: 30, names: ['jawOpen'], frames: [[0.1], [0.3]] } }));
+    await speakAs('Hi mom', { lineageId: 'dex-001/male/2', stage: 'Mid' }, { fetchFn: fn });
+    expect(new Headers(inits[0]?.headers).get('accept')).toBe('application/json, audio/mpeg');
+    expect(cues).toHaveLength(1);
+    const start = cues[0]!;
+    expect(start.kind).toBe('start');
+    if (start.kind !== 'start') return;
+    expect(start.track.kind).toBe('face');
+    expect(start.elapsedMs).toBeCloseTo(30);
+    expect(start.durationMs).toBeCloseTo(1500);
+    stopSpeaking();
+    expect(cues.at(-1)).toEqual({ kind: 'stop', id: start.id });
+    off();
+  });
+
+  it('falls back to character-timed visemes without a face, and to nothing (no cue) without any timing', async () => {
+    vi.stubGlobal('Audio', FakeAudio);
+    const { cues, off } = listen();
+    await speakAs('Hi mom', { lineageId: 'dex-001/male/2', stage: 'Mid' }, { fetchFn: fakeFetch(performance({ alignment })).fn });
+    expect(cues[0]?.kind === 'start' && cues[0].track.kind).toBe('visemes');
+    stopSpeaking();
+    cues.length = 0;
+    // Plain mp3 and no WebAudio in Node: no source, so no cue; the clip still plays.
+    await speakAs('Hi', { lineageId: 'dex-001/male/2', stage: 'Mid' }, { fetchFn: fakeFetch(mp3).fn });
+    expect(cues).toEqual([]);
+    expect(FakeAudio.created.at(-1)?.play).toHaveBeenCalledTimes(1);
+    off();
   });
 });

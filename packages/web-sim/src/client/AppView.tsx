@@ -2,6 +2,7 @@ import { useEffect, useEffectEvent, useRef } from 'react';
 import type { CallToolResult, Client, Tool } from '@modelcontextprotocol/client';
 import { AppBridge, PostMessageTransport, isToolVisibilityModelOnly, type McpUiResourceCsp } from '@modelcontextprotocol/ext-apps/app-bridge';
 import { Button, useInstanceStore, useStore } from '@acme/ui';
+import { SPEECH_CONTEXT_KEY } from '@acme/ui/three/mon/lipsync';
 import { Paragraph } from '@acme/ui/html';
 import { View } from '@acme/ui/tw';
 import { HOST_ONLY_TOOLS } from '../shared/toolSpec.ts';
@@ -10,6 +11,7 @@ import { MCP_APP_MIME } from './mcp.ts';
 import { hostStyleVariables, type Scheme } from './theme.ts';
 import { useSetters } from './state.ts';
 import { ViewFrame } from './ViewFrame.tsx';
+import { addSpeechCueListener } from './speechCues.ts';
 
 /**
  * Hosts one MCP Apps view (spec 2026-01-26): reads the ui:// resource, loads
@@ -223,6 +225,18 @@ export function AppView(props: AppViewProps) {
   useEffect(() => {
     void bridgeRef.current?.sendHostContextChange({ displayMode: props.displayMode });
   }, [props.displayMode]);
+
+  // The Mon's voice, as one cue per utterance through the host context's
+  // extension room (McpUiHostContext allows extra keys). The view aligns the
+  // mouth to the audio from the cue's elapsedMs; no per-frame messages.
+  useEffect(
+    () =>
+      addSpeechCueListener((cue) => {
+        if (status !== 'ready') return;
+        void Promise.resolve(bridgeRef.current?.sendHostContextChange({ [SPEECH_CONTEXT_KEY]: cue } as never)).catch(() => {});
+      }),
+    [status],
+  );
 
   useEffect(() => {
     void bridgeRef.current?.sendHostContextChange({
