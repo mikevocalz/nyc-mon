@@ -1,6 +1,6 @@
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { applyCareAction, createInitialCareState, type CareState, type EggRecord, type MonInstance } from '@acme/core';
+import { applyCareAction, createInitialCareState, mintMonInstance, type CareState, type EggRecord, type MonInstance } from '@acme/core';
 import type { TokenVerifier, VerifiedToken } from '../auth/verifier.ts';
 import { InvalidTokenError } from '../auth/verifier.ts';
 import { V1CallerData } from '../data/v1.ts';
@@ -89,8 +89,21 @@ export function fakeV1(
       return Response.json({ ok: true, data: { mons, ...active } });
     }
     if (url.pathname === '/v1/me/eggs') {
-      const mine = eggs.filter((e) => e.callerId === callerId).map((egg) => ({ egg, readyToHatch: egg.incubationEndsAt <= NOW }));
+      const hatched = new Set(rows.map((r) => r.mon.monInstanceId));
+      const mine = eggs.filter((e) => e.callerId === callerId && !hatched.has(e.monInstanceId)).map((egg) => ({ egg, readyToHatch: egg.incubationEndsAt <= NOW }));
       return Response.json({ ok: true, data: { eggs: mine } });
+    }
+    const hatch = /^\/v1\/eggs\/([^/]+)\/hatch$/.exec(url.pathname);
+    if (hatch !== null && init?.method === 'POST') {
+      // payload game.ts hatchEgg: the Caller's own egg, its existing Mon on a repeat, 409 before it is ready.
+      const egg = eggs.find((e) => e.eggId === decodeURIComponent(hatch[1] ?? '') && e.callerId === callerId);
+      if (egg === undefined) return Response.json({ ok: false, error: { code: 'NOT_FOUND', message: 'x' } }, { status: 404 });
+      const existing = rows.find((r) => r.mon.monInstanceId === egg.monInstanceId);
+      if (existing !== undefined) return Response.json({ ok: true, data: { mon: existing.mon } });
+      if (egg.incubationEndsAt > NOW) return Response.json({ ok: false, error: { code: 'NOT_READY', message: 'x' } }, { status: 409 });
+      const minted = mintMonInstance(egg);
+      rows.push({ mon: minted, care: createInitialCareState(minted.monInstanceId, minted.hatchedAt) });
+      return Response.json({ ok: true, data: { mon: minted } });
     }
     const care = /^\/v1\/mons\/([^/]+)\/care$/.exec(url.pathname);
     if (care !== null && init?.method === 'PUT') {

@@ -50,4 +50,12 @@ export interface CallerData {
    * Throws `WriteUnconfirmedError` when the write was sent but not answered.
    */
   applyCare(write: CareWriteIntent): Promise<MonWithCare>;
+  /**
+   * `POST /v1/eggs/:id/hatch` for one of the Caller's own eggs. Returns the
+   * Mon it hatched into. Idempotent on the server: a second call for the same
+   * egg returns the Mon the first one minted. Throws `EggNotReadyError` while
+   * the egg is still incubating and `NotFoundError` when the Caller has no
+   * such egg.
+   */
+  hatchEgg(callerId: string, eggId: string): Promise<MonInstance>;
 }

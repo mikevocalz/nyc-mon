@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { deriveMonInstanceId } from '@acme/core';
 import { deviceIdFor } from '../data/v1.ts';
 import { callTool, fakeV1, NOW, row, rpc, SERVICE_KEY, start, type Running } from './harness.ts';
 
@@ -350,5 +351,103 @@ describe('familiar people (dev mode, fictional fixtures)', () => {
     }
     const relationship = await call('get_person_relationship', { personId: 'person-james' });
     expect(relationship.structuredContent).toMatchObject({ person: { relationship: 'friend', permissions: { feed: false } } });
+  });
+});
+
+describe('hatch_egg', () => {
+  const metroEgg = (endsIn: number, eggId = 'egg_metro', callerId = ADULT) => ({
+    eggId,
+    monInstanceId: deriveMonInstanceId(eggId),
+    speciesId: 'dex-001',
+    hatchesIntoSpeciesId: 'dex-002',
+    callerId,
+    nickname: null,
+    incubationMinutes: 15 as const,
+    createdAt: NOW + endsIn - 15 * 60_000,
+    incubationEndsAt: NOW + endsIn,
+  });
+  // Lil' Ratti is the chosen companion; the egg hatches beside it.
+  const ratti = () => row(ADULT, {}, { monInstanceId: 'mon_lil_ratti', speciesId: 'dex-003', nickname: null, stage: 'Small' });
+
+  it('hatches a ready egg into Squeaklet and says it is hatching', async () => {
+    const v1 = fakeV1({ rows: [ratti()], eggs: [metroEgg(-60_000)], active: { [ADULT]: 'mon_lil_ratti' } });
+    running = await start({ v1 });
+    const result = await call('hatch_egg');
+    expect(result.isError).toBeFalsy();
+    expect(result.structuredContent).toMatchObject({
+      hatched: true,
+      alreadyHatched: false,
+      hatching: true,
+      egg: { eggId: 'egg_metro', speciesId: 'dex-001' },
+      mon: { monId: deriveMonInstanceId('egg_metro'), speciesId: 'dex-002', stage: 'Baby' },
+      care: { activity: 'awake' },
+    });
+    const post = v1.calls.find((c) => c.method === 'POST');
+    expect(post?.path).toBe('/v1/eggs/egg_metro/hatch');
+    expect(post?.headers.get('X-NYC-MON-Service-Key')).toBe(SERVICE_KEY);
+    expect(post?.headers.get('X-NYC-MON-On-Behalf-Of')).toBe(ADULT);
+    // A stored 409 would replay forever; the route is idempotent without a key.
+    expect(post?.headers.get('Idempotency-Key')).toBeNull();
+    // The companion is still Lil' Ratti.
+    expect((await call('check_on_mon')).structuredContent).toMatchObject({ mon: { monId: 'mon_lil_ratti' } });
+  });
+
+  it('refuses before incubation ends, with the minutes left, and writes nothing', async () => {
+    const v1 = fakeV1({ eggs: [metroEgg(12 * 60_000 - 5_000)] });
+    running = await start({ v1 });
+    const result = await call('hatch_egg');
+    expect(result.isError).toBe(true);
+    expect(result.content[0]?.text).toBe("Your egg isn't ready yet — about 12 minutes left. Ask me to hatch it then.");
+    expect(result.structuredContent.error).toMatchObject({ reason: 'egg-not-ready', minutesRemaining: 12 });
+    expect(v1.calls.some((c) => c.method === 'POST')).toBe(false);
+  });
+
+  it('says "1 minute" in the singular', async () => {
+    running = await start({ v1: fakeV1({ eggs: [metroEgg(20_000)] }) });
+    expect((await call('hatch_egg')).content[0]?.text).toContain('about 1 minute left.');
+  });
+
+  it("surfaces the server's NOT_READY as the same plain refusal", async () => {
+    // Listed as ready on our clock, still incubating on the server's.
+    const egg = metroEgg(-1);
+    const v1 = fakeV1({ eggs: [{ ...egg, incubationEndsAt: NOW + 1 }] });
+    // The fake lists readiness against NOW; make our clock run ahead of it.
+    running = await start({ v1, now: () => NOW + 30_000 });
+    const result = await call('hatch_egg');
+    expect(result.structuredContent.error).toMatchObject({ reason: 'egg-not-ready' });
+    expect(result.content[0]?.text).toMatch(/^Your egg isn't ready yet — about \d+ minutes? left\./);
+  });
+
+  it('is idempotent: the same egg again returns the same Mon and does not replay the hatch', async () => {
+    const v1 = fakeV1({ eggs: [metroEgg(-60_000)] });
+    running = await start({ v1 });
+    const first = await call('hatch_egg', { eggId: 'egg_metro' });
+    const again = await call('hatch_egg', { eggId: 'egg_metro' });
+    expect(again.isError).toBeFalsy();
+    expect(again.structuredContent).toMatchObject({ alreadyHatched: true, hatching: false, mon: { monId: (first.structuredContent.mon as { monId: string }).monId } });
+    expect(v1.rows.filter((r) => r.mon.speciesId === 'dex-002')).toHaveLength(1);
+  });
+
+  it('with no egg says so in plain words', async () => {
+    running = await start({ v1: fakeV1({ rows: [ratti()] }) });
+    const result = await call('hatch_egg');
+    expect(result.structuredContent.error?.reason).toBe('no-egg');
+    expect(result.content[0]?.text).toBe("You don't have an egg waiting to hatch. Ask how your Mon is doing instead.");
+  });
+
+  it("never hatches another Caller's egg", async () => {
+    running = await start({ v1: fakeV1({ eggs: [metroEgg(-60_000, 'egg_theirs', 'someone-else')] }) });
+    expect((await call('hatch_egg', { eggId: 'egg_theirs' })).structuredContent.error?.reason).toBe('no-egg');
+  });
+
+  it('is Caller-only: a familiar or unverified voice is refused before anything is read', async () => {
+    const v1 = fakeV1({ eggs: [metroEgg(-60_000)] });
+    running = await start({ devMode: true, v1 });
+    await call('inject_presence_event', { personId: 'person-dana', confidence: 0.95 });
+    for (const personId of ['person-dana', 'person-james']) {
+      const result = await call('hatch_egg', { speakerHint: { personId } });
+      expect(result.structuredContent.error?.reason, personId).toBe('not-permitted');
+    }
+    expect(v1.calls.some((c) => c.path.startsWith('/v1/eggs') || c.path === '/v1/me/eggs')).toBe(false);
   });
 });
