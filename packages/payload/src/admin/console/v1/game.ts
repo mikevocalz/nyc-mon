@@ -179,7 +179,7 @@ function monFromDoc(raw: unknown): MonInstance {
   return parseRecord(MonInstanceSchema, toMonInstance(doc), 'mon');
 }
 
-async function findCareDoc(payload: Payload, req: PayloadRequest, monInstanceId: string): Promise<Record<string, unknown> | undefined> {
+async function findCareDoc(payload: Payload, req: PayloadRequest | undefined, monInstanceId: string): Promise<Record<string, unknown> | undefined> {
   const result = await payload.find({
     collection: CARE_STATES_SLUG,
     where: { monInstanceId: { equals: monInstanceId } },
@@ -191,35 +191,61 @@ async function findCareDoc(payload: Payload, req: PayloadRequest, monInstanceId:
   return asRecord(result.docs[0]);
 }
 
-/** GET /v1/me/mons */
-export async function handleListMyMons(request: Request): Promise<Response> {
-  const context = await buildContext(request);
-  if (context instanceof Response) return context;
-  const { payload, callerId, req } = context;
-
-  const monDocs = await payload.find({
-    collection: MON_INSTANCES_SLUG,
-    where: { callerId: { equals: callerId } },
-    limit: 0,
-    depth: 0,
-    overrideAccess: true,
-    req,
-  });
-
-  const result = [];
-
-  for (const raw of monDocs.docs) {
-    const mon = monFromDoc(raw);
-    const careDoc = await findCareDoc(payload, req, mon.monInstanceId);
-    const careState =
-      careDoc === undefined
-        ? createInitialCareState(mon.monInstanceId, mon.hatchedAt)
-        : parseRecord(CareStateSchema, toCareState(careDoc), 'care');
-    result.push({ mon, care: careState });
-  }
-
-  return v1Ok({ mons: result });
+/** Dependencies for {@link createListMyMonsHandler}; tests pass a fake Payload. */
+export interface ListMyMonsDeps {
+  readonly getPayload: () => Promise<Payload>;
+  readonly now?: () => number;
+  readonly serviceKey?: string;
 }
+
+/** `users.activeMonInstanceId` as the API reports it: a non-empty id, or null. */
+function activeMonIdOf(user: Record<string, unknown>): string | null {
+  const value = user.activeMonInstanceId;
+  return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
+/**
+ * `GET /v1/me/mons`: the Caller's Mons with their authoritative care states,
+ * plus `activeMonInstanceId`, the companion the Caller chose (null when unset).
+ * Clients that act on "the" Mon without naming one use that id, not the most
+ * recently hatched Mon.
+ */
+export function createListMyMonsHandler(deps: ListMyMonsDeps): (request: Request) => Promise<Response> {
+  return async (request) => {
+    const payload = await deps.getPayload();
+    const nowMs = deps.now?.() ?? Date.now();
+    try {
+      const caller = await authenticateCaller(payload, request, { serviceKey: deps.serviceKey, nowMs });
+      if (caller instanceof Response) return caller;
+
+      const monDocs = await payload.find({
+        collection: MON_INSTANCES_SLUG,
+        where: { callerId: { equals: caller.callerId } },
+        limit: 0,
+        depth: 0,
+        overrideAccess: true,
+      });
+
+      const mons = [];
+      for (const raw of monDocs.docs) {
+        const mon = monFromDoc(raw);
+        const careDoc = await findCareDoc(payload, undefined, mon.monInstanceId);
+        const care =
+          careDoc === undefined
+            ? createInitialCareState(mon.monInstanceId, mon.hatchedAt)
+            : parseRecord(CareStateSchema, toCareState(careDoc), 'care');
+        mons.push({ mon, care });
+      }
+
+      return v1Ok({ mons, activeMonInstanceId: activeMonIdOf(caller.user) });
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  };
+}
+
+/** `GET /v1/me/mons`, wired to the live Payload. */
+export const handleListMyMons = createListMyMonsHandler({ getPayload: getPayloadInstance });
 
 /**
  * POST /v1/eggs — mutating, so a request carrying `Idempotency-Key` replays

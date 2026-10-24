@@ -5,6 +5,7 @@ import {
   CreateEggRequestSchema,
   HatchEggResponseSchema,
   LifecycleStageSchema,
+  ListMyMonsResponseSchema,
   MonSpeciesDefSchema,
   PutCareResponseSchema,
   UnitIntervalSchema,
@@ -38,6 +39,26 @@ describe('boundary schemas (Law 5)', () => {
       PutCareResponseSchema.safeParse({ mon: makeMon(), care: createInitialCareState('m', T0), ackedSeq: -1 }).success,
     ).toBe(false);
     expect(CareActionSchema.safeParse({ kind: 'heal' }).success).toBe(false);
+  });
+
+  describe('ListMyMonsResponse', () => {
+    const entry = { mon: makeMon(), care: createInitialCareState('m', T0) };
+
+    it('round-trips the active Mon id, including null', () => {
+      for (const activeMonInstanceId of ['mon_a', null]) {
+        const body = { mons: [entry], activeMonInstanceId };
+        expect(ListMyMonsResponseSchema.parse(JSON.parse(JSON.stringify(body)))).toEqual(body);
+      }
+    });
+
+    it('still parses a response from a server that predates the field', () => {
+      expect(ListMyMonsResponseSchema.parse({ mons: [entry] }).activeMonInstanceId).toBeUndefined();
+    });
+
+    it('rejects an empty or non-string active Mon id', () => {
+      expect(ListMyMonsResponseSchema.safeParse({ mons: [], activeMonInstanceId: '' }).success).toBe(false);
+      expect(ListMyMonsResponseSchema.safeParse({ mons: [], activeMonInstanceId: 7 }).success).toBe(false);
+    });
   });
 
   describe('MonSpeciesDef', () => {

@@ -51,6 +51,8 @@ export function fakeV1(
   options: {
     rows?: FakeV1Row[];
     eggs?: EggRecord[];
+    /** `activeMonInstanceId` per Caller; a Caller with no entry gets a response without the field (pre-field server). */
+    active?: Record<string, string | null>;
     refuse?: 'ADULT_REQUIRED';
     /** First PUT: apply it, then fail like a timeout so the caller never sees the answer. */
     timeoutAfterApplyOnce?: boolean;
@@ -82,7 +84,9 @@ export function fakeV1(
     const callerId = headers.get('X-NYC-MON-On-Behalf-Of') ?? '';
 
     if (url.pathname === '/v1/me/mons') {
-      return Response.json({ ok: true, data: { mons: rows.filter((r) => r.mon.callerId === callerId) } });
+      const mons = rows.filter((r) => r.mon.callerId === callerId);
+      const active = options.active !== undefined && callerId in options.active ? { activeMonInstanceId: options.active[callerId] } : {};
+      return Response.json({ ok: true, data: { mons, ...active } });
     }
     if (url.pathname === '/v1/me/eggs') {
       const mine = eggs.filter((e) => e.callerId === callerId).map((egg) => ({ egg, readyToHatch: egg.incubationEndsAt <= NOW }));

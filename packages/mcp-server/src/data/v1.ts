@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { EggRecordSchema, ListMyMonsResponseSchema, PutCareResponseSchema, type CareAction, type CareState } from '@acme/core';
 import { z } from 'zod';
-import type { CallerData, CareWriteIntent, IncubatingEgg, MonWithCare } from './caller.ts';
+import type { CallerData, CallerMons, CareWriteIntent, IncubatingEgg, MonWithCare } from './caller.ts';
 import { AdultRequiredError, NotFoundError, UpstreamError, WriteUnconfirmedError } from './errors.ts';
 
 /** Headers admin-vite's `/v1` reads for on-behalf-of calls (payload `v1/service-caller.ts`). */
@@ -68,9 +68,10 @@ export class V1CallerData implements CallerData {
     this.now = options.now ?? Date.now;
   }
 
-  async listMons(callerId: string): Promise<readonly MonWithCare[]> {
+  async listMons(callerId: string): Promise<CallerMons> {
     const body = await this.request(callerId, 'GET', '/v1/me/mons');
-    return parseData(ListMyMonsResponseSchema, body).mons;
+    const { mons, activeMonInstanceId } = parseData(ListMyMonsResponseSchema, body);
+    return { mons, activeMonInstanceId: activeMonInstanceId ?? null };
   }
 
   async listIncubatingEggs(callerId: string): Promise<readonly IncubatingEgg[]> {
@@ -100,7 +101,7 @@ export class V1CallerData implements CallerData {
       // The PUT may have landed. Re-read once: if the write shows in the stored
       // care, answer with that state; otherwise stay unconfirmed. A resend of
       // this intent reuses the key, so it can never apply twice.
-      const reread = (await this.listMons(callerId)).find((entry) => entry.mon.monInstanceId === monInstanceId);
+      const reread = (await this.listMons(callerId)).mons.find((entry) => entry.mon.monInstanceId === monInstanceId);
       if (reread !== undefined && writeLanded(reread.care, action, sent.at)) return reread;
       throw error;
     }

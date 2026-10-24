@@ -72,6 +72,46 @@ describe('read tools', () => {
     expect((await call('check_on_mon', { monId: 'mon_older' })).structuredContent).toMatchObject({ mon: { name: 'Pidge' } });
   });
 
+  describe('which Mon answers when no monId is given', () => {
+    // mon_ratti hatched an hour ago; mon_chosen hatched a day ago and is the companion.
+    const chosen = () => row(ADULT, {}, { monInstanceId: 'mon_chosen', nickname: 'Pidge', hatchedAt: NOW - 86_400_000, voiceLineageId: 'dex-001/male/2' });
+
+    it('answers for the chosen companion, not a Mon hatched after it', async () => {
+      running = await start({ v1: fakeV1({ rows: [chosen(), row(ADULT)], active: { [ADULT]: 'mon_chosen' } }) });
+      for (const tool of ['get_mon_status', 'check_on_mon', 'talk_to_mon']) {
+        expect((await call(tool)).structuredContent, tool).toMatchObject({ mon: { monId: 'mon_chosen', name: 'Pidge' } });
+      }
+      expect((await call('get_mon_status')).structuredContent.mon).toMatchObject({ voice: { lineageId: 'dex-001/male/2' } });
+    });
+
+    it('applies care to the chosen companion', async () => {
+      const v1 = fakeV1({ rows: [chosen(), row(ADULT, { fullness: 0.1 })], active: { [ADULT]: 'mon_chosen' } });
+      running = await start({ v1 });
+      await call('feed_mon');
+      expect(v1.calls.find((c) => c.method === 'PUT')?.path).toBe('/v1/mons/mon_chosen/care');
+    });
+
+    it('falls back to the most recently hatched Mon when no companion is chosen', async () => {
+      running = await start({ v1: fakeV1({ rows: [chosen(), row(ADULT)], active: { [ADULT]: null } }) });
+      expect((await call('check_on_mon')).structuredContent).toMatchObject({ mon: { monId: 'mon_ratti' } });
+    });
+
+    it('falls back when the chosen id names no Mon the Caller owns', async () => {
+      running = await start({ v1: fakeV1({ rows: [chosen(), row(ADULT)], active: { [ADULT]: 'mon_gone' } }) });
+      expect((await call('check_on_mon')).structuredContent).toMatchObject({ mon: { monId: 'mon_ratti' } });
+    });
+
+    it('falls back when /v1 predates the field', async () => {
+      running = await start({ v1: fakeV1({ rows: [chosen(), row(ADULT)] }) });
+      expect((await call('check_on_mon')).structuredContent).toMatchObject({ mon: { monId: 'mon_ratti' } });
+    });
+
+    it('a named monId still wins over the chosen companion', async () => {
+      running = await start({ v1: fakeV1({ rows: [chosen(), row(ADULT)], active: { [ADULT]: 'mon_chosen' } }) });
+      expect((await call('check_on_mon', { monId: 'mon_ratti' })).structuredContent).toMatchObject({ mon: { monId: 'mon_ratti' } });
+    });
+  });
+
   it('check_incubation reports minutes left and readiness from /v1/me/eggs', async () => {
     const egg = {
       eggId: 'egg_1',

@@ -142,14 +142,37 @@ function current(entry: MonWithCare, now: number): MonWithCare {
   return advanceCare({ mon: entry.mon, care: entry.care }, now).state;
 }
 
-/** The named Mon, or the most recently hatched one. */
+/** Fallbacks already logged, so a stale or missing companion warns once per Caller, not per call. */
+const loggedFallbacks = new Set<string>();
+const MAX_LOGGED_FALLBACKS = 1_000;
+
+function logFallbackOnce(callerId: string, activeMonInstanceId: string | null): void {
+  const key = `${callerId}\u0000${activeMonInstanceId ?? ''}`;
+  if (loggedFallbacks.has(key)) return;
+  if (loggedFallbacks.size >= MAX_LOGGED_FALLBACKS) loggedFallbacks.clear();
+  loggedFallbacks.add(key);
+  const why = activeMonInstanceId === null ? 'no companion chosen' : `companion ${activeMonInstanceId} is not among the Caller's Mons`;
+  console.warn(`[mcp-server] ${why}; answering for the most recently hatched Mon`);
+}
+
+/**
+ * The Mon a tool acts on. A named `monId` wins. Otherwise the Caller's chosen
+ * companion (`users.activeMonInstanceId`), so every surface answers for, and
+ * speaks in the voice of, the same Mon the Caller picked. Only when no
+ * companion is chosen, or it names a Mon the Caller no longer has, does the
+ * most recently hatched Mon answer.
+ */
 async function resolveMon(ctx: ToolContext, callerId: string, monId: string | undefined): Promise<MonWithCare | CallToolResult> {
-  const mons = await ctx.data.listMons(callerId);
+  const { mons, activeMonInstanceId } = await ctx.data.listMons(callerId);
   if (mons.length === 0) return failure('no-mon');
+  const byId = (id: string) => mons.find((entry) => entry.mon.monInstanceId === id);
   if (monId !== undefined) {
-    const found = mons.find((entry) => entry.mon.monInstanceId === monId);
+    const found = byId(monId);
     return found === undefined ? failure('mon-not-found') : current(found, ctx.now());
   }
+  const active = activeMonInstanceId === null ? undefined : byId(activeMonInstanceId);
+  if (active !== undefined) return current(active, ctx.now());
+  if (mons.length > 1) logFallbackOnce(callerId, activeMonInstanceId);
   const latest = [...mons].sort((a, b) => b.mon.hatchedAt - a.mon.hatchedAt)[0];
   return latest === undefined ? failure('no-mon') : current(latest, ctx.now());
 }
