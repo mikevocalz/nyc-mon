@@ -24,8 +24,15 @@ import {
   saveSession,
   type TranscriptItem,
 } from './session.ts';
-import { currentMonVoice } from './monVoice.ts';
-import { canListen, canSpeak, listen, speakAs, stopSpeaking, type Listening } from './speech.ts';
+import { IDLE, isBargeIn, nextConversation, openEar, type ConversationEvent, type ConversationMode, type Ear } from './handsFree.ts';
+import { monSpeechPort } from './monSpeechPort.ts';
+import type { MonVoice } from './monVoice.ts';
+import { createSentenceSplitter } from './sentenceStream.ts';
+import { loadVoice, sameVoice, saveVoice, stickyVoice, type RememberedVoice } from './sessionVoice.ts';
+import * as speech from './speech.ts';
+import { canListen, canSpeak, listen, stopSpeaking } from './speech.ts';
+import { addSpeechCueListener } from './speechCues.ts';
+import { createSpeechQueue, type SpeechQueue } from './speechQueue.ts';
 import { useSetters } from './state.ts';
 import { currentScheme, type Scheme } from './theme.ts';
 import { createTurnToolCaller, hintedToolNames, withPresenceLine } from './turnTools.ts';
@@ -54,8 +61,13 @@ interface AppState {
   busy: boolean;
   live: string;
   draft: string;
-  listening: Listening | null;
+  /** The mic is open for the person (not the barge-in watch while the Mon talks). */
+  listening: boolean;
   heard: string;
+  /** Hands-free conversation mode: idle, listening, thinking, speaking. */
+  talkMode: ConversationMode;
+  /** The sentence the Mon is saying right now (raw; the caption cleans it). */
+  speaking: string;
   activeViewId: string | null;
   activeToolTitle: string | null;
   displayMode: DisplayMode;
@@ -102,8 +114,10 @@ export function App({ config }: { config: PublicConfig }) {
     busy: false,
     live: '',
     draft: '',
-    listening: null,
+    listening: false,
     heard: '',
+    talkMode: 'idle',
+    speaking: '',
     activeViewId: [...initial.items].reverse().find((i) => i.kind === 'tool' && i.resourceUri)?.id ?? null,
     activeToolTitle: null,
     displayMode: 'inline',
@@ -119,7 +133,7 @@ export function App({ config }: { config: PublicConfig }) {
     speakerId: '',
     speakerName: '',
   }));
-  const { items, auth, conn, busy, live, draft, listening, heard, activeViewId, activeToolTitle, displayMode, scheme, readAloud, time, speakerId } = useStore(store);
+  const { items, auth, conn, busy, live, draft, listening, heard, talkMode, speaking, activeViewId, activeToolTitle, displayMode, scheme, readAloud, time, speakerId } = useStore(store);
   const {
     items: setItems,
     auth: setAuth,
@@ -129,6 +143,8 @@ export function App({ config }: { config: PublicConfig }) {
     draft: setDraft,
     listening: setListening,
     heard: setHeard,
+    talkMode: setTalkMode,
+    speaking: setSpeaking,
     activeViewId: setActiveViewId,
     activeToolTitle: setActiveToolTitle,
     displayMode: setDisplayMode,
@@ -145,6 +161,74 @@ export function App({ config }: { config: PublicConfig }) {
     [config.authMode, provider],
   );
   const model = useMemo(() => httpModelClient('/api/model', fetch, accessToken), [accessToken]);
+
+  // ---- The Mon's voice: one voice for the whole conversation (sessionVoice.ts).
+  const voiceRef = useRef<RememberedVoice | null>(null);
+  const learnVoice = useCallback(
+    (from: readonly TranscriptItem[]) => {
+      const next = stickyVoice(voiceRef.current, from);
+      if (sameVoice(next, voiceRef.current)) return;
+      voiceRef.current = next;
+      saveVoice(local, next);
+      // speech.ts gains setSessionVoice in a parallel change; call it once it exists.
+      (speech as unknown as { setSessionVoice?: (v: MonVoice | undefined) => void }).setSessionVoice?.(next?.voice);
+    },
+    [local],
+  );
+  // On load: the stored voice, else whatever the restored transcript says.
+  useEffect(() => {
+    voiceRef.current = stickyVoice(loadVoice(local), initial.items);
+    saveVoice(local, voiceRef.current);
+    (speech as unknown as { setSessionVoice?: (v: MonVoice | undefined) => void }).setSessionVoice?.(voiceRef.current?.voice);
+  }, [initial.items, local]);
+
+  // ---- Hands-free conversation (handsFree.ts) and sentence-streamed speech (speechQueue.ts).
+  const convRef = useRef(IDLE);
+  const earRef = useRef<Ear | null>(null);
+  const queueRef = useRef<SpeechQueue | null>(null);
+  const speakingRef = useRef('');
+  const audioStartRef = useRef(0);
+  const bargedRef = useRef(false);
+  /** performance.now() marks for the current turn, for the latency log. */
+  const marksRef = useRef<{ speechEnd: number; firstText?: number; firstSentence?: number; firstAudio?: number } | null>(null);
+
+  const dispatch = useCallback(
+    (e: ConversationEvent) => {
+      convRef.current = nextConversation(convRef.current, e);
+      setTalkMode(convRef.current.mode);
+      return convRef.current;
+    },
+    [setTalkMode],
+  );
+
+  const closeEar = useCallback(() => {
+    earRef.current?.close();
+    earRef.current = null;
+    setListening(false);
+  }, [setListening]);
+
+  const stopVoice = useCallback(() => {
+    queueRef.current?.cancel();
+    queueRef.current = null;
+    stopSpeaking();
+    speakingRef.current = '';
+    setSpeaking('');
+  }, [setSpeaking]);
+
+  // The first audible moment of each clip: drives the barge-in holdoff and the latency log.
+  useEffect(
+    () =>
+      addSpeechCueListener((cue) => {
+        if (cue.kind !== 'start') return;
+        audioStartRef.current = performance.now();
+        const m = marksRef.current;
+        if (m && m.firstAudio === undefined) {
+          m.firstAudio = audioStartRef.current;
+          logLatency(m);
+        }
+      }),
+    [],
+  );
 
   const push = useCallback((item: TranscriptItem) => setItems((prev) => [...prev, item]), [setItems]);
   const notice = useCallback(
@@ -235,17 +319,114 @@ export function App({ config }: { config: PublicConfig }) {
     }
   }, [connect, setConn, store]);
 
+  /** The mic, open for one utterance. `gated` watches for a barge-in while the Mon speaks. */
+  const sendRef = useRef<(text: string, source: 'voice' | 'typed') => Promise<void>>(async () => {});
+  const openMic = useCallback(
+    (gated: boolean) => {
+      earRef.current?.close();
+      const ear = openEar({
+        listen,
+        onInterim: setHeard,
+        onUtterance: (said, endedAt) => {
+          earRef.current = null;
+          setListening(false);
+          marksRef.current = { speechEnd: endedAt };
+          performance.mark('mon:end-of-speech');
+          dispatch({ type: 'utterance' });
+          void sendRef.current(said, 'voice');
+        },
+        onSilent: () => {
+          earRef.current = null;
+          setListening(false);
+          setHeard('');
+          dispatch({ type: 'silent' });
+        },
+        onError: (m) => {
+          earRef.current = null;
+          setListening(false);
+          dispatch({ type: 'stop' });
+          notice(m, 'error');
+        },
+        ...(gated
+          ? {
+              noSpeechMs: Infinity,
+              accept: (heard: string) =>
+                isBargeIn({ heard, speaking: speakingRef.current, msSinceAudioStart: performance.now() - audioStartRef.current }),
+              onBargeIn: () => {
+                // The person talked over the Mon: stop it and listen.
+                bargedRef.current = true;
+                abortRef.current?.abort();
+                stopVoice();
+                dispatch({ type: 'barge-in' });
+                setListening(true);
+              },
+            }
+          : {}),
+      });
+      earRef.current = ear;
+      setListening(!!ear && !gated);
+    },
+    [dispatch, notice, setHeard, setListening, stopVoice],
+  );
+
   const send = useCallback(
-    async (raw: string) => {
+    async (raw: string, source: 'voice' | 'typed' = 'typed') => {
       const text = raw.trim();
       if (!text || busy || conn.kind !== 'connected') return;
-      stopSpeaking();
+      stopVoice();
+      if (source === 'typed') {
+        closeEar();
+        marksRef.current = { speechEnd: performance.now() };
+        dispatch({ type: 'typed' });
+      }
+      bargedRef.current = false;
       setDraft('');
       setHeard('');
       setBusy(true);
       setLive('');
       setActiveToolTitle(null);
       push({ kind: 'user', id: newId('u'), text, at: Date.now() });
+
+      // Speak each sentence as soon as it is complete; the next is fetched while one plays.
+      const splitter = createSentenceSplitter();
+      const queue = readAloud
+        ? createSpeechQueue({
+            port: monSpeechPort({ voice: () => voiceRef.current?.voice, getToken: accessToken }),
+            onSentence: (sentence, index) => {
+              speakingRef.current = sentence;
+              setSpeaking(sentence);
+              if (audioStartRef.current < (marksRef.current?.speechEnd ?? 0)) audioStartRef.current = performance.now();
+              if (index === 0) {
+                if (convRef.current.mode === 'thinking') dispatch({ type: 'reply-audio' });
+                // Barge-in watch: the mic stays open while the Mon talks, behind the echo guard.
+                if (convRef.current.voiceSession && canListen()) openMic(true);
+              }
+            },
+          })
+        : null;
+      queueRef.current = queue;
+      let spokeAny = false;
+      const say = (sentences: string[]) => {
+        for (const s of sentences) {
+          if (marksRef.current && marksRef.current.firstSentence === undefined) marksRef.current.firstSentence = performance.now();
+          spokeAny = true;
+          queue?.push(s);
+        }
+      };
+      const finishSpeech = () => {
+        queue?.end();
+        const afterReply = () => {
+          if (queueRef.current !== queue && queue !== null) return; // a newer turn or a barge-in owns the voice now
+          queueRef.current = null;
+          speakingRef.current = '';
+          setSpeaking('');
+          closeEar();
+          const next = dispatch({ type: 'reply-done' });
+          if (next.mode === 'listening') openMic(false);
+        };
+        if (queue) void queue.done.then((outcome) => outcome === 'finished' && afterReply());
+        else afterReply();
+      };
 
       const { history, restarted } = historyForNextTurn(historyRef.current);
       if (restarted) notice('Long conversation: the Mon starts a fresh thread. Its state on the server is unchanged.', 'info');
@@ -267,10 +448,16 @@ export function App({ config }: { config: PublicConfig }) {
           }),
           onEvent: (e) => {
             if (e.type === 'text') {
+              if (marksRef.current && marksRef.current.firstText === undefined) marksRef.current.firstText = performance.now();
               setActiveToolTitle(null);
               setLive((prev) => prev + e.delta);
+              say(splitter.push(e.delta));
             }
-            if (e.type === 'step-done') setLive('');
+            if (e.type === 'step-done') {
+              setLive('');
+              // "Let me check." plays while the tool runs instead of waiting for the end of the turn.
+              say(splitter.flush());
+            }
             if (e.type === 'tool-start') setActiveToolTitle(toolTitle(toolsByName.get(e.name), e.name));
             if (e.type === 'tool-result') {
               const tool = toolsByName.get(e.name);
@@ -286,6 +473,8 @@ export function App({ config }: { config: PublicConfig }) {
                 resourceUri: uri ?? null,
                 at: Date.now(),
               });
+              // A result that carries the Mon updates the sticky voice before its reply is spoken.
+              learnVoice(store.getState().items);
               if (uri) {
                 setActiveViewId(id);
                 setDisplayMode('inline');
@@ -298,14 +487,22 @@ export function App({ config }: { config: PublicConfig }) {
           turn.outcome === 'refused'
             ? 'I can’t help with that one. Ask me something else about your Mon.'
             : turn.reply.trim() || (turn.outcome === 'step-limit' ? 'That took too many steps. Ask again more simply.' : '');
-        if (reply) {
-          push({ kind: 'mon', id: newId('m'), text: reply, at: Date.now() });
-          // The Mon's own voice, from the latest tool result that carries the Mon.
-          if (readAloud) void speakAs(reply, currentMonVoice(store.getState().items), { getToken: accessToken });
-        }
+        say(splitter.flush());
+        // A canned line (refusal, step limit) was never streamed: speak it now.
+        if (reply && !spokeAny) say([reply]);
+        if (reply) push({ kind: 'mon', id: newId('m'), text: reply, at: Date.now() });
         if (turn.outcome === 'truncated') notice('The reply was cut off before a tool call finished. Ask again.', 'error');
+        finishSpeech();
       } catch (err) {
-        if (abort.signal.aborted) {
+        // A barge-in already stopped the voice and opened the mic; anything else ends the session.
+        if (!bargedRef.current) {
+          stopVoice();
+          closeEar();
+          dispatch({ type: 'stop' });
+        }
+        if (bargedRef.current) {
+          /* the person cut in: no notice */
+        } else if (abort.signal.aborted) {
           notice('Stopped.', 'info');
         } else if ((err instanceof UnauthorizedError || err instanceof ModelAuthExpiredError)) {
           provider.invalidateCredentials('tokens');
@@ -324,23 +521,56 @@ export function App({ config }: { config: PublicConfig }) {
         abortRef.current = null;
       }
     },
-    [accessToken, busy, conn, model, store, notice, provider, push, readAloud, toolsByName, setActiveToolTitle, setActiveViewId, setAuth, setBusy, setConn, setDisplayMode, setDraft, setHeard, setLive],
+    [accessToken, busy, conn, model, store, notice, provider, push, readAloud, toolsByName, closeEar, dispatch, learnVoice, openMic, stopVoice, setActiveToolTitle, setActiveViewId, setAuth, setBusy, setConn, setDisplayMode, setDraft, setHeard, setLive, setSpeaking],
   );
+  useEffect(() => {
+    sendRef.current = send;
+  }, [send]);
 
-  function startListening() {
-    if (listening || busy) return;
-    stopSpeaking();
-    const l = listen({
-      onInterim: setHeard,
-      onFinal: (t) => void send(t),
-      onError: (m) => notice(m, 'error'),
-    });
-    setListening(l);
+  /** Talk: opens a hands-free session; mid-reply it cuts the Mon off; while listening it ends the utterance now. */
+  function talk() {
+    if (listening) {
+      earRef.current?.finish();
+      return;
+    }
+    if (convRef.current.mode === 'thinking' || convRef.current.mode === 'speaking') {
+      bargedRef.current = true;
+      abortRef.current?.abort();
+      stopVoice();
+    }
+    dispatch({ type: 'talk' });
+    openMic(false);
   }
-  function stopListening() {
-    listening?.finish();
-    setListening(null);
+  /** Stop: ends the reply, the voice and the session. */
+  function stopAll() {
+    abortRef.current?.abort();
+    stopVoice();
+    closeEar();
+    dispatch({ type: 'stop' });
   }
+
+  // Before the first reply: learn the Mon's voice once, quietly (no transcript line, no card).
+  const voiceProbed = useRef(false);
+  useEffect(() => {
+    if (conn.kind !== 'connected' || voiceRef.current || voiceProbed.current) return;
+    if (!conn.session.tools.some((t) => t.name === 'get_mon_status')) return;
+    voiceProbed.current = true;
+    conn.session.client
+      .callTool({ name: 'get_mon_status', arguments: {} })
+      .then((result) => {
+        const probe: TranscriptItem = { kind: 'tool', id: 'voice-probe', name: 'get_mon_status', title: '', input: {}, result: result as never, resourceUri: null, at: 0 };
+        learnVoice([probe]);
+      })
+      .catch(() => {
+        voiceProbed.current = false;
+      });
+  }, [conn, learnVoice]);
+
+  // Leaving the page or the session: nothing keeps listening or talking.
+  useEffect(() => () => {
+    earRef.current?.close();
+    queueRef.current?.cancel();
+  }, []);
 
   function toggleTheme() {
     const next: Scheme = scheme === 'dark' ? 'light' : 'dark';
@@ -349,8 +579,7 @@ export function App({ config }: { config: PublicConfig }) {
   }
 
   function newConversation() {
-    abortRef.current?.abort();
-    stopSpeaking();
+    stopAll();
     historyRef.current = [];
     clearSession(local);
     setItems([]);
@@ -398,7 +627,7 @@ export function App({ config }: { config: PublicConfig }) {
   const stage = judgeStage({
     authKind: auth.kind,
     connectionKind: conn.kind,
-    listening: listening !== null,
+    listening,
     busy,
     activeToolTitle,
     heard,
@@ -410,9 +639,21 @@ export function App({ config }: { config: PublicConfig }) {
   const typing = config.devMode || !voiceIn;
   // Without the log on screen, a notice (an error, "Stopped.") has to reach the caption or it's lost.
   const lastItem = items.at(-1);
-  const rawCaption = stage.kind !== 'ready' ? stage.headline : lastItem?.kind === 'notice' ? lastItem.text : lastReply;
-  // Stage directions (*chuckle*) are performed by the voice; captions show only the words.
+  // While the Mon talks, the caption is the sentence it is saying (the latest line only, as on an Echo Show).
+  const rawCaption = listening
+    ? stage.headline
+    : speaking || (stage.kind !== 'ready' ? stage.headline : lastItem?.kind === 'notice' ? lastItem.text : lastReply);
+  // Stage directions (*chuckle*) are performed by the voice and "Callah" reads as Caller: captions show only the words.
   const caption = rawCaption ? captionText(rawCaption) : rawCaption;
+  // The state badge: Listening / Thinking / Speaking while a conversation is under way.
+  const badge =
+    talkMode === 'speaking' && !listening && stage.kind !== 'acting'
+      ? { label: 'Speaking', tone: 'info' as const }
+      : stage.kind === 'ready'
+        ? talkMode === 'speaking'
+          ? { label: 'Speaking', tone: 'info' as const }
+          : null
+        : { label: stage.label, tone: stage.tone };
   const typingPanel = (
     <SolidPanel surface="page" depth="lg">
       <Section aria-labelledby="typing-title" className="gap-4 px-5 py-6">
@@ -523,7 +764,7 @@ export function App({ config }: { config: PublicConfig }) {
                     {signedIn ? (
                       <View role="status" aria-live="polite" aria-atomic="true">
                         {/* Ready needs no badge; the display shows state only while it changes. */}
-                        {stage.kind === 'ready' ? null : <Badge label={stage.label} tone={stage.tone} />}
+                        {badge ? <Badge label={badge.label} tone={badge.tone} /> : null}
                       </View>
                     ) : null}
                   </View>
@@ -597,18 +838,20 @@ export function App({ config }: { config: PublicConfig }) {
               <View className="flex-row flex-wrap items-center justify-center gap-3">
                 <Button
                   variant="cta"
-                  title={listening ? 'Done talking' : 'Talk'}
+                  title={listening ? 'Done talking' : talkMode === 'idle' ? 'Talk' : 'Talk over'}
                   accessibilityHint={
                     voiceIn
                       ? listening
                         ? 'Sends what you said.'
-                        : 'Starts listening. Tap again when you finish.'
+                        : talkMode === 'idle'
+                          ? 'Starts a conversation. Just talk; the Mon answers when you pause, then listens for a follow-up.'
+                          : 'Stops the Mon and listens to you.'
                       : 'Voice input isn’t available in this browser. Type instead.'
                   }
-                  disabled={!voiceIn || !canTalk || busy}
-                  onPress={listening ? stopListening : startListening}
+                  disabled={!voiceIn || !canTalk}
+                  onPress={talk}
                 />
-                {busy ? <Button variant="outline" title="Stop" onPress={() => abortRef.current?.abort()} /> : null}
+                {busy || talkMode !== 'idle' ? <Button variant="outline" title="Stop" onPress={stopAll} /> : null}
               </View>
             ) : null}
             {signedIn && typing && !config.devMode ? typingPanel : null}
@@ -657,7 +900,7 @@ function LogItem({ item, active, hasView, onShow }: { item: TranscriptItem; acti
         </View>
       );
     case 'mon':
-      return <Text className="text-xr-body text-text">{item.text}</Text>;
+      return <Text className="text-xr-body text-text">{captionText(item.text)}</Text>;
     case 'tool':
       return (
         <View className="flex-row flex-wrap items-center gap-3">
@@ -666,6 +909,24 @@ function LogItem({ item, active, hasView, onShow }: { item: TranscriptItem; acti
         </View>
       );
     case 'notice':
-      return <Banner tone={item.tone === 'error' ? 'danger' : 'info'} title={item.text} />;
+      return <Banner tone={item.tone === 'error' ? 'danger' : 'info'} title={captionText(item.text)} />;
   }
+}
+
+/**
+ * One line per turn in the console, and the same numbers on `window.__monLatency`
+ * for a headless run: end of the person's speech to the first audible Mon audio.
+ */
+function logLatency(m: { speechEnd: number; firstText?: number; firstSentence?: number; firstAudio?: number }) {
+  const rel = (t: number | undefined) => (t === undefined ? null : Math.round(t - m.speechEnd));
+  const row = { firstTextMs: rel(m.firstText), firstSentenceMs: rel(m.firstSentence), firstAudioMs: rel(m.firstAudio) };
+  try {
+    performance.mark('mon:first-audio');
+    performance.measure('mon:end-of-speech→first-audio', { start: m.speechEnd, end: m.firstAudio ?? performance.now() });
+  } catch {
+    /* older browsers: the console line still has the numbers */
+  }
+  const w = globalThis as { __monLatency?: unknown[] };
+  (w.__monLatency ??= []).push(row);
+  console.info(`[mon latency] end of speech → first audio ${row.firstAudioMs} ms (first text ${row.firstTextMs} ms, first sentence ${row.firstSentenceMs} ms)`);
 }
