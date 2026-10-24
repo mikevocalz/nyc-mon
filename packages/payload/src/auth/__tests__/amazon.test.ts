@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, onTestFinished, vi } from 'vitest';
 import {
   AMAZON_AUTHORIZATION_URL,
   AMAZON_PROFILE_URL,
@@ -103,6 +103,15 @@ describe('Login with Amazon profile mapping', () => {
     ['development', 'https://localhost.example.com', true, true],
     ['development', 'invalid-url', true, true],
   ])('keeps signup guarded for %s / %s / opt-in=%s', (nodeEnv, baseURL, allowSignUp, disabled) => {
+    // These rows describe a developer's machine. CI sets CI=true, which the
+    // guard rightly treats as hosted (see the Vercel case below), so clear the
+    // hosted markers for the table and restore them after.
+    vi.stubEnv('CI', '');
+    vi.stubEnv('VERCEL', '');
+    vi.stubEnv('VERCEL_ENV', '');
+    onTestFinished(() => {
+      vi.unstubAllEnvs();
+    });
     const plugin = amazonOAuthPlugin({ clientId: 'client-id', clientSecret: 'client-secret' }, {
       nodeEnv, baseURL, allowSignUp,
     });
