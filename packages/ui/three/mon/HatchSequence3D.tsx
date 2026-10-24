@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { createHatchLight, whitener } from './hatch-light.ts';
+import { createHatchLight, whitener, type HatchLightTheme } from './hatch-light.ts';
 import { createHatchSound } from './hatch-sound.ts';
 import { hatchDuration, hatchFrame, soundCues, type HatchPhase } from './hatch-timeline.ts';
 
@@ -38,6 +38,13 @@ export interface HatchSequence3DProps {
   readonly reducedMotion?: boolean;
   /** Original synthesized sound (crack, shimmer, whoosh, chime). On by default; plays only where the browser allows audio. */
   readonly sound?: boolean;
+  /**
+   * The card's theme. Night dims the stage and adds the light over it; daylit
+   * warms the stage instead (a navy dim on a white card is a grey disc) and
+   * paints the light in saturated orange-gold. Defaults to the document's
+   * `data-theme`, then `prefers-color-scheme`.
+   */
+  readonly theme?: HatchLightTheme;
   /** The moment ended (or a model failed to load, so there is nothing to play). */
   readonly onDone?: () => void;
 }
@@ -55,6 +62,16 @@ const CRACK_GLOW: Readonly<Record<string, number>> = {
 const CRACK_COLOR = new THREE.Color('#FD9D40');
 /** Night (brand.night), the colour the stage dims toward. */
 const NIGHT = '0, 4, 28';
+/** Gold (#FEBE80), what the daylit stage warms toward instead of dimming. */
+const DAY_WARM = '254, 190, 128';
+/** How strongly each theme's stage tint comes in at full dim. */
+const DIM_STRENGTH: Readonly<Record<HatchLightTheme, number>> = { dark: 0.85, light: 0.45 };
+
+function documentTheme(): HatchLightTheme {
+  const set = typeof document === 'undefined' ? undefined : document.documentElement.dataset.theme;
+  if (set === 'light' || set === 'dark') return set;
+  return typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
 /** The silhouette's egg shape: the Baby squeezed narrow and a little tall. */
 const EGG_SHAPE = new THREE.Vector2(0.5, 1.12);
 
@@ -136,16 +153,17 @@ function loadGlb(url: string): Promise<GLTF> {
     .loadAsync(url);
 }
 
-export function HatchSequence3D({ eggUrl, monUrl, monClips, width, height, label, announcements, reducedMotion, sound = true, onDone }: HatchSequence3DProps) {
+export function HatchSequence3D({ eggUrl, monUrl, monClips, width, height, label, announcements, reducedMotion, sound = true, theme: themeProp, onDone }: HatchSequence3DProps) {
+  const [theme] = useState<HatchLightTheme>(() => themeProp ?? documentTheme());
   const host = useRef<HTMLDivElement | null>(null);
   const dimRef = useRef<HTMLDivElement | null>(null);
   const whiteRef = useRef<HTMLDivElement | null>(null);
   const [phase, setPhase] = useState<HatchPhase | 'loading'>('loading');
   /** The last phase line said; a phase with no line keeps the previous one, so nothing is re-read. */
   const [said, setSaid] = useState('');
-  const latest = useRef({ onDone, monClips, reducedMotion, width, height, announcements, sound });
+  const latest = useRef({ onDone, monClips, reducedMotion, width, height, announcements, sound, theme });
   useEffect(() => {
-    latest.current = { onDone, monClips, reducedMotion, width, height, announcements, sound };
+    latest.current = { onDone, monClips, reducedMotion, width, height, announcements, sound, theme };
   });
 
   useEffect(() => {
@@ -235,7 +253,7 @@ export function HatchSequence3D({ eggUrl, monUrl, monClips, width, height, label
       egg = { mixer, action, fade, white: whitener(model), glow: crackGlow(model), pivot, cam: framing(size, camera), size };
       camera.position.copy(egg.cam);
       camera.lookAt(0, 0, 0);
-      light = createHatchLight(size.y);
+      light = createHatchLight(size.y, { theme: latest.current.theme });
       scene.add(light.group);
     });
     const monLoad = loadGlb(monUrl).then((gltf) => {
@@ -302,7 +320,7 @@ export function HatchSequence3D({ eggUrl, monUrl, monClips, width, height, label
         camera.lookAt(0, 0, 0);
         rim.intensity = 0.8 + 1.2 * f.glow;
         light?.update(f, t, renderer.getPixelRatio() * h / (2 * Math.tan((camera.fov * Math.PI) / 360)));
-        if (dimRef.current) dimRef.current.style.opacity = String(0.85 * f.dim);
+        if (dimRef.current) dimRef.current.style.opacity = String(DIM_STRENGTH[latest.current.theme] * f.dim);
         if (whiteRef.current) whiteRef.current.style.opacity = String(f.white);
         while (cues.length && cues[0]!.t <= t) audio?.play(cues.shift()!.cue);
         if (f.phase !== shown) {
@@ -349,11 +367,22 @@ export function HatchSequence3D({ eggUrl, monUrl, monClips, width, height, label
       data-testid="hatch-sequence"
       style={{ width, height, position: 'relative' }}
     >
-      {/* The stage dims behind the egg, as the hatch begins. */}
+      {/* The stage dims behind the egg as the hatch begins (night), or warms (daylit). */}
       <div
         ref={dimRef}
         aria-hidden
-        style={{ position: 'absolute', inset: 0, opacity: 0, pointerEvents: 'none', background: `radial-gradient(closest-side, rgba(${NIGHT}, 0.95), rgba(${NIGHT}, 0.6) 70%, rgba(${NIGHT}, 0))` }}
+        data-testid="hatch-dim"
+        data-theme={theme}
+        style={{
+          position: 'absolute',
+          inset: 0,
+          opacity: 0,
+          pointerEvents: 'none',
+          background:
+            theme === 'dark'
+              ? `radial-gradient(closest-side, rgba(${NIGHT}, 0.95), rgba(${NIGHT}, 0.6) 70%, rgba(${NIGHT}, 0))`
+              : `radial-gradient(closest-side, rgba(${DAY_WARM}, 0.7), rgba(${DAY_WARM}, 0.35) 70%, rgba(${DAY_WARM}, 0))`,
+        }}
       />
       {/* The one white-out, over everything. */}
       <div

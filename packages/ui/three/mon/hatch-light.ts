@@ -18,9 +18,19 @@ import { CRACKS, shardStates, type HatchFrame } from './hatch-timeline.ts';
  */
 
 const ORANGE = new THREE.Color('#FC7C00');
-const GOLD = new THREE.Color('#FEBE80');
-const CREAM = new THREE.Color('#FFEDDB');
 const SHELL = new THREE.Color('#C8141A');
+
+/**
+ * Night (dark card): orange through gold to a cream heart, light added over
+ * the dark stage. Daylit (light card): the same "over" paint, but a cream or
+ * pale gold on a near-white card only lifts it a little and reads as a grey
+ * smudge, so every tone is a saturated orange-gold that stays warm on white.
+ */
+export type HatchLightTheme = 'light' | 'dark';
+const PALETTES: Readonly<Record<HatchLightTheme, { readonly orange: THREE.Color; readonly gold: THREE.Color; readonly cream: THREE.Color }>> = {
+  dark: { orange: ORANGE, gold: new THREE.Color('#FEBE80'), cream: new THREE.Color('#FFEDDB') },
+  light: { orange: new THREE.Color('#F07800'), gold: new THREE.Color('#F59B00'), cream: new THREE.Color('#F7B500') },
+};
 
 const PREMULT = {
   transparent: true,
@@ -148,7 +158,8 @@ function shardGeometry(seed: number): THREE.BufferGeometry {
   return g;
 }
 
-export function createHatchLight(unit: number): HatchLight {
+export function createHatchLight(unit: number, opts: { readonly theme?: HatchLightTheme } = {}): HatchLight {
+  const { orange: ORANGE_, gold: GOLD, cream: CREAM } = PALETTES[opts.theme ?? 'dark'];
   const group = new THREE.Group();
   const disposables: { dispose(): void }[] = [];
   const own = <T extends { dispose(): void }>(x: T): T => (disposables.push(x), x);
@@ -161,7 +172,7 @@ export function createHatchLight(unit: number): HatchLight {
         uSettle: { value: 0 },
         uTime: { value: 0 },
         uRingAge: { value: new THREE.Vector3(-1, -1, -1) },
-        uOrange: { value: ORANGE },
+        uOrange: { value: ORANGE_ },
         uGold: { value: GOLD },
         uCream: { value: CREAM },
       },
@@ -176,7 +187,7 @@ export function createHatchLight(unit: number): HatchLight {
   group.add(back);
 
   const orbits = [-0.35, 0.42].map((tilt, i) => {
-    const mat = own(new THREE.ShaderMaterial({ ...PREMULT, uniforms: { uLevel: { value: 0 }, uHead: { value: i * 0.5 }, uOrange: { value: ORANGE } }, vertexShader: orbitVertex, fragmentShader: orbitFragment, side: THREE.DoubleSide }));
+    const mat = own(new THREE.ShaderMaterial({ ...PREMULT, uniforms: { uLevel: { value: 0 }, uHead: { value: i * 0.5 }, uOrange: { value: ORANGE_ } }, vertexShader: orbitVertex, fragmentShader: orbitFragment, side: THREE.DoubleSide }));
     const mesh = new THREE.Mesh(own(new THREE.TorusGeometry(0.62 * unit, 0.007 * unit, 6, 160)), mat);
     // Flattened into an orbit seen from just above, tilted like the Rive file's.
     mesh.rotation.set(Math.PI / 2 - 0.28, 0, tilt);

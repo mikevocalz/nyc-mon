@@ -37,3 +37,35 @@ test('full motion: sparkles spiral in through the tension and shards fly at the 
   assert.ok(p.shards.filter((s) => s.visible).length >= 16);
   light.dispose();
 });
+
+/** Hue in degrees and HSL saturation of a three.js colour. */
+const hsl = (c: THREE.Color) => {
+  const o = { h: 0, s: 0, l: 0 };
+  c.getHSL(o, THREE.SRGBColorSpace);
+  return { hue: o.h * 360, sat: o.s, light: o.l };
+};
+const paints = (light: ReturnType<typeof createHatchLight>) =>
+  light.group.children
+    .filter((o) => (o as THREE.Mesh | THREE.Points).material instanceof THREE.ShaderMaterial)
+    .flatMap((o) => Object.entries(((o as THREE.Mesh).material as THREE.ShaderMaterial).uniforms))
+    .filter(([, u]) => u.value instanceof THREE.Color)
+    .map(([name, u]) => ({ name, ...hsl(u.value as THREE.Color) }));
+
+test('light theme: every light colour is a saturated orange-gold, never a pale cream that greys out on the daylit card', () => {
+  const light = createHatchLight(1, { theme: 'light' });
+  const all = paints(light);
+  assert.ok(all.length >= 4);
+  for (const p of all) {
+    assert.ok(p.hue >= 18 && p.hue <= 45, `${p.name} hue ${p.hue.toFixed(0)}`);
+    assert.ok(p.sat >= 0.85, `${p.name} saturation ${p.sat.toFixed(2)}`);
+    assert.ok(p.light <= 0.62, `${p.name} lightness ${p.light.toFixed(2)}`);
+  }
+  light.dispose();
+});
+
+test('dark theme keeps the night palette: the cream heart stays near white', () => {
+  const light = createHatchLight(1);
+  const cream = paints(light).find((p) => p.name === 'uCream')!;
+  assert.ok(cream.light > 0.9);
+  light.dispose();
+});
