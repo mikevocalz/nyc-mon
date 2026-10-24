@@ -121,10 +121,15 @@ const echoShow8 = (mode: 'inline' | 'fullscreen', theme: 'light' | 'dark') => ({
   hostContext: { theme, displayMode: mode, availableDisplayModes: ['inline', 'fullscreen'], deviceClass: 'echo-show-8', maxWidth: 1280, maxHeight: 800 },
 });
 
-// boot() allows a view 15 s to render; the default 5 s test timeout undercut it.
-// Headless Chromium draws the 3D Mon's WebGL in software, so a click waits on
-// slow frames before the page counts as stable.
-describe('built views boot in a spec host (bundled Chromium)', { timeout: 20_000 }, () => {
+// Every wait inside a test is bounded and named (boot's 15 s render, each
+// waitForFunction, each click), so the test budget only has to cover their sum
+// and never fires first. The longest chain is the lip-sync test: boot 15 s +
+// model ready 15 s + rest 5 s + speech 2 s + facing 2 s + rest 5 s = 44 s.
+// Headless Chromium draws the 3D Mon's WebGL in software, and on a 4-vCPU CI
+// runner beside the other packages' suites a card boot took 14-16 s, so a 20 s
+// budget killed tests that were still progressing, with no step named.
+const CLICK = { timeout: 15_000 };
+describe('built views boot in a spec host (bundled Chromium)', { timeout: 60_000 }, () => {
   for (const [speciesId, form] of [['dex-002', 'Squeaklet'], ['dex-009', 'Kittee Cee'], ['dex-062', 'Yotito']] as const) {
     for (const theme of ['light', 'dark'] as const) {
       it(`card: ${form}, ${theme}`, async () => {
@@ -293,9 +298,12 @@ describe('built views boot in a spec host (bundled Chromium)', { timeout: 20_000
   });
 
   describe('egg (check_incubation result)', () => {
+    // The end time is taken when the test boots, not at module load: the view
+    // counts down from incubationEndsAt, and on CI the build and earlier tests
+    // run minutes before this one (a module-level `now` read "10 min left").
     const eggResult = (minutes: number) => ({
       incubating: true,
-      eggs: [{ eggId: 'egg_demo', speciesId: 'dex-001', incubationEndsAt: now + minutes * 60_000, minutesRemaining: minutes, readyToHatch: minutes === 0 }],
+      eggs: [{ eggId: 'egg_demo', speciesId: 'dex-001', incubationEndsAt: Date.now() + minutes * 60_000, minutesRemaining: minutes, readyToHatch: minutes === 0 }],
     });
     const probe = (frame: Frame) =>
       frame.evaluate(() => ({
@@ -392,7 +400,7 @@ describe('built views boot in a spec host (bundled Chromium)', { timeout: 20_000
   it('a failed care call shows and announces a plain-language notice', async () => {
     const b = await boot('mon-card', { ...echoShow8('inline', 'light'), result: { mon: monFor('dex-002'), care }, callFails: true });
     try {
-      await b.frame.getByRole('button', { name: 'Feed' }).click();
+      await b.frame.getByRole('button', { name: 'Feed' }).click(CLICK);
       await b.frame.waitForFunction(() => (document.querySelector('[role=status]')?.textContent ?? '') !== '', null, { timeout: 5000 });
       const live = await b.frame.locator('[role=status]').textContent();
       expect(live).toBe("NYC-MON can't reach your Mon right now. Try again in a minute.");
@@ -555,8 +563,8 @@ describe('built views boot in a spec host (bundled Chromium)', { timeout: 20_000
   it('a care button calls its tool through the bridge', async () => {
     const b = await boot('mon-card', { ...echoShow8('inline', 'light'), result: { mon: monFor('dex-002'), care } });
     try {
-      await b.frame.getByRole('button', { name: 'Feed' }).click();
-      await b.frame.page().waitForFunction(() => window.calls.length > 0);
+      await b.frame.getByRole('button', { name: 'Feed' }).click(CLICK);
+      await b.frame.page().waitForFunction(() => window.calls.length > 0, null, { timeout: 5000 });
       const calls = await b.frame.page().evaluate(() => window.calls);
       expect(calls[0]).toMatchObject({ name: 'feed_mon', arguments: { monId: 'mon_demo' } });
     } finally {
