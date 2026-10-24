@@ -48,6 +48,7 @@ function mon(id: string, speciesId: string): MonInstance {
     hatchedAt: T0,
     bond: 0,
     stage: 'Baby',
+    gender: null,
     voiceLineageId: null,
     originBlock: null,
     habitatTags: [],

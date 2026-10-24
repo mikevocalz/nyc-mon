@@ -66,8 +66,8 @@ const SERVICE_METHODS = new Set([
   'prompts/list',
 ]);
 
-/** Tools that write care; they need `mcp:care`. Every other tool needs `mcp:caller`. */
-export const CARE_WRITE_TOOLS: ReadonlySet<string> = new Set(['feed_mon', 'rest_mon', 'wake_mon', 'play_with_mon']);
+/** Tools that write care or hatch an egg; they need `mcp:care`. Every other tool needs `mcp:caller`. */
+export const CARE_WRITE_TOOLS: ReadonlySet<string> = new Set(['feed_mon', 'rest_mon', 'wake_mon', 'play_with_mon', 'hatch_egg']);
 
 interface RpcMessage {
   readonly method: string;

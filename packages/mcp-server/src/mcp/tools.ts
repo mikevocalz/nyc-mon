@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import {
   advanceCare,
+  createInitialCareState,
   applyCareAction,
   deriveMonMood,
   listUnmetNeeds,
@@ -14,7 +15,7 @@ import type { z } from 'zod';
 import { permitted, resolveActingVoice, type ActingVoice, type SpeakerHint } from '../auth/actor.ts';
 import { isAdultByBirthYear } from '../auth/request-auth.ts';
 import type { CallerData, MonWithCare } from '../data/caller.ts';
-import { AdultRequiredError, NotFoundError, WriteUnconfirmedError } from '../data/errors.ts';
+import { AdultRequiredError, EggNotReadyError, NotFoundError, WriteUnconfirmedError } from '../data/errors.ts';
 import type { FamiliarDirectory } from '../presence/fixtures.ts';
 import type { PresenceService } from '../presence/service.ts';
 import type { Permission } from '../presence/types.ts';
@@ -25,6 +26,7 @@ import {
   CARE_SUGGESTIONS,
   CareResultOutput,
   FamiliarPeopleOutput,
+  HatchEggOutput,
   IncubationOutput,
   InjectPresenceEventInput,
   MonIdInput,
@@ -38,6 +40,7 @@ import {
   SharedMemoriesOutput,
   careInput,
   checkOnMonOutput,
+  hatchEggInput,
   playInput,
   talkToMonOutput,
 } from './schemas.ts';
@@ -48,6 +51,7 @@ export const CORE_TOOL_NAMES = [
   'get_mon_status',
   'check_on_mon',
   'check_incubation',
+  'hatch_egg',
   'talk_to_mon',
   'feed_mon',
   'rest_mon',
@@ -107,6 +111,11 @@ async function guarded(fn: () => Promise<CallToolResult>): Promise<CallToolResul
   }
 }
 
+/**
+ * The Mon as tools report it. `gender` and `voice` are for a client that voices
+ * the Mon itself (the web simulator); Alexa reads replies in its own voice
+ * (PLATFORM-DOCS §2.8) and copy never uses a pronoun for a Mon (PS-005).
+ */
 function monView(mon: MonInstance) {
   return {
     monId: mon.monInstanceId,
@@ -115,6 +124,8 @@ function monView(mon: MonInstance) {
     stage: mon.stage,
     bond: mon.bond,
     hatchedAt: mon.hatchedAt,
+    gender: mon.gender,
+    voice: mon.voiceLineageId === null ? null : { lineageId: mon.voiceLineageId, stage: mon.stage },
   };
 }
 
@@ -135,16 +146,96 @@ function current(entry: MonWithCare, now: number): MonWithCare {
   return advanceCare({ mon: entry.mon, care: entry.care }, now).state;
 }
 
-/** The named Mon, or the most recently hatched one. */
+/** Fallbacks already logged, so a stale or missing companion warns once per Caller, not per call. */
+const loggedFallbacks = new Set<string>();
+const MAX_LOGGED_FALLBACKS = 1_000;
+
+function logFallbackOnce(callerId: string, activeMonInstanceId: string | null): void {
+  const key = `${callerId}\u0000${activeMonInstanceId ?? ''}`;
+  if (loggedFallbacks.has(key)) return;
+  if (loggedFallbacks.size >= MAX_LOGGED_FALLBACKS) loggedFallbacks.clear();
+  loggedFallbacks.add(key);
+  const why = activeMonInstanceId === null ? 'no companion chosen' : `companion ${activeMonInstanceId} is not among the Caller's Mons`;
+  console.warn(`[mcp-server] ${why}; answering for the most recently hatched Mon`);
+}
+
+/**
+ * The Mon a tool acts on. A named `monId` wins. Otherwise the Caller's chosen
+ * companion (`users.activeMonInstanceId`), so every surface answers for, and
+ * speaks in the voice of, the same Mon the Caller picked. Only when no
+ * companion is chosen, or it names a Mon the Caller no longer has, does the
+ * most recently hatched Mon answer.
+ */
 async function resolveMon(ctx: ToolContext, callerId: string, monId: string | undefined): Promise<MonWithCare | CallToolResult> {
-  const mons = await ctx.data.listMons(callerId);
+  const { mons, activeMonInstanceId } = await ctx.data.listMons(callerId);
   if (mons.length === 0) return failure('no-mon');
+  const byId = (id: string) => mons.find((entry) => entry.mon.monInstanceId === id);
   if (monId !== undefined) {
-    const found = mons.find((entry) => entry.mon.monInstanceId === monId);
+    const found = byId(monId);
     return found === undefined ? failure('mon-not-found') : current(found, ctx.now());
   }
+  const active = activeMonInstanceId === null ? undefined : byId(activeMonInstanceId);
+  if (active !== undefined) return current(active, ctx.now());
+  if (mons.length > 1) logFallbackOnce(callerId, activeMonInstanceId);
   const latest = [...mons].sort((a, b) => b.mon.hatchedAt - a.mon.hatchedAt)[0];
   return latest === undefined ? failure('no-mon') : current(latest, ctx.now());
+}
+
+/** "12 minutes", "1 minute": how a speaker says the time left on an egg. */
+function timeLeft(incubationEndsAt: number, now: number): { minutesRemaining: number; timeLeft: string } {
+  const minutesRemaining = Math.max(1, Math.ceil((incubationEndsAt - now) / 60_000));
+  return { minutesRemaining, timeLeft: minutesRemaining === 1 ? '1 minute' : `${minutesRemaining} minutes` };
+}
+
+/**
+ * hatch_egg: the Caller's own egg only (the Caller-only rule, a familiar or
+ * unverified voice is refused before anything is read), never before its
+ * incubation ends. Safe to retry: `/v1` returns the Mon an egg already minted.
+ * The new Mon is returned explicitly, so the card shows it even while the
+ * Caller's chosen companion (`activeMonInstanceId`) stays another Mon.
+ */
+async function runHatch(ctx: ToolContext, args: { eggId?: string; speakerHint?: SpeakerHint }): Promise<CallToolResult> {
+  const linked = linkedCaller(ctx);
+  if (isResult(linked)) return linked;
+  const actor = actorFor(ctx, linked.callerId, args.speakerHint);
+  if (actor.kind !== 'caller') return failure('not-permitted', { speaker: speakerView(actor) });
+
+  return guarded(async () => {
+    const now = ctx.now();
+    const eggs = [...(await ctx.data.listIncubatingEggs(linked.callerId))].sort((a, b) => a.egg.incubationEndsAt - b.egg.incubationEndsAt);
+    const listed = args.eggId === undefined ? eggs[0] : eggs.find((e) => e.egg.eggId === args.eggId);
+    // A named egg that is no longer listed has hatched already (or is not the
+    // Caller's): /v1 answers with its Mon, or 404, which reads as no egg.
+    const eggId = listed?.egg.eggId ?? args.eggId;
+    if (eggId === undefined) return failure('no-egg');
+    if (listed !== undefined && listed.egg.incubationEndsAt > now) {
+      return failure('egg-not-ready', { eggId, ...timeLeft(listed.egg.incubationEndsAt, now) });
+    }
+    let mon: MonInstance;
+    try {
+      mon = await ctx.data.hatchEgg(linked.callerId, eggId);
+    } catch (error) {
+      // The server's clock says not yet (ours ran a little ahead).
+      if (error instanceof EggNotReadyError) {
+        return failure('egg-not-ready', { eggId, ...timeLeft(listed?.egg.incubationEndsAt ?? now + 60_000, now) });
+      }
+      if (error instanceof NotFoundError) return failure('no-egg');
+      throw error;
+    }
+    const { mons } = await ctx.data.listMons(linked.callerId);
+    const stored = mons.find((entry) => entry.mon.monInstanceId === mon.monInstanceId);
+    const state = current(stored ?? { mon, care: createInitialCareState(mon.monInstanceId, mon.hatchedAt) }, now);
+    const alreadyHatched = listed === undefined;
+    return success({
+      hatched: true,
+      alreadyHatched,
+      hatching: !alreadyHatched,
+      egg: { eggId, speciesId: listed?.egg.speciesId ?? 'dex-001' },
+      mon: monView(state.mon),
+      care: careView(state.care),
+      mood: deriveMonMood(state.care),
+    });
+  });
 }
 
 function suggestedCare(state: MonWithCare, needs: readonly CareNeed[]): (typeof CARE_SUGGESTIONS)[number][] {
@@ -328,7 +419,7 @@ export function buildTools(ctx: ToolContext) {
     def({
       name: 'check_incubation',
       title: 'Check incubation',
-      description: "Whether the Caller has an egg incubating, how many minutes are left, and whether it is ready to hatch in the app.",
+      description: "Whether the Caller has an egg incubating, how many minutes are left, and whether it is ready to hatch (hatch_egg hatches it).",
       input: NoInput,
       output: IncubationOutput,
       annotations: READ,
@@ -347,6 +438,16 @@ export function buildTools(ctx: ToolContext) {
           return success({ incubating: eggs.length > 0, eggs });
         });
       },
+    }),
+    def({
+      name: 'hatch_egg',
+      title: 'Hatch egg',
+      description:
+        "Hatch the Caller's egg once incubation has ended, and show it hatching. Returns the Mon it hatched into. Before the egg is ready it refuses and says how many minutes are left. Only the Caller can hatch. Safe to retry.",
+      input: hatchEggInput(devMode),
+      output: HatchEggOutput,
+      annotations: { ...WRITE, idempotentHint: true },
+      run: (args) => runHatch(ctx, args),
     }),
     def({
       name: 'talk_to_mon',

@@ -9,14 +9,34 @@ export const AMAZON_PROFILE_URL = 'https://api.amazon.com/user/profile';
  * We request `profile`, not only `profile:user_id`, because Better Auth's
  * social-provider path needs an email/name payload when it resolves an
  * account. Amazon still supplies the stable `user_id`, which is the account
- * identity. Implicit sign-up stays disabled so LWA never bypasses NYC-MON's
- * birth-year/guardian gates.
+ * identity. Deployed environments keep implicit sign-up disabled so LWA
+ * never bypasses NYC-MON's birth-year/guardian gates.
  */
 export const AMAZON_SCOPES = ['profile'] as const;
 
 export interface AmazonOAuthClient {
   readonly clientId: string;
   readonly clientSecret: string;
+}
+
+export interface AmazonLocalDevelopment {
+  readonly allowSignUp: boolean;
+  readonly nodeEnv: string | undefined;
+  readonly baseURL: string;
+}
+
+/** An explicit localhost-only demo option; deployed environments stay link-only. */
+function isLocalDevelopment(local: AmazonLocalDevelopment | undefined): boolean {
+  if (local?.nodeEnv !== 'development') return false;
+  // A hosted build is never local, whatever NODE_ENV and BETTER_AUTH_URL say.
+  if (process.env.VERCEL || process.env.VERCEL_ENV || process.env.CI) return false;
+  try {
+    const url = new URL(local.baseURL);
+    return ['http:', 'https:'].includes(url.protocol)
+      && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+  } catch {
+    return false;
+  }
 }
 
 interface AmazonProfileResponse {
@@ -65,12 +85,14 @@ export async function fetchAmazonProfile(
  *
  * - Authorization Code + PKCE (LWA supports S256).
  * - HTTP Basic at the token endpoint.
- * - No sign-up: a Caller must already have a NYC-MON account and explicitly
+ * - No deployed sign-up: a Caller must already have a NYC-MON account and explicitly
  *   link Amazon first, so LWA cannot create an age-unknown account through
  *   either implicit or explicit social sign-up.
  */
-export function amazonOAuthPlugin(client: AmazonOAuthClient | undefined) {
+export function amazonOAuthPlugin(client: AmazonOAuthClient | undefined, local?: AmazonLocalDevelopment) {
   if (client === undefined) return undefined;
+  const localSignUp = isLocalDevelopment(local) && local?.allowSignUp === true;
+  if (localSignUp) console.warn('[auth] AMAZON_LWA_LOCAL_SIGNUP: Login with Amazon can create accounts without the birth-year gate (local development only).');
 
   return genericOAuth({
     config: [
@@ -85,10 +107,9 @@ export function amazonOAuthPlugin(client: AmazonOAuthClient | undefined) {
         responseType: 'code',
         pkce: true,
         authentication: 'basic',
-        disableImplicitSignUp: true,
-        // No client-side requestSignUp escape hatch: Amazon identity is
-        // existing-account/link-only for NYC-MON.
-        disableSignUp: true,
+        disableImplicitSignUp: !localSignUp,
+        // No client-side requestSignUp escape hatch in deployed environments.
+        disableSignUp: !localSignUp,
         // Better Auth 1.7 no longer lets mapped local-user fields define the
         // provider identity. Amazon's immutable subject is `user_id`, not
         // plain OAuth's default `id`, so bind the account row explicitly.

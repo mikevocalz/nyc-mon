@@ -2,6 +2,7 @@ import { useEffect, useEffectEvent, useRef } from 'react';
 import type { CallToolResult, Client, Tool } from '@modelcontextprotocol/client';
 import { AppBridge, PostMessageTransport, isToolVisibilityModelOnly, type McpUiResourceCsp } from '@modelcontextprotocol/ext-apps/app-bridge';
 import { Button, useInstanceStore, useStore } from '@acme/ui';
+import { SPEECH_CONTEXT_KEY, type MonSpeechCue } from '@acme/ui/three/mon/lipsync';
 import { Paragraph } from '@acme/ui/html';
 import { View } from '@acme/ui/tw';
 import { HOST_ONLY_TOOLS } from '../shared/toolSpec.ts';
@@ -10,6 +11,9 @@ import { MCP_APP_MIME } from './mcp.ts';
 import { hostStyleVariables, type Scheme } from './theme.ts';
 import { useSetters } from './state.ts';
 import { ViewFrame } from './ViewFrame.tsx';
+import { addSpeechCueListener, currentSpeechCue, listeningNow } from './speechCues.ts';
+import { createHostHatchSound, isFreshHatch, pageAudioContext, parseHatchStart } from './hatchSound.ts';
+import { setSpeechDuck } from './speech.ts';
 
 /**
  * Hosts one MCP Apps view (spec 2026-01-26): reads the ui:// resource, loads
@@ -38,6 +42,14 @@ export interface AppViewProps {
   readonly onDisplayModeChange: (mode: DisplayMode) => void;
   /** A view proposed text for the conversation (ui/message); the person sends it. */
   readonly onViewMessage: (text: string) => void;
+  /**
+   * Called before "Try card again" reloads the view, so the host can re-list
+   * the server's tools. A rebuilt server serves its views under new URIs; the
+   * retry then loads whatever resourceUri the host passes next.
+   */
+  readonly onRetry?: () => Promise<void>;
+  /** "Read replies aloud": with it off the host plays no hatch sound either. */
+  readonly soundOn?: boolean;
 }
 
 interface LoadedResource {
@@ -68,20 +80,18 @@ async function readView(client: Client, uri: string): Promise<LoadedResource> {
 export function AppView(props: AppViewProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const bridgeRef = useRef<AppBridge | null>(null);
-  // src: the sandbox proxy URL. height: the content height the view reports
-  // (ui/notifications/size-changed). available: the display's height, the cap.
+  // src: the sandbox proxy URL. available: the display slot's height, sent as
+  // maxHeight so an inline view fills the display without overflowing it.
   const store = useInstanceStore<{
     src: string | null;
-    height: number;
     available: number;
     status: 'loading' | 'ready' | 'error';
     error: string;
     attempt: number;
-  }>(() => ({ src: null, height: 320, available: 0, status: 'loading', error: '', attempt: 0 }));
-  const { src, height, available, status, error, attempt } = useStore(store);
+  }>(() => ({ src: null, available: 0, status: 'loading', error: '', attempt: 0 }));
+  const { src, available, status, error, attempt } = useStore(store);
   const {
     src: setSrc,
-    height: setHeight,
     available: setAvailable,
     status: setStatus,
     error: setError,
@@ -93,12 +103,22 @@ export function AppView(props: AppViewProps) {
   const reportViewMessage = useEffectEvent((text: string) => props.onViewMessage(text));
   const ownsResource = useEffectEvent((uri: string) => uri === props.resourceUri);
   const findTool = useEffectEvent((name: string) => props.tools.find((t) => t.name === name));
+  const soundOn = useEffectEvent(() => props.soundOn ?? true);
+  const isHatchResult = useEffectEvent(() => isFreshHatch(props.toolName, props.result));
 
   useEffect(() => {
     let disposed = false;
     const iframe = iframeRef.current;
     if (!iframe) return;
     setStatus('loading');
+    // The hatch's sound, when the view cannot play it (hatchSound.ts).
+    const hatchSound = createHostHatchSound({
+      audio: pageAudioContext,
+      soundOn,
+      reducedMotion: () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true,
+      duckSpeech: setSpeechDuck,
+    });
+    if (isHatchResult()) hatchSound.arm();
 
     (async () => {
       const view = await readView(props.client, props.resourceUri);
@@ -126,13 +146,14 @@ export function AppView(props: AppViewProps) {
       const bridge = new AppBridge(
         props.client,
         { name: 'nyc-mon-simulator', version: '0.1.0' },
-        { openLinks: {}, serverTools: caps?.tools, serverResources: caps?.resources, message: { text: {} } },
+        { openLinks: {}, serverTools: caps?.tools, serverResources: caps?.resources, message: { text: {} }, logging: {} },
         {
           hostContext: {
             theme: props.scheme,
             platform: 'web',
             displayMode: props.displayMode,
             availableDisplayModes: ['inline', 'fullscreen'],
+            ...(store.getState().available > 0 ? { maxHeight: store.getState().available } : {}),
             styles: { variables: hostStyleVariables(props.scheme) },
             ...(props.tool ? { toolInfo: { tool: props.tool } } : {}),
           } as never,
@@ -144,9 +165,6 @@ export function AppView(props: AppViewProps) {
         const next: DisplayMode = mode === 'fullscreen' ? 'fullscreen' : 'inline';
         requestDisplayMode(next);
         return { mode: next };
-      };
-      bridge.onsizechange = ({ height: h }) => {
-        if (typeof h === 'number' && h > 0) setHeight(Math.ceil(h));
       };
       bridge.onopenlink = async ({ url }) => {
         if (/^https:\/\//.test(url)) window.open(url, '_blank', 'noopener,noreferrer');
@@ -161,6 +179,11 @@ export function AppView(props: AppViewProps) {
         return {};
       };
       bridge.onupdatemodelcontext = async () => ({});
+      // The view says when its hatch starts and whether it plays the sound itself.
+      bridge.addEventListener('loggingmessage', (params) => {
+        const report = parseHatchStart(params);
+        if (report && !disposed) void hatchSound.onViewStart(report);
+      });
       // A view reads only its own resource, not every resource on the server.
       bridge.onreadresource = async (params) => {
         if (!ownsResource(params.uri)) throw new Error('This view can only read its own resource.');
@@ -173,7 +196,10 @@ export function AppView(props: AppViewProps) {
         if (!target || HOST_ONLY_TOOLS.has(params.name) || isToolVisibilityModelOnly(target)) {
           return { content: [{ type: 'text', text: `This view can't call ${params.name}.` }], isError: true };
         }
-        return (await props.client.callTool(params)) as never;
+        const result = await props.client.callTool(params);
+        // The Hatch button: the view had the tap, so it normally plays; the host covers it if it cannot.
+        if (isFreshHatch(params.name, result as never)) hatchSound.arm();
+        return result as never;
       };
 
       const initialized = new Promise<void>((resolve) => {
@@ -195,6 +221,7 @@ export function AppView(props: AppViewProps) {
 
     return () => {
       disposed = true;
+      hatchSound.dispose();
       const bridge = bridgeRef.current;
       bridgeRef.current = null;
       if (bridge) {
@@ -205,11 +232,9 @@ export function AppView(props: AppViewProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.client, props.resourceUri, props.sandboxOrigin, attempt]);
 
-  // Track the stage space so the inline frame never runs past the display.
+  // The slot around the frame is the display's free space; report it as it changes.
   useEffect(() => {
-    // The canvas is the display itself; the slot around the frame scrolls when
-    // the view is taller than the space beside the reply.
-    const el = (iframeRef.current?.closest('[aria-label="Smart display"]') as HTMLElement | null) ?? null;
+    const el = iframeRef.current?.parentElement;
     if (!el || typeof ResizeObserver === 'undefined') return;
     const ro = new ResizeObserver(([entry]) => setAvailable(Math.floor(entry?.contentRect.height ?? 0)));
     ro.observe(el);
@@ -217,8 +242,26 @@ export function AppView(props: AppViewProps) {
   }, [setAvailable]);
 
   useEffect(() => {
+    if (available > 0) void bridgeRef.current?.sendHostContextChange({ maxHeight: available } as never);
+  }, [available]);
+
+  useEffect(() => {
     void bridgeRef.current?.sendHostContextChange({ displayMode: props.displayMode });
   }, [props.displayMode]);
+
+  // The Mon's voice, as one cue per utterance through the host context's
+  // extension room (McpUiHostContext allows extra keys). The view aligns the
+  // mouth to the audio from the cue's elapsedMs; no per-frame messages.
+  // A view that becomes ready mid-sentence gets that sentence's cue then.
+  useEffect(() => {
+    if (status !== 'ready') return;
+    const send = (cue: MonSpeechCue) =>
+      void Promise.resolve(bridgeRef.current?.sendHostContextChange({ [SPEECH_CONTEXT_KEY]: cue } as never)).catch(() => {});
+    const now = currentSpeechCue();
+    if (now) send(now);
+    if (listeningNow()) send({ kind: 'listen', id: 'mic', on: true });
+    return addSpeechCueListener(send);
+  }, [status]);
 
   useEffect(() => {
     void bridgeRef.current?.sendHostContextChange({
@@ -228,7 +271,7 @@ export function AppView(props: AppViewProps) {
   }, [props.scheme]);
 
   return (
-    <View className="relative min-h-0 flex-1 overflow-y-auto">
+    <View className="relative min-h-0 flex-1 overflow-hidden">
       {status === 'error' ? (
         <View className="gap-3 p-4">
           <Paragraph role="alert" className="my-0 text-sm text-danger">
@@ -242,7 +285,9 @@ export function AppView(props: AppViewProps) {
               onPress={() => {
                 setError('');
                 setStatus('loading');
-                setAttempt((value) => value + 1);
+                void (props.onRetry?.() ?? Promise.resolve())
+                  .catch(() => {})
+                  .finally(() => setAttempt((value) => value + 1));
               }}
             />
           </View>
@@ -254,7 +299,8 @@ export function AppView(props: AppViewProps) {
         src={src ?? undefined}
         hidden={status === 'error'}
         status={status}
-        style={{ height: props.displayMode === 'inline' ? (available > 0 ? Math.min(height, available) : height) : '100%' }}
+        // The view fits whatever height it is given (MonView), so the frame fills its slot and nothing scrolls.
+        style={{ height: '100%' }}
       />
       {status === 'loading' ? <Paragraph className="my-0 p-4 text-sm text-text-secondary">Loading view…</Paragraph> : null}
     </View>

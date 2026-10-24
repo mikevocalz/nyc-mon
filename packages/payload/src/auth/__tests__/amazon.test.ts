@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, onTestFinished, vi } from 'vitest';
 import {
   AMAZON_AUTHORIZATION_URL,
   AMAZON_PROFILE_URL,
@@ -89,5 +89,55 @@ describe('Login with Amazon profile mapping', () => {
     expect(AMAZON_TOKEN_URL).toBe('https://api.amazon.com/auth/o2/token');
     expect(AMAZON_PROFILE_URL).toBe('https://api.amazon.com/user/profile');
     expect(AMAZON_SCOPES).toEqual(['profile']);
+  });
+
+  it.each([
+    ['development', 'http://localhost:5174', true, false],
+    ['development', 'http://127.0.0.1:5174', true, false],
+    ['development', 'http://[::1]:5174', true, false],
+    ['development', 'http://localhost:5174', false, true],
+    ['production', 'http://localhost:5174', true, true],
+    ['test', 'http://localhost:5174', true, true],
+    [undefined, 'http://localhost:5174', true, true],
+    ['development', 'https://admin.example.com', true, true],
+    ['development', 'https://localhost.example.com', true, true],
+    ['development', 'invalid-url', true, true],
+  ])('keeps signup guarded for %s / %s / opt-in=%s', (nodeEnv, baseURL, allowSignUp, disabled) => {
+    // These rows describe a developer's machine. CI sets CI=true, which the
+    // guard rightly treats as hosted (see the Vercel case below), so clear the
+    // hosted markers for the table and restore them after.
+    vi.stubEnv('CI', '');
+    vi.stubEnv('VERCEL', '');
+    vi.stubEnv('VERCEL_ENV', '');
+    onTestFinished(() => {
+      vi.unstubAllEnvs();
+    });
+    const plugin = amazonOAuthPlugin({ clientId: 'client-id', clientSecret: 'client-secret' }, {
+      nodeEnv, baseURL, allowSignUp,
+    });
+    const config = (plugin as unknown as {
+      options: { config: Array<{ disableImplicitSignUp: boolean; disableSignUp: boolean }> };
+    }).options.config[0];
+    expect(config?.disableImplicitSignUp).toBe(disabled);
+    expect(config?.disableSignUp).toBe(disabled);
+  });
+});
+
+describe('amazonOAuthPlugin on a hosted build', () => {
+  it('stays link-only on Vercel even with a local-looking environment', () => {
+    const previous = process.env.VERCEL;
+    process.env.VERCEL = '1';
+    try {
+      const plugin = amazonOAuthPlugin(
+        { clientId: 'id', clientSecret: 'secret' },
+        { allowSignUp: true, nodeEnv: 'development', baseURL: 'http://localhost:5174' },
+      );
+      const config = (plugin as unknown as { options: { config: { disableSignUp: boolean; disableImplicitSignUp: boolean }[] } }).options.config[0]!;
+      expect(config.disableSignUp).toBe(true);
+      expect(config.disableImplicitSignUp).toBe(true);
+    } finally {
+      if (previous === undefined) delete process.env.VERCEL;
+      else process.env.VERCEL = previous;
+    }
   });
 });

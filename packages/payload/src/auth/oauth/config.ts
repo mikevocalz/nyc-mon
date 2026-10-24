@@ -148,3 +148,16 @@ export function readOAuthConfig(
 
   return { issuer, resource: clean(env.MCP_RESOURCE_URI), clients };
 }
+
+/**
+ * Origins of the public clients' redirect URIs. A public client (no secret,
+ * PKCE only) is a browser app that posts to the token endpoint itself, so the
+ * browser needs CORS on that call. Confidential clients (Alexa) call it from a
+ * server and need none.
+ */
+export function browserClientOrigins(config: OAuthServerConfig): string[] {
+  const origins = config.clients
+    .filter((client) => client.clientSecret === undefined)
+    .flatMap((client) => client.redirectUris.map((uri) => new URL(uri).origin));
+  return [...new Set(origins)];
+}

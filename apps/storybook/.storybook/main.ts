@@ -164,6 +164,14 @@ const config: StorybookConfig = {
         'react-native-web',
       ],
     };
+    // Egg hatch GLBs (@acme/assets/eggs) load as URLs, the way Metro's
+    // assetExts hands native a numeric asset id. Without this Vite parses
+    // them as source and fails on the binary.
+    const existingAssets = viteConfig.assetsInclude;
+    viteConfig.assetsInclude = [
+      ...(Array.isArray(existingAssets) ? existingAssets : existingAssets ? [existingAssets] : []),
+      '**/*.glb',
+    ];
     viteConfig.server = { ...(viteConfig.server ?? {}), hmr: false };
     viteConfig.optimizeDeps = {
       ...(viteConfig.optimizeDeps ?? {}),

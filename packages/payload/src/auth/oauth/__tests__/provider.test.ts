@@ -6,7 +6,7 @@ import { memoryAdapter } from 'better-auth/adapters/memory';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { linkRefusal } from '../adult';
 import { checkResource, withOfflineAccess } from '../guards';
-import { readOAuthConfig } from '../config';
+import { browserClientOrigins, readOAuthConfig } from '../config';
 import { loadLinkPage } from '../pages';
 import { alexaOAuthPlugins, OAUTH_PAGES } from '../plugins';
 
@@ -588,5 +588,11 @@ describe('readOAuthConfig', () => {
   it('takes the issuer origin from AUTH_ISSUER, then BETTER_AUTH_URL', () => {
     expect(readOAuthConfig({ BETTER_AUTH_URL: 'https://admin.test/some/path' }).issuer).toBe('https://admin.test');
     expect(readOAuthConfig({ AUTH_ISSUER: 'https://auth.test', BETTER_AUTH_URL: 'https://admin.test' }).issuer).toBe('https://auth.test');
+  });
+
+  it('gives CORS the public simulator origin and never the confidential Alexa one', () => {
+    expect(browserClientOrigins(CONFIG)).toEqual(['http://localhost:5180']);
+    const withSimSecret = readOAuthConfig({ OAUTH_SIM_CLIENT_SECRET: SECRET, OAUTH_SIM_REDIRECT_URIS: SIM_REDIRECT });
+    expect(browserClientOrigins(withSimSecret)).toEqual([]);
   });
 });

@@ -35,6 +35,9 @@ allowBuilds:
   sharp: true
   unrs-resolver: true
   esbuild: true
+  # protobufjs's postinstall only prints a version warning; @grpc/proto-loader
+  # needs no build output from it.
+  protobufjs: false
 
 # Expo SDK 58 packages were published together. Keep pnpm's 24-hour
 # release-age protection for the rest of the graph while allowing the explicitly
@@ -191,6 +194,9 @@ catalog:
   date-fns: 4.4.0
   zustand: 5.0.15
   zod: 4.6.7
+  # Audio2Face-3D over gRPC from the web-sim's /api/tts (hosted NVCF function).
+  "@grpc/grpc-js": 1.14.6
+  "@grpc/proto-loader": 0.8.1
 
   # auth (ADR 0001; DECISIONS #2, #3)
   # @delmaredigital/payload-better-auth comes from the mikevocalz fork until
@@ -283,8 +289,11 @@ catalog:
   react-native-arrangement-view: 0.4.0
 
 patchedDependencies:
+  '@better-auth/core@1.7.10': patches/@better-auth__core@1.7.10.patch
+  '@delmaredigital/payload-better-auth@0.13.1': patches/@delmaredigital__payload-better-auth@0.13.1.patch
   '@reactvision/react-viro': patches/@reactvision__react-viro.patch
   '@rive-app/react-native@0.5.5': patches/@rive-app__react-native@0.5.5.patch
+  better-call@1.4.2: patches/better-call@1.4.2.patch
   metro@0.87.1: patches/metro@0.87.1.patch
   react-native-graph@1.4.0: patches/react-native-graph@1.4.0.patch
   react-native-skia@3.6.1: patches/react-native-skia@3.6.1.patch

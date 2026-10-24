@@ -69,6 +69,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@acme/assets": "workspace:*",
     "@acme/content": "workspace:*",
     "@acme/core": "workspace:*",
     "@acme/spatial": "workspace:*",

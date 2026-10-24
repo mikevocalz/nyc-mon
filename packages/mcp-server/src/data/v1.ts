@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
-import { EggRecordSchema, ListMyMonsResponseSchema, PutCareResponseSchema, type CareAction, type CareState } from '@acme/core';
+import { EggRecordSchema, ListMyMonsResponseSchema, MonInstanceSchema, PutCareResponseSchema, type CareAction, type CareState, type MonInstance } from '@acme/core';
 import { z } from 'zod';
-import type { CallerData, CareWriteIntent, IncubatingEgg, MonWithCare } from './caller.ts';
-import { AdultRequiredError, NotFoundError, UpstreamError, WriteUnconfirmedError } from './errors.ts';
+import type { CallerData, CallerMons, CareWriteIntent, IncubatingEgg, MonWithCare } from './caller.ts';
+import { AdultRequiredError, EggNotReadyError, NotFoundError, UpstreamError, WriteUnconfirmedError } from './errors.ts';
 
 /** Headers admin-vite's `/v1` reads for on-behalf-of calls (payload `v1/service-caller.ts`). */
 export const SERVICE_KEY_HEADER = 'X-NYC-MON-Service-Key';
@@ -12,6 +12,8 @@ export const IDEMPOTENCY_KEY_HEADER = 'Idempotency-Key';
 const ListMyEggsResponseSchema = z.object({
   eggs: z.array(z.object({ egg: EggRecordSchema, readyToHatch: z.boolean() })),
 });
+
+const HatchEggResponseSchema = z.object({ mon: MonInstanceSchema });
 
 const ErrorEnvelopeSchema = z.object({ ok: z.literal(false), error: z.object({ code: z.string() }) });
 
@@ -68,9 +70,10 @@ export class V1CallerData implements CallerData {
     this.now = options.now ?? Date.now;
   }
 
-  async listMons(callerId: string): Promise<readonly MonWithCare[]> {
+  async listMons(callerId: string): Promise<CallerMons> {
     const body = await this.request(callerId, 'GET', '/v1/me/mons');
-    return parseData(ListMyMonsResponseSchema, body).mons;
+    const { mons, activeMonInstanceId } = parseData(ListMyMonsResponseSchema, body);
+    return { mons, activeMonInstanceId: activeMonInstanceId ?? null };
   }
 
   async listIncubatingEggs(callerId: string): Promise<readonly IncubatingEgg[]> {
@@ -100,12 +103,20 @@ export class V1CallerData implements CallerData {
       // The PUT may have landed. Re-read once: if the write shows in the stored
       // care, answer with that state; otherwise stay unconfirmed. A resend of
       // this intent reuses the key, so it can never apply twice.
-      const reread = (await this.listMons(callerId)).find((entry) => entry.mon.monInstanceId === monInstanceId);
+      const reread = (await this.listMons(callerId)).mons.find((entry) => entry.mon.monInstanceId === monInstanceId);
       if (reread !== undefined && writeLanded(reread.care, action, sent.at)) return reread;
       throw error;
     }
     const { mon, care } = parseData(PutCareResponseSchema, body);
     return { mon, care };
+  }
+
+  async hatchEgg(callerId: string, eggId: string): Promise<MonInstance> {
+    // No Idempotency-Key on purpose: /v1 stores every non-5xx answer under the
+    // key, so a 409 NOT_READY would replay forever once the egg is ready. The
+    // route is idempotent by itself (it returns the Mon an egg already minted).
+    const body = await this.request(callerId, 'POST', `/v1/eggs/${encodeURIComponent(eggId)}/hatch`, {});
+    return parseData(HatchEggResponseSchema, body).mon;
   }
 
   private rememberIntent(key: string, sent: { seq: number; at: number }): void {
@@ -126,7 +137,7 @@ export class V1CallerData implements CallerData {
 
   private async request(
     callerId: string,
-    method: 'GET' | 'PUT',
+    method: 'GET' | 'PUT' | 'POST',
     path: string,
     json?: unknown,
     idempotencyKey?: string,
@@ -146,8 +157,8 @@ export class V1CallerData implements CallerData {
       });
     } catch (error) {
       const detail = `/v1 ${method} ${path} failed: ${error instanceof Error ? error.message : String(error)}`;
-      // A PUT may have been applied before the timeout or drop; a GET changes nothing.
-      throw method === 'PUT' ? new WriteUnconfirmedError(detail) : new UpstreamError(detail);
+      // A PUT or POST may have been applied before the timeout or drop; a GET changes nothing.
+      throw method !== 'GET' ? new WriteUnconfirmedError(detail) : new UpstreamError(detail);
     }
 
     const body: unknown = await response.json().catch(() => undefined);
@@ -157,6 +168,7 @@ export class V1CallerData implements CallerData {
     if (response.status === 403 && (code === 'ADULT_REQUIRED' || code === 'CONSENT_REQUIRED')) {
       throw new AdultRequiredError(`/v1 refused the account (${code})`);
     }
+    if (response.status === 409 && code === 'NOT_READY') throw new EggNotReadyError(`/v1 ${path} answered NOT_READY`);
     if (response.status === 404) throw new NotFoundError(`/v1 ${path} answered 404`);
     throw new UpstreamError(`/v1 ${method} ${path} answered ${response.status}${code === undefined ? '' : ` ${code}`}`);
   }
