@@ -17,7 +17,8 @@ import { Heading } from '../../../../ui/Heading';
 import { Image, type ImageProps } from '../../../../ui/Image';
 import { StatusRow } from '../../../../ui/StatusRow';
 import { Text } from '../../../../ui/Text';
-import { MonModel3D } from '../../../../ui/three/mon/MonModel3D';
+import { MonModel3D, type MouthRig } from '../../../../ui/three/mon/MonModel3D';
+import type { MonSpeechCue } from '../../../../ui/three/mon/lipsync/cue.ts';
 import { View } from '../../../../ui/tw';
 import { clipsFor, eggDetailText, eggReady, eggTimeText, type ActionId, type MonViewModel } from '../contract.ts';
 
@@ -52,6 +53,11 @@ export interface MonViewProps {
   readonly canvasHeight?: number;
   readonly onAction: (id: ActionId) => void;
   readonly onToggleRoom: () => void;
+  /**
+   * The simulator's latest speech cue (host context). On a real Echo no host
+   * sends one: Alexa speaks in its own voice and the Mon keeps its clip.
+   */
+  readonly speech?: MonSpeechCue | null;
 }
 
 declare const __MON_MODEL_ORIGIN__: string;
@@ -62,15 +68,31 @@ declare const __MON_MODEL_ORIGIN__: string;
  * Every other Mon shows its still with "Coming Soon"; their models arrive
  * through the Payload console (mon-models).
  */
-const MON_MODELS: Readonly<Record<number, { file: string }>> = {
-  // The Egg form: the hatch rig (packages/assets/eggs/metro-egg).
+const MON_MODELS: Readonly<Record<number, { file: string; mouth?: MouthRig }>> = {
+  // The Egg form: the hatch rig (packages/assets/eggs/metro-egg). No mouth.
   1: { file: 'metro-egg' },
-  2: { file: 'squeaklet' },
-  3: { file: 'lil-ratti' },
+  // Jaw angles read off the files' own clips (about the jaw's local X, from
+  // bind): Squeaklet binds with the mouth ajar and its mouth_close clip shuts
+  // it at +0.357; jaw_chomp opens to -0.286. Lil' Ratti binds shut;
+  // face_pose_sweep's widest frame is -0.312.
+  2: { file: 'squeaklet', mouth: { jawBone: 'jaw', jawClosedRad: 0.357, jawOpenRad: -0.15 } },
+  3: { file: 'lil-ratti', mouth: { jawBone: 'jaw', jawClosedRad: 0, jawOpenRad: -0.3 } },
 };
 
 /** The Mon in 3D (three.js) when its model exists; otherwise HomeLayout's still with a Coming Soon badge. */
-function Still({ vm, width, nowMs, height = Math.round(width * 1.25) }: { vm: MonViewModel; width: number; nowMs: number; height?: number }) {
+function Still({
+  vm,
+  width,
+  nowMs,
+  speech,
+  height = Math.round(width * 1.25),
+}: {
+  vm: MonViewModel;
+  width: number;
+  nowMs: number;
+  speech: MonSpeechCue | null;
+  height?: number;
+}) {
   const dex = vm.identity.dexId;
   const model = dex === null ? undefined : MON_MODELS[dex];
   const [failed, setFailed] = useState(false);
@@ -81,15 +103,15 @@ function Still({ vm, width, nowMs, height = Math.round(width * 1.25) }: { vm: Mo
       : vm.name;
     const clips = clipsFor(dex, vm.mood, vm.asleep) ?? [];
     return (
-      // MonModel3D picks its clip when the GLB loads, so a mood change re-keys it to play the new one.
+      // A mood change cross-fades the clip inside MonModel3D; the GLB is not reloaded.
       <MonModel3D
-        key={clips.join(',') || 'still'}
         url={`${typeof __MON_MODEL_ORIGIN__ === 'string' ? __MON_MODEL_ORIGIN__ : ''}/mons/${model.file}.glb`}
         clips={clips}
         width={width}
         height={height}
         label={label}
         onError={() => setFailed(true)}
+        {...(model.mouth && !vm.egg ? { mouth: model.mouth, speech } : {})}
       />
     );
   }
@@ -110,14 +132,14 @@ function Still({ vm, width, nowMs, height = Math.round(width * 1.25) }: { vm: Mo
  * The Mon on its stage, the way virtual pets stand in their world (no card
  * around it): name and Bloodline as plain text above, the Mon itself below.
  */
-function Stage({ vm, stillWidth, nowMs }: { vm: MonViewModel; stillWidth: number; nowMs: number }) {
+function Stage({ vm, stillWidth, nowMs, speech }: { vm: MonViewModel; stillWidth: number; nowMs: number; speech: MonSpeechCue | null }) {
   return (
     <View className="items-center gap-2">
       <View className="items-center">
         <Heading level={1} size="title">{vm.name}</Heading>
         {vm.identity.bloodlineLabel ? <Text variant="caption" tone="muted">{vm.identity.bloodlineLabel}</Text> : null}
       </View>
-      <Still vm={vm} width={stillWidth} nowMs={nowMs} />
+      <Still vm={vm} width={stillWidth} nowMs={nowMs} speech={speech} />
     </View>
   );
 }
@@ -256,13 +278,14 @@ function Journal({ vm, nowMs, fit = false }: { vm: MonViewModel; nowMs: number; 
 
 export function MonView(props: MonViewProps) {
   const { vm, layout, theme, nowMs } = props;
+  const speech = props.speech ?? null;
   const height = props.canvasHeight ?? 456;
   if (props.narrow) {
     // Stacked at content height: the Mon, then the status and rings, then the
     // bar. A narrow host grows the frame to fit (main.tsx), so nothing clips.
     return (
       <View className="gap-4">
-        <Stage vm={vm} stillWidth={220} nowMs={nowMs} />
+        <Stage vm={vm} stillWidth={220} nowMs={nowMs} speech={speech} />
         {vm.egg ? <Incubation vm={vm} nowMs={nowMs} /> : <Care vm={vm} theme={theme} />}
         {layout === 'room' ? <Journal vm={vm} nowMs={nowMs} /> : null}
         <Bar {...props} />
@@ -302,7 +325,7 @@ export function MonView(props: MonViewProps) {
         <Bar {...props} narrow={twoRowBar} />
       </View>
       <View className="justify-end">
-        <Still vm={vm} width={stillSize} height={stillSize} nowMs={nowMs} />
+        <Still vm={vm} width={stillSize} height={stillSize} nowMs={nowMs} speech={speech} />
       </View>
     </View>
   );

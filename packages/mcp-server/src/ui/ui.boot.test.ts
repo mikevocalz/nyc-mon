@@ -402,6 +402,36 @@ describe('built views boot in a spec host (bundled Chromium)', { timeout: 20_000
     }
   });
 
+  it("Lil' Ratti lip-syncs a speech cue from the host context, then closes to rest", async () => {
+    const b = await boot('mon-card', { ...echoShow8('inline', 'light'), result: { mon: monFor('dex-003'), care } });
+    try {
+      const canvas = b.frame.locator('canvas[data-engine^="three.js"]');
+      await b.frame.waitForFunction(() => document.querySelector('[role=img][aria-busy="false"]') !== null, null, { timeout: 15_000 });
+      await b.frame.waitForFunction(() => document.querySelector('canvas')?.dataset.mouthOpen === '0', null, { timeout: 5000 });
+      // "Hello Mon, wanna play?" as visemes over 1.6 s: open vowels, a closure, a pause.
+      const keys = [
+        { v: 'mid', startMs: 0, endMs: 120 },
+        { v: 'wide', startMs: 120, endMs: 300 },
+        { v: 'round', startMs: 300, endMs: 520 },
+        { v: 'closed', startMs: 520, endMs: 600 },
+        { v: 'open', startMs: 600, endMs: 900 },
+        { v: 'rest', startMs: 900, endMs: 1050 },
+        { v: 'round', startMs: 1050, endMs: 1250 },
+        { v: 'open', startMs: 1250, endMs: 1600 },
+      ];
+      const cue = { kind: 'start', id: 'boot-1', elapsedMs: 0, durationMs: 1600, track: { kind: 'visemes', keys } };
+      await b.frame.page().evaluate((c) => window.sendHostContext({ nycMonSpeech: c }), cue);
+      // Mid-utterance the jaw is open; read it a few times since frames are slow in software GL.
+      await b.frame.waitForFunction(() => Number(document.querySelector('canvas')?.dataset.mouthOpen ?? 0) > 0.15, null, { timeout: 2000 });
+      // After the audio ends the mouth relaxes back to the clip.
+      await b.frame.waitForFunction(() => Number(document.querySelector('canvas')?.dataset.mouthOpen ?? 1) < 0.02, null, { timeout: 5000 });
+      expect(Number(await canvas.getAttribute('data-mouth-open'))).toBeLessThan(0.02);
+      expect(b.errors).toEqual([]);
+    } finally {
+      await b.close();
+    }
+  });
+
   it('a care button calls its tool through the bridge', async () => {
     const b = await boot('mon-card', { ...echoShow8('inline', 'light'), result: { mon: monFor('dex-002'), care } });
     try {

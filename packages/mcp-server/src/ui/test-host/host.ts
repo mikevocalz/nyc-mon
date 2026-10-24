@@ -20,6 +20,8 @@ interface Mount {
 declare global {
   interface Window {
     mountView: (m: Mount) => Promise<void>;
+    /** ui/notifications/host-context-changed to the mounted view. */
+    sendHostContext: (ctx: Record<string, unknown>) => Promise<void>;
     calls: unknown[];
     sizes: { width?: number; height?: number }[];
   }
@@ -43,6 +45,9 @@ window.mountView = async ({ html, width, height, hostContext, result, callFails 
     window.sizes.push(size);
   };
   bridge.onrequestdisplaymode = async ({ mode }) => ({ mode });
+  window.sendHostContext = async (ctx) => {
+    await bridge.sendHostContextChange(ctx as never);
+  };
   bridge.oninitialized = () => {
     void bridge.sendToolInput({ arguments: {} });
     void bridge.sendToolResult({ content: [], structuredContent: result } as never);

@@ -7,7 +7,7 @@
  * room. State is one zustand store.
  */
 import './view.css';
-import { Component, useEffect, type ReactNode } from 'react';
+import { Component, useEffect, useMemo, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { create } from 'zustand';
 import { App, type McpUiHostContext } from '@modelcontextprotocol/ext-apps/app-with-deps';
@@ -17,6 +17,7 @@ import { MonView } from './MonView.tsx';
 import { StatusRow } from '../../../../ui/StatusRow';
 import { View } from '../../../../ui/tw';
 import { GridBackdrop as RoomBackdrop } from './GridBackdrop.tsx';
+import { parseSpeechCue, SPEECH_CONTEXT_KEY } from '../../../../ui/three/mon/lipsync/cue.ts';
 
 /**
  * Keeps a backdrop failure from taking the room with it: if the grid floor
@@ -153,6 +154,9 @@ function Root() {
   const notice = useView((s) => s.notice);
   const failed = useView((s) => s.failed);
   const nowMs = useView((s) => s.nowMs);
+  // The simulator host's speech cue rides the host context (see lipsync/cue.ts).
+  const speechRaw = useView((s) => s.host[SPEECH_CONTEXT_KEY]);
+  const speech = useMemo(() => parseSpeechCue(speechRaw), [speechRaw]);
   const incubating = vm?.egg != null;
   // An egg's time left counts down on screen without a new tool result.
   useEffect(() => {
@@ -200,6 +204,7 @@ function Root() {
             canvasHeight={canvasHeight - 24}
             onAction={(id) => void runAction(id)}
             onToggleRoom={() => void toggleRoom()}
+            speech={speech}
           />
         </main>
       ) : null}
