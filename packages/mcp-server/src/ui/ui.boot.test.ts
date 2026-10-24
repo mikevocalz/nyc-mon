@@ -579,6 +579,63 @@ describe('built views boot in a spec host (bundled Chromium)', { timeout: 60_000
     }
   });
 
+  it('a short, wide host widens the canvas so the Mon stands at the right edge', async () => {
+    const b = await boot('mon-card', {
+      width: 1180,
+      height: 430,
+      hostContext: { theme: 'light', displayMode: 'inline', availableDisplayModes: ['inline', 'fullscreen'], maxWidth: 1180, maxHeight: 430 },
+      result: { mon: monFor('dex-002'), care },
+      preScript: NO_WEBGL,
+    });
+    try {
+      await b.frame.getByRole('button', { name: 'Feed' }).waitFor({ timeout: 15_000 });
+      // The Mon's box is the last child of the card's row (the still, without WebGL).
+      const mon = await b.frame.evaluate(() => {
+        const r = document.querySelector('main')!.firstElementChild!.lastElementChild!.getBoundingClientRect();
+        return { x: r.x, width: r.width };
+      });
+      const width = await b.frame.evaluate(() => window.innerWidth);
+      expect(mon).not.toBeNull();
+      // Within the 12 px padding of the right edge, not stranded mid-frame on a 768 canvas.
+      expect(width - (mon!.x + mon!.width)).toBeLessThan(24);
+      expect(b.errors.filter((e) => !/webgl/i.test(e))).toEqual([]);
+    } finally {
+      await b.close();
+    }
+  });
+
+  it('the Metro Egg hatches into Squeaklet and hands over to the standing Mon', { timeout: 90_000 }, async () => {
+    const b = await boot('mon-card', {
+      ...echoShow8('inline', 'light'),
+      result: { hatched: true, alreadyHatched: false, hatching: true, egg: { eggId: 'egg_boot', speciesId: 'dex-001' }, mon: monFor('dex-002'), care },
+    });
+    // Set MON_BOOT_FRAMES to a directory to keep a frame strip of the hatch for review.
+    const framesDir = process.env.MON_BOOT_FRAMES;
+    const stage = b.frame.locator('[data-layer="mon"]').locator('..');
+    let n = 0;
+    const shoot = async (tag: string) => {
+      if (!framesDir) return;
+      const box = (await stage.boundingBox()) ?? (await b.frame.locator('canvas').first().boundingBox());
+      if (box) await b.frame.page().screenshot({ path: join(framesDir, `hatch-${String(n++).padStart(3, '0')}-${tag}.png`), clip: box });
+    };
+    try {
+      await b.frame.waitForFunction(() => document.querySelector('canvas[data-hatch-phase]') !== null, null, { timeout: 30_000 });
+      // Through the hatch and 3 s past the hand-over.
+      let handedAt = 0;
+      for (let i = 0; i < 400; i++) {
+        const phase = await b.frame.evaluate(() => document.querySelector('canvas[data-hatch-phase]')?.getAttribute('data-hatch-phase') ?? 'mon');
+        if (phase === 'mon' && !handedAt) handedAt = Date.now();
+        if (['resolve', 'crossfade', 'done', 'mon'].includes(phase)) await shoot(phase);
+        if (handedAt && Date.now() - handedAt > 3000) break;
+        await new Promise((done) => setTimeout(done, 100));
+      }
+      expect(handedAt).toBeGreaterThan(0);
+      expect(b.errors).toEqual([]);
+    } finally {
+      await b.close();
+    }
+  });
+
   it('a care button calls its tool through the bridge', async () => {
     const b = await boot('mon-card', { ...echoShow8('inline', 'light'), result: { mon: monFor('dex-002'), care }, preScript: NO_WEBGL });
     try {

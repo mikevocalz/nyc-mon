@@ -193,7 +193,10 @@ function Root() {
   const narrow = !fitted && frameWidth - 24 < NARROW_BELOW;
   // Fitted, the view is exactly the frame and never scrolls. Fluid (a narrow
   // host), it takes its content height and reports it so the host grows the frame.
-  const style = fitted ? { zoom, width: BASE_WIDTH, height: canvasHeight } : undefined;
+  // A frame wider than the zoomed 768 canvas (a short, wide host) widens the
+  // canvas instead of leaving a gutter, so the Mon still stands at the right edge.
+  const canvasWidth = fitted ? Math.max(BASE_WIDTH, Math.min(frameWidth, typeof host.maxWidth === 'number' ? host.maxWidth : Infinity) / zoom) : undefined;
+  const style = fitted ? { zoom, width: canvasWidth, height: canvasHeight } : undefined;
   return (
     <div style={style} className={`relative flex flex-col bg-bg p-3 ${fitted ? 'overflow-hidden' : ''}`}>
       {__GRID_BACKDROP__ && layout === 'room' && GridBackdrop ? (
@@ -211,6 +214,7 @@ function Root() {
             narrow={narrow}
             nowMs={nowMs}
             canvasHeight={canvasHeight - 24}
+            {...(canvasWidth ? { canvasWidth: canvasWidth - 24 } : {})}
             onAction={(id) => void runAction(id)}
             onToggleRoom={() => void toggleRoom()}
             speech={speech}
