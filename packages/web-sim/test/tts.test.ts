@@ -233,3 +233,73 @@ describe('pitch filter', () => {
     expect(args[args.indexOf('-af') + 1]).toBe(pitchFilter(1.3));
   });
 });
+
+describe('/api/tts JSON (lip-sync)', () => {
+  const alignment = { characters: ['H', 'i'], character_start_times_seconds: [0, 0.1], character_end_times_seconds: [0.1, 0.2] };
+  const timed = (body: unknown = { audio_base64: Buffer.from([1, 2, 3]).toString('base64'), alignment, normalized_alignment: alignment }) =>
+    vi.fn<TtsFetch>(async () => new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } }));
+  const postJson = (body: unknown) =>
+    new Request(`${ORIGIN}/api/tts`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', accept: 'application/json, audio/mpeg', origin: ORIGIN },
+      body: JSON.stringify(body),
+    });
+  /** A shifter that appends a marker byte, so the test can see which bytes went where. */
+  const markShifter = () =>
+    vi.fn<PitchShifter>((audio) =>
+      audio.pipeThrough(new TransformStream<Uint8Array, Uint8Array>({ transform: (c, ctl) => ctl.enqueue(new Uint8Array([...c, 9])) })),
+    );
+
+  it('asks /with-timestamps and answers base64 audio with the alignment', async () => {
+    const fetchFn = timed();
+    const res = await handler({ fetchFn, pitchShift: null })(postJson({ text: 'Hi', lineageId: LINEAGE, stage: 'Mid' }), 'ip');
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toBe('application/json');
+    expect(String(fetchFn.mock.calls[0]?.[0])).toBe(`https://api.elevenlabs.io/v1/text-to-speech/${AYLA}/with-timestamps?output_format=mp3_44100_128`);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body).toEqual({ audio: Buffer.from([1, 2, 3]).toString('base64'), audioContentType: 'audio/mpeg', pitch: 1, alignment });
+  });
+
+  it('shifts the pitch on the buffered clip and sends Audio2Face the SAME bytes it returns', async () => {
+    const face = vi.fn(async () => ({ fps: 30, names: ['jawOpen'], frames: [[0.2]] }));
+    const res = await createTtsHandler({
+      allowedOrigin: ORIGIN,
+      rateLimit: createRateLimiter(100),
+      apiKey: 'k',
+      fetch: timed(),
+      pitchShift: markShifter(),
+      face,
+    })(postJson({ text: 'Hi', lineageId: LINEAGE, stage: 'Baby', mood: 'content' }), 'ip');
+    const body = (await res.json()) as { audio: string; pitch: number; face: unknown };
+    expect(body.pitch).toBe(1.3);
+    expect([...Buffer.from(body.audio, 'base64')]).toEqual([1, 2, 3, 9]);
+    const sent = (face.mock.calls[0] as unknown as [{ audio: Uint8Array; mood: string }])[0];
+    expect([...sent.audio]).toEqual([1, 2, 3, 9]);
+    expect(sent.mood).toBe('content');
+    expect(body.face).toEqual({ fps: 30, names: ['jawOpen'], frames: [[0.2]] });
+  });
+
+  it('a failed face leaves the face out and still answers the clip with its alignment', async () => {
+    const res = await createTtsHandler({
+      allowedOrigin: ORIGIN,
+      rateLimit: createRateLimiter(100),
+      apiKey: 'k',
+      fetch: timed(),
+      pitchShift: null,
+      face: async () => null,
+    })(postJson({ text: 'Hi', lineageId: LINEAGE, stage: 'Mid' }), 'ip');
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.face).toBeUndefined();
+    expect(body.alignment).toEqual(alignment);
+  });
+
+  it('drops a malformed alignment and reports an upstream failure as 502', async () => {
+    const bad = timed({ audio_base64: 'AQID', alignment: { characters: ['a'], character_start_times_seconds: [], character_end_times_seconds: [] } });
+    const body = (await (await handler({ fetchFn: bad, pitchShift: null })(postJson({ text: 'Hi', lineageId: LINEAGE, stage: 'Mid' }), 'ip')).json()) as Record<string, unknown>;
+    expect(body.alignment).toBeUndefined();
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const down = vi.fn<TtsFetch>(async () => new Response('no', { status: 500 }));
+    expect((await handler({ fetchFn: down })(postJson({ text: 'Hi', lineageId: LINEAGE, stage: 'Mid' }), 'ip')).status).toBe(502);
+    err.mockRestore();
+  });
+});

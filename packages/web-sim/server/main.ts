@@ -8,7 +8,8 @@ import { createModelAuth } from './model-auth.ts';
 import { bedrockBackend, clientKey, createModelHandler, createRateLimiter, mockBackend } from './model.ts';
 import { sandboxDocument, sandboxHeaders } from './sandbox.ts';
 import { createSkillLoader, resolveSkillPath } from './skill.ts';
-import { createTtsHandler } from './tts.ts';
+import { createA2fRenderer, createNvcfCall, mp3ToPcm16 } from './a2f.ts';
+import { createTtsHandler, findFfmpeg } from './tts.ts';
 
 /**
  * Two listeners:
@@ -53,11 +54,26 @@ const handleModel = createModelHandler({
   ...(modelAuth ? { auth: modelAuth } : {}),
 });
 
+// Audio2Face-3D needs the NVIDIA key and ffmpeg (mp3 to 16 kHz PCM); without
+// either, /api/tts still sends character timing and the Mon lip-syncs from it.
+const ffmpegForFace = env.NVIDIA_API_KEY ? findFfmpeg() : null;
+const face =
+  env.NVIDIA_API_KEY && ffmpegForFace
+    ? createA2fRenderer({
+        call: createNvcfCall({ apiKey: env.NVIDIA_API_KEY, ...(env.NVIDIA_A2F_FUNCTION_ID ? { functionId: env.NVIDIA_A2F_FUNCTION_ID } : {}) }),
+        toPcm: (mp3, signal) => mp3ToPcm16(ffmpegForFace, mp3, signal),
+        timeoutMs: env.SIM_A2F_TIMEOUT_MS,
+        onTiming: (ms, frames) => console.log(`[web-sim] a2f face in ${ms} ms (${frames} frames)`),
+      })
+    : undefined;
+console.log(`[web-sim] Mon lip-sync: ${face ? 'Audio2Face-3D, then character timing' : 'character timing (no NVIDIA key or ffmpeg)'}`);
+
 const handleTts = createTtsHandler({
   allowedOrigin: hostOrigin,
   rateLimit: createRateLimiter(env.SIM_TTS_RATE_LIMIT_PER_MIN, { globalPerMinute: env.SIM_GLOBAL_RATE_LIMIT_PER_MIN }),
   apiKey: env.ELEVENLABS_API_KEY,
   fetch,
+  ...(face ? { face } : {}),
   ...(modelAuth ? { auth: modelAuth } : {}),
 });
 

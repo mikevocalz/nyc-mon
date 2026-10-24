@@ -58,6 +58,16 @@ export const SimEnvSchema = z.object({
    * only by this process; never sent to the browser.
    */
   ELEVENLABS_API_KEY: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).optional()),
+  /**
+   * NVIDIA API key for Audio2Face-3D on the Mon's voice (server/a2f.ts).
+   * Optional: unset (or empty), /api/tts sends character timing only and the
+   * Mon lip-syncs from that. Read only by this process; never logged.
+   */
+  NVIDIA_API_KEY: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).optional()),
+  /** The NVCF function to call; defaults to `ai-a2x-service` (a2f.ts). */
+  NVIDIA_A2F_FUNCTION_ID: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).optional()),
+  /** How long a face may take before the clip goes out without one. */
+  SIM_A2F_TIMEOUT_MS: z.coerce.number().int().positive().default(4000),
   /** Speech requests per minute per client address. */
   SIM_TTS_RATE_LIMIT_PER_MIN: z.coerce.number().int().positive().default(30),
   AWS_REGION: z.string().optional(),

@@ -3,6 +3,8 @@ import { Readable } from 'node:stream';
 import { resolveVoice, stageDirectionsToTags, voiceDelivery, voicePitchFactor } from '@acme/content/voices';
 import { IdSchema, LifecycleStageSchema, MonMoodSchema } from '@acme/core/schemas';
 import { z } from 'zod';
+import type { CharacterAlignment, FaceTrack } from '@acme/ui/three/mon/lipsync';
+import type { FaceRenderer } from './a2f.ts';
 import type { ModelAuthCheck } from './model-auth.ts';
 
 /**
@@ -26,6 +28,15 @@ import type { ModelAuthCheck } from './model-auth.ts';
  * 204 means "no voice for this": no API key, an Egg, or a lineage whose pool is
  * empty. The client then falls back to Web Speech. The API key and the text are
  * never logged.
+ *
+ * Lip-sync: a client that sends `Accept: application/json` gets one JSON body
+ * instead of streamed mp3: `{ audio (base64 mp3), audioContentType, pitch,
+ * alignment?, face? }`. `alignment` is ElevenLabs' per-character timing
+ * (`/with-timestamps`); the pitch shift keeps duration, so it still fits the
+ * shifted clip. `face` is Audio2Face-3D's frames from that same shifted clip,
+ * when an NVIDIA key is configured and the call answers in time. Buffering
+ * costs no first-audio latency: the browser already waited for the whole clip
+ * before playing it. Either field may be missing; the clip always plays.
  */
 
 export const MAX_TTS_TEXT = 400;
@@ -135,6 +146,36 @@ export interface TtsHandlerDeps {
    * first use. Null: never shift (the clip keeps the voice's own pitch).
    */
   readonly pitchShift?: PitchShifter | null;
+  /** Audio2Face-3D for the JSON answer. Omitted: no face, character timing only. */
+  readonly face?: FaceRenderer;
+}
+
+/** ElevenLabs `/with-timestamps` body. */
+interface TimestampedAudio {
+  readonly audio_base64: string;
+  readonly alignment?: CharacterAlignment | null;
+}
+
+function readAlignment(a: unknown): CharacterAlignment | undefined {
+  if (typeof a !== 'object' || a === null) return undefined;
+  const { characters, character_start_times_seconds: starts, character_end_times_seconds: ends } = a as Record<string, unknown>;
+  if (!Array.isArray(characters) || !Array.isArray(starts) || !Array.isArray(ends)) return undefined;
+  if (characters.length !== starts.length || starts.length !== ends.length || characters.length > 4 * MAX_TTS_TEXT) return undefined;
+  if (!characters.every((c) => typeof c === 'string') || ![...starts, ...ends].every((t) => typeof t === 'number' && Number.isFinite(t))) return undefined;
+  return { characters, character_start_times_seconds: starts, character_end_times_seconds: ends } as CharacterAlignment;
+}
+
+async function collect(stream: ReadableStream<Uint8Array>): Promise<Uint8Array> {
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
+function streamOf(bytes: Uint8Array): ReadableStream<Uint8Array> {
+  return new ReadableStream({
+    start(controller) {
+      controller.enqueue(bytes);
+      controller.close();
+    },
+  });
 }
 
 export function createTtsHandler(deps: TtsHandlerDeps) {
@@ -172,6 +213,53 @@ export function createTtsHandler(deps: TtsHandlerDeps) {
 
     const delivery = voiceDelivery(parsed.mood);
     const spoken = spokenLine(parsed.text, parsed.mood);
+    const shifter = deps.pitchShift === undefined ? systemPitchShifter() : deps.pitchShift;
+
+    if ((req.headers.get('accept') ?? '').includes('application/json')) {
+      let timed: TimestampedAudio;
+      try {
+        const res = await deps.fetch(`${ELEVENLABS_URL}/${voice.elevenLabsVoiceId}/with-timestamps?output_format=mp3_44100_128`, {
+          method: 'POST',
+          headers: { 'xi-api-key': deps.apiKey, 'content-type': 'application/json', accept: 'application/json' },
+          body: JSON.stringify({ text: spoken, model_id: ELEVENLABS_TTS_MODEL, voice_settings: delivery.settings }),
+          signal: req.signal,
+        });
+        if (!res.ok) {
+          console.error('[web-sim] tts upstream status', res.status, 'voice', voice.lineageId);
+          await res.body?.cancel().catch(() => {});
+          return json(502, { error: 'Voice unavailable.' });
+        }
+        timed = (await res.json()) as TimestampedAudio;
+        if (typeof timed.audio_base64 !== 'string' || timed.audio_base64 === '') throw new Error('no audio');
+      } catch (err) {
+        console.error('[web-sim] tts request failed', err instanceof Error ? err.name : 'unknown');
+        return json(502, { error: 'Voice unavailable.' });
+      }
+      let audio: Uint8Array = new Uint8Array(Buffer.from(timed.audio_base64, 'base64'));
+      let applied = 1;
+      if (factor !== 1 && shifter !== null) {
+        try {
+          audio = await collect(shifter(streamOf(audio), factor, req.signal));
+          applied = factor;
+        } catch (err) {
+          console.error('[web-sim] pitch shift unavailable', err instanceof Error ? err.message : 'unknown');
+        }
+      }
+      const alignment = readAlignment(timed.alignment);
+      // The face comes from the bytes the browser will play, after the shift.
+      let face: FaceTrack | null = null;
+      if (deps.face) face = await deps.face({ audio, signal: req.signal, ...(parsed.mood === undefined ? {} : { mood: parsed.mood }) });
+      return new Response(
+        JSON.stringify({
+          audio: Buffer.from(audio).toString('base64'),
+          audioContentType: 'audio/mpeg',
+          pitch: applied,
+          ...(alignment ? { alignment } : {}),
+          ...(face ? { face } : {}),
+        }),
+        { status: 200, headers: { 'content-type': 'application/json', 'cache-control': 'no-store', 'x-mon-pitch': String(applied) } },
+      );
+    }
 
     let upstream: Response;
     try {
@@ -193,7 +281,6 @@ export function createTtsHandler(deps: TtsHandlerDeps) {
 
     let body: ReadableStream<Uint8Array> = upstream.body;
     let applied = 1;
-    const shifter = deps.pitchShift === undefined ? systemPitchShifter() : deps.pitchShift;
     if (factor !== 1 && shifter !== null) {
       try {
         body = shifter(upstream.body, factor, req.signal);
