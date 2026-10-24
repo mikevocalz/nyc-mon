@@ -429,6 +429,8 @@ describe('built views boot in a spec host (bundled Chromium)', { timeout: 20_000
       await b.frame.waitForFunction(() => Number(document.querySelector('canvas')?.dataset.mouthOpen ?? 0) > 0.15, null, { timeout: 2000 });
       // Speech opened the lips too.
       expect(Number(await canvas.getAttribute('data-mouth-close'))).toBeLessThan(1);
+      // And the turntable has brought the face round to the viewer.
+      await b.frame.waitForFunction(() => Number(document.querySelector('canvas')?.dataset.facing ?? 9) < 0.2, null, { timeout: 2000 });
       // After the audio ends the face returns to the rest pose: jaw shut, lips closed.
       await b.frame.waitForFunction(() => {
         const d = document.querySelector('canvas')?.dataset;

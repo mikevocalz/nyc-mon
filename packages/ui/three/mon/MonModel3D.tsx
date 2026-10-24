@@ -54,6 +54,9 @@ export interface MouthRig {
   readonly rest: Readonly<Record<string, number>>;
 }
 
+/** How quickly the Mon turns to face the viewer when it starts to speak (per second, critically damped). */
+const FACE_TURN_RATE = 6;
+
 const NO_CLIPS: readonly string[] = [];
 const CROSSFADE_S = 0.4;
 const X_AXIS = new THREE.Vector3(1, 0, 0);
@@ -383,6 +386,8 @@ export function MonModel3D({
       const range = Math.abs(m.jawOpenRad - m.jawClosedRad) || 1;
       const open = Math.min(1, r.jaw.quaternion.angleTo(closedQuat) / range);
       const next = `${open.toFixed(2)} ${readMorph(r, 'mouthClose').toFixed(2)}`;
+      // How far the Mon is turned from the viewer, in radians (0 = facing).
+      if (root) canvas.dataset.facing = Math.abs(Math.atan2(Math.sin(root.rotation.y), Math.cos(root.rotation.y))).toFixed(2);
       if (next === shown) return;
       shown = next;
       canvas.dataset.mouthOpen = open.toFixed(2);
@@ -417,7 +422,17 @@ export function MonModel3D({
         applyBlink(rig);
         report(rig);
       }
-      if (root) root.rotation.y += dt * 0.35; // slow turntable
+      if (root) {
+        // Slow turntable while idle. While the Mon speaks it turns to face the
+        // viewer by the shortest way round and holds there, so the mouth is seen.
+        const facing = utterance.current !== null;
+        if (facing) {
+          const off = Math.atan2(Math.sin(root.rotation.y), Math.cos(root.rotation.y));
+          root.rotation.y -= off - damp(off, 0, FACE_TURN_RATE, dt);
+        } else {
+          root.rotation.y += dt * 0.35;
+        }
+      }
       renderer.render(scene, camera);
     };
     tick();
