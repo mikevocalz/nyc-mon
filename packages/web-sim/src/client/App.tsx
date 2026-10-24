@@ -35,7 +35,7 @@ import { useSetters } from './state.ts';
 import { currentScheme, type Scheme } from './theme.ts';
 import { createAuthorize, noAuthorize, sdkRefresh } from './freshToken.ts';
 import { createTurnToolCaller, hintedToolNames, latestMonState, withMonState, withPresenceLine } from './turnTools.ts';
-import { currentViewUri, liveViewUri } from './viewUri.ts';
+import { currentViewUri, freshViewFor, liveViewUri } from './viewUri.ts';
 
 export interface PublicConfig {
   readonly mcpUrl: string;
@@ -338,6 +338,8 @@ export function App({ config }: { config: PublicConfig }) {
     }
   }, [connect, setConn, store]);
 
+  /** The newest tool call that opens a card; an older one still re-listing never takes the display from it. */
+  const latestViewRef = useRef<string | null>(null);
   /** The mic, open for one utterance. `gated` watches for a barge-in while the Mon speaks. */
   const sendRef = useRef<(text: string, source: 'voice' | 'typed') => Promise<void>>(async () => {});
   const openMic = useCallback(
@@ -502,8 +504,21 @@ export function App({ config }: { config: PublicConfig }) {
               // A result that carries the Mon updates the sticky voice before its reply is spoken.
               learnVoice(store.getState().items);
               if (uri) {
-                setActiveViewId(id);
-                setDisplayMode('inline');
+                // Re-list first: a server rebuilt behind this page names its views by a new hash (freshViewFor).
+                latestViewRef.current = id;
+                const held = store.getState().conn;
+                const cached = held.kind === 'connected' && held.session.client === s.client ? held.session.tools : s.tools;
+                void freshViewFor({ listTools: () => listAllTools(s.client), cached, toolName: e.name, result: e.result }).then((fresh) => {
+                  const now = store.getState().conn;
+                  if (fresh.changed && now.kind === 'connected' && now.session.client === s.client) {
+                    const tools = [...fresh.tools];
+                    setConn({ kind: 'connected', session: { ...now.session, tools }, conversion: mcpToolsToClaude(tools) });
+                  }
+                  // A later card took the display while this one re-listed: it stays in the transcript only.
+                  if (latestViewRef.current !== id || !fresh.uri) return;
+                  setActiveViewId(id);
+                  setDisplayMode('inline');
+                });
               }
             }
           },
