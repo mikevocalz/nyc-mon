@@ -49,6 +49,10 @@ class BodyError extends Error {
   }
 }
 
+/** After a 413, read and discard at most this much more of the upload, for at most this long. */
+const DRAIN_MAX_BYTES = 8 * 1024 * 1024;
+const DRAIN_TIMEOUT_MS = 2_000;
+
 function readJsonBody(req: IncomingMessage): Promise<unknown> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
@@ -125,7 +129,20 @@ export function createHandler(deps: ServerDeps): (req: IncomingMessage, res: Ser
         if (error instanceof BodyError) {
           if (error.status === 413) {
             res.setHeader('connection', 'close');
-            res.on('finish', () => req.destroy());
+            // Drain the rest of the upload before closing: destroying the
+            // socket while the client is still writing makes it see EPIPE
+            // instead of reading this 413. Bounded so a huge or endless body
+            // can't hold the connection open.
+            let drained = 0;
+            const close = () => req.destroy();
+            const cap = setTimeout(close, DRAIN_TIMEOUT_MS);
+            req.on('data', (chunk: Buffer) => {
+              drained += chunk.length;
+              if (drained > DRAIN_MAX_BYTES) close();
+            });
+            req.once('end', close);
+            req.once('close', () => clearTimeout(cap));
+            req.resume();
           }
           return sendJson(res, error.status, { jsonrpc: '2.0', id: null, error: { code: error.rpcCode, message: error.message } });
         }
