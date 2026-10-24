@@ -156,6 +156,18 @@ describe('mon-instances (Laws 6, 8)', () => {
     expect(await codeOf(back)).toBe('INVALID_TRANSITION');
   });
 
+  it('names a Mon once with an M09 name, keeps a legacy name on re-save, never renames', async () => {
+    const unnamed = validMonDoc({ nickname: null });
+    const name = async (nickname: string | null, originalDoc: Record<string, unknown>) =>
+      codeOf(change(validateMonInstance, { data: { nickname }, operation: 'update', originalDoc }));
+    expect(await name('Pip', unnamed)).toBeUndefined();
+    expect(await name('x'.repeat(17), unnamed)).toBe('INVALID_RECORD');
+    const legacy = validMonDoc({ nickname: 'A legacy name well past sixteen' });
+    expect(await name('A legacy name well past sixteen', legacy)).toBeUndefined();
+    expect(await name('Rename', validMonDoc({ nickname: 'Pip' }))).toBe('INVALID_RECORD');
+    expect(await name(null, validMonDoc({ nickname: 'Pip' }))).toBe('INVALID_RECORD');
+  });
+
   it('keeps monInstanceId, eggId and hatchedAt fixed', async () => {
     const originalDoc = validMonDoc();
     for (const patch of [{ monInstanceId: 'mon_x' }, { eggId: 'egg_x' }, { hatchedAt: 1 }]) {

@@ -2,7 +2,7 @@ import type { CollectionAfterChangeHook, CollectionBeforeChangeHook, CollectionC
 import { nobody, type StaffRole, staffRoles } from './access/roles.ts';
 import { auditReveal, revealOnly } from './audit/reveal.ts';
 import { writeAuditEvent } from './audit/writeAuditEvent.ts';
-import { deriveMonGender, deriveMonInstanceId, deriveVoiceLineageId, MON_GENDERS, MonInstanceSchema } from './core.ts';
+import { deriveMonGender, deriveMonInstanceId, deriveVoiceLineageId, isAllowedMonNicknameWrite, MON_GENDERS, MonInstanceSchema } from './core.ts';
 import { EGGS_SLUG } from './Eggs.ts';
 import { RecordError } from './errors.ts';
 import { asRecord, assertUnchanged, mergeWrite, parseRecord, refuseDelete } from './guards.ts';
@@ -79,6 +79,15 @@ export const validateMonInstance: CollectionBeforeChangeHook = async ({ data, op
   if (operation === 'update') {
     assertUnchanged(MON_IMMUTABLE_FIELDS, incoming, stored, 'mon');
     assertSetOnce(incoming, stored);
+    // The stored schema still loads legacy 1–64 character names, so the write
+    // rule lives here: a Mon is named once, to an M09 name, and never renamed.
+    if (incoming !== undefined && 'nickname' in incoming) {
+      const before = typeof stored?.nickname === 'string' ? stored.nickname : null;
+      const after = typeof incoming.nickname === 'string' ? incoming.nickname : null;
+      if (!isAllowedMonNicknameWrite(before, after)) {
+        throw new RecordError('INVALID_RECORD', 'a Mon is named once, with a name of 16 characters or fewer, and never renamed');
+      }
+    }
     if (incoming !== undefined && 'stage' in incoming && stageRank(incoming.stage) < stageRank(stored?.stage)) {
       throw new RecordError('INVALID_TRANSITION', 'a Mon never moves back a lifecycle stage');
     }
