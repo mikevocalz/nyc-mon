@@ -196,8 +196,8 @@ export function nebiusBackend(options: NebiusOptions, dependencies: {
         completedAt: new Date().toISOString(), latencyMs: Math.round(performance.now() - started),
         inputTokens: result.usage.prompt_tokens, outputTokens: result.usage.completion_tokens, toolCalls: calls.length,
       };
-      dependencies.onReceipt?.(receipt);
-      if (choice.message.content) onText(choice.message.content);
+      void dependencies.onReceipt?.(receipt);
+      if (choice.message.content) void onText(choice.message.content);
       return {
         id: result.id, type: 'message', role: 'assistant', model: result.model, content,
         container: null, diagnostics: null, stop_details: null,
