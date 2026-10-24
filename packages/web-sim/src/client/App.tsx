@@ -9,6 +9,7 @@ import { Form, Header, Heading, Paragraph, Section } from '@acme/ui/html';
 import { MonModel3D } from '@acme/ui/three/mon';
 import { Text, View } from '@acme/ui/tw';
 import { AppView, type DisplayMode } from './AppView.tsx';
+import { captionText } from './caption.ts';
 import { DevPanel } from './DevPanel.tsx';
 import { judgeStage } from './judgeStatus.ts';
 import { SignInRequired, beginSignIn, completeSignIn, connectMcp, listAllTools, type McpSession } from './mcp.ts';
@@ -409,7 +410,9 @@ export function App({ config }: { config: PublicConfig }) {
   const typing = config.devMode || !voiceIn;
   // Without the log on screen, a notice (an error, "Stopped.") has to reach the caption or it's lost.
   const lastItem = items.at(-1);
-  const caption = stage.kind !== 'ready' ? stage.headline : lastItem?.kind === 'notice' ? lastItem.text : lastReply;
+  const rawCaption = stage.kind !== 'ready' ? stage.headline : lastItem?.kind === 'notice' ? lastItem.text : lastReply;
+  // Stage directions (*chuckle*) are performed by the voice; captions show only the words.
+  const caption = rawCaption ? captionText(rawCaption) : rawCaption;
   const typingPanel = (
     <SolidPanel surface="page" depth="lg">
       <Section aria-labelledby="typing-title" className="gap-4 px-5 py-6">
