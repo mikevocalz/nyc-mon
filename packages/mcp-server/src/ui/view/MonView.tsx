@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { companionCopy } from '@acme/app/features/companion/copy.ts';
 import { NEED_RING, isLow } from '@acme/app/features/companion/home-model.ts';
 import { groupJournalByDay, journalEntryCopyId, showsFirstBadge, type DayHeading } from '@acme/app/features/companion/journal-model.ts';
@@ -17,6 +17,7 @@ import { Heading } from '../../../../ui/Heading';
 import { Image, type ImageProps } from '../../../../ui/Image';
 import { StatusRow } from '../../../../ui/StatusRow';
 import { Text } from '../../../../ui/Text';
+import { HatchSequence3D } from '../../../../ui/three/mon/HatchSequence3D';
 import { MonModel3D, type MouthRig } from '../../../../ui/three/mon/MonModel3D';
 import type { MonSpeechCue } from '../../../../ui/three/mon/lipsync/cue.ts';
 import { View } from '../../../../ui/tw';
@@ -36,7 +37,10 @@ import { clipsFor, eggDetailText, eggReady, eggTimeText, type ActionId, type Mon
  *    where the card has its rings.
  *  - Egg: while the companion is still incubating, the Metro Egg stands in
  *    the Mon's place with M11's time left. No meters and no care buttons:
- *    none of them applies to an egg, and hatching happens in the app.
+ *    none of them applies to an egg. Once it is ready, the bar has one
+ *    button, "Hatch your egg", the touch twin of saying "hatch it".
+ *  - Hatching: hatch_egg's result plays the egg cracking open into the Baby
+ *    on the same stage (HatchSequence3D), then hands over to MonModel3D.
  * Every string is from packages/app/features/companion/copy.ts.
  */
 
@@ -58,6 +62,8 @@ export interface MonViewProps {
    * sends one: Alexa speaks in its own voice and the Mon keeps its clip.
    */
   readonly speech?: MonSpeechCue | null;
+  /** The action whose tool call is in flight; its button is disabled until it answers. */
+  readonly busy?: ActionId | null;
 }
 
 declare const __MON_MODEL_ORIGIN__: string;
@@ -83,6 +89,86 @@ const MON_MODELS: Readonly<Record<number, { file: string; mouth?: MouthRig }>> =
   3: { file: 'lil-ratti', mouth: { jawBone: 'jaw', jawClosedRad: 0, jawOpenRad: -0.3, rest: { mouthClose: 1 } } },
 };
 
+const modelUrl = (file: string) => `${typeof __MON_MODEL_ORIGIN__ === 'string' ? __MON_MODEL_ORIGIN__ : ''}/mons/${file}.glb`;
+
+/**
+ * The hatch moment, then the Mon. MonModel3D mounts under the sequence once
+ * the moment ends and replaces it as soon as its own model has loaded
+ * (`aria-busy` false), so the Baby never blinks out between the two.
+ */
+function HatchStage({
+  vm,
+  file,
+  eggFile,
+  mouth,
+  width,
+  height,
+  speech,
+  onError,
+  onHatched,
+}: {
+  vm: MonViewModel;
+  file: string;
+  eggFile: string;
+  mouth: MouthRig | undefined;
+  width: number;
+  height: number;
+  speech: MonSpeechCue | null;
+  onError: () => void;
+  onHatched?: () => void;
+}) {
+  const [stage, setStage] = useState<'playing' | 'handing-over' | 'mon'>('playing');
+  const box = useRef<HTMLDivElement | null>(null);
+  const clips = clipsFor(vm.identity.dexId, vm.mood, vm.asleep) ?? [];
+  useEffect(() => {
+    if (stage !== 'handing-over' || !box.current) return;
+    const el = box.current;
+    const ready = () => el.querySelector('[data-layer="mon"] [role=img][aria-busy="false"]') !== null;
+    if (ready()) {
+      setStage('mon');
+      return;
+    }
+    const watch = new MutationObserver(() => {
+      if (ready()) setStage('mon');
+    });
+    watch.observe(el, { subtree: true, attributes: true, attributeFilter: ['aria-busy'] });
+    return () => watch.disconnect();
+  }, [stage]);
+  return (
+    <div ref={box} style={{ width, height, position: 'relative' }}>
+      {stage === 'playing' ? null : (
+        <div data-layer="mon" style={{ position: 'absolute', inset: 0 }}>
+          <MonModel3D url={modelUrl(file)} clips={clips} width={width} height={height} label={vm.name} onError={onError} {...(mouth ? { mouth, speech } : {})} />
+        </div>
+      )}
+      {stage === 'mon' ? null : (
+        <div style={{ position: 'absolute', inset: 0 }}>
+          <HatchSequence3D
+            eggUrl={modelUrl(eggFile)}
+            monUrl={modelUrl(file)}
+            monClips={clips}
+            width={width}
+            height={height}
+            label={hatchCopy('m12.a11y.crack')}
+            announcements={{
+              stir: hatchCopy('m12.a11y.stir'),
+              pressure: hatchCopy('m12.a11y.pressure'),
+              crack: hatchCopy('m12.a11y.crack'),
+              emerge: hatchCopy('m12.a11y.emerge', { babyName: vm.name }),
+              crossfade: hatchCopy('m12.a11y.emerge', { babyName: vm.name }),
+              done: hatchCopy('m12.a11y.emerge', { babyName: vm.name }),
+            }}
+            onDone={() => {
+              setStage((s) => (s === 'playing' ? 'handing-over' : s));
+              onHatched?.();
+            }}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** The Mon in 3D (three.js) when its model exists; otherwise HomeLayout's still with a Coming Soon badge. */
 function Still({
   vm,
@@ -90,17 +176,42 @@ function Still({
   nowMs,
   speech,
   height = Math.round(width * 1.25),
+  onHatched,
 }: {
   vm: MonViewModel;
   width: number;
   nowMs: number;
   speech: MonSpeechCue | null;
   height?: number;
+  /** The hatch moment has ended (or cannot play here), so the card can show the Mon's controls. */
+  onHatched?: () => void;
 }) {
   const dex = vm.identity.dexId;
   const model = dex === null ? undefined : MON_MODELS[dex];
   const [failed, setFailed] = useState(false);
   const art = artFor(vm.egg ? 'egg' : 'baby', dex);
+  const eggModel = vm.hatching?.eggDexId == null ? undefined : MON_MODELS[vm.hatching.eggDexId];
+  const playable = Boolean(model && !failed && vm.hatching && eggModel);
+  // No hatch to play (a model is missing or failed): the Mon shows straight away.
+  useEffect(() => {
+    if (vm.hatching && !playable) onHatched?.();
+  }, [vm.hatching, playable, onHatched]);
+  if (model && !failed && vm.hatching && eggModel) {
+    return (
+      <HatchStage
+        key={vm.hatching.eggId}
+        vm={vm}
+        file={model.file}
+        eggFile={eggModel.file}
+        mouth={model.mouth}
+        width={width}
+        height={height}
+        speech={speech}
+        onError={() => setFailed(true)}
+        onHatched={onHatched}
+      />
+    );
+  }
   if (model && !failed) {
     const label = vm.egg
       ? hatchCopy(eggReady(vm.egg, nowMs) ? 'm11.egg.a11y.label.ready' : 'm11.egg.a11y.label', { eggName: vm.name })
@@ -109,7 +220,7 @@ function Still({
     return (
       // A mood change cross-fades the clip inside MonModel3D; the GLB is not reloaded.
       <MonModel3D
-        url={`${typeof __MON_MODEL_ORIGIN__ === 'string' ? __MON_MODEL_ORIGIN__ : ''}/mons/${model.file}.glb`}
+        url={modelUrl(model.file)}
         clips={clips}
         width={width}
         height={height}
@@ -136,14 +247,28 @@ function Still({
  * The Mon on its stage, the way virtual pets stand in their world (no card
  * around it): name and Bloodline as plain text above, the Mon itself below.
  */
-function Stage({ vm, stillWidth, nowMs, speech }: { vm: MonViewModel; stillWidth: number; nowMs: number; speech: MonSpeechCue | null }) {
+function Stage({
+  vm,
+  title,
+  stillWidth,
+  nowMs,
+  speech,
+  onHatched,
+}: {
+  vm: MonViewModel;
+  title: string;
+  stillWidth: number;
+  nowMs: number;
+  speech: MonSpeechCue | null;
+  onHatched: () => void;
+}) {
   return (
     <View className="items-center gap-2">
       <View className="items-center">
-        <Heading level={1} size="title">{vm.name}</Heading>
+        <Heading level={1} size="title">{title}</Heading>
         {vm.identity.bloodlineLabel ? <Text variant="caption" tone="muted">{vm.identity.bloodlineLabel}</Text> : null}
       </View>
-      <Still vm={vm} width={stillWidth} nowMs={nowMs} speech={speech} />
+      <Still vm={vm} width={stillWidth} nowMs={nowMs} speech={speech} onHatched={onHatched} />
     </View>
   );
 }
@@ -197,10 +322,13 @@ function Incubation({ vm, nowMs }: { vm: MonViewModel; nowMs: number }) {
  * button from FullWidthWraps. hlynk-care is drawn over the live scene and
  * reads black-on-navy here, where there is no scene.
  */
-function Bar({ vm, layout, canExpand, narrow, onAction, onToggleRoom }: MonViewProps) {
+function Bar(props: MonViewProps) {
+  const { vm, layout, canExpand, narrow, onAction, onToggleRoom } = props;
   const items: (readonly [string, string, () => void])[] = [];
   if (vm.egg) {
-    // An egg has no care actions and no journal yet: only the room's way back.
+    // An egg has no care actions and no journal yet: only Hatch once it is
+    // ready, and the room's way back.
+    if (eggReady(vm.egg, props.nowMs)) items.push(['hatch', hatchCopy('m12.trackpad.open'), () => onAction('hatch')]);
     if (canExpand && layout === 'room') items.push(['mode', companionCopy('m14.close'), onToggleRoom]);
     if (items.length === 0) return null;
   } else {
@@ -220,7 +348,7 @@ function Bar({ vm, layout, canExpand, narrow, onAction, onToggleRoom }: MonViewP
       {items.map(([id, label, onPress]) => (
         // Narrow: two per row, so labels never squeeze below the button's own size.
         <View key={id} style={narrow ? { flexBasis: '45%', flexGrow: 1 } : { flex: 1 }}>
-          <Button variant={id === vm.suggested ? 'cta' : 'outline'} size="sm" fullWidth title={label} onPress={onPress} />
+          <Button variant={id === vm.suggested || id === 'hatch' ? 'cta' : 'outline'} size="sm" fullWidth title={label} onPress={onPress} disabled={props.busy === id} />
         </View>
       ))}
     </View>
@@ -280,19 +408,31 @@ function Journal({ vm, nowMs, fit = false }: { vm: MonViewModel; nowMs: number; 
   );
 }
 
+/** "Your egg started hatching" (M11), where the Mon's rings will be once it is out. */
+function Hatching() {
+  return <Heading level={2} size="display-sm">{hatchCopy('m11.time.resume')}</Heading>;
+}
+
 export function MonView(props: MonViewProps) {
   const { vm, layout, theme, nowMs } = props;
   const speech = props.speech ?? null;
   const height = props.canvasHeight ?? 456;
+  // While the egg is cracking open the card is still the egg's: its name, no
+  // status, rings or buttons. They arrive with the Baby (onHatched).
+  const [hatchedEggId, setHatchedEggId] = useState<string | null>(null);
+  const hatchingEggId = vm.hatching?.eggId ?? null;
+  const hatching = vm.hatching !== null && hatchedEggId !== vm.hatching.eggId;
+  const onHatched = useCallback(() => setHatchedEggId(hatchingEggId), [hatchingEggId]);
+  const title = hatching && vm.hatching ? vm.hatching.eggName : vm.name;
   if (props.narrow) {
     // Stacked at content height: the Mon, then the status and rings, then the
     // bar. A narrow host grows the frame to fit (main.tsx), so nothing clips.
     return (
       <View className="gap-4">
-        <Stage vm={vm} stillWidth={220} nowMs={nowMs} speech={speech} />
-        {vm.egg ? <Incubation vm={vm} nowMs={nowMs} /> : <Care vm={vm} theme={theme} />}
-        {layout === 'room' ? <Journal vm={vm} nowMs={nowMs} /> : null}
-        <Bar {...props} />
+        <Stage vm={vm} title={title} stillWidth={220} nowMs={nowMs} speech={speech} onHatched={onHatched} />
+        {hatching ? <Hatching /> : vm.egg ? <Incubation vm={vm} nowMs={nowMs} /> : <Care vm={vm} theme={theme} />}
+        {layout === 'room' && !hatching ? <Journal vm={vm} nowMs={nowMs} /> : null}
+        {hatching ? null : <Bar {...props} />}
       </View>
     );
   }
@@ -311,14 +451,16 @@ export function MonView(props: MonViewProps) {
       <View className="min-h-0 flex-1 justify-between gap-3">
         {/* Name, Bloodline and status share one row so the rings keep their height. */}
         <View className="gap-1">
-          <Heading level={1} size="title">{vm.name}</Heading>
+          <Heading level={1} size="title">{title}</Heading>
           <View className="flex-row flex-wrap items-center gap-3">
             {vm.identity.bloodlineLabel ? <Text variant="caption" tone="muted">{vm.identity.bloodlineLabel}</Text> : null}
-            {vm.status && !vm.egg ? <StatusRow items={[{ id: 'status', label: vm.status.text, tone: vm.status.tone }]} /> : null}
+            {vm.status && !vm.egg && !hatching ? <StatusRow items={[{ id: 'status', label: vm.status.text, tone: vm.status.tone }]} /> : null}
           </View>
         </View>
-        <View className={`min-h-0 flex-1 gap-4 overflow-hidden ${journalInstead ? 'justify-start' : 'justify-center'}`}>
-          {vm.egg ? (
+        <View className={`min-h-0 flex-1 gap-4 overflow-hidden ${journalInstead && !hatching ? 'justify-start' : 'justify-center'}`}>
+          {hatching ? (
+            <Hatching />
+          ) : vm.egg ? (
             <Incubation vm={vm} nowMs={nowMs} />
           ) : journalInstead ? (
             <Journal vm={vm} nowMs={nowMs} fit />
@@ -326,10 +468,10 @@ export function MonView(props: MonViewProps) {
             <Care vm={vm} theme={theme} status={false} />
           )}
         </View>
-        <Bar {...props} narrow={twoRowBar} />
+        {hatching ? null : <Bar {...props} narrow={twoRowBar} />}
       </View>
       <View className="justify-end">
-        <Still vm={vm} width={stillSize} height={stillSize} nowMs={nowMs} speech={speech} />
+        <Still vm={vm} width={stillSize} height={stillSize} nowMs={nowMs} speech={speech} onHatched={onHatched} />
       </View>
     </View>
   );

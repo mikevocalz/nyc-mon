@@ -22,7 +22,7 @@ import type { CareState, JournalEntry, MonMood } from '@acme/core/types';
  * packages/app/features/hatch/copy.ts.
  */
 
-export type ActionId = 'feed' | 'rest' | 'wake' | 'play';
+export type ActionId = 'feed' | 'rest' | 'wake' | 'play' | 'hatch';
 
 /** The text half of `MonIdentity`: everything but the art. */
 export interface MonNames {
@@ -43,6 +43,17 @@ export interface EggViewModel {
   readonly ready: boolean;
 }
 
+/**
+ * hatch_egg's `hatching: true`: this result is the moment the egg hatched, so
+ * the card plays the egg cracking open before it shows the Mon.
+ */
+export interface HatchingViewModel {
+  readonly eggId: string;
+  /** The Egg form's Dex number (1, the Metro Egg), or null when content has none. */
+  readonly eggDexId: number | null;
+  readonly eggName: string;
+}
+
 export interface MonViewModel {
   /** The Mon's id, or the egg's id while it incubates. */
   readonly monInstanceId: string;
@@ -59,6 +70,8 @@ export interface MonViewModel {
   readonly journal: readonly JournalEntry[];
   /** Set while the companion is still an egg; care actions do not apply then. */
   readonly egg: EggViewModel | null;
+  /** Set only on the hatch_egg result that hatched the egg; null on every other result. */
+  readonly hatching: HatchingViewModel | null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -221,7 +234,17 @@ function eggViewModel(eggs: unknown[]): MonViewModel | null {
     suggested: null,
     journal: [],
     egg,
+    hatching: null,
   };
+}
+
+/** hatch_egg's `hatching: true` and `egg`, else null (a repeat call has `hatching: false`). */
+function readHatching(structured: Record<string, unknown>): HatchingViewModel | null {
+  if (structured.hatching !== true) return null;
+  const egg = isRecord(structured.egg) ? structured.egg : {};
+  const eggId = typeof egg.eggId === 'string' ? egg.eggId : '';
+  const names = monNames(typeof egg.speciesId === 'string' ? egg.speciesId : 'dex-001', null);
+  return { eggId, eggDexId: names.dexId, eggName: names.name };
 }
 
 /** Builds the view model, or null when the payload has neither a Mon nor an incubating egg. */
@@ -248,6 +271,7 @@ export function toMonViewModel(structured: unknown): MonViewModel | null {
     suggested: suggestedAction(care, structured.mood),
     journal: readJournal(structured.journal, monInstanceId),
     egg: null,
+    hatching: readHatching(structured),
   };
 }
 
@@ -269,6 +293,9 @@ export function careOutcomeText(structured: unknown, vm: MonViewModel): string |
   if (!isRecord(structured)) return null;
   const name = vm.name;
   const percent = vm.care ? Math.round(vm.care.fullness * 100) : 0;
+  if (structured.hatched === true) {
+    return vm.hatching ? hatchCopy('m12.a11y.emerge', { babyName: name }) : hatchCopy('m12.a11y.already', { monName: name });
+  }
   if (structured.applied === false) {
     switch (structured.declinedBecause) {
       case 'asleep': return companionCopy('m14.declined.asleep', { name });
@@ -298,7 +325,9 @@ export function careOutcomeText(structured: unknown, vm: MonViewModel): string |
  * plays `emote_tired`. A mood with no entry plays the form's idle.
  */
 export const MON_CLIPS: Readonly<Record<number, { readonly idle: readonly string[]; readonly byMood: Partial<Record<MonMood, readonly string[]>> }>> = {
-  // Metro Egg: the hatch rig on its idle wobble. An egg has no mood.
+  // Metro Egg: the hatch rig on its idle wobble. An egg has no mood. Its
+  // `hatch` clip (6.5 s: stir, pressure, crack, burst, emerge) plays in
+  // HatchSequence3D, never as a loop here.
   1: { idle: ['egg_idle'], byMood: {} },
   // Squeaklet: jaw_chomp, mouth_close, rat_run, tail_swish, blink.
   2: {

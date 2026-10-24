@@ -62,6 +62,7 @@ export const UI_CSP: UiCsp = { connectDomains: [MON_MODEL_ORIGIN], resourceDomai
 export const UI_TOOL_LINKS = {
   get_mon_status: 'mon-card',
   check_incubation: 'mon-card',
+  hatch_egg: 'mon-card',
   feed_mon: 'mon-card',
   rest_mon: 'mon-card',
   wake_mon: 'mon-card',

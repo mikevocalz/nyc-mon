@@ -127,7 +127,7 @@ describe('built MCP App views', () => {
     const read = (await registered[0]!.read()) as { contents: { mimeType: string; text: string; _meta: unknown }[] };
     expect(read.contents[0]?.text).toBe(resources[0]!.html);
     expect(read.contents[0]?._meta).toEqual({ ui: { csp: { connectDomains: [MON_MODEL_ORIGIN], resourceDomains: ['data:'] }, prefersBorder: false } });
-    expect(Object.keys(reg.toolResourceUris).sort()).toEqual(['check_incubation', 'feed_mon', 'get_mon_status', 'play_with_mon', 'rest_mon', 'wake_mon']);
+    expect(Object.keys(reg.toolResourceUris).sort()).toEqual(['check_incubation', 'feed_mon', 'get_mon_status', 'hatch_egg', 'play_with_mon', 'rest_mon', 'wake_mon']);
     expect(UI_TOOL_LINKS.get_mon_status).toBe('mon-card');
   });
 });
@@ -212,6 +212,38 @@ describe('view model (adapter onto the companion models)', () => {
     expect(ready?.status).toEqual({ text: 'Ready to hatch', tone: 'request' });
     expect(toMonViewModel({ incubating: false, eggs: [] })).toBeNull();
     expect(toMonViewModel({ mon: { monId: 'm1', speciesId: 'dex-002' }, care: careView })?.egg).toBeNull();
+  });
+
+  describe("hatch_egg's result", () => {
+    const hatchResult = (hatching: boolean) => ({
+      hatched: true,
+      alreadyHatched: !hatching,
+      hatching,
+      egg: { eggId: 'egg_metro', speciesId: 'dex-001' },
+      mon: { monId: 'mon_new', name: null, speciesId: 'dex-002', stage: 'Baby', bond: 0, hatchedAt: 1 },
+      care: { energy: 1, fullness: 1, social: 1, activity: 'awake', sluggish: false, wantsFood: false, lastFedAt: null },
+      mood: 'content',
+    });
+
+    it('carries the hatching flag and the Metro Egg it hatched from', () => {
+      const vm = toMonViewModel(hatchResult(true))!;
+      expect(vm.hatching).toEqual({ eggId: 'egg_metro', eggDexId: 1, eggName: 'Metro Egg' });
+      expect(vm.name).toBe('Squeaklet');
+      expect(vm.egg).toBeNull();
+      expect(vm.care?.energy).toBe(1);
+      expect(careOutcomeText(hatchResult(true), vm)).toBe('Squeaklet hatched.');
+    });
+
+    it('a repeat (already hatched) shows the Mon without replaying the hatch', () => {
+      const vm = toMonViewModel(hatchResult(false))!;
+      expect(vm.hatching).toBeNull();
+      expect(careOutcomeText(hatchResult(false), vm)).toBe('Squeaklet already hatched.');
+    });
+
+    it('no other result ever sets it', () => {
+      expect(toMonViewModel({ mon: { monId: 'm', speciesId: 'dex-002' }, care: null, hatching: 'yes' })?.hatching).toBeNull();
+      expect(toMonViewModel({ incubating: true, eggs: [{ eggId: 'e', speciesId: 'dex-001', incubationEndsAt: 1, readyToHatch: true }] })?.hatching).toBeNull();
+    });
   });
 
   it('words care outcomes with the M14–M16 strings', () => {

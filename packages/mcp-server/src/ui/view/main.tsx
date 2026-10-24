@@ -113,14 +113,15 @@ const app = new App(
 
 async function runAction(id: ActionId): Promise<void> {
   const { vm, busy } = useView.getState();
-  // An egg has no care actions; the card shows none, so this is a guard only.
-  if (!vm || busy || vm.egg) return;
+  // An egg takes only Hatch; the card shows nothing else for it, so this is a guard only.
+  if (!vm || busy || (vm.egg !== null) !== (id === 'hatch')) return;
   useView.setState({ busy: id, notice: null, failed: false });
   try {
     const result = await app.callServerTool({ name: ACTION_TOOLS[id], arguments: actionArguments(id, vm.monInstanceId) });
     const next = result.isError ? null : toMonViewModel(result.structuredContent);
     if (next) {
-      useView.setState({ vm: next, nowMs: Date.now(), notice: careOutcomeText(result.structuredContent, next) });
+      // A hatch announces itself phase by phase on the stage (HatchSequence3D).
+      useView.setState({ vm: next, nowMs: Date.now(), notice: next.hatching ? null : careOutcomeText(result.structuredContent, next) });
     } else {
       // Failures carry plain-language text with a next step from the server (errors.ts).
       const text = (result.content ?? []).find((c) => c.type === 'text');
@@ -152,6 +153,7 @@ function Root() {
   const frameWidth = useView((s) => s.frameWidth);
   const vm = useView((s) => s.vm);
   const notice = useView((s) => s.notice);
+  const busy = useView((s) => s.busy);
   const failed = useView((s) => s.failed);
   const nowMs = useView((s) => s.nowMs);
   // The simulator host's speech cue rides the host context (see lipsync/cue.ts).
@@ -205,6 +207,7 @@ function Root() {
             onAction={(id) => void runAction(id)}
             onToggleRoom={() => void toggleRoom()}
             speech={speech}
+            busy={busy}
           />
         </main>
       ) : null}
