@@ -95,6 +95,32 @@ export function listen(handlers: {
   };
 }
 
+/** The browser voice for this session: picked once by name, then reused, so Web Speech never alternates voices. */
+let browserVoiceName: string | null = null;
+
+function sessionBrowserVoice(): SpeechSynthesisVoice | undefined {
+  const voices = globalThis.speechSynthesis?.getVoices?.() ?? [];
+  if (voices.length === 0) return undefined;
+  if (browserVoiceName === null) {
+    try {
+      browserVoiceName = globalThis.sessionStorage?.getItem('nyc-mon.browserVoice') ?? null;
+    } catch {
+      browserVoiceName = null;
+    }
+  }
+  let v = browserVoiceName === null ? undefined : voices.find((x) => x.name === browserVoiceName);
+  if (!v) {
+    v = voices.find((x) => x.lang === 'en-US' && x.default) ?? voices.find((x) => x.lang.startsWith('en')) ?? voices[0];
+    browserVoiceName = v?.name ?? null;
+    try {
+      if (browserVoiceName) globalThis.sessionStorage?.setItem('nyc-mon.browserVoice', browserVoiceName);
+    } catch {
+      // Storage blocked: the name still holds for this page.
+    }
+  }
+  return v;
+}
+
 export function speak(text: string, pitch?: number): void {
   if (!canSpeak() || !text.trim()) return;
   globalThis.speechSynthesis.cancel();
@@ -102,23 +128,10 @@ export function speak(text: string, pitch?: number): void {
   const u = new SpeechSynthesisUtterance(text.replace(/\*/g, ''));
   u.lang = 'en-US';
   u.rate = 1.02;
+  const v = sessionBrowserVoice();
+  if (v) u.voice = v;
   if (pitch !== undefined) u.pitch = pitch;
   globalThis.speechSynthesis.speak(u);
-}
-
-let playing: { readonly audio: HTMLAudioElement; readonly url: string; readonly cueId: string | null } | null = null;
-let pending: AbortController | null = null;
-let utterances = 0;
-
-function stopAudio(): void {
-  pending?.abort();
-  pending = null;
-  if (playing) {
-    playing.audio.pause();
-    URL.revokeObjectURL(playing.url);
-    if (playing.cueId) emitSpeechCue({ kind: 'stop', id: playing.cueId });
-    playing = null;
-  }
 }
 
 /** /api/tts's JSON answer: the clip plus whatever timing the server could get for it. */
@@ -165,91 +178,184 @@ export interface SpeakAsOptions {
   readonly getToken?: () => string | undefined;
   readonly endpoint?: string;
   readonly fetchFn?: typeof fetch;
+  /**
+   * Play after whatever is already speaking or queued instead of cutting it
+   * off (sentence-by-sentence replies). `stopSpeaking()` cancels the queue.
+   */
+  readonly queue?: boolean;
+  /** Wait before the one retry (ms). Default 300. */
+  readonly retryDelayMs?: number;
 }
+
+/** One sentence of the Mon's voice, fetched and ready to play. */
+export type MonClip =
+  | { readonly kind: 'audio'; readonly bytes: Uint8Array<ArrayBuffer>; readonly contentType: string; readonly track: SpeechTrack | null }
+  /** The server has no ElevenLabs voice (204): the session's one browser voice reads it. */
+  | { readonly kind: 'browser'; readonly text: string; readonly pitch: number | undefined }
+  /** Nothing to play: an Egg, an empty line, or the voice failed twice (the caption carries the words). */
+  | { readonly kind: 'silent' };
+
+/** The last Mon voice this session used; a reply without a voice of its own speaks in it. */
+let sessionVoice: MonVoice | undefined;
+
+/**
+ * Sets the Mon voice for the rest of the session, so a reply that arrives
+ * before any Mon tool result in this conversation still uses the Mon's voice.
+ */
+export function setSessionVoice(voice: MonVoice | undefined): void {
+  if (voice !== undefined) sessionVoice = voice;
+}
+
+class TtsFailure extends Error {}
+
+/**
+ * Fetches one sentence. With a voice it never falls back to another voice:
+ * a failed request (non-200 other than 204, unreadable body, network) is
+ * retried once after a short wait, then the clip is silent and a warning
+ * names the status (never the text). 204 means this server has no ElevenLabs
+ * at all, and only then does the browser voice read the line.
+ */
+export async function prepareMonClip(text: string, voice: MonVoice | undefined, opts: SpeakAsOptions, signal: AbortSignal): Promise<MonClip> {
+  if (voice !== undefined) setSessionVoice(voice);
+  const v = voice ?? sessionVoice;
+  if (!text.trim()) return { kind: 'silent' };
+  if (v === undefined) return { kind: 'browser', text, pitch: undefined };
+  if (voicePitchFactor(v.stage) === null) return { kind: 'silent' };
+  if (typeof Audio === 'undefined') return { kind: 'silent' };
+  let lastStatus = 'network';
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, opts.retryDelayMs ?? 300));
+    if (signal.aborted) return { kind: 'silent' };
+    try {
+      const token = opts.getToken?.();
+      const res = await (opts.fetchFn ?? fetch)(opts.endpoint ?? '/api/tts', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          // JSON carries the clip with its lip-sync timing; plain audio still works.
+          accept: 'application/json, audio/mpeg',
+          ...(token ? { authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ text: text.slice(0, 400), lineageId: v.lineageId, stage: v.stage, ...(v.mood === undefined ? {} : { mood: v.mood }) }),
+        signal,
+      });
+      if (res.status === 204) return { kind: 'browser', text, pitch: webSpeechPitch(v.stage) ?? undefined };
+      if (res.status !== 200) {
+        lastStatus = String(res.status);
+        throw new TtsFailure();
+      }
+      let bytes: Uint8Array<ArrayBuffer>;
+      let contentType = 'audio/mpeg';
+      let face: FaceTrack | undefined;
+      let alignment: CharacterAlignment | undefined;
+      if ((res.headers.get('content-type') ?? '').startsWith('application/json')) {
+        const body: unknown = await res.json();
+        if (!isPerformance(body)) {
+          lastStatus = 'unreadable body';
+          throw new TtsFailure();
+        }
+        bytes = fromBase64(body.audio);
+        contentType = body.audioContentType;
+        face = body.face;
+        alignment = body.alignment;
+      } else {
+        bytes = new Uint8Array(await res.arrayBuffer());
+      }
+      // Best source first: Audio2Face frames, character timing, then the clip's own loudness.
+      const amplitude = face || alignment ? null : await envelopeOf(bytes.buffer);
+      return { kind: 'audio', bytes, contentType, track: pickSpeechTrack({ face: face ?? null, alignment: alignment ?? null, amplitude }) };
+    } catch (err) {
+      if (signal.aborted) return { kind: 'silent' };
+      if (!(err instanceof TtsFailure)) lastStatus = 'network';
+    }
+  }
+  console.warn(`[web-sim] Mon voice unavailable (${lastStatus}); the caption carries the reply.`);
+  return { kind: 'silent' };
+}
+
+let utterances = 0;
+/** The clip playing now, so stopSpeaking can cut it off and send the view its stop cue. */
+let current: { readonly audio: HTMLAudioElement; readonly url: string; readonly cueId: string | null; readonly done: () => void } | null = null;
+
+function stopAudio(): void {
+  const c = current;
+  if (!c) return;
+  current = null;
+  c.audio.pause();
+  URL.revokeObjectURL(c.url);
+  if (c.cueId) emitSpeechCue({ kind: 'stop', id: c.cueId });
+  c.done();
+}
+
+/**
+ * Plays one prepared clip and resolves when it ends, is cut off, or fails.
+ * The Mon view gets a start cue stamped with the audio's own position once
+ * play() resolves, and a stop cue at the end.
+ */
+export async function playMonClip(clip: MonClip, signal: AbortSignal): Promise<void> {
+  if (signal.aborted || clip.kind === 'silent') return;
+  if (clip.kind === 'browser') return speak(clip.text, clip.pitch);
+  stopAudio();
+  const url = URL.createObjectURL(new Blob([clip.bytes], { type: clip.contentType }));
+  // The pitch is already in the clip; playback rate stays 1 so tempo is the voice's own.
+  const audio = new Audio(url);
+  const track = clip.track;
+  const cueId = track ? `u${++utterances}-${Date.now().toString(36)}` : null;
+  await new Promise<void>((resolve) => {
+    const entry = { audio, url, cueId, done: resolve };
+    current = entry;
+    const finish = () => {
+      if (current === entry) stopAudio();
+    };
+    audio.onended = finish;
+    audio.onerror = finish;
+    signal.addEventListener('abort', finish, { once: true });
+    audio.play().then(
+      () => {
+        if (current !== entry || !track || !cueId) return;
+        const seconds = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : trackDurationMs(track) / 1000;
+        const elapsed = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
+        emitSpeechCue({ kind: 'start', id: cueId, elapsedMs: elapsed * 1000, durationMs: Math.max(1, seconds * 1000), track });
+      },
+      () => {
+        console.warn('[web-sim] Mon voice could not play (autoplay or decode); the caption carries the reply.');
+        finish();
+      },
+    );
+  });
+}
+
+/** One AbortController for everything queued; stopSpeaking() replaces it. */
+let session = new AbortController();
+let tail: Promise<void> = Promise.resolve();
 
 /**
  * Speaks `text` as the current Mon. Simulator only: on a real Echo, Alexa reads
  * replies in its own voice (PLATFORM-DOCS §2.8).
  *
- * With a voice, it fetches the Mon's lineage voice from /api/tts, which bakes
- * the stage's pitch in without changing duration and picks the delivery from
- * the mood, and plays it at rate 1. On 204 or any error it falls back to Web
- * Speech with `utterance.pitch` from the same stage table (Web Speech pitch
- * leaves the rate alone). An Egg is silent. Without a voice it is plain `speak`.
+ * With a voice (or the session voice), it fetches the Mon's lineage voice from
+ * /api/tts and plays it at rate 1; a failure is retried once and then stays
+ * silent, never another voice. Web Speech reads only when the server has no
+ * ElevenLabs at all (204), in one browser voice for the whole session. An Egg
+ * is silent. `{ queue: true }` appends to what is speaking; otherwise it cuts
+ * it off. Resolves when this text has finished (or was cancelled).
  */
 export async function speakAs(text: string, voice: MonVoice | undefined, opts: SpeakAsOptions = {}): Promise<void> {
-  stopSpeaking();
-  if (!text.trim()) return;
-  if (voice === undefined) return speak(text);
-  if (voicePitchFactor(voice.stage) === null) return;
-  const fallback = () => speak(text, webSpeechPitch(voice.stage) ?? undefined);
-  if (typeof Audio === 'undefined') return fallback();
-
-  const abort = new AbortController();
-  pending = abort;
-  try {
-    const token = opts.getToken?.();
-    const res = await (opts.fetchFn ?? fetch)(opts.endpoint ?? '/api/tts', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        // JSON carries the clip with its lip-sync timing; plain audio still works.
-        accept: 'application/json, audio/mpeg',
-        ...(token ? { authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify({
-        text: text.slice(0, 400),
-        lineageId: voice.lineageId,
-        stage: voice.stage,
-        ...(voice.mood === undefined ? {} : { mood: voice.mood }),
-      }),
-      signal: abort.signal,
-    });
-    if (abort.signal.aborted) return;
-    if (res.status !== 200) return fallback();
-    let bytes: Uint8Array<ArrayBuffer>;
-    let contentType = 'audio/mpeg';
-    let face: FaceTrack | undefined;
-    let alignment: CharacterAlignment | undefined;
-    if ((res.headers.get('content-type') ?? '').startsWith('application/json')) {
-      const body: unknown = await res.json();
-      if (!isPerformance(body)) return fallback();
-      bytes = fromBase64(body.audio);
-      contentType = body.audioContentType;
-      face = body.face;
-      alignment = body.alignment;
-    } else {
-      bytes = new Uint8Array(await res.arrayBuffer());
-    }
-    if (abort.signal.aborted) return;
-    // Best source first: Audio2Face frames, character timing, then the clip's own loudness.
-    const amplitude = face || alignment ? null : await envelopeOf(bytes.buffer);
-    if (abort.signal.aborted) return;
-    const track = pickSpeechTrack({ face: face ?? null, alignment: alignment ?? null, amplitude });
-    const url = URL.createObjectURL(new Blob([bytes], { type: contentType }));
-    // The pitch is already in the clip; playback rate stays 1 so tempo is the voice's own.
-    const audio = new Audio(url);
-    audio.onended = () => {
-      if (playing?.audio === audio) stopAudio();
-    };
-    pending = null;
-    const cueId = track ? `u${++utterances}-${Date.now().toString(36)}` : null;
-    playing = { audio, url, cueId };
-    await audio.play();
-    if (track && cueId && playing?.audio === audio) {
-      const seconds = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : trackDurationMs(track) / 1000;
-      const elapsed = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
-      emitSpeechCue({ kind: 'start', id: cueId, elapsedMs: elapsed * 1000, durationMs: Math.max(1, seconds * 1000), track });
-    }
-  } catch {
-    if (!abort.signal.aborted) {
-      stopAudio();
-      fallback();
-    }
-  }
+  if (!opts.queue) stopSpeaking();
+  const { signal } = session;
+  // Fetch now (overlapping the clip ahead), play in order.
+  const ready = prepareMonClip(text, voice, opts, signal);
+  const previous = tail;
+  const mine = previous.then(async () => playMonClip(await ready, signal));
+  tail = mine.catch(() => {});
+  return mine;
 }
 
+/** The only cancel: cuts off the clip playing now and everything queued after it. */
 export function stopSpeaking(): void {
+  session.abort();
+  session = new AbortController();
+  tail = Promise.resolve();
   stopAudio();
   if (canSpeak()) globalThis.speechSynthesis.cancel();
 }
