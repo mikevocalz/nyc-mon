@@ -604,7 +604,7 @@ describe('built views boot in a spec host (bundled Chromium)', { timeout: 60_000
     }
   });
 
-  it('the hatch follows its box when the frame shrinks mid-hatch, and the Mon takes over in the same place', { timeout: 90_000 }, async () => {
+  it('the hatch follows its box when the frame shrinks mid-hatch, and the Mon takes over in the same place', { timeout: 150_000 }, async () => {
     const b = await boot('mon-card', {
       width: 1094,
       height: 404,
@@ -627,7 +627,8 @@ describe('built views boot in a spec host (bundled Chromium)', { timeout: 60_000
       await b.frame.waitForFunction(() => (document.querySelector('canvas[data-hatch-phase]')?.getBoundingClientRect().height ?? 999) < 330, null, { timeout: 5000 });
       const during = await rects();
       expect(during.hatch).toEqual(during.box);
-      await b.frame.waitForFunction(() => document.querySelector('canvas[data-hatch-phase]') === null, null, { timeout: 30_000 });
+      // On CI's software GL the hatch's frames run slow (its clock caps each step), so the full moment takes far longer than its 5 s.
+      await b.frame.waitForFunction(() => document.querySelector('canvas[data-hatch-phase]') === null, null, { timeout: 90_000 });
       const after = await rects();
       expect(after.mon).toEqual(during.hatch);
       expect(b.errors).toEqual([]);
