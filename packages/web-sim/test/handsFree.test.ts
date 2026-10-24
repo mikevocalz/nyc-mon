@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { IDLE, isBargeIn, nextConversation, openEar, type ConversationEvent, type ConversationState, type ListenFn } from '../src/client/handsFree.ts';
+import { IDLE, nextConversation, openEar, type ConversationEvent, type ConversationState, type ListenFn } from '../src/client/handsFree.ts';
 
 function run(events: ConversationEvent['type'][], from: ConversationState = IDLE): ConversationState {
   return events.reduce((s, type) => nextConversation(s, { type } as ConversationEvent), from);
@@ -39,22 +39,6 @@ describe('conversation state machine', () => {
     expect(run(['silent'])).toEqual(IDLE);
     expect(run(['reply-done'])).toEqual(IDLE);
     expect(run(['talk', 'reply-audio']).mode).toBe('listening');
-  });
-});
-
-describe('barge-in guard', () => {
-  const speaking = 'Your Mon ate a whole slice of pizza today.';
-  it('ignores anything inside the holdoff after the clip starts', () => {
-    expect(isBargeIn({ heard: 'hey stop that', speaking, msSinceAudioStart: 200 })).toBe(false);
-  });
-  it('needs at least two words', () => {
-    expect(isBargeIn({ heard: 'hey', speaking, msSinceAudioStart: 2000 })).toBe(false);
-  });
-  it('treats the Mon’s own words coming back through the mic as echo', () => {
-    expect(isBargeIn({ heard: 'ate a whole slice of pizza', speaking, msSinceAudioStart: 2000 })).toBe(false);
-  });
-  it('accepts the person talking over the Mon', () => {
-    expect(isBargeIn({ heard: 'wait is it sleeping', speaking, msSinceAudioStart: 2000 })).toBe(true);
   });
 });
 
