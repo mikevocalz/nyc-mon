@@ -145,7 +145,9 @@ describe('built views boot in a spec host (bundled Chromium)', { timeout: 60_000
           const text = await b.frame.evaluate(() => document.getElementById('root')!.innerText);
           expect(text).toContain(form);
           expect(text).toContain('Asking for food');
-          expect(text).toContain('Journal');
+          // Feed, Rest and Play; no Journal (nothing on the server keeps one yet).
+          expect(text).not.toContain('Journal');
+          expect(await b.frame.getByRole('button', { name: 'Play' }).count()).toBe(1);
           expect(await b.frame.locator('[role=progressbar]').count()).toBe(3);
           expect(b.errors).toEqual([]);
         } finally {
@@ -226,7 +228,8 @@ describe('built views boot in a spec host (bundled Chromium)', { timeout: 60_000
         });
         expect(m.scrollW).toBeLessThanOrEqual(m.inner);
         expect(m.maxRight).toBeLessThanOrEqual(m.inner);
-        expect(m.count).toBeGreaterThanOrEqual(7);
+        // Three care buttons and three rings; the room adds its Close.
+        expect(m.count).toBeGreaterThanOrEqual(6);
         await b.frame.page().waitForFunction(() => window.sizes.some((s) => (s.height ?? 0) > 300), null, { timeout: 5000 });
         const sizes = await b.frame.page().evaluate(() => window.sizes);
         const last = sizes[sizes.length - 1]!;

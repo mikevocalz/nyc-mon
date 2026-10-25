@@ -31,7 +31,7 @@ import { clipsFor, eggDetailText, eggReady, eggTimeText, type ActionId, type Mon
  *  - Status and rings sit beside the Mon, as the StatusRow and CareMeterRing
  *    stories show them, with `scheme` following the page (the GroupDaylit /
  *    GroupNight stories).
- *  - Bar: M13's Feed, Rest or Wake, Play, and Journal (card) or Close
+ *  - Bar: M13's Feed, Rest or Wake, Play, and Close in the room
  *    (room): the asked-for action as the Cta story's button, the rest outline.
  *  - Room: the same header and bar, with M18's timeline rows (JournalScreen)
  *    where the card has its rings.
@@ -340,9 +340,10 @@ function Bar(props: MonViewProps) {
         : ['rest', companionCopy('m13.bar.rest'), () => onAction('rest')],
       ['play', companionCopy('m13.bar.play'), () => onAction('play')],
     );
-    if (canExpand) {
-      items.push(layout === 'room' ? ['mode', companionCopy('m14.close'), onToggleRoom] : ['mode', companionCopy('m18.title'), onToggleRoom]);
-    }
+    // No Journal button on the card: nothing on the server keeps a journal yet
+    // (it lives in the app's local save), so it only enlarged the card. The
+    // room keeps its Close for a host that opens it fullscreen.
+    if (canExpand && layout === 'room') items.push(['mode', companionCopy('m14.close'), onToggleRoom]);
   }
   return (
     <View className="flex-row flex-wrap gap-3">
@@ -441,9 +442,9 @@ export function MonView(props: MonViewProps) {
   // (the turntable sweeps the tail out to the sides, so a narrow box would
   // shrink it); name, rings and the bar stack on the left.
   const stillSize = Math.max(160, Math.round(height * 0.9));
-  // The canvas less its padding and the 24 px gap: four small buttons fit in
-  // one row from about 480 px ("Journal" wraps below that).
-  const twoRowBar = (props.canvasWidth ?? 744) - 24 - stillSize < 480;
+  // The canvas less its padding and the 24 px gap: three small buttons fit in
+  // one row from about 360 px.
+  const twoRowBar = (props.canvasWidth ?? 744) - 24 - stillSize < 360;
   // The room shows the journal where the card has its rings (the rings and a
   // journal do not both fit one screen); a room with no journal yet keeps the rings.
   const journalInstead = layout === 'room' && vm.journal.length > 0;

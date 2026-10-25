@@ -3,8 +3,8 @@
  * The MCP App entry for both views (ext-apps vanilla `App` bridge, React
  * rendering of the kit). `__ENTRY__` picks the starting layout: `card`
  * (inline) or `room` (fullscreen). Fullscreen is the same document with more
- * room, so the card's Journal button requests fullscreen and re-renders as the
- * room. State is one zustand store.
+ * room: a host that opens fullscreen gets the room, and its Close goes back
+ * to the card. State is one zustand store.
  */
 import './view.css';
 import { Component, useEffect, useMemo, type ReactNode } from 'react';
