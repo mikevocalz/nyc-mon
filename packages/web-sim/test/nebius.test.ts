@@ -78,3 +78,17 @@ describe('Nebius NVIDIA adapter (mock transport; not live qualification)', () =>
     await expect(nebiusBackend({ apiKey: 'key' }, { fetch: transport({}) }).stream(input, vi.fn(), signal())).rejects.toThrow(NebiusError);
   });
 });
+
+
+it('preserves caller cancellation while reading a response body and emits no receipt', async () => {
+  const controller = new AbortController();
+  const reason = new Error('Caller cancelled this turn');
+  const onReceipt = vi.fn();
+  const onText = vi.fn();
+  const fetchFn = vi.fn<(input: unknown, init?: RequestInit) => Promise<Response>>(async () =>
+    new Response(new ReadableStream({ pull(stream) { controller.abort(reason); stream.error(reason); } })),
+  );
+  await expect(nebiusBackend({ apiKey: 'key' }, { fetch: fetchFn, onReceipt }).stream(input, onText, controller.signal)).rejects.toBe(reason);
+  expect(onReceipt).not.toHaveBeenCalled();
+  expect(onText).not.toHaveBeenCalled();
+});
