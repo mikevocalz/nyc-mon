@@ -5,6 +5,7 @@ import { runAgentTurn } from '../shared/agentLoop.ts';
 import { SimOAuthProvider, parseCallback, resolveAuthState, type AuthState } from '../shared/auth.ts';
 import { mcpToolsToClaude, type ConversionResult } from '../shared/toolSpec.ts';
 import { Badge, Banner, BrandWordmark, Button, Card, ErrorMessage, SolidPanel, Switch, TextField, useInstanceStore, useStore } from '@acme/ui';
+import type { StoreApi } from 'zustand/vanilla';
 import { xrTypeRamp } from '@acme/theme';
 import { Form, Header, Heading, Paragraph, Section } from '@acme/ui/html';
 import { MonModel3D } from '@acme/ui/three/mon';
@@ -139,7 +140,29 @@ export function App({ config }: { config: PublicConfig }) {
     speakerId: '',
     speakerName: '',
   }));
-  const { items, auth, conn, busy, live, draft, listening, heard, talkMode, speaking, standing, activeViewId, activeToolTitle, displayMode, scheme, readAloud, time, speakerId } = useStore(store);
+  // The fast-changing strings (what the mic hears, the reply streaming in, the
+  // sentence being spoken) are read by <LiveCaption> alone. App follows only
+  // whether each is empty: every App render restyles the whole page (about
+  // 17 ms measured), and one per interim word cost the 3D Mon a frame each time.
+  const items = useStore(store, (s) => s.items);
+  const auth = useStore(store, (s) => s.auth);
+  const conn = useStore(store, (s) => s.conn);
+  const busy = useStore(store, (s) => s.busy);
+  const draft = useStore(store, (s) => s.draft);
+  const listening = useStore(store, (s) => s.listening);
+  const talkMode = useStore(store, (s) => s.talkMode);
+  const standing = useStore(store, (s) => s.standing);
+  const activeViewId = useStore(store, (s) => s.activeViewId);
+  const activeToolTitle = useStore(store, (s) => s.activeToolTitle);
+  const displayMode = useStore(store, (s) => s.displayMode);
+  const scheme = useStore(store, (s) => s.scheme);
+  const readAloud = useStore(store, (s) => s.readAloud);
+  const time = useStore(store, (s) => s.time);
+  const speakerId = useStore(store, (s) => s.speakerId);
+  const hasHeard = useStore(store, (s) => s.heard.trim() !== '');
+  const hasLive = useStore(store, (s) => s.live !== '');
+  const hasSpeaking = useStore(store, (s) => s.speaking !== '');
+
   const {
     items: setItems,
     auth: setAuth,
@@ -287,7 +310,7 @@ export function App({ config }: { config: PublicConfig }) {
   useEffect(() => {
     const log = document.querySelector<HTMLElement>('[role="log"]');
     if (log) log.scrollTop = log.scrollHeight;
-  }, [items, live]);
+  }, [items, hasLive]);
 
   // OAuth redirect back from the authorization server.
   useEffect(() => {
@@ -682,7 +705,7 @@ export function App({ config }: { config: PublicConfig }) {
         abortRef.current = null;
       }
     },
-    [authorize, busy, conn, model, store, notice, provider, push, readAloud, toolsByName, closeEar, closeLiveMic, dispatch, learnVoice, openMic, stopVoice, setActiveToolTitle, setActiveViewId, setAuth, setBusy, setConn, setDisplayMode, setDraft, setHeard, setLive, setSpeaking],
+    [authorize, conn, model, store, notice, provider, push, readAloud, toolsByName, closeEar, closeLiveMic, dispatch, learnVoice, openMic, stopVoice, setActiveToolTitle, setActiveViewId, setAuth, setBusy, setConn, setDisplayMode, setDraft, setHeard, setLive, setSpeaking],
   );
   useEffect(() => {
     sendRef.current = send;
@@ -823,27 +846,17 @@ export function App({ config }: { config: PublicConfig }) {
   const connTone = conn.kind === 'connected' ? 'success' : conn.kind === 'failed' ? 'danger' : 'neutral';
   const canTalk = conn.kind === 'connected';
   const fullscreen = displayMode === 'fullscreen';
-  const stage = judgeStage({
-    authKind: auth.kind,
-    connectionKind: conn.kind,
-    listening,
-    busy,
-    activeToolTitle,
-    heard,
-    live,
-    lastReply,
-  });
+  const stageInput = { authKind: auth.kind, connectionKind: conn.kind, listening, busy, activeToolTitle, lastReply };
+  // Kind, label and tone only depend on whether the strings are empty; LiveCaption fills the headline.
+  const stage = judgeStage({ ...stageInput, heard: hasHeard ? ' ' : '', live: hasLive ? ' ' : '' });
 
   // Voice is the way in. Typing is for testers (dev mode) or a browser with no speech recognition.
   const typing = config.devMode || !voiceIn;
   // Without the log on screen, a notice (an error, "Stopped.") has to reach the caption or it's lost.
   const lastItem = items.at(-1);
-  // While the Mon talks, the caption is the sentence it is saying (the latest line only, as on an Echo Show).
-  const rawCaption = listening
-    ? stage.headline
-    : speaking || (stage.kind !== 'ready' ? stage.headline : lastItem?.kind === 'notice' ? lastItem.text : lastReply);
-  // Stage directions (*chuckle*) are performed by the voice and "Callah" reads as Caller: captions show only the words.
-  const caption = rawCaption ? captionText(rawCaption) : rawCaption;
+  const lastNotice = lastItem?.kind === 'notice' ? lastItem.text : null;
+  // Is there any caption at all (LiveCaption has the words)?
+  const caption = listening || hasSpeaking || stage.kind !== 'ready' || lastNotice !== null || lastReply !== '';
   // The state badge: Listening / Thinking / Speaking while a conversation is under way.
   const badge =
     talkMode === 'speaking' && !listening && stage.kind !== 'acting'
@@ -868,7 +881,7 @@ export function App({ config }: { config: PublicConfig }) {
               surface="daylit"
               label="Message to your Mon"
               placeholder={listening ? 'Listening…' : 'Type to your Mon'}
-              value={listening ? heard : draft}
+              value={listening ? '' : draft}
               onChangeText={setDraft}
               onSubmitEditing={() => void send(draft)}
               disabled={!canTalk || !!listening}
@@ -1034,11 +1047,7 @@ export function App({ config }: { config: PublicConfig }) {
                         lines are always reserved: a caption that grew and shrank resized
                         the view above it, and the Mon jumped with every sentence. */}
                     <View aria-live="polite" aria-atomic="true" className="px-5 pb-3 pt-1" style={{ height: CAPTION_HEIGHT }}>
-                      {caption ? (
-                        <Text numberOfLines={2} className="text-center text-xr-body text-text">
-                          {caption}
-                        </Text>
-                      ) : null}
+                      <LiveCaption store={store} stageInput={stageInput} notice={lastNotice} />
                     </View>
                   </>
                 )}
@@ -1151,4 +1160,33 @@ function logLatency(m: { speechEnd: number; firstText?: number; firstSentence?: 
   const w = globalThis as { __monLatency?: unknown[] };
   (w.__monLatency ??= []).push(row);
   console.info(`[mon latency] end of speech → first audio ${row.firstAudioMs} ms (first text ${row.firstTextMs} ms, first sentence ${row.firstSentenceMs} ms)`);
+}
+
+/**
+ * The caption line: what the mic hears, the reply streaming in, or the
+ * sentence being spoken. The only reader of those fast strings, so a new word
+ * re-renders this line and not the page (see App's store subscription).
+ */
+function LiveCaption({
+  store,
+  stageInput,
+  notice,
+}: {
+  store: StoreApi<AppState>;
+  stageInput: Omit<Parameters<typeof judgeStage>[0], 'heard' | 'live'>;
+  notice: string | null;
+}) {
+  const heard = useStore(store, (s) => s.heard);
+  const live = useStore(store, (s) => s.live);
+  const speaking = useStore(store, (s) => s.speaking);
+  const stage = judgeStage({ ...stageInput, heard, live });
+  // While the Mon talks, the caption is the sentence it is saying (the latest line only, as on an Echo Show).
+  const raw = stageInput.listening ? stage.headline : speaking || (stage.kind !== 'ready' ? stage.headline : (notice ?? stageInput.lastReply));
+  if (!raw) return null;
+  // Stage directions (*chuckle*) are performed by the voice and "Callah" reads as Caller: captions show only the words.
+  return (
+    <Text numberOfLines={2} className="text-center text-xr-body text-text">
+      {captionText(raw)}
+    </Text>
+  );
 }
