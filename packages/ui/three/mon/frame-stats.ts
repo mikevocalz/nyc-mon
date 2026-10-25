@@ -20,6 +20,14 @@ export interface FrameStats {
   readonly clips: readonly string[];
   /** Per stop cue: ms from the stop arriving until the jaw read shut. */
   readonly closeMs: readonly number[];
+  /**
+   * Frames where the head jumped on screen: a step of `px` CSS pixels while
+   * the median step was `medianPx`, with the clip and its time. A pose pop
+   * (a clip whose loop does not meet, a hard cut) shows here even at 120 fps.
+   */
+  readonly jumps: readonly { readonly px: number; readonly medianPx: number; readonly clip: string; readonly clipT: number }[];
+  /** What happened when, ms since the window began: head pops (`pop`), cues and action changes. */
+  readonly events: readonly (readonly [number, string])[];
 }
 
 let reporter: ((stats: FrameStats) => void) | null = null;
@@ -41,8 +49,18 @@ export function createFrameStats(now: () => number = () => performance.now()) {
   let lastX = 0;
   let started = now();
   let closeMs: number[] = [];
+  let steps: number[] = [];
+  let jumps: { px: number; medianPx: number; clip: string; clipT: number }[] = [];
+  let lastHead: [number, number] | null = null;
+  let events: [number, string][] = [];
+  let lastStep: [number, number] | null = null;
+
   let stopAt: number | null = null;
   return {
+    /** Something the head might react to: a cue, an action starting. */
+    note(what: string) {
+      if (reporter) events.push([Math.round(now() - started), what]);
+    },
     /** The view got a stop cue (or the utterance ran out). */
     stopped() {
       if (reporter) stopAt = now();
@@ -53,6 +71,22 @@ export function createFrameStats(now: () => number = () => performance.now()) {
         closeMs.push(Math.round(now() - stopAt));
         stopAt = null;
       }
+    },
+    /** The head's screen position this frame (CSS px), with the clip time. */
+    head(px: number, py: number, clip: string, clipT: number) {
+      if (!reporter) return;
+      if (lastHead) {
+        const v: [number, number] = [px - lastHead[0], py - lastHead[1]];
+        if (lastStep && Math.hypot(v[0] - lastStep[0], v[1] - lastStep[1]) > 1.5) events.push([Math.round(now() - started), `pop ${Math.hypot(v[0] - lastStep[0], v[1] - lastStep[1]).toFixed(1)}px ${clip}@${clipT.toFixed(2)}`]);
+        lastStep = v;
+        const step = Math.hypot(px - lastHead[0], py - lastHead[1]);
+        const sorted = [...steps].sort((a, b) => a - b);
+        const median = sorted[Math.floor(sorted.length / 2)] ?? step;
+        if (steps.length > 30 && step > 3 && step > 6 * Math.max(median, 0.2)) jumps.push({ px: +step.toFixed(1), medianPx: +median.toFixed(2), clip, clipT: +clipT.toFixed(2) });
+        steps.push(step);
+        if (steps.length > 240) steps.shift();
+      }
+      lastHead = [px, py];
     },
     frame(dtMs: number, yaw: number, x: number, clip: string) {
       if (!reporter) return;
@@ -68,7 +102,9 @@ export function createFrameStats(now: () => number = () => performance.now()) {
       if (now() - started < WINDOW_MS) return;
       const sorted = [...dts].sort((a, b) => a - b);
       const at = (q: number) => +(sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * q))] ?? 0).toFixed(1);
-      reporter({ frames: dts.length, p50Ms: at(0.5), p95Ms: at(0.95), maxMs: at(1), slow: dts.filter((d) => d > 25).length, pops, clips, closeMs });
+      reporter({ frames: dts.length, p50Ms: at(0.5), p95Ms: at(0.95), maxMs: at(1), slow: dts.filter((d) => d > 25).length, pops, clips, closeMs, jumps, events });
+      jumps = [];
+      events = [];
       dts = [];
       closeMs = [];
       pops = [];
