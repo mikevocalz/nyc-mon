@@ -167,7 +167,16 @@ export function nebiusBackend(options: NebiusOptions, dependencies: {
         throw new NebiusError(deadline.aborted ? 'TIMEOUT' : 'HTTP');
       }
       if (!response.ok) { await response.body?.cancel(); throw new NebiusError('HTTP', response.status); }
-      const decoded = Completion.safeParse(await readCompletion(response));
+      let payload: unknown;
+      try {
+        payload = await readCompletion(response);
+      } catch (error) {
+        // Cancellation may arrive after headers, while the response body is read.
+        signal.throwIfAborted();
+        if (deadline.aborted) throw new NebiusError('TIMEOUT');
+        throw error;
+      }
+      const decoded = Completion.safeParse(payload);
       if (!decoded.success || decoded.data.model !== opts.modelId) throw new NebiusError('RESPONSE');
       signal.throwIfAborted();
       const result = decoded.data;

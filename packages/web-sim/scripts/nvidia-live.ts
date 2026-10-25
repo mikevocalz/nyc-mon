@@ -9,6 +9,7 @@ import { createModelAuth } from '../server/model-auth.ts';
 import { createMemoryClient, withPersistentMemory } from '../server/companion-memory-client.ts';
 import { runAgentTurn, type ModelClient } from '../src/shared/agentLoop.ts';
 import { mcpToolsToClaude } from '../src/shared/toolSpec.ts';
+import { toolOutcome } from '../src/shared/toolOutcome.ts';
 import { V1CallerData } from '../../mcp-server/src/data/v1.ts';
 import { loadNvidiaEnv } from '../server/nvidia-env.ts';
 import { createSkillLoader, resolveSkillPath } from '../server/skill.ts';
@@ -107,7 +108,7 @@ async function main() {
           requireThat(['get_mon_status', 'feed_mon'].includes(name), 'unapproved test action');
           requireThat(args.monId === monId, 'model must select the designated test Mon');
           const response = await first.callTool({ name, arguments: args });
-          if (name === 'feed_mon' && !response.isError) successfulFeed = true;
+          if (name === 'feed_mon' && toolOutcome(response) === 'applied') successfulFeed = true;
           return response;
         } }, tools: mcpToolsToClaude(tools).tools, history: [], userText: `Feed my test Mon once, monId ${monId}. Use feed_mon, and honestly report any refusal.`,
         maxSteps: 4, signal: AbortSignal.timeout(180000), onEvent: () => {} });
