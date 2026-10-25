@@ -181,6 +181,13 @@ export function AppView(props: AppViewProps) {
       bridge.onupdatemodelcontext = async () => ({});
       // The view says when its hatch starts and whether it plays the sound itself.
       bridge.addEventListener('loggingmessage', (params) => {
+        // The 3D Mon's frame timing (frame-stats.ts), kept for dev tools to read.
+        if ((params as { logger?: unknown }).logger === 'nyc-mon/frames') {
+          const w = globalThis as { __monViewFrames?: unknown[] };
+          (w.__monViewFrames ??= []).push({ at: Date.now(), ...((params as { data?: object }).data ?? {}) });
+          if (w.__monViewFrames.length > 200) w.__monViewFrames.shift();
+          return;
+        }
         const report = parseHatchStart(params);
         if (report && !disposed) void hatchSound.onViewStart(report);
       });

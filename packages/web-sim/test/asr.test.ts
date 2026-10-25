@@ -3,7 +3,7 @@ import type { AddressInfo } from 'node:net';
 import { afterEach, describe, expect, it } from 'vitest';
 import { WebSocket } from 'ws';
 import { createAsrSocket, type AsrEvent, type OpenAsrStream } from '../server/asr.ts';
-import { isEcho, liveMicUrl } from '../src/client/liveMic.ts';
+import { isEcho, isFiller, liveMicUrl } from '../src/client/liveMic.ts';
 
 let server: Server | null = null;
 afterEach(() => {
@@ -112,6 +112,13 @@ describe('live mic helpers', () => {
   });
   it('lets the person cut in', () => {
     expect(isEcho('hold up is he asleep', reply)).toBe(false);
+  });
+  it('drops a filler sound the recognizer finalised on its own, keeps short real turns', () => {
+    expect(isFiller('Oh.')).toBe(true);
+    expect(isFiller('Hm')).toBe(true);
+    expect(isFiller('Bet.')).toBe(false);
+    expect(isFiller('No.')).toBe(false);
+    expect(isFiller('oh wait')).toBe(false);
   });
   it('builds a same-origin socket URL', () => {
     expect(liveMicUrl({ protocol: 'https:', host: 'sim.example' })).toBe('wss://sim.example/api/asr');

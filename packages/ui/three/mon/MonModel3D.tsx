@@ -3,10 +3,11 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { parseSpeechCue, sampleSpeechTrack, utteranceTimeMs, type MonSpeechCue } from './lipsync/cue.ts';
+import { cueAnchorMs, parseSpeechCue, sampleSpeechTrack, utteranceTimeMs, type MonSpeechCue } from './lipsync/cue.ts';
 import { EXPRESSION_CHANNELS, mouthToRig, SPEECH_CHANNELS, type RigTargets } from './lipsync/retarget.ts';
 import { damp } from './lipsync/smoothing.ts';
 import { standFraming } from './framing.ts';
+import { createFrameStats } from './frame-stats.ts';
 import { idleConfig } from './idle/config.ts';
 import { createIdleEngine, resolveIdleClips, type IdleAction, type IdleEngine, type IdleFrame } from './idle/engine.ts';
 
@@ -306,6 +307,7 @@ export function MonModel3D({
   });
 
   const stage = useRef<{ renderer: THREE.WebGLRenderer; camera: THREE.PerspectiveCamera } | null>(null);
+  const statsRef = useRef<ReturnType<typeof createFrameStats> | null>(null);
   const anim = useRef<AnimationState | null>(null);
   const rigRef = useRef<Rig | null>(null);
   /** The utterance in progress: its track and when (performance.now) its audio started. */
@@ -418,6 +420,9 @@ export function MonModel3D({
         rig = readRig(model, mouthRef.current);
         holdHeadInTurns(gltf.animations, model);
         const mixer = new THREE.AnimationMixer(model);
+        // Bind every clip now: the first clipAction() of a clip builds its
+        // property bindings, a 30-40 ms hitch measured at the first switch to it.
+        for (const clip of gltf.animations) mixer.clipAction(clip);
         const durations = Object.fromEntries(gltf.animations.map((a) => [a.name, a.duration]));
         const engine = createIdleEngine(resolveIdleClips(clipsRef.current, durations), seedOf(url));
         // Steps stay inside 90% of the frame with the whole body in view, facing front.
@@ -517,6 +522,7 @@ export function MonModel3D({
       if (next === shown) return;
       shown = next;
       canvas.dataset.mouthOpen = open.toFixed(2);
+      statsRef.current?.mouth(open);
       canvas.dataset.mouthClose = readMorph(r, 'mouthClose').toFixed(2);
     };
 
@@ -606,10 +612,13 @@ export function MonModel3D({
       return Math.abs(Math.atan2(Math.sin(d), Math.cos(d)));
     };
 
+    const stats = createFrameStats();
+    statsRef.current = stats;
     const tick = (now?: number) => {
       frame = requestAnimationFrame(tick);
       timer.update(now);
-      const dt = Math.min(timer.getDelta(), 0.05);
+      const rawDt = timer.getDelta();
+      const dt = Math.min(rawDt, 0.05);
       clock += dt;
       const a = anim.current;
       if (a && root) {
@@ -630,6 +639,7 @@ export function MonModel3D({
         canvas.dataset.rootX = f.rootX.toFixed(3);
         canvas.dataset.boundX = a.boundX.toFixed(3);
         canvas.dataset.clip = a.action?.getClip().name ?? '';
+        stats.frame(rawDt * 1000, f.rootYaw, f.rootX, canvas.dataset.clip);
         if (rig) restoreBase(rig);
         a.mixer.update(dt);
         writeBodyYaw(f.bodyYaw);
@@ -692,6 +702,7 @@ export function MonModel3D({
       if (utterance.current?.cue.id === cue.id) {
         utterance.current = null;
         faceHoldUntil.current = performance.now() + FACE_HOLD_MS;
+        statsRef.current?.stopped();
       }
       return;
     }
@@ -700,7 +711,7 @@ export function MonModel3D({
     // re-anchors to the audio position the host stamped, without restarting.
     const playing = utterance.current;
     if (playing?.cue.id === cue.id && playing.cue.track.kind === cue.track.kind) return;
-    utterance.current = { cue, receivedAt: performance.now() };
+    utterance.current = { cue, receivedAt: cueAnchorMs(cue, performance.now(), Date.now()) };
   }, [speech]);
 
   // Resize in place: no new context, no re-download.
