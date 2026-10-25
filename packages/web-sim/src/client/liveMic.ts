@@ -50,8 +50,13 @@ export async function openLiveMic(opts: { url: string; token: string | undefined
   ws = socket;
   socket.binaryType = 'arraybuffer';
   let ready = false;
+  // Audio from before the recognizer is ready is held, not dropped: the
+  // sign-in check and NVIDIA's stream take a second or two, and the person's
+  // first words land in it. At most 8 s (80 chunks of 100 ms).
+  let held: ArrayBuffer[] = [];
   node.port.onmessage = (e: MessageEvent<ArrayBuffer>) => {
     if (ready && socket.readyState === WebSocket.OPEN) socket.send(e.data);
+    else if (held.length < 80) held.push(e.data);
   };
   socket.onopen = () => socket.send(JSON.stringify({ type: 'start', token: opts.token ?? '' }));
   socket.onmessage = (e: MessageEvent) => {
@@ -62,7 +67,15 @@ export async function openLiveMic(opts: { url: string; token: string | undefined
     } catch {
       return;
     }
-    if (msg.type === 'ready') ready = true;
+    // The last 100 recognizer events, for a headless run to read (like __monLatency).
+    const log = ((globalThis as { __monAsr?: unknown[] }).__monAsr ??= []);
+    log.push([Date.now(), msg.type, msg.text ?? '']);
+    if (log.length > 100) log.shift();
+    if (msg.type === 'ready') {
+      ready = true;
+      for (const chunk of held) socket.send(chunk);
+      held = [];
+    }
     else if (msg.type === 'interim' && msg.text) opts.handlers.onInterim(msg.text);
     else if (msg.type === 'final' && msg.text) opts.handlers.onFinal(msg.text);
     else if (msg.type === 'error') opts.handlers.onError(msg.message ?? 'Speech recognition stopped. Tap Talk to try again.');
