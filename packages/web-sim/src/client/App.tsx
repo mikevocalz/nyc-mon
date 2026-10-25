@@ -5,6 +5,7 @@ import { runAgentTurn } from '../shared/agentLoop.ts';
 import { SimOAuthProvider, parseCallback, resolveAuthState, type AuthState } from '../shared/auth.ts';
 import { mcpToolsToClaude, type ConversionResult } from '../shared/toolSpec.ts';
 import { Badge, Banner, BrandWordmark, Button, Card, ErrorMessage, SolidPanel, Switch, TextField, useInstanceStore, useStore } from '@acme/ui';
+import { xrTypeRamp } from '@acme/theme';
 import { Form, Header, Heading, Paragraph, Section } from '@acme/ui/html';
 import { MonModel3D } from '@acme/ui/three/mon';
 import { Text, View } from '@acme/ui/tw';
@@ -877,8 +878,10 @@ export function App({ config }: { config: PublicConfig }) {
                         </View>
                       ) : null}
                     </View>
-                    {/* On-screen captions, as on an Echo Show: the latest line only. */}
-                    <View aria-live="polite" aria-atomic="true" className="px-5 pb-3 pt-1">
+                    {/* On-screen captions, as on an Echo Show: the latest line only. Two
+                        lines are always reserved: a caption that grew and shrank resized
+                        the view above it, and the Mon jumped with every sentence. */}
+                    <View aria-live="polite" aria-atomic="true" className="px-5 pb-3 pt-1" style={{ height: CAPTION_HEIGHT }}>
                       {caption ? (
                         <Text numberOfLines={2} className="text-center text-xr-body text-text">
                           {caption}
@@ -973,6 +976,9 @@ function LogItem({ item, active, hasView, onShow }: { item: TranscriptItem; acti
  * One line per turn in the console, and the same numbers on `window.__monLatency`
  * for a headless run: end of the person's speech to the first audible Mon audio.
  */
+/** Two xr-body lines plus the caption row's padding (pt-1, pb-3). */
+const CAPTION_HEIGHT = 2 * xrTypeRamp['xr-body'].lineHeightPt + 16;
+
 /** Pause between the end of the Mon's audio and the mic opening. */
 const MIC_SETTLE_MS = 350;
 
