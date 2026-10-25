@@ -7,9 +7,10 @@ import { cueAnchorMs, parseSpeechCue, sampleSpeechTrack, utteranceTimeMs, type M
 import { EXPRESSION_CHANNELS, mouthToRig, SPEECH_CHANNELS, type RigTargets } from './lipsync/retarget.ts';
 import { damp } from './lipsync/smoothing.ts';
 import { standFraming } from './framing.ts';
-import { createFrameStats } from './frame-stats.ts';
+import { smoothJitter } from './clip-smoothing.ts';
+import { captureFrame, createFrameStats, probeFrame, probing } from './frame-stats.ts';
 import { idleConfig } from './idle/config.ts';
-import { createIdleEngine, resolveIdleClips, type IdleAction, type IdleEngine, type IdleFrame } from './idle/engine.ts';
+import { createIdleEngine, LOOPS, resolveIdleClips, type IdleAction, type IdleEngine, type IdleFrame } from './idle/engine.ts';
 
 /**
  * One Mon GLB on a small lit stage, drawn with three.js (WebGL). Plays the
@@ -419,6 +420,8 @@ export function MonModel3D({
         camera.lookAt(0, 0, 0);
         rig = readRig(model, mouthRef.current);
         holdHeadInTurns(gltf.animations, model);
+        // Tremble baked into a clip's keys (emote_tired's shins and ears) shook the whole body.
+        for (const clip of gltf.animations) smoothJitter(clip, LOOPS.has(clip.name));
         const mixer = new THREE.AnimationMixer(model);
         // Bind every clip now: the first clipAction() of a clip builds its
         // property bindings, a 30-40 ms hitch measured at the first switch to it.
@@ -438,6 +441,7 @@ export function MonModel3D({
         const total = bodyChain.reduce((a, b) => a + b.share, 0) || 1;
         bodyChain = bodyChain.map((b) => ({ ...b, share: b.share / total }));
         shoulders = [model.getObjectByName('shoulder_L') ?? null, model.getObjectByName('shoulder_R') ?? null];
+        headBone = model.getObjectByName('head') ?? null;
         rigRef.current = rig;
         setState('ready');
       },
@@ -449,11 +453,34 @@ export function MonModel3D({
       },
     );
 
-    /** Puts every channel speech or blinking writes back to its bind value, so the clip (or nothing) sets the base each frame. */
+    /**
+     * The value the clip last gave each channel speech or blinking writes on
+     * top of. three.js's PropertyMixer skips writing a value that has not
+     * changed since its last frame, so a clip holding a face still (the tired
+     * face: mouthClose 0.9, lids 0.15) writes it once and then never again.
+     * Resetting those channels to their bind value each frame therefore left
+     * them at bind on every frame the clip did not change, and the face
+     * flicked between the two shapes (measured: mouthClose 0 / 0.9 frame to
+     * frame). Restoring the clip's own last value keeps the mixer's skip correct.
+     */
+    const clipBase = { jaw: new THREE.Quaternion(), jawKnown: false, morphs: new Map<string, number>() };
+    const FACE_CHANNELS = [...DRIVEN, ...BLINK_CHANNELS];
+    /** Puts every channel speech or blinking writes back to what the clip (or the bind pose) set, before the mixer runs. */
     const restoreBase = (r: Rig) => {
-      r.jaw?.quaternion.copy(r.jawBind);
-      for (const name of DRIVEN) resetMorph(r, name);
-      for (const name of BLINK_CHANNELS) resetMorph(r, name);
+      if (r.jaw) r.jaw.quaternion.copy(clipBase.jawKnown ? clipBase.jaw : r.jawBind);
+      for (const name of FACE_CHANNELS) {
+        const v = clipBase.morphs.get(name);
+        if (v === undefined) resetMorph(r, name);
+        else writeMorph(r, name, v);
+      }
+    };
+    /** After the mixer: what it left on each channel is the clip's value (written now, or held from before). */
+    const recordBase = (r: Rig) => {
+      if (r.jaw) {
+        clipBase.jaw.copy(r.jaw.quaternion);
+        clipBase.jawKnown = true;
+      }
+      for (const name of FACE_CHANNELS) if (r.morphs.has(name)) clipBase.morphs.set(name, readMorph(r, name));
     };
 
     /** Holds every channel the clip leaves still at the rig's rest pose (jaw shut, lips together). */
@@ -613,6 +640,8 @@ export function MonModel3D({
     };
 
     const stats = createFrameStats();
+    const headAt = new THREE.Vector3();
+    let headBone: THREE.Object3D | null = null;
     statsRef.current = stats;
     const tick = (now?: number) => {
       frame = requestAnimationFrame(tick);
@@ -632,6 +661,8 @@ export function MonModel3D({
           reduced: reduced?.matches ?? false,
           boundX: a.boundX,
         });
+        if ((f.action?.id ?? 0) !== a.actionId) stats.note(`action ${f.action?.kind ?? 'none'} ${f.action?.clip ?? ''}`);
+        if (f.base !== a.base) stats.note(`base ${f.base}`);
         writeClips(a, f);
         // The root never spins: its heading only changes when a turn clip hands one over.
         root.rotation.y = f.rootYaw;
@@ -642,6 +673,7 @@ export function MonModel3D({
         stats.frame(rawDt * 1000, f.rootYaw, f.rootX, canvas.dataset.clip);
         if (rig) restoreBase(rig);
         a.mixer.update(dt);
+        if (rig) recordBase(rig);
         writeBodyYaw(f.bodyYaw);
       } else if (rig) {
         restoreBase(rig);
@@ -654,7 +686,29 @@ export function MonModel3D({
       }
       const facing = facingNow();
       if (facing !== null) canvas.dataset.facing = facing.toFixed(2);
+      if (headBone && a) {
+        headBone.getWorldPosition(headAt).project(camera);
+        stats.head(((headAt.x + 1) / 2) * canvas.clientWidth, ((1 - headAt.y) / 2) * canvas.clientHeight, canvas.dataset.clip ?? '', a.action?.time ?? 0);
+      }
       renderer.render(scene, camera);
+      captureFrame(canvas);
+      if (probing() && rig) {
+        const row: Record<string, number> = { dt: rawDt * 1000 };
+        if (rig.jaw) row.jaw = 2 * Math.acos(Math.min(1, Math.abs(rig.jaw.quaternion.dot(rig.jawBind))));
+        for (const name of rig.morphNames) row[`m:${name}`] = readMorph(rig, name);
+        if (headBone) {
+          headBone.getWorldPosition(headAt);
+          row.hx = headAt.x;
+          row.hy = headAt.y;
+          row.hz = headAt.z;
+        }
+        root?.traverse((o) => {
+          if ((o as THREE.Bone).isBone && /^(spine|chest|neck|head|shin|thigh|ear|hips|pelvis|torso)/.test(o.name)) {
+            row[`b:${o.name}`] = o.quaternion.y + o.quaternion.x * 2 + o.quaternion.z * 3;
+          }
+        });
+        probeFrame(row);
+      }
     };
     tick();
 
@@ -694,6 +748,7 @@ export function MonModel3D({
   useEffect(() => {
     const cue = parseSpeechCue(speech);
     if (!cue) return;
+    statsRef.current?.note(cue.kind === 'listen' ? `listen ${cue.on}` : `${cue.kind} ${cue.kind === 'start' ? cue.track.kind : ''}`);
     if (cue.kind === 'listen') {
       listening.current = cue.on;
       return;

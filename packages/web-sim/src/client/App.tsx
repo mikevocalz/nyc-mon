@@ -956,6 +956,9 @@ export function App({ config }: { config: PublicConfig }) {
                 data-judge-state={stage.kind}
                 className="relative h-full w-full overflow-hidden"
               >
+                {/* The row keeps a badge's height with or without one (an invisible one stands
+                    in): a badge that came and went resized the 3D view under it by 7 px each
+                    turn, and the Mon jumped. */}
                 <View className="flex-row items-center justify-between gap-3 px-5 pt-4">
                   <Text className="text-xr-caption text-text-muted">{time}</Text>
                   <View className="flex-row flex-wrap items-center justify-end gap-2">
@@ -963,7 +966,13 @@ export function App({ config }: { config: PublicConfig }) {
                     {signedIn ? (
                       <View role="status" aria-live="polite" aria-atomic="true">
                         {/* Ready needs no badge; the display shows state only while it changes. */}
-                        {badge ? <Badge label={badge.label} tone={badge.tone} /> : null}
+                        {badge ? (
+                          <Badge label={badge.label} tone={badge.tone} />
+                        ) : (
+                          <View aria-hidden style={{ opacity: 0 }}>
+                            <Badge label="Ready" tone="info" />
+                          </View>
+                        )}
                       </View>
                     ) : null}
                   </View>

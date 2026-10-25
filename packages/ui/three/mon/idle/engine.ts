@@ -61,7 +61,7 @@ export interface IdleClips {
 }
 
 /** Clips that loop well under everything else. The rest of a mood list plays now and then. */
-const LOOPS: ReadonlySet<string> = new Set(['up_idle', 'up_breathe', 'emote_tired', 'tail_swish', 'egg_idle']);
+export const LOOPS: ReadonlySet<string> = new Set(['up_idle', 'up_breathe', 'emote_tired', 'tail_swish', 'egg_idle']);
 const RESTFUL: ReadonlySet<string> = new Set(['emote_tired']);
 
 /**

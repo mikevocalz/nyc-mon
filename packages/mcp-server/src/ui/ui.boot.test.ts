@@ -560,6 +560,28 @@ describe('built views boot in a spec host (bundled Chromium)', { timeout: 60_000
     }
   });
 
+  it("a tired Lil' Ratti's face holds the clip's shape every frame (no flicker to the bind pose)", { timeout: 90_000 }, async () => {
+    // emote_tired holds mouthClose 0.9 and the lids at 0.15. three.js's mixer
+    // writes a value only when it changes, so resetting the face to its bind
+    // pose each frame left 0 showing on every frame the clip held still, and
+    // the face flicked between the two shapes.
+    const b = await boot('mon-card', { ...echoShow8('inline', 'light'), result: { mon: monFor('dex-003'), care: { ...care, activity: 'asleep' }, mood: 'asleep' } });
+    try {
+      await b.frame.waitForFunction(() => document.querySelector('[role=img][aria-busy="false"]') !== null, null, { timeout: 15_000 });
+      await b.frame.waitForFunction(() => document.querySelector('canvas')?.dataset.clip === 'emote_tired', null, { timeout: 10_000 });
+      await new Promise((done) => setTimeout(done, 1500));
+      await b.frame.page().evaluate(() => window.sendHostContext({ nycMonProbe: Date.now() }));
+      await b.frame.page().waitForFunction(() => window.logs.some((l) => l.logger === 'nyc-mon/probe'), null, { timeout: 30_000 });
+      const rows = await b.frame.page().evaluate(() => (window.logs.find((l) => l.logger === 'nyc-mon/probe')!.data as { rows: Record<string, number>[] }).rows);
+      expect(rows.length).toBe(48);
+      const mouth = rows.map((r) => r['m:mouthClose'] ?? 0);
+      expect(Math.min(...mouth)).toBeGreaterThan(0.8);
+      expect(b.errors).toEqual([]);
+    } finally {
+      await b.close();
+    }
+  });
+
   it('Squeaklet lip-syncs a speech cue from the host context, then closes to rest', async () => {
     // Fed, so Squeaklet loops its idle clips. Hungry it plays jaw_chomp
     // (MON_CLIPS needs-fullness), which moves the jaw and so owns it over the rest pose.
