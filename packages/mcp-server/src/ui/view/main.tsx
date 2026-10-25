@@ -19,7 +19,7 @@ import { View } from '../../../../ui/tw';
 import { GridBackdrop as RoomBackdrop } from './GridBackdrop.tsx';
 import { parseSpeechCue, SPEECH_CONTEXT_KEY } from '../../../../ui/three/mon/lipsync/cue.ts';
 import { HATCH_START_LOGGER, setHatchStartReporter } from '../../../../ui/three/mon/hatch-sound.ts';
-import { setFrameStatsReporter } from '../../../../ui/three/mon/frame-stats.ts';
+import { requestFrameCapture, requestProbe, setFrameStatsReporter } from '../../../../ui/three/mon/frame-stats.ts';
 
 /**
  * Keeps a backdrop failure from taking the room with it: if the grid floor
@@ -249,6 +249,19 @@ app.ontoolresult = (params) => {
   }
 };
 app.onhostcontextchanged = (params) => {
+  // Dev aid: the host asks for a burst of rendered frames to see the Mon's motion frame by frame.
+  const ask = (params as { nycMonCapture?: { count?: unknown; every?: unknown; size?: unknown } }).nycMonCapture;
+  if ((params as { nycMonProbe?: unknown }).nycMonProbe) {
+    requestProbe(48, (rows) => {
+      void app.sendLog({ level: 'debug', logger: 'nyc-mon/probe', data: { rows } }).catch(() => {});
+    });
+  }
+  if (ask && typeof ask === 'object') {
+    const n = (v: unknown, d: number, max: number) => (typeof v === 'number' && v > 0 ? Math.min(max, Math.floor(v)) : d);
+    requestFrameCapture(n(ask.count, 24, 60), n(ask.every, 2, 30), n(ask.size, 160, 320), (frames) => {
+      void app.sendLog({ level: 'debug', logger: 'nyc-mon/capture', data: { frames } }).catch(() => {});
+    });
+  }
   useView.setState({ host: { ...useView.getState().host, ...params } });
 };
 

@@ -113,3 +113,51 @@ export function createFrameStats(now: () => number = () => performance.now()) {
     },
   };
 }
+
+/** A pending burst capture of rendered frames (a dev aid for seeing motion frame by frame). */
+let capture: { every: number; left: number; seen: number; size: number; frames: string[]; done: (frames: string[]) => void } | null = null;
+
+/** Captures `count` rendered frames, one every `every` frames, `size` px square, as JPEG data URLs. */
+export function requestFrameCapture(count: number, every: number, size: number, done: (frames: string[]) => void): void {
+  capture = { every: Math.max(1, every), left: count, seen: 0, size, frames: [], done };
+}
+
+/** Called right after each render, while the drawing buffer still holds the frame. */
+export function captureFrame(canvas: HTMLCanvasElement): void {
+  const c = capture;
+  if (!c) return;
+  if (c.seen++ % c.every !== 0) return;
+  const out = document.createElement('canvas');
+  out.width = out.height = c.size;
+  const ctx = out.getContext('2d');
+  if (!ctx) return;
+  ctx.fillStyle = '#f3f4f2';
+  ctx.fillRect(0, 0, c.size, c.size);
+  ctx.drawImage(canvas, 0, 0, c.size, c.size);
+  c.frames.push(out.toDataURL('image/jpeg', 0.7));
+  if (--c.left <= 0) {
+    capture = null;
+    c.done(c.frames);
+  }
+}
+
+/** A pending probe: per-frame readings of named values, to find one that flips frame to frame. */
+let probe: { left: number; rows: Record<string, number>[]; done: (rows: Record<string, number>[]) => void } | null = null;
+
+export function requestProbe(count: number, done: (rows: Record<string, number>[]) => void): void {
+  probe = { left: count, rows: [], done };
+}
+
+export function probing(): boolean {
+  return probe !== null;
+}
+
+export function probeFrame(row: Record<string, number>): void {
+  const p = probe;
+  if (!p) return;
+  p.rows.push(row);
+  if (--p.left <= 0) {
+    probe = null;
+    p.done(p.rows);
+  }
+}
