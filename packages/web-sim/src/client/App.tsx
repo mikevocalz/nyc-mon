@@ -37,6 +37,7 @@ import { currentScheme, type Scheme } from './theme.ts';
 import { createAuthorize, noAuthorize, sdkRefresh } from './freshToken.ts';
 import { createTurnToolCaller, hintedToolNames, latestMonState, withMonState, withPresenceLine } from './turnTools.ts';
 import { currentViewUri, freshViewFor, liveViewUri } from './viewUri.ts';
+import { isEcho, liveMicUrl, openLiveMic, type LiveMic } from './liveMic.ts';
 
 export interface PublicConfig {
   readonly mcpUrl: string;
@@ -46,6 +47,8 @@ export interface PublicConfig {
   readonly devMode: boolean;
   readonly modelBackend: 'bedrock' | 'mock';
   readonly modelLabel: string;
+  /** /api/asr is up: the mic streams to NVIDIA Parakeet, echo-cancelled (liveMic.ts). */
+  readonly liveMic?: boolean;
 }
 
 type Connection =
@@ -200,6 +203,16 @@ export function App({ config }: { config: PublicConfig }) {
   const speakingRef = useRef('');
   const audioStartRef = useRef(0);
   const bargedRef = useRef(false);
+  // ---- Live mic (liveMic.ts): one echo-cancelled stream for the whole voice session.
+  const liveMicRef = useRef<LiveMic | null>(null);
+  const liveOpeningRef = useRef(false);
+  const noSpeechRef = useRef<number | null>(null);
+  /** The latest interim text, for "Done talking" before the recognizer's final arrives. */
+  const heardRef = useRef('');
+  /** Everything the Mon has queued to say this turn: what an echo would sound like. */
+  const replyTextRef = useRef('');
+  /** An utterance that arrived while the cut-off turn was still unwinding. */
+  const pendingUtteranceRef = useRef<string | null>(null);
   /** performance.now() marks for the current turn, for the latency log. */
   const marksRef = useRef<{ speechEnd: number; firstText?: number; firstSentence?: number; firstAudio?: number } | null>(null);
 
@@ -343,8 +356,114 @@ export function App({ config }: { config: PublicConfig }) {
   const latestViewRef = useRef<string | null>(null);
   /** The mic, open for one utterance (only while the Mon is quiet). */
   const sendRef = useRef<(text: string, source: 'voice' | 'typed') => Promise<void>>(async () => {});
+  const clearNoSpeech = useCallback(() => {
+    if (noSpeechRef.current !== null) window.clearTimeout(noSpeechRef.current);
+    noSpeechRef.current = null;
+  }, []);
+  const closeLiveMic = useCallback(() => {
+    clearNoSpeech();
+    liveMicRef.current?.close();
+    liveMicRef.current = null;
+    liveOpeningRef.current = false;
+  }, [clearNoSpeech]);
+
+  /** The person talked over the Mon (or over its thinking): stop it and listen. */
+  const bargeIn = useCallback(() => {
+    bargedRef.current = true;
+    abortRef.current?.abort();
+    stopVoice();
+    dispatch({ type: 'barge-in' });
+    setListening(true);
+  }, [dispatch, setListening, stopVoice]);
+
+  const deliverUtterance = useCallback(
+    (said: string) => {
+      clearNoSpeech();
+      heardRef.current = '';
+      setHeard('');
+      setListening(false);
+      marksRef.current = { speechEnd: performance.now() };
+      performance.mark('mon:end-of-speech');
+      dispatch({ type: 'utterance' });
+      // A cut-off turn is still unwinding (busy): its finally sends this one.
+      if (store.getState().busy) pendingUtteranceRef.current = said;
+      else void sendRef.current(said, 'voice');
+    },
+    [clearNoSpeech, dispatch, setHeard, setListening, store],
+  );
+
+  const startLiveMic = useCallback(async () => {
+    if (liveMicRef.current || liveOpeningRef.current) return;
+    liveOpeningRef.current = true;
+    let token: string | undefined;
+    try {
+      await authorize(async (t) => {
+        token = t;
+        return new Response(null, { status: 204 });
+      });
+      const mic = await openLiveMic({
+        url: liveMicUrl(window.location),
+        token,
+        handlers: {
+          onInterim: (text) => {
+            const mode = convRef.current.mode;
+            if (mode === 'listening') {
+              clearNoSpeech();
+              heardRef.current = text;
+              setHeard(text);
+            } else if ((mode === 'speaking' || mode === 'thinking') && text.split(/\s+/).length >= 2 && !isEcho(text, replyTextRef.current)) {
+              bargeIn();
+              heardRef.current = text;
+              setHeard(text);
+            }
+          },
+          onFinal: (text) => {
+            const mode = convRef.current.mode;
+            if (mode === 'speaking' || mode === 'thinking') {
+              if (isEcho(text, replyTextRef.current)) return;
+              bargeIn();
+            }
+            if (convRef.current.mode === 'listening') deliverUtterance(text);
+          },
+          onError: (m) => {
+            closeLiveMic();
+            setListening(false);
+            dispatch({ type: 'stop' });
+            notice(m, 'error');
+          },
+        },
+      });
+      liveOpeningRef.current = false;
+      // The session ended while the mic was opening.
+      if (convRef.current.mode === 'idle') mic.close();
+      else liveMicRef.current = mic;
+    } catch {
+      liveOpeningRef.current = false;
+      setListening(false);
+      dispatch({ type: 'stop' });
+      notice('The microphone is off or blocked. Allow it for this page, then tap Talk.', 'error');
+    }
+  }, [authorize, bargeIn, clearNoSpeech, closeLiveMic, deliverUtterance, dispatch, notice, setHeard, setListening]);
+
+  const useLiveMic = config.liveMic === true && typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia;
+
   const openMic = useCallback(
     () => {
+      if (useLiveMic) {
+        void startLiveMic();
+        heardRef.current = '';
+        setHeard('');
+        setListening(true);
+        clearNoSpeech();
+        // No speech in the follow-up window ends the session, as on an Echo.
+        noSpeechRef.current = window.setTimeout(() => {
+          if (convRef.current.mode !== 'listening' || heardRef.current) return;
+          closeLiveMic();
+          setListening(false);
+          dispatch({ type: 'silent' });
+        }, LIVE_NO_SPEECH_MS);
+        return;
+      }
       earRef.current?.close();
       const ear = openEar({
         listen,
@@ -373,7 +492,7 @@ export function App({ config }: { config: PublicConfig }) {
       earRef.current = ear;
       setListening(!!ear);
     },
-    [dispatch, notice, setHeard, setListening],
+    [clearNoSpeech, closeLiveMic, dispatch, notice, setHeard, setListening, startLiveMic, useLiveMic],
   );
 
   const send = useCallback(
@@ -383,10 +502,12 @@ export function App({ config }: { config: PublicConfig }) {
       stopVoice();
       if (source === 'typed') {
         closeEar();
+        closeLiveMic();
         marksRef.current = { speechEnd: performance.now() };
         dispatch({ type: 'typed' });
       }
       bargedRef.current = false;
+      replyTextRef.current = '';
       setDraft('');
       setHeard('');
       setBusy(true);
@@ -419,6 +540,7 @@ export function App({ config }: { config: PublicConfig }) {
           if (!s) continue;
           if (marksRef.current && marksRef.current.firstSentence === undefined) marksRef.current.firstSentence = performance.now();
           spokeAny = true;
+          replyTextRef.current += ` ${s}`;
           queue?.push(s);
         }
       };
@@ -552,15 +674,27 @@ export function App({ config }: { config: PublicConfig }) {
         abortRef.current = null;
       }
     },
-    [authorize, busy, conn, model, store, notice, provider, push, readAloud, toolsByName, closeEar, dispatch, learnVoice, openMic, stopVoice, setActiveToolTitle, setActiveViewId, setAuth, setBusy, setConn, setDisplayMode, setDraft, setHeard, setLive, setSpeaking],
+    [authorize, busy, conn, model, store, notice, provider, push, readAloud, toolsByName, closeEar, closeLiveMic, dispatch, learnVoice, openMic, stopVoice, setActiveToolTitle, setActiveViewId, setAuth, setBusy, setConn, setDisplayMode, setDraft, setHeard, setLive, setSpeaking],
   );
   useEffect(() => {
     sendRef.current = send;
   }, [send]);
+  // The person cut in while the old turn was unwinding: send what they said once it has.
+  useEffect(() => {
+    const said = pendingUtteranceRef.current;
+    if (busy || said === null) return;
+    pendingUtteranceRef.current = null;
+    void send(said, 'voice');
+  }, [busy, send]);
 
   /** Talk: opens a hands-free session; mid-reply it cuts the Mon off; while listening it ends the utterance now. */
   function talk() {
     if (listening) {
+      if (useLiveMic) {
+        // Done talking: what was heard so far is the utterance.
+        if (heardRef.current) deliverUtterance(heardRef.current);
+        return;
+      }
       earRef.current?.finish();
       return;
     }
@@ -577,6 +711,7 @@ export function App({ config }: { config: PublicConfig }) {
     abortRef.current?.abort();
     stopVoice();
     closeEar();
+    closeLiveMic();
     dispatch({ type: 'stop' });
   }
 
@@ -666,7 +801,7 @@ export function App({ config }: { config: PublicConfig }) {
     items.find((i): i is Extract<TranscriptItem, { kind: 'tool' }> => i.id === activeViewId && i.kind === 'tool') ?? standing ?? undefined;
   // Never the URI saved with the item: it names a view from the server build that made it.
   const activeViewUri = activeView ? currentViewUri(activeView, toolsByName) : null;
-  const voiceIn = canListen();
+  const voiceIn = useLiveMic || canListen();
   const signedIn = auth.kind === 'dev-bypass' || auth.kind === 'signed-in';
 
   const connLabel =
@@ -978,6 +1113,9 @@ function LogItem({ item, active, hasView, onShow }: { item: TranscriptItem; acti
  */
 /** Two xr-body lines plus the caption row's padding (pt-1, pb-3). */
 const CAPTION_HEIGHT = 2 * xrTypeRamp['xr-body'].lineHeightPt + 16;
+
+/** A follow-up window with no speech ends the voice session (live mic). */
+const LIVE_NO_SPEECH_MS = 8000;
 
 /** Pause between the end of the Mon's audio and the mic opening. */
 const MIC_SETTLE_MS = 350;

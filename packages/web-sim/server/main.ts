@@ -10,6 +10,7 @@ import { sandboxDocument, sandboxHeaders } from './sandbox.ts';
 import { createSkillLoader, resolveSkillPath } from './skill.ts';
 import { createA2fRenderer, createNvcfCall, mp3ToPcm16 } from './a2f.ts';
 import { createTtsHandler, findFfmpeg } from './tts.ts';
+import { createAsrSocket, createParakeetStream } from './asr.ts';
 
 /**
  * Two listeners:
@@ -76,6 +77,22 @@ const handleTts = createTtsHandler({
   ...(face ? { face } : {}),
   ...(modelAuth ? { auth: modelAuth } : {}),
 });
+
+// Live speech-to-text (server/asr.ts): the page's mic streams to NVIDIA Parakeet.
+// Without the key the page keeps the browser's own speech recognition.
+const asrUpgrade = env.NVIDIA_API_KEY
+  ? createAsrSocket({
+      open: createParakeetStream({ apiKey: env.NVIDIA_API_KEY }),
+      allowedOrigin: hostOrigin,
+      rateLimit: createRateLimiter(env.SIM_RATE_LIMIT_PER_MIN, { globalPerMinute: env.SIM_GLOBAL_RATE_LIMIT_PER_MIN }),
+      clientKey: (req) => {
+        const forwarded = req.headers['x-forwarded-for'];
+        return clientKey(req.socket.remoteAddress, typeof forwarded === 'string' ? forwarded : null, env.SIM_TRUST_PROXY === '1');
+      },
+      ...(modelAuth ? { auth: modelAuth } : {}),
+    })
+  : null;
+console.log(`[web-sim] mic: ${asrUpgrade ? 'NVIDIA Parakeet streaming, echo-cancelled' : 'browser speech recognition (no NVIDIA key)'}`);
 
 function toRequest(req: IncomingMessage): Request {
   const headers = new Headers();
@@ -227,6 +244,12 @@ async function main(): Promise<void> {
     }
     res.writeHead(404, { 'content-type': 'text/plain' });
     res.end('Only /sandbox is served on this origin.');
+  });
+
+  // /api/asr only; Vite's dev server takes its own HMR upgrades.
+  app.on('upgrade', (req, socket, head) => {
+    if (asrUpgrade?.(req, socket, head)) return;
+    if (new URL(req.url ?? '/', hostOrigin).pathname === '/api/asr') socket.destroy();
   });
 
   app.listen(env.SIM_PORT, () => {
