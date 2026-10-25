@@ -14,6 +14,8 @@ import { beginSignIn, completeSignIn, connectMcp, type McpSession } from './mcp.
 import { createAuthorize, bearer, sdkRefresh } from './freshToken.ts';
 import { httpModelClient } from './modelClient.ts';
 import { safeStorage } from './session.ts';
+import { createTurnToolCaller } from './turnTools.ts';
+import { toolOutcome } from '../shared/toolOutcome.ts';
 import { MemorySnapshotSchema, type MemorySnapshot } from '@acme/core/schemas';
 
 const ConfigSchema = z.object({ mcpUrl:z.string().url(),clientId:z.string().min(1),modelBackend:z.literal('nebius'),modelLabel:z.string() });
@@ -89,11 +91,12 @@ function Companion({ config }: { config:Config }) {
     const controller=new AbortController();runtime.setState({ abort:controller });
     try {
       const tools=mcpToolsToClaude(connection.tools.filter((tool) => toolsAllowed.has(tool.name))).tools;
-      const result=await runAgentTurn({ model,mcp:{ callTool:(name,args) => connection.client.callTool({ name,arguments:args }) },
+      const result=await runAgentTurn({ model,mcp:createTurnToolCaller({ client:connection.client,signal:controller.signal }),
         tools,history:runtime.getState().history,userText:question,signal:controller.signal,maxSteps:6,
         onEvent:(event) => {
+          if (controller.signal.aborted) return;
           if (event.type==='tool-result') store.setState((previous) => ({ lines:[...previous.lines,
-            `${event.name}: ${event.result.isError?'refused or failed':'completed'} — ${JSON.stringify(event.result.structuredContent ?? event.result.content).slice(0,2500)}`].slice(-40) }));
+            `${event.name}: ${toolOutcome(event.result)} — ${JSON.stringify(event.result.structuredContent ?? event.result.content).slice(0,2500)}`].slice(-40) }));
         } });
       if (controller.signal.aborted) return;
       runtime.setState({ history:result.history });

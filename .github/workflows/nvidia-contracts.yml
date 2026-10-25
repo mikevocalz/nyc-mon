@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - 'packages/web-sim/**'
+      - 'packages/core/**'
       - 'packages/payload/**'
       - 'apps/admin-vite/**'
       - '.github/workflows/nvidia-contracts.yml'
@@ -39,7 +40,9 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Provider and integration contracts (not live inference)
-        run: pnpm --filter @acme/web-sim exec vitest run test/nebius.test.ts test/nvidia-integration.test.ts
+        run: pnpm --filter @acme/web-sim test
+      - name: Native Node migration discovery (no SQL execution)
+        run: pnpm --filter @acme/payload exec vitest run src/__tests__/migration-discovery.test.ts
       - name: Memory ownership, consent and deletion unit tests
         run: pnpm --filter @acme/payload exec vitest run src/admin/console/v1/__tests__/companion-memory.test.ts
       - name: Real disposable PostgreSQL persistence and concurrency
