@@ -430,6 +430,18 @@ describe('built views boot in a spec host (bundled Chromium)', { timeout: 60_000
   });
 
   // "Hello Mon, wanna play?" as visemes over 1.6 s: open vowels, a closure, a pause.
+  /**
+   * helloCue three times over (4.8 s): on CI's software GL a frame can take
+   * longer than one 1.6 s line, so the first frame after the cue landed past
+   * its end and the open-jaw check never saw speech.
+   */
+  const longCue = (id: string) => ({
+    ...helloCue,
+    id,
+    durationMs: 4800,
+    track: { kind: 'visemes', keys: [0, 1600, 3200].flatMap((o) => helloCue.track.keys.map((k) => ({ ...k, startMs: k.startMs + o, endMs: k.endMs + o }))) },
+  });
+
   const helloCue = {
     kind: 'start',
     id: 'boot-1',
@@ -460,18 +472,18 @@ describe('built views boot in a spec host (bundled Chromium)', { timeout: 60_000
         const d = document.querySelector('canvas')?.dataset;
         return d?.mouthOpen === '0.00' && d.mouthClose === '1.00';
       }, null, { timeout: 5000 });
-      await b.frame.page().evaluate((c) => window.sendHostContext({ nycMonSpeech: c }), helloCue);
+      await b.frame.page().evaluate((c) => window.sendHostContext({ nycMonSpeech: c }), longCue('boot-1'));
       // Mid-utterance the jaw is open; read it a few times since frames are slow in software GL.
-      await b.frame.waitForFunction(() => Number(document.querySelector('canvas')?.dataset.mouthOpen ?? 0) > 0.15, null, { timeout: 2000 });
+      await b.frame.waitForFunction(() => Number(document.querySelector('canvas')?.dataset.mouthOpen ?? 0) > 0.15, null, { timeout: 5000 });
       // Speech opened the lips too.
       expect(Number(await canvas.getAttribute('data-mouth-close'))).toBeLessThan(1);
       // And the turntable has brought the face round to the viewer.
-      await b.frame.waitForFunction(() => Number(document.querySelector('canvas')?.dataset.facing ?? 9) < 0.2, null, { timeout: 2000 });
+      await b.frame.waitForFunction(() => Number(document.querySelector('canvas')?.dataset.facing ?? 9) < 0.2, null, { timeout: 5000 });
       // After the audio ends the face returns to the rest pose: jaw shut, lips closed.
       await b.frame.waitForFunction(() => {
         const d = document.querySelector('canvas')?.dataset;
         return Number(d?.mouthOpen ?? 1) < 0.02 && Number(d?.mouthClose ?? 0) > 0.98;
-      }, null, { timeout: 5000 });
+      }, null, { timeout: 10_000 });
       expect(Number(await canvas.getAttribute('data-mouth-open'))).toBeLessThan(0.02);
       expect(Number(await canvas.getAttribute('data-mouth-close'))).toBeGreaterThan(0.98);
       expect(b.errors).toEqual([]);
@@ -563,14 +575,14 @@ describe('built views boot in a spec host (bundled Chromium)', { timeout: 60_000
         const d = document.querySelector('canvas')?.dataset;
         return d?.mouthOpen === '0.00' && d.mouthClose === '1.00';
       }, null, { timeout: 5000 });
-      await b.frame.page().evaluate((c) => window.sendHostContext({ nycMonSpeech: c }), { ...helloCue, id: 'boot-squeaklet' });
-      await b.frame.waitForFunction(() => Number(document.querySelector('canvas')?.dataset.mouthOpen ?? 0) > 0.15, null, { timeout: 2000 });
+      await b.frame.page().evaluate((c) => window.sendHostContext({ nycMonSpeech: c }), longCue('boot-squeaklet'));
+      await b.frame.waitForFunction(() => Number(document.querySelector('canvas')?.dataset.mouthOpen ?? 0) > 0.15, null, { timeout: 5000 });
       expect(Number(await canvas.getAttribute('data-mouth-close'))).toBeLessThan(1);
-      await b.frame.waitForFunction(() => Number(document.querySelector('canvas')?.dataset.facing ?? 9) < 0.2, null, { timeout: 2000 });
+      await b.frame.waitForFunction(() => Number(document.querySelector('canvas')?.dataset.facing ?? 9) < 0.2, null, { timeout: 5000 });
       await b.frame.waitForFunction(() => {
         const d = document.querySelector('canvas')?.dataset;
         return Number(d?.mouthOpen ?? 1) < 0.02 && Number(d?.mouthClose ?? 0) > 0.98;
-      }, null, { timeout: 5000 });
+      }, null, { timeout: 10_000 });
       expect(Number(await canvas.getAttribute('data-mouth-open'))).toBeLessThan(0.02);
       expect(Number(await canvas.getAttribute('data-mouth-close'))).toBeGreaterThan(0.98);
       expect(b.errors).toEqual([]);
