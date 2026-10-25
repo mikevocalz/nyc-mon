@@ -37,7 +37,7 @@ import { currentScheme, type Scheme } from './theme.ts';
 import { createAuthorize, noAuthorize, sdkRefresh } from './freshToken.ts';
 import { createTurnToolCaller, hintedToolNames, latestMonState, withMonState, withPresenceLine } from './turnTools.ts';
 import { currentViewUri, freshViewFor, liveViewUri } from './viewUri.ts';
-import { isEcho, liveMicUrl, openLiveMic, type LiveMic } from './liveMic.ts';
+import { isEcho, isFiller, liveMicUrl, openLiveMic, type LiveMic } from './liveMic.ts';
 
 export interface PublicConfig {
   readonly mcpUrl: string;
@@ -213,6 +213,8 @@ export function App({ config }: { config: PublicConfig }) {
   const replyTextRef = useRef('');
   /** An utterance that arrived while the cut-off turn was still unwinding. */
   const pendingUtteranceRef = useRef<string | null>(null);
+  /** What the person said last, so more said before the Mon answers joins it. */
+  const lastUtteranceRef = useRef('');
   /** performance.now() marks for the current turn, for the latency log. */
   const marksRef = useRef<{ speechEnd: number; firstText?: number; firstSentence?: number; firstAudio?: number } | null>(null);
 
@@ -379,6 +381,7 @@ export function App({ config }: { config: PublicConfig }) {
   const deliverUtterance = useCallback(
     (said: string) => {
       clearNoSpeech();
+      lastUtteranceRef.current = said;
       heardRef.current = '';
       setHeard('');
       setListening(false);
@@ -418,12 +421,16 @@ export function App({ config }: { config: PublicConfig }) {
             }
           },
           onFinal: (text) => {
+            if (isFiller(text)) return;
             const mode = convRef.current.mode;
+            let said = text;
             if (mode === 'speaking' || mode === 'thinking') {
               if (isEcho(text, replyTextRef.current)) return;
+              // Still thinking, nothing said yet: the person kept talking, so it is one turn.
+              if (mode === 'thinking' && !replyTextRef.current.trim()) said = `${lastUtteranceRef.current} ${text}`.trim();
               bargeIn();
             }
-            if (convRef.current.mode === 'listening') deliverUtterance(text);
+            if (convRef.current.mode === 'listening') deliverUtterance(said);
           },
           onError: (m) => {
             closeLiveMic();
@@ -498,7 +505,8 @@ export function App({ config }: { config: PublicConfig }) {
   const send = useCallback(
     async (raw: string, source: 'voice' | 'typed' = 'typed') => {
       const text = raw.trim();
-      if (!text || busy || conn.kind !== 'connected') return;
+      // The store, not the render's `busy`: a cut-in can call this before React re-renders.
+      if (!text || store.getState().busy || conn.kind !== 'connected') return;
       stopVoice();
       if (source === 'typed') {
         closeEar();

@@ -27,7 +27,7 @@ export const ASR_URI = 'grpc.nvcf.nvidia.com:443';
 export const ASR_FUNCTION_ID = '1598d209-5e27-4d3c-8079-4751568b1081';
 export const ASR_SAMPLE_RATE = 16_000;
 /** Words Parakeet should favour: the Mon's names and how the Caller is addressed. */
-export const ASR_PHRASES = ['Callah', 'Caller', "Lil' Ratti", 'Squeaklet', 'Metro Egg', 'Hood Ratti', 'Mon', 'NYC-MON'];
+export const ASR_PHRASES = ['Callah', 'Caller', "Lil' Ratti", 'Squeaklet', 'Metro Egg', 'Hood Ratti', 'Mon', 'NYC-MON', 'bet', 'say less', 'my G'];
 /** Measured: without the boost Parakeet heard "Lil Ray" and "calls"; with it, "Lil' Ratti" and "Callah". */
 const PHRASE_BOOST = 20;
 /** One listening session at most this long; the page reconnects for the next. */

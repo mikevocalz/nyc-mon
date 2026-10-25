@@ -98,3 +98,12 @@ export function isEcho(heard: string, reply: string): boolean {
   const own = new Set(words(reply));
   return said.filter((w) => own.has(w)).length / said.length >= 0.6;
 }
+
+/** Room noise and false starts the recognizer finalises on their own: "Oh.", "Uh", "Hm". */
+const FILLERS = new Set(['oh', 'uh', 'um', 'hm', 'hmm', 'ah', 'eh', 'mm', 'he', 'huh', 'er']);
+
+/** A final that is only a filler sound is not a turn. "Bet." and "No." still are. */
+export function isFiller(text: string): boolean {
+  const said = words(text);
+  return said.length === 0 || (said.length === 1 && FILLERS.has(said[0]!));
+}
