@@ -71,3 +71,60 @@ test("a walk's legs are real motion and are left as authored", () => {
   assert.deepEqual(smoothJitter(new THREE.AnimationClip('up_walk', 2, [thigh]), true), []);
   assert.deepEqual(Array.from(thigh.values), before);
 });
+
+test('a resampled 30 fps track keeps every authored pose and plays without speed steps at 120 Hz', async () => {
+  const { resampleSmooth, RESAMPLE } = await import('./clip-smoothing.ts');
+  const n = 31;
+  const times = Float32Array.from({ length: n }, (_, k) => k / 30);
+  const q = new THREE.Quaternion();
+  const values = new Float32Array(n * 4);
+  const angle = (k: number) => 0.8 * Math.sin((k / 30) * Math.PI * 2);
+  for (let k = 0; k < n; k++) {
+    q.setFromAxisAngle(new THREE.Vector3(1, 0, 0), angle(k));
+    values.set([q.x, q.y, q.z, q.w], k * 4);
+  }
+  const track = new THREE.QuaternionKeyframeTrack('forearm_L.quaternion', times, values);
+  const clip = new THREE.AnimationClip('wave', 1, [track]);
+  const linear = clip.clone();
+  resampleSmooth(clip, false);
+  assert.equal(track.times.length, (n - 1) * RESAMPLE + 1);
+  // Every authored key is still a sample, unchanged.
+  for (let k = 0; k < n; k++) for (let c = 0; c < 4; c++) assert.ok(Math.abs(track.values[k * RESAMPLE * 4 + c]! - values[k * 4 + c]!) < 1e-6);
+  // Played on a 120 Hz clock, the speed changes by far less from frame to frame than linear keys give.
+  const speedSteps = (c: THREE.AnimationClip) => {
+    const bone = new THREE.Bone();
+    bone.name = 'forearm_L';
+    const mixer = new THREE.AnimationMixer(bone);
+    mixer.clipAction(c).play();
+    const xs: number[] = [];
+    for (let f = 0; f < 100; f++) {
+      mixer.setTime(0.1 + f / 120);
+      xs.push(bone.quaternion.x);
+    }
+    const v = xs.slice(1).map((x, i) => x - xs[i]!);
+    return Math.max(...v.slice(1).map((x, i) => Math.abs(x - v[i]!)));
+  };
+  const smooth = speedSteps(clip);
+  const steps = speedSteps(linear);
+  assert.ok(smooth < steps / 3, `smooth ${smooth} vs linear ${steps}`);
+});
+
+test("a loop that ends away from its start is eased shut; Lil' Ratti's emote_tired then meets itself", async () => {
+  const { closeLoop, LOOP_CLOSE_S } = await import('./clip-smoothing.ts');
+  const n = 67;
+  const times = Float32Array.from({ length: n }, (_, k) => k / 30);
+  const q = new THREE.Quaternion();
+  const values = new Float32Array(n * 4);
+  for (let k = 0; k < n; k++) {
+    q.setFromAxisAngle(new THREE.Vector3(0, 0, 1), 0.1 * (k / (n - 1)) + 0.02 * Math.sin(k / 5));
+    values.set([q.x, q.y, q.z, q.w], k * 4);
+  }
+  const track = new THREE.QuaternionKeyframeTrack('forearm_L.quaternion', times, values);
+  const before = Float32Array.from(track.values);
+  closeLoop(new THREE.AnimationClip('emote_tired', 2.2, [track]));
+  const first = new THREE.Quaternion().fromArray(track.values, 0);
+  const last = new THREE.Quaternion().fromArray(track.values, (n - 1) * 4);
+  assert.ok(first.angleTo(last) < 1e-5, `seam ${first.angleTo(last)}`);
+  // Keys before the closing window are exactly as authored.
+  for (let k = 0; times[k]! <= times[n - 1]! - LOOP_CLOSE_S; k++) for (let c = 0; c < 4; c++) assert.equal(track.values[k * 4 + c], before[k * 4 + c]);
+});

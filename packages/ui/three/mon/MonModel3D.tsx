@@ -7,7 +7,7 @@ import { cueAnchorMs, parseSpeechCue, sampleSpeechTrack, utteranceTimeMs, type M
 import { EXPRESSION_CHANNELS, mouthToRig, SPEECH_CHANNELS, type RigTargets } from './lipsync/retarget.ts';
 import { damp } from './lipsync/smoothing.ts';
 import { standFraming } from './framing.ts';
-import { smoothJitter } from './clip-smoothing.ts';
+import { closeLoop, resampleSmooth, smoothJitter } from './clip-smoothing.ts';
 import { captureFrame, createFrameStats, probeFrame, probing } from './frame-stats.ts';
 import { idleConfig } from './idle/config.ts';
 import { createIdleEngine, LOOPS, resolveIdleClips, type IdleAction, type IdleEngine, type IdleFrame } from './idle/engine.ts';
@@ -420,8 +420,14 @@ export function MonModel3D({
         camera.lookAt(0, 0, 0);
         rig = readRig(model, mouthRef.current);
         holdHeadInTurns(gltf.animations, model);
-        // Tremble baked into a clip's keys (emote_tired's shins and ears) shook the whole body.
-        for (const clip of gltf.animations) smoothJitter(clip, LOOPS.has(clip.name));
+        // Clips as authored had baked tremble, linear 30 fps keys (a speed step every
+        // fourth frame at 120 Hz) and loops that did not meet (a snap each restart).
+        for (const clip of gltf.animations) {
+          const loops = LOOPS.has(clip.name) || clip.name === 'up_look_listen' || clip.name === 'up_walk';
+          smoothJitter(clip, loops);
+          if (loops) closeLoop(clip);
+          resampleSmooth(clip, loops);
+        }
         const mixer = new THREE.AnimationMixer(model);
         // Bind every clip now: the first clipAction() of a clip builds its
         // property bindings, a 30-40 ms hitch measured at the first switch to it.
@@ -703,10 +709,28 @@ export function MonModel3D({
           row.hz = headAt.z;
         }
         root?.traverse((o) => {
-          if ((o as THREE.Bone).isBone && /^(spine|chest|neck|head|shin|thigh|ear|hips|pelvis|torso)/.test(o.name)) {
+          if ((o as THREE.Bone).isBone) {
             row[`b:${o.name}`] = o.quaternion.y + o.quaternion.x * 2 + o.quaternion.z * 3;
+            row[`p:${o.name}`] = o.position.x + o.position.y * 2 + o.position.z * 3;
           }
         });
+        row.rootYaw = root?.rotation.y ?? 0;
+        row.rootX = root?.position.x ?? 0;
+        row.clipT = anim.current?.action?.time ?? 0;
+        const rect = canvas.getBoundingClientRect();
+        row.cw = canvas.width;
+        row.ch = canvas.height;
+        row.ccw = canvas.clientWidth;
+        row.cch = canvas.clientHeight;
+        row.rx = rect.left;
+        row.ry = rect.top;
+        row.dpr = window.devicePixelRatio;
+        row.aspect = camera.aspect;
+        row.scrollY = window.scrollY;
+        row.docH = document.documentElement.scrollHeight;
+        row.winH = window.innerHeight;
+        row.camY = camera.position.y;
+        row.camZ = camera.position.z;
         probeFrame(row);
       }
     };
