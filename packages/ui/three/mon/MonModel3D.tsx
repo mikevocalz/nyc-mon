@@ -6,6 +6,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { parseSpeechCue, sampleSpeechTrack, utteranceTimeMs, type MonSpeechCue } from './lipsync/cue.ts';
 import { EXPRESSION_CHANNELS, mouthToRig, SPEECH_CHANNELS, type RigTargets } from './lipsync/retarget.ts';
 import { damp } from './lipsync/smoothing.ts';
+import { standFraming } from './framing.ts';
 import { idleConfig } from './idle/config.ts';
 import { createIdleEngine, resolveIdleClips, type IdleAction, type IdleEngine, type IdleFrame } from './idle/engine.ts';
 
@@ -408,14 +409,11 @@ export function MonModel3D({
         root = new THREE.Group();
         root.add(model);
         scene.add(root);
-        // Fit the cylinder the turntable sweeps, so tails and arms never clip.
-        // Half the radius on top of the centre-plane fit covers the near edge
-        // of the sweep; a full radius left the body small in its box.
+        // Standing face-on at 90% of the frame's height (framing.ts).
         const radius = Math.hypot(size.x, size.z) / 2;
-        const vHalf = (camera.fov * Math.PI) / 360;
-        const hHalf = Math.atan(Math.tan(vHalf) * camera.aspect);
-        const dist = Math.max(size.y / 2 / Math.tan(vHalf), radius / Math.tan(hHalf)) * 1.08 + radius * 0.5;
-        camera.position.set(0, size.y * 0.08, dist);
+        const hHalf = Math.atan(Math.tan((camera.fov * Math.PI) / 360) * camera.aspect);
+        camera.position.copy(standFraming(size, camera));
+        const dist = camera.position.z;
         camera.lookAt(0, 0, 0);
         rig = readRig(model, mouthRef.current);
         holdHeadInTurns(gltf.animations, model);

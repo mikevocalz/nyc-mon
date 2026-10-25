@@ -604,9 +604,47 @@ describe('built views boot in a spec host (bundled Chromium)', { timeout: 60_000
     }
   });
 
-  it('the Metro Egg hatches into Squeaklet and hands over to the standing Mon', { timeout: 90_000 }, async () => {
+  it('the hatch follows its box when the frame shrinks mid-hatch, and the Mon takes over in the same place', { timeout: 150_000 }, async () => {
     const b = await boot('mon-card', {
-      ...echoShow8('inline', 'light'),
+      width: 1094,
+      height: 404,
+      hostContext: { theme: 'light', displayMode: 'inline', availableDisplayModes: ['inline', 'fullscreen'], maxHeight: 404 },
+      result: { hatched: true, alreadyHatched: false, hatching: true, egg: { eggId: 'egg_boot', speciesId: 'dex-001' }, mon: monFor('dex-002'), care },
+    });
+    const rects = () =>
+      b.frame.evaluate(() => {
+        const r = (el: Element | null | undefined) => {
+          const x = el?.getBoundingClientRect();
+          return x ? [Math.round(x.left), Math.round(x.top), Math.round(x.width), Math.round(x.height)] : null;
+        };
+        const hatch = document.querySelector('canvas[data-hatch-phase]');
+        return { hatch: r(hatch), box: r(hatch?.parentElement?.parentElement), mon: r(document.querySelector('[data-layer="mon"] canvas')) };
+      });
+    try {
+      await b.frame.waitForFunction(() => document.querySelector('canvas[data-hatch-phase]') !== null, null, { timeout: 30_000 });
+      // The reply's caption arrives under the card: the host gives the view less height.
+      await b.frame.page().evaluate(() => window.sendHostContext({ maxHeight: 340 }));
+      await b.frame.waitForFunction(() => (document.querySelector('canvas[data-hatch-phase]')?.getBoundingClientRect().height ?? 999) < 330, null, { timeout: 5000 });
+      const during = await rects();
+      expect(during.hatch).toEqual(during.box);
+      // On CI's software GL the hatch's frames run slow (its clock caps each step), so the full moment takes far longer than its 5 s.
+      await b.frame.waitForFunction(() => document.querySelector('canvas[data-hatch-phase]') === null, null, { timeout: 90_000 });
+      const after = await rects();
+      expect(after.mon).toEqual(during.hatch);
+      expect(b.errors).toEqual([]);
+    } finally {
+      await b.close();
+    }
+  });
+
+  it('the Metro Egg hatches into Squeaklet and hands over to the standing Mon', { timeout: 90_000 }, async () => {
+    // MON_BOOT_SIZE=WxH replays at another host's frame (the simulator's card is about 1094x404, no deviceClass).
+    const [w, h] = (process.env.MON_BOOT_SIZE ?? '').split('x').map(Number);
+    const size = w && h
+      ? { width: w, height: h, hostContext: { theme: 'light', displayMode: 'inline', availableDisplayModes: ['inline', 'fullscreen'], maxHeight: h } }
+      : echoShow8('inline', 'light');
+    const b = await boot('mon-card', {
+      ...size,
       result: { hatched: true, alreadyHatched: false, hatching: true, egg: { eggId: 'egg_boot', speciesId: 'dex-001' }, mon: monFor('dex-002'), care },
     });
     // Set MON_BOOT_FRAMES to a directory to keep a frame strip of the hatch for review.
@@ -615,7 +653,8 @@ describe('built views boot in a spec host (bundled Chromium)', { timeout: 60_000
     let n = 0;
     const shoot = async (tag: string) => {
       if (!framesDir) return;
-      const box = (await stage.boundingBox()) ?? (await b.frame.locator('canvas').first().boundingBox());
+      // The whole frame, so a jump between the hatch and the standing Mon shows.
+      const box = process.env.MON_BOOT_SIZE ? await (await b.frame.frameElement()).boundingBox() : (await stage.boundingBox()) ?? (await b.frame.locator('canvas').first().boundingBox());
       if (box) await b.frame.page().screenshot({ path: join(framesDir, `hatch-${String(n++).padStart(3, '0')}-${tag}.png`), clip: box });
     };
     try {
