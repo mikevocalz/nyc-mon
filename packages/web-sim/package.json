@@ -29,6 +29,7 @@
     "react-dom": "catalog:",
     "react-native-skia": "catalog:",
     "react-native-web": "catalog:",
+    "ws": "catalog:",
     "zod": "catalog:",
     "zustand": "catalog:"
   },
@@ -38,6 +39,7 @@
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
+    "@types/ws": "catalog:",
     "@vitejs/plugin-react": "catalog:",
     "eslint": "catalog:",
     "eslint-config-expo": "catalog:",

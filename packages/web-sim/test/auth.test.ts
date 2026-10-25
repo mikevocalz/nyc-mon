@@ -141,7 +141,11 @@ describe('server env', () => {
   });
   it('tells the browser nothing secret, and the client id from one variable', () => {
     const cfg = publicConfig(loadSimEnv({ AWS_REGION: 'us-east-1', SIM_SKILL_PATH: 'x', OAUTH_SIM_CLIENT_ID: 'sim-staging' }));
-    expect(Object.keys(cfg).sort()).toEqual(['authMode', 'clientId', 'devMode', 'mcpUrl', 'modelBackend', 'modelLabel', 'sandboxOrigin']);
+    expect(Object.keys(cfg).sort()).toEqual(['authMode', 'clientId', 'devMode', 'liveMic', 'mcpUrl', 'modelBackend', 'modelLabel', 'sandboxOrigin']);
+    // The NVIDIA key only switches the live mic on; the key itself never reaches the page.
+    const withKey = publicConfig(loadSimEnv({ NVIDIA_API_KEY: 'nvapi-test-secret' }));
+    expect(withKey.liveMic).toBe(true);
+    expect(JSON.stringify(withKey)).not.toContain('nvapi');
     expect(cfg.clientId).toBe('sim-staging');
     expect(publicConfig(loadSimEnv({})).clientId).toBe('nyc-mon-sim');
   });
