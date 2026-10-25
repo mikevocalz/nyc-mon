@@ -24,7 +24,7 @@ import {
   saveSession,
   type TranscriptItem,
 } from './session.ts';
-import { IDLE, isBargeIn, nextConversation, openEar, type ConversationEvent, type ConversationMode, type Ear } from './handsFree.ts';
+import { IDLE, nextConversation, openEar, type ConversationEvent, type ConversationMode, type Ear } from './handsFree.ts';
 import { monSpeechPort } from './monSpeechPort.ts';
 import { createSentenceSplitter } from './sentenceStream.ts';
 import { loadVoice, sameVoice, saveVoice, stickyVoice, type RememberedVoice } from './sessionVoice.ts';
@@ -230,7 +230,7 @@ export function App({ config }: { config: PublicConfig }) {
     emitSpeechCue({ kind: 'listen', id: 'mic', on: listening });
   }, [listening]);
 
-  // The first audible moment of each clip: drives the barge-in holdoff and the latency log.
+  // The first audible moment of each clip: drives the latency log.
   useEffect(
     () =>
       addSpeechCueListener((cue) => {
@@ -340,10 +340,10 @@ export function App({ config }: { config: PublicConfig }) {
 
   /** The newest tool call that opens a card; an older one still re-listing never takes the display from it. */
   const latestViewRef = useRef<string | null>(null);
-  /** The mic, open for one utterance. `gated` watches for a barge-in while the Mon speaks. */
+  /** The mic, open for one utterance (only while the Mon is quiet). */
   const sendRef = useRef<(text: string, source: 'voice' | 'typed') => Promise<void>>(async () => {});
   const openMic = useCallback(
-    (gated: boolean) => {
+    () => {
       earRef.current?.close();
       const ear = openEar({
         listen,
@@ -368,26 +368,11 @@ export function App({ config }: { config: PublicConfig }) {
           dispatch({ type: 'stop' });
           notice(m, 'error');
         },
-        ...(gated
-          ? {
-              noSpeechMs: Infinity,
-              accept: (heard: string) =>
-                isBargeIn({ heard, speaking: speakingRef.current, msSinceAudioStart: performance.now() - audioStartRef.current }),
-              onBargeIn: () => {
-                // The person talked over the Mon: stop it and listen.
-                bargedRef.current = true;
-                abortRef.current?.abort();
-                stopVoice();
-                dispatch({ type: 'barge-in' });
-                setListening(true);
-              },
-            }
-          : {}),
       });
       earRef.current = ear;
-      setListening(!!ear && !gated);
+      setListening(!!ear);
     },
-    [dispatch, notice, setHeard, setListening, stopVoice],
+    [dispatch, notice, setHeard, setListening],
   );
 
   const send = useCallback(
@@ -417,11 +402,10 @@ export function App({ config }: { config: PublicConfig }) {
               speakingRef.current = sentence;
               setSpeaking(sentence);
               if (audioStartRef.current < (marksRef.current?.speechEnd ?? 0)) audioStartRef.current = performance.now();
-              if (index === 0) {
-                if (convRef.current.mode === 'thinking') dispatch({ type: 'reply-audio' });
-                // Barge-in watch: the mic stays open while the Mon talks, behind the echo guard.
-                if (convRef.current.voiceSession && canListen()) openMic(true);
-              }
+              // The mic stays shut while the Mon talks: Web Speech has no echo
+              // cancellation, so it heard the Mon through the speakers and sent
+              // that back as the person's turn. Talk cuts in instead.
+              if (index === 0 && convRef.current.mode === 'thinking') dispatch({ type: 'reply-audio' });
             },
           })
         : null;
@@ -446,7 +430,12 @@ export function App({ config }: { config: PublicConfig }) {
           setSpeaking('');
           closeEar();
           const next = dispatch({ type: 'reply-done' });
-          if (next.mode === 'listening') openMic(false);
+          // Let the speakers fall silent before the mic opens, or it catches the last word.
+          if (next.mode === 'listening') {
+            window.setTimeout(() => {
+              if (convRef.current.mode === 'listening' && !earRef.current) openMic();
+            }, MIC_SETTLE_MS);
+          }
         };
         if (queue) void queue.done.then((outcome) => outcome === 'finished' && afterReply());
         else afterReply();
@@ -580,7 +569,7 @@ export function App({ config }: { config: PublicConfig }) {
       stopVoice();
     }
     dispatch({ type: 'talk' });
-    openMic(false);
+    openMic();
   }
   /** Stop: ends the reply, the voice and the session. */
   function stopAll() {
@@ -984,6 +973,9 @@ function LogItem({ item, active, hasView, onShow }: { item: TranscriptItem; acti
  * One line per turn in the console, and the same numbers on `window.__monLatency`
  * for a headless run: end of the person's speech to the first audible Mon audio.
  */
+/** Pause between the end of the Mon's audio and the mic opening. */
+const MIC_SETTLE_MS = 350;
+
 const SIGN_IN_EXPIRED = 'Your sign-in expired. Sign in again to keep talking.';
 
 function logLatency(m: { speechEnd: number; firstText?: number; firstSentence?: number; firstAudio?: number }) {
