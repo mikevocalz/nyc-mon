@@ -1,15 +1,16 @@
 'use client';
 
-import { useMemo, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, type ReactNode } from 'react';
 import { useRouter } from 'expo-router';
 import type { JournalEntry } from '@acme/core/types';
 import {
   Badge, DaysCalendar, Heading, SafeArea, VirtualList, monthOf, shiftMonth, useInstanceStore,
-  useReducedMotion, useStore, type YearMonth,
+  useReducedMotion, useStore, type DeviceKey, type GlassLine, type GlassView, type YearMonth,
 } from '@acme/ui';
 import { Pressable, ScrollView, Text, View } from '@acme/ui/tw';
 import { localDayKey, selectActiveMon, selectDaysTogether, selectJournal, useMonStore } from '../mon/mon.store';
 import { companionCopy } from './copy';
+import { GlassStage, useGlassOn, useGlassScreen, useMonGlass } from './glass';
 import { useHomeStage } from './home-stage.store';
 import { groupJournalByDay, journalDays, journalEntryCopyId, showsFirstBadge, type DayHeading } from './journal-model';
 import { useMinuteClock } from './minute-clock';
@@ -21,6 +22,9 @@ type Row =
   | { readonly type: 'entry'; readonly entry: JournalEntry };
 
 const EMPTY: readonly JournalEntry[] = [];
+/** The Baby small at the top, seven timeline rows, then Newer / Older / Back. */
+const LAYOUT = { model: 'small', rings: false, lineRows: 7, actionRows: 1, perRow: 3 } as const;
+const PAGE = 7;
 
 function headingText(heading: DayHeading): string {
   switch (heading.kind) {
@@ -57,7 +61,7 @@ function BackButton() {
  * shows every day.
  */
 export function JournalScreen() {
-  useHomeStage({});
+  const router = useRouter();
   const reducedMotion = useReducedMotion();
   const nowMs = useMinuteClock((s) => s.nowMs);
   const mon = useMonStore(selectActiveMon);
@@ -73,6 +77,74 @@ export function JournalScreen() {
 
   const days = useMemo(() => journalDays(entries), [entries]);
   const groups = useMemo(() => groupJournalByDay(entries, nowMs), [entries, nowMs]);
+
+  // ---- the 3D H-Lynk: the Baby on the glass over the timeline, a page of rows at a time ----
+  const glassUi = useInstanceStore(() => ({ failed: false, page: 0, nudge: 0 }));
+  const { failed, page, nudge } = useStore(glassUi);
+  const glassOn = useGlassOn(failed) && mon !== undefined;
+  const { model, monClips } = useMonGlass(mon === undefined ? null : monIdentity(mon).dexId, undefined);
+  const glassName = mon === undefined ? '' : monIdentity(mon).name;
+  const rows: GlassLine[] = groups.flatMap((g) => [
+    { text: headingText(g.heading), size: 'caption' as const, tone: 'dim' as const, align: 'left' as const },
+    ...g.entries.map((entry): GlassLine => ({
+      text: companionCopy(journalEntryCopyId(entry), { name: glassName }),
+      align: 'left',
+      ...(showsFirstBadge(entry) ? { badge: companionCopy('m18.first') } : {}),
+    })),
+  ]);
+  const pages = Math.max(1, Math.ceil(rows.length / PAGE));
+  const at = Math.min(page, pages - 1);
+  const turn = (by: -1 | 1) => glassUi.setState({ page: Math.min(pages - 1, Math.max(0, at + by)) });
+  const glassView: GlassView = {
+    status: { text: daysTogether === 1 ? companionCopy('m18.days.one') : companionCopy('m18.days.other', { n: daysTogether }), tone: 'neutral' },
+    title: companionCopy('m18.heading', { name: glassName }),
+    subtitle: '',
+    rings: [],
+    lines: rows.slice(at * PAGE, at * PAGE + PAGE),
+    actions: [
+      { target: 'newer', label: companionCopy('m18.page.newer'), tone: 'secondary', disabled: at === 0 },
+      { target: 'older', label: companionCopy('m18.page.older'), tone: 'secondary', disabled: at >= pages - 1 },
+      { target: 'back', label: companionCopy('m17.back.a11y'), tone: 'primary' },
+    ],
+  };
+  const onAction = (target: string) => {
+    if (target === 'newer') turn(-1);
+    else if (target === 'older') turn(1);
+    else if (target === 'back') router.back();
+  };
+  const glass = useGlassScreen({ layout: LAYOUT, model, view: glassView, nudge });
+  useEffect(() => {
+    glass.bind({ onAction, monClips, onModel: () => glassUi.setState({ nudge: glassUi.getState().nudge + 1 }) });
+  });
+  const onKey = (key: DeviceKey) => {
+    if (key === 'prev') turn(-1);
+    else if (key === 'next') turn(1);
+    else if (key === 'back') router.back();
+    else if (key === 'home') router.replace('/(home)');
+  };
+  const onFailed = useCallback(() => glassUi.setState({ failed: true }), [glassUi]);
+  useHomeStage(glassOn ? {} : {});
+  if (glassOn) {
+    return (
+      <GlassStage
+        screen={glass.screen}
+        label={glassView.title}
+        testIDPrefix="m18"
+        onKey={onKey}
+        onFailed={onFailed}
+        a11y={
+          <View testID="m18-timeline" accessibilityLabel={companionCopy('m18.timeline.a11y')}>
+            <Text testID="m18-heading" accessibilityRole="header">{glassView.title}</Text>
+            <Text testID="m18-days">{glassView.status?.text ?? ''}</Text>
+            {rows.map((r, i) => <Text key={`${i}-${r.text}`}>{r.badge ? `${r.text}, ${r.badge}` : r.text}</Text>)}
+          </View>
+        }
+        controls={glassView.actions.map((a) => ({
+          key: a.target, label: a.label, disabled: a.disabled, onPress: () => onAction(a.target), testID: `m18-${a.target}`,
+        }))}
+      />
+    );
+  }
 
   // Before the hatch the Menu never offers Journal (M18 States); a direct link gets the back control only.
   if (mon === undefined) {

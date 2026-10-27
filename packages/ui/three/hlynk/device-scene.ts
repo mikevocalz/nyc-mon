@@ -5,12 +5,14 @@ import {
 import type { StoreApi } from 'zustand/vanilla';
 import type { ThreeContext, ThreeFrame, ThreeScene } from '../types';
 import type { EggHatchRig } from '../hatch/egg-hatch-rig';
+import type { MonRig } from '../mon/mon-rig';
 import { NUDGE, nudgeHop, nudgePulse, nudgeRock, nudgeSlide } from './nudge';
 // Extensionless on purpose: Metro picks canvas2d.native.ts on device, web and tsc take canvas2d.ts.
 import { canvasFont, createCanvasSurface, whenFontsReady } from './canvas2d';
 import {
   BODY, EMITTERS, FAN, INTRO, MAX_TILT, REST_YAW, SCREEN_GLASS, STAGE, screenPxToLocal,
 } from './device-geometry';
+import type { ScreenRect } from './screen-actions';
 import type { DeviceScreen, ScreenModel } from './screen';
 import { keyFromTarget, keyTarget, SIDE_KEY, type DeviceKey, type StageState } from './stage-state';
 import { beamGradientTexture, glareTexture, grainTexture, iconTexture, radialGlowTexture, textTexture } from './textures';
@@ -317,7 +319,7 @@ export function createDeviceScene(
       const stageNow = store.getState();
       const holdingPad = stageNow.held && stageNow.hover === keyTarget('activate');
       const warmth = Math.min(1, (screen.warmth?.() ?? 0) + (holdingPad ? 1 : 0));
-      const modelsMoving = stand.update(frame, screen.selected?.() ?? null, power, warmth, screen.nudge?.() ?? 0);
+      const modelsMoving = stand.update(frame, screen.selected?.() ?? null, power, warmth, screen.nudge?.() ?? 0, screen.monClips?.(), screen.modelsVisible?.() ?? true, screen.modelsOffset?.() ?? 0, screen.modelRect?.());
 
       // Input: hover on a move, act on a press. The stage counts presses in
       // the store from its pointerdown handler (so a tap shorter than a
@@ -418,6 +420,16 @@ function standModels(THREE: Three, parent: Group, models: readonly ScreenModel[]
     target: string;
     holder: Group;
     rig: EggHatchRig | null;
+    /** A Baby standing in the slot (ScreenMonSource) instead of an egg. */
+    mon: MonRig | null;
+    /** The eased sideways shift, glass widths (DeviceScreen.modelsOffset). */
+    shift: number;
+    /** Re-seats a loaded Baby (model, tap box and glow) in a new slot (DeviceScreen.modelRect). */
+    place: ((rect: ScreenRect) => void) | null;
+    /** The slot it is seated in now, as a key; '' when hidden. */
+    rectKey: string;
+    /** Takes a hidden Baby's tap box out of reach. */
+    hide: (() => void) | null;
     scale: number;
     spin: number;
     /** Half the model's height in holder units, and where its centre rests: the wobble rocks it on its base. */
@@ -444,7 +456,7 @@ function standModels(THREE: Three, parent: Group, models: readonly ScreenModel[]
     holder.name = `ScreenModel_${m.target}`;
     parent.add(holder);
     holder.rotation.order = 'ZYX'; // the wobble rocks in the glass's plane; the focus turn spins inside it
-    holders.push({ target: m.target, holder, rig: null, scale: 1, spin: 0, halfHeight: 0, rest: { x: 0, y: 0, z: 0 }, glowLevel: 0, glow: null });
+    holders.push({ target: m.target, holder, rig: null, mon: null, shift: 0, place: null, rectKey: '', hide: null, scale: 1, spin: 0, halfHeight: 0, rest: { x: 0, y: 0, z: 0 }, glowLevel: 0, glow: null });
   }
 
   // The glow behind a selected model. One time uniform and one soft dot for
@@ -530,6 +542,69 @@ function standModels(THREE: Three, parent: Group, models: readonly ScreenModel[]
           onSettled();
           return;
         }
+        /** Fits a loaded model into its slot: centred, its back against the glass. */
+        const seat = (root: InstanceType<Three['Object3D']>, heightShare: number, widthShare: number) => {
+          root.updateMatrixWorld(true);
+          const box = new THREE.Box3().setFromObject(root);
+          const size = box.getSize(new THREE.Vector3());
+          const fit = Math.min((slot.height * heightShare) / Math.max(size.y, 1e-6), (slot.width * widthShare) / Math.max(size.x, 1e-6));
+          // The holder's origin is the model's centre, so focus and power-up scale it in place.
+          const inner = new THREE.Group();
+          inner.scale.setScalar(fit);
+          root.position.set(-(box.min.x + box.max.x) / 2, -(box.min.y + box.max.y) / 2, -(box.min.z + box.max.z) / 2);
+          inner.add(root);
+          entry.holder.add(inner);
+          entry.rest = { x: slot.x, y: slot.baseY + slot.height / 2, z: SCREEN_GLASS.z + (size.z * fit) / 2 + 0.01 };
+          entry.halfHeight = (size.y * fit) / 2;
+          entry.holder.position.set(entry.rest.x, entry.rest.y, entry.rest.z);
+        };
+        if (source.kind === 'mon') {
+          // A Baby: the shared Mon rig (mon-rig.ts), idling on its mood's clips, standing in place.
+          void import('../mon/mon-rig')
+            .then(({ MonRig }) => MonRig.create(source))
+            .then((rig) => {
+              if (disposed || isDisposed()) {
+                rig.dispose();
+                return;
+              }
+              // The rig is already posed on its idle (never the bind pose's T) and measured
+              // with its bones current (mon-rig.ts measurePosed): fit that box, as standModels fits
+              // the eggs, inside the slot between the heading and the buttons.
+              const inner = new THREE.Group();
+              inner.add(rig.root);
+              entry.holder.add(inner);
+              const place = (rect: ScreenRect) => {
+                const at = layout({ ...m, rect }, screenSize);
+                const fit = Math.min((at.height * 0.8) / Math.max(rig.size.y, 1e-6), (at.width * 0.75) / Math.max(rig.size.x, 1e-6));
+                inner.scale.setScalar(fit);
+                entry.rest = { x: at.x, y: at.baseY + at.height / 2, z: SCREEN_GLASS.z + (rig.size.z * fit) / 2 + 0.01 };
+                entry.halfHeight = (rig.size.y * fit) / 2;
+                entry.holder.position.set(entry.rest.x, entry.rest.y, entry.rest.z);
+                hit.position.set(at.x, at.baseY + at.height / 2, SCREEN_GLASS.z + 0.12);
+                hit.scale.set(at.width / slot.width, at.height / slot.height, 1);
+                const glow = entry.glow?.group;
+                if (glow) {
+                  const side = Math.max(at.width, at.height) * GLOW.size;
+                  glow.scale.set(side, side, 1);
+                  glow.position.set(at.x, at.baseY + at.height / 2, SCREEN_GLASS.z + 0.004);
+                }
+              };
+              place(m.rect);
+              entry.rectKey = JSON.stringify(m.rect);
+              entry.place = place;
+              entry.hide = () => {
+                // Out of reach of the raycast while hidden (an invisible mesh still intersects).
+                hit.position.set(0, 1000, 0);
+              };
+              entry.mon = rig;
+              onLoaded(entry.holder);
+            })
+            .catch((error: unknown) => {
+              console.warn(`[hlynk] the ${source.key} model did not load; its slot keeps the label.`, error);
+              onSettled();
+            });
+          return;
+        }
         void import('../hatch/egg-hatch-rig')
           .then(({ EggHatchRig }) => EggHatchRig.create(source.eggId, { manifest: source.manifest, glb: source.glb }))
           .then((rig) => {
@@ -540,21 +615,7 @@ function standModels(THREE: Three, parent: Group, models: readonly ScreenModel[]
             rig.setProxyBabyVisible(false);
             rig.idle();
             rig.update(0);
-            const root = rig.root;
-            root.updateMatrixWorld(true);
-            const box = new THREE.Box3().setFromObject(root);
-            const size = box.getSize(new THREE.Vector3());
-            const fit = Math.min((slot.height * 0.78) / Math.max(size.y, 1e-6), (slot.width * 0.72) / Math.max(size.x, 1e-6));
-            // The holder's origin is the egg's centre, so focus and power-up scale it in place;
-            // it sits in the middle of its slot, its back against the glass.
-            const inner = new THREE.Group();
-            inner.scale.setScalar(fit);
-            root.position.set(-(box.min.x + box.max.x) / 2, -(box.min.y + box.max.y) / 2, -(box.min.z + box.max.z) / 2);
-            inner.add(root);
-            entry.holder.add(inner);
-            entry.rest = { x: slot.x, y: slot.baseY + slot.height / 2, z: SCREEN_GLASS.z + (size.z * fit) / 2 + 0.01 };
-            entry.halfHeight = (size.y * fit) / 2;
-            entry.holder.position.set(entry.rest.x, entry.rest.y, entry.rest.z);
+            seat(rig.root, 0.78, 0.72);
             entry.rig = rig;
             onLoaded(entry.holder);
           })
@@ -568,7 +629,12 @@ function standModels(THREE: Three, parent: Group, models: readonly ScreenModel[]
      * Poses every model for this frame. `warmth` 0..1 warms the selected model;
      * a new `nudge` count wobbles it once (see DeviceScreen.nudge). Returns true while any of them moves.
      */
-    update: (frame: ThreeFrame, selected: string | null, power: number, warmth: number, nudge: number): boolean => {
+    update: (
+      frame: ThreeFrame, selected: string | null, power: number, warmth: number, nudge: number, monClips?: readonly string[], visible = true,
+      offset = 0,
+      /** undefined: every model keeps its built slot. null: hide them. A rect: re-seat the Babies there. */
+      rect?: ScreenRect | null,
+    ): boolean => {
       let moving = false;
       if (nudge !== lastNudge) {
         // The first read only learns the count; a press restarts the wobble rather than stacking another.
@@ -589,7 +655,23 @@ function standModels(THREE: Three, parent: Group, models: readonly ScreenModel[]
       glowMotion.value = frame.reducedMotion ? 0 : 1;
       for (const entry of holders) {
         const rig = entry.rig;
-        if (!rig) continue;
+        const mon = entry.mon;
+        if (!rig && !mon) continue;
+        if (rect !== undefined && entry.place) {
+          const key = rect === null ? '' : JSON.stringify(rect);
+          if (key !== entry.rectKey) {
+            entry.rectKey = key;
+            if (rect === null) entry.hide?.();
+            else entry.place(rect);
+          }
+        }
+        const shown = visible && !(rect === null && entry.place !== null);
+        entry.holder.visible = shown;
+        const shiftGoal = offset * SCREEN_GLASS.width;
+        entry.shift = frame.reducedMotion ? shiftGoal : entry.shift + (shiftGoal - entry.shift) * k;
+        if (Math.abs(shiftGoal - entry.shift) > 1e-3) moving = true;
+        if (entry.glow && !shown) entry.glow.group.visible = false;
+        if (!shown) continue;
         // The glow follows the selection and comes up with the screen; warmth swells it.
         const glowGoal = selected === entry.target ? (1 + GLOW.warm * warmth) * power : 0;
         entry.glowLevel += (glowGoal - entry.glowLevel) * kGlow;
@@ -609,7 +691,8 @@ function standModels(THREE: Three, parent: Group, models: readonly ScreenModel[]
         }
         const goal = selected === null ? 1 : selected === entry.target ? MODEL_FOCUS.on : MODEL_FOCUS.off;
         entry.scale += (goal - entry.scale) * k;
-        if (selected === entry.target && !frame.reducedMotion) entry.spin += frame.delta * MODEL_FOCUS.turn;
+        // An egg turns slowly while focused; a Baby faces the Caller and turns only when its idle engine turns it.
+        if (selected === entry.target && !frame.reducedMotion && !mon) entry.spin += frame.delta * MODEL_FOCUS.turn;
         else entry.spin += (0 - entry.spin) * k;
         // The models come up with the screen.
         entry.holder.scale.setScalar(entry.scale * (0.6 + 0.4 * power));
@@ -621,13 +704,19 @@ function standModels(THREE: Three, parent: Group, models: readonly ScreenModel[]
         // The base slides a little with the rock (toward its low side), so the shake reads as a jostle.
         const shift = selected === entry.target ? -slide * 2 * h : 0;
         entry.holder.rotation.z = tilt;
-        entry.holder.position.set(entry.rest.x + shift - h * Math.sin(tilt), entry.rest.y + h * (Math.cos(tilt) - 1) + lift, entry.rest.z);
-        if (frame.reducedMotion) rig.seek('stir', 0);
-        else {
-          rig.idle();
-          // A warmed egg idles livelier.
-          rig.update(frame.delta * (selected === entry.target ? 1 + GLOW.idle * warmth : 1));
-          moving = true;
+        entry.holder.position.set(entry.rest.x + entry.shift + shift - h * Math.sin(tilt), entry.rest.y + h * (Math.cos(tilt) - 1) + lift, entry.rest.z);
+        if (mon) {
+          if (monClips) mon.setClips(monClips);
+          mon.update(frame.delta, { reduced: frame.reducedMotion, boundX: 0 });
+          if (!frame.reducedMotion) moving = true;
+        } else if (rig) {
+          if (frame.reducedMotion) rig.seek('stir', 0);
+          else {
+            rig.idle();
+            // A warmed egg idles livelier.
+            rig.update(frame.delta * (selected === entry.target ? 1 + GLOW.idle * warmth : 1));
+            moving = true;
+          }
         }
         if (Math.abs(goal - entry.scale) > 1e-3) moving = true;
       }
@@ -637,6 +726,7 @@ function standModels(THREE: Three, parent: Group, models: readonly ScreenModel[]
       disposed = true;
       for (const entry of holders) {
         entry.rig?.dispose();
+        entry.mon?.dispose();
         entry.holder.removeFromParent();
       }
       for (const hit of hits) hit.removeFromParent();

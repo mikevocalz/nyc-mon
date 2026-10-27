@@ -89,6 +89,7 @@ function JsThreeCanvas<P>({
   params,
   forceWebGL = false,
   paused = false,
+  maxFps,
   maxPixelRatio = 2,
   fallback = null,
   tracksPointer = true,
@@ -277,6 +278,14 @@ function JsThreeCanvas<P>({
     let built: ThreeScene<P> | null = null;
     const start = async () => {
       const [THREE, setup] = await Promise.all([loadThree(), load()]);
+      // A remounted native canvas can be a frame or two from having a context
+      // with a sized canvas; wait for it (about half a second at most) instead
+      // of failing the backend on "width of undefined".
+      for (let tries = 0; tries < 30 && !cancelled; tries++) {
+        const pendingSurface = surfaceRef.current;
+        if (pendingSurface && (pendingSurface.isReady?.() ?? true)) break;
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      }
       const surface = surfaceRef.current;
       if (cancelled || !surface) return;
       renderer = surface.createRenderer(THREE, { backend: using, device, rendererParams });
@@ -327,8 +336,15 @@ function JsThreeCanvas<P>({
     }
     let frame = 0;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    // With maxFps, display frames inside the budget are skipped (a millisecond of slack keeps 60 Hz → 30 fps exact).
+    const budgetMs = maxFps !== undefined && maxFps > 0 ? 1000 / maxFps - 1 : 0;
+    let lastDraw = 0;
     const tick = () => {
-      draw();
+      const now = performance.now();
+      if (budgetMs === 0 || now - lastDraw >= budgetMs) {
+        lastDraw = now;
+        draw();
+      }
       if (freeRun) timer = setTimeout(tick, 0);
       else frame = requestAnimationFrame(tick);
     };
@@ -341,7 +357,7 @@ function JsThreeCanvas<P>({
       rt.last = 0;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [running]);
+  }, [running, maxFps]);
 
   const setPointer = (event: PointerLike) => {
     const rt = runtime.current!;

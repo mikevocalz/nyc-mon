@@ -322,6 +322,29 @@ Every string ID in M01–M07, generated from the screen files. Shared namespaces
 | `m07.confirmed.a11y.announce` | `screens/M07/05-copy.md` | ui | drafted |
 
 
+## M09 — the nickname is optional
+
+A Mon is always its species (Squeaklet, Lil' Ratti). A nickname is an extra
+the Caller may add; it shows next to the species name and never replaces it
+in the data (`MonInstance.nickname`, null when there is none). After the
+hatch, the 3D Baby on the H-Lynk asks once: **Give {formName} a nickname?**
+with **Yes** and **No**. No is the default and the trackpad's action; it goes
+to M13 with no nickname. Yes opens the text field. Either answer is recorded,
+so boot never sends the Caller back to the question
+(`BootSnapshot.nicknamePromptSeen`). The strings are in
+`screens/M09/05-copy.md`.
+
+| ID | Defined in | Voice | Status |
+|---|---|---|---|
+| `m09.ask.title` | `screens/M09/05-copy.md` | ui | drafted |
+| `m09.ask.body` | `screens/M09/05-copy.md` | ui | drafted |
+| `m09.ask.yes` | `screens/M09/05-copy.md` | ui | drafted |
+| `m09.ask.no` | `screens/M09/05-copy.md` | ui | drafted |
+| `m09.ask.no.a11y.hint` | `screens/M09/05-copy.md` | ui | drafted |
+| `m09.ask.yes.a11y.hint` | `screens/M09/05-copy.md` | ui | drafted |
+| `m09.skipped.a11y.announce` | `screens/M09/05-copy.md` | ui | drafted |
+| `m09.edit.cancel` | `screens/M09/05-copy.md` | ui | drafted |
+
 ## M24 — final permission review (first incubation only)
 
 The final step is **Get your H-Lynk ready**, after M10 starts the first egg.

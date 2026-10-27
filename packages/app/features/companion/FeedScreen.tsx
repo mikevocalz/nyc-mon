@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'expo-router';
 import { assertNever, DEFAULT_CARE_TUNING, deriveMonMood, mealNutrition, wouldOverfeed } from '@acme/core/sim';
 import type { CareAction } from '@acme/core/types';
 import {
-  Button, CareMeterRing, SheetSurface, useInstanceStore, useReducedMotion, useStore,
+  Button, CareMeterRing, HLYNK_COPY, SheetSurface, useInstanceStore, useReducedMotion, useStore, type DeviceKey, type GlassAction,
+  type GlassView,
 } from '@acme/ui';
 import { haptics } from '@acme/ui/haptics';
 import { Text, View } from '@acme/ui/tw';
@@ -13,6 +14,7 @@ import { useMonStore } from '../mon/mon.store';
 import { announcePolitely } from '../onboarding/announce';
 import { careLed, useCareNow } from './care-shared';
 import { companionCopy as c } from './copy';
+import { GlassStage, glassControls, glassRing, useGlassOn, useGlassScreen, useMonGlass } from './glass';
 import { useHomeStage } from './home-stage.store';
 import { tickMinuteClock } from './minute-clock';
 
@@ -20,6 +22,10 @@ import { tickMinuteClock } from './minute-clock';
 const SHARE_A_MEAL: Extract<CareAction, { kind: 'feed' }> = { kind: 'feed' };
 /** How long the eating line holds before the tray returns. The 2D still has no `eat` clip to time it (B2). */
 const EATING_MS = 1200;
+/** The Baby large, the fullness ring, two lines of text and one row of buttons. */
+const LAYOUT = { model: 'large', rings: true, lineRows: 2, actionRows: 1, perRow: 2 } as const;
+/** Squeaklet's eating clip, when the file has it; otherwise the mood's own loop plays. */
+const EATING_CLIPS = ['jaw_chomp'] as const;
 
 type FeedPhase = { kind: 'tray' } | { kind: 'eating' } | { kind: 'declined'; reason: 'asleep' | 'sluggish' };
 
@@ -34,8 +40,11 @@ export function FeedScreen() {
   const router = useRouter();
   const reducedMotion = useReducedMotion();
   const { care, identity, scheme } = useCareNow();
-  const local = useInstanceStore<{ phase: FeedPhase }>(() => ({ phase: { kind: 'tray' } }));
+  const local = useInstanceStore<{ phase: FeedPhase; failed: boolean; nudge: number }>(() => ({ phase: { kind: 'tray' }, failed: false, nudge: 0 }));
   const phase = useStore(local, (s) => s.phase);
+  const failed = useStore(local, (s) => s.failed);
+  const nudge = useStore(local, (s) => s.nudge);
+  const glassOn = useGlassOn(failed);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -159,7 +168,48 @@ export function FeedScreen() {
     </View>
   );
 
-  useHomeStage({
+  // ---- the 3D H-Lynk: the Baby on the glass (eating plays its chomp), the ring and the tray drawn there ----
+  const { model, monClips } = useMonGlass(identity?.dexId ?? null, care, view.kind === 'eating' ? EATING_CLIPS : []);
+  const declinedText = view.kind === 'declined'
+    ? (view.reason === 'asleep' ? c('m14.declined.asleep', { name }) : c('m14.declined.sluggish', { name }))
+    : null;
+  const actions: GlassAction[] = view.kind === 'declined'
+    ? [
+      ...(view.reason === 'asleep' ? [{ target: 'rest', label: c('m14.declined.asleep.action'), tone: 'primary' as const }] : []),
+      { target: 'close', label: c('m14.close'), tone: view.reason === 'asleep' ? 'secondary' : 'primary' },
+    ]
+    : [
+      { target: 'close', label: c('m14.close'), tone: 'secondary' },
+      { target: 'share', label: c('m14.share'), tone: 'primary', disabled: view.kind === 'eating' },
+    ];
+  const glassView: GlassView = {
+    status: null,
+    title: c('m14.title', { name }),
+    subtitle: identity?.bloodlineLabel ?? '',
+    rings: care === undefined ? [] : [glassRing('fullness', care.fullness)],
+    lines: [
+      ...(declinedText ? [{ text: declinedText, tone: 'text' as const }] : []),
+      ...(view.kind !== 'declined' && full ? [{ text: c('m14.full.body', { name }), tone: 'amber' as const }] : []),
+    ],
+    actions,
+  };
+  const onAction = (target: string) => {
+    if (target === 'share') feed();
+    else if (target === 'rest') router.replace('/(home)/rest');
+    else if (target === 'close') router.back();
+  };
+  const glass = useGlassScreen({ layout: LAYOUT, model, view: glassView, nudge });
+  useEffect(() => {
+    glass.bind({ onAction, monClips, onModel: () => local.setState({ nudge: local.getState().nudge + 1 }) });
+  });
+  const onKey = (key: DeviceKey) => {
+    if (key === 'activate' && view.kind === 'tray') feed();
+    else if (key === 'back') router.back();
+    else if (key === 'home') router.replace('/(home)');
+  };
+  const onFailed = useCallback(() => local.setState({ failed: true }), [local]);
+
+  useHomeStage(glassOn ? {} : {
     chrome: {
       status: careLed(care),
       scheme,
@@ -183,5 +233,33 @@ export function FeedScreen() {
     trailing: panel(true),
   });
 
-  return null;
+  if (!glassOn) return null;
+  return (
+    <GlassStage
+      screen={glass.screen}
+      label={c('m14.title', { name })}
+      testIDPrefix="m14"
+      onKey={onKey}
+      onFailed={onFailed}
+      a11y={
+        <>
+          <Text accessibilityRole="header">{c('m14.title', { name })}</Text>
+          {care === undefined ? null : (
+            <Text testID="m14-ring-fullness">{`${c('m13.ring.fullness')} ${Math.round(care.fullness * 100)}%`}</Text>
+          )}
+          {declinedText ? <Text testID="m14-declined">{declinedText}</Text> : null}
+          {view.kind !== 'declined' && full ? <Text testID="m14-full">{c('m14.full.body', { name })}</Text> : null}
+        </>
+      }
+      controls={[
+        ...glassControls(
+          actions,
+          glass.press,
+          (t) => (t === 'share' ? 'm14-share' : t === 'rest' ? 'm14-declined-action' : 'm14-close'),
+          (t) => (t === 'share' ? c('m14.tile.hint', { name }) : undefined),
+        ),
+        { key: 'home', label: HLYNK_COPY['hlynk.key.home.label'], onPress: () => router.replace('/(home)'), testID: 'm14-home' },
+      ]}
+    />
+  );
 }

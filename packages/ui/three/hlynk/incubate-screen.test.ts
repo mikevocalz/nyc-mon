@@ -48,7 +48,7 @@ test('the egg stands as one large 3D model, selected so it glows', () => {
   const { screen } = setup();
   assert.equal(screen.models?.length, 1);
   assert.equal(screen.models?.[0]?.target, INCUBATE_EGG_TARGET);
-  assert.equal(screen.models?.[0]?.source?.eggId, 'metro-egg');
+  assert.equal((screen.models?.[0]?.source as { eggId?: string } | null | undefined)?.eggId, 'metro-egg');
   assert.equal(screen.selected?.(), INCUBATE_EGG_TARGET);
   assert.ok(INCUBATE_EGG_RECT.width > HUD_SIZE.width / 2, 'the egg is the largest thing on the glass');
 });

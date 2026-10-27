@@ -4,20 +4,20 @@ import type { Node } from 'three/webgpu';
 import {
   abs, atan, color, cos, exp, float, fract, length, materialColor, materialEmissive, mix, pow, smoothstep, step, uniform, uv, vec2, vec3, vec4,
 } from 'three/tsl';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { CRACKS, hatchFrame, shardStates, type HatchFrame } from '../mon/hatch-timeline';
+import { MonRig, type MonRigSource } from '../mon/mon-rig';
 import type { ThreeContext, ThreeFrame, ThreeScene } from '../types';
-import { fetchEggBytes } from './egg-bytes';
 import { EggHatchRig, type EggHatchSource } from './egg-hatch-rig';
-import { eggTexturePlugin } from './egg-texture-plugin';
 import { EggHatchAssetError } from './hatch-manifest';
 import { sequenceTime, type SequencePhase } from './hatch-sequence-time';
 
-/** A Baby model to hand over to: its GLB (URL on web, Metro asset id on native) and the idle clips to try, first match wins. */
-export interface HatchBabySource {
-  readonly glb: string | number;
-  readonly clips: readonly string[];
-}
+/**
+ * The Baby the egg hatches into: its GLB (URL on web, Metro asset id on
+ * native), its mood's clips and its mouth's rest pose. Loaded through the
+ * shared Mon rig (mon-rig.ts), so the stage the hatch hands over to reuses
+ * the same parse.
+ */
+export type HatchBabySource = MonRigSource;
 
 /** What HatchSequenceStage hands the scene each frame. */
 export interface HatchSequenceSceneParams {
@@ -388,7 +388,7 @@ export function createHatchSequenceScene({ renderer, invalidate }: ThreeContext,
     inside: THREE.Object3D[];
   } | null = null;
   let mon: {
-    root: THREE.Group; mixer: THREE.AnimationMixer; look: ReturnType<typeof dress>; cam: THREE.Vector3; size: THREE.Vector3; fit: number;
+    root: THREE.Group; rig: MonRig; look: ReturnType<typeof dress>; cam: THREE.Vector3; size: THREE.Vector3; fit: number;
   } | null = null;
   let monState: 'none' | 'loading' | 'ready' | 'failed' = initial.baby === null ? 'none' : 'loading';
   let light: ReturnType<typeof createLight> | null = null;
@@ -452,29 +452,19 @@ export function createHatchSequenceScene({ renderer, invalidate }: ThreeContext,
   );
 
   if (initial.baby !== null) {
-    const baby = initial.baby;
-    const loader = new GLTFLoader();
-    if (eggTexturePlugin) loader.register(eggTexturePlugin);
-    fetchEggBytes(baby.glb)
-      .then((bytes) => loader.parseAsync(bytes, ''))
-      .then((gltf) => {
-        if (disposed) return;
-        const model = gltf.scene;
-        const size = centre(model);
-        const root = new THREE.Group();
-        root.add(model);
-        scene.add(root);
-        const mixer = new THREE.AnimationMixer(model);
-        for (const name of baby.clips) {
-          const clip = THREE.AnimationClip.findByName(gltf.animations, name);
-          if (clip) {
-            mixer.clipAction(clip).play();
-            break;
-          }
+    MonRig.create(initial.baby)
+      .then((rig) => {
+        if (disposed) {
+          rig.dispose();
+          return;
         }
-        const look = dress(model, false);
+        // The hatch scales and drops this holder; the rig's own root keeps the idle engine's heading and step.
+        const root = new THREE.Group();
+        root.add(rig.root);
+        scene.add(root);
+        const look = dress(rig.root, false);
         look.fade(0);
-        mon = { root, mixer, look, cam: new THREE.Vector3(), size, fit: 1 };
+        mon = { root, rig, look, cam: new THREE.Vector3(), size: rig.size.clone(), fit: 1 };
         monState = 'ready';
         place();
         maybeReady();
@@ -537,7 +527,7 @@ export function createHatchSequenceScene({ renderer, invalidate }: ThreeContext,
         const s = f.monScale * m.fit;
         m.root.scale.set(s * THREE.MathUtils.lerp(1, EGG_SHAPE.x, f.monShape), s * THREE.MathUtils.lerp(1, EGG_SHAPE.y, f.monShape), s);
         m.root.position.y = -f.monDrop * 0.12 * e.size.y;
-        if (f.monOpacity > 0 && !reduced) m.mixer.update(frame.delta);
+        if (f.monOpacity > 0) m.rig.update(frame.delta, { reduced, boundX: 0 });
         camPos.lerpVectors(e.cam, m.cam, f.camera);
       } else {
         camPos.copy(e.cam);
@@ -555,9 +545,9 @@ export function createHatchSequenceScene({ renderer, invalidate }: ThreeContext,
       egg?.rig.dispose();
       egg = null;
       if (mon) {
-        mon.mixer.stopAllAction();
         mon.look.dispose();
-        mon.root.traverse((o) => (o as THREE.Mesh).geometry?.dispose());
+        mon.rig.dispose();
+        mon.root.removeFromParent();
         mon = null;
       }
       light?.dispose();

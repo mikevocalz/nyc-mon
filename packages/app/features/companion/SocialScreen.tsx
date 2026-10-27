@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'expo-router';
 import { PEEK_ROUNDS_PER_SESSION, PEEK_SPOTS } from '@acme/core/schemas';
 import { assertNever, createRandom, DEFAULT_CARE_TUNING, hash128 } from '@acme/core/sim';
 import type { PeekRound, PeekSpot } from '@acme/core/types';
 import {
-  Button, CareMeterRing, RoundDots, SheetSurface, useInstanceStore, useReducedMotion, useStore,
+  Button, CareMeterRing, HLYNK_COPY, RoundDots, SheetSurface, useInstanceStore, useReducedMotion, useStore, type DeviceKey,
+  type GlassAction, type GlassLine, type GlassView,
 } from '@acme/ui';
 import { haptics } from '@acme/ui/haptics';
 import { Text, View } from '@acme/ui/tw';
@@ -14,12 +15,19 @@ import { useMonStore } from '../mon/mon.store';
 import { announcePolitely } from '../onboarding/announce';
 import { careLed, useCareNow } from './care-shared';
 import { companionCopy as c, type CompanionCopyId } from './copy';
+import { GlassStage, glassControls, glassRing, useGlassOn, useGlassScreen, useMonGlass } from './glass';
 import { useHomeStage } from './home-stage.store';
 import { settlePeekPlay } from './peek-session';
 import { tickMinuteClock } from './minute-clock';
 
 /** Write time for the one play write; module scope keeps the clock read out of render. */
 const writeTime = (): number => Date.now();
+
+/** The Baby large, the social ring, two lines, and two rows of three (the spots, then the twins). */
+const LAYOUT = { model: 'large', rings: true, lineRows: 2, actionRows: 2, perRow: 3 } as const;
+
+/** Where each spot sits across the glass, a share of its width, for the Baby peeking out there. */
+const PEEK_OFFSET: Record<PeekSpot, number> = { left: -0.3, middle: 0, right: 0.3 };
 
 const SPOT_COPY: Record<PeekSpot, CompanionCopyId> = { left: 'm16.spot.left', middle: 'm16.spot.middle', right: 'm16.spot.right' };
 
@@ -60,6 +68,9 @@ export function SocialScreen() {
   const { care, identity, scheme } = useCareNow();
   const local = useInstanceStore<PeekLocal>(() => INTRO);
   const game = useStore(local);
+  const glassUi = useInstanceStore(() => ({ failed: false, nudge: 0 }));
+  const { failed, nudge } = useStore(glassUi);
+  const glassOn = useGlassOn(failed);
   const leaving = useRef(false);
   const name = identity?.name ?? '';
 
@@ -234,7 +245,72 @@ export function SocialScreen() {
     </View>
   ) : null;
 
-  useHomeStage({
+  // ---- the 3D H-Lynk: the Baby on the glass (hidden while the rounds run), the ring, the spots and the twins drawn there ----
+  const { model, monClips } = useMonGlass(identity?.dexId ?? null, care);
+  const glassLines: GlassLine[] = game.phase === 'intro'
+    ? [{ text: canPlay ? c('m16.intro.body', { name }) : asleep ? c('m16.intro.asleep', { name }) : c('m16.intro.tired', { name }) }]
+    : game.phase === 'result'
+      ? [{ text: c('m16.result.body', { name }) }, ...(canPlay ? [] : [{ text: c('m16.intro.tired', { name }), size: 'caption' as const }])]
+      : [{ text: roundLabel, tone: 'dim' }];
+  const actions: GlassAction[] = game.phase === 'playing'
+    ? [
+      ...PEEK_SPOTS.map((spot, i): GlassAction => ({
+        target: `spot:${spot}`, label: game.lastFound === spot ? name : c(SPOT_COPY[spot]), tone: i === game.focus ? 'selected' : 'secondary',
+      })),
+      { target: 'back', label: c('m16.twin.back'), tone: 'secondary' },
+      { target: 'peek', label: c('m16.twin.peek'), tone: 'primary' },
+      { target: 'forward', label: c('m16.twin.forward'), tone: 'secondary' },
+    ]
+    : game.phase === 'result'
+      ? [
+        { target: 'again', label: c('m16.result.again'), tone: 'primary', disabled: !canPlay },
+        { target: 'done', label: c('m16.result.done'), tone: 'secondary' },
+      ]
+      : canPlay
+        ? [{ target: 'start', label: c('m16.intro.start'), tone: 'primary' }]
+        : asleep ? [] : [{ target: 'tired', label: c('m16.intro.tired.action'), tone: 'secondary' }];
+  const glassView: GlassView = {
+    status: null,
+    title: c('m16.intro.title', { name }),
+    subtitle: game.phase === 'playing' ? c('m16.trackpad.label', { spot: c(SPOT_COPY[focusedSpot]) }) : '',
+    rings: care === undefined ? [] : [glassRing('social', care.social)],
+    lines: glassLines,
+    actions,
+  };
+  const onAction = (target: string) => {
+    if (target.startsWith('spot:')) peek(target.slice(5) as PeekSpot);
+    else if (target === 'back') step(-1);
+    else if (target === 'forward') step(1);
+    else if (target === 'peek') peek();
+    else if (target === 'start' || target === 'again') start();
+    else if (target === 'done') leave();
+    else if (target === 'tired') router.replace('/(home)/rest');
+  };
+  const glass = useGlassScreen({
+    layout: LAYOUT, model, view: glassView, nudge,
+    // While playing, the Mon hides behind a spot until the Caller peeks; then
+    // it peeks out in 3D at the spot it was found, until the next peek.
+    modelVisible: game.phase !== 'playing' || game.lastFound !== null,
+    modelOffset: game.phase === 'playing' && game.lastFound !== null ? PEEK_OFFSET[game.lastFound] : 0,
+  });
+  useEffect(() => {
+    glass.bind({ onAction, monClips, onModel: () => glassUi.setState({ nudge: glassUi.getState().nudge + 1 }) });
+  });
+  const onKey = (key: DeviceKey) => {
+    if (key === 'prev' && game.phase === 'playing') step(-1);
+    else if (key === 'next' && game.phase === 'playing') step(1);
+    else if (key === 'activate') {
+      if (game.phase === 'playing') peek();
+      else if (game.phase === 'intro' && canPlay) start();
+    } else if (key === 'back') leave();
+    else if (key === 'home') {
+      applyPlay();
+      router.replace('/(home)');
+    }
+  };
+  const onFailed = useCallback(() => glassUi.setState({ failed: true }), [glassUi]);
+
+  useHomeStage(glassOn ? {} : {
     chrome: {
       status: careLed(care),
       scheme,
@@ -283,5 +359,26 @@ export function SocialScreen() {
     ),
   });
 
-  return null;
+  if (!glassOn) return null;
+  return (
+    <GlassStage
+      screen={glass.screen}
+      label={c('m16.intro.title', { name })}
+      testIDPrefix="m16"
+      onKey={onKey}
+      onFailed={onFailed}
+      a11y={
+        <>
+          <Text accessibilityRole="header">{c('m16.intro.title', { name })}</Text>
+          {care === undefined ? null : <Text testID="m16-ring-social">{`${c('m13.ring.social')} ${Math.round(care.social * 100)}%`}</Text>}
+          {glassLines.map((l) => <Text key={l.text}>{l.text}</Text>)}
+        </>
+      }
+      controls={[
+        ...glassControls(actions, glass.press, (t) => (t.startsWith('spot:') ? `m16-spot-${t.slice(5)}` : t === 'tired' ? 'm16-tired-action'
+          : ['back', 'peek', 'forward'].includes(t) ? `m16-twin-${t}` : `m16-${t}`)),
+        { key: 'leave', label: HLYNK_COPY['hlynk.key.back.label'], onPress: leave, testID: 'm16-leave' },
+      ]}
+    />
+  );
 }

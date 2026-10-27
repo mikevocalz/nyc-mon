@@ -83,7 +83,7 @@ test('the screen\'s hit targets are the items\' targets, and selecting one write
 
 test('every model stands in its own slot, and a slot with no model has no source', () => {
   const { screen } = screenWithStore();
-  assert.deepEqual(screen.models?.map((m) => [m.target, m.source?.eggId ?? null]), [['F01', 'metro-egg'], ['F02', 'corner-egg'], ['F12', null]]);
+  assert.deepEqual(screen.models?.map((m) => [m.target, (m.source && 'eggId' in m.source ? m.source.eggId : null)]), [['F01', 'metro-egg'], ['F02', 'corner-egg'], ['F12', null]]);
 });
 
 test('the screen draws each label, Coming Soon only where a model is missing, and the focused detail', () => {

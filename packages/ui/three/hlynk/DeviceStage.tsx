@@ -181,6 +181,8 @@ export function DeviceStage({
             load={loadDeviceScene}
             params={params}
             paused={!isVisible || resting}
+            // The idle beam and the Baby are delta-timed: 30 fps keeps them smooth at half the CPU.
+            maxFps={30}
             maxPixelRatio={1.5}
             className="absolute inset-0"
             onBackendChange={onBackendChange}

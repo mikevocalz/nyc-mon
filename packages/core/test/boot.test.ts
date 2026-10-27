@@ -115,7 +115,7 @@ describe('resolveBootRoute (M01)', () => {
     });
   });
 
-  it('a hatched Mon with no nickname resumes at naming (M09), never the companion', () => {
+  it('a hatched Mon with no nickname resumes at the nickname question (M09) until it has been seen', () => {
     const e = egg();
     const unnamed = mintMonInstance(e);
     expect(unnamed.nickname).toBeNull();
@@ -132,6 +132,26 @@ describe('resolveBootRoute (M01)', () => {
       kind: 'resume-onboarding',
       step: 'mon-name',
     });
+  });
+
+  it('a nickname is optional: once the question was answered or skipped, an unnamed Mon boots to the companion', () => {
+    const e = egg();
+    const unnamed = mintMonInstance(e);
+    const inMons = withCaller({ eggs: [e], hatches: [createHatchState(e)], mons: [unnamed] });
+    expect(
+      resolveBootRoute(snapshot({ save: loaded(inMons), nowMs: e.incubationEndsAt + 1, nicknamePromptSeen: [unnamed.monInstanceId] })),
+    ).toEqual({ kind: 'companion', monInstanceId: unnamed.monInstanceId });
+    // Another Mon's answer does not count for this one.
+    expect(
+      resolveBootRoute(snapshot({ save: loaded(inMons), nowMs: e.incubationEndsAt + 1, nicknamePromptSeen: ['mon-other'] })),
+    ).toEqual({ kind: 'resume-onboarding', step: 'mon-name' });
+    const onlyHatch = withCaller({
+      eggs: [e],
+      hatches: [{ kind: 'hatched', eggId: e.eggId, mon: unnamed, serverConfirmed: false }],
+    });
+    expect(
+      resolveBootRoute(snapshot({ save: loaded(onlyHatch), nowMs: e.incubationEndsAt + 1, nicknamePromptSeen: [unnamed.monInstanceId] })),
+    ).toEqual({ kind: 'companion', monInstanceId: unnamed.monInstanceId });
   });
 
   it('a Mon wins over another egg still incubating', () => {

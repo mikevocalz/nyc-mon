@@ -15,7 +15,7 @@ export function ThreeSurface({ ref, androidSurfaceType }: { ref?: Ref<ThreeSurfa
   useImperativeHandle(ref, () => ({
     createRenderer: (THREE, { device, rendererParams }) => {
       const context = canvasRef.current?.getContext('webgpu');
-      if (!context) throw new Error('[ThreeCanvas] react-native-webgpu context is not ready');
+      if (!context?.canvas) throw new Error('[ThreeCanvas] react-native-webgpu context is not ready');
       contextRef.current = context;
       return new THREE.WebGPURenderer({
         antialias: true,
@@ -27,6 +27,10 @@ export function ThreeSurface({ ref, androidSurfaceType }: { ref?: Ref<ThreeSurfa
       });
     },
     present: () => contextRef.current?.present(),
+    isReady: () => {
+      const canvas = canvasRef.current?.getContext('webgpu')?.canvas as { width?: number; height?: number } | undefined;
+      return typeof canvas?.width === 'number' && canvas.width > 0 && typeof canvas.height === 'number' && canvas.height > 0;
+    },
     // Worklet render mode: the context goes to the render runtime, which builds the renderer and presents.
     getContext: () => {
       const context = canvasRef.current?.getContext('webgpu') ?? null;

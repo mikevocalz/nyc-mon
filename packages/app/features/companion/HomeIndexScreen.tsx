@@ -4,6 +4,7 @@ import { Redirect } from 'expo-router';
 import { selectActiveMon, selectPendingEgg, useMonStore } from '../mon/mon.store';
 import { MON_HOME_PATH } from '../egg/egg-model';
 import { resolveBootPath } from '../onboarding/boot';
+import { needsNicknamePrompt } from '../onboarding/onboarding.store';
 import { IncubatingScreen } from '../hatch/IncubatingScreen';
 import { HomeScreen } from './HomeScreen';
 import { ErrorScreen } from '../error/screen';
@@ -11,8 +12,8 @@ import { useMinuteClock } from './minute-clock';
 
 
 /**
- * `/(home)`: M13 when a Mon has hatched (M09 first while it has no name,
- * D-16f), M11 while an egg incubates (M11 "Route and intent"), otherwise the
+ * `/(home)`: M13 when a Mon has hatched (the optional M09 nickname question
+ * first, once), M11 while an egg incubates (M11 "Route and intent"), otherwise the
  * boot route (egg choice; an unreadable save holds on the error screen).
  */
 export function HomeIndexScreen() {
@@ -20,7 +21,8 @@ export function HomeIndexScreen() {
   const pending = useMonStore(selectPendingEgg);
   const nowMs = useMinuteClock((s) => s.nowMs);
   if (mon !== undefined) {
-    if (mon.nickname === null) return <Redirect href="/(home)/name" />;
+    // The nickname question shows once after the hatch; a Mon with no nickname is a whole Mon.
+    if (needsNicknamePrompt(mon)) return <Redirect href="/(home)/name" />;
     return <HomeScreen mon={mon} />;
   }
   if (pending !== undefined) return <IncubatingScreen pending={pending} />;

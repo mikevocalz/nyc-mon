@@ -16,18 +16,26 @@ Same shape as the Caller name (M07) so one validator family serves both: 1–16 
 |---|---|---|---|---|---|
 | `m09.identity` | #{dexNumber} {formName}, {bloodline} | ui | 48 | Caption above the title. "#062 Yotito, Yote Bloodline" | Decisions #9, #11 |
 | `m09.identity.a11y` | Number {dexId}, {formName}, {bloodline} | ui | — | | |
-| `m09.title` | Name this {formName} | ui | 26 | `Heading level={1}`. "Name this Kittee Cee" is 20 | Decision #1 ("names the individual") |
-| `m09.field.label` | Name | ui | 20 | Visible label, never placeholder-only | |
-| `m09.field.hint` | No renaming yet, so take your time. | ui | 48 | True for Phase 1: nothing edits `nickname` after this | §4.3/§4.4 (no rename screen) |
-| `m09.field.clear.a11y.label` | Clear name | ui | — | | |
-| `m09.plate.a11y.label` | Name preview: {name} | ui | — | Full name even when the plate steps down | D10 |
+| `m09.title` | Give {formName} a nickname | ui | 26 | `Heading level={1}`. "Name this Kittee Cee" is 20 | Decision #1 ("names the individual") |
+| `m09.field.label` | Nickname | ui | 20 | Visible label, never placeholder-only | |
+| `m09.field.hint` | Nicknames can't change yet, so take your time. | ui | 48 | True for Phase 1: nothing edits `nickname` after this | §4.3/§4.4 (no rename screen) |
+| `m09.field.clear.a11y.label` | Clear nickname | ui | — | | |
+| `m09.plate.a11y.label` | Nickname preview: {name} | ui | — | Full name even when the plate steps down | D10 |
 | `m09.baby.a11y.label` | `CREATURE_ART[].alt` for the Baby | ui | — | Already pronoun-free (PS-005) | `packages/assets/creatures` |
-| `m09.cta` | Use this name | ui | 20 | Same verb as M07 | |
-| `m09.cta.a11y.hint.disabled` | Type a name first | ui | — | | |
-| `m09.trackpad.label` | Name {formName} | ui | — | | |
-| `m09.trackpad.hint` | Tap to type a name. Hold to use it. | ui | — | Only reachable with the keyboard down | DIRECTION.md "Controls" |
-| `m09.trackpad.commit.label` | Use this name | ui | — | `commitLabel` | |
-| `m09.confirmed.a11y.announce` | Name saved: {name}. | ui | — | Polite | |
+| `m09.cta` | Use this nickname | ui | 20 | Same verb as M07 | |
+| `m09.cta.a11y.hint.disabled` | Type a nickname first | ui | — | | |
+| `m09.trackpad.label` | Nickname for {formName} | ui | — | | |
+| `m09.trackpad.hint` | Tap to type a nickname. Hold to use it. | ui | — | Only reachable with the keyboard down | DIRECTION.md "Controls" |
+| `m09.trackpad.commit.label` | Use this nickname | ui | — | `commitLabel` | |
+| `m09.confirmed.a11y.announce` | Nickname saved: {name}. | ui | — | Polite | |
+| `m09.ask.title` | Give {formName} a nickname? | ui | 32 | The question, drawn on the glass over the 3D Baby. A nickname is optional; the Mon is always its species | Mike, 2026-10-27 |
+| `m09.ask.body` | {formName} keeps its name either way. | ui | 48 | Under the Baby | Mike, 2026-10-27 |
+| `m09.ask.yes` | Yes | ui | 12 | Glass button; opens the text field | |
+| `m09.ask.no` | No | ui | 12 | Glass button and the trackpad's default. Goes to M13 with no nickname | |
+| `m09.ask.no.a11y.hint` | Goes to {formName}. No nickname. | ui | — | | |
+| `m09.ask.yes.a11y.hint` | Opens a text field for the nickname. | ui | — | | |
+| `m09.skipped.a11y.announce` | No nickname. {formName} it is. | ui | — | Polite | |
+| `m09.edit.cancel` | Cancel | ui | 12 | Back to the question from the text field | |
 | `m09.error.blank` | Add at least one letter. | ui | 80 | Same wording as M07 | |
 | `m09.error.too_long` | That's more than 16 characters. Try a shorter version. | ui | 80 | | |
 | `m09.error.characters` | Names can use letters, spaces, hyphens, apostrophes and periods. | ui | 80 | | |

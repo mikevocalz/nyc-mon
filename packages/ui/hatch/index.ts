@@ -17,10 +17,12 @@ export {
 export { ChoiceRows, type ChoiceRowsProps, type ChoiceRow } from './ChoiceRows';
 export { HatchEgg3D, type HatchEgg3DProps } from './HatchEgg3D';
 export { HatchSequenceStage, type HatchSequenceStageProps } from './HatchSequenceStage';
+export { MonStage, type MonStageProps } from './MonStage';
+export type { MonRigSource, MonMouthRest } from '../three/mon/mon-rig';
 export type { HatchBabySource } from '../three/hatch/hatch-sequence-scene';
 export { sequenceSpan, sequenceTime, type SequencePhase } from '../three/hatch/hatch-sequence-time';
 export {
   EggHatchAssetError, parseEggHatchManifest, hatchClipTime, type EggAttention, type EggHatchPhase, type EggHatchManifest,
 } from '../three/hatch/hatch-manifest';
 export type { EggHatchSource } from '../three/hatch/egg-hatch-rig';
-export { preloadEggHatch } from '../three/hatch/load-hatch';
+export { preloadEggHatch, preloadMonModel } from '../three/hatch/load-hatch';

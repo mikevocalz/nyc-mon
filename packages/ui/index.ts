@@ -109,6 +109,8 @@ export {
   type ChoiceAction, type ChoiceItem, type ChoicePanel, type DeviceCapture, type DeviceKey, type DeviceScreen,
   type DeviceStageApi, type DeviceStageProps, type IncubateScreenOptions, type ScreenModelSource,
   type HLynkHudStageControls, type HLynkHudStageProps, type HudContent, type HudMeter, type HudTab,
+  createGlassScreen, createSwitchScreen, GLASS_MON_TARGET, glassGeometry, type GlassAction, type GlassLayout, type GlassLine, type GlassRing, type GlassTone, type GlassView,
+  type ScreenMonSource,
 } from './three/hlynk';
 export { RiverTide, type RiverTideProps, type RiverTideOrigin } from './backgrounds/RiverTide';
 export { RainWindow, type RainWindowProps } from './backgrounds/RainWindow';

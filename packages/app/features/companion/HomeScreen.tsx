@@ -1,18 +1,24 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'expo-router';
 import type { MonInstance } from '@acme/core/types';
 import {
-  Button, CareMeterRing, CareMeterRingGroup, StatusRow, useInstanceStore, useReducedMotion, useStore,
+  Button, CareMeterRing, CareMeterRingGroup, HLYNK_COPY, StatusRow, useInstanceStore, useReducedMotion, useStore,
+  type DeviceKey, type GlassAction, type GlassView,
 } from '@acme/ui';
 import { Pressable, Text, View } from '@acme/ui/tw';
 import { announcePolitely } from '../onboarding/announce';
 import { careLed, useCareNow } from './care-shared';
 import { companionCopy } from './copy';
 import { NEED_RING, askRoute, homeStatus, isLow } from './home-model';
+import { GlassStage, glassRing, useGlassOn, useGlassScreen, useMonGlass } from './glass';
 import { useHomeStage } from './home-stage.store';
 import { useMinuteClock } from './minute-clock';
+
+const NEEDS = ['energy', 'fullness', 'social'] as const;
+/** The bar's four buttons in one row; the menu reuses the same row. */
+const LAYOUT = { model: 'large', rings: true, lineRows: 0, actionRows: 1, perRow: 4 } as const;
 
 /**
  * M13 Home (Baby) at `/(home)`. Shows in two seconds whether the Mon is
@@ -25,8 +31,9 @@ export function HomeScreen({ mon }: { mon: MonInstance }) {
   const reducedMotion = useReducedMotion();
   const { care, identity, scheme: clockScheme } = useCareNow();
   const resumeCount = useMinuteClock((s) => s.resumeCount);
-  const local = useInstanceStore(() => ({ reactionKey: 0 }));
-  const { reactionKey } = useStore(local);
+  const local = useInstanceStore(() => ({ reactionKey: 0, menu: false, failed: false }));
+  const { reactionKey, menu, failed } = useStore(local);
+  const glassOn = useGlassOn(failed);
 
   const name = identity?.name ?? '';
   const status = care === undefined ? undefined : homeStatus(care);
@@ -97,7 +104,60 @@ export function HomeScreen({ mon }: { mon: MonInstance }) {
     ? companionCopy('m13.mon.a11y', { name, bloodline: identity?.bloodlineLabel ?? '', status: status.text })
     : name;
 
-  useHomeStage({
+  // ---- the 3D H-Lynk: the Baby on the glass, the rings and the bar drawn there (MonView's card) ----
+  const { model, monClips } = useMonGlass(identity?.dexId ?? null, care);
+  const suggested = care === undefined ? undefined : askRoute(care);
+  const formName = identity?.formName ?? '';
+  const nicknamed = mon.nickname !== null;
+  const subtitle = [nicknamed ? formName : '', identity?.bloodlineLabel ?? ''].filter((t) => t !== '').join(' · ');
+  const tone = (route: string): GlassAction['tone'] => (route === suggested ? 'primary' : 'secondary');
+  const actions: GlassAction[] = menu
+    ? [
+      { target: 'dex', label: companionCopy('m13.bar.dex'), tone: 'secondary' },
+      { target: 'journal', label: companionCopy('m18.title'), tone: 'secondary' },
+      { target: 'close', label: companionCopy('m14.close'), tone: 'primary' },
+    ]
+    : [
+      { target: 'feed', label: companionCopy('m13.bar.feed'), tone: tone('/(home)/feed') },
+      { target: 'rest', label: companionCopy(asleep ? 'm13.bar.wake' : 'm13.bar.rest'), tone: tone('/(home)/rest') },
+      { target: 'play', label: companionCopy('m13.bar.play'), tone: tone('/(home)/social') },
+      { target: 'dex', label: companionCopy('m13.bar.dex'), tone: 'secondary' },
+    ];
+  const view: GlassView = {
+    status: status ? { text: status.text, tone: status.tone === 'request' ? 'request' : 'neutral' } : null,
+    title: name,
+    subtitle,
+    rings: care === undefined ? [] : NEEDS.map((need) => glassRing(need, care[need])),
+    lines: [],
+    actions,
+  };
+  const go = (target: string) => {
+    if (target === 'close') local.setState({ menu: false });
+    else if (target === 'journal') {
+      local.setState({ menu: false });
+      router.push('/(home)/journal');
+    } else if (target === 'dex') {
+      local.setState({ menu: false });
+      router.push(dexHref);
+    } else if (target === 'feed') router.push('/(home)/feed');
+    else if (target === 'rest') router.push('/(home)/rest');
+    else if (target === 'play') router.push('/(home)/social');
+  };
+  const glass = useGlassScreen({ layout: LAYOUT, model, view, nudge: reactionKey });
+  useEffect(() => {
+    glass.bind({ onAction: go, onModel: sayHi, monClips });
+  });
+  const onKey = (key: DeviceKey) => {
+    if (key === 'activate') answer();
+    else if (key === 'menu') local.setState({ menu: !local.getState().menu });
+    else if (key === 'back') {
+      if (local.getState().menu) local.setState({ menu: false });
+      else router.back();
+    }
+  };
+  const onFailed = useCallback(() => local.setState({ failed: true }), [local]);
+
+  useHomeStage(glassOn ? {} : {
     chrome: {
       status: careLed(care),
       scheme,
@@ -151,5 +211,41 @@ export function HomeScreen({ mon }: { mon: MonInstance }) {
     ),
   });
 
-  return null;
+  if (!glassOn) return null;
+
+  return (
+    <GlassStage
+      screen={glass.screen}
+      label={monLabel}
+      testIDPrefix="m13"
+      onKey={onKey}
+      onFailed={onFailed}
+      a11y={
+        <>
+          <Text testID="m13-name" accessibilityRole="header">{name}</Text>
+          {subtitle !== '' ? <Text>{subtitle}</Text> : null}
+          {status ? <Text testID="m13-status">{status.text}</Text> : null}
+          {care === undefined ? null : (
+            <View testID="m13-rings" accessibilityLabel={companionCopy('m13.rings.a11y.label')}>
+              {NEEDS.map((need) => (
+                <Text key={need} testID={`m13-ring-${need}`}>
+                  {`${companionCopy(NEED_RING[need])} ${Math.round(care[need] * 100)}%${isLow(care[need]) ? `, ${companionCopy('m13.ring.low')}` : ''}`}
+                </Text>
+              ))}
+            </View>
+          )}
+        </>
+      }
+      controls={[
+        { key: 'mon', label: monLabel, hint: companionCopy('m13.mon.a11y.hint'), onPress: sayHi, testID: 'm13-mon' },
+        ...actions.map((a) => ({
+          key: a.target,
+          label: a.label,
+          onPress: () => go(a.target),
+          testID: a.target === 'close' ? 'm13-menu-close' : a.target === 'journal' ? 'home-menu-journal' : `m13-bar-${a.target}`,
+        })),
+        { key: 'menu', label: HLYNK_COPY['hlynk.key.menu.label'], onPress: () => onKey('menu'), testID: 'm13-menu' },
+      ]}
+    />
+  );
 }

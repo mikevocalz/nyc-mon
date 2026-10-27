@@ -1,15 +1,18 @@
 'use client';
 
+import { useCallback, useEffect } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { allSpecies, bloodlines } from '@acme/content';
 import { LIFECYCLE_STAGES } from '@acme/core/schemas';
 import type { EvolutionNode, MonInstance } from '@acme/core/types';
 import {
-  Button, HLYNK_COPY, Heading, Image, LifecycleTrack, SafeArea, SignagePlate, lifecycleSlots, type ImageProps,
+  Button, HLYNK_COPY, Heading, Image, LifecycleTrack, SafeArea, SignagePlate, lifecycleSlots, useInstanceStore, useStore,
+  type DeviceKey, type GlassLine, type GlassView, type ImageProps,
 } from '@acme/ui';
 import { Pressable, ScrollView, Text, View } from '@acme/ui/tw';
 import { useMonStore } from '../mon/mon.store';
 import { companionCopy } from './copy';
+import { GlassStage, useGlassOn, useGlassScreen, useMonGlass } from './glass';
 import { useHomeStage } from './home-stage.store';
 import { dexNumber, monIdentity } from './mon-identity';
 
@@ -36,6 +39,9 @@ function slotsFor(mon: MonInstance) {
   const later = LIFECYCLE_STAGES.length - 1 - LIFECYCLE_STAGES.indexOf(mon.stage);
   return lifecycleSlots(labels, later);
 }
+
+/** The Baby, then the Dex facts as lines, then Back. */
+const LAYOUT = { model: 'medium', rings: false, lineRows: 7, actionRows: 1, perRow: 1 } as const;
 
 function BackButton() {
   const router = useRouter();
@@ -69,11 +75,73 @@ function Fact({ label, value, testID }: { label: string; value: string; testID: 
  * hidden until transparent capture exists (D-15i). Writes nothing.
  */
 export function DexProfileScreen() {
-  useHomeStage({});
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const mon = useMonStore((s) => s.save?.mons.find((m) => m.monInstanceId === id));
   const caller = useMonStore((s) => s.save?.caller);
+
+  // ---- the 3D H-Lynk: this Mon as its 3D model on the glass, the Dex facts drawn under it ----
+  const ui = useInstanceStore(() => ({ failed: false, nudge: 0 }));
+  const { failed, nudge } = useStore(ui);
+  const glassOn = useGlassOn(failed) && mon !== undefined;
+  const who0 = mon === undefined ? undefined : monIdentity(mon);
+  const { model, monClips } = useMonGlass(who0?.dexId ?? null, undefined);
+  const lines: GlassLine[] = [];
+  if (mon !== undefined && who0 !== undefined) {
+    if (who0.bloodlineName !== null) lines.push({ text: companionCopy('m17.bloodline', { bloodlineName: who0.bloodlineName }), tone: 'dim' });
+    lines.push({
+      text: slotsFor(mon).map((slot) => (slot.state === 'later' ? '?' : slot.state === 'current' ? `[${slot.label}]` : slot.label)).join('  ›  '),
+      tone: 'amber',
+    });
+    lines.push({ text: `${companionCopy('m17.fact.name')}: ${who0.name}`, align: 'left' });
+    lines.push({
+      text: `${companionCopy('m17.fact.hatched')}: ${new Intl.DateTimeFormat(undefined, { dateStyle: 'long' }).format(new Date(mon.hatchedAt))}`,
+      align: 'left',
+    });
+    if (caller != null) lines.push({ text: `${companionCopy('m17.fact.caller')}: ${caller.callerName}`, align: 'left' });
+  }
+  const view: GlassView = {
+    status: who0?.dexId != null ? { text: companionCopy('m17.dex', { dex: dexNumber(who0.dexId) }), tone: 'neutral' } : null,
+    title: who0?.name ?? '',
+    subtitle: who0?.formName ?? '',
+    rings: [],
+    lines,
+    actions: [{ target: 'back', label: companionCopy('m17.back.a11y'), tone: 'secondary' }],
+  };
+  const glass = useGlassScreen({ layout: LAYOUT, model, view, nudge });
+  useEffect(() => {
+    glass.bind({ monClips, onAction: () => router.back(), onModel: () => ui.setState({ nudge: ui.getState().nudge + 1 }) });
+  });
+  const onKey = (key: DeviceKey) => {
+    if (key === 'back') router.back();
+    else if (key === 'home') router.replace('/(home)');
+  };
+  const onFailed = useCallback(() => ui.setState({ failed: true }), [ui]);
+  useHomeStage(glassOn ? {} : {});
+
+  if (glassOn && who0 !== undefined) {
+    return (
+      <GlassStage
+        screen={glass.screen}
+        label={who0.name}
+        testIDPrefix="m17"
+        onKey={onKey}
+        onFailed={onFailed}
+        a11y={
+          <>
+            <Text accessibilityRole="header">{who0.name}</Text>
+            {who0.dexId !== null ? <Text testID="m17-dex">{companionCopy('m17.dex.a11y', { dexSpoken: who0.dexId })}</Text> : null}
+            {who0.formName !== null ? <Text testID="m17-form">{who0.formName}</Text> : null}
+            {lines.map((l) => <Text key={l.text}>{l.text}</Text>)}
+          </>
+        }
+        controls={[
+          { key: 'back', label: companionCopy('m17.back.a11y'), onPress: () => router.back(), testID: 'm17-back' },
+          { key: 'home', label: HLYNK_COPY['hlynk.key.home.label'], onPress: () => router.replace('/(home)'), testID: 'm17-home-key' },
+        ]}
+      />
+    );
+  }
 
   if (mon === undefined) {
     // M22's not-found recovery is not built; the honest route is home.

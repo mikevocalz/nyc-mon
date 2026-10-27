@@ -17,6 +17,7 @@ export const ONBOARDING_KEYS = {
   notifyOff: 'notify-off',
   permissionsPending: 'permissions-pending',
   permissionReview: 'permission-review',
+  nicknamePromptSeen: 'nickname-prompt-seen',
 } as const;
 
 export const SAVE_KEY = 'save';
@@ -50,6 +51,34 @@ export function completePermissionReview(): void {
 
 
 /** Parses the stored M04 answer. A malformed value is treated as unanswered (Law 5 at the boundary). */
+/**
+ * Mons whose nickname question (M09) was answered or skipped, by
+ * `monInstanceId`. A nickname is optional (the Mon is always its species),
+ * so boot asks once and then goes to the companion with or without one.
+ */
+export function readNicknamePromptSeen(): readonly string[] {
+  const raw = onboardingStorage.getString(ONBOARDING_KEYS.nicknamePromptSeen);
+  if (raw === undefined) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Records that this Mon's nickname question was answered or skipped. Idempotent. */
+export function markNicknamePromptSeen(monInstanceId: string): void {
+  const seen = readNicknamePromptSeen();
+  if (seen.includes(monInstanceId)) return;
+  onboardingStorage.set(ONBOARDING_KEYS.nicknamePromptSeen, JSON.stringify([...seen, monInstanceId]));
+}
+
+/** True while a hatched Mon has no nickname and its nickname question was never answered or skipped. */
+export function needsNicknamePrompt(mon: { readonly monInstanceId: string; readonly nickname: string | null }): boolean {
+  return mon.nickname === null && !readNicknamePromptSeen().includes(mon.monInstanceId);
+}
+
 export function readAgeAnswer(): AgeAnswer | undefined {
   const raw = onboardingStorage.getString(ONBOARDING_KEYS.ageAnswer);
   if (raw === undefined) return undefined;

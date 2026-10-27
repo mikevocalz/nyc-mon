@@ -2,7 +2,9 @@
 
 import { useId, useLayoutEffect, type ReactNode } from 'react';
 import { create } from 'zustand';
-import type { CreatureFraming, CreaturePerformance, HLynkShellProps, HLynkStatus, ShellTrackpadProps, StillReaction } from '@acme/ui';
+import type {
+  CreatureFraming, CreaturePerformance, DeviceKey, DeviceScreen, HLynkShellProps, HLynkStatus, ShellTrackpadProps, StillReaction,
+} from '@acme/ui';
 
 /**
  * The shell chrome a `/(home)` route asks for. The shell itself is mounted
@@ -42,12 +44,27 @@ export interface HomeStageEntry {
   readonly immersive?: boolean;
 }
 
+/**
+ * A route's screen on the persistent 3D H-Lynk (HomeLayout's one stage):
+ * what the glass draws and selects, and what the device keys do.
+ */
+export interface GlassRoute {
+  readonly owner: string;
+  readonly screen: DeviceScreen;
+  readonly label: string;
+  readonly onKey: (key: DeviceKey) => void;
+}
+
 interface HomeStageState extends HomeStageEntry {
   readonly owner: string | null;
   /** True while a bare route is on top: the route draws full-window over the mounted shell. */
   readonly bare: boolean;
   readonly menuOpen: boolean;
   readonly immersive: boolean;
+  /** The shared 3D companion stage reported no GPU backend: the 2D shell is the fallback from then on. */
+  readonly glassFailed: boolean;
+  /** The route screen on the persistent 3D H-Lynk now, or null (the stage shows the Baby and its name). */
+  readonly glass: GlassRoute | null;
 }
 
 const EMPTY: HomeStageState = {
@@ -55,6 +72,8 @@ const EMPTY: HomeStageState = {
   bare: false,
   menuOpen: false,
   immersive: false,
+  glassFailed: false,
+  glass: null,
   chrome: undefined,
   screen: undefined,
   leading: undefined,
@@ -63,6 +82,20 @@ const EMPTY: HomeStageState = {
 
 /** Read by the layout's shell host; written only through {@linkcode useHomeStage}. */
 export const useHomeStageStore = create<HomeStageState>()(() => EMPTY);
+
+/** A route puts its screen on the persistent stage (GlassStage), in place: nothing remounts. */
+export function publishGlass(route: GlassRoute): void {
+  useHomeStageStore.setState({ glass: route });
+}
+
+/** The route left: the stage keeps running and shows the Baby until the next route publishes. */
+export function clearGlass(owner: string): void {
+  if (useHomeStageStore.getState().glass?.owner === owner) useHomeStageStore.setState({ glass: null });
+}
+
+export function setGlassFailed(): void {
+  useHomeStageStore.setState({ glassFailed: true });
+}
 
 export function setHomeMenuOpen(open: boolean): void {
   useHomeStageStore.setState({ menuOpen: open });

@@ -119,6 +119,12 @@ export interface ThreeCanvasProps<P> {
   forceWebGL?: boolean;
   /** Stop the frame loop; the last frame stays on screen. */
   paused?: boolean;
+  /**
+   * Cap on frames drawn per second while the loop runs (the 3D H-Lynk's
+   * idle beam and Baby: 30). Unset: every display frame. Animation in scenes
+   * is delta-timed, so a cap only lowers the cost, not the speed.
+   */
+  maxFps?: number;
   /** Cap on device pixel ratio, to bound fill cost on 3x phones. Default 2. */
   maxPixelRatio?: number;
   /**
@@ -178,4 +184,11 @@ export interface ThreeSurfaceHandle {
   present: () => void;
   /** Native only: the raw react-native-webgpu context, for a worklet render runtime. Null on web. */
   getContext?: () => NativeCanvasContext | null;
+  /**
+   * Native only: whether the GPU canvas exists and has a size yet. A
+   * remounted react-native-webgpu Canvas can hand out its context (or a
+   * context without its `canvas`) a frame or two before it is laid out, and
+   * the renderer then reads `canvas.width` of undefined. Unset: always ready.
+   */
+  isReady?: () => boolean;
 }

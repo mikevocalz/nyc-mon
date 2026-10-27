@@ -3,7 +3,7 @@
 import type { Href } from 'expo-router';
 import { readBootSave } from '@acme/core/save';
 import { assertNever, type BootRoute, type BootSnapshot, resolveBootRoute } from '@acme/core/sim';
-import { readAgeAnswer, readPermissionReview, readSessionFlag, SAVE_KEY } from './onboarding.store';
+import { readAgeAnswer, readNicknamePromptSeen, readPermissionReview, readSessionFlag, SAVE_KEY } from './onboarding.store';
 import { saveStorage } from './storage';
 import { MEET_PATH, MON_HOME_PATH, PERMISSIONS_PATH } from '../egg/egg-model.ts';
 
@@ -29,6 +29,7 @@ export function buildBootSnapshot(nowMs: number): BootSnapshot {
     hasSession: readSessionFlag(),
     ageAnswer: readAgeAnswer(),
     nowMs,
+    nicknamePromptSeen: readNicknamePromptSeen(),
   };
 }
 
@@ -62,7 +63,7 @@ export function bootPath(route: BootRoute): Href {
           // M08 egg choice (D-16a).
           return MEET_PATH;
         case 'mon-name':
-          // M09 naming after the hatch (D-16f): a hatched Mon with no nickname resumes here.
+          // M09, the optional nickname question after the hatch: asked until answered or skipped once.
           return '/(home)/name';
         default:
           return assertNever(route.step);

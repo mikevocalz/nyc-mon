@@ -110,6 +110,9 @@ export const COMPANION_COPY = {
   'm18.cal.day.plain': '{date}',
   'm18.cal.prev': 'Previous month',
   'm18.cal.next': 'Next month',
+  // The timeline on the 3D H-Lynk's glass, a page at a time.
+  'm18.page.newer': 'Newer',
+  'm18.page.older': 'Older',
   'm18.day.today': 'Today',
   'm18.day.yesterday': 'Yesterday',
   'm18.entry.hatched': '{name} hatched',

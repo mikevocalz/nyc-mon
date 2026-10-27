@@ -1,0 +1,311 @@
+'use client';
+
+import { Suspense, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, type ReactNode } from 'react';
+import { useWindowDimensions } from 'react-native';
+import { deriveMonMood } from '@acme/core/sim';
+import type { CareNeed, CareState } from '@acme/core/types';
+import { hud } from '@acme/theme';
+import {
+  createGlassScreen, createStageReady, createSwitchScreen, DeviceStage, GLASS_MON_TARGET, glassGeometry, KeyboardAwareScroll, SafeArea, StageReadyGate, useInstanceStore,
+  useReducedMotion, useStore, type DeviceKey, type DeviceScreen, type GlassLayout, type GlassRing, type GlassView, type ScreenModelSource,
+  type StageReadyResource,
+} from '@acme/ui';
+import { View } from '@acme/ui/tw';
+import { StageControls, type StageControl } from '../egg/StageControls';
+import { StageLoader } from '../egg/StageLoader';
+import { isAccessibilityTextSize } from '../egg/window-layout';
+import { companionCopy } from './copy';
+import { clearGlass, publishGlass, setGlassFailed, useHomeStageStore } from './home-stage.store';
+import { isLow, NEED_RING } from './home-model';
+import { clipsFor, monModelSource } from './mon-models';
+
+/** The kit's convention for a model that does not exist yet (MonView, EggStill). */
+export const COMING_SOON = 'Coming Soon';
+
+/** Each need's ring tint on the glass (`hud` tokens). */
+export const RING_TINT: Record<CareNeed, string> = { energy: hud.amber, fullness: hud.green, social: hud.cyan };
+
+/** One care meter as a ring on the glass, with M13's label and low wording. */
+export function glassRing(need: CareNeed, value: number): GlassRing {
+  return {
+    id: need, label: companionCopy(NEED_RING[need]), value, low: isLow(value),
+    lowLabel: companionCopy('m13.ring.low'), tint: RING_TINT[need],
+  };
+}
+
+/**
+ * The active Baby on the glass: its rigged model (null source: Coming Soon)
+ * and its clips for the mood now, read every frame so a mood change
+ * cross-fades in place. `lead` clips play first when the file has them
+ * (M14's eating: `jaw_chomp`).
+ */
+export function useMonGlass(dexId: number | null, care: CareState | undefined, lead: readonly string[] = []) {
+  const model = useMemo(() => ({ source: monModelSource(dexId) }), [dexId]);
+  const clips = useRef<readonly string[]>([]);
+  const mood = care === undefined ? null : deriveMonMood(care);
+  const asleep = care?.activity.kind === 'asleep';
+  const leadKey = lead.join('\n');
+  useEffect(() => {
+    clips.current = [...(leadKey === '' ? [] : leadKey.split('\n')), ...(clipsFor(dexId, mood, asleep) ?? [])];
+  }, [dexId, mood, asleep, leadKey]);
+  const monClips = useCallback(() => clips.current, []);
+  return { model, monClips };
+}
+
+/**
+ * Whether a screen runs on the full-window 3D H-Lynk. Same rule as M08, M10
+ * and M11: it does unless motion is reduced, the text is at an accessibility
+ * size (the glass can't reflow), or the stage reported it can't run (no
+ * GPU). Only then does the 2D shell come back, as the fallback.
+ */
+export function useGlassOn(failed: boolean): boolean {
+  const reducedMotion = useReducedMotion();
+  const { fontScale } = useWindowDimensions();
+  const stageFailed = useHomeStageStore((st) => st.glassFailed);
+  return !reducedMotion && !isAccessibilityTextSize(fontScale) && !failed && !stageFailed;
+}
+
+/** What a tap on the glass does; a route binds these from its own effect (`glass.bind`). */
+export interface GlassHandlers {
+  readonly onAction: (target: string) => void;
+  readonly onModel: () => void;
+  readonly monClips: () => readonly string[];
+}
+
+/** A built glass screen and the binder for its handlers. */
+export interface GlassScreenHandle {
+  readonly screen: DeviceScreen;
+  /**
+   * Hands the screen the route's latest handlers. Call it from the route's
+   * own `useEffect` (no deps), never during render: the handlers write the
+   * save and read refs, which a render must not do.
+   */
+  readonly bind: (handlers: Partial<GlassHandlers>) => void;
+  /** Presses a glass action through the bound handler, for the hidden accessible controls. */
+  readonly press: (target: string) => void;
+}
+
+const NO_HANDLERS: GlassHandlers = { onAction: () => undefined, onModel: () => undefined, monClips: () => [] };
+
+/**
+ * A glass screen (createGlassScreen) that a route rebuilds on every render.
+ * It takes data only; the route binds its handlers with `bind` from an
+ * effect. The screen itself is built once per layout and model and reads the
+ * latest view, handlers and per-frame values from stores, so the stage never
+ * rebuilds; the glass repaints only when the view's content changes. `nudge`
+ * counts taps on the Baby, and each one wobbles it.
+ */
+export function useGlassScreen(options: {
+  readonly layout: GlassLayout;
+  readonly model: { readonly source: ScreenModelSource | null; readonly glow?: string } | null;
+  readonly view: GlassView;
+  /** Whether the Baby shows now (M16 hides it during the rounds). */
+  readonly modelVisible?: boolean;
+  /** Where the Baby stands across the glass, a share of its width (M16's peek). */
+  readonly modelOffset?: number;
+  readonly nudge?: number;
+}): GlassScreenHandle {
+  const store = useInstanceStore(() => ({
+    view: options.view,
+    key: JSON.stringify(options.view),
+    nudge: options.nudge ?? 0,
+    visible: options.modelVisible ?? true,
+    offset: options.modelOffset ?? 0,
+  }));
+  const handlers = useInstanceStore<GlassHandlers>(() => NO_HANDLERS);
+  // After each commit: the view only when its content changed (one repaint per change), and the per-frame values.
+  useEffect(() => {
+    const key = JSON.stringify(options.view);
+    const state = store.getState();
+    const next: Partial<{ view: GlassView; key: string; nudge: number; visible: boolean; offset: number }> = {};
+    if (key !== state.key) Object.assign(next, { view: options.view, key });
+    if ((options.nudge ?? 0) !== state.nudge) next.nudge = options.nudge ?? 0;
+    if ((options.modelVisible ?? true) !== state.visible) next.visible = options.modelVisible ?? true;
+    if ((options.modelOffset ?? 0) !== state.offset) next.offset = options.modelOffset ?? 0;
+    if (Object.keys(next).length > 0) store.setState(next);
+  });
+  const { layout, model } = options;
+  const layoutKey = JSON.stringify(layout);
+  const modelKey = model === null ? 'none' : model.source === null ? 'soon' : 'eggId' in model.source ? model.source.eggId : model.source.key;
+  const screen = useMemo(
+    () => createGlassScreen({
+      layout,
+      model,
+      comingSoon: COMING_SOON,
+      view: () => store.getState().view,
+      subscribe: (onChange) => store.subscribe((next, prev) => {
+        if (next.key !== prev.key) onChange();
+      }),
+      onAction: (target) => handlers.getState().onAction(target),
+      onModel: () => handlers.getState().onModel(),
+      monClips: () => handlers.getState().monClips(),
+      modelVisible: () => store.getState().visible,
+      modelOffset: () => store.getState().offset,
+      nudge: () => store.getState().nudge,
+    }),
+    // The scene reads the layout and the model once; rebuild only when they really change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [layoutKey, modelKey, store, handlers],
+  );
+  return useMemo(() => ({
+    screen,
+    bind: (h: Partial<GlassHandlers>) => handlers.setState(h),
+    press: (target: string) => handlers.getState().onAction(target),
+  }), [screen, handlers]);
+}
+
+/**
+ * The glass's buttons as hidden accessible controls (StageControls), each
+ * pressing what a tap on the glass would. `testIDOf` names each one.
+ */
+export function glassControls(
+  actions: readonly { readonly target: string; readonly label: string; readonly disabled?: boolean }[],
+  onAction: (target: string) => void,
+  testIDOf: (target: string) => string,
+  hintOf: (target: string) => string | undefined = () => undefined,
+): StageControl[] {
+  return actions.map((a) => ({
+    key: a.target, label: a.label, disabled: a.disabled, hint: hintOf(a.target), onPress: () => onAction(a.target), testID: testIDOf(a.target),
+  }));
+}
+
+export interface GlassStageProps {
+  readonly screen: DeviceScreen;
+  /** The stage's accessible name. */
+  readonly label: string;
+  readonly testIDPrefix: string;
+  /** What the glass says, for screen readers (the canvas is hidden from them). Drawn at 1 px, zero opacity. */
+  readonly a11y: ReactNode;
+  /** Every action on the glass, as real buttons for screen readers, switch control and keyboards. */
+  readonly controls: readonly StageControl[];
+  readonly onKey: (key: DeviceKey) => void;
+  /** No GPU backend: the route goes back to its 2D fallback. */
+  readonly onFailed: () => void;
+  /** A real control under the device, for what can't be drawn on the glass (M09's text field). */
+  readonly below?: ReactNode;
+}
+
+/**
+ * A route's screen on the ONE persistent 3D H-Lynk (HomeLayout's
+ * PersistentGlass). The route draws no canvas: it publishes its screen and
+ * key handler to the stage, which swaps the glass and re-seats the Baby in
+ * place, so moving between routes never tears the renderer down, reloads a
+ * GLB, replays the intro or shows the loader again. What this renders is
+ * transparent: what the glass says for screen readers, every action as a
+ * hidden accessible button, and `below`, a real control for what can't be
+ * drawn on the glass (M09's text field).
+ */
+export function GlassStage({ screen, label, testIDPrefix, a11y, controls, onKey, onFailed, below }: GlassStageProps) {
+  const owner = useId();
+  const keys = useInstanceStore<{ onKey: (key: DeviceKey) => void }>(() => ({ onKey }));
+  useEffect(() => {
+    keys.setState({ onKey });
+  });
+  useLayoutEffect(() => {
+    publishGlass({ owner, screen, label, onKey: (key) => keys.getState().onKey(key) });
+  }, [owner, screen, label, keys]);
+  useLayoutEffect(() => () => clearGlass(owner), [owner]);
+  const failed = useHomeStageStore((st) => st.glassFailed);
+  useEffect(() => {
+    if (failed) onFailed();
+  }, [failed, onFailed]);
+
+  return (
+    <View className="absolute inset-0" style={{ pointerEvents: 'box-none' }} testID={`${testIDPrefix}-3d`}>
+      <View className="absolute left-0 top-0 h-px w-px overflow-hidden opacity-0" testID={`${testIDPrefix}-glass-a11y`}>{a11y}</View>
+      <StageControls testID={`${testIDPrefix}-stage-controls`} controls={controls} />
+      {below ? (
+        <KeyboardAwareScroll className="absolute inset-0" contentContainerClassName="grow justify-end" keyboardShouldPersistTaps="handled">
+          <SafeArea edges={['bottom', 'left', 'right']}>{below}</SafeArea>
+        </KeyboardAwareScroll>
+      ) : null}
+    </View>
+  );
+}
+
+/**
+ * The persistent stage itself, mounted once by HomeLayout for every `(home)`
+ * route on the 3D path: the device, the active Baby loaded once (fitted
+ * inside the glass, on its mood's idle), and the Rive loader over it only
+ * until its very first frame. It draws the current route's screen
+ * (createSwitchScreen); with no route screen it shows the Baby under its
+ * name. `fallbackKey` handles the keys then.
+ */
+export function PersistentGlassStage({
+  model, fallback, fallbackKey, label, children,
+}: {
+  readonly model: { readonly source: ScreenModelSource | null } | null;
+  readonly fallback: DeviceScreen;
+  readonly fallbackKey: (key: DeviceKey) => void;
+  readonly label: string;
+  readonly children?: ReactNode;
+}) {
+  const route = useHomeStageStore((st) => st.glass);
+  const current = useInstanceStore<{ screen: DeviceScreen }>(() => ({ screen: route?.screen ?? fallback }));
+  useLayoutEffect(() => {
+    const next = route?.screen ?? fallback;
+    if (current.getState().screen !== next) current.setState({ screen: next });
+  }, [route, fallback, current]);
+  const keys = useInstanceStore<{ onKey: (key: DeviceKey) => void }>(() => ({ onKey: fallbackKey }));
+  useEffect(() => {
+    keys.setState({ onKey: route?.onKey ?? fallbackKey });
+  });
+  const source = model?.source ?? null;
+  const modelKey = source === null ? 'none' : 'eggId' in source ? source.eggId : source.key;
+  const screen = useMemo(
+    () => createSwitchScreen({
+      models: source === null ? [] : [{ target: GLASS_MON_TARGET, rect: glassGeometry(PERSISTENT_LAYOUT).model!, source }],
+      current: () => current.getState().screen,
+      watch: (onChange) => current.subscribe((next, prev) => {
+        if (next.screen !== prev.screen) onChange();
+      }),
+    }),
+    // One scene per Baby: the model loads once and stays.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [modelKey, current],
+  );
+  const local = useInstanceStore<{ ready: StageReadyResource }>(() => ({ ready: createStageReady() }));
+  const ready = useStore(local, (st) => st.ready);
+  const onReady = useCallback(() => local.getState().ready.settle(), [local]);
+  const onBackend = useCallback((backend: unknown) => {
+    if (backend !== null) return;
+    local.getState().ready.settle();
+    setGlassFailed();
+  }, [local]);
+  const onKey = useCallback((key: DeviceKey) => keys.getState().onKey(key), [keys]);
+
+  return (
+    <View className="absolute inset-0 bg-ink-950" testID="home-glass-stage">
+      <SafeArea className="flex-1" edges={['top', 'bottom', 'left', 'right']}>
+        <View className="relative min-h-0 flex-1">
+          <View
+            testID="home-device-stage"
+            aria-hidden
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            className="absolute inset-0"
+          >
+            <DeviceStage
+              key={modelKey}
+              screen={screen}
+              label={route?.label ?? label}
+              className="h-full"
+              stageClassName="min-h-0 w-full flex-1"
+              onKey={onKey}
+              onReady={onReady}
+              onBackendChange={onBackend}
+            />
+          </View>
+          {/* The Rive loader covers the stage until its first frame, once: later screens swap in place. */}
+          <Suspense fallback={<StageLoader label={label} testID="home-stage-loader" />}>
+            <StageReadyGate resource={ready} />
+          </Suspense>
+          {children}
+        </View>
+      </SafeArea>
+    </View>
+  );
+}
+
+/** The persistent stage's default slot for the Baby (re-seated per screen through `modelRect`). */
+export const PERSISTENT_LAYOUT = { model: 'large', rings: false, lineRows: 0, actionRows: 0, perRow: 1 } as const;
