@@ -43,6 +43,7 @@ import {
 import { hashUnit, mapArea, pairs, pointInRing, ribbon, VertexBuffer } from '../geometry.ts';
 import { CITY_COLORS, hexToRgb } from '../palette.ts';
 import { box, type Frame } from '../parts.ts';
+import { createLampPoolMaterial } from '../materials.ts';
 import { PHYSICAL_GRADE, PHYSICAL_POST } from '../physical-look.ts';
 import { PRE_WAR } from '../physical-materials-constants.ts';
 import { SURFACES } from '../surfaces.ts';
@@ -183,8 +184,22 @@ export function faceliftWallTone(building: Pick<CityBuilding, 'id' | 'class'>, p
   return tones[Math.floor(hashUnit(`${building.id}:facelift:tone`) * tones.length) % tones.length]!;
 }
 
-/** LED streetlight colour for the light rig: cooler than the sodium-warm pools (lampHalo). */
-export const FACELIFT_STREETLIGHT = { color: physicalFacelift.streetLed } as const;
+/**
+ * LED streetlight colour, cooler than the sodium lampHalo: `color` is the
+ * token, `linear` the scene-linear rgb the lamp pools and halos multiply.
+ * There are no streetlamp lights in the physical rig (ClusteredLighting
+ * carries the fleet's headlights), so the LED colour goes to the emissive
+ * pools under the furniture lamps and the living city's dusk halos.
+ */
+export const FACELIFT_STREETLIGHT = {
+  color: physicalFacelift.streetLed,
+  linear: hexToRgb(physicalFacelift.streetLed).map(srgbToLinear) as [number, number, number],
+} as const;
+
+/** The furniture lamps' light pools in the LED colour (materials.ts createLampPoolMaterial). */
+export function createFaceliftLampPools(THREE: Three): Mat {
+  return createLampPoolMaterial(THREE, THREE.TSL.color(new THREE.Color(...FACELIFT_STREETLIGHT.linear)));
+}
 
 const COMMERCIAL: ReadonlySet<RoadClass> = new Set(['primary', 'secondary', 'trunk']);
 

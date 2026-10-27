@@ -63,3 +63,9 @@ export function loadDeviceProbes(): typeof import('./render-runtime/device-probe
     ? require('./render-runtime/device-probes.ts')
     : viaNode('./render-runtime/device-probes.ts')) as typeof import('./render-runtime/device-probes.ts');
 }
+
+export function loadPhysicalFacelift(): typeof import('./world/physical/facelift.ts') {
+  return (typeof require === 'function'
+    ? require('./world/physical/facelift.ts')
+    : viaNode('./world/physical/facelift.ts')) as typeof import('./world/physical/facelift.ts');
+}

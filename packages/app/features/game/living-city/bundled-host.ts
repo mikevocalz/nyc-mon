@@ -37,6 +37,9 @@ import type { SceneActorFactory } from '../scene-actor.ts';
 import type { SkyName } from '../world/sky-rig.ts';
 import { placeStreetFurniture } from '../world/street-furniture.ts';
 import { EXPERIMENTAL_WORLD_VD } from '../world/vd-materials.ts';
+import { FUTURE_LAYER } from '../world/future-layer.ts';
+import { EXPERIMENTAL_WORLD_PHYSICAL, physicalFeaturesFor, WORLD_PROBE } from '../world/physical-look.ts';
+import { loadPhysicalFacelift } from '../physical-graph.ts';
 import { createStreetClearance } from '../world/walkability.ts';
 import { bundledSignals } from './bundled-signals.ts';
 import { bundledTopology } from './bundled-topology.ts';
@@ -249,6 +252,10 @@ function create(): LivingCityBundle {
         read, placements, focus, onMount: attach, onUnmount: detach,
         // The vd lane draws no light pools on the pavement (Valdrada lights the street, it does not paint it).
         ...(EXPERIMENTAL_WORLD_VD ? { poolCap: 0 } : {}),
+        // The physical city with the facelift on lights its lamps in the LED colour, as the world's pools do.
+        ...(physicalFeaturesFor(EXPERIMENTAL_WORLD_PHYSICAL, WORLD_PROBE, false)?.pbrMaterials && FUTURE_LAYER
+          ? { color: loadPhysicalFacelift().FACELIFT_STREETLIGHT.linear }
+          : {}),
       })
     : null;
   return { host, vehicleFactory, pedFactory, signalFactory, lampFactory, slice, pedSlice };

@@ -23,7 +23,7 @@ import { buildPrecipitation } from './vd-weather.ts';
 import { CURB_HEIGHT, VD_SHADOWS, VD_SHADOW_HALF } from './curb.ts';
 import { FUTURE_LAYER, type AdSurface } from './future-layer.ts';
 import { buildPhysicalCityMaterials } from './physical/index.ts';
-import { buildPhysicalFacelift, faceliftBakePicks } from './physical/facelift.ts';
+import { buildPhysicalFacelift, createFaceliftLampPools, faceliftBakePicks } from './physical/facelift.ts';
 import { loadPhysicalRig } from '../physical-graph.ts';
 import { buildLaneTopology } from '../living-city/topology.ts';
 
@@ -219,7 +219,9 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
     ? buildPhysicalFacelift(THREE, dataset, city.meshes, clearance)
     : null;
   const trees = buildTrees(THREE, dataset, materials, clearance, vd, VD_LEAN, leanMat, leanDraw);
-  const furniture = buildStreetFurniture(THREE, dataset, materials, clearance, city.texts);
+  // The facelift's LED streetlights: the furniture lamps pool in the LED colour instead of sodium.
+  const ledPools = facelift ? createFaceliftLampPools(THREE) : null;
+  const furniture = buildStreetFurniture(THREE, dataset, ledPools ? { ...materials, lampPools: ledPools } : materials, clearance, city.texts);
   const props = buildStreetProps(THREE, dataset, materials, clearance, furniture.signs, furniture.lights);
   const bandMinZ = -dataset.extentMeters - SHADOW_BAND_METRES;
   const bandCount = Math.max(1, Math.ceil((dataset.extentMeters * 2 + SHADOW_BAND_METRES * 2) / SHADOW_BAND_METRES) + 1);
@@ -331,6 +333,7 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
     },
     dispose() {
       facelift?.dispose();
+      ledPools?.dispose();
       city.dispose();
       phys?.dispose();
       trees.dispose();
