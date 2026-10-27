@@ -362,7 +362,10 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
         rig.update(camera.position.y, params.camera.x, params.camera.z);
         const preset = params.preset ?? DEFAULT_PHYSICAL_PRESET;
         if (preset !== rig.preset) {
-          rig.applyPreset(preset);
+          // The rebake renders PMREM cube faces through renderer.render, which
+          // the post mount has pointed at the pipeline; run it on the direct path.
+          if (post) post.withDirectRender(() => rig.applyPreset(preset));
+          else rig.applyPreset(preset);
           post?.physical?.applyLook(PHYSICAL_PRESETS[preset].grade);
           invalidate?.();
         }

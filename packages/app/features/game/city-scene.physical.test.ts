@@ -90,6 +90,45 @@ test('flag on: sRGB output, ACES in one pipeline, shadows, null background, the 
   }
 });
 
+test('a time-of-day rebake after the pipeline mounts renders cube faces on the direct path', async () => {
+  // PMREMGenerator._sceneToCubeUV calls renderer.clear() and renderer.render(scene, cubeCamera)
+  // (three r186 src/renderers/common/extras/PMREMGenerator.js). The double does the same.
+  type FromScene = (this: { _renderer: { render(s: unknown, c: unknown): void } }, envScene: unknown, sigma: unknown, near: unknown, far: unknown, options: { renderTarget?: InstanceType<typeof THREE.RenderTarget> | null }) => unknown;
+  const pmremProto = THREE.PMREMGenerator.prototype as unknown as { fromScene: FromScene };
+  const originalFromScene = pmremProto.fromScene;
+  const rendererProto = THREE.WebGPURenderer.prototype as unknown as { render: (...args: unknown[]) => unknown };
+  const hadOwnRender = Object.hasOwn(rendererProto, 'render');
+  const originalRender = rendererProto.render;
+  const pipelineProto = THREE.RenderPipeline.prototype as unknown as { render: () => void };
+  const originalPipelineRender = pipelineProto.render;
+  const direct: unknown[] = [];
+  let pipelineRenders = 0;
+  rendererProto.render = function (target: unknown) { direct.push(target); };
+  pipelineProto.render = function () { pipelineRenders++; };
+  pmremProto.fromScene = function (envScene, _s, _n, _f, options) {
+    this._renderer.render(envScene, new THREE.PerspectiveCamera());
+    return options.renderTarget ?? new THREE.RenderTarget(4, 4);
+  };
+  try {
+    const renderer = await stubRenderer();
+    const params = sceneParams();
+    const built = createCityScene(sceneContext(renderer), params);
+    assert.equal(direct.length, 1, 'the mount-time bake ran before the pipeline existed');
+    direct.length = 0;
+    built.update!({ delta: 0, time: 0, reducedMotion: false } as never, { ...params, preset: 'golden' });
+    assert.equal(pipelineRenders, 0, 'the rebake must not run the post pipeline');
+    assert.equal(direct.length, 1, 'the rebake reached the original renderer.render');
+    assert.ok((direct[0] as { isScene?: boolean }).isScene, 'with the environment scene, not the city');
+    assert.notEqual(direct[0], built.scene);
+    built.dispose!();
+  } finally {
+    pmremProto.fromScene = originalFromScene;
+    if (hadOwnRender) rendererProto.render = originalRender;
+    else delete (rendererProto as { render?: unknown }).render;
+    pipelineProto.render = originalPipelineRender;
+  }
+});
+
 test('flag on without a renderer still builds the rig objects (node scene path)', () => {
   const built = createCityScene(sceneContext(null), sceneParams());
   assert.ok(built.scene.getObjectByName('city:physical-sun'));

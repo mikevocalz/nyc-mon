@@ -255,6 +255,13 @@ export interface CityPostPipeline {
   scenePass: PassT;
   /** The Slop-grade chain when `request.physical` was set, else null. */
   physical: PhysicalPostHandle | null;
+  /**
+   * Runs `fn` with renderer.render answering on the direct path. Anything
+   * that renders its own scene through the canvas renderer after the mount
+   * (PMREMGenerator.fromScene's cube faces on a time-of-day rebake) goes
+   * through here, or the delegate runs the whole pipeline instead.
+   */
+  withDirectRender<R>(fn: () => R): R;
   /** Restores renderer.render and tone mapping, then frees the nodes and the pipeline. */
   dispose(): void;
 }
@@ -335,7 +342,7 @@ export function mountCityPostPipeline(THREE: Three, request: CityPostRequest): C
   pipeline.outputColorTransform = !needsConvertedInput;
   pipeline.outputNode = outputNode;
 
-  const restore = delegateRender(renderer, pipeline);
+  const delegate = delegateRender(renderer, pipeline);
   let disposed = false;
   return {
     pipeline,
@@ -343,10 +350,11 @@ export function mountCityPostPipeline(THREE: Three, request: CityPostRequest): C
     options,
     scenePass,
     physical: null,
+    withDirectRender: delegate.direct,
     dispose() {
       if (disposed) return;
       disposed = true;
-      restore();
+      delegate.restore();
       renderer.toneMapping = priorToneMapping;
       renderer.toneMappingExposure = priorExposure;
       aoNode?.dispose();
@@ -362,9 +370,10 @@ export function mountCityPostPipeline(THREE: Three, request: CityPostRequest): C
  * Points renderer.render at pipeline.render(). The canvas calls
  * renderer.render(scene, camera); PassNode.updateBefore and QuadMesh.render
  * call it again from inside the pipeline, and the inPipeline flag routes
- * those nested calls to the direct path. Returns the undo.
+ * those nested calls to the direct path. `direct(fn)` sets the same flag
+ * around a caller's own renders. Returns the undo and that wrapper.
  */
-function delegateRender(renderer: RendererT, pipeline: PipelineT): () => void {
+function delegateRender(renderer: RendererT, pipeline: PipelineT): { restore(): void; direct<R>(fn: () => R): R } {
   const directRender = renderer.render;
   const hadOwnRender = Object.hasOwn(renderer, 'render');
   let inPipeline = false;
@@ -377,12 +386,23 @@ function delegateRender(renderer: RendererT, pipeline: PipelineT): () => void {
       inPipeline = false;
     }
   }) as typeof renderer.render;
-  return () => {
-    if (hadOwnRender) {
-      renderer.render = directRender;
-    } else {
-      delete (renderer as { render?: unknown }).render;
-    }
+  return {
+    restore() {
+      if (hadOwnRender) {
+        renderer.render = directRender;
+      } else {
+        delete (renderer as { render?: unknown }).render;
+      }
+    },
+    direct<R>(fn: () => R): R {
+      if (inPipeline) return fn();
+      inPipeline = true;
+      try {
+        return fn();
+      } finally {
+        inPipeline = false;
+      }
+    },
   };
 }
 
@@ -506,7 +526,7 @@ function mountPhysical(
   const pipeline = new THREE.RenderPipeline(renderer);
   pipeline.outputColorTransform = true;
   pipeline.outputNode = outputNode;
-  const restore = delegateRender(renderer, pipeline);
+  const delegate = delegateRender(renderer, pipeline);
 
   const handle: PhysicalPostHandle = {
     applied: {
@@ -538,10 +558,11 @@ function mountPhysical(
     options,
     scenePass,
     physical: handle,
+    withDirectRender: delegate.direct,
     dispose() {
       if (disposed) return;
       disposed = true;
-      restore();
+      delegate.restore();
       renderer.toneMapping = priorToneMapping;
       renderer.toneMappingExposure = priorExposure;
       ssrNode?.dispose();
