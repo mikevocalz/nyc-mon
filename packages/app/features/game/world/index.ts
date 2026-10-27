@@ -22,6 +22,9 @@ import { VD_LEANMAT } from './vd-leanmat.ts';
 import { buildPrecipitation } from './vd-weather.ts';
 import { CURB_HEIGHT, VD_SHADOWS, VD_SHADOW_HALF } from './curb.ts';
 import { FUTURE_LAYER, type AdSurface } from './future-layer.ts';
+import { buildPhysicalCityMaterials } from './physical/index.ts';
+import { cityUniforms } from './physical-rig.ts';
+import { buildLaneTopology } from '../living-city/topology.ts';
 
 // Lane G1 "GPU budget" (EXPO_PUBLIC_WORLD_BUNDLES) was deleted 2026-11: the
 // recorded bundle replayed the record-frame camera pose forever — three r186
@@ -126,6 +129,12 @@ export interface CityWorldOptions {
    * overlays are merged into the shared buffers, so draw calls stay flat.
    */
   future?: boolean;
+  /**
+   * EXPO_PUBLIC_WORLD_PHYSICAL: Slop's facade, interior, road and sidewalk
+   * materials replace the four city materials one for one, and road paint
+   * and fire escapes are added (world/physical/). Off unless set.
+   */
+  physical?: boolean;
 }
 
 export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: CityWorldOptions = {}) {
@@ -192,7 +201,16 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
 
   // One street-clearance index for every tree, pole, sign, stoop and prop.
   const clearance = createStreetClearance(dataset);
-  const city = buildCityMeshes(THREE, dataset, materials, away, clearance, options.future ?? EXPERIMENTAL_WORLD_FUTURE);
+  const phys = options.physical
+    ? buildPhysicalCityMaterials(THREE, cityUniforms(THREE), dataset, { topology: buildLaneTopology(dataset) })
+    : null;
+  const city = phys
+    ? buildCityMeshes(
+        THREE, dataset,
+        { ...materials, masonry: phys.masonry, glass: phys.glass, roads: phys.roads, sidewalks: phys.sidewalks },
+        away, clearance, options.future ?? EXPERIMENTAL_WORLD_FUTURE, { facadeAttributes: true, fireEscapes: true },
+      )
+    : buildCityMeshes(THREE, dataset, materials, away, clearance, options.future ?? EXPERIMENTAL_WORLD_FUTURE);
   const trees = buildTrees(THREE, dataset, materials, clearance, vd, VD_LEAN, leanMat, leanDraw);
   const furniture = buildStreetFurniture(THREE, dataset, materials, clearance, city.texts);
   const props = buildStreetProps(THREE, dataset, materials, clearance, furniture.signs, furniture.lights);
@@ -232,6 +250,8 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
   }
   group.add(ground, ...city.meshes, ...trees.objects, ...furniture.objects, ...props.objects, hemi, sun, sun.target);
   if (precipitation) group.add(precipitation.mesh);
+  if (phys?.roadPaint) group.add(phys.roadPaint);
+  if (phys) group.add(...phys.fireEscapes.meshes);
 
   const horizon = skyRig?.horizon ?? linearColor(THREE, 'skyHorizon');
   const fog = skyRig?.fog ?? new THREE.Fog(horizon, 600, 2500);
@@ -295,9 +315,11 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
       furniture.setFocus(x, z);
       shadowBands(z, bandMinZ, bandCount, bands);
       props.setFocus(x, z, bands[0], bands[1]);
+      if (phys && city.physical) phys.fireEscapes.update(city.physical.fireEscapes, x, z);
     },
     dispose() {
       city.dispose();
+      phys?.dispose();
       trees.dispose();
       furniture.dispose();
       props.dispose();

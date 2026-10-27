@@ -140,7 +140,7 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
   const world = buildCityWorld(THREE, dataset, {
     sky: initial.sky,
     ...(bundle ? { glassTier: bundle.glassTier, envWidth: bundle.envWidth } : {}),
-    ...(physical?.pbrMaterials ? { pbr: true, carPbr: true } : {}),
+    ...(physical?.pbrMaterials ? { pbr: true, carPbr: true, physical: true } : {}),
   });
   scene.add(world.sky, world.group);
   scene.fog = world.fog;
