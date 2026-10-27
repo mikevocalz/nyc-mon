@@ -29,7 +29,7 @@ test('shared fails when Skia is on another device, and keeps Skia\'s error', asy
   assert.equal(record.ok, false);
   assert.equal(record.nonBlack, true);
   assert.equal(record.detail.skiaAccepts, false);
-  assert.match(String(record.detail.skiaError), /not on the Skia device/);
+  assert.match(String(record.detail.skiaError), /not on the Skia GPUDevice/);
 });
 
 test('shared without Skia on the runtime reports skiaAccepts null and does not pass', async () => {

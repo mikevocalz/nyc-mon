@@ -84,7 +84,7 @@ export type FakeDevice = ReturnType<typeof fakeDevice>;
 export function fakeSkia(owner: FakeDevice, options: { pointer?: bigint } = {}) {
   const calls: string[] = [];
   const check = (texture: FakeTexture) => {
-    if (texture.owner !== owner) throw new Error('texture is not on the Skia device');
+    if (texture.owner !== owner) throw new Error('texture is not on the Skia GPUDevice');
   };
   const skia = {
     calls,

@@ -243,7 +243,7 @@ export interface LabelTexture {
  */
 export function makeLabelTexture(THREE: Three, spec: LabelSpec, env: LabelTextureEnv): LabelTexture {
   const { width, height } = labelSize(spec);
-  let fallbackReason = !env.device ? 'no device' : !env.skia ? 'Skia API not on this runtime' : env.deviceSource !== 'shared' ? `device is ${env.deviceSource}, not Skia's` : '';
+  let fallbackReason = !env.device ? 'no GPUDevice' : !env.skia ? 'Skia API not on this runtime' : env.deviceSource !== 'shared' ? `device is ${env.deviceSource}, not Skia's` : '';
   if (env.device && env.skia && env.deviceSource === 'shared') {
     const skia = env.skia;
     try {

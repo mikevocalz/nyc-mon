@@ -93,7 +93,7 @@ test('an own device, a missing Skia API, or a Skia refusal each fall back to the
   assert.match(noSkia.fallbackReason ?? '', /Skia API not on this runtime/);
   const refused = makeLabelTexture(THREE, spec, { device: asDevice(device), deviceSource: 'shared', skia: asSkia(fakeSkia(other)) });
   assert.equal(refused.path, 'bitmap');
-  assert.match(refused.fallbackReason ?? '', /not on the Skia device/);
+  assert.match(refused.fallbackReason ?? '', /not on the Skia GPUDevice/);
   assert.equal(device.textures[0]?.destroyed, true, 'the refused texture is released');
   const data = refused.texture as THREE.DataTexture;
   assert.equal(data.image.width, labelSize(spec).width);

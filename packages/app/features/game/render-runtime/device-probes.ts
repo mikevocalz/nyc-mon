@@ -121,7 +121,7 @@ export async function probeShared(deps: SharedProbeDeps): Promise<ProbeRecord> {
   const t0 = now();
   const detail: Record<string, unknown> = { deviceSource: deps.deviceSource, skiaOnRuntime: deps.skia !== null };
   if (!deps.device) {
-    return { probe: 'shared', runtime: deps.runtime, ok: false, nonBlack: null, ms: round(now() - t0), detail: { ...detail, error: 'no device' } };
+    return { probe: 'shared', runtime: deps.runtime, ok: false, nonBlack: null, ms: round(now() - t0), detail: { ...detail, error: 'no GPUDevice' } };
   }
   const device = deps.device;
   const texture = device.createTexture({ label: 'probe:shared', size: { width: 4, height: 4 }, format: SKIA_TEXTURE_FORMAT, usage: SKIA_TEXTURE_USAGE });
@@ -191,7 +191,7 @@ export async function probeSkiaTex(deps: SkiaTexProbeDeps): Promise<ProbeRecord>
   const t0 = now();
   const frames = deps.frames ?? 6;
   if (!deps.device || !deps.skia) {
-    const error = !deps.device ? 'no device' : 'Skia API not installed on this runtime';
+    const error = !deps.device ? 'no GPUDevice' : 'Skia API not installed on this runtime';
     return { probe: 'skiatex', runtime: deps.runtime, ok: false, nonBlack: null, ms: round(now() - t0), detail: { error } };
   }
   const skia = deps.skia;
