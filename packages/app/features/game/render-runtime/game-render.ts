@@ -7,9 +7,10 @@
 // Mode docs, "Running third party libraries in Worklets").
 //
 // State it does not own arrives through `snapshot` (render-snapshot.ts): the
-// JS-thread simulation writes the camera and Caller there, and this loop
-// reads the latest array once per tick. The Caller proxy reads a mirror store
-// fed from that array, so character/ and world/ run here unchanged.
+// JS-thread simulation writes the camera, Caller and time-of-day preset
+// there, and this loop reads the latest array once per tick. The Caller
+// proxy reads a mirror store fed from that array, so character/ and world/
+// run here unchanged.
 //
 // Milestones, breadcrumbs and failures go back to the JS thread with
 // scheduleOnRN (runtime-report.ts routes them there). Nothing thrown on this
@@ -29,7 +30,7 @@ import { createLampActor, lampPlacements } from '../living-city/lamp-viz.ts';
 import { createPedActor } from '../living-city/ped-actor.ts';
 import { createSignalActor } from '../living-city/signal-viz.ts';
 import { createVehicleActor } from '../living-city/vehicle-actor.ts';
-import { readCaller, readCamera, readView, snapshotVersion, type MutableCallerState } from '../render-snapshot.ts';
+import { readCaller, readCamera, readPreset, readView, snapshotVersion, type MutableCallerState } from '../render-snapshot.ts';
 import { createStreetClearance } from '../world/walkability.ts';
 import { describeRuntimeError, installFrameGlobals, type GameRenderEventKind } from './runtime-report.ts';
 import { FrameSampleWindow, type MutableFrameTimingSample } from '../perf/frame-sampler.ts';
@@ -325,6 +326,8 @@ export function startGameRender(args: GameRenderArgs): void {
     const params: GameSceneParams = {
       dataset: city.dataset,
       get camera() { return readCamera(s.snapshot, s.camera); },
+      // The time-of-day pick worklet-host packs from timeOfDayStore; city-scene re-lights on change.
+      get preset() { return readPreset(s.snapshot); },
       // PR05: the vehicle fleet reads its own packed Synchronizable — the sim
       // stays JS-authoritative and only the snapshot crosses runtimes.
       // PR06: the crowd reads the SAME channel — the ped section is appended

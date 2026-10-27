@@ -67,7 +67,7 @@ import { CITY_FRAME_SINK_ENABLED, onCityFrame } from './perf/on-city-frame.ts';
 import { GAME_SURFACE_TYPE } from './perf/surface-type.ts';
 import { GAME_FREERUN } from './perf/frame-pacing.ts';
 import { physicalRendererParams } from './world/physical-look.ts';
-import { timeOfDayStore } from './world/time-of-day.store.ts';
+import { onTimeOfDayChange, timeOfDayStore } from './world/time-of-day.store.ts';
 import { runJsDeviceProbe } from './render-runtime/run-js-device-probes.ts';
 
 // EXPO_PUBLIC_WORLD_PHYSICAL: reversed depth on the JS render path. Flag off: {}.
@@ -167,6 +167,8 @@ export function GameScreen({ focused = true }: GameScreenProps = {}) {
   useEffect(() => gameCameraStore.subscribe(() => canvas.current?.invalidate()), []);
   // The Caller moving (a jump in place moves no camera) -> one redraw, outside React render.
   useEffect(() => callerStore.subscribe(() => canvas.current?.invalidate()), []);
+  // A new time-of-day pick -> one redraw; city-scene re-lights from params.preset in that frame.
+  useEffect(() => onTimeOfDayChange(timeOfDayStore, () => canvas.current?.invalidate()), []);
 
   // Redraw once when the lobby hands over. The on-demand canvas drew its
   // first frame under the lobby cover, and on Android that frame does not

@@ -33,7 +33,7 @@ import {
 } from './physical-look.ts';
 import { PHYSICAL_NIGHT_SKY, PHYSICAL_PRESETS } from './physical-presets.ts';
 import { applyPhysicalShadowRoles, cityUniforms, createPhysicalRig, swapInstanceMatricesToStorage } from './physical-rig.ts';
-import { createTimeOfDayStore } from './time-of-day.store.ts';
+import { createTimeOfDayStore, onTimeOfDayChange } from './time-of-day.store.ts';
 
 const full = fullPhysicalFeatures(false);
 
@@ -316,4 +316,16 @@ test('storage swap: WebGPU backend only, every InstancedMesh once, same matrices
   assert.ok(instanced.instanceMatrix instanceof THREE.StorageInstancedBufferAttribute);
   assert.deepEqual(Array.from(instanced.instanceMatrix.array), before);
   assert.equal(swapInstanceMatricesToStorage(THREE, webgpu, root), 0, 'already swapped');
+});
+
+test('onTimeOfDayChange fires once per new preset, not on a repeat pick', () => {
+  const store = createTimeOfDayStore();
+  const seen: string[] = [];
+  const stop = onTimeOfDayChange(store, (preset) => seen.push(preset));
+  store.getState().setPreset('golden');
+  store.getState().setPreset('golden');
+  store.getState().setPreset('midnight');
+  stop();
+  store.getState().setPreset('midday');
+  assert.deepEqual(seen, ['golden', 'midnight']);
 });
