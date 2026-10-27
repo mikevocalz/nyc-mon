@@ -46,7 +46,8 @@ export function ErrorMessageBlock({ kind = 'not-found', detail, onGoHome, surfac
 export function ErrorScreen(props: ErrorScreenProps) {
   return (
     <View className="mx-auto min-h-screen w-full max-w-screen-2xl flex-1 items-center justify-center bg-surface p-6">
-      <Container width="form">
+      {/* Tablet: a wider measure from md; the kit type already steps up a rung there. */}
+      <Container width="form" className="md:max-w-content-detail">
         <ErrorMessageBlock {...props} />
       </Container>
     </View>

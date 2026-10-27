@@ -363,7 +363,8 @@ export function GameScreen({ focused = true }: GameScreenProps = {}) {
               variant="cornerCut"
               tone="orange"
               corner="bottom-right"
-              size="lg"
+              // 48pt on phones, 64pt from md so the way out is sized for a tablet.
+              size="adaptive-lg"
               onPress={() => {
                 gameInputRouter.pauseRequest('touch');
                 lobbyStore.getState().returnToLobby();

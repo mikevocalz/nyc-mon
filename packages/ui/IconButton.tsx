@@ -27,7 +27,7 @@ const iconButton = tv({
       outline: { root: 'active:translate-x-[2px] active:translate-y-[2px]' },
       ghost: { root: 'relative items-center justify-center' },
     },
-    size: { sm: {}, md: {}, lg: {}, adaptive: {} },
+    size: { sm: {}, md: {}, lg: {}, adaptive: {}, 'adaptive-lg': {} },
     disabled: { true: { root: 'cursor-not-allowed active:translate-x-0 active:translate-y-0' } },
   },
   compoundVariants: [
@@ -37,6 +37,7 @@ const iconButton = tv({
     { look: 'ghost', size: 'md', class: { root: 'h-11 w-11 android:h-12 android:w-12' } },
     { look: 'ghost', size: 'lg', class: { root: 'h-12 w-12' } },
     { look: 'ghost', size: 'adaptive', class: { root: 'h-11 w-11 android:h-12 android:w-12 md:h-16 md:w-16' } },
+    { look: 'ghost', size: 'adaptive-lg', class: { root: 'h-12 w-12 md:h-16 md:w-16' } },
   ],
   defaultVariants: { look: 'solid', size: 'md', disabled: false },
 });
@@ -48,6 +49,8 @@ const CUT_FACE = {
   lg: { className: 'h-12 w-12', cut: 12 },
   // md on phones, larger from the md breakpoint (tablets) for carousel controls.
   adaptive: { className: 'h-11 w-11 md:h-16 md:w-16', cut: 12 },
+  // lg on phones, the same 64pt face from md (tablets) for overlay HUD buttons.
+  'adaptive-lg': { className: 'h-12 w-12 md:h-16 md:w-16', cut: 12 },
 } as const;
 
 export interface IconButtonProps {
@@ -63,8 +66,8 @@ export interface IconButtonProps {
    * frame (nav bars), tone tint on hover.
    */
   variant?: IconButtonVariant;
-  /** `adaptive`: md on phones, 64pt from the md breakpoint (tablets). */
-  size?: 'sm' | 'md' | 'lg' | 'adaptive';
+  /** `adaptive`: md on phones, 64pt from the md breakpoint (tablets). `adaptive-lg`: lg on phones, 64pt from md. */
+  size?: 'sm' | 'md' | 'lg' | 'adaptive' | 'adaptive-lg';
   disabled?: boolean;
   /** Colour family. Overrides `district`. */
   tone?: ControlTone;

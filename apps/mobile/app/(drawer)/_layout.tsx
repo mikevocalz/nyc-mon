@@ -1,6 +1,7 @@
 import { Redirect } from 'expo-router';
 import { Drawer } from 'expo-router/drawer';
 import { useColorScheme } from 'react-native';
+import { useResolveClassNames } from 'uniwind';
 import { palette } from '@acme/theme';
 import { readSave } from '@acme/app/features/onboarding/save-store.ts';
 import { DrawerContent } from '../../components/DrawerContent';
@@ -18,6 +19,9 @@ export default function DrawerLayout() {
    */
   const searches = usePaneSearchStore((state) => state.panes);
   const swipeEnabled = horizontalGesturesEnabled(Object.values(searches));
+  // drawerStyle takes a number, so the md breakpoint is read through Uniwind:
+  // 270 on phones, 360 from md (tablets), where the rows and type grow too.
+  const { width: drawerWidth } = useResolveClassNames('w-[270px] md:w-[360px]') as { width?: number };
 
   // Boot (`/`) decides where a player belongs; a deep link (nycmon:///game)
   // skips it. Without a Caller the lobby's START has no identity to start a
@@ -33,7 +37,7 @@ export default function DrawerLayout() {
         header: () => <AppHeader />,
         drawerType: 'front',
         drawerStyle: {
-          width: 270,
+          width: drawerWidth ?? 270,
           backgroundColor: isDark ? palette.ink[900] : palette.ink[50],
         },
         overlayColor: 'rgba(0,0,0,0.6)',

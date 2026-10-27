@@ -228,8 +228,13 @@ export function GameLobby({
   );
 
   // Today's layout for the profile: the whole lobby when it has one pane.
+  // A tablet (or web) column is capped; a landscape tablet on the fallback
+  // backend (iPadOS before 27.1) widens the cap and sets the board beside
+  // resume + START, the same pairing the native split draws, by class only.
   const singleColumn = (
-    <View className={`flex-1 gap-6 px-4 pb-4 pt-6 ${CAPPED.has(profile) ? 'w-full max-w-content-screen self-center' : ''}`}>
+    <View
+      className={`flex-1 gap-6 px-4 pb-4 pt-6 ${CAPPED.has(profile) ? 'w-full max-w-content-screen self-center md:px-8 md:pt-8 md:landscape:max-w-content-wide' : ''}`}
+    >
       {wordmark}
       {twoColumn ? (
         <View className="flex-1 flex-row gap-6">
@@ -242,14 +247,27 @@ export function GameLobby({
             {start}
           </View>
         </View>
-      ) : (
-        <View className={`flex-1 gap-6 ${tabletop ? 'justify-between' : ''}`}>
+      ) : tabletop ? (
+        <View className="flex-1 justify-between gap-6">
           {panel}
           <View className="gap-3">
             {resumeBlock}
             {strip}
           </View>
-          <View className={tabletop ? '' : 'mt-auto'}>{start}</View>
+          <View>{start}</View>
+        </View>
+      ) : (
+        // Portrait: board, resume, START at the foot (unchanged spacing). Landscape
+        // from md: the board on the left, resume and START centred on the right.
+        <View className="flex-1 gap-6 md:landscape:flex-row md:landscape:gap-10">
+          <View className="md:landscape:basis-[48%]">{panel}</View>
+          <View className="flex-1 gap-6 md:landscape:justify-center">
+            <View className="gap-3">
+              {resumeBlock}
+              {strip}
+            </View>
+            <View className="mt-auto md:landscape:mt-0">{start}</View>
+          </View>
         </View>
       )}
     </View>
