@@ -29,6 +29,10 @@ import { CURB_HEIGHT, VD_LANE } from './curb.ts';
 import { VD_STOREFRONTS } from './vd-storefronts.ts';
 import { facadePhoto } from './vd-facades.ts';
 import { buildingSurface, ContactField, contactReach, surfacePick, SURFACES, wallAo } from './surfaces.ts';
+import { buildingFacade, CLASS_FAMILY } from './physical/class-family.ts';
+import { FACADE_FLOATS_PER_VERTEX, FacadeAttributeWriter, WALL_KINDS, type WallKind } from './physical/facade-attributes.ts';
+import type { FireEscapePlacement } from './physical/fire-escapes.ts';
+import { FIRE_ESCAPE } from './physical-materials-constants.ts';
 
 type Point = [number, number];
 type Mesh = InstanceType<Three['Mesh']>;
@@ -83,7 +87,10 @@ function emitFlat(THREE: Three, buffer: VertexBuffer, ring: Point[], holes: Poin
  * Walls around a ring. Outer rings counter-clockwise on the map, holes clockwise, so normals face out of the solid. `ao` is the [bottom, top] occlusion pair.
  * `uvScale` rescales the metre uv the facade shader grids over: the v3 bake's floor height and window width land the shader's fixed rows and columns on the real pitch.
  */
-function emitWalls(buffer: VertexBuffer, ring: Point[], bottom: number, top: number, color: readonly number[], outward = 0, ao?: readonly [number, number], uvScale: readonly [number, number] = [1, 1]): void {
+function emitWalls(
+  buffer: VertexBuffer, ring: Point[], bottom: number, top: number, color: readonly number[], outward = 0, ao?: readonly [number, number],
+  uvScale: readonly [number, number] = [1, 1], onQuad?: (edge: number, length: number) => void,
+): void {
   let along = 0;
   for (let i = 0; i < ring.length; i++) {
     const [ax, az] = ring[i]!;
@@ -104,6 +111,7 @@ function emitWalls(buffer: VertexBuffer, ring: Point[], bottom: number, top: num
       ],
       ao && [ao[0], ao[0], ao[1], ao[1]],
     );
+    onQuad?.(i, length);
     along += length;
   }
 }
@@ -315,7 +323,22 @@ export function neonKeyFor(id: string): (typeof NEON_KEYS)[number] {
   return NEON_KEYS[Math.floor(hashUnit(`${id}:neon`) * NEON_KEYS.length) % NEON_KEYS.length]!;
 }
 
-export function buildCityMeshes(THREE: Three, dataset: CityDatasetV3, materials: CityMaterials, sunAway: Point, clearance: StreetClearance = createStreetClearance(dataset), future = FUTURE_LAYER) {
+/**
+ * What the physically lit city (EXPO_PUBLIC_WORLD_PHYSICAL, world/physical/)
+ * asks the bake for. Every option defaults off; with all of them off the
+ * bake writes exactly the bytes it always has.
+ */
+export interface PhysicalMeshOptions {
+  /** Write aFacadeWall / aFacadeGrid on the masonry and glass walls (physical/facade-attributes.ts). */
+  facadeAttributes?: boolean;
+  /** Hand fire escapes back as placements for the instanced Slop escapes instead of baking them into the street detail. */
+  fireEscapes?: boolean;
+}
+
+export function buildCityMeshes(
+  THREE: Three, dataset: CityDatasetV3, materials: CityMaterials, sunAway: Point,
+  clearance: StreetClearance = createStreetClearance(dataset), future = FUTURE_LAYER, physical: PhysicalMeshOptions = {},
+) {
   const masonry = new VertexBuffer(262144);
   const glass = new VertexBuffer();
   const roofs = new VertexBuffer(131072);
@@ -344,6 +367,11 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV3, materials:
   // banded loop runs, and the ground layers emit after it queries them.
   const field = new ContactField();
   const occlude = (x: number, z: number) => field.occlusion(x, z);
+  // Physical lane: facade attribute writers in step with the two wall buffers, and the fire-escape placements.
+  const facadeWriters = physical.facadeAttributes
+    ? { masonry: new FacadeAttributeWriter(262144), glass: new FacadeAttributeWriter() }
+    : null;
+  const escapePlacements: FireEscapePlacement[] = [];
 
   // Buildings in z bands, so the contact shadows of one band are one vertex range (drawn by distance).
   const minZ = -dataset.extentMeters - SHADOW_BAND_METRES;
@@ -387,6 +415,17 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV3, materials:
     // same buffer inherit the wall pick — stone trim belongs to the family.
     target.surface(...buildingSurface(building.class, building.id));
     target.facade(...facadePhoto(building));
+    let onWallQuad: ((edge: number, length: number) => void) | undefined;
+    let onHoleQuad: ((edge: number, length: number) => void) | undefined;
+    if (facadeWriters) {
+      const facade = buildingFacade(building);
+      facadeWriters.masonry.building(facade, masonry.vertexCount);
+      facadeWriters.glass.building(facade, glass.vertexCount);
+      const writer = building.class === 'glass' ? facadeWriters.glass : facadeWriters.masonry;
+      const kinds = wallKinds(ring, building, frontEdge, clearance, commercial);
+      onWallQuad = (edge, length) => writer.wallQuad(target.vertexCount, length, h, kinds[edge]!);
+      onHoleQuad = (_edge, length) => writer.wallQuad(target.vertexCount, length, h, WALL_KINDS.rear);
+    }
     const reach = contactReach(h);
     const wallOcclusion: [number, number] = [wallAo(0, reach), wallAo(h, reach)];
     field.add(ring, h);
@@ -398,8 +437,8 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV3, materials:
       grid.bay / (building.windowWidthMeters ?? grid.bay),
       grid.floor / (building.floorHeightMeters ?? grid.floor),
     ];
-    emitWalls(target, ring, 0, h, wall, 0, wallOcclusion, uvScale);
-    for (const hole of holes) emitWalls(target, hole, 0, h, wall, 0, wallOcclusion, uvScale);
+    emitWalls(target, ring, 0, h, wall, 0, wallOcclusion, uvScale, onWallQuad);
+    for (const hole of holes) emitWalls(target, hole, 0, h, wall, 0, wallOcclusion, uvScale, onHoleQuad);
     roofs.surface(...SURFACES.tarRoof);
     const roofColor = tint(rgb('roof').map((v, i) => v * 0.8 + wall[i]! * 0.2), variation);
     emitFlat(THREE, roofs, ring, holes, h, roofColor);
@@ -504,7 +543,16 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV3, materials:
       const wantsEscape = mask === undefined ? hasFireEscape(building.id, i, h, building.class) : (mask & DETAIL.fireEscape) !== 0 && onFront && !escaped;
       if (length >= 7 && wantsEscape && escapeFloors > 0) {
         const at = (hashUnit(`${building.id}:${i}:bay`) - 0.5) * Math.max(0, length - 4);
-        for (let k = 1; k <= escapeFloors; k++) emitFireEscapeFloor(detail.buffer, f, at, k * floorPitch, rgb('iron'), k % 2 === 0);
+        if (physical.fireEscapes) {
+          const o = FIRE_ESCAPE.wallOffset;
+          escapePlacements.push({
+            // Slop js/buildings.js: first landing a hand above the 2nd floor, nominal height (landings − 1) storeys + 1 m.
+            x: mid[0] + along[0] * at + out[0] * o, z: mid[1] + along[1] * at + out[1] * o, y: floorPitch + 0.1,
+            facing: Math.atan2(out[0], out[1]), storey: floorPitch, landings: escapeFloors, h: (escapeFloors - 1) * floorPitch + 1,
+          });
+        } else {
+          for (let k = 1; k <= escapeFloors; k++) emitFireEscapeFloor(detail.buffer, f, at, k * floorPitch, rgb('iron'), k % 2 === 0);
+        }
         escaped = true;
         fireEscapes++;
       }
@@ -665,8 +713,16 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV3, materials:
     }
   }
   add('city:roads', roads, materials.roads);
-  add('city:walls-masonry', masonry, materials.masonry);
-  add('city:walls-glass', glass, materials.glass);
+  const masonryMesh = add('city:walls-masonry', masonry, materials.masonry);
+  const glassMesh = add('city:walls-glass', glass, materials.glass);
+  let facadeBytes = 0;
+  if (facadeWriters) {
+    for (const [mesh, buffer, writer] of [[masonryMesh, masonry, facadeWriters.masonry], [glassMesh, glass, facadeWriters.glass]] as const) {
+      writer.finish(buffer.vertexCount);
+      if (mesh) writer.attach(THREE, mesh.geometry);
+      facadeBytes += buffer.vertexCount * FACADE_FLOATS_PER_VERTEX * 4;
+    }
+  }
   add('city:roofs', roofs, materials.roofs);
   add('city:landmarks', accents, materials.accents);
   add('city:neon', neon, materials.neon);
@@ -696,6 +752,10 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV3, materials:
     texts,
     /** The AdSurface registry rows for the panels this build drew (future-layer.ts). */
     adSurfaces,
+    /** Physical-lane outputs; absent unless a PhysicalMeshOptions flag asked for them. */
+    physical: physical.facadeAttributes || physical.fireEscapes
+      ? { fireEscapes: escapePlacements, facadeBytes }
+      : undefined,
     /** Contact shadows only near the focus: a few z bands, one draw range, no allocation. */
     setFocus(_x: number, z: number) {
       shadowBands(z, minZ, bandCount, bands);
@@ -709,6 +769,36 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV3, materials:
     },
     dispose: () => { for (const mesh of meshes) mesh.geometry.dispose(); },
   };
+}
+
+/**
+ * Slop's wall kind for each edge of a footprint (physical/facade-attributes.ts
+ * WALL_KINDS), from the same street tests the detail pass below uses: a
+ * commercial frontage is a storefront, any other street face a residential
+ * entrance, a face pressed against a neighbour a windowless lot line (stone
+ * for the limestone family, brick otherwise), and the rest yard walls.
+ */
+function wallKinds(
+  ring: Point[], building: CityBuilding, frontEdge: number, clearance: StreetClearance, commercial: SegmentGrid,
+): WallKind[] {
+  const h = building.heightMeters;
+  const mask = building.detailMask;
+  const stone = CLASS_FAMILY[building.class].family === 'limestone';
+  return ring.map(([ax, az], i) => {
+    const [bx, bz] = ring[(i + 1) % ring.length]!;
+    const length = Math.hypot(bx - ax, bz - az);
+    if (length < 1e-6) return WALL_KINDS.rear;
+    const out = normalOf(ax, az, bx, bz);
+    const mid: Point = [(ax + bx) / 2, (az + bz) / 2];
+    const facesStreet = clearance.kerbGap(mid[0] + out[0] * 3.5, mid[1] + out[1] * 3.5) < 7;
+    const onAvenue = length >= 5 && h >= 6 && commercial.nearest(mid[0] + out[0] * 6, mid[1] + out[1] * 6) <= 14;
+    if (onAvenue && (mask === undefined || (mask & DETAIL.storefront) !== 0)) return WALL_KINDS.shop;
+    if (facesStreet || i === frontEdge) return WALL_KINDS.entry;
+    const px = mid[0] + out[0] * 0.75; const pz = mid[1] + out[1] * 0.75;
+    const party = !clearance.standable(px, pz) && !clearance.inCarriageway(px, pz, 0);
+    if (party) return stone ? WALL_KINDS.blankStone : WALL_KINDS.lotLine;
+    return WALL_KINDS.rear;
+  });
 }
 
 /** An LED panel standing off a facade: gradient top to bottom, uv for the scan lines. */
