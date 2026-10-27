@@ -45,10 +45,10 @@ export function bootPath(route: BootRoute): Href {
       return WELCOME_ROUTE_ENABLED ? '/(onboarding)/welcome' : '/(auth)/age';
     case 'restore':
       // The server-restore pass (`GET /v1/me/mons` + profile) is Phase 3; a
-      // session on a fresh install lands on sign-in until it exists. Signing
-      // in there routes home and back here, so a returning player loops until
-      // restore lands. New accounts never reach this: sign-up starts the local
-      // save (`startSaveForNewAccount`).
+      // session on a fresh install with no save lands on sign-in until it
+      // exists. Sign-up and sign-in both start the local save
+      // (`startSaveForNewAccount`), so signing in continues onboarding instead
+      // of looping back here.
       return '/(auth)/sign-in?intent=sign-in';
     case 'resume-onboarding':
       switch (route.step) {

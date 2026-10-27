@@ -100,6 +100,10 @@ export function SignInScreen() {
       fail(result.error);
       return;
     }
+    // No server restore yet (Phase 3): a signed-in device with no save would
+    // boot to `restore` and land back here. Start the local save, as sign-up
+    // does, so the Caller continues onboarding. It never touches an existing save.
+    startSaveForNewAccount(Date.now());
     setSession(true);
     replace(homePath);
   };
