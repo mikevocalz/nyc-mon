@@ -350,7 +350,9 @@ export function startGameRender(args: GameRenderArgs): void {
               // the sidewalk, lamp glows reuse the same kerb math.
               const streetClearance = createStreetClearance(city.dataset);
               return [
-                createVehicleActor({ read }),
+                // ponytail: real headlight spots stay off; r186 ClusteredLighting clusters only
+                // unshadowed PointLights, so spots would hit every lit material. Lamps and flares still show.
+                createVehicleActor({ read, focus, headlightSpots: false }),
                 createPedActor({ read }),
                 ...(topology && signals
                   ? [createSignalActor({ read, signals, topology, focus, clearance: streetClearance, headCap: caps.signalHeadCap, pedCap: caps.pedBoxCap })]

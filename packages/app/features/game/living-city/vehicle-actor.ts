@@ -34,6 +34,7 @@ import type { Three } from '@acme/ui/three';
 import type { ActorFrame, SceneActor, SceneActorFactory } from '../scene-actor.ts';
 import { WORLD_TIER } from '../perf/tier.ts';
 import { parseSkyRigFlag } from '../world/sky-rig.ts';
+import { EXPERIMENTAL_WORLD_PHYSICAL } from '../world/physical-look.ts';
 import {
   candidates,
   createWorldAssetRegistry,
@@ -100,8 +101,7 @@ export const EXPERIMENTAL_LIVING_CITY = parseSkyRigFlag(process.env.EXPO_PUBLIC_
  * flag off returns [] — the scene's actors array is byte-identical to
  * pre-PR05 — flag on passes the factories through.
  */
-/** The Slop-grade master flag (§5.1), default OFF, same truthy table. `EXPO_PUBLIC_WORLD_PHYSICAL=1`. */
-export const EXPERIMENTAL_WORLD_PHYSICAL = parseSkyRigFlag(process.env.EXPO_PUBLIC_WORLD_PHYSICAL);
+export { EXPERIMENTAL_WORLD_PHYSICAL };
 
 export function livingCityFactoriesFor(flag: boolean, factories: readonly SceneActorFactory[]): readonly SceneActorFactory[] {
   return flag ? factories : [];
