@@ -33,6 +33,8 @@ import { readCaller, readCamera, readView, snapshotVersion, type MutableCallerSt
 import { createStreetClearance } from '../world/walkability.ts';
 import { describeRuntimeError, installFrameGlobals, type GameRenderEventKind } from './runtime-report.ts';
 import { FrameSampleWindow, type MutableFrameTimingSample } from '../perf/frame-sampler.ts';
+import { readInteropGlobals, resolveRendererDevice, WORLD_PHYSICAL, type RendererDevice } from './shared-device.ts';
+import { createPipecacheTimer, formatProbeRecord, probeShared, probeSkiaTex, threeSampler, WORLD_DEVICE_PROBE } from './device-probes.ts';
 
 export type { GameRenderEventKind } from './runtime-report.ts';
 
@@ -48,6 +50,8 @@ export interface GameRenderArgs {
   session: number;
   context: NativeCanvasContext;
   device: GPUDevice | null;
+  /** gpu-store's record of `device` (readGpuDevice().source): `shared` is Skia's Graphite device. Read only under EXPO_PUBLIC_WORLD_PHYSICAL. */
+  deviceSource?: 'shared' | 'own' | null;
   snapshot: Synchronizable<number[]>;
   /** Living City PR05: the packed vehicle channel — null/absent when the flag is off (flag-off = zero-diff). */
   vehicles?: Synchronizable<number[]> | null;
@@ -282,6 +286,13 @@ export function startGameRender(args: GameRenderArgs): void {
     return;
   }
   trace(s, 'city parsed');
+  // EXPO_PUBLIC_WORLD_PHYSICAL (G9): the renderer runs on Skia's device when
+  // gpu-store handed it or this runtime can import it (shared-device.ts).
+  // Flag off, `device` is args.device exactly as before.
+  const shared = WORLD_PHYSICAL ? resolveRendererDevice(args.device, args.deviceSource, readInteropGlobals()) : null;
+  if (shared) trace(s, `renderer device: ${shared.source}; ${shared.note}`);
+  const device = shared ? shared.device : args.device;
+  const pipecache = shared && WORLD_DEVICE_PROBE === 'pipecache' ? createPipecacheTimer('worklet') : null;
   let renderer: InstanceType<typeof THREE.WebGPURenderer>;
   try {
     // With inline requires (forced by Bundle Mode), this line is where three.js is first evaluated here.
@@ -290,7 +301,7 @@ export function startGameRender(args: GameRenderArgs): void {
       // react-native-webgpu's canvas is DOM-shaped enough for three; its types are not.
       canvas: args.context.canvas as unknown as HTMLCanvasElement,
       context: args.context,
-      ...(args.device ? { device: args.device } : {}),
+      ...(device ? { device } : {}),
     });
   } catch (error) {
     fail(s, 'renderer construct', error);
@@ -298,9 +309,13 @@ export function startGameRender(args: GameRenderArgs): void {
   }
   s.renderer = renderer;
   trace(s, 'three loaded, renderer constructed; init pending');
-  renderer.init().then(() => {
+  const ready = shared && WORLD_DEVICE_PROBE && WORLD_DEVICE_PROBE !== 'pipecache'
+    ? renderer.init().then(() => runRendererProbe(s, renderer, shared))
+    : renderer.init();
+  ready.then(() => {
     if (s.disposed) return;
     trace(s, 'renderer init resolved');
+    pipecache?.mark('rendererInit');
     emit(s, 'stage', 'moduleLoaded');
     stopInternalLoop(renderer);
     const mirror = { getState: () => s.caller };
@@ -350,11 +365,18 @@ export function startGameRender(args: GameRenderArgs): void {
             })()
           : []),
       ],
-      onFirstFrame: () => emit(s, 'firstFrame'),
+      onFirstFrame: () => {
+        emit(s, 'firstFrame');
+        const record = pipecache?.finish();
+        if (record) trace(s, formatProbeRecord(record));
+      },
     };
     const setup = withFirstFrameSignal(
       createCityScene,
-      (stage) => emit(s, 'stage', stage),
+      (stage) => {
+        pipecache?.mark(stage);
+        emit(s, 'stage', stage);
+      },
       (event) => trace(s, event),
     );
     const invalidate = () => {
@@ -370,6 +392,31 @@ export function startGameRender(args: GameRenderArgs): void {
   }).catch((error: unknown) => {
     if (!s.disposed) fail(s, 'renderer init or scene build', error);
   });
+}
+
+/**
+ * The `shared` and `skiatex` probes on this runtime, after init and before
+ * the city builds, against the device three actually holds
+ * (WebGPUBackend.device, three 0.186.1 build/three.webgpu.js ~L87210). A
+ * probe failure is logged, never thrown: the world still loads.
+ */
+async function runRendererProbe(s: Session, renderer: InstanceType<typeof THREE.WebGPURenderer>, shared: RendererDevice): Promise<void> {
+  const device = (renderer.backend as { device?: GPUDevice | null }).device ?? null;
+  const { skia } = readInteropGlobals();
+  try {
+    if (WORLD_DEVICE_PROBE === 'shared') {
+      trace(s, formatProbeRecord(await probeShared({ runtime: 'worklet', device, deviceSource: shared.source, skia })));
+    } else if (WORLD_DEVICE_PROBE === 'skiatex') {
+      const sampler = threeSampler(THREE, renderer);
+      try {
+        trace(s, formatProbeRecord(await probeSkiaTex({ runtime: 'worklet', device, skia, sample: sampler.sample })));
+      } finally {
+        sampler.dispose();
+      }
+    }
+  } catch (error) {
+    emit(s, 'error', describeRuntimeError(`probe ${WORLD_DEVICE_PROBE}`, error));
+  }
 }
 
 /** A write landed while the loop was parked. */
