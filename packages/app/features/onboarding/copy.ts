@@ -120,6 +120,7 @@ export const ONBOARDING_COPY = {
   'm07.field.clear.a11y.label': 'Clear name',
   'm07.plate.a11y.label': 'Caller name preview: {name}',
   'm07.continue': 'Use this name',
+  'settings.caller.saved': 'Saved.',
   'm07.continue.a11y.hint.disabled': 'Type a name first',
   'm07.back.a11y.label': 'Back',
   'm07.error.blank': 'Add at least one letter.',

@@ -13,6 +13,7 @@ import { EXPERIMENTAL_WORLD_PHYSICAL } from '../game/world/physical-look.ts';
 import { useTimeOfDay } from '../game/world/time-of-day.store.ts';
 import { SOFTWARE_CREDITS, SOFTWARE_CREDITS_GROUP } from './software-credits.ts';
 import { TimeOfDayRow } from './TimeOfDayRow';
+import { CallerNameCard } from './CallerNameCard';
 
 /** The game-control settings route (apps/mobile/app/(drawer)/game-controls.tsx). */
 const GAME_CONTROLS_PATH = '/game-controls';
@@ -185,6 +186,7 @@ export function SettingsAccountCards({ grid = false }: { grid?: boolean }) {
   const wide = grid ? GRID_CELL_WIDE : undefined;
   return (
     <>
+      <CallerNameCard className={grid ? GRID_CELL : undefined} />
       <AmazonAccountLink className={grid ? GRID_CELL : undefined} />
 
       <FadeIn delay={220} className={wide}>

@@ -102,6 +102,7 @@ export const COMPANION_COPY = {
 
   // M18 Journal (screens/M18/05-copy.md)
   'm18.title': 'Journal',
+  'm13.menu.settings': 'Settings',
   'm18.heading': '{name} and you',
   'm18.days.one': '1 day together',
   'm18.days.other': '{n} days together',

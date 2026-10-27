@@ -115,6 +115,7 @@ export function HomeScreen({ mon }: { mon: MonInstance }) {
     ? [
       { target: 'dex', label: companionCopy('m13.bar.dex'), tone: 'secondary' },
       { target: 'journal', label: companionCopy('m18.title'), tone: 'secondary' },
+      { target: 'settings', label: companionCopy('m13.menu.settings'), tone: 'secondary' },
       { target: 'close', label: companionCopy('m14.close'), tone: 'primary' },
     ]
     : [
@@ -136,6 +137,9 @@ export function HomeScreen({ mon }: { mon: MonInstance }) {
     else if (target === 'journal') {
       local.setState({ menu: false });
       router.push('/(home)/journal');
+    } else if (target === 'settings') {
+      local.setState({ menu: false });
+      router.push('/(drawer)/settings');
     } else if (target === 'dex') {
       local.setState({ menu: false });
       router.push(dexHref);

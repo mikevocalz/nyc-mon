@@ -588,3 +588,6 @@ Notes:
 
 - **The line is fixed by the spec** (§5.8) and is not reworded. The link target is https://github.com/mrdoob/slop-newyork; the full licence is `docs/licenses/slop-newyork-mit.md`.
 - **It does not sit under "City data".** No Slop geodata is imported, so putting the row next to the data sources would imply a data credit that isn't true.
+
+| `settings.caller.saved` | Settings › Caller name | ui | drafted (confirmation after renaming the Caller; the card reuses the m07 field label, hint and button) |
+| `m13.menu.settings` | M13 H-Lynk menu | ui | drafted (opens Settings from the companion) |
