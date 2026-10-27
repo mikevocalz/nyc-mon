@@ -23,7 +23,7 @@ import { buildPrecipitation } from './vd-weather.ts';
 import { CURB_HEIGHT, VD_SHADOWS, VD_SHADOW_HALF } from './curb.ts';
 import { FUTURE_LAYER, type AdSurface } from './future-layer.ts';
 import { buildPhysicalCityMaterials } from './physical/index.ts';
-import { buildPhysicalFacelift } from './physical/facelift.ts';
+import { buildPhysicalFacelift, faceliftBakePicks } from './physical/facelift.ts';
 import { loadPhysicalRig } from '../physical-graph.ts';
 import { buildLaneTopology } from '../living-city/topology.ts';
 
@@ -205,15 +205,17 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
   const phys = options.physical
     ? buildPhysicalCityMaterials(THREE, loadPhysicalRig().cityUniforms(THREE), dataset, { topology: buildLaneTopology(dataset) })
     : null;
+  const future = options.future ?? EXPERIMENTAL_WORLD_FUTURE;
   const city = phys
     ? buildCityMeshes(
         THREE, dataset,
         { ...materials, masonry: phys.masonry, glass: phys.glass, roads: phys.roads, sidewalks: phys.sidewalks },
-        away, clearance, options.future ?? EXPERIMENTAL_WORLD_FUTURE, { facadeAttributes: true, fireEscapes: true },
+        away, clearance, future,
+        { facadeAttributes: true, fireEscapes: true, facelift: future ? faceliftBakePicks(dataset) : undefined },
       )
-    : buildCityMeshes(THREE, dataset, materials, away, clearance, options.future ?? EXPERIMENTAL_WORLD_FUTURE);
+    : buildCityMeshes(THREE, dataset, materials, away, clearance, future);
   // The facelift reads the built masonry walls, so it follows buildCityMeshes.
-  const facelift = phys && (options.future ?? EXPERIMENTAL_WORLD_FUTURE)
+  const facelift = phys && future
     ? buildPhysicalFacelift(THREE, dataset, city.meshes, clearance)
     : null;
   const trees = buildTrees(THREE, dataset, materials, clearance, vd, VD_LEAN, leanMat, leanDraw);

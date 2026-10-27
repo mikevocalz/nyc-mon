@@ -33,7 +33,7 @@ import type { Three } from '@acme/ui/three';
 import { physicalFacelift } from '@acme/theme';
 import type { BufferGeometry } from 'three/webgpu';
 import type { BuildingClass, CityBuilding, CityDatasetV3, CityRoad, RoadClass } from '../../city-dataset.ts';
-import { LAYER, neonTrimShare } from '../city-mesh.ts';
+import { LAYER, neonTrimShare, type FaceliftBakePick } from '../city-mesh.ts';
 import { CURB_HEIGHT } from '../curb.ts';
 import { wallFrame } from '../facade-detail.ts';
 import {
@@ -286,6 +286,35 @@ export function kitEntrance(building: Pick<CityBuilding, 'id' | 'ring' | 'frontE
   return null;
 }
 
+/**
+ * Each building's facelift plan on a tile: its block type (landmark, then
+ * the D17 avenue rule on the ccw ring) and faceliftPlan with today's
+ * neonTrimShare. The facelift geometry and the city bake both read this, so
+ * the trims one drops are the trims the other leaves out.
+ */
+export function faceliftPlanner(
+  dataset: Pick<CityDatasetV3, 'roads' | 'landmarks'>, density?: Readonly<Record<FaceliftBlock, FaceliftDensity>>,
+): (building: CityBuilding) => FaceliftPlan {
+  const frontage = new CommercialFrontage(dataset.roads);
+  const landmarks = new Set(dataset.landmarks.map((l) => l.buildingId));
+  return (building) => {
+    const landmark = landmarks.has(building.id);
+    const block = classifyFaceliftBlock(building, { landmark, onAvenue: !landmark && frontage.onAvenue(ccwRing(building).ring, building.heightMeters) });
+    return faceliftPlan(building, block, neonTrimShare(building.heightMeters), density);
+  };
+}
+
+/** The bake's per-building picks (city-mesh.ts PhysicalMeshOptions.facelift): the refreshed wall tone and the trim gate. */
+export function faceliftBakePicks(
+  dataset: Pick<CityDatasetV3, 'roads' | 'landmarks'>, density?: Readonly<Record<FaceliftBlock, FaceliftDensity>>,
+): (building: CityBuilding) => FaceliftBakePick {
+  const plan = faceliftPlanner(dataset, density);
+  return (building) => {
+    const p = plan(building);
+    return { wallTone: faceliftWallTone(building, p), trim: p.trim };
+  };
+}
+
 const edgeKey = (ax: number, az: number, bx: number, bz: number) =>
   `${Math.fround(ax)},${Math.fround(az)},${Math.fround(bx)},${Math.fround(bz)}`;
 
@@ -408,7 +437,7 @@ export function buildFaceliftGeometry(THREE: Three, input: FaceliftInput): Facel
   const { dataset, clearance } = input;
   const buffer = new VertexBuffer(65_536);
   const skin = new SkinWriter();
-  const frontage = new CommercialFrontage(dataset.roads);
+  const planOf = faceliftPlanner(dataset, input.density);
   const landmarks = new Set(dataset.landmarks.map((l) => l.buildingId));
   const masonryWalls = input.masonry ? readWalls(input.masonry) : new Map<string, WallQuad>();
   const glassWalls = input.glass ? readWalls(input.glass) : new Map<string, WallQuad>();
@@ -436,10 +465,9 @@ export function buildFaceliftGeometry(THREE: Three, input: FaceliftInput): Facel
     const { ring, frontEdge } = ccwRing(building);
     const h = building.heightMeters;
     const landmark = landmarks.has(building.id);
-    const block = classifyFaceliftBlock(building, { landmark, onAvenue: !landmark && frontage.onAvenue(ring, h) });
-    const plan = faceliftPlan(building, block, neonTrimShare(h), input.density);
+    const plan = planOf(building);
     plans.set(building.id, plan);
-    stats.blocks[block]++;
+    stats.blocks[plan.block]++;
     for (const k of Object.keys(stats.planned) as (keyof FaceliftStats['planned'])[]) if (plan[k]) stats.planned[k]++;
     // Landmarks keep their accents and nothing else (city-mesh.ts skips them before the trims too).
     if (landmark) continue;

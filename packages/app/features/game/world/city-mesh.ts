@@ -333,6 +333,19 @@ export interface PhysicalMeshOptions {
   facadeAttributes?: boolean;
   /** Hand fire escapes back as placements for the instanced Slop escapes instead of baking them into the street detail. */
   fireEscapes?: boolean;
+  /**
+   * The physical facelift's per-building picks (physical/facelift.ts
+   * faceliftBakePicks), read only while `future` is on: a refreshed wall
+   * tone replaces the wall quads' colour, and the cel roofline trim is
+   * emitted only where the plan keeps it.
+   */
+  facelift?: (building: CityBuilding) => FaceliftBakePick;
+}
+
+/** One building's facelift picks for the bake: the refreshed wall tone (hex) or null, and whether its roofline trim stays. */
+export interface FaceliftBakePick {
+  wallTone: string | null;
+  trim: boolean;
 }
 
 export function buildCityMeshes(
@@ -372,6 +385,7 @@ export function buildCityMeshes(
     ? { masonry: new FacadeAttributeWriter(262144), glass: new FacadeAttributeWriter() }
     : null;
   const escapePlacements: FireEscapePlacement[] = [];
+  const facelift = future ? physical.facelift : undefined;
 
   // Buildings in z bands, so the contact shadows of one band are one vertex range (drawn by distance).
   const minZ = -dataset.extentMeters - SHADOW_BAND_METRES;
@@ -408,6 +422,9 @@ export function buildCityMeshes(
     const variation = 0.92 + hashUnit(building.id) * 0.16;
     const wallKey: CityColor = landmark?.key === 'hotel-theresa' ? 'terracotta' : wallTone(building);
     const wall = tint(rgb(wallKey), variation);
+    const pick = facelift?.(building);
+    // The refreshed tone recolours the wall quads only; roofs, cornices and stoops keep the record tone.
+    const wallFace = pick?.wallTone ? tint(hexToRgb(pick.wallTone), variation) : wall;
     const target = building.class === 'glass' ? glass : masonry;
     const h = building.heightMeters;
     // Surface family per building id, and the wall-base occlusion ramp over
@@ -437,8 +454,8 @@ export function buildCityMeshes(
       grid.bay / (building.windowWidthMeters ?? grid.bay),
       grid.floor / (building.floorHeightMeters ?? grid.floor),
     ];
-    emitWalls(target, ring, 0, h, wall, 0, wallOcclusion, uvScale, onWallQuad);
-    for (const hole of holes) emitWalls(target, hole, 0, h, wall, 0, wallOcclusion, uvScale, onHoleQuad);
+    emitWalls(target, ring, 0, h, wallFace, 0, wallOcclusion, uvScale, onWallQuad);
+    for (const hole of holes) emitWalls(target, hole, 0, h, wallFace, 0, wallOcclusion, uvScale, onHoleQuad);
     roofs.surface(...SURFACES.tarRoof);
     const roofColor = tint(rgb('roof').map((v, i) => v * 0.8 + wall[i]! * 0.2), variation);
     emitFlat(THREE, roofs, ring, holes, h, roofColor);
@@ -447,7 +464,7 @@ export function buildCityMeshes(
 
     // The near-future layer: a neon roofline, storefront light bands and the odd billboard.
     const neonColor = rgb(neonKeyFor(building.id));
-    if (hashUnit(`${building.id}:trim`) < neonTrimShare(h)) {
+    if (pick ? pick.trim : hashUnit(`${building.id}:trim`) < neonTrimShare(h)) {
       emitWalls(neon, ring, h - 0.32, h - 0.06, neonColor, 0.06);
       trims++;
     }
