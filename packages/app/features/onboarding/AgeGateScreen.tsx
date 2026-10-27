@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { MIN_BIRTH_YEAR } from '@acme/core/schemas';
 import { resolveCreateEntry } from '@acme/core/sim';
-import { Button, Heading, KeyboardAwareScroll, Text, TextField, YearGrid, type YearGridStep } from '@acme/ui';
+import { Button, Heading, KeyboardAwareScroll, Text, TextField, YearGrid } from '@acme/ui';
 import { Form } from '@acme/ui/primitives';
 import { View } from '@acme/ui/tw';
 import { copy } from './copy';
@@ -25,8 +25,9 @@ function typedYearError(raw: string, maxYear: number): { ok: true; year: number 
 
 /**
  * M04 Birth year gate. Neutral by rule: one question, no default, no hint at
- * a threshold; every answer gets the same screen. Decade → year two-step via
- * {@linkcode YearGrid}, or a typed four-digit field as the alternative.
+ * a threshold; every answer gets the same screen. One grid of every year
+ * (newest first) via {@linkcode YearGrid}, or a typed four-digit field as the
+ * alternative. The decade step was dropped as redundant (Mike, 2026-10-27).
  * Continue stores the answer (MMKV, parsed on read — it gates every P1
  * route) and hands the result to {@linkcode resolveCreateEntry}: 13+ to M03
  * create, a consent-required year to M05.
@@ -36,7 +37,6 @@ export function AgeGateScreen() {
   const setAgeAnswer = useOnboarding((s) => s.setAgeAnswer);
   const maxYear = CURRENT_YEAR;
 
-  const [step, setStep] = useState<YearGridStep>('decade');
   const [typed, setTyped] = useState(false);
   const [year, setYear] = useState<number | null>(null);
   const [raw, setRaw] = useState('');
@@ -100,14 +100,9 @@ export function AgeGateScreen() {
                 onChange={setYear}
                 minYear={MIN_BIRTH_YEAR}
                 maxYear={maxYear}
-                step={step}
-                onStepChange={setStep}
-                groupLabel={copy('m04.grid.decades.a11y.label')}
-                yearGroupLabel={(decade) => copy('m04.grid.years.a11y.label', { decade })}
+                step="all"
+                groupLabel={copy('m04.grid.all.a11y.label')}
               />
-              {step === 'year' ? (
-                <Button variant="ghost" tone="royal" title={copy('m04.change_decade')} onPress={() => setStep('decade')} />
-              ) : null}
               <Button
                 variant="ghost"
                 tone="royal"

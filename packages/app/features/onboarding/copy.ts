@@ -98,6 +98,7 @@ export const ONBOARDING_COPY = {
   'm04.why': 'We ask everyone this once.',
   'm04.back.a11y.label': 'Back',
   'm04.grid.decades.a11y.label': 'Decades',
+  'm04.grid.all.a11y.label': 'Birth year',
   'm04.decade.a11y.hint': 'Shows the years in that decade',
   'm04.grid.years.a11y.label': 'Years in the {decade}s',
   'm04.change_decade': 'Change decade',

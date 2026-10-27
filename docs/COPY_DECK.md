@@ -228,6 +228,7 @@ Every string ID in M01–M07, generated from the screen files. Shared namespaces
 | `m04.year.label` | `screens/M04/05-copy.md` | ui | drafted |
 | `m04.year.a11y.selected` | `screens/M04/05-copy.md` | ui | drafted |
 | `m04.change_decade` | `screens/M04/05-copy.md` | ui | drafted |
+| `m04.grid.all.a11y.label` | `screens/M04/05-copy.md` | ui | drafted (single year grid; the decade step and its keys are unused since 2026-10-27) |
 | `m04.type_instead` | `screens/M04/05-copy.md` | ui | drafted |
 | `m04.field.label` | `screens/M04/05-copy.md` | ui | drafted |
 | `m04.field.hint` | `screens/M04/05-copy.md` | ui | drafted |

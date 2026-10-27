@@ -6,7 +6,8 @@ import { Pressable, Text, View } from './tw';
 import { TYPE_SCALE_TV } from './type-scale';
 
 /** The controlled stage displayed by {@linkcode YearGrid}. */
-export type YearGridStep = 'decade' | 'year';
+/** `all`: every year from maxYear down to minYear in one grid, no decade step. */
+export type YearGridStep = 'decade' | 'year' | 'all';
 
 /** Props for the controlled {@linkcode YearGrid} picker. */
 export interface YearGridProps {
@@ -65,24 +66,27 @@ export function YearGrid({ value, onChange, minYear, maxYear, step, onStepChange
   const decade = selectedDecade ?? pickedDecade ?? firstDecade;
   const values = step === 'decade'
     ? range(firstDecade, lastDecade, 10)
-    : range(Math.max(minYear, decade), Math.min(maxYear, decade + 9));
+    : step === 'all'
+      ? range(minYear, maxYear).reverse()
+      : range(Math.max(minYear, decade), Math.min(maxYear, decade + 9));
+  const picksYear = step !== 'decade';
 
   return (
     <View
-      role={step === 'year' ? 'radiogroup' : 'group'}
+      role={picksYear ? 'radiogroup' : 'group'}
       aria-label={step === 'year' ? (yearGroupLabel?.(decade) ?? groupLabel) : groupLabel}
       className={`flex-row flex-wrap ${className ?? ''}`}
     >
       {values.map((item) => {
-        const selected = step === 'year' ? value === item : selectedDecade === item || pickedDecade === item;
+        const selected = picksYear ? value === item : selectedDecade === item || pickedDecade === item;
         const styles = tile({ selected });
         const label = step === 'decade' ? `${item}s` : String(item);
         return (
-          <View key={item} className="w-1/3 p-1">
+          <View key={item} className={step === 'all' ? 'w-1/3 p-1 md:w-1/5' : 'w-1/3 p-1'}>
             <Pressable
-              role={step === 'year' ? 'radio' : 'button'}
-              aria-checked={step === 'year' ? selected : undefined}
-              accessibilityState={step === 'year' ? { selected, checked: selected } : { selected }}
+              role={picksYear ? 'radio' : 'button'}
+              aria-checked={picksYear ? selected : undefined}
+              accessibilityState={picksYear ? { selected, checked: selected } : { selected }}
               accessibilityLabel={label}
               onPress={() => {
                 if (step === 'decade') {
