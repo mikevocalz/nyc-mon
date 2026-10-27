@@ -1,8 +1,8 @@
 // The physically lit city's time-of-day pick (G2: four presets, twilight by
-// default). The HUD and settings write it; the Game screen passes
+// default). Graphics settings write it; the Game screen passes
 // `preset` into the scene params, where city-scene re-lights on change.
-// The render runtime never reads this store: on the worklet path the pick
-// crosses in the params like the camera does.
+// The render runtime never reads this store. The worklet snapshot does not
+// carry the pick yet, so that path renders the default until it does.
 import { createStore } from 'zustand/vanilla';
 import { useStore } from 'zustand';
 import { DEFAULT_PHYSICAL_PRESET, PHYSICAL_PRESET_IDS, type PhysicalPresetId } from './physical-look.ts';
