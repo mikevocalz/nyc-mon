@@ -321,3 +321,85 @@ export const SEED_ASSETS: readonly WorldAssetEntry[] = [
     provenance: { licenseVerified: true, note: 'Pole cylinder + head box + 3 lens markers.' },
   },
 ];
+
+// ── Slop-grade lofted fleet (EXPO_PUBLIC_WORLD_PHYSICAL) ───────────────────
+// One recipe per sim VehicleKind. They live outside SEED_ASSETS so the
+// default registry, and every test pinned to it, is unchanged with the flag
+// off. `vehicleKind` names the sim class the recipe draws: sedan and taxi
+// share the `vehicle.sedan` id (VEHICLE_SEMANTIC_ID), and the taxi's roof
+// sign comes from its kind, not from its paint. Geometry and material:
+// lofted-car.ts and lofted-car-material.ts, ported from Slop New York.
+// Bounds are the built meshes' measured extents, mirrors included
+// (lofted-car.test.ts pins them to 1 cm).
+
+const SLOP_PROVENANCE = {
+  generatorUrl: 'https://github.com/mrdoob/slop-newyork/blob/be65d0a/js/actor-models.js',
+  author: 'Mr.doob (Ricardo Cabello), Slop New York; LoftGeometry and CarGenerator by the three.js authors',
+  licenseVerified: true,
+} as const;
+
+export const LOFTED_VEHICLE_ASSETS: readonly WorldAssetEntry[] = [
+  {
+    id: 'vehicle.sedan',
+    variant: 'slop-lofted-sedan',
+    kind: 'vehicle',
+    source: 'procedural',
+    uri: 'proc:lofted-car',
+    params: { body: 'sedan', vehicleKind: 'sedan' },
+    bounds: { lengthM: 4.55, widthM: 2.11, heightM: 1.46 },
+    pivot: 'ground-center',
+    forwardAxis: '+Z',
+    upAxis: '+Y',
+    license: 'MIT',
+    status: 'ready',
+    provenance: { ...SLOP_PROVENANCE, note: 'Slop BODY_SPECS.sedan, ported to plain arrays (no three import) so the worklet runtime can build it.' },
+  },
+  {
+    id: 'vehicle.sedan',
+    variant: 'slop-lofted-taxi',
+    kind: 'vehicle',
+    source: 'procedural',
+    uri: 'proc:lofted-car',
+    params: { body: 'taxi', vehicleKind: 'taxi' },
+    bounds: { lengthM: 4.55, widthM: 2.11, heightM: 1.65 },
+    pivot: 'ground-center',
+    forwardAxis: '+Z',
+    upAxis: '+Y',
+    license: 'MIT',
+    status: 'ready',
+    provenance: { ...SLOP_PROVENANCE, note: 'Slop BODY_SPECS.taxi: the sedan body with the medallion roof sign, gated on the taxi kind.' },
+  },
+  {
+    id: 'vehicle.van',
+    variant: 'slop-lofted-van',
+    kind: 'vehicle',
+    source: 'procedural',
+    uri: 'proc:lofted-car',
+    params: { body: 'suv', vehicleKind: 'van' },
+    bounds: { lengthM: 4.65, widthM: 2.21, heightM: 1.8 },
+    pivot: 'ground-center',
+    forwardAxis: '+Z',
+    upAxis: '+Y',
+    license: 'MIT',
+    status: 'ready',
+    provenance: { ...SLOP_PROVENANCE, note: 'Slop has no van; BODY_SPECS.suv is its tallest car body.' },
+  },
+  {
+    id: 'vehicle.bus',
+    variant: 'slop-lofted-bus',
+    kind: 'vehicle',
+    source: 'procedural',
+    uri: 'proc:lofted-bus',
+    params: { body: 'bus', vehicleKind: 'bus' },
+    bounds: { lengthM: 11.83, widthM: 2.87, heightM: 3.26 },
+    pivot: 'ground-center',
+    forwardAxis: '+Z',
+    upAxis: '+Y',
+    license: 'MIT',
+    status: 'ready',
+    provenance: { ...SLOP_PROVENANCE, note: 'Slop BUS_SPEC (40-ft low-floor MTA bus); static tyres in the body mesh.' },
+  },
+];
+
+/** The registry seed with the lofted fleet ranked ahead of the box recipes; the vehicle actor uses it when the physical flag is on. */
+export const PHYSICAL_SEED_ASSETS: readonly WorldAssetEntry[] = [...SEED_ASSETS, ...LOFTED_VEHICLE_ASSETS];
