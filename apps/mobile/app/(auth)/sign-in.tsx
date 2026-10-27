@@ -5,7 +5,7 @@ import { IconButton } from '@acme/ui';
 import { ChevronLeft } from '@acme/ui/icons';
 import { View } from '@acme/ui/tw';
 import { copy } from '@acme/app/features/onboarding/copy.ts';
-import { SignInBrandPanel } from '@acme/app/features/onboarding/SignInBrandPanel.tsx';
+import { SignInBrandPanel, SignInSkyline } from '@acme/app/features/onboarding/SignInBrandPanel.tsx';
 import { SignInScreen } from '@acme/app/features/onboarding/SignInScreen.tsx';
 import { useSignInNav } from '@acme/app/features/onboarding/sign-in-nav.ts';
 
@@ -18,7 +18,8 @@ export default function SignInRoute() {
   const { back } = useSignInNav();
   const scheme = useColorScheme() === 'light' ? 'light' : 'dark';
   return (
-    <View className="flex-1 bg-bg lg:flex-row">
+    <View className="flex-1 bg-bg">
+    <View className="flex-1 lg:flex-row">
       <Stack.Screen
         options={{
           headerShown: true,
@@ -41,6 +42,9 @@ export default function SignInRoute() {
       <View className="flex-1">
         <SignInScreen />
       </View>
+    </View>
+      {/* The city runs across the whole bottom edge, under both columns. */}
+      <SignInSkyline className="hidden lg:flex" />
     </View>
   );
 }
