@@ -92,6 +92,7 @@ import {
   headlightBeamScale,
   slopGlowFromLampLevel,
 } from './vehicle-physical-constants.ts';
+import { pushBox } from './box-faces.ts';
 
 /** Opt-in lane flag — default OFF, matching the L1–L6 realism lanes. `EXPO_PUBLIC_LIVING_CITY=1`. */
 export const EXPERIMENTAL_LIVING_CITY = parseSkyRigFlag(process.env.EXPO_PUBLIC_LIVING_CITY);
@@ -122,28 +123,6 @@ export interface BoxGeometryData {
 }
 
 /** Append an axis-aligned box to the position/normal/index lists (24 verts, 12 tris). */
-function pushBox(pos: number[], nrm: number[], idx: number[], cx: number, cy: number, cz: number, sx: number, sy: number, sz: number): void {
-  const hx = sx / 2;
-  const hy = sy / 2;
-  const hz = sz / 2;
-  const faces: [number, number, number, number[]][] = [
-    // normal, the four corners (ccw seen from outside)
-    [1, 0, 0, [hx, -hy, -hz, hx, -hy, hz, hx, hy, hz, hx, hy, -hz]],
-    [-1, 0, 0, [-hx, -hy, hz, -hx, -hy, -hz, -hx, hy, -hz, -hx, hy, hz]],
-    [0, 1, 0, [-hx, hy, -hz, hx, hy, -hz, hx, hy, hz, -hx, hy, hz]],
-    [0, -1, 0, [-hx, -hy, hz, hx, -hy, hz, hx, -hy, -hz, -hx, -hy, -hz]],
-    [0, 0, 1, [-hx, -hy, hz, hx, -hy, hz, hx, hy, hz, -hx, hy, hz]],
-    [0, 0, -1, [hx, -hy, -hz, -hx, -hy, -hz, -hx, hy, -hz, hx, hy, -hz]],
-  ];
-  for (const [nx, ny, nz, c] of faces) {
-    const base = pos.length / 3;
-    for (let i = 0; i < 4; i++) {
-      pos.push(cx + c[i * 3]!, cy + c[i * 3 + 1]!, cz + c[i * 3 + 2]!);
-      nrm.push(nx, ny, nz);
-    }
-    idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
-  }
-}
 
 /**
  * The `proc:box-car` / `proc:box-bus` recipe: a body box, a cabin box biased
