@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, type ReactNode } from 'react';
+import { Platform } from 'react-native';
 import { useInView } from '../../backgrounds/use-in-view';
 import { useReducedMotion } from '../../backgrounds/use-reduced-motion';
 import { Figcaption, Figure } from '../../html';
@@ -145,6 +146,9 @@ export function DeviceStage({
           if (sound) primeSideKeyChirp();
           stage.setState({ taps: stage.getState().taps + 1 });
         }}
+        // Native: pointer events may not reach this view, so a touch counts the press too
+        // (two counts in one frame still make one tap: the scene only checks for a change).
+        {...(Platform.OS === 'web' ? {} : { onTouchStart: () => stage.setState({ taps: stage.getState().taps + 1 }) })}
       >
         {live ? (
           <ThreeCanvas

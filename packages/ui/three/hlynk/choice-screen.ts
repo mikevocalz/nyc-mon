@@ -35,9 +35,11 @@ const { width: W, height: H } = HUD_SIZE;
 const PAD = 40;
 const GAP = 20;
 /** The slot row, canvas px. */
-export const CHOICE_ROW = { y: 236, height: 540 } as const;
+// Centred on the screen (row middle at 512 of 1024), between the heading and the foot copy;
+// slots are about as tall as they are wide plus the label, not long columns.
+export const CHOICE_ROW = { y: 322, height: 380 } as const;
 /** Label strip at the bottom of each slot. */
-const LABEL_H = 104;
+const LABEL_H = 84;
 
 /** Canvas rect of slot `i` of `count`. */
 export function choiceSlotRect(i: number, count: number): { x: number; y: number; width: number; height: number } {

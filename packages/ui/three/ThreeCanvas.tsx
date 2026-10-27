@@ -369,9 +369,14 @@ function JsThreeCanvas<P>({
     invalidate();
   };
   // Mouse hover on web; on native a finger down or dragging counts, and
-  // lifting it lets the blocks settle back.
+  // lifting it lets the blocks settle back. Native also gets touch handlers:
+  // pointer events are not delivered to this view on every RN build, and a
+  // touch carries the same locationX/locationY.
   const pointerHandlers = tracksPointer
-    ? { onPointerMove: setPointer, onPointerDown: pressPointer, onPointerUp: liftPointer, onPointerLeave: releasePointer, onPointerCancel: releasePointer }
+    ? {
+        onPointerMove: setPointer, onPointerDown: pressPointer, onPointerUp: liftPointer, onPointerLeave: releasePointer, onPointerCancel: releasePointer,
+        ...(Platform.OS === 'web' ? {} : { onTouchStart: pressPointer, onTouchMove: setPointer, onTouchEnd: liftPointer, onTouchCancel: releasePointer }),
+      }
     : {};
 
   let surface = null;
