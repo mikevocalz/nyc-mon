@@ -9,6 +9,10 @@ import { AuthProviderButton, Button, Card, ErrorMessage, Heading, SegmentedContr
 import { useProfile, type ThemePreference } from '../profile/profile.store';
 import { auth } from '../onboarding/auth';
 import { CITY_MAP_ASSETS, CITY_MAP_DERIVED, CITY_MAP_SOURCES } from '../game/map-data-credit';
+import { EXPERIMENTAL_WORLD_PHYSICAL } from '../game/world/physical-look.ts';
+import { useTimeOfDay } from '../game/world/time-of-day.store.ts';
+import { SOFTWARE_CREDITS, SOFTWARE_CREDITS_GROUP } from './software-credits.ts';
+import { TimeOfDayRow } from './TimeOfDayRow';
 
 /** The game-control settings route (apps/mobile/app/(drawer)/game-controls.tsx). */
 const GAME_CONTROLS_PATH = '/game-controls';
@@ -32,6 +36,24 @@ function GameControlsRow() {
   );
 }
 
+// The physically lit city's light preset (G2, D19). Native only for the
+// same reason as GameControlsRow, and only under EXPO_PUBLIC_WORLD_PHYSICAL:
+// with the flag off the city has one fixed look and the row would change
+// nothing. Settings only; the HUD gains no control in this lane
+// (docs/design/research/slop-grade-city-mobbin.md §§ 2–3).
+function GraphicsCard() {
+  const preset = useTimeOfDay((s) => s.preset);
+  const setPreset = useTimeOfDay((s) => s.setPreset);
+  if (process.env.EXPO_OS === 'web' || !EXPERIMENTAL_WORLD_PHYSICAL) return null;
+  return (
+    <FadeIn delay={155}>
+      <Card className="gap-4">
+        <Text variant="heading">Graphics</Text>
+        <TimeOfDayRow value={preset} onChange={setPreset} />
+      </Card>
+    </FadeIn>
+  );
+}
 
 function AmazonAccountLink() {
   const enabled = process.env.EXPO_OS === 'web' && process.env.EXPO_PUBLIC_AMAZON_AUTH_ENABLED === 'true';
@@ -122,6 +144,8 @@ export function SettingsContent() {
         </Card>
       </FadeIn>
 
+      <GraphicsCard />
+
       <GameControlsRow />
 
       <AmazonAccountLink />
@@ -170,6 +194,21 @@ export function SettingsContent() {
                   accessibilityRole="link"
                 >
                   {source.license}
+                </Text>
+              </View>
+            ))}
+            {/* Code, not data: its own group so it never reads as a map-data credit. */}
+            <Text variant="caption" tone="muted">{SOFTWARE_CREDITS_GROUP}</Text>
+            {SOFTWARE_CREDITS.map((credit) => (
+              <View key={credit.url} className="gap-0.5">
+                <Text variant="caption">{credit.line}</Text>
+                <Text
+                  variant="caption"
+                  tone="muted"
+                  onPress={() => void Linking.openURL(credit.url)}
+                  accessibilityRole="link"
+                >
+                  {credit.linkLabel}
                 </Text>
               </View>
             ))}
