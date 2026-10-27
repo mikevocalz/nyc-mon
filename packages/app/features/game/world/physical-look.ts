@@ -9,9 +9,10 @@
 //
 // - EXPO_PUBLIC_WORLD_PHYSICAL: the master flag (default off, the sky-rig
 //   truthy table). With it unset nothing in this module changes a frame.
-// - EXPO_PUBLIC_WORLD_PROBE=<name>: Phase 0. Turns on one feature of the
-//   physical stack, alone, over today's look, so a black frame on hardware
-//   points at that one feature. See resolvePhysicalFeatures.
+// - EXPO_PUBLIC_WORLD_PROBE=<name>: Phase 0, read only under
+//   EXPO_PUBLIC_WORLD_PHYSICAL. Turns on one feature of the physical stack,
+//   alone, over today's look, so a black frame on hardware points at that
+//   one feature. See physicalFeaturesFor.
 //
 // Colours are not here: they live in @acme/theme physicalCityLight.
 // "Slop measured" marks a value copied from Slop; TODO(tune) marks a value
@@ -47,12 +48,23 @@ export function isDeviceLaneProbe(probe: WorldProbe | null): probe is DeviceLane
   return probe !== null && (DEVICE_LANE_PROBES as readonly string[]).includes(probe);
 }
 
-/** The active probe, inlined at bundle time; null when unset. */
-export const WORLD_PROBE: WorldProbe | null = parseWorldProbe(process.env.EXPO_PUBLIC_WORLD_PROBE);
+/**
+ * A probe counts only under the master flag, for the rig probes and the
+ * device-lane ones alike: EXPO_PUBLIC_WORLD_PROBE alone changes nothing.
+ */
+export function activeWorldProbe(physical: boolean, probe: WorldProbe | null): WorldProbe | null {
+  return physical ? probe : null;
+}
+
+/** The active probe, inlined at bundle time; null when unset or without EXPO_PUBLIC_WORLD_PHYSICAL. */
+export const WORLD_PROBE: WorldProbe | null = activeWorldProbe(
+  EXPERIMENTAL_WORLD_PHYSICAL,
+  parseWorldProbe(process.env.EXPO_PUBLIC_WORLD_PROBE),
+);
 
 /**
- * Which pieces of the physical stack a scene mounts. With the flag off and
- * no probe, `physicalFeaturesFor` returns null and city-scene runs today's
+ * Which pieces of the physical stack a scene mounts. With the flag off,
+ * `physicalFeaturesFor` returns null and city-scene runs today's
  * path untouched.
  */
 export interface PhysicalFeatures {
@@ -128,17 +140,17 @@ export function probeFeatures(probe: WorldProbe): PhysicalFeatures {
 }
 
 /**
- * The feature set for a scene. A probe wins over the master flag, so a
- * probe build measures one feature even when the flag is also set. Null
- * means today's path.
+ * The feature set for a scene. Nothing mounts without the master flag,
+ * probe or not. Under the flag a probe wins over the full stack, so a probe
+ * build measures one feature. Null means today's path.
  */
 export function physicalFeaturesFor(
   physical: boolean,
   probe: WorldProbe | null,
   tierSsr: boolean,
 ): PhysicalFeatures | null {
-  if (probe !== null) return probeFeatures(probe);
-  return physical ? fullPhysicalFeatures(tierSsr) : null;
+  if (!physical) return null;
+  return probe !== null ? probeFeatures(probe) : fullPhysicalFeatures(tierSsr);
 }
 
 /**

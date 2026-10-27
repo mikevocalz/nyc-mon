@@ -23,6 +23,7 @@ import {
   PHYSICAL_LIGHT,
   PHYSICAL_PRESET_IDS,
   PHYSICAL_RIG,
+  activeWorldProbe,
   physicalFeaturesFor,
   probeFeatures,
   RIG_PROBES,
@@ -39,6 +40,11 @@ const full = fullPhysicalFeatures(false);
 test('the master flag is opt-in on the shared truth table', () => {
   assert.equal(EXPERIMENTAL_WORLD_PHYSICAL, parseSkyRigFlag(process.env.EXPO_PUBLIC_WORLD_PHYSICAL));
   assert.equal(physicalFeaturesFor(false, null, true), null, 'flag off, no probe: today\'s path');
+  for (const probe of [...RIG_PROBES, ...DEVICE_LANE_PROBES]) {
+    assert.equal(physicalFeaturesFor(false, probe, true), null, `${probe} without the master flag: today's path`);
+    assert.equal(activeWorldProbe(false, probe), null, `${probe} is inactive without the master flag`);
+    assert.equal(activeWorldProbe(true, probe), probe);
+  }
   assert.deepEqual(physicalFeaturesFor(true, null, false), fullPhysicalFeatures(false));
   assert.equal(physicalFeaturesFor(true, null, true)?.ssr, true, 'SSR follows the tier');
 });
@@ -79,7 +85,7 @@ test('each rig probe turns on exactly its feature and the ones it needs', () => 
   };
   for (const probe of RIG_PROBES) assert.deepEqual(on(probeFeatures(probe)), expected[probe], probe);
   for (const probe of DEVICE_LANE_PROBES) assert.deepEqual(on(probeFeatures(probe)), [], probe);
-  // A probe wins over the master flag, so a probe build measures one feature.
+  // Under the master flag a probe wins over the full stack, so a probe build measures one feature.
   assert.deepEqual(physicalFeaturesFor(true, 'srgb', true), probeFeatures('srgb'));
 });
 

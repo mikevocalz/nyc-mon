@@ -60,7 +60,7 @@ export interface DeviceLaneProbeContext {
  */
 export const deviceLaneProbeHooks: Partial<Record<DeviceLaneProbe, (context: DeviceLaneProbeContext) => (() => void) | void>> = {};
 
-/** The physical features this build mounts; null is today's path. Exported for tests. */
+/** The physical features this build mounts; null is today's path, including a probe without the master flag. Exported for tests. */
 export function cityPhysicalFeatures(
   physical: boolean = EXPERIMENTAL_WORLD_PHYSICAL,
   probe: WorldProbe | null = WORLD_PROBE,
@@ -133,8 +133,9 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
   // when the selector is set or the render-scale controller is on — with
   // neither, every lane keeps its own defaults (perf/tier.ts).
   const bundle = WORLD_TIER_SELECTED || EXPERIMENTAL_WORLD_RENDER_SCALE ? tierBundle(WORLD_TIER) : null;
-  // Slop-grade city: null with EXPO_PUBLIC_WORLD_PHYSICAL and _PROBE unset,
-  // and then nothing below differs from the path before this lane.
+  // Slop-grade city: null with EXPO_PUBLIC_WORLD_PHYSICAL unset (a probe
+  // alone mounts nothing), and then nothing below differs from the path
+  // before this lane.
   const physical = cityPhysicalFeatures();
   const physicalTier = TIER[WORLD_TIER].physical;
   const world = buildCityWorld(THREE, dataset, {
