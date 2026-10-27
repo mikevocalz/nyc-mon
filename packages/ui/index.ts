@@ -73,6 +73,8 @@ export { SegmentedControl, type SegmentedControlProps, type SegmentedOption } fr
 export { FieldGroup, type FieldGroupProps, type FieldSectionProps } from './FieldGroup';
 export { Slider, type SliderProps } from './Slider';
 export { Collapsible, type CollapsibleProps } from './Collapsible';
+export { RiveLoader, type RiveLoaderProps } from './RiveLoader';
+export { riveLoaderColors, type RiveLoaderPhase, type RiveLoaderScheme, type RiveLoaderColors } from './rive-loader-bindings';
 export { List, ListItem, type ListProps, type ListItemProps } from './List';
 export { NativeSlot, type NativeSlotProps } from './NativeSlot';
 export { Menu, type MenuProps, type MenuAction } from './Menu';
@@ -102,8 +104,10 @@ export { ThreeCanvas } from './three/ThreeCanvas';
 export type { ThreeBackend, ThreeCanvasHandle, ThreeCanvasProps, ThreeContext, ThreeFrame, ThreePointer, ThreeScene, ThreeSetup } from './three/types';
 // The H-Lynk in 3D, one stage on web and native (also '@acme/ui/three/hlynk').
 export {
-  DeviceStage, HLynkHudStage, createChoiceScreen, createHudScreen,
-  type ChoiceItem, type DeviceCapture, type DeviceScreen, type DeviceStageApi, type DeviceStageProps,
+  DeviceStage, HLynkHudStage, createChoiceScreen, createHudScreen, createIncubateScreen, incubateOptionTarget,
+  INCUBATE_EGG_TARGET, INCUBATE_START_TARGET, createStageReady, StageReadyGate, type StageReadyResource,
+  type ChoiceAction, type ChoiceItem, type ChoicePanel, type DeviceCapture, type DeviceKey, type DeviceScreen,
+  type DeviceStageApi, type DeviceStageProps, type IncubateScreenOptions, type ScreenModelSource,
   type HLynkHudStageControls, type HLynkHudStageProps, type HudContent, type HudMeter, type HudTab,
 } from './three/hlynk';
 export { RiverTide, type RiverTideProps, type RiverTideOrigin } from './backgrounds/RiverTide';
