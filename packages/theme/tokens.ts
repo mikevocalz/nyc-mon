@@ -925,6 +925,46 @@ export const physicalCityMaterials = {
   fireEscape: { steel: '#25292C' },
 } as const;
 
+// Slop-grade city: facelift
+/**
+ * The futuristic facelift on the physically lit city
+ * (EXPO_PUBLIC_WORLD_PHYSICAL with EXPO_PUBLIC_WORLD_FUTURE;
+ * packages/app/features/game/world/physical/facelift.ts). The approved
+ * direction is MOBILE_WORLD_PR_PACK.md "Approved art direction"
+ * (2026-10-13), restated for PBR in docs/design/handoff/slop-grade-city.md
+ * § 4. Glow colours are brand 400/500 steps; the rest are nyc-mon picks,
+ * not Slop values, and each waits for an iPhone 17 / iPad Pro frame.
+ * Scene colours only: nothing here sits under UI text, and build-css never
+ * emits them.
+ */
+export const physicalFacelift = {
+  /** Refined wall tones per masonry family (the palette refresh); the brick bond and relief stay the shader's. */
+  wallRefresh: {
+    brick: ['#8E4B3B', '#A0624A', '#7A4436'],
+    brownstone: ['#6E4C3C', '#7E5A46', '#5E4236'],
+    limestone: ['#CFC8BA', '#BDB6A8', '#D9D2C4'],
+  },
+  /** Painted aluminium window frames and canopies: a dielectric paint, not bare metal. */
+  frame: '#2B2F33',
+  canopy: '#4A4F55',
+  /** Sealant in the modular panel joints. */
+  panelJoint: '#1F2225',
+  /**
+   * Neon roofline trims: brand 400 and 500. Royal 500 is left out: it is
+   * so saturated that the bloom pass's 8x peak limit caps its luminance
+   * below the threshold, so it could not glow.
+   */
+  trim: [orange[400], orange[500], royal[400], carolina[400], carolina[500], leaf[400], leaf[500], apple[400], apple[500]],
+  /** Vertical architectural light strips: brand 400. */
+  strip: [royal[400], carolina[400], orange[400]],
+  /** The light band under an upgraded entrance canopy. */
+  entrance: orange[400],
+  /** The royal kerb light line along the commercial avenues (400: 500 cannot clear the bloom threshold, see trim). */
+  kerb: royal[400],
+  /** LED streetlight, about 5000 K: cooler than the sodium-warm pools the city draws today. */
+  streetLed: '#DCE8FF',
+} as const;
+
 export type Palette = typeof palette;
 export type SemanticColor = keyof typeof semantic;
 export type TypeRampStep = keyof typeof typeRamp;
