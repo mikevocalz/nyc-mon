@@ -52,6 +52,13 @@ export interface DeviceScreen {
    * up once incubation starts). The scene adds the trackpad's hold on top.
    */
   warmth?(): number;
+  /**
+   * A press counter, read every frame (M11 "Keep it warm"). Each change gives
+   * the selected model one short V-pet wobble, rocking on its base, and a
+   * glow pulse; a press mid-wobble restarts it. Under reduced motion only the
+   * pulse plays.
+   */
+  nudge?(): number;
 }
 
 /** UV (v bottom-up) to canvas px (y top-down) on a screen of `size`. */

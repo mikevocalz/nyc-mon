@@ -105,7 +105,7 @@ export type { ThreeBackend, ThreeCanvasHandle, ThreeCanvasProps, ThreeContext, T
 // The H-Lynk in 3D, one stage on web and native (also '@acme/ui/three/hlynk').
 export {
   DeviceStage, HLynkHudStage, createChoiceScreen, createHudScreen, createIncubateScreen, incubateOptionTarget,
-  INCUBATE_EGG_TARGET, INCUBATE_START_TARGET, createStageReady, StageReadyGate, type StageReadyResource,
+  INCUBATE_EGG_TARGET, INCUBATE_START_TARGET, createIncubatingScreen, type IncubatingView, createStageReady, StageReadyGate, type StageReadyResource,
   type ChoiceAction, type ChoiceItem, type ChoicePanel, type DeviceCapture, type DeviceKey, type DeviceScreen,
   type DeviceStageApi, type DeviceStageProps, type IncubateScreenOptions, type ScreenModelSource,
   type HLynkHudStageControls, type HLynkHudStageProps, type HudContent, type HudMeter, type HudTab,

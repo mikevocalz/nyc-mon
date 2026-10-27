@@ -16,6 +16,9 @@ export {
 } from './hatch-model';
 export { ChoiceRows, type ChoiceRowsProps, type ChoiceRow } from './ChoiceRows';
 export { HatchEgg3D, type HatchEgg3DProps } from './HatchEgg3D';
+export { HatchSequenceStage, type HatchSequenceStageProps } from './HatchSequenceStage';
+export type { HatchBabySource } from '../three/hatch/hatch-sequence-scene';
+export { sequenceSpan, sequenceTime, type SequencePhase } from '../three/hatch/hatch-sequence-time';
 export {
   EggHatchAssetError, parseEggHatchManifest, hatchClipTime, type EggAttention, type EggHatchPhase, type EggHatchManifest,
 } from '../three/hatch/hatch-manifest';

@@ -5,6 +5,7 @@ import {
 import type { StoreApi } from 'zustand/vanilla';
 import type { ThreeContext, ThreeFrame, ThreeScene } from '../types';
 import type { EggHatchRig } from '../hatch/egg-hatch-rig';
+import { NUDGE, nudgeHop, nudgePulse, nudgeRock, nudgeSlide } from './nudge';
 // Extensionless on purpose: Metro picks canvas2d.native.ts on device, web and tsc take canvas2d.ts.
 import { canvasFont, createCanvasSurface, whenFontsReady } from './canvas2d';
 import {
@@ -87,7 +88,8 @@ const MODEL_WAIT_MS = 8000;
  * trackpad (and the screen's own warmth) adds, and `idle` the clip speed it adds.
  */
 const GLOW = { size: 1.25, rings: 3.2, speed: 0.45, rays: 9, spin: 0.25, breath: 2.6, warm: 0.9, idle: 1.5, rate: 5 } as const;
-/** Glow tints by slot when a model names none: hud tokens. */
+
+
 export const SCREEN_GLOW_TINTS = [hud.amber, hud.cyan, hud.green] as const;
 
 const CORE = hlynk.core;
@@ -315,7 +317,7 @@ export function createDeviceScene(
       const stageNow = store.getState();
       const holdingPad = stageNow.held && stageNow.hover === keyTarget('activate');
       const warmth = Math.min(1, (screen.warmth?.() ?? 0) + (holdingPad ? 1 : 0));
-      const modelsMoving = stand.update(frame, screen.selected?.() ?? null, power, warmth);
+      const modelsMoving = stand.update(frame, screen.selected?.() ?? null, power, warmth, screen.nudge?.() ?? 0);
 
       // Input: hover on a move, act on a press. The stage counts presses in
       // the store from its pointerdown handler (so a tap shorter than a
@@ -418,6 +420,9 @@ function standModels(THREE: Three, parent: Group, models: readonly ScreenModel[]
     rig: EggHatchRig | null;
     scale: number;
     spin: number;
+    /** Half the model's height in holder units, and where its centre rests: the wobble rocks it on its base. */
+    halfHeight: number;
+    rest: { x: number; y: number; z: number };
     /** 0 hidden .. 1 selected .. 1 + GLOW.warm warmed */
     glowLevel: number;
     glow: { group: Group; halo: Material & { opacity: number }; rings: Material & { opacity: number } } | null;
@@ -438,7 +443,8 @@ function standModels(THREE: Three, parent: Group, models: readonly ScreenModel[]
     const holder = new THREE.Group();
     holder.name = `ScreenModel_${m.target}`;
     parent.add(holder);
-    holders.push({ target: m.target, holder, rig: null, scale: 1, spin: 0, glowLevel: 0, glow: null });
+    holder.rotation.order = 'ZYX'; // the wobble rocks in the glass's plane; the focus turn spins inside it
+    holders.push({ target: m.target, holder, rig: null, scale: 1, spin: 0, halfHeight: 0, rest: { x: 0, y: 0, z: 0 }, glowLevel: 0, glow: null });
   }
 
   // The glow behind a selected model. One time uniform and one soft dot for
@@ -491,6 +497,11 @@ function standModels(THREE: Three, parent: Group, models: readonly ScreenModel[]
     return { x: base.x, baseY: base.y, height: top.y - base.y, width: (m.rect.width / size.width) * SCREEN_GLASS.width };
   };
 
+  /** The last nudge count seen (null before the first frame), when the current wobble started, and the models' own clock. */
+  let lastNudge: number | null = null;
+  let nudgeFrom = -1;
+  let clock = 0;
+
   return {
     hits,
     /** `onLoaded` gets each model that loaded; `onSettled` fires once for each one that is missing or failed. */
@@ -541,7 +552,9 @@ function standModels(THREE: Three, parent: Group, models: readonly ScreenModel[]
             root.position.set(-(box.min.x + box.max.x) / 2, -(box.min.y + box.max.y) / 2, -(box.min.z + box.max.z) / 2);
             inner.add(root);
             entry.holder.add(inner);
-            entry.holder.position.set(slot.x, slot.baseY + slot.height / 2, SCREEN_GLASS.z + (size.z * fit) / 2 + 0.01);
+            entry.rest = { x: slot.x, y: slot.baseY + slot.height / 2, z: SCREEN_GLASS.z + (size.z * fit) / 2 + 0.01 };
+            entry.halfHeight = (size.y * fit) / 2;
+            entry.holder.position.set(entry.rest.x, entry.rest.y, entry.rest.z);
             entry.rig = rig;
             onLoaded(entry.holder);
           })
@@ -551,9 +564,25 @@ function standModels(THREE: Three, parent: Group, models: readonly ScreenModel[]
           });
       });
     },
-    /** Poses every model for this frame. `warmth` 0..1 warms the selected model. Returns true while any of them moves. */
-    update: (frame: ThreeFrame, selected: string | null, power: number, warmth: number): boolean => {
+    /**
+     * Poses every model for this frame. `warmth` 0..1 warms the selected model;
+     * a new `nudge` count wobbles it once (see DeviceScreen.nudge). Returns true while any of them moves.
+     */
+    update: (frame: ThreeFrame, selected: string | null, power: number, warmth: number, nudge: number): boolean => {
       let moving = false;
+      if (nudge !== lastNudge) {
+        // The first read only learns the count; a press restarts the wobble rather than stacking another.
+        if (lastNudge !== null) nudgeFrom = clock;
+        lastNudge = nudge;
+      }
+      clock += frame.delta;
+      const nudgeAge = nudgeFrom < 0 ? Infinity : clock - nudgeFrom;
+      const pulse = nudgePulse(nudgeAge);
+      const rock = frame.reducedMotion ? 0 : nudgeRock(nudgeAge);
+      const hop = frame.reducedMotion ? 0 : nudgeHop(nudgeAge);
+      const slide = frame.reducedMotion ? 0 : nudgeSlide(nudgeAge);
+      if (nudgeAge < NUDGE.pulseSeconds) moving = true;
+      else nudgeFrom = -1;
       const k = frame.delta > 0 ? 1 - Math.exp(-frame.delta * MODEL_FOCUS.rate) : 1;
       const kGlow = frame.delta > 0 ? 1 - Math.exp(-frame.delta * GLOW.rate) : 1;
       glowTime.value = frame.reducedMotion ? 0 : glowTime.value + frame.delta * (1 + warmth);
@@ -564,13 +593,17 @@ function standModels(THREE: Three, parent: Group, models: readonly ScreenModel[]
         // The glow follows the selection and comes up with the screen; warmth swells it.
         const glowGoal = selected === entry.target ? (1 + GLOW.warm * warmth) * power : 0;
         entry.glowLevel += (glowGoal - entry.glowLevel) * kGlow;
+        // The press's pulse rides on top of the eased level, so it is snappy.
+        const shownGlow = entry.glowLevel + (selected === entry.target ? NUDGE.pulse * pulse * power : 0);
         if (Math.abs(glowGoal - entry.glowLevel) > 1e-3) moving = true;
         const glow = entry.glow;
         if (glow) {
-          const level = entry.glowLevel;
+          const level = shownGlow;
           glow.group.visible = level > 1e-3;
           const swell = frame.reducedMotion ? 1 : 1 + 0.06 * Math.sin((2 * Math.PI * glowTime.value) / GLOW.breath);
-          glow.group.children[0]?.scale.setScalar(0.85 * swell * (1 + 0.12 * warmth));
+          // A press swells the halo too, so the pulse reads as a flare, not just a brighter disc.
+          const flare = selected === entry.target ? NUDGE.flare * pulse : 0;
+          glow.group.children[0]?.scale.setScalar(0.85 * swell * (1 + 0.12 * warmth) * (1 + flare));
           glow.halo.opacity = Math.min(1, 0.55 * level);
           glow.rings.opacity = Math.min(1, 0.6 * level);
         }
@@ -581,6 +614,14 @@ function standModels(THREE: Three, parent: Group, models: readonly ScreenModel[]
         // The models come up with the screen.
         entry.holder.scale.setScalar(entry.scale * (0.6 + 0.4 * power));
         entry.holder.rotation.y = entry.spin;
+        // The wobble: rock about the egg's base (so its centre swings on an arc) with a small hop on the first beat.
+        const tilt = selected === entry.target ? rock : 0;
+        const h = entry.halfHeight * entry.holder.scale.y;
+        const lift = selected === entry.target ? hop * h : 0;
+        // The base slides a little with the rock (toward its low side), so the shake reads as a jostle.
+        const shift = selected === entry.target ? -slide * 2 * h : 0;
+        entry.holder.rotation.z = tilt;
+        entry.holder.position.set(entry.rest.x + shift - h * Math.sin(tilt), entry.rest.y + h * (Math.cos(tilt) - 1) + lift, entry.rest.z);
         if (frame.reducedMotion) rig.seek('stir', 0);
         else {
           rig.idle();

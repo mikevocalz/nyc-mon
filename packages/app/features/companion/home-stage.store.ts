@@ -34,6 +34,12 @@ export interface HomeStageEntry {
   /** Side panes on wide windows (`HLynkStage`). */
   readonly leading?: ReactNode;
   readonly trailing?: ReactNode;
+  /**
+   * The route draws its own full-window 3D H-Lynk in the slot layer (M11 on
+   * the 3D stage): the layout unmounts the 2D shell while it is set. Leave
+   * `chrome` out with it.
+   */
+  readonly immersive?: boolean;
 }
 
 interface HomeStageState extends HomeStageEntry {
@@ -41,12 +47,14 @@ interface HomeStageState extends HomeStageEntry {
   /** True while a bare route is on top: the route draws full-window over the mounted shell. */
   readonly bare: boolean;
   readonly menuOpen: boolean;
+  readonly immersive: boolean;
 }
 
 const EMPTY: HomeStageState = {
   owner: null,
   bare: false,
   menuOpen: false,
+  immersive: false,
   chrome: undefined,
   screen: undefined,
   leading: undefined,
@@ -76,12 +84,13 @@ export function useHomeStage(entry: HomeStageEntry): void {
       screen: entry.screen,
       leading: entry.leading,
       trailing: entry.trailing,
+      immersive: entry.immersive === true,
     });
   });
   useLayoutEffect(
     () => () => {
       if (useHomeStageStore.getState().owner === owner) {
-        useHomeStageStore.setState({ owner: null, bare: false, screen: undefined, leading: undefined, trailing: undefined, menuOpen: false });
+        useHomeStageStore.setState({ owner: null, bare: false, screen: undefined, leading: undefined, trailing: undefined, menuOpen: false, immersive: false });
       }
     },
     [owner],

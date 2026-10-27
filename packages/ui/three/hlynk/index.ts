@@ -10,6 +10,10 @@ export {
   createIncubateScreen, INCUBATE_EGG_TARGET, incubateOptionRect, INCUBATE_START_TARGET, incubateOptionTarget,
   type IncubateScreenOptions,
 } from './incubate-screen';
+export {
+  createIncubatingScreen, INCUBATING_ACTION_TARGET, INCUBATING_EGG_TARGET, INCUBATING_NOTIFY_TARGET,
+  type IncubatingScreenOptions, type IncubatingView,
+} from './incubating-screen';
 export { buttonAt, drawButton, inRect, type ScreenButton, type ScreenRect } from './screen-actions';
 export { keyFromTarget, keyTarget, type DeviceKey } from './stage-state';
 export { createStageReady, type StageReadyResource } from './stage-ready';

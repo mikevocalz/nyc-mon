@@ -413,7 +413,8 @@ export function MeetScreen() {
             {/* Visually hidden from the first frame: the radio group screen readers and keyboards use. */}
             <View className="absolute inset-0 opacity-0" pointerEvents="none" testID="m08-triptych-a11y">
               <ChoiceTriptych
-                items={tileItems}
+                // No photos behind the 3D stage, not even invisible ones: the radio group needs only the labels.
+                items={tileItems.map((item) => ({ ...item, media: null }))}
                 focusedIndex={focused}
                 onFocusChange={(i) => set(meetFocus(store.getState(), i))}
                 accessibilityLabel={titleText}

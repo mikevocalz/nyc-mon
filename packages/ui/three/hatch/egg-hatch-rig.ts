@@ -211,6 +211,18 @@ export class EggHatchRig {
     this.apply(eggPoseFor(this.manifest, phase, 0, attention, false));
   }
 
+  /**
+   * Holds the hatch clip at `seconds` (clamped to the clip): the Alexa-style
+   * hatch sequence (hatch-sequence-scene.ts) drives the clip from its own
+   * timeline (hatch-timeline.ts `clipTime`) rather than by phase.
+   */
+  hatchAt(seconds: number): void {
+    const clamped = Math.max(0, Math.min(seconds, this.actions.hatch.getClip().duration));
+    const pose: EggPose = { kind: 'hatch', seconds: clamped };
+    this.mode = { kind: 'still', pose };
+    this.apply(pose);
+  }
+
   /** Plays an attention clip over the finished hatch. */
   attention(kind: EggAttention, durationSeconds?: number): void {
     this.playPhase('attention', durationSeconds, kind);

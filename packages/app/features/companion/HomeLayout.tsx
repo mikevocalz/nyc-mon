@@ -100,6 +100,12 @@ function CompanionMenu() {
 
 /** Subscribes to the stage store; the router slot is a sibling, so republishing never re-renders a route. */
 function ShellHost() {
+  const immersive = useHomeStageStore((s) => s.immersive);
+  // A route on the full-window 3D H-Lynk (M11) draws everything itself: no 2D shell under it.
+  return immersive ? null : <Shell2D />;
+}
+
+function Shell2D() {
   const router = useRouter();
   const reducedMotion = useReducedMotion();
   const stage = useHomeStageStore(
@@ -143,6 +149,8 @@ function ShellHost() {
  * through `useHomeStage` and render nothing themselves; bare routes (M17,
  * M18, "Shell: none") draw full-window over the mounted shell in the slot
  * layer. The slot stays at one place in the tree, so route state survives.
+ * A route on the full-window 3D H-Lynk (M11 when the GPU stage runs) sets
+ * `immersive` and the 2D shell is not mounted at all while it shows.
  */
 export function HomeLayout({ children }: { children: ReactNode }) {
   useMinuteClockDriver();

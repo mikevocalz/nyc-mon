@@ -6,7 +6,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { createHatchState, deriveFirstLook } from '@acme/core/sim';
 import { eggHatchAssetForSpecies } from '@acme/assets/eggs';
 import {
-  Button, HLYNK_COPY, HatchBurst, HatchEgg, HatchEgg3D, Image, SignagePlate, TrackpadActions,
+  Button, HLYNK_COPY, HatchBurst, HatchEgg, HatchSequenceStage, Image, SignagePlate, TrackpadActions,
   useInstanceStore, useReducedMotion, useStore, type CreaturePerformance, type ImageProps,
 } from '@acme/ui';
 import { haptics } from '@acme/ui/haptics';
@@ -17,6 +17,7 @@ import { clearReadyNotification } from '../onboarding/notify-permission';
 import { useHomeStage } from '../companion/home-stage.store';
 import { tickMinuteClock } from '../companion/minute-clock';
 import { eggIdentity, monIdentity } from '../companion/mon-identity';
+import { StageLoader } from '../egg/StageLoader';
 import { hatchCopy } from './copy';
 import {
   CRACK_BEATS, HESITATE_HINT_MS, PHASE_MS, SKIP_AFTER_MS, eggPrecrackPose, resolveHatchEntry, type HatchPhase,
@@ -31,6 +32,8 @@ interface LocalState {
   /** Hesitation resolved by the Caller's hold or the "Stay close" button. */
   stayedClose: boolean;
   showHesitateHint: boolean;
+  /** The 3D hatch sequence: `starting` until its egg is posed (the Rive loader covers it), `ready`, or `failed` (the 2D egg). */
+  seq3d: 'starting' | 'ready' | 'failed';
 }
 
 const PHASE_ANNOUNCE: Partial<Record<HatchPhase, 'm12.a11y.stir' | 'm12.a11y.pressure' | 'm12.a11y.crack' | 'm12.a11y.emerge'>> = {
@@ -61,6 +64,7 @@ export function HatchScreen() {
     showSkip: false,
     stayedClose: false,
     showHesitateHint: false,
+    seq3d: 'starting',
   }));
   const s = useStore(local);
   const eggId = s.eggId;
@@ -269,21 +273,32 @@ export function HatchScreen() {
       />
     </Animated.View>
   );
-  // The 3D egg plays each phase over the screen's own phase length, so it stays in step with the
-  // phase loop above; a resumed phase starts at its beginning. On any load error it shows flatEgg.
-  const eggView = egg3d === undefined ? flatEgg : (
-    <HatchEgg3D
-      testID="m12-egg-3d"
-      className="h-72 w-72"
-      eggId={egg3d.eggId}
-      source={egg3d}
-      phase={phase ?? null}
-      phaseMs={phase === undefined ? undefined : durations[phase]}
-      phaseStartedAt={phase === undefined ? undefined : phaseStartedAt}
-      firstLook={hesitating ? 'hesitate' : 'lean-in'}
-      reducedMotion={reducedMotion}
-      fallback={flatEgg}
-    />
+  // The 3D hatch is the Alexa view's moment (HatchSequence3D) on the shared
+  // renderer: each M12 phase plays its window of that one timeline over the
+  // screen's own phase length, so it stays in step with the phase loop above
+  // and a resumed phase starts at its beginning. The app's creature layer
+  // draws the Baby (no Baby model ships in the app yet), so the scene hands
+  // over to it under the white-out. On any load error it shows flatEgg.
+  const seqFailed = egg3d === undefined || s.seq3d === 'failed';
+  const eggView = egg3d === undefined || s.seq3d === 'failed' ? flatEgg : (
+    <View className="h-full w-full">
+      <HatchSequenceStage
+        testID="m12-egg-3d"
+        eggId={egg3d.eggId}
+        source={egg3d}
+        phase={s.stage === 'show' ? (phase ?? null) : null}
+        phaseMs={phase === undefined ? 0 : durations[phase]}
+        phaseStartedAt={phaseStartedAt}
+        reducedMotion={reducedMotion}
+        fallback={flatEgg}
+        onReady={() => local.setState({ seq3d: 'ready' })}
+        onError={() => local.setState({ seq3d: 'failed' })}
+        onBackendChange={(backend) => {
+          if (backend === null) local.setState({ seq3d: 'failed' });
+        }}
+      />
+      {s.seq3d === 'starting' ? <StageLoader label={hatchCopy('m12.trackpad.open')} testID="m12-stage-loader" /> : null}
+    </View>
   );
 
   const trackpad =
@@ -323,6 +338,7 @@ export function HatchScreen() {
             <View className="flex-1 items-center justify-center">
               <View
                 testID="m12-egg-scene"
+                className={seqFailed ? undefined : 'flex-1 self-stretch'}
                 accessible
                 accessibilityRole="image"
                 accessibilityLabel={hatchCopy('m11.egg.a11y.label.ready', { eggName: eggId0?.eggName ?? '' })}
@@ -330,7 +346,7 @@ export function HatchScreen() {
               >
                 {eggView}
               </View>
-              {phase === 'burst' ? (
+              {phase === 'burst' && seqFailed ? (
                 <View className="absolute inset-0 items-center justify-center" style={{ pointerEvents: 'none' }}>
                   <HatchBurst testID="m12-burst" progress={burst} peakOpacity={peak} reducedMotion={reducedMotion} />
                 </View>

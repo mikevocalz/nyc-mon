@@ -8,3 +8,7 @@ export const loadEggHatch = (): Promise<ThreeSetup<EggHatchSceneParams>> => impo
 export const preloadEggHatch = (...args: Parameters<typeof import('./egg-hatch-rig').preloadEggHatch>): void => {
   void import('./egg-hatch-rig').then((m) => m.preloadEggHatch(...args));
 };
+
+/** The hatch sequence scene (the Alexa choreography on the shared renderer), loaded on first use. Module-level, so its identity is stable. */
+export const loadHatchSequence = (): Promise<ThreeSetup<import('./hatch-sequence-scene').HatchSequenceSceneParams>> =>
+  import('./hatch-sequence-scene').then((m) => m.createHatchSequenceScene);
