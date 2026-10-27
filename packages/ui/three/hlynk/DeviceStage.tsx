@@ -13,7 +13,7 @@ import type { ThreeBackend, ThreeSetup } from '../types';
 import type { DeviceSceneParams } from './device-scene';
 import type { DeviceScreen } from './screen';
 import { playSideKeyChirp, primeSideKeyChirp } from './side-key-chirp';
-import { initialStageState } from './stage-state';
+import { initialStageState, type DeviceKey } from './stage-state';
 
 /** The static capture: a render of the scene at its rest pose, on the stage's ink. */
 export interface DeviceCapture {
@@ -23,10 +23,12 @@ export interface DeviceCapture {
   sizes: string;
 }
 
-/** What `children` can do to the stage: the side key, for a control under it. */
+/** What `children` can do to the stage: the side key and the front keys, for controls over or under it. */
 export interface DeviceStageApi {
   /** Press the side key: the 3D key dips and, with sound on, chirps. */
   pressSideKey: () => void;
+  /** Press a front key as if tapped on the 3D H-Lynk: the key dips (when it has one) and `onKey` runs. */
+  pressKey: (key: DeviceKey) => void;
 }
 
 export interface DeviceStageProps {
@@ -53,6 +55,11 @@ export interface DeviceStageProps {
   sound?: boolean;
   /** Called after each side key press (3D key or `pressSideKey`). */
   onSideKey?: () => void;
+  /**
+   * Called after each front-key press: the 3D `<` (`prev`), `>` (`next`),
+   * home, menu and trackpad (`activate`), or `pressKey` (which also sends `back`).
+   */
+  onKey?: (key: DeviceKey) => void;
   /** Called once the first frame with the H-Lynk in it is on screen. */
   onReady?: () => void;
   /** The backend once the renderer is up, or null when it falls back. */
@@ -90,7 +97,7 @@ const HANDOFF_MS = 400;
  */
 export function DeviceStage({
   screen, model = 'placeholder', capture, fallback = null, caption, label, className, stageClassName,
-  sound = false, onSideKey, onReady, onBackendChange, children, testID, captureTestID,
+  sound = false, onSideKey, onKey, onReady, onBackendChange, children, testID, captureTestID,
 }: DeviceStageProps) {
   const { ref, hasBeenNear, isVisible } = useInView({ nearMarginPx: 600 });
   const reducedMotion = useReducedMotion();
@@ -107,19 +114,30 @@ export function DeviceStage({
       stage.setState({ presses: stage.getState().presses + 1 });
       onSideKey?.();
     };
+    const pressKey = (key: DeviceKey) => {
+      stage.setState({ keyPresses: stage.getState().keyPresses + 1, lastKey: key });
+      onKey?.(key);
+    };
     return {
       model,
       screen,
       store: stage,
       onSideKey: pressSideKey,
+      onKey: pressKey,
       onReady: () => {
         stage.setState({ ready: true });
         onReady?.();
       },
       onRest: (rest) => stage.setState({ resting: rest }),
     };
-  }, [model, screen, stage, sound, onSideKey, onReady]);
-  const api = useMemo<DeviceStageApi>(() => ({ pressSideKey: () => params.onSideKey?.() }), [params]);
+  }, [model, screen, stage, sound, onSideKey, onKey, onReady]);
+  const api = useMemo<DeviceStageApi>(
+    () => ({ pressSideKey: () => params.onSideKey?.(), pressKey: (key) => params.onKey?.(key) }),
+    [params],
+  );
+  const release = () => {
+    if (stage.getState().held) stage.setState({ held: false });
+  };
 
   const showCover = !live || !ready;
   const cover = capture ? (
@@ -142,13 +160,21 @@ export function DeviceStage({
         // Count the press for the scene (it raycasts once per press). The 3D
         // side key chirps from a scene frame, after the gesture, so unlock
         // audio inside the gesture itself and every browser lets it play.
+        // `held` lasts until the pointer lifts or leaves: the trackpad's hold warms the egg (M10).
         onPointerDown={() => {
           if (sound) primeSideKeyChirp();
-          stage.setState({ taps: stage.getState().taps + 1 });
+          stage.setState({ taps: stage.getState().taps + 1, held: true });
         }}
+        onPointerUp={release}
+        onPointerCancel={release}
+        onPointerLeave={release}
         // Native: pointer events may not reach this view, so a touch counts the press too
         // (two counts in one frame still make one tap: the scene only checks for a change).
-        {...(Platform.OS === 'web' ? {} : { onTouchStart: () => stage.setState({ taps: stage.getState().taps + 1 }) })}
+        {...(Platform.OS === 'web' ? {} : {
+          onTouchStart: () => stage.setState({ taps: stage.getState().taps + 1, held: true }),
+          onTouchEnd: release,
+          onTouchCancel: release,
+        })}
       >
         {live ? (
           <ThreeCanvas

@@ -1,6 +1,7 @@
 import { hud } from '@acme/theme';
 import { roundRect, wrap } from './hud-draw.ts';
 import { HUD_SIZE } from './hud.ts';
+import { buttonAt, drawButton, type ScreenButton, type ScreenRect } from './screen-actions.ts';
 import { uvToScreenPx, type DeviceScreen, type ScreenModel, type ScreenModelSource } from './screen.ts';
 
 /** One choice on the screen: a slot with a model standing in it and a label under it. */
@@ -13,6 +14,32 @@ export interface ChoiceItem {
   readonly detail: string;
   /** The model standing in the slot; null draws the "Coming Soon" badge. */
   readonly source: ScreenModelSource | null;
+  /** Glow tint behind the model while it is focused; a theme token. Default by slot. */
+  readonly glow?: string;
+}
+
+/** A button on the panel under the slots. */
+export interface ChoiceAction {
+  /** The hit target; `onAction` receives it. */
+  readonly target: string;
+  readonly label: string;
+  readonly tone: 'primary' | 'secondary';
+}
+
+/**
+ * The panel under the slots, read on every repaint: what the focused choice
+ * is and what can be done with it (M08: the egg's card and its Choose /
+ * confirm buttons). Without a panel the screen draws the focused detail or the hint.
+ */
+export interface ChoicePanel {
+  /** Large line, e.g. the egg's name or the confirm question. */
+  readonly heading?: string;
+  /** Small line under it, e.g. "#001 · Bloodline". */
+  readonly meta?: string;
+  /** Up to three wrapped lines. */
+  readonly body?: string;
+  /** Up to two buttons, side by side. */
+  readonly actions: readonly ChoiceAction[];
 }
 
 export interface ChoiceScreenOptions {
@@ -29,15 +56,24 @@ export interface ChoiceScreenOptions {
   readonly subscribe: (onChange: () => void) => () => void;
   /** A tap on slot `index`. */
   readonly onSelect: (index: number) => void;
+  /** The panel under the slots, read on every repaint. `subscribe` must fire when it changes. */
+  readonly panel?: () => ChoicePanel;
+  /** A tap on a panel button. */
+  readonly onAction?: (target: string) => void;
 }
 
 const { width: W, height: H } = HUD_SIZE;
 const PAD = 40;
 const GAP = 20;
 /** The slot row, canvas px. */
-// Centred on the screen (row middle at 512 of 1024), between the heading and the foot copy;
-// slots are about as tall as they are wide plus the label, not long columns.
-export const CHOICE_ROW = { y: 322, height: 380 } as const;
+// Under the heading, leaving the lower 40% of the glass to the panel (the
+// focused egg's card, its buttons, the hint); slots are about as tall as
+// they are wide plus the label, not long columns.
+export const CHOICE_ROW = { y: 226, height: 344 } as const;
+/** The panel's text starts here; its buttons sit on the ACTION_ROW. */
+const PANEL_Y = 616;
+/** The panel's button row, canvas px. */
+export const ACTION_ROW = { y: 846, height: 128 } as const;
 /** Label strip at the bottom of each slot. */
 const LABEL_H = 84;
 
@@ -52,6 +88,13 @@ export function choiceSlotRect(i: number, count: number): { x: number; y: number
 export function choiceModelRect(i: number, count: number): { x: number; y: number; width: number; height: number } {
   const r = choiceSlotRect(i, count);
   return { x: r.x, y: r.y, width: r.width, height: r.height - LABEL_H };
+}
+
+/** Canvas rect of panel button `i` of `count` (one or two, side by side). */
+export function choiceActionRect(i: number, count: number): ScreenRect {
+  const n = Math.max(1, Math.min(2, count));
+  const width = (W - PAD * 2 - GAP * (n - 1)) / n;
+  return { x: PAD + i * (width + GAP), y: ACTION_ROW.y, width, height: ACTION_ROW.height };
 }
 
 /** Screen UV (v bottom-up) to the slot under it, or null. */
@@ -74,16 +117,29 @@ export function choiceSlotAt(u: number, v: number, count: number): number | null
 export function createChoiceScreen(options: ChoiceScreenOptions): DeviceScreen {
   const { items } = options;
   const count = items.length;
-  const models: ScreenModel[] = items.map((item, i) => ({ target: item.target, rect: choiceModelRect(i, count), source: item.source }));
+  const models: ScreenModel[] = items.map((item, i) => ({
+    target: item.target, rect: choiceModelRect(i, count), source: item.source, ...(item.glow ? { glow: item.glow } : {}),
+  }));
+  const buttons = (): ScreenButton[] => {
+    const actions = options.panel?.().actions.slice(0, 2) ?? [];
+    return actions.map((a, i) => ({ target: a.target, label: a.label, tone: a.tone, rect: choiceActionRect(i, actions.length) }));
+  };
 
   return {
     size: HUD_SIZE,
     models,
     hitTest: (u, v) => {
+      const { x, y } = uvToScreenPx(u, v, HUD_SIZE);
+      const button = buttonAt(buttons(), x, y);
+      if (button) return button.target;
       const i = choiceSlotAt(u, v, count);
       return i === null ? null : (items[i]?.target ?? null);
     },
     select: (target) => {
+      if (buttons().some((b) => b.target === target)) {
+        options.onAction?.(target);
+        return;
+      }
       const i = items.findIndex((item) => item.target === target);
       if (i >= 0) options.onSelect(i);
     },
@@ -159,22 +215,56 @@ export function createChoiceScreen(options: ChoiceScreenOptions): DeviceScreen {
         }
       });
 
+      const panel = options.panel?.();
+      if (panel) {
+        drawPanel(ctx, font, panel);
+        for (const button of buttons()) drawButton(ctx, font, button, hover);
+        return;
+      }
+
       // Foot: the focused choice's name and detail, or the hint while browsing.
       const chosen = focused === null ? undefined : items[focused];
       if (chosen) {
         ctx.textAlign = 'center';
         ctx.fillStyle = hud.text;
         ctx.font = font(48, 700);
-        ctx.fillText(chosen.label, W / 2, 846);
+        ctx.fillText(chosen.label, W / 2, PANEL_Y + 40);
         ctx.fillStyle = hud.dim;
         ctx.font = font(32, 500);
-        wrap(ctx, chosen.detail, W - PAD * 2).slice(0, 2).forEach((line, j) => ctx.fillText(line, W / 2, 910 + j * 44));
+        wrap(ctx, chosen.detail, W - PAD * 2).slice(0, 2).forEach((line, j) => ctx.fillText(line, W / 2, PANEL_Y + 104 + j * 44));
       } else {
         ctx.textAlign = 'center';
         ctx.fillStyle = hud.dim;
         ctx.font = font(34, 500);
-        wrap(ctx, options.hint, W - PAD * 2).slice(0, 3).forEach((line, j) => ctx.fillText(line, W / 2, 850 + j * 46));
+        wrap(ctx, options.hint, W - PAD * 2).slice(0, 3).forEach((line, j) => ctx.fillText(line, W / 2, PANEL_Y + 44 + j * 46));
       }
     },
   };
+}
+
+/** The panel's text block, centred above the button row. */
+function drawPanel(ctx: Parameters<DeviceScreen['draw']>[0], font: Parameters<DeviceScreen['draw']>[1], panel: ChoicePanel) {
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  let y = PANEL_Y + 30;
+  if (panel.heading) {
+    ctx.fillStyle = hud.text;
+    ctx.font = font(50, 700);
+    const lines = wrap(ctx, panel.heading, W - PAD * 2).slice(0, 2);
+    lines.forEach((line, j) => ctx.fillText(line, W / 2, y + j * 56));
+    y += lines.length * 56 + 6;
+  }
+  if (panel.meta) {
+    ctx.fillStyle = hud.dim;
+    ctx.font = font(34, 600);
+    ctx.fillText(panel.meta, W / 2, y);
+    y += 50;
+  }
+  if (panel.body) {
+    ctx.fillStyle = hud.text;
+    ctx.font = font(32, 500);
+    // Lines that would run into the button row are dropped, never drawn over it.
+    const room = Math.max(1, Math.floor((ACTION_ROW.y - 16 - y + 20) / 42));
+    wrap(ctx, panel.body, W - PAD * 2).slice(0, Math.min(3, room)).forEach((line, j) => ctx.fillText(line, W / 2, y + j * 42));
+  }
 }

@@ -16,6 +16,8 @@ export interface ScreenModel {
   readonly rect: { readonly x: number; readonly y: number; readonly width: number; readonly height: number };
   /** null: no model exists yet; the screen draws "Coming Soon" in the slot instead. */
   readonly source: ScreenModelSource | null;
+  /** Tint of the glow and radiating rings behind the model while it is selected. A `hud`/theme token; default by slot. */
+  readonly glow?: string;
 }
 
 /**
@@ -30,16 +32,26 @@ export interface DeviceScreen {
   readonly size: { readonly width: number; readonly height: number };
   /** Paint the current state. `hover` is the target under the pointer, or null. */
   draw(ctx: Ctx2D, font: CanvasFont, hover: string | null): void;
-  /** Screen UV from a raycast (v runs bottom-up) to the target there, or null. */
+  /**
+   * Screen UV from a raycast (v runs bottom-up) to the target there, or null.
+   * Targets are the screen's own: a model's slot (`ScreenModel.target`) or an
+   * action drawn on the glass (a button, see screen-actions.ts). The scene
+   * never interprets them; it hands them back through `select`.
+   */
   hitTest(u: number, v: number): string | null;
-  /** A tap or click landed on `target`. */
+  /** A tap or click landed on `target` (a model target or an action target). */
   select(target: string): void;
   /** Called whenever the screen's own state changes and it needs a repaint. Returns the unsubscribe. */
   subscribe(onChange: () => void): () => void;
   /** Models standing on the screen. Read once, when the scene builds. */
   readonly models?: readonly ScreenModel[];
-  /** The selected target, for the scene to bring its model forward. */
+  /** The selected target, for the scene to bring its model forward and light its glow. */
   selected?(): string | null;
+  /**
+   * Extra warmth on the selected model's glow, 0..1, read every frame (M10:
+   * up once incubation starts). The scene adds the trackpad's hold on top.
+   */
+  warmth?(): number;
 }
 
 /** UV (v bottom-up) to canvas px (y top-down) on a screen of `size`. */

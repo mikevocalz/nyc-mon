@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createStore } from 'zustand/vanilla';
 import type { Ctx2D } from './canvas2d-types.ts';
-import { choiceModelRect, choiceSlotAt, choiceSlotRect, createChoiceScreen, type ChoiceItem } from './choice-screen.ts';
+import { CHOICE_ROW, choiceActionRect, choiceModelRect, choiceSlotAt, choiceSlotRect, createChoiceScreen, type ChoiceItem } from './choice-screen.ts';
 import { HUD_SIZE } from './hud.ts';
 
 /** A Ctx2D that records the text it draws and accepts every other call. */
@@ -109,4 +109,33 @@ test('a focus change reaches the screen\'s subscriber, so the glass repaints', (
   unsubscribe();
   store.setState({ focused: 1 });
   assert.equal(repaints, 1);
+});
+
+test('with a panel, its buttons are hit targets that reach onAction, drawn below the slots', () => {
+  const store = createStore<{ focused: number | null }>(() => ({ focused: 0 }));
+  const actions: string[] = [];
+  const screen = createChoiceScreen({
+    title: 'Choose an egg', hint: 'Tap an egg.', comingSoon: 'Coming Soon', items,
+    focused: () => store.getState().focused,
+    subscribe: (onChange) => store.subscribe(onChange),
+    onSelect: (i) => store.setState({ focused: i }),
+    panel: () => ({
+      heading: 'Metro Egg', meta: '#001', body: 'Each egg holds one Mon.',
+      actions: [{ target: 'yes', label: 'Choose this egg', tone: 'primary' }, { target: 'no', label: 'Keep looking', tone: 'secondary' }],
+    }),
+    onAction: (target) => void actions.push(target),
+  });
+  const yes = choiceActionRect(0, 2);
+  const no = choiceActionRect(1, 2);
+  assert.ok(yes.y > CHOICE_ROW.y + CHOICE_ROW.height, 'buttons sit under the slot row');
+  assert.ok(yes.x + yes.width < no.x && no.x + no.width <= HUD_SIZE.width);
+  assert.equal(screen.hitTest(...uv(yes.x + 10, yes.y + 10)), 'yes');
+  assert.equal(screen.hitTest(...uv(no.x + no.width - 10, no.y + no.height - 10)), 'no');
+  screen.select('no');
+  screen.select('F02');
+  assert.deepEqual(actions, ['no']);
+  assert.equal(store.getState().focused, 1, 'a slot target still focuses its egg');
+  const drawn = recordingCtx();
+  screen.draw(drawn.ctx, () => '', null);
+  for (const text of ['Metro Egg', '#001', 'Choose this egg', 'Keep looking']) assert.ok(drawn.texts.includes(text), text);
 });

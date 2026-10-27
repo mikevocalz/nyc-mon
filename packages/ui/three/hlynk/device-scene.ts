@@ -1,6 +1,6 @@
-import { hlynk, led, palette, signage } from '@acme/theme';
+import { hlynk, hud, led, palette, signage } from '@acme/theme';
 import {
-  float, hash, instanceIndex, materialOpacity, mix, smoothstep, texture, uniform, uv, vec2, vec3, vec4,
+  atan, float, hash, instanceIndex, materialOpacity, mix, smoothstep, texture, uniform, uv, vec2, vec3, vec4,
 } from 'three/tsl';
 import type { StoreApi } from 'zustand/vanilla';
 import type { ThreeContext, ThreeFrame, ThreeScene } from '../types';
@@ -11,7 +11,7 @@ import {
   BODY, EMITTERS, FAN, INTRO, MAX_TILT, REST_YAW, SCREEN_GLASS, STAGE, screenPxToLocal,
 } from './device-geometry';
 import type { DeviceScreen, ScreenModel } from './screen';
-import { SIDE_KEY, type StageState } from './stage-state';
+import { keyFromTarget, keyTarget, SIDE_KEY, type DeviceKey, type StageState } from './stage-state';
 import { beamGradientTexture, glareTexture, grainTexture, iconTexture, radialGlowTexture, textTexture } from './textures';
 
 export { BODY, EMITTERS, FAN, HEAD_DEPTH, INTRO, MAX_TILT, REST_YAW, STAGE, fanCorners } from './device-geometry';
@@ -30,6 +30,8 @@ export interface DeviceSceneParams {
   store: StoreApi<StageState>;
   /** A press on the 3D left side key. The stage plays the chirp (when sound is on) and counts the press. */
   onSideKey?: () => void;
+  /** A press on a front key or the trackpad. The stage counts it (the scene dips that key) and calls its `onKey`. */
+  onKey?: (key: DeviceKey) => void;
   /** Called once, after the first frame with the H-Lynk in it has been drawn. The stage drops its capture then. */
   onReady?: () => void;
   /**
@@ -72,6 +74,21 @@ const SCREEN_ON = 0.62;
 const SIDE_KEY_DIP_S = 0.16;
 /** A model on the screen: its scale when focused, when another is focused, and its turn speed (rad/s) while focused. */
 const MODEL_FOCUS = { on: 1.08, off: 0.9, turn: 0.7, rate: 8 } as const;
+/** How far a front key or the trackpad dips into the shell per press, and for how long (s). */
+const KEY_DIP = { depth: 0.012, seconds: 0.16 } as const;
+/** The longest `onReady` waits for the screen's models before announcing anyway, ms. */
+const MODEL_WAIT_MS = 8000;
+/**
+ * The selected model's glow: a soft halo plus rings and rays radiating from
+ * its centre, behind it on the glass. `size` is the glow plane's side as a
+ * share of the slot's larger side; `rings` per glow radius and `speed` rings
+ * leaving the centre per second; `rays` around the circle turning at `spin`
+ * rad/s; `breath` the halo's swell, period in s. `warm` is the level a held
+ * trackpad (and the screen's own warmth) adds, and `idle` the clip speed it adds.
+ */
+const GLOW = { size: 1.25, rings: 3.2, speed: 0.45, rays: 9, spin: 0.25, breath: 2.6, warm: 0.9, idle: 1.5, rate: 5 } as const;
+/** Glow tints by slot when a model names none: hud tokens. */
+export const SCREEN_GLOW_TINTS = [hud.amber, hud.cyan, hud.green] as const;
 
 const CORE = hlynk.core;
 const { apple, concrete, ink, silver } = palette;
@@ -136,10 +153,15 @@ export function createDeviceScene(
   let dipFrom = -1; // scene time the current dip started; -1 none
   let dipQueued = false;
   let tapQueued = false;
+  // A front key or the trackpad dips the same way, one key at a time.
+  let keyDipFrom = -1;
+  let keyDipQueued: DeviceKey | null = null;
+  let keyDipping: DeviceKey | null = null;
   const unsubscribeStage = store.subscribe((next, prev) => {
     if (next.hover !== prev.hover) glass.paint();
     if (next.presses !== prev.presses) dipQueued = true;
     if (next.taps !== prev.taps) tapQueued = true;
+    if (next.keyPresses !== prev.keyPresses) keyDipQueued = next.lastKey;
     invalidate();
   });
   const unsubscribeScreen = screen.subscribe(() => {
@@ -161,7 +183,7 @@ export function createDeviceScene(
   // where the input is unchanged (PS-019's per-frame raycast).
   const raycaster = new THREE.Raycaster();
   const ndc = new THREE.Vector2();
-  const targets = [...modelHits, device.screen, device.sideKeyHit];
+  const targets = [...modelHits, device.screen, device.sideKeyHit, ...device.keyHits];
   let lastPointer = { x: Number.NaN, y: Number.NaN, inside: false };
   const pick = (): string | null => {
     device.group.updateMatrixWorld(true);
@@ -169,6 +191,8 @@ export function createDeviceScene(
     const hit = raycaster.intersectObjects(targets, false)[0];
     if (!hit) return null;
     if (hit.object === device.sideKeyHit) return SIDE_KEY;
+    const key = (hit.object.userData as { key?: DeviceKey }).key;
+    if (key !== undefined) return keyTarget(key);
     const target = (hit.object.userData as { target?: string }).target;
     if (target !== undefined) return target;
     return hit.uv ? screen.hitTest(hit.uv.x, hit.uv.y) : null;
@@ -214,7 +238,18 @@ export function createDeviceScene(
   }, 0);
   device.group.visible = false;
 
-  // Each model compiles off the frame path too, then shows.
+  // Each model compiles off the frame path too, then shows. `onReady` waits
+  // for every model to settle (shown, missing or failed), or MODEL_WAIT_MS,
+  // so the stage's loader covers the eggs popping in.
+  let unsettled = models.length;
+  const settleModel = () => {
+    unsettled = Math.max(0, unsettled - 1);
+    invalidate();
+  };
+  const modelWait = setTimeout(() => {
+    unsettled = 0;
+    invalidate();
+  }, MODEL_WAIT_MS);
   stand.load({
     onLoaded: (root) => {
       if (disposed) return;
@@ -224,9 +259,10 @@ export function createDeviceScene(
       void compiling.catch(() => undefined).then(() => {
         if (disposed) return;
         root.visible = true;
-        invalidate();
+        settleModel();
       });
     },
+    onSettled: settleModel,
     isDisposed: () => disposed,
   });
 
@@ -275,7 +311,11 @@ export function createDeviceScene(
       );
       device.beam(t, live);
       device.power(SCREEN_ON * power);
-      const modelsMoving = stand.update(frame, screen.selected?.() ?? null, power);
+      // Holding the trackpad warms the selected model's glow (M10), on top of the screen's own warmth.
+      const stageNow = store.getState();
+      const holdingPad = stageNow.held && stageNow.hover === keyTarget('activate');
+      const warmth = Math.min(1, (screen.warmth?.() ?? 0) + (holdingPad ? 1 : 0));
+      const modelsMoving = stand.update(frame, screen.selected?.() ?? null, power, warmth);
 
       // Input: hover on a move, act on a press. The stage counts presses in
       // the store from its pointerdown handler (so a tap shorter than a
@@ -292,7 +332,9 @@ export function createDeviceScene(
           hover = pick();
         }
         if (hover !== store.getState().hover) store.setState({ hover });
+        const pressedKey = keyFromTarget(hover);
         if (pressed && hover === SIDE_KEY) params.onSideKey?.();
+        else if (pressed && pressedKey !== null) params.onKey?.(pressedKey);
         else if (pressed && hover !== null) screen.select(hover);
       }
 
@@ -304,8 +346,17 @@ export function createDeviceScene(
       const dipping = dipFrom >= 0 && frame.time - dipFrom < SIDE_KEY_DIP_S;
       if (!dipping) dipFrom = -1;
       device.dipSideKey(dipping);
+      if (keyDipQueued !== null) {
+        keyDipping = keyDipQueued;
+        keyDipQueued = null;
+        keyDipFrom = frame.time;
+      }
+      const keyDown = keyDipFrom >= 0 && frame.time - keyDipFrom < KEY_DIP.seconds;
+      if (!keyDown) keyDipFrom = -1;
+      // The trackpad stays down while it is held.
+      device.dipKey(keyDown ? keyDipping : holdingPad ? 'activate' : null);
 
-      if (!announced) {
+      if (!announced && unsettled === 0) {
         announced = true;
         // After this frame's render, which runs right after update returns.
         setTimeout(() => {
@@ -316,7 +367,7 @@ export function createDeviceScene(
       // A queued dip needs the loop for one more beat; idling models keep it running.
       // A live beam keeps the loop running while the stage is on screen (the
       // stage still pauses it offscreen); under reduced motion it rests as before.
-      const rest = t >= INTRO.end && !tracking && settled && !dipping && !modelsMoving && !live;
+      const rest = t >= INTRO.end && !tracking && settled && !dipping && !keyDown && !modelsMoving && !live;
       if (rest !== resting) {
         resting = rest;
         params.onRest?.(rest);
@@ -327,6 +378,7 @@ export function createDeviceScene(
       unsubscribeStage();
       unsubscribeScreen();
       clearTimeout(warm);
+      clearTimeout(modelWait);
       stand.dispose();
       device.group.userData.dispose();
     },
@@ -360,18 +412,77 @@ function screenTexture(
  * model idles on its own clip; under reduced motion each holds still.
  */
 function standModels(THREE: Three, parent: Group, models: readonly ScreenModel[], screenSize: DeviceScreen['size']) {
-  const holders: { target: string; holder: Group; rig: EggHatchRig | null; scale: number; spin: number }[] = [];
+  interface Holder {
+    target: string;
+    holder: Group;
+    rig: EggHatchRig | null;
+    scale: number;
+    spin: number;
+    /** 0 hidden .. 1 selected .. 1 + GLOW.warm warmed */
+    glowLevel: number;
+    glow: { group: Group; halo: Material & { opacity: number }; rings: Material & { opacity: number } } | null;
+  }
+  const holders: Holder[] = [];
   const hits: Mesh[] = [];
+  // Buckets, as buildDevice's: everything here is freed in dispose.
   const geometries: Geometry[] = [];
-  const hitMaterial = new THREE.MeshBasicMaterial();
+  const materials: Material[] = [];
+  const textures: { dispose(): void }[] = [];
+  const track = <G extends Geometry>(g: G) => (geometries.push(g), g);
+  const mat = <M extends Material>(m: M) => (materials.push(m), m);
+  const tex = <T extends { dispose(): void }>(t: T) => (textures.push(t), t);
+  const hitMaterial = mat(new THREE.MeshBasicMaterial());
   let disposed = false;
 
   for (const m of models) {
     const holder = new THREE.Group();
     holder.name = `ScreenModel_${m.target}`;
     parent.add(holder);
-    holders.push({ target: m.target, holder, rig: null, scale: 1, spin: 0 });
+    holders.push({ target: m.target, holder, rig: null, scale: 1, spin: 0, glowLevel: 0, glow: null });
   }
+
+  // The glow behind a selected model. One time uniform and one soft dot for
+  // all of them; each model has its own halo and ring materials (own tint and
+  // level). Additive, no depth writes, so the model in front still occludes.
+  const glowTime = uniform(0);
+  const glowMotion = uniform(0); // 0 under reduced motion: a still halo, no rings
+  const glowDot = tex(radialGlowTexture(THREE));
+  const glowPlane = track(new THREE.PlaneGeometry(1, 1));
+  const centred = uv().sub(0.5).mul(2);
+  const radius = centred.length();
+  // Rings: a sawtooth in radius moving outward, shaped into thin bands.
+  const wave = radius.mul(GLOW.rings).sub(glowTime.mul(GLOW.speed)).fract();
+  const band = smoothstep(float(0), float(0.12), wave).mul(float(1).sub(smoothstep(float(0.12), float(0.55), wave)));
+  // Rays: soft spokes turning slowly.
+  const rays = atan(centred.y, centred.x).mul(GLOW.rays).add(glowTime.mul(GLOW.spin)).sin().mul(0.5).add(0.5).pow(4);
+  // Clear of the model's middle, gone before the plane's edge.
+  const reach = smoothstep(float(0.18), float(0.32), radius).mul(float(1).sub(smoothstep(float(0.55), float(1), radius)));
+  const radiate = band.mul(0.85).add(rays.mul(0.35)).mul(reach).mul(glowMotion);
+
+  const addGlow = (entry: Holder, tint: string, slot: { x: number; baseY: number; height: number; width: number }) => {
+    const group = new THREE.Group();
+    group.name = `ScreenModelGlow_${entry.target}`;
+    const side = Math.max(slot.width, slot.height) * GLOW.size;
+    group.scale.set(side, side, 1);
+    // On the glass, behind the model (which stands proud of it), centred on the model.
+    group.position.set(slot.x, slot.baseY + slot.height / 2, SCREEN_GLASS.z + 0.004);
+    const halo = mat(new THREE.MeshBasicMaterial({
+      map: glowDot, color: tint, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending,
+    }));
+    const rings = mat(new THREE.MeshBasicNodeMaterial({
+      color: tint, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending,
+    }));
+    rings.opacityNode = materialOpacity.mul(radiate);
+    const haloMesh = new THREE.Mesh(glowPlane, halo);
+    haloMesh.scale.setScalar(0.85);
+    group.add(haloMesh);
+    const ringMesh = new THREE.Mesh(glowPlane, rings);
+    ringMesh.position.z = 0.001;
+    group.add(ringMesh);
+    group.visible = false;
+    parent.add(group);
+    entry.glow = { group, halo, rings };
+  };
 
   /** A slot's rect (screen canvas px) as glass-local placement: centre x, base y, height and width in body widths. */
   const layout = (m: ScreenModel, size: DeviceScreen['size']) => {
@@ -382,7 +493,12 @@ function standModels(THREE: Three, parent: Group, models: readonly ScreenModel[]
 
   return {
     hits,
-    load: ({ onLoaded, isDisposed }: { onLoaded: (root: Group) => void; isDisposed: () => boolean }) => {
+    /** `onLoaded` gets each model that loaded; `onSettled` fires once for each one that is missing or failed. */
+    load: ({ onLoaded, onSettled, isDisposed }: {
+      onLoaded: (root: Group) => void;
+      onSettled: () => void;
+      isDisposed: () => boolean;
+    }) => {
       models.forEach((m, i) => {
         const slot = layout(m, screenSize);
         const entry = holders[i]!;
@@ -396,8 +512,13 @@ function standModels(THREE: Three, parent: Group, models: readonly ScreenModel[]
         parent.add(hit);
         hits.push(hit);
 
+        addGlow(entry, m.glow ?? SCREEN_GLOW_TINTS[i % SCREEN_GLOW_TINTS.length]!, slot);
+
         const source = m.source;
-        if (source === null) return;
+        if (source === null) {
+          onSettled();
+          return;
+        }
         void import('../hatch/egg-hatch-rig')
           .then(({ EggHatchRig }) => EggHatchRig.create(source.eggId, { manifest: source.manifest, glb: source.glb }))
           .then((rig) => {
@@ -426,16 +547,33 @@ function standModels(THREE: Three, parent: Group, models: readonly ScreenModel[]
           })
           .catch((error: unknown) => {
             console.warn(`[hlynk] the ${source.eggId} model did not load; its slot keeps the label.`, error);
+            onSettled();
           });
       });
     },
-    /** Poses every model for this frame. Returns true while any of them moves. */
-    update: (frame: ThreeFrame, selected: string | null, power: number): boolean => {
+    /** Poses every model for this frame. `warmth` 0..1 warms the selected model. Returns true while any of them moves. */
+    update: (frame: ThreeFrame, selected: string | null, power: number, warmth: number): boolean => {
       let moving = false;
       const k = frame.delta > 0 ? 1 - Math.exp(-frame.delta * MODEL_FOCUS.rate) : 1;
+      const kGlow = frame.delta > 0 ? 1 - Math.exp(-frame.delta * GLOW.rate) : 1;
+      glowTime.value = frame.reducedMotion ? 0 : glowTime.value + frame.delta * (1 + warmth);
+      glowMotion.value = frame.reducedMotion ? 0 : 1;
       for (const entry of holders) {
         const rig = entry.rig;
         if (!rig) continue;
+        // The glow follows the selection and comes up with the screen; warmth swells it.
+        const glowGoal = selected === entry.target ? (1 + GLOW.warm * warmth) * power : 0;
+        entry.glowLevel += (glowGoal - entry.glowLevel) * kGlow;
+        if (Math.abs(glowGoal - entry.glowLevel) > 1e-3) moving = true;
+        const glow = entry.glow;
+        if (glow) {
+          const level = entry.glowLevel;
+          glow.group.visible = level > 1e-3;
+          const swell = frame.reducedMotion ? 1 : 1 + 0.06 * Math.sin((2 * Math.PI * glowTime.value) / GLOW.breath);
+          glow.group.children[0]?.scale.setScalar(0.85 * swell * (1 + 0.12 * warmth));
+          glow.halo.opacity = Math.min(1, 0.55 * level);
+          glow.rings.opacity = Math.min(1, 0.6 * level);
+        }
         const goal = selected === null ? 1 : selected === entry.target ? MODEL_FOCUS.on : MODEL_FOCUS.off;
         entry.scale += (goal - entry.scale) * k;
         if (selected === entry.target && !frame.reducedMotion) entry.spin += frame.delta * MODEL_FOCUS.turn;
@@ -446,7 +584,8 @@ function standModels(THREE: Three, parent: Group, models: readonly ScreenModel[]
         if (frame.reducedMotion) rig.seek('stir', 0);
         else {
           rig.idle();
-          rig.update(frame.delta);
+          // A warmed egg idles livelier.
+          rig.update(frame.delta * (selected === entry.target ? 1 + GLOW.idle * warmth : 1));
           moving = true;
         }
         if (Math.abs(goal - entry.scale) > 1e-3) moving = true;
@@ -460,8 +599,10 @@ function standModels(THREE: Three, parent: Group, models: readonly ScreenModel[]
         entry.holder.removeFromParent();
       }
       for (const hit of hits) hit.removeFromParent();
+      for (const entry of holders) entry.glow?.group.removeFromParent();
       geometries.forEach((g) => g.dispose());
-      hitMaterial.dispose();
+      materials.forEach((m) => m.dispose());
+      textures.forEach((t) => t.dispose());
     },
   };
 }
@@ -479,6 +620,10 @@ function buildDevice(
   sideKeyHit: Mesh;
   /** press the left side key into the shell, or let it back out */
   dipSideKey: (down: boolean) => void;
+  /** invisible boxes over the four front keys and the trackpad; `userData.key` names each */
+  keyHits: Mesh[];
+  /** press one front key (or the trackpad) into the shell; null lets every key back out */
+  dipKey: (key: DeviceKey | null) => void;
   /** fan opacity scale 0..1 and emitter emissive intensity */
   light: (fan: number, emitter: number) => void;
   /** the fan's ripples and glitter at scene time `time`; `live` false holds the beam still with no glitter */
@@ -669,16 +814,36 @@ function buildDevice(
   ];
   const keyFace = rounded(0.125, 0.14, 0.05, 0.022);
   const keyGlyph = track(new THREE.PlaneGeometry(0.06, 0.06));
+  // What each key does when pressed: `<` and `>` step, home and menu as named.
+  const KEY_OF = { home: 'home', menu: 'menu', back: 'prev', next: 'next' } as const;
+  const keyParts = new Map<DeviceKey, Mesh[]>();
+  const keyHits: Mesh[] = [];
+  const keyHitMaterial = mat(new THREE.MeshBasicMaterial());
+  const keyHitGeo = track(new THREE.BoxGeometry(0.15, 0.17, 0.08));
+  const addKeyHit = (key: DeviceKey, geo: Geometry, x: number) => {
+    const hit = new THREE.Mesh(geo, keyHitMaterial);
+    hit.position.set(x, rowY, front + 0.03);
+    hit.visible = false;
+    hit.userData.key = key;
+    group.add(hit);
+    keyHits.push(hit);
+  };
   for (const { x, icon, red } of keys) {
-    box(keyFace, pianoBlack, x, rowY, front + 0.02);
+    const face = box(keyFace, pianoBlack, x, rowY, front + 0.02);
     const m = mat(new THREE.MeshBasicMaterial({
       map: tex(iconTexture(THREE, icon, red ? apple[400] : CORE.glyph)), transparent: true, depthWrite: false,
     }));
-    box(keyGlyph, m, x, rowY, front + 0.047);
+    const glyph = box(keyGlyph, m, x, rowY, front + 0.047);
+    keyParts.set(KEY_OF[icon], [face, glyph]);
+    addKeyHit(KEY_OF[icon], keyHitGeo, x);
   }
-  // Trackpad: red ring on a gloss black pad, slightly proud of the row.
+  // Trackpad: red ring on a gloss black pad, slightly proud of the row. The pad dips; the ring stays.
   box(rounded(0.28, 0.28, 0.034, 0.045), ring, 0, rowY, front + 0.015);
-  box(rounded(0.23, 0.23, 0.05, 0.035), pianoBlack, 0, rowY, front + 0.02);
+  const pad = box(rounded(0.23, 0.23, 0.05, 0.035), pianoBlack, 0, rowY, front + 0.02);
+  keyParts.set('activate', [pad]);
+  addKeyHit('activate', track(new THREE.BoxGeometry(0.3, 0.3, 0.08)), 0);
+  const keyRestZ = new Map<Mesh, number>();
+  for (const parts of keyParts.values()) for (const part of parts) keyRestZ.set(part, part.position.z);
 
   // --- side keys -------------------------------------------------------------
 
@@ -740,6 +905,12 @@ function buildDevice(
     sideKeyHit,
     dipSideKey: (down) => {
       sideKey.position.x = down ? sideKeyRestX + 0.014 : sideKeyRestX;
+    },
+    keyHits,
+    dipKey: (down) => {
+      for (const [key, parts] of keyParts) {
+        for (const part of parts) part.position.z = (keyRestZ.get(part) ?? part.position.z) - (key === down ? KEY_DIP.depth : 0);
+      }
     },
     light: (level, intensity) => {
       fan.level(level);

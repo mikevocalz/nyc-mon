@@ -3,9 +3,17 @@ export { DeviceStage, type DeviceCapture, type DeviceStageApi, type DeviceStageP
 export { HLynkHudStage, type HLynkHudStageControls, type HLynkHudStageProps } from './HLynkHudStage';
 export { createHudScreen } from './hud-screen';
 export {
-  CHOICE_ROW, choiceModelRect, choiceSlotAt, choiceSlotRect, createChoiceScreen,
-  type ChoiceItem, type ChoiceScreenOptions,
+  ACTION_ROW, CHOICE_ROW, choiceActionRect, choiceModelRect, choiceSlotAt, choiceSlotRect, createChoiceScreen,
+  type ChoiceAction, type ChoiceItem, type ChoicePanel, type ChoiceScreenOptions,
 } from './choice-screen';
+export {
+  createIncubateScreen, INCUBATE_EGG_TARGET, incubateOptionRect, INCUBATE_START_TARGET, incubateOptionTarget,
+  type IncubateScreenOptions,
+} from './incubate-screen';
+export { buttonAt, drawButton, inRect, type ScreenButton, type ScreenRect } from './screen-actions';
+export { keyFromTarget, keyTarget, type DeviceKey } from './stage-state';
+export { createStageReady, type StageReadyResource } from './stage-ready';
+export { StageReadyGate } from './StageReadyGate';
 export type { DeviceScreen, ScreenModel, ScreenModelSource } from './screen';
 export type { DeviceSceneParams } from './device-scene';
 export {
