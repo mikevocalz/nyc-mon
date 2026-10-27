@@ -355,6 +355,7 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
         actorFrame.reducedMotion = frame.reducedMotion === true;
         let anyMoving = false;
         for (const actor of actors) if (actor.update(actorFrame)) anyMoving = true;
+        world.updateFacelift(actorTime, actorFrame.reducedMotion);
         moving = anyMoving;
       }
       // After the actors: a chase camera reads the Caller's position in this frame's params.

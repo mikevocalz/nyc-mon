@@ -23,6 +23,7 @@ import { buildPrecipitation } from './vd-weather.ts';
 import { CURB_HEIGHT, VD_SHADOWS, VD_SHADOW_HALF } from './curb.ts';
 import { FUTURE_LAYER, type AdSurface } from './future-layer.ts';
 import { buildPhysicalCityMaterials } from './physical/index.ts';
+import { buildPhysicalFacelift } from './physical/facelift.ts';
 import { cityUniforms } from './physical-rig.ts';
 import { buildLaneTopology } from '../living-city/topology.ts';
 
@@ -211,6 +212,10 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
         away, clearance, options.future ?? EXPERIMENTAL_WORLD_FUTURE, { facadeAttributes: true, fireEscapes: true },
       )
     : buildCityMeshes(THREE, dataset, materials, away, clearance, options.future ?? EXPERIMENTAL_WORLD_FUTURE);
+  // The facelift reads the built masonry walls, so it follows buildCityMeshes.
+  const facelift = phys && (options.future ?? EXPERIMENTAL_WORLD_FUTURE)
+    ? buildPhysicalFacelift(THREE, dataset, city.meshes, clearance)
+    : null;
   const trees = buildTrees(THREE, dataset, materials, clearance, vd, VD_LEAN, leanMat, leanDraw);
   const furniture = buildStreetFurniture(THREE, dataset, materials, clearance, city.texts);
   const props = buildStreetProps(THREE, dataset, materials, clearance, furniture.signs, furniture.lights);
@@ -252,6 +257,7 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
   if (precipitation) group.add(precipitation.mesh);
   if (phys?.roadPaint) group.add(phys.roadPaint);
   if (phys) group.add(...phys.fireEscapes.meshes);
+  if (facelift?.mesh) group.add(facelift.mesh);
 
   const horizon = skyRig?.horizon ?? linearColor(THREE, 'skyHorizon');
   const fog = skyRig?.fog ?? new THREE.Fog(horizon, 600, 2500);
@@ -259,7 +265,7 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
   const stats: CityWorldStats = {
     ...city.stats, trees: trees.count, signs: furniture.stats.signs, streetlights: furniture.stats.streetlights, treeClearance: trees.report,
     props: props.stats,
-    drawCalls: city.stats.drawCalls + trees.objects.length + furniture.objects.length + props.objects.length + 2,
+    drawCalls: city.stats.drawCalls + trees.objects.length + furniture.objects.length + props.objects.length + 2 + (facelift?.mesh ? 1 : 0),
   };
   let viewDistance = 220;
   const bands: [number, number] = [0, 0];
@@ -317,7 +323,12 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
       props.setFocus(x, z, bands[0], bands[1]);
       if (phys && city.physical) phys.fireEscapes.update(city.physical.fireEscapes, x, z);
     },
+    /** Advances the facelift's LED sweep; holds it still under Reduce Motion. No-op without the facelift. */
+    updateFacelift(time: number, reducedMotion: boolean) {
+      facelift?.update(time, reducedMotion);
+    },
     dispose() {
+      facelift?.dispose();
       city.dispose();
       phys?.dispose();
       trees.dispose();
