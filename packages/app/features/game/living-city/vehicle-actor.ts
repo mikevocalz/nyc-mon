@@ -28,7 +28,9 @@
 // street through a tiered pool of real SpotLights plus night flare sprites
 // (vehicle-headlights.ts). With the flag off nothing below changes: the
 // default registry, the box recipes and the PR07 light quads are exactly
-// as before.
+// as before, and lofted-car.ts, lofted-car-material.ts and
+// vehicle-headlights.ts are never evaluated (physical-graph.ts loads them
+// inside createLoftedFleet).
 
 import type { Three } from '@acme/ui/three';
 import type { ActorFrame, SceneActor, SceneActorFactory } from '../scene-actor.ts';
@@ -42,22 +44,8 @@ import {
   type WorldAssetRegistry,
 } from './asset-registry.ts';
 import { readEnvSection } from './clock.ts';
-import {
-  buildBusGeometryData,
-  buildCarGeometryData,
-  buildCarProxyGeometryData,
-  bodySpecForKind,
-  frontLampMount,
-  rearLampMount,
-  type VehicleMeshData,
-} from './lofted-car.ts';
-import {
-  LOFTED_INSTANCE_ATTRIBUTES,
-  carStateFromFlags,
-  createLoftedBusMaterial,
-  createLoftedCarMaterial,
-  vehiclePaintToken,
-} from './lofted-car-material.ts';
+import type { VehicleMeshData } from './lofted-car.ts';
+import { loadLoftedCar, loadLoftedCarMaterial, loadVehicleHeadlights } from '../physical-graph.ts';
 import { PHYSICAL_SEED_ASSETS, SEED_ASSETS } from './seed-assets.ts';
 import { envSectionOffset } from './signal-viz.ts';
 import {
@@ -70,20 +58,7 @@ import {
   interpolateVehiclePose,
   type VehicleKind,
 } from './vehicle-sim.ts';
-import {
-  FLARES_PER_VEHICLE,
-  FLARE_STRIDE,
-  createCarFlareMaterial,
-  createVehicleHeadlight,
-  headlightSpotCount,
-  metresPerPixelAt1m,
-  placeVehicleHeadlight,
-  rankLitVehicles,
-  writeVehicleFlares,
-  type FlareMount,
-  type HeadlightTier,
-  type LightFocus,
-} from './vehicle-headlights.ts';
+import type { FlareMount, HeadlightTier, LightFocus } from './vehicle-headlights.ts';
 import {
   FLARE_GLOW_ON,
   HEADLIGHTS,
@@ -566,6 +541,21 @@ function createLoftedFleet(
   options: VehicleActorOptions,
   group: InstanceType<Three['Group']>,
 ): LoftedFleet | null {
+  const { buildBusGeometryData, buildCarGeometryData, buildCarProxyGeometryData, bodySpecForKind, frontLampMount, rearLampMount } =
+    loadLoftedCar();
+  const { LOFTED_INSTANCE_ATTRIBUTES, carStateFromFlags, createLoftedBusMaterial, createLoftedCarMaterial, vehiclePaintToken } =
+    loadLoftedCarMaterial();
+  const {
+    FLARES_PER_VEHICLE,
+    FLARE_STRIDE,
+    createCarFlareMaterial,
+    createVehicleHeadlight,
+    headlightSpotCount,
+    metresPerPixelAt1m,
+    placeVehicleHeadlight,
+    rankLitVehicles,
+    writeVehicleFlares,
+  } = loadVehicleHeadlights();
   const T = THREE.TSL;
   const tier: HeadlightTier = options.tier ?? WORLD_TIER;
   const nearCap = LOFTED_NEAR_VEHICLES[tier];

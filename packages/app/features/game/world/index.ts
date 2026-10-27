@@ -24,7 +24,7 @@ import { CURB_HEIGHT, VD_SHADOWS, VD_SHADOW_HALF } from './curb.ts';
 import { FUTURE_LAYER, type AdSurface } from './future-layer.ts';
 import { buildPhysicalCityMaterials } from './physical/index.ts';
 import { buildPhysicalFacelift } from './physical/facelift.ts';
-import { cityUniforms } from './physical-rig.ts';
+import { loadPhysicalRig } from '../physical-graph.ts';
 import { buildLaneTopology } from '../living-city/topology.ts';
 
 // Lane G1 "GPU budget" (EXPO_PUBLIC_WORLD_BUNDLES) was deleted 2026-11: the
@@ -203,7 +203,7 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
   // One street-clearance index for every tree, pole, sign, stoop and prop.
   const clearance = createStreetClearance(dataset);
   const phys = options.physical
-    ? buildPhysicalCityMaterials(THREE, cityUniforms(THREE), dataset, { topology: buildLaneTopology(dataset) })
+    ? buildPhysicalCityMaterials(THREE, loadPhysicalRig().cityUniforms(THREE), dataset, { topology: buildLaneTopology(dataset) })
     : null;
   const city = phys
     ? buildCityMeshes(

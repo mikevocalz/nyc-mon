@@ -2,8 +2,11 @@
 // gpu-store's device and react-native-skia's `SkiaApi` global both live.
 // game-render.ts runs the same probes on the worklet render runtime. RN
 // runtime only: @acme/ui/gpu pulls in react-native, so it is imported on
-// call, and the worklet runtime never loads this file.
-import { formatProbeRecord, probeShared, probeSkiaTex, webgpuSampler, WORLD_DEVICE_PROBE, type ProbeRecord } from './device-probes.ts';
+// call, and the worklet runtime never loads this file. device-probes.ts
+// loads only when a probe runs (physical-graph.ts).
+import type { ProbeRecord } from './device-probes.ts';
+import { loadDeviceProbes } from '../physical-graph.ts';
+import { WORLD_DEVICE_PROBE } from '../world/physical-look.ts';
 import { readInteropGlobals, WORLD_PHYSICAL, type InteropGlobals } from './shared-device.ts';
 
 export interface JsProbeDeps {
@@ -33,6 +36,7 @@ export async function runJsDeviceProbe(
   deps: JsProbeDeps = defaultDeps,
 ): Promise<ProbeRecord | null> {
   if (probe !== 'shared' && probe !== 'skiatex') return null;
+  const { formatProbeRecord, probeShared, probeSkiaTex, webgpuSampler } = loadDeviceProbes();
   const gpu = await deps.gpu();
   const { skia } = deps.globals();
   const device = gpu?.device ?? null;

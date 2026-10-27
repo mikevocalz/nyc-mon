@@ -63,6 +63,13 @@ export const WORLD_PROBE: WorldProbe | null = activeWorldProbe(
 );
 
 /**
+ * The shared-device lane's probe (shared, skiatex, pipecache); null for a rig
+ * probe or none. Here rather than in render-runtime/device-probes.ts so a
+ * caller can test it without loading the probes.
+ */
+export const WORLD_DEVICE_PROBE: DeviceLaneProbe | null = isDeviceLaneProbe(WORLD_PROBE) ? WORLD_PROBE : null;
+
+/**
  * Which pieces of the physical stack a scene mounts. With the flag off,
  * `physicalFeaturesFor` returns null and city-scene runs today's
  * path untouched.

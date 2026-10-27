@@ -26,7 +26,8 @@ import {
   type WorldProbe,
 } from './world/physical-look.ts';
 import { PHYSICAL_PRESETS } from './world/physical-presets.ts';
-import { applyPhysicalShadowRoles, createPhysicalRig, swapInstanceMatricesToStorage, type PhysicalRig } from './world/physical-rig.ts';
+import type { PhysicalRig } from './world/physical-rig.ts';
+import { loadPhysicalRig } from './physical-graph.ts';
 
 export interface CityCamera {
   x: number;
@@ -161,8 +162,10 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
   // The bgnull probe's failure case. Slop (js/lighting.js): a Color background
   // makes the renderer force a clear that wipes cascade 0 while cascade 1 renders.
   if (physical?.colorBackground) scene.background = new THREE.Color(world.horizon);
-  const rig: PhysicalRig | null = physical
-    ? createPhysicalRig(THREE, renderer ?? null, scene, {
+  // The rig module (SkyMesh, SunLight, ClusteredLighting) is evaluated only here, flag on.
+  const rigModule = physical ? loadPhysicalRig() : null;
+  const rig: PhysicalRig | null = physical && rigModule
+    ? rigModule.createPhysicalRig(THREE, renderer ?? null, scene, {
         features: physical,
         shadowTile: physicalTier.shadowTile,
         clusteredMaxLights: physicalTier.clusteredMaxLights,
@@ -259,9 +262,9 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
     throw error;
   }
 
-  if (physical && physical.sunShadow > 0) applyPhysicalShadowRoles(scene);
+  if (rigModule && physical && physical.sunShadow > 0) rigModule.applyPhysicalShadowRoles(scene);
   // After the actors joined, so their instanced meshes are swapped too.
-  const storageSwapped = renderer && physical?.storage ? swapInstanceMatricesToStorage(THREE, renderer, scene) : 0;
+  const storageSwapped = rigModule && renderer && physical?.storage ? rigModule.swapInstanceMatricesToStorage(THREE, renderer, scene) : 0;
   let probeCleanup: (() => void) | void = undefined;
   if (renderer && isDeviceLaneProbe(WORLD_PROBE)) {
     probeCleanup = deviceLaneProbeHooks[WORLD_PROBE]?.({ THREE, renderer, scene, camera });

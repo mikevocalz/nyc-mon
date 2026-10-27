@@ -10,7 +10,7 @@
 // Pure: device, Skia and three arrive as arguments. Worklet-safe.
 import type * as ThreeWebGpu from 'three/webgpu';
 import { CITY_COLORS } from '../world/palette.ts';
-import { isDeviceLaneProbe, WORLD_PROBE, type DeviceLaneProbe } from '../world/physical-look.ts';
+import { type DeviceLaneProbe } from '../world/physical-look.ts';
 import {
   createSkiaTexture, drawLabel, rgba, SKIA_TEXTURE_FORMAT, SKIA_TEXTURE_USAGE, toThreeTexture,
   type LabelSpec, type Rgba, type SkiaInterop, type SkiaTexture,
@@ -18,8 +18,8 @@ import {
 
 type Three = typeof ThreeWebGpu;
 
-/** This lane's probe from EXPO_PUBLIC_WORLD_PROBE (parsed in world/physical-look.ts); null for the light-rig probes or none. */
-export const WORLD_DEVICE_PROBE: DeviceLaneProbe | null = isDeviceLaneProbe(WORLD_PROBE) ? WORLD_PROBE : null;
+/** This lane's probe from EXPO_PUBLIC_WORLD_PROBE (world/physical-look.ts); null for the light-rig probes or none. */
+export { WORLD_DEVICE_PROBE } from '../world/physical-look.ts';
 
 export type ProbeRuntime = 'js' | 'worklet';
 

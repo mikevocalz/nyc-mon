@@ -34,9 +34,11 @@ import { readCaller, readCamera, readPreset, readView, snapshotVersion, type Mut
 import { createStreetClearance } from '../world/walkability.ts';
 import { describeRuntimeError, installFrameGlobals, type GameRenderEventKind } from './runtime-report.ts';
 import { FrameSampleWindow, type MutableFrameTimingSample } from '../perf/frame-sampler.ts';
-import { physicalRendererParams } from '../world/physical-look.ts';
+import { physicalRendererParams, WORLD_DEVICE_PROBE } from '../world/physical-look.ts';
 import { readInteropGlobals, resolveRendererDevice, WORLD_PHYSICAL, type RendererDevice } from './shared-device.ts';
-import { createPipecacheTimer, formatProbeRecord, probeShared, probeSkiaTex, threeSampler, WORLD_DEVICE_PROBE } from './device-probes.ts';
+// device-probes.ts (and the Skia texture bridge it imports) loads only when a
+// device-lane probe runs on a shared device, under EXPO_PUBLIC_WORLD_PHYSICAL.
+import { loadDeviceProbes } from '../physical-graph.ts';
 
 export type { GameRenderEventKind } from './runtime-report.ts';
 
@@ -294,7 +296,7 @@ export function startGameRender(args: GameRenderArgs): void {
   const shared = WORLD_PHYSICAL ? resolveRendererDevice(args.device, args.deviceSource, readInteropGlobals()) : null;
   if (shared) trace(s, `renderer device: ${shared.source}; ${shared.note}`);
   const device = shared ? shared.device : args.device;
-  const pipecache = shared && WORLD_DEVICE_PROBE === 'pipecache' ? createPipecacheTimer('worklet') : null;
+  const pipecache = shared && WORLD_DEVICE_PROBE === 'pipecache' ? loadDeviceProbes().createPipecacheTimer('worklet') : null;
   let renderer: InstanceType<typeof THREE.WebGPURenderer>;
   try {
     // With inline requires (forced by Bundle Mode), this line is where three.js is first evaluated here.
@@ -376,7 +378,7 @@ export function startGameRender(args: GameRenderArgs): void {
       onFirstFrame: () => {
         emit(s, 'firstFrame');
         const record = pipecache?.finish();
-        if (record) trace(s, formatProbeRecord(record));
+        if (record) trace(s, loadDeviceProbes().formatProbeRecord(record));
       },
     };
     const setup = withFirstFrameSignal(
@@ -411,6 +413,7 @@ export function startGameRender(args: GameRenderArgs): void {
 async function runRendererProbe(s: Session, renderer: InstanceType<typeof THREE.WebGPURenderer>, shared: RendererDevice): Promise<void> {
   const device = (renderer.backend as { device?: GPUDevice | null }).device ?? null;
   const { skia } = readInteropGlobals();
+  const { formatProbeRecord, probeShared, probeSkiaTex, threeSampler } = loadDeviceProbes();
   try {
     if (WORLD_DEVICE_PROBE === 'shared') {
       trace(s, formatProbeRecord(await probeShared({ runtime: 'worklet', device, deviceSource: shared.source, skia })));

@@ -53,7 +53,8 @@ import type { Node } from 'three/webgpu';
 import { bloom } from 'three/examples/jsm/tsl/display/BloomNode.js';
 import { ssao } from 'three/examples/jsm/tsl/display/SSAONode.js';
 import { fxaa } from 'three/examples/jsm/tsl/display/FXAANode.js';
-import { ssr } from 'three/examples/jsm/tsl/display/SSRNode.js';
+import type { ssr } from 'three/examples/jsm/tsl/display/SSRNode.js';
+import { loadSsrNode } from '../physical-graph.ts';
 import { parseSkyRigFlag } from '../world/sky-rig.ts';
 import { PHYSICAL_POST, type PhysicalGradeNumbers, type PhysicalPostSettings } from '../world/physical-look.ts';
 
@@ -449,7 +450,8 @@ function mountPhysical(
   let ssrNode: SsrT | null = null;
   if (wireSsr && settings.ssr) {
     const metalRough = scenePass.getTextureNode('metalRough');
-    ssrNode = ssr(sceneColor, scenePass.getTextureNode('depth'), scenePass.getTextureNode('normal') as unknown as Node<'vec3'>, {
+    // SSRNode is evaluated only here, on the physical chain with SSR wired.
+    ssrNode = loadSsrNode().ssr(sceneColor, scenePass.getTextureNode('depth'), scenePass.getTextureNode('normal') as unknown as Node<'vec3'>, {
       metalnessNode: metalRough.r,
       roughnessNode: metalRough.g,
       camera,
