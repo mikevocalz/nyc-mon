@@ -4,30 +4,31 @@ import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { MIN_BIRTH_YEAR } from '@acme/core/schemas';
 import { resolveCreateEntry } from '@acme/core/sim';
-import { Button, Heading, KeyboardAwareScroll, Text, TextField, YearGrid } from '@acme/ui';
+import { Button, Heading, KeyboardAwareScroll, Select, Text } from '@acme/ui';
 import { Form } from '@acme/ui/primitives';
 import { View } from '@acme/ui/tw';
 import { copy } from './copy';
 import { OnboardingPanes, PANE_HEADING_CLASS } from './OnboardingPanes';
 import { useOnboarding } from './onboarding.store';
 
-/** The current year at bundle load — the grid ceiling and the future-year check. */
+/** The current year at bundle load: the newest year offered. */
 const CURRENT_YEAR = new Date().getUTCFullYear();
 
-/** First failing typed-year rule, or the valid year. Mirrors the M04 copy table. */
-function typedYearError(raw: string, maxYear: number): { ok: true; year: number } | { ok: false; message: string } {
-  if (!/^\d{4}$/.test(raw)) return { ok: false, message: copy('m04.error.incomplete') };
-  const year = Number(raw);
-  if (year > maxYear) return { ok: false, message: copy('m04.error.future') };
-  if (year < MIN_BIRTH_YEAR) return { ok: false, message: copy('m04.error.too_early') };
-  return { ok: true, year };
-}
+/** A blank prompt first (no year preselected), then every year newest first. */
+const YEAR_OPTIONS = [
+  { value: '', label: copy('m04.select.placeholder') },
+  ...Array.from({ length: CURRENT_YEAR - MIN_BIRTH_YEAR + 1 }, (_, i) => {
+    const y = String(CURRENT_YEAR - i);
+    return { value: y, label: y };
+  }),
+];
 
 /**
  * M04 Birth year gate. Neutral by rule: one question, no default, no hint at
- * a threshold; every answer gets the same screen. One grid of every year
- * (newest first) via {@linkcode YearGrid}, or a typed four-digit field as the
- * alternative. The decade step was dropped as redundant (Mike, 2026-10-27).
+ * a threshold; every answer gets the same screen. The year comes from the kit
+ * Select (the OS picker on native), newest first, with a blank prompt so
+ * nothing is preselected. It replaced the decade/year grid and the typed
+ * field (Mike, 2026-10-27).
  * Continue stores the answer (MMKV, parsed on read — it gates every P1
  * route) and hands the result to {@linkcode resolveCreateEntry}: 13+ to M03
  * create, a consent-required year to M05.
@@ -35,12 +36,7 @@ function typedYearError(raw: string, maxYear: number): { ok: true; year: number 
 export function AgeGateScreen() {
   const router = useRouter();
   const setAgeAnswer = useOnboarding((s) => s.setAgeAnswer);
-  const maxYear = CURRENT_YEAR;
-
-  const [typed, setTyped] = useState(false);
   const [year, setYear] = useState<number | null>(null);
-  const [raw, setRaw] = useState('');
-  const [error, setError] = useState<string | undefined>();
 
   const continueWith = (picked: number) => {
     const nowMs = Date.now();
@@ -60,60 +56,15 @@ export function AgeGateScreen() {
         }
       >
         <Form className="gap-6 md:flex-1">
-          {typed ? (
-            <View className="gap-4">
-              <TextField
-                surface="daylit"
-                label={copy('m04.field.label')}
-                hint={copy('m04.field.hint')}
-                keyboardType="number-pad"
-                maxLength={4}
-                textContentType="none"
-                value={raw}
-                error={error}
-                onChangeText={(text) => {
-                  const digits = text.replace(/\D/g, '');
-                  setRaw(digits);
-                  setError(undefined);
-                  if (/^\d{4}$/.test(digits)) {
-                    const result = typedYearError(digits, maxYear);
-                    setYear(result.ok ? result.year : null);
-                  } else {
-                    setYear(null);
-                  }
-                }}
-              />
-              <Button
-                variant="ghost"
-                tone="royal"
-                title={copy('m04.pick_instead')}
-                onPress={() => {
-                  setTyped(false);
-                  setError(undefined);
-                }}
-              />
-            </View>
-          ) : (
-            <View className="gap-4">
-              <YearGrid
-                value={year}
-                onChange={setYear}
-                minYear={MIN_BIRTH_YEAR}
-                maxYear={maxYear}
-                step="all"
-                groupLabel={copy('m04.grid.all.a11y.label')}
-              />
-              <Button
-                variant="ghost"
-                tone="royal"
-                title={copy('m04.type_instead')}
-                onPress={() => {
-                  setTyped(true);
-                  setYear(null);
-                }}
-              />
-            </View>
-          )}
+          {/* The kit Select: the OS picker on native, the kit dropdown on web.
+              The first option is a blank prompt, so no year is preselected. */}
+          <Select
+            label={copy('m04.field.label')}
+            tone="royal"
+            value={year === null ? '' : String(year)}
+            onValueChange={(next: string) => setYear(next === '' ? null : Number(next))}
+            options={YEAR_OPTIONS}
+          />
 
           {/* Tablet: Continue sits on the pane's bottom edge. */}
           {year !== null ? (
@@ -123,16 +74,7 @@ export function AgeGateScreen() {
                 size="lg"
                 fullWidth
                 title={copy('m04.continue')}
-                onPress={() => {
-                  if (typed) {
-                    const result = typedYearError(raw, maxYear);
-                    if (!result.ok) {
-                      setError(result.message);
-                      return;
-                    }
-                  }
-                  continueWith(year);
-                }}
+                onPress={() => continueWith(year)}
               />
             </View>
           ) : null}
