@@ -4,6 +4,7 @@
 // that supports init but not buffer creation. Checks that every milestone up
 // to the compile is reported, and that a failure later on reaches the JS side
 // as an `error` with a stack plus `failed`, instead of vanishing.
+import '../classic-flags.test-support.ts';
 import assert from 'node:assert/strict';
 import { register } from 'node:module';
 import { test } from 'node:test';

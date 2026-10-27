@@ -70,6 +70,13 @@ export function parseSkyRigFlag(value: string | undefined | null): boolean {
   return value != null && TRUTHY_FLAG.has(value.trim().toLowerCase());
 }
 
+const FALSY_FLAG = new Set(['0', 'false', 'off', 'no']);
+
+/** Default-on flag: on unless set to 0/false/off/no (the kill switch). */
+export function parseDefaultOnFlag(value: string | undefined | null): boolean {
+  return value == null || !FALSY_FLAG.has(value.trim().toLowerCase());
+}
+
 /** Opt-in L1 flag — default OFF. Matches the EXPERIMENTAL_SURFACE_DETAIL pattern. */
 export const EXPERIMENTAL_SKY_RIG = parseSkyRigFlag(process.env.EXPO_PUBLIC_WORLD_SKY_RIG);
 

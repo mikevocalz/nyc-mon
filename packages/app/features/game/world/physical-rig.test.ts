@@ -10,7 +10,7 @@ import * as THREE from 'three/webgpu';
 import { physicalCityLight } from '@acme/theme';
 import { SunLight } from 'three/examples/jsm/lights/SunLight.js';
 import { SkyMesh } from 'three/examples/jsm/objects/SkyMesh.js';
-import { parseSkyRigFlag } from './sky-rig.ts';
+import { parseDefaultOnFlag } from './sky-rig.ts';
 import {
   DEFAULT_PHYSICAL_PRESET,
   DEVICE_LANE_PROBES,
@@ -37,8 +37,11 @@ import { createTimeOfDayStore, onTimeOfDayChange } from './time-of-day.store.ts'
 
 const full = fullPhysicalFeatures(false);
 
-test('the master flag is opt-in on the shared truth table', () => {
-  assert.equal(EXPERIMENTAL_WORLD_PHYSICAL, parseSkyRigFlag(process.env.EXPO_PUBLIC_WORLD_PHYSICAL));
+test('the master flag defaults on, and 0 is the kill switch', () => {
+  assert.equal(EXPERIMENTAL_WORLD_PHYSICAL, parseDefaultOnFlag(process.env.EXPO_PUBLIC_WORLD_PHYSICAL));
+  assert.equal(parseDefaultOnFlag(undefined), true);
+  for (const off of ['0', 'false', 'OFF', ' no ']) assert.equal(parseDefaultOnFlag(off), false, off);
+  assert.equal(parseDefaultOnFlag('1'), true);
   assert.equal(physicalFeaturesFor(false, null, true), null, 'flag off, no probe: today\'s path');
   for (const probe of [...RIG_PROBES, ...DEVICE_LANE_PROBES]) {
     assert.equal(physicalFeaturesFor(false, probe, true), null, `${probe} without the master flag: today's path`);

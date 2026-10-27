@@ -1,3 +1,4 @@
+import './classic-flags.test-support.ts';
 import assert from 'node:assert/strict';
 import { readFileSync, statSync } from 'node:fs';
 import { URL } from 'node:url';

@@ -73,8 +73,8 @@ const byName = (group: Group, name: string) => group.getObjectByName(name) as TH
 
 // --- Registry ---------------------------------------------------------------------------------------------------
 
-test('the physical flag is opt-in and the default registry is unchanged', () => {
-  assert.equal(EXPERIMENTAL_WORLD_PHYSICAL, false);
+test('the physical flag is on by default and the classic registry is unchanged', () => {
+  assert.equal(EXPERIMENTAL_WORLD_PHYSICAL, true);
   assert.equal(PHYSICAL_SEED_ASSETS.length, SEED_ASSETS.length + LOFTED_VEHICLE_ASSETS.length);
   assert.ok(!SEED_ASSETS.some(isLoftedRecipe), 'SEED_ASSETS carries no lofted recipe');
   assert.equal(LOFTED_VEHICLE_ASSETS.length, VEHICLE_KINDS.length, 'one lofted recipe per VehicleKind');

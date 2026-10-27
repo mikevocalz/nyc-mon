@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { registerHooks } from 'node:module';
 import { test } from 'node:test';
 
-delete process.env.EXPO_PUBLIC_WORLD_PHYSICAL;
+process.env.EXPO_PUBLIC_WORLD_PHYSICAL = '0';
 delete process.env.EXPO_PUBLIC_WORLD_PROBE;
 delete process.env.EXPO_PUBLIC_WORLD_POST;
 delete process.env.EXPO_PUBLIC_WORLD_VD;

@@ -41,18 +41,17 @@
 import type { BuildingClass, CityBuilding, CityDatasetV3, GeoPoint } from '../city-dataset.ts';
 import { hashUnit, mapArea, pointInRing, ringCentroid, type VertexBuffer } from './geometry.ts';
 import { box, cone, cylinder, frame, type Frame } from './parts.ts';
-import { parseSkyRigFlag } from './sky-rig.ts';
+import { parseDefaultOnFlag } from './sky-rig.ts';
 import { SURFACES } from './surfaces.ts';
 
 type Point = readonly [number, number];
 type Rgb = readonly number[];
 
 /**
- * The future layer is on (EXPO_PUBLIC_WORLD_FUTURE). Opt-in, default OFF,
- * like the rest of the flagged lanes: the overlays are an optional
- * decoration layer, never a replacement for the record city.
+ * The future layer is on (EXPO_PUBLIC_WORLD_FUTURE). Default ON;
+ * EXPO_PUBLIC_WORLD_FUTURE=0 is the kill switch.
  */
-export const FUTURE_LAYER = parseSkyRigFlag(process.env.EXPO_PUBLIC_WORLD_FUTURE);
+export const FUTURE_LAYER = parseDefaultOnFlag(process.env.EXPO_PUBLIC_WORLD_FUTURE);
 
 /** Per-kind counts for stats and tests. */
 export interface FutureLayerStats {

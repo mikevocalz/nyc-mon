@@ -39,7 +39,7 @@ import { buildLaneTopology } from '../living-city/topology.ts';
  * The optional "future layer" (future-layer.ts): NYC roof furniture, the
  * NYCHA exterior facelift kit and the AdSurface inventory, as an additive
  * overlay on the record city (docs/implementation/MOBILE_WORLD_PR_PACK.md).
- * Defaults to EXPO_PUBLIC_WORLD_FUTURE — off unless set.
+ * Defaults to EXPO_PUBLIC_WORLD_FUTURE: on unless set to 0.
  */
 export const EXPERIMENTAL_WORLD_FUTURE = FUTURE_LAYER;
 

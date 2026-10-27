@@ -7,8 +7,9 @@
 // three import, so node tests pin every value, and the render runtime can
 // read the flags without loading three.
 //
-// - EXPO_PUBLIC_WORLD_PHYSICAL: the master flag (default off, the sky-rig
-//   truthy table). With it unset nothing in this module changes a frame.
+// - EXPO_PUBLIC_WORLD_PHYSICAL: the master flag, default ON. Set it to
+//   0/false/off/no to fall back to the old look; with it off nothing in
+//   this module changes a frame.
 // - EXPO_PUBLIC_WORLD_PROBE=<name>: Phase 0, read only under
 //   EXPO_PUBLIC_WORLD_PHYSICAL. Turns on one feature of the physical stack,
 //   alone, over today's look, so a black frame on hardware points at that
@@ -17,10 +18,10 @@
 // Colours are not here: they live in @acme/theme physicalCityLight.
 // "Slop measured" marks a value copied from Slop; TODO(tune) marks a value
 // nyc-mon chose that still needs an iPhone 17 / iPad Pro frame.
-import { parseSkyRigFlag } from './sky-rig.ts';
+import { parseDefaultOnFlag } from './sky-rig.ts';
 
-/** Opt-in master flag. Same truthy set as every other world lane. */
-export const EXPERIMENTAL_WORLD_PHYSICAL = parseSkyRigFlag(process.env.EXPO_PUBLIC_WORLD_PHYSICAL);
+/** Master flag, default on; EXPO_PUBLIC_WORLD_PHYSICAL=0 is the kill switch. */
+export const EXPERIMENTAL_WORLD_PHYSICAL = parseDefaultOnFlag(process.env.EXPO_PUBLIC_WORLD_PHYSICAL);
 
 // ---- Phase 0 probes ---------------------------------------------------------
 
