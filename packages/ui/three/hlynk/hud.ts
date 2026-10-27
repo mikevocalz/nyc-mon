@@ -5,8 +5,9 @@
  * and node tests check the copy and the regions.
  *
  * One store per stage holds the state (repo rule: Zustand, never useState).
- * The DOM tab control is the accessible source of truth; the 3D screen is a
- * second view of the same store and writes to it on a tap or click.
+ * The tab control is the accessible source of truth; the 3D screen is a
+ * second view of the same store and writes to it on a tap or click. Shared
+ * by the website and the app (packages/ui/three/hlynk).
  */
 
 /** The tabs, in the order the creator named them (PS-037, supersedes PS-019). */
@@ -18,24 +19,18 @@ export const DEFAULT_HUD_TAB: HudTab = 'crew';
 /** What the pointer is over on the 3D model: a tab on the screen, or the left side key. */
 export type HudHover = HudTab | 'side-key';
 
-/** Per-stage state shared by the DOM controls and the scene. */
+/**
+ * Per-stage screen state shared by the tab control and the 3D screen. The
+ * pointer's hover target and the press counters belong to the stage
+ * (DeviceStage's store), which every H-Lynk screen shares.
+ */
 export interface HudState {
   tab: HudTab;
-  /** Pointer target on the 3D model; null when it is over neither. */
-  hover: HudHover | null;
   /** Side key sound on. The chirp only ever plays from a direct press. */
   sound: boolean;
-  /** Counts side key presses, so the scene can dip the key once per press. */
-  presses: number;
-  /**
-   * Counts pointer presses on the stage, written from the DOM pointerdown
-   * handler. The scene raycasts once per new press, so a click shorter than a
-   * frame still lands.
-   */
-  taps: number;
 }
 
-export const initialHudState = (): HudState => ({ tab: DEFAULT_HUD_TAB, hover: null, sound: true, presses: 0, taps: 0 });
+export const initialHudState = (): HudState => ({ tab: DEFAULT_HUD_TAB, sound: true });
 
 /** One care meter on the Care tab. The value is an illustration, never a reading. */
 export interface HudMeter {

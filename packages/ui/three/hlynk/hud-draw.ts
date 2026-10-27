@@ -1,13 +1,14 @@
 import { hud } from '@acme/theme';
-import { HUD_SIZE, HUD_TABS, hudTabRect, type HudContent, type HudHover, type HudTab } from './hlynk-hud.ts';
+import type { CanvasFont, Ctx2D } from './canvas2d-types.ts';
+import { HUD_SIZE, HUD_TABS, hudTabRect, type HudContent, type HudHover, type HudTab } from './hud.ts';
 
-/** Canvas font string for a size and weight, in the page's body face. */
-export type HudFont = (size: number, weight?: number) => string;
+/** Canvas font string for a size and weight, in the body face. */
+export type HudFont = CanvasFont;
 
 const { width: W, height: H } = HUD_SIZE;
 const PAD = 40;
 
-function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+export function roundRect(ctx: Ctx2D, x: number, y: number, w: number, h: number, r: number) {
   ctx.beginPath();
   ctx.moveTo(x + r, y);
   ctx.arcTo(x + w, y, x + w, y + h, r);
@@ -18,7 +19,7 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
 }
 
 /** Greedy word wrap to `maxWidth`; returns the lines. */
-function wrap(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+export function wrap(ctx: Ctx2D, text: string, maxWidth: number): string[] {
   const lines: string[] = [];
   let line = '';
   for (const word of text.split(' ')) {
@@ -35,7 +36,7 @@ function wrap(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): st
 }
 
 /** A tab's heading: the scanner's red rule, then the label. */
-function heading(ctx: CanvasRenderingContext2D, font: HudFont, label: string) {
+function heading(ctx: Ctx2D, font: HudFont, label: string) {
   ctx.fillStyle = hud.red;
   ctx.fillRect(PAD, 132, 72, 6);
   ctx.textAlign = 'left';
@@ -45,7 +46,7 @@ function heading(ctx: CanvasRenderingContext2D, font: HudFont, label: string) {
 }
 
 /** Exhaustive over HudTab: a new tab fails the typecheck until it has a screen. */
-function drawTab(ctx: CanvasRenderingContext2D, font: HudFont, tab: HudTab, c: HudContent) {
+function drawTab(ctx: Ctx2D, font: HudFont, tab: HudTab, c: HudContent) {
   switch (tab) {
     case 'crew': {
       // The resting face (PS-019's static screen): the Mon's name with the line under it.
@@ -139,7 +140,7 @@ function drawTab(ctx: CanvasRenderingContext2D, font: HudFont, tab: HudTab, c: H
  * Called only when the tab, the hover target or the fonts change.
  */
 export function drawHud(
-  ctx: CanvasRenderingContext2D,
+  ctx: Ctx2D,
   font: HudFont,
   content: HudContent,
   tab: HudTab,

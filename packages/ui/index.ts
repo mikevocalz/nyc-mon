@@ -100,6 +100,12 @@ export { HolographicTerrain, type HolographicTerrainProps } from './three/Hologr
 export { NeonTide, type NeonTideProps, type NeonTideOrigin } from './three/NeonTide';
 export { ThreeCanvas } from './three/ThreeCanvas';
 export type { ThreeBackend, ThreeCanvasHandle, ThreeCanvasProps, ThreeContext, ThreeFrame, ThreePointer, ThreeScene, ThreeSetup } from './three/types';
+// The H-Lynk in 3D, one stage on web and native (also '@acme/ui/three/hlynk').
+export {
+  DeviceStage, HLynkHudStage, createChoiceScreen, createHudScreen,
+  type ChoiceItem, type DeviceCapture, type DeviceScreen, type DeviceStageApi, type DeviceStageProps,
+  type HLynkHudStageControls, type HLynkHudStageProps, type HudContent, type HudMeter, type HudTab,
+} from './three/hlynk';
 export { RiverTide, type RiverTideProps, type RiverTideOrigin } from './backgrounds/RiverTide';
 export { RainWindow, type RainWindowProps } from './backgrounds/RainWindow';
 export { LazyScene, type LazySceneProps, type LazySceneState } from './backgrounds/LazyScene';

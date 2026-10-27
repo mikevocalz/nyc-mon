@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { BODY, EMITTERS, FAN, HEAD_DEPTH, INTRO, MAX_TILT, REST_YAW, STAGE, fanCorners } from './device-scene.ts';
+import { BODY, EMITTERS, FAN, HEAD_DEPTH, INTRO, MAX_TILT, REST_YAW, STAGE, fanCorners } from './device-geometry.ts';
 
 type V = [number, number, number];
 

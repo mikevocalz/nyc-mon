@@ -1,29 +1,39 @@
-import { fontFamilies, hlynk, led, pageMotion, palette, signage } from '@acme/theme';
-import type { ThreeContext, ThreeFrame, ThreeScene } from '@acme/ui';
+import { hlynk, led, palette, signage } from '@acme/theme';
 import type { StoreApi } from 'zustand/vanilla';
-import { HUD_SIZE, hudTabAt, type HudContent, type HudHover, type HudState } from './hlynk-hud.ts';
-import { drawHud } from './hud-draw.ts';
+import type { ThreeContext, ThreeFrame, ThreeScene } from '../types';
+import type { EggHatchRig } from '../hatch/egg-hatch-rig';
+// Extensionless on purpose: Metro picks canvas2d.native.ts on device, web and tsc take canvas2d.ts.
+import { canvasFont, createCanvasSurface, whenFontsReady } from './canvas2d';
+import {
+  BODY, EMITTERS, FAN, INTRO, MAX_TILT, REST_YAW, SCREEN_GLASS, STAGE, screenPxToLocal,
+} from './device-geometry';
+import type { DeviceScreen, ScreenModel } from './screen';
+import { SIDE_KEY, type StageState } from './stage-state';
+import { beamGradientTexture, glareTexture, grainTexture, iconTexture, radialGlowTexture, textTexture } from './textures';
 
-/** What the stage hands the scene. Read in `update`; the content and the store are read once, at build. */
+export { BODY, EMITTERS, FAN, HEAD_DEPTH, INTRO, MAX_TILT, REST_YAW, STAGE, fanCorners } from './device-geometry';
+
+/** What the stage hands the scene. Read in `update`; the screen and the store are read once, at build. */
 export interface DeviceSceneParams {
   /** `placeholder` is the procedural model below; `h-lynk-entry` swaps in the real GLB when it lands. */
   model: 'placeholder' | 'h-lynk-entry';
-  /** Everything the screen shows. Strings come from copy.ts and @acme/content, never from this file. */
-  hud: HudContent;
   /**
-   * The stage's HUD store, shared with the DOM tab control (PS-037). The scene
-   * reads the tab from it and writes the tab and hover target to it; it
-   * redraws the screen only when they change.
+   * What the glass shows and what a tap there selects: the website's HUD
+   * (hud-screen.ts) or the app's egg choice (choice-screen.ts). Its models,
+   * if any, stand in front of the glass.
    */
-  store: StoreApi<HudState>;
+  screen: DeviceScreen;
+  /** The stage's store: hover target and press counters, shared with the stage's DOM / view handlers. */
+  store: StoreApi<StageState>;
   /** A press on the 3D left side key. The stage plays the chirp (when sound is on) and counts the press. */
   onSideKey?: () => void;
   /** Called once, after the first frame with the H-Lynk in it has been drawn. The stage drops its capture then. */
   onReady?: () => void;
   /**
    * Called with `true` when the H-Lynk is at rest (intro over, pointer away,
-   * tilt settled) and with `false` when it needs frames again. The stage
-   * pauses the loop while it rests, so a still object costs no frames.
+   * tilt settled, no model idling) and with `false` when it needs frames
+   * again. The stage pauses the loop while it rests, so a still object costs
+   * no frames.
    */
   onRest?: (resting: boolean) => void;
 }
@@ -33,76 +43,8 @@ type Group = InstanceType<Three['Group']>;
 type Material = InstanceType<Three['Material']>;
 type Geometry = NonNullable<ConstructorParameters<Three['Mesh']>[0]>;
 type Mesh = InstanceType<Three['Mesh']>;
-type CanvasTexture = InstanceType<Three['CanvasTexture']>;
+type Texture = InstanceType<Three['Texture']>;
 
-/** Resting three-quarter turn so the side keys and depth read. */
-export const REST_YAW = -0.38;
-/** Pointer tilt cap, from the page motion tokens (8 degrees). */
-export const MAX_TILT = (pageMotion.tilt.stage * Math.PI) / 180;
-/** Placement of the model in the scene: drop, scale, camera. Shared with the beam test. */
-export const STAGE = { baseY: -0.1, scale: 1.25, camera: { y: 0.12, z: 5.4, lookY: 0.05, fov: 30 } } as const;
-
-/** Body size, body widths. */
-export const BODY = { W: 1, H: 1.78, D: 0.21 } as const;
-/** The two red emitters in the head, x centres and radius. The fan rises from between them. */
-export const EMITTERS = { x: [0.14, 0.32], r: 0.028 } as const;
-/** Head depth: the fan's crossed plane stays inside it so it never hangs in front of the face. */
-export const HEAD_DEPTH = BODY.D + 0.06;
-
-/**
- * The scanner fan (PS-037 fix). Centred on the emitters, opening upward from
- * their span, and never wider than the body: the widest layer's tip spans
- * x 0.01..0.45 of the body's -0.5..0.5. The crossed plane that gives the fan
- * volume is narrower than the head is deep, so no sheet of light hangs in
- * front of the head's left side at the three-quarter turn.
- */
-export const FAN = {
-  x: (EMITTERS.x[0] + EMITTERS.x[1]) / 2,
-  length: 0.42,
-  /** lean back, radians: reads as projection, and the tip fades before the stage's top edge */
-  lean: -0.08,
-  /** [half-width at the mouth, half-width at the tip, peak opacity] per layer: wash, beam, core */
-  layers: [
-    [0.115, 0.22, 0.55],
-    [0.09, 0.16, 0.8],
-    [0.035, 0.07, 0.95],
-  ],
-  /** the crossed plane's half-depth as a share of the face half-width */
-  depth: 0.45,
-} as const;
-
-/** Every corner of the fan's planes in the model's local space, for bounds checks. */
-export function fanCorners(): [number, number, number][] {
-  const points: [number, number, number][] = [];
-  const cos = Math.cos(FAN.lean);
-  const sin = Math.sin(FAN.lean);
-  for (const [base, tip] of FAN.layers) {
-    for (const [half, y] of [[base, 0], [tip, FAN.length]] as const) {
-      for (const sx of [-1, 1]) {
-        // The face plane spans x; the crossed plane spans z at FAN.depth of the width.
-        for (const [px, pz] of [[sx * half, 0], [0, sx * half * FAN.depth]] as const) {
-          // rotation.x by FAN.lean: y' = y cos - z sin, z' = y sin + z cos
-          points.push([FAN.x + px, BODY.H / 2 + y * cos - pz * sin, y * sin + pz * cos]);
-        }
-      }
-    }
-  }
-  return points;
-}
-
-/**
- * The intro, in seconds of scene time from the first frame after the
- * pipelines compile. One pass, then the object rests (PS-018):
- * it settles into frame, turns slowly to its three-quarter rest, the scanner
- * catches the light once, and the screen comes up readable.
- */
-export const INTRO = {
-  settle: { from: 0, to: 1.0, drop: 0.14 },
-  yaw: { from: 0, to: 1.8, turn: 0.42 },
-  scanner: { from: 1.0, to: 1.9 },
-  screen: { from: 1.5, to: 2.4 },
-  end: 2.4,
-} as const;
 /** Fan and emitter levels at rest and at the scanner's one flare. */
 const FAN_REST = 0.3;
 const EMITTER_REST = 1.4;
@@ -111,6 +53,8 @@ const EMITTER_PEAK = 3.2;
 const SCREEN_ON = 0.62;
 /** How long the side key stays down per press, seconds. */
 const SIDE_KEY_DIP_S = 0.16;
+/** A model on the screen: its scale when focused, when another is focused, and its turn speed (rad/s) while focused. */
+const MODEL_FOCUS = { on: 1.16, off: 0.9, turn: 0.7, rate: 8 } as const;
 
 const CORE = hlynk.core;
 const { apple, concrete, ink, silver } = palette;
@@ -160,40 +104,57 @@ export function createDeviceScene(
   rim.position.set(4, 2, -4);
   scene.add(rim);
 
-  const { store } = initial;
-  const device = buildDevice(THREE, initial.hud, store.getState(), invalidate);
+  const { store, screen } = initial;
+  const glass = screenTexture(THREE, screen, store);
+  const device = buildDevice(THREE, glass.texture);
   const BASE_Y = STAGE.baseY;
   device.group.position.y = BASE_Y;
   device.group.scale.setScalar(STAGE.scale);
   device.group.rotation.y = REST_YAW;
   scene.add(device.group);
 
-  // The screen follows the store: a new tab or hover target repaints the
-  // canvas once and asks for one frame. Nothing repaints per frame. A side
-  // key press (from the DOM button or the 3D key) dips the key.
+  // The glass follows the screen's state and the stage's hover target: a
+  // change repaints the canvas once and asks for one frame. Nothing repaints
+  // per frame. A side key press (from a control or the 3D key) dips the key.
   let dipFrom = -1; // scene time the current dip started; -1 none
   let dipQueued = false;
   let tapQueued = false;
-  const unsubscribe = store.subscribe((next, prev) => {
-    if (next.tab !== prev.tab || next.hover !== prev.hover) device.paint(next.tab, next.hover);
+  const unsubscribeStage = store.subscribe((next, prev) => {
+    if (next.hover !== prev.hover) glass.paint();
     if (next.presses !== prev.presses) dipQueued = true;
     if (next.taps !== prev.taps) tapQueued = true;
     invalidate();
   });
+  const unsubscribeScreen = screen.subscribe(() => {
+    glass.paint();
+    invalidate();
+  });
+  whenFontsReady(() => {
+    glass.paint();
+    invalidate();
+  });
+
+  // Models standing on the glass (the egg choice's eggs). Each loads on its
+  // own; a slot whose model fails keeps its label and nothing else.
+  const models = screen.models ?? [];
+  const stand = standModels(THREE, device.group, models, screen.size);
+  const modelHits = stand.hits;
 
   // Raycasts run only when the pointer moved or went down, never on a frame
   // where the input is unchanged (PS-019's per-frame raycast).
   const raycaster = new THREE.Raycaster();
   const ndc = new THREE.Vector2();
-  const targets = [device.screen, device.sideKeyHit];
+  const targets = [...modelHits, device.screen, device.sideKeyHit];
   let lastPointer = { x: Number.NaN, y: Number.NaN, inside: false };
-  const pick = (): HudHover | null => {
+  const pick = (): string | null => {
     device.group.updateMatrixWorld(true);
     raycaster.setFromCamera(ndc, camera);
     const hit = raycaster.intersectObjects(targets, false)[0];
     if (!hit) return null;
-    if (hit.object === device.sideKeyHit) return 'side-key';
-    return hit.uv ? hudTabAt(hit.uv.x, hit.uv.y) : null;
+    if (hit.object === device.sideKeyHit) return SIDE_KEY;
+    const target = (hit.object.userData as { target?: string }).target;
+    if (target !== undefined) return target;
+    return hit.uv ? screen.hitTest(hit.uv.x, hit.uv.y) : null;
   };
 
   let disposed = false;
@@ -236,6 +197,22 @@ export function createDeviceScene(
   }, 0);
   device.group.visible = false;
 
+  // Each model compiles off the frame path too, then shows.
+  stand.load({
+    onLoaded: (root) => {
+      if (disposed) return;
+      root.visible = true;
+      const compiling = renderer.compileAsync(root, camera, scene);
+      root.visible = false;
+      void compiling.catch(() => undefined).then(() => {
+        if (disposed) return;
+        root.visible = true;
+        invalidate();
+      });
+    },
+    isDisposed: () => disposed,
+  });
+
   return {
     scene,
     camera,
@@ -270,26 +247,25 @@ export function createDeviceScene(
       device.group.rotation.set(tiltX, REST_YAW + INTRO.yaw.turn * (1 - turn) + tiltY, 0);
       device.light(FAN_REST + (1 - FAN_REST) * flare, EMITTER_REST + (EMITTER_PEAK - EMITTER_REST) * flare);
       device.power(SCREEN_ON * power);
+      const modelsMoving = stand.update(frame, screen.selected?.() ?? null, power);
 
       // Input: hover on a move, act on a press. The stage counts presses in
-      // the store from its pointerdown handler (so a click shorter than a
+      // the store from its pointerdown handler (so a tap shorter than a
       // frame still lands); the pointer already holds the press position.
-      // A touch tap arrives as a press with a position, so it switches tabs too.
       const p = frame.pointer;
       const moved = p.x !== lastPointer.x || p.y !== lastPointer.y || p.inside !== lastPointer.inside;
       const pressed = tapQueued;
       tapQueued = false;
       lastPointer = { x: p.x, y: p.y, inside: p.inside };
       if (moved || pressed) {
-        let hover: HudHover | null = null;
+        let hover: string | null = null;
         if ((p.inside || pressed) && t >= INTRO.screen.from) {
           ndc.set(p.x, p.y);
           hover = pick();
         }
-        const state = store.getState();
-        if (hover !== state.hover) store.setState({ hover });
-        if (pressed && hover === 'side-key') params.onSideKey?.();
-        else if (pressed && hover !== null && hover !== 'side-key' && hover !== state.tab) store.setState({ tab: hover });
+        if (hover !== store.getState().hover) store.setState({ hover });
+        if (pressed && hover === SIDE_KEY) params.onSideKey?.();
+        else if (pressed && hover !== null) screen.select(hover);
       }
 
       // The side key dips 0.014 into the shell for 160 ms per press.
@@ -309,8 +285,8 @@ export function createDeviceScene(
         }, 0);
       }
       const settled = Math.abs(tiltX - goalX) < 1e-3 && Math.abs(tiltY - goalY) < 1e-3;
-      // A queued dip needs the loop for one more beat.
-      const rest = t >= INTRO.end && !tracking && settled && !dipping;
+      // A queued dip needs the loop for one more beat; idling models keep it running.
+      const rest = t >= INTRO.end && !tracking && settled && !dipping && !modelsMoving;
       if (rest !== resting) {
         resting = rest;
         params.onRest?.(rest);
@@ -318,9 +294,143 @@ export function createDeviceScene(
     },
     dispose: () => {
       disposed = true;
-      unsubscribe();
+      unsubscribeStage();
+      unsubscribeScreen();
       clearTimeout(warm);
+      stand.dispose();
       device.group.userData.dispose();
+    },
+  };
+}
+
+/**
+ * The glass's texture: the screen drawn into a CanvasSurface (a browser
+ * canvas on web, Skia on native). `paint` redraws it with the stage's
+ * current hover target and flags one upload. It runs only when the screen's
+ * state or the hover target changes, and once more when web fonts load.
+ */
+function screenTexture(
+  THREE: Three,
+  screen: DeviceScreen,
+  store: StoreApi<StageState>,
+): { texture: Texture; paint: () => void } {
+  const surface = createCanvasSurface(THREE, screen.size.width, screen.size.height);
+  const paint = () => {
+    screen.draw(surface.ctx, canvasFont, store.getState().hover);
+    surface.commit();
+  };
+  paint();
+  return { texture: surface.texture, paint };
+}
+
+/**
+ * Stands each screen model in its slot, in front of the glass, scaled to the
+ * slot's height, with an invisible box over the slot as its tap target. The
+ * focused model comes forward and turns slowly; the others step back. Every
+ * model idles on its own clip; under reduced motion each holds still.
+ */
+function standModels(THREE: Three, parent: Group, models: readonly ScreenModel[], screenSize: DeviceScreen['size']) {
+  const holders: { target: string; holder: Group; rig: EggHatchRig | null; scale: number; spin: number }[] = [];
+  const hits: Mesh[] = [];
+  const geometries: Geometry[] = [];
+  const hitMaterial = new THREE.MeshBasicMaterial();
+  let disposed = false;
+
+  for (const m of models) {
+    const holder = new THREE.Group();
+    holder.name = `ScreenModel_${m.target}`;
+    parent.add(holder);
+    holders.push({ target: m.target, holder, rig: null, scale: 1, spin: 0 });
+  }
+
+  /** A slot's rect (screen canvas px) as glass-local placement: centre x, base y, height and width in body widths. */
+  const layout = (m: ScreenModel, size: DeviceScreen['size']) => {
+    const base = screenPxToLocal(m.rect.x + m.rect.width / 2, m.rect.y + m.rect.height, size);
+    const top = screenPxToLocal(m.rect.x, m.rect.y, size);
+    return { x: base.x, baseY: base.y, height: top.y - base.y, width: (m.rect.width / size.width) * SCREEN_GLASS.width };
+  };
+
+  return {
+    hits,
+    load: ({ onLoaded, isDisposed }: { onLoaded: (root: Group) => void; isDisposed: () => boolean }) => {
+      models.forEach((m, i) => {
+        const slot = layout(m, screenSize);
+        const entry = holders[i]!;
+        // The tap target: the whole slot above the label, a little proud of the glass.
+        const hitGeo = new THREE.BoxGeometry(slot.width, slot.height, 0.24);
+        geometries.push(hitGeo);
+        const hit = new THREE.Mesh(hitGeo, hitMaterial);
+        hit.position.set(slot.x, slot.baseY + slot.height / 2, SCREEN_GLASS.z + 0.12);
+        hit.visible = false;
+        hit.userData.target = m.target;
+        parent.add(hit);
+        hits.push(hit);
+
+        const source = m.source;
+        if (source === null) return;
+        void import('../hatch/egg-hatch-rig')
+          .then(({ EggHatchRig }) => EggHatchRig.create(source.eggId, { manifest: source.manifest, glb: source.glb }))
+          .then((rig) => {
+            if (disposed || isDisposed()) {
+              rig.dispose();
+              return;
+            }
+            rig.setProxyBabyVisible(false);
+            rig.idle();
+            rig.update(0);
+            const root = rig.root;
+            root.updateMatrixWorld(true);
+            const box = new THREE.Box3().setFromObject(root);
+            const size = box.getSize(new THREE.Vector3());
+            const fit = Math.min((slot.height * 0.86) / Math.max(size.y, 1e-6), (slot.width * 0.8) / Math.max(size.x, 1e-6));
+            // Centre the egg on x/z and stand its lowest point on the slot's base, its back against the glass.
+            const inner = new THREE.Group();
+            inner.scale.setScalar(fit);
+            root.position.set(-(box.min.x + box.max.x) / 2, -box.min.y, -(box.min.z + box.max.z) / 2);
+            inner.add(root);
+            entry.holder.add(inner);
+            entry.holder.position.set(slot.x, slot.baseY + slot.height * 0.04, SCREEN_GLASS.z + (size.z * fit) / 2 + 0.01);
+            entry.rig = rig;
+            onLoaded(entry.holder);
+          })
+          .catch((error: unknown) => {
+            console.warn(`[hlynk] the ${source.eggId} model did not load; its slot keeps the label.`, error);
+          });
+      });
+    },
+    /** Poses every model for this frame. Returns true while any of them moves. */
+    update: (frame: ThreeFrame, selected: string | null, power: number): boolean => {
+      let moving = false;
+      const k = frame.delta > 0 ? 1 - Math.exp(-frame.delta * MODEL_FOCUS.rate) : 1;
+      for (const entry of holders) {
+        const rig = entry.rig;
+        if (!rig) continue;
+        const goal = selected === null ? 1 : selected === entry.target ? MODEL_FOCUS.on : MODEL_FOCUS.off;
+        entry.scale += (goal - entry.scale) * k;
+        if (selected === entry.target && !frame.reducedMotion) entry.spin += frame.delta * MODEL_FOCUS.turn;
+        else entry.spin += (0 - entry.spin) * k;
+        // The models come up with the screen.
+        entry.holder.scale.setScalar(entry.scale * (0.6 + 0.4 * power));
+        entry.holder.rotation.y = entry.spin;
+        if (frame.reducedMotion) rig.seek('stir', 0);
+        else {
+          rig.idle();
+          rig.update(frame.delta);
+          moving = true;
+        }
+        if (Math.abs(goal - entry.scale) > 1e-3) moving = true;
+      }
+      return moving;
+    },
+    dispose: () => {
+      disposed = true;
+      for (const entry of holders) {
+        entry.rig?.dispose();
+        entry.holder.removeFromParent();
+      }
+      for (const hit of hits) hit.removeFromParent();
+      geometries.forEach((g) => g.dispose());
+      hitMaterial.dispose();
     },
   };
 }
@@ -328,17 +438,14 @@ export function createDeviceScene(
 /** One tracked material/geometry bucket so `dispose` frees everything. */
 function buildDevice(
   THREE: Three,
-  content: HudContent,
-  initialState: HudState,
-  invalidate: () => void,
+  /** the drawn screen; the device owns and disposes it */
+  screenMap: Texture,
 ): {
   group: Group;
-  /** the screen glass, raycast for the tab under the pointer */
+  /** the screen glass, raycast for the screen target under the pointer */
   screen: Mesh;
   /** an invisible box over the left side key and the shell strip beside it: the key's hit area */
   sideKeyHit: Mesh;
-  /** redraw the screen for a tab and hover target */
-  paint: (tab: HudState['tab'], hover: HudHover | null) => void;
   /** press the left side key into the shell, or let it back out */
   dipSideKey: (down: boolean) => void;
   /** fan opacity scale 0..1 and emitter emissive intensity */
@@ -395,8 +502,7 @@ function buildDevice(
     color: ink[900], roughness: 0.05, metalness: 0.55, envMapIntensity: 1.4,
   }));
   /** Screen glass; the drawn screen doubles as its own emitter so it reads in the dark. */
-  const hudScreen = hudTexture(THREE, content, initialState, invalidate);
-  const screenTexture = tex(hudScreen.texture);
+  const screenTexture = tex(screenMap);
   const screen = mat(new THREE.MeshStandardMaterial({
     map: screenTexture,
     emissiveMap: screenTexture,
@@ -516,9 +622,9 @@ function buildDevice(
   // --- face ----------------------------------------------------------------
 
   // Recessed bezel, then the screen glass.
-  const screenY = 0.17;
+  const screenY = SCREEN_GLASS.y;
   box(rounded(0.88, 1.08, 0.03, 0.03), black, 0, screenY, front + 0.012);
-  const screenMesh = box(track(new THREE.PlaneGeometry(0.8, 1.0)), screen, 0, screenY, front + 0.029);
+  const screenMesh = box(track(new THREE.PlaneGeometry(SCREEN_GLASS.width, SCREEN_GLASS.height)), screen, 0, screenY, SCREEN_GLASS.z);
 
   // --- control row ----------------------------------------------------------
 
@@ -599,7 +705,6 @@ function buildDevice(
     group,
     screen: screenMesh,
     sideKeyHit,
-    paint: hudScreen.paint,
     dipSideKey: (down) => {
       sideKey.position.x = down ? sideKeyRestX + 0.014 : sideKeyRestX;
     },
@@ -724,172 +829,3 @@ function studioEnvironment(THREE: Three): InstanceType<Three['Scene']> {
   return env;
 }
 
-// ============================================================================
-// Canvas textures — all the printed and lit detail lives here.
-// ============================================================================
-
-function makeCanvasTexture(THREE: Three, canvas: HTMLCanvasElement): CanvasTexture {
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.anisotropy = 4;
-  return texture;
-}
-
-function canvas2d(width: number, height: number): [HTMLCanvasElement, CanvasRenderingContext2D] {
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  return [canvas, canvas.getContext('2d') as CanvasRenderingContext2D];
-}
-
-/**
- * Canvas font string in the site's body face. next/font renames the family,
- * so the page's `--font-sans` wins; the token's stack is the fallback.
- */
-const font = (size: number, weight = 700) => {
-  const family = getComputedStyle(document.body).getPropertyValue('--font-sans').trim();
-  return `${weight} ${size}px ${family ? `${family}, ` : ''}${fontFamilies.sans}`;
-};
-
-/**
- * The fan's alpha falloff: opaque white at the mouth's centre, fading upward
- * and toward the edges. RGB is white so the material colour carries the tint.
- */
-function beamGradientTexture(THREE: Three): CanvasTexture {
-  const [canvas, ctx] = canvas2d(64, 256);
-  const img = ctx.createImageData(64, 256);
-  for (let y = 0; y < 256; y++) {
-    // Row 0 is the texture's top (v=1), the apex; row 255 is the mouth. The
-    // last 10% fades out too, or the crossed plane's mouth edge shows as a
-    // pale slab across the head.
-    const t = y / 255;
-    const vertical = Math.pow(t, 1.7) * Math.min(1, (1 - t) / 0.1);
-    for (let x = 0; x < 64; x++) {
-      // Feather to zero inside the trapezoid edge so no silhouette shows under additive blending.
-      const u = x / 63;
-      const m = Math.min(u, 1 - u) / 0.28;
-      const edge = m >= 1 ? 1 : m * m * (3 - 2 * m);
-      const i = (y * 64 + x) * 4;
-      img.data[i] = 255;
-      img.data[i + 1] = 255;
-      img.data[i + 2] = 255;
-      img.data[i + 3] = Math.round(255 * vertical * edge);
-    }
-  }
-  ctx.putImageData(img, 0, 0);
-  return makeCanvasTexture(THREE, canvas);
-}
-
-/** One soft diagonal light streak for the screen glass: the softbox catching the display. */
-function glareTexture(THREE: Three): CanvasTexture {
-  const [canvas, ctx] = canvas2d(256, 320);
-  const grad = ctx.createLinearGradient(30, 300, 200, 20);
-  grad.addColorStop(0, 'rgba(255,255,255,0)');
-  grad.addColorStop(0.42, 'rgba(255,255,255,0.10)');
-  grad.addColorStop(0.5, 'rgba(255,255,255,0.22)');
-  grad.addColorStop(0.58, 'rgba(255,255,255,0.10)');
-  grad.addColorStop(1, 'rgba(255,255,255,0)');
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, 256, 320);
-  return makeCanvasTexture(THREE, canvas);
-}
-
-/** Key glyphs: home, menu, back, forward. */
-function iconTexture(THREE: Three, icon: 'home' | 'menu' | 'back' | 'next', color: string): CanvasTexture {
-  const [canvas, ctx] = canvas2d(128, 128);
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 12;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  ctx.beginPath();
-  if (icon === 'home') {
-    ctx.moveTo(24, 68); ctx.lineTo(64, 32); ctx.lineTo(104, 68);
-    ctx.moveTo(36, 62); ctx.lineTo(36, 100); ctx.lineTo(92, 100); ctx.lineTo(92, 62);
-  } else if (icon === 'menu') {
-    for (const y of [44, 64, 84]) { ctx.moveTo(32, y); ctx.lineTo(96, y); }
-  } else if (icon === 'back') {
-    ctx.moveTo(84, 44); ctx.lineTo(48, 64); ctx.lineTo(84, 84);
-  } else {
-    ctx.moveTo(48, 44); ctx.lineTo(84, 64); ctx.lineTo(48, 84);
-  }
-  ctx.stroke();
-  return makeCanvasTexture(THREE, canvas);
-}
-
-/** Tiling fine noise: the moulded-plastic grain under the finish. */
-function grainTexture(THREE: Three): CanvasTexture {
-  const [canvas, ctx] = canvas2d(128, 128);
-  const img = ctx.createImageData(128, 128);
-  // Deterministic, so every mount (and the capture) has the same grain.
-  let seed = 0xbeef;
-  const rand = () => {
-    seed = (seed * 1664525 + 1013904223) >>> 0;
-    return seed / 4294967296;
-  };
-  for (let i = 0; i < 128 * 128; i++) {
-    const v = 118 + Math.floor(rand() * 20);
-    img.data[i * 4] = v;
-    img.data[i * 4 + 1] = v;
-    img.data[i * 4 + 2] = v;
-    img.data[i * 4 + 3] = 255;
-  }
-  ctx.putImageData(img, 0, 0);
-  const texture = makeCanvasTexture(THREE, canvas);
-  texture.wrapS = THREE.RepeatWrapping;
-  texture.wrapT = THREE.RepeatWrapping;
-  texture.repeat.set(6, 10);
-  return texture;
-}
-
-/** Soft white radial falloff; each sprite's material colour tints it. */
-function radialGlowTexture(THREE: Three): CanvasTexture {
-  const [canvas, ctx] = canvas2d(128, 128);
-  const g = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
-  g.addColorStop(0, 'rgba(255,255,255,1)');
-  g.addColorStop(0.4, 'rgba(255,255,255,0.4)');
-  g.addColorStop(1, 'rgba(255,255,255,0)');
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, 128, 128);
-  return makeCanvasTexture(THREE, canvas);
-}
-
-/** A single printed glyph on a transparent plate. */
-function textTexture(THREE: Three, text: string, color: string): CanvasTexture {
-  const [canvas, ctx] = canvas2d(512, 128);
-  ctx.font = font(64, 800);
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle = color;
-  ctx.fillText(text, 256, 64);
-  return makeCanvasTexture(THREE, canvas);
-}
-
-/**
- * The H-Lynk screen (PS-037): status row, the active tab's screen and the tab
- * bar, drawn by hud-draw.ts in the `hud` tokens. `paint` redraws the canvas
- * and flags one texture upload; it runs only when the tab or hover target
- * changes, and once more when the web fonts finish loading. Never per frame.
- */
-function hudTexture(
-  THREE: Three,
-  content: HudContent,
-  initial: HudState,
-  invalidate: () => void,
-): { texture: CanvasTexture; paint: (tab: HudState['tab'], hover: HudHover | null) => void } {
-  const [canvas, ctx] = canvas2d(HUD_SIZE.width, HUD_SIZE.height);
-  let tab = initial.tab;
-  let hover = initial.hover;
-  drawHud(ctx, font, content, tab, hover);
-  const texture = makeCanvasTexture(THREE, canvas);
-  const paint = (nextTab: HudState['tab'], nextHover: HudHover | null) => {
-    tab = nextTab;
-    hover = nextHover;
-    drawHud(ctx, font, content, tab, hover);
-    texture.needsUpdate = true;
-  };
-  void document.fonts?.ready.then(() => {
-    paint(tab, hover);
-    invalidate();
-  });
-  return { texture, paint };
-}

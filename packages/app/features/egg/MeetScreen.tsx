@@ -1,18 +1,23 @@
 'use client';
 
-import { useCallback, type ReactNode } from 'react';
+import { useCallback, useMemo, type ReactNode } from 'react';
 import { useWindowDimensions } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { eggHatchAssetForSpecies } from '@acme/assets/eggs';
 import { bloodlines, eggs } from '@acme/content';
 import {
   Button,
   Card,
   ChoiceRows,
   ChoiceTriptych,
+  createChoiceScreen,
+  DeviceStage,
   ErrorMessage,
   Heading,
   HLynkFit,
   HLynkShell,
+  IconButton,
+  SafeArea,
   StatusRow,
   Text,
   TrackpadActions,
@@ -26,6 +31,7 @@ import {
   type ShellTrackpadProps,
 } from '@acme/ui';
 import { haptics } from '@acme/ui/haptics';
+import { ChevronLeft } from '@acme/ui/icons';
 import { View } from '@acme/ui/tw';
 import { selectActiveMon, selectPendingEgg, useMonStore } from '../mon/mon.store';
 import { announcePolitely } from '../onboarding/announce';
@@ -63,6 +69,21 @@ interface MeetStore extends MeetState {
   /** Content rebuilt after "Try again". */
   readonly loaded: ReturnType<typeof loadEggs>;
   readonly scheme: 'daylit' | 'night';
+  /**
+   * The 3D H-Lynk stage: `starting` until its first frame, then `ready`;
+   * `failed` when no GPU backend starts. Only `ready` covers the triptych.
+   */
+  readonly stage3d: 'starting' | 'ready' | 'failed';
+}
+
+/** The kit's convention for a model that does not exist yet (MonView, MonsModels3D, EggStill). */
+const COMING_SOON = 'Coming Soon';
+
+/** An egg's hatch GLB, if one is bundled for its species. */
+function eggModel(view: EggView) {
+  const speciesId = eggs.find((e) => e.bloodlineId === view.bloodlineId)?.speciesId;
+  const asset = speciesId === undefined ? undefined : eggHatchAssetForSpecies(speciesId);
+  return asset === undefined ? null : { eggId: asset.eggId, manifest: asset.manifest, glb: asset.glb };
 }
 
 /**
@@ -88,8 +109,9 @@ export function MeetScreen() {
     holding: false,
     loaded: loadEggs(),
     scheme: schemeForTime(Date.now()),
+    stage3d: 'starting',
   }));
-  const { phase, focused, holding, loaded, scheme } = useStore(store);
+  const { phase, focused, holding, loaded, scheme, stage3d } = useStore(store);
 
   // Re-entry guard (handoff § States "already chosen"): on mount and on focus.
   useFocusEffect(
@@ -104,6 +126,38 @@ export function MeetScreen() {
   const views = 'views' in loaded ? loaded.views : [];
   const count = views.length;
   const egg = focused === null ? undefined : views[focused];
+
+  const titleText = eggCopy('m08.title');
+  const captionText = eggCopy('m08.santoro.caption');
+
+  const onStageReady = useCallback(() => store.setState({ stage3d: 'ready' }), [store]);
+  const onStageBackend = useCallback((backend: unknown) => {
+    if (backend === null) store.setState({ stage3d: 'failed' });
+  }, [store]);
+
+  // The egg choice on the 3D H-Lynk's glass: the same DeviceStage the
+  // website's H-LYNK section shows, with this screen's store as the focus.
+  // A tap on an egg (or its slot) focuses it exactly as a tile press does.
+  const eggScreen = useMemo(
+    () => createChoiceScreen({
+      title: titleText,
+      hint: captionText,
+      comingSoon: COMING_SOON,
+      items: ('views' in loaded ? loaded.views : []).map((v) => ({
+        target: v.bloodlineId, label: v.eggName, detail: v.bloodline, source: eggModel(v),
+      })),
+      focused: () => store.getState().focused,
+      subscribe: (onChange) => store.subscribe((next, prev) => {
+        if (next.focused !== prev.focused) onChange();
+      }),
+      onSelect: (i) => {
+        haptics.selection();
+        const next = meetFocus(store.getState(), i);
+        store.setState({ phase: next.phase, focused: next.focused });
+      },
+    }),
+    [loaded, store, titleText, captionText],
+  );
 
   const choose = (chosen: EggView) => {
     haptics.success();
@@ -259,8 +313,6 @@ export function MeetScreen() {
     </View>
   );
 
-  const titleText = eggCopy('m08.title');
-  const captionText = eggCopy('m08.santoro.caption');
   const showHead = phase === 'browsing' || listLayout;
   const head = (type: FitStep) => (
     <View className="gap-1">
@@ -269,6 +321,72 @@ export function MeetScreen() {
       {santoroLine !== '' ? <Text className={`${type.body.className} text-text`} testID="m08-santoro-line">{santoroLine}</Text> : null}
     </View>
   );
+
+  // The 3D stage runs unless motion is reduced, the GPU never started, or the
+  // text size switched the choice to rows. Until its first frame the triptych
+  // shows; after it, the stage covers the triptych and the card gets its own pane.
+  const stageOn = !reducedMotion && !listLayout && stage3d !== 'failed' && views.length > 0;
+  const stageCovers = stageOn && stage3d === 'ready';
+
+  // The 3D H-Lynk REPLACES the 2D shell (it is the same device as the site's
+  // DeviceStage, the eggs standing on its glass). The 2D shell below is only
+  // the fallback: reduced motion, no GPU, large text (rows) or a load error.
+  // The triptych stays mounted under the stage until its first frame, and
+  // after it as the radio group screen readers use (hidden visually).
+  if (stageOn && !('error' in loaded)) {
+    return (
+      <View className="flex-1 bg-bg" testID="m08-3d">
+        <SafeArea className="flex-1" edges={['top', 'bottom', 'left', 'right']}>
+          <View className="flex-row items-center px-2 pt-1">
+            <IconButton variant="ghost" tone="royal" aria-label={eggCopy('m08.back.a11y.label')} onPress={back} icon={<ChevronLeft size={26} />} />
+          </View>
+          {/* The title and Santoro's line are on the device's own screen, so they
+              are not repeated here. Portrait: the device, then the card and
+              actions. Landscape from md: the device left, card and actions right. */}
+          <View className="flex-1 gap-4 px-4 pb-4 md:px-8 md:landscape:flex-row md:landscape:gap-10">
+            <View className="relative min-h-0 flex-1">
+              <View className="absolute inset-0" style={{ opacity: stageCovers ? 0 : 1 }} pointerEvents={stageCovers ? 'none' : 'auto'}>
+                <ChoiceTriptych
+                  items={tileItems}
+                  focusedIndex={focused}
+                  onFocusChange={(i) => set(meetFocus(store.getState(), i))}
+                  accessibilityLabel={titleText}
+                  focusedOverlay={null}
+                  overlayPlacement="bottom"
+                  holding={holding}
+                  reducedMotion={reducedMotion}
+                  testID="m08-triptych"
+                  itemTestID={(item) => `m08-egg-${item.key}`}
+                />
+              </View>
+              <View
+                testID="m08-device-stage"
+                aria-hidden
+                accessibilityElementsHidden
+                importantForAccessibility="no-hide-descendants"
+                pointerEvents={stageCovers ? 'auto' : 'none'}
+                className="absolute inset-0"
+                style={{ opacity: stageCovers ? 1 : 0 }}
+              >
+                <DeviceStage
+                  screen={eggScreen}
+                  label={titleText}
+                  className="h-full"
+                  stageClassName="min-h-0 w-full flex-1"
+                  onReady={onStageReady}
+                  onBackendChange={onStageBackend}
+                />
+              </View>
+            </View>
+            <View className="gap-4 md:landscape:w-2/5 md:landscape:max-w-md md:landscape:justify-center">
+              {card}
+              {actions}
+            </View>
+          </View>
+        </SafeArea>
+      </View>
+    );
+  }
 
   // Decision H-3: nothing in the H-Lynk screen scrolls; HLynkFit steps the type
   // and spacing down until the step fits. The triptych is the flexible media.
@@ -312,19 +430,52 @@ export function MeetScreen() {
               </View>
             ) : (
               <>
-                <View style={{ flexGrow: 1, minHeight: fit.mediaPt, ...(landscape ? { maxWidth: TRIPTYCH_LANDSCAPE_MAX_DP, width: '100%', alignSelf: 'center' } : null) }}>
-                  <ChoiceTriptych
-                    items={tileItems}
-                    focusedIndex={focused}
-                    onFocusChange={(i) => set(meetFocus(store.getState(), i))}
-                    accessibilityLabel={titleText}
-                    focusedOverlay={card}
-                    overlayPlacement={landscape ? 'trailing' : 'bottom'}
-                    holding={holding}
-                    reducedMotion={reducedMotion}
-                    testID="m08-triptych"
-                    itemTestID={(item) => `m08-egg-${item.key}`}
-                  />
+                <View
+                  // Portrait stacks the stage over the card, top-aligned; a landscape window from md puts them side by side.
+                  className="justify-start gap-3 md:landscape:flex-row md:landscape:items-stretch"
+                  style={{ flexGrow: 1, minHeight: fit.mediaPt, ...(landscape && !stageCovers ? { maxWidth: TRIPTYCH_LANDSCAPE_MAX_DP, width: '100%', alignSelf: 'center' } : null) }}
+                >
+                  <View className="relative min-h-0 flex-1">
+                    {/* The triptych stays mounted under the 3D stage: it is the radio group screen readers and keyboards use. */}
+                    <ChoiceTriptych
+                      items={tileItems}
+                      focusedIndex={focused}
+                      onFocusChange={(i) => set(meetFocus(store.getState(), i))}
+                      accessibilityLabel={titleText}
+                      focusedOverlay={stageCovers ? null : card}
+                      overlayPlacement={landscape ? 'trailing' : 'bottom'}
+                      holding={holding}
+                      reducedMotion={reducedMotion}
+                      testID="m08-triptych"
+                      itemTestID={(item) => `m08-egg-${item.key}`}
+                    />
+                    {stageOn ? (
+                      <View
+                        testID="m08-device-stage"
+                        aria-hidden
+                        accessibilityElementsHidden
+                        importantForAccessibility="no-hide-descendants"
+                        pointerEvents={stageCovers ? 'auto' : 'none'}
+                        className="absolute inset-0"
+                        // Computed: the stage covers the triptych only once its first frame is up.
+                        style={{ opacity: stageCovers ? 1 : 0 }}
+                      >
+                        <DeviceStage
+                          screen={eggScreen}
+                          label={titleText}
+                          className="h-full"
+                          stageClassName="min-h-0 w-full flex-1"
+                          onReady={onStageReady}
+                          onBackendChange={onStageBackend}
+                        />
+                      </View>
+                    ) : null}
+                  </View>
+                  {stageCovers && card !== null ? (
+                    <View testID="m08-card-pane" className="md:landscape:w-2/5 md:landscape:max-w-sm md:landscape:justify-center">
+                      {card}
+                    </View>
+                  ) : null}
                 </View>
                 {actions}
               </>

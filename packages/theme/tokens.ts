@@ -227,7 +227,7 @@ export const hlynk = {
 
 /**
  * The H-Lynk screen's own UI, drawn on a canvas inside the 3D device
- * (apps/web/components/home/device-scene.ts). Canvas can't read CSS variables,
+ * (packages/ui/three/hlynk: hud-draw.ts, choice-screen.ts). Canvas can't read CSS variables,
  * so these stay TS-only and are not emitted to theme.css.
  */
 export const hud = {
