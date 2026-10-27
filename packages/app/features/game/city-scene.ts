@@ -11,8 +11,22 @@ import { EXPERIMENTAL_WORLD_POST, mountCityPostPipeline, resolvePostOptions } fr
 import { livingCityAdaptiveBridge } from './living-city/adaptive-bridge.ts';
 import { EXPERIMENTAL_WORLD_RENDER_SCALE, mountRenderScale } from './perf/render-scale.ts';
 import { EXPERIMENTAL_WORLD_THERMAL, thermalSignal, thermalWorsened } from './perf/thermal.ts';
-import { tierBundle, WORLD_TIER, WORLD_TIER_SELECTED } from './perf/tier.ts';
+import { TIER, tierBundle, WORLD_TIER, WORLD_TIER_SELECTED } from './perf/tier.ts';
 import { parseSkyRigFlag, type SkyName } from './world/sky-rig.ts';
+import { FrameSampleWindow } from './perf/frame-sampler.ts';
+import {
+  DEFAULT_PHYSICAL_PRESET,
+  EXPERIMENTAL_WORLD_PHYSICAL,
+  isDeviceLaneProbe,
+  physicalFeaturesFor,
+  WORLD_PROBE,
+  type DeviceLaneProbe,
+  type PhysicalFeatures,
+  type PhysicalPresetId,
+  type WorldProbe,
+} from './world/physical-look.ts';
+import { PHYSICAL_PRESETS } from './world/physical-presets.ts';
+import { applyPhysicalShadowRoles, createPhysicalRig, swapInstanceMatricesToStorage, type PhysicalRig } from './world/physical-rig.ts';
 
 export interface CityCamera {
   x: number;
@@ -27,7 +41,35 @@ export interface CitySceneParams {
   actors?: readonly SceneActorFactory[];
   /** L1 sky pick (morning/dusk/night) — only read when the sky rig flag is on. */
   sky?: SkyName;
+  /** Time-of-day preset for the physically lit city (world/time-of-day.store.ts); default twilight. */
+  preset?: PhysicalPresetId;
 }
+
+/** What a device-lane probe (shared, skiatex, pipecache) gets from the scene. */
+export interface DeviceLaneProbeContext {
+  THREE: ThreeContext['THREE'];
+  renderer: NonNullable<ThreeContext['renderer']>;
+  scene: ThreeScene<CitySceneParams>['scene'];
+  camera: ThreeScene<CitySceneParams>['camera'];
+}
+
+/**
+ * The shared-device lane registers its Phase 0 probes here. city-scene runs
+ * the hook for the active device-lane probe once the scene is built and calls
+ * the returned cleanup on dispose.
+ */
+export const deviceLaneProbeHooks: Partial<Record<DeviceLaneProbe, (context: DeviceLaneProbeContext) => (() => void) | void>> = {};
+
+/** The physical features this build mounts; null is today's path. Exported for tests. */
+export function cityPhysicalFeatures(
+  physical: boolean = EXPERIMENTAL_WORLD_PHYSICAL,
+  probe: WorldProbe | null = WORLD_PROBE,
+): PhysicalFeatures | null {
+  return physicalFeaturesFor(physical, probe, TIER[WORLD_TIER].physical.ssr !== null);
+}
+
+/** Log tag for every Phase 0 probe line. */
+const PROBE_LOG = '[NYC-Mon/probe]';
 
 /** Camera distance clamp, metres. The floor is chase range for a 1.8 m Caller. */
 export const CAMERA_MIN_DISTANCE = 8;
@@ -91,9 +133,14 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
   // when the selector is set or the render-scale controller is on — with
   // neither, every lane keeps its own defaults (perf/tier.ts).
   const bundle = WORLD_TIER_SELECTED || EXPERIMENTAL_WORLD_RENDER_SCALE ? tierBundle(WORLD_TIER) : null;
+  // Slop-grade city: null with EXPO_PUBLIC_WORLD_PHYSICAL and _PROBE unset,
+  // and then nothing below differs from the path before this lane.
+  const physical = cityPhysicalFeatures();
+  const physicalTier = TIER[WORLD_TIER].physical;
   const world = buildCityWorld(THREE, dataset, {
     sky: initial.sky,
     ...(bundle ? { glassTier: bundle.glassTier, envWidth: bundle.envWidth } : {}),
+    ...(physical?.pbrMaterials ? { pbr: true, carPbr: true } : {}),
   });
   scene.add(world.sky, world.group);
   scene.fog = world.fog;
@@ -101,20 +148,57 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
   // maps and Color backgrounds (metro-live README): linear output, no tone
   // mapping, no shadow maps, and the clear colour as the sky's fallback.
   if (renderer) {
-    renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
+    renderer.outputColorSpace = physical?.srgbOutput ? THREE.SRGBColorSpace : THREE.LinearSRGBColorSpace;
     renderer.toneMapping = VD_TONEMAP === 'agx' ? THREE.AgXToneMapping
       : VD_TONEMAP === 'aces' ? THREE.ACESFilmicToneMapping
         : VD_TONEMAP === 'neutral' ? THREE.NeutralToneMapping : THREE.NoToneMapping;
     // AgX compresses highlights and pulls mids down; a lift keeps the palette's daylight read.
     renderer.toneMappingExposure = VD_TONEMAP ? 1.6 : 1;
-    renderer.shadowMap.enabled = VD_SHADOWS;
+    renderer.shadowMap.enabled = VD_SHADOWS || (physical !== null && physical.sunShadow > 0);
     renderer.setClearColor(world.horizon, 1);
+  }
+  // The bgnull probe's failure case. Slop (js/lighting.js): a Color background
+  // makes the renderer force a clear that wipes cascade 0 while cascade 1 renders.
+  if (physical?.colorBackground) scene.background = new THREE.Color(world.horizon);
+  const rig: PhysicalRig | null = physical
+    ? createPhysicalRig(THREE, renderer ?? null, scene, {
+        features: physical,
+        shadowTile: physicalTier.shadowTile,
+        clusteredMaxLights: physicalTier.clusteredMaxLights,
+        preset: initial.preset ?? DEFAULT_PHYSICAL_PRESET,
+      })
+    : null;
+  if (rig) {
+    // The rig's lights and sky replace the world's own, one for one.
+    if (rig.sky) world.sky.visible = false;
+    world.group.traverse((object) => {
+      const light = object as typeof object & { isDirectionalLight?: boolean; isHemisphereLight?: boolean };
+      if ((rig.sun && light.isDirectionalLight) || (rig.hemi && light.isHemisphereLight)) object.visible = false;
+    });
   }
   // L5 "finishing pass": flagged post stack on the renderer — the mount
   // swaps renderer.render for the RenderPipeline's quad path (post/pipeline.ts).
   // Flag OFF mounts nothing and the direct path stays byte-identical.
-  const post =
-    renderer && EXPERIMENTAL_WORLD_POST
+  const post = renderer && physical?.pipeline
+    ? mountCityPostPipeline(THREE, {
+        renderer,
+        scene,
+        camera,
+        options: {},
+        physical: {
+          mrt: physical.mrt,
+          ssr: physical.ssr,
+          bloom: physical.bloom,
+          grade: physical.grade,
+          msaaDiscard: physical.msaaDiscard,
+          settings: {
+            look: PHYSICAL_PRESETS[rig?.preset ?? DEFAULT_PHYSICAL_PRESET].grade,
+            ssr: physicalTier.ssr,
+            bloomResolutionScale: physicalTier.bloomResolutionScale,
+          },
+        },
+      })
+    : renderer && EXPERIMENTAL_WORLD_POST && physical === null
       ? mountCityPostPipeline(THREE, {
           renderer,
           scene,
@@ -168,10 +252,36 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
     }
   } catch (error) {
     post?.dispose();
+    rig?.dispose();
     for (const actor of actors) actor.dispose();
     world.dispose();
     throw error;
   }
+
+  if (physical && physical.sunShadow > 0) applyPhysicalShadowRoles(scene);
+  // After the actors joined, so their instanced meshes are swapped too.
+  const storageSwapped = renderer && physical?.storage ? swapInstanceMatricesToStorage(THREE, renderer, scene) : 0;
+  let probeCleanup: (() => void) | void = undefined;
+  if (renderer && isDeviceLaneProbe(WORLD_PROBE)) {
+    probeCleanup = deviceLaneProbeHooks[WORLD_PROBE]?.({ THREE, renderer, scene, camera });
+  }
+  if (WORLD_PROBE !== null) {
+    console.info(`${PROBE_LOG} active`, {
+      probe: WORLD_PROBE,
+      tier: WORLD_TIER,
+      features: physical,
+      shadowTile: rig?.shadowTile ?? null,
+      storageSwapped,
+      postWired: post?.physical?.applied ?? null,
+      deviceLaneHook: isDeviceLaneProbe(WORLD_PROBE) ? deviceLaneProbeHooks[WORLD_PROBE] !== undefined : null,
+    });
+  }
+  // Probe cadence: the gap between scene updates is the draw cadence on this
+  // runtime, and cpuMs is update() alone (JS work, not GPU time). The
+  // render/present split comes from EXPO_PUBLIC_GAME_PERF on either runtime.
+  const probeWindow = WORLD_PROBE !== null ? new FrameSampleWindow() : null;
+  const probeSample = { cpuMs: 0, intervalMs: null as number | null };
+  let probeLast = 0;
 
   // Per-frame scratch: the pose, the actor frame and the camera write into
   // preallocated objects, so the update loop allocates nothing.
@@ -248,11 +358,34 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
       }
       // After the actors: a chase camera reads the Caller's position in this frame's params.
       positionCamera(params.camera);
+      if (rig) {
+        rig.update(camera.position.y, params.camera.x, params.camera.z);
+        const preset = params.preset ?? DEFAULT_PHYSICAL_PRESET;
+        if (preset !== rig.preset) {
+          rig.applyPreset(preset);
+          post?.physical?.applyLook(PHYSICAL_PRESETS[preset].grade);
+          invalidate?.();
+        }
+      }
       // Precipitation animates on the shader clock — while rain or snow is
       // live the loop must keep drawing, or the on-demand canvas freezes
       // the weather with the world.
       const precip = world.weather;
       if (moving || (precip !== null && Math.max(precip.wet.value, precip.snow.value) > 0.01)) invalidate?.();
+      if (probeWindow) {
+        const end = typeof performance !== 'undefined' ? performance.now() : Date.now();
+        probeSample.cpuMs = end - now;
+        probeSample.intervalMs = probeLast > 0 ? now - probeLast : null;
+        probeLast = now;
+        const summary = probeWindow.push(probeSample);
+        if (summary) {
+          console.info(`${PROBE_LOG} ${WORLD_PROBE} scene cadence`, {
+            ...summary,
+            drawCalls: renderer?.info.render.drawCalls ?? null,
+            triangles: renderer?.info.render.triangles ?? null,
+          });
+        }
+      }
     },
     resize: (width, height) => {
       if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return;
@@ -265,7 +398,9 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
       if (disposed) return;
       disposed = true;
       renderScale?.dispose();
+      probeCleanup?.();
       post?.dispose();
+      rig?.dispose();
       for (const actor of actors) actor.dispose();
       world.dispose();
       scene.clear();

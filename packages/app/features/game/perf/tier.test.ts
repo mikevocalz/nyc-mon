@@ -173,3 +173,31 @@ test('PR09: the adaptive stepper walks high→medium→low on surrendering scale
   const d = createLivingCityAdaptive();
   assert.equal(d.frame(0.5, 'xr'), 'high');
 });
+
+test('Slop-grade city start values (§5.7): phone = iPhone 17, high = iPad Pro', () => {
+  assert.deepEqual(TIER.phone.physical, {
+    shadowTile: 2048,
+    ssr: null,
+    bloomResolutionScale: 0.5,
+    clusteredMaxLights: 128,
+    headlightSpots: 8,
+    interiorFootprintFade: true,
+    frameTarget: 60,
+  });
+  assert.deepEqual(TIER.high.physical, {
+    shadowTile: 3072,
+    ssr: { resolutionScale: 0.5, quality: 0.25, binaryRefine: true },
+    bloomResolutionScale: 0.5,
+    clusteredMaxLights: 256,
+    headlightSpots: 24,
+    interiorFootprintFade: true,
+    frameTarget: 60,
+  });
+  // Shadow atlas memory at 4 bytes per texel, two tiles side by side.
+  const mib = (tile: number) => (tile * 2 * tile * 4) / 2 ** 20;
+  assert.equal(mib(TIER.phone.physical.shadowTile), 32);
+  assert.equal(mib(TIER.high.physical.shadowTile), 72);
+  // The physical rows leave the selector and its defaults alone.
+  assert.equal(parseWorldTier(undefined), 'phone');
+  assert.equal(parseWorldTier('low'), 'phone');
+});
