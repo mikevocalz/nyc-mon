@@ -488,3 +488,79 @@ Notes:
 - **No lobby loading copy ships from this deck.** G5 keeps the dataset
   bundled, so the lobby's existing progress state stays; if G5 moves it to
   a fetch, lobby strings land then, not preemptively.
+
+## Time of day and quality tiers (Slop-grade city)
+
+Lane A1/F2, 2026-10-27, for `docs/plans/slop-grade-city-prompt.md` §6.1 #4. Skill: `design:ux-copy`, loaded through the Skill tool and applied with the `no-ai-slop` rules. Every string is `voice: "ui"`. The deck's rules apply: sentence case, lead with what the Caller can do, promise only what ships, status is never colour alone. Status **drafted** on every row; none ships before its UI lane builds it and the flag (`EXPO_PUBLIC_WORLD_PHYSICAL`) is on.
+
+### Time of day
+
+Gate G2's default (D19): Slop's four presets, `twilight` first. The control is a fourth row on the graphics settings surface; the HUD gains nothing in this lane (`docs/design/research/slop-grade-city-mobbin.md` §§ 2–3). Namespace `game.timeofday.*`.
+
+| ID | String | Voice | Max | Status |
+|---|---|---|---|---|
+| `game.timeofday.label` | Time of day | ui | 16 | drafted |
+| `game.timeofday.twilight` | Dusk | ui | 12 | drafted |
+| `game.timeofday.golden` | Golden hour | ui | 12 | drafted |
+| `game.timeofday.midday` | Midday | ui | 12 | drafted |
+| `game.timeofday.midnight` | Night | ui | 12 | drafted |
+| `game.timeofday.a11y.value` | {label}, {n} of 4 | ui | 24 | drafted |
+| `game.timeofday.a11y.hint` | Changes the light in the city. Your game is not affected. | ui | 60 | drafted |
+
+Notes:
+
+- **Labels name the light.** Slop's buttons say "Golden Hour", "Sunny Midday", "Blue Hour" and "Night 23:00" (`index.html` `data-time` titles). A clock time promises a sim clock this lane doesn't have, so no row names an hour.
+- **`twilight` reads "Dusk".** D17 calls the city's canon look dusk and `handoff/realism.md` § Time of day already uses Morning / Dusk / Night. "Blue hour" is a photographer's term the rest of the app never uses.
+- **Order is fixed: Dusk, Golden hour, Midday, Night.** Dusk leads because it is the default, then the day runs forward. Callers who never touch the control see the canon look.
+- **The hint says the game is unaffected.** The preset is lighting only: it drives sun, sky, interior glow and road wetness (`lighting.js` `TIME_PRESETS`), not care timers or the hatch clock. If a later lane ties presets to a world clock, this hint changes with it.
+- **Night is not "Midnight".** Slop's preset id is `midnight`; its sun is a moonlight-coloured key. "Night" matches `handoff/realism.md` and the Graphics section's wording.
+
+### Quality tiers
+
+The Caller-facing tiers stay the three in § Graphics quality (`settings.graphics.auto`, `.performance`, `.quality` and their `.desc` rows). No new tier label ships. The spec's internal tiers (`low` for the Duo, `phone` for iPhone 17, `high` for iPad Pro; `perf/tier.ts`) are developer names and never appear in UI.
+
+| ID | String | Voice | Max | Status |
+|---|---|---|---|---|
+| `settings.graphics.quality.desc` | Full detail, reflections and lit rooms. May run slower on older phones. | ui | 2 lines | drafted (unchanged; now literally true under the flag: SSR and interior mapping) |
+| `settings.graphics.performance.desc` | Lighter detail and a lower render scale, for the smoothest frame. | ui | 2 lines | drafted (unchanged) |
+
+`quality.desc` says "phones", which is wrong on iPad Pro. On a tablet the implementer uses `settings.graphics.quality.desc.tablet`:
+
+| ID | String | Voice | Max | Status |
+|---|---|---|---|---|
+| `settings.graphics.quality.desc.tablet` | Full detail, reflections and lit rooms. May run slower on older tablets. | ui | 2 lines | drafted |
+
+### Lobby: shaders compiling
+
+The physical mode compiles more pipelines before the first frame. The lobby says what it is doing, with honest progress (spec D4: no stall at the known 75 % point, `worklet-rendering.md`). These rows join the G02 copy family; `g02.start.loading` ("Opening the city") stays the spoken line at START.
+
+| ID | String | Voice | Max | Status |
+|---|---|---|---|---|
+| `g02.start.compiling` | Setting up the city's lights | ui | 32 | drafted |
+| `g02.start.compiling.progress` | Setting up the city's lights · {percent}% | ui | 40 | drafted |
+| `g02.start.compiling.a11y` | Setting up the city's lights, {percent} percent | ui | 48 | drafted |
+| `g02.start.compiling.slow` | Still setting up the lights. Your game is safe. | ui | 2 lines | drafted |
+| `g02.start.compiling.failed` | The city's lights couldn't finish setting up. Try again, and if it keeps happening, restart the app. | ui | 2 lines | drafted |
+| `g02.start.compiling.failed.action` | Try again | ui | 12 | drafted |
+
+Notes:
+
+- **Progress is a count.** `{percent}` is finished compile jobs over total jobs, the way Slop's loader reports it (`main.js`, "Compiling Shaders & Render Pipelines... n%"). No row estimates time remaining: cold-launch versus warm-launch compile time is the `pipecache` probe, and it has not run.
+- **"Slow" reports a state.** It appears when progress has not moved for a threshold the implementer sets from measurement. It names the step and says the save is untouched (compiling reads nothing from the save). It never says "almost there" and makes no claim about which step is longest until the `pipecache` probe measures it.
+- **Failure reuses the `g02.resume.fail.generic` shape** (what happened, what to do), with "lights" so the Caller knows the save is not the problem. One action.
+- **The a11y line is announced politely once per 25 % step,** not every percent.
+
+### Credits: Slop New York
+
+Joins § City data credits in the "Legal & credits" card (`settings-content.tsx`), as its own "Software" group, since Slop supplies code techniques and no data.
+
+| ID | String | Voice | Status |
+|---|---|---|---|
+| `settings.legal.software.group` | Software | ui | drafted |
+| `settings.legal.software.slop.line` | Rendering techniques adapted from Slop New York by Mr.doob (MIT) | ui | drafted |
+| `settings.legal.software.slop.link` | View the Slop New York repository | ui | drafted |
+
+Notes:
+
+- **The line is fixed by the spec** (§5.8) and is not reworded. The link target is https://github.com/mrdoob/slop-newyork; the full licence is `docs/licenses/slop-newyork-mit.md`.
+- **It does not sit under "City data".** No Slop geodata is imported, so putting the row next to the data sources would imply a data credit that isn't true.
