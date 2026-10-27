@@ -16,6 +16,7 @@ export function useSignInNav(): {
   openLink: (href: string) => void;
   replace: (path: string) => void;
   back: () => void;
+  inlineBack: boolean;
 } {
   const router = useRouter();
   const raw = useSearchParams()?.get('intent');
@@ -34,5 +35,6 @@ export function useSignInNav(): {
     openLink: router.push,
     replace: router.replace,
     back: router.back,
+    inlineBack: true,
   };
 }

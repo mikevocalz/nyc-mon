@@ -33,6 +33,8 @@ export function useSignInNav(): {
   replace: (path: string) => void;
   /** The ‹ in the stack header (M03 direction): back to the previous route. */
   back: () => void;
+  /** Draw the ‹ inside the screen. False in the app: the native stack header carries it. */
+  inlineBack: boolean;
 } {
   const router = useRouter();
   const params = useLocalSearchParams<{ intent?: string }>();
@@ -51,6 +53,8 @@ export function useSignInNav(): {
     ],
     openLink: (href) => void Linking.openURL(`${SITE_URL}${href}`),
     replace: (path) => router.replace(path as never),
-    back: () => router.back(),
+    // Sign-in is often reached by replace (from the age gate), so there may be no history.
+    back: () => (router.canGoBack() ? router.back() : router.replace('/(onboarding)/welcome' as never)),
+    inlineBack: false,
   };
 }

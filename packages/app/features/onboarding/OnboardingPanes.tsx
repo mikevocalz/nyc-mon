@@ -25,6 +25,7 @@ export function OnboardingPanes({
   intro,
   children,
   tightTop = false,
+  stacked = false,
   testID,
 }: {
   /** Heading, supporting copy and any landscape-only art. Read first. */
@@ -33,18 +34,21 @@ export function OnboardingPanes({
   children: ReactNode;
   /** M03 keeps its stack-header row close to the safe area (py-2, not py-6). */
   tightTop?: boolean;
+  /** Never split into panes: the page already puts a brand panel beside it (M03). */
+  stacked?: boolean;
   testID?: string;
 }) {
+  const split = !stacked;
   return (
     <Container
       width="full"
       testID={testID}
-      className={`flex-1 px-4 md:px-8 md:py-10 md:landscape:flex-row md:landscape:gap-12 ${tightTop ? 'py-2' : 'py-6'}`}
+      className={`flex-1 px-4 md:px-8 md:py-10 ${split ? 'md:landscape:flex-row md:landscape:gap-12' : ''} ${tightTop ? 'py-2' : 'py-6'}`}
     >
-      <View className="mx-auto mb-6 w-full max-w-content-form md:max-w-[560px] md:landscape:mx-0 md:landscape:mb-0 md:landscape:w-auto md:landscape:flex-1">
+      <View className={`mx-auto mb-6 w-full max-w-content-form md:max-w-[560px] ${split ? 'md:landscape:mx-0 md:landscape:mb-0 md:landscape:w-auto md:landscape:flex-1' : ''}`}>
         {intro}
       </View>
-      <View className="mx-auto w-full max-w-content-form flex-1 md:max-w-[560px] md:landscape:mx-0 md:landscape:w-[44%] md:landscape:flex-none">
+      <View className={`mx-auto w-full max-w-content-form flex-1 md:max-w-[560px] ${split ? 'md:landscape:mx-0 md:landscape:w-[44%] md:landscape:flex-none' : ''}`}>
         {children}
       </View>
     </Container>

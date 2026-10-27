@@ -59,7 +59,7 @@ function errorCopyId(error: AuthError): OnboardingCopyId | undefined {
  * shown raw, and a cancelled provider sheet shows nothing.
  */
 export function SignInScreen() {
-  const { intent, ageGatePath, homePath, signInPath, legalLinks, openLink, replace, back } = useSignInNav();
+  const { intent, ageGatePath, homePath, signInPath, legalLinks, openLink, replace, back, inlineBack } = useSignInNav();
   const ageAnswer = useOnboarding((s) => s.ageAnswer);
   const setSession = useOnboarding((s) => s.setSession);
 
@@ -167,19 +167,24 @@ export function SignInScreen() {
     <KeyboardAwareScroll contentContainerClassName="grow">
       <OnboardingPanes
         tightTop
+        stacked
         intro={
           <View className="gap-6">
-            {/* M03's stack-header ‹ (03-direction): the screen's one header row. */}
-            <View className="-ml-2 flex-row items-center" testID="m03-back">
-              <IconButton
-                variant="ghost"
-                size="sm"
-                tone="royal"
-                aria-label={copy('m03.back.a11y.label')}
-                onPress={back}
-                icon={<ChevronLeft size={22} />}
-              />
-            </View>
+            {/* M03's ‹ (03-direction). In the app it lives in the native stack
+                header's left slot (apps/mobile/app/(auth)/sign-in.tsx); on web,
+                which has no stack header, it is the screen's first row. */}
+            {inlineBack ? (
+              <View className="-ml-2 flex-row items-center" testID="m03-back">
+                <IconButton
+                  variant="ghost"
+                  size="sm"
+                  tone="royal"
+                  aria-label={copy('m03.back.a11y.label')}
+                  onPress={back}
+                  icon={<ChevronLeft size={22} />}
+                />
+              </View>
+            ) : null}
             <View className="gap-2">
               <Heading level={1} size="title" className={PANE_HEADING_CLASS}>{title}</Heading>
               {mode === 'providers' || mode === 'email' ? (
