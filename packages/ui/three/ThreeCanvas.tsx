@@ -98,6 +98,7 @@ function JsThreeCanvas<P>({
   background,
   androidSurfaceType,
   freeRun = false,
+  rendererParams,
   onBackendChange,
   onFrameTiming,
   children,
@@ -278,7 +279,7 @@ function JsThreeCanvas<P>({
       const [THREE, setup] = await Promise.all([loadThree(), load()]);
       const surface = surfaceRef.current;
       if (cancelled || !surface) return;
-      renderer = surface.createRenderer(THREE, { backend: using, device });
+      renderer = surface.createRenderer(THREE, { backend: using, device, rendererParams });
       await renderer.init();
       stopInternalLoop(renderer);
       if (cancelled) return;

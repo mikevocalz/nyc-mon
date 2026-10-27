@@ -66,6 +66,12 @@ import { loadGameScene, type GameSceneParams } from './load-game-scene.ts';
 import { CITY_FRAME_SINK_ENABLED, onCityFrame } from './perf/on-city-frame.ts';
 import { GAME_SURFACE_TYPE } from './perf/surface-type.ts';
 import { GAME_FREERUN } from './perf/frame-pacing.ts';
+import { physicalRendererParams } from './world/physical-look.ts';
+import { timeOfDayStore } from './world/time-of-day.store.ts';
+import { runJsDeviceProbe } from './render-runtime/run-js-device-probes.ts';
+
+// EXPO_PUBLIC_WORLD_PHYSICAL: reversed depth on the JS render path. Flag off: {}.
+const PHYSICAL_RENDERER_PARAMS = physicalRendererParams();
 import { useGamePerfMounts } from './perf/use-game-perf.ts';
 import { useGameRenderThread } from './render-thread-choice.ts';
 import { readLobbyIdentity } from './lobby/lobby-identity.ts';
@@ -148,6 +154,10 @@ export function GameScreen({ focused = true }: GameScreenProps = {}) {
     gameScreenActions.viewStateChanged(state);
   }, [state]);
   useEffect(() => () => gameScreenActions.viewStateChanged(null), []);
+  // EXPO_PUBLIC_WORLD_PROBE=shared|skiatex on the RN runtime; a no-op otherwise.
+  useEffect(() => {
+    void runJsDeviceProbe();
+  }, []);
   // Gameplay input and the controller exist only once the lobby has handed over (review finding H1):
   // under the cover, neither touch, hardware nor a screen reader reaches the world.
   const lobbyPhase = useStore(lobbyStore, (s) => s.phase);
@@ -201,6 +211,8 @@ export function GameScreen({ focused = true }: GameScreenProps = {}) {
       // PR07: the world clock picks the sky preset (dusk at the slice's
       // starting hour). Flag off → undefined → the world's own default.
       sky: livingCitySky(),
+      // EXPO_PUBLIC_WORLD_PHYSICAL: the time-of-day pick; city-scene re-lights on change.
+      get preset() { return timeOfDayStore.getState().preset; },
       onFirstFrame: gameScreenActions.firstFrame,
     };
   }, [city]);
@@ -288,6 +300,7 @@ export function GameScreen({ focused = true }: GameScreenProps = {}) {
               // Off by default; EXPO_PUBLIC_GAME_FREERUN=1 lets the on-demand
               // loop outpace vsync — only meaningful on the superseding surface.
               freeRun={GAME_FREERUN}
+              rendererParams={PHYSICAL_RENDERER_PARAMS}
               load={loadGameScene}
               params={params}
               paused

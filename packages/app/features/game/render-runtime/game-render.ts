@@ -33,6 +33,7 @@ import { readCaller, readCamera, readView, snapshotVersion, type MutableCallerSt
 import { createStreetClearance } from '../world/walkability.ts';
 import { describeRuntimeError, installFrameGlobals, type GameRenderEventKind } from './runtime-report.ts';
 import { FrameSampleWindow, type MutableFrameTimingSample } from '../perf/frame-sampler.ts';
+import { physicalRendererParams } from '../world/physical-look.ts';
 import { readInteropGlobals, resolveRendererDevice, WORLD_PHYSICAL, type RendererDevice } from './shared-device.ts';
 import { createPipecacheTimer, formatProbeRecord, probeShared, probeSkiaTex, threeSampler, WORLD_DEVICE_PROBE } from './device-probes.ts';
 
@@ -302,6 +303,8 @@ export function startGameRender(args: GameRenderArgs): void {
       canvas: args.context.canvas as unknown as HTMLCanvasElement,
       context: args.context,
       ...(device ? { device } : {}),
+      // EXPO_PUBLIC_WORLD_PHYSICAL: reversed depth, as Slop's main.js sets it. Flag off: {}.
+      ...physicalRendererParams(),
     });
   } catch (error) {
     fail(s, 'renderer construct', error);

@@ -27,6 +27,7 @@ import { callerStore } from '../character/caller-store.ts';
 import { gameCameraStore, gameScreenActions } from '../game-session.ts';
 import { EXPERIMENTAL_LIVING_CITY, livingCityHost } from '../living-city/bundled-host.ts';
 import { emptySnapshot, bumpSnapshot, packSnapshot, type SnapshotView } from '../render-snapshot.ts';
+import { readGpuDevice } from '@acme/ui/gpu';
 import { parseSkyRigFlag } from '../world/sky-rig.ts';
 import {
   setGameRenderRunning,
@@ -221,6 +222,7 @@ function start(options: WorkletRenderStart): WorkletRenderSession {
     session,
     context: options.context,
     device: options.device,
+    deviceSource: readGpuDevice()?.source ?? null,
     snapshot,
     vehicles,
     idle,
