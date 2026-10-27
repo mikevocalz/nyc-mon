@@ -22,9 +22,8 @@ import { VD_LEANMAT } from './vd-leanmat.ts';
 import { buildPrecipitation } from './vd-weather.ts';
 import { CURB_HEIGHT, VD_SHADOWS, VD_SHADOW_HALF } from './curb.ts';
 import { FUTURE_LAYER, type AdSurface } from './future-layer.ts';
-import { buildPhysicalCityMaterials } from './physical/index.ts';
-import { buildPhysicalFacelift, createFaceliftLampPools, faceliftBakePicks } from './physical/facelift.ts';
-import { loadPhysicalRig } from '../physical-graph.ts';
+import { loadPhysicalCityMaterials, loadPhysicalFacelift, loadPhysicalRig } from '../physical-graph.ts';
+// Static: the living city's bundled-topology.ts evaluates topology.ts in every build, so a lazy load here saves nothing.
 import { buildLaneTopology } from '../living-city/topology.ts';
 
 // Lane G1 "GPU budget" (EXPO_PUBLIC_WORLD_BUNDLES) was deleted 2026-11: the
@@ -202,25 +201,27 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
 
   // One street-clearance index for every tree, pole, sign, stoop and prop.
   const clearance = createStreetClearance(dataset);
+  // The physical modules load only on this branch (physical-graph.ts).
   const phys = options.physical
-    ? buildPhysicalCityMaterials(THREE, loadPhysicalRig().cityUniforms(THREE), dataset, { topology: buildLaneTopology(dataset) })
+    ? loadPhysicalCityMaterials().buildPhysicalCityMaterials(
+        THREE, loadPhysicalRig().cityUniforms(THREE), dataset, { topology: buildLaneTopology(dataset) },
+      )
     : null;
   const future = options.future ?? EXPERIMENTAL_WORLD_FUTURE;
+  const faceliftModule = phys && future ? loadPhysicalFacelift() : null;
   const city = phys
     ? buildCityMeshes(
         THREE, dataset,
         { ...materials, masonry: phys.masonry, glass: phys.glass, roads: phys.roads, sidewalks: phys.sidewalks },
         away, clearance, future,
-        { facadeAttributes: true, fireEscapes: true, facelift: future ? faceliftBakePicks(dataset) : undefined },
+        { facadeAttributes: true, fireEscapes: true, facelift: faceliftModule?.faceliftBakePicks(dataset) },
       )
     : buildCityMeshes(THREE, dataset, materials, away, clearance, future);
   // The facelift reads the built masonry walls, so it follows buildCityMeshes.
-  const facelift = phys && future
-    ? buildPhysicalFacelift(THREE, dataset, city.meshes, clearance)
-    : null;
+  const facelift = faceliftModule ? faceliftModule.buildPhysicalFacelift(THREE, dataset, city.meshes, clearance) : null;
   const trees = buildTrees(THREE, dataset, materials, clearance, vd, VD_LEAN, leanMat, leanDraw);
   // The facelift's LED streetlights: the furniture lamps pool in the LED colour instead of sodium.
-  const ledPools = facelift ? createFaceliftLampPools(THREE) : null;
+  const ledPools = faceliftModule ? faceliftModule.createFaceliftLampPools(THREE) : null;
   const furniture = buildStreetFurniture(THREE, dataset, ledPools ? { ...materials, lampPools: ledPools } : materials, clearance, city.texts);
   const props = buildStreetProps(THREE, dataset, materials, clearance, furniture.signs, furniture.lights);
   const bandMinZ = -dataset.extentMeters - SHADOW_BAND_METRES;

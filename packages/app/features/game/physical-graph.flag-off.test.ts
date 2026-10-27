@@ -1,7 +1,8 @@
 // Flag-off load invariant: with EXPO_PUBLIC_WORLD_PHYSICAL unset, loading the
 // Game scene, the worklet render module and the vehicle actor evaluates none
 // of the physical-only modules (the light rig and its three addons, SSR, the
-// lofted fleet, the device-lane probes and the Skia bridge). A load hook
+// lofted fleet, the device-lane probes and the Skia bridge, and the Slop city
+// materials and facelift under world/physical/). A load hook
 // records every module URL node evaluates; react-native-worklets is a stub.
 import assert from 'node:assert/strict';
 import { registerHooks } from 'node:module';
@@ -39,6 +40,20 @@ const PHYSICAL_ONLY = [
   '/features/game/living-city/vehicle-headlights.ts',
   '/features/game/render-runtime/device-probes.ts',
   '/features/game/render-runtime/skia-texture-bridge.ts',
+  // world/physical/: everything but class-family.ts and facade-attributes.ts,
+  // which city-mesh.ts reads on every build for the wall-attribute writers.
+  '/features/game/world/physical/index.ts',
+  '/features/game/world/physical/facelift.ts',
+  '/features/game/world/physical/facade.ts',
+  '/features/game/world/physical/facade-frame.ts',
+  '/features/game/world/physical/interior.ts',
+  '/features/game/world/physical/fire-escapes.ts',
+  '/features/game/world/physical/road-paint.ts',
+  '/features/game/world/physical/roads.ts',
+  '/features/game/world/physical/canyon-ao.ts',
+  '/features/game/world/physical/culling.ts',
+  '/features/game/world/physical/tsl-common.ts',
+  '/features/game/world/physical/loose-tsl.ts',
 ];
 
 test('flag off: city-scene, game-render and vehicle-actor load no physical-only module', async () => {

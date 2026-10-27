@@ -3,7 +3,9 @@
 // through these functions at the use site, behind the flag, so a flag-off
 // build never evaluates them: the light rig with SkyMesh, SunLight,
 // SunLightNode and ClusteredLighting, SSRNode, the lofted fleet and its
-// headlights, and the device-lane probes with the Skia texture bridge.
+// headlights, the device-lane probes with the Skia texture bridge, the
+// Slop city materials (world/physical/index.ts) and the facelift
+// (world/physical/facelift.ts).
 //
 // Each loader is an inline `require('<literal path>')`: Metro collects the
 // literal as a dependency and evaluates the module on the first call, with
@@ -68,4 +70,10 @@ export function loadPhysicalFacelift(): typeof import('./world/physical/facelift
   return (typeof require === 'function'
     ? require('./world/physical/facelift.ts')
     : viaNode('./world/physical/facelift.ts')) as typeof import('./world/physical/facelift.ts');
+}
+
+export function loadPhysicalCityMaterials(): typeof import('./world/physical/index.ts') {
+  return (typeof require === 'function'
+    ? require('./world/physical/index.ts')
+    : viaNode('./world/physical/index.ts')) as typeof import('./world/physical/index.ts');
 }
