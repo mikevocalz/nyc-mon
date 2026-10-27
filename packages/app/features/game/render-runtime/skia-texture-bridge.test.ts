@@ -4,6 +4,7 @@
 // react-native-webgpu's own mock constants. N8: nothing here needs a DOM.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { readFileSync } from 'node:fs';
 import * as THREE from 'three/webgpu';
 import { fakeDevice, fakeSkia, webgpuMock } from './webgpu-mock.test-support.ts';
 import {
@@ -97,4 +98,12 @@ test('an own device, a missing Skia API, or a Skia refusal each fall back to the
   assert.equal(device.textures[0]?.destroyed, true, 'the refused texture is released');
   const data = refused.texture as THREE.DataTexture;
   assert.equal(data.image.width, labelSize(spec).width);
+});
+
+test('the Slop attribution header names the functions this module reimplements', () => {
+  const source = readFileSync(new URL('./skia-texture-bridge.ts', import.meta.url), 'utf8');
+  assert.match(
+    source.split('\n')[0]!,
+    /^\/\/ Adapted from mrdoob\/slop-newyork @ be65d0a, js\/actor-models\.js carPlateTexture and js\/street-details\.js createStreetSignBladeTexture \(MIT, © 2026 Mr\.doob\)$/,
+  );
 });

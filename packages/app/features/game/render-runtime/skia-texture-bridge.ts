@@ -1,7 +1,9 @@
+// Adapted from mrdoob/slop-newyork @ be65d0a, js/actor-models.js carPlateTexture and js/street-details.js createStreetSignBladeTexture (MIT, © 2026 Mr.doob)
+//
 // Labels drawn by Skia straight into WebGPU textures that three samples:
 // licence plates, street-name blades, bus destination signs. Slop New York
-// draws these on DOM canvases (js/actor-models.js plate texture,
-// js/street-details.js sign blades); React Native has no DOM canvas, so on
+// draws these on DOM canvases (carPlateTexture's plate atlas,
+// createStreetSignBladeTexture's green blade); React Native has no DOM canvas, so on
 // the shared device Skia draws them instead, with no copy (gate G9,
 // docs/adr/0026-one-gpu-device.md).
 //
