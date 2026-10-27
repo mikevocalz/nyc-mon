@@ -733,6 +733,18 @@ export const physicalCityLight = {
   },
   /** The SkyMesh is mixed toward this by each preset's night factor. */
   nightSky: '#0B1528',
+  /**
+   * Streetlamp PointLights without the facelift (js/street-details.js, the
+   * cobra-head SpotLight colour). With the facelift on they take
+   * physicalFacelift.streetLed instead.
+   */
+  streetlamp: '#FFE8C2',
+  /**
+   * Storefront PointLights under the shop awnings (js/buildings.js
+   * storeThemeColors): bistro gold, pharmacy white, bookstore amber, deli
+   * orange-gold, boutique ivory.
+   */
+  storefront: ['#FFD896', '#D8EEFF', '#FFE4AD', '#FFBE88', '#FFF2D6'],
 } as const;
 
 // Slop-grade city: vehicles

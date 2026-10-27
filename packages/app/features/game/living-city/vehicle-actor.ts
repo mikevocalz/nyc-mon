@@ -25,7 +25,7 @@
 // class draws the nearest vehicles with the full model and the rest with
 // the coarse proxy (two draws per car class, one for the bus), paints from
 // the per-instance `paintColor` / `carState` attributes, and lights the
-// street through a tiered pool of real SpotLights plus night flare sprites
+// street through a tiered pool of road-pool PointLights plus night flare sprites
 // (vehicle-headlights.ts). With the flag off nothing below changes: the
 // default registry, the box recipes and the PR07 light quads are exactly
 // as before, and lofted-car.ts, lofted-car-material.ts and
@@ -36,7 +36,7 @@ import type { Three } from '@acme/ui/three';
 import type { ActorFrame, SceneActor, SceneActorFactory } from '../scene-actor.ts';
 import { WORLD_TIER } from '../perf/tier.ts';
 import { parseSkyRigFlag } from '../world/sky-rig.ts';
-import { EXPERIMENTAL_WORLD_PHYSICAL } from '../world/physical-look.ts';
+import { EXPERIMENTAL_WORLD_PHYSICAL, WORLD_CLUSTERED_LIGHTING } from '../world/physical-look.ts';
 import {
   candidates,
   createWorldAssetRegistry,
@@ -61,8 +61,7 @@ import {
 import type { FlareMount, HeadlightTier, LightFocus } from './vehicle-headlights.ts';
 import {
   FLARE_GLOW_ON,
-  HEADLIGHTS,
-  HEADLIGHT_SPOT_VEHICLES,
+  HEADLIGHT_POOL,
   LOFTED_NEAR_VEHICLES,
   headlightBeamScale,
   slopGlowFromLampLevel,
@@ -271,16 +270,17 @@ export interface VehicleActorOptions {
   readonly physical?: boolean;
   /**
    * Camera on the ground plane, for near/far detail, headlight ranking and flares. Without it every lofted vehicle
-   * draws the proxy past the near cap in snapshot order and no spot or flare is assigned.
+   * draws the proxy past the near cap in snapshot order and no headlight light or flare is assigned.
    */
   readonly focus?: () => LightFocus | null;
-  /** Spot pool and detail tier (default EXPO_PUBLIC_WORLD_TIER). */
+  /** Headlight pool and detail tier (default EXPO_PUBLIC_WORLD_TIER). */
   readonly tier?: HeadlightTier;
   /**
-   * Real headlight SpotLights (default on with `physical`). Each spot is a light every lit material evaluates
-   * unless the renderer runs three's ClusteredLighting, so turn this off on a renderer without it.
+   * Headlight PointLights on the road ahead of the nearest vehicles (default WORLD_CLUSTERED_LIGHTING: on when the
+   * scene mounts three's ClusteredLighting). Without ClusteredLighting each one is a light every lit material
+   * evaluates, so a renderer without it leaves them off.
    */
-  readonly headlightSpots?: boolean;
+  readonly headlightLights?: boolean;
   /** Rear plate atlas for the lofted cars (plateAtlasPixels layout); defaults to the pixel-font atlas. */
   readonly plateTexture?: unknown;
   /** Camera field of view (degrees) and viewport height (px) for flare sizing. */
@@ -513,7 +513,7 @@ interface LoftedFleet {
   begin(): void;
   /** Queue one snapshot record for this frame. */
   collect(snap: readonly number[], index: number, alpha: number, kind: VehicleKind): void;
-  /** Write instances, spots and flares for the queued records. */
+  /** Write instances, headlight lights and flares for the queued records. */
   commit(lampLevel: number, blinkOn: boolean): void;
   dispose(): void;
 }
@@ -550,7 +550,7 @@ function createLoftedFleet(
     FLARE_STRIDE,
     createCarFlareMaterial,
     createVehicleHeadlight,
-    headlightSpotCount,
+    headlightLightCount,
     metresPerPixelAt1m,
     placeVehicleHeadlight,
     rankLitVehicles,
@@ -636,20 +636,19 @@ function createLoftedFleet(
   }
   if (kinds.size === 0) return null;
 
-  // Real low beams for the nearest vehicles (two spots each), parked under the street when unassigned.
-  const spotsOn = options.headlightSpots ?? true;
-  const spotGroup = new THREE.Group();
-  spotGroup.name = 'living-city:vehicle-headlights';
-  const spots: InstanceType<Three['SpotLight']>[] = [];
-  if (spotsOn) {
-    for (let i = 0; i < headlightSpotCount(tier); i++) {
-      const spot = createVehicleHeadlight(THREE);
-      spot.position.set(0, -1000, 0);
-      spot.target.position.set(0, -1001, 0);
-      spotGroup.add(spot, spot.target);
-      spots.push(spot);
+  // A road pool ahead of each of the nearest vehicles, parked under the street when unassigned.
+  const lightsOn = options.headlightLights ?? WORLD_CLUSTERED_LIGHTING;
+  const lightGroup = new THREE.Group();
+  lightGroup.name = 'living-city:vehicle-headlights';
+  const lights: InstanceType<Three['PointLight']>[] = [];
+  if (lightsOn) {
+    for (let i = 0; i < headlightLightCount(tier); i++) {
+      const light = createVehicleHeadlight(THREE);
+      light.position.set(0, -1000, 0);
+      lightGroup.add(light);
+      lights.push(light);
     }
-    group.add(spotGroup);
+    group.add(lightGroup);
   }
 
   // Night flares: four per vehicle, one instanced sprite draw.
@@ -759,32 +758,27 @@ function createLoftedFleet(
         if (lk.far) flush(lk.far);
       }
 
-      // Spots: nearest effective distance first, faded at the cut-off, scaled by the night ramp.
+      // Headlight pools: nearest effective distance first, faded at the cut-off, scaled by the night ramp.
       let used = 0;
       const beam = headlightBeamScale(glow.value);
-      if (spots.length > 0 && focus && beam > 0.001) {
+      if (lights.length > 0 && focus && beam > 0.001) {
         litPositions.length = 0;
         for (let i = 0; i < recordCount; i++) litPositions.push(records[i]!);
-        for (const lit of rankLitVehicles(litPositions, focus, HEADLIGHT_SPOT_VEHICLES[tier])) {
-          if (used + 2 > spots.length) break;
+        for (const lit of rankLitVehicles(litPositions, focus, lights.length)) {
           const rec = litPositions[lit.index]!;
           const lk = kinds.get(rec.kind)!;
           quat.setFromAxisAngle(up, rec.yaw);
           matrix.compose(pos.set(rec.x, 0, rec.z), quat, one);
-          const intensity = (lk.bus ? HEADLIGHTS.busIntensity : HEADLIGHTS.intensity) * beam * lit.fade;
-          for (let side = -1; side <= 1; side += 2) {
-            const spot = spots[used++]!;
-            placeVehicleHeadlight(spot, lk.head, side, matrix);
-            spot.intensity = intensity;
-          }
+          const light = lights[used++]!;
+          placeVehicleHeadlight(light, lk.head, matrix);
+          light.intensity = (lk.bus ? HEADLIGHT_POOL.busIntensity : HEADLIGHT_POOL.intensity) * beam * lit.fade;
         }
       }
-      for (let i = used; i < spots.length; i++) {
-        const spot = spots[i]!;
-        if (spot.intensity === 0) continue;
-        spot.intensity = 0;
-        spot.position.set(0, -1000, 0);
-        spot.target.position.set(0, -1001, 0);
+      for (let i = used; i < lights.length; i++) {
+        const light = lights[i]!;
+        if (light.intensity === 0) continue;
+        light.intensity = 0;
+        light.position.set(0, -1000, 0);
       }
 
       // Flares past FLARE_NEAR_METRES once the glow says night.
@@ -814,7 +808,7 @@ function createLoftedFleet(
       }
       for (const m of materials) m.dispose();
       ownedPlate?.dispose();
-      for (const spot of spots) spot.dispose();
+      for (const light of lights) light.dispose();
       flareGeometry.dispose();
       flareMaterial.dispose();
     },

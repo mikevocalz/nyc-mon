@@ -218,7 +218,7 @@ function create(): LivingCityBundle {
     const { x, z } = gameCameraStore.getState().camera;
     return { x, z };
   };
-  const vehicleFactory = createVehicleActor({ read, onMount: attach, onUnmount: detach, focus, headlightSpots: false });
+  const vehicleFactory = createVehicleActor({ read, onMount: attach, onUnmount: detach, focus });
   const city0 = bundledCity();
   const walkClearance = city0.ok && CURB_HEIGHT > 0 ? createStreetClearance(city0.dataset) : null;
   const pedFactory = createPedActor({

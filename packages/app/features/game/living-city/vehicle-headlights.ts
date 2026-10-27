@@ -1,21 +1,23 @@
-// Adapted from mrdoob/slop-newyork @ be65d0a, js/vehicle-lights.js HEADLIGHTS, createVehicleHeadlight,
-// placeVehicleHeadlight; js/traffic.js updateTrafficLights and the highway flare pass; js/tsl-materials.js
-// createCarFlareMaterial (MIT, © 2026 Mr.doob).
+// Adapted from mrdoob/slop-newyork @ be65d0a, js/vehicle-lights.js HEADLIGHTS; js/traffic.js updateTrafficLights and
+// the highway flare pass; js/tsl-materials.js createCarFlareMaterial (MIT, © 2026 Mr.doob).
 //
-// Street light from the traffic. The nearest vehicles get a pair of real, unshadowed SpotLights each, so they stay
-// in three's clustered lighting path (Slop's comment in vehicle-lights.js); the tier sets how many
-// (HEADLIGHT_SPOT_VEHICLES). Every other vehicle keeps the emissive lamps the lofted material paints, which bloom but
-// light nothing. Distant traffic also gets additive flare sprites so a street reads as a stream of lamps once the
-// lamp geometry is smaller than a pixel.
+// Street light from the traffic. The nearest vehicles each get one unshadowed PointLight a few metres ahead of the
+// nose, low over the road, so three r186's ClusteredLighting clusters it (it clusters only unshadowed PointLights;
+// Slop's SpotLights rely on three@dev clustering spots). The tier row sets how many (perf/tier.ts headlightLights).
+// Every other vehicle keeps the emissive lamps the lofted material paints, which bloom but light nothing. Distant
+// traffic also gets additive flare sprites so a street reads as a stream of lamps once the lamp geometry is smaller
+// than a pixel.
 //
-// The ranking, placement and flare maths are pure functions over plain numbers. The two factories take the
-// world's THREE namespace, as every scene actor does, so nothing here imports three at module scope.
+// The ranking, placement and flare maths are pure functions over plain numbers. The light factory takes the world's
+// THREE namespace, as every scene actor does, so nothing here imports three at module scope.
 //
-// Not ported: Slop's player-car beam shortening (`maxReach` when the player is ahead) and the NYPD roof strobes.
+// Not ported: Slop's two-beam SpotLight profile, the player-car beam shortening (`maxReach` when the player is
+// ahead) and the NYPD roof strobes.
 
 import type { Three } from '@acme/ui/three';
 import type { Node } from 'three/webgpu';
 import { physicalVehicles } from '@acme/theme';
+import { TIER, type WorldTier } from '../perf/tier.ts';
 import {
   FLARE_DEFAULT_FOV_DEG,
   FLARE_DEFAULT_VIEWPORT_PX,
@@ -28,25 +30,23 @@ import {
   FLARE_PIXELS,
   FLARE_RAMP_METRES,
   FLARE_REAR_RGB,
-  HEADLIGHT_AIM_METRES,
   HEADLIGHT_BEHIND_SLACK,
   HEADLIGHT_BEHIND_WEIGHT,
   HEADLIGHT_FADE_START,
   HEADLIGHT_MAX_DISTANCE,
-  HEADLIGHT_SPOT_VEHICLES,
-  HEADLIGHTS,
+  HEADLIGHT_POOL,
 } from './vehicle-physical-constants.ts';
 
-export { HEADLIGHTS };
+export { HEADLIGHT_POOL };
 
-export type HeadlightTier = keyof typeof HEADLIGHT_SPOT_VEHICLES;
+export type HeadlightTier = WorldTier;
 
-/** SpotLights a tier keeps in its pool: two per lit vehicle. */
-export function headlightSpotCount(tier: HeadlightTier): number {
-  return HEADLIGHT_SPOT_VEHICLES[tier] * 2;
+/** PointLights a tier keeps in its headlight pool: one per lit vehicle. */
+export function headlightLightCount(tier: HeadlightTier): number {
+  return TIER[tier].physical.headlightLights;
 }
 
-// --- Placement (vehicle-lights.js) ----------------------------------------------------------------------------------
+// --- Placement --------------------------------------------------------------------------------------------------------
 
 /** The parts of a three Vector3 placement uses; THREE.Vector3 satisfies it. */
 export interface Vec3Like {
@@ -57,57 +57,40 @@ export interface Vec3Like {
   applyMatrix4(m: { elements: ArrayLike<number> }): unknown;
 }
 
-/** The parts of a SpotLight placement uses; THREE.SpotLight satisfies it. */
-export interface SpotLike {
+/** The parts of a PointLight placement uses; THREE.PointLight satisfies it. */
+export interface PointLike {
   readonly position: Vec3Like;
-  readonly target: { readonly position: Vec3Like };
 }
 
-/** Where a body's low beams sit: lamp centre |x| and height (first two entries), nose z. */
+/** Where a body's nose is: z of the front bumper in the body's frame (+Z forward). */
 export interface HeadlightMount {
-  readonly headlight: readonly [number, number, ...number[]];
   readonly zFront: number;
 }
 
-/**
- * An unshadowed low-beam spot, off until assigned (Slop `createVehicleHeadlight`). No cookie map and no colour node,
- * so it stays an ordinary clustered spot.
- */
-export function createVehicleHeadlight(THREE: Three): InstanceType<Three['SpotLight']> {
-  const spot = new THREE.SpotLight(
+/** An unshadowed road-pool PointLight in the low-beam colour, off until assigned. */
+export function createVehicleHeadlight(THREE: Three): InstanceType<Three['PointLight']> {
+  const light = new THREE.PointLight(
     new THREE.Color().setStyle(physicalVehicles.lamp.headBeam),
     0,
-    HEADLIGHTS.distance,
-    HEADLIGHTS.angle,
-    HEADLIGHTS.penumbra,
-    HEADLIGHTS.decay,
+    HEADLIGHT_POOL.distance,
+    HEADLIGHT_POOL.decay,
   );
-  spot.castShadow = false;
-  return spot;
+  light.castShadow = false;
+  return light;
 }
 
 /**
- * Puts one beam on its lamp and aims it forward, a little outward and down so the whole cone stays under the
- * chassis horizon (Slop `placeVehicleHeadlight`). `side` is +1 for +x (the driver's left), -1 for -x. With
- * `matrix`, both points move into world space, so slope and yaw carry the beam. Positions are reset each call, so
- * a pooled spot never accumulates an earlier transform.
+ * Puts a vehicle's road pool on the centreline, HEADLIGHT_POOL.ahead metres past the nose and HEADLIGHT_POOL.height
+ * above the road. With `matrix`, the point moves into world space, so slope and yaw carry it. The position is reset
+ * each call, so a pooled light never accumulates an earlier transform.
  */
 export function placeVehicleHeadlight(
-  spot: SpotLike,
+  light: PointLike,
   spec: HeadlightMount,
-  side: number,
   matrix?: { elements: ArrayLike<number> } | null,
 ): void {
-  const x = side * spec.headlight[0];
-  const y = spec.headlight[1];
-  const z = spec.zFront + HEADLIGHTS.noseOffset;
-  const aim = HEADLIGHT_AIM_METRES;
-  spot.position.set(x, y, z);
-  spot.target.position.set(x + side * aim * HEADLIGHTS.toeOut, y - aim * Math.tan(HEADLIGHTS.pitch), z + aim);
-  if (matrix) {
-    spot.position.applyMatrix4(matrix);
-    spot.target.position.applyMatrix4(matrix);
-  }
+  light.position.set(0, HEADLIGHT_POOL.height, spec.zFront + HEADLIGHT_POOL.ahead);
+  if (matrix) light.position.applyMatrix4(matrix);
 }
 
 // --- Ranking (traffic.js updateTrafficLights) -------------------------------------------------------------------------
@@ -148,8 +131,8 @@ export interface LitVehicle {
 }
 
 /**
- * Picks the vehicles that get real beams this frame: inside HEADLIGHT_MAX_DISTANCE, nearest effective distance
- * first, at most `maxVehicles`. The cut-off shrinks to the first vehicle left out, and beams fade over the last
+ * Picks the vehicles that get a headlight light this frame: inside HEADLIGHT_MAX_DISTANCE, nearest effective distance
+ * first, at most `maxVehicles`. The cut-off shrinks to the first vehicle left out, and lights fade over the last
  * 38 % before it, so a vehicle entering or leaving the set never pops (Slop `vehCutoff` and `smoothDistFade`).
  */
 export function rankLitVehicles(

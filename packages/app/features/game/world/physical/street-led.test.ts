@@ -1,8 +1,8 @@
-// The facelift's LED streetlights (facelift.ts FACELIFT_STREETLIGHT). The
-// physical rig has no streetlamp lights, so the LED colour lands on the two
-// emissive layers that light the street: the furniture lamps' pools
+// The facelift's LED streetlights (facelift.ts FACELIFT_STREETLIGHT) on the
+// two emissive layers under the lamps: the furniture lamps' pools
 // (world/index.ts) and the living city's dusk halos and pools
-// (living-city/lamp-viz.ts). With the facelift off both keep sodium.
+// (living-city/lamp-viz.ts). With the facelift off both keep sodium. The
+// streetlamp PointLights take the same LED colour (night-lights.test.ts).
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import * as THREE from 'three/webgpu';

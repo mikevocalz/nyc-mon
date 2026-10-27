@@ -25,7 +25,7 @@ import { emptyPedSection } from './ped-sim.ts';
 import { LOFTED_VEHICLE_ASSETS, PHYSICAL_SEED_ASSETS, SEED_ASSETS } from './seed-assets.ts';
 import { emptySignalSection } from './signal-viz.ts';
 import { EXPERIMENTAL_WORLD_PHYSICAL, createVehicleActor, isLoftedRecipe, resolveVehicleEntry } from './vehicle-actor.ts';
-import { HEADLIGHTS } from './vehicle-physical-constants.ts';
+import { HEADLIGHT_POOL } from './vehicle-physical-constants.ts';
 import { VEHICLE_KINDS, VEHICLE_SEMANTIC_ID, VFLAG, VSNAP_STRIDE } from './vehicle-sim.ts';
 
 type Builder = {
@@ -170,7 +170,9 @@ test('physical on: lofted near/far meshes per car kind, one bus mesh, the instan
   assert.ok(byName(group, 'living-city:vehicles:bus:near'));
   assert.equal(byName(group, 'living-city:vehicles:bus:far'), undefined, 'the bus has no proxy');
   assert.equal(byName(group, 'living-city:vehicles:sedan'), undefined, 'no box mesh for a lofted kind');
-  assert.equal((group.getObjectByName('living-city:vehicle-headlights') as Group).children.filter((c) => (c as THREE.SpotLight).isSpotLight).length, 16, 'phone pool: 16 spots');
+  const pool = (group.getObjectByName('living-city:vehicle-headlights') as Group).children;
+  assert.equal(pool.length, 8, 'phone pool: one light per lit vehicle, eight vehicles');
+  assert.ok(pool.every((c) => (c as THREE.PointLight).isPointLight && c.castShadow === false), 'unshadowed PointLights only');
   actor.dispose();
 });
 
@@ -188,7 +190,7 @@ test('physical off: the actor builds exactly the box meshes and the PR07 light q
   actor.dispose();
 });
 
-test('a night snapshot drives paint, brake state, near/far split, spots and flares', () => {
+test('a night snapshot drives paint, brake state, near/far split, headlight pools and flares', () => {
   const focus = { x: 0, z: 0, fwdX: 0, fwdZ: 1 };
   let snap = snapshot(
     [
@@ -215,38 +217,41 @@ test('a night snapshot drives paint, brake state, near/far split, spots and flar
   assert.equal(byName(group, 'living-city:vehicles:taxi:near')!.count, 1);
   assert.equal(byName(group, 'living-city:vehicles:bus:near')!.count, 1);
 
-  const spots = (group.getObjectByName('living-city:vehicle-headlights') as Group).children.filter((c) => (c as THREE.SpotLight).isSpotLight) as THREE.SpotLight[];
-  const lit = spots.filter((s) => s.intensity > 0);
-  assert.equal(lit.length, 16, 'eight vehicles, two beams each');
-  assert.ok(lit.every((s) => s.intensity <= HEADLIGHTS.busIntensity * 1.28));
-  assert.ok(lit.some((s) => Math.abs(s.position.z - (8 + 2.25 + HEADLIGHTS.noseOffset)) < 1e-5), 'the nearest sedan carries a beam at its nose');
+  const pools = (group.getObjectByName('living-city:vehicle-headlights') as Group).children as THREE.PointLight[];
+  const lit = pools.filter((s) => s.intensity > 0);
+  assert.equal(lit.length, 8, 'eight vehicles, one road pool each');
+  assert.ok(lit.every((s) => s.intensity <= HEADLIGHT_POOL.busIntensity * 1.28));
+  assert.ok(
+    lit.some((s) => Math.abs(s.position.z - (8 + 2.25 + HEADLIGHT_POOL.ahead)) < 1e-5 && Math.abs(s.position.y - HEADLIGHT_POOL.height) < 1e-5),
+    'the nearest sedan paints the road ahead of its nose',
+  );
 
   const flares = group.getObjectByName('living-city:vehicle-flares') as THREE.Mesh;
   assert.ok(flares.visible && flares.count > 0 && flares.count % 4 === 0, `flares on distant cars (${flares.count})`);
 
-  // Daylight: beams off and parked, flares hidden.
+  // Daylight: pools off and parked, flares hidden.
   snap = snapshot([rec(1, KIND.sedan, 0, 8), rec(18, KIND.sedan, 0, 90)], 0);
   actor.update(frame);
-  assert.ok(spots.every((s) => s.intensity === 0));
+  assert.ok(pools.every((s) => s.intensity === 0));
   assert.equal(flares.visible, false);
   actor.dispose();
 });
 
-test('without a focus no spot or flare is assigned and the near cap still holds', () => {
+test('without a focus no headlight light or flare is assigned and the near cap still holds', () => {
   const snap = snapshot(Array.from({ length: 9 }, (_, i) => rec(i + 1, KIND.van, 0, i * 5)), 1);
   const actor = createVehicleActor({ read: () => snap, physical: true, tier: 'high' })(THREE);
   const group = actor.object as Group;
   actor.update(frame);
   assert.equal(byName(group, 'living-city:vehicles:van:near')!.count, 9, 'high tier: twelve near slots');
-  const spots = (group.getObjectByName('living-city:vehicle-headlights') as Group).children.filter((c) => (c as THREE.SpotLight).isSpotLight) as THREE.SpotLight[];
-  assert.equal(spots.length, 48);
-  assert.ok(spots.every((s) => s.intensity === 0));
+  const pools = (group.getObjectByName('living-city:vehicle-headlights') as Group).children as THREE.PointLight[];
+  assert.equal(pools.length, 24, 'high pool: 24 vehicles');
+  assert.ok(pools.every((s) => s.intensity === 0));
   assert.equal((group.getObjectByName('living-city:vehicle-flares') as THREE.Mesh).visible, false);
   actor.dispose();
 });
 
-test('headlightSpots: false builds no lights', () => {
-  const actor = createVehicleActor({ read: () => null, physical: true, headlightSpots: false })(THREE);
+test('headlightLights: false builds no lights', () => {
+  const actor = createVehicleActor({ read: () => null, physical: true, headlightLights: false })(THREE);
   assert.equal((actor.object as Group).getObjectByName('living-city:vehicle-headlights'), undefined);
   actor.dispose();
 });

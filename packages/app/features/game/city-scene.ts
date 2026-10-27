@@ -143,6 +143,10 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
     sky: initial.sky,
     ...(bundle ? { glassTier: bundle.glassTier, envWidth: bundle.envWidth } : {}),
     ...(physical?.pbrMaterials ? { pbr: true, carPbr: true, physical: true } : {}),
+    // Pooled PointLights only where ClusteredLighting clusters them (physical-rig.ts).
+    ...(physical?.pbrMaterials && physical.clustered
+      ? { nightLights: { streetlamps: physicalTier.streetlampLights, storefronts: physicalTier.storefrontLights } }
+      : {}),
   });
   scene.add(world.sky, world.group);
   scene.fog = world.fog;
@@ -374,6 +378,13 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
           post?.physical?.applyLook(PHYSICAL_PRESETS[preset].grade);
           invalidate?.();
         }
+        // Night light follows the camera and the preset's interior glow (world/physical/night-lights.ts).
+        const fx = pose.target[0] - pose.position[0];
+        const fz = pose.target[2] - pose.position[2];
+        const fl = Math.hypot(fx, fz) || 1;
+        world.updateNightLights(
+          camera.position.x, camera.position.y, camera.position.z, fx / fl, fz / fl, rig.uniforms.uInteriorGlow.value,
+        );
       }
       // Precipitation animates on the shader clock — while rain or snow is
       // live the loop must keep drawing, or the on-demand canvas freezes

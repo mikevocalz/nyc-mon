@@ -162,6 +162,14 @@ export function physicalFeaturesFor(
 }
 
 /**
+ * True when the scene mounts three's ClusteredLighting: the full stack, or
+ * the `clustered` probe. The pooled PointLights (headlights, streetlamps,
+ * storefronts) mount only then; without clustering each would be a light on
+ * the per-material path of every lit material.
+ */
+export const WORLD_CLUSTERED_LIGHTING: boolean = physicalFeaturesFor(EXPERIMENTAL_WORLD_PHYSICAL, WORLD_PROBE, false)?.clustered === true;
+
+/**
  * Extra WebGPURenderer constructor parameters, spread where the renderer is
  * built (packages/ui/three/surface.native.tsx and surface.web.tsx on the JS
  * path, render-runtime/game-render.ts on the worklet path). js/main.js

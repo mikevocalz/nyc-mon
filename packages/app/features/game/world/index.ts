@@ -22,7 +22,8 @@ import { VD_LEANMAT } from './vd-leanmat.ts';
 import { buildPrecipitation } from './vd-weather.ts';
 import { CURB_HEIGHT, VD_SHADOWS, VD_SHADOW_HALF } from './curb.ts';
 import { FUTURE_LAYER, type AdSurface } from './future-layer.ts';
-import { loadPhysicalCityMaterials, loadPhysicalFacelift, loadPhysicalRig } from '../physical-graph.ts';
+import { loadPhysicalCityMaterials, loadPhysicalFacelift, loadPhysicalNightLights, loadPhysicalRig } from '../physical-graph.ts';
+import { LIGHT_POLE_HEIGHT } from './signage.ts';
 // Static: the living city's bundled-topology.ts evaluates topology.ts in every build, so a lazy load here saves nothing.
 import { buildLaneTopology } from '../living-city/topology.ts';
 
@@ -135,6 +136,13 @@ export interface CityWorldOptions {
    * and fire escapes are added (world/physical/). Off unless set.
    */
   physical?: boolean;
+  /**
+   * Pool sizes for the physical city's streetlamp and storefront PointLights
+   * (world/physical/night-lights.ts), from the tier row. Read only with
+   * `physical`; city-scene passes it only when ClusteredLighting is mounted.
+   * Absent, no light is built.
+   */
+  nightLights?: { streetlamps: number; storefronts: number };
 }
 
 export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: CityWorldOptions = {}) {
@@ -209,12 +217,16 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
     : null;
   const future = options.future ?? EXPERIMENTAL_WORLD_FUTURE;
   const faceliftModule = phys && future ? loadPhysicalFacelift() : null;
+  const nightPools = phys ? options.nightLights : undefined;
   const city = phys
     ? buildCityMeshes(
         THREE, dataset,
         { ...materials, masonry: phys.masonry, glass: phys.glass, roads: phys.roads, sidewalks: phys.sidewalks },
         away, clearance, future,
-        { facadeAttributes: true, fireEscapes: true, facelift: faceliftModule?.faceliftBakePicks(dataset) },
+        {
+          facadeAttributes: true, fireEscapes: true, facelift: faceliftModule?.faceliftBakePicks(dataset),
+          ...(nightPools ? { storefronts: true } : {}),
+        },
       )
     : buildCityMeshes(THREE, dataset, materials, away, clearance, future);
   // The facelift reads the built masonry walls, so it follows buildCityMeshes.
@@ -224,6 +236,19 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
   const ledPools = faceliftModule ? faceliftModule.createFaceliftLampPools(THREE) : null;
   const furniture = buildStreetFurniture(THREE, dataset, ledPools ? { ...materials, lampPools: ledPools } : materials, clearance, city.texts);
   const props = buildStreetProps(THREE, dataset, materials, clearance, furniture.signs, furniture.lights);
+  // Real night light at the lamp heads and under the awnings, in the LED colour with the facelift.
+  const night = nightPools
+    ? (() => {
+        const m = loadPhysicalNightLights();
+        return m.createNightLights(THREE, {
+          streetlamps: m.streetlampSites(furniture.lights, LIGHT_POLE_HEIGHT - 0.05 + CURB_HEIGHT),
+          storefronts: m.storefrontSites(city.physical?.storefronts ?? [], CURB_HEIGHT),
+          streetlampCount: nightPools.streetlamps,
+          storefrontCount: nightPools.storefronts,
+          led: faceliftModule !== null,
+        });
+      })()
+    : null;
   const bandMinZ = -dataset.extentMeters - SHADOW_BAND_METRES;
   const bandCount = Math.max(1, Math.ceil((dataset.extentMeters * 2 + SHADOW_BAND_METRES * 2) / SHADOW_BAND_METRES) + 1);
 
@@ -263,6 +288,7 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
   if (phys?.roadPaint) group.add(phys.roadPaint);
   if (phys) group.add(...phys.fireEscapes.meshes);
   if (facelift?.mesh) group.add(facelift.mesh);
+  if (night) group.add(night.group);
 
   const horizon = skyRig?.horizon ?? linearColor(THREE, 'skyHorizon');
   const fog = skyRig?.fog ?? new THREE.Fog(horizon, 600, 2500);
@@ -273,6 +299,7 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
     drawCalls: city.stats.drawCalls + trees.objects.length + furniture.objects.length + props.objects.length + 2 + (facelift?.mesh ? 1 : 0),
   };
   let viewDistance = 220;
+  const nightCamera = { x: 0, y: 0, z: 0, fwdX: 0, fwdZ: 1 };
   const bands: [number, number] = [0, 0];
   return {
     group,
@@ -328,11 +355,25 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
       props.setFocus(x, z, bands[0], bands[1]);
       if (phys && city.physical) phys.fireEscapes.update(city.physical.fireEscapes, x, z);
     },
+    /**
+     * Re-ranks the streetlamp and storefront PointLights for the camera
+     * (position and unit ground-plane forward) and scales them by the
+     * preset's interior glow: off at midday, on from dusk. No-op without the
+     * night pools.
+     */
+    updateNightLights(x: number, y: number, z: number, fwdX: number, fwdZ: number, interiorGlow: number) {
+      if (!night) return;
+      nightCamera.x = x; nightCamera.y = y; nightCamera.z = z; nightCamera.fwdX = fwdX; nightCamera.fwdZ = fwdZ;
+      night.update(nightCamera, interiorGlow);
+    },
+    /** The night light pools, null unless `nightLights` was passed under `physical`. */
+    nightLights: night,
     /** Advances the facelift's LED sweep; holds it still under Reduce Motion. No-op without the facelift. */
     updateFacelift(time: number, reducedMotion: boolean) {
       facelift?.update(time, reducedMotion);
     },
     dispose() {
+      night?.dispose();
       facelift?.dispose();
       ledPools?.dispose();
       city.dispose();

@@ -85,10 +85,17 @@ export interface PhysicalTierRow {
   ssr: { resolutionScale: number; quality: number; binaryRefine: boolean } | null;
   /** BloomNode render scale. */
   bloomResolutionScale: number;
-  /** ClusteredLighting maxLights. */
+  /** ClusteredLighting maxLights; covers physicalPooledLights with headroom. */
   clusteredMaxLights: number;
-  /** Nearest vehicles that get real headlight SpotLights; the rest use emissive lamps. */
-  headlightSpots: number;
+  /**
+   * Nearest vehicles that get a headlight PointLight on the road ahead; the rest
+   * keep their emissive lamps. One light per vehicle.
+   */
+  headlightLights: number;
+  /** Nearest streetlamp heads that get a PointLight at night (world/physical/night-lights.ts). */
+  streetlampLights: number;
+  /** Nearest shop awnings that get a PointLight at night. Slop's pool is 28. */
+  storefrontLights: number;
   /** Interior mapping keeps Slop's pixel-footprint fade on every tier. */
   interiorFootprintFade: true;
   /** Frame target, Hz (G4: 60 locked on the phone; 120 on iPad Pro only once D3 numbers allow). */
@@ -109,7 +116,9 @@ export const TIER: Record<WorldTier, TierBundle> = {
       ssr: null,
       bloomResolutionScale: 0.5,
       clusteredMaxLights: 128,
-      headlightSpots: 8,
+      headlightLights: 8,
+      streetlampLights: 24,
+      storefrontLights: 12,
       interiorFootprintFade: true,
       frameTarget: 60,
     },
@@ -130,12 +139,24 @@ export const TIER: Record<WorldTier, TierBundle> = {
       ssr: { resolutionScale: 0.5, quality: 0.25, binaryRefine: true },
       bloomResolutionScale: 0.5,
       clusteredMaxLights: 256,
-      headlightSpots: 24,
+      headlightLights: 24,
+      streetlampLights: 36,
+      storefrontLights: 28,
       interiorFootprintFade: true,
       frameTarget: 60,
     },
   },
 } as const;
+
+/**
+ * Every PointLight a physical tier row pools: headlights, streetlamps and
+ * storefronts. ClusteredLighting sizes its light buffer by maxLights, and a
+ * parked light (intensity 0) still takes a slot, so the row's maxLights must
+ * cover this sum.
+ */
+export function physicalPooledLights(row: PhysicalTierRow): number {
+  return row.headlightLights + row.streetlampLights + row.storefrontLights;
+}
 
 /** The bundle for a tier — the option defaults city-scene applies when the bundle is active. */
 export function tierBundle(tier: WorldTier): TierBundle {

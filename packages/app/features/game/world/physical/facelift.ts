@@ -187,9 +187,9 @@ export function faceliftWallTone(building: Pick<CityBuilding, 'id' | 'class'>, p
 /**
  * LED streetlight colour, cooler than the sodium lampHalo: `color` is the
  * token, `linear` the scene-linear rgb the lamp pools and halos multiply.
- * There are no streetlamp lights in the physical rig (ClusteredLighting
- * carries the fleet's headlights), so the LED colour goes to the emissive
- * pools under the furniture lamps and the living city's dusk halos.
+ * It goes to the emissive pools under the furniture lamps, the living
+ * city's dusk halos, and the streetlamp PointLights the clustered rig
+ * carries at night (night-lights.ts, which reads the same streetLed token).
  */
 export const FACELIFT_STREETLIGHT = {
   color: physicalFacelift.streetLed,

@@ -9,40 +9,29 @@
 // Pure data: no imports, so the worklet render runtime and node tests read it as is.
 
 /**
- * Low-beam spot lights (Slop `HEADLIGHTS`). Slop measured. Intensities are candela (three's SpotLight with
- * physically based falloff, decay 2); Slop's note: "calibrated for inverse-square decay".
+ * Headlight road pools. Slop lights each near vehicle with two unshadowed low-beam SpotLights (js/vehicle-lights.js
+ * `HEADLIGHTS`, Slop measured: car 700 cd, bus 900 cd, decay 2, 36 m reach, aimed 0.145 rad down). three r186's
+ * ClusteredLighting clusters only unshadowed PointLights, so a SpotLight would go on the per-material path of every
+ * lit material. Here each lit vehicle gets one PointLight instead, held low and a few metres past the nose where the
+ * two cones would land, so it paints a pool on the road. Intensities are candela with three's physical falloff.
+ * TODO(tune): every value but the bus/car ratio is a port pick, checked on iPhone 17 and iPad Pro.
  */
-export const HEADLIGHTS = {
-  /** Car low beam, cd. */
-  intensity: 700,
-  /** Bus low beam, cd. */
-  busIntensity: 900,
+export const HEADLIGHT_POOL = {
+  /** Car road pool, cd. */
+  intensity: 40,
+  /** Bus road pool, cd: Slop's bus/car low-beam ratio (900 / 700) on the car value. */
+  busIntensity: (40 * 900) / 700,
   /** Cut-off range, m. */
-  distance: 36,
-  /** Cone half-angle, rad. */
-  angle: 0.14,
-  /** Soft edge, 0..1. */
-  penumbra: 0.85,
-  /** Inverse-square falloff exponent. */
-  decay: 2,
-  /** Downward aim below the chassis horizon, rad. */
-  pitch: 0.145,
-  /** Outward aim, metres sideways per metre forward. */
-  toeOut: 0.005,
-  /** Spot origin ahead of the nose, m. */
-  noseOffset: 0.08,
+  distance: 18,
+  /** Falloff exponent; under 2 so the pool reaches the far edge of the lane. */
+  decay: 1.6,
+  /** Light ahead of the nose, m. */
+  ahead: 4,
+  /** Light height above the road, m. */
+  height: 0.9,
 } as const;
 
-/** Distance along the beam to the aim target, m (Slop `placeVehicleHeadlight` `aim`). Slop measured. */
-export const HEADLIGHT_AIM_METRES = 10;
-
-/**
- * Vehicles that get a pair of real SpotLights, nearest first (§5.7 start values: iPhone 17 `phone` 8, iPad Pro
- * `high` 24). Every other vehicle keeps its emissive lamps, which bloom without lighting the street. TODO(tune).
- */
-export const HEADLIGHT_SPOT_VEHICLES = { phone: 8, high: 24 } as const;
-
-/** Beyond this effective distance a vehicle never gets a spot, m (Slop city traffic `MAX_LIGHT_DIST`). Slop measured. */
+/** Beyond this effective distance a vehicle never gets a headlight light, m (Slop city traffic `MAX_LIGHT_DIST`). Slop measured. */
 export const HEADLIGHT_MAX_DISTANCE = 115;
 /**
  * Effective-distance penalty for vehicles behind the camera: `d + max(0, behindSlack - forwardDot) * behindWeight`
@@ -50,7 +39,7 @@ export const HEADLIGHT_MAX_DISTANCE = 115;
  */
 export const HEADLIGHT_BEHIND_SLACK = 5.0;
 export const HEADLIGHT_BEHIND_WEIGHT = 3.2;
-/** Spots fade from this fraction of the cut-off to the cut-off (Slop `smoothDistFade(eff, cutoff * 0.62, cutoff)`). */
+/** Headlight lights fade from this fraction of the cut-off to the cut-off (Slop `smoothDistFade(eff, cutoff * 0.62, cutoff)`). */
 export const HEADLIGHT_FADE_START = 0.62;
 
 /**
@@ -66,7 +55,7 @@ export function slopGlowFromLampLevel(lampLevel: number): number {
   return SLOP_GLOW_DAY + (SLOP_GLOW_NIGHT - SLOP_GLOW_DAY) * t;
 }
 
-/** Spot intensity scale from the glow: off by day, full by dusk (Slop `beamScale`). Slop measured. */
+/** Headlight intensity scale from the glow: off by day, full by dusk (Slop `beamScale`). Slop measured. */
 export function headlightBeamScale(glow: number): number {
   return Math.max(0, Math.min(1.28, (glow - 0.6) * 1.45));
 }

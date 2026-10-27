@@ -1,21 +1,22 @@
-// N6 (slop-grade-city §9): the cases from mrdoob/slop-newyork @ be65d0a tests/vehicle-lights.test.cjs (MIT, © 2026
-// Mr.doob), run against three's real SpotLight, Vector3 and Matrix4 instead of Slop's mocks. The specs below are
-// that test's own fixtures, copied unchanged. Then the parts this port adds: the tiered pool, the ranking and the
-// flare maths.
+// N6 (slop-grade-city §9) started from the cases in mrdoob/slop-newyork @ be65d0a tests/vehicle-lights.test.cjs (MIT,
+// © 2026 Mr.doob). Slop's two-beam SpotLight profile is gone: three r186's ClusteredLighting clusters only
+// unshadowed PointLights, so each lit vehicle now gets one road-pool PointLight. What stays from Slop: placement
+// under the vehicle's own matrix (yaw, slope, pooled reuse), the ranking and the flare maths.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import * as THREE from 'three/webgpu';
 import { physicalVehicles } from '@acme/theme';
+import { TIER } from '../perf/tier.ts';
 import { frontLampMount } from './lofted-car.ts';
 import {
   FLARE_STRIDE,
-  HEADLIGHTS,
+  HEADLIGHT_POOL,
   createCarFlareMaterial,
   createVehicleHeadlight,
   effectiveLightDistance,
   flareDistanceWeight,
   flareFacing,
-  headlightSpotCount,
+  headlightLightCount,
   placeVehicleHeadlight,
   rankLitVehicles,
   smoothDistFade,
@@ -31,50 +32,38 @@ import {
 } from './vehicle-physical-constants.ts';
 
 const specs = {
-  sedan: { headlight: [0.56, 0.705], zFront: 2.25 },
-  suv: { headlight: [0.6, 0.9], zFront: 2.3 },
-  bus: { headlight: [0.79, 0.8], zFront: 5.78 },
+  sedan: { zFront: 2.25 },
+  suv: { zFront: 2.3 },
+  bus: { zFront: 5.78 },
 } as const;
 const close = (a: number, b: number) => assert.ok(Math.abs(a - b) < 1e-12, `${a} should equal ${b}`);
 // three's Vector3.applyMatrix4 divides by w; Float32 matrix storage leaves ~1e-7 error, so world-space checks use this.
 const near = (a: number, b: number) => assert.ok(Math.abs(a - b) < 1e-5, `${a} should equal ${b}`);
 
-test('the shared profile creates ordinary unshadowed spots with no cookie or custom light node', () => {
-  const spot = createVehicleHeadlight(THREE);
-  assert.equal(spot.intensity, 0, 'pool lights remain off until assigned');
-  assert.equal(spot.distance, HEADLIGHTS.distance);
-  assert.equal(spot.angle, HEADLIGHTS.angle);
-  assert.equal(spot.penumbra, HEADLIGHTS.penumbra);
-  assert.equal(spot.decay, 2);
-  assert.ok(spot.penumbra >= 0 && spot.penumbra <= 1);
-  assert.equal(spot.color.getHexString(), new THREE.Color().setStyle(physicalVehicles.lamp.headBeam).getHexString());
-  placeVehicleHeadlight(spot, specs.sedan, 1);
-  assert.equal(spot.map, null);
-  assert.equal((spot as unknown as { colorNode?: unknown }).colorNode ?? null, null);
-  assert.equal(spot.castShadow, false);
+test('the pool light is an unshadowed PointLight in the low-beam colour, off until assigned', () => {
+  const light = createVehicleHeadlight(THREE);
+  assert.equal(light.isPointLight, true, 'r186 ClusteredLighting clusters PointLights only');
+  assert.equal((light as unknown as { isSpotLight?: boolean }).isSpotLight, undefined);
+  assert.equal(light.castShadow, false, 'a shadowed PointLight leaves the clusters');
+  assert.equal(light.intensity, 0, 'pool lights remain off until assigned');
+  assert.equal(light.distance, HEADLIGHT_POOL.distance);
+  assert.equal(light.decay, HEADLIGHT_POOL.decay);
+  assert.equal(light.color.getHexString(), new THREE.Color().setStyle(physicalVehicles.lamp.headBeam).getHexString());
 });
 
 for (const [name, spec] of Object.entries(specs)) {
-  test(`${name} beams originate at the modeled lamps and stay below the chassis horizon`, () => {
-    for (const side of [-1, 1]) {
-      const spot = createVehicleHeadlight(THREE);
-      placeVehicleHeadlight(spot, spec, side);
-      close(spot.position.x, side * spec.headlight[0]);
-      close(spot.position.y, spec.headlight[1]);
-      close(spot.position.z, spec.zFront + HEADLIGHTS.noseOffset);
-      const dx = spot.target.position.x - spot.position.x;
-      const dy = spot.target.position.y - spot.position.y;
-      const dz = spot.target.position.z - spot.position.z;
-      assert.ok(dz > 0 && dx * side > 0, 'the beam points forward with a slight outward angle');
-      close(dx / dz, side * HEADLIGHTS.toeOut);
-      close(-dy / dz, Math.tan(HEADLIGHTS.pitch));
-      const downwardAngle = Math.atan2(-dy, Math.hypot(dx, dz));
-      assert.ok(downwardAngle > spot.angle, 'the entire cone stays below the local horizon, including toe-out');
-    }
+  test(`${name}: the road pool sits on the centreline, ahead of the nose and low over the road`, () => {
+    const light = createVehicleHeadlight(THREE);
+    placeVehicleHeadlight(light, spec);
+    close(light.position.x, 0);
+    close(light.position.y, HEADLIGHT_POOL.height);
+    close(light.position.z, spec.zFront + HEADLIGHT_POOL.ahead);
+    assert.ok(light.position.y < 1.5, 'near road height');
+    assert.ok(light.position.z - spec.zFront >= 2, 'a few metres past the bumper');
   });
 }
 
-test('lamp and target follow both yaw and slope at elevated road height', () => {
+test('the pool follows both yaw and slope at elevated road height, and a pooled light resets', () => {
   // A road climbing at 10%, facing +X: yaw = pi/2, pitch = -atan(.1), translated onto the viaduct.
   const pitch = -Math.atan(0.1);
   const s = Math.sin(pitch);
@@ -82,41 +71,34 @@ test('lamp and target follow both yaw and slope at elevated road height', () => 
   const matrix = new THREE.Matrix4().fromArray([0, 0, -1, 0, s, c, 0, 0, c, -s, 0, 0, 30, 7.6, -10, 1]);
   const local = createVehicleHeadlight(THREE);
   const world = createVehicleHeadlight(THREE);
-  placeVehicleHeadlight(local, specs.suv, -1);
-  placeVehicleHeadlight(world, specs.suv, -1, matrix);
-  for (const [a, b] of [[local.position, world.position], [local.target.position, world.target.position]] as const) {
-    near(b.x, 30 + s * a.y + c * a.z);
-    near(b.y, 7.6 + c * a.y - s * a.z);
-    near(b.z, -10 - a.x);
-  }
-  const dx = world.target.position.x - world.position.x;
-  const dy = world.target.position.y - world.position.y;
-  const dz = world.target.position.z - world.position.z;
-  const vertical = dx * s + dy * c; // dot with the elevated road's up vector
-  const horizontal = Math.sqrt(dx * dx + dy * dy + dz * dz - vertical * vertical);
-  assert.ok(Math.atan2(-vertical, horizontal) > world.angle, 'the transformed cone stays below the road-relative horizon');
+  placeVehicleHeadlight(local, specs.suv);
+  placeVehicleHeadlight(world, specs.suv, matrix);
+  const a = local.position;
+  const b = world.position;
+  near(b.x, 30 + s * a.y + c * a.z);
+  near(b.y, 7.6 + c * a.y - s * a.z);
+  near(b.z, -10 - a.x);
   // Reusing a pooled light must reset local coordinates instead of accumulating the prior matrix transform.
-  placeVehicleHeadlight(world, specs.suv, -1);
+  placeVehicleHeadlight(world, specs.suv);
   assert.deepEqual(world.position.toArray(), local.position.toArray());
-  assert.deepEqual(world.target.position.toArray(), local.target.position.toArray());
 });
 
-test('the lofted bodies mount their beams on their own lamps', () => {
+test('the lofted bodies put their pools ahead of their own noses', () => {
   for (const kind of ['sedan', 'taxi', 'van', 'bus'] as const) {
     const m = frontLampMount(kind);
-    const spot = createVehicleHeadlight(THREE);
-    placeVehicleHeadlight(spot, { headlight: [m.x, m.y], zFront: m.zFront }, 1);
-    close(spot.position.x, m.x);
-    close(spot.position.z, m.zFront + HEADLIGHTS.noseOffset);
-    assert.ok(m.y > 0.6 && m.y < 1, `${kind} lamp height ${m.y}`);
+    const light = createVehicleHeadlight(THREE);
+    placeVehicleHeadlight(light, { zFront: m.zFront });
+    close(light.position.z, m.zFront + HEADLIGHT_POOL.ahead);
   }
 });
 
 // --- Tiers, night ramp, ranking -----------------------------------------------------------------------------------
 
-test('tier pools: phone lights 8 vehicles, high 24, two spots each', () => {
-  assert.equal(headlightSpotCount('phone'), 16);
-  assert.equal(headlightSpotCount('high'), 48);
+test('tier pools: one light per lit vehicle, phone 8, high 24, from the tier row', () => {
+  assert.equal(headlightLightCount('phone'), 8);
+  assert.equal(headlightLightCount('high'), 24);
+  assert.equal(headlightLightCount('phone'), TIER.phone.physical.headlightLights);
+  assert.equal(headlightLightCount('high'), TIER.high.physical.headlightLights);
 });
 
 test('the night ramp: no beams by day, full by dusk, capped like Slop', () => {

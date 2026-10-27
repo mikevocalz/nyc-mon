@@ -24,7 +24,7 @@ Cars on the tile are `proc:box-car`: six boxes, 72 triangles (`vehicle-actor.ts`
 
 **No module-level mutable state.** Neither module has a module-scope `let`, `var`, `Map` or cache. Slop memoises layouts on its spec objects (`spec._body`, `spec._layout`); the port recomputes them, and `lofted-car.test.ts` L189–196 checks `BODY_SPECS` serialises the same after a build. `BODY_SPECS` and `BUS_SPEC` are typed `Readonly` but not frozen.
 
-**Real headlight spots are off.** `createVehicleActor` defaults `headlightSpots` to true (`vehicle-actor.ts` L650). Both call sites pass `false`: `render-runtime/game-render.ts` L355 and `living-city/bundled-host.ts` L218. In three r186, `ClusteredLightsNode` puts a light in the clusters only when `light.isPointLight === true && light.castShadow !== true` (`ClusteredLightsNode.js` L219). A `SpotLight`, shadowed or not, goes on the per-material path and would light every lit material in the city. Lamps and the flare sprites still show. `bundled-host.ts` L218 carries no comment saying why; `game-render.ts` L353–354 does.
+**Headlights are road-pool PointLights, not spots.** In three r186, `ClusteredLightsNode` puts a light in the clusters only when `light.isPointLight === true && light.castShadow !== true` (`ClusteredLightsNode.js` L219). A `SpotLight`, shadowed or not, goes on the per-material path and would light every lit material in the city, so Slop's two low-beam spots per vehicle were never switched on here. Each of the nearest vehicles (tier row `headlightLights`: phone 8, high 24) now gets one unshadowed `PointLight` 4 m past the nose and 0.9 m above the road (`vehicle-physical-constants.ts` `HEADLIGHT_POOL`), which ClusteredLighting clusters. `createVehicleActor` builds the pool when `WORLD_CLUSTERED_LIGHTING` is true (`world/physical-look.ts`: the full physical stack or the `clustered` probe); neither call site (`render-runtime/game-render.ts`, `living-city/bundled-host.ts`) overrides it any more. The emissive lamps and the flare sprites are unchanged. The pool is a point, so it cannot reproduce the beam's forward throw; its values are TODO(tune).
 
 ## Numbers
 
@@ -74,7 +74,7 @@ Rejected for the flag-on path. It cannot reach the look target. It remains the f
 
 - The fleet costs more triangles. The far proxy (about 500 triangles) draws every vehicle outside the near set. Whether the fleet stays inside the 50 k actor budget at full traffic has not been measured.
 - Adding a vehicle kind means a recipe in `LOFTED_VEHICLE_ASSETS` with its `vehicleKind`, a pinned count in `lofted-car.test.ts`, and two more draws if it has a far proxy.
-- Turning headlight spots on waits for either three clustering `SpotLight`s or a lane that measures spots on the per-material path. Until then the two call sites stay `false`.
+- Real `SpotLight` beams wait for three clustering `SpotLight`s (three@dev does; r186 does not). Until then the headlights stay one road-pool `PointLight` per lit vehicle.
 
 ## Verification status
 

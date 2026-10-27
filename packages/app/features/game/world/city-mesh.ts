@@ -32,6 +32,7 @@ import { buildingSurface, ContactField, contactReach, surfacePick, SURFACES, wal
 import { buildingFacade, CLASS_FAMILY } from './physical/class-family.ts';
 import { FACADE_FLOATS_PER_VERTEX, FacadeAttributeWriter, WALL_KINDS, type WallKind } from './physical/facade-attributes.ts';
 import type { FireEscapePlacement } from './physical/fire-escapes.ts';
+import type { StorefrontPlacement } from './physical/night-lights.ts';
 import { FIRE_ESCAPE } from './physical-materials-constants.ts';
 
 type Point = [number, number];
@@ -340,6 +341,8 @@ export interface PhysicalMeshOptions {
    * emitted only where the plan keeps it.
    */
   facelift?: (building: CityBuilding) => FaceliftBakePick;
+  /** Hand back each procedural awning's wall point and outward normal, for the storefront night lights. */
+  storefronts?: boolean;
 }
 
 /** One building's facelift picks for the bake: the refreshed wall tone (hex) or null, and whether its roofline trim stays. */
@@ -385,6 +388,7 @@ export function buildCityMeshes(
     ? { masonry: new FacadeAttributeWriter(262144), glass: new FacadeAttributeWriter() }
     : null;
   const escapePlacements: FireEscapePlacement[] = [];
+  const storefrontPlacements: StorefrontPlacement[] = [];
   const facelift = future ? physical.facelift : undefined;
 
   // Buildings in z bands, so the contact shadows of one band are one vertex range (drawn by distance).
@@ -589,6 +593,7 @@ export function buildCityMeshes(
           const at = (cIdx + 0.5) * pitch - edgeStart - length / 2;
           const tone = AWNING_TONES[Math.floor(hashUnit(`${building.id}:${i}:${cIdx}:hue`) * AWNING_TONES.length) % AWNING_TONES.length]!;
           emitAwning(detail.buffer, f, at, Math.min(3.8, pitch - 0.2), rgb(tone));
+          if (physical.storefronts) storefrontPlacements.push({ x: f.x + f.oz * at, z: f.z - f.ox * at, outX: f.ox, outZ: f.oz });
           awnings++;
         }
         if (hasShopSign(building.id, i)) {
@@ -770,8 +775,8 @@ export function buildCityMeshes(
     /** The AdSurface registry rows for the panels this build drew (future-layer.ts). */
     adSurfaces,
     /** Physical-lane outputs; absent unless a PhysicalMeshOptions flag asked for them. */
-    physical: physical.facadeAttributes || physical.fireEscapes
-      ? { fireEscapes: escapePlacements, facadeBytes }
+    physical: physical.facadeAttributes || physical.fireEscapes || physical.storefronts
+      ? { fireEscapes: escapePlacements, storefronts: storefrontPlacements, facadeBytes }
       : undefined,
     /** Contact shadows only near the focus: a few z bands, one draw range, no allocation. */
     setFocus(_x: number, z: number) {
