@@ -1,4 +1,7 @@
 import { hlynk, led, palette, signage } from '@acme/theme';
+import {
+  float, hash, instanceIndex, materialOpacity, mix, smoothstep, texture, uniform, uv, vec2, vec3, vec4,
+} from 'three/tsl';
 import type { StoreApi } from 'zustand/vanilla';
 import type { ThreeContext, ThreeFrame, ThreeScene } from '../types';
 import type { EggHatchRig } from '../hatch/egg-hatch-rig';
@@ -49,12 +52,26 @@ type Texture = InstanceType<Three['Texture']>;
 const FAN_REST = 0.3;
 const EMITTER_REST = 1.4;
 const EMITTER_PEAK = 3.2;
+/**
+ * The live beam after the intro. `period` is one slow breath of the fan and
+ * emitters (s), `fan`/`emitter` its depth as a share of their rest level, and
+ * `flicker` the emitters' faint fast waver on top. `bands` is how many
+ * ripples fit along the fan, `speed` how many leave the mouth per second,
+ * `depth` how far a ripple swings the fan's opacity either side of its level.
+ */
+const BEAM = { period: 3.2, fan: 0.28, emitter: 0.18, flicker: 0.06, bands: 2.6, speed: 0.55, depth: 0.42 } as const;
+/**
+ * Glitter rising through the fan: instanced sprites placed on the GPU from
+ * their index, so the CPU uploads nothing per frame. Sizes in body widths,
+ * `rise` in fan lengths per second, `twinkle` in radians per second.
+ */
+const MOTES = { count: 180, size: [0.007, 0.018], rise: [0.12, 0.3], twinkle: [2.5, 7], sway: 0.012, opacity: 0.9 } as const;
 /** Screen emissive once powered: bright enough to read, not a billboard. */
 const SCREEN_ON = 0.62;
 /** How long the side key stays down per press, seconds. */
 const SIDE_KEY_DIP_S = 0.16;
 /** A model on the screen: its scale when focused, when another is focused, and its turn speed (rad/s) while focused. */
-const MODEL_FOCUS = { on: 1.16, off: 0.9, turn: 0.7, rate: 8 } as const;
+const MODEL_FOCUS = { on: 1.08, off: 0.9, turn: 0.7, rate: 8 } as const;
 
 const CORE = hlynk.core;
 const { apple, concrete, ink, silver } = palette;
@@ -245,7 +262,18 @@ export function createDeviceScene(
 
       device.group.position.y = BASE_Y - INTRO.settle.drop * (1 - settle);
       device.group.rotation.set(tiltX, REST_YAW + INTRO.yaw.turn * (1 - turn) + tiltY, 0);
-      device.light(FAN_REST + (1 - FAN_REST) * flare, EMITTER_REST + (EMITTER_PEAK - EMITTER_REST) * flare);
+      // After the flare the beam stays alive: fan and emitters breathe together,
+      // the emitters waver faintly, ripples climb the fan and glitter rises
+      // through it. Reduced motion holds the plain rest beam.
+      const live = !frame.reducedMotion;
+      const wake = live ? span(t, INTRO.scanner.to, INTRO.end) : 0;
+      const breath = wake * Math.sin((2 * Math.PI * t) / BEAM.period);
+      const flicker = wake * Math.sin(t * 23.1) * Math.sin(t * 37.7);
+      device.light(
+        (FAN_REST + (1 - FAN_REST) * flare) * (1 + BEAM.fan * breath),
+        (EMITTER_REST + (EMITTER_PEAK - EMITTER_REST) * flare) * (1 + BEAM.emitter * breath + BEAM.flicker * flicker),
+      );
+      device.beam(t, live);
       device.power(SCREEN_ON * power);
       const modelsMoving = stand.update(frame, screen.selected?.() ?? null, power);
 
@@ -286,7 +314,9 @@ export function createDeviceScene(
       }
       const settled = Math.abs(tiltX - goalX) < 1e-3 && Math.abs(tiltY - goalY) < 1e-3;
       // A queued dip needs the loop for one more beat; idling models keep it running.
-      const rest = t >= INTRO.end && !tracking && settled && !dipping && !modelsMoving;
+      // A live beam keeps the loop running while the stage is on screen (the
+      // stage still pauses it offscreen); under reduced motion it rests as before.
+      const rest = t >= INTRO.end && !tracking && settled && !dipping && !modelsMoving && !live;
       if (rest !== resting) {
         resting = rest;
         params.onRest?.(rest);
@@ -382,14 +412,15 @@ function standModels(THREE: Three, parent: Group, models: readonly ScreenModel[]
             root.updateMatrixWorld(true);
             const box = new THREE.Box3().setFromObject(root);
             const size = box.getSize(new THREE.Vector3());
-            const fit = Math.min((slot.height * 0.86) / Math.max(size.y, 1e-6), (slot.width * 0.8) / Math.max(size.x, 1e-6));
-            // Centre the egg on x/z and stand its lowest point on the slot's base, its back against the glass.
+            const fit = Math.min((slot.height * 0.78) / Math.max(size.y, 1e-6), (slot.width * 0.72) / Math.max(size.x, 1e-6));
+            // The holder's origin is the egg's centre, so focus and power-up scale it in place;
+            // it sits in the middle of its slot, its back against the glass.
             const inner = new THREE.Group();
             inner.scale.setScalar(fit);
-            root.position.set(-(box.min.x + box.max.x) / 2, -box.min.y, -(box.min.z + box.max.z) / 2);
+            root.position.set(-(box.min.x + box.max.x) / 2, -(box.min.y + box.max.y) / 2, -(box.min.z + box.max.z) / 2);
             inner.add(root);
             entry.holder.add(inner);
-            entry.holder.position.set(slot.x, slot.baseY + slot.height * 0.04, SCREEN_GLASS.z + (size.z * fit) / 2 + 0.01);
+            entry.holder.position.set(slot.x, slot.baseY + slot.height / 2, SCREEN_GLASS.z + (size.z * fit) / 2 + 0.01);
             entry.rig = rig;
             onLoaded(entry.holder);
           })
@@ -450,6 +481,8 @@ function buildDevice(
   dipSideKey: (down: boolean) => void;
   /** fan opacity scale 0..1 and emitter emissive intensity */
   light: (fan: number, emitter: number) => void;
+  /** the fan's ripples and glitter at scene time `time`; `live` false holds the beam still with no glitter */
+  beam: (time: number, live: boolean) => void;
   /** screen emissive intensity */
   power: (level: number) => void;
   /** hand every lit material the baked studio; the group owns and disposes it */
@@ -609,7 +642,7 @@ function buildDevice(
   box(track(new THREE.CylinderGeometry(0.05, 0.055, 0.03, 24)), pianoBlack, -0.4, top + 0.005, -0.01);
 
   // The red fan the head projects upward, from the emitters only (FAN).
-  const fan = buildFan(THREE, { track, mat, tex });
+  const fan = buildFan(THREE, { track, mat, tex }, glowTexture);
   fan.group.position.set(FAN.x, top, 0);
   group.add(fan.group);
   // The mouth glow: a sprite always faces the camera, so it is sized to stay
@@ -713,6 +746,7 @@ function buildDevice(
       glow.opacity = 0.85 * level;
       emitter.emissiveIntensity = intensity;
     },
+    beam: (time, live) => fan.animate(time, live),
     power: (level) => {
       screen.emissiveIntensity = level;
     },
@@ -732,6 +766,11 @@ function buildDevice(
  * The scanner's fan, built to read like projected light, not a decal: three
  * nested cones (wide wash, mid beam, hot core), each drawn twice as crossed
  * planes so the fan has volume from any yaw. `level` scales all three.
+ *
+ * `animate` drives what makes it read as live light: bright bands climbing
+ * from the mouth to the tip (a TSL opacity term over the fan's v, against a
+ * scene-time uniform) and glitter motes rising through the beam's volume. Both
+ * are computed on the GPU; per frame the CPU sets two uniforms.
  */
 function buildFan(
   THREE: Three,
@@ -740,12 +779,24 @@ function buildFan(
     mat: <M extends Material>(m: M) => M;
     tex: <T extends { dispose(): void }>(t: T) => T;
   },
-): { group: Group; level: (level: number) => void } {
+  /** soft radial dot for the glitter; the device owns it */
+  moteMap: Texture,
+): { group: Group; level: (level: number) => void; animate: (time: number, live: boolean) => void } {
   const { track, mat, tex } = ctx;
   const group = new THREE.Group();
   const LENGTH = FAN.length;
   group.rotation.x = FAN.lean;
   const gradient = tex(beamGradientTexture(THREE));
+
+  // Scene time and the ripple depth (0 holds the plain gradient: reduced motion).
+  const beamTime = uniform(0);
+  const rippleDepth = uniform(0);
+  // v runs 0 at the mouth to 1 at the tip; bands move toward the tip as time grows.
+  const band = uv().y.mul(BEAM.bands).sub(beamTime.mul(BEAM.speed)).mul(2 * Math.PI).sin().mul(0.5).add(0.5);
+  // A fainter cross-beam shimmer so the bands are not ruler-straight.
+  const shimmer = uv().x.mul(9).add(uv().y.mul(5)).add(beamTime.mul(1.7)).sin().mul(0.5).add(0.5);
+  const ripple = mix(float(1).sub(rippleDepth), float(1).add(rippleDepth), band.mul(band))
+    .mul(mix(float(1), shimmer.mul(0.4).add(0.8), rippleDepth));
 
   const plane = (halfBase: number, halfTop: number) => {
     const shape = new THREE.Shape();
@@ -771,10 +822,12 @@ function buildFan(
   // at full width (the old fan) it hung a sheet of red in front of the
   // head's left side at the three-quarter turn.
   const cone = (halfBase: number, halfTop: number, color: string, peak: number) => {
-    const material = mat(new THREE.MeshBasicMaterial({
+    const material = mat(new THREE.MeshBasicNodeMaterial({
       color, map: gradient, transparent: true, opacity: peak,
       depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending,
     }));
+    // The gradient's alpha still multiplies in through `map`; this scales the level by the ripple.
+    material.opacityNode = materialOpacity.mul(ripple).min(1);
     group.add(new THREE.Mesh(plane(halfBase, halfTop), material));
     const crossed = new THREE.Mesh(plane(halfBase * FAN.depth, halfTop * FAN.depth), material);
     crossed.rotation.y = Math.PI / 2;
@@ -784,10 +837,55 @@ function buildFan(
 
   const colors = [led.on, led.on, apple[100]] as const;
   const layers = FAN.layers.map(([base, tip, peak], i) => cone(base, tip, colors[i] ?? led.on, peak));
+
+  // Glitter: one instanced sprite draw. Each mote's lane, speed, size and
+  // twinkle phase come from hashes of its index; its height loops up the fan
+  // with time. Lanes stay inside the mid beam (face and crossed width), and
+  // each mote fades in at the mouth and out before the tip.
+  const id = float(instanceIndex);
+  const seed = (k: number) => hash(id.add(k * 97));
+  const [beamBase, beamTip] = FAN.layers[1];
+  const rise = mix(float(MOTES.rise[0]), float(MOTES.rise[1]), seed(1));
+  const along = seed(2).add(beamTime.mul(rise)).fract();
+  const half = mix(float(beamBase), float(beamTip), along).mul(0.8);
+  const laneX = seed(3).mul(2).sub(1);
+  const laneZ = seed(4).mul(2).sub(1);
+  const sway = beamTime.mul(mix(float(0.6), float(1.3), seed(5))).add(seed(6).mul(2 * Math.PI)).sin().mul(MOTES.sway);
+  const twinkle = beamTime.mul(mix(float(MOTES.twinkle[0]), float(MOTES.twinkle[1]), seed(7)))
+    .add(seed(8).mul(2 * Math.PI)).sin().mul(0.5).add(0.5);
+  const sparkle = twinkle.pow(6).mul(0.85).add(0.15);
+  const fade = smoothstep(float(0), float(0.12), along).mul(float(1).sub(smoothstep(float(0.6), float(1), along)));
+  const moteMaterial = mat(new THREE.SpriteNodeMaterial({
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: MOTES.opacity,
+  }));
+  // Lanes bunch toward the centre line (lane × |lane|), like a beam's hot core.
+  moteMaterial.positionNode = vec3(
+    laneX.mul(laneX.abs()).mul(half).add(sway),
+    along.mul(LENGTH),
+    laneZ.mul(laneZ.abs()).mul(half).mul(FAN.depth),
+  );
+  moteMaterial.scaleNode = vec2(mix(float(MOTES.size[0]), float(MOTES.size[1]), seed(9)).mul(twinkle.mul(0.5).add(0.5)));
+  const dot = texture(moteMap, uv());
+  const tint = mix(uniform(new THREE.Color(led.on)), uniform(new THREE.Color(apple[100])), seed(10).pow(2));
+  moteMaterial.colorNode = vec4(vec3(tint).mul(dot.rgb), dot.a);
+  moteMaterial.opacityNode = materialOpacity.mul(fade).mul(sparkle);
+  const motes = new THREE.Sprite(moteMaterial);
+  motes.count = MOTES.count;
+  // One sprite at the fan's origin stands for every mote: its own bounds say nothing.
+  motes.frustumCulled = false;
+  group.add(motes);
+
   return {
     group,
     level: (level) => {
       for (const { material, peak } of layers) material.opacity = peak * level;
+      // Glitter tracks the fan, but stays visible at the rest level.
+      moteMaterial.opacity = MOTES.opacity * Math.min(1, level * 2.5);
+    },
+    animate: (time, live) => {
+      beamTime.value = time;
+      rippleDepth.value = live ? BEAM.depth : 0;
+      motes.visible = live;
     },
   };
 }
