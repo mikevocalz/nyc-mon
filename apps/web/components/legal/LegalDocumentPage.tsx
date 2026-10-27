@@ -1,7 +1,7 @@
 import { Article, Heading, Link, List, ListItem, Nav, OrderedList, Paragraph, Section, Text } from '@acme/ui/html';
 import { View } from '@acme/ui/tw';
 import { Eyebrow } from '../home/Eyebrow';
-import { LEGAL_COPY, type LegalDocument } from './copy';
+import { LEGAL_COPY, type LegalDocument } from '@acme/app/features/legal/copy.ts';
 import { LegalParagraph, legalParagraphKey } from './LegalParagraph';
 import { siteHref } from '../../lib/site-href';
 

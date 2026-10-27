@@ -1,13 +1,9 @@
 'use client';
 
-import { Linking } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { APP_HOME_PATH } from './boot';
 
 export type SignInIntent = 'create' | 'sign_in';
-
-/** Product-site origin for links the app does not host (legal pages). */
-const SITE_URL = process.env.EXPO_PUBLIC_SITE_URL ?? 'http://localhost:3100';
 
 export interface SignInLegalLink {
   id: 'terms' | 'privacy' | 'children';
@@ -28,7 +24,7 @@ export function useSignInNav(): {
   signInPath: string;
   /** Terms/privacy destinations, opened on the product site. */
   legalLinks: SignInLegalLink[];
-  /** Opens a legal href: in-app router on web, the site on native. */
+  /** Opens a legal href in the app's own /legal/* screens (the site's on web). */
   openLink: (href: string) => void;
   replace: (path: string) => void;
   /** The ‹ in the stack header (M03 direction): back to the previous route. */
@@ -51,7 +47,7 @@ export function useSignInNav(): {
       { id: 'privacy', href: '/legal/privacy' },
       { id: 'children', href: '/legal/childrens-privacy' },
     ],
-    openLink: (href) => void Linking.openURL(`${SITE_URL}${href}`),
+    openLink: (href) => router.push(href as never),
     replace: (path) => router.replace(path as never),
     // Sign-in is often reached by replace (from the age gate), so there may be no history.
     back: () => (router.canGoBack() ? router.back() : router.replace('/(onboarding)/welcome' as never)),
