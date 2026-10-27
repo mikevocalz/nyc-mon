@@ -591,3 +591,22 @@ Notes:
 
 | `settings.caller.saved` | Settings › Caller name | ui | drafted (confirmation after renaming the Caller; the card reuses the m07 field label, hint and button) |
 | `m13.menu.settings` | M13 H-Lynk menu | ui | drafted (opens Settings from the companion) |
+| `settings.page.previous` | Previous | ui | drafted (Settings glass: moves the highlight up one row) |
+| `settings.page.next` | Next | ui | drafted (Settings glass: moves the highlight down one row) |
+| `settings.row.change` | Change | ui | drafted (Settings glass: the select button on Caller name, Theme and Time of day) |
+| `settings.row.open` | Open | ui | drafted (Settings glass: the select button on Game controls, Legal and Credits) |
+| `settings.theme.label` | Theme | ui | drafted (same word as the 2D Appearance card's control) |
+| `settings.theme.system` | System | ui | drafted |
+| `settings.theme.light` | Light | ui | drafted |
+| `settings.theme.dark` | Dark | ui | drafted |
+| `settings.game_controls.label` | Game controls | ui | drafted (same as the 2D Game card's button) |
+| `settings.game_controls.caption` | Stick, buttons, hand, haptics. | ui | drafted (same as the 2D Game card's caption) |
+| `settings.legal.label` | Legal | ui | drafted (opens /legal/terms; the documents switch there) |
+| `settings.credits.label` | Credits | ui | drafted (the map, model and software credits, a page at a time) |
+| `settings.credits.map` | Map data | ui | drafted (group heading, same as the 2D card) |
+| `settings.credits.assets` | Models & textures | ui | drafted (group heading, same as the 2D card) |
+| `settings.sign_out.label` | Sign out | ui | drafted |
+| `settings.sign_out.caption` | Sign out on this device only. | ui | drafted (same as the 2D Session card's caption) |
+| `settings.sign_out.confirm.title` | Sign out? | ui | drafted (the glass asks once; Cancel is the default and the trackpad) |
+| `settings.sign_out.error` | Couldn't sign out. Check your connection and try again. | ui | drafted |
+| `settings.value.a11y` | {label}, {value} | ui | drafted (screen-reader name of a settings row with a value) |

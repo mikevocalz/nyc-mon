@@ -139,7 +139,7 @@ export function HomeScreen({ mon }: { mon: MonInstance }) {
       router.push('/(home)/journal');
     } else if (target === 'settings') {
       local.setState({ menu: false });
-      router.push('/(drawer)/settings');
+      router.push('/(home)/settings');
     } else if (target === 'dex') {
       local.setState({ menu: false });
       router.push(dexHref);

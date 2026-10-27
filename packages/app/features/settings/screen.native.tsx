@@ -1,4 +1,5 @@
 'use client';
+import type { ReactNode } from 'react';
 import { ScrollView, View } from '@acme/ui/tw';
 import { Container, SafeArea } from '@acme/ui';
 import { SETTINGS_GRID, SettingsAccountCards, SettingsDeviceCards, SettingsHeader } from './settings-content';
@@ -16,10 +17,14 @@ import { SETTINGS_GRID, SettingsAccountCards, SettingsDeviceCards, SettingsHeade
     (Legal & credits, Session) on the right; each pane scrolls on its own.
 
   Every value lives in a store, so rotating between the trees loses nothing.
+
+  `leading` sits above both arrangements: the Settings glass's 2D fallback
+  puts its Back control there, since the (home) group has no stack header.
 */
-export function SettingsScreen() {
+export function SettingsScreen({ leading }: { leading?: ReactNode } = {}) {
   return (
     <SafeArea edges={['top']} className="flex-1 bg-surface">
+      {leading}
       <View className="flex-1 md:landscape:hidden">
         <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
           <Container width="detail" className="py-4 pb-48 md:max-w-content-wide md:py-8">

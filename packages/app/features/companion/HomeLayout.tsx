@@ -71,7 +71,7 @@ const CreatureLayer = memo(function CreatureLayer({ chrome, reducedMotion }: { c
   );
 });
 
-/** The companion menu (Menu key, Q42 keeps screen names): Dex and Journal, by screen name. */
+/** The companion menu (Menu key, Q42 keeps screen names): Dex, Journal and Settings, by screen name. */
 function CompanionMenu() {
   const router = useRouter();
   const open = useHomeStageStore((s) => s.menuOpen);
@@ -88,6 +88,7 @@ function CompanionMenu() {
           {([
             ['m13.bar.dex', `/(home)/mon/${monId}`, 'home-menu-dex'],
             ['m18.title', '/(home)/journal', 'home-menu-journal'],
+            ['m13.menu.settings', '/(home)/settings', 'home-menu-settings'],
           ] as const).map(([id, href, testID]) => (
             <View key={testID} testID={testID}>
               <Button variant="outline" size="lg" fullWidth title={companionCopy(id)} onPress={() => go(href)} className="min-h-target" />

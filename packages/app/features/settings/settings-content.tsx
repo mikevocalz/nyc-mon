@@ -5,15 +5,18 @@ import { useState } from 'react';
 import { Linking } from 'react-native';
 import { useRouter } from 'solito/navigation';
 import { Section, View } from '@acme/ui/tw';
-import { AuthProviderButton, Button, Card, ErrorMessage, Heading, SegmentedControl, Switch, Text, FadeIn } from '@acme/ui';
-import { useProfile, type ThemePreference } from '../profile/profile.store';
+import { AuthProviderButton, Button, Card, ErrorMessage, Heading, SegmentedControl, Switch, Text, FadeIn, useInstanceStore, useStore } from '@acme/ui';
+import { useProfile } from '../profile/profile.store';
 import { auth } from '../onboarding/auth';
+import { copy } from '../onboarding/copy';
 import { CITY_MAP_ASSETS, CITY_MAP_DERIVED, CITY_MAP_SOURCES } from '../game/map-data-credit';
 import { EXPERIMENTAL_WORLD_PHYSICAL } from '../game/world/physical-look.ts';
 import { useTimeOfDay } from '../game/world/time-of-day.store.ts';
 import { SOFTWARE_CREDITS, SOFTWARE_CREDITS_GROUP } from './software-credits.ts';
 import { TimeOfDayRow } from './TimeOfDayRow';
 import { CallerNameCard } from './CallerNameCard';
+import { SIGNED_OUT_PATH, signOutHere } from './sign-out';
+import { THEME_OPTIONS } from './theme-options.ts';
 
 /** The game-control settings route (apps/mobile/app/(drawer)/game-controls.tsx). */
 const GAME_CONTROLS_PATH = '/game-controls';
@@ -115,16 +118,41 @@ function AmazonAccountLink({ className }: CellProps) {
   );
 }
 
-const THEME_OPTIONS: { value: ThemePreference; label: string }[] = [
-  { value: 'system', label: 'System' },
-  { value: 'light', label: 'Light' },
-  { value: 'dark', label: 'Dark' },
-];
-
 function ThemeSegment() {
   const theme = useProfile((s) => s.theme);
   const setTheme = useProfile((s) => s.setTheme);
-  return <SegmentedControl aria-label="Theme" options={THEME_OPTIONS} value={theme} onChange={setTheme} className="self-start" />;
+  return <SegmentedControl aria-label="Theme" options={[...THEME_OPTIONS]} value={theme} onChange={setTheme} className="self-start" />;
+}
+
+/** Session: Sign out ends the auth session here (signOutHere) and goes to sign-in. */
+function SessionCard({ className }: CellProps) {
+  const router = useRouter();
+  const store = useInstanceStore(() => ({ pending: false, failed: false }));
+  const pending = useStore(store, (s) => s.pending);
+  const failed = useStore(store, (s) => s.failed);
+  const signOut = async () => {
+    store.setState({ pending: true, failed: false });
+    if (await signOutHere()) {
+      router.replace(SIGNED_OUT_PATH);
+      return;
+    }
+    store.setState({ pending: false, failed: true });
+  };
+  return (
+    <FadeIn delay={260} className={className}>
+      <Card className="gap-3">
+        <View className="gap-1">
+          <Text variant="heading">Session</Text>
+          <Text variant="caption" tone="muted">Sign out on this device only.</Text>
+        </View>
+        {failed ? <ErrorMessage message={copy('settings.sign_out.error')} /> : null}
+        <View className="flex-row gap-3">
+          <Button title="Sign out" variant="outline" loading={pending} disabled={pending} onPress={() => void signOut()} />
+          <Button title="Delete account" variant="danger" onPress={() => {}} />
+        </View>
+      </Card>
+    </FadeIn>
+  );
 }
 
 /** Title and one line of context. */
@@ -255,18 +283,7 @@ export function SettingsAccountCards({ grid = false }: { grid?: boolean }) {
         </Card>
       </FadeIn>
 
-      <FadeIn delay={260} className={wide}>
-        <Card className="gap-3">
-          <View className="gap-1">
-            <Text variant="heading">Session</Text>
-            <Text variant="caption" tone="muted">Sign out on this device only.</Text>
-          </View>
-          <View className="flex-row gap-3">
-            <Button title="Sign out" variant="outline" onPress={() => {}} />
-            <Button title="Delete account" variant="danger" onPress={() => {}} />
-          </View>
-        </Card>
-      </FadeIn>
+      <SessionCard className={wide} />
     </>
   );
 }
