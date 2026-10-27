@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { assertNever, DEFAULT_CARE_TUNING, deriveMonMood, mealNutrition, wouldOverfeed } from '@acme/core/sim';
 import type { CareAction } from '@acme/core/types';
 import {
-  Button, CareMeterRing, SheetSurface, useHLynkStageWide, useInstanceStore, useReducedMotion, useStore,
+  Button, CareMeterRing, SheetSurface, useInstanceStore, useReducedMotion, useStore,
 } from '@acme/ui';
 import { haptics } from '@acme/ui/haptics';
 import { Text, View } from '@acme/ui/tw';
@@ -33,7 +33,6 @@ type FeedPhase = { kind: 'tray' } | { kind: 'eating' } | { kind: 'declined'; rea
 export function FeedScreen() {
   const router = useRouter();
   const reducedMotion = useReducedMotion();
-  const wide = useHLynkStageWide();
   const { care, identity, scheme } = useCareNow();
   const local = useInstanceStore<{ phase: FeedPhase }>(() => ({ phase: { kind: 'tray' } }));
   const phase = useStore(local, (s) => s.phase);
@@ -99,11 +98,13 @@ export function FeedScreen() {
     }
   };
 
-  const panel = (
+  // One panel, drawn twice: over the device screen below md, and titled in
+  // the stage's companion pane from md (HLynkStage). Only one is ever displayed.
+  const panel = (inPane: boolean) => (
     <SheetSurface
       placement="in-screen"
       scheme="night"
-      title={wide ? c('m14.title', { name }) : undefined}
+      title={inPane ? c('m14.title', { name }) : undefined}
       onClose={() => router.back()}
       closeLabel={c('m14.close')}
       testID="m14-tray"
@@ -176,10 +177,10 @@ export function FeedScreen() {
     screen: (
       <View className="flex-1" style={{ pointerEvents: 'box-none' }}>
         {ring}
-        {wide ? null : <View className="absolute inset-x-0 bottom-0">{panel}</View>}
+        <View className="absolute inset-x-0 bottom-0 md:hidden">{panel(false)}</View>
       </View>
     ),
-    trailing: wide ? panel : undefined,
+    trailing: panel(true),
   });
 
   return null;

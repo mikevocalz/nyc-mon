@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { assertNever, DEFAULT_CARE_TUNING } from '@acme/core/sim';
 import type { CareAction } from '@acme/core/types';
 import {
-  Button, CareMeterRing, SheetSurface, useHLynkStageWide, useInstanceStore, useReducedMotion, useStore,
+  Button, CareMeterRing, SheetSurface, useInstanceStore, useReducedMotion, useStore,
 } from '@acme/ui';
 import { haptics } from '@acme/ui/haptics';
 import { Text, View } from '@acme/ui/tw';
@@ -40,7 +40,6 @@ interface RestLocal {
 export function RestScreen() {
   const router = useRouter();
   const reducedMotion = useReducedMotion();
-  const wide = useHLynkStageWide();
   const { care, identity, scheme } = useCareNow();
   const local = useInstanceStore<RestLocal>(() => ({ settling: false, confirming: false, raced: false, showLeave: false }));
   const { settling, confirming, raced, showLeave } = useStore(local);
@@ -207,10 +206,11 @@ export function RestScreen() {
             />
           </View>
         )}
-        {wide ? null : <View className="absolute inset-x-0 bottom-0">{panel}</View>}
+        {/* From md the panel sits in the stage's companion pane instead (HLynkStage). */}
+        <View className="absolute inset-x-0 bottom-0 md:hidden">{panel}</View>
       </View>
     ),
-    trailing: wide ? panel : undefined,
+    trailing: panel,
   });
 
   return null;

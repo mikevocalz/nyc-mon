@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 import { Redirect, useRouter } from 'expo-router';
 import { MON_NAME_MAX_LENGTH, monNameErrorCopyId, validateMonName } from '@acme/core/sim';
 import {
-  Button, ErrorMessage, Heading, KeyboardAwareScroll, SignagePlate, TextField, useHLynkStageWide, useInstanceStore,
+  Button, ErrorMessage, Heading, KeyboardAwareScroll, SignagePlate, TextField, useInstanceStore,
   useStore,
 } from '@acme/ui';
 import { haptics } from '@acme/ui/haptics';
@@ -43,7 +43,6 @@ interface LocalState {
  */
 export function NameScreen() {
   const router = useRouter();
-  const wide = useHLynkStageWide();
   const mon = useMonStore(selectActiveMon);
   const nowMs = useMinuteClock((st) => st.nowMs);
   const local = useInstanceStore<LocalState>(() => ({ raw: '', error: undefined, saving: false, saveError: false, reactionKey: 0, focusKey: 0 }));
@@ -180,14 +179,15 @@ export function NameScreen() {
       },
       keys: { back: { disabled: true }, home: { disabled: true }, forward: { disabled: true } },
     },
-    screen: wide ? null : (
+    // The form stays on the device at every width: one text field, never two
+    // mounted copies competing for focus and the keyboard, so no companion pane.
+    screen: (
       <KeyboardAwareScroll>
         <View className="flex-1 justify-end">
           <View testID="m09-scrim" className="bg-night/90 px-4 pb-4 pt-4">{form}</View>
         </View>
       </KeyboardAwareScroll>
     ),
-    trailing: wide ? <View className="bg-night px-6 py-6">{form}</View> : undefined,
   });
 
   if (mon === undefined || mon.stage !== 'Baby') {

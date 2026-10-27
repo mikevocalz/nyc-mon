@@ -6,7 +6,7 @@ import { PEEK_ROUNDS_PER_SESSION, PEEK_SPOTS } from '@acme/core/schemas';
 import { assertNever, createRandom, DEFAULT_CARE_TUNING, hash128 } from '@acme/core/sim';
 import type { PeekRound, PeekSpot } from '@acme/core/types';
 import {
-  Button, CareMeterRing, RoundDots, SheetSurface, useHLynkStageWide, useInstanceStore, useReducedMotion, useStore,
+  Button, CareMeterRing, RoundDots, SheetSurface, useInstanceStore, useReducedMotion, useStore,
 } from '@acme/ui';
 import { haptics } from '@acme/ui/haptics';
 import { Text, View } from '@acme/ui/tw';
@@ -57,7 +57,6 @@ const INTRO: PeekLocal = { phase: 'intro', hidden: [], rounds: [], focus: 1, las
 export function SocialScreen() {
   const router = useRouter();
   const reducedMotion = useReducedMotion();
-  const wide = useHLynkStageWide();
   const { care, identity, scheme } = useCareNow();
   const local = useInstanceStore<PeekLocal>(() => INTRO);
   const game = useStore(local);
@@ -271,10 +270,17 @@ export function SocialScreen() {
           </View>
         )}
         {playing}
-        {wide || card === null ? null : <View className="absolute inset-x-0 bottom-0">{card}</View>}
+        {/* From md the card sits in the stage's companion pane instead (HLynkStage). */}
+        {card === null ? null : <View className="absolute inset-x-0 bottom-0 md:hidden">{card}</View>}
       </View>
     ),
-    trailing: wide ? card ?? undefined : undefined,
+    // While playing, the pane keeps its place with the round count so the
+    // shell does not jump width between the intro, the rounds and the result.
+    trailing: card ?? (
+      <SheetSurface placement="in-screen" scheme="night" title={c('m16.intro.title', { name })} testID="m16-pane-round">
+        <Text className="text-xr-body text-text">{roundLabel}</Text>
+      </SheetSurface>
+    ),
   });
 
   return null;

@@ -49,7 +49,7 @@ test('the time-of-day row: named for screen readers, 2x2 on phones, captioned on
 
 test('Settings mounts the Graphics card: native only, behind the physical flag, bound to timeOfDayStore', () => {
   const settings = source('./settings-content.tsx');
-  assert.match(settings, /<GraphicsCard \/>/);
+  assert.match(settings, /<GraphicsCard\b[^>]*\/>/);
   assert.match(settings, /process\.env\.EXPO_OS === 'web' \|\| !EXPERIMENTAL_WORLD_PHYSICAL\) return null/);
   assert.match(settings, /useTimeOfDay\(\(s\) => s\.preset\)/);
   assert.match(settings, /useTimeOfDay\(\(s\) => s\.setPreset\)/);

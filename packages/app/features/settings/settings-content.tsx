@@ -17,14 +17,30 @@ import { TimeOfDayRow } from './TimeOfDayRow';
 /** The game-control settings route (apps/mobile/app/(drawer)/game-controls.tsx). */
 const GAME_CONTROLS_PATH = '/game-controls';
 
+/** Layout classes a parent grid hands each settings card (on its FadeIn). */
+interface CellProps {
+  className?: string;
+}
+
+/**
+ * The native tablet portrait grid: below md a plain `gap-6` column (the
+ * phone layout, unchanged); from md the cards pair into two columns. RN has
+ * no CSS grid, so it is a wrapping row with half-width cells whose padding
+ * makes the gutter, and a negative margin that cancels it at the edges.
+ */
+export const SETTINGS_GRID = 'gap-6 md:-mx-3 md:flex-row md:flex-wrap md:gap-x-0 md:gap-y-10 lg:gap-y-12';
+const GRID_CELL = 'md:w-1/2 md:px-3';
+/** Long cards (the credits list, the session actions) span both columns. */
+const GRID_CELL_WIDE = 'md:w-full md:px-3';
+
 // Decision (2026-10-15, STRIKE on web): the Game tab never mounts on web
 // (GameScreen.tsx), so the row that opens its controls is native only; a
 // web row would land on a route that does not exist there.
-function GameControlsRow() {
+function GameControlsRow({ className }: CellProps) {
   const router = useRouter();
   if (process.env.EXPO_OS === 'web') return null;
   return (
-    <FadeIn delay={170}>
+    <FadeIn delay={170} className={className}>
       <Card className="gap-3">
         <View className="gap-1">
           <Text variant="heading">Game</Text>
@@ -41,12 +57,12 @@ function GameControlsRow() {
 // with the flag off the city has one fixed look and the row would change
 // nothing. Settings only; the HUD gains no control in this lane
 // (docs/design/research/slop-grade-city-mobbin.md §§ 2–3).
-function GraphicsCard() {
+function GraphicsCard({ className }: CellProps) {
   const preset = useTimeOfDay((s) => s.preset);
   const setPreset = useTimeOfDay((s) => s.setPreset);
   if (process.env.EXPO_OS === 'web' || !EXPERIMENTAL_WORLD_PHYSICAL) return null;
   return (
-    <FadeIn delay={155}>
+    <FadeIn delay={155} className={className}>
       <Card className="gap-4">
         <Text variant="heading">Graphics</Text>
         <TimeOfDayRow value={preset} onChange={setPreset} />
@@ -55,7 +71,7 @@ function GraphicsCard() {
   );
 }
 
-function AmazonAccountLink() {
+function AmazonAccountLink({ className }: CellProps) {
   const enabled = process.env.EXPO_OS === 'web' && process.env.EXPO_PUBLIC_AMAZON_AUTH_ENABLED === 'true';
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | undefined>();
@@ -76,7 +92,7 @@ function AmazonAccountLink() {
   }
 
   return (
-    <FadeIn delay={190}>
+    <FadeIn delay={190} className={className}>
       <Card className="gap-4">
         <View className="gap-1">
           <Text variant="heading">Amazon account</Text>
@@ -110,19 +126,29 @@ function ThemeSegment() {
   return <SegmentedControl aria-label="Theme" options={THEME_OPTIONS} value={theme} onChange={setTheme} className="self-start" />;
 }
 
-export function SettingsContent() {
-  const p = useProfile();
-
+/** Title and one line of context. */
+export function SettingsHeader() {
   return (
-    <View className="gap-6 md:gap-10 lg:gap-12">
-      <FadeIn>
-        <Section className="gap-1">
-          <Heading level={1} size="display-sm">Settings</Heading>
-          <Text tone="muted">Notifications, appearance, and your session.</Text>
-        </Section>
-      </FadeIn>
+    <FadeIn>
+      <Section className="gap-1">
+        <Heading level={1} size="display-sm">Settings</Heading>
+        <Text tone="muted">Notifications, appearance, and your session.</Text>
+      </Section>
+    </FadeIn>
+  );
+}
 
-      <FadeIn delay={80}>
+/**
+ * The cards that tune the app on this device: Preferences, Appearance,
+ * Graphics and Game. Siblings, so they drop into a `gap-*` column or, with
+ * `grid`, into {@linkcode SETTINGS_GRID}.
+ */
+export function SettingsDeviceCards({ grid = false }: { grid?: boolean }) {
+  const p = useProfile();
+  const cell = grid ? GRID_CELL : undefined;
+  return (
+    <>
+      <FadeIn delay={80} className={cell}>
         <Card className="gap-4">
           <View className="gap-1">
             <Text variant="heading">Preferences</Text>
@@ -134,7 +160,7 @@ export function SettingsContent() {
         </Card>
       </FadeIn>
 
-      <FadeIn delay={140}>
+      <FadeIn delay={140} className={cell}>
         <Card className="gap-4">
           <View className="gap-1">
             <Text variant="heading">Appearance</Text>
@@ -144,13 +170,24 @@ export function SettingsContent() {
         </Card>
       </FadeIn>
 
-      <GraphicsCard />
+      <GraphicsCard className={cell} />
 
-      <GameControlsRow />
+      <GameControlsRow className={cell} />
+    </>
+  );
+}
 
-      <AmazonAccountLink />
+/**
+ * The account cards: the Amazon link (web), Legal & credits and Session.
+ * Same sibling contract as {@linkcode SettingsDeviceCards}.
+ */
+export function SettingsAccountCards({ grid = false }: { grid?: boolean }) {
+  const wide = grid ? GRID_CELL_WIDE : undefined;
+  return (
+    <>
+      <AmazonAccountLink className={grid ? GRID_CELL : undefined} />
 
-      <FadeIn delay={220}>
+      <FadeIn delay={220} className={wide}>
         <Card className="gap-3">
           <View className="gap-1">
             <Text variant="heading">Legal &amp; credits</Text>
@@ -216,7 +253,7 @@ export function SettingsContent() {
         </Card>
       </FadeIn>
 
-      <FadeIn delay={260}>
+      <FadeIn delay={260} className={wide}>
         <Card className="gap-3">
           <View className="gap-1">
             <Text variant="heading">Session</Text>
@@ -228,6 +265,16 @@ export function SettingsContent() {
           </View>
         </Card>
       </FadeIn>
+    </>
+  );
+}
+
+export function SettingsContent() {
+  return (
+    <View className="gap-6 md:gap-10 lg:gap-12">
+      <SettingsHeader />
+      <SettingsDeviceCards />
+      <SettingsAccountCards />
     </View>
   );
 }

@@ -73,14 +73,21 @@ export function ProfileDetails() {
   );
 }
 
+/** The identity block as the page shows it: avatar and name, faded in. */
+export function ProfileSummary() {
+  return (
+    <FadeIn>
+      <Section className="gap-4">
+        <ProfileIdentity />
+      </Section>
+    </FadeIn>
+  );
+}
+
 export function ProfileContent() {
   return (
     <View className="gap-6 md:gap-10 lg:gap-12">
-      <FadeIn>
-        <Section className="gap-4">
-          <ProfileIdentity />
-        </Section>
-      </FadeIn>
+      <ProfileSummary />
       <ProfileDetails />
     </View>
   );

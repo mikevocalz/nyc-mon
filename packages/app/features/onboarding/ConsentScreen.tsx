@@ -18,6 +18,7 @@ import { View } from '@acme/ui/tw';
 import { AUTH_BASE_URL } from './auth';
 import { copy } from './copy';
 import { useOnboarding, writeConsentRequested } from './onboarding.store';
+import { OnboardingPanes, PANE_HEADING_CLASS } from './OnboardingPanes';
 import { readSave } from './save-store';
 
 type Mode = 'ask' | 'sent' | 'denied';
@@ -101,30 +102,41 @@ export function ConsentScreen() {
   }
 
   return (
-    <KeyboardAwareScroll>
-      <Container width="full" className="flex-1 px-4 py-6">
-        <Form className="mx-auto w-full max-w-content-form gap-6">
-          {mode === 'sent' ? (
-            <>
+    <KeyboardAwareScroll contentContainerClassName="grow">
+      <OnboardingPanes
+        intro={
+          mode === 'sent' ? (
+            <View className="gap-6">
               <StatusRow
                 items={[{ id: 'status-consent-pending', label: copy('m05.badge.pending'), tone: 'pending' }]}
               />
-              <Heading level={1} size="title">{copy('m05.sent.title')}</Heading>
+              <Heading level={1} size="title" className={PANE_HEADING_CLASS}>{copy('m05.sent.title')}</Heading>
+            </View>
+          ) : (
+            <View className="gap-2">
+              <Heading level={1} size="title" className={PANE_HEADING_CLASS}>{copy('m05.ask.title')}</Heading>
+              <Text>{copy('m05.ask.body')}</Text>
+            </View>
+          )
+        }
+      >
+        <Form className="gap-6 md:flex-1">
+          {mode === 'sent' ? (
+            <>
               <Text>{copy('m05.sent.body', { email: parentEmail })}</Text>
-              <Button
-                variant="ghost"
-                size="lg"
-                fullWidth
-                title={copy('m05.sent.change_email')}
-                onPress={() => setMode('ask')}
-              />
+              {/* Tablet: the action sits on the pane's bottom edge. */}
+              <View className="md:mt-auto">
+                <Button
+                  variant="ghost"
+                  size="lg"
+                  fullWidth
+                  title={copy('m05.sent.change_email')}
+                  onPress={() => setMode('ask')}
+                />
+              </View>
             </>
           ) : (
             <>
-              <View className="gap-2">
-                <Heading level={1} size="title">{copy('m05.ask.title')}</Heading>
-                <Text>{copy('m05.ask.body')}</Text>
-              </View>
               {error !== undefined ? <ErrorMessage message={error} /> : null}
               <TextField
                 surface="daylit"
@@ -155,18 +167,21 @@ export function ConsentScreen() {
                   <Text>{copy('mail.consent.body.no')}</Text>
                 </View>
               ) : null}
-              <Button
-                variant="cta"
-                size="lg"
-                fullWidth
-                title={pending ? copy('m05.send.loading') : copy('m05.send')}
-                disabled={pending || parentEmail === ''}
-                onPress={() => void send()}
-              />
+              {/* Tablet: Send sits on the pane's bottom edge. */}
+              <View className="md:mt-auto">
+                <Button
+                  variant="cta"
+                  size="lg"
+                  fullWidth
+                  title={pending ? copy('m05.send.loading') : copy('m05.send')}
+                  disabled={pending || parentEmail === ''}
+                  onPress={() => void send()}
+                />
+              </View>
             </>
           )}
         </Form>
-      </Container>
+      </OnboardingPanes>
     </KeyboardAwareScroll>
   );
 }

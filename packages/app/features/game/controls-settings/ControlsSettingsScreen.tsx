@@ -148,8 +148,11 @@ function ReducedMotionStatus() {
   );
 }
 
-function ControllerPreview({ profile }: { profile: ControllerProfile }) {
-  const arcadeRive = useArcadeRiveFiles();
+function ControllerPreview({ profile, arcadeRive, testID }: {
+  profile: ControllerProfile;
+  arcadeRive: ReturnType<typeof useArcadeRiveFiles>;
+  testID: string;
+}) {
   const reducedMotion = useReducedMotion();
   // Preview mode never calls the router; it exists so the kit's props are complete.
   const router = useMemo(() => createGameInputRouter({ bindings: DEFAULT_CAMERA_BINDINGS }), []);
@@ -161,7 +164,7 @@ function ControllerPreview({ profile }: { profile: ControllerProfile }) {
       className="w-full overflow-hidden border-2 border-border bg-surface-sunken"
       // Computed: a fixed well so the resolver lays the controller out at one known size.
       style={{ height: PREVIEW_HEIGHT }}
-      {...({ testID: 'g03-preview' } as object)}
+      {...({ testID } as object)}
     >
       <ArcadeController
         rive={arcadeRive}
@@ -180,8 +183,20 @@ function ControllerPreview({ profile }: { profile: ControllerProfile }) {
   );
 }
 
+/**
+ * The native tablet portrait grid for the four setting cards: below md a
+ * plain `gap-6` column (the phone layout, unchanged); from md a wrapping row
+ * of half-width cells, padding for the gutter and a negative margin that
+ * cancels it at the edges (RN has no CSS grid).
+ */
+const CARD_GRID = 'gap-6 md:-mx-3 md:flex-row md:flex-wrap md:gap-x-0 md:gap-y-6';
+const CARD_CELL = 'md:w-1/2 md:px-3';
+
 export function ControlsSettingsScreen() {
   const profile = useControllerProfile((s) => s.profile);
+  // Loaded once here and handed to both previews below, so the second
+  // arrangement never parses the .riv files again.
+  const arcadeRive = useArcadeRiveFiles();
   const screen = useInstanceStore<ScreenState>(() => ({ restoreOpen: false }));
   const restoreOpen = useStore(screen, (s) => s.restoreOpen);
   const set = controllerProfileActions.set;
@@ -207,138 +222,191 @@ export function ControlsSettingsScreen() {
     value: DEFAULT_CAMERA_SPOKEN_LABELS[id],
   }));
 
+  // `split` marks the landscape copy: its testIDs carry a -split suffix so
+  // the two mounted arrangements never share one.
+  const intro = (split: boolean) => (
+    <View className="gap-1">
+      <Heading level={1} size="title" {...({ testID: split ? 'g03-title-split' : 'g03-title' } as object)}>{G03.title}</Heading>
+      <Text tone="muted">{G03.intro}</Text>
+    </View>
+  );
+
+  const preview = (split: boolean) => (
+    <View className="gap-2">
+      <ControllerPreview profile={profile} arcadeRive={arcadeRive} testID={split ? 'g03-preview-split' : 'g03-preview'} />
+      {profile.haptics !== 'off' ? <Text variant="caption" tone="muted">{G03.preview.hint}</Text> : null}
+      <ReducedMotionStatus />
+    </View>
+  );
+
+  const cards = (cell: string | undefined) => (
+    <>
+      <View className={cell}>
+        <Card className="gap-4">
+          <Text variant="heading">{G03.section.stick}</Text>
+          <View className="gap-1">
+            <Text variant="label">{G03.stick.mode.label}</Text>
+            <SegmentedControl
+              aria-label={G03.stick.mode.a11y}
+              district={DISTRICT}
+              options={STICK_MODE_OPTIONS}
+              value={profile.stickMode}
+              onChange={(stickMode) => set({ stickMode })}
+              className="self-start"
+            />
+            <Text variant="caption" tone="muted">{G03.stick.mode.caption}</Text>
+          </View>
+          <View className="gap-1">
+            <Text variant="label">{G03.stick.placement.label}</Text>
+            <SegmentedControl
+              aria-label={G03.stick.placement.a11y}
+              district={DISTRICT}
+              options={STICK_PLACEMENT_OPTIONS}
+              value={profile.stickPlacement}
+              onChange={(stickPlacement) => set({ stickPlacement })}
+              className="self-start"
+            />
+            <Text variant="caption" tone="muted">{G03.stick.placement.caption}</Text>
+          </View>
+          <View className="gap-1">
+            <SliderField
+              label={G03.stick.deadzone.label}
+              visibleValue={percentLabel(profile.stick.deadZone)}
+              spokenValue={percentSpoken(profile.stick.deadZone)}
+              range={SLIDER_RANGES.deadZone}
+              value={profile.stick.deadZone}
+              onChange={(deadZone) => setStick({ deadZone })}
+            />
+            <Text variant="caption" tone="muted">{G03.stick.deadzone.caption}</Text>
+          </View>
+          <View className="gap-1">
+            <SliderField
+              label={G03.stick.sensitivity.label}
+              visibleValue={timesLabel(profile.stick.sensitivity)}
+              spokenValue={timesSpoken(profile.stick.sensitivity)}
+              range={SLIDER_RANGES.sensitivity}
+              value={profile.stick.sensitivity}
+              onChange={(sensitivity) => setStick({ sensitivity })}
+            />
+            <Text variant="caption" tone="muted">{G03.stick.sensitivity.caption}</Text>
+          </View>
+        </Card>
+      </View>
+
+      <View className={cell}>
+        <Card className="gap-4">
+          <Text variant="heading">{G03.section.layout}</Text>
+          <View className="gap-1">
+            <Text variant="label">{G03.hand.label}</Text>
+            <SegmentedControl
+              aria-label={G03.hand.a11y}
+              district={DISTRICT}
+              options={HANDEDNESS_OPTIONS}
+              value={profile.handedness}
+              onChange={(handedness) => set({ handedness })}
+              className="self-start"
+            />
+            <Text variant="caption" tone="muted">{G03.hand.caption}</Text>
+          </View>
+          <View className="gap-1">
+            <SliderField
+              label={G03.size.label}
+              visibleValue={percentLabel(profile.scale)}
+              spokenValue={percentSpoken(profile.scale)}
+              range={SLIDER_RANGES.scale}
+              value={profile.scale}
+              onChange={(scale) => set({ scale })}
+            />
+          </View>
+          <View className="gap-1">
+            <SliderField
+              label={G03.opacity.label}
+              visibleValue={percentLabel(profile.opacity)}
+              spokenValue={percentSpoken(profile.opacity)}
+              range={SLIDER_RANGES.opacity}
+              value={profile.opacity}
+              onChange={(opacity) => set({ opacity })}
+            />
+            <Text variant="caption" tone="muted">{G03.opacity.caption}</Text>
+          </View>
+        </Card>
+      </View>
+
+      <View className={cell}>
+        <Card className="gap-4">
+          <Text variant="heading">{G03.section.feel}</Text>
+          <View className="gap-1">
+            <Text variant="label">{G03.haptics.label}</Text>
+            <SegmentedControl
+              aria-label={G03.haptics.a11y}
+              district={DISTRICT}
+              options={HAPTICS_OPTIONS}
+              value={profile.haptics}
+              onChange={(haptics) => set({ haptics })}
+              segmentClassName="basis-[40%] sm:basis-auto"
+            />
+          </View>
+        </Card>
+      </View>
+
+      <View className={cell}>
+        <Card className="gap-3">
+          <Text variant="heading">{G03.section.buttons}</Text>
+          <Text variant="caption" tone="muted">{G03.bindings.caption}</Text>
+          <KeyValueList items={bindingItems} columns={2} />
+        </Card>
+      </View>
+    </>
+  );
+
+  const restoreButton = (
+    <Button
+      title={G03.restore.button}
+      variant="outline"
+      district={DISTRICT}
+      fullWidth
+      onPress={() => screen.setState({ restoreOpen: true })}
+    />
+  );
+
+  /*
+    Two arrangements, both mounted, switched by class only (no JS width
+    checks; Uniwind's landscape: updates live on rotation):
+
+    - Phones and tablets in portrait: one top-aligned column, preview first.
+      From md it widens to content-wide and the four cards pair into two
+      columns (Stick | Layout, Feel | Buttons). Below md nothing changes.
+    - Landscape from md: two panes like an open foldable. Title, the preview
+      at its authored 200pt height and Restore defaults on the left; the
+      setting cards on the right. Each pane scrolls on its own.
+
+    Every value lives in controllerProfileStore, so rotating loses nothing.
+  */
   return (
     <SafeArea edges={['top']} className="flex-1 bg-surface" {...({ testID: 'g03-page' } as object)}>
-      <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
-        <View className="w-full max-w-content-detail gap-6 self-center px-4 py-4 pb-48 sm:px-6">
-          <View className="gap-1">
-            <Heading level={1} size="title" {...({ testID: 'g03-title' } as object)}>{G03.title}</Heading>
-            <Text tone="muted">{G03.intro}</Text>
+      <View className="flex-1 md:landscape:hidden">
+        <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
+          <View className="w-full max-w-content-detail gap-6 self-center px-4 py-4 pb-48 sm:px-6 md:max-w-content-wide md:py-8">
+            {intro(false)}
+            {preview(false)}
+            <View className={CARD_GRID}>{cards(CARD_CELL)}</View>
+            {restoreButton}
           </View>
+        </ScrollView>
+      </View>
 
-          <View className="gap-2">
-            <ControllerPreview profile={profile} />
-            {profile.haptics !== 'off' ? <Text variant="caption" tone="muted">{G03.preview.hint}</Text> : null}
-            <ReducedMotionStatus />
+      <View className="hidden flex-1 flex-row md:landscape:flex">
+        <ScrollView className="flex-1 border-r-2 border-border" showsVerticalScrollIndicator={false}>
+          <View className="gap-6 px-6 py-8 pb-48">
+            {intro(true)}
+            {preview(true)}
+            {restoreButton}
           </View>
-
-          <Card className="gap-4">
-            <Text variant="heading">{G03.section.stick}</Text>
-            <View className="gap-1">
-              <Text variant="label">{G03.stick.mode.label}</Text>
-              <SegmentedControl
-                aria-label={G03.stick.mode.a11y}
-                district={DISTRICT}
-                options={STICK_MODE_OPTIONS}
-                value={profile.stickMode}
-                onChange={(stickMode) => set({ stickMode })}
-                className="self-start"
-              />
-              <Text variant="caption" tone="muted">{G03.stick.mode.caption}</Text>
-            </View>
-            <View className="gap-1">
-              <Text variant="label">{G03.stick.placement.label}</Text>
-              <SegmentedControl
-                aria-label={G03.stick.placement.a11y}
-                district={DISTRICT}
-                options={STICK_PLACEMENT_OPTIONS}
-                value={profile.stickPlacement}
-                onChange={(stickPlacement) => set({ stickPlacement })}
-                className="self-start"
-              />
-              <Text variant="caption" tone="muted">{G03.stick.placement.caption}</Text>
-            </View>
-            <View className="gap-1">
-              <SliderField
-                label={G03.stick.deadzone.label}
-                visibleValue={percentLabel(profile.stick.deadZone)}
-                spokenValue={percentSpoken(profile.stick.deadZone)}
-                range={SLIDER_RANGES.deadZone}
-                value={profile.stick.deadZone}
-                onChange={(deadZone) => setStick({ deadZone })}
-              />
-              <Text variant="caption" tone="muted">{G03.stick.deadzone.caption}</Text>
-            </View>
-            <View className="gap-1">
-              <SliderField
-                label={G03.stick.sensitivity.label}
-                visibleValue={timesLabel(profile.stick.sensitivity)}
-                spokenValue={timesSpoken(profile.stick.sensitivity)}
-                range={SLIDER_RANGES.sensitivity}
-                value={profile.stick.sensitivity}
-                onChange={(sensitivity) => setStick({ sensitivity })}
-              />
-              <Text variant="caption" tone="muted">{G03.stick.sensitivity.caption}</Text>
-            </View>
-          </Card>
-
-          <Card className="gap-4">
-            <Text variant="heading">{G03.section.layout}</Text>
-            <View className="gap-1">
-              <Text variant="label">{G03.hand.label}</Text>
-              <SegmentedControl
-                aria-label={G03.hand.a11y}
-                district={DISTRICT}
-                options={HANDEDNESS_OPTIONS}
-                value={profile.handedness}
-                onChange={(handedness) => set({ handedness })}
-                className="self-start"
-              />
-              <Text variant="caption" tone="muted">{G03.hand.caption}</Text>
-            </View>
-            <View className="gap-1">
-              <SliderField
-                label={G03.size.label}
-                visibleValue={percentLabel(profile.scale)}
-                spokenValue={percentSpoken(profile.scale)}
-                range={SLIDER_RANGES.scale}
-                value={profile.scale}
-                onChange={(scale) => set({ scale })}
-              />
-            </View>
-            <View className="gap-1">
-              <SliderField
-                label={G03.opacity.label}
-                visibleValue={percentLabel(profile.opacity)}
-                spokenValue={percentSpoken(profile.opacity)}
-                range={SLIDER_RANGES.opacity}
-                value={profile.opacity}
-                onChange={(opacity) => set({ opacity })}
-              />
-              <Text variant="caption" tone="muted">{G03.opacity.caption}</Text>
-            </View>
-          </Card>
-
-          <Card className="gap-4">
-            <Text variant="heading">{G03.section.feel}</Text>
-            <View className="gap-1">
-              <Text variant="label">{G03.haptics.label}</Text>
-              <SegmentedControl
-                aria-label={G03.haptics.a11y}
-                district={DISTRICT}
-                options={HAPTICS_OPTIONS}
-                value={profile.haptics}
-                onChange={(haptics) => set({ haptics })}
-                segmentClassName="basis-[40%] sm:basis-auto"
-              />
-            </View>
-          </Card>
-
-          <Card className="gap-3">
-            <Text variant="heading">{G03.section.buttons}</Text>
-            <Text variant="caption" tone="muted">{G03.bindings.caption}</Text>
-            <KeyValueList items={bindingItems} columns={2} />
-          </Card>
-
-          <Button
-            title={G03.restore.button}
-            variant="outline"
-            district={DISTRICT}
-            fullWidth
-            onPress={() => screen.setState({ restoreOpen: true })}
-          />
-        </View>
-      </ScrollView>
+        </ScrollView>
+        <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
+          <View className="gap-6 px-6 py-8 pb-48">{cards(undefined)}</View>
+        </ScrollView>
+      </View>
 
       <ResponsiveDialog
         open={restoreOpen}

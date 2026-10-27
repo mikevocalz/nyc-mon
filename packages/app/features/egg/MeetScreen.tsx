@@ -47,7 +47,7 @@ import {
   type EggView,
   type MeetState,
 } from './egg-model';
-import { isAccessibilityTextSize, isLandscapeWindow, meetFitBlocks } from './window-layout';
+import { isAccessibilityTextSize, isLandscapeWindow, meetFitBlocks, TRIPTYCH_LANDSCAPE_MAX_DP } from './window-layout';
 
 /** Built once at import: a content parse failure surfaces as the route's error state. */
 function loadEggs(): { views: readonly EggView[] } | { error: true } {
@@ -312,7 +312,7 @@ export function MeetScreen() {
               </View>
             ) : (
               <>
-                <View style={{ flexGrow: 1, minHeight: fit.mediaPt, ...(landscape ? { maxWidth: 3 * 300 + 2 * 12, width: '100%', alignSelf: 'center' } : null) }}>
+                <View style={{ flexGrow: 1, minHeight: fit.mediaPt, ...(landscape ? { maxWidth: TRIPTYCH_LANDSCAPE_MAX_DP, width: '100%', alignSelf: 'center' } : null) }}>
                   <ChoiceTriptych
                     items={tileItems}
                     focusedIndex={focused}

@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 import { useRouter } from 'expo-router';
 import type { MonInstance } from '@acme/core/types';
 import {
-  Button, CareMeterRing, CareMeterRingGroup, StatusRow, useHLynkStageWide, useInstanceStore, useReducedMotion, useStore,
+  Button, CareMeterRing, CareMeterRingGroup, StatusRow, useInstanceStore, useReducedMotion, useStore,
 } from '@acme/ui';
 import { Pressable, Text, View } from '@acme/ui/tw';
 import { announcePolitely } from '../onboarding/announce';
@@ -23,7 +23,6 @@ import { useMinuteClock } from './minute-clock';
 export function HomeScreen({ mon }: { mon: MonInstance }) {
   const router = useRouter();
   const reducedMotion = useReducedMotion();
-  const wide = useHLynkStageWide();
   const { care, identity, scheme: clockScheme } = useCareNow();
   const resumeCount = useMinuteClock((s) => s.resumeCount);
   const local = useInstanceStore(() => ({ reactionKey: 0 }));
@@ -72,8 +71,8 @@ export function HomeScreen({ mon }: { mon: MonInstance }) {
     </CareMeterRingGroup>
   );
 
-  const nameBlock = (
-    <View testID="m13-name" className="gap-1">
+  const nameBlock = (testID: string) => (
+    <View testID={testID} className="gap-1">
       <Text className="text-xr-label text-signage-white">{name}</Text>
       {identity?.bloodlineLabel ? <Text className="text-xr-caption text-silver-300">{identity.bloodlineLabel}</Text> : null}
     </View>
@@ -123,8 +122,9 @@ export function HomeScreen({ mon }: { mon: MonInstance }) {
     screen: (
       <View className="flex-1 justify-between">
         <View className="flex-row items-start justify-between gap-3 bg-scrim-scene p-4">
-          {wide ? <View /> : nameBlock}
-          {rings}
+          {/* From md the name moves to the stage's companion pane; the rings stay on the device. */}
+          <View className="md:hidden">{nameBlock('m13-name')}</View>
+          <View className="ml-auto">{rings}</View>
         </View>
         <View testID="m13-mon" className="flex-1">
           <Pressable
@@ -139,14 +139,16 @@ export function HomeScreen({ mon }: { mon: MonInstance }) {
         <View className="px-4 pb-4">{bar}</View>
       </View>
     ),
-    leading: wide ? (
-      <View className="gap-target-gap border-2 border-border bg-surface-raised p-4">
-        {nameBlock}
-        <View testID="m13-pane-dex">
+    // The companion pane from md (HLynkStage): name card and the Dex link,
+    // side by side in tablet portrait, stacked beside the device in landscape.
+    leading: (
+      <View className="gap-target-gap border-2 border-border bg-scrim-scene p-4 md:portrait:flex-row md:portrait:items-center">
+        <View className="md:portrait:flex-1">{nameBlock('m13-pane-name')}</View>
+        <View testID="m13-pane-dex" className="md:portrait:flex-1">
           <Button variant="outline" size="lg" fullWidth title={companionCopy('m13.bar.dex')} onPress={() => router.push(dexHref)} className="min-h-target" />
         </View>
       </View>
-    ) : undefined,
+    ),
   });
 
   return null;

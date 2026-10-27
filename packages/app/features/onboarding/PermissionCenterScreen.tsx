@@ -8,7 +8,7 @@ import { useRouter } from 'expo-router';
 import { Button, Heading, SafeArea, Switch, Text } from '@acme/ui';
 import { ScrollView, View } from '@acme/ui/tw';
 import { useReservedRegions } from '@acme/ui/adaptive-panes';
-import { permissionViewport } from './permissions-layout';
+import { isWholeWindow, permissionViewport } from './permissions-layout';
 import { selectPendingEgg, useMonStore } from '../mon/mon.store';
 import { copy } from './copy';
 import { getNotifyPermission, scheduleReadyNotification } from './notify-permission';
@@ -42,6 +42,10 @@ export function PermissionCenterScreen() {
   const { width, height } = useWindowDimensions();
   const regions = useReservedRegions();
   const viewport = permissionViewport(width, height, regions);
+  // Breakpoint classes read the whole window. Inside one segment of a split
+  // foldable they would describe the wrong width, so the tablet layout only
+  // applies when the form has the whole window to itself.
+  const tablet = isWholeWindow(viewport, width, height);
   const pending = useMonStore(selectPendingEgg);
   const setNotifyOff = useOnboarding((s) => s.setNotifyOff);
   const setPermissionsPending = useOnboarding((s) => s.setPermissionsPending);
@@ -141,19 +145,43 @@ export function PermissionCenterScreen() {
     <View className="flex-1 bg-bg">
       <View style={{ position: 'absolute', ...viewport }}>
         <SafeArea className="flex-1">
-          <ScrollView className="flex-1" contentContainerClassName="items-center gap-5 px-4 py-6">
-            <View className="w-full gap-5" style={{ maxWidth: 660 }} testID="onboarding-permissions">
+          <ScrollView
+            className="flex-1"
+            contentContainerClassName={tablet ? 'grow items-center gap-5 px-4 py-6 md:px-8 md:py-10' : 'items-center gap-5 px-4 py-6'}
+          >
+            {/* Phone: one column capped at 660. Tablet portrait: a wider column,
+                top-aligned, actions on the bottom edge. Landscape: the six
+                permissions in two columns, actions in one row below them. */}
+            <View
+              className={tablet
+                ? 'w-full max-w-[660px] gap-5 md:flex-1 md:gap-8 md:portrait:max-w-[760px] md:landscape:max-w-[1080px]'
+                : 'w-full max-w-[660px] gap-5'}
+              testID="onboarding-permissions"
+            >
               <View className="gap-2">
                 <Text variant="caption" tone="muted">H-LYNK SETUP / FINAL STEP</Text>
                 <Heading level={1} size="display-sm">Ready for NYC?</Heading>
                 <Text tone="muted">Choose what to enable. Notifications are selected; everything else is your call.</Text>
               </View>
-              <View className="gap-1 border-y border-concrete-400">
-                {PERMISSION_IDS.map((id) => {
+              <View
+                className={tablet
+                  ? 'gap-1 border-y border-concrete-400 md:landscape:flex-row md:landscape:flex-wrap md:landscape:justify-between md:landscape:gap-y-0'
+                  : 'gap-1 border-y border-concrete-400'}
+              >
+                {PERMISSION_IDS.map((id, index) => {
                   const item = PERMISSION_COPY[id];
                   const status = statuses[id];
+                  // Two columns: the last row of each column drops its rule so the
+                  // list's own bottom border is the only one under it.
+                  const lastRow = index >= PERMISSION_IDS.length - 2;
                   return (
-                    <View key={id} className="gap-1 border-b border-concrete-400 py-4" testID={'permission-' + id}>
+                    <View
+                      key={id}
+                      className={tablet
+                        ? `gap-1 border-b border-concrete-400 py-4 md:py-5 md:landscape:w-[47%] ${lastRow ? 'md:landscape:border-b-0' : ''}`
+                        : 'gap-1 border-b border-concrete-400 py-4'}
+                      testID={'permission-' + id}
+                    >
                       <Switch
                         value={selected.includes(id)}
                         onChange={(checked) => choose(id, checked)}
@@ -176,26 +204,30 @@ export function PermissionCenterScreen() {
                   );
                 })}
               </View>
-              <View className="gap-3">
-                <Button
-                  title={selected.length === 0 ? 'Continue' : 'Continue with ' + selected.length + ' selected'}
-                  variant="cta"
-                  size="lg"
-                  fullWidth
-                  loading={busy}
-                  testID="permissions-continue"
-                  onPress={() => { void continueSetup(); }}
-                />
-                <Button
-                  title="Not now"
-                  variant="ghost"
-                  size="lg"
-                  fullWidth
-                  disabled={busy}
-                  testID="permissions-skip"
-                  onPress={() => { void notNow(); }}
-                />
-                <Text variant="caption" tone="muted">
+              <View className={tablet ? 'gap-3 md:mt-auto md:landscape:flex-row md:landscape:flex-wrap md:landscape:items-center md:landscape:justify-between' : 'gap-3'}>
+                <View className={tablet ? 'md:landscape:w-[47%]' : undefined}>
+                  <Button
+                    title={selected.length === 0 ? 'Continue' : 'Continue with ' + selected.length + ' selected'}
+                    variant="cta"
+                    size="lg"
+                    fullWidth
+                    loading={busy}
+                    testID="permissions-continue"
+                    onPress={() => { void continueSetup(); }}
+                  />
+                </View>
+                <View className={tablet ? 'md:landscape:w-[47%]' : undefined}>
+                  <Button
+                    title="Not now"
+                    variant="ghost"
+                    size="lg"
+                    fullWidth
+                    disabled={busy}
+                    testID="permissions-skip"
+                    onPress={() => { void notNow(); }}
+                  />
+                </View>
+                <Text variant="caption" tone="muted" className={tablet ? 'md:landscape:w-full' : undefined}>
                   Denying access won’t block your Mon. You can enable permissions later in device settings or when you use a feature.
                 </Text>
               </View>

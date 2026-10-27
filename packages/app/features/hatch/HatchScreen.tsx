@@ -7,7 +7,7 @@ import { createHatchState, deriveFirstLook } from '@acme/core/sim';
 import { eggHatchAssetForSpecies } from '@acme/assets/eggs';
 import {
   Button, HLYNK_COPY, HatchBurst, HatchEgg, HatchEgg3D, Image, SignagePlate, TrackpadActions,
-  useHLynkStageWide, useInstanceStore, useReducedMotion, useStore, type CreaturePerformance, type ImageProps,
+  useInstanceStore, useReducedMotion, useStore, type CreaturePerformance, type ImageProps,
 } from '@acme/ui';
 import { haptics } from '@acme/ui/haptics';
 import { Text, View } from '@acme/ui/tw';
@@ -52,7 +52,6 @@ const PHASE_ANNOUNCE: Partial<Record<HatchPhase, 'm12.a11y.stir' | 'm12.a11y.pre
 export function HatchScreen() {
   const router = useRouter();
   const reducedMotion = useReducedMotion();
-  const wide = useHLynkStageWide();
   const params = useLocalSearchParams<{ eggId?: string; from?: string }>();
   const fromM11 = params.from === 'm11';
 
@@ -130,7 +129,8 @@ export function HatchScreen() {
     return { transform: [{ rotate: `${pose.rotateDeg}deg` }, { scale: pose.scale }] };
   });
 
-  const peak = wide ? 0.4 : 0.6;
+  // The burst always draws inside the H-Lynk screen (the 0.4 side-pane peak went with Decision H-2).
+  const peak = 0.6;
   const durations = PHASE_MS[reducedMotion ? 'reduced' : 'full'];
 
   // Skip appears 2000 ms into the show.

@@ -5,7 +5,6 @@ import type { AuthError } from '@acme/auth';
 import {
   AuthProviderButton,
   Button,
-  Container,
   ErrorMessage,
   Heading,
   IconButton,
@@ -19,6 +18,7 @@ import { Pressable, View } from '@acme/ui/tw';
 import { auth, isPasskeySupported } from './auth';
 import { copy, type OnboardingCopyId } from './copy';
 import { useOnboarding } from './onboarding.store';
+import { OnboardingPanes, PANE_HEADING_CLASS } from './OnboardingPanes';
 import { startSaveForNewAccount } from './save-store';
 import { useSignInNav } from './sign-in-nav';
 
@@ -165,37 +165,43 @@ export function SignInScreen() {
 
   return (
     <KeyboardAwareScroll contentContainerClassName="grow">
-      <Container width="full" className="flex-1 px-4 py-2">
-        <Form className="mx-auto w-full max-w-content-form flex-1 gap-6">
-          {/* M03's stack-header ‹ (03-direction): the screen's one header row. */}
-          <View className="-ml-2 flex-row items-center" testID="m03-back">
-            <IconButton
-              variant="ghost"
-              size="sm"
-              tone="royal"
-              aria-label={copy('m03.back.a11y.label')}
-              onPress={back}
-              icon={<ChevronLeft size={22} />}
-            />
+      <OnboardingPanes
+        tightTop
+        intro={
+          <View className="gap-6">
+            {/* M03's stack-header ‹ (03-direction): the screen's one header row. */}
+            <View className="-ml-2 flex-row items-center" testID="m03-back">
+              <IconButton
+                variant="ghost"
+                size="sm"
+                tone="royal"
+                aria-label={copy('m03.back.a11y.label')}
+                onPress={back}
+                icon={<ChevronLeft size={22} />}
+              />
+            </View>
+            <View className="gap-2">
+              <Heading level={1} size="title" className={PANE_HEADING_CLASS}>{title}</Heading>
+              {mode === 'providers' || mode === 'email' ? (
+                <>
+                  <Text>{copy(intent === 'create' ? 'm03.subtitle.create' : 'm03.subtitle.sign_in')}</Text>
+                  <View className="self-start">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      tone="royal"
+                      title={copy(intent === 'create' ? 'm03.switch.to_sign_in' : 'm03.switch.to_create')}
+                      disabled={pending}
+                      onPress={() => replace(intent === 'create' ? signInPath : ageGatePath)}
+                    />
+                  </View>
+                </>
+              ) : null}
+            </View>
           </View>
-          <View className="gap-2">
-            <Heading level={1} size="title">{title}</Heading>
-            {mode === 'providers' || mode === 'email' ? (
-              <>
-                <Text>{copy(intent === 'create' ? 'm03.subtitle.create' : 'm03.subtitle.sign_in')}</Text>
-                <View className="self-start">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    tone="royal"
-                    title={copy(intent === 'create' ? 'm03.switch.to_sign_in' : 'm03.switch.to_create')}
-                    disabled={pending}
-                    onPress={() => replace(intent === 'create' ? signInPath : ageGatePath)}
-                  />
-                </View>
-              </>
-            ) : null}
-          </View>
+        }
+      >
+        <Form className="flex-1 gap-6">
           {error !== undefined ? <ErrorMessage message={error} /> : null}
           {pendingCopy !== undefined ? <Text>{pendingCopy}</Text> : null}
 
@@ -335,7 +341,7 @@ export function SignInScreen() {
             </View>
           ) : null}
         </Form>
-      </Container>
+      </OnboardingPanes>
     </KeyboardAwareScroll>
   );
 }

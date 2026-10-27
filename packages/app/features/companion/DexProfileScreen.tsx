@@ -5,7 +5,7 @@ import { allSpecies, bloodlines } from '@acme/content';
 import { LIFECYCLE_STAGES } from '@acme/core/schemas';
 import type { EvolutionNode, MonInstance } from '@acme/core/types';
 import {
-  Button, HLYNK_COPY, Heading, Image, LifecycleTrack, SafeArea, SignagePlate, lifecycleSlots, useHLynkStageWide, type ImageProps,
+  Button, HLYNK_COPY, Heading, Image, LifecycleTrack, SafeArea, SignagePlate, lifecycleSlots, type ImageProps,
 } from '@acme/ui';
 import { Pressable, ScrollView, Text, View } from '@acme/ui/tw';
 import { useMonStore } from '../mon/mon.store';
@@ -53,8 +53,9 @@ function BackButton() {
 }
 
 function Fact({ label, value, testID }: { label: string; value: string; testID: string }) {
+  // Tablet portrait sets the facts two to a row (md:portrait:w-1/2 on the set's grid below).
   return (
-    <View testID={testID} accessible accessibilityLabel={`${label}, ${value}`} className="gap-1 border-b border-border py-3">
+    <View testID={testID} accessible accessibilityLabel={`${label}, ${value}`} className="gap-1 border-b border-border py-3 md:portrait:w-1/2 md:portrait:pr-6">
       <Text className="text-xr-caption text-text-muted">{label}</Text>
       <Text className="text-xr-body text-text">{value}</Text>
     </View>
@@ -70,7 +71,6 @@ function Fact({ label, value, testID }: { label: string; value: string; testID: 
 export function DexProfileScreen() {
   useHomeStage({});
   const router = useRouter();
-  const wide = useHLynkStageWide();
   const { id } = useLocalSearchParams<{ id: string }>();
   const mon = useMonStore((s) => s.save?.mons.find((m) => m.monInstanceId === id));
   const caller = useMonStore((s) => s.save?.caller);
@@ -120,7 +120,7 @@ export function DexProfileScreen() {
         accessibilityLabel={companionCopy('m17.life.a11y')}
         stateWords={{ done: 'done', current: 'now', later: companionCopy('m17.life.later.a11y') }}
       />
-      <View>
+      <View className="md:portrait:flex-row md:portrait:flex-wrap">
         <Fact testID="m17-fact-name" label={companionCopy('m17.fact.name')} value={who.name} />
         <Fact testID="m17-fact-hatched" label={companionCopy('m17.fact.hatched')} value={hatched} />
         {caller != null ? <Fact testID="m17-fact-caller" label={companionCopy('m17.fact.caller')} value={caller.callerName} /> : null}
@@ -128,25 +128,35 @@ export function DexProfileScreen() {
     </View>
   );
 
+  const heading = <Heading level={1} className="text-xr-title">{who.name}</Heading>;
   return (
     <SafeArea className="flex-1 bg-bg">
-      <ScrollView className="flex-1" contentContainerClassName="px-4 pb-12 pt-2">
+      {/*
+        One scroll below md and in tablet portrait: top-aligned and stacked.
+        Phones keep the full-width portrait; tablet portrait caps it at half
+        the content width so the facts start on the first screen.
+      */}
+      <ScrollView className="flex-1 md:landscape:hidden" contentContainerClassName="px-4 pb-12 pt-2 md:px-8">
         <View className="mx-auto w-full max-w-content-screen gap-4">
           <BackButton />
-          <Heading level={1} className="text-xr-title">{who.name}</Heading>
-          {wide ? (
-            <View className="flex-row gap-8">
-              <View style={{ width: '41.6667%' }}>{portrait}</View>
-              <View className="flex-1">{text}</View>
-            </View>
-          ) : (
-            <View className="gap-4">
-              {portrait}
-              {text}
-            </View>
-          )}
+          {heading}
+          <View className="gap-4 md:gap-8">
+            <View className="w-full md:w-1/2 md:self-center">{portrait}</View>
+            {text}
+          </View>
         </View>
       </ScrollView>
+      {/* Landscape from md (the open foldable): portrait left, facts right, each pane scrolling on its own. */}
+      <View className="hidden flex-1 flex-row gap-10 px-8 md:landscape:flex">
+        <ScrollView className="w-5/12 grow-0" contentContainerClassName="gap-4 pb-12 pt-2">
+          <BackButton />
+          {portrait}
+        </ScrollView>
+        <ScrollView className="flex-1" contentContainerClassName="gap-6 pb-12 pt-2">
+          {heading}
+          {text}
+        </ScrollView>
+      </View>
     </SafeArea>
   );
 }

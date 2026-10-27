@@ -4,10 +4,10 @@ import { useMemo, type ReactNode } from 'react';
 import { useRouter } from 'expo-router';
 import type { JournalEntry } from '@acme/core/types';
 import {
-  Badge, DaysCalendar, Heading, SafeArea, VirtualList, monthOf, shiftMonth, useHLynkStageWide, useInstanceStore,
+  Badge, DaysCalendar, Heading, SafeArea, VirtualList, monthOf, shiftMonth, useInstanceStore,
   useReducedMotion, useStore, type YearMonth,
 } from '@acme/ui';
-import { Pressable, Text, View } from '@acme/ui/tw';
+import { Pressable, ScrollView, Text, View } from '@acme/ui/tw';
 import { localDayKey, selectActiveMon, selectDaysTogether, selectJournal, useMonStore } from '../mon/mon.store';
 import { companionCopy } from './copy';
 import { useHomeStage } from './home-stage.store';
@@ -58,7 +58,6 @@ function BackButton() {
  */
 export function JournalScreen() {
   useHomeStage({});
-  const wide = useHLynkStageWide();
   const reducedMotion = useReducedMotion();
   const nowMs = useMinuteClock((s) => s.nowMs);
   const mon = useMonStore(selectActiveMon);
@@ -101,7 +100,7 @@ export function JournalScreen() {
   );
 
   const calendar = (
-    <View className="mt-6">
+    <View className="mt-6 md:portrait:mt-0">
       <DaysCalendar
         testID="m18-calendar"
         month={month}
@@ -145,22 +144,30 @@ export function JournalScreen() {
   };
   const key = (row: Row, i: number) => (row.type === 'entry' ? row.entry.entryId : row.type === 'day' ? `day-${row.iso}` : `top-${i}`);
 
-  if (wide) {
-    return (
-      <SafeArea className="flex-1 bg-bg">
-        <View className="mx-auto w-full max-w-content-screen flex-1 flex-row gap-8 px-4">
-          <View style={{ width: '41.6667%' }}>{header}{calendar}</View>
-          <View testID="m18-timeline" accessibilityLabel={companionCopy('m18.timeline.a11y')} className="flex-1">
-            <VirtualList data={timeline} renderItem={renderRow} keyExtractor={key} estimatedItemSize={52} className="flex-1" />
-          </View>
-        </View>
-      </SafeArea>
-    );
-  }
+  const timelineLabel = companionCopy('m18.timeline.a11y');
   return (
     <SafeArea className="flex-1 bg-bg">
-      <View testID="m18-timeline" accessibilityLabel={companionCopy('m18.timeline.a11y')} className="flex-1 px-4">
+      {/* Below md (phones in portrait): one list, the header and calendar as its first row. As before. */}
+      <View testID="m18-timeline" accessibilityLabel={timelineLabel} className="flex-1 px-4 md:hidden">
         <VirtualList data={[{ type: 'top' }, ...timeline]} renderItem={renderRow} keyExtractor={key} estimatedItemSize={52} className="flex-1" />
+      </View>
+      {/*
+        From md, two panes that each scroll on their own. Portrait: the header
+        and the calendar side by side at the top, the timeline under them.
+        Landscape (the open foldable): calendar left, timeline right.
+      */}
+      <View className="hidden flex-1 gap-6 px-8 md:flex md:landscape:flex-row md:landscape:gap-10">
+        <ScrollView
+          testID="m18-calendar-pane"
+          className="grow-0 md:portrait:max-h-[55%] md:landscape:w-5/12"
+          contentContainerClassName="pb-6 md:portrait:flex-row md:portrait:gap-8"
+        >
+          <View className="md:portrait:flex-1">{header}</View>
+          <View className="md:portrait:flex-1">{calendar}</View>
+        </ScrollView>
+        <View testID="m18-timeline" accessibilityLabel={timelineLabel} className="w-full flex-1 md:portrait:max-w-content-detail md:portrait:self-center">
+          <VirtualList data={timeline} renderItem={renderRow} keyExtractor={key} estimatedItemSize={52} className="flex-1" />
+        </View>
       </View>
     </SafeArea>
   );

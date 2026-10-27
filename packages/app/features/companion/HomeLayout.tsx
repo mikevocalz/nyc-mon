@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { IDLE_PRESENCE, resolveSceneMode } from '@acme/core/sim';
 import type { MonSceneInput } from '@acme/core/types';
 import {
-  Button, CreatureStage, HLynkShell, HLynkStage, Image, MonStillReaction, SheetSurface, useHLynkStageWide, useReducedMotion,
+  Button, CreatureStage, HLynkShell, HLynkStage, Image, MonStillReaction, SheetSurface, useReducedMotion,
   type ImageProps,
 } from '@acme/ui';
 import { View } from '@acme/ui/tw';
@@ -102,7 +102,6 @@ function CompanionMenu() {
 function ShellHost() {
   const router = useRouter();
   const reducedMotion = useReducedMotion();
-  const wide = useHLynkStageWide();
   const stage = useHomeStageStore(
     useShallow((s) => ({ chrome: s.chrome, screen: s.screen, leading: s.leading, trailing: s.trailing, bare: s.bare })),
   );
@@ -113,7 +112,7 @@ function ShellHost() {
     ...chrome.keys,
   };
   return (
-    <HLynkStage leading={wide ? stage.leading : undefined} trailing={wide ? stage.trailing : undefined} testID="home-stage">
+    <HLynkStage leading={stage.bare ? undefined : stage.leading} trailing={stage.bare ? undefined : stage.trailing} testID="home-stage">
       <HLynkShell
         tier="core"
         scheme={chrome.scheme}

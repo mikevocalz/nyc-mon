@@ -4,10 +4,11 @@ import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { MIN_BIRTH_YEAR } from '@acme/core/schemas';
 import { resolveCreateEntry } from '@acme/core/sim';
-import { Button, Container, Heading, KeyboardAwareScroll, Text, TextField, YearGrid, type YearGridStep } from '@acme/ui';
+import { Button, Heading, KeyboardAwareScroll, Text, TextField, YearGrid, type YearGridStep } from '@acme/ui';
 import { Form } from '@acme/ui/primitives';
 import { View } from '@acme/ui/tw';
 import { copy } from './copy';
+import { OnboardingPanes, PANE_HEADING_CLASS } from './OnboardingPanes';
 import { useOnboarding } from './onboarding.store';
 
 /** The current year at bundle load — the grid ceiling and the future-year check. */
@@ -49,14 +50,16 @@ export function AgeGateScreen() {
   };
 
   return (
-    <KeyboardAwareScroll>
-      <Container width="full" className="flex-1 px-4 py-6">
-        <Form className="mx-auto w-full max-w-content-form gap-6">
+    <KeyboardAwareScroll contentContainerClassName="grow">
+      <OnboardingPanes
+        intro={
           <View className="gap-2">
-            <Heading level={1} size="title" testID="m04-title">{copy('m04.title')}</Heading>
+            <Heading level={1} size="title" className={PANE_HEADING_CLASS} testID="m04-title">{copy('m04.title')}</Heading>
             <Text tone="muted">{copy('m04.why')}</Text>
           </View>
-
+        }
+      >
+        <Form className="gap-6 md:flex-1">
           {typed ? (
             <View className="gap-4">
               <TextField
@@ -117,26 +120,29 @@ export function AgeGateScreen() {
             </View>
           )}
 
+          {/* Tablet: Continue sits on the pane's bottom edge. */}
           {year !== null ? (
-            <Button
-              variant="cta"
-              size="lg"
-              fullWidth
-              title={copy('m04.continue')}
-              onPress={() => {
-                if (typed) {
-                  const result = typedYearError(raw, maxYear);
-                  if (!result.ok) {
-                    setError(result.message);
-                    return;
+            <View className="md:mt-auto">
+              <Button
+                variant="cta"
+                size="lg"
+                fullWidth
+                title={copy('m04.continue')}
+                onPress={() => {
+                  if (typed) {
+                    const result = typedYearError(raw, maxYear);
+                    if (!result.ok) {
+                      setError(result.message);
+                      return;
+                    }
                   }
-                }
-                continueWith(year);
-              }}
-            />
+                  continueWith(year);
+                }}
+              />
+            </View>
           ) : null}
         </Form>
-      </Container>
+      </OnboardingPanes>
     </KeyboardAwareScroll>
   );
 }
