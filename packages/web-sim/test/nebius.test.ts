@@ -21,7 +21,7 @@ describe('Nebius NVIDIA adapter (mock transport; not live qualification)', () =>
     const init = fetchFn.mock.calls[0]?.[1];
     expect(init?.redirect).toBe('error');
     expect(new Headers(init?.headers).get('authorization')).toBe('Bearer test-key');
-    expect(JSON.parse(String(init?.body))).toMatchObject({ model: NVIDIA_MODELS[0], stream: false, parallel_tool_calls: false });
+    expect(JSON.parse(String(init?.body))).toMatchObject({ model: NVIDIA_MODELS[0], stream: false, tool_choice: 'auto' });
     expect(result.stop_reason).toBe('end_turn'); expect(onText).toHaveBeenCalledWith('Here is the state.');
     expect(onReceipt).toHaveBeenCalledWith(expect.objectContaining({ provider: 'nebius-token-factory', returnedModel: NVIDIA_MODELS[0] }));
     expect(JSON.stringify(onReceipt.mock.calls)).not.toContain('test-key');
@@ -36,7 +36,7 @@ describe('Nebius NVIDIA adapter (mock transport; not live qualification)', () =>
     const req = toNebiusRequest({ ...input, messages: [...input.messages,
       { role: 'assistant', content: first.content },
       { role: 'user', content: [{ type: 'tool_result', tool_use_id: tool.id, is_error: true, content: 'not-permitted' }] }] });
-    expect(req.messages.at(-1)).toEqual({ role: 'tool', tool_call_id: tool.id, content: '{"is_error":true,"result":"not-permitted"}' });
+    expect(req.messages.at(-1)).toEqual({ role: 'tool', tool_call_id: tool.id, name: 'get_mon_status', content: '{"is_error":true,"result":"not-permitted"}' });
   });
   it('rejects unmatched tool results', () => {
     expect(() => toNebiusRequest({ ...input, messages: [{ role: 'user', content: [{ type: 'tool_result', tool_use_id: 'missing', content: 'ok' }] }] })).toThrow(NebiusError);
