@@ -11,7 +11,9 @@
     "./starters": "./mons/starters.ts",
     "./eggs": "./eggs.ts",
     "./voices": "./voices.ts",
-    "./voice": "./mon-voice.ts"
+    "./voice": "./mon-voice.ts",
+    "./lines": "./mon-lines.ts",
+    "./lingo": "./lingo/index.ts"
   },
   "scripts": {
     "lint": "eslint",

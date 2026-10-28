@@ -18,10 +18,12 @@ import { Route as OauthRefusedRouteImport } from './routes/oauth/refused'
 import { Route as OauthSignInRouteImport } from './routes/oauth/sign-in'
 import { Route as V1EggsRouteImport } from './routes/v1/eggs'
 import { Route as V1GuardianConsentsRouteImport } from './routes/v1/guardian-consents'
+import { Route as V1MonLingoRouteImport } from './routes/v1/mon-lingo'
 import { Route as V1WaitlistRouteImport } from './routes/v1/waitlist'
 import { Route as PayloadAdminIndexRouteImport } from './routes/_payload/admin.index'
 import { Route as PayloadAdminSplatRouteImport } from './routes/_payload/admin.$'
 import { Route as PayloadPayloadApiSplatRouteImport } from './routes/_payload/payload-api.$'
+import { Route as V1MeCompanionMemoryRouteImport } from './routes/v1/me/companion-memory'
 import { Route as V1MeEggsRouteImport } from './routes/v1/me/eggs'
 import { Route as V1MeMonsRouteImport } from './routes/v1/me/mons'
 import { Route as V1EggsIdHatchRouteImport } from './routes/v1/eggs/$id/hatch'
@@ -72,6 +74,11 @@ const V1GuardianConsentsRoute = V1GuardianConsentsRouteImport.update({
   path: '/v1/guardian-consents',
   getParentRoute: () => rootRouteImport,
 } as any)
+const V1MonLingoRoute = V1MonLingoRouteImport.update({
+  id: '/v1/mon-lingo',
+  path: '/v1/mon-lingo',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const V1WaitlistRoute = V1WaitlistRouteImport.update({
   id: '/v1/waitlist',
   path: '/v1/waitlist',
@@ -91,6 +98,11 @@ const PayloadPayloadApiSplatRoute = PayloadPayloadApiSplatRouteImport.update({
   id: '/payload-api/$',
   path: '/payload-api/$',
   getParentRoute: () => PayloadRoute,
+} as any)
+const V1MeCompanionMemoryRoute = V1MeCompanionMemoryRouteImport.update({
+  id: '/v1/me/companion-memory',
+  path: '/v1/me/companion-memory',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const V1MeEggsRoute = V1MeEggsRouteImport.update({
   id: '/v1/me/eggs',
@@ -122,9 +134,11 @@ export interface FileRoutesByFullPath {
   '/oauth/sign-in': typeof OauthSignInRoute
   '/v1/eggs': typeof V1EggsRouteWithChildren
   '/v1/guardian-consents': typeof V1GuardianConsentsRoute
+  '/v1/mon-lingo': typeof V1MonLingoRoute
   '/v1/waitlist': typeof V1WaitlistRoute
   '/admin/$': typeof PayloadAdminSplatRoute
   '/payload-api/$': typeof PayloadPayloadApiSplatRoute
+  '/v1/me/companion-memory': typeof V1MeCompanionMemoryRoute
   '/v1/me/eggs': typeof V1MeEggsRoute
   '/v1/me/mons': typeof V1MeMonsRoute
   '/admin/': typeof PayloadAdminIndexRoute
@@ -140,9 +154,11 @@ export interface FileRoutesByTo {
   '/oauth/sign-in': typeof OauthSignInRoute
   '/v1/eggs': typeof V1EggsRouteWithChildren
   '/v1/guardian-consents': typeof V1GuardianConsentsRoute
+  '/v1/mon-lingo': typeof V1MonLingoRoute
   '/v1/waitlist': typeof V1WaitlistRoute
   '/admin/$': typeof PayloadAdminSplatRoute
   '/payload-api/$': typeof PayloadPayloadApiSplatRoute
+  '/v1/me/companion-memory': typeof V1MeCompanionMemoryRoute
   '/v1/me/eggs': typeof V1MeEggsRoute
   '/v1/me/mons': typeof V1MeMonsRoute
   '/admin': typeof PayloadAdminIndexRoute
@@ -160,9 +176,11 @@ export interface FileRoutesById {
   '/oauth/sign-in': typeof OauthSignInRoute
   '/v1/eggs': typeof V1EggsRouteWithChildren
   '/v1/guardian-consents': typeof V1GuardianConsentsRoute
+  '/v1/mon-lingo': typeof V1MonLingoRoute
   '/v1/waitlist': typeof V1WaitlistRoute
   '/_payload/admin/$': typeof PayloadAdminSplatRoute
   '/_payload/payload-api/$': typeof PayloadPayloadApiSplatRoute
+  '/v1/me/companion-memory': typeof V1MeCompanionMemoryRoute
   '/v1/me/eggs': typeof V1MeEggsRoute
   '/v1/me/mons': typeof V1MeMonsRoute
   '/_payload/admin/': typeof PayloadAdminIndexRoute
@@ -180,9 +198,11 @@ export interface FileRouteTypes {
     | '/oauth/sign-in'
     | '/v1/eggs'
     | '/v1/guardian-consents'
+    | '/v1/mon-lingo'
     | '/v1/waitlist'
     | '/admin/$'
     | '/payload-api/$'
+    | '/v1/me/companion-memory'
     | '/v1/me/eggs'
     | '/v1/me/mons'
     | '/admin/'
@@ -198,9 +218,11 @@ export interface FileRouteTypes {
     | '/oauth/sign-in'
     | '/v1/eggs'
     | '/v1/guardian-consents'
+    | '/v1/mon-lingo'
     | '/v1/waitlist'
     | '/admin/$'
     | '/payload-api/$'
+    | '/v1/me/companion-memory'
     | '/v1/me/eggs'
     | '/v1/me/mons'
     | '/admin'
@@ -217,9 +239,11 @@ export interface FileRouteTypes {
     | '/oauth/sign-in'
     | '/v1/eggs'
     | '/v1/guardian-consents'
+    | '/v1/mon-lingo'
     | '/v1/waitlist'
     | '/_payload/admin/$'
     | '/_payload/payload-api/$'
+    | '/v1/me/companion-memory'
     | '/v1/me/eggs'
     | '/v1/me/mons'
     | '/_payload/admin/'
@@ -237,7 +261,9 @@ export interface RootRouteChildren {
   OauthSignInRoute: typeof OauthSignInRoute
   V1EggsRoute: typeof V1EggsRouteWithChildren
   V1GuardianConsentsRoute: typeof V1GuardianConsentsRoute
+  V1MonLingoRoute: typeof V1MonLingoRoute
   V1WaitlistRoute: typeof V1WaitlistRoute
+  V1MeCompanionMemoryRoute: typeof V1MeCompanionMemoryRoute
   V1MeEggsRoute: typeof V1MeEggsRoute
   V1MeMonsRoute: typeof V1MeMonsRoute
   V1MonsIdCareRoute: typeof V1MonsIdCareRoute
@@ -308,6 +334,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof V1GuardianConsentsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/v1/mon-lingo': {
+      id: '/v1/mon-lingo'
+      path: '/v1/mon-lingo'
+      fullPath: '/v1/mon-lingo'
+      preLoaderRoute: typeof V1MonLingoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/v1/waitlist': {
       id: '/v1/waitlist'
       path: '/v1/waitlist'
@@ -335,6 +368,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/payload-api/$'
       preLoaderRoute: typeof PayloadPayloadApiSplatRouteImport
       parentRoute: typeof PayloadRoute
+    }
+    '/v1/me/companion-memory': {
+      id: '/v1/me/companion-memory'
+      path: '/v1/me/companion-memory'
+      fullPath: '/v1/me/companion-memory'
+      preLoaderRoute: typeof V1MeCompanionMemoryRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/v1/me/eggs': {
       id: '/v1/me/eggs'
@@ -404,7 +444,9 @@ const rootRouteChildren: RootRouteChildren = {
   OauthSignInRoute: OauthSignInRoute,
   V1EggsRoute: V1EggsRouteWithChildren,
   V1GuardianConsentsRoute: V1GuardianConsentsRoute,
+  V1MonLingoRoute: V1MonLingoRoute,
   V1WaitlistRoute: V1WaitlistRoute,
+  V1MeCompanionMemoryRoute: V1MeCompanionMemoryRoute,
   V1MeEggsRoute: V1MeEggsRoute,
   V1MeMonsRoute: V1MeMonsRoute,
   V1MonsIdCareRoute: V1MonsIdCareRoute,

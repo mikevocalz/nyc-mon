@@ -14,6 +14,7 @@
     "./admin/console/waitlist": { "types": "./src/admin/console/waitlist.ts", "default": "./src/admin/console/waitlist.ts" },
     "./admin/console/v1-game": { "types": "./src/admin/console/v1/game.ts", "default": "./src/admin/console/v1/game.ts" },
     "./admin/console/v1-memory": { "types": "./src/admin/console/v1/companion-memory.ts", "default": "./src/admin/console/v1/companion-memory.ts" },
+    "./admin/console/v1-mon-lingo": { "types": "./src/admin/console/v1/mon-lingo.ts", "default": "./src/admin/console/v1/mon-lingo.ts" },
     "./admin/console/stores": { "types": "./src/admin/console/stores/index.ts", "default": "./src/admin/console/stores/index.ts" },
     "./admin/console/stores/*": { "types": "./src/admin/console/stores/*.ts", "default": "./src/admin/console/stores/*.ts" },
     "./auth/options": { "types": "./src/auth/options.ts", "default": "./src/auth/options.ts" },

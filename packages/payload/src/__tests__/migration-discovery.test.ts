@@ -36,6 +36,8 @@ describe('native Node Payload migration discovery', () => {
         { name: '20261021_195853_mon_models', up: 'function', down: 'function' },
         { name: '20261023_235809_mon_gender', up: 'function', down: 'function' },
         { name: '20261024_164500_companion_memory', up: 'function', down: 'function' },
+        { name: '20261028_192132_mon_lingo', up: 'function', down: 'function' },
+        { name: '20261028_200000_mon_lingo_seed', up: 'function', down: 'function' },
       ]);
     }, 35_000);
   }

@@ -1,5 +1,6 @@
 import { createRequire } from 'node:module';
 import type { ModelAuthCheck } from './model-auth.ts';
+import type { MonLingoSource } from './mon-lingo-source.ts';
 import { createRateLimiter } from './model.ts';
 import type { NvidiaEnv } from './nvidia-env.ts';
 import { createFfmpegPitchShifter, createTtsHandler, findFfmpeg, type PitchShifter, type TtsFetch } from './tts.ts';
@@ -78,6 +79,8 @@ export interface NvidiaTtsDeps {
   readonly perMinute?: number;
   /** One line per request: method, status, lineage, stage, applied pitch, time. Never the text. Default console.info. */
   readonly log?: (line: string) => void;
+  /** The served lingo, read on behalf of the signed-in Caller. Omitted: the bundled fallback. */
+  readonly lingo?: MonLingoSource;
 }
 
 const LINEAGE = /^[a-z0-9-]+\/[a-z]+\/\d+$/;
@@ -132,6 +135,7 @@ export function createNvidiaTts(env: NvidiaEnv, deps: NvidiaTtsDeps): (req: Requ
       },
       rateLimit: () => limit(owner ?? `unauthenticated:${clientKey}`),
       ...(pitchShift === undefined ? {} : { pitchShift }),
+      ...(deps.lingo === undefined ? {} : { lingo: async () => (owner === undefined ? deps.lingo!.latest() : deps.lingo!.get(owner)) }),
     });
     return handleOne(req, clientKey);
   }
