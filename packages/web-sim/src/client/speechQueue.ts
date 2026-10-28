@@ -1,3 +1,5 @@
+import type { MonVoicePort } from '@acme/content/voice';
+
 /**
  * Plays the Mon's reply sentence by sentence as it streams in.
  *
@@ -8,12 +10,8 @@
  * through one AbortSignal, and nothing else plays.
  */
 
-export interface VoicePort<C> {
-  /** Fetch one sentence's audio. Rejecting skips the sentence. */
-  prepare(text: string, signal: AbortSignal): Promise<C>;
-  /** Play a prepared clip; resolves when it has finished or was cut off. */
-  play(clip: C, signal: AbortSignal): Promise<void>;
-}
+/** The Mon's speak() contract, shared by every surface (`@acme/content/voice`). */
+export type VoicePort<C> = MonVoicePort<C>;
 
 export type QueueOutcome = 'finished' | 'cancelled';
 

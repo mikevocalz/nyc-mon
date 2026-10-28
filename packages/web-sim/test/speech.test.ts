@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { MonSpeechCue } from '@acme/ui/three/mon/lipsync';
-import { setSessionVoice, speakAs, stopSpeaking } from '../src/client/speech.ts';
+import { clearSessionVoice, setSessionVoice, speakAs, stopSpeaking } from '../src/client/speech.ts';
 import { addSpeechCueListener } from '../src/client/speechCues.ts';
 
 /** Records what speakAs does to the element; Node has no HTMLAudioElement. Ends only when told to. */
@@ -166,6 +166,17 @@ describe('speakAs', () => {
     await started('hey', { lineageId: 'dex-001/male/2', stage: 'Mid' }, { fetchFn: fn });
     await started('again', undefined, { fetchFn: fn });
     expect(JSON.parse(String(inits[2]?.body))).toMatchObject({ lineageId: 'dex-001/male/2', stage: 'Mid' });
+  });
+
+  it('clearSessionVoice forgets the sticky voice (sign-out), so the next account does not inherit it', async () => {
+    vi.stubGlobal('Audio', FakeAudio);
+    const spoken = stubWebSpeech();
+    setSessionVoice({ lineageId: 'dex-001/female/1', stage: 'Small' });
+    clearSessionVoice();
+    const { fn, inits } = fakeFetch(mp3);
+    await speakAs('hello', undefined, { fetchFn: fn });
+    expect(inits).toHaveLength(0);
+    expect(spoken).toEqual([{ text: 'hello', pitch: 1, rate: 1.02, voice: 'Samantha' }]);
   });
 
   it('queue: true plays after the current clip instead of cutting it off; stopSpeaking cancels both', async () => {
