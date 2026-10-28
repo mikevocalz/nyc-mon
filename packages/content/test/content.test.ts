@@ -86,6 +86,15 @@ describe('content integrity (§8)', () => {
     }
   });
 
+  it('serves the starters from a standalone entry that matches the full roster', async () => {
+    const starters = await import('../mons/starters.ts');
+    const { inheritedDexDetails } = await import('../mons/inherited-v11-details.ts');
+    const { starterDexDetails } = await import('../mons/inherited-v11-starters.ts');
+    expect(starters.starterSpecies).toEqual(allSpecies.slice(0, 21));
+    expect(starters.starterSpecies.map((s) => s.dexId)).toEqual(Object.keys(starterDexDetails).map(Number));
+    expect(Object.keys(inheritedDexDetails)).toHaveLength(109);
+  });
+
   it('preserves borough-level encounter context without mapping it to home districts', () => {
     expect(Object.keys(boroughEncounterProfiles)).toHaveLength(18);
     expect(boroughEncounterProfiles.F12?.tierByBorough.Bronx).toBe('U');

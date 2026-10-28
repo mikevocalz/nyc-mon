@@ -1,5 +1,5 @@
 import type { Bloodline, BloodlineId } from '@acme/core';
-import { starterBloodlines } from './mons/index.ts';
+import { starterBloodlines } from './mons/starters.ts';
 
 export interface StarterEgg {
   readonly bloodlineId: BloodlineId;

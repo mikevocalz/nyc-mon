@@ -1,5 +1,8 @@
 import type { Bloodline, BloodlineId, EvolutionNode, LifecycleStage, MonSpeciesDef } from '@acme/core';
-import { inheritedDexDetails } from './inherited-v11-details.ts';
+import type { InheritedDexDetail } from './inherited-v11-starters.ts';
+
+/** Inherited v8 records keyed by Dex number; callers pass the smallest table that covers their forms. */
+export type InheritedDexTable = Readonly<Partial<Record<number, InheritedDexDetail>>>;
 
 /** A bloodline's identity without its chain: the roster's family number and name. */
 export interface BloodlineRef {
@@ -23,8 +26,9 @@ export function rosterForm(
   dexId: number,
   formName: string,
   stage: LifecycleStage,
+  details: InheritedDexTable,
 ): MonSpeciesDef {
-  const inherited = inheritedDexDetails[dexId];
+  const inherited = details[dexId];
   return {
     speciesId: speciesIdForDex(dexId),
     dexId,
