@@ -8,7 +8,7 @@ import { captionText } from '@acme/content/voice';
 import type { McpSession } from './mcp.ts';
 
 /** One entry in the conversation log. `detail` is the raw server answer, shown collapsed. */
-export interface Line { id: number; who: 'Caller' | 'Mon' | 'Result'; text: string; detail?: string }
+export interface Line { id: number; who: 'Caller' | 'Mon' | 'Result'; text: string; detail?: string; cut?: boolean }
 
 /** Visible state of the NVIDIA companion page (nvidia.tsx). */
 export interface CompanionState {
@@ -57,6 +57,22 @@ export function toolResultLine(name: string, result: CallToolResult): Omit<Line,
     text: `${ACTION[name] ?? name}: ${OUTCOME[toolOutcome(result)]}`,
     detail: JSON.stringify(result.structuredContent ?? result.content, null, 2).slice(0, MAX_DETAIL),
   };
+}
+
+/**
+ * Adds one spoken sentence to a Mon line, captioned like monLine. The page
+ * calls this as each sentence starts playing, so the caption never shows
+ * words the Mon has not said yet.
+ */
+export function growLine(lines: Line[], id: number, sentence: string): Line[] {
+  const words = captionText(sentence).trim();
+  if (!words) return lines;
+  return lines.map((l) => (l.id === id ? { ...l, text: l.text ? `${l.text} ${words}` : words } : l));
+}
+
+/** The Caller cut the Mon off: the line keeps what was said and is marked cut. */
+export function cutLine(lines: Line[], id: number): Line[] {
+  return lines.some((l) => l.id === id) ? lines.map((l) => (l.id === id ? { ...l, cut: true } : l)) : lines;
 }
 
 /** The Mon's reply as the main simulator captions it: "Caller" on screen, stage directions dropped. */
