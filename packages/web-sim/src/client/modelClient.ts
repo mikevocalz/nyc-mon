@@ -72,7 +72,7 @@ export function httpModelClient(endpoint = '/api/model', fetchFn: typeof fetch =
       }
       if (res.status === 401) throw new ModelAuthExpiredError();
       if (!res.ok || !res.body) {
-        let message = 'The simulator server didn’t answer. Check that it’s running.';
+        let message = 'The companion server didn’t answer. Try again.';
         try {
           const body = (await res.json()) as { error?: string };
           if (body.error && body.error.includes(' ')) message = body.error;
