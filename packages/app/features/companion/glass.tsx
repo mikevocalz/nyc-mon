@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, type ReactNode } from 'react';
 import { useWindowDimensions } from 'react-native';
-import { useIsFocused } from 'expo-router';
+import { useIsFocused, usePathname } from 'expo-router';
 import { deriveMonMood } from '@acme/core/sim';
 import type { CareNeed, CareState } from '@acme/core/types';
 import { hud } from '@acme/theme';
@@ -17,9 +17,10 @@ import { isAccessibilityTextSize } from '../egg/window-layout';
 import { companionCopy } from './copy';
 import { CompanionPaneLoading } from './CompanionPane';
 import { CompanionStageHost, useTabletClass } from './CompanionStageHost';
-import { clearCompanion, clearGlass, publishCompanion, publishGlass, setGlassFailed, setStageFrame, useHomeStageStore } from './home-stage.store';
+import { clearCompanion, clearGlass, publishCompanion, publishGlass, setGlassFailed, setStageFrame, useHomeStageStore, type GlassRoute } from './home-stage.store';
 import { isLow, NEED_RING } from './home-model';
 import { STAGE_LOADING, stageLoaderUp, type StageLoading } from './stage-loading';
+import { stageFailureState } from '../system/recovery-model';
 import { clipsFor, monModelSource } from './mon-models';
 
 /** The kit's convention for a model that does not exist yet (MonView, EggStill). */
@@ -88,6 +89,9 @@ export interface GlassScreenHandle {
   readonly press: (target: string) => void;
 }
 
+type GlassReaction = { readonly key: number; readonly clips: readonly string[] };
+const NO_REACTION: GlassReaction = { key: 0, clips: [] };
+
 const NO_HANDLERS: GlassHandlers = { onAction: () => undefined, onModel: () => undefined, monClips: () => [] };
 
 /**
@@ -107,6 +111,13 @@ export function useGlassScreen(options: {
   /** Where the Baby stands across the glass, a share of its width (M16's peek). */
   readonly modelOffset?: number;
   readonly nudge?: number;
+  /**
+   * A one-shot clip on the Baby (M13 `attention` / `approach`): bump `key`
+   * to play the first of `clips` its GLB has, once.
+   */
+  readonly reaction?: { readonly key: number; readonly clips: readonly string[] };
+  /** The trackpad pans on this screen: a press answers on release, a drag pans (GlassStage `onPan`). */
+  readonly padPans?: boolean;
 }): GlassScreenHandle {
   const store = useInstanceStore(() => ({
     view: options.view,
@@ -114,20 +125,23 @@ export function useGlassScreen(options: {
     nudge: options.nudge ?? 0,
     visible: options.modelVisible ?? true,
     offset: options.modelOffset ?? 0,
+    reaction: options.reaction ?? NO_REACTION,
   }));
   const handlers = useInstanceStore<GlassHandlers>(() => NO_HANDLERS);
   // After each commit: the view only when its content changed (one repaint per change), and the per-frame values.
   useEffect(() => {
     const key = JSON.stringify(options.view);
     const state = store.getState();
-    const next: Partial<{ view: GlassView; key: string; nudge: number; visible: boolean; offset: number }> = {};
+    const next: Partial<{ view: GlassView; key: string; nudge: number; visible: boolean; offset: number; reaction: GlassReaction }> = {};
     if (key !== state.key) Object.assign(next, { view: options.view, key });
     if ((options.nudge ?? 0) !== state.nudge) next.nudge = options.nudge ?? 0;
     if ((options.modelVisible ?? true) !== state.visible) next.visible = options.modelVisible ?? true;
     if ((options.modelOffset ?? 0) !== state.offset) next.offset = options.modelOffset ?? 0;
+    if ((options.reaction?.key ?? 0) !== state.reaction.key) next.reaction = options.reaction ?? NO_REACTION;
     if (Object.keys(next).length > 0) store.setState(next);
   });
   const { layout, model } = options;
+  const padPans = options.padPans === true;
   const layoutKey = JSON.stringify(layout);
   const modelKey = model === null ? 'none' : model.source === null ? 'soon' : 'eggId' in model.source ? model.source.eggId : model.source.key;
   const screen = useMemo(
@@ -145,10 +159,12 @@ export function useGlassScreen(options: {
       modelVisible: () => store.getState().visible,
       modelOffset: () => store.getState().offset,
       nudge: () => store.getState().nudge,
+      monReaction: () => store.getState().reaction,
+      padPans,
     }),
     // The scene reads the layout and the model once; rebuild only when they really change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [layoutKey, modelKey, store, handlers],
+    [layoutKey, modelKey, store, handlers, padPans],
   );
   return useMemo(() => ({
     screen,
@@ -191,6 +207,8 @@ export interface GlassStageProps {
    * device on tablet-class windows only. Phones never render it.
    */
   readonly companion?: ReactNode;
+  /** A drag on the 3D trackpad, pt (M13's room pan). Pair it with `useGlassScreen({ padPans: true })`. */
+  readonly onPan?: (dxPt: number, dyPt: number) => void;
 }
 
 /**
@@ -203,15 +221,19 @@ export interface GlassStageProps {
  * hidden accessible button, and `below`, a real control for what can't be
  * drawn on the glass (M09's text field).
  */
-export function GlassStage({ screen, label, testIDPrefix, a11y, controls, onKey, onFailed, below, companion }: GlassStageProps) {
+export function GlassStage({ screen, label, testIDPrefix, a11y, controls, onKey, onFailed, below, companion, onPan }: GlassStageProps) {
   const owner = useId();
-  const keys = useInstanceStore<{ onKey: (key: DeviceKey) => void }>(() => ({ onKey }));
+  const keys = useInstanceStore<{ onKey: (key: DeviceKey) => void; onPan: GlassStageProps['onPan'] }>(() => ({ onKey, onPan }));
   useEffect(() => {
-    keys.setState({ onKey });
+    keys.setState({ onKey, onPan });
   });
+  const pans = onPan !== undefined;
   useLayoutEffect(() => {
-    publishGlass({ owner, screen, label, onKey: (key) => keys.getState().onKey(key) });
-  }, [owner, screen, label, keys]);
+    publishGlass({
+      owner, screen, label, onKey: (key) => keys.getState().onKey(key),
+      ...(pans ? { onPan: (dx: number, dy: number) => keys.getState().onPan?.(dx, dy) } : {}),
+    });
+  }, [owner, screen, label, keys, pans]);
   useLayoutEffect(() => () => clearGlass(owner), [owner]);
   // The pane is republished every render (it carries live data); only the stage host re-renders for it.
   useLayoutEffect(() => {
@@ -265,9 +287,9 @@ export function PersistentGlassStage({
     const next = route?.screen ?? fallback;
     if (current.getState().screen !== next) current.setState({ screen: next });
   }, [route, fallback, current]);
-  const keys = useInstanceStore<{ onKey: (key: DeviceKey) => void }>(() => ({ onKey: fallbackKey }));
+  const keys = useInstanceStore<{ onKey: (key: DeviceKey) => void; onPan: GlassRoute['onPan'] }>(() => ({ onKey: fallbackKey, onPan: undefined }));
   useEffect(() => {
-    keys.setState({ onKey: route?.onKey ?? fallbackKey });
+    keys.setState({ onKey: route?.onKey ?? fallbackKey, onPan: route?.onPan });
   });
   const source = model?.source ?? null;
   const modelKey = source === null ? 'none' : 'eggId' in source ? source.eggId : source.key;
@@ -284,11 +306,16 @@ export function PersistentGlassStage({
     [modelKey, current],
   );
   const onKey = useCallback((key: DeviceKey) => keys.getState().onKey(key), [keys]);
+  const onPan = useCallback((dx: number, dy: number) => keys.getState().onPan?.(dx, dy), [keys]);
 
   const tablet = useTabletClass();
   // The root stack keeps (home) mounted under (drawer) routes so the stage
   // never reloads; covered, it must not keep drawing.
   const focused = useIsFocused();
+  // Full screens inside (home) that draw their own content over the stage (MONS)
+  // hold it too, so only one renderer runs.
+  const pathname = usePathname() ?? '/';
+  const overlaid = pathname === '/mons' || pathname.startsWith('/mons/');
 
   return (
     <View className="absolute inset-0 bg-ink-950" testID="home-glass-stage">
@@ -307,7 +334,8 @@ export function PersistentGlassStage({
                 loaderLabel={label}
                 glassScale={tablet.glassScale}
                 onKey={onKey}
-                covered={!focused}
+                onPan={onPan}
+                covered={!focused || overlaid}
                 progressKey={source?.kind === 'mon' ? source.key : null}
               />
               {children}
@@ -327,12 +355,13 @@ export function PersistentGlassStage({
  * the intro waits to play until the loader lifts. With the GLB's size known
  * the loader fills with the bytes downloaded.
  */
-function GlassDevice({ screen, label, loaderLabel, glassScale, onKey, covered, progressKey }: {
+function GlassDevice({ screen, label, loaderLabel, glassScale, onKey, onPan, covered, progressKey }: {
   readonly screen: DeviceScreen;
   readonly label: string;
   readonly loaderLabel: string;
   readonly glassScale: number;
   readonly onKey: (key: DeviceKey) => void;
+  readonly onPan: (dxPt: number, dyPt: number) => void;
   /** Another root route is on top of (home): hold the loop (the renderer and the Baby stay loaded). */
   readonly covered: boolean;
   /** The Baby's model key, for its download progress; null with no Baby (or an egg). */
@@ -343,10 +372,15 @@ function GlassDevice({ screen, label, loaderLabel, glassScale, onKey, covered, p
   const progress = useStore(glbProgressStore, (all) => (progressKey === null ? undefined : glbFraction(all[progressKey])));
   const onReady = useCallback(() => loading.setState({ deviceReady: true }), [loading]);
   const onModelsSettled = useCallback(() => loading.setState({ modelsSettled: true }), [loading]);
+  // A backend that ran and then went away is a lost context, not a device that can't run 3D (M22).
+  const started = useRef(false);
   const onBackend = useCallback((backend: unknown) => {
-    if (backend !== null) return;
+    if (backend !== null) {
+      started.current = true;
+      return;
+    }
     loading.setState({ failed: true });
-    setGlassFailed();
+    setGlassFailed(stageFailureState(started.current));
   }, [loading]);
   return (
     <>
@@ -364,6 +398,7 @@ function GlassDevice({ screen, label, loaderLabel, glassScale, onKey, covered, p
           stageClassName="min-h-0 w-full flex-1"
           glassScale={glassScale}
           onKey={onKey}
+          onPan={onPan}
           onReady={onReady}
           onModelsSettled={onModelsSettled}
           onBackendChange={onBackend}
