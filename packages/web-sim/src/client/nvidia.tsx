@@ -3,6 +3,7 @@ import './globals.css';
 import { useCallback, useEffect, useMemo } from 'react';
 import { createRoot } from 'react-dom/client';
 import { z } from 'zod';
+import type { CallToolResult } from '@modelcontextprotocol/client';
 import { Banner, Button, Dialog, Switch, TextField, useInstanceStore, useStore } from '@acme/ui';
 import { Details, Heading, List, ListItem, Main, Paragraph, Section, Summary, Text } from '@acme/ui/html';
 import { View } from '@acme/ui/tw';
@@ -29,6 +30,8 @@ const toolsAllowed = new Set(['get_mon_status','check_on_mon','check_incubation'
 const NOTE_MAX = 500;
 const PAGE = 'mx-auto w-full max-w-content-feed gap-6 px-4 py-6 md:px-6';
 const TITLE = 'NYC-Mon Personal Companion';
+const BROWSER_VOICE_NOTE = 'Using your browser’s voice: the Mon’s voice is unavailable.';
+const VOICE_UNAVAILABLE_NOTE = 'The Mon’s voice is unavailable right now. The reply is in the conversation below.';
 
 function Companion({ config }: { config:Config }) {
   const store = useInstanceStore<CompanionState>(initialCompanionState);
@@ -43,9 +46,12 @@ function Companion({ config }: { config:Config }) {
       redirectUrl:new URL('/nvidia.html',window.location.origin).href,navigate:(url) => window.location.assign(url.href) });
   },[config.clientId]);
   // The Mon's one voice: sticky lineage voice from tool results, spoken through the shared port to /api/tts (companionVoice.ts).
+  // The browser's voice is only ever a labelled fallback: the status line says so whenever a sentence is not in the Mon's own voice.
   const voice = useMemo(() => createCompanionVoice({
-    port:(current,authorize) => monSpeechPort({ voice:current,...(authorize ? { authorize } : {}) }),stopAll:stopSpeaking,
-    setSessionVoice:(next) => { if (next) setSessionVoice(next); else clearSessionVoice(); } }),[]);
+    port:(current,authorize) => monSpeechPort({ voice:current,...(authorize ? { authorize } : {}),
+      onFallback:(why) => store.setState({ status:why==='browser-voice' ? BROWSER_VOICE_NOTE : VOICE_UNAVAILABLE_NOTE }) }),
+    stopAll:(opts) => { void stopSpeaking(opts); },
+    setSessionVoice:(next) => { if (next) setSessionVoice(next); else clearSessionVoice(); } }),[store]);
   useEffect(() => () => { voice.stop(); },[voice]);
   const onSignedOut = useCallback(() => { voice.reset();expireSession(store,runtime); },[store,runtime,voice]);
   const authorize = useMemo(() => createAuthorize({ store:provider,refresh:sdkRefresh(config.mcpUrl,provider),onSignedOut }),[provider,config.mcpUrl,onSignedOut]);
@@ -93,11 +99,13 @@ function Companion({ config }: { config:Config }) {
       const connected=await connectMcp({ url:config.mcpUrl,mode:'oauth',provider });
       if (disposed) { await connected.close();return; }
       runtime.setState({ session:connected });
+      // The Mon's voice before the first reply: a turn with no tool call would otherwise have no voice to speak in.
+      void voice.prime(async () => (await connected.client.callTool({ name:'get_mon_status',arguments:{} })) as CallToolResult);
       store.setState({ connected:true,status:'Signed in. Your Mon and saved preferences belong to this account.' });
       void memoryRequest('GET');
     })().catch((error:unknown) => { if (!disposed) showError(error); });
     return () => { disposed=true;runtime.getState().abort?.abort();void runtime.getState().session?.close();runtime.setState({ session:null }); };
-  },[provider,config.mcpUrl,store,showError,runtime,memoryRequest]);
+  },[provider,config.mcpUrl,store,showError,runtime,memoryRequest,voice]);
 
   async function send() {
     const current=store.getState();const connection=runtime.getState().session;
