@@ -85,8 +85,8 @@ The test keeps these honest: each forbidden pair below must still measure under 
 |---|---|---|---|---:|---|---|---|
 | text on surface | light | `text` #000000 | `surface` #F3F4F4 | 19.06 | text (4.5) | pass | `packages/ui/Text.tsx:39`, `packages/ui/Heading.tsx:25` |
 | text on surface | dark | `text` #F8F8F8 | `surface` #00041C | 19.12 | text (4.5) | pass | `packages/ui/Text.tsx:39`, `packages/ui/Heading.tsx:25` |
-| muted text on surface | light | `text-muted` #61656A | `surface` #F3F4F4 | 5.33 | text (4.5) | pass | `packages/ui/Text.tsx:40`, `apps/mobile/components/AppTabBar.tsx:86`, `packages/app/features/schedule/BookingSurface.tsx:63` |
-| muted text on surface | dark | `text-muted` #BEC0C2 | `surface` #00041C | 11.13 | text (4.5) | pass | `packages/ui/Text.tsx:40`, `apps/mobile/components/AppTabBar.tsx:86`, `packages/app/features/schedule/BookingSurface.tsx:63` |
+| muted text on surface | light | `text-muted` #61656A | `surface` #F3F4F4 | 5.33 | text (4.5) | pass | `packages/ui/Text.tsx:40`, `packages/app/features/navigation/ShellNav.tsx:67`, `packages/app/features/schedule/BookingSurface.tsx:63` |
+| muted text on surface | dark | `text-muted` #BEC0C2 | `surface` #00041C | 11.13 | text (4.5) | pass | `packages/ui/Text.tsx:40`, `packages/app/features/navigation/ShellNav.tsx:67`, `packages/app/features/schedule/BookingSurface.tsx:63` |
 | muted text on raised | light | `text-muted` #61656A | `surface-raised` #FFFFFF | 5.87 | text (4.5) | pass | `packages/app/features/home/home-content.tsx:76`, `packages/ui/Text.tsx:40` |
 | muted text on raised | dark | `text-muted` #BEC0C2 | `surface-raised` #0A1230 | 10.08 | text (4.5) | pass | `packages/app/features/home/home-content.tsx:76`, `packages/ui/Text.tsx:40` |
 | primary text on surface | light | `primary` #A35100 | `surface` #F3F4F4 | 5.10 | large-text (3) | pass | `packages/app/features/error/screen.shared.tsx:19`; font-display text-display-xl (60px) |
@@ -103,12 +103,12 @@ The test keeps these honest: each forbidden pair below must still measure under 
 | accent bell icon on raised | dark | `accent` #4BA8F0 | `surface-raised` #0A1230 | 7.14 | ui (3) | pass | `apps/mobile/components/AppHeader.tsx:69` |
 | danger text on raised | light | `danger` #D50000 | `surface-raised` #FFFFFF | 5.48 | text (4.5) | pass | `packages/ui/Text.tsx:44`, `packages/app/features/editor/AttachSheet.tsx:168` |
 | danger text on raised | dark | `danger` #FA4040 | `surface-raised` #0A1230 | 5.14 | text (4.5) | pass | `packages/ui/Text.tsx:44`, `packages/app/features/editor/AttachSheet.tsx:168` |
-| on-primary on primary | light | `on-primary` #FFFFFF | `primary` #A35100 | 5.62 | text (4.5) | pass | `packages/app/features/home/home-content.tsx:48`, `packages/app/features/explore/explore.store.ts:17`, `apps/mobile/components/AppTabBar.tsx:86` |
-| on-primary on primary | dark | `on-primary` #00041C | `primary` #FC7C00 | 7.76 | text (4.5) | pass | `packages/app/features/home/home-content.tsx:48`, `packages/app/features/explore/explore.store.ts:17`, `apps/mobile/components/AppTabBar.tsx:86` |
+| on-primary on primary | light | `on-primary` #FFFFFF | `primary` #A35100 | 5.62 | text (4.5) | pass | `packages/app/features/home/home-content.tsx:48`, `packages/app/features/explore/explore.store.ts:17`, `packages/app/features/navigation/ShellNav.tsx:67` |
+| on-primary on primary | dark | `on-primary` #00041C | `primary` #FC7C00 | 7.76 | text (4.5) | pass | `packages/app/features/home/home-content.tsx:48`, `packages/app/features/explore/explore.store.ts:17`, `packages/app/features/navigation/ShellNav.tsx:67` |
 | on-primary/90 on primary | light | `on-primary/90` #F6EEE6 | `primary` #A35100 | 4.88 | text (4.5) | pass | `packages/app/features/home/home-content.tsx:53`, `packages/app/features/home/home-content.tsx:54` |
 | on-primary/90 on primary | dark | `on-primary/90` #191019 | `primary` #FC7C00 | 7.10 | text (4.5) | pass | `packages/app/features/home/home-content.tsx:53`, `packages/app/features/home/home-content.tsx:54` |
-| on-primary on primary-pressed | light | `on-primary` #FFFFFF | `primary-pressed` #884300 | 7.37 | text (4.5) | pass | `packages/app/features/explore/explore.store.ts:18`, `apps/mobile/components/AppTabBar.tsx:78` |
-| on-primary on primary-pressed | dark | `on-primary` #00041C | `primary-pressed` #FD9D40 | 9.74 | text (4.5) | pass | `packages/app/features/explore/explore.store.ts:18`, `apps/mobile/components/AppTabBar.tsx:78` |
+| on-primary on primary-pressed | light | `on-primary` #FFFFFF | `primary-pressed` #884300 | 7.37 | text (4.5) | pass | `packages/app/features/explore/explore.store.ts:18`, `packages/app/features/navigation/ShellNav.tsx:63` |
+| on-primary on primary-pressed | dark | `on-primary` #00041C | `primary-pressed` #FD9D40 | 9.74 | text (4.5) | pass | `packages/app/features/explore/explore.store.ts:18`, `packages/app/features/navigation/ShellNav.tsx:63` |
 | on-accent on accent | light | `on-accent` #FFFFFF | `accent` #0058F8 | 5.60 | text (4.5) | pass | `packages/app/features/explore/explore.store.ts:19` |
 | on-accent on accent | dark | `on-accent` #00041C | `accent` #4BA8F0 | 7.89 | text (4.5) | pass | `packages/app/features/explore/explore.store.ts:19` |
 | inverse text on text | light | `text-inverse` #F8F8F8 | `text` #000000 | 19.77 | text (4.5) | pass | `packages/ui/Text.tsx:43`, `packages/ui/Heading.tsx:29` |

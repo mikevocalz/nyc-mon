@@ -13,7 +13,7 @@ import { careLed, useCareNow } from './care-shared';
 import { companionCopy } from './copy';
 import { NEED_RING, askRoute, homeStatus, isLow } from './home-model';
 import { GlassStage, glassRing, useGlassOn, useGlassScreen, useMonGlass } from './glass';
-import { useHomeStage } from './home-stage.store';
+import { setHomeMenuOpen, useHomeStage, useHomeStageStore } from './home-stage.store';
 import { useMinuteClock } from './minute-clock';
 
 const NEEDS = ['energy', 'fullness', 'social'] as const;
@@ -34,6 +34,13 @@ export function HomeScreen({ mon }: { mon: MonInstance }) {
   const local = useInstanceStore(() => ({ reactionKey: 0, menu: false, failed: false }));
   const { reactionKey, menu, failed } = useStore(local);
   const glassOn = useGlassOn(failed);
+  // The shell's H-LYNK tab asks for the device menu through the stage store.
+  const menuRequested = useHomeStageStore((s) => s.menuOpen);
+  useEffect(() => {
+    if (!menuRequested || !glassOn) return;
+    local.setState({ menu: true });
+    setHomeMenuOpen(false);
+  }, [menuRequested, glassOn, local]);
 
   const name = identity?.name ?? '';
   const status = care === undefined ? undefined : homeStatus(care);

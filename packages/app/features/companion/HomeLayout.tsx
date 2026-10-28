@@ -2,6 +2,8 @@
 
 import { memo, useCallback, useEffect, useMemo, type ReactNode } from 'react';
 import { useRouter } from 'expo-router';
+import { I18nManager } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IDLE_PRESENCE, resolveSceneMode } from '@acme/core/sim';
 import type { MonSceneInput } from '@acme/core/types';
 import {
@@ -9,6 +11,7 @@ import {
   useInstanceStore, type DeviceKey, type GlassView, type ImageProps,
 } from '@acme/ui';
 import { View } from '@acme/ui/tw';
+import { useAdaptiveNavigationPlacement } from '@acme/ui/adaptive-panes/parts';
 import { useShallow } from 'zustand/react/shallow';
 import { deepLinkStore } from '../onboarding/notify-route';
 import { selectActiveMon, selectCareNow, selectSceneInput, useMonStore } from '../mon/mon.store';
@@ -18,6 +21,10 @@ import { setHomeMenuOpen, useHomeStageStore, type HomeChrome } from './home-stag
 import { useMinuteClock, useMinuteClockDriver } from './minute-clock';
 import { artFor, monIdentity } from './mon-identity';
 import { allSpecies } from '@acme/content';
+import { ShellBottomBar, ShellDrawer, ShellRail, RAIL_EXPANDED_WIDTH, RAIL_WIDTH } from '../navigation/ShellNav';
+import { activeDrawerItem, activeShellDestination } from '../navigation/shell-destinations';
+import { useShellNavigate } from '../navigation/use-shell-navigate';
+import { usePathname } from 'expo-router';
 
 /** Flat phone scene (ADR 0011): the 2D window never asks for room or tabletop in this lane. */
 const PHONE_SCENE = resolveSceneMode({ platform: 'phone', capabilities: null, anchors: undefined, preference: 'screen' });
@@ -221,7 +228,7 @@ function Shell2D() {
  * A route on the full-window 3D H-Lynk (M11 when the GPU stage runs) sets
  * `immersive` and the 2D shell is not mounted at all while it shows.
  */
-export function HomeLayout({ children }: { children: ReactNode }) {
+export function HomeLayout({ children, header }: { children: ReactNode; /** The app header, drawn across the top on rail hardware (tablet, foldable, headset). */ header?: ReactNode }) {
   useMinuteClockDriver();
   const router = useRouter();
   // M01 boots here for incubating / egg-ready / companion and arms a
@@ -233,10 +240,87 @@ export function HomeLayout({ children }: { children: ReactNode }) {
     // The router is a stable imperative handle; mount-only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  // Shell (foldable layout): on rail hardware the header runs across the top,
+  // the stage and the rail share a PHYSICAL row under it (reversed under RTL,
+  // where Yoga mirrors `row`), and the drawer opens beside the rail. Phones
+  // get the five-tab bar under the stage. The stage host is the same element
+  // in every arrangement, so the family resolving never remounts it.
   return (
     <View className="flex-1 bg-bg">
-      <ShellHost />
-      <View className="absolute inset-0" style={{ pointerEvents: 'box-none' }}>{children}</View>
+      <HomeShellHeader header={header} />
+      <View className={`min-h-0 flex-1 ${I18nManager.isRTL ? 'flex-row-reverse' : 'flex-row'}`}>
+        <View className="relative min-w-0 flex-1">
+          <ShellHost />
+          <View className="absolute inset-0" style={{ pointerEvents: 'box-none' }}>{children}</View>
+        </View>
+        <HomeRail />
+      </View>
+      <HomeBottomBar />
+      <HomeDrawer />
     </View>
+  );
+}
+
+/**
+ * The `(tabs)` group's rail, drawn here too on rail hardware (native tablet,
+ * foldable incl. its cover, headset; skill §2), so the companion loop can
+ * reach Game, Alerts and Profile. Phones and web get nothing: the H-Lynk keeps
+ * its own chrome there. Every `(home)` route is the Home destination.
+ *
+ * The rail consumes the top, bottom and right safe-area insets. The stage's
+ * SafeAreaViews pad by their own overlap with the unsafe area, so with the
+ * rail beside it the stage no longer touches the right edge and gets no
+ * right inset: each inset is consumed once. The stage is measured narrower
+ * rather than overlapped, so HLynkShell's `railRightPt` stays 0.
+ *
+ * No drawer toggle at the foot: `(home)` is outside the drawer navigator, and
+ * the H-Lynk's own Menu key opens the companion menu.
+ */
+function HomeShellHeader({ header }: { header: ReactNode }) {
+  const placement = useAdaptiveNavigationPlacement();
+  return placement.rail ? <>{header}</> : null;
+}
+
+function HomeRail() {
+  const placement = useAdaptiveNavigationPlacement();
+  const insets = useSafeAreaInsets();
+  const pathname = usePathname() ?? '/';
+  const navigate = useShellNavigate();
+  if (!placement.rail) return null;
+  return (
+    <ShellRail
+      active={activeShellDestination(pathname)}
+      expanded={placement.expanded}
+      insets={{ bottom: insets.bottom, right: insets.right }}
+      onSelect={navigate}
+    />
+  );
+}
+
+/** Phones: the five tabs under the stage. Immersive routes (M11, M12) keep the full window. */
+function HomeBottomBar() {
+  const placement = useAdaptiveNavigationPlacement();
+  const insets = useSafeAreaInsets();
+  const pathname = usePathname() ?? '/';
+  const navigate = useShellNavigate();
+  const immersive = useHomeStageStore((s) => s.immersive);
+  if (placement.rail || immersive) return null;
+  return <ShellBottomBar active={activeShellDestination(pathname)} onSelect={navigate} bottomInset={insets.bottom} />;
+}
+
+function HomeDrawer() {
+  const placement = useAdaptiveNavigationPlacement();
+  const insets = useSafeAreaInsets();
+  const pathname = usePathname() ?? '/';
+  const router = useRouter();
+  return (
+    <ShellDrawer
+      anchor={placement.rail ? 'rail' : 'bar'}
+      railWidth={placement.expanded ? RAIL_EXPANDED_WIDTH : RAIL_WIDTH}
+      insets={{ bottom: insets.bottom, right: insets.right }}
+      barHeight={insets.bottom + 72}
+      active={activeDrawerItem(pathname)}
+      onSelect={(href) => router.push(href as never)}
+    />
   );
 }
