@@ -81,3 +81,26 @@ test('masked, displaced or see-through materials never stand in as bare position
   assert.equal(proxyableMaterial(new THREE.MeshStandardNodeMaterial({ transparent: true })), false);
   assert.equal(proxyableMaterial([new THREE.MeshStandardNodeMaterial()]), false);
 });
+
+test('chunks share the source vertex data and copy each instance once', () => {
+  const scene = new THREE.Scene();
+  const root = new THREE.Group();
+  scene.add(root);
+  const mesh = props(400, 800);
+  mesh.name = 'lamps';
+  root.add(mesh);
+  const source = mesh.geometry;
+  setupSceneCulling(THREE, scene, [root]);
+  const chunks = root.children.filter((c) => c.name === 'lamps') as THREE.InstancedMesh[];
+  assert.ok(chunks.length > 1);
+  for (const chunk of chunks) {
+    for (const name of Object.keys(source.attributes)) {
+      assert.equal(chunk.geometry.getAttribute(name), source.getAttribute(name), `${name} is shared, not copied`);
+    }
+    assert.equal(chunk.geometry.index, source.index);
+  }
+  // Instance data: exactly the source's floats, split, with nothing duplicated across chunks.
+  const floats = chunks.reduce((n, c) => n + c.instanceMatrix.array.length, 0);
+  assert.equal(floats, 400 * 16);
+  assert.ok(!root.children.includes(mesh), 'the source mesh leaves the scene');
+});

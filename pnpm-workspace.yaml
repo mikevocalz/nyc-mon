@@ -309,3 +309,4 @@ patchedDependencies:
   react-native-skia@3.6.1: patches/react-native-skia@3.6.1.patch
   react-native-webgpu@0.16.0: patches/react-native-webgpu@0.16.0.patch
   react-native-worklets@0.13.0: patches/react-native-worklets@0.13.0.patch
+  three@0.186.1: patches/three@0.186.1.patch

@@ -27,7 +27,8 @@
 // beginning and ending). `useWorldSaveLifecycle` is mounted here, once, with
 // the Caller identity read the way the boot screen reads it (`readSave()`).
 import { useEffect, useMemo, useRef } from 'react';
-import { AccessibilityInfo, I18nManager, Platform, type LayoutChangeEvent, type HostInstance } from 'react-native';
+import { AccessibilityInfo, I18nManager, Platform, useWindowDimensions, type LayoutChangeEvent, type HostInstance } from 'react-native';
+import { EXPERIMENTAL_WORLD_PHYSICAL } from './world/physical-look.ts';
 import { GestureDetector } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useStore } from 'zustand';
@@ -71,6 +72,7 @@ import { runJsDeviceProbe } from './render-runtime/run-js-device-probes.ts';
 
 // EXPO_PUBLIC_WORLD_PHYSICAL: reversed depth on the JS render path. Flag off: {}.
 const PHYSICAL_RENDERER_PARAMS = physicalRendererParams();
+import { budgetedPixelRatio } from './perf/pixel-budget.ts';
 import { useGamePerfMounts } from './perf/use-game-perf.ts';
 import { useGameRenderThread } from './render-thread-choice.ts';
 import { readLobbyIdentity } from './lobby/lobby-identity.ts';
@@ -137,6 +139,7 @@ export function GameScreen({ focused = true }: GameScreenProps = {}) {
   const { width, height, originX, originY } = useStore(geometry);
   const host = useRef<HostInstance>(null);
   const canvas = useRef<ThreeCanvasHandle>(null);
+  const windowSize = useWindowDimensions();
 
   const screen = useStore(gameScreenStore);
   const overMappedArea = useStore(gameCameraStore, (s) => (city.ok ? isOverMappedArea(s.camera, city.bounds) : true));
@@ -302,6 +305,9 @@ export function GameScreen({ focused = true }: GameScreenProps = {}) {
               // loop outpace vsync — only meaningful on the superseding surface.
               freeRun={GAME_FREERUN}
               rendererParams={PHYSICAL_RENDERER_PARAMS}
+              // The physical city's targets were sized for an iPhone 17 buffer; a bigger
+              // screen gets a lower ratio rather than running out of memory.
+              maxPixelRatio={EXPERIMENTAL_WORLD_PHYSICAL ? budgetedPixelRatio(windowSize.width, windowSize.height, 2) : undefined}
               load={loadGameScene}
               params={params}
               paused

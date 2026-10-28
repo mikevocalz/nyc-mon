@@ -158,7 +158,15 @@ export function physicalFeaturesFor(
   tierSsr: boolean,
 ): PhysicalFeatures | null {
   if (!physical) return null;
-  return probe !== null ? probeFeatures(probe) : fullPhysicalFeatures(tierSsr);
+  if (probe !== null) return probeFeatures(probe);
+  const full = fullPhysicalFeatures(tierSsr);
+  // EXPO_PUBLIC_WORLD_DROP=bloom,ssr: the full stack minus named features,
+  // to measure a feature's cost on hardware. Unknown names are ignored.
+  for (const name of (process.env.EXPO_PUBLIC_WORLD_DROP ?? '').split(',')) {
+    const key = name.trim() as keyof PhysicalFeatures;
+    if (key in full) (full as unknown as Record<string, unknown>)[key] = key === 'sunShadow' ? 0 : false;
+  }
+  return full;
 }
 
 /**

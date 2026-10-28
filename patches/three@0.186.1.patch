@@ -1,0 +1,51 @@
+diff --git a/build/three.webgpu.js b/build/three.webgpu.js
+index 48b30e6bf4bf114ba5524ae509c81c4a043d27ea..253c22d93ba94783e56f735a9bb4a12ae3d6cac8 100644
+--- a/build/three.webgpu.js
++++ b/build/three.webgpu.js
+@@ -40755,7 +40755,11 @@ const attributeArray = ( count, type = 'float' ) => {
+ 	}
+ 
+ 	const buffer = new StorageBufferAttribute( count, itemSize, typedArray );
+-	const node = storage( buffer, type, count );
++	// nyc-mon patch: buffer.count, as instancedArray does. Passing `count` through
++	// hands a TypedArray argument to StorageBufferNode as its bufferCount, and
++	// WGSLNodeBuilder.getUniforms then coerces it with `bufferCount > 0`, joining
++	// every element into a string once per shader stage.
++	const node = storage( buffer, type, buffer.count );
+ 
+ 	return node;
+ 
+diff --git a/build/three.webgpu.nodes.js b/build/three.webgpu.nodes.js
+index e96c4ae08d528fea66c58e5869923c1675822ac9..b39156f0516fc6ec60f72fc8ae5484ff9badb4d9 100644
+--- a/build/three.webgpu.nodes.js
++++ b/build/three.webgpu.nodes.js
+@@ -40755,7 +40755,11 @@ const attributeArray = ( count, type = 'float' ) => {
+ 	}
+ 
+ 	const buffer = new StorageBufferAttribute( count, itemSize, typedArray );
+-	const node = storage( buffer, type, count );
++	// nyc-mon patch: buffer.count, as instancedArray does. Passing `count` through
++	// hands a TypedArray argument to StorageBufferNode as its bufferCount, and
++	// WGSLNodeBuilder.getUniforms then coerces it with `bufferCount > 0`, joining
++	// every element into a string once per shader stage.
++	const node = storage( buffer, type, buffer.count );
+ 
+ 	return node;
+ 
+diff --git a/src/nodes/accessors/Arrays.js b/src/nodes/accessors/Arrays.js
+index 99a6ec180a58371376d7aebd16c5a7e565d8cf06..1988501daae24986465ef078cb6efc566047a8b4 100644
+--- a/src/nodes/accessors/Arrays.js
++++ b/src/nodes/accessors/Arrays.js
+@@ -29,7 +29,11 @@ export const attributeArray = ( count, type = 'float' ) => {
+ 	}
+ 
+ 	const buffer = new StorageBufferAttribute( count, itemSize, typedArray );
+-	const node = storage( buffer, type, count );
++	// nyc-mon patch: buffer.count, as instancedArray does. Passing `count` through
++	// hands a TypedArray argument to StorageBufferNode as its bufferCount, and
++	// WGSLNodeBuilder.getUniforms then coerces it with `bufferCount > 0`, joining
++	// every element into a string once per shader stage.
++	const node = storage( buffer, type, buffer.count );
+ 
+ 	return node;
+ 

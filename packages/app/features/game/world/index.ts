@@ -44,6 +44,9 @@ import { buildLaneTopology } from '../living-city/topology.ts';
  */
 export const EXPERIMENTAL_WORLD_FUTURE = FUTURE_LAYER;
 
+/** How far the focus moves before the physical fire escapes re-sort near/far, metres (near band: FIRE_ESCAPE.nearDistance, 30 m). */
+export const FIRE_ESCAPE_RESORT_METRES = 1;
+
 /**
  * Dusk sun, low in the south-west (about 25 degrees up): long light on the
  * west and south walls, the rest of the city in the cel mid band, where the
@@ -301,6 +304,8 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
   let viewDistance = 220;
   const nightCamera = { x: 0, y: 0, z: 0, fwdX: 0, fwdZ: 1 };
   const bands: [number, number] = [0, 0];
+  // Infinity so the first setFocus always places the escapes.
+  const escapeFocus = { x: Infinity, z: Infinity };
   return {
     group,
     sky,
@@ -353,7 +358,12 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
       furniture.setFocus(x, z);
       shadowBands(z, bandMinZ, bandCount, bands);
       props.setFocus(x, z, bands[0], bands[1]);
-      if (phys && city.physical) phys.fireEscapes.update(city.physical.fireEscapes, x, z);
+      // The escapes re-sort near/far on a 1 m step, not every frame: each sort
+      // rewrites and re-uploads up to FIRE_ESCAPE.maxEscapes instance matrices.
+      if (phys && city.physical && Math.hypot(x - escapeFocus.x, z - escapeFocus.z) >= FIRE_ESCAPE_RESORT_METRES) {
+        escapeFocus.x = x; escapeFocus.z = z;
+        phys.fireEscapes.update(city.physical.fireEscapes, x, z);
+      }
     },
     /**
      * Re-ranks the streetlamp and storefront PointLights for the camera
