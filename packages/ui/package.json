@@ -26,6 +26,10 @@
       "default": "./icons.web.ts"
     },
     "./native": "./native.ts",
+    "./game-perf": {
+      "react-native": "./game-perf.native.ts",
+      "default": "./game-perf.ts"
+    },
     "./admin": "./admin/index.ts",
     "./game-controls": "./game-controls/index.ts",
     "./game-controls/parts": "./game-controls/parts.ts",
@@ -35,7 +39,13 @@
     "./lobby": "./lobby/index.ts",
     "./adaptive-panes": "./adaptive-panes/index.tsx",
     "./arrangement": "./arrangement/index.ts",
-    "./adaptive-panes/parts": "./adaptive-panes/parts.ts"
+    "./adaptive-panes/parts": "./adaptive-panes/parts.ts",
+    "./three/hatch": "./three/hatch/index.ts",
+    "./three/mon": "./three/mon/MonModel3D.tsx",
+    "./three/mon/lipsync": "./three/mon/lipsync/index.ts",
+    "./three/mon/hatch-sound": "./three/mon/hatch-sound.ts",
+    "./three/mon/hatch-timeline": "./three/mon/hatch-timeline.ts",
+    "./three/mon/idle": "./three/mon/idle/index.ts"
   },
   "sideEffects": [
     "./rn-globals-shim.ts",

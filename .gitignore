@@ -36,3 +36,11 @@ packages/web-sim/public/canvaskit/
 
 # Offline Alexa readiness reports and per-run evidence.
 .alexa-readiness/
+
+# Local research scratch (Mobbin screenshots etc.) — evidence, not source
+scratchpad/
+
+# Valdrada tile cache written by tooling/city/valdrada/fetch.mjs (bytes are ODbL 1.0 — not committed).
+tooling/city/.cache/
+__pycache__/
+*.blend1

@@ -1,8 +1,60 @@
 # Device checks
 
-Everything below has passed typecheck, unit tests and web/Storybook screenshots, but has **not been run on a phone, tablet, foldable or simulator**. No device is set up yet. Do these checks before the matching milestone closes. Every `08-handoff.md` links back here.
+## Device record
+
+Measured 2026-10-17 on the bench device (USB adb serial `913949703467`). Commands run against the live device; values are verbatim.
+
+| Fact | Value | How measured |
+| --- | --- | --- |
+| Model | Microsoft Surface Duo (1st gen), `ro.product.device` = `duo`, hardware `surfaceduo` | `adb shell getprop ro.product.model` → `Surface Duo`; `ro.product.manufacturer` → `Microsoft` |
+| Android version | 14 (`ro.build.version.release`), SDK 34 (`ro.build.version.sdk`) | `adb shell getprop` |
+| Build | `treble_arm64_bgN-userdebug 14 UP1A.231105.003.A1` — a Project Treble GSI, not stock Duo 12L (vendor fingerprint `surface/duo/duo:12/2022.902.48`) | `adb shell getprop ro.build.display.id` / `ro.build.fingerprint` |
+| SoC / GPU | Snapdragon 855 platform (`ro.board.platform` = `msmnile`), Adreno 640 (`GLES: Qualcomm, Adreno (TM) 640, OpenGL ES 3.2 V@0502.0`) | `getprop`; `adb shell dumpsys SurfaceFlinger` GLES block |
+| Display | "Built-in Screen" 2700×1800 (unfolded dual-panel), 400 dpi, single mode `2700×1800 @ 60.000004 Hz`; no alternative refresh rates | `adb shell dumpsys display` → `supportedModes`, `renderFrameRate 60.000004` |
+| Frame deadline | 16,666,666 ns present deadline, appVsyncOff 1,000,000 ns | `dumpsys display` DisplayDeviceInfo |
+| RAM | 5,647,472 kB total (~5.4 GiB usable) | `adb shell cat /proc/meminfo` → `MemTotal` |
+| App package | `com.nycmon.app`, versionName 0.1.0, versionCode 1, minSdk 29, targetSdk 34 | `adb shell pm dump com.nycmon.app` |
+
+Two consequences for the performance pass: the Duo has exactly one display mode, so 60 Hz is the only cadence it can present at (the pass's "more than 60 fps" goal needs different hardware), and the userdebug GSI keeps `adb shell perfetto` and `dumpsys` fully available without root.
+
+The device record above and the release-build performance baseline in `docs/performance/baseline-duo-2026-10-17.md` were measured on this physical Surface Duo. Everything below still lists checks that remain unverified on hardware; most predate the baseline and cover screens the baseline did not touch. Do these checks before the matching milestone closes. Every `08-handoff.md` links back here.
 
 Target matrix (BUILD_PROMPT_v3 §0C, §6 step 11): iPhone SE 3, iPhone 16 Pro Max, Pixel 8, plus one Android foldable (Pixel Fold or Galaxy Z Fold) and one Android tablet.
+
+## F1 — Harlem city dataset v3 on the bench Duo (2026-10-17)
+
+Lane `lane-v3e3` @ `23ec560`, release build verified on the physical Surface
+Duo above (same method and honesty bar as the M0 baseline). Full report:
+`docs/performance/v3-f1-2026-10-17.md`; artifacts:
+`/Users/mikevocalz/nyc-mon-artifacts/f1-duo/`.
+
+- [x] **v3 tile runs on hardware:** `harlem-apollo-20261017` confirmed inside the shipped bundle; city renders with no crash over an 84 s scripted walk.
+- [x] **Frame timing at the walk window:** p50 36 ms / p90 48 / p95 53 / p99 61, janky 44.3 % (n = 3 457) — p50 identical to the v2 M0 baseline, p90+ ~5 ms better; janky share is window-sensitive, see report.
+- [x] **Memory:** PSS 395 MB lobby → 630 MB scene start → 651 MB after walk (v2: 378 → 602 → 649).
+- [x] **Load path:** cold start TotalTime median 1 472 ms (3 runs); START → first frame ≤ ~15 s fresh-install, ~6.4–7.0 s warm.
+- [ ] **Device parse ms / city build ms, split:** PENDING — only a 1 617 ms combined worst frame is instrumented (needs a finer probe; not added in this lane).
+- [ ] **Landmark identification in captured frames (Apollo marquee, E3):** PENDING — frames captured, visual ID belongs to the F3 critique pass.
+- [ ] **iPhone SE 3 class run (spec D2):** PENDING — the Duo is the only bench device.
+
+## PR09 — Living City perf + adaptive quality on the bench Duo (2026-10-17)
+
+Lane `lane-lc-perf`, release build with `EXPO_PUBLIC_GAME_PERF=1` +
+`EXPO_PUBLIC_LIVING_CITY=1` verified on the physical Surface Duo above
+(same method and honesty bar as M0/F1). Full report:
+`docs/living-city/pr09-perf.md`; artifacts:
+`/Users/mikevocalz/nyc-mon-artifacts/pr09-duo/`.
+
+- [x] **Living city runs on hardware:** flag-on release build mounted the full actor set (vehicles, peds, signal heads/ped displays, lamp glows) — draw calls 53–54 vs F1's 40–41, triangles ~319–335 k vs ~310 k, consistent with the PR07 arithmetic budget.
+- [x] **Scripted drive near ACP:** ~86 s stick-held drive (35 s north + 50 s east) from the Apollo spawn; gfxinfo p50 15 ms / p90 30 / p95 34 / p99 40, janky 33.3 % (n = 3 713) — at/below the 36 ms M0/F1 baseline; window composition caveats in the report (not claimed as an improvement).
+- [x] **JS submission under living-city load:** `[NYC-Mon/perf]` cpuP50 ~10.4 ms during drive windows (F1: 17.3) — submission cost, not GPU completion.
+- [x] **Adaptive render scale:** controller held buffer at 2160×1440 (0.80×) the entire session — engaged before scene build, never oscillated.
+- [x] **Actor/LOD tiers landed:** `EXPO_PUBLIC_LIVING_CITY_TIER` = low/medium/high/xr over the world-tier row, default `high` = byte-identical authored counts; ambient population retargets live via `setTargetVehicles`/`setTargetPeds` (scripted spawns never culled; off-camera retirement).
+- [x] **Posture cycle:** `cmd device_state` overrides OPENED→HALF_OPENED→FOLDED→CLOSED→OPENED — scene alive at every posture, no crash/ANR/restart, controller pill re-laid out.
+- [x] **Background/foreground:** HOME parked the process (perf windows gapped ~21 s), `nycmon://game` resume on same PID, no duplicate ticker, state continuous.
+- [ ] **Physical hinge fold:** PENDING — `cmd device_state` overrides the reported posture but did not change display geometry on this unit; a real fold needs hands on the device.
+- [ ] **Crowd step-down observed live:** PENDING — scale held 0.80 ≥ the 0.75 trigger mark; stepper is node-test covered but never fired on device.
+- [ ] **Memory growth attribution:** PENDING — PSS rose 735,846 → 916,798 kB over the session (F1: +20 MB over its walk); needs a heap breakdown.
+- [ ] **GPU completion timing:** PENDING — capped 4 950 ms histogram tail bucket, timestamp queries still unenabled (inherited from M0/F1).
 
 ## Rendering
 

@@ -69,14 +69,17 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@acme/assets": "workspace:*",
     "@acme/content": "workspace:*",
     "@acme/core": "workspace:*",
+    "@acme/spatial": "workspace:*",
     "@acme/ui": "workspace:*",
     "@aws-sdk/client-sns": "catalog:",
     "@better-auth/oauth-provider": "catalog:",
     "@better-auth/passkey": "catalog:",
     "@delmaredigital/payload-better-auth": "catalog:",
     "@payloadcms/db-postgres": "catalog:",
+    "@payloadcms/plugin-mcp": "catalog:",
     "@payloadcms/ui": "catalog:",
     "@vercel/functions": "catalog:",
     "better-auth": "catalog:",

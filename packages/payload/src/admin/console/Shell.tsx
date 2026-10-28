@@ -7,7 +7,7 @@ import { useShellStore } from './stores';
 
 const links = [
   ['/admin/overview', 'overview'], ['/admin/callers', 'callers'], ['/admin/consent', 'consent'],
-  ['/admin/mons', 'mons'], ['/admin/content', 'content'], ['/admin/audit', 'audit'], ['/admin/settings', 'settings'],
+  ['/admin/mons', 'mons'], ['/admin/models', 'models'], ['/admin/content', 'content'], ['/admin/audit', 'audit'], ['/admin/settings', 'settings'],
 ] as const;
 
 export function ConsoleShell({ section, heading, children }: { section: keyof typeof consoleCopy.nav; heading: string; children: ReactNode }) {

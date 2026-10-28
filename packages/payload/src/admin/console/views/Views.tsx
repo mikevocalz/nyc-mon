@@ -1,5 +1,6 @@
 import type { AdminViewServerProps } from 'payload';
 import { allSpecies, bloodlineLabel, eggs, starterBloodlines } from '@acme/content';
+import { ModelsViewClient, type ModelDoc } from './ModelsClient';
 import { AuditViewClient, CallersViewClient, ConsentViewClient, ContentViewClient, MonsViewClient, OverviewViewClient, SettingsViewClient } from './ViewsClient';
 
 function requireUser({ initPageResult }: AdminViewServerProps): NonNullable<AdminViewServerProps['initPageResult']['req']['user']> | null {
@@ -53,6 +54,26 @@ export async function ContentView(props: AdminViewServerProps) {
   const nameBySpeciesId = new Map(allSpecies.map((species) => [species.speciesId, species.formName ?? species.speciesId]));
   const labelByBloodlineId = new Map(starterBloodlines.map(({ bloodline }) => [bloodline.bloodlineId, bloodlineLabel(bloodline)]));
   return <ContentViewClient speciesCount={allSpecies.length} bloodlines={starterBloodlines.map(({ bloodline, forms }) => ({ id: bloodline.bloodlineId, name: bloodlineLabel(bloodline), forms: forms.map((form) => ({ id: form.speciesId, dex: form.dexId, name: form.formName, stage: form.stage, culture: form.cultureNote, scale: form.scaleMeters, affinity: form.affinityId, clazz: form.classId, rig: form.rigDefinitionId, food: form.foodClassIds })) }))} eggs={eggs.map((egg) => ({ id: egg.speciesId, name: egg.eggName, hatches: nameBySpeciesId.get(egg.hatchesIntoSpeciesId) ?? egg.hatchesIntoSpeciesId, bloodline: labelByBloodlineId.get(egg.bloodlineId) ?? egg.bloodlineId }))} />;
+}
+
+export async function ModelsView(props: AdminViewServerProps) {
+  const user = requireUser(props); if (!user) return null; const { req } = props.initPageResult;
+  const route = await props.params; const selectedId = typeof route?.segments?.[1] === 'string' ? route.segments[1] : null;
+  // ponytail: one page of 200 covers the roster (allSpecies is ~100 forms); paginate if it grows past that.
+  const result = await req.payload.find({ collection: 'mon-models', limit: 200, depth: 0, user, overrideAccess: false, req });
+  const labelByBloodlineId = new Map(starterBloodlines.map(({ bloodline }) => [bloodline.bloodlineId, bloodlineLabel(bloodline)]));
+  const forms = allSpecies.map((species) => ({ id: species.speciesId, dex: species.dexId, name: species.formName ?? species.bloodlineName, stage: species.stage, bloodline: labelByBloodlineId.get(species.bloodlineId) ?? species.bloodlineName }));
+  const models: ModelDoc[] = result.docs.map((doc) => ({
+    id: String(doc.id), speciesId: doc.speciesId, status: doc.status, url: doc.url ?? null, filename: doc.filename ?? null, filesize: doc.filesize ?? null, updatedAt: doc.updatedAt,
+    scale: doc.scale, position: [doc.position.x, doc.position.y, doc.position.z], rotation: [doc.rotation.x, doc.rotation.y, doc.rotation.z],
+    animations: (doc.animations ?? []).map((row) => ({ role: row.role, clip: row.clip, loop: row.loop ?? true })),
+    animationClips: (doc.animationClips ?? []).flatMap((row) => (row.name ? [row.name] : [])),
+    morphTargets: (doc.morphTargets ?? []).flatMap((row) => (row.name ? [row.name] : [])),
+    heightMeters: doc.heightMeters ?? null,
+    credit: { author: doc.credit?.author ?? '', license: doc.credit?.license ?? 'owned', sourceUrl: doc.credit?.sourceUrl ?? '' },
+    notes: doc.notes ?? '',
+  }));
+  return <ModelsViewClient forms={forms} models={models} selectedId={selectedId} canEdit={user.role === 'ops' || user.role === 'content'} />;
 }
 
 export async function AuditView(props: AdminViewServerProps) {

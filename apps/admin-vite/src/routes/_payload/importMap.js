@@ -9,6 +9,7 @@ import { OverviewView as OverviewView_06a29d3f6d7565f88bb8395566b04087 } from '.
 import { CallersView as CallersView_06a29d3f6d7565f88bb8395566b04087 } from '../../../../../packages/payload/src/admin/console/views/Views'
 import { ConsentView as ConsentView_06a29d3f6d7565f88bb8395566b04087 } from '../../../../../packages/payload/src/admin/console/views/Views'
 import { MonsView as MonsView_06a29d3f6d7565f88bb8395566b04087 } from '../../../../../packages/payload/src/admin/console/views/Views'
+import { ModelsView as ModelsView_06a29d3f6d7565f88bb8395566b04087 } from '../../../../../packages/payload/src/admin/console/views/Views'
 import { ContentView as ContentView_06a29d3f6d7565f88bb8395566b04087 } from '../../../../../packages/payload/src/admin/console/views/Views'
 import { AuditView as AuditView_06a29d3f6d7565f88bb8395566b04087 } from '../../../../../packages/payload/src/admin/console/views/Views'
 import { SettingsView as SettingsView_06a29d3f6d7565f88bb8395566b04087 } from '../../../../../packages/payload/src/admin/console/views/Views'
@@ -33,6 +34,7 @@ export const importMap = {
   "./admin/console/views/Views#CallersView": CallersView_06a29d3f6d7565f88bb8395566b04087,
   "./admin/console/views/Views#ConsentView": ConsentView_06a29d3f6d7565f88bb8395566b04087,
   "./admin/console/views/Views#MonsView": MonsView_06a29d3f6d7565f88bb8395566b04087,
+  "./admin/console/views/Views#ModelsView": ModelsView_06a29d3f6d7565f88bb8395566b04087,
   "./admin/console/views/Views#ContentView": ContentView_06a29d3f6d7565f88bb8395566b04087,
   "./admin/console/views/Views#AuditView": AuditView_06a29d3f6d7565f88bb8395566b04087,
   "./admin/console/views/Views#SettingsView": SettingsView_06a29d3f6d7565f88bb8395566b04087,

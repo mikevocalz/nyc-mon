@@ -77,6 +77,8 @@ export interface Config {
     'integrity-runs': IntegrityRun;
     'idempotency-records': IdempotencyRecord;
     waitlist: Waitlist;
+    'language-lexicon': LanguageLexicon;
+    'mon-models': MonModel;
     sessions: Session;
     accounts: Account;
     verifications: Verification;
@@ -110,6 +112,8 @@ export interface Config {
     'integrity-runs': IntegrityRunsSelect<false> | IntegrityRunsSelect<true>;
     'idempotency-records': IdempotencyRecordsSelect<false> | IdempotencyRecordsSelect<true>;
     waitlist: WaitlistSelect<false> | WaitlistSelect<true>;
+    'language-lexicon': LanguageLexiconSelect<false> | LanguageLexiconSelect<true>;
+    'mon-models': MonModelsSelect<false> | MonModelsSelect<true>;
     sessions: SessionsSelect<false> | SessionsSelect<true>;
     accounts: AccountsSelect<false> | AccountsSelect<true>;
     verifications: VerificationsSelect<false> | VerificationsSelect<true>;
@@ -284,6 +288,7 @@ export interface MonInstance {
   hatchedAt: number;
   bond: number;
   stage: 'Baby' | 'Small' | 'Mid' | 'Max';
+  gender?: ('female' | 'male') | null;
   voiceLineageId?: string | null;
   serverConfirmedAt?: string | null;
   updatedAt: string;
@@ -423,6 +428,148 @@ export interface Waitlist {
   source?: string | null;
   updatedAt: string;
   createdAt: string;
+}
+/**
+ * NYC-Mon voice/dialect lexicon. Identity-linked language is opt-in/persona-driven only; never infer identity from a Caller.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "language-lexicon".
+ */
+export interface LanguageLexicon {
+  id: number;
+  key: string;
+  entryType: 'lexicon' | 'pronunciation_rule' | 'grammar_rule' | 'call_response' | 'ballroom_term' | 'style_rule';
+  canonicalText: string;
+  spokenForm?: string | null;
+  meaning: string;
+  category: string;
+  subcategory?: string | null;
+  /**
+   * Pipe-delimited tags, e.g. Black NYC English|AAE|NYC
+   */
+  communityTags?: string | null;
+  /**
+   * Pipe-delimited borough/neighborhood tags or all
+   */
+  boroughTags?: string | null;
+  register?: string | null;
+  tone?: string | null;
+  ageMin?: number | null;
+  usageFrequency?: ('low' | 'medium' | 'high') | null;
+  mirrorStrength?: ('none' | 'low' | 'medium' | 'high') | null;
+  ttsPronunciation?: string | null;
+  pronunciationNotes?: string | null;
+  grammarNotes?: string | null;
+  triggerText?: string | null;
+  responseText?: string | null;
+  relationshipGate?: string | null;
+  activationPolicy: string;
+  avoidWhen?: string | null;
+  identityInference: string;
+  profanity: 'none';
+  sourceBasis?: string | null;
+  sourceUrl?: string | null;
+  editorNotes?: string | null;
+  active: boolean;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "mon-models".
+ */
+export interface MonModel {
+  id: number;
+  speciesId:
+    | 'dex-001'
+    | 'dex-002'
+    | 'dex-003'
+    | 'dex-004'
+    | 'dex-005'
+    | 'dex-006'
+    | 'dex-007'
+    | 'dex-008'
+    | 'dex-009'
+    | 'dex-010'
+    | 'dex-011'
+    | 'dex-012'
+    | 'dex-013'
+    | 'dex-014'
+    | 'dex-061'
+    | 'dex-062'
+    | 'dex-063'
+    | 'dex-064'
+    | 'dex-065'
+    | 'dex-066'
+    | 'dex-067';
+  stage?: string | null;
+  bloodlineId?: string | null;
+  /**
+   * Only approved models reach the game. Uploading a new file sets this back to In review.
+   */
+  status: 'in-review' | 'approved';
+  bunnyUrl?: string | null;
+  /**
+   * Uniform scale applied in every scene. 1 keeps the exported size.
+   */
+  scale: number;
+  /**
+   * Moves the model so its feet sit on the floor at the origin.
+   */
+  position: {
+    x: number;
+    y: number;
+    z: number;
+  };
+  /**
+   * Turns the model so it faces the camera (+Z).
+   */
+  rotation: {
+    x: number;
+    y: number;
+    z: number;
+  };
+  /**
+   * Which clip in the file plays for each moment. Clip names come from the uploaded file.
+   */
+  animations?:
+    | {
+        role: 'idle' | 'asleep' | 'feed' | 'rest' | 'wake' | 'play' | 'hatch' | 'evolve';
+        clip: string;
+        loop?: boolean | null;
+        id?: string | null;
+      }[]
+    | null;
+  animationClips?:
+    | {
+        name?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  morphTargets?:
+    | {
+        name?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  heightMeters?: number | null;
+  credit?: {
+    author?: string | null;
+    license?: ('owned' | 'cc0' | 'cc-by-4.0' | 'other') | null;
+    sourceUrl?: string | null;
+  };
+  notes?: string | null;
+  updatedAt: string;
+  createdAt: string;
+  url?: string | null;
+  thumbnailURL?: string | null;
+  filename?: string | null;
+  mimeType?: string | null;
+  filesize?: number | null;
+  width?: number | null;
+  height?: number | null;
+  focalX?: number | null;
+  focalY?: number | null;
 }
 /**
  * Auto-generated from Better Auth schema (session)
@@ -1083,6 +1230,14 @@ export interface PayloadLockedDocument {
         value: number | Waitlist;
       } | null)
     | ({
+        relationTo: 'language-lexicon';
+        value: number | LanguageLexicon;
+      } | null)
+    | ({
+        relationTo: 'mon-models';
+        value: number | MonModel;
+      } | null)
+    | ({
         relationTo: 'sessions';
         value: number | Session;
       } | null)
@@ -1275,6 +1430,7 @@ export interface MonInstancesSelect<T extends boolean = true> {
   hatchedAt?: T;
   bond?: T;
   stage?: T;
+  gender?: T;
   voiceLineageId?: T;
   serverConfirmedAt?: T;
   updatedAt?: T;
@@ -1354,6 +1510,108 @@ export interface WaitlistSelect<T extends boolean = true> {
   source?: T;
   updatedAt?: T;
   createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "language-lexicon_select".
+ */
+export interface LanguageLexiconSelect<T extends boolean = true> {
+  key?: T;
+  entryType?: T;
+  canonicalText?: T;
+  spokenForm?: T;
+  meaning?: T;
+  category?: T;
+  subcategory?: T;
+  communityTags?: T;
+  boroughTags?: T;
+  register?: T;
+  tone?: T;
+  ageMin?: T;
+  usageFrequency?: T;
+  mirrorStrength?: T;
+  ttsPronunciation?: T;
+  pronunciationNotes?: T;
+  grammarNotes?: T;
+  triggerText?: T;
+  responseText?: T;
+  relationshipGate?: T;
+  activationPolicy?: T;
+  avoidWhen?: T;
+  identityInference?: T;
+  profanity?: T;
+  sourceBasis?: T;
+  sourceUrl?: T;
+  editorNotes?: T;
+  active?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "mon-models_select".
+ */
+export interface MonModelsSelect<T extends boolean = true> {
+  speciesId?: T;
+  stage?: T;
+  bloodlineId?: T;
+  status?: T;
+  bunnyUrl?: T;
+  scale?: T;
+  position?:
+    | T
+    | {
+        x?: T;
+        y?: T;
+        z?: T;
+      };
+  rotation?:
+    | T
+    | {
+        x?: T;
+        y?: T;
+        z?: T;
+      };
+  animations?:
+    | T
+    | {
+        role?: T;
+        clip?: T;
+        loop?: T;
+        id?: T;
+      };
+  animationClips?:
+    | T
+    | {
+        name?: T;
+        id?: T;
+      };
+  morphTargets?:
+    | T
+    | {
+        name?: T;
+        id?: T;
+      };
+  heightMeters?: T;
+  credit?:
+    | T
+    | {
+        author?: T;
+        license?: T;
+        sourceUrl?: T;
+      };
+  notes?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  url?: T;
+  thumbnailURL?: T;
+  filename?: T;
+  mimeType?: T;
+  filesize?: T;
+  width?: T;
+  height?: T;
+  focalX?: T;
+  focalY?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -1738,6 +1996,8 @@ export interface CollectionQueryWidget {
     relatedCollection:
       | 'users'
       | 'media'
+      | 'language-lexicon'
+      | 'mon-models'
       | 'sessions'
       | 'accounts'
       | 'verifications'
@@ -1778,6 +2038,8 @@ export interface ActivityWidget {
       | (
           | 'users'
           | 'media'
+          | 'language-lexicon'
+          | 'mon-models'
           | 'sessions'
           | 'accounts'
           | 'verifications'

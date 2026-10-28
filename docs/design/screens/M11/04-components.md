@@ -5,15 +5,17 @@
 | Shell | `HLynkShell` (`packages/ui/hlynk`) | `status`, `scheme`, `reducedMotion`, `trackpad`, `keys`, `statusRow`, `testIDPrefix="m11"` | exists |
 | LED + chip | `HLynkStatus` `{ led: 'incubating', label, progress }` → `{ led: 'ready', label }` | | exists |
 | Trackpad | `ShellTrackpadProps` | `label`, `onActivate`, `onCommit` + `commitLabel` (counting: warm), `accent` (`'hatch'` from ready) | exists; needs press-and-hold *duration* callbacks for warm (see below) |
-| Labelled equivalents | `TrackpadActions` | "Warm the case" / "Open the case" | exists |
-| Case | `CaptureCase` | see below | **NEW** |
+| Labelled equivalents | `TrackpadActions` | "Keep it warm" / "Hatch your egg" | exists |
+| Egg | `EggStill` (`packages/app/features/egg`) in a 120 pt `View` with image role, `m11.egg.a11y.label` | | exists |
 | Ring | `IncubationRing` (Skia, §3.4) | see below | **NEW** (named in the brief, not in the repo) |
 | Text plate | `View` on `signage-black` @ 88% | | kit token, no component |
 | Notification rows | M06's `m11.status.notify_off*`, `m11.status.schedule_failed` | in `statusRow` | strings exist; row component per M06 handoff |
 | Announcer | `Announcer` (`packages/ui/hlynk/Announcer.*`) | polite | exists |
 | Haptics | `haptics` façade (`packages/ui/haptics.*`) | | exists; needs a `warm` verb (see below) |
 
-## NEW `CaptureCase`
+## `CaptureCase` (not used on M11)
+
+> Superseded by Decision 29 (2026-10-21): M11 no longer renders `CaptureCase`. The capture case is only for capturing encountered Mons; the component and its story stay in the kit for that mechanic. The original spec is kept below for the record.
 
 The single-egg case (`V11 ¶64`), drawn in 2D now; a glb replaces the drawing later behind the same props. Look is an art-direction choice (Q4 open), not canon.
 
@@ -54,7 +56,7 @@ Skia arc, 4 pt stroke: track `concrete-700`, fill `signage-white`, full ring `or
 
 ## Variant: trackpad hold with a duration
 
-`TrackpadProps.onCommit` fires once after 600 ms. Warming needs "while held": `onHoldStart` / `onHoldEnd`, so the pad glows and the haptic pulses for as long as the thumb stays. Proposed addition to `Trackpad.types.ts`:
+`TrackpadProps.onCommit` fires once after 600 ms. Warming needs "while held": `onHoldStart` / `onHoldEnd`, so the haptic pulses for as long as the thumb stays (the pad glow went with the case, Decision 29). Proposed addition to `Trackpad.types.ts`:
 
 ```ts
 /** Press-and-hold that lasts as long as the press. Mutually exclusive with `onCommit`. */
@@ -70,7 +72,7 @@ The façade has `tap`, `success`, `warning`, `selection`. Add `warm: guard((p) =
 
 ## Shared breath clock
 
-One `SharedValue<number>` (0–1 phase of the 4000 ms period) owned by the shell's LED and exported from `packages/ui/hlynk` as `useLedBreathPhase()`. The LED, the pad glow and the warm haptic read it, so they never drift apart. NEW hook; `led-rhythm.ts` already resolves the period from `motionTokens['motion-led-breath']`.
+One `SharedValue<number>` (0–1 phase of the 4000 ms period) owned by the shell's LED and exported from `packages/ui/hlynk` as `useLedBreathPhase()`. The LED and the warm haptic read it (the case pad glow did too until Decision 29), so they never drift apart. NEW hook; `led-rhythm.ts` already resolves the period from `motionTokens['motion-led-breath']`.
 
 ## Token diffs
 

@@ -6,6 +6,7 @@
 // clearance by the caller.
 import { hashUnit, type VertexBuffer } from './geometry.ts';
 import { box, cone, cylinder, frame, type Frame } from './parts.ts';
+import { SURFACES } from './surfaces.ts';
 
 type Point = readonly [number, number];
 type Rgb = readonly number[];
@@ -58,11 +59,13 @@ export function bays(length: number, bay: number, inset = 0.6): number[] {
 export function emitStoop(buffer: VertexBuffer, f: Frame, at: number, stone: Rgb, iron: Rgb): void {
   const hw = STOOP_WIDTH / 2;
   const rise = STOOP_RISE / STOOP_STEPS;
+  buffer.surface(...SURFACES.stone);
   box(buffer, f, [at - hw, 0, 0], [at + hw, STOOP_RISE, STOOP_LANDING], stone, { skip: ['back', 'bottom'] });
   for (let k = 0; k < STOOP_STEPS - 1; k++) {
     const reach = STOOP_LANDING + (STOOP_STEPS - 1 - k) * STOOP_RUN;
     box(buffer, f, [at - hw, k * rise, STOOP_LANDING], [at + hw, (k + 1) * rise, reach], stone, { skip: ['back', 'bottom'] });
   }
+  buffer.surface(...SURFACES.iron);
   for (const side of [-1, 1]) {
     const x = at + side * (hw - 0.05);
     // Newel post at the foot, and the rail along the steps (a thin box tilted down the flight).
@@ -91,9 +94,21 @@ export function emitCornice(buffer: VertexBuffer, f: Frame, length: number, top:
   box(buffer, f, [-hl, top - 0.75, 0], [hl, top - 0.15, 0.45], color, { skip: ['back', 'left', 'right', 'top'] });
 }
 
+/**
+ * The brick parapet the cornice crowns: the wall continued a few courses
+ * past the roof line, a touch proud of the facade — the roofline lip a New
+ * York block reads on from the street. Front and top faces only; the ends
+ * meet the neighbours' parapets.
+ */
+export function emitParapet(buffer: VertexBuffer, f: Frame, length: number, top: number, color: Rgb): void {
+  const hl = length / 2;
+  box(buffer, f, [-hl, top - 0.08, -0.02], [hl, top + 0.34, 0.12], color, { skip: ['bottom', 'back', 'left', 'right'] });
+}
+
 /** One floor of a zig-zag fire escape: balcony, front rail, posts and the ladder down to the floor below. */
 export function emitFireEscapeFloor(buffer: VertexBuffer, f: Frame, at: number, floorY: number, iron: Rgb, flip: boolean): void {
   const w = 3.0; const d = 0.85;
+  buffer.surface(...SURFACES.iron);
   const x0 = at - w / 2; const x1 = at + w / 2;
   box(buffer, f, [x0, floorY - 0.06, 0], [x1, floorY, d], iron, { skip: ['back'] });
   box(buffer, f, [x0, floorY + 0.95, d - 0.04], [x1, floorY + 1.0, d], iron, { skip: ['back', 'bottom', 'left', 'right'] });
@@ -108,10 +123,11 @@ export function emitFireEscapeFloor(buffer: VertexBuffer, f: Frame, at: number, 
 }
 
 /** A shop awning at local x `at`: a sloping canopy, its valance and two side cheeks. */
-export function emitAwning(buffer: VertexBuffer, f: Frame, at: number, width: number, color: Rgb): void {
+export function emitAwning(buffer: VertexBuffer, f: Frame, at: number, width: number, color: Rgb, top = 3.05, reach = 1.3): void {
+  buffer.surface(...SURFACES.fabric);
   const p = (lx: number, ly: number, lz: number) => [f.x + f.oz * lx + f.ox * lz, f.y + ly, f.z - f.ox * lx + f.oz * lz] as const;
   const x0 = at - width / 2; const x1 = at + width / 2;
-  const top = 3.05; const low = 2.55; const reach = 1.3; const valance = 0.28;
+  const low = top - 0.5 * (reach / 1.3); const valance = 0.28;
   const slope = Math.atan2(top - low, reach);
   const n = [f.ox * Math.sin(slope), Math.cos(slope), f.oz * Math.sin(slope)] as const;
   buffer.quad(p(x0, low, reach), p(x1, low, reach), p(x1, top, 0), p(x0, top, 0), n, color);
@@ -133,13 +149,16 @@ export function emitWaterTower(buffer: VertexBuffer, x: number, z: number, roof:
   const f = frame(x, z, [0, 1], roof);
   const r = 1.5 * scale;
   const legs = 2.2 * scale;
+  buffer.surface(...SURFACES.iron);
   for (const [lx, lz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]] as const) {
     const cx = lx * r * 0.7; const cz = lz * r * 0.7;
     box(buffer, f, [cx - 0.09, 0, cz - 0.09], [cx + 0.09, legs, cz + 0.09], steel, { skip: ['bottom', 'top'] });
   }
   box(buffer, f, [-r * 1.05, legs - 0.12, -r * 1.05], [r * 1.05, legs, r * 1.05], steel, {});
   const tank = 3.0 * scale;
+  buffer.surface(...SURFACES.wood);
   cylinder(buffer, f, 0, 0, r, legs, legs + tank, 8, wood);
+  buffer.surface(...SURFACES.tarRoof);
   cone(buffer, f, 0, 0, r * 1.08, legs + tank, legs + tank + r * 0.75, 8, roofColor);
 }
 

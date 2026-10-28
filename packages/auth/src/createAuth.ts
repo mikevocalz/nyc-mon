@@ -3,7 +3,7 @@ import { inferAdditionalFields } from 'better-auth/client/plugins';
 import { createAuthClient } from 'better-auth/react';
 import type { AuthResult } from './AuthResult.ts';
 import { AUTH_BASE_PATH } from './paths.ts';
-import type { SignInRequest } from './SignInRequest.ts';
+import type { SignInRequest, SocialProvider } from './SignInRequest.ts';
 import type { SignUpRequest } from './SignUpRequest.ts';
 import { toAuthResult } from './toAuthResult.ts';
 
@@ -11,11 +11,14 @@ import { toAuthResult } from './toAuthResult.ts';
 export interface CreateAuthOptions {
   /** Origin of apps/admin-vite, the host that serves `/payload-api/auth` (docs/adr/0003-admin-app-split.md). */
   baseURL: string;
+  /** Native only: the Origin header to send ({@link APP_ORIGIN}). Browsers set their own. */
+  appOrigin?: string;
 }
 
-function buildClient(baseURL: string) {
+function buildClient(baseURL: string, appOrigin: string | undefined) {
   return createAuthClient({
     baseURL: `${baseURL}${AUTH_BASE_PATH}`,
+    ...(appOrigin === undefined ? {} : { fetchOptions: { headers: { origin: appOrigin } } }),
     plugins: [
       passkeyClient(),
       inferAdditionalFields({
@@ -30,8 +33,8 @@ function buildClient(baseURL: string) {
  * directly. Every call resolves to an {@link AuthResult}; none throws on an
  * auth failure.
  */
-export function createAuth({ baseURL }: CreateAuthOptions) {
-  const client = buildClient(baseURL);
+export function createAuth({ baseURL, appOrigin }: CreateAuthOptions) {
+  const client = buildClient(baseURL, appOrigin);
 
   async function signIn(request: SignInRequest): Promise<AuthResult> {
     switch (request.method) {
@@ -71,6 +74,11 @@ export function createAuth({ baseURL }: CreateAuthOptions) {
     return toAuthResult(await client.signOut());
   }
 
+  /** Explicitly links a social identity to the already signed-in Caller. */
+  async function linkSocial(provider: SocialProvider, callbackURL: string): Promise<AuthResult> {
+    return toAuthResult(await client.linkSocial({ provider, callbackURL }));
+  }
+
   /** M03 "Forgot password?": always resolves ok on the client so the answer never reveals whether the email exists. */
   async function requestPasswordReset(email: string): Promise<AuthResult> {
     return toAuthResult(await client.requestPasswordReset({ email }));
@@ -85,6 +93,7 @@ export function createAuth({ baseURL }: CreateAuthOptions) {
     signIn,
     signUp,
     signOut,
+    linkSocial,
     requestPasswordReset,
     resendVerification,
     /** React hook: the current session, or `null` when signed out. */

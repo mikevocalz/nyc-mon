@@ -1,0 +1,70 @@
+<!doctype html>
+<!--
+  GLB playback check for the hatch pipeline. Serve the repo root over HTTP and
+  open /tooling/blender/hatching/playback/?egg=metro-egg. playback.mjs drives it
+  headlessly and screenshots each phase boundary. three.js comes from the
+  copy packages/ui already installs (0.186.1), loaded with the stock GLTFLoader.
+-->
+<html><head><meta charset="utf-8"><title>Hatch playback</title>
+<style>html,body{margin:0;background:#1d2027}canvas{display:block}</style>
+<script type="importmap">{"imports":{"three":"/packages/ui/node_modules/three/build/three.module.js","three/addons/":"/packages/ui/node_modules/three/examples/jsm/"}}</script>
+</head><body>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+
+const egg = new URLSearchParams(location.search).get('egg') ?? 'metro-egg';
+const base = `/packages/assets/eggs/${egg}/`;
+const manifest = await (await fetch(base + 'hatch.manifest.json')).json();
+const W = 960, H = 720;
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setSize(W, H);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1d2027);
+scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
+const key = new THREE.DirectionalLight(0xffffff, 2.2);
+key.position.set(0.4, 1, 0.9);
+scene.add(key);
+const ground = new THREE.Mesh(new THREE.CircleGeometry(0.5, 64), new THREE.MeshStandardMaterial({ color: 0x2a2e37, roughness: 0.9 }));
+ground.rotation.x = -Math.PI / 2;
+scene.add(ground);
+const camera = new THREE.PerspectiveCamera(32, W / H, 0.01, 10);
+camera.position.set(0.18, 0.2, 0.5);
+camera.lookAt(0, 0.06, 0);
+
+const gltf = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(base + manifest.runtime.glb);
+scene.add(gltf.scene);
+const mixer = new THREE.AnimationMixer(gltf.scene);
+const clips = Object.fromEntries(gltf.animations.map((c) => [c.name, c]));
+const missing = Object.values(manifest.runtime.clipMap).filter((n) => !clips[n]);
+let action = null;
+
+// Deterministic seek: play one clip from 0 and jump the mixer to `seconds`.
+// Attention clips only move the Baby, so the hatch clip is held at its last
+// frame underneath them, the way the runtime chains the two.
+const once = (name) => { const a = mixer.clipAction(clips[name]); a.reset().play(); a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; return a; };
+window.__seek = (clipName, seconds) => {
+  mixer.stopAllAction();
+  if (clipName !== 'hatch') { once('hatch'); mixer.setTime(clips.hatch.duration); }
+  action = once(clipName);
+  if (clipName !== 'hatch') action.time = 0;
+  mixer.update(clipName === 'hatch' ? 0 : 0);
+  if (clipName === 'hatch') mixer.setTime(seconds); else { action.time = seconds; mixer.update(0); }
+  renderer.render(scene, camera);
+  const weights = {};
+  gltf.scene.traverse((o) => { if (o.morphTargetInfluences) weights[o.name] = o.morphTargetInfluences.map((w) => +w.toFixed(3)); });
+  const pos = (n) => { const o = gltf.scene.getObjectByName(n); const v = new THREE.Vector3(); o.getWorldPosition(v); return v.toArray().map((x) => +x.toFixed(4)); };
+  return { weights, baby: pos('PROXY_Baby'), crown: pos('Shell_Crown') };
+};
+window.__info = {
+  clips: gltf.animations.map((c) => ({ name: c.name, duration: +c.duration.toFixed(3), tracks: c.tracks.length })),
+  missing,
+  meshes: (() => { const m = []; gltf.scene.traverse((o) => o.isMesh && m.push(o.name)); return m; })(),
+  manifest: manifest.runtime,
+};
+document.title = 'ready';
+</script></body></html>

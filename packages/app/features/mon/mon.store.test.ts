@@ -48,6 +48,7 @@ function mon(id: string, speciesId: string): MonInstance {
     hatchedAt: T0,
     bond: 0,
     stage: 'Baby',
+    gender: null,
     voiceLineageId: null,
     originBlock: null,
     habitatTags: [],
@@ -258,6 +259,7 @@ describe('selectors', () => {
 describe('model slots', () => {
   it('ship one empty slot per bloodline × stage', () => {
     assert.equal(MON_MODEL_SLOTS.length, 3 * 5);
+    assert.deepEqual([...new Set(MON_MODEL_SLOTS.map((slot) => slot.bloodlineId))], ['F01', 'F02', 'F12']);
     for (const slot of MON_MODEL_SLOTS) {
       assert.equal(slot.glbUri, null);
       assert.ok(Object.values(slot.clips).every((clip) => clip === null));

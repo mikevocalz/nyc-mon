@@ -2,6 +2,7 @@ export { useAuditStore } from './audit.ts';
 export { useCallersStore } from './callers.ts';
 export { useConsentStore } from './consent.ts';
 export { useContentStore } from './content.ts';
+export { useModelsStore, type ModelDraft, type ModelFilter, type ModelYaw, type PendingModel } from './models.ts';
 export { useMonsStore } from './mons.ts';
 export { useOverviewStore } from './overview.ts';
 export { useSettingsStore } from './settings.ts';

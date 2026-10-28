@@ -8,7 +8,9 @@
   "exports": {
     ".": "./index.ts",
     "./mons": "./mons/index.ts",
-    "./eggs": "./eggs.ts"
+    "./starters": "./mons/starters.ts",
+    "./eggs": "./eggs.ts",
+    "./voices": "./voices.ts"
   },
   "scripts": {
     "lint": "eslint",

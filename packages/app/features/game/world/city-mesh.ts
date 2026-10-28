@@ -2,19 +2,33 @@
 // (masonry and glass), roofs, contact shadows, land-use areas, sidewalks,
 // roads and landmark accents. Every building, road and area lands in a
 // shared vertex buffer, so draw calls stay flat as the feature count grows
-// (metro-live's mergeByMaterial, applied while building).
+// (metro-live's mergeByMaterial, applied while building). Beside colour,
+// each vertex carries its surface family — aRoughMetal from the surfaces.ts
+// ranges by a building/road id hash, and aOcclusion from the contact-shadow
+// field — which only the flagged PBR materials read; the cel lane ignores
+// the extra attributes entirely.
 import type { Three } from '@acme/ui/three';
-import type { BuildingClass, CityBuilding, CityDatasetV2, CityLandmark, CityRoad, RoadClass } from '../city-dataset.ts';
+import type { BuildingClass, CityBuilding, CityDatasetV3, CityLandmark, CityRoad, RoadClass } from '../city-dataset.ts';
 import { counterClockwise, hashUnit, mapArea, pairs, pointInRing, ribbon, VertexBuffer } from './geometry.ts';
 import {
-  bays, emitAwning, emitCornice, emitFireEscapeFloor, emitStoop, emitWaterTower, fireEscapeFloors, FLOOR_HEIGHT, hasFireEscape,
-  hasShopSign, hasStoop, hasWaterTower, shopWords, STOOP_REACH, STOOP_WIDTH, towerSpot, wallFrame,
+  emitAwning, emitCornice, emitFireEscapeFloor, emitParapet, emitStoop, emitWaterTower, fireEscapeFloors, FLOOR_HEIGHT,
+  hasFireEscape, hasShopSign, hasStoop, hasWaterTower, shopWords, STOOP_REACH, STOOP_WIDTH, towerSpot, wallFrame,
 } from './facade-detail.ts';
 import { emitStackedText, emitText, textWidth, type TextFace } from './lettering.ts';
+import {
+  adSurface, emitBulkhead, emitChimneyPots, emitNychaBalcony, emitNychaEntrance, emitNychaLightStrip, emitNychaPanels,
+  emitRoofAc, emitStandpipe, emptyFutureStats, FUTURE_LAYER, hasNychaBalcony, isNychaTower, NYCHA_BALCONY_TOP,
+  roofscapePlan, scaledRing, type AdSurface, type FutureLayerStats,
+} from './future-layer.ts';
 import { BandedBuffer, box } from './parts.ts';
 import type { CityMaterials } from './materials.ts';
+import { WINDOW_GRID } from './windows.ts';
 import { createStreetClearance, WALKWAY_CLASSES, type StreetClearance } from './walkability.ts';
 import { AWNING_TONES, CITY_COLORS, hexToRgb, WALL_TONES, type CityColor } from './palette.ts';
+import { CURB_HEIGHT, VD_LANE } from './curb.ts';
+import { VD_STOREFRONTS } from './vd-storefronts.ts';
+import { facadePhoto } from './vd-facades.ts';
+import { buildingSurface, ContactField, contactReach, surfacePick, SURFACES, wallAo } from './surfaces.ts';
 
 type Point = [number, number];
 type Mesh = InstanceType<Three['Mesh']>;
@@ -37,11 +51,13 @@ export function areaLayer(kind: string): number {
 export const SHADOW_BAND_METRES = 50;
 /** ... out to this distance north and south of them. */
 export const SHADOW_RADIUS = 160;
-/** The z bands to draw for a focus z: [first, last], inclusive, clamped to the tile. */
-export function shadowBands(focusZ: number, minZ: number, bandCount: number): [number, number] {
+/** The z bands to draw for a focus z: [first, last], inclusive, clamped to the tile. `out` reuses the caller's tuple so per-frame callers allocate nothing. */
+export function shadowBands(focusZ: number, minZ: number, bandCount: number, out: [number, number] = [0, 0]): [number, number] {
   const first = Math.floor((focusZ - SHADOW_RADIUS - minZ) / SHADOW_BAND_METRES);
   const last = Math.floor((focusZ + SHADOW_RADIUS - minZ) / SHADOW_BAND_METRES);
-  return [Math.max(0, Math.min(bandCount - 1, first)), Math.max(0, Math.min(bandCount - 1, last))];
+  out[0] = Math.max(0, Math.min(bandCount - 1, first));
+  out[1] = Math.max(0, Math.min(bandCount - 1, last));
+  return out;
 }
 
 const rgb = (key: CityColor) => hexToRgb(CITY_COLORS[key]);
@@ -49,8 +65,8 @@ const tint = (color: readonly number[], amount: number) => color.map((v) => Math
 
 const CENTRE_LINE_MIN_WIDTH = 9;
 
-/** Triangulate a ring (with holes) and emit it facing up at height y, counter-clockwise on the map. */
-function emitFlat(THREE: Three, buffer: VertexBuffer, ring: Point[], holes: Point[][], y: number, color: readonly number[]): void {
+/** Triangulate a ring (with holes) and emit it facing up at height y, counter-clockwise on the map. `ao` bakes per-corner occlusion when given. */
+function emitFlat(THREE: Three, buffer: VertexBuffer, ring: Point[], holes: Point[][], y: number, color: readonly number[], ao?: (x: number, z: number) => number): void {
   const contour = ring.map(([x, z]) => new THREE.Vector2(x, z));
   const holeVectors = holes.map((hole) => hole.map(([x, z]) => new THREE.Vector2(x, z)));
   const all = [...ring, ...holes.flat()];
@@ -59,12 +75,15 @@ function emitFlat(THREE: Three, buffer: VertexBuffer, ring: Point[], holes: Poin
     let [a, b, c] = face.map((i) => all[i]!) as [Point, Point, Point];
     if (!a || !b || !c) continue;
     if (mapArea([a, b, c]) < 0) [b, c] = [c, b];
-    for (const [x, z] of [a, b, c]) buffer.vertex(x, y, z, 0, 1, 0, color, x, z);
+    for (const [x, z] of [a, b, c]) buffer.vertex(x, y, z, 0, 1, 0, color, x, z, ao?.(x, z));
   }
 }
 
-/** Walls around a ring. Outer rings counter-clockwise on the map, holes clockwise, so normals face out of the solid. */
-function emitWalls(buffer: VertexBuffer, ring: Point[], bottom: number, top: number, color: readonly number[], outward = 0): void {
+/**
+ * Walls around a ring. Outer rings counter-clockwise on the map, holes clockwise, so normals face out of the solid. `ao` is the [bottom, top] occlusion pair.
+ * `uvScale` rescales the metre uv the facade shader grids over: the v3 bake's floor height and window width land the shader's fixed rows and columns on the real pitch.
+ */
+function emitWalls(buffer: VertexBuffer, ring: Point[], bottom: number, top: number, color: readonly number[], outward = 0, ao?: readonly [number, number], uvScale: readonly [number, number] = [1, 1]): void {
   let along = 0;
   for (let i = 0; i < ring.length; i++) {
     const [ax, az] = ring[i]!;
@@ -79,7 +98,11 @@ function emitWalls(buffer: VertexBuffer, ring: Point[], bottom: number, top: num
     buffer.quad(
       [ax + ox, bottom, az + oz], [bx + ox, bottom, bz + oz], [bx + ox, top, bz + oz], [ax + ox, top, az + oz],
       [nx, 0, nz], color,
-      [[along, bottom], [along + length, bottom], [along + length, top], [along, top]],
+      [
+        [along * uvScale[0], bottom * uvScale[1]], [(along + length) * uvScale[0], bottom * uvScale[1]],
+        [(along + length) * uvScale[0], top * uvScale[1]], [along * uvScale[0], top * uvScale[1]],
+      ],
+      ao && [ao[0], ao[0], ao[1], ao[1]],
     );
     along += length;
   }
@@ -167,6 +190,26 @@ function streetFace(ring: Point[], roads: readonly CityRoad[]): { mid: Point; ou
   return best;
 }
 
+/**
+ * The front face a v3 building carries as `fi` (the stored ring's edge index), in the
+ * same shape `streetFace` returns. Right of travel is outward only on a
+ * counter-clockwise ring, so a stored clockwise ring flips the normal.
+ */
+function recordedFace(building: CityBuilding): { mid: Point; out: Point; length: number } | null {
+  const i = building.frontEdgeIndex;
+  if (i === undefined || i < 0) return null;
+  const pts = pairs(building.ring);
+  const n = pts.length;
+  if (i >= n) return null;
+  const a = pts[i]!;
+  const b = pts[(i + 1) % n]!;
+  const length = Math.hypot(b[0] - a[0], b[1] - a[1]);
+  if (length < 1e-6) return null;
+  const [ox, oz] = normalOf(a[0], a[1], b[0], b[1]);
+  const out: Point = mapArea(pts) < 0 ? [-ox, -oz] : [ox, oz];
+  return { mid: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], out, length };
+}
+
 function segmentDistance(x: number, z: number, ax: number, az: number, bx: number, bz: number): number {
   const dx = bx - ax; const dz = bz - az;
   const len = dx * dx + dz * dz;
@@ -175,7 +218,7 @@ function segmentDistance(x: number, z: number, ax: number, az: number, bx: numbe
 }
 
 function landmarkAccents(buffer: VertexBuffer, text: VertexBuffer, landmark: CityLandmark, building: CityBuilding, ring: Point[], roads: readonly CityRoad[]): void {
-  const face = streetFace(ring, roads);
+  const face = recordedFace(building) ?? streetFace(ring, roads);
   const h = building.heightMeters;
   switch (landmark.key) {
     case 'apollo-theater': {
@@ -217,7 +260,19 @@ function landmarkAccents(buffer: VertexBuffer, text: VertexBuffer, landmark: Cit
 export interface CityMeshStats {
   buildings: number; roads: number; areas: number; triangles: number; drawCalls: number; neonTrims: number; storefronts: number; billboards: number;
   cornices: number; stoops: number; fireEscapes: number; awnings: number; shopSigns: number; waterTowers: number;
+  parapets: number;
+  /** The flagged future layer (future-layer.ts): all zero when FUTURE_LAYER is off. */
+  future: FutureLayerStats;
 }
+
+/**
+ * The `d` detail bitset (city-dataset.ts §5.2 order: cornice, fire escape,
+ * stoop, water tower, storefront, setbacks, gable). Where the bake carries a
+ * mask, each bit replaces the v2 hash outright. Bits 5 (setbacks) and 6
+ * (gable) are data only for now: the mesh has no setback or gable feature
+ * for them to drive, and `e` provenance bits never reach the renderer.
+ */
+const DETAIL = { cornice: 1, fireEscape: 2, stoop: 4, waterTower: 8, storefront: 16 } as const;
 
 /** Masonry fronts that carry a cornice. */
 const CORNICE_CLASSES: ReadonlySet<BuildingClass> = new Set(['brownstone', 'brick', 'nycha', 'civic', 'church', 'plain']);
@@ -238,6 +293,13 @@ const BILLBOARD_PAIRS = [
   ['neonOrange', 'neonApple'], ['neonRoyal', 'neonCarolina'], ['neonCarolina', 'neonLeaf'], ['neonApple', 'neonRoyal'], ['neonOrange', 'neonRoyal'],
 ] as const satisfies readonly (readonly [CityColor, CityColor])[];
 export const MAX_BILLBOARDS = 48;
+/**
+ * Top edge a hologram can mount at, metres. The chase camera never pitches
+ * to a roofline, so boards clamp into the band a player sees: above the
+ * storefront signs (~4 m), below the second storey. Taller facades still
+ * qualify — only their mount height drops.
+ */
+export const BILLBOARD_TOP = 12;
 
 /**
  * Share of buildings of a height that carry a neon roofline trim. Taller
@@ -253,7 +315,7 @@ export function neonKeyFor(id: string): (typeof NEON_KEYS)[number] {
   return NEON_KEYS[Math.floor(hashUnit(`${id}:neon`) * NEON_KEYS.length) % NEON_KEYS.length]!;
 }
 
-export function buildCityMeshes(THREE: Three, dataset: CityDatasetV2, materials: CityMaterials, sunAway: Point, clearance: StreetClearance = createStreetClearance(dataset)) {
+export function buildCityMeshes(THREE: Three, dataset: CityDatasetV3, materials: CityMaterials, sunAway: Point, clearance: StreetClearance = createStreetClearance(dataset), future = FUTURE_LAYER) {
   const masonry = new VertexBuffer(262144);
   const glass = new VertexBuffer();
   const roofs = new VertexBuffer(131072);
@@ -268,10 +330,20 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV2, materials:
   const detail = new BandedBuffer();
   const landmarkText = new VertexBuffer();
   const texts: (TextFace & { text: string })[] = [];
+  const adSurfaces: AdSurface[] = [];
+  const futureStats = emptyFutureStats();
   let cornices = 0; let stoops = 0; let fireEscapes = 0; let awnings = 0; let shopSigns = 0; let waterTowers = 0;
+  let parapets = 0;
   const landmarkByBuilding = new Map(dataset.landmarks.map((l) => [l.buildingId, l]));
   const shadowColor = rgb('shadow');
   const commercial = new SegmentGrid(dataset.roads.filter((r) => COMMERCIAL.has(r.class)));
+  // vd lane: Valdrada's measured 125th Street storefronts, by nyc-mon building id.
+  const storefronts = new Map<string, (typeof VD_STOREFRONTS)[number][]>();
+  if (VD_LANE) for (const front of VD_STOREFRONTS) storefronts.set(front.b, [...(storefronts.get(front.b) ?? []), front]);
+  // Baked occlusion: footprints collect into the contact-shadow field as the
+  // banded loop runs, and the ground layers emit after it queries them.
+  const field = new ContactField();
+  const occlude = (x: number, z: number) => field.occlusion(x, z);
 
   // Buildings in z bands, so the contact shadows of one band are one vertex range (drawn by distance).
   const minZ = -dataset.extentMeters - SHADOW_BAND_METRES;
@@ -293,7 +365,16 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV2, materials:
   for (const { building, band: buildingBand } of banded) {
     while (band < buildingBand) bandStart[++band] = shadows.vertexCount;
     detail.mark(buildingBand);
-    const ring = counterClockwise(pairs(building.ring));
+    // The ccw ring and whether the stored order flipped: `fi` indexes the
+    // stored ring, so a stored clockwise ring shifts the recorded front edge.
+    const flat = pairs(building.ring);
+    const reversed = mapArea(flat) < 0;
+    const ring = reversed ? [...flat].reverse() : flat;
+    const n = ring.length;
+    const frontEdge =
+      building.frontEdgeIndex !== undefined && building.frontEdgeIndex >= 0 && building.frontEdgeIndex < n
+        ? reversed ? (((n - 2 - building.frontEdgeIndex) % n) + n) % n : building.frontEdgeIndex
+        : -1;
     const holes = building.holes.map((hole) => counterClockwise(pairs(hole)).reverse());
     const landmark = landmarkByBuilding.get(building.id);
     const variation = 0.92 + hashUnit(building.id) * 0.16;
@@ -301,8 +382,25 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV2, materials:
     const wall = tint(rgb(wallKey), variation);
     const target = building.class === 'glass' ? glass : masonry;
     const h = building.heightMeters;
-    emitWalls(target, ring, 0, h, wall);
-    for (const hole of holes) emitWalls(target, hole, 0, h, wall);
+    // Surface family per building id, and the wall-base occlusion ramp over
+    // this building's shadow reach (surfaces.ts). Cornices written into the
+    // same buffer inherit the wall pick — stone trim belongs to the family.
+    target.surface(...buildingSurface(building.class, building.id));
+    target.facade(...facadePhoto(building));
+    const reach = contactReach(h);
+    const wallOcclusion: [number, number] = [wallAo(0, reach), wallAo(h, reach)];
+    field.add(ring, h);
+    // v3 facts: `fh` and `ww` rescale the wall uv so the facade shader's
+    // fixed window grid lands on the real floor pitch and bay module
+    // (scale 1 on v2 buildings — the emitted bytes are unchanged there).
+    const grid = building.class === 'glass' ? WINDOW_GRID.glass : WINDOW_GRID.masonry;
+    const uvScale: [number, number] = [
+      grid.bay / (building.windowWidthMeters ?? grid.bay),
+      grid.floor / (building.floorHeightMeters ?? grid.floor),
+    ];
+    emitWalls(target, ring, 0, h, wall, 0, wallOcclusion, uvScale);
+    for (const hole of holes) emitWalls(target, hole, 0, h, wall, 0, wallOcclusion, uvScale);
+    roofs.surface(...SURFACES.tarRoof);
     const roofColor = tint(rgb('roof').map((v, i) => v * 0.8 + wall[i]! * 0.2), variation);
     emitFlat(THREE, roofs, ring, holes, h, roofColor);
     emitShadow(shadows, ring, Math.max(1.2, Math.min(5, h * 0.12)), sunAway, shadowColor);
@@ -315,10 +413,36 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV2, materials:
       trims++;
     }
     let stooped = false;
+    const measured = storefronts.get(building.id);
+    if (measured) {
+      for (const front of measured) {
+        const counts = emitMeasuredFront(front, neon, detail.buffer, texts);
+        shopSigns += counts.signs;
+        awnings += counts.awnings;
+      }
+    }
+    let escaped = false;
+    let entranced = false;
+    // v3 facts: `d` bit-gates each detail feature, `f`/`fh` set the escape's
+    // floor count and pitch, `ww` the storefront bays, `sh` the band height.
+    // Where the mask is absent (v2 tiles, unmatched records) the hash rules
+    // below run exactly as before.
+    const mask = building.detailMask;
+    const floorPitch = building.floorHeightMeters ?? FLOOR_HEIGHT;
+    const escapeFloors = building.floors !== undefined ? Math.max(0, building.floors - 1) : fireEscapeFloors(h);
+    const shopTop = building.storefrontHeightMeters !== undefined && building.storefrontHeightMeters > 0 ? building.storefrontHeightMeters : undefined;
+    // The wall uv's `u` is metres along the ring, continuous from vertex 0 —
+    // the facade shader's column grid (gates, window panes) keys on it, so
+    // storefront geometry must sit on the same lattice, not on edge-centred
+    // bays: column `c` covers metres [c*pitch, (c+1)*pitch) of `u`.
+    let u0 = 0;
     for (let i = 0; i < ring.length; i++) {
       const [ax, az] = ring[i]!;
       const [bx, bz] = ring[(i + 1) % ring.length]!;
       const length = Math.hypot(bx - ax, bz - az);
+      if (length < 1e-6) continue;
+      const edgeStart = u0;
+      u0 += length;
       if (length < 4) continue;
       const out = normalOf(ax, az, bx, bz);
       const mid: Point = [(ax + bx) / 2, (az + bz) / 2];
@@ -327,15 +451,47 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV2, materials:
       // A street face: a carriageway within about a sidewalk's width of the wall.
       const facesStreet = clearance.kerbGap(mid[0] + out[0] * 3.5, mid[1] + out[1] * 3.5) < 7;
       const onAvenue = length >= 5 && h >= 6 && commercial.nearest(mid[0] + out[0] * 6, mid[1] + out[1] * 6) <= 14;
+      // NYCHA facelift (future-layer.ts, PR pack art direction): the modular
+      // panel grid, planted balconies and vertical light go on every long
+      // edge — the towers stand in campuses, so the kit does not wait for a
+      // street face. The upgraded entrance lands on the recorded front.
+      if (future && isNychaTower(building) && length >= 8) {
+        emitNychaPanels(detail.buffer, f, length, h, floorPitch, rgb('iron'), tint(rgb('civic'), 0.8));
+        futureStats.nychaPanels++;
+        emitNychaLightStrip(neon, f, length, h, rgb('windowWarm'));
+        futureStats.lightStrips++;
+        const balconyTop = Math.floor((h * NYCHA_BALCONY_TOP) / floorPitch);
+        for (let k = 2; k <= balconyTop; k++) {
+          if (!hasNychaBalcony(building.id, i, k)) continue;
+          const at = (hashUnit(`${building.id}:${i}:${k}:balcAt`) - 0.5) * Math.max(0, length - 5);
+          emitNychaBalcony(detail.buffer, f, at, k * floorPitch, rgb('curb'), rgb('iron'), rgb('leafDark'));
+          futureStats.nychaBalconies++;
+        }
+        const onNychaFront = frontEdge < 0 || i === frontEdge;
+        if (onNychaFront && !entranced) {
+          const at = (hashUnit(`${building.id}:${i}:doorAt`) - 0.5) * Math.max(0, length - 8);
+          emitNychaEntrance(detail.buffer, neon, f, at, rgb('limestone'), rgb('windowWarm'), rgb('cedar'), rgb('leafDark'));
+          entranced = true;
+          futureStats.nychaEntrances++;
+        }
+      }
       if (!facesStreet && !onAvenue) continue;
+      // The recorded front edge: single-face details land there when the tile says which face is the front.
+      const onFront = frontEdge < 0 || i === frontEdge;
 
-      // Cornice along the roof line of masonry street fronts.
-      if (CORNICE_CLASSES.has(building.class) && h < 45) {
+      // Cornice along the roof line of masonry street fronts, with the
+      // brick parapet lip it crowns — the roofline a New York block reads
+      // on. The lip goes to the near-field detail band; at overview range
+      // the cornice still carries the line.
+      if (mask === undefined ? CORNICE_CLASSES.has(building.class) && h < 45 : (mask & DETAIL.cornice) !== 0) {
         emitCornice(masonry, f, length, h, tint(rgb('cornice').map((v, k) => v * 0.6 + wall[k]! * 0.4), 1));
+        emitParapet(detail.buffer, f, length, h, tint(wall, 0.82));
         cornices++;
+        parapets++;
       }
       // A brownstone's stoop, off one street face, when the sidewalk has room for it.
-      if (building.class === 'brownstone' && !onAvenue && !stooped && length >= 5 && hasStoop(building.id)) {
+      const wantsStoop = mask === undefined ? building.class === 'brownstone' && hasStoop(building.id) : (mask & DETAIL.stoop) !== 0 && onFront;
+      if (wantsStoop && !onAvenue && !stooped && length >= 5) {
         const at = (hashUnit(`${building.id}:door`) - 0.5) * Math.max(0, length - STOOP_WIDTH - 1.2);
         const tip: Point = [mid[0] + along[0] * at + out[0] * (STOOP_REACH + 0.2), mid[1] + along[1] * at + out[1] * (STOOP_REACH + 0.2)];
         if (clearance.standable(tip[0], tip[1])) {
@@ -344,56 +500,110 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV2, materials:
           stoops++;
         }
       }
-      // Zig-zag fire escape on a tenement front, one per face, over a central bay.
-      if (length >= 7 && hasFireEscape(building.id, i, h, building.class)) {
-        const floors = fireEscapeFloors(h);
+      // Zig-zag fire escape on a tenement front, one per building on its recorded front, over a central bay.
+      const wantsEscape = mask === undefined ? hasFireEscape(building.id, i, h, building.class) : (mask & DETAIL.fireEscape) !== 0 && onFront && !escaped;
+      if (length >= 7 && wantsEscape && escapeFloors > 0) {
         const at = (hashUnit(`${building.id}:${i}:bay`) - 0.5) * Math.max(0, length - 4);
-        for (let k = 1; k <= floors; k++) emitFireEscapeFloor(detail.buffer, f, at, k * FLOOR_HEIGHT, rgb('iron'), k % 2 === 0);
+        for (let k = 1; k <= escapeFloors; k++) emitFireEscapeFloor(detail.buffer, f, at, k * floorPitch, rgb('iron'), k % 2 === 0);
+        escaped = true;
         fireEscapes++;
       }
       if (!onAvenue) continue;
 
       // Storefronts: awnings over most bays, and either a lit shop sign or the plain fascia band.
-      for (const at of bays(length, 4.5)) {
-        if (hashUnit(`${building.id}:${i}:${at}:awning`) > 0.55) continue;
-        const tone = AWNING_TONES[Math.floor(hashUnit(`${building.id}:${i}:${at}:hue`) * AWNING_TONES.length) % AWNING_TONES.length]!;
-        emitAwning(detail.buffer, f, at, 3.8, rgb(tone));
-        awnings++;
-      }
-      if (hasShopSign(building.id, i)) {
-        const width = Math.min(length * 0.75, 9);
-        const panel = rgb(SHOP_SIGN_TONES[Math.floor(hashUnit(`${building.id}:${i}:panel`) * SHOP_SIGN_TONES.length) % SHOP_SIGN_TONES.length]!);
-        box(neon, f, [-width / 2, 3.15, 0], [width / 2, 4.05, 0.18], panel, { skip: ['back', 'bottom'] });
-        const words = shopWords(building.id, i);
-        const condense = Math.max(0.5, Math.min(1, (width - 0.4) / textWidth(words, 0.42)));
-        if (textWidth(words, 0.42, condense) <= width - 0.2) {
-          texts.push({ text: words, x: mid[0] + out[0] * 0.2, y: 3.6, z: mid[1] + out[1] * 0.2, right: along, height: 0.42, condense, color: rgb('signText') });
+      // Canopies sit on the shader's own column lattice — column centres in
+      // edge-local metres — so a roll-down gate reads inside its canopy.
+      if (measured) { fronts++; continue; }
+      if (mask === undefined || (mask & DETAIL.storefront) !== 0) {
+        const pitch = building.windowWidthMeters ?? grid.bay;
+        const inset = 0.6;
+        const c0 = Math.ceil((edgeStart + inset) / pitch - 0.5);
+        const c1 = Math.floor((edgeStart + length - inset) / pitch - 0.5);
+        for (let cIdx = c0; cIdx <= c1; cIdx++) {
+          if (hashUnit(`${building.id}:${i}:${cIdx}:awning`) > 0.55) continue;
+          const at = (cIdx + 0.5) * pitch - edgeStart - length / 2;
+          const tone = AWNING_TONES[Math.floor(hashUnit(`${building.id}:${i}:${cIdx}:hue`) * AWNING_TONES.length) % AWNING_TONES.length]!;
+          emitAwning(detail.buffer, f, at, Math.min(3.8, pitch - 0.2), rgb(tone));
+          awnings++;
         }
-        shopSigns++;
-      } else {
-        // Storefront band: a lit fascia above the shop windows, inset from the corners.
-        const inset = Math.min(0.8, length * 0.08);
-        const ux = (bx - ax) / length; const uz = (bz - az) / length;
-        const off = 0.12;
-        const [sx, sz] = [ax + ux * inset + out[0] * off, az + uz * inset + out[1] * off];
-        const [ex, ez] = [bx - ux * inset + out[0] * off, bz - uz * inset + out[1] * off];
-        // One quad facing the street (emitWalls on a two-point ring would add a hidden back face).
-        neon.quad([sx, 3.15, sz], [ex, 3.15, ez], [ex, 3.45, ez], [sx, 3.45, sz], [out[0], 0, out[1]], tint(neonColor, 0.95));
+        if (hasShopSign(building.id, i)) {
+          const width = Math.min(length * 0.75, 9);
+          const panel = rgb(SHOP_SIGN_TONES[Math.floor(hashUnit(`${building.id}:${i}:panel`) * SHOP_SIGN_TONES.length) % SHOP_SIGN_TONES.length]!);
+          const signTop = shopTop ?? 4.05;
+          box(neon, f, [-width / 2, signTop - 0.9, 0], [width / 2, signTop, 0.18], panel, { skip: ['back', 'bottom'] });
+          const words = shopWords(building.id, i);
+          const condense = Math.max(0.5, Math.min(1, (width - 0.4) / textWidth(words, 0.42)));
+          if (textWidth(words, 0.42, condense) <= width - 0.2) {
+            texts.push({ text: words, x: mid[0] + out[0] * 0.2, y: signTop - 0.45, z: mid[1] + out[1] * 0.2, right: along, height: 0.42, condense, color: rgb('signText') });
+          }
+          shopSigns++;
+        } else {
+          // Storefront band: a lit fascia above the shop windows, inset from the corners.
+          const bandTop = shopTop ?? 3.45;
+          const inset = Math.min(0.8, length * 0.08);
+          const ux = (bx - ax) / length; const uz = (bz - az) / length;
+          const off = 0.12;
+          const [sx, sz] = [ax + ux * inset + out[0] * off, az + uz * inset + out[1] * off];
+          const [ex, ez] = [bx - ux * inset + out[0] * off, bz - uz * inset + out[1] * off];
+          // One quad facing the street (emitWalls on a two-point ring would add a hidden back face).
+          neon.quad([sx, bandTop - 0.3, sz], [ex, bandTop - 0.3, ez], [ex, bandTop, ez], [sx, bandTop, sz], [out[0], 0, out[1]], tint(neonColor, 0.95));
+        }
+        fronts++;
       }
-      fronts++;
       if (boards < MAX_BILLBOARDS && h >= 16 && length >= 8 && hashUnit(`${building.id}:${i}:board`) < 0.4) {
         const [top, bottom] = BILLBOARD_PAIRS[Math.floor(hashUnit(`${building.id}:pair`) * BILLBOARD_PAIRS.length) % BILLBOARD_PAIRS.length]!;
-        emitBillboard(billboards, mid, out, Math.min(length * 0.55, 9), Math.min(h * 0.32, 7), h - 2.2, rgb(top), rgb(bottom));
+        const bw = Math.min(length * 0.55, 9);
+        const bh = Math.min(Math.min(h * 0.32, 7), BILLBOARD_TOP - 4.6);
+        const btop = Math.min(h - 2.2, BILLBOARD_TOP);
+        emitBillboard(billboards, mid, out, bw, bh, btop, rgb(top), rgb(bottom));
         boards++;
+        // The addressable AdSurface row the CMS pipeline reads (future-layer.ts):
+        // the same numbers the emitter drew, keyed by a stable world-space id.
+        adSurfaces.push(adSurface(building, i, mid[0] + out[0] * 0.3, mid[1] + out[1] * 0.3, out, bw, bh, btop, dataset));
       }
     }
     // A wooden water tower on a share of the five-storey-and-up roofs.
-    if (hasWaterTower(building.id, h, building.class)) {
+    if (mask === undefined ? hasWaterTower(building.id, h, building.class) : (mask & DETAIL.waterTower) !== 0) {
       const scale = 0.85 + hashUnit(`${building.id}:tankScale`) * 0.35;
       const spot = towerSpot(ring, (x, z) => pointInRing(x, z, ring), 1.9 * scale);
       if (spot) {
         emitWaterTower(roofs, spot[0], spot[1], h, scale, rgb('cedar'), rgb('towerSteel'), rgb('towerRoof'));
         waterTowers++;
+      }
+    }
+    if (future) {
+      // Roof furniture (future-layer.ts): Valdrada's roofscape kinds —
+      // bulkhead, packaged AC, chimney pots, standpipe — on id-hash rules.
+      // Into the banded detail buffer, so only the roofs near the Caller pay.
+      for (const piece of roofscapePlan(building, ring)) {
+        switch (piece.kind) {
+          case 'bulkhead':
+            emitBulkhead(detail.buffer, piece.x, piece.z, h, piece.dir, 0.9 + hashUnit(`${building.id}:bhScale`) * 0.3, tint(wall, 0.95), rgb('cornice'), rgb('roomDoor'));
+            futureStats.bulkheads++;
+            break;
+          case 'roofAc':
+            emitRoofAc(detail.buffer, piece.x, piece.z, h, rgb('carGrey'), rgb('iron'));
+            futureStats.acUnits++;
+            break;
+          case 'chimneyPot':
+            emitChimneyPots(detail.buffer, piece.x, piece.z, h, piece.dir, piece.count, rgb('brickRed'), rgb('cornice'));
+            futureStats.chimneyPots += piece.count;
+            break;
+          case 'standpipe':
+            emitStandpipe(detail.buffer, piece.x, piece.z, h, rgb('iron'), rgb('gate'));
+            futureStats.standpipes++;
+            break;
+        }
+      }
+      // The facelift's roof garden: the planted patch and its low planter
+      // wall on the tower roof (always drawn — it reads in the aerials).
+      if (isNychaTower(building)) {
+        futureStats.nychaTowers++;
+        const garden = scaledRing(ring, 0.55);
+        roofs.surface(...SURFACES.wood);
+        emitFlat(THREE, roofs, garden, [], h + 0.06, rgb('garden'));
+        emitWalls(roofs, garden, h, h + 0.45, rgb('curb'));
+        futureStats.roofGardens++;
       }
     }
   }
@@ -405,20 +615,30 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV2, materials:
   for (const area of sortedAreas) {
     const ring = counterClockwise(pairs(area.ring));
     const holes = area.holes.map((hole) => pairs(hole));
-    emitFlat(THREE, areas, ring, holes, areaLayer(area.kind), rgb(AREA_COLOR[area.kind] ?? 'grass'));
+    areas.surface(...areaSurface(area.kind, hashUnit(`${area.id}:surf`)));
+    emitFlat(THREE, areas, ring, holes, areaLayer(area.kind) + CURB_HEIGHT, rgb(AREA_COLOR[area.kind] ?? 'grass'), occlude);
   }
 
   for (const road of dataset.roads) {
     const points = pairs(road.points);
     if (WALKWAY_CLASSES.has(road.class)) {
       const color = road.class === 'pedestrian' ? rgb('plaza') : rgb('sidewalk');
-      strip(sidewalks, points, road.widthMeters / 2, LAYER.sidewalks, color);
+      sidewalks.surface(...surfacePick('masonry', hashUnit(`${road.id}:walk`)));
+      strip(sidewalks, points, road.widthMeters / 2, LAYER.sidewalks + CURB_HEIGHT, color, occlude);
       continue;
     }
-    if (road.sidewalkMeters > 0) strip(sidewalks, points, road.widthMeters / 2 + road.sidewalkMeters, LAYER.sidewalks, rgb('sidewalk'));
+    if (road.sidewalkMeters > 0) {
+      sidewalks.surface(...surfacePick('masonry', hashUnit(`${road.id}:walk`)));
+      strip(sidewalks, points, road.widthMeters / 2 + road.sidewalkMeters, LAYER.sidewalks + CURB_HEIGHT, rgb('sidewalk'), occlude);
+    }
+    if (CURB_HEIGHT > 0 && road.class !== 'crossing') {
+      sidewalks.surface(...SURFACES.stone);
+      curbFaces(sidewalks, points, road.widthMeters / 2, LAYER.roads, LAYER.sidewalks + CURB_HEIGHT, rgb('curb'), clearance);
+    }
     const zebra = road.class === 'crossing' ? 1 : 0;
     const centre = !zebra && road.widthMeters >= CENTRE_LINE_MIN_WIDTH ? 1 : 0;
-    strip(roads, points, road.widthMeters / 2, zebra ? LAYER.crossings : LAYER.roads, [centre, zebra, road.widthMeters / 100]);
+    roads.surface(...surfacePick('asphalt', hashUnit(`${road.id}:surf`)));
+    strip(roads, points, road.widthMeters / 2, zebra ? LAYER.crossings : LAYER.roads, [centre, zebra, road.widthMeters / 100], occlude);
   }
 
   const meshes: Mesh[] = [];
@@ -431,8 +651,19 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV2, materials:
     meshes.push(mesh);
     return mesh;
   };
-  add('city:areas', areas, materials.areas);
-  add('city:sidewalks', sidewalks, materials.sidewalks);
+  const areaMesh = add('city:areas', areas, materials.areas);
+  const walkMesh = add('city:sidewalks', sidewalks, materials.sidewalks);
+  if (CURB_HEIGHT > 0) {
+    // Raised ground drawn as an underlay: lots and sidewalks sit at curb
+    // height but write no depth and draw before the roads, so the
+    // carriageway (and the attached-sidewalk ribbons it overlaps) still
+    // reads on top, sunk below the curb faces.
+    for (const [mesh, order] of [[areaMesh, -3], [walkMesh, -2]] as const) {
+      if (!mesh) continue;
+      mesh.renderOrder = order;
+      (mesh.material as InstanceType<Three['Material']>).depthWrite = false;
+    }
+  }
   add('city:roads', roads, materials.roads);
   add('city:walls-masonry', masonry, materials.masonry);
   add('city:walls-glass', glass, materials.glass);
@@ -453,19 +684,25 @@ export function buildCityMeshes(THREE: Three, dataset: CityDatasetV2, materials:
   const stats: CityMeshStats = {
     buildings: dataset.buildings.length, roads: dataset.roads.length, areas: dataset.areas.length,
     triangles, drawCalls: meshes.length, neonTrims: trims, storefronts: fronts, billboards: boards,
-    cornices, stoops, fireEscapes, awnings, shopSigns, waterTowers,
+    cornices, stoops, fireEscapes, awnings, shopSigns, waterTowers, parapets,
+    future: futureStats,
   };
-  let shownBands: [number, number] = [-1, -1];
+  const shownBands: [number, number] = [-1, -1];
+  const bands: [number, number] = [0, 0];
   return {
     meshes,
     stats,
     /** Shop-sign lettering for the banded lettering mesh (street-furniture.ts). */
     texts,
+    /** The AdSurface registry rows for the panels this build drew (future-layer.ts). */
+    adSurfaces,
     /** Contact shadows only near the focus: a few z bands, one draw range, no allocation. */
     setFocus(_x: number, z: number) {
-      const [first, last] = shadowBands(z, minZ, bandCount);
+      shadowBands(z, minZ, bandCount, bands);
+      const first = bands[0], last = bands[1];
       if (first === shownBands[0] && last === shownBands[1]) return;
-      shownBands = [first, last];
+      shownBands[0] = first;
+      shownBands[1] = last;
       const start = bandStart[first]!;
       shadowMesh?.geometry.setDrawRange(start, bandStart[last + 1]! - start);
       detailMesh?.geometry.setDrawRange(detailStart[first]!, detailStart[last + 1]! - detailStart[first]!);
@@ -536,8 +773,101 @@ const AREA_COLOR: Record<string, CityColor> = {
   plaza: 'plaza', parking: 'parking', water: 'water', school: 'school',
 };
 
-/** A flat ribbon along a polyline; u runs across (0..1), v along in metres. */
-function strip(buffer: VertexBuffer, points: Point[], half: number, y: number, color: readonly number[]): void {
+/** Surface family per area kind: planted kinds read as foliage, hard ground as masonry, water gets its own flat pick. */
+const AREA_FAMILY: Record<string, 'foliage' | 'masonry'> = {
+  park: 'foliage', garden: 'foliage', grass: 'foliage', pitch: 'foliage',
+};
+function areaSurface(kind: string, seed: number): readonly [number, number] {
+  if (kind === 'water') return SURFACES.water;
+  return surfacePick(AREA_FAMILY[kind] ?? 'masonry', seed);
+}
+
+/**
+ * One of Valdrada's measured storefronts: per bay, the sign it recorded
+ * (a panel or lightbox board in its background colour with the name in its
+ * letter colour, or bare channel letters on the wall) and its awning. Bay
+ * and sign spans are metres from the face's left end as seen from the
+ * street; the frame's local +x runs that way (facade-detail.ts wallFrame).
+ */
+function emitMeasuredFront(
+  front: (typeof VD_STOREFRONTS)[number], boards: VertexBuffer, canopies: VertexBuffer, texts: (TextFace & { text: string })[],
+): { signs: number; awnings: number } {
+  const a: Point = [front.ax, front.az];
+  const b: Point = [front.ax + front.dx * front.len, front.az + front.dz * front.len];
+  const f = wallFrame(a, b, [front.nx, front.nz]);
+  const along: Point = [front.dx, front.dz];
+  const half = front.len / 2;
+  let signs = 0; let awnings = 0;
+  for (const bay of front.bays) {
+    const sign = 'sign' in bay ? bay.sign : undefined;
+    if (sign) {
+      const x0 = Math.max(0, sign.u0) - half; const x1 = Math.min(front.len, sign.u1) - half;
+      const width = x1 - x0;
+      if (width > 0.4) {
+        const board = sign.bg !== null;
+        if (board) boards.surface(...SURFACES.iron);
+        if (board) box(boards, f, [x0, sign.y, 0.02], [x1, sign.y + sign.h, sign.k === 'lightbox' ? 0.24 : 0.1], sign.bg, { skip: ['back', 'bottom'] });
+        if (board) {
+          // Near-future layer: LED strips along the board's top and bottom edges, lit in the sign's letter colour.
+          const d = (sign.k === 'lightbox' ? 0.24 : 0.1) + 0.012;
+          const led = sign.fg.map((v) => Math.min(1, v * 0.6 + 0.4));
+          for (const yy of [sign.y, sign.y + sign.h - 0.045]) box(boards, f, [x0, yy, d - 0.01], [x1, yy + 0.045, d], led, { skip: ['back', 'bottom', 'top'] });
+        }
+        let height = Math.min(sign.h * 0.62, 0.7);
+        let condense = Math.max(0.45, Math.min(1, (width - 0.3) / textWidth(sign.t, height)));
+        while (textWidth(sign.t, height, condense) > width - 0.15 && height > 0.12) height *= 0.9;
+        if (textWidth(sign.t, height, condense) <= width - 0.1) {
+          const centre = (x0 + x1) / 2;
+          const lift = board ? (sign.k === 'lightbox' ? 0.26 : 0.12) : 0.06;
+          texts.push({
+            text: sign.t,
+            x: f.x + along[0] * centre + front.nx * lift, y: sign.y + sign.h / 2, z: f.z + along[1] * centre + front.nz * lift,
+            right: along, height, condense, color: sign.fg,
+          });
+        }
+        signs++;
+      }
+    }
+    const awning = 'aw' in bay ? bay.aw : undefined;
+    if (awning) {
+      const u0 = Math.max(0, bay.u0); const u1 = Math.min(front.len, bay.u1);
+      if (u1 - u0 > 0.8) {
+        emitAwning(canopies, f, (u0 + u1) / 2 - half, u1 - u0 - 0.1, awning.c, awning.top, awning.proj);
+        awnings++;
+      }
+    }
+  }
+  return { signs, awnings };
+}
+
+/**
+ * Granite curb faces along both carriageway edges, from road level up to
+ * the sidewalk top, facing the road. A face whose outside lands in another
+ * carriageway (a junction mouth, a crossing) is left out, as Valdrada's
+ * emitter skips faces inside `inCarriageway` (compile.mjs ~L2985).
+ */
+function curbFaces(buffer: VertexBuffer, points: Point[], half: number, y0: number, y1: number, color: readonly number[], clearance: StreetClearance): void {
+  if (points.length < 2) return;
+  const { left, right, v } = ribbon(points, half);
+  for (const edge of [left, right]) {
+    for (let i = 1; i < points.length; i++) {
+      const a = edge[i - 1]!; const b = edge[i]!;
+      const mx = (a[0] + b[0]) / 2; const mz = (a[1] + b[1]) / 2;
+      const cx = (points[i - 1]![0] + points[i]![0]) / 2; const cz = (points[i - 1]![1] + points[i]![1]) / 2;
+      const len = Math.hypot(mx - cx, mz - cz);
+      if (len < 1e-6) continue;
+      // Unit normal toward the road centre.
+      const nx = (cx - mx) / len; const nz = (cz - mz) / len;
+      if (clearance.inCarriageway(mx - nx * 0.6, mz - nz * 0.6, 0)) continue;
+      const u0 = v[i - 1]!; const u1 = v[i]!;
+      buffer.quad([a[0], y0, a[1]], [b[0], y0, b[1]], [b[0], y1, b[1]], [a[0], y1, a[1]], [nx, 0, nz], color,
+        [[u0, y0], [u1, y0], [u1, y1], [u0, y1]]);
+    }
+  }
+}
+
+/** A flat ribbon along a polyline; u runs across (0..1), v along in metres. `ao` bakes per-corner occlusion when given. */
+function strip(buffer: VertexBuffer, points: Point[], half: number, y: number, color: readonly number[], ao?: (x: number, z: number) => number): void {
   if (points.length < 2) return;
   const { left, right, v } = ribbon(points, half);
   for (let i = 1; i < points.length; i++) {
@@ -551,6 +881,7 @@ function strip(buffer: VertexBuffer, points: Point[], half: number, y: number, c
     buffer.quad(
       [ordered[0][0], y, ordered[0][1]], [ordered[1][0], y, ordered[1][1]], [ordered[2][0], y, ordered[2][1]], [ordered[3][0], y, ordered[3][1]],
       [0, 1, 0], color, orderedUv,
+      ao && ordered.map(([x, z]) => ao(x, z)),
     );
   }
 }

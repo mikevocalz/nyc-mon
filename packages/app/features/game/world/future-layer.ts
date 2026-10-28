@@ -1,0 +1,395 @@
+// The "future layer" (docs/implementation/MOBILE_WORLD_PR_PACK.md): the
+// optional, reversible decoration that sits on the record-backed city —
+// NYC roof furniture, the creator-approved NYCHA exterior facelift and the
+// addressable AdSurface inventory the CMS pipeline later fills.
+//
+// Canon, and what is still a gap:
+//
+// - Roofscape: Valdrada's FURN ids 23–26 — ROOF_AC, ROOF_BULKHEAD,
+//   CHIMNEY_POT, STANDPIPE — placed by its runtime roofEngine
+//   (docs/design/handoff/harlem-v3.md, furniture table). No cyberpunk
+//   invention: these are the four kinds the record pipeline already names.
+//   The record roofKind byte (membrane, solar and green-roof bits, the DOB
+//   water-tank record) is NOT in the v3 schema, so every pick below is a
+//   hash rule — flagged as estimated, same discipline as `d`-less detail.
+//   When a later bake imports roofKind, record bits replace the hashes the
+//   way `d` replaced the v2 hashes.
+// - NYCHA facelift: MOBILE_WORLD_PR_PACK "Approved art direction"
+//   (creator, 2026-10-13): charcoal window framing, modular facade panels,
+//   planted balconies and roof gardens, vertical architectural lighting,
+//   upgraded entrances. Overlays are additive, semantic and keyed by
+//   building id — FUTURE_LAYER off leaves the city byte-identical.
+//   Targeting uses `class === 'nycha'`, which on the v3 tile is Valdrada
+//   STYLE 12 (PROJECT_BRICK), classify()'s rule over PLUTO records. It is
+//   classification against a named NYC dataset, but NOT yet the verified
+//   NYCHA development dataset — that cross-check stays open as FUT-01.
+//   Canon also wants >= 3 kit families by typology/borough (FUT-02); this
+//   ships one procedural kit with hash variants. Courtyard landscaping,
+//   wayfinding signage and entrance interiors stay unimplemented — the
+//   tile does not identify campus grounds.
+// - AdSurfaces: the PR pack's addressable contract — stable world-space id,
+//   geo/borough/neighbourhood, orientation, dimensions, visibility limits,
+//   permitted formats, LOD priority, campaign eligibility. The registry
+//   below describes the LED panels the renderer already draws (D17); the
+//   Payload collections the canon assigns (campaign, creative, schedule,
+//   daypart, approval, community inventory, analytics) do not exist yet —
+//   the schema is a product decision, so only the inventory is data-driven.
+//
+// Pure (no three import): placements are pure functions so node tests pin
+// them; emitters write into the shared buffers, so the layer adds no draw
+// calls. Everything is hash-seeded by building id — deterministic.
+import type { BuildingClass, CityBuilding, CityDatasetV3, GeoPoint } from '../city-dataset.ts';
+import { hashUnit, mapArea, pointInRing, ringCentroid, type VertexBuffer } from './geometry.ts';
+import { box, cone, cylinder, frame, type Frame } from './parts.ts';
+import { parseSkyRigFlag } from './sky-rig.ts';
+import { SURFACES } from './surfaces.ts';
+
+type Point = readonly [number, number];
+type Rgb = readonly number[];
+
+/**
+ * The future layer is on (EXPO_PUBLIC_WORLD_FUTURE). Opt-in, default OFF,
+ * like the rest of the flagged lanes: the overlays are an optional
+ * decoration layer, never a replacement for the record city.
+ */
+export const FUTURE_LAYER = parseSkyRigFlag(process.env.EXPO_PUBLIC_WORLD_FUTURE);
+
+/** Per-kind counts for stats and tests. */
+export interface FutureLayerStats {
+  bulkheads: number;
+  acUnits: number;
+  chimneyPots: number;
+  standpipes: number;
+  nychaTowers: number;
+  nychaPanels: number;
+  nychaBalconies: number;
+  nychaEntrances: number;
+  roofGardens: number;
+  lightStrips: number;
+}
+
+export function emptyFutureStats(): FutureLayerStats {
+  return {
+    bulkheads: 0, acUnits: 0, chimneyPots: 0, standpipes: 0,
+    nychaTowers: 0, nychaPanels: 0, nychaBalconies: 0, nychaEntrances: 0,
+    roofGardens: 0, lightStrips: 0,
+  };
+}
+
+// --- Roofscape (Valdrada FURN 23–26) ---------------------------------------
+
+/** No roof furniture below this height, metres — garden sheds and garages stay bare. */
+export const ROOF_MIN_HEIGHT = 8;
+/** Pieces a single roof may carry at most. */
+export const MAX_PIECES_PER_ROOF = 4;
+
+export type RoofPieceKind = 'bulkhead' | 'roofAc' | 'chimneyPot' | 'standpipe';
+export interface RoofPiece {
+  readonly kind: RoofPieceKind;
+  readonly x: number;
+  readonly z: number;
+  /** Unit direction rows run along (chimney pots); [0, 1] elsewhere. */
+  readonly dir: Point;
+  /** Item count for row kinds. */
+  readonly count: number;
+}
+
+/** The ring's longest edge as a unit direction — chimney rows align with it. */
+export function longestEdgeDir(ring: readonly Point[]): Point {
+  let best: Point = [0, 1];
+  let longest = 0;
+  for (let i = 0; i < ring.length; i++) {
+    const [ax, az] = ring[i]!;
+    const [bx, bz] = ring[(i + 1) % ring.length]!;
+    const l = Math.hypot(bx - ax, bz - az);
+    if (l > longest) { longest = l; best = [(bx - ax) / l, (bz - az) / l]; }
+  }
+  return best;
+}
+
+/**
+ * A spot on the roof, `clear` metres in from the footprint edge: the
+ * centroid first, then deterministic jitters (a hash of the building id
+ * picks the angle and radius). Returns null when nothing fits.
+ */
+function roofSpot(ring: readonly Point[], id: string, salt: string, clear: number): Point | null {
+  const [cx, cz] = ringCentroid(ring);
+  const inside = (x: number, z: number) => pointInRing(x, z, ring)
+    && pointInRing(x + clear, z, ring) && pointInRing(x - clear, z, ring)
+    && pointInRing(x, z + clear, ring) && pointInRing(x, z - clear, ring);
+  if (inside(cx, cz)) return [cx, cz];
+  const reach = Math.max(2, Math.sqrt(Math.abs(mapArea(ring)) / Math.PI) * 0.6);
+  for (let k = 0; k < 8; k++) {
+    const a = hashUnit(`${id}:${salt}:a${k}`) * Math.PI * 2;
+    const r = Math.sqrt(hashUnit(`${id}:${salt}:r${k}`)) * reach;
+    const x = cx + Math.cos(a) * r;
+    const z = cz + Math.sin(a) * r;
+    if (inside(x, z)) return [x, z];
+  }
+  return null;
+}
+
+/**
+ * The roof-furniture plan for one building: which of Valdrada's four roof
+ * kinds stand where. Rule-driven today (roofKind is not in v3); keyed by
+ * building id so the plan is stable. Churches keep bare roofs.
+ */
+export function roofscapePlan(building: Pick<CityBuilding, 'id' | 'class' | 'heightMeters'>, ring: readonly Point[]): RoofPiece[] {
+  const { id } = building;
+  const h = building.heightMeters;
+  if (h < ROOF_MIN_HEIGHT || building.class === 'church') return [];
+  const area = Math.abs(mapArea(ring));
+  if (area < 50) return [];
+  const out: RoofPiece[] = [];
+  // ROOF_BULKHEAD (24): the stair/elevator penthouse every tall NYC roof
+  // needs — likelier on big footprints, never on glass curtain walls.
+  if (building.class !== 'glass' && h >= 10 && area >= 100 && hashUnit(`${id}:bulkhead`) < 0.28) {
+    const spot = roofSpot(ring, id, 'bh', 2.2);
+    if (spot) out.push({ kind: 'bulkhead', x: spot[0], z: spot[1], dir: longestEdgeDir(ring), count: 1 });
+  }
+  // ROOF_AC (23): packaged condensers, mostly on commercial and large roofs.
+  const acShare = building.class === 'glass' || building.class === 'civic' || building.class === 'plain' ? 0.4
+    : building.class === 'brownstone' ? 0.1 : 0.2;
+  if (area >= 150 && hashUnit(`${id}:roofac`) < acShare) {
+    const units = 1 + Math.floor(hashUnit(`${id}:roofac:n`) * 2);
+    for (let u = 0; u < units && out.length < MAX_PIECES_PER_ROOF; u++) {
+      const spot = roofSpot(ring, id, `ac${u}`, 1.1);
+      if (spot) out.push({ kind: 'roofAc', x: spot[0], z: spot[1], dir: [0, 1], count: 1 });
+    }
+  }
+  // CHIMNEY_POT (25): the pot row on masonry low-rises under eight storeys.
+  if (building.class !== 'glass' && h <= 25 && hashUnit(`${id}:chimney`) < 0.22) {
+    const spot = roofSpot(ring, id, 'ch', 1.6);
+    if (spot && out.length < MAX_PIECES_PER_ROOF) {
+      out.push({ kind: 'chimneyPot', x: spot[0], z: spot[1], dir: longestEdgeDir(ring), count: 1 + Math.floor(hashUnit(`${id}:chimney:n`) * 3) });
+    }
+  }
+  // STANDPIPE (26): a vent pipe; churches out, everything else a modest share.
+  if (out.length < MAX_PIECES_PER_ROOF && hashUnit(`${id}:standpipe`) < 0.16) {
+    const spot = roofSpot(ring, id, 'sp', 0.5);
+    if (spot) out.push({ kind: 'standpipe', x: spot[0], z: spot[1], dir: [0, 1], count: 1 });
+  }
+  return out;
+}
+
+/** A stair/elevator bulkhead: a brick-and-concrete penthouse with its cap slab and a door face. */
+export function emitBulkhead(buffer: VertexBuffer, x: number, z: number, roof: number, dir: Point, scale: number, brick: Rgb, concrete: Rgb, door: Rgb): void {
+  const f = frame(x, z, dir, roof);
+  const w = 3.2 * scale;
+  const d = 2.2 * scale;
+  const h = 2.6 * scale;
+  buffer.surface(...SURFACES.stone);
+  box(buffer, f, [-w / 2, 0, -d / 2], [w / 2, h, d / 2], brick, { skip: ['bottom'] });
+  buffer.surface(...SURFACES.tarRoof);
+  box(buffer, f, [-w / 2 - 0.08, h, -d / 2 - 0.08], [w / 2 + 0.08, h + 0.12, d / 2 + 0.08], concrete, { skip: ['bottom'] });
+  // Door on the short face.
+  box(buffer, f, [-0.4, 0, d / 2], [0.4, 1.9 * scale, d / 2 + 0.06], door, { skip: ['back', 'bottom', 'top'] });
+}
+
+/** A packaged roof condenser: box on rail feet with a fan drum on top. */
+export function emitRoofAc(buffer: VertexBuffer, x: number, z: number, roof: number, metal: Rgb, dark: Rgb): void {
+  const f = frame(x, z, [0, 1], roof);
+  buffer.surface(...SURFACES.iron);
+  for (const s of [-0.45, 0.45]) box(buffer, f, [s - 0.05, 0, -0.5], [s + 0.05, 0.15, 0.5], dark, { skip: ['bottom'] });
+  buffer.surface(...SURFACES.iron);
+  box(buffer, f, [-0.7, 0.15, -0.55], [0.7, 1.0, 0.55], metal, {});
+  cylinder(buffer, f, 0, 0, 0.42, 1.0, 1.14, 8, dark);
+}
+
+/** A row of terracotta chimney pots along `dir`, each a short square flue with a cap slab (boxes keep the row cheap). */
+export function emitChimneyPots(buffer: VertexBuffer, x: number, z: number, roof: number, dir: Point, count: number, clay: Rgb, cap: Rgb): void {
+  const f = frame(x, z, dir, roof);
+  for (let k = 0; k < count; k++) {
+    const at = (k - (count - 1) / 2) * 0.55;
+    buffer.surface(...SURFACES.stone);
+    box(buffer, f, [at - 0.15, 0, -0.15], [at + 0.15, 0.7, 0.15], clay, { skip: ['bottom'] });
+    buffer.surface(...SURFACES.tarRoof);
+    box(buffer, f, [at - 0.19, 0.7, -0.19], [at + 0.19, 0.78, 0.19], cap, { skip: ['bottom'] });
+  }
+}
+
+/** A standpipe vent: a slim square pipe with a cowl cap, 1.8 m tall. */
+export function emitStandpipe(buffer: VertexBuffer, x: number, z: number, roof: number, pipe: Rgb, cap: Rgb): void {
+  const f = frame(x, z, [0, 1], roof);
+  buffer.surface(...SURFACES.iron);
+  box(buffer, f, [-0.09, 0, -0.09], [0.09, 1.6, 0.09], pipe, { skip: ['bottom'] });
+  cone(buffer, f, 0, 0, 0.2, 1.6, 1.85, 6, cap);
+}
+
+// --- NYCHA exterior facelift (PR pack art direction, creator 2026-10-13) ---
+
+/** The facelift targets the nycha class only: Valdrada STYLE 12, PROJECT_BRICK. */
+export function isNychaTower(building: Pick<CityBuilding, 'class'>): boolean {
+  return building.class === 'nycha';
+}
+
+/** Panel module pitch on the facade, metres. */
+export const NYCHA_PANEL_PITCH = 3.0;
+/** Balcony share per eligible floor edge (hash of building id + edge + floor). */
+export const NYCHA_BALCONY_SHARE = 0.24;
+/** Balconies climb no higher than this share of the tower, so the silhouette stays masonry. */
+export const NYCHA_BALCONY_TOP = 0.7;
+
+/**
+ * The modular panel grid on one facade edge: a charcoal spandrel band at
+ * each floor line (the "charcoal window framing" of the canon — the facade
+ * shader owns the panes, so the kit frames the slab edges) and vertical
+ * concrete fins at the panel pitch. Written into the near-field detail
+ * buffer, banded like the stoops.
+ */
+export function emitNychaPanels(buffer: VertexBuffer, f: Frame, length: number, heightMeters: number, floorPitch: number, charcoal: Rgb, fin: Rgb): void {
+  const hl = length / 2 - 0.4;
+  const floors = Math.max(2, Math.round(heightMeters / floorPitch));
+  buffer.surface(...SURFACES.stone);
+  // A spandrel band every other floor line: the panel seams read without
+  // doubling the vertex cost of a per-floor grid.
+  for (let k = 2; k < floors; k += 2) {
+    box(buffer, f, [-hl, k * floorPitch - 0.1, 0], [hl, k * floorPitch + 0.12, 0.05], charcoal, { skip: ['back', 'bottom'] });
+  }
+  buffer.surface(...SURFACES.stone);
+  // Vertical fins at twice the panel pitch — the grid reads at street range.
+  const fins = Math.floor((length - 1.5) / (NYCHA_PANEL_PITCH * 2));
+  for (let m = 0; m <= fins; m++) {
+    const x = -hl + 0.6 + m * NYCHA_PANEL_PITCH * 2;
+    box(buffer, f, [x - 0.07, 0.4, 0], [x + 0.07, heightMeters - 0.6, 0.04], fin, { skip: ['back', 'bottom'] });
+  }
+}
+
+/** A planted balcony: slab, front rail and the planter strip that greens the edge. */
+export function emitNychaBalcony(buffer: VertexBuffer, f: Frame, at: number, floorY: number, slab: Rgb, rail: Rgb, leaf: Rgb): void {
+  buffer.surface(...SURFACES.stone);
+  box(buffer, f, [at - 1.1, floorY - 0.18, 0], [at + 1.1, floorY, 1.0], slab, {});
+  buffer.surface(...SURFACES.iron);
+  box(buffer, f, [at - 1.1, floorY + 0.9, 0.94], [at + 1.1, floorY + 1.0, 1.0], rail, { skip: ['back', 'bottom', 'left', 'right'] });
+  buffer.surface(...SURFACES.wood);
+  box(buffer, f, [at - 0.9, floorY, 0.62], [at + 0.9, floorY + 0.28, 0.9], leaf, { skip: ['back', 'bottom'] });
+}
+
+/** Whether this edge floor carries a planted balcony (deterministic). */
+export function hasNychaBalcony(id: string, edge: number, floor: number): boolean {
+  return hashUnit(`${id}:${edge}:balcony:${floor}`) < NYCHA_BALCONY_SHARE;
+}
+
+/**
+ * The upgraded entrance: a concrete canopy over the door, a warm lit band
+ * under it (into the neon buffer — the near-future light, not a sign) and
+ * two planters beside the opening.
+ */
+export function emitNychaEntrance(buffer: VertexBuffer, glow: VertexBuffer, f: Frame, at: number, canopy: Rgb, warm: Rgb, soil: Rgb, leaf: Rgb): void {
+  buffer.surface(...SURFACES.stone);
+  box(buffer, f, [at - 1.8, 2.6, 0], [at + 1.8, 2.9, 1.5], canopy, { skip: ['back'] });
+  box(buffer, f, [at - 1.6, 0, 1.1], [at - 1.0, 0.5, 1.7], soil, {});
+  box(buffer, f, [at + 1.0, 0, 1.1], [at + 1.6, 0.5, 1.7], soil, {});
+  buffer.surface(...SURFACES.wood);
+  box(buffer, f, [at - 1.55, 0.5, 1.15], [at - 1.05, 0.8, 1.65], leaf, {});
+  box(buffer, f, [at + 1.05, 0.5, 1.15], [at + 1.55, 0.8, 1.65], leaf, {});
+  // The lit band runs under the canopy lip — warm architectural light.
+  box(glow, f, [at - 1.7, 2.45, 1.32], [at + 1.7, 2.6, 1.44], warm, { skip: ['back', 'bottom'] });
+}
+
+/**
+ * Vertical architectural lighting: a slim warm strip up each end of a
+ * facade edge, from the canopy line to the parapet — the canon's "vertical
+ * architectural lighting", kept to two quads per edge.
+ */
+export function emitNychaLightStrip(glow: VertexBuffer, f: Frame, length: number, heightMeters: number, warm: Rgb): void {
+  const hl = length / 2 - 0.25;
+  glow.surface(...SURFACES.iron);
+  for (const s of [-1, 1]) {
+    box(glow, f, [s * hl - 0.09, 1.2, 0], [s * hl + 0.09, heightMeters - 0.5, 0.04], warm, { skip: ['back', 'bottom'] });
+  }
+}
+
+/** The footprint scaled about its centroid — the roof garden's planted patch. */
+export function scaledRing(ring: readonly Point[], scale: number): [number, number][] {
+  const [cx, cz] = ringCentroid(ring);
+  return ring.map(([x, z]) => [cx + (x - cx) * scale, cz + (z - cz) * scale]);
+}
+
+// --- Addressable AdSurface inventory (PR pack contract) ---------------------
+
+/**
+ * Creative formats the renderer can show today. The canon wants CMS-driven
+ * stills/video/holograms; until the Payload collections exist a surface
+ * honestly lists the one format the mesh draws.
+ */
+export const AD_FORMATS = ['emissive-panel'] as const;
+
+/** Classes whose buildings are residences or sensitive uses: no paid campaigns. */
+const AD_RESIDENTIAL: ReadonlySet<BuildingClass> = new Set(['brownstone', 'brick', 'nycha', 'church']);
+
+/**
+ * Campaign placement eligibility (PR pack: "no arbitrary advertising on
+ * real residences"; community placements for nonprofits and small local
+ * businesses stay welcome everywhere).
+ */
+export function adEligibility(class_: BuildingClass): 'campaign' | 'community' {
+  return AD_RESIDENTIAL.has(class_) ? 'community' : 'campaign';
+}
+
+/** The stable world-space id: one per building edge. */
+export function adSurfaceId(buildingId: string, edge: number): string {
+  return `ad:${buildingId}:e${edge}`;
+}
+
+/** Inverse of projectCityPoint (city-dataset.ts) — local metres back to WGS84. */
+export function unprojectCityPoint(x: number, z: number, origin: GeoPoint): GeoPoint {
+  const radians = Math.PI / 180;
+  const radius = 6_371_008.8;
+  const [originLon, originLat] = origin;
+  return [x / (radians * radius * Math.cos(originLat * radians)) + originLon, originLat - z / (radians * radius)];
+}
+
+export interface AdSurface {
+  readonly id: string;
+  readonly buildingId: string;
+  readonly edge: number;
+  readonly kind: 'facade-panel';
+  /** Panel centre in tile-local metres. */
+  readonly x: number;
+  readonly z: number;
+  /** WGS84 position, for the geo-targeted campaign join. */
+  readonly geo: GeoPoint;
+  /** This tile's locale (Harlem, Manhattan) — single-tile game today. */
+  readonly borough: 'Manhattan';
+  readonly neighborhood: 'Harlem';
+  /** Unit outward direction the panel faces. */
+  readonly normal: Point;
+  readonly widthMeters: number;
+  readonly heightMeters: number;
+  /** Top edge height, metres; the panel runs top-heightMeters .. topMeters. */
+  readonly topMeters: number;
+  readonly formats: readonly (typeof AD_FORMATS)[number][];
+  readonly eligibility: 'campaign' | 'community';
+  /** 0..1, nearest the play centre first — the CMS's LOD pick order. */
+  readonly lodPriority: number;
+  /** Dataset the surface belongs to (the registry key changes with the tile). */
+  readonly tileId: string;
+}
+
+/** One registry row for a rendered panel — same numbers the emitter drew. */
+export function adSurface(
+  building: Pick<CityBuilding, 'id' | 'class'>, edge: number,
+  x: number, z: number, normal: Point, widthMeters: number, heightMeters: number, topMeters: number,
+  dataset: Pick<CityDatasetV3, 'id' | 'origin' | 'extentMeters'>,
+): AdSurface {
+  const distance = Math.hypot(x, z);
+  return {
+    id: adSurfaceId(building.id, edge),
+    buildingId: building.id,
+    edge,
+    kind: 'facade-panel',
+    x, z,
+    geo: unprojectCityPoint(x, z, dataset.origin),
+    borough: 'Manhattan',
+    neighborhood: 'Harlem',
+    normal,
+    widthMeters,
+    heightMeters,
+    topMeters,
+    formats: AD_FORMATS,
+    eligibility: adEligibility(building.class),
+    lodPriority: Math.max(0, 1 - distance / dataset.extentMeters),
+    tileId: dataset.id,
+  };
+}

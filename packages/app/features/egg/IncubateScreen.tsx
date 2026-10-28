@@ -9,7 +9,6 @@ import type { EggRecord, IncubationMinutes } from '@acme/core/types';
 import {
   Button,
   ChoiceRows,
-  EggCase,
   ErrorMessage,
   FIT_SIDE_GAP_PT,
   Heading,
@@ -63,8 +62,12 @@ const STOPS: readonly IncubationRingStop<IncubationMinutes>[] = INCUBATION_MINUT
   accessibilityLabel: eggCopy(OPTION_ID[value].a11y),
 }));
 
-/** Pause between the case shutting and the sheet or M11 (M10 "Motion"). Reduced motion: none. */
-const AFTER_CLOSE_HOLD_MS = 400;
+/**
+ * Pause between the confirmation and the sheet or M11 (M10 "Motion"), so the
+ * announcement lands before the route changes. Reduced motion: none. The case
+ * close that used to fill this gap is gone (Decision 29).
+ */
+const AFTER_START_HOLD_MS = 400;
 /** Ready-at refresh cadence: often enough to turn over on the minute. */
 const CLOCK_TICK_MS = 15_000;
 
@@ -86,7 +89,6 @@ interface IncubateStore {
   readonly minutes: IncubationMinutes | null;
   readonly phase: IncubatePhase;
   readonly egg: EggRecord | null;
-  readonly caseState: 'open' | 'closing' | 'closed';
   /** The final review route was entered; re-focus resolves to its saved checkpoint. */
   readonly permissionsShown: boolean;
   readonly nowMs: number;
@@ -96,8 +98,9 @@ interface IncubateStore {
 /**
  * M10 incubation choice (docs/design/screens/M10/08-handoff.md, D-16b/c/e).
  * 15, 30 or 60 minutes, no default. Start calls `startIncubation` once (the
- * only write in the M08 → M10 path), the case closes around the egg, and
- * after the case closes the final permissions review opens. First-run
+ * only write in the M08 → M10 path), the egg starts incubating where it sits
+ * (no case, Decision 29), and after a short hold the final permissions review
+ * opens. First-run
  * notification scheduling belongs there, never during the animation.
  * Re-entry with an egg or a Mon goes
  * straight to `/(home)`; a bad `bloodline` param goes back to M08.
@@ -113,7 +116,7 @@ export function IncubateScreen() {
 
   const store = useInstanceStore<IncubateStore>(() => {
     const nowMs = Date.now();
-    return { minutes: null, phase: 'choose', egg: null, caseState: 'open', permissionsShown: false, nowMs, scheme: schemeForTime(nowMs) };
+    return { minutes: null, phase: 'choose', egg: null, permissionsShown: false, nowMs, scheme: schemeForTime(nowMs) };
   });
   const s = useStore(store);
 
@@ -142,7 +145,7 @@ export function IncubateScreen() {
     }, [router, store]),
   );
 
-  // The hold after the case closes ends on a timer; unmount clears it so a
+  // The hold after the confirmation ends on a timer; unmount clears it so a
   // left screen never routes.
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => {
@@ -171,27 +174,28 @@ export function IncubateScreen() {
       return;
     }
     store.setState({ phase: 'starting' });
+    let created: EggRecord;
     try {
-      const created = useMonStore.getState().startIncubation({ bloodlineId: egg.bloodlineId, minutes, atMs: eventNow() });
-      // Persist before the case-close animation; a force quit still resumes M24.
-      startPermissionReview();
-      store.setState({ phase: 'confirmed', egg: created, caseState: 'closing', nowMs: eventNow() });
+      created = useMonStore.getState().startIncubation({ bloodlineId: egg.bloodlineId, minutes, atMs: eventNow() });
     } catch {
       store.setState({ phase: 'error' });
+      return;
     }
+    // The egg exists from here on. Nothing below may route to the error state,
+    // or a retry would start a second egg.
+    startPermissionReview();
+    store.setState({ phase: 'confirmed', egg: created, nowMs: eventNow() });
+    confirmed(created);
   };
 
-  const onCaseEnd = (end: 'closed' | 'open') => {
-    const created = store.getState().egg;
-    if (end !== 'closed' || created === null || store.getState().caseState === 'closed') return;
-    store.setState({ caseState: 'closed' });
+  const confirmed = (created: EggRecord) => {
     haptics.success();
     announcePolitely(eggCopy('m10.confirmed.a11y.announce', { time: formatClock(created.incubationEndsAt) }));
     store.setState({ permissionsShown: true });
     if (closeTimer.current !== null) clearTimeout(closeTimer.current);
     closeTimer.current = setTimeout(
       () => router.replace(readPermissionReview() === 'pending' ? PERMISSIONS_PATH : MON_HOME_PATH),
-      reducedMotion ? 0 : AFTER_CLOSE_HOLD_MS,
+      reducedMotion ? 0 : AFTER_START_HOLD_MS,
     );
   };
 
@@ -215,7 +219,7 @@ export function IncubateScreen() {
   };
   const keys = {
     back: { label: eggCopy('m10.back.a11y.label'), onPress: busy ? undefined : () => router.back() },
-    home: { onPress: s.caseState === 'closed' ? () => router.replace(readPermissionReview() === 'pending' ? PERMISSIONS_PATH : MON_HOME_PATH) : undefined },
+    home: { onPress: s.permissionsShown ? () => router.replace(readPermissionReview() === 'pending' ? PERMISSIONS_PATH : MON_HOME_PATH) : undefined },
   };
 
   const consentPending = readConsentRequested();
@@ -224,21 +228,18 @@ export function IncubateScreen() {
   ) : undefined;
 
   const eggLabel = eggCopy('m10.egg.a11y.label', { eggName: egg.eggName });
-  const eggCase = (sizePt: number) => (
-    <EggCase
-      state={s.caseState}
-      padLit={s.caseState !== 'open'}
-      onTransitionEnd={onCaseEnd}
-      reducedMotion={reducedMotion}
-      accessibilityLabel={s.caseState === 'closed' ? eggCopy('m10.case.a11y.closed', { eggName: egg.eggName }) : undefined}
-      sizePt={sizePt}
-      scheme={s.scheme}
-      testID="m10-case"
+  const incubatingLabel = s.phase === 'confirmed' ? eggCopy('m10.egg.a11y.incubating', { eggName: egg.eggName }) : eggLabel;
+  const eggView = (sizePt: number) => (
+    <View
+      testID="m10-egg"
+      accessible
+      accessibilityRole="image"
+      accessibilityLabel={incubatingLabel}
+      aria-label={incubatingLabel}
+      style={{ width: sizePt, height: sizePt }}
     >
-      <View testID="m10-egg" accessible accessibilityRole="image" accessibilityLabel={eggLabel} aria-label={eggLabel} className="flex-1">
-        <EggStill dexId={egg.dexId} decorative />
-      </View>
-    </EggCase>
+      <EggStill dexId={egg.dexId} decorative />
+    </View>
   );
 
   const titleText = eggCopy('m10.title');
@@ -256,7 +257,7 @@ export function IncubateScreen() {
 
   const choice = (mediaPt: number) => listLayout ? (
     <View style={{ gap: 8 }}>
-      <View className="items-center">{eggCase(mediaPt)}</View>
+      <View className="items-center">{eggView(mediaPt)}</View>
       <ChoiceRows
         rows={STOPS.map((stop) => ({ key: String(stop.value), label: stop.accessibilityLabel, accessibilityLabel: stop.accessibilityLabel }))}
         value={s.minutes === null ? null : INCUBATION_MINUTES.indexOf(s.minutes)}
@@ -273,7 +274,7 @@ export function IncubateScreen() {
         value={s.minutes}
         onChange={busy ? undefined : choose}
         accessibilityLabel={eggCopy('m10.ring.a11y.label')}
-        centre={eggCase(Math.round(mediaPt * 0.5))}
+        centre={eggView(Math.round(mediaPt * 0.5))}
         sizePt={mediaPt}
         scheme={s.scheme}
         reducedMotion={reducedMotion}

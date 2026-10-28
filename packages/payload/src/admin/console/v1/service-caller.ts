@@ -44,6 +44,9 @@ const SERVICE_ROUTES: readonly { method: string; path: RegExp }[] = [
   { method: 'GET', path: /^\/v1\/me\/mons\/?$/ },
   { method: 'GET', path: /^\/v1\/me\/eggs\/?$/ },
   { method: 'PUT', path: /^\/v1\/mons\/[^/]+\/care\/?$/ },
+  // hatch_egg. The handler finds the egg by eggId AND the delegated callerId,
+  // so the key can only hatch the named Caller's own egg.
+  { method: 'POST', path: /^\/v1\/eggs\/[^/]+\/hatch\/?$/ },
 ];
 
 /** True when `request` is one of the routes the service key may reach. */

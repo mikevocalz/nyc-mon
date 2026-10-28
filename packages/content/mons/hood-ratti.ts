@@ -1,5 +1,6 @@
 import type { Bloodline, MonSpeciesDef } from '@acme/core';
 import { type BloodlineRef, buildBloodline, rosterForm } from './define.ts';
+import { starterDexDetails } from './inherited-v11-starters.ts';
 
 /**
  * F01 · Hood Ratti Bloodline. Starter slot 1 (DECISIONS.md #1).
@@ -9,13 +10,13 @@ import { type BloodlineRef, buildBloodline, rosterForm } from './define.ts';
 const ref: BloodlineRef = { bloodlineId: 'F01', bloodlineName: 'Hood Ratti' };
 
 export const hoodRattiForms: readonly MonSpeciesDef[] = [
-  rosterForm(ref, 1, 'Metro Egg', 'Egg'),
-  rosterForm(ref, 2, 'Squeaklet', 'Baby'),
-  rosterForm(ref, 3, 'Lil’ Ratti', 'Small'),
-  rosterForm(ref, 4, 'Hood Ratti', 'Mid'),
-  rosterForm(ref, 5, 'Ratti Royale', 'Max'),
-  rosterForm(ref, 6, 'Agua Ratti', 'Max'),
-  rosterForm(ref, 7, 'Phantom Ratti', 'Max'),
+  rosterForm(ref, 1, 'Metro Egg', 'Egg', starterDexDetails),
+  rosterForm(ref, 2, 'Squeaklet', 'Baby', starterDexDetails),
+  rosterForm(ref, 3, 'Lil’ Ratti', 'Small', starterDexDetails),
+  rosterForm(ref, 4, 'Hood Ratti', 'Mid', starterDexDetails),
+  rosterForm(ref, 5, 'Ratti Royale', 'Max', starterDexDetails),
+  rosterForm(ref, 6, 'Agua Ratti', 'Max', starterDexDetails),
+  rosterForm(ref, 7, 'Phantom Ratti', 'Max', starterDexDetails),
 ];
 
 /** Evolution chain, Egg-rooted; the Mid branches to each Max form (DECISIONS.md #12). */

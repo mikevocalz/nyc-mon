@@ -1,8 +1,11 @@
+import { HATCH_PRESENTATION_PHASES } from '../schemas/hatch.ts';
 import type { EggRecord, HatchPresentationPhase, HatchState, IncubationMinutes, MonInstance } from '../types/index.ts';
 import { assertNever } from './assert-never.ts';
 import { hash128, toHex32 } from './random.ts';
+import { deriveMonGender, deriveVoiceLineageId } from './voice.ts';
 
-const PHASES: readonly HatchPresentationPhase[] = ['case-open', 'scanner', 'crack', 'burst', 'emerge', 'attention'];
+/** Phase order comes from the schema, the single source (Decision 29). */
+const PHASES: readonly HatchPresentationPhase[] = HATCH_PRESENTATION_PHASES;
 
 /** Thrown when two different individuals claim one egg. A P0 (Law 6). */
 export class HatchIntegrityError extends Error {
@@ -41,7 +44,8 @@ export function createEggRecord(input: CreateEggInput): EggRecord {
  * Mints the individual an egg hatches into, as its Baby form
  * (`egg.hatchesIntoSpeciesId`). A pure function of the EggRecord:
  * `hatchedAt` is the incubation end, not the device clock, so device A, device B
- * and the server replay all mint the identical MonInstance.
+ * and the server replay all mint the identical MonInstance. Gender and voice
+ * lineage come from the egg id the same way (see `voice.ts`).
  */
 export function mintMonInstance(egg: EggRecord): MonInstance {
   if (egg.monInstanceId !== deriveMonInstanceId(egg.eggId)) {
@@ -56,7 +60,8 @@ export function mintMonInstance(egg: EggRecord): MonInstance {
     // TODO(canon): starting bond for a hatchling.
     bond: 0,
     stage: 'Baby',
-    voiceLineageId: null,
+    gender: deriveMonGender(egg.eggId),
+    voiceLineageId: deriveVoiceLineageId(egg),
     originBlock: null,
     habitatTags: [],
     activeHours: null,
@@ -103,7 +108,7 @@ export function transitionHatch(state: HatchState, event: HatchEvent, egg: EggRe
     case 'open': {
       const ticked = transitionHatch(state, { type: 'tick', now: event.now }, egg);
       return ticked.kind === 'ready'
-        ? { kind: 'presenting', eggId: ticked.eggId, mon: mintMonInstance(egg), phase: 'case-open', serverConfirmed: false }
+        ? { kind: 'presenting', eggId: ticked.eggId, mon: mintMonInstance(egg), phase: HATCH_PRESENTATION_PHASES[0], serverConfirmed: false }
         : ticked;
     }
     case 'advance': {

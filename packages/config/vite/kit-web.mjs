@@ -36,7 +36,7 @@ function workletsTransform() {
     enforce: 'pre',
     async transform(code, id) {
       const file = id.split('?')[0] ?? id;
-      if (!file.startsWith(packagesRoot) || !/\.[jt]sx?$/.test(file) || !WORKLET_HINT.test(code)) return null;
+      if (!file.startsWith(packagesRoot) || file.includes('/node_modules/') || !/\.[jt]sx?$/.test(file) || !WORKLET_HINT.test(code)) return null;
       const babel = await import(pathToFileURL(babelCorePath).href);
       const out = await babel.transformAsync(code, {
         filename: file,
@@ -154,6 +154,24 @@ export async function withKitWeb(viteConfig, { appRoot, react }) {
       ],
       rolldownOptions: {
         ...(viteConfig.optimizeDeps?.rolldownOptions ?? {}),
+        // The optimizer's CommonJS require pass does not use Vite's alias
+        // plugin for SvgTouchableMixin's lazy Android sound import.
+        plugins: [
+          ...(viteConfig.optimizeDeps?.rolldownOptions?.plugins ?? []),
+          {
+            name: 'nyc-mon:optimizer-svg-sound-web',
+            resolveId(source) {
+              if (/(?:^|\/)NativeSvgSoundModule(?:\.js)?$/.test(source)) {
+                return '\0nyc-mon:svg-sound-web';
+              }
+            },
+            load(id) {
+              if (id === '\0nyc-mon:svg-sound-web') {
+                return 'export default { playTouchSound() {} };';
+              }
+            },
+          },
+        ],
         resolve: {
           ...(viteConfig.optimizeDeps?.rolldownOptions?.resolve ?? {}),
           // The optimizer bundles with its own extension list

@@ -2,7 +2,7 @@ import type { CollectionAfterChangeHook, CollectionBeforeChangeHook, CollectionC
 import { nobody, type StaffRole, staffRoles } from './access/roles.ts';
 import { auditReveal, revealOnly } from './audit/reveal.ts';
 import { writeAuditEvent } from './audit/writeAuditEvent.ts';
-import { deriveMonInstanceId, MonInstanceSchema } from './core.ts';
+import { deriveMonGender, deriveMonInstanceId, deriveVoiceLineageId, isAllowedMonNicknameWrite, MON_GENDERS, MonInstanceSchema } from './core.ts';
 import { EGGS_SLUG } from './Eggs.ts';
 import { RecordError } from './errors.ts';
 import { asRecord, assertUnchanged, mergeWrite, parseRecord, refuseDelete } from './guards.ts';
@@ -20,6 +20,22 @@ export const MON_STAGES = ['Baby', 'Small', 'Mid', 'Max'] as const;
 
 export const MON_IMMUTABLE_FIELDS = ['monInstanceId', 'eggId', 'hatchedAt'] as const;
 
+/**
+ * Set once, then fixed for life (Bible v11 ¶56). A Mon hatched before these
+ * existed holds null and may be backfilled once from its egg id.
+ */
+export const MON_SET_ONCE_FIELDS = ['gender', 'voiceLineageId'] as const;
+
+function assertSetOnce(incoming: Record<string, unknown> | undefined, stored: Record<string, unknown> | undefined): void {
+  if (incoming === undefined || stored === undefined) return;
+  for (const field of MON_SET_ONCE_FIELDS) {
+    const before = stored[field] ?? null;
+    if (before !== null && field in incoming && incoming[field] !== before) {
+      throw new RecordError('IMMUTABLE_FIELD', `mon.${field} is fixed for life once set`);
+    }
+  }
+}
+
 export function toMonInstance(doc: Record<string, unknown>): unknown {
   return {
     monInstanceId: doc.monInstanceId,
@@ -29,6 +45,7 @@ export function toMonInstance(doc: Record<string, unknown>): unknown {
     hatchedAt: doc.hatchedAt,
     bond: doc.bond,
     stage: doc.stage,
+    gender: doc.gender ?? null,
     voiceLineageId: doc.voiceLineageId ?? null,
   };
 }
@@ -61,6 +78,16 @@ export const validateMonInstance: CollectionBeforeChangeHook = async ({ data, op
   const stored = asRecord(originalDoc);
   if (operation === 'update') {
     assertUnchanged(MON_IMMUTABLE_FIELDS, incoming, stored, 'mon');
+    assertSetOnce(incoming, stored);
+    // The stored schema still loads legacy 1–64 character names, so the write
+    // rule lives here: a Mon is named once, to an M09 name, and never renamed.
+    if (incoming !== undefined && 'nickname' in incoming) {
+      const before = typeof stored?.nickname === 'string' ? stored.nickname : null;
+      const after = typeof incoming.nickname === 'string' ? incoming.nickname : null;
+      if (!isAllowedMonNicknameWrite(before, after)) {
+        throw new RecordError('INVALID_RECORD', 'a Mon is named once, with a name of 16 characters or fewer, and never renamed');
+      }
+    }
     if (incoming !== undefined && 'stage' in incoming && stageRank(incoming.stage) < stageRank(stored?.stage)) {
       throw new RecordError('INVALID_TRANSITION', 'a Mon never moves back a lifecycle stage');
     }
@@ -82,6 +109,10 @@ export const validateMonInstance: CollectionBeforeChangeHook = async ({ data, op
     }
     if (egg.hatchesIntoSpeciesId !== mon.speciesId || egg.incubationEndsAt !== mon.hatchedAt || mon.stage !== 'Baby') {
       throw new RecordError('INVALID_RECORD', `mon ${mon.monInstanceId} must be minted from egg ${eggId} as its Baby form`);
+    }
+    const eggSpeciesId = typeof egg.speciesId === 'string' ? egg.speciesId : '';
+    if (mon.gender !== deriveMonGender(eggId) || mon.voiceLineageId !== deriveVoiceLineageId({ eggId, speciesId: eggSpeciesId })) {
+      throw new RecordError('INVALID_RECORD', `mon ${mon.monInstanceId} must carry the gender and voice lineage minted from egg ${eggId}`);
     }
   }
   return data;
@@ -168,6 +199,8 @@ export const MonInstances: CollectionConfig = {
     { name: 'hatchedAt', type: 'number', required: true },
     { name: 'bond', type: 'number', required: true, min: 0, max: 1 },
     { name: 'stage', type: 'select', required: true, options: [...MON_STAGES] },
+    // Set at hatch from the egg id; fixed for life once set (MON_SET_ONCE_FIELDS).
+    { name: 'gender', type: 'select', options: [...MON_GENDERS] },
     { name: 'voiceLineageId', type: 'text', maxLength: 128 },
     { name: 'serverConfirmedAt', type: 'date' },
   ],

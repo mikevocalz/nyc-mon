@@ -11,7 +11,7 @@
 import { Linking } from 'react-native';
 import { Text } from '@acme/ui';
 import { Pressable, View } from '@acme/ui/tw';
-import type { CityDataset } from './city-dataset.ts';
+import type { CitySource } from './city-dataset.ts';
 import type { Rect } from './hud-layout.ts';
 
 export const OSM_COPYRIGHT_URL = 'https://www.openstreetmap.org/copyright';
@@ -26,7 +26,7 @@ export function shortCredit(attribution: string): string {
   return attribution.replace(/\s+contributors$/i, '');
 }
 
-export function MapAttribution({ source, rect }: { source: CityDataset['source']; rect: Rect }) {
+export function MapAttribution({ source, rect }: { source: CitySource; rect: Rect }) {
   const label = `${source.attribution}, ${licenseLabel(source.license)}`;
   return (
     <View

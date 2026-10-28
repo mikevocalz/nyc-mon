@@ -35,6 +35,7 @@ export const adminComponents: AdminComponents = {
     mons: { Component: './admin/console/views/Views#MonsView', path: '/mons/:monInstanceId?' },
     eggs: { Component: './admin/console/views/Views#MonsView', path: '/eggs/:eggId?' },
     integrity: { Component: './admin/console/views/Views#MonsView', path: '/integrity', exact: true },
+    models: { Component: './admin/console/views/Views#ModelsView', path: '/models/:speciesId?' },
     content: { Component: './admin/console/views/Views#ContentView', path: '/content/:rest*' },
     audit: { Component: './admin/console/views/Views#AuditView', path: '/audit/:eventId?' },
     settings: { Component: './admin/console/views/Views#SettingsView', path: '/settings/:rest*' },

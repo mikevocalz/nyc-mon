@@ -4,6 +4,17 @@ import type * as ThreeWebGpu from 'three/webgpu';
 import type { RenderThread } from './render-thread';
 import type { NativeCanvasContext, WorkletRenderHost } from './worklet-host';
 
+/**
+ * The Android view react-native-webgpu backs the canvas with — the values of
+ * its `android.surfaceType` prop. 'auto' (the default, spelled by leaving the
+ * prop unset) picks SurfaceView for an opaque canvas and TextureView for a
+ * non-opaque one. 'HardwareBufferView' (API 29+, experimental upstream)
+ * presents through an AHardwareBuffer pool instead of the surface swapchain:
+ * mailbox semantics — the producer never blocks on the window's buffer queue,
+ * and the view draws the latest GPU-finished frame.
+ */
+export type AndroidSurfaceType = 'SurfaceView' | 'TextureView' | 'HardwareBufferView';
+
 /** The `three/webgpu` module namespace, loaded on demand. */
 export type Three = typeof ThreeWebGpu;
 
@@ -14,6 +25,26 @@ export type Three = typeof ThreeWebGpu;
  * WebGL2 path.
  */
 export type ThreeBackend = 'webgpu' | 'webgl2';
+/** JS-thread submission cost, not GPU completion or Android UI frame time. */
+export interface ThreeFrameTiming {
+  cpuMs: number;
+  intervalMs: number | null;
+  backend: ThreeBackend;
+  /** Scene update() cost — G1 stage attribution, set when the probe timed stages. */
+  updateMs?: number;
+  /** advanceNodeFrame() cost (info.reset + nodeFrame.update). */
+  nodeMs?: number;
+  /** renderer.render() cost: traversal, node/binding updates, encode + queue submit. */
+  renderMs?: number;
+  /** Surface present() cost — the swapchain hand-off; can block on buffer availability. */
+  presentMs?: number;
+  /** renderer.info.render.drawCalls / .triangles for this frame. */
+  drawCalls?: number;
+  triangles?: number;
+  /** Drawing-buffer pixels after this frame's pixel ratio (canvas.width/height). */
+  bufferW?: number;
+  bufferH?: number;
+}
 
 /** The pointer over the canvas, in normalised device coordinates (-1..1, y up). */
 export interface ThreePointer {
@@ -100,8 +131,24 @@ export interface ThreeCanvasProps<P> {
   opacity?: number;
   /** The fill behind the canvas, visible before the first frame. */
   background?: string;
+  /**
+   * Native only: which Android view backs the canvas (see AndroidSurfaceType).
+   * Unset keeps the default auto choice — TextureView for this canvas, which
+   * is non-opaque. Ignored on web and iOS.
+   */
+  androidSurfaceType?: AndroidSurfaceType;
+  /**
+   * Native only: pace the running loop on a zero-delay timer instead of
+   * requestAnimationFrame. Only useful on a superseding present path
+   * (androidSurfaceType 'HardwareBufferView'); on a fifo surface the present
+   * stall throttles the loop the same way rAF pacing does. Ignored on web
+   * and on the worklet thread.
+   */
+  freeRun?: boolean;
   /** Called with the backend once the renderer is up, or null when falling back. */
   onBackendChange?: (backend: ThreeBackend | null) => void;
+  /** Opt-in JS renderer metrics. Worklet runtimes use their own reporting channel. */
+  onFrameTiming?: (sample: ThreeFrameTiming) => void;
   /** Laid over the canvas. */
   children?: ReactNode;
   ref?: Ref<ThreeCanvasHandle>;
