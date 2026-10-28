@@ -2,46 +2,73 @@ import './rn-globals.ts';
 import './globals.css';
 import { useCallback, useEffect, useMemo } from 'react';
 import { createRoot } from 'react-dom/client';
-import type Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
-import { Button, Switch, TextField, useInstanceStore, useStore } from '@acme/ui';
-import { Heading, Paragraph, Section } from '@acme/ui/html';
+import { Banner, Button, Dialog, Switch, TextField, useInstanceStore, useStore } from '@acme/ui';
+import { Details, Heading, List, ListItem, Main, Paragraph, Section, Summary, Text } from '@acme/ui/html';
 import { View } from '@acme/ui/tw';
 import { SimOAuthProvider, parseCallback } from '../shared/auth.ts';
 import { runAgentTurn } from '../shared/agentLoop.ts';
 import { mcpToolsToClaude } from '../shared/toolSpec.ts';
-import { beginSignIn, completeSignIn, connectMcp, type McpSession } from './mcp.ts';
+import { beginSignIn, completeSignIn, connectMcp } from './mcp.ts';
 import { createAuthorize, bearer, sdkRefresh } from './freshToken.ts';
 import { httpModelClient } from './modelClient.ts';
 import { safeStorage } from './session.ts';
 import { createTurnToolCaller } from './turnTools.ts';
-import { toolOutcome } from '../shared/toolOutcome.ts';
-import { MemorySnapshotSchema, type MemorySnapshot } from '@acme/core/schemas';
+import {
+  appendLine, errorMessage, expireSession, initialCompanionState, memoryErrorMessage, monLine, toolResultLine,
+  type CompanionRuntime, type CompanionState, type Line,
+} from './companionState.ts';
+import { MemorySnapshotSchema } from '@acme/core/schemas';
 
 const ConfigSchema = z.object({ mcpUrl:z.string().url(),clientId:z.string().min(1),modelBackend:z.literal('nebius'),modelLabel:z.string() });
 type Config = z.infer<typeof ConfigSchema>;
-interface State { connected:boolean;busy:boolean;question:string;note:string;consent:boolean;memory:MemorySnapshot|null;error:string;lines:string[] }
-interface Runtime { session: McpSession|null; history: Anthropic.MessageParam[]; abort: AbortController|null }
 const toolsAllowed = new Set(['get_mon_status','check_on_mon','check_incubation','hatch_egg','talk_to_mon','feed_mon','rest_mon','wake_mon','play_with_mon']);
+const NOTE_MAX = 500;
+const PAGE = 'mx-auto w-full max-w-content-feed gap-6 px-4 py-6 md:px-6';
+const TITLE = 'NYC-Mon Personal Companion';
 
 function Companion({ config }: { config:Config }) {
-  const store = useInstanceStore<State>(() => ({ connected:false,busy:false,question:'',note:'',consent:false,memory:null,error:'',lines:[] }));
+  const store = useInstanceStore<CompanionState>(initialCompanionState);
   const state = useStore(store);
   // Per-mounted-page protocol handles, not UI state. Visible state stays in the instance store.
-  const runtime = useInstanceStore<Runtime>(() => ({ session:null,history:[],abort:null }));
+  const runtime = useInstanceStore<CompanionRuntime>(() => ({ session:null,history:[],abort:null }));
   const provider = useMemo(() => {
     const storage = safeStorage('session');
+    // boot() checks storage before rendering; this stays as a guard.
     if (!storage) throw new Error('Session storage is required for secure sign-in.');
     return new SimOAuthProvider({ clientId:config.clientId,store:storage,
       redirectUrl:new URL('/nvidia.html',window.location.origin).href,navigate:(url) => window.location.assign(url.href) });
   },[config.clientId]);
-  const onSignedOut = useCallback(() => {
-    runtime.getState().abort?.abort(); runtime.setState({ history:[] });
-    store.setState({ connected:false,memory:null,note:'',consent:false,lines:[] });
-  },[store,runtime]);
+  const onSignedOut = useCallback(() => { expireSession(store,runtime); },[store,runtime]);
   const authorize = useMemo(() => createAuthorize({ store:provider,refresh:sdkRefresh(config.mcpUrl,provider),onSignedOut }),[provider,config.mcpUrl,onSignedOut]);
   const model = useMemo(() => httpModelClient('/api/model',fetch,authorize),[authorize]);
-  const showError = useCallback((error:unknown) => store.setState({ error:error instanceof Error ? error.message : 'The request failed.' }),[store]);
+  const showError = useCallback((error:unknown) => store.setState({ error:errorMessage(error),status:'' }),[store]);
+  const push = useCallback((line:Omit<Line,'id'>) => store.setState((s) => appendLine(s,line)),[store]);
+
+  const memoryRequest = useCallback(async (method:'GET'|'PUT'|'DELETE') => {
+    if (store.getState().busy) return;
+    const current=store.getState();
+    if (method !== 'GET' && current.memory === null) { store.setState({ error:'Saved preferences haven’t loaded yet. Wait a moment, then try again.' });return; }
+    store.setState({ busy:true,error:'' });
+    const controller=new AbortController();runtime.setState({ abort:controller });
+    try {
+      const body=method==='PUT' ? { expectedRevision:current.memory?.revision,consent:current.consent,
+        preferences:{ ...(current.memory?.preferences ?? { interests:[] }),approvedNote:current.note } }
+        : method==='DELETE' ? { expectedRevision:current.memory?.revision } : undefined;
+      const response=await authorize((token) => fetch('/api/memory',{ method,signal:controller.signal,
+        headers:{ 'content-type':'application/json',...bearer(token) },...(body===undefined?{}:{body:JSON.stringify(body)}) }));
+      if (!response.ok) throw new Error(memoryErrorMessage(method,response.status));
+      const envelope=z.object({ ok:z.literal(true),data:MemorySnapshotSchema }).parse(await response.json());
+      if (controller.signal.aborted) return;
+      // Forget also discards this page's conversation, so a previous preference is not replayed from history.
+      if (method==='DELETE') runtime.setState({ history:[] });
+      const status = method==='PUT' ? `Saved. Revision ${envelope.data.revision}.`
+        : method==='DELETE' ? 'Preferences forgotten. Conversation cleared.' : '';
+      store.setState({ memory:envelope.data,note:envelope.data.preferences?.approvedNote??'',consent:false,
+        ...(method==='DELETE'?{lines:[]}:{}),error:'',status });
+    } catch(error) { if (!controller.signal.aborted) showError(error); }
+    finally { if (!controller.signal.aborted) store.setState({ busy:false }); }
+  },[store,runtime,authorize,showError]);
 
   useEffect(() => {
     let disposed=false;
@@ -57,37 +84,19 @@ function Companion({ config }: { config:Config }) {
       if (!provider.tokens()?.access_token) return;
       const connected=await connectMcp({ url:config.mcpUrl,mode:'oauth',provider });
       if (disposed) { await connected.close();return; }
-      runtime.setState({ session:connected });store.setState({ connected:true });
+      runtime.setState({ session:connected });
+      store.setState({ connected:true,status:'Signed in. Your Mon and saved preferences belong to this account.' });
+      void memoryRequest('GET');
     })().catch((error:unknown) => { if (!disposed) showError(error); });
     return () => { disposed=true;runtime.getState().abort?.abort();void runtime.getState().session?.close();runtime.setState({ session:null }); };
-  },[provider,config.mcpUrl,store,showError,runtime]);
+  },[provider,config.mcpUrl,store,showError,runtime,memoryRequest]);
 
-  async function memoryRequest(method:'GET'|'PUT'|'DELETE') {
-    if (store.getState().busy) return;
-    const current=store.getState();
-    if (method !== 'GET' && current.memory === null) { store.setState({ error:'Load memory before changing it.' });return; }
-    store.setState({ busy:true,error:'' });
-    const controller=new AbortController();runtime.setState({ abort:controller });
-    try {
-      const body=method==='PUT' ? { expectedRevision:current.memory?.revision,consent:current.consent,
-        preferences:{ ...(current.memory?.preferences ?? { interests:[] }),approvedNote:current.note } }
-        : method==='DELETE' ? { expectedRevision:current.memory?.revision } : undefined;
-      const response=await authorize((token) => fetch('/api/memory',{ method,signal:controller.signal,
-        headers:{ 'content-type':'application/json',...bearer(token) },...(body===undefined?{}:{body:JSON.stringify(body)}) }));
-      if (!response.ok) throw new Error(response.status===409?'Memory changed in another session. Load it again.':'Memory was not saved. Check sign-in and backend availability.');
-      const envelope=z.object({ ok:z.literal(true),data:MemorySnapshotSchema }).parse(await response.json());
-      if (controller.signal.aborted) return;
-      // Forget also discards this page's conversation, so a previous preference is not replayed from history.
-      if (method==='DELETE') runtime.setState({ history:[] });
-      store.setState({ memory:envelope.data,note:envelope.data.preferences?.approvedNote??'',consent:false,
-        ...(method==='DELETE'?{lines:[]}:{}),error:'' });
-    } catch(error) { if (!controller.signal.aborted) showError(error); }
-    finally { if (!controller.signal.aborted) store.setState({ busy:false }); }
-  }
   async function send() {
     const current=store.getState();const connection=runtime.getState().session;
     if (current.busy || !connection || !current.question.trim()) return;
-    const question=current.question.trim();store.setState({ busy:true,error:'',question:'',lines:[...current.lines,`Caller: ${question}`].slice(-40) });
+    const question=current.question.trim();
+    store.setState({ busy:true,error:'',question:'',status:'Waiting for Nemotron on Nebius…' });
+    push({ who:'Caller',text:question });
     const controller=new AbortController();runtime.setState({ abort:controller });
     try {
       const tools=mcpToolsToClaude(connection.tools.filter((tool) => toolsAllowed.has(tool.name))).tools;
@@ -95,52 +104,85 @@ function Companion({ config }: { config:Config }) {
         tools,history:runtime.getState().history,userText:question,signal:controller.signal,maxSteps:6,
         onEvent:(event) => {
           if (controller.signal.aborted) return;
-          if (event.type==='tool-result') store.setState((previous) => ({ lines:[...previous.lines,
-            `${event.name}: ${toolOutcome(event.result)} — ${JSON.stringify(event.result.structuredContent ?? event.result.content).slice(0,2500)}`].slice(-40) }));
+          if (event.type==='tool-result') push(toolResultLine(event.name,event.result));
         } });
       if (controller.signal.aborted) return;
       runtime.setState({ history:result.history });
-      store.setState((previous) => ({ lines:[...previous.lines,`Mon: ${result.reply || result.outcome}`].slice(-40) }));
+      push(monLine(result.reply,result.outcome));
+      store.setState({ status:'' });
     } catch(error) { if (!controller.signal.aborted) showError(error); }
     finally { if (!controller.signal.aborted) store.setState({ busy:false }); }
   }
   function signOut() {
     runtime.getState().abort?.abort();void runtime.getState().session?.close();runtime.setState({ session:null });provider.signOut();runtime.setState({ history:[] });
-    store.setState({ connected:false,busy:false,question:'',note:'',consent:false,memory:null,error:'',lines:[] });
+    store.setState({ ...initialCompanionState(),status:'Signed out. This page no longer holds your conversation or preferences.' });
   }
   function exportMemory() {
     if (!state.memory) return;
     const url=URL.createObjectURL(new Blob([JSON.stringify(state.memory,null,2)],{type:'application/json'}));
     const link=document.createElement('a');link.href=url;link.download='nyc-mon-memory.json';link.click();URL.revokeObjectURL(url);
+    store.setState({ status:'Downloaded nyc-mon-memory.json.' });
   }
-  return <Section className="mx-auto w-full gap-target-gap">
-    <Heading>NYC-Mon Personal Companion</Heading>
-    <Paragraph>{config.modelLabel}. Live services only; no scripted fallback.</Paragraph>
+  return <Main className={PAGE}>
+    <Heading className="font-display text-type-station">{TITLE}</Heading>
+    <Paragraph className="text-type-caption text-text-muted">{config.modelLabel}. If Nebius doesn’t answer, nothing answers in its place.</Paragraph>
+    {/* Always mounted so screen readers have the region before its text changes. */}
+    <Paragraph role="status" className="text-type-caption text-text-muted">{state.status}</Paragraph>
     {!state.connected ? <Button title="Sign in as an adult Caller" onPress={() => { void beginSignIn(config.mcpUrl,provider).catch(showError); }}/> : <Button title="Sign out" variant="outline" onPress={signOut}/>}
-    {state.error ? <Paragraph role="alert">{state.error}</Paragraph>:null}
-    {state.connected ? <View className="gap-target-gap">
-      <TextField label="Ask your Mon" value={state.question} onChangeText={(question) => store.setState({question})} disabled={state.busy}/>
-      <Button title={state.busy?'Working…':'Send'} onPress={() => { void send(); }} disabled={state.busy}/>
-      <View aria-live="polite" className="gap-target-gap">{state.lines.map((line,index) => <Paragraph key={index}>{line}</Paragraph>)}</View>
-      <Heading>Memory you control</Heading>
-      <Paragraph>Only save information you approve. Do not include passwords or sensitive personal details. Saved preferences are sent to Nebius with model requests. Chat history is not stored here.</Paragraph>
-      <Button title="Load / refresh memory" variant="outline" onPress={() => { void memoryRequest('GET'); }} disabled={state.busy}/>
-      <TextField label="Approved preferences (500 characters maximum)" value={state.note} onChangeText={(note) => store.setState({note:note.slice(0,500)})} disabled={state.busy || !state.memory}/>
-      <Switch label="I approve saving these preferences" value={state.consent} onChange={(consent) => store.setState({consent})}/>
-      <View className="flex-row flex-wrap gap-target-gap">
-        <Button title="Save approved memory" onPress={() => { void memoryRequest('PUT'); }} disabled={state.busy || !state.memory || !state.consent}/>
-        <Button title="Forget all saved preferences" variant="outline" onPress={() => { void memoryRequest('DELETE'); }} disabled={state.busy || !state.memory}/>
-        <Button title="Export my memory" variant="outline" onPress={exportMemory} disabled={!state.memory}/>
-      </View>
-      <Paragraph>Revision: {state.memory?.revision ?? 'not loaded'}. A new browser session reads the same authenticated account, not a local fixture.</Paragraph>
-    </View>:null}
-  </Section>;
+    {state.error ? <Banner tone="danger" live="alert" title={state.error}/> : null}
+    {state.connected ? <>
+      <Section aria-label="Chat" className="gap-3">
+        <TextField surface="daylit" label="Ask your Mon" hint="Your Mon can check on itself, eat, rest, wake up and play."
+          value={state.question} onChangeText={(question) => store.setState({question})} disabled={state.busy}/>
+        <Button title="Send" variant="cta" onPress={() => { void send(); }} disabled={state.busy}/>
+        <View aria-live="polite">
+          <List aria-label="Conversation" className="gap-3">
+            {state.lines.map((line) => (
+              <ListItem key={line.id} className="text-type-body">
+                <Text className="font-semibold">{line.who}: </Text>{line.text}
+                {line.detail ? <Details><Summary className="text-type-caption text-text-muted">Server response</Summary>
+                  <Text className="whitespace-pre-wrap text-type-caption">{line.detail}</Text></Details> : null}
+              </ListItem>
+            ))}
+          </List>
+        </View>
+      </Section>
+      <Section className="gap-3">
+        <Heading level={2} className="text-type-title">Saved preferences</Heading>
+        <Paragraph className="text-type-body">Only save information you approve. Do not include passwords or sensitive personal details. Saved preferences are sent to Nebius with model requests. Chat history is not stored here.</Paragraph>
+        {state.memory === null && !state.busy ? <Button title="Reload saved preferences" variant="outline" onPress={() => { void memoryRequest('GET'); }}/> : null}
+        <TextField surface="daylit" label="What should your Mon remember?" hint={`Up to ${NOTE_MAX} characters. ${NOTE_MAX - state.note.length} left.`}
+          value={state.note} onChangeText={(note) => store.setState({note:note.slice(0,NOTE_MAX)})} disabled={state.busy || !state.memory}/>
+        <Switch label="Save this for my Mon to use" value={state.consent} onChange={(consent) => store.setState({consent})} disabled={state.busy || !state.memory}/>
+        <View className="flex-row flex-wrap gap-3">
+          <Button title="Save preferences" variant="outline" onPress={() => { void memoryRequest('PUT'); }} disabled={state.busy || !state.memory || !state.consent}/>
+          <Button title="Forget preferences" variant="danger" onPress={() => store.setState({ confirmForget:true })} disabled={state.busy || !state.memory}/>
+          <Button title="Download preferences (JSON)" variant="outline" onPress={exportMemory} disabled={!state.memory}/>
+        </View>
+        <Paragraph className="text-type-caption text-text-muted">Revision {state.memory?.revision ?? '(not loaded)'}. Sign in from another browser to see the same preferences.</Paragraph>
+      </Section>
+      <Dialog open={state.confirmForget} onClose={() => store.setState({ confirmForget:false })}
+        title="Forget your saved preferences?"
+        description="Your Mon will stop using them, and this conversation will be cleared. This can’t be undone."
+        actions={<>
+          <Button title="Keep preferences" variant="outline" onPress={() => store.setState({ confirmForget:false })}/>
+          <Button title="Forget preferences" variant="danger" onPress={() => { store.setState({ confirmForget:false }); void memoryRequest('DELETE'); }}/>
+        </>}/>
+    </>:null}
+  </Main>;
 }
 async function boot() {
   const element=document.getElementById('root');if (!element) throw new Error('Missing app root.');
   const root=createRoot(element);
-  try { const response=await fetch('/api/nvidia/config',{cache:'no-store'});if(!response.ok)throw new Error('NVIDIA server unavailable.');
+  const fail = (title:string, description:string) => root.render(<Main className={PAGE}>
+    <Heading className="font-display text-type-station">{TITLE}</Heading>
+    <Banner tone="danger" live="alert" title={title} description={description}/>
+  </Main>);
+  if (!safeStorage('session')) { fail('This browser is blocking session storage, which sign-in needs.','Turn off private mode or allow site data, then reload.');return; }
+  try {
+    const response=await fetch('/api/nvidia/config',{cache:'no-store'});
+    if (!response.ok) throw new Error(`config ${response.status}`);
     root.render(<Companion config={ConfigSchema.parse(await response.json())}/>);
-  } catch { root.render(<Paragraph role="alert">Start the NVIDIA companion server and check its nonsecret configuration.</Paragraph>); }
+  } catch { fail('The companion server isn’t answering.','Reload in a minute.'); }
 }
 void boot();
