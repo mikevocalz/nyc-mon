@@ -134,7 +134,7 @@ const Completion = z.object({
       tool_calls: z.array(z.object({
         id: z.string().min(1).max(256), type: z.literal('function'),
         function: z.object({ name: z.string().regex(/^[a-zA-Z0-9_-]{1,128}$/), arguments: z.string().max(200000) }),
-      })).max(16).optional(),
+      })).max(16).nullable().optional(),
     }),
   })).length(1),
   usage: z.object({ prompt_tokens: z.number().int().nonnegative(), completion_tokens: z.number().int().nonnegative() }),
