@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { companionCopy } from '@acme/app/features/companion/copy.ts';
 import { NEED_RING, isLow } from '@acme/app/features/companion/home-model.ts';
 import { groupJournalByDay, journalEntryCopyId, showsFirstBadge, type DayHeading } from '@acme/app/features/companion/journal-model.ts';
-import { artFor } from '@acme/app/features/companion/mon-identity.ts';
+import { artFor } from '@acme/app/features/companion/creature-art.ts';
 import { MON_MOUTHS } from '@acme/app/features/companion/mon-models.ts';
 import { hatchCopy } from '@acme/app/features/hatch/copy.ts';
 // Kit components are imported the way their Storybook stories import them

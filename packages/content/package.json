@@ -8,6 +8,7 @@
   "exports": {
     ".": "./index.ts",
     "./mons": "./mons/index.ts",
+    "./starters": "./mons/starters.ts",
     "./eggs": "./eggs.ts",
     "./voices": "./voices.ts"
   },
