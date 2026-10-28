@@ -5,6 +5,7 @@ import * as protoLoader from '@grpc/proto-loader';
 import type { IncomingMessage } from 'node:http';
 import type { Duplex } from 'node:stream';
 import { WebSocketServer, type RawData, type WebSocket } from 'ws';
+import { FALLBACK_MON_LINGO, type MonLingo } from '@acme/content/lingo';
 
 /**
  * Live speech-to-text for the simulator's mic: the page streams 16 kHz mono
@@ -26,8 +27,28 @@ export const ASR_URI = 'grpc.nvcf.nvidia.com:443';
 /** NVCF function for parakeet-ctc-1.1b-asr (streaming). Verified live 2026-10-24. */
 export const ASR_FUNCTION_ID = '1598d209-5e27-4d3c-8079-4751568b1081';
 export const ASR_SAMPLE_RATE = 16_000;
-/** Words Parakeet should favour: the Mon's names and how the Caller is addressed. */
-export const ASR_PHRASES = ['Callah', 'Caller', "Lil' Ratti", 'Squeaklet', 'Metro Egg', 'Hood Ratti', 'Mon', 'NYC-MON', 'bet', 'say less', 'my G'];
+/** Names Parakeet should favour that are not lingo: the Mon's forms and the product. */
+export const ASR_NAMES = ["Lil' Ratti", 'Squeaklet', 'Metro Egg', 'Hood Ratti', 'Mon', 'NYC-MON'];
+
+const plainApostrophes = (text: string) => text.replace(/[\u2018\u2019]/g, "'").toLowerCase();
+
+/**
+ * Words Parakeet should favour: ASR_NAMES, then from the served lingo every
+ * pronunciation's screen word and spellings (Caller, Callah) and each palette
+ * entry that is a word the Mon says. A palette entry counts when its own
+ * example line contains it ("bet": Like: "Bet."); descriptions such as
+ * "habitual be" or "copula drop, casual lines only" are not words to listen for.
+ */
+export function asrPhrases(lingo: MonLingo): string[] {
+  const spellings = lingo.pronunciations.flatMap((entry) => [entry.written, ...entry.variants]);
+  const palette = lingo.guide
+    .filter((entry) => entry.category === 'word-palette' && !entry.text.includes(',') && plainApostrophes(entry.meaning).includes(plainApostrophes(entry.text)))
+    .map((entry) => entry.text);
+  return [...new Set([...spellings, ...ASR_NAMES, ...palette].map((phrase) => phrase.trim()).filter((phrase) => phrase !== ''))];
+}
+
+/** The word boost with the bundled lingo, for a stream opened without a source. */
+export const ASR_PHRASES = asrPhrases(FALLBACK_MON_LINGO);
 /** Measured: without the boost Parakeet heard "Lil Ray" and "calls"; with it, "Lil' Ratti" and "Callah". */
 const PHRASE_BOOST = 20;
 /** One listening session at most this long; the page reconnects for the next. */
@@ -51,7 +72,7 @@ interface RecognizeResponse {
 }
 
 /** Riva StreamingRecognize over NVCF: TLS, bearer and function-id metadata. */
-export function createParakeetStream(opts: { apiKey: string; functionId?: string }): OpenAsrStream {
+export function createParakeetStream(opts: { apiKey: string; functionId?: string; phrases?: () => readonly string[] }): OpenAsrStream {
   const def = protoLoader.loadSync('riva/proto/riva_asr.proto', { keepCase: true, longs: Number, enums: String, defaults: true, includeDirs: [PROTO_DIR] });
   const pkg = grpc.loadPackageDefinition(def) as unknown as {
     nvidia: { riva: { asr: { RivaSpeechRecognition: new (uri: string, creds: grpc.ChannelCredentials) => grpc.Client } } };
@@ -84,7 +105,7 @@ export function createParakeetStream(opts: { apiKey: string; functionId?: string
           max_alternatives: 1,
           enable_automatic_punctuation: true,
           audio_channel_count: 1,
-          speech_contexts: [{ phrases: ASR_PHRASES, boost: PHRASE_BOOST }],
+          speech_contexts: [{ phrases: opts.phrases?.() ?? ASR_PHRASES, boost: PHRASE_BOOST }],
         },
         interim_results: true,
       },

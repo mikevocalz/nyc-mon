@@ -1,7 +1,7 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { Readable } from 'node:stream';
-import { MAX_SPOKEN_TEXT, planMonUtterance } from '@acme/content/voice';
+import { MAX_SPOKEN_TEXT, planMonUtterance, type MonLingo } from '@acme/content/voice';
 import { IdSchema, LifecycleStageSchema, MonMoodSchema } from '@acme/core/schemas';
 import { z } from 'zod';
 import type { CharacterAlignment, FaceTrack } from '@acme/ui/three/mon/lipsync';
@@ -129,6 +129,12 @@ export interface TtsHandlerDeps {
   readonly pitchShift?: PitchShifter | null;
   /** Audio2Face-3D for the JSON answer. Omitted: no face, character timing only. */
   readonly face?: FaceRenderer;
+  /**
+   * The Mon's lingo as Payload serves it (`GET /v1/mon-lingo`): voice table,
+   * pronunciations, stage directions. Called once per line after sign-in.
+   * Omitted: the bundled FALLBACK_MON_LINGO.
+   */
+  readonly lingo?: () => Promise<MonLingo>;
 }
 
 /** ElevenLabs `/with-timestamps` body. */
@@ -235,7 +241,7 @@ export function createTtsHandler(deps: TtsHandlerDeps) {
       return json(400, { error: 'Malformed speech request.' });
     }
 
-    const plan = planMonUtterance(parsed.text, parsed);
+    const plan = planMonUtterance(parsed.text, parsed, deps.lingo ? await deps.lingo() : undefined);
     if (deps.apiKey === undefined || plan.voice.kind !== 'lineage') return silent();
     // The mood's stability and similarity plus the voice's own style and speed.
     // Checked live 2026-10-23: eleven_v4_turbo answers 200 with all four fields.
