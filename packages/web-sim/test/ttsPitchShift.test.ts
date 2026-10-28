@@ -1,12 +1,15 @@
 import { spawnSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
+import { bundledFfmpeg } from '../server/nvidia-tts.ts';
 import { createFfmpegPitchShifter, findFfmpeg } from '../server/tts.ts';
 
 /**
- * Runs the real ffmpeg shifter on a generated tone. Skipped when no ffmpeg
- * binary is on this machine (FFMPEG_PATH or PATH).
+ * Runs the real ffmpeg shifter on a generated tone, with the bundled
+ * ffmpeg-static binary the companion runs on Render. Falls back to FFMPEG_PATH
+ * or PATH; skipped when neither exists.
  */
-const ffmpeg = findFfmpeg();
+const bundled = bundledFfmpeg();
+const ffmpeg = (bundled === null ? null : findFfmpeg(bundled)) ?? findFfmpeg();
 const RATE = 44_100;
 const TONE_HZ = 440;
 const TONE_SECONDS = 2;
