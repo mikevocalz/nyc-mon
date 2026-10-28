@@ -181,6 +181,21 @@ export function AppView(props: AppViewProps) {
       bridge.onupdatemodelcontext = async () => ({});
       // The view says when its hatch starts and whether it plays the sound itself.
       bridge.addEventListener('loggingmessage', (params) => {
+        if ((params as { logger?: unknown }).logger === 'nyc-mon/probe') {
+          (globalThis as { __monProbe?: unknown }).__monProbe = (params as { data?: { rows?: unknown } }).data?.rows ?? null;
+          return;
+        }
+        if ((params as { logger?: unknown }).logger === 'nyc-mon/capture') {
+          (globalThis as { __monCapture?: unknown }).__monCapture = (params as { data?: { frames?: unknown } }).data?.frames ?? null;
+          return;
+        }
+        // The 3D Mon's frame timing (frame-stats.ts), kept for dev tools to read.
+        if ((params as { logger?: unknown }).logger === 'nyc-mon/frames') {
+          const w = globalThis as { __monViewFrames?: unknown[] };
+          (w.__monViewFrames ??= []).push({ at: Date.now(), ...((params as { data?: object }).data ?? {}) });
+          if (w.__monViewFrames.length > 200) w.__monViewFrames.shift();
+          return;
+        }
         const report = parseHatchStart(params);
         if (report && !disposed) void hatchSound.onViewStart(report);
       });
@@ -248,6 +263,20 @@ export function AppView(props: AppViewProps) {
   useEffect(() => {
     void bridgeRef.current?.sendHostContextChange({ displayMode: props.displayMode });
   }, [props.displayMode]);
+
+  // Dev aid: window.__monRequestCapture(count, every, size) asks the view for a frame burst (window.__monCapture).
+  useEffect(() => {
+    const w = globalThis as { __monRequestCapture?: (count: number, every: number, size: number) => void };
+    (w as { __monRequestProbe?: () => void }).__monRequestProbe = () => {
+      void bridgeRef.current?.sendHostContextChange({ nycMonProbe: Date.now() } as never);
+    };
+    w.__monRequestCapture = (count, every, size) => {
+      void bridgeRef.current?.sendHostContextChange({ nycMonCapture: { count, every, size, at: Date.now() } } as never);
+    };
+    return () => {
+      delete w.__monRequestCapture;
+    };
+  }, []);
 
   // The Mon's voice, as one cue per utterance through the host context's
   // extension room (McpUiHostContext allows extra keys). The view aligns the

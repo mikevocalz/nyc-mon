@@ -197,6 +197,8 @@ catalog:
   # Audio2Face-3D over gRPC from the web-sim's /api/tts (hosted NVCF function).
   "@grpc/grpc-js": 1.14.6
   "@grpc/proto-loader": 0.8.1
+  ws: 8.22.0
+  "@types/ws": 8.18.2
 
   # auth (ADR 0001; DECISIONS #2, #3)
   # @delmaredigital/payload-better-auth comes from the mikevocalz fork until
