@@ -10,6 +10,7 @@ describe('describeModelError on the NVIDIA path', () => {
     [new NebiusError('HTTP', 502), 'Nebius returned an error (502). No other model was used. Try again.', true],
     [new NebiusError('HTTP'), 'Nebius returned an error. No other model was used. Try again.', true],
     [new NebiusError('RESPONSE'), 'Nebius sent a reply this page couldn’t use. No other model was used. Try again.', true],
+    [new NebiusError('EMPTY'), 'Nemotron on Nebius finished without an answer. No other model answered instead. Try again.', true],
     [new NebiusError('INPUT'), 'This conversation couldn’t be sent to Nebius. Start a new conversation.', false],
     [new NebiusError('CONFIG'), 'This conversation couldn’t be sent to Nebius. Start a new conversation.', false],
     [new CompanionMemoryError(503), 'Your saved preferences couldn’t be checked, so nothing was sent to the model. Try again.', true],

@@ -17,7 +17,8 @@ const Schema = z.object({
   NEBIUS_API_KEY: z.string().trim().min(1),
   NEBIUS_BASE_URL: z.enum(NEBIUS_ENDPOINTS).default(NEBIUS_ENDPOINTS[0]),
   SIM_NEBIUS_MODEL_ID: z.enum(NVIDIA_MODELS).default(NVIDIA_MODELS[0]),
-  SIM_MAX_OUTPUT_TOKENS: z.coerce.number().int().min(256).max(16000).default(1024),
+  // Nemotron 3.5 Lightning reasons before it answers; 1024 left too little room. Matches the adapter default.
+  SIM_MAX_OUTPUT_TOKENS: z.coerce.number().int().min(256).max(16000).default(4096),
 });
 export type NvidiaEnv = z.infer<typeof Schema>;
 /** Dedicated entry uses the existing simulator/agent/auth modules; it never falls back to Bedrock or a mock. */
