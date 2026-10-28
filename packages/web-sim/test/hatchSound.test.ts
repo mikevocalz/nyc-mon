@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BEATS, CRACK_TICK, CRACKS, soundCues } from '@acme/ui/three/mon/hatch-timeline';
 import { HATCH_START_LOGGER } from '@acme/ui/three/mon/hatch-sound';
 import { createHostHatchSound, isFreshHatch, parseHatchStart, type HostAudio } from '../src/client/hatchSound.ts';
@@ -79,6 +79,17 @@ describe('parseHatchStart', () => {
 });
 
 describe('the host plays the hatch sound', () => {
+  // The host adds its own processing time (two performance.now() reads) to the
+  // reported lag. Pin the clock so these timings check the scheduling math, not
+  // how fast the runner is: a loaded CI runner spent 5 ms there and failed.
+  let clock: { mockRestore(): void } | undefined;
+  beforeEach(() => {
+    clock = vi.spyOn(globalThis.performance, 'now').mockReturnValue(1000);
+  });
+  afterEach(() => {
+    clock?.mockRestore();
+  });
+
   it('schedules every beat at its timeline offset from when the view started', async () => {
     const { host, audio } = setup();
     host.arm();
