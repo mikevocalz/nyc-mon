@@ -80,7 +80,8 @@ describe('lingo parity: seed tables vs the hard-coded tables they replaced', () 
       }
     }
     expect(compared).toBeGreaterThan(20_000);
-  });
+    // 60,000+ plans: about 3 s locally, past vitest's 5 s default on shared CI runners.
+  }, 60_000);
 
   it('captions, pronunciations and stage directions match', () => {
     for (const text of PARITY_TEXTS) {
