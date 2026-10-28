@@ -38,6 +38,14 @@ export const WORLD_SAVE_MIGRATIONS: readonly WorldSaveMigration[] = [];
  */
 export interface DatasetMigration {
   readonly datasetId: string;
+  /**
+   * Earlier dataset ids this step accepts saves from. A re-baked tile can
+   * carry a new dated id (city dataset v3): the world save stores the id the
+   * scene was built against, so a rename alone would strand every save as
+   * `incompatible-dataset`. List the superseded ids here to opt a step into
+   * cross-id resolution; absent means the historical same-id-only behaviour.
+   */
+  readonly fromDatasetIds?: readonly string[];
   readonly fromDatasetVersion: number;
   readonly toDatasetVersion: number;
   readonly migratePosition: (position: GeoPosition) => GeoPosition;

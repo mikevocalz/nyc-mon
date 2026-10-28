@@ -15,34 +15,47 @@ interface Mount {
   result: Record<string, unknown>;
   /** The host rejects every tools/call (transport failure). */
   callFails?: boolean;
+  /** What a tools/call from the view answers with; defaults to `result`. */
+  callResult?: Record<string, unknown>;
 }
 
 declare global {
   interface Window {
     mountView: (m: Mount) => Promise<void>;
+    /** ui/notifications/host-context-changed to the mounted view. */
+    sendHostContext: (ctx: Record<string, unknown>) => Promise<void>;
     calls: unknown[];
     sizes: { width?: number; height?: number }[];
+    /** notifications/message from the view (app.sendLog), newest last. */
+    logs: { logger?: string; data?: unknown }[];
   }
 }
 
 window.calls = [];
 window.sizes = [];
-window.mountView = async ({ html, width, height, hostContext, result, callFails }) => {
+window.logs = [];
+window.mountView = async ({ html, width, height, hostContext, result, callFails, callResult }) => {
   const frame = document.createElement('iframe');
   frame.setAttribute('sandbox', 'allow-scripts');
   frame.style.cssText = `border:0;display:block;width:${width}px;height:${height}px`;
   document.body.append(frame);
-  const bridge = new AppBridge(null, { name: 'boot-test', version: '0' }, { serverTools: {} }, { hostContext } as never);
+  const bridge = new AppBridge(null, { name: 'boot-test', version: '0' }, { serverTools: {}, logging: {} }, { hostContext } as never);
+  bridge.addEventListener('loggingmessage', (params) => {
+    window.logs.push(params as { logger?: string; data?: unknown });
+  });
   bridge.oncalltool = async (params) => {
     window.calls.push(params);
     if (callFails) throw new Error('host lost the server');
-    return { content: [], structuredContent: result } as never;
+    return { content: [], structuredContent: callResult ?? result } as never;
   };
   // ui/notifications/size-changed from the view (App autoResize).
   bridge.onsizechange = (size) => {
     window.sizes.push(size);
   };
   bridge.onrequestdisplaymode = async ({ mode }) => ({ mode });
+  window.sendHostContext = async (ctx) => {
+    await bridge.sendHostContextChange(ctx as never);
+  };
   bridge.oninitialized = () => {
     void bridge.sendToolInput({ arguments: {} });
     void bridge.sendToolResult({ content: [], structuredContent: result } as never);

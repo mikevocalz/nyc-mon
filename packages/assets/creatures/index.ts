@@ -13,11 +13,16 @@
  * 2026-10-07. The model returned 960×1280 (3:4) and 1536×1024 (3:2); the 3:4
  * frames are cropped to 4:5 (960×1200). `blurDataURL` is a 20×25 (24×16 for
  * the wide frame) WebP of the same crop.
+ *
+ * Lil' Ratti is the exception: a render of apps/web/public/mons/lil-ratti.glb
+ * (three.js, `up_idle` at 0.4 s, front three-quarter, transparent background)
+ * at 960×1200, so the 34 MB model is never needed where one picture will do.
  */
 
 import cornerEgg from './corner-egg.webp';
 import hatchNight from './hatch-night.webp';
 import kitteeCee from './kittee-cee.webp';
+import lilRatti from './lil-ratti.webp';
 import metroEgg from './metro-egg.webp';
 import prismEgg from './prism-egg.webp';
 import squeaklet from './squeaklet.webp';
@@ -26,7 +31,7 @@ import yotito from './yotito.webp';
 export type CreatureSource = string | number | { src: string; width: number; height: number };
 
 /** Which canon record the art depicts. `scene` is the hatch night, which shows an egg but no particular one. */
-export type CreatureArtKind = 'baby' | 'egg' | 'scene';
+export type CreatureArtKind = 'baby' | 'small' | 'egg' | 'scene';
 
 export interface CreatureArt {
   id: string;
@@ -44,6 +49,7 @@ export interface CreatureArt {
 }
 
 const GENERATED = { tool: 'Figma generate_image', model: 'gpt-image-2.5-sunburst', date: '2026-10-07' } as const;
+const RENDERED_LIL_RATTI = { tool: 'three.js render of lil-ratti.glb', model: 'lil-ratti.glb up_idle', date: '2026-10-23' } as const;
 
 export const CREATURE_ART: readonly CreatureArt[] = [
   {
@@ -51,7 +57,7 @@ export const CREATURE_ART: readonly CreatureArt[] = [
     kind: 'baby',
     dexId: 2,
     source: squeaklet,
-    alt: 'Squeaklet, a young charcoal-furred rat Mon with big round pink ears and a long pink tail, sitting on a sunny Harlem brownstone stoop and grinning at the viewer',
+    alt: 'Squeaklet, a charcoal-furred rat Mon with pink ears and tail, sitting on a sunny Harlem brownstone stoop.',
     width: 960,
     height: 1200,
     blurDataURL:
@@ -63,7 +69,7 @@ export const CREATURE_ART: readonly CreatureArt[] = [
     kind: 'baby',
     dexId: 9,
     source: kitteeCee,
-    alt: 'Kittee Cee, a young calico cat Mon with big soft paws, sitting upright on a Harlem bodega step beside a fruit stand, chin raised and calm',
+    alt: 'Kittee Cee, a calico cat Mon with soft paws, sitting on a Harlem bodega step beside a fruit stand.',
     width: 960,
     height: 1200,
     blurDataURL:
@@ -75,7 +81,7 @@ export const CREATURE_ART: readonly CreatureArt[] = [
     kind: 'baby',
     dexId: 62,
     source: yotito,
-    alt: 'Yotito, a young sandy-gray coyote Mon with tall pointed ears and big paws, standing on a Times Square sidewalk under bright screens and looking at the viewer',
+    alt: 'Yotito, a sandy-gray coyote Mon with tall ears and big paws, standing on a bright Times Square sidewalk.',
     width: 960,
     height: 1200,
     blurDataURL:
@@ -83,11 +89,23 @@ export const CREATURE_ART: readonly CreatureArt[] = [
     generatedWith: GENERATED,
   },
   {
+    id: 'lil-ratti',
+    kind: 'small',
+    dexId: 3,
+    source: lilRatti,
+    alt: 'Lil’ Ratti, a charcoal rat Mon with big pink ears, in a red hoodie, black shorts and red high-tops.',
+    width: 960,
+    height: 1200,
+    blurDataURL:
+      'data:image/webp;base64,UklGRrABAABXRUJQVlA4WAoAAAAQAAAAEwAAGAAAQUxQSMoAAAABgKtt//nl81e2jdnY3O6aeABdzY3/Ldfkdts2J9vGAdh445tOICImQP6lfVIgF7oRogi8BDKoThzVrQK402W28fmLETP+RZV8rTYMvvtQGKFi9Bxqn3BVrCusSk+VAjzejlAiMgUAA9/wwMdbW8pw5MMZ0qkgPAN4wTTVVlEOYGGmnZoumAZw03tOxV4Dj4A2gRKz2a340StD4a0OWhQB8OAUWtxIKjqolD4ArvFoZtxegIfTgFwsMhIY7asW2QPcmc/D02KU3yMBVlA4IMAAAADQBACdASoUABkAPtFYpEyoJSOiKA1RABoJbAC93BUCIeC8uYWxS+pI5Z0HX2NGoAD+y1fz30twXdehxreVebZxZ0761PA7vfpOVIczEyMisnOcqR51kcc3fSPEuyh1J576rrtwfzevwoj9aYBEV0+pwwm7PsGNB/8nkDTR/V8v/mYRRMraE8mE1s3aML0wz/f9dZ0pV1Fv6wQEpfNza+eZIMO+hfMJM31pEa38P/BMdn1/S4qxHjL8MVCsf9apkAA=',
+    generatedWith: RENDERED_LIL_RATTI,
+  },
+  {
     id: 'metro-egg',
     kind: 'egg',
     dexId: 1,
     source: metroEgg,
-    alt: 'The Metro Egg, a glossy red egg with white diagonal stripes and a small round gold inset, resting on a Harlem brownstone step',
+    alt: 'The Metro Egg, glossy red with white diagonal stripes and a gold inset, on a Harlem brownstone step.',
     width: 960,
     height: 1200,
     blurDataURL:
@@ -99,7 +117,7 @@ export const CREATURE_ART: readonly CreatureArt[] = [
     kind: 'egg',
     dexId: 8,
     source: cornerEgg,
-    alt: 'The Corner Egg, a glossy pink egg wrapped in a band of white fur with a tiny gold heart, resting on a bodega step',
+    alt: 'The Corner Egg, glossy pink with a white fur band and tiny gold heart, resting on a bodega step.',
     width: 960,
     height: 1200,
     blurDataURL:
@@ -111,7 +129,7 @@ export const CREATURE_ART: readonly CreatureArt[] = [
     kind: 'egg',
     dexId: 61,
     source: prismEgg,
-    alt: 'The Prism Egg, a glossy black egg with painted red, orange and yellow flames and a clear crystal inset, resting on a ledge in Times Square',
+    alt: 'The Prism Egg, glossy black with painted flames and a clear crystal inset, on a Times Square ledge.',
     width: 960,
     height: 1200,
     blurDataURL:
@@ -122,7 +140,7 @@ export const CREATURE_ART: readonly CreatureArt[] = [
     id: 'hatch-night',
     kind: 'scene',
     source: hatchNight,
-    alt: 'Night on a Harlem stoop: an egg rests in an open metal case on the bottom step, a thin crack in its shell glowing orange, with a lit bridge and skyline blurred behind',
+    alt: 'Night on a Harlem stoop: an egg in an open metal case, a thin shell crack glowing orange against a blurred skyline.',
     width: 1536,
     height: 1024,
     blurDataURL:

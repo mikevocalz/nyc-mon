@@ -5,6 +5,7 @@ import { View } from '@acme/ui/tw';
 import { Eyebrow } from '../home/Eyebrow';
 import { hatchArt, monsArt } from './art';
 import { W02_COPY } from './copy';
+import { MonsModels3D } from './MonsModels3D';
 import { MonsMotion } from './MonsMotion';
 import { ArtFill, ConceptCaption, DexChip, RouteDisc, StreetFigure, dexDigits } from './parts';
 import { monsStarters, type MonsStarter } from './starters';
@@ -197,6 +198,8 @@ export function MonsIndexPage() {
         </Section>
 
         <SkylineDivider district="harlem" seed={11} size="lg" still />
+
+        <MonsModels3D />
 
         <List aria-label={copy.eyebrow} className="m-0 w-full list-none p-0 pb-6 pt-6 md:pt-10">
           {starters.map((starter, i) => (

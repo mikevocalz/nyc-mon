@@ -12,6 +12,7 @@ import { announcePolitely } from './announce';
 import { defaultCallerNameFilter } from './caller-name-filter';
 import { MEET_PATH } from '../egg/egg-model.ts';
 import { copy } from './copy';
+import { useProfile } from '../profile/profile.store';
 import { readConsentRequested, useOnboarding } from './onboarding.store';
 import { readSave, storeCallerProfile } from './save-store';
 
@@ -81,7 +82,9 @@ export function CallerNameScreen() {
       consentStatus: under13 ? 'pending' : (existing?.consentStatus ?? 'not-required'),
       createdAt: existing?.createdAt ?? nowMs,
     };
-    storeCallerProfile(caller, nowMs);
+    const saved = storeCallerProfile(caller, nowMs);
+    // The profile store reads the Caller name once at load; keep it current.
+    useProfile.getState().setName(saved.caller?.callerName ?? caller.callerName);
     announcePolitely(copy('m07.confirmed.a11y.announce'));
     // M07 confirmed → M08 egg choice (M08 handoff "Route and intent").
     router.replace(MEET_PATH);

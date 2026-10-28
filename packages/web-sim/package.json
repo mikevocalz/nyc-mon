@@ -13,9 +13,13 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@acme/content": "workspace:*",
+    "@acme/core": "workspace:*",
     "@acme/theme": "workspace:*",
     "@acme/ui": "workspace:*",
     "@anthropic-ai/bedrock-sdk": "catalog:",
+    "@grpc/grpc-js": "catalog:",
+    "@grpc/proto-loader": "catalog:",
     "@anthropic-ai/sdk": "catalog:",
     "@modelcontextprotocol/client": "catalog:",
     "@modelcontextprotocol/ext-apps": "catalog:",
@@ -25,6 +29,7 @@
     "react-dom": "catalog:",
     "react-native-skia": "catalog:",
     "react-native-web": "catalog:",
+    "ws": "catalog:",
     "zod": "catalog:",
     "zustand": "catalog:"
   },
@@ -34,6 +39,7 @@
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
+    "@types/ws": "catalog:",
     "@vitejs/plugin-react": "catalog:",
     "eslint": "catalog:",
     "eslint-config-expo": "catalog:",

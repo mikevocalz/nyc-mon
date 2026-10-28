@@ -24,9 +24,12 @@ export const SimEnvSchema = z.object({
   SIM_DEV_MODE: z.enum(['0', '1']).default('0'),
   /** 'bedrock' calls Claude on Amazon Bedrock; 'mock' is the scripted stand-in for tests and offline runs. */
   SIM_MODEL_BACKEND: z.enum(['bedrock', 'mock']).default('bedrock'),
-  /** Bedrock model id (Claude in Amazon Bedrock, Messages API endpoint). */
-  SIM_BEDROCK_MODEL_ID: z.string().min(1).default('anthropic.claude-opus-5-5'),
-  /** AWS region of the bedrock-mantle endpoint. Falls back to AWS_REGION. */
+  /**
+   * Bedrock model id. A geo-prefixed inference profile (`us.anthropic.…`) goes
+   * to bedrock-runtime; a bare id (`anthropic.claude-opus-5-5`) goes to mantle.
+   */
+  SIM_BEDROCK_MODEL_ID: z.string().min(1).default('us.anthropic.claude-sonnet-4-6'),
+  /** AWS region of the Bedrock endpoint. Falls back to AWS_REGION. */
   SIM_BEDROCK_REGION: z.string().optional(),
   /** Thinking/effort depth. Low keeps voice replies quick. */
   SIM_MODEL_EFFORT: z.enum(['low', 'medium', 'high']).default('low'),
@@ -49,6 +52,24 @@ export const SimEnvSchema = z.object({
   AUTH_JWKS_URL: z.string().url().optional(),
   /** The simulator's OAuth client id. Same variable admin-vite registers the client from. */
   OAUTH_SIM_CLIENT_ID: z.string().min(1).default('nyc-mon-sim'),
+  /**
+   * ElevenLabs key for /api/tts, the Mon's own voice in the simulator. Optional:
+   * unset (or empty), the route answers 204 and the page uses Web Speech. Read
+   * only by this process; never sent to the browser.
+   */
+  ELEVENLABS_API_KEY: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).optional()),
+  /**
+   * NVIDIA API key for Audio2Face-3D on the Mon's voice (server/a2f.ts).
+   * Optional: unset (or empty), /api/tts sends character timing only and the
+   * Mon lip-syncs from that. Read only by this process; never logged.
+   */
+  NVIDIA_API_KEY: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).optional()),
+  /** The NVCF function to call; defaults to `ai-a2x-service` (a2f.ts). */
+  NVIDIA_A2F_FUNCTION_ID: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).optional()),
+  /** How long a face may take before the clip goes out without one. */
+  SIM_A2F_TIMEOUT_MS: z.coerce.number().int().positive().default(4000),
+  /** Speech requests per minute per client address. */
+  SIM_TTS_RATE_LIMIT_PER_MIN: z.coerce.number().int().positive().default(30),
   AWS_REGION: z.string().optional(),
   NODE_ENV: z.string().optional(),
 });
@@ -84,6 +105,7 @@ export interface PublicConfig {
   readonly devMode: boolean;
   readonly modelBackend: 'bedrock' | 'mock';
   readonly modelLabel: string;
+  readonly liveMic: boolean;
 }
 
 export function publicConfig(env: SimEnv): PublicConfig {
@@ -95,5 +117,7 @@ export function publicConfig(env: SimEnv): PublicConfig {
     devMode: env.SIM_DEV_MODE === '1',
     modelBackend: env.SIM_MODEL_BACKEND,
     modelLabel: env.SIM_MODEL_BACKEND === 'mock' ? 'Scripted test model' : `Claude on Amazon Bedrock (${env.SIM_BEDROCK_MODEL_ID})`,
+    /** /api/asr is up (NVIDIA key set): the mic streams to Parakeet, echo-cancelled. */
+    liveMic: Boolean(env.NVIDIA_API_KEY),
   };
 }

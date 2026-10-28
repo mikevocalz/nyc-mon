@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { AnthropicBedrockMantle } from '@anthropic-ai/bedrock-sdk';
+import { AnthropicBedrock, AnthropicBedrockMantle } from '@anthropic-ai/bedrock-sdk';
 import { z } from 'zod';
 import type { ModelAuthCheck } from './model-auth.ts';
 
@@ -38,15 +38,28 @@ export interface BedrockOptions {
 
 /**
  * Claude on Amazon Bedrock through the Messages-API endpoint
- * (`bedrock-mantle.<region>.api.aws/anthropic/v1/messages`), SigV4-signed by
- * the Anthropic Bedrock SDK from the default AWS credential chain.
+ * (`bedrock-mantle.<region>.api.aws/anthropic/v1/messages`), or bedrock-runtime
+ * InvokeModel for inference-profile ids, SigV4-signed by the Anthropic Bedrock
+ * SDK from the default AWS credential chain.
  */
 /** The slice of the Bedrock client this backend uses; tests pass a fake. */
 export type BedrockMessagesClient = Pick<AnthropicBedrockMantle, 'messages'>;
 
+/**
+ * Inference-profile ids (`us.anthropic.claude-sonnet-4-6`) only exist on
+ * bedrock-runtime; bare ids (`anthropic.claude-opus-5-5`) go to mantle.
+ */
+export function usesBedrockRuntime(modelId: string): boolean {
+  return /^(us|eu|apac|jp|au|global)\.anthropic\./.test(modelId);
+}
+
 export function bedrockBackend(opts: BedrockOptions, injected?: BedrockMessagesClient): ModelBackend {
   let client: BedrockMessagesClient | null = injected ?? null;
-  const getClient = () => (client ??= new AnthropicBedrockMantle({ awsRegion: opts.region }));
+  // ponytail: runtime path exists because this account's mantle quota for Opus 5.5 is 0 (docs/aws-builder.md); drop it once Support lifts that.
+  const getClient = () =>
+    (client ??= usesBedrockRuntime(opts.modelId)
+      ? (new AnthropicBedrock({ awsRegion: opts.region }) as unknown as BedrockMessagesClient)
+      : new AnthropicBedrockMantle({ awsRegion: opts.region }));
   return {
     label: opts.modelId,
     async stream({ system, messages, tools }, onText, signal) {
@@ -103,6 +116,25 @@ function mockMessage(content: Anthropic.ContentBlock[], stop: Anthropic.StopReas
  * once and then reads the result back. It exists so the MCP path, the views
  * and the transcript can be exercised without AWS.
  */
+/** A tool result's text when it reads as speech; undefined for JSON or empty. */
+function spokenText(body: string): string | undefined {
+  const t = body.trim();
+  if (t === '' || t.startsWith('{') || t.startsWith('[')) return undefined;
+  return t.slice(0, 240);
+}
+
+/** The plain-language message inside an error result, never its code or JSON. */
+function spokenError(body: string): string {
+  try {
+    const parsed: unknown = JSON.parse(body);
+    const message = (parsed as { error?: { message?: unknown } } | null)?.error?.message;
+    if (typeof message === 'string' && message.trim() !== '') return message.trim().slice(0, 240);
+  } catch {
+    /* not JSON */
+  }
+  return spokenText(body) ?? 'That didn’t go through. Try again in a minute.';
+}
+
 export function mockBackend(): ModelBackend {
   return {
     label: 'mock',
@@ -112,23 +144,25 @@ export function mockBackend(): ModelBackend {
         ? last.content.filter((b): b is Anthropic.ToolResultBlockParam => b.type === 'tool_result')
         : [];
       if (results.length > 0) {
-        const calls = messages.at(-2)?.content;
-        const called = Array.isArray(calls) ? calls.find((b): b is Anthropic.ToolUseBlockParam => b.type === 'tool_use')?.name : undefined;
         const first = results[0];
         const body = Array.isArray(first?.content)
           ? first.content.map((c) => (c.type === 'text' ? c.text : '')).join(' ')
           : String(first?.content ?? '');
-        const text = first?.is_error
-          ? `Scripted test reply. ${called ?? 'The tool'} came back with an error: ${body.slice(0, 160)}`
-          : `Scripted test reply. ${called ?? 'The tool'} answered; the card shows what it returned.`;
+        // The display is customer-facing: no tool names, codes or JSON on it
+        // (Alexa+ functional requirements §2). Tool text is written to be
+        // spoken (voice-only must stand on its own), so read that back.
+        const text = first?.is_error ? spokenError(body) : spokenText(body) ?? 'Here’s your Mon.';
         onText(text);
         return mockMessage([{ type: 'text', text, citations: null } as Anthropic.TextBlock], 'end_turn');
       }
+      // A tool named in the request ("hatch my egg" -> hatch_egg) wins, so the mock can drive any no-argument tool.
+      const said = typeof last?.content === 'string' ? last.content.toLowerCase() : '';
       const tool =
+        tools.find((t) => needsNoArgs(t) && said.includes(t.name.split('_')[0]!)) ??
         MOCK_TOOL_PREFERENCE.map((n) => tools.find((t) => t.name === n)).find((t) => t && needsNoArgs(t)) ??
         tools.find(needsNoArgs);
       if (!tool) {
-        const text = 'Scripted test reply. The server offered no tool I can call without arguments.';
+        const text = 'I can’t check on your Mon right now. Try again in a minute.';
         onText(text);
         return mockMessage([{ type: 'text', text, citations: null } as Anthropic.TextBlock], 'end_turn');
       }
@@ -266,7 +300,7 @@ export function clientKey(remoteAddress: string | undefined, forwardedFor: strin
 export function describeModelError(err: unknown): { message: string; retry: boolean } {
   if (err instanceof Anthropic.RateLimitError) return { message: 'The model is busy. Try again in a few seconds.', retry: true };
   if (err instanceof Anthropic.AuthenticationError || err instanceof Anthropic.PermissionDeniedError) {
-    return { message: 'This server can’t reach Claude on Bedrock: its AWS credentials were refused.', retry: false };
+    return { message: 'Bedrock refused this request. Check the AWS credentials and that this account has access to the configured model.', retry: false };
   }
   if (err instanceof Anthropic.NotFoundError) return { message: 'The configured Bedrock model id wasn’t found in this region.', retry: false };
   if (err instanceof Anthropic.BadRequestError) return { message: 'The model rejected this request. Start a new conversation and try again.', retry: false };

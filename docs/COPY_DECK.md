@@ -333,3 +333,158 @@ gameplay, or the onboarding completion checkpoint. The egg-ready push stays
 one local notification per egg. Parental consent is a separate gate.
 
 Source of copy: `packages/app/features/onboarding/copy.ts`, `m24.*`.
+
+## Graphics quality (game settings)
+
+The world renders at one of three tiers; the setting lives on the game's
+settings surface next to Game controls (G03's sibling). Every string is
+`voice: "ui"`, namespace `settings.graphics.*`. Rules that apply: sentence
+case, lead with what the Caller can do, promise only what ships, status is
+never colour alone.
+
+| ID | String | Voice | Status |
+|---|---|---|---|
+| `settings.graphics.label` | Graphics | ui | drafted |
+| `settings.graphics.caption` | How the city looks and how hard the phone works to draw it. | ui | drafted |
+| `settings.graphics.auto` | Auto | ui | drafted |
+| `settings.graphics.performance` | Performance | ui | drafted |
+| `settings.graphics.quality` | Quality | ui | drafted |
+| `settings.graphics.auto.desc` | Follows what the phone can hold steady. The city stays detailed until the frame rate drops. | ui | drafted |
+| `settings.graphics.performance.desc` | Lighter detail and a lower render scale, for the smoothest frame. | ui | drafted |
+| `settings.graphics.quality.desc` | Full detail, reflections and lit rooms. May run slower on older phones. | ui | drafted |
+| `settings.graphics.render_scale.note` | In Auto the city can draw at a lower resolution to keep the frame steady. It never drops below half. | ui | drafted |
+| `settings.graphics.reduced.note` | Reduced motion is on. Animated glow and shimmer stay off. | ui | drafted |
+| `settings.graphics.reduced.action` | Change | ui | drafted |
+| `settings.graphics.reduced.action.a11y.hint` | Opens system settings | ui | drafted |
+
+Notes:
+
+- **Reduced motion is honoured, not offered.** There is no in-app motion
+  toggle; the `settings.graphics.reduced.*` status row appears only when the
+  OS reports reduced motion, the same pattern as `g03.reduced.*`. Reduced
+  motion never changes copy.
+- **No pressure in the descriptions.** The tiers say what each does, not
+  which is best. Auto is the default and the recommended row carries no
+  badge, star or "best" label.
+- **Render scale is explained, not buried.** The note sits under the
+  control so a Caller on Performance knows the softness is the setting
+  working, not a broken screen.
+
+## Battery and frame rate (game settings)
+
+The performance pass adds two controls beside Graphics on the same
+settings surface (PR 4's frame-rate request, PR 5's heat handling). Every
+string is `voice: "ui"`, namespaces `settings.framerate.*` and
+`settings.battery.*`. The Graphics section's rules apply: sentence case,
+lead with what the Caller can do, promise only what ships, status is
+never colour alone.
+
+| ID | String | Voice | Status |
+|---|---|---|---|
+| `settings.framerate.label` | Frame rate | ui | drafted |
+| `settings.framerate.caption` | How often the screen draws a new frame. Higher looks smoother and uses more battery. | ui | drafted |
+| `settings.framerate.auto` | Match the screen | ui | drafted |
+| `settings.framerate.auto.desc` | Asks for the fastest rate the city can hold steady. Never above it — swinging frames feel worse than a steady one. | ui | drafted |
+| `settings.framerate.sixty` | 60 fps | ui | drafted |
+| `settings.framerate.sixty.desc` | A steady 60 on any screen. The battery-friendlier pick on fast displays. | ui | drafted |
+| `settings.battery.label` | Battery | ui | drafted |
+| `settings.battery.caption` | Lighter detail and a lower frame rate use less power and keep the phone cooler. | ui | drafted |
+| `settings.battery.saver` | Battery saver | ui | drafted |
+| `settings.battery.saver.desc` | Holds the city on the lighter tier and a steady 60 frames a second. | ui | drafted |
+| `settings.battery.thermal.note` | The phone is running warm, so the city eased off to keep the frame steady. | ui | drafted |
+
+Notes:
+
+- **"The phone", never "device"** for the hardware; "H-Lynk" stays for
+  the in-fiction unit (Law 9, same as `g03.haptics.unsupported`).
+- **No rate the city can't hold.** The auto option describes the spec's
+  rule — request only rates the build holds — without promising a number
+  the Duo 1 can't reach. No option names 90 or 120; the screen decides
+  (PR 4).
+- **The thermal note is a status, not a warning.** It follows the
+  `settings.graphics.reduced.*` StatusRow pattern: it appears only while
+  the OS reports the phone is warm (PR 5's Thermal API step-down), names
+  what happened and why, and carries no action — there's nothing for the
+  Caller to do.
+- **Battery saver is one switch, not a second tier picker.** It composes
+  the existing settings (lighter tier, capped rate) rather than adding a
+  fourth graphics tier — the Graphics section keeps three.
+- **Reduced motion never changes copy** — these strings are identical
+  under reduced motion.
+
+## City data credits (dataset v3)
+
+The "Legal & credits" card in Settings (`settings-content.tsx`) gains rows
+when the bundled tile is v3: `map-data-credit.ts` becomes a list derived
+from the tile's `sources`, and each source renders name, what it supplied
+and its licence link. Every string is `voice: "ui"`, namespace
+`settings.legal.*`. Status: **drafted** — this is the G7 draft; Mike
+reviews before it ships. Rules that apply: sentence case, lead with what
+the reader can do, promise only what the record backs.
+
+| ID | String | Voice | Status |
+|---|---|---|---|
+| `settings.legal.title` | Legal & credits | ui | shipped |
+| `settings.legal.citydata.group` | City data | ui | drafted |
+| `settings.legal.citydata.attribution` | © OpenStreetMap contributors | ui | shipped |
+| `settings.legal.citydata.body` | NYC-Mon's 3D city uses OpenStreetMap data under the Open Database License (ODbL 1.0). | ui | shipped |
+| `settings.legal.citydata.valdrada.name` | Valdrada | ui | drafted |
+| `settings.legal.citydata.valdrada.line` | A real-data, real-time digital twin of New York City, maintained by Mehmet Kerem Turkcan. | ui | drafted |
+| `settings.legal.citydata.valdrada.cite` | Turkcan, M. K. (2026). Valdrada: a real-data, real-time digital twin of New York City (version 0.4.0). | ui | drafted |
+| `settings.legal.citydata.sources.lead` | Valdrada compiles these NYC records: | ui | drafted |
+| `settings.legal.citydata.src.footprints` | Building Footprints — building shapes, roof heights, ground elevation | ui | drafted |
+| `settings.legal.citydata.src.pluto` | PLUTO — floor counts, year built, building class | ui | drafted |
+| `settings.legal.citydata.src.fisp` | DOB NOW safety filings — facade materials | ui | drafted |
+| `settings.legal.citydata.src.cscl` | Street Centerlines — road shape, width, lanes, names | ui | drafted |
+| `settings.legal.citydata.src.trees` | 2015 Street Tree Census — street trees | ui | drafted |
+| `settings.legal.citydata.src.hydrants` | Hydrants — hydrant locations | ui | drafted |
+| `settings.legal.citydata.src.shelters` | Bus Stop Shelters — shelter locations | ui | drafted |
+| `settings.legal.citydata.src.linknyc` | LinkNYC — kiosk locations | ui | drafted |
+| `settings.legal.citydata.src.subway` | MTA subway entrances — station stairs | ui | drafted |
+| `settings.legal.citydata.src.bikeracks` | CityRacks — bike rack locations | ui | drafted |
+| `settings.legal.citydata.link.osm` | View OpenStreetMap copyright | ui | drafted |
+| `settings.legal.citydata.link.odbl` | View the ODbL 1.0 licence | ui | drafted |
+| `settings.legal.citydata.link.valdrada` | View the Valdrada repository | ui | drafted |
+| `settings.legal.citydata.link.dataset` | View the record on NYC Open Data | ui | drafted |
+
+The BibTeX for Valdrada, verbatim from its README — for docs and the
+citation link target, not rendered in the UI:
+
+```bibtex
+@software{turkcan2026valdrada,
+  author  = {Turkcan, Mehmet Kerem},
+  title   = {{Valdrada}: a real-data, real-time digital twin of New York City},
+  year    = {2026},
+  version = {0.4.0},
+  url     = {https://github.com/mkturkcan/valdrada}
+}
+```
+
+Notes:
+
+- **The group label changes with the tile.** "City data" replaces the
+  existing "Map data" caption only when the bundled tile is v3; the v1/v2
+  copy above (`attribution`, `body`) is untouched and stays what older
+  tiles show. `settings.legal.citydata.attribution`/`body` are the shipped
+  strings — they are still accurate on v3 (OSM data is inside the Valdrada
+  tile), so they are repeated here rather than rewritten.
+- **Records are named by what they gave us.** Each `src.*` row says what
+  the tile took from that record set — nothing more. The FISP row says
+  "facade materials", not "wall types" or "fire risk"; the PLUTO row says
+  "floor counts", not "storeys" or "use". What a source did not supply is
+  never implied. Source ids and URLs live in `map-data-credit.ts` and the
+  tile's `sources`, not in the strings.
+- **No claim about style.** STYLE ids are a classification over records,
+  not a record — no credit row says "architecture" or "facade style comes
+  from the city". The `e` provenance bits carry that distinction in data;
+  the credit copy does not try to.
+- **Link labels are verb-first** ("View …"), sentence case, one per
+  licence or source. Every row's link gets a screen-reader label; the
+  a11y review (§6.1 #6) checks targets and contrast.
+- **MTA's entrances live on data.ny.gov**, not NYC Open Data — the shared
+  `link.dataset` label reads "NYC Open Data" and the MTA row needs its own
+  variant at implementation ("View the record on NY Open Data") or the
+  shared label generalises. Flagged for the implementer; not decided here.
+- **No lobby loading copy ships from this deck.** G5 keeps the dataset
+  bundled, so the lobby's existing progress state stays; if G5 moves it to
+  a fetch, lobby strings land then, not preemptively.

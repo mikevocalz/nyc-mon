@@ -1,0 +1,32 @@
+diff --git a/dist/utils.cjs b/dist/utils.cjs
+index 800820acaffca3a363db9995947c2c88cc10d5ac..83b19aba0459cd05fd7051ceb976a4d181da434a 100644
+--- a/dist/utils.cjs
++++ b/dist/utils.cjs
+@@ -53,7 +53,10 @@ async function getBody(request, allowedMediaTypes) {
+ 	return await request.text();
+ }
+ function isAPIError(error) {
+-	return error instanceof require_error.APIError || error?.name === "APIError";
++	// Name match only with a numeric statusCode: Payload's APIError is also
++	// named "APIError" but carries a numeric `status` and no `statusCode`, and
++	// rendering it as ours answers `200 <status>` with an empty body.
++	return error instanceof require_error.APIError || error?.name === "APIError" && typeof error.statusCode === "number";
+ }
+ function tryDecode(str) {
+ 	try {
+diff --git a/dist/utils.mjs b/dist/utils.mjs
+index c00fd6ef78d0985906014a2d9969728a45c2c056..d01118f59f6d06008ac25eca29feef6440ae5638 100644
+--- a/dist/utils.mjs
++++ b/dist/utils.mjs
+@@ -53,7 +53,10 @@ async function getBody(request, allowedMediaTypes) {
+ 	return await request.text();
+ }
+ function isAPIError(error) {
+-	return error instanceof APIError || error?.name === "APIError";
++	// Name match only with a numeric statusCode: Payload's APIError is also
++	// named "APIError" but carries a numeric `status` and no `statusCode`, and
++	// rendering it as ours answers `200 <status>` with an empty body.
++	return error instanceof APIError || error?.name === "APIError" && typeof error.statusCode === "number";
+ }
+ function tryDecode(str) {
+ 	try {

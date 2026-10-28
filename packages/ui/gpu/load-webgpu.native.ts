@@ -1,5 +1,5 @@
 import { createElement, type Ref } from 'react';
-import { Canvas, type CanvasRef } from 'react-native-webgpu';
+import { Canvas, installWebGPU, type CanvasRef } from 'react-native-webgpu';
 import type { GpuCanvasRef, WebGpuModule } from './types';
 
 // react-native-webgpu's Canvas, filling its parent, transparent over the views behind.
@@ -14,6 +14,12 @@ function NativeGpuCanvas({ ref }: { ref?: Ref<GpuCanvasRef> }) {
  * import is static so that happens before the first support check.
  */
 export async function loadWebGpu(): Promise<WebGpuModule | null> {
+  // Bundle Mode (react-native-worklets) forces Metro inlineRequires: the
+  // package's `export * from "./main"` then evaluates lazily, so the entry
+  // never assigns `navigator.gpu` on the main runtime (react-native-webgpu
+  // src/index.tsx vs src/main/index.tsx). installWebGPU() is the package's own
+  // idempotent install and a no-op when the entry already ran.
+  installWebGPU();
   if (typeof navigator === 'undefined' || !navigator.gpu) return null;
   return { Canvas: NativeGpuCanvas };
 }

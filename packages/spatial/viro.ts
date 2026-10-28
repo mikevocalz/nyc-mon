@@ -14,6 +14,7 @@ export {
   ViroGameLoop,
   ViroMaterials,
   ViroNode,
+  ViroOrbitCamera,
   ViroPolyline,
   ViroQuad,
   ViroScene,

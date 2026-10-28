@@ -58,7 +58,7 @@ describe('M12 entry', () => {
   it('sends an early entry home and resumes a presenting hatch at its phase', () => {
     assert.deepEqual(resolveHatchEntry({ ...base, hatch: createHatchState(egg), nowMs: END - 1 }), { kind: 'early' });
     const presenting = transitionHatch(transitionHatch(createHatchState(egg), { type: 'open', now: END }, egg), { type: 'advance' }, egg);
-    assert.deepEqual(resolveHatchEntry({ ...base, hatch: presenting }), { kind: 'resume', phase: 'scanner' });
+    assert.deepEqual(resolveHatchEntry({ ...base, hatch: presenting }), { kind: 'resume', phase: 'pressure' });
   });
   it('treats a second entry after the hatch as already hatched', () => {
     const hatched = transitionHatch(createHatchState(egg), { type: 'skip' }, egg);

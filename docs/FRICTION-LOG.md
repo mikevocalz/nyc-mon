@@ -2,7 +2,7 @@
 
 The hackathon rules give up to a 10% bonus for friction log entries, each with "specific task attempted, steps taken, expected vs. actual result, severity rating, workaround used, and actionable suggestion" (`docs/alexa/HACKATHON.md`, submission checklist). Every entry below names the tool and points at a commit, a test or a captured doc. Anything not yet run against real infrastructure says **pending live verification**.
 
-**Started:** 2026-10-06. **Last filled:** 2026-10-14.
+**Started:** 2026-10-06. **Last filled:** 2026-10-23.
 
 ## Severity
 
@@ -140,7 +140,86 @@ Newest first.
 - **Evidence:** 6bd5ae1, `docs/adr/0005-alexa-mcp-transport.md`, `packages/mcp-server/`.
 - **Status:** superseded.
 
+## Amazon Bedrock
+
+### 2026-10-21: No console page links the Anthropic use-case form
+- **Tool:** Amazon Bedrock console and docs, "Request access to models"
+- **Task:** file Anthropic's first-time use case form so Claude models answer on a new account.
+- **Steps:** opened Claude Sonnet 4.6 in the model catalog and in the playground, opened the Model access page, and read the docs page, which says to open an Anthropic model from the catalog or the Anthropic providers page and complete the form.
+- **Expected / actual:** a form or a link to it. The playground showed only `ResourceNotFoundException: Model use case details have not been submitted for this account`. The Model access page says it "has been retired", and the providers URL redirected to the catalog with "The requested model was not found."
+- **Severity:** Blocker.
+- **Workaround:** `aws bedrock put-use-case-for-model-access` with base64 JSON, then `get-foundation-model-availability` reported `AVAILABLE`.
+- **Suggestion:** put the form, or a link to it, in the error the playground shows.
+- **Evidence:** `docs/aws-builder.md`, "Account state and decisions, 2026-10-19" and "First real Bedrock turns, 2026-10-21".
+- **Status:** worked around.
+
+### 2026-10-19: Claude worked for about an hour, then every Anthropic model returned 404
+- **Tool:** Amazon Bedrock, bedrock-runtime
+- **Task:** first real model turn for the simulator.
+- **Steps:** called `us.anthropic.claude-sonnet-4-6` and `us.anthropic.claude-opus-4-6-v1` on a new account.
+- **Expected / actual:** either access or a clear refusal from the start. Two calls succeeded. Later calls returned `404 Model use case details have not been submitted for this account`, which read like a wrong model id.
+- **Severity:** High.
+- **Workaround:** filed the use-case form (entry above).
+- **Suggestion:** return 403 with the form's name, and don't serve a grace window that ends without warning.
+- **Evidence:** `docs/aws-builder.md`, blocker 1.
+- **Status:** worked around.
+
+### 2026-10-19: Opus 5.5 on bedrock-mantle has an applied quota of 0, and Service Quotas refuses to raise it
+- **Tool:** Amazon Bedrock (bedrock-mantle), Service Quotas
+- **Task:** run the simulator on `anthropic.claude-opus-5-5` through the Messages-API endpoint.
+- **Steps:** called the model, read the quotas, tried a quota increase.
+- **Expected / actual:** the AWS default of 20M input and 2M output tokens per minute. The call returned `permission_error: ... is not available for this account`. Both applied quotas were 0, and `RequestServiceQuotaIncrease` rejects any value at or below the default.
+- **Severity:** Blocker for Opus 5.5.
+- **Workaround:** a bedrock-runtime path for inference-profile ids (48f54a6). The simulator now defaults to Claude Sonnet 4.6 (58fb23d).
+- **Suggestion:** say in the error that the account is restricted and that only a Support case lifts it.
+- **Evidence:** `docs/aws-builder.md`, blocker 2; `packages/web-sim/server/model.ts` (`usesBedrockRuntime`).
+- **Status:** worked around; Opus 5.5 still blocked.
+
 ## MCP SDKs and the libraries around them
+
+### 2026-10-23: The JWKS endpoint answered "200 500" with an empty body
+- **Tool:** `payload-better-auth` (the Payload adapter for Better Auth), `better-call` 1.4.2 and `@better-auth/core` 1.7.10.
+- **Task:** let the MCP server and the simulator verify access tokens against `{issuer}/payload-api/auth/jwks`.
+- **Steps:** `curl` on the JWKS URL; read the adapter's `dist/adapter/index.js` and better-call's `isAPIError`.
+- **Expected / actual:** expected a JSON key set. Got status 200 with reason "500", an empty body and no log line, and the `jwks` table stayed empty. Two bugs stacked. Better Auth calls adapter methods with the resolved model name, `getModelName('jwks')` = `'jwkss'`; the adapter's double-s guard tested `!model.endsWith('ss')`, which is always false for `'jwkss'`, so every query went to a collection slug `jwkss` and Payload threw "The collection with slug jwkss can't be found". Payload's base error is also named `APIError`, and better-call and core match errors by that name, so better-call rendered it as its own: status from the missing `statusCode` (defaults to 200), status text from the numeric status, body from the missing body. Core's `onError` skipped the log for the same reason.
+- **Severity:** Blocker for sign-in: no token could be verified, and the failure looked like success.
+- **Workaround:** three pnpm patches (`patchedDependencies`). The adapter tests the schema key from `getDefaultModelName` and rethrows Payload's `APIError` as a plain `Error` naming the method and model. better-call and core also require a numeric `statusCode` before treating an error as their own.
+- **Suggestion (payload-better-auth):** test the guard against Better Auth's pluralised names. **(better-call, Better Auth):** match `APIError` by class or brand, not by `name`.
+- **Evidence:** 67de5df. After the fix the JWKS returns one EdDSA/Ed25519 key, `payload.jwks` went from 0 rows to 1, and a forced Payload `APIError` answers 500 with both log lines.
+- **Status:** worked around (pnpm patches).
+
+### 2026-10-23: The simulator's token exchange was blocked by CORS
+- **Tool:** Payload's CORS list and `@better-auth/oauth-provider` public clients.
+- **Task:** sign in from the web simulator, a public OAuth client (PKCE, no secret).
+- **Steps:** "Sign in" on http://localhost:5180, linking pages, back to `/oauth/callback`, then the browser posts the code to `/payload-api/auth/oauth2/token`.
+- **Expected / actual:** expected a token. Payload's CORS list held only the auth origins, so the browser blocked the call and sign-in ended in "Failed to fetch".
+- **Severity:** High. Every public-client sign-in failed after a successful login.
+- **Workaround:** CORS also lists the redirect origins of public clients. Confidential clients (Alexa) call from a server and stay off the list. CSRF is unchanged.
+- **Suggestion (Better Auth):** document that a browser-based public client needs its origin allowed on the token endpoint, or expose the provider's client origins to the host's CORS config.
+- **Evidence:** 22b58d5, `docs/alexa/AUTH.md`.
+- **Status:** fixed.
+
+### 2026-10-23: The 3D Mon drew grey inside the MCP Apps sandbox
+- **Tool:** three.js `GLTFLoader` under the MCP Apps view CSP (SEP-1865).
+- **Task:** show the textured Mon GLB in the mon-card view.
+- **Steps:** loaded `/mons/<id>.glb` from the declared model origin inside the sandboxed iframe.
+- **Expected / actual:** expected the same textured model `/mons` shows. The geometry drew grey. `GLTFLoader` decodes embedded textures with `ImageBitmapLoader`, which `fetch()`es `blob:` URLs, so they fall under `connect-src`, where the host lists only declared origins.
+- **Severity:** Medium.
+- **Workaround:** decode textures through `TextureLoader` (an `<img>`), which `img-src` allows for `blob:`.
+- **Suggestion (MCP Apps):** say in the CSP section whether hosts allow `blob:` in `connect-src`, or let a view declare it. **(three.js):** note in the loader docs that embedded textures are fetched from `blob:` URLs.
+- **Evidence:** 44a20ed.
+- **Status:** worked around.
+
+### 2026-10-23: Saved cards pointed at `ui://` URIs that a restarted server no longer had
+- **Tool:** MCP Apps `ui://` resources and our simulator (`packages/web-sim`).
+- **Task:** reopen the last card after a reload.
+- **Steps:** restarted the MCP server, reloaded the sim.
+- **Expected / actual:** expected the card back. The sim had saved each call's `resourceUri`, which carries a content hash, so a rebuilt server changed it; `resources/read` answered "Resource not found", and "Try card again" fetched the same stale URI.
+- **Severity:** Medium. Only a new conversation cleared it.
+- **Workaround:** the sim derives the view URI at render time from the tool the connected server lists, and "Try card again" re-lists the tools first (reconnecting if the session is gone).
+- **Suggestion (MCP Apps):** say whether a host may cache `resourceUri` across server versions, and how a server should signal that a URI moved.
+- **Evidence:** 59528bf, `packages/web-sim/test/viewUri.test.ts` (fails against the old behaviour).
+- **Status:** fixed.
 
 ### 2026-10-14: An oversized body reset the connection instead of answering 413
 - **Tool:** Node.js `http` (our MCP server's body reader).
@@ -199,6 +278,39 @@ Newest first.
 
 ## Our own safeguards
 
+### 2026-10-23: The first hatch of every egg answered 409
+- **Tool:** our `/v1` game API and the Payload `MonInstances` validate hook.
+- **Task:** hatch an egg through `POST /v1/eggs/:id/hatch`.
+- **Steps:** ran the request on a local database.
+- **Expected / actual:** expected a Mon. `hatchEgg` built the Mon from `mintMonInstance`, which returns no `eggId`; the hook derives the Mon id from `eggId` and threw `MON_ID_MISMATCH`, so every first hatch answered 409.
+- **Severity:** Blocker for new Callers.
+- **Workaround:** `hatchEgg` passes `eggId`.
+- **Suggestion:** none for Amazon.
+- **Evidence:** d95dcf0. The same request now answers 200 and the row carries its egg id.
+- **Status:** fixed.
+
+### 2026-10-23: View boot tests passed only with the simulator running
+- **Tool:** our MCP server boot suite (`packages/mcp-server/src/ui/ui.boot.test.ts`).
+- **Task:** run the view boot tests on CI.
+- **Steps:** the views fetch `/mons/*.glb` from the model origin (localhost:5180, the sim host).
+- **Expected / actual:** passed on a machine with the sim running; on CI nothing listened there, the GLB fetch logged a console error in 10 boot tests and the egg never rendered.
+- **Severity:** Medium.
+- **Workaround:** the test browser context fulfils those requests from `apps/web/public/mons`. Checked with `NYC_MON_MODEL_ORIGIN` pointed at an unused port: 47 of 47 pass.
+- **Suggestion:** none for Amazon.
+- **Evidence:** db1eddd.
+- **Status:** fixed.
+
+### 2026-10-23: `CI=true` broke the Amazon sign-up guard test
+- **Tool:** our Amazon LWA sign-up guard test (`packages/payload/src/auth/__tests__/amazon.test.ts`) on GitHub Actions.
+- **Task:** keep local-only Amazon sign-up off on hosted builds.
+- **Steps:** ran the guard's table test locally and on CI.
+- **Expected / actual:** the three "developer machine" rows passed locally and failed on GitHub, because CI sets `CI=true` and the guard correctly treats that as a hosted build. The test, not the guard, was wrong.
+- **Severity:** Low.
+- **Workaround:** the table clears `CI`, `VERCEL` and `VERCEL_ENV` for its rows and restores them after; the Vercel case still checks the hosted path.
+- **Suggestion:** none for Amazon.
+- **Evidence:** 21045ad.
+- **Status:** fixed.
+
 ### 2026-10-14: The scripted mock could have answered a judge
 - **Tool:** our simulator (`packages/web-sim`). No Amazon simulator is available, so ours is the judged surface.
 - **Task:** keep the offline test model out of any public deployment.
@@ -213,6 +325,6 @@ Newest first.
 <!--
 Append real friction as it happens: every failed tool call, doc
 contradiction, missing capability or confusing UX counts, including
-"worked but surprising". Live runs still owed: Bedrock, deployed OAuth,
+"worked but surprising". Live runs still owed: deployed OAuth,
 the migration on a real database, care latency, the demo video.
 -->

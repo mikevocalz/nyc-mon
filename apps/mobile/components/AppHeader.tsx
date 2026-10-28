@@ -3,7 +3,7 @@ import { usePathname } from 'expo-router';
 import { BrandWordmark, SafeArea } from '@acme/ui';
 import { Header } from '@acme/ui/primitives';
 import { Text } from '@acme/ui/tw';
-import { AVATAR_URI, MenuButton, useProfile } from '@acme/app';
+import { MenuButton, useProfile } from '@acme/app';
 import { useRouter } from 'expo-router';
 import { Avatar } from '@acme/ui';
 import { Pressable, View } from '@acme/ui/tw';
@@ -76,7 +76,7 @@ export function AppHeader() {
           onPress={() => router.push('/profile')}
           className="rounded-none"
         >
-          <Avatar name={profileName} imageUri={AVATAR_URI} />
+          <Avatar name={profileName} />
         </Pressable>
       </Header>
     </SafeArea>

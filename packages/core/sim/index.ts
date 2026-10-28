@@ -45,7 +45,9 @@ export {
   journalKindForOutcome,
 } from './journal.ts';
 export {
+  isAllowedMonNicknameWrite,
   isStoredMonName,
+  LEGACY_MON_NAME_MAX_LENGTH,
   MON_NAME_MAX_LENGTH,
   type MonNameErrorCopyId,
   monNameErrorCopyId,
@@ -79,6 +81,13 @@ export {
   type ServerCareRecord,
   toCreateEggRequest,
 } from './queue.ts';
+export {
+  deriveMonGender,
+  deriveVoiceLineageId,
+  type ParsedVoiceLineage,
+  parseVoiceLineageId,
+  VOICE_SLOTS_PER_GENDER,
+} from './voice.ts';
 export { type CreateEntry, type CreateEntryInput, resolveCreateEntry } from './onboarding.ts';
 export { createRandom, hash128, mixSeed, toHex32 } from './random.ts';
 export type { ActivitySpan, CareEvent, SimState } from './state.ts';

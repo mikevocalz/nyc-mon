@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect, useMemo } from 'react';
-import { Easing, cancelAnimation, useSharedValue, withTiming } from 'react-native-reanimated';
+import Animated, { Easing, cancelAnimation, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { createHatchState, deriveFirstLook } from '@acme/core/sim';
+import { eggHatchAssetForSpecies } from '@acme/assets/eggs';
 import {
-  Button, CaptureCase, HLYNK_COPY, HatchBurst, HatchEgg, Image, SignagePlate, TrackpadActions,
+  Button, HLYNK_COPY, HatchBurst, HatchEgg, HatchEgg3D, Image, SignagePlate, TrackpadActions,
   useHLynkStageWide, useInstanceStore, useReducedMotion, useStore, type CreaturePerformance, type ImageProps,
 } from '@acme/ui';
 import { haptics } from '@acme/ui/haptics';
@@ -17,7 +18,9 @@ import { useHomeStage } from '../companion/home-stage.store';
 import { tickMinuteClock } from '../companion/minute-clock';
 import { eggIdentity, monIdentity } from '../companion/mon-identity';
 import { hatchCopy } from './copy';
-import { CRACK_BEATS, HESITATE_HINT_MS, PHASE_MS, SKIP_AFTER_MS, resolveHatchEntry, type HatchPhase } from './hatch-sequence';
+import {
+  CRACK_BEATS, HESITATE_HINT_MS, PHASE_MS, SKIP_AFTER_MS, eggPrecrackPose, resolveHatchEntry, type HatchPhase,
+} from './hatch-sequence';
 
 type Stage = 'entering' | 'pre' | 'show' | 'complete' | 'leaving';
 
@@ -30,8 +33,9 @@ interface LocalState {
   showHesitateHint: boolean;
 }
 
-const PHASE_ANNOUNCE: Partial<Record<HatchPhase, 'm12.a11y.case_open' | 'm12.a11y.crack' | 'm12.a11y.emerge'>> = {
-  'case-open': 'm12.a11y.case_open',
+const PHASE_ANNOUNCE: Partial<Record<HatchPhase, 'm12.a11y.stir' | 'm12.a11y.pressure' | 'm12.a11y.crack' | 'm12.a11y.emerge'>> = {
+  stir: 'm12.a11y.stir',
+  pressure: 'm12.a11y.pressure',
   crack: 'm12.a11y.crack',
   emerge: 'm12.a11y.emerge',
 };
@@ -42,7 +46,8 @@ const PHASE_ANNOUNCE: Partial<Record<HatchPhase, 'm12.a11y.case_open' | 'm12.a11
  * any point resumes the same Mon at the start of its saved phase. The screen
  * never decides state: it asks `applyHatch` and reads the result back. Skip
  * writes `skip` and lands on the lean-in ending. The Baby itself is drawn by
- * the layout's creature layer, so M12 → M09 → M13 never cuts.
+ * the layout's creature layer, so M12 → M09 → M13 never cuts. The egg sits
+ * in the hatch scene on its own: no case, lid or scanner (Decision 29).
  */
 export function HatchScreen() {
   const router = useRouter();
@@ -115,11 +120,15 @@ export function HatchScreen() {
   }, []);
 
   // UI-thread values the kit pieces read; the JS side only starts each phase.
-  const lidProgress = useSharedValue(0);
+  const stirProgress = useSharedValue(0);
+  const pressureProgress = useSharedValue(0);
   const hatchProgress = useSharedValue(0);
   const crackGlow = useSharedValue(0);
   const burst = useSharedValue(0);
-  const padGlow = useSharedValue(0);
+  const eggPose = useAnimatedStyle(() => {
+    const pose = eggPrecrackPose(stirProgress.get(), pressureProgress.get(), reducedMotion);
+    return { transform: [{ rotate: `${pose.rotateDeg}deg` }, { scale: pose.scale }] };
+  });
 
   const peak = wide ? 0.4 : 0.6;
   const durations = PHASE_MS[reducedMotion ? 'reduced' : 'full'];
@@ -141,16 +150,21 @@ export function HatchScreen() {
     if (announce) announcePolitely(hatchCopy(announce, { babyName }));
     const timing = (duration: number) => ({ duration: reducedMotion ? 0 : duration, easing: Easing.out(Easing.cubic) });
     switch (phase) {
-      case 'case-open':
-        haptics.hatchLatch();
-        lidProgress.set(0);
-        lidProgress.set(withTiming(1, timing(ms)));
+      case 'stir':
+        haptics.tap();
+        stirProgress.set(0);
+        stirProgress.set(withTiming(1, { duration: reducedMotion ? 0 : ms, easing: Easing.linear }));
         break;
-      case 'scanner':
-        lidProgress.set(1);
+      case 'pressure':
+        stirProgress.set(1);
         haptics.selection();
+        pressureProgress.set(0);
+        // Reduced motion holds the authored fuller pose for the whole beat.
+        pressureProgress.set(reducedMotion ? 0.5 : withTiming(1, { duration: ms, easing: Easing.linear }));
         break;
       case 'crack':
+        stirProgress.set(1);
+        pressureProgress.set(1);
         hatchProgress.set(0);
         hatchProgress.set(withTiming(1, { duration: ms, easing: Easing.linear }));
         crackGlow.set(withTiming(1, timing(ms)));
@@ -197,8 +211,9 @@ export function HatchScreen() {
     local.setState({ stage: 'show' });
   };
   const skip = () => {
-    for (const v of [lidProgress, hatchProgress, crackGlow, burst]) cancelAnimation(v);
-    lidProgress.set(1);
+    for (const v of [stirProgress, pressureProgress, hatchProgress, crackGlow, burst]) cancelAnimation(v);
+    stirProgress.set(1);
+    pressureProgress.set(1);
     hatchProgress.set(1);
     apply({ type: 'skip' });
     announcePolitely(hatchCopy('m12.a11y.skipped', { babyName }));
@@ -229,9 +244,47 @@ export function HatchScreen() {
           : undefined;
 
   const hesitating = phase === 'attention' && firstLook === 'hesitate' && !s.stayedClose;
-  const showCase = s.stage === 'pre' || (s.stage === 'show' && phase !== undefined && phase !== 'emerge' && phase !== 'attention');
-  const lid = s.stage === 'pre' ? 'closed' : phase === 'case-open' ? 'opening' : 'open';
+  const showEgg = s.stage === 'pre' || (s.stage === 'show' && phase !== undefined && phase !== 'emerge' && phase !== 'attention');
   const eggArt = eggId0?.eggArt;
+  // The Blender-built hatch GLB for this egg, when one exists; HatchEgg stays the fallback.
+  const egg3d = egg === undefined ? undefined : eggHatchAssetForSpecies(egg.speciesId);
+  // The 3D shell stays through emerge and attention: its pieces part and settle,
+  // goo pools and the creature layer's Baby climbs out over it. The flat egg
+  // has no open state, so it still leaves at emerge.
+  const showEggScene = showEgg || (egg3d !== undefined && s.stage === 'show' && (phase === 'emerge' || phase === 'attention'));
+  // When the screen entered this phase; a late GLB load starts the clip this far in.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const phaseStartedAt = useMemo(() => Date.now(), [phase, s.stage]);
+  const flatEgg = egg === undefined ? null : (
+    <Animated.View style={eggPose}>
+      <HatchEgg
+        testID="m12-egg"
+        eggSpeciesId={egg.speciesId}
+        hatchProgress={hatchProgress}
+        crackGlow={crackGlow}
+        reducedMotion={reducedMotion}
+        art={eggArt ? (
+          <Image src={eggArt.source as ImageProps['src']} alt={eggArt.alt} fill framed={false} unoptimized className="h-full w-full" />
+        ) : null}
+      />
+    </Animated.View>
+  );
+  // The 3D egg plays each phase over the screen's own phase length, so it stays in step with the
+  // phase loop above; a resumed phase starts at its beginning. On any load error it shows flatEgg.
+  const eggView = egg3d === undefined ? flatEgg : (
+    <HatchEgg3D
+      testID="m12-egg-3d"
+      className="h-72 w-72"
+      eggId={egg3d.eggId}
+      source={egg3d}
+      phase={phase ?? null}
+      phaseMs={phase === undefined ? undefined : durations[phase]}
+      phaseStartedAt={phase === undefined ? undefined : phaseStartedAt}
+      firstLook={hesitating ? 'hesitate' : 'lean-in'}
+      reducedMotion={reducedMotion}
+      fallback={flatEgg}
+    />
+  );
 
   const trackpad =
     s.stage === 'pre'
@@ -266,31 +319,17 @@ export function HatchScreen() {
     screen:
       s.stage === 'entering' || s.stage === 'leaving' ? null : (
         <View testID={`m12-phase-${s.stage === 'show' ? (phase ?? 'hatched') : s.stage}`} className="flex-1">
-          {showCase ? (
+          {showEggScene ? (
             <View className="flex-1 items-center justify-center">
-              <CaptureCase
-                testID="m12-case"
-                lid={lid}
-                lidProgress={lidProgress}
-                padGlow={padGlow}
-                seam="lit"
-                scheme="night"
-                reducedMotion={reducedMotion}
-                accessibilityLabel={hatchCopy('m11.case.a11y.label.ready', { eggName: eggId0?.eggName ?? '' })}
+              <View
+                testID="m12-egg-scene"
+                accessible
+                accessibilityRole="image"
+                accessibilityLabel={hatchCopy('m11.egg.a11y.label.ready', { eggName: eggId0?.eggName ?? '' })}
+                aria-label={hatchCopy('m11.egg.a11y.label.ready', { eggName: eggId0?.eggName ?? '' })}
               >
-                {s.stage === 'show' && egg !== undefined ? (
-                  <HatchEgg
-                    testID="m12-egg"
-                    eggSpeciesId={egg.speciesId}
-                    hatchProgress={hatchProgress}
-                    crackGlow={crackGlow}
-                    reducedMotion={reducedMotion}
-                    art={eggArt ? (
-                      <Image src={eggArt.source as ImageProps['src']} alt={eggArt.alt} fill framed={false} unoptimized className="h-full w-full" />
-                    ) : null}
-                  />
-                ) : null}
-              </CaptureCase>
+                {eggView}
+              </View>
               {phase === 'burst' ? (
                 <View className="absolute inset-0 items-center justify-center" style={{ pointerEvents: 'none' }}>
                   <HatchBurst testID="m12-burst" progress={burst} peakOpacity={peak} reducedMotion={reducedMotion} />

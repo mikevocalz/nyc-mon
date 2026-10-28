@@ -1,4 +1,4 @@
-import { CARE_NEEDS, EpochMsSchema, IdSchema, LifecycleStageSchema, MonMoodSchema, UnitIntervalSchema } from '@acme/core';
+import { CARE_NEEDS, EpochMsSchema, IdSchema, LifecycleStageSchema, MonGenderSchema, MonMoodSchema, UnitIntervalSchema } from '@acme/core';
 import { z } from 'zod';
 import { PermissionSchema, PresenceEventSchema, PresenceTierSchema } from '../presence/types.ts';
 
@@ -42,6 +42,14 @@ export function playInput(devMode: boolean) {
     : z.object({ monId, quality, intentId });
 }
 
+const eggId = IdSchema.optional().describe(
+  "The egg to hatch, from check_incubation's eggs[].eggId. Omit to hatch the Caller's egg that is ready first.",
+);
+
+export function hatchEggInput(devMode: boolean) {
+  return devMode ? z.object({ eggId, speakerHint: SpeakerHintSchema.optional() }) : z.object({ eggId });
+}
+
 export const PersonIdInput = z.object({ personId: IdSchema.describe('From get_familiar_people.') });
 
 export const AcknowledgePersonInput = z.object({
@@ -64,6 +72,14 @@ export const MonViewSchema = z.object({
   stage: LifecycleStageSchema,
   bond: UnitIntervalSchema,
   hatchedAt: EpochMsSchema,
+  gender: MonGenderSchema.nullable().describe('Set at hatch. Null for a Mon hatched before genders. Never use a pronoun for a Mon.'),
+  voice: z
+    .object({
+      lineageId: IdSchema.describe('The one voice this Mon keeps for life.'),
+      stage: LifecycleStageSchema.describe('Pitch follows the stage: higher when young, lower when grown. An Egg is silent.'),
+    })
+    .nullable()
+    .describe('For clients that voice the Mon themselves. Null for a Mon hatched before voice lineages.'),
 });
 
 export const CareViewSchema = z.object({
@@ -133,6 +149,16 @@ export const IncubationOutput = z.object({
       readyToHatch: z.boolean(),
     }),
   ),
+});
+
+export const HatchEggOutput = z.object({
+  hatched: z.literal(true),
+  alreadyHatched: z.boolean().describe('True when this egg had hatched before this call; nothing new was minted.'),
+  hatching: z.boolean().describe('True when this call hatched the egg: the card plays the hatch, then shows the Mon.'),
+  egg: z.object({ eggId: IdSchema, speciesId: IdSchema.describe("The Egg form's Dex record, e.g. dex-001 (Metro Egg).") }),
+  mon: MonViewSchema,
+  care: CareViewSchema,
+  mood: MonMoodSchema,
 });
 
 export function talkToMonOutput(devMode: boolean) {

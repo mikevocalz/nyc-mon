@@ -2,12 +2,12 @@
 import { brand } from '@acme/theme';
 import { View } from '@acme/ui/tw';
 import { Container, GridFloor, SceneSection, SolidPanel } from '@acme/ui';
-import { ProfileDetails, ProfileIdentity, ProfileOverview } from './profile-content';
+import { ProfileDetails, ProfileIdentity } from './profile-content';
 
 /**
  * Web Profile: the Caller's identity on an ink plate over Harlem's street
- * grid (your block, the brownstone rows on the horizon), then tags, stats
- * and the account fields on the page surface.
+ * grid (your block, the brownstone rows on the horizon), then the way into
+ * settings on the page surface.
  */
 export function ProfileScreen() {
   return (
@@ -27,7 +27,6 @@ export function ProfileScreen() {
       </SceneSection>
       <Container width="detail" className="py-10 md:py-14">
         <View className="gap-6 md:gap-10 lg:gap-12">
-          <ProfileOverview showEdit />
           <ProfileDetails />
         </View>
       </Container>

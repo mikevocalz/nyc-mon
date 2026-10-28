@@ -8,10 +8,13 @@ import { createModelAuth } from './model-auth.ts';
 import { bedrockBackend, clientKey, createModelHandler, createRateLimiter, mockBackend } from './model.ts';
 import { sandboxDocument, sandboxHeaders } from './sandbox.ts';
 import { createSkillLoader, resolveSkillPath } from './skill.ts';
+import { createA2fRenderer, createNvcfCall, mp3ToPcm16 } from './a2f.ts';
+import { createTtsHandler, findFfmpeg } from './tts.ts';
+import { createAsrSocket, createParakeetStream } from './asr.ts';
 
 /**
  * Two listeners:
- *  - the simulator page + /api (SIM_PORT): page assets, /api/config, /api/model
+ *  - the simulator page + /api (SIM_PORT): page assets, /api/config, /api/model, /api/tts
  *  - the MCP Apps sandbox proxy (SIM_SANDBOX_PORT), a separate origin by spec
  * In dev the page is served through Vite middleware; in production from dist/.
  */
@@ -34,23 +37,62 @@ const backend =
         effort: env.SIM_MODEL_EFFORT,
         maxTokens: env.SIM_MAX_OUTPUT_TOKENS,
       });
+const modelAuth =
+  env.SIM_AUTH_MODE === 'oauth'
+    ? createModelAuth({
+        issuer: env.AUTH_ISSUER.replace(/\/+$/, ''),
+        audience: env.SIM_MCP_URL,
+        clientId: env.OAUTH_SIM_CLIENT_ID,
+        jwks: jwksUrl(env),
+      })
+    : undefined;
 const handleModel = createModelHandler({
   backend,
   system: createSkillLoader(skillPath),
   allowedOrigin: hostOrigin,
   rateLimit: createRateLimiter(env.SIM_RATE_LIMIT_PER_MIN, { globalPerMinute: env.SIM_GLOBAL_RATE_LIMIT_PER_MIN }),
   // With sign-in on, a model turn needs the person's MCP token (issued to this client).
-  ...(env.SIM_AUTH_MODE === 'oauth'
-    ? {
-        auth: createModelAuth({
-          issuer: env.AUTH_ISSUER.replace(/\/+$/, ''),
-          audience: env.SIM_MCP_URL,
-          clientId: env.OAUTH_SIM_CLIENT_ID,
-          jwks: jwksUrl(env),
-        }),
-      }
-    : {}),
+  ...(modelAuth ? { auth: modelAuth } : {}),
 });
+
+// Audio2Face-3D needs the NVIDIA key and ffmpeg (mp3 to 16 kHz PCM); without
+// either, /api/tts still sends character timing and the Mon lip-syncs from it.
+const ffmpegForFace = env.NVIDIA_API_KEY ? findFfmpeg() : null;
+const face =
+  env.NVIDIA_API_KEY && ffmpegForFace
+    ? createA2fRenderer({
+        call: createNvcfCall({ apiKey: env.NVIDIA_API_KEY, ...(env.NVIDIA_A2F_FUNCTION_ID ? { functionId: env.NVIDIA_A2F_FUNCTION_ID } : {}) }),
+        toPcm: (mp3, signal) => mp3ToPcm16(ffmpegForFace, mp3, signal),
+        timeoutMs: env.SIM_A2F_TIMEOUT_MS,
+        onTiming: (ms, frames) => console.log(`[web-sim] a2f face in ${ms} ms (${frames} frames)`),
+      })
+    : undefined;
+console.log(`[web-sim] Mon lip-sync: ${face ? 'Audio2Face-3D, then character timing' : 'character timing (no NVIDIA key or ffmpeg)'}`);
+
+const handleTts = createTtsHandler({
+  allowedOrigin: hostOrigin,
+  rateLimit: createRateLimiter(env.SIM_TTS_RATE_LIMIT_PER_MIN, { globalPerMinute: env.SIM_GLOBAL_RATE_LIMIT_PER_MIN }),
+  apiKey: env.ELEVENLABS_API_KEY,
+  fetch,
+  ...(face ? { face } : {}),
+  ...(modelAuth ? { auth: modelAuth } : {}),
+});
+
+// Live speech-to-text (server/asr.ts): the page's mic streams to NVIDIA Parakeet.
+// Without the key the page keeps the browser's own speech recognition.
+const asrUpgrade = env.NVIDIA_API_KEY
+  ? createAsrSocket({
+      open: createParakeetStream({ apiKey: env.NVIDIA_API_KEY }),
+      allowedOrigin: hostOrigin,
+      rateLimit: createRateLimiter(env.SIM_RATE_LIMIT_PER_MIN, { globalPerMinute: env.SIM_GLOBAL_RATE_LIMIT_PER_MIN }),
+      clientKey: (req) => {
+        const forwarded = req.headers['x-forwarded-for'];
+        return clientKey(req.socket.remoteAddress, typeof forwarded === 'string' ? forwarded : null, env.SIM_TRUST_PROXY === '1');
+      },
+      ...(modelAuth ? { auth: modelAuth } : {}),
+    })
+  : null;
+console.log(`[web-sim] mic: ${asrUpgrade ? 'NVIDIA Parakeet streaming, echo-cancelled' : 'browser speech recognition (no NVIDIA key)'}`);
 
 function toRequest(req: IncomingMessage): Request {
   const headers = new Headers();
@@ -92,6 +134,8 @@ const PAGE_CSP = [
   "script-src 'self' 'wasm-unsafe-eval'",
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob:",
+  // The Mon's voice from /api/tts plays from a blob: URL.
+  "media-src 'self' blob:",
   "font-src 'self' data:",
   // The MCP server and the authorization server (OAuth discovery, token exchange).
   `connect-src 'self' ${mcpOrigin} ${issuerOrigin}`,
@@ -111,6 +155,7 @@ const MIME: Record<string, string> = {
   '.svg': 'image/svg+xml',
   '.json': 'application/json',
   '.wasm': 'application/wasm',
+  '.glb': 'model/gltf-binary',
 };
 
 function serveStatic(req: IncomingMessage, res: ServerResponse): void {
@@ -161,6 +206,28 @@ async function main(): Promise<void> {
       const key = clientKey(req.socket.remoteAddress, typeof forwarded === 'string' ? forwarded : null, env.SIM_TRUST_PROXY === '1');
       return void handleModel(toRequest(req), key).then((r) => sendResponse(res, r)).catch(fail);
     }
+    // POST /api/tts, and GET /api/tts/face/:id for the deferred Audio2Face frames.
+    if (url.pathname === '/api/tts' || url.pathname.startsWith('/api/tts/face/')) {
+      const forwarded = req.headers['x-forwarded-for'];
+      const key = clientKey(req.socket.remoteAddress, typeof forwarded === 'string' ? forwarded : null, env.SIM_TRUST_PROXY === '1');
+      return void handleTts(toRequest(req), key).then((r) => sendResponse(res, r)).catch(fail);
+    }
+    // Mon GLBs: fetched by the view from the sandbox origin, so they carry CORS.
+    const glb = /^\/mons\/([a-z0-9-]+)\.glb$/.exec(url.pathname);
+    if (glb && req.method === 'GET') {
+      const file = join(root, 'public', 'mons', `${glb[1]}.glb`);
+      if (!existsSync(file)) {
+        res.writeHead(404, { 'content-type': 'text/plain' });
+        return void res.end('No such model.');
+      }
+      res.writeHead(200, {
+        'content-type': 'model/gltf-binary',
+        'access-control-allow-origin': '*',
+        'cache-control': 'public, max-age=3600',
+        'x-content-type-options': 'nosniff',
+      });
+      return void createReadStream(file).on('error', () => res.destroy()).pipe(res);
+    }
     if (url.pathname.startsWith('/api/')) {
       res.writeHead(404, { 'content-type': 'application/json' });
       return void res.end(JSON.stringify({ error: 'not_found' }));
@@ -177,6 +244,12 @@ async function main(): Promise<void> {
     }
     res.writeHead(404, { 'content-type': 'text/plain' });
     res.end('Only /sandbox is served on this origin.');
+  });
+
+  // /api/asr only; Vite's dev server takes its own HMR upgrades.
+  app.on('upgrade', (req, socket, head) => {
+    if (asrUpgrade?.(req, socket, head)) return;
+    if (new URL(req.url ?? '/', hostOrigin).pathname === '/api/asr') socket.destroy();
   });
 
   app.listen(env.SIM_PORT, () => {

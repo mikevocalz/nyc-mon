@@ -6,6 +6,7 @@
  *
  * SOT: node_modules/@tanstack/start-client-core/dist/esm/startEntry.d.ts (RouterEntry)
  */
+import './rn-globals';
 import { createRouter } from '@tanstack/react-router';
 import { routeTree } from './routeTree.gen';
 

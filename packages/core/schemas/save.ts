@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { CallerProfileSchema } from './caller.ts';
 import { CareStateSchema } from './care.ts';
 import { EggRecordSchema } from './egg.ts';
-import { HatchStateSchema } from './hatch.ts';
+import { HatchStateSchema, HatchStateV2Schema } from './hatch.ts';
 import { JournalEntrySchema } from './journal.ts';
 import { MonInstanceSchema } from './mon.ts';
 import { EpochMsSchema, IdSchema, UnitIntervalSchema } from './primitives.ts';
@@ -57,7 +57,7 @@ export const SaveV1Schema = z.object({
   savedAt: EpochMsSchema,
   caller: CallerProfileSchema.nullable(),
   eggs: z.array(EggRecordSchema),
-  hatches: z.array(HatchStateSchema),
+  hatches: z.array(HatchStateV2Schema),
   mons: z.array(MonInstanceSchema),
   care: z.array(CareStateSchema),
   queue: WriteQueueV1Schema,
@@ -65,14 +65,14 @@ export const SaveV1Schema = z.object({
 
 /**
  * Save blob v2: v1 plus the journal (M18) and queued egg creations (M10).
- * Feed writes nest their food (D-15e).
+ * Feed writes nest their food (D-15e). Frozen; v2 blobs migrate to v3 on load.
  */
 export const SaveV2Schema = z.object({
   version: z.literal(2),
   savedAt: EpochMsSchema,
   caller: CallerProfileSchema.nullable(),
   eggs: z.array(EggRecordSchema),
-  hatches: z.array(HatchStateSchema),
+  hatches: z.array(HatchStateV2Schema),
   mons: z.array(MonInstanceSchema),
   care: z.array(CareStateSchema),
   queue: WriteQueueSchema,
@@ -80,5 +80,15 @@ export const SaveV2Schema = z.object({
   journal: z.array(JournalEntrySchema),
 });
 
-export const CURRENT_SAVE_VERSION = 2;
-export const SaveCurrentSchema = SaveV2Schema;
+/**
+ * Save blob v3: v2 with the egg-native hatch phases (Decision 29). A
+ * presenting hatch stores `stir` or `pressure` where v2 stored `case-open` or
+ * `scanner`; every other field is unchanged.
+ */
+export const SaveV3Schema = SaveV2Schema.extend({
+  version: z.literal(3),
+  hatches: z.array(HatchStateSchema),
+});
+
+export const CURRENT_SAVE_VERSION = 3;
+export const SaveCurrentSchema = SaveV3Schema;

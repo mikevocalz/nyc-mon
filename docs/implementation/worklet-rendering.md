@@ -133,7 +133,7 @@ Read from github.com/margelo/react-native-runtimes on 2026-10-16: `packages/core
 1. **Fix the UI thread first.** 38 to 44 ms UI frames cap the screen near 25 fps on any rendering thread. The four autoPlay Rive views and layout work are the next measurement, not this.
 2. **Try worklets Bundle Mode on the Duo with the flag.** It is the only option the installed packages support end to end, it needs no native rebuild, and it is off in the default build. If the Bundle Mode build breaks unrelated worklets or Expo Router, drop it.
 3. **Defer react-native-runtimes.** STRIKE it for the render path until react-native-webgpu holds one manager per runtime (an upstream change) and #34 is fixed. It may suit headless work later (a world-tile parse, say), where no WebGPU view is involved.
-4. **Next best, if Bundle Mode fails on the device.** Keep three.js on JS and cut what the 9 to 14 ms is made of: render bundles for the static city, fewer per-frame `setFocus` rebuilds, frustum culling of the banded meshes. That is a smaller win and needs no new runtime.
+4. **Next best, if Bundle Mode fails on the device.** Keep three.js on JS and cut what the 9 to 14 ms is made of: fewer per-frame `setFocus` rebuilds, frustum culling of the banded meshes. (Render bundles for the static city were tried and deleted 2026-11 — r186 replay froze the camera transform.) That is a smaller win and needs no new runtime.
 
 ## Running both modes on the Duo
 

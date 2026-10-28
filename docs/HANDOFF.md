@@ -1,5 +1,17 @@
 # NYC-MON handoff, 2026-10-08
 
+## Continuation — 2026-10-23
+
+Branch `feat/egg-native-hatch`, commits since 63e9557. This updates §2; the details live in `docs/alexa/DESIGN.md`, `docs/alexa/SIMULATOR.md`, `docs/alexa/AUTH.md` and `docs/FRICTION-LOG.md`.
+
+- **MCP Apps views.** Squeaklet, Lil' Ratti and the Metro Egg render in 3D (`MonModel3D`, three.js WebGL) at 90% of the frame's height on the right. The notch `Card` around the Mon is gone, an owner call that sits against the Alexa+ "Don't invent alternatives" rule (recorded in DESIGN.md). The view fits its frame with no scroll, sizing inline frames from `hostContext.maxHeight`. Clips follow the tool's mood. `check_incubation` opens the egg view. The room shows the journal. GLBs are fetched from `NYC_MON_MODEL_ORIGIN`, which production requires.
+- **Simulator.** Voice first: the active view edge to edge, a caption, Talk and Stop; typing moves to the dev panel. The page fits one screen. Each Mon speaks in its own ElevenLabs voice, picked by the `voiceLineageId` minted at hatch and pitched per stage by ffmpeg on the server (`ELEVENLABS_API_KEY`, `FFMPEG_PATH`); Web Speech is the fallback, and a real Echo uses Alexa's voice. The model is Claude Sonnet 4.6 on Bedrock (`us.anthropic.claude-sonnet-4-6`, us-east-1). Lip sync is in progress and not on the branch.
+- **Mons.** Each Mon gets a gender and a voice lineage at hatch (migration `20261023_235809_mon_gender`, additive), set once in Payload. Nickname writes are enforced on the server.
+- **Auth.** The JWKS endpoint works (pnpm patches to the payload-better-auth adapter, better-call and @better-auth/core). The token endpoint allows public clients' redirect origins, so the simulator can sign in. The Amazon return URL is `http://localhost:5174/payload-api/auth/callback/amazon` locally. The Alexa linking pages show Lil' Ratti and fit one screen at 1280×800 and 390×844.
+- **Fixed on the way.** The first hatch answered 409 `MON_ID_MISMATCH`; saved cards pointed at stale `ui://` hashes after a restart; the 3D Mon drew grey under the sandbox CSP; view boot tests needed a running simulator; `CI=true` broke the Amazon guard test. Each has a friction log entry.
+
+Still not verified: anything on an Echo device (WebGL there is untested), Amazon's account linking against a deployed host, and the migration on a hosted database.
+
 ## Continuation — 2026-10-09
 
 This section updates **branch and PR status**, not the original Oct 8 research and verification notes below.

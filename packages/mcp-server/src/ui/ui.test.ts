@@ -7,8 +7,9 @@ import { brand, palette, semantic } from '@acme/theme';
 // Read from the kit source file (as the views import kit files), so the test tracks it.
 import { CARE_COLORS } from '../../../ui/care/care-colors.ts';
 import { buildUi } from './build.ts';
-import { careOutcomeText, spokenSummary, toMonViewModel } from './contract.ts';
-import { getUiResources, mcpAppsRegistration, parseUiManifest, UI_MIME_TYPE, UI_TOOL_LINKS, type UiResource } from './index.ts';
+import { readFileSync } from 'node:fs';
+import { careOutcomeText, clipsFor, eggDetailText, eggTimeText, MON_CLIPS, spokenSummary, toMonViewModel } from './contract.ts';
+import { getUiResources, MON_MODEL_ORIGIN, mcpAppsRegistration, parseUiManifest, UI_MIME_TYPE, UI_TOOL_LINKS, type UiResource } from './index.ts';
 
 /**
  * Budgets per view, measured 2026-10-08. The card is about 1398 KiB raw,
@@ -20,8 +21,12 @@ import { getUiResources, mcpAppsRegistration, parseUiManifest, UI_MIME_TYPE, UI_
  * content-hashed bundle.
  */
 const BUDGET: Readonly<Record<string, { raw: number; gzip: number }>> = {
-  'mon-card': { raw: 1500 * 1024, gzip: 520 * 1024 },
-  'mon-room': { raw: 2400 * 1024, gzip: 780 * 1024 },
+  // three.js for the 3D Mon (Dex 2 and 3) adds about 640 KB raw. The hatch's
+  // evolution light, shards and synthesized sound (hatch-light.ts,
+  // hatch-sound.ts, 2026-10-23) add about 37 KB raw, 12 KB gzip: drawn in
+  // three.js because the MCP Apps CSP refuses the Rive runtime's WebAssembly.
+  'mon-card': { raw: 2200 * 1024, gzip: 700 * 1024 },
+  'mon-room': { raw: 2950 * 1024, gzip: 920 * 1024 },
 };
 
 /**
@@ -46,6 +51,7 @@ const IDENTIFIER_URL = [
   /^https:\/\/docs\.swmansion\.com\//,
   /^https:\/\/dev\.to\/li\/how-to-requestpermission/,
   /^https:\/\/tailwindcss\.com$/,
+  /^https:\/\/jcgt\.org\/published\//,
 ];
 
 let resources: readonly UiResource[];
@@ -62,7 +68,7 @@ describe('built MCP App views', () => {
       expect(r.mimeType).toBe('text/html;profile=mcp-app');
       expect(r.mimeType).toBe(UI_MIME_TYPE);
       expect(r.uri).toMatch(new RegExp(`^ui://nyc-mon/${r.id}-[0-9a-f]{8}\\.html$`));
-      expect(r.csp).toEqual({ connectDomains: [], resourceDomains: ['data:'] });
+      expect(r.csp).toEqual({ connectDomains: [MON_MODEL_ORIGIN], resourceDomains: ['data:'] });
     }
   });
 
@@ -123,8 +129,8 @@ describe('built MCP App views', () => {
     expect(registered.every((r) => r.config.mimeType === 'text/html;profile=mcp-app')).toBe(true);
     const read = (await registered[0]!.read()) as { contents: { mimeType: string; text: string; _meta: unknown }[] };
     expect(read.contents[0]?.text).toBe(resources[0]!.html);
-    expect(read.contents[0]?._meta).toEqual({ ui: { csp: { connectDomains: [], resourceDomains: ['data:'] }, prefersBorder: false } });
-    expect(Object.keys(reg.toolResourceUris).sort()).toEqual(['feed_mon', 'get_mon_status', 'play_with_mon', 'rest_mon', 'wake_mon']);
+    expect(read.contents[0]?._meta).toEqual({ ui: { csp: { connectDomains: [MON_MODEL_ORIGIN], resourceDomains: ['data:'] }, prefersBorder: false } });
+    expect(Object.keys(reg.toolResourceUris).sort()).toEqual(['check_incubation', 'feed_mon', 'get_mon_status', 'hatch_egg', 'play_with_mon', 'rest_mon', 'wake_mon']);
     expect(UI_TOOL_LINKS.get_mon_status).toBe('mon-card');
   });
 });
@@ -186,6 +192,63 @@ describe('view model (adapter onto the companion models)', () => {
     expect(vm?.journal.map((e) => e.kind)).toEqual(['hatched', 'fed']);
   });
 
+  it("reads check_incubation's eggs as the Metro Egg with M11's time left", () => {
+    const at = Date.now();
+    const vm = toMonViewModel({
+      incubating: true,
+      eggs: [
+        { eggId: 'egg_late', speciesId: 'dex-001', incubationEndsAt: at + 60 * 60_000, minutesRemaining: 60, readyToHatch: false },
+        { eggId: 'egg_1', speciesId: 'dex-001', incubationEndsAt: at + 12 * 60_000, minutesRemaining: 12, readyToHatch: false },
+      ],
+    });
+    expect(vm?.monInstanceId).toBe('egg_1');
+    expect(vm?.name).toBe('Metro Egg');
+    expect(vm?.identity.dexId).toBe(1);
+    expect(vm?.care).toBeNull();
+    expect(vm?.suggested).toBeNull();
+    expect(vm?.status).toEqual({ text: '12 min left', tone: 'neutral' });
+    expect(eggTimeText(vm!.egg!, at)).toBe('12 min left');
+    expect(eggDetailText(vm!.egg!, vm!.name, at)).toMatch(/^Metro Egg · ready at /);
+    // Past its end time on this clock it reads ready, even before a new result.
+    expect(eggTimeText(vm!.egg!, at + 13 * 60_000)).toBe('Ready to hatch');
+    const ready = toMonViewModel({ incubating: true, eggs: [{ eggId: 'e', speciesId: 'dex-001', incubationEndsAt: at - 1, minutesRemaining: 0, readyToHatch: true }] });
+    expect(ready?.status).toEqual({ text: 'Ready to hatch', tone: 'request' });
+    expect(toMonViewModel({ incubating: false, eggs: [] })).toBeNull();
+    expect(toMonViewModel({ mon: { monId: 'm1', speciesId: 'dex-002' }, care: careView })?.egg).toBeNull();
+  });
+
+  describe("hatch_egg's result", () => {
+    const hatchResult = (hatching: boolean) => ({
+      hatched: true,
+      alreadyHatched: !hatching,
+      hatching,
+      egg: { eggId: 'egg_metro', speciesId: 'dex-001' },
+      mon: { monId: 'mon_new', name: null, speciesId: 'dex-002', stage: 'Baby', bond: 0, hatchedAt: 1 },
+      care: { energy: 1, fullness: 1, social: 1, activity: 'awake', sluggish: false, wantsFood: false, lastFedAt: null },
+      mood: 'content',
+    });
+
+    it('carries the hatching flag and the Metro Egg it hatched from', () => {
+      const vm = toMonViewModel(hatchResult(true))!;
+      expect(vm.hatching).toEqual({ eggId: 'egg_metro', eggDexId: 1, eggName: 'Metro Egg' });
+      expect(vm.name).toBe('Squeaklet');
+      expect(vm.egg).toBeNull();
+      expect(vm.care?.energy).toBe(1);
+      expect(careOutcomeText(hatchResult(true), vm)).toBe('Squeaklet hatched.');
+    });
+
+    it('a repeat (already hatched) shows the Mon without replaying the hatch', () => {
+      const vm = toMonViewModel(hatchResult(false))!;
+      expect(vm.hatching).toBeNull();
+      expect(careOutcomeText(hatchResult(false), vm)).toBe('Squeaklet already hatched.');
+    });
+
+    it('no other result ever sets it', () => {
+      expect(toMonViewModel({ mon: { monId: 'm', speciesId: 'dex-002' }, care: null, hatching: 'yes' })?.hatching).toBeNull();
+      expect(toMonViewModel({ incubating: true, eggs: [{ eggId: 'e', speciesId: 'dex-001', incubationEndsAt: 1, readyToHatch: true }] })?.hatching).toBeNull();
+    });
+  });
+
   it('words care outcomes with the M14–M16 strings', () => {
     const vm = toMonViewModel({ mon: { monId: 'm2', name: 'Biscuit', speciesId: 'dex-009' }, care: { ...careView, fullness: 0.66 } })!;
     expect(careOutcomeText({ applied: true, effect: 'eaten' }, vm)).toBe('Biscuit finished eating. Fullness 66 percent.');
@@ -193,6 +256,47 @@ describe('view model (adapter onto the companion models)', () => {
       'Biscuit is asleep. Food can wait until Biscuit wakes up.',
     );
     expect(careOutcomeText({ applied: true, effect: 'played' }, vm)).toBe('Biscuit had fun playing with you.');
+  });
+});
+
+describe('mood on screen (MonModel3D clip by mood)', () => {
+  const careView = { energy: 0.72, fullness: 0.31, social: 0.58, activity: 'awake', sluggish: false, wantsFood: true, lastFedAt: null };
+  const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..');
+  const glbClips = (file: string): Set<string> => {
+    const b = readFileSync(join(repoRoot, 'apps/web/public/mons', `${file}.glb`));
+    const json = JSON.parse(b.subarray(20, 20 + b.readUInt32LE(12)).toString('utf8')) as { animations?: { name: string }[] };
+    return new Set((json.animations ?? []).map((a) => a.name));
+  };
+
+  it('reads mood from the result, else derives it from the meters', () => {
+    expect(toMonViewModel({ mon: { monId: 'm', speciesId: 'dex-002' }, mood: 'needs-social' })?.mood).toBe('needs-social');
+    expect(toMonViewModel({ mon: { monId: 'm', speciesId: 'dex-002' }, care: careView })?.mood).toBe('needs-fullness');
+    expect(toMonViewModel({ mon: { monId: 'm', speciesId: 'dex-002' }, mood: 'grumpy' })?.mood).toBeNull();
+  });
+
+  it('maps each mood to an existing clip and keeps the idle otherwise', () => {
+    expect(clipsFor(2, 'content', false)).toEqual(['tail_swish', 'rat_run']);
+    expect(clipsFor(2, 'needs-fullness', false)?.[0]).toBe('jaw_chomp');
+    expect(clipsFor(2, 'needs-social', false)?.[0]).toBe('rat_run');
+    expect(clipsFor(2, 'needs-energy', false)).toEqual(['tail_swish', 'rat_run']);
+    // No sleep clip in the Squeaklet file: an asleep Squeaklet holds still.
+    expect(clipsFor(2, 'content', true)).toEqual([]);
+    expect(clipsFor(3, 'asleep', false)?.[0]).toBe('emote_tired');
+    expect(clipsFor(3, 'needs-fullness', false)?.[0]).toBe('quad_idle_sniff');
+    expect(clipsFor(3, 'needs-social', false)?.[0]).toBe('beckon');
+    expect(clipsFor(3, 'sluggish', false)?.[0]).toBe('up_breathe');
+    expect(clipsFor(3, null, false)).toEqual(['up_idle', 'up_breathe', 'quad_idle_sniff']);
+    expect(clipsFor(1, null, false)).toEqual(['egg_idle']);
+    expect(clipsFor(9, 'content', false)).toBeNull();
+    expect(clipsFor(null, 'content', false)).toBeNull();
+  });
+
+  it('names only clips the GLBs carry', () => {
+    const files: Record<number, string> = { 1: 'metro-egg', 2: 'squeaklet', 3: 'lil-ratti' };
+    for (const [dex, entry] of Object.entries(MON_CLIPS)) {
+      const have = glbClips(files[Number(dex)]!);
+      for (const name of [...entry.idle, ...Object.values(entry.byMood).flat()]) expect(have, `${files[Number(dex)]}: ${name}`).toContain(name);
+    }
   });
 });
 
