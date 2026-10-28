@@ -111,3 +111,17 @@ describe('tool result messages', () => {
     expect(req.messages.at(-1)).toEqual({ role: 'tool', tool_call_id: 'toolu_a', name: 'feed_mon', content: '{"applied":true}' });
   });
 });
+
+// Shape of a real Token Factory reply (2026-10-28 live probe): every optional
+// message field is present and null when unused.
+describe('null optional fields from the live API', () => {
+  const nulls = { refusal: null, annotations: null, audio: null, function_call: null, reasoning: null, reasoning_content: null };
+  it('accepts a plain answer with tool_calls: null', async () => {
+    const result = await run(completion({ choices: [{ finish_reason: 'stop', message: { role: 'assistant', content: 'Hi, Caller!', tool_calls: null, ...nulls } }] }));
+    expect(result.content).toEqual([expect.objectContaining({ type: 'text', text: 'Hi, Caller!' })]);
+  });
+  it('accepts a tool call with content: null and the other fields null', async () => {
+    const result = await run(completion({ choices: [{ finish_reason: 'tool_calls', message: { role: 'assistant', content: null, tool_calls: [call('c1')], ...nulls } }] }));
+    expect(result.stop_reason).toBe('tool_use');
+  });
+});
