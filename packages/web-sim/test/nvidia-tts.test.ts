@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { loadNvidiaEnv, nvidiaPublicConfig } from '../server/nvidia-env.ts';
-import { createNvidiaTts, nvidiaCsp, nvidiaPitchShift } from '../server/nvidia-tts.ts';
+import { bundledFfmpeg, createNvidiaTts, nvidiaCsp, nvidiaPitchShift } from '../server/nvidia-tts.ts';
+import { findFfmpeg } from '../server/tts.ts';
 import type { TtsFetch } from '../server/tts.ts';
 
 const base = { NEBIUS_API_KEY: 'k', V1_MCP_SERVICE_KEY: 'v'.repeat(32) };
@@ -122,9 +123,42 @@ describe('NVIDIA pitch shift', () => {
     expect(nvidiaPitchShift(loadNvidiaEnv({ ...base, FFMPEG_PATH: '/nope' }), () => null)).toBeNull();
   });
 
-  it('falls back to the system lookup when unset', () => {
+  it('uses the bundled ffmpeg-static binary when FFMPEG_PATH is unset', () => {
+    const find = vi.fn((candidate?: string) => (candidate === '/bundled/ffmpeg' ? candidate : null));
+    expect(typeof nvidiaPitchShift(loadNvidiaEnv(base), find, '/bundled/ffmpeg')).toBe('function');
+    expect(find).toHaveBeenCalledWith('/bundled/ffmpeg');
+  });
+
+  it('falls back to the system lookup when unset and the bundled binary does not run', () => {
     const find = vi.fn(() => null);
-    expect(nvidiaPitchShift(loadNvidiaEnv(base), find)).toBeUndefined();
-    expect(find).not.toHaveBeenCalled();
+    expect(nvidiaPitchShift(loadNvidiaEnv(base), find, '/bundled/ffmpeg')).toBeUndefined();
+    expect(nvidiaPitchShift(loadNvidiaEnv(base), find, null)).toBeUndefined();
+  });
+
+  it('ships a bundled ffmpeg for this platform that runs', () => {
+    expect(bundledFfmpeg()).toEqual(expect.any(String));
+    expect(findFfmpeg(bundledFfmpeg()!)).toBe(bundledFfmpeg());
+  });
+});
+
+describe('NVIDIA /api/tts request log', () => {
+  it('logs status, lineage and applied pitch for each request, never the text or key', async () => {
+    const lines: string[] = [];
+    const log = (line: string) => lines.push(line);
+    const tts = createNvidiaTts(loadNvidiaEnv({ ...base, ELEVENLABS_API_KEY: 'eleven-secret' }), { auth: signedIn(), fetch: audio(), pitchShift: null, log });
+    await tts(post(ORIGIN), 'ip');
+    await tts(post('https://evil.example'), 'ip');
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toMatch(/^\[nvidia-tts\] POST 200 lineage=dex-001\/female\/1 stage=Baby pitch=1 ms=\d+$/);
+    expect(lines[1]).toMatch(/^\[nvidia-tts\] POST 403 lineage=dex-001\/female\/1 stage=Baby pitch=- ms=\d+$/);
+    expect(lines.join('\n')).not.toContain('Hi there');
+    expect(lines.join('\n')).not.toContain('eleven-secret');
+  });
+
+  it('logs a malformed body without echoing it', async () => {
+    const lines: string[] = [];
+    const tts = createNvidiaTts(loadNvidiaEnv(base), { auth: signedIn(), fetch: audio(), pitchShift: null, log: (l) => lines.push(l) });
+    await tts(new Request(`${ORIGIN}/api/tts`, { method: 'POST', headers: { origin: ORIGIN, authorization: 'Bearer t' }, body: '{"text":"secret words","lineageId":"<script>"}' }), 'ip');
+    expect(lines[0]).toMatch(/^\[nvidia-tts\] POST 400 lineage=- stage=- pitch=- ms=\d+$/);
   });
 });

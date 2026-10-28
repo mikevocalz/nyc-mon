@@ -113,3 +113,67 @@ describe('the NVIDIA companion speaks in the Mon voice', () => {
     expect(rec().prepared).toEqual([]);
   });
 });
+
+describe('barge-in on the NVIDIA companion voice', () => {
+  it('fades the playing clip out before cancelling the queue, so the fade is not cut short', async () => {
+    const order: string[] = [];
+    let playSignal!: AbortSignal;
+    const port: VoicePort<string> = {
+      prepare: async (text) => text,
+      play: (_clip, signal) => {
+        playSignal = signal;
+        return new Promise<void>((done) => signal.addEventListener('abort', () => { order.push('queue-cancelled'); done(); }));
+      },
+    };
+    const voice = createCompanionVoice({
+      port: () => port,
+      stopAll: (opts) => { order.push(`fade:${opts?.fadeMs ?? 0}`); },
+      setSessionVoice: () => {},
+    });
+    const done = voice.speak('First one here. Second one here.');
+    await vi.waitFor(() => expect(playSignal).toBeDefined());
+    order.length = 0; // speak() itself stops whatever spoke before
+    voice.stop({ fadeMs: 60 });
+    expect(await done).toBe('cancelled');
+    expect(order).toEqual(['fade:60', 'queue-cancelled']);
+  });
+
+  it('reports each sentence as it starts, so captions never run ahead of the voice', async () => {
+    const started: string[] = [];
+    let release!: () => void;
+    const port: VoicePort<string> = {
+      prepare: async (text) => text,
+      play: () => new Promise<void>((done) => (release = done)),
+    };
+    const voice = createCompanionVoice({ port: () => port, stopAll: () => {}, setSessionVoice: () => {} });
+    const done = voice.speak('First one here. Second one here.', undefined, (s) => started.push(s));
+    await vi.waitFor(() => expect(started).toEqual(['First one here.']));
+    voice.stop();
+    release();
+    expect(await done).toBe('cancelled');
+    expect(started).toEqual(['First one here.']);
+  });
+});
+
+describe('the first reply after sign-in is in the Mon voice', () => {
+  it('waits for the Mon voice loaded at connect before speaking a reply that came first', async () => {
+    const { voice, rec } = setup();
+    let loaded!: (r: CallToolResult) => void;
+    voice.prime(() => new Promise<CallToolResult>((r) => (loaded = r)));
+    const done = voice.speak('Hey Callah.');
+    await new Promise((r) => setTimeout(r, 10));
+    loaded(ratti('Baby'));
+    expect(await done).toBe('finished');
+    expect(rec().prepared[0]?.voice).toEqual({ lineageId: 'dex-001/male/1', stage: 'Baby' });
+  });
+
+  it('still speaks when loading the voice fails or hangs', async () => {
+    const { voice, rec } = setup();
+    voice.prime(async () => { throw new Error('offline'); });
+    expect(await voice.speak('Hey.')).toBe('finished');
+    expect(rec().prepared[0]?.voice).toBeUndefined();
+    const hung = setup();
+    hung.voice.prime(() => new Promise(() => {}), 20);
+    expect(await hung.voice.speak('Hey.')).toBe('finished');
+  });
+});

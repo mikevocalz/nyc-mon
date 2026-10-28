@@ -22,18 +22,32 @@ export interface CompanionVoice {
    * Speak a reply, cutting off any reply still speaking, with the sign-in it
    * was answered under. Resolves when it has finished or was cut off.
    */
-  speak(reply: string, authorize?: Authorize): Promise<QueueOutcome>;
-  /** Stop speaking now. */
-  stop(): void;
+  speak(reply: string, authorize?: Authorize, onSentence?: (sentence: string) => void): Promise<QueueOutcome>;
+  /**
+   * Stop speaking now and drop the sentences still queued. With `fadeMs` the
+   * clip playing fades out over that long (barge-in) instead of a hard cut.
+   */
+  stop(opts?: StopOptions): void;
   /** Stop and forget the voice (sign-out). */
   reset(): void;
+  /**
+   * Loads the Mon's voice before the first reply (nvidia.tsx calls
+   * get_mon_status on connect): a reply that arrives first waits for it, at
+   * most `timeoutMs`, so a turn with no tool call still speaks in the Mon's
+   * own voice instead of the browser's.
+   */
+  prime(load: () => Promise<CallToolResult>, timeoutMs?: number): Promise<void>;
+}
+
+export interface StopOptions {
+  readonly fadeMs?: number;
 }
 
 export interface CompanionVoiceDeps {
   /** Builds one reply's port; it reads the current voice per sentence. nvidia.tsx passes monSpeechPort. */
   readonly port: (voice: () => MonVoice | undefined, authorize: Authorize | undefined) => VoicePort<unknown>;
   /** speech.ts stopSpeaking: also silences anything the adapter is playing outside the queue. */
-  readonly stopAll: () => void;
+  readonly stopAll: (opts?: StopOptions) => void;
   /** speech.ts setSessionVoice / clearSessionVoice. */
   readonly setSessionVoice: (voice: MonVoice | undefined) => void;
 }
@@ -45,31 +59,47 @@ const asItem = (result: CallToolResult): TranscriptItem => ({
 export function createCompanionVoice(deps: CompanionVoiceDeps): CompanionVoice {
   let remembered: RememberedVoice | null = null;
   let queue: SpeechQueue | null = null;
+  let primed: Promise<void> = Promise.resolve();
   const current = () => remembered?.voice;
 
-  const stop = () => {
+  const stop = (opts?: StopOptions) => {
+    // The fade goes first: it takes the playing clip out of the queue's hands,
+    // so cancelling the queue does not cut it short.
+    deps.stopAll(opts);
     queue?.cancel();
     queue = null;
-    deps.stopAll();
+  };
+
+  const learn = (result: CallToolResult) => {
+    const next = stickyVoice(remembered, [asItem(result)]);
+    if (next === remembered) return;
+    remembered = next;
+    deps.setSessionVoice(next?.voice);
   };
 
   return {
-    learn(result) {
-      const next = stickyVoice(remembered, [asItem(result)]);
-      if (next === remembered) return;
-      remembered = next;
-      deps.setSessionVoice(next?.voice);
+    learn,
+    prime(load, timeoutMs = 4000) {
+      const loading = load().then(learn, () => {});
+      primed = Promise.race([loading, new Promise<void>((r) => setTimeout(r, timeoutMs))]);
+      return primed;
     },
-    speak(reply, authorize) {
+    speak(reply, authorize, onSentence) {
       stop();
-      const mine = createSpeechQueue({ port: deps.port(current, authorize) });
+      const mine = createSpeechQueue({
+        port: deps.port(current, authorize),
+        ...(onSentence ? { onSentence: (text: string) => onSentence(text) } : {}),
+      });
       queue = mine;
-      for (const sentence of splitSentences(reply)) {
-        // Quote marks are never spoken; stage directions go on to the voice, which performs them.
-        const s = spokenText(sentence);
-        if (s) mine.push(s);
-      }
-      mine.end();
+      void primed.then(() => {
+        if (queue !== mine) return;
+        for (const sentence of splitSentences(reply)) {
+          // Quote marks are never spoken; stage directions go on to the voice, which performs them.
+          const s = spokenText(sentence);
+          if (s) mine.push(s);
+        }
+        mine.end();
+      });
       return mine.done.then((outcome) => {
         if (queue === mine) queue = null;
         return outcome;
