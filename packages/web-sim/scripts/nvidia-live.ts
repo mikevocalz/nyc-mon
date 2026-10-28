@@ -5,6 +5,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { z } from 'zod';
 import { nebiusBackend, NebiusOptionsSchema, type NebiusReceipt } from '../server/nebius.ts';
+import { PROVIDER_PROOF_MAX_TOKENS, providerProofAnswered } from './nvidia-live-checks.ts';
 import { createModelAuth } from '../server/model-auth.ts';
 import { createMemoryClient, withPersistentMemory } from '../server/companion-memory-client.ts';
 import { runAgentTurn, type ModelClient } from '../src/shared/agentLoop.ts';
@@ -41,7 +42,7 @@ function save() {
 async function main() {
   const options = NebiusOptionsSchema.safeParse({ apiKey: env.NEBIUS_API_KEY,
     ...(env.NEBIUS_BASE_URL ? { baseUrl: env.NEBIUS_BASE_URL } : {}),
-    ...(env.SIM_NEBIUS_MODEL_ID ? { modelId: env.SIM_NEBIUS_MODEL_ID } : {}), maxTokens: 512 });
+    ...(env.SIM_NEBIUS_MODEL_ID ? { modelId: env.SIM_NEBIUS_MODEL_ID } : {}), maxTokens: PROVIDER_PROOF_MAX_TOKENS });
   if (!options.success) { checks.push({ id: 'configuration', status: 'NOT_RUN', reason: 'Missing/invalid NEBIUS_API_KEY or reviewed model/endpoint.' }); return; }
   const opts = options.data;
   const backend = nebiusBackend(opts, { onReceipt: (receipt) => receipts.push(receipt) });
@@ -53,7 +54,7 @@ async function main() {
   })) return;
   if (!await check('real-nebius-nvidia-inference', async () => {
     const answer = await backend.stream({ system: 'Reply with a brief greeting. Do not call tools.', messages: [{ role: 'user', content: 'Hello.' }], tools: [] }, () => {}, AbortSignal.timeout(65000));
-    requireThat(answer.model === opts.modelId && answer.content.some((block) => block.type === 'text' && block.text.trim()), 'no model response');
+    requireThat(providerProofAnswered(answer, opts.modelId), 'no model response');
     requireThat(receipts.length === 1 && receipts[0]?.provider === 'nebius-token-factory', 'missing receipt');
   })) return;
   if (!full) return;
