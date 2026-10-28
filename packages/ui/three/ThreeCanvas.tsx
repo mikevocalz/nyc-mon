@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useImperativeHandle, useRef } from 'react';
+import { useEffect, useImperativeHandle, useLayoutEffect, useRef } from 'react';
 import { PixelRatio, Platform, type GestureResponderEvent } from 'react-native';
 import { twMerge } from 'tailwind-merge';
 import { useReducedMotion } from '../backgrounds/use-reduced-motion';
@@ -118,7 +118,10 @@ function JsThreeCanvas<P>({
   // The renderer starts asynchronously; a layout change during that wait must
   // still size it, so applySize reads the latest size, never a stale closure.
   const latestSize = useRef(size);
-  latestSize.current = size;
+  // Synced before paint (and before any effect reads it), not during render.
+  useLayoutEffect(() => {
+    latestSize.current = size;
+  }, [size]);
   const surfaceRef = useRef<ThreeSurfaceHandle>(null);
   const runtime = useRef<Runtime<P>>(null);
   runtime.current ??= {
