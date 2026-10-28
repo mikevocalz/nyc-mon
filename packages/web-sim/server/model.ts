@@ -307,6 +307,7 @@ export function describeModelError(err: unknown): { message: string; retry: bool
     if (code === 'HTTP' && status === 429) return { message: 'Nebius is limiting requests right now. Wait a minute and try again.', retry: true };
     if (code === 'HTTP') return { message: `Nebius returned an error${status === undefined ? '' : ` (${status})`}. No other model was used. Try again.`, retry: true };
     if (code === 'RESPONSE') return { message: 'Nebius sent a reply this page couldn’t use. No other model was used. Try again.', retry: true };
+    if (code === 'EMPTY') return { message: 'Nemotron on Nebius finished without an answer. No other model answered instead. Try again.', retry: true };
     return { message: 'This conversation couldn’t be sent to Nebius. Start a new conversation.', retry: false };
   }
   if (err instanceof Error && err.name === 'CompanionMemoryError') {
