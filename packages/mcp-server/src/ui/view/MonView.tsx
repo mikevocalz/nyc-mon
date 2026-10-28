@@ -3,6 +3,7 @@ import { companionCopy } from '@acme/app/features/companion/copy.ts';
 import { NEED_RING, isLow } from '@acme/app/features/companion/home-model.ts';
 import { groupJournalByDay, journalEntryCopyId, showsFirstBadge, type DayHeading } from '@acme/app/features/companion/journal-model.ts';
 import { artFor } from '@acme/app/features/companion/creature-art.ts';
+import { MON_MOUTHS } from '@acme/app/features/companion/mon-models.ts';
 import { hatchCopy } from '@acme/app/features/hatch/copy.ts';
 // Kit components are imported the way their Storybook stories import them
 // (from the component file, not the @acme/ui barrel) and used with the props
@@ -79,16 +80,10 @@ declare const __MON_MODEL_ORIGIN__: string;
 const MON_MODELS: Readonly<Record<number, { file: string; mouth?: MouthRig }>> = {
   // The Egg form: the hatch rig (packages/assets/eggs/metro-egg). No mouth.
   1: { file: 'metro-egg' },
-  // Jaw angles read off the files' own clips (about the jaw's local X, from
-  // bind): Squeaklet binds with the mouth ajar and its mouth_close clip shuts
-  // it at +0.357; jaw_chomp opens to -0.286. Lil' Ratti binds shut;
-  // face_pose_sweep's widest frame is -0.312. Rest: Lil' Ratti's neutral
-  // geometry (all weights 0) has the mouth open, so its resting face is
-  // mouthClose 1, the value its own emote clips rest on; frames at 0, 0.7 and
-  // 1 showed lips meeting only at 1, without crushing. Squeaklet rests on
-  // its mouth_close pose (jaw shut, mouthClose 1).
-  2: { file: 'squeaklet', mouth: { jawBone: 'jaw', jawClosedRad: 0.357, jawOpenRad: -0.15, rest: { mouthClose: 1 } } },
-  3: { file: 'lil-ratti', mouth: { jawBone: 'jaw', jawClosedRad: 0, jawOpenRad: -0.3, rest: { mouthClose: 1 } } },
+  // The mouths' rest poses (jaw angles, resting morphs) are the app's own
+  // table (MON_MOUTHS), so the app's 3D stages and this view agree.
+  2: { file: 'squeaklet', mouth: MON_MOUTHS[2] },
+  3: { file: 'lil-ratti', mouth: MON_MOUTHS[3] },
 };
 
 const modelUrl = (file: string) => `${typeof __MON_MODEL_ORIGIN__ === 'string' ? __MON_MODEL_ORIGIN__ : ''}/mons/${file}.glb`;

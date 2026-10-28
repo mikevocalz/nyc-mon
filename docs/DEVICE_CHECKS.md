@@ -98,3 +98,32 @@ Lane `lane-lc-perf`, release build with `EXPO_PUBLIC_GAME_PERF=1` +
 ## Admin console
 
 - [ ] **Responsive matrix** at 390, 768, 1280 and 1440 widths, plus foldable postures, on real hardware browsers (Safari iOS, Chrome Android).
+
+## Slop-grade city: Phase 0 probe matrix
+
+Spec: `docs/plans/slop-grade-city-prompt.md` §8 Phase 0; decision record `docs/adr/0023-renderer-mode-physical.md`; gates G5 and G9 in `docs/design/DECISIONS.md` (D19). Each probe is `EXPO_PUBLIC_WORLD_PROBE=<name>` on the Harlem tile. A cell is filled only from hardware: non-black yes/no, a capture path and the frame time. Record the device model, chip and iOS version from the device itself. Simulator and browser results never fill a cell.
+
+Status 2026-10-27: nothing has run. The iPad Pro columns are scheduled for the end of this session. No iPhone 17 is cabled, so its columns stay open.
+
+| Probe | What it isolates | iPhone 17, JS | iPhone 17, worklet | iPad Pro, JS | iPad Pro, worklet |
+|---|---|---|---|---|---|
+| `control` | react-native-webgpu `apps/example/src/ThreeJS/PostProcessing.tsx` @ `3f4b0f0`, unmodified | not run | not run | not run | not run |
+| `srgb` | `outputColorSpace = SRGBColorSpace` | not run | not run | not run | not run |
+| `aces` | `RenderPipeline` with `ACESFilmicToneMapping` | not run | not run | not run | not run |
+| `shadow1` | `SunLight`, 1 cascade | not run | not run | not run | not run |
+| `shadow2` | `SunLight`, 2 cascades in one atlas | not run | not run | not run | not run |
+| `bgnull` | `scene.background` null vs a `Color` | not run | not run | not run | not run |
+| `pmrem` | `SkyMesh` baked to PMREM as `scene.environment` | not run | not run | not run | not run |
+| `mrt` | Scene pass with `output`, `normalView`, `metalRough` attachments | not run | not run | not run | not run |
+| `ssr` | SSR at 0.5 resolution | not run | not run | not run | not run |
+| `bloom` | Bloom at 0.5 resolution | not run | not run | not run | not run |
+| `clustered` | `ClusteredLighting` | not run | not run | not run | not run |
+| `storage` | `StorageInstancedBufferAttribute` swap on instanced meshes | not run | not run | not run | not run |
+| `msaa` | `storeMultisampledColorBuffer = false` | not run | not run | not run | not run |
+| `shared` | three, TypeGPU and Skia on one device from `importDevice(Skia.getNativeDevice())`; three on the worklet runtime while Skia records | not run | not run | not run | not run |
+| `skiatex` | Skia `MakeFromGPUTexture` draws a plate and a sign blade; three samples it the same frame, after `flush()` and after `flush(true)` | not run | not run | not run | not run |
+| `pipecache` | Time to world-ready, cold launch vs second launch | not run | not run | not run | not run |
+
+- [ ] **D1, Phase 0 complete on both devices and both runtimes:** not run.
+- [ ] **G5:** answered only if a probe renders black or corrupt; bisect the four suspects in ADR 0023 first.
+- [ ] **G9:** `shared` and `skiatex` must pass in all four columns before the one-device path is adopted (device lane, ADR 0026).

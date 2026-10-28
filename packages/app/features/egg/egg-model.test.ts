@@ -138,6 +138,12 @@ describe('window layout (Horizon 2D window 360–1280 dp, phones, tablets)', () 
     assert.equal(ringSizeDp(160, 400), 144);
     assert.ok(ringSizeDp(1280, 704) <= 360);
   });
+
+  it('a tablet-sized portrait screen grows the ring past the phone cap, to 420 at most', () => {
+    assert.equal(ringSizeDp(439, 585), 260);
+    assert.equal(ringSizeDp(552, 736), 386);
+    assert.equal(ringSizeDp(820, 1100), 420);
+  });
 });
 
 describe('copy rules', () => {

@@ -9,30 +9,20 @@ import { readSave } from '../onboarding/save-store';
 // photo) was STRUCK 2026-10-17: every player saw "Nina Alvarez". Handle,
 // email and a photo return when a backing source exists (the auth session
 // for email; nothing yet for handle or photo). Avatar falls back to initials.
+// The notification, digest and public-profile flags were STRUCK 2026-10-28:
+// in memory only, read by nothing (settings-content.tsx).
 
 interface ProfileState {
   name: string;
-  notifications: boolean;
-  digest: boolean;
-  publicProfile: boolean;
   theme: ThemePreference;
   setName: (name: string) => void;
-  setNotifications: (v: boolean) => void;
-  setDigest: (v: boolean) => void;
-  setPublicProfile: (v: boolean) => void;
   setTheme: (theme: ThemePreference) => void;
 }
 
 export const useProfile = create<ProfileState>((set) => ({
   name: readSave()?.caller?.callerName ?? '',
-  notifications: true,
-  digest: false,
-  publicProfile: true,
   theme: 'dark', // NYC Mon is dark-first
   setName: (name) => set({ name }),
-  setNotifications: (notifications) => set({ notifications }),
-  setDigest: (digest) => set({ digest }),
-  setPublicProfile: (publicProfile) => set({ publicProfile }),
   setTheme: (theme) => { setThemePreference(theme); set({ theme }); },
 }));
 

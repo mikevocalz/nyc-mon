@@ -77,6 +77,7 @@ export const MonViewSchema = z.object({
     .object({
       lineageId: IdSchema.describe('The one voice this Mon keeps for life.'),
       stage: LifecycleStageSchema.describe('Pitch follows the stage: higher when young, lower when grown. An Egg is silent.'),
+      voiced: z.boolean().describe('False for an Egg, or when no voice is cast for this lineage yet: show the reply, do not speak it.'),
     })
     .nullable()
     .describe('For clients that voice the Mon themselves. Null for a Mon hatched before voice lineages.'),
@@ -165,6 +166,9 @@ export function talkToMonOutput(devMode: boolean) {
   const base = z.object({
     mon: MonViewSchema,
     mood: MonMoodSchema,
+    voiceGuide: z
+      .array(z.string())
+      .describe("How this Mon talks right now, as published in Payload: the voice rules and word palette for its form, stage and mood, and its canon lines. Write the reply within them."),
     needs: NeedsSchema,
     activity: z.enum(['awake', 'asleep']),
     wantsFood: z.boolean(),

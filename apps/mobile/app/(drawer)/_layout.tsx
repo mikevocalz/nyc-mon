@@ -1,47 +1,21 @@
 import { Redirect } from 'expo-router';
 import { Drawer } from 'expo-router/drawer';
-import { useColorScheme } from 'react-native';
-import { palette } from '@acme/theme';
 import { readSave } from '@acme/app/features/onboarding/save-store.ts';
-import { DrawerContent } from '../../components/DrawerContent';
-import { AppHeader } from '../../components/AppHeader';
-import { horizontalGesturesEnabled, usePaneSearchStore } from '@/src/navigation/split-view';
 
+/**
+ * The (drawer) group is only a route container now. The shell (header, rail,
+ * tab bar, drawer) is drawn once around the root stack (navigation/RootShell),
+ * so this navigator draws no header, no drawer panel and opens no drawer.
+ */
 export default function DrawerLayout() {
-  const isDark = useColorScheme() === 'dark';
-  /**
-   * The drawer's edge swipe and a focused search field want the same gesture: a
-   * horizontal drag near the leading edge is also how you move the caret or
-   * select text. The field wins while it holds focus — it is the surface the
-   * user is actively working in. Generalised from the reference's
-   * `use-drawer-enabled`, which disabled the drawer on search focus.
-   */
-  const searches = usePaneSearchStore((state) => state.panes);
-  const swipeEnabled = horizontalGesturesEnabled(Object.values(searches));
-
   // Boot (`/`) decides where a player belongs; a deep link (nycmon:///game)
   // skips it. Without a Caller the lobby's START has no identity to start a
   // session with and silently does nothing, so send the player back through
   // boot, which resumes onboarding at the step they still owe.
   if (!readSave()?.caller) return <Redirect href="/" />;
-
   return (
-    <Drawer
-      drawerContent={(props) => <DrawerContent {...props} />}
-      screenOptions={{
-        // Every drawer route gets the app bar.
-        header: () => <AppHeader />,
-        drawerType: 'front',
-        drawerStyle: {
-          width: 270,
-          backgroundColor: isDark ? palette.ink[900] : palette.ink[50],
-        },
-        overlayColor: 'rgba(0,0,0,0.6)',
-        swipeEnabled,
-        swipeEdgeWidth: 40,
-      }}
-    >
-      <Drawer.Screen name="(tabs)" options={{ headerShown: false }} />
+    <Drawer screenOptions={{ headerShown: false, swipeEnabled: false, drawerStyle: { width: 0 } }}>
+      <Drawer.Screen name="(tabs)" />
     </Drawer>
   );
 }

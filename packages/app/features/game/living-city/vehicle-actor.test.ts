@@ -84,3 +84,17 @@ test('EXPO_PUBLIC_LIVING_CITY defaults off and the gate returns [] (zero-diff)',
   assert.deepEqual(livingCityFactoriesFor(false, [factory]), []);
   assert.deepEqual(livingCityFactoriesFor(true, [factory]), [factory]);
 });
+
+test('box-car triangles wind counter-clockwise seen from outside, so front-face culling keeps them', async () => {
+  const { boxCarGeometryData } = await import('./vehicle-actor.ts');
+  const { positions: p, normals: n, indices } = boxCarGeometryData({ lengthM: 4.5, widthM: 1.8, heightM: 1.5 });
+  const inward: number[] = [];
+  for (let t = 0; t < indices.length; t += 3) {
+    const [a, b, c] = [indices[t]!, indices[t + 1]!, indices[t + 2]!].map((i) => i * 3) as [number, number, number];
+    const e1 = [p[b]! - p[a]!, p[b + 1]! - p[a + 1]!, p[b + 2]! - p[a + 2]!];
+    const e2 = [p[c]! - p[a]!, p[c + 1]! - p[a + 1]!, p[c + 2]! - p[a + 2]!];
+    const cross = [e1[1]! * e2[2]! - e1[2]! * e2[1]!, e1[2]! * e2[0]! - e1[0]! * e2[2]!, e1[0]! * e2[1]! - e1[1]! * e2[0]!];
+    if (cross[0]! * n[a]! + cross[1]! * n[a + 1]! + cross[2]! * n[a + 2]! <= 0) inward.push(t / 3);
+  }
+  assert.deepEqual(inward, []);
+});

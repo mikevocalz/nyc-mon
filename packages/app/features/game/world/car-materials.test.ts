@@ -3,6 +3,7 @@
 // own, the lamps follow the sky pick through a live uniform, the graph
 // compiles to WGSL on the real instanced mesh, and the unflagged world is
 // untouched. Same stub-renderer convention as pbr-materials.test.ts.
+import '../classic-flags.test-support.ts';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import * as THREE from 'three/webgpu';

@@ -64,5 +64,5 @@ export function avatarCut(width: number, height: number): number {
 }
 
 /** px per size step, matching the h-/w- classes on the tile. */
-export const AVATAR_PX = { sm: 32, md: 44, lg: 64, xl: 96 } as const;
+export const AVATAR_PX = { sm: 32, md: 44, rail: 56, lg: 64, xl: 96 } as const;
 export type AvatarSize = keyof typeof AVATAR_PX;

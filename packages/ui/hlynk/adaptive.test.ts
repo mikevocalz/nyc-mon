@@ -3,6 +3,7 @@
 // content that fits the H-Lynk screen without scrolling. Viewports are unit
 // fixtures in dp, not device evidence.
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { foldLayoutsFromRegions } from '../adaptive-panes/fold-layout.ts';
 import type { ReservedRegion } from '../reserved-regions.types.ts';
@@ -10,9 +11,13 @@ import { fitHLynkContent, type FitBlock } from './content-fit.ts';
 import {
   HLYNK_BRAND_MIN_PT,
   HLYNK_GEOMETRY,
+  HLYNK_STAGE_SHELL_MAX_PT,
+  HLYNK_TWO_PANE_MIN_PT,
   STANDARD_ROW_NEED_PT,
+  hlynkUsableRegions,
   measureShell,
   planHLynkPlacement,
+  planHLynkStageSplit,
   type HLynkFold,
   type HLynkPlacement,
   type HLynkRect,
@@ -264,4 +269,46 @@ test('too small at the last step reports fits: false instead of scrolling', () =
   assert.equal(fit.fits, false);
   assert.equal(fit.step, 2);
   assert.equal(fit.mediaPt, 144);
+});
+
+// Tablet open-foldable stage (HLynkStage, 2026-10-27): the companion pane
+// takes the brand pane's place on landscape md+ windows, and a fold decides
+// where it ends. Fixtures are iPad Pro 12.9 / iPad 11 / Duo sizes in pt, not
+// device evidence.
+
+test('stage: the landscape shell slot cap is below the brand threshold, and the class says the same number', () => {
+  assert.ok(HLYNK_STAGE_SHELL_MAX_PT < HLYNK_TWO_PANE_MIN_PT);
+  const source = readFileSync(new URL('./HLynkStage.tsx', import.meta.url), 'utf8');
+  assert.ok(source.includes(`md:landscape:max-w-[${HLYNK_STAGE_SHELL_MAX_PT}px]`));
+});
+
+test('stage: a capped shell slot on tablet landscape holds the device alone, standard and filling the height', () => {
+  for (const [name, w, h] of [['iPad Pro 12.9', 1366, 1024 - 24 - 20], ['iPad 11', 1194, 834 - 24 - 20]] as const) {
+    const slot = Math.min(Math.round(w * 0.46), HLYNK_STAGE_SHELL_MAX_PT);
+    const p = planHLynkPlacement({ widthPt: slot, heightPt: h, folds: [] });
+    assert.equal(p.arrangement, 'single', name);
+    assert.equal(p.brand, null, name);
+    const geo = measureShell({ widthPt: slot, heightPt: h, safeTopPt: 0, safeBottomPt: 0 });
+    assert.equal(geo.layout, 'standard', name);
+    assert.ok(geo.bodyWidthPt <= slot && geo.bodyWidthPt >= G.minBodyPt, `${name}: body ${geo.bodyWidthPt}`);
+    assert.ok(geo.bodyHeightPt <= h, name);
+  }
+});
+
+test('stage: no fold, no split; the classes decide', () => {
+  assert.equal(planHLynkStageSplit(hlynkUsableRegions(1366, 1024, [])), null);
+  // A flat, non-separating crease cuts nothing (skill §4).
+  assert.equal(planHLynkStageSplit(hlynkUsableRegions(1080, 720, [vfold(540, 0, 720, { separating: false, occlusionType: 'none' })])), null);
+});
+
+test('stage: a vertical hinge ends the companion pane at the hinge; the shell gets the right region', () => {
+  for (const hinge of [0, 34]) {
+    const split = planHLynkStageSplit(hlynkUsableRegions(1080, 720, [vfold(540, hinge, 720)]));
+    assert.deepEqual(split, { axis: 'row', panePt: 540 });
+  }
+});
+
+test('stage: a horizontal hinge puts the pane above it and the shell below', () => {
+  const split = planHLynkStageSplit(hlynkUsableRegions(720, 1080, [hfold(540, 34, 720)]));
+  assert.deepEqual(split, { axis: 'column', panePt: 540 });
 });

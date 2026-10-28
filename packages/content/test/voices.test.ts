@@ -104,7 +104,7 @@ describe('voice registry', () => {
 
   it('keeps the Egg silent and lowers the voice as the Mon grows', () => {
     expect(voicePitchFactor('Egg')).toBeNull();
-    const rates = LIFECYCLE_STAGES.filter((s) => s !== 'Egg').map(voicePitchFactor);
+    const rates = LIFECYCLE_STAGES.filter((s) => s !== 'Egg').map((s) => voicePitchFactor(s));
     expect(rates).toEqual([1.3, 1.15, 1, 0.92]);
     for (const stage of LIFECYCLE_STAGES) {
       const pitch = webSpeechPitch(stage);

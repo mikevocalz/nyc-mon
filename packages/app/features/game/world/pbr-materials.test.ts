@@ -4,6 +4,7 @@
 // and the aOcclusion bake follows the contact shadows, the graphs compile
 // to WGSL through three's own WGSLNodeBuilder, and the unflagged world is
 // untouched. Same stub-renderer convention as shader-graphs.test.ts.
+import '../classic-flags.test-support.ts';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';

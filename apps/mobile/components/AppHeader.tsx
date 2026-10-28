@@ -1,11 +1,8 @@
-import { useWindowDimensions } from 'react-native';
 import { usePathname } from 'expo-router';
 import { BrandWordmark, SafeArea } from '@acme/ui';
 import { Header } from '@acme/ui/primitives';
 import { Text } from '@acme/ui/tw';
-import { MenuButton, useProfile } from '@acme/app';
 import { useRouter } from 'expo-router';
-import { Avatar } from '@acme/ui';
 import { Pressable, View } from '@acme/ui/tw';
 import { Bell } from '@acme/ui/icons';
 
@@ -23,9 +20,6 @@ import { Bell } from '@acme/ui/icons';
  * does not update when the native tab bar switches tabs, so the title stuck on
  * "Home" no matter which tab was showing.
  */
-/** Routes rendered inside the tab navigator, and so behind the rail. */
-const TAB_PATHS = new Set(['/notifications', '/profile']);
-
 /** Page names shown after the wordmark. */
 const TITLES: Record<string, string> = {
   '/notifications': 'Notifications',
@@ -35,14 +29,8 @@ const TITLES: Record<string, string> = {
 
 export function AppHeader() {
   const pathname = usePathname() ?? '/';
-  // On rail-sized screens the drawer toggle lives at the foot of the rail, so
-  // the header must not show a second one — but ONLY on the tab routes, which
-  // are the only ones the rail renders on. Hiding it everywhere left Settings
-  // with no way into the drawer at all.
-  const { width } = useWindowDimensions();
-  const railHasMenu = width >= 600 && TAB_PATHS.has(pathname);
+  // The menu button lives in the shell (the rail's foot or the phone bar), not here.
   const router = useRouter();
-  const profileName = useProfile((state) => state.name);
 
   return (
     <SafeArea edges={['top']} className="bg-ink-950">
@@ -50,7 +38,6 @@ export function AppHeader() {
           swallow it. The logo is never recoloured; the bar moved to night
           instead, with the orange as its bottom keyline. */}
       <Header className="flex-row items-center gap-3 border-b-2 border-primary bg-ink-950 px-4 py-2">
-        {railHasMenu ? null : <MenuButton />}
         {/* Full header height: the row is sized by its 44 pt controls, so the wordmark matches them. */}
         <BrandWordmark height={44} />
         <Text numberOfLines={1} className="flex-1 text-lg font-semibold text-ink-50 md:text-xl">
@@ -64,20 +51,14 @@ export function AppHeader() {
             pane toggles, so controls on the primary field read as one set. */}
         <Pressable
           aria-label="Notifications"
+          // The header only draws on rail hardware (tablets, foldables); 6pt off the right edge there.
           onPress={() => router.push('/notifications')}
-          className="relative h-11 w-11 items-center justify-center rounded-none border-2 border-border bg-surface-raised transition-colors duration-fast hover:bg-surface-sunken active:bg-surface-sunken motion-reduce:transition-none"
+          className="relative mr-[6px] h-11 w-11 items-center justify-center rounded-none border-2 border-border bg-surface-raised transition-colors duration-fast hover:bg-surface-sunken active:bg-surface-sunken motion-reduce:transition-none"
         >
           <Bell size={20} className="text-accent" />
           <View className="absolute right-2 top-2 h-2 w-2 rounded-full bg-danger" />
         </Pressable>
 
-        <Pressable
-          aria-label="Profile"
-          onPress={() => router.push('/profile')}
-          className="rounded-none"
-        >
-          <Avatar name={profileName} />
-        </Pressable>
       </Header>
     </SafeArea>
   );

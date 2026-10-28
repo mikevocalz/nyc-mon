@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { FALLBACK_MON_LINGO, type MonLingo } from '@acme/content/lingo';
 import { deriveMonInstanceId } from '@acme/core';
 import { deviceIdFor } from '../data/v1.ts';
 import { callTool, fakeV1, NOW, row, rpc, SERVICE_KEY, start, type Running } from './harness.ts';
@@ -50,6 +51,29 @@ describe('read tools', () => {
         voice: { lineageId: 'dex-001/female/3', stage: 'Baby' },
       });
     }
+  });
+
+  it('reads mon.voice and the voice guide from the lingo Payload serves, revalidating by ETag', async () => {
+    const served: MonLingo = { ...FALLBACK_MON_LINGO, voices: { ...FALLBACK_MON_LINGO.voices, lineages: [] }, guide: [{ ...FALLBACK_MON_LINGO.guide[0]!, text: 'Served rule only.' }] };
+    const v1 = fakeV1({ rows: [row(ADULT)], lingo: served });
+    running = await start({ v1 });
+    const talk = await call('talk_to_mon');
+    expect(talk.structuredContent.mon).toMatchObject({ voice: { lineageId: 'dex-001/female/3', stage: 'Baby', voiced: false } });
+    expect(talk.structuredContent.voiceGuide).toContain('Served rule only.');
+    const lingoCalls = v1.calls.filter((c) => c.path === '/v1/mon-lingo');
+    expect(lingoCalls.length).toBeGreaterThan(1);
+    expect(lingoCalls[0]?.headers.get('if-none-match')).toBeNull();
+    expect(lingoCalls.at(-1)?.headers.get('if-none-match')).toMatch(/^"\d+"$/);
+  });
+
+  it('keeps working on the bundled lingo when /v1/mon-lingo is down', async () => {
+    running = await start({ v1: fakeV1({ rows: [row(ADULT)], lingo: null }) });
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const talk = await call('talk_to_mon');
+    errors.mockRestore();
+    expect(talk.isError).toBeFalsy();
+    expect(talk.structuredContent.mon).toMatchObject({ voice: { lineageId: 'dex-001/female/3', stage: 'Baby', voiced: true } });
+    expect((talk.structuredContent.voiceGuide as string[]).length).toBeGreaterThan(0);
   });
 
   it('reports gender and voice as null for a Mon hatched before either existed', async () => {
@@ -220,7 +244,7 @@ describe('care tools', () => {
     const result = await call('feed_mon', {}, 8);
     expect(result.isError).toBeFalsy();
     expect(result.structuredContent).toMatchObject({ applied: true, effect: 'eaten' });
-    expect(v1.calls.map((c) => `${c.method} ${c.path}`)).toEqual([
+    expect(v1.calls.filter((c) => c.path !== '/v1/mon-lingo').map((c) => `${c.method} ${c.path}`)).toEqual([
       'GET /v1/me/mons',
       'PUT /v1/mons/mon_ratti/care',
       'GET /v1/me/mons',

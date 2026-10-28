@@ -11,8 +11,25 @@ import { EXPERIMENTAL_WORLD_POST, mountCityPostPipeline, resolvePostOptions } fr
 import { livingCityAdaptiveBridge } from './living-city/adaptive-bridge.ts';
 import { EXPERIMENTAL_WORLD_RENDER_SCALE, mountRenderScale } from './perf/render-scale.ts';
 import { EXPERIMENTAL_WORLD_THERMAL, thermalSignal, thermalWorsened } from './perf/thermal.ts';
-import { tierBundle, WORLD_TIER, WORLD_TIER_SELECTED } from './perf/tier.ts';
+import { TIER, tierBundle, WORLD_TIER, WORLD_TIER_SELECTED } from './perf/tier.ts';
 import { parseSkyRigFlag, type SkyName } from './world/sky-rig.ts';
+import { FrameSampleWindow } from './perf/frame-sampler.ts';
+import {
+  DEFAULT_PHYSICAL_PRESET,
+  EXPERIMENTAL_WORLD_PHYSICAL,
+  isDeviceLaneProbe,
+  physicalFeaturesFor,
+  WORLD_PROBE,
+  type DeviceLaneProbe,
+  type PhysicalFeatures,
+  type PhysicalPresetId,
+  type WorldProbe,
+} from './world/physical-look.ts';
+import { PHYSICAL_PRESETS } from './world/physical-presets.ts';
+import type { PhysicalRig } from './world/physical-rig.ts';
+import { loadPhysicalRig } from './physical-graph.ts';
+import { backendUploaded, createUploadedReleaser, RELEASE_UPLOADED } from './world/release-uploaded.ts';
+import { applyReversedDepthOffsets } from './world/reversed-depth-offset.ts';
 
 export interface CityCamera {
   x: number;
@@ -27,7 +44,35 @@ export interface CitySceneParams {
   actors?: readonly SceneActorFactory[];
   /** L1 sky pick (morning/dusk/night) — only read when the sky rig flag is on. */
   sky?: SkyName;
+  /** Time-of-day preset for the physically lit city (world/time-of-day.store.ts); default twilight. */
+  preset?: PhysicalPresetId;
 }
+
+/** What a device-lane probe (shared, skiatex, pipecache) gets from the scene. */
+export interface DeviceLaneProbeContext {
+  THREE: ThreeContext['THREE'];
+  renderer: NonNullable<ThreeContext['renderer']>;
+  scene: ThreeScene<CitySceneParams>['scene'];
+  camera: ThreeScene<CitySceneParams>['camera'];
+}
+
+/**
+ * The shared-device lane registers its Phase 0 probes here. city-scene runs
+ * the hook for the active device-lane probe once the scene is built and calls
+ * the returned cleanup on dispose.
+ */
+export const deviceLaneProbeHooks: Partial<Record<DeviceLaneProbe, (context: DeviceLaneProbeContext) => (() => void) | void>> = {};
+
+/** The physical features this build mounts; null is today's path, including a probe without the master flag. Exported for tests. */
+export function cityPhysicalFeatures(
+  physical: boolean = EXPERIMENTAL_WORLD_PHYSICAL,
+  probe: WorldProbe | null = WORLD_PROBE,
+): PhysicalFeatures | null {
+  return physicalFeaturesFor(physical, probe, TIER[WORLD_TIER].physical.ssr !== null);
+}
+
+/** Log tag for every Phase 0 probe line. */
+const PROBE_LOG = '[NYC-Mon/probe]';
 
 /** Camera distance clamp, metres. The floor is chase range for a 1.8 m Caller. */
 export const CAMERA_MIN_DISTANCE = 8;
@@ -91,30 +136,83 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
   // when the selector is set or the render-scale controller is on — with
   // neither, every lane keeps its own defaults (perf/tier.ts).
   const bundle = WORLD_TIER_SELECTED || EXPERIMENTAL_WORLD_RENDER_SCALE ? tierBundle(WORLD_TIER) : null;
+  // Slop-grade city: null with EXPO_PUBLIC_WORLD_PHYSICAL unset (a probe
+  // alone mounts nothing), and then nothing below differs from the path
+  // before this lane.
+  const physical = cityPhysicalFeatures();
+  const physicalTier = TIER[WORLD_TIER].physical;
   const world = buildCityWorld(THREE, dataset, {
     sky: initial.sky,
     ...(bundle ? { glassTier: bundle.glassTier, envWidth: bundle.envWidth } : {}),
+    ...(physical?.pbrMaterials ? { pbr: true, carPbr: true, physical: true } : {}),
+    // Pooled PointLights only where ClusteredLighting clusters them (physical-rig.ts).
+    ...(physical?.pbrMaterials && physical.clustered
+      ? { nightLights: { streetlamps: physicalTier.streetlampLights, storefronts: physicalTier.storefrontLights } }
+      : {}),
   });
   scene.add(world.sky, world.group);
   scene.fog = world.fog;
   // react-native-webgpu renders black through three's output pass, shadow
   // maps and Color backgrounds (metro-live README): linear output, no tone
   // mapping, no shadow maps, and the clear colour as the sky's fallback.
+  // With the physical stack on, its RenderPipeline owns tone mapping (ACES,
+  // exposure from the grade) and the vd lane's direct AgX x1.6 stays off:
+  // stacked on the physical bloom it blew the facades out.
+  const vdTonemap = physical ? '' : VD_TONEMAP;
   if (renderer) {
-    renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
-    renderer.toneMapping = VD_TONEMAP === 'agx' ? THREE.AgXToneMapping
-      : VD_TONEMAP === 'aces' ? THREE.ACESFilmicToneMapping
-        : VD_TONEMAP === 'neutral' ? THREE.NeutralToneMapping : THREE.NoToneMapping;
+    renderer.outputColorSpace = physical?.srgbOutput ? THREE.SRGBColorSpace : THREE.LinearSRGBColorSpace;
+    renderer.toneMapping = vdTonemap === 'agx' ? THREE.AgXToneMapping
+      : vdTonemap === 'aces' ? THREE.ACESFilmicToneMapping
+        : vdTonemap === 'neutral' ? THREE.NeutralToneMapping : THREE.NoToneMapping;
     // AgX compresses highlights and pulls mids down; a lift keeps the palette's daylight read.
-    renderer.toneMappingExposure = VD_TONEMAP ? 1.6 : 1;
-    renderer.shadowMap.enabled = VD_SHADOWS;
+    renderer.toneMappingExposure = vdTonemap ? 1.6 : 1;
+    renderer.shadowMap.enabled = VD_SHADOWS || (physical !== null && physical.sunShadow > 0);
     renderer.setClearColor(world.horizon, 1);
+  }
+  // The bgnull probe's failure case. Slop (js/lighting.js): a Color background
+  // makes the renderer force a clear that wipes cascade 0 while cascade 1 renders.
+  if (physical?.colorBackground) scene.background = new THREE.Color(world.horizon);
+  // The rig module (SkyMesh, SunLight, ClusteredLighting) is evaluated only here, flag on.
+  const rigModule = physical ? loadPhysicalRig() : null;
+  const rig: PhysicalRig | null = physical && rigModule
+    ? rigModule.createPhysicalRig(THREE, renderer ?? null, scene, {
+        features: physical,
+        shadowTile: physicalTier.shadowTile,
+        clusteredMaxLights: physicalTier.clusteredMaxLights,
+        preset: initial.preset ?? DEFAULT_PHYSICAL_PRESET,
+      })
+    : null;
+  if (rig) {
+    // The rig's lights and sky replace the world's own, one for one.
+    if (rig.sky) world.sky.visible = false;
+    world.group.traverse((object) => {
+      const light = object as typeof object & { isDirectionalLight?: boolean; isHemisphereLight?: boolean };
+      if ((rig.sun && light.isDirectionalLight) || (rig.hemi && light.isHemisphereLight)) object.visible = false;
+    });
   }
   // L5 "finishing pass": flagged post stack on the renderer — the mount
   // swaps renderer.render for the RenderPipeline's quad path (post/pipeline.ts).
   // Flag OFF mounts nothing and the direct path stays byte-identical.
-  const post =
-    renderer && EXPERIMENTAL_WORLD_POST
+  const post = renderer && physical?.pipeline
+    ? mountCityPostPipeline(THREE, {
+        renderer,
+        scene,
+        camera,
+        options: {},
+        physical: {
+          mrt: physical.mrt,
+          ssr: physical.ssr,
+          bloom: physical.bloom,
+          grade: physical.grade,
+          msaaDiscard: physical.msaaDiscard,
+          settings: {
+            look: PHYSICAL_PRESETS[rig?.preset ?? DEFAULT_PHYSICAL_PRESET].grade,
+            ssr: physicalTier.ssr,
+            bloomResolutionScale: physicalTier.bloomResolutionScale,
+          },
+        },
+      })
+    : renderer && EXPERIMENTAL_WORLD_POST && physical === null
       ? mountCityPostPipeline(THREE, {
           renderer,
           scene,
@@ -128,14 +226,16 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
   // update clock and steps the drawing buffer through the pixel ratio.
   // It cannot fix the UI-thread/Rive ceiling — GPU-side gains are
   // reported separately on device (perf/render-scale.ts header).
-  // The vd lane implies the controller: without it the Duo measured
-  // ~16 fps (2026-10-18) — unplayable. An explicit
-  // EXPO_PUBLIC_WORLD_RENDER_SCALE=0 still turns it off.
+  // The vd lane implies the controller on the direct path: without it the
+  // Duo measured ~16 fps (2026-10-18) — unplayable. Under the physical stack
+  // the pipeline sizes its own targets, so the vd lane leaves the physical
+  // path's scale as it was. An explicit EXPO_PUBLIC_WORLD_RENDER_SCALE=0
+  // still turns it off.
   const renderScaleEnv = process.env.EXPO_PUBLIC_WORLD_RENDER_SCALE;
   const renderScaleOff =
     renderScaleEnv != null && renderScaleEnv.trim() !== '' && !parseSkyRigFlag(renderScaleEnv);
   const renderScale =
-    renderer && !renderScaleOff && (EXPERIMENTAL_WORLD_RENDER_SCALE || VD_LANE)
+    renderer && !renderScaleOff && (EXPERIMENTAL_WORLD_RENDER_SCALE || (VD_LANE && physical === null))
       ? mountRenderScale(renderer, (bundle ?? tierBundle(WORLD_TIER)).scale)
       : null;
   // Last consumed thermalSignal sample — the monitor (perf/thermal.ts,
@@ -168,10 +268,38 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
     }
   } catch (error) {
     post?.dispose();
+    rig?.dispose();
     for (const actor of actors) actor.dispose();
     world.dispose();
     throw error;
   }
+
+  if (rigModule && physical && physical.sunShadow > 0) rigModule.applyPhysicalShadowRoles(scene);
+  // Ground-layer polygon offsets point toward the camera only on a standard depth buffer (world/reversed-depth-offset.ts).
+  applyReversedDepthOffsets(scene, renderer as { reversedDepthBuffer?: boolean } | null | undefined);
+  // After the actors joined, so their instanced meshes are swapped too.
+  const storageSwapped = rigModule && renderer && physical?.storage ? rigModule.swapInstanceMatricesToStorage(THREE, renderer, scene) : 0;
+  let probeCleanup: (() => void) | void = undefined;
+  if (renderer && isDeviceLaneProbe(WORLD_PROBE)) {
+    probeCleanup = deviceLaneProbeHooks[WORLD_PROBE]?.({ THREE, renderer, scene, camera });
+  }
+  if (WORLD_PROBE !== null) {
+    console.info(`${PROBE_LOG} active`, {
+      probe: WORLD_PROBE,
+      tier: WORLD_TIER,
+      features: physical,
+      shadowTile: rig?.shadowTile ?? null,
+      storageSwapped,
+      postWired: post?.physical?.applied ?? null,
+      deviceLaneHook: isDeviceLaneProbe(WORLD_PROBE) ? deviceLaneProbeHooks[WORLD_PROBE] !== undefined : null,
+    });
+  }
+  // Probe cadence: the gap between scene updates is the draw cadence on this
+  // runtime, and cpuMs is update() alone (JS work, not GPU time). The
+  // render/present split comes from EXPO_PUBLIC_GAME_PERF on either runtime.
+  const probeWindow = WORLD_PROBE !== null ? new FrameSampleWindow() : null;
+  const probeSample = { cpuMs: 0, intervalMs: null as number | null };
+  let probeLast = 0;
 
   // Per-frame scratch: the pose, the actor frame and the camera write into
   // preallocated objects, so the update loop allocates nothing.
@@ -205,11 +333,19 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
   let lastActorTick = 0;
   let moving = false;
   let disposed = false;
+  // Opt-in (EXPO_PUBLIC_WORLD_RELEASE_UPLOADED=1; off by default since the
+  // iPad's START failed with it on, world/release-uploaded.ts): static world
+  // geometry and data-texture pixels leave the CPU once the GPU has held them
+  // for RELEASE_SETTLE_FRAMES frames. Each update checks what earlier frames
+  // uploaded; once nothing is pending the check costs nothing.
+  const releaser = renderer && RELEASE_UPLOADED ? createUploadedReleaser(world.group) : null;
+  const uploaded = renderer && releaser ? backendUploaded(renderer) : null;
   return {
     scene,
     camera,
     update: (frame, params) => {
       if (params.dataset !== initial.dataset) throw new Error('Remount city scene when changing datasets');
+      if (releaser && uploaded && releaser.pending > 0) releaser.release(uploaded);
       const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
       // Frame pacing for the scale controller: the interval between these
       // calls is the draw cadence — JS submission pacing, not GPU or UI
@@ -244,15 +380,49 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
         actorFrame.reducedMotion = frame.reducedMotion === true;
         let anyMoving = false;
         for (const actor of actors) if (actor.update(actorFrame)) anyMoving = true;
+        world.updateFacelift(actorTime, actorFrame.reducedMotion);
         moving = anyMoving;
       }
       // After the actors: a chase camera reads the Caller's position in this frame's params.
       positionCamera(params.camera);
+      if (rig) {
+        rig.update(camera.position.y, params.camera.x, params.camera.z);
+        const preset = params.preset ?? DEFAULT_PHYSICAL_PRESET;
+        if (preset !== rig.preset) {
+          // The rebake renders PMREM cube faces through renderer.render, which
+          // the post mount has pointed at the pipeline; run it on the direct path.
+          if (post) post.withDirectRender(() => rig.applyPreset(preset));
+          else rig.applyPreset(preset);
+          post?.physical?.applyLook(PHYSICAL_PRESETS[preset].grade);
+          invalidate?.();
+        }
+        // Night light follows the camera and the preset's interior glow (world/physical/night-lights.ts).
+        const fx = pose.target[0] - pose.position[0];
+        const fz = pose.target[2] - pose.position[2];
+        const fl = Math.hypot(fx, fz) || 1;
+        world.updateNightLights(
+          camera.position.x, camera.position.y, camera.position.z, fx / fl, fz / fl, rig.uniforms.uInteriorGlow.value,
+        );
+      }
       // Precipitation animates on the shader clock — while rain or snow is
       // live the loop must keep drawing, or the on-demand canvas freezes
       // the weather with the world.
       const precip = world.weather;
       if (moving || (precip !== null && Math.max(precip.wet.value, precip.snow.value) > 0.01)) invalidate?.();
+      if (probeWindow) {
+        const end = typeof performance !== 'undefined' ? performance.now() : Date.now();
+        probeSample.cpuMs = end - now;
+        probeSample.intervalMs = probeLast > 0 ? now - probeLast : null;
+        probeLast = now;
+        const summary = probeWindow.push(probeSample);
+        if (summary) {
+          console.info(`${PROBE_LOG} ${WORLD_PROBE} scene cadence`, {
+            ...summary,
+            drawCalls: renderer?.info.render.drawCalls ?? null,
+            triangles: renderer?.info.render.triangles ?? null,
+          });
+        }
+      }
     },
     resize: (width, height) => {
       if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return;
@@ -264,8 +434,13 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
     dispose: () => {
       if (disposed) return;
       disposed = true;
+      // First, while every instanced mesh is still in the scene: their storage
+      // instance matrices are freed by nothing else (physical-rig.ts).
+      if (rigModule && renderer && storageSwapped > 0) rigModule.releaseStorageInstanceMatrices(renderer, scene);
       renderScale?.dispose();
+      probeCleanup?.();
       post?.dispose();
+      rig?.dispose();
       for (const actor of actors) actor.dispose();
       world.dispose();
       scene.clear();
