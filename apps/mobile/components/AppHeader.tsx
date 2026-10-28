@@ -2,9 +2,7 @@ import { usePathname } from 'expo-router';
 import { BrandWordmark, SafeArea } from '@acme/ui';
 import { Header } from '@acme/ui/primitives';
 import { Text } from '@acme/ui/tw';
-import { useProfile } from '@acme/app';
 import { useRouter } from 'expo-router';
-import { Avatar } from '@acme/ui';
 import { Pressable, View } from '@acme/ui/tw';
 import { Bell } from '@acme/ui/icons';
 
@@ -33,7 +31,6 @@ export function AppHeader() {
   const pathname = usePathname() ?? '/';
   // The menu button lives in the shell (the rail's foot or the phone bar), not here.
   const router = useRouter();
-  const profileName = useProfile((state) => state.name);
 
   return (
     <SafeArea edges={['top']} className="bg-ink-950">
@@ -61,13 +58,6 @@ export function AppHeader() {
           <View className="absolute right-2 top-2 h-2 w-2 rounded-full bg-danger" />
         </Pressable>
 
-        <Pressable
-          aria-label="Profile"
-          onPress={() => router.push('/profile')}
-          className="rounded-none"
-        >
-          <Avatar name={profileName} />
-        </Pressable>
       </Header>
     </SafeArea>
   );

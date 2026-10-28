@@ -111,7 +111,7 @@ export function ShellAvatar({ onPress }: { onPress: () => void }) {
   return (
     <Pressable aria-label={`${name || 'Caller'}, profile`} onPress={onPress} className="self-center">
       {/* Same 56pt box as the menu button under it. */}
-      <Avatar name={name} className="h-14 w-14" />
+      <Avatar name={name} size="rail" />
     </Pressable>
   );
 }

@@ -17,6 +17,8 @@ export const avatarTile = tv({
     size: {
       sm: { root: 'h-8 w-8', initials: 'text-[11px]', bracket: 'h-2 w-2' },
       md: { root: 'h-11 w-11', initials: 'text-sm', bracket: 'h-2.5 w-2.5' },
+      /** The navigation rail's 56pt cell, the same box as its menu button. */
+      rail: { root: 'h-14 w-14', initials: 'text-base', bracket: 'h-3 w-3' },
       lg: { root: 'h-16 w-16', initials: 'text-xl', bracket: 'h-3.5 w-3.5' },
       xl: { root: 'h-24 w-24', initials: 'text-3xl', bracket: 'h-5 w-5' },
     },
