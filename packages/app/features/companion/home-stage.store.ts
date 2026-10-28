@@ -65,6 +65,22 @@ interface HomeStageState extends HomeStageEntry {
   readonly glassFailed: boolean;
   /** The route screen on the persistent 3D H-Lynk now, or null (the stage shows the Baby and its name). */
   readonly glass: GlassRoute | null;
+  /** The route's companion pane on tablet-class windows (GlassStage `companion`), or null. */
+  readonly companion: { readonly owner: string; readonly node: ReactNode } | null;
+  /**
+   * The device's box inside the stage host while a companion pane shares it,
+   * host-local pt; null when the device has the whole host. Overlays that
+   * belong to the device (M09's name field) sit inside it.
+   */
+  readonly stageFrame: StageFrame | null;
+}
+
+/** A box inside the stage host, pt from its top-left. */
+export interface StageFrame {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
 }
 
 const EMPTY: HomeStageState = {
@@ -74,6 +90,8 @@ const EMPTY: HomeStageState = {
   immersive: false,
   glassFailed: false,
   glass: null,
+  companion: null,
+  stageFrame: null,
   chrome: undefined,
   screen: undefined,
   leading: undefined,
@@ -91,6 +109,23 @@ export function publishGlass(route: GlassRoute): void {
 /** The route left: the stage keeps running and shows the Baby until the next route publishes. */
 export function clearGlass(owner: string): void {
   if (useHomeStageStore.getState().glass?.owner === owner) useHomeStageStore.setState({ glass: null });
+}
+
+/** A route's companion pane, republished on every render of the route (the stage host re-renders, the route does not). */
+export function publishCompanion(owner: string, node: ReactNode): void {
+  useHomeStageStore.setState({ companion: { owner, node } });
+}
+
+export function clearCompanion(owner: string): void {
+  if (useHomeStageStore.getState().companion?.owner === owner) useHomeStageStore.setState({ companion: null });
+}
+
+/** The stage host reports where the device sits; skipped when nothing moved. */
+export function setStageFrame(frame: StageFrame | null): void {
+  const prev = useHomeStageStore.getState().stageFrame;
+  const same = prev === frame || (prev !== null && frame !== null
+    && prev.x === frame.x && prev.y === frame.y && prev.width === frame.width && prev.height === frame.height);
+  if (!same) useHomeStageStore.setState({ stageFrame: frame });
 }
 
 export function setGlassFailed(): void {

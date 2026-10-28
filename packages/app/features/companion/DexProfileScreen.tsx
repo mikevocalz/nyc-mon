@@ -14,6 +14,7 @@ import { useMonStore } from '../mon/mon.store';
 import { companionCopy } from './copy';
 import { GlassStage, useGlassOn, useGlassScreen, useMonGlass } from './glass';
 import { useHomeStage } from './home-stage.store';
+import { CompanionPane } from './CompanionPane';
 import { dexNumber, monIdentity } from './mon-identity';
 
 /** Chain nodes from the Egg down to `speciesId`, or empty when the species is not in the chain. */
@@ -69,6 +70,46 @@ function Fact({ label, value, testID }: { label: string; value: string; testID: 
 }
 
 /**
+ * The Dex facts for one Mon: number, form, Bloodline, life stages, then name,
+ * hatch date and Caller. The 2D entry shows them under the portrait; on the
+ * 3D H-Lynk they are the companion pane on tablet-class windows.
+ */
+function DexFacts({ mon, callerName }: { mon: MonInstance; callerName: string | null }) {
+  const who = monIdentity(mon);
+  const hatched = new Intl.DateTimeFormat(undefined, { dateStyle: 'long' }).format(new Date(mon.hatchedAt));
+  return (
+    <View className="gap-6">
+      <View className="gap-2">
+        {who.dexId !== null ? (
+          <View accessible accessibilityLabel={companionCopy('m17.dex.a11y', { dexSpoken: who.dexId })}>
+            <SignagePlate testID="m17-dex" text={companionCopy('m17.dex', { dex: dexNumber(who.dexId) })} accessibilityLabel={companionCopy('m17.dex.a11y', { dexSpoken: who.dexId })} />
+          </View>
+        ) : null}
+        {who.formName !== null ? (
+          <SignagePlate testID="m17-form" text={who.formName} accessibilityLabel={who.formName} />
+        ) : null}
+        {who.bloodlineName !== null ? (
+          <Text testID="m17-bloodline" className="text-xr-label text-text">
+            {companionCopy('m17.bloodline', { bloodlineName: who.bloodlineName })}
+          </Text>
+        ) : null}
+      </View>
+      <LifecycleTrack
+        testID="m17-life"
+        slots={slotsFor(mon)}
+        accessibilityLabel={companionCopy('m17.life.a11y')}
+        stateWords={{ done: 'done', current: 'now', later: companionCopy('m17.life.later.a11y') }}
+      />
+      <View className="md:portrait:flex-row md:portrait:flex-wrap">
+        <Fact testID="m17-fact-name" label={companionCopy('m17.fact.name')} value={who.name} />
+        <Fact testID="m17-fact-hatched" label={companionCopy('m17.fact.hatched')} value={hatched} />
+        {callerName !== null ? <Fact testID="m17-fact-caller" label={companionCopy('m17.fact.caller')} value={callerName} /> : null}
+      </View>
+    </View>
+    );
+}
+
+/**
  * M17 Dex entry for one of the Caller's Mons (Decision #18: any Mon, not
  * only the active one). Shell: none. Bond, likes and the culture note are not
  * rendered until Q26, Q24 and Q12/Q13 are answered, and photo mode stays
@@ -119,7 +160,7 @@ export function DexProfileScreen() {
   const onFailed = useCallback(() => ui.setState({ failed: true }), [ui]);
   useHomeStage(glassOn ? {} : {});
 
-  if (glassOn && who0 !== undefined) {
+  if (glassOn && who0 !== undefined && mon !== undefined) {
     return (
       <GlassStage
         screen={glass.screen}
@@ -127,6 +168,11 @@ export function DexProfileScreen() {
         testIDPrefix="m17"
         onKey={onKey}
         onFailed={onFailed}
+        companion={
+          <CompanionPane title={companionCopy('pane.dex.title', { name: who0.name })} testID="m17-pane">
+            <DexFacts mon={mon} callerName={caller?.callerName ?? null} />
+          </CompanionPane>
+        }
         a11y={
           <>
             <Text accessibilityRole="header">{who0.name}</Text>
@@ -156,7 +202,6 @@ export function DexProfileScreen() {
   }
 
   const who = monIdentity(mon);
-  const hatched = new Intl.DateTimeFormat(undefined, { dateStyle: 'long' }).format(new Date(mon.hatchedAt));
   const portrait = who.art ? (
     <View testID="m17-portrait" className="w-full" style={{ aspectRatio: 4 / 5 }}>
       <Image src={who.art.source as ImageProps['src']} alt={who.art.alt} fill unoptimized className="h-full w-full" />
@@ -165,36 +210,7 @@ export function DexProfileScreen() {
     <View testID="m17-portrait" className="w-full bg-surface-raised" style={{ aspectRatio: 4 / 5 }} />
   );
 
-  const text = (
-    <View className="gap-6">
-      <View className="gap-2">
-        {who.dexId !== null ? (
-          <View accessible accessibilityLabel={companionCopy('m17.dex.a11y', { dexSpoken: who.dexId })}>
-            <SignagePlate testID="m17-dex" text={companionCopy('m17.dex', { dex: dexNumber(who.dexId) })} accessibilityLabel={companionCopy('m17.dex.a11y', { dexSpoken: who.dexId })} />
-          </View>
-        ) : null}
-        {who.formName !== null ? (
-          <SignagePlate testID="m17-form" text={who.formName} accessibilityLabel={who.formName} />
-        ) : null}
-        {who.bloodlineName !== null ? (
-          <Text testID="m17-bloodline" className="text-xr-label text-text">
-            {companionCopy('m17.bloodline', { bloodlineName: who.bloodlineName })}
-          </Text>
-        ) : null}
-      </View>
-      <LifecycleTrack
-        testID="m17-life"
-        slots={slotsFor(mon)}
-        accessibilityLabel={companionCopy('m17.life.a11y')}
-        stateWords={{ done: 'done', current: 'now', later: companionCopy('m17.life.later.a11y') }}
-      />
-      <View className="md:portrait:flex-row md:portrait:flex-wrap">
-        <Fact testID="m17-fact-name" label={companionCopy('m17.fact.name')} value={who.name} />
-        <Fact testID="m17-fact-hatched" label={companionCopy('m17.fact.hatched')} value={hatched} />
-        {caller != null ? <Fact testID="m17-fact-caller" label={companionCopy('m17.fact.caller')} value={caller.callerName} /> : null}
-      </View>
-    </View>
-  );
+  const text = <DexFacts mon={mon} callerName={caller?.callerName ?? null} />;
 
   const heading = <Heading level={1} className="text-xr-title">{who.name}</Heading>;
   return (

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, type ReactNode } from 'react';
 import { useRouter } from 'expo-router';
 import type { JournalEntry } from '@acme/core/types';
 import {
-  Badge, DaysCalendar, Heading, SafeArea, VirtualList, monthOf, shiftMonth, useInstanceStore,
+  Badge, Button, DaysCalendar, Heading, SafeArea, VirtualList, monthOf, shiftMonth, useInstanceStore,
   useReducedMotion, useStore, type DeviceKey, type GlassLine, type GlassView, type YearMonth,
 } from '@acme/ui';
 import { Pressable, ScrollView, Text, View } from '@acme/ui/tw';
@@ -12,6 +12,7 @@ import { localDayKey, selectActiveMon, selectDaysTogether, selectJournal, useMon
 import { companionCopy } from './copy';
 import { GlassStage, useGlassOn, useGlassScreen, useMonGlass } from './glass';
 import { useHomeStage } from './home-stage.store';
+import { CompanionPane } from './CompanionPane';
 import { groupJournalByDay, journalDays, journalEntryCopyId, showsFirstBadge, type DayHeading } from './journal-model';
 import { useMinuteClock } from './minute-clock';
 import { monIdentity } from './mon-identity';
@@ -84,7 +85,9 @@ export function JournalScreen() {
   const glassOn = useGlassOn(failed) && mon !== undefined;
   const { model, monClips } = useMonGlass(mon === undefined ? null : monIdentity(mon).dexId, undefined);
   const glassName = mon === undefined ? '' : monIdentity(mon).name;
-  const rows: GlassLine[] = groups.flatMap((g) => [
+  // The pane's calendar narrows the glass timeline to one day, as it does the 2D list.
+  const glassGroups = selected === undefined ? groups : groups.filter((g) => g.iso === selected);
+  const rows: GlassLine[] = glassGroups.flatMap((g) => [
     { text: headingText(g.heading), size: 'caption' as const, tone: 'dim' as const, align: 'left' as const },
     ...g.entries.map((entry): GlassLine => ({
       text: companionCopy(journalEntryCopyId(entry), { name: glassName }),
@@ -123,6 +126,53 @@ export function JournalScreen() {
     else if (key === 'home') router.replace('/(home)');
   };
   const onFailed = useCallback(() => glassUi.setState({ failed: true }), [glassUi]);
+  const selectDay = (iso: string) => {
+    if (!days.has(iso)) return;
+    ui.setState({ selected: ui.getState().selected === iso ? undefined : iso });
+    glassUi.setState({ page: 0 });
+  };
+  const calendarLabels = {
+    together: companionCopy('m18.cal.day.together', { date: '' }).replace(/^,\s*/, ''),
+    previousMonth: companionCopy('m18.cal.prev'),
+    nextMonth: companionCopy('m18.cal.next'),
+  };
+  const selectedLabel = selected === undefined
+    ? null
+    : new Intl.DateTimeFormat(undefined, { dateStyle: 'long' }).format(new Date(`${selected}T12:00:00`));
+  const companion = mon === undefined ? undefined : (
+    <CompanionPane
+      title={companionCopy('pane.journal.title')}
+      testID="m18-pane"
+      empty={entries.length === 0 ? { title: companionCopy('pane.home.recent.empty.title'), description: companionCopy('pane.home.recent.empty.body', { name: glassName }) } : null}
+    >
+      <Text testID="m18-pane-days" className="text-xr-body text-text-muted">{glassView.status?.text ?? ''}</Text>
+      <DaysCalendar
+        testID="m18-pane-calendar"
+        month={month}
+        daysTogether={days}
+        today={today}
+        selected={selected}
+        onSelectDay={selectDay}
+        onMonthChange={(direction) => ui.setState({ month: shiftMonth(ui.getState().month, direction) })}
+        minMonth={monthOf(localDayKey(mon.hatchedAt))}
+        reducedMotion={reducedMotion}
+        labels={calendarLabels}
+      />
+      {selectedLabel === null ? null : (
+        <View className="gap-2" testID="m18-pane-filter">
+          <Text accessibilityLiveRegion="polite" className="text-xr-body text-text">{companionCopy('pane.journal.filtered', { date: selectedLabel })}</Text>
+          <Button
+            variant="outline"
+            size="lg"
+            fullWidth
+            title={companionCopy('pane.journal.all')}
+            onPress={() => { ui.setState({ selected: undefined }); glassUi.setState({ page: 0 }); }}
+            className="min-h-target"
+          />
+        </View>
+      )}
+    </CompanionPane>
+  );
   useHomeStage(glassOn ? {} : {});
   if (glassOn) {
     return (
@@ -132,6 +182,7 @@ export function JournalScreen() {
         testIDPrefix="m18"
         onKey={onKey}
         onFailed={onFailed}
+        companion={companion}
         a11y={
           <View testID="m18-timeline" accessibilityLabel={companionCopy('m18.timeline.a11y')}>
             <Text testID="m18-heading" accessibilityRole="header">{glassView.title}</Text>

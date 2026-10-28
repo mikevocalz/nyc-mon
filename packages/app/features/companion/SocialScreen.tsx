@@ -17,6 +17,7 @@ import { careLed, useCareNow } from './care-shared';
 import { companionCopy as c, type CompanionCopyId } from './copy';
 import { GlassStage, glassControls, glassRing, useGlassOn, useGlassScreen, useMonGlass } from './glass';
 import { useHomeStage } from './home-stage.store';
+import { CareHistoryPane } from './pane-content';
 import { settlePeekPlay } from './peek-session';
 import { tickMinuteClock } from './minute-clock';
 
@@ -360,6 +361,12 @@ export function SocialScreen() {
   });
 
   if (!glassOn) return null;
+  const paneTips = [
+    c('pane.social.tip.how', { name }),
+    c('pane.social.tip.social'),
+    ...(canPlay ? [] : [c('pane.social.tip.tired', { name })]),
+  ];
+
   return (
     <GlassStage
       screen={glass.screen}
@@ -367,6 +374,7 @@ export function SocialScreen() {
       testIDPrefix="m16"
       onKey={onKey}
       onFailed={onFailed}
+      companion={<CareHistoryPane route="social" tips={paneTips} loading={care === undefined} />}
       a11y={
         <>
           <Text accessibilityRole="header">{c('m16.intro.title', { name })}</Text>

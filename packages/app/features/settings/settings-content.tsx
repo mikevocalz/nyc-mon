@@ -21,21 +21,10 @@ import { THEME_OPTIONS } from './theme-options.ts';
 /** The game-control settings route (apps/mobile/app/(drawer)/game-controls.tsx). */
 const GAME_CONTROLS_PATH = '/game-controls';
 
-/** Layout classes a parent grid hands each settings card (on its FadeIn). */
+/** Layout classes a parent hands a settings card (on its FadeIn). */
 interface CellProps {
   className?: string;
 }
-
-/**
- * The native tablet portrait grid: below md a plain `gap-6` column (the
- * phone layout, unchanged); from md the cards pair into two columns. RN has
- * no CSS grid, so it is a wrapping row with half-width cells whose padding
- * makes the gutter, and a negative margin that cancels it at the edges.
- */
-export const SETTINGS_GRID = 'gap-6 md:-mx-3 md:flex-row md:flex-wrap md:gap-x-0 md:gap-y-10 lg:gap-y-12';
-const GRID_CELL = 'md:w-1/2 md:px-3';
-/** Long cards (the credits list, the session actions) span both columns. */
-const GRID_CELL_WIDE = 'md:w-full md:px-3';
 
 // Decision (2026-10-15, STRIKE on web): the Game tab never mounts on web
 // (GameScreen.tsx), so the row that opens its controls is native only; a
@@ -143,12 +132,15 @@ function SessionCard({ className }: CellProps) {
       <Card className="gap-3">
         <View className="gap-1">
           <Text variant="heading">Session</Text>
-          <Text variant="caption" tone="muted">Sign out on this device only.</Text>
+          <Text variant="caption" tone="muted">{copy('settings.sign_out.caption')}</Text>
         </View>
         {failed ? <ErrorMessage message={copy('settings.sign_out.error')} /> : null}
+        {/* STRUCK 2026-10-28: "Delete account" (onPress did nothing, so a
+            danger button that looked destructive and was not). It returns
+            with a real deletion flow, which App Store review 5.1.1(v)
+            requires for accounts made in the app. */}
         <View className="flex-row gap-3">
-          <Button title="Sign out" variant="outline" loading={pending} disabled={pending} onPress={() => void signOut()} />
-          <Button title="Delete account" variant="danger" onPress={() => {}} />
+          <Button title={copy('settings.sign_out.label')} variant="outline" loading={pending} disabled={pending} onPress={() => void signOut()} />
         </View>
       </Card>
     </FadeIn>
@@ -169,15 +161,13 @@ export function SettingsHeader() {
 
 /**
  * The cards that tune the app on this device: Preferences, Appearance,
- * Graphics and Game. Siblings, so they drop into a `gap-*` column or, with
- * `grid`, into {@linkcode SETTINGS_GRID}.
+ * Graphics and Game. Siblings, so they drop into any `gap-*` column.
  */
-export function SettingsDeviceCards({ grid = false }: { grid?: boolean }) {
+export function SettingsDeviceCards() {
   const p = useProfile();
-  const cell = grid ? GRID_CELL : undefined;
   return (
     <>
-      <FadeIn delay={80} className={cell}>
+      <FadeIn delay={80}>
         <Card className="gap-4">
           <View className="gap-1">
             <Text variant="heading">Preferences</Text>
@@ -189,7 +179,7 @@ export function SettingsDeviceCards({ grid = false }: { grid?: boolean }) {
         </Card>
       </FadeIn>
 
-      <FadeIn delay={140} className={cell}>
+      <FadeIn delay={140}>
         <Card className="gap-4">
           <View className="gap-1">
             <Text variant="heading">Appearance</Text>
@@ -199,9 +189,9 @@ export function SettingsDeviceCards({ grid = false }: { grid?: boolean }) {
         </Card>
       </FadeIn>
 
-      <GraphicsCard className={cell} />
+      <GraphicsCard />
 
-      <GameControlsRow className={cell} />
+      <GameControlsRow />
     </>
   );
 }
@@ -210,14 +200,13 @@ export function SettingsDeviceCards({ grid = false }: { grid?: boolean }) {
  * The account cards: the Amazon link (web), Legal & credits and Session.
  * Same sibling contract as {@linkcode SettingsDeviceCards}.
  */
-export function SettingsAccountCards({ grid = false }: { grid?: boolean }) {
-  const wide = grid ? GRID_CELL_WIDE : undefined;
+export function SettingsAccountCards() {
   return (
     <>
-      <CallerNameCard className={grid ? GRID_CELL : undefined} />
-      <AmazonAccountLink className={grid ? GRID_CELL : undefined} />
+      <CallerNameCard />
+      <AmazonAccountLink />
 
-      <FadeIn delay={220} className={wide}>
+      <FadeIn delay={220}>
         <Card className="gap-3">
           <View className="gap-1">
             <Text variant="heading">Legal &amp; credits</Text>
@@ -283,7 +272,7 @@ export function SettingsAccountCards({ grid = false }: { grid?: boolean }) {
         </Card>
       </FadeIn>
 
-      <SessionCard className={wide} />
+      <SessionCard />
     </>
   );
 }

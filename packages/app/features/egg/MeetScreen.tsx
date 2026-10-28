@@ -41,6 +41,8 @@ import { copy as onboardingCopy } from '../onboarding/copy';
 import { readConsentRequested } from '../onboarding/onboarding.store';
 import { schemeForTime } from '../onboarding/time-scheme';
 import { useTextRamp } from './use-text-ramp';
+import { CompanionPane } from '../companion/CompanionPane';
+import { CompanionStageHost, useTabletClass } from '../companion/CompanionStageHost';
 import { eggCopy } from './copy';
 import { EggStill } from './EggStill';
 import { eggGlowTint, eggModelSource } from './egg-source';
@@ -116,6 +118,7 @@ export function MeetScreen() {
     stageReady: createStageReady(),
   }));
   const { phase, focused, holding, loaded, scheme, stage3d, stageReady } = useStore(store);
+  const tablet = useTabletClass();
 
   // Re-entry guard (handoff § States "already chosen"): on mount and on focus.
   useFocusEffect(
@@ -408,8 +411,11 @@ export function MeetScreen() {
     return (
       <View className="flex-1 bg-ink-950" testID="m08-3d">
         <SafeArea className="flex-1" edges={['top', 'bottom', 'left', 'right']}>
-          {/* The stage fills the screen in portrait and landscape; the camera keeps the whole unit in frame. */}
-          <View className="relative min-h-0 flex-1">
+          {/* Phones: the stage fills the screen. Tablets: the egg's facts beside or under the device. */}
+          <CompanionStageHost
+            enabled={tablet.companion}
+            pane={<MeetPane egg={phase === 'browsing' ? undefined : egg} />}
+            device={<>
             {/* Visually hidden from the first frame: the radio group screen readers and keyboards use. */}
             <View className="absolute inset-0 opacity-0" pointerEvents="none" testID="m08-triptych-a11y">
               <ChoiceTriptych
@@ -438,6 +444,7 @@ export function MeetScreen() {
                 label={titleText}
                 className="h-full"
                 stageClassName="min-h-0 w-full flex-1"
+                glassScale={tablet.glassScale}
                 onKey={onStageKey}
                 onReady={onStageReady}
                 onBackendChange={onStageBackend}
@@ -447,7 +454,8 @@ export function MeetScreen() {
               <StageReadyGate resource={stageReady} />
             </Suspense>
             <StageControls controls={controls} testID="m08-stage-controls" />
-          </View>
+            </>}
+          />
         </SafeArea>
       </View>
     );
@@ -547,4 +555,34 @@ function meetPanel(state: MeetState, views: readonly EggView[], hint: string): C
     body: eggCopy('m08.card.body'),
     actions: [{ target: 'choose', label: eggCopy('m08.cta.choose', { eggName: at.eggName }), tone: 'primary' }],
   };
+}
+
+/**
+ * M08's companion pane on tablets: the focused egg's name, number and
+ * Bloodline, the only canon-settled facts before the hatch (08-handoff P3;
+ * culture notes are not authored yet). Nothing focused: how to pick one.
+ */
+function MeetPane({ egg }: { egg: EggView | undefined }) {
+  return (
+    <CompanionPane
+      title={egg?.eggName ?? eggCopy('pane.meet.title')}
+      testID="m08-pane"
+      empty={egg === undefined ? { title: eggCopy('pane.meet.empty.title'), description: eggCopy('pane.meet.empty.body') } : null}
+    >
+      {egg === undefined ? null : (
+        <View className="gap-3" testID="m08-pane-facts">
+          <View accessible accessibilityLabel={`${eggCopy('pane.meet.number')}, ${eggCopy('m08.card.number.a11y', { dexId: egg.dexId })}`} className="min-h-target justify-center gap-1 border-b border-border py-2">
+            <Text className="text-xr-caption text-text-muted">{eggCopy('pane.meet.number')}</Text>
+            <Text className="text-xr-body text-text" style={{ fontVariant: ['tabular-nums'] }}>{eggCopy('m08.card.number', { dexNumber: egg.dexNumber })}</Text>
+          </View>
+          <View accessible accessibilityLabel={`${eggCopy('pane.meet.bloodline')}, ${egg.bloodline}`} className="min-h-target justify-center gap-1 border-b border-border py-2">
+            <Text className="text-xr-caption text-text-muted">{eggCopy('pane.meet.bloodline')}</Text>
+            <Text className="text-xr-body text-text">{eggCopy('m08.card.bloodline', { bloodline: egg.bloodline })}</Text>
+          </View>
+          <Text className="text-xr-body text-text">{eggCopy('m08.card.body')}</Text>
+          <Text className="text-xr-body text-text-muted">{eggCopy('m08.santoro.caption')}</Text>
+        </View>
+      )}
+    </CompanionPane>
+  );
 }

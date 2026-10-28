@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'expo-router';
 import type { MonInstance } from '@acme/core/types';
 import {
-  Button, CareMeterRing, CareMeterRingGroup, HLYNK_COPY, StatusRow, useInstanceStore, useReducedMotion, useStore,
+  Badge, Button, CareMeterRing, EmptyState, CareMeterRingGroup, HLYNK_COPY, StatusRow, useInstanceStore, useReducedMotion, useStore,
   type DeviceKey, type GlassAction, type GlassView,
 } from '@acme/ui';
 import { Pressable, Text, View } from '@acme/ui/tw';
@@ -15,8 +15,12 @@ import { NEED_RING, askRoute, homeStatus, isLow } from './home-model';
 import { GlassStage, glassRing, useGlassOn, useGlassScreen, useMonGlass } from './glass';
 import { setHomeMenuOpen, useHomeStage, useHomeStageStore } from './home-stage.store';
 import { useMinuteClock } from './minute-clock';
+import { CompanionPane } from './CompanionPane';
+import { JournalRows, PaneSection, useActiveJournal } from './pane-content';
 
 const NEEDS = ['energy', 'fullness', 'social'] as const;
+/** How many journal moments the Home pane lists before pointing to the Journal. */
+const RECENT = 5;
 /** The bar's four buttons in one row; the menu reuses the same row. */
 const LAYOUT = { model: 'large', rings: true, lineRows: 0, actionRows: 1, perRow: 4 } as const;
 
@@ -168,6 +172,52 @@ export function HomeScreen({ mon }: { mon: MonInstance }) {
   };
   const onFailed = useCallback(() => local.setState({ failed: true }), [local]);
 
+  // ---- the companion pane (tablet / open foldable): care summary, then recent moments ----
+  const journal = useActiveJournal();
+  const recent = journal.entries.slice(0, RECENT);
+  const companion = (
+    <CompanionPane
+      title={companionCopy('pane.home.title', { name })}
+      testID="m13-pane"
+      loading={care === undefined}
+    >
+      <View className="gap-2" testID="m13-pane-care">
+        <PaneSection title={companionCopy('pane.home.care', { name })} />
+        {status ? <Text className="text-xr-body text-text" testID="m13-pane-status">{status.text}</Text> : null}
+        {care === undefined ? null : NEEDS.map((need) => {
+          const meter = companionCopy(NEED_RING[need]);
+          const percent = Math.round(care[need] * 100);
+          const low = isLow(care[need]);
+          return (
+            <View
+              key={need}
+              accessible
+              accessibilityLabel={`${companionCopy('pane.home.meter', { meter, percent })}${low ? `, ${companionCopy('m13.ring.low')}` : ''}`}
+              className="min-h-target flex-row items-center justify-between border-b border-border py-2"
+            >
+              <Text className="text-xr-body text-text">{companionCopy('pane.home.meter', { meter, percent })}</Text>
+              {low ? <Badge label={companionCopy('m13.ring.low')} size="sm" tone="accent" /> : null}
+            </View>
+          );
+        })}
+      </View>
+      <View className="gap-2" testID="m13-pane-recent">
+        <PaneSection title={companionCopy('pane.home.recent')} />
+        {recent.length === 0 ? (
+          <EmptyState
+            title={companionCopy('pane.home.recent.empty.title')}
+            description={companionCopy('pane.home.recent.empty.body', { name })}
+          />
+        ) : (
+          <JournalRows entries={recent} name={journal.name} testID="m13-pane-entry" />
+        )}
+        <View testID="m13-pane-journal">
+          <Button variant="outline" size="lg" fullWidth title={companionCopy('pane.home.journal')} onPress={() => router.push('/(home)/journal')} className="min-h-target" />
+        </View>
+      </View>
+    </CompanionPane>
+  );
+
   useHomeStage(glassOn ? {} : {
     chrome: {
       status: careLed(care),
@@ -231,6 +281,7 @@ export function HomeScreen({ mon }: { mon: MonInstance }) {
       testIDPrefix="m13"
       onKey={onKey}
       onFailed={onFailed}
+      companion={companion}
       a11y={
         <>
           <Text testID="m13-name" accessibilityRole="header">{name}</Text>

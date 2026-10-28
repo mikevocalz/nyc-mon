@@ -15,7 +15,8 @@ import { resolveBootPath } from '../onboarding/boot';
 import { defaultCallerNameFilter } from '../onboarding/caller-name-filter';
 import { markNicknamePromptSeen, needsNicknamePrompt } from '../onboarding/onboarding.store';
 import { GlassStage, useGlassOn, useGlassScreen, useMonGlass } from '../companion/glass';
-import { useHomeStage } from '../companion/home-stage.store';
+import { CompanionPane } from '../companion/CompanionPane';
+import { useHomeStage, useHomeStageStore } from '../companion/home-stage.store';
 import { tickMinuteClock, useMinuteClock } from '../companion/minute-clock';
 import { dexNumber, monIdentity } from '../companion/mon-identity';
 import { hatchCopy } from './copy';
@@ -279,6 +280,7 @@ export function NameScreen() {
     </View>
   );
 
+  const paned = useHomeStageStore((st) => st.stageFrame !== null);
   useHomeStage(glassOn ? {} : {
     chrome: {
       status: { led: 'off' },
@@ -315,6 +317,28 @@ export function NameScreen() {
   if (!glassOn || id === undefined) return null;
 
   const label = editing ? hatchCopy('m09.title', { formName }) : hatchCopy('m09.ask.title', { formName });
+  const nameForm = (
+    <View className="gap-3 bg-ink-950/90 px-4 pb-4 pt-3">
+      {field}
+      <View className="flex-row gap-target-gap">
+        <View className="flex-1">
+          <Button variant="outline" size="lg" fullWidth title={hatchCopy('m09.edit.cancel')} onPress={cancelEdit} className="min-h-target" />
+        </View>
+        <View className="flex-1">
+          <Button
+            variant="cta"
+            size="lg"
+            fullWidth
+            title={s.saveError ? hatchCopy('m09.save_error.retry') : hatchCopy('m09.cta')}
+            disabled={!canSubmit}
+            loading={s.saving}
+            onPress={submit}
+            className="min-h-target"
+          />
+        </View>
+      </View>
+    </View>
+  );
   return (
     <GlassStage
       screen={glass.screen}
@@ -344,28 +368,21 @@ export function NameScreen() {
           { key: 'yes', label: hatchCopy('m09.ask.yes'), hint: hatchCopy('m09.ask.yes.a11y.hint'), onPress: wantNickname, testID: 'm09-ask-yes' },
         ]}
       // Only while editing: the field (it can't be drawn on the glass) with its two actions beside it, under the device.
-      below={editing ? (
-        <View className="gap-3 bg-ink-950/90 px-4 pb-4 pt-3">
-          {field}
-          <View className="flex-row gap-target-gap">
-            <View className="flex-1">
-              <Button variant="outline" size="lg" fullWidth title={hatchCopy('m09.edit.cancel')} onPress={cancelEdit} className="min-h-target" />
+      // Only while editing: the field (it can't be drawn on the glass) with its two actions, under the device.
+      // With the companion pane beside the device the field sits in the pane instead.
+      below={editing && !paned ? nameForm : undefined}
+      companion={
+        <CompanionPane title={label} testID="m09-pane">
+          <Text testID="m09-pane-identity" className="text-xr-body text-text-muted" accessibilityLabel={hatchCopy('m09.identity.a11y', { dexId: id.dexId ?? '', formName, bloodline })}>{identityText}</Text>
+          {editing ? nameForm : (
+            <View className="gap-3">
+              <Text className="text-xr-body text-text">{hatchCopy('m09.ask.body', { formName })}</Text>
+              <Button variant="cta" size="lg" fullWidth title={hatchCopy('m09.ask.yes')} accessibilityHint={hatchCopy('m09.ask.yes.a11y.hint')} onPress={wantNickname} className="min-h-target" />
+              <Button variant="outline" size="lg" fullWidth title={hatchCopy('m09.ask.no')} accessibilityHint={hatchCopy('m09.ask.no.a11y.hint', { formName })} onPress={keepName} className="min-h-target" />
             </View>
-            <View className="flex-1">
-              <Button
-                variant="cta"
-                size="lg"
-                fullWidth
-                title={s.saveError ? hatchCopy('m09.save_error.retry') : hatchCopy('m09.cta')}
-                disabled={!canSubmit}
-                loading={s.saving}
-                onPress={submit}
-                className="min-h-target"
-              />
-            </View>
-          </View>
-        </View>
-      ) : undefined}
+          )}
+        </CompanionPane>
+      }
     />
   );
 }

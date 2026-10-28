@@ -13,6 +13,26 @@ export const MAX_TILT = (pageMotion.tilt.stage * Math.PI) / 180;
 /** Placement of the model in the scene: drop, scale, camera. Shared with the beam test. */
 export const STAGE = { baseY: -0.1, scale: 1.25, camera: { y: 0.12, z: 5.4, lookY: 0.05, fov: 30 } } as const;
 
+/**
+ * The authored frame: the stage aspect whose camera distance is exactly
+ * `STAGE.camera.z`. At or above it the frame is height-bound and the device
+ * fills the stage's height; below it the frame is width-bound and the camera
+ * backs off so the unit stays whole across the pane's width.
+ */
+export const FRAME_ASPECT = 0.75;
+
+/**
+ * Camera distance for a stage of `width / height` = `aspect`: the device fills
+ * the pane it is given on the binding axis, whatever the pane's shape (a
+ * phone column, a tablet's top band, one half of an open foldable). Same
+ * values as before for every aspect a phone stage reaches; the old floor at
+ * aspect 0.45 is gone, so a narrow split-screen pane no longer crops the sides.
+ */
+export function stageCameraZ(aspect: number): number {
+  const a = Number.isFinite(aspect) && aspect > 0 ? aspect : FRAME_ASPECT;
+  return a >= FRAME_ASPECT ? STAGE.camera.z : STAGE.camera.z * (FRAME_ASPECT / a);
+}
+
 /** Body size, body widths. */
 export const BODY = { W: 1, H: 1.78, D: 0.21 } as const;
 /** The two red emitters in the head, x centres and radius. The fan rises from between them. */

@@ -22,13 +22,20 @@ import { schemeForTime } from '../onboarding/time-scheme';
 import { setHomeMenuOpen, useHomeStage, useHomeStageStore } from '../companion/home-stage.store';
 import { useMinuteClock } from '../companion/minute-clock';
 import { eggIdentity } from '../companion/mon-identity';
+import { CompanionStageHost, useTabletClass } from '../companion/CompanionStageHost';
+import { eggCopy } from '../egg/copy';
 import { EggStill } from '../egg/EggStill';
+import { IncubationPane } from '../egg/IncubationPane';
 import { eggSpeciesModel } from '../egg/egg-source';
 import { StageControls } from '../egg/StageControls';
 import { StageLoader } from '../egg/StageLoader';
 import { isAccessibilityTextSize } from '../egg/window-layout';
 import { hatchCopy } from './copy';
 import { detailLine, incubationProgress, incubationView, minutesLeft, timeLine } from './incubation-model';
+
+/** The picked wait in words, for the incubation pane (M10's option labels). */
+const INCUBATION_A11Y = { 15: 'm10.option.15.a11y', 30: 'm10.option.30.a11y', 60: 'm10.option.60.a11y' } as const;
+const PANE_CLOCK = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
 
 /** One warm announcement per this window at most (M11 copy). */
 const WARM_ANNOUNCE_MS = 10_000;
@@ -109,6 +116,7 @@ export function IncubatingScreen({ pending }: { pending: PendingEgg }) {
     };
   });
   const s = useStore(local);
+  const tablet = useTabletClass();
 
   const view = incubationView(hatch, egg, nowMs, s.entryMs, s.readyLatched);
   const ready = view === 'ready' || view === 'overdue' || view === 'resume';
@@ -358,7 +366,23 @@ export function IncubatingScreen({ pending }: { pending: PendingEgg }) {
   return (
     <View className="flex-1 bg-ink-950" testID="m11-3d">
       <SafeArea className="flex-1" edges={['top', 'bottom', 'left', 'right']}>
-        <View className="relative min-h-0 flex-1">
+        <CompanionStageHost
+          enabled={tablet.companion}
+          pane={
+            <IncubationPane
+              testID="m11-pane"
+              reducedMotion={reducedMotion}
+              input={{
+                eggName: id.eggName,
+                stage: ready ? 'ready' : 'incubating',
+                duration: eggCopy(INCUBATION_A11Y[egg.incubationMinutes]),
+                startedAt: egg.createdAt,
+                readyAt: egg.incubationEndsAt,
+                clock: (ms) => PANE_CLOCK.format(new Date(ms)),
+              }}
+            />
+          }
+          device={<>
           {/* Visually hidden: what the glass says, for screen readers (the canvas is hidden from them). */}
           <View className="absolute left-0 top-0 h-px w-px overflow-hidden opacity-0" testID="m11-glass-a11y">
             <View testID="m11-status" accessible accessibilityLabel={status.label ?? ''}>
@@ -382,6 +406,7 @@ export function IncubatingScreen({ pending }: { pending: PendingEgg }) {
               label={eggLabel}
               className="h-full"
               stageClassName="min-h-0 w-full flex-1"
+              glassScale={tablet.glassScale}
               onKey={onStageKey}
               onReady={onStageReady}
               onBackendChange={onStageBackend}
@@ -410,7 +435,8 @@ export function IncubatingScreen({ pending }: { pending: PendingEgg }) {
               { key: 'back', label: HLYNK_COPY['hlynk.key.back.label'], onPress: () => router.back(), testID: 'm11-back' },
             ]}
           />
-        </View>
+          </>}
+        />
       </SafeArea>
     </View>
   );

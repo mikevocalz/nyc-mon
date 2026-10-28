@@ -16,6 +16,7 @@ import { careLed, useCareNow } from './care-shared';
 import { companionCopy as c } from './copy';
 import { GlassStage, glassControls, glassRing, useGlassOn, useGlassScreen, useMonGlass } from './glass';
 import { useHomeStage } from './home-stage.store';
+import { CareHistoryPane } from './pane-content';
 import { tickMinuteClock } from './minute-clock';
 
 /** `m15.sleeping.leave` shows once per session (M15 copy notes). */
@@ -259,6 +260,12 @@ export function RestScreen() {
   });
 
   if (!glassOn) return null;
+  const paneTips = [
+    c('pane.rest.tip.energy'),
+    c('pane.rest.tip.close', { name }),
+    c('pane.rest.tip.early', { name }),
+  ];
+
   return (
     <GlassStage
       screen={glass.screen}
@@ -266,6 +273,7 @@ export function RestScreen() {
       testIDPrefix="m15"
       onKey={onKey}
       onFailed={onFailed}
+      companion={<CareHistoryPane route="rest" tips={paneTips} loading={care === undefined} />}
       a11y={
         <>
           <Text testID="m15-status" accessibilityLiveRegion="polite">{statusText}</Text>

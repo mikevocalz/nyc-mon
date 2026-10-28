@@ -60,9 +60,17 @@ export const ONBOARDING_COPY = {
 
   // The notifications tab (drawer + site). NYC-MON sends one notification
   // per egg, so the honest inbox is empty until the first egg is ready.
+  // Caller (the profile tab).
+  'profile.identity.label': 'Account',
+  'profile.name.empty': 'No Caller name yet',
+
   'inbox.title': 'Notifications',
   'inbox.unread': '{count} unread',
   'inbox.mark_all_read': 'Mark all read',
+  'inbox.mark_all_read.a11y.label': 'Mark all notifications read',
+  'inbox.all_read': 'All read',
+  'inbox.row.unread.a11y': 'Unread',
+  'inbox.row.a11y.hint': 'Marks it read',
   'inbox.today': 'Today',
   'inbox.earlier': 'Earlier',
   'inbox.empty.title': 'Nothing yet',
@@ -238,6 +246,21 @@ export const ONBOARDING_COPY = {
   'mail.consent.body.no': "If you say no, we delete your email address and everything your child saved with us. In the game, their Mon goes to stay with one of the characters, so your child doesn't see it deleted.",
   'mail.consent.body.silence': "If you don't answer within {days} days, we delete this request and your email address.",
   'mail.consent.footer': "You got this email because someone typed your address into NYC-MON. If you don't know who, you can ignore it and we'll delete it in {days} days.",
+
+  // Permission Center (/permissions), the final setup step.
+  'perm.step': 'H-LYNK SETUP / FINAL STEP',
+  'perm.title': 'Ready for NYC?',
+  'perm.intro': 'Choose what to enable. Notifications are selected; everything else is your call.',
+  'perm.status.undetermined': 'Not requested',
+  'perm.status.granted': 'Allowed on this device',
+  'perm.status.denied': 'Not allowed',
+  'perm.status.blocked': 'Change in device settings',
+  'perm.status.unavailable': 'Unavailable on this device',
+  'perm.open_settings': 'Open device settings',
+  'perm.continue': 'Continue',
+  'perm.continue.selected': 'Continue with {n} selected',
+  'perm.not_now': 'Not now',
+  'perm.footnote': 'Denying access won’t block your Mon. You can enable permissions later in device settings or when you use a feature.',
 } as const;
 
 export type OnboardingCopyId = keyof typeof ONBOARDING_COPY;

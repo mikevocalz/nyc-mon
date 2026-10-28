@@ -10,7 +10,7 @@ import { haptics } from '@acme/ui/haptics';
 import { Pressable, Text, View } from '@acme/ui/tw';
 import { GlassStage, useGlassOn, useGlassScreen, useMonGlass } from '../companion/glass';
 import { companionCopy } from '../companion/copy';
-import { useHomeStage } from '../companion/home-stage.store';
+import { useHomeStage, useHomeStageStore } from '../companion/home-stage.store';
 import { monIdentity } from '../companion/mon-identity';
 import { EXPERIMENTAL_WORLD_PHYSICAL } from '../game/world/physical-look.ts';
 import { timeOfDayStore, useTimeOfDay } from '../game/world/time-of-day.store.ts';
@@ -20,6 +20,7 @@ import { announcePolitely } from '../onboarding/announce';
 import { copy } from '../onboarding/copy';
 import { useProfile } from '../profile/profile.store';
 import { useCallerNameEditor } from './caller-name-editor';
+import { SettingsDetailPane } from './SettingsDetailPane';
 import { SettingsScreen } from './screen.native';
 import {
   clampCursor, creditLines, pageAround, rowText, settingsRows, type CreditLine, type SettingsRow,
@@ -314,6 +315,8 @@ export function SettingsGlass() {
   });
   const onFailed = useCallback(() => local.setState({ failed: true }), [local]);
 
+  const paned = useHomeStageStore((st) => st.stageFrame !== null);
+
   // Shell: none. The glass, or the 2D page full-window over the mounted shell.
   useHomeStage({});
 
@@ -337,6 +340,28 @@ export function SettingsGlass() {
         textContentType="nickname"
         clearButton={{ accessibilityLabel: copy('m07.field.clear.a11y.label') }}
       />
+    </View>
+  );
+
+  const nameForm = (
+    <View className="gap-3 bg-ink-950/90 px-4 pb-4 pt-3">
+      {field}
+      <View className="flex-row gap-target-gap">
+        <View className="flex-1">
+          <Button variant="outline" size="lg" fullWidth title={cancel} onPress={cancelName} className="min-h-target" />
+        </View>
+        <View className="flex-1">
+          <Button
+            variant="cta"
+            size="lg"
+            fullWidth
+            title={copy('m07.continue')}
+            disabled={!editor.changed}
+            onPress={saveName}
+            className="min-h-target"
+          />
+        </View>
+      </View>
     </View>
   );
 
@@ -375,27 +400,21 @@ export function SettingsGlass() {
       }
       controls={controls}
       // Only while renaming: the field (it can't be drawn on the glass) with its two actions, under the device.
-      below={s.mode === 'name' ? (
-        <View className="gap-3 bg-ink-950/90 px-4 pb-4 pt-3">
-          {field}
-          <View className="flex-row gap-target-gap">
-            <View className="flex-1">
-              <Button variant="outline" size="lg" fullWidth title={cancel} onPress={cancelName} className="min-h-target" />
-            </View>
-            <View className="flex-1">
-              <Button
-                variant="cta"
-                size="lg"
-                fullWidth
-                title={copy('m07.continue')}
-                disabled={!editor.changed}
-                onPress={saveName}
-                className="min-h-target"
-              />
-            </View>
-          </View>
-        </View>
-      ) : undefined}
+      // With the Detail pane beside the device they sit in the pane instead.
+      below={s.mode === 'name' && !paned ? nameForm : undefined}
+      companion={
+        <SettingsDetailPane
+          row={current}
+          mode={s.mode}
+          credits={CREDITS}
+          nameForm={nameForm}
+          signingOut={s.signingOut}
+          signOutFailed={s.signOutFailed}
+          onSelect={() => select(current)}
+          onSignOut={() => void signOut()}
+          onCancel={() => (s.mode === 'name' ? cancelName() : toList())}
+        />
+      }
     />
   );
 }

@@ -92,11 +92,15 @@ export function ConsentScreen() {
 
   if (mode === 'denied') {
     return (
-      <Container width="full" className="flex-1 items-center justify-center px-4 py-6">
-        <EmptyState
-          title={copy('m05.denied.title.no_mon')}
-          description={copy('m05.denied.body.no_mon')}
-        />
+      // Phone: centred as before. Tablet (md+): top-aligned in the panes' 560
+      // column, like every other auth step; one message, so no second pane.
+      <Container width="full" className="flex-1 items-center justify-center px-4 py-6 md:justify-start md:px-8 md:py-10">
+        <View className="w-full max-w-content-form md:max-w-[560px]">
+          <EmptyState
+            title={copy('m05.denied.title.no_mon')}
+            description={copy('m05.denied.body.no_mon')}
+          />
+        </View>
       </Container>
     );
   }

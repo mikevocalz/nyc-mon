@@ -6,6 +6,7 @@ import { useRouter } from 'solito/navigation';
 import { Section, View } from '@acme/ui/tw';
 import { Avatar, Heading, PressScale, Text, FadeIn, ScaleIn } from '@acme/ui';
 import { Settings as SettingsIcon, ChevronRight } from '@acme/ui/icons';
+import { copy } from '../onboarding/copy';
 import { useProfile } from './profile.store';
 
 // STRUCK 2026-10-17: the starter's tags (Design/Mobile/Web), stats
@@ -22,6 +23,8 @@ import { useProfile } from './profile.store';
 export function ProfileIdentity({ surface = 'page' }: { surface?: 'page' | 'night' }) {
   const p = useProfile();
   const night = surface === 'night';
+  // An empty heading reads as a broken page; say the name is missing instead.
+  const name = p.name || copy('profile.name.empty');
   return (
     <View className="flex-row flex-wrap items-center gap-5">
       <ScaleIn delay={60}>
@@ -30,13 +33,13 @@ export function ProfileIdentity({ surface = 'page' }: { surface?: 'page' | 'nigh
       <View className="min-w-40 flex-1 gap-1">
         {night ? (
           <>
-            <Text variant="label" className="text-silver-300">Account</Text>
-            <Heading level={1} size="display-sm" className="text-orange-500">{p.name}</Heading>
+            <Text variant="label" className="text-silver-300">{copy('profile.identity.label')}</Text>
+            <Heading level={1} size="display-sm" className="text-orange-500">{name}</Heading>
           </>
         ) : (
           <>
-            <Text variant="label" tone="muted">Account</Text>
-            <Heading level={1} size="display-sm">{p.name}</Heading>
+            <Text variant="label" tone="muted">{copy('profile.identity.label')}</Text>
+            <Heading level={1} size="display-sm">{name}</Heading>
           </>
         )}
       </View>

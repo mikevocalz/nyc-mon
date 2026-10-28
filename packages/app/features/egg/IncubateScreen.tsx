@@ -54,7 +54,9 @@ import {
   readyAt,
   stepMinutes,
 } from './egg-model';
+import { CompanionStageHost, useTabletClass } from '../companion/CompanionStageHost';
 import { EggStill } from './EggStill';
+import { IncubationPane } from './IncubationPane';
 import { eggGlowTint, eggModelSource } from './egg-source';
 import { StageControls } from './StageControls';
 import { StageLoader } from './StageLoader';
@@ -138,6 +140,7 @@ export function IncubateScreen() {
     };
   });
   const s = useStore(store);
+  const tablet = useTabletClass();
 
   // The 3D H-Lynk continues M08's device: the chosen egg's 3D model large on
   // the glass, the times and Start as glass buttons, `<`/`>` and the trackpad
@@ -486,7 +489,23 @@ export function IncubateScreen() {
     return (
       <View className="flex-1 bg-ink-950" testID="m10-3d">
         <SafeArea className="flex-1" edges={['top', 'bottom', 'left', 'right']}>
-          <View className="relative min-h-0 flex-1">
+          <CompanionStageHost
+            enabled={tablet.companion}
+            pane={
+              <IncubationPane
+                testID="m10-pane"
+                reducedMotion={reducedMotion}
+                input={eggName === undefined ? null : {
+                  eggName,
+                  stage: s.phase === 'confirmed' ? 'incubating' : 'choosing',
+                  duration: s.minutes === null ? null : eggCopy(OPTION_ID[s.minutes].a11y),
+                  startedAt: s.egg?.createdAt ?? null,
+                  readyAt: s.egg?.incubationEndsAt ?? (s.minutes === null ? null : s.nowMs + s.minutes * 60_000),
+                  clock: formatClock,
+                }}
+              />
+            }
+            device={<>
             {/* Visually hidden: the times as a radio group for screen readers and keyboards. */}
             <View className="absolute inset-0 opacity-0" pointerEvents="none" testID="m10-ring-a11y">
               <ChoiceRows
@@ -510,6 +529,7 @@ export function IncubateScreen() {
                 label={incubatingLabel}
                 className="h-full"
                 stageClassName="min-h-0 w-full flex-1"
+                glassScale={tablet.glassScale}
                 onKey={onStageKey}
                 onReady={onStageReady}
                 onBackendChange={onStageBackend}
@@ -534,7 +554,8 @@ export function IncubateScreen() {
                 { key: 'back', label: eggCopy('m10.back.a11y.label'), onPress: goBack, disabled: busy, testID: 'm10-back' },
               ]}
             />
-          </View>
+            </>}
+          />
         </SafeArea>
       </View>
     );

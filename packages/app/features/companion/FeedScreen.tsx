@@ -16,6 +16,7 @@ import { careLed, useCareNow } from './care-shared';
 import { companionCopy as c } from './copy';
 import { GlassStage, glassControls, glassRing, useGlassOn, useGlassScreen, useMonGlass } from './glass';
 import { useHomeStage } from './home-stage.store';
+import { CareHistoryPane } from './pane-content';
 import { tickMinuteClock } from './minute-clock';
 
 /** D-15e: no named foods, so every meal is the shared meal. */
@@ -234,6 +235,12 @@ export function FeedScreen() {
   });
 
   if (!glassOn) return null;
+  const paneTips = [
+    ...(care?.activity.kind === 'asleep' ? [c('pane.feed.tip.asleep', { name })] : []),
+    c('pane.feed.tip.ask', { name }),
+    c('pane.feed.tip.full', { name }),
+  ];
+
   return (
     <GlassStage
       screen={glass.screen}
@@ -241,6 +248,7 @@ export function FeedScreen() {
       testIDPrefix="m14"
       onKey={onKey}
       onFailed={onFailed}
+      companion={<CareHistoryPane route="feed" tips={paneTips} loading={care === undefined} />}
       a11y={
         <>
           <Text accessibilityRole="header">{c('m14.title', { name })}</Text>

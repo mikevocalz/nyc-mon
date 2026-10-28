@@ -68,6 +68,8 @@ export interface DeviceStageProps {
   children?: ReactNode | ((stage: DeviceStageApi) => ReactNode);
   testID?: string;
   captureTestID?: string;
+  /** Backing-store scale of the glass canvas (2 on tablets for crisp text). Read when the scene builds. Default 1. */
+  glassScale?: number;
 }
 
 // Module-level and stable, so three.js and the scene stay out of the first chunk.
@@ -97,7 +99,7 @@ const HANDOFF_MS = 400;
  */
 export function DeviceStage({
   screen, model = 'placeholder', capture, fallback = null, caption, label, className, stageClassName,
-  sound = false, onSideKey, onKey, onReady, onBackendChange, children, testID, captureTestID,
+  sound = false, onSideKey, onKey, onReady, onBackendChange, children, testID, captureTestID, glassScale = 1,
 }: DeviceStageProps) {
   const { ref, hasBeenNear, isVisible } = useInView({ nearMarginPx: 600 });
   const reducedMotion = useReducedMotion();
@@ -129,8 +131,9 @@ export function DeviceStage({
         onReady?.();
       },
       onRest: (rest) => stage.setState({ resting: rest }),
+      glassScale,
     };
-  }, [model, screen, stage, sound, onSideKey, onKey, onReady]);
+  }, [model, screen, stage, sound, onSideKey, onKey, onReady, glassScale]);
   const api = useMemo<DeviceStageApi>(
     () => ({ pressSideKey: () => params.onSideKey?.(), pressKey: (key) => params.onKey?.(key) }),
     [params],

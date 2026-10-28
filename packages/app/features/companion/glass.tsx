@@ -15,7 +15,9 @@ import { StageControls, type StageControl } from '../egg/StageControls';
 import { StageLoader } from '../egg/StageLoader';
 import { isAccessibilityTextSize } from '../egg/window-layout';
 import { companionCopy } from './copy';
-import { clearGlass, publishGlass, setGlassFailed, useHomeStageStore } from './home-stage.store';
+import { CompanionPaneLoading } from './CompanionPane';
+import { CompanionStageHost, useTabletClass } from './CompanionStageHost';
+import { clearCompanion, clearGlass, publishCompanion, publishGlass, setGlassFailed, setStageFrame, useHomeStageStore } from './home-stage.store';
 import { isLow, NEED_RING } from './home-model';
 import { clipsFor, monModelSource } from './mon-models';
 
@@ -183,6 +185,11 @@ export interface GlassStageProps {
   readonly onFailed: () => void;
   /** A real control under the device, for what can't be drawn on the glass (M09's text field). */
   readonly below?: ReactNode;
+  /**
+   * The route's companion pane (CompanionPane), drawn beside or under the
+   * device on tablet-class windows only. Phones never render it.
+   */
+  readonly companion?: ReactNode;
 }
 
 /**
@@ -195,7 +202,7 @@ export interface GlassStageProps {
  * hidden accessible button, and `below`, a real control for what can't be
  * drawn on the glass (M09's text field).
  */
-export function GlassStage({ screen, label, testIDPrefix, a11y, controls, onKey, onFailed, below }: GlassStageProps) {
+export function GlassStage({ screen, label, testIDPrefix, a11y, controls, onKey, onFailed, below, companion }: GlassStageProps) {
   const owner = useId();
   const keys = useInstanceStore<{ onKey: (key: DeviceKey) => void }>(() => ({ onKey }));
   useEffect(() => {
@@ -205,19 +212,30 @@ export function GlassStage({ screen, label, testIDPrefix, a11y, controls, onKey,
     publishGlass({ owner, screen, label, onKey: (key) => keys.getState().onKey(key) });
   }, [owner, screen, label, keys]);
   useLayoutEffect(() => () => clearGlass(owner), [owner]);
+  // The pane is republished every render (it carries live data); only the stage host re-renders for it.
+  useLayoutEffect(() => {
+    if (companion === undefined) clearCompanion(owner);
+    else publishCompanion(owner, companion);
+  });
+  useLayoutEffect(() => () => clearCompanion(owner), [owner]);
   const failed = useHomeStageStore((st) => st.glassFailed);
   useEffect(() => {
     if (failed) onFailed();
   }, [failed, onFailed]);
+  // With a companion pane beside it, the device's own overlays (M09's field) stay over the device.
+  const frame = useHomeStageStore((st) => st.stageFrame);
+  const box = frame === null ? undefined : { left: frame.x, top: frame.y, width: frame.width, height: frame.height };
 
   return (
     <View className="absolute inset-0" style={{ pointerEvents: 'box-none' }} testID={`${testIDPrefix}-3d`}>
       <View className="absolute left-0 top-0 h-px w-px overflow-hidden opacity-0" testID={`${testIDPrefix}-glass-a11y`}>{a11y}</View>
       <StageControls testID={`${testIDPrefix}-stage-controls`} controls={controls} />
       {below ? (
-        <KeyboardAwareScroll className="absolute inset-0" contentContainerClassName="grow justify-end" keyboardShouldPersistTaps="handled">
-          <SafeArea edges={['bottom', 'left', 'right']}>{below}</SafeArea>
-        </KeyboardAwareScroll>
+        <View className={box === undefined ? 'absolute inset-0' : 'absolute'} style={[{ pointerEvents: 'box-none' }, box]}>
+          <KeyboardAwareScroll className="flex-1" contentContainerClassName="grow justify-end" keyboardShouldPersistTaps="handled">
+            <SafeArea edges={['bottom', 'left', 'right']}>{below}</SafeArea>
+          </KeyboardAwareScroll>
+        </View>
       ) : null}
     </View>
   );
@@ -274,37 +292,53 @@ export function PersistentGlassStage({
   }, [local]);
   const onKey = useCallback((key: DeviceKey) => keys.getState().onKey(key), [keys]);
 
+  const tablet = useTabletClass();
+
   return (
     <View className="absolute inset-0 bg-ink-950" testID="home-glass-stage">
       <SafeArea className="flex-1" edges={['top', 'bottom', 'left', 'right']}>
-        <View className="relative min-h-0 flex-1">
-          <View
-            testID="home-device-stage"
-            aria-hidden
-            accessibilityElementsHidden
-            importantForAccessibility="no-hide-descendants"
-            className="absolute inset-0"
-          >
-            <DeviceStage
-              key={modelKey}
-              screen={screen}
-              label={route?.label ?? label}
-              className="h-full"
-              stageClassName="min-h-0 w-full flex-1"
-              onKey={onKey}
-              onReady={onReady}
-              onBackendChange={onBackend}
-            />
-          </View>
-          {/* The Rive loader covers the stage until its first frame, once: later screens swap in place. */}
-          <Suspense fallback={<StageLoader label={label} testID="home-stage-loader" />}>
-            <StageReadyGate resource={ready} />
-          </Suspense>
-          {children}
-        </View>
+        <CompanionStageHost
+          enabled={tablet.companion}
+          pane={<HomeCompanionPane />}
+          onFrame={setStageFrame}
+          device={
+            <>
+              <View
+                testID="home-device-stage"
+                aria-hidden
+                accessibilityElementsHidden
+                importantForAccessibility="no-hide-descendants"
+                className="absolute inset-0"
+              >
+                <DeviceStage
+                  key={modelKey}
+                  screen={screen}
+                  label={route?.label ?? label}
+                  className="h-full"
+                  stageClassName="min-h-0 w-full flex-1"
+                  glassScale={tablet.glassScale}
+                  onKey={onKey}
+                  onReady={onReady}
+                  onBackendChange={onBackend}
+                />
+              </View>
+              {/* The Rive loader covers the stage until its first frame, once: later screens swap in place. */}
+              <Suspense fallback={<StageLoader label={label} testID="home-stage-loader" />}>
+                <StageReadyGate resource={ready} />
+              </Suspense>
+              {children}
+            </>
+          }
+        />
       </SafeArea>
     </View>
   );
+}
+
+/** The current route's pane, or the loading state while the next route mounts. */
+function HomeCompanionPane() {
+  const companion = useHomeStageStore((st) => st.companion);
+  return <>{companion?.node ?? <CompanionPaneLoading />}</>;
 }
 
 /** The persistent stage's default slot for the Baby (re-seated per screen through `modelRect`). */

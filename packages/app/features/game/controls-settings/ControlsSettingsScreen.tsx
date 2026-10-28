@@ -39,7 +39,6 @@ import {
   Heading,
   KeyValueList,
   ResponsiveDialog,
-  SafeArea,
   SegmentedControl,
   Slider,
   StatusRow,
@@ -55,7 +54,9 @@ import {
   createGameInputRouter,
   type ControllerProfile,
 } from '@acme/ui/game-controls/parts';
-import { ScrollView, View } from '@acme/ui/tw';
+import { View } from '@acme/ui/tw';
+import { ScreenPanes } from '../../layout/ScreenPanes';
+import { PANE_HEADING_CLASS } from '../../onboarding/OnboardingPanes';
 import { controllerLayoutActions } from '../controller-layout.store.ts';
 import { controllerProfileActions, useControllerProfile } from '../controller-profile.store.ts';
 import {
@@ -183,19 +184,8 @@ function ControllerPreview({ profile, arcadeRive, testID }: {
   );
 }
 
-/**
- * The native tablet portrait grid for the four setting cards: below md a
- * plain `gap-6` column (the phone layout, unchanged); from md a wrapping row
- * of half-width cells, padding for the gutter and a negative margin that
- * cancels it at the edges (RN has no CSS grid).
- */
-const CARD_GRID = 'gap-6 md:-mx-3 md:flex-row md:flex-wrap md:gap-x-0 md:gap-y-6';
-const CARD_CELL = 'md:w-1/2 md:px-3';
-
 export function ControlsSettingsScreen() {
   const profile = useControllerProfile((s) => s.profile);
-  // Loaded once here and handed to both previews below, so the second
-  // arrangement never parses the .riv files again.
   const arcadeRive = useArcadeRiveFiles();
   const screen = useInstanceStore<ScreenState>(() => ({ restoreOpen: false }));
   const restoreOpen = useStore(screen, (s) => s.restoreOpen);
@@ -222,26 +212,24 @@ export function ControlsSettingsScreen() {
     value: DEFAULT_CAMERA_SPOKEN_LABELS[id],
   }));
 
-  // `split` marks the landscape copy: its testIDs carry a -split suffix so
-  // the two mounted arrangements never share one.
-  const intro = (split: boolean) => (
+  const intro = (
     <View className="gap-1">
-      <Heading level={1} size="title" {...({ testID: split ? 'g03-title-split' : 'g03-title' } as object)}>{G03.title}</Heading>
+      <Heading level={1} size="title" className={PANE_HEADING_CLASS} {...({ testID: 'g03-title' } as object)}>{G03.title}</Heading>
       <Text tone="muted">{G03.intro}</Text>
     </View>
   );
 
-  const preview = (split: boolean) => (
+  const preview = (
     <View className="gap-2">
-      <ControllerPreview profile={profile} arcadeRive={arcadeRive} testID={split ? 'g03-preview-split' : 'g03-preview'} />
+      <ControllerPreview profile={profile} arcadeRive={arcadeRive} testID="g03-preview" />
       {profile.haptics !== 'off' ? <Text variant="caption" tone="muted">{G03.preview.hint}</Text> : null}
       <ReducedMotionStatus />
     </View>
   );
 
-  const cards = (cell: string | undefined) => (
+  const cards = (
     <>
-      <View className={cell}>
+      <View>
         <Card className="gap-4">
           <Text variant="heading">{G03.section.stick}</Text>
           <View className="gap-1">
@@ -293,7 +281,7 @@ export function ControlsSettingsScreen() {
         </Card>
       </View>
 
-      <View className={cell}>
+      <View>
         <Card className="gap-4">
           <Text variant="heading">{G03.section.layout}</Text>
           <View className="gap-1">
@@ -332,7 +320,7 @@ export function ControlsSettingsScreen() {
         </Card>
       </View>
 
-      <View className={cell}>
+      <View>
         <Card className="gap-4">
           <Text variant="heading">{G03.section.feel}</Text>
           <View className="gap-1">
@@ -349,7 +337,7 @@ export function ControlsSettingsScreen() {
         </Card>
       </View>
 
-      <View className={cell}>
+      <View>
         <Card className="gap-3">
           <Text variant="heading">{G03.section.buttons}</Text>
           <Text variant="caption" tone="muted">{G03.bindings.caption}</Text>
@@ -370,44 +358,33 @@ export function ControlsSettingsScreen() {
   );
 
   /*
-    Two arrangements, both mounted, switched by class only (no JS width
-    checks; Uniwind's landscape: updates live on rotation):
+    One tree (ScreenPanes), switched by class only:
 
-    - Phones and tablets in portrait: one top-aligned column, preview first.
-      From md it widens to content-wide and the four cards pair into two
-      columns (Stick | Layout, Feel | Buttons). Below md nothing changes.
-    - Landscape from md: two panes like an open foldable. Title, the preview
-      at its authored 200pt height and Restore defaults on the left; the
-      setting cards on the right. Each pane scrolls on its own.
+    - Phone: the old column, preview first, Restore defaults last.
+    - Tablet portrait (md+): the same column, top-aligned and widened to 560.
+    - Landscape (md+): title and the preview at its authored 200pt height on
+      the left; the setting cards, then Restore defaults, on the right.
 
-    Every value lives in controllerProfileStore, so rotating loses nothing.
+    One tree means one ArcadeController preview: the earlier two mounted
+    arrangements drew two. Every value lives in controllerProfileStore.
   */
   return (
-    <SafeArea edges={['top']} className="flex-1 bg-surface" {...({ testID: 'g03-page' } as object)}>
-      <View className="flex-1 md:landscape:hidden">
-        <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
-          <View className="w-full max-w-content-detail gap-6 self-center px-4 py-4 pb-48 sm:px-6 md:max-w-content-wide md:py-8">
-            {intro(false)}
-            {preview(false)}
-            <View className={CARD_GRID}>{cards(CARD_CELL)}</View>
+    <View className="flex-1 bg-surface">
+      <ScreenPanes
+        testID="g03-page"
+        primary={
+          <>
+            {intro}
+            {preview}
+          </>
+        }
+        secondary={
+          <>
+            {cards}
             {restoreButton}
-          </View>
-        </ScrollView>
-      </View>
-
-      <View className="hidden flex-1 flex-row md:landscape:flex">
-        <ScrollView className="flex-1 border-r-2 border-border" showsVerticalScrollIndicator={false}>
-          <View className="gap-6 px-6 py-8 pb-48">
-            {intro(true)}
-            {preview(true)}
-            {restoreButton}
-          </View>
-        </ScrollView>
-        <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
-          <View className="gap-6 px-6 py-8 pb-48">{cards(undefined)}</View>
-        </ScrollView>
-      </View>
-
+          </>
+        }
+      />
       <ResponsiveDialog
         open={restoreOpen}
         onClose={() => screen.setState({ restoreOpen: false })}
@@ -420,6 +397,6 @@ export function ControlsSettingsScreen() {
           </>
         }
       />
-    </SafeArea>
+    </View>
   );
 }

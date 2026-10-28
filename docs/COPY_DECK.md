@@ -610,3 +610,106 @@ Notes:
 | `settings.sign_out.confirm.title` | Sign out? | ui | drafted (the glass asks once; Cancel is the default and the trackpad) |
 | `settings.sign_out.error` | Couldn't sign out. Check your connection and try again. | ui | drafted |
 | `settings.value.a11y` | {label}, {value} | ui | drafted (screen-reader name of a settings row with a value) |
+
+
+## Companion pane (tablets and open foldables)
+
+Written 2026-10-28. On a tablet, an open foldable or a wide web window, the 3D H-Lynk screens get a pane beside the device (landscape) or under it (portrait). Phones never show it. Strings live in `packages/app/features/companion/copy.ts` (`pane.*`, M13 to M18) and `packages/app/features/egg/copy.ts` (`pane.meet.*`, `pane.incubation.*`, M08, M10 and M11). Settings and M09 reuse their existing strings. Layout: `docs/design/foldable-arrangements.md`, "Companion pane on the persistent stage".
+
+| ID | String | Voice | Status |
+|---|---|---|---|
+| `pane.loading.a11y` | Loading | ui | drafted |
+| `pane.tips` | Good to know | ui | drafted |
+| `pane.home.title` | Today with {name} | ui | drafted |
+| `pane.home.care` | How {name} is doing | ui | drafted |
+| `pane.home.meter` | {meter}: {percent}% | ui | drafted |
+| `pane.home.recent` | Recent moments | ui | drafted |
+| `pane.home.journal` | Open Journal | ui | drafted |
+| `pane.home.recent.empty.title` | Nothing here yet | ui | drafted |
+| `pane.home.recent.empty.body` | Feed, rest or play with {name}. Each one shows up here. | ui | drafted |
+| `pane.feed.title` | Meals | ui | drafted |
+| `pane.feed.history` | Recent meals | ui | drafted |
+| `pane.feed.empty.title` | No meals yet | ui | drafted |
+| `pane.feed.empty.body` | Share a meal with {name}. It shows up here. | ui | drafted |
+| `pane.feed.tip.full` | Feeding {name} when Fullness is already high makes {name} slow for a while. | ui | drafted |
+| `pane.feed.tip.asleep` | {name} does not eat while asleep. | ui | drafted |
+| `pane.feed.tip.ask` | When {name} asks for food, the trackpad shares a meal in one tap. | ui | drafted |
+| `pane.rest.title` | Sleep | ui | drafted |
+| `pane.rest.history` | Recent naps | ui | drafted |
+| `pane.rest.empty.title` | No naps yet | ui | drafted |
+| `pane.rest.empty.body` | Put {name} to bed. It shows up here. | ui | drafted |
+| `pane.rest.tip.energy` | Sleep brings Energy back. | ui | drafted |
+| `pane.rest.tip.close` | You can close the H-Lynk while {name} sleeps. | ui | drafted |
+| `pane.rest.tip.early` | Waking {name} early leaves {name} a little less social. | ui | drafted |
+| `pane.social.title` | Peek | ui | drafted |
+| `pane.social.history` | Recent games | ui | drafted |
+| `pane.social.empty.title` | No games yet | ui | drafted |
+| `pane.social.empty.body` | Play Peek with {name}. It shows up here. | ui | drafted |
+| `pane.social.tip.how` | {name} hides in one of three spots. Flick to look, tap to peek. | ui | drafted |
+| `pane.social.tip.tired` | {name} needs some Energy to play. When Energy runs low, rest comes first. | ui | drafted |
+| `pane.social.tip.social` | Each game raises Social. | ui | drafted |
+| `pane.dex.title` | About {name} | ui | drafted |
+| `pane.journal.title` | Calendar | ui | drafted |
+| `pane.journal.all` | Show every day | ui | drafted |
+| `pane.journal.filtered` | Showing {date} | ui | drafted |
+| `pane.meet.title` | About this egg | ui | drafted |
+| `pane.meet.number` | Number | ui | drafted |
+| `pane.meet.bloodline` | Bloodline | ui | drafted |
+| `pane.meet.empty.title` | Pick an egg | ui | drafted |
+| `pane.meet.empty.body` | Tap an egg to see the name, number and Bloodline. | ui | drafted |
+| `pane.incubation.title` | Incubation | ui | drafted |
+| `pane.incubation.a11y` | Incubation steps | ui | drafted |
+| `pane.incubation.chosen` | You chose the {eggName} | ui | drafted |
+| `pane.incubation.wait` | Incubating | ui | drafted |
+| `pane.incubation.wait.pick` | Pick how long the egg incubates. | ui | drafted |
+| `pane.incubation.wait.for` | For {duration}. | ui | drafted |
+| `pane.incubation.started` | Started {time} | ui | drafted |
+| `pane.incubation.ready` | Ready to hatch | ui | drafted |
+| `pane.incubation.ready.at` | {time} | ui | drafted |
+| `pane.incubation.hatch` | Hatch and meet your Mon | ui | drafted |
+| `pane.incubation.hatch.body` | You can give your Mon a nickname after the hatch. | ui | drafted |
+| `pane.incubation.now` | Now | ui | drafted |
+
+Notes:
+
+- **M08 shows canon facts only** (M08 handoff P3): the egg's name, number and Bloodline. Culture notes are `null` in content, so the pane has no lore text yet.
+- **No pronoun for a Mon or an egg** (PS-005). "the egg", "your Mon" and `{name}` instead; `egg-model.test.ts` enforces it for the egg strings.
+- **Low is a request, not a loss.** The Home pane marks a low meter with the existing `m13.ring.low` badge in the accent tone, never a warning colour.
+
+## Tablet layouts for the 2D screens (2026-10-28)
+
+Added with the responsive pass on Alerts, Caller, Settings, Game controls, Legal, the error pages and the Permission Center. Most `error.*` and `perm.*` strings already shipped hardcoded in the screens; they now live in copy files and only the ids are new. New wording is marked "new".
+
+| ID | String | Voice | Status |
+|---|---|---|---|
+| `profile.identity.label` | Account | ui | drafted (moved from the screen) |
+| `profile.name.empty` | No Caller name yet | ui | drafted, new (heading when no Caller name exists) |
+| `inbox.mark_all_read.a11y.label` | Mark all notifications read | ui | drafted (moved from the screen) |
+| `inbox.all_read` | All read | ui | drafted, new (replaces the vanished count after Mark all read) |
+| `inbox.row.unread.a11y` | Unread | ui | drafted, new |
+| `inbox.row.a11y.hint` | Marks it read | ui | drafted, new |
+| `LEGAL_UI.back` | Go back | ui | drafted (`features/legal/copy.ts`) |
+| `LEGAL_UI.contentsLabel` | On this page | ui | drafted, new |
+| `LEGAL_UI.contentsHint` | Scrolls the document to this section. | ui | drafted, new |
+| `LEGAL_UI.switcherLabel` | Legal documents | ui | drafted, new |
+| `error.not_found.code` | 404 | ui | drafted (moved, `features/error/copy.ts`) |
+| `error.not_found.title` | Page not found | ui | drafted (moved) |
+| `error.not_found.body` | The page you are looking for does not exist or has moved. | ui | drafted (moved) |
+| `error.failed.code` | ! | ui | drafted (moved) |
+| `error.failed.title` | Something went wrong | ui | drafted (moved) |
+| `error.failed.body` | An unexpected error occurred. Try again in a moment. | ui | drafted (moved) |
+| `error.home` | Back to Home | ui | drafted (moved) |
+| `error.back` | Go back | ui | drafted, new (shown only when the stack can go back) |
+| `perm.step` | H-LYNK SETUP / FINAL STEP | ui | drafted (moved) |
+| `perm.title` | Ready for NYC? | ui | drafted (moved) |
+| `perm.intro` | Choose what to enable. Notifications are selected; everything else is your call. | ui | drafted (moved) |
+| `perm.status.undetermined` | Not requested | ui | drafted (moved) |
+| `perm.status.granted` | Allowed on this device | ui | drafted (moved) |
+| `perm.status.denied` | Not allowed | ui | drafted (moved) |
+| `perm.status.blocked` | Change in device settings | ui | drafted (moved) |
+| `perm.status.unavailable` | Unavailable on this device | ui | drafted (moved) |
+| `perm.open_settings` | Open device settings | ui | drafted (moved) |
+| `perm.continue` | Continue | ui | drafted (moved) |
+| `perm.continue.selected` | Continue with {n} selected | ui | drafted (moved) |
+| `perm.not_now` | Not now | ui | drafted (moved) |
+| `perm.footnote` | Denying access won’t block your Mon. You can enable permissions later in device settings or when you use a feature. | ui | drafted (moved) |

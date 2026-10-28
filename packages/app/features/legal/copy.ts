@@ -247,3 +247,11 @@ const childrens: LegalDocument = {
 };
 
 export const LEGAL_COPY = { privacy, terms, childrens } as const;
+
+/** The app's own chrome around the documents (stack header, contents list). */
+export const LEGAL_UI = {
+  back: 'Go back',
+  contentsLabel: 'On this page',
+  contentsHint: 'Scrolls the document to this section.',
+  switcherLabel: 'Legal documents',
+} as const;

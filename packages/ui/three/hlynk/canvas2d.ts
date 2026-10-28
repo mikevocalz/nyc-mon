@@ -8,12 +8,15 @@ import type { CanvasFont, CanvasSurface, Ctx2D } from './canvas2d-types';
  * (canvas2d.native.ts) draws the same calls with Skia. Same `.ts` extension
  * as the fork, so Metro's `.native.ts` wins on device.
  */
-export function createCanvasSurface(THREE: Three, width: number, height: number): CanvasSurface {
+export function createCanvasSurface(THREE: Three, width: number, height: number, scale = 1): CanvasSurface {
   const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
+  canvas.width = Math.round(width * scale);
+  canvas.height = Math.round(height * scale);
+  const raw = canvas.getContext('2d');
+  // Callers draw in logical px; the backing store holds `scale` times as many (crisp glass text on tablets).
+  if (scale !== 1) raw?.scale(scale, scale);
   // The browser context is a superset of Ctx2D; its fillStyle getter is wider, so a cast.
-  const ctx = canvas.getContext('2d') as unknown as Ctx2D;
+  const ctx = raw as unknown as Ctx2D;
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = 4;

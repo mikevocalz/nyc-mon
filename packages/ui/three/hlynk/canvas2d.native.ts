@@ -164,29 +164,33 @@ class SkiaContext2D implements Ctx2D {
   }
 }
 
-export function createCanvasSurface(THREE: Three, width: number, height: number): CanvasSurface {
-  const surface: SkSurface | null = Skia.Surface.MakeRaster(width, height) ?? Skia.Surface.MakeOffscreen(width, height);
-  if (!surface) throw new Error(`[hlynk] Skia could not make a ${width}x${height} surface`);
+export function createCanvasSurface(THREE: Three, width: number, height: number, scale = 1): CanvasSurface {
+  // Callers draw in logical px; the raster holds `scale` times as many (crisp glass text on tablets).
+  const pw = Math.round(width * scale);
+  const ph = Math.round(height * scale);
+  const surface: SkSurface | null = Skia.Surface.MakeRaster(pw, ph) ?? Skia.Surface.MakeOffscreen(pw, ph);
+  if (!surface) throw new Error(`[hlynk] Skia could not make a ${pw}x${ph} surface`);
   const canvas = surface.getCanvas();
   canvas.clear(Skia.Color('transparent'));
+  if (scale !== 1) canvas.scale(scale, scale);
   const ctx = new SkiaContext2D(canvas);
-  const data = new Uint8Array(width * height * 4);
-  const texture = new THREE.DataTexture(data, width, height, THREE.RGBAFormat, THREE.UnsignedByteType);
+  const data = new Uint8Array(pw * ph * 4);
+  const texture = new THREE.DataTexture(data, pw, ph, THREE.RGBAFormat, THREE.UnsignedByteType);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = 4;
   texture.generateMipmaps = true;
   texture.minFilter = THREE.LinearMipmapLinearFilter;
   texture.magFilter = THREE.LinearFilter;
-  const row = width * 4;
+  const row = pw * 4;
   const commit = () => {
     surface.flush();
     const pixels = surface.makeImageSnapshot().readPixels(0, 0, {
-      width, height, colorType: ColorType.RGBA_8888, alphaType: AlphaType.Unpremul,
+      width: pw, height: ph, colorType: ColorType.RGBA_8888, alphaType: AlphaType.Unpremul,
     });
     if (!(pixels instanceof Uint8Array)) return;
     // Skia rows run top-down; a DataTexture's first row is v = 0, the bottom.
-    for (let y = 0; y < height; y++) {
-      data.set(pixels.subarray(y * row, (y + 1) * row), (height - 1 - y) * row);
+    for (let y = 0; y < ph; y++) {
+      data.set(pixels.subarray(y * row, (y + 1) * row), (ph - 1 - y) * row);
     }
     texture.needsUpdate = true;
   };

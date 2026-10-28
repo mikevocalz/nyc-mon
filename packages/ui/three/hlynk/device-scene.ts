@@ -10,14 +10,14 @@ import { NUDGE, nudgeHop, nudgePulse, nudgeRock, nudgeSlide } from './nudge';
 // Extensionless on purpose: Metro picks canvas2d.native.ts on device, web and tsc take canvas2d.ts.
 import { canvasFont, createCanvasSurface, whenFontsReady } from './canvas2d';
 import {
-  BODY, EMITTERS, FAN, INTRO, MAX_TILT, REST_YAW, SCREEN_GLASS, STAGE, screenPxToLocal,
+  BODY, EMITTERS, FAN, INTRO, MAX_TILT, REST_YAW, SCREEN_GLASS, STAGE, screenPxToLocal, stageCameraZ,
 } from './device-geometry';
 import type { ScreenRect } from './screen-actions';
 import type { DeviceScreen, ScreenModel } from './screen';
 import { keyFromTarget, keyTarget, SIDE_KEY, type DeviceKey, type StageState } from './stage-state';
 import { beamGradientTexture, glareTexture, grainTexture, iconTexture, radialGlowTexture, textTexture } from './textures';
 
-export { BODY, EMITTERS, FAN, HEAD_DEPTH, INTRO, MAX_TILT, REST_YAW, STAGE, fanCorners } from './device-geometry';
+export { BODY, EMITTERS, FAN, FRAME_ASPECT, HEAD_DEPTH, INTRO, MAX_TILT, REST_YAW, STAGE, fanCorners, stageCameraZ } from './device-geometry';
 
 /** What the stage hands the scene. Read in `update`; the screen and the store are read once, at build. */
 export interface DeviceSceneParams {
@@ -44,6 +44,12 @@ export interface DeviceSceneParams {
    * no frames.
    */
   onRest?: (resting: boolean) => void;
+  /**
+   * Backing-store scale of the glass canvas, read once at build. 2 on tablets
+   * so the glass text stays crisp at the larger device size; screens still
+   * draw in their own logical px. Default 1.
+   */
+  glassScale?: number;
 }
 
 type Three = ThreeContext['THREE'];
@@ -143,7 +149,7 @@ export function createDeviceScene(
   scene.add(rim);
 
   const { store, screen } = initial;
-  const glass = screenTexture(THREE, screen, store);
+  const glass = screenTexture(THREE, screen, store, initial.glassScale ?? 1);
   const device = buildDevice(THREE, glass.texture);
   const BASE_Y = STAGE.baseY;
   device.group.position.y = BASE_Y;
@@ -275,8 +281,8 @@ export function createDeviceScene(
     camera,
     resize: (width, height) => {
       camera.aspect = width / Math.max(height, 1);
-      // Keep the whole unit in frame on tall, narrow stages.
-      camera.position.z = camera.aspect < 0.75 ? 5.4 / Math.max(camera.aspect / 0.75, 0.6) : 5.4;
+      // Fit the pane's actual shape: height-bound when wide, backed off when narrow.
+      camera.position.z = stageCameraZ(camera.aspect);
       camera.updateProjectionMatrix();
     },
     update: (frame: ThreeFrame, params: DeviceSceneParams) => {
@@ -399,8 +405,9 @@ function screenTexture(
   THREE: Three,
   screen: DeviceScreen,
   store: StoreApi<StageState>,
+  scale = 1,
 ): { texture: Texture; paint: () => void } {
-  const surface = createCanvasSurface(THREE, screen.size.width, screen.size.height);
+  const surface = createCanvasSurface(THREE, screen.size.width, screen.size.height, scale);
   const paint = () => {
     screen.draw(surface.ctx, canvasFont, store.getState().hover);
     surface.commit();

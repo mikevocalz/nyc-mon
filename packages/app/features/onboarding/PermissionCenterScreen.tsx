@@ -10,7 +10,7 @@ import { ScrollView, View } from '@acme/ui/tw';
 import { useReservedRegions } from '@acme/ui/adaptive-panes';
 import { isWholeWindow, permissionViewport } from './permissions-layout';
 import { selectPendingEgg, useMonStore } from '../mon/mon.store';
-import { copy } from './copy';
+import { copy, type OnboardingCopyId } from './copy';
 import { getNotifyPermission, scheduleReadyNotification } from './notify-permission';
 import { getDevicePermission, requestDevicePermission } from './permission-center-api';
 import {
@@ -23,12 +23,12 @@ import {
 } from './permission-center-model';
 import { useOnboarding } from './onboarding.store';
 
-const STATUS: Record<PermissionAccess, string> = {
-  undetermined: 'Not requested',
-  granted: 'Allowed on this device',
-  denied: 'Not allowed',
-  blocked: 'Change in device settings',
-  unavailable: 'Unavailable on this device',
+const STATUS: Record<PermissionAccess, OnboardingCopyId> = {
+  undetermined: 'perm.status.undetermined',
+  granted: 'perm.status.granted',
+  denied: 'perm.status.denied',
+  blocked: 'perm.status.blocked',
+  unavailable: 'perm.status.unavailable',
 };
 
 /**
@@ -159,9 +159,10 @@ export function PermissionCenterScreen() {
               testID="onboarding-permissions"
             >
               <View className="gap-2">
-                <Text variant="caption" tone="muted">H-LYNK SETUP / FINAL STEP</Text>
-                <Heading level={1} size="display-sm">Ready for NYC?</Heading>
-                <Text tone="muted">Choose what to enable. Notifications are selected; everything else is your call.</Text>
+                <Text variant="caption" tone="muted">{copy('perm.step')}</Text>
+                {/* Tablet: one rung up, like the other onboarding headings. */}
+                <Heading level={1} size="display-sm" className={tablet ? 'md:text-display-lg' : undefined}>{copy('perm.title')}</Heading>
+                <Text tone="muted" className={tablet ? 'md:text-lg' : undefined}>{copy('perm.intro')}</Text>
               </View>
               <View
                 className={tablet
@@ -189,12 +190,12 @@ export function PermissionCenterScreen() {
                         disabled={busy}
                       />
                       <Text variant="caption" tone="muted">{item.detail}</Text>
-                      {status ? <Text variant="caption" tone="muted">{STATUS[status]}</Text> : null}
+                      {status ? <Text variant="caption" tone="muted">{copy(STATUS[status])}</Text> : null}
                       {status === 'blocked' ? (
                         <View className="self-start">
                           <Button
                             variant="outline"
-                            title="Open device settings"
+                            title={copy('perm.open_settings')}
                             disabled={busy}
                             onPress={() => { void Linking.openSettings().catch(() => {}); }}
                           />
@@ -207,7 +208,7 @@ export function PermissionCenterScreen() {
               <View className={tablet ? 'gap-3 md:mt-auto md:landscape:flex-row md:landscape:flex-wrap md:landscape:items-center md:landscape:justify-between' : 'gap-3'}>
                 <View className={tablet ? 'md:landscape:w-[47%]' : undefined}>
                   <Button
-                    title={selected.length === 0 ? 'Continue' : 'Continue with ' + selected.length + ' selected'}
+                    title={selected.length === 0 ? copy('perm.continue') : copy('perm.continue.selected', { n: selected.length })}
                     variant="cta"
                     size="lg"
                     fullWidth
@@ -218,7 +219,7 @@ export function PermissionCenterScreen() {
                 </View>
                 <View className={tablet ? 'md:landscape:w-[47%]' : undefined}>
                   <Button
-                    title="Not now"
+                    title={copy('perm.not_now')}
                     variant="ghost"
                     size="lg"
                     fullWidth
@@ -228,7 +229,7 @@ export function PermissionCenterScreen() {
                   />
                 </View>
                 <Text variant="caption" tone="muted" className={tablet ? 'md:landscape:w-full' : undefined}>
-                  Denying access won’t block your Mon. You can enable permissions later in device settings or when you use a feature.
+                  {copy('perm.footnote')}
                 </Text>
               </View>
             </View>
