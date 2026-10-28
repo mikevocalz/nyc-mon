@@ -46,7 +46,7 @@ export function loadNvidiaEnv(source: Record<string, string | undefined> = proce
   return env;
 }
 export function nvidiaPublicConfig(env: NvidiaEnv) {
-  return { mcpUrl: env.SIM_MCP_URL, clientId: env.OAUTH_SIM_CLIENT_ID,
+  return { mcpUrl: env.SIM_MCP_URL, clientId: env.OAUTH_SIM_CLIENT_ID, issuer: env.AUTH_ISSUER.replace(/\/+$/, ''),
     modelBackend: 'nebius' as const, modelLabel: `NVIDIA ${env.SIM_NEBIUS_MODEL_ID} on Nebius Token Factory`,
     asr: env.NVIDIA_API_KEY ? 'riva' as const : 'browser' as const };
 }

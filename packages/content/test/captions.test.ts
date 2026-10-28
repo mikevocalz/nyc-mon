@@ -64,3 +64,29 @@ describe('streamed sentences', () => {
     expect(captionText('Bet!\n\nLil’ Ratti is good.')).toBe('Bet! Lil’ Ratti is good.');
   });
 });
+
+describe('markdown the model sent despite the prompt', () => {
+  // Nemotron on Nebius answered the hosted companion with "## headings",
+  // "- **label**" bullets and "**Roasted chestnuts** are your favorite". The
+  // stage-direction rule read each "*…*" inside the bold as a direction, so the
+  // screen showed "* * are your favorite" and the voice skipped the words.
+  it('keeps the words of bold text on screen', () => {
+    expect(captionText('For your snack: **Roasted chestnuts** are your favorite.')).toBe('For your snack: Roasted chestnuts are your favorite.');
+    expect(captionText('Right now your Mon is __awake__, Callah.')).toBe('Right now your Mon is awake, Caller.');
+  });
+
+  it('drops heading and bullet markers but keeps their words', () => {
+    expect(captionText('## First, who you are\n- **Name:** Call me Captain Lantern.\n* Snack: chestnuts\n1. Feed me')).toBe(
+      'First, who you are Name: Call me Captain Lantern. Snack: chestnuts Feed me',
+    );
+  });
+
+  it('still drops a real stage direction next to bold text', () => {
+    expect(captionText('*chuckle* **Captain Lantern**, I see you.')).toBe('Captain Lantern, I see you.');
+  });
+
+  it('sends the bold words, not the markers, to the voice', () => {
+    expect(spokenText('**Roasted chestnuts** are your favorite. *yawn*')).toBe('Roasted chestnuts are your favorite. *yawn*');
+    expect(spokenText('## Next\n- **Fullness:** 81 percent')).toBe('Next\nFullness: 81 percent');
+  });
+});

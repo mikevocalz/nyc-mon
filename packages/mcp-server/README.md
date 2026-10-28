@@ -55,4 +55,4 @@ Lane C's `mcpAppsRegistration()` (`src/ui`) registers the `ui://nyc-mon/…` res
 
 ## Env
 
-`MCP_PORT` (8788) · `MCP_RESOURCE_URI` (`http://localhost:8788/mcp`) · `MCP_ALLOWED_ORIGINS` · `AUTH_ISSUER` · `MCP_TOKEN_VERIFIER` (`jwt` | `introspection`) · `AUTH_JWKS_URL` · `AUTH_INTROSPECTION_URL` / `_CLIENT_ID` / `_CLIENT_SECRET` · `V1_BASE_URL` · `V1_MCP_SERVICE_KEY` (32+ chars) · `V1_TIMEOUT_MS` (400) · `OAUTH_DEV_BYPASS` · `MCP_DEV_MODE` · `MCP_WWW_AUTHENTICATE` (0). `src/env.ts` validates them at startup and names every missing value.
+`MCP_PORT` (8788) · `MCP_RESOURCE_URI` (`http://localhost:8788/mcp`) · `MCP_ALLOWED_ORIGINS` · `AUTH_ISSUER` · `MCP_TOKEN_VERIFIER` (`jwt` | `introspection`) · `AUTH_JWKS_URL` · `AUTH_INTROSPECTION_URL` / `_CLIENT_ID` / `_CLIENT_SECRET` · `V1_BASE_URL` · `V1_MCP_SERVICE_KEY` (32+ chars) · `V1_TIMEOUT_MS` (400) · `OAUTH_DEV_BYPASS` · `MCP_DEV_MODE` · `MCP_WWW_AUTHENTICATE` (0) · `MCP_RATE_LIMIT_PER_MINUTE` (120 per Caller or service client; 0 turns it off; past it, 429 with `Retry-After`). `src/env.ts` validates them at startup and names every missing value.
