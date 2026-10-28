@@ -1,0 +1,21 @@
+name: NYC-Mon district authority contract
+on:
+  pull_request:
+    paths:
+      - 'packages/core/realtime/**'
+      - 'packages/core/package.json'
+      - 'docs/architecture/colyseus-district-2026-10-16.md'
+      - '.github/workflows/nycmon-district-authority.yml'
+permissions:
+  contents: read
+jobs:
+  deterministic-authority:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: node --test packages/core/realtime/district-authority.test.ts

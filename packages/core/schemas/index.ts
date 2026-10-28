@@ -92,3 +92,5 @@ export {
   Vec3Schema,
 } from './spatial.ts';
 export * from './world-save.ts';
+
+export { CompanionPreferencesSchema, MemoryWriteSchema, MemoryDeleteSchema, MemorySnapshotSchema, type CompanionPreferences, type MemorySnapshot } from './companion-memory.ts';
