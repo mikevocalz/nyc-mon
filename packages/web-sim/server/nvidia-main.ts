@@ -43,7 +43,7 @@ const asrUpgrade = env.NVIDIA_API_KEY ? createAsrSocket({
   clientKey: asrClientKey,
   auth,
 }) : null;
-const mime: Record<string,string> = { '.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css','.woff2':'font/woff2','.svg':'image/svg+xml' };
+const mime: Record<string,string> = { '.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css','.woff2':'font/woff2','.svg':'image/svg+xml','.ico':'image/x-icon' };
 async function start() {
   const vite = env.NODE_ENV === 'production' ? undefined : await (await import('vite')).createServer({ root, server: { middlewareMode: true }, appType: 'mpa' });
   const server = createServer((req,res) => {
