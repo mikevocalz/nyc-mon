@@ -12,6 +12,7 @@ export { useIsHeadset } from './use-is-headset';
 export { isHeadsetAndroid } from './headset';
 export { LinkButton, type LinkButtonProps, type LinkButtonVariant } from './LinkButton';
 export { IconButton, type IconButtonProps } from './IconButton';
+export { BackButton, type BackButtonProps } from './BackButton';
 export { Card, type CardProps } from './Card';
 export { Badge, type BadgeProps } from './Badge';
 export { Avatar, type AvatarProps } from './Avatar';
@@ -112,6 +113,8 @@ export {
   createGlassScreen, createSwitchScreen, GLASS_MON_TARGET, glassGeometry, type GlassAction, type GlassLayout, type GlassLine, type GlassRing, type GlassTone, type GlassView,
   type ScreenMonSource,
 } from './three/hlynk';
+// Baby GLB download progress for the stage loader (no three.js import).
+export { glbFraction, glbProgressStore, type GlbProgress } from './three/mon/load-progress';
 export { RiverTide, type RiverTideProps, type RiverTideOrigin } from './backgrounds/RiverTide';
 export { RainWindow, type RainWindowProps } from './backgrounds/RainWindow';
 export { LazyScene, type LazySceneProps, type LazySceneState } from './backgrounds/LazyScene';

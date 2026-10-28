@@ -61,9 +61,11 @@ interface ItemProps {
 }
 
 /** One primary tab in the app's slab language. H-LYNK is the raised centre action. */
-function ShellNavItem({ name, label, raised, focused, layout, onPress }: ItemProps) {
+function ShellNavItem({ name, label, raised: raisedTab, focused, layout, onPress }: ItemProps) {
   const Icon = ICONS[name];
   const rail = layout !== 'bottom';
+  // The raised centre action belongs to the phone bar; on the rail H-LYNK is a tab like the rest.
+  const raised = raisedTab && !rail;
   const wide = layout === 'rail-expanded';
   return (
     <Pressable
@@ -108,7 +110,8 @@ export function ShellAvatar({ onPress }: { onPress: () => void }) {
   const name = useProfile((s) => s.name);
   return (
     <Pressable aria-label={`${name || 'Caller'}, profile`} onPress={onPress} className="self-center">
-      <Avatar name={name} />
+      {/* Same 56pt box as the menu button under it. */}
+      <Avatar name={name} className="h-14 w-14" />
     </Pressable>
   );
 }

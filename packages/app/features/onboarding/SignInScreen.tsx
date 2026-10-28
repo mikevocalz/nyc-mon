@@ -4,15 +4,15 @@ import { useEffect, useState } from 'react';
 import type { AuthError } from '@acme/auth';
 import {
   AuthProviderButton,
+  BackButton,
   Button,
   ErrorMessage,
   Heading,
-  IconButton,
   KeyboardAwareScroll,
   Text,
   TextField,
 } from '@acme/ui';
-import { ChevronLeft, Fingerprint, Mail } from '@acme/ui/icons';
+import { Fingerprint, Mail } from '@acme/ui/icons';
 import { Form } from '@acme/ui/primitives';
 import { Pressable, View } from '@acme/ui/tw';
 import { auth, isPasskeySupported } from './auth';
@@ -179,14 +179,7 @@ export function SignInScreen() {
                 which has no stack header, it is the screen's first row. */}
             {inlineBack ? (
               <View className="-ml-2 flex-row items-center" testID="m03-back">
-                <IconButton
-                  variant="ghost"
-                  size="sm"
-                  tone="royal"
-                  aria-label={copy('m03.back.a11y.label')}
-                  onPress={back}
-                  icon={<ChevronLeft size={22} />}
-                />
+                <BackButton label={copy('m03.back.a11y.label')} onPress={back} />
               </View>
             ) : null}
             <View className="gap-2">
