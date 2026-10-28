@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
-import { useFocusEffect } from 'expo-router';
 import { monLine, type MonLineOccasion } from '@acme/content/lines';
 import type { MonMood } from '@acme/core';
 import type { MonInstance } from '@acme/core/types';
@@ -11,6 +10,7 @@ import { AUTH_BASE_URL } from '../onboarding/auth';
 import { createMonLingoSource } from './mon-lingo-source';
 import { createMonSpeaker, type MonVoiceSubject } from './mon-speaker';
 import { createMonVoicePort, MON_VOICE_HEADERS } from './mon-voice-port';
+import { useScreenFocus } from './use-screen-focus';
 
 /**
  * The app's one Mon voice. Every screen that lets the Mon talk goes through
@@ -67,7 +67,7 @@ export function useMonVoice(mon: MonInstance | undefined, mood?: MonMood) {
   // This screen's token: its blur or unmount stops only a line it started.
   const [owner] = useState(() => ({}));
 
-  useFocusEffect(
+  useScreenFocus(
     useCallback(() => {
       void monLingo.refresh();
       return () => monSpeaker.stop(owner);
