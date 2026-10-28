@@ -35,10 +35,10 @@ describe('conversation lines', () => {
   });
 
   it.each([
-    [{ structuredContent: { applied: true, effect: 'eaten' } }, 'Feed: done. The server saved the change.'],
-    [{ structuredContent: { applied: false, declinedBecause: 'asleep' } }, 'Feed: not done. The server declined it, so nothing changed.'],
-    [{ isError: true, content: [{ type: 'text', text: 'x' }] }, 'Feed: failed. Nothing changed. Try again.'],
-    [{ structuredContent: { applied: 'true' } }, 'Feed: the server’s answer couldn’t be read, so this isn’t counted as done.'],
+    [{ structuredContent: { applied: true, effect: 'eaten' } }, 'Fed.'],
+    [{ structuredContent: { applied: false, declinedBecause: 'asleep' } }, 'Didn’t feed: your Mon is asleep. Nothing changed.'],
+    [{ isError: true, content: [{ type: 'text', text: 'x' }] }, 'Feeding failed. Nothing changed. Try again.'],
+    [{ structuredContent: { applied: 'true' } }, 'Couldn’t read the answer to feeding, so it isn’t counted as done.'],
   ] as const)('care result %j reads as a sentence', (result, text) => {
     const line = toolResultLine('feed_mon', result as never);
     expect(line).toMatchObject({ who: 'Result', text });
@@ -47,7 +47,7 @@ describe('conversation lines', () => {
   });
 
   it('names a status read and an unknown tool plainly', () => {
-    expect(toolResultLine('get_mon_status', { content: [{ type: 'text', text: '{}' }] } as never).text).toBe('Status: checked.');
+    expect(toolResultLine('get_mon_status', { content: [{ type: 'text', text: '{}' }] } as never).text).toBe('Checked in.');
     expect(toolResultLine('mystery_tool', { structuredContent: { mon: {} } } as never).text).toBe('mystery_tool: checked.');
   });
 

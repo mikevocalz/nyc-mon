@@ -3,10 +3,10 @@ import type Anthropic from '@anthropic-ai/sdk';
 import type { CallToolResult } from '@modelcontextprotocol/client';
 import type { MemorySnapshot } from '@acme/core/schemas';
 import type { TurnOutcome } from '../shared/agentLoop.ts';
-import { toolOutcome, type ToolOutcome } from '../shared/toolOutcome.ts';
 import { captionText } from '@acme/content/voice';
 import type { McpSession } from './mcp.ts';
 import { INITIAL_VOICE, type VoiceState } from './voiceState.ts';
+import { careSentence, type MonCard } from './companionMon.ts';
 
 /** One entry in the conversation log. `detail` is the raw server answer, shown collapsed. */
 export interface Line { id: number; who: 'Caller' | 'Mon' | 'Result'; text: string; detail?: string; cut?: boolean }
@@ -16,6 +16,10 @@ export interface CompanionState {
   connected: boolean; busy: boolean; question: string; note: string; consent: boolean;
   memory: MemorySnapshot | null; error: string; status: string; confirmForget: boolean;
   lines: Line[]; nextId: number;
+  /** The signed-in Caller's Mon, from the last tool result that carried it (companionMon.ts). */
+  mon: MonCard | null;
+  /** Which right-hand panel is open: the conversation or the Memory controls. */
+  panel: 'chat' | 'memory';
   /** Voice conversation: listening, thinking, speaking, interrupted (voiceState.ts). */
   voice: VoiceState;
 }
@@ -24,7 +28,7 @@ export interface CompanionRuntime { session: McpSession | null; history: Anthrop
 
 export const initialCompanionState = (): CompanionState => ({
   connected: false, busy: false, question: '', note: '', consent: false, memory: null,
-  error: '', status: '', confirmForget: false, lines: [], nextId: 0, voice: INITIAL_VOICE,
+  error: '', status: '', confirmForget: false, lines: [], nextId: 0, voice: INITIAL_VOICE, mon: null, panel: 'chat',
 });
 
 const MAX_LINES = 40;
@@ -35,17 +39,6 @@ export function appendLine(state: Pick<CompanionState, 'lines' | 'nextId'>, line
   return { lines: [...state.lines, { ...line, id: state.nextId }].slice(-MAX_LINES), nextId: state.nextId + 1 };
 }
 
-const ACTION: Readonly<Record<string, string>> = {
-  get_mon_status: 'Status', check_on_mon: 'Check-in', check_incubation: 'Egg check', hatch_egg: 'Hatch',
-  talk_to_mon: 'Talk', feed_mon: 'Feed', rest_mon: 'Rest', wake_mon: 'Wake', play_with_mon: 'Play',
-};
-const OUTCOME: Readonly<Record<ToolOutcome, string>> = {
-  applied: 'done. The server saved the change.',
-  declined: 'not done. The server declined it, so nothing changed.',
-  failed: 'failed. Nothing changed. Try again.',
-  returned: 'checked.',
-  unverified: 'the server’s answer couldn’t be read, so this isn’t counted as done.',
-};
 const EMPTY_REPLY: Readonly<Record<TurnOutcome, string>> = {
   done: 'No reply text.',
   refused: 'The model declined to answer. Try asking another way.',
@@ -53,11 +46,11 @@ const EMPTY_REPLY: Readonly<Record<TurnOutcome, string>> = {
   'step-limit': 'Your Mon tried too many steps and stopped. Try a simpler request.',
 };
 
-/** A tool result as one sentence, from the server's answer and never the model's account of it. */
+/** A tool result as one plain sentence (companionMon.ts careSentence), with the raw answer kept for the detail. */
 export function toolResultLine(name: string, result: CallToolResult): Omit<Line, 'id'> {
   return {
     who: 'Result',
-    text: `${ACTION[name] ?? name}: ${OUTCOME[toolOutcome(result)]}`,
+    text: careSentence(name, result),
     detail: JSON.stringify(result.structuredContent ?? result.content, null, 2).slice(0, MAX_DETAIL),
   };
 }
@@ -101,7 +94,7 @@ export function errorMessage(error: unknown): string {
 export function expireSession(store: StoreApi<CompanionState>, runtime: StoreApi<CompanionRuntime>): void {
   runtime.getState().abort?.abort(); runtime.setState({ history: [] });
   store.setState({
-    connected: false, busy: false, memory: null, note: '', consent: false, confirmForget: false, lines: [], status: '',
+    connected: false, busy: false, memory: null, note: '', consent: false, confirmForget: false, lines: [], status: '', mon: null, panel: 'chat',
     error: 'Your sign-in expired. Sign in again to keep talking.',
   });
 }
