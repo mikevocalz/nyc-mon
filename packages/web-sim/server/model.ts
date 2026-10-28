@@ -298,6 +298,20 @@ export function clientKey(remoteAddress: string | undefined, forwardedFor: strin
 }
 
 export function describeModelError(err: unknown): { message: string; retry: boolean } {
+  // The NVIDIA entry (nvidia-main.ts) shares this handler. Its errors are matched
+  // by name so the Bedrock simulator never imports the Nebius adapter. The 60 s
+  // figure is NebiusOptionsSchema's timeoutMs default, which nvidia-main.ts keeps.
+  if (err instanceof Error && err.name === 'NebiusError') {
+    const { code, status } = err as Error & { code?: string; status?: number };
+    if (code === 'TIMEOUT') return { message: 'Nemotron on Nebius didn’t answer within 60 seconds. No other model answered instead. Try again.', retry: true };
+    if (code === 'HTTP' && status === 429) return { message: 'Nebius is limiting requests right now. Wait a minute and try again.', retry: true };
+    if (code === 'HTTP') return { message: `Nebius returned an error${status === undefined ? '' : ` (${status})`}. No other model was used. Try again.`, retry: true };
+    if (code === 'RESPONSE') return { message: 'Nebius sent a reply this page couldn’t use. No other model was used. Try again.', retry: true };
+    return { message: 'This conversation couldn’t be sent to Nebius. Start a new conversation.', retry: false };
+  }
+  if (err instanceof Error && err.name === 'CompanionMemoryError') {
+    return { message: 'Your saved preferences couldn’t be checked, so nothing was sent to the model. Try again.', retry: true };
+  }
   if (err instanceof Anthropic.RateLimitError) return { message: 'The model is busy. Try again in a few seconds.', retry: true };
   if (err instanceof Anthropic.AuthenticationError || err instanceof Anthropic.PermissionDeniedError) {
     return { message: 'Bedrock refused this request. Check the AWS credentials and that this account has access to the configured model.', retry: false };
