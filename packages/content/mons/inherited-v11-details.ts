@@ -5,7 +5,7 @@
  * Per-species home district is NOT defined by these sources; no guessed home districts.
  */
 export interface InheritedDexDetail {
-  readonly legacyTypeNames: readonly string[];
+  readonly legacyTypeNames: readonly ('Neutral' | 'Water' | 'Ghost' | 'Wind' | 'Electric' | 'Nature' | 'Spirit' | 'Poison' | 'Fire' | 'Rock')[];
   readonly scaleTargetDescription: string | null;
   readonly loreSummary: string | null;
   readonly evolutionUnlock: { readonly itemName: string; readonly mastery: string } | null;
