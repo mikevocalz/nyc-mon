@@ -644,7 +644,7 @@ If the grace ever comes back for self-deletion, the privacy notice changes first
 
 ### Device settings (M19, 2026-10-28)
 
-The "This device" card on the 2D page, and one row each on the glass. Every switch is saved (MMKV, `device-prefs.store.ts`) and read: Haptics silences every `@acme/ui/haptics` call, Sound silences the side key chirp and the synthesized hatch sounds, Reduce motion ORs into the kit's `useReducedMotion`, Egg alerts gates `scheduleReadyNotification` and cancels the scheduled alert when turned off. No Rive file in the repo carries audio, so Rive has nothing to mute. Haptics and Egg alerts are native only (web has neither).
+The "This device" card on the 2D page, and one row each on the glass. Every switch is saved (MMKV, `device-prefs.store.ts`) and read: Haptics silences every `@acme/ui/haptics` call, Sound silences the Mon's voice (`features/voice`, captions stay up), the side key chirp and the synthesized hatch sounds, Reduce motion ORs into the kit's `useReducedMotion`, Egg alerts gates `scheduleReadyNotification` and cancels the scheduled alert when turned off. No Rive file in the repo carries audio, so Rive has nothing to mute. Haptics and Egg alerts are native only (web has neither).
 
 | ID | String | Voice | Status |
 |---|---|---|---|
@@ -656,7 +656,7 @@ The "This device" card on the 2D page, and one row each on the glass. Every swit
 | `settings.haptics.label` | Haptics | ui | drafted |
 | `settings.haptics.caption` | Vibration on taps, the hatch and the controls. | ui | drafted |
 | `settings.sound.label` | Sound | ui | drafted |
-| `settings.sound.caption` | Sound effects, like the side key chirp. | ui | drafted |
+| `settings.sound.caption` | Your Mon's voice and sound effects, like the side key chirp. | ui | drafted (2026-10-28: the switch also mutes the Mon's voice; captions stay) |
 | `settings.motion.label` | Reduce motion | ui | drafted |
 | `settings.motion.caption` | Follows your phone. Turn on to reduce motion here even when your phone doesn’t. | ui | drafted |
 | `settings.motion.caption.system` | On in your phone’s settings, so motion is already reduced. | ui | drafted (the switch reads on and can't turn the OS setting off) |

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { captionText, spokenText, unwrapQuotes } from '../src/client/caption.ts';
+import { captionText, spokenText, unwrapQuotes } from '../captions.ts';
 
 describe('captionText', () => {
   it('drops stage directions the voice performs', () => {

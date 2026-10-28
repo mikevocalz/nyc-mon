@@ -166,7 +166,7 @@ export const ONBOARDING_COPY = {
   'settings.haptics.label': 'Haptics',
   'settings.haptics.caption': 'Vibration on taps, the hatch and the controls.',
   'settings.sound.label': 'Sound',
-  'settings.sound.caption': 'Sound effects, like the side key chirp.',
+  'settings.sound.caption': "Your Mon's voice and sound effects, like the side key chirp.",
   'settings.motion.label': 'Reduce motion',
   'settings.motion.caption': 'Follows your phone. Turn on to reduce motion here even when your phone doesn’t.',
   'settings.motion.caption.system': 'On in your phone’s settings, so motion is already reduced.',

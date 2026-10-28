@@ -26,6 +26,8 @@ import { StageControls, type StageControl } from '../egg/StageControls';
 import { StageLoader } from '../egg/StageLoader';
 import { COMING_SOON } from '../companion/glass';
 import { monModelSource } from '../companion/mon-models';
+import { MonCaption } from '../voice/MonCaption';
+import { useMonVoice } from '../voice/use-mon-voice';
 import { hatchCopy } from './copy';
 import {
   CRACK_BEATS, HESITATE_HINT_MS, PHASE_MS, SKIP_AFTER_MS, eggPrecrackPose, resolveHatchEntry, type HatchPhase,
@@ -131,6 +133,8 @@ export function HatchScreen() {
   const monName = mon ? monIdentity(mon).name : babyName;
   const firstLook = mon === undefined ? 'lean-in' : deriveFirstLook(mon.monInstanceId, under13 ?? true);
   const phase: HatchPhase | undefined = hatch?.kind === 'presenting' ? hatch.phase : undefined;
+  // The first look is where the Baby's first words go (canon lines only: @acme/content/lines).
+  const voice = useMonVoice(mon);
 
   // Entry (M12 "Route, entry and states"), once.
   useEffect(() => {
@@ -239,6 +243,7 @@ export function HatchScreen() {
         if (firstLook === 'lean-in') {
           haptics.firstLook();
           announcePolitely(hatchCopy('m12.a11y.first_look.lean_in', { babyName }));
+          voice.sayLine('first-words');
         } else if (!local.getState().stayedClose) {
           announcePolitely(hatchCopy('m12.a11y.first_look.hesitate', { babyName }));
           at(HESITATE_HINT_MS, () => local.setState({ showHesitateHint: true }));
@@ -280,6 +285,7 @@ export function HatchScreen() {
     haptics.warm();
     announcePolitely(hatchCopy('m12.a11y.first_look.resolved', { babyName }));
     haptics.firstLook();
+    voice.sayLine('first-words');
     // The phase loop re-runs with `stayedClose` and writes the `advance` after the lean-in.
     local.setState({ stayedClose: true, showHesitateHint: false });
   };
@@ -448,8 +454,12 @@ export function HatchScreen() {
               {hatchCopy('m12.first_look.hesitate.hint')}
             </Text>
           ) : null}
+          {s.stage !== 'complete' && !(hesitating && s.showHesitateHint) ? (
+            <MonCaption testID="m12-mon-caption" className="absolute inset-x-4 bottom-4 text-center" />
+          ) : null}
           {s.stage === 'complete' && eggId0 !== undefined ? (
             <View className="absolute inset-x-4 bottom-4 items-center gap-1">
+              <MonCaption testID="m12-mon-caption" className="text-center" />
               <SignagePlate
                 testID="m12-plate"
                 text={babyName}
@@ -540,6 +550,7 @@ export function HatchScreen() {
                 {hatchCopy('m12.first_look.hesitate.hint')}
               </Text>
             ) : null}
+            <MonCaption testID="m12-mon-caption" className="text-center" />
             {s.stage === 'complete' && eggId0 !== undefined ? (
               <View
                 testID="m12-plate"

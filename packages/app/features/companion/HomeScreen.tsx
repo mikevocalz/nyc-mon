@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'expo-router';
+import { deriveMonMood } from '@acme/core/sim';
 import type { MonInstance } from '@acme/core/types';
 import {
   Badge, Button, CareMeterRing, EmptyState, CareMeterRingGroup, HLYNK_COPY, SegmentedControl, SheetSurface, StatusRow, useInstanceStore,
@@ -23,6 +24,8 @@ import { useMinuteClock } from './minute-clock';
 import { monIdentity } from './mon-identity';
 import { CompanionPane } from './CompanionPane';
 import { JournalRows, PaneSection, useActiveJournal } from './pane-content';
+import { MonCaption } from '../voice/MonCaption';
+import { useMonVoice } from '../voice/use-mon-voice';
 
 const NEEDS = ['energy', 'fullness', 'social'] as const;
 /** How many journal moments the Home pane lists before pointing to the Journal. */
@@ -81,6 +84,13 @@ export function HomeScreen({ mon }: { mon: MonInstance }) {
   const asleep = care?.activity.kind === 'asleep';
   const scheme = asleep ? 'night' : clockScheme;
   const dexId = identity?.dexId ?? null;
+  // The Mon's voice (canon lines only); its caption takes the glass subtitle while it shows.
+  const voice = useMonVoice(mon, care === undefined ? undefined : deriveMonMood(care));
+  /** A line for a tap or a return, unless the Mon is asleep: asking for food gets "hungry". */
+  const speak = (askingForFood: boolean) => {
+    if (asleep) return;
+    voice.sayLine(askingForFood ? 'hungry' : 'hello');
+  };
 
   // ---- Decision #18: which Mon is with the Caller ----
   const mons = useMonStore((s) => s.save?.mons) ?? NO_MONS;
@@ -109,6 +119,8 @@ export function HomeScreen({ mon }: { mon: MonInstance }) {
     if (status) announcePolitely(companionCopy('m13.resumed.a11y', { name, status: status.text }));
     const r = homeReaction(dexId, care, 'resume', nowMs);
     if (r.kind === 'clip') local.setState((st) => ({ clip: { key: st.clip.key + 1, clips: r.clips } }));
+    speak(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `speak` reads this render's Mon; the resume count is the trigger
   }, [resumeCount, status, name, dexId, care, nowMs, local]);
 
   // The status chip is a polite live region: announced when its words change, never on the minute tick.
@@ -126,6 +138,7 @@ export function HomeScreen({ mon }: { mon: MonInstance }) {
     const r = homeReaction(dexId, care, 'tap', nowMs);
     if (glassOn && r.kind === 'clip') local.setState((st) => ({ clip: { key: st.clip.key + 1, clips: r.clips } }));
     else local.setState((st) => ({ reactionKey: st.reactionKey + 1 }));
+    speak(care !== undefined && askRoute(care) === '/(home)/feed');
   };
   const answer = () => {
     const route = care === undefined ? undefined : askRoute(care);
@@ -226,7 +239,7 @@ export function HomeScreen({ mon }: { mon: MonInstance }) {
     : {
       status: status ? { text: status.text, tone: status.tone === 'request' ? 'request' : 'neutral' } : null,
       title: name,
-      subtitle,
+      subtitle: voice.caption ?? subtitle,
       rings: care === undefined ? [] : NEEDS.map((need) => glassRing(need, care[need])),
       lines: [],
       actions,
@@ -364,6 +377,7 @@ export function HomeScreen({ mon }: { mon: MonInstance }) {
           <View className="ml-auto">{rings}</View>
         </View>
         <View testID="m13-mon" className="flex-1">
+          <MonCaption testID="m13-mon-caption" className="px-4 pt-2 text-center" />
           <Pressable
             role="button"
             accessibilityLabel={monLabel}

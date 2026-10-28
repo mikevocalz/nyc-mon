@@ -18,6 +18,8 @@ import { Route as OauthRefusedRouteImport } from './routes/oauth/refused'
 import { Route as OauthSignInRouteImport } from './routes/oauth/sign-in'
 import { Route as V1EggsRouteImport } from './routes/v1/eggs'
 import { Route as V1GuardianConsentsRouteImport } from './routes/v1/guardian-consents'
+import { Route as V1MonLingoRouteImport } from './routes/v1/mon-lingo'
+import { Route as V1MonVoiceRouteImport } from './routes/v1/mon-voice'
 import { Route as V1WaitlistRouteImport } from './routes/v1/waitlist'
 import { Route as PayloadAdminIndexRouteImport } from './routes/_payload/admin.index'
 import { Route as PayloadAdminSplatRouteImport } from './routes/_payload/admin.$'
@@ -72,6 +74,16 @@ const V1GuardianConsentsRoute = V1GuardianConsentsRouteImport.update({
   path: '/v1/guardian-consents',
   getParentRoute: () => rootRouteImport,
 } as any)
+const V1MonLingoRoute = V1MonLingoRouteImport.update({
+  id: '/v1/mon-lingo',
+  path: '/v1/mon-lingo',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const V1MonVoiceRoute = V1MonVoiceRouteImport.update({
+  id: '/v1/mon-voice',
+  path: '/v1/mon-voice',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const V1WaitlistRoute = V1WaitlistRouteImport.update({
   id: '/v1/waitlist',
   path: '/v1/waitlist',
@@ -122,6 +134,8 @@ export interface FileRoutesByFullPath {
   '/oauth/sign-in': typeof OauthSignInRoute
   '/v1/eggs': typeof V1EggsRouteWithChildren
   '/v1/guardian-consents': typeof V1GuardianConsentsRoute
+  '/v1/mon-lingo': typeof V1MonLingoRoute
+  '/v1/mon-voice': typeof V1MonVoiceRoute
   '/v1/waitlist': typeof V1WaitlistRoute
   '/admin/$': typeof PayloadAdminSplatRoute
   '/payload-api/$': typeof PayloadPayloadApiSplatRoute
@@ -140,6 +154,8 @@ export interface FileRoutesByTo {
   '/oauth/sign-in': typeof OauthSignInRoute
   '/v1/eggs': typeof V1EggsRouteWithChildren
   '/v1/guardian-consents': typeof V1GuardianConsentsRoute
+  '/v1/mon-lingo': typeof V1MonLingoRoute
+  '/v1/mon-voice': typeof V1MonVoiceRoute
   '/v1/waitlist': typeof V1WaitlistRoute
   '/admin/$': typeof PayloadAdminSplatRoute
   '/payload-api/$': typeof PayloadPayloadApiSplatRoute
@@ -160,6 +176,8 @@ export interface FileRoutesById {
   '/oauth/sign-in': typeof OauthSignInRoute
   '/v1/eggs': typeof V1EggsRouteWithChildren
   '/v1/guardian-consents': typeof V1GuardianConsentsRoute
+  '/v1/mon-lingo': typeof V1MonLingoRoute
+  '/v1/mon-voice': typeof V1MonVoiceRoute
   '/v1/waitlist': typeof V1WaitlistRoute
   '/_payload/admin/$': typeof PayloadAdminSplatRoute
   '/_payload/payload-api/$': typeof PayloadPayloadApiSplatRoute
@@ -180,6 +198,8 @@ export interface FileRouteTypes {
     | '/oauth/sign-in'
     | '/v1/eggs'
     | '/v1/guardian-consents'
+    | '/v1/mon-lingo'
+    | '/v1/mon-voice'
     | '/v1/waitlist'
     | '/admin/$'
     | '/payload-api/$'
@@ -198,6 +218,8 @@ export interface FileRouteTypes {
     | '/oauth/sign-in'
     | '/v1/eggs'
     | '/v1/guardian-consents'
+    | '/v1/mon-lingo'
+    | '/v1/mon-voice'
     | '/v1/waitlist'
     | '/admin/$'
     | '/payload-api/$'
@@ -217,6 +239,8 @@ export interface FileRouteTypes {
     | '/oauth/sign-in'
     | '/v1/eggs'
     | '/v1/guardian-consents'
+    | '/v1/mon-lingo'
+    | '/v1/mon-voice'
     | '/v1/waitlist'
     | '/_payload/admin/$'
     | '/_payload/payload-api/$'
@@ -237,6 +261,8 @@ export interface RootRouteChildren {
   OauthSignInRoute: typeof OauthSignInRoute
   V1EggsRoute: typeof V1EggsRouteWithChildren
   V1GuardianConsentsRoute: typeof V1GuardianConsentsRoute
+  V1MonLingoRoute: typeof V1MonLingoRoute
+  V1MonVoiceRoute: typeof V1MonVoiceRoute
   V1WaitlistRoute: typeof V1WaitlistRoute
   V1MeEggsRoute: typeof V1MeEggsRoute
   V1MeMonsRoute: typeof V1MeMonsRoute
@@ -306,6 +332,20 @@ declare module '@tanstack/react-router' {
       path: '/v1/guardian-consents'
       fullPath: '/v1/guardian-consents'
       preLoaderRoute: typeof V1GuardianConsentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/v1/mon-lingo': {
+      id: '/v1/mon-lingo'
+      path: '/v1/mon-lingo'
+      fullPath: '/v1/mon-lingo'
+      preLoaderRoute: typeof V1MonLingoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/v1/mon-voice': {
+      id: '/v1/mon-voice'
+      path: '/v1/mon-voice'
+      fullPath: '/v1/mon-voice'
+      preLoaderRoute: typeof V1MonVoiceRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/v1/waitlist': {
@@ -404,6 +444,8 @@ const rootRouteChildren: RootRouteChildren = {
   OauthSignInRoute: OauthSignInRoute,
   V1EggsRoute: V1EggsRouteWithChildren,
   V1GuardianConsentsRoute: V1GuardianConsentsRoute,
+  V1MonLingoRoute: V1MonLingoRoute,
+  V1MonVoiceRoute: V1MonVoiceRoute,
   V1WaitlistRoute: V1WaitlistRoute,
   V1MeEggsRoute: V1MeEggsRoute,
   V1MeMonsRoute: V1MeMonsRoute,
