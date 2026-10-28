@@ -1,5 +1,6 @@
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { FALLBACK_MON_LINGO, type MonLingo } from '@acme/content/lingo';
 import { applyCareAction, createInitialCareState, mintMonInstance, type CareState, type EggRecord, type MonInstance } from '@acme/core';
 import type { TokenVerifier, VerifiedToken } from '../auth/verifier.ts';
 import { InvalidTokenError } from '../auth/verifier.ts';
@@ -58,6 +59,8 @@ export function fakeV1(
     timeoutAfterApplyOnce?: boolean;
     /** First PUT: fail like a dropped connection before anything is applied. */
     dropBeforeApplyOnce?: boolean;
+    /** What `GET /v1/mon-lingo` serves (default: the bundled seed); null answers 503. */
+    lingo?: MonLingo | null;
   } = {},
 ) {
   const rows = options.rows ?? [];
@@ -83,6 +86,13 @@ export function fakeV1(
     }
     const callerId = headers.get('X-NYC-MON-On-Behalf-Of') ?? '';
 
+    if (url.pathname === '/v1/mon-lingo') {
+      if (options.lingo === null) return Response.json({ ok: false, error: { code: 'INTERNAL_ERROR', message: 'x' } }, { status: 503 });
+      const body = JSON.stringify({ ok: true, data: options.lingo ?? FALLBACK_MON_LINGO });
+      const etag = `"${body.length}"`;
+      if (headers.get('if-none-match') === etag) return new Response(null, { status: 304, headers: { etag } });
+      return new Response(body, { status: 200, headers: { etag, 'content-type': 'application/json' } });
+    }
     if (url.pathname === '/v1/me/mons') {
       const mons = rows.filter((r) => r.mon.callerId === callerId);
       const active = options.active !== undefined && callerId in options.active ? { activeMonInstanceId: options.active[callerId] } : {};

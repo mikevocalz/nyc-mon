@@ -14,7 +14,10 @@ function sqlText(query: Chunk): string {
 async function capture(run: (args: never) => Promise<void>): Promise<string> {
   const statements: string[] = [];
   const db = { execute: async (query: Chunk) => { statements.push(sqlText(query)); } };
-  await run({ db, payload: {}, req: {} } as never);
+  // Data migrations (the lingo seed) write through the Local API, not SQL;
+  // their calls resolve as no-ops so only raw SQL is inspected.
+  const payload = new Proxy({}, { get: () => async () => ({ docs: [], totalDocs: 0 }) });
+  await run({ db, payload, req: {} } as never);
   return statements.join('\n');
 }
 

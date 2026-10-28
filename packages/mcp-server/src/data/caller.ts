@@ -1,3 +1,4 @@
+import type { MonLingo } from '@acme/content/lingo';
 import type { CareAction, CareState, EggRecord, MonInstance } from '@acme/core';
 
 /** One Mon with its stored care state, as `/v1/me/mons` returns it. */
@@ -39,6 +40,12 @@ export interface CareWriteIntent {
  * contract (ADR 0001 §1.4). Methods throw the errors in `./errors.ts`.
  */
 export interface CallerData {
+  /**
+   * `GET /v1/mon-lingo`: the Mon's lines and lingo as Payload publishes them.
+   * Optional so a test double can leave it out; the tools then use the
+   * bundled fallback.
+   */
+  monLingo?(callerId: string): Promise<MonLingo>;
   /** `GET /v1/me/mons`. */
   listMons(callerId: string): Promise<CallerMons>;
   /** `GET /v1/me/eggs`. */

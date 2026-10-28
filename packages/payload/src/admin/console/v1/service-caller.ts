@@ -23,6 +23,8 @@ const SERVICE_ROUTES: readonly { method: string; path: RegExp }[] = [
   { method:'GET',path:/^\/v1\/me\/companion-memory\/?$/ },
   { method:'PUT',path:/^\/v1\/me\/companion-memory\/?$/ },
   { method:'DELETE',path:/^\/v1\/me\/companion-memory\/?$/ },
+  // The Mon's published lines and lingo (read-only, the same for every Caller).
+  { method:'GET',path:/^\/v1\/mon-lingo\/?$/ },
 ];
 export function isServiceRoute(request: Request): boolean {
   return SERVICE_ROUTES.some((route) => route.method === request.method.toUpperCase() && route.path.test(new URL(request.url).pathname));

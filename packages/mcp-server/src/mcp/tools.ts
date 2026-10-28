@@ -11,6 +11,7 @@ import {
   type MonInstance,
 } from '@acme/core';
 import type { CallToolResult, McpServer } from '@modelcontextprotocol/server';
+import { FALLBACK_MON_LINGO, monVoiceView, voiceGuideFor, type MonLingo } from '@acme/content/voice';
 import type { z } from 'zod';
 import { permitted, resolveActingVoice, type ActingVoice, type SpeakerHint } from '../auth/actor.ts';
 import { isAdultByBirthYear } from '../auth/request-auth.ts';
@@ -112,11 +113,29 @@ async function guarded(fn: () => Promise<CallToolResult>): Promise<CallToolResul
 }
 
 /**
- * The Mon as tools report it. `gender` and `voice` are for a client that voices
- * the Mon itself (the web simulator); Alexa reads replies in its own voice
- * (PLATFORM-DOCS §2.8) and copy never uses a pronoun for a Mon (PS-005).
+ * The Mon's lines and lingo as Payload publishes them (`GET /v1/mon-lingo`).
+ * When `/v1` can't answer, the bundled fallback keeps the tools working; the
+ * voice data is never a reason to fail a care call.
  */
-function monView(mon: MonInstance) {
+async function lingoFor(ctx: ToolContext, callerId: string): Promise<MonLingo> {
+  if (ctx.data.monLingo === undefined) return FALLBACK_MON_LINGO;
+  try {
+    return await ctx.data.monLingo(callerId);
+  } catch (error) {
+    console.error('[mcp] mon-lingo unavailable, using the bundled fallback:', error instanceof Error ? error.message : String(error));
+    return FALLBACK_MON_LINGO;
+  }
+}
+
+/**
+ * The Mon as tools report it. `gender` and `voice` (from `@acme/content/voice`, the
+ * one Mon voice module, read against the lingo Payload serves) are for a
+ * client that voices the Mon itself (the web simulator); Alexa reads replies
+ * in its own voice (PLATFORM-DOCS §2.8) and copy never uses a pronoun for a
+ * Mon (PS-005).
+ */
+async function monView(ctx: ToolContext, callerId: string, mon: MonInstance) {
+  const lingo = await lingoFor(ctx, callerId);
   return {
     monId: mon.monInstanceId,
     name: mon.nickname,
@@ -125,7 +144,7 @@ function monView(mon: MonInstance) {
     bond: mon.bond,
     hatchedAt: mon.hatchedAt,
     gender: mon.gender,
-    voice: mon.voiceLineageId === null ? null : { lineageId: mon.voiceLineageId, stage: mon.stage },
+    voice: monVoiceView(mon, lingo),
   };
 }
 
@@ -231,7 +250,7 @@ async function runHatch(ctx: ToolContext, args: { eggId?: string; speakerHint?: 
       alreadyHatched,
       hatching: !alreadyHatched,
       egg: { eggId, speciesId: listed?.egg.speciesId ?? 'dex-001' },
-      mon: monView(state.mon),
+      mon: await monView(ctx, linked.callerId, state.mon),
       care: careView(state.care),
       mood: deriveMonMood(state.care),
     });
@@ -295,7 +314,7 @@ async function runCare(
       return success({
         applied: false,
         declinedBecause: predicted.outcome.reason,
-        mon: monView(state.mon),
+        mon: await monView(ctx, linked.callerId, state.mon),
         care: careView(state.care),
         mood: deriveMonMood(state.care),
       });
@@ -318,7 +337,7 @@ async function runCare(
     return success({
       applied: true,
       effect,
-      mon: monView(written.mon),
+      mon: await monView(ctx, linked.callerId, written.mon),
       care: careView(written.care),
       mood: deriveMonMood(written.care),
     });
@@ -383,7 +402,7 @@ export function buildTools(ctx: ToolContext) {
           const state = await resolveMon(ctx, linked.callerId, args.monId);
           if (isResult(state)) return state;
           return success({
-            mon: monView(state.mon),
+            mon: await monView(ctx, linked.callerId, state.mon),
             care: careView(state.care),
             mood: deriveMonMood(state.care),
             needs: listUnmetNeeds(state.care),
@@ -407,7 +426,7 @@ export function buildTools(ctx: ToolContext) {
           if (isResult(state)) return state;
           const needs = listUnmetNeeds(state.care);
           return success({
-            mon: monView(state.mon),
+            mon: await monView(ctx, linked.callerId, state.mon),
             mood: deriveMonMood(state.care),
             needs,
             suggestedCare: suggestedCare(state, needs),
@@ -465,9 +484,11 @@ export function buildTools(ctx: ToolContext) {
         return guarded(async () => {
           const state = await resolveMon(ctx, linked.callerId, args.monId);
           if (isResult(state)) return state;
+          const mood = deriveMonMood(state.care);
           return success({
-            mon: monView(state.mon),
-            mood: deriveMonMood(state.care),
+            mon: await monView(ctx, linked.callerId, state.mon),
+            mood,
+            voiceGuide: voiceGuideFor(state.mon, mood, await lingoFor(ctx, linked.callerId)),
             needs: listUnmetNeeds(state.care),
             activity: state.care.activity.kind,
             wantsFood: state.care.pendingRequest !== null,

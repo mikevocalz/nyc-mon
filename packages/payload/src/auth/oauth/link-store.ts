@@ -4,19 +4,31 @@
 // page mounts so a later visit starts clean.
 import { create } from 'zustand';
 
-type SignInPending = 'amazon' | 'email' | 'passkey' | 'code';
+type SignInPending = 'amazon' | 'email' | 'passkey' | 'code' | 'sign-up' | 'reset';
+/** Which form the sign-in page shows. */
+export type SignInMode = 'sign-in' | 'sign-up' | 'forgot';
+export type SignInField = 'email' | 'password' | 'birthYear';
 type ConsentPending = 'link' | 'cancel';
 
 interface SignInStore {
+  mode: SignInMode;
   email: string;
   password: string;
+  birthYear: string;
   code: string;
+  fieldErrors: Partial<Record<SignInField, string>>;
+  /** A confirmation, e.g. that a reset link was sent. */
+  notice: string | undefined;
   needsCode: boolean;
   pending: SignInPending | undefined;
   error: string | undefined;
   passkeySupported: boolean;
+  setMode: (mode: SignInMode) => void;
   setEmail: (email: string) => void;
   setPassword: (password: string) => void;
+  setBirthYear: (birthYear: string) => void;
+  setFieldErrors: (fieldErrors: Partial<Record<SignInField, string>>) => void;
+  setNotice: (notice: string | undefined) => void;
   setCode: (code: string) => void;
   setNeedsCode: (needsCode: boolean) => void;
   setPending: (pending: SignInPending | undefined) => void;
@@ -26,9 +38,13 @@ interface SignInStore {
 }
 
 const SIGN_IN_INITIAL = {
+  mode: 'sign-in' as SignInMode,
   email: '',
   password: '',
+  birthYear: '',
   code: '',
+  fieldErrors: {},
+  notice: undefined,
   needsCode: false,
   pending: undefined,
   error: undefined,
@@ -37,8 +53,14 @@ const SIGN_IN_INITIAL = {
 
 export const useLinkSignInStore = create<SignInStore>((set) => ({
   ...SIGN_IN_INITIAL,
-  setEmail: (email) => set({ email }),
-  setPassword: (password) => set({ password }),
+  // Switching forms keeps the email, clears the password and every message.
+  setMode: (mode) => set({ mode, password: '', fieldErrors: {}, error: undefined, notice: undefined }),
+  // Typing in a field clears that field's message.
+  setEmail: (email) => set((state) => ({ email, fieldErrors: { ...state.fieldErrors, email: undefined } })),
+  setPassword: (password) => set((state) => ({ password, fieldErrors: { ...state.fieldErrors, password: undefined } })),
+  setBirthYear: (birthYear) => set((state) => ({ birthYear, fieldErrors: { ...state.fieldErrors, birthYear: undefined } })),
+  setFieldErrors: (fieldErrors) => set({ fieldErrors }),
+  setNotice: (notice) => set({ notice }),
   setCode: (code) => set({ code }),
   setNeedsCode: (needsCode) => set({ needsCode }),
   setPending: (pending) => set({ pending }),
