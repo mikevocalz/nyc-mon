@@ -6,25 +6,30 @@ import { companionCopy } from '../companion/copy';
 import { monsCopy } from './copy';
 import { DexHero } from './dex-art';
 import {
-  adjacentEntry, dexDigits, dexEntry, entryFacts, entryName, evolutionLine, evolutionTrigger,
+  adjacentEntry, dexDigits, dexEntry, entryFacts, entryName, entryTypes, evolutionLine, evolutionTrigger,
   type DexEntry, type EvolutionColumn, type EvolutionStep,
 } from './dex-model';
 import { useDex } from './use-dex';
 
 const TABULAR = { fontVariant: ['tabular-nums' as const] };
 
-/** One form on the line: a 48 pt button. The entry being read carries the one orange edge on the screen. */
+/**
+ * One form on the line: a 48 pt button. The entry being read carries the one
+ * orange edge on the screen. Under it, what the form needs (its
+ * `evolutionUnlock`), shown only once the form is seen: some item and mastery
+ * names carry the form's name, so an unseen step stays "???" and nothing more.
+ */
 function Step({ step, branch, onOpen }: { step: EvolutionStep; branch: boolean; onOpen: (speciesId: string) => void }) {
   const name = step.label ?? monsCopy('mons.unseen');
   const spoken = step.seen ? name : monsCopy('mons.unseen.a11y');
-  const trigger = branch ? evolutionTrigger(step.speciesId) : null;
+  const trigger = step.seen ? evolutionTrigger(step.speciesId) : null;
   const frame = step.current
     ? 'border-cta bg-cta/10'
     : step.seen
       ? 'border-structure bg-surface-raised'
       : 'border-dashed border-border bg-surface-sunken';
   return (
-    <View className="gap-1" testID={`mons-step-${step.speciesId}`}>
+    <View className="max-w-[240px] gap-1" testID={`mons-step-${step.speciesId}`}>
       <Pressable
         accessibilityLabel={monsCopy(step.current ? 'mons.entry.step.current.a11y' : 'mons.entry.step.a11y', { stage: step.stage, name: spoken })}
         accessibilityHint={step.current ? undefined : monsCopy('mons.row.hint')}
@@ -37,12 +42,16 @@ function Step({ step, branch, onOpen }: { step: EvolutionStep; branch: boolean; 
         <Text className="text-xr-caption text-text-muted" style={TABULAR}>{monsCopy('mons.number', { dex: dexDigits(step.dexId) })}</Text>
         <Text className={`text-xr-label ${step.seen ? 'text-text' : 'text-text-muted'}`}>{name}</Text>
       </Pressable>
-      {branch ? (
-        trigger === null ? (
-          <Text className="text-xr-caption text-text-muted">{monsCopy('mons.entry.trigger.unknown')}</Text>
-        ) : (
-          <Text className="text-xr-caption text-text" accessibilityLabel={monsCopy('mons.entry.trigger.a11y', { trigger: trigger.name })}>{trigger.name}</Text>
-        )
+      {trigger !== null ? (
+        <Text
+          testID={`mons-trigger-${step.speciesId}`}
+          className="text-xr-caption text-text"
+          accessibilityLabel={monsCopy('mons.entry.trigger.a11y', { item: trigger.name, mastery: trigger.mastery })}
+        >
+          {monsCopy('mons.entry.trigger', { item: trigger.name, mastery: trigger.mastery })}
+        </Text>
+      ) : branch && step.seen ? (
+        <Text className="text-xr-caption text-text-muted">{monsCopy('mons.entry.trigger.unknown')}</Text>
       ) : null}
     </View>
   );
@@ -50,7 +59,7 @@ function Step({ step, branch, onOpen }: { step: EvolutionStep; branch: boolean; 
 
 /**
  * The evolution line as a diagram: one row per stage, Egg at the top, Max at
- * the bottom with every branch side by side and what triggers each one.
+ * the bottom with every branch side by side and what each one needs.
  * Every step opens its entry; unseen steps stay "???".
  */
 function EvolutionLine({ columns, onOpen }: { columns: readonly EvolutionColumn[]; onOpen: (speciesId: string) => void }) {
@@ -114,9 +123,9 @@ function Neighbours({ entry, index, onOpen }: { entry: DexEntry; index: readonly
 
 /**
  * One MONS entry, Pokédex style: the Mon big on a plain stage with its Dex
- * number set huge behind it, then the number, name, stage and Bloodline, the
- * lore line when canon has one, and the evolution line. Unseen forms keep
- * only their number. Every fact is read from `@acme/content`; a null field
+ * number set huge behind it, then the number, name, stage, Bloodline and
+ * type chips, the lore and size lines when content has them, and the
+ * evolution line. Unseen forms keep only their number. Every fact is read from `@acme/content`; a null field
  * is left out (dex-model `MISSING_CANON_FIELDS`). The phone route's back
  * control is MonsScreen's, above this view.
  */
@@ -140,6 +149,7 @@ export function DexEntryView({ speciesId, onOpen, testID = 'mons-entry' }: {
   const number = monsCopy('mons.number', { dex: dexDigits(entry.dexId) });
   const numberSpoken = monsCopy('mons.number.a11y', { dexSpoken: entry.dexId ?? '' });
   const facts = entry.seen ? entryFacts(entry.speciesId) : [];
+  const types = entry.seen ? entryTypes(entry.speciesId) : [];
 
   return (
     <ScrollView testID={testID} className="flex-1" contentContainerClassName="pb-16">
@@ -170,14 +180,25 @@ export function DexEntryView({ speciesId, onOpen, testID = 'mons-entry' }: {
               <Badge label={entry.stage} tone="neutral" size="sm" />
               <Text className="text-xr-body text-text-muted">{companionCopy('m17.bloodline', { bloodlineName: entry.bloodlineName })}</Text>
             </View>
-          ) : (
+          ) : null}
+          {types.length > 0 ? (
+            <View
+              testID={`${testID}-types`}
+              accessibilityLabel={`${monsCopy('mons.entry.types')}: ${types.join(', ')}`}
+              className="flex-row flex-wrap items-center gap-2"
+            >
+              <Text aria-hidden className="text-xr-caption text-text-muted">{monsCopy('mons.entry.types')}</Text>
+              {types.map((type) => <Badge key={type} label={type} tone="info" size="sm" />)}
+            </View>
+          ) : null}
+          {entry.seen ? null : (
             <Text className="text-xr-body text-text-muted">{monsCopy('mons.entry.unseen.body')}</Text>
           )}
         </View>
 
         {facts.map((fact) => (
-          <View key={fact.id} className="gap-1 border-t border-border pt-4">
-            <Text className="text-xr-caption text-text-muted">{monsCopy('mons.entry.lore')}</Text>
+          <View key={fact.id} testID={`${testID}-${fact.id}`} className="gap-1 border-t border-border pt-4">
+            <Text className="text-xr-caption text-text-muted">{monsCopy(fact.id === 'lore' ? 'mons.entry.lore' : 'mons.entry.size')}</Text>
             <Text selectable className="text-xr-body text-text">{fact.value}</Text>
           </View>
         ))}

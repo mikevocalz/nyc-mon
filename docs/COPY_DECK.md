@@ -837,6 +837,8 @@ The fourth native tab (Gameplay Bible v12): "what is this Mon?", never the care 
 | `mons.entry.stage` | Stage | ui | drafted |
 | `mons.entry.bloodline` | Bloodline | ui | drafted |
 | `mons.entry.lore` | Lore | ui | drafted |
+| `mons.entry.types` | Type | ui | drafted, new |
+| `mons.entry.size` | Size | ui | drafted, new |
 | `mons.entry.unseen.body` | Meet this Mon to fill in the entry. | ui | drafted |
 | `mons.entry.line` | Evolution line | ui | drafted |
 | `mons.entry.line.a11y` | Evolution line, Egg to Max | ui | drafted |
@@ -844,8 +846,9 @@ The fourth native tab (Gameplay Bible v12): "what is this Mon?", never the care 
 | `mons.entry.step.current.a11y` | {stage}: {name}, this entry | ui | drafted |
 | `mons.entry.branch` | A Mid becomes one of these | ui | drafted |
 | `mons.entry.branch.why` | Bond and personality can shape which one. | ui | drafted |
+| `mons.entry.trigger` | Needs {item} · {mastery} | ui | drafted, new |
 | `mons.entry.trigger.unknown` | Trigger unknown | ui | drafted |
-| `mons.entry.trigger.a11y` | Evolves with {trigger} | ui | drafted |
+| `mons.entry.trigger.a11y` | Needs {item}. {mastery} | ui | drafted, changed |
 | `mons.entry.previous` | Previous | ui | drafted |
 | `mons.entry.next` | Next | ui | drafted |
 | `mons.entry.previous.a11y` | Previous entry, number {dexSpoken} | ui | drafted |
@@ -862,8 +865,8 @@ The fourth native tab (Gameplay Bible v12): "what is this Mon?", never the care 
 Notes:
 
 - **Unseen is "???" with the number only.** A form counts as seen when the save shows the Caller met it (M08 eggs, an egg record, a Mon and the forms on its chain). Search matches unseen forms by number only, never by name, so it cannot leak one. Babies are never shown before the hatch (glossary, P3), so the unseen art is a question mark, not the form's outline.
-- **Branch triggers are not in canon.** Decision #12 leaves what decides a Max branch `TODO(canon)`; v11 says only "Personality/Bond can influence branching evolution". `mons.entry.branch.why` paraphrases that line and each Max step reads `mons.entry.trigger.unknown` until canon names a crystal, item or condition.
-- **Facts come from content only.** Type, temperament, home district, height and weight have no canon value yet, so the entry has no label for them. `mons.entry.lore` shows only when a record's `cultureNote` is set.
+- **Each Max form shows what it needs.** The v11.1 roster (#115) gives all 37 Max forms an `evolutionUnlock`: an item and a mastery cue, shown as `mons.entry.trigger` under the step. A seen step shows it; an unseen step shows nothing, because some item and mastery names carry the form's name. Decision #12 still leaves what decides a branch `TODO(canon)`, so `mons.entry.branch.why` stays. `mons.entry.trigger.unknown` is the fallback for a seen branch form with no unlock (none today).
+- **Facts come from content only.** `mons.entry.lore` shows the record's `cultureNote`, or the roster's `loreSummary` while that is null (it is null on every form today). `mons.entry.size` shows `scaleTargetDescription` verbatim: an art-direction size target, not a height. `mons.entry.types` labels the v8 `legacyTypeNames` chips (none on Eggs); the eight Affinities are still unauthored. Temperament, home district (`districtId` is null everywhere), height and weight have no canon value, so the entry has no label for them.
 
 ## HOME hub and Caller, Phase 1 (2026-10-28)
 

@@ -105,7 +105,7 @@ export function seenCount(entries: readonly DexEntry[]): { readonly seen: number
   return { seen: entries.filter((e) => e.seen).length, total: entries.length };
 }
 
-/** The Bloodline filter options, in starter slot order. */
+/** The Bloodline filter options in content order: the three starter Bloodlines, then F03 to F18. */
 export function bloodlineFilters(): readonly { readonly id: BloodlineId; readonly label: string }[] {
   return bloodlines.map((b) => ({ id: b.bloodlineId, label: bloodlineLabel(b) }));
 }
@@ -193,24 +193,27 @@ export interface EvolutionColumn {
   readonly branches: boolean;
 }
 
-/** What makes a branch happen, when canon names it: an item, a crystal or a condition. */
+/** What a form needs before a Mon can evolve into it: an item and a mastery trial. */
 export interface EvolutionTrigger {
+  /** The item, e.g. "Street Cred Crystal". */
   readonly name: string;
+  /** The mastery cue, e.g. "Street Cred trial". */
+  readonly mastery: string;
   /** A theme token for its swatch, only when canon gives a colour. */
   readonly swatch: string | null;
 }
 
 /**
- * The trigger for evolving into `speciesId` at a branch. Canon names none
- * today: Decision #12 leaves "what decides the branch" TODO(canon), and the
- * v11 Bible says only "Personality/Bond can influence branching evolution"
- * (Canon and Lore Bible v11, paragraph 70). No crystal, item or condition is
- * named for any Max form, so this is null for every form and the entry says
- * "Trigger unknown". Content models no trigger field to read yet.
+ * The unlock for evolving into `speciesId`, read from the form's
+ * `evolutionUnlock` (the inherited v8 item and mastery cue, PR #115). All 37
+ * Max forms carry one; no other stage does. Null when content has none. It is
+ * a cue for the Dex, not an executable EvolutionEvent: Decision #12 still
+ * leaves what decides a branch TODO(canon).
  */
 export function evolutionTrigger(speciesId: string): EvolutionTrigger | null {
-  void speciesId;
-  return null;
+  const unlock = speciesById.get(speciesId)?.evolutionUnlock;
+  if (unlock === null || unlock === undefined) return null;
+  return { name: unlock.itemName, mastery: unlock.mastery, swatch: null };
 }
 
 /**
@@ -242,26 +245,50 @@ export function evolutionLine(speciesId: string, seen: ReadonlySet<string>): rea
     .filter((column) => column.steps.length > 0);
 }
 
+/** One text fact on an entry. */
+export interface EntryFact {
+  readonly id: 'lore' | 'size';
+  readonly value: string;
+}
+
 /**
- * Optional canon facts for a seen entry, only where content has a value.
- * `cultureNote` is the species card's line (Q12, Q13). Content has no field
- * at all for type/temperament labels, home district, height or weight, and
- * `affinityId` / `classId` have no published label list, so none of those
- * render (see `MISSING_CANON_FIELDS`).
+ * Optional canon facts for a seen entry, only where content has a value, in
+ * the order the entry shows them:
+ *
+ * - lore: the species card's `cultureNote` (Q12, Q13) when set, otherwise
+ *   the form's `loreSummary` from the v11.1 roster;
+ * - size: `scaleTargetDescription`, the art-direction size target, verbatim.
+ *   It is prose, never a height or weight.
+ *
+ * `districtId` is null on every form and `affinityId` / `classId` have no
+ * published label list, so none of those render (see `MISSING_CANON_FIELDS`).
  */
-export function entryFacts(speciesId: string): readonly { readonly id: 'lore'; readonly value: string }[] {
+export function entryFacts(speciesId: string): readonly EntryFact[] {
   const species = speciesById.get(speciesId);
-  if (species === undefined || species.cultureNote === null) return [];
-  return [{ id: 'lore', value: species.cultureNote }];
+  if (species === undefined) return [];
+  const facts: EntryFact[] = [];
+  const lore = species.cultureNote ?? species.loreSummary ?? null;
+  if (lore !== null) facts.push({ id: 'lore', value: lore });
+  const size = species.scaleTargetDescription ?? null;
+  if (size !== null) facts.push({ id: 'size', value: size });
+  return facts;
+}
+
+/**
+ * The form's type labels from `legacyTypeNames`: the v8 ten-type names the
+ * roster kept, not the eight-Affinity combat system (still unauthored, Q33).
+ * Empty for every Egg and for any form content gives none.
+ */
+export function entryTypes(speciesId: string): readonly string[] {
+  return speciesById.get(speciesId)?.legacyTypeNames ?? [];
 }
 
 /** What the entry would show if canon supplied it, and why it does not yet. For the report and the tests. */
 export const MISSING_CANON_FIELDS = [
-  { field: 'type / Affinity', reason: '`affinityId` is null on every record; the eight-Affinity list is not authored (Q33).' },
+  { field: 'Affinity', reason: '`affinityId` is null on every record; the eight-Affinity list is not authored (Q33). The entry shows the v8 `legacyTypeNames` instead.' },
   { field: 'temperament / combat Class', reason: '`classId` is null on every record; no Class list is published. No temperament field exists.' },
-  { field: 'home district', reason: 'No species field. `originBlock` is per-Mon and Phase 2.' },
-  { field: 'height / weight', reason: 'No field. `scaleMeters` (scale against the 1 m disc, Q29) is null and is not a height.' },
-  { field: 'branch triggers (crystal, item or condition) for every Max form', reason: 'Decision #12 leaves the branch decider TODO(canon); v11 says only that Personality/Bond can influence it. #005-#007, #012-#014, #065-#067 show "Trigger unknown".' },
-  { field: 'lore line', reason: '`cultureNote` is null on every record (Q12, Q13).' },
-  { field: 'records #015–#060, #068–#115', reason: '`@acme/content` ships the three starter Bloodlines only (21 of the roster\'s 115).' },
+  { field: 'home district', reason: '`districtId` is null on every form; borough encounter weights are not home districts. `originBlock` is per-Mon and Phase 2.' },
+  { field: 'height / weight', reason: '`scaleMeters` (scale against the 1 m disc, Q29) is null. The entry shows `scaleTargetDescription`, an art-direction size target, not a measurement.' },
+  { field: 'what decides a Max branch', reason: 'Decision #12 leaves the branch decider TODO(canon); v11 says only that Personality/Bond can influence it. Each Max form shows its `evolutionUnlock` item and mastery cue, which is not an executable EvolutionEvent.' },
+  { field: 'species culture note', reason: '`cultureNote` is null on every record (Q12, Q13). The lore line falls back to `loreSummary`.' },
 ] as const;

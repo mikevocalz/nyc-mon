@@ -67,8 +67,8 @@ function Silhouette({ size }: { size: 'thumb' | 'hero' }) {
 }
 
 /**
- * A list row's thumbnail, 56 pt. Thumbnails never run a renderer (21 live
- * canvases in a list would not hold a frame rate), so a form with a model
+ * A list row's thumbnail, 56 pt. Thumbnails never run a renderer (a live
+ * canvas per row across 109 forms would not hold a frame rate), so a form with a model
  * shows its still: for Lil' Ratti that still is a render of its GLB.
  */
 export function DexThumb({ entry }: { entry: DexEntry }) {

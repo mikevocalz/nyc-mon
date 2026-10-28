@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { allSpecies, eggs } from '@acme/content';
+import { allSpecies, bloodlines, eggs } from '@acme/content';
 import { MONS_COPY } from './copy.ts';
 import {
-  ALL_DEX, adjacentEntry, dexDigits, dexEntry, dexIndex, entryFacts, entryName, evolutionLine, evolutionTrigger,
-  filterDex, groupByBloodline, MISSING_CANON_FIELDS, seenCount, seenSpeciesIds, UNSEEN,
+  ALL_DEX, adjacentEntry, bloodlineFilters, dexDigits, dexEntry, dexIndex, entryFacts, entryName, entryTypes, evolutionLine,
+  evolutionTrigger, filterDex, groupByBloodline, MISSING_CANON_FIELDS, seenCount, seenSpeciesIds, UNSEEN,
 } from './dex-model.ts';
 import { LIST_MAX, LIST_MIN, monsArrangement } from './dex-layout.ts';
 
@@ -73,12 +73,22 @@ describe('MONS index', () => {
     const yote = filterDex(index, { ...ALL_DEX, bloodline: 'F12' });
     assert.ok(yote.length > 0 && yote.every((e) => e.bloodlineId === 'F12'));
     const headings = groupByBloodline(index).filter((i) => i.kind === 'heading');
-    assert.deepEqual(headings.map((h) => (h.kind === 'heading' ? h.bloodlineId : '')), ['F01', 'F02', 'F12']);
+    const ids = headings.map((h) => (h.kind === 'heading' ? h.bloodlineId : ''));
+    // One heading per Bloodline content ships, each listed once: Dex order never splits a Bloodline.
+    assert.equal(ids.length, bloodlines.length);
+    assert.deepEqual([...ids].sort(), bloodlines.map((b) => b.bloodlineId).sort());
+    for (const bloodline of bloodlines) {
+      const run = groupByBloodline(filterDex(index, { ...ALL_DEX, bloodline: bloodline.bloodlineId }));
+      assert.equal(run.filter((i) => i.kind === 'entry').length, allSpecies.filter((s) => s.bloodlineId === bloodline.bloodlineId).length, bloodline.bloodlineId);
+    }
+    assert.deepEqual(bloodlineFilters().map((f) => f.id), bloodlines.map((b) => b.bloodlineId));
   });
 
   it('searches by number for every form but by name only among seen ones, so a search never leaks a name', () => {
     const index = dexIndex(seenSpeciesIds(HATCHED));
-    assert.deepEqual(filterDex(index, { ...ALL_DEX, text: '2' }).map((e) => e.dexId), [2, 12, 62]);
+    const twos = allSpecies.filter((s) => s.dexId !== null && dexDigits(s.dexId).includes('2')).map((s) => s.dexId).sort((a, b) => a! - b!);
+    assert.ok(twos.length > 3, 'the full roster has more than the starters\' 2, 12 and 62');
+    assert.deepEqual(filterDex(index, { ...ALL_DEX, text: '2' }).map((e) => e.dexId), twos);
     assert.deepEqual(filterDex(index, { ...ALL_DEX, text: 'No. 004' }).map((e) => e.dexId), [4]);
     assert.deepEqual(filterDex(index, { ...ALL_DEX, text: 'squeak' }).map((e) => e.dexId), [2]);
     assert.equal(filterDex(index, { ...ALL_DEX, text: 'royale' }).length, 0, 'Ratti Royale is unseen');
@@ -113,9 +123,14 @@ describe('MONS evolution line', () => {
     assert.deepEqual(steps.filter((s) => s.current).map((s) => s.dexId), [2]);
   });
 
-  it('names no branch trigger: canon has none, so every Max form reads Trigger unknown', () => {
-    for (const s of allSpecies.filter((x) => x.stage === 'Max')) assert.equal(evolutionTrigger(s.speciesId), null, s.formName ?? '');
-    assert.equal(MONS_COPY['mons.entry.trigger.unknown'], 'Trigger unknown');
+  it('reads each form\'s trigger from its evolutionUnlock, and none where content has none', () => {
+    for (const s of allSpecies) {
+      const trigger = evolutionTrigger(s.speciesId);
+      if (s.evolutionUnlock === null || s.evolutionUnlock === undefined) assert.equal(trigger, null, s.speciesId);
+      else assert.deepEqual(trigger, { name: s.evolutionUnlock.itemName, mastery: s.evolutionUnlock.mastery, swatch: null }, s.speciesId);
+    }
+    assert.equal(evolutionTrigger('dex-005')?.name, 'Street Cred Crystal');
+    assert.equal(evolutionTrigger('dex-004'), null, 'a Mid has no unlock');
   });
 
   it('is empty for an id content does not know', () => {
@@ -124,12 +139,20 @@ describe('MONS evolution line', () => {
 });
 
 describe('MONS facts come from content only', () => {
-  it('leaves out every null field instead of inventing one', () => {
+  it('shows lore (culture note first, else the roster summary) and the size target, and nothing content leaves null', () => {
     for (const s of allSpecies) {
-      assert.equal(s.cultureNote, null, 'update this test when a culture note lands');
-      assert.deepEqual(entryFacts(s.speciesId), []);
+      const expected = [
+        ...((s.cultureNote ?? s.loreSummary ?? null) === null ? [] : [{ id: 'lore', value: s.cultureNote ?? s.loreSummary }]),
+        ...((s.scaleTargetDescription ?? null) === null ? [] : [{ id: 'size', value: s.scaleTargetDescription }]),
+      ];
+      assert.deepEqual(entryFacts(s.speciesId), expected, s.speciesId);
+      assert.deepEqual(entryTypes(s.speciesId), s.legacyTypeNames ?? [], s.speciesId);
+      assert.equal(s.districtId ?? null, null, 'update the entry when a home district lands');
     }
-    assert.ok(MISSING_CANON_FIELDS.some((m) => m.field.startsWith('branch triggers')));
+    assert.deepEqual(entryFacts('dex-999'), []);
+    assert.deepEqual(entryTypes('dex-001'), [], 'an Egg has no type');
+    assert.ok(MISSING_CANON_FIELDS.some((m) => m.field === 'home district'));
+    assert.equal(MISSING_CANON_FIELDS.some((m) => m.field.startsWith('records')), false, 'content ships the full roster');
   });
 
   it('keeps the ui copy to the canon words', () => {

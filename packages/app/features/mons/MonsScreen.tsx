@@ -4,7 +4,7 @@ import { useCallback, useMemo, useRef, type ReactNode } from 'react';
 import { I18nManager, type HostInstance, type LayoutChangeEvent } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import type { LifecycleStage } from '@acme/core/types';
-import { BackButton, Button, EmptyState, Heading, SafeArea, SearchBar, SegmentedControl, useInstanceStore, useStore, VirtualList } from '@acme/ui';
+import { BackButton, Button, EmptyState, Heading, SafeArea, SearchBar, SegmentedControl, Select, useInstanceStore, useStore, VirtualList } from '@acme/ui';
 import { useFoldLayout } from '@acme/ui/adaptive-panes/parts';
 import { Pressable, Text, View } from '@acme/ui/tw';
 import { useShallow } from 'zustand/react/shallow';
@@ -70,13 +70,17 @@ function BloodlineHeading({ name }: { name: string }) {
   );
 }
 
-/** The filters: Bloodline, then stage. Two segmented rows, wrapping two by two on a phone. */
+/**
+ * The filters: Bloodline, then stage. Eighteen Bloodlines are too many for a
+ * segmented row, so Bloodline is the kit Select (the OS picker on native, the
+ * kit dropdown on web); stage stays a segmented row, wrapping on a phone.
+ */
 function Filters() {
   const { bloodline, stage } = useDexBrowse(useShallow((s) => ({ bloodline: s.query.bloodline, stage: s.query.stage })));
   const setQuery = useDexBrowse((s) => s.setQuery);
   const all = monsCopy('mons.filter.all');
   const bloodlineOptions = useMemo(
-    () => [{ value: 'all' as DexFilter, label: all }, ...bloodlineFilters().map((b) => ({ value: b.id as DexFilter, label: b.label }))],
+    () => [{ value: 'all', label: all }, ...bloodlineFilters().map((b) => ({ value: b.id as string, label: b.label }))],
     [all],
   );
   const stageOptions = useMemo(
@@ -85,12 +89,12 @@ function Filters() {
   );
   return (
     <View className="gap-3">
-      <SegmentedControl
-        aria-label={monsCopy('mons.filter.bloodline.a11y')}
-        options={bloodlineOptions}
+      <Select
+        label={monsCopy('mons.filter.bloodline.a11y')}
+        tone="royal"
         value={bloodline}
-        onChange={(v) => setQuery({ bloodline: v })}
-        segmentClassName="basis-[45%] grow"
+        onValueChange={(next: string) => setQuery({ bloodline: next as DexFilter })}
+        options={bloodlineOptions}
       />
       <SegmentedControl
         aria-label={monsCopy('mons.filter.stage.a11y')}
