@@ -1,6 +1,8 @@
 # UI-thread investigation: Rive views, Bundle Mode, measurement
 
-Owner: `performance`. Written 2026-10-16. Status: findings; nothing here is implemented. Read next to `docs/implementation/worklet-rendering.md`, which has the frame numbers this builds on.
+> **Status: Superseded.** Kept as a record of what was known on 2026-10-16. The re-measurement this doc asked for ran on 2026-10-17: `baseline-duo-2026-10-17.md` has the Duo numbers, `ui-thread-attribution-2026-10-17.md` attributes the UI-thread cost, and `worklet-ab-2026-10-17.md` runs the Bundle Mode A/B. Read those for current figures; the inventory and protocol below are not updated.
+
+Owner: `performance`. Written 2026-10-16. Original status: findings; nothing here was implemented. Read next to `docs/implementation/worklet-rendering.md`, which has the frame numbers this builds on.
 
 Context: the Duo caps near 25 fps. `worklet-rendering.md` records JS submission at p50 9 ms / p90 14 ms and the Android UI thread at 38–44 ms. The review's directive was "pause or consolidate the autoplay Rive views, then run the Worklets Bundle Mode A/B; measure with `gfxinfo framestats` and Perfetto." This investigation found the pause work is already partially landed, so the honest first step is a re-measurement, not new code.
 
