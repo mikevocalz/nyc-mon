@@ -10,7 +10,8 @@
     "./mons": "./mons/index.ts",
     "./starters": "./mons/starters.ts",
     "./eggs": "./eggs.ts",
-    "./voices": "./voices.ts"
+    "./voices": "./voices.ts",
+    "./voice": "./mon-voice.ts"
   },
   "scripts": {
     "lint": "eslint",

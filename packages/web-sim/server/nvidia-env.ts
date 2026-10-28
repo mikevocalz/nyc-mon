@@ -19,6 +19,10 @@ const Schema = z.object({
   SIM_NEBIUS_MODEL_ID: z.enum(NVIDIA_MODELS).default(NVIDIA_MODELS[0]),
   // Nemotron 3.5 Lightning reasons before it answers; 1024 left too little room. Matches the adapter default.
   SIM_MAX_OUTPUT_TOKENS: z.coerce.number().int().min(256).max(16000).default(4096),
+  // The Mon's own voice on /api/tts. Unset (or empty): the route answers 204 and the page reads with Web Speech.
+  ELEVENLABS_API_KEY: z.preprocess((v) => (v === '' ? undefined : v), z.string().trim().min(1).optional()),
+  // ffmpeg for the stage pitch shift. Unset: `ffmpeg` on PATH; neither runs: the voice keeps its natural pitch.
+  FFMPEG_PATH: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).optional()),
 });
 export type NvidiaEnv = z.infer<typeof Schema>;
 /** Dedicated entry uses the existing simulator/agent/auth modules; it never falls back to Bedrock or a mock. */
