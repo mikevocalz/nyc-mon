@@ -1,4 +1,18 @@
 /**
+ * Markdown the model sent although the skill asks for plain speech: heading
+ * and list markers go, and bold or underline emphasis keeps its words. This
+ * runs before the stage-direction rule, which would otherwise read the inner
+ * "*…*" of "**Roasted chestnuts**" as a direction and drop the words.
+ */
+export function plainMarkdown(text: string): string {
+  return text
+    .replace(/^[ \t]*#{1,6}[ \t]+/gm, '')
+    .replace(/^[ \t]*(?:[-*+•]|\d{1,2}[.)])[ \t]+/gm, '')
+    .replace(/\*\*([^*\n]+?)\*\*/g, '$1')
+    .replace(/__([^_\n]+?)__/g, '$1');
+}
+
+/**
  * What the screen shows for a spoken line. Stage directions (*chuckle*) are
  * performed by the voice, so they're dropped. "Callah" is how a Mon SAYS
  * Caller (TTS lexicon, ADR 0008: Caller → "Call-uh"); on screen the word is
@@ -6,7 +20,7 @@
  * one surrounding pair.
  */
 export function captionText(text: string): string {
-  const cleaned = text
+  const cleaned = plainMarkdown(text)
     .replace(/\bCallah(s?)\b/g, 'Caller$1')
     .replace(/\bCALLAH(S?)\b/g, 'CALLER$1')
     .replace(/\bcallah(s?)\b/g, 'caller$1')
@@ -70,5 +84,5 @@ export function unwrapQuotes(text: string): string {
  * otherwise send a stray opening or closing mark with each end).
  */
 export function spokenText(text: string): string {
-  return text.replace(/["“”]/g, '').replace(/[ \t]{2,}/g, ' ').trim();
+  return plainMarkdown(text).replace(/["“”]/g, '').replace(/[ \t]{2,}/g, ' ').trim();
 }
