@@ -47,6 +47,8 @@ const SERVICE_ROUTES: readonly { method: string; path: RegExp }[] = [
   // hatch_egg. The handler finds the egg by eggId AND the delegated callerId,
   // so the key can only hatch the named Caller's own egg.
   { method: 'POST', path: /^\/v1\/eggs\/[^/]+\/hatch\/?$/ },
+  // The Mon's published lines and lingo (read-only, the same for every Caller).
+  { method: 'GET', path: /^\/v1\/mon-lingo\/?$/ },
 ];
 
 /** True when `request` is one of the routes the service key may reach. */

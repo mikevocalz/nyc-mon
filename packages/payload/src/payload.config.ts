@@ -28,6 +28,7 @@ import { MonInstances } from './collections/MonInstances';
 import { MonModels } from './collections/MonModels';
 import { LanguageLexicon } from './collections/LanguageLexicon';
 import { Waitlist } from './collections/Waitlist';
+import { MonVoices } from './globals/MonVoices';
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 const isProduction = process.env.NODE_ENV === 'production';
@@ -56,6 +57,8 @@ export default buildConfig({
   },
   endpoints: consoleEndpoints,
   collections: [Users, Media, GuardianConsents, Eggs, MonInstances, CareStates, AuditEvents, IntegrityRuns, IdempotencyRecords, Waitlist, LanguageLexicon, MonModels],
+  // The Mon's voice casting and delivery; its words are in LanguageLexicon.
+  globals: [MonVoices],
   plugins: [
     // POST /payload-api/mcp, staff only. Collection access still decides what
     // each role may do (ops and content edit). Files are uploaded in the
