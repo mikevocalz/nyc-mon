@@ -1,3 +1,4 @@
+import { createRequire } from 'node:module';
 import type { ModelAuthCheck } from './model-auth.ts';
 import { createRateLimiter } from './model.ts';
 import type { NvidiaEnv } from './nvidia-env.ts';
@@ -26,12 +27,37 @@ export function nvidiaCsp(env: NvidiaEnv): string {
 }
 
 /**
- * FFMPEG_PATH, when set, is the binary for the stage pitch shift; null when it
- * does not run (the clip keeps the voice's own pitch). Unset: undefined, so
- * tts.ts looks for `ffmpeg` on PATH on first use.
+ * The ffmpeg binary from the pinned `ffmpeg-static` package, downloaded for
+ * the build host at install time. Render's native Node runtime has no ffmpeg,
+ * so this is what runs there. Null when the package has no binary for this
+ * platform or is missing.
  */
-export function nvidiaPitchShift(env: NvidiaEnv, find: (candidate?: string) => string | null = findFfmpeg): PitchShifter | null | undefined {
-  if (env.FFMPEG_PATH === undefined) return undefined;
+export function bundledFfmpeg(): string | null {
+  try {
+    const path = createRequire(import.meta.url)('ffmpeg-static') as string | null;
+    return typeof path === 'string' && path ? path : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The stage pitch shift. FFMPEG_PATH, when set, is the binary; null when it
+ * does not run (the clip keeps the voice's own pitch). Unset: the bundled
+ * ffmpeg-static binary when it runs, else undefined, so tts.ts looks for
+ * `ffmpeg` on PATH on first use.
+ */
+export function nvidiaPitchShift(
+  env: NvidiaEnv,
+  find: (candidate?: string) => string | null = findFfmpeg,
+  bundled: string | null = bundledFfmpeg(),
+): PitchShifter | null | undefined {
+  if (env.FFMPEG_PATH === undefined) {
+    const binary = bundled === null ? null : find(bundled);
+    if (binary === null) return undefined;
+    console.info('[nvidia] stage pitch shift: bundled ffmpeg-static');
+    return createFfmpegPitchShifter(binary);
+  }
   const binary = find(env.FFMPEG_PATH);
   if (binary === null) console.warn('[nvidia] FFMPEG_PATH does not run; Mon voices play at their natural pitch');
   return binary === null ? null : createFfmpegPitchShifter(binary);

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { loadNvidiaEnv, nvidiaPublicConfig } from '../server/nvidia-env.ts';
-import { createNvidiaTts, nvidiaCsp, nvidiaPitchShift } from '../server/nvidia-tts.ts';
+import { bundledFfmpeg, createNvidiaTts, nvidiaCsp, nvidiaPitchShift } from '../server/nvidia-tts.ts';
+import { findFfmpeg } from '../server/tts.ts';
 import type { TtsFetch } from '../server/tts.ts';
 
 const base = { NEBIUS_API_KEY: 'k', V1_MCP_SERVICE_KEY: 'v'.repeat(32) };
@@ -122,9 +123,20 @@ describe('NVIDIA pitch shift', () => {
     expect(nvidiaPitchShift(loadNvidiaEnv({ ...base, FFMPEG_PATH: '/nope' }), () => null)).toBeNull();
   });
 
-  it('falls back to the system lookup when unset', () => {
+  it('uses the bundled ffmpeg-static binary when FFMPEG_PATH is unset', () => {
+    const find = vi.fn((candidate?: string) => (candidate === '/bundled/ffmpeg' ? candidate : null));
+    expect(typeof nvidiaPitchShift(loadNvidiaEnv(base), find, '/bundled/ffmpeg')).toBe('function');
+    expect(find).toHaveBeenCalledWith('/bundled/ffmpeg');
+  });
+
+  it('falls back to the system lookup when unset and the bundled binary does not run', () => {
     const find = vi.fn(() => null);
-    expect(nvidiaPitchShift(loadNvidiaEnv(base), find)).toBeUndefined();
-    expect(find).not.toHaveBeenCalled();
+    expect(nvidiaPitchShift(loadNvidiaEnv(base), find, '/bundled/ffmpeg')).toBeUndefined();
+    expect(nvidiaPitchShift(loadNvidiaEnv(base), find, null)).toBeUndefined();
+  });
+
+  it('ships a bundled ffmpeg for this platform that runs', () => {
+    expect(bundledFfmpeg()).toEqual(expect.any(String));
+    expect(findFfmpeg(bundledFfmpeg()!)).toBe(bundledFfmpeg());
   });
 });
