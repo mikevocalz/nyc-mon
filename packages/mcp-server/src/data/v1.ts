@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { parseMonLingo, type MonLingo } from '@acme/content/lingo';
 import { EggRecordSchema, ListMyMonsResponseSchema, MonInstanceSchema, PutCareResponseSchema, type CareAction, type CareState, type MonInstance } from '@acme/core';
 import { z } from 'zod';
 import type { CallerData, CallerMons, CareWriteIntent, IncubatingEgg, MonWithCare } from './caller.ts';
@@ -68,6 +69,33 @@ export class V1CallerData implements CallerData {
     this.options = options;
     this.doFetch = options.fetch ?? fetch;
     this.now = options.now ?? Date.now;
+  }
+
+  private lingo: { readonly etag: string; readonly data: MonLingo } | undefined;
+
+  /**
+   * `GET /v1/mon-lingo`, revalidated with the last ETag: an unchanged table
+   * costs a 304. The table is the same for every Caller; `callerId` only
+   * satisfies the service key's on-behalf-of rule.
+   */
+  async monLingo(callerId: string): Promise<MonLingo> {
+    const headers: Record<string, string> = { accept: 'application/json', [ON_BEHALF_OF_HEADER]: callerId };
+    if (this.options.serviceKey !== undefined) headers[SERVICE_KEY_HEADER] = this.options.serviceKey;
+    if (this.lingo !== undefined) headers['if-none-match'] = this.lingo.etag;
+    let response: Response;
+    try {
+      response = await this.doFetch(new URL('/v1/mon-lingo', this.options.baseUrl), { method: 'GET', headers, signal: AbortSignal.timeout(this.options.timeoutMs) });
+    } catch (error) {
+      throw new UpstreamError(`/v1 GET /v1/mon-lingo failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    if (response.status === 304 && this.lingo !== undefined) return this.lingo.data;
+    const body: unknown = await response.json().catch(() => undefined);
+    if (!response.ok) throw new UpstreamError(`/v1 GET /v1/mon-lingo answered ${response.status}`);
+    const data = parseMonLingo((body as { data?: unknown } | undefined)?.data);
+    if (data === undefined) throw new UpstreamError('/v1/mon-lingo response did not match the contract');
+    const etag = response.headers.get('etag');
+    this.lingo = etag === null ? undefined : { etag, data };
+    return data;
   }
 
   async listMons(callerId: string): Promise<CallerMons> {

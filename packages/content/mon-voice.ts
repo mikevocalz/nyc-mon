@@ -1,5 +1,7 @@
 import { LIFECYCLE_STAGES, type LifecycleStage, MON_MOODS, type MonMood } from '@acme/core';
 import { captionText, spokenText } from './captions.ts';
+import { FALLBACK_MON_LINGO, type MonLingo } from './lingo/index.ts';
+import { allSpecies } from './mons/index.ts';
 import {
   expressiveVoiceSettings,
   type ExpressiveVoiceSettings,
@@ -12,15 +14,22 @@ import {
 } from './voices.ts';
 
 export { captionText, dropUnmatchedQuotes, spokenText, unwrapQuotes } from './captions.ts';
+export { FALLBACK_MON_LINGO, parseMonLingo } from './lingo/index.ts';
+export type { LingoGuideEntry, MonLineEntry, MonLingo } from './lingo/index.ts';
 
 /**
  * The Mon's one voice, for every surface that plays it.
  *
- * Source of truth: `voices.ts` (lineage -> ElevenLabs voice, stage pitch, mood
- * delivery, lexicon) and `captions.ts` (what the screen shows). This file joins
- * them into one plan per line, `planMonUtterance`, so the server that calls
- * ElevenLabs, the browser that plays the clip, the Web Speech fallback and any
- * native player all read the same voice id, settings, pitch and caption.
+ * Source of truth: Payload. The `language-lexicon` collection holds the
+ * words (pronunciations such as Caller -> "Call-uh", stage directions, lines)
+ * and the `mon-voices` global the voices (lineage -> ElevenLabs voice, stage
+ * pitch, mood delivery). `GET /v1/mon-lingo` serves both as one `MonLingo`.
+ * This file joins them with `captions.ts` (what the screen shows) into one
+ * plan per line, `planMonUtterance(text, ref, lingo)`, a pure function of
+ * its inputs, so the server that calls ElevenLabs, the browser that plays the
+ * clip, the Web Speech fallback and any native player read the same voice id,
+ * settings, pitch and caption for the same served tables. Without `lingo` it
+ * plans with `FALLBACK_MON_LINGO` (the seed; tests and offline only).
  *
  * The MCP server (the Alexa+ path) reports `mon.voice` through `monVoiceRef`.
  * Alexa itself reads replies in its own voice (docs/alexa/PLATFORM-DOCS.md
@@ -43,6 +52,48 @@ export function monVoiceRef(mon: { readonly voiceLineageId: string | null; reado
   return mon.voiceLineageId === null ? null : { lineageId: mon.voiceLineageId, stage: mon.stage };
 }
 
+/** `mon.voice` as the MCP tools report it: the ref plus whether the served lingo can voice it right now. */
+export interface MonVoiceView {
+  readonly lineageId: string;
+  readonly stage: LifecycleStage;
+  /** False for an Egg, or when Payload has no voice cast for this lineage yet: the reply is shown, not spoken. */
+  readonly voiced: boolean;
+}
+
+/** `mon.voice` for a Mon record, read against the served lingo. Null for a Mon hatched before voice lineages. */
+export function monVoiceView(mon: { readonly voiceLineageId: string | null; readonly stage: LifecycleStage }, lingo: MonLingo = FALLBACK_MON_LINGO): MonVoiceView | null {
+  const ref = monVoiceRef(mon);
+  if (ref === null) return null;
+  const voiced = voicePitchFactor(ref.stage, lingo) !== null && resolveVoice(ref.lineageId, lingo) !== null;
+  return { ...ref, voiced };
+}
+
+const BLOODLINE_OF = new Map(allSpecies.map((species) => [species.speciesId, species.bloodlineId as string]));
+
+/**
+ * The served writing guidance for one Mon: the voice rules and word palette
+ * that apply to its form, bloodline, stage and mood, and its canon lines.
+ * A rule with no form, bloodline, stage or mood applies to every Mon. For a
+ * model writing the Mon's reply (the MCP server's `talk_to_mon`).
+ */
+export function voiceGuideFor(mon: { readonly speciesId: string; readonly stage: LifecycleStage }, mood: MonMood | undefined, lingo: MonLingo = FALLBACK_MON_LINGO): string[] {
+  const bloodlineId = BLOODLINE_OF.get(mon.speciesId);
+  const applies = (entry: { speciesId: string | null; bloodlineId: string | null; stage: LifecycleStage | null; mood: MonMood | null }) =>
+    (entry.speciesId === null || entry.speciesId === mon.speciesId) &&
+    (entry.bloodlineId === null || entry.bloodlineId === bloodlineId) &&
+    (entry.stage === null || entry.stage === mon.stage) &&
+    (entry.mood === null || entry.mood === mood);
+  const guide = lingo.guide.filter(applies).map((entry) => {
+    if (entry.category === 'word-palette') return `${entry.text}: ${entry.meaning} ${entry.policy}`;
+    if (entry.mood !== null) return `Mood ${entry.mood}: ${entry.text}`;
+    return entry.text;
+  });
+  const lines = lingo.lines
+    .filter((line) => line.speciesId === mon.speciesId && line.stage === mon.stage && (line.mood === null || line.mood === mood))
+    .map((line) => `Canon line (${line.occasion}): "${line.text}"`);
+  return [...guide, ...lines];
+}
+
 function isStage(value: unknown): value is LifecycleStage {
   return (LIFECYCLE_STAGES as readonly unknown[]).includes(value);
 }
@@ -63,11 +114,12 @@ export function readMonVoiceRef(voice: unknown, mood?: unknown): MonVoiceRef | u
 }
 
 /**
- * Eleven v4 Turbo: reads audio tags like `[laughs]` and acts out the line,
- * where Flash v2.5 reads flat. Measured 2026-10-23 on a 100-character line via
- * /stream: about 0.2 to 0.3 s to first byte, 1.3 s total (Flash was 0.6 s).
+ * The seed's model, Eleven v4 Turbo: reads audio tags like `[laughs]` and acts
+ * out the line, where Flash v2.5 reads flat. Measured 2026-10-23 on a
+ * 100-character line via /stream: about 0.2 to 0.3 s to first byte, 1.3 s
+ * total (Flash was 0.6 s). The served model is `lingo.voices.model`.
  */
-export const ELEVENLABS_TTS_MODEL = 'eleven_v4_turbo';
+export const ELEVENLABS_TTS_MODEL: string = FALLBACK_MON_LINGO.voices.model;
 
 /** The longest line one request speaks; a reply is spoken sentence by sentence. */
 export const MAX_SPOKEN_TEXT = 400;
@@ -82,10 +134,10 @@ const AUDIO_TAG = /\[[a-z][a-z ]*\]/i;
  * its own direction, the mood tag is left off: two tags read as two
  * performances stacked on one word. The mood's voice settings apply either way.
  */
-export function spokenLine(text: string, mood: MonMood | undefined): string {
+export function spokenLine(text: string, mood: MonMood | undefined, lingo: MonLingo = FALLBACK_MON_LINGO): string {
   // Everything here is the Mon's voice: canon pronunciations apply (Caller is "Call-uh").
-  const line = pronounceForVoice(stageDirectionsToTags(spokenText(text)));
-  const { tag } = voiceDelivery(mood);
+  const line = pronounceForVoice(stageDirectionsToTags(spokenText(text), lingo), lingo);
+  const { tag } = voiceDelivery(mood, lingo);
   return tag === undefined || AUDIO_TAG.test(line) ? line : `${tag} ${line}`;
 }
 
@@ -93,7 +145,7 @@ export function spokenLine(text: string, mood: MonMood | undefined): string {
  * The text a voice without audio tags reads (Web Speech): stage directions
  * dropped instead of read out, quote marks removed, canon pronunciations kept.
  */
-export function plainSpokenLine(text: string): string {
+export function plainSpokenLine(text: string, lingo: MonLingo = FALLBACK_MON_LINGO): string {
   return pronounceForVoice(
     spokenText(text)
       .replace(/\*[^*\n]{1,60}\*/g, ' ')
@@ -101,6 +153,7 @@ export function plainSpokenLine(text: string): string {
       .replace(/[ \t]{2,}/g, ' ')
       .replace(/ +([.,!?])/g, '$1')
       .trim(),
+    lingo,
   );
 }
 
@@ -114,7 +167,7 @@ export type MonVoicePlan =
       readonly provider: 'elevenlabs';
       readonly lineageId: string;
       readonly voiceId: string;
-      readonly model: typeof ELEVENLABS_TTS_MODEL;
+      readonly model: string;
       readonly settings: ExpressiveVoiceSettings;
       /** Frequency multiplier baked into the clip; playback stays at rate 1. */
       readonly pitchFactor: number;
@@ -136,29 +189,32 @@ export interface MonUtterance {
   readonly voice: MonVoicePlan;
 }
 
-/** Plans one line for `ref` (the Mon's voice), the same on every surface. */
-export function planMonUtterance(text: string, ref: MonVoiceRef | undefined): MonUtterance {
+/**
+ * Plans one line for `ref` (the Mon's voice) with `lingo` (the served tables),
+ * the same on every surface: a pure function of its three inputs.
+ */
+export function planMonUtterance(text: string, ref: MonVoiceRef | undefined, lingo: MonLingo = FALLBACK_MON_LINGO): MonUtterance {
   const trimmed = text.slice(0, MAX_SPOKEN_TEXT);
-  const caption = captionText(trimmed);
-  const spoken = spokenLine(trimmed, ref?.mood);
-  const plainSpoken = plainSpokenLine(trimmed);
+  const caption = captionText(trimmed, lingo);
+  const spoken = spokenLine(trimmed, ref?.mood, lingo);
+  const plainSpoken = plainSpokenLine(trimmed, lingo);
   const base = { caption, spoken, plainSpoken, ref };
   if (plainSpoken === '') return { ...base, voice: { kind: 'silent' } };
   if (ref === undefined) return { ...base, voice: { kind: 'fallback', pitch: undefined } };
-  const pitchFactor = voicePitchFactor(ref.stage);
-  const fallbackPitch = webSpeechPitch(ref.stage);
+  const pitchFactor = voicePitchFactor(ref.stage, lingo);
+  const fallbackPitch = webSpeechPitch(ref.stage, lingo);
   if (pitchFactor === null || fallbackPitch === null) return { ...base, voice: { kind: 'silent' } };
-  const voice = resolveVoice(ref.lineageId);
+  const voice = resolveVoice(ref.lineageId, lingo);
   if (voice === null) return { ...base, voice: { kind: 'fallback', pitch: fallbackPitch } };
   return {
     ...base,
     voice: {
       kind: 'lineage',
-      provider: 'elevenlabs',
+      provider: lingo.voices.provider,
       lineageId: voice.lineageId,
       voiceId: voice.elevenLabsVoiceId,
-      model: ELEVENLABS_TTS_MODEL,
-      settings: expressiveVoiceSettings(voice, ref.mood),
+      model: lingo.voices.model,
+      settings: expressiveVoiceSettings(voice, ref.mood, lingo),
       pitchFactor,
       fallbackPitch,
     },

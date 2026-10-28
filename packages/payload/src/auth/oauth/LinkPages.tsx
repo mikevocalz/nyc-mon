@@ -16,7 +16,8 @@ import { oauthProviderClient } from '@better-auth/oauth-provider/client';
 import { passkeyClient } from '@better-auth/passkey/client';
 import { createAuthClient } from 'better-auth/react';
 import { type ReactNode, useEffect } from 'react';
-import { useLinkConsentStore, useLinkSignInStore } from './link-store';
+import { credentialsError, hasFieldErrors, type LinkClientKind, linkCopyFor, nameFromEmail, signInErrors, signUpErrors } from './link-form';
+import { type SignInMode, useLinkConsentStore, useLinkSignInStore } from './link-store';
 import type { LinkPageData } from './pages';
 
 export { LINK_PAGE_HEADERS } from './link-page-headers';
@@ -44,35 +45,60 @@ const COPY = {
     password: 'Password',
     submit: 'Sign in',
     loading: 'Signing you in…',
+    forgot: 'Forgot password?',
+    noAccount: 'New to NYC-MON?',
+    create: 'Create an account',
     code: 'Code from your authenticator app',
     verify: 'Verify code',
     verifying: 'Checking your code…',
   },
+  signUp: {
+    heading: 'Create your NYC-MON account',
+    body: (client: string) => `Then link it to ${client}. Linking is for adults (18+).`,
+    formHeading: 'Your account',
+    password: 'Password (10 or more characters)',
+    birthYear: 'Year you were born',
+    submit: 'Create account and continue',
+    loading: 'Creating your account…',
+    haveAccount: 'Already have an account?',
+    signIn: 'Sign in instead',
+  },
+  forgot: {
+    heading: 'Reset your password',
+    body: "Enter your account's email. We'll send a link to set a new password; then come back to this tab and sign in.",
+    submit: 'Send reset link',
+    loading: 'Sending…',
+    sent: 'If that email has an NYC-MON account, a reset link is on its way. Check your inbox, then sign in here.',
+    back: 'Back to sign in',
+  },
   consent: {
     heading: (client: string) => `Link NYC-MON to ${client}?`,
     body: (client: string) => `${client} will be able to:`,
-    note: 'You can unlink any time in the Alexa app.',
     link: 'Link',
     linking: 'Linking…',
     cancel: 'Cancel',
   },
   refused: {
-    heading: 'NYC-MON on Alexa is for adults',
-    body: 'Only accounts for people 18 and over can link NYC-MON to Alexa. You can still play NYC-MON in the app.',
+    heading: 'Linking NYC-MON is for adults',
+    body: (client: string | undefined) =>
+      `Only accounts for people 18 and over can link NYC-MON${client === undefined ? '' : ` to ${client}`}. You can still play NYC-MON in the app.`,
     help: 'If the birth year on this account is wrong, contact NYC-MON support.',
     back: (client: string) => `Back to ${client}`,
   },
   expired: {
     heading: 'This link has expired',
-    body: 'Go back to the Alexa app and start linking NYC-MON again.',
+    body: 'Go back to the app you came from and start linking NYC-MON again.',
   },
   error: {
     passkey: "That passkey didn't work. Try again, or sign in with your email.",
     amazon: "That Amazon account isn't linked to NYC-MON yet. Link Amazon from NYC-MON Settings first, or sign in another way.",
-    credentials: "That email and password don't match. Check both, or reset your password.",
+    signUp: "We couldn't create that account. If you already have one, sign in instead.",
+    emailTaken: 'That email already has an account. Sign in instead.',
+    tooYoung: 'Linking is for adults 18 and over.',
+    reset: "We couldn't send a reset link. Try again in a minute.",
     code: "That code didn't work. Check your authenticator app and try again.",
-    adultsOnly: 'NYC-MON on Alexa is for adults (18+) only.',
-    expired: 'This request has expired. Start again from the Alexa app.',
+    adultsOnly: 'Linking NYC-MON is for adults (18+) only.',
+    expired: 'This request has expired. Start again from the app you came from.',
     offline: "You're offline. Connect to the internet to sign in.",
     server: 'Something broke on our end. Try again in a minute.',
   },
@@ -123,8 +149,9 @@ function LinkFrame({ intro, aside, children }: { intro?: ReactNode; aside?: Reac
   // Same frame as the console sign-in (admin/console/Chrome.tsx ConsoleLogin),
   // following the device's light or dark setting. Lil' Ratti stands above the
   // column on a phone and beside it from lg up. With an `aside` (the sign-in
-  // page's provider buttons) the buttons and the Card sit side by side from lg
-  // up, so the page fits a 1280x800 window without scrolling.
+  // page's provider buttons) the heading, intro and buttons form the left
+  // column and the Card the right one from lg up, so neither column is left
+  // with a tall empty gap and the page fits a 1280x800 window.
   return (
     // The console root class and the device light/dark scheme sit on a wrapping
     // View; Page keeps the console sign-in's own layout classes.
@@ -134,9 +161,14 @@ function LinkFrame({ intro, aside, children }: { intro?: ReactNode; aside?: Reac
         <StarterStill />
         <View className={aside === undefined ? 'w-full max-w-md gap-4' : 'w-full max-w-md gap-4 lg:max-w-3xl'}>
           <BrandWordmark height={32} />
-          {intro}
-          <View className="gap-4 lg:flex-row lg:items-start lg:gap-6">
-            {aside !== undefined ? <Section className="gap-3 lg:flex-1">{aside}</Section> : null}
+          {aside === undefined ? intro : null}
+          <View className="gap-4 lg:flex-row lg:items-center lg:gap-8">
+            {aside !== undefined ? (
+              <Section className="gap-4 lg:flex-1">
+                {intro}
+                <View className="gap-3">{aside}</View>
+              </Section>
+            ) : null}
             <View className="lg:flex-1">
               <Card variant="notch" district="megacity" notchSides={['top']}>
                 <Section className="gap-3">{children}</Section>
@@ -158,10 +190,37 @@ function Status({ message }: { message: string | undefined }) {
   );
 }
 
-function SignInPage({ clientName, amazonEnabled }: { clientName: string; amazonEnabled: boolean }) {
+function Notice({ message }: { message: string | undefined }) {
+  return (
+    <Output aria-live="polite">
+      {message === undefined ? null : <Paragraph className="my-0 text-sm text-text">{message}</Paragraph>}
+    </Output>
+  );
+}
+
+/** The quiet link-style switch under a form ("Create an account", "Sign in instead"). */
+function SwitchRow({ prompt, action, disabled, onPress }: { prompt?: string; action: string; disabled: boolean; onPress: () => void }) {
+  return (
+    <View className="flex-row flex-wrap items-center justify-center gap-x-1">
+      {prompt !== undefined ? <Paragraph className="my-0 text-sm text-text-muted">{prompt}</Paragraph> : null}
+      <Button title={action} variant="ghost" size="sm" disabled={disabled} onPress={onPress} />
+    </View>
+  );
+}
+
+function SignInPage({
+  clientName,
+  amazonEnabled,
+  passwordResetEnabled,
+}: {
+  clientName: string;
+  amazonEnabled: boolean;
+  passwordResetEnabled: boolean;
+}) {
   const copy = COPY.signIn;
-  const { email, password, code, needsCode, pending, error, passkeySupported } = useLinkSignInStore();
-  const { setEmail, setPassword, setCode, setNeedsCode, setPending, setError, setPasskeySupported, reset } = useLinkSignInStore();
+  const { mode, email, password, birthYear, code, needsCode, pending, error, notice, fieldErrors, passkeySupported } = useLinkSignInStore();
+  const { setMode, setEmail, setPassword, setBirthYear, setCode, setNeedsCode, setPending, setError, setNotice, setFieldErrors, setPasskeySupported, reset } =
+    useLinkSignInStore();
 
   // Decided after hydration so the server and first client render agree.
   useEffect(() => {
@@ -169,8 +228,13 @@ function SignInPage({ clientName, amazonEnabled }: { clientName: string; amazonE
     setPasskeySupported(typeof globalThis.PublicKeyCredential !== 'undefined');
   }, [reset, setPasskeySupported]);
 
-  async function run(kind: 'amazon' | 'email' | 'passkey' | 'code', failure: string): Promise<void> {
+  async function run(kind: 'amazon' | 'email' | 'passkey' | 'code' | 'sign-up', failure: string): Promise<void> {
     setError(undefined);
+    if (kind === 'email' || kind === 'sign-up') {
+      const errors = kind === 'email' ? signInErrors({ email, password }) : signUpErrors({ email, password, birthYear }, Date.now());
+      setFieldErrors(errors);
+      if (hasFieldErrors(errors)) return;
+    }
     setPending(kind);
     try {
       const auth = authClient();
@@ -185,6 +249,13 @@ function SignInPage({ clientName, amazonEnabled }: { clientName: string; amazonE
           ? await auth.signIn.passkey()
           : kind === 'code'
           ? await auth.$fetch('/two-factor/verify-totp', { method: 'POST', body: { code: code.trim() } })
+          : kind === 'sign-up'
+          ? // The signed oauth_query rides along (oauthProviderClient), so the
+            // new session continues this authorization request to consent.
+            await auth.$fetch('/sign-up/email', {
+              method: 'POST',
+              body: { email: email.trim(), password, name: nameFromEmail(email), birthYear: Number(birthYear.trim()) },
+            })
           : await auth.signIn.email({ email: email.trim(), password });
       const data: unknown = result.data;
       if (typeof data === 'object' && data !== null && (data as { twoFactorRedirect?: unknown }).twoFactorRedirect === true) {
@@ -196,6 +267,17 @@ function SignInPage({ clientName, amazonEnabled }: { clientName: string; amazonE
         window.location.assign(url);
         return;
       }
+      if (kind === 'sign-up' && result.error) {
+        const errorCode = (result.error as { code?: string }).code ?? '';
+        setError(
+          errorCode.startsWith('USER_ALREADY_EXISTS')
+            ? COPY.error.emailTaken
+            : errorCode === 'GUARDIAN_CONSENT_REQUIRED'
+            ? COPY.error.tooYoung
+            : failure,
+        );
+        return;
+      }
       setError(result.error ? failure : COPY.error.expired);
     } catch {
       setError(isOffline() ? COPY.error.offline : COPY.error.server);
@@ -204,18 +286,56 @@ function SignInPage({ clientName, amazonEnabled }: { clientName: string; amazonE
     }
   }
 
+  async function sendReset(): Promise<void> {
+    setError(undefined);
+    setNotice(undefined);
+    const errors = signInErrors({ email, password: 'unused' });
+    setFieldErrors(errors);
+    if (hasFieldErrors(errors)) return;
+    setPending('reset');
+    try {
+      // Payload's reset-password view takes the token and sets the new password.
+      const result = await authClient().$fetch('/request-password-reset', {
+        method: 'POST',
+        body: { email: email.trim(), redirectTo: `${window.location.origin}/admin/reset-password` },
+      });
+      if (result.error) setError(COPY.error.reset);
+      else setNotice(COPY.forgot.sent);
+    } catch {
+      setError(isOffline() ? COPY.error.offline : COPY.error.server);
+    } finally {
+      setPending(undefined);
+    }
+  }
+
+  const busy = pending !== undefined;
+  const switchTo = (next: SignInMode) => () => setMode(next);
+  const intro =
+    mode === 'sign-up' ? (
+      <Section className="gap-2">
+        <Heading level={1} size="title" className="my-0">{COPY.signUp.heading}</Heading>
+        <Paragraph className="my-0 text-base text-text">{COPY.signUp.body(clientName)}</Paragraph>
+      </Section>
+    ) : mode === 'forgot' ? (
+      <Section className="gap-2">
+        <Heading level={1} size="title" className="my-0">{COPY.forgot.heading}</Heading>
+        <Paragraph className="my-0 text-base text-text">{COPY.forgot.body}</Paragraph>
+      </Section>
+    ) : (
+      // Same order as M03 SignInScreen: heading and intro on the page, then
+      // the provider buttons on the page surface, then the email form.
+      <Section className="gap-2">
+        <Heading level={1} size="title" className="my-0">{copy.heading}</Heading>
+        <Paragraph className="my-0 text-base text-text">{copy.body(clientName, passkeySupported && !needsCode)}</Paragraph>
+      </Section>
+    );
+  const showProviders = mode === 'sign-in' && !needsCode && (amazonEnabled || passkeySupported);
+
   return (
     <LinkFrame
-      intro={
-        // Same order as M03 SignInScreen: heading and intro on the page, then
-        // the provider buttons on the page surface, then the email form.
-        <Section className="gap-2">
-          <Heading level={1} size="title" className="my-0">{copy.heading}</Heading>
-          <Paragraph className="my-0 text-base text-text">{copy.body(clientName, passkeySupported && !needsCode)}</Paragraph>
-        </Section>
-      }
+      intro={intro}
       aside={
-        needsCode || !(amazonEnabled || passkeySupported) ? undefined : (
+        !showProviders ? undefined : (
           <>
               {amazonEnabled ? (
                 <AuthProviderButton
@@ -223,7 +343,7 @@ function SignInPage({ clientName, amazonEnabled }: { clientName: string; amazonE
                   intent="sign-in"
                   label={COPY.signIn.amazon}
                   loading={pending === 'amazon'}
-                  disabled={pending !== undefined}
+                  disabled={busy}
                   onPress={() => void run('amazon', COPY.error.amazon)}
                 />
               ) : null}
@@ -234,7 +354,7 @@ function SignInPage({ clientName, amazonEnabled }: { clientName: string; amazonE
                   label={copy.passkey}
                   icon={<Fingerprint className="size-5 text-text" />}
                   loading={pending === 'passkey'}
-                  disabled={pending !== undefined}
+                  disabled={busy}
                   onPress={() => void run('passkey', COPY.error.passkey)}
                 />
               ) : null}
@@ -242,45 +362,100 @@ function SignInPage({ clientName, amazonEnabled }: { clientName: string; amazonE
         )
       }
     >
-      <Heading level={2} size="title" className="my-0">{copy.emailHeading}</Heading>
-      <Form className="gap-4" noValidate onSubmit={(event) => event.preventDefault()}>
-        {needsCode ? (
-          <TextField label={copy.code} value={code} onChangeText={setCode} />
-        ) : (
-          <>
-            <TextField label={copy.email} value={email} onChangeText={setEmail} />
-            <TextField label={copy.password} value={password} onChangeText={setPassword} secureTextEntry />
-          </>
-        )}
-        <Status message={error} />
-        {needsCode ? (
-          <Button
-            title={pending === 'code' ? copy.verifying : copy.verify}
-            variant="cta"
-            size="lg"
-            fullWidth
-            loading={pending === 'code'}
-            disabled={pending !== undefined}
-            onPress={() => void run('code', COPY.error.code)}
-          />
-        ) : (
-          <Button
-            title={pending === 'email' ? copy.loading : copy.submit}
-            variant="cta"
-            size="lg"
-            fullWidth
-            loading={pending === 'email'}
-            disabled={pending !== undefined}
-            onPress={() => void run('email', COPY.error.credentials)}
-          />
-        )}
-      </Form>
+      {mode === 'sign-up' ? (
+        <>
+          <Heading level={2} size="title" className="my-0">{COPY.signUp.formHeading}</Heading>
+          <Form className="gap-4" noValidate onSubmit={(event) => event.preventDefault()}>
+            <TextField label={copy.email} value={email} onChangeText={setEmail} error={fieldErrors.email}
+              keyboardType="email-address" autoCapitalize="none" autoComplete="email" />
+            <TextField label={COPY.signUp.password} value={password} onChangeText={setPassword} error={fieldErrors.password}
+              secureTextEntry autoComplete="new-password" />
+            <TextField label={COPY.signUp.birthYear} value={birthYear} onChangeText={setBirthYear} error={fieldErrors.birthYear}
+              keyboardType="number-pad" maxLength={4} />
+            <Status message={error} />
+            <Button
+              title={pending === 'sign-up' ? COPY.signUp.loading : COPY.signUp.submit}
+              variant="cta"
+              size="lg"
+              fullWidth
+              loading={pending === 'sign-up'}
+              disabled={busy}
+              onPress={() => void run('sign-up', COPY.error.signUp)}
+            />
+          </Form>
+          <SwitchRow prompt={COPY.signUp.haveAccount} action={COPY.signUp.signIn} disabled={busy} onPress={switchTo('sign-in')} />
+        </>
+      ) : mode === 'forgot' ? (
+        <>
+          <Form className="gap-4" noValidate onSubmit={(event) => event.preventDefault()}>
+            <TextField label={copy.email} value={email} onChangeText={setEmail} error={fieldErrors.email}
+              keyboardType="email-address" autoCapitalize="none" autoComplete="email" />
+            <Status message={error} />
+            <Notice message={notice} />
+            <Button
+              title={pending === 'reset' ? COPY.forgot.loading : COPY.forgot.submit}
+              variant="cta"
+              size="lg"
+              fullWidth
+              loading={pending === 'reset'}
+              disabled={busy}
+              onPress={() => void sendReset()}
+            />
+          </Form>
+          <SwitchRow action={COPY.forgot.back} disabled={busy} onPress={switchTo('sign-in')} />
+        </>
+      ) : (
+        <>
+          <Heading level={2} size="title" className="my-0">{copy.emailHeading}</Heading>
+          <Form className="gap-4" noValidate onSubmit={(event) => event.preventDefault()}>
+            {needsCode ? (
+              <TextField label={copy.code} value={code} onChangeText={setCode} keyboardType="number-pad" autoComplete="one-time-code" />
+            ) : (
+              <>
+                <TextField label={copy.email} value={email} onChangeText={setEmail} error={fieldErrors.email}
+                  keyboardType="email-address" autoCapitalize="none" autoComplete="email" />
+                <TextField label={copy.password} value={password} onChangeText={setPassword} error={fieldErrors.password}
+                  secureTextEntry autoComplete="current-password" />
+              </>
+            )}
+            <Status message={error} />
+            {needsCode ? (
+              <Button
+                title={pending === 'code' ? copy.verifying : copy.verify}
+                variant="cta"
+                size="lg"
+                fullWidth
+                loading={pending === 'code'}
+                disabled={busy}
+                onPress={() => void run('code', COPY.error.code)}
+              />
+            ) : (
+              <Button
+                title={pending === 'email' ? copy.loading : copy.submit}
+                variant="cta"
+                size="lg"
+                fullWidth
+                loading={pending === 'email'}
+                disabled={busy}
+                onPress={() => void run('email', credentialsError(passwordResetEnabled))}
+              />
+            )}
+          </Form>
+          {needsCode ? null : (
+            <>
+              {passwordResetEnabled ? <SwitchRow action={copy.forgot} disabled={busy} onPress={switchTo('forgot')} /> : null}
+              <SwitchRow prompt={copy.noAccount} action={copy.create} disabled={busy} onPress={switchTo('sign-up')} />
+            </>
+          )}
+        </>
+      )}
     </LinkFrame>
   );
 }
 
-function ConsentPage({ clientName, scopes }: { clientName: string; scopes: string[] }) {
+function ConsentPage({ clientName, clientKind, scopes }: { clientName: string; clientKind: LinkClientKind; scopes: string[] }) {
   const copy = COPY.consent;
+  const clientCopy = linkCopyFor(clientKind);
   const { pending, error, setPending, setError, reset } = useLinkConsentStore();
   useEffect(() => {
     reset();
@@ -298,7 +473,7 @@ function ConsentPage({ clientName, scopes }: { clientName: string; scopes: strin
         return;
       }
       const status = (result.error as { status?: number } | null)?.status;
-      setError(status === 403 ? COPY.error.adultsOnly : COPY.error.expired);
+      setError(status === 403 ? COPY.error.adultsOnly : `This request has expired. ${clientCopy.startAgain}`);
     } catch {
       setError(isOffline() ? COPY.error.offline : COPY.error.server);
     } finally {
@@ -317,7 +492,7 @@ function ConsentPage({ clientName, scopes }: { clientName: string; scopes: strin
           </ListItem>
         ))}
       </List>
-      <Paragraph className="my-0 text-sm text-text-muted">{copy.note}</Paragraph>
+      <Paragraph className="my-0 text-sm text-text-muted">{clientCopy.unlinkNote}</Paragraph>
       <Status message={error} />
       <Button
         title={pending === 'link' ? copy.linking : copy.link}
@@ -338,7 +513,9 @@ function RefusedPage({ clientName, backHref }: { clientName: string | undefined;
   return (
     <LinkFrame>
       <Heading level={1} size="title" className="my-0">{copy.heading}</Heading>
-      <Paragraph className="my-0 text-base text-text">{copy.body}</Paragraph>
+      <Paragraph className="my-0 text-base text-text">
+        {copy.body(clientName)}
+      </Paragraph>
       <Paragraph className="my-0 text-sm text-text-muted">{copy.help}</Paragraph>
       {backHref !== undefined ? (
         <Button title={copy.back(clientName ?? 'Alexa')} variant="cta" size="lg" fullWidth onPress={() => window.location.assign(backHref)} />
@@ -360,9 +537,9 @@ function ExpiredPage() {
 export function LinkPage({ data }: { data: LinkPageData }) {
   switch (data.kind) {
     case 'sign-in':
-      return <SignInPage clientName={data.clientName} amazonEnabled={data.amazonEnabled} />;
+      return <SignInPage clientName={data.clientName} amazonEnabled={data.amazonEnabled} passwordResetEnabled={data.passwordResetEnabled} />;
     case 'consent':
-      return <ConsentPage clientName={data.clientName} scopes={data.scopes} />;
+      return <ConsentPage clientName={data.clientName} clientKind={data.clientKind} scopes={data.scopes} />;
     case 'refused':
       return <RefusedPage clientName={data.clientName} backHref={data.backHref} />;
     case 'expired':

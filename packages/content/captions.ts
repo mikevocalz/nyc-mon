@@ -1,3 +1,5 @@
+import { captionFormsWith, FALLBACK_MON_LINGO, type MonLingo } from './lingo/index.ts';
+
 /**
  * Markdown the model sent although the skill asks for plain speech: heading
  * and list markers go, and bold or underline emphasis keeps its words. This
@@ -15,15 +17,14 @@ export function plainMarkdown(text: string): string {
 /**
  * What the screen shows for a spoken line. Stage directions (*chuckle*) are
  * performed by the voice, so they're dropped. "Callah" is how a Mon SAYS
- * Caller (TTS lexicon, ADR 0008: Caller → "Call-uh"); on screen the word is
- * always spelled Caller. A reply the model wrapped in quote marks loses the
- * one surrounding pair.
+ * Caller (the lexicon's pronunciation rows in Payload, ADR 0008: Caller →
+ * "Call-uh"); on screen the word is always spelled Caller. A reply the model
+ * wrapped in quote marks loses the one surrounding pair.
+ *
+ * `lingo` is the served lexicon; leaving it out uses the offline fallback.
  */
-export function captionText(text: string): string {
-  const cleaned = plainMarkdown(text)
-    .replace(/\bCallah(s?)\b/g, 'Caller$1')
-    .replace(/\bCALLAH(S?)\b/g, 'CALLER$1')
-    .replace(/\bcallah(s?)\b/g, 'caller$1')
+export function captionText(text: string, lingo: MonLingo = FALLBACK_MON_LINGO): string {
+  const cleaned = captionFormsWith(plainMarkdown(text), lingo)
     .replace(/\*[^*\n]{1,60}\*/g, ' ')
     .replace(/[ \t]{2,}/g, ' ')
     .replace(/ +([.,!?])/g, '$1')
