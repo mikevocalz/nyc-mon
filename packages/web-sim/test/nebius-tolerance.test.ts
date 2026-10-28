@@ -125,3 +125,15 @@ describe('null optional fields from the live API', () => {
     expect(result.stop_reason).toBe('tool_use');
   });
 });
+
+// finish_reason content_filter is documented (OpenAPI 20261022). It is a provider refusal,
+// not a malformed response, and must never become a tool call or a fabricated answer.
+describe('content filter', () => {
+  it('reports a filtered reply as FILTERED, with no receipt', async () => {
+    const onReceipt = vi.fn();
+    const error = await run(completion({ choices: [{ finish_reason: 'content_filter', message: { role: 'assistant', content: null, tool_calls: null } }] }), onReceipt).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(NebiusError);
+    expect((error as NebiusError).code).toBe('FILTERED');
+    expect(onReceipt).not.toHaveBeenCalled();
+  });
+});
