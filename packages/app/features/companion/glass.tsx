@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, type ReactNode } from 'react';
 import { useWindowDimensions } from 'react-native';
 import { useIsFocused, usePathname } from 'expo-router';
+import { lobbyStore } from '../game/lobby/lobby.store.ts';
 import { deriveMonMood } from '@acme/core/sim';
 import type { CareNeed, CareState } from '@acme/core/types';
 import { hud } from '@acme/theme';
@@ -316,6 +317,10 @@ export function PersistentGlassStage({
   // hold it too, so only one renderer runs.
   const pathname = usePathname() ?? '/';
   const overlaid = pathname === '/mons' || pathname.startsWith('/mons/');
+  // The city is a second WebGPU renderer and a large world. With both alive
+  // the iPad runs out of memory, so the H-Lynk releases its renderer while
+  // the city is up. It reloads on return; the Baby's GLB parse is cached.
+  const cityUp = useStore(lobbyStore, (st: { phase: string }) => st.phase !== 'lobby');
 
   return (
     <View className="absolute inset-0 bg-ink-950" testID="home-glass-stage">
@@ -327,7 +332,7 @@ export function PersistentGlassStage({
           device={
             <>
               {/* Keyed by the Baby: a new Baby is a new scene, and its loader starts over. */}
-              <GlassDevice
+              {cityUp ? null : <GlassDevice
                 key={modelKey}
                 screen={screen}
                 label={route?.label ?? label}
@@ -337,7 +342,7 @@ export function PersistentGlassStage({
                 onPan={onPan}
                 covered={!focused || overlaid}
                 progressKey={source?.kind === 'mon' ? source.key : null}
-              />
+              />}
               {children}
             </>
           }

@@ -7,6 +7,7 @@ import {
   EggHatchAssetError, attentionRole, eggPoseFor, hatchClipTime, isClipPhase, parseEggHatchManifest, phaseLengthSeconds,
   playbackProgress, resolveEggClips, type EggAttention, type EggClipRole, type EggHatchManifest, type EggHatchPhase, type EggPose,
 } from './hatch-manifest';
+import { weldShellSeamNormals } from './shell-seams';
 
 /** An egg's runtime assets as `@acme/assets/eggs` exports them: the manifest JSON and the bundled GLB (URL on web, asset id on native). */
 export interface EggHatchSource {
@@ -69,6 +70,8 @@ async function loadEgg(eggId: string, source: EggHatchSource): Promise<LoadedEgg
   } catch (cause) {
     throw new EggHatchAssetError('parse', `${eggId}: GLTFLoader could not parse ${manifest.runtime.glb}`, { cause });
   }
+  // The shell ships cut into hatch pieces; without this every cut catches the light and the resting egg looks cracked.
+  weldShellSeamNormals(gltf.scene, manifest.runtime.shellPieceNames ?? shellPieceNamesIn(gltf.scene));
   const clips = resolveEggClips(manifest, gltf.animations);
   const owned = new Set([...clips.leanIn.tracks, ...clips.hesitate.tracks].map((t) => t.name));
   const hatchUnderAttention = new THREE.AnimationClip(
@@ -77,6 +80,15 @@ async function loadEgg(eggId: string, source: EggHatchSource): Promise<LoadedEgg
     clips.hatch.tracks.filter((t) => !owned.has(t.name)),
   );
   return { manifest, gltf, clips, hatchUnderAttention };
+}
+
+/** The hatch pieces when a manifest predates `shellPieceNames`: every node the fracture build names `Shell_*`. */
+function shellPieceNamesIn(root: THREE.Object3D): string[] {
+  const names: string[] = [];
+  root.traverse((o) => {
+    if (/^Shell_(Cup|Crown|Shard_\d+)$/.test(o.name)) names.push(o.name);
+  });
+  return names;
 }
 
 function acquire(eggId: string, source: EggHatchSource): Promise<LoadedEgg> {
