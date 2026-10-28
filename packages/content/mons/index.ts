@@ -1,10 +1,17 @@
 import type { Bloodline, EvolutionNode, MonSpeciesDef } from '@acme/core';
+import { type BloodlineRef, buildBloodline, rosterForm } from './define.ts';
+import { rosterEntries, type RosterEntry } from './roster-v11-1.ts';
 import { bodegaBaddieeCeeBloodline, bodegaBaddieeCeeForms } from './bodega-cee.ts';
 import { hoodRattiBloodline, hoodRattiForms } from './hood-ratti.ts';
 import { yoteBloodline, yoteForms } from './yotes.ts';
 
 export type { BloodlineRef } from './define.ts';
 export { speciesIdForDex } from './define.ts';
+export { rosterEntries } from './roster-v11-1.ts';
+export type { RosterEntry } from './roster-v11-1.ts';
+export { inheritedDexDetails } from './inherited-v11-details.ts';
+export { boroughEncounterProfiles } from './borough-encounters.ts';
+export type { BoroughName, EncounterTier, BloodlineEncounterProfile } from './borough-encounters.ts';
 export { hoodRattiBloodline, hoodRattiForms } from './hood-ratti.ts';
 export { bodegaBaddieeCeeBloodline, bodegaBaddieeCeeForms } from './bodega-cee.ts';
 export { yoteBloodline, yoteForms } from './yotes.ts';
@@ -23,13 +30,45 @@ export const starterBloodlines: readonly StarterBloodline[] = [
 ];
 
 /**
- * Every bloodline this package ships, as evolution-chain resources in starter
- * slot order. The Dex screen (M17) and the web /mons pages (W02) render from this.
+ * All 115 registered forms are available via rosterEntries. F19 is intentionally
+ * not promoted to a runnable Bloodline: #114 has no canon lifecycle stage and
+ * #110 has no approved name. Never invent a stage/branch to satisfy a count.
+ * The 18 fully staged F01–F18 Bloodlines are exposed to Dex/chain consumers.
  */
-export const bloodlines: readonly Bloodline[] = starterBloodlines.map((starter) => starter.bloodline);
+const starterIds = new Set(starterBloodlines.map(({ bloodline }) => bloodline.bloodlineId));
+const additionalRefs: BloodlineRef[] = [];
+for (const row of rosterEntries) {
+  if (starterIds.has(row.bloodlineId) || row.bloodlineId === 'F19') continue;
+  if (!additionalRefs.some(({ bloodlineId }) => bloodlineId === row.bloodlineId)) {
+    additionalRefs.push({ bloodlineId: row.bloodlineId, bloodlineName: row.bloodlineName });
+  }
+}
 
-/** Every Dex record this package ships. */
-export const allSpecies: readonly MonSpeciesDef[] = starterBloodlines.flatMap((starter) => starter.forms);
+function toResolvedSpecies(row: RosterEntry, ref: BloodlineRef): MonSpeciesDef {
+  if (row.stage === null || row.formName === null) {
+    throw new Error(`Unresolved canon in ${ref.bloodlineId} #${row.dexId}; do not fabricate an evolution`);
+  }
+  return rosterForm(ref, row.dexId, row.formName, row.stage);
+}
+
+const additionalBloodlines = additionalRefs.map((ref) => {
+  const forms = rosterEntries
+    .filter((row) => row.bloodlineId === ref.bloodlineId)
+    .map((row) => toResolvedSpecies(row, ref));
+  return { bloodline: buildBloodline(ref, forms), forms };
+});
+
+/** Three starters first, followed by the other 15 complete Bloodlines. */
+export const bloodlines: readonly Bloodline[] = [
+  ...starterBloodlines.map(({ bloodline }) => bloodline),
+  ...additionalBloodlines.map(({ bloodline }) => bloodline),
+];
+
+/** 109 runtime-safe forms. The six F19 records remain in rosterEntries pending canon resolution. */
+export const allSpecies: readonly MonSpeciesDef[] = [
+  ...starterBloodlines.flatMap(({ forms }) => forms),
+  ...additionalBloodlines.flatMap(({ forms }) => forms),
+];
 
 /** UI label for a bloodline (DECISIONS.md #11): "Hood Ratti Bloodline". */
 export function bloodlineLabel(bloodline: Pick<Bloodline, 'bloodlineName'>): string {
