@@ -38,6 +38,7 @@ import type {
   SaveCurrent,
 } from '@acme/core/types';
 import type { SaveIO } from '../onboarding/save-io';
+import { localDayKey } from './local-day.ts';
 
 /**
  * The Mon store (ADR 0010). It holds the parsed save as read from {@linkcode SaveIO}
@@ -104,16 +105,17 @@ export interface MonStoreOptions {
   /**
    * Mints a new `eggId` for {@linkcode MonStoreState.startIncubation}. Must
    * be unique per egg and fit `IdSchema` (1–128 chars). Defaults to
-   * `crypto.randomUUID()`.
+   * `crypto.randomUUID()` where the runtime has it, otherwise time plus
+   * randomness (release Hermes lacks `crypto.randomUUID` — M0 found
+   * incubation throwing on the release APK, 2026-10-17).
    */
   readonly newEggId?: () => string;
 }
 
 function defaultNewEggId(): string {
-  if (typeof globalThis.crypto?.randomUUID !== 'function') {
-    throw new Error('crypto.randomUUID is unavailable; pass MonStoreOptions.newEggId');
-  }
-  return `egg-${globalThis.crypto.randomUUID()}`;
+  const uuid = globalThis.crypto?.randomUUID?.();
+  if (uuid !== undefined) return `egg-${uuid}`;
+  return `egg-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
 }
 
 function pickActive(save: SaveCurrent | undefined, preferred: string | undefined): string | undefined {
@@ -406,16 +408,7 @@ export function selectJournal(monInstanceId: string): (state: MonStoreState) => 
   };
 }
 
-/**
- * The local calendar day of an instant as ISO `YYYY-MM-DD`, in the device's
- * time zone (M18 day boundaries). The journal and DaysCalendar key days by it.
- */
-export function localDayKey(atMs: number): string {
-  const d = new Date(atMs);
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return `${d.getFullYear()}-${mm}-${dd}`;
-}
+export { localDayKey } from './local-day.ts';
 
 /**
  * Returns a selector for the active Mon's "days together" (M18, D-15a): the

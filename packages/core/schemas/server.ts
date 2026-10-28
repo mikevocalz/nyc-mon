@@ -30,7 +30,15 @@ export const HatchEggResponseSchema = z.object({ mon: MonInstanceSchema });
 
 /** GET /v1/me/mons — the caller's Mons and their authoritative care states for restore. */
 export const MonWithCareSchema = z.object({ mon: MonInstanceSchema, care: CareStateSchema });
-export const ListMyMonsResponseSchema = z.object({ mons: z.array(MonWithCareSchema) });
+export const ListMyMonsResponseSchema = z.object({
+  mons: z.array(MonWithCareSchema),
+  /**
+   * The Mon the Caller chose as their companion (`users.activeMonInstanceId`),
+   * or null when none is set. Absent from servers that predate the field.
+   * It may name a Mon not in `mons` (a stale pointer); clients check.
+   */
+  activeMonInstanceId: IdSchema.nullable().optional(),
+});
 
 /** One queued care write. `seq` is monotonic per device. */
 export const CareWriteSchema = z.object({

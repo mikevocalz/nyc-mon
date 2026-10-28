@@ -211,6 +211,7 @@ export function applyCareAction(
           care: {
             ...care,
             fullness: clamp01(care.fullness + nutrition),
+            energy: clamp01(care.energy + mealEnergy(action, tuning)),
             lastFedAt: t,
             pendingRequest: null,
             sluggishUntil,
@@ -258,6 +259,11 @@ export function applyCareAction(
 /** Fullness a feed adds: the food's nutrition, or the shared meal's when no food is named (D-15e). */
 export function mealNutrition(action: Extract<CareAction, { kind: 'feed' }>, tuning: CareTuning = DEFAULT_CARE_TUNING): number {
   return action.food?.nutrition ?? tuning.sharedMealNutrition;
+}
+
+/** Energy a feed adds: 5/40 of the meal's Fullness, as v7's full meal (40 Fullness / 5 Energy). */
+export function mealEnergy(action: Extract<CareAction, { kind: 'feed' }>, tuning: CareTuning = DEFAULT_CARE_TUNING): number {
+  return action.food ? mealNutrition(action, tuning) * (5 / 40) : tuning.sharedMealEnergy;
 }
 
 /**

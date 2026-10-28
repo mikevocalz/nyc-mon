@@ -14,7 +14,7 @@ import { resolveRenderThread } from './render-thread';
 import { WorkletThreeCanvas } from './WorkletThreeCanvas';
 import { toNdc } from './pointer';
 import { ThreeSurface } from './surface';
-import type { ThreeBackend, ThreeCanvasProps, ThreePointer, ThreeScene, ThreeSurfaceHandle } from './types';
+import type { ThreeBackend, ThreeCanvasProps, ThreeFrameTiming, ThreePointer, ThreeScene, ThreeSurfaceHandle } from './types';
 import type { WebGPURenderer } from 'three/webgpu';
 import { useOnScreen } from './use-on-screen';
 
@@ -31,6 +31,7 @@ interface Runtime<P> {
   running: boolean;
   time: number;
   last: number;
+  lastProbeStart: number;
   width: number;
   height: number;
   pixelRatio: number;
@@ -38,6 +39,9 @@ interface Runtime<P> {
   reducedMotion: boolean;
   queued: boolean;
   pointer: ThreePointer;
+  frame: { time: number; delta: number; width: number; height: number; pixelRatio: number; reducedMotion: boolean; pointer: ThreePointer };
+  /** Reused when onFrameTiming is set: the opt-in probe allocates nothing per frame either. */
+  probe: ThreeFrameTiming;
 }
 
 const isWeb = Platform.OS === 'web';
@@ -92,7 +96,10 @@ function JsThreeCanvas<P>({
   className,
   opacity = 1,
   background,
+  androidSurfaceType,
+  freeRun = false,
   onBackendChange,
+  onFrameTiming,
   children,
   ref,
 }: ThreeCanvasProps<P>) {
@@ -113,6 +120,7 @@ function JsThreeCanvas<P>({
     running: false,
     time: 0,
     last: 0,
+    lastProbeStart: 0,
     width: 0,
     height: 0,
     pixelRatio: 1,
@@ -120,6 +128,8 @@ function JsThreeCanvas<P>({
     reducedMotion,
     queued: false,
     pointer: { x: 0, y: 0, inside: false, pressed: false },
+    frame: { time: 0, delta: 0, width: 0, height: 0, pixelRatio: 1, reducedMotion, pointer: { x: 0, y: 0, inside: false, pressed: false } },
+    probe: { cpuMs: 0, intervalMs: null, backend: 'webgpu' },
   };
 
   // Pick the backend. WebGPU when it works; the WebGL2 backend on web when it
@@ -135,6 +145,17 @@ function JsThreeCanvas<P>({
   const live = !pending && backend !== null;
   const running = live && !paused && !reducedMotion && onScreen;
 
+  // One-shot pacing diagnostic: pairs the flag votes with the sampler's
+  // intervalMs so a build's actual cadence is attributable from logcat.
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      console.info('[NYC-Mon/perf] canvas pacing', {
+        freeRun,
+        surface: androidSurfaceType ?? 'auto',
+      });
+    }
+  }, [freeRun, androidSurfaceType]);
+
   // Draws one frame. The clock advances only while the loop runs, so a still
   // canvas redraws the same moment.
   const draw = () => {
@@ -143,6 +164,9 @@ function JsThreeCanvas<P>({
     const { renderer, built } = rt;
     if (!renderer || !built || !rt.sized) return;
     const now = performance.now();
+    const probeStart = onFrameTiming ? now : 0;
+    const probeInterval = onFrameTiming && rt.lastProbeStart > 0 ? probeStart - rt.lastProbeStart : null;
+    if (onFrameTiming) rt.lastProbeStart = probeStart;
     let delta = 0;
     if (rt.running) {
       // Clamp so a backgrounded tab doesn't jump the scene forward.
@@ -151,13 +175,48 @@ function JsThreeCanvas<P>({
       rt.last = now;
     }
     try {
-      built.update?.(
-        { time: rt.time, delta, width: rt.width, height: rt.height, pixelRatio: rt.pixelRatio, reducedMotion: rt.reducedMotion, pointer: rt.pointer },
-        rt.params,
-      );
+      // The frame object is reused: zero allocation per frame.
+      const frame = rt.frame;
+      frame.time = rt.time;
+      frame.delta = delta;
+      frame.width = rt.width;
+      frame.height = rt.height;
+      frame.pixelRatio = rt.pixelRatio;
+      frame.reducedMotion = rt.reducedMotion;
+      frame.pointer = rt.pointer;
+      // Stage attribution for the opt-in probe (G1): four extra clock reads
+      // per frame only while onFrameTiming is set; the flag-off path is
+      // unchanged and the staged sample keeps cpuMs = the whole draw.
+      const t0 = onFrameTiming ? performance.now() : 0;
+      built.update?.(frame, rt.params);
+      const t1 = onFrameTiming ? performance.now() : 0;
       advanceNodeFrame(renderer);
+      const t2 = onFrameTiming ? performance.now() : 0;
       renderer.render(built.scene, built.camera);
+      const t3 = onFrameTiming ? performance.now() : 0;
       rt.surface?.present();
+      if (onFrameTiming) {
+        try {
+          const t4 = performance.now();
+          const probe = rt.probe;
+          probe.cpuMs = Math.max(0, t4 - probeStart);
+          probe.intervalMs = probeInterval;
+          probe.backend = (renderer.backend as { isWebGLBackend?: boolean }).isWebGLBackend ? 'webgl2' : 'webgpu';
+          probe.updateMs = t1 - t0;
+          probe.nodeMs = t2 - t1;
+          probe.renderMs = t3 - t2;
+          probe.presentMs = t4 - t3;
+          const info = renderer.info?.render;
+          probe.drawCalls = info?.drawCalls ?? -1;
+          probe.triangles = info?.triangles ?? -1;
+          probe.bufferW = renderer.domElement?.width ?? -1;
+          probe.bufferH = renderer.domElement?.height ?? -1;
+          onFrameTiming(probe);
+        } catch (error) {
+          // A diagnostics callback must never take down the game renderer.
+          console.warn('[ThreeCanvas] frame diagnostics failed', error);
+        }
+      }
     } catch (error) {
       console.error('[ThreeCanvas] render failed.', error);
       status.setState((s) => ({ failed: [...s.failed, (renderer.backend as { isWebGLBackend?: boolean }).isWebGLBackend ? 'webgl2' : 'webgpu'] }));
@@ -168,7 +227,12 @@ function JsThreeCanvas<P>({
     const rt = runtime.current!;
     if (rt.running || rt.queued) return;
     rt.queued = true;
-    requestAnimationFrame(draw);
+    // freeRun: on a superseding present path the next frame queues on a
+    // zero-delay timer instead of a vsync-locked rAF, so an on-demand loop
+    // (paused canvas kept alive by invalidate) is not capped near 30 fps by
+    // rAF delivery plus draw time.
+    if (freeRun) setTimeout(draw, 0);
+    else requestAnimationFrame(draw);
   };
 
   useImperativeHandle(ref, () => ({ invalidate }));
@@ -239,6 +303,7 @@ function JsThreeCanvas<P>({
       rt.renderer = null;
       rt.built = null;
       rt.surface = null;
+      rt.lastProbeStart = 0;
     };
     // invalidate, applySize and status are stable per instance; hasSize gates the first build only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -260,13 +325,17 @@ function JsThreeCanvas<P>({
       return;
     }
     let frame = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     const tick = () => {
       draw();
-      frame = requestAnimationFrame(tick);
+      if (freeRun) timer = setTimeout(tick, 0);
+      else frame = requestAnimationFrame(tick);
     };
-    frame = requestAnimationFrame(tick);
+    if (freeRun) timer = setTimeout(tick, 0);
+    else frame = requestAnimationFrame(tick);
     return () => {
       cancelAnimationFrame(frame);
+      if (timer !== undefined) clearTimeout(timer);
       rt.running = false;
       rt.last = 0;
     };
@@ -308,7 +377,7 @@ function JsThreeCanvas<P>({
   if (live) {
     // A backend change needs a fresh canvas: one element can't hold both a
     // webgpu and a webgl2 context.
-    surface = <ThreeSurface key={`${backend}-${device ? 'shared' : 'own'}`} ref={surfaceRef} />;
+    surface = <ThreeSurface key={`${backend}-${device ? 'shared' : 'own'}`} ref={surfaceRef} androidSurfaceType={androidSurfaceType} />;
   } else if (!pending) {
     surface = fallback;
   }

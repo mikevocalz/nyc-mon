@@ -8,7 +8,8 @@
 //   └─ HUD overlay (box-none, siblings of the detector)
 //       ├─ GameStatusLayer    loading / empty / errors / unsupported
 //       ├─ paused scrim       over the world while the session is paused
-//       └─ ArcadeController   stick, six caps, START/STOP pill (G01)
+//       ├─ ArcadeController   stick, six caps, START/STOP pill (G01)
+//       └─ MapAttribution     ODbL, always while the dataset exists
 //
 // Rendering is on demand: the city is static, so ThreeCanvas runs `paused`
 // and every camera change calls invalidate() once. No idle frame loop burns
@@ -51,6 +52,7 @@ import {
 import { View } from '@acme/ui/tw';
 import { brand } from '@acme/theme';
 import { GameStatusLayer } from './GameStatusLayer.tsx';
+import { MapAttribution } from './MapAttribution.tsx';
 import { commandToAction, describeCamera, type CameraCommand } from './camera-input.ts';
 import { isOverMappedArea } from './city-bounds.ts';
 import { bundledCity, BUNDLED_CITY_NAME } from './city-data.ts';
@@ -61,10 +63,15 @@ import { gameCameraStore, gameScreenActions, gameScreenStore } from './game-sess
 import { resolveGameViewState, shouldMountCanvas } from './game-status.ts';
 import { resolveGameHudLayout } from './hud-layout.ts';
 import { loadGameScene, type GameSceneParams } from './load-game-scene.ts';
+import { CITY_FRAME_SINK_ENABLED, onCityFrame } from './perf/on-city-frame.ts';
+import { GAME_SURFACE_TYPE } from './perf/surface-type.ts';
+import { GAME_FREERUN } from './perf/frame-pacing.ts';
+import { useGamePerfMounts } from './perf/use-game-perf.ts';
 import { useGameRenderThread } from './render-thread-choice.ts';
 import { readLobbyIdentity } from './lobby/lobby-identity.ts';
 import { lobbyStore } from './lobby/lobby.store.ts';
 import { gameInputRouter, useGameInput } from './use-game-input.ts';
+import { livingCityActorFactories, livingCitySky } from './living-city/bundled-host.ts';
 import { useCityCameraGestures } from './use-city-camera-gestures.ts';
 import { useWorldSaveLifecycle } from './world-resume/use-world-save-lifecycle.ts';
 import type { SceneActorFactory } from './scene-actor.ts';
@@ -187,7 +194,13 @@ export function GameScreen({ focused = true }: GameScreenProps = {}) {
     return {
       dataset: city.dataset,
       get camera() { return gameCameraStore.getState().camera; },
-      actors: CALLER_ACTORS,
+      // PR05/PR06 Living City (EXPO_PUBLIC_LIVING_CITY=1, default off): the
+      // flag contributes the vehicle + pedestrian factories; off, the list is
+      // byte-identical.
+      actors: [...CALLER_ACTORS, ...livingCityActorFactories()],
+      // PR07: the world clock picks the sky preset (dusk at the slice's
+      // starting hour). Flag off → undefined → the world's own default.
+      sky: livingCitySky(),
       onFirstFrame: gameScreenActions.firstFrame,
     };
   }, [city]);
@@ -218,6 +231,10 @@ export function GameScreen({ focused = true }: GameScreenProps = {}) {
   const identity = useMemo(() => readLobbyIdentity(), []);
   const dataset = city.ok ? city.dataset : null;
   useWorldSaveLifecycle({ identity, dataset });
+  // Flag-gated platform perf mounts: display-rate vote, thermal headroom
+  // monitor, ADPF hint session (performance-pass PR4.2 / PR5.1-2). Only while
+  // the Game tab is focused: the tab stays mounted when the player leaves it.
+  useGamePerfMounts(worldReady && focused);
   const input = useGameInput({
     enabled: gameplayInputEnabled(worldReady, lobbyPhase),
     focused,
@@ -265,6 +282,12 @@ export function GameScreen({ focused = true }: GameScreenProps = {}) {
               ref={canvas}
               renderThread={renderThread.thread}
               workletHost={renderThread.host}
+              // Off by default; EXPO_PUBLIC_GAME_SURFACE=ahb presents through the
+              // AHB pool (mailbox semantics) instead of the TextureView queue.
+              androidSurfaceType={GAME_SURFACE_TYPE}
+              // Off by default; EXPO_PUBLIC_GAME_FREERUN=1 lets the on-demand
+              // loop outpace vsync — only meaningful on the superseding surface.
+              freeRun={GAME_FREERUN}
               load={loadGameScene}
               params={params}
               paused
@@ -276,6 +299,7 @@ export function GameScreen({ focused = true }: GameScreenProps = {}) {
               background={brand.night}
               // No accessibilityLabel: the canvas layer stays hidden; the wrapping View is the named, actionable element.
               onBackendChange={gameScreenActions.backendChanged}
+              onFrameTiming={CITY_FRAME_SINK_ENABLED ? onCityFrame : undefined}
             />
           </View>
         </GestureDetector>
@@ -309,8 +333,10 @@ export function GameScreen({ focused = true }: GameScreenProps = {}) {
             onStart={input.startSession}
             onStopHoldStart={input.beginStopConfirm}
             onStopReleased={input.cancelStopConfirm}
+            onStopShortPress={input.shortPressFromStopConfirm}
           />
         ) : null}
+        {city.ok && shouldMountCanvas(state) ? <MapAttribution source={city.dataset.sources[0]!} rect={hud.attribution} /> : null}
         {handedOver ? (
           // Leave the city: pause (the session saves on pause), then back to
           // the lobby, which offers "Continue your game". The rail is hidden

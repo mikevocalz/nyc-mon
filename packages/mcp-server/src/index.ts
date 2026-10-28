@@ -10,7 +10,7 @@ export type { ToolContext, ToolName, ToolRequest } from './mcp/tools.ts';
 export type { McpAppsRegistration } from './mcp/ui-seam.ts';
 export { failure, success } from './mcp/errors.ts';
 export type { FailureReason } from './mcp/errors.ts';
-export type { CallerData, CareWriteIntent, IncubatingEgg, MonWithCare } from './data/caller.ts';
+export type { CallerData, CallerMons, CareWriteIntent, IncubatingEgg, MonWithCare } from './data/caller.ts';
 export { V1CallerData, deviceIdFor, idempotencyKeyFor, writeLanded } from './data/v1.ts';
 export { AdultRequiredError, DataError, NotFoundError, UpstreamError, WriteUnconfirmedError } from './data/errors.ts';
 export { EnvSchema, loadEnv } from './env.ts';

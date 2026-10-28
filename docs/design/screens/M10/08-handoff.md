@@ -1,5 +1,7 @@
 # M10 Incubation choice: handoff
 
+> Superseded by Decision 29 (2026-10-21): M10 no longer renders `EggCase` or closes a case around the egg. On confirm the egg stays in view (`m10-egg`, label `m10.egg.a11y.incubating`), `haptics.success` and the announcement fire at once, and the route changes after a 400 ms hold (0 under reduced motion). Case rows below are kept for the record only.
+
 Implementation contract for `platform`, `sim-core`, `render` and the kit. Inputs: `01-research.md` to `07-a11y.md`; `V11 ¶49`, `¶65`; canon #5, #7, #8, #9; design D5, D8, D11, P2; `screens/M06/08-handoff.md`; `screens/M08/08-handoff.md`; `packages/core/sim/hatch.ts`; `packages/app/features/mon/create-mon-store.ts`.
 
 ## Blockers before implementation

@@ -65,3 +65,14 @@ test('a short or foreign array is replaced by a full-length one', () => {
   assert.equal(snap.length, SNAPSHOT_LENGTH);
   assert.equal(snap[SNAPSHOT_SLOTS.version], 1);
 });
+
+test('a reused out buffer is seeded from previous, not its own stale data', () => {
+  const a = packSnapshot(emptySnapshot(), camera, caller, view);
+  const out = new Array<number>(SNAPSHOT_LENGTH).fill(-999);
+  const b = packSnapshot(a, { ...camera, x: Number.NaN }, caller, view, out);
+  assert.equal(snapshotVersion(b), snapshotVersion(a) + 1);
+  assert.equal(readCamera(b).x, camera.x);
+  const c = bumpSnapshot(b, new Array<number>(SNAPSHOT_LENGTH).fill(-999));
+  assert.equal(snapshotVersion(c), snapshotVersion(b) + 1);
+  assert.deepEqual(c.slice(1), b.slice(1));
+});

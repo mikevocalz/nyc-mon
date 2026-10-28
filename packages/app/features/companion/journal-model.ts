@@ -1,6 +1,6 @@
 import type { JournalEntry } from '@acme/core/types';
 import type { CompanionCopyId } from './copy.ts';
-import { localDayKey } from '../mon/create-mon-store.ts';
+import { localDayKey } from '../mon/local-day.ts';
 
 // Pure helpers for M18 (docs/design/screens/M18/08-handoff.md). Day
 // boundaries follow the device time zone, like the time-of-day rig.

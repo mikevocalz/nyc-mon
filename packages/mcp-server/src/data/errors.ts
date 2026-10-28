@@ -28,3 +28,8 @@ export class WriteUnconfirmedError extends DataError {
 export class UpstreamError extends DataError {
   override readonly name = 'UpstreamError';
 }
+
+/** `/v1` refused a hatch because the egg is still incubating (409 NOT_READY). */
+export class EggNotReadyError extends DataError {
+  override readonly name = 'EggNotReadyError';
+}

@@ -381,3 +381,41 @@ All NYC-MON shader/effect implementations target WebGPU through TypeGPU. React N
 A shared typed effects package owns WGSL, TypeGPU pipelines, effect schemas, React Native surfaces, Three/@typegpu adapters, performance tiers, accessibility variants, resource lifetime and provenance. Gameplay/features request semantic effects rather than embedding loose WGSL.
 
 `shader-effects-inc/shaders` is approved as an effects reference/source subject to license/provenance review and adaptation through this shared pipeline.
+
+## Decision 29 — the capture case is not part of eggs or hatching
+
+- **Date:** 2026-10-21
+- **Decided by:** Mike (creator)
+- **Kind:** canon
+- **Answers:** `docs/canon/OPEN_QUESTIONS.md` Q4
+- **Overrides:** `docs/phase-1-brief.md` §2.4 (L220), M10 and M11 (L283-284); M11/M12 design direction where it shows the case
+
+The capture case exists only for capturing encountered Hood Mons. Eggs, incubation and hatching never use it. The egg incubates and hatches in its own scene, and its own movement from inside starts the hatch. No lid, hinge, handle, biometric pad, scanner sweep or red scan light appears on M10, M11 or M12, and the H-Lynk's scanner LED stays a status light, never a hatch trigger.
+
+The hatch keeps six presentation phases. The first two, `case-open` and `scanner`, become `stir` (the egg shifts and wobbles from inside) and `pressure` (the shell swells and light builds within it), with the same timings. Saves from v1 and v2 that stopped mid-hatch at a legacy label load as save v3 at the start of the matching new phase, with the same reserved `monInstanceId`. The capture-case component and its story stay in the kit for the capture mechanic; encounter and capture gameplay are unchanged.
+
+## Decision 30 — egg shells for the four supplied 3D eggs
+
+- **Date:** 2026-10-21
+- **Decided by:** Mike (creator)
+- **Kind:** canon (art)
+- **Answers:** `docs/canon/OPEN_QUESTIONS.md` Q11 for these four eggs only
+
+The Glossy Red Polka-Dot Racing Egg is the LanternFye bloodline's egg, #020 Signal Egg, which hatches into #021 Fye Dot. No Bible or roster file in the repo described the Signal Egg's look before this.
+
+When a shell cracks, its inside is the egg's own colour, never white: Metro Egg red, Corner Egg pink, Signal Egg light grey, Prism Egg charcoal.
+
+## Decision 31 — which supplied egg is which
+
+- **Date:** 2026-10-21
+- **Decided by:** Mike (creator)
+- **Kind:** canon (art)
+
+The supplied egg files carry their canon names and match the eggs by their Bible skins:
+
+- `Metro-Egg.glb` is #001 Metro Egg: glossy red with white stripes (v7). Its reference is the "Glossy Spotted Red Egg with White Bands" image.
+- `Corner-Egg.glb` (supplied as `Bodega-Egg.glb`) is #008 Corner Egg: glossy pink with a white fur wrap (v7).
+- `Prism-Egg.glb` (supplied as `Fuego-Egg.glb`) is #061 Prism Egg: glossy black with flames and a clear crystal (v7).
+- The "Glossy Red Polka-Dot Racing Egg" image is #020 Signal Egg, the LanternFye bloodline's egg (as Decision 30 says). No 3D mesh has been made from it yet.
+
+`Fye-Egg.glb` (the tan "Glossy Spotted Alien Egg") is not assigned to any egg.

@@ -1,0 +1,80 @@
+import { createConsoleStore } from './base.ts';
+
+export type ModelFilter = 'all' | 'missing' | 'in-review' | 'approved';
+export type ModelYaw = '0' | '90' | '180' | '270';
+
+/** The editable fields of a Mon model, as the console form holds them (numbers as typed text). */
+export interface ModelDraft {
+  scale: string;
+  position: [string, string, string];
+  rotation: [string, string, string];
+  /** role -> clip name; '' leaves the role without a clip. */
+  clips: Record<string, string>;
+  author: string;
+  license: string;
+  sourceUrl: string;
+  notes: string;
+}
+
+/** A dropped GLB shown in the viewer before it is saved. */
+export interface PendingModel {
+  url: string;
+  name: string;
+  file: File;
+  release?: () => void;
+}
+
+export interface ModelsPage {
+  filter: ModelFilter;
+  setFilter: (filter: ModelFilter) => void;
+  yaw: ModelYaw;
+  setYaw: (yaw: ModelYaw) => void;
+  clip: string;
+  setClip: (clip: string) => void;
+  dragging: boolean;
+  setDragging: (dragging: boolean) => void;
+  pending: PendingModel | null;
+  setPending: (pending: PendingModel | null) => void;
+  /** Keyed by speciesId + updatedAt so a saved or switched form loads fresh values. */
+  draftKey: string | null;
+  draft: ModelDraft | null;
+  loadDraft: (key: string, draft: ModelDraft) => void;
+  editDraft: (patch: Partial<ModelDraft>) => void;
+  busy: 'upload' | 'save' | 'status' | null;
+  setBusy: (busy: ModelsPage['busy']) => void;
+  error: string | null;
+  setError: (error: string | null) => void;
+  /** Confirmation after a save; cleared by the next action. */
+  notice: string | null;
+  setNotice: (notice: string | null) => void;
+  viewerError: boolean;
+  setViewerError: (viewerError: boolean) => void;
+}
+
+export const useModelsStore = createConsoleStore<ModelsPage>((set) => ({
+  filter: 'all',
+  setFilter: (filter) => set({ filter }),
+  yaw: '0',
+  setYaw: (yaw) => set({ yaw }),
+  clip: '',
+  setClip: (clip) => set({ clip }),
+  dragging: false,
+  setDragging: (dragging) => set({ dragging }),
+  pending: null,
+  setPending: (pending) => set((state) => {
+    state.pending?.release?.();
+    return { pending, clip: '', viewerError: false, error: null, notice: null };
+  }),
+  draftKey: null,
+  draft: null,
+  loadDraft: (draftKey, draft) => set({ draftKey, draft, clip: '', yaw: '0', viewerError: false, error: null, notice: null }),
+  editDraft: (patch) => set((state) => ({ notice: null, draft: state.draft ? { ...state.draft, ...patch } : state.draft })),
+  busy: null,
+  setBusy: (busy) => set({ busy }),
+  error: null,
+  setError: (error) => set({ error, notice: null }),
+  notice: null,
+  setNotice: (notice) => set({ notice, error: null }),
+  viewerError: false,
+  setViewerError: (viewerError) => set({ viewerError }),
+}));

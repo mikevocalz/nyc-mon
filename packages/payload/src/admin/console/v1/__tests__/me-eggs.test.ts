@@ -137,8 +137,27 @@ describe('service key routes', () => {
     expect(isServiceRoute(at('GET', '/v1/me/eggs'))).toBe(true);
     expect(isServiceRoute(at('PUT', '/v1/mons/mon_1/care'))).toBe(true);
     expect(isServiceRoute(at('POST', '/v1/eggs'))).toBe(false);
-    expect(isServiceRoute(at('POST', '/v1/eggs/e1/hatch'))).toBe(false);
+    expect(isServiceRoute(at('POST', '/v1/eggs/e1/hatch'))).toBe(true);
     expect(isServiceRoute(at('GET', '/v1/mons/mon_1/care'))).toBe(false);
+  });
+
+  it('allows only POST to one egg\'s hatch path', () => {
+    expect(isServiceRoute(at('POST', '/v1/eggs/e1/hatch/'))).toBe(true);
+    expect(isServiceRoute(at('GET', '/v1/eggs/e1/hatch'))).toBe(false);
+    expect(isServiceRoute(at('POST', '/v1/eggs/e1/hatch/more'))).toBe(false);
+    expect(isServiceRoute(at('POST', '/v1/eggs/a/b/hatch'))).toBe(false);
+    expect(isServiceRoute(at('POST', '/v1/eggs//hatch'))).toBe(false);
+  });
+
+  it('acts for an adult Caller on the hatch route', async () => {
+    const { payload, auth } = fakePayload({ users: [{ id: 'u1', birthYear: 1990 }, { id: 'kid', birthYear: 2015 }] });
+    const ok = await authenticateCaller(payload, at('POST', '/v1/eggs/e1/hatch', asService('u1')), { serviceKey: SERVICE_KEY, nowMs: NOW });
+    expect(ok).toMatchObject({ callerId: 'u1' });
+    const minor = await authenticateCaller(payload, at('POST', '/v1/eggs/e1/hatch', asService('kid')), { serviceKey: SERVICE_KEY, nowMs: NOW });
+    expect((minor as Response).status).toBe(403);
+    const wrongKey = await authenticateCaller(payload, at('POST', '/v1/eggs/e1/hatch', asService('u1', 'x'.repeat(48))), { serviceKey: SERVICE_KEY, nowMs: NOW });
+    expect((wrongKey as Response).status).toBe(401);
+    expect(auth).not.toHaveBeenCalled();
   });
 
   it('acts for the Caller on an allowed route and refuses the service headers anywhere else', async () => {

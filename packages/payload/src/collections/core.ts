@@ -5,7 +5,8 @@ export {
   EggRecordSchema,
   EpochMsSchema,
   IdSchema,
+  MON_GENDERS,
   MIN_BIRTH_YEAR,
   MonInstanceSchema,
 } from '@acme/core/schemas';
-export { deriveMonInstanceId, isConsentRequired } from '@acme/core/sim';
+export { deriveMonGender, deriveMonInstanceId, deriveVoiceLineageId, isAllowedMonNicknameWrite, isConsentRequired } from '@acme/core/sim';

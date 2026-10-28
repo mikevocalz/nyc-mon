@@ -1,5 +1,6 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import type { ModelClient, ModelTurnRequest } from '../shared/agentLoop.ts';
+import { AuthExpiredError, bearer, noAuthorize, type Authorize } from './freshToken.ts';
 
 /** Raised with a message meant for the screen. */
 export class ModelTurnError extends Error {
@@ -48,25 +49,27 @@ export function drainSse(buffer: string, onEvent: (e: WireEvent) => void): strin
 
 /** The browser half of /api/model. */
 /**
- * The browser half of /api/model. `getToken` supplies the person's MCP access
- * token in OAuth mode; the server checks it before spending a model turn.
+ * The browser half of /api/model. `authorize` (freshToken.ts) supplies the
+ * person's MCP access token in OAuth mode, refreshed when it is about to lapse
+ * and retried once on a 401; the server checks it before spending a model turn.
  */
-export function httpModelClient(
-  endpoint = '/api/model',
-  fetchFn: typeof fetch = fetch,
-  getToken: () => string | undefined = () => undefined,
-): ModelClient {
+export function httpModelClient(endpoint = '/api/model', fetchFn: typeof fetch = fetch, authorize: Authorize = noAuthorize): ModelClient {
   return {
     async streamTurn(req: ModelTurnRequest, onText, signal) {
-      const res = await fetchFn(endpoint, {
-        method: 'POST',
-        headers: (() => {
-          const token = getToken();
-          return { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) };
-        })(),
-        body: JSON.stringify({ messages: req.messages, tools: req.tools }),
-        signal,
-      });
+      let res: Response;
+      try {
+        res = await authorize((token) =>
+          fetchFn(endpoint, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json', ...bearer(token) },
+            body: JSON.stringify({ messages: req.messages, tools: req.tools }),
+            signal,
+          }),
+        );
+      } catch (err) {
+        if (err instanceof AuthExpiredError) throw new ModelAuthExpiredError();
+        throw err;
+      }
       if (res.status === 401) throw new ModelAuthExpiredError();
       if (!res.ok || !res.body) {
         let message = 'The simulator server didn’t answer. Check that it’s running.';

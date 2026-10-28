@@ -21,6 +21,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import sharp from 'sharp';
 import { build, type InlineConfig, type Plugin } from 'vite';
 import { viteSingleFile } from 'vite-plugin-singlefile';
+import { MON_MODEL_ORIGIN } from './model-origin.ts';
 import { UI_VIEWS, type UiViewId } from './views.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -82,6 +83,7 @@ async function buildView(view: UiViewId): Promise<string> {
       // The room carries the GridBand backdrop; the inline card does not.
       __GRID_BACKDROP__: JSON.stringify(view === 'mon-room'),
       'process.env.NODE_ENV': JSON.stringify('production'),
+      __MON_MODEL_ORIGIN__: JSON.stringify(MON_MODEL_ORIGIN),
     },
     build: {
       outDir,
@@ -131,7 +133,7 @@ export async function buildUi(): Promise<Record<UiViewId, UiManifestEntry>> {
     await writeFile(join(UI_DIST, file), html);
     manifest[view] = { file, hash, bytes: Buffer.byteLength(html) };
   }
-  await writeFile(join(UI_DIST, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
+  await writeFile(join(UI_DIST, 'manifest.json'), `${JSON.stringify({ ...manifest, modelOrigin: MON_MODEL_ORIGIN }, null, 2)}\n`);
   return manifest;
 }
 

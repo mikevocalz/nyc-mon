@@ -1,0 +1,78 @@
+{
+  "runtimeVersion": 1,
+  "eggId": "prism-egg",
+  "eggSpeciesId": "dex-061",
+  "eggName": "Prism Egg",
+  "dexId": 61,
+  "hatchesIntoSpeciesId": "dex-062",
+  "babyName": "Yotito",
+  "bloodlineId": "F12",
+  "source": {
+    "mesh": "packages/assets/eggs/prism-egg/source/Prism-Egg.glb",
+    "meshSha256": "b624de189d56444d76f66607a847e270656720773deb4fdb0d2c199814b0e0b2",
+    "sourceRevision": "creator upload 2026-10-21, optimized GLB",
+    "approval": "pending creator review",
+    "canonMatch": "Bible skin (v7, STARTERS_EXTRACT:404): glossy black egg with red-orange-yellow flame motifs and a clear crystal. Supplied as Fuego-Egg.glb, renamed to its canon name."
+  },
+  "baby": {
+    "model": null,
+    "proxy": true,
+    "note": "No Yotito model or rig exists. The build uses a labeled proxy for pipeline tests only."
+  },
+  "fractureSeed": 1061,
+  "fracture": {
+    "capShards": 5,
+    "waist": 0.5,
+    "waistWobble": 0.07,
+    "edgeNoise": 0.22,
+    "shellThickness": 0.0016,
+    "innerColorSource": "creator 2026-10-21: metro red, corner pink, signal light grey, prism charcoal",
+    "innerColorSrgb": "#1A1B1D"
+  },
+  "gooProfile": {
+    "color": [
+      1.0,
+      0.72,
+      0.3,
+      0.78
+    ],
+    "emissiveFleck": [
+      0.6,
+      0.22,
+      0.02
+    ],
+    "drips": 3,
+    "dripRadius": 0.0028,
+    "puddleRadius": 0.05
+  },
+  "timing": {
+    "fps": 30,
+    "phases": {
+      "stir": [
+        0.0,
+        1.0
+      ],
+      "pressure": [
+        1.0,
+        1.8
+      ],
+      "crack": [
+        1.8,
+        4.2
+      ],
+      "burst": [
+        4.2,
+        4.7
+      ],
+      "emerge": [
+        4.7,
+        6.5
+      ]
+    },
+    "crackBeats": [
+      0.25,
+      0.55,
+      0.85
+    ]
+  }
+}

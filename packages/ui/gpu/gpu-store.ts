@@ -33,6 +33,12 @@ async function start(): Promise<void> {
     const module = await loadWebGpu();
     const adapter = module ? await navigator.gpu.requestAdapter() : null;
     if (!module || !adapter) {
+      // Distinguish "no navigator.gpu" from "adapter request resolved null":
+      // the unsupported state is terminal, so the cause must be in the log.
+      console.warn(
+        '[GpuCanvas] WebGPU unavailable, using the fallback renderer.',
+        !module ? 'navigator.gpu is not installed' : 'requestAdapter() returned null',
+      );
       gpuStore.setState({ support: 'unsupported' });
       return;
     }

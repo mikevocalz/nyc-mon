@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { parseCityDataset, type CityDatasetV2, type CityRoad } from '../city-dataset.ts';
+import { parseCityDataset, type CityDatasetV3, type CityRoad } from '../city-dataset.ts';
 import { CROWN_REACH, MAX_OVERHANG, treePlacements } from './foliage.ts';
 import { segmentDistanceSq } from './geometry.ts';
 import { placeStreetFurniture } from './street-furniture.ts';
@@ -22,31 +22,32 @@ function gapTo(roads: readonly CityRoad[], x: number, z: number): number {
   return gap;
 }
 
-function tile(roads: CityRoad[], osm: number[], fill: number[]): CityDatasetV2 {
+function tile(roads: CityRoad[], census: number[], fill: number[]): CityDatasetV3 {
   return {
-    version: 2, id: 't', origin: [-73.95, 40.81], extentMeters: 200,
-    source: { url: 'https://www.openstreetmap.org/copyright', attribution: 't', license: 'ODbL-1.0', retrievedAt: '2026-10-16T00:00:00Z' },
-    notes: [], buildings: [], areas: [], landmarks: [], roads, trees: { osm, fill }, transit: { subway: [], shelters: [] },
+    version: 3, id: 't', origin: [-73.95, 40.81], extentMeters: 200,
+    sources: [{ url: 'https://www.openstreetmap.org/copyright', attribution: 't', license: 'ODbL-1.0', retrievedAt: '2026-10-16T00:00:00Z' }],
+    notes: [], buildings: [], areas: [], landmarks: [], roads,
+    trees: { census, fill }, transit: { subway: [], shelters: [] }, furniture: { hydrant: [], linknyc: [], bikeRack: [] },
   };
 }
 const road = (id: string, cls: CityRoad['class'], points: number[], width: number): CityRoad => ({
   id, class: cls, widthMeters: width, sidewalkMeters: 0, points, widthEstimated: false,
 });
 
-test('OSM trees in the street move to the sidewalk band within 3 m, else drop; generated ones drop', () => {
+test('record trees in the street move to the sidewalk band within 3 m, else drop; generated ones drop', () => {
   // A 10 m street along x and a 3 m zebra crossing across it at x = 50.
   const roads = [road('s', 'residential', [-100, 0, 100, 0], 10), road('c', 'crossing', [50, -6, 50, 6], 3)];
-  const osm = [0, 4, /* 1 m inside the kerb: moves */ 20, 0.5 /* mid-street: 4.5+ m to a kerb, drops */, 50, 6 /* on the crossing's end */];
+  const census = [0, 4, /* 1 m inside the kerb: moves */ 20, 0.5 /* mid-street: 4.5+ m to a kerb, drops */, 50, 6 /* on the crossing's end */];
   const fill = [-20, 3 /* in the road: drops */, -30, 7 /* on the sidewalk: stays */];
-  const { trees, report } = treePlacements(tile(roads, osm, fill));
-  assert.equal(report.osmMoved, 2);
-  assert.equal(report.osmDropped, 1);
+  const { trees, report } = treePlacements(tile(roads, census, fill));
+  assert.equal(report.recordMoved, 2);
+  assert.equal(report.recordDropped, 1);
   assert.equal(report.fillDropped, 1);
   for (const t of trees) {
     assert.ok(gapTo(roads, t.x, t.z) >= KERB_MARGIN, `${t.x},${t.z}`);
     assert.ok(CROWN_REACH * t.scale <= gapTo(roads, t.x, t.z) + MAX_OVERHANG + 1e-9, 'crown overhang');
   }
-  const moved = trees.find((t) => t.osm && t.x === 0)!;
+  const moved = trees.find((t) => t.record && t.x === 0)!;
   assert.ok(Math.abs(moved.z - (5 + BAND_INNER + 0.2)) < 1e-6, `moved to ${moved.z}`);
 });
 
@@ -95,7 +96,7 @@ test('the real tile: no tree, pole or sign base inside any carriageway or crossi
   assert.ok(props.cars.length > 300 && props.cars.some((c) => c.taxi));
   assert.ok(INTERSECTION_CLEAR > 0);
   console.log(`props: ${JSON.stringify({ hydrants: props.hydrants.length, baskets: props.baskets.length, cars: props.cars.length, subway: props.subway.length, shelters: props.shelters.length, ...props.report })}`);
-  console.log(`clearance: ${JSON.stringify(report)}; trees ${trees.length} of ${dataset.trees.osm.length / 2 + dataset.trees.fill.length / 2}; signs ${signs.length} of ${intersections}; lights ${lights.length}`);
+  console.log(`clearance: ${JSON.stringify(report)}; trees ${trees.length} of ${dataset.trees.census.length / 2 + dataset.trees.fill.length / 2}; signs ${signs.length} of ${intersections}; lights ${lights.length}`);
   assert.ok(signs.length > 100, `${signs.length} signs`);
   assert.ok(lights.length > 300, `${lights.length} lights`);
 });

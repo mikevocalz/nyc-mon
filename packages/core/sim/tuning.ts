@@ -32,6 +32,13 @@ export interface CareTuning {
   readonly overfeedAfterMealAbove: number;
   /** Fullness a "Share a meal" feed adds (D-15e: no named foods until `content/food`). */
   readonly sharedMealNutrition: number;
+  /**
+   * Energy a "Share a meal" feed adds: v7's full meal gives 40 Fullness and
+   * 5 Energy (M7 L14726; STARTERS_EXTRACT "Full meals restore 40 Fullness/5
+   * Energy"), so a meal is mostly food with a small lift. Resting is still
+   * how Energy comes back. TODO(canon) Q19: the owner confirms v7's numbers.
+   */
+  readonly sharedMealEnergy: number;
   readonly sluggishDurationMs: number;
   /** Energy drains this many times faster while sluggish. */
   readonly sluggishEnergyDecayMultiplier: number;
@@ -75,6 +82,8 @@ export const DEFAULT_CARE_TUNING: CareTuning = {
   needsAttentionBelow: 0.25,
   overfeedAfterMealAbove: 1,
   sharedMealNutrition: 0.35,
+  // 5/40 of the meal's Fullness, as v7's full meal (40 Fullness / 5 Energy).
+  sharedMealEnergy: 0.35 * (5 / 40),
   sluggishDurationMs: 45 * 60_000,
   sluggishEnergyDecayMultiplier: 2,
   earlyWakeEnergyBelow: 0.6,

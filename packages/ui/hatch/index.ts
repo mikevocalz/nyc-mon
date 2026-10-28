@@ -15,3 +15,9 @@ export {
   triptychKey, type CreatureFraming, type StillReaction,
 } from './hatch-model';
 export { ChoiceRows, type ChoiceRowsProps, type ChoiceRow } from './ChoiceRows';
+export { HatchEgg3D, type HatchEgg3DProps } from './HatchEgg3D';
+export {
+  EggHatchAssetError, parseEggHatchManifest, hatchClipTime, type EggAttention, type EggHatchPhase, type EggHatchManifest,
+} from '../three/hatch/hatch-manifest';
+export type { EggHatchSource } from '../three/hatch/egg-hatch-rig';
+export { preloadEggHatch } from '../three/hatch/load-hatch';

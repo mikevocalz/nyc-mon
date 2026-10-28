@@ -16,6 +16,10 @@
 
 NYC-MON is a near-future New York where intelligent Mons live alongside people. Phase 1 builds the H-Lynk companion loop on iOS and Android (meet three starters, pick an egg, hatch it, care for the Baby Mon in real time) plus the product site on Next.js.
 
+## Alexa+ hackathon entry
+
+The Alexa+ add-on is an MCP server (`packages/mcp-server`), an Agent Skill (`skills/nyc-mon-companion`) and a smart-display simulator (`packages/web-sim`) that runs Claude Sonnet 4.6 on Amazon Bedrock. Run it locally with [docs/alexa/SIMULATOR.md](docs/alexa/SIMULATOR.md). The AWS setup and measured cost are in [docs/aws-builder.md](docs/aws-builder.md).
+
 ## Monorepo
 
 | Path | Package | What it is |
@@ -27,7 +31,7 @@ NYC-MON is a near-future New York where intelligent Mons live alongside people. 
 | `packages/ui` | `@acme/ui` | NYC-Tron, the UI kit: universal semantic components, neon controls, Skia and three.js/WebGPU backgrounds. See [its README](packages/ui/README.md). |
 | `packages/theme` | `@acme/theme` | Design tokens. `tokens.ts` is the only file with hex values, and `build-css.mjs` turns it into the Tailwind 4 and Uniwind CSS. |
 | `packages/core` | `@acme/core` | Game types, Zod schemas, the care simulation and save format. |
-| `packages/content` | `@acme/content` | Starter Mons and egg data. |
+| `packages/content` | `@acme/content` | Complete 115-form registered roster, 109 canon-staged species, 18 evolution chains, source-backed legacy details, plus three Phase-1 starter eggs. [Canon sync status](docs/canon/CONTENT_SYNC_V11_1.md). |
 | `packages/payload` | `@acme/payload` | Payload CMS config, collections and a typed REST reader. |
 | `packages/auth` | `@acme/auth` | The auth client apps import: Better Auth with passkeys, returning typed results instead of throwing. |
 | `packages/assets` | `@acme/assets` | Brand marks, fonts, district photos. |

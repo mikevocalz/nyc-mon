@@ -7,11 +7,11 @@
 // 2026-10-15, docs/implementation/city-world.md); if first-chunk cost
 // matters, move it behind the scene's dynamic import.
 import raw from './data/harlem-apollo.json';
-import { parseCityDataset, type CityDatasetV2 } from './city-dataset.ts';
+import { parseCityDataset, type CityDatasetV3 } from './city-dataset.ts';
 import { cityDatasetBounds, type CityBounds } from './city-bounds.ts';
 
 export type BundledCity =
-  | { ok: true; dataset: CityDatasetV2; bounds: CityBounds }
+  | { ok: true; dataset: CityDatasetV3; bounds: CityBounds }
   | { ok: false; error: Error };
 
 let cached: BundledCity | null = null;
