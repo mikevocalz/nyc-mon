@@ -177,7 +177,9 @@ export function ShellRail({ active, onSelect, expanded = false, insets }: ShellR
           />
         ))}
         <View className="flex-1" />
-        <ShellAvatar onPress={() => onSelect('caller')} />
+        <View style={{ marginBottom: 10 }}>
+          <ShellAvatar onPress={() => onSelect('caller')} />
+        </View>
         <ShellMenuButton />
       </View>
       <View style={{ width: insets.right }} />

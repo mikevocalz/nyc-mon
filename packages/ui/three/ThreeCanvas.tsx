@@ -115,6 +115,10 @@ function JsThreeCanvas<P>({
   const status = useInstanceStore(() => ({ failed: [] as ThreeBackend[] }));
   const failed = useStore(status, (s) => s.failed);
   const { size, onLayout } = useLayoutSize({ width: 0, height: 0 });
+  // The renderer starts asynchronously; a layout change during that wait must
+  // still size it, so applySize reads the latest size, never a stale closure.
+  const latestSize = useRef(size);
+  latestSize.current = size;
   const surfaceRef = useRef<ThreeSurfaceHandle>(null);
   const runtime = useRef<Runtime<P>>(null);
   runtime.current ??= {
@@ -261,6 +265,7 @@ function JsThreeCanvas<P>({
   const applySize = () => {
     const rt = runtime.current!;
     const { renderer, built } = rt;
+    const size = latestSize.current;
     if (!renderer || !built || size.width <= 0 || size.height <= 0) return;
     const pixelRatio = Math.min(PixelRatio.get(), maxPixelRatio);
     if (rt.sized && rt.width === size.width && rt.height === size.height && rt.pixelRatio === pixelRatio) return;

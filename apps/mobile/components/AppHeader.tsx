@@ -51,9 +51,9 @@ export function AppHeader() {
             pane toggles, so controls on the primary field read as one set. */}
         <Pressable
           aria-label="Notifications"
-          // The header only draws on rail hardware (tablets, foldables); 10pt off the right edge there.
+          // The header only draws on rail hardware (tablets, foldables); 6pt off the right edge there.
           onPress={() => router.push('/notifications')}
-          className="relative mr-[10px] h-11 w-11 items-center justify-center rounded-none border-2 border-border bg-surface-raised transition-colors duration-fast hover:bg-surface-sunken active:bg-surface-sunken motion-reduce:transition-none"
+          className="relative mr-[6px] h-11 w-11 items-center justify-center rounded-none border-2 border-border bg-surface-raised transition-colors duration-fast hover:bg-surface-sunken active:bg-surface-sunken motion-reduce:transition-none"
         >
           <Bell size={20} className="text-accent" />
           <View className="absolute right-2 top-2 h-2 w-2 rounded-full bg-danger" />
