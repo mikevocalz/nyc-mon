@@ -223,4 +223,10 @@ describe('env', () => {
     const env = loadEnv({ NODE_ENV: 'production', AUTH_JWKS_URL: 'https://a.test/jwks', V1_MCP_SERVICE_KEY: 'k'.repeat(32) });
     expect(env.MCP_RESOURCE_URI).toBe('http://localhost:8788/mcp');
   });
+
+  it('keeps the WWW-Authenticate challenge off unless MCP_WWW_AUTHENTICATE=1 (Alexa wants a bare 401)', () => {
+    const base = { NODE_ENV: 'development', OAUTH_DEV_BYPASS: '1' };
+    expect(loadEnv(base).MCP_WWW_AUTHENTICATE).toBe('0');
+    expect(loadEnv({ ...base, MCP_WWW_AUTHENTICATE: '1' }).MCP_WWW_AUTHENTICATE).toBe('1');
+  });
 });

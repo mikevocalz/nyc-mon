@@ -15,10 +15,10 @@ pnpm --filter @acme/mcp-server typecheck
 ## Endpoints
 
 - `POST /mcp`: JSON-RPC. Initialize with `2025-11-25`, `2025-06-18` or `2025-03-26` (Alexa sends 2025-03-26) and the server answers with the same version.
-- `GET /.well-known/oauth-protected-resource` and `…/oauth-protected-resource/mcp`: RFC 9728 metadata. `resource` is the exact `MCP_RESOURCE_URI`.
+- `GET /.well-known/oauth-protected-resource` and `…/oauth-protected-resource/mcp`: RFC 9728 metadata. `resource` is the exact `MCP_RESOURCE_URI`. The document is public, so it is served with `Access-Control-Allow-Origin: *` to any origin, and `OPTIONS` on either path answers 204.
 - `GET /healthz`.
 
-An `Origin` header that is not the resource's own origin or listed in `MCP_ALLOWED_ORIGINS` gets 403. A request with no `Origin` passes, which is how Alexa calls.
+On `/mcp`, an `Origin` header that is not the resource's own origin or listed in `MCP_ALLOWED_ORIGINS` gets 403. A request with no `Origin` passes, which is how Alexa calls.
 
 ## Auth
 
@@ -31,7 +31,9 @@ Tokens come from the issuer on admin-vite (lane B, `docs/alexa/AUTH.md`) and are
 | `mcp:caller` | read tools | care tools → 403 |
 | `mcp:care` | feed, rest, wake, play | read tools → 403 |
 
-No 401 or 403 carries `WWW-Authenticate`, per Amazon. Clients find the metadata at the well-known path.
+The token is checked before the body is read, so an anonymous request gets 401 whatever it sent (an empty POST included).
+
+By default no 401 or 403 carries `WWW-Authenticate`, per Amazon; Alexa finds the metadata at the well-known path. With `MCP_WWW_AUTHENTICATE=1` (the browser companion's host), refusals carry the MCP spec's challenge: `Bearer resource_metadata="<origin>/.well-known/oauth-protected-resource/mcp"`, plus `error="invalid_token"` for a bad or expired token, or `error="insufficient_scope"` and `scope="mcp:caller mcp:care"` on a 403. `Access-Control-Expose-Headers` lists `www-authenticate` so a browser client can read it.
 
 Accounts must be 18 or older. A token whose `birth_year` claim says otherwise gets an `adults-only` result before any `/v1` call. `/v1` enforces the same rule from the Users record on every on-behalf-of request, so a token without the claim is still checked.
 
@@ -53,4 +55,4 @@ Lane C's `mcpAppsRegistration()` (`src/ui`) registers the `ui://nyc-mon/…` res
 
 ## Env
 
-`MCP_PORT` (8788) · `MCP_RESOURCE_URI` (`http://localhost:8788/mcp`) · `MCP_ALLOWED_ORIGINS` · `AUTH_ISSUER` · `MCP_TOKEN_VERIFIER` (`jwt` | `introspection`) · `AUTH_JWKS_URL` · `AUTH_INTROSPECTION_URL` / `_CLIENT_ID` / `_CLIENT_SECRET` · `V1_BASE_URL` · `V1_MCP_SERVICE_KEY` (32+ chars) · `V1_TIMEOUT_MS` (400) · `OAUTH_DEV_BYPASS` · `MCP_DEV_MODE`. `src/env.ts` validates them at startup and names every missing value.
+`MCP_PORT` (8788) · `MCP_RESOURCE_URI` (`http://localhost:8788/mcp`) · `MCP_ALLOWED_ORIGINS` · `AUTH_ISSUER` · `MCP_TOKEN_VERIFIER` (`jwt` | `introspection`) · `AUTH_JWKS_URL` · `AUTH_INTROSPECTION_URL` / `_CLIENT_ID` / `_CLIENT_SECRET` · `V1_BASE_URL` · `V1_MCP_SERVICE_KEY` (32+ chars) · `V1_TIMEOUT_MS` (400) · `OAUTH_DEV_BYPASS` · `MCP_DEV_MODE` · `MCP_WWW_AUTHENTICATE` (0). `src/env.ts` validates them at startup and names every missing value.
