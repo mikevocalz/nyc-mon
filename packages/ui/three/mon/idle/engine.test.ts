@@ -127,6 +127,12 @@ test('listening swaps the base to up_look_listen', () => {
   assert.equal(f.base, 'up_look_listen');
 });
 
+test('a tired Mon keeps its rest pose while it listens', () => {
+  const clips = resolveIdleClips(['emote_tired', 'up_breathe'], RATTI);
+  const f = run(2, 7, () => ({ ...quiet, listening: true }), clips).at(-1)!;
+  assert.equal(f.base, 'emote_tired');
+});
+
 test('a hungry Lil’ Ratti stands in up_idle and sniffs now and then', () => {
   const clips = resolveIdleClips(['quad_idle_sniff', 'up_idle'], RATTI);
   assert.equal(clips.base, 'up_idle');

@@ -3,11 +3,14 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { parseSpeechCue, sampleSpeechTrack, utteranceTimeMs, type MonSpeechCue } from './lipsync/cue.ts';
+import { cueAnchorMs, parseSpeechCue, sampleSpeechTrack, utteranceTimeMs, type MonSpeechCue } from './lipsync/cue.ts';
 import { EXPRESSION_CHANNELS, mouthToRig, SPEECH_CHANNELS, type RigTargets } from './lipsync/retarget.ts';
 import { damp } from './lipsync/smoothing.ts';
+import { standFraming } from './framing.ts';
+import { closeLoop, resampleSmooth, smoothJitter } from './clip-smoothing.ts';
+import { captureFrame, createFrameStats, probeFrame, probing } from './frame-stats.ts';
 import { idleConfig } from './idle/config.ts';
-import { createIdleEngine, resolveIdleClips, type IdleAction, type IdleEngine, type IdleFrame } from './idle/engine.ts';
+import { createIdleEngine, LOOPS, resolveIdleClips, type IdleAction, type IdleEngine, type IdleFrame } from './idle/engine.ts';
 
 /**
  * One Mon GLB on a small lit stage, drawn with three.js (WebGL). Plays the
@@ -305,6 +308,7 @@ export function MonModel3D({
   });
 
   const stage = useRef<{ renderer: THREE.WebGLRenderer; camera: THREE.PerspectiveCamera } | null>(null);
+  const statsRef = useRef<ReturnType<typeof createFrameStats> | null>(null);
   const anim = useRef<AnimationState | null>(null);
   const rigRef = useRef<Rig | null>(null);
   /** The utterance in progress: its track and when (performance.now) its audio started. */
@@ -408,18 +412,26 @@ export function MonModel3D({
         root = new THREE.Group();
         root.add(model);
         scene.add(root);
-        // Fit the cylinder the turntable sweeps, so tails and arms never clip.
-        // Half the radius on top of the centre-plane fit covers the near edge
-        // of the sweep; a full radius left the body small in its box.
+        // Standing face-on at 90% of the frame's height (framing.ts).
         const radius = Math.hypot(size.x, size.z) / 2;
-        const vHalf = (camera.fov * Math.PI) / 360;
-        const hHalf = Math.atan(Math.tan(vHalf) * camera.aspect);
-        const dist = Math.max(size.y / 2 / Math.tan(vHalf), radius / Math.tan(hHalf)) * 1.08 + radius * 0.5;
-        camera.position.set(0, size.y * 0.08, dist);
+        const hHalf = Math.atan(Math.tan((camera.fov * Math.PI) / 360) * camera.aspect);
+        camera.position.copy(standFraming(size, camera));
+        const dist = camera.position.z;
         camera.lookAt(0, 0, 0);
         rig = readRig(model, mouthRef.current);
         holdHeadInTurns(gltf.animations, model);
+        // Clips as authored had baked tremble, linear 30 fps keys (a speed step every
+        // fourth frame at 120 Hz) and loops that did not meet (a snap each restart).
+        for (const clip of gltf.animations) {
+          const loops = LOOPS.has(clip.name) || clip.name === 'up_look_listen' || clip.name === 'up_walk';
+          smoothJitter(clip, loops);
+          if (loops) closeLoop(clip);
+          resampleSmooth(clip, loops);
+        }
         const mixer = new THREE.AnimationMixer(model);
+        // Bind every clip now: the first clipAction() of a clip builds its
+        // property bindings, a 30-40 ms hitch measured at the first switch to it.
+        for (const clip of gltf.animations) mixer.clipAction(clip);
         const durations = Object.fromEntries(gltf.animations.map((a) => [a.name, a.duration]));
         const engine = createIdleEngine(resolveIdleClips(clipsRef.current, durations), seedOf(url));
         // Steps stay inside 90% of the frame with the whole body in view, facing front.
@@ -435,6 +447,7 @@ export function MonModel3D({
         const total = bodyChain.reduce((a, b) => a + b.share, 0) || 1;
         bodyChain = bodyChain.map((b) => ({ ...b, share: b.share / total }));
         shoulders = [model.getObjectByName('shoulder_L') ?? null, model.getObjectByName('shoulder_R') ?? null];
+        headBone = model.getObjectByName('head') ?? null;
         rigRef.current = rig;
         setState('ready');
       },
@@ -446,11 +459,34 @@ export function MonModel3D({
       },
     );
 
-    /** Puts every channel speech or blinking writes back to its bind value, so the clip (or nothing) sets the base each frame. */
+    /**
+     * The value the clip last gave each channel speech or blinking writes on
+     * top of. three.js's PropertyMixer skips writing a value that has not
+     * changed since its last frame, so a clip holding a face still (the tired
+     * face: mouthClose 0.9, lids 0.15) writes it once and then never again.
+     * Resetting those channels to their bind value each frame therefore left
+     * them at bind on every frame the clip did not change, and the face
+     * flicked between the two shapes (measured: mouthClose 0 / 0.9 frame to
+     * frame). Restoring the clip's own last value keeps the mixer's skip correct.
+     */
+    const clipBase = { jaw: new THREE.Quaternion(), jawKnown: false, morphs: new Map<string, number>() };
+    const FACE_CHANNELS = [...DRIVEN, ...BLINK_CHANNELS];
+    /** Puts every channel speech or blinking writes back to what the clip (or the bind pose) set, before the mixer runs. */
     const restoreBase = (r: Rig) => {
-      r.jaw?.quaternion.copy(r.jawBind);
-      for (const name of DRIVEN) resetMorph(r, name);
-      for (const name of BLINK_CHANNELS) resetMorph(r, name);
+      if (r.jaw) r.jaw.quaternion.copy(clipBase.jawKnown ? clipBase.jaw : r.jawBind);
+      for (const name of FACE_CHANNELS) {
+        const v = clipBase.morphs.get(name);
+        if (v === undefined) resetMorph(r, name);
+        else writeMorph(r, name, v);
+      }
+    };
+    /** After the mixer: what it left on each channel is the clip's value (written now, or held from before). */
+    const recordBase = (r: Rig) => {
+      if (r.jaw) {
+        clipBase.jaw.copy(r.jaw.quaternion);
+        clipBase.jawKnown = true;
+      }
+      for (const name of FACE_CHANNELS) if (r.morphs.has(name)) clipBase.morphs.set(name, readMorph(r, name));
     };
 
     /** Holds every channel the clip leaves still at the rig's rest pose (jaw shut, lips together). */
@@ -519,6 +555,7 @@ export function MonModel3D({
       if (next === shown) return;
       shown = next;
       canvas.dataset.mouthOpen = open.toFixed(2);
+      statsRef.current?.mouth(open);
       canvas.dataset.mouthClose = readMorph(r, 'mouthClose').toFixed(2);
     };
 
@@ -608,10 +645,15 @@ export function MonModel3D({
       return Math.abs(Math.atan2(Math.sin(d), Math.cos(d)));
     };
 
+    const stats = createFrameStats();
+    const headAt = new THREE.Vector3();
+    let headBone: THREE.Object3D | null = null;
+    statsRef.current = stats;
     const tick = (now?: number) => {
       frame = requestAnimationFrame(tick);
       timer.update(now);
-      const dt = Math.min(timer.getDelta(), 0.05);
+      const rawDt = timer.getDelta();
+      const dt = Math.min(rawDt, 0.05);
       clock += dt;
       const a = anim.current;
       if (a && root) {
@@ -625,6 +667,8 @@ export function MonModel3D({
           reduced: reduced?.matches ?? false,
           boundX: a.boundX,
         });
+        if ((f.action?.id ?? 0) !== a.actionId) stats.note(`action ${f.action?.kind ?? 'none'} ${f.action?.clip ?? ''}`);
+        if (f.base !== a.base) stats.note(`base ${f.base}`);
         writeClips(a, f);
         // The root never spins: its heading only changes when a turn clip hands one over.
         root.rotation.y = f.rootYaw;
@@ -632,8 +676,10 @@ export function MonModel3D({
         canvas.dataset.rootX = f.rootX.toFixed(3);
         canvas.dataset.boundX = a.boundX.toFixed(3);
         canvas.dataset.clip = a.action?.getClip().name ?? '';
+        stats.frame(rawDt * 1000, f.rootYaw, f.rootX, canvas.dataset.clip);
         if (rig) restoreBase(rig);
         a.mixer.update(dt);
+        if (rig) recordBase(rig);
         writeBodyYaw(f.bodyYaw);
       } else if (rig) {
         restoreBase(rig);
@@ -646,7 +692,47 @@ export function MonModel3D({
       }
       const facing = facingNow();
       if (facing !== null) canvas.dataset.facing = facing.toFixed(2);
+      if (headBone && a) {
+        headBone.getWorldPosition(headAt).project(camera);
+        stats.head(((headAt.x + 1) / 2) * canvas.clientWidth, ((1 - headAt.y) / 2) * canvas.clientHeight, canvas.dataset.clip ?? '', a.action?.time ?? 0);
+      }
       renderer.render(scene, camera);
+      captureFrame(canvas);
+      if (probing() && rig) {
+        const row: Record<string, number> = { dt: rawDt * 1000 };
+        if (rig.jaw) row.jaw = 2 * Math.acos(Math.min(1, Math.abs(rig.jaw.quaternion.dot(rig.jawBind))));
+        for (const name of rig.morphNames) row[`m:${name}`] = readMorph(rig, name);
+        if (headBone) {
+          headBone.getWorldPosition(headAt);
+          row.hx = headAt.x;
+          row.hy = headAt.y;
+          row.hz = headAt.z;
+        }
+        root?.traverse((o) => {
+          if ((o as THREE.Bone).isBone) {
+            row[`b:${o.name}`] = o.quaternion.y + o.quaternion.x * 2 + o.quaternion.z * 3;
+            row[`p:${o.name}`] = o.position.x + o.position.y * 2 + o.position.z * 3;
+          }
+        });
+        row.rootYaw = root?.rotation.y ?? 0;
+        row.rootX = root?.position.x ?? 0;
+        row.clipT = anim.current?.action?.time ?? 0;
+        const rect = canvas.getBoundingClientRect();
+        row.cw = canvas.width;
+        row.ch = canvas.height;
+        row.ccw = canvas.clientWidth;
+        row.cch = canvas.clientHeight;
+        row.rx = rect.left;
+        row.ry = rect.top;
+        row.dpr = window.devicePixelRatio;
+        row.aspect = camera.aspect;
+        row.scrollY = window.scrollY;
+        row.docH = document.documentElement.scrollHeight;
+        row.winH = window.innerHeight;
+        row.camY = camera.position.y;
+        row.camZ = camera.position.z;
+        probeFrame(row);
+      }
     };
     tick();
 
@@ -686,6 +772,7 @@ export function MonModel3D({
   useEffect(() => {
     const cue = parseSpeechCue(speech);
     if (!cue) return;
+    statsRef.current?.note(cue.kind === 'listen' ? `listen ${cue.on}` : `${cue.kind} ${cue.kind === 'start' ? cue.track.kind : ''}`);
     if (cue.kind === 'listen') {
       listening.current = cue.on;
       return;
@@ -694,6 +781,7 @@ export function MonModel3D({
       if (utterance.current?.cue.id === cue.id) {
         utterance.current = null;
         faceHoldUntil.current = performance.now() + FACE_HOLD_MS;
+        statsRef.current?.stopped();
       }
       return;
     }
@@ -702,7 +790,7 @@ export function MonModel3D({
     // re-anchors to the audio position the host stamped, without restarting.
     const playing = utterance.current;
     if (playing?.cue.id === cue.id && playing.cue.track.kind === cue.track.kind) return;
-    utterance.current = { cue, receivedAt: performance.now() };
+    utterance.current = { cue, receivedAt: cueAnchorMs(cue, performance.now(), Date.now()) };
   }, [speech]);
 
   // Resize in place: no new context, no re-download.

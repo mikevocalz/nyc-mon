@@ -367,14 +367,14 @@ export async function playMonClip(clip: MonClip, signal: AbortSignal): Promise<v
         const seconds = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : trackDurationMs(track) / 1000;
         const elapsed = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
         const gesture = clip.gesture ? { gesture: clip.gesture } : {};
-        emitSpeechCue({ kind: 'start', id: cueId, elapsedMs: elapsed * 1000, durationMs: Math.max(1, seconds * 1000), track, ...gesture });
+        emitSpeechCue({ kind: 'start', id: cueId, elapsedMs: elapsed * 1000, durationMs: Math.max(1, seconds * 1000), track, sentAtMs: Date.now(), ...gesture });
         // The face arrives mid-line: the same utterance id with the face track,
         // stamped with where the audio is now, so the view switches on the clip's clock.
         void clip.face?.then((frames) => {
           const faceTrack = frames ? pickSpeechTrack({ face: frames, alignment: null, amplitude: null }) : null;
           if (!faceTrack || current !== entry || audio.ended) return;
           const at = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
-          emitSpeechCue({ kind: 'start', id: cueId, elapsedMs: at * 1000, durationMs: Math.max(1, seconds * 1000), track: faceTrack, ...gesture });
+          emitSpeechCue({ kind: 'start', id: cueId, elapsedMs: at * 1000, durationMs: Math.max(1, seconds * 1000), track: faceTrack, sentAtMs: Date.now(), ...gesture });
         });
       },
       () => {

@@ -5,8 +5,8 @@ import type { Listening } from './speech.ts';
  *
  * Talk opens a voice session. The mic listens; ~700 ms after the person stops
  * talking the utterance goes to the Mon without a "Done talking" press. While
- * the Mon replies, the mic stays open for a barge-in. When the Mon finishes,
- * the mic re-opens for a follow-up; a follow-up window with no speech (~8 s)
+ * the Mon replies, the mic is shut (no echo cancellation: it heard the Mon
+ * itself); Talk cuts in. When the Mon finishes, the mic re-opens for a follow-up; a follow-up window with no speech (~8 s)
  * ends the session and the display goes back to idle.
  */
 
@@ -51,36 +51,6 @@ export function nextConversation(s: ConversationState, e: ConversationEvent): Co
     case 'barge-in':
       return s.mode === 'speaking' || s.mode === 'thinking' ? { ...s, mode: 'listening' } : s;
   }
-}
-
-// ----------------------------------------------------------- barge-in ---
-
-function words(text: string): string[] {
-  return text
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}' ]+/gu, ' ')
-    .split(/\s+/)
-    .filter(Boolean);
-}
-
-/**
- * Whether what the mic heard while the Mon was speaking is the person cutting
- * in, not the speakers' echo: the holdoff after the clip started has passed,
- * there are at least two words, and most of them are not the Mon's own line.
- */
-export function isBargeIn(opts: {
-  readonly heard: string;
-  readonly speaking: string;
-  readonly msSinceAudioStart: number;
-  readonly holdoffMs?: number;
-  readonly minWords?: number;
-}): boolean {
-  if (opts.msSinceAudioStart < (opts.holdoffMs ?? 600)) return false;
-  const heard = words(opts.heard);
-  if (heard.length < (opts.minWords ?? 2)) return false;
-  const own = new Set(words(opts.speaking));
-  const echoed = heard.filter((w) => own.has(w)).length;
-  return echoed / heard.length < 0.6;
 }
 
 // ---------------------------------------------------------------- ear ---
