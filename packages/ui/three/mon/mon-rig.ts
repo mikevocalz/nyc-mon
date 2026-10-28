@@ -6,6 +6,7 @@ import { reportGlbProgress } from './load-progress';
 import { eggTexturePlugin } from '../hatch/egg-texture-plugin';
 import { closeLoop, resampleSmooth, smoothJitter } from './clip-smoothing.ts';
 import { idleConfig } from './idle/config.ts';
+import { weldSceneMorphSeams } from './morph-seams.ts';
 import { createIdleEngine, LOOPS, resolveIdleClips, type IdleAction, type IdleEngine, type IdleFrame } from './idle/engine.ts';
 
 /**
@@ -158,6 +159,8 @@ async function parse(source: Pick<MonRigSource, 'key' | 'glb'>): Promise<Parsed>
   gltf.scene.traverse((o) => {
     if ((o as THREE.Mesh).isMesh) o.frustumCulled = false;
   });
+  // Squeaklet's mouthClose tears its UV seams open beside the mouth, and the rest pose holds it at 1 (morph-seams.ts).
+  weldSceneMorphSeams(gltf.scene);
   return { gltf, durations: Object.fromEntries(gltf.animations.map((a) => [a.name, a.duration])) };
 }
 
@@ -303,6 +306,17 @@ export class MonRig {
     if (key === this.clipsKey) return;
     this.clipsKey = key;
     this.engine.setClips(resolveIdleClips(clips, this.durations));
+  }
+
+  /**
+   * Plays the first of `clips` this GLB has, once, over the idle (M13's
+   * `attention` and `approach`). Returns false when the file has none of
+   * them, so the caller can fall back to the glass's nudge.
+   */
+  react(clips: readonly string[]): boolean {
+    if (this.disposed) return false;
+    const clip = clips.find((name) => this.durations[name] !== undefined);
+    return clip === undefined ? false : this.engine.perform(clip);
   }
 
   /**
