@@ -57,7 +57,9 @@ test('tablet landscape splits into two panes and docks START at the foot', () =>
   assert.match(tablet.identity, /md:landscape:flex-1/);
   assert.match(tablet.board, /md:landscape:flex-1/);
   assert.match(tablet.resume, /md:landscape:justify-end/);
-  assert.match(tablet.resume, /md:landscape:flex-none/);
+  // Both panes flex; resume is capped. A % width with flex-none drew it 0 wide on native.
+  assert.match(tablet.resume, /md:landscape:max-w-\[420px\]/);
+  assert.doesNotMatch(tablet.resume, /flex-none|w-\[\d+%\]/);
   // The JS probe reads the same variant the row uses.
   assert.match(LOBBY_SPLIT_PROBE, /md:landscape:flex/);
 });
