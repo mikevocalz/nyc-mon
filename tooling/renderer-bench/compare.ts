@@ -51,6 +51,7 @@ export function validateCapture(v:RendererCapture): void {
   ) throw new Error('Invalid renderer capture');
 }
 export function timingStats(values:readonly number[]):TimingStats {
+  if (values.length===0) throw new Error('timingStats needs at least one recorded value; got an empty array');
   const s=[...values].sort((a,b)=>a-b);
   const pct=(p:number)=>s[Math.ceil(p*s.length)-1]!;
   return {

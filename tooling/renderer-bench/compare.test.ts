@@ -46,3 +46,6 @@ test('p90/p99 and budget miss counters report recorded numbers only',()=>{
   assert.equal(s.p99Ms,16);
   assert.equal(s.over60HzBudget,1);
 });
+test('timingStats refuses an empty series instead of returning undefined percentiles',()=>{
+  assert.throws(()=>timingStats([]),/timingStats needs at least one recorded value/);
+});
