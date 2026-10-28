@@ -10,7 +10,10 @@ export {
   MAX_SPOKEN_TEXT,
   monSpeechRequest,
   monVoiceRef,
+  monVoiceView,
   planMonUtterance,
   readMonVoiceRef,
+  voiceGuideFor,
 } from './mon-voice.ts';
+export type { MonVoiceView } from './mon-voice.ts';
 export type { MonSpeechRequest, MonUtterance, MonVoicePlan, MonVoicePort, MonVoiceRef } from './mon-voice.ts';

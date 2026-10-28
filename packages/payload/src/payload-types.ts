@@ -140,9 +140,11 @@ export interface Config {
   };
   fallbackLocale: null;
   globals: {
+    'mon-voices': MonVoice;
     'payload-jobs-stats': PayloadJobsStat;
   };
   globalsSelect: {
+    'mon-voices': MonVoicesSelect<false> | MonVoicesSelect<true>;
     'payload-jobs-stats': PayloadJobsStatsSelect<false> | PayloadJobsStatsSelect<true>;
   };
   locale: null;
@@ -430,7 +432,7 @@ export interface Waitlist {
   createdAt: string;
 }
 /**
- * NYC-Mon voice/dialect lexicon. Identity-linked language is opt-in/persona-driven only; never infer identity from a Caller.
+ * NYC-Mon voice/dialect lexicon and the Mon's lines. Publish a row to make it canon; only published, active rows are spoken. Identity-linked language is opt-in/persona-driven only; never infer identity from a Caller.
  *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "language-lexicon".
@@ -442,6 +444,9 @@ export interface LanguageLexicon {
   canonicalText: string;
   spokenForm?: string | null;
   meaning: string;
+  /**
+   * Categories the Mon's voice reads: mon-line, pronunciation, stage-direction, word-palette, voice-rule. mon-line: triggerText is the occasion (hello, first-words, hungry…), responseText the line, with speciesId and stage. pronunciation: canonicalText is the screen word, variants the other spellings, spokenForm what the voice says. stage-direction: variants are the keywords, spokenForm the audio tag.
+   */
   category: string;
   subcategory?: string | null;
   /**
@@ -467,12 +472,33 @@ export interface LanguageLexicon {
   avoidWhen?: string | null;
   identityInference: string;
   profanity: 'none';
+  /**
+   * Mon form, e.g. dex-002
+   */
+  speciesId?: string | null;
+  /**
+   * Bloodline, e.g. F01
+   */
+  bloodlineId?: string | null;
+  stage?: ('Egg' | 'Baby' | 'Small' | 'Mid' | 'Max') | null;
+  mood?: ('content' | 'asleep' | 'sluggish' | 'needs-fullness' | 'needs-energy' | 'needs-social') | null;
+  /**
+   * Pipe-delimited: other spellings (pronunciation) or keywords (stage-direction).
+   */
+  variants?: string | null;
+  spokenPlural?: string | null;
+  /**
+   * Lower first.
+   */
+  sortOrder?: number | null;
+  locale: string;
   sourceBasis?: string | null;
   sourceUrl?: string | null;
   editorNotes?: string | null;
   active: boolean;
   updatedAt: string;
   createdAt: string;
+  _status?: ('draft' | 'published') | null;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -501,7 +527,95 @@ export interface MonModel {
     | 'dex-064'
     | 'dex-065'
     | 'dex-066'
-    | 'dex-067';
+    | 'dex-067'
+    | 'dex-015'
+    | 'dex-016'
+    | 'dex-017'
+    | 'dex-018'
+    | 'dex-019'
+    | 'dex-020'
+    | 'dex-021'
+    | 'dex-022'
+    | 'dex-023'
+    | 'dex-024'
+    | 'dex-025'
+    | 'dex-026'
+    | 'dex-027'
+    | 'dex-028'
+    | 'dex-029'
+    | 'dex-030'
+    | 'dex-031'
+    | 'dex-032'
+    | 'dex-033'
+    | 'dex-034'
+    | 'dex-035'
+    | 'dex-036'
+    | 'dex-037'
+    | 'dex-038'
+    | 'dex-039'
+    | 'dex-040'
+    | 'dex-041'
+    | 'dex-042'
+    | 'dex-043'
+    | 'dex-044'
+    | 'dex-045'
+    | 'dex-046'
+    | 'dex-047'
+    | 'dex-048'
+    | 'dex-049'
+    | 'dex-050'
+    | 'dex-051'
+    | 'dex-052'
+    | 'dex-053'
+    | 'dex-054'
+    | 'dex-055'
+    | 'dex-056'
+    | 'dex-057'
+    | 'dex-058'
+    | 'dex-059'
+    | 'dex-060'
+    | 'dex-068'
+    | 'dex-069'
+    | 'dex-070'
+    | 'dex-071'
+    | 'dex-072'
+    | 'dex-073'
+    | 'dex-074'
+    | 'dex-075'
+    | 'dex-076'
+    | 'dex-077'
+    | 'dex-078'
+    | 'dex-079'
+    | 'dex-080'
+    | 'dex-081'
+    | 'dex-082'
+    | 'dex-083'
+    | 'dex-084'
+    | 'dex-085'
+    | 'dex-086'
+    | 'dex-087'
+    | 'dex-088'
+    | 'dex-089'
+    | 'dex-090'
+    | 'dex-091'
+    | 'dex-092'
+    | 'dex-093'
+    | 'dex-094'
+    | 'dex-095'
+    | 'dex-096'
+    | 'dex-097'
+    | 'dex-098'
+    | 'dex-099'
+    | 'dex-100'
+    | 'dex-101'
+    | 'dex-102'
+    | 'dex-103'
+    | 'dex-104'
+    | 'dex-105'
+    | 'dex-106'
+    | 'dex-107'
+    | 'dex-108'
+    | 'dex-109';
   stage?: string | null;
   bloodlineId?: string | null;
   /**
@@ -1540,12 +1654,21 @@ export interface LanguageLexiconSelect<T extends boolean = true> {
   avoidWhen?: T;
   identityInference?: T;
   profanity?: T;
+  speciesId?: T;
+  bloodlineId?: T;
+  stage?: T;
+  mood?: T;
+  variants?: T;
+  spokenPlural?: T;
+  sortOrder?: T;
+  locale?: T;
   sourceBasis?: T;
   sourceUrl?: T;
   editorNotes?: T;
   active?: T;
   updatedAt?: T;
   createdAt?: T;
+  _status?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -1949,6 +2072,100 @@ export interface PayloadMigrationsSelect<T extends boolean = true> {
   createdAt?: T;
 }
 /**
+ * The voice each Mon lineage speaks with, pitch by stage, and delivery by mood. Words and pronunciations are in the Language Lexicon.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "mon-voices".
+ */
+export interface MonVoice {
+  id: number;
+  provider: 'elevenlabs';
+  /**
+   * ElevenLabs model id. v4 Turbo performs audio tags.
+   */
+  model: string;
+  /**
+   * One row per lineage slot. A pool shorter than the slot count wraps, so fill each pool.
+   */
+  lineages?:
+    | {
+        lineageId: string;
+        /**
+         * ElevenLabs voice id.
+         */
+        voiceId: string;
+        name: string;
+        style: number;
+        speed: number;
+        id?: string | null;
+      }[]
+    | null;
+  stagePitch?: {
+    /**
+     * Empty: an Egg is silent.
+     */
+    egg?: number | null;
+    /**
+     * Pitch factor, 1 is the voice as cast. Empty: silent.
+     */
+    baby?: number | null;
+    /**
+     * Pitch factor, 1 is the voice as cast. Empty: silent.
+     */
+    small?: number | null;
+    /**
+     * Pitch factor, 1 is the voice as cast. Empty: silent.
+     */
+    mid?: number | null;
+    /**
+     * Pitch factor, 1 is the voice as cast. Empty: silent.
+     */
+    max?: number | null;
+  };
+  moods?:
+    | {
+        mood: 'content' | 'asleep' | 'sluggish' | 'needs-fullness' | 'needs-energy' | 'needs-social';
+        /**
+         * Audio tag before the line, e.g. [happily]. Empty: none.
+         */
+        tag?: string | null;
+        /**
+         * Lower is livelier, higher is flatter.
+         */
+        stability: number;
+        /**
+         * How closely the output keeps to the cast voice.
+         */
+        similarityBoost: number;
+        id?: string | null;
+      }[]
+    | null;
+  defaultDelivery: {
+    tag?: string | null;
+    /**
+     * Lower is livelier, higher is flatter.
+     */
+    stability: number;
+    /**
+     * How closely the output keeps to the cast voice.
+     */
+    similarityBoost: number;
+  };
+  /**
+   * In these moods the Mon keeps its voice but drops the swagger.
+   */
+  lowEnergy: {
+    moods?: ('content' | 'asleep' | 'sluggish' | 'needs-fullness' | 'needs-energy' | 'needs-social')[] | null;
+    /**
+     * Multiplies the voice’s style.
+     */
+    styleFactor: number;
+    maxSpeed: number;
+  };
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-jobs-stats".
  */
@@ -1965,6 +2182,59 @@ export interface PayloadJobsStat {
     | null;
   updatedAt?: string | null;
   createdAt?: string | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "mon-voices_select".
+ */
+export interface MonVoicesSelect<T extends boolean = true> {
+  provider?: T;
+  model?: T;
+  lineages?:
+    | T
+    | {
+        lineageId?: T;
+        voiceId?: T;
+        name?: T;
+        style?: T;
+        speed?: T;
+        id?: T;
+      };
+  stagePitch?:
+    | T
+    | {
+        egg?: T;
+        baby?: T;
+        small?: T;
+        mid?: T;
+        max?: T;
+      };
+  moods?:
+    | T
+    | {
+        mood?: T;
+        tag?: T;
+        stability?: T;
+        similarityBoost?: T;
+        id?: T;
+      };
+  defaultDelivery?:
+    | T
+    | {
+        tag?: T;
+        stability?: T;
+        similarityBoost?: T;
+      };
+  lowEnergy?:
+    | T
+    | {
+        moods?: T;
+        styleFactor?: T;
+        maxSpeed?: T;
+      };
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
