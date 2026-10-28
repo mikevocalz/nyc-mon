@@ -37,7 +37,8 @@ export interface NebiusReceipt {
 export class NebiusError extends Error {
   override readonly name = 'NebiusError';
   /** EMPTY: the model returned no answer text and no tool call, e.g. it spent its output budget on reasoning. */
-  constructor(readonly code: 'CONFIG' | 'INPUT' | 'HTTP' | 'RESPONSE' | 'TIMEOUT' | 'EMPTY', readonly status?: number) {
+  /** FILTERED: the provider's content filter stopped the reply (finish_reason content_filter). */
+  constructor(readonly code: 'CONFIG' | 'INPUT' | 'HTTP' | 'RESPONSE' | 'TIMEOUT' | 'EMPTY' | 'FILTERED', readonly status?: number) {
     super(`Nebius ${code.toLowerCase()} error${status === undefined ? '' : ` (${status})`}. No alternate provider was used.`);
   }
 }
@@ -128,7 +129,7 @@ export function toNebiusRequest(params: TurnParams) {
 const Completion = z.object({
   id: z.string().min(1).max(256), model: z.string().min(1).max(256),
   choices: z.array(z.object({
-    finish_reason: z.enum(['stop', 'length', 'tool_calls']),
+    finish_reason: z.enum(['stop', 'length', 'tool_calls', 'content_filter']),
     message: z.object({
       role: z.literal('assistant'), content: z.string().max(200000).nullable().optional(),
       tool_calls: z.array(z.object({
@@ -203,6 +204,7 @@ export function nebiusBackend(options: NebiusOptions, dependencies: {
       const result = decoded.data;
       const choice = result.choices[0];
       if (!choice) throw new NebiusError('RESPONSE');
+      if (choice.finish_reason === 'content_filter') throw new NebiusError('FILTERED');
       const calls = choice.message.tool_calls ?? [];
       // Some servers report tool calls with finish_reason 'stop'. A 'tool_calls' finish with no
       // calls, or calls cut off by the length limit, is still malformed.
