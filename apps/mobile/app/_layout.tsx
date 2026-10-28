@@ -1,15 +1,19 @@
-import { Slot } from "expo-router";
+import { Stack, router, useNavigationContainerRef, useRootNavigationState, type ErrorBoundaryProps } from "expo-router";
+import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
-import { DarkTheme, DefaultTheme, ThemeProvider, type Theme } from "@react-navigation/native";
+import { CommonActions, DarkTheme, DefaultTheme, ThemeProvider, type Theme } from "@react-navigation/native";
+import { useEffect } from "react";
 import { useColorScheme } from "react-native";
 
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { withUniwind } from "uniwind";
 import { AppQueryProvider, SafeAreaProvider, useProfile } from "@acme/app";
+import { RootErrorBoundary } from "@acme/app/features/error/root-boundary.tsx";
 import { hydrateMon } from "@acme/app/features/mon/mon.store.ts";
 import { hydrateOnboarding } from "@acme/app/features/onboarding/onboarding.store.ts";
 import { useReadyNotificationRouting } from "@acme/app/features/onboarding/notify-hook.ts";
+import { cleanRootStack, type StackLike } from "@acme/app/features/onboarding/root-stack.ts";
 import { semantic } from "@acme/theme";
 import { setThemePreference } from "@acme/theme/switch";
 import { Toaster } from "@acme/ui";
@@ -50,10 +54,47 @@ function navTheme(base: Theme, scheme: "light" | "dark"): Theme {
 }
 const NAV_THEME = { light: navTheme(DefaultTheme, "light"), dark: navTheme(DarkTheme, "dark") };
 
+const hideNativeSplash = () => {
+  void SplashScreen.hideAsync().catch(() => undefined);
+};
+
+const goHome = () => {
+  // Web: a full load from "/" also drops whatever state broke the tree.
+  const location = (globalThis as { location?: { assign: (url: string) => void } }).location;
+  if (process.env.EXPO_OS === "web" && location !== undefined) location.assign("/");
+  else router.replace("/");
+};
+
+/**
+ * Root error boundary (expo-router). The router renders it in place of this
+ * layout, so it must not rely on anything RootLayout provides: it brings its
+ * own SafeAreaProvider and catches throws from the providers below as well
+ * as from every screen without a closer boundary.
+ */
+export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  return <RootErrorBoundary error={error} retry={retry} goHome={goHome} hideSplash={hideNativeSplash} />;
+}
+
+/**
+ * Keeps the root stack to one copy of each session group, and none under a
+ * signed-out entry (root-stack.ts). Runs after each navigation commit.
+ */
+function useRootStackHygiene() {
+  const navigation = useNavigationContainerRef();
+  const state = useRootNavigationState() as unknown as (StackLike & { type?: string }) | undefined;
+  useEffect(() => {
+    if (state === undefined || state.type !== "stack") return;
+    const clean = cleanRootStack(state);
+    if (clean === null) return;
+    navigation.dispatch(CommonActions.reset({ ...state, index: clean.index, routes: clean.routes } as never));
+  }, [state, navigation]);
+}
+
 export default function RootLayout() {
   const scheme = useColorScheme() === "light" ? "light" : "dark";
   // Hatch-ready notification tap → M12, cold start and warm (M12 B3).
   useReadyNotificationRouting();
+  useRootStackHygiene();
   return (
     <GestureRoot className="flex-1">
       <StatusBar style="auto" />
@@ -68,7 +109,18 @@ export default function RootLayout() {
         <SafeAreaProvider>
           <AppQueryProvider>
             <ThemeProvider value={NAV_THEME[scheme]}>
-              <Slot />
+              {/*
+                A stack, not a Slot: going from (drawer) (Game, Caller) back to
+                (home) must find (home) still mounted, or its 3D stage rebuilds
+                the renderer and reloads the Baby GLB. `dangerouslySingular`
+                makes a navigate to either group move the existing copy to the
+                top instead of mounting a second one. No animation: group
+                changes are shell tab switches, not pushes.
+              */}
+              <Stack screenOptions={{ headerShown: false, animation: "none" }}>
+                <Stack.Screen name="(home)" dangerouslySingular />
+                <Stack.Screen name="(drawer)" dangerouslySingular />
+              </Stack>
             </ThemeProvider>
             {/* Global overlays are mounted once at the app root. The starter's
                 booking/editor sheets went with the demo schedule route: nothing

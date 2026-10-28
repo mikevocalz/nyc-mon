@@ -2,6 +2,8 @@
 
 import { Button } from '@acme/ui';
 import { View } from '@acme/ui/tw';
+// Extensionless on purpose: Metro and Next pick the .native/.web fork.
+import { STAGE_CONTROLS_LOOK } from './stage-controls-look';
 
 export interface StageControl {
   readonly key: string;
@@ -18,12 +20,16 @@ export interface StageControl {
  * nothing 2D shows over the stage while every action stays reachable. They
  * sit in the stage's top-left corner, so a screen reader's activation lands
  * on the button itself, not the canvas.
+ *
+ * Web: a control that takes keyboard focus shows as a chip with the focus
+ * ring in that corner (WCAG 2.4.7); native keeps them screen-reader-only
+ * (stage-controls-look.*).
  */
 export function StageControls({ controls, testID }: { controls: readonly StageControl[]; testID: string }) {
   return (
-    <View testID={testID} className="absolute left-0 top-0 h-px w-px overflow-hidden opacity-0">
+    <View testID={testID} className={STAGE_CONTROLS_LOOK.group}>
       {controls.map((c) => (
-        <View key={c.key} testID={c.testID}>
+        <View key={c.key} testID={c.testID} className={STAGE_CONTROLS_LOOK.item}>
           <Button variant="outline" title={c.label} onPress={c.onPress} disabled={c.disabled} accessibilityHint={c.hint} />
         </View>
       ))}

@@ -2,6 +2,7 @@ import * as THREE from 'three/webgpu';
 import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { fetchEggBytes } from '../hatch/egg-bytes';
+import { reportGlbProgress } from './load-progress';
 import { eggTexturePlugin } from '../hatch/egg-texture-plugin';
 import { closeLoop, resampleSmooth, smoothJitter } from './clip-smoothing.ts';
 import { idleConfig } from './idle/config.ts';
@@ -118,10 +119,17 @@ const bytesCache = new Map<string, Promise<ArrayBuffer>>();
 function bytesFor(source: Pick<MonRigSource, 'key' | 'glb'>): Promise<ArrayBuffer> {
   let pending = bytesCache.get(source.key);
   if (!pending) {
-    pending = fetchEggBytes(source.glb).catch((error: unknown) => {
-      bytesCache.delete(source.key);
-      throw error;
-    });
+    const key = source.key;
+    // The stage loader reads this (load-progress.ts): real bytes where the platform streams them.
+    pending = fetchEggBytes(source.glb, (loaded, total) => reportGlbProgress(key, { loaded, total, done: false }))
+      .then((bytes) => {
+        reportGlbProgress(key, { loaded: bytes.byteLength, total: bytes.byteLength, done: true });
+        return bytes;
+      })
+      .catch((error: unknown) => {
+        bytesCache.delete(key);
+        throw error;
+      });
     bytesCache.set(source.key, pending);
   }
   return pending;

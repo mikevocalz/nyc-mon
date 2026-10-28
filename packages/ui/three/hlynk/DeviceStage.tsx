@@ -9,6 +9,7 @@ import { Image, type ImageProps } from '../../Image';
 import { View } from '../../tw';
 import { useInstanceStore, useStore } from '../../use-instance-store';
 import { ThreeCanvas } from '../ThreeCanvas';
+import { loopPlan } from '../loop-policy';
 import type { ThreeBackend, ThreeSetup } from '../types';
 import type { DeviceSceneParams } from './device-scene';
 import type { DeviceScreen } from './screen';
@@ -70,6 +71,16 @@ export interface DeviceStageProps {
   captureTestID?: string;
   /** Backing-store scale of the glass canvas (2 on tablets for crisp text). Read when the scene builds. Default 1. */
   glassScale?: number;
+  /** The live beam and its glitter. Default true; false lets an idle stage with no model go still and stop its loop. */
+  beam?: boolean;
+  /** Called once every screen model is really on the glass (or missing/failed); no 8 s give-up. */
+  onModelsSettled?: () => void;
+  /**
+   * Holds the loop while something covers the stage (a loader): only the
+   * frames the scene asks for (compile done, a model landing) draw, and the
+   * intro's clock waits, so the intro plays when the cover lifts.
+   */
+  hold?: boolean;
 }
 
 // Module-level and stable, so three.js and the scene stay out of the first chunk.
@@ -93,13 +104,14 @@ const HANDOFF_MS = 400;
  * backend starts, the capture (or `fallback`) stays.
  *
  * One store per stage holds the hover target and the press counters. The
- * scene plays one intro, then rests and the loop pauses; a pointer over the
- * stage wakes it for the tilt (at most 8 degrees), and models idling on the
- * screen keep it running. Offscreen it is paused too.
+ * scene plays one intro at the display rate, then drops to 30 fps while only
+ * the beam and idling models move, and stops when nothing does; a pointer
+ * over the stage wakes it for the tilt (at most 8 degrees). Offscreen or
+ * backgrounded it is paused too.
  */
 export function DeviceStage({
   screen, model = 'placeholder', capture, fallback = null, caption, label, className, stageClassName,
-  sound = false, onSideKey, onKey, onReady, onBackendChange, children, testID, captureTestID, glassScale = 1,
+  sound = false, onSideKey, onKey, onReady, onBackendChange, children, testID, captureTestID, glassScale = 1, beam = true, onModelsSettled, hold = false,
 }: DeviceStageProps) {
   const { ref, hasBeenNear, isVisible } = useInView({ nearMarginPx: 600 });
   const reducedMotion = useReducedMotion();
@@ -107,7 +119,7 @@ export function DeviceStage({
 
   const stage = useInstanceStore(initialStageState);
   const ready = useStore(stage, (s) => s.ready);
-  const resting = useStore(stage, (s) => s.resting);
+  const motion = useStore(stage, (s) => s.motion);
   const pointing = useStore(stage, (s) => s.hover !== null);
 
   const params = useMemo<DeviceSceneParams>(() => {
@@ -131,9 +143,17 @@ export function DeviceStage({
         onReady?.();
       },
       onRest: (rest) => stage.setState({ resting: rest }),
+      onMotion: (next) => stage.setState({ motion: next }),
+      onModelsSettled: () => onModelsSettled?.(),
       glassScale,
+      beam,
     };
-  }, [model, screen, stage, sound, onSideKey, onKey, onReady, glassScale]);
+  }, [model, screen, stage, sound, onSideKey, onKey, onReady, onModelsSettled, glassScale, beam]);
+  // On-demand rendering (loop-policy.ts): display rate while something eases
+  // or the pointer drives the tilt, 30 fps while only the idle clip and the
+  // beam move, stopped when still. ThreeCanvas also stops offscreen and while
+  // the app is backgrounded (useOnScreen).
+  const plan = loopPlan(hold ? 'still' : motion, isVisible);
   const api = useMemo<DeviceStageApi>(
     () => ({ pressSideKey: () => params.onSideKey?.(), pressKey: (key) => params.onKey?.(key) }),
     [params],
@@ -183,9 +203,8 @@ export function DeviceStage({
           <ThreeCanvas
             load={loadDeviceScene}
             params={params}
-            paused={!isVisible || resting}
-            // The idle beam and the Baby are delta-timed: 30 fps keeps them smooth at half the CPU.
-            maxFps={30}
+            paused={plan.paused}
+            maxFps={plan.maxFps}
             maxPixelRatio={1.5}
             className="absolute inset-0"
             onBackendChange={onBackendChange}

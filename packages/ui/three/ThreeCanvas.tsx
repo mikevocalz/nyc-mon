@@ -17,6 +17,7 @@ import { ThreeSurface } from './surface';
 import type { ThreeBackend, ThreeCanvasProps, ThreeFrameTiming, ThreePointer, ThreeScene, ThreeSurfaceHandle } from './types';
 import type { WebGPURenderer } from 'three/webgpu';
 import { useOnScreen } from './use-on-screen';
+import { tickDue } from './loop-policy';
 
 type PointerLike = GestureResponderEvent & {
   currentTarget: { getBoundingClientRect?: () => { left: number; top: number } };
@@ -42,6 +43,8 @@ interface Runtime<P> {
   frame: { time: number; delta: number; width: number; height: number; pixelRatio: number; reducedMotion: boolean; pointer: ThreePointer };
   /** Reused when onFrameTiming is set: the opt-in probe allocates nothing per frame either. */
   probe: ThreeFrameTiming;
+  /** The latest `maxFps`, read per tick so a cap change never restarts the loop. */
+  maxFps: number | undefined;
 }
 
 const isWeb = Platform.OS === 'web';
@@ -132,6 +135,7 @@ function JsThreeCanvas<P>({
     pointer: { x: 0, y: 0, inside: false, pressed: false },
     frame: { time: 0, delta: 0, width: 0, height: 0, pixelRatio: 1, reducedMotion, pointer: { x: 0, y: 0, inside: false, pressed: false } },
     probe: { cpuMs: 0, intervalMs: null, backend: 'webgpu' },
+    maxFps,
   };
 
   // Pick the backend. WebGPU when it works; the WebGL2 backend on web when it
@@ -248,6 +252,8 @@ function JsThreeCanvas<P>({
     const rt = runtime.current!;
     rt.params = params;
     rt.reducedMotion = reducedMotion;
+    // Read by the running loop's next tick; the loop itself is not restarted.
+    rt.maxFps = maxFps;
     invalidate();
   });
 
@@ -336,12 +342,13 @@ function JsThreeCanvas<P>({
     }
     let frame = 0;
     let timer: ReturnType<typeof setTimeout> | undefined;
-    // With maxFps, display frames inside the budget are skipped (a millisecond of slack keeps 60 Hz → 30 fps exact).
-    const budgetMs = maxFps !== undefined && maxFps > 0 ? 1000 / maxFps - 1 : 0;
+    // With maxFps, display frames inside the budget are skipped (loop-policy.ts tickDue).
+    // Read per tick: a scene moving between active and ambient changes the cap
+    // without restarting the loop, so the clock never loses a frame of delta.
     let lastDraw = 0;
     const tick = () => {
       const now = performance.now();
-      if (budgetMs === 0 || now - lastDraw >= budgetMs) {
+      if (tickDue(now, lastDraw, rt.maxFps)) {
         lastDraw = now;
         draw();
       }
@@ -357,7 +364,7 @@ function JsThreeCanvas<P>({
       rt.last = 0;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [running, maxFps]);
+  }, [running]);
 
   const setPointer = (event: PointerLike) => {
     const rt = runtime.current!;

@@ -2,7 +2,7 @@
 // Where a primary tab press goes. One function for both shell hosts.
 import { useRouter } from 'expo-router';
 import { selectActiveMon, useMonStore } from '../mon/mon.store';
-import { setHomeMenuOpen } from '../companion/home-stage.store';
+import { requestHomeMenu } from '../companion/home-stage.store';
 import { shellHref, type ShellDestinationName } from './shell-destinations';
 import { useShellDrawer } from './ShellNav';
 
@@ -13,6 +13,6 @@ export function useShellNavigate(): (name: ShellDestinationName) => void {
   return (name) => {
     useShellDrawer.getState().setOpen(false);
     router.navigate(shellHref(name, activeMonId) as never);
-    if (name === 'hlynk') setHomeMenuOpen(true);
+    if (name === 'hlynk') requestHomeMenu();
   };
 }

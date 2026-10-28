@@ -60,6 +60,8 @@ interface HomeStageState extends HomeStageEntry {
   /** True while a bare route is on top: the route draws full-window over the mounted shell. */
   readonly bare: boolean;
   readonly menuOpen: boolean;
+  /** Bumped by the shell's H-LYNK tab; Home opens the device menu once per bump. Route cleanup never resets it. */
+  readonly menuRequest: number;
   readonly immersive: boolean;
   /** The shared 3D companion stage reported no GPU backend: the 2D shell is the fallback from then on. */
   readonly glassFailed: boolean;
@@ -87,6 +89,7 @@ const EMPTY: HomeStageState = {
   owner: null,
   bare: false,
   menuOpen: false,
+  menuRequest: 0,
   immersive: false,
   glassFailed: false,
   glass: null,
@@ -130,6 +133,11 @@ export function setStageFrame(frame: StageFrame | null): void {
 
 export function setGlassFailed(): void {
   useHomeStageStore.setState({ glassFailed: true });
+}
+
+/** The shell's H-LYNK tab: ask Home to open the device menu (survives the route change). */
+export function requestHomeMenu(): void {
+  useHomeStageStore.setState({ menuRequest: useHomeStageStore.getState().menuRequest + 1 });
 }
 
 export function setHomeMenuOpen(open: boolean): void {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
   Button,
   Container,
@@ -17,7 +17,8 @@ import { Form } from '@acme/ui/primitives';
 import { View } from '@acme/ui/tw';
 import { AUTH_BASE_URL } from './auth';
 import { copy } from './copy';
-import { useOnboarding, writeConsentRequested } from './onboarding.store';
+import { hydrateMon } from '../mon/mon.store';
+import { clearDeniedConsent, useOnboarding, writeConsentRequested } from './onboarding.store';
 import { OnboardingPanes, PANE_HEADING_CLASS } from './OnboardingPanes';
 import { readSave } from './save-store';
 
@@ -37,13 +38,17 @@ function newIdempotencyKey(): string {
 /**
  * M05 guardian consent. The ask form posts the parent email to the consent
  * endpoint hosted by the admin app (`/v1/guardian-consents`, ADR 0003); the
- * play path is never blocked while the request is pending, and the denied
- * state is terminal until a fresh install (consent law). The mail preview
+ * play path is never blocked while the request is pending. The denied state
+ * has one exit, Close, which does what a fresh install would (consent law):
+ * it clears the age answer and a denied Caller's local save
+ * (`clearDeniedConsent`) and returns to Welcome, so the next launch boots to
+ * first-run instead of this screen. The mail preview
  * stays copy-only for now — the retention window token (`{days}`) is a
  * lead+counsel decision, so the preview omits the deletion-timeline lines.
  */
 export function ConsentScreen() {
   const params = useLocalSearchParams<{ state?: string }>();
+  const router = useRouter();
   const ageAnswer = useOnboarding((s) => s.ageAnswer);
 
   const denied =
@@ -90,6 +95,11 @@ export function ConsentScreen() {
     setMode('sent');
   };
 
+  const closeDenied = () => {
+    if (clearDeniedConsent().removedDeniedSave) hydrateMon();
+    router.replace('/(onboarding)/welcome');
+  };
+
   if (mode === 'denied') {
     return (
       // Phone: centred as before. Tablet (md+): top-aligned in the panes' 560
@@ -99,6 +109,7 @@ export function ConsentScreen() {
           <EmptyState
             title={copy('m05.denied.title.no_mon')}
             description={copy('m05.denied.body.no_mon')}
+            action={<Button variant="outline" size="lg" fullWidth title={copy('m05.denied.close')} onPress={closeDenied} />}
           />
         </View>
       </Container>

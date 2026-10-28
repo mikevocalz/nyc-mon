@@ -10,6 +10,8 @@ export interface ErrorScreenProps {
   onGoHome?: () => void;
   /** A quieter "Go back" under the home button, when there is a screen to return to. */
   onGoBack?: () => void;
+  /** "Try again" above the home button: re-renders what failed (the root error boundary). */
+  onRetry?: () => void;
 }
 
 /** {@linkcode ErrorMessageBlock} props: `surface="night"` for an ink plate. Default page. */
@@ -18,7 +20,7 @@ export interface ErrorMessageBlockProps extends ErrorScreenProps {
 }
 
 /** The code, the headline, the explanation and the way home. The web page lays it on a plate over a background. */
-export function ErrorMessageBlock({ kind = 'not-found', detail, onGoHome, onGoBack, surface = 'page' }: ErrorMessageBlockProps) {
+export function ErrorMessageBlock({ kind = 'not-found', detail, onGoHome, onGoBack, onRetry, surface = 'page' }: ErrorMessageBlockProps) {
   const notFound = kind === 'not-found';
   // Explicit palette steps on the ink plate: themed tokens follow the page's
   // scheme. Measured in packages/theme/contrast.ts ('error message on ink plate').
@@ -44,7 +46,12 @@ export function ErrorMessageBlock({ kind = 'not-found', detail, onGoHome, onGoBa
         </Text>
       </View>
       <View className="w-full items-center gap-2">
-        <Button title={errorCopy('error.home')} onPress={onGoHome} />
+        {onRetry !== undefined ? <Button title={errorCopy('error.retry')} onPress={onRetry} /> : null}
+        <Button
+          {...(onRetry !== undefined ? { variant: 'ghost' as const, tone: 'royal' as const } : {})}
+          title={errorCopy('error.home')}
+          onPress={onGoHome}
+        />
         {onGoBack !== undefined ? (
           <Button variant="ghost" tone="royal" title={errorCopy('error.back')} onPress={onGoBack} />
         ) : null}

@@ -38,13 +38,17 @@ export function HomeScreen({ mon }: { mon: MonInstance }) {
   const local = useInstanceStore(() => ({ reactionKey: 0, menu: false, failed: false }));
   const { reactionKey, menu, failed } = useStore(local);
   const glassOn = useGlassOn(failed);
-  // The shell's H-LYNK tab asks for the device menu through the stage store.
-  const menuRequested = useHomeStageStore((s) => s.menuOpen);
+  // The shell's H-LYNK tab asks for the device menu with a counter, so a
+  // route change's cleanup can't erase the request. A request made before
+  // this screen mounted still counts; one is answered once.
+  const menuRequest = useHomeStageStore((s) => s.menuRequest);
+  const answered = useRef(0);
   useEffect(() => {
-    if (!menuRequested || !glassOn) return;
-    local.setState({ menu: true });
-    setHomeMenuOpen(false);
-  }, [menuRequested, glassOn, local]);
+    if (menuRequest === answered.current) return;
+    answered.current = menuRequest;
+    if (glassOn) local.setState({ menu: true });
+    else setHomeMenuOpen(true);
+  }, [menuRequest, glassOn, local]);
 
   const name = identity?.name ?? '';
   const status = care === undefined ? undefined : homeStatus(care);

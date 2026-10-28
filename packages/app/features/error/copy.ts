@@ -9,6 +9,7 @@ export const ERROR_COPY = {
   'error.failed.code': '!',
   'error.failed.title': 'Something went wrong',
   'error.failed.body': 'An unexpected error occurred. Try again in a moment.',
+  'error.retry': 'Try again',
   'error.home': 'Back to Home',
   'error.back': 'Go back',
 } as const;

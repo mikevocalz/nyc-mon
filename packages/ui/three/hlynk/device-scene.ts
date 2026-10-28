@@ -4,6 +4,7 @@ import {
 } from 'three/tsl';
 import type { StoreApi } from 'zustand/vanilla';
 import type { ThreeContext, ThreeFrame, ThreeScene } from '../types';
+import { sceneMotion, type SceneMotion } from '../loop-policy';
 import type { EggHatchRig } from '../hatch/egg-hatch-rig';
 import type { MonRig } from '../mon/mon-rig';
 import { NUDGE, nudgeHop, nudgePulse, nudgeRock, nudgeSlide } from './nudge';
@@ -38,12 +39,32 @@ export interface DeviceSceneParams {
   /** Called once, after the first frame with the H-Lynk in it has been drawn. The stage drops its capture then. */
   onReady?: () => void;
   /**
+   * Called once, after the first frame in which every screen model has
+   * really settled (shown, missing or failed). Unlike `onReady` it never
+   * gives up after MODEL_WAIT_MS, so a loader can stay up until a slow
+   * 26 MB Baby is on the glass instead of revealing an empty slot.
+   */
+  onModelsSettled?: () => void;
+  /**
    * Called with `true` when the H-Lynk is at rest (intro over, pointer away,
-   * tilt settled, no model idling) and with `false` when it needs frames
-   * again. The stage pauses the loop while it rests, so a still object costs
-   * no frames.
+   * tilt settled, no model idling, beam still) and with `false` when it needs
+   * frames again. Same signal as `onMotion(...) === 'still'`.
    */
   onRest?: (resting: boolean) => void;
+  /**
+   * Called when the scene's motion level changes (loop-policy.ts):
+   * `active` for the intro, input and tweens; `ambient` when only the idle
+   * clip and the live beam move; `still` when nothing does (reduced motion,
+   * the beam off and no model idling, or still compiling). The stage maps it
+   * to the canvas's `paused` and `maxFps` with `loopPlan`.
+   */
+  onMotion?: (motion: SceneMotion) => void;
+  /**
+   * The live beam (breathing fan, climbing ripples, rising glitter). Default
+   * true. False holds the plain rest beam, so with no model idling the scene
+   * goes still and the loop stops.
+   */
+  beam?: boolean;
   /**
    * Backing-store scale of the glass canvas, read once at build. 2 on tablets
    * so the glass text stays crisp at the larger device size; screens still
@@ -213,6 +234,17 @@ export function createDeviceScene(
   let introStart = -1;
   let announced = false;
   let resting = false;
+  let motion: SceneMotion | null = null;
+  const report = (next: SceneMotion, params: DeviceSceneParams) => {
+    if (next === motion) return;
+    motion = next;
+    params.onMotion?.(next);
+    const rest = next === 'still';
+    if (rest !== resting) {
+      resting = rest;
+      params.onRest?.(rest);
+    }
+  };
   let tiltX = 0;
   let tiltY = 0;
   let model = initial.model;
@@ -252,8 +284,12 @@ export function createDeviceScene(
   // for every model to settle (shown, missing or failed), or MODEL_WAIT_MS,
   // so the stage's loader covers the eggs popping in.
   let unsettled = models.length;
+  // The same count without the timeout: only a real settle lowers it.
+  let landing = models.length;
+  let landed = false;
   const settleModel = () => {
     unsettled = Math.max(0, unsettled - 1);
+    landing = Math.max(0, landing - 1);
     invalidate();
   };
   const modelWait = setTimeout(() => {
@@ -287,7 +323,12 @@ export function createDeviceScene(
     },
     update: (frame: ThreeFrame, params: DeviceSceneParams) => {
       if (params.model !== model) model = params.model; // 'h-lynk-entry' loads here once the model exists.
-      if (!ready) return;
+      // Compiling: nothing to draw yet. The loop stops; the compile and each
+      // model landing call `invalidate`, which draws the frame that wakes it.
+      if (!ready) {
+        report('still', params);
+        return;
+      }
       if (introStart < 0) introStart = frame.time;
       // Under reduced motion the stage shows the capture, but a still canvas
       // still lands on the rest pose.
@@ -311,7 +352,7 @@ export function createDeviceScene(
       // After the flare the beam stays alive: fan and emitters breathe together,
       // the emitters waver faintly, ripples climb the fan and glitter rises
       // through it. Reduced motion holds the plain rest beam.
-      const live = !frame.reducedMotion;
+      const live = !frame.reducedMotion && params.beam !== false;
       const wake = live ? span(t, INTRO.scanner.to, INTRO.end) : 0;
       const breath = wake * Math.sin((2 * Math.PI * t) / BEAM.period);
       const flicker = wake * Math.sin(t * 23.1) * Math.sin(t * 37.7);
@@ -325,7 +366,7 @@ export function createDeviceScene(
       const stageNow = store.getState();
       const holdingPad = stageNow.held && stageNow.hover === keyTarget('activate');
       const warmth = Math.min(1, (screen.warmth?.() ?? 0) + (holdingPad ? 1 : 0));
-      const modelsMoving = stand.update(frame, screen.selected?.() ?? null, power, warmth, screen.nudge?.() ?? 0, screen.monClips?.(), screen.modelsVisible?.() ?? true, screen.modelsOffset?.() ?? 0, screen.modelRect?.());
+      const models = stand.update(frame, screen.selected?.() ?? null, power, warmth, screen.nudge?.() ?? 0, screen.monClips?.(), screen.modelsVisible?.() ?? true, screen.modelsOffset?.() ?? 0, screen.modelRect?.());
 
       // Input: hover on a move, act on a press. The stage counts presses in
       // the store from its pointerdown handler (so a tap shorter than a
@@ -366,6 +407,12 @@ export function createDeviceScene(
       // The trackpad stays down while it is held.
       device.dipKey(keyDown ? keyDipping : holdingPad ? 'activate' : null);
 
+      if (!landed && landing === 0) {
+        landed = true;
+        setTimeout(() => {
+          if (!disposed) params.onModelsSettled?.();
+        }, 0);
+      }
       if (!announced && unsettled === 0) {
         announced = true;
         // After this frame's render, which runs right after update returns.
@@ -374,14 +421,12 @@ export function createDeviceScene(
         }, 0);
       }
       const settled = Math.abs(tiltX - goalX) < 1e-3 && Math.abs(tiltY - goalY) < 1e-3;
-      // A queued dip needs the loop for one more beat; idling models keep it running.
-      // A live beam keeps the loop running while the stage is on screen (the
-      // stage still pauses it offscreen); under reduced motion it rests as before.
-      const rest = t >= INTRO.end && !tracking && settled && !dipping && !keyDown && !modelsMoving && !live;
-      if (rest !== resting) {
-        resting = rest;
-        params.onRest?.(rest);
-      }
+      // The intro, a pointer tilt, a key dip or a model tween want every
+      // display frame; the idle clip and the live beam alone run at the
+      // ambient cap; nothing moving stops the loop (loop-policy.ts). The
+      // stage still pauses it offscreen or backgrounded.
+      const active = t < INTRO.end || tracking || !settled || dipping || keyDown || models.active || dipQueued || keyDipQueued !== null;
+      report(sceneMotion({ active, ambient: live || models.ambient }), params);
     },
     dispose: () => {
       disposed = true;
@@ -641,8 +686,10 @@ function standModels(THREE: Three, parent: Group, models: readonly ScreenModel[]
       offset = 0,
       /** undefined: every model keeps its built slot. null: hide them. A rect: re-seat the Babies there. */
       rect?: ScreenRect | null,
-    ): boolean => {
-      let moving = false;
+    ): { active: boolean; ambient: boolean } => {
+      // `active`: a tween or a press easing to a goal. `ambient`: a looping idle (the clip, the glow's breath).
+      let active = false;
+      let ambient = false;
       if (nudge !== lastNudge) {
         // The first read only learns the count; a press restarts the wobble rather than stacking another.
         if (lastNudge !== null) nudgeFrom = clock;
@@ -654,7 +701,7 @@ function standModels(THREE: Three, parent: Group, models: readonly ScreenModel[]
       const rock = frame.reducedMotion ? 0 : nudgeRock(nudgeAge);
       const hop = frame.reducedMotion ? 0 : nudgeHop(nudgeAge);
       const slide = frame.reducedMotion ? 0 : nudgeSlide(nudgeAge);
-      if (nudgeAge < NUDGE.pulseSeconds) moving = true;
+      if (nudgeAge < NUDGE.pulseSeconds) active = true;
       else nudgeFrom = -1;
       const k = frame.delta > 0 ? 1 - Math.exp(-frame.delta * MODEL_FOCUS.rate) : 1;
       const kGlow = frame.delta > 0 ? 1 - Math.exp(-frame.delta * GLOW.rate) : 1;
@@ -676,7 +723,7 @@ function standModels(THREE: Three, parent: Group, models: readonly ScreenModel[]
         entry.holder.visible = shown;
         const shiftGoal = offset * SCREEN_GLASS.width;
         entry.shift = frame.reducedMotion ? shiftGoal : entry.shift + (shiftGoal - entry.shift) * k;
-        if (Math.abs(shiftGoal - entry.shift) > 1e-3) moving = true;
+        if (Math.abs(shiftGoal - entry.shift) > 1e-3) active = true;
         if (entry.glow && !shown) entry.glow.group.visible = false;
         if (!shown) continue;
         // The glow follows the selection and comes up with the screen; warmth swells it.
@@ -684,11 +731,12 @@ function standModels(THREE: Three, parent: Group, models: readonly ScreenModel[]
         entry.glowLevel += (glowGoal - entry.glowLevel) * kGlow;
         // The press's pulse rides on top of the eased level, so it is snappy.
         const shownGlow = entry.glowLevel + (selected === entry.target ? NUDGE.pulse * pulse * power : 0);
-        if (Math.abs(glowGoal - entry.glowLevel) > 1e-3) moving = true;
+        if (Math.abs(glowGoal - entry.glowLevel) > 1e-3) active = true;
         const glow = entry.glow;
         if (glow) {
           const level = shownGlow;
           glow.group.visible = level > 1e-3;
+          if (glow.group.visible && !frame.reducedMotion) ambient = true;
           const swell = frame.reducedMotion ? 1 : 1 + 0.06 * Math.sin((2 * Math.PI * glowTime.value) / GLOW.breath);
           // A press swells the halo too, so the pulse reads as a flare, not just a brighter disc.
           const flare = selected === entry.target ? NUDGE.flare * pulse : 0;
@@ -715,19 +763,19 @@ function standModels(THREE: Three, parent: Group, models: readonly ScreenModel[]
         if (mon) {
           if (monClips) mon.setClips(monClips);
           mon.update(frame.delta, { reduced: frame.reducedMotion, boundX: 0 });
-          if (!frame.reducedMotion) moving = true;
+          if (!frame.reducedMotion) ambient = true;
         } else if (rig) {
           if (frame.reducedMotion) rig.seek('stir', 0);
           else {
             rig.idle();
             // A warmed egg idles livelier.
             rig.update(frame.delta * (selected === entry.target ? 1 + GLOW.idle * warmth : 1));
-            moving = true;
+            ambient = true;
           }
         }
-        if (Math.abs(goal - entry.scale) > 1e-3) moving = true;
+        if (Math.abs(goal - entry.scale) > 1e-3) active = true;
       }
-      return moving;
+      return { active, ambient };
     },
     dispose: () => {
       disposed = true;

@@ -3,7 +3,8 @@
 import { create } from 'zustand';
 import { AgeAnswerSchema } from '@acme/core/schemas';
 import type { AgeAnswer } from '@acme/core/types';
-import { onboardingStorage } from './storage';
+import { resetAfterConsentDenied, type ConsentResetResult } from './consent-reset';
+import { onboardingStorage, saveStorage } from './storage';
 
 /**
  * Storage keys (MMKV `nyc-mon`). `save` is the single sim save value, in
@@ -185,6 +186,20 @@ export const useOnboarding = create<OnboardingState>()((set) => ({
     else completePermissionReview();
   },
 }));
+
+/**
+ * M05 denied → Close: clears the age answer, the consent marker and a denied
+ * Caller's local save (rule in `consent-reset.ts`), then syncs this store.
+ * The caller re-hydrates the Mon store when `removedDeniedSave` is true.
+ */
+export function clearDeniedConsent(): ConsentResetResult {
+  const result = resetAfterConsentDenied(onboardingStorage, saveStorage);
+  useOnboarding.setState({
+    ageAnswer: undefined,
+    ...(result.removedDeniedSave ? { hasSession: false } : {}),
+  });
+  return result;
+}
 
 /** Loads the persisted onboarding state once at app start (root layout or first screen). */
 export function hydrateOnboarding(): void {

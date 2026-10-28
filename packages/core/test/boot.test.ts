@@ -185,6 +185,18 @@ describe('resolveBootRoute (M01)', () => {
     expect(resolveBootRoute(snapshot({ save: loaded(save), hasSession: true }))).toEqual({ kind: 'consent-denied' });
   });
 
+  it('after M05 Close (age answer, denied save and session flag cleared) boots to first-run, not denied', () => {
+    // The state M05's Close leaves (packages/app consent-reset.ts): nothing local.
+    expect(resolveBootRoute(snapshot({ save: { status: 'missing' }, hasSession: false, ageAnswer: undefined }))).toEqual({
+      kind: 'first-run',
+    });
+    // Clearing only the age answer is NOT enough: the denied save still wins.
+    const denied = withCaller({}, 'denied');
+    expect(resolveBootRoute(snapshot({ save: loaded(denied), hasSession: true, ageAnswer: undefined }))).toEqual({
+      kind: 'consent-denied',
+    });
+  });
+
   it('consent pending plays on locally', () => {
     const e = egg();
     const save = withCaller({ eggs: [e] }, 'pending');

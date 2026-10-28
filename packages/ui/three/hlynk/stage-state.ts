@@ -1,3 +1,5 @@
+import type { SceneMotion } from '../loop-policy';
+
 /**
  * Per-stage state for DeviceStage, shared by the stage's React tree and its
  * scene through one vanilla Zustand store (repo rule: never useState).
@@ -7,6 +9,8 @@ export interface StageState {
   ready: boolean;
   /** Intro over, pointer away, tilt settled, nothing animating: the loop may pause. */
   resting: boolean;
+  /** How much the scene moves now (loop-policy.ts): drives the canvas's pause and fps cap. */
+  motion: SceneMotion;
   /** The target under the pointer: a screen target, 'side-key', or null. */
   hover: string | null;
   /** Side key presses, so the scene dips the key once per press. */
@@ -25,7 +29,7 @@ export interface StageState {
 }
 
 export const initialStageState = (): StageState => ({
-  ready: false, resting: false, hover: null, presses: 0, taps: 0, held: false, keyPresses: 0, lastKey: null,
+  ready: false, resting: false, motion: 'active', hover: null, presses: 0, taps: 0, held: false, keyPresses: 0, lastKey: null,
 });
 
 /** The hover target for the left side key. */

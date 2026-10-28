@@ -1,14 +1,14 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, type ReactNode } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, type ReactNode } from 'react';
 import { useWindowDimensions } from 'react-native';
+import { useIsFocused } from 'expo-router';
 import { deriveMonMood } from '@acme/core/sim';
 import type { CareNeed, CareState } from '@acme/core/types';
 import { hud } from '@acme/theme';
 import {
-  createGlassScreen, createStageReady, createSwitchScreen, DeviceStage, GLASS_MON_TARGET, glassGeometry, KeyboardAwareScroll, SafeArea, StageReadyGate, useInstanceStore,
+  createGlassScreen, createSwitchScreen, DeviceStage, GLASS_MON_TARGET, glbFraction, glassGeometry, glbProgressStore, KeyboardAwareScroll, SafeArea, useInstanceStore,
   useReducedMotion, useStore, type DeviceKey, type DeviceScreen, type GlassLayout, type GlassRing, type GlassView, type ScreenModelSource,
-  type StageReadyResource,
 } from '@acme/ui';
 import { View } from '@acme/ui/tw';
 import { StageControls, type StageControl } from '../egg/StageControls';
@@ -19,6 +19,7 @@ import { CompanionPaneLoading } from './CompanionPane';
 import { CompanionStageHost, useTabletClass } from './CompanionStageHost';
 import { clearCompanion, clearGlass, publishCompanion, publishGlass, setGlassFailed, setStageFrame, useHomeStageStore } from './home-stage.store';
 import { isLow, NEED_RING } from './home-model';
+import { STAGE_LOADING, stageLoaderUp, type StageLoading } from './stage-loading';
 import { clipsFor, monModelSource } from './mon-models';
 
 /** The kit's convention for a model that does not exist yet (MonView, EggStill). */
@@ -244,8 +245,8 @@ export function GlassStage({ screen, label, testIDPrefix, a11y, controls, onKey,
 /**
  * The persistent stage itself, mounted once by HomeLayout for every `(home)`
  * route on the 3D path: the device, the active Baby loaded once (fitted
- * inside the glass, on its mood's idle), and the Rive loader over it only
- * until its very first frame. It draws the current route's screen
+ * inside the glass, on its mood's idle), and the Rive loader over both until
+ * the device has drawn and the Baby has landed (GlassDevice). It draws the current route's screen
  * (createSwitchScreen); with no route screen it shows the Baby under its
  * name. `fallbackKey` handles the keys then.
  */
@@ -282,17 +283,12 @@ export function PersistentGlassStage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [modelKey, current],
   );
-  const local = useInstanceStore<{ ready: StageReadyResource }>(() => ({ ready: createStageReady() }));
-  const ready = useStore(local, (st) => st.ready);
-  const onReady = useCallback(() => local.getState().ready.settle(), [local]);
-  const onBackend = useCallback((backend: unknown) => {
-    if (backend !== null) return;
-    local.getState().ready.settle();
-    setGlassFailed();
-  }, [local]);
   const onKey = useCallback((key: DeviceKey) => keys.getState().onKey(key), [keys]);
 
   const tablet = useTabletClass();
+  // The root stack keeps (home) mounted under (drawer) routes so the stage
+  // never reloads; covered, it must not keep drawing.
+  const focused = useIsFocused();
 
   return (
     <View className="absolute inset-0 bg-ink-950" testID="home-glass-stage">
@@ -303,35 +299,79 @@ export function PersistentGlassStage({
           onFrame={setStageFrame}
           device={
             <>
-              <View
-                testID="home-device-stage"
-                aria-hidden
-                accessibilityElementsHidden
-                importantForAccessibility="no-hide-descendants"
-                className="absolute inset-0"
-              >
-                <DeviceStage
-                  key={modelKey}
-                  screen={screen}
-                  label={route?.label ?? label}
-                  className="h-full"
-                  stageClassName="min-h-0 w-full flex-1"
-                  glassScale={tablet.glassScale}
-                  onKey={onKey}
-                  onReady={onReady}
-                  onBackendChange={onBackend}
-                />
-              </View>
-              {/* The Rive loader covers the stage until its first frame, once: later screens swap in place. */}
-              <Suspense fallback={<StageLoader label={label} testID="home-stage-loader" />}>
-                <StageReadyGate resource={ready} />
-              </Suspense>
+              {/* Keyed by the Baby: a new Baby is a new scene, and its loader starts over. */}
+              <GlassDevice
+                key={modelKey}
+                screen={screen}
+                label={route?.label ?? label}
+                loaderLabel={label}
+                glassScale={tablet.glassScale}
+                onKey={onKey}
+                covered={!focused}
+                progressKey={source?.kind === 'mon' ? source.key : null}
+              />
               {children}
             </>
           }
         />
       </SafeArea>
     </View>
+  );
+}
+
+/**
+ * The device and its Rive loader. The loader is up from the very first frame
+ * and stays until the device has drawn AND the Baby is really on the glass
+ * (stage-loading.ts), never lifting on the scene's 8 s model wait. While it is
+ * up the stage holds its loop: only the frames the scene asks for draw, and
+ * the intro waits to play until the loader lifts. With the GLB's size known
+ * the loader fills with the bytes downloaded.
+ */
+function GlassDevice({ screen, label, loaderLabel, glassScale, onKey, covered, progressKey }: {
+  readonly screen: DeviceScreen;
+  readonly label: string;
+  readonly loaderLabel: string;
+  readonly glassScale: number;
+  readonly onKey: (key: DeviceKey) => void;
+  /** Another root route is on top of (home): hold the loop (the renderer and the Baby stay loaded). */
+  readonly covered: boolean;
+  /** The Baby's model key, for its download progress; null with no Baby (or an egg). */
+  readonly progressKey: string | null;
+}) {
+  const loading = useInstanceStore<StageLoading>(() => STAGE_LOADING);
+  const up = useStore(loading, stageLoaderUp);
+  const progress = useStore(glbProgressStore, (all) => (progressKey === null ? undefined : glbFraction(all[progressKey])));
+  const onReady = useCallback(() => loading.setState({ deviceReady: true }), [loading]);
+  const onModelsSettled = useCallback(() => loading.setState({ modelsSettled: true }), [loading]);
+  const onBackend = useCallback((backend: unknown) => {
+    if (backend !== null) return;
+    loading.setState({ failed: true });
+    setGlassFailed();
+  }, [loading]);
+  return (
+    <>
+      <View
+        testID="home-device-stage"
+        aria-hidden
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        className="absolute inset-0"
+      >
+        <DeviceStage
+          screen={screen}
+          label={label}
+          className="h-full"
+          stageClassName="min-h-0 w-full flex-1"
+          glassScale={glassScale}
+          onKey={onKey}
+          onReady={onReady}
+          onModelsSettled={onModelsSettled}
+          onBackendChange={onBackend}
+          hold={up || covered}
+        />
+      </View>
+      {up ? <StageLoader label={loaderLabel} testID="home-stage-loader" progress={progress} /> : null}
+    </>
   );
 }
 
