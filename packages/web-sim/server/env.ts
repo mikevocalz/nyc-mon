@@ -102,6 +102,8 @@ export interface PublicConfig {
   readonly authMode: 'oauth' | 'dev-bypass';
   /** The OAuth client id the page signs in as (single source: OAUTH_SIM_CLIENT_ID). */
   readonly clientId: string;
+  /** The authorization server, so sign-out can revoke the refresh token (RFC 7009). */
+  readonly issuer: string;
   readonly devMode: boolean;
   readonly modelBackend: 'bedrock' | 'mock';
   readonly modelLabel: string;
@@ -114,6 +116,7 @@ export function publicConfig(env: SimEnv): PublicConfig {
     sandboxOrigin: new URL(env.SIM_SANDBOX_ORIGIN).origin,
     authMode: env.SIM_AUTH_MODE,
     clientId: env.OAUTH_SIM_CLIENT_ID,
+    issuer: env.AUTH_ISSUER.replace(/\/+$/, ''),
     devMode: env.SIM_DEV_MODE === '1',
     modelBackend: env.SIM_MODEL_BACKEND,
     modelLabel: env.SIM_MODEL_BACKEND === 'mock' ? 'Scripted test model' : `Claude on Amazon Bedrock (${env.SIM_BEDROCK_MODEL_ID})`,
