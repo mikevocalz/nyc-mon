@@ -6,6 +6,7 @@ import type { TurnOutcome } from '../shared/agentLoop.ts';
 import { toolOutcome, type ToolOutcome } from '../shared/toolOutcome.ts';
 import { captionText } from '@acme/content/voice';
 import type { McpSession } from './mcp.ts';
+import { INITIAL_VOICE, type VoiceState } from './voiceState.ts';
 
 /** One entry in the conversation log. `detail` is the raw server answer, shown collapsed. */
 export interface Line { id: number; who: 'Caller' | 'Mon' | 'Result'; text: string; detail?: string; cut?: boolean }
@@ -15,13 +16,15 @@ export interface CompanionState {
   connected: boolean; busy: boolean; question: string; note: string; consent: boolean;
   memory: MemorySnapshot | null; error: string; status: string; confirmForget: boolean;
   lines: Line[]; nextId: number;
+  /** Voice conversation: listening, thinking, speaking, interrupted (voiceState.ts). */
+  voice: VoiceState;
 }
 /** Per-page protocol handles that are not UI state. */
 export interface CompanionRuntime { session: McpSession | null; history: Anthropic.MessageParam[]; abort: AbortController | null }
 
 export const initialCompanionState = (): CompanionState => ({
   connected: false, busy: false, question: '', note: '', consent: false, memory: null,
-  error: '', status: '', confirmForget: false, lines: [], nextId: 0,
+  error: '', status: '', confirmForget: false, lines: [], nextId: 0, voice: INITIAL_VOICE,
 });
 
 const MAX_LINES = 40;

@@ -17,19 +17,44 @@ import { safeStorage } from './session.ts';
 import { createTurnToolCaller } from './turnTools.ts';
 import { createCompanionVoice } from './companionVoice.ts';
 import { monSpeechPort } from './monSpeechPort.ts';
-import { clearSessionVoice, setSessionVoice, stopSpeaking } from './speech.ts';
+import { canListen, clearSessionVoice, listen, onPlayback, playbackStartedAt, setSessionVoice, stopSpeaking, type Listening } from './speech.ts';
 import {
-  appendLine, errorMessage, expireSession, initialCompanionState, memoryErrorMessage, monLine, toolResultLine,
+  appendLine, cutLine, errorMessage, expireSession, growLine, initialCompanionState, memoryErrorMessage, monLine, toolResultLine,
   type CompanionRuntime, type CompanionState, type Line,
 } from './companionState.ts';
+import { openEar, type ListenFn } from './handsFree.ts';
+import { isFiller, liveMicUrl, openLiveMic, type LiveMic } from './liveMic.ts';
+import { openMicPipeline, type MicPipeline } from './micPipeline.ts';
+import { createVoiceController, type BargeInRecord, type EarHandlers, type VoiceController } from './voiceController.ts';
+import { nextVoice, voiceAnnouncement, type VoiceEvent } from './voiceState.ts';
 import { MemorySnapshotSchema } from '@acme/core/schemas';
 
-const ConfigSchema = z.object({ mcpUrl:z.string().url(),clientId:z.string().min(1),modelBackend:z.literal('nebius'),modelLabel:z.string() });
+const ConfigSchema = z.object({ mcpUrl:z.string().url(),clientId:z.string().min(1),modelBackend:z.literal('nebius'),modelLabel:z.string(),
+  asr:z.enum(['riva','browser']).default('browser') });
 type Config = z.infer<typeof ConfigSchema>;
 const toolsAllowed = new Set(['get_mon_status','check_on_mon','check_incubation','hatch_egg','talk_to_mon','feed_mon','rest_mon','wake_mon','play_with_mon']);
 const NOTE_MAX = 500;
 const PAGE = 'mx-auto w-full max-w-content-feed gap-6 px-4 py-6 md:px-6';
 const TITLE = 'NYC-Mon Personal Companion';
+/** One turn's timing, on window.__monTurns for a headless run to read (like the simulator's __monLatency). */
+interface VoiceHandles {
+  turn:TurnRecord|null;speakingLine:number|null;pendingStop:BargeInRecord|null;pipeline:MicPipeline|null;
+  controller:VoiceController|null;
+  runTurn:(question:string, source:'typed'|'voice', startedAt:number) => Promise<void>;
+  finishTurn:(turn:TurnRecord, outcome:TurnRecord['outcome']) => void;
+}
+interface TurnRecord { source:'typed'|'voice';startedAt:number;firstAudioAt:number|null;doneAt:number|null;outcome:'pending'|'finished'|'interrupted'|'failed' }
+function record(key:'__monTurns'|'__monBargeIns', row:Record<string,unknown>) {
+  const w = globalThis as Record<string, unknown>;
+  const rows = (w[key] ??= []) as unknown[];
+  rows.push(row);
+  if (rows.length > 200) rows.shift();
+}
+function talkTitle(phase: string): string {
+  if (phase === 'listening') return 'Done talking';
+  if (phase === 'thinking' || phase === 'speaking') return 'Cut in and talk';
+  return 'Talk';
+}
 const BROWSER_VOICE_NOTE = 'Using your browser’s voice: the Mon’s voice is unavailable.';
 const VOICE_UNAVAILABLE_NOTE = 'The Mon’s voice is unavailable right now. The reply is in the conversation below.';
 
@@ -58,6 +83,86 @@ function Companion({ config }: { config:Config }) {
   const model = useMemo(() => httpModelClient('/api/model',fetch,authorize),[authorize]);
   const showError = useCallback((error:unknown) => store.setState({ error:errorMessage(error),status:'' }),[store]);
   const push = useCallback((line:Omit<Line,'id'>) => store.setState((s) => appendLine(s,line)),[store]);
+
+  // ---- Voice conversation: push-to-talk, conversation mode and barge-in (voiceController.ts).
+  // Per-page voice handles, not UI state (like `runtime`).
+  const handles = useInstanceStore<VoiceHandles>(() => ({ turn:null,speakingLine:null,pendingStop:null,pipeline:null,controller:null,
+    runTurn:async () => {},finishTurn:() => {} }));
+  const dispatchVoice = useCallback((event:VoiceEvent) => {
+    store.setState((st) => ({ voice:nextVoice(st.voice,event) }));
+    handles.getState().controller?.sync();
+  },[store,handles]);
+  const controller = useMemo(() => {
+    const riva: ListenFn = (h) => {
+      const pipeline = handles.getState().pipeline;
+      if (!pipeline) return null;
+      let mic: LiveMic | null = null;
+      let cancelled = false;
+      void (async () => {
+        let token: string | undefined;
+        await authorize(async (t) => { token = t; return new Response(null,{ status:204 }); });
+        const opened = await openLiveMic({ url:liveMicUrl(window.location),token,
+          source:{ onPcm:(fn) => pipeline.onPcm(fn),preroll:pipeline.preroll() },
+          handlers:{ onInterim:h.onInterim,onFinal:h.onFinal,onError:h.onError } });
+        if (cancelled) opened.close(); else mic = opened;
+      })().catch(() => h.onError('NVIDIA speech recognition is unavailable. Type instead.'));
+      const listening: Listening = { finish:() => {},cancel:() => { cancelled = true;mic?.close(); } };
+      return listening;
+    };
+    const c = createVoiceController({
+      state:() => store.getState().voice,
+      dispatch:(event) => store.setState((st) => ({ voice:nextVoice(st.voice,event) })),
+      openMic:async () => { const p = await openMicPipeline();handles.setState({ pipeline:p });
+        return { onFrame:(fn) => p.onFrame(fn),close:() => { p.close();if (handles.getState().pipeline === p) handles.setState({ pipeline:null }); } }; },
+      openEar:(h:EarHandlers,{ conversation }) => {
+        const useRiva = store.getState().voice.asr === 'riva';
+        if (!useRiva && !canListen()) return null;
+        const ear = openEar({ listen:useRiva ? riva : listen,
+          onInterim:h.onInterim,
+          onUtterance:(text,endedAt) => { if (isFiller(text)) h.onSilent(); else h.onUtterance(text,endedAt); },
+          onSilent:h.onSilent,onError:h.onError,
+          noSpeechMs:conversation ? 15_000 : 8_000 });
+        return ear;
+      },
+      stopVoice:(fadeMs) => voice.stop({ fadeMs }),
+      abortTurn:() => {
+        const { speakingLine:line,turn,finishTurn:finish } = handles.getState();
+        if (line !== null) { store.setState((st) => ({ lines:cutLine(st.lines,line) }));handles.setState({ speakingLine:null }); }
+        runtime.getState().abort?.abort();
+        if (turn) finish(turn,'interrupted');
+        store.setState({ busy:false,status:'' });
+      },
+      submit:(text,endedAt) => { void handles.getState().runTurn(text,'voice',endedAt); },
+      playingSince:playbackStartedAt,
+      onBargeIn:(r) => {
+        if (r.phase === 'speaking') handles.setState({ pendingStop:r });
+        else record('__monBargeIns',{ ...r,stoppedAt:null,latencyMs:null });
+      },
+    });
+    return c;
+  },[store,runtime,voice,authorize,handles]);
+  useEffect(() => { handles.setState({ controller }); },[handles,controller]);
+  useEffect(() => { handles.setState({ runTurn,finishTurn }); });
+  useEffect(() => { store.setState((st) => ({ voice:nextVoice(st.voice,{ type:'asr',kind:config.asr }) })); },[store,config.asr]);
+  useEffect(() => onPlayback((e) => {
+    if (e.kind === 'start') {
+      const turn = handles.getState().turn;
+      if (turn && turn.firstAudioAt === null) turn.firstAudioAt = e.at;
+      if (store.getState().voice.phase === 'thinking') dispatchVoice({ type:'reply-audio' });
+      return;
+    }
+    const cut = handles.getState().pendingStop;
+    if (cut) { handles.setState({ pendingStop:null });record('__monBargeIns',{ ...cut,stoppedAt:e.at,latencyMs:Math.round(e.at - cut.triggerAt) }); }
+  }),[store,dispatchVoice,handles]);
+  useEffect(() => () => controller.close(),[controller]);
+  // Hold Space (outside a text field or button) to talk; release to finish.
+  useEffect(() => {
+    const typing = (t: EventTarget | null) => t instanceof HTMLElement && (t.closest('input,textarea,button,[role=button],[role=switch]') !== null || t.isContentEditable);
+    const down = (e: KeyboardEvent) => { if (e.code !== 'Space' || e.repeat || typing(e.target) || !store.getState().connected) return; e.preventDefault();void controller.talk(); };
+    const up = (e: KeyboardEvent) => { if (e.code !== 'Space' || typing(e.target)) return; controller.finish(); };
+    window.addEventListener('keydown',down);window.addEventListener('keyup',up);
+    return () => { window.removeEventListener('keydown',down);window.removeEventListener('keyup',up); };
+  },[controller,store]);
 
   const memoryRequest = useCallback(async (method:'GET'|'PUT'|'DELETE') => {
     if (store.getState().busy) return;
@@ -107,15 +212,17 @@ function Companion({ config }: { config:Config }) {
     return () => { disposed=true;runtime.getState().abort?.abort();void runtime.getState().session?.close();runtime.setState({ session:null }); };
   },[provider,config.mcpUrl,store,showError,runtime,memoryRequest,voice]);
 
-  async function send() {
-    const current=store.getState();const connection=runtime.getState().session;
-    if (current.busy || !connection || !current.question.trim()) return;
-    const question=current.question.trim();
+  /** One turn, typed or spoken. The reply is spoken sentence by sentence and captioned as each sentence starts. */
+  async function runTurn(question:string, source:'typed'|'voice', startedAt:number) {
+    const connection=runtime.getState().session;
+    if (!connection || !question.trim()) { dispatchVoice({ type:'reply-done' });return; }
+    voice.stop();
+    runtime.getState().abort?.abort();
     store.setState({ busy:true,error:'',question:'',status:'Waiting for Nemotron on Nebius…' });
     push({ who:'Caller',text:question });
-    voice.stop();
     const controller=new AbortController();runtime.setState({ abort:controller });
-    controller.signal.addEventListener('abort',() => voice.stop(),{ once:true });
+    const turn: TurnRecord = { source,startedAt,firstAudioAt:null,doneAt:null,outcome:'pending' };
+    handles.setState({ turn });
     try {
       const tools=mcpToolsToClaude(connection.tools.filter((tool) => toolsAllowed.has(tool.name))).tools;
       const result=await runAgentTurn({ model,mcp:createTurnToolCaller({ client:connection.client,signal:controller.signal }),
@@ -128,13 +235,33 @@ function Companion({ config }: { config:Config }) {
         } });
       if (controller.signal.aborted) return;
       runtime.setState({ history:result.history });
-      push(monLine(result.reply,result.outcome));
-      if (result.reply.trim()) void voice.speak(result.reply,authorize);
-      store.setState({ status:'' });
-    } catch(error) { if (!controller.signal.aborted) showError(error); }
+      store.setState({ status:'',busy:false });
+      if (!result.reply.trim()) { push(monLine(result.reply,result.outcome));finishTurn(turn,'finished');dispatchVoice({ type:'reply-done' });return; }
+      // The caption follows the voice: each sentence appears as it starts, so a barge-in never leaves unspoken words on screen.
+      push({ who:'Mon',text:'' });
+      const lineId=store.getState().lines.at(-1)!.id;
+      handles.setState({ speakingLine:lineId });
+      const outcome=await voice.speak(result.reply,authorize,(sentence) => store.setState((st) => ({ lines:growLine(st.lines,lineId,sentence) })));
+      if (handles.getState().speakingLine===lineId) handles.setState({ speakingLine:null });
+      if (outcome==='finished') { finishTurn(turn,'finished');dispatchVoice({ type:'reply-done' }); }
+    } catch(error) {
+      if (!controller.signal.aborted) { showError(error);finishTurn(turn,'failed');dispatchVoice({ type:'reply-done' }); }
+    }
     finally { if (!controller.signal.aborted) store.setState({ busy:false }); }
   }
+  function finishTurn(turn:TurnRecord, outcome:TurnRecord['outcome']) {
+    if (turn.outcome!=='pending') return;
+    turn.outcome=outcome;turn.doneAt=performance.now();
+    record('__monTurns',{ ...turn,ttfaMs:turn.firstAudioAt===null?null:Math.round(turn.firstAudioAt-turn.startedAt),turnMs:Math.round(turn.doneAt-turn.startedAt) });
+  }
+  async function send() {
+    const current=store.getState();
+    if (!runtime.getState().session || !current.question.trim()) return;
+    dispatchVoice({ type:'typed' });
+    await runTurn(current.question.trim(),'typed',performance.now());
+  }
   function signOut() {
+    controller.close();store.setState((st) => ({ voice:nextVoice(st.voice,{ type:'stop' }) }));
     voice.reset();runtime.getState().abort?.abort();void runtime.getState().session?.close();runtime.setState({ session:null });provider.signOut();runtime.setState({ history:[] });
     store.setState({ ...initialCompanionState(),status:'Signed out. This page no longer holds your conversation or preferences.' });
   }
@@ -153,14 +280,33 @@ function Companion({ config }: { config:Config }) {
     {state.error ? <Banner tone="danger" live="alert" title={state.error}/> : null}
     {state.connected ? <>
       <Section aria-label="Chat" className="gap-3">
-        <TextField surface="daylit" label="Ask your Mon" hint="Your Mon can check on itself, eat, rest, wake up and play."
-          value={state.question} onChangeText={(question) => store.setState({question})} disabled={state.busy}/>
+        <Section aria-label="Talk to your Mon" className="gap-3">
+          <View className="flex-row flex-wrap items-center gap-3">
+            <Button title={talkTitle(state.voice.phase)} variant="cta" onPress={() => {
+              if (state.voice.phase === 'listening') controller.finish(); else void controller.talk(); }}
+              disabled={state.voice.mic === 'denied' || state.voice.asr === 'unavailable'}/>
+            {state.voice.phase === 'thinking' || state.voice.phase === 'speaking'
+              ? <Button title="Stop" variant="outline" onPress={() => controller.cutIn('tap')}/> : null}
+          </View>
+          <Switch label="Conversation mode: always listening, talk over your Mon any time" value={state.voice.conversation}
+            onChange={(on) => { void controller.setConversation(on); }} disabled={state.voice.mic === 'denied' || state.voice.asr === 'unavailable'}/>
+          {/* Always mounted so screen readers have the region before its text changes. */}
+          <Paragraph aria-live="polite" className="text-type-caption text-text-muted">{voiceAnnouncement(state.voice)}</Paragraph>
+          {state.voice.heard ? <Paragraph className="text-type-body"><Text className="font-semibold">Hearing: </Text>{state.voice.heard}</Paragraph> : null}
+          <Paragraph className="text-type-caption text-text-muted">{state.voice.asr === 'riva'
+            ? 'Speech to text: NVIDIA Riva (Parakeet). Hold Space to talk.' : 'Speech to text: your browser. Hold Space to talk.'}</Paragraph>
+        </Section>
+        <TextField surface="daylit" label="Ask your Mon" hint="Your Mon can check on itself, eat, rest, wake up and play. Typing while it talks cuts it off."
+          value={state.question} onChangeText={(question) => {
+            if (question && store.getState().voice.phase === 'speaking') controller.cutIn('type');
+            store.setState({question}); }} disabled={state.busy}/>
         <Button title="Send" variant="cta" onPress={() => { void send(); }} disabled={state.busy}/>
         <View aria-live="polite">
           <List aria-label="Conversation" className="gap-3">
             {state.lines.map((line) => (
               <ListItem key={line.id} className="text-type-body">
                 <Text className="font-semibold">{line.who}: </Text>{line.text}
+                {line.cut ? <Text className="text-type-caption text-text-muted"> (cut off)</Text> : null}
                 {line.detail ? <Details><Summary className="text-type-caption text-text-muted">Server response</Summary>
                   <Text className="whitespace-pre-wrap text-type-caption">{line.detail}</Text></Details> : null}
               </ListItem>
