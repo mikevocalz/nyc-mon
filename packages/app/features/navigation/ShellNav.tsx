@@ -5,12 +5,14 @@
 // the canon's five primary tabs, a menu button, and a drawer for the rest.
 // SOT: ./shell-destinations.ts · packages/ui/adaptive-navigation.ts (placement policy)
 // SOT-KEYWORDS: shell rail drawer bottom bar menu physical right rtl tablet foldable
-import { useEffect, type ReactNode } from 'react';
+import { useEffect } from 'react';
 import { BackHandler, I18nManager } from 'react-native';
 import { create } from 'zustand';
 import { Pressable, Text, View } from '@acme/ui/tw';
 import { Bell, Calendar, Compass, Home, Layers, Menu, Navigation, Settings, ShieldCheck, Smartphone, User, X } from '@acme/ui/icons';
 import { haptics } from '@acme/ui/haptics';
+import { Avatar } from '@acme/ui';
+import { useProfile } from '../profile/profile.store';
 import { navChrome } from '@acme/theme';
 import {
   SHELL_DESTINATIONS,
@@ -63,7 +65,6 @@ function ShellNavItem({ name, label, raised, focused, layout, onPress }: ItemPro
   const Icon = ICONS[name];
   const rail = layout !== 'bottom';
   const wide = layout === 'rail-expanded';
-  const on = focused || raised;
   return (
     <Pressable
       aria-label={label}
@@ -74,23 +75,40 @@ function ShellNavItem({ name, label, raised, focused, layout, onPress }: ItemPro
       }}
       className={rail ? 'w-full' : 'flex-1'}
     >
+      {/* Blue is the structure, orange the one hot colour: the selected tab
+          gets a carolina edge bar and tint; H-LYNK, the raised action, is the
+          only orange face. */}
       <View
-        style={rail ? { height: raised ? ITEM + 12 : ITEM } : undefined}
-        className={`rounded-none border-2 ${
-          wide ? 'flex-row items-center justify-start gap-3 px-4' : `items-center justify-center gap-0.5 ${rail ? 'px-1' : 'px-2 py-1.5'}`
-        } ${raised && !rail ? '-mt-4 py-3' : ''} ${
-          raised
-            ? `border-border shadow-card ${focused ? 'bg-primary' : 'bg-accent'}`
-            : focused
-              ? 'border-border bg-primary shadow-card'
-              : 'border-transparent'
-        }`}
+        style={rail ? { minHeight: ITEM } : undefined}
+        className={`relative ${wide ? 'flex-row items-center justify-start gap-3 px-3' : 'items-center justify-center gap-1'} ${rail ? 'py-2' : 'py-1.5'} ${
+          focused && !raised ? 'bg-accent/10' : ''
+        } ${raised && !rail ? '-mt-5' : ''}`}
       >
-        <Icon size={raised ? 28 : 24} className={on ? 'text-on-primary' : 'text-text-muted'} />
-        <Text numberOfLines={1} className={`text-xs font-semibold md:text-sm ${on ? 'text-on-primary' : 'text-text-muted'}`}>
+        {focused && !raised ? (
+          <View aria-hidden className={rail ? 'absolute bottom-2 left-0 top-2 w-1 bg-accent' : 'absolute left-3 right-3 top-0 h-1 bg-accent'} />
+        ) : null}
+        <View
+          className={raised ? `h-12 w-12 items-center justify-center bg-cta shadow-card ${focused ? 'border-2 border-accent' : ''}` : 'items-center justify-center'}
+        >
+          <Icon size={raised ? 26 : 22} className={raised ? 'text-on-cta' : focused ? 'text-accent' : 'text-text-muted'} />
+        </View>
+        <Text
+          numberOfLines={1}
+          className={`text-[10px] tracking-wider md:text-xs ${focused || raised ? 'font-bold text-text' : 'font-semibold text-text-muted'}`}
+        >
           {label}
         </Text>
       </View>
+    </Pressable>
+  );
+}
+
+/** The Caller's avatar, above the menu button; opens CALLER. */
+export function ShellAvatar({ onPress }: { onPress: () => void }) {
+  const name = useProfile((s) => s.name);
+  return (
+    <Pressable aria-label={`${name || 'Caller'}, profile`} onPress={onPress} className="self-center">
+      <Avatar name={name} />
     </Pressable>
   );
 }
@@ -111,9 +129,9 @@ export function ShellMenuButton() {
     >
       <View
         style={{ width: MENU, height: MENU }}
-        className={`items-center justify-center rounded-none border-2 ${open ? 'border-border bg-primary shadow-card' : 'border-border bg-surface-raised'}`}
+        className={`items-center justify-center rounded-none border-2 ${open ? 'border-accent bg-accent/15' : 'border-border bg-surface-raised'}`}
       >
-        {open ? <X size={24} className="text-on-primary" /> : <Menu size={24} className="text-text" />}
+        {open ? <X size={24} className="text-accent" /> : <Menu size={24} className="text-text" />}
       </View>
     </Pressable>
   );
@@ -156,6 +174,7 @@ export function ShellRail({ active, onSelect, expanded = false, insets }: ShellR
           />
         ))}
         <View className="flex-1" />
+        <ShellAvatar onPress={() => onSelect('caller')} />
         <ShellMenuButton />
       </View>
       <View style={{ width: insets.right }} />
@@ -178,25 +197,20 @@ export function ShellBottomBar({ active, onSelect, bottomInset }: { active: Shel
 }
 
 export interface ShellDrawerProps {
-  /** `rail`: anchored beside the right rail, 10pt above the menu button. `bar`: above the phone bar. */
-  anchor: 'rail' | 'bar';
-  railWidth: number;
-  insets: { bottom: number; right: number };
-  /** Height of the phone bar, for the `bar` anchor. */
-  barHeight?: number;
+  insets: { top: number; bottom: number; left: number };
   active: ShellDrawerItemName | null;
   onSelect: (href: string) => void;
-  header?: ReactNode;
 }
 
 /**
  * The drawer: everything that is not a primary tab. It opens from the
- * physical RIGHT, beside the rail, its bottom edge 10pt above the menu
- * button. A tap outside, Android back, or choosing an item closes it.
+ * LEFT edge at full height, with the Caller at its head. A tap outside,
+ * Android back, or choosing an item closes it.
  */
-export function ShellDrawer({ anchor, railWidth, insets, barHeight = 0, active, onSelect, header }: ShellDrawerProps) {
+export function ShellDrawer({ insets, active, onSelect }: ShellDrawerProps) {
   const open = useShellDrawer((s) => s.open);
   const setOpen = useShellDrawer((s) => s.setOpen);
+  const name = useProfile((s) => s.name);
 
   useEffect(() => {
     if (!open) return;
@@ -208,24 +222,19 @@ export function ShellDrawer({ anchor, railWidth, insets, barHeight = 0, active, 
   }, [open, setOpen]);
 
   if (!open) return null;
-  // The panel's bottom edge sits 10pt above the menu button's top edge.
-  const panelBottom =
-    anchor === 'rail'
-      ? insets.bottom + SHELL_SPACING.menuFromBottom + MENU + SHELL_SPACING.drawerAboveMenu
-      : barHeight + SHELL_SPACING.drawerAboveMenu;
-  const side = anchor === 'rail' ? railWidth + insets.right + 8 : insets.right + 8;
-  const edge = I18nManager.isRTL && I18nManager.doLeftAndRightSwapInRTL ? { left: side } : { right: side };
-
   return (
     <View className="absolute inset-0" style={{ zIndex: 50 }}>
-      <Pressable aria-label="Close menu" onPress={() => setOpen(false)} className="absolute inset-0 bg-ink-950/50" />
+      <Pressable aria-label="Close menu" onPress={() => setOpen(false)} className="absolute inset-0 bg-ink-950/60" />
       <View
         role={'menu' as never}
         testID="shell-drawer"
-        style={{ position: 'absolute', bottom: panelBottom, width: DRAWER_WIDTH, ...edge }}
-        className="gap-1 rounded-none border-2 border-border bg-surface py-2 shadow-card"
+        style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: DRAWER_WIDTH + insets.left, paddingTop: insets.top + 16, paddingBottom: insets.bottom + 16, paddingLeft: insets.left }}
+        className="gap-1 border-r-2 border-accent bg-surface"
       >
-        {header}
+        <View className="mx-3 mb-4 flex-row items-center gap-3 border-b-2 border-border pb-4">
+          <Avatar name={name} />
+          <Text numberOfLines={1} className="flex-1 text-lg font-bold text-text">{name}</Text>
+        </View>
         {SHELL_DRAWER_ITEMS.map((item) => {
           const Icon = DRAWER_ICONS[item.name];
           const on = active === item.name;
@@ -240,10 +249,11 @@ export function ShellDrawer({ anchor, railWidth, insets, barHeight = 0, active, 
                 setOpen(false);
                 onSelect(item.href);
               }}
-              className={`mx-2 min-h-12 flex-row items-center gap-3 rounded-none border-2 px-3 ${on ? 'border-border bg-primary' : 'border-transparent'}`}
+              className={`relative mx-2 min-h-12 flex-row items-center gap-3 px-4 ${on ? 'bg-accent/10' : ''}`}
             >
-              <Icon size={22} className={on ? 'text-on-primary' : 'text-text-muted'} />
-              <Text className={`flex-1 text-base md:text-lg ${on ? 'font-semibold text-on-primary' : 'text-text'}`}>{item.label}</Text>
+              {on ? <View aria-hidden className="absolute bottom-2 left-0 top-2 w-1 bg-accent" /> : null}
+              <Icon size={22} className={on ? 'text-accent' : 'text-text-muted'} />
+              <Text className={`flex-1 text-base md:text-lg ${on ? 'font-bold text-text' : 'text-text'}`}>{item.label}</Text>
             </Pressable>
           );
         })}

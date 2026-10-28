@@ -2,7 +2,7 @@ import { Redirect, usePathname, useRouter } from 'expo-router';
 import { View } from '@acme/ui/tw';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAdaptiveNavigationPlacement } from '@acme/ui/adaptive-panes/parts';
-import { RAIL_EXPANDED_WIDTH, RAIL_WIDTH, ShellDrawer } from '@acme/app/features/navigation/ShellNav.tsx';
+import { ShellDrawer } from '@acme/app/features/navigation/ShellNav.tsx';
 import { activeDrawerItem } from '@acme/app/features/navigation/shell-destinations.ts';
 import { Drawer } from 'expo-router/drawer';
 import { useColorScheme } from 'react-native';
@@ -51,10 +51,7 @@ export default function DrawerLayout() {
       <Drawer.Screen name="(tabs)" options={{ headerShown: placement.rail }} />
     </Drawer>
     <ShellDrawer
-      anchor={placement.rail ? 'rail' : 'bar'}
-      railWidth={placement.expanded ? RAIL_EXPANDED_WIDTH : RAIL_WIDTH}
-      insets={{ bottom: insets.bottom, right: insets.right }}
-      barHeight={insets.bottom + 72}
+      insets={{ top: insets.top, bottom: insets.bottom, left: insets.left }}
       active={activeDrawerItem(pathname)}
       onSelect={(href) => router.push(href as never)}
     />

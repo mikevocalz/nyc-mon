@@ -1,7 +1,7 @@
 'use client';
 
 import { memo, useCallback, useEffect, useMemo, type ReactNode } from 'react';
-import { useRouter } from 'expo-router';
+import { usePathname, useRouter } from 'expo-router';
 import { I18nManager } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IDLE_PRESENCE, resolveSceneMode } from '@acme/core/sim';
@@ -21,10 +21,9 @@ import { setHomeMenuOpen, useHomeStageStore, type HomeChrome } from './home-stag
 import { useMinuteClock, useMinuteClockDriver } from './minute-clock';
 import { artFor, monIdentity } from './mon-identity';
 import { allSpecies } from '@acme/content';
-import { ShellBottomBar, ShellDrawer, ShellRail, RAIL_EXPANDED_WIDTH, RAIL_WIDTH } from '../navigation/ShellNav';
+import { ShellBottomBar, ShellDrawer, ShellRail } from '../navigation/ShellNav';
 import { activeDrawerItem, activeShellDestination } from '../navigation/shell-destinations';
 import { useShellNavigate } from '../navigation/use-shell-navigate';
-import { usePathname } from 'expo-router';
 
 /** Flat phone scene (ADR 0011): the 2D window never asks for room or tabletop in this lane. */
 const PHONE_SCENE = resolveSceneMode({ platform: 'phone', capabilities: null, anchors: undefined, preference: 'screen' });
@@ -309,16 +308,12 @@ function HomeBottomBar() {
 }
 
 function HomeDrawer() {
-  const placement = useAdaptiveNavigationPlacement();
   const insets = useSafeAreaInsets();
   const pathname = usePathname() ?? '/';
   const router = useRouter();
   return (
     <ShellDrawer
-      anchor={placement.rail ? 'rail' : 'bar'}
-      railWidth={placement.expanded ? RAIL_EXPANDED_WIDTH : RAIL_WIDTH}
-      insets={{ bottom: insets.bottom, right: insets.right }}
-      barHeight={insets.bottom + 72}
+      insets={{ top: insets.top, bottom: insets.bottom, left: insets.left }}
       active={activeDrawerItem(pathname)}
       onSelect={(href) => router.push(href as never)}
     />
