@@ -87,7 +87,7 @@ function messagesIn(body: unknown): RpcMessage[] {
   return out;
 }
 
-/** The HTTP answer for a request: let it through, or 401 / 403 with no WWW-Authenticate. */
+/** The HTTP answer for a request: let it through, or 401 / 403 (the server adds any WWW-Authenticate challenge). */
 export type AccessDecision = 'allow' | 401 | 403;
 
 /**
