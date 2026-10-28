@@ -70,6 +70,11 @@ export const EnvSchema = z
      * companion's MCP host.
      */
     MCP_WWW_AUTHENTICATE: flag,
+    /**
+     * Requests one Caller (or one service client) may make per minute before a
+     * 429 with Retry-After. 0 turns the limit off.
+     */
+    MCP_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(0).default(120),
   })
   .superRefine((env, ctx) => {
     if (env.OAUTH_DEV_BYPASS === '1') {

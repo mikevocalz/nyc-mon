@@ -7,6 +7,7 @@ import type { TokenVerifier } from '../auth/verifier.ts';
 import type { CallerData } from '../data/caller.ts';
 import type { FamiliarDirectory } from '../presence/fixtures.ts';
 import type { PresenceService } from '../presence/service.ts';
+import { createRateLimiter } from './rate-limit.ts';
 import { registerTools, type ToolContext } from './tools.ts';
 import type { McpAppsRegistration } from './ui-seam.ts';
 
@@ -38,6 +39,11 @@ export interface ServerDeps {
    * back to the well-known URI. Browser MCP clients read the header first.
    */
   readonly wwwAuthenticate?: boolean;
+  /**
+   * Requests one authenticated principal (Caller, or service client) may make
+   * per minute before getting 429 (MCP_RATE_LIMIT_PER_MINUTE). Unset or 0: no limit.
+   */
+  readonly rateLimitPerMinute?: number;
   /** Seeded fixtures; set only in dev mode, which also registers the dev tools. */
   readonly familiar?: FamiliarDirectory;
   /** Lane C's MCP Apps views. See `ui-seam.ts`. */
@@ -119,6 +125,7 @@ export function createHandler(deps: ServerDeps): (req: IncomingMessage, res: Ser
   const resourceMetadataUrl = `${resource.origin}${prmPathList[prmPathList.length - 1]}`;
   const allowedOrigins = new Set([resource.origin, ...deps.allowedOrigins.map((o) => new URL(o).origin)]);
   const now = deps.now ?? Date.now;
+  const limiter = deps.rateLimitPerMinute !== undefined && deps.rateLimitPerMinute > 0 ? createRateLimiter(deps.rateLimitPerMinute, () => now()) : undefined;
 
   return async function handle(req, res) {
     const url = new URL(req.url ?? '/', resource.origin);
@@ -173,6 +180,16 @@ export function createHandler(deps: ServerDeps): (req: IncomingMessage, res: Ser
     const auth: RequestAuth =
       deps.verifier === 'dev-bypass' ? devBypassAuth(now()) : await authenticateRequest(req.headers.authorization, deps.verifier);
     if (auth.kind === 'none' || auth.kind === 'invalid') return refuse(401, auth.kind);
+
+    // Counted after auth, so failed attempts never use up a Caller's window,
+    // and before the body is read, so a limited caller can't make us buffer one.
+    if (limiter !== undefined) {
+      const retryAfter = limiter.hit(auth.kind === 'user' ? `caller:${auth.callerId}` : `client:${auth.clientId}`);
+      if (retryAfter > 0) {
+        res.setHeader('retry-after', String(retryAfter));
+        return sendJson(res, 429, { jsonrpc: '2.0', id: null, error: { code: -32000, message: 'Too many requests. Wait a minute and try again.' } });
+      }
+    }
 
     let body: unknown;
     if (req.method === 'POST') {

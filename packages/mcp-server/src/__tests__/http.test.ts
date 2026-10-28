@@ -464,3 +464,35 @@ describe('real JWT verification over HTTP', () => {
     expect(v1.calls.length).toBe(readsBefore);
   });
 });
+
+describe('rate limit', () => {
+  const ping = { jsonrpc: '2.0', id: 7, method: 'ping' };
+
+  it('answers 429 with Retry-After once a Caller passes the per-minute limit, and only for that Caller', async () => {
+    let clock = Date.parse('2026-10-28T12:00:00Z');
+    running = await start({ rateLimitPerMinute: 3, now: () => clock });
+    for (let i = 0; i < 3; i++) expect((await rpc(running, ping, { token: 'adult' })).status).toBe(200);
+    const limited = await rpc(running, ping, { token: 'adult' });
+    expect(limited.status).toBe(429);
+    expect(Number(limited.headers.get('retry-after'))).toBeGreaterThan(0);
+    expect(await json(limited)).toMatchObject({ jsonrpc: '2.0', error: { code: -32000 } });
+    // Another Caller has its own window.
+    expect((await rpc(running, ping, { token: 'minor' })).status).toBe(200);
+    // A minute later the first Caller is let through again.
+    clock += 60_001;
+    expect((await rpc(running, ping, { token: 'adult' })).status).toBe(200);
+  });
+
+  it('limits a service client by its client id', async () => {
+    running = await start({ rateLimitPerMinute: 2 });
+    expect((await rpc(running, ping, { token: 'service' })).status).toBe(200);
+    expect((await rpc(running, ping, { token: 'service' })).status).toBe(200);
+    expect((await rpc(running, ping, { token: 'service' })).status).toBe(429);
+  });
+
+  it('never counts a request that failed auth', async () => {
+    running = await start({ rateLimitPerMinute: 1 });
+    for (let i = 0; i < 5; i++) expect((await rpc(running, ping, { token: 'nope' })).status).toBe(401);
+    expect((await rpc(running, ping, { token: 'adult' })).status).toBe(200);
+  });
+});

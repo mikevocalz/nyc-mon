@@ -229,4 +229,11 @@ describe('env', () => {
     expect(loadEnv(base).MCP_WWW_AUTHENTICATE).toBe('0');
     expect(loadEnv({ ...base, MCP_WWW_AUTHENTICATE: '1' }).MCP_WWW_AUTHENTICATE).toBe('1');
   });
+
+  it('limits each principal to 120 requests a minute unless MCP_RATE_LIMIT_PER_MINUTE says otherwise (0 turns it off)', () => {
+    const base = { NODE_ENV: 'development', OAUTH_DEV_BYPASS: '1' };
+    expect(loadEnv(base).MCP_RATE_LIMIT_PER_MINUTE).toBe(120);
+    expect(loadEnv({ ...base, MCP_RATE_LIMIT_PER_MINUTE: '0' }).MCP_RATE_LIMIT_PER_MINUTE).toBe(0);
+    expect(() => loadEnv({ ...base, MCP_RATE_LIMIT_PER_MINUTE: '-1' })).toThrow(/MCP_RATE_LIMIT_PER_MINUTE/);
+  });
 });
