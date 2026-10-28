@@ -44,6 +44,7 @@ const handler = createHandler({
   authorizationServer: env.AUTH_ISSUER,
   allowedOrigins: env.MCP_ALLOWED_ORIGINS,
   verifier: verifierFor(env),
+  wwwAuthenticate: env.MCP_WWW_AUTHENTICATE === '1',
   data: new V1CallerData({ baseUrl: env.V1_BASE_URL, serviceKey: env.V1_MCP_SERVICE_KEY, timeoutMs: env.V1_TIMEOUT_MS }),
   presence: new PresenceService(),
   familiar: env.MCP_DEV_MODE === '1' ? new FixtureFamiliarDirectory() : undefined,

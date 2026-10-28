@@ -93,7 +93,94 @@ describe('protected resource metadata', () => {
   });
 });
 
+describe('protected resource metadata from a browser', () => {
+  const PRM_PATHS = ['/.well-known/oauth-protected-resource', '/.well-known/oauth-protected-resource/mcp'];
+
+  it('answers a CORS preflight on both well-known paths with 204 and Allow-Origin *', async () => {
+    running = await start();
+    for (const path of PRM_PATHS) {
+      for (const origin of [ALLOWED_ORIGIN, 'https://elsewhere.example']) {
+        const response = await fetch(`${running.url}${path}`, {
+          method: 'OPTIONS',
+          headers: { origin, 'access-control-request-method': 'GET', 'access-control-request-headers': 'mcp-protocol-version' },
+        });
+        expect(response.status, `${path} ${origin}`).toBe(204);
+        expect(response.headers.get('access-control-allow-origin')).toBe('*');
+        expect(response.headers.get('access-control-allow-methods')).toBe('GET, OPTIONS');
+        expect(response.headers.get('access-control-allow-headers')).toContain('mcp-protocol-version');
+      }
+    }
+  });
+
+  it('serves the document cross-origin with Allow-Origin *', async () => {
+    running = await start();
+    for (const path of PRM_PATHS) {
+      const response = await fetch(`${running.url}${path}`, { headers: { origin: 'https://elsewhere.example', 'mcp-protocol-version': '2025-11-25' } });
+      expect(response.status, path).toBe(200);
+      expect(response.headers.get('access-control-allow-origin')).toBe('*');
+      expect(((await json(response)) as { resource: string }).resource).toBe(running.mcpUrl);
+    }
+  });
+});
+
+describe('WWW-Authenticate challenge (MCP_WWW_AUTHENTICATE=1)', () => {
+  const challenge = (r: Running) => `resource_metadata="${r.url}/.well-known/oauth-protected-resource/mcp"`;
+
+  it('answers a request with no token with 401 and a Bearer resource_metadata challenge', async () => {
+    running = await start({ wwwAuthenticate: true });
+    const response = await rpc(running, initialize('2025-11-25'));
+    expect(response.status).toBe(401);
+    const header = response.headers.get('www-authenticate') ?? '';
+    expect(header.startsWith('Bearer ')).toBe(true);
+    expect(header).toContain(challenge(running));
+    expect(header).not.toContain('error=');
+  });
+
+  it('checks auth before the body, so an anonymous bodyless POST gets 401 with the challenge, not 400', async () => {
+    running = await start({ wwwAuthenticate: true });
+    const response = await fetch(running.mcpUrl, { method: 'POST', headers: { origin: ALLOWED_ORIGIN } });
+    expect(response.status).toBe(401);
+    expect(response.headers.get('www-authenticate')).toContain(challenge(running));
+  });
+
+  it('marks a bad token error="invalid_token"', async () => {
+    running = await start({ wwwAuthenticate: true });
+    const response = await rpc(running, initialize('2025-11-25'), { token: 'forged' });
+    expect(response.status).toBe(401);
+    const header = response.headers.get('www-authenticate') ?? '';
+    expect(header).toContain('error="invalid_token"');
+    expect(header).toContain(challenge(running));
+  });
+
+  it('marks a missing care scope 403 error="insufficient_scope"', async () => {
+    running = await start({ wwwAuthenticate: true, v1: fakeV1({ rows: [row('caller-adult')] }) });
+    const response = await rpc(running, callTool('feed_mon'), { token: 'read-only' });
+    expect(response.status).toBe(403);
+    const header = response.headers.get('www-authenticate') ?? '';
+    expect(header).toContain('error="insufficient_scope"');
+    expect(header).toContain('scope="mcp:caller mcp:care"');
+    expect(header).toContain(challenge(running));
+  });
+
+  it('lets a browser client read the challenge through Access-Control-Expose-Headers', async () => {
+    running = await start({ wwwAuthenticate: true });
+    const response = await rpc(running, initialize('2025-11-25'), { origin: ALLOWED_ORIGIN });
+    expect(response.status).toBe(401);
+    expect(response.headers.get('access-control-allow-origin')).toBe(ALLOWED_ORIGIN);
+    const exposed = (response.headers.get('access-control-expose-headers') ?? '').split(',').map((h) => h.trim().toLowerCase());
+    expect(exposed).toContain('www-authenticate');
+    expect(exposed).toContain('mcp-protocol-version');
+  });
+});
+
 describe('auth tiers', () => {
+  it('answers an anonymous bodyless POST with 401, not a JSON parse error', async () => {
+    running = await start();
+    const response = await fetch(running.mcpUrl, { method: 'POST' });
+    expect(response.status).toBe(401);
+    expect(response.headers.get('www-authenticate')).toBeNull();
+  });
+
   it('returns 401 with no WWW-Authenticate when no token is sent', async () => {
     running = await start();
     const response = await rpc(running, initialize('2025-11-25'));
@@ -296,14 +383,16 @@ describe('malformed JSON-RPC', () => {
     expect(v1.calls.some((c) => c.method === 'PUT')).toBe(false);
   });
 
-  it('answers a body over 1 MB with a 413 the client can read, before auth', async () => {
+  it('answers a body over 1 MB with a 413 the client can read, and a forged token with a readable 401 without buffering it', async () => {
     running = await start();
     const big = JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: { pad: 'x'.repeat(1_100_000) } });
-    for (const token of ['adult', 'forged']) {
-      const { status, text } = await postRaw(running, big, token);
-      expect(status).toBe(413);
-      expect(JSON.parse(text)).toMatchObject({ jsonrpc: '2.0', id: null, error: { code: -32600 } });
-    }
+    const signedIn = await postRaw(running, big, 'adult');
+    expect(signedIn.status).toBe(413);
+    expect(JSON.parse(signedIn.text)).toMatchObject({ jsonrpc: '2.0', id: null, error: { code: -32600 } });
+    // Auth runs before the body is read, so a bad token never gets as far as the size check.
+    const forged = await postRaw(running, big, 'forged');
+    expect(forged.status).toBe(401);
+    expect(JSON.parse(forged.text)).toEqual({ error: 'unauthorized' });
     // The listener still serves the next request.
     expect((await rpc(running, initialize('2025-11-25'), { token: 'service' })).status).toBe(200);
   });
