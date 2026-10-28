@@ -97,8 +97,11 @@ test('physical + vd first frame: vd mounted, no typed array becomes a string, WG
     process.env.CI === 'true' || frame.frame0Ms <= reference.frame0Ms * FRAME0_VS_REFERENCE,
     `frame 0 took ${frame.frame0Ms.toFixed(0)} ms, the physical-only reference ${reference.frame0Ms.toFixed(0)} ms (cap x${FRAME0_VS_REFERENCE})`,
   );
+  // Allocation comes from the V8 heap profiler, which some CI runners don't expose
+  // (the child reports 0, the parent NaN); compare only when both measured.
+  const measured = Number.isFinite(frame.frame0AllocatedBytes) && reference.frame0AllocatedBytes > 0;
   assert.ok(
-    frame.frame0AllocatedBytes <= reference.frame0AllocatedBytes * FRAME0_VS_REFERENCE,
+    !measured || frame.frame0AllocatedBytes <= reference.frame0AllocatedBytes * FRAME0_VS_REFERENCE,
     `frame 0 allocated ${(frame.frame0AllocatedBytes / 1e6).toFixed(0)} MB, the reference ${(reference.frame0AllocatedBytes / 1e6).toFixed(0)} MB (cap x${FRAME0_VS_REFERENCE})`,
   );
 });
