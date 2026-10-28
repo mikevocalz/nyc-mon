@@ -1,9 +1,4 @@
 import { Tabs } from 'expo-router';
-import { I18nManager } from 'react-native';
-import { tabBarPositionForPlacement, useAdaptiveNavigationPlacement } from '@acme/ui/adaptive-panes';
-import { useStore } from 'zustand';
-import { lobbyStore } from '@acme/app/features/game/lobby/lobby.store.ts';
-import { AppTabBar } from '../../../components/AppTabBar';
 
 /*
   WHERE THE BAR GOES is decided by HARDWARE FAMILY, not window size
@@ -39,23 +34,13 @@ import { AppTabBar } from '../../../components/AppTabBar';
  * the rail is identical on both platforms and carries the app's own styling.
  */
 export default function TabLayout() {
-  const placement = useAdaptiveNavigationPlacement();
-  const rail = placement.rail;
-  // The city takes the whole screen: no rail or bar once START hands over;
-  // the Game screen's orange back button returns to the lobby.
-  const inCity = useStore(lobbyStore, (st) => st.phase !== 'lobby');
-
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarPosition: tabBarPositionForPlacement(placement, I18nManager.isRTL),
       }}
-      tabBar={(props) =>
-        inCity && props.state.routes[props.state.index]?.name === 'game' ? null : (
-          <AppTabBar {...props} rail={rail} expanded={placement.expanded} />
-        )
-      }
+      // The bar and rail are the root shell's (navigation/RootShell); none here.
+      tabBar={() => null}
     >
       <Tabs.Screen name="home" options={{ title: 'Home' }} />
       <Tabs.Screen name="game" options={{ title: 'Game' }} />

@@ -1,9 +1,7 @@
 'use client';
 
 import { memo, useCallback, useEffect, useMemo, type ReactNode } from 'react';
-import { usePathname, useRouter } from 'expo-router';
-import { I18nManager } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { IDLE_PRESENCE, resolveSceneMode } from '@acme/core/sim';
 import type { MonSceneInput } from '@acme/core/types';
 import {
@@ -11,7 +9,6 @@ import {
   useInstanceStore, type DeviceKey, type GlassView, type ImageProps,
 } from '@acme/ui';
 import { View } from '@acme/ui/tw';
-import { useAdaptiveNavigationPlacement } from '@acme/ui/adaptive-panes/parts';
 import { useShallow } from 'zustand/react/shallow';
 import { deepLinkStore } from '../onboarding/notify-route';
 import { selectActiveMon, selectCareNow, selectSceneInput, useMonStore } from '../mon/mon.store';
@@ -21,9 +18,6 @@ import { setHomeMenuOpen, useHomeStageStore, type HomeChrome } from './home-stag
 import { useMinuteClock, useMinuteClockDriver } from './minute-clock';
 import { artFor, monIdentity } from './mon-identity';
 import { allSpecies } from '@acme/content';
-import { ShellBottomBar, ShellDrawer, ShellRail } from '../navigation/ShellNav';
-import { activeDrawerItem, activeShellDestination } from '../navigation/shell-destinations';
-import { useShellNavigate } from '../navigation/use-shell-navigate';
 import { OfflineBanner } from '../system/OfflineBanner';
 import { recoveryHref } from '../system/recovery-model';
 
@@ -229,7 +223,7 @@ function Shell2D() {
  * A route on the full-window 3D H-Lynk (M11 when the GPU stage runs) sets
  * `immersive` and the 2D shell is not mounted at all while it shows.
  */
-export function HomeLayout({ children, header }: { children: ReactNode; /** The app header, drawn across the top on rail hardware (tablet, foldable, headset). */ header?: ReactNode }) {
+export function HomeLayout({ children }: { children: ReactNode }) {
   useMinuteClockDriver();
   useStageFailureRecovery();
   const router = useRouter();
@@ -242,24 +236,16 @@ export function HomeLayout({ children, header }: { children: ReactNode; /** The 
     // The router is a stable imperative handle; mount-only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  // Shell (foldable layout): on rail hardware the header runs across the top,
-  // the stage and the rail share a PHYSICAL row under it (reversed under RTL,
-  // where Yoga mirrors `row`), and the drawer opens beside the rail. Phones
-  // get the five-tab bar under the stage. The stage host is the same element
-  // in every arrangement, so the family resolving never remounts it.
   return (
     <View className="flex-1 bg-bg">
-      <HomeShellHeader header={header} />
-      <View className={`min-h-0 flex-1 ${I18nManager.isRTL ? 'flex-row-reverse' : 'flex-row'}`}>
-        <View className="relative min-w-0 flex-1">
-          <ShellHost />
-          <View className="absolute inset-0" style={{ pointerEvents: 'box-none' }}>{children}</View>
-          <HomeSyncBanner />
-        </View>
-        <HomeRail />
+      {/* The header, rail, bar and drawer live once in the root shell
+          (navigation/RootShell), so a rotation or a group change never
+          mounts a second rail. */}
+      <View className="relative min-h-0 flex-1">
+        <ShellHost />
+        <View className="absolute inset-0" style={{ pointerEvents: 'box-none' }}>{children}</View>
+        <HomeSyncBanner />
       </View>
-      <HomeBottomBar />
-      <HomeDrawer />
     </View>
   );
 }
@@ -303,49 +289,4 @@ function useStageFailureRecovery() {
     // The router is a stable imperative handle; this runs once per failure.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seq]);
-}
-
-function HomeShellHeader({ header }: { header: ReactNode }) {
-  const placement = useAdaptiveNavigationPlacement();
-  return placement.rail ? <>{header}</> : null;
-}
-
-function HomeRail() {
-  const placement = useAdaptiveNavigationPlacement();
-  const insets = useSafeAreaInsets();
-  const pathname = usePathname() ?? '/';
-  const navigate = useShellNavigate();
-  if (!placement.rail) return null;
-  return (
-    <ShellRail
-      active={activeShellDestination(pathname)}
-      expanded={placement.expanded}
-      insets={{ bottom: insets.bottom, right: insets.right }}
-      onSelect={navigate}
-    />
-  );
-}
-
-/** Phones: the five tabs under the stage. Immersive routes (M11, M12) keep the full window. */
-function HomeBottomBar() {
-  const placement = useAdaptiveNavigationPlacement();
-  const insets = useSafeAreaInsets();
-  const pathname = usePathname() ?? '/';
-  const navigate = useShellNavigate();
-  const immersive = useHomeStageStore((s) => s.immersive);
-  if (placement.rail || immersive) return null;
-  return <ShellBottomBar active={activeShellDestination(pathname)} onSelect={navigate} bottomInset={insets.bottom} />;
-}
-
-function HomeDrawer() {
-  const insets = useSafeAreaInsets();
-  const pathname = usePathname() ?? '/';
-  const router = useRouter();
-  return (
-    <ShellDrawer
-      insets={{ top: insets.top, bottom: insets.bottom, left: insets.left }}
-      active={activeDrawerItem(pathname)}
-      onSelect={(href) => router.push(href as never)}
-    />
-  );
 }

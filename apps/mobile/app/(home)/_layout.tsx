@@ -1,6 +1,5 @@
 import { Slot } from 'expo-router';
 import { HomeLayout } from '@acme/app/features/companion/HomeLayout.tsx';
-import { AppHeader } from '../../components/AppHeader';
 
 /**
  * The `(home)` group: one H-Lynk shell and one creature layer for M11, M12,
@@ -9,7 +8,7 @@ import { AppHeader } from '../../components/AppHeader';
  */
 export default function HomeGroupLayout() {
   return (
-    <HomeLayout header={<AppHeader />}>
+    <HomeLayout>
       <Slot />
     </HomeLayout>
   );

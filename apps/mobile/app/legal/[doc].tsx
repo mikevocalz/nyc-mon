@@ -21,7 +21,7 @@ export default function LegalRoute() {
   return (
     <View className="flex-1 bg-bg">
       <Stack.Screen options={{ headerShown: false }} />
-      <SafeArea edges={['top']} className="px-4 pt-2">
+      <SafeArea edges={['top']} className="px-4 pt-4">
         <BackButton label={LEGAL_UI.back} onPress={() => (router.canGoBack() ? router.back() : router.replace('/' as never))} />
       </SafeArea>
       <View className="flex-1">

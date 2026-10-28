@@ -16,6 +16,8 @@ import { hydrateDevicePrefs } from "@acme/app/features/settings/device-prefs.sto
 import { useReadyNotificationRouting } from "@acme/app/features/onboarding/notify-hook.ts";
 import { cleanRootStack, type StackLike } from "@acme/app/features/onboarding/root-stack.ts";
 import { hydrateSync, startConnectivity } from "@acme/app/features/system/sync.store.ts";
+import { RootShell } from "@acme/app/features/navigation/RootShell.tsx";
+import { AppHeader } from "../components/AppHeader";
 import { semantic } from "@acme/theme";
 import { setThemePreference } from "@acme/theme/switch";
 import { Toaster } from "@acme/ui";
@@ -124,10 +126,14 @@ export default function RootLayout() {
                 top instead of mounting a second one. No animation: group
                 changes are shell tab switches, not pushes.
               */}
-              <Stack screenOptions={{ headerShown: false, animation: "none" }}>
-                <Stack.Screen name="(home)" dangerouslySingular />
-                <Stack.Screen name="(drawer)" dangerouslySingular />
-              </Stack>
+              {/* One shell (header, rail, tab bar, drawer) around every route
+                  group, so rotation and group changes never mount a second rail. */}
+              <RootShell header={<AppHeader />}>
+                <Stack screenOptions={{ headerShown: false, animation: "none" }}>
+                  <Stack.Screen name="(home)" dangerouslySingular />
+                  <Stack.Screen name="(drawer)" dangerouslySingular />
+                </Stack>
+              </RootShell>
             </ThemeProvider>
             {/* Global overlays are mounted once at the app root. The starter's
                 booking/editor sheets went with the demo schedule route: nothing

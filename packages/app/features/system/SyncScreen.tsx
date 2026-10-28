@@ -2,8 +2,8 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'expo-router';
-import { Badge, Button, EmptyState, FadeIn, Heading, StatusRow, Text } from '@acme/ui';
-import { Pressable, Section, View } from '@acme/ui/tw';
+import { BackButton, Badge, Button, EmptyState, FadeIn, Heading, StatusRow, Text } from '@acme/ui';
+import { Section, View } from '@acme/ui/tw';
 import { monIdentity } from '../companion/mon-identity';
 import { ScreenPanes } from '../layout/ScreenPanes';
 import { useMonStore } from '../mon/mon.store';
@@ -25,17 +25,8 @@ function useNameFor(): (monInstanceId: string | null) => string {
 function Back() {
   const router = useRouter();
   return (
-    <View className="px-4 pt-2 md:px-8">
-      <View testID="m21-back" className="self-start">
-      <Pressable
-        role="button"
-        accessibilityLabel={systemCopy('m21.back')}
-        onPress={() => (router.canGoBack() ? router.back() : router.replace('/(home)'))}
-        className="min-h-target min-w-target items-start justify-center self-start focus-visible:ring-2 focus-visible:ring-focus"
-      >
-        <Text>{`‹ ${systemCopy('m21.back')}`}</Text>
-      </Pressable>
-      </View>
+    <View testID="m21-back" className="flex-row px-4 pt-4">
+      <BackButton label={systemCopy('m21.back')} onPress={() => (router.canGoBack() ? router.back() : router.replace('/(home)'))} />
     </View>
   );
 }

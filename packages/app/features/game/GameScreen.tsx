@@ -31,8 +31,7 @@ import { AccessibilityInfo, I18nManager, Platform, type LayoutChangeEvent, type 
 import { GestureDetector } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useStore } from 'zustand';
-import { IconButton, useInstanceStore, useReducedMotion } from '@acme/ui';
-import { ChevronLeft } from '@acme/ui/icons';
+import { BackButton, SafeArea, useInstanceStore, useReducedMotion } from '@acme/ui';
 import { useGpuSupport } from '@acme/ui/gpu';
 import { ThreeCanvas, type ThreeCanvasHandle } from '@acme/ui/three';
 import {
@@ -356,21 +355,18 @@ export function GameScreen({ focused = true }: GameScreenProps = {}) {
           // Leave the city: pause (the session saves on pause), then back to
           // the lobby, which offers "Continue your game". The rail is hidden
           // while the city is up, so this is the way out.
-          <View className="absolute" style={{ top: insets.top + 12, left: insets.left + 12 }}>
-            <IconButton
-              aria-label="Back to the lobby"
-              icon={<ChevronLeft />}
-              variant="cornerCut"
-              tone="orange"
-              corner="bottom-right"
-              // 48pt on phones, 64pt from md so the way out is sized for a tablet.
-              size="adaptive-lg"
-              onPress={() => {
-                gameInputRouter.pauseRequest('touch');
-                lobbyStore.getState().returnToLobby();
-              }}
-            />
-          </View>
+          // The kit BackButton in the same top-left spot as every other screen.
+          <SafeArea edges={['top', 'left']} pointerEvents="box-none" className="absolute left-0 top-0">
+            <View className="flex-row px-4 pt-4">
+              <BackButton
+                label="Back to the lobby"
+                onPress={() => {
+                  gameInputRouter.pauseRequest('touch');
+                  lobbyStore.getState().returnToLobby();
+                }}
+              />
+            </View>
+          </SafeArea>
         ) : null}
       </View>
     </View>

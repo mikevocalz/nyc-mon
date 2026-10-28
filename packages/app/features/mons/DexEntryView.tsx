@@ -1,6 +1,5 @@
 'use client';
 
-import type { ReactNode } from 'react';
 import { Badge, Button, EmptyState, Heading } from '@acme/ui';
 import { Pressable, ScrollView, Text, View } from '@acme/ui/tw';
 import { companionCopy } from '../companion/copy';
@@ -118,13 +117,12 @@ function Neighbours({ entry, index, onOpen }: { entry: DexEntry; index: readonly
  * number set huge behind it, then the number, name, stage and Bloodline, the
  * lore line when canon has one, and the evolution line. Unseen forms keep
  * only their number. Every fact is read from `@acme/content`; a null field
- * is left out (dex-model `MISSING_CANON_FIELDS`). `leading` sits above the
- * stage (the phone route's back control).
+ * is left out (dex-model `MISSING_CANON_FIELDS`). The phone route's back
+ * control is MonsScreen's, above this view.
  */
-export function DexEntryView({ speciesId, onOpen, leading, testID = 'mons-entry' }: {
+export function DexEntryView({ speciesId, onOpen, testID = 'mons-entry' }: {
   speciesId: string;
   onOpen: (speciesId: string) => void;
-  leading?: ReactNode;
   testID?: string;
 }) {
   const { seen, index } = useDex();
@@ -133,7 +131,6 @@ export function DexEntryView({ speciesId, onOpen, leading, testID = 'mons-entry'
   if (entry === undefined) {
     return (
       <View testID={`${testID}-notfound`} className="flex-1 gap-6 px-4 py-6">
-        {leading}
         <EmptyState title={monsCopy('mons.notfound.title')} description={monsCopy('mons.notfound.body')} />
       </View>
     );
@@ -147,7 +144,6 @@ export function DexEntryView({ speciesId, onOpen, leading, testID = 'mons-entry'
   return (
     <ScrollView testID={testID} className="flex-1" contentContainerClassName="pb-16">
       <View className="mx-auto w-full max-w-content-detail gap-6 px-4 pt-2 md:px-8">
-        {leading}
         {/* The stage: the Mon owns it. The number sits huge behind, in the structure blue, and the Mon stands in front of it. */}
         <View className="relative w-full max-w-[520px] self-center overflow-hidden" style={{ aspectRatio: 1 }} testID={`${testID}-stage`}>
           <Text

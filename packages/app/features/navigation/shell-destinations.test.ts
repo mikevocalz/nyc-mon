@@ -7,6 +7,7 @@ import {
   activeDrawerItem,
   activeShellDestination,
   isShellDestination,
+  shellChromeVisible,
   shellHref,
 } from './shell-destinations.ts';
 
@@ -51,5 +52,10 @@ describe('shell destinations', () => {
 
   it('uses the foldable shell spacing', () => {
     assert.deepEqual({ ...SHELL_SPACING }, { itemsBelowHeader: 20, menuFromBottom: 30, drawerAboveMenu: 10 });
+  });
+
+  it('shows the shell on tabs and companion screens, hides it on full-window flows', () => {
+    for (const p of ['/', '/home', '/game', '/mons', '/profile', '/feed', '/settings', '/sync', '/error']) assert.equal(shellChromeVisible(p), true, p);
+    for (const p of ['/welcome', '/age', '/sign-in', '/consent', '/caller', '/meet', '/incubate', '/hatch', '/legal/terms']) assert.equal(shellChromeVisible(p), false, p);
   });
 });

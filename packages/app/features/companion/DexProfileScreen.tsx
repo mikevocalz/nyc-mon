@@ -6,10 +6,10 @@ import { allSpecies, bloodlines } from '@acme/content';
 import { LIFECYCLE_STAGES } from '@acme/core/schemas';
 import type { EvolutionNode, MonInstance } from '@acme/core/types';
 import {
-  HLYNK_COPY, Heading, Image, LifecycleTrack, SafeArea, SignagePlate, lifecycleSlots, useInstanceStore, useStore,
+  BackButton, HLYNK_COPY, Heading, Image, LifecycleTrack, SafeArea, SignagePlate, lifecycleSlots, useInstanceStore, useStore,
   type DeviceKey, type GlassLine, type GlassView, type ImageProps,
 } from '@acme/ui';
-import { Pressable, ScrollView, Text, View } from '@acme/ui/tw';
+import { ScrollView, Text, View } from '@acme/ui/tw';
 import { useMonStore } from '../mon/mon.store';
 import { companionCopy } from './copy';
 import { GlassStage, useGlassOn, useGlassScreen, useMonGlass } from './glass';
@@ -45,17 +45,12 @@ function slotsFor(mon: MonInstance) {
 /** The Baby, then the Dex facts as lines, then Back. */
 const LAYOUT = { model: 'medium', rings: false, lineRows: 7, actionRows: 1, perRow: 1 } as const;
 
-function BackButton() {
+/** The kit's back tile, top left under the safe area: the same place on every screen. */
+function Back() {
   const router = useRouter();
   return (
-    <View testID="m17-back" className="self-start">
-    <Pressable
-      accessibilityLabel={companionCopy('m17.back.a11y')}
-      onPress={() => router.back()}
-      className="min-h-target min-w-target items-start justify-center self-start focus-visible:ring-2 focus-visible:ring-focus"
-    >
-      <Text className="text-xr-label text-text">{`‹ ${companionCopy('m17.back.a11y')}`}</Text>
-    </Pressable>
+    <View testID="m17-back" className="flex-row px-4 pt-4">
+      <BackButton label={companionCopy('m17.back.a11y')} onPress={() => router.back()} />
     </View>
   );
 }
@@ -209,6 +204,7 @@ export function DexProfileScreen() {
   const heading = <Heading level={1} className="text-xr-title">{who.name}</Heading>;
   return (
     <SafeArea className="flex-1 bg-bg">
+      <Back />
       {/*
         One scroll below md and in tablet portrait: top-aligned and stacked.
         Phones keep the full-width portrait; tablet portrait caps it at half
@@ -216,7 +212,6 @@ export function DexProfileScreen() {
       */}
       <ScrollView className="flex-1 md:landscape:hidden" contentContainerClassName="px-4 pb-12 pt-2 md:px-8">
         <View className="mx-auto w-full max-w-content-screen gap-4">
-          <BackButton />
           {heading}
           <View className="gap-4 md:gap-8">
             <View className="w-full md:w-1/2 md:self-center">{portrait}</View>
@@ -227,7 +222,6 @@ export function DexProfileScreen() {
       {/* Landscape from md (the open foldable): portrait left, facts right, each pane scrolling on its own. */}
       <View className="hidden flex-1 flex-row gap-10 px-8 md:landscape:flex">
         <ScrollView className="w-5/12 grow-0" contentContainerClassName="gap-4 pb-12 pt-2">
-          <BackButton />
           {portrait}
         </ScrollView>
         <ScrollView className="flex-1" contentContainerClassName="gap-6 pb-12 pt-2">

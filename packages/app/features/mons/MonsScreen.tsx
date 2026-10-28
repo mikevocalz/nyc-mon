@@ -4,7 +4,7 @@ import { useCallback, useMemo, useRef, type ReactNode } from 'react';
 import { I18nManager, type HostInstance, type LayoutChangeEvent } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import type { LifecycleStage } from '@acme/core/types';
-import { Button, EmptyState, Heading, SafeArea, SearchBar, SegmentedControl, useInstanceStore, useStore, VirtualList } from '@acme/ui';
+import { BackButton, Button, EmptyState, Heading, SafeArea, SearchBar, SegmentedControl, useInstanceStore, useStore, VirtualList } from '@acme/ui';
 import { useFoldLayout } from '@acme/ui/adaptive-panes/parts';
 import { Pressable, Text, View } from '@acme/ui/tw';
 import { useShallow } from 'zustand/react/shallow';
@@ -167,16 +167,9 @@ function DexList({ selectedId, onOpen }: { selectedId: string | null; onOpen: (s
 
 /** The phone route's way back to the list (the (home) group has no stack header). */
 function BackToList({ onPress }: { onPress: () => void }) {
-  const label = monsCopy('mons.entry.back');
   return (
-    <View testID="mons-back" className="self-start">
-      <Pressable
-        accessibilityLabel={label}
-        onPress={onPress}
-        className="min-h-target min-w-target items-start justify-center focus-visible:ring-2 focus-visible:ring-focus"
-      >
-        <Text className="text-xr-label text-text">{`‹ ${label}`}</Text>
-      </Pressable>
+    <View testID="mons-back" className="flex-row px-4 pt-4">
+      <BackButton label={monsCopy('mons.entry.back')} onPress={onPress} />
     </View>
   );
 }
@@ -264,16 +257,13 @@ export function MonsScreen({ routeSpeciesId }: { routeSpeciesId?: string }) {
         {split && arrangement.gapWidth > 0 ? <View aria-hidden testID="mons-hinge" style={{ width: arrangement.gapWidth }} /> : null}
         {listOnly ? null : (
           <View testID="mons-detail" className="min-w-0 flex-1">
+            {entryOnly ? <BackToList onPress={backToList} /> : null}
             {selectedId === null ? (
               <View className="flex-1 justify-center px-8">
                 <EmptyState title={monsCopy('mons.detail.empty.title')} description={monsCopy('mons.detail.empty.body')} />
               </View>
             ) : (
-              <DexEntryView
-                speciesId={selectedId}
-                onOpen={open}
-                leading={entryOnly ? <BackToList onPress={backToList} /> : undefined}
-              />
+              <DexEntryView speciesId={selectedId} onOpen={open} />
             )}
           </View>
         )}

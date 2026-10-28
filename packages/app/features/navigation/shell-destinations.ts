@@ -98,3 +98,14 @@ export function activeDrawerItem(pathname: string): ShellDrawerItemName | null {
 
 /** Shell spacing (pt), the foldable layout: items 20 below the header, menu 30 above the bottom, drawer 10 above the menu. */
 export const SHELL_SPACING = { itemsBelowHeader: 20, menuFromBottom: 30, drawerAboveMenu: 10 } as const;
+
+/**
+ * Routes that draw full-window and hide the shell: first run and auth, the
+ * egg choice and incubate, the hatch, legal pages. Everything else (the five
+ * tabs, the companion loop, the drawer screens, sync and recovery) shows it.
+ */
+const CHROMELESS = /^\/(welcome|age|consent|sign-in|caller|permissions|notify|meet|incubate|hatch|legal)(\/|$)/;
+
+export function shellChromeVisible(pathname: string): boolean {
+  return !CHROMELESS.test(pathname);
+}

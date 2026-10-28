@@ -16,7 +16,7 @@ export default function SignInRoute() {
   return (
     <View className="flex-1 bg-bg">
       <Stack.Screen options={{ headerShown: false }} />
-      <SafeArea edges={['top']} className="px-4 pt-2">
+      <SafeArea edges={['top']} className="px-4 pt-4">
         <BackButton label={copy('m03.back.a11y.label')} onPress={back} />
       </SafeArea>
       <View className="flex-1 lg:flex-row">

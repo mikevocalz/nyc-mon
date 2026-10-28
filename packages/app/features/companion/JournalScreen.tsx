@@ -4,10 +4,10 @@ import { useCallback, useEffect, useMemo, type ReactNode } from 'react';
 import { useRouter } from 'expo-router';
 import type { JournalEntry } from '@acme/core/types';
 import {
-  Badge, Button, DaysCalendar, Heading, SafeArea, VirtualList, monthOf, shiftMonth, useInstanceStore,
+  BackButton, Badge, Button, DaysCalendar, Heading, SafeArea, VirtualList, monthOf, shiftMonth, useInstanceStore,
   useReducedMotion, useStore, type DeviceKey, type GlassLine, type GlassView, type YearMonth,
 } from '@acme/ui';
-import { Pressable, ScrollView, Text, View } from '@acme/ui/tw';
+import { ScrollView, Text, View } from '@acme/ui/tw';
 import { localDayKey, selectActiveMon, selectDaysTogether, selectJournal, useMonStore } from '../mon/mon.store';
 import { companionCopy } from './copy';
 import { GlassStage, useGlassOn, useGlassScreen, useMonGlass } from './glass';
@@ -38,18 +38,12 @@ function headingText(heading: DayHeading): string {
   }
 }
 
-function BackButton() {
+/** The kit's back tile, top left under the safe area: the same place on every screen. */
+function Back() {
   const router = useRouter();
-  const label = companionCopy('m17.back.a11y');
   return (
-    <View testID="m18-back" className="self-start">
-    <Pressable
-      accessibilityLabel={label}
-      onPress={() => router.back()}
-      className="min-h-target min-w-target items-start justify-center self-start focus-visible:ring-2 focus-visible:ring-focus"
-    >
-      <Text className="text-xr-label text-text">{`‹ ${label}`}</Text>
-    </Pressable>
+    <View testID="m18-back" className="flex-row px-4 pt-4">
+      <BackButton label={companionCopy('m17.back.a11y')} onPress={() => router.back()} />
     </View>
   );
 }
@@ -201,7 +195,7 @@ export function JournalScreen() {
   if (mon === undefined) {
     return (
       <SafeArea className="flex-1 bg-bg">
-        <View className="px-4 py-2"><BackButton /></View>
+        <Back />
       </SafeArea>
     );
   }
@@ -214,7 +208,6 @@ export function JournalScreen() {
 
   const header = (
     <View className="gap-2">
-      <BackButton />
       <Heading level={1} testID="m18-heading" className="text-xr-title">{companionCopy('m18.heading', { name })}</Heading>
       <Text testID="m18-days" className="text-xr-body text-text-muted">
         {daysTogether === 1 ? companionCopy('m18.days.one') : companionCopy('m18.days.other', { n: daysTogether })}
@@ -270,6 +263,7 @@ export function JournalScreen() {
   const timelineLabel = companionCopy('m18.timeline.a11y');
   return (
     <SafeArea className="flex-1 bg-bg">
+      <Back />
       {/* Below md (phones in portrait): one list, the header and calendar as its first row. As before. */}
       <View testID="m18-timeline" accessibilityLabel={timelineLabel} className="flex-1 px-4 md:hidden">
         <VirtualList data={[{ type: 'top' }, ...timeline]} renderItem={renderRow} keyExtractor={key} estimatedItemSize={52} className="flex-1" />

@@ -4,10 +4,10 @@ import { useCallback, useEffect } from 'react';
 import { useRouter } from 'expo-router';
 import { CALLER_NAME_MAX_LENGTH } from '@acme/core/sim';
 import {
-  Button, TextField, useInstanceStore, useReducedMotion, useStore, type DeviceKey, type GlassAction, type GlassLine, type GlassView,
+  BackButton, Button, TextField, useInstanceStore, useReducedMotion, useStore, type DeviceKey, type GlassAction, type GlassLine, type GlassView,
 } from '@acme/ui';
 import { haptics } from '@acme/ui/haptics';
-import { Pressable, Text, View } from '@acme/ui/tw';
+import { Text, View } from '@acme/ui/tw';
 import { GlassStage, useGlassOn, useGlassScreen, useMonGlass } from '../companion/glass';
 import { companionCopy } from '../companion/copy';
 import { useHomeStage, useHomeStageStore } from '../companion/home-stage.store';
@@ -76,16 +76,9 @@ function creditGlassLine(line: CreditLine): GlassLine {
 
 /** The 2D page's Back control: the (home) group has no stack header. */
 function BackRow({ onPress }: { onPress: () => void }) {
-  const label = companionCopy('m17.back.a11y');
   return (
-    <View testID="settings-back" className="self-start px-4 py-2">
-      <Pressable
-        accessibilityLabel={label}
-        onPress={onPress}
-        className="min-h-target min-w-target items-start justify-center focus-visible:ring-2 focus-visible:ring-focus"
-      >
-        <Text className="text-xr-label text-text">{`‹ ${label}`}</Text>
-      </Pressable>
+    <View testID="settings-back" className="flex-row px-4 pt-4">
+      <BackButton label={companionCopy('m17.back.a11y')} onPress={onPress} />
     </View>
   );
 }
