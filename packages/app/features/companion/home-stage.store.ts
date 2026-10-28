@@ -53,6 +53,8 @@ export interface GlassRoute {
   readonly screen: DeviceScreen;
   readonly label: string;
   readonly onKey: (key: DeviceKey) => void;
+  /** A drag on the 3D trackpad, pt (M13's room pan); unset: the trackpad does not pan. */
+  readonly onPan?: (dxPt: number, dyPt: number) => void;
 }
 
 interface HomeStageState extends HomeStageEntry {
@@ -65,6 +67,13 @@ interface HomeStageState extends HomeStageEntry {
   readonly immersive: boolean;
   /** The shared 3D companion stage reported no GPU backend: the 2D shell is the fallback from then on. */
   readonly glassFailed: boolean;
+  /**
+   * Which failure it was (M22): the stage never got a backend
+   * (`webgpu-unavailable`) or had one and lost it (`context-lost`). Bumped
+   * with `glassFailureSeq` so the layout routes to M22 once per failure.
+   */
+  readonly glassFailure: 'webgpu-unavailable' | 'context-lost' | null;
+  readonly glassFailureSeq: number;
   /** The route screen on the persistent 3D H-Lynk now, or null (the stage shows the Baby and its name). */
   readonly glass: GlassRoute | null;
   /** The route's companion pane on tablet-class windows (GlassStage `companion`), or null. */
@@ -92,6 +101,8 @@ const EMPTY: HomeStageState = {
   menuRequest: 0,
   immersive: false,
   glassFailed: false,
+  glassFailure: null,
+  glassFailureSeq: 0,
   glass: null,
   companion: null,
   stageFrame: null,
@@ -131,8 +142,15 @@ export function setStageFrame(frame: StageFrame | null): void {
   if (!same) useHomeStageStore.setState({ stageFrame: frame });
 }
 
-export function setGlassFailed(): void {
-  useHomeStageStore.setState({ glassFailed: true });
+export function setGlassFailed(kind: 'webgpu-unavailable' | 'context-lost' = 'webgpu-unavailable'): void {
+  const st = useHomeStageStore.getState();
+  if (st.glassFailed) return;
+  useHomeStageStore.setState({ glassFailed: true, glassFailure: kind, glassFailureSeq: st.glassFailureSeq + 1 });
+}
+
+/** M22 "Try 3D again": clears the failure. The caller remounts `(home)` so every route starts a fresh stage. */
+export function retryGlass(): void {
+  useHomeStageStore.setState({ glassFailed: false, glassFailure: null });
 }
 
 /** The shell's H-LYNK tab: ask Home to open the device menu (survives the route change). */

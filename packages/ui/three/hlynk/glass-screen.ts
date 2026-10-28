@@ -85,6 +85,10 @@ export interface GlassScreenOptions {
   readonly modelVisible?: () => boolean;
   /** Where the Baby stands across the glass now, a share of its width (M16's peek). */
   readonly modelOffset?: () => number;
+  /** One-shot clip requests for the Baby (DeviceScreen.monReaction). */
+  readonly monReaction?: () => { readonly key: number; readonly clips: readonly string[] };
+  /** The trackpad pans on this screen (DeviceScreen.padPans). */
+  readonly padPans?: boolean;
 }
 
 const { width: W, height: H } = HUD_SIZE;
@@ -196,6 +200,8 @@ export function createGlassScreen(options: GlassScreenOptions): DeviceScreen {
     ...(options.monClips ? { monClips: options.monClips } : {}),
     ...(options.modelVisible ? { modelsVisible: options.modelVisible } : {}),
     ...(options.modelOffset ? { modelsOffset: options.modelOffset } : {}),
+    ...(options.monReaction ? { monReaction: options.monReaction } : {}),
+    ...(options.padPans ? { padPans: () => true } : {}),
     // The slot this layout gives the Baby, so a persistent stage re-seats it per screen.
     modelRect: () => (models.length > 0 ? geo.model : null),
     subscribe: options.subscribe,

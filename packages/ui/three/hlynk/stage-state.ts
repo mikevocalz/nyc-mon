@@ -22,6 +22,8 @@ export interface StageState {
   taps: number;
   /** A pointer or finger is down on the stage (for the trackpad's hold: warming the egg). */
   held: boolean;
+  /** The press now (or the last one) moved past the tap slop: a drag, not a tap (M13's room pan). */
+  dragged: boolean;
   /** Front-key presses, so the scene dips `lastKey` once per press. */
   keyPresses: number;
   /** The front key pressed last. */
@@ -29,7 +31,7 @@ export interface StageState {
 }
 
 export const initialStageState = (): StageState => ({
-  ready: false, resting: false, motion: 'active', hover: null, presses: 0, taps: 0, held: false, keyPresses: 0, lastKey: null,
+  ready: false, resting: false, motion: 'active', hover: null, presses: 0, taps: 0, held: false, dragged: false, keyPresses: 0, lastKey: null,
 });
 
 /** The hover target for the left side key. */

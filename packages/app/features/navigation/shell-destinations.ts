@@ -37,33 +37,38 @@ export function shellDestination(name: ShellDestinationName): ShellDestination {
 }
 
 /**
- * The route a primary tab opens. MONS is the species index; until it exists
- * it opens the active Mon's Dex page, and HOME when there is no Mon yet.
- * H-LYNK opens the companion stage (the host also opens the device menu).
+ * The route a primary tab opens. HOME is the hub; H-LYNK opens the companion
+ * stage (the host also opens the device menu); MONS is the species index.
+ * `activeMonId` is kept for the hosts' call shape; no tab depends on it now.
  */
-export function shellHref(name: ShellDestinationName, activeMonId: string | undefined): string {
+export function shellHref(name: ShellDestinationName, _activeMonId: string | undefined): string {
   switch (name) {
     case 'home':
+      // The hub: the active Mon, Continue Game, the hatch reminder, the way into H-Lynk.
+      return '/home';
     case 'hlynk':
       return '/(home)';
     case 'game':
       return '/game';
     case 'mons':
-      return activeMonId === undefined ? '/(home)' : `/(home)/mon/${activeMonId}`;
+      return '/mons';
     case 'caller':
       return '/profile';
   }
 }
 
 /**
- * Which primary tab a path belongs to. The `(home)` group's Dex routes are
- * MONS; the rest of the companion loop is H-LYNK; HOME is the bare landing.
+ * Which primary tab a path belongs to. `/home` is HOME. The species index
+ * (`/mons`, `/mons/…`) and a Mon's Dex page (`/mon/…`) are MONS. The
+ * `(home)` landing (`/`, the companion stage) and the rest of the companion
+ * loop are H-LYNK.
  */
 export function activeShellDestination(pathname: string): ShellDestinationName | null {
+  if (pathname === '/home' || pathname.startsWith('/home/')) return 'home';
   if (pathname.startsWith('/game')) return 'game';
   if (pathname.startsWith('/profile')) return 'caller';
-  if (pathname.startsWith('/mon/')) return 'mons';
-  if (pathname === '/' || pathname === '') return 'home';
+  if (pathname === '/mons' || pathname.startsWith('/mons/') || pathname.startsWith('/mon/')) return 'mons';
+  if (pathname === '/' || pathname === '') return 'hlynk';
   if (/^\/(feed|rest|social|journal|name|hatch)\b/.test(pathname)) return 'hlynk';
   return null;
 }

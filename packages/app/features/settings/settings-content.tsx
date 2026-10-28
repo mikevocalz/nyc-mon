@@ -20,6 +20,8 @@ import { useDeleteAccountFlow, useHasAccount } from './delete-account';
 import { DELETED_PATH } from './delete-account-model.ts';
 import { hatchCopy } from '../hatch/copy';
 import { THEME_OPTIONS } from './theme-options.ts';
+import { DeviceCard } from './DeviceCard';
+import { AccountCard } from './AccountCard';
 
 /** The game-control settings route (apps/mobile/app/(drawer)/game-controls.tsx). */
 const GAME_CONTROLS_PATH = '/game-controls';
@@ -217,7 +219,7 @@ export function SettingsHeader() {
     <FadeIn>
       <Section className="gap-1">
         <Heading level={1} size="display-sm">Settings</Heading>
-        <Text tone="muted">Appearance, game and your account.</Text>
+        <Text tone="muted">This device, your account and the game.</Text>
       </Section>
     </FadeIn>
   );
@@ -246,6 +248,8 @@ export function SettingsDeviceCards() {
         </Card>
       </FadeIn>
 
+      <DeviceCard />
+
       <GraphicsCard />
 
       <GameControlsRow />
@@ -260,6 +264,7 @@ export function SettingsDeviceCards() {
 export function SettingsAccountCards() {
   return (
     <>
+      <AccountCard />
       <CallerNameCard />
       <AmazonAccountLink />
 

@@ -13,20 +13,20 @@ import { nextOf, THEME_OPTIONS } from './theme-options.ts';
 
 const source = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
 
-test('rows: Caller name first when a Caller exists, Sign out last, no sound row', () => {
+test('rows: Caller name first when a Caller exists, Sign out last; device rows only when given', () => {
   const rows = settingsRows({ callerName: 'Mike', theme: 'dark', timeOfDay: 'twilight' });
-  assert.deepEqual(rows.map((r) => r.id), ['caller', 'theme', 'timeOfDay', 'controls', 'legal', 'credits', 'signOut']);
+  assert.deepEqual(rows.map((r) => r.id), ['caller', 'theme', 'timeOfDay', 'controls', 'export', 'legal', 'credits', 'signOut']);
   assert.equal(rowText(rows[0]!), 'Caller name · Mike');
   assert.equal(rowText(rows[1]!), 'Theme · Dark');
   assert.equal(rowText(rows[2]!), 'Time of day · Dusk');
   assert.equal(rowText(rows[3]!), 'Game controls');
-  assert.equal(rows[6]!.verb, 'Sign out');
-  assert.equal(rows[6]!.hint, 'Sign out on this device only.');
+  assert.equal(rows[7]!.verb, 'Sign out');
+  assert.equal(rows[7]!.hint, 'Sign out on this device only.');
 });
 
 test('rows: no Caller, no Caller row; physical city off, no Time of day row', () => {
   const rows = settingsRows({ callerName: null, theme: 'system', timeOfDay: null });
-  assert.deepEqual(rows.map((r) => r.id), ['theme', 'controls', 'legal', 'credits', 'signOut']);
+  assert.deepEqual(rows.map((r) => r.id), ['theme', 'controls', 'export', 'legal', 'credits', 'signOut']);
   assert.equal(rows[0]!.value, 'System');
 });
 
@@ -118,4 +118,25 @@ test('the glass Delete question: Cancel is the default, the trackpad and Back ca
   assert.ok(view.indexOf("target: 'cancel'") < view.indexOf("target: 'delete'"));
   assert.match(glass, /mode === 'deleteAccount'\) \{\n      \/\/ Same rule: the trackpad and Back answer Cancel, never Delete\.\n      if \(leaving \|\| key === 'activate'\) toList\(\);/);
   assert.match(glass, /useDeleteAccountFlow\(\(\) => router\.replace\(DELETED_PATH\)\)/);
+});
+
+test('rows: M19/M20 rows in reading order, switches say On or Off', () => {
+  const rows = settingsRows({
+    callerName: 'Mike', theme: 'dark', timeOfDay: null, hasAccount: true, email: 'mike@example.com',
+    notify: true, haptics: false, sound: true, motion: false,
+  });
+  assert.deepEqual(rows.map((r) => r.id), [
+    'account', 'caller', 'notify', 'haptics', 'sound', 'motion', 'theme', 'controls', 'export', 'legal', 'credits', 'signOut', 'deleteAccount',
+  ]);
+  assert.equal(rowText(rows[0]!), 'Account · mike@example.com');
+  assert.equal(rowText(rows[2]!), 'Egg alerts · On');
+  assert.equal(rowText(rows[3]!), 'Haptics · Off');
+  assert.equal(rows[8]!.verb, 'Download');
+});
+
+test('rows: no Egg alerts row where notifications are unsupported; a blocked OS opens Settings', () => {
+  assert.ok(!settingsRows({ callerName: null, theme: 'dark', timeOfDay: null, notify: null }).some((r) => r.id === 'notify'));
+  const [row] = settingsRows({ callerName: null, theme: 'dark', timeOfDay: null, notify: false, notifyDenied: true });
+  assert.equal(row!.id, 'notify');
+  assert.equal(row!.verb, 'Open phone Settings');
 });

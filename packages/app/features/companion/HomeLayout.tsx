@@ -24,6 +24,8 @@ import { allSpecies } from '@acme/content';
 import { ShellBottomBar, ShellDrawer, ShellRail } from '../navigation/ShellNav';
 import { activeDrawerItem, activeShellDestination } from '../navigation/shell-destinations';
 import { useShellNavigate } from '../navigation/use-shell-navigate';
+import { OfflineBanner } from '../system/OfflineBanner';
+import { recoveryHref } from '../system/recovery-model';
 
 /** Flat phone scene (ADR 0011): the 2D window never asks for room or tabletop in this lane. */
 const PHONE_SCENE = resolveSceneMode({ platform: 'phone', capabilities: null, anchors: undefined, preference: 'screen' });
@@ -229,6 +231,7 @@ function Shell2D() {
  */
 export function HomeLayout({ children, header }: { children: ReactNode; /** The app header, drawn across the top on rail hardware (tablet, foldable, headset). */ header?: ReactNode }) {
   useMinuteClockDriver();
+  useStageFailureRecovery();
   const router = useRouter();
   // M01 boots here for incubating / egg-ready / companion and arms a
   // hatch-ready tap that arrived during boot. Pushing it from this mount puts
@@ -251,6 +254,7 @@ export function HomeLayout({ children, header }: { children: ReactNode; /** The 
         <View className="relative min-w-0 flex-1">
           <ShellHost />
           <View className="absolute inset-0" style={{ pointerEvents: 'box-none' }}>{children}</View>
+          <HomeSyncBanner />
         </View>
         <HomeRail />
       </View>
@@ -275,6 +279,32 @@ export function HomeLayout({ children, header }: { children: ReactNode; /** The 
  * No drawer toggle at the foot: `(home)` is outside the drawer navigator, and
  * the H-Lynk's own Menu key opens the companion menu.
  */
+/**
+ * M21: the offline banner and waiting-count chip over the content area.
+ * Immersive routes (M11's egg, M12's hatch) keep the whole window.
+ */
+function HomeSyncBanner() {
+  const immersive = useHomeStageStore((s) => s.immersive);
+  return immersive ? null : <OfflineBanner />;
+}
+
+/**
+ * M22: when the shared 3D stage fails, say so once per failure and offer the
+ * 2D view or a retry, instead of switching to 2D silently. The 2D shell is
+ * already up underneath, so Back from M22 lands on a working screen.
+ */
+function useStageFailureRecovery() {
+  const router = useRouter();
+  const seq = useHomeStageStore((s) => s.glassFailureSeq);
+  useEffect(() => {
+    if (seq === 0) return;
+    const kind = useHomeStageStore.getState().glassFailure;
+    if (kind !== null) router.push(recoveryHref(kind));
+    // The router is a stable imperative handle; this runs once per failure.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seq]);
+}
+
 function HomeShellHeader({ header }: { header: ReactNode }) {
   const placement = useAdaptiveNavigationPlacement();
   return placement.rail ? <>{header}</> : null;

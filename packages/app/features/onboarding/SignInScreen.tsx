@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { AuthError } from '@acme/auth';
 import {
   AuthProviderButton,
@@ -21,14 +21,23 @@ import { useOnboarding } from './onboarding.store';
 import { OnboardingPanes, PANE_HEADING_CLASS } from './OnboardingPanes';
 import { startSaveForNewAccount } from './save-store';
 import { useSignInNav } from './sign-in-nav';
+import { isSocialProviderSupported, startSocialSignIn, type SocialSignInProvider } from './social-sign-in';
 
 type Mode = 'providers' | 'email' | 'verify' | 'reset' | 'reset_sent';
+type PendingKind = 'email' | 'passkey' | SocialSignInProvider;
+
+/** Server codes that mean "this Caller has not passed the birth-year gate". */
+const AGE_GATE_CODES: ReadonlySet<string> = new Set(['GUARDIAN_CONSENT_REQUIRED', 'INVALID_BIRTH_YEAR', 'BIRTH_YEAR_REQUIRED']);
+
+/** Provider-side codes a web redirect returns when the Caller closed the provider's page. */
+const SOCIAL_CANCEL_CODES: ReadonlySet<string> = new Set(['access_denied', 'user_cancelled_authorize']);
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LENGTH = 10;
 
-function errorCopyId(error: AuthError): OnboardingCopyId | undefined {
+function errorCopyId(error: AuthError, provider?: SocialSignInProvider): OnboardingCopyId | undefined {
   if (error.status === 0) return 'm03.error.offline';
+  if (provider !== undefined && error.status < 500) return socialFailedCopyId(provider);
   switch (error.code) {
     case 'INVALID_EMAIL':
       return 'm03.error.email.invalid';
@@ -49,17 +58,36 @@ function errorCopyId(error: AuthError): OnboardingCopyId | undefined {
   }
 }
 
+function socialFailedCopyId(provider: SocialSignInProvider): OnboardingCopyId {
+  return provider === 'apple' ? 'm03.error.apple.failed' : 'm03.error.google.failed';
+}
+
 /**
  * M03 sign-in / create account. The create path is only reachable through
  * the birth-year gate (P1): without a stored answer this redirects to M04.
- * Apple and Google buttons are held back until their native integrations
- * and brand assets land; the passkey button renders only when WebAuthn is
- * available, and only in the sign-in intent (create-by-passkey is an open
- * question). Every failure maps to a copy-deck id — server text is never
- * shown raw, and a cancelled provider sheet shows nothing.
+ * Apple comes first (App Store guideline 4.8), then Google, passkey and
+ * email. Apple shows on iOS (native sheet) and web; Android has no Apple
+ * sheet, so the row is hidden there. The passkey button renders only when
+ * WebAuthn is available, and only in the sign-in intent (create-by-passkey
+ * is an open question). A new Apple or Google account needs the M04 answer:
+ * without it the server refuses and the Caller is routed to the gate. Every
+ * failure maps to a copy-deck id; server text is never shown raw, and a
+ * cancelled provider sheet shows nothing.
  */
 export function SignInScreen() {
-  const { intent, ageGatePath, homePath, signInPath, legalLinks, openLink, replace, back, inlineBack } = useSignInNav();
+  const {
+    intent,
+    ageGatePath,
+    homePath,
+    signInPath,
+    legalLinks,
+    openLink,
+    replace,
+    back,
+    inlineBack,
+    socialReturn,
+    socialURLs,
+  } = useSignInNav();
   const ageAnswer = useOnboarding((s) => s.ageAnswer);
   const setSession = useOnboarding((s) => s.setSession);
 
@@ -67,28 +95,42 @@ export function SignInScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [pendingCopy, setPendingCopy] = useState<string | undefined>();
-  const [pendingKind, setPendingKind] = useState<'email' | 'passkey' | undefined>();
+  const [pendingKind, setPendingKind] = useState<PendingKind | undefined>();
   const [error, setError] = useState<string | undefined>();
   const [resent, setResent] = useState(false);
+  /** True once the Caller starts another attempt; hides a web return error. */
+  const [acted, setActed] = useState(false);
   const pending = pendingCopy !== undefined;
 
   useEffect(() => {
     if (intent === 'create' && ageAnswer === undefined) replace(ageGatePath);
   }, [intent, ageAnswer, replace, ageGatePath]);
 
-  const fail = (raw: AuthError) => {
+  const fail = (raw: AuthError, provider?: SocialSignInProvider) => {
     setPendingCopy(undefined);
     setPendingKind(undefined);
-    // GUARDIAN_CONSENT_REQUIRED / INVALID_BIRTH_YEAR must never surface their
-    // server text (m03.error.needs_age): route back to the gate silently.
-    if (raw.code === 'GUARDIAN_CONSENT_REQUIRED' || raw.code === 'INVALID_BIRTH_YEAR') {
+    // Age-gate codes never surface their server text (m03.error.needs_age):
+    // route to the gate silently. BIRTH_YEAR_REQUIRED is a new Apple or
+    // Google identity with no M04 answer yet.
+    if (raw.code !== undefined && AGE_GATE_CODES.has(raw.code)) {
       replace(ageGatePath);
       return;
     }
-    setError(copy(errorCopyId(raw) ?? 'm03.error.server'));
+    setError(copy(errorCopyId(raw, provider) ?? 'm03.error.server'));
+  };
+
+  // The same landing as every other method. No server restore yet (Phase 3):
+  // a signed-in device with no save would boot to `restore` and land back
+  // here, so the local save starts, as sign-up does. It never touches an
+  // existing save.
+  const completeSignIn = () => {
+    startSaveForNewAccount(Date.now());
+    setSession(true);
+    replace(homePath);
   };
 
   const signIn = async (kind: 'email' | 'passkey') => {
+    setActed(true);
     setError(undefined);
     setPendingKind(kind);
     setPendingCopy(copy(kind === 'passkey' ? 'm03.provider.passkey.loading' : 'm03.email.loading'));
@@ -100,15 +142,76 @@ export function SignInScreen() {
       fail(result.error);
       return;
     }
-    // No server restore yet (Phase 3): a signed-in device with no save would
-    // boot to `restore` and land back here. Start the local save, as sign-up
-    // does, so the Caller continues onboarding. It never touches an existing save.
-    startSaveForNewAccount(Date.now());
-    setSession(true);
-    replace(homePath);
+    completeSignIn();
   };
 
+  const signInSocial = async (provider: SocialSignInProvider) => {
+    setActed(true);
+    setError(undefined);
+    setPendingKind(provider);
+    setPendingCopy(copy(provider === 'apple' ? 'm03.provider.apple.loading' : 'm03.provider.google.loading'));
+    const outcome = await startSocialSignIn(provider, {
+      // Sent on both intents: a returning Caller ignores it, and a sign-in
+      // that would create an account can only do so with the M04 answer.
+      birthYear: ageAnswer?.birthYear,
+      ...socialURLs(provider),
+    });
+    switch (outcome.kind) {
+      case 'signed_in':
+        completeSignIn();
+        return;
+      case 'redirecting':
+        return; // web: the page is leaving for the provider
+      case 'cancelled':
+        setPendingCopy(undefined);
+        setPendingKind(undefined);
+        return;
+      case 'failed':
+        if (outcome.error !== undefined) {
+          fail(outcome.error, provider);
+          return;
+        }
+        setPendingCopy(undefined);
+        setPendingKind(undefined);
+        setError(copy(socialFailedCopyId(provider)));
+        return;
+      default: {
+        const unreachable: never = outcome;
+        return unreachable;
+      }
+    }
+  };
+
+  // Web: a failed round trip's message, derived from the URL until the Caller tries again.
+  const returnCode = socialReturn?.error;
+  const returnError =
+    socialReturn !== undefined &&
+    !acted &&
+    returnCode !== undefined &&
+    !SOCIAL_CANCEL_CODES.has(returnCode) &&
+    !AGE_GATE_CODES.has(returnCode)
+      ? copy(socialFailedCopyId(socialReturn.provider))
+      : undefined;
+  const shownError = error ?? returnError;
+
+  // Web: the provider round trip came back to this screen.
+  const handledReturn = useRef(false);
+  useEffect(() => {
+    if (socialReturn === undefined || handledReturn.current) return;
+    handledReturn.current = true;
+    const code = socialReturn.error;
+    if (code === undefined) {
+      completeSignIn();
+      return;
+    }
+    if (AGE_GATE_CODES.has(code)) replace(ageGatePath);
+    // Any other code is shown as `returnError` below.
+    // completeSignIn and the store setters are stable for this screen's life.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [socialReturn, replace, ageGatePath]);
+
   const submitEmail = async () => {
+    setActed(true);
     if (!EMAIL_PATTERN.test(email)) {
       setError(copy('m03.error.email.invalid'));
       return;
@@ -204,7 +307,7 @@ export function SignInScreen() {
         }
       >
         <Form className="flex-1 gap-6">
-          {error !== undefined ? <ErrorMessage message={error} /> : null}
+          {shownError !== undefined ? <ErrorMessage message={shownError} /> : null}
           {pendingCopy !== undefined ? <Text>{pendingCopy}</Text> : null}
 
           {mode === 'reset' || mode === 'reset_sent' ? (
@@ -249,6 +352,26 @@ export function SignInScreen() {
             </View>
           ) : (
             <View className="gap-3">
+              {isSocialProviderSupported('apple') ? (
+                <AuthProviderButton
+                  provider="apple"
+                  intent={intent === 'create' ? 'create' : 'sign-in'}
+                  label={copy(intent === 'create' ? 'm03.provider.apple.label.create' : 'm03.provider.apple.label.sign_in')}
+                  loading={pending && pendingKind === 'apple'}
+                  disabled={pending}
+                  onPress={() => void signInSocial('apple')}
+                />
+              ) : null}
+              {isSocialProviderSupported('google') ? (
+                <AuthProviderButton
+                  provider="google"
+                  intent={intent === 'create' ? 'create' : 'sign-in'}
+                  label={copy(intent === 'create' ? 'm03.provider.google.label.create' : 'm03.provider.google.label.sign_in')}
+                  loading={pending && pendingKind === 'google'}
+                  disabled={pending}
+                  onPress={() => void signInSocial('google')}
+                />
+              ) : null}
               {intent === 'sign_in' && isPasskeySupported() ? (
                 <AuthProviderButton
                   provider="passkey"

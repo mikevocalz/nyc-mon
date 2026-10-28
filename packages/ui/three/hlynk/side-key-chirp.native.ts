@@ -1,4 +1,5 @@
 import { AudioContext } from 'react-native-audio-api';
+import { soundEnabled } from '../../device-preferences';
 import { scheduleChirp, type ChirpContext } from './chirp-core';
 
 /**
@@ -19,6 +20,8 @@ export function primeSideKeyChirp(): void {
 
 /** Play the chirp once. A no-op where the audio context can't start. */
 export function playSideKeyChirp(): void {
+  // The Caller's Sound switch (Settings, M19) wins over the stage's own prop.
+  if (!soundEnabled()) return;
   primeSideKeyChirp();
   if (context) scheduleChirp(context as unknown as ChirpContext);
 }

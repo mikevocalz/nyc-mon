@@ -7,14 +7,14 @@ import { resolveBootPath } from '../onboarding/boot';
 import { needsNicknamePrompt } from '../onboarding/onboarding.store';
 import { IncubatingScreen } from '../hatch/IncubatingScreen';
 import { HomeScreen } from './HomeScreen';
-import { ErrorScreen } from '../error/screen';
+import { recoveryHref } from '../system/recovery-model';
 import { useMinuteClock } from './minute-clock';
 
 
 /**
  * `/(home)`: M13 when a Mon has hatched (the optional M09 nickname question
  * first, once), M11 while an egg incubates (M11 "Route and intent"), otherwise the
- * boot route (egg choice; an unreadable save holds on the error screen).
+ * boot route (egg choice; an unreadable save goes to M22).
  */
 export function HomeIndexScreen() {
   const mon = useMonStore(selectActiveMon);
@@ -27,10 +27,9 @@ export function HomeIndexScreen() {
   }
   if (pending !== undefined) return <IncubatingScreen pending={pending} />;
   // Neither an egg nor a Mon: hand over to the boot route. When boot also
-  // answers `(home)` (an unreadable save, whose M22 screen is unbuilt, or a
-  // store that disagrees with boot) a redirect would loop back here, so the
-  // generic error screen holds instead and nothing is written.
+  // answers `(home)` (a store that disagrees with the save) a redirect would
+  // loop back here, so M22 takes it ("mon-missing") and nothing is written.
   const { path } = resolveBootPath(nowMs);
-  if (path === MON_HOME_PATH) return <ErrorScreen kind="error" />;
+  if (path === MON_HOME_PATH) return <Redirect href={recoveryHref('mon-missing')} />;
   return <Redirect href={path} />;
 }

@@ -52,3 +52,90 @@ test('deletion turned off on the server reads as a 404 failure', async () => {
   if (result.ok) return;
   assert.equal(result.error.status, 404);
 });
+
+test('listAccounts GETs /list-accounts and keeps provider ids', async () => {
+  const seen = stubFetch(200, [
+    { id: 1, providerId: 'credential', accountId: '1', createdAt: '2026-10-01T00:00:00.000Z' },
+    { id: 2, providerId: 'apple', accountId: 'x' },
+    { id: 3 },
+  ]);
+  const result = await createAuth({ baseURL: 'https://admin.example' }).listAccounts();
+  assert.equal(seen[0]?.method, 'GET');
+  assert.equal(seen[0]?.url, 'https://admin.example/payload-api/auth/list-accounts');
+  assert.deepEqual(result, {
+    ok: true,
+    data: [
+      { id: '1', providerId: 'credential', createdAt: '2026-10-01T00:00:00.000Z' },
+      { id: '2', providerId: 'apple', createdAt: undefined },
+    ],
+  });
+});
+
+test('listAccounts without a session is a 401 failure, not thrown', async () => {
+  stubFetch(401, { code: 'UNAUTHORIZED', message: 'Unauthorized' });
+  const result = await createAuth({ baseURL: 'https://admin.example' }).listAccounts();
+  assert.equal(result.ok, false);
+  if (result.ok) return;
+  assert.equal(result.error.status, 401);
+});
+
+test('changeEmail posts the new address to /change-email', async () => {
+  const seen = stubFetch(200, { status: true });
+  const result = await createAuth({ baseURL: 'https://admin.example' }).changeEmail('new@example.com');
+  assert.deepEqual(result, { ok: true });
+  assert.equal(seen[0]?.url, 'https://admin.example/payload-api/auth/change-email');
+  assert.deepEqual(JSON.parse(seen[0]?.body ?? 'null'), { newEmail: 'new@example.com' });
+});
+
+test('changePassword posts both passwords and signs other devices out', async () => {
+  const seen = stubFetch(200, { token: null });
+  const result = await createAuth({ baseURL: 'https://admin.example' }).changePassword('old-password-1', 'new-password-1');
+  assert.deepEqual(result, { ok: true });
+  assert.equal(seen[0]?.url, 'https://admin.example/payload-api/auth/change-password');
+  assert.deepEqual(JSON.parse(seen[0]?.body ?? 'null'), {
+    currentPassword: 'old-password-1',
+    newPassword: 'new-password-1',
+    revokeOtherSessions: true,
+  });
+});
+
+test('a wrong current password comes back as INVALID_PASSWORD', async () => {
+  stubFetch(400, { code: 'INVALID_PASSWORD', message: 'Invalid password' });
+  const result = await createAuth({ baseURL: 'https://admin.example' }).changePassword('nope-nope-1', 'new-password-1');
+  assert.equal(result.ok, false);
+  if (result.ok) return;
+  assert.equal(result.error.code, 'INVALID_PASSWORD');
+});
+
+test('id-token sign-in posts the Apple token and the M04 birth year to /sign-in/social', async () => {
+  const seen = stubFetch(200, { redirect: false, token: 't', user: { id: '1' } });
+  const result = await createAuth({ baseURL: 'https://admin.example' }).signIn({
+    method: 'id-token',
+    provider: 'apple',
+    token: 'header.payload.sig',
+    nonce: 'raw-nonce',
+    name: { firstName: 'Dani' },
+    birthYear: 2008,
+  });
+  assert.deepEqual(result, { ok: true });
+  assert.equal(seen[0]?.url, 'https://admin.example/payload-api/auth/sign-in/social');
+  assert.deepEqual(JSON.parse(seen[0]?.body ?? 'null'), {
+    provider: 'apple',
+    idToken: { token: 'header.payload.sig', nonce: 'raw-nonce', user: { name: { firstName: 'Dani' } } },
+    additionalData: { birthYear: 2008 },
+  });
+});
+
+test('a returning Caller signs in by id token without a birth year', async () => {
+  const seen = stubFetch(200, { redirect: false, token: 't', user: { id: '1' } });
+  await createAuth({ baseURL: 'https://admin.example' }).signIn({ method: 'id-token', provider: 'google', token: 'g' });
+  assert.deepEqual(JSON.parse(seen[0]?.body ?? 'null'), { provider: 'google', idToken: { token: 'g' } });
+});
+
+test('a new social account without the M04 answer comes back as BIRTH_YEAR_REQUIRED', async () => {
+  stubFetch(403, { code: 'BIRTH_YEAR_REQUIRED', message: 'Answer the birth-year question before making an account.' });
+  const result = await createAuth({ baseURL: 'https://admin.example' }).signIn({ method: 'id-token', provider: 'apple', token: 'a' });
+  assert.equal(result.ok, false);
+  if (result.ok) return;
+  assert.equal(result.error.code, 'BIRTH_YEAR_REQUIRED');
+});

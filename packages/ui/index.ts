@@ -122,6 +122,9 @@ export { SceneSection, type SceneSectionProps } from './backgrounds/SceneSection
 export { SkylineDivider, type SkylineDividerProps } from './backgrounds/SkylineDivider';
 export { useInView } from './backgrounds/use-in-view';
 export { useReducedMotion } from './backgrounds/use-reduced-motion';
+export {
+  getKitPreferences, setKitPreferences, subscribeKitPreferences, useForcedReducedMotion, useSoundEnabled,
+} from './device-preferences';
 export type { InView, InViewOptions } from './backgrounds/use-in-view.types';
 // Districts and tones: one module for the whole kit.
 export {

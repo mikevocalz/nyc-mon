@@ -1,12 +1,12 @@
 'use client';
 
 import { useCallback, useEffect } from 'react';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { allSpecies, bloodlines } from '@acme/content';
 import { LIFECYCLE_STAGES } from '@acme/core/schemas';
 import type { EvolutionNode, MonInstance } from '@acme/core/types';
 import {
-  Button, HLYNK_COPY, Heading, Image, LifecycleTrack, SafeArea, SignagePlate, lifecycleSlots, useInstanceStore, useStore,
+  HLYNK_COPY, Heading, Image, LifecycleTrack, SafeArea, SignagePlate, lifecycleSlots, useInstanceStore, useStore,
   type DeviceKey, type GlassLine, type GlassView, type ImageProps,
 } from '@acme/ui';
 import { Pressable, ScrollView, Text, View } from '@acme/ui/tw';
@@ -16,6 +16,7 @@ import { GlassStage, useGlassOn, useGlassScreen, useMonGlass } from './glass';
 import { useHomeStage } from './home-stage.store';
 import { CompanionPane } from './CompanionPane';
 import { dexNumber, monIdentity } from './mon-identity';
+import { recoveryHref } from '../system/recovery-model';
 
 /** Chain nodes from the Egg down to `speciesId`, or empty when the species is not in the chain. */
 function pathTo(node: EvolutionNode, speciesId: string): readonly EvolutionNode[] {
@@ -190,15 +191,8 @@ export function DexProfileScreen() {
   }
 
   if (mon === undefined) {
-    // M22's not-found recovery is not built; the honest route is home.
-    return (
-      <SafeArea className="flex-1 bg-bg">
-        <View className="flex-1 gap-6 px-4 py-6">
-          <BackButton />
-          <View testID="m17-home"><Button title={HLYNK_COPY['hlynk.key.home.label']} variant="cta" size="lg" onPress={() => router.replace('/(home)')} /></View>
-        </View>
-      </SafeArea>
-    );
+    // An id that is not in the save: M22 says so and offers Home (and Back when there is one).
+    return <Redirect href={recoveryHref('dex-not-found')} />;
   }
 
   const who = monIdentity(mon);

@@ -24,6 +24,10 @@ export function createSwitchScreen(options: SwitchScreenOptions): DeviceScreen {
   let total = 0;
   let seen: DeviceScreen | null = null;
   let seenCount = 0;
+  let reactionSeen: DeviceScreen | null = null;
+  let reactionKey = 0;
+  let reactionTotal = 0;
+  let reactionClips: readonly string[] = [];
   return {
     size: HUD_SIZE,
     models: options.models,
@@ -57,6 +61,21 @@ export function createSwitchScreen(options: SwitchScreenOptions): DeviceScreen {
       return total;
     },
     monClips: () => options.current().monClips?.() ?? [],
+    // Same rule as nudge: a counter that restarts with a new screen plays nothing.
+    monReaction: () => {
+      const screen = options.current();
+      const next = screen.monReaction?.() ?? { key: 0, clips: [] };
+      if (screen !== reactionSeen) {
+        reactionSeen = screen;
+        reactionKey = next.key;
+      } else if (next.key !== reactionKey) {
+        reactionKey = next.key;
+        reactionTotal += 1;
+        reactionClips = next.clips;
+      }
+      return { key: reactionTotal, clips: reactionClips };
+    },
+    padPans: () => options.current().padPans?.() ?? false,
     modelsVisible: () => options.current().modelsVisible?.() ?? true,
     modelsOffset: () => options.current().modelsOffset?.() ?? 0,
     modelRect: () => {

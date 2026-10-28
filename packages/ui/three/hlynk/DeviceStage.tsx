@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, type ReactNode } from 'react';
+import { useMemo, useRef, type ReactNode } from 'react';
 import { Platform } from 'react-native';
 import { useInView } from '../../backgrounds/use-in-view';
 import { useReducedMotion } from '../../backgrounds/use-reduced-motion';
@@ -13,8 +13,12 @@ import { loopPlan } from '../loop-policy';
 import type { ThreeBackend, ThreeSetup } from '../types';
 import type { DeviceSceneParams } from './device-scene';
 import type { DeviceScreen } from './screen';
+import { useSoundEnabled } from '../../device-preferences';
 import { playSideKeyChirp, primeSideKeyChirp } from './side-key-chirp';
-import { initialStageState, type DeviceKey } from './stage-state';
+import { initialStageState, keyTarget, type DeviceKey } from './stage-state';
+
+/** How far a press moves before it is a drag (pan), pt. Matches the 2D trackpad's slop. */
+const DRAG_SLOP_PT = 8;
 
 /** The static capture: a render of the scene at its rest pose, on the stage's ink. */
 export interface DeviceCapture {
@@ -52,7 +56,10 @@ export interface DeviceStageProps {
   className?: string;
   /** Classes for the stage box. Default: a 4:5 box the figure's width. */
   stageClassName?: string;
-  /** Side key sound. The chirp only plays from a press. Default off. */
+  /**
+   * Side key sound. The chirp only plays from a press. Omitted, it follows the
+   * Caller's Sound setting (device-preferences.ts, M19); either way Sound off wins.
+   */
   sound?: boolean;
   /** Called after each side key press (3D key or `pressSideKey`). */
   onSideKey?: () => void;
@@ -81,6 +88,12 @@ export interface DeviceStageProps {
    * intro's clock waits, so the intro plays when the cover lifts.
    */
   hold?: boolean;
+  /**
+   * A drag on the 3D trackpad, in pt since the last call (M13's room pan).
+   * Pair it with a screen whose `padPans` is true, so a drag never also
+   * activates.
+   */
+  onPan?: (dxPt: number, dyPt: number) => void;
 }
 
 // Module-level and stable, so three.js and the scene stay out of the first chunk.
@@ -111,10 +124,12 @@ const HANDOFF_MS = 400;
  */
 export function DeviceStage({
   screen, model = 'placeholder', capture, fallback = null, caption, label, className, stageClassName,
-  sound = false, onSideKey, onKey, onReady, onBackendChange, children, testID, captureTestID, glassScale = 1, beam = true, onModelsSettled, hold = false,
+  sound: soundProp, onSideKey, onKey, onReady, onBackendChange, children, testID, captureTestID, glassScale = 1, beam = true, onModelsSettled, hold = false, onPan,
 }: DeviceStageProps) {
   const { ref, hasBeenNear, isVisible } = useInView({ nearMarginPx: 600 });
   const reducedMotion = useReducedMotion();
+  const soundSetting = useSoundEnabled();
+  const sound = soundProp ?? soundSetting;
   const live = hasBeenNear && !reducedMotion;
 
   const stage = useInstanceStore(initialStageState);
@@ -159,7 +174,25 @@ export function DeviceStage({
     [params],
   );
   const release = () => {
+    drag.current = null;
     if (stage.getState().held) stage.setState({ held: false });
+  };
+  // Where the press started and was last seen, for the trackpad drag (a ref: per-move, never rendered).
+  const drag = useRef<{ x0: number; y0: number; x: number; y: number } | null>(null);
+  const press = (x: number, y: number) => {
+    drag.current = { x0: x, y0: y, x, y };
+    stage.setState({ taps: stage.getState().taps + 1, held: true, dragged: false });
+  };
+  const move = (x: number, y: number) => {
+    const d = drag.current;
+    if (d === null || onPan === undefined) return;
+    const st = stage.getState();
+    if (!st.held || st.hover !== keyTarget('activate')) return;
+    if (!st.dragged && Math.hypot(x - d.x0, y - d.y0) < DRAG_SLOP_PT) return;
+    if (!st.dragged) stage.setState({ dragged: true });
+    onPan(x - d.x, y - d.y);
+    d.x = x;
+    d.y = y;
   };
 
   const showCover = !live || !ready;
@@ -184,17 +217,19 @@ export function DeviceStage({
         // side key chirps from a scene frame, after the gesture, so unlock
         // audio inside the gesture itself and every browser lets it play.
         // `held` lasts until the pointer lifts or leaves: the trackpad's hold warms the egg (M10).
-        onPointerDown={() => {
+        onPointerDown={(e) => {
           if (sound) primeSideKeyChirp();
-          stage.setState({ taps: stage.getState().taps + 1, held: true });
+          press(e.nativeEvent.pageX, e.nativeEvent.pageY);
         }}
+        onPointerMove={(e) => move(e.nativeEvent.pageX, e.nativeEvent.pageY)}
         onPointerUp={release}
         onPointerCancel={release}
         onPointerLeave={release}
         // Native: pointer events may not reach this view, so a touch counts the press too
         // (two counts in one frame still make one tap: the scene only checks for a change).
         {...(Platform.OS === 'web' ? {} : {
-          onTouchStart: () => stage.setState({ taps: stage.getState().taps + 1, held: true }),
+          onTouchStart: (e: { nativeEvent: { pageX: number; pageY: number } }) => press(e.nativeEvent.pageX, e.nativeEvent.pageY),
+          onTouchMove: (e: { nativeEvent: { pageX: number; pageY: number } }) => move(e.nativeEvent.pageX, e.nativeEvent.pageY),
           onTouchEnd: release,
           onTouchCancel: release,
         })}

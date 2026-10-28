@@ -34,6 +34,11 @@ export const COMPANION_COPY = {
   'm13.resumed.a11y': '{name} is here. {status}.',
   'm13.choose.title': 'Which Mon is with you?',
   'm13.choose.body': 'You can switch any time from the Menu key.',
+  // Decision #18 chooser: the glass pages Mons with More; the menu entry; the spoken confirmation.
+  'm13.choose.more': 'More',
+  'm13.menu.switch': 'Switch Mon',
+  'm13.choose.done': '{name} is with you.',
+  'm13.choose.selected': 'with you now',
 
   // M14 Feed (screens/M14/05-copy.md). D-15e: no named foods, so the one
   // action is "Share a meal" (DECISIONS.md D-15e) until content/food exists.

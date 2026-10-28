@@ -5,6 +5,12 @@ import { APP_HOME_PATH } from './boot';
 
 export type SignInIntent = 'create' | 'sign_in';
 
+/** Web only: the Apple/Google redirect came back to M03 (`?social=…`, plus `error` on failure). */
+export interface SocialReturn {
+  provider: 'apple' | 'google';
+  error: string | undefined;
+}
+
 export interface SignInLegalLink {
   id: 'terms' | 'privacy' | 'children';
   href: string;
@@ -31,6 +37,10 @@ export function useSignInNav(): {
   back: () => void;
   /** Draw the ‹ inside the screen. False in the app: the native stack header carries it. */
   inlineBack: boolean;
+  /** Web only; the app signs in by ID token and never leaves the screen. */
+  socialReturn: SocialReturn | undefined;
+  /** Web only: absolute URLs for a provider round trip. Empty in the app. */
+  socialURLs: (provider: 'apple' | 'google') => { returnURL: string; errorURL: string };
 } {
   const router = useRouter();
   const params = useLocalSearchParams<{ intent?: string }>();
@@ -52,5 +62,7 @@ export function useSignInNav(): {
     // Sign-in is often reached by replace (from the age gate), so there may be no history.
     back: () => (router.canGoBack() ? router.back() : router.replace('/(onboarding)/welcome' as never)),
     inlineBack: false,
+    socialReturn: undefined,
+    socialURLs: () => ({ returnURL: '', errorURL: '' }),
   };
 }

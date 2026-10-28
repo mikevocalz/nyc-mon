@@ -184,6 +184,8 @@ export function createDeviceScene(
   let dipFrom = -1; // scene time the current dip started; -1 none
   let dipQueued = false;
   let tapQueued = false;
+  /** A trackpad press on a panning screen, waiting for the release to tell a tap from a drag. */
+  let padPending = false;
   // A front key or the trackpad dips the same way, one key at a time.
   let keyDipFrom = -1;
   let keyDipQueued: DeviceKey | null = null;
@@ -366,7 +368,7 @@ export function createDeviceScene(
       const stageNow = store.getState();
       const holdingPad = stageNow.held && stageNow.hover === keyTarget('activate');
       const warmth = Math.min(1, (screen.warmth?.() ?? 0) + (holdingPad ? 1 : 0));
-      const models = stand.update(frame, screen.selected?.() ?? null, power, warmth, screen.nudge?.() ?? 0, screen.monClips?.(), screen.modelsVisible?.() ?? true, screen.modelsOffset?.() ?? 0, screen.modelRect?.());
+      const models = stand.update(frame, screen.selected?.() ?? null, power, warmth, screen.nudge?.() ?? 0, screen.monClips?.(), screen.modelsVisible?.() ?? true, screen.modelsOffset?.() ?? 0, screen.modelRect?.(), screen.monReaction?.());
 
       // Input: hover on a move, act on a press. The stage counts presses in
       // the store from its pointerdown handler (so a tap shorter than a
@@ -385,8 +387,15 @@ export function createDeviceScene(
         if (hover !== store.getState().hover) store.setState({ hover });
         const pressedKey = keyFromTarget(hover);
         if (pressed && hover === SIDE_KEY) params.onSideKey?.();
+        // A panning trackpad (M13's room) answers on release, and only a press that did not drag.
+        else if (pressed && pressedKey === 'activate' && screen.padPans?.() === true) padPending = true;
         else if (pressed && pressedKey !== null) params.onKey?.(pressedKey);
         else if (pressed && hover !== null) screen.select(hover);
+      }
+
+      if (padPending && !stageNow.held) {
+        padPending = false;
+        if (!store.getState().dragged) params.onKey?.('activate');
       }
 
       // The side key dips 0.014 into the shell for 160 ms per press.
@@ -564,6 +573,8 @@ function standModels(THREE: Three, parent: Group, models: readonly ScreenModel[]
   /** The last nudge count seen (null before the first frame), when the current wobble started, and the models' own clock. */
   let lastNudge: number | null = null;
   let nudgeFrom = -1;
+  /** The last reaction key seen (null before the first frame): a new one plays its clip once. */
+  let lastReaction: number | null = null;
   let clock = 0;
 
   return {
@@ -686,7 +697,12 @@ function standModels(THREE: Three, parent: Group, models: readonly ScreenModel[]
       offset = 0,
       /** undefined: every model keeps its built slot. null: hide them. A rect: re-seat the Babies there. */
       rect?: ScreenRect | null,
+      /** A one-shot clip request (DeviceScreen.monReaction): a new key plays it once. */
+      reaction?: { readonly key: number; readonly clips: readonly string[] },
     ): { active: boolean; ambient: boolean } => {
+      // The first read only learns the key, like the nudge.
+      const react = reaction !== undefined && lastReaction !== null && reaction.key !== lastReaction ? reaction.clips : null;
+      if (reaction !== undefined) lastReaction = reaction.key;
       // `active`: a tween or a press easing to a goal. `ambient`: a looping idle (the clip, the glow's breath).
       let active = false;
       let ambient = false;
@@ -762,6 +778,7 @@ function standModels(THREE: Three, parent: Group, models: readonly ScreenModel[]
         entry.holder.position.set(entry.rest.x + entry.shift + shift - h * Math.sin(tilt), entry.rest.y + h * (Math.cos(tilt) - 1) + lift, entry.rest.z);
         if (mon) {
           if (monClips) mon.setClips(monClips);
+          if (react !== null && !frame.reducedMotion) mon.react(react);
           mon.update(frame.delta, { reduced: frame.reducedMotion, boundX: 0 });
           if (!frame.reducedMotion) ambient = true;
         } else if (rig) {

@@ -1,5 +1,5 @@
 import { monModelAssetForDex } from '@acme/assets/mons';
-import type { MonMood } from '@acme/core/types';
+import type { AnimationIntent, MonMood } from '@acme/core/types';
 
 /**
  * The loop each rigged form plays, by mood (first match wins in the Mon
@@ -42,6 +42,36 @@ export function clipsFor(dexId: number | null, mood: MonMood | null, asleep: boo
   if (!entry) return null;
   const key: MonMood | null = asleep ? 'asleep' : mood;
   return (key === null ? undefined : entry.byMood[key]) ?? entry.idle;
+}
+
+/** The one-shot reactions Home plays (ANIMATION_INTENTS in @acme/core): a tap and a return. */
+export type MonReactionIntent = Extract<AnimationIntent, 'attention' | 'approach'>;
+
+/**
+ * Each intent's clips per rigged form, best first; the rig plays the first
+ * its GLB has. Neither GLB has a clip named `attention` or `approach`
+ * (clip lists read from apps/web/public/mons/*.glb, 2026-10-28), so these
+ * map the intents onto clips that exist:
+ * - Lil' Ratti: attention = `up_look_listen` (looks at the Caller), else
+ *   `emote_curious`; approach = `wave` (a greeting), else `emote_happy`.
+ * - Squeaklet has five clips (jaw_chomp, mouth_close, rat_run, tail_swish,
+ *   blink) and none reads as a look or a greeting, so it has no entry and
+ *   Home falls back to the glass's nudge for both.
+ * The Metro Egg's `attention_lean_in` / `attention_hesitate` belong to M12's
+ * first look, not to a Baby on Home.
+ */
+export const MON_REACTIONS: Readonly<Record<number, Partial<Record<MonReactionIntent, readonly string[]>>>> = {
+  3: {
+    attention: ['up_look_listen', 'emote_curious'],
+    approach: ['wave', 'emote_happy'],
+  },
+};
+
+/** The clips for a reaction on this form, or null when it has none (Home then nudges the Baby instead). */
+export function reactionClipsFor(dexId: number | null, intent: MonReactionIntent): readonly string[] | null {
+  if (dexId === null) return null;
+  const clips = MON_REACTIONS[dexId]?.[intent];
+  return clips === undefined || clips.length === 0 ? null : clips;
 }
 
 /**

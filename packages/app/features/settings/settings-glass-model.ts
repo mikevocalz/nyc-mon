@@ -9,7 +9,12 @@ import { SOFTWARE_CREDITS, SOFTWARE_CREDITS_GROUP } from './software-credits.ts'
 import { themeLabel } from './theme-options.ts';
 import { TIME_OF_DAY_COPY, TIME_OF_DAY_OPTIONS } from './time-of-day-options.ts';
 
-export type SettingsRowId = 'caller' | 'theme' | 'timeOfDay' | 'controls' | 'legal' | 'credits' | 'signOut' | 'deleteAccount';
+export type SettingsRowId =
+  | 'account' | 'caller' | 'notify' | 'haptics' | 'sound' | 'motion' | 'theme' | 'timeOfDay' | 'controls'
+  | 'export' | 'legal' | 'credits' | 'signOut' | 'deleteAccount';
+
+/** The rows whose select flips a switch in place. */
+export const SWITCH_ROWS: readonly SettingsRowId[] = ['notify', 'haptics', 'sound', 'motion'];
 
 export interface SettingsRow {
   readonly id: SettingsRowId;
@@ -32,21 +37,53 @@ export interface SettingsRowsInput {
   readonly timeOfDay: PhysicalPresetId | null;
   /** This device has an account (useHasAccount). Without one there is nothing to delete (no row). */
   readonly hasAccount?: boolean;
+  /** The signed-in email, or null when signed out (no Account row then). */
+  readonly email?: string | null;
+  /** Egg alerts on, or null where the app never notifies (web; no row then). */
+  readonly notify?: boolean | null;
+  /** The OS blocks alerts: the row opens the phone's Settings instead. */
+  readonly notifyDenied?: boolean;
+  readonly haptics?: boolean;
+  readonly sound?: boolean;
+  /** Reduced motion in effect (forced or from the OS). */
+  readonly motion?: boolean;
 }
 
+const onOff = (on: boolean): string => copy(on ? 'settings.on' : 'settings.off');
+
 /**
- * The native settings that matter on the H-Lynk, in reading order. Sound has
- * no row: the app has no sound setting yet.
+ * The native settings that matter on the H-Lynk, in reading order: the
+ * account, the device switches (M19), appearance, game, data, legal and the
+ * session.
  */
 export function settingsRows(input: SettingsRowsInput): SettingsRow[] {
   const change = copy('settings.row.change');
   const open = copy('settings.row.open');
   const rows: SettingsRow[] = [];
+  if (typeof input.email === 'string') {
+    rows.push({ id: 'account', label: copy('settings.account.title'), value: input.email, verb: open, hint: copy('settings.account.methods') });
+  }
   if (input.callerName !== null) {
     rows.push({
       id: 'caller', label: copy('m07.field.label'), value: input.callerName, verb: change,
       hint: input.callerSaved ? copy('settings.caller.saved') : copy('m07.field.hint'),
     });
+  }
+  if (input.notify !== undefined && input.notify !== null) {
+    rows.push({
+      id: 'notify', label: copy('settings.notify.label'), value: onOff(input.notify),
+      verb: input.notifyDenied ? copy('settings.notify.open_settings') : change,
+      hint: copy(input.notifyDenied ? 'settings.notify.caption.denied' : 'settings.notify.caption'),
+    });
+  }
+  if (input.haptics !== undefined) {
+    rows.push({ id: 'haptics', label: copy('settings.haptics.label'), value: onOff(input.haptics), verb: change, hint: copy('settings.haptics.caption') });
+  }
+  if (input.sound !== undefined) {
+    rows.push({ id: 'sound', label: copy('settings.sound.label'), value: onOff(input.sound), verb: change, hint: copy('settings.sound.caption') });
+  }
+  if (input.motion !== undefined) {
+    rows.push({ id: 'motion', label: copy('settings.motion.label'), value: onOff(input.motion), verb: change, hint: copy('settings.motion.caption') });
   }
   rows.push({ id: 'theme', label: copy('settings.theme.label'), value: themeLabel(input.theme), verb: change });
   if (input.timeOfDay !== null) {
@@ -58,6 +95,7 @@ export function settingsRows(input: SettingsRowsInput): SettingsRow[] {
   }
   rows.push(
     { id: 'controls', label: copy('settings.game_controls.label'), verb: open, hint: copy('settings.game_controls.caption') },
+    { id: 'export', label: copy('settings.export.label'), verb: copy('settings.export.action'), hint: copy('settings.export.caption') },
     { id: 'legal', label: copy('settings.legal.label'), verb: open },
     { id: 'credits', label: copy('settings.credits.label'), verb: open },
     { id: 'signOut', label: copy('settings.sign_out.label'), verb: copy('settings.sign_out.label'), hint: copy('settings.sign_out.caption') },

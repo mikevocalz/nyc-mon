@@ -4,7 +4,7 @@ import { useCallback, useEffect } from 'react';
 import { useRouter } from 'expo-router';
 import { CALLER_NAME_MAX_LENGTH } from '@acme/core/sim';
 import {
-  Button, TextField, useInstanceStore, useStore, type DeviceKey, type GlassAction, type GlassLine, type GlassView,
+  Button, TextField, useInstanceStore, useReducedMotion, useStore, type DeviceKey, type GlassAction, type GlassLine, type GlassView,
 } from '@acme/ui';
 import { haptics } from '@acme/ui/haptics';
 import { Pressable, Text, View } from '@acme/ui/tw';
@@ -19,7 +19,13 @@ import { selectActiveMon, useMonStore } from '../mon/mon.store';
 import { announcePolitely } from '../onboarding/announce';
 import { copy } from '../onboarding/copy';
 import { useProfile } from '../profile/profile.store';
+import { useAccount } from './account';
+import { AccountDetails } from './AccountCard';
 import { useCallerNameEditor } from './caller-name-editor';
+import { useDataExport } from './data-export';
+import { useDevicePrefs } from './device-prefs.store';
+import { providerCopyId } from './account-model.ts';
+import { useNotifyToggle } from './notify-toggle';
 import { SettingsDetailPane } from './SettingsDetailPane';
 import { SettingsScreen } from './screen.native';
 import {
@@ -43,7 +49,7 @@ const CREDIT_LINES_PER_PAGE = 8;
 const GAME_CONTROLS_PATH = '/(drawer)/game-controls';
 const LEGAL_PATH = '/legal/terms';
 
-type Mode = 'list' | 'name' | 'signOut' | 'deleteAccount' | 'credits';
+type Mode = 'list' | 'name' | 'signOut' | 'deleteAccount' | 'credits' | 'account';
 
 interface LocalState {
   mode: Mode;
@@ -108,6 +114,11 @@ export function SettingsGlass() {
   const mon = useMonStore(selectActiveMon);
   const hasAccount = useHasAccount();
   const deletion = useDeleteAccountFlow(() => router.replace(DELETED_PATH));
+  const prefs = useDevicePrefs();
+  const reduced = useReducedMotion();
+  const notify = useNotifyToggle();
+  const account = useAccount();
+  const exporter = useDataExport(account.user);
   const { model, monClips } = useMonGlass(mon === undefined ? null : monIdentity(mon).dexId, undefined);
 
   const rows = settingsRows({
@@ -116,6 +127,12 @@ export function SettingsGlass() {
     theme,
     timeOfDay: EXPERIMENTAL_WORLD_PHYSICAL ? timeOfDay : null,
     hasAccount,
+    email: account.signedIn ? (account.email ?? copy('settings.account.email.none')) : null,
+    notify: notify.available ? notify.on : null,
+    notifyDenied: notify.denied,
+    haptics: prefs.haptics,
+    sound: prefs.sound,
+    motion: prefs.forceReducedMotion || reduced,
   });
   const cursor = clampCursor(s.cursor, rows.length);
   const current: SettingsRow | undefined = rows[cursor];
@@ -157,6 +174,29 @@ export function SettingsGlass() {
         announcePolitely(copy('settings.value.a11y', { label: row.label, value: label }));
         return;
       }
+      case 'account':
+        local.setState({ mode: 'account' });
+        return;
+      case 'notify':
+        if (notify.denied) notify.openSettings();
+        else void notify.set(!notify.on);
+        return;
+      case 'haptics':
+      case 'sound': {
+        const next = !prefs[row.id];
+        prefs.set(row.id, next);
+        announcePolitely(copy('settings.value.a11y', { label: row.label, value: copy(next ? 'settings.on' : 'settings.off') }));
+        return;
+      }
+      case 'motion': {
+        const next = !(prefs.forceReducedMotion || reduced);
+        prefs.set('forceReducedMotion', next);
+        announcePolitely(copy('settings.value.a11y', { label: row.label, value: copy(next || reduced ? 'settings.on' : 'settings.off') }));
+        return;
+      }
+      case 'export':
+        void exporter.run();
+        return;
       case 'controls':
         router.push(GAME_CONTROLS_PATH);
         return;
@@ -271,6 +311,22 @@ export function SettingsGlass() {
         },
       ],
     };
+  } else if (s.mode === 'account') {
+    label = copy('settings.account.title');
+    const methods = account.accounts === null
+      ? [copy(account.loadFailed ? 'settings.account.methods.error' : 'settings.account.methods.loading')]
+      : account.accounts.map((a) => copy(providerCopyId(a.providerId)));
+    view = {
+      status: { text: title, tone: 'neutral' },
+      title: label,
+      subtitle: account.email ?? copy('settings.account.email.none'),
+      rings: [],
+      lines: [
+        { text: copy('settings.account.methods'), size: 'caption', tone: 'amber', align: 'left' },
+        ...methods.slice(0, 6).map((text): GlassLine => ({ text, size: 'caption', tone: 'text', align: 'left' })),
+      ],
+      actions: [{ target: 'back', label: back, tone: 'primary' }],
+    };
   } else if (s.mode === 'credits') {
     label = copy('settings.credits.label');
     const page = Math.min(s.creditPage, CREDIT_PAGES - 1);
@@ -321,6 +377,8 @@ export function SettingsGlass() {
     } else if (s.mode === 'deleteAccount') {
       if (target === 'delete') void deleteAccount();
       else if (target === 'cancel') toList();
+    } else if (s.mode === 'account') {
+      if (target === 'back') toList();
     } else if (s.mode === 'credits') {
       if (target === 'previous') turnCredits(-1);
       else if (target === 'next') turnCredits(1);
@@ -343,6 +401,8 @@ export function SettingsGlass() {
       if ((leaving || key === 'activate') && !local.getState().signingOut) toList();
     } else if (mode === 'deleteAccount') {
       // Same rule: the trackpad and Back answer Cancel, never Delete.
+      if (leaving || key === 'activate') toList();
+    } else if (mode === 'account') {
       if (leaving || key === 'activate') toList();
     } else if (mode === 'credits') {
       if (key === 'prev') turnCredits(-1);
@@ -411,6 +471,14 @@ export function SettingsGlass() {
     </View>
   );
 
+  // The change-email and change-password fields can't be drawn on the glass:
+  // on phones they sit under the device (like the name field), on tablets in the Detail pane.
+  const accountPanel = (
+    <View testID="settings-account-panel" className="gap-3 bg-ink-950/90 px-4 pb-4 pt-3">
+      <AccountDetails account={account} />
+    </View>
+  );
+
   const actionControls = (actions: readonly GlassAction[]) => actions.map((a) => ({
     key: a.target, label: a.label, disabled: a.disabled, onPress: () => onAction(a.target), testID: `settings-${s.mode}-${a.target}`,
   }));
@@ -447,7 +515,7 @@ export function SettingsGlass() {
       controls={controls}
       // Only while renaming: the field (it can't be drawn on the glass) with its two actions, under the device.
       // With the Detail pane beside the device they sit in the pane instead.
-      below={s.mode === 'name' && !paned ? nameForm : undefined}
+      below={!paned && s.mode === 'name' ? nameForm : !paned && s.mode === 'account' ? accountPanel : undefined}
       companion={
         <SettingsDetailPane
           row={current}
@@ -462,6 +530,9 @@ export function SettingsGlass() {
           deleteErrorId={deletion.errorId}
           onDelete={() => void deleteAccount()}
           onCancel={() => (s.mode === 'name' ? cancelName() : toList())}
+          account={account}
+          exporting={exporter.exporting}
+          exportFailed={exporter.failed}
         />
       }
     />

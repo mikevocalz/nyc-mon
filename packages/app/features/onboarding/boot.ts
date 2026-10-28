@@ -6,6 +6,7 @@ import { assertNever, type BootRoute, type BootSnapshot, resolveBootRoute } from
 import { readAgeAnswer, readNicknamePromptSeen, readPermissionReview, readSessionFlag, SAVE_KEY } from './onboarding.store';
 import { saveStorage } from './storage';
 import { MEET_PATH, MON_HOME_PATH, PERMISSIONS_PATH } from '../egg/egg-model.ts';
+import { recoveryHref } from '../system/recovery-model.ts';
 
 /**
  * M02 ships with canon-safe art: the real egg captures are still pending
@@ -35,9 +36,8 @@ export function buildBootSnapshot(nowMs: number): BootSnapshot {
 
 /**
  * Maps a {@linkcode BootRoute} to an expo-router href. Exhaustive: a new
- * `BootRoute` kind fails typecheck here (M01 "Tests to write"). Destinations
- * whose screens are still unbuilt (M22) fall back to the nearest shipped
- * route, marked per case. M08 (`/(onboarding)/meet`), M09 (`/(home)/name`)
+ * `BootRoute` kind fails typecheck here (M01 "Tests to write"). An
+ * unreadable save goes to M22 (`/(system)/error?state=save-recovered`). M08 (`/(onboarding)/meet`), M09 (`/(home)/name`)
  * and M11/M13 (`/(home)`) point at their D-16 routes.
  */
 export function bootPath(route: BootRoute): Href {
@@ -77,10 +77,9 @@ export function bootPath(route: BootRoute): Href {
     case 'consent-denied':
       return '/(auth)/consent?state=denied';
     case 'save-recovered':
-      // M22 is not built. `(home)` finds neither egg nor Mon in an unreadable
-      // save and shows the generic error screen (HomeIndexScreen) without
-      // writing, so the broken save is still there for M22 to recover.
-      return APP_HOME_PATH;
+      // M22: nothing is written on the way, so the broken save is still there
+      // to recover from the last good copy or to set aside.
+      return recoveryHref('save-recovered');
     default:
       return assertNever(route);
   }

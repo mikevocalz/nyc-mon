@@ -12,8 +12,10 @@ import { AppQueryProvider, SafeAreaProvider, useProfile } from "@acme/app";
 import { RootErrorBoundary } from "@acme/app/features/error/root-boundary.tsx";
 import { hydrateMon } from "@acme/app/features/mon/mon.store.ts";
 import { hydrateOnboarding } from "@acme/app/features/onboarding/onboarding.store.ts";
+import { hydrateDevicePrefs } from "@acme/app/features/settings/device-prefs.store.ts";
 import { useReadyNotificationRouting } from "@acme/app/features/onboarding/notify-hook.ts";
 import { cleanRootStack, type StackLike } from "@acme/app/features/onboarding/root-stack.ts";
+import { hydrateSync, startConnectivity } from "@acme/app/features/system/sync.store.ts";
 import { semantic } from "@acme/theme";
 import { setThemePreference } from "@acme/theme/switch";
 import { Toaster } from "@acme/ui";
@@ -36,6 +38,11 @@ setThemePreference(useProfile.getState().theme);
 // M01 boot reads these flags synchronously; hydrate before the first frame.
 hydrateOnboarding();
 hydrateMon();
+// M21: the conflict log, then the app's one connectivity source (expo-network).
+hydrateSync();
+startConnectivity();
+// M19: haptics, sound and forced reduced motion reach the kit before the first frame.
+hydrateDevicePrefs();
 
 // The navigator paints every screen's card. Left on its default theme it
 // stays light (#F2F2F2) while the kit text follows the dark preference, so

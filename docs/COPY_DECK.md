@@ -631,6 +631,79 @@ Back in the 2D Session card and as the last row on the glass, shown only when th
 Struck the same day: the Preferences card's "Push notifications", "Weekly email digest" and "Public profile" switches. Nothing saved or read them, there is no digest mail (the privacy notice says there is no marketing channel) and no public profile. The Settings header line is now "Appearance, game and your account." (also on Profile's Settings row).
 
 
+### Deletion rule (decision, 2026-10-28)
+
+The brief (§4.4 M20) asks for "two-step, 7-day grace". The privacy notice (`features/legal/copy.ts`, "Your data, your call") promises deletion with no waiting period, and the server already deletes a self-service request at once (`releaseOwnAccount` in `packages/payload/src/auth/deletion.ts`) while keeping the 7-day grace for deletions staff schedule (`deleteCallerAccount`, hourly job).
+
+- **BUILD: two steps.** Delete account opens a question; only its own Delete button deletes. Cancel comes first, is the default look, and is what the trackpad, Back and Home answer on the glass.
+- **STRIKE: a 7-day grace on self-deletion.** The notice is the promise the Caller read. A grace would also need a "cancel deletion" path and copy the notice doesn't mention, and it keeps a child's personal data longer than they asked.
+- **Kept: the 7-day grace for staff-scheduled deletions** (DECISIONS L3), which the Caller didn't start.
+- **The Mon is never deleted** (Law 8): it passes into Dr. Santoro's care either way. The confirm body says so.
+
+If the grace ever comes back for self-deletion, the privacy notice changes first.
+
+### Device settings (M19, 2026-10-28)
+
+The "This device" card on the 2D page, and one row each on the glass. Every switch is saved (MMKV, `device-prefs.store.ts`) and read: Haptics silences every `@acme/ui/haptics` call, Sound silences the side key chirp and the synthesized hatch sounds, Reduce motion ORs into the kit's `useReducedMotion`, Egg alerts gates `scheduleReadyNotification` and cancels the scheduled alert when turned off. No Rive file in the repo carries audio, so Rive has nothing to mute. Haptics and Egg alerts are native only (web has neither).
+
+| ID | String | Voice | Status |
+|---|---|---|---|
+| `settings.device.title` | This device | ui | drafted |
+| `settings.notify.label` | Egg alerts | ui | drafted (the only notification is the egg-ready one) |
+| `settings.notify.caption` | One alert when your egg is ready to hatch. Nothing else. | ui | drafted |
+| `settings.notify.caption.denied` | Your phone blocks alerts from NYC-MON. Turn them on in your phone’s Settings. | ui | drafted |
+| `settings.notify.open_settings` | Open phone Settings | ui | drafted (deep link, `Linking.openSettings`) |
+| `settings.haptics.label` | Haptics | ui | drafted |
+| `settings.haptics.caption` | Vibration on taps, the hatch and the controls. | ui | drafted |
+| `settings.sound.label` | Sound | ui | drafted |
+| `settings.sound.caption` | Sound effects, like the side key chirp. | ui | drafted |
+| `settings.motion.label` | Reduce motion | ui | drafted |
+| `settings.motion.caption` | Follows your phone. Turn on to reduce motion here even when your phone doesn’t. | ui | drafted |
+| `settings.motion.caption.system` | On in your phone’s settings, so motion is already reduced. | ui | drafted (the switch reads on and can't turn the OS setting off) |
+| `settings.on` / `settings.off` | On / Off | ui | drafted (glass row values) |
+| `settings.export.label` | Download your data | ui | drafted |
+| `settings.export.caption` | A JSON file with your save, these settings and your account details. | ui | drafted |
+| `settings.export.action` | Download | ui | drafted |
+| `settings.export.title` | Your NYC-MON data | ui | drafted (share sheet title) |
+| `settings.export.error` | Couldn't open the share sheet. Try again. | ui | drafted |
+| `settings.export.done.a11y` | Your data is ready to share. | ui | drafted |
+
+The export holds the whole local save, these settings and, when signed in, the account record (email, Caller name, birth year, created date) and sign-in methods. There is no fuller server export yet; the privacy notice's "ask for a copy" route still covers the rest, and the file's `notes` say what is missing.
+
+### Account (M20, 2026-10-28)
+
+Inside Settings, not a separate route: the 2D Account card, and the glass's Account row (methods on the glass; the email and password forms under the device on phones and in the Detail pane on tablets and open foldables).
+
+| ID | String | Voice | Status |
+|---|---|---|---|
+| `settings.account.title` | Account | ui | drafted |
+| `settings.account.email` | Email | ui | drafted |
+| `settings.account.email.none` | No email on this account | ui | drafted (Apple private relay can still give one; some providers don't) |
+| `settings.account.methods` | Ways to sign in | ui | drafted |
+| `settings.account.methods.loading` | Checking… | ui | drafted |
+| `settings.account.methods.error` | Couldn't load your sign-in methods. Try again. | ui | drafted |
+| `settings.account.provider.*` | Email and password / Apple / Google / Amazon / Other | ui | drafted |
+| `settings.account.signed_out` | Sign in to see your account. | ui | drafted |
+| `settings.account.change_email` | Change email | ui | drafted |
+| `settings.account.change_email.field` | New email | ui | drafted |
+| `settings.account.change_email.hint` | We email your current address first. It changes once you open that link. | ui | drafted (Better Auth `changeEmail`, `updateEmailWithoutVerification: false`) |
+| `settings.account.change_email.sent` | Check {email} for a link to confirm the change. | ui | drafted ({email} is the current address) |
+| `settings.account.change_email.invalid` | That email looks off. Check it for a typo. | ui | drafted (same line as M03) |
+| `settings.account.change_password` | Change password | ui | drafted (only on email-and-password accounts) |
+| `settings.account.password.current` | Current password | ui | drafted |
+| `settings.account.password.new` | New password | ui | drafted |
+| `settings.account.password.hint` | At least 10 characters. Your other devices get signed out. | ui | drafted (`revokeOtherSessions: true`) |
+| `settings.account.password.too_short` | Use at least 10 characters. | ui | drafted |
+| `settings.account.password.done` | Password changed. | ui | drafted |
+| `settings.account.save` | Save | ui | drafted |
+| `settings.account.error.offline` | You're offline. Connect to the internet and try again. | ui | drafted |
+| `settings.account.error.reauth` | It's been a while since you signed in. Sign out, sign back in, then try again. | ui | drafted |
+| `settings.account.error.password_wrong` | That isn't your current password. | ui | drafted |
+| `settings.account.error.email_taken` | That email already has an account. | ui | drafted |
+| `settings.account.error.generic` | That didn't work. Try again in a minute. | ui | drafted |
+
+The Settings header line is now "This device, your account and the game." (also on Profile's Settings row).
+
 ## Companion pane (tablets and open foldables)
 
 Written 2026-10-28. On a tablet, an open foldable or a wide web window, the 3D H-Lynk screens get a pane beside the device (landscape) or under it (portrait). Phones never show it. Strings live in `packages/app/features/companion/copy.ts` (`pane.*`, M13 to M18) and `packages/app/features/egg/copy.ts` (`pane.meet.*`, `pane.incubation.*`, M08, M10 and M11). Settings and M09 reuse their existing strings. Layout: `docs/design/foldable-arrangements.md`, "Companion pane on the persistent stage".
@@ -732,3 +805,193 @@ Added with the responsive pass on Alerts, Caller, Settings, Game controls, Legal
 | `perm.continue.selected` | Continue with {n} selected | ui | drafted (moved) |
 | `perm.not_now` | Not now | ui | drafted (moved) |
 | `perm.footnote` | Denying access won’t block your Mon. You can enable permissions later in device settings or when you use a feature. | ui | drafted (moved) |
+
+
+## MONS — the species index (2026-10-28)
+
+The fourth native tab (Gameplay Bible v12): "what is this Mon?", never the care screen. A plain screen in the `(home)` shell with no H-Lynk on it. Strings live in `packages/app/features/mons/copy.ts`; the Bloodline label reuses `m17.bloodline`. Stage names (Egg, Baby, Small, Mid, Max) are canon and come from the data.
+
+| ID | String | Voice | Status |
+|---|---|---|---|
+| `mons.title` | Mons | ui | drafted |
+| `mons.count` | Seen {seen} of {total} | ui | drafted |
+| `mons.count.a11y` | You have seen {seen} of {total} Mons | ui | drafted |
+| `mons.search.placeholder` | Name or number | ui | drafted |
+| `mons.search.a11y` | Search Mons by name or number | ui | drafted |
+| `mons.filter.bloodline.a11y` | Bloodline | ui | drafted |
+| `mons.filter.stage.a11y` | Stage | ui | drafted |
+| `mons.filter.all` | All | ui | drafted |
+| `mons.number` | No. {dex} | ui | drafted |
+| `mons.number.a11y` | Number {dexSpoken} | ui | drafted |
+| `mons.unseen` | ??? | ui | drafted |
+| `mons.comingSoon` | Coming Soon | ui | drafted |
+| `mons.unseen.a11y` | Not seen yet | ui | drafted |
+| `mons.row.a11y` | {name}, number {dexSpoken}, {stage}, {bloodline} | ui | drafted |
+| `mons.row.unseen.a11y` | Number {dexSpoken}, not seen yet | ui | drafted |
+| `mons.row.hint` | Opens the entry | ui | drafted |
+| `mons.empty.title` | No Mons seen yet | ui | drafted |
+| `mons.empty.body` | Pick an egg and each Mon you meet fills in here. | ui | drafted |
+| `mons.nomatch.title` | No Mons match | ui | drafted |
+| `mons.nomatch.body` | Try another name or number, or show every Bloodline. | ui | drafted |
+| `mons.nomatch.clear` | Clear search and filters | ui | drafted |
+| `mons.entry.stage` | Stage | ui | drafted |
+| `mons.entry.bloodline` | Bloodline | ui | drafted |
+| `mons.entry.lore` | Lore | ui | drafted |
+| `mons.entry.unseen.body` | Meet this Mon to fill in the entry. | ui | drafted |
+| `mons.entry.line` | Evolution line | ui | drafted |
+| `mons.entry.line.a11y` | Evolution line, Egg to Max | ui | drafted |
+| `mons.entry.step.a11y` | {stage}: {name} | ui | drafted |
+| `mons.entry.step.current.a11y` | {stage}: {name}, this entry | ui | drafted |
+| `mons.entry.branch` | A Mid becomes one of these | ui | drafted |
+| `mons.entry.branch.why` | Bond and personality can shape which one. | ui | drafted |
+| `mons.entry.trigger.unknown` | Trigger unknown | ui | drafted |
+| `mons.entry.trigger.a11y` | Evolves with {trigger} | ui | drafted |
+| `mons.entry.previous` | Previous | ui | drafted |
+| `mons.entry.next` | Next | ui | drafted |
+| `mons.entry.previous.a11y` | Previous entry, number {dexSpoken} | ui | drafted |
+| `mons.entry.next.a11y` | Next entry, number {dexSpoken} | ui | drafted |
+| `mons.entry.back` | All Mons | ui | drafted |
+| `mons.entry.model.a11y` | {name}, 3D model | ui | drafted |
+| `mons.entry.unseen.art.a11y` | Unseen Mon | ui | drafted |
+| `mons.notfound.title` | No entry here | ui | drafted |
+| `mons.notfound.body` | This number is not in the index. | ui | drafted |
+| `mons.loading.a11y` | Loading the Mon | ui | drafted |
+| `mons.detail.empty.title` | Pick a Mon | ui | drafted |
+| `mons.detail.empty.body` | Choose a number on the left to read the entry. | ui | drafted |
+
+Notes:
+
+- **Unseen is "???" with the number only.** A form counts as seen when the save shows the Caller met it (M08 eggs, an egg record, a Mon and the forms on its chain). Search matches unseen forms by number only, never by name, so it cannot leak one. Babies are never shown before the hatch (glossary, P3), so the unseen art is a question mark, not the form's outline.
+- **Branch triggers are not in canon.** Decision #12 leaves what decides a Max branch `TODO(canon)`; v11 says only "Personality/Bond can influence branching evolution". `mons.entry.branch.why` paraphrases that line and each Max step reads `mons.entry.trigger.unknown` until canon names a crystal, item or condition.
+- **Facts come from content only.** Type, temperament, home district, height and weight have no canon value yet, so the entry has no label for them. `mons.entry.lore` shows only when a record's `cultureNote` is set.
+
+## HOME hub and Caller, Phase 1 (2026-10-28)
+
+HOME is the canon's first tab (`/home`, `features/hub/copy.ts`); CALLER is the fifth (`features/profile/copy.ts`). Both are Phase 1 only: no Stories, events, tournaments, reputation, rankings, achievements or friends, and no placeholder lines for them. The hub reuses H-Lynk's own words for care (`m13.status.*`) and the egg's time line (`m11.time.*`), so a status reads the same on Home as on the H-Lynk. Copy tests in `hub-model.test.ts` reject "pet", "player", "device", "user", "owner", "trainer", "Get started" and exclamation marks.
+
+| ID | String | Voice | Status |
+|---|---|---|---|
+| `hub.loading.a11y` | Loading Home | ui | drafted, new |
+| `hub.mon.label` | With you now | ui | drafted, new |
+| `hub.mon.stage` | {stage} stage | ui | drafted, new |
+| `hub.mon.a11y` | {name}, {stage} stage. {status}. | ui | drafted, new |
+| `hub.need.feed` | Feed {name} | ui | drafted, new |
+| `hub.need.rest` | Put {name} to bed | ui | drafted, new |
+| `hub.need.asleep` | Check on {name} | ui | drafted, new |
+| `hub.need.play` | Play with {name} | ui | drafted, new |
+| `hub.need.hi` | Say hi to {name} | ui | drafted, new |
+| `hub.need.hint` | Opens H-Lynk | ui | drafted, new |
+| `hub.egg.label` | Your egg | ui | drafted, new |
+| `hub.hatch.counting.title` | Your egg is incubating | ui | drafted, new |
+| `hub.hatch.ready.title` | Your egg is ready | ui | drafted, new |
+| `hub.hatch.resume.title` | Your egg started hatching | ui | drafted, new |
+| `hub.hatch.counting.action` | Check your egg | ui | drafted, new |
+| `hub.hatch.ready.action` | Hatch your egg | ui | drafted, new |
+| `hub.hatch.resume.action` | Finish the hatch | ui | drafted, new |
+| `hub.game.continue` | Continue game | ui | drafted, new |
+| `hub.game.continue.detail` | Last saved {when} | ui | drafted, new |
+| `hub.game.start` | Start the game | ui | drafted, new |
+| `hub.game.start.detail` | Walk the city with {name}. | ui | drafted, new |
+| `hub.game.start.detail.solo` | Walk the city. | ui | drafted, new |
+| `hub.game.failed` | Open the game | ui | drafted, new |
+| `hub.game.failed.detail` | Your city save didn't load. The game can fix it. | ui | drafted, new |
+| `hub.hlynk.title` | Your H-Lynk | ui | drafted, new |
+| `hub.hlynk.detail` | Feed, rest and play with {name}. | ui | drafted, new |
+| `hub.hlynk.detail.egg` | Your egg is in there. | ui | drafted, new |
+| `hub.hlynk.a11y` | Open your H-Lynk | ui | drafted, new |
+| `hub.empty.title` | No Mon yet | ui | drafted, new |
+| `hub.empty.body` | Pick an egg. Your Mon hatches from it. | ui | drafted, new |
+| `hub.empty.action` | Choose your egg | ui | drafted, new |
+| `caller.label` | Caller | ui | drafted, new (replaces `profile.identity.label` "Account" over the name) |
+| `caller.since` | Caller since {date} | ui | drafted, new (month and year, device locale) |
+| `caller.record.title` | Your record | ui | drafted, new |
+| `caller.record.hatched` | Eggs hatched | ui | drafted, new |
+| `caller.record.highlights` | Journal highlights | ui | drafted, new (the hatch, the naming, and each first meal, nap and game) |
+| `caller.record.a11y` | {label}, {count} | ui | drafted, new |
+| `caller.mons.title` | Mons raised | ui | drafted, new |
+| `caller.mons.stage` | {stage} stage | ui | drafted, new |
+| `caller.mons.days.one` | 1 day together | ui | drafted, new |
+| `caller.mons.days.many` | {days} days together | ui | drafted, new |
+| `caller.mons.row.a11y` | {name}, {stage} stage, {days} | ui | drafted, new |
+| `caller.mons.empty.egg` | Your egg is incubating. Your first Mon hatches from it. | ui | drafted, new |
+| `caller.mons.empty` | No Mon yet. Pick an egg on Home. | ui | drafted, new |
+| `caller.settings.title` | Settings | ui | drafted, new |
+| `caller.settings.detail` | Appearance, graphics and game controls. | ui | drafted, new |
+| `caller.settings.a11y` | Open settings | ui | drafted, new |
+| `caller.account.title` | Account | ui | drafted, new (opens Settings: its account cards hold the Caller name, sign out and delete) |
+| `caller.account.detail` | Caller name, sign out, delete account. | ui | drafted, new |
+| `caller.account.a11y` | Open your account settings | ui | drafted, new |
+| `caller.loading.a11y` | Loading your Caller record | ui | drafted, new |
+
+## M21 offline / sync and M22 error / recovery (2026-10-28)
+
+Strings live in `packages/app/features/system/copy.ts`. Every one is `ui` voice; neither screen has a character line.
+
+M22 always says three things in order: what happened, what is safe, what to do. "Your Mon is fine" leads both 3D states because the Mon is the first worry. A damaged save is never deleted, and the copy says so before the Caller picks an action. "Start a new save" sits behind a confirm with Cancel first.
+
+M21 says "saved here" before it says "offline": the Caller can keep playing. A conflict is one line in the sync log, never a dialog (brief §4.4). Phase 1 has no client that sends the queue to the server, so Sync now answers `m21.result.no_server` instead of pretending to sync.
+
+"This device" here means the phone or tablet, never the H-Lynk (the banned use).
+
+| ID | String | Voice | Status |
+|---|---|---|---|
+| `m22.save.title` | Your save didn't open | ui | drafted |
+| `m22.save.body.restore` | The save on this device is damaged. You can go back to the last copy that saved cleanly, from {when}. | ui | drafted ({when} is the last-good save time, device locale) |
+| `m22.save.body.none` | The save on this device is damaged, and there's no clean copy to go back to. You can start a new save. | ui | drafted |
+| `m22.save.body.newer` | This save was made by a newer version of NYC-MON. Update the app to open it, or go back to an older copy. | ui | drafted |
+| `m22.save.kept` | The damaged save stays on this device. Nothing is deleted. | ui | drafted (under every save state; the broken save moves to its own key) |
+| `m22.webgpu.title` | 3D can't run on this device | ui | drafted |
+| `m22.webgpu.body` | Your Mon is fine. The 2D view has everything the 3D one does. | ui | drafted |
+| `m22.lost.title` | The 3D view stopped | ui | drafted |
+| `m22.lost.body` | Your Mon is fine. Try the 3D view again, or keep going in 2D. If it stops again, close and reopen the app. | ui | drafted (React Native Skia 3.6 treats a lost shared device as fatal, hence the reopen line) |
+| `m22.mon.title` | Your Mon didn't load | ui | drafted |
+| `m22.mon.body` | The save opened, but your Mon is missing from this screen. Load the save again to bring them back. | ui | drafted (M13 with no Mon and no egg while the save itself reads) |
+| `m22.dex.title` | No Dex entry here | ui | drafted |
+| `m22.dex.body` | This link points to a Mon that isn't in your Dex. | ui | drafted |
+| `m22.action.restore` | Go back to the last good save | ui | drafted |
+| `m22.action.start_over` | Start a new save | ui | drafted |
+| `m22.action.use_2d` | Use the 2D view | ui | drafted |
+| `m22.action.retry_3d` | Try 3D again | ui | drafted |
+| `m22.action.reload` | Load the save again | ui | drafted |
+| `m22.action.home` | Back to Home | ui | drafted |
+| `m22.action.back` | Go back | ui | drafted |
+| `m22.start_over.confirm.title` | Start a new save? | ui | drafted |
+| `m22.start_over.confirm.body` | You start again from the first step. The damaged save stays on this device in case it can be fixed later. | ui | drafted |
+| `m22.start_over.confirm.action` | Start a new save | ui | drafted |
+| `m22.start_over.cancel` | Cancel | ui | drafted (Cancel comes first, in the primary look) |
+| `m22.restore.failed` | That copy didn't open either. You can start a new save. | ui | drafted |
+| `m22.done.a11y` | Save restored. Opening Home. | ui | drafted |
+| `m21.banner.offline` | You're offline | ui | drafted |
+| `m21.banner.offline.body` | Care you give is saved here and syncs when you reconnect. | ui | drafted |
+| `m21.banner.pending` | {count} waiting to sync | ui | drafted (the queued-writes badge) |
+| `m21.banner.pending.one` | 1 waiting to sync | ui | drafted |
+| `m21.banner.syncing` | Syncing | ui | drafted |
+| `m21.banner.conflict` | Sync finished with a change | ui | drafted |
+| `m21.banner.a11y.hint` | Opens sync details | ui | drafted |
+| `m21.title` | Sync | ui | drafted |
+| `m21.status.online` | Online | ui | drafted |
+| `m21.status.offline` | Offline | ui | drafted |
+| `m21.status.reconciling` | Syncing now | ui | drafted |
+| `m21.status.conflict` | Synced, with a change | ui | drafted |
+| `m21.local_first` | Everything saves on this device first, so you can play without a connection. | ui | drafted |
+| `m21.queue.title` | Waiting to sync | ui | drafted |
+| `m21.queue.count` | {count} changes | ui | drafted |
+| `m21.queue.count.one` | 1 change | ui | drafted |
+| `m21.queue.empty.title` | All caught up | ui | drafted |
+| `m21.queue.empty.body` | Nothing is waiting to sync. | ui | drafted |
+| `m21.queue.feed` | Fed {name} | ui | drafted |
+| `m21.queue.rest` | {name} went to sleep | ui | drafted |
+| `m21.queue.wake` | Woke {name} | ui | drafted |
+| `m21.queue.play` | Played with {name} | ui | drafted |
+| `m21.queue.egg` | New egg | ui | drafted |
+| `m21.log.title` | Sync log | ui | drafted |
+| `m21.log.empty` | No changes from the server yet. | ui | drafted |
+| `m21.log.server_kept` | The server kept its version of {count} changes for {name}. | ui | drafted (the one-line conflict log; the server tie-break wins silently) |
+| `m21.log.server_kept.one` | The server kept its version of 1 change for {name}. | ui | drafted |
+| `m21.retry` | Sync now | ui | drafted |
+| `m21.retry.a11y.hint` | Sends the waiting changes | ui | drafted |
+| `m21.result.offline` | Still offline. Your changes are safe here and sync when you're back online. | ui | drafted |
+| `m21.result.no_server` | Saved on this device. Syncing with the server isn't switched on yet, so changes stay here for now. | ui | drafted (Phase 1 ships no sync sender; this is the honest answer until one exists) |
+| `m21.result.synced` | Synced. | ui | drafted |
+| `m21.result.failed` | Couldn't reach the server. Your changes are safe here. Try again in a minute. | ui | drafted |
+| `m21.back` | Back | ui | drafted |

@@ -98,6 +98,18 @@ export interface DeviceScreen {
    * pulse plays.
    */
   nudge?(): number;
+  /**
+   * A one-shot clip request, read every frame (M13: `attention` on a tap,
+   * `approach` on resume). Each new `key` plays the first of `clips` the
+   * Baby's GLB has, once, over its idle. A first read only learns the key.
+   */
+  monReaction?(): { readonly key: number; readonly clips: readonly string[] };
+  /**
+   * True when a drag on the trackpad pans (M13's room). A trackpad press then
+   * activates on release, and only if the finger did not drag; otherwise it
+   * activates on touch, as every other screen expects.
+   */
+  padPans?(): boolean;
 }
 
 /** UV (v bottom-up) to canvas px (y top-down) on a screen of `size`. */
