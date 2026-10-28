@@ -1,12 +1,16 @@
 import './rn-globals.ts';
 import './globals.css';
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef, type ComponentRef } from 'react';
 import { createRoot } from 'react-dom/client';
 import { z } from 'zod';
 import type { CallToolResult } from '@modelcontextprotocol/client';
-import { Banner, Button, Dialog, Switch, TextField, useInstanceStore, useStore } from '@acme/ui';
-import { Details, Heading, List, ListItem, Main, Paragraph, Section, Summary, Text } from '@acme/ui/html';
-import { View } from '@acme/ui/tw';
+import {
+  Banner, BrandWordmark, Button, Card, CareMeterRing, CareMeterRingGroup, Dialog, Image, SegmentedControl, Switch, TextField,
+  useInstanceStore, useReducedMotion, useStore,
+} from '@acme/ui';
+import { Aside, Details, Footer, Header, Heading, List, ListItem, Main, Paragraph, Section, Summary, Text } from '@acme/ui/html';
+import { Mic, Square } from '@acme/ui/icons';
+import { ScrollView, View } from '@acme/ui/tw';
 import { SimOAuthProvider, parseCallback, revokeRefreshToken } from '../shared/auth.ts';
 import { runAgentTurn } from '../shared/agentLoop.ts';
 import { mcpToolsToClaude } from '../shared/toolSpec.ts';
@@ -28,14 +32,17 @@ import { openMicPipeline, type MicPipeline } from './micPipeline.ts';
 import { createVoiceController, type BargeInRecord, type EarHandlers, type VoiceController } from './voiceController.ts';
 import { nextVoice, voiceAnnouncement, type VoiceEvent } from './voiceState.ts';
 import { MemorySnapshotSchema } from '@acme/core/schemas';
+import { Composer } from './CompanionComposer.tsx';
+import { STARTER_ART, artForDex, type CompanionArt } from './companionArt.ts';
+import { mergeMonCard, type MonCard } from './companionMon.ts';
 
 const ConfigSchema = z.object({ mcpUrl:z.string().url(),clientId:z.string().min(1),issuer:z.string().url(),modelBackend:z.literal('nebius'),modelLabel:z.string(),
   asr:z.enum(['riva','browser']).default('browser') });
 type Config = z.infer<typeof ConfigSchema>;
 const toolsAllowed = new Set(['get_mon_status','check_on_mon','check_incubation','hatch_egg','talk_to_mon','feed_mon','rest_mon','wake_mon','play_with_mon']);
 const NOTE_MAX = 500;
-const PAGE = 'mx-auto w-full max-w-content-feed gap-6 px-4 py-6 md:px-6';
-const TITLE = 'NYC-Mon Personal Companion';
+const PAGE = 'mx-auto min-h-dvh w-full max-w-content-wide gap-4 px-4 py-4 lg:h-dvh lg:px-6 lg:py-5';
+const TITLE = 'NYC-MON Companion';
 /** One turn's timing, on window.__monTurns for a headless run to read (like the simulator's __monLatency). */
 interface VoiceHandles {
   turn:TurnRecord|null;speakingLine:number|null;pendingStop:BargeInRecord|null;pipeline:MicPipeline|null;
@@ -205,8 +212,13 @@ function Companion({ config }: { config:Config }) {
       if (disposed) { await connected.close();return; }
       runtime.setState({ session:connected });
       // The Mon's voice before the first reply: a turn with no tool call would otherwise have no voice to speak in.
-      void voice.prime(async () => (await connected.client.callTool({ name:'get_mon_status',arguments:{} })) as CallToolResult);
-      store.setState({ connected:true,status:'Signed in. Your Mon and saved preferences belong to this account.' });
+      // The same status read draws the Mon card (art, name, meters) before the Caller says anything.
+      void voice.prime(async () => {
+        const result=(await connected.client.callTool({ name:'get_mon_status',arguments:{} })) as CallToolResult;
+        if (!disposed) store.setState((st) => ({ mon:mergeMonCard(st.mon,result) }));
+        return result;
+      });
+      store.setState({ connected:true,status:'Signed in. Your Mon and its memory belong to this account.' });
       void memoryRequest('GET');
     })().catch((error:unknown) => { if (!disposed) showError(error); });
     return () => { disposed=true;runtime.getState().abort?.abort();void runtime.getState().session?.close();runtime.setState({ session:null }); };
@@ -218,7 +230,7 @@ function Companion({ config }: { config:Config }) {
     if (!connection || !question.trim()) { dispatchVoice({ type:'reply-done' });return; }
     voice.stop();
     runtime.getState().abort?.abort();
-    store.setState({ busy:true,error:'',question:'',status:'Waiting for Nemotron on Nebius…' });
+    store.setState({ busy:true,error:'',question:'',status:'' });
     push({ who:'Caller',text:question });
     const controller=new AbortController();runtime.setState({ abort:controller });
     const turn: TurnRecord = { source,startedAt,firstAudioAt:null,doneAt:null,outcome:'pending' };
@@ -232,6 +244,8 @@ function Companion({ config }: { config:Config }) {
           if (event.type!=='tool-result') return;
           // A result that carries the Mon sets the voice before its reply is spoken.
           voice.learn(event.result);push(toolResultLine(event.name,event.result));
+          // Care results carry the Mon and its meters: the card follows the server, never the model's account.
+          store.setState((st) => ({ mon:mergeMonCard(st.mon,event.result as CallToolResult) }));
         } });
       if (controller.signal.aborted) return;
       runtime.setState({ history:result.history });
@@ -254,11 +268,10 @@ function Companion({ config }: { config:Config }) {
     turn.outcome=outcome;turn.doneAt=performance.now();
     record('__monTurns',{ ...turn,ttfaMs:turn.firstAudioAt===null?null:Math.round(turn.firstAudioAt-turn.startedAt),turnMs:Math.round(turn.doneAt-turn.startedAt) });
   }
-  async function send() {
-    const current=store.getState();
-    if (!runtime.getState().session || !current.question.trim()) return;
+  async function send(text:string) {
+    if (!runtime.getState().session || !text) return;
     dispatchVoice({ type:'typed' });
-    await runTurn(current.question.trim(),'typed',performance.now());
+    await runTurn(text,'typed',performance.now());
   }
   function signOut() {
     controller.close();store.setState((st) => ({ voice:nextVoice(st.voice,{ type:'stop' }) }));
@@ -274,63 +287,65 @@ function Companion({ config }: { config:Config }) {
     const link=document.createElement('a');link.href=url;link.download='nyc-mon-memory.json';link.click();URL.revokeObjectURL(url);
     store.setState({ status:'Downloaded nyc-mon-memory.json.' });
   }
+  const signIn = () => { void beginSignIn(config.mcpUrl,provider).catch(showError); };
+  const micOff = state.voice.mic === 'denied' || state.voice.asr === 'unavailable';
+  const speaking = state.voice.phase === 'speaking';
+  const lastMon = [...state.lines].reverse().find((l) => l.who === 'Mon');
   return <Main className={PAGE}>
-    <Heading className="font-display text-type-station">{TITLE}</Heading>
-    <Paragraph className="text-type-caption text-text-muted">{config.modelLabel}. If Nebius doesn’t answer, nothing answers in its place.</Paragraph>
+    <Header className="flex-row flex-wrap items-center justify-between gap-3">
+      <View className="flex-row items-center gap-3">
+        <BrandWordmark height={28}/>
+        <Heading className="my-0 font-sans text-type-label text-text-muted">Companion</Heading>
+      </View>
+      {state.connected ? <Button title="Sign out" variant="outline" size="sm" onPress={signOut}/> : null}
+    </Header>
     {/* Always mounted so screen readers have the region before its text changes. */}
-    <Paragraph role="status" className="text-type-caption text-text-muted">{state.status}</Paragraph>
-    {!state.connected ? <Button title="Sign in as an adult Caller" onPress={() => { void beginSignIn(config.mcpUrl,provider).catch(showError); }}/> : <Button title="Sign out" variant="outline" onPress={signOut}/>}
+    <Paragraph role="status" className="my-0 text-type-caption text-text-muted">{state.status}</Paragraph>
     {state.error ? <Banner tone="danger" live="alert" title={state.error}/> : null}
-    {state.connected ? <>
-      <Section aria-label="Chat" className="gap-3">
-        <Section aria-label="Talk to your Mon" className="gap-3">
-          <View className="flex-row flex-wrap items-center gap-3">
-            <Button title={talkTitle(state.voice.phase)} variant="cta" onPress={() => {
-              if (state.voice.phase === 'listening') controller.finish(); else void controller.talk(); }}
-              disabled={state.voice.mic === 'denied' || state.voice.asr === 'unavailable'}/>
-            {state.voice.phase === 'thinking' || state.voice.phase === 'speaking'
-              ? <Button title="Stop" variant="outline" onPress={() => controller.cutIn('tap')}/> : null}
-          </View>
-          <Switch label="Conversation mode: always listening, talk over your Mon any time" value={state.voice.conversation}
-            onChange={(on) => { void controller.setConversation(on); }} disabled={state.voice.mic === 'denied' || state.voice.asr === 'unavailable'}/>
-          {/* Always mounted so screen readers have the region before its text changes. */}
-          <Paragraph aria-live="polite" className="text-type-caption text-text-muted">{voiceAnnouncement(state.voice)}</Paragraph>
-          {state.voice.heard ? <Paragraph className="text-type-body"><Text className="font-semibold">Hearing: </Text>{state.voice.heard}</Paragraph> : null}
-          <Paragraph className="text-type-caption text-text-muted">{state.voice.asr === 'riva'
-            ? 'Speech to text: NVIDIA Riva (Parakeet). Hold Space to talk.' : 'Speech to text: your browser. Hold Space to talk.'}</Paragraph>
-        </Section>
-        <TextField surface="daylit" label="Ask your Mon" hint="Your Mon can check on itself, eat, rest, wake up and play. Typing while it talks cuts it off."
-          value={state.question} onChangeText={(question) => {
-            if (question && store.getState().voice.phase === 'speaking') controller.cutIn('type');
-            store.setState({question}); }} disabled={state.busy}/>
-        <Button title="Send" variant="cta" onPress={() => { void send(); }} disabled={state.busy}/>
-        <View aria-live="polite">
-          <List aria-label="Conversation" className="gap-3">
-            {state.lines.map((line) => (
-              <ListItem key={line.id} className="text-type-body">
-                <Text className="font-semibold">{line.who}: </Text>{line.text}
-                {line.cut ? <Text className="text-type-caption text-text-muted"> (cut off)</Text> : null}
-                {line.detail ? <Details><Summary className="text-type-caption text-text-muted">Server response</Summary>
-                  <Text className="whitespace-pre-wrap text-type-caption">{line.detail}</Text></Details> : null}
-              </ListItem>
-            ))}
-          </List>
-        </View>
-      </Section>
-      <Section className="gap-3">
-        <Heading level={2} className="text-type-title">Saved preferences</Heading>
-        <Paragraph className="text-type-body">Only save information you approve. Do not include passwords or sensitive personal details. Saved preferences are sent to Nebius with model requests. Chat history is not stored here.</Paragraph>
-        {state.memory === null && !state.busy ? <Button title="Reload saved preferences" variant="outline" onPress={() => { void memoryRequest('GET'); }}/> : null}
-        <TextField surface="daylit" label="What should your Mon remember?" hint={`Up to ${NOTE_MAX} characters. ${NOTE_MAX - state.note.length} left.`}
-          value={state.note} onChangeText={(note) => store.setState({note:note.slice(0,NOTE_MAX)})} disabled={state.busy || !state.memory}/>
-        <Switch label="Save this for my Mon to use" value={state.consent} onChange={(consent) => store.setState({consent})} disabled={state.busy || !state.memory}/>
-        <View className="flex-row flex-wrap gap-3">
-          <Button title="Save preferences" variant="outline" onPress={() => { void memoryRequest('PUT'); }} disabled={state.busy || !state.memory || !state.consent}/>
-          <Button title="Forget preferences" variant="danger" onPress={() => store.setState({ confirmForget:true })} disabled={state.busy || !state.memory}/>
-          <Button title="Download preferences (JSON)" variant="outline" onPress={exportMemory} disabled={!state.memory}/>
-        </View>
-        <Paragraph className="text-type-caption text-text-muted">Revision {state.memory?.revision ?? '(not loaded)'}. Sign in from another browser to see the same preferences.</Paragraph>
-      </Section>
+    {!state.connected ? <Landing onSignIn={signIn}/> : <>
+      <View className="min-h-0 flex-1 gap-4 lg:flex-row lg:gap-6">
+        <Aside aria-label="Your Mon" className="gap-4 lg:w-80 lg:shrink-0 lg:overflow-y-auto xl:w-96">
+          <MonPanel mon={state.mon} speaking={speaking} caption={speaking ? lastMon?.text ?? '' : ''}/>
+          <Section aria-label="Talk to your Mon" className="gap-3">
+            <Button title={talkTitle(state.voice.phase)} variant="cta" size="lg" fullWidth
+              icon={state.voice.phase === 'listening' ? <Square size={20}/> : <Mic size={20}/>}
+              onPress={() => { if (state.voice.phase === 'listening') controller.finish(); else void controller.talk(); }}
+              disabled={micOff}/>
+            {state.voice.phase === 'thinking' || speaking
+              ? <View className="flex-row"><Button title="Stop" variant="outline" size="sm" onPress={() => controller.cutIn('tap')}/></View> : null}
+            {/* Always mounted so screen readers have the region before its text changes. */}
+            <Paragraph aria-live="polite" className="my-0 text-type-body text-text">{voiceAnnouncement(state.voice) || 'Tap Talk, or hold Space, and say something.'}</Paragraph>
+            {state.voice.heard ? <Paragraph className="my-0 text-type-body text-text"><Text className="font-semibold">Hearing: </Text>{state.voice.heard}</Paragraph> : null}
+            <Switch label="Conversation mode: keep listening, and talk over your Mon any time" value={state.voice.conversation}
+              onChange={(on) => { void controller.setConversation(on); }} disabled={micOff}/>
+          </Section>
+        </Aside>
+        <Card surface="page" className="flex-1 h-full min-h-0 gap-4">
+          <SegmentedControl aria-label="Show" options={PANELS} value={state.panel} onChange={(panel) => store.setState({ panel })}/>
+          {state.panel === 'chat' ? <>
+            <Transcript lines={state.lines} name={state.mon?.name ?? 'your Mon'}/>
+            <Composer question={state.question} busy={state.busy} onSend={(text) => { void send(text); }}
+              onChange={(question) => {
+                if (question && store.getState().voice.phase === 'speaking') controller.cutIn('type');
+                store.setState({ question }); }}/>
+          </> : <Section aria-label="Memory" className="gap-3">
+            <Heading level={2} className="my-0 font-display text-type-title text-text">Memory</Heading>
+            <Paragraph className="my-0 text-type-body text-text">Your Mon remembers only what you approve here. Don’t save passwords or sensitive details. What you save goes to Nebius with each request; the conversation itself isn’t stored.</Paragraph>
+            {state.memory === null && !state.busy ? <Button title="Reload saved preferences" variant="outline" onPress={() => { void memoryRequest('GET'); }}/> : null}
+            <TextField surface="daylit" label="What should your Mon remember?" hint={`Up to ${NOTE_MAX} characters. ${NOTE_MAX - state.note.length} left.`}
+              value={state.note} onChangeText={(note) => store.setState({note:note.slice(0,NOTE_MAX)})} disabled={state.busy || !state.memory}/>
+            <Switch label="Save this for my Mon to use" value={state.consent} onChange={(consent) => store.setState({consent})} disabled={state.busy || !state.memory}/>
+            <View className="flex-row flex-wrap gap-3">
+              <Button title="Save preferences" variant="cta" onPress={() => { void memoryRequest('PUT'); }} disabled={state.busy || !state.memory || !state.consent}/>
+              <Button title="Download preferences (JSON)" variant="outline" onPress={exportMemory} disabled={!state.memory}/>
+              <Button title="Forget preferences" variant="danger" onPress={() => store.setState({ confirmForget:true })} disabled={state.busy || !state.memory}/>
+            </View>
+            <Paragraph className="my-0 text-type-caption text-text-muted">{state.memory
+              ? `Revision ${state.memory.revision}. Your Mon uses the same memory on any browser you sign in with.`
+              : 'Memory hasn’t loaded yet.'}</Paragraph>
+          </Section>}
+        </Card>
+      </View>
       <Dialog open={state.confirmForget} onClose={() => store.setState({ confirmForget:false })}
         title="Forget your saved preferences?"
         description="Your Mon will stop using them, and this conversation will be cleared. This can’t be undone."
@@ -338,8 +353,108 @@ function Companion({ config }: { config:Config }) {
           <Button title="Keep preferences" variant="outline" onPress={() => store.setState({ confirmForget:false })}/>
           <Button title="Forget preferences" variant="danger" onPress={() => { store.setState({ confirmForget:false }); void memoryRequest('DELETE'); }}/>
         </>}/>
-    </>:null}
+    </>}
+    <Credit modelLabel={config.modelLabel} asr={state.voice.asr}/>
   </Main>;
+}
+
+const PANELS = [{ value:'chat',label:'Conversation' },{ value:'memory',label:'Memory' }] as const;
+
+/** The Mon's picture: a transparent cut-out sits on the page, a scene gets the kit frame. */
+function MonArt({ art, className }: { art:CompanionArt; className:string }) {
+  return <View className={className} style={{ aspectRatio:art.width / art.height }}>
+    <Image src={art.src} alt={art.alt} fill framed={!art.cutout} unoptimized className="h-full w-full"/>
+  </View>;
+}
+
+function MonPanel({ mon, speaking, caption }: { mon:MonCard|null; speaking:boolean; caption:string }) {
+  const reducedMotion = useReducedMotion();
+  if (!mon) return <Paragraph className="my-0 text-type-body text-text-muted">Checking on your Mon…</Paragraph>;
+  const art = artForDex(mon.dexId);
+  const form = [mon.name === mon.formName ? null : mon.formName, mon.stage ? `${mon.stage} stage` : null].filter(Boolean).join(', ');
+  const low = (k:string) => mon.needs.includes(k);
+  return <View className="gap-4">
+    <View className="flex-row items-center gap-4">
+      {art ? <View className="relative w-28 shrink-0 sm:w-36 lg:w-36 xl:w-48">
+        {/* Speaking: an orange keyline breathes around the Mon while the voice plays (still under reduced motion). */}
+        {speaking ? <View aria-hidden className="absolute -inset-1.5 border-4 border-cta motion-safe:animate-pulse"/> : null}
+        <MonArt art={art} className="w-full"/>
+      </View> : null}
+      <View className="min-w-0 flex-1 gap-1">
+        <Heading level={1} className="my-0 font-display text-type-title text-text">{mon.name}</Heading>
+        {form ? <Paragraph className="my-0 text-type-body text-text">{form}</Paragraph> : null}
+        {mon.bloodline ? <Paragraph className="my-0 text-type-caption text-text-muted">{mon.bloodline}</Paragraph> : null}
+        {mon.asleep ? <Paragraph className="my-0 text-type-caption text-text-muted">Asleep</Paragraph> : null}
+      </View>
+    </View>
+    {speaking && caption ? <Paragraph aria-hidden className="my-0 border-l-4 border-cta bg-surface-raised px-3 py-2 text-type-body text-text">{caption}</Paragraph> : null}
+    {mon.care ? <CareMeterRingGroup accessibilityLabel={`${mon.name}’s care`}>
+      <CareMeterRing need="energy" value={mon.care.energy} label="Energy" low={low('energy')} lowLabel="low" scheme="night" reducedMotion={reducedMotion}/>
+      <CareMeterRing need="fullness" value={mon.care.fullness} label="Fullness" low={low('fullness')} lowLabel="low" scheme="night" reducedMotion={reducedMotion}/>
+      <CareMeterRing need="social" value={mon.care.social} label="Social" low={low('social')} lowLabel="low" scheme="night" reducedMotion={reducedMotion}/>
+    </CareMeterRingGroup> : null}
+  </View>;
+}
+
+/** The conversation, oldest first, scrolled to the newest line whenever one arrives or grows. */
+function Transcript({ lines, name }: { lines:Line[]; name:string }) {
+  const scroller = useRef<ComponentRef<typeof ScrollView>>(null);
+  // react-native-web hands back the scrolling element with scrollToEnd on it; scrollTop covers a plain element.
+  const toEnd = () => {
+    const el = scroller.current as unknown as (HTMLElement & { scrollToEnd?:(o:{ animated:boolean }) => void }) | null;
+    if (el?.scrollToEnd) el.scrollToEnd({ animated:false }); else if (el) el.scrollTop = el.scrollHeight;
+  };
+  useEffect(toEnd,[lines]);
+  return <ScrollView ref={scroller} onContentSizeChange={toEnd} className="max-h-[55dvh] min-h-48 lg:max-h-none lg:min-h-0 lg:flex-1"
+    contentContainerClassName="gap-3 py-1">
+    {lines.length === 0 ? <Paragraph className="my-0 text-type-body text-text-muted">Say hi to {name}, or ask how it’s doing. Your Mon can check on itself, eat, rest, wake up and play.</Paragraph> : null}
+    <View aria-live="polite">
+      <List aria-label="Conversation" className="m-0 flex list-none flex-col gap-3 p-0">
+        {lines.map((line) => <ListItem key={line.id} className={BUBBLE[line.who]}>
+          {line.who === 'Result' ? null : <Text className={`block text-type-caption font-semibold ${INK[line.who]}`}>{line.who === 'Mon' ? name : 'You'}</Text>}
+          <Text className={line.who === 'Result' ? 'text-type-caption text-text-muted' : `text-type-body ${INK[line.who]}`}>{line.text}</Text>
+          {line.cut ? <Text className={`text-type-caption ${INK[line.who]}`}> (cut off)</Text> : null}
+          {line.detail ? <Details className="mt-1"><Summary className="text-type-caption text-text-muted">Details</Summary>
+            <Text className="block whitespace-pre-wrap text-type-caption text-text-muted">{line.detail}</Text></Details> : null}
+        </ListItem>)}
+      </List>
+    </View>
+  </ScrollView>;
+}
+/** Text colour per speaker: dark on the blue Caller bubble, light on the night surfaces. */
+const INK: Readonly<Record<Line['who'], string>> = { Caller: 'text-on-accent', Mon: 'text-text', Result: 'text-text-muted' };
+const BUBBLE: Readonly<Record<Line['who'], string>> = {
+  Caller: 'ml-auto max-w-[85%] list-none bg-accent px-3 py-2 text-on-accent',
+  Mon: 'mr-auto max-w-[85%] list-none border-l-4 border-cta bg-surface-sunken px-3 py-2 text-text',
+  Result: 'list-none border border-border px-3 py-2',
+};
+
+function Landing({ onSignIn }: { onSignIn:() => void }) {
+  return <Section aria-label="Sign in" className="flex-1 items-center justify-center gap-6 lg:flex-row lg:gap-12">
+    <MonArt art={STARTER_ART} className="w-40 sm:w-56 lg:w-72"/>
+    <View className="max-w-content-form gap-4">
+      <Heading level={1} className="my-0 font-display text-type-station text-text">Talk to your Mon.</Heading>
+      <Paragraph className="my-0 text-type-body text-text">Ask how your Mon is doing, feed it, play or put it to bed, by voice or by typing. It answers in its own voice and remembers only what you approve.</Paragraph>
+      <Button title="Sign in to talk to your Mon" variant="cta" size="lg" onPress={onSignIn}/>
+      <Paragraph className="my-0 text-type-caption text-text-muted">For adults (18+). You sign in with your NYC-MON account.</Paragraph>
+    </View>
+  </Section>;
+}
+
+/** The NVIDIA and Nebius credit, with the plain details one tap away. */
+function Credit({ modelLabel, asr }: { modelLabel:string; asr:'riva'|'browser'|'unavailable' }) {
+  return <Footer className="gap-1">
+    <Paragraph className="my-0 text-type-caption text-text-muted">Powered by NVIDIA Nemotron on Nebius.</Paragraph>
+    <Details>
+      <Summary className="text-type-caption text-text-muted">How this works</Summary>
+      <List className="m-0 gap-1 pl-5">
+        <ListItem className="text-type-caption text-text-muted">Replies: {modelLabel}. If Nebius doesn’t answer, your Mon stays quiet; nothing else answers in its place.</ListItem>
+        <ListItem className="text-type-caption text-text-muted">Speech to text: {asr === 'riva' ? 'NVIDIA Riva (Parakeet)' : asr === 'browser' ? 'your browser' : 'unavailable in this browser'}.</ListItem>
+        <ListItem className="text-type-caption text-text-muted">Voice: your Mon’s own voice. When it’s unavailable the page says so and uses your browser’s voice.</ListItem>
+        <ListItem className="text-type-caption text-text-muted">Care results come from the NYC-MON server, never from the model. Open Details on any result to see the raw answer.</ListItem>
+      </List>
+    </Details>
+  </Footer>;
 }
 async function boot() {
   const element=document.getElementById('root');if (!element) throw new Error('Missing app root.');
