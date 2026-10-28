@@ -153,8 +153,10 @@ export interface ShellRailProps {
  * and the menu button 30pt above the bottom edge. Yoga mirrors `row` under
  * RTL, so the row is reversed there to keep the inset spacer physically right.
  */
-export function ShellRail({ active, onSelect, expanded = false, insets }: ShellRailProps) {
-  const layout = expanded ? 'rail-expanded' : 'rail';
+export function ShellRail({ active, onSelect, insets }: ShellRailProps) {
+  // One width in every orientation and window size: the rail never widens.
+  const expanded = false;
+  const layout = 'rail';
   return (
     <View testID="shell-rail" className={`h-full bg-surface ${I18nManager.isRTL ? 'flex-row-reverse' : 'flex-row'}`}>
       <View
