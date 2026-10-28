@@ -7,6 +7,7 @@ import { createModelAuth } from './model-auth.ts';
 import { createModelHandler, createRateLimiter } from './model.ts';
 import { nebiusBackend } from './nebius.ts';
 import { loadNvidiaEnv, nvidiaPublicConfig } from './nvidia-env.ts';
+import { createNvidiaTts, nvidiaCsp } from './nvidia-tts.ts';
 import { createMemoryClient, createMemoryProxy, withPersistentMemory } from './companion-memory-client.ts';
 import { createSkillLoader, resolveSkillPath } from './skill.ts';
 
@@ -25,7 +26,9 @@ const system = createSkillLoader(resolveSkillPath(undefined));
 const modelLimit = createRateLimiter(30, { globalPerMinute: 120 });
 const memoryLimit = createRateLimiter(30, { globalPerMinute: 120 });
 const memoryProxy = createMemoryProxy({ origin: new URL(env.SIM_PUBLIC_ORIGIN).origin, auth, memory, rateLimit: memoryLimit });
-const csp = `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' ${new URL(env.SIM_MCP_URL).origin} ${new URL(env.AUTH_ISSUER).origin}; object-src 'none'; base-uri 'self'; frame-ancestors 'none'`;
+// The Mon's voice: same handler and sign-in as the simulator's /api/tts, its own rate limiter (nvidia-tts.ts).
+const tts = createNvidiaTts(env, { auth, fetch });
+const csp = nvidiaCsp(env);
 
 function requestFrom(req: IncomingMessage): Request {
   const headers = new Headers();
@@ -65,6 +68,8 @@ async function start() {
       });
       void handle(requestFrom(req), req.socket.remoteAddress ?? 'unknown').then((r) => send(res,r)).catch(fail); return;
     }
+    // POST /api/tts, and GET /api/tts/face/:id, mounted as server/main.ts mounts them.
+    if (path === '/api/tts' || path.startsWith('/api/tts/face/')) { void tts(requestFrom(req), req.socket.remoteAddress ?? 'unknown').then((r) => send(res,r)).catch(fail); return; }
     if (path === '/api/memory') { void memoryProxy(requestFrom(req)).then((r) => send(res,r)).catch(fail); return; }
     if (path.startsWith('/api/')) { res.writeHead(404); res.end(); return; }
     if (path === '/') { res.writeHead(302, { location:'/nvidia.html' }); res.end(); return; }

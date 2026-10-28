@@ -14,6 +14,9 @@ import { createAuthorize, bearer, sdkRefresh } from './freshToken.ts';
 import { httpModelClient } from './modelClient.ts';
 import { safeStorage } from './session.ts';
 import { createTurnToolCaller } from './turnTools.ts';
+import { createCompanionVoice } from './companionVoice.ts';
+import { monSpeechPort } from './monSpeechPort.ts';
+import { clearSessionVoice, setSessionVoice, stopSpeaking } from './speech.ts';
 import {
   appendLine, errorMessage, expireSession, initialCompanionState, memoryErrorMessage, monLine, toolResultLine,
   type CompanionRuntime, type CompanionState, type Line,
@@ -39,7 +42,12 @@ function Companion({ config }: { config:Config }) {
     return new SimOAuthProvider({ clientId:config.clientId,store:storage,
       redirectUrl:new URL('/nvidia.html',window.location.origin).href,navigate:(url) => window.location.assign(url.href) });
   },[config.clientId]);
-  const onSignedOut = useCallback(() => { expireSession(store,runtime); },[store,runtime]);
+  // The Mon's one voice: sticky lineage voice from tool results, spoken through the shared port to /api/tts (companionVoice.ts).
+  const voice = useMemo(() => createCompanionVoice({
+    port:(current,authorize) => monSpeechPort({ voice:current,...(authorize ? { authorize } : {}) }),stopAll:stopSpeaking,
+    setSessionVoice:(next) => { if (next) setSessionVoice(next); else clearSessionVoice(); } }),[]);
+  useEffect(() => () => { voice.stop(); },[voice]);
+  const onSignedOut = useCallback(() => { voice.reset();expireSession(store,runtime); },[store,runtime,voice]);
   const authorize = useMemo(() => createAuthorize({ store:provider,refresh:sdkRefresh(config.mcpUrl,provider),onSignedOut }),[provider,config.mcpUrl,onSignedOut]);
   const model = useMemo(() => httpModelClient('/api/model',fetch,authorize),[authorize]);
   const showError = useCallback((error:unknown) => store.setState({ error:errorMessage(error),status:'' }),[store]);
@@ -97,24 +105,29 @@ function Companion({ config }: { config:Config }) {
     const question=current.question.trim();
     store.setState({ busy:true,error:'',question:'',status:'Waiting for Nemotron on Nebius…' });
     push({ who:'Caller',text:question });
+    voice.stop();
     const controller=new AbortController();runtime.setState({ abort:controller });
+    controller.signal.addEventListener('abort',() => voice.stop(),{ once:true });
     try {
       const tools=mcpToolsToClaude(connection.tools.filter((tool) => toolsAllowed.has(tool.name))).tools;
       const result=await runAgentTurn({ model,mcp:createTurnToolCaller({ client:connection.client,signal:controller.signal }),
         tools,history:runtime.getState().history,userText:question,signal:controller.signal,maxSteps:6,
         onEvent:(event) => {
           if (controller.signal.aborted) return;
-          if (event.type==='tool-result') push(toolResultLine(event.name,event.result));
+          if (event.type!=='tool-result') return;
+          // A result that carries the Mon sets the voice before its reply is spoken.
+          voice.learn(event.result);push(toolResultLine(event.name,event.result));
         } });
       if (controller.signal.aborted) return;
       runtime.setState({ history:result.history });
       push(monLine(result.reply,result.outcome));
+      if (result.reply.trim()) void voice.speak(result.reply,authorize);
       store.setState({ status:'' });
     } catch(error) { if (!controller.signal.aborted) showError(error); }
     finally { if (!controller.signal.aborted) store.setState({ busy:false }); }
   }
   function signOut() {
-    runtime.getState().abort?.abort();void runtime.getState().session?.close();runtime.setState({ session:null });provider.signOut();runtime.setState({ history:[] });
+    voice.reset();runtime.getState().abort?.abort();void runtime.getState().session?.close();runtime.setState({ session:null });provider.signOut();runtime.setState({ history:[] });
     store.setState({ ...initialCompanionState(),status:'Signed out. This page no longer holds your conversation or preferences.' });
   }
   function exportMemory() {

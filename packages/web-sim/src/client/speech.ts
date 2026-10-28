@@ -1,4 +1,4 @@
-import { voicePitchFactor, webSpeechPitch } from '@acme/content/voices';
+import { monSpeechRequest, planMonUtterance } from '@acme/content/voice';
 import { gestureFor } from '@acme/ui/three/mon/idle';
 import { amplitudeEnvelope, pickSpeechTrack, type CharacterAlignment, type FaceTrack, type MonGesture, type SpeechTrack } from '@acme/ui/three/mon/lipsync';
 import type { MonVoice } from './monVoice.ts';
@@ -10,6 +10,10 @@ import { emitSpeechCue } from './speechCues.ts';
  * without them the simulator is text-only and says so on the mic button.
  * `speakAs` adds the Mon's own ElevenLabs voice through /api/tts, falling back
  * to Web Speech.
+ *
+ * This file is the browser adapter for the Mon's one voice: every line is
+ * planned by `planMonUtterance` (`@acme/content/voice`), the same plan the
+ * server's /api/tts and any other surface use, and only played here.
  */
 
 interface RecognitionResultEvent {
@@ -123,12 +127,14 @@ function sessionBrowserVoice(): SpeechSynthesisVoice | undefined {
   return v;
 }
 
-/** Speaks with Web Speech; resolves when the utterance ends, fails, or is cancelled. */
+/**
+ * Speaks with Web Speech; resolves when the utterance ends, fails, or is
+ * cancelled. `text` is a plan's `plainSpoken` (stage directions already gone).
+ */
 export function speak(text: string, pitch?: number): Promise<void> {
   if (!canSpeak() || !text.trim()) return Promise.resolve();
   globalThis.speechSynthesis.cancel();
-  // The skill writes stage directions as *short huff*; some voices read the asterisks out.
-  const u = new SpeechSynthesisUtterance(text.replace(/\*/g, ''));
+  const u = new SpeechSynthesisUtterance(text);
   u.lang = 'en-US';
   u.rate = 1.02;
   const v = sessionBrowserVoice();
@@ -242,6 +248,11 @@ export function setSessionVoice(voice: MonVoice | undefined): void {
   if (voice !== undefined) sessionVoice = voice;
 }
 
+/** Forgets the session voice on sign-out, so the next account's Mon never speaks in this one's voice. */
+export function clearSessionVoice(): void {
+  sessionVoice = undefined;
+}
+
 class TtsFailure extends Error {}
 
 /**
@@ -254,9 +265,10 @@ class TtsFailure extends Error {}
 export async function prepareMonClip(text: string, voice: MonVoice | undefined, opts: SpeakAsOptions, signal: AbortSignal): Promise<MonClip> {
   if (voice !== undefined) setSessionVoice(voice);
   const v = voice ?? sessionVoice;
-  if (!text.trim()) return { kind: 'silent' };
-  if (v === undefined) return { kind: 'browser', text, pitch: undefined };
-  if (voicePitchFactor(v.stage) === null) return { kind: 'silent' };
+  const plan = planMonUtterance(text, v);
+  if (plan.voice.kind === 'silent') return { kind: 'silent' };
+  if (plan.voice.kind === 'fallback' || v === undefined) return { kind: 'browser', text: plan.plainSpoken, pitch: plan.voice.kind === 'fallback' ? plan.voice.pitch : undefined };
+  const fallbackPitch = plan.voice.fallbackPitch;
   if (typeof Audio === 'undefined') return { kind: 'silent' };
   let lastStatus = 'network';
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -272,11 +284,11 @@ export async function prepareMonClip(text: string, voice: MonVoice | undefined, 
             accept: 'application/json, audio/mpeg',
             ...bearer(token),
           },
-          body: JSON.stringify({ text: text.slice(0, 400), lineageId: v.lineageId, stage: v.stage, ...(v.mood === undefined ? {} : { mood: v.mood }) }),
+          body: JSON.stringify(monSpeechRequest(text, v)),
           signal,
         }),
       );
-      if (res.status === 204) return { kind: 'browser', text, pitch: webSpeechPitch(v.stage) ?? undefined };
+      if (res.status === 204) return { kind: 'browser', text: plan.plainSpoken, pitch: fallbackPitch };
       if (res.status !== 200) {
         lastStatus = String(res.status);
         throw new TtsFailure();

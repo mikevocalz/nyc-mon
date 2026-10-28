@@ -4,7 +4,7 @@ import type { CallToolResult } from '@modelcontextprotocol/client';
 import type { MemorySnapshot } from '@acme/core/schemas';
 import type { TurnOutcome } from '../shared/agentLoop.ts';
 import { toolOutcome, type ToolOutcome } from '../shared/toolOutcome.ts';
-import { captionText } from './caption.ts';
+import { captionText } from '@acme/content/voice';
 import type { McpSession } from './mcp.ts';
 
 /** One entry in the conversation log. `detail` is the raw server answer, shown collapsed. */
