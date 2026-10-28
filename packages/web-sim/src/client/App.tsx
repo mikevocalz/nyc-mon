@@ -11,7 +11,7 @@ import { Form, Header, Heading, Paragraph, Section } from '@acme/ui/html';
 import { MonModel3D } from '@acme/ui/three/mon';
 import { Text, View } from '@acme/ui/tw';
 import { AppView, type DisplayMode } from './AppView.tsx';
-import { captionText, spokenText } from './caption.ts';
+import { captionText, spokenText } from '@acme/content/voice';
 import { DevPanel } from './DevPanel.tsx';
 import { judgeStage } from './judgeStatus.ts';
 import { SignInRequired, beginSignIn, completeSignIn, connectMcp, listAllTools, type McpSession } from './mcp.ts';

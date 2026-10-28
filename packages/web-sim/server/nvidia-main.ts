@@ -1,12 +1,14 @@
-import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
+import { createServer, type IncomingMessage } from 'node:http';
 import { createReadStream, existsSync, statSync } from 'node:fs';
 import { dirname, extname, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Readable } from 'node:stream';
+import { createAsrSocket, createParakeetStream } from './asr.ts';
 import { createModelAuth } from './model-auth.ts';
+import { asrClientKey, nodeRequest, sendResponse } from './nvidia-http.ts';
 import { createModelHandler, createRateLimiter } from './model.ts';
 import { nebiusBackend } from './nebius.ts';
 import { loadNvidiaEnv, nvidiaPublicConfig } from './nvidia-env.ts';
+import { createNvidiaTts, nvidiaCsp } from './nvidia-tts.ts';
 import { createMemoryClient, createMemoryProxy, withPersistentMemory } from './companion-memory-client.ts';
 import { createSkillLoader, resolveSkillPath } from './skill.ts';
 
@@ -25,28 +27,22 @@ const system = createSkillLoader(resolveSkillPath(undefined));
 const modelLimit = createRateLimiter(30, { globalPerMinute: 120 });
 const memoryLimit = createRateLimiter(30, { globalPerMinute: 120 });
 const memoryProxy = createMemoryProxy({ origin: new URL(env.SIM_PUBLIC_ORIGIN).origin, auth, memory, rateLimit: memoryLimit });
-const csp = `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' ${new URL(env.SIM_MCP_URL).origin} ${new URL(env.AUTH_ISSUER).origin}; object-src 'none'; base-uri 'self'; frame-ancestors 'none'`;
+// The Mon's voice: same handler and sign-in as the simulator's /api/tts, its own rate limiter (nvidia-tts.ts).
+const tts = createNvidiaTts(env, { auth, fetch });
+const csp = nvidiaCsp(env);
 
-function requestFrom(req: IncomingMessage): Request {
-  const headers = new Headers();
-  for (const [key,value] of Object.entries(req.headers)) {
-    if (typeof value === 'string') headers.set(key,value); else if (Array.isArray(value)) headers.set(key,value.join(', '));
-  }
-  const body = req.method === 'GET' || req.method === 'HEAD' ? undefined : Readable.toWeb(req);
-  const controller = new AbortController(); req.on('aborted', () => controller.abort());
-  return new Request(new URL(req.url ?? '/', env.SIM_PUBLIC_ORIGIN), {
-    method: req.method, headers, signal: controller.signal,
-    ...(body ? { body, duplex: 'half' } : {}),
-  } as RequestInit);
-}
-async function send(res: ServerResponse, response: Response) {
-  res.writeHead(response.status, Object.fromEntries(response.headers));
-  if (!response.body) { res.end(); return; }
-  const reader = response.body.getReader();
-  res.on('close', () => { void reader.cancel().catch(() => {}); });
-  try { for (;;) { const part = await reader.read(); if (part.done) break; res.write(part.value); } }
-  finally { reader.releaseLock(); res.end(); }
-}
+const requestFrom = (req: IncomingMessage) => nodeRequest(req, env.SIM_PUBLIC_ORIGIN);
+const send = sendResponse;
+// Live speech-to-text (asr.ts): the page's echo-cancelled mic streams to NVIDIA Riva Parakeet over NVCF.
+// No NVIDIA_API_KEY: /api/asr is closed and the page listens with the browser's SpeechRecognition.
+const asrUpgrade = env.NVIDIA_API_KEY ? createAsrSocket({
+  open: createParakeetStream({ apiKey: env.NVIDIA_API_KEY }),
+  allowedOrigin: new URL(env.SIM_PUBLIC_ORIGIN).origin,
+  // One session per listening window; a conversation opens one every turn or two.
+  rateLimit: createRateLimiter(20, { globalPerMinute: 120 }),
+  clientKey: asrClientKey,
+  auth,
+}) : null;
 const mime: Record<string,string> = { '.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css','.woff2':'font/woff2','.svg':'image/svg+xml' };
 async function start() {
   const vite = env.NODE_ENV === 'production' ? undefined : await (await import('vite')).createServer({ root, server: { middlewareMode: true }, appType: 'mpa' });
@@ -65,6 +61,8 @@ async function start() {
       });
       void handle(requestFrom(req), req.socket.remoteAddress ?? 'unknown').then((r) => send(res,r)).catch(fail); return;
     }
+    // POST /api/tts, and GET /api/tts/face/:id, mounted as server/main.ts mounts them.
+    if (path === '/api/tts' || path.startsWith('/api/tts/face/')) { void tts(requestFrom(req), req.socket.remoteAddress ?? 'unknown').then((r) => send(res,r)).catch(fail); return; }
     if (path === '/api/memory') { void memoryProxy(requestFrom(req)).then((r) => send(res,r)).catch(fail); return; }
     if (path.startsWith('/api/')) { res.writeHead(404); res.end(); return; }
     if (path === '/') { res.writeHead(302, { location:'/nvidia.html' }); res.end(); return; }
@@ -77,8 +75,14 @@ async function start() {
       'cache-control': file.endsWith('.html') ? 'no-store' : 'public, max-age=3600' });
     createReadStream(file).on('error',fail).pipe(res);
   });
+  server.on('upgrade', (req, socket, head) => {
+    if (asrUpgrade?.(req, socket, head)) return;
+    // Vite's dev server takes its own HMR upgrades; anything else is closed.
+    if (vite && new URL(req.url ?? '/', env.SIM_PUBLIC_ORIGIN).pathname !== '/api/asr') return;
+    socket.destroy();
+  });
   server.listen(env.SIM_PORT, env.NODE_ENV === 'production' ? '0.0.0.0' : '127.0.0.1', () => {
-    console.info(`[nvidia] ${env.SIM_PUBLIC_ORIGIN}/nvidia.html; OAuth required; ${env.SIM_NEBIUS_MODEL_ID}`);
+    console.info(`[nvidia] ${env.SIM_PUBLIC_ORIGIN}/nvidia.html; OAuth required; ${env.SIM_NEBIUS_MODEL_ID}; mic: ${asrUpgrade ? 'NVIDIA Riva Parakeet' : 'browser speech recognition (no NVIDIA_API_KEY)'}`);
   });
   for (const event of ['SIGTERM','SIGINT'] as const) process.on(event, () => { server.close(); void vite?.close(); });
 }

@@ -1,7 +1,7 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { Readable } from 'node:stream';
-import { expressiveVoiceSettings, pronounceForVoice, resolveVoice, stageDirectionsToTags, voiceDelivery, voicePitchFactor } from '@acme/content/voices';
+import { MAX_SPOKEN_TEXT, planMonUtterance } from '@acme/content/voice';
 import { IdSchema, LifecycleStageSchema, MonMoodSchema } from '@acme/core/schemas';
 import { z } from 'zod';
 import type { CharacterAlignment, FaceTrack } from '@acme/ui/three/mon/lipsync';
@@ -15,10 +15,10 @@ import type { ModelAuthCheck } from './model-auth.ts';
  * (PLATFORM-DOCS §2.8); the voice lineage exists so the simulator can show how
  * one Mon sounds as it grows up (Bible v11 ¶56).
  *
- * Body: { text, lineageId, stage, mood? }. The lineage picks the ElevenLabs
- * voice from `@acme/content/voices`. The mood picks a leading audio tag and
- * voice settings, and `*stage directions*` become audio tags where one fits.
- * The stage picks a pitch factor, which ffmpeg bakes in without changing
+ * Body: { text, lineageId, stage, mood? } (`monSpeechRequest`). The server
+ * re-plans the line with `planMonUtterance` from `@acme/content/voice`, the
+ * same plan every surface uses: lineage -> ElevenLabs voice, mood -> lead tag
+ * and settings, `*stage directions*` -> audio tags. The stage picks a pitch factor, which ffmpeg bakes in without changing
  * duration, so the browser plays the clip at rate 1. An Egg is silent.
  *
  * The pitch shift streams (ffmpeg reads mp3 on stdin and writes mp3 on
@@ -41,13 +41,8 @@ import type { ModelAuthCheck } from './model-auth.ts';
  * face in mid-line. Either field may be missing; the clip always plays.
  */
 
-export const MAX_TTS_TEXT = 400;
-/**
- * Eleven v4 Turbo: reads audio tags like `[laughs]` and acts out the line,
- * where Flash v2.5 reads flat. Measured 2026-10-23 on a 100-character line via
- * /stream: about 0.2 to 0.3 s to first byte, 1.3 s total (Flash was 0.6 s).
- */
-export const ELEVENLABS_TTS_MODEL = 'eleven_v4_turbo';
+/** Same limit as every other surface (`@acme/content/voice`). */
+export const MAX_TTS_TEXT = MAX_SPOKEN_TEXT;
 const ELEVENLABS_URL = 'https://api.elevenlabs.io/v1/text-to-speech';
 const SAMPLE_RATE = 44_100;
 const MAX_BODY_BYTES = 4_096;
@@ -73,23 +68,6 @@ export function pitchFilter(factor: number): string {
   // atempo takes 0.5 to 100 per instance; the stage table stays inside that.
   if (tempo < 0.5 || tempo > 100) throw new RangeError(`pitch factor ${factor} is outside what atempo can undo`);
   return `asetrate=${shiftedRate},aresample=${SAMPLE_RATE},atempo=${tempo.toFixed(6)}`;
-}
-
-/** An ElevenLabs audio tag such as `[laughs]` or `[clears throat]`. */
-const AUDIO_TAG = /\[[a-z][a-z ]*\]/i;
-
-/**
- * The text ElevenLabs reads. The skill opens character lines with a stage
- * direction picked from the mood (`*chuckle*`, `*sighs*`), and the mood also
- * has a lead tag (`[happily]`). When the line already carries a tag from its
- * own direction, the mood tag is left off: two tags read as two performances
- * stacked on one word. The mood's voice settings apply either way.
- */
-export function spokenLine(text: string, mood: z.infer<typeof MonMoodSchema> | undefined): string {
-  // Everything here is the Mon's voice: canon pronunciations apply (Caller is "Call-uh").
-  const line = pronounceForVoice(stageDirectionsToTags(text));
-  const { tag } = voiceDelivery(mood);
-  return tag === undefined || AUDIO_TAG.test(line) ? line : `${tag} ${line}`;
 }
 
 /** ffmpeg arguments for a streaming mp3-in, mp3-out pitch shift. */
@@ -257,28 +235,25 @@ export function createTtsHandler(deps: TtsHandlerDeps) {
       return json(400, { error: 'Malformed speech request.' });
     }
 
-    const factor = voicePitchFactor(parsed.stage);
-    if (deps.apiKey === undefined || factor === null) return silent();
-    const voice = resolveVoice(parsed.lineageId);
-    if (voice === null) return silent();
-
+    const plan = planMonUtterance(parsed.text, parsed);
+    if (deps.apiKey === undefined || plan.voice.kind !== 'lineage') return silent();
     // The mood's stability and similarity plus the voice's own style and speed.
     // Checked live 2026-10-23: eleven_v4_turbo answers 200 with all four fields.
-    const settings = expressiveVoiceSettings(voice, parsed.mood);
-    const spoken = spokenLine(parsed.text, parsed.mood);
+    const { voiceId, model, settings, pitchFactor: factor, lineageId } = plan.voice;
+    const spoken = plan.spoken;
     const shifter = deps.pitchShift === undefined ? systemPitchShifter() : deps.pitchShift;
 
     if ((req.headers.get('accept') ?? '').includes('application/json')) {
       let timed: TimestampedAudio;
       try {
-        const res = await deps.fetch(`${ELEVENLABS_URL}/${voice.elevenLabsVoiceId}/with-timestamps?output_format=mp3_44100_128`, {
+        const res = await deps.fetch(`${ELEVENLABS_URL}/${voiceId}/with-timestamps?output_format=mp3_44100_128`, {
           method: 'POST',
           headers: { 'xi-api-key': deps.apiKey, 'content-type': 'application/json', accept: 'application/json' },
-          body: JSON.stringify({ text: spoken, model_id: ELEVENLABS_TTS_MODEL, voice_settings: settings }),
+          body: JSON.stringify({ text: spoken, model_id: model, voice_settings: settings }),
           signal: req.signal,
         });
         if (!res.ok) {
-          console.error('[web-sim] tts upstream status', res.status, 'voice', voice.lineageId);
+          console.error('[web-sim] tts upstream status', res.status, 'voice', lineageId);
           await res.body?.cancel().catch(() => {});
           return json(502, { error: 'Voice unavailable.' });
         }
@@ -316,10 +291,10 @@ export function createTtsHandler(deps: TtsHandlerDeps) {
 
     let upstream: Response;
     try {
-      upstream = await deps.fetch(`${ELEVENLABS_URL}/${voice.elevenLabsVoiceId}/stream?output_format=mp3_44100_128`, {
+      upstream = await deps.fetch(`${ELEVENLABS_URL}/${voiceId}/stream?output_format=mp3_44100_128`, {
         method: 'POST',
         headers: { 'xi-api-key': deps.apiKey, 'content-type': 'application/json', accept: 'audio/mpeg' },
-        body: JSON.stringify({ text: spoken, model_id: ELEVENLABS_TTS_MODEL, voice_settings: settings }),
+        body: JSON.stringify({ text: spoken, model_id: model, voice_settings: settings }),
         signal: req.signal,
       });
     } catch (err) {
@@ -327,7 +302,7 @@ export function createTtsHandler(deps: TtsHandlerDeps) {
       return json(502, { error: 'Voice unavailable.' });
     }
     if (!upstream.ok || !upstream.body) {
-      console.error('[web-sim] tts upstream status', upstream.status, 'voice', voice.lineageId);
+      console.error('[web-sim] tts upstream status', upstream.status, 'voice', lineageId);
       await upstream.body?.cancel().catch(() => {});
       return json(502, { error: 'Voice unavailable.' });
     }

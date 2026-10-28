@@ -1,21 +1,8 @@
-import { LIFECYCLE_STAGES, type LifecycleStage, MON_MOODS, type MonMood } from '@acme/core';
+import { type MonVoiceRef, readMonVoiceRef } from '@acme/content/voice';
 import type { TranscriptItem } from './session.ts';
 
-/** The voice a Mon speaks with, as the MCP tools report it in `mon.voice`. */
-export interface MonVoice {
-  readonly lineageId: string;
-  readonly stage: LifecycleStage;
-  /** The Mon's mood from the same tool result; sets how the line is delivered. */
-  readonly mood?: MonMood;
-}
-
-function isMood(value: unknown): value is MonMood {
-  return (MON_MOODS as readonly unknown[]).includes(value);
-}
-
-function isStage(value: unknown): value is LifecycleStage {
-  return (LIFECYCLE_STAGES as readonly unknown[]).includes(value);
-}
+/** The voice a Mon speaks with, as the MCP tools report it in `mon.voice` (`@acme/content/voice`). */
+export type MonVoice = MonVoiceRef;
 
 /**
  * The current Mon's voice: `mon.voice` from the latest tool result that
@@ -31,12 +18,7 @@ export function currentMonVoice(items: readonly TranscriptItem[]): MonVoice | un
     const structured = item.result.structuredContent as { mon?: unknown; mood?: unknown } | undefined;
     const mon = structured?.mon;
     if (typeof mon !== 'object' || mon === null) continue;
-    const voice = (mon as { voice?: unknown }).voice;
-    if (typeof voice !== 'object' || voice === null) return undefined;
-    const { lineageId, stage } = voice as { lineageId?: unknown; stage?: unknown };
-    if (typeof lineageId !== 'string' || !isStage(stage)) return undefined;
-    const mood = structured?.mood;
-    return isMood(mood) ? { lineageId, stage, mood } : { lineageId, stage };
+    return readMonVoiceRef((mon as { voice?: unknown }).voice, structured?.mood);
   }
   return undefined;
 }

@@ -3,13 +3,13 @@ import type { ModelAuthCheck } from '../server/model-auth.ts';
 import { createRateLimiter } from '../server/model.ts';
 import {
   createTtsHandler,
-  ELEVENLABS_TTS_MODEL,
   MAX_TTS_TEXT,
   type PitchShifter,
   pitchFilter,
   pitchShiftArgs,
   type TtsFetch,
 } from '../server/tts.ts';
+import { ELEVENLABS_TTS_MODEL } from '@acme/content/voice';
 import { expressiveVoiceSettings, resolveVoice } from '@acme/content/voices';
 
 const ORIGIN = 'http://localhost:5180';

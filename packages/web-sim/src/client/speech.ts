@@ -1,4 +1,4 @@
-import { voicePitchFactor, webSpeechPitch } from '@acme/content/voices';
+import { monSpeechRequest, planMonUtterance } from '@acme/content/voice';
 import { gestureFor } from '@acme/ui/three/mon/idle';
 import { amplitudeEnvelope, pickSpeechTrack, type CharacterAlignment, type FaceTrack, type MonGesture, type SpeechTrack } from '@acme/ui/three/mon/lipsync';
 import type { MonVoice } from './monVoice.ts';
@@ -10,6 +10,10 @@ import { emitSpeechCue } from './speechCues.ts';
  * without them the simulator is text-only and says so on the mic button.
  * `speakAs` adds the Mon's own ElevenLabs voice through /api/tts, falling back
  * to Web Speech.
+ *
+ * This file is the browser adapter for the Mon's one voice: every line is
+ * planned by `planMonUtterance` (`@acme/content/voice`), the same plan the
+ * server's /api/tts and any other surface use, and only played here.
  */
 
 interface RecognitionResultEvent {
@@ -123,22 +127,25 @@ function sessionBrowserVoice(): SpeechSynthesisVoice | undefined {
   return v;
 }
 
-/** Speaks with Web Speech; resolves when the utterance ends, fails, or is cancelled. */
+/**
+ * Speaks with Web Speech; resolves when the utterance ends, fails, or is
+ * cancelled. `text` is a plan's `plainSpoken` (stage directions already gone).
+ */
 export function speak(text: string, pitch?: number): Promise<void> {
   if (!canSpeak() || !text.trim()) return Promise.resolve();
   globalThis.speechSynthesis.cancel();
-  // The skill writes stage directions as *short huff*; some voices read the asterisks out.
-  const u = new SpeechSynthesisUtterance(text.replace(/\*/g, ''));
+  const u = new SpeechSynthesisUtterance(text);
   u.lang = 'en-US';
   u.rate = 1.02;
   const v = sessionBrowserVoice();
   if (v) u.voice = v;
   if (pitch !== undefined) u.pitch = pitch;
   const ended = new Promise<void>((resolve) => {
-    u.onend = () => resolve();
-    u.onerror = () => resolve();
+    u.onend = () => { playbackStopped(); resolve(); };
+    u.onerror = () => { playbackStopped(); resolve(); };
   });
   globalThis.speechSynthesis.speak(u);
+  playbackStarted();
   return ended;
 }
 
@@ -228,8 +235,8 @@ export type MonClip =
     }
   /** The server has no ElevenLabs voice (204): the session's one browser voice reads it. */
   | { readonly kind: 'browser'; readonly text: string; readonly pitch: number | undefined }
-  /** Nothing to play: an Egg, an empty line, or the voice failed twice (the caption carries the words). */
-  | { readonly kind: 'silent' };
+  /** Nothing to play: an Egg, an empty line, or (`unavailable`) the voice failed twice and the caption carries the words. */
+  | { readonly kind: 'silent'; readonly reason?: 'unavailable' };
 
 /** The last Mon voice this session used; a reply without a voice of its own speaks in it. */
 let sessionVoice: MonVoice | undefined;
@@ -240,6 +247,11 @@ let sessionVoice: MonVoice | undefined;
  */
 export function setSessionVoice(voice: MonVoice | undefined): void {
   if (voice !== undefined) sessionVoice = voice;
+}
+
+/** Forgets the session voice on sign-out, so the next account's Mon never speaks in this one's voice. */
+export function clearSessionVoice(): void {
+  sessionVoice = undefined;
 }
 
 class TtsFailure extends Error {}
@@ -254,9 +266,10 @@ class TtsFailure extends Error {}
 export async function prepareMonClip(text: string, voice: MonVoice | undefined, opts: SpeakAsOptions, signal: AbortSignal): Promise<MonClip> {
   if (voice !== undefined) setSessionVoice(voice);
   const v = voice ?? sessionVoice;
-  if (!text.trim()) return { kind: 'silent' };
-  if (v === undefined) return { kind: 'browser', text, pitch: undefined };
-  if (voicePitchFactor(v.stage) === null) return { kind: 'silent' };
+  const plan = planMonUtterance(text, v);
+  if (plan.voice.kind === 'silent') return { kind: 'silent' };
+  if (plan.voice.kind === 'fallback' || v === undefined) return { kind: 'browser', text: plan.plainSpoken, pitch: plan.voice.kind === 'fallback' ? plan.voice.pitch : undefined };
+  const fallbackPitch = plan.voice.fallbackPitch;
   if (typeof Audio === 'undefined') return { kind: 'silent' };
   let lastStatus = 'network';
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -272,11 +285,11 @@ export async function prepareMonClip(text: string, voice: MonVoice | undefined, 
             accept: 'application/json, audio/mpeg',
             ...bearer(token),
           },
-          body: JSON.stringify({ text: text.slice(0, 400), lineageId: v.lineageId, stage: v.stage, ...(v.mood === undefined ? {} : { mood: v.mood }) }),
+          body: JSON.stringify(monSpeechRequest(text, v)),
           signal,
         }),
       );
-      if (res.status === 204) return { kind: 'browser', text, pitch: webSpeechPitch(v.stage) ?? undefined };
+      if (res.status === 204) return { kind: 'browser', text: plan.plainSpoken, pitch: fallbackPitch };
       if (res.status !== 200) {
         lastStatus = String(res.status);
         throw new TtsFailure();
@@ -311,7 +324,7 @@ export async function prepareMonClip(text: string, voice: MonVoice | undefined, 
     }
   }
   console.warn(`[web-sim] Mon voice unavailable (${lastStatus}); the caption carries the reply.`);
-  return { kind: 'silent' };
+  return { kind: 'silent', reason: 'unavailable' };
 }
 
 let utterances = 0;
@@ -327,14 +340,78 @@ export function setSpeechDuck(level: number): void {
 /** The clip playing now, so stopSpeaking can cut it off and send the view its stop cue. */
 let current: { readonly audio: HTMLAudioElement; readonly url: string; readonly cueId: string | null; readonly done: () => void } | null = null;
 
-function stopAudio(): void {
+export interface PlaybackEvent {
+  readonly kind: 'start' | 'stop';
+  /** performance.now() */
+  readonly at: number;
+}
+
+/** When the Mon's current clip started playing (performance.now()), or null when nothing plays. */
+let playingSince: number | null = null;
+const playbackListeners = new Set<(e: PlaybackEvent) => void>();
+
+/**
+ * Hears each clip start and stop (the Mon's voice, or the browser voice when
+ * the server has none). The companion's barge-in uses it to know the Mon is
+ * talking and how long this clip has played (vad.ts's echo guard).
+ */
+export function onPlayback(listener: (e: PlaybackEvent) => void): () => void {
+  playbackListeners.add(listener);
+  return () => playbackListeners.delete(listener);
+}
+
+export function playbackStartedAt(): number | null {
+  return playingSince;
+}
+
+function playbackStarted(): void {
+  playingSince = performance.now();
+  for (const l of playbackListeners) l({ kind: 'start', at: playingSince });
+}
+
+function playbackStopped(): void {
+  if (playingSince === null) return;
+  playingSince = null;
+  const at = performance.now();
+  for (const l of playbackListeners) l({ kind: 'stop', at });
+}
+
+/** Ramps the element's volume to 0 over `ms` (10 ms steps), then resolves. */
+function fadeOut(audio: HTMLAudioElement, ms: number): Promise<void> {
+  const from = audio.volume;
+  const start = performance.now();
+  return new Promise((resolve) => {
+    const step = () => {
+      const t = Math.min(1, (performance.now() - start) / ms);
+      audio.volume = Math.max(0, from * (1 - t));
+      if (t >= 1) resolve();
+      else setTimeout(step, 10);
+    };
+    step();
+  });
+}
+
+/**
+ * Takes the playing clip off the voice and stops it: at once, or after a
+ * volume fade of `fadeMs` (barge-in) so the cut does not click. The queue
+ * behind it is released immediately either way.
+ */
+function stopAudio(fadeMs = 0): Promise<void> {
   const c = current;
-  if (!c) return;
+  if (!c) return Promise.resolve();
   current = null;
-  c.audio.pause();
-  URL.revokeObjectURL(c.url);
   if (c.cueId) emitSpeechCue({ kind: 'stop', id: c.cueId });
   c.done();
+  const end = () => {
+    c.audio.pause();
+    URL.revokeObjectURL(c.url);
+    playbackStopped();
+  };
+  if (fadeMs <= 0) {
+    end();
+    return Promise.resolve();
+  }
+  return fadeOut(c.audio, fadeMs).then(end);
 }
 
 /**
@@ -363,6 +440,7 @@ export async function playMonClip(clip: MonClip, signal: AbortSignal): Promise<v
     signal.addEventListener('abort', finish, { once: true });
     audio.play().then(
       () => {
+        if (current === entry) playbackStarted();
         if (current !== entry || !track || !cueId) return;
         const seconds = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : trackDurationMs(track) / 1000;
         const elapsed = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
@@ -411,11 +489,17 @@ export async function speakAs(text: string, voice: MonVoice | undefined, opts: S
   return mine;
 }
 
-/** The only cancel: cuts off the clip playing now and everything queued after it. */
-export function stopSpeaking(): void {
+/**
+ * The only cancel: cuts off the clip playing now and everything queued after
+ * it. `fadeMs` fades the playing clip out first (barge-in); the queue is
+ * dropped at once either way. Resolves when the clip has stopped.
+ */
+export function stopSpeaking(opts: { readonly fadeMs?: number } = {}): Promise<void> {
+  // The clip first: aborting the session would otherwise cut it off with no fade.
+  const stopped = stopAudio(opts.fadeMs ?? 0);
   session.abort();
   session = new AbortController();
   tail = Promise.resolve();
-  stopAudio();
   if (canSpeak()) globalThis.speechSynthesis.cancel();
+  return stopped;
 }

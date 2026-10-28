@@ -37,3 +37,27 @@ describe('monSpeechPort', () => {
     await vi.waitFor(() => expect(done).toBe(true));
   });
 });
+
+describe('the browser voice is a labelled fallback', () => {
+  it('reports when a sentence will be read by the browser voice or could not be voiced', async () => {
+    const notes: string[] = [];
+    const clips: MonClip[] = [{ kind: 'browser', text: 'Hi.', pitch: undefined }, { kind: 'silent', reason: 'unavailable' }, { kind: 'silent' }];
+    const prepare = vi.fn<typeof prepareMonClip>(async () => clips.shift()!);
+    const port = monSpeechPort({ voice: () => baby, prepare, onFallback: (why) => notes.push(why) });
+    const signal = new AbortController().signal;
+    await port.prepare('One.', signal);
+    await port.prepare('Two.', signal);
+    await port.prepare('Three.', signal);
+    expect(notes).toEqual(['browser-voice', 'unavailable']);
+  });
+});
+
+describe('prepareMonClip without a known voice', () => {
+  it('says the clip is the browser voice (no Mon voice known), so the page can label it', async () => {
+    const { prepareMonClip } = await import('../src/client/speech.ts');
+    vi.stubGlobal('Audio', class {});
+    const clip = await prepareMonClip('Hi there.', undefined, { fetchFn: vi.fn() as never }, new AbortController().signal);
+    expect(clip.kind).toBe('browser');
+    vi.unstubAllGlobals();
+  });
+});

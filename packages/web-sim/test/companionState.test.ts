@@ -81,3 +81,17 @@ describe('error copy', () => {
     expect(errorMessage('nope')).toBe('Something on this page failed. Reload and try again.');
   });
 });
+
+describe('Mon captions that follow the voice', () => {
+  it('grows one Mon line sentence by sentence and marks it when the Caller cuts in', async () => {
+    const { appendLine, growLine, cutLine } = await import('../src/client/companionState.ts');
+    let s = appendLine({ lines: [], nextId: 0 }, { who: 'Mon', text: '' });
+    const id = s.lines[0]!.id;
+    s = { ...s, lines: growLine(s.lines, id, '*yawns* Hey Callah.') };
+    s = { ...s, lines: growLine(s.lines, id, 'I ate!') };
+    expect(s.lines[0]!.text).toBe('Hey Caller. I ate!');
+    const cut = cutLine(s.lines, id);
+    expect(cut[0]).toMatchObject({ text: 'Hey Caller. I ate!', cut: true });
+    expect(cutLine(s.lines, 99)).toEqual(s.lines);
+  });
+});
