@@ -145,7 +145,9 @@ describe('built views boot in a spec host (bundled Chromium)', { timeout: 60_000
           const text = await b.frame.evaluate(() => document.getElementById('root')!.innerText);
           expect(text).toContain(form);
           expect(text).toContain('Asking for food');
-          expect(text).toContain('Journal');
+          // Feed, Rest and Play; no Journal (nothing on the server keeps one yet).
+          expect(text).not.toContain('Journal');
+          expect(await b.frame.getByRole('button', { name: 'Play' }).count()).toBe(1);
           expect(await b.frame.locator('[role=progressbar]').count()).toBe(3);
           expect(b.errors).toEqual([]);
         } finally {
@@ -226,7 +228,8 @@ describe('built views boot in a spec host (bundled Chromium)', { timeout: 60_000
         });
         expect(m.scrollW).toBeLessThanOrEqual(m.inner);
         expect(m.maxRight).toBeLessThanOrEqual(m.inner);
-        expect(m.count).toBeGreaterThanOrEqual(7);
+        // Three care buttons and three rings; the room adds its Close.
+        expect(m.count).toBeGreaterThanOrEqual(6);
         await b.frame.page().waitForFunction(() => window.sizes.some((s) => (s.height ?? 0) > 300), null, { timeout: 5000 });
         const sizes = await b.frame.page().evaluate(() => window.sizes);
         const last = sizes[sizes.length - 1]!;
@@ -430,6 +433,18 @@ describe('built views boot in a spec host (bundled Chromium)', { timeout: 60_000
   });
 
   // "Hello Mon, wanna play?" as visemes over 1.6 s: open vowels, a closure, a pause.
+  /**
+   * helloCue three times over (4.8 s): on CI's software GL a frame can take
+   * longer than one 1.6 s line, so the first frame after the cue landed past
+   * its end and the open-jaw check never saw speech.
+   */
+  const longCue = (id: string) => ({
+    ...helloCue,
+    id,
+    durationMs: 4800,
+    track: { kind: 'visemes', keys: [0, 1600, 3200].flatMap((o) => helloCue.track.keys.map((k) => ({ ...k, startMs: k.startMs + o, endMs: k.endMs + o }))) },
+  });
+
   const helloCue = {
     kind: 'start',
     id: 'boot-1',
@@ -460,18 +475,18 @@ describe('built views boot in a spec host (bundled Chromium)', { timeout: 60_000
         const d = document.querySelector('canvas')?.dataset;
         return d?.mouthOpen === '0.00' && d.mouthClose === '1.00';
       }, null, { timeout: 5000 });
-      await b.frame.page().evaluate((c) => window.sendHostContext({ nycMonSpeech: c }), helloCue);
+      await b.frame.page().evaluate((c) => window.sendHostContext({ nycMonSpeech: c }), longCue('boot-1'));
       // Mid-utterance the jaw is open; read it a few times since frames are slow in software GL.
-      await b.frame.waitForFunction(() => Number(document.querySelector('canvas')?.dataset.mouthOpen ?? 0) > 0.15, null, { timeout: 2000 });
+      await b.frame.waitForFunction(() => Number(document.querySelector('canvas')?.dataset.mouthOpen ?? 0) > 0.15, null, { timeout: 5000 });
       // Speech opened the lips too.
       expect(Number(await canvas.getAttribute('data-mouth-close'))).toBeLessThan(1);
       // And the turntable has brought the face round to the viewer.
-      await b.frame.waitForFunction(() => Number(document.querySelector('canvas')?.dataset.facing ?? 9) < 0.2, null, { timeout: 2000 });
+      await b.frame.waitForFunction(() => Number(document.querySelector('canvas')?.dataset.facing ?? 9) < 0.2, null, { timeout: 5000 });
       // After the audio ends the face returns to the rest pose: jaw shut, lips closed.
       await b.frame.waitForFunction(() => {
         const d = document.querySelector('canvas')?.dataset;
         return Number(d?.mouthOpen ?? 1) < 0.02 && Number(d?.mouthClose ?? 0) > 0.98;
-      }, null, { timeout: 5000 });
+      }, null, { timeout: 10_000 });
       expect(Number(await canvas.getAttribute('data-mouth-open'))).toBeLessThan(0.02);
       expect(Number(await canvas.getAttribute('data-mouth-close'))).toBeGreaterThan(0.98);
       expect(b.errors).toEqual([]);
@@ -548,6 +563,28 @@ describe('built views boot in a spec host (bundled Chromium)', { timeout: 60_000
     }
   });
 
+  it("a tired Lil' Ratti's face holds the clip's shape every frame (no flicker to the bind pose)", { timeout: 90_000 }, async () => {
+    // emote_tired holds mouthClose 0.9 and the lids at 0.15. three.js's mixer
+    // writes a value only when it changes, so resetting the face to its bind
+    // pose each frame left 0 showing on every frame the clip held still, and
+    // the face flicked between the two shapes.
+    const b = await boot('mon-card', { ...echoShow8('inline', 'light'), result: { mon: monFor('dex-003'), care: { ...care, activity: 'asleep' }, mood: 'asleep' } });
+    try {
+      await b.frame.waitForFunction(() => document.querySelector('[role=img][aria-busy="false"]') !== null, null, { timeout: 15_000 });
+      await b.frame.waitForFunction(() => document.querySelector('canvas')?.dataset.clip === 'emote_tired', null, { timeout: 10_000 });
+      await new Promise((done) => setTimeout(done, 1500));
+      await b.frame.page().evaluate(() => window.sendHostContext({ nycMonProbe: Date.now() }));
+      await b.frame.page().waitForFunction(() => window.logs.some((l) => l.logger === 'nyc-mon/probe'), null, { timeout: 30_000 });
+      const rows = await b.frame.page().evaluate(() => (window.logs.find((l) => l.logger === 'nyc-mon/probe')!.data as { rows: Record<string, number>[] }).rows);
+      expect(rows.length).toBe(48);
+      const mouth = rows.map((r) => r['m:mouthClose'] ?? 0);
+      expect(Math.min(...mouth)).toBeGreaterThan(0.8);
+      expect(b.errors).toEqual([]);
+    } finally {
+      await b.close();
+    }
+  });
+
   it('Squeaklet lip-syncs a speech cue from the host context, then closes to rest', async () => {
     // Fed, so Squeaklet loops its idle clips. Hungry it plays jaw_chomp
     // (MON_CLIPS needs-fullness), which moves the jaw and so owns it over the rest pose.
@@ -563,16 +600,112 @@ describe('built views boot in a spec host (bundled Chromium)', { timeout: 60_000
         const d = document.querySelector('canvas')?.dataset;
         return d?.mouthOpen === '0.00' && d.mouthClose === '1.00';
       }, null, { timeout: 5000 });
-      await b.frame.page().evaluate((c) => window.sendHostContext({ nycMonSpeech: c }), { ...helloCue, id: 'boot-squeaklet' });
-      await b.frame.waitForFunction(() => Number(document.querySelector('canvas')?.dataset.mouthOpen ?? 0) > 0.15, null, { timeout: 2000 });
+      await b.frame.page().evaluate((c) => window.sendHostContext({ nycMonSpeech: c }), longCue('boot-squeaklet'));
+      await b.frame.waitForFunction(() => Number(document.querySelector('canvas')?.dataset.mouthOpen ?? 0) > 0.15, null, { timeout: 5000 });
       expect(Number(await canvas.getAttribute('data-mouth-close'))).toBeLessThan(1);
-      await b.frame.waitForFunction(() => Number(document.querySelector('canvas')?.dataset.facing ?? 9) < 0.2, null, { timeout: 2000 });
+      await b.frame.waitForFunction(() => Number(document.querySelector('canvas')?.dataset.facing ?? 9) < 0.2, null, { timeout: 5000 });
       await b.frame.waitForFunction(() => {
         const d = document.querySelector('canvas')?.dataset;
         return Number(d?.mouthOpen ?? 1) < 0.02 && Number(d?.mouthClose ?? 0) > 0.98;
-      }, null, { timeout: 5000 });
+      }, null, { timeout: 10_000 });
       expect(Number(await canvas.getAttribute('data-mouth-open'))).toBeLessThan(0.02);
       expect(Number(await canvas.getAttribute('data-mouth-close'))).toBeGreaterThan(0.98);
+      expect(b.errors).toEqual([]);
+    } finally {
+      await b.close();
+    }
+  });
+
+  it('a short, wide host widens the canvas so the Mon stands at the right edge', async () => {
+    const b = await boot('mon-card', {
+      width: 1180,
+      height: 430,
+      hostContext: { theme: 'light', displayMode: 'inline', availableDisplayModes: ['inline', 'fullscreen'], maxWidth: 1180, maxHeight: 430 },
+      result: { mon: monFor('dex-002'), care },
+      preScript: NO_WEBGL,
+    });
+    try {
+      await b.frame.getByRole('button', { name: 'Feed' }).waitFor({ timeout: 15_000 });
+      // The Mon's box is the last child of the card's row (the still, without WebGL).
+      const mon = await b.frame.evaluate(() => {
+        const r = document.querySelector('main')!.firstElementChild!.lastElementChild!.getBoundingClientRect();
+        return { x: r.x, width: r.width };
+      });
+      const width = await b.frame.evaluate(() => window.innerWidth);
+      expect(mon).not.toBeNull();
+      // Within the 12 px padding of the right edge, not stranded mid-frame on a 768 canvas.
+      expect(width - (mon!.x + mon!.width)).toBeLessThan(24);
+      expect(b.errors.filter((e) => !/webgl/i.test(e))).toEqual([]);
+    } finally {
+      await b.close();
+    }
+  });
+
+  it('the hatch follows its box when the frame shrinks mid-hatch, and the Mon takes over in the same place', { timeout: 150_000 }, async () => {
+    const b = await boot('mon-card', {
+      width: 1094,
+      height: 404,
+      hostContext: { theme: 'light', displayMode: 'inline', availableDisplayModes: ['inline', 'fullscreen'], maxHeight: 404 },
+      result: { hatched: true, alreadyHatched: false, hatching: true, egg: { eggId: 'egg_boot', speciesId: 'dex-001' }, mon: monFor('dex-002'), care },
+    });
+    const rects = () =>
+      b.frame.evaluate(() => {
+        const r = (el: Element | null | undefined) => {
+          const x = el?.getBoundingClientRect();
+          return x ? [Math.round(x.left), Math.round(x.top), Math.round(x.width), Math.round(x.height)] : null;
+        };
+        const hatch = document.querySelector('canvas[data-hatch-phase]');
+        return { hatch: r(hatch), box: r(hatch?.parentElement?.parentElement), mon: r(document.querySelector('[data-layer="mon"] canvas')) };
+      });
+    try {
+      await b.frame.waitForFunction(() => document.querySelector('canvas[data-hatch-phase]') !== null, null, { timeout: 30_000 });
+      // The reply's caption arrives under the card: the host gives the view less height.
+      await b.frame.page().evaluate(() => window.sendHostContext({ maxHeight: 340 }));
+      await b.frame.waitForFunction(() => (document.querySelector('canvas[data-hatch-phase]')?.getBoundingClientRect().height ?? 999) < 330, null, { timeout: 5000 });
+      const during = await rects();
+      expect(during.hatch).toEqual(during.box);
+      // On CI's software GL the hatch's frames run slow (its clock caps each step), so the full moment takes far longer than its 5 s.
+      await b.frame.waitForFunction(() => document.querySelector('canvas[data-hatch-phase]') === null, null, { timeout: 90_000 });
+      const after = await rects();
+      expect(after.mon).toEqual(during.hatch);
+      expect(b.errors).toEqual([]);
+    } finally {
+      await b.close();
+    }
+  });
+
+  it('the Metro Egg hatches into Squeaklet and hands over to the standing Mon', { timeout: 90_000 }, async () => {
+    // MON_BOOT_SIZE=WxH replays at another host's frame (the simulator's card is about 1094x404, no deviceClass).
+    const [w, h] = (process.env.MON_BOOT_SIZE ?? '').split('x').map(Number);
+    const size = w && h
+      ? { width: w, height: h, hostContext: { theme: 'light', displayMode: 'inline', availableDisplayModes: ['inline', 'fullscreen'], maxHeight: h } }
+      : echoShow8('inline', 'light');
+    const b = await boot('mon-card', {
+      ...size,
+      result: { hatched: true, alreadyHatched: false, hatching: true, egg: { eggId: 'egg_boot', speciesId: 'dex-001' }, mon: monFor('dex-002'), care },
+    });
+    // Set MON_BOOT_FRAMES to a directory to keep a frame strip of the hatch for review.
+    const framesDir = process.env.MON_BOOT_FRAMES;
+    const stage = b.frame.locator('[data-layer="mon"]').locator('..');
+    let n = 0;
+    const shoot = async (tag: string) => {
+      if (!framesDir) return;
+      // The whole frame, so a jump between the hatch and the standing Mon shows.
+      const box = process.env.MON_BOOT_SIZE ? await (await b.frame.frameElement()).boundingBox() : (await stage.boundingBox()) ?? (await b.frame.locator('canvas').first().boundingBox());
+      if (box) await b.frame.page().screenshot({ path: join(framesDir, `hatch-${String(n++).padStart(3, '0')}-${tag}.png`), clip: box });
+    };
+    try {
+      await b.frame.waitForFunction(() => document.querySelector('canvas[data-hatch-phase]') !== null, null, { timeout: 30_000 });
+      // Through the hatch and 3 s past the hand-over.
+      let handedAt = 0;
+      for (let i = 0; i < 400; i++) {
+        const phase = await b.frame.evaluate(() => document.querySelector('canvas[data-hatch-phase]')?.getAttribute('data-hatch-phase') ?? 'mon');
+        if (phase === 'mon' && !handedAt) handedAt = Date.now();
+        if (['resolve', 'crossfade', 'done', 'mon'].includes(phase)) await shoot(phase);
+        if (handedAt && Date.now() - handedAt > 3000) break;
+        await new Promise((done) => setTimeout(done, 100));
+      }
+      expect(handedAt).toBeGreaterThan(0);
       expect(b.errors).toEqual([]);
     } finally {
       await b.close();

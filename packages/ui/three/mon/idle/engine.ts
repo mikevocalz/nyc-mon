@@ -61,7 +61,7 @@ export interface IdleClips {
 }
 
 /** Clips that loop well under everything else. The rest of a mood list plays now and then. */
-const LOOPS: ReadonlySet<string> = new Set(['up_idle', 'up_breathe', 'emote_tired', 'tail_swish', 'egg_idle']);
+export const LOOPS: ReadonlySet<string> = new Set(['up_idle', 'up_breathe', 'emote_tired', 'tail_swish', 'egg_idle']);
 const RESTFUL: ReadonlySet<string> = new Set(['emote_tired']);
 
 /**
@@ -339,7 +339,9 @@ export function createIdleEngine(initial: IdleClips, seed: number = idleConfig.s
       const away = heading + turning;
       const wanted = rodent ? 0 : Math.abs(away) > 1e-3 ? -Math.sign(away) * Math.min(Math.abs(drift), Math.abs(away)) : drift;
       bodyYaw += (wanted - bodyYaw) * (1 - Math.exp(-cfg.drift.settleRate * dt));
-      const base = inputs.listening && clips.listen ? clips.listen : clips.base;
+      // A tired or sleeping Mon stays in its rest pose to listen: springing up
+      // into up_look_listen each turn and slumping back after looked like a glitch.
+      const base = inputs.listening && clips.listen && !clips.restful ? clips.listen : clips.base;
       return { base, action, rootYaw: heading + sway, rootX: x, bodyYaw, heading: heading + turning + sway + bodyYaw };
     },
   };

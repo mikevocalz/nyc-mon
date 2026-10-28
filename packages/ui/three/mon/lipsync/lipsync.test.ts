@@ -215,6 +215,18 @@ test('face frames land on the audio clock: frame k at k / fps, from the cue\'s o
   }
 });
 
+test('the mouth anchors to when the host sent the cue, not when the view got it', async () => {
+  const { cueAnchorMs } = await import('./cue.ts');
+  const cue = parseSpeechCue({ kind: 'start', id: 'u', elapsedMs: 0, durationMs: 900, sentAtMs: 1_000_000, track: { kind: 'amplitude', fps: 60, values: [0.4] } });
+  assert.ok(cue?.kind === 'start');
+  // Delivered 60 ms late: the anchor moves 60 ms back, so the mouth is on the voice.
+  assert.equal(cueAnchorMs(cue, 5000, 1_000_060), 4940);
+  // A wild clock gap is capped, and a cue without a stamp keeps the receive time.
+  assert.equal(cueAnchorMs(cue, 5000, 1_009_000), 4500);
+  const { sentAtMs: _drop, ...unstamped } = cue;
+  assert.equal(cueAnchorMs(unstamped, 5000, 1_000_060), 5000);
+});
+
 test('a start cue carries a known gesture class and drops an unknown one; a listen cue parses', () => {
   const base = { kind: 'start', id: 'g1', elapsedMs: 0, durationMs: 800, track: { kind: 'amplitude', fps: 60, values: [0.4] } };
   assert.equal((parseSpeechCue({ ...base, gesture: 'greet' }) as { gesture?: string }).gesture, 'greet');
