@@ -2,6 +2,8 @@
 export {
   DistrictAuthority,
   DEFAULT_DISTRICT_SPEC,
+  DEFAULT_WALKABLE_CELL_METRES,
+  segmentCellsWalkable,
   normalizeInput,
   type DistrictSpec,
   type DistrictPlayerSnapshot,

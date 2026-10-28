@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DistrictAuthority, DEFAULT_DISTRICT_SPEC, normalizeInput } from './district-authority.ts';
+import { DistrictAuthority, DEFAULT_DISTRICT_SPEC, normalizeInput, segmentCellsWalkable } from './district-authority.ts';
 
 test('only trusted join context supplies initial position; snapshot excludes secrets',()=>{
   const room=new DistrictAuthority();
@@ -51,4 +51,30 @@ test('capacity, disconnect and room clearance do not preserve ghost players',()=
   assert.equal(room.join({sessionId:'new',callerId:'b',startX:0,startZ:0}),null);
   room.clear();
   assert.equal(room.snapshot().length,0);
+});
+test('a wall between two walkable cells blocks a move that skips over it',()=>{
+  // 0.25 m cells; the cell x in [1, 1.25) is a wall. Start and end are both walkable.
+  const wall=(x:number)=>!(x>=1&&x<1.25);
+  const spec={...DEFAULT_DISTRICT_SPEC,extentMetres:4,tickMs:100,walkableCellMetres:.25,
+    walkable:(x:number,_z:number)=>wall(x)};
+  const room=new DistrictAuthority(spec);
+  assert.equal(room.join({sessionId:'s',callerId:'c',startX:.9,startZ:.1}),null);
+  // Running for one 100 ms tick covers 0.75 m: 0.9 -> 1.65, past the wall.
+  assert.ok(spec.walkable(.9+.75,.1));
+  assert.equal(room.submit('s',{seq:1,dx:1,dz:0,run:true}),null);
+  assert.equal(room.step()[0]!.x,.9);
+  // Walking back the other way crosses no wall and is applied.
+  assert.equal(room.submit('s',{seq:2,dx:-1,dz:0,run:false}),null);
+  assert.ok(Math.abs(room.step()[0]!.x-(.9-.45))<1e-9);
+});
+test('segmentCellsWalkable visits every crossed cell, diagonals included',()=>{
+  const visited:string[]=[];
+  const ok=segmentCellsWalkable(.5,.5,2.5,1.5,1,(x,z)=>{visited.push(`${x},${z}`);return true;});
+  assert.equal(ok,true);
+  assert.deepEqual(visited,['1.5,0.5','1.5,1.5','2.5,1.5']);
+  assert.equal(segmentCellsWalkable(.5,.5,.6,.7,1,()=>false),true);
+  assert.equal(segmentCellsWalkable(-.5,-.5,-2.5,-.5,1,(x)=>x!==-1.5),false);
+});
+test('rejects a non-positive walkability cell size',()=>{
+  assert.throws(()=>new DistrictAuthority({...DEFAULT_DISTRICT_SPEC,walkableCellMetres:0}),/Invalid district/);
 });

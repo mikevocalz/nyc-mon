@@ -17,6 +17,12 @@ export interface DistrictSpec {
   runMetresPerSecond: number;
   /** Optional server-side wall/road clearance query; never client provided. */
   walkable?: (x:number,z:number) => boolean;
+  /**
+   * Side of one square cell of the walkability grid, metres. A move is checked
+   * against `walkable` at the centre of every cell its segment crosses, so a
+   * wall thinner than one tick of movement still blocks it. Default 0.5.
+   */
+  walkableCellMetres?: number;
 }
 export interface TrustedJoin {
   /** Session assigned to a verified Colyseus client, not request body. */
@@ -58,6 +64,33 @@ export const DEFAULT_DISTRICT_SPEC: DistrictSpec = {
 };
 const finite=(n:unknown):n is number=>typeof n==='number'&&Number.isFinite(n);
 const safeId=(n:unknown):n is string=>typeof n==='string'&&n.length>0&&n.length<=128;
+export const DEFAULT_WALKABLE_CELL_METRES=0.5;
+/**
+ * Grid DDA (Amanatides & Woo): visits every cell of size `cell` that the
+ * segment (x0,z0)->(x1,z1) passes through, in order, excluding the start cell.
+ * Returns false as soon as `walkable` refuses a visited cell's centre.
+ */
+export function segmentCellsWalkable(
+  x0:number,z0:number,x1:number,z1:number,cell:number,
+  walkable:(x:number,z:number)=>boolean,
+):boolean {
+  let ix=Math.floor(x0/cell),iz=Math.floor(z0/cell);
+  const endX=Math.floor(x1/cell),endZ=Math.floor(z1/cell);
+  const dx=x1-x0,dz=z1-z0;
+  const stepX=Math.sign(dx),stepZ=Math.sign(dz);
+  const tDeltaX=stepX===0?Infinity:cell/Math.abs(dx);
+  const tDeltaZ=stepZ===0?Infinity:cell/Math.abs(dz);
+  let tMaxX=stepX===0?Infinity:((stepX>0?ix+1:ix)*cell-x0)/dx;
+  let tMaxZ=stepZ===0?Infinity:((stepZ>0?iz+1:iz)*cell-z0)/dz;
+  // A segment crosses at most |endX-ix|+|endZ-iz| cell boundaries.
+  let remaining=Math.abs(endX-ix)+Math.abs(endZ-iz);
+  while (remaining-->0) {
+    if (tMaxX<tMaxZ) { ix+=stepX; tMaxX+=tDeltaX; }
+    else { iz+=stepZ; tMaxZ+=tDeltaZ; }
+    if (!walkable((ix+.5)*cell,(iz+.5)*cell)) return false;
+  }
+  return true;
+}
 /** Input direction, not displacement: diagonal length is clamped to one. */
 export function normalizeInput(dx:number,dz:number):readonly [number,number] {
   const len=Math.hypot(dx,dz);
@@ -75,7 +108,9 @@ export class DistrictAuthority {
       !Number.isSafeInteger(spec.tickMs) || spec.tickMs<16 || spec.tickMs>100 ||
       !finite(spec.walkMetresPerSecond) || spec.walkMetresPerSecond<=0 ||
       !finite(spec.runMetresPerSecond) || spec.runMetresPerSecond<spec.walkMetresPerSecond ||
-      spec.runMetresPerSecond>15) throw new Error('Invalid district authority specification');
+      spec.runMetresPerSecond>15 ||
+      (spec.walkableCellMetres!==undefined && (!finite(spec.walkableCellMetres) ||
+        spec.walkableCellMetres<=0 || spec.walkableCellMetres>spec.extentMetres))) throw new Error('Invalid district authority specification');
     this.spec=spec;
   }
   join(input:TrustedJoin):JoinRefusal|null {
@@ -111,7 +146,12 @@ export class DistrictAuthority {
       const speed=v.run?this.spec.runMetresPerSecond:this.spec.walkMetresPerSecond;
       const proposedX=m.x+dx*dt*speed,proposedZ=m.z+dz*dt*speed;
       if (Math.abs(proposedX)>this.spec.extentMetres||Math.abs(proposedZ)>this.spec.extentMetres) continue;
-      if (this.spec.walkable&&!this.spec.walkable(proposedX,proposedZ)) continue;
+      const walkable=this.spec.walkable;
+      if (walkable) {
+        if (!walkable(proposedX,proposedZ)) continue;
+        const cell=this.spec.walkableCellMetres??DEFAULT_WALKABLE_CELL_METRES;
+        if (!segmentCellsWalkable(m.x,m.z,proposedX,proposedZ,cell,walkable)) continue;
+      }
       m.x=proposedX;m.z=proposedZ;
     }
     return this.snapshot();

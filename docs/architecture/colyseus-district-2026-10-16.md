@@ -5,7 +5,7 @@ Stacked draft on #46. The package subpath `@acme/core/realtime` now has a **work
 ## Implemented in this increment
 
 - A district `DistrictAuthority` that admits verified session-to-Caller pairs provided by the future *server* adapter, enforces room capacity, rejects duplicated session/player IDs, invalid vectors and stale sequence numbers.
-- Player input is **direction intent**, not a client-provided absolute coordinate or delta time. A burst of packets can move at most once per fixed server tick. Cardinal/diagonal speed normalized, movement limited to the baked tile; optional trusted collision query blocks walls.
+- Player input is **direction intent**, not a client-provided absolute coordinate or delta time. A burst of packets can move at most once per fixed server tick. Cardinal/diagonal speed normalized, movement limited to the baked tile; an optional trusted collision query blocks walls. The server checks that query at the move's endpoint and at the centre of every walkability-grid cell the move crosses (grid DDA, `walkableCellMetres`, default 0.5 m), so a wall thinner than one tick of movement still stops it.
 - Snapshot exposes only ephemeral in-room `callerId, x, z, tick`; never Better Auth account IDs, GPS coordinates, tokens, or an inventory. Disconnect drops the session.
 - `packages/core/realtime` subpath is exported with no Colyseus/React/Three dependency. The existing OSM dataset and Mon ownership stay authoritative elsewhere. Tests exercise spoof/teleport/replay, boundary, collision and disconnect cases.
 
