@@ -62,4 +62,11 @@ export interface CanvasSurface {
   readonly texture: Texture;
   /** Flag the texture for upload after a redraw. */
   commit(): void;
+  /**
+   * Frees the drawing surface once no more drawing will happen. The texture
+   * keeps its pixels and stays the caller's to dispose: on native the Skia
+   * raster goes (the DataTexture holds its own copy); on web it is a no-op,
+   * the canvas being the texture's image.
+   */
+  dispose(): void;
 }

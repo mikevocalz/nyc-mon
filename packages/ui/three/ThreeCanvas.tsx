@@ -9,7 +9,7 @@ import { useInstance, useInstanceStore, useStore } from '../use-instance-store';
 import { useLayoutSize } from '../use-layout-size';
 import { View } from '../tw';
 import { loadThree } from './load-three';
-import { advanceNodeFrame, stopInternalLoop } from './renderer-internals';
+import { advanceNodeFrame, releaseCanvasBuffers, stopInternalLoop } from './renderer-internals';
 import { resolveRenderThread } from './render-thread';
 import { WorkletThreeCanvas } from './WorkletThreeCanvas';
 import { toNdc } from './pointer';
@@ -302,7 +302,14 @@ function JsThreeCanvas<P>({
       renderer = surface.createRenderer(THREE, { backend: using, device, rendererParams });
       await renderer.init();
       stopInternalLoop(renderer);
-      if (cancelled) return;
+      if (cancelled) {
+        // Unmounted while init was pending: the cleanup's dispose() was a no-op on an
+        // uninitialised renderer, so this initialised one would otherwise outlive the stage.
+        releaseCanvasBuffers(renderer);
+        void renderer.dispose().catch(() => undefined);
+        renderer = null;
+        return;
+      }
       built = setup({ THREE, renderer, backend: using, invalidate }, rt.params);
       rt.renderer = renderer;
       rt.built = built;
@@ -320,7 +327,8 @@ function JsThreeCanvas<P>({
     return () => {
       cancelled = true;
       built?.dispose?.();
-      renderer?.dispose();
+      if (renderer) releaseCanvasBuffers(renderer);
+      void renderer?.dispose().catch((error: unknown) => console.warn('[ThreeCanvas] dispose failed', error));
       rt.renderer = null;
       rt.built = null;
       rt.surface = null;

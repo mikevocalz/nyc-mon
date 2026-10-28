@@ -4,6 +4,7 @@ export { HolographicTerrain, type HolographicTerrainProps } from './HolographicT
 export { CityHeightfield, type CityHeightfieldProps } from './CityHeightfield';
 export { NeonTide, type NeonTideProps, type NeonTideOrigin } from './NeonTide';
 export { loadThree } from './load-three';
+export { releaseHLynkResources, type ReleaseCount } from './release';
 export { toNdc, approach } from './pointer';
 export { parseRenderThreadFlag, resolveRenderThread, type RenderThread, type RenderThreadReason } from './render-thread';
 export { installWebGPUOnRuntime } from './install-webgpu';

@@ -28,6 +28,8 @@ import {
 import { PHYSICAL_PRESETS } from './world/physical-presets.ts';
 import type { PhysicalRig } from './world/physical-rig.ts';
 import { loadPhysicalRig } from './physical-graph.ts';
+import { backendUploaded, createUploadedReleaser, RELEASE_UPLOADED } from './world/release-uploaded.ts';
+import { applyReversedDepthOffsets } from './world/reversed-depth-offset.ts';
 
 export interface CityCamera {
   x: number;
@@ -153,13 +155,17 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
   // react-native-webgpu renders black through three's output pass, shadow
   // maps and Color backgrounds (metro-live README): linear output, no tone
   // mapping, no shadow maps, and the clear colour as the sky's fallback.
+  // With the physical stack on, its RenderPipeline owns tone mapping (ACES,
+  // exposure from the grade) and the vd lane's direct AgX x1.6 stays off:
+  // stacked on the physical bloom it blew the facades out.
+  const vdTonemap = physical ? '' : VD_TONEMAP;
   if (renderer) {
     renderer.outputColorSpace = physical?.srgbOutput ? THREE.SRGBColorSpace : THREE.LinearSRGBColorSpace;
-    renderer.toneMapping = VD_TONEMAP === 'agx' ? THREE.AgXToneMapping
-      : VD_TONEMAP === 'aces' ? THREE.ACESFilmicToneMapping
-        : VD_TONEMAP === 'neutral' ? THREE.NeutralToneMapping : THREE.NoToneMapping;
+    renderer.toneMapping = vdTonemap === 'agx' ? THREE.AgXToneMapping
+      : vdTonemap === 'aces' ? THREE.ACESFilmicToneMapping
+        : vdTonemap === 'neutral' ? THREE.NeutralToneMapping : THREE.NoToneMapping;
     // AgX compresses highlights and pulls mids down; a lift keeps the palette's daylight read.
-    renderer.toneMappingExposure = VD_TONEMAP ? 1.6 : 1;
+    renderer.toneMappingExposure = vdTonemap ? 1.6 : 1;
     renderer.shadowMap.enabled = VD_SHADOWS || (physical !== null && physical.sunShadow > 0);
     renderer.setClearColor(world.horizon, 1);
   }
@@ -220,14 +226,16 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
   // update clock and steps the drawing buffer through the pixel ratio.
   // It cannot fix the UI-thread/Rive ceiling — GPU-side gains are
   // reported separately on device (perf/render-scale.ts header).
-  // The vd lane implies the controller: without it the Duo measured
-  // ~16 fps (2026-10-18) — unplayable. An explicit
-  // EXPO_PUBLIC_WORLD_RENDER_SCALE=0 still turns it off.
+  // The vd lane implies the controller on the direct path: without it the
+  // Duo measured ~16 fps (2026-10-18) — unplayable. Under the physical stack
+  // the pipeline sizes its own targets, so the vd lane leaves the physical
+  // path's scale as it was. An explicit EXPO_PUBLIC_WORLD_RENDER_SCALE=0
+  // still turns it off.
   const renderScaleEnv = process.env.EXPO_PUBLIC_WORLD_RENDER_SCALE;
   const renderScaleOff =
     renderScaleEnv != null && renderScaleEnv.trim() !== '' && !parseSkyRigFlag(renderScaleEnv);
   const renderScale =
-    renderer && !renderScaleOff && (EXPERIMENTAL_WORLD_RENDER_SCALE || VD_LANE)
+    renderer && !renderScaleOff && (EXPERIMENTAL_WORLD_RENDER_SCALE || (VD_LANE && physical === null))
       ? mountRenderScale(renderer, (bundle ?? tierBundle(WORLD_TIER)).scale)
       : null;
   // Last consumed thermalSignal sample — the monitor (perf/thermal.ts,
@@ -267,6 +275,8 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
   }
 
   if (rigModule && physical && physical.sunShadow > 0) rigModule.applyPhysicalShadowRoles(scene);
+  // Ground-layer polygon offsets point toward the camera only on a standard depth buffer (world/reversed-depth-offset.ts).
+  applyReversedDepthOffsets(scene, renderer as { reversedDepthBuffer?: boolean } | null | undefined);
   // After the actors joined, so their instanced meshes are swapped too.
   const storageSwapped = rigModule && renderer && physical?.storage ? rigModule.swapInstanceMatricesToStorage(THREE, renderer, scene) : 0;
   let probeCleanup: (() => void) | void = undefined;
@@ -323,11 +333,19 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
   let lastActorTick = 0;
   let moving = false;
   let disposed = false;
+  // Opt-in (EXPO_PUBLIC_WORLD_RELEASE_UPLOADED=1; off by default since the
+  // iPad's START failed with it on, world/release-uploaded.ts): static world
+  // geometry and data-texture pixels leave the CPU once the GPU has held them
+  // for RELEASE_SETTLE_FRAMES frames. Each update checks what earlier frames
+  // uploaded; once nothing is pending the check costs nothing.
+  const releaser = renderer && RELEASE_UPLOADED ? createUploadedReleaser(world.group) : null;
+  const uploaded = renderer && releaser ? backendUploaded(renderer) : null;
   return {
     scene,
     camera,
     update: (frame, params) => {
       if (params.dataset !== initial.dataset) throw new Error('Remount city scene when changing datasets');
+      if (releaser && uploaded && releaser.pending > 0) releaser.release(uploaded);
       const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
       // Frame pacing for the scale controller: the interval between these
       // calls is the draw cadence — JS submission pacing, not GPU or UI
@@ -416,6 +434,9 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
     dispose: () => {
       if (disposed) return;
       disposed = true;
+      // First, while every instanced mesh is still in the scene: their storage
+      // instance matrices are freed by nothing else (physical-rig.ts).
+      if (rigModule && renderer && storageSwapped > 0) rigModule.releaseStorageInstanceMatrices(renderer, scene);
       renderScale?.dispose();
       probeCleanup?.();
       post?.dispose();

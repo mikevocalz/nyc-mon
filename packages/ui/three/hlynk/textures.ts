@@ -13,6 +13,8 @@ type Texture = CanvasSurface['texture'];
 
 const finish = (surface: CanvasSurface): Texture => {
   surface.commit();
+  // Drawn once: the Skia raster is done (the texture keeps the pixels).
+  surface.dispose();
   return surface.texture;
 };
 

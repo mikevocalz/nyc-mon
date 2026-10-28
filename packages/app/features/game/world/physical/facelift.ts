@@ -746,14 +746,20 @@ export function createFaceliftMaterial(THREE: Three): StdMat {
   const opening = filteredPulse(cellUV.x, halfX, 1 - halfX, fw.x).mul(filteredPulse(cellUV.y, halfY, 1 - halfY, fw.y)).mul(open);
   const glass = filteredPulse(cellUV.x, fx.add(halfX), fx.negate().add(1 - halfX), fw.x)
     .mul(filteredPulse(cellUV.y, fy.add(halfY), fy.negate().add(1 - halfY), fw.y)).mul(open);
+  // The skin is alpha-tested at 0.5, so a line thinner than a pixel survives only where its coverage happens to
+  // cross 0.5: dotted joints that crawl as the Caller walks. Each line fades out between 2 and 1 px wide
+  // (metres per pixel from the wall coordinates), so what is drawn is always at least ~1.5 px wide.
+  const metresPerPixel = T.max(T.max(T.fwidth(uCoord), T.fwidth(vCoord)), 1e-4);
+  const wideEnough = (width: number) => T.smoothstep(1, 2, T.float(width).div(metresPerPixel));
   const rails = T.max(
     lineAA(cellUV.y.sub(0.52), T.float(FACELIFT.railHalfWidth).div(floorHeight)),
     lineAA(cellUV.x.sub(0.5), T.float(FACELIFT.railHalfWidth).div(bayWidth)),
-  ).mul(glass);
+  ).mul(glass).mul(wideEnough(FACELIFT.railHalfWidth * 2));
   const upper = T.float(1).sub(isRoof).mul(T.float(1).sub(isCornice)).mul(T.float(1).sub(isGroundFloor));
-  const frames = T.clamp(T.max(opening.sub(glass), rails), 0, 1).mul(upper).mul(wantFrames);
+  const frames = T.clamp(T.max(opening.sub(glass).mul(wideEnough(FACELIFT.frameWidth)), rails), 0, 1).mul(upper).mul(wantFrames);
   const joints = T.max(gridLine(vCoord, floorHeight, FACELIFT.jointHalfWidth), gridLine(uCoord, bayWidth, FACELIFT.jointHalfWidth))
-    .mul(T.float(1).sub(opening)).mul(upper).mul(T.float(1).sub(coping)).mul(T.float(1).sub(blank)).mul(wantJoints);
+    .mul(T.float(1).sub(opening)).mul(upper).mul(T.float(1).sub(coping)).mul(T.float(1).sub(blank)).mul(wantJoints)
+    .mul(wideEnough(FACELIFT.jointHalfWidth * 2));
   const isFrame = T.step(joints, frames);
 
   mat.opacityNode = asNode(T.mix(T.float(1), T.max(frames, joints), isSkin));

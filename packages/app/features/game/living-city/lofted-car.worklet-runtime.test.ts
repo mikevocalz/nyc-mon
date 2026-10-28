@@ -81,12 +81,20 @@ test('the lofted actor graph loads without react-native and builds a lofted taxi
   await import('./vehicle-headlights.ts');
   await import('./lofted-car-material.ts');
   await import('./vehicle-physical-constants.ts');
-  const actor = createVehicleActor({ read: () => null, physical: true, tier: 'phone' })(THREE);
+  const actor = createVehicleActor({ read: () => null, physical: true, vd: false, tier: 'phone' })(THREE);
   const group = actor.object as InstanceType<typeof THREE.Group>;
   const taxi = group.getObjectByName('living-city:vehicles:taxi:near') as InstanceType<typeof THREE.InstancedMesh>;
   assert.ok(taxi?.isInstancedMesh, 'a lofted taxi mesh exists');
   assert.ok((taxi.geometry.index?.count ?? 0) / 3 > 4000);
   actor.update({ delta: 1 / 60, time: 0, reducedMotion: false });
   actor.dispose();
+  // The vd lane's baked bodies (vd-car-mesh.ts, vd-car-material.ts) load through the same graph.
+  const vd = createVehicleActor({ read: () => null, physical: true, vd: true, tier: 'phone' })(THREE);
+  // A plain Mesh over an InstancedBufferGeometry (world/vd-instanced.ts), not an InstancedMesh.
+  const cab = (vd.object as InstanceType<typeof THREE.Group>).getObjectByName('living-city:vehicles:taxi:near-vd-taxinv200') as InstanceType<typeof THREE.Mesh>;
+  assert.ok(cab?.isMesh && (cab.geometry as { isInstancedBufferGeometry?: boolean }).isInstancedBufferGeometry, 'the baked cab mesh exists');
+  assert.ok((cab.geometry.index?.count ?? 0) / 3 > 4000);
+  vd.update({ delta: 1 / 60, time: 0, reducedMotion: false });
+  vd.dispose();
   assert.deepEqual(appDomReads(), [], 'no app module touched a DOM global');
 });

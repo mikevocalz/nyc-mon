@@ -8,6 +8,8 @@ import {
   playbackProgress, resolveEggClips, type EggAttention, type EggClipRole, type EggHatchManifest, type EggHatchPhase, type EggPose,
 } from './hatch-manifest';
 import { weldShellSeamNormals } from './shell-seams';
+import { disposeObjectTree } from '../dispose-object.ts';
+import { SharedParseCache, type ParseLease } from '../parse-cache.ts';
 
 /** An egg's runtime assets as `@acme/assets/eggs` exports them: the manifest JSON and the bundled GLB (URL on web, asset id on native). */
 export interface EggHatchSource {
@@ -26,31 +28,25 @@ interface LoadedEgg {
   readonly hatchUnderAttention: THREE.AnimationClip;
 }
 
-interface CacheEntry {
-  readonly promise: Promise<LoadedEgg>;
-  refs: number;
+/** Parsed eggs by eggId, shared by every mounted rig for the egg (parse-cache.ts); freed when the last one releases it. */
+const cache = new SharedParseCache<LoadedEgg>('egg-hatch-rig', {
+  keepMs: 0,
+  dispose: (egg) => disposeObjectTree(egg.gltf.scene),
+});
+
+function fetchEgg(eggId: string, source: EggHatchSource): Promise<ArrayBuffer> {
+  return fetchEggBytes(source.glb).catch((cause: unknown) => {
+    throw new EggHatchAssetError('fetch', `${eggId}: could not fetch the hatch GLB`, { cause });
+  });
 }
 
-/** Parsed eggs by eggId. Shared by every mounted rig for the egg; disposed when the last one releases it. */
-const cache = new Map<string, CacheEntry>();
-/** Raw GLB bytes by eggId, warmed by `preloadEggHatch` during incubation so the hatch starts without a network wait. */
-const bytesCache = new Map<string, Promise<ArrayBuffer>>();
-
-function bytesFor(eggId: string, source: EggHatchSource): Promise<ArrayBuffer> {
-  let pending = bytesCache.get(eggId);
-  if (!pending) {
-    pending = fetchEggBytes(source.glb).catch((cause: unknown) => {
-      bytesCache.delete(eggId);
-      throw new EggHatchAssetError('fetch', `${eggId}: could not fetch the hatch GLB`, { cause });
-    });
-    bytesCache.set(eggId, pending);
-  }
-  return pending;
-}
-
-/** Starts fetching an egg's GLB bytes. Safe to call repeatedly; errors surface on the real load. */
+/**
+ * Starts fetching an egg's GLB bytes during incubation, so the hatch starts
+ * without a network wait. Safe to call repeatedly; a no-op once the egg is
+ * parsed. Errors surface on the real load.
+ */
 export function preloadEggHatch(eggId: string, source: EggHatchSource): void {
-  bytesFor(eggId, source).catch(() => undefined);
+  cache.preload(eggId, () => fetchEgg(eggId, source));
 }
 
 async function loadEgg(eggId: string, source: EggHatchSource): Promise<LoadedEgg> {
@@ -58,7 +54,7 @@ async function loadEgg(eggId: string, source: EggHatchSource): Promise<LoadedEgg
   if (manifest.eggId !== eggId) {
     throw new EggHatchAssetError('egg-mismatch', `asked for ${eggId}, manifest describes ${manifest.eggId}`);
   }
-  const bytes = await bytesFor(eggId, source);
+  const bytes = await cache.bytesFor(eggId, () => fetchEgg(eggId, source));
   const loader = new GLTFLoader();
   // The GLBs use KHR_mesh_quantization only, which GLTFLoader reads with no
   // decoder. Meshopt and Draco are off the table: both decoders need
@@ -91,50 +87,6 @@ function shellPieceNamesIn(root: THREE.Object3D): string[] {
   return names;
 }
 
-function acquire(eggId: string, source: EggHatchSource): Promise<LoadedEgg> {
-  let entry = cache.get(eggId);
-  if (!entry) {
-    const promise = loadEgg(eggId, source);
-    entry = { promise, refs: 0 };
-    cache.set(eggId, entry);
-    // A failed load leaves the cache, so a remount retries instead of replaying the error.
-    promise.catch(() => {
-      if (cache.get(eggId)?.promise === promise) cache.delete(eggId);
-    });
-  }
-  entry.refs += 1;
-  return entry.promise;
-}
-
-function release(eggId: string): void {
-  const entry = cache.get(eggId);
-  if (!entry) return;
-  entry.refs -= 1;
-  if (entry.refs > 0) return;
-  cache.delete(eggId);
-  entry.promise.then((egg) => disposeObject(egg.gltf.scene), () => undefined);
-}
-
-/** Frees every geometry, material and texture under `root`. Shared resources are only reached once. */
-function disposeObject(root: THREE.Object3D): void {
-  const seen = new Set<{ dispose: () => void }>();
-  const add = (resource: { dispose: () => void } | null | undefined) => {
-    if (resource) seen.add(resource);
-  };
-  root.traverse((object) => {
-    const mesh = object as Partial<THREE.Mesh>;
-    add(mesh.geometry);
-    const materials = mesh.material === undefined ? [] : Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-    for (const material of materials) {
-      add(material);
-      for (const value of Object.values(material)) {
-        if (value instanceof THREE.Texture) add(value);
-      }
-    }
-  });
-  for (const resource of seen) resource.dispose();
-}
-
 /**
  * One egg's hatch, ready to pose. Built per scene from the shared parse: the
  * scene graph is cloned (geometry and materials stay shared), with its own
@@ -149,7 +101,7 @@ export class EggHatchRig {
   private readonly mixer: THREE.AnimationMixer;
   private readonly actions: Record<EggClipRole | 'hatchUnder', THREE.AnimationAction>;
   private readonly proxies: THREE.Object3D[] = [];
-  private readonly eggId: string;
+  private readonly lease: ParseLease<LoadedEgg>;
   private disposed = false;
 
   private mode: { kind: 'still'; pose: EggPose } | { kind: 'idle'; time: number } | {
@@ -160,8 +112,8 @@ export class EggHatchRig {
     duration: number;
   } = { kind: 'still', pose: { kind: 'hatch', seconds: 0 } };
 
-  private constructor(eggId: string, egg: LoadedEgg) {
-    this.eggId = eggId;
+  private constructor(eggId: string, egg: LoadedEgg, lease: ParseLease<LoadedEgg>) {
+    this.lease = lease;
     this.manifest = egg.manifest;
     this.root = cloneSkinned(egg.gltf.scene);
     this.root.name = `EggHatch_${eggId}`;
@@ -189,8 +141,13 @@ export class EggHatchRig {
 
   /** Loads (or reuses) the egg and builds a rig. Rejects with `EggHatchAssetError` on any contract break. */
   static async create(eggId: string, source: EggHatchSource): Promise<EggHatchRig> {
-    const egg = await acquire(eggId, source);
-    return new EggHatchRig(eggId, egg);
+    const lease = cache.acquire(eggId, () => loadEgg(eggId, source));
+    try {
+      return new EggHatchRig(eggId, await lease.value, lease);
+    } catch (error) {
+      lease.release();
+      throw error;
+    }
   }
 
   /** The Baby in these GLBs is a labelled stand-in (manifest `baby.proxy`); hide it wherever real creature art draws the Baby. */
@@ -276,7 +233,7 @@ export class EggHatchRig {
     this.mixer.stopAllAction();
     this.mixer.uncacheRoot(this.root);
     this.root.removeFromParent();
-    release(this.eggId);
+    this.lease.release();
   }
 
   private attentionClip(kind: EggAttention): THREE.AnimationClip {

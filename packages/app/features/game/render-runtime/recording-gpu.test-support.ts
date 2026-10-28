@@ -16,7 +16,18 @@ export interface GpuRecord {
   writes: number;
   writeBytes: number;
   draws: number;
+  /** Every render pipeline's label and vertex buffer count, in creation order. */
+  pipelineVertexBuffers: { label: string; buffers: number }[];
+  /** Every texture's label, format, size and mip level count, in creation order. */
+  textures: { label: string; format: string; width: number; height: number; layers: number; mipLevelCount: number }[];
+  /** Every sampler descriptor, in creation order. */
+  samplers: { magFilter?: string; minFilter?: string; mipmapFilter?: string; maxAnisotropy?: number; addressModeU?: string }[];
 }
+
+/** WebGPU's default `maxVertexBuffers`, and what Dawn reports on the A12X iPad. */
+export const MAX_VERTEX_BUFFERS = 8;
+
+type PipelineDescriptor = { label?: string; vertex?: { buffers?: readonly unknown[] } };
 
 const FORMAT_BYTES: Record<string, number> = {
   r8unorm: 1, r16float: 2, rg16float: 4, r32float: 4, rgba8unorm: 4, 'rgba8unorm-srgb': 4, bgra8unorm: 4,
@@ -72,8 +83,16 @@ export function installGpuGlobals(): void {
 }
 
 export function recordingGpuDevice(): { device: unknown; record: GpuRecord } {
-  const record: GpuRecord = { shaders: [], renderPipelines: 0, computePipelines: 0, bufferBytes: 0, textureBytes: 0, writes: 0, writeBytes: 0, draws: 0 };
-  const limits = new Proxy({}, { get: (_t, p) => (p === 'then' ? undefined : 1 << 28) });
+  const record: GpuRecord = {
+    shaders: [], renderPipelines: 0, computePipelines: 0, bufferBytes: 0, textureBytes: 0, writes: 0, writeBytes: 0, draws: 0,
+    pipelineVertexBuffers: [], textures: [], samplers: [],
+  };
+  // The iPad's real vertex-buffer limit; every other limit is effectively unbounded.
+  const limits = new Proxy({}, { get: (_t, p) => (p === 'then' ? undefined : p === 'maxVertexBuffers' ? MAX_VERTEX_BUFFERS : 1 << 28) });
+  const pipeline = (d: PipelineDescriptor) => {
+    record.renderPipelines++;
+    record.pipelineVertexBuffers.push({ label: d.label ?? '', buffers: d.vertex?.buffers?.length ?? 0 });
+  };
   const device = {
     features: new Set<string>(['float32-filterable']),
     limits,
@@ -87,8 +106,8 @@ export function recordingGpuDevice(): { device: unknown; record: GpuRecord } {
     },
     // Descriptors are reused and reset by three after the call: read everything now.
     createShaderModule: (d: { code: string }) => { record.shaders.push(d.code); return { getCompilationInfo: async () => ({ messages: [] }) }; },
-    createRenderPipeline: () => { record.renderPipelines++; return inert(); },
-    createRenderPipelineAsync: async () => { record.renderPipelines++; return inert(); },
+    createRenderPipeline: (d: PipelineDescriptor) => { pipeline(d); return inert(); },
+    createRenderPipelineAsync: async (d: PipelineDescriptor) => { pipeline(d); return inert(); },
     createComputePipeline: () => { record.computePipelines++; return inert(); },
     createComputePipelineAsync: async () => { record.computePipelines++; return inert(); },
     createBuffer: (d: { size: number }) => {
@@ -96,17 +115,20 @@ export function recordingGpuDevice(): { device: unknown; record: GpuRecord } {
       record.bufferBytes += size;
       return { size, getMappedRange: () => new ArrayBuffer(size), unmap() {}, destroy() {}, mapAsync: async () => {} };
     },
-    createTexture: (d: { size: { width: number; height?: number; depthOrArrayLayers?: number } | number[]; format: string; sampleCount?: number }) => {
+    createTexture: (d: { label?: string; size: { width: number; height?: number; depthOrArrayLayers?: number } | number[]; format: string; sampleCount?: number; mipLevelCount?: number }) => {
       const s = Array.isArray(d.size)
         ? { width: d.size[0]!, height: d.size[1] ?? 1, depthOrArrayLayers: d.size[2] ?? 1 }
         : { width: d.size.width, height: d.size.height ?? 1, depthOrArrayLayers: d.size.depthOrArrayLayers ?? 1 };
       record.textureBytes += s.width * s.height * s.depthOrArrayLayers * (FORMAT_BYTES[d.format] ?? 4) * (d.sampleCount ?? 1);
-      return { ...s, format: d.format, createView: () => inert(), destroy() {} };
+      const mipLevelCount = d.mipLevelCount ?? 1;
+      record.textures.push({ label: d.label ?? '', format: d.format, width: s.width, height: s.height, layers: s.depthOrArrayLayers, mipLevelCount });
+      // mipLevelCount is a GPUTexture property (react-native-webgpu exposes it too): three's mip pass loops over it.
+      return { ...s, mipLevelCount, format: d.format, createView: () => inert(), destroy() {} };
     },
     createBindGroup: () => inert(),
     createBindGroupLayout: () => inert(),
     createPipelineLayout: () => inert(),
-    createSampler: () => inert(),
+    createSampler: (d: GpuRecord['samplers'][number] = {}) => { record.samplers.push({ ...d }); return inert(); },
     createQuerySet: () => inert(),
     createCommandEncoder: () => encoder(record),
     createRenderBundleEncoder: () => encoder(record),

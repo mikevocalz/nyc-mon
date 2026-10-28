@@ -36,6 +36,7 @@ import {
   type PhysicalPresetId,
 } from './physical-look.ts';
 import { PHYSICAL_NIGHT_SKY, PHYSICAL_PRESETS } from './physical-presets.ts';
+import { createSoftShadowFilter, SOFT_SHADOW_RADIUS } from './physical/soft-shadow-filter.ts';
 
 type RendererT = InstanceType<Three['WebGPURenderer']>;
 type SceneT = InstanceType<Three['Scene']>;
@@ -224,6 +225,9 @@ export function createPhysicalRig(
     s.shadow.camera.near = PHYSICAL_RIG.shadowNear;
     s.shadow.camera.far = PHYSICAL_RIG.shadowFarMin;
     s.shadow.normalBias = PHYSICAL_RIG.normalBias;
+    // Noise-free tent filter in place of three's IGN-rotated PCF (physical/soft-shadow-filter.ts): canopy shadows read soft, not dithered.
+    (s.shadow as unknown as { filterNode: unknown }).filterNode = createSoftShadowFilter(THREE);
+    s.shadow.radius = SOFT_SHADOW_RADIUS;
     sun = s;
   } else if (features.sunShadow === 1) {
     const d = new THREE.DirectionalLight(new THREE.Color(start.colors.sun), start.sunIntensity);
@@ -237,6 +241,8 @@ export function createPhysicalRig(
     cam.far = PHYSICAL_RIG.singleShadowDistance * 2;
     cam.updateProjectionMatrix();
     d.shadow.normalBias = PHYSICAL_RIG.normalBias;
+    (d.shadow as unknown as { filterNode: unknown }).filterNode = createSoftShadowFilter(THREE);
+    d.shadow.radius = SOFT_SHADOW_RADIUS;
     scene.add(d.target);
     added.push(d.target);
     sun = d;
@@ -257,13 +263,16 @@ export function createPhysicalRig(
 
   // ---- Clustered lighting -------------------------------------------------------
   const priorLighting = renderer?.lighting ?? null;
+  // Kept so dispose can free the scene's clustered node and its storage buffers.
+  let clustered: InstanceType<typeof ClusteredLighting> | null = null;
   if (renderer && features.clustered) {
-    renderer.lighting = new ClusteredLighting(
+    clustered = new ClusteredLighting(
       options.clusteredMaxLights,
       PHYSICAL_RIG.clusterTileSize,
       PHYSICAL_RIG.clusterZSlices,
       PHYSICAL_RIG.clusterMaxPerCluster,
     );
+    renderer.lighting = clustered;
   }
 
   let focusX = 0;
@@ -362,6 +371,7 @@ export function createPhysicalRig(
       if (disposed) return;
       disposed = true;
       for (const object of added) object.removeFromParent();
+      if (renderer && clustered) releaseClusteredNode(renderer, clustered, scene);
       if (renderer && features.clustered && priorLighting) renderer.lighting = priorLighting;
       if (fog) scene.fog = priorFog;
       if (sky) {
@@ -379,14 +389,53 @@ export function createPhysicalRig(
   };
 }
 
+type RendererAttributes = { _attributes?: { delete(attribute: object): unknown } | null };
+
+/**
+ * Frees the scene's ClusteredLightsNode. Its light-index list is a storage
+ * buffer (about 16 MB at the iPad Pro's drawing buffer), and node.dispose()
+ * only frees bindings, which skip storage buffers, so the attribute is
+ * deleted from the renderer first. Neither `_lightsNodeMap`, `_lightIndexes`
+ * nor `_attributes` is public API (three r186). Returns whether a node was freed.
+ */
+export function releaseClusteredNode(renderer: RendererT, lighting: object, scene: object): boolean {
+  const map = (lighting as { _lightsNodeMap?: WeakMap<object, { _lightIndexes?: { value?: object } | null; dispose(): void }> })._lightsNodeMap;
+  const node = map?.get(scene);
+  if (!node) return false;
+  const indexes = node._lightIndexes?.value;
+  if (indexes) (renderer as unknown as RendererAttributes)._attributes?.delete(indexes);
+  node.dispose();
+  map!.delete(scene);
+  return true;
+}
+
+/**
+ * Deletes the GPU buffers of every InstancedMesh whose instanceMatrix
+ * swapInstanceMatricesToStorage moved to a storage attribute: geometry
+ * dispose never reaches the instance matrix, so they waited for a GC on the
+ * shared device. Call first in the scene's dispose. Returns how many were freed.
+ */
+export function releaseStorageInstanceMatrices(renderer: RendererT, root: Object3DT): number {
+  const attributes = (renderer as unknown as RendererAttributes)._attributes;
+  if (!attributes) return 0;
+  let freed = 0;
+  root.traverse((object) => {
+    const mesh = object as Object3DT & { isInstancedMesh?: boolean; instanceMatrix?: object & { isStorageInstancedBufferAttribute?: boolean } };
+    if (mesh.isInstancedMesh !== true || mesh.instanceMatrix?.isStorageInstancedBufferAttribute !== true) return;
+    if (attributes.delete(mesh.instanceMatrix) !== null) freed++;
+  });
+  return freed;
+}
+
 /** Meshes that never cast a sun shadow: flat ground layers and the sky. */
 const NON_CASTERS = new Set([
   'city:ground', 'city:roads', 'city:sidewalks', 'city:areas', 'city:contact-shadows', 'city:sky', 'city:physical-sky',
 ]);
 
 /**
- * Shadow roles for everything under `root`: opaque meshes cast, everything
- * but the sky receives. Returns the caster count.
+ * Shadow roles for everything under `root`: opaque meshes cast (unless
+ * `userData.noSunShadow`), everything but the sky receives. Returns the
+ * caster count.
  */
 export function applyPhysicalShadowRoles(root: Object3DT): number {
   let casters = 0;
@@ -395,7 +444,8 @@ export function applyPhysicalShadowRoles(root: Object3DT): number {
     if (mesh.isMesh !== true) return;
     const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
     const transparent = materials.some((m) => m?.transparent === true);
-    const cast = !NON_CASTERS.has(object.name) && !transparent;
+    // `userData.noSunShadow`: a mesh too far out for its shadow to read (the far parked-car level) skips the caster pass.
+    const cast = !NON_CASTERS.has(object.name) && !transparent && object.userData.noSunShadow !== true;
     object.castShadow = cast;
     object.receiveShadow = object.name !== 'city:sky' && object.name !== 'city:physical-sky';
     if (cast) casters++;

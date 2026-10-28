@@ -57,6 +57,39 @@ export function vdSpecies(h: number): number {
   return VD_TREE_SHARE.length - 1;
 }
 
+/**
+ * Folds a geometry's static per-vertex attributes into one InterleavedBuffer,
+ * so they bind as a single vertex buffer. WebGPU's default maxVertexBuffers is
+ * 8 and Dawn on the A12X iPad reports exactly 8: the lean-draw far leaf used
+ * to bind nine (five per-vertex streams, four per-instance ones and the
+ * instance matrix), and its pipeline failed to create, so the far trees never
+ * drew. Each attribute keeps its name, item size and values.
+ */
+export function interleaveVertexAttributes(THREE: Three, geometry: InstanceType<Three['BufferGeometry']>, names: readonly string[]): void {
+  const parts = names.map((name) => {
+    const a = geometry.getAttribute(name) as InstanceType<Three['BufferAttribute']> | undefined;
+    if (!a || (a as { isInterleavedBufferAttribute?: boolean }).isInterleavedBufferAttribute || (a as { isInstancedBufferAttribute?: boolean }).isInstancedBufferAttribute) {
+      throw new Error(`interleaveVertexAttributes: ${name} is not a plain per-vertex attribute`);
+    }
+    if (!(a.array instanceof Float32Array)) throw new Error(`interleaveVertexAttributes: ${name} is not Float32`);
+    return { name, a };
+  });
+  const count = parts[0]!.a.count;
+  const stride = parts.reduce((n, p) => n + p.a.itemSize, 0);
+  const data = new Float32Array(count * stride);
+  let offset = 0;
+  const placed = parts.map(({ name, a }) => {
+    if (a.count !== count) throw new Error(`interleaveVertexAttributes: ${name} has ${a.count} vertices, not ${count}`);
+    const src = a.array as Float32Array;
+    for (let v = 0; v < count; v++) for (let c = 0; c < a.itemSize; c++) data[v * stride + offset + c] = src[v * a.itemSize + c]!;
+    const at = { name, itemSize: a.itemSize, offset };
+    offset += a.itemSize;
+    return at;
+  });
+  const buffer = new THREE.InterleavedBuffer(data, stride);
+  for (const { name, itemSize, offset: o } of placed) geometry.setAttribute(name, new THREE.InterleavedBufferAttribute(buffer, itemSize, o));
+}
+
 const f32 = (b64: string) => { const u = decodeBase64(b64); return new Float32Array(u.buffer, u.byteOffset, u.byteLength / 4); };
 const u16 = (b64: string) => { const u = decodeBase64(b64); return new Uint16Array(u.buffer, u.byteOffset, u.byteLength / 2); };
 // Display-space value of a linear bark albedo: the city feeds palette values straight to the screen.
@@ -139,8 +172,16 @@ export function buildVdTreeMeshes(
   leanMat = VD_LEANMAT,
   /** Overridable for tests: the cross-species merged draws (vd-leandraw.ts). Defaults to the flag. */
   leanDraw = VD_LEANDRAW,
+  /**
+   * Under the physical stack (sRGB output): colours are authored as display
+   * values for the direct linear-output path, so each colour and glow is
+   * decoded to the linear working space. Default false.
+   */
+  linearColors = false,
 ) {
   const T = THREE.TSL;
+  type V3n = Node<'vec3'>;
+  const working = (x: V3n): V3n => (linearColors ? T.sRGBTransferEOTF(x) as V3n : x);
   // Lean bodies (vd-leanmat.ts): the same colour graphs on an unlit basic
   // body. `lights = false` keeps the node builder from wrapping the output
   // in a lighting context at all — the draw encodes the colour nodes and
@@ -177,7 +218,7 @@ export function buildVdTreeMeshes(
     ? leanBody()
     : new THREE.MeshStandardNodeMaterial({ roughness: 0.92, metalness: 0 });
   const trunkStreak = T.fract(T.sin(T.positionLocal.x.mul(17.1).add(T.positionLocal.z.mul(11.3))).mul(43758.5453)).mul(0.25).add(0.85);
-  trunkMaterial.colorNode = T.vec4(T.vec3(toDisplay(meanBark[0]!), toDisplay(meanBark[1]!), toDisplay(meanBark[2]!)).mul(trunkStreak), 1);
+  trunkMaterial.colorNode = T.vec4(working(T.vec3(toDisplay(meanBark[0]!), toDisplay(meanBark[1]!), toDisplay(meanBark[2]!)).mul(trunkStreak)), 1);
   materials.push(trunkMaterial);
 
   // The far imposter leaves likewise share one material: the atlas layer and
@@ -197,18 +238,18 @@ export function buildVdTreeMeshes(
     const crown = T.attribute<'vec4'>('aCrown', 'vec4');
     const base = T.attribute<'float'>('aBase', 'float');
     const barkTone = T.vec3(toDisplay(meanBark[0]!), toDisplay(meanBark[1]!), toDisplay(meanBark[2]!)).mul(trunkStreak);
-    farLeafMaterial.colorNode = T.vec4(T.mix(farSample.rgb.mul(T.mix(T.float(0.55), T.float(1.1), farShade)), barkTone, solid), 1);
+    farLeafMaterial.colorNode = T.vec4(working(T.mix(farSample.rgb.mul(T.mix(T.float(0.55), T.float(1.1), farShade)), barkTone, solid) as V3n), 1);
     farLeafMaterial.opacityNode = T.mix(farSample.a, T.float(1), solid);
-    setEmissive(farLeafMaterial, T.mix(farSample.rgb, barkTone, solid).mul(0.08));
+    setEmissive(farLeafMaterial, working(T.mix(farSample.rgb, barkTone, solid).mul(0.08) as V3n));
     farLeafMaterial.positionNode = T.mix(
       T.vec3(crown.x.add(T.positionLocal.x.mul(crown.z)), base.add(T.positionLocal.y.mul(crown.w)), crown.y.add(T.positionLocal.z.mul(crown.z))),
       T.vec3(T.positionLocal.x, T.positionLocal.y.mul(base), T.positionLocal.z),
       solid,
     );
   } else {
-    farLeafMaterial.colorNode = T.vec4(farSample.rgb.mul(T.mix(T.float(0.55), T.float(1.1), farShade)), 1);
+    farLeafMaterial.colorNode = T.vec4(working(farSample.rgb.mul(T.mix(T.float(0.55), T.float(1.1), farShade))), 1);
     farLeafMaterial.opacityNode = farSample.a;
-    setEmissive(farLeafMaterial, farSample.rgb.mul(0.08));
+    setEmissive(farLeafMaterial, working(farSample.rgb.mul(0.08)));
   }
   materials.push(farLeafMaterial);
 
@@ -232,7 +273,7 @@ export function buildVdTreeMeshes(
     const [r, g, b] = tree.barkColor;
     // Bark: the scan's tone with low-frequency streaks up the trunk, in place of the bark photo.
     const streak = T.fract(T.sin(T.positionLocal.x.mul(17.1).add(T.positionLocal.z.mul(11.3))).mul(43758.5453)).mul(0.25).add(0.85);
-    barkMaterial.colorNode = T.vec4(T.vec3(toDisplay(r), toDisplay(g), toDisplay(b)).mul(streak), 1);
+    barkMaterial.colorNode = T.vec4(working(T.vec3(toDisplay(r), toDisplay(g), toDisplay(b)).mul(streak)), 1);
 
     // Leaves: the CC0 leaf atlas, alpha-cut, darkened toward the crown's
     // interior by the baked per-card shade, with Valdrada's back-light share
@@ -243,9 +284,9 @@ export function buildVdTreeMeshes(
       : new THREE.MeshStandardNodeMaterial({ side: THREE.DoubleSide, alphaTest: 0.5, roughness: 0.6, metalness: 0 });
     const sample = T.texture(atlas, T.uv()).depth(T.float(layer));
     const shade = T.attribute<'float'>('aShade', 'float');
-    leafMaterial.colorNode = T.vec4(sample.rgb.mul(T.mix(T.float(0.55), T.float(1.1), shade)), 1);
+    leafMaterial.colorNode = T.vec4(working(sample.rgb.mul(T.mix(T.float(0.55), T.float(1.1), shade))), 1);
     leafMaterial.opacityNode = sample.a;
-    setEmissive(leafMaterial, sample.rgb.mul(0.08));
+    setEmissive(leafMaterial, working(sample.rgb.mul(0.08)));
     materials.push(barkMaterial, leafMaterial);
 
     const midLeaf = new THREE.BufferGeometry();
@@ -381,11 +422,26 @@ export function buildVdTreeMeshes(
     const leafGeometry = mergeSpeciesGeometry(THREE, species.map((s) => s.leaf.geometry));
     const midGeometry = mergeSpeciesGeometry(THREE, species.map((s) => s.midLeaf.geometry));
     geometries.push(barkGeometry, leafGeometry, midGeometry);
+    // The merged copies are the only ones drawn on this path; the six
+    // species' own bark, leaf and mid arrays would sit on the CPU for the
+    // scene's life (about 5 MB with the iPad's ~2.5 GiB ceiling close).
+    // Their meshes stay as empty shells so the tier bookkeeping keeps its shape.
+    for (const s of species) {
+      for (const g of [s.bark.geometry, s.leaf.geometry, s.midLeaf.geometry]) {
+        for (const a of [...Object.values(g.attributes), g.index]) {
+          const attr = a as unknown as { array: ArrayBufferView } | null;
+          if (attr && ArrayBuffer.isView(attr.array)) {
+            const Ctor = attr.array.constructor as new (n: number) => ArrayBufferView;
+            attr.array = new Ctor(0);
+          }
+        }
+      }
+    }
 
     const nearBarkMaterial = leanMat
       ? leanBody()
       : new THREE.MeshStandardNodeMaterial({ roughness: 0.92, metalness: 0 });
-    nearBarkMaterial.colorNode = T.vec4(T.attribute<'vec3'>('aTint', 'vec3').mul(trunkStreak), 1);
+    nearBarkMaterial.colorNode = T.vec4(working(T.attribute<'vec3'>('aTint', 'vec3').mul(trunkStreak)), 1);
     nearBarkMaterial.positionNode = T.positionLocal.mul(speciesMatch);
     materials.push(nearBarkMaterial);
 
@@ -394,9 +450,9 @@ export function buildVdTreeMeshes(
       : new THREE.MeshStandardNodeMaterial({ side: THREE.DoubleSide, alphaTest: 0.5, roughness: 0.6, metalness: 0 });
     const nearSample = T.texture(atlas, T.uv()).depth(T.attribute<'float'>('aSp', 'float'));
     const nearShade = T.attribute<'float'>('aShade', 'float');
-    nearLeafMaterial.colorNode = T.vec4(nearSample.rgb.mul(T.mix(T.float(0.55), T.float(1.1), nearShade)), 1);
+    nearLeafMaterial.colorNode = T.vec4(working(nearSample.rgb.mul(T.mix(T.float(0.55), T.float(1.1), nearShade))), 1);
     nearLeafMaterial.opacityNode = nearSample.a;
-    setEmissive(nearLeafMaterial, nearSample.rgb.mul(0.08));
+    setEmissive(nearLeafMaterial, working(nearSample.rgb.mul(0.08)));
     nearLeafMaterial.positionNode = T.positionLocal.mul(speciesMatch);
     materials.push(nearLeafMaterial);
 
@@ -431,6 +487,9 @@ export function buildVdTreeMeshes(
     farLeafGeometry.setAttribute('aShade', new THREE.Float32BufferAttribute([0.85, 0.85, 1, 1, 0.85, 0.85, 1, 1], 1));
     farLeafGeometry.setIndex([0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7]);
   }
+  // One vertex buffer for the card's own streams: with the per-instance ones
+  // and the instance matrix the far leaf binds at most six (limit 8).
+  interleaveVertexAttributes(THREE, farLeafGeometry, leanDraw ? ['position', 'normal', 'uv', 'aShade', 'aSolid'] : ['position', 'normal', 'uv', 'aShade']);
   farLeafGeometry.setAttribute('aLayer', farLayer);
   farLeafGeometry.setAttribute('aRep', farRep);
   geometries.push(farLeafGeometry);

@@ -7,6 +7,8 @@ import { eggTexturePlugin } from '../hatch/egg-texture-plugin';
 import { closeLoop, resampleSmooth, smoothJitter } from './clip-smoothing.ts';
 import { idleConfig } from './idle/config.ts';
 import { weldSceneMorphSeams } from './morph-seams.ts';
+import { disposeObjectTree } from '../dispose-object.ts';
+import { SharedParseCache, type ParseLease } from '../parse-cache.ts';
 import { createIdleEngine, LOOPS, resolveIdleClips, type IdleAction, type IdleEngine, type IdleFrame } from './idle/engine.ts';
 
 /**
@@ -109,40 +111,31 @@ interface Parsed {
   readonly gltf: GLTF;
   readonly durations: Readonly<Record<string, number>>;
 }
-interface CacheEntry {
-  readonly promise: Promise<Parsed>;
-  refs: number;
-  drop: ReturnType<typeof setTimeout> | null;
-}
-const cache = new Map<string, CacheEntry>();
-const bytesCache = new Map<string, Promise<ArrayBuffer>>();
 
-function bytesFor(source: Pick<MonRigSource, 'key' | 'glb'>): Promise<ArrayBuffer> {
-  let pending = bytesCache.get(source.key);
-  if (!pending) {
-    const key = source.key;
-    // The stage loader reads this (load-progress.ts): real bytes where the platform streams them.
-    pending = fetchEggBytes(source.glb, (loaded, total) => reportGlbProgress(key, { loaded, total, done: false }))
-      .then((bytes) => {
-        reportGlbProgress(key, { loaded: bytes.byteLength, total: bytes.byteLength, done: true });
-        return bytes;
-      })
-      .catch((error: unknown) => {
-        bytesCache.delete(key);
-        throw error;
-      });
-    bytesCache.set(source.key, pending);
-  }
-  return pending;
+/** Parsed Babies by model key, shared by every stage showing one (parse-cache.ts); emptied by releaseHLynkResources. */
+const cache = new SharedParseCache<Parsed>('mon-rig', {
+  keepMs: KEEP_MS,
+  dispose: (parsed) => disposeObjectTree(parsed.gltf.scene),
+});
+
+/** Fetches a Mon's GLB, reporting its download for the stage loader (load-progress.ts) where the platform streams it. */
+function fetchMon(source: Pick<MonRigSource, 'key' | 'glb'>): Promise<ArrayBuffer> {
+  const key = source.key;
+  // A refetch after releaseHLynkResources starts the loader over, not at the last load's "done".
+  reportGlbProgress(key, { loaded: 0, total: null, done: false });
+  return fetchEggBytes(source.glb, (loaded, total) => reportGlbProgress(key, { loaded, total, done: false })).then((bytes) => {
+    reportGlbProgress(key, { loaded: bytes.byteLength, total: bytes.byteLength, done: true });
+    return bytes;
+  });
 }
 
-/** Starts fetching a Mon's GLB bytes (26-34 MB) ahead of its first stage. Safe to call repeatedly. */
+/** Starts fetching a Mon's GLB bytes (26-34 MB) ahead of its first stage. Safe to call repeatedly; a no-op once parsed. */
 export function preloadMonRig(source: Pick<MonRigSource, 'key' | 'glb'>): void {
-  bytesFor(source).catch(() => undefined);
+  cache.preload(source.key, () => fetchMon(source));
 }
 
 async function parse(source: Pick<MonRigSource, 'key' | 'glb'>): Promise<Parsed> {
-  const bytes = await bytesFor(source);
+  const bytes = await cache.bytesFor(source.key, () => fetchMon(source));
   const loader = new GLTFLoader();
   // Plain glTF: no Draco or Meshopt (their decoders need WebAssembly, which Hermes lacks).
   if (eggTexturePlugin) loader.register(eggTexturePlugin);
@@ -164,51 +157,6 @@ async function parse(source: Pick<MonRigSource, 'key' | 'glb'>): Promise<Parsed>
   return { gltf, durations: Object.fromEntries(gltf.animations.map((a) => [a.name, a.duration])) };
 }
 
-function acquire(source: Pick<MonRigSource, 'key' | 'glb'>): Promise<Parsed> {
-  let entry = cache.get(source.key);
-  if (!entry) {
-    const promise = parse(source);
-    entry = { promise, refs: 0, drop: null };
-    cache.set(source.key, entry);
-    promise.catch(() => {
-      if (cache.get(source.key)?.promise === promise) cache.delete(source.key);
-    });
-  }
-  if (entry.drop !== null) {
-    clearTimeout(entry.drop);
-    entry.drop = null;
-  }
-  entry.refs += 1;
-  return entry.promise;
-}
-
-function release(key: string): void {
-  const entry = cache.get(key);
-  if (!entry) return;
-  entry.refs -= 1;
-  if (entry.refs > 0) return;
-  entry.drop = setTimeout(() => {
-    if (cache.get(key) !== entry || entry.refs > 0) return;
-    cache.delete(key);
-    bytesCache.delete(key);
-    entry.promise.then((p) => disposeObject(p.gltf.scene), () => undefined);
-  }, KEEP_MS);
-}
-
-function disposeObject(root: THREE.Object3D): void {
-  const seen = new Set<{ dispose: () => void }>();
-  root.traverse((object) => {
-    const mesh = object as Partial<THREE.Mesh>;
-    if (mesh.geometry) seen.add(mesh.geometry);
-    const materials = mesh.material === undefined ? [] : Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-    for (const material of materials) {
-      seen.add(material);
-      for (const value of Object.values(material)) if (value instanceof THREE.Texture) seen.add(value);
-    }
-  });
-  for (const resource of seen) resource.dispose();
-}
-
 interface MorphSlot {
   readonly influences: number[];
   readonly index: number;
@@ -228,7 +176,7 @@ interface MorphSlot {
 export class MonRig {
   readonly root: THREE.Group;
   readonly size: THREE.Vector3;
-  private readonly key: string;
+  private readonly lease: ParseLease<Parsed>;
   private readonly model: THREE.Object3D;
   private readonly mixer: THREE.AnimationMixer;
   private readonly animations: readonly THREE.AnimationClip[];
@@ -254,12 +202,17 @@ export class MonRig {
   private disposed = false;
 
   static async create(source: MonRigSource): Promise<MonRig> {
-    const parsed = await acquire(source);
-    return new MonRig(source, parsed);
+    const lease = cache.acquire(source.key, () => parse(source));
+    try {
+      return new MonRig(source, await lease.value, lease);
+    } catch (error) {
+      lease.release();
+      throw error;
+    }
   }
 
-  private constructor(source: MonRigSource, parsed: Parsed) {
-    this.key = source.key;
+  private constructor(source: MonRigSource, parsed: Parsed, lease: ParseLease<Parsed>) {
+    this.lease = lease;
     this.mouth = source.mouth;
     this.model = cloneSkinned(parsed.gltf.scene);
     this.animations = parsed.gltf.animations;
@@ -378,7 +331,7 @@ export class MonRig {
     this.disposed = true;
     this.mixer.stopAllAction();
     this.root.removeFromParent();
-    release(this.key);
+    this.lease.release();
   }
 
   private readMorph(name: string): number {

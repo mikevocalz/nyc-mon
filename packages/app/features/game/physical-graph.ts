@@ -6,7 +6,8 @@
 // headlights, the device-lane probes with the Skia texture bridge, the
 // Slop city materials (world/physical/index.ts), the facelift
 // (world/physical/facelift.ts) and the night light pools
-// (world/physical/night-lights.ts).
+// (world/physical/night-lights.ts), and the vd lane's baked fleet bodies
+// (world/vd-car-mesh.ts with its 700 KB vd-cars.ts, living-city/vd-car-material.ts).
 //
 // Each loader is an inline `require('<literal path>')`: Metro collects the
 // literal as a dependency and evaluates the module on the first call, with
@@ -83,4 +84,14 @@ export function loadPhysicalNightLights(): typeof import('./world/physical/night
   return (typeof require === 'function'
     ? require('./world/physical/night-lights.ts')
     : viaNode('./world/physical/night-lights.ts')) as typeof import('./world/physical/night-lights.ts');
+}
+
+export function loadVdCarMaterial(): typeof import('./living-city/vd-car-material.ts') {
+  return (typeof require === 'function'
+    ? require('./living-city/vd-car-material.ts')
+    : viaNode('./living-city/vd-car-material.ts')) as typeof import('./living-city/vd-car-material.ts');
+}
+
+export function loadVdCarMesh(): typeof import('./world/vd-car-mesh.ts') {
+  return (typeof require === 'function' ? require('./world/vd-car-mesh.ts') : viaNode('./world/vd-car-mesh.ts')) as typeof import('./world/vd-car-mesh.ts');
 }

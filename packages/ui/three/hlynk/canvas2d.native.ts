@@ -4,6 +4,7 @@ import {
 } from 'react-native-skia';
 import { fontFamilies } from '@acme/theme';
 import type { Three } from '../types';
+import { registerReleasable } from '../release.ts';
 import type { CanvasFont, CanvasSurface, Ctx2D, Gradient2D, ImageData2D } from './canvas2d-types';
 
 /**
@@ -25,6 +26,15 @@ export const canvasFont: CanvasFont = (size, weight = 700) => `${weight} ${size}
 export function whenFontsReady(_onReady: () => void): void {}
 
 const fonts = new Map<string, SkFont>();
+// releaseHLynkResources empties it with the GLB caches; the glass rematches on its next paint.
+registerReleasable({
+  name: 'skia-fonts',
+  releaseAll: () => {
+    const freed = fonts.size;
+    fonts.clear();
+    return { freed, deferred: 0 };
+  },
+});
 /** Parses `"700 32px Family"` (canvasFont's shape) into a cached Skia font from the system font manager. */
 function skFont(spec: string): SkFont {
   const cached = fonts.get(spec);
@@ -161,6 +171,7 @@ class SkiaContext2D implements Ctx2D {
     const paint = Skia.Paint();
     paint.setBlendMode(BlendMode.Src);
     this.canvas.drawImage(img, x, y, paint);
+    img.dispose();
   }
 }
 
@@ -184,9 +195,12 @@ export function createCanvasSurface(THREE: Three, width: number, height: number,
   const row = pw * 4;
   const commit = () => {
     surface.flush();
-    const pixels = surface.makeImageSnapshot().readPixels(0, 0, {
+    // A snapshot is a full raster copy in native memory; free it now, not at a GC that cannot see its size.
+    const snapshot = surface.makeImageSnapshot();
+    const pixels = snapshot.readPixels(0, 0, {
       width: pw, height: ph, colorType: ColorType.RGBA_8888, alphaType: AlphaType.Unpremul,
     });
+    snapshot.dispose();
     if (!(pixels instanceof Uint8Array)) return;
     // Skia rows run top-down; a DataTexture's first row is v = 0, the bottom.
     for (let y = 0; y < ph; y++) {
@@ -194,5 +208,11 @@ export function createCanvasSurface(THREE: Three, width: number, height: number,
     }
     texture.needsUpdate = true;
   };
-  return { ctx, width, height, texture, commit };
+  let disposed = false;
+  const dispose = () => {
+    if (disposed) return;
+    disposed = true;
+    surface.dispose();
+  };
+  return { ctx, width, height, texture, commit: () => (disposed ? undefined : commit()), dispose };
 }

@@ -621,7 +621,7 @@ patchedDependencies:
   react-native-skia@3.6.1: 919cfa3bb1dd2915be2badf8bd7ccbace23ae749ee638b440e77e8d46a4332bc
   react-native-webgpu@0.16.0: 0ce767a55a7c99be09d27c3b5af01d47d241d4bbcb7d80b3de43addca0a1f1f4
   react-native-worklets@0.13.0: 1b9cd2d9a9630c9652643ab12092e794598366c4b36719eb37875da116d0f553
-  three@0.186.1: 5bf22a1982d5519c48afa9ad5dcc1df86670bdbcbd6c62e963d1b00480255836
+  three@0.186.1: 10396b7a81d0df3d873c18e51f32bafebcf576e3c820f0390833f2a8f57d8d50
 
 importers:
 
@@ -1324,7 +1324,7 @@ importers:
         version: 0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1)
       three:
         specifier: 'catalog:'
-        version: 0.186.1(patch_hash=5bf22a1982d5519c48afa9ad5dcc1df86670bdbcbd6c62e963d1b00480255836)
+        version: 0.186.1(patch_hash=10396b7a81d0df3d873c18e51f32bafebcf576e3c820f0390833f2a8f57d8d50)
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
@@ -1747,7 +1747,7 @@ importers:
         version: 0.12.6(typegpu@0.12.7)
       '@typegpu/three':
         specifier: 'catalog:'
-        version: 0.12.1(@typegpu/gl@0.12.6(typegpu@0.12.7))(three@0.186.1(patch_hash=5bf22a1982d5519c48afa9ad5dcc1df86670bdbcbd6c62e963d1b00480255836))(typegpu@0.12.7)
+        version: 0.12.1(@typegpu/gl@0.12.6(typegpu@0.12.7))(three@0.186.1(patch_hash=10396b7a81d0df3d873c18e51f32bafebcf576e3c820f0390833f2a8f57d8d50))(typegpu@0.12.7)
       expo-drag-drop-content-view:
         specifier: 'catalog:'
         version: 0.9.2(expo@58.0.14)(react-native@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0)
@@ -1822,7 +1822,7 @@ importers:
         version: 3.3.1(tailwind-merge@3.7.0)(tailwindcss@4.3.3)
       three:
         specifier: 'catalog:'
-        version: 0.186.1(patch_hash=5bf22a1982d5519c48afa9ad5dcc1df86670bdbcbd6c62e963d1b00480255836)
+        version: 0.186.1(patch_hash=10396b7a81d0df3d873c18e51f32bafebcf576e3c820f0390833f2a8f57d8d50)
       typegpu:
         specifier: 'catalog:'
         version: 0.12.7
@@ -15923,10 +15923,10 @@ snapshots:
       tinyest: 0.3.4
       typegpu: 0.12.7
 
-  '@typegpu/three@0.12.1(@typegpu/gl@0.12.6(typegpu@0.12.7))(three@0.186.1(patch_hash=5bf22a1982d5519c48afa9ad5dcc1df86670bdbcbd6c62e963d1b00480255836))(typegpu@0.12.7)':
+  '@typegpu/three@0.12.1(@typegpu/gl@0.12.6(typegpu@0.12.7))(three@0.186.1(patch_hash=10396b7a81d0df3d873c18e51f32bafebcf576e3c820f0390833f2a8f57d8d50))(typegpu@0.12.7)':
     dependencies:
       '@typegpu/gl': 0.12.6(typegpu@0.12.7)
-      three: 0.186.1(patch_hash=5bf22a1982d5519c48afa9ad5dcc1df86670bdbcbd6c62e963d1b00480255836)
+      three: 0.186.1(patch_hash=10396b7a81d0df3d873c18e51f32bafebcf576e3c820f0390833f2a8f57d8d50)
       typegpu: 0.12.7
 
   '@types/aria-query@5.0.4': {}
@@ -21698,7 +21698,7 @@ snapshots:
     dependencies:
       real-require: 1.0.0
 
-  three@0.186.1(patch_hash=5bf22a1982d5519c48afa9ad5dcc1df86670bdbcbd6c62e963d1b00480255836): {}
+  three@0.186.1(patch_hash=10396b7a81d0df3d873c18e51f32bafebcf576e3c820f0390833f2a8f57d8d50): {}
 
   throat@5.0.0: {}
 

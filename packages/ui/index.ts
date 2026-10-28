@@ -113,6 +113,8 @@ export {
   createGlassScreen, createSwitchScreen, GLASS_MON_TARGET, glassGeometry, type GlassAction, type GlassLayout, type GlassLine, type GlassRing, type GlassTone, type GlassView,
   type ScreenMonSource,
 } from './three/hlynk';
+// Empties the shared Baby/egg GLB parses and glass caches while the H-Lynk is down (no three.js import).
+export { releaseHLynkResources, type ReleaseCount } from './three/release';
 // Baby GLB download progress for the stage loader (no three.js import).
 export { glbFraction, glbProgressStore, type GlbProgress } from './three/mon/load-progress';
 export { RiverTide, type RiverTideProps, type RiverTideOrigin } from './backgrounds/RiverTide';

@@ -445,6 +445,8 @@ export function createDeviceScene(
       clearTimeout(modelWait);
       stand.dispose();
       device.group.userData.dispose();
+      // The glass's Skia raster (2x the screen on tablets); its texture went with the device.
+      glass.dispose();
     },
   };
 }
@@ -460,14 +462,23 @@ function screenTexture(
   screen: DeviceScreen,
   store: StoreApi<StageState>,
   scale = 1,
-): { texture: Texture; paint: () => void } {
+): { texture: Texture; paint: () => void; dispose: () => void } {
   const surface = createCanvasSurface(THREE, screen.size.width, screen.size.height, scale);
+  let disposed = false;
   const paint = () => {
+    if (disposed) return;
     screen.draw(surface.ctx, canvasFont, store.getState().hover);
     surface.commit();
   };
   paint();
-  return { texture: surface.texture, paint };
+  return {
+    texture: surface.texture,
+    paint,
+    dispose: () => {
+      disposed = true;
+      surface.dispose();
+    },
+  };
 }
 
 /**

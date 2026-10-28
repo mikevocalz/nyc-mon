@@ -1,4 +1,4 @@
-// vd lane: the flag is opt-in, the Valdrada STYLE/class → wall photo table
+// vd lane: the flag is on by default (EXPO_PUBLIC_WORLD_VD=0 kills it), the Valdrada STYLE/class → wall photo table
 // matches its materials.js, the baked textures have the declared size, the
 // walls carry aFacade, weather drives the uniforms and the precipitation
 // visibility, and the textured graphs compile to WGSL. Same stub-renderer
@@ -36,8 +36,8 @@ async function stubRenderer() {
 }
 const dataset = () => parseCityDataset(JSON.parse(readFileSync(new URL('../data/harlem-apollo.json', import.meta.url), 'utf8')));
 
-test('vd flag is opt-in and weather parses from its env value', () => {
-  assert.equal(EXPERIMENTAL_WORLD_VD, false);
+test('vd flag is on by default and weather parses from its env value', () => {
+  assert.equal(EXPERIMENTAL_WORLD_VD, process.env.EXPO_PUBLIC_WORLD_VD?.trim() !== '0');
   assert.deepEqual(weatherFromEnv(undefined), { rain: 0, snow: 0 });
   assert.deepEqual(weatherFromEnv(' Rain '), { rain: 1, snow: 0 });
   assert.deepEqual(weatherFromEnv('snow'), { rain: 0, snow: 1 });

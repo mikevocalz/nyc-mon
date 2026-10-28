@@ -108,8 +108,12 @@ export interface CityWorldOptions {
   carPbr?: boolean;
   /**
    * The vd lane: Valdrada's facades, ground and weather ported to TSL over
-   * the PBR body (vd-materials.ts). Defaults to EXPO_PUBLIC_WORLD_VD — off
-   * unless set. Takes precedence over `pbr` and `glass`.
+   * the PBR body (vd-materials.ts). Defaults to EXPO_PUBLIC_WORLD_VD — on
+   * unless set to 0. Takes precedence over `pbr` and `glass`. With
+   * `physical` the two compose: the physical rig lights, shadows and night
+   * pools a city wearing Valdrada's masonry, roads, sidewalks, roofs, trees
+   * and weather, while the physical curtain-wall glass, road paint, fire
+   * escapes and facelift stay.
    */
   vd?: boolean;
   /**
@@ -167,8 +171,13 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
   const tod = options.timeOfDay ?? TOD_BY_SKY[skyRig ? (options.sky ?? 'dusk') : 'dusk'];
   const vd = options.vd ?? EXPERIMENTAL_WORLD_VD;
   const leanMat = options.leanMat ?? VD_LEANMAT;
-  const leanDraw = options.leanDraw ?? VD_LEANDRAW;
-  const vdMaterials = vd ? createVdCityMaterials(THREE, { sunDirection, timeOfDay: tod }, leanMat) : null;
+  // Under the physical stack the merged cross-species tree draws are the
+  // default: the per-species near tier cost 50 shader modules, 30 pipelines
+  // and 45 draws on the iPad frame (city-scene.physical-first-frame.test.ts)
+  // for the same picture. EXPO_PUBLIC_WORLD_VD_LEANDRAW=0 restores it.
+  const leanDraw = options.leanDraw ?? (VD_LEANDRAW || (options.physical === true && process.env.EXPO_PUBLIC_WORLD_VD_LEANDRAW?.trim() !== '0'));
+  // Under the physical stack the vd colours decode to linear (sRGB output, ACES in the pipeline).
+  const vdMaterials = vd ? createVdCityMaterials(THREE, { sunDirection, timeOfDay: tod, physical: options.physical === true }, leanMat) : null;
   const materials = vdMaterials ?? (glass
     ? createGlassCityMaterials(THREE, {
         sunDirection,
@@ -221,10 +230,18 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
   const future = options.future ?? EXPERIMENTAL_WORLD_FUTURE;
   const faceliftModule = phys && future ? loadPhysicalFacelift() : null;
   const nightPools = phys ? options.nightLights : undefined;
+  // vd + physical: Valdrada's photo masonry, asphalt and flags take the wall
+  // and ground draws; the physical curtain wall keeps the glass class (Valdrada
+  // gives its curtain-wall styles no photo either).
+  const cityMaterials = phys
+    ? vdMaterials
+      ? { ...materials, glass: phys.glass }
+      : { ...materials, masonry: phys.masonry, glass: phys.glass, roads: phys.roads, sidewalks: phys.sidewalks }
+    : materials;
   const city = phys
     ? buildCityMeshes(
         THREE, dataset,
-        { ...materials, masonry: phys.masonry, glass: phys.glass, roads: phys.roads, sidewalks: phys.sidewalks },
+        cityMaterials,
         away, clearance, future,
         {
           facadeAttributes: true, fireEscapes: true, facelift: faceliftModule?.faceliftBakePicks(dataset),
@@ -234,7 +251,7 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
     : buildCityMeshes(THREE, dataset, materials, away, clearance, future);
   // The facelift reads the built masonry walls, so it follows buildCityMeshes.
   const facelift = faceliftModule ? faceliftModule.buildPhysicalFacelift(THREE, dataset, city.meshes, clearance) : null;
-  const trees = buildTrees(THREE, dataset, materials, clearance, vd, VD_LEAN, leanMat, leanDraw);
+  const trees = buildTrees(THREE, dataset, materials, clearance, vd, VD_LEAN, leanMat, leanDraw, phys !== null);
   // The facelift's LED streetlights: the furniture lamps pool in the LED colour instead of sodium.
   const ledPools = faceliftModule ? faceliftModule.createFaceliftLampPools(THREE) : null;
   const furniture = buildStreetFurniture(THREE, dataset, ledPools ? { ...materials, lampPools: ledPools } : materials, clearance, city.texts);
@@ -264,7 +281,11 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
   const precipitation = vdMaterials ? buildPrecipitation(THREE, vdMaterials.weather) : null;
   precipitation?.update();
   if (!skyRig) sun.position.set(SUN[0] * 1000, SUN[1] * 1000, SUN[2] * 1000);
-  if (VD_SHADOWS) {
+  // The physical rig's SunLight cascades replace this sun and its shadow
+  // (city-scene hides it and applyPhysicalShadowRoles sets the roles), so the
+  // vd lane's own shadow box only runs without the physical stack.
+  const vdShadows = VD_SHADOWS && phys === null;
+  if (vdShadows) {
     // An orthographic shadow box that follows the Caller (setFocus); the
     // whole tile would spread 2048 texels over 1.7 km.
     sun.castShadow = true;
@@ -346,7 +367,7 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
      * allocation-free and only runs after it has moved about 10 m.
      */
     setFocus(x: number, z: number) {
-      if (VD_SHADOWS) {
+      if (vdShadows) {
         // Keep the shadow box centred on the Caller, the sun 400 m out along its direction.
         sun.target.position.set(x, 0, z);
         sun.position.set(x + sunDirection[0] * 400, sunDirection[1] * 400, z + sunDirection[2] * 400);
@@ -394,6 +415,9 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
       skyGeometry.dispose();
       groundGeometry.dispose();
       skyRig?.dispose();
+      // Lights hold shadow maps and node state; the rig's sun is the rig's to dispose.
+      hemi.dispose();
+      if (!skyRig) sun.dispose();
       carPbr?.dispose();
       precipitation?.dispose();
       materials.dispose();

@@ -8,7 +8,7 @@ import { deriveMonMood } from '@acme/core/sim';
 import type { CareNeed, CareState } from '@acme/core/types';
 import { hud } from '@acme/theme';
 import {
-  createGlassScreen, createSwitchScreen, DeviceStage, GLASS_MON_TARGET, glbFraction, glassGeometry, glbProgressStore, KeyboardAwareScroll, SafeArea, useInstanceStore,
+  createGlassScreen, createSwitchScreen, DeviceStage, GLASS_MON_TARGET, glbFraction, glassGeometry, glbProgressStore, KeyboardAwareScroll, releaseHLynkResources, SafeArea, useInstanceStore,
   useReducedMotion, useStore, type DeviceKey, type DeviceScreen, type GlassLayout, type GlassRing, type GlassView, type ScreenModelSource,
 } from '@acme/ui';
 import { View } from '@acme/ui/tw';
@@ -319,8 +319,16 @@ export function PersistentGlassStage({
   const overlaid = pathname === '/mons' || pathname.startsWith('/mons/');
   // The city is a second WebGPU renderer and a large world. With both alive
   // the iPad runs out of memory, so the H-Lynk releases its renderer while
-  // the city is up. It reloads on return; the Baby's GLB parse is cached.
+  // the city is up, and with it the shared GLB parses (the Baby's 26-34 MB
+  // file decodes to ~110-190 MB of geometry, morphs and textures), their
+  // decoded images and the glass's Skia rasters. On return the device
+  // remounts and reloads under its Rive loader.
   const cityUp = useStore(lobbyStore, (st: { phase: string }) => st.phase !== 'lobby');
+  useEffect(() => {
+    // Passive effects run after the GlassDevice's unmount cleanup, so its rigs have let go and are freed now;
+    // a stage still mounted elsewhere in (home) keeps its parse until it unmounts.
+    if (cityUp) releaseHLynkResources();
+  }, [cityUp]);
 
   return (
     <View className="absolute inset-0 bg-ink-950" testID="home-glass-stage">

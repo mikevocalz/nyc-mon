@@ -87,7 +87,8 @@ export function physicalTsl(THREE: Three): PhysicalTsl {
     const hw = T.float(halfWidth).toVar();
     const aa = T.fwidth(c).max(0.0001).toVar();
     const effHw = T.max(hw, aa.mul(0.5)).toVar();
-    const cov = T.smoothstep(effHw.add(aa), effHw.sub(aa), T.abs(c));
+    // 1 - smoothstep with the edges in order: Metal leaves reversed-edge smoothstep undefined (post/pipeline.ts).
+    const cov = T.float(1).sub(T.smoothstep(effHw.sub(aa), effHw.add(aa), T.abs(c)));
     return cov.mul(T.min(T.float(1.0), hw.div(effHw)));
   });
 
@@ -98,7 +99,7 @@ export function physicalTsl(THREE: Three): PhysicalTsl {
     const aa = T.fwidth(g).max(0.0001).toVar();
     const hw = T.float(halfWidth).div(p).toVar();
     const effHw = T.max(hw, aa.mul(0.5)).toVar();
-    const cov = T.smoothstep(effHw.add(aa), effHw.sub(aa), d);
+    const cov = T.float(1).sub(T.smoothstep(effHw.sub(aa), effHw.add(aa), d));
     return cov.mul(T.min(T.float(1.0), hw.div(effHw)));
   });
 

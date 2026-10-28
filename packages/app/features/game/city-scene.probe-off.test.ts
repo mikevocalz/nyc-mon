@@ -5,9 +5,9 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 process.env.EXPO_PUBLIC_WORLD_PHYSICAL = '0';
+process.env.EXPO_PUBLIC_WORLD_VD = '0';
 process.env.EXPO_PUBLIC_WORLD_PROBE = 'bgnull';
 delete process.env.EXPO_PUBLIC_WORLD_POST;
-delete process.env.EXPO_PUBLIC_WORLD_VD;
 
 const THREE = await import('three/webgpu');
 const { cityPhysicalFeatures, createCityScene } = await import('./city-scene.ts');

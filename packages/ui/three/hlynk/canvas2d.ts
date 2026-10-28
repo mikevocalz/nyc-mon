@@ -28,6 +28,9 @@ export function createCanvasSurface(THREE: Three, width: number, height: number,
     commit: () => {
       texture.needsUpdate = true;
     },
+    // The canvas IS the texture's image here (uploaded lazily, re-uploaded by
+    // a new renderer), so it stays; it goes with the texture at GC.
+    dispose: () => undefined,
   };
 }
 

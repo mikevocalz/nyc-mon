@@ -17,7 +17,7 @@
 // runtime reaches logcat or Metro by itself, so every entry point catches.
 import * as THREE from 'three/webgpu';
 import { scheduleOnRN, type Synchronizable } from 'react-native-worklets';
-import { advanceNodeFrame, stopInternalLoop } from '@acme/ui/three/internals';
+import { advanceNodeFrame, releaseCanvasBuffers, stopInternalLoop } from '@acme/ui/three/internals';
 import type { NativeCanvasContext, ThreeFrame, ThreeScene } from '@acme/ui/three';
 import { bundledCity } from '../city-data.ts';
 import { createCityScene } from '../city-scene.ts';
@@ -247,6 +247,9 @@ function disposeSession(s: Session) {
   s.disposed = true;
   try {
     s.built?.dispose?.();
+    // three's dispose leaves the canvas target's multisampled colour and
+    // depth buffers to a GC on the shared device: about 100 MB at the iPad size.
+    if (s.renderer) releaseCanvasBuffers(s.renderer);
     s.renderer?.dispose();
   } catch (error) {
     emit(s, 'error', describeRuntimeError('dispose', error));
@@ -319,7 +322,14 @@ export function startGameRender(args: GameRenderArgs): void {
     ? renderer.init().then(() => runRendererProbe(s, renderer, shared))
     : renderer.init();
   ready.then(() => {
-    if (s.disposed) return;
+    if (s.disposed) {
+      // Unmounted while init ran: the dispose above came before init made its
+      // frame loop and canvas buffers, so release what init built now.
+      stopInternalLoop(renderer);
+      releaseCanvasBuffers(renderer);
+      void renderer.dispose();
+      return;
+    }
     trace(s, 'renderer init resolved');
     pipecache?.mark('rendererInit');
     emit(s, 'stage', 'moduleLoaded');

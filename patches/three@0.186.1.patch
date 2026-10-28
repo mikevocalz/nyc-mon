@@ -32,6 +32,31 @@ index e96c4ae08d528fea66c58e5869923c1675822ac9..b39156f0516fc6ec60f72fc8ae5484ff
  
  	return node;
  
+diff --git a/examples/jsm/lights/SunShadowNode.js b/examples/jsm/lights/SunShadowNode.js
+--- a/examples/jsm/lights/SunShadowNode.js
++++ b/examples/jsm/lights/SunShadowNode.js
+@@ -10,7 +10,7 @@
+ 	Vector2,
+ 	VSMShadowMap
+ } from 'three/webgpu';
+-import { Fn, If, float, mix, normalWorld, positionView, reference, renderGroup, shadowPositionWorld, smoothstep, texture, uniform, vec4 } from 'three/tsl';
++import { Fn, If, float, mix, normalWorldGeometry, positionView, reference, renderGroup, shadowPositionWorld, smoothstep, texture, uniform, vec4 } from 'three/tsl';
+ 
+ let _vsmWarned = false;
+ 
+@@ -123,7 +123,11 @@
+ 		// evaluated outside the cascade branches so nodes shared with the rest of
+ 		// the shader, like the world normal, are not trapped in a branch scope
+ 
+-		const shadowPosition = vec4( shadowPositionWorld.add( normalWorld.mul( normalBias ) ), 1 ).toVar();
++		// nyc-mon patch: offset along the geometric normal, not normalWorld. In the
++		// fragment stage normalWorld is the material's normalNode, so a bump-mapped
++		// facade moved every brick's shadow lookup by a different amount and wall
++		// shadows broke into patches that changed with camera distance.
++		const shadowPosition = vec4( shadowPositionWorld.add( normalWorldGeometry.mul( normalBias ) ), 1 ).toVar();
+ 		const viewDepth = positionView.z.negate().toVar();
+ 
+ 		const shadowValue = float( 1 ).toVar( 'shadowValue' );
 diff --git a/src/nodes/accessors/Arrays.js b/src/nodes/accessors/Arrays.js
 index 99a6ec180a58371376d7aebd16c5a7e565d8cf06..1988501daae24986465ef078cb6efc566047a8b4 100644
 --- a/src/nodes/accessors/Arrays.js

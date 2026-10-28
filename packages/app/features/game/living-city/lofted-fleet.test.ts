@@ -1,6 +1,7 @@
 // The lofted fleet behind EXPO_PUBLIC_WORLD_PHYSICAL: registry ranking, the flag-off invariant, the per-instance
 // attribute contract (N5: paintColor vec3, carState vec4), snapshot-driven state, the tiered spots and flares, the
 // WGSL compile of both materials on the real instanced meshes, and the plate atlas that replaces Slop's canvas.
+// These pin the lofted bodies (vd: false); vd-fleet.test.ts covers the vd lane's baked near bodies.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
@@ -150,7 +151,7 @@ test('the plate atlas is four yellow bands of pixel-font ink, no canvas', () => 
 // --- The actor --------------------------------------------------------------------------------------------------
 
 test('physical on: lofted near/far meshes per car kind, one bus mesh, the instance attribute contract', () => {
-  const actor = createVehicleActor({ read: () => null, physical: true, tier: 'phone' })(THREE);
+  const actor = createVehicleActor({ read: () => null, physical: true, vd: false, tier: 'phone' })(THREE);
   const group = actor.object as Group;
   for (const kind of ['sedan', 'taxi', 'van'] as const) {
     for (const lod of ['near', 'far']) {
@@ -201,7 +202,7 @@ test('a night snapshot drives paint, brake state, near/far split, headlight pool
     ],
     1,
   );
-  const actor = createVehicleActor({ read: () => snap, physical: true, tier: 'phone', focus: () => focus })(THREE);
+  const actor = createVehicleActor({ read: () => snap, physical: true, vd: false, tier: 'phone', focus: () => focus })(THREE);
   const group = actor.object as Group;
   assert.equal(actor.update(frame), true, 'moving fleet keeps drawing');
 
@@ -239,7 +240,7 @@ test('a night snapshot drives paint, brake state, near/far split, headlight pool
 
 test('without a focus no headlight light or flare is assigned and the near cap still holds', () => {
   const snap = snapshot(Array.from({ length: 9 }, (_, i) => rec(i + 1, KIND.van, 0, i * 5)), 1);
-  const actor = createVehicleActor({ read: () => snap, physical: true, tier: 'high' })(THREE);
+  const actor = createVehicleActor({ read: () => snap, physical: true, vd: false, tier: 'high' })(THREE);
   const group = actor.object as Group;
   actor.update(frame);
   assert.equal(byName(group, 'living-city:vehicles:van:near')!.count, 9, 'high tier: twelve near slots');
@@ -251,7 +252,7 @@ test('without a focus no headlight light or flare is assigned and the near cap s
 });
 
 test('headlightLights: false builds no lights', () => {
-  const actor = createVehicleActor({ read: () => null, physical: true, headlightLights: false })(THREE);
+  const actor = createVehicleActor({ read: () => null, physical: true, vd: false, headlightLights: false })(THREE);
   assert.equal((actor.object as Group).getObjectByName('living-city:vehicle-headlights'), undefined);
   actor.dispose();
 });
@@ -260,7 +261,7 @@ test('headlightLights: false builds no lights', () => {
 
 test('the car and bus graphs compile to WGSL on the real lofted instanced meshes', async () => {
   const renderer = await stubRenderer();
-  const actor = createVehicleActor({ read: () => null, physical: true })(THREE);
+  const actor = createVehicleActor({ read: () => null, physical: true, vd: false })(THREE);
   const group = actor.object as Group;
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(50, 1, 0.5, 10_000);

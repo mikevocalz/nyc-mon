@@ -26,7 +26,7 @@ const stubs = {
   'react-native-worklets': ${JSON.stringify(worklets)},
   '@acme/ui/three': 'export const installWebGPUOnRuntime = () => {};',
   '@acme/ui/gpu': 'export const readGpuDevice = () => null;',
-  '@acme/ui/three/internals': 'export const advanceNodeFrame = () => {}; export const stopInternalLoop = () => {};',
+  '@acme/ui/three/internals': 'export const advanceNodeFrame = () => {}; export const stopInternalLoop = () => {}; export const releaseCanvasBuffers = () => 0;',
 };
 export async function resolve(specifier, context, next) {
   if (specifier in stubs) return { url: 'data:text/javascript,' + encodeURIComponent(stubs[specifier]), shortCircuit: true };

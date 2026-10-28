@@ -197,6 +197,8 @@ export function buildTrees(
   leanMat = VD_LEANMAT,
   /** vd lane, overridable for tests: the merged cross-species draws (vd-leandraw.ts). Defaults to the flag. */
   leanDraw = VD_LEANDRAW,
+  /** vd lane under the physical stack: the model trees decode their display colours to linear (vd-trees-mesh.ts). */
+  linearColors = false,
 ) {
   const { trees: placements, report } = treePlacements(dataset, clearance);
   const count = Math.max(1, placements.length);
@@ -247,7 +249,7 @@ export function buildTrees(
   // Lean halves the near set and folds the mid tier into the far imposter
   // pool, so that pool has to hold midCap + farCap rows (vd-lean.ts).
   const vdNearCap = lean ? VD_LEAN_NEAR_TREE_CAP : VD_NEAR_TREE_CAP;
-  const vd = modelTrees ? buildVdTreeMeshes(THREE, Math.min(count, vdNearCap), Math.min(count, VD_MID_TREE_CAP), Math.min(count, lean ? VD_MID_TREE_CAP + VD_FAR_TREE_CAP : VD_FAR_TREE_CAP), leanMat, leanDraw) : null;
+  const vd = modelTrees ? buildVdTreeMeshes(THREE, Math.min(count, vdNearCap), Math.min(count, VD_MID_TREE_CAP), Math.min(count, lean ? VD_MID_TREE_CAP + VD_FAR_TREE_CAP : VD_FAR_TREE_CAP), leanMat, leanDraw, linearColors) : null;
   const vdTiers = vd ? new VdTreeTiers(xs, zs, { nearCap: vdNearCap }) : null;
   const vdSpeciesOf = new Uint8Array(placements.length);
   const vdMatrices = vd ? new Float32Array(placements.length * 16) : null;

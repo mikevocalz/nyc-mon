@@ -31,6 +31,17 @@
 // as before, and lofted-car.ts, lofted-car-material.ts and
 // vehicle-headlights.ts are never evaluated (physical-graph.ts loads them
 // inside createLoftedFleet).
+//
+// vd lane (VD_LANE, world/curb.ts, the default) on top of the physical
+// fleet: every vehicle is a Valdrada baked body (world/vd-car-mesh.ts). Cars
+// pick their body per vehicle id from VD_FLEET_BODIES; the bus is the MTA
+// XD40 (vd-car-mesh.ts VD_BUS_ID). Up to LOFTED_NEAR_VEHICLES of a kind
+// inside VD_FLEET_NEAR_METRES draw LOD2, the rest the same body's `mid`
+// decimation: one mesh per body and level, no lofted body or proxy and no
+// box car. The headlight pools and the flares are unchanged. The vd meshes
+// are plain Meshes over InstancedBufferGeometry with the transform in
+// `vdXform` (world/vd-instanced.ts), so all sixteen share one node build and
+// one pipeline; an InstancedMesh would compile its own.
 
 import type { Three } from '@acme/ui/three';
 import type { ActorFrame, SceneActor, SceneActorFactory } from '../scene-actor.ts';
@@ -45,7 +56,10 @@ import {
 } from './asset-registry.ts';
 import { readEnvSection } from './clock.ts';
 import type { VehicleMeshData } from './lofted-car.ts';
-import { loadLoftedCar, loadLoftedCarMaterial, loadVehicleHeadlights } from '../physical-graph.ts';
+import { loadLoftedCar, loadLoftedCarMaterial, loadVdCarMaterial, loadVdCarMesh, loadVehicleHeadlights } from '../physical-graph.ts';
+import { VD_LANE } from '../world/curb.ts';
+import type { VdCarId } from '../world/vd-car-mesh.ts';
+import { VD_XFORM_ATTRIBUTE, vdInstancedGeometry, writeVdXform } from '../world/vd-instanced.ts';
 import { PHYSICAL_SEED_ASSETS, SEED_ASSETS } from './seed-assets.ts';
 import { envSectionOffset } from './signal-viz.ts';
 import {
@@ -283,6 +297,8 @@ export interface VehicleActorOptions {
   readonly headlightLights?: boolean;
   /** Rear plate atlas for the lofted cars (plateAtlasPixels layout); defaults to the pixel-font atlas. */
   readonly plateTexture?: unknown;
+  /** vd lane: the near car set wears Valdrada's baked bodies (VD_FLEET_BODIES). Default VD_LANE; needs `physical`. */
+  readonly vd?: boolean;
   /** Camera field of view (degrees) and viewport height (px) for flare sizing. */
   readonly flareView?: { readonly fovDeg: number; readonly viewportPx: number };
 }
@@ -507,6 +523,22 @@ export function createVehicleActor(options: VehicleActorOptions): SceneActorFact
 
 // --- Slop-grade lofted fleet (EXPO_PUBLIC_WORLD_PHYSICAL) ---------------------------------------------------------
 
+/**
+ * vd lane near bodies per car kind, picked per vehicle id (vdCarHash). Sedans spread over the CARLA saloons and the
+ * SUV, taxis are mostly the TLC cab with some yellow-painted Lincolns, vans the Sprinter. The bus stays lofted.
+ */
+export const VD_FLEET_BODIES: Readonly<Record<Exclude<VehicleKind, 'bus'>, readonly VdCarId[]>> = {
+  sedan: ['lincoln', 'mercedes', 'charger', 'suv'],
+  taxi: ['taxinv200', 'taxinv200', 'lincoln'],
+  van: ['van'],
+};
+
+/**
+ * vd lane: a vehicle draws its full body (LOD2) only inside this distance of the camera focus, as the parked cars do
+ * (street-props.ts VD_PARKED_RADIUS); past it, or past the near cap, the same body's `mid` decimation.
+ */
+export const VD_FLEET_NEAR_METRES = 40;
+
 interface LoftedFleet {
   /** Kinds this fleet draws; the box path skips them. */
   readonly kinds: ReadonlySet<VehicleKind>;
@@ -563,32 +595,47 @@ function createLoftedFleet(
   const plateTexture = options.plateTexture as InstanceType<Three['Texture']> | undefined;
   let ownedPlate: InstanceType<Three['Texture']> | null = null;
 
-  type Mesh = InstanceType<Three['InstancedMesh']>;
-  type Attr = InstanceType<Three['InstancedBufferAttribute']>;
+  type Object3D = InstanceType<Three['Object3D']> & { geometry: { dispose(): void } };
+  /** One drawn body level: the lofted InstancedMesh or a vd instanced Mesh, behind one slot writer. */
   interface Lod {
-    readonly mesh: Mesh;
-    readonly paint: Attr;
-    readonly state: Attr;
+    readonly mesh: Object3D;
     readonly capacity: number;
     count: number;
+    /** Writes the next slot: pose, paint (linear RGB) and carState. */
+    write(slot: number, x: number, z: number, yaw: number, grow: number, rgb: readonly number[], state: readonly number[]): void;
+    /** Publishes `count` and flags this frame's slots for upload. */
+    flush(): void;
   }
   interface LoftedKind {
     readonly kind: VehicleKind;
-    readonly near: Lod;
-    readonly far: Lod | null;
+    /** One near mesh (lofted) or one per vd body; `pickNear` chooses the mesh for a vehicle id. */
+    readonly nears: readonly Lod[];
+    readonly pickNear: (id: number) => number;
+    /** Near slots across all `nears`. */
+    readonly nearCap: number;
+    /** Past the near cap: the lofted proxy (one), the vd `mid` body (one per near, same index), or none (lofted bus). */
+    readonly fars: readonly Lod[];
+    /** Near only within this focus distance (vd); Infinity keeps the lofted fleet's cap-only rule. */
+    readonly nearMetres: number;
     readonly material: InstanceType<Three['MeshStandardNodeMaterial']>;
     readonly head: { readonly headlight: readonly [number, number]; readonly zFront: number };
     readonly flare: FlareMount;
     readonly bus: boolean;
   }
 
-  const buildLod = (kind: VehicleKind, data: VehicleMeshData, material: LoftedKind['material'], cap: number, name: string): Lod => {
+  const loftedGeometry = (data: VehicleMeshData) => {
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.BufferAttribute(data.positions, 3));
     geometry.setAttribute('normal', new THREE.BufferAttribute(data.normals, 3));
     geometry.setAttribute('uv', new THREE.BufferAttribute(data.uvs, 2));
     geometry.setAttribute('partId', new THREE.BufferAttribute(data.partIds, 1));
     geometry.setIndex(new THREE.BufferAttribute(data.indices, 1));
+    return geometry;
+  };
+  const buildLod = (
+    kind: VehicleKind, data: VehicleMeshData | InstanceType<Three['InstancedMesh']>['geometry'], material: InstanceType<Three['Material']>, cap: number, name: string,
+  ): Lod => {
+    const geometry = 'isBufferGeometry' in data ? data : loftedGeometry(data);
     const paint = new THREE.InstancedBufferAttribute(new Float32Array(cap * LOFTED_INSTANCE_ATTRIBUTES.paintColor), LOFTED_INSTANCE_ATTRIBUTES.paintColor);
     const state = new THREE.InstancedBufferAttribute(new Float32Array(cap * LOFTED_INSTANCE_ATTRIBUTES.carState), LOFTED_INSTANCE_ATTRIBUTES.carState);
     paint.setUsage(THREE.DynamicDrawUsage);
@@ -599,23 +646,107 @@ function createLoftedFleet(
     mesh.name = `living-city:vehicles:${kind}:${name}`;
     mesh.count = 0;
     mesh.frustumCulled = false;
-    mesh.castShadow = name === 'near';
+    mesh.castShadow = name.startsWith('near');
     mesh.receiveShadow = true;
     group.add(mesh);
-    return { mesh, paint, state, capacity: cap, count: 0 };
+    const lod: Lod = {
+      mesh, capacity: cap, count: 0,
+      write: (slot, x, z, yaw, grow, rgb, carState) => {
+        quat.setFromAxisAngle(up, yaw);
+        matrix.compose(pos.set(x, 0, z), quat, scale.set(grow, grow, grow));
+        mesh.setMatrixAt(slot, matrix);
+        (paint.array as Float32Array).set(rgb, slot * 3);
+        (state.array as Float32Array).set(carState, slot * 4);
+      },
+      flush: () => {
+        if (mesh.count !== lod.count) mesh.count = lod.count;
+        if (lod.count > 0) {
+          mesh.instanceMatrix.needsUpdate = true;
+          paint.needsUpdate = true;
+          state.needsUpdate = true;
+        }
+      },
+    };
+    return lod;
   };
+  // vd: one instanced Mesh per body and level over the body's geometry (world/vd-instanced.ts).
+  const buildVdLod = (
+    kind: VehicleKind, base: InstanceType<Three['BufferGeometry']>, material: InstanceType<Three['Material']>, cap: number, name: string,
+  ): Lod => {
+    const made = vdInstancedGeometry(THREE, base, cap, [
+      [VD_XFORM_ATTRIBUTE, 4], ['carState', LOFTED_INSTANCE_ATTRIBUTES.carState], ['paintColor', LOFTED_INSTANCE_ATTRIBUTES.paintColor],
+    ]);
+    const { geometry, buffer, stride } = made;
+    const at = { xform: made.offsets[VD_XFORM_ATTRIBUTE]!, state: made.offsets.carState!, paint: made.offsets.paintColor! };
+    const array = buffer.array as Float32Array;
+    // Visible while empty, as the lofted fleet's meshes are: instanceCount 0 skips the draw, and the one shared node
+    // build happens on frame 0 instead of when the first vehicle drives in.
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.name = `living-city:vehicles:${kind}:${name}`;
+    mesh.frustumCulled = false;
+    mesh.castShadow = name.startsWith('near');
+    mesh.receiveShadow = true;
+    group.add(mesh);
+    const lod: Lod = {
+      mesh, capacity: cap, count: 0,
+      write: (slot, x, z, yaw, grow, rgb, carState) => {
+        writeVdXform(array, slot, stride, at.xform, x, z, yaw, grow);
+        array.set(carState, slot * stride + at.state);
+        array.set(rgb, slot * stride + at.paint);
+      },
+      flush: () => {
+        geometry.instanceCount = lod.count;
+        if (lod.count > 0) buffer.needsUpdate = true;
+      },
+    };
+    return lod;
+  };
+
+  // vd lane: the baked bodies and their one shared material, loaded only when the lane is on.
+  const vd = options.vd ?? VD_LANE;
+  const vdMesh = vd ? loadVdCarMesh() : null;
+  const vdMaterial = vd ? loadVdCarMaterial().createVdCarMaterial(THREE, { glow }) : null;
+  const firstNear = (): number => 0;
 
   const kinds = new Map<VehicleKind, LoftedKind>();
   for (const kind of VEHICLE_KINDS) {
     const entry = resolveVehicleEntry(registry, VEHICLE_SEMANTIC_ID[kind], kind);
     if (!isLoftedRecipe(entry)) continue;
+    if (vdMesh && vdMaterial) {
+      // vd: the same baked body near (LOD2) and past the near cap (the `mid` decimation), per body.
+      const bodies: readonly VdCarId[] = kind === 'bus' ? [vdMesh.VD_BUS_ID] : VD_FLEET_BODIES[kind];
+      const ids = [...new Set(bodies)];
+      const cap = Math.min(capacity, nearCap);
+      const nears: Lod[] = [];
+      const fars: Lod[] = [];
+      for (const id of ids) {
+        const lods = vdMesh.vdCarLodGeometries(THREE, id);
+        nears.push(buildVdLod(kind, lods.near, vdMaterial, cap, `near-vd-${id}`));
+        fars.push(buildVdLod(kind, lods.mid, vdMaterial, capacity, `far-vd-${id}`));
+        lods.far.dispose();
+      }
+      const slot = bodies.map((id) => ids.indexOf(id));
+      const pickNear = slot.length === 1 ? firstNear : (id: number) => slot[Math.floor(vdMesh.vdCarHash(id) * slot.length) % slot.length]!;
+      const front = frontLampMount(kind);
+      const back = rearLampMount(kind);
+      // The XD40 runs 12.5 m over bumpers: its lamps sit at its own ends, not the lofted bus's.
+      const half = kind === 'bus' ? vdMesh.decodeVdCar(vdMesh.VD_BUS_ID).size[2] / 2 : 0;
+      const zFront = kind === 'bus' ? half : front.zFront;
+      const zRear = kind === 'bus' ? -half : back.zRear;
+      kinds.set(kind, {
+        kind, nears, pickNear, nearCap: cap, fars, nearMetres: VD_FLEET_NEAR_METRES, material: vdMaterial, bus: kind === 'bus',
+        head: { headlight: [front.x, front.y], zFront },
+        flare: { frontX: front.x, frontY: front.y, zFront, rearX: back.x, rearY: back.y, zRear },
+      });
+      continue;
+    }
     if (kind === 'bus') {
       const material = createLoftedBusMaterial(THREE, { glow });
       const near = buildLod(kind, buildBusGeometryData(), material, capacity, 'near');
       const front = frontLampMount(kind);
       const back = rearLampMount(kind);
       kinds.set(kind, {
-        kind, near, far: null, material, bus: true,
+        kind, nears: [near], pickNear: firstNear, nearCap: capacity, fars: [], nearMetres: Infinity, material, bus: true,
         head: { headlight: [front.x, front.y], zFront: front.zFront },
         flare: { frontX: front.x, frontY: front.y, zFront: front.zFront, rearX: back.x, rearY: back.y, zRear: back.zRear },
       });
@@ -624,12 +755,13 @@ function createLoftedFleet(
     const spec = bodySpecForKind(kind);
     const made = createLoftedCarMaterial(THREE, spec, { glow, plateTexture: plateTexture ?? ownedPlate ?? undefined });
     if (made.ownsPlateTexture) ownedPlate = made.plateTexture;
-    const near = buildLod(kind, buildCarGeometryData(spec), made.material, Math.min(capacity, nearCap), 'near');
+    const cap = Math.min(capacity, nearCap);
+    const nears = [buildLod(kind, buildCarGeometryData(spec), made.material, cap, 'near')];
     const far = buildLod(kind, buildCarProxyGeometryData(spec), made.material, capacity, 'far');
     const front = frontLampMount(kind);
     const back = rearLampMount(kind);
     kinds.set(kind, {
-      kind, near, far, material: made.material, bus: false,
+      kind, nears, pickNear: firstNear, nearCap: cap, fars: [far], nearMetres: Infinity, material: made.material, bus: false,
       head: { headlight: [front.x, front.y], zFront: front.zFront },
       flare: { frontX: front.x, frontY: front.y, zFront: front.zFront, rearX: back.x, rearY: back.y, zRear: back.zRear },
     });
@@ -689,9 +821,6 @@ function createLoftedFleet(
 
   const writeInstance = (lod: Lod, rec: FleetRecord, blinkOn: boolean) => {
     const slot = lod.count++;
-    quat.setFromAxisAngle(up, rec.yaw);
-    matrix.compose(pos.set(rec.x, 0, rec.z), quat, scale.set(rec.grow, rec.grow, rec.grow));
-    lod.mesh.setMatrixAt(slot, matrix);
     let rgb = paints.get(rec.id);
     if (!rgb) {
       if (paints.size > capacity * 16) paints.clear();
@@ -699,18 +828,10 @@ function createLoftedFleet(
       rgb = [paintColor.r, paintColor.g, paintColor.b];
       paints.set(rec.id, rgb);
     }
-    (lod.paint.array as Float32Array).set(rgb, slot * 3);
-    (lod.state.array as Float32Array).set(carStateFromFlags(rec.flags, blinkOn, VFLAG), slot * 4);
+    lod.write(slot, rec.x, rec.z, rec.yaw, rec.grow, rgb, carStateFromFlags(rec.flags, blinkOn, VFLAG));
   };
 
-  const flush = (lod: Lod) => {
-    if (lod.mesh.count !== lod.count) lod.mesh.count = lod.count;
-    if (lod.count > 0) {
-      lod.mesh.instanceMatrix.needsUpdate = true;
-      lod.paint.needsUpdate = true;
-      lod.state.needsUpdate = true;
-    }
-  };
+  const flush = (lod: Lod) => lod.flush();
 
   return {
     kinds: new Set(kinds.keys()),
@@ -747,15 +868,22 @@ function createLoftedFleet(
       for (const [kind, lk] of kinds) {
         const list = byKind.get(kind)!;
         if (focus) list.sort((a, b) => records[a]!.dist - records[b]!.dist);
-        lk.near.count = 0;
-        if (lk.far) lk.far.count = 0;
+        for (const near of lk.nears) near.count = 0;
+        for (const far of lk.fars) far.count = 0;
+        let nearUsed = 0;
         for (const i of list) {
           const rec = records[i]!;
-          if (lk.near.count < lk.near.capacity) writeInstance(lk.near, rec, blinkOn);
-          else if (lk.far && lk.far.count < lk.far.capacity) writeInstance(lk.far, rec, blinkOn);
+          const body = lk.pickNear(rec.id);
+          const near = lk.nears[body]!;
+          const far = lk.fars.length > 1 ? lk.fars[body] : lk.fars[0];
+          const close = !focus || rec.dist <= lk.nearMetres;
+          if (close && nearUsed < lk.nearCap && near.count < near.capacity) {
+            writeInstance(near, rec, blinkOn);
+            nearUsed++;
+          } else if (far && far.count < far.capacity) writeInstance(far, rec, blinkOn);
         }
-        flush(lk.near);
-        if (lk.far) flush(lk.far);
+        for (const near of lk.nears) flush(near);
+        for (const far of lk.fars) flush(far);
       }
 
       // Headlight pools: nearest effective distance first, faded at the cut-off, scaled by the night ramp.
@@ -799,13 +927,13 @@ function createLoftedFleet(
     dispose: () => {
       const materials = new Set<{ dispose(): void }>();
       for (const lk of kinds.values()) {
-        for (const lod of [lk.near, lk.far]) {
-          if (!lod) continue;
+        for (const lod of [...lk.nears, ...lk.fars]) {
           lod.mesh.geometry.dispose();
-          lod.mesh.dispose();
+          (lod.mesh as { dispose?: () => void }).dispose?.();
         }
         materials.add(lk.material);
       }
+      if (vdMaterial) materials.add(vdMaterial);
       for (const m of materials) m.dispose();
       ownedPlate?.dispose();
       for (const light of lights) light.dispose();

@@ -476,7 +476,9 @@ export function buildCityMeshes(
     const measured = storefronts.get(building.id);
     if (measured) {
       for (const front of measured) {
-        const counts = emitMeasuredFront(front, neon, detail.buffer, texts);
+        // A measured front skips the generic awning loop below, so its own
+        // awnings feed the physical storefront night pools: one per awning.
+        const counts = emitMeasuredFront(front, neon, detail.buffer, texts, physical.storefronts ? storefrontPlacements : undefined);
         shopSigns += counts.signs;
         awnings += counts.awnings;
       }
@@ -903,6 +905,8 @@ function areaSurface(kind: string, seed: number): readonly [number, number] {
  */
 function emitMeasuredFront(
   front: (typeof VD_STOREFRONTS)[number], boards: VertexBuffer, canopies: VertexBuffer, texts: (TextFace & { text: string })[],
+  /** Physical night pools: one placement per emitted awning, as the generic awnings push. */
+  placements?: StorefrontPlacement[],
 ): { signs: number; awnings: number } {
   const a: Point = [front.ax, front.az];
   const b: Point = [front.ax + front.dx * front.len, front.az + front.dz * front.len];
@@ -945,6 +949,10 @@ function emitMeasuredFront(
       const u0 = Math.max(0, bay.u0); const u1 = Math.min(front.len, bay.u1);
       if (u1 - u0 > 0.8) {
         emitAwning(canopies, f, (u0 + u1) / 2 - half, u1 - u0 - 0.1, awning.c, awning.top, awning.proj);
+        const at = (u0 + u1) / 2;
+        // The bake rounds the normal to 4 decimals; the pools expect a unit vector.
+        const nl = Math.hypot(front.nx, front.nz) || 1;
+        placements?.push({ x: front.ax + front.dx * at, z: front.az + front.dz * at, outX: front.nx / nl, outZ: front.nz / nl });
         awnings++;
       }
     }

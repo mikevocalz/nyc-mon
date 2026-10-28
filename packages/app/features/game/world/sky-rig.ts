@@ -502,6 +502,8 @@ export function createSkyRig(THREE: Three, request: SkyRigRequest = {}) {
   const dispose = () => {
     disposed = true;
     dome.dispose();
+    // The rig's DirectionalLight owns its shadow state; nothing else disposes it.
+    sun.dispose();
     loadedEquirect?.dispose();
     environment?.dispose();
     loadedEquirect = null;
