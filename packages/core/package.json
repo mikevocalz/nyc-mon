@@ -10,6 +10,7 @@
     "./schemas": "./schemas/index.ts",
     "./types": "./types/index.ts",
     "./sim": "./sim/index.ts",
+    "./realtime": "./realtime/index.ts",
     "./save": "./save/index.ts"
   },
   "scripts": {

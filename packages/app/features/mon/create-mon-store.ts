@@ -38,6 +38,7 @@ import type {
   SaveCurrent,
 } from '@acme/core/types';
 import type { SaveIO } from '../onboarding/save-io';
+import { localDayKey } from './local-day.ts';
 
 /**
  * The Mon store (ADR 0010). It holds the parsed save as read from {@linkcode SaveIO}
@@ -407,16 +408,7 @@ export function selectJournal(monInstanceId: string): (state: MonStoreState) => 
   };
 }
 
-/**
- * The local calendar day of an instant as ISO `YYYY-MM-DD`, in the device's
- * time zone (M18 day boundaries). The journal and DaysCalendar key days by it.
- */
-export function localDayKey(atMs: number): string {
-  const d = new Date(atMs);
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return `${d.getFullYear()}-${mm}-${dd}`;
-}
+export { localDayKey } from './local-day.ts';
 
 /**
  * Returns a selector for the active Mon's "days together" (M18, D-15a): the

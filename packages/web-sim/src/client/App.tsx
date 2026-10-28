@@ -5,6 +5,8 @@ import { runAgentTurn } from '../shared/agentLoop.ts';
 import { SimOAuthProvider, parseCallback, resolveAuthState, type AuthState } from '../shared/auth.ts';
 import { mcpToolsToClaude, type ConversionResult } from '../shared/toolSpec.ts';
 import { Badge, Banner, BrandWordmark, Button, Card, ErrorMessage, SolidPanel, Switch, TextField, useInstanceStore, useStore } from '@acme/ui';
+import type { StoreApi } from 'zustand/vanilla';
+import { xrTypeRamp } from '@acme/theme';
 import { Form, Header, Heading, Paragraph, Section } from '@acme/ui/html';
 import { MonModel3D } from '@acme/ui/three/mon';
 import { Text, View } from '@acme/ui/tw';
@@ -24,7 +26,7 @@ import {
   saveSession,
   type TranscriptItem,
 } from './session.ts';
-import { IDLE, isBargeIn, nextConversation, openEar, type ConversationEvent, type ConversationMode, type Ear } from './handsFree.ts';
+import { IDLE, nextConversation, openEar, type ConversationEvent, type ConversationMode, type Ear } from './handsFree.ts';
 import { monSpeechPort } from './monSpeechPort.ts';
 import { createSentenceSplitter } from './sentenceStream.ts';
 import { loadVoice, sameVoice, saveVoice, stickyVoice, type RememberedVoice } from './sessionVoice.ts';
@@ -36,6 +38,7 @@ import { currentScheme, type Scheme } from './theme.ts';
 import { createAuthorize, noAuthorize, sdkRefresh } from './freshToken.ts';
 import { createTurnToolCaller, hintedToolNames, latestMonState, withMonState, withPresenceLine } from './turnTools.ts';
 import { currentViewUri, freshViewFor, liveViewUri } from './viewUri.ts';
+import { isEcho, isFiller, liveMicUrl, openLiveMic, type LiveMic } from './liveMic.ts';
 
 export interface PublicConfig {
   readonly mcpUrl: string;
@@ -45,6 +48,8 @@ export interface PublicConfig {
   readonly devMode: boolean;
   readonly modelBackend: 'bedrock' | 'mock';
   readonly modelLabel: string;
+  /** /api/asr is up: the mic streams to NVIDIA Parakeet, echo-cancelled (liveMic.ts). */
+  readonly liveMic?: boolean;
 }
 
 type Connection =
@@ -135,7 +140,29 @@ export function App({ config }: { config: PublicConfig }) {
     speakerId: '',
     speakerName: '',
   }));
-  const { items, auth, conn, busy, live, draft, listening, heard, talkMode, speaking, standing, activeViewId, activeToolTitle, displayMode, scheme, readAloud, time, speakerId } = useStore(store);
+  // The fast-changing strings (what the mic hears, the reply streaming in, the
+  // sentence being spoken) are read by <LiveCaption> alone. App follows only
+  // whether each is empty: every App render restyles the whole page (about
+  // 17 ms measured), and one per interim word cost the 3D Mon a frame each time.
+  const items = useStore(store, (s) => s.items);
+  const auth = useStore(store, (s) => s.auth);
+  const conn = useStore(store, (s) => s.conn);
+  const busy = useStore(store, (s) => s.busy);
+  const draft = useStore(store, (s) => s.draft);
+  const listening = useStore(store, (s) => s.listening);
+  const talkMode = useStore(store, (s) => s.talkMode);
+  const standing = useStore(store, (s) => s.standing);
+  const activeViewId = useStore(store, (s) => s.activeViewId);
+  const activeToolTitle = useStore(store, (s) => s.activeToolTitle);
+  const displayMode = useStore(store, (s) => s.displayMode);
+  const scheme = useStore(store, (s) => s.scheme);
+  const readAloud = useStore(store, (s) => s.readAloud);
+  const time = useStore(store, (s) => s.time);
+  const speakerId = useStore(store, (s) => s.speakerId);
+  const hasHeard = useStore(store, (s) => s.heard.trim() !== '');
+  const hasLive = useStore(store, (s) => s.live !== '');
+  const hasSpeaking = useStore(store, (s) => s.speaking !== '');
+
   const {
     items: setItems,
     auth: setAuth,
@@ -199,6 +226,18 @@ export function App({ config }: { config: PublicConfig }) {
   const speakingRef = useRef('');
   const audioStartRef = useRef(0);
   const bargedRef = useRef(false);
+  // ---- Live mic (liveMic.ts): one echo-cancelled stream for the whole voice session.
+  const liveMicRef = useRef<LiveMic | null>(null);
+  const liveOpeningRef = useRef(false);
+  const noSpeechRef = useRef<number | null>(null);
+  /** The latest interim text, for "Done talking" before the recognizer's final arrives. */
+  const heardRef = useRef('');
+  /** Everything the Mon has queued to say this turn: what an echo would sound like. */
+  const replyTextRef = useRef('');
+  /** An utterance that arrived while the cut-off turn was still unwinding. */
+  const pendingUtteranceRef = useRef<string | null>(null);
+  /** What the person said last, so more said before the Mon answers joins it. */
+  const lastUtteranceRef = useRef('');
   /** performance.now() marks for the current turn, for the latency log. */
   const marksRef = useRef<{ speechEnd: number; firstText?: number; firstSentence?: number; firstAudio?: number } | null>(null);
 
@@ -230,7 +269,7 @@ export function App({ config }: { config: PublicConfig }) {
     emitSpeechCue({ kind: 'listen', id: 'mic', on: listening });
   }, [listening]);
 
-  // The first audible moment of each clip: drives the barge-in holdoff and the latency log.
+  // The first audible moment of each clip: drives the latency log.
   useEffect(
     () =>
       addSpeechCueListener((cue) => {
@@ -271,7 +310,7 @@ export function App({ config }: { config: PublicConfig }) {
   useEffect(() => {
     const log = document.querySelector<HTMLElement>('[role="log"]');
     if (log) log.scrollTop = log.scrollHeight;
-  }, [items, live]);
+  }, [items, hasLive]);
 
   // OAuth redirect back from the authorization server.
   useEffect(() => {
@@ -340,10 +379,121 @@ export function App({ config }: { config: PublicConfig }) {
 
   /** The newest tool call that opens a card; an older one still re-listing never takes the display from it. */
   const latestViewRef = useRef<string | null>(null);
-  /** The mic, open for one utterance. `gated` watches for a barge-in while the Mon speaks. */
+  /** The mic, open for one utterance (only while the Mon is quiet). */
   const sendRef = useRef<(text: string, source: 'voice' | 'typed') => Promise<void>>(async () => {});
+  const clearNoSpeech = useCallback(() => {
+    if (noSpeechRef.current !== null) window.clearTimeout(noSpeechRef.current);
+    noSpeechRef.current = null;
+  }, []);
+  const closeLiveMic = useCallback(() => {
+    clearNoSpeech();
+    liveMicRef.current?.close();
+    liveMicRef.current = null;
+    liveOpeningRef.current = false;
+  }, [clearNoSpeech]);
+
+  /** The person talked over the Mon (or over its thinking): stop it and listen. */
+  const bargeIn = useCallback(() => {
+    bargedRef.current = true;
+    abortRef.current?.abort();
+    stopVoice();
+    dispatch({ type: 'barge-in' });
+    setListening(true);
+  }, [dispatch, setListening, stopVoice]);
+
+  const deliverUtterance = useCallback(
+    (said: string) => {
+      clearNoSpeech();
+      lastUtteranceRef.current = said;
+      heardRef.current = '';
+      setHeard('');
+      setListening(false);
+      marksRef.current = { speechEnd: performance.now() };
+      performance.mark('mon:end-of-speech');
+      dispatch({ type: 'utterance' });
+      // A cut-off turn is still unwinding (busy): its finally sends this one.
+      if (store.getState().busy) pendingUtteranceRef.current = said;
+      else void sendRef.current(said, 'voice');
+    },
+    [clearNoSpeech, dispatch, setHeard, setListening, store],
+  );
+
+  const startLiveMic = useCallback(async () => {
+    if (liveMicRef.current || liveOpeningRef.current) return;
+    liveOpeningRef.current = true;
+    let token: string | undefined;
+    try {
+      await authorize(async (t) => {
+        token = t;
+        return new Response(null, { status: 204 });
+      });
+      const mic = await openLiveMic({
+        url: liveMicUrl(window.location),
+        token,
+        handlers: {
+          onInterim: (text) => {
+            const mode = convRef.current.mode;
+            if (mode === 'listening') {
+              clearNoSpeech();
+              heardRef.current = text;
+              setHeard(text);
+            } else if ((mode === 'speaking' || mode === 'thinking') && text.split(/\s+/).length >= 2 && !isEcho(text, replyTextRef.current)) {
+              bargeIn();
+              heardRef.current = text;
+              setHeard(text);
+            }
+          },
+          onFinal: (text) => {
+            if (isFiller(text)) return;
+            const mode = convRef.current.mode;
+            let said = text;
+            if (mode === 'speaking' || mode === 'thinking') {
+              if (isEcho(text, replyTextRef.current)) return;
+              // Still thinking, nothing said yet: the person kept talking, so it is one turn.
+              if (mode === 'thinking' && !replyTextRef.current.trim()) said = `${lastUtteranceRef.current} ${text}`.trim();
+              bargeIn();
+            }
+            if (convRef.current.mode === 'listening') deliverUtterance(said);
+          },
+          onError: (m) => {
+            closeLiveMic();
+            setListening(false);
+            dispatch({ type: 'stop' });
+            notice(m, 'error');
+          },
+        },
+      });
+      liveOpeningRef.current = false;
+      // The session ended while the mic was opening.
+      if (convRef.current.mode === 'idle') mic.close();
+      else liveMicRef.current = mic;
+    } catch {
+      liveOpeningRef.current = false;
+      setListening(false);
+      dispatch({ type: 'stop' });
+      notice('The microphone is off or blocked. Allow it for this page, then tap Talk.', 'error');
+    }
+  }, [authorize, bargeIn, clearNoSpeech, closeLiveMic, deliverUtterance, dispatch, notice, setHeard, setListening]);
+
+  const useLiveMic = config.liveMic === true && typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia;
+
   const openMic = useCallback(
-    (gated: boolean) => {
+    () => {
+      if (useLiveMic) {
+        void startLiveMic();
+        heardRef.current = '';
+        setHeard('');
+        setListening(true);
+        clearNoSpeech();
+        // No speech in the follow-up window ends the session, as on an Echo.
+        noSpeechRef.current = window.setTimeout(() => {
+          if (convRef.current.mode !== 'listening' || heardRef.current) return;
+          closeLiveMic();
+          setListening(false);
+          dispatch({ type: 'silent' });
+        }, LIVE_NO_SPEECH_MS);
+        return;
+      }
       earRef.current?.close();
       const ear = openEar({
         listen,
@@ -368,39 +518,27 @@ export function App({ config }: { config: PublicConfig }) {
           dispatch({ type: 'stop' });
           notice(m, 'error');
         },
-        ...(gated
-          ? {
-              noSpeechMs: Infinity,
-              accept: (heard: string) =>
-                isBargeIn({ heard, speaking: speakingRef.current, msSinceAudioStart: performance.now() - audioStartRef.current }),
-              onBargeIn: () => {
-                // The person talked over the Mon: stop it and listen.
-                bargedRef.current = true;
-                abortRef.current?.abort();
-                stopVoice();
-                dispatch({ type: 'barge-in' });
-                setListening(true);
-              },
-            }
-          : {}),
       });
       earRef.current = ear;
-      setListening(!!ear && !gated);
+      setListening(!!ear);
     },
-    [dispatch, notice, setHeard, setListening, stopVoice],
+    [clearNoSpeech, closeLiveMic, dispatch, notice, setHeard, setListening, startLiveMic, useLiveMic],
   );
 
   const send = useCallback(
     async (raw: string, source: 'voice' | 'typed' = 'typed') => {
       const text = raw.trim();
-      if (!text || busy || conn.kind !== 'connected') return;
+      // The store, not the render's `busy`: a cut-in can call this before React re-renders.
+      if (!text || store.getState().busy || conn.kind !== 'connected') return;
       stopVoice();
       if (source === 'typed') {
         closeEar();
+        closeLiveMic();
         marksRef.current = { speechEnd: performance.now() };
         dispatch({ type: 'typed' });
       }
       bargedRef.current = false;
+      replyTextRef.current = '';
       setDraft('');
       setHeard('');
       setBusy(true);
@@ -417,11 +555,10 @@ export function App({ config }: { config: PublicConfig }) {
               speakingRef.current = sentence;
               setSpeaking(sentence);
               if (audioStartRef.current < (marksRef.current?.speechEnd ?? 0)) audioStartRef.current = performance.now();
-              if (index === 0) {
-                if (convRef.current.mode === 'thinking') dispatch({ type: 'reply-audio' });
-                // Barge-in watch: the mic stays open while the Mon talks, behind the echo guard.
-                if (convRef.current.voiceSession && canListen()) openMic(true);
-              }
+              // The mic stays shut while the Mon talks: Web Speech has no echo
+              // cancellation, so it heard the Mon through the speakers and sent
+              // that back as the person's turn. Talk cuts in instead.
+              if (index === 0 && convRef.current.mode === 'thinking') dispatch({ type: 'reply-audio' });
             },
           })
         : null;
@@ -434,6 +571,7 @@ export function App({ config }: { config: PublicConfig }) {
           if (!s) continue;
           if (marksRef.current && marksRef.current.firstSentence === undefined) marksRef.current.firstSentence = performance.now();
           spokeAny = true;
+          replyTextRef.current += ` ${s}`;
           queue?.push(s);
         }
       };
@@ -446,7 +584,12 @@ export function App({ config }: { config: PublicConfig }) {
           setSpeaking('');
           closeEar();
           const next = dispatch({ type: 'reply-done' });
-          if (next.mode === 'listening') openMic(false);
+          // Let the speakers fall silent before the mic opens, or it catches the last word.
+          if (next.mode === 'listening') {
+            window.setTimeout(() => {
+              if (convRef.current.mode === 'listening' && !earRef.current) openMic();
+            }, MIC_SETTLE_MS);
+          }
         };
         if (queue) void queue.done.then((outcome) => outcome === 'finished' && afterReply());
         else afterReply();
@@ -562,15 +705,27 @@ export function App({ config }: { config: PublicConfig }) {
         abortRef.current = null;
       }
     },
-    [authorize, busy, conn, model, store, notice, provider, push, readAloud, toolsByName, closeEar, dispatch, learnVoice, openMic, stopVoice, setActiveToolTitle, setActiveViewId, setAuth, setBusy, setConn, setDisplayMode, setDraft, setHeard, setLive, setSpeaking],
+    [authorize, conn, model, store, notice, provider, push, readAloud, toolsByName, closeEar, closeLiveMic, dispatch, learnVoice, openMic, stopVoice, setActiveToolTitle, setActiveViewId, setAuth, setBusy, setConn, setDisplayMode, setDraft, setHeard, setLive, setSpeaking],
   );
   useEffect(() => {
     sendRef.current = send;
   }, [send]);
+  // The person cut in while the old turn was unwinding: send what they said once it has.
+  useEffect(() => {
+    const said = pendingUtteranceRef.current;
+    if (busy || said === null) return;
+    pendingUtteranceRef.current = null;
+    void send(said, 'voice');
+  }, [busy, send]);
 
   /** Talk: opens a hands-free session; mid-reply it cuts the Mon off; while listening it ends the utterance now. */
   function talk() {
     if (listening) {
+      if (useLiveMic) {
+        // Done talking: what was heard so far is the utterance.
+        if (heardRef.current) deliverUtterance(heardRef.current);
+        return;
+      }
       earRef.current?.finish();
       return;
     }
@@ -580,13 +735,14 @@ export function App({ config }: { config: PublicConfig }) {
       stopVoice();
     }
     dispatch({ type: 'talk' });
-    openMic(false);
+    openMic();
   }
   /** Stop: ends the reply, the voice and the session. */
   function stopAll() {
     abortRef.current?.abort();
     stopVoice();
     closeEar();
+    closeLiveMic();
     dispatch({ type: 'stop' });
   }
 
@@ -676,7 +832,7 @@ export function App({ config }: { config: PublicConfig }) {
     items.find((i): i is Extract<TranscriptItem, { kind: 'tool' }> => i.id === activeViewId && i.kind === 'tool') ?? standing ?? undefined;
   // Never the URI saved with the item: it names a view from the server build that made it.
   const activeViewUri = activeView ? currentViewUri(activeView, toolsByName) : null;
-  const voiceIn = canListen();
+  const voiceIn = useLiveMic || canListen();
   const signedIn = auth.kind === 'dev-bypass' || auth.kind === 'signed-in';
 
   const connLabel =
@@ -690,27 +846,17 @@ export function App({ config }: { config: PublicConfig }) {
   const connTone = conn.kind === 'connected' ? 'success' : conn.kind === 'failed' ? 'danger' : 'neutral';
   const canTalk = conn.kind === 'connected';
   const fullscreen = displayMode === 'fullscreen';
-  const stage = judgeStage({
-    authKind: auth.kind,
-    connectionKind: conn.kind,
-    listening,
-    busy,
-    activeToolTitle,
-    heard,
-    live,
-    lastReply,
-  });
+  const stageInput = { authKind: auth.kind, connectionKind: conn.kind, listening, busy, activeToolTitle, lastReply };
+  // Kind, label and tone only depend on whether the strings are empty; LiveCaption fills the headline.
+  const stage = judgeStage({ ...stageInput, heard: hasHeard ? ' ' : '', live: hasLive ? ' ' : '' });
 
   // Voice is the way in. Typing is for testers (dev mode) or a browser with no speech recognition.
   const typing = config.devMode || !voiceIn;
   // Without the log on screen, a notice (an error, "Stopped.") has to reach the caption or it's lost.
   const lastItem = items.at(-1);
-  // While the Mon talks, the caption is the sentence it is saying (the latest line only, as on an Echo Show).
-  const rawCaption = listening
-    ? stage.headline
-    : speaking || (stage.kind !== 'ready' ? stage.headline : lastItem?.kind === 'notice' ? lastItem.text : lastReply);
-  // Stage directions (*chuckle*) are performed by the voice and "Callah" reads as Caller: captions show only the words.
-  const caption = rawCaption ? captionText(rawCaption) : rawCaption;
+  const lastNotice = lastItem?.kind === 'notice' ? lastItem.text : null;
+  // Is there any caption at all (LiveCaption has the words)?
+  const caption = listening || hasSpeaking || stage.kind !== 'ready' || lastNotice !== null || lastReply !== '';
   // The state badge: Listening / Thinking / Speaking while a conversation is under way.
   const badge =
     talkMode === 'speaking' && !listening && stage.kind !== 'acting'
@@ -735,7 +881,7 @@ export function App({ config }: { config: PublicConfig }) {
               surface="daylit"
               label="Message to your Mon"
               placeholder={listening ? 'Listening…' : 'Type to your Mon'}
-              value={listening ? heard : draft}
+              value={listening ? '' : draft}
               onChangeText={setDraft}
               onSubmitEditing={() => void send(draft)}
               disabled={!canTalk || !!listening}
@@ -823,6 +969,9 @@ export function App({ config }: { config: PublicConfig }) {
                 data-judge-state={stage.kind}
                 className="relative h-full w-full overflow-hidden"
               >
+                {/* The row keeps a badge's height with or without one (an invisible one stands
+                    in): a badge that came and went resized the 3D view under it by 7 px each
+                    turn, and the Mon jumped. */}
                 <View className="flex-row items-center justify-between gap-3 px-5 pt-4">
                   <Text className="text-xr-caption text-text-muted">{time}</Text>
                   <View className="flex-row flex-wrap items-center justify-end gap-2">
@@ -830,7 +979,13 @@ export function App({ config }: { config: PublicConfig }) {
                     {signedIn ? (
                       <View role="status" aria-live="polite" aria-atomic="true">
                         {/* Ready needs no badge; the display shows state only while it changes. */}
-                        {badge ? <Badge label={badge.label} tone={badge.tone} /> : null}
+                        {badge ? (
+                          <Badge label={badge.label} tone={badge.tone} />
+                        ) : (
+                          <View aria-hidden style={{ opacity: 0 }}>
+                            <Badge label="Ready" tone="info" />
+                          </View>
+                        )}
                       </View>
                     ) : null}
                   </View>
@@ -888,13 +1043,11 @@ export function App({ config }: { config: PublicConfig }) {
                         </View>
                       ) : null}
                     </View>
-                    {/* On-screen captions, as on an Echo Show: the latest line only. */}
-                    <View aria-live="polite" aria-atomic="true" className="px-5 pb-3 pt-1">
-                      {caption ? (
-                        <Text numberOfLines={2} className="text-center text-xr-body text-text">
-                          {caption}
-                        </Text>
-                      ) : null}
+                    {/* On-screen captions, as on an Echo Show: the latest line only. Two
+                        lines are always reserved: a caption that grew and shrank resized
+                        the view above it, and the Mon jumped with every sentence. */}
+                    <View aria-live="polite" aria-atomic="true" className="px-5 pb-3 pt-1" style={{ height: CAPTION_HEIGHT }}>
+                      <LiveCaption store={store} stageInput={stageInput} notice={lastNotice} />
                     </View>
                   </>
                 )}
@@ -984,6 +1137,15 @@ function LogItem({ item, active, hasView, onShow }: { item: TranscriptItem; acti
  * One line per turn in the console, and the same numbers on `window.__monLatency`
  * for a headless run: end of the person's speech to the first audible Mon audio.
  */
+/** Two xr-body lines plus the caption row's padding (pt-1, pb-3). */
+const CAPTION_HEIGHT = 2 * xrTypeRamp['xr-body'].lineHeightPt + 16;
+
+/** A follow-up window with no speech ends the voice session (live mic). */
+const LIVE_NO_SPEECH_MS = 8000;
+
+/** Pause between the end of the Mon's audio and the mic opening. */
+const MIC_SETTLE_MS = 350;
+
 const SIGN_IN_EXPIRED = 'Your sign-in expired. Sign in again to keep talking.';
 
 function logLatency(m: { speechEnd: number; firstText?: number; firstSentence?: number; firstAudio?: number }) {
@@ -998,4 +1160,33 @@ function logLatency(m: { speechEnd: number; firstText?: number; firstSentence?: 
   const w = globalThis as { __monLatency?: unknown[] };
   (w.__monLatency ??= []).push(row);
   console.info(`[mon latency] end of speech → first audio ${row.firstAudioMs} ms (first text ${row.firstTextMs} ms, first sentence ${row.firstSentenceMs} ms)`);
+}
+
+/**
+ * The caption line: what the mic hears, the reply streaming in, or the
+ * sentence being spoken. The only reader of those fast strings, so a new word
+ * re-renders this line and not the page (see App's store subscription).
+ */
+function LiveCaption({
+  store,
+  stageInput,
+  notice,
+}: {
+  store: StoreApi<AppState>;
+  stageInput: Omit<Parameters<typeof judgeStage>[0], 'heard' | 'live'>;
+  notice: string | null;
+}) {
+  const heard = useStore(store, (s) => s.heard);
+  const live = useStore(store, (s) => s.live);
+  const speaking = useStore(store, (s) => s.speaking);
+  const stage = judgeStage({ ...stageInput, heard, live });
+  // While the Mon talks, the caption is the sentence it is saying (the latest line only, as on an Echo Show).
+  const raw = stageInput.listening ? stage.headline : speaking || (stage.kind !== 'ready' ? stage.headline : (notice ?? stageInput.lastReply));
+  if (!raw) return null;
+  // Stage directions (*chuckle*) are performed by the voice and "Callah" reads as Caller: captions show only the words.
+  return (
+    <Text numberOfLines={2} className="text-center text-xr-body text-text">
+      {captionText(raw)}
+    </Text>
+  );
 }

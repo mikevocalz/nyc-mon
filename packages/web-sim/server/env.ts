@@ -105,6 +105,7 @@ export interface PublicConfig {
   readonly devMode: boolean;
   readonly modelBackend: 'bedrock' | 'mock';
   readonly modelLabel: string;
+  readonly liveMic: boolean;
 }
 
 export function publicConfig(env: SimEnv): PublicConfig {
@@ -116,5 +117,7 @@ export function publicConfig(env: SimEnv): PublicConfig {
     devMode: env.SIM_DEV_MODE === '1',
     modelBackend: env.SIM_MODEL_BACKEND,
     modelLabel: env.SIM_MODEL_BACKEND === 'mock' ? 'Scripted test model' : `Claude on Amazon Bedrock (${env.SIM_BEDROCK_MODEL_ID})`,
+    /** /api/asr is up (NVIDIA key set): the mic streams to Parakeet, echo-cancelled. */
+    liveMic: Boolean(env.NVIDIA_API_KEY),
   };
 }
