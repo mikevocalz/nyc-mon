@@ -1,5 +1,6 @@
 import { allSpecies, bloodlineLabel, bloodlines, eggs } from '@acme/content';
-import { CREATURE_ART, type CreatureArt } from '@acme/assets/creatures';
+import type { CreatureArt } from '@acme/assets/creatures';
+import { artFor } from './creature-art.ts';
 import type { EggRecord, MonInstance } from '@acme/core/types';
 
 /** What every Phase 1 screen shows about one Mon, read from `@acme/content` by `speciesId`. */
@@ -20,11 +21,7 @@ export interface MonIdentity {
 const speciesById = new Map(allSpecies.map((s) => [s.speciesId, s]));
 const bloodlineById = new Map(bloodlines.map((b) => [b.bloodlineId, b]));
 
-/** Art for a form by Dex number and kind; undefined when the bundle has none. */
-export function artFor(kind: 'baby' | 'egg', dexId: number | null): CreatureArt | undefined {
-  if (dexId === null) return undefined;
-  return CREATURE_ART.find((a) => a.kind === kind && a.dexId === dexId);
-}
+export { artFor } from './creature-art.ts';
 
 /** Identity of a hatched Mon. Pure; never throws for an unknown species. */
 export function monIdentity(mon: MonInstance): MonIdentity {

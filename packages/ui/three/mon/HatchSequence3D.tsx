@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { createHatchLight, whitener, type HatchLightTheme } from './hatch-light.ts';
+import { standFraming } from './framing.ts';
 import { createHatchSound } from './hatch-sound.ts';
 import { hatchDuration, hatchFrame, soundCues, type HatchPhase } from './hatch-timeline.ts';
 
@@ -75,7 +76,7 @@ function documentTheme(): HatchLightTheme {
 /** The silhouette's egg shape: the Baby squeezed narrow and a little tall. */
 const EGG_SHAPE = new THREE.Vector2(0.5, 1.12);
 
-/** MonModel3D's framing: fits the turntable's sweep, camera slightly above centre. */
+/** The egg's framing: room round it for the shakes, shards and light, camera slightly above centre. */
 function framing(size: THREE.Vector3, camera: THREE.PerspectiveCamera): THREE.Vector3 {
   const radius = Math.hypot(size.x, size.z) / 2;
   const vHalf = (camera.fov * Math.PI) / 360;
@@ -162,6 +163,7 @@ export function HatchSequence3D({ eggUrl, monUrl, monClips, width, height, label
   /** The last phase line said; a phase with no line keeps the previous one, so nothing is re-read. */
   const [said, setSaid] = useState('');
   const latest = useRef({ onDone, monClips, reducedMotion, width, height, announcements, sound, theme });
+  const stage = useRef<{ renderer: THREE.WebGLRenderer; camera: THREE.PerspectiveCamera } | null>(null);
   useEffect(() => {
     latest.current = { onDone, monClips, reducedMotion, width, height, announcements, sound, theme };
   });
@@ -190,6 +192,7 @@ export function HatchSequence3D({ eggUrl, monUrl, monClips, width, height, label
     rim.position.set(-2, 2, -2);
     scene.add(rim);
     const camera = new THREE.PerspectiveCamera(30, w / h, 0.01, 50);
+    stage.current = { renderer, camera };
 
     let disposed = false;
     let frame = 0;
@@ -273,7 +276,7 @@ export function HatchSequence3D({ eggUrl, monUrl, monClips, width, height, label
       }
       const fade = fader(model);
       fade(0);
-      mon = { mixer, root, fade, white: whitener(model), cam: framing(size, camera), fit: 1, size };
+      mon = { mixer, root, fade, white: whitener(model), cam: standFraming(size, camera), fit: 1, size };
     });
     Promise.all([eggLoad, monLoad]).then(
       () => {
@@ -319,7 +322,7 @@ export function HatchSequence3D({ eggUrl, monUrl, monClips, width, height, label
         camera.position.copy(camPos);
         camera.lookAt(0, 0, 0);
         rim.intensity = 0.8 + 1.2 * f.glow;
-        light?.update(f, t, renderer.getPixelRatio() * h / (2 * Math.tan((camera.fov * Math.PI) / 360)));
+        light?.update(f, t, renderer.getPixelRatio() * latest.current.height / (2 * Math.tan((camera.fov * Math.PI) / 360)));
         if (dimRef.current) dimRef.current.style.opacity = String(DIM_STRENGTH[latest.current.theme] * f.dim);
         if (whiteRef.current) whiteRef.current.style.opacity = String(f.white);
         while (cues.length && cues[0]!.t <= t) audio?.play(cues.shift()!.cue);
@@ -354,9 +357,21 @@ export function HatchSequence3D({ eggUrl, monUrl, monClips, width, height, label
       });
       renderer.forceContextLoss();
       renderer.dispose();
+      stage.current = null;
       renderer.domElement.remove();
     };
   }, [eggUrl, monUrl]);
+
+  // The box can change size mid-hatch (the host's caption arrives and the
+  // frame shrinks). Follow it in place, as MonModel3D does, so the hatch ends
+  // exactly where the standing Mon then draws.
+  useEffect(() => {
+    const s = stage.current;
+    if (!s) return;
+    s.renderer.setSize(width, height);
+    s.camera.aspect = width / height;
+    s.camera.updateProjectionMatrix();
+  }, [width, height]);
 
   return (
     <div

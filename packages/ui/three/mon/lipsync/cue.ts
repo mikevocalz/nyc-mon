@@ -35,6 +35,8 @@ export type MonSpeechCue =
       readonly track: SpeechTrack;
       /** What the sentence does, for the body: one upper-body gesture at most (idle/gestures.ts). */
       readonly gesture?: MonGesture;
+      /** Date.now() when the host sent this, so the view can add the delivery delay back. */
+      readonly sentAtMs?: number;
     }
   | { readonly kind: 'stop'; readonly id: string }
   /** The host's microphone opened (`on`) or closed: the Mon looks and listens. */
@@ -82,6 +84,17 @@ export function pickSpeechTrack(sources: SpeechSources): SpeechTrack | null {
  */
 export function utteranceTimeMs(cue: Extract<MonSpeechCue, { kind: 'start' }>, receivedAtMs: number, nowMs: number): number {
   return nowMs - receivedAtMs + cue.elapsedMs;
+}
+
+/**
+ * When the audio was at `cue.elapsedMs`, on this document's performance clock:
+ * the receive time less the delivery delay (host to view through the bridge
+ * and React), which otherwise leaves the mouth that far behind the voice.
+ * Capped, since the two documents' wall clocks are the same machine's.
+ */
+export function cueAnchorMs(cue: Extract<MonSpeechCue, { kind: 'start' }>, receivedAtMs: number, wallNowMs: number): number {
+  if (cue.sentAtMs === undefined) return receivedAtMs;
+  return receivedAtMs - Math.min(500, Math.max(0, wallNowMs - cue.sentAtMs));
 }
 
 export interface SampleSpeechOptions {
@@ -156,5 +169,6 @@ export function parseSpeechCue(value: unknown): MonSpeechCue | null {
   const track = parseTrack(value.track);
   if (!track) return null;
   const gesture = (MON_GESTURES as readonly unknown[]).includes(value.gesture) ? (value.gesture as MonGesture) : undefined;
-  return { kind: 'start', id: value.id, elapsedMs: Math.max(0, value.elapsedMs), durationMs: value.durationMs, track, ...(gesture ? { gesture } : {}) };
+  const sentAtMs = isNum(value.sentAtMs) ? { sentAtMs: value.sentAtMs } : {};
+  return { kind: 'start', id: value.id, elapsedMs: Math.max(0, value.elapsedMs), durationMs: value.durationMs, track, ...(gesture ? { gesture } : {}), ...sentAtMs };
 }

@@ -3,8 +3,8 @@
  * The MCP App entry for both views (ext-apps vanilla `App` bridge, React
  * rendering of the kit). `__ENTRY__` picks the starting layout: `card`
  * (inline) or `room` (fullscreen). Fullscreen is the same document with more
- * room, so the card's Journal button requests fullscreen and re-renders as the
- * room. State is one zustand store.
+ * room: a host that opens fullscreen gets the room, and its Close goes back
+ * to the card. State is one zustand store.
  */
 import './view.css';
 import { Component, useEffect, useMemo, type ReactNode } from 'react';
@@ -19,6 +19,7 @@ import { View } from '../../../../ui/tw';
 import { GridBackdrop as RoomBackdrop } from './GridBackdrop.tsx';
 import { parseSpeechCue, SPEECH_CONTEXT_KEY } from '../../../../ui/three/mon/lipsync/cue.ts';
 import { HATCH_START_LOGGER, setHatchStartReporter } from '../../../../ui/three/mon/hatch-sound.ts';
+import { requestFrameCapture, requestProbe, setFrameStatsReporter } from '../../../../ui/three/mon/frame-stats.ts';
 
 /**
  * Keeps a backdrop failure from taking the room with it: if the grid floor
@@ -114,6 +115,11 @@ const app = new App(
 
 // The hatch tells the host when it starts and whether this frame's audio runs,
 // so exactly one of the two plays its sound (the host covers the voice path).
+// Frame timing for the host's dev tools (the simulator keeps it on window.__monViewFrames).
+setFrameStatsReporter((stats) => {
+  void app.sendLog({ level: 'debug', logger: 'nyc-mon/frames', data: stats }).catch(() => {});
+});
+
 setHatchStartReporter(({ sound, elapsedMs }) => {
   void app.sendLog({ level: 'info', logger: HATCH_START_LOGGER, data: { event: 'hatch-start', sound, elapsedMs } }).catch(() => {});
 });
@@ -193,7 +199,10 @@ function Root() {
   const narrow = !fitted && frameWidth - 24 < NARROW_BELOW;
   // Fitted, the view is exactly the frame and never scrolls. Fluid (a narrow
   // host), it takes its content height and reports it so the host grows the frame.
-  const style = fitted ? { zoom, width: BASE_WIDTH, height: canvasHeight } : undefined;
+  // A frame wider than the zoomed 768 canvas (a short, wide host) widens the
+  // canvas instead of leaving a gutter, so the Mon still stands at the right edge.
+  const canvasWidth = fitted ? Math.max(BASE_WIDTH, Math.min(frameWidth, typeof host.maxWidth === 'number' ? host.maxWidth : Infinity) / zoom) : undefined;
+  const style = fitted ? { zoom, width: canvasWidth, height: canvasHeight } : undefined;
   return (
     <div style={style} className={`relative flex flex-col bg-bg p-3 ${fitted ? 'overflow-hidden' : ''}`}>
       {__GRID_BACKDROP__ && layout === 'room' && GridBackdrop ? (
@@ -211,6 +220,7 @@ function Root() {
             narrow={narrow}
             nowMs={nowMs}
             canvasHeight={canvasHeight - 24}
+            {...(canvasWidth ? { canvasWidth: canvasWidth - 24 } : {})}
             onAction={(id) => void runAction(id)}
             onToggleRoom={() => void toggleRoom()}
             speech={speech}
@@ -239,6 +249,19 @@ app.ontoolresult = (params) => {
   }
 };
 app.onhostcontextchanged = (params) => {
+  // Dev aid: the host asks for a burst of rendered frames to see the Mon's motion frame by frame.
+  const ask = (params as { nycMonCapture?: { count?: unknown; every?: unknown; size?: unknown } }).nycMonCapture;
+  if ((params as { nycMonProbe?: unknown }).nycMonProbe) {
+    requestProbe(48, (rows) => {
+      void app.sendLog({ level: 'debug', logger: 'nyc-mon/probe', data: { rows } }).catch(() => {});
+    });
+  }
+  if (ask && typeof ask === 'object') {
+    const n = (v: unknown, d: number, max: number) => (typeof v === 'number' && v > 0 ? Math.min(max, Math.floor(v)) : d);
+    requestFrameCapture(n(ask.count, 24, 60), n(ask.every, 2, 30), n(ask.size, 160, 320), (frames) => {
+      void app.sendLog({ level: 'debug', logger: 'nyc-mon/capture', data: { frames } }).catch(() => {});
+    });
+  }
   useView.setState({ host: { ...useView.getState().host, ...params } });
 };
 

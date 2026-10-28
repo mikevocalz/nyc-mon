@@ -2,7 +2,7 @@ import { companionCopy } from '@acme/app/features/companion/copy.ts';
 import { askRoute, homeStatus } from '@acme/app/features/companion/home-model.ts';
 import { hatchCopy } from '@acme/app/features/hatch/copy.ts';
 import { detailLine, timeLine } from '@acme/app/features/hatch/incubation-model.ts';
-import { allSpecies, bloodlineLabel, bloodlines } from '@acme/content';
+import { bloodlineLabel, starterBloodlines, starterSpecies } from '@acme/content/starters';
 import { deriveMonMood } from '@acme/core/sim';
 import type { CareState, JournalEntry, MonMood } from '@acme/core/types';
 
@@ -15,7 +15,7 @@ import type { CareState, JournalEntry, MonMood } from '@acme/core/types';
  *
  * The MCP server imports this file (through index.ts), so it stays free of
  * asset imports: the Baby still is looked up in the view bundle
- * (view/MonView.tsx, `artFor` from mon-identity), never here. The names
+ * (view/MonView.tsx, `artFor` from creature-art.ts), never here. The names
  * follow `monIdentity` (packages/app/features/companion/mon-identity.ts).
  * No copy is written here: every string comes from
  * packages/app/features/companion/copy.ts, or for an egg from M11's
@@ -135,8 +135,11 @@ function readMood(value: unknown): MonMood | null {
   return typeof value === 'string' && Object.hasOwn(MOODS, value) ? (value as MonMood) : null;
 }
 
-const speciesById = new Map(allSpecies.map((s) => [s.speciesId, s]));
-const bloodlineById = new Map(bloodlines.map((b) => [b.bloodlineId, b]));
+// Phase 1 ships only the three starters, so the card resolves names from the
+// starter entry and never bundles the full 115-form roster (ui.test.ts budget).
+// A species outside the starters gets null names, the same as an unknown id.
+const speciesById = new Map(starterSpecies.map((s) => [s.speciesId, s]));
+const bloodlineById = new Map(starterBloodlines.map(({ bloodline }) => [bloodline.bloodlineId, bloodline]));
 
 /** `monIdentity` without the art: nickname, else form name, else Bloodline label. */
 function monNames(speciesId: string, nickname: string | null): MonNames {
