@@ -278,6 +278,8 @@ export const betterAuthOptions = {
       '/one-time-token/generate': { window: 60, max: 5 },
     },
   },
+  // `user.deleteUser` is enabled in payload.config.ts (selfDeletionOptions in
+  // ./deletion): its beforeDelete needs the live Payload to move Mons and eggs.
   user: {
     additionalFields: {
       role: { type: 'string', defaultValue: 'user', input: false },

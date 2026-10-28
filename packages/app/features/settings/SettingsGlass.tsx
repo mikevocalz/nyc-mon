@@ -23,15 +23,17 @@ import { useCallerNameEditor } from './caller-name-editor';
 import { SettingsDetailPane } from './SettingsDetailPane';
 import { SettingsScreen } from './screen.native';
 import {
-  clampCursor, creditLines, pageAround, rowText, settingsRows, type CreditLine, type SettingsRow,
+  clampCursor, creditLines, deleteConfirmLines, pageAround, rowText, settingsRows, type CreditLine, type SettingsRow,
 } from './settings-glass-model';
+import { useDeleteAccountFlow, useHasAccount } from './delete-account';
+import { DELETED_PATH } from './delete-account-model.ts';
 import { SIGNED_OUT_PATH, signOutHere } from './sign-out';
 import { nextOf, THEME_OPTIONS, themeLabel } from './theme-options.ts';
 import { TIME_OF_DAY_OPTIONS } from './time-of-day-options.ts';
 
 /** The Baby small at the top, seven text rows, one row of buttons. */
 const LIST_LAYOUT = { model: 'small', rings: false, lineRows: 7, actionRows: 1, perRow: 3 } as const;
-/** Same slots with two buttons (the name field, the sign-out question), so the Baby never moves. */
+/** Same slots with two buttons (the name field, the sign-out and delete questions), so the Baby never moves. */
 const FORM_LAYOUT = { ...LIST_LAYOUT, perRow: 2 } as const;
 /** Settings rows per page; the seventh line is the highlighted row's caption. */
 const ROWS_PER_PAGE = 6;
@@ -41,7 +43,7 @@ const CREDIT_LINES_PER_PAGE = 8;
 const GAME_CONTROLS_PATH = '/(drawer)/game-controls';
 const LEGAL_PATH = '/legal/terms';
 
-type Mode = 'list' | 'name' | 'signOut' | 'credits';
+type Mode = 'list' | 'name' | 'signOut' | 'deleteAccount' | 'credits';
 
 interface LocalState {
   mode: Mode;
@@ -104,6 +106,8 @@ export function SettingsGlass() {
   const theme = useProfile((st) => st.theme);
   const timeOfDay = useTimeOfDay((st) => st.preset);
   const mon = useMonStore(selectActiveMon);
+  const hasAccount = useHasAccount();
+  const deletion = useDeleteAccountFlow(() => router.replace(DELETED_PATH));
   const { model, monClips } = useMonGlass(mon === undefined ? null : monIdentity(mon).dexId, undefined);
 
   const rows = settingsRows({
@@ -111,6 +115,7 @@ export function SettingsGlass() {
     callerSaved: editor.saved,
     theme,
     timeOfDay: EXPERIMENTAL_WORLD_PHYSICAL ? timeOfDay : null,
+    hasAccount,
   });
   const cursor = clampCursor(s.cursor, rows.length);
   const current: SettingsRow | undefined = rows[cursor];
@@ -125,7 +130,11 @@ export function SettingsGlass() {
     haptics.selection();
     local.setState({ cursor: next });
   };
-  const toList = () => local.setState({ mode: 'list', signOutFailed: false });
+  const toList = () => {
+    if (deletion.deleting) return;
+    deletion.cancel();
+    local.setState({ mode: 'list', signOutFailed: false });
+  };
 
   const select = (row: SettingsRow | undefined) => {
     if (row === undefined) return;
@@ -160,6 +169,10 @@ export function SettingsGlass() {
       case 'signOut':
         local.setState({ mode: 'signOut', signOutFailed: false });
         return;
+      case 'deleteAccount':
+        deletion.ask();
+        local.setState({ mode: 'deleteAccount' });
+        return;
     }
   };
   const selectAt = (index: number) => {
@@ -187,6 +200,11 @@ export function SettingsGlass() {
     }
     haptics.warning();
     local.setState({ signingOut: false, signOutFailed: true });
+  };
+
+  const deleteAccount = async () => {
+    haptics.warning();
+    await deletion.confirm();
   };
 
   const turnCredits = (by: -1 | 1) =>
@@ -229,6 +247,28 @@ export function SettingsGlass() {
       actions: [
         { target: 'cancel', label: cancel, tone: 'primary', disabled: s.signingOut },
         { target: 'signOut', label: copy('settings.sign_out.label'), tone: 'secondary', disabled: s.signingOut },
+      ],
+    };
+  } else if (s.mode === 'deleteAccount') {
+    label = copy('settings.delete.confirm.title');
+    const error = deletion.errorId === undefined ? undefined : copy(deletion.errorId);
+    view = {
+      status: { text: title, tone: 'neutral' },
+      title: label,
+      subtitle: '',
+      rings: [],
+      lines: deleteConfirmLines(error).map((text): GlassLine => ({
+        text, size: 'caption', tone: error === undefined ? 'dim' : 'red', align: 'left',
+      })),
+      // Cancel is the default (primary, and the trackpad): deleting takes a tap on its own button.
+      actions: [
+        { target: 'cancel', label: cancel, tone: 'primary', disabled: deletion.deleting },
+        {
+          target: 'delete',
+          label: deletion.errorId === undefined ? copy('settings.delete.confirm.action') : copy('settings.delete.retry'),
+          tone: 'secondary',
+          disabled: deletion.deleting,
+        },
       ],
     };
   } else if (s.mode === 'credits') {
@@ -278,6 +318,9 @@ export function SettingsGlass() {
     } else if (s.mode === 'signOut') {
       if (target === 'signOut') void signOut();
       else if (target === 'cancel') toList();
+    } else if (s.mode === 'deleteAccount') {
+      if (target === 'delete') void deleteAccount();
+      else if (target === 'cancel') toList();
     } else if (s.mode === 'credits') {
       if (target === 'previous') turnCredits(-1);
       else if (target === 'next') turnCredits(1);
@@ -298,6 +341,9 @@ export function SettingsGlass() {
     } else if (mode === 'signOut') {
       // The trackpad answers the default, Cancel.
       if ((leaving || key === 'activate') && !local.getState().signingOut) toList();
+    } else if (mode === 'deleteAccount') {
+      // Same rule: the trackpad and Back answer Cancel, never Delete.
+      if (leaving || key === 'activate') toList();
     } else if (mode === 'credits') {
       if (key === 'prev') turnCredits(-1);
       else if (key === 'next') turnCredits(1);
@@ -308,7 +354,7 @@ export function SettingsGlass() {
     else if (leaving) leave();
   };
 
-  const layout = s.mode === 'name' || s.mode === 'signOut' ? FORM_LAYOUT : LIST_LAYOUT;
+  const layout = s.mode === 'name' || s.mode === 'signOut' || s.mode === 'deleteAccount' ? FORM_LAYOUT : LIST_LAYOUT;
   const glass = useGlassScreen({ layout, model: mon === undefined ? null : model, view, nudge: s.nudge });
   useEffect(() => {
     glass.bind({ onAction, monClips, onModel: () => local.setState((st) => ({ nudge: st.nudge + 1 })) });
@@ -412,6 +458,9 @@ export function SettingsGlass() {
           signOutFailed={s.signOutFailed}
           onSelect={() => select(current)}
           onSignOut={() => void signOut()}
+          deleting={deletion.deleting}
+          deleteErrorId={deletion.errorId}
+          onDelete={() => void deleteAccount()}
           onCancel={() => (s.mode === 'name' ? cancelName() : toList())}
         />
       }

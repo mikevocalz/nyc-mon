@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { CITY_MAP_ASSETS, CITY_MAP_SOURCES } from '../game/map-data-credit.ts';
 import {
-  clampCursor, CREDIT_LINE_CHARS, creditLines, pageAround, rowText, settingsRows, wrapWords,
+  clampCursor, CONFIRM_LINES, CREDIT_LINE_CHARS, creditLines, deleteConfirmLines, pageAround, rowText, settingsRows, wrapWords,
 } from './settings-glass-model.ts';
 import { nextOf, THEME_OPTIONS } from './theme-options.ts';
 
@@ -90,4 +90,32 @@ test('renaming uses the shared M07 rules in both the card and the glass', () => 
   assert.match(editor, /useProfile\.getState\(\)\.setName\(/);
   assert.match(source('./CallerNameCard.tsx'), /useCallerNameEditor\(\)/);
   assert.match(source('./SettingsGlass.tsx'), /useCallerNameEditor\(\)/);
+});
+
+test('Delete account is the last row, only with an account, and selecting it only opens the question', () => {
+  const base = { callerName: 'Ray', theme: 'dark' as const, timeOfDay: null };
+  assert.equal(settingsRows(base).some((r) => r.id === 'deleteAccount'), false);
+  assert.equal(settingsRows({ ...base, hasAccount: false }).some((r) => r.id === 'deleteAccount'), false);
+  const rows = settingsRows({ ...base, hasAccount: true });
+  const last = rows[rows.length - 1];
+  assert.equal(last?.id, 'deleteAccount');
+  assert.equal(last?.label, 'Delete account');
+  assert.equal(last?.verb, 'Open');
+});
+
+test('the glass question shows the warning, or the error in its place, within eight caption lines', () => {
+  const body = deleteConfirmLines(undefined);
+  assert.ok(body.length > 1 && body.length <= CONFIRM_LINES);
+  assert.ok(body.every((line) => line.length <= CREDIT_LINE_CHARS || !line.includes(' ')));
+  assert.equal(body.join(' '), 'This deletes your email, Caller name, birth year and sign-in methods right away, and clears the save on this device. Your Mon goes to stay with Dr. Santoro. You can\u2019t undo this.');
+  assert.deepEqual(deleteConfirmLines('Try again.'), ['Try again.']);
+});
+
+test('the glass Delete question: Cancel is the default, the trackpad and Back cancel', () => {
+  const glass = readFileSync(new URL('./SettingsGlass.tsx', import.meta.url), 'utf8');
+  const view = glass.slice(glass.indexOf("s.mode === 'deleteAccount') {\n    label"), glass.indexOf("} else if (s.mode === 'credits') {\n    label"));
+  assert.match(view, /target: 'cancel', label: cancel, tone: 'primary'/);
+  assert.ok(view.indexOf("target: 'cancel'") < view.indexOf("target: 'delete'"));
+  assert.match(glass, /mode === 'deleteAccount'\) \{\n      \/\/ Same rule: the trackpad and Back answer Cancel, never Delete\.\n      if \(leaving \|\| key === 'activate'\) toList\(\);/);
+  assert.match(glass, /useDeleteAccountFlow\(\(\) => router\.replace\(DELETED_PATH\)\)/);
 });

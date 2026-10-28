@@ -89,10 +89,21 @@ export function createAuth({ baseURL, appOrigin }: CreateAuthOptions) {
     return toAuthResult(await client.sendVerificationEmail({ email }));
   }
 
+  /**
+   * M20: deletes the signed-in Caller's account (Better Auth `/delete-user`).
+   * The server moves their Mons into the sanctuary first. A session older
+   * than Better Auth's fresh age (one day) is refused with
+   * `SESSION_EXPIRED`; the Caller signs in again and retries.
+   */
+  async function deleteAccount(): Promise<AuthResult> {
+    return toAuthResult(await client.deleteUser({}));
+  }
+
   return {
     signIn,
     signUp,
     signOut,
+    deleteAccount,
     linkSocial,
     requestPasswordReset,
     resendVerification,

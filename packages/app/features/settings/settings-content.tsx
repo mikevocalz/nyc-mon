@@ -1,11 +1,11 @@
 'use client';
-// Settings — reached from Profile. Preferences, appearance, and session
+// Settings — reached from Profile. Appearance, game, credits and account
 // controls live here; identity stays on the profile screen.
 import { useState } from 'react';
 import { Linking } from 'react-native';
 import { useRouter } from 'solito/navigation';
-import { Section, View } from '@acme/ui/tw';
-import { AuthProviderButton, Button, Card, ErrorMessage, Heading, SegmentedControl, Switch, Text, FadeIn, useInstanceStore, useStore } from '@acme/ui';
+import { Pressable, Section, View } from '@acme/ui/tw';
+import { AuthProviderButton, Button, Card, ErrorMessage, Heading, ResponsiveDialog, SegmentedControl, Text, FadeIn, useInstanceStore, useStore } from '@acme/ui';
 import { useProfile } from '../profile/profile.store';
 import { auth } from '../onboarding/auth';
 import { copy } from '../onboarding/copy';
@@ -16,6 +16,9 @@ import { SOFTWARE_CREDITS, SOFTWARE_CREDITS_GROUP } from './software-credits.ts'
 import { TimeOfDayRow } from './TimeOfDayRow';
 import { CallerNameCard } from './CallerNameCard';
 import { SIGNED_OUT_PATH, signOutHere } from './sign-out';
+import { useDeleteAccountFlow, useHasAccount } from './delete-account';
+import { DELETED_PATH } from './delete-account-model.ts';
+import { hatchCopy } from '../hatch/copy';
 import { THEME_OPTIONS } from './theme-options.ts';
 
 /** The game-control settings route (apps/mobile/app/(drawer)/game-controls.tsx). */
@@ -113,6 +116,70 @@ function ThemeSegment() {
   return <SegmentedControl aria-label="Theme" options={[...THEME_OPTIONS]} value={theme} onChange={setTheme} className="self-start" />;
 }
 
+/**
+ * One licence or source link in Legal & credits. The caption-sized words sit
+ * inside a pressable at least `min-h-target` (48pt) tall, so the tap target
+ * clears the 44pt floor on iOS and the 48dp floor on Android and web. On web
+ * it is still announced as a link.
+ */
+function LicenceLink({ label, url }: { label: string; url: string }) {
+  return (
+    <Pressable
+      role="link"
+      accessibilityLabel={label}
+      onPress={() => void Linking.openURL(url)}
+      className="min-h-target min-w-target self-start justify-center rounded-sm focus-visible:ring-2 focus-visible:ring-focus"
+    >
+      <Text variant="caption" tone="muted" className="underline">{label}</Text>
+    </Pressable>
+  );
+}
+
+/**
+ * M20 Delete account (App Store 5.1.1(v)). The row shows only when this
+ * device has an account. The confirm step says what goes, and Cancel comes
+ * first; a failure keeps the dialog open with the reason and a retry.
+ */
+function DeleteAccountRow() {
+  const router = useRouter();
+  const hasAccount = useHasAccount();
+  const flow = useDeleteAccountFlow(() => router.replace(DELETED_PATH));
+  if (!hasAccount) return null;
+  return (
+    <View className="gap-2 border-t border-border pt-3">
+      <Text variant="caption" tone="muted">{copy('settings.delete.caption')}</Text>
+      <View className="flex-row">
+        <Button title={copy('settings.delete.label')} variant="danger" onPress={flow.ask} />
+      </View>
+      <ResponsiveDialog
+        open={flow.confirming}
+        onClose={flow.cancel}
+        title={copy('settings.delete.confirm.title')}
+        size="sm"
+        footerAlign="right"
+        actions={
+          <>
+            {/* Cancel first and in the primary look: the safe answer is the default. */}
+            <Button title={hatchCopy('m09.edit.cancel')} variant="cta" disabled={flow.deleting} onPress={flow.cancel} />
+            <Button
+              title={flow.errorId === undefined ? copy('settings.delete.confirm.action') : copy('settings.delete.retry')}
+              variant="danger"
+              loading={flow.deleting}
+              disabled={flow.deleting}
+              onPress={() => void flow.confirm()}
+            />
+          </>
+        }
+      >
+        <View className="gap-3">
+          <Text>{copy('settings.delete.confirm.body')}</Text>
+          {flow.errorId !== undefined ? <ErrorMessage message={copy(flow.errorId)} /> : null}
+        </View>
+      </ResponsiveDialog>
+    </View>
+  );
+}
+
 /** Session: Sign out ends the auth session here (signOutHere) and goes to sign-in. */
 function SessionCard({ className }: CellProps) {
   const router = useRouter();
@@ -135,13 +202,10 @@ function SessionCard({ className }: CellProps) {
           <Text variant="caption" tone="muted">{copy('settings.sign_out.caption')}</Text>
         </View>
         {failed ? <ErrorMessage message={copy('settings.sign_out.error')} /> : null}
-        {/* STRUCK 2026-10-28: "Delete account" (onPress did nothing, so a
-            danger button that looked destructive and was not). It returns
-            with a real deletion flow, which App Store review 5.1.1(v)
-            requires for accounts made in the app. */}
         <View className="flex-row gap-3">
           <Button title={copy('settings.sign_out.label')} variant="outline" loading={pending} disabled={pending} onPress={() => void signOut()} />
         </View>
+        <DeleteAccountRow />
       </Card>
     </FadeIn>
   );
@@ -153,32 +217,25 @@ export function SettingsHeader() {
     <FadeIn>
       <Section className="gap-1">
         <Heading level={1} size="display-sm">Settings</Heading>
-        <Text tone="muted">Notifications, appearance, and your session.</Text>
+        <Text tone="muted">Appearance, game and your account.</Text>
       </Section>
     </FadeIn>
   );
 }
 
 /**
- * The cards that tune the app on this device: Preferences, Appearance,
- * Graphics and Game. Siblings, so they drop into any `gap-*` column.
+ * The cards that tune the app on this device: Appearance, Graphics and
+ * Game. Siblings, so they drop into any `gap-*` column.
  */
 export function SettingsDeviceCards() {
-  const p = useProfile();
   return (
     <>
-      <FadeIn delay={80}>
-        <Card className="gap-4">
-          <View className="gap-1">
-            <Text variant="heading">Preferences</Text>
-            <Text variant="caption" tone="muted">Notifications and visibility.</Text>
-          </View>
-          <Switch value={p.notifications} onChange={p.setNotifications} label="Push notifications" />
-          <Switch value={p.digest} onChange={p.setDigest} label="Weekly email digest" />
-          <Switch value={p.publicProfile} onChange={p.setPublicProfile} label="Public profile" />
-        </Card>
-      </FadeIn>
-
+      {/* STRUCK 2026-10-28: the Preferences card ("Push notifications",
+          "Weekly email digest", "Public profile"). Each switch wrote an
+          in-memory flag that nothing saved or read: no digest mail exists
+          (the privacy notice says there is no marketing channel), there is
+          no public profile, and the egg alert's permission lives in the
+          Permission Center. They return with a real backing setting. */}
       <FadeIn delay={140}>
         <Card className="gap-4">
           <View className="gap-1">
@@ -216,41 +273,20 @@ export function SettingsAccountCards() {
             {CITY_MAP_SOURCES.map((source) => (
               <View key={source.attribution} className="gap-0.5">
                 <Text variant="caption">{source.attribution}</Text>
-                <Text
-                  variant="caption"
-                  tone="muted"
-                  onPress={() => void Linking.openURL(source.licenseUrl)}
-                  accessibilityRole="link"
-                >
-                  {source.license}
-                </Text>
+                <LicenceLink label={source.license} url={source.licenseUrl} />
               </View>
             ))}
             {/* ODbL §4.4(a): the bundled tile's own licence grant, beside
                 the source licences. */}
             <View className="gap-0.5">
               <Text variant="caption">{CITY_MAP_DERIVED.attribution}</Text>
-              <Text
-                variant="caption"
-                tone="muted"
-                onPress={() => void Linking.openURL(CITY_MAP_DERIVED.licenseUrl)}
-                accessibilityRole="link"
-              >
-                {CITY_MAP_DERIVED.license}
-              </Text>
+              <LicenceLink label={CITY_MAP_DERIVED.license} url={CITY_MAP_DERIVED.licenseUrl} />
             </View>
             <Text variant="caption" tone="muted">Models &amp; textures</Text>
             {CITY_MAP_ASSETS.map((source) => (
               <View key={source.attribution} className="gap-0.5">
                 <Text variant="caption">{source.attribution}</Text>
-                <Text
-                  variant="caption"
-                  tone="muted"
-                  onPress={() => void Linking.openURL(source.licenseUrl)}
-                  accessibilityRole="link"
-                >
-                  {source.license}
-                </Text>
+                <LicenceLink label={source.license} url={source.licenseUrl} />
               </View>
             ))}
             {/* Code, not data: its own group so it never reads as a map-data credit. */}
@@ -258,14 +294,7 @@ export function SettingsAccountCards() {
             {SOFTWARE_CREDITS.map((credit) => (
               <View key={credit.url} className="gap-0.5">
                 <Text variant="caption">{credit.line}</Text>
-                <Text
-                  variant="caption"
-                  tone="muted"
-                  onPress={() => void Linking.openURL(credit.url)}
-                  accessibilityRole="link"
-                >
-                  {credit.linkLabel}
-                </Text>
+                <LicenceLink label={credit.linkLabel} url={credit.url} />
               </View>
             ))}
           </View>

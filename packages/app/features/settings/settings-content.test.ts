@@ -69,12 +69,44 @@ test('the Slop credit: the spec line verbatim, its own Software group, linked to
   const legal = settings.slice(settings.indexOf('Legal &amp; credits'));
   // Below the data groups, so the row never reads as a data credit.
   assert.ok(legal.indexOf('SOFTWARE_CREDITS_GROUP') > legal.indexOf('CITY_MAP_ASSETS.map'));
-  assert.match(legal, /Linking\.openURL\(credit\.url\)/);
-  assert.match(legal, /\{credit\.linkLabel\}/);
+  assert.match(legal, /<LicenceLink label=\{credit\.linkLabel\} url=\{credit\.url\} \/>/);
 });
 
 test('the on-map attribution lists data only, so the Slop credit stays off it', () => {
   const map = source('../game/MapAttribution.tsx');
   assert.doesNotMatch(map, /slop/i);
   assert.match(map, /OSM_COPYRIGHT_URL/);
+});
+
+test('every licence link in Legal & credits is a 48pt target announced as a link', () => {
+  const settings = source('./settings-content.tsx');
+  const link = settings.slice(settings.indexOf('function LicenceLink'), settings.indexOf('M20 Delete account'));
+  assert.match(link, /role="link"/);
+  assert.match(link, /className="min-h-target min-w-target /);
+  assert.match(link, /Linking\.openURL\(url\)/);
+  const legal = settings.slice(settings.indexOf('Legal &amp; credits'));
+  // No bare caption-sized Text link is left: the only openURL is inside LicenceLink.
+  assert.equal(settings.match(/Linking\.openURL/g)?.length, 1);
+  assert.equal(legal.match(/<LicenceLink /g)?.length, 4);
+});
+
+test('the Preferences switches are gone: nothing stored or read them', () => {
+  const settings = source('./settings-content.tsx');
+  assert.doesNotMatch(settings, /label="(Push notifications|Weekly email digest|Public profile)"/);
+  assert.doesNotMatch(settings, /<Switch\b/);
+  // Code only: the STRUCK comment names the flags on purpose.
+  const profile = source('../profile/profile.store.ts').replace(/\/\/.*$/gm, '');
+  assert.doesNotMatch(profile, /\b(digest|publicProfile|setNotifications)\b/);
+});
+
+test('the Session card mounts Delete account: confirm with Cancel first, error with retry, then Welcome', () => {
+  const settings = source('./settings-content.tsx');
+  const row = settings.slice(settings.indexOf('function DeleteAccountRow'), settings.indexOf('function SessionCard'));
+  assert.match(row, /if \(!hasAccount\) return null/);
+  assert.match(row, /router\.replace\(DELETED_PATH\)/);
+  assert.ok(row.indexOf("hatchCopy('m09.edit.cancel')") < row.indexOf("copy('settings.delete.confirm.action')"), 'Cancel comes first');
+  assert.match(row, /copy\('settings\.delete\.confirm\.body'\)/);
+  assert.match(row, /<ErrorMessage message=\{copy\(flow\.errorId\)\} \/>/);
+  assert.match(row, /copy\('settings\.delete\.retry'\)/);
+  assert.match(settings, /<DeleteAccountRow \/>/);
 });

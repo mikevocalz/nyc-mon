@@ -9,7 +9,7 @@ import { SOFTWARE_CREDITS, SOFTWARE_CREDITS_GROUP } from './software-credits.ts'
 import { themeLabel } from './theme-options.ts';
 import { TIME_OF_DAY_COPY, TIME_OF_DAY_OPTIONS } from './time-of-day-options.ts';
 
-export type SettingsRowId = 'caller' | 'theme' | 'timeOfDay' | 'controls' | 'legal' | 'credits' | 'signOut';
+export type SettingsRowId = 'caller' | 'theme' | 'timeOfDay' | 'controls' | 'legal' | 'credits' | 'signOut' | 'deleteAccount';
 
 export interface SettingsRow {
   readonly id: SettingsRowId;
@@ -30,6 +30,8 @@ export interface SettingsRowsInput {
   readonly theme: ThemePreference;
   /** The city's light preset, or null when the physically lit city is off (no row then). */
   readonly timeOfDay: PhysicalPresetId | null;
+  /** This device has an account (useHasAccount). Without one there is nothing to delete (no row). */
+  readonly hasAccount?: boolean;
 }
 
 /**
@@ -60,6 +62,10 @@ export function settingsRows(input: SettingsRowsInput): SettingsRow[] {
     { id: 'credits', label: copy('settings.credits.label'), verb: open },
     { id: 'signOut', label: copy('settings.sign_out.label'), verb: copy('settings.sign_out.label'), hint: copy('settings.sign_out.caption') },
   );
+  if (input.hasAccount === true) {
+    // Last, after Sign out: the one destructive row. Selecting it only opens the question.
+    rows.push({ id: 'deleteAccount', label: copy('settings.delete.label'), verb: copy('settings.row.open'), hint: copy('settings.delete.caption') });
+  }
   return rows;
 }
 
@@ -126,4 +132,17 @@ export function creditLines(max: number = CREDIT_LINE_CHARS): CreditLine[] {
     { text: SOFTWARE_CREDITS_GROUP, kind: 'group' },
     ...SOFTWARE_CREDITS.flatMap((c) => wrapWords(c.line, max).map((t): CreditLine => ({ text: t, kind: 'credit' }))),
   ];
+}
+
+/** Caption lines the glass holds under a question (seven body rows hold eight caption lines). */
+export const CONFIRM_LINES = 8;
+
+/**
+ * The Delete account question on the glass, as caption lines. It shows what
+ * gets deleted; after a failure the error takes its place (the Caller has
+ * read the warning already, and both together would overflow the glass). The
+ * Detail pane and the 2D dialog show both in full.
+ */
+export function deleteConfirmLines(error: string | undefined, max: number = CREDIT_LINE_CHARS): string[] {
+  return wrapWords(error ?? copy('settings.delete.confirm.body'), max).slice(0, CONFIRM_LINES);
 }

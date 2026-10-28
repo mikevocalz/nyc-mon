@@ -150,6 +150,18 @@ export const ONBOARDING_COPY = {
   'settings.sign_out.confirm.title': 'Sign out?',
   'settings.sign_out.error': "Couldn't sign out. Check your connection and try again.",
   'settings.value.a11y': '{label}, {value}',
+  // M20 Delete account (App Store 5.1.1(v)). The body matches the privacy
+  // notice's "Your data, your call" section (features/legal/copy.ts).
+  'settings.delete.label': 'Delete account',
+  'settings.delete.caption': 'Deletes your account and its data. You can’t undo this.',
+  'settings.delete.confirm.title': 'Delete your account?',
+  'settings.delete.confirm.body': 'This deletes your email, Caller name, birth year and sign-in methods right away, and clears the save on this device. Your Mon goes to stay with Dr. Santoro. You can’t undo this.',
+  'settings.delete.confirm.action': 'Delete account',
+  'settings.delete.retry': 'Try again',
+  'settings.delete.error.offline': "You're offline. Connect to the internet and try again.",
+  'settings.delete.error.reauth': "It's been a while since you signed in. Sign out, sign back in, then delete your account.",
+  'settings.delete.error.generic': "Couldn't delete your account. Try again in a minute.",
+  'settings.delete.done.a11y': 'Your account is deleted.',
   'm07.continue.a11y.hint.disabled': 'Type a name first',
   'm07.back.a11y.label': 'Back',
   'm07.error.blank': 'Add at least one letter.',

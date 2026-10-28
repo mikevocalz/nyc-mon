@@ -611,6 +611,25 @@ Notes:
 | `settings.sign_out.error` | Couldn't sign out. Check your connection and try again. | ui | drafted |
 | `settings.value.a11y` | {label}, {value} | ui | drafted (screen-reader name of a settings row with a value) |
 
+### Delete account (M20, 2026-10-28)
+
+Back in the 2D Session card and as the last row on the glass, shown only when this device has an account. App Store guideline 5.1.1(v) requires it for accounts made in the app. The body follows the privacy notice's "Your data, your call" section (`features/legal/copy.ts`): personal data goes, the Mon passes into Dr. Santoro's care. The notice names no waiting period, so deletion happens right away; the 7-day grace (DECISIONS L3) stays for deletions staff schedule in the console.
+
+| ID | String | Voice | Status |
+|---|---|---|---|
+| `settings.delete.label` | Delete account | ui | drafted |
+| `settings.delete.caption` | Deletes your account and its data. You can’t undo this. | ui | drafted (under Sign out; the glass row's caption) |
+| `settings.delete.confirm.title` | Delete your account? | ui | drafted |
+| `settings.delete.confirm.body` | This deletes your email, Caller name, birth year and sign-in methods right away, and clears the save on this device. Your Mon goes to stay with Dr. Santoro. You can’t undo this. | ui | drafted (the glass wraps it into caption lines) |
+| `settings.delete.confirm.action` | Delete account | ui | drafted (danger button; Cancel, `m09.edit.cancel`, comes first and is the default) |
+| `settings.delete.retry` | Try again | ui | drafted (replaces the action label after a failure) |
+| `settings.delete.error.offline` | You're offline. Connect to the internet and try again. | ui | drafted (same line as the Amazon link card) |
+| `settings.delete.error.reauth` | It's been a while since you signed in. Sign out, sign back in, then delete your account. | ui | drafted (Better Auth refuses a session older than a day with `SESSION_EXPIRED`) |
+| `settings.delete.error.generic` | Couldn't delete your account. Try again in a minute. | ui | drafted |
+| `settings.delete.done.a11y` | Your account is deleted. | ui | drafted (announced before Welcome opens) |
+
+Struck the same day: the Preferences card's "Push notifications", "Weekly email digest" and "Public profile" switches. Nothing saved or read them, there is no digest mail (the privacy notice says there is no marketing channel) and no public profile. The Settings header line is now "Appearance, game and your account." (also on Profile's Settings row).
+
 
 ## Companion pane (tablets and open foldables)
 

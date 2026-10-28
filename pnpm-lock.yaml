@@ -1316,6 +1316,9 @@ importers:
       '@acme/config':
         specifier: workspace:*
         version: link:../config
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.5
       '@types/react':
         specifier: 'catalog:'
         version: 19.3.0

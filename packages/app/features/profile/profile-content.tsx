@@ -67,7 +67,7 @@ export function ProfileDetails() {
           </View>
           <View className="flex-1 gap-0.5">
             <Text variant="heading">Settings</Text>
-            <Text variant="caption" tone="muted">Notifications, appearance, session.</Text>
+            <Text variant="caption" tone="muted">Appearance, game and your account.</Text>
           </View>
           <ChevronRight size={18} className="text-text-muted" />
         </PressScale>
