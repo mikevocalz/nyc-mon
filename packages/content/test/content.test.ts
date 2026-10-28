@@ -59,7 +59,7 @@ describe('roster v11.1 fixture', () => {
     }))).toEqual(roster);
   });
 
-  it('keeps F19's name and lifecycle decisions open, without inventing a sixth stage', () => {
+  it("keeps F19's name and lifecycle decisions open, without inventing a sixth stage", () => {
     expect(rosterEntries.find((row) => row.dexId === 110)?.formName).toBeNull();
     expect(rosterEntries.find((row) => row.dexId === 114)?.stage).toBeNull();
     expect(rosterEntries.filter((row) => row.bloodlineId === 'F19')).toHaveLength(6);
