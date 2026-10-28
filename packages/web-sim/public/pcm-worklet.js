@@ -1,12 +1,16 @@
 // Mic to 16-bit PCM for /api/asr (src/client/liveMic.ts). Runs in the audio
 // thread of an AudioContext created at 16 kHz, so no resampling here: it
 // converts float samples to s16 and posts one 100 ms chunk at a time.
+// `processorOptions.chunk` picks another size: the NVIDIA companion
+// (micPipeline.ts) uses 320 samples, 20 ms, so its VAD reacts fast.
 const CHUNK = 1600;
 
 class Pcm16 extends AudioWorkletProcessor {
-  constructor() {
+  constructor(options) {
     super();
-    this.buf = new Int16Array(CHUNK);
+    const chunk = options && options.processorOptions && options.processorOptions.chunk;
+    this.chunk = Number.isInteger(chunk) && chunk > 0 ? chunk : CHUNK;
+    this.buf = new Int16Array(this.chunk);
     this.n = 0;
   }
 
@@ -16,9 +20,9 @@ class Pcm16 extends AudioWorkletProcessor {
       for (let i = 0; i < ch.length; i++) {
         const s = Math.max(-1, Math.min(1, ch[i]));
         this.buf[this.n++] = s < 0 ? s * 0x8000 : s * 0x7fff;
-        if (this.n === CHUNK) {
+        if (this.n === this.chunk) {
           this.port.postMessage(this.buf.buffer, [this.buf.buffer]);
-          this.buf = new Int16Array(CHUNK);
+          this.buf = new Int16Array(this.chunk);
           this.n = 0;
         }
       }
