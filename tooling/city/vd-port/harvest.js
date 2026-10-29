@@ -200,6 +200,30 @@ export function packStructure(id, kind, root, lit, opts) {
   } catch (e) { throw new Error(`${id}: ${e.message}`); }
 }
 
+/**
+ * vd-port: Valdrada's bridges are built at boot (main.js buildBridges over tiles/bridges.json through
+ * city/bridgeKit.js), never inside an assembled tile, so no tile's harvest reaches them. A ring bakes the bridges
+ * it names once each here: buildLOD gives every piece a near (full) and a coarse level — harvest() walks LOD level
+ * 0 for the near level and the last for the shell, as everywhere else. `base` is the flat land datum (3.24): the
+ * deck's at-grade approaches sit on it; over water a pavement lookup would return nothing anyway.
+ */
+export async function bridgeStructures(keys, opts) {
+  await MeshoptSimplifier.ready;
+  const kit = await import('/src/city/bridgeKit.js');
+  const all = await (await fetch('/tiles/bridges.json')).json();
+  const list = all.filter((br) => keys.includes(br.key) && br.deck && br.deck.length >= 2);
+  const group = kit.buildBridges(list, new THREE.Scene(), null);
+  // buildBridges adds one child per bridge with a deck, in record order (bake_landmarks.js relies on the same)
+  const out = [];
+  list.forEach((br, k) => {
+    const g = group.children[k];
+    if (!g) return;
+    const s = packStructure(`bridge:${br.key}`, 'bridge', g, 0, opts);
+    if (s) { s.bridge = { key: br.key, name: br.name }; s.landmark = { key: br.key }; s.base = 3.24; out.push(s); }
+  });
+  return out;
+}
+
 /** The structures one assembled tile holds: the landmarks' groups, each area part's pieces and each facade-kit spec. */
 export async function tileStructures(key, group, opts) {
   await MeshoptSimplifier.ready;

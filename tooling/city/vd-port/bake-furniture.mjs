@@ -39,13 +39,13 @@ const toScene = toSceneExact;
 const groundVd = valdradaGround;
 const log = (s) => process.stderr.write(s + '\n');
 // --ring ring1 (or VD_RING=ring1): assemble the ring's tiles too (VD_TILES, assemble-city.mjs) and keep the pieces
-// in its region as well as the square's. --ring ring2 .. --ring ring6: the union bake — home + rings 1..N tiles and
+// in its region as well as the square's. --ring ring2 .. --ring ring7: the union bake — home + rings 1..N tiles and
 // regions — so the earlier rings' pieces are regenerated alongside the new ring's rather than dropped. Furniture
 // pools are resident, self-culling draws, so the rings' instances join the same pools and assets (pools.bin,
 // lamps.ts) rather than streaming.
 const RING = process.argv.includes('--ring') ? process.argv[process.argv.indexOf('--ring') + 1] : process.env.VD_RING ?? null;
 let inRegion = null;
-if (RING === 'ring1' || RING === 'ring2' || RING === 'ring3' || RING === 'ring4' || RING === 'ring5' || RING === 'ring6') {
+if (RING === 'ring1' || RING === 'ring2' || RING === 'ring3' || RING === 'ring4' || RING === 'ring5' || RING === 'ring6' || RING === 'ring7') {
   const { RING1_TILES, ring1RectsScene, inRing1Scene, inHomeSquare } = await import('./ring1.mjs');
   const { tileIdsForSquare } = await import('../valdrada/decode.mjs');
   const tiles = [...tileIdsForSquare(), ...RING1_TILES.map((k) => `t_${k}`)];
@@ -57,30 +57,37 @@ if (RING === 'ring1' || RING === 'ring2' || RING === 'ring3' || RING === 'ring4'
     const R2S = ring2RectsScene(AFF);
     const keepR1 = inRegion;
     inRegion = (x, z) => keepR1(x, z) || inRing2Scene(x, z, R2S);
-    if (RING === 'ring3' || RING === 'ring4' || RING === 'ring5' || RING === 'ring6') {
+    if (RING === 'ring3' || RING === 'ring4' || RING === 'ring5' || RING === 'ring6' || RING === 'ring7') {
       const { RING3_TILES, ring3RectsScene, inRing3Scene } = await import('./ring3.mjs');
       for (const k of RING3_TILES) tiles.push(`t_${k}`);
       const R3S = ring3RectsScene(AFF);
       const keepR2 = inRegion;
       inRegion = (x, z) => keepR2(x, z) || inRing3Scene(x, z, R3S);
-      if (RING === 'ring4' || RING === 'ring5' || RING === 'ring6') {
+      if (RING === 'ring4' || RING === 'ring5' || RING === 'ring6' || RING === 'ring7') {
         const { RING4_TILES, ring4RectsScene, inRing4Scene } = await import('./ring4.mjs');
         for (const k of RING4_TILES) tiles.push(`t_${k}`);
         const R4S = ring4RectsScene(AFF);
         const keepR3 = inRegion;
         inRegion = (x, z) => keepR3(x, z) || inRing4Scene(x, z, R4S);
-        if (RING === 'ring5' || RING === 'ring6') {
+        if (RING === 'ring5' || RING === 'ring6' || RING === 'ring7') {
           const { RING5_TILES, ring5RectsScene, inRing5Scene } = await import('./ring5.mjs');
           for (const k of RING5_TILES) tiles.push(`t_${k}`);
           const R5S = ring5RectsScene(AFF);
           const keepR4 = inRegion;
           inRegion = (x, z) => keepR4(x, z) || inRing5Scene(x, z, R5S);
-          if (RING === 'ring6') {
+          if (RING === 'ring6' || RING === 'ring7') {
             const { RING6_TILES, ring6RectsScene, inRing6Scene } = await import('./ring6.mjs');
             for (const k of RING6_TILES) tiles.push(`t_${k}`);
             const R6S = ring6RectsScene(AFF);
             const keepR5 = inRegion;
             inRegion = (x, z) => keepR5(x, z) || inRing6Scene(x, z, R6S);
+            if (RING === 'ring7') {
+              const { RING7_TILES, ring7RectsScene, inRing7Scene } = await import('./ring7.mjs');
+              for (const k of RING7_TILES) tiles.push(`t_${k}`);
+              const R7S = ring7RectsScene(AFF);
+              const keepR6 = inRegion;
+              inRegion = (x, z) => keepR6(x, z) || inRing7Scene(x, z, R7S);
+            }
           }
         }
       }
@@ -142,12 +149,17 @@ const ourBuildingAt = (x, z) => (bgrid.get(`${Math.floor(x / BCELL)}_${Math.floo
 // ---------------------------------------------------------------- instances
 const _m = new THREE.Matrix4(), _p = new THREE.Vector3(), _q = new THREE.Quaternion(), _s = new THREE.Vector3(), _e = new THREE.Euler();
 const pools = [];
-const stats = { roofNoBuilding: 0, outside: 0 };
+const stats = { roofNoBuilding: 0, outside: 0, dupClaim: 0 };
 const lamps = [];
 for (const [name, p] of instancer.pools) {
   if (OTHER_LANES(name) || !p.pos || !geos[name]) continue;
   const def = geos[name];
   const rows = [];
+  // one compiled record claims once: a tile can carry the same record twice (tile 0_17's sign pole at (410.04,
+  // 8925.33) is emitted twice upstream), and the instancer claims it twice — furniture.test.ts's double-claim
+  // check. A row identical on every field is the same record; two poles sharing a corner differ somewhere
+  // (~0.25 m apart, opposite yaws), so nothing real is dropped.
+  const seen = new Set();
   for (let slot = 0; slot < p.top; slot++) {
     if (!p.alive[slot]) continue;
     _m.fromArray(p.mats, slot * 16).decompose(_p, _q, _s);
@@ -178,7 +190,11 @@ for (const [name, p] of instancer.pools) {
     // record carries the lamp at full scale and the shader collapses it when its lamp is off
     const sig = signalCode.get(`${name}:${slot}`) ?? 0;
     if (sig) { const k = 1 / Math.max(_s.x, 1e-6); _s.multiplyScalar(k); }
-    rows.push({ x, y, z, yaw, sx: _s.x, sy: _s.y, sz: _s.z, r: p.cols[slot * 3], g: p.cols[slot * 3 + 1], b: p.cols[slot * 3 + 2], ground: ground | sig, vx: _p.x, vy: _p.y, vz: _p.z });
+    const row = { x, y, z, yaw, sx: _s.x, sy: _s.y, sz: _s.z, r: p.cols[slot * 3], g: p.cols[slot * 3 + 1], b: p.cols[slot * 3 + 2], ground: ground | sig, vx: _p.x, vy: _p.y, vz: _p.z };
+    const dupKey = `${row.x.toFixed(3)}|${row.y.toFixed(3)}|${row.z.toFixed(3)}|${row.yaw.toFixed(4)}|${row.sx.toFixed(3)}|${row.sy.toFixed(3)}|${row.sz.toFixed(3)}|${row.r}|${row.g}|${row.b}|${row.ground}`;
+    if (seen.has(dupKey)) { stats.dupClaim++; continue; }
+    seen.add(dupKey);
+    rows.push(row);
     // city/props.js L296 / L300: the light a pole throws (N11 fixture kind, head height, arm yaw)
     if (name === 'lampCobra' || name === 'lampCrook') {
       const crook = name === 'lampCrook', out = crook ? 1.7 : 3.4;

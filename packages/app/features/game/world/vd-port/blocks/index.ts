@@ -36,6 +36,7 @@ import { VD_BLOCKS_RING3 } from './data-ring3/manifest.ts';
 import { VD_BLOCKS_RING4 } from './data-ring4/manifest.ts';
 import { VD_BLOCKS_RING5 } from './data-ring5/manifest.ts';
 import { VD_BLOCKS_RING6 } from './data-ring6/manifest.ts';
+import { VD_BLOCKS_RING7 } from './data-ring7/manifest.ts';
 import { decodeBase64 } from '../../foliage.ts';
 import { WORLD_PRESETS } from '../../../perf/tier-presets.ts';
 
@@ -79,7 +80,7 @@ let ownedSpecs: Set<string> | null = null;
  */
 export function vdBlocksOwn(frontId: string | null, x: number, z: number): boolean {
   if (!vdBlockBytes()) return false;
-  ownedSpecs ??= new Set([...VD_BLOCKS.structures, ...VD_BLOCKS_RING1.structures, ...VD_BLOCKS_RING2.structures, ...VD_BLOCKS_RING3.structures, ...VD_BLOCKS_RING4.structures, ...VD_BLOCKS_RING5.structures, ...VD_BLOCKS_RING6.structures].filter((s) => s.kind === 'fk').map((s) => s.id.slice(3)));
+  ownedSpecs ??= new Set([...VD_BLOCKS.structures, ...VD_BLOCKS_RING1.structures, ...VD_BLOCKS_RING2.structures, ...VD_BLOCKS_RING3.structures, ...VD_BLOCKS_RING4.structures, ...VD_BLOCKS_RING5.structures, ...VD_BLOCKS_RING6.structures, ...VD_BLOCKS_RING7.structures].filter((s) => s.kind === 'fk').map((s) => s.id.slice(3)));
   if (frontId && ownedSpecs.has(frontId.split('#')[0]!)) return true;
   for (const s of VD_BLOCKS.structures) for (const r of s.owned as readonly (readonly (readonly number[])[])[]) if (inRing(r, x, z)) return true;
   for (const s of VD_BLOCKS_RING1.structures) for (const r of s.owned as readonly (readonly (readonly number[])[])[]) if (inRing(r, x, z)) return true;
@@ -88,6 +89,7 @@ export function vdBlocksOwn(frontId: string | null, x: number, z: number): boole
   for (const s of VD_BLOCKS_RING4.structures) for (const r of s.owned as readonly (readonly (readonly number[])[])[]) if (inRing(r, x, z)) return true;
   for (const s of VD_BLOCKS_RING5.structures) for (const r of s.owned as readonly (readonly (readonly number[])[])[]) if (inRing(r, x, z)) return true;
   for (const s of VD_BLOCKS_RING6.structures) for (const r of s.owned as readonly (readonly (readonly number[])[])[]) if (inRing(r, x, z)) return true;
+  for (const s of VD_BLOCKS_RING7.structures) for (const r of s.owned as readonly (readonly (readonly number[])[])[]) if (inRing(r, x, z)) return true;
   return false;
 }
 
@@ -123,6 +125,7 @@ export function build(ctx: VdPortCtx): VdPortPart {
   if (packs.ring4) shellSets.push({ infos: VD_BLOCKS_RING4.shell as readonly ShellCellInfo[], bytes: packs.ring4.shell });
   if (packs.ring5) shellSets.push({ infos: VD_BLOCKS_RING5.shell as readonly ShellCellInfo[], bytes: packs.ring5.shell });
   if (packs.ring6) shellSets.push({ infos: VD_BLOCKS_RING6.shell as readonly ShellCellInfo[], bytes: packs.ring6.shell });
+  if (packs.ring7) shellSets.push({ infos: VD_BLOCKS_RING7.shell as readonly ShellCellInfo[], bytes: packs.ring7.shell });
   const maxShell = Math.max(3, ...shellSets.flatMap((s) => s.infos.map((c) => c.triangles * 3)));
   const shellEmissive = new THREE.BufferAttribute(new Uint8Array(maxShell * 4), 4, true);
   const identity = maxShell > 65535 ? new Uint32Array(maxShell) : new Uint16Array(maxShell);
@@ -236,6 +239,16 @@ export function build(ctx: VdPortCtx): VdPortPart {
         info, packs.level,
         file ? () => Promise.resolve(file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength) as ArrayBuffer) : undefined,
         'cell-local', `ring6-${packs.level}/${info.key}`,
+      ));
+    }
+  }
+  if (packs.ring7) {
+    for (const info of VD_BLOCKS_RING7[packs.level] as readonly NearCellInfo[]) {
+      const file = info.bundled === false ? null : packs.ring7.bundled.get(info.key) ?? null;
+      packages.push(sourceNearPackage(
+        info, packs.level,
+        file ? () => Promise.resolve(file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength) as ArrayBuffer) : undefined,
+        'cell-local', `ring7-${packs.level}/${info.key}`,
       ));
     }
   }

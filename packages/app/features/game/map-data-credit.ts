@@ -133,6 +133,17 @@ export const CITY_MAP_STREAMED: readonly CityMapSourceCredit[] = [
     license: 'ODbL-1.0',
     licenseUrl: 'https://opendatacommons.org/licenses/odbl/1-0/',
   },
+  {
+    // ring 7 (the Brooklyn waterfront: Greenpoint, Williamsburg, the Navy Yard, DUMBO, Brooklyn Heights and
+    // Downtown Brooklyn; the Williamsburg, Manhattan and Brooklyn bridges): the ring's block near/lite cells
+    // (world/vd-port/blocks/data-ring7) bake from the same pinned tile set and stream through the same hash-pinned
+    // cell source (ring7-near/ring7-lite manifest keys); the ring adds no lane-C structure cells. The three bridges
+    // are Valdrada's bridge kit (city/bridgeKit.js, MIT, the kit credit in CITY_MAP_ASSETS) laid on the NYC Street
+    // Centerline (CSCL) alignments in the pinned tiles/bridges.json, so they carry this ODbL credit too.
+    attribution: 'Valdrada ring-7 near and structure cells (rev 09b5836), Mehmet Kerem Turkcan',
+    license: 'ODbL-1.0',
+    licenseUrl: 'https://opendatacommons.org/licenses/odbl/1-0/',
+  },
 ];
 
 // ODbL §4.4(a): the bundled tile is itself a Derivative Database of the

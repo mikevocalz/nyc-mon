@@ -225,8 +225,10 @@ export async function writePacks(structures, { nearErrM, heroErrM, outDir = OUT,
       const q = [(c.pos[i * 3] - ox) * 8, c.pos[i * 3 + 1] * 8, (c.pos[i * 3 + 2] - oz) * 8].map(Math.round);
       dv.setInt16(i * 16, q[0], true); dv.setInt16(i * 16 + 2, q[1], true); dv.setInt16(i * 16 + 4, q[2], true);
       vb.set(c.col.slice(i * 4, i * 4 + 4), i * 16 + 8);
-      const uq = [c.emi[i * 2] * 1024, c.emi[i * 2 + 1] * 1024].map(Math.round);
-      for (const v of uq) if (v < -32768 || v > 32767) throw new Error(`shell cell ${key}: a face spans ${v / 1024} window-grid tiles`);
+      // vd-port: a face can span more window-grid tiles than int16 at 1/1024 holds (a bridge's simplified cables
+      // run hundreds of metres per triangle — ring 7): the uv clamps at the int16 edge, which only chooses the
+      // wrap phase the oversize face ends on; the near level draws the real detail
+      const uq = [c.emi[i * 2] * 1024, c.emi[i * 2 + 1] * 1024].map((v) => Math.max(-32768, Math.min(32767, Math.round(v))));
       dv.setInt16(i * 16 + 12, uq[0], true); dv.setInt16(i * 16 + 14, uq[1], true);
     }
     const ev = Buffer.from(MeshoptEncoder.encodeVertexBuffer(vb, n, 16));
