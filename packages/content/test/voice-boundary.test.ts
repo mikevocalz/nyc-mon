@@ -13,6 +13,9 @@ import { describe, expect, it } from 'vitest';
 const ADAPTERS: ReadonlyMap<string, string> = new Map([
   ['packages/web-sim/src/client/speech.ts', 'browser adapter: plays /api/tts clips, Web Speech fallback'],
   ['packages/web-sim/server/tts.ts', 'server adapter: ElevenLabs lineage voice + stage pitch'],
+  ['packages/payload/src/admin/console/v1/mon-voice.ts', 'app server adapter: POST /v1/mon-voice, ElevenLabs behind the Better Auth session'],
+  ['packages/app/features/voice/mon-voice-port.native.ts', 'app native adapter: /v1/mon-voice clips on react-native-audio-api'],
+  ['packages/app/features/voice/mon-voice-port.web.ts', 'app web adapter: /v1/mon-voice clips in HTMLAudio, Web Speech fallback'],
 ]);
 
 const PLATFORM_TTS: readonly RegExp[] = [

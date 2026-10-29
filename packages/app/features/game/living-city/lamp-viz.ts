@@ -109,6 +109,12 @@ export interface LampActorOptions {
   readonly poolCap?: number;
   readonly glowRadiusMeters?: number;
   readonly poolRadiusMeters?: number;
+  /**
+   * Scene-linear lamp colour for the halos and pools. Unset keeps the warm
+   * sodium pair below; the physical facelift passes its LED colour
+   * (world/physical/facelift.ts FACELIFT_STREETLIGHT).
+   */
+  readonly color?: readonly [number, number, number];
 }
 
 /**
@@ -170,7 +176,7 @@ export function createLampActor(options: LampActorOptions): SceneActorFactory {
       const r = T.uv().sub(0.5).length().mul(2);
       const fall = T.float(1).sub(T.smoothstep(0, 1, r));
       // Warm LED halo — bright core, soft skirt. Additive: black at day.
-      const warm = T.vec3(1.0, 0.82, 0.55);
+      const warm = options.color ? T.vec3(...options.color) : T.vec3(1.0, 0.82, 0.55);
       glowMaterial.colorNode = T.vec4(warm.mul(fall.mul(fall).mul(1.9)), 1);
       glowMaterial.opacityNode = fall.mul(glowLevel).mul(0.85);
     }
@@ -194,7 +200,7 @@ export function createLampActor(options: LampActorOptions): SceneActorFactory {
     {
       const r = T.uv().sub(0.5).length().mul(2);
       const fall = T.float(1).sub(T.smoothstep(0, 1, r));
-      const warm = T.vec3(1.0, 0.85, 0.6);
+      const warm = options.color ? T.vec3(...options.color) : T.vec3(1.0, 0.85, 0.6);
       poolMaterial.colorNode = T.vec4(warm.mul(fall.mul(fall)), 1);
       poolMaterial.opacityNode = poolLevel.mul(0.5);
     }

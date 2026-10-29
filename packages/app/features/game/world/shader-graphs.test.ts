@@ -5,6 +5,7 @@
 // compiled as their TSL albedo and emissive graphs on a basic material
 // (materials.albedoGraphs); and textured materials (lettering, leaves) need
 // a GPU backend for sampling, so they are skipped. Scene fog is not included.
+import '../classic-flags.test-support.ts';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';

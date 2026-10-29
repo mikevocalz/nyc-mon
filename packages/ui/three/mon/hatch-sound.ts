@@ -1,3 +1,4 @@
+import { soundEnabled } from '../../device-preferences';
 import { soundCues, type SoundCue } from './hatch-timeline.ts';
 
 /**
@@ -130,6 +131,8 @@ export function scheduleHatchSound(
   out.gain.value = HATCH_SOUND_LEVEL;
   out.connect(destination);
   const scheduled: { cue: SoundCue; at: number }[] = [];
+  // Sound off in Settings (M19): schedule nothing; the gain stays silent.
+  if (!soundEnabled()) return { scheduled, cancel() { out.disconnect(); } };
   for (const { t, cue } of soundCues(reducedMotion)) {
     const at = startAt + t;
     if (at < c.currentTime - LATE_SECONDS) continue;
@@ -154,7 +157,8 @@ export function createHatchSound(): HatchSound {
   return {
     async start() {
       const began = globalThis.performance?.now() ?? Date.now();
-      if (Ctx) {
+      // Sound off in Settings (M19): no context at all, so every cue is a no-op.
+      if (Ctx && soundEnabled()) {
         try {
           ctx = new Ctx();
           out = ctx.createGain();
@@ -175,7 +179,7 @@ export function createHatchSound(): HatchSound {
       return live;
     },
     play(cue) {
-      if (!live || !ctx || !out) return;
+      if (!soundEnabled() || !live || !ctx || !out) return;
       playHatchCue(ctx, out, cue, ctx.currentTime + 0.01);
     },
     dispose() {

@@ -77,7 +77,8 @@ function WorldLoader() {
   const progress = useStore(gameScreenStore, (s) => s.loadProgress);
   return (
     <View className="absolute inset-0 items-center justify-center bg-ink-950 px-8">
-      <View className="w-full max-w-[420px]">
+      {/* Tablet: the skyline bar widens with the screen instead of staying phone-length. */}
+      <View className="w-full max-w-[420px] md:max-w-[560px] lg:max-w-[640px]">
         <ProgressBar
           value={progress}
           district="harlem"

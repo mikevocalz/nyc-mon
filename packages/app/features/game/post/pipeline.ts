@@ -39,13 +39,24 @@
 //   black frame. 'none' leaves renderOutput an identity transform.
 // - MRT normals on the Dawn backend, FXAA's sRGB-input ordering, and the
 //   actual look of every measured value below.
+//
+// Slop-grade city (EXPO_PUBLIC_WORLD_PHYSICAL, and the Phase 0 probes):
+// `request.physical` swaps the chain above for the one ported from
+// mrdoob/slop-newyork @ be65d0a, js/main.js initApp (MRT, SSR) and
+// js/post-processing.js createPostProcessing (MIT, © 2026 Mr.doob), on this
+// same mount; there is never a second RenderPipeline. ACES and the output
+// conversion run once, in the pipeline's own renderOutput after the graph.
+// The legacy bloom/AO/FXAA/grade picks are not wired in that mode.
 
 import type { Three } from '@acme/ui/three';
 import type { Node } from 'three/webgpu';
 import { bloom } from 'three/examples/jsm/tsl/display/BloomNode.js';
 import { ssao } from 'three/examples/jsm/tsl/display/SSAONode.js';
 import { fxaa } from 'three/examples/jsm/tsl/display/FXAANode.js';
+import type { ssr } from 'three/examples/jsm/tsl/display/SSRNode.js';
+import { loadSsrNode } from '../physical-graph.ts';
 import { parseSkyRigFlag } from '../world/sky-rig.ts';
+import { PHYSICAL_POST, type PhysicalGradeNumbers, type PhysicalPostSettings } from '../world/physical-look.ts';
 
 type RendererT = InstanceType<Three['WebGPURenderer']>;
 type SceneT = InstanceType<Three['Scene']>;
@@ -56,6 +67,7 @@ type PassT = ReturnType<Three['TSL']['pass']>;
 type BloomT = ReturnType<typeof bloom>;
 type SsaoT = ReturnType<typeof ssao>;
 type FxaaT = ReturnType<typeof fxaa>;
+type SsrT = ReturnType<typeof ssr>;
 
 /**
  * The pinned look constants — the Flying Roadster measured values from the
@@ -207,6 +219,30 @@ export interface CityPostRequest {
   camera: CameraT;
   /** Explicit options skip env resolution entirely (tests, dev panels). */
   options?: CityPostOptions;
+  /** The Slop-grade chain. When set, `options`' effects are not wired. */
+  physical?: PhysicalPostRequest;
+}
+
+/** Which Slop stages to wire; a Phase 0 probe sets one. */
+export interface PhysicalPostRequest {
+  /** Scene pass writes output, normalView and metalRough. */
+  mrt: boolean;
+  /** SSR from the MRT; ignored without `mrt` or without tier SSR settings. */
+  ssr: boolean;
+  bloom: boolean;
+  grade: boolean;
+  /** scenePass.renderTarget.storeMultisampledColorBuffer = false. */
+  msaaDiscard: boolean;
+  settings: PhysicalPostSettings;
+}
+
+/** What the physical chain wired, and the per-preset look switch. */
+export interface PhysicalPostHandle {
+  applied: { mrt: boolean; ssr: boolean; bloom: boolean; grade: boolean; msaaDiscard: boolean };
+  ssrNode: SsrT | null;
+  bloomNode: BloomT | null;
+  /** js/post-processing.js applyPreset: exposure, balance, contrast, saturation, bloom strength and threshold. */
+  applyLook(look: PhysicalGradeNumbers): void;
 }
 
 export interface CityPostPipeline {
@@ -218,6 +254,15 @@ export interface CityPostPipeline {
   options: Required<CityPostOptions>;
   /** The scene pass feeding the chain — owns the scene render target. */
   scenePass: PassT;
+  /** The Slop-grade chain when `request.physical` was set, else null. */
+  physical: PhysicalPostHandle | null;
+  /**
+   * Runs `fn` with renderer.render answering on the direct path. Anything
+   * that renders its own scene through the canvas renderer after the mount
+   * (PMREMGenerator.fromScene's cube faces on a time-of-day rebake) goes
+   * through here, or the delegate runs the whole pipeline instead.
+   */
+  withDirectRender<R>(fn: () => R): R;
   /** Restores renderer.render and tone mapping, then frees the nodes and the pipeline. */
   dispose(): void;
 }
@@ -235,17 +280,21 @@ export function mountCityPostPipeline(THREE: Three, request: CityPostRequest): C
   const options: Required<CityPostOptions> = request.options
     ? { ...DEFAULT_POST_OPTIONS, ...request.options }
     : resolvePostOptions();
-  const applied: AppliedPostEffects = {
-    bloom: options.bloom,
-    // The tier contract: AO exists only on 'high' — the phone tier keeps the
-    // L2 baked vertex occlusion.
-    ao: options.ao && options.tier === 'high',
-    aa: options.aa,
-    grade: options.grade,
-  };
+  const physicalRequest = request.physical ?? null;
+  const applied: AppliedPostEffects = physicalRequest
+    ? { bloom: false, ao: false, aa: false, grade: false }
+    : {
+        bloom: options.bloom,
+        // The tier contract: AO exists only on 'high' — the phone tier keeps the
+        // L2 baked vertex occlusion.
+        ao: options.ao && options.tier === 'high',
+        aa: options.aa,
+        grade: options.grade,
+      };
 
   const T = THREE.TSL;
   const scenePass = T.pass(scene, camera);
+  if (physicalRequest) return mountPhysical(THREE, request, physicalRequest, options, applied, scenePass);
   // AO needs view-space normals — a second render-target output on the same
   // scene pass, so the geometry still renders once.
   if (applied.ao) scenePass.setMRT(T.mrt({ output: T.output, normal: T.normalView }));
@@ -294,6 +343,38 @@ export function mountCityPostPipeline(THREE: Three, request: CityPostRequest): C
   pipeline.outputColorTransform = !needsConvertedInput;
   pipeline.outputNode = outputNode;
 
+  const delegate = delegateRender(renderer, pipeline);
+  let disposed = false;
+  return {
+    pipeline,
+    applied,
+    options,
+    scenePass,
+    physical: null,
+    withDirectRender: delegate.direct,
+    dispose() {
+      if (disposed) return;
+      disposed = true;
+      delegate.restore();
+      renderer.toneMapping = priorToneMapping;
+      renderer.toneMappingExposure = priorExposure;
+      aoNode?.dispose();
+      bloomNode?.dispose();
+      fxaaNode?.dispose();
+      scenePass.dispose();
+      pipeline.dispose();
+    },
+  };
+}
+
+/**
+ * Points renderer.render at pipeline.render(). The canvas calls
+ * renderer.render(scene, camera); PassNode.updateBefore and QuadMesh.render
+ * call it again from inside the pipeline, and the inPipeline flag routes
+ * those nested calls to the direct path. `direct(fn)` sets the same flag
+ * around a caller's own renders. Returns the undo and that wrapper.
+ */
+function delegateRender(renderer: RendererT, pipeline: PipelineT): { restore(): void; direct<R>(fn: () => R): R } {
   const directRender = renderer.render;
   const hadOwnRender = Object.hasOwn(renderer, 'render');
   let inPipeline = false;
@@ -306,6 +387,171 @@ export function mountCityPostPipeline(THREE: Three, request: CityPostRequest): C
       inPipeline = false;
     }
   }) as typeof renderer.render;
+  return {
+    restore() {
+      if (hadOwnRender) {
+        renderer.render = directRender;
+      } else {
+        delete (renderer as { render?: unknown }).render;
+      }
+    },
+    direct<R>(fn: () => R): R {
+      if (inPipeline) return fn();
+      inPipeline = true;
+      try {
+        return fn();
+      } finally {
+        inPipeline = false;
+      }
+    },
+  };
+}
+
+/**
+ * The Slop chain (js/main.js, js/post-processing.js). Two edits from Slop,
+ * same maths: `smoothstep(e0, e1, x)` with e0 > e1 is written as
+ * `1 - smoothstep(e1, e0, x)`, because Metal leaves smoothstep undefined for
+ * reversed edges and Dawn's WGSL lowers to it on iOS; and bloom/SSR/grade
+ * are each optional so a probe can wire one alone.
+ */
+function mountPhysical(
+  THREE: Three,
+  request: CityPostRequest,
+  physical: PhysicalPostRequest,
+  options: Required<CityPostOptions>,
+  applied: AppliedPostEffects,
+  scenePass: PassT,
+): CityPostPipeline {
+  const { renderer, camera } = request;
+  const T = THREE.TSL;
+  const P = PHYSICAL_POST;
+  const settings = physical.settings;
+
+  // The multisampled colour attachments only need resolving, never storing;
+  // the multisampled depth stays stored because SSR reads it.
+  if (physical.msaaDiscard) scenePass.renderTarget.storeMultisampledColorBuffer = false;
+
+  const wireSsr = physical.mrt && physical.ssr && settings.ssr !== null;
+  if (physical.mrt) {
+    // Metalness fades out from 180 to 360 m; SSR skips roughness >= 0.75.
+    const ssrFade = T.float(1).sub(T.smoothstep(P.ssrFadeNear, P.ssrFadeFar, T.positionView.z.negate()));
+    const sceneMRT = T.mrt({
+      output: T.output,
+      normal: T.normalView,
+      metalRough: T.vec2(T.roughness.lessThan(P.maxSsrRoughness).select(T.metalness.mul(ssrFade), 0), T.roughness),
+    });
+    sceneMRT.setBlendMode('normal', new THREE.BlendMode(THREE.MaterialBlending));
+    sceneMRT.setBlendMode('metalRough', new THREE.BlendMode(THREE.MaterialBlending));
+    scenePass.setMRT(sceneMRT);
+  }
+
+  const sceneColor = scenePass.getTextureNode('output') as Node<'vec4'>;
+  let reflections: Node<'vec3'> | null = null;
+  let ssrNode: SsrT | null = null;
+  if (wireSsr && settings.ssr) {
+    const metalRough = scenePass.getTextureNode('metalRough');
+    // SSRNode is evaluated only here, on the physical chain with SSR wired.
+    ssrNode = loadSsrNode().ssr(sceneColor, scenePass.getTextureNode('depth'), scenePass.getTextureNode('normal') as unknown as Node<'vec3'>, {
+      metalnessNode: metalRough.r,
+      roughnessNode: metalRough.g,
+      camera,
+      binaryRefine: settings.ssr.binaryRefine,
+    });
+    ssrNode.resolutionScale = settings.ssr.resolutionScale;
+    ssrNode.blurQuality = P.ssrBlurQuality;
+    ssrNode.maxDistance.value = P.ssrMaxDistance;
+    ssrNode.thickness.value = P.ssrThickness;
+    ssrNode.quality.value = settings.ssr.quality;
+    ssrNode.intensity.value = P.ssrIntensity;
+    ssrNode.screenEdgeFadeBlack = true;
+    // Roughness mip blur must not spread reflections onto matte surfaces.
+    const reflectionMask = metalRough.r.greaterThan(0).select(
+      T.float(1).sub(T.smoothstep(P.ssrMaskRoughness, P.maxSsrRoughness, metalRough.g)),
+      0,
+    );
+    reflections = ssrNode.rgb.mul(reflectionMask);
+  }
+
+  const exposure = T.uniform(1);
+  const contrast = T.uniform(1);
+  const saturation = T.uniform(1);
+  const balance = T.uniform(new THREE.Vector3(1, 1, 1));
+  const lit = reflections ? sceneColor.rgb.add(reflections) : sceneColor.rgb;
+  // Exposure and white balance before bloom, so the threshold follows the exposed image.
+  const exposed = physical.grade ? T.max(lit, T.vec3(0)).mul(exposure).mul(balance) : lit;
+
+  let bloomNode: BloomT | null = null;
+  if (physical.bloom) {
+    // Limit only bloom's peak radiance, scaling RGB together to keep neon and lamp hues.
+    const peak = T.max(T.max(exposed.r, exposed.g), exposed.b);
+    const bloomInput = T.vec4(exposed.mul(T.float(P.bloomPeak).div(T.max(peak, P.bloomPeak))), 1);
+    bloomNode = bloom(bloomInput, settings.look.bloom, P.bloomRadius, settings.look.threshold);
+    bloomNode.smoothWidth.value = P.bloomSmoothWidth;
+    bloomNode.setResolutionScale(settings.bloomResolutionScale);
+  }
+  const bloomed = bloomNode ? exposed.add(bloomNode.rgb) : exposed;
+
+  let outputNode: Node;
+  if (physical.grade) {
+    const lumaWeights = T.vec3(...P.luma);
+    outputNode = T.Fn(() => {
+      const color = T.vec3(bloomed).toVar();
+      const luma = T.dot(color, lumaWeights).toVar();
+      // Cool shadows, warm highlights; a multiply, so black stays black.
+      const shadows = T.mix(T.vec3(...P.shadowTint), T.vec3(1), T.smoothstep(P.shadowBand[0], P.shadowBand[1], luma));
+      const highlights = T.mix(T.vec3(1), T.vec3(...P.highlightTint), T.smoothstep(P.highlightBand[0], P.highlightBand[1], luma));
+      color.mulAssign(shadows.mul(highlights));
+      // Contrast pivots on 18% grey and scales RGB together.
+      color.mulAssign(T.pow(T.max(luma, 0.0001).div(P.contrastPivot), contrast.sub(1)));
+      const gray = T.dot(color, lumaWeights);
+      const top = T.max(T.max(color.r, color.g), color.b);
+      const chroma = top.sub(T.min(T.min(color.r, color.g), color.b));
+      const vibrance = T.float(P.vibrance).mul(T.float(1).sub(chroma.div(T.max(top, 0.0001))));
+      color.assign(T.max(T.mix(T.vec3(gray), color, saturation.add(vibrance)), T.vec3(0)));
+      // Corner-radius normalised so the falloff matches in portrait and landscape.
+      const aspect = T.screenSize.x.div(T.screenSize.y);
+      const radius = T.length(T.screenUV.sub(0.5).mul(T.vec2(aspect, 1))).div(T.length(T.vec2(aspect, 1).mul(0.5)));
+      const vignette = T.float(1).sub(T.smoothstep(P.vignetteInner, P.vignetteOuter, radius).mul(P.vignetteStrength));
+      return T.vec4(color.mul(vignette), 1);
+    })();
+  } else if (reflections || bloomNode) {
+    outputNode = T.vec4(bloomed, 1);
+  } else {
+    outputNode = sceneColor;
+  }
+
+  const priorToneMapping = renderer.toneMapping;
+  const priorExposure = renderer.toneMappingExposure;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1;
+
+  const pipeline = new THREE.RenderPipeline(renderer);
+  pipeline.outputColorTransform = true;
+  pipeline.outputNode = outputNode;
+  const delegate = delegateRender(renderer, pipeline);
+
+  const handle: PhysicalPostHandle = {
+    applied: {
+      mrt: physical.mrt,
+      ssr: ssrNode !== null,
+      bloom: bloomNode !== null,
+      grade: physical.grade,
+      msaaDiscard: physical.msaaDiscard,
+    },
+    ssrNode,
+    bloomNode,
+    applyLook(look) {
+      exposure.value = look.exposure;
+      contrast.value = look.contrast;
+      saturation.value = look.saturation;
+      balance.value.set(look.balance[0], look.balance[1], look.balance[2]);
+      if (bloomNode) {
+        bloomNode.strength.value = look.bloom;
+        bloomNode.threshold.value = look.threshold;
+      }
+    },
+  };
+  handle.applyLook(settings.look);
 
   let disposed = false;
   return {
@@ -313,19 +559,16 @@ export function mountCityPostPipeline(THREE: Three, request: CityPostRequest): C
     applied,
     options,
     scenePass,
+    physical: handle,
+    withDirectRender: delegate.direct,
     dispose() {
       if (disposed) return;
       disposed = true;
-      if (hadOwnRender) {
-        renderer.render = directRender;
-      } else {
-        delete (renderer as { render?: unknown }).render;
-      }
+      delegate.restore();
       renderer.toneMapping = priorToneMapping;
       renderer.toneMappingExposure = priorExposure;
-      aoNode?.dispose();
+      ssrNode?.dispose();
       bloomNode?.dispose();
-      fxaaNode?.dispose();
       scenePass.dispose();
       pipeline.dispose();
     },

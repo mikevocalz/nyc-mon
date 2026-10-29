@@ -10,7 +10,7 @@ import { betterAuth } from 'better-auth';
 import { mcpPlugin } from '@payloadcms/plugin-mcp';
 import { APIError, buildConfig } from 'payload';
 import sharp from 'sharp';
-import { deleteDueCallersTask } from './auth/deletion';
+import { deleteDueCallersTask, selfDeletionOptions } from './auth/deletion';
 import { AUTH_BASE_PATH, PAYLOAD_API_ROUTE, PAYLOAD_CORS_ORIGINS, PAYLOAD_ORIGINS, betterAuthOptions, sendMail } from './auth/options';
 import { accountMerge } from './auth/plugins/account-merge';
 import { adminComponents } from './admin/components';
@@ -118,6 +118,9 @@ export default buildConfig({
           // the live Payload; it adds no schema, so the collection generator
           // above does not need to see it.
           plugins: [...betterAuthOptions.plugins, accountMerge({ payload, sendMail })],
+          // Self-service deletion (M20): Mons and eggs pass to the sanctuary
+          // before Better Auth removes the user (deletion.ts, DECISIONS L3).
+          user: { ...betterAuthOptions.user, deleteUser: selfDeletionOptions(payload) },
           database: payloadAdapter({ payloadClient: payload }),
         }),
     }),

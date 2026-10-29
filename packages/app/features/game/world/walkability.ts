@@ -136,6 +136,9 @@ export const BAND_OUTER_GAP = 0.3;
 export const ASSUMED_SIDEWALK = 3;
 /** How far past a carriageway the clearance grid looks (crown overhang queries reach this far). */
 const LOOK = 6;
+/** inBuilding's four rim directions: +x, -x, +z, -z. */
+const RIM_UNIT_X = [1, -1, 0, 0] as const;
+const RIM_UNIT_Z = [0, 0, 1, -1] as const;
 
 interface Carriageway { ax: number; az: number; bx: number; bz: number; half: number; sidewalk: number; id: string; crossing: boolean }
 
@@ -196,9 +199,11 @@ export function createStreetClearance(dataset: CityDatasetV3): StreetClearance {
   const inBuilding = (x: number, z: number, pad = 0.2) => {
     for (const b of buildings.at(x, z)) if (contains(b, x, z, pad)) return true;
     // `contains` takes the pad on the bounding box only; test the rim too.
+    // Unit offsets scaled by pad: no array literals per call (the physical city build calls this for every placement probe).
     if (pad > 0) {
-      for (const [ox, oz] of [[pad, 0], [-pad, 0], [0, pad], [0, -pad]] as const) {
-        for (const b of buildings.at(x + ox, z + oz)) if (contains(b, x + ox, z + oz)) return true;
+      for (let k = 0; k < 4; k++) {
+        const px = x + RIM_UNIT_X[k]! * pad; const pz = z + RIM_UNIT_Z[k]! * pad;
+        for (const b of buildings.at(px, pz)) if (contains(b, px, pz)) return true;
       }
     }
     return false;

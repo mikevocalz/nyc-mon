@@ -67,7 +67,7 @@ JS thread                                         render runtime ("nyc-mon-rende
 use-game-input: Caller sim (rAF, unchanged)
   -> callerStore / gameCameraStore
        -> worklet-host mirror(): packSnapshot  ---- Synchronizable<number[]> ---->  tick(): getDirty()
-          (21 numbers, version++)                                                    draw(): update, render, present
+          (22 numbers, version++)                                                    draw(): update, render, present
        -> if idle: one scheduleOnRuntime(wake)  ------------------------------->     parks after 2 quiet ticks
 ThreeCanvas (worklet mode): size, visibility,                                        idle.setBlocking(true)
   reduced motion -> session.resize/setRunning
@@ -76,7 +76,7 @@ gameScreenActions.loadStage / firstFrame  <---- scheduleOnRN('stage'|'firstFrame
 
 - **What moves.** Renderer init, scene build, `compileAsync`, every `update` (camera placement, tree LOD, Caller pose), `renderer.render` and `present()`. That is the 9 to 14 ms measured on the Duo.
 - **What stays on JS.** The Caller simulation and both stores, gestures, the HUD, Rive, the lobby. `character/` and `world/` are untouched and run on the runtime as they are: the Caller proxy is built with `createCallerProxyWith(mirror)`, where `mirror.getState()` returns the Caller read from the latest snapshot.
-- **Data flow.** Per input event the JS thread packs 21 numbers and writes one Synchronizable; no hop onto the render runtime. The runtime reads the latest snapshot once per tick. A hop happens only on the parked-to-drawing edge (`idle` flag, double-checked after parking so a write between the last read and parking is never lost), so a held stick costs one hop for the whole hold.
+- **Data flow.** Per input event the JS thread packs 22 numbers (camera, Caller, view, time-of-day preset) and writes one Synchronizable; no hop onto the render runtime. The runtime reads the latest snapshot once per tick. A hop happens only on the parked-to-drawing edge (`idle` flag, double-checked after parking so a write between the last read and parking is never lost), so a held stick costs one hop for the whole hold.
 - **On demand, as today.** The Game canvas stays `paused`: the loop runs while snapshots change or an actor reports motion, and parks otherwise. `invalidate()` from the canvas handle bumps the snapshot version.
 - **Milestones.** `withFirstFrameSignal` now takes a reporter (default `gameScreenActions.loadStage`, so the JS path is unchanged). On the runtime the reporter relays `worldBuilt` and `firstRender` with `scheduleOnRN`; `onFirstFrame` relays `firstFrame`. The compile-then-one-more-frame rule is the same code.
 - **Dispose.** Unmount disposes the session (stores unsubscribed on JS, scene and renderer disposed on the runtime). The runtime itself lives for the app's life, so three.js loads there once.

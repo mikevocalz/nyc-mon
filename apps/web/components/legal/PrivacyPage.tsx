@@ -1,4 +1,4 @@
-import { LEGAL_COPY } from './copy';
+import { LEGAL_COPY } from '@acme/app/features/legal/copy.ts';
 import { LegalDocumentPage } from './LegalDocumentPage';
 
 /** W06 — the privacy notice, laid out by LegalDocumentPage. */

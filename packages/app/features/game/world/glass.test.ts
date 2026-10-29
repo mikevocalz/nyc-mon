@@ -5,6 +5,7 @@
 // seeded probability by time of day, and both tiers compile to WGSL
 // through three's own WGSLNodeBuilder. Same stub-renderer convention as
 // pbr-materials.test.ts / shader-graphs.test.ts.
+import '../classic-flags.test-support.ts';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';

@@ -1,8 +1,9 @@
 'use client';
 import { useWindowDimensions } from 'react-native';
 import { Text, View } from '../tw';
+import { BackButton } from '../BackButton';
 import { IconButton } from '../IconButton';
-import { ChevronLeft, X } from '../icons';
+import { X } from '../icons';
 import { isCollapsed, windowSizeClassForWidth } from './constants.ts';
 
 export interface DetailNavbarProps {
@@ -32,13 +33,7 @@ export function DetailNavbar({ title, onDismiss, children }: DetailNavbarProps) 
   return (
     <View className="flex-row items-center gap-2">
       {alone ? (
-        <IconButton
-          variant="ghost"
-          size="sm"
-          aria-label="Back"
-          icon={<ChevronLeft className="text-text-muted" />}
-          onPress={onDismiss}
-        />
+        <BackButton onPress={onDismiss} />
       ) : null}
 
       <Text className="flex-1 text-base font-semibold text-text md:text-lg lg:text-xl">
