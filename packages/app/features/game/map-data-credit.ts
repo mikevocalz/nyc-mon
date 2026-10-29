@@ -111,4 +111,17 @@ export const CITY_MAP_ASSETS: readonly CityMapSourceCredit[] = [
     license: 'CC0 1.0',
     licenseUrl: 'https://creativecommons.org/publicdomain/zero/1.0/',
   },
+  {
+    // world/vd-port: the 125th Street buildings, landmarks, storefronts and street furniture are baked from Valdrada's
+    // own kits (client/src/city: the facade kit, landmarks.js, the w125 area parts, the furniture kits), its persistent
+    // tier format and far material, and its far window grid texture (textures/far_windows_fw14.png)
+    attribution: 'Valdrada v0.4.0 (commit 2724c79) city kits, shaders and far window texture, Mehmet Kerem Turkcan',
+    license: 'MIT',
+    licenseUrl: 'https://github.com/mkturkcan/valdrada/blob/main/LICENSE',
+  },
+  {
+    attribution: 'meshoptimizer decoder (reference implementation), Arseny Kapoulkine and Jasper St. Pierre',
+    license: 'MIT',
+    licenseUrl: 'https://github.com/zeux/meshoptimizer/blob/master/LICENSE.md',
+  },
 ];

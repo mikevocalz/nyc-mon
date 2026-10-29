@@ -115,7 +115,8 @@ export interface MonStoreOptions {
 function defaultNewEggId(): string {
   const uuid = globalThis.crypto?.randomUUID?.();
   if (uuid !== undefined) return `egg-${uuid}`;
-  return `egg-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+  // Math.random().toString(36) can be shorter than 12 characters (0.5 is "0.i"): pad the ten digits the id promises.
+  return `egg-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12).padEnd(10, '0')}`;
 }
 
 function pickActive(save: SaveCurrent | undefined, preferred: string | undefined): string | undefined {
