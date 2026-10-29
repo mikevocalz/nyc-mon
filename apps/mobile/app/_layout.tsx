@@ -1,4 +1,4 @@
-import { Stack, router, useNavigationContainerRef, useRootNavigationState, type ErrorBoundaryProps } from "expo-router";
+import { Stack, router, useNavigationContainerRef, usePathname, useRootNavigationState, type ErrorBoundaryProps } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { CommonActions, DarkTheme, DefaultTheme, ThemeProvider, type Theme } from "@react-navigation/native";
@@ -104,6 +104,9 @@ export default function RootLayout() {
   // Hatch-ready notification tap → M12, cold start and warm (M12 B3).
   useReadyNotificationRouting();
   useRootStackHygiene();
+  // The joystick sits at the left edge: an edge drag in the city must move the
+  // Caller, never pop the root stack out of the game.
+  const inGame = (usePathname() ?? "").startsWith("/game");
   return (
     <GestureRoot className="flex-1">
       <StatusBar style="auto" />
@@ -131,7 +134,7 @@ export default function RootLayout() {
               <RootShell header={(back) => <AppHeader back={back} />}>
                 <Stack screenOptions={{ headerShown: false, animation: "none" }}>
                   <Stack.Screen name="(home)" dangerouslySingular />
-                  <Stack.Screen name="(drawer)" dangerouslySingular />
+                  <Stack.Screen name="(drawer)" dangerouslySingular options={{ gestureEnabled: !inGame, fullScreenGestureEnabled: !inGame }} />
                 </Stack>
               </RootShell>
             </ThemeProvider>
