@@ -4,7 +4,7 @@ import { useCallback, useMemo, useRef, type ReactNode } from 'react';
 import { I18nManager, type HostInstance, type LayoutChangeEvent } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import type { LifecycleStage } from '@acme/core/types';
-import { BackButton, Button, EmptyState, Heading, SafeArea, SearchBar, SegmentedControl, Select, useInstanceStore, useStore, VirtualList } from '@acme/ui';
+import { Button, EmptyState, Heading, SafeArea, SearchBar, SegmentedControl, Select, useInstanceStore, useStore, VirtualList } from '@acme/ui';
 import { useFoldLayout } from '@acme/ui/adaptive-panes/parts';
 import { Pressable, Text, View } from '@acme/ui/tw';
 import { useShallow } from 'zustand/react/shallow';
@@ -20,9 +20,9 @@ import {
 import { useDexBrowse } from './dex.store';
 import { DexEntryView } from './DexEntryView';
 import { useDex } from './use-dex';
+import { ScreenBack } from '../navigation/use-header-back';
 
 const TABULAR = { fontVariant: ['tabular-nums' as const] };
-const INDEX_PATH = '/(home)/mons';
 const entryPath = (speciesId: string) => `/(home)/mons/${speciesId}`;
 
 type StageFilter = 'all' | LifecycleStage;
@@ -169,15 +169,6 @@ function DexList({ selectedId, onOpen }: { selectedId: string | null; onOpen: (s
   );
 }
 
-/** The phone route's way back to the list (the (home) group has no stack header). */
-function BackToList({ onPress }: { onPress: () => void }) {
-  return (
-    <View testID="mons-back" className="flex-row px-4 pt-4">
-      <BackButton label={monsCopy('mons.entry.back')} onPress={onPress} />
-    </View>
-  );
-}
-
 /**
  * MONS, the species index (Gameplay Bible v12, tab 4): "what is this Mon?",
  * not the care screen. A plain full screen in the (home) group under the
@@ -229,10 +220,6 @@ export function MonsScreen({ routeSpeciesId }: { routeSpeciesId?: string }) {
     if (routeSpeciesId === undefined) router.push(entryPath(speciesId) as never);
     else router.replace(entryPath(speciesId) as never);
   };
-  const backToList = () => {
-    if (router.canGoBack()) router.back();
-    else router.replace(INDEX_PATH as never);
-  };
 
   const listOnly = !split && routeSpeciesId === undefined;
   const entryOnly = !split && routeSpeciesId !== undefined;
@@ -261,7 +248,8 @@ export function MonsScreen({ routeSpeciesId }: { routeSpeciesId?: string }) {
         {split && arrangement.gapWidth > 0 ? <View aria-hidden testID="mons-hinge" style={{ width: arrangement.gapWidth }} /> : null}
         {listOnly ? null : (
           <View testID="mons-detail" className="min-w-0 flex-1">
-            {entryOnly ? <BackToList onPress={backToList} /> : null}
+            {/* The entry alone: Back to the list ("All Mons"), in the shell header on rail hardware, here on phones. */}
+            {entryOnly ? <ScreenBack testID="mons-back" /> : null}
             {selectedId === null ? (
               <View className="flex-1 justify-center px-8">
                 <EmptyState title={monsCopy('mons.detail.empty.title')} description={monsCopy('mons.detail.empty.body')} />

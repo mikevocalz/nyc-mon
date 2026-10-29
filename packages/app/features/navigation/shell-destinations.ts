@@ -96,8 +96,8 @@ export function activeDrawerItem(pathname: string): ShellDrawerItemName | null {
   return hit?.name ?? null;
 }
 
-/** Shell spacing (pt), the foldable layout: items 20 below the header, menu 30 above the bottom, drawer 10 above the menu. */
-export const SHELL_SPACING = { itemsBelowHeader: 20, menuFromBottom: 30, drawerAboveMenu: 10 } as const;
+/** Shell spacing (pt), the foldable layout: items 80 below the header, menu 30 above the bottom, drawer 10 above the menu. */
+export const SHELL_SPACING = { itemsBelowHeader: 80, menuFromBottom: 30, drawerAboveMenu: 10 } as const;
 
 /**
  * Routes that draw full-window and hide the shell: first run and auth, the
