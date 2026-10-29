@@ -1,4 +1,15 @@
-import { LIFECYCLE_STAGES, type LifecycleStage, MON_MOODS, type MonMood } from '@acme/core';
+import {
+  type BabbleInventory,
+  capVoiceStage,
+  enforceVoiceStage,
+  LIFECYCLE_STAGES,
+  type LifecycleStage,
+  MON_MOODS,
+  type MonMood,
+  parseVoiceLineageId,
+  type VoiceStage,
+  voiceStage as voiceStageAt,
+} from '@acme/core';
 import { captionText, spokenText } from './captions.ts';
 import { FALLBACK_MON_LINGO, type MonLingo } from './lingo/index.ts';
 import { allSpecies } from './mons/index.ts';
@@ -15,7 +26,7 @@ import {
 
 export { captionText, dropUnmatchedQuotes, spokenText, unwrapQuotes } from './captions.ts';
 export { FALLBACK_MON_LINGO, parseMonLingo } from './lingo/index.ts';
-export type { LingoGuideEntry, MonLineEntry, MonLingo } from './lingo/index.ts';
+export type { BabbleEntry, BabbleKind, LingoGuideEntry, MonLineEntry, MonLingo } from './lingo/index.ts';
 
 /**
  * The Mon's one voice, for every surface that plays it.
@@ -37,32 +48,57 @@ export type { LingoGuideEntry, MonLineEntry, MonLingo } from './lingo/index.ts';
  *
  * Surfaces never call a TTS API directly: they take a plan from here and hand
  * it to a `MonVoicePort` (test/voice-boundary.test.ts enforces it).
+ *
+ * Voice stage (Decision 32): an Egg and a Baby in its first 24 hours babble,
+ * a Baby after that speaks `limited` (family sound plus at most two words),
+ * later forms speak in full. `monVoiceRef(mon, now)` works the stage out from
+ * the Mon's `hatchedAt`; `planMonUtterance` runs every line through the speech
+ * gate in @acme/core before anything is captioned or voiced, so a scripted
+ * line or a model reply that breaks the stage never reaches the Caller.
  */
 
 /** Which voice a Mon speaks with right now, as the MCP tools report it in `mon.voice` (plus the result's mood). */
 export interface MonVoiceRef {
   readonly lineageId: string;
   readonly stage: LifecycleStage;
+  /**
+   * How much speech the Mon has (`voiceStage(mon, now)` in @acme/core). The
+   * planner never grants more than the lifecycle stage allows; left out, an
+   * Egg babbles and a Baby is `limited`.
+   */
+  readonly voiceStage?: VoiceStage;
   /** Sets how the line is delivered; from the same tool result's `mood`. */
   readonly mood?: MonMood;
 }
 
-/** `mon.voice` for a Mon record: null for a Mon hatched before voice lineages. */
-export function monVoiceRef(mon: { readonly voiceLineageId: string | null; readonly stage: LifecycleStage }): { lineageId: string; stage: LifecycleStage } | null {
-  return mon.voiceLineageId === null ? null : { lineageId: mon.voiceLineageId, stage: mon.stage };
+/** The fields of a Mon record the voice reads. `hatchedAt` sets the first-day babble. */
+export interface MonVoiceSource {
+  readonly voiceLineageId: string | null;
+  readonly stage: LifecycleStage;
+  readonly hatchedAt?: number | null;
+}
+
+/**
+ * `mon.voice` for a Mon record at `now` (the caller's clock; on a server, the
+ * server's): null for a Mon hatched before voice lineages.
+ */
+export function monVoiceRef(mon: MonVoiceSource, now: number): { lineageId: string; stage: LifecycleStage; voiceStage: VoiceStage } | null {
+  return mon.voiceLineageId === null ? null : { lineageId: mon.voiceLineageId, stage: mon.stage, voiceStage: voiceStageAt(mon, now) };
 }
 
 /** `mon.voice` as the MCP tools report it: the ref plus whether the served lingo can voice it right now. */
 export interface MonVoiceView {
   readonly lineageId: string;
   readonly stage: LifecycleStage;
-  /** False for an Egg, or when Payload has no voice cast for this lineage yet: the reply is shown, not spoken. */
+  /** `baby-talk`, `limited` or `full`: what the Mon may say right now. */
+  readonly voiceStage: VoiceStage;
+  /** False when the stage has no pitch or Payload has no voice cast for this lineage yet: the reply is shown, not spoken. */
   readonly voiced: boolean;
 }
 
-/** `mon.voice` for a Mon record, read against the served lingo. Null for a Mon hatched before voice lineages. */
-export function monVoiceView(mon: { readonly voiceLineageId: string | null; readonly stage: LifecycleStage }, lingo: MonLingo = FALLBACK_MON_LINGO): MonVoiceView | null {
-  const ref = monVoiceRef(mon);
+/** `mon.voice` for a Mon record at `now`, read against the served lingo. Null for a Mon hatched before voice lineages. */
+export function monVoiceView(mon: MonVoiceSource, now: number, lingo: MonLingo = FALLBACK_MON_LINGO): MonVoiceView | null {
+  const ref = monVoiceRef(mon, now);
   if (ref === null) return null;
   const voiced = voicePitchFactor(ref.stage, lingo) !== null && resolveVoice(ref.lineageId, lingo) !== null;
   return { ...ref, voiced };
@@ -70,13 +106,60 @@ export function monVoiceView(mon: { readonly voiceLineageId: string | null; read
 
 const BLOODLINE_OF = new Map(allSpecies.map((species) => [species.speciesId, species.bloodlineId as string]));
 
+/** The Bloodline of a species id, or of a lineage id's line key (the Egg form's species id). */
+function bloodlineFor(subject: { readonly speciesId?: string; readonly lineageId?: string }): string | undefined {
+  if (subject.speciesId !== undefined) return BLOODLINE_OF.get(subject.speciesId);
+  const lineKey = subject.lineageId === undefined ? undefined : parseVoiceLineageId(subject.lineageId)?.lineKey;
+  return lineKey === undefined ? undefined : BLOODLINE_OF.get(lineKey);
+}
+
+/**
+ * The babble a Mon is made of, from the served `babble` rows (the fallback's
+ * when the served lingo has none): the shared syllables, its Bloodline's
+ * family sound, and for an Egg the sounds from inside the shell.
+ */
+export function babbleInventory(
+  subject: { readonly speciesId?: string; readonly lineageId?: string },
+  stage: LifecycleStage,
+  lingo: MonLingo = FALLBACK_MON_LINGO,
+): BabbleInventory {
+  const rows = lingo.babble.length > 0 ? lingo.babble : FALLBACK_MON_LINGO.babble;
+  const bloodlineId = bloodlineFor(subject);
+  const mine = rows.filter((row) => row.bloodlineId === null || row.bloodlineId === bloodlineId);
+  return {
+    syllables: mine.filter((row) => row.kind === 'syllable').map((row) => row.text),
+    sounds: mine.filter((row) => row.kind === 'family-sound' || (stage === 'Egg' && row.kind === 'egg-sound')).map((row) => row.text),
+  };
+}
+
+/** Writing guidance for a model voicing a babbling Mon: the only sounds it may use. */
+function babbleGuide(inventory: BabbleInventory, egg: boolean): string[] {
+  const who = egg ? 'The Mon is still an Egg' : 'The Mon hatched less than a day ago';
+  return [
+    `${who}: baby talk only. Reply with wordless babble, two or three short sounds, like "${makeBabbleExample(inventory)}".`,
+    `Build every sound from these syllables: ${inventory.syllables.join(', ')}. Its own sounds: ${inventory.sounds.join(', ') || 'none'}.`,
+    'No real words in any language, no names, no "Callah", no numbers. Anything else is replaced with babble before it is spoken.',
+  ];
+}
+
+function makeBabbleExample(inventory: BabbleInventory): string {
+  return enforceVoiceStage('', 'baby-talk', inventory, { seed: 'guide-example' }).text;
+}
+
 /**
  * The served writing guidance for one Mon: the voice rules and word palette
  * that apply to its form, bloodline, stage and mood, and its canon lines.
  * A rule with no form, bloodline, stage or mood applies to every Mon. For a
  * model writing the Mon's reply (the MCP server's `talk_to_mon`).
  */
-export function voiceGuideFor(mon: { readonly speciesId: string; readonly stage: LifecycleStage }, mood: MonMood | undefined, lingo: MonLingo = FALLBACK_MON_LINGO): string[] {
+export function voiceGuideFor(
+  mon: { readonly speciesId: string; readonly stage: LifecycleStage },
+  mood: MonMood | undefined,
+  lingo: MonLingo = FALLBACK_MON_LINGO,
+  voiceStage?: VoiceStage,
+): string[] {
+  const stage = capVoiceStage(mon.stage, voiceStage);
+  if (stage === 'baby-talk') return babbleGuide(babbleInventory({ speciesId: mon.speciesId }, mon.stage, lingo), mon.stage === 'Egg');
   const bloodlineId = BLOODLINE_OF.get(mon.speciesId);
   const applies = (entry: { speciesId: string | null; bloodlineId: string | null; stage: LifecycleStage | null; mood: MonMood | null }) =>
     (entry.speciesId === null || entry.speciesId === mon.speciesId) &&
@@ -102,15 +185,23 @@ function isMood(value: unknown): value is MonMood {
   return (MON_MOODS as readonly unknown[]).includes(value);
 }
 
+const VOICE_STAGES: readonly VoiceStage[] = ['baby-talk', 'limited', 'full'];
+
 /**
  * Reads `mon.voice` from untrusted JSON (a tool result, storage). Undefined
- * unless it has a string lineage and a known stage; an unknown mood is dropped.
+ * unless it has a string lineage and a known stage; an unknown mood or voice
+ * stage is dropped (the planner then caps by lifecycle stage).
  */
 export function readMonVoiceRef(voice: unknown, mood?: unknown): MonVoiceRef | undefined {
   if (typeof voice !== 'object' || voice === null) return undefined;
-  const { lineageId, stage } = voice as { lineageId?: unknown; stage?: unknown };
+  const { lineageId, stage, voiceStage } = voice as { lineageId?: unknown; stage?: unknown; voiceStage?: unknown };
   if (typeof lineageId !== 'string' || lineageId === '' || !isStage(stage)) return undefined;
-  return isMood(mood) ? { lineageId, stage, mood } : { lineageId, stage };
+  return {
+    lineageId,
+    stage,
+    ...((VOICE_STAGES as readonly unknown[]).includes(voiceStage) ? { voiceStage: voiceStage as VoiceStage } : {}),
+    ...(isMood(mood) ? { mood } : {}),
+  };
 }
 
 /**
@@ -159,7 +250,7 @@ export function plainSpokenLine(text: string, lingo: MonLingo = FALLBACK_MON_LIN
 
 /** How one line is voiced. */
 export type MonVoicePlan =
-  /** An Egg, or nothing to say: no sound, the caption carries it. */
+  /** Nothing to say, or a stage with no pitch: no sound, the caption carries it. */
   | { readonly kind: 'silent' }
   /** The Mon's lineage voice (ElevenLabs), pitched by stage. */
   | {
@@ -179,6 +270,10 @@ export type MonVoicePlan =
 
 /** One line of the Mon, planned once and played by any surface. */
 export interface MonUtterance {
+  /** The voice stage the line was gated at (`full` when no Mon voice is known). */
+  readonly voiceStage: VoiceStage;
+  /** True when the speech gate replaced the line (a real word from a babbling Mon, a sentence from a `limited` one). */
+  readonly gated: boolean;
   /** What the screen shows: "Caller", no stage directions, one flowing line. */
   readonly caption: string;
   /** What the lineage voice reads: lexicon, audio tags, mood lead tag. */
@@ -189,16 +284,40 @@ export interface MonUtterance {
   readonly voice: MonVoicePlan;
 }
 
+/** Options for {@link planMonUtterance}. */
+export interface PlanOptions {
+  /**
+   * Seeds the babble that replaces a line the gate refuses, so every surface
+   * planning the same turn says the same babble. Defaults to lineage + text.
+   */
+  readonly seed?: string;
+}
+
+/**
+ * Runs a line through the speech gate for `ref`'s voice stage (Decision 32):
+ * babble only for `baby-talk`, the Q32 limit for `limited`, untouched for
+ * `full` or when no Mon voice is known. Servers call it on model output.
+ */
+export function gateMonLine(text: string, ref: MonVoiceRef | undefined, lingo: MonLingo = FALLBACK_MON_LINGO, options: PlanOptions = {}): { text: string; voiceStage: VoiceStage; replaced: boolean } {
+  if (ref === undefined) return { text, voiceStage: 'full', replaced: false };
+  const voiceStage = capVoiceStage(ref.stage, ref.voiceStage);
+  const inventory = babbleInventory({ lineageId: ref.lineageId }, ref.stage, lingo);
+  const gated = enforceVoiceStage(text, voiceStage, inventory, { seed: options.seed ?? `${ref.lineageId}|${text}` });
+  return { text: gated.text, voiceStage, replaced: gated.replaced };
+}
+
 /**
  * Plans one line for `ref` (the Mon's voice) with `lingo` (the served tables),
- * the same on every surface: a pure function of its three inputs.
+ * the same on every surface: a pure function of its inputs. The line is gated
+ * by voice stage first ({@link gateMonLine}).
  */
-export function planMonUtterance(text: string, ref: MonVoiceRef | undefined, lingo: MonLingo = FALLBACK_MON_LINGO): MonUtterance {
-  const trimmed = text.slice(0, MAX_SPOKEN_TEXT);
+export function planMonUtterance(text: string, ref: MonVoiceRef | undefined, lingo: MonLingo = FALLBACK_MON_LINGO, options: PlanOptions = {}): MonUtterance {
+  const gate = gateMonLine(text.slice(0, MAX_SPOKEN_TEXT), ref, lingo, options);
+  const trimmed = gate.text.slice(0, MAX_SPOKEN_TEXT);
   const caption = captionText(trimmed, lingo);
   const spoken = spokenLine(trimmed, ref?.mood, lingo);
   const plainSpoken = plainSpokenLine(trimmed, lingo);
-  const base = { caption, spoken, plainSpoken, ref };
+  const base = { voiceStage: gate.voiceStage, gated: gate.replaced, caption, spoken, plainSpoken, ref };
   if (plainSpoken === '') return { ...base, voice: { kind: 'silent' } };
   if (ref === undefined) return { ...base, voice: { kind: 'fallback', pitch: undefined } };
   const pitchFactor = voicePitchFactor(ref.stage, lingo);
@@ -226,12 +345,20 @@ export interface MonSpeechRequest {
   readonly text: string;
   readonly lineageId: string;
   readonly stage: LifecycleStage;
+  /** The client's voice stage. A server caps it by `stage` (`capVoiceStage`) and never trusts it to grant more speech. */
+  readonly voiceStage?: VoiceStage;
   readonly mood?: MonMood;
 }
 
 /** The request for one line in `ref`'s voice. The server re-plans it from the same data. */
 export function monSpeechRequest(text: string, ref: MonVoiceRef): MonSpeechRequest {
-  return { text: text.slice(0, MAX_SPOKEN_TEXT), lineageId: ref.lineageId, stage: ref.stage, ...(ref.mood === undefined ? {} : { mood: ref.mood }) };
+  return {
+    text: text.slice(0, MAX_SPOKEN_TEXT),
+    lineageId: ref.lineageId,
+    stage: ref.stage,
+    ...(ref.voiceStage === undefined ? {} : { voiceStage: ref.voiceStage }),
+    ...(ref.mood === undefined ? {} : { mood: ref.mood }),
+  };
 }
 
 /**

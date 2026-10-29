@@ -1,9 +1,11 @@
 import { monLingoFromRows, type MonLingo } from './model.ts';
+import { MON_BABBLE_SEED_ROWS, MON_EGG_STAGE_PITCH } from './babble-seed.ts';
 import { MON_LINGO_SEED_ROWS, MON_VOICES_SEED } from './seed.ts';
 
 export * from './model.ts';
 export * from './rows.ts';
 export { MON_LINGO_SEED_ROWS, MON_VOICES_SEED } from './seed.ts';
+export { MON_BABBLE_SEED_ROWS, MON_EGG_STAGE_PITCH } from './babble-seed.ts';
 
 /**
  * The Mon's lingo for code that has no server: tests, and a client before its
@@ -11,7 +13,11 @@ export { MON_LINGO_SEED_ROWS, MON_VOICES_SEED } from './seed.ts';
  * with, by the same function the server runs on Payload's documents. Payload
  * is the source of truth; this is a typed fallback only.
  */
-export const FALLBACK_MON_LINGO: MonLingo = monLingoFromRows(MON_LINGO_SEED_ROWS, MON_VOICES_SEED);
+export const FALLBACK_MON_LINGO: MonLingo = monLingoFromRows([...MON_LINGO_SEED_ROWS, ...MON_BABBLE_SEED_ROWS], {
+  ...MON_VOICES_SEED,
+  // Migration 20261029_120000_mon_babble_seed sets the same Egg pitch in Payload.
+  stagePitch: { ...MON_VOICES_SEED.stagePitch, egg: MON_EGG_STAGE_PITCH },
+});
 
 interface CompiledLingo {
   readonly voice: readonly (readonly [RegExp, (whole: string, plural: string) => string])[];

@@ -99,7 +99,7 @@ async function browserPosts(line: string, ref: MonVoiceRef): Promise<unknown> {
 
 /** The MCP path: the tool result's `mon.voice` and `mood`, read back by the client. */
 function viaToolResult(ref: MonVoiceRef): MonVoiceRef | undefined {
-  const mon = { monId: 'mon_1', voice: monVoiceRef({ voiceLineageId: ref.lineageId, stage: ref.stage }) };
+  const mon = { monId: 'mon_1', voice: monVoiceRef({ voiceLineageId: ref.lineageId, stage: ref.stage }, Date.now()) };
   const item = { kind: 'tool', result: { content: [], structuredContent: { mon, ...(ref.mood ? { mood: ref.mood } : {}) } } } as unknown as TranscriptItem;
   return currentMonVoice([item]);
 }

@@ -144,7 +144,7 @@ async function monView(ctx: ToolContext, callerId: string, mon: MonInstance) {
     bond: mon.bond,
     hatchedAt: mon.hatchedAt,
     gender: mon.gender,
-    voice: monVoiceView(mon, lingo),
+    voice: monVoiceView(mon, ctx.now(), lingo),
   };
 }
 

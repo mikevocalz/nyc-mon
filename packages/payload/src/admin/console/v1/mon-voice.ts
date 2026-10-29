@@ -194,7 +194,7 @@ function speakHandler(deps: MonVoiceDeps): (request: Request) => Promise<Respons
       if (doc === undefined) return v1Error('NOT_FOUND', 'Mon not found.', 404);
       const mon = parseRecord(MonInstanceSchema, toMonInstance(doc), 'mon');
 
-      const ref = monVoiceRef(mon);
+      const ref = monVoiceRef(mon, Date.now());
       const lingo = await deps.lingo(payload);
       const plan = planMonUtterance(input.text, ref === null ? undefined : { ...ref, ...(input.mood ? { mood: input.mood } : {}) }, lingo);
       if (plan.voice.kind === 'silent') return silent('silent');

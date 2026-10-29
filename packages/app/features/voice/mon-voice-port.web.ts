@@ -30,7 +30,7 @@ function abortError(): Error {
 export const MON_VOICE_HEADERS: Readonly<Record<string, string>> = {};
 
 function speechFallback(text: string, mon: MonVoiceSubject, lingo: MonLingo): WebMonClip {
-  const ref = monVoiceRef(mon);
+  const ref = monVoiceRef(mon, Date.now());
   const plan = planMonUtterance(text, ref === null ? undefined : { ...ref, ...(mon.mood === undefined ? {} : { mood: mon.mood }) }, lingo);
   if (plan.voice.kind === 'silent' || plan.plainSpoken === '' || typeof globalThis.speechSynthesis === 'undefined') throw new MonVoiceSilent('silent');
   const pitch = plan.voice.kind === 'lineage' ? plan.voice.fallbackPitch : plan.voice.pitch;

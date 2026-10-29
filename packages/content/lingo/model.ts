@@ -49,6 +49,18 @@ export interface LingoGuideEntry {
   readonly trigger: string | null;
 }
 
+/** What kind of babble sound a row is. */
+export type BabbleKind = 'syllable' | 'family-sound' | 'egg-sound';
+
+/** One babble sound (Decision 32): a syllable every Mon chains, a line's family sound, or an Egg's muffled sound. */
+export interface BabbleEntry {
+  readonly key: string;
+  readonly kind: BabbleKind;
+  readonly text: string;
+  /** Null: every Bloodline. */
+  readonly bloodlineId: string | null;
+}
+
 /**
  * How one voice performs: the ElevenLabs `style` (how strongly the voice's own
  * delivery is exaggerated, 0 to 1) and `speed` (1 is the voice's natural pace,
@@ -102,6 +114,8 @@ export interface MonLingo {
   readonly pronunciations: readonly PronunciationEntry[];
   readonly stageDirections: readonly StageDirectionEntry[];
   readonly guide: readonly LingoGuideEntry[];
+  /** Babble sounds. Empty in lingo served before the babble rows; readers then use the fallback's. */
+  readonly babble: readonly BabbleEntry[];
   readonly voices: MonVoiceTables;
 }
 
@@ -163,6 +177,7 @@ export function monLingoFromRows(rows: readonly LexiconRow[], voices: MonVoicesD
   const pronunciations: PronunciationEntry[] = [];
   const stageDirections: StageDirectionEntry[] = [];
   const guide: LingoGuideEntry[] = [];
+  const babble: BabbleEntry[] = [];
   for (const row of served) {
     switch (row.category) {
       case 'mon-line': {
@@ -201,6 +216,13 @@ export function monLingoFromRows(rows: readonly LexiconRow[], voices: MonVoicesD
           trigger: nonEmpty(row.triggerText) ?? null,
         });
         break;
+      case 'babble': {
+        const text = nonEmpty(row.canonicalText)?.toLowerCase();
+        const kind = row.subcategory?.trim();
+        if (text === undefined || (kind !== 'syllable' && kind !== 'family-sound' && kind !== 'egg-sound')) break;
+        babble.push({ key: row.key, kind, text, bloodlineId: nonEmpty(row.bloodlineId) ?? null });
+        break;
+      }
       default:
         break;
     }
@@ -226,6 +248,7 @@ export function monLingoFromRows(rows: readonly LexiconRow[], voices: MonVoicesD
     pronunciations,
     stageDirections,
     guide,
+    babble,
     voices: {
       provider: voices.provider,
       model: voices.model,
@@ -264,11 +287,14 @@ export function parseMonLingo(value: unknown): MonLingo | undefined {
   if (!Array.isArray(pronunciations) || !pronunciations.every((p) => isObj(p) && isStr(p.key) && isStr(p.written) && isStrArr(p.variants) && isStr(p.spoken) && isStrOrNull(p.spokenPlural))) return undefined;
   if (!Array.isArray(stageDirections) || !stageDirections.every((d) => isObj(d) && isStr(d.key) && isStr(d.tag) && isStrArr(d.keywords) && d.keywords.length > 0)) return undefined;
   if (!Array.isArray(guide) || !guide.every((g) => isObj(g) && isStr(g.key) && (g.category === 'word-palette' || g.category === 'voice-rule') && isStr(g.text))) return undefined;
+  // A server from before the babble rows sends no `babble`: read it as empty.
+  const babble = value.babble ?? [];
+  if (!Array.isArray(babble) || !babble.every((b) => isObj(b) && isStr(b.key) && isStr(b.text) && (b.kind === 'syllable' || b.kind === 'family-sound' || b.kind === 'egg-sound') && isStrOrNull(b.bloodlineId))) return undefined;
   if (voices.provider !== 'elevenlabs' || !isStr(voices.model) || !Array.isArray(voices.lineages)) return undefined;
   if (!voices.lineages.every((l) => isObj(l) && isStr(l.lineageId) && isStr(l.elevenLabsVoiceId) && isStr(l.name) && isObj(l.expression) && isNum(l.expression.style) && isNum(l.expression.speed))) return undefined;
   const { stagePitch, moods, defaultDelivery, lowEnergy } = voices;
   if (!isObj(stagePitch) || !LIFECYCLE_STAGES.every((s) => stagePitch[s] === null || isNum(stagePitch[s]))) return undefined;
   if (!isObj(moods) || !MON_MOODS.every((m) => isDelivery(moods[m])) || !isDelivery(defaultDelivery)) return undefined;
   if (!isObj(lowEnergy) || !Array.isArray(lowEnergy.moods) || !lowEnergy.moods.every(isMood) || !isNum(lowEnergy.styleFactor) || !isNum(lowEnergy.maxSpeed)) return undefined;
-  return value as unknown as MonLingo;
+  return { ...(value as unknown as MonLingo), babble: babble as BabbleEntry[] };
 }

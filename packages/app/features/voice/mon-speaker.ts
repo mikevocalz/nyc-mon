@@ -95,7 +95,7 @@ export function createMonSpeaker<C>(deps: MonSpeakerDeps<C>): MonSpeaker {
     async say({ text, mon, owner }) {
       stop();
       const lingo = deps.lingo?.() ?? FALLBACK_MON_LINGO;
-      const ref = monVoiceRef(mon);
+      const ref = monVoiceRef(mon, Date.now());
       const plan = planMonUtterance(text, ref === null ? undefined : { ...ref, ...(mon.mood === undefined ? {} : { mood: mon.mood }) }, lingo);
       if (plan.caption === '') return;
 
