@@ -49,7 +49,7 @@ export { SegmentedControl, type SegmentedControlProps, type SegmentedOption } fr
 export { Select, type SelectOption, type SelectProps } from '../Select';
 export { SignageBand, type SignageBandProps } from '../SignageBand';
 export { Switch, type SwitchProps } from '../Switch';
-export { TabBar, type TabBarProps } from '../TabBar';
+export { TabBar, type TabBarProps, type TabBarTab, type TabIconState } from '../TabBar';
 export { Text, type TextProps } from '../Text';
 export { Textarea, type TextareaProps } from '../Textarea';
 export { TextField, type TextFieldProps } from '../TextField';
