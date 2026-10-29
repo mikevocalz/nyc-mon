@@ -77,8 +77,10 @@ export function createCompanionVoice(deps: CompanionVoiceDeps): CompanionVoice {
 
   const learn = (result: CallToolResult) => {
     const mon = (result.structuredContent as { mon?: { hatchedAt?: unknown } } | undefined)?.mon;
-    if (!result.isError && mon && typeof mon === 'object') hatched = typeof mon.hatchedAt === 'number' && Number.isFinite(mon.hatchedAt) ? mon.hatchedAt : undefined;
     const next = stickyVoice(remembered, [asItem(result)]);
+    // A result without hatchedAt keeps the one already known; a different Mon's voice forgets it.
+    if (next?.voice.lineageId !== remembered?.voice.lineageId) hatched = undefined;
+    if (!result.isError && mon && typeof mon === 'object' && typeof mon.hatchedAt === 'number' && Number.isFinite(mon.hatchedAt)) hatched = mon.hatchedAt;
     if (next === remembered) return;
     remembered = next;
     deps.setSessionVoice(next?.voice);

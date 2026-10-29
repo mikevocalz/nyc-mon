@@ -231,16 +231,30 @@ function Companion({ config }: { config:Config }) {
   },[provider,config.mcpUrl,store,showError,runtime,memoryRequest,voice,rememberMon]);
 
   // An Egg, or a Baby in its first day, babbles now and then on its own (ambientBabble.ts): a scripted line, no model call.
-  // This page has no mute control; a hidden tab counts as muted.
+  // This page has no mute control; a hidden tab counts as muted. `babbling` covers the TTS fetch, before any clip plays,
+  // so a second line never starts on top; the caption comes from the sentence the voice actually starts.
+  const babbling = useRef(false);
   useEffect(() => {
     if (!state.connected) return;
     return startAmbientBabble({
       voice:() => voice.current(),hatchedAt:() => voice.hatchedAt(),
-      quiet:() => { const st=store.getState();return st.busy || st.voice.phase !== 'off' || playbackStartedAt() !== null || handles.getState().speakingLine !== null; },
+      quiet:() => { const st=store.getState();return babbling.current || st.busy || st.voice.phase !== 'off' || playbackStartedAt() !== null || handles.getState().speakingLine !== null; },
       muted:() => document.visibilityState !== 'visible',
-      say:(line) => { push({ who:'Mon',text:line });void voice.speak(line,authorize); },
+      say:(line) => {
+        babbling.current=true;
+        void voice.speak(line,authorize,(sentence) => {
+          // The Caller started talking while the clip was being fetched: drop the babble instead of playing over them.
+          if (store.getState().busy || store.getState().voice.phase !== 'off') { voice.stop();return; }
+          push({ who:'Mon',text:sentence });
+        }).finally(() => { babbling.current=false; });
+      },
     });
   },[state.connected,store,voice,handles,push,authorize]);
+
+  // Talk, a conversation or a turn cuts an ambient babble off (barge-in does the same for a reply).
+  useEffect(() => {
+    if (babbling.current && (state.busy || state.voice.phase !== 'off')) { voice.stop();babbling.current=false; }
+  },[state.busy,state.voice.phase,voice]);
 
   /** One turn, typed or spoken. The reply is spoken sentence by sentence and captioned as each sentence starts. */
   async function runTurn(question:string, source:'typed'|'voice', startedAt:number) {

@@ -65,6 +65,15 @@ describe('the NVIDIA companion speaks in the Mon voice', () => {
     expect(voice.hatchedAt()).toBeUndefined();
   });
 
+  it('keeps the known hatch time when a later result omits it, and forgets it for another Mon', () => {
+    const { voice } = setup();
+    voice.learn(result({ mon: { monId: 'mon-1', hatchedAt: 5, voice: { lineageId: 'dex-001/male/1', stage: 'Baby' } } }));
+    voice.learn(result({ mon: { monId: 'mon-1', voice: { lineageId: 'dex-001/male/1', stage: 'Baby' } } }));
+    expect(voice.hatchedAt()).toBe(5);
+    voice.learn(result({ mon: { monId: 'mon-2', voice: { lineageId: 'dex-008/female/2', stage: 'Baby' } } }));
+    expect(voice.hatchedAt()).toBeUndefined();
+  });
+
   it('keeps the voice when a later result names none (sticky)', async () => {
     const { voice, rec } = setup();
     voice.learn(ratti('Small'));
