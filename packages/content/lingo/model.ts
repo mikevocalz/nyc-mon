@@ -219,7 +219,8 @@ export function monLingoFromRows(rows: readonly LexiconRow[], voices: MonVoicesD
       case 'babble': {
         const text = nonEmpty(row.canonicalText)?.toLowerCase();
         const kind = row.subcategory?.trim();
-        if (text === undefined || (kind !== 'syllable' && kind !== 'family-sound' && kind !== 'egg-sound')) break;
+        // Letters only; the speech gate re-checks every entry against its real-word list.
+        if (text === undefined || !/^[a-z]{1,10}$/.test(text) || (kind !== 'syllable' && kind !== 'family-sound' && kind !== 'egg-sound')) break;
         babble.push({ key: row.key, kind, text, bloodlineId: nonEmpty(row.bloodlineId) ?? null });
         break;
       }
@@ -265,6 +266,9 @@ export function monLingoFromRows(rows: readonly LexiconRow[], voices: MonVoicesD
 
 // --- Reading served JSON -----------------------------------------------------
 
+/** More babble rows than a served lingo may carry; a longer list is malformed. */
+export const MAX_BABBLE_ROWS = 200;
+
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 const isStr = (v: unknown): v is string => typeof v === 'string';
 const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
@@ -288,8 +292,8 @@ export function parseMonLingo(value: unknown): MonLingo | undefined {
   if (!Array.isArray(stageDirections) || !stageDirections.every((d) => isObj(d) && isStr(d.key) && isStr(d.tag) && isStrArr(d.keywords) && d.keywords.length > 0)) return undefined;
   if (!Array.isArray(guide) || !guide.every((g) => isObj(g) && isStr(g.key) && (g.category === 'word-palette' || g.category === 'voice-rule') && isStr(g.text))) return undefined;
   // A server from before the babble rows sends no `babble`: read it as empty.
-  const babble = value.babble ?? [];
-  if (!Array.isArray(babble) || !babble.every((b) => isObj(b) && isStr(b.key) && isStr(b.text) && (b.kind === 'syllable' || b.kind === 'family-sound' || b.kind === 'egg-sound') && isStrOrNull(b.bloodlineId))) return undefined;
+  const babble = value.babble === undefined ? [] : value.babble;
+  if (!Array.isArray(babble) || babble.length > MAX_BABBLE_ROWS || !babble.every((b) => isObj(b) && isStr(b.key) && isStr(b.text) && (b.kind === 'syllable' || b.kind === 'family-sound' || b.kind === 'egg-sound') && isStrOrNull(b.bloodlineId))) return undefined;
   if (voices.provider !== 'elevenlabs' || !isStr(voices.model) || !Array.isArray(voices.lineages)) return undefined;
   if (!voices.lineages.every((l) => isObj(l) && isStr(l.lineageId) && isStr(l.elevenLabsVoiceId) && isStr(l.name) && isObj(l.expression) && isNum(l.expression.style) && isNum(l.expression.speed))) return undefined;
   const { stagePitch, moods, defaultDelivery, lowEnergy } = voices;

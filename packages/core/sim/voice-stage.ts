@@ -42,8 +42,13 @@ export function voiceStage(mon: VoiceStageSubject, now: number): VoiceStage {
       if (hatchedAt === undefined || !Number.isFinite(now)) return 'limited';
       return now - hatchedAt < BABY_TALK_MS ? 'baby-talk' : 'limited';
     }
-    default:
+    case 'Small':
+    case 'Mid':
+    case 'Max':
       return 'full';
+    default:
+      // A stage this build does not know (bad data): never more than limited.
+      return 'limited';
   }
 }
 
@@ -64,7 +69,7 @@ const RANK: Readonly<Record<VoiceStage, number>> = { 'baby-talk': 0, limited: 1,
  * {@link voiceStage}).
  */
 export function capVoiceStage(stage: LifecycleStage, claimed?: VoiceStage): VoiceStage {
-  const ceiling: VoiceStage = stage === 'Egg' ? 'baby-talk' : stage === 'Baby' ? 'limited' : 'full';
-  if (claimed === undefined) return ceiling;
+  const ceiling: VoiceStage = stage === 'Egg' ? 'baby-talk' : stage === 'Small' || stage === 'Mid' || stage === 'Max' ? 'full' : 'limited';
+  if (claimed === undefined || !(claimed in RANK)) return ceiling;
   return RANK[claimed] < RANK[ceiling] ? claimed : ceiling;
 }

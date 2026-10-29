@@ -75,10 +75,23 @@ interface CleanInventory {
   readonly sounds: ReadonlySet<string>;
 }
 
-function clean(inventory: BabbleInventory): CleanInventory {
-  const syllables = [...new Set(inventory.syllables.map((s) => s.trim().toLowerCase()))].filter((s) => /^[a-z]{1,5}$/.test(s) && !BLOCKED.has(s));
-  const sounds = new Set(inventory.sounds.map((s) => s.trim().toLowerCase()).filter((s) => /^[a-z]{2,10}$/.test(s) && !BLOCKED.has(s)));
+const byText = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+
+/**
+ * The inventory the gate trusts: lower-case letters only (syllables 1 to 5,
+ * sounds 2 to 10), no blocked real word, de-duplicated and sorted so the same
+ * rows in any order babble the same. No usable syllable falls back to
+ * {@link DEFAULT_BABBLE_SYLLABLES}. Anything shown to a model goes through this too.
+ */
+export function cleanBabbleInventory(inventory: BabbleInventory): BabbleInventory {
+  const syllables = [...new Set(inventory.syllables.map((s) => s.trim().toLowerCase()))].filter((s) => /^[a-z]{1,5}$/.test(s) && !BLOCKED.has(s)).sort(byText);
+  const sounds = [...new Set(inventory.sounds.map((s) => s.trim().toLowerCase()))].filter((s) => /^[a-z]{2,10}$/.test(s) && !BLOCKED.has(s)).sort(byText);
   return { syllables: syllables.length > 0 ? syllables : DEFAULT_BABBLE_SYLLABLES, sounds };
+}
+
+function clean(inventory: BabbleInventory): CleanInventory {
+  const { syllables, sounds } = cleanBabbleInventory(inventory);
+  return { syllables, sounds: new Set(sounds) };
 }
 
 /** True when `text` splits into 1 to MAX_BABBLE_SYLLABLES syllables with no syllable twice in a row. */
@@ -131,7 +144,7 @@ function makeToken(inv: CleanInventory, random: () => number): string {
     const token = chain.length > 1 && random() < 0.4 ? chain.join('-') : chain.join('');
     if (tokenOk(token, inv)) return token;
   }
-  return inv.syllables[0]!;
+  return inv.syllables.find((s) => tokenOk(s, inv)) ?? DEFAULT_BABBLE_SYLLABLES[0]!;
 }
 
 /**

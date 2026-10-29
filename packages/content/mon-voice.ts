@@ -1,6 +1,7 @@
 import {
   type BabbleInventory,
   capVoiceStage,
+  cleanBabbleInventory,
   enforceVoiceStage,
   LIFECYCLE_STAGES,
   type LifecycleStage,
@@ -83,6 +84,7 @@ export interface MonVoiceSource {
  * server's): null for a Mon hatched before voice lineages.
  */
 export function monVoiceRef(mon: MonVoiceSource, now: number): { lineageId: string; stage: LifecycleStage; voiceStage: VoiceStage } | null {
+  if (typeof now !== 'number') throw new TypeError('monVoiceRef(mon, now): now must be a clock reading in ms');
   return mon.voiceLineageId === null ? null : { lineageId: mon.voiceLineageId, stage: mon.stage, voiceStage: voiceStageAt(mon, now) };
 }
 
@@ -123,13 +125,21 @@ export function babbleInventory(
   stage: LifecycleStage,
   lingo: MonLingo = FALLBACK_MON_LINGO,
 ): BabbleInventory {
-  const rows = lingo.babble.length > 0 ? lingo.babble : FALLBACK_MON_LINGO.babble;
   const bloodlineId = bloodlineFor(subject);
-  const mine = rows.filter((row) => row.bloodlineId === null || row.bloodlineId === bloodlineId);
-  return {
-    syllables: mine.filter((row) => row.kind === 'syllable').map((row) => row.text),
-    sounds: mine.filter((row) => row.kind === 'family-sound' || (stage === 'Egg' && row.kind === 'egg-sound')).map((row) => row.text),
+  const pick = (rows: MonLingo['babble']) => {
+    const mine = rows.filter((row) => row.bloodlineId === null || row.bloodlineId === bloodlineId);
+    return {
+      syllables: mine.filter((row) => row.kind === 'syllable').map((row) => row.text),
+      sounds: mine.filter((row) => row.kind === 'family-sound' || (stage === 'Egg' && row.kind === 'egg-sound')).map((row) => row.text),
+    };
   };
+  const served = pick(lingo.babble);
+  const fallback = pick(FALLBACK_MON_LINGO.babble);
+  // Each kind falls back on its own, so a partial edit never leaves a Mon without syllables or its family sound.
+  return cleanBabbleInventory({
+    syllables: served.syllables.length > 0 ? served.syllables : fallback.syllables,
+    sounds: served.sounds.length > 0 ? served.sounds : fallback.sounds,
+  });
 }
 
 /** Writing guidance for a model voicing a babbling Mon: the only sounds it may use. */
@@ -296,7 +306,10 @@ export interface PlanOptions {
 /**
  * Runs a line through the speech gate for `ref`'s voice stage (Decision 32):
  * babble only for `baby-talk`, the Q32 limit for `limited`, untouched for
- * `full` or when no Mon voice is known. Servers call it on model output.
+ * `full` or when no Mon voice is known. Servers call it on model output with a
+ * ref built from the stored Mon (`monVoiceRef(mon, serverNow)`), never from a
+ * client's `voiceStage`: a claim can only lower speech, and without one a Baby
+ * is capped at `limited`, which misses its first-day babble.
  */
 export function gateMonLine(text: string, ref: MonVoiceRef | undefined, lingo: MonLingo = FALLBACK_MON_LINGO, options: PlanOptions = {}): { text: string; voiceStage: VoiceStage; replaced: boolean } {
   if (ref === undefined) return { text, voiceStage: 'full', replaced: false };

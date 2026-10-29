@@ -103,3 +103,11 @@ describe('capVoiceStage', () => {
     expect(capVoiceStage('Max', 'limited')).toBe('limited');
   });
 });
+
+describe('unknown stages', () => {
+  it('a stage this build does not know never gets more than limited', () => {
+    expect(voiceStage({ stage: 'Mega' as never }, T0)).toBe('limited');
+    expect(capVoiceStage('Mega' as never, 'full')).toBe('limited');
+    expect(capVoiceStage('Baby', 'shouting' as never)).toBe('limited');
+  });
+});

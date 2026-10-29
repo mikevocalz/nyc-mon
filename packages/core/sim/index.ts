@@ -92,6 +92,7 @@ export { BABY_TALK_MS, babyTalkEndsAt, capVoiceStage, voiceStage, type VoiceStag
 export {
   type BabbleInventory,
   checkLimitedSpeech,
+  cleanBabbleInventory,
   DEFAULT_BABBLE_SYLLABLES,
   enforceBabble,
   enforceLimitedSpeech,
