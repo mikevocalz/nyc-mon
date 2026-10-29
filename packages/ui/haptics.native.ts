@@ -77,4 +77,10 @@ export const haptics = {
   hatchEmerge: guard((p) => p.unfurl),
   /** hatch: the lean-in first look (M12) */
   firstLook: guard((p) => p.heartbeat),
+  /** Mon Space: a real attention call opens (once per call, never repeated while it stays open) */
+  attention: guard((p) => p.System.notificationWarning),
+  /** Mon Space: the evolve beat lands */
+  evolve: guard((p) => p.bloom),
+  /** Mon Space: the flush clears the piles */
+  flush: guard((p) => p.System.notificationSuccess),
 };

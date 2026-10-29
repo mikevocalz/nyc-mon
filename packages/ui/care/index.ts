@@ -14,3 +14,12 @@ export { roundDots, type RoundDot } from './round-dots-model';
 export {
   countdownProgress, minuteSteppedProgress, stopArcs, arcPath, stepStop, percentOf, careRingName, clamp01,
 } from './ring-model';
+// Mon Space: four-heart rows, the LCD panel and its pixel parts (docs/research/vpet-modern-design-directions.md, Direction A).
+export { HeartRow, type HeartRowProps } from './HeartRow';
+export { SegmentBar, type SegmentBarProps } from './SegmentBar';
+export { SegmentNumber, type SegmentNumberProps } from './SegmentNumber';
+export { PixelGlyph, type PixelGlyphProps } from './PixelGlyph';
+export { LcdPanel, type LcdPanelProps } from './LcdPanel';
+export { LcdIconButton, type LcdIconButtonProps } from './LcdIconButton';
+export { PIXEL_GLYPHS, glyphPath, glyphSize, fourMarks, type PixelBitmap, type PixelGlyphName } from './pixel-glyphs';
+export { lcdColors, segmentDigits, segmentMask, type LcdColors, type SegmentMask } from './lcd-model';

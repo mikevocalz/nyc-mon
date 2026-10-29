@@ -11,17 +11,19 @@ export const GLASS_MON_TARGET = 'mon';
 /** The status row's tone: plain, asking for something, or done. */
 export type GlassTone = 'neutral' | 'request' | 'ready';
 
-/** One care meter drawn as a ring (M13's CareMeterRing on the glass). */
+/**
+ * One care meter drawn as a row of four hearts (the kit's HeartRow on the
+ * glass). One tint for every meter, no number, no red (M13 direction: "No
+ * numbers on the rings", "No danger red", "One fill colour").
+ */
 export interface GlassRing {
   readonly id: string;
   readonly label: string;
-  /** 0..1. */
-  readonly value: number;
-  /** Under the needs-you line: the arc turns red and the label says so. */
+  /** 0..4 full hearts (`heartsFor` in `@acme/core/sim`). */
+  readonly hearts: number;
+  /** Under the needs-you line: the label says so in words. */
   readonly low: boolean;
   readonly lowLabel: string;
-  /** A `hud` token. */
-  readonly tint: string;
 }
 
 /** One line of text in the screen's lower block. */
@@ -128,41 +130,40 @@ export function glassGeometry(layout: GlassLayout) {
   return { headerBottom, actionsTop, linesTop, linesHeight, model, actionRect };
 }
 
-/** An arc as a polyline (Ctx2D has no `arc`), clockwise from 12 o'clock over `turn` of a circle. */
-function strokeArc(ctx: Ctx2D, cx: number, cy: number, r: number, turn: number): void {
-  const steps = Math.max(2, Math.ceil(64 * turn));
-  ctx.beginPath();
-  for (let i = 0; i <= steps; i++) {
-    const a = -Math.PI / 2 + (i / steps) * turn * Math.PI * 2;
-    const x = cx + Math.cos(a) * r;
-    const y = cy + Math.sin(a) * r;
-    if (i === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
-  }
-  ctx.stroke();
+/** The 7 x 6 pixel heart the kit's HeartRow draws, so glass and screen share one mark. */
+const HEART: readonly string[] = ['.##.##.', '#######', '#######', '.#####.', '..###..', '...#...'];
+const HEART_EMPTY: readonly string[] = ['.##.##.', '#..#..#', '#.....#', '.#...#.', '..#.#..', '...#...'];
+const HEART_CELL = 6;
+const HEART_GAP = 10;
+
+function drawHeart(ctx: Ctx2D, x: number, y: number, bitmap: readonly string[]): void {
+  bitmap.forEach((row, r) => {
+    for (let c = 0; c < row.length; c++) if (row[c] === '#') ctx.fillRect(x + c * HEART_CELL, y + r * HEART_CELL, HEART_CELL, HEART_CELL);
+  });
 }
 
 function drawRings(ctx: Ctx2D, font: CanvasFont, rings: readonly GlassRing[]): void {
   const slot = (W - PAD * 2) / Math.max(1, rings.length);
+  const heartW = 7 * HEART_CELL;
+  const rowW = heartW * 4 + HEART_GAP * 3;
   rings.forEach((ring, i) => {
     const cx = PAD + slot * (i + 0.5);
     const cy = 296;
-    const value = Math.min(1, Math.max(0, ring.value));
-    ctx.lineCap = 'round';
-    ctx.lineWidth = 12;
-    ctx.strokeStyle = hud.line;
-    strokeArc(ctx, cx, cy, RING_R, 1);
-    if (value > 0) {
-      ctx.strokeStyle = ring.low ? hud.red : ring.tint;
-      strokeArc(ctx, cx, cy, RING_R, value);
+    const filled = Math.max(0, Math.min(4, Math.floor(ring.hearts)));
+    // Hearts stack two by two when a third of the glass is too narrow for a row of four.
+    const twoRows = rowW > slot - 16;
+    ctx.fillStyle = hud.cyan;
+    for (let h = 0; h < 4; h++) {
+      const col = twoRows ? h % 2 : h;
+      const line = twoRows ? Math.floor(h / 2) : 0;
+      const width = twoRows ? heartW * 2 + HEART_GAP : rowW;
+      const x = cx - width / 2 + col * (heartW + HEART_GAP);
+      const y = (twoRows ? cy - 6 * HEART_CELL - HEART_GAP / 2 : cy - 3 * HEART_CELL) + line * (6 * HEART_CELL + HEART_GAP);
+      drawHeart(ctx, x, y, h < filled ? HEART : HEART_EMPTY);
     }
-    ctx.lineCap = 'butt';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillStyle = hud.text;
-    ctx.font = font(26, 700);
-    ctx.fillText(`${Math.round(value * 100)}`, cx, cy);
-    ctx.fillStyle = ring.low ? hud.amber : hud.dim;
+    ctx.fillStyle = ring.low ? hud.text : hud.dim;
     ctx.font = font(24, 600);
     ctx.fillText(ring.low ? `${ring.label} · ${ring.lowLabel}` : ring.label, cx, cy + RING_R + 32);
   });

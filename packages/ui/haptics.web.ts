@@ -10,4 +10,7 @@ export const haptics = {
   hatchBloom: () => undefined,
   hatchEmerge: () => undefined,
   firstLook: () => undefined,
+  attention: () => undefined,
+  evolve: () => undefined,
+  flush: () => undefined,
 };

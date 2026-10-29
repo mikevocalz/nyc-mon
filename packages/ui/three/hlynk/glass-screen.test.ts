@@ -24,7 +24,7 @@ const HOME: GlassView = {
   status: { text: 'Squeaklet is hungry', tone: 'request' },
   title: 'Squeaklet',
   subtitle: 'Hood Ratti Bloodline',
-  rings: [{ id: 'fullness', label: 'Food', value: 0.2, low: true, lowLabel: 'Low', tint: 'hud-green' }],
+  rings: [{ id: 'fullness', label: 'Food', hearts: 1, low: true, lowLabel: 'Low' }],
   lines: [{ text: 'A line' }],
   actions: [
     { target: 'feed', label: 'Feed', tone: 'primary' },
@@ -58,13 +58,15 @@ test('the Baby stands in one slot between the header and the text block, inside 
   assert.equal(screen.selected?.(), GLASS_MON_TARGET);
 });
 
-test('draws the status, title, rings with their low word, lines and buttons', () => {
+test('draws the status, title, heart rows with their low word, lines and buttons', () => {
   const { screen } = setup();
   const { ctx, texts } = recordingCtx();
   screen.draw(ctx, (size) => `${size}px x`, null);
-  for (const t of ['Squeaklet is hungry', 'Squeaklet', 'Hood Ratti Bloodline', 'Food · Low', '20', 'A line', 'Feed', 'Rest', 'Play']) {
+  for (const t of ['Squeaklet is hungry', 'Squeaklet', 'Hood Ratti Bloodline', 'Food · Low', 'A line', 'Feed', 'Rest', 'Play']) {
     assert.ok(texts.includes(t), `draws ${t}`);
   }
+  // Care meters are hearts: no percent number on the glass (M13 direction).
+  assert.ok(!texts.some((t) => /^\d+$/.test(t)), 'draws no meter number');
 });
 
 test('a tap on a button acts; a disabled one does nothing; the model tap goes to onModel', () => {
