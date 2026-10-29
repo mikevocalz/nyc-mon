@@ -34,6 +34,9 @@ import type { PhysicalRig } from './world/physical-rig.ts';
 import { loadPhysicalRig } from './physical-graph.ts';
 import { backendUploaded, createUploadedReleaser, RELEASE_UPLOADED } from './world/release-uploaded.ts';
 import { applyReversedDepthOffsets } from './world/reversed-depth-offset.ts';
+import { createFloatingOrigin, updateFloatingOrigin } from './world/floating-origin.ts';
+import { setRenderOrigin } from './world/render-space.ts';
+import { CELL } from './world/cells/cell-rules.ts';
 
 export interface CityCamera {
   x: number;
@@ -146,6 +149,14 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(50, 1, 0.5, 10_000);
+  const origin = createFloatingOrigin();
+  updateFloatingOrigin(origin, initial.camera.x, initial.camera.z);
+  const renderRoot = new THREE.Group();
+  renderRoot.position.set(-origin.cx * CELL, 0, -origin.cz * CELL);
+  renderRoot.updateMatrix();
+  renderRoot.matrixAutoUpdate = false;
+  scene.add(renderRoot);
+  setRenderOrigin(scene, origin.cx * CELL, 0, origin.cz * CELL);
   // L6 "holding frame rate": the tier bundle contributes the option
   // defaults the lower lanes expose (env size, glass tier, post picks)
   // when the selector is set or the render-scale controller is on — with
@@ -178,7 +189,7 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
       : {}),
     ...(worldStreamEnabled(physical !== null) ? { stream: { preset, log: streamLog } } : {}),
   });
-  scene.add(world.sky, world.group);
+  renderRoot.add(world.sky, world.group);
   scene.fog = world.fog;
   // react-native-webgpu renders black through three's output pass, shadow
   // maps and Color backgrounds (metro-live README): linear output, no tone
@@ -293,7 +304,7 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
     for (const factory of initial.actors ?? []) {
       const actor = factory(THREE);
       actors.push(actor);
-      scene.add(actor.object as InstanceType<typeof THREE.Object3D>);
+      (actor.coordinateSpace === 'render' ? scene : renderRoot).add(actor.object as InstanceType<typeof THREE.Object3D>);
     }
   } catch (error) {
     post?.dispose();
@@ -344,14 +355,20 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
   // Per-frame scratch: the pose, the actor frame and the camera write into
   // preallocated objects, so the update loop allocates nothing.
   const pose: CameraPose = { position: [0, 0, 0], target: [0, 0, 0], pitch: 0, distance: 0 };
-  const actorFrame: { -readonly [K in keyof ActorFrame]: ActorFrame[K] } = { delta: 0, time: 0, reducedMotion: false };
+  const actorFrame: { -readonly [K in keyof ActorFrame]: ActorFrame[K] } = { delta: 0, time: 0, reducedMotion: false, originX: origin.cx * CELL, originZ: origin.cz * CELL, originChanged: false };
+  const streamCamera = { x: 0, y: 0, z: 0 };
+  let lastOriginChanged = true;
 
   function positionCamera(value: CityCamera) {
     if (![value.x, value.z, value.yaw, value.distance].every(Number.isFinite)) throw new Error('Invalid city camera');
     cameraPose(value, pose);
+    const ox = origin.cx * CELL, oz = origin.cz * CELL;
+    streamCamera.x = pose.position[0];
+    streamCamera.y = pose.position[1];
+    streamCamera.z = pose.position[2];
     // No spreads in the frame loop: each would materialise an arguments array.
-    camera.position.set(pose.position[0], pose.position[1], pose.position[2]);
-    camera.lookAt(pose.target[0], pose.target[1], pose.target[2]);
+    camera.position.set(pose.position[0] - ox, pose.position[1], pose.position[2] - oz);
+    camera.lookAt(pose.target[0] - ox, pose.target[1], pose.target[2] - oz);
     // Near and far follow the zoom so depth precision holds from 8 m to 3 km.
     const near = Math.max(0.1, Math.min(5, pose.distance * 0.02));
     const far = Math.max(3000, pose.distance * 6);
@@ -362,14 +379,14 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
     }
     world.setViewDistance(pose.distance, far);
     // After the distance: tree LOD reads it.
-    world.setFocus(value.x, value.z);
-    world.sky.position.copy(camera.position);
+    world.setFocus(value.x, value.z, origin.cx * CELL, origin.cz * CELL, lastOriginChanged);
+    world.sky.position.set(pose.position[0], pose.position[1], pose.position[2]);
     world.sky.scale.setScalar(far * 0.9);
   }
   positionCamera(initial.camera);
   // The START set, after every scene pass above (shadow roles, depth offsets) has reached the layer templates.
   camera.updateMatrixWorld();
-  world.primeStream(camera.position, errorScale(), preset.residentRadiusM * STREAM_START_SHARE);
+  world.primeStream(streamCamera, errorScale(), preset.residentRadiusM * STREAM_START_SHARE);
   if (world.stream) cityStreamStats.set(scene, world.stream.stats);
   if (streamLog && world.stream) {
     streamLog('preset', { preset: preset.name, stream: true, radius: preset.residentRadiusM, k: Math.round(errorScale()) });
@@ -417,7 +434,18 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
           );
         }
       }
+      const originChanged = updateFloatingOrigin(origin, params.camera.x, params.camera.z);
+      lastOriginChanged = originChanged;
+      if (originChanged) {
+        renderRoot.position.set(-origin.cx * CELL, 0, -origin.cz * CELL);
+        renderRoot.updateMatrix();
+        setRenderOrigin(scene, origin.cx * CELL, 0, origin.cz * CELL);
+        invalidate?.();
+      }
       if (actors.length > 0) {
+        actorFrame.originX = origin.cx * CELL;
+        actorFrame.originZ = origin.cz * CELL;
+        actorFrame.originChanged = originChanged;
         let delta = frame.delta > 0 ? frame.delta : 0;
         // A redraw requested by a moving actor: measure the gap ourselves. The first frame after rest moves nothing.
         if (delta === 0 && moving && lastActorTick > 0) delta = Math.min(Math.max((now - lastActorTick) / 1000, 0), 0.1);
@@ -434,7 +462,7 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
       // After the actors: a chase camera reads the Caller's position in this frame's params.
       positionCamera(params.camera);
       // Cells in and out for this camera; while some are still to build or fading, ask for the next frame.
-      if (world.updateStream(camera.position, errorScale(), now / 1000)) invalidate?.();
+      if (world.updateStream(streamCamera, errorScale(), now / 1000)) invalidate?.();
       if (streamLog && world.stream && now - streamLogAt >= 5000) {
         streamLogAt = now;
         const st = world.stream.stats;
@@ -444,7 +472,7 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
         });
       }
       if (rig) {
-        rig.update(camera.position.y, params.camera.x, params.camera.z);
+        rig.update(camera.position.y, params.camera.x - origin.cx * CELL, params.camera.z - origin.cz * CELL);
         const preset = params.preset ?? DEFAULT_PHYSICAL_PRESET;
         if (preset !== rig.preset) {
           // The rebake renders PMREM cube faces through renderer.render, which
@@ -459,7 +487,7 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
         const fz = pose.target[2] - pose.position[2];
         const fl = Math.hypot(fx, fz) || 1;
         world.updateNightLights(
-          camera.position.x, camera.position.y, camera.position.z, fx / fl, fz / fl, rig.uniforms.uInteriorGlow.value,
+          streamCamera.x, streamCamera.y, streamCamera.z, fx / fl, fz / fl, rig.uniforms.uInteriorGlow.value,
         );
       }
       // Precipitation animates on the shader clock — while rain or snow is

@@ -42,13 +42,14 @@ export function facadeFrame(THREE: FrameThree): FacadeFrame {
  * coordinate its window grid runs along. `wallLocal` is Slop's `boxLocal`:
  * the wall is told apart by its own geometry normal rather than the frame.
  */
-export function facadeProjection(THREE: FrameThree, frame: FacadeFrame, wallLocal: boolean): { nWall: TslNode; alongZ: TslNode; uCoord: TslNode; isRoof: TslNode } {
+export function facadeProjection(THREE: FrameThree, frame: FacadeFrame, wallLocal: boolean, patternWorld?: TslNode): { nWall: TslNode; alongZ: TslNode; uCoord: TslNode; isRoof: TslNode } {
   const T = looseTsl(THREE);
   const nWall = wallLocal ? T.normalGeometry : frame.normal;
   const nW = T.abs(nWall);
   const isRoof = T.step(0.75, nW.y);
   const alongZ = wallLocal ? T.step(nW.z, nW.x) : frame.alongZ;
-  const uCoord = T.mix(T.positionWorld.x, T.positionWorld.z, alongZ);
+  const wp = patternWorld ?? T.positionWorld;
+  const uCoord = T.mix(wp.x, wp.z, alongZ);
   return { nWall, alongZ, uCoord, isRoof };
 }
 

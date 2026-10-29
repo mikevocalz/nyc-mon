@@ -31,21 +31,28 @@ export function preloadVdBlocks(): Promise<VdBlockBytes | null> {
   if (bytes) return Promise.resolve(bytes);
   pending ??= (async () => {
     try {
-      const [{ VD_SHELL_ASSET, VD_NEAR_ASSETS, VD_LITE_ASSETS }, { fetchAssetBytes }, { worldPresetWithoutCanvas }] = await Promise.all([
+      const [{ VD_SHELL_ASSET, VD_NEAR_ASSETS, VD_LITE_ASSETS }, { fetchAssetBytes }, { worldPresetWithoutCanvas }, { vdCellFetch }] = await Promise.all([
         import('./data/assets.ts'),
         import('@acme/ui/three/asset-bytes'),
         import('../../../perf/tier-presets.ts'),
+        import('../../cell-source/index.ts'),
       ]);
       // only the level this device draws is read: the iPad and phone rows take the lite cells, 'high' the full ones
       const level = worldPresetWithoutCanvas().vdPort.blocksNear.level;
       const entries = Object.entries(level === 'lite' ? VD_LITE_ASSETS : VD_NEAR_ASSETS);
+      // The cells read through the cell source: the bundled Metro asset is the home copy and wins first; the disk
+      // cache and the hash-pinned host cover a bundled read that fails. A cell nothing can produce rejects here,
+      // which the catch below turns into the tile keeping its own buildings (no half-drawn lane A).
       const [shell, ...near] = await Promise.all([
         fetchAssetBytes(VD_SHELL_ASSET),
-        ...entries.map(([, src]) => fetchAssetBytes(src)),
+        ...entries.map(([key, src]) => vdCellFetch(`${level}/${key}`, () => fetchAssetBytes(src)).then((b) => {
+          if (!b) throw new Error(`vd-port: cell ${level}/${key} is in the manifest but no source produced it`);
+          return b;
+        })),
       ]);
       bytes = {
         shell: new Uint8Array(shell!),
-        near: new Map(entries.map(([key], i) => [key, new Uint8Array(near[i]!)])),
+        near: new Map(entries.map(([key], i) => [key, near[i]! instanceof Uint8Array ? near[i]! as Uint8Array : new Uint8Array(near[i]!)])),
         level,
       };
       return bytes;

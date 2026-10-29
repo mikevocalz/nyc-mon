@@ -14,6 +14,7 @@ import { looseTsl, type TslNode } from './loose-tsl.ts';
 import type { AreaKind, CityArea } from '../../city-dataset.ts';
 import { pairs, pointInRing } from '../geometry.ts';
 import { CANYON_AO, OPEN_SKY_GRID } from '../physical-materials-constants.ts';
+import { worldPatternPosition } from '../render-space.ts';
 
 /** Area kinds with nothing overhead: the sky opens over them like Slop's Central Park. */
 export const OPEN_SKY_KINDS: ReadonlySet<AreaKind> = new Set([
@@ -106,7 +107,7 @@ export interface OpenSkyInput {
  */
 export function canyonSkyAO(THREE: Three, openSky?: OpenSkyInput): TslNode {
   const T = looseTsl(THREE);
-  const wp = T.positionWorld;
+  const wp = worldPatternPosition(THREE) as unknown as TslNode;
   const heightOpenness = T.smoothstep(0.0, CANYON_AO.openHeight, wp.y);
   const streetCrevice = T.smoothstep(0.0, CANYON_AO.creviceHeight, wp.y).mul(1 - CANYON_AO.creviceFloor).add(CANYON_AO.creviceFloor);
   const canyonAO = T.mix(T.float(CANYON_AO.streetFloor), T.float(1.0), heightOpenness).mul(streetCrevice);

@@ -427,15 +427,16 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
      * lettering and light pools draw around it; each refresh is
      * allocation-free and only runs after it has moved about 10 m.
      */
-    setFocus(x: number, z: number) {
+    setFocus(x: number, z: number, originX = 0, originZ = 0, originChanged = false) {
       if (vdShadows) {
-        // Keep the shadow box centred on the Caller, the sun 400 m out along its direction.
-        sun.target.position.set(x, 0, z);
-        sun.position.set(x + sunDirection[0] * 400, sunDirection[1] * 400, z + sunDirection[2] * 400);
+        // Keep the shadow box centred on the Caller, the sun 400 m out along its direction. These objects live
+        // under the render root, so they take the focus render-relative.
+        sun.target.position.set(x - originX, 0, z - originZ);
+        sun.position.set(x - originX + sunDirection[0] * 400, sunDirection[1] * 400, z - originZ + sunDirection[2] * 400);
         sun.target.updateMatrixWorld();
         sun.updateMatrixWorld();
       }
-      trees.update(x, z, viewDistance);
+      trees.update(x - originX, z - originZ, viewDistance);
       // Streamed, the contact shadows and the street detail are per-cell meshes chosen by screen error, not a band.
       if (!stream) city.setFocus(x, z);
       furniture.setFocus(x, z);
@@ -443,9 +444,9 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
       props.setFocus(x, z, bands[0], bands[1]);
       // The escapes re-sort near/far on a 1 m step, not every frame: each sort
       // rewrites and re-uploads up to FIRE_ESCAPE.maxEscapes instance matrices.
-      if (phys && city.physical && Math.hypot(x - escapeFocus.x, z - escapeFocus.z) >= FIRE_ESCAPE_RESORT_METRES) {
+      if (phys && city.physical && (originChanged || Math.hypot(x - escapeFocus.x, z - escapeFocus.z) >= FIRE_ESCAPE_RESORT_METRES)) {
         escapeFocus.x = x; escapeFocus.z = z;
-        phys.fireEscapes.update(city.physical.fireEscapes, x, z);
+        phys.fireEscapes.update(city.physical.fireEscapes, x, z, originX, originZ);
       }
     },
     /**
