@@ -10,7 +10,7 @@ import { RecordError } from '../errors.ts';
 import { auditConsentChange, auditConsentDelete, validateConsent } from '../GuardianConsents.ts';
 import { refuseDelete } from '../guards.ts';
 import { guardIntegrityRun } from '../IntegrityRuns.ts';
-import { afterMonChange, validateMonInstance } from '../MonInstances.ts';
+import { afterMonChange, CALLER_DELETION_CONTEXT_KEY, validateMonInstance } from '../MonInstances.ts';
 import { anyCollection, EGG_ID, fakeReq, staff, validCareDoc, validEggDoc, validMonDoc } from './helpers.ts';
 
 type ChangeArgs = {
@@ -166,6 +166,18 @@ describe('mon-instances (Laws 6, 8)', () => {
     expect(await name('A legacy name well past sixteen', legacy)).toBeUndefined();
     expect(await name('Rename', validMonDoc({ nickname: 'Pip' }))).toBe('INVALID_RECORD');
     expect(await name(null, validMonDoc({ nickname: 'Pip' }))).toBe('INVALID_RECORD');
+  });
+
+  it('clears a nickname only inside an account deletion (DECISIONS L3)', async () => {
+    const named = validMonDoc({ nickname: 'Pip' });
+    const clear = (context: Record<string, unknown>, nickname: string | null = null) =>
+      codeOf(change(validateMonInstance, { data: { nickname }, operation: 'update', originalDoc: named }, fakeReq({ context }).req));
+    expect(await clear({ [CALLER_DELETION_CONTEXT_KEY]: true })).toBeUndefined();
+    // Anything short of the deletion flag is still a rename.
+    expect(await clear({})).toBe('INVALID_RECORD');
+    expect(await clear({ [CALLER_DELETION_CONTEXT_KEY]: 'true' })).toBe('INVALID_RECORD');
+    // The flag releases a name; it never grants a rename.
+    expect(await clear({ [CALLER_DELETION_CONTEXT_KEY]: true }, 'Rename')).toBe('INVALID_RECORD');
   });
 
   it('keeps monInstanceId, eggId and hatchedAt fixed', async () => {

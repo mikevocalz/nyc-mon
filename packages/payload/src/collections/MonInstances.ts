@@ -21,6 +21,14 @@ export const MON_STAGES = ['Baby', 'Small', 'Mid', 'Max'] as const;
 export const MON_IMMUTABLE_FIELDS = ['monInstanceId', 'eggId', 'hatchedAt'] as const;
 
 /**
+ * `req.context` key set by account deletion (`auth/deletion.ts`) when it
+ * passes a Mon to the sanctuary. Only that write may clear a nickname
+ * (DECISIONS L3): a Caller leaving takes their name for the Mon with them.
+ * Every other write still names a Mon once and never renames it.
+ */
+export const CALLER_DELETION_CONTEXT_KEY = 'callerDeletion';
+
+/**
  * Set once, then fixed for life (Bible v11 ¶56). A Mon hatched before these
  * existed holds null and may be backfilled once from its egg id.
  */
@@ -84,7 +92,8 @@ export const validateMonInstance: CollectionBeforeChangeHook = async ({ data, op
     if (incoming !== undefined && 'nickname' in incoming) {
       const before = typeof stored?.nickname === 'string' ? stored.nickname : null;
       const after = typeof incoming.nickname === 'string' ? incoming.nickname : null;
-      if (!isAllowedMonNicknameWrite(before, after)) {
+      const releasedByDeletion = req.context?.[CALLER_DELETION_CONTEXT_KEY] === true && after === null;
+      if (!releasedByDeletion && !isAllowedMonNicknameWrite(before, after)) {
         throw new RecordError('INVALID_RECORD', 'a Mon is named once, with a name of 16 characters or fewer, and never renamed');
       }
     }
