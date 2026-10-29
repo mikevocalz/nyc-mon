@@ -1,7 +1,7 @@
 import type { CallToolResult } from '@modelcontextprotocol/client';
 import type { Authorize } from './freshToken.ts';
 import { spokenText } from '@acme/content/voice';
-import type { MonVoice } from './monVoice.ts';
+import { gatedLine, type MonVoice } from './monVoice.ts';
 import type { TranscriptItem } from './session.ts';
 import { stickyVoice, type RememberedVoice } from './sessionVoice.ts';
 import { splitSentences } from './sentenceStream.ts';
@@ -37,6 +37,10 @@ export interface CompanionVoice {
    * own voice instead of the browser's.
    */
   prime(load: () => Promise<CallToolResult>, timeoutMs?: number): Promise<void>;
+  /** The voice learned so far (undefined before any Mon result). */
+  current(): MonVoice | undefined;
+  /** The learned Mon's `hatchedAt`, when a result reported it (ambient babble's clock). */
+  hatchedAt(): number | undefined;
 }
 
 export interface StopOptions {
@@ -58,6 +62,7 @@ const asItem = (result: CallToolResult): TranscriptItem => ({
 
 export function createCompanionVoice(deps: CompanionVoiceDeps): CompanionVoice {
   let remembered: RememberedVoice | null = null;
+  let hatched: number | undefined;
   let queue: SpeechQueue | null = null;
   let primed: Promise<void> = Promise.resolve();
   const current = () => remembered?.voice;
@@ -71,6 +76,8 @@ export function createCompanionVoice(deps: CompanionVoiceDeps): CompanionVoice {
   };
 
   const learn = (result: CallToolResult) => {
+    const mon = (result.structuredContent as { mon?: { hatchedAt?: unknown } } | undefined)?.mon;
+    if (!result.isError && mon && typeof mon === 'object') hatched = typeof mon.hatchedAt === 'number' && Number.isFinite(mon.hatchedAt) ? mon.hatchedAt : undefined;
     const next = stickyVoice(remembered, [asItem(result)]);
     if (next === remembered) return;
     remembered = next;
@@ -79,6 +86,8 @@ export function createCompanionVoice(deps: CompanionVoiceDeps): CompanionVoice {
 
   return {
     learn,
+    current,
+    hatchedAt: () => hatched,
     prime(load, timeoutMs = 4000) {
       const loading = load().then(learn, () => {});
       primed = Promise.race([loading, new Promise<void>((r) => setTimeout(r, timeoutMs))]);
@@ -95,8 +104,10 @@ export function createCompanionVoice(deps: CompanionVoiceDeps): CompanionVoice {
         if (queue !== mine) return;
         for (const sentence of splitSentences(reply)) {
           // Quote marks are never spoken; stage directions go on to the voice, which performs them.
+          // The speech gate runs here too, so the caption (onSentence) shows what the voice says.
           const s = spokenText(sentence);
-          if (s) mine.push(s);
+          const line = s ? gatedLine(s, current()) : '';
+          if (line) mine.push(line);
         }
         mine.end();
       });
@@ -109,6 +120,7 @@ export function createCompanionVoice(deps: CompanionVoiceDeps): CompanionVoice {
     reset() {
       stop();
       remembered = null;
+      hatched = undefined;
       deps.setSessionVoice(undefined);
     },
   };
