@@ -52,6 +52,28 @@ export function vdHiddenBuildings(): ReadonlySet<string> | null {
   return vdBlockBytes() ? new Set<string>(VD_BLOCKS.hide) : null;
 }
 
+const inRing = (ring: readonly (readonly number[])[], x: number, z: number) => {
+  let c = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const xi = ring[i]![0]!, zi = ring[i]![1]!, xj = ring[j]![0]!, zj = ring[j]![1]!;
+    if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) c = !c;
+  }
+  return c;
+};
+let ownedSpecs: Set<string> | null = null;
+
+/**
+ * Whether lane A draws this front whole, so another lane must not: a facade-kit face (`<spec>#<face>`, a spec lane A
+ * baked) or any point inside a footprint lane A replaces. Always false when the packs did not load.
+ */
+export function vdBlocksOwn(frontId: string | null, x: number, z: number): boolean {
+  if (!vdBlockBytes()) return false;
+  ownedSpecs ??= new Set(VD_BLOCKS.structures.filter((s) => s.kind === 'fk').map((s) => s.id.slice(3)));
+  if (frontId && ownedSpecs.has(frontId.split('#')[0]!)) return true;
+  for (const s of VD_BLOCKS.structures) for (const r of s.owned as readonly (readonly (readonly number[])[])[]) if (inRing(r, x, z)) return true;
+  return false;
+}
+
 export function build(ctx: VdPortCtx): VdPortPart {
   const packs = vdBlockBytes();
   if (!packs) return EMPTY_PART;

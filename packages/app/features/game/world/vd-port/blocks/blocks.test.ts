@@ -179,3 +179,23 @@ test('the port builds: shells resident, the near layer streamed under its own bu
     setVdBlockBytes(null);
   }
 });
+
+test('lane B leaves the facade kit\'s fronts to lane A once the packs are in, and keeps every other front', async () => {
+  const { VD_STOREFRONT_PLAN } = await import('../storefronts/plan.generated.ts');
+  const { vdBlocksOwn } = await import('./index.ts');
+  const own = (f: (typeof VD_STOREFRONT_PLAN.fronts)[number]) =>
+    vdBlocksOwn(f.src === 0 ? f.id : null, f.p0[0]! + f.u[0]! * f.len / 2 - f.n[0]! * 0.5, f.p0[1]! + f.u[1]! * f.len / 2 - f.n[1]! * 0.5);
+  assert.equal(VD_STOREFRONT_PLAN.fronts.filter(own).length, 0, 'without the packs lane B draws everything');
+  setVdBlockBytes({ shell: shellBytes, near: nearBytes });
+  try {
+    const owned = VD_STOREFRONT_PLAN.fronts.filter(own);
+    const specFronts = VD_STOREFRONT_PLAN.fronts.filter((f) => f.src === 0);
+    const bakedSpecs = new Set(VD_BLOCKS.structures.filter((s) => s.kind === 'fk').map((s) => s.id.slice(3)));
+    const spec = specFronts.filter((f) => bakedSpecs.has(f.id.split('#')[0]!));
+    assert.ok(spec.length > 0 && spec.every(own), `${spec.length} kit faces, all lane A's`);
+    const kept = VD_STOREFRONT_PLAN.fronts.length - owned.length;
+    assert.ok(kept > 0, `${kept} fronts stay with lane B`);
+  } finally {
+    setVdBlockBytes(null);
+  }
+});

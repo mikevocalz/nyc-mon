@@ -133,11 +133,13 @@ export async function writePacks(structures, { nearErrM, heroErrM }) {
     }
     if (s.landmark && s.landmarkMode === 'replace') { const [x, z] = toScene(s.landmark.cx, s.landmark.cz); const id = ourAt(x, z); if (id) replaced.push(id); }
     for (const id of replaced) hide.add(id);
+    // the footprints lane A draws whole (scene metres, 0.01 m): another lane's storefront inside one would be drawn twice
+    const owned = s.fk && !s.fk.keepCompiled ? s.fk.rings.map((r) => r.ring.map(([x, z]) => toScene(x, z).map((v) => Math.round(v * 100) / 100))) : [];
     out.push({
       id: s.id, kind: s.kind, name: s.fk?.name ?? s.landmark?.key ?? null, addr: s.fk?.addr ?? null, tile: s.tile,
       trisExact: s.tris0, trisNear: s.near.tris, nearErrM: r3(s.near.err), trisShell: s.shell.tris, shellHow: s.shell.how,
       // Valdrada world box of the exact geometry, and the scene box of the near level (the tests compare the two)
-      vbox: s.box, box: sBox.map(r3), base: r3(s.base), replaces: [...new Set(replaced)],
+      vbox: s.box, box: sBox.map(r3), base: r3(s.base), replaces: [...new Set(replaced)], owned,
     });
   }
 
