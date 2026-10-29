@@ -47,6 +47,11 @@ const SERVICE_ROUTES: readonly { method: string; path: RegExp }[] = [
   // hatch_egg. The handler finds the egg by eggId AND the delegated callerId,
   // so the key can only hatch the named Caller's own egg.
   { method: 'POST', path: /^\/v1\/eggs\/[^/]+\/hatch\/?$/ },
+  // Companion memory, scoped to the delegated Caller. The companion server
+  // (packages/web-sim/server/companion-memory-client.ts) reads and changes it.
+  { method: 'GET', path: /^\/v1\/me\/companion-memory\/?$/ },
+  { method: 'PUT', path: /^\/v1\/me\/companion-memory\/?$/ },
+  { method: 'DELETE', path: /^\/v1\/me\/companion-memory\/?$/ },
   // The Mon's published lines and lingo (read-only, the same for every Caller).
   { method: 'GET', path: /^\/v1\/mon-lingo\/?$/ },
 ];

@@ -149,7 +149,7 @@ export interface ShellRailProps {
 }
 
 /**
- * The rail on the PHYSICAL right: the five tabs from 20pt below the header,
+ * The rail on the PHYSICAL right: the five tabs from 80pt below the header,
  * and the menu button 30pt above the bottom edge. Yoga mirrors `row` under
  * RTL, so the row is reversed there to keep the inset spacer physically right.
  */

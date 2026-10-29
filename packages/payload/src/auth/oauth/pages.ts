@@ -8,7 +8,7 @@
 // (plugins.ts, guards.ts), never here.
 import { oauthProviderAuthServerMetadata, verifyOAuthQueryParams } from '@better-auth/oauth-provider';
 import { readAuthEnv } from '../env';
-import type { OAuthServerConfig } from './config';
+import type { OAuthServerConfig, StaticClient } from './config';
 import { OAUTH_PAGES } from './plugins';
 
 /** Which linking page is being rendered. */
@@ -17,8 +17,8 @@ export type LinkPageKind = 'sign-in' | 'consent' | 'refused';
 /** What a linking page renders. `expired` covers a missing, forged or expired `oauth_query`. */
 export type LinkPageData =
   | { kind: 'expired' }
-  | { kind: 'sign-in'; clientName: string; amazonEnabled: boolean }
-  | { kind: 'consent'; clientName: string; scopes: string[] }
+  | { kind: 'sign-in'; clientName: string; clientKind: StaticClient['kind']; amazonEnabled: boolean; passwordResetEnabled: boolean }
+  | { kind: 'consent'; clientName: string; clientKind: StaticClient['kind']; scopes: string[] }
   | { kind: 'refused'; clientName: string | undefined; backHref: string | undefined };
 
 export { LINK_PAGE_HEADERS } from './link-page-headers';
@@ -29,6 +29,17 @@ export interface LinkPageOptions {
   secret?: string | undefined;
   /** Lets tests or alternate hosts override whether Login with Amazon is available. */
   amazonEnabled?: boolean | undefined;
+  /**
+   * Whether "Forgot password?" can work: Better Auth only gets
+   * `sendResetPassword` when a mail sender is configured (auth/options.ts).
+   * Defaults to RESEND_API_KEY and AUTH_EMAIL_FROM both being set.
+   */
+  passwordResetEnabled?: boolean | undefined;
+}
+
+function mailConfigured(): boolean {
+  const env = readAuthEnv();
+  return env.resendApiKey !== undefined && env.emailFrom !== undefined;
 }
 
 /** Returns the signed query, or `undefined` when it is missing, forged or expired. */
@@ -39,8 +50,8 @@ async function signedQuery(search: string, secret: string | undefined): Promise<
   return new URLSearchParams(raw);
 }
 
-function clientName(config: OAuthServerConfig, clientId: string | null): string | undefined {
-  return config.clients.find((client) => client.clientId === clientId)?.name;
+function findClient(config: OAuthServerConfig, clientId: string | null): StaticClient | undefined {
+  return config.clients.find((client) => client.clientId === clientId);
 }
 
 /** The link back to the app with `access_denied`, on the redirect URI the provider already validated. */
@@ -49,7 +60,7 @@ function refusalHref(query: URLSearchParams, issuer: string): string | undefined
   if (redirectUri === null) return undefined;
   const url = new URL(redirectUri);
   url.searchParams.set('error', 'access_denied');
-  url.searchParams.set('error_description', 'NYC-MON on Alexa is for adults only.');
+  url.searchParams.set('error_description', 'Linking NYC-MON is for adults only.');
   const state = query.get('state');
   if (state !== null) url.searchParams.set('state', state);
   url.searchParams.set('iss', issuer);
@@ -68,18 +79,22 @@ export async function loadLinkPage(kind: LinkPageKind, search: string, options: 
     // The refusal page still says why, even without a way back.
     return kind === 'refused' ? { kind, clientName: undefined, backHref: undefined } : { kind: 'expired' };
   }
-  const name = clientName(options.config, query.get('client_id'));
+  const client = findClient(options.config, query.get('client_id'));
+  const clientName = client?.name ?? 'Alexa';
+  const clientKind = client?.kind ?? 'alexa';
   switch (kind) {
     case 'sign-in':
       return {
         kind,
-        clientName: name ?? 'Alexa',
+        clientName,
+        clientKind,
         amazonEnabled: options.amazonEnabled ?? readAuthEnv().amazon !== undefined,
+        passwordResetEnabled: options.passwordResetEnabled ?? mailConfigured(),
       };
     case 'consent':
-      return { kind, clientName: name ?? 'Alexa', scopes: (query.get('scope') ?? '').split(' ').filter((scope) => scope !== '') };
+      return { kind, clientName, clientKind, scopes: (query.get('scope') ?? '').split(' ').filter((scope) => scope !== '') };
     case 'refused':
-      return { kind, clientName: name, backHref: refusalHref(query, options.config.issuer) };
+      return { kind, clientName: client?.name, backHref: refusalHref(query, options.config.issuer) };
   }
 }
 

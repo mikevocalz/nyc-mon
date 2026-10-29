@@ -24,6 +24,7 @@ import { Route as V1WaitlistRouteImport } from './routes/v1/waitlist'
 import { Route as PayloadAdminIndexRouteImport } from './routes/_payload/admin.index'
 import { Route as PayloadAdminSplatRouteImport } from './routes/_payload/admin.$'
 import { Route as PayloadPayloadApiSplatRouteImport } from './routes/_payload/payload-api.$'
+import { Route as V1MeCompanionMemoryRouteImport } from './routes/v1/me/companion-memory'
 import { Route as V1MeEggsRouteImport } from './routes/v1/me/eggs'
 import { Route as V1MeMonsRouteImport } from './routes/v1/me/mons'
 import { Route as V1MonsAdoptRouteImport } from './routes/v1/mons/adopt'
@@ -105,6 +106,11 @@ const PayloadPayloadApiSplatRoute = PayloadPayloadApiSplatRouteImport.update({
   path: '/payload-api/$',
   getParentRoute: () => PayloadRoute,
 } as any)
+const V1MeCompanionMemoryRoute = V1MeCompanionMemoryRouteImport.update({
+  id: '/v1/me/companion-memory',
+  path: '/v1/me/companion-memory',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const V1MeEggsRoute = V1MeEggsRouteImport.update({
   id: '/v1/me/eggs',
   path: '/v1/me/eggs',
@@ -145,6 +151,7 @@ export interface FileRoutesByFullPath {
   '/v1/waitlist': typeof V1WaitlistRoute
   '/admin/$': typeof PayloadAdminSplatRoute
   '/payload-api/$': typeof PayloadPayloadApiSplatRoute
+  '/v1/me/companion-memory': typeof V1MeCompanionMemoryRoute
   '/v1/me/eggs': typeof V1MeEggsRoute
   '/v1/me/mons': typeof V1MeMonsRoute
   '/v1/mons/adopt': typeof V1MonsAdoptRoute
@@ -166,6 +173,7 @@ export interface FileRoutesByTo {
   '/v1/waitlist': typeof V1WaitlistRoute
   '/admin/$': typeof PayloadAdminSplatRoute
   '/payload-api/$': typeof PayloadPayloadApiSplatRoute
+  '/v1/me/companion-memory': typeof V1MeCompanionMemoryRoute
   '/v1/me/eggs': typeof V1MeEggsRoute
   '/v1/me/mons': typeof V1MeMonsRoute
   '/v1/mons/adopt': typeof V1MonsAdoptRoute
@@ -189,6 +197,7 @@ export interface FileRoutesById {
   '/v1/waitlist': typeof V1WaitlistRoute
   '/_payload/admin/$': typeof PayloadAdminSplatRoute
   '/_payload/payload-api/$': typeof PayloadPayloadApiSplatRoute
+  '/v1/me/companion-memory': typeof V1MeCompanionMemoryRoute
   '/v1/me/eggs': typeof V1MeEggsRoute
   '/v1/me/mons': typeof V1MeMonsRoute
   '/v1/mons/adopt': typeof V1MonsAdoptRoute
@@ -212,6 +221,7 @@ export interface FileRouteTypes {
     | '/v1/waitlist'
     | '/admin/$'
     | '/payload-api/$'
+    | '/v1/me/companion-memory'
     | '/v1/me/eggs'
     | '/v1/me/mons'
     | '/v1/mons/adopt'
@@ -233,6 +243,7 @@ export interface FileRouteTypes {
     | '/v1/waitlist'
     | '/admin/$'
     | '/payload-api/$'
+    | '/v1/me/companion-memory'
     | '/v1/me/eggs'
     | '/v1/me/mons'
     | '/v1/mons/adopt'
@@ -255,6 +266,7 @@ export interface FileRouteTypes {
     | '/v1/waitlist'
     | '/_payload/admin/$'
     | '/_payload/payload-api/$'
+    | '/v1/me/companion-memory'
     | '/v1/me/eggs'
     | '/v1/me/mons'
     | '/v1/mons/adopt'
@@ -276,6 +288,7 @@ export interface RootRouteChildren {
   V1MonLingoRoute: typeof V1MonLingoRoute
   V1MonVoiceRoute: typeof V1MonVoiceRoute
   V1WaitlistRoute: typeof V1WaitlistRoute
+  V1MeCompanionMemoryRoute: typeof V1MeCompanionMemoryRoute
   V1MeEggsRoute: typeof V1MeEggsRoute
   V1MeMonsRoute: typeof V1MeMonsRoute
   V1MonsAdoptRoute: typeof V1MonsAdoptRoute
@@ -389,6 +402,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PayloadPayloadApiSplatRouteImport
       parentRoute: typeof PayloadRoute
     }
+    '/v1/me/companion-memory': {
+      id: '/v1/me/companion-memory'
+      path: '/v1/me/companion-memory'
+      fullPath: '/v1/me/companion-memory'
+      preLoaderRoute: typeof V1MeCompanionMemoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/v1/me/eggs': {
       id: '/v1/me/eggs'
       path: '/v1/me/eggs'
@@ -467,6 +487,7 @@ const rootRouteChildren: RootRouteChildren = {
   V1MonLingoRoute: V1MonLingoRoute,
   V1MonVoiceRoute: V1MonVoiceRoute,
   V1WaitlistRoute: V1WaitlistRoute,
+  V1MeCompanionMemoryRoute: V1MeCompanionMemoryRoute,
   V1MeEggsRoute: V1MeEggsRoute,
   V1MeMonsRoute: V1MeMonsRoute,
   V1MonsAdoptRoute: V1MonsAdoptRoute,

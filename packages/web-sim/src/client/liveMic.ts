@@ -23,28 +23,49 @@ export interface LiveMic {
 
 export const LIVE_MIC_SAMPLE_RATE = 16_000;
 
-export async function openLiveMic(opts: { url: string; token: string | undefined; handlers: LiveMicHandlers }): Promise<LiveMic> {
-  const media = await navigator.mediaDevices.getUserMedia({
-    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 },
-  });
-  const ctx = new AudioContext({ sampleRate: LIVE_MIC_SAMPLE_RATE });
+/**
+ * An already-open mic to stream from (the NVIDIA companion's micPipeline.ts),
+ * instead of opening one here. `preroll` is sent first, so audio from just
+ * before the stream opened is not lost.
+ */
+export interface LiveMicSource {
+  onPcm(fn: (chunk: ArrayBuffer) => void): () => void;
+  readonly preroll?: ArrayBuffer[];
+}
+
+export async function openLiveMic(opts: { url: string; token: string | undefined; handlers: LiveMicHandlers; source?: LiveMicSource }): Promise<LiveMic> {
   let closed = false;
   let ws: WebSocket | null = null;
+  let release: () => void = () => {};
   const close = () => {
     if (closed) return;
     closed = true;
-    media.getTracks().forEach((t) => t.stop());
-    void ctx.close().catch(() => {});
+    release();
     ws?.close();
   };
-  try {
-    await ctx.audioWorklet.addModule('/pcm-worklet.js');
-  } catch (err) {
-    close();
-    throw err;
+  const pcm: { onmessage: ((e: MessageEvent<ArrayBuffer>) => void) | null } = { onmessage: null };
+  if (opts.source) {
+    const off = opts.source.onPcm((chunk) => pcm.onmessage?.({ data: chunk } as MessageEvent<ArrayBuffer>));
+    release = off;
+  } else {
+    const media = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 },
+    });
+    const ctx = new AudioContext({ sampleRate: LIVE_MIC_SAMPLE_RATE });
+    release = () => {
+      media.getTracks().forEach((t) => t.stop());
+      void ctx.close().catch(() => {});
+    };
+    try {
+      await ctx.audioWorklet.addModule('/pcm-worklet.js');
+    } catch (err) {
+      close();
+      throw err;
+    }
+    const node = new AudioWorkletNode(ctx, 'pcm16');
+    ctx.createMediaStreamSource(media).connect(node);
+    node.port.onmessage = (e: MessageEvent<ArrayBuffer>) => pcm.onmessage?.(e);
   }
-  const node = new AudioWorkletNode(ctx, 'pcm16');
-  ctx.createMediaStreamSource(media).connect(node);
 
   const socket = new WebSocket(opts.url);
   ws = socket;
@@ -53,10 +74,15 @@ export async function openLiveMic(opts: { url: string; token: string | undefined
   // Audio from before the recognizer is ready is held, not dropped: the
   // sign-in check and NVIDIA's stream take a second or two, and the person's
   // first words land in it. At most 8 s (80 chunks of 100 ms).
-  let held: ArrayBuffer[] = [];
-  node.port.onmessage = (e: MessageEvent<ArrayBuffer>) => {
+  let held: ArrayBuffer[] = [...(opts.source?.preroll ?? [])];
+  // At most 8 s of audio waits for the recognizer, whatever the frame size.
+  let heldBytes = held.reduce((n, b) => n + b.byteLength, 0);
+  pcm.onmessage = (e: MessageEvent<ArrayBuffer>) => {
     if (ready && socket.readyState === WebSocket.OPEN) socket.send(e.data);
-    else if (held.length < 80) held.push(e.data);
+    else if (heldBytes < 8 * LIVE_MIC_SAMPLE_RATE * 2) {
+      held.push(e.data);
+      heldBytes += e.data.byteLength;
+    }
   };
   socket.onopen = () => socket.send(JSON.stringify({ type: 'start', token: opts.token ?? '' }));
   socket.onmessage = (e: MessageEvent) => {
@@ -75,6 +101,7 @@ export async function openLiveMic(opts: { url: string; token: string | undefined
       ready = true;
       for (const chunk of held) socket.send(chunk);
       held = [];
+      heldBytes = 0;
     }
     else if (msg.type === 'interim' && msg.text) opts.handlers.onInterim(msg.text);
     else if (msg.type === 'final' && msg.text) opts.handlers.onFinal(msg.text);

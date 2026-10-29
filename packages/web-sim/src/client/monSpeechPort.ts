@@ -18,6 +18,12 @@ export interface MonSpeechPortDeps {
   readonly fetchFn?: typeof fetch;
   readonly prepare?: typeof prepareMonClip;
   readonly play?: typeof playMonClip;
+  /**
+   * A sentence will not be in the Mon's own voice: `browser-voice` when the
+   * browser reads it (no Mon voice known, or the server has no ElevenLabs),
+   * `unavailable` when the Mon's voice failed and the caption carries it.
+   */
+  readonly onFallback?: (why: 'browser-voice' | 'unavailable') => void;
 }
 
 export function monSpeechPort(deps: MonSpeechPortDeps): VoicePort<MonClip> {
@@ -29,7 +35,12 @@ export function monSpeechPort(deps: MonSpeechPortDeps): VoicePort<MonClip> {
     ...(deps.fetchFn ? { fetchFn: deps.fetchFn } : {}),
   };
   return {
-    prepare: (text, signal) => prepare(text, deps.voice(), opts, signal),
+    prepare: async (text, signal) => {
+      const clip = await prepare(text, deps.voice(), opts, signal);
+      if (clip.kind === 'browser') deps.onFallback?.('browser-voice');
+      else if (clip.kind === 'silent' && clip.reason === 'unavailable') deps.onFallback?.('unavailable');
+      return clip;
+    },
     play: (clip, signal) => play(clip, signal),
   };
 }

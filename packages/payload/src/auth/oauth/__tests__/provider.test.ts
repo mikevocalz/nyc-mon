@@ -8,7 +8,7 @@ import { linkRefusal } from '../adult';
 import { checkResource, withOfflineAccess } from '../guards';
 import { browserClientOrigins, readOAuthConfig } from '../config';
 import { loadLinkPage } from '../pages';
-import { alexaOAuthPlugins, OAUTH_PAGES } from '../plugins';
+import { alexaOAuthPlugins, OAUTH_PAGES, USER_ACCESS_TOKEN_TTL_SECONDS } from '../plugins';
 
 const ORIGIN = 'http://localhost:5174';
 const BASE = `${ORIGIN}/payload-api/auth`;
@@ -417,6 +417,13 @@ describe('Alexa+ authorization server', () => {
         resource: RESOURCE,
       });
       expect(response.status).toBe(200);
+      // Gate 4: MCP verifies JWTs locally, so a user token lives 10 minutes,
+      // not an hour, after sign-out revokes its refresh token.
+      const body = (await response.json()) as Record<string, unknown>;
+      expect(body.expires_in).toBe(USER_ACCESS_TOKEN_TTL_SECONDS);
+      expect(USER_ACCESS_TOKEN_TTL_SECONDS).toBe(600);
+      const claims = await verifyAccessToken(auth, String(body.access_token));
+      expect(Number(claims.exp) - Number(claims.iat)).toBe(600);
     });
   });
 
@@ -505,17 +512,22 @@ describe('linking page data', () => {
     expect(await loadLinkPage('consent', consentUrl.search, options)).toEqual({
       kind: 'consent',
       clientName: 'Alexa',
+      clientKind: 'alexa',
       scopes: ['mcp:caller', 'mcp:care', 'offline_access'],
     });
-    expect(await loadLinkPage('sign-in', consentUrl.search, { ...options, amazonEnabled: false })).toEqual({
+    expect(await loadLinkPage('sign-in', consentUrl.search, { ...options, amazonEnabled: false, passwordResetEnabled: false })).toEqual({
       kind: 'sign-in',
       clientName: 'Alexa',
+      clientKind: 'alexa',
       amazonEnabled: false,
+      passwordResetEnabled: false,
     });
-    expect(await loadLinkPage('sign-in', consentUrl.search, { ...options, amazonEnabled: true })).toEqual({
+    expect(await loadLinkPage('sign-in', consentUrl.search, { ...options, amazonEnabled: true, passwordResetEnabled: true })).toEqual({
       kind: 'sign-in',
       clientName: 'Alexa',
+      clientKind: 'alexa',
       amazonEnabled: true,
+      passwordResetEnabled: true,
     });
 
     const forged = new URL(consentUrl);
@@ -524,6 +536,50 @@ describe('linking page data', () => {
     expect(await loadLinkPage('sign-in', forged.search, options)).toEqual({ kind: 'expired' });
     expect(await loadLinkPage('refused', forged.search, options)).toEqual({ kind: 'refused', clientName: undefined, backHref: undefined });
     expect(await loadLinkPage('consent', '', options)).toEqual({ kind: 'expired' });
+  });
+
+  it('names the companion client "NYC-Mon Personal Companion" and marks it as the companion', async () => {
+    const { auth } = makeAuth();
+    await auth.$context;
+    const cookie = await signUp(auth, 'companion-page@example.com', ADULT_YEAR);
+    const { challenge } = await pkcePair();
+    const first = await authorize(auth, cookie, alexaAuthorizeParams(challenge, { client_id: 'nyc-mon-sim', redirect_uri: SIM_REDIRECT }));
+    const consentUrl = new URL(first.headers.get('location') ?? '', ORIGIN);
+    expect(await loadLinkPage('consent', consentUrl.search, { config: CONFIG, secret: SECRET })).toEqual({
+      kind: 'consent',
+      clientName: 'NYC-Mon Personal Companion',
+      clientKind: 'companion',
+      scopes: ['mcp:caller', 'mcp:care', 'offline_access'],
+    });
+  });
+
+  it('lets a Caller with no account sign up on the sign-in page and land on consent', async () => {
+    const { auth, db } = makeAuth();
+    await auth.$context;
+    const { challenge } = await pkcePair();
+    // A signed-out Caller is sent to the sign-in page with a signed query.
+    const first = await authorize(auth, '', alexaAuthorizeParams(challenge, { client_id: 'nyc-mon-sim', redirect_uri: SIM_REDIRECT }));
+    expect(first.status).toBe(302);
+    const signInUrl = new URL(first.headers.get('location') ?? '', ORIGIN);
+    expect(signInUrl.pathname).toBe(OAUTH_PAGES.signIn);
+    // The page posts sign-up with the signed query attached (oauthProviderClient does this in the browser).
+    const response = await auth.handler(
+      new Request(`${BASE}/sign-up/email`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: ORIGIN },
+        body: JSON.stringify({
+          email: 'new-caller@example.com',
+          password: 'correct-horse-battery',
+          name: 'new-caller',
+          birthYear: ADULT_YEAR,
+          oauth_query: signInUrl.search.slice(1),
+        }),
+      }),
+    );
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { url?: string };
+    expect(new URL(body.url ?? '', ORIGIN).pathname).toBe(OAUTH_PAGES.consent);
+    expect(db.user?.find((user) => user.email === 'new-caller@example.com')?.birthYear).toBe(ADULT_YEAR);
   });
 
   it('gives a refused account a way back to the app with access_denied', async () => {

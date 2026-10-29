@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { MonSpeechCue } from '@acme/ui/three/mon/lipsync';
-import { setSessionVoice, speakAs, stopSpeaking } from '../src/client/speech.ts';
+import { clearSessionVoice, onPlayback, playbackStartedAt, setSessionVoice, speakAs, stopSpeaking } from '../src/client/speech.ts';
 import { addSpeechCueListener } from '../src/client/speechCues.ts';
 
 /** Records what speakAs does to the element; Node has no HTMLAudioElement. Ends only when told to. */
@@ -168,6 +168,17 @@ describe('speakAs', () => {
     expect(JSON.parse(String(inits[2]?.body))).toMatchObject({ lineageId: 'dex-001/male/2', stage: 'Mid' });
   });
 
+  it('clearSessionVoice forgets the sticky voice (sign-out), so the next account does not inherit it', async () => {
+    vi.stubGlobal('Audio', FakeAudio);
+    const spoken = stubWebSpeech();
+    setSessionVoice({ lineageId: 'dex-001/female/1', stage: 'Small' });
+    clearSessionVoice();
+    const { fn, inits } = fakeFetch(mp3);
+    await speakAs('hello', undefined, { fetchFn: fn });
+    expect(inits).toHaveLength(0);
+    expect(spoken).toEqual([{ text: 'hello', pitch: 1, rate: 1.02, voice: 'Samantha' }]);
+  });
+
   it('queue: true plays after the current clip instead of cutting it off; stopSpeaking cancels both', async () => {
     vi.stubGlobal('Audio', FakeAudio);
     const { fn } = fakeFetch(mp3);
@@ -281,6 +292,48 @@ describe('speakAs lip-sync cues', () => {
     releaseFace();
     await new Promise((r) => setTimeout(r, 10));
     expect(cues.map((c) => c.kind)).toEqual(['start', 'stop']);
+    off();
+  });
+});
+
+describe('barge-in: fading the Mon out and reporting playback', () => {
+  it('fades the playing clip to silence within the fade window, then pauses it', async () => {
+    vi.stubGlobal('Audio', FakeAudio);
+    const { fn } = fakeFetch(mp3);
+    const clip = (await started('Talking now.', { lineageId: 'dex-001/male/2', stage: 'Mid' }, { fetchFn: fn })) as FakeAudio & { volume: number };
+    clip.volume = 1;
+    const t0 = performance.now();
+    const stopped = stopSpeaking({ fadeMs: 60 });
+    expect(clip.pause).not.toHaveBeenCalled();
+    await stopped;
+    const took = performance.now() - t0;
+    expect(clip.pause).toHaveBeenCalledTimes(1);
+    expect(clip.volume).toBe(0);
+    expect(took).toBeGreaterThanOrEqual(50);
+    expect(took).toBeLessThan(80 + 40);
+  });
+
+  it('stops at once without a fade', async () => {
+    vi.stubGlobal('Audio', FakeAudio);
+    const { fn } = fakeFetch(mp3);
+    const clip = await started('Talking now.', { lineageId: 'dex-001/male/2', stage: 'Mid' }, { fetchFn: fn });
+    void stopSpeaking();
+    expect(clip.pause).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports when a clip starts and stops playing, with the start time for the echo guard', async () => {
+    vi.stubGlobal('Audio', FakeAudio);
+    const events: string[] = [];
+    const off = onPlayback((e) => events.push(e.kind));
+    const { fn } = fakeFetch(mp3);
+    expect(playbackStartedAt()).toBeNull();
+    const before = performance.now();
+    await started('Talking now.', { lineageId: 'dex-001/male/2', stage: 'Mid' }, { fetchFn: fn });
+    await vi.waitFor(() => expect(events).toEqual(['start']));
+    expect(playbackStartedAt()).toBeGreaterThanOrEqual(before);
+    await stopSpeaking({ fadeMs: 10 });
+    expect(events).toEqual(['start', 'stop']);
+    expect(playbackStartedAt()).toBeNull();
     off();
   });
 });
