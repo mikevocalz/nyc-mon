@@ -17,6 +17,7 @@ import { valdradaToScene } from './transform.ts';
 import type { VdEnv, VdLayerBudget, VdPortCtx, VdPortPart, VdStreamLayer } from './types.ts';
 import type { CellPackage } from '../cells/cell-rules.ts';
 import type { ExternalLayer } from '../cells/cell-stream.ts';
+import type { WorldPreset } from '../../perf/tier-presets.ts';
 
 export type { VdEnv, VdLayerBudget, VdPortCtx, VdPortPart, VdStreamLayer } from './types.ts';
 
@@ -34,6 +35,8 @@ export interface VdPortOptions {
   horizon: readonly [number, number, number];
   /** The vd lane's weather uniforms (vd-materials.ts VdWeather), or none. */
   weather?: { wet: { value: number }; snow: { value: number } } | null;
+  /** The streaming preset, or null when the world is built whole. */
+  preset?: WorldPreset | null;
 }
 
 export interface VdPort {
@@ -87,6 +90,7 @@ export function buildVdPort(THREE: Three, dataset: CityDatasetV3, options: VdPor
     group,
     night,
     env,
+    preset: options.preset ?? null,
     physical: options.physical,
     groundY: options.groundY,
     toScene,

@@ -29,6 +29,7 @@ import { vdBlockBytes } from './load.ts';
 import { makeNearMaterial, makeShellMaterial } from './shell-material.ts';
 import { VD_BLOCKS, VD_FW14 } from './data/manifest.ts';
 import { decodeBase64 } from '../../foliage.ts';
+import { WORLD_PRESETS } from '../../../perf/tier-presets.ts';
 
 type Mesh = InstanceType<Three['Mesh']>;
 
@@ -46,8 +47,8 @@ export const SHELL_NAME = 'city:vd-blocks-shell';
  */
 export const NEAR_LAYER = { errorM: 0.09, chunk: CELL, fade: true, pin: false } as const;
 
-/** The near level's own budget per preset (the cells along 125th Street run to 345k triangles and 10.6 MB). */
-export const NEAR_BUDGET = { geometryBytes: 64 * 1024 * 1024, cellDraws: 24, triangles: 1_200_000 } as const;
+/** The near level's own budget on the ipad-a12x row (perf/tier-presets.ts vdPort.blocksNear); the ctx's preset wins. */
+export const NEAR_BUDGET = WORLD_PRESETS['ipad-a12x'].vdPort.blocksNear;
 
 /** The bundled tile's building ids lane A replaces, or null when the packs did not load (the tile keeps its own). */
 export function vdHiddenBuildings(): ReadonlySet<string> | null {
@@ -134,7 +135,7 @@ export function build(ctx: VdPortCtx): VdPortPart {
     if (!file) throw new Error(`vd-port: near cell ${info.key} is in the manifest but not in the packs`);
     return lazyNearPackage(info, () => file);
   });
-  ctx.registerChunks(template, NEAR_LAYER, packages, NEAR_BUDGET);
+  ctx.registerChunks(template, NEAR_LAYER, packages, ctx.preset?.vdPort.blocksNear ?? NEAR_BUDGET);
 
   // Valdrada's near mask: a shell cell hides while its near cell is fully faded in. Allocation-free per frame.
   const nearIn = new Set<number>();

@@ -76,6 +76,14 @@ export interface WorldPreset {
   readonly shadowTile: number;
   /** Cap on the physical bloom chain's resolution scale. */
   readonly bloomResolutionScale: number;
+  /**
+   * The vd port's own budgets (world/vd-port), outside `budget`: the blocks' near level (cells/cell-stream.ts external
+   * layer budget) and the resident vertices of lane C's streamed structures (vk, pk, lk).
+   */
+  readonly vdPort: {
+    readonly blocksNear: { readonly geometryBytes: number; readonly cellDraws: number; readonly triangles: number };
+    readonly structureVertices: number;
+  };
 }
 
 const MiB = 1 << 20;
@@ -95,6 +103,9 @@ export const WORLD_PRESETS: Readonly<Record<WorldPresetName, WorldPreset>> = {
     shadowTile: 2048,
     // Bloom's first level is 3 rgba16float targets at the scale (11.2 MB each at 0.5 of 2732 x 2048).
     bloomResolutionScale: 0.35,
+    // Walk peak (cell-stream.walk.test.ts, the combined vd port): the blocks' near level 8 cells, 26.2 MB, 856k
+    // triangles; lane C's structures 250k vertices (its own cap, structures.test.ts). Not yet measured on the device.
+    vdPort: { blocksNear: { geometryBytes: 64 * MiB, cellDraws: 24, triangles: 1_200_000 }, structureVertices: 250_000 },
   },
   phone: {
     name: 'phone',
@@ -108,6 +119,7 @@ export const WORLD_PRESETS: Readonly<Record<WorldPresetName, WorldPreset>> = {
     fadeS: 0.45,
     shadowTile: 2048,
     bloomResolutionScale: 0.5,
+    vdPort: { blocksNear: { geometryBytes: 64 * MiB, cellDraws: 24, triangles: 1_200_000 }, structureVertices: 250_000 },
   },
   high: {
     name: 'high',
@@ -120,6 +132,7 @@ export const WORLD_PRESETS: Readonly<Record<WorldPresetName, WorldPreset>> = {
     fadeS: 0.45,
     shadowTile: 3072,
     bloomResolutionScale: 0.5,
+    vdPort: { blocksNear: { geometryBytes: 256 * MiB, cellDraws: 64, triangles: 4_000_000 }, structureVertices: 2_000_000 },
   },
 };
 

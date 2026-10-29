@@ -37,7 +37,6 @@ import type { SceneActorFactory } from '../scene-actor.ts';
 import type { SkyName } from '../world/sky-rig.ts';
 import { placeStreetFurniture } from '../world/street-furniture.ts';
 import { EXPERIMENTAL_WORLD_VD } from '../world/vd-materials.ts';
-import { vdPoolObstacles } from '../world/vd-port/obstacles.ts';
 import { FUTURE_LAYER } from '../world/future-layer.ts';
 import { EXPERIMENTAL_WORLD_PHYSICAL, physicalFeaturesFor, WORLD_PROBE } from '../world/physical-look.ts';
 import { loadPhysicalFacelift } from '../physical-graph.ts';
@@ -149,10 +148,9 @@ let bundle: LivingCityBundle | null = null;
 let obstacleCache: FlatPoints | null = null;
 
 /**
- * Static sidewalk obstacles as flat [x, z, ...] pairs: street trees, and
+ * Static sidewalk obstacles as flat [x, z, ...] pairs: street trees,
  * hydrants, LinkNYC kiosks, bike racks, subway stairs and bus shelters from
- * the bundled tile's record layers (on the vd lane, from the vd port's
- * furniture pools instead, which is what is drawn). Furniture arrives as [x, z, rot]
+ * the bundled tile's record layers. Furniture arrives as [x, z, rot]
  * triplets — only the position half feeds the ped corridor index.
  */
 function bundledObstacles(): FlatPoints {
@@ -161,15 +159,9 @@ function bundledObstacles(): FlatPoints {
   const city = bundledCity();
   if (city.ok) {
     const d = city.dataset;
-    out.push(...d.trees.census, ...d.trees.fill);
-    if (EXPERIMENTAL_WORLD_VD) {
-      // The vd port draws Valdrada's furniture (vd-port/furniture): the walkers step round those pieces.
-      out.push(...vdPoolObstacles());
-    } else {
-      out.push(...d.transit.subway, ...d.transit.shelters);
-      for (const list of [d.furniture.hydrant, d.furniture.linknyc, d.furniture.bikeRack]) {
-        for (let i = 0; i + 1 < list.length; i += 3) out.push(list[i]!, list[i + 1]!);
-      }
+    out.push(...d.trees.census, ...d.trees.fill, ...d.transit.subway, ...d.transit.shelters);
+    for (const list of [d.furniture.hydrant, d.furniture.linknyc, d.furniture.bikeRack]) {
+      for (let i = 0; i + 1 < list.length; i += 3) out.push(list[i]!, list[i + 1]!);
     }
   }
   obstacleCache = out;

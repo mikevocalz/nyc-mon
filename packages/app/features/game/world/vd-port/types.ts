@@ -6,6 +6,7 @@
 import type { Three } from '@acme/ui/three';
 import type { Node } from 'three/webgpu';
 import type { CellPackage } from '../cells/cell-rules.ts';
+import type { WorldPreset } from '../../perf/tier-presets.ts';
 
 type Group = InstanceType<Three['Group']>;
 type Mesh = InstanceType<Three['Mesh']>;
@@ -41,6 +42,11 @@ export interface VdPortCtx {
    * and the weather bus (wet, snow).
    */
   env: VdEnv;
+  /**
+   * The streaming and budget preset (perf/tier-presets.ts: residentRadiusM, the vd port's own budgets in `vdPort`), or
+   * null when the world is built whole (no streaming): then each lane uses the ipad-a12x row.
+   */
+  preset: WorldPreset | null;
   /** True when the physical stack is on: colours then decode to linear (sRGB output, ACES in the pipeline). */
   physical: boolean;
   /**

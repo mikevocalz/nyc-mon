@@ -30,7 +30,7 @@ import { createCellStream, type CellStream, type Vec3 } from './cells/cell-strea
 import { buildVdPort, vdNight } from './vd-port/index.ts';
 import { vdHiddenBuildings } from './vd-port/blocks/index.ts';
 import { vdLampSites } from './vd-port/furniture/index.ts';
-import { VD_POOLS } from './vd-port/furniture/data/instances.ts';
+import { VD_POOLS } from './vd-port/furniture/data/pools.ts';
 import type { WorldPreset } from '../perf/tier-presets.ts';
 
 // Lane G1 "GPU budget" (EXPO_PUBLIC_WORLD_BUNDLES) was deleted 2026-11: the
@@ -347,6 +347,7 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
         sunColor: linearColor(THREE, 'sun').toArray() as [number, number, number],
         horizon: (skyRig?.horizon ?? linearColor(THREE, 'skyHorizon')).toArray() as [number, number, number],
         weather: vdMaterials?.weather ?? null,
+        preset: options.stream?.preset ?? null,
       })
     : null;
   if (vdPort) group.add(vdPort.group);
