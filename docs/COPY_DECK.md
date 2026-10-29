@@ -932,7 +932,7 @@ Strings live in `packages/app/features/system/copy.ts`. Every one is `ui` voice;
 
 M22 always says three things in order: what happened, what is safe, what to do. "Your Mon is fine" leads both 3D states because the Mon is the first worry. A damaged save is never deleted, and the copy says so before the Caller picks an action. "Start a new save" sits behind a confirm with Cancel first.
 
-M21 says "saved here" before it says "offline": the Caller can keep playing. A conflict is one line in the sync log, never a dialog (brief §4.4). Phase 1 has no client that sends the queue to the server, so Sync now answers `m21.result.no_server` instead of pretending to sync.
+M21 says "saved here" before it says "offline": the Caller can keep playing. A conflict is one line in the sync log, never a dialog (brief §4.4). The queue goes to the server only while a Caller is signed in on the device; signed out, Sync now answers `m21.result.signed_out`. A send the server refuses (`m21.result.rejected`) reads differently from one that never got an answer or is worth retrying (`m21.result.failed`).
 
 "This device" here means the phone or tablet, never the H-Lynk (the banned use).
 
@@ -994,7 +994,8 @@ M21 says "saved here" before it says "offline": the Caller can keep playing. A c
 | `m21.retry` | Sync now | ui | drafted |
 | `m21.retry.a11y.hint` | Sends the waiting changes | ui | drafted |
 | `m21.result.offline` | Still offline. Your changes are safe here and sync when you're back online. | ui | drafted |
-| `m21.result.no_server` | Saved on this device. Syncing with the server isn't switched on yet, so changes stay here for now. | ui | drafted (Phase 1 ships no sync sender; this is the honest answer until one exists) |
+| `m21.result.signed_out` | Sign in to sync. Your changes are saved on this device until you do. | ui | drafted (no session on this device, or the server refused it) |
 | `m21.result.synced` | Synced. | ui | drafted |
-| `m21.result.failed` | Couldn't reach the server. Your changes are safe here. Try again in a minute. | ui | drafted |
+| `m21.result.failed` | Sync didn't finish. Your changes are safe here. Try again in a minute. | ui | drafted (no answer, a 5xx, a 429, or an egg the server says is still incubating) |
+| `m21.result.rejected` | The server didn't accept these changes. They're still saved on this device. | ui | drafted (a 4xx refusal; retrying the same writes won't help) |
 | `m21.back` | Back | ui | drafted |

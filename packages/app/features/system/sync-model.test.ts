@@ -5,7 +5,7 @@ import type { WriteQueue } from '@acme/core/types';
 import { SYSTEM_COPY } from './copy.ts';
 import {
   appendConflicts, applySyncReply, bannerFor, LOG_LIMIT, onlineFrom, OUTCOME_COPY, parseConflictLog, queuedCount, queueRows, runSync,
-  STATUS_COPY, syncStatus, unseenConflicts, type ConflictEntry, type SyncTransport,
+  STATUS_COPY, SyncHttpError, SyncSignedOutError, syncStatus, unseenConflicts, type ConflictEntry, type SyncTransport,
 } from './sync-model.ts';
 
 const MON = 'mon_a';
@@ -98,8 +98,17 @@ describe('M21 sync attempt', () => {
     assert.equal(r.reply, undefined);
   });
 
-  it('says so honestly when no server transport is set', async () => {
-    assert.equal((await runSync({ online: true, queue: queueWith(), transport: null, nowMs: 9 })).outcome, 'no-server');
+  it('says sign in when no transport is set (nobody is signed in here)', async () => {
+    assert.equal((await runSync({ online: true, queue: queueWith(), transport: null, nowMs: 9 })).outcome, 'signed-out');
+  });
+
+  it('tells a refusal apart from a send worth retrying', async () => {
+    const answering = (error: Error): SyncTransport => ({ send: async () => { throw error; } });
+    const at = (t: SyncTransport) => runSync({ online: true, queue: queueWith(), transport: t, nowMs: 9 });
+    assert.equal((await at(answering(new SyncSignedOutError()))).outcome, 'signed-out');
+    assert.equal((await at(answering(new SyncHttpError(400, 'INVALID_RECORD', 'no')))).outcome, 'rejected');
+    assert.equal((await at(answering(new SyncHttpError(409, 'NOT_READY', 'wait')))).outcome, 'failed');
+    assert.equal((await at(answering(new SyncHttpError(503, 'INTERNAL_ERROR', 'down')))).outcome, 'failed');
   });
 
   it('leaves the queue intact when the send fails', async () => {

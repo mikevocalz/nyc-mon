@@ -16,6 +16,7 @@ import { hydrateDevicePrefs } from "@acme/app/features/settings/device-prefs.sto
 import { useReadyNotificationRouting } from "@acme/app/features/onboarding/notify-hook.ts";
 import { cleanRootStack, type StackLike } from "@acme/app/features/onboarding/root-stack.ts";
 import { hydrateSync, startConnectivity } from "@acme/app/features/system/sync.store.ts";
+import { useSyncSession } from "@acme/app/features/system/sync-session.ts";
 import { RootShell } from "@acme/app/features/navigation/RootShell.tsx";
 import { AppHeader } from "../components/AppHeader";
 import { semantic } from "@acme/theme";
@@ -41,6 +42,7 @@ setThemePreference(useProfile.getState().theme);
 hydrateOnboarding();
 hydrateMon();
 // M21: the conflict log, then the app's one connectivity source (expo-network).
+// The sender itself follows the session (useSyncSession in RootLayout).
 hydrateSync();
 startConnectivity();
 // M19: haptics, sound and forced reduced motion reach the kit before the first frame.
@@ -104,6 +106,8 @@ export default function RootLayout() {
   // Hatch-ready notification tap → M12, cold start and warm (M12 B3).
   useReadyNotificationRouting();
   useRootStackHygiene();
+  // M21: the server sender exists only while a Caller is signed in here.
+  useSyncSession();
   return (
     <GestureRoot className="flex-1">
       <StatusBar style="auto" />
