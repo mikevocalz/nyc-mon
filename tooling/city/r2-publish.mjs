@@ -4,8 +4,10 @@
 // Layout in the bucket:
 //   releases/<release>/<path>       one object per manifest cell, immutable, sha256 pinned in x-amz-meta-sha256
 //   releases/<release>/manifest.json the release's full pin list + the ODbL attribution block, uploaded LAST
-//   releases/current                 the activation pointer (JSON {"release": "<id>"}); the public edge resolves
-//                                    releases/current/<path> from it. Rollback rewrites this one object only.
+//   releases/current                 a record of the active release (JSON {"release": "<id>"}) for tooling. It is one
+//                                    object: R2 does not resolve releases/current/<path> from it (that URL is a 404),
+//                                    so clients and r2-verify.mjs use a literal releases/<id>/ base. Rollback rewrites
+//                                    this one object only.
 //
 // Cell key -> baked file (mirrors vd-port/write-cells-manifest.mjs):
 //   structures/<cx>_<cz>  -> packages/app/features/game/world/vd-port/furniture/cells/<cx>_<cz>.bin

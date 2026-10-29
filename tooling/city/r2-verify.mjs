@@ -3,8 +3,11 @@
 // Cache-Control, then a CORS Origin probe and a Range request probe on the first key. Per-file PASS/FAIL,
 // non-zero exit on any FAIL.
 //
-//   R2_PUBLIC_BASE_URL=https://city-assets.nyc-mon.city/releases/current/ node tooling/city/r2-verify.mjs
-//   R2_PUBLIC_BASE_URL=https://pub-<id>.r2.dev/releases/current/ node tooling/city/r2-verify.mjs --head-only
+//   R2_PUBLIC_BASE_URL=https://city-assets.nyc-mon.city/releases/<release-id>/ node tooling/city/r2-verify.mjs
+//   R2_PUBLIC_BASE_URL=https://pub-<id>.r2.dev/releases/<release-id>/ node tooling/city/r2-verify.mjs --head-only
+//
+// The base is a literal release root. R2 has no releases/current/<path> resolution (it 404s), so a base ending in
+// /releases/current is refused.
 //
 //   --head-only        skip the GET bodies (headers + pins on Content-Length only)
 //   --concurrency N    parallel checks (default 8)
@@ -29,7 +32,11 @@ const flag = (n) => args.includes(`--${n}`);
 
 const BASE = (process.env.R2_PUBLIC_BASE_URL ?? '').replace(/\/+$/, '');
 if (!BASE) {
-  console.error('r2-verify: R2_PUBLIC_BASE_URL is required (e.g. https://city-assets.nyc-mon.city/releases/current/)');
+  console.error('r2-verify: R2_PUBLIC_BASE_URL is required (e.g. https://city-assets.nyc-mon.city/releases/<release-id>/)');
+  process.exit(1);
+}
+if (/\/releases\/current$/.test(BASE)) {
+  console.error('r2-verify: R2_PUBLIC_BASE_URL ends in /releases/current, which R2 does not resolve (every object 404s). Use the literal release root, https://<host>/releases/<release-id>/');
   process.exit(1);
 }
 const HEAD_ONLY = flag('head-only');
@@ -93,10 +100,15 @@ if (probeKey) {
   try {
     const res = await fetch(url, { method: 'HEAD', headers: { Origin: ORIGIN } });
     const acao = res.headers.get('access-control-allow-origin');
-    if (acao) console.log(`PASS cors  access-control-allow-origin: ${acao} (origin ${ORIGIN})`);
-    else console.log(`FAIL cors  no access-control-allow-origin on HEAD with Origin ${ORIGIN}`);
-    if (acao) results.push({ key: '@cors', ok: true, why: [] });
-    else results.push({ key: '@cors', ok: false, why: ['no ACAO header'] });
+    // A 404 can carry the header too; the probe only counts against a real object.
+    if (res.status === 200 && acao) {
+      console.log(`PASS cors  HTTP 200, access-control-allow-origin: ${acao} (origin ${ORIGIN})`);
+      results.push({ key: '@cors', ok: true, why: [] });
+    } else {
+      const why = [...(res.status === 200 ? [] : [`HTTP ${res.status}`]), ...(acao ? [] : ['no ACAO header'])];
+      console.log(`FAIL cors  ${why.join('; ')} on HEAD with Origin ${ORIGIN}`);
+      results.push({ key: '@cors', ok: false, why });
+    }
   } catch (err) {
     console.log(`FAIL cors  ${err.message}`);
     results.push({ key: '@cors', ok: false, why: [err.message] });
