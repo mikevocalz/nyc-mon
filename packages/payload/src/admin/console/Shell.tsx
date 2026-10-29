@@ -58,7 +58,7 @@ export function ConsoleShell({ section, heading, children }: { section: keyof ty
       <Aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-border bg-surface-raised min-[840px]:flex min-[1200px]:w-80" testID="console-nav">
         <Header className="border-b border-border px-5 py-5">
           <Link href="/admin/overview" aria-label={consoleCopy.shell.brandLabel} className="self-start no-underline">
-            <BrandWordmark height={28} decorative />
+            <BrandWordmark height={40} decorative />
           </Link>
         </Header>
         <Nav aria-label="Console" className="flex-1 gap-1 overflow-y-auto px-3 py-4">
@@ -73,7 +73,7 @@ export function ConsoleShell({ section, heading, children }: { section: keyof ty
       {/* Brand strip below 840px; the bottom TabBar carries the nav there. */}
       <Header className="flex-row items-center justify-between border-b border-border bg-surface-raised px-4 py-3 min-[840px]:hidden">
         <Link href="/admin/overview" aria-label={consoleCopy.shell.brandLabel} className="no-underline">
-          <BrandWordmark height={20} decorative />
+          <BrandWordmark height={26} decorative />
         </Link>
       </Header>
       <Main className="flex-1 gap-6 px-4 pb-28 pt-6 min-[840px]:pb-10 min-[840px]:pl-[18rem] min-[840px]:pr-8 min-[840px]:pt-8 min-[1200px]:pl-[22rem]">
@@ -104,5 +104,5 @@ export function ConsoleShell({ section, heading, children }: { section: keyof ty
   );
 }
 
-export function ConsoleNavFallback() { return <Nav aria-label="Console"><BrandWordmark height={24} /></Nav>; }
-export function ConsoleLogo() { return <BrandWordmark height={32} />; }
+export function ConsoleNavFallback() { return <Nav aria-label="Console"><BrandWordmark height={32} /></Nav>; }
+export function ConsoleLogo() { return <BrandWordmark height={40} />; }
