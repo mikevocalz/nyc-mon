@@ -15,6 +15,8 @@ export interface VdBlockBytes {
   ring1?: { shell: Uint8Array; bundled: ReadonlyMap<string, Uint8Array> } | null;
   /** Ring 2's packs (blocks/data-ring2), same contract under `ring2-<level>/<cell>`. */
   ring2?: { shell: Uint8Array; bundled: ReadonlyMap<string, Uint8Array> } | null;
+  /** Ring 3's packs (blocks/data-ring3), same contract under `ring3-<level>/<cell>`. */
+  ring3?: { shell: Uint8Array; bundled: ReadonlyMap<string, Uint8Array> } | null;
 }
 
 let bytes: VdBlockBytes | null = null;
@@ -90,12 +92,29 @@ export function preloadVdBlocks(): Promise<VdBlockBytes | null> {
       } catch (cause) {
         console.warn('[vd-port] the ring-2 block packs did not load; its cells stay with the cell source', cause);
       }
+      // Ring 3's packs: same contract — resident bundled shell, home-overlap cells bundled, the rest stream.
+      let ring3: VdBlockBytes['ring3'] = null;
+      try {
+        const r3 = await import('./data-ring3/assets.ts');
+        const r3Entries = Object.entries(level === 'lite' ? r3.VD_LITE_ASSETS : r3.VD_NEAR_ASSETS);
+        const [r3Shell, ...r3Cells] = await Promise.all([
+          fetchAssetBytes(r3.VD_SHELL_ASSET),
+          ...r3Entries.map(([key, src]) => vdCellFetch(`ring3-${level}/${key}`, () => fetchAssetBytes(src))),
+        ]);
+        ring3 = {
+          shell: new Uint8Array(r3Shell!),
+          bundled: new Map(r3Entries.map(([key], i) => [key, r3Cells[i]! instanceof Uint8Array ? r3Cells[i]! as Uint8Array : r3Cells[i]! ? new Uint8Array(r3Cells[i]!) : new Uint8Array(0)])),
+        };
+      } catch (cause) {
+        console.warn('[vd-port] the ring-3 block packs did not load; its cells stay with the cell source', cause);
+      }
       bytes = {
         shell: new Uint8Array(shell!),
         near: new Map(entries.map(([key], i) => [key, near[i]! instanceof Uint8Array ? near[i]! as Uint8Array : new Uint8Array(near[i]!)])),
         level,
         ring1,
         ring2,
+        ring3,
       };
       return bytes;
     } catch (cause) {
