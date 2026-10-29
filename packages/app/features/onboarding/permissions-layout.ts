@@ -81,3 +81,13 @@ export function permissionViewport(
   );
   return segments[0]!;
 }
+
+/**
+ * True when the chosen viewport is the whole window: no separating fold took
+ * a piece of it. Window breakpoint classes (md:, landscape:) describe the
+ * window, so screens apply them only when this holds.
+ */
+export function isWholeWindow(viewport: PermissionViewport, width: number, height: number): boolean {
+  return viewport.left === 0 && viewport.top === 0
+    && viewport.width >= Math.max(1, width) && viewport.height >= Math.max(1, height);
+}

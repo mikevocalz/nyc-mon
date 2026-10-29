@@ -361,3 +361,42 @@ export function placeBodyInFrame(frame: { width: number; height: number }, force
     top: Math.max(0, (height - geo.bodyHeightPt) / 2),
   };
 }
+
+/**
+ * Widest the shell's pane gets when `HLynkStage` shows companion panes beside
+ * it on a landscape md+ window (the open-foldable layout). Under
+ * {@linkcode HLYNK_TWO_PANE_MIN_PT}, so the shell's own planner keeps the
+ * device alone in its pane: the companion pane takes the brand pane's place
+ * on the left instead of a third column. `HLynkStage` writes the same number
+ * into its `max-w-[592px]` class; `adaptive.test.ts` holds the two together.
+ */
+export const HLYNK_STAGE_SHELL_MAX_PT = 592;
+
+/** How a fold splits the stage between the companion pane and the shell. Produced by {@linkcode planHLynkStageSplit}. */
+export interface HLynkStageSplit {
+  /** `row`: a vertical fold, companion pane left, shell right. `column`: a horizontal fold, pane above, shell below. */
+  axis: 'row' | 'column';
+  /** The companion pane's width (`row`) or height (`column`): it ends where the first usable region ends. */
+  panePt: number;
+}
+
+/**
+ * Where the companion pane ends when a separating or fully occluding fold
+ * cuts the stage, so no pane ever straddles a hinge (foldable skill §4).
+ * `regions` are the stage's usable regions ({@linkcode hlynkUsableRegions},
+ * or `HLynkPlacement.regions`). The pane takes the first region (leftmost;
+ * topmost on a horizontal fold, as the brand pane does in Decision H-2) and
+ * the shell takes the rest, hinge included, which its own planner cuts away.
+ * `null` when nothing splits the stage: the panes then follow the window's
+ * breakpoint and orientation classes. Pure.
+ */
+export function planHLynkStageSplit(regions: readonly HLynkRect[]): HLynkStageSplit | null {
+  if (regions.length < 2) return null;
+  const topY = Math.min(...regions.map((r) => r.y));
+  if (new Set(regions.map((r) => r.y)).size > 1) {
+    const top = regions.filter((r) => r.y === topY);
+    return { axis: 'column', panePt: Math.max(...top.map((r) => r.y + r.height)) };
+  }
+  const leftmost = regions.reduce((a, b) => (b.x < a.x ? b : a));
+  return { axis: 'row', panePt: leftmost.x + leftmost.width };
+}

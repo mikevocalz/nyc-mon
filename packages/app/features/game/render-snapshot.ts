@@ -1,18 +1,24 @@
 // What the worklet render runtime needs from the JS thread each frame, packed
 // into one flat number array: the city camera, the Caller's pose inputs, the
-// canvas size and the motion setting. The simulation stays on JS (it writes
+// canvas size, the motion setting and the time-of-day preset. The simulation stays on JS (it writes
 // gameCameraStore and callerStore); the render runtime reads the latest array
 // through a Synchronizable, so an input event costs a pack and a native write,
 // never a hop onto the render runtime. Pure, for node tests.
 import type { CityCamera } from './city-scene.ts';
 import type { CallerState } from './character/caller-store.ts';
 import type { Gait, JumpState } from './character/locomotion.ts';
+import { DEFAULT_PHYSICAL_PRESET, PHYSICAL_PRESET_IDS, type PhysicalPresetId } from './world/physical-look.ts';
 
 type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 /** A CallerState the snapshot reader may rewrite in place (the caller owns it; the render runtime keeps one per session). */
 export type MutableCallerState = Omit<Mutable<CallerState>, 'jump'> & { jump: Mutable<JumpState> };
 
-/** Slot of each value. `version` grows on every write so the reader can tell a new frame from a repeat. */
+/**
+ * Slot of each value. `version` grows on every write so the reader can tell a
+ * new frame from a repeat. New values are appended, never inserted, and
+ * SNAPSHOT_LENGTH grows with them: a buffer of the old length is replaced,
+ * not reused (seedSnapshot), so no reader sees a half-old layout.
+ */
 export const SNAPSHOT_SLOTS = {
   version: 0,
   width: 1,
@@ -35,8 +41,10 @@ export const SNAPSHOT_SLOTS = {
   gaitPhase: 18,
   jumpHeight: 19,
   jumpVelocity: 20,
+  /** Index into PHYSICAL_PRESET_IDS (world/time-of-day.store.ts); an unknown index reads as the default. */
+  preset: 21,
 } as const;
-export const SNAPSHOT_LENGTH = 21;
+export const SNAPSHOT_LENGTH = 22;
 
 const GAITS: readonly Gait[] = ['idle', 'walk', 'run'];
 
@@ -50,6 +58,7 @@ function seedSnapshot(target: number[], previous: readonly number[]): void {
   } else {
     target.fill(0);
     target[SNAPSHOT_SLOTS.pixelRatio] = 1;
+    target[SNAPSHOT_SLOTS.preset] = PHYSICAL_PRESET_IDS.indexOf(DEFAULT_PHYSICAL_PRESET);
   }
 }
 
@@ -60,16 +69,17 @@ export interface SnapshotView {
   reducedMotion: boolean;
 }
 
-/** A fresh array with every slot at zero except a 1x pixel ratio. */
+/** A fresh array with every slot at zero except a 1x pixel ratio and the default preset. */
 export function emptySnapshot(): number[] {
   const out = new Array<number>(SNAPSHOT_LENGTH).fill(0);
   out[SNAPSHOT_SLOTS.pixelRatio] = 1;
+  out[SNAPSHOT_SLOTS.preset] = PHYSICAL_PRESET_IDS.indexOf(DEFAULT_PHYSICAL_PRESET);
   return out;
 }
 
 /**
  * The next snapshot: `previous` with a bumped version and the given camera,
- * Caller and view written in. Non-finite camera or Caller numbers keep the
+ * Caller, view and time-of-day preset written in. Non-finite camera or Caller numbers keep the
  * previous value, so a bad frame never reaches the renderer as NaN.
  * `out` reuses a caller's buffer for the write. Never pass a buffer that was
  * already handed to a Synchronizable: worklets caches serializables by
@@ -78,7 +88,14 @@ export function emptySnapshot(): number[] {
  * clone and readers see its version 1 forever (measured on the Duo,
  * 2026-10-17). Callers writing to a Synchronizable must leave `out` unset.
  */
-export function packSnapshot(previous: readonly number[], camera: CityCamera, caller: CallerState, view: SnapshotView, out?: number[]): number[] {
+export function packSnapshot(
+  previous: readonly number[],
+  camera: CityCamera,
+  caller: CallerState,
+  view: SnapshotView,
+  preset: PhysicalPresetId,
+  out?: number[],
+): number[] {
   'worklet';
   const target = out ?? (previous.length === SNAPSHOT_LENGTH ? previous.slice() : emptySnapshot());
   if (out !== undefined) seedSnapshot(target, previous);
@@ -106,6 +123,8 @@ export function packSnapshot(previous: readonly number[], camera: CityCamera, ca
   put(SNAPSHOT_SLOTS.gaitPhase, caller.gaitPhase);
   put(SNAPSHOT_SLOTS.jumpHeight, caller.jump.height);
   put(SNAPSHOT_SLOTS.jumpVelocity, caller.jump.velocity);
+  const presetIndex = PHYSICAL_PRESET_IDS.indexOf(preset);
+  if (presetIndex >= 0) target[SNAPSHOT_SLOTS.preset] = presetIndex;
   return target;
 }
 
@@ -162,4 +181,10 @@ export function readView(snapshot: readonly number[], out?: SnapshotView): Snaps
   target.pixelRatio = snapshot[SNAPSHOT_SLOTS.pixelRatio] ?? 1;
   target.reducedMotion = snapshot[SNAPSHOT_SLOTS.reducedMotion] === 1;
   return target;
+}
+
+/** The time-of-day preset; the default for an unknown index or a short array. */
+export function readPreset(snapshot: readonly number[]): PhysicalPresetId {
+  'worklet';
+  return PHYSICAL_PRESET_IDS[snapshot[SNAPSHOT_SLOTS.preset] ?? -1] ?? DEFAULT_PHYSICAL_PRESET;
 }

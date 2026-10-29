@@ -62,6 +62,26 @@ export const EGG_COPY = {
   'm10.error.body': 'Nothing was saved. Try again. If it keeps happening, restart NYC-MON.',
   'm10.error.retry': 'Try again',
   'm10.back.a11y.label': 'Back',
+
+  // Companion pane beside or under the 3D H-Lynk on tablets and open foldables
+  // (docs/design/foldable-arrangements.md). M08 shows only canon-settled facts (P3).
+  'pane.meet.title': 'About this egg',
+  'pane.meet.number': 'Number',
+  'pane.meet.bloodline': 'Bloodline',
+  'pane.meet.empty.title': 'Pick an egg',
+  'pane.meet.empty.body': 'Tap an egg to see the name, number and Bloodline.',
+  'pane.incubation.title': 'Incubation',
+  'pane.incubation.a11y': 'Incubation steps',
+  'pane.incubation.chosen': 'You chose the {eggName}',
+  'pane.incubation.wait': 'Incubating',
+  'pane.incubation.wait.pick': 'Pick how long the egg incubates.',
+  'pane.incubation.wait.for': 'For {duration}.',
+  'pane.incubation.started': 'Started {time}',
+  'pane.incubation.ready': 'Ready to hatch',
+  'pane.incubation.ready.at': '{time}',
+  'pane.incubation.hatch': 'Hatch and meet your Mon',
+  'pane.incubation.hatch.body': 'You can give your Mon a nickname after the hatch.',
+  'pane.incubation.now': 'Now',
 } as const;
 
 export type EggCopyId = keyof typeof EGG_COPY;

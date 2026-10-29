@@ -7,16 +7,17 @@
 // Mode docs, "Running third party libraries in Worklets").
 //
 // State it does not own arrives through `snapshot` (render-snapshot.ts): the
-// JS-thread simulation writes the camera and Caller there, and this loop
-// reads the latest array once per tick. The Caller proxy reads a mirror store
-// fed from that array, so character/ and world/ run here unchanged.
+// JS-thread simulation writes the camera, Caller and time-of-day preset
+// there, and this loop reads the latest array once per tick. The Caller
+// proxy reads a mirror store fed from that array, so character/ and world/
+// run here unchanged.
 //
 // Milestones, breadcrumbs and failures go back to the JS thread with
 // scheduleOnRN (runtime-report.ts routes them there). Nothing thrown on this
 // runtime reaches logcat or Metro by itself, so every entry point catches.
 import * as THREE from 'three/webgpu';
 import { scheduleOnRN, type Synchronizable } from 'react-native-worklets';
-import { advanceNodeFrame, stopInternalLoop } from '@acme/ui/three/internals';
+import { advanceNodeFrame, releaseCanvasBuffers, stopInternalLoop } from '@acme/ui/three/internals';
 import type { NativeCanvasContext, ThreeFrame, ThreeScene } from '@acme/ui/three';
 import { bundledCity } from '../city-data.ts';
 import { createCityScene } from '../city-scene.ts';
@@ -29,10 +30,15 @@ import { createLampActor, lampPlacements } from '../living-city/lamp-viz.ts';
 import { createPedActor } from '../living-city/ped-actor.ts';
 import { createSignalActor } from '../living-city/signal-viz.ts';
 import { createVehicleActor } from '../living-city/vehicle-actor.ts';
-import { readCaller, readCamera, readView, snapshotVersion, type MutableCallerState } from '../render-snapshot.ts';
+import { readCaller, readCamera, readPreset, readView, snapshotVersion, type MutableCallerState } from '../render-snapshot.ts';
 import { createStreetClearance } from '../world/walkability.ts';
 import { describeRuntimeError, installFrameGlobals, type GameRenderEventKind } from './runtime-report.ts';
 import { FrameSampleWindow, type MutableFrameTimingSample } from '../perf/frame-sampler.ts';
+import { physicalRendererParams, WORLD_DEVICE_PROBE } from '../world/physical-look.ts';
+import { readInteropGlobals, resolveRendererDevice, WORLD_PHYSICAL, type RendererDevice } from './shared-device.ts';
+// device-probes.ts (and the Skia texture bridge it imports) loads only when a
+// device-lane probe runs on a shared device, under EXPO_PUBLIC_WORLD_PHYSICAL.
+import { loadDeviceProbes } from '../physical-graph.ts';
 
 export type { GameRenderEventKind } from './runtime-report.ts';
 
@@ -48,6 +54,8 @@ export interface GameRenderArgs {
   session: number;
   context: NativeCanvasContext;
   device: GPUDevice | null;
+  /** gpu-store's record of `device` (readGpuDevice().source): `shared` is Skia's Graphite device. Read only under EXPO_PUBLIC_WORLD_PHYSICAL. */
+  deviceSource?: 'shared' | 'own' | null;
   snapshot: Synchronizable<number[]>;
   /** Living City PR05: the packed vehicle channel — null/absent when the flag is off (flag-off = zero-diff). */
   vehicles?: Synchronizable<number[]> | null;
@@ -239,6 +247,9 @@ function disposeSession(s: Session) {
   s.disposed = true;
   try {
     s.built?.dispose?.();
+    // three's dispose leaves the canvas target's multisampled colour and
+    // depth buffers to a GC on the shared device: about 100 MB at the iPad size.
+    if (s.renderer) releaseCanvasBuffers(s.renderer);
     s.renderer?.dispose();
   } catch (error) {
     emit(s, 'error', describeRuntimeError('dispose', error));
@@ -282,6 +293,13 @@ export function startGameRender(args: GameRenderArgs): void {
     return;
   }
   trace(s, 'city parsed');
+  // EXPO_PUBLIC_WORLD_PHYSICAL (G9): the renderer runs on Skia's device when
+  // gpu-store handed it or this runtime can import it (shared-device.ts).
+  // Flag off, `device` is args.device exactly as before.
+  const shared = WORLD_PHYSICAL ? resolveRendererDevice(args.device, args.deviceSource, readInteropGlobals()) : null;
+  if (shared) trace(s, `renderer device: ${shared.source}; ${shared.note}`);
+  const device = shared ? shared.device : args.device;
+  const pipecache = shared && WORLD_DEVICE_PROBE === 'pipecache' ? loadDeviceProbes().createPipecacheTimer('worklet') : null;
   let renderer: InstanceType<typeof THREE.WebGPURenderer>;
   try {
     // With inline requires (forced by Bundle Mode), this line is where three.js is first evaluated here.
@@ -290,7 +308,9 @@ export function startGameRender(args: GameRenderArgs): void {
       // react-native-webgpu's canvas is DOM-shaped enough for three; its types are not.
       canvas: args.context.canvas as unknown as HTMLCanvasElement,
       context: args.context,
-      ...(args.device ? { device: args.device } : {}),
+      ...(device ? { device } : {}),
+      // EXPO_PUBLIC_WORLD_PHYSICAL: reversed depth, as Slop's main.js sets it. Flag off: {}.
+      ...physicalRendererParams(),
     });
   } catch (error) {
     fail(s, 'renderer construct', error);
@@ -298,15 +318,28 @@ export function startGameRender(args: GameRenderArgs): void {
   }
   s.renderer = renderer;
   trace(s, 'three loaded, renderer constructed; init pending');
-  renderer.init().then(() => {
-    if (s.disposed) return;
+  const ready = shared && WORLD_DEVICE_PROBE && WORLD_DEVICE_PROBE !== 'pipecache'
+    ? renderer.init().then(() => runRendererProbe(s, renderer, shared))
+    : renderer.init();
+  ready.then(() => {
+    if (s.disposed) {
+      // Unmounted while init ran: the dispose above came before init made its
+      // frame loop and canvas buffers, so release what init built now.
+      stopInternalLoop(renderer);
+      releaseCanvasBuffers(renderer);
+      void renderer.dispose();
+      return;
+    }
     trace(s, 'renderer init resolved');
+    pipecache?.mark('rendererInit');
     emit(s, 'stage', 'moduleLoaded');
     stopInternalLoop(renderer);
     const mirror = { getState: () => s.caller };
     const params: GameSceneParams = {
       dataset: city.dataset,
       get camera() { return readCamera(s.snapshot, s.camera); },
+      // The time-of-day pick worklet-host packs from timeOfDayStore; city-scene re-lights on change.
+      get preset() { return readPreset(s.snapshot); },
       // PR05: the vehicle fleet reads its own packed Synchronizable — the sim
       // stays JS-authoritative and only the snapshot crosses runtimes.
       // PR06: the crowd reads the SAME channel — the ped section is appended
@@ -332,7 +365,8 @@ export function startGameRender(args: GameRenderArgs): void {
               // the sidewalk, lamp glows reuse the same kerb math.
               const streetClearance = createStreetClearance(city.dataset);
               return [
-                createVehicleActor({ read }),
+                // Headlight PointLights default to WORLD_CLUSTERED_LIGHTING (vehicle-actor.ts).
+                createVehicleActor({ read, focus }),
                 createPedActor({ read }),
                 ...(topology && signals
                   ? [createSignalActor({ read, signals, topology, focus, clearance: streetClearance, headCap: caps.signalHeadCap, pedCap: caps.pedBoxCap })]
@@ -350,11 +384,18 @@ export function startGameRender(args: GameRenderArgs): void {
             })()
           : []),
       ],
-      onFirstFrame: () => emit(s, 'firstFrame'),
+      onFirstFrame: () => {
+        emit(s, 'firstFrame');
+        const record = pipecache?.finish();
+        if (record) trace(s, loadDeviceProbes().formatProbeRecord(record));
+      },
     };
     const setup = withFirstFrameSignal(
       createCityScene,
-      (stage) => emit(s, 'stage', stage),
+      (stage) => {
+        pipecache?.mark(stage);
+        emit(s, 'stage', stage);
+      },
       (event) => trace(s, event),
     );
     const invalidate = () => {
@@ -370,6 +411,32 @@ export function startGameRender(args: GameRenderArgs): void {
   }).catch((error: unknown) => {
     if (!s.disposed) fail(s, 'renderer init or scene build', error);
   });
+}
+
+/**
+ * The `shared` and `skiatex` probes on this runtime, after init and before
+ * the city builds, against the device three actually holds
+ * (WebGPUBackend.device, three 0.186.1 build/three.webgpu.js ~L87210). A
+ * probe failure is logged, never thrown: the world still loads.
+ */
+async function runRendererProbe(s: Session, renderer: InstanceType<typeof THREE.WebGPURenderer>, shared: RendererDevice): Promise<void> {
+  const device = (renderer.backend as { device?: GPUDevice | null }).device ?? null;
+  const { skia } = readInteropGlobals();
+  const { formatProbeRecord, probeShared, probeSkiaTex, threeSampler } = loadDeviceProbes();
+  try {
+    if (WORLD_DEVICE_PROBE === 'shared') {
+      trace(s, formatProbeRecord(await probeShared({ runtime: 'worklet', device, deviceSource: shared.source, skia })));
+    } else if (WORLD_DEVICE_PROBE === 'skiatex') {
+      const sampler = threeSampler(THREE, renderer);
+      try {
+        trace(s, formatProbeRecord(await probeSkiaTex({ runtime: 'worklet', device, skia, sample: sampler.sample })));
+      } finally {
+        sampler.dispose();
+      }
+    }
+  } catch (error) {
+    emit(s, 'error', describeRuntimeError(`probe ${WORLD_DEVICE_PROBE}`, error));
+  }
 }
 
 /** A write landed while the loop was parked. */

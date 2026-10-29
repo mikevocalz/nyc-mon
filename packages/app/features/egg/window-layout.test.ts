@@ -37,9 +37,16 @@ test('M10 stack: title, body, ring, ready, actions, Start', () => {
   ]);
 });
 
-test('M10 side: the ring may reach 360; 600-wide screens cap the stacked ring at 300', () => {
-  assert.equal(incubateFitBlocks(base, true).find((b) => b.kind === 'media')?.maxPt, 360);
-  assert.equal(incubateFitBlocks({ ...base, widthDp: 640 }, false).find((b) => b.kind === 'media')?.maxPt, 300);
+test('M10 side: the ring may reach 360; a tablet-sized screen grows the stacked ring', () => {
+  const cap = (widthDp: number, side = false) => incubateFitBlocks({ ...base, widthDp }, side).find((b) => b.kind === 'media')?.maxPt;
+  assert.equal(cap(400, true), 360);
+  // Phones, up to the 440 pt body: unchanged.
+  assert.equal(cap(400), 260);
+  assert.equal(cap(439), 260);
+  // Tablet shell (iPad body 600, screen content ~550): 70 % of the width, 300..420.
+  assert.equal(cap(440), 308);
+  assert.equal(cap(552), 386);
+  assert.equal(cap(640), 420);
 });
 
 test('M10 busy and error states change only their own blocks', () => {

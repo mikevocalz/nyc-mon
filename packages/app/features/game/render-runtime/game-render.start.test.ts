@@ -4,6 +4,7 @@
 // that supports init but not buffer creation. Checks that every milestone up
 // to the compile is reported, and that a failure later on reaches the JS side
 // as an `error` with a stack plus `failed`, instead of vanishing.
+import '../classic-flags.test-support.ts';
 import assert from 'node:assert/strict';
 import { register } from 'node:module';
 import { test } from 'node:test';
@@ -75,6 +76,8 @@ test('startGameRender reports each stage, then surfaces the first GPU failure wi
     'renderer init resolved',
   ]);
   assert.ok(traces.includes('scene built'), traces.join(' | '));
+  // EXPO_PUBLIC_WORLD_PHYSICAL is unset here: no shared-device resolution and no probe ran.
+  assert.ok(!traces.some((t) => t.startsWith('renderer device:') || t.startsWith('probe ')), traces.join(' | '));
   assert.ok(traces.includes('compileAsync started'), traces.join(' | '));
   assert.deepEqual(stages.slice(0, 2), ['moduleLoaded', 'worldBuilt']);
   assert.ok(events.some((e) => e.kind === 'backend' && e.detail === 'webgpu'));

@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { ChildrensPrivacyPage } from '../../../../components/legal/ChildrensPrivacyPage';
-import { LEGAL_COPY } from '../../../../components/legal/copy';
+import { LEGAL_COPY } from '@acme/app/features/legal/copy.ts';
 
 export const metadata: Metadata = {
   title: { absolute: "NYC-MON | Children's privacy" },

@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'expo-router';
 import { assertNever, DEFAULT_CARE_TUNING } from '@acme/core/sim';
 import type { CareAction } from '@acme/core/types';
 import {
-  Button, CareMeterRing, SheetSurface, useHLynkStageWide, useInstanceStore, useReducedMotion, useStore,
+  Button, CareMeterRing, HLYNK_COPY, SheetSurface, useInstanceStore, useReducedMotion, useStore, type DeviceKey, type GlassAction,
+  type GlassView,
 } from '@acme/ui';
 import { haptics } from '@acme/ui/haptics';
 import { Text, View } from '@acme/ui/tw';
@@ -13,7 +14,9 @@ import { useMonStore } from '../mon/mon.store';
 import { announcePolitely } from '../onboarding/announce';
 import { careLed, useCareNow } from './care-shared';
 import { companionCopy as c } from './copy';
+import { GlassStage, glassControls, glassRing, useGlassOn, useGlassScreen, useMonGlass } from './glass';
 import { useHomeStage } from './home-stage.store';
+import { CareHistoryPane } from './pane-content';
 import { tickMinuteClock } from './minute-clock';
 
 /** `m15.sleeping.leave` shows once per session (M15 copy notes). */
@@ -21,6 +24,8 @@ let leaveNoteShown = false;
 
 /** How long "Settling in." holds before the sleeping lines. The 2D still has no `sleep_in` clip to time it (B2). */
 const SETTLING_MS = 1200;
+/** The Baby large, the energy ring, three lines and one row of buttons. */
+const LAYOUT = { model: 'large', rings: true, lineRows: 3, actionRows: 1, perRow: 2 } as const;
 
 interface RestLocal {
   settling: boolean;
@@ -28,6 +33,8 @@ interface RestLocal {
   /** A race: another surface put the Mon to bed first (`declined: already-asleep`). */
   raced: boolean;
   showLeave: boolean;
+  failed: boolean;
+  nudge: number;
 }
 
 /**
@@ -40,10 +47,10 @@ interface RestLocal {
 export function RestScreen() {
   const router = useRouter();
   const reducedMotion = useReducedMotion();
-  const wide = useHLynkStageWide();
   const { care, identity, scheme } = useCareNow();
-  const local = useInstanceStore<RestLocal>(() => ({ settling: false, confirming: false, raced: false, showLeave: false }));
-  const { settling, confirming, raced, showLeave } = useStore(local);
+  const local = useInstanceStore<RestLocal>(() => ({ settling: false, confirming: false, raced: false, showLeave: false, failed: false, nudge: 0 }));
+  const { settling, confirming, raced, showLeave, failed, nudge } = useStore(local);
+  const glassOn = useGlassOn(failed);
   const entered = useRef(false);
   const sawAsleep = useRef(false);
   const leaving = useRef(false);
@@ -178,7 +185,45 @@ export function RestScreen() {
     </SheetSurface>
   );
 
-  useHomeStage({
+  // ---- the 3D H-Lynk: the Baby asleep on the glass (its tired / still pose), the energy ring and Wake drawn there ----
+  const { model, monClips } = useMonGlass(identity?.dexId ?? null, care);
+  const statusText = raced ? c('m15.declined.already', { name }) : settling ? c('m15.settling') : c('m15.sleeping');
+  const canWake = asleep && !settling;
+  const actions: GlassAction[] = !canWake ? [] : confirming
+    ? [
+      { target: 'cancel', label: c('m15.wake.cancel', { name }), tone: 'secondary' },
+      { target: 'confirm', label: c('m15.wake.confirm', { name }), tone: 'primary' },
+    ]
+    : [{ target: 'wake', label: c('m15.wake.button', { name }), tone: 'secondary' }];
+  const glassView: GlassView = {
+    status: null,
+    title: name,
+    subtitle: statusText,
+    rings: care === undefined ? [] : [glassRing('energy', care.energy)],
+    lines: [
+      ...(showLeave && !settling ? [{ text: c('m15.sleeping.leave', { name }), size: 'caption' as const }] : []),
+      ...(earlyWake && canWake ? [{ text: c('m15.wake.cost', { name }), tone: 'amber' as const }] : []),
+    ],
+    actions,
+  };
+  const onAction = (target: string) => {
+    if (target === 'wake') onWakeButton();
+    else if (target === 'confirm') wake();
+    else if (target === 'cancel') local.setState({ confirming: false });
+  };
+  const glass = useGlassScreen({ layout: LAYOUT, model, view: glassView, nudge });
+  useEffect(() => {
+    // A tap on the sleeping Baby never wakes it (M15): it only stirs.
+    glass.bind({ onAction, monClips, onModel: () => local.setState({ nudge: local.getState().nudge + 1 }) });
+  });
+  const onKey = (key: DeviceKey) => {
+    if (key === 'activate' && canWake) (confirming ? wake : onWakeButton)();
+    else if (key === 'back') leave();
+    else if (key === 'home') router.replace('/(home)');
+  };
+  const onFailed = useCallback(() => local.setState({ failed: true }), [local]);
+
+  useHomeStage(glassOn ? {} : {
     chrome: {
       status: careLed(care),
       scheme: asleep ? 'night' : scheme,
@@ -207,12 +252,42 @@ export function RestScreen() {
             />
           </View>
         )}
-        {wide ? null : <View className="absolute inset-x-0 bottom-0">{panel}</View>}
+        {/* From md the panel sits in the stage's companion pane instead (HLynkStage). */}
+        <View className="absolute inset-x-0 bottom-0 md:hidden">{panel}</View>
       </View>
     ),
-    trailing: wide ? panel : undefined,
+    trailing: panel,
   });
 
-  return null;
+  if (!glassOn) return null;
+  const paneTips = [
+    c('pane.rest.tip.energy'),
+    c('pane.rest.tip.close', { name }),
+    c('pane.rest.tip.early', { name }),
+  ];
+
+  return (
+    <GlassStage
+      screen={glass.screen}
+      label={statusText}
+      testIDPrefix="m15"
+      onKey={onKey}
+      onFailed={onFailed}
+      companion={<CareHistoryPane route="rest" tips={paneTips} loading={care === undefined} />}
+      a11y={
+        <>
+          <Text testID="m15-status" accessibilityLiveRegion="polite">{statusText}</Text>
+          {care === undefined ? null : <Text testID="m15-ring-energy">{`${c('m13.ring.energy')} ${Math.round(care.energy * 100)}%`}</Text>}
+          {showLeave && !settling ? <Text testID="m15-leave-note">{c('m15.sleeping.leave', { name })}</Text> : null}
+          {earlyWake && canWake ? <Text testID="m15-wake-cost">{c('m15.wake.cost', { name })}</Text> : null}
+        </>
+      }
+      controls={[
+        ...glassControls(actions, glass.press, (t) => `m15-${t === 'confirm' ? 'wake-confirm' : t === 'cancel' ? 'wake-cancel' : 'wake'}`),
+        { key: 'back', label: HLYNK_COPY['hlynk.key.back.label'], onPress: leave, testID: 'm15-back' },
+        { key: 'home', label: HLYNK_COPY['hlynk.key.home.label'], onPress: () => router.replace('/(home)'), testID: 'm15-home' },
+      ]}
+    />
+  );
 }
 

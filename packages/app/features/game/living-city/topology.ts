@@ -529,11 +529,12 @@ export function buildLaneTopology(dataset: CityDatasetV3): LaneTopology {
             ];
     for (const { dir, count, splitOdd } of directions) {
       // Lanes share their direction's half of the carriageway (the whole
-      // width on one-way pieces); lane 0 rides the kerb.
+      // width on one-way pieces); lane 0 rides the right kerb, which sits
+      // half the road width from the centreline either way.
       const span = oneway === 0 ? road.widthMeters / 2 : road.widthMeters;
       const laneWidth = span / count;
       for (let i = 0; i < count; i++) {
-        const lateral = -(span - laneWidth * (i + 0.5));
+        const lateral = -(road.widthMeters / 2 - laneWidth * (i + 0.5));
         const points = offsetTravelPolyline(road, dir, lateral);
         const from = dir === 'forward' ? nodeA : nodeB;
         const to = dir === 'forward' ? nodeB : nodeA;

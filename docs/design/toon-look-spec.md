@@ -1,5 +1,7 @@
 # Toon look spec: the Game world's cel material
 
+> **Superseded for the city (2026-10-26).** `DECISIONS.md` D19 moves the Game city to Slop New York's physically lit look behind `EXPO_PUBLIC_WORLD_PHYSICAL`. This spec no longer governs buildings, streets or cars. It stays in force for the Caller and the Mons until gate G1 (cel, physical or hybrid characters) is answered; until then `cel-rig.ts` is untouched.
+
 Owner: `graphics`. Written 2026-10-16. Status: proposal. Nothing here is implemented; it is the brief a shader writer builds the replacement cel material from, without reference to the material it replaces.
 
 Clean-room note: this brief was written from canon, the world's own code and docs, and published papers only. No constants, parameter names or structure carry over from the previous cel material. Every number below is a starting point marked **to be tuned** on device, not a value recovered from old code.

@@ -6,8 +6,17 @@
 //   the stair well, the green globe lamps), bus shelters (posts, roof,
 //   glass, a lit ad panel with no artwork) and LinkNYC kiosks (a slim
 //   monolith with two lit faces) at their record positions
-// - city:cars: parked cars and taxis, one InstancedMesh whose instance list
-//   follows the Caller (preallocated, rebuilt after a 10 m move)
+// - city:cars (vd lane off): parked cars and taxis, one InstancedMesh of box
+//   cars whose instance list follows the Caller (preallocated, rebuilt after
+//   a 10 m move)
+// - city:cars-vd-<car>[-mid|-far] (vd lane, the default): every parked car
+//   in CAR_RADIUS is a Valdrada baked body (vd-car-mesh.ts), one
+//   InstancedMesh per body and detail level. The nearest VD_PARKED_CAP inside
+//   VD_PARKED_RADIUS draw LOD2; the rest out to VD_PARKED_MID_RADIUS draw the
+//   `mid` decimation, and out to CAR_RADIUS the `far` one. No box car is
+//   built. Same material, same instance tone. Each is a Mesh over an
+//   InstancedBufferGeometry with the transform in `vdXform`
+//   (vd-instanced.ts), so the eighteen share one node build and pipeline.
 //
 // Layout and the clearance rules are street-props-layout.ts. Where the v3
 // tile carries record furniture (`dataset.furniture`), the records place
@@ -17,7 +26,7 @@
 // (living-city/bundled-host.ts bundledObstacles), so drawing them also
 // makes the crowd's detours legible.
 import type { Three } from '@acme/ui/three';
-import { CURB_HEIGHT } from './curb.ts';
+import { CURB_HEIGHT, VD_LANE } from './curb.ts';
 import type { CityDatasetV3 } from '../city-dataset.ts';
 import { SHADOW_BAND_METRES } from './city-mesh.ts';
 import { VertexBuffer } from './geometry.ts';
@@ -32,6 +41,8 @@ import {
 import { SURFACES, surfaceMid } from './surfaces.ts';
 import { pickWithin, TREE_REFRESH_METRES } from './tree-lod.ts';
 import type { StreetClearance } from './walkability.ts';
+import { VD_LODS, vdCarHash, vdParkedCarLodGeometries, type VdCarId, type VdLod } from './vd-car-mesh.ts';
+import { VD_XFORM_ATTRIBUTE, vdInstancedGeometry, vdXformPositionNode, writeVdXform } from './vd-instanced.ts';
 
 const rgb = (key: CityColor) => hexToRgb(CITY_COLORS[key]);
 /** Body paint marker: vertices coloured below zero take the instance tone (materials.ts `cars`). */
@@ -39,6 +50,28 @@ const PAINT = [-1, -1, -1] as const;
 
 export const CAR_RADIUS = 200;
 export const CAR_CAP = 220;
+/** vd lane: parked cars this close to the Caller may draw the full baked body (LOD2). */
+export const VD_PARKED_RADIUS = 40;
+/**
+ * At most this many full bodies, about 4k triangles each. budget.test.ts at the Apollo spawn put 13 bodies (cap 40) at 48.6k
+ * triangles against a 320k frame budget the vd trees already exceed (2026-10-28), so the cap is the fleet's high-tier
+ * near count. Cars past the cap draw the same body's `mid` decimation (~600 triangles), never a box.
+ */
+export const VD_PARKED_CAP = 12;
+/** vd lane: out to here the `mid` decimation, past it (to CAR_RADIUS) the `far` one (~150 triangles). */
+export const VD_PARKED_MID_RADIUS = 90;
+/** Parked bodies, with the share each takes of the non-taxi slots. Taxis are the TLC cab, a quarter of them a yellow sedan. */
+const VD_PARKED_SHARE: readonly (readonly [VdCarId, number])[] = [['lincoln', 0.3], ['suv', 0.25], ['mercedes', 0.2], ['charger', 0.15], ['van', 0.1]];
+export const VD_PARKED_CARS: readonly VdCarId[] = ['lincoln', 'suv', 'mercedes', 'charger', 'van', 'taxinv200'];
+
+/** Which baked body parked car `i` wears: deterministic per slot. */
+export function vdParkedCar(i: number, taxi: boolean): VdCarId {
+  const h = vdCarHash(i);
+  if (taxi) return h < 0.75 ? 'taxinv200' : 'lincoln';
+  let acc = 0;
+  for (const [id, share] of VD_PARKED_SHARE) { acc += share; if (h < acc) return id; }
+  return 'lincoln';
+}
 
 /** Every street prop for a tile, after the clearance. Pure apart from the clearance. */
 export function placeStreetProps(dataset: CityDatasetV3, clearance: StreetClearance, signs: readonly SignPlacement[], lights: readonly LightPlacement[]) {
@@ -194,6 +227,7 @@ function carGeometry(THREE: Three) {
 export function buildStreetProps(
   THREE: Three, dataset: CityDatasetV3, materials: Pick<CityMaterials, 'roofs' | 'neon' | 'cars'>,
   clearance: StreetClearance, signs: readonly SignPlacement[], lights: readonly LightPlacement[],
+  vd: boolean = VD_LANE,
 ) {
   const placed = placeStreetProps(dataset, clearance, signs, lights);
 
@@ -230,15 +264,7 @@ export function buildStreetProps(
   mesh('city:transit', structure, materials.roofs);
   mesh('city:transit-lights', glow, materials.neon);
 
-  // Parked cars and taxis: source rows once, the near ones copied into the instance buffer as the Caller walks.
-  const carGeo = carGeometry(THREE);
-  const capacity = Math.max(1, Math.min(CAR_CAP, placed.cars.length));
-  const cars = new THREE.InstancedMesh(carGeo, materials.cars, capacity);
-  cars.name = 'city:cars';
-  cars.count = 0;
-  cars.frustumCulled = false;
-  const tones = new THREE.InstancedBufferAttribute(new Float32Array(capacity * 3), 3);
-  carGeo.setAttribute(TONE_ATTRIBUTE, tones);
+  // Parked cars and taxis: source rows once, the near ones copied into the instance buffers as the Caller walks.
   const n = placed.cars.length;
   const sourceMatrices = new Float32Array(Math.max(1, n) * 16);
   const sourceTones = new Float32Array(Math.max(1, n) * 3);
@@ -249,17 +275,87 @@ export function buildStreetProps(
   const up = new THREE.Vector3(0, 1, 0);
   const pos = new THREE.Vector3();
   const one = new THREE.Vector3(1, 1, 1);
+  const sourceYaw = new Float32Array(n);
   placed.cars.forEach((car: CarPlacement, i) => {
-    q.setFromAxisAngle(up, Math.atan2(-car.dir[1], car.dir[0]));
+    sourceYaw[i] = Math.atan2(-car.dir[1], car.dir[0]);
+    q.setFromAxisAngle(up, sourceYaw[i]!);
     matrix.compose(pos.set(car.x, 0, car.z), q, one).toArray(sourceMatrices, i * 16);
     const tone = car.taxi ? rgb('taxi') : rgb(CAR_TONES[Math.floor(car.tone * CAR_TONES.length) % CAR_TONES.length]!);
     sourceTones.set(tone, i * 3);
     xs[i] = car.x;
     zs[i] = car.z;
   });
+  const capacity = Math.max(1, Math.min(CAR_CAP, n));
   const ids = new Int32Array(capacity);
   const scratch = new Float32Array(n);
-  objects.push(cars);
+
+  // vd off: the box cars. vd on: none.
+  let cars: InstanceType<Three['InstancedMesh']> | null = null;
+  let tones: InstanceType<Three['InstancedBufferAttribute']> | null = null;
+  if (!vd) {
+    const carGeo = carGeometry(THREE);
+    cars = new THREE.InstancedMesh(carGeo, materials.cars, capacity);
+    cars.name = 'city:cars';
+    cars.count = 0;
+    cars.frustumCulled = false;
+    tones = new THREE.InstancedBufferAttribute(new Float32Array(capacity * 3), 3);
+    carGeo.setAttribute(TONE_ATTRIBUTE, tones);
+    objects.push(cars);
+  }
+
+  // vd on: one instanced Mesh per baked body and detail level (vd-instanced.ts); a car's body is fixed per slot at build.
+  type Mesh = InstanceType<Three['Mesh']>;
+  type InstancedGeometry = InstanceType<Three['InstancedBufferGeometry']>;
+  interface VdParked {
+    readonly mesh: Mesh;
+    readonly geometry: InstancedGeometry;
+    readonly buffer: InstanceType<Three['InstancedInterleavedBuffer']>;
+    readonly stride: number;
+    readonly toneAt: number;
+    readonly xformAt: number;
+    readonly cap: number;
+    count: number;
+  }
+  const vdMeshes: VdParked[] = [];
+  /** vdSlots[body][lod] -> index into vdMeshes. */
+  const vdSlots: Record<VdLod, number>[] = [];
+  const vdKindOf = new Uint8Array(n);
+  if (vd && n > 0) {
+    // The parked-car material is only these meshes' under vd: it reads the transform from vdXform.
+    (materials.cars as unknown as { positionNode: unknown }).positionNode = vdXformPositionNode(THREE);
+    const used = new Set<VdCarId>();
+    placed.cars.forEach((car, i) => used.add(vdParkedCar(i, car.taxi)));
+    const slotOf = new Map<VdCarId, number>();
+    for (const id of VD_PARKED_CARS) {
+      if (!used.has(id)) continue;
+      const geometries = vdParkedCarLodGeometries(THREE, id);
+      const slots = {} as Record<VdLod, number>;
+      for (const lod of VD_LODS) {
+        // The near level stops at VD_PARKED_CAP in setFocus.
+        const cap = capacity;
+        const made = vdInstancedGeometry(THREE, geometries[lod], cap, [[VD_XFORM_ATTRIBUTE, 4], [TONE_ATTRIBUTE, 3]]);
+        const mesh = new THREE.Mesh(made.geometry, materials.cars);
+        mesh.name = lod === 'near' ? `city:cars-vd-${id}` : `city:cars-vd-${id}-${lod}`;
+        mesh.visible = false;
+        mesh.frustumCulled = false;
+        mesh.matrixAutoUpdate = false;
+        // Past VD_PARKED_MID_RADIUS a car's sun shadow is a few pixels: the far level skips the caster pass.
+        if (lod === 'far') mesh.userData.noSunShadow = true;
+        slots[lod] = vdMeshes.length;
+        vdMeshes.push({
+          mesh, geometry: made.geometry, buffer: made.buffer, stride: made.stride,
+          toneAt: made.offsets[TONE_ATTRIBUTE]!, xformAt: made.offsets[VD_XFORM_ATTRIBUTE]!, cap, count: 0,
+        });
+        objects.push(mesh);
+      }
+      slotOf.set(id, vdSlots.length);
+      vdSlots.push(slots);
+    }
+    placed.cars.forEach((car, i) => { vdKindOf[i] = slotOf.get(vdParkedCar(i, car.taxi))!; });
+  }
+  const vdR2 = VD_PARKED_RADIUS * VD_PARKED_RADIUS;
+  const midR2 = VD_PARKED_MID_RADIUS * VD_PARKED_MID_RADIUS;
+  let near = true; // meshes start visible; setDistance keeps them in step
   let lastX = Number.NaN;
   let lastZ = Number.NaN;
   const shown: [number, number] = [-1, -1];
@@ -281,25 +377,49 @@ export function buildStreetProps(
       lastX = x;
       lastZ = z;
       const count = pickWithin(xs, zs, x, z, CAR_RADIUS, ids, scratch);
-      const target = cars.instanceMatrix.array as Float32Array;
-      const toneArray = tones.array as Float32Array;
-      for (let k = 0; k < count; k++) {
-        const i = ids[k]!;
-        target.set(sourceMatrices.subarray(i * 16, i * 16 + 16), k * 16);
-        toneArray[k * 3] = sourceTones[i * 3]!; toneArray[k * 3 + 1] = sourceTones[i * 3 + 1]!; toneArray[k * 3 + 2] = sourceTones[i * 3 + 2]!;
+      if (vdMeshes.length > 0) {
+        // pickWithin returns the nearest first: LOD2 for the first VD_PARKED_CAP inside the near radius, then by distance.
+        for (const m of vdMeshes) m.count = 0;
+        for (let k = 0; k < count; k++) {
+          const i = ids[k]!;
+          const d2 = scratch[i]!;
+          const lod: VdLod = k < VD_PARKED_CAP && d2 <= vdR2 ? 'near' : d2 <= midR2 ? 'mid' : 'far';
+          const m = vdMeshes[vdSlots[vdKindOf[i]!]![lod]]!;
+          if (m.count >= m.cap) continue;
+          const slot = m.count++;
+          const array = m.buffer.array as Float32Array;
+          writeVdXform(array, slot, m.stride, m.xformAt, xs[i]!, zs[i]!, sourceYaw[i]!);
+          array.set(sourceTones.subarray(i * 3, i * 3 + 3), slot * m.stride + m.toneAt);
+        }
+        for (const m of vdMeshes) {
+          m.geometry.instanceCount = m.count;
+          m.mesh.visible = near && m.count > 0;
+          if (m.count > 0) m.buffer.needsUpdate = true;
+        }
       }
-      cars.count = count;
-      cars.instanceMatrix.needsUpdate = true;
-      tones.needsUpdate = true;
+      if (cars && tones) {
+        const target = cars.instanceMatrix.array as Float32Array;
+        const toneArray = tones.array as Float32Array;
+        for (let k = 0; k < count; k++) {
+          const i = ids[k]!;
+          target.set(sourceMatrices.subarray(i * 16, i * 16 + 16), k * 16);
+          toneArray[k * 3] = sourceTones[i * 3]!; toneArray[k * 3 + 1] = sourceTones[i * 3 + 1]!; toneArray[k * 3 + 2] = sourceTones[i * 3 + 2]!;
+        }
+        cars.count = count;
+        cars.instanceMatrix.needsUpdate = true;
+        tones.needsUpdate = true;
+      }
     },
     setDistance(distance: number) {
       const close = distance < 320;
-      cars.visible = close;
+      near = close;
+      if (cars) cars.visible = close;
+      for (const m of vdMeshes) m.mesh.visible = close && m.count > 0;
       if (propMesh) propMesh.visible = close;
     },
     dispose() {
       for (const o of objects) o.geometry.dispose();
-      cars.dispose();
+      cars?.dispose();
     },
   };
 }

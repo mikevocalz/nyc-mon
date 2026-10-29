@@ -9,7 +9,11 @@
     "./photos": "./photos/index.ts",
     "./creatures": "./creatures/index.ts",
     "./skies": "./skies/index.ts",
-    "./eggs": "./eggs/index.ts"
+    "./eggs": "./eggs/index.ts",
+    "./mons": {
+      "react-native": "./mons/index.native.ts",
+      "default": "./mons/index.ts"
+    }
   },
   "scripts": {
     "lint": "eslint",

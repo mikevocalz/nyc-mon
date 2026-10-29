@@ -320,44 +320,5 @@ export function careOutcomeText(structured: unknown, vm: MonViewModel): string |
   }
 }
 
-/**
- * The loop each rigged form plays, by mood (first match wins in MonModel3D).
- * Only clips that exist in the GLBs (apps/web/public/mons/*.glb, listed
- * 2026-10-23). Neither file has a sleep or lie-down clip, so an asleep
- * Squeaklet holds its bind pose (an empty list) and an asleep Lil' Ratti
- * plays `emote_tired`. A mood with no entry plays the form's idle.
- */
-export const MON_CLIPS: Readonly<Record<number, { readonly idle: readonly string[]; readonly byMood: Partial<Record<MonMood, readonly string[]>> }>> = {
-  // Metro Egg: the hatch rig on its idle wobble. An egg has no mood. Its
-  // `hatch` clip (6.5 s: stir, pressure, crack, burst, emerge) plays in
-  // HatchSequence3D, never as a loop here.
-  1: { idle: ['egg_idle'], byMood: {} },
-  // Squeaklet: jaw_chomp, mouth_close, rat_run, tail_swish, blink.
-  2: {
-    idle: ['tail_swish', 'rat_run'],
-    byMood: {
-      asleep: [],
-      'needs-fullness': ['jaw_chomp', 'tail_swish'],
-      'needs-social': ['rat_run', 'tail_swish'],
-    },
-  },
-  // Lil' Ratti: full-body emotes and up/quad locomotion.
-  3: {
-    idle: ['up_idle', 'up_breathe', 'quad_idle_sniff'],
-    byMood: {
-      asleep: ['emote_tired', 'up_breathe'],
-      sluggish: ['up_breathe', 'up_idle'],
-      'needs-energy': ['emote_tired', 'up_breathe'],
-      'needs-fullness': ['quad_idle_sniff', 'up_idle'],
-      'needs-social': ['beckon', 'emote_curious', 'up_idle'],
-    },
-  },
-};
-
-/** The clip list for a rigged form in this mood (asleep wins over `mood`), or null when the form has no model. */
-export function clipsFor(dexId: number | null, mood: MonMood | null, asleep: boolean): readonly string[] | null {
-  const entry = dexId === null ? undefined : MON_CLIPS[dexId];
-  if (!entry) return null;
-  const key: MonMood | null = asleep ? 'asleep' : mood;
-  return (key === null ? undefined : entry.byMood[key]) ?? entry.idle;
-}
+// The clip table lives with the app's Mon models (one table for the app and these views).
+export { MON_CLIPS, clipsFor } from '@acme/app/features/companion/mon-models.ts';

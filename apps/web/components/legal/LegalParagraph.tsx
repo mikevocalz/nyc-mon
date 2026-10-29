@@ -1,6 +1,6 @@
 import { Link } from 'solito/link';
 import { Paragraph } from '@acme/ui/html';
-import type { LegalParagraph as LegalParagraphCopy } from './copy';
+import type { LegalParagraph as LegalParagraphCopy } from '@acme/app/features/legal/copy.ts';
 
 const PARAGRAPH = 'my-0 text-base leading-8 text-text md:text-lg md:leading-8';
 

@@ -6,29 +6,110 @@
   "main": "./src/payload.config.ts",
   "types": "./index.ts",
   "exports": {
-    ".": { "types": "./index.ts", "default": "./src/payload.config.ts" },
-    "./config": { "types": "./src/payload.config.ts", "default": "./src/payload.config.ts" },
-    "./admin/console/api": { "types": "./src/admin/console/api.ts", "default": "./src/admin/console/api.ts" },
-    "./admin/console/features": { "types": "./src/admin/console/features.ts", "default": "./src/admin/console/features.ts" },
-    "./admin/console/guardian-consent": { "types": "./src/admin/console/guardian-consent.ts", "default": "./src/admin/console/guardian-consent.ts" },
-    "./admin/console/waitlist": { "types": "./src/admin/console/waitlist.ts", "default": "./src/admin/console/waitlist.ts" },
-    "./admin/console/v1-game": { "types": "./src/admin/console/v1/game.ts", "default": "./src/admin/console/v1/game.ts" },
-    "./admin/console/v1-memory": { "types": "./src/admin/console/v1/companion-memory.ts", "default": "./src/admin/console/v1/companion-memory.ts" },
-    "./admin/console/v1-mon-lingo": { "types": "./src/admin/console/v1/mon-lingo.ts", "default": "./src/admin/console/v1/mon-lingo.ts" },
-    "./admin/console/stores": { "types": "./src/admin/console/stores/index.ts", "default": "./src/admin/console/stores/index.ts" },
-    "./admin/console/stores/*": { "types": "./src/admin/console/stores/*.ts", "default": "./src/admin/console/stores/*.ts" },
-    "./auth/options": { "types": "./src/auth/options.ts", "default": "./src/auth/options.ts" },
-    "./auth/oauth": { "types": "./src/auth/oauth/routes.ts", "default": "./src/auth/oauth/routes.ts" },
-    "./auth/oauth/ui": { "types": "./src/auth/oauth/LinkPages.tsx", "default": "./src/auth/oauth/LinkPages.tsx" },
-    "./auth/templates": { "types": "./src/auth/templates.ts", "default": "./src/auth/templates.ts" },
-    "./collections/core": { "types": "./src/collections/core.ts", "default": "./src/collections/core.ts" }
+    ".": {
+      "types": "./index.ts",
+      "default": "./src/payload.config.ts"
+    },
+    "./config": {
+      "types": "./src/payload.config.ts",
+      "default": "./src/payload.config.ts"
+    },
+    "./admin/console/api": {
+      "types": "./src/admin/console/api.ts",
+      "default": "./src/admin/console/api.ts"
+    },
+    "./admin/console/features": {
+      "types": "./src/admin/console/features.ts",
+      "default": "./src/admin/console/features.ts"
+    },
+    "./admin/console/guardian-consent": {
+      "types": "./src/admin/console/guardian-consent.ts",
+      "default": "./src/admin/console/guardian-consent.ts"
+    },
+    "./admin/console/waitlist": {
+      "types": "./src/admin/console/waitlist.ts",
+      "default": "./src/admin/console/waitlist.ts"
+    },
+    "./admin/console/v1-game": {
+      "types": "./src/admin/console/v1/game.ts",
+      "default": "./src/admin/console/v1/game.ts"
+    },
+    "./admin/console/v1-memory": {
+      "types": "./src/admin/console/v1/companion-memory.ts",
+      "default": "./src/admin/console/v1/companion-memory.ts"
+    },
+    "./admin/console/v1-mon-voice": {
+      "types": "./src/admin/console/v1/mon-voice.ts",
+      "default": "./src/admin/console/v1/mon-voice.ts"
+    },
+    "./admin/console/v1-mon-lingo": {
+      "types": "./src/admin/console/v1/mon-lingo.ts",
+      "default": "./src/admin/console/v1/mon-lingo.ts"
+    },
+    "./admin/console/stores": {
+      "types": "./src/admin/console/stores/index.ts",
+      "default": "./src/admin/console/stores/index.ts"
+    },
+    "./admin/console/stores/*": {
+      "types": "./src/admin/console/stores/*.ts",
+      "default": "./src/admin/console/stores/*.ts"
+    },
+    "./auth/options": {
+      "types": "./src/auth/options.ts",
+      "default": "./src/auth/options.ts"
+    },
+    "./auth/oauth": {
+      "types": "./src/auth/oauth/routes.ts",
+      "default": "./src/auth/oauth/routes.ts"
+    },
+    "./auth/oauth/ui": {
+      "types": "./src/auth/oauth/LinkPages.tsx",
+      "default": "./src/auth/oauth/LinkPages.tsx"
+    },
+    "./auth/templates": {
+      "types": "./src/auth/templates.ts",
+      "default": "./src/auth/templates.ts"
+    },
+    "./collections/core": {
+      "types": "./src/collections/core.ts",
+      "default": "./src/collections/core.ts"
+    }
   },
-  "scripts": { "lint": "eslint", "typecheck": "tsc --noEmit", "test": "vitest run" },
+  "scripts": {
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
   "dependencies": {
-    "@acme/assets": "workspace:*", "@acme/content": "workspace:*", "@acme/core": "workspace:*", "@acme/spatial": "workspace:*", "@acme/ui": "workspace:*",
-    "@aws-sdk/client-sns": "catalog:", "@better-auth/oauth-provider": "catalog:", "@better-auth/passkey": "catalog:",
-    "@delmaredigital/payload-better-auth": "catalog:", "@payloadcms/db-postgres": "catalog:", "@payloadcms/plugin-mcp": "catalog:", "@payloadcms/ui": "catalog:",
-    "@vercel/functions": "catalog:", "better-auth": "catalog:", "payload": "catalog:", "pg": "catalog:", "react": "catalog:", "resend": "catalog:", "sharp": "catalog:", "zod": "catalog:", "zustand": "catalog:"
+    "@acme/assets": "workspace:*",
+    "@acme/content": "workspace:*",
+    "@acme/core": "workspace:*",
+    "@acme/spatial": "workspace:*",
+    "@acme/ui": "workspace:*",
+    "@aws-sdk/client-sns": "catalog:",
+    "@better-auth/oauth-provider": "catalog:",
+    "@better-auth/passkey": "catalog:",
+    "@delmaredigital/payload-better-auth": "catalog:",
+    "@payloadcms/db-postgres": "catalog:",
+    "@payloadcms/plugin-mcp": "catalog:",
+    "@payloadcms/ui": "catalog:",
+    "@vercel/functions": "catalog:",
+    "better-auth": "catalog:",
+    "payload": "catalog:",
+    "pg": "catalog:",
+    "react": "catalog:",
+    "resend": "catalog:",
+    "sharp": "catalog:",
+    "zod": "catalog:",
+    "zustand": "catalog:"
   },
-  "devDependencies": { "@acme/config": "workspace:*", "@types/pg": "catalog:", "@types/react": "catalog:", "eslint": "catalog:", "eslint-config-expo": "catalog:", "typescript": "catalog:", "vitest": "catalog:" }
+  "devDependencies": {
+    "@acme/config": "workspace:*",
+    "@types/pg": "catalog:",
+    "@types/react": "catalog:",
+    "eslint": "catalog:",
+    "eslint-config-expo": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
 }

@@ -46,8 +46,8 @@ test('record furniture renders: LinkNYC kiosks and bike racks join the existing 
   assert.ok(placed.hydrants.length <= 687, 'record hydrants bounded by the record count');
 
   const materials = createPbrCityMaterials(THREE, { sunDirection: [0.5, -0.5, 0.7] });
-  const props = buildStreetProps(THREE, dataset, materials, clearance, signs, lights);
-  // Merged into the existing buffers: still exactly four objects.
+  const props = buildStreetProps(THREE, dataset, materials, clearance, signs, lights, false);
+  // Merged into the existing buffers: still exactly four objects off the vd lane (street-props-vd.test.ts covers it on).
   assert.deepEqual(
     props.objects.map((m) => m.name).sort(),
     ['city:cars', 'city:street-props', 'city:transit', 'city:transit-lights'],

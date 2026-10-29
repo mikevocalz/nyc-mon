@@ -10,6 +10,7 @@ import { standFraming } from './framing.ts';
 import { closeLoop, resampleSmooth, smoothJitter } from './clip-smoothing.ts';
 import { captureFrame, createFrameStats, probeFrame, probing } from './frame-stats.ts';
 import { idleConfig } from './idle/config.ts';
+import { weldSceneMorphSeams } from './morph-seams.ts';
 import { createIdleEngine, LOOPS, resolveIdleClips, type IdleAction, type IdleEngine, type IdleFrame } from './idle/engine.ts';
 
 /**
@@ -403,6 +404,8 @@ export function MonModel3D({
         gltf.scene.traverse((o) => {
           if ((o as THREE.Mesh).isMesh) o.frustumCulled = false;
         });
+        // A shape key that tears the UV seams (Squeaklet's mouthClose) would hold them open at the rest pose (morph-seams.ts).
+        weldSceneMorphSeams(gltf.scene);
         const model = gltf.scene;
         const box = new THREE.Box3().setFromObject(model);
         const size = box.getSize(new THREE.Vector3());
