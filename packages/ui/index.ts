@@ -163,3 +163,5 @@ export * from './arrangement';
 // Phase 1 loop primitives: egg choice, case, incubation, hatch (M08–M12) and care (M13–M18).
 export * from './hatch';
 export * from './care';
+// M32 Mon Space: the full-screen Memory LCD (TSL) and its LcdLayerSpec draw spec.
+export * from './mon-space';
