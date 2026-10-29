@@ -46,7 +46,7 @@ for (const [level, dir] of [
 // square. Lane A's ring packs mark bundled per cell in their own manifest; lane C's ring cells are the ones packed
 // under cells/<ring>/.
 const HOME_EDGE = (cx, cz, size) => cx * size < 850 && cx * size + size > -850 && cz * size < 850 && cz * size + size > -850;
-for (const [ring, constName] of [['ring1', 'VD_BLOCKS_RING1'], ['ring2', 'VD_BLOCKS_RING2'], ['ring3', 'VD_BLOCKS_RING3']]) {
+for (const [ring, constName] of [['ring1', 'VD_BLOCKS_RING1'], ['ring2', 'VD_BLOCKS_RING2'], ['ring3', 'VD_BLOCKS_RING3'], ['ring4', 'VD_BLOCKS_RING4']]) {
   const ringBlocksTs = join(APP, `world/vd-port/blocks/data-${ring}/manifest.ts`);
   if (existsSync(ringBlocksTs)) {
     const m = JSON.parse(readFileSync(ringBlocksTs, 'utf8').replace(new RegExp(`^[\\s\\S]*?${constName} = `), '').replace(/ as const;[\s\S]*$/, ''));

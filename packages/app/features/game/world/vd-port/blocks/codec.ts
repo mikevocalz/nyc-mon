@@ -49,23 +49,28 @@ export interface NearArrays {
 
 const NEAR_Q = 128;
 
-/** A near cell file: 'VDN1', vertex count, index count, encoded vertex length (bit 31: 32-bit indices), the two streams. */
+/** A near cell file: 'VDN1'/'VDN2', vertex count, index count, encoded vertex length (bit 31: 32-bit indices), the
+ * two streams. VDN2 adds a float32 y origin (header 20 bytes, written when a structure over 256 m tall — Central
+ * Park South's supertalls — puts a vertex past int16 at 1/128 m absolute); VDN1's origin is 0. */
 export function decodeNearCell(file: Uint8Array, cx: number, cz: number, coordinateFrame: BlockCoordinateFrame = 'absolute'): NearArrays {
-  if (file[0] !== 0x56 || file[1] !== 0x44 || file[2] !== 0x4e || file[3] !== 0x31) throw new Error('not a VDN1 near cell');
+  if (file[0] !== 0x56 || file[1] !== 0x44 || file[2] !== 0x4e || (file[3] !== 0x31 && file[3] !== 0x32)) throw new Error('not a VDN1/VDN2 near cell');
+  const v2 = file[3] === 0x32;
   const dv = new DataView(file.buffer, file.byteOffset, file.byteLength);
   const n = dv.getUint32(4, true), count = dv.getUint32(8, true), word = dv.getUint32(12, true);
+  const yOrigin = v2 ? dv.getFloat32(16, true) : 0;
+  const head = v2 ? 20 : 16;
   const wide = (word & 0x80000000) !== 0, evLen = word & 0x7fffffff;
   const vb = new Uint8Array(n * 16);
-  decodeVertexBuffer(vb, n, 16, file.subarray(16, 16 + evLen));
+  decodeVertexBuffer(vb, n, 16, file.subarray(head, head + evLen));
   const index = wide ? new Uint32Array(count) : new Uint16Array(count);
-  decodeIndexBuffer(index, count, file.subarray(16 + evLen));
+  decodeIndexBuffer(index, count, file.subarray(head + evLen));
   const ox = coordinateFrame === 'cell-local' ? 0 : cx * CELL + CELL / 2;
   const oz = coordinateFrame === 'cell-local' ? 0 : cz * CELL + CELL / 2;
   const position = new Float32Array(n * 3), color = new Uint8Array(n * 4), emissive = new Uint8Array(n * 4);
   const v = new DataView(vb.buffer);
   for (let i = 0; i < n; i++) {
     position[i * 3] = v.getInt16(i * 16, true) / NEAR_Q + ox;
-    position[i * 3 + 1] = v.getInt16(i * 16 + 2, true) / NEAR_Q;
+    position[i * 3 + 1] = v.getInt16(i * 16 + 2, true) / NEAR_Q + yOrigin;
     position[i * 3 + 2] = v.getInt16(i * 16 + 4, true) / NEAR_Q + oz;
     color.set(vb.subarray(i * 16 + 8, i * 16 + 12), i * 4);
     emissive.set(vb.subarray(i * 16 + 12, i * 16 + 16), i * 4);

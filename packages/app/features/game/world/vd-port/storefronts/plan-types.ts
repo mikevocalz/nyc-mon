@@ -63,7 +63,7 @@ export interface Front extends FrontFrame {
   src: 0 | 1 | 2;
   /** The ring district the front belongs to (bake-vd-storefronts.mjs --ring ringN): drawn whether or not the
    * tile's playable square covers it. */
-  ring?: 1 | 2 | 3;
+  ring?: 1 | 2 | 3 | 4;
   id: string;
   addr: string;
   bays: (StoreBay | EntranceBay)[];

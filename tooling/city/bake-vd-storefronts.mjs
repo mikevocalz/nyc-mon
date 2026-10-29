@@ -42,11 +42,12 @@ const HALF = dataset.extentMeters;
 // --ring ring2: the union bake — ring 1's fronts are regenerated tagged 1 alongside ring 2's tagged 2.
 // storefronts/index.ts draws them, the cell manifest streams nothing extra (the plan is a bundled .ts).
 const RING = process.argv.includes('--ring') ? process.argv[process.argv.indexOf('--ring') + 1] : null;
-if (RING && RING !== 'ring1' && RING !== 'ring2' && RING !== 'ring3') throw new Error(`unknown --ring ${RING}`);
+if (RING && RING !== 'ring1' && RING !== 'ring2' && RING !== 'ring3' && RING !== 'ring4') throw new Error(`unknown --ring ${RING}`);
 const { RING1_TILES = [], RING1_RECTS_VD = [] } = RING ? await import('./vd-port/ring1.mjs') : {};
-const { RING2_TILES = [], RING2_RECTS_VD = [] } = RING === 'ring2' || RING === 'ring3' ? await import('./vd-port/ring2.mjs') : {};
-const { RING3_TILES = [], RING3_RECTS_VD = [] } = RING === 'ring3' ? await import('./vd-port/ring3.mjs') : {};
-const RING_TILES = [...RING1_TILES, ...RING2_TILES, ...RING3_TILES];
+const { RING2_TILES = [], RING2_RECTS_VD = [] } = RING === 'ring2' || RING === 'ring3' || RING === 'ring4' ? await import('./vd-port/ring2.mjs') : {};
+const { RING3_TILES = [], RING3_RECTS_VD = [] } = RING === 'ring3' || RING === 'ring4' ? await import('./vd-port/ring3.mjs') : {};
+const { RING4_TILES = [], RING4_RECTS_VD = [] } = RING === 'ring4' ? await import('./vd-port/ring4.mjs') : {};
+const RING_TILES = [...RING1_TILES, ...RING2_TILES, ...RING3_TILES, ...RING4_TILES];
 // vd-port/transform.ts valdradaToSceneAffine, for the dataset origin
 const R_M = 6_371_008.8, DEG = Math.PI / 180;
 const LAT0 = 40.7831, LON0 = -73.9712, MLAT = 111132.0, MLON = 111320.0 * Math.cos(LAT0 * DEG);
@@ -57,9 +58,9 @@ const inHome = ([x, z]) => Math.abs(x) <= HALF && Math.abs(z) <= HALF;
 // a point inside a ring region (scene metres; the Valdrada->scene map is affine, the rects stay rects); the ring
 // number each rect set belongs to, for the fronts' `ring` tag
 const sceneRects = (rects) => rects.map(([x0, z0, x1, z1]) => { const [ax, az] = toScene(x0, z0), [bx, bz] = toScene(x1, z1); return [Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz)]; });
-const R1_SCENE = sceneRects(RING1_RECTS_VD), R2_SCENE = sceneRects(RING2_RECTS_VD), R3_SCENE = sceneRects(RING3_RECTS_VD);
+const R1_SCENE = sceneRects(RING1_RECTS_VD), R2_SCENE = sceneRects(RING2_RECTS_VD), R3_SCENE = sceneRects(RING3_RECTS_VD), R4_SCENE = sceneRects(RING4_RECTS_VD);
 const inRects = (rects) => ([x, z]) => rects.some(([x0, z0, x1, z1]) => x >= x0 && x <= x1 && z >= z0 && z <= z1);
-const inRingRect = (p) => inRects(R1_SCENE)(p) || inRects(R2_SCENE)(p) || inRects(R3_SCENE)(p);
+const inRingRect = (p) => inRects(R1_SCENE)(p) || inRects(R2_SCENE)(p) || inRects(R3_SCENE)(p) || inRects(R4_SCENE)(p);
 const inBounds = (p) => inHome(p) || inRingRect(p);
 void project; void unproject;
 
@@ -580,7 +581,7 @@ signs.forEach((s, i) => {
 // a ring edge keeps the lower ring, as the ring-1 bake tagged every out-of-home front 1.
 if (RING) for (const f of fronts) {
   const end = [f.p0[0] + f.u[0] * f.len, f.p0[1] + f.u[1] * f.len];
-  f.ring = inHome(f.p0) && inHome(end) ? undefined : inRects(R3_SCENE)(f.p0) || inRects(R3_SCENE)(end) ? 3 : inRects(R2_SCENE)(f.p0) || inRects(R2_SCENE)(end) ? 2 : 1;
+  f.ring = inHome(f.p0) && inHome(end) ? undefined : inRects(R4_SCENE)(f.p0) || inRects(R4_SCENE)(end) ? 4 : inRects(R3_SCENE)(f.p0) || inRects(R3_SCENE)(end) ? 3 : inRects(R2_SCENE)(f.p0) || inRects(R2_SCENE)(end) ? 2 : 1;
   if (f.ring === undefined) delete f.ring;
 }
 const header = [

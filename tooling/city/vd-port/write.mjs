@@ -181,9 +181,16 @@ export async function writePacks(structures, { nearErrM, heroErrM, outDir = OUT,
   for (const [key, c] of [...levelCells.get(L.name)].sort()) {
     const ox = c.cx * CELL + CELL / 2, oz = c.cz * CELL + CELL / 2;
     const n = c.pos.length / 3;
+    // VDN2: y is absolute in the stream, so a structure over 256 m tall (Central Park South's supertalls) overflows
+    // int16 at 1/128 m; such a cell writes 'VDN2' with a float32 y origin the decoder adds back (codec.ts), the rest
+    // stay 'VDN1' byte for byte.
+    let yMin = Infinity, yMax = -Infinity;
+    for (let i = 0; i < n; i++) { if (c.pos[i * 3 + 1] < yMin) yMin = c.pos[i * 3 + 1]; if (c.pos[i * 3 + 1] > yMax) yMax = c.pos[i * 3 + 1]; }
+    const v2 = n > 0 && (yMin * NEAR_Q < -32768 || yMax * NEAR_Q > 32767);
+    const yOrigin = v2 ? Math.round(((yMin + yMax) / 2) * NEAR_Q) / NEAR_Q : 0;
     const vb = new Uint8Array(n * 16), dv = new DataView(vb.buffer);
     for (let i = 0; i < n; i++) {
-      const q = [(c.pos[i * 3] - ox) * NEAR_Q, c.pos[i * 3 + 1] * NEAR_Q, (c.pos[i * 3 + 2] - oz) * NEAR_Q].map(Math.round);
+      const q = [(c.pos[i * 3] - ox) * NEAR_Q, (c.pos[i * 3 + 1] - yOrigin) * NEAR_Q, (c.pos[i * 3 + 2] - oz) * NEAR_Q].map(Math.round);
       for (const v of q) if (v < -32768 || v > 32767) throw new Error(`near cell ${key}: a vertex lies ${v / NEAR_Q} m from the cell centre`);
       dv.setInt16(i * 16, q[0], true); dv.setInt16(i * 16 + 2, q[1], true); dv.setInt16(i * 16 + 4, q[2], true);
       vb[i * 16 + 8] = c.col[i * 3]; vb[i * 16 + 9] = c.col[i * 3 + 1]; vb[i * 16 + 10] = c.col[i * 3 + 2]; vb[i * 16 + 11] = c.nmix[i * 2];
@@ -193,8 +200,9 @@ export async function writePacks(structures, { nearErrM, heroErrM, outDir = OUT,
     const ib = wide ? Uint32Array.from(c.idx) : Uint16Array.from(c.idx);
     const ev = MeshoptEncoder.encodeVertexBuffer(vb, n, 16);
     const ei = MeshoptEncoder.encodeIndexBuffer(new Uint8Array(ib.buffer), ib.length, wide ? 4 : 2);
-    const head = Buffer.alloc(16);
-    head.write('VDN1', 0, 'latin1'); head.writeUInt32LE(n, 4); head.writeUInt32LE(ib.length, 8); head.writeUInt32LE(ev.length + (wide ? 0x80000000 : 0), 12);
+    const head = Buffer.alloc(v2 ? 20 : 16);
+    head.write(v2 ? 'VDN2' : 'VDN1', 0, 'latin1'); head.writeUInt32LE(n, 4); head.writeUInt32LE(ib.length, 8); head.writeUInt32LE(ev.length + (wide ? 0x80000000 : 0), 12);
+    if (v2) head.writeFloatLE(yOrigin, 16);
     const file = Buffer.concat([head, Buffer.from(ev), Buffer.from(ei)]);
     await writeFile(join(OUT, L.name, `${key}.bin`), file);
     nearFileBytes += file.length;
