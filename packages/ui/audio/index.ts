@@ -10,3 +10,6 @@ export {
   pushLevel,
   summarise,
 } from './waveform.ts';
+// Mon Space care cues: chiptune stingers on the chirp's synth path (care-cues-core.ts).
+export { playCareCue } from './care-cues';
+export { CARE_CUES, CARE_CUE_NOTES, cueSeconds, type CareCue, type CueNote } from './care-cues-core.ts';
