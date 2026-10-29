@@ -1,4 +1,6 @@
 import { CURRENT_SAVE_VERSION, SaveCurrentSchema, SaveEnvelopeSchema } from '../schemas/save.ts';
+import { MonInstanceSchema } from '../schemas/mon.ts';
+import { createInitialClassicCare } from '../sim/classic.ts';
 import { journalEntryId } from '../sim/journal.ts';
 import type { SaveCurrent } from '../types/index.ts';
 
@@ -72,10 +74,28 @@ function migrateV2ToV3(blob: Record<string, unknown>): Record<string, unknown> {
   };
 }
 
+/**
+ * v3 → v4. Adds the classic care layer (Mike, 2026-10-29): one fresh
+ * `ClassicCareState` per Mon, seeded at `savedAt` (a v3 save holds no poop,
+ * cold, calls or mistakes, so nothing is lost or invented). Every v3 field is
+ * kept as is. A Mon record that does not parse is skipped here and reported
+ * by validation.
+ */
+function migrateV3ToV4(blob: Record<string, unknown>): Record<string, unknown> {
+  const mons = Array.isArray(blob['mons']) ? blob['mons'] : [];
+  const savedAt = Number(blob['savedAt']);
+  const classic = mons.flatMap((raw: unknown) => {
+    const mon = MonInstanceSchema.safeParse(raw);
+    return mon.success && Number.isFinite(savedAt) ? [createInitialClassicCare(mon.data, savedAt)] : [];
+  });
+  return { ...blob, classic };
+}
+
 /** The migration table: one step per version. CURRENT_SAVE_VERSION is the last step's target. */
 export const SAVE_MIGRATIONS: readonly SaveMigration[] = [
   { from: 1, migrate: migrateV1ToV2 },
   { from: 2, migrate: migrateV2ToV3 },
+  { from: 3, migrate: migrateV3ToV4 },
 ];
 
 export type SaveLoadFailure = 'corrupt' | 'future-version' | 'missing-migration' | 'invalid';

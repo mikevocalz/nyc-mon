@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { CURRENT_SAVE_VERSION, SaveCurrentSchema, SaveV1Schema, SaveV2Schema, SaveV3Schema } from '../schemas/index.ts';
+import { CURRENT_SAVE_VERSION, SaveCurrentSchema, SaveV1Schema, SaveV2Schema, SaveV3Schema, SaveV4Schema } from '../schemas/index.ts';
 import { loadSave, migrateSaveBlob, SaveLoadError, type SaveMigration } from '../save/migrate.ts';
 import { createInitialCareState } from '../sim/care.ts';
+import { createInitialClassicCare } from '../sim/classic.ts';
 import { createEggRecord, createHatchState, deriveMonInstanceId, mintMonInstance, transitionHatch } from '../sim/hatch.ts';
 import { journalEntryId } from '../sim/journal.ts';
 import { T0 } from './harness.ts';
@@ -54,7 +55,7 @@ describe('save blob and migrations', () => {
     expect(SaveCurrentSchema.parse(loaded)).toEqual(loaded);
     expect(loaded.version).toBe(CURRENT_SAVE_VERSION);
     const { version: _v1, queue: v1Queue, ...v1Rest } = v1;
-    const { version: _v2, queue: v2Queue, journal, ...v2Rest } = loaded;
+    const { version: _v2, queue: v2Queue, journal, classic: _classic, ...v2Rest } = loaded;
     expect(v2Rest).toEqual(v1Rest);
     expect(v2Queue.deviceId).toBe(v1Queue.deviceId);
     expect(v2Queue.nextSeq).toBe(v1Queue.nextSeq);
@@ -105,9 +106,9 @@ describe('save blob and migrations', () => {
     expect(failureOf(() => migrateSaveBlob(fullV1Save(), 3, table.slice(1)))).toBe('missing-migration');
   });
 
-  it('the current save version is v3', () => {
-    expect(CURRENT_SAVE_VERSION).toBe(3);
-    expect(SaveCurrentSchema).toBe(SaveV3Schema);
+  it('the current save version is v4', () => {
+    expect(CURRENT_SAVE_VERSION).toBe(4);
+    expect(SaveCurrentSchema).toBe(SaveV4Schema);
   });
 });
 
@@ -127,7 +128,7 @@ describe('save v2 → v3: egg-native hatch phases (Decision 29)', () => {
     const old = v2SaveAt(legacy);
     expect(SaveV2Schema.safeParse(old).success).toBe(true);
     const loaded = loadSave(JSON.stringify(old));
-    expect(loaded.version).toBe(3);
+    expect(loaded.version).toBe(4);
     const hatch = loaded.hatches[0];
     expect(hatch?.kind).toBe('presenting');
     if (hatch?.kind !== 'presenting') return;
@@ -168,7 +169,7 @@ describe('save v2 → v3: egg-native hatch phases (Decision 29)', () => {
     const legacy = { ...v1, hatches: [{ kind: 'presenting', eggId: egg.eggId, mon: mintMonInstance(egg), phase: 'case-open', serverConfirmed: true }] };
     expect(SaveV1Schema.safeParse(legacy).success).toBe(true);
     const loaded = loadSave(JSON.stringify(legacy));
-    expect(loaded.version).toBe(3);
+    expect(loaded.version).toBe(4);
     expect(loaded.hatches[0]).toMatchObject({ kind: 'presenting', phase: 'stir', serverConfirmed: true });
     expect(loaded.journal).toHaveLength(1);
   });
@@ -178,6 +179,30 @@ describe('save v2 → v3: egg-native hatch phases (Decision 29)', () => {
     const v3 = loadSave(JSON.stringify(v2SaveAt('stir')));
     const bad = { ...v3, hatches: [{ ...v3.hatches[0], phase: 'case-open' }] };
     expect(failureOf(() => loadSave(JSON.stringify(bad)))).toBe('invalid');
-    expect(SaveV3Schema.safeParse({ ...v3, hatches: [{ ...v3.hatches[0], phase: 'scanner' }] }).success).toBe(false);
+    expect(SaveV4Schema.safeParse({ ...v3, hatches: [{ ...v3.hatches[0], phase: 'scanner' }] }).success).toBe(false);
+  });
+});
+
+describe('save v3 → v4: the classic care layer (Mike, 2026-10-29)', () => {
+  it('keeps every v3 field and seeds one fresh classic record per Mon at savedAt', () => {
+    const v3 = SaveV3Schema.parse(migrateSaveBlob(fullV1Save(), 3));
+    const loaded = loadSave(JSON.stringify(v3));
+    expect(loaded.version).toBe(4);
+    const { version: _v3Version, ...v3Fields } = v3;
+    const { version: _v4Version, classic, ...kept } = loaded;
+    // Lossless: CareState gains only `pause`, which a v3 row parses to null.
+    expect(kept).toEqual({ ...v3Fields, care: v3Fields.care.map((c) => ({ ...c, pause: null })) });
+    expect(classic).toEqual(v3.mons.map((mon) => createInitialClassicCare(mon, v3.savedAt)));
+    expect(classic[0]).toMatchObject({ poop: 0, cold: null, calls: [], mistakes: 0, lights: 'on', weight: 5 });
+  });
+
+  it('a v3 save with no Mon migrates to an empty classic list', () => {
+    const v3 = SaveV3Schema.parse(migrateSaveBlob({ ...fullV1Save(), mons: [], care: [], queue: { deviceId: 'd', nextSeq: 1, entries: [] } }, 3));
+    expect(loadSave(JSON.stringify(v3)).classic).toEqual([]);
+  });
+
+  it('a current v4 save round-trips unchanged', () => {
+    const v4 = loadSave(JSON.stringify(fullV1Save()));
+    expect(loadSave(JSON.stringify(v4))).toEqual(v4);
   });
 });
