@@ -16,7 +16,7 @@
 // EXT_meshopt_compression; textures are KTX2 (KHR_texture_basisu, UASTC).
 // Frame: +Z forward, +Y up, origin at the ground centre, left at +X.
 //
-// The bake takes LOD2 (3.3k-5k triangles a car) and:
+// The bake takes LOD1 (11k-24k triangles) and:
 //   1. decodes the meshopt views (meshoptimizer, a transitive dependency in
 //      node_modules/.pnpm) and dequantises with the LOD node transform;
 //   2. transcodes each detail atlas with three's basis_transcoder.wasm to
@@ -28,12 +28,20 @@
 //      untextured MI_Emissive_Parked lamp faces and the lamp class -> FRONT or
 //      REAR by which end they sit on (a lamp on the roof -> SIGN), other
 //      detail -> TRIM. Lens shells (transparent, a few triangles) are dropped;
-//   4. quantises: int16 position in a per-car box, int8 normal, rgb8 colour,
-//      u8 part (bit 7 = paint), u16 index;
-//   5. decimates two cheaper index lists over the same vertices with
-//      meshoptimizer's simplifier, so distance LOD draws the same body:
-//      `mid` (about a sixth of LOD2) and `far` (about a twentieth); see the
-//      LOD block below for how the body and the wheels decimate.
+//   4. drops the triangles no one outside can see (the cabin behind the glass,
+//      which both car materials draw opaque, and the hidden floor and
+//      bulkheads; exteriorTriangles), turns every kept triangle to face the
+//      way its normals do, and decimates three index lists (buildLevels):
+//      `near` (LEVEL_TRIS, about LOD2's size), `mid` and `far`;
+//   5. keeps only the vertices those levels draw and quantises: int16
+//      position in a per-car box, int8 normal, rgb8 colour, u8 part (bit 7 =
+//      paint), u16 index.
+//
+// Why LOD1 and not LOD2 (2026-10-28): the cab's LOD2 is broken at the source.
+// Decoded and drawn, it is shards: long slivers across the body, 35 % of the
+// rays from outside meeting a back face (vd-car-draw.test.ts). The CARLA
+// bodies' LOD2s are whole but carry 2-6 % of their faces wound against their
+// normals, which front-face culling turned into holes in the doors.
 //
 // The bus is mtaxd40, Valdrada's New Flyer Xcelsior XD40 in the 2016+ MTA
 // livery (client/tools/ar34/vehicles/bus40/build_bus40.mjs, built from
@@ -58,8 +66,6 @@ const REPO = join(ROOT, '../..');
 const SRC = join(ROOT, '.cache/vd-cars');
 const OUT = join(REPO, 'packages/app/features/game/world/vd-cars.ts');
 const CARS = ['lincoln', 'suv', 'van', 'taxinv200', 'mercedes', 'charger', 'mtaxd40'];
-/** Distance LODs as a share of LOD2's triangles (the wheels keep twice that share). */
-const LODS = [['mid', 1 / 6], ['far', 1 / 20]];
 /** Atlas mip to sample: the first level at or under this width, so a vertex reads an area average, not one texel. */
 const SAMPLE_WIDTH = 256;
 const PART = { BODY: 0, WINDOW: 1, TYRE: 2, ALLOY: 3, TRIM: 4, MIRROR: 5, SIGN: 6, FRONT: 7, REAR: 8 };
@@ -177,7 +183,7 @@ const toSrgb8 = (linear) => Math.round(255 * Math.pow(Math.min(1, Math.max(0, li
 const b64 = (a) => Buffer.from(a.buffer, a.byteOffset, a.byteLength).toString('base64');
 
 /**
- * The cab's LOD2 decimated its tyres away: the wheels shrink to a 0.17 m rim disc and the body floats 13 cm. Where a
+ * A body whose LOD decimated its tyres away (the cab's LOD2: a 0.17 m rim disc, the body 13 cm up) is regrown. Where a
  * hub's wheel vertices reach less than 80 % of the hub radius, push them out radially to the hub radius and paint the
  * outer third as tyre rubber, so the car stands on its wheels again.
  */
@@ -203,18 +209,23 @@ function regrowWheels(P, C, R, hubs, wheelOf, counts) {
 }
 
 /**
- * LOD2 of several CARLA bodies has no lamp faces (suv, mercedes) or only one end of them (the cab, the van). For an
- * end with no FRONT/REAR vertex, the outward-facing trim at lamp height near that end becomes the lamp: red texels
- * at the rear, bright ones at the front, and, when the atlas shows neither, the outboard trim in the lamp band.
+ * LOD1 of several CARLA bodies has no lamp faces (suv, mercedes, the van). For an end with no FRONT/REAR vertex, the
+ * outward-facing exterior trim at lamp height near that end becomes the lamp: red texels at the rear, bright ones at
+ * the front, and, when the atlas shows neither, the outboard trim in the lamp band. Exterior: the van's lamp housings
+ * behind the lens face the right way too, and would light a lamp no one can see.
  */
-function deriveLamps(P, N, C, R, size, counts) {
+function deriveLamps(P, N, C, R, size, counts, exterior) {
   const [W, H, L] = size;
   const nv = P.length / 3;
   let minZ = Infinity; let maxZ = -Infinity;
   for (let v = 0; v < nv; v++) { minZ = Math.min(minZ, P[v * 3 + 2]); maxZ = Math.max(maxZ, P[v * 3 + 2]); }
-  const has = (id) => R.some((p) => (p & 0x7f) === id);
-  const end = (front) => (v) => {
-    if (R[v] !== PART.TRIM) return false;
+  // A lamp only counts if it is on the outside (the van's emissive lamp faces sit inside its housings).
+  const has = (id) => [...exterior].some((v) => (R[v] & 0x7f) === id);
+  // Exterior trim first; a body whose lamp corners are all paint (the van) falls back to any exterior face but glass and wheels.
+  const end = (front, anyPart) => (v) => {
+    if (!exterior.has(v)) return false;
+    const part = R[v] & 0x7f;
+    if (anyPart ? [PART.WINDOW, PART.TYRE, PART.ALLOY].includes(part) : R[v] !== PART.TRIM) return false;
     const x = P[v * 3]; const y = P[v * 3 + 1]; const z = P[v * 3 + 2]; const nz = N[v * 3 + 2];
     const band = front ? [0.25 * H, 0.52 * H] : [0.3 * H, 0.62 * H];
     const reach = front ? maxZ - z : z - minZ;
@@ -227,15 +238,194 @@ function deriveLamps(P, N, C, R, size, counts) {
     return n;
   };
   if (!has(PART.REAR)) {
-    const atEnd = end(false);
+    const atEnd = end(false, false);
     const red = (v) => atEnd(v) && C[v * 3] > 60 && C[v * 3] > 1.6 * C[v * 3 + 1];
-    if (tag(red, PART.REAR, null) === 0) tag(atEnd, PART.REAR, [150, 22, 18]);
+    if (tag(red, PART.REAR, null) === 0 && tag(atEnd, PART.REAR, [150, 22, 18]) === 0) tag(end(false, true), PART.REAR, [150, 22, 18]);
   }
   if (!has(PART.FRONT)) {
-    const atEnd = end(true);
+    const atEnd = end(true, false);
     const bright = (v) => atEnd(v) && Math.min(C[v * 3], C[v * 3 + 1], C[v * 3 + 2]) > 150;
-    if (tag(bright, PART.FRONT, null) === 0) tag(atEnd, PART.FRONT, [220, 222, 216]);
+    if (tag(bright, PART.FRONT, null) === 0 && tag(atEnd, PART.FRONT, [220, 222, 216]) === 0) tag(end(true, true), PART.FRONT, [220, 222, 216]);
   }
+}
+
+/** Triangles per detail level. Valdrada's LOD1 is the source; `near` takes the place of its LOD2 (about 4k a car). */
+const LEVEL_TRIS = { near: 4500, mid: 900, far: 260 };
+const BUS_LEVEL_TRIS = { near: 6000, mid: 1400, far: 420 };
+/** Voxel edge (m) for the interior test, and how far off a face (in voxels) its two sides are probed. */
+const VOXEL = 0.05;
+const PROBE = 3;
+/** A decimated corner whose best vertex normal is under this cosine to its face gets a copy with the face normal. */
+const MIN_FACING = 0.25;
+
+/**
+ * The triangles a viewer outside the car can reach. The body is voxelised (every triangle marks the cells it passes
+ * through, then one cell of dilation closes panel seams), the air outside is flood-filled from the box corner, and a
+ * triangle stays when either side of it, PROBE voxels off its face, is outside air. The cabin behind the glass (the
+ * glass draws opaque in both car materials) and the hidden floor and bulkheads go. If the fill leaks in through a gap,
+ * every triangle reads as reachable and the body keeps its interior: a slower car, not a broken one.
+ */
+function exteriorTriangles(P, I) {
+  const lo = [Infinity, Infinity, Infinity]; const hi = [-Infinity, -Infinity, -Infinity];
+  for (let i = 0; i < P.length; i++) { lo[i % 3] = Math.min(lo[i % 3], P[i]); hi[i % 3] = Math.max(hi[i % 3], P[i]); }
+  const pad = PROBE + 3;
+  const dim = [0, 1, 2].map((c) => Math.ceil((hi[c] - lo[c]) / VOXEL) + pad * 2);
+  const at = (x, y, z) => {
+    const i = Math.floor((x - lo[0]) / VOXEL) + pad; const j = Math.floor((y - lo[1]) / VOXEL) + pad; const k = Math.floor((z - lo[2]) / VOXEL) + pad;
+    return i < 0 || j < 0 || k < 0 || i >= dim[0] || j >= dim[1] || k >= dim[2] ? -1 : (k * dim[1] + j) * dim[0] + i;
+  };
+  const cells = dim[0] * dim[1] * dim[2];
+  const solid = new Uint8Array(cells);
+  const each = (a, b, c, step, fn) => {
+    const e = Math.max(Math.hypot(P[a] - P[b], P[a + 1] - P[b + 1], P[a + 2] - P[b + 2]), Math.hypot(P[b] - P[c], P[b + 1] - P[c + 1], P[b + 2] - P[c + 2]), Math.hypot(P[c] - P[a], P[c + 1] - P[a + 1], P[c + 2] - P[a + 2]));
+    const n = Math.max(1, Math.ceil(e / step));
+    for (let u = 0; u <= n; u++) for (let v = 0; v <= n - u; v++) {
+      const w = n - u - v;
+      fn((P[a] * w + P[b] * u + P[c] * v) / n, (P[a + 1] * w + P[b + 1] * u + P[c + 1] * v) / n, (P[a + 2] * w + P[b + 2] * u + P[c + 2] * v) / n);
+    }
+  };
+  for (let t = 0; t < I.length; t += 3) each(I[t] * 3, I[t + 1] * 3, I[t + 2] * 3, VOXEL / 3, (x, y, z) => { const i = at(x, y, z); if (i >= 0) solid[i] = 1; });
+  const sx = 1; const sy = dim[0]; const sz = dim[0] * dim[1];
+  const dilated = Uint8Array.from(solid);
+  for (let i = 0; i < cells; i++) if (solid[i]) for (const d of [sx, -sx, sy, -sy, sz, -sz]) { const j = i + d; if (j >= 0 && j < cells) dilated[j] = 1; }
+  const outside = new Uint8Array(cells);
+  const queue = new Int32Array(cells);
+  let head = 0; let tail = 0;
+  queue[tail++] = 0; outside[0] = 1;
+  while (head < tail) {
+    const i = queue[head++];
+    const x = i % dim[0]; const y = Math.floor(i / sy) % dim[1]; const z = Math.floor(i / sz);
+    for (const [ok, d] of [[x > 0, -sx], [x < dim[0] - 1, sx], [y > 0, -sy], [y < dim[1] - 1, sy], [z > 0, -sz], [z < dim[2] - 1, sz]]) {
+      const j = i + d;
+      if (ok && !outside[j] && !dilated[j]) { outside[j] = 1; queue[tail++] = j; }
+    }
+  }
+  /** Outside-air samples on the +normal side minus the -normal side of triangle (a, b, c), PROBE voxels off it; 0 when sealed in. */
+  const side = (a, b, c) => {
+    const ux = P[b] - P[a]; const uy = P[b + 1] - P[a + 1]; const uz = P[b + 2] - P[a + 2];
+    const vx = P[c] - P[a]; const vy = P[c + 1] - P[a + 1]; const vz = P[c + 2] - P[a + 2];
+    let nx = uy * vz - uz * vy; let ny = uz * vx - ux * vz; let nz = ux * vy - uy * vx;
+    const len = Math.hypot(nx, ny, nz);
+    if (len === 0) return { front: 0, back: 0 };
+    nx /= len; ny /= len; nz /= len;
+    const off = PROBE * VOXEL;
+    let front = 0; let back = 0;
+    each(a, b, c, VOXEL * 2, (x, y, z) => {
+      const f = at(x + nx * off, y + ny * off, z + nz * off); if (f < 0 || outside[f]) front++;
+      const k = at(x - nx * off, y - ny * off, z - nz * off); if (k < 0 || outside[k]) back++;
+    });
+    return { front, back };
+  };
+  const keep = [];
+  for (let t = 0; t < I.length; t += 3) {
+    const { front, back } = side(I[t] * 3, I[t + 1] * 3, I[t + 2] * 3);
+    if (front + back > 0) keep.push(I[t], I[t + 1], I[t + 2]);
+  }
+  return { keep, side };
+}
+
+/** Turns each triangle so its winding faces the way its vertex normals do (front faces cull the right side). Returns the flips. */
+function orient(P, N, idx) {
+  let flipped = 0;
+  for (let t = 0; t < idx.length; t += 3) {
+    const a = idx[t] * 3; const b = idx[t + 1] * 3; const c = idx[t + 2] * 3;
+    const ux = P[b] - P[a]; const uy = P[b + 1] - P[a + 1]; const uz = P[b + 2] - P[a + 2];
+    const vx = P[c] - P[a]; const vy = P[c + 1] - P[a + 1]; const vz = P[c + 2] - P[a + 2];
+    const gx = uy * vz - uz * vy; const gy = uz * vx - ux * vz; const gz = ux * vy - uy * vx;
+    if (gx * (N[a] + N[b] + N[c]) + gy * (N[a + 1] + N[b + 1] + N[c + 1]) + gz * (N[a + 2] + N[b + 2] + N[c + 2]) < 0) {
+      const s = idx[t + 1]; idx[t + 1] = idx[t + 2]; idx[t + 2] = s; flipped++;
+    }
+  }
+  return flipped;
+}
+
+/**
+ * near / mid / far index lists over the unwelded LOD1 vertices. `near` is the exterior triangles (turned to their
+ * normals) decimated by meshoptimizer's attribute-aware simplifier with Permissive, which collapses across the colour
+ * and normal seams of the unwelded input and keeps every corner on its own side of a seam. `mid` and `far` decimate
+ * `near` harder: on the unwelded mesh the simplifier stalls at its open borders, so those two simplify the
+ * position-welded surface and then put each corner back on the vertex at that position whose normal best matches
+ * the triangle. The old bake stopped at the welded index, so a decimated triangle took the first vertex at each
+ * position, often an interior or a wheel vertex, and drew in its colour and normal: the grey, black and see-through
+ * panels on distant cars.
+ */
+function buildLevels(id, P, N, C, R, ext, side, counts) {
+  const budget = id === 'mtaxd40' ? BUS_LEVEL_TRIS : LEVEL_TRIS;
+  const Pf = Float32Array.from(P);
+  const nv = P.length / 3;
+  const attrs = new Float32Array(nv * 7);
+  for (let v = 0; v < nv; v++) {
+    for (let c = 0; c < 3; c++) { attrs[v * 7 + c] = N[v * 3 + c]; attrs[v * 7 + 3 + c] = C[v * 3 + c] / 255; }
+    attrs[v * 7 + 6] = (R[v] & 0x7f) / 8 + ((R[v] & PAINT_BIT) ? 1 : 0);
+  }
+  const weights = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 1];
+  // Lamp faces are a few small patches the materials light by part: they stay as baked.
+  const lampLock = Uint8Array.from({ length: nv }, (_, v) => ([PART.FRONT, PART.REAR, PART.SIGN].includes(R[v] & 0x7f) ? 1 : 0));
+  const near = ext.length / 3 > budget.near
+    ? [...MeshoptSimplifier.simplifyWithAttributes(Uint32Array.from(ext), Pf, 3, attrs, 7, weights, lampLock, budget.near * 3, 1, ['Permissive'])[0]]
+    : [...ext];
+  // Weld near's vertices by position; the representative of a position is the first near vertex there.
+  const remap = MeshoptSimplifier.generatePositionRemap(Pf, 3);
+  const group = new Map();
+  for (const v of new Set(near)) { const w = remap[v]; if (!group.has(w)) group.set(w, []); group.get(w).push(v); }
+  const rep = new Map([...group].map(([w, list]) => [w, list[0]]));
+  const welded = Uint32Array.from(near, (v) => rep.get(remap[v]));
+  // A clustered triangle faces the outside air (its winding is flipped if that air lies behind it; one sealed in on
+  // both sides is dropped), and each corner takes the vertex at its position whose normal best matches that face.
+  const unweld = (idx) => {
+    const out = [];
+    for (let t = 0; t < idx.length; t += 3) {
+      let tri = [idx[t], idx[t + 1], idx[t + 2]];
+      const { front, back } = side(tri[0] * 3, tri[1] * 3, tri[2] * 3);
+      if (front + back === 0) continue;
+      if (back > front) tri = [tri[0], tri[2], tri[1]];
+      const [a, b, c] = tri.map((v) => v * 3);
+      const gx = (P[b + 1] - P[a + 1]) * (P[c + 2] - P[a + 2]) - (P[b + 2] - P[a + 2]) * (P[c + 1] - P[a + 1]);
+      const gy = (P[b + 2] - P[a + 2]) * (P[c] - P[a]) - (P[b] - P[a]) * (P[c + 2] - P[a + 2]);
+      const gz = (P[b] - P[a]) * (P[c + 1] - P[a + 1]) - (P[b + 1] - P[a + 1]) * (P[c] - P[a]);
+      const len = Math.hypot(gx, gy, gz);
+      for (const corner of tri) {
+        let best = corner; let score = -Infinity;
+        for (const v of group.get(remap[corner])) {
+          const d = (N[v * 3] * gx + N[v * 3 + 1] * gy + N[v * 3 + 2] * gz) / len;
+          if (d > score) { score = d; best = v; }
+        }
+        // No vertex there faces this way (the clusterer bridged two surfaces): a copy with the face's own normal,
+        // so the facet lights as the side it shows instead of the one it hides.
+        if (score < MIN_FACING) {
+          const v = P.length / 3;
+          P.push(P[best * 3], P[best * 3 + 1], P[best * 3 + 2]);
+          N.push(gx / len, gy / len, gz / len);
+          C.push(C[best * 3], C[best * 3 + 1], C[best * 3 + 2]);
+          R.push(R[best]);
+          counts.refaced = (counts.refaced ?? 0) + 1;
+          best = v;
+        }
+        out.push(best);
+      }
+    }
+    return out;
+  };
+  // The clusterer may answer with any vertex of the buffer it is given, so it gets the representatives alone.
+  const reps = [...new Set(welded)];
+  const local = new Map(reps.map((v, i) => [v, i]));
+  const repPositions = new Float32Array(reps.length * 3);
+  reps.forEach((v, i) => repPositions.set(Pf.subarray(v * 3, v * 3 + 3), i * 3));
+  const weldedLocal = Uint32Array.from(welded, (v) => local.get(v));
+  // The tyres' contact patches (nothing else comes within 6 cm of the street) stay put, so a clustered car still stands.
+  const groundLock = Uint8Array.from(reps, (v) => (P[v * 3 + 1] < 0.06 ? 1 : 0));
+  const decimate = (tris) => unweld(Array.from(MeshoptSimplifier.simplifySloppy(weldedLocal, repPositions, 3, groundLock, Math.min(weldedLocal.length, tris * 3), 1)[0], (i) => reps[i]));
+  counts.flipped = orient(Pf, N, near);
+  // The clusterer can lose a whole tyre at a coarse grid (the cab's far level floated 21 cm): ask for more until the
+  // level still stands on the street, at most the mid budget.
+  const floor = (idx) => idx.reduce((m, v) => Math.min(m, P[v * 3 + 1]), Infinity);
+  const ground = floor(near) + 0.08;
+  const standing = (tris) => {
+    let out = decimate(tris);
+    for (let n = tris; floor(out) > ground && n < budget.mid; ) { n = Math.min(budget.mid, Math.round(n * 1.4)); out = decimate(n); }
+    return out;
+  };
+  return { near, mid: standing(budget.mid), far: standing(budget.far) };
 }
 
 const cars = [];
@@ -243,8 +433,8 @@ for (const id of CARS) {
   const glb = openGlb(join(SRC, `${id}.glb`));
   const { j } = glb;
   const root = j.nodes.find((n) => n.extras?.hubs);
-  const lod = j.nodes.find((n) => n.name === 'LOD2');
-  if (!root || !lod || lod.rotation) throw new Error(`${id}: expected a root with extras and an unrotated LOD2 node`);
+  const lod = j.nodes.find((n) => n.name === 'LOD1');
+  if (!root || !lod || lod.rotation) throw new Error(`${id}: expected a root with extras and an unrotated LOD1 node`);
   const t = lod.translation ?? [0, 0, 0];
   const s = lod.scale ?? [1, 1, 1];
   const size = root.extras.size;
@@ -310,54 +500,38 @@ for (const id of CARS) {
     }
     for (const k of idx) I.push(base + k);
   }
-  const nv = P.length / 3;
   regrowWheels(P, C, R, hubs, wheelOf, counts);
-  deriveLamps(P, N, C, R, size, counts);
+  const { keep: exterior, side } = exteriorTriangles(Float32Array.from(P), I);
+  counts.interior = (I.length - exterior.length) / 3;
+  deriveLamps(P, N, C, R, size, counts, new Set(exterior));
+  const levels = buildLevels(id, P, N, C, R, exterior, side, counts);
+  // Keep only the vertices some level draws, renumbered in first-use order.
+  const used = new Int32Array(P.length / 3).fill(-1);
+  let nv = 0;
+  for (const level of Object.values(levels)) for (const v of level) if (used[v] < 0) used[v] = nv++;
   if (nv > 65535) throw new Error(`${id}: ${nv} vertices exceed u16 indices`);
+  const pick = (src, n) => { const out = new Array(nv * n); for (let v = 0; v < used.length; v++) if (used[v] >= 0) for (let c = 0; c < n; c++) out[used[v] * n + c] = src[v * n + c]; return out; };
+  const P2 = pick(P, 3); const N2 = pick(N, 3); const C2 = pick(C, 3); const R2 = pick(R, 1);
+  const index = {};
+  for (const [name, level] of Object.entries(levels)) index[name] = Uint16Array.from(level, (v) => used[v]);
   const lo = [Infinity, Infinity, Infinity]; const hi = [-Infinity, -Infinity, -Infinity];
-  for (let v = 0; v < nv; v++) for (let c = 0; c < 3; c++) { lo[c] = Math.min(lo[c], P[v * 3 + c]); hi[c] = Math.max(hi[c], P[v * 3 + c]); }
+  for (let v = 0; v < nv; v++) for (let c = 0; c < 3; c++) { lo[c] = Math.min(lo[c], P2[v * 3 + c]); hi[c] = Math.max(hi[c], P2[v * 3 + c]); }
   const q = new Int16Array(nv * 3);
   for (let i = 0; i < nv * 3; i++) {
     const c = i % 3;
-    q[i] = Math.round(((P[i] - lo[c]) / (hi[c] - lo[c] || 1)) * 65535) - 32768;
+    q[i] = Math.round(((P2[i] - lo[c]) / (hi[c] - lo[c] || 1)) * 65535) - 32768;
   }
-  const n8 = Int8Array.from(N, (x) => Math.round(Math.max(-1, Math.min(1, x)) * 127));
-  // Distance LODs: new index lists over the same vertices. Positions are welded first (generatePositionRemap) so
-  // the simplifier sees one surface across part and UV seams; a welded index points at the first vertex of its
-  // position, so a far triangle may take its neighbour's colour across a seam. The body and the wheels decimate
-  // apart: the body with the attribute-aware simplifier (colour and part weighted, Pruned of the specks it can no
-  // longer hold), the wheels with the sloppy clusterer, which keeps a coarse tyre where edge collapse cannot (each
-  // wheel is a closed cylinder of its own and Prune would drop it, leaving the car hovering).
-  const attrs = new Float32Array(nv * 4);
-  for (let v = 0; v < nv; v++) {
-    for (let c = 0; c < 3; c++) attrs[v * 4 + c] = C[v * 3 + c] / 255;
-    attrs[v * 4 + 3] = (R[v] & 0x7f) / 8 + ((R[v] & PAINT_BIT) ? 1 : 0);
-  }
-  const Pf = Float32Array.from(P);
-  const remap = MeshoptSimplifier.generatePositionRemap(Pf, 3);
-  const isWheel = (v) => R[v] === PART.TYRE || R[v] === PART.ALLOY;
-  const bodyTris = []; const wheelTris = [];
-  for (let t = 0; t < I.length; t += 3) {
-    const tri = [I[t], I[t + 1], I[t + 2]];
-    (tri.every(isWheel) ? wheelTris : bodyTris).push(...tri.map((v) => remap[v]));
-  }
+  const n8 = Int8Array.from(N2, (x) => Math.round(Math.max(-1, Math.min(1, x)) * 127));
   const lods = {};
-  for (const [name, share] of LODS) {
-    const bodyTarget = Math.max(12, Math.floor((I.length / 3) * share)) * 3;
-    const [body] = MeshoptSimplifier.simplifyWithAttributes(Uint32Array.from(bodyTris), Pf, 3, attrs, 4, [0.5, 0.5, 0.5, 1], null, bodyTarget, 1, ['Prune', 'Permissive']);
-    const wheelTarget = Math.max(16 * hubs.length, Math.floor((wheelTris.length / 3) * share * 2)) * 3;
-    const [wheels] = wheelTris.length > 0 ? MeshoptSimplifier.simplifySloppy(Uint32Array.from(wheelTris), Pf, 3, null, wheelTarget, 1) : [new Uint32Array()];
-    const idx = Uint16Array.from([...body, ...wheels]);
-    lods[name] = { triangles: idx.length / 3, index: b64(idx) };
-  }
+  for (const name of ['mid', 'far']) lods[name] = { triangles: index[name].length / 3, index: b64(index[name]) };
   cars.push({
     id,
     size: size.map((x) => Number(x.toFixed(3))),
     wheelbase: Number((root.extras.wheelbase ?? 0).toFixed(3)),
     box: [lo.map((x) => Number(x.toFixed(5))), hi.map((x) => Number(x.toFixed(5)))],
     vertices: nv,
-    triangles: I.length / 3,
-    position: b64(q), normal: b64(n8), color: b64(Uint8Array.from(C)), part: b64(Uint8Array.from(R)), index: b64(Uint16Array.from(I)),
+    triangles: index.near.length / 3,
+    position: b64(q), normal: b64(n8), color: b64(Uint8Array.from(C2)), part: b64(Uint8Array.from(R2)), index: b64(index.near),
     lods,
     counts,
   });
@@ -366,7 +540,7 @@ for (const id of CARS) {
 const text = [
   '// Generated by tooling/city/bake-cars.mjs. Do not edit.',
   '// Street cars from Valdrada v0.4.0 (github.com/mkturkcan/valdrada; Hugging Face',
-  '// mehmetkeremturkcan/valdrada Content/models/fleet24), LOD2. lincoln, suv, van, mercedes,',
+  '// mehmetkeremturkcan/valdrada Content/models/fleet24), LOD1, decimated. lincoln, suv, van, mercedes,',
   '// charger: CC BY 4.0, CARLA Simulator (carla.org). taxinv200: CC BY 4.0, memoov',
   '// ("Dhl delivery van", Sketchfab), TLC cab build by Valdrada. mtaxd40: Valdrada\'s MTA',
   '// New Flyer XD40 bus, built from published dimensions. Valdrada code MIT.',
@@ -375,7 +549,7 @@ const text = [
   '/**',
   ' * Base64 little-endian arrays: Int16 position in `box` ([lo, hi], metres), Int8 normal (/127), sRGB8 colour,',
   ' * u8 part (CAR_PARTS id | VD_CAR_PAINT_BIT), Uint16 index. +Z forward, +Y up, origin at the ground centre, left at +X.',
-  ' * `lods.mid` / `lods.far`: meshopt-decimated Uint16 index lists over the same vertices (about 1/6 and 1/20 of LOD2).',
+  ' * `index` is the near level; `lods.mid` / `lods.far`: coarser Uint16 index lists over the same vertices.',
   ' */',
   `export const VD_CARS = ${JSON.stringify(cars.map(({ counts, ...c }) => c))} as const;`,
   '',

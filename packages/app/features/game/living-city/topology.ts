@@ -160,6 +160,12 @@ export interface LaneEdge {
   internal: boolean;
   /** Ends at a tile-edge stub node. */
   boundary: boolean;
+  /**
+   * A bus runs here: a lane of a primary road. The tile carries no route records, and in Manhattan the primary
+   * avenues and crosstown streets (125th, 116th, Broadway, Amsterdam, Frederick Douglass, St Nicholas) are the ones
+   * the MTA's local routes ride; the vehicle sim spawns and steers its buses on these.
+   */
+  busRoute?: true;
 }
 
 export interface WalkEdge {
@@ -557,6 +563,7 @@ export function buildLaneTopology(dataset: CityDatasetV3): LaneTopology {
           boundary,
         };
         if (road.segmentId !== undefined) edge.segmentId = road.segmentId;
+        if (road.class === 'primary') edge.busRoute = true;
         if (onewayInferred) edge.onewayInferred = onewayInferred;
         if (speedInferred) edge.speedInferred = speedInferred;
         if (lanesInferred) edge.lanesInferred = lanesInferred;
