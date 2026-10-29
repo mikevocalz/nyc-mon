@@ -16,6 +16,7 @@
 // ctx.night is Valdrada's ENV.night. Colours arrive as display sRGB; on the physical stack they decode to linear.
 // No import from world/physical/: the vd port loads with the physical stack off (physical-graph.flag-off.test.ts).
 import type { Three } from '@acme/ui/three';
+import { shadowSafe } from '../shared/shadow-safe.ts';
 import type { Node } from 'three/webgpu';
 import { decodeBase64 } from '../../foliage-decode.ts';
 import type { Slot } from './emit.ts';
@@ -120,7 +121,7 @@ export function createStorefrontMaterials(THREE: Three, night: Node<'float'>, ph
   // a frosted pane is lit from behind after dark (facadeKit L816-L818)
   glass.emissiveNode = node(working(T.vec3(1, 0.95, 0.85)).mul(frosted).mul(n).mul(0.6)) as never;
 
-  const bySlot: Record<Slot, Material> = { paint, detail, glass };
+  const bySlot: Record<Slot, Material> = { paint: shadowSafe(THREE, paint), detail: shadowSafe(THREE, detail), glass };
   return {
     bySlot,
     atlas,

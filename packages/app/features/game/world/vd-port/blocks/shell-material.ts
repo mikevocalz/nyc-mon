@@ -20,6 +20,7 @@
 // Metal (feat/city-real-125th c769e5e6), so it is normalized through a guarded length, falling back to up.
 import type { Three } from '@acme/ui/three';
 import type { Node } from 'three/webgpu';
+import { shadowSafe } from '../shared/shadow-safe.ts';
 
 type F = Node<'float'>;
 type V2 = Node<'vec2'>;
@@ -42,34 +43,38 @@ export interface ShellEnv {
 /** shellMaterial.js WALL_SKY default (`?lodwallsky=`): a wall sees at most half the sky. */
 export const WALL_SKY = 0.5;
 
-/** The persistent tier: makeFarMaterial + the lod16 shell patch, over the FW14 window grid. */
-export function makeShellMaterial(THREE: Three, env: ShellEnv, fw14: TextureT | null): BasicMat {
-  return build(THREE, env, fw14, false);
-}
-
 /**
- * The near level: the same lighting and sky mirror (so the handover from the shell does not step), without the far-only
- * terms (the FW14 grid, floor lines, lot spread, distance silhouette and window stipple: the near geometry has its real
- * windows), plus each vertex's emission x mix(lo, hi, night) (tooling harvest.js nightMix: Valdrada's own night scaling of
- * that material's emission). Colours and emission come in the vertex attributes `color` and `emissive`.
+ * One material for both of lane A's levels, so they draw through one pipeline and share one shadow program (the
+ * all-lanes walk's pipeline budget, world/vd-port/budget.test.ts). A mesh's `userData.vdShell` (1 on the shell, absent on
+ * the near level) picks per object, through an object uniform, between:
+ *   * the shell: Valdrada's persistent tier, makeFarMaterial plus the lod16 shell patch over the FW14 window grid, with
+ *     shellMaterial.js's depth bias (polygonOffset factor 1 units 2) as a nudge of the vertex away from the eye;
+ *   * the near level: the same lighting and sky mirror (so the handover does not step), without the far-only terms (the
+ *     grid, floor lines, lot spread, distance silhouette and window stipple: the near geometry has its real windows),
+ *     plus each vertex's emission x mix(lo, hi, night) (tooling harvest.js nightMix).
+ * Both levels carry the same attributes: position, `color` and `emissive` (RGBA8) and `uv` (the shell's FW14 uv, zero on
+ * the near level; the near level's emission, zero on the shell), and are indexed.
  */
-export function makeNearMaterial(THREE: Three, env: ShellEnv): BasicMat {
-  const m = build(THREE, env, null, true);
-  m.name = 'vd:blocksNear';
-  // the near geometry is what the shell gives way to: no offset of its own
-  m.polygonOffset = false;
-  return m;
+export function makeBlocksMaterial(THREE: Three, env: ShellEnv, fw14: TextureT | null): BasicMat {
+  return shadowSafe(THREE, build(THREE, env, fw14));
 }
 
-function build(THREE: Three, env: ShellEnv, fw14: TextureT | null, near: boolean): BasicMat {
+// fw14 null (the WGSL tests: three's builder samples no texture without a GPU) multiplies by white instead
+function build(THREE: Three, env: ShellEnv, fw14: TextureT | null): BasicMat {
   const T = THREE.TSL;
   // The vertex colour is read below as an attribute: with vertexColors set, the node material would multiply it in twice.
   const mat = new THREE.MeshBasicNodeMaterial({ fog: true });
-  mat.name = 'vd:lod16Shell';
-  // where a near piece and the shell meet on the same wall, the near geometry wins (shellMaterial.js polygonOffset)
-  mat.polygonOffset = true;
-  mat.polygonOffsetFactor = 1;
-  mat.polygonOffsetUnits = 2;
+  mat.name = 'vd:blocks';
+  const isShell = T.uniform(0).onObjectUpdate(({ object }) => ((object?.userData as { vdShell?: number } | undefined)?.vdShell ? 1 : 0)) as unknown as F;
+  // shellMaterial.js polygonOffset (factor 1, units 2) without a pipeline state of its own: the shell's vertices move away
+  // from the eye by 0.2 % of their distance, at most 0.3 m, so where a near piece and the shell meet the near piece wins.
+  // (In the shadow pass the eye is the sun's: a far shell's shadow moves by the same few centimetres.)
+  {
+    const p = T.positionLocal;
+    const away = p.sub(T.cameraPosition);
+    const d = T.length(away);
+    mat.positionNode = p.add(away.div(T.max(d, 1e-3)).mul(T.min(d.mul(0.002), 0.3)).mul(isShell)) as never;
+  }
 
   // HASH_GLSL
   const hash12 = (p: V2): F => {
@@ -117,7 +122,7 @@ function build(THREE: Three, env: ShellEnv, fw14: TextureT | null, near: boolean
     const wPos = T.positionWorld;
     const vColor = T.attribute('color', 'vec4') as unknown as Node<'vec4'>;
     const uvN = T.uv();
-    const base = fw14 ? vColor.rgb.mul(T.texture(fw14, uvN).rgb) : vColor.rgb;
+    const base = vColor.rgb.mul(T.mix(T.vec3(1), fw14 ? T.texture(fw14, uvN).rgb : T.vec3(1), isShell));
     const dc = base.mul(base).toVar();   // sRGB bytes -> approx linear
     let N = safeNormal(T.cross(T.dFdx(wPos), T.dFdy(wPos)) as unknown as V3).toVar() as unknown as V3;
     const V = T.normalize(T.cameraPosition.sub(wPos));
@@ -129,12 +134,13 @@ function build(THREE: Three, env: ShellEnv, fw14: TextureT | null, near: boolean
     // TOWERFX
     const vertF = T.float(1).sub(T.abs(N.y));
     T.If(vertF.greaterThan(0.12), () => {
-      if (!near) {
+      {
+        // far-only: the floor lines and the per-lot spread
         const fb = wPos.y.div(3.8) as unknown as F;
         const aaFb = T.max(T.fwidth(fb), 1e-4) as unknown as F;
         const bv = T.smoothstep(1.1, 0.28, aaFb).mul(vertF);
-        dc.mulAssign(T.mix(1, T.float(0.8).add(pcov(fb, 0.24, 0.96, aaFb.mul(1.25) as unknown as F).mul(0.3)), bv.mul(0.7)));
-        dc.mulAssign(T.float(0.85).add(hash12(T.floor(wPos.xz.div(26)).add(3.7) as unknown as V2).mul(0.3)));
+        dc.mulAssign(T.mix(1, T.mix(1, T.float(0.8).add(pcov(fb, 0.24, 0.96, aaFb.mul(1.25) as unknown as F).mul(0.3)), bv.mul(0.7)), isShell));
+        dc.mulAssign(T.mix(1, T.float(0.85).add(hash12(T.floor(wPos.xz.div(26)).add(3.7) as unknown as V2).mul(0.3)), isShell));
       }
       const Rf = T.reflect(V.negate(), N);
       const glassy = T.smoothstep(0, 0.1, dc.b.sub(dc.r.mul(0.9)));
@@ -146,23 +152,25 @@ function build(THREE: Three, env: ShellEnv, fw14: TextureT | null, near: boolean
       dc.addAssign(env.sunColor.mul(sunDisc(Rf as unknown as V3, T.mix(0.16, 0.06, glassy) as unknown as F, fpF))
         .mul(frF).mul(T.float(6).add(glassy.mul(16))).mul(env.reflGain).mul(vertF).mul(T.float(1).sub(env.night)));
     });
-    if (!near) {
-      const aer = T.smoothstep(1800, 7000, T.distance(wPos, T.cameraPosition)).mul(vertF);
+    {
+      // far-only: the distance silhouette
+      const aer = T.smoothstep(1800, 7000, T.distance(wPos, T.cameraPosition)).mul(vertF).mul(isShell);
       dc.mulAssign(T.mix(1, 0.66, aer));
       dc.assign(T.mix(dc, dc.mul(T.vec3(0.82, 0.95, 1.12)), aer.mul(0.6)));
     }
     dc.mulAssign(T.float(1).sub(env.night.mul(0.55)));
     dc.mulAssign(T.float(1).sub(env.wet.mul(0.3).mul(T.float(0.6).add(vnoise(wPos.xz.mul(0.031) as unknown as V2).mul(0.4)))));
     dc.assign(T.mix(dc, T.vec3(0.8, 0.83, 0.88), env.snow.mul(T.float(0.4).add(vnoise(wPos.xz.mul(0.06) as unknown as V2).mul(0.4)))));
-    if (near) {
-      // the emission: linear / 4 coded as sRGB bytes, times mix(lo, hi, night) with lo, hi over 4 in the two alphas
+    {
+      // near: the emission, linear / 4 coded as sRGB bytes, times mix(lo, hi, night) with lo, hi over 4 in the two alphas
       const e = T.attribute('emissive', 'vec4') as unknown as Node<'vec4'>;
       const eLin = T.mix(e.rgb.div(12.92), T.pow(e.rgb.add(0.055).div(1.055), T.vec3(2.4)), T.step(T.vec3(0.04045), e.rgb)).mul(4);
       const k = T.mix(vColor.a.mul(4), e.a.mul(4), env.night);
-      dc.addAssign(eLin.mul(k));
-    } else {
+      dc.addAssign(eLin.mul(k).mul(T.float(1).sub(isShell)));
+    }
+    {
       // shellMaterial.js v2 night windows on the FW14 bays (4 x 4 per tile)
-      const wq = (fw14 ? uvN.mul(4) : T.vec2(wPos.x.add(wPos.z.mul(0.7)), wPos.y).div(3)) as unknown as V2;
+      const wq = uvN.mul(4) as unknown as V2;
       const lodPx = T.max(T.length(T.fwidth(wq)), 1e-4);
       const lodL = T.max(0, T.log2(lodPx.mul(2)));
       const lodL0 = T.floor(lodL), lodFr = lodL.sub(lodL0);
@@ -175,7 +183,7 @@ function build(THREE: Three, env: ShellEnv, fw14: TextureT | null, near: boolean
         const w = k === 0 ? T.float(1).sub(lodFr) : lodFr;
         sp.addAssign(T.step(hash12(c.add(T.vec2(lodL0.add(k).mul(17), 3)) as unknown as V2), lodP).mul(win).mul(w));
       }
-      sp.mulAssign(env.night.mul(T.float(1).sub(T.smoothstep(0.5, 0.8, T.abs(N.y)))));
+      sp.mulAssign(env.night.mul(T.float(1).sub(T.smoothstep(0.5, 0.8, T.abs(N.y)))).mul(isShell));
       dc.addAssign(T.vec3(1, 0.82, 0.5).mul(sp).mul(1.1));
     }
     return T.vec4(dc, 1);

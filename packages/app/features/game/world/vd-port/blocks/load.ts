@@ -1,10 +1,13 @@
 // The block packs' bytes, read once while the game scene loads (load-game-scene.ts) and kept compressed: the shell
-// (4.7 MB) decodes when the world is built, each near cell (16.4 MB together) when the streamer first builds it.
+// (4.7 MB) decodes when the world is built, each near cell (16.4 MB together; 9.2 MB for the lite level) when the
+// streamer first builds it.
 // buildCityWorld is synchronous, so the bytes must be here before it runs; without them lane A draws nothing and says so.
 
 export interface VdBlockBytes {
   shell: Uint8Array;
+  /** The near level's cells, of `level` (perf/tier-presets.ts vdPort.blocksNear.level: 'lite' on the iPad and phone). */
   near: ReadonlyMap<string, Uint8Array>;
+  level: 'near' | 'lite';
 }
 
 let bytes: VdBlockBytes | null = null;
@@ -28,11 +31,14 @@ export function preloadVdBlocks(): Promise<VdBlockBytes | null> {
   if (bytes) return Promise.resolve(bytes);
   pending ??= (async () => {
     try {
-      const [{ VD_SHELL_ASSET, VD_NEAR_ASSETS }, { fetchAssetBytes }] = await Promise.all([
+      const [{ VD_SHELL_ASSET, VD_NEAR_ASSETS, VD_LITE_ASSETS }, { fetchAssetBytes }, { worldPresetWithoutCanvas }] = await Promise.all([
         import('./data/assets.ts'),
         import('@acme/ui/three/asset-bytes'),
+        import('../../../perf/tier-presets.ts'),
       ]);
-      const entries = Object.entries(VD_NEAR_ASSETS);
+      // only the level this device draws is read: the iPad and phone rows take the lite cells, 'high' the full ones
+      const level = worldPresetWithoutCanvas().vdPort.blocksNear.level;
+      const entries = Object.entries(level === 'lite' ? VD_LITE_ASSETS : VD_NEAR_ASSETS);
       const [shell, ...near] = await Promise.all([
         fetchAssetBytes(VD_SHELL_ASSET),
         ...entries.map(([, src]) => fetchAssetBytes(src)),
@@ -40,6 +46,7 @@ export function preloadVdBlocks(): Promise<VdBlockBytes | null> {
       bytes = {
         shell: new Uint8Array(shell!),
         near: new Map(entries.map(([key], i) => [key, new Uint8Array(near[i]!)])),
+        level,
       };
       return bytes;
     } catch (cause) {

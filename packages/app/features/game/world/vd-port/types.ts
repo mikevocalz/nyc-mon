@@ -6,6 +6,7 @@
 import type { Three } from '@acme/ui/three';
 import type { Node } from 'three/webgpu';
 import type { CellPackage } from '../cells/cell-rules.ts';
+import type { ExternalBudget } from '../cells/cell-stream.ts';
 import type { WorldPreset } from '../../perf/tier-presets.ts';
 
 type Group = InstanceType<Three['Group']>;
@@ -20,11 +21,20 @@ export interface VdStreamLayer {
   errorM: number;
   chunk: number;
   fade: boolean;
+  /** Wanted within this distance of a cell's box instead of by screen error (cells/cell-stream.ts ExternalLayer). */
+  reachM?: number;
+  /** The template draws on the layer's first build, not at the START compile (cells/cell-stream.ts ExternalLayer). */
+  warmOnBuild?: boolean;
   /**
    * false: never pinned resident by the landmark rule (cell-stream.ts `pinned`), so detail streamed around a landmark
    * (storefronts, furniture, the blocks' near level) still evicts. Default: pinned where it overlaps a landmark.
    */
   pin?: boolean;
+  /**
+   * External layers (registerChunks) only: the template's material is shared with other meshes and already carries the
+   * dither (cells/cell-stream.ts ditherFadeMask), so the streamer neither clones it nor adds a second mask.
+   */
+  sharedMaterial?: boolean;
 }
 
 export interface VdPortCtx {
@@ -85,11 +95,8 @@ export interface VdEnv {
   reflGain: Node<'float'>;
 }
 
-export interface VdLayerBudget {
-  geometryBytes: number;
-  cellDraws: number;
-  triangles: number;
-}
+/** A layer's own budget (cells/cell-stream.ts ExternalBudget): layers handed one object share it. */
+export type VdLayerBudget = ExternalBudget;
 
 /** What a sub-builder hands back: per-frame work, disposal and counts for the budget tests. */
 export interface VdPortPart {

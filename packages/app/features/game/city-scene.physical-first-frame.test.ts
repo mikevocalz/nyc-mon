@@ -79,7 +79,9 @@ test('physical + vd first frame: vd mounted, no typed array becomes a string, WG
   assert.ok(frame.textureBytes <= BUDGET.textureBytes, `${frame.textureBytes} GPU texture bytes`);
   assert.ok(frame.bufferBytes <= BUDGET.bufferBytes, `${frame.bufferBytes} GPU buffer bytes`);
   assert.ok(frame.retainedAfterReleaseBytes <= BUDGET.retainedAfterReleaseBytes, `${frame.retainedAfterReleaseBytes} CPU array bytes held after release`);
-  assert.ok(frame.retainedAfterReleaseBytes < frame.retainedArrayBytes / 2, 'the release pass dropped most uploaded arrays');
+  // of what the GPU received, the release pass dropped most (an array never uploaded, a mesh not yet in view, stays)
+  const uploaded = frame.retainedArrayBytes - frame.retainedNeverUploadedBytes;
+  assert.ok(frame.retainedAfterReleaseBytes - frame.retainedNeverUploadedBytes < uploaded / 2, `the release pass dropped most uploaded arrays: ${JSON.stringify({ first: frame.retainedArrayBytes, after: frame.retainedAfterReleaseBytes, neverUploaded: frame.retainedNeverUploadedBytes })}`);
   // The frames after the first now re-render the scene (the harness advances the node frame as the app does),
   // so they write uniforms; a re-sent geometry or texture would be megabytes, and would read a trapped array.
   assert.ok(frame.secondFrameWriteBytes < 256_000, `${frame.secondFrameWriteBytes} bytes uploaded after the first frame: uniforms only`);

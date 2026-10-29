@@ -18,6 +18,8 @@
 // multiply its draws by the cell count). The lamp light spots are exported for the night lights (vdLampSites).
 import type { Three } from '@acme/ui/three';
 import type { Node } from 'three/webgpu';
+import { shadowSafe } from '../shared/shadow-safe.ts';
+import type { SlotDesc } from './cell-package.ts';
 import type { VdPortCtx, VdPortPart } from '../types.ts';
 import { decodeAtlas } from './pool-data.ts';
 import { createPoolInstancer, type PoolInstancer } from './pool-instancer.ts';
@@ -129,8 +131,7 @@ export function build(ctx: VdPortCtx, options: FurnitureOptions = {}): Furniture
     for (const m of pools.meshes) ctx.register(m, null);
     stats.meshes = pools.meshes.length;
     structures = buildStructures(ctx, assets);
-    const s = structures;
-    pools.onCamera((camera) => s.streamer.frame(camera, clock.value));
+    return structures.streamer.ready;
   });
   const part: FurniturePart = {
     ready,
@@ -139,6 +140,7 @@ export function build(ctx: VdPortCtx, options: FurnitureOptions = {}): Furniture
     update(timeS: number) {
       clock.value = timeS;
       structures?.tick(nightNode.value ?? 0, timeS);
+      structures?.streamer.update();
     },
     dispose() {
       disposed = true;
@@ -184,6 +186,7 @@ function buildStructures(ctx: VdPortCtx, assets: FurnitureAssets): { streamer: S
     ...(ctx.preset ? { limits: { radiusM: ctx.preset.residentRadiusM, maxVertices: ctx.preset.vdPort.structureVertices } } : {}),
     assets: { ...assets, protos: async () => { const [p] = await Promise.all([assets.protos(), pbrReady, vkReady]); return p; } },
     group: ctx.group,
+    register: (template, layer, packages, budget) => ctx.registerChunks(template, layer, packages, budget),
     onAtlas(bytes) {
       const { width, height } = VD_STRUCTURES.sign;
       const t = new THREE.DataTexture(new Uint8Array(bytes), width, height, THREE.RGBAFormat);
@@ -198,6 +201,11 @@ function buildStructures(ctx: VdPortCtx, assets: FurnitureAssets): { streamer: S
       textures.push(t);
     },
     material(desc) {
+      return shadowSafe(THREE, slotMaterial(desc));
+    },
+  });
+  function slotMaterial(desc: SlotDesc): Material {
+    {
       if (desc.family === 'pbr') {
         if (!pbr) throw new Error('vd structures: a pbr slot before the PBR arrays');
         return createPbrMaterial(THREE, desc as unknown as PbrDescriptor, { night: ctx.night, physical: ctx.physical, albedo: pbr.albedo, orm: pbr.orm }) as unknown as Material;
@@ -207,8 +215,8 @@ function buildStructures(ctx: VdPortCtx, assets: FurnitureAssets): { streamer: S
       }
       if (!signAtlas) throw new Error('vd structures: a std slot before the sign atlas');
       return createStdMaterial(THREE, desc, { night: ctx.night, physical: ctx.physical, atlas: signAtlas, rects: VD_STRUCTURES.sign.rects }, drivers);
-    },
-  });
+    }
+  }
   return {
     streamer,
     tick(night, t) { for (const d of drivers) d.update(night, t); },

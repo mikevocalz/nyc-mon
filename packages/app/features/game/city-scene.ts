@@ -7,6 +7,8 @@ import type { ThreeContext, ThreeScene } from '@acme/ui/three';
 import type { CityDatasetV3 } from './city-dataset.ts';
 import type { ActorFrame, SceneActor, SceneActorFactory } from './scene-actor.ts';
 import { buildCityWorld } from './world/index.ts';
+import { shadowSafeCasters } from './world/vd-port/shared/shadow-safe.ts';
+import { cityCompilePass, type CompilePass } from './compile-pass.ts';
 import { EXPERIMENTAL_WORLD_POST, mountCityPostPipeline, resolvePostOptions } from './post/pipeline.ts';
 import { livingCityAdaptiveBridge } from './living-city/adaptive-bridge.ts';
 import { EXPERIMENTAL_WORLD_RENDER_SCALE, mountRenderScale } from './perf/render-scale.ts';
@@ -248,6 +250,7 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
           options: resolvePostOptions(process.env, bundle?.post ?? {}),
         })
       : null;
+  if (post) cityCompilePass.set(scene, post.scenePass as unknown as CompilePass);
   // The render-scale controller samples draw pacing from this scene's
   // update clock and steps the drawing buffer through the pixel ratio.
   // It cannot fix the UI-thread/Rive ceiling — GPU-side gains are
@@ -300,7 +303,11 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
     throw error;
   }
 
-  if (rigModule && physical && physical.sunShadow > 0) rigModule.applyPhysicalShadowRoles(scene);
+  if (rigModule && physical && physical.sunShadow > 0) {
+    rigModule.applyPhysicalShadowRoles(scene);
+    // one shadow program per mask, side and layout, not one per colour graph (world/vd-port/shared/shadow-safe.ts)
+    shadowSafeCasters(THREE, scene);
+  }
   // Ground-layer polygon offsets point toward the camera only on a standard depth buffer (world/reversed-depth-offset.ts).
   applyReversedDepthOffsets(scene, renderer as { reversedDepthBuffer?: boolean } | null | undefined);
   // After the actors joined, so their instanced meshes are swapped too.

@@ -16,6 +16,7 @@ import type { ThreeSetup } from '@acme/ui/three';
 import type { CitySceneParams } from './city-scene.ts';
 import { gameScreenActions } from './game-session.ts';
 import { preloadVdBlocks } from './world/vd-port/blocks/load.ts';
+import { compileForFrames } from './compile-pass.ts';
 
 export interface GameSceneParams extends CitySceneParams {
   onFirstFrame: () => void;
@@ -45,7 +46,7 @@ export function withFirstFrameSignal(
     };
     if (trace) {
       trace('compileAsync started');
-      context.renderer.compileAsync(built.scene, built.camera).then(
+      compileForFrames(context.renderer, built.scene, built.camera).then(
         () => {
           trace('compileAsync resolved');
           ready();
@@ -56,7 +57,7 @@ export function withFirstFrameSignal(
         },
       );
     } else {
-      context.renderer.compileAsync(built.scene, built.camera).then(ready, ready);
+      compileForFrames(context.renderer, built.scene, built.camera).then(ready, ready);
     }
     let signalled = false;
     return {

@@ -40,6 +40,7 @@ import { join, dirname } from 'node:path';
 import { createHash } from 'node:crypto';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { REPO, THREE, vd } from './valdrada-runtime.mjs';
+import { slotTable } from './structure-slots.mjs';
 
 // ---------------------------------------------------------------- the load hook: pk and lk report what they pose
 const PATCH = {
@@ -460,6 +461,8 @@ for (const [key, list] of [...placements].sort()) {
     key, bounds: [x0, y0, z0, x1, y1, z1].map((v) => +v.toFixed(2)), placements: list.length, placementsOffset: off, bytes: file.length,
     near: list.filter((x) => x.lod === 0).reduce((a, x) => a + vertsOf(x.proto), 0),
     far: list.filter((x) => x.lod === 1).reduce((a, x) => a + vertsOf(x.proto), 0),
+    // the cell streamer's packages: [level, slot, cast, vertices, indices, ...] (structure-slots.mjs)
+    slots: slotTable(list, protoMeta),
   });
 }
 

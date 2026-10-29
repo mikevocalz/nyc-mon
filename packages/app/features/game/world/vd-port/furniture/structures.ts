@@ -1,30 +1,30 @@
 // The streamed structures of lane C (vk viaducts and stations, pk street hardware, lk street life): Valdrada's cell
-// loader (client/src/cells/cellLoader.js) and decision core (core/streaming/stream.mjs) as the cell streamer of PR #128
-// (world/cells/cell-stream.ts) runs them, for packages that arrive from disk instead of from a merged mesh in memory.
-//
-// #128's streamer cuts geometry it already holds; these cells are Metro assets fetched on demand (asset-bytes*.ts), so
-// this module keeps #128's rules and reuses its pieces (cell-rules.ts boxDistance, cell-stream.ts ditherFadeMask):
-//   * want: a cell's near level within NEAR_M of its box, its far level out to the preset radius (360 m, the ipad-a12x
-//     and phone presets' residentRadiusM), nothing past it;
-//   * budget: at most 250k resident vertices of vk/pk/lk (the ipad-a12x cap); a near level that would pass it is not
-//     loaded and the far level stays;
-//   * build: one package fetched at a time, one cell level built per frame (Valdrada attaches one chunk a frame), nearest
-//     first; the shared prototypes and the sign atlas load once, first;
-//   * evict with hysteresis (stream.mjs HYSTERESIS 0.8 on the distance, EVICT_AFTER_S 4) and fade in and out with the
-//     dither (fadeS 0.5).
-// A level is one merged mesh per material slot (cell-package.ts poseCell, as pk/lk merge per key per cell).
-//
-// The camera comes from the pooled instancer's driver (pool-instancer.ts onCamera): the port's update(timeS) has none.
+// loader (client/src/cells/cellLoader.js) as a package source for the cell streamer of PR #128 (world/cells/cell-stream.ts),
+// which owns the streaming rules and the budget for every layer, this one's included:
+//   * a package is one cell level's merged geometry in one material slot (cell-package.ts poseCell, as pk/lk merge per
+//     key per cell); its size comes from the manifest's table (tooling structure-slots.mjs), its bytes from the cell's
+//     Metro asset, fetched when the streamer first wants it or a package within one cell of its reach (the prefetch
+//     ring), one cell file at a time;
+//   * a layer per (level, slot, casts): the slot's material, which carries the streamer's dither itself and is shared by
+//     the slot's layers; the near level within the manifest's NEAR_M of a cell's box, the far level out to the preset's
+//     resident radius (360 m on the iPad and phone presets), by distance as Valdrada's stream.mjs wants them;
+//   * one budget for all of the lane's layers: the preset's resident vertex cap (250k on the iPad tier). A cell level's
+//     packages form one group (CellPackage.group): it starts only if all of it fits, so a level the budget refuses
+//     leaves the far level drawn and never half a near level over it;
+//   * near replaces far: a cell's far meshes hide while every one of its near packages is resident and faded in
+//     (Valdrada's near mask, as the blocks' shells do: vd-port/blocks), and its far packages are then unwanted
+//     (CellPackage.suppressed), so they leave and give the budget back; as the near level fades out the far is wanted
+//     again and builds from the cell file already in memory.
 import type { Three } from '@acme/ui/three';
 import type { Node } from 'three/webgpu';
-import { boxDistance } from '../../cells/cell-rules.ts';
+import type { CellAttribute, CellPackage } from '../../cells/cell-rules.ts';
 import { ditherFadeMask } from '../../cells/cell-stream.ts';
+import type { VdLayerBudget, VdStreamLayer } from '../types.ts';
 import { decodePlacements, decodeProto, poseCell, type CellMeta, type Placement, type Proto, type SlotDesc, type StructureManifest } from './cell-package.ts';
 
 type Mesh = InstanceType<Three['Mesh']>;
 type Group = InstanceType<Three['Group']>;
 type Material = InstanceType<Three['Material']>;
-type Camera = InstanceType<Three['Camera']>;
 
 /** The lane's binary assets (Metro assets on native: asset-bytes.native.ts). */
 export interface FurnitureAssets {
@@ -43,32 +43,17 @@ export const STRUCTURE_LIMITS = {
   radiusM: 360,
   /** Resident vk + pk + lk vertices at once (the ipad-a12x cap). */
   maxVertices: 250_000,
-  hysteresis: 0.8,
-  evictAfterS: 4,
-  fadeS: 0.5,
 } as const;
 
-interface CellState {
-  meta: CellMeta;
-  bounds: Float64Array;
-  placements: Placement[] | null;
-  loading: boolean;
-  /** 0 near, 1 far, -1 none. */
-  level: -1 | 0 | 1;
-  meshes: Mesh[];
-  vertices: number;
-  unwantedSince: number;
-  fade: number;
-  fading: -1 | 0 | 1;
-}
+export const STRUCTURE_NAME = 'vd-structure';
 
 export interface Structures {
-  /** Called with the main camera each frame it draws (the pool driver), and the scene time. */
-  frame(camera: Camera, timeS: number): void;
-  /** Resident vertices and cells, loads and evictions, for the budget tests and the perf log. */
-  stats(): { vertices: number; near: number; far: number; loads: number; evictions: number; pending: number };
-  /** Resolves when the shared prototypes and the atlas are in (tests). */
+  /** Resolves when the shared prototypes, the atlas and the textures are in and the layers are registered. */
   ready: Promise<void>;
+  /** Once a frame: the near mask, and the counts below. */
+  update(): void;
+  /** Resident vertices, cells with a near or far level drawn, cell files on their way. */
+  stats(): { vertices: number; near: number; far: number; pending: number };
   dispose(): void;
 }
 
@@ -78,21 +63,36 @@ export interface StructureOptions {
   limits?: { radiusM: number; maxVertices: number };
   assets: FurnitureAssets;
   group: Group;
-  /** Builds the material of a slot (std / pbr / vk families), given the sign atlas bytes. */
+  /** Builds the material of a slot (std / pbr / vk families), once the textures are in. */
   material(desc: SlotDesc, slot: number): Material;
   /** Prepares the materials that need the sign atlas, once it has loaded. */
   onAtlas(bytes: ArrayBuffer): void;
+  /** Hands a layer to the cell streamer (VdPortCtx.registerChunks). */
+  register(template: Mesh, layer: VdStreamLayer, packages: readonly CellPackage[], budget: VdLayerBudget): void;
+}
+
+interface CellSource {
+  meta: CellMeta;
+  num: number;
+  placements: Placement[] | null;
+  queued: boolean;
+  /** The group keys of its near and far packages. */
+  groups: [object, object];
+  /** Near packages in the cell (the near mask's count). */
+  nearPackages: number;
 }
 
 export function createStructures(THREE: Three, o: StructureOptions): Structures {
   const { manifest } = o;
-  // the preset's row when the ctx has one (perf/tier-presets.ts residentRadiusM, vdPort.structureVertices)
   const radiusM = o.limits?.radiusM ?? STRUCTURE_LIMITS.radiusM;
-  const maxVertices = o.limits?.maxVertices ?? STRUCTURE_LIMITS.maxVertices;
-  const cells: CellState[] = manifest.cells.map((meta) => ({
-    meta, bounds: Float64Array.from(meta.bounds), placements: null, loading: false, level: -1, meshes: [], vertices: 0, unwantedSince: -1, fade: 0, fading: 0,
-  }));
-  const fileOf = new Map<string, ArrayBuffer>();   // cell key -> its package
+  const budget: VdLayerBudget = {
+    name: 'structures',
+    // Valdrada's structures carry a vertex cap only (the old private streamer's one rule)
+    geometryBytes: Number.POSITIVE_INFINITY, cellDraws: Number.POSITIVE_INFINITY, triangles: Number.POSITIVE_INFINITY,
+    vertices: o.limits?.maxVertices ?? STRUCTURE_LIMITS.maxVertices,
+  };
+  const sources: CellSource[] = manifest.cells.map((meta, num) => ({ meta, num, placements: null, queued: false, groups: [{}, {}], nearPackages: 0 }));
+  const fileOf = new Map<string, ArrayBuffer>();   // cell key -> its file (its own prototypes and placements)
   let shared: ArrayBuffer | null = null;
   const protoCache = new Map<number, Proto>();
   const proto = (id: number): Proto => {
@@ -107,7 +107,79 @@ export function createStructures(THREE: Three, o: StructureOptions): Structures 
     }
     return p;
   };
+  let disposed = false;
+
+  // Cell files, one in flight at a time (cellLoader.js fetches one chunk at a time). ponytail: first asked, first
+  // fetched; order the queue by distance if a walk ever waits on a far cell's file.
+  const queue: CellSource[] = [];
+  let inflight = 0;
+  const pump = () => {
+    while (inflight === 0 && queue.length > 0 && !disposed) {
+      const c = queue.shift()!;
+      inflight++;
+      void o.assets.cell(c.meta.key).then((buf) => {
+        fileOf.set(c.meta.key, buf);
+        c.placements = decodePlacements(buf, c.meta, manifest.placementBytes);
+      }).catch(() => { /* a cell that fails to load stays out (queued, so never asked again); the pools still draw */ })
+        .finally(() => { inflight--; pump(); });
+    }
+  };
+  const request = (c: CellSource) => {
+    if (c.placements || c.queued) return;
+    c.queued = true;
+    queue.push(c);
+    pump();
+  };
+
+  // One attribute set for every package (the union of the prototypes' layouts: uv, colour and the vk extras), zeros
+  // (white for colour) where a slot has none: three's render-pipeline key lists a geometry's attributes, so one material
+  // over two layouts builds two pipelines. A material reads only what its graph uses, so the padding changes no pixel.
+  const extrasUnion: [string, number][] = [];
+  for (const p of manifest.protos) for (const [n, size] of p?.extras ?? []) if (!extrasUnion.some(([m]) => m === n)) extrasUnion.push([n, size]);
+  const vertexBytes = 12 + 12 + 8 + 12 + extrasUnion.reduce((a, [, size]) => a + size * 4, 0);
+  const layout = (n: number, b: ReturnType<typeof poseCell>[number] | null): Record<string, CellAttribute> => {
+    const attrs: Record<string, CellAttribute> = {
+      position: { array: b?.position ?? new Float32Array(n * 3), itemSize: 3, normalized: false },
+      normal: { array: b?.normal ?? new Float32Array(n * 3), itemSize: 3, normalized: false },
+      uv: { array: b?.uv ?? new Float32Array(n * 2), itemSize: 2, normalized: false },
+      color: { array: b?.color ?? new Float32Array(n * 3).fill(1), itemSize: 3, normalized: false },
+    };
+    for (const [name, size] of extrasUnion) attrs[name] = { array: b?.extras[name] ?? new Float32Array(n * size), itemSize: size, normalized: false };
+    return attrs;
+  };
+
+  // cells whose near level is all in (update): their far packages are suppressed
+  const nearComplete = new Set<number>();
+  const packageOf = (src: CellSource, level: 0 | 1, slot: number, vertices: number, indices: number): CellPackage => {
+    let posed: ReturnType<typeof poseCell>[number] | null = null;
+    const pose = () => {
+      if (!posed) {
+        if (!src.placements) throw new Error(`vd structures: cell ${src.meta.key} built before its file`);
+        const mine = src.placements.filter((p) => p.lod === level && proto(p.proto).meta.slot === slot);
+        posed = poseCell(mine, level, proto)[0] ?? null;
+        if (!posed) throw new Error(`vd structures: cell ${src.meta.key} level ${level} has no slot ${slot}`);
+      }
+      return posed;
+    };
+    const [cx, cz] = src.meta.key.split('_').map(Number) as [number, number];
+    return {
+      cx, cz, num: src.num, size: manifest.cell,
+      get attributes() { return layout(vertices, pose()); },
+      get index() { return pose().index; },
+      vertexCount: vertices,
+      triangles: indices / 3,
+      bounds: Float64Array.from(src.meta.bounds),
+      bytes: vertices * vertexBytes + indices * 4,
+      release() { posed = null; },
+      ready: () => src.placements !== null,
+      prefetch: () => request(src),
+      group: src.groups[level],
+      ...(level === 1 ? { suppressed: () => nearComplete.has(src.num) } : {}),
+    };
+  };
+
   const materials = new Map<number, Material>();
+  const templates: Mesh[] = [];
   const fadeMask = ditherFadeMask(THREE);
   const materialOf = (slot: number) => {
     let m = materials.get(slot);
@@ -119,140 +191,92 @@ export function createStructures(THREE: Three, o: StructureOptions): Structures 
     }
     return m;
   };
-  let vertices = 0, loads = 0, evictions = 0;
-  let inflight = 0;
-  let lastT = NaN;
+
+  const register = () => {
+    const layers = new Map<string, { level: 0 | 1; slot: number; cast: boolean; packages: CellPackage[] }>();
+    for (const src of sources) {
+      const t = src.meta.slots;
+      for (let i = 0; i + 4 < t.length; i += 5) {
+        const level = t[i] as 0 | 1, slot = t[i + 1]!, cast = t[i + 2] === 1;
+        const key = `${level}:${slot}:${cast ? 1 : 0}`;
+        let l = layers.get(key);
+        if (!l) layers.set(key, (l = { level, slot, cast, packages: [] }));
+        l.packages.push(packageOf(src, level, slot, t[i + 3]!, t[i + 4]!));
+        if (level === 0) src.nearPackages++;
+      }
+    }
+    for (const l of layers.values()) {
+      const g = new THREE.BufferGeometry();
+      for (const [name, a] of Object.entries(layout(3, null))) g.setAttribute(name, new THREE.BufferAttribute(a.array, a.itemSize, a.normalized));
+      g.setIndex(new THREE.BufferAttribute(new Uint32Array([0, 1, 2]), 1));
+      g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 0);
+      g.userData = { keepCpuArrays: true };
+      const t = new THREE.Mesh(g, materialOf(l.slot));
+      t.name = `${STRUCTURE_NAME}:${l.level ? 'far' : 'near'}:${l.slot}`;
+      // a vk slot Valdrada draws without a shadow (vk-materials.ts noShadow) does not cast, whatever its pieces said
+      t.castShadow = l.cast && !(manifest.slots[l.slot] as { noShadow?: boolean }).noShadow;
+      t.receiveShadow = true;
+      t.matrixAutoUpdate = false;
+      t.userData = { vdStructure: l.level };
+      // hidden until the streamer warms it on the layer's first build (warmOnBuild)
+      t.visible = false;
+      o.group.add(t);
+      templates.push(t);
+      o.register(t, {
+        errorM: 0, chunk: manifest.cell, fade: true, pin: false, sharedMaterial: true, warmOnBuild: true,
+        reachM: l.level === 0 ? manifest.nearM : radiusM,
+      }, l.packages, budget);
+    }
+  };
 
   const ready = (async () => {
     const [p, a] = await Promise.all([o.assets.protos(), o.assets.signAtlas()]);
+    if (disposed) return;
     shared = p;
     o.onAtlas(a);
+    register();
   })();
-  let isReady = false;
-  void ready.then(() => { isReady = true; });
 
-  const dropMeshes = (c: CellState) => {
-    for (const m of c.meshes) {
-      m.removeFromParent();
-      m.geometry.dispose();
-      m.dispatchEvent({ type: 'dispose' } as never);
-    }
-    c.meshes = [];
-    vertices -= c.vertices;
-    c.vertices = 0;
-    c.level = -1;
-  };
-  const build = (c: CellState, level: 0 | 1) => {
-    const batches = poseCell(c.placements!, level, proto);
-    const meshes: Mesh[] = [];
-    let nv = 0;
-    for (const b of batches) {
-      const g = new THREE.BufferGeometry();
-      g.setAttribute('position', new THREE.BufferAttribute(b.position, 3));
-      g.setAttribute('normal', new THREE.BufferAttribute(b.normal, 3));
-      if (b.uv) g.setAttribute('uv', new THREE.BufferAttribute(b.uv, 2));
-      if (b.color) g.setAttribute('color', new THREE.BufferAttribute(b.color, 3));
-      for (const [name, a] of Object.entries(b.extras)) {
-        const size = manifest.protos.find((p) => p && p.extras.some(([n]) => n === name))?.extras.find(([n]) => n === name)?.[1] ?? 1;
-        g.setAttribute(name, new THREE.BufferAttribute(a, size));
-      }
-      g.setIndex(new THREE.BufferAttribute(b.index, 1));
-      const bb = c.meta.bounds;
-      g.boundingBox = new THREE.Box3(new THREE.Vector3(bb[0], bb[1], bb[2]), new THREE.Vector3(bb[3], bb[4], bb[5]));
-      g.boundingSphere = g.boundingBox.getBoundingSphere(new THREE.Sphere());
-      const mesh = new THREE.Mesh(g, materialOf(b.slot));
-      mesh.name = `vd-structure:${c.meta.key}:${level ? 'far' : 'near'}:${b.slot}`;
-      // a vk slot Valdrada draws without a shadow (vk-materials.ts noShadow) does not cast, whatever its pieces said
-      mesh.castShadow = b.castShadow && !(manifest.slots[b.slot] as { noShadow?: boolean }).noShadow;
-      mesh.receiveShadow = true;
-      mesh.matrixAutoUpdate = false;
-      mesh.userData.cellFade = c.fade;
-      o.group.add(mesh);
-      meshes.push(mesh);
-      nv += b.vertices;
-    }
-    if (c.level >= 0) dropMeshes(c);
-    c.meshes = meshes;
-    c.vertices = nv;
-    vertices += nv;
-    c.level = level;
-    loads++;
-  };
-  const levelVerts = (c: CellState, level: 0 | 1) => (level === 0 ? c.meta.near : c.meta.far);
-
+  // the near mask and the counts; allocation-free per frame
+  const nearIn = new Map<number, number>();
+  const counts = { vertices: 0, near: 0, far: 0 };
+  const nearCells = new Set<number>(), farCells = new Set<number>();
   return {
     ready,
-    frame(camera, timeS) {
-      if (!isReady) return;
-      const dt = Number.isFinite(lastT) ? Math.min(0.1, Math.max(0, timeS - lastT)) : 0;
-      lastT = timeS;
-      camera.updateMatrixWorld();
-      const e = camera.matrixWorld.elements;
-      const cx = e[12]!, cy = e[13]!, cz = e[14]!;
-      // the stream's own clock (#128 cell-stream.ts nowS): the frame time, not the wall clock
-      const t = timeS;
-      // want set, nearest first
-      const order = cells.map((c) => ({ c, d: boxDistance(c.bounds, cx, cy, cz) })).sort((a, b) => a.d - b.d);
-      let built = false;
-      for (const { c, d } of order) {
-        const keepNear = c.level === 0 && d <= manifestNear() / STRUCTURE_LIMITS.hysteresis;
-        const want: -1 | 0 | 1 = d <= manifestNear() || keepNear ? 0 : d <= radiusM ? 1 : (c.level >= 0 && d <= radiusM / STRUCTURE_LIMITS.hysteresis ? c.level : -1);
-        if (want === c.level) { c.unwantedSince = -1; continue; }
-        if (want === -1) {
-          if (c.unwantedSince < 0) c.unwantedSince = t;
-          else if (t - c.unwantedSince >= STRUCTURE_LIMITS.evictAfterS && c.fading !== -1) c.fading = -1;
-          continue;
-        }
-        c.unwantedSince = -1;
-        if (!c.placements) {
-          if (!c.loading && inflight === 0) {
-            c.loading = true; inflight++;
-            void o.assets.cell(c.meta.key).then((buf) => {
-              fileOf.set(c.meta.key, buf);
-              c.placements = decodePlacements(buf, c.meta, manifest.placementBytes);
-            }).catch(() => { /* a cell that fails to load stays out; the pools still draw */ }).finally(() => { c.loading = false; inflight--; });
-          }
-          continue;
-        }
-        if (built) continue;
-        // budget: a level that would pass the resident cap is not loaded (a near level falls back to far)
-        let level: 0 | 1 = want;
-        const cur = c.level >= 0 ? c.vertices : 0;
-        if (vertices - cur + levelVerts(c, level) > maxVertices) {
-          if (level === 0 && vertices - cur + levelVerts(c, 1) <= maxVertices) level = 1;
-          else continue;
-          if (level === c.level) continue;
-        }
-        const fadeIn = c.level < 0;
-        build(c, level);
-        if (fadeIn) { c.fade = 0; c.fading = 1; }
-        built = true;
+    update() {
+      nearIn.clear(); nearCells.clear(); farCells.clear();
+      let vertices = 0;
+      const kids = o.group.children;
+      for (const m of kids) {
+        const ud = m.userData as { vdStructure?: number; cell?: number; cellFade?: number };
+        if (ud.vdStructure === undefined || ud.cell === undefined) continue;
+        vertices += (m as Mesh).geometry.getAttribute('position').count;
+        if (ud.vdStructure === 0) {
+          nearCells.add(ud.cell);
+          if ((ud.cellFade ?? 1) >= 1) nearIn.set(ud.cell, (nearIn.get(ud.cell) ?? 0) + 1);
+        } else farCells.add(ud.cell);
       }
-      // fades
-      const step = STRUCTURE_LIMITS.fadeS > 0 ? dt / STRUCTURE_LIMITS.fadeS : 1;
-      for (const c of cells) {
-        if (c.fading === 0 || c.level < 0) continue;
-        c.fade = Math.min(1, Math.max(0, c.fade + c.fading * step));
-        for (const m of c.meshes) m.userData.cellFade = c.fade;
-        if (c.fading === 1 && c.fade >= 1) c.fading = 0;
-        else if (c.fading === -1 && c.fade <= 0) { dropMeshes(c); c.fading = 0; evictions++; }
+      nearComplete.clear();
+      for (const [num, n] of nearIn) if (n === sources[num]!.nearPackages) nearComplete.add(num);
+      for (const m of kids) {
+        const ud = m.userData as { vdStructure?: number; cell?: number };
+        if (ud.vdStructure !== 1 || ud.cell === undefined) continue;
+        m.visible = !nearComplete.has(ud.cell);
       }
+      counts.vertices = vertices; counts.near = nearCells.size; counts.far = farCells.size;
     },
     stats() {
-      return {
-        vertices,
-        near: cells.filter((c) => c.level === 0).length,
-        far: cells.filter((c) => c.level === 1).length,
-        loads, evictions,
-        pending: cells.filter((c) => c.loading).length,
-      };
+      return { ...counts, pending: queue.length + inflight };
     },
     dispose() {
-      for (const c of cells) if (c.level >= 0) dropMeshes(c);
+      disposed = true;
+      queue.length = 0;
+      for (const t of templates) { t.removeFromParent(); t.geometry.dispose(); }
+      templates.length = 0;
       for (const m of materials.values()) m.dispose();
       materials.clear();
       protoCache.clear();
+      fileOf.clear();
     },
   };
-  function manifestNear() { return manifest.nearM; }
 }

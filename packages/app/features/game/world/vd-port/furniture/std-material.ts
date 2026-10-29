@@ -92,7 +92,9 @@ export function createStdMaterial(THREE: Three, desc: SlotDesc, env: StdEnv, dri
   const color = T.uniform(new THREE.Color(...(d.color ?? [1, 1, 1])));
   const map = sampler(d.map), alphaMap = sampler(d.alphaMap), emissiveMap = sampler(d.emissiveMap);
   let albedo: V3 = (color as unknown as V3).mul(map.rgb) as V3;
-  if (d.vertexColors) albedo = albedo.mul(T.attribute<'vec3'>('color', 'vec3')) as V3;
+  // Every structure batch carries a colour attribute (structures.ts pads it white where a slot has none), so the vertex
+  // colour multiplies in unconditionally: the same pixels, one graph for the vertex-coloured slots and the rest.
+  albedo = albedo.mul(T.attribute<'vec3'>('color', 'vec3')) as V3;
   const alpha = T.uniform(d.opacity ?? 1).mul(map.a).mul(alphaMap.g) as Node<'float'>;
   m.colorNode = T.vec4(working(albedo), alpha);
   m.alphaTestNode = T.uniform(d.alphaTest ?? 0) as unknown as Node<'float'>;

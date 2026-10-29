@@ -16,7 +16,7 @@ import { build as buildFurniture } from './furniture/index.ts';
 import { valdradaToScene } from './transform.ts';
 import type { VdEnv, VdLayerBudget, VdPortCtx, VdPortPart, VdStreamLayer } from './types.ts';
 import type { CellPackage } from '../cells/cell-rules.ts';
-import type { ExternalLayer } from '../cells/cell-stream.ts';
+import type { CellStream, ExternalLayer } from '../cells/cell-stream.ts';
 import type { WorldPreset } from '../../perf/tier-presets.ts';
 
 export type { VdEnv, VdLayerBudget, VdPortCtx, VdPortPart, VdStreamLayer } from './types.ts';
@@ -45,6 +45,8 @@ export interface VdPort {
   streamMeshes: Mesh[];
   /** Layers registered already cut (registerChunks), for createCellStream's `external`. */
   streamLayers: ExternalLayer[];
+  /** The streamer made from streamLayers: a layer registered later (lane C, once its assets are in) goes straight to it. */
+  attachStream(stream: CellStream): void;
   /** Sets Valdrada's ENV.night. */
   setNight(value: number): void;
   update(timeS: number): void;
@@ -85,6 +87,7 @@ export function buildVdPort(THREE: Three, dataset: CityDatasetV3, options: VdPor
   const half = dataset.extentMeters;
   const streamMeshes: Mesh[] = [];
   const streamLayers: ExternalLayer[] = [];
+  let stream: CellStream | null = null;
   const ctx: VdPortCtx = {
     THREE,
     group,
@@ -101,7 +104,9 @@ export function buildVdPort(THREE: Three, dataset: CityDatasetV3, options: VdPor
       streamMeshes.push(mesh);
     },
     registerChunks(template: Mesh, layer: VdStreamLayer, packages: readonly CellPackage[], budget?: VdLayerBudget) {
-      streamLayers.push({ template, spec: layer, packages, ...(budget ? { budget } : {}) });
+      const ext: ExternalLayer = { template, spec: layer, packages, ...(budget ? { budget } : {}) };
+      streamLayers.push(ext);
+      stream?.addExternal(ext);
     },
   };
   const parts: VdPortPart[] = [buildBlocks(ctx), buildStorefronts(ctx), buildFurniture(ctx)];
@@ -115,6 +120,9 @@ export function buildVdPort(THREE: Three, dataset: CityDatasetV3, options: VdPor
     group,
     streamMeshes,
     streamLayers,
+    attachStream(s: CellStream) {
+      stream = s;
+    },
     setNight(value: number) {
       night.value = Math.max(0, Math.min(1, value));
     },

@@ -81,7 +81,8 @@ export interface WorldPreset {
    * layer budget) and the resident vertices of lane C's streamed structures (vk, pk, lk).
    */
   readonly vdPort: {
-    readonly blocksNear: { readonly geometryBytes: number; readonly cellDraws: number; readonly triangles: number };
+    /** errorM: the near layer's reach knob (cells/cell-stream.ts: wanted while errorM x K / distance >= screenErrorPx). */
+    readonly blocksNear: { readonly geometryBytes: number; readonly cellDraws: number; readonly triangles: number; readonly errorM: number; readonly level: 'near' | 'lite' };
     readonly structureVertices: number;
   };
 }
@@ -103,9 +104,10 @@ export const WORLD_PRESETS: Readonly<Record<WorldPresetName, WorldPreset>> = {
     shadowTile: 2048,
     // Bloom's first level is 3 rgba16float targets at the scale (11.2 MB each at 0.5 of 2732 x 2048).
     bloomResolutionScale: 0.35,
-    // Walk peak (cell-stream.walk.test.ts, the combined vd port): the blocks' near level 8 cells, 26.2 MB, 856k
-    // triangles; lane C's structures 250k vertices (its own cap, structures.test.ts). Not yet measured on the device.
-    vdPort: { blocksNear: { geometryBytes: 64 * MiB, cellDraws: 24, triangles: 1_200_000 }, structureVertices: 250_000 },
+    // The blocks' near level held to 350k triangles on the A12X until a device measurement says otherwise: the lite cells
+    // (Valdrada's near mesh simplified to 10 cm, 2 cm on the heroes) inside a third of the high tier's reach. Walk peak
+    // (cell-stream.walk.test.ts) 305k triangles, no refused load. Lane C's structures 250k vertices (structures.test.ts).
+    vdPort: { blocksNear: { geometryBytes: 24 * MiB, cellDraws: 12, triangles: 350_000, errorM: 0.03, level: 'lite' }, structureVertices: 250_000 },
   },
   phone: {
     name: 'phone',
@@ -119,7 +121,7 @@ export const WORLD_PRESETS: Readonly<Record<WorldPresetName, WorldPreset>> = {
     fadeS: 0.45,
     shadowTile: 2048,
     bloomResolutionScale: 0.5,
-    vdPort: { blocksNear: { geometryBytes: 64 * MiB, cellDraws: 24, triangles: 1_200_000 }, structureVertices: 250_000 },
+    vdPort: { blocksNear: { geometryBytes: 24 * MiB, cellDraws: 12, triangles: 350_000, errorM: 0.03, level: 'lite' }, structureVertices: 250_000 },
   },
   high: {
     name: 'high',
@@ -132,7 +134,7 @@ export const WORLD_PRESETS: Readonly<Record<WorldPresetName, WorldPreset>> = {
     fadeS: 0.45,
     shadowTile: 3072,
     bloomResolutionScale: 0.5,
-    vdPort: { blocksNear: { geometryBytes: 256 * MiB, cellDraws: 64, triangles: 4_000_000 }, structureVertices: 2_000_000 },
+    vdPort: { blocksNear: { geometryBytes: 256 * MiB, cellDraws: 64, triangles: 4_000_000, errorM: 0.09, level: 'near' }, structureVertices: 2_000_000 },
   },
 };
 
@@ -178,6 +180,18 @@ export function detectWorldPreset(
   if (worldTierHigh) return WORLD_PRESETS.high;
   const long = Math.max(logical.width, logical.height);
   return long >= IPAD_MIN_LONG_SIDE_PT ? WORLD_PRESETS['ipad-a12x'] : WORLD_PRESETS.phone;
+}
+
+/**
+ * The preset's name without a canvas: 'high' when the selector or the world tier says so, else whichever of the iPad and
+ * phone rows the canvas will pick, which share every row the loader needs (vd-port blocks' near level). For a loader that
+ * runs before the canvas is sized.
+ */
+export function worldPresetWithoutCanvas(
+  selected: WorldPresetName | null = WORLD_PRESET_SELECTED,
+  worldTierHigh = process.env.EXPO_PUBLIC_WORLD_TIER?.trim().toLowerCase() === 'high',
+): WorldPreset {
+  return detectWorldPreset({ width: IPAD_MIN_LONG_SIDE_PT, height: 0 }, selected, worldTierHigh);
 }
 
 /** Pixels per metre at one metre: K = heightPx / (2 tan(fovV / 2)), fovV in degrees (Valdrada stream.mjs). */

@@ -372,6 +372,8 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
         pinned: (x0, z0, size) => landmarkBoxes.some(([a, b, c, d]) => c >= x0 && a < x0 + size && d >= z0 && b < z0 + size),
       })
     : null;
+  // lane C registers its layers once its assets are in, after this
+  if (stream) vdPort?.attachStream(stream);
 
   const horizon = skyRig?.horizon ?? linearColor(THREE, 'skyHorizon');
   const fog = skyRig?.fog ?? new THREE.Fog(horizon, 600, 2500);

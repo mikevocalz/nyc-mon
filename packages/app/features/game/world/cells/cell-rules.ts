@@ -65,6 +65,23 @@ export interface CellPackage {
   readonly index?: Uint16Array | Uint32Array | null;
   readonly triangles?: number;
   release?(): void;
+  /**
+   * A package whose bytes arrive asynchronously (a Metro asset fetched on demand: world/vd-port/furniture): `ready` is
+   * false until they are in, and the streamer calls `prefetch` for it inside its layer's reach plus a one-chunk ring and
+   * builds it once `ready`. Absent: always ready.
+   */
+  ready?(): boolean;
+  prefetch?(): void;
+  /**
+   * True while a finer package of the same ground is in (a far level under its near level, world/vd-port/furniture):
+   * the streamer treats it as unwanted, so it leaves as any other cell does and gives its budget back.
+   */
+  suppressed?(): boolean;
+  /**
+   * Packages that draw one thing together (a cell level's material slots, world/vd-port/furniture) share a group key:
+   * the first of them builds only if all of them fit the budget, so a budget never leaves a level half drawn.
+   */
+  readonly group?: object;
 }
 
 type Geometry = InstanceType<Three['BufferGeometry']>;

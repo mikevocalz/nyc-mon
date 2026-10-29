@@ -104,6 +104,10 @@ export interface CellStreamStats {
    * loads their budget refused. cells, bytes, triangles and overBudget above include them; the preset's budget does not.
    */
   own: { cells: number; bytes: number; triangles: number; overBudget: number };
+  /** The same, per named budget (ExternalLayer.budget.name: the blocks' near level, lane C's structures). */
+  budgets: Record<string, { cells: number; bytes: number; triangles: number; vertices: number; overBudget: number }>;
+  /** Wanted packages whose bytes are still on their way (CellPackage.ready). */
+  fetching: number;
   /** Packaged cells per layer, and their total bytes (the CPU store). */
   packages: number;
   packageBytes: number;
@@ -118,6 +122,11 @@ export interface CellStream {
   prime(camera: Vec3, k: number, startRadius: number): void;
   /** One frame: re-picks the want set when the camera moved or a moment passed, builds, evicts, fades. True while work is left. */
   update(camera: Vec3, k: number, nowS: number): boolean;
+  /**
+   * Adds an external layer after the streamer was made (a part whose materials wait for assets: world/vd-port/furniture).
+   * Its template is warmed on its first build if its spec says so, else on the next update.
+   */
+  addExternal(ext: ExternalLayer): void;
   /** Every cell mesh and any material cloned for the fade; packages are dropped. */
   dispose(): void;
 }
@@ -144,10 +153,31 @@ export interface CellStreamOptions {
 
 export interface ExternalLayer {
   template: Mesh;
-  spec: { errorM: number; chunk: number; fade: boolean; pin?: boolean };
+  /**
+   * sharedMaterial: the template's material is shared and carries the dither already: no clone, no second mask.
+   * reachM: wanted within this distance of the cell's box (kept to reachM / hysteresis), in place of the screen-error rule
+   * (Valdrada's structures stream by distance: stream.mjs NEAR_M and the resident radius).
+   * warmOnBuild: the template draws for two frames when the layer's first cell builds, not at the START compile (a
+   * layer that may never build keeps its pipelines unbuilt).
+   */
+  spec: { errorM: number; chunk: number; fade: boolean; pin?: boolean; sharedMaterial?: boolean; reachM?: number; warmOnBuild?: boolean };
   packages: readonly CellPackage[];
-  budget?: { geometryBytes: number; cellDraws: number; triangles: number };
+  /**
+   * The layer's own budget, outside the preset's. Layers handed the same budget object share it (one budget for all of
+   * lane C's material layers); `vertices` caps resident vertices where given; `name` keys stats.budgets.
+   */
+  budget?: ExternalBudget;
 }
+
+export interface ExternalBudget {
+  readonly name?: string;
+  readonly geometryBytes: number;
+  readonly cellDraws: number;
+  readonly triangles: number;
+  readonly vertices?: number;
+}
+
+interface Held { bytes: number; triangles: number; vertices: number; cells: number; overBudget: number }
 
 interface Slot {
   readonly pkg: CellPackage;
@@ -170,9 +200,13 @@ interface Layer {
   /** The fade mask went on a clone of the source material, which this module then owns. */
   readonly cloned: boolean;
   readonly slots: Slot[];
-  /** An external layer's own budget, and what it holds resident. */
-  readonly budget: ExternalLayer['budget'] | null;
-  held: { bytes: number; triangles: number; cells: number };
+  /** An external layer's own budget, and what it (and every layer sharing that budget) holds resident. */
+  readonly budget: ExternalBudget | null;
+  readonly held: Held;
+  readonly reachM: number | null;
+  readonly chunk: number;
+  /** Updates left with the template drawn; -1: hidden and done, -2: waiting for its first build (warmOnBuild). */
+  templateFrames: number;
 }
 
 const triangleCount = (pkg: CellPackage) => pkg.triangles ?? pkg.vertexCount / 3;
@@ -198,6 +232,17 @@ export function createCellStream(THREE: Three, meshes: readonly Mesh[], options:
   const stats: CellStreamStats = {
     cells: 0, bytes: 0, triangles: 0, loads: 0, evictions: 0, builtThisFrame: 0, buildMsThisFrame: 0, maxBuildMs: 0,
     pending: 0, overBudget: 0, packages: 0, packageBytes: 0, own: { cells: 0, bytes: 0, triangles: 0, overBudget: 0 },
+    budgets: {}, fetching: 0,
+  };
+  const heldOf = new Map<ExternalBudget, Held>();
+  const heldFor = (budget: ExternalBudget | null): Held => {
+    if (!budget) return { bytes: 0, triangles: 0, vertices: 0, cells: 0, overBudget: 0 };
+    let h = heldOf.get(budget);
+    if (!h) {
+      heldOf.set(budget, (h = { bytes: 0, triangles: 0, vertices: 0, cells: 0, overBudget: 0 }));
+      if (budget.name) stats.budgets[budget.name] = h;
+    }
+    return h;
   };
   const t0 = now();
   for (const mesh of meshes) {
@@ -229,7 +274,10 @@ export function createCellStream(THREE: Three, meshes: readonly Mesh[], options:
     mesh.material = material;
     mesh.frustumCulled = false;
     source.dispose();
-    const layer: Layer = { name: mesh.name, template: mesh, material, errorM: spec.errorM, fade: spec.fade, cloned, slots: [], budget: null, held: { bytes: 0, triangles: 0, cells: 0 } };
+    const layer: Layer = {
+      name: mesh.name, template: mesh, material, errorM: spec.errorM, fade: spec.fade, cloned, slots: [], budget: null, held: heldFor(null),
+      reachM: null, chunk: spec.chunk, templateFrames: 2,
+    };
     for (const pkg of packages) {
       const slot: Slot = {
         pkg, layer, pinned: spec.pin !== false && (options.pinned?.(pkg.cx * pkg.size, pkg.cz * pkg.size, pkg.size) ?? false), mesh: null, fade: 0, fading: 0, unwantedSince: -1, distance: Infinity,
@@ -242,11 +290,11 @@ export function createCellStream(THREE: Three, meshes: readonly Mesh[], options:
     layers.push(layer);
   }
   // External layers: already cut, their template already in the scene.
-  for (const ext of options.external ?? []) {
+  const addExternal = (ext: ExternalLayer) => {
     const mesh = ext.template;
     let material = mesh.material as Material;
     let cloned = false;
-    if (ext.spec.fade) {
+    if (ext.spec.fade && !ext.spec.sharedMaterial) {
       if ((users.get(material) ?? 0) > 1) { material = material.clone(); cloned = true; }
       const m = material as Material & { maskNode?: Node<'bool'> | null };
       const dither = ditherFadeMask(THREE);
@@ -255,9 +303,12 @@ export function createCellStream(THREE: Three, meshes: readonly Mesh[], options:
       mesh.material = material;
     }
     mesh.frustumCulled = false;
+    const warmOnBuild = ext.spec.warmOnBuild === true;
+    if (warmOnBuild) mesh.visible = false;
     const layer: Layer = {
       name: mesh.name, template: mesh, material, errorM: ext.spec.errorM, fade: ext.spec.fade, cloned, slots: [],
-      budget: ext.budget ?? null, held: { bytes: 0, triangles: 0, cells: 0 },
+      budget: ext.budget ?? null, held: heldFor(ext.budget ?? null), reachM: ext.spec.reachM ?? null, chunk: ext.spec.chunk,
+      templateFrames: warmOnBuild ? -2 : 2,
     };
     for (const pkg of ext.packages) {
       const slot: Slot = {
@@ -265,11 +316,13 @@ export function createCellStream(THREE: Three, meshes: readonly Mesh[], options:
       };
       layer.slots.push(slot);
       slots.push(slot);
+      if (pkg.group) { const g = groups.get(pkg.group); if (g) g.push(slot); else groups.set(pkg.group, [slot]); }
       stats.packages++;
       stats.packageBytes += pkg.bytes;
     }
     layers.push(layer);
-  }
+  };
+  for (const ext of options.external ?? []) addExternal(ext);
   // What the budgeted (external) layers hold, kept out of the preset's budget.
   const own = stats.own;
   log?.('packaged', {
@@ -278,12 +331,13 @@ export function createCellStream(THREE: Three, meshes: readonly Mesh[], options:
 
   function refuse(slot: Slot) {
     stats.overBudget++;
-    if (slot.layer.budget) own.overBudget++;
+    if (slot.layer.budget) { own.overBudget++; slot.layer.held.overBudget++; }
   }
 
   function hold(layer: Layer, pkg: CellPackage, sign: 1 | -1) {
     const t = triangleCount(pkg);
-    layer.held.bytes += sign * pkg.bytes; layer.held.triangles += sign * t; layer.held.cells += sign;
+    const h = layer.held;
+    h.bytes += sign * pkg.bytes; h.triangles += sign * t; h.vertices += sign * pkg.vertexCount; h.cells += sign;
     if (layer.budget) { own.bytes += sign * pkg.bytes; own.triangles += sign * t; own.cells += sign; }
   }
 
@@ -327,6 +381,7 @@ export function createCellStream(THREE: Three, meshes: readonly Mesh[], options:
     stats.triangles += triangleCount(pkg);
     stats.loads++;
     hold(layer, pkg, 1);
+    if (layer.templateFrames === -2) { layer.template.visible = true; layer.templateFrames = 2; }
     const ms = now() - start;
     stats.builtThisFrame++;
     stats.buildMsThisFrame += ms;
@@ -354,10 +409,24 @@ export function createCellStream(THREE: Three, meshes: readonly Mesh[], options:
     slot.pkg.release?.();
   };
 
+  // Grouped packages (CellPackage.group): the slots of each group, for fitsGroup.
+  const groups = new Map<object, Slot[]>();
   const fits = (slot: Slot) => {
     if (slot.pinned) return true;
+    const g = slot.pkg.group ? groups.get(slot.pkg.group) : undefined;
+    if (g && slot.layer.budget && !g.some((s) => s.mesh !== null)) {
+      // a group not yet started starts only if the whole of it fits (members share their layers' budget)
+      const b = slot.layer.budget, h = slot.layer.held;
+      let bytes = 0, tris = 0, verts = 0, cells = 0;
+      for (const s of g) if (s.mesh === null) { bytes += s.pkg.bytes; tris += triangleCount(s.pkg); verts += s.pkg.vertexCount; cells++; }
+      return h.bytes + bytes <= b.geometryBytes && h.cells + cells <= b.cellDraws && h.triangles + tris <= b.triangles
+        && (b.vertices === undefined || h.vertices + verts <= b.vertices);
+    }
     const b = slot.layer.budget, h = slot.layer.held, t = triangleCount(slot.pkg);
-    if (b) return h.bytes + slot.pkg.bytes <= b.geometryBytes && h.cells + 1 <= b.cellDraws && h.triangles + t <= b.triangles;
+    if (b) {
+      return h.bytes + slot.pkg.bytes <= b.geometryBytes && h.cells + 1 <= b.cellDraws && h.triangles + t <= b.triangles
+        && (b.vertices === undefined || h.vertices + slot.pkg.vertexCount <= b.vertices);
+    }
     return stats.bytes - own.bytes + slot.pkg.bytes <= preset.budget.geometryBytes
       && stats.cells - own.cells + 1 <= preset.budget.cellDraws
       && stats.triangles - own.triangles + t <= preset.budget.triangles;
@@ -365,17 +434,23 @@ export function createCellStream(THREE: Three, meshes: readonly Mesh[], options:
 
   const requests: Slot[] = [];
   const last = { x: NaN, y: NaN, z: NaN, at: -Infinity, k: NaN, frameAt: NaN };
-  let templatesHidden = false;
-  let updates = 0;
+
+  /** Wanted at `d` (rise: the load rule; else the keep rule, eased by the hysteresis). */
+  const wanted = (layer: Layer, d: number, k: number, rise: boolean) => {
+    if (layer.reachM !== null) return d <= (rise ? layer.reachM : layer.reachM / preset.hysteresis);
+    const sse = (layer.errorM * k) / Math.max(1, d);
+    return sse >= (rise ? preset.screenErrorPx : preset.screenErrorPx * preset.hysteresis);
+  };
+  /** The reach in metres (what a package within one chunk of it prefetches against). */
+  const reachOf = (layer: Layer, k: number) => (layer.reachM !== null ? layer.reachM : (layer.errorM * k) / preset.screenErrorPx);
 
   const pick = (camera: Vec3, k: number, nowS: number, radius: number) => {
-    const thr = preset.screenErrorPx;
     const keepRadius = radius + CELL;
     requests.length = 0;
+    stats.fetching = 0;
     for (const slot of slots) {
       const d = boxDistance(slot.pkg.bounds, camera.x, camera.y, camera.z);
       slot.distance = d;
-      const sse = (slot.layer.errorM * k) / Math.max(1, d);
       const resident = slot.mesh !== null && slot.fading !== -1;
       if (slot.pinned) {
         if (slot.mesh === null) requests.push(slot);
@@ -383,17 +458,22 @@ export function createCellStream(THREE: Three, meshes: readonly Mesh[], options:
         continue;
       }
       if (resident) {
-        const keep = d <= keepRadius && sse >= thr * preset.hysteresis;
+        const keep = d <= keepRadius && wanted(slot.layer, d, k, false) && !slot.pkg.suppressed?.();
         if (keep) slot.unwantedSince = -1;
         else if (slot.unwantedSince < 0) slot.unwantedSince = nowS;
         else if (nowS - slot.unwantedSince >= preset.evictAfterS) {
           if (slot.layer.fade) slot.fading = -1;
           else evict(slot);
         }
-      } else if (d <= radius && sse >= thr) {
+      } else if (d <= radius && wanted(slot.layer, d, k, true) && !slot.pkg.suppressed?.()) {
         // A leaving near cell that is wanted again turns around where it is.
         if (slot.mesh !== null) { slot.fading = 1; slot.unwantedSince = -1; continue; }
+        // bytes still on their way: ask for them, build once they are in
+        if (slot.pkg.ready && !slot.pkg.ready()) { slot.pkg.prefetch?.(); stats.fetching++; continue; }
         requests.push(slot);
+      } else if (slot.mesh === null && slot.pkg.prefetch && d <= Math.min(radius, reachOf(slot.layer, k) + slot.layer.chunk)) {
+        // the prefetch ring: one chunk past the reach, so a cell's bytes are in before it is wanted
+        slot.pkg.prefetch();
       }
     }
     requests.sort((a, b) => (a.pinned === b.pinned ? a.distance - b.distance : a.pinned ? -1 : 1));
@@ -413,8 +493,13 @@ export function createCellStream(THREE: Three, meshes: readonly Mesh[], options:
     return active;
   };
 
-  const setTemplatesVisible = (visible: boolean) => {
-    for (const layer of layers) layer.template.visible = visible;
+  // A template draws through the START compile and the next frame (or, warmOnBuild, the two frames after its layer's
+  // first build), then hides; hidden, it keeps its render objects and so its pipelines.
+  const advanceTemplates = () => {
+    for (const layer of layers) {
+      if (layer.templateFrames <= 0) continue;
+      if (--layer.templateFrames === 0) { layer.template.visible = false; layer.templateFrames = -1; }
+    }
   };
 
   return {
@@ -433,16 +518,14 @@ export function createCellStream(THREE: Three, meshes: readonly Mesh[], options:
       }
       // A fresh pick next frame streams the rest.
       last.at = -Infinity;
-      stats.pending = requests.length - built;
+      stats.pending = requests.length - built + stats.fetching;
       log?.('start', {
         cells: stats.cells, mb: +(stats.bytes / 1e6).toFixed(1), tris: stats.triangles, ms: +(now() - t).toFixed(1),
         pending: stats.pending, radius: startRadius,
       });
     },
     update(camera, k, nowS) {
-      updates++;
-      // The templates drew through the START compile and the first frame; from the second update on they hide.
-      if (!templatesHidden && updates >= 2) { setTemplatesVisible(false); templatesHidden = true; }
+      advanceTemplates();
       const dt = Number.isFinite(last.frameAt) ? Math.min(0.1, Math.max(0, nowS - last.frameAt)) : 0;
       last.frameAt = nowS;
       stats.builtThisFrame = 0;
@@ -464,7 +547,7 @@ export function createCellStream(THREE: Three, meshes: readonly Mesh[], options:
         uploaded += slot.pkg.bytes;
       }
       requests.splice(0, i);
-      stats.pending = requests.length;
+      stats.pending = requests.length + stats.fetching;
       const fading = advanceFades(dt);
       if (log && (stats.builtThisFrame > 0)) {
         log('frame', {
@@ -474,6 +557,7 @@ export function createCellStream(THREE: Three, meshes: readonly Mesh[], options:
       }
       return stats.pending > 0 || fading;
     },
+    addExternal,
     dispose() {
       for (const slot of slots) if (slot.mesh) evict(slot);
       // The template geometry stays with its mesh, whose builder disposes it (city-mesh.ts, facelift, road paint);
@@ -481,6 +565,7 @@ export function createCellStream(THREE: Three, meshes: readonly Mesh[], options:
       for (const layer of layers) if (layer.cloned) layer.material.dispose();
       slots.length = 0;
       layers.length = 0;
+      groups.clear();
     },
   };
 }

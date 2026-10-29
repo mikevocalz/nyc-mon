@@ -470,10 +470,11 @@ export function createVkMaterial(THREE: Three, desc: VkDesc, env: VkEnv): Materi
   }
   // materialColor and materialEmissive carry map / emissiveMap; colours to the lane's working space
   m.colorNode = asNode<'vec4'>(T.vec4(shade(T.materialColor.rgb), 1));
-  const emissive = desc.family === 'vkLit'
-    ? T.materialEmissive.mul(T.mix(T.materialReference('userData.vkLit.dayK', 'float'), T.materialReference('userData.vkLit.nightK', 'float'), env.night as unknown as V))
-    : T.materialEmissive;
-  if (desc.family === 'vkLit') m.userData.vkLit = { dayK: desc.dayK, nightK: desc.nightK };
+  // Every non-steel family shares the vkLit graph: emission x mix(dayK, nightK, night), a family without the night rule
+  // at dayK = nightK = 1 (the same arithmetic as its plain emission), so the families compile to one program
+  // (the all-lanes pipeline budget, world/vd-port/budget.test.ts).
+  const emissive = T.materialEmissive.mul(T.mix(T.materialReference('userData.vkLit.dayK', 'float'), T.materialReference('userData.vkLit.nightK', 'float'), env.night as unknown as V));
+  m.userData.vkLit = desc.family === 'vkLit' ? { dayK: desc.dayK, nightK: desc.nightK } : { dayK: 1, nightK: 1 };
   m.emissiveNode = asNode<'vec3'>(shade(emissive));
   return m;
 }

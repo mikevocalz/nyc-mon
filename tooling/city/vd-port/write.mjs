@@ -18,6 +18,7 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ORIGIN } from '../valdrada/decode.mjs';
+import { HEROES } from './heroes.mjs';
 
 const HERE = fileURLToPath(new URL('.', import.meta.url));
 const ROOT = join(HERE, '..', '..', '..');
@@ -26,6 +27,9 @@ const TILE = join(ROOT, 'packages/app/features/game/data/harlem-apollo.json');
 const CELL = 128;
 const CURB = 0.14;
 const NEAR_Q = 128;
+/** The lite near level's error (the iPad and phone presets), metres; the heroes' (bake.mjs HEROES). */
+const LITE_ERR_M = +(process.env.VD_LITE_ERR ?? 0.1);
+const LITE_HERO_ERR_M = +(process.env.VD_LITE_HERO_ERR ?? 0.02);
 
 const meshoptPath = process.env.VD_MESHOPT ?? '/Users/mikevocalz/nyc-mon/node_modules/.pnpm/meshoptimizer@1.1.1/node_modules/meshoptimizer/index.js';
 const sharpPath = process.env.VD_SHARP ?? '/Users/mikevocalz/nyc-mon/node_modules/.pnpm/sharp@0.35.5_@types+node@26.6.5/node_modules/sharp/dist/index.mjs';
@@ -42,16 +46,34 @@ const r3 = (v) => Math.round(v * 1000) / 1000;
 const inRing = (ring, x, z) => { let c = false; for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) { const [xi, zi] = ring[i], [xj, zj] = ring[j]; if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) c = !c; } return c; };
 
 export async function writePacks(structures, { nearErrM, heroErrM }) {
-  const { MeshoptEncoder } = await import(meshoptPath);
+  const { MeshoptEncoder, MeshoptSimplifier } = await import(meshoptPath);
   await MeshoptEncoder.ready;
+  await MeshoptSimplifier.ready;
+  // The near levels. `near` is the bake's own (2 cm, 5 mm on the heroes); `lite`, for the iPad and phone presets
+  // (perf/tier-presets.ts vdPort.blocksNear.level), is the same welded mesh simplified further by meshoptimizer, with the
+  // colour and emission weighted as the bake weights them, to LITE_ERR_M (LITE_HERO_ERR_M on the heroes).
+  const liteIndex = (s, V, C, E, I) => {
+    const errM = HEROES.includes(s.id) ? LITE_HERO_ERR_M : LITE_ERR_M;
+    const n = V.length / 3;
+    const pos = Float32Array.from(V);
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+    for (let i = 0; i < pos.length; i += 3) { x0 = Math.min(x0, pos[i]); x1 = Math.max(x1, pos[i]); y0 = Math.min(y0, pos[i + 1]); y1 = Math.max(y1, pos[i + 1]); z0 = Math.min(z0, pos[i + 2]); z1 = Math.max(z1, pos[i + 2]); }
+    const extent = Math.max(x1 - x0, y1 - y0, z1 - z0, 1e-3);
+    const attr = new Float32Array(n * 6);
+    for (let i = 0; i < n; i++) for (let k = 0; k < 3; k++) { attr[i * 6 + k] = C[i * 3 + k] / 255; attr[i * 6 + 3 + k] = E[i * 3 + k] / 255; }
+    const [J] = MeshoptSimplifier.simplifyWithAttributes(new Uint32Array(I), pos, 3, attr, 6, [1, 1, 1, 1, 1, 1], null, 0, errM / extent, []);
+    return J;
+  };
+  const LEVELS = [{ name: 'near', index: (_s, _V, _C, _E, I) => I }, { name: 'lite', index: liteIndex }];
   const tile = JSON.parse(await readFile(TILE, 'utf8'));
   const ours = tile.buildings.map((b) => { const ring = []; for (let i = 0; i + 1 < b.p.length; i += 2) ring.push([b.p[i], b.p[i + 1]]); let cx = 0, cz = 0; for (const [x, z] of ring) { cx += x; cz += z; } return { id: b.id, ring, c: [cx / ring.length, cz / ring.length] }; });
   const ourAt = (x, z) => ours.find((b) => inRing(b.ring, x, z))?.id ?? null;
 
   await rm(OUT, { recursive: true, force: true });
-  await mkdir(join(OUT, 'near'), { recursive: true });
+  for (const L of LEVELS) await mkdir(join(OUT, L.name), { recursive: true });
 
-  const cells = new Map();   // key -> { cx, cz, pos: [], col: [], emi: [], idx: [], bounds }
+  // key -> { cx, cz, pos: [], col: [], emi: [], idx: [], bounds }, one map per near level
+  const levelCells = new Map(LEVELS.map((L) => [L.name, new Map()]));
   const shellCells = new Map();
   const cellOf = (key, cx, cz, map) => {
     let c = map.get(key);
@@ -69,32 +91,38 @@ export async function writePacks(structures, { nearErrM, heroErrM }) {
     const P = fromB64(s.near.pos, Float32Array), C = fromB64(s.near.col, Uint8Array), E = fromB64(s.near.emi, Uint8Array), NM = fromB64(s.near.nmix, Uint8Array), I = fromB64(s.near.idx, Uint32Array);
     const V = new Float64Array(P.length);
     for (let i = 0; i < P.length; i += 3) { const [x, y, z] = T(P[i], P[i + 1], P[i + 2]); V[i] = x; V[i + 1] = y; V[i + 2] = z; }
-    const remap = new Map();   // cellKey -> Int32Array(vertex -> cell vertex)
     const sBox = [Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity];
-    for (let t = 0; t < I.length; t += 3) {
-      const a = I[t], b = I[t + 1], c = I[t + 2];
-      const mx = (V[a * 3] + V[b * 3] + V[c * 3]) / 3, mz = (V[a * 3 + 2] + V[b * 3 + 2] + V[c * 3 + 2]) / 3;
-      const cx = Math.floor(mx / CELL), cz = Math.floor(mz / CELL), key = `${cx}_${cz}`;
-      const cell = cellOf(key, cx, cz, cells);
-      cell.structures.add(s.id);
-      // each structure's triangles are contiguous in a cell: [id, first index, index count]
-      const last = cell.ranges[cell.ranges.length - 1];
-      if (last && last[0] === s.id) last[2] += 3; else cell.ranges.push([s.id, cell.idx.length, 3]);
-      let rm2 = remap.get(key);
-      if (!rm2) remap.set(key, (rm2 = new Int32Array(P.length / 3).fill(-1)));
-      for (const v of [a, b, c]) {
-        if (rm2[v] < 0) {
-          rm2[v] = cell.pos.length / 3;
-          cell.pos.push(V[v * 3], V[v * 3 + 1], V[v * 3 + 2]);
-          cell.col.push(C[v * 3], C[v * 3 + 1], C[v * 3 + 2]);
-          cell.emi.push(E[v * 3], E[v * 3 + 1], E[v * 3 + 2]);
-          cell.nmix.push(NM[v * 2], NM[v * 2 + 1]);
-          grow(cell.bounds, V[v * 3], V[v * 3 + 1], V[v * 3 + 2]);
-          grow(sBox, V[v * 3], V[v * 3 + 1], V[v * 3 + 2]);
+    const levelTris = {};
+    for (const L of LEVELS) {
+      const cells = levelCells.get(L.name);
+      const IL = L.index(s, V, C, E, I);
+      levelTris[L.name] = IL.length / 3;
+      const remap = new Map();   // cellKey -> Int32Array(vertex -> cell vertex)
+      for (let t = 0; t < IL.length; t += 3) {
+        const a = IL[t], b = IL[t + 1], c = IL[t + 2];
+        const mx = (V[a * 3] + V[b * 3] + V[c * 3]) / 3, mz = (V[a * 3 + 2] + V[b * 3 + 2] + V[c * 3 + 2]) / 3;
+        const cx = Math.floor(mx / CELL), cz = Math.floor(mz / CELL), key = `${cx}_${cz}`;
+        const cell = cellOf(key, cx, cz, cells);
+        cell.structures.add(s.id);
+        // each structure's triangles are contiguous in a cell: [id, first index, index count]
+        const last = cell.ranges[cell.ranges.length - 1];
+        if (last && last[0] === s.id) last[2] += 3; else cell.ranges.push([s.id, cell.idx.length, 3]);
+        let rm2 = remap.get(key);
+        if (!rm2) remap.set(key, (rm2 = new Int32Array(P.length / 3).fill(-1)));
+        for (const v of [a, b, c]) {
+          if (rm2[v] < 0) {
+            rm2[v] = cell.pos.length / 3;
+            cell.pos.push(V[v * 3], V[v * 3 + 1], V[v * 3 + 2]);
+            cell.col.push(C[v * 3], C[v * 3 + 1], C[v * 3 + 2]);
+            cell.emi.push(E[v * 3], E[v * 3 + 1], E[v * 3 + 2]);
+            cell.nmix.push(NM[v * 2], NM[v * 2 + 1]);
+            grow(cell.bounds, V[v * 3], V[v * 3 + 1], V[v * 3 + 2]);
+            grow(sBox, V[v * 3], V[v * 3 + 1], V[v * 3 + 2]);
+          }
+          cell.idx.push(rm2[v]);
         }
-        cell.idx.push(rm2[v]);
+        cell.tris++;
       }
-      cell.tris++;
     }
     // ---- the shell (pack's per-face vertices, 1/8 m about its origin, in Valdrada world)
     const SP = fromB64(s.shell.P, Int16Array), SC = fromB64(s.shell.C, Uint8Array), o = s.shell.origin;
@@ -143,10 +171,13 @@ export async function writePacks(structures, { nearErrM, heroErrM }) {
     });
   }
 
-  // ---- encode the cells
-  const nearCells = [];
+  // ---- encode the cells, per near level
+  const levelOut = {};
+  const levelFileBytes = {};
+  for (const L of LEVELS) {
+  const nearCells = (levelOut[L.name] = []);
   let nearFileBytes = 0;
-  for (const [key, c] of [...cells].sort()) {
+  for (const [key, c] of [...levelCells.get(L.name)].sort()) {
     const ox = c.cx * CELL + CELL / 2, oz = c.cz * CELL + CELL / 2;
     const n = c.pos.length / 3;
     const vb = new Uint8Array(n * 16), dv = new DataView(vb.buffer);
@@ -164,11 +195,13 @@ export async function writePacks(structures, { nearErrM, heroErrM }) {
     const head = Buffer.alloc(16);
     head.write('VDN1', 0, 'latin1'); head.writeUInt32LE(n, 4); head.writeUInt32LE(ib.length, 8); head.writeUInt32LE(ev.length + (wide ? 0x80000000 : 0), 12);
     const file = Buffer.concat([head, Buffer.from(ev), Buffer.from(ei)]);
-    await writeFile(join(OUT, 'near', `${key}.bin`), file);
+    await writeFile(join(OUT, L.name, `${key}.bin`), file);
     nearFileBytes += file.length;
     nearCells.push({ key, cx: c.cx, cz: c.cz, vertices: n, triangles: c.tris, wide, bounds: c.bounds.map(r3),
-      // GPU bytes: float32x3 position + unorm8x4 colour + unorm8x4 emissive, and the index
-      bytes: n * 20 + ib.length * (wide ? 4 : 2), fileBytes: file.length, ranges: c.ranges });
+      // GPU bytes: float32x3 position + unorm8x4 colour + unorm8x4 emissive + float32x2 uv (blocks material), and the index
+      bytes: n * 28 + ib.length * (wide ? 4 : 2), fileBytes: file.length, ranges: c.ranges });
+  }
+  levelFileBytes[L.name] = nearFileBytes;
   }
   // the shell: one file, its cells one after another
   const shellParts = [], shellCellsOut = [];
@@ -198,11 +231,12 @@ export async function writePacks(structures, { nearErrM, heroErrM }) {
 
   const manifest = {
     source: 'github.com/mkturkcan/valdrada @ 2724c79 (MIT); tiles: huggingface.co/datasets/mehmetkeremturkcan/valdrada v0.4.0 (ODbL 1.0)',
-    nearErrM, heroErrM, cell: CELL, nearQ: NEAR_Q, curb: CURB, affine: AFFINE,
-    structures: out, hide: [...hide].sort(), near: nearCells, shell: shellCellsOut,
+    nearErrM, heroErrM, liteErrM: LITE_ERR_M, liteHeroErrM: LITE_HERO_ERR_M, cell: CELL, nearQ: NEAR_Q, curb: CURB, affine: AFFINE,
+    structures: out, hide: [...hide].sort(), near: levelOut.near, lite: levelOut.lite, shell: shellCellsOut,
     totals: {
-      structures: out.length, trisExact: out.reduce((a, s) => a + s.trisExact, 0), trisNear: nearCells.reduce((a, c) => a + c.triangles, 0),
-      trisShell: shellCellsOut.reduce((a, c) => a + c.triangles, 0), nearFileBytes, shellFileBytes: at,
+      structures: out.length, trisExact: out.reduce((a, s) => a + s.trisExact, 0), trisNear: levelOut.near.reduce((a, c) => a + c.triangles, 0),
+      trisLite: levelOut.lite.reduce((a, c) => a + c.triangles, 0), liteFileBytes: levelFileBytes.lite,
+      trisShell: shellCellsOut.reduce((a, c) => a + c.triangles, 0), nearFileBytes: levelFileBytes.near, shellFileBytes: at,
     },
   };
   const ts = [
@@ -213,7 +247,8 @@ export async function writePacks(structures, { nearErrM, heroErrM }) {
     '',
   ].join('\n');
   await writeFile(join(OUT, 'manifest.ts'), ts);
-  const keys = nearCells.map((c) => c.key);
+  const keys = levelOut.near.map((c) => c.key);
+  const liteKeys = levelOut.lite.map((c) => c.key);
   await writeFile(join(OUT, 'assets.ts'), [
     '// Generated by tooling/city/vd-port/write.mjs. Metro registers .bin as an asset (apps/mobile/metro.config.js), so',
     '// require() gives an asset id that @acme/ui/three/asset-bytes resolves and reads (vd-port/blocks/load.ts).',
@@ -222,9 +257,12 @@ export async function writePacks(structures, { nearErrM, heroErrM }) {
     'export const VD_NEAR_ASSETS: Readonly<Record<string, number>> = {',
     ...keys.map((k) => `  '${k}': require('./near/${k}.bin'),`),
     '};',
+    'export const VD_LITE_ASSETS: Readonly<Record<string, number>> = {',
+    ...liteKeys.map((k) => `  '${k}': require('./lite/${k}.bin'),`),
+    '};',
     '',
   ].join('\n'));
-  console.log(`wrote ${out.length} structures, ${nearCells.length} near cells (${(nearFileBytes / 1e6).toFixed(1)} MB, ${manifest.totals.trisNear} triangles), ${shellCellsOut.length} shell cells (${(at / 1e6).toFixed(1)} MB, ${manifest.totals.trisShell} triangles), ${hide.size} buildings replaced`);
+  console.log(`wrote ${out.length} structures, ${levelOut.near.length} near cells (${(levelFileBytes.near / 1e6).toFixed(1)} MB, ${manifest.totals.trisNear} triangles), lite ${(levelFileBytes.lite / 1e6).toFixed(1)} MB ${manifest.totals.trisLite} triangles, ${shellCellsOut.length} shell cells (${(at / 1e6).toFixed(1)} MB, ${manifest.totals.trisShell} triangles), ${hide.size} buildings replaced`);
 }
 
 // `node write.mjs` re-writes the packs from the bake's cache (tooling/city/.cache/vd-port/structures.json) without

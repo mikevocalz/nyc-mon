@@ -12,7 +12,7 @@ import { buildVdPort } from '../index.ts';
 import { decodeNearCell, decodeShellCell, type ShellCellInfo } from './codec.ts';
 import { NEAR_NAME, SHELL_NAME, vdHiddenBuildings } from './index.ts';
 import { setVdBlockBytes } from './load.ts';
-import { makeNearMaterial, makeShellMaterial } from './shell-material.ts';
+import { makeBlocksMaterial } from './shell-material.ts';
 import { VD_BLOCKS } from './data/manifest.ts';
 import { parseCityDataset } from '../../../city-dataset.ts';
 
@@ -113,7 +113,7 @@ test('the shell cells decode to Valdrada\'s persistent-tier triangles, at most 2
   for (const s of VD_BLOCKS.structures) assert.ok(s.trisShell <= 2000, `${s.id}: ${s.trisShell}`);
 });
 
-test('the shell and near materials build to WGSL with no WebGL-only API', async () => {
+test('the blocks material (shell and near level) builds to WGSL with no WebGL-only API', async () => {
   const canvas = { width: 300, height: 150, style: {}, addEventListener() {}, removeEventListener() {}, getContext: () => null } as unknown as HTMLCanvasElement;
   const renderer = new THREE.WebGPURenderer({ canvas });
   await renderer.init().catch(() => undefined);
@@ -127,11 +127,9 @@ test('the shell and near materials build to WGSL with no WebGL-only API', async 
   } as never;
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera();
+  // (a textured material needs a GPU to sample in this builder: the graph is built without the FW14 grid's sample)
   for (const [name, material, attrs] of [
-    // (a textured material needs a GPU to sample in this builder, so the shell is built over the grid's absence here; the
-    // graph is the same but for the map's multiply)
-    ['shell', makeShellMaterial(T, env, null), ['position', 'color', 'uv']],
-    ['near', makeNearMaterial(T, env), ['position', 'color', 'emissive']],
+    ['blocks', makeBlocksMaterial(T, env, null), ['position', 'color', 'emissive', 'uv']],
   ] as const) {
     const g = new THREE.BufferGeometry();
     for (const a of attrs) g.setAttribute(a, new THREE.BufferAttribute(new Float32Array(a === 'uv' ? 6 : a === 'position' ? 9 : 12), a === 'uv' ? 2 : a === 'position' ? 3 : 4));
@@ -146,7 +144,7 @@ test('the shell and near materials build to WGSL with no WebGL-only API', async 
 });
 
 test('the port builds: shells resident, the near layer streamed under its own budget, the shell yielding to it', () => {
-  setVdBlockBytes({ shell: shellBytes, near: nearBytes });
+  setVdBlockBytes({ shell: shellBytes, near: nearBytes, level: 'near' });
   try {
     const dataset = parseCityDataset(JSON.parse(readFileSync(new URL('../../../data/harlem-apollo.json', import.meta.url), 'utf8')));
     assert.ok(vdHiddenBuildings()!.has('osm:way:271798914'), 'the Apollo leaves the city mesh');
@@ -164,8 +162,9 @@ test('the port builds: shells resident, the near layer streamed under its own bu
     stream.prime({ x: ax, y: 1.7, z: az + 10 }, k, 200);
     const near = port.group.children.filter((o) => o.name === NEAR_NAME && o.userData.cell !== undefined);
     assert.ok(near.length > 0, 'near cells built at the Apollo');
-    assert.ok(stream.stats.triangles <= 1_200_000, `${stream.stats.triangles} near triangles`);
-    port.update(0);
+    assert.ok(stream.stats.triangles <= WORLD_PRESETS['ipad-a12x'].vdPort.blocksNear.triangles, `${stream.stats.triangles} near triangles`);
+    // the mask starts on the third update (the first two draw every shell through the START compile)
+    for (let i = 0; i < 3; i++) port.update(0);
     const hidden = shells.filter((m) => !m.visible).length;
     assert.equal(hidden, near.length, 'each resident near cell hides the shell cell under it');
     // walk away: everything evicts, the decoded arrays go with it, the shells come back
@@ -186,7 +185,7 @@ test('lane B leaves the facade kit\'s fronts to lane A once the packs are in, an
   const own = (f: (typeof VD_STOREFRONT_PLAN.fronts)[number]) =>
     vdBlocksOwn(f.src === 0 ? f.id : null, f.p0[0]! + f.u[0]! * f.len / 2 - f.n[0]! * 0.5, f.p0[1]! + f.u[1]! * f.len / 2 - f.n[1]! * 0.5);
   assert.equal(VD_STOREFRONT_PLAN.fronts.filter(own).length, 0, 'without the packs lane B draws everything');
-  setVdBlockBytes({ shell: shellBytes, near: nearBytes });
+  setVdBlockBytes({ shell: shellBytes, near: nearBytes, level: 'near' });
   try {
     const owned = VD_STOREFRONT_PLAN.fronts.filter(own);
     const specFronts = VD_STOREFRONT_PLAN.fronts.filter((f) => f.src === 0);

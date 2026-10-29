@@ -43,6 +43,8 @@ export interface CellMeta {
   /** Vertices of the posed near and far levels. */
   near: number;
   far: number;
+  /** The cell's packages: [level, slot, cast (0 / 1), vertices, indices, ...] (tooling structure-slots.mjs). */
+  slots: readonly number[];
 }
 
 export interface StructureManifest {

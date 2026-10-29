@@ -18,6 +18,7 @@
 //   applyCityAO (materials.js L355): samples Valdrada's baked city sky-visibility texture (ENV.cityAO), not in the port.
 //   applySnowCap (materials.js L253): reads ENV.snow; the port's ctx carries no weather (lane A, types.ts).
 import type { Three } from '@acme/ui/three';
+import { shadowSafe } from '../shared/shadow-safe.ts';
 import type { Node } from 'three/webgpu';
 import type { PoolMaterialKind } from './pool-data.ts';
 import { lampScaleNode } from './signal-clock.ts';
@@ -102,7 +103,7 @@ export function createPoolMaterials(THREE: Three, night: Node<'float'>, physical
   return {
     get(kind) {
       let m = made.get(kind);
-      if (!m) { m = build(kind); m.name = `vd-pool:${kind}`; made.set(kind, m); }
+      if (!m) { m = shadowSafe(THREE, build(kind)); m.name = `vd-pool:${kind}`; made.set(kind, m); }
       return m;
     },
     dispose() { for (const m of made.values()) m.dispose(); made.clear(); },

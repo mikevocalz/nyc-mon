@@ -1,6 +1,6 @@
 // Lane C structures (vk, pk, lk): the packages decode, stay inside the square and the caps (disk 25 MB, JS bundle 3 MB,
-// 250k resident vertices on the iPad tier), stream near / far / nothing by distance, and the whole lane builds within
-// the GPU budgets with everything on.
+// 250k resident vertices on the iPad tier), stream near / far / nothing by distance through the cell streamer, and the
+// whole lane builds within the GPU budgets with everything on.
 import assert from 'node:assert/strict';
 import { readdirSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -62,45 +62,65 @@ test('caps: packages on disk <= 25 MB, the lane\'s JS data <= 3 MB, one cell\'s 
   console.log(`packages ${(disk / 1e6).toFixed(2)} MB, lane JS ${(js / 1e6).toFixed(2)} MB, densest near cell ${worst} vertices`);
 });
 
+// Lane C on the cell streamer (world/cells/cell-stream.ts), as the world wires it: its layers registered once the assets
+// are in, the streamer stepping along the path with the files' promises settling in between.
 async function streamAlong(path: readonly (readonly [number, number])[]) {
   const group = new THREE.Group();
   const { build } = await import('./index.ts');
+  const { createCellStream } = await import('../../cells/cell-stream.ts');
+  const { WORLD_PRESETS } = await import('../../../perf/tier-presets.ts');
+  const preset = WORLD_PRESETS['ipad-a12x'];
+  const stream = createCellStream(THREE as never, [], { preset });
   const part = build({
     THREE: THREE as never, group: group as never, night: THREE.TSL.uniform(0) as never, physical: true, groundY: () => 0.14,
-    toScene: valdradaToScene(ORIGIN), inBounds: () => true, register: () => {}, registerChunks: () => {}, env: {} as never, preset: null,
+    toScene: valdradaToScene(ORIGIN), inBounds: () => true, register: () => {}, env: {} as never, preset,
+    registerChunks: (template, spec, packages, budget) => stream.addExternal({ template, spec, packages, ...(budget ? { budget } : {}) }),
   }, { assets: diskAssets() });
   await part.ready;
   const s = part.structures()!;
-  const camera = new THREE.PerspectiveCamera(60, 1.5, 0.5, 2000);
   const seen: { vertices: number; near: number; far: number }[] = [];
   let t = 0;
   for (const [x, z] of path) {
-    camera.position.set(x, 1.7, z);
-    camera.updateMatrixWorld();
-    // frames per stop with the packages' promises settling in between
+    // frames per stop with the files' promises settling in between
     for (let k = 0; k < 180; k++) {   // 6 s: past evictAfterS + fadeS
-      s.frame(camera, (t += 1 / 30));
+      stream.update({ x, y: 1.7, z }, 1000, (t += 1 / 30));
+      part.update!(t);
       await new Promise((r) => setImmediate(r));
     }
     seen.push(s.stats());
   }
-  return { part, s, seen, group };
+  return { part, s, seen, group, stream };
 }
 
 test('streaming: near within 60 m, far beyond, nothing past 360 m, never over 250k resident vertices', async () => {
   const mvv = (VD_STRUCTURES.anchors as Record<string, { scene: [number, number] }>).mvv!.scene;
-  const { part, s, seen, group } = await streamAlong([mvv, [mvv[0] + 300, mvv[1] + 120], [0, 0], [600, 400]]);
+  const { part, seen, group, stream } = await streamAlong([mvv, [mvv[0] + 300, mvv[1] + 120], [0, 0], [600, 400]]);
   for (const st of seen) assert.ok(st.vertices <= STRUCTURE_LIMITS.maxVertices, `${st.vertices} resident vertices`);
   assert.ok(seen[0]!.near > 0, 'near cells at the Manhattan Valley arch');
-  // the meshes in the group are the resident cells; none of them is past the radius from the last stop
+  // a cell level is drawn whole or not at all: where the budget refused a near level, none of it went over the far
+  const nearOf = new Map<number, number>();
+  for (const m of group.children) {
+    const ud = m.userData as { vdStructure?: number; cell?: number };
+    if (ud.vdStructure === 0 && ud.cell !== undefined) nearOf.set(ud.cell, (nearOf.get(ud.cell) ?? 0) + 1);
+  }
+  for (const [num, n] of nearOf) {
+    const t = VD_STRUCTURES.cells[num]!.slots;
+    let want = 0;
+    for (let i = 0; i < t.length; i += 5) if (t[i] === 0) want++;
+    assert.equal(n, want, `cell ${VD_STRUCTURES.cells[num]!.key}: ${n} of its ${want} near packages resident`);
+  }
+  // the meshes in the group are the resident cells; none of them is past the radius (and the streamer's keep margin) from the last stop
   const last = new THREE.Vector3(600, 1.7, 400);
   for (const m of group.children) {
-    if (!m.name.startsWith('vd-structure:')) continue;
+    const ud = m.userData as { vdStructure?: number; cell?: number };
+    if (ud.vdStructure === undefined || ud.cell === undefined) continue;
     const box = (m as InstanceType<typeof THREE.Mesh>).geometry.boundingBox!;
-    assert.ok(box.distanceToPoint(last) <= STRUCTURE_LIMITS.radiusM / STRUCTURE_LIMITS.hysteresis + 1, `${m.name} resident ${box.distanceToPoint(last).toFixed(0)} m out`);
+    assert.ok(box.distanceToPoint(last) <= STRUCTURE_LIMITS.radiusM + 64, `${m.name} resident ${box.distanceToPoint(last).toFixed(0)} m out`);
+    // near replaces far: a cell whose near level is in draws no far mesh (hidden, then gone)
+    if (ud.vdStructure === 1 && nearOf.has(ud.cell)) assert.equal(m.visible, false, `${m.name} drawn under cell ${ud.cell}'s near level`);
   }
-  console.log(`streaming stops: ${seen.map((x) => `${x.vertices} v / ${x.near} near / ${x.far} far`).join(' | ')}`);
-  s.dispose();
+  console.log(`streaming stops: ${seen.map((x) => `${x.vertices} v / ${x.near} near / ${x.far} far`).join(' | ')}; refused ${stream.stats.budgets.structures?.overBudget ?? 0}`);
+  stream.dispose();
   part.dispose();
 });
 
@@ -122,9 +142,14 @@ test('GPU budget with everything on: pools and streamed structures, the sun cast
   const group = new THREE.Group();
   scene.add(group);
   const { build } = await import('./index.ts');
+  const { createCellStream } = await import('../../cells/cell-stream.ts');
+  const { WORLD_PRESETS } = await import('../../../perf/tier-presets.ts');
+  const preset = WORLD_PRESETS['ipad-a12x'];
+  const stream = createCellStream(THREE as never, [], { preset });
   const part = build({
     THREE: THREE as never, group: group as never, night: THREE.TSL.uniform(1) as never, physical: true, groundY: () => 0.14,
-    toScene: valdradaToScene(ORIGIN), inBounds: () => true, register: () => {}, registerChunks: () => {}, env: {} as never, preset: null,
+    toScene: valdradaToScene(ORIGIN), inBounds: () => true, register: () => {}, env: {} as never, preset,
+    registerChunks: (template, spec, packages, budget) => stream.addExternal({ template, spec, packages, ...(budget ? { budget } : {}) }),
   }, { assets: diskAssets() });
   await part.ready;
   const mvv = (VD_STRUCTURES.anchors as Record<string, { scene: [number, number] }>).mvv!.scene;
@@ -132,14 +157,16 @@ test('GPU budget with everything on: pools and streamed structures, the sun cast
   camera.position.set(mvv[0] + 20, 6, mvv[1] + 30);
   camera.lookAt(mvv[0], 8, mvv[1]);
   for (let k = 0; k < 60; k++) {
+    stream.update(camera.position, 1000, k / 30);
     part.update!(k / 30);
     renderer.render(scene, camera);
     await new Promise((r) => setImmediate(r));
   }
-  const drawn = group.children.filter((m) => m.visible && m.name.startsWith('vd-structure:')).length;
+  const drawn = group.children.filter((m) => m.visible && m.userData.cell !== undefined && m.name.startsWith('vd-structure:')).length;
   const added = { modules: record.shaders.length - baseline.modules, pipelines: record.renderPipelines - baseline.pipelines };
   console.log(`structures drawn ${drawn} meshes; lane C added ${added.modules} shader modules, ${added.pipelines} pipelines`);
   assert.ok(drawn > 0, 'structures streamed in and drew');
   assert.ok(added.modules <= 90 && added.pipelines <= 90, `${added.modules} modules, ${added.pipelines} pipelines`);
+  stream.dispose();
   part.dispose();
 });

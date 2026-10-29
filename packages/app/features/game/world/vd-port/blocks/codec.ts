@@ -14,6 +14,9 @@ export interface NearCellInfo {
   readonly bytes: number;
 }
 
+/** GPU bytes a near cell uploads: float32x3 position + RGBA8 colour + RGBA8 emission + float32x2 uv, and the index. */
+export const nearCellBytes = (info: NearCellInfo) => info.vertices * 28 + info.triangles * 3 * (info.wide ? 4 : 2);
+
 export interface ShellCellInfo {
   readonly key: string;
   readonly cx: number;
@@ -103,13 +106,15 @@ export function lazyNearPackage(info: NearCellInfo, file: () => Uint8Array): Cel
         position: { array: a.position, itemSize: 3, normalized: false },
         color: { array: a.color, itemSize: 4, normalized: true },
         emissive: { array: a.emissive, itemSize: 4, normalized: true },
+        // the shell's FW14 uv slot: unused here (blocks material, makeBlocksMaterial), present so both levels share a layout
+        uv: { array: new Float32Array(a.position.length / 3 * 2), itemSize: 2, normalized: false },
       };
     },
     get index() { return get().index; },
     vertexCount: info.vertices,
     triangles: info.triangles,
     bounds: Float64Array.from([b[0]!, b[1]!, b[2]!, b[3]!, b[4]!, b[5]!]),
-    bytes: info.bytes,
+    bytes: nearCellBytes(info),
     release() { arrays = null; },
   };
 }
