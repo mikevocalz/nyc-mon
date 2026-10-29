@@ -187,7 +187,7 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
     ...(physical?.pbrMaterials && physical.clustered
       ? { nightLights: { streetlamps: physicalTier.streetlampLights, storefronts: physicalTier.storefrontLights } }
       : {}),
-    ...(worldStreamEnabled(physical !== null) ? { stream: { preset, log: streamLog } } : {}),
+    ...(worldStreamEnabled(physical !== null) ? { stream: { preset, log: streamLog, wake: invalidate } } : {}),
   });
   renderRoot.add(world.sky, world.group);
   scene.fog = world.fog;

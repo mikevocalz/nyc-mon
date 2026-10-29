@@ -81,9 +81,14 @@ export interface CellPackage {
    * A package whose bytes arrive asynchronously (a Metro asset fetched on demand: world/vd-port/furniture): `ready` is
    * false until they are in, and the streamer calls `prefetch` for it inside its layer's reach plus a one-chunk ring and
    * builds it once `ready`. Absent: always ready.
+   *
+   * A package whose fetch can end without bytes (world/cell-source: no host configured, host down, cooldown) returns the
+   * fetch's promise from `prefetch` (the same promise while it is in flight), resolving true once the bytes are in. The
+   * streamer then wakes the canvas on arrival instead of redrawing every frame while it waits, so an unreachable source
+   * lets an on-demand canvas rest. A `prefetch` that returns nothing is polled: the streamer keeps asking for frames.
    */
   ready?(): boolean;
-  prefetch?(): void;
+  prefetch?(): void | Promise<boolean>;
   /**
    * True while a finer package of the same ground is in (a far level under its near level, world/vd-port/furniture):
    * the streamer treats it as unwanted, so it leaves as any other cell does and gives its budget back.

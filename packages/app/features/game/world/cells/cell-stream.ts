@@ -149,6 +149,8 @@ export interface CellStreamOptions {
    * is held to it and kept out of the preset's budget, so it can neither starve the near-detail layers nor be starved.
    */
   external?: readonly ExternalLayer[];
+  /** Asks the host for a frame: called when a prefetch that reports through a promise (CellPackage.prefetch) lands its bytes. */
+  wake?: () => void;
 }
 
 export interface ExternalLayer {
@@ -456,9 +458,28 @@ export function createCellStream(THREE: Three, meshes: readonly Mesh[], options:
   /** The reach in metres (what a package within one chunk of it prefetches against). */
   const reachOf = (layer: Layer, k: number) => (layer.reachM !== null ? layer.reachM : (layer.errorM * k) / preset.screenErrorPx);
 
+  // Fetches that report through a promise wake the canvas once, on arrival, and force a fresh pick so the landed
+  // cell is built on the next frame. Fetches that report nothing are polled: `polling` keeps update() returning true.
+  const watched = new WeakSet<Promise<boolean>>();
+  let polling = 0;
+  const prefetch = (slot: Slot, counted: boolean) => {
+    const p = slot.pkg.prefetch?.();
+    if (p && typeof p.then === 'function') {
+      if (!watched.has(p)) {
+        watched.add(p);
+        void p.then((landed) => {
+          if (!landed || slots.length === 0) return;
+          last.at = -Infinity;
+          options.wake?.();
+        }, () => {});
+      }
+    } else if (counted) polling++;
+  };
+
   const pick = (camera: Vec3, k: number, nowS: number, radius: number) => {
     requests.length = 0;
     stats.fetching = 0;
+    polling = 0;
     for (const slot of slots) {
       // A reachM layer's radius is its own reach (the far tier streams to 13 km while the near detail stays at the
       // preset's residentRadiusM); reachM at or under the preset's radius changes nothing (lane C's 60 m and 360 m).
@@ -484,11 +505,11 @@ export function createCellStream(THREE: Three, meshes: readonly Mesh[], options:
         // A leaving near cell that is wanted again turns around where it is.
         if (slot.mesh !== null) { slot.fading = 1; slot.unwantedSince = -1; continue; }
         // bytes still on their way: ask for them, build once they are in
-        if (slot.pkg.ready && !slot.pkg.ready()) { slot.pkg.prefetch?.(); stats.fetching++; continue; }
+        if (slot.pkg.ready && !slot.pkg.ready()) { prefetch(slot, true); stats.fetching++; continue; }
         requests.push(slot);
       } else if (slot.mesh === null && slot.pkg.prefetch && d <= Math.min(slotRadius, reachOf(slot.layer, k) + slot.layer.chunk)) {
         // the prefetch ring: one chunk past the reach, so a cell's bytes are in before it is wanted
-        slot.pkg.prefetch();
+        prefetch(slot, false);
       }
     }
     requests.sort((a, b) => (a.pinned === b.pinned ? a.distance - b.distance : a.pinned ? -1 : 1));
@@ -570,7 +591,7 @@ export function createCellStream(THREE: Three, meshes: readonly Mesh[], options:
           mb: +(stats.bytes / 1e6).toFixed(1), tris: stats.triangles, pending: stats.pending, evictions: stats.evictions,
         });
       }
-      return stats.pending > 0 || fading;
+      return requests.length > 0 || polling > 0 || fading;
     },
     addExternal,
     dispose() {

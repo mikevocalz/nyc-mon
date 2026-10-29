@@ -160,7 +160,7 @@ export interface CityWorldOptions {
    * Cell streaming (cells/cell-stream.ts): the merged near-detail layers are packaged into 256 m chunks after the bake
    * and only the preset's want set is built; the shells and the ground stay whole. Absent, the whole tile is built.
    */
-  stream?: { preset: WorldPreset; log?: (line: string, data: Record<string, unknown>) => void } | null;
+  stream?: { preset: WorldPreset; log?: (line: string, data: Record<string, unknown>) => void; wake?: () => void } | null;
 }
 
 export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: CityWorldOptions = {}) {
@@ -368,6 +368,7 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
     ? createCellStream(THREE, [...city.meshes, ...(facelift?.mesh ? [facelift.mesh] : []), ...(phys?.roadPaint ? [phys.roadPaint] : []), ...(vdPort?.streamMeshes ?? [])], {
         preset: options.stream.preset,
         log: options.stream.log,
+        wake: options.stream.wake,
         external: vdPort?.streamLayers ?? [],
         pinned: (x0, z0, size) => landmarkBoxes.some(([a, b, c, d]) => c >= x0 && a < x0 + size && d >= z0 && b < z0 + size),
       })
