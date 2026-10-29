@@ -177,7 +177,8 @@ export function createCellStream(THREE: Three, meshes: readonly Mesh[], options:
   };
   const t0 = now();
   for (const mesh of meshes) {
-    const spec = CELL_LAYERS[mesh.name];
+    // A vd-port mesh carries its own layer (world/vd-port/types.ts VdStreamLayer).
+    const spec = CELL_LAYERS[mesh.name] ?? (mesh.userData.cellLayer as (typeof CELL_LAYERS)[string] | undefined);
     if (!spec || Array.isArray(mesh.material) || !splittable(mesh.geometry)) continue;
     const packages = splitByCell(mesh.geometry, spec.chunk);
     let material = mesh.material as Material;

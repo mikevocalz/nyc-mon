@@ -27,6 +27,8 @@ import { LIGHT_POLE_HEIGHT } from './signage.ts';
 // Static: the living city's bundled-topology.ts evaluates topology.ts in every build, so a lazy load here saves nothing.
 import { buildLaneTopology } from '../living-city/topology.ts';
 import { createCellStream, type CellStream, type Vec3 } from './cells/cell-stream.ts';
+import { buildVdPort } from './vd-port/index.ts';
+import { createWalkQueries } from './walkability.ts';
 import type { WorldPreset } from '../perf/tier-presets.ts';
 
 // Lane G1 "GPU budget" (EXPO_PUBLIC_WORLD_BUNDLES) was deleted 2026-11: the
@@ -320,6 +322,9 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
   if (phys) group.add(...phys.fireEscapes.meshes);
   if (facelift?.mesh) group.add(facelift.mesh);
   if (night) group.add(night.group);
+  // The vd port: Valdrada's kits and data for the blocks, landmarks, storefronts and furniture in bounds (vd-port/).
+  const vdPort = vd ? buildVdPort(THREE, dataset, { physical: phys !== null, night: tod, groundY: createWalkQueries(dataset).groundHeight }) : null;
+  if (vdPort) group.add(vdPort.group);
 
   // Cell streaming: after every scene-graph pass above has run on the source meshes (shadow casters), so the
   // templates carry it. Landmark buildings' chunks are pinned resident (Valdrada never evicts a landmark).
@@ -334,7 +339,7 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
     return [[x0, z0, x1, z1] as const];
   });
   const stream: CellStream | null = options.stream
-    ? createCellStream(THREE, [...city.meshes, ...(facelift?.mesh ? [facelift.mesh] : []), ...(phys?.roadPaint ? [phys.roadPaint] : [])], {
+    ? createCellStream(THREE, [...city.meshes, ...(facelift?.mesh ? [facelift.mesh] : []), ...(phys?.roadPaint ? [phys.roadPaint] : []), ...(vdPort?.streamMeshes ?? [])], {
         preset: options.stream.preset,
         log: options.stream.log,
         pinned: (x0, z0, size) => landmarkBoxes.some(([a, b, c, d]) => c >= x0 && a < x0 + size && d >= z0 && b < z0 + size),
@@ -443,9 +448,13 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
     /** Advances the facelift's LED sweep; holds it still under Reduce Motion. No-op without the facelift. */
     updateFacelift(time: number, reducedMotion: boolean) {
       facelift?.update(time, reducedMotion);
+      vdPort?.update(time);
     },
+    /** The vd port (vd-port/), null off the vd lane. */
+    vdPort,
     dispose() {
       stream?.dispose();
+      vdPort?.dispose();
       night?.dispose();
       facelift?.dispose();
       ledPools?.dispose();
