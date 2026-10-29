@@ -1,5 +1,6 @@
 import { createStore } from 'zustand/vanilla';
 import { parseReadyNotificationData } from '../mon/ready-notification.ts';
+import { parseCareCallData } from '../mon-space/care-notification-plan.ts';
 
 /**
  * Foreground presentation of the hatch-ready notification, the pure half
@@ -13,6 +14,11 @@ import { parseReadyNotificationData } from '../mon/ready-notification.ts';
 /** The request identifier `scheduleReadyNotification` sets, and the one M12 cancels and dismisses. */
 export function readyNotificationId(eggId: string): string {
   return `egg-ready-${eggId}`;
+}
+
+/** True for an identifier {@linkcode readyNotificationId} made. */
+export function isReadyNotificationId(identifier: string): boolean {
+  return identifier.startsWith('egg-ready-');
 }
 
 /** expo-notifications 58.0.11 `NotificationBehavior`, minus the deprecated `shouldShowAlert`. */
@@ -45,8 +51,18 @@ export const QUIET_READY: ForegroundBehavior = {
   shouldSetBadge: false,
 };
 
-/** Quiet only for a hatch-ready payload naming the egg M11 has on screen; everything else shows as usual. */
+/**
+ * A care call that fires while the app is open: the attention LED and the
+ * in-app cue already carry it, so it goes to the list without a banner or sound.
+ */
+export const QUIET_CARE_CALL: ForegroundBehavior = QUIET_READY;
+
+/**
+ * Quiet for a care call (the app is open, the LED shows it) and for a
+ * hatch-ready payload naming the egg M11 has on screen; everything else shows as usual.
+ */
 export function foregroundBehavior(data: unknown, onScreenEggId: string | null): ForegroundBehavior {
+  if (parseCareCallData(data) !== null) return QUIET_CARE_CALL;
   if (onScreenEggId === null) return SHOW_NOTIFICATION;
   const parsed = parseReadyNotificationData(data);
   return parsed.ok && parsed.data.eggId === onScreenEggId ? QUIET_READY : SHOW_NOTIFICATION;

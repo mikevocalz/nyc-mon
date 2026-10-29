@@ -20,6 +20,8 @@ function snapshot(state: DevicePrefs): DevicePrefs {
     sound: state.sound,
     forceReducedMotion: state.forceReducedMotion,
     notifications: state.notifications,
+    monCalls: state.monCalls,
+    monCallsAsked: state.monCallsAsked,
   };
 }
 

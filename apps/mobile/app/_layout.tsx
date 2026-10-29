@@ -14,6 +14,7 @@ import { hydrateMon } from "@acme/app/features/mon/mon.store.ts";
 import { hydrateOnboarding } from "@acme/app/features/onboarding/onboarding.store.ts";
 import { hydrateDevicePrefs } from "@acme/app/features/settings/device-prefs.store.ts";
 import { useReadyNotificationRouting } from "@acme/app/features/onboarding/notify-hook.ts";
+import { useLegacyMealReminderCleanup } from "@acme/app/features/schedule/legacy-reminders.ts";
 import { cleanRootStack, type StackLike } from "@acme/app/features/onboarding/root-stack.ts";
 import { hydrateSync, startConnectivity } from "@acme/app/features/system/sync.store.ts";
 import { useSyncSession } from "@acme/app/features/system/sync-session.ts";
@@ -105,6 +106,8 @@ export default function RootLayout() {
   const scheme = useColorScheme() === "light" ? "light" : "dark";
   // Hatch-ready notification tap → M12, cold start and warm (M12 B3).
   useReadyNotificationRouting();
+  // Older builds scheduled daily "Breakfast time" alerts; cancel them on launch.
+  useLegacyMealReminderCleanup();
   useRootStackHygiene();
   // M21: the server sender exists only while a Caller is signed in here.
   useSyncSession();

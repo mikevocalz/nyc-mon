@@ -61,6 +61,9 @@ const config: ExpoConfig & { newArchEnabled: true } = {
     './plugins/with-optional-gamepad',
     // Keeps rnskia_getWGPUInstance linked on iOS so react-native-webgpu can share Skia's device (ADR 0026).
     './plugins/with-skia-wgpu-instance',
+    // The Mon keychain: a WidgetKit extension plus the App Group it shares with
+    // the app (canon Decision #36; targets/keychain-widget, modules/keychain-widget).
+    './plugins/with-keychain-widget',
     'expo-router',
     // Quest and PICO run Android 12+; Skia v3 (Graphite) needs 26+, and Meta's
     // layout library and react-native-webgpu's AHardwareBuffer use need 29.

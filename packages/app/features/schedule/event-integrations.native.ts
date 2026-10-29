@@ -4,6 +4,7 @@ import * as Notifications from 'expo-notifications';
 import { AndroidImportance } from 'expo-notifications';
 import type { ScheduleEvent } from './model';
 import type { EventIntegrationContext, EventIntegrationResult } from './event-integrations.types';
+import { allowsLocalReminder, legacyMealReminderIds } from './reminder-policy.ts';
 
 const CHANNEL_ID = 'mon-care';
 let channelReady = false;
@@ -79,14 +80,10 @@ async function ensureNotificationChannel() {
   channelReady = true;
 }
 
+// Meals have no phone reminder (reminder-policy.ts): the Mon calls for food
+// itself through Mon Space care notifications.
 function notificationCopy(event: ScheduleEvent, monName: string) {
   switch (event.kind) {
-    case 'breakfast':
-      return { title: `Breakfast time for ${monName}`, body: 'Your Mon is ready to eat.' };
-    case 'lunch':
-      return { title: `Lunch time for ${monName}`, body: 'Your Mon is ready to eat.' };
-    case 'dinner':
-      return { title: `Dinner time for ${monName}`, body: 'Your Mon is ready to eat.' };
     case 'play-date':
       return { title: `${monName}'s play date`, body: 'Time to meet up with the other Mons.' };
     case 'battle':
@@ -100,7 +97,7 @@ async function scheduleReminder(
   event: ScheduleEvent,
   context: EventIntegrationContext,
 ): Promise<{ id?: string; status: EventIntegrationResult['reminderStatus'] }> {
-  if (!event.reminderEnabled) return { status: 'skipped' };
+  if (!event.reminderEnabled || !allowsLocalReminder(event)) return { status: 'skipped' };
 
   const permission = await Notifications.requestPermissionsAsync();
   if (!permission.granted) return { status: 'denied' };
@@ -112,23 +109,6 @@ async function scheduleReminder(
 
   const reminderMinutes = event.reminderMinutesBefore ?? 0;
   const copy = notificationCopy(event, context.monName);
-
-  if (isDaily(event)) {
-    const start = new Date(event.start.getTime() - reminderMinutes * 60_000);
-    const id = await Notifications.scheduleNotificationAsync({
-      content: {
-        ...copy,
-        data: { scheduleEventId: event.id, monId: event.resourceId, kind: event.kind },
-      },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DAILY,
-        hour: start.getHours(),
-        minute: start.getMinutes(),
-        channelId: Platform.OS === 'android' ? CHANNEL_ID : undefined,
-      },
-    });
-    return { id, status: 'scheduled' };
-  }
 
   const triggerDate = new Date(event.start.getTime() - reminderMinutes * 60_000);
   if (triggerDate.getTime() <= Date.now()) return { status: 'skipped' };
@@ -176,4 +156,20 @@ export async function removeEventIntegrations(params: {
       ? Notifications.cancelScheduledNotificationAsync(params.notificationId).catch(() => undefined)
       : Promise.resolve(),
   ]);
+}
+
+/**
+ * Cancels the daily meal reminders older builds scheduled, so installs that
+ * already have them stop getting them.
+ * Matches on the payload those builds wrote (reminder-policy.ts). Runs once
+ * per launch from the root layout; a failure is ignored and retried next launch.
+ */
+export async function cancelLegacyMealReminders(): Promise<number> {
+  try {
+    const ids = legacyMealReminderIds(await Notifications.getAllScheduledNotificationsAsync());
+    await Promise.allSettled(ids.map((id) => Notifications.cancelScheduledNotificationAsync(id)));
+    return ids.length;
+  } catch {
+    return 0;
+  }
 }
