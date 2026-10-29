@@ -26,19 +26,19 @@ export function useShellChrome(): { chrome: boolean; rail: boolean; header: bool
   return { chrome, rail: placement.rail, header: chrome && placement.rail };
 }
 
-/** The current route's Back (label and press), or null when there is nowhere to go back to. */
+/** The current route's Back (label and press), or null on a primary tab or a full-window route. */
 export function useRouteBack(): { label: string | undefined; onPress: () => void } | null {
   const pathname = usePathname() ?? '/';
   const router = useRouter();
   const back = headerBack(pathname);
-  if (back === null || backAction(back, router.canGoBack()) === null) return null;
+  if (back === null) return null;
   return {
     label: back.label,
     onPress: () => {
       // Read the stack again at press time; it may have changed since render.
       const action = backAction(back, router.canGoBack());
-      if (action?.kind === 'pop') router.back();
-      else if (action?.kind === 'replace') router.replace(action.href as never);
+      if (action.kind === 'pop') router.back();
+      else router.replace(action.href as never);
     },
   };
 }
