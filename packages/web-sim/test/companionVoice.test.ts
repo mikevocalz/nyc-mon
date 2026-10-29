@@ -4,6 +4,8 @@ import { createCompanionVoice } from '../src/client/companionVoice.ts';
 import type { Authorize } from '../src/client/freshToken.ts';
 import type { MonVoice } from '../src/client/monVoice.ts';
 import type { VoicePort } from '../src/client/speechQueue.ts';
+import { babbleInventory } from '@acme/content/voice';
+import { isBabble } from '@acme/core';
 
 const result = (structuredContent: unknown): CallToolResult => ({ content: [], structuredContent }) as never;
 const ratti = (stage = 'Baby', mood?: string) => result({ mon: { monId: 'mon-1', voice: { lineageId: 'dex-001/male/1', stage } }, ...(mood ? { mood } : {}) });
@@ -38,14 +40,38 @@ function setup() {
 describe('the NVIDIA companion speaks in the Mon voice', () => {
   it('learns the voice from a tool result and speaks each sentence in it, without quote marks', async () => {
     const { voice, rec, setSession } = setup();
-    voice.learn(ratti('Baby', 'content'));
+    voice.learn(ratti('Small', 'content'));
     const done = voice.speak('*yawns* Hey "Callah". I ate!');
     expect(await done).toBe('finished');
     expect(rec().prepared).toEqual([
-      { text: '*yawns* Hey Callah.', voice: { lineageId: 'dex-001/male/1', stage: 'Baby', mood: 'content' } },
-      { text: 'I ate!', voice: { lineageId: 'dex-001/male/1', stage: 'Baby', mood: 'content' } },
+      { text: '*yawns* Hey Callah.', voice: { lineageId: 'dex-001/male/1', stage: 'Small', mood: 'content' } },
+      { text: 'I ate!', voice: { lineageId: 'dex-001/male/1', stage: 'Small', mood: 'content' } },
     ]);
-    expect(setSession).toHaveBeenCalledWith({ lineageId: 'dex-001/male/1', stage: 'Baby', mood: 'content' });
+    expect(setSession).toHaveBeenCalledWith({ lineageId: 'dex-001/male/1', stage: 'Small', mood: 'content' });
+  });
+
+  it('gates each sentence by the voice stage, so the caption shows what the voice says (Decision 32)', async () => {
+    const { voice, rec } = setup();
+    voice.learn(result({ mon: { monId: 'mon-1', hatchedAt: 5, voice: { lineageId: 'dex-001/male/1', stage: 'Egg', voiceStage: 'baby-talk' } } }));
+    const captions: string[] = [];
+    await voice.speak('Hello Callah, I love you.', undefined, (s) => captions.push(s));
+    const inv = babbleInventory({ lineageId: 'dex-001/male/1' }, 'Egg');
+    expect(rec().prepared).toHaveLength(1);
+    expect(isBabble(rec().prepared[0]!.text, inv)).toBe(true);
+    expect(captions).toEqual([rec().prepared[0]!.text]);
+    expect(voice.current()?.voiceStage).toBe('baby-talk');
+    expect(voice.hatchedAt()).toBe(5);
+    voice.reset();
+    expect(voice.hatchedAt()).toBeUndefined();
+  });
+
+  it('keeps the known hatch time when a later result omits it, and forgets it for another Mon', () => {
+    const { voice } = setup();
+    voice.learn(result({ mon: { monId: 'mon-1', hatchedAt: 5, voice: { lineageId: 'dex-001/male/1', stage: 'Baby' } } }));
+    voice.learn(result({ mon: { monId: 'mon-1', voice: { lineageId: 'dex-001/male/1', stage: 'Baby' } } }));
+    expect(voice.hatchedAt()).toBe(5);
+    voice.learn(result({ mon: { monId: 'mon-2', voice: { lineageId: 'dex-008/female/2', stage: 'Baby' } } }));
+    expect(voice.hatchedAt()).toBeUndefined();
   });
 
   it('keeps the voice when a later result names none (sticky)', async () => {

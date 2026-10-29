@@ -32,7 +32,7 @@ The phone becomes an H-Lynk Core. A red plastic handheld wraps the screen. Its b
 | M13 Home, M14 Feed, M15 Rest, M16 Social | Yes | Companion loop per §4.3 |
 | M02–M07 onboarding and auth | Never | §2.4: never on auth or settings |
 | M17 Dex, M18 Journal, M19–M22 settings, system | Never | §4.3/§4.4 mark them `none`. Restated 2026-10-29 for M17 (D20g): the code that wraps `DexProfileScreen` in the H-Lynk is drift to remove |
-| M32 Mon Space | Never | Canon Decision #32 (2026-10-29). Mike: "i no longer want this experience inside the h-lynk but just in the screen!" The whole screen is the Memory LCD. The H-Lynk opens Mon Space; it does not frame it |
+| M32 Mon Space | Never | Canon Decision #33 (2026-10-29). Mike: "i no longer want this experience inside the h-lynk but just in the screen!" The whole screen is the Memory LCD. The H-Lynk opens Mon Space; it does not frame it |
 
 M01 is the deliberate exception the screen map already gives (`docs/design/DECISIONS.md` D1).
 

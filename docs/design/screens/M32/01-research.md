@@ -4,7 +4,7 @@ Status: §6 pipeline, step 1. Written 2026-10-29 by lane (a). Skills loaded for 
 
 ## Why this screen exists
 
-Canon v12 names the surface: "H-Lynk → Active Mon opens **Mon Space**" (`docs/canon/GAMEPLAY_BIBLE_V12.md:54`), and Decision #23 puts it on web at `/mon-space`. No native route implemented it before this; `/mon/:id` is the M17 Dex. Mike approved the build on 2026-10-29: "good ideas, go (make sure ui/ux skills are used for designing this! i no longer want this experience inside the h-lynk but just in the screen!)" (canon Decisions #32–#36).
+Canon v12 names the surface: "H-Lynk → Active Mon opens **Mon Space**" (`docs/canon/GAMEPLAY_BIBLE_V12.md:54`), and Decision #23 puts it on web at `/mon-space`. No native route implemented it before this; `/mon/:id` is the M17 Dex. Mike approved the build on 2026-10-29: "good ideas, go (make sure ui/ux skills are used for designing this! i no longer want this experience inside the h-lynk but just in the screen!)" (canon Decisions #33–#37).
 
 ## Sources
 

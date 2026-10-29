@@ -12,7 +12,7 @@ Every string carries `voice: "ui" | "character"`.
 
 **`character`** is a named character speaking: a Mon, Santoro, Malik, anyone in the story. Character strings come from canon only. If canon has no line, the string is `TODO(canon)` and ships empty. Nobody writes a character line from a vibe (§2.3, Law 1).
 
-M01–M07 contain no character strings. The one `character` slot (`m05.denied.santoro_line`) is `TODO(canon)`: v11 describes Dr. Santoro (`V11 ¶83`, `¶84`) but quotes no line from her. No Mon dialogue exists before the hatch, because no Mon exists (Decision #5), and Phase 1 Baby speech is open (Q32).
+M01–M07 contain no character strings. The one `character` slot (`m05.denied.santoro_line`) is `TODO(canon)`: v11 describes Dr. Santoro (`V11 ¶83`, `¶84`) but quotes no line from her. No Mon dialogue exists before the hatch, because no Mon exists (Decision #5), and a Phase 1 Baby babbles on its first day, then says at most two words (Decision 32).
 
 ## Caller and Callah
 
@@ -38,7 +38,7 @@ M01–M07 contain no character strings. The one `character` slot (`m05.denied.sa
 - **Lead with what the reader can do.** "You can keep playing" comes before "a parent needs to say yes" (M05).
 - **Errors: what happened, then what to do.** No blame, no "oops", no "invalid input". A cancelled Apple or Google sheet shows nothing. The player chose to close it.
 - **No pressure.** No countdowns, no "hurry", no streak guilt, no "your egg misses you". The egg waits (`M7 L388`). This follows Zagal et al. on playing by appointment (https://www.diva-portal.org/smash/get/diva2:1043332/FULLTEXT01.pdf) and ICO Children's Code standard 13 on nudges (https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/childrens-information/childrens-code-guidance-and-resources/age-appropriate-design-a-code-of-practice-for-online-services/).
-- **Promise only what ships.** One notification per egg (M23), so the copy says one. Nothing about features that are not in Phase 1. Amended 2026-10-29: Mon calls (Decision #36) are a separate, opt-in switch, so the egg-alert copy still promises one; see "Mon Space, keychain and Mon calls".
+- **Promise only what ships.** One notification per egg (M23), so the copy says one. Nothing about features that are not in Phase 1. Amended 2026-10-29: Mon calls (Decision #37) are a separate, opt-in switch, so the egg-alert copy still promises one; see "Mon Space, keychain and Mon calls".
 - **Sentence case everywhere**, buttons included (`docs/DESIGN_SYSTEM.md` type rules). No all-caps, no exclamation marks in `ui` copy.
 - **Buttons start with a verb** and say what happens: "Send email", "Use this name", "Turn on notifications". "Continue" only where the next step is the whole point (M04).
 
@@ -1002,7 +1002,7 @@ M21 says "saved here" before it says "offline": the Caller can keep playing. A c
 
 ## Mon Space, keychain and Mon calls (2026-10-29)
 
-Screen M32 (`docs/design/screens/M32/`), canon Decisions #32–#36, design D20. Mike, 2026-10-29: "good ideas, go (make sure ui/ux skills are used for designing this! i no longer want this experience inside the h-lynk but just in the screen!)". Keys are stable: `monspace.*` for the screen, `keychain.*` for the Lock Screen and Home Screen widget, `notify.call.<kind>.*` for Mon call notifications, `settings.mon_calls.*` for the opt-in. Every string is `ui` voice except the `.line` slots, which are `character` and ship only with a canon line.
+Screen M32 (`docs/design/screens/M32/`), canon Decisions #33–#37, design D20. Mike, 2026-10-29: "good ideas, go (make sure ui/ux skills are used for designing this! i no longer want this experience inside the h-lynk but just in the screen!)". Keys are stable: `monspace.*` for the screen, `keychain.*` for the Lock Screen and Home Screen widget, `notify.call.<kind>.*` for Mon call notifications, `settings.mon_calls.*` for the opt-in. Every string is `ui` voice except the `.line` slots, which are `character` and ship only with a canon line.
 
 Word choices:
 
@@ -1149,7 +1149,7 @@ The title is the Mon's name, so the alert reads as coming from the Mon. The body
 | `notify.call.bedtime.line` | — | character | `TODO(canon)` |
 | `notify.call.thread` | Mon calls | ui | notification group / channel name |
 
-No key exists for a false call: false calls never notify (Decision #36).
+No key exists for a false call: false calls never notify (Decision #37).
 
 ### Settings
 

@@ -1,6 +1,6 @@
 # M32 Mon Space: direction
 
-Inputs: `01-research.md`, `02-references.md`, canon Decisions #4, #7, #8, #12, #15, #23, #28, #32–#36, design D20. Route: native `/(home)/mon-space` for the active Mon (lane (c) owns the final file path; the web companion is `/mon-space`, Decision #23). Shell: **none**. No H-Lynk body, head, keys or trackpad (Decision #32). Scheme: day or night from the existing time-of-day rig (Decision #4).
+Inputs: `01-research.md`, `02-references.md`, canon Decisions #4, #7, #8, #12, #15, #23, #28, #33–#37, design D20. Route: native `/(home)/mon-space` for the active Mon (lane (c) owns the final file path; the web companion is `/mon-space`, Decision #23). Shell: **none**. No H-Lynk body, head, keys or trackpad (Decision #33). Scheme: day or night from the existing time-of-day rig (Decision #4).
 
 ## The one move
 
@@ -91,5 +91,5 @@ Bloom is off under Reduce Transparency and on the lowest graphics tier. Text run
 - No death, no grave, no departure, no egg reset (Law 8, Decision #15). No word from the banned list: sick, dead, died, killed, neglected, punish.
 - No care-mistake count, no "missed" history, no "while you were away" summary (D20e).
 - No weight band words (D20f). No numbers on hearts. No danger red on any care state.
-- No H-Lynk frame, keys or trackpad (Decision #32). No speech bubble, no pronoun for the Mon.
+- No H-Lynk frame, keys or trackpad (Decision #33). No speech bubble, no pronoun for the Mon.
 - No interactive care from the widget or a notification; both open Mon Space.

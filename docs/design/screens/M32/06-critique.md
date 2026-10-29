@@ -29,8 +29,8 @@ Verdict: solid foundation, four things to hold the build to.
 |---|---|---|---|
 | S-1 | Care mistakes never shown on any screen | STRIKE | D20e; calm UX for a child audience |
 | S-2 | Mon calls notify only after an explicit opt-in in Mon Space | BUILD | D20b; the egg-alert grant promised "Nothing else" |
-| S-3 | Interactive widget care buttons | DEFER | Decision #36 approves a glance widget only; a care action from the Lock Screen skips the moment the app exists for |
-| S-4 | Ring-dial input from the research | STRIKE here | No H-Lynk trackpad on this screen (Decision #32) |
+| S-3 | Interactive widget care buttons | DEFER | Decision #37 approves a glance widget only; a care action from the Lock Screen skips the moment the app exists for |
+| S-4 | Ring-dial input from the research | STRIKE here | No H-Lynk trackpad on this screen (Decision #33) |
 | S-5 | Mistake totals in M18 Journal or M17 Dex | STRIKE | D20e; the contract's lifetime count stays data only |
 
 ## Priority actions

@@ -1,6 +1,6 @@
 # M32 Mon Space: handoff
 
-Implementation contract for lanes (b)–(f). Inputs: `01`–`07` here, canon Decisions #32–#36, design D20, the lead's contract (2026-10-29). Data comes from `@acme/core/sim` only; this file names no new API.
+Implementation contract for lanes (b)–(f). Inputs: `01`–`07` here, canon Decisions #33–#37, design D20, the lead's contract (2026-10-29). Data comes from `@acme/core/sim` only; this file names no new API.
 
 ## Blockers before implementation
 
@@ -12,7 +12,7 @@ Implementation contract for lanes (b)–(f). Inputs: `01`–`07` here, canon Dec
 | B4 | Route file and store wiring (`applyMonCare`, `tickMonCare`) | lane (c) | screen |
 | B5 | Widget target and notification scheduling | lane (e) | keychain, Mon calls |
 
-Not blocked on: canon numbers. Every rate is `TODO(canon)` tuning (Decisions #33–#35).
+Not blocked on: canon numbers. Every rate is `TODO(canon)` tuning (Decisions #34–#36).
 
 ## Route and intent
 

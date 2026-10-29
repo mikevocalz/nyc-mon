@@ -2,7 +2,7 @@
 
 Owner: `ux-writer`. Inputs: `01-research.md`, `03-direction.md`, `04-components.md`, `screens/M07/05-copy.md` (name rules and error tone); canon #1, #5, #9, #11, #14; PS-005; Q14, Q17, Q32; `docs/COPY_DECK.md`.
 
-All strings are `voice: "ui"`. The Baby does not speak on M09: Phase 1 Baby speech is open (Q32), and no canon line exists. No pronoun for the Mon anywhere (PS-005, Q14): the copy uses the form name or "your Mon".
+All strings are `voice: "ui"`. The Baby says no words on M09: naming follows the hatch, and a Baby babbles for its first 24 hours (Decision 32). No pronoun for the Mon anywhere (PS-005, Q14): the copy uses the form name or "your Mon".
 
 Tokens: `{formName}` and `{dexNumber}` from the active Mon's `speciesId` in `@acme/content` (`allSpecies`: `formName`, `dexId`); `{bloodline}` = `` `${bloodlineName} Bloodline` `` (Decision #11); `{name}` is the trimmed, NFC-normalised name.
 
@@ -44,7 +44,7 @@ Same shape as the Caller name (M07) so one validator family serves both: 1–16 
 | `m09.save_error.title` | The name didn't save. | ui | 40 | Save write threw | |
 | `m09.save_error.body` | Your Mon is fine and the name is still in the field. Try again. | ui | 80 | Reassures first (Law 8 spirit: nothing happened to the Mon) | |
 | `m09.save_error.retry` | Try again | ui | 20 | | |
-| `m09.sound.attention` | (audio slot) | — | — | No string; off until Q32 + assets | Q32 |
+| `m09.sound.attention` | (audio slot) | — | — | No string; babble, off until assets | Decision 32 |
 
 Error order: blank → too long → characters → reserved (if enabled) → blocked. One at a time, after a ≥ 1 s typing pause or on submit (M07 timing).
 
@@ -52,7 +52,7 @@ Error order: blank → too long → characters → reserved (if enabled) → blo
 
 - Suggested names and a shuffle (Q17, Law 1).
 - "You can change this later" (no rename exists).
-- Any Mon reaction line ("Squeaklet likes it!"): it would invent a Baby's opinion (#14, Q32).
+- Any Mon reaction line ("Squeaklet likes it!"): it would invent a Baby's opinion, and a first-day Baby only babbles (#14, Decision 32).
 
 ## Reduced motion
 
@@ -66,5 +66,5 @@ No copy changes.
 ## Open questions
 
 1. **"Ratti" (Decision #1).** Is the Caller barred from typing "Ratti", or only from having it as a default? Built either way: the reserved list ships empty until Mike rules.
-2. **Q32.** Do Babies make a sound on M09? Slot ready, off.
+2. **Q32.** Answered by Decision 32: a first-day Baby babbles. Slot ready, off until the sound assets exist.
 3. **Rename.** If a rename ever ships (M17), `m09.field.hint` is rewritten in the same PR.

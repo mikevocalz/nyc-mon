@@ -420,9 +420,31 @@ The supplied egg files carry their canon names and match the eggs by their Bible
 
 `Fye-Egg.glb` (the tan "Glossy Spotted Alien Egg") is not assigned to any egg.
 
+## Decision 32 — an Egg and a first-day Baby babble
+
+- **Date:** 2026-10-29
+- **Decided by:** Mike (creator)
+- **Kind:** canon (voice)
+- **Answers:** `docs/canon/OPEN_QUESTIONS.md` Q32 (rest of it)
+
+Mike: "also while in egg form is supposed to be making baby gibberish sounds, and for the 1st day of the 1st form (ie squeaklet stops speaking the baby gibberish after 1 day - look in the docs about how we thought this through)".
+
+This is the first rung of v11's "baby-talk/gibberish, then limited speech, then full speech" (`V11 ¶56`), with a clock on it:
+
+- **Egg:** babbles. Wordless baby sounds from inside the shell, never a real word in any language.
+- **Baby, first 24 hours:** still babbles, counted from `hatchedAt`, the incubation end the hatch writes (not the moment the Caller watched it).
+- **Baby, after 24 hours:** `limited`, as answered for the Hood Ratti line on 2026-10-23: the family sound plus at most two words ("Bet!", "Food?"), never a sentence, no "Callah".
+- **Small, Mid, Max:** full speech, as before.
+
+The rule covers all three starter lines: Hood Ratti (Squeaklet), Bodega Baddiee Cee (Kittee Cee) and Yote (Yotito). A Mon keeps one `voiceLineageId` for life (`V11 ¶56`), so the babble, the first words and the full voice are the same voice growing up. A line's babble carries its family sound, so a Squeaklet's babble chirps like a Ratti.
+
+A Baby with no `hatchedAt` speaks `limited`, so missing data never leaves a Mon babbling forever. A clock that reads earlier than the hatch still babbles, so the first day is never skipped. The server's clock decides what is spoken; a client's clock only times local effects.
+
+Where it lives in code: `voiceStage` in `packages/core/sim/voice-stage.ts` maps stage and `hatchedAt` to `baby-talk`, `limited` or `full`; the speech gate in `packages/core/sim/speech-gate.ts` turns any line into babble or trims it to the limited rule before it is spoken. The babble sounds are Payload `language-lexicon` rows in category `babble` (seed: `packages/content/lingo/babble-seed.ts`), which Mike edits in the admin. The Egg's pitch is 1.45 in the `mon-voices` global; the Egg was silent before this.
+
 ---
 
-## The Mon Space care build (Decisions 32–36)
+## The Mon Space care build (Decisions 33–37)
 
 Mike approved the Mon Space proposal on 2026-10-29 in one message. Each decision below quotes it in full:
 
@@ -430,7 +452,7 @@ Mike approved the Mon Space proposal on 2026-10-29 in one message. Each decision
 
 The proposal he approved is the research in `docs/research/virtual-pet-semantics.md`, `docs/research/mon-screen-vpet-audit.md` and `docs/research/vpet-modern-design-directions.md`. The engineering contract that turns these decisions into code is the lead's, dated the same day. Every number below is game feel and stays `TODO(canon)`: Mike approved the mechanics, not the tuning.
 
-## Decision 32 — Mon Space is its own screen: a full-screen Memory LCD with no H-Lynk frame
+## Decision 33 — Mon Space is its own screen: a full-screen Memory LCD with no H-Lynk frame
 
 - **Date:** 2026-10-29
 - **Decided by:** Mike (creator): "good ideas, go (make sure ui/ux skills are used for designing this! i no longer want this experience inside the h-lynk but just in the screen!)"
@@ -448,17 +470,17 @@ What is approved:
 - The Mon is the full-colour 3D model. It steps out of the LCD toward the Caller and back into it, where it is drawn as an LCD sprite.
 - Decision #8 still holds in full: the bond lives on the `MonInstance`, and no copy says the screen or the H-Lynk owns, holds or controls the Mon.
 
-## Decision 33 — classic care mechanics, inside canon, with no death
+## Decision 34 — classic care mechanics, inside canon, with no death
 
 - **Date:** 2026-10-29
 - **Decided by:** Mike (creator): "good ideas, go (make sure ui/ux skills are used for designing this! i no longer want this experience inside the h-lynk but just in the screen!)"
 - **Kind:** canon (care model)
 - **Amends:** the three-meter rule as the code states it (`packages/core/schemas/care.ts`: "The three care meters (Bible v11: Energy, Fullness, one Social meter). No more."). "No more." is a code comment, not canon text. The canon three meters stay the only meters. Everything below is a care state or a count, and none of it is a meter.
-- **Supersedes:** D-15c's "no care push notifications" only as far as Decision 36 says; the design-tier bans on poop, a cold, discipline, care mistakes and weight listed in `docs/research/mon-screen-vpet-audit.md` §2.3
+- **Supersedes:** D-15c's "no care push notifications" only as far as Decision 37 says; the design-tier bans on poop, a cold, discipline, care mistakes and weight listed in `docs/research/mon-screen-vpet-audit.md` §2.3
 
 What is approved:
 
-1. **Attention calls and care mistakes.** The Mon calls for attention. A call left unanswered for 15 minutes of running (unpaused) time counts as one care mistake, and the call closes. Mistakes count per lifecycle stage. They feed the evolution branch (Decision 34) and nothing else: they never lower bond, never lock anything and are never shown to the Caller as a tally.
+1. **Attention calls and care mistakes.** The Mon calls for attention. A call left unanswered for 15 minutes of running (unpaused) time counts as one care mistake, and the call closes. Mistakes count per lifecycle stage. They feed the evolution branch (Decision 35) and nothing else: they never lower bond, never lock anything and are never shown to the Caller as a tally.
 2. **Poop.** Up to 4 piles. One clean flushes all of them.
 3. **A cold.** A Mon can catch a cold. Medicine cures it in 2 or 3 doses. A cold is never fatal, never ends anything and never lowers bond. Copy says "a cold", never "sick".
 4. **Discipline, including false calls.** A Mon sometimes calls when it needs nothing. Answering that call with a boundary raises discipline. This is partnership, not control: v11 lets Mons disagree and refuse, and Decision #8 forbids copy that says anything controls the Mon. The action reads "Set a boundary" (`docs/COPY_DECK.md`, Mon Space).
@@ -467,7 +489,7 @@ What is approved:
 
 What stays forbidden, restated: **no death and never a reset to an egg.** Law 8 and Decision #15 stand unchanged. No state, count or combination of them deletes a Mon, ends its life, sends it away or turns it back into an egg. The words sick, dead, died, killed, neglected and punish never appear in UI copy.
 
-## Decision 34 — care history picks the evolution branch; the stage triggers
+## Decision 35 — care history picks the evolution branch; the stage triggers
 
 - **Date:** 2026-10-29
 - **Decided by:** Mike (creator): "good ideas, go (make sure ui/ux skills are used for designing this! i no longer want this experience inside the h-lynk but just in the screen!)"
@@ -481,7 +503,7 @@ What is approved:
 - **Stage triggers (Q43).** A stage change becomes ready when both hold: the Mon's age in its current stage, counted in unpaused time, has reached the stage's minimum, and bond has reached the authored `minBond` of the event. Minimums: Baby → Small 2 days, Small → Mid 5 days, Mid → Max 10 days. All three numbers are `TODO(canon)` tuning.
 - **Law 7 still holds.** Nothing evolves without an authored `EvolutionEvent` in `content/`. The trigger makes an event eligible; it does not create one. When no event's care conditions match, the event with no care conditions (the authored default branch) is taken.
 
-## Decision 35 — an official pause, with no catch-up
+## Decision 36 — an official pause, with no catch-up
 
 - **Date:** 2026-10-29
 - **Decided by:** Mike (creator): "good ideas, go (make sure ui/ux skills are used for designing this! i no longer want this experience inside the h-lynk but just in the screen!)"
@@ -494,7 +516,7 @@ What is approved:
 - Resuming continues from exactly where things stopped. Nothing is credited for the paused time. A pause cannot be backdated.
 - Outside a pause, care runs on real time, the same on every surface (Decision #23: one Mon everywhere).
 
-## Decision 36 — the keychain widget and care notifications for real calls only
+## Decision 37 — the keychain widget and care notifications for real calls only
 
 - **Date:** 2026-10-29
 - **Decided by:** Mike (creator): "good ideas, go (make sure ui/ux skills are used for designing this! i no longer want this experience inside the h-lynk but just in the screen!)"

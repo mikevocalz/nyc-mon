@@ -63,4 +63,4 @@ Tile name `type-label`; full/declined line `type-body`. Tile face `surface-raise
 
 ## Amendment 2026-10-29
 
-Canon Decision #33 adds a snack beside the meal on M32 Mon Space. A snack adds more weight than a meal; play burns weight off. The overfeed rule here (sluggish, never sick) is unchanged. A Mon with a cold still takes meals and declines snacks. "Sick" still never appears.
+Canon Decision #34 adds a snack beside the meal on M32 Mon Space. A snack adds more weight than a meal; play burns weight off. The overfeed rule here (sluggish, never sick) is unchanged. A Mon with a cold still takes meals and declines snacks. "Sick" still never appears.

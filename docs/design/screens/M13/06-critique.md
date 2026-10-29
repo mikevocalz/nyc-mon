@@ -30,4 +30,4 @@ Heuristic findings: H1 (system status) is met by the chip; H2 met by "Asking for
 
 ## Amendment 2026-10-29
 
-H-1 is superseded by canon Decision #36 and D20b. Mike, 2026-10-29: "good ideas, go (make sure ui/ux skills are used for designing this! i no longer want this experience inside the h-lynk but just in the screen!)". Real calls notify, opt-in, through a setting separate from the egg alert. H-1's conditions (opt-in, reviewed) are met by D20b; quiet hours come from bedtime, when the Mon is asleep and only the bedtime call can open.
+H-1 is superseded by canon Decision #37 and D20b. Mike, 2026-10-29: "good ideas, go (make sure ui/ux skills are used for designing this! i no longer want this experience inside the h-lynk but just in the screen!)". Real calls notify, opt-in, through a setting separate from the egg alert. H-1's conditions (opt-in, reviewed) are met by D20b; quiet hours come from bedtime, when the Mon is asleep and only the bedtime call can open.

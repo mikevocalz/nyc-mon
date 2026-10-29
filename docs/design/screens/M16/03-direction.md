@@ -58,4 +58,4 @@ Round dots: filled `structure`, empty `concrete-300` outline (dots are progress;
 
 ## Amendment 2026-10-29
 
-Canon Decision #33: play burns weight on M32 Mon Space, and a Mon with a cold declines play until it is over the cold. Peek itself is unchanged: no score, no sad reaction.
+Canon Decision #34: play burns weight on M32 Mon Space, and a Mon with a cold declines play until it is over the cold. Peek itself is unchanged: no score, no sad reaction.

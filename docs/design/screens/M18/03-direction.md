@@ -55,4 +55,4 @@ Month change: `motion-step` slide 24 pt; reduced: cross-fade. New entry since la
 
 ## Amendment 2026-10-29
 
-Canon Decision #33 adds care mistakes. They are never logged here (D20e), and neither are false calls, colds or missed bedtimes. The Journal may record positive firsts the new care adds (first clean-up, first boundary, over a first cold) when lane (c) wires them; that is optional.
+Canon Decision #34 adds care mistakes. They are never logged here (D20e), and neither are false calls, colds or missed bedtimes. The Journal may record positive firsts the new care adds (first clean-up, first boundary, over a first cold) when lane (c) wires them; that is optional.

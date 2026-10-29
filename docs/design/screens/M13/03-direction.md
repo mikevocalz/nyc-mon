@@ -73,9 +73,9 @@ Name `type-label` 600 on the screen's top scrim; bloodline `type-caption` `text-
 
 ## Amendment 2026-10-29 (Mon Space)
 
-Mike, 2026-10-29: "good ideas, go (make sure ui/ux skills are used for designing this! i no longer want this experience inside the h-lynk but just in the screen!)". Canon Decisions #32–#36 and design D20 change these rules for the care loop:
+Mike, 2026-10-29: "good ideas, go (make sure ui/ux skills are used for designing this! i no longer want this experience inside the h-lynk but just in the screen!)". Canon Decisions #33–#37 and design D20 change these rules for the care loop:
 
-- "No push notification about care" is superseded by Decision #36 and D20b: one opt-in local notification per real call, never for a false call, never while paused.
+- "No push notification about care" is superseded by Decision #37 and D20b: one opt-in local notification per real call, never for a false call, never while paused.
 - The classic care loop (calls, poop, a cold, boundaries, weight, lights-out, pause) lives on M32 Mon Space, which has no H-Lynk frame. This screen keeps its chrome and its three-meter layout until the lead decides how M13 hands off to M32.
 - Where M13's meters move to hearts (D20a), the hearts follow this file's bans: no numbers, no danger red.
 - The rest of the no-list stands: no "while you were away" tally, no sad face, no "neglected", no level number. Care mistakes are never shown (D20e).

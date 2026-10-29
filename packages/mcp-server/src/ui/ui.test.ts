@@ -217,6 +217,16 @@ describe('view model (adapter onto the companion models)', () => {
     expect(toMonViewModel({ mon: { monId: 'm1', speciesId: 'dex-002' }, care: careView })?.egg).toBeNull();
   });
 
+  it("reads the server's gated say line for a babbling Mon or egg, and null otherwise", () => {
+    const say = { text: 'Bwa-gu mi!', caption: 'Bwa-gu mi!', voiceStage: 'baby-talk', verbatim: true };
+    const mon = { monId: 'm1', speciesId: 'dex-002' };
+    expect(toMonViewModel({ mon, care: careView, say })?.say).toEqual({ caption: 'Bwa-gu mi!', voiceStage: 'baby-talk' });
+    expect(toMonViewModel({ mon, care: careView })?.say).toBeNull();
+    expect(toMonViewModel({ mon, care: careView, say: { caption: 'x', voiceStage: 'shouting' } })?.say).toBeNull();
+    const egg = { eggId: 'e', speciesId: 'dex-001', incubationEndsAt: Date.now() + 60_000, minutesRemaining: 1, readyToHatch: false, say };
+    expect(toMonViewModel({ incubating: true, eggs: [egg] })?.say).toEqual({ caption: 'Bwa-gu mi!', voiceStage: 'baby-talk' });
+  });
+
   describe("hatch_egg's result", () => {
     const hatchResult = (hatching: boolean) => ({
       hatched: true,

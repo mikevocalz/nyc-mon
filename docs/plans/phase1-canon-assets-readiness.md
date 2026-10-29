@@ -41,7 +41,8 @@ Do not duplicate PR #11 (Phase 1 screens, merged), #17 (kit accessibility issues
 | Q11 egg names / egg skins | done / open | Decision #9; OPEN_QUESTIONS Q11 "the yes/no below is still open" |
 | Scanner LED red | done | Decision #7 |
 | "Ratti" reservation, Q17 | open | `packages/core/sim/mon-name.ts` |
-| Q12, Q32, Q44 | open | OPEN_QUESTIONS §B, §D, §I; design D-15b |
+| Q12, Q44 | open | OPEN_QUESTIONS §B, §I; design D-15b |
+| Q32 Baby voice | done | Decision 32 (2026-10-29) |
 | Q18 to Q25 care numbers | open | `packages/core/sim/tuning.ts` `TODO(canon)` block; design D-15d |
 | Q29 Baby scale | open | `packages/content/mons/define.ts` `scaleMeters: null` |
 | GLB rigs and clips | open | no `.glb`/`.gltf` on `main`; PR #18 blocked on models |

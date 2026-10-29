@@ -3,6 +3,7 @@ import { loadNvidiaEnv, nvidiaPublicConfig } from '../server/nvidia-env.ts';
 import { bundledFfmpeg, createNvidiaTts, nvidiaCsp, nvidiaPitchShift } from '../server/nvidia-tts.ts';
 import { findFfmpeg } from '../server/tts.ts';
 import type { TtsFetch } from '../server/tts.ts';
+import { trustClaim } from './fixtures/roster.ts';
 
 const base = { NEBIUS_API_KEY: 'k', V1_MCP_SERVICE_KEY: 'v'.repeat(32) };
 const ORIGIN = 'http://localhost:5180';
@@ -44,7 +45,7 @@ describe('NVIDIA /api/tts', () => {
   it('refuses a foreign or missing origin before auth or ElevenLabs', async () => {
     const fetchFn = audio();
     const auth = signedIn();
-    const tts = createNvidiaTts(loadNvidiaEnv({ ...base, ELEVENLABS_API_KEY: 'x' }), { auth, fetch: fetchFn, pitchShift: null });
+    const tts = createNvidiaTts(loadNvidiaEnv({ ...base, ELEVENLABS_API_KEY: 'x' }), { roster: (_c, claim) => trustClaim(null, claim), auth, fetch: fetchFn, pitchShift: null });
     for (const origin of ['https://evil.example', 'http://localhost:5181', null]) {
       expect((await tts(post(origin), 'ip')).status, String(origin)).toBe(403);
     }
@@ -54,14 +55,14 @@ describe('NVIDIA /api/tts', () => {
 
   it('allows the origin of SIM_PUBLIC_ORIGIN', async () => {
     const env = loadNvidiaEnv({ ...base, SIM_PUBLIC_ORIGIN: 'http://127.0.0.1:6100' });
-    const tts = createNvidiaTts(env, { auth: signedIn(), fetch: audio(), pitchShift: null });
+    const tts = createNvidiaTts(env, { roster: (_c, claim) => trustClaim(null, claim), auth: signedIn(), fetch: audio(), pitchShift: null });
     expect((await tts(post('http://127.0.0.1:6100'), 'ip')).status).toBe(204);
     expect((await tts(post(ORIGIN), 'ip')).status).toBe(403);
   });
 
   it('answers 204 without an ElevenLabs key, so the page reads with Web Speech', async () => {
     const fetchFn = audio();
-    const tts = createNvidiaTts(loadNvidiaEnv(base), { auth: signedIn(), fetch: fetchFn, pitchShift: null });
+    const tts = createNvidiaTts(loadNvidiaEnv(base), { roster: (_c, claim) => trustClaim(null, claim), auth: signedIn(), fetch: fetchFn, pitchShift: null });
     expect((await tts(post(ORIGIN), 'ip')).status).toBe(204);
     expect(fetchFn).not.toHaveBeenCalled();
   });
@@ -71,7 +72,7 @@ describe('NVIDIA /api/tts', () => {
     const auth = vi.fn(async () => {
       throw new Error('no user scope');
     });
-    const tts = createNvidiaTts(loadNvidiaEnv({ ...base, ELEVENLABS_API_KEY: 'x' }), { auth, fetch: fetchFn, pitchShift: null });
+    const tts = createNvidiaTts(loadNvidiaEnv({ ...base, ELEVENLABS_API_KEY: 'x' }), { roster: (_c, claim) => trustClaim(null, claim), auth, fetch: fetchFn, pitchShift: null });
     expect((await tts(post(ORIGIN, null), 'ip')).status).toBe(401);
     expect(auth).toHaveBeenCalledWith(null);
     expect(fetchFn).not.toHaveBeenCalled();
@@ -79,7 +80,7 @@ describe('NVIDIA /api/tts', () => {
 
   it('speaks in the lineage voice with the key when signed in', async () => {
     const fetchFn = audio();
-    const tts = createNvidiaTts(loadNvidiaEnv({ ...base, ELEVENLABS_API_KEY: 'eleven-secret' }), { auth: signedIn(), fetch: fetchFn, pitchShift: null });
+    const tts = createNvidiaTts(loadNvidiaEnv({ ...base, ELEVENLABS_API_KEY: 'eleven-secret' }), { roster: (_c, claim) => trustClaim(null, claim), auth: signedIn(), fetch: fetchFn, pitchShift: null });
     const res = await tts(post(ORIGIN), 'ip');
     expect(res.status).toBe(200);
     const init = fetchFn.mock.calls[0]?.[1];
@@ -88,7 +89,7 @@ describe('NVIDIA /api/tts', () => {
 
   it('rate-limits per signed-in Caller, not per proxy address', async () => {
     const auth = vi.fn(async (authorization: string | null) => ({ callerId: authorization === 'Bearer a' ? 'a' : 'b' }));
-    const tts = createNvidiaTts(loadNvidiaEnv(base), { auth, fetch: audio(), pitchShift: null, perMinute: 2 });
+    const tts = createNvidiaTts(loadNvidiaEnv(base), { roster: (_c, claim) => trustClaim(null, claim), auth, fetch: audio(), pitchShift: null, perMinute: 2 });
     expect((await tts(post(ORIGIN, 'Bearer a'), 'proxy')).status).toBe(204);
     expect((await tts(post(ORIGIN, 'Bearer a'), 'proxy')).status).toBe(204);
     expect((await tts(post(ORIGIN, 'Bearer a'), 'proxy')).status).toBe(429);
@@ -97,7 +98,7 @@ describe('NVIDIA /api/tts', () => {
   });
 
   it('serves the deferred face path (204 for an unknown id)', async () => {
-    const tts = createNvidiaTts(loadNvidiaEnv(base), { auth: signedIn(), fetch: audio(), pitchShift: null });
+    const tts = createNvidiaTts(loadNvidiaEnv(base), { roster: (_c, claim) => trustClaim(null, claim), auth: signedIn(), fetch: audio(), pitchShift: null });
     const res = await tts(new Request(`${ORIGIN}/api/tts/face/00000000-0000-4000-8000-000000000000`, { headers: { origin: ORIGIN } }), 'ip');
     expect(res.status).toBe(204);
   });
@@ -145,7 +146,7 @@ describe('NVIDIA /api/tts request log', () => {
   it('logs status, lineage and applied pitch for each request, never the text or key', async () => {
     const lines: string[] = [];
     const log = (line: string) => lines.push(line);
-    const tts = createNvidiaTts(loadNvidiaEnv({ ...base, ELEVENLABS_API_KEY: 'eleven-secret' }), { auth: signedIn(), fetch: audio(), pitchShift: null, log });
+    const tts = createNvidiaTts(loadNvidiaEnv({ ...base, ELEVENLABS_API_KEY: 'eleven-secret' }), { roster: (_c, claim) => trustClaim(null, claim), auth: signedIn(), fetch: audio(), pitchShift: null, log });
     await tts(post(ORIGIN), 'ip');
     await tts(post('https://evil.example'), 'ip');
     expect(lines).toHaveLength(2);
@@ -157,7 +158,7 @@ describe('NVIDIA /api/tts request log', () => {
 
   it('logs a malformed body without echoing it', async () => {
     const lines: string[] = [];
-    const tts = createNvidiaTts(loadNvidiaEnv(base), { auth: signedIn(), fetch: audio(), pitchShift: null, log: (l) => lines.push(l) });
+    const tts = createNvidiaTts(loadNvidiaEnv(base), { roster: (_c, claim) => trustClaim(null, claim), auth: signedIn(), fetch: audio(), pitchShift: null, log: (l) => lines.push(l) });
     await tts(new Request(`${ORIGIN}/api/tts`, { method: 'POST', headers: { origin: ORIGIN, authorization: 'Bearer t' }, body: '{"text":"secret words","lineageId":"<script>"}' }), 'ip');
     expect(lines[0]).toMatch(/^\[nvidia-tts\] POST 400 lineage=- stage=- pitch=- ms=\d+$/);
   });

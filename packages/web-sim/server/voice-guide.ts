@@ -1,25 +1,29 @@
 import type { MonLingo } from '@acme/content/lingo';
 import { voiceGuideFor } from '@acme/content/voice';
-import { LIFECYCLE_STAGES, MON_MOODS, type LifecycleStage, type MonMood } from '@acme/core';
+import type { LifecycleStage, MonMood } from '@acme/core';
 import type Anthropic from '@anthropic-ai/sdk';
 import type { MonLingoSource } from './mon-lingo-source.ts';
 import type { ModelBackend, TurnParams } from './model.ts';
+import type { MonRoster } from './mon-roster.ts';
+import { resolveTurnVoice, sightingFromLine, streamGated, turnVoice, type TurnVoice } from './voice-stage-gate.ts';
 
 /**
  * The served voice guide on every model turn: `voiceGuideFor(mon, mood,
- * lingo)` from `@acme/content/voice`, read against the lingo Payload serves,
- * appended to the system prompt the Nebius request carries.
+ * lingo, voiceStage)` from `@acme/content/voice`, read against the lingo
+ * Payload serves, appended to the system prompt the Nebius request carries.
  *
- * Which Mon: the host's own "[Mon now, … s ago: dex-003, Small, mood content,
- * …]" line on the newest user text (src/client/turnTools.ts monStateLine;
+ * Which Mon: the newest one the conversation reports (voice-stage-gate.ts
+ * `turnVoice`), from a tool result or the host's "[Mon now, … s ago: dex-003,
+ * Small, mood content, …]" line (src/client/turnTools.ts monStateLine;
  * server/skill.ts tells the model what it is). Only a dex id, a lifecycle
- * stage and a mood are read from it, each checked against its closed set, so
- * the line can pick which published rules apply but cannot put its own text
- * in the system prompt. Without the line, only the rules for every Mon apply.
+ * stage, a mood and a voice stage are read, each checked against its closed
+ * set, so the conversation can pick which published rules apply but cannot
+ * put its own text in the system prompt. Without a Mon, only the rules for
+ * every Mon apply.
+ *
+ * For an Egg or a first-day Baby the guide is the babble rules. The guide is
+ * a hint; the gate in voice-stage-gate.ts is what keeps words out.
  */
-
-const MON_NOW = /\[Mon now, \d+ s ago: ([^\]\n]*)\]/;
-const SPECIES = /^dex-\d{1,4}$/;
 
 export interface TurnMon {
   readonly mon: { readonly speciesId: string; readonly stage: LifecycleStage };
@@ -36,17 +40,9 @@ export function monFromTurn(messages: readonly Anthropic.MessageParam[]): TurnMo
   for (let i = messages.length - 1; i >= 0; i--) {
     const message = messages[i]!;
     if (message.role !== 'user') continue;
-    const line = MON_NOW.exec(textOf(message));
-    if (!line) continue;
-    // dex id, then "named <name>", then stage, then mood: the id is read from the
-    // front and the stage and mood from the back, so a name can't stand in for either.
-    const parts = line[1]!.split(',').map((part) => part.trim());
-    const fromBack = [...parts].reverse();
-    const speciesId = parts.find((part) => SPECIES.test(part));
-    const stage = fromBack.find((part): part is LifecycleStage => (LIFECYCLE_STAGES as readonly string[]).includes(part));
-    const mood = fromBack.map((part) => /^mood (\S+)$/.exec(part)?.[1]).find((m): m is MonMood => (MON_MOODS as readonly (string | undefined)[]).includes(m));
-    if (speciesId === undefined || stage === undefined) return null;
-    return { mon: { speciesId, stage }, mood };
+    const seen = sightingFromLine(textOf(message));
+    if (seen === null) continue;
+    return { mon: { speciesId: seen.speciesId!, stage: seen.stage }, mood: seen.mood };
   }
   return null;
 }
@@ -59,24 +55,38 @@ function rulesForEveryMon(lingo: MonLingo): string[] {
 }
 
 /** `params` with the served voice guide for this turn's Mon appended to the system prompt. */
-export function withVoiceGuide(params: TurnParams, lingo: MonLingo): TurnParams {
-  const turn = monFromTurn(params.messages);
-  const guide = turn === null ? rulesForEveryMon(lingo) : voiceGuideFor(turn.mon, turn.mood, lingo);
+export function withVoiceGuide(params: TurnParams, lingo: MonLingo, turn: TurnVoice | null = turnVoice(params.messages, Date.now())): TurnParams {
+  // A babbling Mon gets the babble rules even when no form is known (the shared syllables then).
+  const mon = turn === null ? null : turn.speciesId !== undefined ? { speciesId: turn.speciesId, stage: turn.stage } : turn.voiceStage === 'baby-talk' ? { speciesId: '', stage: turn.stage } : null;
+  const guide = mon === null ? rulesForEveryMon(lingo) : voiceGuideFor(mon, turn!.mood, lingo, turn!.voiceStage);
   if (guide.length === 0) return params;
-  const heading = turn === null
+  const heading = mon === null
     ? 'How a Mon talks, as published in Payload (no Mon state this turn, so only the rules for every Mon):'
-    : `How this Mon talks right now (${turn.mon.speciesId}, ${turn.mon.stage}${turn.mood ? `, mood ${turn.mood}` : ''}), as published in Payload. Write character lines within it:`;
+    : `How this Mon talks right now (${mon.speciesId || 'form unknown'}, ${mon.stage}${turn!.mood ? `, mood ${turn!.mood}` : ''}${turn!.voiceStage === 'full' ? '' : `, voice ${turn!.voiceStage}`}), as published in Payload. Write character lines within it:`;
   return { ...params, system: `${params.system}\n\n${heading}\n${guide.map((line) => `- ${line}`).join('\n')}` };
 }
 
-/** Reads the served lingo on behalf of the turn's owner and appends its voice guide before the backend runs. */
-export function withServedVoice(backend: ModelBackend, source: MonLingoSource, callerId: () => string | undefined): ModelBackend {
+/**
+ * Reads the served lingo on behalf of the turn's owner, appends its voice
+ * guide before the backend runs, and gates the reply by voice stage. The
+ * voice stage comes from `roster` (the server's lookup of the owner's Mons),
+ * lowered by whatever the conversation claims.
+ */
+export function withServedVoice(
+  backend: ModelBackend,
+  source: MonLingoSource,
+  callerId: () => string | undefined,
+  roster: () => Promise<MonRoster>,
+  now: () => number = Date.now,
+): ModelBackend {
   return {
     label: backend.label,
     async stream(params, onText, signal) {
       const owner = callerId();
       const lingo = owner === undefined ? source.latest() : await source.get(owner);
-      return backend.stream(withVoiceGuide(params, lingo), onText, signal);
+      const t = now();
+      const turn = resolveTurnVoice(turnVoice(params.messages, t), await roster(), t);
+      return streamGated(backend, withVoiceGuide(params, lingo, turn), onText, signal, turn, lingo);
     },
   };
 }
