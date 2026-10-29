@@ -44,6 +44,8 @@ export function journalKindForOutcome(outcome: CareOutcome): JournalEntryKind | 
     case 'played':
       return 'played';
     case 'woke':
+    case 'paused':
+    case 'resumed':
     case 'declined':
       return undefined;
     default:

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { CallerProfileSchema } from './caller.ts';
 import { CareStateSchema } from './care.ts';
+import { ClassicCareStateSchema } from './classic-care.ts';
 import { EggRecordSchema } from './egg.ts';
 import { HatchStateSchema, HatchStateV2Schema } from './hatch.ts';
 import { JournalEntrySchema } from './journal.ts';
@@ -90,5 +91,14 @@ export const SaveV3Schema = SaveV2Schema.extend({
   hatches: z.array(HatchStateSchema),
 });
 
-export const CURRENT_SAVE_VERSION = 3;
-export const SaveCurrentSchema = SaveV3Schema;
+/**
+ * Save blob v4: v3 plus the classic care layer, one `ClassicCareState` per
+ * Mon (Mike, 2026-10-29). Local-first, like nicknames; the server never sees it.
+ */
+export const SaveV4Schema = SaveV3Schema.extend({
+  version: z.literal(4),
+  classic: z.array(ClassicCareStateSchema),
+});
+
+export const CURRENT_SAVE_VERSION = 4;
+export const SaveCurrentSchema = SaveV4Schema;

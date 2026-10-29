@@ -35,6 +35,12 @@ export const CareStateSchema = z.object({
   /** Overfeeding makes a Mon sluggish until this time. Never sick (§4.3 M14). */
   sluggishUntil: EpochMsSchema.nullable(),
   pendingRequest: CareRequestSchema.nullable(),
+  /**
+   * The Caller's official pause (Mike, 2026-10-29). While set, decay,
+   * requests and every classic-care clock stand still; only `resume` is
+   * accepted. A save or row without the key parses to null.
+   */
+  pause: z.object({ since: EpochMsSchema }).nullable().default(null),
 });
 
 /**
@@ -65,4 +71,7 @@ export const CareActionSchema = z.discriminatedUnion('kind', [
     /** Mini-game result quality, scales the Social and bond gain. */
     quality: UnitIntervalSchema,
   }),
+  /** Stops care time for this Mon until `resume`. Nothing is credited back on resume. */
+  z.object({ kind: z.literal('pause') }),
+  z.object({ kind: z.literal('resume') }),
 ]);

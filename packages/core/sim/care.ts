@@ -43,7 +43,7 @@ function isSluggishAt(care: CareState, t: number): boolean {
 
 /** Keeps the invariant: awake and Fullness below the request line ⇒ a pending food request. */
 function ensureFoodRequest(care: CareState, t: number, tuning: CareTuning, events: CareEvent[]): CareState {
-  if (care.activity.kind !== 'awake' || care.pendingRequest !== null) return care;
+  if (care.pause !== null || care.activity.kind !== 'awake' || care.pendingRequest !== null) return care;
   if (care.fullness >= tuning.foodRequestBelow) return care;
   const at = Math.ceil(t);
   events.push({ type: 'food-requested', at });
@@ -115,6 +115,8 @@ export function advanceCare(state: SimState, now: number, tuning: CareTuning = D
   let care = state.care;
   let t = care.updatedAt;
   if (now <= t) return { state, events, timeline };
+  // Paused: the clock moves, nothing else does (no decay, requests or wakes).
+  if (care.pause !== null) return { state: { mon: state.mon, care: { ...care, updatedAt: now } }, events, timeline };
   care = ensureFoodRequest(care, t, tuning, events);
   while (t < now) {
     let end = now;
@@ -162,9 +164,19 @@ export type CareOutcome =
   | { readonly kind: 'fell-asleep' }
   | { readonly kind: 'woke'; readonly early: boolean }
   | { readonly kind: 'played' }
+  | { readonly kind: 'paused' }
+  | { readonly kind: 'resumed' }
   | {
       readonly kind: 'declined';
-      readonly reason: 'asleep' | 'sluggish' | 'already-asleep' | 'already-awake' | 'too-tired';
+      readonly reason:
+        | 'asleep'
+        | 'sluggish'
+        | 'already-asleep'
+        | 'already-awake'
+        | 'too-tired'
+        | 'paused'
+        | 'already-paused'
+        | 'not-paused';
     };
 
 export interface ActResult extends AdvanceResult {
@@ -194,6 +206,25 @@ export function applyCareAction(
   });
   const decline = (reason: Extract<CareOutcome, { kind: 'declined' }>['reason']): ActResult =>
     done(advanced.state, { kind: 'declined', reason });
+
+  if (care.pause !== null) {
+    if (action.kind === 'pause') return decline('already-paused');
+    if (action.kind !== 'resume') return decline('paused');
+    // Absolute deadlines move by the paused span, so they keep the time they
+    // had left. Nothing is credited for the pause itself (no catch-up).
+    const pausedMs = t - care.pause.since;
+    return done(
+      {
+        mon,
+        care: {
+          ...care,
+          pause: null,
+          sluggishUntil: care.sluggishUntil === null ? null : care.sluggishUntil + pausedMs,
+        },
+      },
+      { kind: 'resumed' },
+    );
+  }
 
   switch (action.kind) {
     case 'feed': {
@@ -251,6 +282,10 @@ export function applyCareAction(
         { kind: 'played' },
       );
     }
+    case 'pause':
+      return done({ mon, care: { ...care, pause: { since: t } } }, { kind: 'paused' });
+    case 'resume':
+      return decline('not-paused');
     default:
       return assertNever(action);
   }
@@ -288,6 +323,7 @@ export function createInitialCareState(monInstanceId: string, at: number): CareS
     activity: { kind: 'awake' },
     sluggishUntil: null,
     pendingRequest: null,
+    pause: null,
   };
 }
 

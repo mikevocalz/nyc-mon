@@ -134,5 +134,6 @@ export function createEmptySave(deviceId: string, savedAt: number): SaveCurrent 
     care: [],
     queue: { deviceId, nextSeq: 1, entries: [], eggCreates: [] },
     journal: [],
+    classic: [],
   };
 }
