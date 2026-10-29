@@ -26,6 +26,7 @@ import { useDataExport } from './data-export';
 import { useDevicePrefs } from './device-prefs.store';
 import { providerCopyId } from './account-model.ts';
 import { useNotifyToggle } from './notify-toggle';
+import { useMonCallsToggle } from './mon-calls-toggle';
 import { SettingsDetailPane } from './SettingsDetailPane';
 import { SettingsScreen } from './screen.native';
 import {
@@ -102,6 +103,7 @@ export function SettingsGlass() {
   const prefs = useDevicePrefs();
   const reduced = useReducedMotion();
   const notify = useNotifyToggle();
+  const monCalls = useMonCallsToggle();
   const account = useAccount();
   const exporter = useDataExport(account.user);
   const { model, monClips } = useMonGlass(mon === undefined ? null : monIdentity(mon).dexId, undefined);
@@ -115,6 +117,7 @@ export function SettingsGlass() {
     email: account.signedIn ? (account.email ?? copy('settings.account.email.none')) : null,
     notify: notify.available ? notify.on : null,
     notifyDenied: notify.denied,
+    monCalls: monCalls.available ? monCalls.on : null,
     haptics: prefs.haptics,
     sound: prefs.sound,
     motion: prefs.forceReducedMotion || reduced,
@@ -165,6 +168,10 @@ export function SettingsGlass() {
       case 'notify':
         if (notify.denied) notify.openSettings();
         else void notify.set(!notify.on);
+        return;
+      case 'monCalls':
+        if (monCalls.denied) monCalls.openSettings();
+        else void monCalls.set(!monCalls.on);
         return;
       case 'haptics':
       case 'sound': {

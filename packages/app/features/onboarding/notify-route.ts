@@ -1,6 +1,7 @@
 import { createStore } from 'zustand/vanilla';
 import type { BootRoute } from '@acme/core/sim';
 import { parseReadyNotificationData } from '../mon/ready-notification.ts';
+import { MON_SPACE_PATHNAME, parseCareCallData } from '../mon-space/care-notification-plan.ts';
 
 /**
  * Hatch-ready notification → M12 routing, the pure half (M12 handoff B3).
@@ -33,6 +34,16 @@ export interface ReadyLink {
   readonly key: string;
 }
 
+/** Where a care-call tap goes: Mon Space with the calling Mon named (contract §7). */
+export interface CareLink {
+  readonly pathname: typeof MON_SPACE_PATHNAME;
+  readonly params: { readonly monId: string };
+  readonly key: string;
+}
+
+/** Any link a notification tap can carry. */
+export type AppLink = ReadyLink | CareLink;
+
 export type ReadyLinkResult =
   | { readonly ok: true; readonly link: ReadyLink }
   | { readonly ok: false; readonly reason: 'not-a-tap' | 'not-hatch-ready'; readonly issues?: string };
@@ -52,6 +63,36 @@ export function readyLinkFromResponse(response: ResponseLike): ReadyLinkResult {
   };
 }
 
+export type CareLinkResult =
+  | { readonly ok: true; readonly link: CareLink }
+  | { readonly ok: false; readonly reason: 'not-a-tap' | 'not-care-call' };
+
+/** Parses one response as a care-call tap. */
+export function careLinkFromResponse(response: ResponseLike): CareLinkResult {
+  if (response.actionIdentifier !== DEFAULT_ACTION_IDENTIFIER) return { ok: false, reason: 'not-a-tap' };
+  const data = parseCareCallData(response.notification.request.content.data);
+  if (data === null) return { ok: false, reason: 'not-care-call' };
+  return {
+    ok: true,
+    link: {
+      pathname: data.url,
+      params: { monId: data.monInstanceId },
+      key: `${response.notification.request.identifier}@${response.notification.date}`,
+    },
+  };
+}
+
+export type AppLinkResult =
+  | { readonly ok: true; readonly link: AppLink }
+  | { readonly ok: false; readonly reason: 'not-a-tap' | 'not-hatch-ready'; readonly issues?: string };
+
+/** A hatch-ready or a care-call tap; anything else is ignored (Law 5). */
+export function appLinkFromResponse(response: ResponseLike): AppLinkResult {
+  const care = careLinkFromResponse(response);
+  if (care.ok) return care;
+  return readyLinkFromResponse(response);
+}
+
 /** Boot routes after which a hatch-ready link still makes sense (M12 handoff B3). Any other route drops it. */
 const LINKABLE_BOOT_ROUTES: ReadonlySet<BootRoute['kind']> = new Set(['egg-ready', 'incubating', 'companion']);
 
@@ -66,13 +107,13 @@ export interface DeepLinkState {
   /** M01 has resolved its route; links now navigate directly. */
   readonly bootResolved: boolean;
   /** A link that arrived before boot resolved. */
-  readonly pending: ReadyLink | null;
+  readonly pending: AppLink | null;
   /**
    * A held link that boot cleared for its route. The destination applies it
    * on mount ({@link takeArmed}), so the push lands after boot's
    * `router.replace` has committed rather than in the same tick.
    */
-  readonly armed: ReadyLink | null;
+  readonly armed: AppLink | null;
   /** Keys of the last {@link SEEN_KEY_LIMIT} taps taken, so one tap routes once. */
   readonly seen: readonly string[];
 }
@@ -81,6 +122,7 @@ export interface DeepLinkState {
 export interface CurrentRoute {
   readonly pathname: string;
   readonly eggId?: string;
+  readonly monId?: string;
 }
 
 /** What the caller does with a received link. */
@@ -92,8 +134,9 @@ function withoutGroups(pathname: string): string {
 }
 
 /** Whether the app already shows the link's screen for the link's egg. */
-export function isOnLink(link: ReadyLink, current: CurrentRoute): boolean {
-  return withoutGroups(current.pathname) === withoutGroups(link.pathname) && current.eggId === link.params.eggId;
+export function isOnLink(link: AppLink, current: CurrentRoute): boolean {
+  if (withoutGroups(current.pathname) !== withoutGroups(link.pathname)) return false;
+  return 'eggId' in link.params ? current.eggId === link.params.eggId : current.monId === link.params.monId;
 }
 
 /** A store for the one pending link. The app binds one ({@linkcode deepLinkStore}); tests make their own. */
@@ -105,7 +148,7 @@ export function createDeepLinkStore() {
    * of the same tap is a duplicate; a tap for the screen and egg already
    * showing is `already-there` and pushes nothing.
    */
-  function receive(link: ReadyLink, current?: CurrentRoute): ReceiveOutcome {
+  function receive(link: AppLink, current?: CurrentRoute): ReceiveOutcome {
     const s = store.getState();
     if (s.seen.includes(link.key)) return 'duplicate';
     const seen = [...s.seen, link.key].slice(-SEEN_KEY_LIMIT);
@@ -132,7 +175,7 @@ export function createDeepLinkStore() {
   }
 
   /** The boot destination calls this on mount. Returns the armed link once, then clears it. */
-  function takeArmed(): ReadyLink | undefined {
+  function takeArmed(): AppLink | undefined {
     const { armed } = store.getState();
     if (armed === null) return undefined;
     store.setState({ armed: null });

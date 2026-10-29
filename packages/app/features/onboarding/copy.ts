@@ -174,6 +174,9 @@ export const ONBOARDING_COPY = {
   'settings.notify.caption': 'One alert when your egg is ready to hatch. Nothing else.',
   'settings.notify.caption.denied': 'Your phone blocks alerts from NYC-MON. Turn them on in your phone’s Settings.',
   'settings.notify.open_settings': 'Open phone Settings',
+  // Mon calls (COPY_DECK "Mon Space", design D20b): separate from egg alerts, off until the Caller opts in.
+  'settings.mon_calls.label': 'Mon calls',
+  'settings.mon_calls.caption': 'An alert when your Mon needs food, rest, play, medicine or bedtime. Never while paused.',
   'settings.on': 'On',
   'settings.off': 'Off',
   'settings.device.title': 'This device',

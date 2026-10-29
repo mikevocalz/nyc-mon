@@ -14,6 +14,10 @@ export interface DevicePrefs {
   readonly forceReducedMotion: boolean;
   /** The Caller wants the egg-ready notification. The OS permission is separate. */
   readonly notifications: boolean;
+  /** Mon calls (settings.mon_calls, D20b): a local alert for each real call. Off until the Caller opts in. */
+  readonly monCalls: boolean;
+  /** The one-time Mon Space ask sheet was answered (either way); it never shows again. */
+  readonly monCallsAsked: boolean;
 }
 
 export const DEFAULT_DEVICE_PREFS: DevicePrefs = {
@@ -21,6 +25,8 @@ export const DEFAULT_DEVICE_PREFS: DevicePrefs = {
   sound: true,
   forceReducedMotion: false,
   notifications: true,
+  monCalls: false,
+  monCallsAsked: false,
 };
 
 /** Reads the stored preferences. Missing, unreadable or mistyped fields fall back to the defaults one by one. */
@@ -42,6 +48,8 @@ export function readDevicePrefs(storage: KeyValueStorage): DevicePrefs {
     sound: pick('sound'),
     forceReducedMotion: pick('forceReducedMotion'),
     notifications: pick('notifications'),
+    monCalls: pick('monCalls'),
+    monCallsAsked: pick('monCallsAsked'),
   };
 }
 
