@@ -24,7 +24,7 @@ const knownBloodline: Validate<string | null | undefined> = (value) =>
  * are what the Mon's voice reads, served by `GET /v1/mon-lingo`; only
  * published (canon), active rows reach it. See packages/content/lingo/rows.ts.
  */
-const VOICE_CATEGORY_HELP = `Categories the Mon's voice reads: ${MON_LINGO_CATEGORIES.join(', ')}. mon-line: triggerText is the occasion (hello, first-words, hungry…), responseText the line, with speciesId and stage. pronunciation: canonicalText is the screen word, variants the other spellings, spokenForm what the voice says. stage-direction: variants are the keywords, spokenForm the audio tag.`;
+const VOICE_CATEGORY_HELP = `Categories the Mon's voice reads: ${MON_LINGO_CATEGORIES.join(', ')}. mon-line: triggerText is the occasion (hello, first-words, hungry…), responseText the line, with speciesId and stage. pronunciation: canonicalText is the screen word, variants the other spellings, spokenForm what the voice says. stage-direction: variants are the keywords, spokenForm the audio tag. babble: the wordless sounds an Egg and a Baby in its first 24 hours make (Decision 32); subcategory syllable, family-sound (with bloodlineId) or egg-sound, canonicalText the sound.`;
 
 export const LanguageLexicon: CollectionConfig = {
   slug: LANGUAGE_LEXICON_SLUG,
