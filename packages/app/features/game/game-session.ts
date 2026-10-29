@@ -38,9 +38,10 @@ export interface GameScreenState {
 
 /**
  * Where each load stage ends on the bar. Ordered; a stage's fractional reports fill the band from the previous
- * stage's end to its own, and progress never moves backwards. The bands follow where the time goes on the A12X
- * iPad: the import and renderer init are short, the synchronous world build is long, and compiling the scene's
- * pipelines (renderer.compileAsync, one step per render object) is the longest; the first draw after it is short.
+ * stage's end to its own, and progress never moves backwards. Bands follow the work: the import and renderer init
+ * are short, the synchronous world build is long, compileAsync builds the main-pass pipelines one render object per
+ * step, and the warm-up frames (load-game-scene.ts planWarmUp) build the rest, the MRT, post and shadow pipelines, a
+ * few materials per frame.
  */
 export const LOAD_STAGES = {
   /** The scene module import has started. */
@@ -49,11 +50,11 @@ export const LOAD_STAGES = {
   moduleLoaded: 10,
   /** The city meshes, materials and actors are built (world/index.ts reports its checkpoints on the way). */
   worldBuilt: 40,
-  /** Every pipeline compileAsync found is built (it reports loaded / total objects on the way). */
-  compile: 95,
-  /** The first frame after the compile is being drawn. */
-  firstRender: 97,
-  /** The first frame landed: the world is ready. Only firstFrame() sets it. */
+  /** compileAsync has built the main pass (it reports loaded / total objects on the way). */
+  compile: 70,
+  /** Every warm-up chunk has been drawn: all pipelines exist. */
+  firstRender: 99,
+  /** The first frame after the warm-up landed: the world is ready. Only firstFrame() sets it. */
   done: 100,
 } as const;
 

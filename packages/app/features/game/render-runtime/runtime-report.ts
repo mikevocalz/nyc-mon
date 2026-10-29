@@ -16,7 +16,7 @@
 // nothing at all (Surface Duo, 2026-10-16: loadProgress stuck at 0).
 
 /** Events from the render runtime. `detail` is a stage, a breadcrumb, a formatted error, or a JSON perf summary. */
-export type GameRenderEventKind = 'backend' | 'stage' | 'firstFrame' | 'failed' | 'trace' | 'error' | 'perf';
+export type GameRenderEventKind = 'backend' | 'stage' | 'firstFrame' | 'failed' | 'trace' | 'error' | 'perf' | 'load';
 
 /** The load stages the runtime may report (game-session.ts LOAD_STAGES, minus `done`, which `firstFrame` sets). */
 export const RUNTIME_LOAD_STAGES = ['requested', 'moduleLoaded', 'worldBuilt', 'compile', 'firstRender'] as const;
@@ -98,6 +98,10 @@ export function routeRenderEvent(kind: GameRenderEventKind, detail: string, sink
       // Same logcat tag as the JS-path probe (record-city-frame.ts); this one
       // measures the draw's CPU cost and interval on the render runtime.
       sinks.log(`[NYC-Mon/perf] worklet render submission ${detail}`);
+      return true;
+    case 'load':
+      // load-game-scene.ts timing lines, already prefixed `[NYC-Mon/load]`.
+      sinks.log(detail);
       return true;
     case 'stage': {
       const parsed = parseRuntimeStage(detail);

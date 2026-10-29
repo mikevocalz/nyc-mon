@@ -397,6 +397,8 @@ export function startGameRender(args: GameRenderArgs): void {
         emit(s, 'stage', formatRuntimeStage(stage, fraction));
       },
       (event) => trace(s, event),
+      // The `[NYC-Mon/load]` timing lines (EXPO_PUBLIC_GAME_PERF), printed as-is on the JS thread.
+      GAME_PERF ? (line) => emit(s, 'load', line) : null,
     );
     const invalidate = () => {
       s.wantFrame = true;
