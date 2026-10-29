@@ -143,6 +143,13 @@ export interface IdleEngine {
   step(dt: number, inputs: IdleInputs): IdleFrame;
   /** The mood changed: new base and flavor from the next step on. Heading, position and plans carry over. */
   setClips(next: IdleClips): void;
+  /**
+   * A one-shot reaction now (M13: `attention` on a tap, `approach` on
+   * resume): drops any plan, turns back to the viewer if turned away, then
+   * plays `clip` once. Returns false (and changes nothing) when the GLB has
+   * no such clip.
+   */
+  perform(clip: string): boolean;
 }
 
 export function createIdleEngine(initial: IdleClips, seed: number = idleConfig.seed, cfg: IdleConfig = idleConfig): IdleEngine {
@@ -234,6 +241,21 @@ export function createIdleEngine(initial: IdleClips, seed: number = idleConfig.s
   return {
     setClips(next) {
       clips = next;
+    },
+    perform(clip) {
+      const d = dur(clip, 0);
+      if (d <= 0) return false;
+      const play: Step = { kind: 'clip', action: { clip, loop: false, fadeS: cfg.actionFadeS, kind: 'gesture' }, durS: d, yawAtEnd: 0 };
+      const s = current?.step;
+      if (s?.kind === 'clip' && s.yawAtEnd !== 0) {
+        // Mid-turn: cutting it would snap the root. Let it land, turn back, then react.
+        const after = clamp(heading + s.yawAtEnd, -Math.PI / 2, Math.PI / 2);
+        queue = [...(after === 0 ? [] : [turnStep(-after, 0.15)]), play];
+        return true;
+      }
+      queue = [...backToFront(), play];
+      begin();
+      return true;
     },
     step(dtIn, inputs) {
       const dt = Math.max(0, Math.min(dtIn, 0.1));

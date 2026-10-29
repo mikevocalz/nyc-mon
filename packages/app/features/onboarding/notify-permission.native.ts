@@ -7,6 +7,7 @@ import * as Notifications from 'expo-notifications';
 import { AndroidImportance, IosAuthorizationStatus } from 'expo-notifications';
 import type { ReadyNotification } from './notify-permission';
 import { readyNotificationId } from './notify-foreground';
+import { devicePrefs } from '../settings/device-prefs.store';
 
 export type { ReadyNotification };
 export type NotifyPermission = 'undetermined' | 'granted' | 'denied' | 'unsupported';
@@ -60,6 +61,9 @@ async function ensureReadyChannel(): Promise<void> {
  * `data.url` is the M12 deep link (`/(home)/hatch`) for the receipt handler.
  */
 export async function scheduleReadyNotification(input: ReadyNotification): Promise<boolean> {
+  // Notifications off in Settings (M19): nothing is scheduled. Resolves true:
+  // the Caller chose this, so M11 shows no "couldn't schedule" error.
+  if (!devicePrefs().notifications) return true;
   try {
     if (Platform.OS === 'android') {
       await ensureReadyChannel();
@@ -97,4 +101,18 @@ export async function clearReadyNotification(eggId: string): Promise<void> {
     Notifications.cancelScheduledNotificationAsync(id),
     Notifications.dismissNotificationAsync(id),
   ]);
+}
+
+/**
+ * M19 Notifications off: cancels every scheduled egg-ready alert. The egg
+ * alert is the only notification the app schedules (privacy notice), so
+ * "all scheduled" is exactly those. A failure is ignored; the preference
+ * still stops any new one.
+ */
+export async function cancelReadyNotifications(): Promise<void> {
+  try {
+    await Notifications.cancelAllScheduledNotificationsAsync();
+  } catch {
+    // Nothing to undo: the preference already blocks new schedules.
+  }
 }

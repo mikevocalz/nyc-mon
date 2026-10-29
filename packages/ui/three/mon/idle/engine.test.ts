@@ -202,3 +202,41 @@ test('every turn-away comes back to the front within a few seconds, and the uppe
   const front = frames.filter((f) => Math.abs(f.heading) < (20 * Math.PI) / 180 + 1e-6).length / frames.length;
   assert.ok(front > 0.75, `front ${front}`);
 });
+
+test('perform (M13 attention/approach): plays the clip once, facing front, then returns to the idle', () => {
+  const e = createIdleEngine(resolveIdleClips(IDLE, RATTI), 7);
+  e.step(1 / FPS, quiet);
+  assert.equal(e.perform('up_look_listen'), true);
+  const frames: IdleFrame[] = [];
+  for (let i = 0; i < 4 * FPS; i++) frames.push(e.step(1 / FPS, quiet));
+  const first = frames.find((f) => f.action !== null);
+  assert.equal(first?.action?.clip, 'up_look_listen');
+  assert.equal(first?.action?.kind, 'gesture');
+  assert.equal(first?.action?.loop, false);
+  // 2.5 s clip: by 4 s it is over and nothing replays it.
+  assert.equal(frames.at(-1)?.action?.clip === 'up_look_listen', false);
+  assert.ok(frames.every((f) => f.rootYaw === 0));
+});
+
+test('perform with a clip the GLB lacks changes nothing and says so', () => {
+  const e = createIdleEngine(resolveIdleClips(['tail_swish'], SQUEAKLET), 7);
+  e.step(1 / FPS, quiet);
+  assert.equal(e.perform('up_look_listen'), false);
+  assert.equal(e.step(1 / FPS, quiet).action, null);
+});
+
+test('perform while turned away: it turns back to the viewer first, then plays', () => {
+  // Run until a turn has landed (heading off the front with no plan running).
+  const e = createIdleEngine(resolveIdleClips(IDLE, RATTI), 7);
+  let f = e.step(1 / FPS, quiet);
+  for (let i = 0; i < 600 * FPS && !(f.rootYaw !== 0 && f.action === null); i++) f = e.step(1 / FPS, quiet);
+  assert.notEqual(f.rootYaw, 0, 'the seed should turn the Mon within ten minutes');
+  assert.equal(e.perform('wave'), true);
+  const kinds: string[] = [];
+  for (let i = 0; i < 4 * FPS; i++) {
+    const a = e.step(1 / FPS, quiet).action;
+    if (a && kinds.at(-1) !== `${a.kind}:${a.clip}`) kinds.push(`${a.kind}:${a.clip}`);
+  }
+  assert.equal(kinds[0]?.startsWith('turn:'), true, kinds.join(','));
+  assert.ok(kinds.includes('gesture:wave'), kinds.join(','));
+});

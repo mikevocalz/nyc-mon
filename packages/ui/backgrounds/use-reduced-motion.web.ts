@@ -1,5 +1,6 @@
 'use client';
 import { useSyncExternalStore } from 'react';
+import { useForcedReducedMotion } from '../device-preferences';
 
 // `prefers-reduced-motion` as a live subscription, so toggling the OS setting
 // stops the grid without a reload. The server pass assumes motion is allowed;
@@ -12,10 +13,13 @@ function subscribe(onChange: () => void): () => void {
   return () => list.removeEventListener('change', onChange);
 }
 
+/** The OS setting OR the Caller's Settings override (M19). */
 export function useReducedMotion(): boolean {
-  return useSyncExternalStore(
+  const forced = useForcedReducedMotion();
+  const system = useSyncExternalStore(
     subscribe,
     () => window.matchMedia(QUERY).matches,
     () => false,
   );
+  return forced || system;
 }

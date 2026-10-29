@@ -30,7 +30,12 @@ import type { GlassTier } from '../world/glass.ts';
 import { SKY_RIG } from '../world/sky-rig.ts';
 import { RENDER_SCALE_FLOOR, type RenderScaleBand } from './render-scale.ts';
 
-/** The device tier: 'phone' is the default — the Duo's constraints are the baseline. */
+/**
+ * The device tier, 'phone' when unset. Slop-grade city (2026-10-26): the
+ * baseline devices are iPhone 17 ('phone') and iPad Pro ('high'). The
+ * Surface Duo stays on today's look (G4): it runs without
+ * EXPO_PUBLIC_WORLD_PHYSICAL, so the `physical` rows below never apply to it.
+ */
 export type WorldTier = 'phone' | 'high';
 
 /** Only 'high' opts in; anything else (including unset) is the phone tier. */
@@ -64,6 +69,37 @@ export interface TierBundle {
    * medium caps; 'high' keeps the authored counts.
    */
   livingCity: LivingCityTier;
+  /** Slop-grade city start values (§5.7). Read only under EXPO_PUBLIC_WORLD_PHYSICAL. */
+  physical: PhysicalTierRow;
+}
+
+/**
+ * Start values from the Slop-grade city spec §5.7; each is replaced by a
+ * hardware measurement or kept with one (lane F1). Slop's own values are
+ * the high row: js/main.js and js/lighting.js.
+ */
+export interface PhysicalTierRow {
+  /** Per-cascade sun shadow tile, px. Two cascades share one atlas, so the atlas is twice as wide. */
+  shadowTile: number;
+  /** Screen-space reflections; null keeps SSR off on this tier. */
+  ssr: { resolutionScale: number; quality: number; binaryRefine: boolean } | null;
+  /** BloomNode render scale. */
+  bloomResolutionScale: number;
+  /** ClusteredLighting maxLights; covers physicalPooledLights with headroom. */
+  clusteredMaxLights: number;
+  /**
+   * Nearest vehicles that get a headlight PointLight on the road ahead; the rest
+   * keep their emissive lamps. One light per vehicle.
+   */
+  headlightLights: number;
+  /** Nearest streetlamp heads that get a PointLight at night (world/physical/night-lights.ts). */
+  streetlampLights: number;
+  /** Nearest shop awnings that get a PointLight at night. Slop's pool is 28. */
+  storefrontLights: number;
+  /** Interior mapping keeps Slop's pixel-footprint fade on every tier. */
+  interiorFootprintFade: true;
+  /** Frame target, Hz (G4: 60 locked on the phone; 120 on iPad Pro only once D3 numbers allow). */
+  frameTarget: 60 | 120;
 }
 
 export const TIER: Record<WorldTier, TierBundle> = {
@@ -73,6 +109,19 @@ export const TIER: Record<WorldTier, TierBundle> = {
     post: { bloom: false, ao: false, aa: true, tier: 'phone' },
     scale: { band: { low: 27, high: 38 }, floor: RENDER_SCALE_FLOOR },
     livingCity: 'medium',
+    // iPhone 17. 2048 px tiles: atlas 4096 x 2048 at 4 bytes per texel ≈ 32 MiB.
+    // SSR starts off and gets a 0.5-scale trial against the G6 budget.
+    physical: {
+      shadowTile: 2048,
+      ssr: null,
+      bloomResolutionScale: 0.5,
+      clusteredMaxLights: 128,
+      headlightLights: 8,
+      streetlampLights: 24,
+      storefrontLights: 12,
+      interiorFootprintFade: true,
+      frameTarget: 60,
+    },
   },
   high: {
     envWidth: SKY_RIG.envWidth * 2, // 2048 equirect → 512px PMREM cube.
@@ -82,8 +131,32 @@ export const TIER: Record<WorldTier, TierBundle> = {
     // the high tier; a flagship panel targets its ~60 Hz refresh.
     scale: { band: { low: 45, high: 60 }, floor: RENDER_SCALE_FLOOR },
     livingCity: 'high',
+    // iPad Pro. 3072 px tiles when the device's maxTextureDimension2D fits
+    // the 6144 atlas (≈ 72 MiB), else 2048 (world/physical-look.ts
+    // sunShadowTile). SSR at Slop's settings.
+    physical: {
+      shadowTile: 3072,
+      ssr: { resolutionScale: 0.5, quality: 0.25, binaryRefine: true },
+      bloomResolutionScale: 0.5,
+      clusteredMaxLights: 256,
+      headlightLights: 24,
+      streetlampLights: 36,
+      storefrontLights: 28,
+      interiorFootprintFade: true,
+      frameTarget: 60,
+    },
   },
 } as const;
+
+/**
+ * Every PointLight a physical tier row pools: headlights, streetlamps and
+ * storefronts. ClusteredLighting sizes its light buffer by maxLights, and a
+ * parked light (intensity 0) still takes a slot, so the row's maxLights must
+ * cover this sum.
+ */
+export function physicalPooledLights(row: PhysicalTierRow): number {
+  return row.headlightLights + row.streetlampLights + row.storefrontLights;
+}
 
 /** The bundle for a tier — the option defaults city-scene applies when the bundle is active. */
 export function tierBundle(tier: WorldTier): TierBundle {

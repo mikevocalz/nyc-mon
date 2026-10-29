@@ -287,3 +287,32 @@ Palette notes:
 - `hotel-theresa` keeps its `terracotta` accent lookup (`city-mesh.ts` L312): landmark treatment is keyed on the landmark, not the class, so the mapping never touches it.
 - FISP facade-material records can still disagree with the family a class implies (a "masonry" filing on a glass-class tower). The class stays the gate; a mismatch is a data question for E1/F2, not a palette exception.
 - Landmark accents, neon trims, shop signs and furniture colours are unchanged by this mapping — they already read palette keys.
+
+### Physically lit city (Slop-grade, D19)
+
+Applies only under `EXPO_PUBLIC_WORLD_PHYSICAL`. Skill: `design:design-system`, loaded through the Skill tool. The code lanes own the token values; this section sets the rules they follow and names the groups as they land. Written 2026-10-27, while those lanes are in progress.
+
+**Where values live.** Every colour Slop New York hard-codes and this lane ports becomes a token in `packages/theme/tokens.ts`; physical quantities (intensities, densities, metres, exposure) become named constants with units in `world/physical-look.ts`, marked "Slop measured" or `TODO(tune)`. No hex literal sits outside `tokens.ts` (spec N2 fails the build on one). The existing rule above still holds for the cel city: `CITY_COLORS` and `WALL_TONES` in `palette.ts` stay palette steps or `mixHex` recipes.
+
+**Token groups.**
+
+| Group | What it holds | Slop source | Status 2026-10-27 |
+|---|---|---|---|
+| `physicalCityLight.<preset>` (`golden`, `midday`, `twilight`, `midnight`) | `sun`, `hemiSky`, `hemiGround`, `skyTop`, `skyHorizon`, `fog`; plus `physicalCityLight.nightSky` | `js/lighting.js` `TIME_PRESETS`, `uNightSkyColor` | In `tokens.ts` (lane E1) |
+| Facade tones per family (pre-war brick, brownstone, limestone and terra cotta, curtain wall) | stone, trim, glass and soot colours for each family | `js/tsl-materials.js` `createPreWarBuildingMaterial`, `createCurtainWallMaterial` option defaults | Lane E2; not yet in `tokens.ts` |
+| Interior palette | warm and cool bulb ranges, wall, floor, rug, door and the six drape swatches | `evaluateApartmentInterior` | Lane E2 |
+| Road, paint and kerb | asphalt dark and light, lane white, yellow, green | `createRoadSurfaceMaterial`, `js/road-paint.js` `WHITE`, `YELLOW`, `GREEN` | Lane E2 |
+| Vehicle paint and lamps | paint colours fed to `paintColor`, headlight white, tail and brake reds | `js/actor-models.js` `createLoftedCarMaterial`, `js/vehicle-lights.js` `HEADLIGHTS.color` | Lane E3 |
+| Street and store lights | cobra-head LED, point lamps, the facelift's cooler LED | `js/street-details.js` light pools | Lanes E3, E4 |
+| Facelift | brick and concrete refinements, charcoal frame, roofline trim, kerb strip, LED AdSurface gradient | `MOBILE_WORLD_PR_PACK.md` § Approved art direction; brand 400/500 steps for trims | Lane E4 |
+
+The table names Slop's colours by source, not by value, so it can't drift from `tokens.ts`. Read the values there.
+
+**Brand steps stay brand steps.** Neon roofline trims and LED kerb strips keep using palette `brand 400/500` keys (D17); they are not copied into the physical group. Slop has no brand, so nothing it ships replaces them.
+
+**Contrast note: required wherever a city colour sits under UI.** A scene light colour drives pixels the HUD sits on. Each group above therefore carries one of two notes in `tokens.ts` and in the `contrast.ts` registry:
+
+1. **"Not under UI"**, when no Caller-facing text, icon or control ever draws over surfaces lit by it at the shipped camera bookmarks. E1's `physicalCityLight` doc comment makes this claim for the light colours; it holds only while every HUD chip has its own opaque face.
+2. **A measured pair**, when UI sits on it. The background is the brightest region of the frame behind the element, sampled from a device capture at each bookmark (`docs/design/handoff/slop-grade-city.md` § Camera bookmarks) and preset, after tone mapping. The foreground is the chip's text token. Method as in § Measured pairs: WCAG 2.2 relative luminance, text minimum 4.5, non-text 3.0.
+
+The a11y review (`docs/design/review/slop-grade-city-a11y.md`, lane F3) checks that every HUD chip either has an opaque face (case 1) or a measured pair at every preset, starting with `midday`, which has the strongest sun (`sunIntensity` 6.6 in `TIME_PRESETS`). No measured pair exists yet: there is no device capture of the physical mode (`docs/DEVICE_CHECKS.md` § Slop-grade city).

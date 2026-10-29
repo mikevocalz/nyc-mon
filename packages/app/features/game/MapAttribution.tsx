@@ -44,7 +44,7 @@ export function MapAttribution({ source, rect }: { source: CitySource; rect: Rec
         onPress={() => void Linking.openURL(OSM_COPYRIGHT_URL)}
       >
         <Text
-          className="text-[11px] text-ink-50/70"
+          className="text-[11px] text-ink-50/70 md:text-[13px]"
           numberOfLines={1}
           style={{ textShadowColor: 'rgba(0,4,28,0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }}
         >

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { eggs } from '@acme/content';
-import { createEmptySave } from '@acme/core/save';
+import { createEmptySave, lastGoodKey } from '@acme/core/save';
 import {
   advanceCare,
   createEggRecord,
@@ -48,7 +48,8 @@ function memoryStorage(): KeyValueStorage & { readonly writes: number } {
   return {
     getString: (key) => values.get(key),
     set: (key, value) => {
-      writes += 1;
+      // Counts writes of the save itself; SaveIO's last-good backup (M22) is the same bytes under a second key.
+      if (key !== lastGoodKey(KEY)) writes += 1;
       values.set(key, value);
     },
     remove: (key) => {

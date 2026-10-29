@@ -3,7 +3,8 @@
 import { create } from 'zustand';
 import { AgeAnswerSchema } from '@acme/core/schemas';
 import type { AgeAnswer } from '@acme/core/types';
-import { onboardingStorage } from './storage';
+import { resetAfterConsentDenied, type ConsentResetResult } from './consent-reset';
+import { onboardingStorage, saveStorage } from './storage';
 
 /**
  * Storage keys (MMKV `nyc-mon`). `save` is the single sim save value, in
@@ -17,6 +18,7 @@ export const ONBOARDING_KEYS = {
   notifyOff: 'notify-off',
   permissionsPending: 'permissions-pending',
   permissionReview: 'permission-review',
+  nicknamePromptSeen: 'nickname-prompt-seen',
 } as const;
 
 export const SAVE_KEY = 'save';
@@ -50,6 +52,34 @@ export function completePermissionReview(): void {
 
 
 /** Parses the stored M04 answer. A malformed value is treated as unanswered (Law 5 at the boundary). */
+/**
+ * Mons whose nickname question (M09) was answered or skipped, by
+ * `monInstanceId`. A nickname is optional (the Mon is always its species),
+ * so boot asks once and then goes to the companion with or without one.
+ */
+export function readNicknamePromptSeen(): readonly string[] {
+  const raw = onboardingStorage.getString(ONBOARDING_KEYS.nicknamePromptSeen);
+  if (raw === undefined) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Records that this Mon's nickname question was answered or skipped. Idempotent. */
+export function markNicknamePromptSeen(monInstanceId: string): void {
+  const seen = readNicknamePromptSeen();
+  if (seen.includes(monInstanceId)) return;
+  onboardingStorage.set(ONBOARDING_KEYS.nicknamePromptSeen, JSON.stringify([...seen, monInstanceId]));
+}
+
+/** True while a hatched Mon has no nickname and its nickname question was never answered or skipped. */
+export function needsNicknamePrompt(mon: { readonly monInstanceId: string; readonly nickname: string | null }): boolean {
+  return mon.nickname === null && !readNicknamePromptSeen().includes(mon.monInstanceId);
+}
+
 export function readAgeAnswer(): AgeAnswer | undefined {
   const raw = onboardingStorage.getString(ONBOARDING_KEYS.ageAnswer);
   if (raw === undefined) return undefined;
@@ -156,6 +186,20 @@ export const useOnboarding = create<OnboardingState>()((set) => ({
     else completePermissionReview();
   },
 }));
+
+/**
+ * M05 denied → Close: clears the age answer, the consent marker and a denied
+ * Caller's local save (rule in `consent-reset.ts`), then syncs this store.
+ * The caller re-hydrates the Mon store when `removedDeniedSave` is true.
+ */
+export function clearDeniedConsent(): ConsentResetResult {
+  const result = resetAfterConsentDenied(onboardingStorage, saveStorage);
+  useOnboarding.setState({
+    ageAnswer: undefined,
+    ...(result.removedDeniedSave ? { hasSession: false } : {}),
+  });
+  return result;
+}
 
 /** Loads the persisted onboarding state once at app start (root layout or first screen). */
 export function hydrateOnboarding(): void {

@@ -2,6 +2,7 @@
 // as game-render.start.test.ts: `pacing: 'vsync'` must not self-schedule on
 // the runtime's rAF polyfill — nothing draws until the UI-side driver calls
 // vsyncTickGameRender for the session.
+import '../classic-flags.test-support.ts';
 import assert from 'node:assert/strict';
 import { register } from 'node:module';
 import { test } from 'node:test';

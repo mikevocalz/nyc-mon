@@ -37,6 +37,7 @@ import {
 import { SEED_ASSETS } from './seed-assets.ts';
 import { VSNAP, VSNAP_HEADER } from './vehicle-sim.ts';
 import type { BoxGeometryData } from './vehicle-actor.ts';
+import { pushBox } from './box-faces.ts';
 
 /** Instanced capacity per ped kind — plenty over a few-hundred-ped crowd split two ways. */
 const PED_CAPACITY = 192;
@@ -60,32 +61,10 @@ export function personGeometryData(bounds: { lengthM: number; widthM: number; he
   const nrm: number[] = [];
   const idx: number[] = [];
   // Legs/hips: ground → ~55% height.
-  pushBoxLocal(pos, nrm, idx, 0, h * 0.275, 0, w * 0.62, h * 0.55, d * 0.8);
+  pushBox(pos, nrm, idx, 0, h * 0.275, 0, w * 0.62, h * 0.55, d * 0.8);
   // Torso + head mass: 55% → top, slightly narrower than the shoulder bound.
-  pushBoxLocal(pos, nrm, idx, 0, h * 0.55 + h * 0.225, 0, w * 0.86, h * 0.45, d);
+  pushBox(pos, nrm, idx, 0, h * 0.55 + h * 0.225, 0, w * 0.86, h * 0.45, d);
   return { positions: pos, normals: nrm, indices: idx, triangles: idx.length / 3 };
-}
-
-function pushBoxLocal(pos: number[], nrm: number[], idx: number[], cx: number, cy: number, cz: number, sx: number, sy: number, sz: number): void {
-  const hx = sx / 2;
-  const hy = sy / 2;
-  const hz = sz / 2;
-  const faces: [number, number, number, number[]][] = [
-    [1, 0, 0, [hx, -hy, -hz, hx, -hy, hz, hx, hy, hz, hx, hy, -hz]],
-    [-1, 0, 0, [-hx, -hy, hz, -hx, -hy, -hz, -hx, hy, -hz, -hx, hy, hz]],
-    [0, 1, 0, [-hx, hy, -hz, hx, hy, -hz, hx, hy, hz, -hx, hy, hz]],
-    [0, -1, 0, [-hx, -hy, hz, hx, -hy, hz, hx, -hy, -hz, -hx, -hy, -hz]],
-    [0, 0, 1, [-hx, -hy, hz, hx, -hy, hz, hx, hy, hz, -hx, hy, hz]],
-    [0, 0, -1, [hx, -hy, -hz, -hx, -hy, -hz, -hx, hy, -hz, hx, hy, -hz]],
-  ];
-  for (const [nx, ny, nz, c] of faces) {
-    const base = pos.length / 3;
-    for (let i = 0; i < 4; i++) {
-      pos.push(cx + c[i * 3]!, cy + c[i * 3 + 1]!, cz + c[i * 3 + 2]!);
-      nrm.push(nx, ny, nz);
-    }
-    idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
-  }
 }
 
 /**

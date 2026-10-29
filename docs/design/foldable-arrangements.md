@@ -94,7 +94,7 @@ Shell per skill §2 does not change with any of these: native foldables, tablets
 | Journal, M18 (`features/companion/JournalScreen.tsx`) | calendar on top of the timeline list | primary: calendar and days-together count; secondary: the timeline for the selected day | calendar above, timeline below | split | `split`, `primarySide: 'left'`. The selected day stays in the screen's store, so folding keeps it (skill §6). Both panes are already rendered by `VirtualList`. |
 | Profile (`features/profile/profile-content.tsx`) | identity, details stacked | primary: `ProfileIdentity`; secondary: `ProfileDetails` | identity above, details below | split | `split`. `ProfileOverview` was struck 2026-10-17 (demo tags and stats with no backing source). |
 | Settings (`features/settings/settings-content.tsx`, `(drawer)/settings`) | one list | Master: setting groups; Detail: the chosen group | list above, detail below | Master/Detail | Existing `SplitView`/AdaptivePanes (skill §5 Master/Detail). Not an Arrangement View: Settings has selection and navigation inside it, and the HIG keeps navigation outside arrangement views. |
-| Game lobby, G02 (`features/game/lobby/GameLobbyScreen.tsx`, `ui/lobby/GameLobby.tsx`) | one column | `ArrangementPanes`: wordmark + NYC Rank in the left pane, resume + START centred in the right pane, split at the hinge | stage above, START below | one column | Done 2026-10-16. The screen measures its host with `measureInWindow` (the GameScreen pattern) and converts folds on both axes, so a non-zero host origin no longer shifts the split (skill §4, §10). No folds until the first layout pass. |
+| Game lobby, G02 (`features/game/lobby/GameLobbyScreen.tsx`, `ui/lobby/GameLobby.tsx`) | one column | `ArrangementPanes`: wordmark + NYC Rank in the left pane, resume + START docked at the foot of the right pane (level with the board's foot), split at the hinge | stage above, START below | one column | Done 2026-10-16. The screen measures its host with `measureInWindow` (the GameScreen pattern) and converts folds on both axes, so a non-zero host origin no longer shifts the split (skill §4, §10). No folds until the first layout pass. 2026-10-28: the fallback (iPadOS before 27.1, web) follows the onboarding pattern by class (`ui/lobby/lobby-layout.ts`): md portrait a 640 pt top-aligned column, md landscape the same two panes as the native split; phones unchanged. Unit-tested only, not seen on a device. |
 | Starter home (`features/home/screen.native.tsx`) | scroll column | no change | no change | no change | Out of scope: a single feed with no companion pane (HIG: "Consider an arrangement view when your layout already resembles one"). |
 
 ## Skill §9 steps
@@ -122,3 +122,56 @@ Shell per skill §2 does not change with any of these: native foldables, tablets
 ## Duo hinge policy (2026-10-16)
 
 The Surface Duo reports its hinge through WindowManager as a flat fold: `separating: false`, width 0, x 540 in a 1080 dp window. The library's default `hingePolicy="avoidSeparating"` ignores a flat fold, so the lobby split at the middle of its 1000 dp view, 40 dp left of the hinge, and START sat across it. `ArrangementPanes.native.tsx` now passes `hingePolicy="alwaysAvoid"`: the panes split around the hinge with the library's 24 dp gap (528 and 552 dp). A flat fold still splits only where two panes fit (`arrange.ts`), so phones keep one pane. Measured on the Duo: NYC Rank ends at 509 dp and START starts at 566 dp.
+
+## Companion pane on the persistent stage (2026-10-28)
+
+Mike's report from the iPad: in landscape the companion loop showed a small portrait device in an empty window. Each glass screen draws on a fixed 768 x 1024 canvas and the device was centred in whatever box it got, so no screen had a tablet layout.
+
+Status: built and covered by node tests (unit fixtures), typecheck and lint. Not run on an iPad, a foldable or a simulator.
+
+### Who gets the pane
+
+`useTabletClass` (`packages/app/features/companion/CompanionStageHost.tsx`): native rail hardware (tablet, foldable, headset; `useAdaptiveNavigationPlacement().rail`) at 672 pt or wider, which is Tailwind's `md` on native (rem 14). Web: 672 pt or wider. A phone never gets it, so a landscape phone wider than 672 pt keeps the device alone (phone unchanged). A foldable cover or one Duo panel is narrower than 672 and keeps the device alone too.
+
+### Where it goes
+
+`planCompanion` (`companion-layout.ts`, pure, `companion-layout.test.ts`) works from the stage host's measured size, which is the space left of the rail and under the header, not the window:
+
+| Host | Plan |
+| --- | --- |
+| Phone, or any host too small for both | `single`: the device alone |
+| Wider than tall (iPad landscape, Duo spanned) | `row`: pane on the physical left (40%, at most 480 pt), device on the physical right, the H-Lynk's documented side (skill §2: physical, also in RTL) |
+| Taller than wide (iPad portrait) | `column`: device in a top band (60% of the height), pane under it |
+| A vertical fold through a row | the split lands on the fold, gap = hinge width; a zero-width fold still splits (skill §4) |
+| A horizontal fold (tabletop) | device above the fold, pane below |
+
+Minimums: device 320 pt wide or 380 pt tall, pane 280 pt wide or 220 pt tall; below them the plan is `single` instead of squeezing either. The pane, gap and device slots keep their places in the tree in every plan and only their sizes and the flex direction change, so rotating, folding or resizing never remounts the DeviceStage (skill §6). Overlays that belong to the device (M09's and Settings' name field) read `stageFrame` from the stage store and stay inside the device box.
+
+One side for every screen: the device stays physically right on Home, Feed, Rest, Social, Dex, Journal, Settings and M09, because they share one persistent stage and moving it between routes would make it jump. This replaces the earlier per-screen rows above for Dex (`primarySide: 'left'`) and Journal on the 3D path; the 2D fallbacks keep their own layouts.
+
+### What each pane shows
+
+| Screen | Pane | Role (skill §5) |
+| --- | --- | --- |
+| M13 Home | care summary (the three meters, Low marked) and the last five journal moments, with Open Journal | supplementary |
+| M14 Feed, M15 Rest, M16 Social | that route's past meals, naps or games from the journal, and plain tips that follow the Mon's state | supplementary |
+| M17 Dex | the full facts (number, form, Bloodline, life stages, name, hatched, Caller) | supplementary |
+| M18 Journal | the calendar; picking a day narrows the glass timeline to it, Show every day clears it | Master (calendar) / Detail (glass timeline) |
+| Settings | the highlighted row's detail: Theme and Time of day change in place, the rename field, every credit line, the sign-out question with Cancel first | Master (glass list) / Detail (pane) |
+| M09 Name | the Mon's identity, then the ask or the name field | detail |
+| M08 egg choice | the focused egg's name, number and Bloodline, the only canon facts before the hatch (M08 handoff P3); nothing focused: how to pick | Inspector |
+| M10 incubate, M11 incubating | the incubation steps (chosen, incubating, ready, hatch) on the kit Timeline | supplementary |
+| M12 hatch | none: full-window cinematic, unchanged | n/a |
+
+Every pane has a loading state (kit LoadingSkeleton, also shown between routes) and an empty state (kit EmptyState) where a list can be empty. Panes are real, focusable UI; the glass keeps its hidden mirror for what it draws.
+
+### Camera and glass resolution
+
+- `stageCameraZ` (`packages/ui/three/hlynk/device-geometry.ts`, `stage-camera.test.ts`): the camera distance follows the pane's aspect. Wide panes are height-bound at the authored distance, narrow ones back off. Every aspect a phone stage reaches keeps the old value. The old floor at aspect 0.45 is gone, so a narrow split-screen pane no longer crops the device's sides. The earlier formula already followed the aspect; the empty window came from the device having the whole window, which the pane now fills.
+- On tablet-class hardware the glass canvas renders at 2x (`DeviceStage glassScale`, `createCanvasSurface(..., scale)` on web and Skia). Screens still draw in their 768 x 1024 logical px. Read once when the scene builds.
+
+### Gaps
+
+- Not run on any device or simulator. Placement on iPad, Duo and Pixel Fold is from unit fixtures only.
+- The trifold case uses the first matching fold only.
+- M08 has no lore text: culture notes are `null` in content.

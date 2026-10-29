@@ -55,7 +55,7 @@ marked `estimate` when rule-derived:
 
 | Field | Content |
 | --- | --- |
-| `f`, `fh` | Recorded frontage / facade height facts |
+| `f`, `fh` | Recorded floor count and floor height in metres (`floors`, `floorHeightMeters` in `city-dataset.ts`) |
 | `d` | Detail bits: cornice, fire escape, stoop, water tower, storefront (bits 0–4). Bits 5–6 (setbacks, gable) are recorded but data-only — no mesh feature consumes them |
 | `sh`, `ww` | Storefront height / window pitch — drive the existing shader window grid via `uvScale`, no new materials |
 | `fi` | Recorded front-face index — re-aims landmark details (e.g. the Apollo marquee) at the real front |
@@ -102,6 +102,14 @@ Before the 2026-10-16 frame-budget pass (below), baked in node on the same Mac, 
 | `world/budget.ts` | Visible-triangle count, the rule the Duo measurement used. |
 | `world/walkability.ts`, `world/bundled-queries.ts` | `isWalkable(x, z)` and `cityGroundHeight(x, z)`. |
 | `world/palette.ts` | Material colours from `@acme/theme` tokens. |
+
+### react-native-webgpu rules
+
+**Update, 2026-10-27 (D19, ADR 0023).** The rule below came from a simulator. vg-demos-all `README.md` L23 reads: "On react-native-webgpu (checked on the iOS 27 simulator with three r186), shadow maps, three's output pass (tone mapping / sRGB) and `Color` scene backgrounds render a black frame." react-native-webgpu's own `apps/example/src/ThreeJS/PostProcessing.tsx` @ `3f4b0f0` runs `RenderPipeline`, `bloom()` and `NeutralToneMapping` and calls `context.present()` after the pipeline. Slop New York's `js/lighting.js` L143–146 explains the background case: a `Color` background forces a clear that wipes shadow cascade 0 while cascade 1 renders. Under `EXPO_PUBLIC_WORLD_PHYSICAL` the city uses sRGB output, ACES, sun shadows and post; with the flag off, the rule below still holds and the build is unchanged.
+
+Phase 0 device results (`docs/DEVICE_CHECKS.md` § Slop-grade city): **pending.** The iPad Pro probes run at the end of the 2026-10-27 session; iPhone 17 is open (no device cabled). No probe result exists yet, so nothing here claims the physical path renders on hardware.
+
+The rule as written for the cel city (history, still in force with the flag off):
 
 react-native-webgpu rules from the metro-live README, all followed: no shadow maps (a TSL contact shadow strip around every footprint, leaning away from the sun, stands in), no output pass (linear output, no tone mapping), and no `scene.background = Color` (an unlit dome drawn first; the renderer clear colour matches the horizon as a fallback). Colours are fed to three as linear values, so the frame shows the token colours as authored without switching off colour management for the app's other scenes.
 
@@ -273,3 +281,9 @@ SOFTWARE.
 ```
 
 OpenStreetMap data © OpenStreetMap contributors, ODbL 1.0. Attribution surfaces in Settings under "Legal & credits", rendered from `map-data-credit.ts` (`CITY_MAP_SOURCES`) — the test in `map-data-credit.test.ts` keeps that list equal to the bundled tile's `sources` and asserts the game screen mounts no attribution HUD.
+
+## MIT notice (Slop New York)
+
+The physical mode behind `EXPO_PUBLIC_WORLD_PHYSICAL` (D19, ADR 0023) adapts rendering techniques from Slop New York by Mr.doob, https://github.com/mrdoob/slop-newyork @ `be65d0a`, MIT, © 2026 Mr.doob. The full licence text and the list of what is and is not taken are in `docs/licenses/slop-newyork-mit.md`. Each ported file names the Slop file and function it came from in its header; the technique-to-file table is `docs/design/handoff/slop-grade-city.md`.
+
+No Slop geodata is imported. Slop's README credits NYC Open Data and OpenStreetMap (ODbL) for its Manhattan data; none of it reaches this repo, so that notice does not carry over. The tile and its data notices above are unchanged.

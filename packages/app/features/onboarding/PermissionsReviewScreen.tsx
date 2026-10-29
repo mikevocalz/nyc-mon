@@ -14,7 +14,7 @@ import { announcePolitely } from './announce';
 import { copy, type OnboardingCopyId } from './copy';
 import { completePermissionReview, useOnboarding } from './onboarding.store';
 import { shouldScheduleEggReminder } from './permissions-model';
-import { permissionViewport } from './permissions-layout';
+import { isWholeWindow, permissionViewport } from './permissions-layout';
 import { getNotifyPermission, requestNotifyPermission, scheduleReadyNotification, type NotifyPermission } from './notify-permission';
 
 const OPTIONAL_FEATURES: readonly {
@@ -43,6 +43,9 @@ export function PermissionsReviewScreen() {
   const { width, height } = useWindowDimensions();
   const regions = useReservedRegions();
   const viewport = permissionViewport(width, height, regions);
+  // Window breakpoint classes only when the form owns the whole window; one
+  // segment of a split foldable keeps the phone column (see isWholeWindow).
+  const tablet = isWholeWindow(viewport, width, height);
   const setNotifyOff = useOnboarding((state) => state.setNotifyOff);
   const local = useMemo(() => createStore<{ status: NotifyPermission | 'loading'; busy: boolean }>(() => ({
     status: 'loading', busy: false,
@@ -124,64 +127,79 @@ export function PermissionsReviewScreen() {
       }}>
         <SafeArea className="flex-1">
           <ScrollView className="flex-1" contentContainerClassName="grow" keyboardShouldPersistTaps="handled">
-            <Container width="form" className="flex-1 gap-5 px-4 py-6" testID="m24-permissions">
-              <View className="gap-2">
-                <Text variant="caption" className="font-semibold tracking-widest text-primary">
-                  {copy('m24.step')}
-                </Text>
-                <Heading level={1} size="display-sm" testID="m24-title">
-                  {copy('m24.title')}
-                </Heading>
-                <Text tone="muted">{copy('m24.intro')}</Text>
-              </View>
-
-              <View className="gap-3" testID="m24-notifications">
-                <View className="border-2 border-border bg-surface-raised p-4">
-                  <View className="flex-row items-start justify-between gap-3">
-                    <View className="flex-1 gap-1">
-                      <Text variant="caption" className="font-semibold text-text-muted">01 / LIVE NOW</Text>
-                      <Text variant="heading">{copy('m24.notifications.title')}</Text>
-                    </View>
-                    <Text variant="caption" className="shrink-0 font-semibold text-text-muted">{copy(notificationBadge)}</Text>
+            {/* Phone: the form column. Tablet portrait: a wider column, top-aligned,
+                Continue on the bottom edge. Landscape: what is live now on the
+                left, what comes later on the right, the footer under the right pane. */}
+            <Container
+              width="form"
+              className={tablet
+                ? 'flex-1 gap-5 px-4 py-6 md:gap-8 md:px-8 md:py-10 md:portrait:max-w-[640px] md:landscape:max-w-[1080px]'
+                : 'flex-1 gap-5 px-4 py-6'}
+              testID="m24-permissions"
+            >
+              <View className={tablet ? 'gap-5 md:portrait:gap-8 md:landscape:flex-row md:landscape:items-start md:landscape:gap-12' : 'gap-5'}>
+                <View className={tablet ? 'gap-5 md:landscape:flex-1' : 'gap-5'}>
+                  <View className="gap-2">
+                    <Text variant="caption" className="font-semibold tracking-widest text-primary">
+                      {copy('m24.step')}
+                    </Text>
+                    <Heading level={1} size="display-sm" testID="m24-title">
+                      {copy('m24.title')}
+                    </Heading>
+                    <Text tone="muted">{copy('m24.intro')}</Text>
                   </View>
-                  <Text className="mt-2" tone="muted">{copy('m24.notifications.body')}</Text>
-                  <View className="mt-3">
-                    {status === 'undetermined' ? (
-                      <Button variant="outline" size="lg" fullWidth disabled={busy}
-                        title={copy('m24.notifications.allow')} onPress={() => void enableNotifications()} />
-                    ) : status === 'denied' ? (
-                      <Button variant="outline" size="lg" fullWidth disabled={busy}
-                        title={copy('m24.notifications.settings')}
-                        onPress={() => void Linking.openSettings().catch(() => undefined)} />
-                    ) : null}
+
+                  <View className="gap-3" testID="m24-notifications">
+                    <View className="border-2 border-border bg-surface-raised p-4">
+                      <View className="flex-row items-start justify-between gap-3">
+                        <View className="flex-1 gap-1">
+                          <Text variant="caption" className="font-semibold text-text-muted">01 / LIVE NOW</Text>
+                          <Text variant="heading">{copy('m24.notifications.title')}</Text>
+                        </View>
+                        <Text variant="caption" className="shrink-0 font-semibold text-text-muted">{copy(notificationBadge)}</Text>
+                      </View>
+                      <Text className="mt-2" tone="muted">{copy('m24.notifications.body')}</Text>
+                      <View className="mt-3">
+                        {status === 'undetermined' ? (
+                          <Button variant="outline" size="lg" fullWidth disabled={busy}
+                            title={copy('m24.notifications.allow')} onPress={() => void enableNotifications()} />
+                        ) : status === 'denied' ? (
+                          <Button variant="outline" size="lg" fullWidth disabled={busy}
+                            title={copy('m24.notifications.settings')}
+                            onPress={() => void Linking.openSettings().catch(() => undefined)} />
+                        ) : null}
+                      </View>
+                    </View>
+                  </View>
+                </View>
+
+                <View className={tablet ? 'gap-5 md:landscape:flex-1' : 'gap-5'}>
+                  <View className="gap-2">
+                    <Heading level={2} size="title">{copy('m24.later.title')}</Heading>
+                    <Text tone="muted">{copy('m24.later.body')}</Text>
+                  </View>
+                  <View className="gap-3">
+                    {OPTIONAL_FEATURES.map((feature, index) => (
+                      <View key={feature.id} className="border-2 border-border bg-surface-raised p-4" testID={`m24-${feature.id}`}>
+                        <View className="flex-row items-start gap-3">
+                          <Text variant="caption" className="font-semibold text-text-muted">
+                            {`0${index + 2}`}
+                          </Text>
+                          <View className="flex-1 gap-1">
+                            <Text variant="heading">{copy(feature.title)}</Text>
+                            <Text tone="muted">{copy(feature.body)}</Text>
+                            <Text variant="caption" className="mt-1 font-semibold text-text-muted">
+                              {copy(feature.badge)}
+                            </Text>
+                          </View>
+                        </View>
+                      </View>
+                    ))}
                   </View>
                 </View>
               </View>
 
-              <View className="gap-2">
-                <Heading level={2} size="title">{copy('m24.later.title')}</Heading>
-                <Text tone="muted">{copy('m24.later.body')}</Text>
-              </View>
-              <View className="gap-3">
-                {OPTIONAL_FEATURES.map((feature, index) => (
-                  <View key={feature.id} className="border-2 border-border bg-surface-raised p-4" testID={`m24-${feature.id}`}>
-                    <View className="flex-row items-start gap-3">
-                      <Text variant="caption" className="font-semibold text-text-muted">
-                        {`0${index + 2}`}
-                      </Text>
-                      <View className="flex-1 gap-1">
-                        <Text variant="heading">{copy(feature.title)}</Text>
-                        <Text tone="muted">{copy(feature.body)}</Text>
-                        <Text variant="caption" className="mt-1 font-semibold text-text-muted">
-                          {copy(feature.badge)}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-                ))}
-              </View>
-
-              <View className="mt-auto gap-3 pt-3 pb-4">
+              <View className={tablet ? 'mt-auto gap-3 pt-3 pb-4 md:landscape:w-[47%] md:landscape:self-end' : 'mt-auto gap-3 pt-3 pb-4'}>
                 <Text variant="caption" tone="muted">{copy('m24.privacy')}</Text>
                 <Button
                   variant="cta" size="lg" fullWidth disabled={busy || status === 'loading'}

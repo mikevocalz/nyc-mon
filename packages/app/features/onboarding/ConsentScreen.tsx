@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
   Button,
   Container,
@@ -17,7 +17,9 @@ import { Form } from '@acme/ui/primitives';
 import { View } from '@acme/ui/tw';
 import { AUTH_BASE_URL } from './auth';
 import { copy } from './copy';
-import { useOnboarding, writeConsentRequested } from './onboarding.store';
+import { hydrateMon } from '../mon/mon.store';
+import { clearDeniedConsent, useOnboarding, writeConsentRequested } from './onboarding.store';
+import { OnboardingPanes, PANE_HEADING_CLASS } from './OnboardingPanes';
 import { readSave } from './save-store';
 
 type Mode = 'ask' | 'sent' | 'denied';
@@ -36,13 +38,17 @@ function newIdempotencyKey(): string {
 /**
  * M05 guardian consent. The ask form posts the parent email to the consent
  * endpoint hosted by the admin app (`/v1/guardian-consents`, ADR 0003); the
- * play path is never blocked while the request is pending, and the denied
- * state is terminal until a fresh install (consent law). The mail preview
+ * play path is never blocked while the request is pending. The denied state
+ * has one exit, Close, which does what a fresh install would (consent law):
+ * it clears the age answer and a denied Caller's local save
+ * (`clearDeniedConsent`) and returns to Welcome, so the next launch boots to
+ * first-run instead of this screen. The mail preview
  * stays copy-only for now — the retention window token (`{days}`) is a
  * lead+counsel decision, so the preview omits the deletion-timeline lines.
  */
 export function ConsentScreen() {
   const params = useLocalSearchParams<{ state?: string }>();
+  const router = useRouter();
   const ageAnswer = useOnboarding((s) => s.ageAnswer);
 
   const denied =
@@ -89,42 +95,63 @@ export function ConsentScreen() {
     setMode('sent');
   };
 
+  const closeDenied = () => {
+    if (clearDeniedConsent().removedDeniedSave) hydrateMon();
+    router.replace('/(onboarding)/welcome');
+  };
+
   if (mode === 'denied') {
     return (
-      <Container width="full" className="flex-1 items-center justify-center px-4 py-6">
-        <EmptyState
-          title={copy('m05.denied.title.no_mon')}
-          description={copy('m05.denied.body.no_mon')}
-        />
+      // Phone: centred as before. Tablet (md+): top-aligned in the panes' 560
+      // column, like every other auth step; one message, so no second pane.
+      <Container width="full" className="flex-1 items-center justify-center px-4 py-6 md:justify-start md:px-8 md:py-10">
+        <View className="w-full max-w-content-form md:max-w-[560px]">
+          <EmptyState
+            title={copy('m05.denied.title.no_mon')}
+            description={copy('m05.denied.body.no_mon')}
+            action={<Button variant="outline" size="lg" fullWidth title={copy('m05.denied.close')} onPress={closeDenied} />}
+          />
+        </View>
       </Container>
     );
   }
 
   return (
-    <KeyboardAwareScroll>
-      <Container width="full" className="flex-1 px-4 py-6">
-        <Form className="mx-auto w-full max-w-content-form gap-6">
-          {mode === 'sent' ? (
-            <>
+    <KeyboardAwareScroll contentContainerClassName="grow">
+      <OnboardingPanes
+        intro={
+          mode === 'sent' ? (
+            <View className="gap-6">
               <StatusRow
                 items={[{ id: 'status-consent-pending', label: copy('m05.badge.pending'), tone: 'pending' }]}
               />
-              <Heading level={1} size="title">{copy('m05.sent.title')}</Heading>
+              <Heading level={1} size="title" className={PANE_HEADING_CLASS}>{copy('m05.sent.title')}</Heading>
+            </View>
+          ) : (
+            <View className="gap-2">
+              <Heading level={1} size="title" className={PANE_HEADING_CLASS}>{copy('m05.ask.title')}</Heading>
+              <Text>{copy('m05.ask.body')}</Text>
+            </View>
+          )
+        }
+      >
+        <Form className="gap-6 md:flex-1">
+          {mode === 'sent' ? (
+            <>
               <Text>{copy('m05.sent.body', { email: parentEmail })}</Text>
-              <Button
-                variant="ghost"
-                size="lg"
-                fullWidth
-                title={copy('m05.sent.change_email')}
-                onPress={() => setMode('ask')}
-              />
+              {/* Tablet: the action sits on the pane's bottom edge. */}
+              <View className="md:mt-auto">
+                <Button
+                  variant="ghost"
+                  size="lg"
+                  fullWidth
+                  title={copy('m05.sent.change_email')}
+                  onPress={() => setMode('ask')}
+                />
+              </View>
             </>
           ) : (
             <>
-              <View className="gap-2">
-                <Heading level={1} size="title">{copy('m05.ask.title')}</Heading>
-                <Text>{copy('m05.ask.body')}</Text>
-              </View>
               {error !== undefined ? <ErrorMessage message={error} /> : null}
               <TextField
                 surface="daylit"
@@ -155,18 +182,21 @@ export function ConsentScreen() {
                   <Text>{copy('mail.consent.body.no')}</Text>
                 </View>
               ) : null}
-              <Button
-                variant="cta"
-                size="lg"
-                fullWidth
-                title={pending ? copy('m05.send.loading') : copy('m05.send')}
-                disabled={pending || parentEmail === ''}
-                onPress={() => void send()}
-              />
+              {/* Tablet: Send sits on the pane's bottom edge. */}
+              <View className="md:mt-auto">
+                <Button
+                  variant="cta"
+                  size="lg"
+                  fullWidth
+                  title={pending ? copy('m05.send.loading') : copy('m05.send')}
+                  disabled={pending || parentEmail === ''}
+                  onPress={() => void send()}
+                />
+              </View>
             </>
           )}
         </Form>
-      </Container>
+      </OnboardingPanes>
     </KeyboardAwareScroll>
   );
 }

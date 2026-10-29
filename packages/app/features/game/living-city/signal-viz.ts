@@ -61,6 +61,7 @@ import {
   packVehicleSnapshot,
   type VehicleSim,
 } from './vehicle-sim.ts';
+import { pushBox } from './box-faces.ts';
 
 // --- Signal section codec --------------------------------------------------------
 
@@ -404,28 +405,6 @@ export interface VizGeometryData {
   readonly triangles: number;
   /** Flat list of lens anchor points in local space — the instanced lens quads mount here. */
   readonly lensAnchors: readonly number[];
-}
-
-function pushBox(pos: number[], nrm: number[], idx: number[], cx: number, cy: number, cz: number, sx: number, sy: number, sz: number): void {
-  const hx = sx / 2;
-  const hy = sy / 2;
-  const hz = sz / 2;
-  const faces: [number, number, number, number[]][] = [
-    [1, 0, 0, [hx, -hy, -hz, hx, -hy, hz, hx, hy, hz, hx, hy, -hz]],
-    [-1, 0, 0, [-hx, -hy, hz, -hx, -hy, -hz, -hx, hy, -hz, -hx, hy, hz]],
-    [0, 1, 0, [-hx, hy, -hz, hx, hy, -hz, hx, hy, hz, -hx, hy, hz]],
-    [0, -1, 0, [-hx, -hy, hz, hx, -hy, hz, hx, -hy, -hz, -hx, -hy, -hz]],
-    [0, 0, 1, [-hx, -hy, hz, hx, -hy, hz, hx, hy, hz, -hx, hy, hz]],
-    [0, 0, -1, [hx, -hy, -hz, -hx, -hy, -hz, -hx, hy, -hz, hx, hy, -hz]],
-  ];
-  for (const [nx, ny, nz, c] of faces) {
-    const base = pos.length / 3;
-    for (let i = 0; i < 4; i++) {
-      pos.push(cx + c[i * 3]!, cy + c[i * 3 + 1]!, cz + c[i * 3 + 2]!);
-      nrm.push(nx, ny, nz);
-    }
-    idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
-  }
 }
 
 /** Open 6-sided tube (pole), base at y=0 — same recipe as the world's sign poles. */

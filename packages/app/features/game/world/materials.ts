@@ -335,6 +335,25 @@ export function leafGraphs(THREE: Three, map: TextureT): LeafGraphs {
  * the caller disposes). Extracted so pbr-materials.ts does not re-author
  * them.
  */
+/**
+ * Light pools under the street lamps: additive, a radial falloff from the
+ * disc uv centre, faded by distance instead of fogged. `color` is the lamp
+ * colour node: the sodium lampHalo here, the facelift's LED colour on the
+ * physical city (physical/facelift.ts).
+ */
+export function createLampPoolMaterial(THREE: Three, color: ReturnType<ReturnType<typeof cityShaderTools>['c']>): BasicMat {
+  const { T, detail } = cityShaderTools(THREE);
+  const lampPools = new THREE.MeshBasicNodeMaterial({
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false,
+    polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -8,
+  });
+  const r = T.uv().sub(0.5).length().mul(2);
+  const fall = T.float(1).sub(T.smoothstep(0, 1, r));
+  // No fog on an additive layer (it would add the haze colour); fade by distance instead.
+  lampPools.colorNode = T.vec4(color.mul(fall.mul(fall).mul(0.32).mul(detail(80, 240))), 1);
+  return lampPools;
+}
+
 export function createUnlitLayers(THREE: Three, sunDirection: readonly [number, number, number]) {
   const { T, c, detail, vertexRgb } = cityShaderTools(THREE);
   const sky = createSkyMaterial(THREE, sunDirection);
@@ -365,20 +384,10 @@ export function createUnlitLayers(THREE: Three, sunDirection: readonly [number, 
     shadows.opacityNode = fall.mul(fall).mul(0.34);
   }
 
-  // Lamp heads are unlit; light pools under the lamps are additive, radial
-  // falloff from the disc uv centre, distance-faded instead of fogged.
+  // Lamp heads are unlit; the light pools under them are createLampPoolMaterial in the sodium halo.
   const lampHeads = new THREE.MeshBasicNodeMaterial();
   lampHeads.colorNode = T.vec4(c('lampHead'), 1);
-  const lampPools = new THREE.MeshBasicNodeMaterial({
-    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false,
-    polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -8,
-  });
-  {
-    const r = T.uv().sub(0.5).length().mul(2);
-    const fall = T.float(1).sub(T.smoothstep(0, 1, r));
-    // No fog on an additive layer (it would add the haze colour); fade by distance instead.
-    lampPools.colorNode = T.vec4(c('lampHalo').mul(fall.mul(fall).mul(0.32).mul(detail(80, 240))), 1);
-  }
+  const lampPools = createLampPoolMaterial(THREE, c('lampHalo'));
 
   // Pixel-font lettering (pixel-font.ts atlas, built in memory: no canvas on native). Ink is the vertex colour.
   const atlas = new THREE.DataTexture(atlasPixels(), ATLAS_WIDTH, ATLAS_HEIGHT, THREE.RGBAFormat);

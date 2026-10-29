@@ -20,6 +20,11 @@ export interface OAuthClient {
   clientSecret: string;
 }
 
+export interface GoogleClient extends OAuthClient {
+  /** iOS and Android OAuth client ids whose ID tokens the server also accepts (native M03). */
+  nativeClientIds: string[];
+}
+
 export interface AppleClient extends OAuthClient {
   appBundleIdentifier: string | undefined;
 }
@@ -65,7 +70,7 @@ export interface AuthEnv {
   emailFrom: string | undefined;
   /** Off until Resend sends from a verified domain in this environment (ADR 0001, lockout guard). */
   requireEmailVerification: boolean;
-  google: OAuthClient | undefined;
+  google: GoogleClient | undefined;
   apple: AppleClient | undefined;
   /** Login with Amazon. Used as a social provider; Alexa itself remains a separate OAuth client. */
   amazon: OAuthClient | undefined;
@@ -81,7 +86,16 @@ function oauthClient(rawId: string | undefined, rawSecret: string | undefined): 
 export function readAuthEnv(): AuthEnv {
   // Static process.env reads only: bundlers inline them and the expo lint
   // rule rejects dynamic access.
-  const google = oauthClient(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET);
+  const googleWeb = oauthClient(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET);
+  const google: GoogleClient | undefined =
+    googleWeb === undefined
+      ? undefined
+      : {
+          ...googleWeb,
+          nativeClientIds: [clean(process.env.GOOGLE_IOS_CLIENT_ID), clean(process.env.GOOGLE_ANDROID_CLIENT_ID)].filter(
+            (id): id is string => id !== undefined,
+          ),
+        };
   const appleClient = oauthClient(process.env.APPLE_CLIENT_ID, process.env.APPLE_CLIENT_SECRET);
   const amazon = oauthClient(process.env.AMAZON_LWA_CLIENT_ID, process.env.AMAZON_LWA_CLIENT_SECRET);
 

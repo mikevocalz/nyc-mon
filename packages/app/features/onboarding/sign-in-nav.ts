@@ -1,13 +1,15 @@
 'use client';
 
-import { Linking } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { APP_HOME_PATH } from './boot';
 
 export type SignInIntent = 'create' | 'sign_in';
 
-/** Product-site origin for links the app does not host (legal pages). */
-const SITE_URL = process.env.EXPO_PUBLIC_SITE_URL ?? 'http://localhost:3100';
+/** Web only: the Apple/Google redirect came back to M03 (`?social=…`, plus `error` on failure). */
+export interface SocialReturn {
+  provider: 'apple' | 'google';
+  error: string | undefined;
+}
 
 export interface SignInLegalLink {
   id: 'terms' | 'privacy' | 'children';
@@ -28,11 +30,17 @@ export function useSignInNav(): {
   signInPath: string;
   /** Terms/privacy destinations, opened on the product site. */
   legalLinks: SignInLegalLink[];
-  /** Opens a legal href: in-app router on web, the site on native. */
+  /** Opens a legal href in the app's own /legal/* screens (the site's on web). */
   openLink: (href: string) => void;
   replace: (path: string) => void;
   /** The ‹ in the stack header (M03 direction): back to the previous route. */
   back: () => void;
+  /** Draw the ‹ inside the screen. False in the app: the native stack header carries it. */
+  inlineBack: boolean;
+  /** Web only; the app signs in by ID token and never leaves the screen. */
+  socialReturn: SocialReturn | undefined;
+  /** Web only: absolute URLs for a provider round trip. Empty in the app. */
+  socialURLs: (provider: 'apple' | 'google') => { returnURL: string; errorURL: string };
 } {
   const router = useRouter();
   const params = useLocalSearchParams<{ intent?: string }>();
@@ -49,8 +57,12 @@ export function useSignInNav(): {
       { id: 'privacy', href: '/legal/privacy' },
       { id: 'children', href: '/legal/childrens-privacy' },
     ],
-    openLink: (href) => void Linking.openURL(`${SITE_URL}${href}`),
+    openLink: (href) => router.push(href as never),
     replace: (path) => router.replace(path as never),
-    back: () => router.back(),
+    // Sign-in is often reached by replace (from the age gate), so there may be no history.
+    back: () => (router.canGoBack() ? router.back() : router.replace('/(onboarding)/welcome' as never)),
+    inlineBack: false,
+    socialReturn: undefined,
+    socialURLs: () => ({ returnURL: '', errorURL: '' }),
   };
 }
