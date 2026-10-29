@@ -6,6 +6,7 @@ import * as migration_20261023_235809_mon_gender from './20261023_235809_mon_gen
 import * as migration_20261024_164500_companion_memory from './20261024_164500_companion_memory';
 import * as migration_20261028_192132_mon_lingo from './20261028_192132_mon_lingo';
 import * as migration_20261028_200000_mon_lingo_seed from './20261028_200000_mon_lingo_seed';
+import * as migration_20261029_120000_mon_babble_seed from './20261029_120000_mon_babble_seed';
 
 export const migrations = [
   {
@@ -47,5 +48,10 @@ export const migrations = [
     up: migration_20261028_200000_mon_lingo_seed.up,
     down: migration_20261028_200000_mon_lingo_seed.down,
     name: '20261028_200000_mon_lingo_seed',
+  },
+  {
+    up: migration_20261029_120000_mon_babble_seed.up,
+    down: migration_20261029_120000_mon_babble_seed.down,
+    name: '20261029_120000_mon_babble_seed',
   },
 ];

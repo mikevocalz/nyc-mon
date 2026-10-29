@@ -445,7 +445,7 @@ export interface LanguageLexicon {
   spokenForm?: string | null;
   meaning: string;
   /**
-   * Categories the Mon's voice reads: mon-line, pronunciation, stage-direction, word-palette, voice-rule. mon-line: triggerText is the occasion (hello, first-words, hungry…), responseText the line, with speciesId and stage. pronunciation: canonicalText is the screen word, variants the other spellings, spokenForm what the voice says. stage-direction: variants are the keywords, spokenForm the audio tag.
+   * Categories the Mon's voice reads: mon-line, pronunciation, stage-direction, word-palette, voice-rule, babble. mon-line: triggerText is the occasion (hello, first-words, hungry…), responseText the line, with speciesId and stage. pronunciation: canonicalText is the screen word, variants the other spellings, spokenForm what the voice says. stage-direction: variants are the keywords, spokenForm the audio tag. babble: the wordless sounds an Egg and a Baby in its first 24 hours make (Decision 32); subcategory syllable, family-sound (with bloodlineId) or egg-sound, canonicalText the sound.
    */
   category: string;
   subcategory?: string | null;
@@ -2102,7 +2102,7 @@ export interface MonVoice {
     | null;
   stagePitch?: {
     /**
-     * Empty: an Egg is silent.
+     * Pitch for the Egg's babble from inside the shell (Decision 32), set higher than the Baby's. Empty: silent.
      */
     egg?: number | null;
     /**

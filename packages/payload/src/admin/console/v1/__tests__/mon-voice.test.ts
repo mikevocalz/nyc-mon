@@ -1,4 +1,5 @@
-import { FALLBACK_MON_LINGO, planMonUtterance, MAX_SPOKEN_TEXT, type MonLingo, type MonVoiceRef } from '@acme/content/voice';
+import { babbleInventory, FALLBACK_MON_LINGO, monVoiceRef, planMonUtterance, MAX_SPOKEN_TEXT, type MonLingo, type MonVoiceRef } from '@acme/content/voice';
+import { BABY_TALK_MS, isBabble } from '@acme/core';
 import type { Payload } from 'payload';
 import { describe, expect, it, vi } from 'vitest';
 import { MON_INSTANCES_SLUG } from '../../../../collections/MonInstances.ts';
@@ -6,7 +7,9 @@ import {
   createClipCache,
   createMonVoiceHandler,
   createMonVoiceRateLimiter,
+  MON_CAPTION_HEADER,
   MON_VOICE_REASON_HEADER,
+  MON_VOICE_STAGE_HEADER,
   type MonVoiceFetch,
 } from '../mon-voice.ts';
 import { ON_BEHALF_OF_HEADER, SERVICE_KEY_HEADER } from '../service-caller.ts';
@@ -17,6 +20,9 @@ type LocalApiCall = (options: Record<string, unknown>) => Promise<unknown>;
 const SERVICE_KEY = 'k'.repeat(48);
 const WEB_ORIGIN = 'https://nycmon.test';
 const MP3 = new Uint8Array([0xff, 0xfb, 0x90, 0x44]);
+/** The server clock every test runs on. */
+const NOW = Date.UTC(2026, 9, 29, 12);
+const HOUR = 60 * 60 * 1000;
 
 function monDoc(monInstanceId: string, callerId: string, extra: Doc = {}): Doc {
   return {
@@ -57,6 +63,7 @@ function setup(opts: {
   fetch?: ReturnType<typeof upstreamOk>;
   rateLimit?: (key: string) => boolean;
   lingo?: MonLingo;
+  now?: number;
 } = {}) {
   const fake = fakePayload({ sessionUser: 'sessionUser' in opts ? opts.sessionUser : { id: 'c1' }, mons: opts.mons ?? [monDoc('mon_1', 'c1')] });
   const upstream = opts.fetch ?? upstreamOk();
@@ -69,6 +76,7 @@ function setup(opts: {
     serviceKey: SERVICE_KEY,
     corsOrigins: async () => [WEB_ORIGIN],
     lingo: async () => opts.lingo ?? FALLBACK_MON_LINGO,
+    now: () => opts.now ?? NOW,
   });
   return { fake, upstream, handle };
 }
@@ -103,14 +111,6 @@ describe('POST /v1/mon-voice', () => {
   it('answers 404 for a Mon that does not exist', async () => {
     const { handle } = setup();
     expect((await handle(post({ monId: 'mon_missing', text: 'Hi.' }))).status).toBe(404);
-  });
-
-  it('keeps an Egg silent: 204 with a reason, no upstream call', async () => {
-    const { handle, upstream } = setup({ mons: [monDoc('mon_1', 'c1', { stage: 'Egg' })] });
-    const res = await handle(post({ monId: 'mon_1', text: 'Hi.' }));
-    expect(res.status).toBe(204);
-    expect(res.headers.get(MON_VOICE_REASON_HEADER)).toBe('silent');
-    expect(upstream).not.toHaveBeenCalled();
   });
 
   it('answers 204 for a Mon hatched before voice lineages', async () => {
@@ -210,7 +210,8 @@ describe('POST /v1/mon-voice matches the shared plan (mon-voice parity)', () => 
         const mon = monDoc('mon_1', 'c1', { voiceLineageId: ref.lineageId, stage: ref.stage });
         const { handle, upstream } = setup({ mons: [mon] });
         const res = await handle(post({ monId: 'mon_1', text: line, ...(ref.mood ? { mood: ref.mood } : {}) }));
-        const plan = planMonUtterance(line, ref);
+        const voice = monVoiceRef({ voiceLineageId: ref.lineageId, stage: ref.stage, hatchedAt: 1 }, NOW)!;
+        const plan = planMonUtterance(line, { ...voice, ...(ref.mood ? { mood: ref.mood } : {}) });
         if (plan.voice.kind !== 'lineage') throw new Error('parity voices must resolve to a lineage voice');
         expect(res.status).toBe(200);
         const [url, init] = upstream.mock.calls[0]!;
@@ -316,5 +317,125 @@ describe('createClipCache', () => {
     cache.get('a');
     cache.set('c', new Uint8Array(4));
     expect([cache.get('a') !== undefined, cache.get('b') !== undefined, cache.get('c') !== undefined]).toEqual([true, false, true]);
+  });
+});
+
+/** What the route sent ElevenLabs for the first call. */
+function sentText(upstream: ReturnType<typeof upstreamOk>): string {
+  const [, init] = upstream.mock.calls[0]!;
+  return (JSON.parse(String(init.body)) as { text: string }).text;
+}
+
+const inventoryFor = (stage: 'Egg' | 'Baby') => babbleInventory({ lineageId: 'dex-001/female/1' }, stage, FALLBACK_MON_LINGO);
+
+describe('POST /v1/mon-voice gates the line by voice stage on the server clock (Decision 32)', () => {
+  const SENTENCE = "Yeah Callah, I'm good.";
+
+  it('lets an Egg babble: 200 with the clip, ElevenLabs reads babble and never the posted words', async () => {
+    const { handle, upstream } = setup({ mons: [monDoc('mon_1', 'c1', { stage: 'Egg', hatchedAt: NOW - HOUR })] });
+    const res = await handle(post({ monId: 'mon_1', text: SENTENCE }));
+    expect(res.status).toBe(200);
+    expect(res.headers.get(MON_VOICE_STAGE_HEADER)).toBe('baby-talk');
+    expect(res.headers.get('x-mon-pitch-target')).toBe('1.45');
+    const text = sentText(upstream);
+    expect(text).not.toMatch(/callah|good|yeah/i);
+    expect(isBabble(text, inventoryFor('Egg'))).toBe(true);
+    const caption = decodeURIComponent(res.headers.get(MON_CAPTION_HEADER)!);
+    expect(caption).not.toMatch(/caller|good|yeah/i);
+    expect(isBabble(caption, inventoryFor('Egg'))).toBe(true);
+  });
+
+  it('lets a Baby babble for its first 24 hours after hatchedAt', async () => {
+    const { handle, upstream } = setup({ mons: [monDoc('mon_1', 'c1', { stage: 'Baby', hatchedAt: NOW - (BABY_TALK_MS - HOUR) })] });
+    const res = await handle(post({ monId: 'mon_1', text: SENTENCE }));
+    expect(res.status).toBe(200);
+    expect(res.headers.get(MON_VOICE_STAGE_HEADER)).toBe('baby-talk');
+    expect(isBabble(sentText(upstream), inventoryFor('Baby'))).toBe(true);
+  });
+
+  it('replaces a sentence from a Baby past its first day, and says so in the caption', async () => {
+    const mon = monDoc('mon_1', 'c1', { stage: 'Baby', hatchedAt: NOW - BABY_TALK_MS });
+    const { handle, upstream } = setup({ mons: [mon] });
+    const res = await handle(post({ monId: 'mon_1', text: SENTENCE }));
+    expect(res.status).toBe(200);
+    expect(res.headers.get(MON_VOICE_STAGE_HEADER)).toBe('limited');
+    const plan = planMonUtterance(SENTENCE, monVoiceRef({ voiceLineageId: 'dex-001/female/1', stage: 'Baby', hatchedAt: NOW - BABY_TALK_MS }, NOW)!);
+    expect(plan.gated).toBe(true);
+    expect(sentText(upstream)).toBe(plan.spoken);
+    expect(sentText(upstream)).not.toMatch(/callah/i);
+    expect(decodeURIComponent(res.headers.get(MON_CAPTION_HEADER)!)).toBe(plan.caption);
+  });
+
+  it('passes a Small line through untouched', async () => {
+    const { handle, upstream } = setup();
+    const res = await handle(post({ monId: 'mon_1', text: SENTENCE }));
+    expect(res.status).toBe(200);
+    expect(res.headers.get(MON_VOICE_STAGE_HEADER)).toBe('full');
+    const plan = planMonUtterance(SENTENCE, monVoiceRef({ voiceLineageId: 'dex-001/female/1', stage: 'Small', hatchedAt: 1 }, NOW)!);
+    expect(plan.gated).toBe(false);
+    expect(sentText(upstream)).toBe(plan.spoken);
+    expect(sentText(upstream)).toContain('good');
+    expect(decodeURIComponent(res.headers.get(MON_CAPTION_HEADER)!)).toBe(plan.caption);
+  });
+
+  it('plans from the stored Mon only: a claimed voice stage or stage in the body is refused', async () => {
+    const { handle, upstream } = setup({ mons: [monDoc('mon_1', 'c1', { stage: 'Egg', hatchedAt: NOW - HOUR })] });
+    expect((await handle(post({ monId: 'mon_1', text: SENTENCE, voiceStage: 'full' }))).status).toBe(400);
+    expect((await handle(post({ monId: 'mon_1', text: SENTENCE, stage: 'Max' }))).status).toBe(400);
+    expect(upstream).not.toHaveBeenCalled();
+  });
+
+  it('reads the clock per request: the same Baby babbles, then speaks once its day is over', async () => {
+    let now = NOW;
+    const hatchedAt = NOW - BABY_TALK_MS + HOUR;
+    const fake = fakePayload({ sessionUser: { id: 'c1' }, mons: [monDoc('mon_1', 'c1', { stage: 'Baby', hatchedAt })] });
+    const handle = createMonVoiceHandler({
+      getPayload: async () => fake.payload,
+      apiKey: () => 'test-key',
+      fetch: upstreamOk(),
+      rateLimit: () => true,
+      cache: createClipCache(),
+      corsOrigins: async () => [],
+      lingo: async () => FALLBACK_MON_LINGO,
+      now: () => now,
+    });
+    expect((await handle(post({ monId: 'mon_1', text: 'Bet!' }))).headers.get(MON_VOICE_STAGE_HEADER)).toBe('baby-talk');
+    now += HOUR;
+    expect((await handle(post({ monId: 'mon_1', text: 'Bet!' }))).headers.get(MON_VOICE_STAGE_HEADER)).toBe('limited');
+  });
+
+  it('carries the stage and caption on a 204 too, so the client shows what the Mon said', async () => {
+    const { handle } = setup({ apiKey: undefined, mons: [monDoc('mon_1', 'c1', { stage: 'Egg', hatchedAt: NOW - HOUR })] });
+    const res = await handle(post({ monId: 'mon_1', text: 'Hi.' }));
+    expect(res.status).toBe(204);
+    expect(res.headers.get(MON_VOICE_REASON_HEADER)).toBe('no-key');
+    expect(res.headers.get(MON_VOICE_STAGE_HEADER)).toBe('baby-talk');
+    expect(isBabble(decodeURIComponent(res.headers.get(MON_CAPTION_HEADER)!), inventoryFor('Egg'))).toBe(true);
+  });
+
+  it('answers 204 silent for a line with nothing to say aloud (stage directions only)', async () => {
+    const { handle, upstream } = setup();
+    const res = await handle(post({ monId: 'mon_1', text: '*yawn*' }));
+    expect(res.status).toBe(204);
+    expect(res.headers.get(MON_VOICE_REASON_HEADER)).toBe('silent');
+    expect(upstream).not.toHaveBeenCalled();
+  });
+
+  it('gates the caption of an Egg with no voice lineage too: no words on the screen either', async () => {
+    const { handle } = setup({ mons: [monDoc('mon_1', 'c1', { stage: 'Egg', hatchedAt: NOW - HOUR, voiceLineageId: null })] });
+    const res = await handle(post({ monId: 'mon_1', text: SENTENCE }));
+    expect(res.status).toBe(204);
+    expect(res.headers.get(MON_VOICE_REASON_HEADER)).toBe('no-voice');
+    expect(res.headers.get(MON_VOICE_STAGE_HEADER)).toBe('baby-talk');
+    const caption = decodeURIComponent(res.headers.get(MON_CAPTION_HEADER)!);
+    expect(isBabble(caption, babbleInventory({ speciesId: 'dex-001' }, 'Egg', FALLBACK_MON_LINGO))).toBe(true);
+  });
+
+  it('exposes the stage and caption headers to the web app', async () => {
+    const { handle } = setup();
+    const res = await handle(post({ monId: 'mon_1', text: 'Hi.' }, { origin: WEB_ORIGIN }));
+    const exposed = res.headers.get('access-control-expose-headers') ?? '';
+    expect(exposed).toContain(MON_VOICE_STAGE_HEADER);
+    expect(exposed).toContain(MON_CAPTION_HEADER);
   });
 });
