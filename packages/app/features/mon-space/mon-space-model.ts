@@ -40,7 +40,7 @@ export function iconIndex(icon: MonSpaceIcon): number {
 export function initialUi(view: Pick<MonCareView, 'call' | 'paused'> | undefined): MonSpaceUi {
   if (view?.paused === true) return { focus: iconIndex('pause'), layer: 'bar' };
   const call = view?.call ?? null;
-  return { focus: iconIndex(call === null ? 'meal' : ANSWER_ICON[call.kind]), layer: 'bar' };
+  return { focus: iconIndex(call === null ? 'meal' : (ANSWER_ICON[call.kind] ?? 'meal')), layer: 'bar' };
 }
 
 /** What one press asks the screen to do. */
@@ -207,7 +207,7 @@ const CALL_COPY: Record<CallKind, CompanionCopyId> = {
 };
 
 export function callCopy(kind: CallKind): CompanionCopyId {
-  return CALL_COPY[kind];
+  return CALL_COPY[kind] ?? 'monspace.call.false_call';
 }
 
 /** A copy key and its tokens (filled by the screen with `companionCopy`). */
