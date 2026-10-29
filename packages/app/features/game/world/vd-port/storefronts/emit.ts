@@ -86,10 +86,26 @@ export function gateDrop(dayDown: number, night: number): number {
 }
 
 export interface Buffers {
-  position: number[];
-  normal: number[];
-  color: number[];
-  extra: Record<string, number[]>;
+  position: Float32Array;
+  normal: Float32Array;
+  color: Float32Array;
+  extra: Record<string, Float32Array>;
+}
+
+/**
+ * A growable float sink. V8 packs a `number[]` to 2^27 elements (134,217,728) and `push` past that throws
+ * 'Invalid array length' — the union plan's detail slot crossed the cap with ring 6 (~13 M triangles, ~160 M
+ * colour components). The buffers accumulate here and finalize to one Float32Array (its cap is the ArrayBuffer's,
+ * far past this).
+ */
+class Bag {
+  private a = new Float32Array(1 << 16);
+  private n = 0;
+  push(v: number): void {
+    if (this.n === this.a.length) { const b = new Float32Array(this.a.length * 2); b.set(this.a); this.a = b; }
+    this.a[this.n++] = v;
+  }
+  finish(): Float32Array { return this.a.length === this.n ? this.a : this.a.slice(0, this.n); }
 }
 
 /** What the tests and the report count: doors, gates and signs where they were placed, in scene metres. */
@@ -111,7 +127,7 @@ export interface EmitResult {
 }
 
 export class Writer {
-  readonly buffers = {} as Record<Slot, Buffers>;
+  readonly buffers = {} as Record<Slot, { position: Bag; normal: Bag; color: Bag; extra: Record<string, Bag> }>;
   /** Roughness written into colour.w; null takes the slot's. */
   rough: number | null = null;
   /** Emit every triangle a second time, reversed (the awning cloth, seen from under it). */
@@ -124,9 +140,9 @@ export class Writer {
   solidUv: [number, number] = [0, 0];
   constructor() {
     for (const s of SLOTS) {
-      const extra: Record<string, number[]> = {};
-      for (const k of Object.keys(EXTRA[s])) extra[k] = [];
-      this.buffers[s] = { position: [], normal: [], color: [], extra };
+      const extra: Record<string, Bag> = {};
+      for (const k of Object.keys(EXTRA[s])) extra[k] = new Bag();
+      this.buffers[s] = { position: new Bag(), normal: new Bag(), color: new Bag(), extra };
     }
   }
   /** A quad a-b-c-d (counter-clockwise seen from the normal's side). */
@@ -145,9 +161,9 @@ export class Writer {
     const B = this.buffers[slot];
     const r = this.rough ?? ROUGH[ws];
     for (const i of order) {
-      B.position.push(p[i]![0], p[i]![1], p[i]![2]);
-      B.normal.push(n[0], n[1], n[2]);
-      B.color.push(col[0], col[1], col[2], r);
+      B.position.push(p[i]![0]!); B.position.push(p[i]![1]!); B.position.push(p[i]![2]!);
+      B.normal.push(n[0]!); B.normal.push(n[1]!); B.normal.push(n[2]!);
+      B.color.push(col[0]!); B.color.push(col[1]!); B.color.push(col[2]!); B.color.push(r);
       for (const [k, size] of Object.entries(EXTRA[slot])) {
         const v = ex[k]?.[i] ?? ex[k]?.[0] ?? (k === 'uv' ? this.solidUv : EXTRA_DEFAULT[k]!);
         for (let j = 0; j < size; j++) B.extra[k]!.push(v[j] ?? 0);
@@ -591,7 +607,7 @@ export function emitPlan(plan: StorefrontPlan, groundY: (x: number, z: number) =
   // the atlas's last cell is solid (bake-vd-storefronts.mjs): a lit surface that is not lettering samples it
   const A = plan.atlas, last = (A.width / A.cellW) * (A.height / A.cellH) - 1;
   W.solidUv = [((last % A.cols) + 0.5) * A.cellW / A.width, (Math.floor(last / A.cols) + 0.5) * A.cellH / A.height];
-  const out: EmitResult = { buffers: W.buffers, features: [], holes: [] };
+  const out: EmitResult = { buffers: {} as Record<Slot, Buffers>, features: [], holes: [] };
   for (const front of plan.fronts) {
     if (filter && !filter(front)) continue;
     // the sidewalk in front (facadeKit makeB: padYNear 1.2 m out from the face's middle)
@@ -607,6 +623,12 @@ export function emitPlan(plan: StorefrontPlan, groundY: (x: number, z: number) =
     for (const u of front.units ?? []) unit(W, F, u, front, plan, out);
     for (const s of front.signs) sign(W, F, s, plan, front, out);
     for (const a of front.awnings) awning(W, F, a, plan, front, out);
+  }
+  for (const s of SLOTS) {
+    const B = W.buffers[s];
+    const extra: Record<string, Float32Array> = {};
+    for (const k of Object.keys(EXTRA[s])) extra[k] = B.extra[k]!.finish();
+    out.buffers[s] = { position: B.position.finish(), normal: B.normal.finish(), color: B.color.finish(), extra };
   }
   return out;
 }

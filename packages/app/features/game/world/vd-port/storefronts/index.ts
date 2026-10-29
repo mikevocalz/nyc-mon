@@ -92,7 +92,13 @@ export function build(ctx: VdPortCtx): VdPortPart {
     geometry.setAttribute('color', new THREE.BufferAttribute(vc, 4, true));
     for (const [name, size] of Object.entries(EXTRA[slot])) {
       // the sign ground as unorm8x4; the rest float
-      if (name === 'aBg') geometry.setAttribute(name, new THREE.BufferAttribute(Uint8Array.from(B.extra[name]!, (v) => Math.round(v * 255)), size, true));
+      if (name === 'aBg') {
+        // Uint8Array.from on a >2^27-element iterable materializes it as a JS array first (V8's packed cap):
+        // the union plan's detail slot passes that, so the bytes are copied explicitly
+        const src = B.extra[name]!, u8 = new Uint8Array(src.length);
+        for (let i = 0; i < src.length; i++) u8[i] = Math.round(src[i]! * 255);
+        geometry.setAttribute(name, new THREE.BufferAttribute(u8, size, true));
+      }
       else geometry.setAttribute(name, new THREE.Float32BufferAttribute(B.extra[name]!, size));
     }
     geometry.computeBoundingBox();

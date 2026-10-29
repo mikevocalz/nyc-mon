@@ -122,6 +122,17 @@ export const CITY_MAP_STREAMED: readonly CityMapSourceCredit[] = [
     license: 'ODbL-1.0',
     licenseUrl: 'https://opendatacommons.org/licenses/odbl/1-0/',
   },
+  {
+    // ring 6 (Downtown: SoHo, Tribeca, the Financial District, Battery Park, Ellis Island and the Statue of Liberty
+    // on Liberty Island): the ring's block near/lite cells (world/vd-port/blocks/data-ring6) and lane-C structure
+    // cells (furniture/cells/ring6) bake from the same pinned tile set and stream through the same hash-pinned cell
+    // source (ring6-*/structures-ring6 manifest keys). The statue's own credits are in CITY_MAP_ASSETS below: her
+    // model is jerryfisher's CC BY 4.0 scan via Objaverse, her pedestal and island the public-domain HAER NY-138
+    // measured drawings.
+    attribution: 'Valdrada ring-6 near and structure cells (rev 09b5836), Mehmet Kerem Turkcan',
+    license: 'ODbL-1.0',
+    licenseUrl: 'https://opendatacommons.org/licenses/odbl/1-0/',
+  },
 ];
 
 // ODbL §4.4(a): the bundled tile is itself a Derivative Database of the

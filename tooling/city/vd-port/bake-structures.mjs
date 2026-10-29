@@ -96,14 +96,14 @@ const dataset = parseCityDataset(JSON.parse(readFileSync(join(REPO, 'packages/ap
 const ourGround = createWalkQueries(dataset).groundHeight;
 
 // --ring ring1 (or VD_RING=ring1): assemble the ring's tiles too (VD_TILES, assemble-city.mjs) and keep the pieces
-// in its region as well as the square's. --ring ring2 .. --ring ring5: the union bake — home + rings 1..N tiles and
+// in its region as well as the square's. --ring ring2 .. --ring ring6: the union bake — home + rings 1..N tiles and
 // regions — so the earlier rings' cells are repacked alongside the new ring's rather than dropped. The ring-only
 // cells stream: they pack under cells/<ring>/, carry key '<ring>/<cx>_<cz>' (the fetch path
 // 'structures/<ring>/<cx>_<cz>'), and stay out of VD_CELL_ASSETS.
 const RING = process.argv.includes('--ring') ? process.argv[process.argv.indexOf('--ring') + 1] : process.env.VD_RING ?? null;
 let inRegion = null;
-let R1S = null, inRing1 = null, inRing2 = null, inRing3 = null, inRing4 = null;
-if (RING === 'ring1' || RING === 'ring2' || RING === 'ring3' || RING === 'ring4' || RING === 'ring5') {
+let R1S = null, inRing1 = null, inRing2 = null, inRing3 = null, inRing4 = null, inRing5 = null;
+if (RING === 'ring1' || RING === 'ring2' || RING === 'ring3' || RING === 'ring4' || RING === 'ring5' || RING === 'ring6') {
   const { RING1_TILES, ring1RectsScene, inRing1Scene, inHomeSquare } = await import('./ring1.mjs');
   const { tileIdsForSquare } = await import('../valdrada/decode.mjs');
   const tiles = [...tileIdsForSquare(), ...RING1_TILES.map((k) => `t_${k}`)];
@@ -118,26 +118,34 @@ if (RING === 'ring1' || RING === 'ring2' || RING === 'ring3' || RING === 'ring4'
     inRing2 = (x, z) => inRing2Scene(x, z, R2S);
     const keepR1 = inRegion;
     inRegion = (x, z) => keepR1(x, z) || inRing2(x, z);
-    if (RING === 'ring3' || RING === 'ring4' || RING === 'ring5') {
+    if (RING === 'ring3' || RING === 'ring4' || RING === 'ring5' || RING === 'ring6') {
       const { RING3_TILES, ring3RectsScene, inRing3Scene } = await import('./ring3.mjs');
       for (const k of RING3_TILES) tiles.push(`t_${k}`);
       const R3S = ring3RectsScene(R1AFF);
       inRing3 = (x, z) => inRing3Scene(x, z, R3S);
       const keepR2 = inRegion;
       inRegion = (x, z) => keepR2(x, z) || inRing3(x, z);
-      if (RING === 'ring4' || RING === 'ring5') {
+      if (RING === 'ring4' || RING === 'ring5' || RING === 'ring6') {
         const { RING4_TILES, ring4RectsScene, inRing4Scene } = await import('./ring4.mjs');
         for (const k of RING4_TILES) tiles.push(`t_${k}`);
         const R4S = ring4RectsScene(R1AFF);
         inRing4 = (x, z) => inRing4Scene(x, z, R4S);
         const keepR3 = inRegion;
         inRegion = (x, z) => keepR3(x, z) || inRing4(x, z);
-        if (RING === 'ring5') {
+        if (RING === 'ring5' || RING === 'ring6') {
           const { RING5_TILES, ring5RectsScene, inRing5Scene } = await import('./ring5.mjs');
           for (const k of RING5_TILES) tiles.push(`t_${k}`);
           const R5S = ring5RectsScene(R1AFF);
+          inRing5 = (x, z) => inRing5Scene(x, z, R5S);
           const keepR4 = inRegion;
-          inRegion = (x, z) => keepR4(x, z) || inRing5Scene(x, z, R5S);
+          inRegion = (x, z) => keepR4(x, z) || inRing5(x, z);
+          if (RING === 'ring6') {
+            const { RING6_TILES, ring6RectsScene, inRing6Scene } = await import('./ring6.mjs');
+            for (const k of RING6_TILES) tiles.push(`t_${k}`);
+            const R6S = ring6RectsScene(R1AFF);
+            const keepR5 = inRegion;
+            inRegion = (x, z) => keepR5(x, z) || inRing6Scene(x, z, R6S);
+          }
         }
       }
     }
@@ -497,12 +505,13 @@ const ringCellKey = (key, list) => {
   // a cell inside a ring but not overlapping the square streams: its file lives under cells/<ring>/ and its key
   // carries the ring namespace, so 'structures/<key>' never collides with a home cell's pin. Under the union bake
   // a cell keeps the lowest ring namespace its placements reach: a ring-1 placement pins 'ring1', else a ring-2
-  // placement 'ring2', a ring-3 'ring3', a ring-4 'ring4', else the cell is new to the latest ring and packs under it.
+  // placement 'ring2', a ring-3 'ring3', a ring-4 'ring4', a ring-5 'ring5', else the cell is new to the latest ring
+  // and packs under it.
   // A cell-local prototype's placement is its own cell (the vk corridor pieces' matrix is near identity, which is
   // inside ring 1's rect — it must not namespace the cell), so its ring is the cell's, not its matrix's.
   const at = (x) => { const p = protos[x.proto]; return p && !p.shared && p.cell === key ? [cx * CELL + CELL / 2, cz * CELL + CELL / 2] : [x.m[3], x.m[11]]; };
   const inNs = (inR) => !!inR && list.some((x) => inR(...at(x)));
-  const ns = inNs(inRing1) ? 'ring1' : inNs(inRing2) ? 'ring2' : inNs(inRing3) ? 'ring3' : inNs(inRing4) ? 'ring4' : RING;
+  const ns = inNs(inRing1) ? 'ring1' : inNs(inRing2) ? 'ring2' : inNs(inRing3) ? 'ring3' : inNs(inRing4) ? 'ring4' : inNs(inRing5) ? 'ring5' : RING;
   return { key: `${ns}/${key}`, file: `${ns}/${key}.bin`, bundled: false };
 };
 for (const [cellKey, list] of [...placements].sort()) {
