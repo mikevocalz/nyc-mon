@@ -2,11 +2,23 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { FALLBACK_MON_LINGO, type MonLingo, type MonVoicePort } from '@acme/content/voice';
 import { createMonLingoSource } from './mon-lingo-source.ts';
-import { createMonSpeaker, type MonVoiceSubject } from './mon-speaker.ts';
-import { MonVoiceSilent, requestMonVoice, type MonVoiceRequestDeps } from './mon-voice-request.ts';
+import { BABY_TALK_MS, isBabble } from '@acme/core';
+import { babbleInventory } from '@acme/content/voice';
+import { babbleLine, createMonSpeaker, type MonVoiceSubject } from './mon-speaker.ts';
+import { MonVoiceHttpError, MonVoiceSilent, requestMonVoice, type MonVoiceRequestDeps } from './mon-voice-request.ts';
 
-const squeaklet: MonVoiceSubject = { monInstanceId: 'mon_1', voiceLineageId: 'dex-001/female/1', stage: 'Baby' };
-const egg: MonVoiceSubject = { monInstanceId: 'mon_2', voiceLineageId: 'dex-001/female/1', stage: 'Egg' };
+/** The fixed clock every speaker in this file reads. */
+const NOW = Date.UTC(2026, 9, 29, 12, 0, 0);
+const now = () => NOW;
+const LINEAGE = 'dex-001/female/1';
+/** A Small speaks in full (existing canon): lines pass the gate untouched. */
+const squeaklet: MonVoiceSubject = { monInstanceId: 'mon_1', voiceLineageId: LINEAGE, stage: 'Small', hatchedAt: NOW - 30 * BABY_TALK_MS };
+/** A Baby past its first day: the Q32 limit (family sound plus two words, no "Callah"). */
+const baby: MonVoiceSubject = { monInstanceId: 'mon_3', voiceLineageId: LINEAGE, stage: 'Baby', hatchedAt: NOW - BABY_TALK_MS - 1 };
+/** A Baby an hour after hatching: babble only. */
+const newBaby: MonVoiceSubject = { monInstanceId: 'mon_4', voiceLineageId: LINEAGE, stage: 'Baby', hatchedAt: NOW - 60 * 60_000 };
+const egg: MonVoiceSubject = { monInstanceId: 'mon_2', voiceLineageId: LINEAGE, stage: 'Egg', hatchedAt: null };
+const inventory = (stage: MonVoiceSubject['stage']) => babbleInventory({ lineageId: LINEAGE }, stage);
 
 const tick = () => new Promise((r) => setTimeout(r, 0));
 
@@ -37,6 +49,7 @@ function speaker(opts: { sound?: boolean } = {}) {
   const holds: (() => void)[] = [];
   const s = createMonSpeaker({
     portFor: port.portFor,
+    now,
     soundEnabled: () => opts.sound ?? true,
     hold: (_ms, done) => {
       holds.push(done);
@@ -67,11 +80,97 @@ describe('createMonSpeaker', () => {
     assert.equal(s.caption(), null);
   });
 
-  it('an Egg makes no sound; its caption still shows', async () => {
+  it('an Egg babbles: the caption is the gated babble, never the real word, and the line goes to the port', async () => {
     const { s, port } = speaker();
-    await s.say({ text: 'Bet!', mon: egg });
-    assert.equal(s.caption(), 'Bet!');
-    assert.equal(port.calls.prepared.length, 0);
+    const done = s.say({ text: 'Bet!', mon: egg });
+    const caption = s.caption();
+    assert.notEqual(caption, 'Bet!');
+    assert.ok(caption !== null && isBabble(caption, inventory('Egg')), String(caption));
+    await tick();
+    assert.equal(port.calls.prepared.length, 1);
+    port.end();
+    await done;
+  });
+
+  it('reads the voice stage at the injected clock: the same Baby babbles at hour 1 and speaks limited after 24 h', async () => {
+    const hatchedAt = NOW - 60 * 60_000;
+    const mon: MonVoiceSubject = { ...baby, hatchedAt };
+    const captionAt = async (at: number) => {
+      const s = createMonSpeaker<string>({ portFor: () => ({ prepare: async (t) => t, play: async () => {} }), soundEnabled: () => false, hold: () => () => {}, now: () => at });
+      await s.say({ text: 'Food?', mon });
+      return s.caption();
+    };
+    const early = await captionAt(NOW);
+    assert.ok(early !== null && early !== 'Food?' && isBabble(early, inventory('Baby')), String(early));
+    assert.equal(await captionAt(hatchedAt + BABY_TALK_MS), 'Food?');
+  });
+
+  it('a Baby past its first day never says "Callah" or a sentence: the caption is the gated line', async () => {
+    const { s } = speaker({ sound: false });
+    await s.say({ text: '*chuckle* Bet, Callah!', mon: baby });
+    const caption = s.caption() ?? '';
+    assert.doesNotMatch(caption, /call/i);
+  });
+
+  it('a first-day Baby babbles even a canon line', async () => {
+    const { s } = speaker({ sound: false });
+    await s.say({ text: 'Bet!', mon: newBaby });
+    const caption = s.caption();
+    assert.ok(caption !== null && caption !== 'Bet!' && isBabble(caption, inventory('Baby')), String(caption));
+  });
+
+  it("prefers the server's caption when the clip carries one (the server clock decides)", async () => {
+    let finish: (() => void) | undefined;
+    const s = createMonSpeaker<{ caption: string }>({
+      portFor: () => ({
+        prepare: async () => ({ caption: 'Bwa gu!' }),
+        play: () => new Promise<void>((r) => { finish = r; }),
+        captionOf: (clip) => clip.caption,
+      }),
+      soundEnabled: () => true,
+      hold: () => () => {},
+      now,
+    });
+    const done = s.say({ text: 'Food?', mon: squeaklet });
+    assert.equal(s.caption(), 'Food?');
+    await tick();
+    assert.equal(s.caption(), 'Bwa gu!');
+    finish?.();
+    await done;
+  });
+
+  it("shows the server's caption from a silent answer too", async () => {
+    const s = createMonSpeaker<string>({
+      portFor: () => ({ prepare: async () => { throw new MonVoiceSilent('no-key', 'Nya-mi~'); }, play: async () => {} }),
+      soundEnabled: () => true,
+      hold: () => () => {},
+      now,
+    });
+    await s.say({ text: 'Food?', mon: squeaklet });
+    assert.equal(s.caption(), 'Nya-mi~');
+  });
+
+  it('an Egg the server has no record for (404) keeps the local babble caption', async () => {
+    const holds: (() => void)[] = [];
+    const s = createMonSpeaker<string>({
+      portFor: () => ({ prepare: async () => { throw new MonVoiceHttpError(404); }, play: async () => {} }),
+      soundEnabled: () => true,
+      hold: (_ms, done) => (holds.push(done), () => {}),
+      now,
+    });
+    await s.say({ text: babbleLine(egg, NOW, 'tap|1') ?? '', mon: egg });
+    const caption = s.caption();
+    assert.ok(caption !== null && isBabble(caption, inventory('Egg')), String(caption));
+    assert.equal(holds.length, 1);
+  });
+
+  it('speaking() is true from say() until the caption clears', async () => {
+    const { s, holds } = speaker({ sound: false });
+    assert.equal(s.speaking(), false);
+    await s.say({ text: 'Food?', mon: squeaklet });
+    assert.equal(s.speaking(), true);
+    holds.at(-1)?.();
+    assert.equal(s.speaking(), false);
   });
 
   it('a new line cuts off the one playing', async () => {
@@ -99,6 +198,7 @@ describe('createMonSpeaker', () => {
       portFor: () => ({ prepare: async () => { throw new MonVoiceSilent('no-key'); }, play: async () => {} }),
       soundEnabled: () => true,
       hold: (_ms, done) => (holds.push(done), () => {}),
+      now,
     });
     await s.say({ text: 'Food?', mon: squeaklet });
     assert.equal(s.caption(), 'Food?');
@@ -130,6 +230,7 @@ describe('createMonSpeaker', () => {
       }),
       soundEnabled: () => true,
       hold: () => () => {},
+      now,
     });
     const first = s.say({ text: 'Bet!', mon: squeaklet });
     await tick();
@@ -168,18 +269,20 @@ describe('createMonSpeaker with the lingo Payload serves', () => {
       soundEnabled: () => true,
       hold: () => () => {},
       lingo: () => served,
+      now,
     });
     await s.say({ text: 'Yo Kolla!', mon: squeaklet });
     assert.equal(s.caption(), 'Yo Caller!');
     assert.deepEqual(seen, [served]);
   });
 
-  it('an Egg stays silent by the served stage pitch, not a hard-coded rule', async () => {
-    const babySilent: MonLingo = { ...FALLBACK_MON_LINGO, voices: { ...FALLBACK_MON_LINGO.voices, stagePitch: { ...FALLBACK_MON_LINGO.voices.stagePitch, Baby: null } } };
+  it('a stage stays silent by the served stage pitch, not a hard-coded rule', async () => {
+    const eggSilent: MonLingo = { ...FALLBACK_MON_LINGO, voices: { ...FALLBACK_MON_LINGO.voices, stagePitch: { ...FALLBACK_MON_LINGO.voices.stagePitch, Egg: null } } };
     const port = fakePort();
-    const s = createMonSpeaker({ portFor: port.portFor, soundEnabled: () => true, hold: () => () => {}, lingo: () => babySilent });
-    await s.say({ text: 'Bet!', mon: squeaklet });
+    const s = createMonSpeaker({ portFor: port.portFor, soundEnabled: () => true, hold: () => () => {}, lingo: () => eggSilent, now });
+    await s.say({ text: 'Bet!', mon: egg });
     assert.equal(port.calls.prepared.length, 0);
+    assert.ok(s.caption() !== null);
   });
 });
 
@@ -286,6 +389,46 @@ describe('requestMonVoice', () => {
 
   it('rejects on any other status', async () => {
     await assert.rejects(requestMonVoice({ monId: 'mon_1', text: 'Bet!' }, new AbortController().signal, deps(new Response(null, { status: 404 }))));
+  });
+});
+
+describe('requestMonVoice reads what the server gated', () => {
+  it('returns the x-mon-caption caption (URI-encoded) and x-mon-voice-stage', async () => {
+    const res = new Response(new Uint8Array([1]), { status: 200, headers: { 'x-mon-caption': encodeURIComponent('Bwa gu, nya!'), 'x-mon-voice-stage': 'baby-talk' } });
+    const clip = await requestMonVoice({ monId: 'mon_1', text: 'Bet!' }, new AbortController().signal, deps(res));
+    assert.equal(clip.caption, 'Bwa gu, nya!');
+    assert.equal(clip.voiceStage, 'baby-talk');
+  });
+
+  it('ignores a malformed caption or an unknown stage', async () => {
+    const res = new Response(new Uint8Array([1]), { status: 200, headers: { 'x-mon-caption': '%E0%A4%A', 'x-mon-voice-stage': 'shouting' } });
+    const clip = await requestMonVoice({ monId: 'mon_1', text: 'Bet!' }, new AbortController().signal, deps(res));
+    assert.equal(clip.caption, undefined);
+    assert.equal(clip.voiceStage, undefined);
+  });
+
+  it('a 204 carries the server caption on MonVoiceSilent; a 404 is a MonVoiceHttpError', async () => {
+    const silent = new Response(null, { status: 204, headers: { 'x-mon-voice-reason': 'silent', 'x-mon-caption': encodeURIComponent('Mi~') } });
+    await assert.rejects(
+      requestMonVoice({ monId: 'mon_1', text: 'Bet!' }, new AbortController().signal, deps(silent)),
+      (err: unknown) => err instanceof MonVoiceSilent && err.caption === 'Mi~',
+    );
+    await assert.rejects(
+      requestMonVoice({ monId: 'egg', text: 'Bwa!' }, new AbortController().signal, deps(new Response(null, { status: 404 }))),
+      (err: unknown) => err instanceof MonVoiceHttpError && err.status === 404,
+    );
+  });
+});
+
+describe('babbleLine', () => {
+  it("is seeded babble from the Mon's own sounds for an Egg and a first-day Baby, and nothing after", () => {
+    const a = babbleLine(egg, NOW, 'tap|1');
+    assert.ok(a !== undefined && isBabble(a, inventory('Egg')), String(a));
+    assert.equal(babbleLine(egg, NOW, 'tap|1'), a);
+    assert.ok(babbleLine(newBaby, NOW, 'x') !== undefined);
+    assert.equal(babbleLine(baby, NOW, 'x'), undefined);
+    assert.equal(babbleLine(squeaklet, NOW, 'x'), undefined);
+    assert.equal(babbleLine({ ...egg, voiceLineageId: null }, NOW, 'x'), undefined);
   });
 });
 
