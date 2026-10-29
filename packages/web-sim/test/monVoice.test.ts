@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { TranscriptItem } from '../src/client/session.ts';
-import { currentMonVoice } from '../src/client/monVoice.ts';
+import { currentMonVoice, gatedLine, liveVoiceStage } from '../src/client/monVoice.ts';
+import { babbleInventory } from '@acme/content/voice';
+import { BABY_TALK_MS, isBabble } from '@acme/core';
 
 const tool = (id: string, structuredContent: unknown): TranscriptItem => ({
   kind: 'tool',
@@ -41,5 +43,23 @@ describe('currentMonVoice', () => {
     expect(currentMonVoice([tool('a', { mon: { voice }, mood: 'asleep' })])).toEqual({ ...voice, mood: 'asleep' });
     expect(currentMonVoice([tool('a', { mon: { voice }, mood: 'grumpy' })])).toEqual(voice);
     expect(currentMonVoice([tool('a', { mon: { voice } })])).toEqual(voice);
+  });
+});
+
+describe('gatedLine and liveVoiceStage (Decision 32)', () => {
+  const egg = { lineageId: 'dex-001/male/1', stage: 'Egg', voiceStage: 'baby-talk' } as const;
+  it('babbles a line for an Egg, leaves empty lines and unknown voices alone', () => {
+    expect(isBabble(gatedLine('Hello Callah', egg), babbleInventory({ lineageId: egg.lineageId }, 'Egg'))).toBe(true);
+    expect(gatedLine('', egg)).toBe('');
+    expect(gatedLine('Hello Callah', undefined)).toBe('Hello Callah');
+    expect(gatedLine('Hello Callah', { lineageId: 'dex-001/male/1', stage: 'Small', voiceStage: 'full' })).toBe('Hello Callah');
+  });
+  it('ends a Baby’s first day by its hatch time, and never gives an Egg words', () => {
+    const baby = { lineageId: 'dex-001/male/1', stage: 'Baby', voiceStage: 'baby-talk' } as const;
+    expect(liveVoiceStage(baby, 0, BABY_TALK_MS - 1)).toBe('baby-talk');
+    expect(liveVoiceStage(baby, 0, BABY_TALK_MS)).toBe('limited');
+    expect(liveVoiceStage(baby, undefined, 0)).toBe('baby-talk');
+    expect(liveVoiceStage({ ...egg, voiceStage: 'full' }, undefined, 0)).toBe('baby-talk');
+    expect(liveVoiceStage(undefined, 0, 0)).toBeUndefined();
   });
 });

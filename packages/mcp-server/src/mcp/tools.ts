@@ -9,6 +9,8 @@ import {
   type CareNeed,
   type CareState,
   type MonInstance,
+  type MonMood,
+  voiceStage,
 } from '@acme/core';
 import type { CallToolResult, McpServer } from '@modelcontextprotocol/server';
 import { FALLBACK_MON_LINGO, monVoiceView, voiceGuideFor, type MonLingo } from '@acme/content/voice';
@@ -21,6 +23,7 @@ import type { FamiliarDirectory } from '../presence/fixtures.ts';
 import type { PresenceService } from '../presence/service.ts';
 import type { Permission } from '../presence/types.ts';
 import { failure, success } from './errors.ts';
+import { BABY_TALK_RULE, eggSpeech, monSpeech, type MonOccasion } from './mon-speech.ts';
 import {
   AcknowledgeOutput,
   AcknowledgePersonInput,
@@ -134,8 +137,8 @@ async function lingoFor(ctx: ToolContext, callerId: string): Promise<MonLingo> {
  * in its own voice (PLATFORM-DOCS §2.8) and copy never uses a pronoun for a
  * Mon (PS-005).
  */
-async function monView(ctx: ToolContext, callerId: string, mon: MonInstance) {
-  const lingo = await lingoFor(ctx, callerId);
+async function monView(ctx: ToolContext, callerId: string, mon: MonInstance, lingo?: MonLingo) {
+  const served = lingo ?? (await lingoFor(ctx, callerId));
   return {
     monId: mon.monInstanceId,
     name: mon.nickname,
@@ -144,8 +147,34 @@ async function monView(ctx: ToolContext, callerId: string, mon: MonInstance) {
     bond: mon.bond,
     hatchedAt: mon.hatchedAt,
     gender: mon.gender,
-    voice: monVoiceView(mon, lingo),
+    voice: monVoiceView(mon, ctx.now(), served),
   };
+}
+
+/**
+ * `mon` plus what the Mon may say (`say`, `speechRule`), from one read of the
+ * lingo. Both speech fields are absent for a Mon that speaks in full.
+ */
+async function monAndSpeech(ctx: ToolContext, callerId: string, mon: MonInstance, mood: MonMood, occasion: MonOccasion) {
+  const lingo = await lingoFor(ctx, callerId);
+  return { mon: await monView(ctx, callerId, mon, lingo), ...monSpeech(mon, mood, occasion, lingo, ctx.now()) };
+}
+
+/**
+ * talk_to_mon for a Caller whose only companion is still an egg: the no-mon
+ * failure, carrying the egg's babble so Alexa can babble for the egg.
+ */
+async function eggOnlyTalk(ctx: ToolContext, callerId: string): Promise<CallToolResult> {
+  const eggs = [...(await ctx.data.listIncubatingEggs(callerId))].sort((a, b) => a.egg.incubationEndsAt - b.egg.incubationEndsAt);
+  const first = eggs[0];
+  if (first === undefined) return failure('no-mon');
+  const speech = eggSpeech(first.egg, await lingoFor(ctx, callerId), ctx.now());
+  return failure('no-mon', { egg: { eggId: first.egg.eggId, ...speech }, speechRule: BABY_TALK_RULE });
+}
+
+function isNoMon(result: CallToolResult): boolean {
+  const error = (result.structuredContent as { error?: { reason?: unknown } } | undefined)?.error;
+  return error?.reason === 'no-mon';
 }
 
 function careView(care: CareState) {
@@ -250,7 +279,7 @@ async function runHatch(ctx: ToolContext, args: { eggId?: string; speakerHint?: 
       alreadyHatched,
       hatching: !alreadyHatched,
       egg: { eggId, speciesId: listed?.egg.speciesId ?? 'dex-001' },
-      mon: await monView(ctx, linked.callerId, state.mon),
+      ...(await monAndSpeech(ctx, linked.callerId, state.mon, deriveMonMood(state.care), 'first-words')),
       care: careView(state.care),
       mood: deriveMonMood(state.care),
     });
@@ -314,7 +343,7 @@ async function runCare(
       return success({
         applied: false,
         declinedBecause: predicted.outcome.reason,
-        mon: await monView(ctx, linked.callerId, state.mon),
+        ...(await monAndSpeech(ctx, linked.callerId, state.mon, deriveMonMood(state.care), 'hello')),
         care: careView(state.care),
         mood: deriveMonMood(state.care),
       });
@@ -337,7 +366,7 @@ async function runCare(
     return success({
       applied: true,
       effect,
-      mon: await monView(ctx, linked.callerId, written.mon),
+      ...(await monAndSpeech(ctx, linked.callerId, written.mon, deriveMonMood(written.care), effect === 'played' ? 'played' : 'hello')),
       care: careView(written.care),
       mood: deriveMonMood(written.care),
     });
@@ -401,10 +430,11 @@ export function buildTools(ctx: ToolContext) {
         return guarded(async () => {
           const state = await resolveMon(ctx, linked.callerId, args.monId);
           if (isResult(state)) return state;
+          const mood = deriveMonMood(state.care);
           return success({
-            mon: await monView(ctx, linked.callerId, state.mon),
+            ...(await monAndSpeech(ctx, linked.callerId, state.mon, mood, state.care.pendingRequest !== null ? 'hungry' : 'hello')),
             care: careView(state.care),
-            mood: deriveMonMood(state.care),
+            mood,
             needs: listUnmetNeeds(state.care),
           });
         });
@@ -425,9 +455,10 @@ export function buildTools(ctx: ToolContext) {
           const state = await resolveMon(ctx, linked.callerId, args.monId);
           if (isResult(state)) return state;
           const needs = listUnmetNeeds(state.care);
+          const mood = deriveMonMood(state.care);
           return success({
-            mon: await monView(ctx, linked.callerId, state.mon),
-            mood: deriveMonMood(state.care),
+            ...(await monAndSpeech(ctx, linked.callerId, state.mon, mood, state.care.pendingRequest !== null ? 'hungry' : 'hello')),
+            mood,
             needs,
             suggestedCare: suggestedCare(state, needs),
             ...(devMode ? { presentPeople: presentPeople(ctx, linked.callerId) } : {}),
@@ -447,14 +478,17 @@ export function buildTools(ctx: ToolContext) {
         if (isResult(linked)) return linked;
         return guarded(async () => {
           const now = ctx.now();
-          const eggs = (await ctx.data.listIncubatingEggs(linked.callerId)).map(({ egg }) => ({
+          const listed = await ctx.data.listIncubatingEggs(linked.callerId);
+          const lingo = listed.length === 0 ? undefined : await lingoFor(ctx, linked.callerId);
+          const eggs = listed.map(({ egg }) => ({
             eggId: egg.eggId,
             speciesId: egg.speciesId,
             incubationEndsAt: egg.incubationEndsAt,
             minutesRemaining: Math.max(0, Math.ceil((egg.incubationEndsAt - now) / 60_000)),
             readyToHatch: egg.incubationEndsAt <= now,
+            ...(lingo === undefined ? {} : eggSpeech(egg, lingo, now)),
           }));
-          return success({ incubating: eggs.length > 0, eggs });
+          return success({ incubating: eggs.length > 0, eggs, ...(eggs.length > 0 ? { speechRule: BABY_TALK_RULE } : {}) });
         });
       },
     }),
@@ -472,7 +506,7 @@ export function buildTools(ctx: ToolContext) {
       name: 'talk_to_mon',
       title: 'Talk to Mon',
       description:
-        "Use when the Caller talks to their Mon. Returns the Mon's state (mood, needs, awake or asleep, whether it wants food) and who is speaking, so the reply can be voiced in character. Writes nothing.",
+        "Use when the Caller talks to their Mon, or to their egg. Returns the Mon's state (mood, needs, awake or asleep, whether it wants food) and who is speaking, so the reply can be voiced in character. When `say` is present with verbatim true, the Mon's words are exactly say.text. A Caller with only an egg gets no-mon with the egg's babble in error.egg.say. Writes nothing.",
       input: careInput(devMode),
       output: talkToMonOutput(devMode),
       annotations: READ,
@@ -483,15 +517,16 @@ export function buildTools(ctx: ToolContext) {
         const actor = actorFor(ctx, linked.callerId, hint);
         return guarded(async () => {
           const state = await resolveMon(ctx, linked.callerId, args.monId);
-          if (isResult(state)) return state;
+          if (isResult(state)) return args.monId === undefined && isNoMon(state) ? eggOnlyTalk(ctx, linked.callerId) : state;
           const mood = deriveMonMood(state.care);
+          const wantsFood = state.care.pendingRequest !== null;
           return success({
-            mon: await monView(ctx, linked.callerId, state.mon),
+            ...(await monAndSpeech(ctx, linked.callerId, state.mon, mood, wantsFood ? 'hungry' : 'hello')),
             mood,
-            voiceGuide: voiceGuideFor(state.mon, mood, await lingoFor(ctx, linked.callerId)),
+            voiceGuide: voiceGuideFor(state.mon, mood, await lingoFor(ctx, linked.callerId), voiceStage(state.mon, ctx.now())),
             needs: listUnmetNeeds(state.care),
             activity: state.care.activity.kind,
-            wantsFood: state.care.pendingRequest !== null,
+            wantsFood,
             speaker: speakerView(actor),
             ...(devMode ? { presentPeople: presentPeople(ctx, linked.callerId) } : {}),
           });

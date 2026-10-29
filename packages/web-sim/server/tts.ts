@@ -2,11 +2,12 @@ import { spawn, spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { Readable } from 'node:stream';
 import { MAX_SPOKEN_TEXT, planMonUtterance, type MonLingo } from '@acme/content/voice';
-import { IdSchema, LifecycleStageSchema, MonMoodSchema } from '@acme/core/schemas';
+import { IdSchema, LifecycleStageSchema, MonMoodSchema, VoiceStageSchema } from '@acme/core/schemas';
 import { z } from 'zod';
 import type { CharacterAlignment, FaceTrack } from '@acme/ui/three/mon/lipsync';
 import type { FaceRenderer } from './a2f.ts';
 import type { ModelAuthCheck } from './model-auth.ts';
+import { serverVoice, type MonRosterLookup } from './mon-roster.ts';
 
 /**
  * POST /api/tts: speaks one reply in the current Mon's own voice.
@@ -15,18 +16,26 @@ import type { ModelAuthCheck } from './model-auth.ts';
  * (PLATFORM-DOCS §2.8); the voice lineage exists so the simulator can show how
  * one Mon sounds as it grows up (Bible v11 ¶56).
  *
- * Body: { text, lineageId, stage, mood? } (`monSpeechRequest`). The server
- * re-plans the line with `planMonUtterance` from `@acme/content/voice`, the
- * same plan every surface uses: lineage -> ElevenLabs voice, mood -> lead tag
- * and settings, `*stage directions*` -> audio tags. The stage picks a pitch factor, which ffmpeg bakes in without changing
- * duration, so the browser plays the clip at rate 1. An Egg is silent.
+ * Body: { text, lineageId, stage, voiceStage?, mood? } (`monSpeechRequest`).
+ * The server re-plans the line with `planMonUtterance` from
+ * `@acme/content/voice`, the same plan every surface uses: the speech gate
+ * first (Decision 32: an Egg or a first-day Baby babbles, a later Baby says at
+ * most two words), then lineage -> ElevenLabs voice, mood -> lead tag and
+ * settings, `*stage directions*` -> audio tags. The Mon's stage and hatch
+ * time come from the server's roster (mon-roster.ts), never from the body: the
+ * body's `stage` and `voiceStage` can only lower the speech. A lineage that is
+ * not one of the Caller's Mons, or a roster the server could not read, is
+ * voiced as babble. The stage picks a pitch factor (an Egg 1.45),
+ * which ffmpeg bakes in without changing duration, so the browser plays the
+ * clip at rate 1. Every answer with audio carries `x-mon-caption`, the gated
+ * caption URL-encoded, so a client shows what was voiced.
  *
  * The pitch shift streams (ffmpeg reads mp3 on stdin and writes mp3 on
  * stdout), so it adds encoder latency, not a full-clip buffer. Without an
  * ffmpeg binary (FFMPEG_PATH, else `ffmpeg` on PATH) the clip is served at the
  * voice's own pitch and the server logs that once.
  *
- * 204 means "no voice for this": no API key, an Egg, or a lineage whose pool is
+ * 204 means "no voice for this": no API key, or a lineage whose pool is
  * empty. The client then falls back to Web Speech. The API key and the text are
  * never logged.
  *
@@ -51,6 +60,7 @@ export const TtsRequestSchema = z.strictObject({
   text: z.string().trim().min(1).max(MAX_TTS_TEXT),
   lineageId: IdSchema,
   stage: LifecycleStageSchema,
+  voiceStage: VoiceStageSchema.optional(),
   mood: MonMoodSchema.optional(),
 });
 
@@ -65,7 +75,7 @@ export function pitchFilter(factor: number): string {
   if (!(factor > 0)) throw new RangeError(`pitch factor must be positive, got ${factor}`);
   const shiftedRate = Math.round(SAMPLE_RATE * factor);
   const tempo = SAMPLE_RATE / shiftedRate;
-  // atempo takes 0.5 to 100 per instance; the stage table stays inside that.
+  // atempo takes 0.5 to 100 per instance; the stage table (0.92 to the Egg's 1.45) stays inside that.
   if (tempo < 0.5 || tempo > 100) throw new RangeError(`pitch factor ${factor} is outside what atempo can undo`);
   return `asetrate=${shiftedRate},aresample=${SAMPLE_RATE},atempo=${tempo.toFixed(6)}`;
 }
@@ -135,6 +145,9 @@ export interface TtsHandlerDeps {
    * Omitted: the bundled FALLBACK_MON_LINGO.
    */
   readonly lingo?: () => Promise<MonLingo>;
+  /** The Caller's Mons as the server finds them out; the voice stage comes from here, not the body. */
+  readonly roster: MonRosterLookup;
+  readonly now?: () => number;
 }
 
 /** ElevenLabs `/with-timestamps` body. */
@@ -241,12 +254,16 @@ export function createTtsHandler(deps: TtsHandlerDeps) {
       return json(400, { error: 'Malformed speech request.' });
     }
 
-    const plan = planMonUtterance(parsed.text, parsed, deps.lingo ? await deps.lingo() : undefined);
+    // The Mon's real stage decides how much it may say; the body's claims only lower it.
+    const voice = serverVoice(await deps.roster(req.headers.get('authorization'), parsed).catch(() => null), parsed, (deps.now ?? Date.now)());
+    const ref = { lineageId: parsed.lineageId, stage: voice.mon?.stage ?? parsed.stage, voiceStage: voice.voiceStage, ...(parsed.mood ? { mood: parsed.mood } : {}) };
+    const plan = planMonUtterance(parsed.text, ref, deps.lingo ? await deps.lingo() : undefined);
     if (deps.apiKey === undefined || plan.voice.kind !== 'lineage') return silent();
     // The mood's stability and similarity plus the voice's own style and speed.
     // Checked live 2026-10-23: eleven_v4_turbo answers 200 with all four fields.
     const { voiceId, model, settings, pitchFactor: factor, lineageId } = plan.voice;
     const spoken = plan.spoken;
+    const caption = encodeURIComponent(plan.caption);
     const shifter = deps.pitchShift === undefined ? systemPitchShifter() : deps.pitchShift;
 
     if ((req.headers.get('accept') ?? '').includes('application/json')) {
@@ -291,7 +308,7 @@ export function createTtsHandler(deps: TtsHandlerDeps) {
           ...(alignment ? { alignment } : {}),
           ...(faceId ? { faceId } : {}),
         }),
-        { status: 200, headers: { 'content-type': 'application/json', 'cache-control': 'no-store', 'x-mon-pitch': String(applied) } },
+        { status: 200, headers: { 'content-type': 'application/json', 'cache-control': 'no-store', 'x-mon-pitch': String(applied), 'x-mon-caption': caption } },
       );
     }
 
@@ -331,6 +348,8 @@ export function createTtsHandler(deps: TtsHandlerDeps) {
         'x-content-type-options': 'nosniff',
         // The pitch factor baked into this clip; 1 when no shift ran.
         'x-mon-pitch': String(applied),
+        // The gated caption of what this clip says, URL-encoded.
+        'x-mon-caption': caption,
       },
     });
   };

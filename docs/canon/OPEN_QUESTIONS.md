@@ -99,8 +99,9 @@ The Bible outranks the build prompt (`IDX L7-L8`; BUILD_PROMPT_v3 §0B Law 1). E
 
 **Q31. Refusal at Baby stage.** v11 requires "listening/talking/refusal performance" for conversation (`V11 ¶97`) and says Mons "refuse" (`V11 ¶43`). The prompt's `refuse` clip plays in M08 and M14. v7's Baby notes give only an "approach/step-back cue" (`[v7] M7 L509`). Yes/no: a Baby's refusal is a step-back/turn-away body cue with no speech?
 
-**Q32. Baby voice.** v11: "Hatchlings may use baby-talk/gibberish, then limited speech, then full speech." (`V11 ¶56`). v7 gives species sounds (scritchy chirps; chirrup and purr; yips and a short rally howl). Yes/no: Phase 1 Babies use only species sounds, no baby-talk words?
+**Q32. Baby voice.** **Answered → Decision #32.** Original question kept for the record: v11: "Hatchlings may use baby-talk/gibberish, then limited speech, then full speech." (`V11 ¶56`). v7 gives species sounds (scritchy chirps; chirrup and purr; yips and a short rally howl). Yes/no: Phase 1 Babies use only species sounds, no baby-talk words?
   **Partly answered 2026-10-23 (Mike), Hood Ratti line only:** a Squeaklet uses the family sound plus at most two words ("Bet!", "Food?"), never a sentence, and no "Callah" yet. Open for the other two lines.
+  **Answered 2026-10-29 (Mike), all three lines:** an Egg babbles (wordless baby sounds, no real words), and a Baby keeps babbling for its first 24 hours after `hatchedAt`. After that a Baby speaks the 2026-10-23 limit above: the family sound plus at most two words, never a sentence, no "Callah". Small, Mid and Max speak in full. This holds for Squeaklet, Kittee Cee and Yotito, with one `voiceLineageId` for life (`V11 ¶56`). See `docs/canon/DECISIONS.md` Decision 32.
 
 **Q33. Type field.** v7 types all three Babies "Neutral". The index calls type fields "legacy data until the explicit migration map is authored" (`IDX L41`); v11 lists that map as open (`V11 ¶101`). Yes/no: Phase 1 content omits type/Affinity entirely?
 
