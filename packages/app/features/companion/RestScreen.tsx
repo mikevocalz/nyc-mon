@@ -2,10 +2,10 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'expo-router';
-import { assertNever, DEFAULT_CARE_TUNING } from '@acme/core/sim';
+import { assertNever, DEFAULT_CARE_TUNING, heartsFor } from '@acme/core/sim';
 import type { CareAction } from '@acme/core/types';
 import {
-  Button, CareMeterRing, HLYNK_COPY, SheetSurface, useInstanceStore, useReducedMotion, useStore, type DeviceKey, type GlassAction,
+  Button, HeartRow, HLYNK_COPY, SheetSurface, useInstanceStore, useReducedMotion, useStore, type DeviceKey, type GlassAction,
   type GlassView,
 } from '@acme/ui';
 import { haptics } from '@acme/ui/haptics';
@@ -102,6 +102,8 @@ export function RestScreen() {
       case 'overfed':
       case 'woke':
       case 'played':
+      case 'paused':
+      case 'resumed':
         return;
       default:
         return assertNever(outcome);
@@ -146,6 +148,8 @@ export function RestScreen() {
       case 'overfed':
       case 'fell-asleep':
       case 'played':
+      case 'paused':
+      case 'resumed':
         return;
       default:
         return assertNever(outcome);
@@ -239,15 +243,11 @@ export function RestScreen() {
       <View className="flex-1" style={{ pointerEvents: 'box-none' }}>
         {care === undefined ? null : (
           <View className="absolute right-4 top-4">
-            <CareMeterRing
-              need="energy"
-              value={care.energy}
-              label={c('m13.ring.energy')}
-              low={care.energy < DEFAULT_CARE_TUNING.needsAttentionBelow}
-              lowLabel={c('m13.ring.low')}
-              size="md"
+            <HeartRow
+              filled={heartsFor(care.energy)}
+              label={care.energy < DEFAULT_CARE_TUNING.needsAttentionBelow ? `${c('m13.ring.energy')} · ${c('m13.ring.low')}` : c('m13.ring.energy')}
+              accessibilityLabel={`${c('m13.ring.energy')}, ${c('monspace.a11y.hearts', { count: heartsFor(care.energy) })}${care.energy < DEFAULT_CARE_TUNING.needsAttentionBelow ? `, ${c('m13.ring.low')}` : ''}`}
               scheme="night"
-              reducedMotion={reducedMotion}
               testID="m15-ring-energy"
             />
           </View>
@@ -277,7 +277,7 @@ export function RestScreen() {
       a11y={
         <>
           <Text testID="m15-status" accessibilityLiveRegion="polite">{statusText}</Text>
-          {care === undefined ? null : <Text testID="m15-ring-energy">{`${c('m13.ring.energy')} ${Math.round(care.energy * 100)}%`}</Text>}
+          {care === undefined ? null : <Text testID="m15-ring-energy">{`${c('m13.ring.energy')}, ${c('monspace.a11y.hearts', { count: heartsFor(care.energy) })}`}</Text>}
           {showLeave && !settling ? <Text testID="m15-leave-note">{c('m15.sleeping.leave', { name })}</Text> : null}
           {earlyWake && canWake ? <Text testID="m15-wake-cost">{c('m15.wake.cost', { name })}</Text> : null}
         </>

@@ -74,6 +74,8 @@ const ACTION_COPY: Readonly<Record<CareAction['kind'], SystemCopyId>> = {
   rest: 'm21.queue.rest',
   wake: 'm21.queue.wake',
   play: 'm21.queue.play',
+  pause: 'm21.queue.pause',
+  resume: 'm21.queue.resume',
 };
 
 /** Every waiting write as a row, newest first. */

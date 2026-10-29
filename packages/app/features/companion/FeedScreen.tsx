@@ -2,10 +2,10 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'expo-router';
-import { assertNever, DEFAULT_CARE_TUNING, deriveMonMood, mealNutrition, wouldOverfeed } from '@acme/core/sim';
+import { assertNever, DEFAULT_CARE_TUNING, deriveMonMood, mealNutrition, wouldOverfeed, heartsFor } from '@acme/core/sim';
 import type { CareAction } from '@acme/core/types';
 import {
-  Button, CareMeterRing, HLYNK_COPY, SheetSurface, useInstanceStore, useReducedMotion, useStore, type DeviceKey, type GlassAction,
+  Button, HeartRow, HLYNK_COPY, SheetSurface, useInstanceStore, useReducedMotion, useStore, type DeviceKey, type GlassAction,
   type GlassView,
 } from '@acme/ui';
 import { haptics } from '@acme/ui/haptics';
@@ -101,6 +101,8 @@ export function FeedScreen() {
       case 'fell-asleep':
       case 'woke':
       case 'played':
+      case 'paused':
+      case 'resumed':
         // Feed never returns these; listed so a new outcome fails typecheck here.
         return;
       default:
@@ -155,15 +157,11 @@ export function FeedScreen() {
 
   const ring = care === undefined ? null : (
     <View className="absolute left-4 top-4">
-      <CareMeterRing
-        need="fullness"
-        value={care.fullness}
-        label={c('m13.ring.fullness')}
-        low={care.fullness < DEFAULT_CARE_TUNING.needsAttentionBelow}
-        lowLabel={c('m13.ring.low')}
-        size="sm"
+      <HeartRow
+        filled={heartsFor(care.fullness)}
+        label={care.fullness < DEFAULT_CARE_TUNING.needsAttentionBelow ? `${c('m13.ring.fullness')} · ${c('m13.ring.low')}` : c('m13.ring.fullness')}
+        accessibilityLabel={`${c('m13.ring.fullness')}, ${c('monspace.a11y.hearts', { count: heartsFor(care.fullness) })}${care.fullness < DEFAULT_CARE_TUNING.needsAttentionBelow ? `, ${c('m13.ring.low')}` : ''}`}
         scheme={scheme}
-        reducedMotion={reducedMotion}
         testID="m14-ring-fullness"
       />
     </View>
@@ -253,7 +251,7 @@ export function FeedScreen() {
         <>
           <Text accessibilityRole="header">{c('m14.title', { name })}</Text>
           {care === undefined ? null : (
-            <Text testID="m14-ring-fullness">{`${c('m13.ring.fullness')} ${Math.round(care.fullness * 100)}%`}</Text>
+            <Text testID="m14-ring-fullness">{`${c('m13.ring.fullness')}, ${c('monspace.a11y.hearts', { count: heartsFor(care.fullness) })}`}</Text>
           )}
           {declinedText ? <Text testID="m14-declined">{declinedText}</Text> : null}
           {view.kind !== 'declined' && full ? <Text testID="m14-full">{c('m14.full.body', { name })}</Text> : null}

@@ -2,10 +2,10 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'expo-router';
-import { deriveMonMood } from '@acme/core/sim';
+import { deriveMonMood, heartsFor } from '@acme/core/sim';
 import type { MonInstance } from '@acme/core/types';
 import {
-  Badge, Button, CareMeterRing, EmptyState, CareMeterRingGroup, HLYNK_COPY, SegmentedControl, SheetSurface, StatusRow, useInstanceStore,
+  Badge, Button, EmptyState, HeartRow, HLYNK_COPY, SegmentedControl, SheetSurface, StatusRow, useInstanceStore,
   useReducedMotion, useStore, type DeviceKey, type GlassAction, type GlassView,
 } from '@acme/ui';
 import { Pressable, Text, View } from '@acme/ui/tw';
@@ -28,6 +28,8 @@ import { MonCaption } from '../voice/MonCaption';
 import { useMonVoice } from '../voice/use-mon-voice';
 
 const NEEDS = ['energy', 'fullness', 'social'] as const;
+/** M32 Mon Space: the care loop's home from Home (canon v12). */
+const MON_SPACE = '/(home)/mon-space' as const;
 /** How many journal moments the Home pane lists before pointing to the Journal. */
 const RECENT = 5;
 /** The bar's four buttons in one row; the menu and the chooser reuse the same row. */
@@ -140,34 +142,35 @@ export function HomeScreen({ mon }: { mon: MonInstance }) {
     else local.setState((st) => ({ reactionKey: st.reactionKey + 1 }));
     speak(care !== undefined && askRoute(care) === '/(home)/feed');
   };
+  /** The trackpad answers the ask in Mon Space (M32), which holds the whole care loop; with nothing asked it says hi. */
   const answer = () => {
     const route = care === undefined ? undefined : askRoute(care);
     if (route === undefined) sayHi();
-    else router.push(route);
+    else router.push(MON_SPACE);
   };
   const onPan = useCallback((dx: number) => local.setState((st) => ({ pan: panRoom(st.pan, dx) })), [local]);
   const dexHref = `/(home)/mon/${mon.monInstanceId}` as const;
 
+  // Four hearts per meter (M32 D20a): one tint, no number, no red.
   const rings = care === undefined ? null : (
-    <CareMeterRingGroup accessibilityLabel={companionCopy('m13.rings.a11y.label')} testID="m13-rings">
-      {(['energy', 'fullness', 'social'] as const).map((need) => {
+    <View testID="m13-rings" accessibilityLabel={companionCopy('m13.rings.a11y.label')} className="gap-1">
+      {NEEDS.map((need) => {
         const low = isLow(care[need]);
+        const hearts = heartsFor(care[need]);
+        const meter = companionCopy(NEED_RING[need]);
         return (
-          <CareMeterRing
+          <HeartRow
             key={need}
             testID={`m13-ring-${need}`}
-            need={need}
-            value={care[need]}
-            label={companionCopy(NEED_RING[need])}
-            low={low}
-            lowLabel={companionCopy('m13.ring.low')}
-            size="md"
+            filled={hearts}
+            label={low ? `${meter} · ${companionCopy('m13.ring.low')}` : meter}
+            accessibilityLabel={`${meter}, ${companionCopy('monspace.a11y.hearts', { count: hearts })}${low ? `, ${companionCopy('m13.ring.low')}` : ''}`}
             scheme={scheme}
-            reducedMotion={reducedMotion}
+            labelClassName="text-type-caption text-text"
           />
         );
       })}
-    </CareMeterRingGroup>
+    </View>
   );
 
   const nameBlock = (testID: string) => (
@@ -192,7 +195,7 @@ export function HomeScreen({ mon }: { mon: MonInstance }) {
   const bar = (
     <View className="flex-row justify-between gap-target-gap">
       {([
-        ['m13-bar-feed', 'm13.bar.feed', () => router.push('/(home)/feed')],
+        ['m13-bar-space', 'monspace.title', () => router.push(MON_SPACE)],
         ['m13-bar-rest', asleep ? 'm13.bar.wake' : 'm13.bar.rest', () => router.push('/(home)/rest')],
         ['m13-bar-play', 'm13.bar.play', () => router.push('/(home)/social')],
         ['m13-bar-dex', 'm13.bar.dex', () => router.push(dexHref)],
@@ -229,7 +232,7 @@ export function HomeScreen({ mon }: { mon: MonInstance }) {
     : menu
       ? menuActions
       : [
-        { target: 'feed', label: companionCopy('m13.bar.feed'), tone: tone('/(home)/feed') },
+        { target: 'space', label: companionCopy('monspace.title'), tone: suggested !== undefined ? 'primary' : 'secondary' },
         { target: 'rest', label: companionCopy(asleep ? 'm13.bar.wake' : 'm13.bar.rest'), tone: tone('/(home)/rest') },
         { target: 'play', label: companionCopy('m13.bar.play'), tone: tone('/(home)/social') },
         { target: 'dex', label: companionCopy('m13.bar.dex'), tone: 'secondary' },
@@ -265,7 +268,8 @@ export function HomeScreen({ mon }: { mon: MonInstance }) {
     } else if (target === 'dex') {
       local.setState({ menu: false });
       router.push(dexHref);
-    } else if (target === 'feed') router.push('/(home)/feed');
+    } else if (target === 'space') router.push(MON_SPACE);
+    else if (target === 'feed') router.push('/(home)/feed');
     else if (target === 'rest') router.push('/(home)/rest');
     else if (target === 'play') router.push('/(home)/social');
   };
@@ -308,16 +312,17 @@ export function HomeScreen({ mon }: { mon: MonInstance }) {
         {status ? <Text className="text-xr-body text-text" testID="m13-pane-status">{status.text}</Text> : null}
         {care === undefined ? null : NEEDS.map((need) => {
           const meter = companionCopy(NEED_RING[need]);
-          const percent = Math.round(care[need] * 100);
+          const hearts = heartsFor(care[need]);
           const low = isLow(care[need]);
           return (
-            <View
-              key={need}
-              accessible
-              accessibilityLabel={`${companionCopy('pane.home.meter', { meter, percent })}${low ? `, ${companionCopy('m13.ring.low')}` : ''}`}
-              className="min-h-target flex-row items-center justify-between border-b border-border py-2"
-            >
-              <Text className="text-xr-body text-text">{companionCopy('pane.home.meter', { meter, percent })}</Text>
+            <View key={need} className="min-h-target flex-row items-center justify-between border-b border-border py-2">
+              <HeartRow
+                filled={hearts}
+                label={meter}
+                accessibilityLabel={`${meter}, ${companionCopy('monspace.a11y.hearts', { count: hearts })}${low ? `, ${companionCopy('m13.ring.low')}` : ''}`}
+                labelClassName="text-xr-body text-text"
+                cell={4}
+              />
               {low ? <Badge label={companionCopy('m13.ring.low')} size="sm" tone="accent" /> : null}
             </View>
           );
@@ -447,7 +452,7 @@ export function HomeScreen({ mon }: { mon: MonInstance }) {
               <View testID="m13-rings" accessibilityLabel={companionCopy('m13.rings.a11y.label')}>
                 {NEEDS.map((need) => (
                   <Text key={need} testID={`m13-ring-${need}`}>
-                    {`${companionCopy(NEED_RING[need])} ${Math.round(care[need] * 100)}%${isLow(care[need]) ? `, ${companionCopy('m13.ring.low')}` : ''}`}
+                    {`${companionCopy(NEED_RING[need])}, ${companionCopy('monspace.a11y.hearts', { count: heartsFor(care[need]) })}${isLow(care[need]) ? `, ${companionCopy('m13.ring.low')}` : ''}`}
                   </Text>
                 ))}
               </View>
@@ -463,7 +468,7 @@ export function HomeScreen({ mon }: { mon: MonInstance }) {
           onPress: () => go(a.target),
           testID: choosing
             ? chooserTestID(a.target)
-            : a.target === 'close' ? 'm13-menu-close' : a.target === 'journal' ? 'home-menu-journal' : a.target === 'switch' ? 'm13-menu-switch' : `m13-bar-${a.target}`,
+            : a.target === 'space' ? 'm13-bar-space' : a.target === 'close' ? 'm13-menu-close' : a.target === 'journal' ? 'home-menu-journal' : a.target === 'switch' ? 'm13-menu-switch' : `m13-bar-${a.target}`,
         })),
         { key: 'menu', label: HLYNK_COPY['hlynk.key.menu.label'], onPress: () => onKey('menu'), testID: 'm13-menu' },
       ]}

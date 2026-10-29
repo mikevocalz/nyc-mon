@@ -3,10 +3,10 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'expo-router';
 import { PEEK_ROUNDS_PER_SESSION, PEEK_SPOTS } from '@acme/core/schemas';
-import { assertNever, createRandom, DEFAULT_CARE_TUNING, hash128 } from '@acme/core/sim';
+import { assertNever, createRandom, DEFAULT_CARE_TUNING, hash128, heartsFor } from '@acme/core/sim';
 import type { PeekRound, PeekSpot } from '@acme/core/types';
 import {
-  Button, CareMeterRing, HLYNK_COPY, RoundDots, SheetSurface, useInstanceStore, useReducedMotion, useStore, type DeviceKey,
+  Button, HeartRow, HLYNK_COPY, RoundDots, SheetSurface, useInstanceStore, useReducedMotion, useStore, type DeviceKey,
   type GlassAction, type GlassLine, type GlassView,
 } from '@acme/ui';
 import { haptics } from '@acme/ui/haptics';
@@ -99,6 +99,8 @@ export function SocialScreen() {
       tickMinuteClock();
       switch (outcome.kind) {
         case 'played':
+        case 'paused':
+        case 'resumed':
         case 'declined': // asleep / too-tired only on a race; the gate prevents it
         case 'eaten':
         case 'overfed':
@@ -333,15 +335,11 @@ export function SocialScreen() {
       <View className="flex-1" style={{ pointerEvents: 'box-none' }}>
         {care === undefined ? null : (
           <View className="absolute right-4 top-4">
-            <CareMeterRing
-              need="social"
-              value={care.social}
-              label={c('m13.ring.social')}
-              low={care.social < DEFAULT_CARE_TUNING.needsAttentionBelow}
-              lowLabel={c('m13.ring.low')}
-              size="sm"
+            <HeartRow
+              filled={heartsFor(care.social)}
+              label={care.social < DEFAULT_CARE_TUNING.needsAttentionBelow ? `${c('m13.ring.social')} · ${c('m13.ring.low')}` : c('m13.ring.social')}
+              accessibilityLabel={`${c('m13.ring.social')}, ${c('monspace.a11y.hearts', { count: heartsFor(care.social) })}${care.social < DEFAULT_CARE_TUNING.needsAttentionBelow ? `, ${c('m13.ring.low')}` : ''}`}
               scheme={scheme}
-              reducedMotion={reducedMotion}
               testID="m16-ring-social"
             />
           </View>
@@ -378,7 +376,7 @@ export function SocialScreen() {
       a11y={
         <>
           <Text accessibilityRole="header">{c('m16.intro.title', { name })}</Text>
-          {care === undefined ? null : <Text testID="m16-ring-social">{`${c('m13.ring.social')} ${Math.round(care.social * 100)}%`}</Text>}
+          {care === undefined ? null : <Text testID="m16-ring-social">{`${c('m13.ring.social')}, ${c('monspace.a11y.hearts', { count: heartsFor(care.social) })}`}</Text>}
           {glassLines.map((l) => <Text key={l.text}>{l.text}</Text>)}
         </>
       }

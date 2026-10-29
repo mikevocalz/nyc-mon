@@ -58,6 +58,8 @@ export const SYSTEM_COPY = {
   'm21.queue.rest': '{name} went to sleep',
   'm21.queue.wake': 'Woke {name}',
   'm21.queue.play': 'Played with {name}',
+  'm21.queue.pause': 'Paused time for {name}',
+  'm21.queue.resume': 'Resumed time for {name}',
   'm21.queue.egg': 'New egg',
   'm21.log.title': 'Sync log',
   'm21.log.empty': 'No changes from the server yet.',
