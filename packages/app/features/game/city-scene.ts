@@ -7,6 +7,7 @@ import type { ThreeContext, ThreeScene } from '@acme/ui/three';
 import type { CityDatasetV3 } from './city-dataset.ts';
 import type { ActorFrame, SceneActor, SceneActorFactory } from './scene-actor.ts';
 import { buildCityWorld } from './world/index.ts';
+import { installShadowPassAlphaTest } from './world/shadow-pass-alpha.ts';
 import { EXPERIMENTAL_WORLD_POST, mountCityPostPipeline, resolvePostOptions } from './post/pipeline.ts';
 import { livingCityAdaptiveBridge } from './living-city/adaptive-bridge.ts';
 import { EXPERIMENTAL_WORLD_RENDER_SCALE, mountRenderScale } from './perf/render-scale.ts';
@@ -46,6 +47,8 @@ export interface CitySceneParams {
   sky?: SkyName;
   /** Time-of-day preset for the physically lit city (world/time-of-day.store.ts); default twilight. */
   preset?: PhysicalPresetId;
+  /** World build progress, 0..1 (world/index.ts CityWorldOptions.onProgress); load-game-scene.ts feeds the load bar. */
+  onBuildProgress?: (fraction: number) => void;
 }
 
 /** What a device-lane probe (shared, skiatex, pipecache) gets from the scene. */
@@ -120,6 +123,8 @@ export function cameraPose(value: CityCamera, out: CameraPose = { position: [0, 
 
 export function createCityScene(context: ThreeContext, initial: CitySceneParams): ThreeScene<CitySceneParams> {
   const { THREE, invalidate, renderer } = context;
+  // The shadow pass re-keyed every caster every frame without it (world/shadow-pass-alpha.ts).
+  installShadowPassAlphaTest(THREE);
   if (![initial.camera.x, initial.camera.z, initial.camera.yaw, initial.camera.distance].every(Number.isFinite)) throw new Error('Invalid city camera');
   // The dataset arrives parsed (city-data.ts runs parseCityDataset once per runtime); only check the shape here.
   const dataset = initial.dataset;
@@ -143,6 +148,7 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
   const physicalTier = TIER[WORLD_TIER].physical;
   const world = buildCityWorld(THREE, dataset, {
     sky: initial.sky,
+    ...(initial.onBuildProgress ? { onProgress: initial.onBuildProgress } : {}),
     ...(bundle ? { glassTier: bundle.glassTier, envWidth: bundle.envWidth } : {}),
     ...(physical?.pbrMaterials ? { pbr: true, carPbr: true, physical: true } : {}),
     // Pooled PointLights only where ClusteredLighting clusters them (physical-rig.ts).

@@ -185,6 +185,8 @@ function create(): LivingCityBundle {
     signals,
     seed: LIVING_CITY_SEED,
     targetVehicles: caps.vehicles,
+    // Buses ride the primary avenues and crosstown streets (topology.ts LaneEdge.busRoute), not a random share.
+    busTarget: caps.buses,
     vehicles: slice?.spawns ?? [],
     peds: {
       seed: LIVING_CITY_SEED ^ 0x5eed,

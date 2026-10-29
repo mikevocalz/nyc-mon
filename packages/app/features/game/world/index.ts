@@ -67,6 +67,12 @@ export interface CityWorldStats extends CityMeshStats {
 
 export interface CityWorldOptions {
   /**
+   * Build progress, 0..1, at the build's checkpoints (materials, meshes, facelift, trees, props, lights). The load
+   * bar and START's no-progress watchdog read it (load-game-scene.ts): the build is synchronous, but on the render
+   * runtime each call reaches the JS thread while the build runs.
+   */
+  onProgress?: (fraction: number) => void;
+  /**
    * Lane L1 "one light" rig: dome, sun, exp² fog and env from one committed
    * sky JSON. Defaults to EXPO_PUBLIC_WORLD_SKY_RIG — off unless set.
    */
@@ -219,14 +225,17 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
     (materials.ground as InstanceType<Three['Material']>).depthWrite = false;
   }
 
+  const progress = options.onProgress ?? (() => {});
   // One street-clearance index for every tree, pole, sign, stoop and prop.
   const clearance = createStreetClearance(dataset);
+  progress(0.1);
   // The physical modules load only on this branch (physical-graph.ts).
   const phys = options.physical
     ? loadPhysicalCityMaterials().buildPhysicalCityMaterials(
         THREE, loadPhysicalRig().cityUniforms(THREE), dataset, { topology: buildLaneTopology(dataset) },
       )
     : null;
+  progress(0.2);
   const future = options.future ?? EXPERIMENTAL_WORLD_FUTURE;
   const faceliftModule = phys && future ? loadPhysicalFacelift() : null;
   const nightPools = phys ? options.nightLights : undefined;
@@ -249,13 +258,17 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
         },
       )
     : buildCityMeshes(THREE, dataset, materials, away, clearance, future);
+  progress(0.55);
   // The facelift reads the built masonry walls, so it follows buildCityMeshes.
   const facelift = faceliftModule ? faceliftModule.buildPhysicalFacelift(THREE, dataset, city.meshes, clearance) : null;
+  progress(0.65);
   const trees = buildTrees(THREE, dataset, materials, clearance, vd, VD_LEAN, leanMat, leanDraw, phys !== null);
+  progress(0.75);
   // The facelift's LED streetlights: the furniture lamps pool in the LED colour instead of sodium.
   const ledPools = faceliftModule ? faceliftModule.createFaceliftLampPools(THREE) : null;
   const furniture = buildStreetFurniture(THREE, dataset, ledPools ? { ...materials, lampPools: ledPools } : materials, clearance, city.texts);
   const props = buildStreetProps(THREE, dataset, materials, clearance, furniture.signs, furniture.lights);
+  progress(0.9);
   // Real night light at the lamp heads and under the awnings, in the LED colour with the facelift.
   const night = nightPools
     ? (() => {

@@ -18,12 +18,26 @@
 /** Events from the render runtime. `detail` is a stage, a breadcrumb, a formatted error, or a JSON perf summary. */
 export type GameRenderEventKind = 'backend' | 'stage' | 'firstFrame' | 'failed' | 'trace' | 'error' | 'perf';
 
-/** The load milestones the runtime may report (game-session.ts LOAD_STAGES, minus `done`, which `firstFrame` sets). */
-export const RUNTIME_LOAD_STAGES = ['requested', 'moduleLoaded', 'worldBuilt', 'firstRender'] as const;
+/** The load stages the runtime may report (game-session.ts LOAD_STAGES, minus `done`, which `firstFrame` sets). */
+export const RUNTIME_LOAD_STAGES = ['requested', 'moduleLoaded', 'worldBuilt', 'compile', 'firstRender'] as const;
 export type RuntimeLoadStage = (typeof RUNTIME_LOAD_STAGES)[number];
 
 export function isRuntimeLoadStage(value: string): value is RuntimeLoadStage {
   return (RUNTIME_LOAD_STAGES as readonly string[]).includes(value);
+}
+
+/** A stage event's detail: the stage, then `:` and how far through it (0..1) for a partial report. */
+export function formatRuntimeStage(stage: RuntimeLoadStage, fraction?: number): string {
+  return fraction === undefined ? stage : `${stage}:${Math.round(fraction * 1000) / 1000}`;
+}
+
+/** The stage and fraction of a stage event's detail, or null for anything else. */
+export function parseRuntimeStage(detail: string): { stage: RuntimeLoadStage; fraction?: number } | null {
+  const [stage, part] = detail.split(':');
+  if (stage === undefined || !isRuntimeLoadStage(stage)) return null;
+  if (part === undefined) return { stage };
+  const fraction = Number(part);
+  return Number.isFinite(fraction) ? { stage, fraction } : null;
 }
 
 /**
@@ -64,7 +78,7 @@ export function installFrameGlobals(target: Record<string, unknown> = globalThis
 export interface RenderEventSinks {
   log: (message: string) => void;
   error: (message: string) => void;
-  loadStage: (stage: RuntimeLoadStage) => void;
+  loadStage: (stage: RuntimeLoadStage, fraction?: number) => void;
 }
 
 /**
@@ -85,14 +99,21 @@ export function routeRenderEvent(kind: GameRenderEventKind, detail: string, sink
       // measures the draw's CPU cost and interval on the render runtime.
       sinks.log(`[NYC-Mon/perf] worklet render submission ${detail}`);
       return true;
-    case 'stage':
-      if (isRuntimeLoadStage(detail)) {
-        sinks.log(`[GameRender] load stage: ${detail}`);
-        sinks.loadStage(detail);
+    case 'stage': {
+      const parsed = parseRuntimeStage(detail);
+      if (parsed) {
+        // Partial reports arrive a percent at a time; the log keeps the whole stages.
+        if (parsed.fraction === undefined) {
+          sinks.log(`[GameRender] load stage: ${detail}`);
+          sinks.loadStage(parsed.stage);
+        } else {
+          sinks.loadStage(parsed.stage, parsed.fraction);
+        }
       } else {
         sinks.error(`[GameRender] unknown load stage from the render runtime: ${detail}`);
       }
       return true;
+    }
     default:
       return false;
   }

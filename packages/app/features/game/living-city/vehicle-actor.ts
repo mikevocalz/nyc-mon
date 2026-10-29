@@ -36,7 +36,7 @@
 // fleet: every vehicle is a Valdrada baked body (world/vd-car-mesh.ts). Cars
 // pick their body per vehicle id from VD_FLEET_BODIES; the bus is the MTA
 // XD40 (vd-car-mesh.ts VD_BUS_ID). Up to LOFTED_NEAR_VEHICLES of a kind
-// inside VD_FLEET_NEAR_METRES draw LOD2, the rest the same body's `mid`
+// inside VD_FLEET_NEAR_METRES draw the full body, the rest the same body's `mid`
 // decimation: one mesh per body and level, no lofted body or proxy and no
 // box car. The headlight pools and the flares are unchanged. The vd meshes
 // are plain Meshes over InstancedBufferGeometry with the transform in
@@ -534,10 +534,25 @@ export const VD_FLEET_BODIES: Readonly<Record<Exclude<VehicleKind, 'bus'>, reado
 };
 
 /**
- * vd lane: a vehicle draws its full body (LOD2) only inside this distance of the camera focus, as the parked cars do
+ * vd lane: a vehicle draws its full body only inside this distance of the camera focus, as the parked cars do
  * (street-props.ts VD_PARKED_RADIUS); past it, or past the near cap, the same body's `mid` decimation.
  */
 export const VD_FLEET_NEAR_METRES = 40;
+
+/**
+ * Flags the first `count` array elements of a per-frame instance buffer for upload, not its whole capacity: three
+ * r186 writes only the update ranges (WebGPUAttributeUtils.updateAttribute) and clears them after. The fleet's
+ * buffers are sized for the tier's cap and the flares for four per vehicle, so a full re-send moved ~45 KB a frame
+ * where the live slots are a few KB.
+ */
+export function uploadPrefix(
+  target: { clearUpdateRanges(): void; addUpdateRange(start: number, count: number): void; needsUpdate: boolean },
+  count: number,
+): void {
+  target.clearUpdateRanges();
+  target.addUpdateRange(0, count);
+  target.needsUpdate = true;
+}
 
 interface LoftedFleet {
   /** Kinds this fleet draws; the box path skips them. */
@@ -661,9 +676,10 @@ function createLoftedFleet(
       flush: () => {
         if (mesh.count !== lod.count) mesh.count = lod.count;
         if (lod.count > 0) {
-          mesh.instanceMatrix.needsUpdate = true;
-          paint.needsUpdate = true;
-          state.needsUpdate = true;
+          // Only the written slots go up (uploadPrefix): the rest of the capacity is not drawn.
+          uploadPrefix(mesh.instanceMatrix, lod.count * 16);
+          uploadPrefix(paint, lod.count * 3);
+          uploadPrefix(state, lod.count * 4);
         }
       },
     };
@@ -696,7 +712,7 @@ function createLoftedFleet(
       },
       flush: () => {
         geometry.instanceCount = lod.count;
-        if (lod.count > 0) buffer.needsUpdate = true;
+        if (lod.count > 0) uploadPrefix(buffer, lod.count * stride);
       },
     };
     return lod;
@@ -713,7 +729,7 @@ function createLoftedFleet(
     const entry = resolveVehicleEntry(registry, VEHICLE_SEMANTIC_ID[kind], kind);
     if (!isLoftedRecipe(entry)) continue;
     if (vdMesh && vdMaterial) {
-      // vd: the same baked body near (LOD2) and past the near cap (the `mid` decimation), per body.
+      // vd: the same baked body near (full) and past the near cap (the `mid` decimation), per body.
       const bodies: readonly VdCarId[] = kind === 'bus' ? [vdMesh.VD_BUS_ID] : VD_FLEET_BODIES[kind];
       const ids = [...new Set(bodies)];
       const cap = Math.min(capacity, nearCap);
@@ -920,8 +936,8 @@ function createLoftedFleet(
       flares.count = flareCount;
       flares.visible = flareCount > 0;
       if (flareCount > 0) {
-        flarePosAttr.needsUpdate = true;
-        flareColAttr.needsUpdate = true;
+        uploadPrefix(flarePosAttr, flareCount * FLARE_STRIDE);
+        uploadPrefix(flareColAttr, flareCount * FLARE_STRIDE);
       }
     },
     dispose: () => {

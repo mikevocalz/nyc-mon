@@ -1,5 +1,5 @@
 // The vd lane's baked cars (vd-cars.ts, from tooling/city/bake-cars.mjs):
-// decodes one Valdrada LOD2 body into plain arrays and THREE geometry.
+// decodes one Valdrada body (LOD1, decimated) into plain arrays and THREE geometry.
 //
 // Two consumers, two frames:
 // - the moving fleet (living-city/vehicle-actor.ts) draws the body as baked,
@@ -29,7 +29,7 @@ export const VD_CAR_IDS = VD_CARS.map((c) => c.id) as readonly VdCarId[];
 /** The baked bus (Valdrada's MTA New Flyer XD40). */
 export const VD_BUS_ID = 'mtaxd40' as const satisfies VdCarId;
 
-/** Detail levels: LOD2 as baked, then the two decimations. */
+/** Detail levels: the full baked body, then the two coarser ones. */
 export const VD_LODS = ['near', 'mid', 'far'] as const;
 export type VdLod = (typeof VD_LODS)[number];
 

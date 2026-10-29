@@ -61,6 +61,8 @@ const LANE_END_GUARD_METRES = 0.1;
 /** Spawner cadence and geometry. */
 const SPAWN_PERIOD_SECONDS = 0.4;
 const SPAWN_HEAD_CLEARANCE = 2.0;
+/** A bus spawns on a route lane starting within this band past the anti-pop radius (where one exists). */
+const BUS_SPAWN_BAND_METRES = 120;
 const DEFAULT_SPAWN_MIN_FOCUS_METRES = 130;
 const DEFAULT_DESPAWN_FOCUS_METRES = 500;
 /** Vehicles are dropped once they are this far from focus — far past any readable view. */
@@ -89,6 +91,8 @@ const SPAWN_MIX: readonly [VehicleKind, number][] = [
   ['van', 0.15],
   ['bus', 0.1],
 ];
+/** The same mix without buses, for a sim whose buses come from `busTarget` on the bus routes instead. */
+const CAR_MIX: readonly [VehicleKind, number][] = SPAWN_MIX.filter(([kind]) => kind !== 'bus').map(([kind, w]) => [kind, w / 0.9]);
 
 // --- Snapshot layout (the flat channel the renderer reads) ---------------------
 
@@ -166,6 +170,12 @@ export interface VehicleSimOptions {
   readonly spawnMinDistance?: number;
   /** Vehicles beyond this from focus despawn. Default 500 m. */
   readonly despawnDistance?: number;
+  /**
+   * Buses to keep running on the bus-route lanes (LaneEdge.busRoute), inside `targetVehicles`. Set, it replaces the
+   * random 10 % bus share: buses spawn only on a route lane and turn onto route lanes where the junction allows.
+   * Unset keeps the old mix (scripted scenarios and their tests).
+   */
+  readonly busTarget?: number;
 }
 
 /** What the snapshot writer and the tests see: one row per live vehicle. */
@@ -390,6 +400,8 @@ export class VehicleSim {
   private readonly matrices = new Map<string, ConflictMatrix>();
   private readonly stopLines = new Map<string, number>();
   private readonly spawnCandidates: readonly LaneEdge[];
+  private readonly busSpawnCandidates: readonly LaneEdge[];
+  private readonly busTarget: number | null;
   // --- Per-tick caches ----------------------------------------------------------
   private readonly occupancy = new Map<string, Vehicle[]>();
   private readonly aspectCache = new Map<string, SignalState>();
@@ -411,6 +423,8 @@ export class VehicleSim {
       options.spawnLanes !== undefined
         ? options.spawnLanes.map((id) => this.lane(id)).filter((l): l is LaneEdge => l !== undefined)
         : topology.lanes.filter((l) => !l.internal && l.lengthMeters >= 30);
+    this.busSpawnCandidates = this.spawnCandidates.filter((l) => l.busRoute === true);
+    this.busTarget = options.busTarget === undefined ? null : Math.max(0, Math.floor(options.busTarget));
     for (const spec of options.vehicles ?? []) this.spawn(spec);
   }
 
@@ -659,9 +673,10 @@ export class VehicleSim {
   }
 
   /** The lane-start candidates the auto-population may use, filtered for head room and the anti-pop focus distance. */
-  private autoSpawnLane(): LaneEdge | null {
-    const cands = this.spawnCandidates;
+  private autoSpawnLane(cands: readonly LaneEdge[] = this.spawnCandidates, kind: VehicleKind = 'sedan'): LaneEdge | null {
     if (cands.length === 0) return null;
+    // Room for the new vehicle behind the one ahead: a car's 6 m, or the bus's own length (12 m does not fit a car's gap).
+    const room = (kind === 'bus' ? VEHICLE_LENGTH.bus + 1.4 : 6) + SPAWN_HEAD_CLEARANCE;
     // One random probe per cadence keeps the cost O(1); dense traffic simply retries.
     const lane = cands[Math.floor(this.rng() * cands.length)]!;
     const fromNode = this.topology.nodeById.get(lane.from);
@@ -672,10 +687,10 @@ export class VehicleSim {
       if (d < this.spawnMinDistance) return null;
     }
     for (const w of this.vehicles) {
-      if (w.elementKind === 'lane' && w.element === lane.id && w.s - w.len < 6 + SPAWN_HEAD_CLEARANCE) return null;
+      if (w.elementKind === 'lane' && w.element === lane.id && w.s - w.len < room) return null;
       if (w.elementKind === 'conn') {
         const c = this.connById.get(w.element);
-        if (c && c.out === lane.id && this.connGeom(c).length - w.s < 6 + SPAWN_HEAD_CLEARANCE) return null;
+        if (c && c.out === lane.id && this.connGeom(c).length - w.s < room) return null;
       }
     }
     return lane;
@@ -683,7 +698,7 @@ export class VehicleSim {
 
   private autoSpawnKind(): VehicleKind {
     let r = this.rng();
-    for (const [kind, w] of SPAWN_MIX) {
+    for (const [kind, w] of this.busTarget === null ? SPAWN_MIX : CAR_MIX) {
       r -= w;
       if (r <= 0) return kind;
     }
@@ -725,7 +740,10 @@ export class VehicleSim {
       v.leaving = true;
       return false;
     }
-    const conn = candidates[Math.floor(this.rng() * candidates.length)]!;
+    // A bus keeps to the bus routes where the junction offers one; off them (a route's end) it takes any legal move.
+    const onRoute = v.kind === 'bus' ? candidates.filter((c) => this.lane(c.out)?.busRoute === true) : candidates;
+    const pool = onRoute.length > 0 ? onRoute : candidates;
+    const conn = pool[Math.floor(this.rng() * pool.length)]!;
     v.route.push(conn.out);
     v.conn = conn;
     return true;
@@ -1066,6 +1084,23 @@ export class VehicleSim {
       for (const v of [...this.vehicles]) if (v.retiring) this.despawn(v);
     }
     if (this.vehicles.length >= this.targetVehicles) return;
+    if (this.busTarget !== null && this.busTarget > 0) {
+      let buses = 0;
+      for (const v of this.vehicles) if (v.kind === 'bus' && !v.retiring) buses++;
+      if (buses < this.busTarget) {
+        // Just past the anti-pop radius, so the bus drives into view instead of wandering the far end of the tile.
+        let cands = this.busSpawnCandidates;
+        if (Number.isFinite(this.focusX)) {
+          const near = cands.filter((l) => Math.hypot(l.points[0]! - this.focusX, l.points[1]! - this.focusZ) < this.spawnMinDistance + BUS_SPAWN_BAND_METRES);
+          if (near.length > 0) cands = near;
+        }
+        const route = this.autoSpawnLane(cands, 'bus');
+        if (route) {
+          this.spawn({ kind: 'bus', lane: route.id, s: 0, ambient: true });
+          return;
+        }
+      }
+    }
     const lane = this.autoSpawnLane();
     if (lane) this.spawn({ kind: this.autoSpawnKind(), lane: lane.id, s: 0, ambient: true });
   }
