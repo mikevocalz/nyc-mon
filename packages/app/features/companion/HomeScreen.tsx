@@ -6,7 +6,7 @@ import { deriveMonMood, heartsFor } from '@acme/core/sim';
 import type { MonInstance } from '@acme/core/types';
 import {
   Badge, Button, EmptyState, HeartRow, HLYNK_COPY, SegmentedControl, SheetSurface, StatusRow, useInstanceStore,
-  useReducedMotion, useStore, type DeviceKey, type GlassAction, type GlassView,
+  useStore, type DeviceKey, type GlassAction, type GlassView,
 } from '@acme/ui';
 import { Pressable, Text, View } from '@acme/ui/tw';
 import { announcePolitely } from '../onboarding/announce';
@@ -54,7 +54,6 @@ function chooserTestID(target: string): string {
  */
 export function HomeScreen({ mon }: { mon: MonInstance }) {
   const router = useRouter();
-  const reducedMotion = useReducedMotion();
   const { care, identity, nowMs, scheme: clockScheme } = useCareNow();
   const resumeCount = useMinuteClock((s) => s.resumeCount);
   const local = useInstanceStore(() => ({

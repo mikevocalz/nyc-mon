@@ -19,7 +19,7 @@ const VIEW: MonCareView = {
   call: null,
   attention: 'none',
   ageDays: 2,
-  stage: 'baby',
+  stage: 'Baby',
 };
 const view = (patch: Partial<MonCareView>): MonCareView => ({ ...VIEW, ...patch });
 const call = (kind: NonNullable<MonCareView['call']>['kind'], openedAt = 1) => ({ kind, openedAt, msLeft: 60_000 });
