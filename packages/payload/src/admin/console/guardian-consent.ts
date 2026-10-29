@@ -1,5 +1,5 @@
 import { isConsentRequired } from '@acme/core/sim';
-import { commitTransaction, createLocalReq, getPayload, initTransaction, killTransaction } from 'payload';
+import { commitTransaction, createPayloadRequest, getPayload, initTransaction, killTransaction } from 'payload';
 import type { PayloadRequest } from 'payload';
 import config from '../../payload.config.ts';
 import { sendMail } from '../../auth/options.ts';
@@ -179,7 +179,7 @@ export async function handleGuardianConsentDecision(request: Request, id: string
 
   const payload = await getPayload({ config });
   // Forward the request headers so the audit events keep the request id.
-  const req = await createLocalReq({ req: { headers: request.headers } as Partial<PayloadRequest> }, payload);
+  const req = await createPayloadRequest({ payload, req: { headers: request.headers } as Partial<PayloadRequest> });
   const ownTransaction = await initTransaction(req);
   try {
     const consent = await findConsentRecord(payload, req, id);

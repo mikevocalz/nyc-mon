@@ -66,8 +66,8 @@ const getIncomingFiles = (
     },
   ];
 
-  if (data.sizes) {
-    for (const [sizeName, resized] of Object.entries(data.sizes)) {
+  if (data.variants) {
+    for (const [sizeName, resized] of Object.entries(data.variants)) {
       const buffer = uploadSizes?.[sizeName];
       if (buffer && resized?.mimeType && resized.filename) {
         files.push({
@@ -126,8 +126,8 @@ const filenamesFor = (doc: Partial<FileData>) => {
   const filenames: string[] = [];
   if (typeof doc.filename === 'string') filenames.push(doc.filename);
 
-  if (doc.sizes && typeof doc.sizes === 'object') {
-    for (const size of Object.values(doc.sizes)) {
+  if (doc.variants && typeof doc.variants === 'object') {
+    for (const size of Object.values(doc.variants)) {
       if (size?.filename && typeof size.filename === 'string') {
         filenames.push(size.filename);
       }
@@ -226,10 +226,10 @@ export const withBunnyMediaURLs = <T extends BunnyReadableMedia>(doc: T): T => {
   const publicURL = doc.bunnyUrl;
   if (typeof publicURL !== 'string' || publicURL.length === 0) return doc;
 
-  const sizes =
-    doc.sizes && typeof doc.sizes === 'object'
+  const variants =
+    doc.variants && typeof doc.variants === 'object'
       ? Object.fromEntries(
-          Object.entries(doc.sizes).map(([name, size]) => {
+          Object.entries(doc.variants).map(([name, size]) => {
             if (
               size &&
               typeof size === 'object' &&
@@ -241,13 +241,13 @@ export const withBunnyMediaURLs = <T extends BunnyReadableMedia>(doc: T): T => {
             return [name, size];
           }),
         )
-      : doc.sizes;
+      : doc.variants;
 
   return {
     ...doc,
     url: publicURL,
     ...(doc.mimeType?.startsWith('image/') ? { thumbnailURL: publicURL } : {}),
-    ...(sizes ? { sizes } : {}),
+    ...(variants ? { variants } : {}),
   };
 };
 

@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
-const packageDir = fileURLToPath(new URL('../..', import.meta.url));
+const packageDir = fileURLToPath(new URL('../..', import.meta.url).href);
 const repoRoot = resolve(packageDir, '../..');
 const require = createRequire(import.meta.url);
 const payloadModule = pathToFileURL(require.resolve('payload')).href;
