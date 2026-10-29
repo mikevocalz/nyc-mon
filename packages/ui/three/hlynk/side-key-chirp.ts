@@ -1,5 +1,5 @@
 import { soundEnabled } from '../../device-preferences';
-import { scheduleChirp, type ChirpContext } from './chirp-core';
+import { scheduleChirp } from './chirp-core';
 
 /**
  * Web (and the platform resolution anchor): the side key's chirp on the
@@ -26,5 +26,5 @@ export function playSideKeyChirp(): void {
   // The Caller's Sound switch (Settings, M19) wins over the stage's own prop.
   if (!soundEnabled()) return;
   primeSideKeyChirp();
-  if (context) scheduleChirp(context as unknown as ChirpContext);
+  if (context) scheduleChirp(context);
 }

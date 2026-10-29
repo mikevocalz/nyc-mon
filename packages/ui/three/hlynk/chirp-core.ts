@@ -11,37 +11,51 @@ interface Param {
   setValueAtTime(value: number, time: number): unknown;
   exponentialRampToValueAtTime(value: number, time: number): unknown;
 }
-interface Node {
-  connect(destination: never): unknown;
+
+/** A node that can feed another. Both platforms' AudioNodes fit it structurally. */
+export interface CueNode {
+  connect(destination: CueNode): unknown;
 }
 
-/** The slice of a Web Audio context the chirp needs. Both platforms' contexts fit it. */
+/**
+ * The slice of a Web Audio context the chirp and the care cues need. The
+ * browser's AudioContext and react-native-audio-api's AudioContext both
+ * satisfy it as they are, so callers pass them without a cast.
+ */
 export interface ChirpContext {
   readonly currentTime: number;
-  readonly destination: unknown;
-  createGain(): Node & { gain: Param };
-  createBiquadFilter(): Node & { type: string; frequency: Param };
-  createOscillator(): Node & { type: string; frequency: Param; start(when?: number): unknown; stop(when?: number): unknown };
+  readonly destination: CueNode;
+  createGain(): CueNode & { gain: Param };
+  createBiquadFilter(): CueNode & { type: string; frequency: Param };
+  createOscillator(): CueNode & { type: string; frequency: Param; start(when?: number): unknown; stop(when?: number): unknown };
+}
+
+/** The chirp's tones: [Hz, start s, length s]. ~60 ms on 1.45 kHz, a short gap, ~55 ms up on 1.83 kHz. */
+const CHIRP_TONES = [
+  [1450, 0, 0.06],
+  [1830, 0.075, 0.055],
+] as const;
+/** The oscillator runs this long past its gate. */
+const CHIRP_STOP_TAIL = 0.01;
+
+/** How long the chirp sounds, stop tail included, in seconds. */
+export function chirpSeconds(): number {
+  return Math.max(...CHIRP_TONES.map(([, start, length]) => start + length)) + CHIRP_STOP_TAIL;
 }
 
 /** Schedules the chirp on `ctx`, starting now. */
 export function scheduleChirp(ctx: ChirpContext): void {
   const t = ctx.currentTime;
-  const connect = (from: Node, to: unknown) => from.connect(to as never);
 
   const out = ctx.createGain();
   out.gain.setValueAtTime(0.5, t);
   const lowpass = ctx.createBiquadFilter();
   lowpass.type = 'lowpass';
   lowpass.frequency.setValueAtTime(3200, t);
-  connect(lowpass, out);
-  connect(out, ctx.destination);
+  lowpass.connect(out);
+  out.connect(ctx.destination);
 
-  // ~60 ms on 1.45 kHz, a short gap, ~55 ms up on 1.83 kHz.
-  for (const [freq, start, length] of [
-    [1450, 0, 0.06],
-    [1830, 0.075, 0.055],
-  ] as const) {
+  for (const [freq, start, length] of CHIRP_TONES) {
     const osc = ctx.createOscillator();
     osc.type = 'square';
     osc.frequency.setValueAtTime(freq, t + start);
@@ -49,9 +63,9 @@ export function scheduleChirp(ctx: ChirpContext): void {
     gate.gain.setValueAtTime(0.0001, t + start);
     gate.gain.exponentialRampToValueAtTime(0.35, t + start + 0.006);
     gate.gain.exponentialRampToValueAtTime(0.0001, t + start + length);
-    connect(osc, gate);
-    connect(gate, lowpass);
+    osc.connect(gate);
+    gate.connect(lowpass);
     osc.start(t + start);
-    osc.stop(t + start + length + 0.01);
+    osc.stop(t + start + length + CHIRP_STOP_TAIL);
   }
 }

@@ -1,4 +1,5 @@
 import type { ChirpContext } from '../three/hlynk/chirp-core.ts';
+import { devWarn } from './dev-warn.ts';
 
 /**
  * Mon Space care cues: short chiptune stingers, synthesised, no asset. They
@@ -89,15 +90,13 @@ export function cueSeconds(cue: CareCue): number {
 /** Schedules `cue` on `ctx`, starting now. Returns its length in seconds. */
 export function scheduleCareCue(ctx: ChirpContext, cue: CareCue): number {
   const t = ctx.currentTime;
-  const connect = (from: { connect(d: never): unknown }, to: unknown) => from.connect(to as never);
-
   const out = ctx.createGain();
   out.gain.setValueAtTime(OUTPUT_GAIN, t);
   const lowpass = ctx.createBiquadFilter();
   lowpass.type = 'lowpass';
   lowpass.frequency.setValueAtTime(LOWPASS_HZ, t);
-  connect(lowpass, out);
-  connect(out, ctx.destination);
+  lowpass.connect(out);
+  out.connect(ctx.destination);
 
   for (const n of CARE_CUE_NOTES[cue]) {
     const on = t + n.start;
@@ -110,35 +109,123 @@ export function scheduleCareCue(ctx: ChirpContext, cue: CareCue): number {
     gate.gain.setValueAtTime(0.0001, on);
     gate.gain.exponentialRampToValueAtTime(CARE_CUE_NOTE_PEAK * n.level, on + ATTACK);
     gate.gain.exponentialRampToValueAtTime(0.0001, off);
-    connect(osc, gate);
-    connect(gate, lowpass);
+    osc.connect(gate);
+    gate.connect(lowpass);
     osc.start(on);
     osc.stop(off + STOP_TAIL);
   }
   return cueSeconds(cue);
 }
 
+/**
+ * A Web Audio context as both platforms hand it over: the chirp's slice plus
+ * the run state. The browser's AudioContext and react-native-audio-api's
+ * AudioContext fit it without a cast.
+ */
+export type CueContext = ChirpContext & {
+  readonly state?: string;
+  resume?(): Promise<unknown>;
+};
+
+/**
+ * Same-cue repeats inside this window are dropped, so a re-render or a remount
+ * cannot beep twice. Ticks and per-press cues (select, cancel, flush, dose)
+ * answer every press and are never dropped.
+ */
+export const CARE_CUE_REPEAT_WINDOW_MS: Readonly<Record<CareCue, number>> = {
+  attention: 3000,
+  hatch: 3000,
+  evolve: 3000,
+  select: 0,
+  cancel: 0,
+  flush: 0,
+  dose: 0,
+};
+
+/** How long a suspended context gets to resume before the cue is dropped. */
+export const CARE_CUE_RESUME_WAIT_MS = 150;
+
 export interface CareCuePorts {
   /** The Caller's Sound switch, read at the moment a cue would play. */
   enabled(): boolean;
-  /** The platform's audio context, created lazily; null where there is no audio. */
-  context(): ChirpContext | null;
-  /** Called with the cue's length just before it is scheduled (native holds the iOS session for it). */
-  willPlay?(seconds: number): void;
+  /**
+   * Takes the shared ambient-session lease for `seconds` (native; the web
+   * binding is a no-op). Called BEFORE `context()`, so the session is set
+   * before the first lazy AudioContext starts.
+   */
+  holdSession?(seconds: number): void;
+  /** The platform's audio context, created lazily; null where there is no audio. Throwing means no audio here. */
+  context(): CueContext | null;
+  /** Overrides per cue of CARE_CUE_REPEAT_WINDOW_MS. */
+  readonly repeatWindowMs?: Partial<Record<CareCue, number>>;
+  /** Clock for the repeat window. Default Date.now. */
+  now?(): number;
+  /** Resolves after `ms`. Default setTimeout. */
+  wait?(ms: number): Promise<void>;
 }
 
-/** Builds `playCareCue` for one platform. Sound off returns before any context or session work. */
+const defaultWait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Builds `playCareCue` for one platform. Never throws. Sound off returns
+ * before any session, context or timer work. A suspended context (web before
+ * a gesture, native after an interruption such as a phone call) is resumed
+ * first and the cue is scheduled from the resumed clock, or dropped if it
+ * does not resume within CARE_CUE_RESUME_WAIT_MS. Failures that point at a
+ * bug warn in development; missing audio stays silent.
+ */
 export function createCareCuePlayer(ports: CareCuePorts): (cue: CareCue) => void {
+  const last = new Map<CareCue, number>();
+  const now = ports.now ?? Date.now;
+  const wait = ports.wait ?? defaultWait;
+
+  const schedule = (ctx: CueContext, cue: CareCue) => {
+    try {
+      scheduleCareCue(ctx, cue);
+    } catch (error) {
+      devWarn(`care cue "${cue}" failed to schedule`, error);
+    }
+  };
+
   return (cue) => {
     if (!ports.enabled()) return;
-    if (!Object.hasOwn(CARE_CUE_NOTES, cue)) return;
-    try {
-      const ctx = ports.context();
-      if (!ctx) return;
-      ports.willPlay?.(cueSeconds(cue));
-      scheduleCareCue(ctx, cue);
-    } catch {
-      // No audio here: the cue's LED, text and haptic still carry the moment.
+    if (!Object.hasOwn(CARE_CUE_NOTES, cue)) {
+      devWarn(`unknown care cue "${String(cue)}"`);
+      return;
     }
+    const t = now();
+    const windowMs = ports.repeatWindowMs?.[cue] ?? CARE_CUE_REPEAT_WINDOW_MS[cue];
+    const previous = last.get(cue);
+    if (previous !== undefined && t - previous < windowMs) return;
+    last.set(cue, t);
+
+    try {
+      ports.holdSession?.(cueSeconds(cue) + CARE_CUE_RESUME_WAIT_MS / 1000);
+    } catch (error) {
+      devWarn('care cue: session hold failed', error);
+    }
+
+    let ctx: CueContext | null;
+    try {
+      ctx = ports.context();
+    } catch {
+      return; // No audio here: the LED, text and haptic carry the moment.
+    }
+    if (!ctx) return;
+    if (ctx.state === undefined || ctx.state === 'running') {
+      schedule(ctx, cue);
+      return;
+    }
+    const resume = ctx.resume?.bind(ctx);
+    if (ctx.state === 'closed' || !resume) return;
+    const live = ctx;
+    const resumed = resume().then(
+      () => undefined,
+      () => undefined,
+    );
+    void Promise.race([resumed, wait(CARE_CUE_RESUME_WAIT_MS)]).then(() => {
+      // Scheduled from the resumed clock, never a frozen currentTime.
+      if (live.state === 'running') schedule(live, cue);
+    });
   };
 }

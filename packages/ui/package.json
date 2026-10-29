@@ -28,6 +28,10 @@
       "default": "./icons.web.ts"
     },
     "./native": "./native.ts",
+    "./audio-session": {
+      "react-native": "./audio/session.native.ts",
+      "default": "./audio/session.ts"
+    },
     "./game-perf": {
       "react-native": "./game-perf.native.ts",
       "default": "./game-perf.ts"

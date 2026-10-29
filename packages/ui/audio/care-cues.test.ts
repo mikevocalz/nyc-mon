@@ -5,6 +5,8 @@ import {
   CARE_CUE_MAX_SECONDS,
   CARE_CUE_NOTES,
   CARE_CUE_NOTE_PEAK,
+  CARE_CUE_REPEAT_WINDOW_MS,
+  CARE_CUE_RESUME_WAIT_MS,
   createCareCuePlayer,
   cueSeconds,
   midiHz,
@@ -13,7 +15,7 @@ import {
 } from './care-cues-core.ts';
 
 /** A Web Audio stand-in that records what a cue schedules. */
-function fakeContext(now = 1) {
+function fakeContext(now = 1, state?: string) {
   const log: { kind: string; type?: string; freq: number[]; glide: number[]; start?: number; stop?: number; peaks: number[] }[] = [];
   const param = (into: number[], glideInto?: number[]) => ({
     setValueAtTime(v: number) { into.push(v); },
@@ -23,7 +25,8 @@ function fakeContext(now = 1) {
     log,
     ctx: {
       currentTime: now,
-      destination: {},
+      state,
+      destination: { connect() {} },
       createGain() {
         const peaks: number[] = [];
         log.push({ kind: 'gain', freq: [], glide: [], peaks });
@@ -113,6 +116,11 @@ describe('care cue note tables', () => {
     assert.ok(CARE_CUE_NOTES.flush.some((n) => n.glideTo !== undefined && n.glideTo < n.midi));
   });
 
+  it('the chirp reports its own length from its tone table', async () => {
+    const { chirpSeconds } = await import('../three/hlynk/chirp-core.ts');
+    assert.ok(Math.abs(chirpSeconds() - 0.14) < 1e-9);
+  });
+
   it('midiHz maps A4 to 440 and an octave to a doubling', () => {
     assert.equal(midiHz(69), 440);
     assert.ok(Math.abs(midiHz(81) - 880) < 1e-9);
@@ -149,19 +157,17 @@ describe('createCareCuePlayer', () => {
     const play = createCareCuePlayer({
       enabled: () => false,
       context: () => { contextAsked++; return fakeContext().ctx; },
-      willPlay: () => { held++; },
+      holdSession: () => { held++; },
     });
     for (const cue of CARE_CUES) play(cue);
     assert.equal(contextAsked, 0);
     assert.equal(held, 0);
   });
 
-  it('plays when sound is on and tells the session how long the cue holds', () => {
+  it('plays when sound is on', () => {
     const fake = fakeContext();
-    const held: number[] = [];
-    const play = createCareCuePlayer({ enabled: () => true, context: () => fake.ctx, willPlay: (s) => held.push(s) });
+    const play = createCareCuePlayer({ enabled: () => true, context: () => fake.ctx });
     play('evolve');
-    assert.deepEqual(held, [cueSeconds('evolve')]);
     assert.equal(fake.log.filter((e) => e.kind === 'osc').length, CARE_CUE_NOTES.evolve.length);
   });
 
@@ -181,6 +187,101 @@ describe('createCareCuePlayer', () => {
     assert.doesNotThrow(() =>
       createCareCuePlayer({ enabled: () => true, context: () => { throw new Error('no audio'); } })('hatch'),
     );
+  });
+
+  it('takes the session lease before it asks for the context', () => {
+    const order: string[] = [];
+    const play = createCareCuePlayer({
+      enabled: () => true,
+      holdSession: () => order.push('session'),
+      context: () => { order.push('context'); return fakeContext().ctx; },
+    });
+    play('hatch');
+    assert.deepEqual(order, ['session', 'context']);
+  });
+
+  it('holds the session for the cue plus the resume wait', () => {
+    const held: number[] = [];
+    const play = createCareCuePlayer({ enabled: () => true, holdSession: (s) => held.push(s), context: () => fakeContext().ctx });
+    play('attention');
+    assert.deepEqual(held, [cueSeconds('attention') + CARE_CUE_RESUME_WAIT_MS / 1000]);
+  });
+
+  it('drops a repeat of the attention call inside the window and plays it after', () => {
+    let t = 0;
+    const fake = fakeContext();
+    const oscs = () => fake.log.filter((e) => e.kind === 'osc').length;
+    const play = createCareCuePlayer({ enabled: () => true, context: () => fake.ctx, now: () => t });
+    play('attention');
+    const once = oscs();
+    t = 2999;
+    play('attention'); // a re-render or remount
+    assert.equal(oscs(), once);
+    t = 3000;
+    play('attention');
+    assert.equal(oscs(), once * 2);
+    assert.equal(CARE_CUE_REPEAT_WINDOW_MS.attention, 3000);
+  });
+
+  it('never drops press ticks, and the window is configurable per cue', () => {
+    const fake = fakeContext();
+    const oscs = () => fake.log.filter((e) => e.kind === 'osc').length;
+    const play = createCareCuePlayer({ enabled: () => true, context: () => fake.ctx, now: () => 0, repeatWindowMs: { attention: 0 } });
+    play('select');
+    play('select');
+    play('dose');
+    play('dose');
+    play('attention');
+    play('attention');
+    assert.equal(oscs(), 2 * 1 + 2 * CARE_CUE_NOTES.dose.length + 2 * CARE_CUE_NOTES.attention.length);
+  });
+
+  it('resumes a suspended context and schedules from the resumed clock', async () => {
+    const fake = fakeContext(5, 'suspended');
+    const ctx = Object.assign(fake.ctx, {
+      async resume() {
+        ctx.state = 'running';
+        ctx.currentTime = 9;
+      },
+    });
+    const play = createCareCuePlayer({ enabled: () => true, context: () => ctx, wait: () => new Promise(() => {}) });
+    play('select');
+    assert.equal(fake.log.length, 0, 'nothing scheduled on the frozen clock');
+    await new Promise((r) => setTimeout(r, 0));
+    const osc = fake.log.find((e) => e.kind === 'osc');
+    assert.equal(osc?.start, 9);
+  });
+
+  it('drops the cue when the context will not resume in time, or is closed', async () => {
+    const stuck = fakeContext(1, 'suspended');
+    const stuckCtx = Object.assign(stuck.ctx, { resume: () => new Promise<void>(() => {}) });
+    createCareCuePlayer({ enabled: () => true, context: () => stuckCtx, wait: () => Promise.resolve() })('select');
+    const closed = fakeContext(1, 'closed');
+    createCareCuePlayer({ enabled: () => true, context: () => closed.ctx })('select');
+    await new Promise((r) => setTimeout(r, 0));
+    assert.equal(stuck.log.length, 0);
+    assert.equal(closed.log.length, 0);
+  });
+
+  it('warns in development when scheduling fails, and still does not throw', () => {
+    const g = globalThis as { __DEV__?: boolean };
+    const before = g.__DEV__;
+    const original = console.warn;
+    const warnings: unknown[] = [];
+    g.__DEV__ = true;
+    console.warn = (...args: unknown[]) => { warnings.push(args[0]); };
+    try {
+      const fake = fakeContext();
+      const broken = { ...fake.ctx, createOscillator() { throw new TypeError('api mismatch'); } };
+      assert.doesNotThrow(() => createCareCuePlayer({ enabled: () => true, context: () => broken })('hatch'));
+      assert.equal(warnings.length, 1);
+      // A missing context is environmental: no warning.
+      createCareCuePlayer({ enabled: () => true, context: () => { throw new Error('no audio'); } })('hatch');
+      assert.equal(warnings.length, 1);
+    } finally {
+      console.warn = original;
+      g.__DEV__ = before;
+    }
   });
 
   it('ignores an unknown cue name from untyped callers', () => {
