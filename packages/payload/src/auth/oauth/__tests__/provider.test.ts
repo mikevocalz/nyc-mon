@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { linkRefusal } from '../adult';
 import { checkResource, withOfflineAccess } from '../guards';
 import { browserClientOrigins, readOAuthConfig } from '../config';
-import { loadLinkPage } from '../pages';
+import { createAuthServerMetadataHandler, loadLinkPage } from '../pages';
 import { alexaOAuthPlugins, OAUTH_PAGES, USER_ACCESS_TOKEN_TTL_SECONDS } from '../plugins';
 
 const ORIGIN = 'http://localhost:5174';
@@ -183,6 +183,27 @@ describe('Alexa+ authorization server', () => {
       ['alexa', RESOURCE],
       ['nyc-mon-sim', RESOURCE],
     ]);
+  });
+
+  it('serves the root RFC 8414 document to a browser on any origin, preflight included', async () => {
+    const handler = createAuthServerMetadataHandler(auth);
+    const url = `${ORIGIN}/.well-known/oauth-authorization-server`;
+    const browser = 'https://companion.example';
+    // The MCP SDK sends MCP-Protocol-Version on discovery, which makes the browser preflight first.
+    const preflight = await handler(
+      new Request(url, {
+        method: 'OPTIONS',
+        headers: { origin: browser, 'access-control-request-method': 'GET', 'access-control-request-headers': 'mcp-protocol-version' },
+      }),
+    );
+    expect(preflight.status).toBe(204);
+    expect(preflight.headers.get('access-control-allow-origin')).toBe('*');
+    expect(preflight.headers.get('access-control-allow-methods')).toBe('GET, OPTIONS');
+    expect(preflight.headers.get('access-control-allow-headers')).toContain('mcp-protocol-version');
+    const get = await handler(new Request(url, { headers: { origin: browser, 'mcp-protocol-version': '2025-11-25' } }));
+    expect(get.status).toBe(200);
+    expect(get.headers.get('access-control-allow-origin')).toBe('*');
+    expect(((await get.json()) as { issuer: string }).issuer).toBe(ORIGIN);
   });
 
   it('publishes RFC 8414 metadata Amazon accepts, with no OIDC', async () => {

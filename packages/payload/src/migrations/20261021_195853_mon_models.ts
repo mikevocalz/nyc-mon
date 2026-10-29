@@ -288,9 +288,9 @@ export async function down({ db, payload, req }: MigrateDownArgs): Promise<void>
   DROP TABLE "payload"."_mon_models_v_version_animation_clips" CASCADE;
   DROP TABLE "payload"."_mon_models_v_version_morph_targets" CASCADE;
   DROP TABLE "payload"."_mon_models_v" CASCADE;
-  ALTER TABLE "payload"."payload_locked_documents_rels" DROP CONSTRAINT "payload_locked_documents_rels_language_lexicon_fk";
+  ALTER TABLE "payload"."payload_locked_documents_rels" DROP CONSTRAINT IF EXISTS "payload_locked_documents_rels_language_lexicon_fk";
   
-  ALTER TABLE "payload"."payload_locked_documents_rels" DROP CONSTRAINT "payload_locked_documents_rels_mon_models_fk";
+  ALTER TABLE "payload"."payload_locked_documents_rels" DROP CONSTRAINT IF EXISTS "payload_locked_documents_rels_mon_models_fk";
   
   DROP INDEX "payload"."payload_locked_documents_rels_language_lexicon_id_idx";
   DROP INDEX "payload"."payload_locked_documents_rels_mon_models_id_idx";

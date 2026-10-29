@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "project": "NYC-Mon Personal Companion",
+  "competition": "Nebius × NVIDIA Global AI Hackathon",
+  "track": "Personal AI",
+  "status": "draft",
+  "sourceCommit": null,
+  "publicRepositoryUrl": null,
+  "hostedDemoUrl": null,
+  "youtubeUrl": null,
+  "videoDurationSeconds": null,
+  "license": { "spdx": null, "scopeApproved": false, "thirdPartyNoticesReviewed": false },
+  "source": { "functionalPublicSlice": false, "freshCloneReproduced": false, "privateAssetsExcluded": false },
+  "acceptance": { "browserAccountLinking": false, "ownerIsolation": false, "ageAndServiceTokenDenials": false, "forgetAndExport": false, "judgeAccessWithoutSSO": false },
+  "submission": { "significantUpdateWritten": false, "modelAndNebiusExplained": false, "toolFeedbackWritten": false, "videoIsPublic": false, "devpostSubmitted": false },
+  "liveEvidencePath": "packages/web-sim/.nvidia-readiness/live.json"
+}

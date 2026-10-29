@@ -1,18 +1,23 @@
 # Run the NVIDIA Personal Companion
 
-This adds `/nvidia.html` and `server/nvidia-main.ts` **inside the existing web-sim package**, reusing Better Auth, the MCP client, the agent loop, shared UI kit, Payload and Neon. The original Bedrock simulator entry is unchanged. The focused text interface deliberately needs no proprietary character model, music or map asset. It is not yet a claim of a legally complete public export or a live deployment.
+The companion adds `/nvidia.html` and a dedicated entry inside the existing web-sim package, reusing Better Auth, the MCP client/agent loop, shared UI, Payload and Neon. The original Bedrock entry is unchanged. This first interface is text-first and does not require proprietary character media, but the complete public-source dependency closure still needs rights review.
 
-## Required real services
+## Prerequisites
 
-1. Existing admin-vite/Payload auth and `/v1`, using the existing Neon database.
-2. Reviewed migration `20261024_164500_companion_memory` applied by an authorized operator. This PR does not run it.
-3. Existing MCP server with `MCP_DEV_MODE` and `OAUTH_DEV_BYPASS` unset, real `V1_BASE_URL` and service key.
-4. A Nebius Token Factory account/key with an available NVIDIA model.
-5. An adult Caller and a real hatched Mon in the existing account. Do not fabricate a different save or bypass age checks.
+Use the repository's pinned Node and pnpm versions. From the repository root run `pnpm install --frozen-lockfile` for the full workspace: a narrowly filtered install can omit universal image/native peers and produce misleading shared-UI type errors.
 
-Register `${SIM_PUBLIC_ORIGIN}/nvidia.html` alongside the existing `/oauth/callback` in `OAUTH_SIM_REDIRECT_URIS` for the existing `nyc-mon-sim` client. Do not remove existing redirects. Keep issuer, resource URL and client ID consistent on all three services.
+Required real services:
+1. Existing admin-vite/Payload authorization and `/v1` backend, with the existing Neon database.
+2. Reviewed migration `20261024_164500_companion_memory`, applied by an authorized operator. This PR does not apply it.
+3. Existing MCP server using real JWT auth and `/v1`, with fixture/bypass flags unset.
+4. Nebius Token Factory account/key and an available reviewed NVIDIA model.
+5. An adult Caller and real hatched Mon in that account. No parallel account/save system or age bypass.
 
-Server environment names (secret values belong in a secret manager, not a committed file):
+Add `${SIM_PUBLIC_ORIGIN}/nvidia.html` alongside existing callbacks in `OAUTH_SIM_REDIRECT_URIS` for `nyc-mon-sim`. Preserve existing callback registrations. Match issuer, audience/resource, client ID, trusted origin and shared service key across the existing services.
+
+## Server environment
+
+Set secret values in the approved environment/secret manager, not source, a PR or chat.
 
 ```
 NODE_ENV=development
@@ -29,21 +34,19 @@ SIM_NEBIUS_MODEL_ID=nvidia/Nemotron-3_5-Lightning
 SIM_MAX_OUTPUT_TOKENS=1024
 ```
 
-From the repository root after frozen-lockfile installation:
+## Run and build
 
 ```
-pnpm --filter @acme/web-sim exec node server/nvidia-main.ts
+pnpm --filter @acme/web-sim exec node server/nvidia-main.mjs
+pnpm --filter @acme/web-sim build
 ```
 
-Open `/nvidia.html`. Sign in, load memory, enter a harmless preference, explicitly approve it, then save. Ask a care question and inspect the real MCP outcome. Sign out, open a second browser session, sign into the same account, load the same revision, and ask a personalized question. Forget memory and verify it disappears in a fresh session. A denied or unavailable tool must be shown as such, never as successful care.
+The `.mjs` launcher explicitly supplies `--experimental-transform-types` because native Node 24 strip-only mode cannot execute TypeScript parameter properties. Do not invoke the typed `.ts` entry directly without that flag. Validate the pinned Node runtime before production use.
 
-Build: `pnpm --filter @acme/web-sim build`. Production uses `NODE_ENV=production` and HTTPS for every public/auth/backend origin, behind an approved TLS proxy. This is a long-running Node service, not proof that the existing Vercel website hosts MCP or this simulator. The native/Bedrock page is not rewritten. The focused companion currently uses buffered model completion; token streaming, character rendering and voice are outside this initial acceptance path.
+Open `/nvidia.html`. Sign in, load memory, enter a harmless preference, explicitly approve saving, and save. Ask a care question and inspect the real MCP outcome. Sign out and use a second browser session to verify the same account/Mon and saved preference. Forget memory and check another fresh session. A refusal or unavailable backend must remain visible, not portrayed as successful care.
 
-## Explicit remaining evidence
+Production: build first, set `NODE_ENV=production`, use HTTPS origins and an approved proxy/process supervisor. This is a long-running Node service; a ready general Vercel website does not prove MCP or this companion is deployed. Memory is read afresh for each model call. Buffered model completion is used initially; character rendering and voice are not part of this minimal acceptance path.
 
-- Current account `/models` availability and first real inference receipt.
-- Route generation/build validation for admin-vite.
-- Real OAuth, migration, database-backed action, second-browser and deletion tests.
-- Hosted judge access, latency measurements, public source/asset licensing review and YouTube video.
+## Verification still required
 
-Do not call offline tests or a successful page build a qualifying live demo.
+Actual account `/models` availability and inference receipt; authorized migration; visual OAuth flow; database-backed care action; second-session/browser continuity and deletion; hosted judge access; latency; public-source and asset permissions; public YouTube demo. See `ACCEPTANCE.md` and `VALIDATION-2026-10-24.md` for the exact distinction between performed tests and open runtime gates.

@@ -3,7 +3,8 @@ import { sql } from '@payloadcms/db-postgres'
 
 export async function up({ db, payload, req }: MigrateUpArgs): Promise<void> {
   await db.execute(sql`
-   CREATE TYPE "payload"."enum_users_role" AS ENUM('user', 'ops', 'support', 'consent', 'content');
+   CREATE SCHEMA IF NOT EXISTS "payload";
+  CREATE TYPE "payload"."enum_users_role" AS ENUM('user', 'ops', 'support', 'consent', 'content');
   CREATE TYPE "payload"."enum_users_consent_status" AS ENUM('not-required', 'pending', 'approved', 'denied');
   CREATE TYPE "payload"."enum_users_two_factor_otp_channel" AS ENUM('email', 'sms');
   CREATE TYPE "payload"."enum_users_deletion_reason" AS ENUM('support_request', 'parent_request', 'deletion_check', 'legal', 'caller_request', 'parent_withdrew', 'sent_in_error');

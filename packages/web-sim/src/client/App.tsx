@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type Anthropic from '@anthropic-ai/sdk';
 import { UnauthorizedError, type Tool } from '@modelcontextprotocol/client';
 import { runAgentTurn } from '../shared/agentLoop.ts';
-import { SimOAuthProvider, parseCallback, resolveAuthState, type AuthState } from '../shared/auth.ts';
+import { SimOAuthProvider, parseCallback, resolveAuthState, revokeRefreshToken, type AuthState } from '../shared/auth.ts';
 import { mcpToolsToClaude, type ConversionResult } from '../shared/toolSpec.ts';
 import { Badge, Banner, BrandWordmark, Button, Card, ErrorMessage, SolidPanel, Switch, TextField, useInstanceStore, useStore } from '@acme/ui';
 import type { StoreApi } from 'zustand/vanilla';
@@ -45,6 +45,7 @@ export interface PublicConfig {
   readonly sandboxOrigin: string;
   readonly authMode: 'oauth' | 'dev-bypass';
   readonly clientId: string;
+  readonly issuer: string;
   readonly devMode: boolean;
   readonly modelBackend: 'bedrock' | 'mock';
   readonly modelLabel: string;
@@ -810,6 +811,9 @@ export function App({ config }: { config: PublicConfig }) {
   }
 
   function signOut() {
+    // Revoke at the server (RFC 7009) as well as forgetting it here.
+    const refreshToken = (provider.tokens() as { refresh_token?: string } | undefined)?.refresh_token;
+    void revokeRefreshToken({ issuer: config.issuer, clientId: config.clientId, refreshToken });
     provider.signOut();
     newConversation();
     void session?.close();

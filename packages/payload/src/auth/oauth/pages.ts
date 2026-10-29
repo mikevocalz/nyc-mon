@@ -102,10 +102,26 @@ export async function loadLinkPage(kind: LinkPageKind, search: string, options: 
 export const OAUTH_PAGE_PATHS = OAUTH_PAGES;
 
 /**
- * `GET /.well-known/oauth-authorization-server` at the origin root (RFC 8414
- * for an issuer with no path; Amazon reads it there). The provider builds the
+ * `/.well-known/oauth-authorization-server` at the origin root (RFC 8414 for
+ * an issuer with no path; Amazon reads it there). The provider builds the
  * document; this only serves it outside Better Auth's base path.
+ *
+ * The document is public, so any origin may read it. A browser MCP client
+ * sends `MCP-Protocol-Version` with the GET, which makes the browser send a
+ * preflight `OPTIONS` first; that answers 204 here instead of reaching the app.
  */
 export function createAuthServerMetadataHandler(auth: Parameters<typeof oauthProviderAuthServerMetadata>[0]) {
-  return oauthProviderAuthServerMetadata(auth, { headers: { 'Access-Control-Allow-Origin': '*' } });
+  const serve = oauthProviderAuthServerMetadata(auth, { headers: { 'Access-Control-Allow-Origin': '*' } });
+  return async (request: Request): Promise<Response> => {
+    if (request.method !== 'OPTIONS') return serve(request);
+    return new Response(null, {
+      status: 204,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, OPTIONS',
+        'Access-Control-Allow-Headers': 'mcp-protocol-version, accept, content-type',
+        'Access-Control-Max-Age': '600',
+      },
+    });
+  };
 }

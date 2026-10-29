@@ -1,6 +1,20 @@
 import { captionFormsWith, FALLBACK_MON_LINGO, type MonLingo } from './lingo/index.ts';
 
 /**
+ * Markdown the model sent although the skill asks for plain speech: heading
+ * and list markers go, and bold or underline emphasis keeps its words. This
+ * runs before the stage-direction rule, which would otherwise read the inner
+ * "*…*" of "**Roasted chestnuts**" as a direction and drop the words.
+ */
+export function plainMarkdown(text: string): string {
+  return text
+    .replace(/^[ \t]*#{1,6}[ \t]+/gm, '')
+    .replace(/^[ \t]*(?:[-*+•]|\d{1,2}[.)])[ \t]+/gm, '')
+    .replace(/\*\*([^*\n]+?)\*\*/g, '$1')
+    .replace(/__([^_\n]+?)__/g, '$1');
+}
+
+/**
  * What the screen shows for a spoken line. Stage directions (*chuckle*) are
  * performed by the voice, so they're dropped. "Callah" is how a Mon SAYS
  * Caller (the lexicon's pronunciation rows in Payload, ADR 0008: Caller →
@@ -10,7 +24,7 @@ import { captionFormsWith, FALLBACK_MON_LINGO, type MonLingo } from './lingo/ind
  * `lingo` is the served lexicon; leaving it out uses the offline fallback.
  */
 export function captionText(text: string, lingo: MonLingo = FALLBACK_MON_LINGO): string {
-  const cleaned = captionFormsWith(text, lingo)
+  const cleaned = captionFormsWith(plainMarkdown(text), lingo)
     .replace(/\*[^*\n]{1,60}\*/g, ' ')
     .replace(/[ \t]{2,}/g, ' ')
     .replace(/ +([.,!?])/g, '$1')
@@ -71,5 +85,5 @@ export function unwrapQuotes(text: string): string {
  * otherwise send a stray opening or closing mark with each end).
  */
 export function spokenText(text: string): string {
-  return text.replace(/["“”]/g, '').replace(/[ \t]{2,}/g, ' ').trim();
+  return plainMarkdown(text).replace(/["“”]/g, '').replace(/[ \t]{2,}/g, ' ').trim();
 }

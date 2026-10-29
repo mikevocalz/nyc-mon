@@ -11,7 +11,7 @@ import {
 import { Aside, Details, Footer, Header, Heading, List, ListItem, Main, Paragraph, Section, Summary, Text } from '@acme/ui/html';
 import { Mic, Square } from '@acme/ui/icons';
 import { ScrollView, View } from '@acme/ui/tw';
-import { SimOAuthProvider, parseCallback } from '../shared/auth.ts';
+import { SimOAuthProvider, parseCallback, revokeRefreshToken } from '../shared/auth.ts';
 import { runAgentTurn } from '../shared/agentLoop.ts';
 import { mcpToolsToClaude } from '../shared/toolSpec.ts';
 import { beginSignIn, completeSignIn, connectMcp } from './mcp.ts';
@@ -36,7 +36,7 @@ import { Composer } from './CompanionComposer.tsx';
 import { STARTER_ART, artForDex, type CompanionArt } from './companionArt.ts';
 import { mergeMonCard, type MonCard } from './companionMon.ts';
 
-const ConfigSchema = z.object({ mcpUrl:z.string().url(),clientId:z.string().min(1),modelBackend:z.literal('nebius'),modelLabel:z.string(),
+const ConfigSchema = z.object({ mcpUrl:z.string().url(),clientId:z.string().min(1),issuer:z.string().url(),modelBackend:z.literal('nebius'),modelLabel:z.string(),
   asr:z.enum(['riva','browser']).default('browser') });
 type Config = z.infer<typeof ConfigSchema>;
 const toolsAllowed = new Set(['get_mon_status','check_on_mon','check_incubation','hatch_egg','talk_to_mon','feed_mon','rest_mon','wake_mon','play_with_mon']);
@@ -275,7 +275,10 @@ function Companion({ config }: { config:Config }) {
   }
   function signOut() {
     controller.close();store.setState((st) => ({ voice:nextVoice(st.voice,{ type:'stop' }) }));
-    voice.reset();runtime.getState().abort?.abort();void runtime.getState().session?.close();runtime.setState({ session:null });provider.signOut();runtime.setState({ history:[] });
+    voice.reset();runtime.getState().abort?.abort();void runtime.getState().session?.close();runtime.setState({ session:null });
+    // Revoke at the server (RFC 7009) as well as forgetting it here: a copied refresh token stops working too.
+    void revokeRefreshToken({ issuer:config.issuer,clientId:config.clientId,refreshToken:(provider.tokens() as { refresh_token?:string } | undefined)?.refresh_token });
+    provider.signOut();runtime.setState({ history:[] });
     store.setState({ ...initialCompanionState(),status:'Signed out. This page no longer holds your conversation or preferences.' });
   }
   function exportMemory() {

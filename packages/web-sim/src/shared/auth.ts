@@ -185,6 +185,39 @@ export function resolveAuthState(mode: AuthMode, provider: SimOAuthProvider, now
   return { kind: 'signed-in', expiresAt };
 }
 
+/**
+ * RFC 7009 at sign-out. Clearing sessionStorage only forgets the tokens in this
+ * tab; a refresh token copied out of it would keep minting access tokens for
+ * its whole 90-day life. This asks the authorization server to revoke it. The
+ * endpoint comes from the issuer's RFC 8414 metadata and must share the
+ * issuer's origin, so the token never goes anywhere else. Never throws.
+ */
+export async function revokeRefreshToken(options: {
+  readonly issuer: string;
+  readonly clientId: string;
+  readonly refreshToken: string | undefined;
+  readonly fetch?: typeof fetch;
+}): Promise<'revoked' | 'none' | 'failed'> {
+  if (!options.refreshToken) return 'none';
+  const doFetch = options.fetch ?? fetch;
+  try {
+    const issuer = new URL(options.issuer);
+    const metadataUrl = new URL('/.well-known/oauth-authorization-server', issuer.origin);
+    const metadata = (await (await doFetch(metadataUrl.href)).json()) as { revocation_endpoint?: unknown };
+    if (typeof metadata.revocation_endpoint !== 'string') return 'failed';
+    const endpoint = new URL(metadata.revocation_endpoint);
+    if (endpoint.origin !== issuer.origin) return 'failed';
+    const response = await doFetch(endpoint.href, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ token: options.refreshToken, token_type_hint: 'refresh_token', client_id: options.clientId }).toString(),
+    });
+    return response.ok ? 'revoked' : 'failed';
+  } catch {
+    return 'failed';
+  }
+}
+
 /** Read `code`/`state`/`error` off the OAuth redirect. */
 export function parseCallback(search: string):
   | { readonly ok: true; readonly code: string; readonly state: string | null; readonly iss: string | null }
