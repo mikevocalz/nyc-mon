@@ -9,7 +9,7 @@ import { buildCityMeshes, SHADOW_BAND_METRES, shadowBands, type CityMeshStats } 
 import { buildStreetProps } from './street-props.ts';
 import { buildTrees, type TreeReport } from './foliage.ts';
 import { buildStreetFurniture } from './street-furniture.ts';
-import { createStreetClearance } from './walkability.ts';
+import { createStreetClearance, createWalkQueries } from './walkability.ts';
 import { createCityMaterials, linearColor } from './materials.ts';
 import { createPbrCityMaterials, EXPERIMENTAL_WORLD_PBR } from './pbr-materials.ts';
 import { createGlassCityMaterials, EXPERIMENTAL_WORLD_GLASS, type GlassTier } from './glass.ts';
@@ -27,8 +27,8 @@ import { LIGHT_POLE_HEIGHT } from './signage.ts';
 // Static: the living city's bundled-topology.ts evaluates topology.ts in every build, so a lazy load here saves nothing.
 import { buildLaneTopology } from '../living-city/topology.ts';
 import { createCellStream, type CellStream, type Vec3 } from './cells/cell-stream.ts';
-import { buildVdPort } from './vd-port/index.ts';
-import { createWalkQueries } from './walkability.ts';
+import { buildVdPort, vdNight } from './vd-port/index.ts';
+import { vdHiddenBuildings } from './vd-port/blocks/index.ts';
 import type { WorldPreset } from '../perf/tier-presets.ts';
 
 // Lane G1 "GPU budget" (EXPO_PUBLIC_WORLD_BUNDLES) was deleted 2026-11: the
@@ -247,19 +247,23 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
       ? { ...materials, glass: phys.glass }
       : { ...materials, masonry: phys.masonry, glass: phys.glass, roads: phys.roads, sidewalks: phys.sidewalks }
     : materials;
+  // The bundled tile's buildings the vd port's blocks replace leave the city mesh, their placeholder signs and fronts with
+  // them (vd-port/blocks: Valdrada's facade-kit buildings and replace-mode landmarks); colliders and walkability keep them.
+  const vdHide = vd ? vdHiddenBuildings() : null;
+  const meshDataset = vdHide ? { ...dataset, buildings: dataset.buildings.filter((b) => !vdHide.has(b.id)) } : dataset;
   const city = phys
     ? buildCityMeshes(
-        THREE, dataset,
+        THREE, meshDataset,
         cityMaterials,
         away, clearance, future,
         {
-          facadeAttributes: true, fireEscapes: true, facelift: faceliftModule?.faceliftBakePicks(dataset),
+          facadeAttributes: true, fireEscapes: true, facelift: faceliftModule?.faceliftBakePicks(meshDataset),
           ...(nightPools ? { storefronts: true } : {}),
         },
       )
-    : buildCityMeshes(THREE, dataset, materials, away, clearance, future);
+    : buildCityMeshes(THREE, meshDataset, materials, away, clearance, future);
   // The facelift reads the built masonry walls, so it follows buildCityMeshes.
-  const facelift = faceliftModule ? faceliftModule.buildPhysicalFacelift(THREE, dataset, city.meshes, clearance) : null;
+  const facelift = faceliftModule ? faceliftModule.buildPhysicalFacelift(THREE, meshDataset, city.meshes, clearance) : null;
   const trees = buildTrees(THREE, dataset, materials, clearance, vd, VD_LEAN, leanMat, leanDraw, phys !== null);
   // The facelift's LED streetlights: the furniture lamps pool in the LED colour instead of sodium.
   const ledPools = faceliftModule ? faceliftModule.createFaceliftLampPools(THREE) : null;
@@ -323,7 +327,17 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
   if (facelift?.mesh) group.add(facelift.mesh);
   if (night) group.add(night.group);
   // The vd port: Valdrada's kits and data for the blocks, landmarks, storefronts and furniture in bounds (vd-port/).
-  const vdPort = vd ? buildVdPort(THREE, dataset, { physical: phys !== null, night: tod, groundY: createWalkQueries(dataset).groundHeight }) : null;
+  const vdPort = vd
+    ? buildVdPort(THREE, dataset, {
+        physical: phys !== null,
+        night: vdNight(tod),
+        groundY: createWalkQueries(dataset).groundHeight,
+        sunDirection: sunDirection,
+        sunColor: linearColor(THREE, 'sun').toArray() as [number, number, number],
+        horizon: (skyRig?.horizon ?? linearColor(THREE, 'skyHorizon')).toArray() as [number, number, number],
+        weather: vdMaterials?.weather ?? null,
+      })
+    : null;
   if (vdPort) group.add(vdPort.group);
 
   // Cell streaming: after every scene-graph pass above has run on the source meshes (shadow casters), so the
@@ -342,6 +356,7 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
     ? createCellStream(THREE, [...city.meshes, ...(facelift?.mesh ? [facelift.mesh] : []), ...(phys?.roadPaint ? [phys.roadPaint] : []), ...(vdPort?.streamMeshes ?? [])], {
         preset: options.stream.preset,
         log: options.stream.log,
+        external: vdPort?.streamLayers ?? [],
         pinned: (x0, z0, size) => landmarkBoxes.some(([a, b, c, d]) => c >= x0 && a < x0 + size && d >= z0 && b < z0 + size),
       })
     : null;
@@ -441,14 +456,16 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
     },
     /** One streaming frame; true while cells are still to build or fading. No-op (false) without streaming. */
     updateStream(camera: Vec3, k: number, nowS: number): boolean {
-      return stream ? stream.update(camera, k, nowS) : false;
+      const busy = stream ? stream.update(camera, k, nowS) : false;
+      // After the cells moved: the vd port's near mask reads which near cells are in.
+      vdPort?.update(nowS);
+      return busy;
     },
     /** The night light pools, null unless `nightLights` was passed under `physical`. */
     nightLights: night,
     /** Advances the facelift's LED sweep; holds it still under Reduce Motion. No-op without the facelift. */
     updateFacelift(time: number, reducedMotion: boolean) {
       facelift?.update(time, reducedMotion);
-      vdPort?.update(time);
     },
     /** The vd port (vd-port/), null off the vd lane. */
     vdPort,

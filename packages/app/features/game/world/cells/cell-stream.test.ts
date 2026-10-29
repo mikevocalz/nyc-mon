@@ -144,3 +144,21 @@ test('layers it does not stream are left whole', () => {
   assert.equal(stream.stats.packages, 0);
   assert.equal(walls.geometry, g);
 });
+
+test('a layer with pin: false is not pinned by the landmark rule and evicts; the default layer stays pinned', () => {
+  const pinnedLayer = detailLayer(2);
+  const detail = detailLayer(2, new THREE.MeshStandardNodeMaterial());
+  detail.mesh.name = 'vd:test-unpinned';
+  detail.mesh.userData.cellLayer = { errorM: 0.25, chunk: 256, fade: false, pin: false };
+  const root = new THREE.Group();
+  root.add(pinnedLayer.mesh, detail.mesh);
+  const stream = createCellStream(T, [pinnedLayer.mesh, detail.mesh], { preset: preset({ evictAfterS: 0 }), pinned: () => true });
+  stream.prime({ x: 10, y: 1.7, z: 10 }, K, 100);
+  const byName = (n: string) => root.children.filter((o) => o.name === n && o.userData.cell !== undefined).length;
+  assert.equal(byName('city:street-detail'), 2, 'the default layer is pinned everywhere: all its cells load');
+  assert.equal(byName('vd:test-unpinned'), 1, 'the opted-out layer loads only what it wants');
+  for (let t = 1; t < 10; t++) stream.update({ x: 5000, y: 1.7, z: 5000 }, K, t);
+  assert.equal(byName('city:street-detail'), 2, 'pinned cells never evict');
+  assert.equal(byName('vd:test-unpinned'), 0, 'the opted-out layer evicts');
+  stream.dispose();
+});

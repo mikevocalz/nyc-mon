@@ -5,6 +5,7 @@
 // out and listed in the sub-builder's header, not invented.
 import type { Three } from '@acme/ui/three';
 import type { Node } from 'three/webgpu';
+import type { CellPackage } from '../cells/cell-rules.ts';
 
 type Group = InstanceType<Three['Group']>;
 type Mesh = InstanceType<Three['Mesh']>;
@@ -18,6 +19,11 @@ export interface VdStreamLayer {
   errorM: number;
   chunk: number;
   fade: boolean;
+  /**
+   * false: never pinned resident by the landmark rule (cell-stream.ts `pinned`), so detail streamed around a landmark
+   * (storefronts, furniture, the blocks' near level) still evicts. Default: pinned where it overlaps a landmark.
+   */
+  pin?: boolean;
 }
 
 export interface VdPortCtx {
@@ -29,6 +35,12 @@ export interface VdPortCtx {
    * read ENV.night to this node. One uniform for the port; the world drives it from the time of day.
    */
   night: Node<'float'>;
+  /**
+   * Valdrada's ENV (client/src/world/materials.js) as TSL nodes, shared by every lane: the sun direction and colour, the
+   * horizon (ENV.fogColor), the sky ambient (sky.js: fogColor x (0.6 + 0.4 dayL), dayL = 1 - night), the reflection gain
+   * and the weather bus (wet, snow).
+   */
+  env: VdEnv;
   /** True when the physical stack is on: colours then decode to linear (sRGB output, ACES in the pipeline). */
   physical: boolean;
   /**
@@ -47,6 +59,30 @@ export interface VdPortCtx {
    * draw.
    */
   register(mesh: Mesh, layer: VdStreamLayer | null): void;
+  /**
+   * Hands the streamer a layer already cut into packages (cells/cell-rules.ts CellPackage: indexed or not, decoded on
+   * first read and released on eviction if the package says so). `template` is in `group`: the layer's material and
+   * attribute layout over one triangle, drawn by the START compile so a streamed cell never compiles a pipeline.
+   * `budget` holds the layer to its own triangles, bytes and draws, outside the preset's near-detail budget.
+   */
+  registerChunks(template: Mesh, layer: VdStreamLayer, packages: readonly CellPackage[], budget?: VdLayerBudget): void;
+}
+
+export interface VdEnv {
+  night: Node<'float'>;
+  wet: Node<'float'>;
+  snow: Node<'float'>;
+  sunDir: Node<'vec3'>;
+  sunColor: Node<'vec3'>;
+  skyAmbient: Node<'vec3'>;
+  fogColor: Node<'vec3'>;
+  reflGain: Node<'float'>;
+}
+
+export interface VdLayerBudget {
+  geometryBytes: number;
+  cellDraws: number;
+  triangles: number;
 }
 
 /** What a sub-builder hands back: per-frame work, disposal and counts for the budget tests. */

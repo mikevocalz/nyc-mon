@@ -55,8 +55,16 @@ export interface CellPackage {
   readonly vertexCount: number;
   /** World-space bounds of the cell's triangles: min x, y, z, max x, y, z. */
   readonly bounds: Float64Array;
-  /** Vertex bytes the package uploads. */
+  /** Vertex bytes the package uploads (index bytes included when it has an index). */
   readonly bytes: number;
+  /**
+   * An indexed package's triangles (`index` holds them; the attributes then hold welded vertices). Absent: non-indexed,
+   * vertexCount / 3 triangles. A package built elsewhere (world/vd-port) may decode its arrays on first read of
+   * `attributes` and `index`, and drop them again in `release`, which the streamer calls on eviction.
+   */
+  readonly index?: Uint16Array | Uint32Array | null;
+  readonly triangles?: number;
+  release?(): void;
 }
 
 type Geometry = InstanceType<Three['BufferGeometry']>;

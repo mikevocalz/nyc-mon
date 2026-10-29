@@ -58,7 +58,7 @@ type Material = InstanceType<Three['Material']>;
  * threshold well inside the radius, so it streams without a seam. 256 m chunks: at 128 m the same reach cost about
  * twice the draws on the walk for a few MB less residency.
  */
-export const CELL_LAYERS: Readonly<Record<string, { errorM: number; chunk: number; fade: boolean }>> = {
+export const CELL_LAYERS: Readonly<Record<string, { errorM: number; chunk: number; fade: boolean; pin?: boolean }>> = {
   // Stoops, awnings, parapets, roof AC and chimney pots, NYCHA panels.
   'city:street-detail': { errorM: 0.25, chunk: 2 * CELL, fade: true },
   // The facelift's panels, balconies and light strips on the walls.
@@ -121,11 +121,27 @@ export interface Vec3 { x: number; y: number; z: number }
 
 export interface CellStreamOptions {
   preset: WorldPreset;
-  /** Chunks never evicted, by their ground square: x in [x0, x0 + size), z in [z0, z0 + size). */
+  /**
+   * Chunks never evicted, by their ground square: x in [x0, x0 + size), z in [z0, z0 + size). A layer whose spec says
+   * `pin: false` (streamed detail around a landmark: storefronts, furniture) is never pinned and evicts like any other.
+   */
   pinned?: (x0: number, z0: number, size: number) => boolean;
   /** Stage timing lines (EXPO_PUBLIC_GAME_PERF), or undefined for none. */
   log?: (line: string, data: Record<string, unknown>) => void;
   now?: () => number;
+  /**
+   * Layers whose packages arrive already cut (world/vd-port): the template mesh (in the scene, its material and attribute
+   * layout, one triangle) and the packages, which may be indexed and decode lazily (CellPackage). A layer with `budget`
+   * is held to it and kept out of the preset's budget, so it can neither starve the near-detail layers nor be starved.
+   */
+  external?: readonly ExternalLayer[];
+}
+
+export interface ExternalLayer {
+  template: Mesh;
+  spec: { errorM: number; chunk: number; fade: boolean; pin?: boolean };
+  packages: readonly CellPackage[];
+  budget?: { geometryBytes: number; cellDraws: number; triangles: number };
 }
 
 interface Slot {
@@ -149,9 +165,12 @@ interface Layer {
   /** The fade mask went on a clone of the source material, which this module then owns. */
   readonly cloned: boolean;
   readonly slots: Slot[];
+  /** An external layer's own budget, and what it holds resident. */
+  readonly budget: ExternalLayer['budget'] | null;
+  held: { bytes: number; triangles: number; cells: number };
 }
 
-const triangleCount = (pkg: CellPackage) => pkg.vertexCount / 3;
+const triangleCount = (pkg: CellPackage) => pkg.triangles ?? pkg.vertexCount / 3;
 
 /**
  * Packages `meshes` (those named in CELL_LAYERS whose geometry splitByCell can cut) and returns the streamer. Meshes it
@@ -205,10 +224,10 @@ export function createCellStream(THREE: Three, meshes: readonly Mesh[], options:
     mesh.material = material;
     mesh.frustumCulled = false;
     source.dispose();
-    const layer: Layer = { name: mesh.name, template: mesh, material, errorM: spec.errorM, fade: spec.fade, cloned, slots: [] };
+    const layer: Layer = { name: mesh.name, template: mesh, material, errorM: spec.errorM, fade: spec.fade, cloned, slots: [], budget: null, held: { bytes: 0, triangles: 0, cells: 0 } };
     for (const pkg of packages) {
       const slot: Slot = {
-        pkg, layer, pinned: options.pinned?.(pkg.cx * pkg.size, pkg.cz * pkg.size, pkg.size) ?? false, mesh: null, fade: 0, fading: 0, unwantedSince: -1, distance: Infinity,
+        pkg, layer, pinned: spec.pin !== false && (options.pinned?.(pkg.cx * pkg.size, pkg.cz * pkg.size, pkg.size) ?? false), mesh: null, fade: 0, fading: 0, unwantedSince: -1, distance: Infinity,
       };
       layer.slots.push(slot);
       slots.push(slot);
@@ -217,9 +236,46 @@ export function createCellStream(THREE: Three, meshes: readonly Mesh[], options:
     }
     layers.push(layer);
   }
+  // External layers: already cut, their template already in the scene.
+  for (const ext of options.external ?? []) {
+    const mesh = ext.template;
+    let material = mesh.material as Material;
+    let cloned = false;
+    if (ext.spec.fade) {
+      if ((users.get(material) ?? 0) > 1) { material = material.clone(); cloned = true; }
+      const m = material as Material & { maskNode?: Node<'bool'> | null };
+      const dither = ditherFadeMask(THREE);
+      m.maskNode = (m.maskNode ? (m.maskNode as unknown as { and(n: unknown): Node<'bool'> }).and(dither) : dither);
+      m.needsUpdate = true;
+      mesh.material = material;
+    }
+    mesh.frustumCulled = false;
+    const layer: Layer = {
+      name: mesh.name, template: mesh, material, errorM: ext.spec.errorM, fade: ext.spec.fade, cloned, slots: [],
+      budget: ext.budget ?? null, held: { bytes: 0, triangles: 0, cells: 0 },
+    };
+    for (const pkg of ext.packages) {
+      const slot: Slot = {
+        pkg, layer, pinned: ext.spec.pin !== false && (options.pinned?.(pkg.cx * pkg.size, pkg.cz * pkg.size, pkg.size) ?? false), mesh: null, fade: 0, fading: 0, unwantedSince: -1, distance: Infinity,
+      };
+      layer.slots.push(slot);
+      slots.push(slot);
+      stats.packages++;
+      stats.packageBytes += pkg.bytes;
+    }
+    layers.push(layer);
+  }
+  // What the budgeted (external) layers hold, kept out of the preset's budget.
+  const own = { bytes: 0, triangles: 0, cells: 0 };
   log?.('packaged', {
     layers: layers.length, packages: stats.packages, mb: +(stats.packageBytes / 1e6).toFixed(1), ms: +(now() - t0).toFixed(1),
   });
+
+  function hold(layer: Layer, pkg: CellPackage, sign: 1 | -1) {
+    const t = triangleCount(pkg);
+    layer.held.bytes += sign * pkg.bytes; layer.held.triangles += sign * t; layer.held.cells += sign;
+    if (layer.budget) { own.bytes += sign * pkg.bytes; own.triangles += sign * t; own.cells += sign; }
+  }
 
   const build = (slot: Slot, fadeIn: boolean) => {
     const start = now();
@@ -228,11 +284,14 @@ export function createCellStream(THREE: Three, meshes: readonly Mesh[], options:
     for (const [name, a] of Object.entries(pkg.attributes)) {
       geometry.setAttribute(name, new THREE.BufferAttribute(a.array, a.itemSize, a.normalized));
     }
+    if (pkg.index) geometry.setIndex(new THREE.BufferAttribute(pkg.index, 1));
     const b = pkg.bounds;
     geometry.boundingBox = new THREE.Box3(new THREE.Vector3(b[0], b[1], b[2]), new THREE.Vector3(b[3], b[4], b[5]));
     geometry.boundingSphere = geometry.boundingBox.getBoundingSphere(new THREE.Sphere());
-    // The package arrays are the store a later rebuild reads: world/release-uploaded.ts must leave them.
-    geometry.userData = { keepCpuArrays: true };
+    // The package arrays are the store a later rebuild reads: world/release-uploaded.ts must leave them. A package that
+    // decodes on demand (it has `release`) is its own store: its decoded arrays go once uploaded, and a rebuild decodes.
+    geometry.userData = { keepCpuArrays: !pkg.release };
+    pkg.release?.();
     const t = layer.template;
     const mesh = new THREE.Mesh(geometry, layer.material);
     mesh.name = t.name;
@@ -257,6 +316,7 @@ export function createCellStream(THREE: Three, meshes: readonly Mesh[], options:
     stats.bytes += pkg.bytes;
     stats.triangles += triangleCount(pkg);
     stats.loads++;
+    hold(layer, pkg, 1);
     const ms = now() - start;
     stats.builtThisFrame++;
     stats.buildMsThisFrame += ms;
@@ -279,13 +339,19 @@ export function createCellStream(THREE: Three, meshes: readonly Mesh[], options:
     stats.bytes -= slot.pkg.bytes;
     stats.triangles -= triangleCount(slot.pkg);
     stats.evictions++;
+    hold(slot.layer, slot.pkg, -1);
+    // A lazily decoded package drops its arrays with the mesh; it decodes again if it is wanted again.
+    slot.pkg.release?.();
   };
 
-  const fits = (slot: Slot) => slot.pinned || (
-    stats.bytes + slot.pkg.bytes <= preset.budget.geometryBytes
-    && stats.cells + 1 <= preset.budget.cellDraws
-    && stats.triangles + triangleCount(slot.pkg) <= preset.budget.triangles
-  );
+  const fits = (slot: Slot) => {
+    if (slot.pinned) return true;
+    const b = slot.layer.budget, h = slot.layer.held, t = triangleCount(slot.pkg);
+    if (b) return h.bytes + slot.pkg.bytes <= b.geometryBytes && h.cells + 1 <= b.cellDraws && h.triangles + t <= b.triangles;
+    return stats.bytes - own.bytes + slot.pkg.bytes <= preset.budget.geometryBytes
+      && stats.cells - own.cells + 1 <= preset.budget.cellDraws
+      && stats.triangles - own.triangles + t <= preset.budget.triangles;
+  };
 
   const requests: Slot[] = [];
   const last = { x: NaN, y: NaN, z: NaN, at: -Infinity, k: NaN, frameAt: NaN };

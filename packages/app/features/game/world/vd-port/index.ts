@@ -14,23 +14,34 @@ import { build as buildBlocks } from './blocks/index.ts';
 import { build as buildStorefronts } from './storefronts/index.ts';
 import { build as buildFurniture } from './furniture/index.ts';
 import { valdradaToScene } from './transform.ts';
-import type { VdPortCtx, VdPortPart, VdStreamLayer } from './types.ts';
+import type { VdEnv, VdLayerBudget, VdPortCtx, VdPortPart, VdStreamLayer } from './types.ts';
+import type { CellPackage } from '../cells/cell-rules.ts';
+import type { ExternalLayer } from '../cells/cell-stream.ts';
 
-export type { VdPortCtx, VdPortPart, VdStreamLayer } from './types.ts';
+export type { VdEnv, VdLayerBudget, VdPortCtx, VdPortPart, VdStreamLayer } from './types.ts';
 
 type Mesh = InstanceType<Three['Mesh']>;
 
 export interface VdPortOptions {
   physical: boolean;
-  /** 0 by day … 1 after dark; the world's time-of-day share. */
+  /** Valdrada's ENV.night: 0 by day, 0.92 under its night skies (sky.js isNight). */
   night: number;
   groundY(x: number, z: number): number;
+  /** Unit vector toward the sun, scene axes. */
+  sunDirection: readonly [number, number, number];
+  /** Linear RGB, unit scale, as Valdrada's ENV.sunColor and ENV.fogColor. */
+  sunColor: readonly [number, number, number];
+  horizon: readonly [number, number, number];
+  /** The vd lane's weather uniforms (vd-materials.ts VdWeather), or none. */
+  weather?: { wet: { value: number }; snow: { value: number } } | null;
 }
 
 export interface VdPort {
   group: InstanceType<Three['Group']>;
   /** Meshes registered with a stream layer (userData.cellLayer set), for createCellStream. */
   streamMeshes: Mesh[];
+  /** Layers registered already cut (registerChunks), for createCellStream's `external`. */
+  streamLayers: ExternalLayer[];
   /** Sets Valdrada's ENV.night. */
   setNight(value: number): void;
   update(timeS: number): void;
@@ -38,17 +49,44 @@ export interface VdPort {
   stats: { meshes: number; triangles: number; structures: number; streamed: number };
 }
 
+/**
+ * Valdrada's ENV.night from the world's lit-room share (index.ts TOD_BY_SKY: morning 0.15, dusk 0.8, night 1): 0 by day
+ * and 0.92 at night, sky.js's value under its night skies. Dusk sits on the line between (0.75 at the world's 0.8): the
+ * dusk HDRI's luminance, which Valdrada derives it from, is not in the port.
+ */
+export function vdNight(timeOfDay: number): number {
+  return Math.max(0, Math.min(0.92, ((timeOfDay - 0.15) / 0.85) * 0.92));
+}
+
 export function buildVdPort(THREE: Three, dataset: CityDatasetV3, options: VdPortOptions): VdPort {
   const group = new THREE.Group();
   group.name = 'city:vd-port';
-  const night = THREE.TSL.uniform(options.night) as unknown as Node<'float'> & { value: number };
+  const T = THREE.TSL;
+  const night = T.uniform(options.night) as unknown as Node<'float'> & { value: number };
+  const v3 = (a: readonly [number, number, number]) => T.uniform(new THREE.Vector3(a[0], a[1], a[2])) as unknown as Node<'vec3'>;
+  const fogColor = v3(options.horizon);
+  const env: VdEnv = {
+    night,
+    // the weather bus: the vd lane's own uniforms when it has them, so the port and the vd materials stay in step
+    wet: (options.weather?.wet ?? T.uniform(0)) as unknown as Node<'float'>,
+    snow: (options.weather?.snow ?? T.uniform(0)) as unknown as Node<'float'>,
+    sunDir: v3(options.sunDirection),
+    sunColor: v3(options.sunColor),
+    fogColor,
+    // sky.js: ENV.skyAmbient = fogColor x (0.6 + 0.4 dayL)
+    skyAmbient: fogColor.mul(T.float(0.6).add(T.float(1).sub(night).mul(0.4))) as unknown as Node<'vec3'>,
+    // materials.js ENV.reflGain default
+    reflGain: T.float(1) as unknown as Node<'float'>,
+  };
   const toScene = valdradaToScene(dataset.origin);
   const half = dataset.extentMeters;
   const streamMeshes: Mesh[] = [];
+  const streamLayers: ExternalLayer[] = [];
   const ctx: VdPortCtx = {
     THREE,
     group,
     night,
+    env,
     physical: options.physical,
     groundY: options.groundY,
     toScene,
@@ -58,9 +96,12 @@ export function buildVdPort(THREE: Three, dataset: CityDatasetV3, options: VdPor
       mesh.userData.cellLayer = layer;
       streamMeshes.push(mesh);
     },
+    registerChunks(template: Mesh, layer: VdStreamLayer, packages: readonly CellPackage[], budget?: VdLayerBudget) {
+      streamLayers.push({ template, spec: layer, packages, ...(budget ? { budget } : {}) });
+    },
   };
   const parts: VdPortPart[] = [buildBlocks(ctx), buildStorefronts(ctx), buildFurniture(ctx)];
-  const stats = { meshes: 0, triangles: 0, structures: 0, streamed: streamMeshes.length };
+  const stats = { meshes: 0, triangles: 0, structures: 0, streamed: streamMeshes.length + streamLayers.reduce((a, l) => a + l.packages.length, 0) };
   for (const p of parts) {
     stats.meshes += p.stats.meshes;
     stats.triangles += p.stats.triangles;
@@ -69,6 +110,7 @@ export function buildVdPort(THREE: Three, dataset: CityDatasetV3, options: VdPor
   return {
     group,
     streamMeshes,
+    streamLayers,
     setNight(value: number) {
       night.value = Math.max(0, Math.min(1, value));
     },

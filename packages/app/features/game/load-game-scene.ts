@@ -15,6 +15,7 @@
 import type { ThreeSetup } from '@acme/ui/three';
 import type { CitySceneParams } from './city-scene.ts';
 import { gameScreenActions } from './game-session.ts';
+import { preloadVdBlocks } from './world/vd-port/blocks/load.ts';
 
 export interface GameSceneParams extends CitySceneParams {
   onFirstFrame: () => void;
@@ -73,7 +74,8 @@ export function withFirstFrameSignal(
 
 export const loadGameScene = (): Promise<ThreeSetup<GameSceneParams>> => {
   gameScreenActions.loadStage('requested');
-  return import('./city-scene.ts').then((m) => {
+  // The vd port's block packs are read while the scene module loads: the world is built synchronously and needs them there.
+  return Promise.all([import('./city-scene.ts'), preloadVdBlocks()]).then(([m]) => {
     gameScreenActions.loadStage('moduleLoaded');
     return withFirstFrameSignal(m.createCityScene);
   });
