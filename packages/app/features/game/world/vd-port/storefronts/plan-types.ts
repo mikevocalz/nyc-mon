@@ -61,6 +61,9 @@ export interface NamedShop {
 export interface Front extends FrontFrame {
   /** 0 a spec'd face (fk/specs), 1 a namedShops.js front, 2 nycDress storefront units. */
   src: 0 | 1 | 2;
+  /** The ring district the front belongs to (bake-vd-storefronts.mjs --ring ringN): drawn whether or not the
+   * tile's playable square covers it. */
+  ring?: 1 | 2;
   id: string;
   addr: string;
   bays: (StoreBay | EntranceBay)[];

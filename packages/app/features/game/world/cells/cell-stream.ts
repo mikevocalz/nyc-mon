@@ -349,8 +349,17 @@ export function createCellStream(THREE: Three, meshes: readonly Mesh[], options:
       geometry.setAttribute(name, new THREE.BufferAttribute(a.array, a.itemSize, a.normalized));
     }
     if (pkg.index) geometry.setIndex(new THREE.BufferAttribute(pkg.index, 1));
+    const origin = pkg.positionFrame?.origin;
+    const scale = pkg.positionFrame?.scale;
+    const ox = origin?.[0] ?? 0, oy = origin?.[1] ?? 0, oz = origin?.[2] ?? 0;
+    const sx = scale?.[0] ?? 1, sy = scale?.[1] ?? 1, sz = scale?.[2] ?? 1;
     const b = pkg.bounds;
-    geometry.boundingBox = new THREE.Box3(new THREE.Vector3(b[0], b[1], b[2]), new THREE.Vector3(b[3], b[4], b[5]));
+    // The package's bounds are scene-space; in the mesh's local frame they sit `origin` back and, on a scaled frame
+    // (a far chunk's quantized positions), `scale` up, so the box still covers the vertices it culls against.
+    geometry.boundingBox = new THREE.Box3(
+      new THREE.Vector3((b[0]! - ox) / sx, (b[1]! - oy) / sy, (b[2]! - oz) / sz),
+      new THREE.Vector3((b[3]! - ox) / sx, (b[4]! - oy) / sy, (b[5]! - oz) / sz),
+    );
     geometry.boundingSphere = geometry.boundingBox.getBoundingSphere(new THREE.Sphere());
     // The package arrays are the store a later rebuild reads: world/release-uploaded.ts must leave them. A package that
     // decodes on demand (it has `release`) is its own store: its decoded arrays go once uploaded, and a rebuild decodes.
@@ -363,6 +372,9 @@ export function createCellStream(THREE: Three, meshes: readonly Mesh[], options:
     mesh.castShadow = t.castShadow;
     mesh.receiveShadow = t.receiveShadow;
     mesh.layers.mask = t.layers.mask;
+    mesh.position.set(ox, oy, oz);
+    if (scale) mesh.scale.set(sx, sy, sz);
+    mesh.updateMatrix();
     mesh.matrixAutoUpdate = false;
     mesh.userData = { ...t.userData, cell: pkg.num, cellFade: 1 };
     slot.mesh = mesh;
@@ -445,10 +457,13 @@ export function createCellStream(THREE: Three, meshes: readonly Mesh[], options:
   const reachOf = (layer: Layer, k: number) => (layer.reachM !== null ? layer.reachM : (layer.errorM * k) / preset.screenErrorPx);
 
   const pick = (camera: Vec3, k: number, nowS: number, radius: number) => {
-    const keepRadius = radius + CELL;
     requests.length = 0;
     stats.fetching = 0;
     for (const slot of slots) {
+      // A reachM layer's radius is its own reach (the far tier streams to 13 km while the near detail stays at the
+      // preset's residentRadiusM); reachM at or under the preset's radius changes nothing (lane C's 60 m and 360 m).
+      const slotRadius = slot.layer.reachM !== null ? Math.max(radius, slot.layer.reachM) : radius;
+      const keepRadius = Math.max(radius + CELL, slotRadius + slot.layer.chunk);
       const d = boxDistance(slot.pkg.bounds, camera.x, camera.y, camera.z);
       slot.distance = d;
       const resident = slot.mesh !== null && slot.fading !== -1;
@@ -465,13 +480,13 @@ export function createCellStream(THREE: Three, meshes: readonly Mesh[], options:
           if (slot.layer.fade) slot.fading = -1;
           else evict(slot);
         }
-      } else if (d <= radius && wanted(slot.layer, d, k, true) && !slot.pkg.suppressed?.()) {
+      } else if (d <= slotRadius && wanted(slot.layer, d, k, true) && !slot.pkg.suppressed?.()) {
         // A leaving near cell that is wanted again turns around where it is.
         if (slot.mesh !== null) { slot.fading = 1; slot.unwantedSince = -1; continue; }
         // bytes still on their way: ask for them, build once they are in
         if (slot.pkg.ready && !slot.pkg.ready()) { slot.pkg.prefetch?.(); stats.fetching++; continue; }
         requests.push(slot);
-      } else if (slot.mesh === null && slot.pkg.prefetch && d <= Math.min(radius, reachOf(slot.layer, k) + slot.layer.chunk)) {
+      } else if (slot.mesh === null && slot.pkg.prefetch && d <= Math.min(slotRadius, reachOf(slot.layer, k) + slot.layer.chunk)) {
         // the prefetch ring: one chunk past the reach, so a cell's bytes are in before it is wanted
         slot.pkg.prefetch();
       }

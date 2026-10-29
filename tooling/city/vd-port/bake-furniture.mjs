@@ -38,6 +38,30 @@ const TILE = join(REPO, 'packages/app/features/game/data/harlem-apollo.json');
 const toScene = toSceneExact;
 const groundVd = valdradaGround;
 const log = (s) => process.stderr.write(s + '\n');
+// --ring ring1 (or VD_RING=ring1): assemble the ring's tiles too (VD_TILES, assemble-city.mjs) and keep the pieces
+// in its region as well as the square's. --ring ring2: the union bake — home + ring 1 + ring 2 tiles and regions —
+// so ring 1's pieces are regenerated alongside ring 2's rather than dropped. Furniture pools are resident,
+// self-culling draws, so the rings' instances join the same pools and assets (pools.bin, lamps.ts) rather than
+// streaming.
+const RING = process.argv.includes('--ring') ? process.argv[process.argv.indexOf('--ring') + 1] : process.env.VD_RING ?? null;
+let inRegion = null;
+if (RING === 'ring1' || RING === 'ring2') {
+  const { RING1_TILES, ring1RectsScene, inRing1Scene, inHomeSquare } = await import('./ring1.mjs');
+  const { tileIdsForSquare } = await import('../valdrada/decode.mjs');
+  const tiles = [...tileIdsForSquare(), ...RING1_TILES.map((k) => `t_${k}`)];
+  const R1S = ring1RectsScene(AFF);
+  inRegion = (x, z) => inHomeSquare(x, z) || inRing1Scene(x, z, R1S);
+  if (RING === 'ring2') {
+    const { RING2_TILES, ring2RectsScene, inRing2Scene } = await import('./ring2.mjs');
+    for (const k of RING2_TILES) tiles.push(`t_${k}`);
+    const R2S = ring2RectsScene(AFF);
+    const keepR1 = inRegion;
+    inRegion = (x, z) => keepR1(x, z) || inRing2Scene(x, z, R2S);
+  }
+  process.env.VD_TILES = [...new Set(tiles)].join(',');
+} else if (RING) throw new Error(`unknown --ring ${RING}`);
+const keep = (x, z) => inRegion ? inRegion(x, z) : Math.abs(x) <= EXTENT_METERS && Math.abs(z) <= EXTENT_METERS;
+
 const { instancer, roofOf, signalReg } = await assembleCity(log);
 // sim/signals.js SignalController: which lit lens or pedestrian head each slot is, and the axis it serves. Code in the
 // instance flags (pool-data.ts): bits 1-3 the lamp (1 sigR, 2 sigA, 3 sigG, 4 pedHand, 5 pedMan), bit 4 serves E-W.
@@ -104,7 +128,7 @@ for (const [name, p] of instancer.pools) {
       if (Math.abs(e[1]) + Math.abs(e[9]) > 1e-4 * (_s.x + _s.z) || Math.abs(e[4]) + Math.abs(e[6]) > 1e-4 * _s.y) throw new Error(`${name}: a non-yaw rotation`);
     }
     const [x, z] = toScene(_p.x, _p.z);
-    if (Math.abs(x) > EXTENT_METERS || Math.abs(z) > EXTENT_METERS) { stats.outside++; continue; }
+    if (!keep(x, z)) { stats.outside++; continue; }
     const roof = roofOf.get(`${name}:${slot}`);
     let y, ground;
     if (roof) {

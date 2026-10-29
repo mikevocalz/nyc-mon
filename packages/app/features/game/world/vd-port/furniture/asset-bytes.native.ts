@@ -6,6 +6,7 @@
 // @ts-expect-error React Native ships this module untyped
 import resolveAssetSource from 'react-native/Libraries/Image/resolveAssetSource';
 import { VD_CELL_ASSETS, VD_PBR_ALBEDO_ASSET, VD_PBR_ORM_ASSET, VD_PROTOS_ASSET, VD_SIGN_ATLAS_ASSET, VD_VK_TEXTURES_ASSET } from './cells/index.ts';
+import { vdCellFetch } from '../../cell-source/index.ts';
 import type { FurnitureAssets } from './structures.ts';
 
 /* eslint-disable @typescript-eslint/no-require-imports -- Metro bundles an asset only through a literal require() */
@@ -20,7 +21,17 @@ async function bytesOf(id: number): Promise<ArrayBuffer> {
 export const FURNITURE_ASSETS: FurnitureAssets | null = {
   pools: () => bytesOf(require('./assets/pools.bin') as number),
   panelAtlas: () => bytesOf(require('./assets/panel-atlas.bin') as number),
-  cell: (key) => { const f = VD_CELL_ASSETS[key]; if (!f) throw new Error(`vd structures: no cell ${key}`); return bytesOf(f()); },
+  cell: (key) => {
+    const f = VD_CELL_ASSETS[key];
+    // The bundled asset is the home copy; the cell source adds the disk cache and the hash-pinned host behind it.
+    return vdCellFetch(`structures/${key}`, () => {
+      if (!f) throw new Error(`vd structures: no cell ${key}`);
+      return bytesOf(f());
+    }).then((b) => {
+      if (!b) throw new Error(`vd structures: cell ${key} unavailable`);
+      return b instanceof Uint8Array ? b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer : b;
+    });
+  },
   protos: () => bytesOf(VD_PROTOS_ASSET()),
   signAtlas: () => bytesOf(VD_SIGN_ATLAS_ASSET()),
   pbrAlbedo: () => bytesOf(VD_PBR_ALBEDO_ASSET()),

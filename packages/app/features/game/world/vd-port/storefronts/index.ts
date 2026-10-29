@@ -77,7 +77,7 @@ export function build(ctx: VdPortCtx): VdPortPart {
     const mx = f.p0[0]! + f.u[0]! * f.len / 2 - f.n[0]! * 0.5, mz = f.p0[1]! + f.u[1]! * f.len / 2 - f.n[1]! * 0.5;
     return vdBlocksOwn(f.src === 0 ? f.id : null, mx, mz);
   };
-  const result = emitPlan(VD_STOREFRONT_PLAN, (x, z) => ctx.groundY(x, z), (f) => ctx.inBounds(f.p0[0]!, f.p0[1]!) && !ownedByBlocks(f));
+  const result = emitPlan(VD_STOREFRONT_PLAN, (x, z) => ctx.groundY(x, z), (f) => (f.ring != null || ctx.inBounds(f.p0[0]!, f.p0[1]!)) && !ownedByBlocks(f));
   const mats = createStorefrontMaterials(THREE, ctx.night, ctx.physical, FASCIA_ATLAS_R8, FASCIA_ATLAS_WIDTH, FASCIA_ATLAS_HEIGHT);
   const meshes: Mesh[] = [];
   let triangles = 0;

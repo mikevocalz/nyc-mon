@@ -84,6 +84,8 @@ export interface WorldPreset {
     /** errorM: the near layer's reach knob (cells/cell-stream.ts: wanted while errorM x K / distance >= screenErrorPx). */
     readonly blocksNear: { readonly geometryBytes: number; readonly cellDraws: number; readonly triangles: number; readonly errorM: number; readonly level: 'near' | 'lite' };
     readonly structureVertices: number;
+    /** The far tier (vd-port/far-tier): the streamed L4/L6 chunks and landmark silhouettes inside the 13 km reach. */
+    readonly far: { readonly geometryBytes: number; readonly cellDraws: number; readonly triangles: number };
   };
 }
 
@@ -107,7 +109,9 @@ export const WORLD_PRESETS: Readonly<Record<WorldPresetName, WorldPreset>> = {
     // The blocks' near level held to 350k triangles on the A12X until a device measurement says otherwise: the lite cells
     // (Valdrada's near mesh simplified to 10 cm, 2 cm on the heroes) inside a third of the high tier's reach. Walk peak
     // (cell-stream.walk.test.ts) 305k triangles, no refused load. Lane C's structures 250k vertices (structures.test.ts).
-    vdPort: { blocksNear: { geometryBytes: 24 * MiB, cellDraws: 12, triangles: 350_000, errorM: 0.03, level: 'lite' }, structureVertices: 250_000 },
+    vdPort: { blocksNear: { geometryBytes: 24 * MiB, cellDraws: 12, triangles: 350_000, errorM: 0.03, level: 'lite' }, structureVertices: 250_000,
+      // the 13 km reach holds ~300 MB of far chunks on 'high'; the A12X keeps about the nearest fifth of it resident
+      far: { geometryBytes: 64 * MiB, cellDraws: 160, triangles: 1_200_000 } },
   },
   phone: {
     name: 'phone',
@@ -121,7 +125,8 @@ export const WORLD_PRESETS: Readonly<Record<WorldPresetName, WorldPreset>> = {
     fadeS: 0.45,
     shadowTile: 2048,
     bloomResolutionScale: 0.5,
-    vdPort: { blocksNear: { geometryBytes: 24 * MiB, cellDraws: 12, triangles: 350_000, errorM: 0.03, level: 'lite' }, structureVertices: 250_000 },
+    vdPort: { blocksNear: { geometryBytes: 24 * MiB, cellDraws: 12, triangles: 350_000, errorM: 0.03, level: 'lite' }, structureVertices: 250_000,
+      far: { geometryBytes: 64 * MiB, cellDraws: 160, triangles: 1_200_000 } },
   },
   high: {
     name: 'high',
@@ -134,7 +139,9 @@ export const WORLD_PRESETS: Readonly<Record<WorldPresetName, WorldPreset>> = {
     fadeS: 0.45,
     shadowTile: 3072,
     bloomResolutionScale: 0.5,
-    vdPort: { blocksNear: { geometryBytes: 256 * MiB, cellDraws: 64, triangles: 4_000_000, errorM: 0.09, level: 'near' }, structureVertices: 2_000_000 },
+    vdPort: { blocksNear: { geometryBytes: 256 * MiB, cellDraws: 64, triangles: 4_000_000, errorM: 0.09, level: 'near' }, structureVertices: 2_000_000,
+      // 'high' holds every chunk inside the 13 km macro radius (289 chunks, ~294 MB of quantized geometry)
+      far: { geometryBytes: 384 * MiB, cellDraws: 512, triangles: 6_000_000 } },
   },
 };
 

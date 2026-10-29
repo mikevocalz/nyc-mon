@@ -31,6 +31,8 @@ export async function measureVdBudget(): Promise<VdBudget> {
   const { physicalRendererParams } = await import('../physical-look.ts');
   const { advanceNodeFrame } = await import('@acme/ui/three/internals');
   (await import('./blocks/load-from-disk.test-support.ts')).loadVdBlocksFromDisk();
+  // the far tier streams from the same disk copies (the bundled home chunks always, the full bake when .cache is here)
+  (await import('./far-tier/load-from-disk.test-support.ts')).loadVdFarFromDisk();
   const furniture = await import('./furniture/index.ts');
   if (process.env.EXPO_PUBLIC_WORLD_VD_FURNITURE !== '0') furniture.setFurnitureAssets((await import('./furniture/disk-assets.test-support.ts')).diskAssets());
   const { valdradaToScene } = await import('./transform.ts');

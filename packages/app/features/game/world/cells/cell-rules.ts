@@ -37,6 +37,17 @@ export function cellKey(cx: number, cz: number): string {
   return `${cx}_${cz}`;
 }
 
+export interface CellLocalPositionFrame {
+  readonly kind: 'cell-local';
+  readonly origin: readonly [x: number, y: number, z: number];
+  /**
+   * A non-unit scale the built mesh carries with the origin (the far tier's quantized int16 positions, scaled by the
+   * chunk's 1/4 m or 1/8 m step x the tile affine). Positive components; the local bounding box is the package's
+   * scene-space bounds shifted by `origin` and divided by it. Absent: unit scale.
+   */
+  readonly scale?: readonly [x: number, y: number, z: number];
+}
+
 export interface CellAttribute {
   readonly array: Float32Array | Uint16Array | Uint32Array | Int16Array | Uint8Array | Int8Array | Int32Array | Float64Array;
   readonly itemSize: number;
@@ -45,6 +56,7 @@ export interface CellAttribute {
 
 /** One cell's share of a merged mesh: non-indexed triangles in the source's attribute layout. */
 export interface CellPackage {
+  readonly positionFrame?: CellLocalPositionFrame;
   /** Chunk coordinates, in units of the chunk size the package was cut at. */
   readonly cx: number;
   readonly cz: number;

@@ -47,7 +47,11 @@ test('the street-sign poles are Valdrada\'s placements: no two poles at one spot
     const k = `${Math.floor(p[0] / 2)}_${Math.floor(p[1] / 2)}`;
     for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) {
       for (const q of grid.get(`${Math.floor(p[0] / 2) + dx}_${Math.floor(p[1] / 2) + dz}`) ?? []) {
-        assert.ok(Math.hypot(p[0] - q[0], p[1] - q[1]) > 0.3, `${p[2]} and ${q[2]} at (${p[0].toFixed(2)}, ${p[1].toFixed(2)})`);
+        // two compiled records may sit at one corner (a one-way pair on the adjoining streets, ~0.25 m apart facing
+        // opposite ways — the Morningside pair at (-1584.65, 581.5) is one); one record claimed twice would coincide
+        // exactly, so the double-claim check is the near-zero pair
+        const d = Math.hypot(p[0] - q[0], p[1] - q[1]);
+        assert.ok(d > 0.15, `${p[2]} and ${q[2]} at (${p[0].toFixed(2)}, ${p[1].toFixed(2)})`);
       }
     }
     if (!grid.has(k)) grid.set(k, []);

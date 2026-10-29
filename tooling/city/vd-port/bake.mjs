@@ -4,6 +4,12 @@
 //
 //   node tooling/city/vd-port/bake.mjs --measure [--near-err 0.01]   counts only, to tooling/city/vd-port/measure.json
 //   node tooling/city/vd-port/bake.mjs [--near-err 0.01]              writes the structure packs (write.mjs)
+//   node tooling/city/vd-port/bake.mjs --ring ring1                   the ring's tiles and bounds (ring1.mjs): packs to
+//                                                                   blocks/data-ring1/, structures already in
+//                                                                   VD_BLOCKS skipped
+//   node tooling/city/vd-port/bake.mjs --ring ring2                   ring 2 (ring2.mjs): packs to blocks/data-ring2/,
+//                                                                   structures already in VD_BLOCKS or
+//                                                                   VD_BLOCKS_RING1 skipped
 //
 // Needs --deps (three 0.185.1 and earcut 3) or VD_BAKE_DEPS, and Playwright (VD_PLAYWRIGHT, the module path).
 import { writeFile } from 'node:fs/promises';
@@ -11,11 +17,27 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openBake, TILE_KEYS } from './page.mjs';
 import { toScene, EXTENT_METERS } from '../valdrada/decode.mjs';
+import { RING1_TILES, inRing1Vd, bakedBlockIds } from './ring1.mjs';
+import { RING2_TILES, inRing2Vd, bakedRing2Ids } from './ring2.mjs';
 
 const HERE = fileURLToPath(new URL('.', import.meta.url));
 const argv = process.argv.slice(2);
 const flag = (n) => argv.includes(`--${n}`);
 const val = (n, d) => { const i = argv.indexOf(`--${n}`); return i >= 0 ? argv[i + 1] : d; };
+
+/** The --ring argument: 'ring1' or 'ring2' (the ring module's tile list, region and dedupe), or none for the square. */
+const RING = val('ring', null);
+if (RING && RING !== 'ring1' && RING !== 'ring2') throw new Error(`unknown --ring ${RING}`);
+const TILE_LIST = RING === 'ring1' ? RING1_TILES : RING === 'ring2' ? RING2_TILES : TILE_KEYS;
+const SKIP = RING === 'ring1' ? bakedBlockIds() : RING === 'ring2' ? bakedRing2Ids() : new Set();
+/** A structure's Valdrada world box inside the bake's region (the bundled square for the home bake, the ring's two
+ * rects for a ring; s.box is Valdrada world metres, so the home test transforms first). */
+const inRegion = (s) => {
+  if (RING === 'ring1') return inRing1Vd(s.box);
+  if (RING === 'ring2') return inRing2Vd(s.box);
+  const [ax, az] = toScene(s.box[0], s.box[2]), [bx, bz] = toScene(s.box[3], s.box[5]);
+  return Math.max(ax, bx) >= -EXTENT_METERS && Math.min(ax, bx) <= EXTENT_METERS && Math.max(az, bz) >= -EXTENT_METERS && Math.min(az, bz) <= EXTENT_METERS;
+};
 
 /** The area parts lane A ports (city/areas.js names). w125c builds nothing while the facade kit owns the Apollo. */
 export const LANE_A_PARTS = ['w125c', 'w125cb', 'w125w', 'w125e'];
@@ -29,7 +51,7 @@ export async function bakeStructures({ measure, nearErrM, heroErrM }) {
   try {
     await page.addScriptTag({ type: 'module', content: "import * as H from '/harvest.js'; window.__vdH = H;" });
     await page.waitForFunction(() => !!window.__vdH);
-    for (const key of TILE_KEYS) {
+    for (const key of TILE_LIST) {
       const t0 = Date.now();
       const list = await page.evaluate(async ({ k, opts }) => {
         const data = await window.__vd.assemble(k);
@@ -39,9 +61,8 @@ export async function bakeStructures({ measure, nearErrM, heroErrM }) {
       for (const s of list) {
         // a spec or landmark reached from two tiles is built once (its primary tile wins: the first seen)
         if (seen.has(s.id)) continue;
-        const [ax, az] = toScene(s.box[0], s.box[2]), [bx, bz] = toScene(s.box[3], s.box[5]);
-        const inside = Math.max(ax, bx) >= -EXTENT_METERS && Math.min(ax, bx) <= EXTENT_METERS && Math.max(az, bz) >= -EXTENT_METERS && Math.min(az, bz) <= EXTENT_METERS;
-        if (!inside) continue;
+        if (SKIP.has(s.id)) { seen.add(s.id); continue; }   // lane A baked it already (the home pack owns it)
+        if (!inRegion(s)) continue;
         seen.add(s.id);
         s.tile = key;
         out.push(s);
@@ -70,8 +91,12 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   else {
     const { mkdir: mk } = await import('node:fs/promises');
     await mk(join(HERE, '..', '.cache', 'vd-port'), { recursive: true });
-    await writeFile(join(HERE, '..', '.cache', 'vd-port', 'structures.json'), JSON.stringify({ nearErrM, heroErrM, structures: out }));
+    const cacheName = RING ? `structures-${RING}.json` : 'structures.json';
+    await writeFile(join(HERE, '..', '.cache', 'vd-port', cacheName), JSON.stringify({ nearErrM, heroErrM, ring: RING, structures: out }));
     const { writePacks } = await import('./write.mjs');
-    await writePacks(out, { nearErrM, heroErrM });
+    const writer = RING === 'ring1' ? (await import('./write-ring1.mjs')).writeRing1Packs
+      : RING === 'ring2' ? (await import('./write-ring2.mjs')).writeRing2Packs : null;
+    if (writer) await writer(out, { nearErrM, heroErrM });
+    else await writePacks(out, { nearErrM, heroErrM });
   }
 }

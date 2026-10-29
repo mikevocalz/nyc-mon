@@ -25,10 +25,13 @@ import type { Three } from '@acme/ui/three';
 import { EMPTY_PART, type VdPortCtx, type VdPortPart } from '../types.ts';
 import { cellNum, CELL } from '../../cells/cell-rules.ts';
 import { ditherFadeMask } from '../../cells/cell-stream.ts';
-import { decodeShellCell, lazyNearPackage, type NearCellInfo, type ShellCellInfo } from './codec.ts';
+import { decodeShellCell, type NearCellInfo, type ShellCellInfo } from './codec.ts';
+import { sourceNearPackage } from './on-demand.ts';
 import { vdBlockBytes } from './load.ts';
 import { makeBlocksMaterial } from './shell-material.ts';
 import { VD_BLOCKS, VD_FW14 } from './data/manifest.ts';
+import { VD_BLOCKS_RING1 } from './data-ring1/manifest.ts';
+import { VD_BLOCKS_RING2 } from './data-ring2/manifest.ts';
 import { decodeBase64 } from '../../foliage.ts';
 import { WORLD_PRESETS } from '../../../perf/tier-presets.ts';
 
@@ -72,9 +75,11 @@ let ownedSpecs: Set<string> | null = null;
  */
 export function vdBlocksOwn(frontId: string | null, x: number, z: number): boolean {
   if (!vdBlockBytes()) return false;
-  ownedSpecs ??= new Set(VD_BLOCKS.structures.filter((s) => s.kind === 'fk').map((s) => s.id.slice(3)));
+  ownedSpecs ??= new Set([...VD_BLOCKS.structures, ...VD_BLOCKS_RING1.structures, ...VD_BLOCKS_RING2.structures].filter((s) => s.kind === 'fk').map((s) => s.id.slice(3)));
   if (frontId && ownedSpecs.has(frontId.split('#')[0]!)) return true;
   for (const s of VD_BLOCKS.structures) for (const r of s.owned as readonly (readonly (readonly number[])[])[]) if (inRing(r, x, z)) return true;
+  for (const s of VD_BLOCKS_RING1.structures) for (const r of s.owned as readonly (readonly (readonly number[])[])[]) if (inRing(r, x, z)) return true;
+  for (const s of VD_BLOCKS_RING2.structures) for (const r of s.owned as readonly (readonly (readonly number[])[])[]) if (inRing(r, x, z)) return true;
   return false;
 }
 
@@ -97,19 +102,22 @@ export function build(ctx: VdPortCtx): VdPortPart {
   (blocksMat as unknown as { maskNode: unknown }).maskNode = ditherFadeMask(THREE);
   const shellMat = blocksMat, nearMat = blocksMat;
 
-  // ---- the shell: resident, one mesh per 128 m cell
-  const shells = new Map<number, Mesh>();
+  // ---- the shell: resident, one mesh per 128 m cell (the home pack's cells and, with its bytes in, ring 1's)
+  const shells = new Map<number, Mesh[]>();
   let triangles = 0;
   // One layout with the near level (makeBlocksMaterial): the shell has no emission and no shared vertices, so every
   // shell cell reads one zero emission attribute and one identity index, sized to the largest cell and cut by its draw
   // range (one CPU array and one GPU buffer each, not one per cell).
-  const maxShell = Math.max(3, ...(VD_BLOCKS.shell as readonly ShellCellInfo[]).map((c) => c.triangles * 3));
+  const shellSets: { infos: readonly ShellCellInfo[]; bytes: Uint8Array }[] = [{ infos: VD_BLOCKS.shell as readonly ShellCellInfo[], bytes: packs.shell }];
+  if (packs.ring1) shellSets.push({ infos: VD_BLOCKS_RING1.shell as readonly ShellCellInfo[], bytes: packs.ring1.shell });
+  if (packs.ring2) shellSets.push({ infos: VD_BLOCKS_RING2.shell as readonly ShellCellInfo[], bytes: packs.ring2.shell });
+  const maxShell = Math.max(3, ...shellSets.flatMap((s) => s.infos.map((c) => c.triangles * 3)));
   const shellEmissive = new THREE.BufferAttribute(new Uint8Array(maxShell * 4), 4, true);
   const identity = maxShell > 65535 ? new Uint32Array(maxShell) : new Uint16Array(maxShell);
   for (let i = 0; i < maxShell; i++) identity[i] = i;
   const shellIndex = new THREE.BufferAttribute(identity, 1);
-  for (const info of VD_BLOCKS.shell as readonly ShellCellInfo[]) {
-    const a = decodeShellCell(packs.shell, info);
+  for (const { infos, bytes: shellBytes } of shellSets) for (const info of infos) {
+    const a = decodeShellCell(shellBytes, info, 'cell-local');
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(a.position, 3));
     g.setAttribute('color', new THREE.BufferAttribute(a.color, 4, true));
@@ -117,11 +125,13 @@ export function build(ctx: VdPortCtx): VdPortPart {
     g.setAttribute('emissive', shellEmissive);
     g.setIndex(shellIndex);
     g.setDrawRange(0, a.position.length / 3);
-    const b = info.bounds;
-    g.boundingBox = new THREE.Box3(new THREE.Vector3(b[0], b[1], b[2]), new THREE.Vector3(b[3], b[4], b[5]));
+    const b = info.bounds, o = a.positionFrame!.origin;
+    g.boundingBox = new THREE.Box3(new THREE.Vector3(b[0]! - o[0]!, b[1]! - o[1]!, b[2]! - o[2]!), new THREE.Vector3(b[3]! - o[0]!, b[4]! - o[1]!, b[5]! - o[2]!));
     g.boundingSphere = g.boundingBox.getBoundingSphere(new THREE.Sphere());
     const m = new THREE.Mesh(g, shellMat);
     m.name = SHELL_NAME;
+    m.position.set(o[0]!, o[1]!, o[2]!);
+    m.updateMatrix();
     m.matrixAutoUpdate = false;
     m.castShadow = true;
     m.receiveShadow = true;
@@ -129,7 +139,8 @@ export function build(ctx: VdPortCtx): VdPortPart {
     m.userData.vdShell = 1;
     ctx.group.add(m);
     ctx.register(m, null);
-    shells.set(m.userData.cell as number, m);
+    const num = m.userData.cell as number;
+    (shells.get(num) ?? shells.set(num, []).get(num)!).push(m);
     triangles += info.triangles;
   }
 
@@ -152,8 +163,20 @@ export function build(ctx: VdPortCtx): VdPortPart {
   const packages = (VD_BLOCKS[packs.level] as readonly NearCellInfo[]).map((info) => {
     const file = packs.near.get(info.key);
     if (!file) throw new Error(`vd-port: near cell ${info.key} is in the manifest but not in the packs`);
-    return lazyNearPackage(info, () => file);
+    return sourceNearPackage(info, packs.level, () => Promise.resolve(file!.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength) as ArrayBuffer), 'cell-local');
   });
+  // Ring 1's cells join the same layer under 'ring1-<level>/<cell>': the home-overlap cells carry a bundled loader,
+  // the rest prefetch through the cell source only (a cell that never arrives keeps its far shell).
+  if (packs.ring1) {
+    for (const info of VD_BLOCKS_RING1[packs.level] as readonly NearCellInfo[]) {
+      const file = info.bundled === false ? null : packs.ring1.bundled.get(info.key) ?? null;
+      packages.push(sourceNearPackage(
+        info, packs.level,
+        file ? () => Promise.resolve(file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength) as ArrayBuffer) : undefined,
+        'cell-local', `ring1-${packs.level}/${info.key}`,
+      ));
+    }
+  }
   const nearBudget = ctx.preset?.vdPort.blocksNear ?? NEAR_BUDGET;
   ctx.registerChunks(template, { ...NEAR_LAYER, errorM: nearBudget.errorM, sharedMaterial: true }, packages, { name: 'blocks', ...nearBudget });
 
@@ -172,15 +195,15 @@ export function build(ctx: VdPortCtx): VdPortPart {
         const ud = o.userData as { cell?: number; cellFade?: number };
         if (ud.cell !== undefined && (ud.cellFade ?? 1) >= 1) nearIn.add(ud.cell);
       }
-      for (const [num, m] of shells) m.visible = !nearIn.has(num);
+      for (const [num, list] of shells) for (const m of list) m.visible = !nearIn.has(num);
     },
     dispose() {
-      for (const m of shells.values()) m.geometry.dispose();
+      for (const list of shells.values()) for (const m of list) m.geometry.dispose();
       tg.dispose();
       blocksMat.dispose();
       fw14.dispose();
     },
-    stats: { meshes: shells.size + 1, triangles, structures: VD_BLOCKS.structures.length },
+    stats: { meshes: [...shells.values()].reduce((a, l) => a + l.length, 0) + 1, triangles, structures: VD_BLOCKS.structures.length + VD_BLOCKS_RING1.structures.length },
   };
 }
 

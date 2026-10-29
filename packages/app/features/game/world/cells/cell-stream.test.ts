@@ -4,6 +4,7 @@ import * as THREE from 'three/webgpu';
 import type { Three } from '@acme/ui/three';
 import { WORLD_PRESETS, type WorldPreset } from '../../perf/tier-presets.ts';
 import { createCellStream } from './cell-stream.ts';
+import type { CellPackage } from './cell-rules.ts';
 
 const T = THREE as unknown as Three;
 
@@ -29,6 +30,25 @@ const preset = (over: Partial<WorldPreset> = {}): WorldPreset => ({ ...WORLD_PRE
 /** K for a 2048 px tall buffer at fov 50. */
 const K = 2048 / (2 * Math.tan((50 * Math.PI) / 360));
 const cells = (group: THREE.Group) => group.children.filter((o) => o.userData.cell !== undefined) as THREE.Mesh[];
+
+function trianglePackage(over: Partial<CellPackage> & Pick<CellPackage, 'num' | 'bounds' | 'attributes'>): CellPackage {
+  return {
+    cx: 0, cz: 0, size: 128, vertexCount: 3, triangles: 1, bytes: 54, index: new Uint16Array([0, 1, 2]),
+    ...over,
+  };
+}
+
+function externalFixture(material = new THREE.MeshStandardNodeMaterial()) {
+  const root = new THREE.Group();
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(9), 3));
+  geometry.setAttribute('color', new THREE.BufferAttribute(new Uint8Array(12).fill(255), 4, true));
+  const template = new THREE.Mesh(geometry, material);
+  template.name = 'vd:test-framed';
+  root.add(template);
+  const spec = { errorM: 1, chunk: 128, fade: false, pin: false, sharedMaterial: true, reachM: 100 };
+  return { root, template, material, spec };
+}
 
 test('packages the layer, drops the source geometry and keeps a one-triangle template with the same layout', () => {
   const { group, mesh, source } = detailLayer(4);
@@ -143,6 +163,96 @@ test('layers it does not stream are left whole', () => {
   const stream = createCellStream(T, [walls], { preset: preset() });
   assert.equal(stream.stats.packages, 0);
   assert.equal(walls.geometry, g);
+});
+
+test('cell-local and absolute external packages share one material and layout, with local bounds and reconstructable world positions', () => {
+  const f = externalFixture();
+  const origin = [48960, 0, -48960] as const;
+  const localPosition = new Float32Array([39.999, 0, -40.001, 40.001, 0, -40.001, 39.999, 1, -39.999]);
+  const local = trianglePackage({
+    num: 1, positionFrame: { kind: 'cell-local', origin },
+    attributes: {
+      position: { array: localPosition, itemSize: 3, normalized: false },
+      color: { array: new Uint8Array(12).fill(255), itemSize: 4, normalized: true },
+    },
+    bounds: Float64Array.from([48999.999, 0, -49000.001, 49000.001, 1, -48999.999]),
+  });
+  const absolutePosition = new Float32Array([49010, 0, -49010, 49012, 0, -49010, 49010, 1, -49008]);
+  const absolute = trianglePackage({
+    num: 2,
+    attributes: {
+      position: { array: absolutePosition, itemSize: 3, normalized: false },
+      color: { array: new Uint8Array(12).fill(128), itemSize: 4, normalized: true },
+    },
+    bounds: Float64Array.from([49010, 0, -49010, 49012, 1, -49008]),
+  });
+  const stream = createCellStream(T, [], {
+    preset: preset({ residentRadiusM: 1000 }),
+    external: [{ template: f.template, spec: f.spec, packages: [local, absolute] }],
+  });
+  stream.prime({ x: 49000, y: 0, z: -49000 }, K, 1000);
+  const built = cells(f.root);
+  assert.equal(built.length, 2);
+  const localMesh = built.find((m) => m.userData.cell === 1)!;
+  const absoluteMesh = built.find((m) => m.userData.cell === 2)!;
+  assert.equal(localMesh.material, f.material);
+  assert.equal(absoluteMesh.material, f.material);
+  assert.deepEqual(Object.keys(localMesh.geometry.attributes), Object.keys(absoluteMesh.geometry.attributes));
+  assert.equal(localMesh.matrixAutoUpdate, false);
+  assert.equal(absoluteMesh.matrixAutoUpdate, false);
+  assert.deepEqual([localMesh.position.x, localMesh.position.y, localMesh.position.z], [...origin]);
+  assert.deepEqual([absoluteMesh.position.x, absoluteMesh.position.y, absoluteMesh.position.z], [0, 0, 0]);
+  assert.deepEqual([localMesh.matrix.elements[12], localMesh.matrix.elements[13], localMesh.matrix.elements[14]], [...origin]);
+  assert.ok(Math.abs(localMesh.geometry.boundingBox!.min.x - 39.999) < 1e-5);
+  assert.ok(Math.abs(localMesh.geometry.boundingBox!.max.z + 39.999) < 1e-5);
+  assert.equal(absoluteMesh.geometry.boundingBox!.min.x, 49010);
+  localMesh.updateMatrixWorld(true);
+  const v = new THREE.Vector3(localPosition[0], localPosition[1], localPosition[2]).applyMatrix4(localMesh.matrixWorld);
+  assert.ok(Math.abs(v.x - 48999.999) <= 0.05);
+  assert.ok(Math.abs(v.z + 49000.001) <= 0.05);
+  stream.dispose();
+});
+
+test('a lazy local package keeps absolute stream bounds, decodes after ready, and preserves its origin across eviction and rebuild', () => {
+  const f = externalFixture();
+  const origin = [-49024, 3, 49024] as const;
+  let ready = false;
+  let prefetches = 0;
+  const local = trianglePackage({
+    num: 7, positionFrame: { kind: 'cell-local', origin },
+    attributes: {
+      position: { array: new Float32Array([24, -3, -24, 26, -3, -24, 24, -2, -22]), itemSize: 3, normalized: false },
+      color: { array: new Uint8Array(12).fill(255), itemSize: 4, normalized: true },
+    },
+    bounds: Float64Array.from([-49000, 0, 49000, -48998, 1, 49002]),
+    ready: () => ready,
+    prefetch: () => { prefetches++; },
+  });
+  const stream = createCellStream(T, [], {
+    preset: preset({ residentRadiusM: 1000, evictAfterS: 0, stream: { msPerFrame: 1e9, uploadBytesPerFrame: 1e9 } }),
+    external: [{ template: f.template, spec: f.spec, packages: [local] }],
+  });
+  const camera = { x: -49000, y: 0, z: 49000 };
+  stream.prime(camera, K, 1000);
+  assert.equal(cells(f.root).length, 0);
+  assert.equal(prefetches, 1);
+  assert.equal(stream.stats.fetching, 1);
+  assert.deepEqual(local.bounds, Float64Array.from([-49000, 0, 49000, -48998, 1, 49002]));
+  ready = true;
+  stream.update(camera, K, 1);
+  const first = cells(f.root)[0]!;
+  assert.deepEqual([first.position.x, first.position.y, first.position.z], [...origin]);
+  stream.update({ x: 200000, y: 0, z: 200000 }, K, 2);
+  stream.update({ x: 200000, y: 0, z: 200000 }, K, 3);
+  assert.equal(cells(f.root).length, 0);
+  stream.update(camera, K, 4);
+  const rebuilt = cells(f.root)[0]!;
+  assert.notEqual(rebuilt, first);
+  assert.deepEqual([rebuilt.position.x, rebuilt.position.y, rebuilt.position.z], [...origin]);
+  assert.ok(Math.abs(rebuilt.geometry.boundingBox!.min.x - 24) < 1e-5);
+  assert.ok(Math.abs(rebuilt.geometry.boundingBox!.min.z + 24) < 1e-5);
+  assert.equal(rebuilt.material, f.material);
+  stream.dispose();
 });
 
 test('a layer with pin: false is not pinned by the landmark rule and evicts; the default layer stays pinned', () => {
