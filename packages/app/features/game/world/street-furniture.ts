@@ -34,6 +34,13 @@ const BLADE_THICKNESS = 0.03;
 const PIXEL = LETTER_HEIGHT / 7;
 /** Vertex colours carry display values straight through (materials.ts). */
 const linearRgb = (key: CityColor) => hexToRgb(CITY_COLORS[key]);
+/**
+ * Scene height of a blade's centre. The poles stand on the raised sidewalk
+ * (CURB_HEIGHT), so the blade box and both lettering faces take it from
+ * here; the lettering once used the bare blade.y and hung 0.14 m below its
+ * plate on the vd lane (Mike, iPad 2026-10-28).
+ */
+export const bladeCentreY = (blade: Pick<SignBlade, 'y'>) => blade.y + CURB_HEIGHT;
 
 /** Metres of lettering for a blade's text at square pixels. */
 export const measureText = (text: string) => layoutText(text).width * PIXEL;
@@ -86,7 +93,7 @@ export function buildStreetFurniture(
   for (const sign of signs) {
     for (const blade of sign.blades) {
       rotation.setFromAxisAngle(up, yawOf(blade.dir[0], blade.dir[1]));
-      matrix.compose(position.set(sign.x, blade.y + CURB_HEIGHT, sign.z), rotation, scale.set(blade.length, BLADE_HEIGHT, BLADE_THICKNESS));
+      matrix.compose(position.set(sign.x, bladeCentreY(blade), sign.z), rotation, scale.set(blade.length, BLADE_HEIGHT, BLADE_THICKNESS));
       blades.setMatrixAt(b++, matrix);
     }
   }
@@ -202,7 +209,7 @@ function bladeFaces(x: number, z: number, blade: SignBlade, color: readonly numb
     // Face normal (-dz, dx) * side; reading along dir * side keeps the text the right way round.
     const nx = -dz * side; const nz = dx * side;
     return {
-      text: blade.text, x: x + nx * off, y: blade.y, z: z + nz * off,
+      text: blade.text, x: x + nx * off, y: bladeCentreY(blade), z: z + nz * off,
       right: [dx * side, dz * side] as const, height: LETTER_HEIGHT, condense: blade.condense, color,
     };
   });
