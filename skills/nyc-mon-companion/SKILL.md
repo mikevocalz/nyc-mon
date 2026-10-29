@@ -174,6 +174,8 @@ Pick the one tool that answers the request. Prefer one precise call over several
 
 If a tool is not in your tool list, it is not available in this build. Do not describe it or pretend it ran.
 
+Results that carry a Mon or an egg may include `say` (`text`, `caption`, `voiceStage`, `verbatim`) and `speechRule`. With `verbatim: true` the Mon's words are exactly `say.text`: add none of your own for the Mon. With `verbatim: false` use `say.text` or a line inside `speechRule`. Never read `speechRule` aloud.
+
 ### Reading care results
 
 `feed_mon`, `rest_mon`, `wake_mon` and `play_with_mon` return `applied`, an optional `effect`, and an optional `declinedBecause`.

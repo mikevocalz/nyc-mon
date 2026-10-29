@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FALLBACK_MON_LINGO, type MonLingo } from '@acme/content/lingo';
-import { deriveMonInstanceId } from '@acme/core';
+import { checkLimitedSpeech, deriveMonInstanceId, deriveVoiceLineageId, isBabble, REAL_WORD_BLOCKLIST, speechTokens } from '@acme/core';
+import { babbleInventory } from '@acme/content/voice';
 import { deviceIdFor } from '../data/v1.ts';
 import { callTool, fakeV1, NOW, row, rpc, SERVICE_KEY, start, type Running } from './harness.ts';
 
@@ -26,6 +27,7 @@ async function call(name: string, args: Record<string, unknown> = {}, id: number
 }
 
 const ADULT = 'caller-adult';
+const HOUR = 3_600_000;
 let nextId = 100;
 
 describe('read tools', () => {
@@ -55,10 +57,11 @@ describe('read tools', () => {
 
   it('reads mon.voice and the voice guide from the lingo Payload serves, revalidating by ETag', async () => {
     const served: MonLingo = { ...FALLBACK_MON_LINGO, voices: { ...FALLBACK_MON_LINGO.voices, lineages: [] }, guide: [{ ...FALLBACK_MON_LINGO.guide[0]!, text: 'Served rule only.' }] };
-    const v1 = fakeV1({ rows: [row(ADULT)], lingo: served });
+    // Past its first day, so the served rules apply (a first-day Baby gets babble guidance only).
+    const v1 = fakeV1({ rows: [row(ADULT, {}, { hatchedAt: NOW - 25 * HOUR })], lingo: served });
     running = await start({ v1 });
     const talk = await call('talk_to_mon');
-    expect(talk.structuredContent.mon).toMatchObject({ voice: { lineageId: 'dex-001/female/3', stage: 'Baby', voiced: false } });
+    expect(talk.structuredContent.mon).toMatchObject({ voice: { lineageId: 'dex-001/female/3', stage: 'Baby', voiceStage: 'limited', voiced: false } });
     expect(talk.structuredContent.voiceGuide).toContain('Served rule only.');
     const lingoCalls = v1.calls.filter((c) => c.path === '/v1/mon-lingo');
     expect(lingoCalls.length).toBeGreaterThan(1);
@@ -152,7 +155,8 @@ describe('read tools', () => {
     const v1 = fakeV1({ eggs: [egg] });
     running = await start({ v1 });
     const result = await call('check_incubation');
-    expect(result.structuredContent).toEqual({
+    // Every field an older client read is unchanged; voice, say and speechRule are additions.
+    expect(result.structuredContent).toMatchObject({
       incubating: true,
       eggs: [{ eggId: 'egg_1', speciesId: 'dex-001', incubationEndsAt: NOW + 600_000, minutesRemaining: 10, readyToHatch: false }],
     });
@@ -473,5 +477,103 @@ describe('hatch_egg', () => {
       expect(result.structuredContent.error?.reason, personId).toBe('not-permitted');
     }
     expect(v1.calls.some((c) => c.path.startsWith('/v1/eggs') || c.path === '/v1/me/eggs')).toBe(false);
+  });
+});
+
+describe('voice stage on the Alexa path (Decision 32)', () => {
+  interface Say {
+    text: string;
+    caption: string;
+    voiceStage: string;
+    verbatim: boolean;
+  }
+  const blocked = (text: string) => speechTokens(text).filter((t) => REAL_WORD_BLOCKLIST.includes(t));
+  const babbleOk = (say: Say, lineageId: string, stage: 'Egg' | 'Baby') => {
+    const inventory = babbleInventory({ lineageId }, stage, FALLBACK_MON_LINGO);
+    expect(isBabble(say.text, inventory), say.text).toBe(true);
+    expect(blocked(say.text), say.text).toEqual([]);
+    expect(say.text).not.toMatch(/call/i);
+  };
+  const incubating = {
+    eggId: 'egg_talk',
+    monInstanceId: 'mon_egg_talk',
+    speciesId: 'dex-001',
+    hatchesIntoSpeciesId: 'dex-002',
+    callerId: ADULT,
+    nickname: null,
+    incubationMinutes: 30 as const,
+    createdAt: NOW - 20 * 60_000,
+    incubationEndsAt: NOW + 10 * 60_000,
+  };
+
+  it('an incubating egg babbles: check_incubation hands Alexa a verbatim babble line', async () => {
+    running = await start({ v1: fakeV1({ eggs: [incubating] }) });
+    const result = await call('check_incubation');
+    const egg = (result.structuredContent.eggs as { voice: unknown; say: Say }[])[0]!;
+    const lineageId = deriveVoiceLineageId(incubating);
+    expect(egg.voice).toEqual({ lineageId, stage: 'Egg', voiceStage: 'baby-talk' });
+    expect(egg.say).toMatchObject({ voiceStage: 'baby-talk', verbatim: true });
+    babbleOk(egg.say, lineageId, 'Egg');
+    expect(egg.say.caption.length).toBeGreaterThan(0);
+    expect(result.structuredContent.speechRule).toMatch(/say\.text/);
+  });
+
+  it('talking to an egg with no Mon yet still answers with the egg babble', async () => {
+    running = await start({ v1: fakeV1({ eggs: [incubating] }) });
+    const result = await call('talk_to_mon');
+    expect(result.structuredContent.error?.reason).toBe('no-mon');
+    const egg = (result.structuredContent.error as unknown as { egg: { eggId: string; say: Say } }).egg;
+    expect(egg.eggId).toBe('egg_talk');
+    babbleOk(egg.say, deriveVoiceLineageId(incubating), 'Egg');
+  });
+
+  it('a Baby an hour after hatching babbles only, the same line for the same turn', async () => {
+    running = await start({ v1: fakeV1({ rows: [row(ADULT, {}, { hatchedAt: NOW - HOUR })] }) });
+    const first = await call('talk_to_mon');
+    const say = first.structuredContent.say as Say;
+    expect(first.structuredContent.mon).toMatchObject({ voice: { voiceStage: 'baby-talk' } });
+    expect(say).toMatchObject({ voiceStage: 'baby-talk', verbatim: true });
+    babbleOk(say, 'dex-001/female/3', 'Baby');
+    expect(first.structuredContent.speechRule).toMatch(/exactly/);
+    expect((first.structuredContent.voiceGuide as string[]).join(' ')).toMatch(/baby talk only/i);
+    expect((await call('talk_to_mon')).structuredContent.say).toEqual(say);
+  });
+
+  it('care results for a first-day Baby carry the babble line too', async () => {
+    running = await start({ v1: fakeV1({ rows: [row(ADULT, { fullness: 0.2 }, { hatchedAt: NOW - HOUR })] }) });
+    const fed = await call('feed_mon');
+    expect(fed.structuredContent.applied).toBe(true);
+    babbleOk(fed.structuredContent.say as Say, 'dex-001/female/3', 'Baby');
+  });
+
+  it('a Baby 25 hours after hatching is limited: a canon line within the limit, no Callah', async () => {
+    running = await start({ v1: fakeV1({ rows: [row(ADULT, {}, { hatchedAt: NOW - 25 * HOUR })] }) });
+    const result = await call('talk_to_mon');
+    const say = result.structuredContent.say as Say;
+    expect(result.structuredContent.mon).toMatchObject({ voice: { voiceStage: 'limited' } });
+    expect(say).toMatchObject({ voiceStage: 'limited', verbatim: false });
+    const inventory = babbleInventory({ lineageId: 'dex-001/female/3' }, 'Baby', FALLBACK_MON_LINGO);
+    expect(checkLimitedSpeech(say.text, inventory)).toEqual({ ok: true });
+    expect(say.text).not.toMatch(/call/i);
+    expect(result.structuredContent.speechRule).toMatch(/two words/);
+    expect(result.structuredContent.speechRule).toMatch(/Callah/);
+  });
+
+  it('a Small speaks in full: no forced line and no speech rule', async () => {
+    running = await start({ v1: fakeV1({ rows: [row(ADULT, {}, { stage: 'Small', speciesId: 'dex-003' })] }) });
+    for (const tool of ['talk_to_mon', 'check_on_mon', 'get_mon_status']) {
+      const result = await call(tool);
+      expect(result.structuredContent.mon, tool).toMatchObject({ voice: { voiceStage: 'full' } });
+      expect(result.structuredContent.say, tool).toBeUndefined();
+      expect(result.structuredContent.speechRule, tool).toBeUndefined();
+    }
+  });
+
+  it('a just-hatched Baby from hatch_egg babbles its first sound', async () => {
+    const ready = { ...incubating, eggId: 'egg_ready', monInstanceId: deriveMonInstanceId('egg_ready'), incubationEndsAt: NOW - 60_000 };
+    running = await start({ v1: fakeV1({ eggs: [ready] }) });
+    const result = await call('hatch_egg');
+    expect(result.structuredContent.hatched).toBe(true);
+    babbleOk(result.structuredContent.say as Say, deriveVoiceLineageId(ready), 'Baby');
   });
 });
