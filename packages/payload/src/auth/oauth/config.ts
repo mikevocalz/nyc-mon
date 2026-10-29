@@ -24,8 +24,10 @@ export type ClientGrantType = 'authorization_code' | 'refresh_token' | 'client_c
 /** One statically registered client. Amazon supports no dynamic registration. */
 export interface StaticClient {
   clientId: string;
-  /** Shown on the consent page. */
+  /** Shown on the sign-in and consent pages. */
   name: string;
+  /** Where the Caller unlinks: the Alexa app, or by signing out of the companion. */
+  kind: 'alexa' | 'companion';
   /** Absent for a public client: PKCE only, no client_credentials. */
   clientSecret: string | undefined;
   /** Exact-match list; the runtime `redirect_uri` must equal one entry. */
@@ -46,6 +48,9 @@ export const DEFAULT_ALEXA_CLIENT_ID = 'alexa';
 /** Shortest Alexa client secret accepted; Amazon's token call authenticates with it alone. */
 export const MIN_CLIENT_SECRET_LENGTH = 32;
 export const DEFAULT_SIM_CLIENT_ID = 'nyc-mon-sim';
+
+/** What the companion (web-sim) client is called on the linking pages. */
+export const COMPANION_CLIENT_NAME = 'NYC-Mon Personal Companion';
 
 function clean(value: string | undefined): string | undefined {
   return value === undefined || value.trim() === '' ? undefined : value.trim();
@@ -121,6 +126,7 @@ export function readOAuthConfig(
     clients.push({
       clientId: clean(env.OAUTH_ALEXA_CLIENT_ID) ?? DEFAULT_ALEXA_CLIENT_ID,
       name: 'Alexa',
+      kind: 'alexa',
       clientSecret: alexaSecret,
       redirectUris: alexaRedirects,
       grantTypes: ['authorization_code', 'refresh_token', 'client_credentials'],
@@ -133,7 +139,8 @@ export function readOAuthConfig(
   if (simRedirects.length > 0) {
     clients.push({
       clientId: clean(env.OAUTH_SIM_CLIENT_ID) ?? DEFAULT_SIM_CLIENT_ID,
-      name: 'NYC-MON simulator',
+      name: COMPANION_CLIENT_NAME,
+      kind: 'companion',
       clientSecret: simSecret,
       redirectUris: simRedirects,
       grantTypes:
