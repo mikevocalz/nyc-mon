@@ -128,7 +128,7 @@ export default function RootLayout() {
               */}
               {/* One shell (header, rail, tab bar, drawer) around every route
                   group, so rotation and group changes never mount a second rail. */}
-              <RootShell header={<AppHeader />}>
+              <RootShell header={(back) => <AppHeader back={back} />}>
                 <Stack screenOptions={{ headerShown: false, animation: "none" }}>
                   <Stack.Screen name="(home)" dangerouslySingular />
                   <Stack.Screen name="(drawer)" dangerouslySingular />

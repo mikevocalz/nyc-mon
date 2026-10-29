@@ -1,8 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useRouter } from 'expo-router';
-import { BackButton, Badge, Button, EmptyState, FadeIn, Heading, StatusRow, Text } from '@acme/ui';
+import { Badge, Button, EmptyState, FadeIn, Heading, StatusRow, Text } from '@acme/ui';
 import { Section, View } from '@acme/ui/tw';
 import { monIdentity } from '../companion/mon-identity';
 import { ScreenPanes } from '../layout/ScreenPanes';
@@ -10,6 +9,7 @@ import { useMonStore } from '../mon/mon.store';
 import { systemCopy } from './copy';
 import { OUTCOME_COPY, queuedCount, queueRows, STATUS_COPY, syncStatus, unseenConflicts } from './sync-model';
 import { markSyncLogSeen, syncNow, useSyncStore } from './sync.store';
+import { ScreenBack } from '../navigation/use-header-back';
 
 const time = (ms: number) => new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(ms));
 
@@ -20,15 +20,6 @@ function useNameFor(): (monInstanceId: string | null) => string {
     const mon = mons?.find((m) => m.monInstanceId === id);
     return mon === undefined ? (id ?? '') : monIdentity(mon).name;
   };
-}
-
-function Back() {
-  const router = useRouter();
-  return (
-    <View testID="m21-back" className="flex-row px-4 pt-4">
-      <BackButton label={systemCopy('m21.back')} onPress={() => (router.canGoBack() ? router.back() : router.replace('/(home)'))} />
-    </View>
-  );
 }
 
 /** Title, connection status, the local-first line, the last result and Sync now. */
@@ -138,7 +129,7 @@ export function SyncScreen() {
   }, []);
   return (
     <View className="flex-1 bg-surface" testID="m21-sync">
-      <ScreenPanes testID="m21-panes" leading={<Back />} primary={<SyncSummary />} secondary={<SyncDetails />} />
+      <ScreenPanes testID="m21-panes" leading={<ScreenBack testID="m21-back" />} primary={<SyncSummary />} secondary={<SyncDetails />} />
     </View>
   );
 }

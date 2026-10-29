@@ -4,7 +4,7 @@ import { useCallback, useEffect } from 'react';
 import { useRouter } from 'expo-router';
 import { CALLER_NAME_MAX_LENGTH } from '@acme/core/sim';
 import {
-  BackButton, Button, TextField, useInstanceStore, useReducedMotion, useStore, type DeviceKey, type GlassAction, type GlassLine, type GlassView,
+  Button, TextField, useInstanceStore, useReducedMotion, useStore, type DeviceKey, type GlassAction, type GlassLine, type GlassView,
 } from '@acme/ui';
 import { haptics } from '@acme/ui/haptics';
 import { Text, View } from '@acme/ui/tw';
@@ -36,6 +36,7 @@ import { DELETED_PATH } from './delete-account-model.ts';
 import { SIGNED_OUT_PATH, signOutHere } from './sign-out';
 import { nextOf, THEME_OPTIONS, themeLabel } from './theme-options.ts';
 import { TIME_OF_DAY_OPTIONS } from './time-of-day-options.ts';
+import { ScreenBack } from '../navigation/use-header-back';
 
 /** The Baby small at the top, seven text rows, one row of buttons. */
 const LIST_LAYOUT = { model: 'small', rings: false, lineRows: 7, actionRows: 1, perRow: 3 } as const;
@@ -72,15 +73,6 @@ const CREDIT_PAGES = Math.max(1, Math.ceil(CREDITS.length / CREDIT_LINES_PER_PAG
 function creditGlassLine(line: CreditLine): GlassLine {
   if (line.kind === 'group') return { text: line.text, size: 'caption', tone: 'amber', align: 'left' };
   return { text: line.text, size: 'caption', tone: line.kind === 'credit' ? 'text' : 'dim', align: 'left' };
-}
-
-/** The 2D page's Back control: the (home) group has no stack header. */
-function BackRow({ onPress }: { onPress: () => void }) {
-  return (
-    <View testID="settings-back" className="flex-row px-4 pt-4">
-      <BackButton label={companionCopy('m17.back.a11y')} onPress={onPress} />
-    </View>
-  );
 }
 
 /**
@@ -419,7 +411,7 @@ export function SettingsGlass() {
   // Shell: none. The glass, or the 2D page full-window over the mounted shell.
   useHomeStage({});
 
-  if (!glassOn) return <SettingsScreen leading={<BackRow onPress={leave} />} />;
+  if (!glassOn) return <SettingsScreen leading={<ScreenBack testID="settings-back" />} />;
 
   const field = (
     <View testID="settings-field-caller">

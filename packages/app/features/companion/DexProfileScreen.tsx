@@ -6,7 +6,7 @@ import { allSpecies, bloodlines } from '@acme/content';
 import { LIFECYCLE_STAGES } from '@acme/core/schemas';
 import type { EvolutionNode, MonInstance } from '@acme/core/types';
 import {
-  BackButton, HLYNK_COPY, Heading, Image, LifecycleTrack, SafeArea, SignagePlate, lifecycleSlots, useInstanceStore, useStore,
+  HLYNK_COPY, Heading, Image, LifecycleTrack, SafeArea, SignagePlate, lifecycleSlots, useInstanceStore, useStore,
   type DeviceKey, type GlassLine, type GlassView, type ImageProps,
 } from '@acme/ui';
 import { ScrollView, Text, View } from '@acme/ui/tw';
@@ -17,6 +17,7 @@ import { useHomeStage } from './home-stage.store';
 import { CompanionPane } from './CompanionPane';
 import { dexNumber, monIdentity } from './mon-identity';
 import { recoveryHref } from '../system/recovery-model';
+import { ScreenBack } from '../navigation/use-header-back';
 
 /** Chain nodes from the Egg down to `speciesId`, or empty when the species is not in the chain. */
 function pathTo(node: EvolutionNode, speciesId: string): readonly EvolutionNode[] {
@@ -44,16 +45,6 @@ function slotsFor(mon: MonInstance) {
 
 /** The Baby, then the Dex facts as lines, then Back. */
 const LAYOUT = { model: 'medium', rings: false, lineRows: 7, actionRows: 1, perRow: 1 } as const;
-
-/** The kit's back tile, top left under the safe area: the same place on every screen. */
-function Back() {
-  const router = useRouter();
-  return (
-    <View testID="m17-back" className="flex-row px-4 pt-4">
-      <BackButton label={companionCopy('m17.back.a11y')} onPress={() => router.back()} />
-    </View>
-  );
-}
 
 function Fact({ label, value, testID }: { label: string; value: string; testID: string }) {
   // Tablet portrait sets the facts two to a row (md:portrait:w-1/2 on the set's grid below).
@@ -204,7 +195,7 @@ export function DexProfileScreen() {
   const heading = <Heading level={1} className="text-xr-title">{who.name}</Heading>;
   return (
     <SafeArea className="flex-1 bg-bg">
-      <Back />
+      <ScreenBack testID="m17-back" />
       {/*
         One scroll below md and in tablet portrait: top-aligned and stacked.
         Phones keep the full-width portrait; tablet portrait caps it at half

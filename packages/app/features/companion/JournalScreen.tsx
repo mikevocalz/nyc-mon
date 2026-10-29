@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, type ReactNode } from 'react';
 import { useRouter } from 'expo-router';
 import type { JournalEntry } from '@acme/core/types';
 import {
-  BackButton, Badge, Button, DaysCalendar, Heading, SafeArea, VirtualList, monthOf, shiftMonth, useInstanceStore,
+  Badge, Button, DaysCalendar, Heading, SafeArea, VirtualList, monthOf, shiftMonth, useInstanceStore,
   useReducedMotion, useStore, type DeviceKey, type GlassLine, type GlassView, type YearMonth,
 } from '@acme/ui';
 import { ScrollView, Text, View } from '@acme/ui/tw';
@@ -16,6 +16,7 @@ import { CompanionPane } from './CompanionPane';
 import { groupJournalByDay, journalDays, journalEntryCopyId, showsFirstBadge, type DayHeading } from './journal-model';
 import { useMinuteClock } from './minute-clock';
 import { monIdentity } from './mon-identity';
+import { ScreenBack } from '../navigation/use-header-back';
 
 type Row =
   | { readonly type: 'top' }
@@ -36,16 +37,6 @@ function headingText(heading: DayHeading): string {
     case 'date':
       return new Intl.DateTimeFormat(undefined, { dateStyle: 'long' }).format(new Date(heading.atMs));
   }
-}
-
-/** The kit's back tile, top left under the safe area: the same place on every screen. */
-function Back() {
-  const router = useRouter();
-  return (
-    <View testID="m18-back" className="flex-row px-4 pt-4">
-      <BackButton label={companionCopy('m17.back.a11y')} onPress={() => router.back()} />
-    </View>
-  );
 }
 
 /**
@@ -195,7 +186,7 @@ export function JournalScreen() {
   if (mon === undefined) {
     return (
       <SafeArea className="flex-1 bg-bg">
-        <Back />
+        <ScreenBack testID="m18-back" />
       </SafeArea>
     );
   }
@@ -263,7 +254,7 @@ export function JournalScreen() {
   const timelineLabel = companionCopy('m18.timeline.a11y');
   return (
     <SafeArea className="flex-1 bg-bg">
-      <Back />
+      <ScreenBack testID="m18-back" />
       {/* Below md (phones in portrait): one list, the header and calendar as its first row. As before. */}
       <View testID="m18-timeline" accessibilityLabel={timelineLabel} className="flex-1 px-4 md:hidden">
         <VirtualList data={[{ type: 'top' }, ...timeline]} renderItem={renderRow} keyExtractor={key} estimatedItemSize={52} className="flex-1" />
