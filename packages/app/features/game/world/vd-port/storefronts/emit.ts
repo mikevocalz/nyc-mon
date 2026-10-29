@@ -68,8 +68,12 @@ class Frame {
   }
 }
 
-/** Metres over the sidewalk under which a downward face is never in view (eye height 1.6 m, less a margin). */
-const EYE_FLOOR = 1.2;
+/**
+ * Metres over the sidewalk under which a face turned down is never in view: the game's only camera is the chase
+ * camera, which never comes lower than city-scene.ts cameraPose at CAMERA_MIN_DISTANCE (1.2 + 8 tan 0.35 = 4.12 m over
+ * the street, 3.98 m over a 0.14 m curb); 3.9 leaves a margin. storefronts.test.ts holds it to cameraPose.
+ */
+export const EYE_FLOOR = 3.9;
 
 const rgb = (c: Rgb | null | undefined, d: V3): V3 => (c ? [c[0]!, c[1]!, c[2]!] : d);
 
@@ -112,6 +116,8 @@ export class Writer {
   rough: number | null = null;
   /** Emit every triangle a second time, reversed (the awning cloth, seen from under it). */
   twoSided = false;
+  /** World y of EYE_FLOOR over the front being written. */
+  floorY = EYE_FLOOR;
   /** Write the far level's pieces into the near level (a dresser unit is all near level: nycDress builds it within reach). */
   near = false;
   /** The fascia atlas's solid cell, for lit surfaces that are not lettering (uv into a coverage of 1). */
@@ -130,7 +136,9 @@ export class Writer {
   }
   tri(slot: WSlot, p: V3[], n: V3, col: V3, ex: Record<string, number[][]> = {}): void {
     this.put(slot, p, n, col, ex, [0, 1, 2]);
-    if (this.twoSided) this.put(slot, p, [-n[0], -n[1], -n[2]], col, ex, [0, 2, 1]);
+    // the cloth's second side: left out where it faces down under the camera floor (an awning's underside), as a box's
+    // bottom is
+    if (this.twoSided && !(-n[1] < -0.2 && Math.max(p[0]![1], p[1]![1], p[2]![1]) < this.floorY)) this.put(slot, p, [-n[0], -n[1], -n[2]], col, ex, [0, 2, 1]);
   }
   private put(ws: WSlot, p: V3[], n: V3, col: V3, ex: Record<string, number[][]>, order: number[]): void {
     const slot: Slot = ws === 'glass' ? 'glass' : ws === 'detail' || this.near ? 'detail' : 'paint';
@@ -156,8 +164,8 @@ export class Writer {
     const P = (u: number, y: number, w: number) => F.p(u, y, w);
     this.quad(slot, P(u0, y0, w1), P(u1, y0, w1), P(u1, y1, w1), P(u0, y1, w1), F.d(0, 0, 1), col, ex);    // front
     if (!skipTop) this.quad(slot, P(u0, y1, w1), P(u1, y1, w1), P(u1, y1, w0), P(u0, y1, w0), F.d(0, 1, 0), col, ex);    // top
-    // a face turned down under eye height is never seen from the street or the chase camera (both stand above
-    // EYE_FLOOR), so it is culled here as the GPU would cull it; higher soffits (sign boxes, gate hoods) stay
+    // a face turned down under EYE_FLOOR is never seen from the chase camera, so it is culled here as the GPU would
+    // cull it
     if (!skipBottom && y0 >= EYE_FLOOR) this.quad(slot, P(u0, y0, w0), P(u1, y0, w0), P(u1, y0, w1), P(u0, y0, w1), F.d(0, -1, 0), col, ex);
     if (skipEnds) return;
     this.quad(slot, P(u0, y0, w0), P(u0, y0, w1), P(u0, y1, w1), P(u0, y1, w0), F.d(-1, 0, 0), col, ex);   // left end
@@ -490,21 +498,56 @@ function unit(W: Writer, F: Frame, U: NonNullable<Front['units']>[number], front
 function unitBody(W: Writer, F: Frame, U: NonNullable<Front['units']>[number], front: Front, plan: StorefrontPlan, out: EmitResult): void {
   const sfH = 2.9, signH = 0.75, rd = 0.18, w = U.w - 0.5, uc = U.u;
   const a = uc - w / 2, c = uc + w / 2;
+  // An open unit gets facadeKit storeBay's door (L826-L905) in its entry bay, the span K.storefront's partial gate
+  // covers (L909-L910: min(2.2, 0.4 w) at the entrySide end): STORE_DEF's single 1.0 m glass leaf (L794), frameW 0.05,
+  // its head at min(transom bar, 2.35). The leaf stands in the storefront plane (recess 0, which storeBay allows:
+  // Math.max(0, D.recess)); STORE_DEF's 1.2 m vestibule would sit inside the city's solid shell wall.
+  const door = U.gate === 0 ? (() => {
+    const fw = 0.05, gwidth = Math.min(2.2, w * 0.4), du = uc + U.side * (w / 2 - gwidth / 2);
+    return { fw, d0: Math.max(a + fw, du - 0.5 - 0.06), d1: Math.min(c - fw, du + 0.5 + 0.06), top: Math.min(sfH - 0.7, 2.35) };
+  })() : null;
+  const around = (x0: number, x1: number): [number, number][] => (door ? [[x0, door.d0], [door.d1, x1]] : [[x0, x1]]);
   // bulkhead box(w, 0.55, 0.12) at (0, 0.02, -rd + 0.06), z centred; colour 0.16, 0.15, 0.15
-  W.box('detail', F, a, c, 0.02, 0.57, -rd, -rd + 0.12, [0.16, 0.15, 0.15], {}, true);
+  for (const [x0, x1] of around(a, c)) W.box('detail', F, x0, x1, 0.02, 0.57, -rd, -rd + 0.12, [0.16, 0.15, 0.15], {}, true);
   // the sign: an atlas cell quad(w + 0.1, signH) at (0, sfH + 0.12, 0.10) and its box(w + 0.18, signH + 0.08, 0.14) at
   // (0, sfH + 0.08, 0.02); the 'signs' material lights it at 0.05 of its colour
   W.box('detail', F, uc - (w + 0.18) / 2, uc + (w + 0.18) / 2, sfH + 0.08, sfH + 0.16 + signH, 0.02 - 0.07, 0.02 + 0.07, [0.12, 0.11, 0.11]);
   sign(W, F, { text: plan.slots[U.slot] ?? '', u0: uc - (w + 0.1) / 2, u1: uc + (w + 0.1) / 2, y: sfH + 0.12, h: signH, z: 0.1, kind: 'kit', lit: 0, fg: U.fg, bg: U.bg, slot: U.slot }, plan, front, out, [0.05, 0.05]);
   // the glazing: quad(gw, sfH - 0.62) from y 0.6 at z -rd + 0.02, gw = q05(min(w - 0.1, 7)); the steelDark frame
   const gw = Math.round(Math.min(w - 0.1, 7) * 20) / 20, g0 = uc - gw / 2, g1 = uc + gw / 2;
-  W.wall('glass', F, g0, g1, 0.6, 0.6 + sfH - 0.62, -rd + 0.02, [1, 1, 1], glassEx(false));
+  if (door) {
+    for (const [x0, x1] of around(g0, g1)) W.wall('glass', F, x0, x1, 0.6, door.top, -rd + 0.02, [1, 1, 1], glassEx(false));
+    W.wall('glass', F, g0, g1, door.top, 0.6 + sfH - 0.62, -rd + 0.02, [1, 1, 1], glassEx(false));
+  } else W.wall('glass', F, g0, g1, 0.6, 0.6 + sfH - 0.62, -rd + 0.02, [1, 1, 1], glassEx(false));
   const steel: V3 = [0.12, 0.12, 0.13];
   const nM = Math.max(1, Math.round(gw / 1.4));
-  for (let i = 0; i <= nM; i++) { const x = g0 + (gw / nM) * i; W.box('detail', F, x - 0.0275, x + 0.0275, 0.6, sfH, -rd + 0.03 - 0.035, -rd + 0.03 + 0.035, steel, {}, true, true, i > 0 && i < nM); }
-  W.box('detail', F, g0, g1, sfH - 0.06, sfH, -rd + 0.03 - 0.035, -rd + 0.03 + 0.035, steel);
-  W.box('detail', F, g0, g1, 0.55, 0.6, -rd + 0.03 - 0.045, -rd + 0.03 + 0.045, steel);
-  W.box('detail', F, g0, g1, sfH - 0.7, sfH - 0.65, -rd + 0.03 - 0.035, -rd + 0.03 + 0.035, steel);
+  for (let i = 0; i <= nM; i++) {
+    const x = g0 + (gw / nM) * i;
+    if (door && x > door.d0 - 0.03 && x < door.d1 + 0.03) continue;   // the door's own posts stand there
+    W.box('detail', F, x - 0.0275, x + 0.0275, 0.6, sfH, -rd + 0.03 - 0.035, -rd + 0.03 + 0.035, steel, {}, true, true, i > 0 && i < nM);
+  }
+  // the head, sill and transom bars run between the outer mullions, whose boxes bury their ends
+  W.box('detail', F, g0, g1, sfH - 0.06, sfH, -rd + 0.03 - 0.035, -rd + 0.03 + 0.035, steel, {}, false, false, true);
+  for (const [x0, x1] of around(g0, g1)) W.box('detail', F, x0, x1, 0.55, 0.6, -rd + 0.03 - 0.045, -rd + 0.03 + 0.045, steel, {}, false, false, true);
+  W.box('detail', F, g0, g1, sfH - 0.7, sfH - 0.65, -rd + 0.03 - 0.035, -rd + 0.03 + 0.035, steel, {}, false, false, true);
+  if (door) {
+    // storeBay L871-L905 at recess 0: the posts at d0 / d1 in the frame's depth, the leaf (stiles 0.11, rails, the
+    // glass), the push bar, the closer and the pull in alu_clear, the head bar
+    const { fw, d0, d1, top } = door, zd = -rd + 0.065, zb = -rd - 0.005;
+    for (const u of [d0, d1]) W.box('detail', F, u - fw / 2, u + fw / 2, 0, top, zb, zd, steel, {}, false, true);
+    const la = d0 + 0.06, lc = d1 - 0.06, st = 0.11;
+    W.box('detail', F, la, la + st, 0, top - 0.05, zd - 0.05, zd, steel, {}, false, true);
+    W.box('detail', F, lc - st, lc, 0, top - 0.05, zd - 0.05, zd, steel, {}, false, true);
+    W.box('detail', F, la + st, lc - st, top - 0.16, top - 0.05, zd - 0.05, zd, steel, {}, false, false, true);
+    W.box('detail', F, la + st, lc - st, 0, 0.25, zd - 0.05, zd, steel, {}, false, false, true);
+    W.wall('glass', F, la + st, lc - st, 0.25, top - 0.16, zd - 0.025, [1, 1, 1], glassEx(false));
+    W.box('detail', F, la + 0.12, lc - 0.12, 0.98, 1.02, zd, zd + 0.06, ALU);
+    W.box('detail', F, lc - 0.5, lc - 0.14, top - 0.2, top - 0.145, zd, zd + 0.06, ALU);
+    W.box('detail', F, lc - 0.1, lc - 0.075, 0.82, 1.22, zd + 0.045, zd + 0.075, ALU);
+    W.box('detail', F, d0, d1, top - 0.05, top, zd - 0.06, zd, steel, {}, false, false, true);   // ends in the posts
+    const p = F.p((d0 + d1) / 2, 0, zd);
+    out.features.push({ kind: 'door', front: front.id, x: p[0], y: p[1], z: p[2], u: (d0 + d1) / 2 });
+  }
   // the shop fill (0.42, 0.38, 0.32, "a lit shop interior, not a black card") and the warm ceiling strips
   if (U.gate !== 2) {
     W.wall('lit', F, g0, g1, 0.55, sfH - 0.15, -UNIT_FORWARD + 0.005, [0.42, 0.38, 0.32], { aLit: [[1, 1]] });
@@ -555,6 +598,7 @@ export function emitPlan(plan: StorefrontPlan, groundY: (x: number, z: number) =
     const mid = front.len / 2;
     const gx = front.p0[0]! + front.u[0]! * mid + front.n[0]! * 1.2, gz = front.p0[1]! + front.u[1]! * mid + front.n[1]! * 1.2;
     const F = new Frame(front, groundY(gx, gz), front.src === 2 ? UNIT_FORWARD : 0);
+    W.floorY = F.y0 + EYE_FLOOR;
     if (front.src === 1) namedFront(W, F, front, plan, out);
     for (const bay of front.bays) {
       if (bay.t === 's') storeBay(W, F, bay, front, out);

@@ -84,6 +84,18 @@ test("the dresser units: Valdrada's sign roster, its gates up by day on about th
   const open = units.filter((u) => u.gate === 0).length / units.length;
   assert.ok(open > 0.7 && open < 0.82, `${(open * 100).toFixed(1)} % of units open by day (nycDress FAC8: 76 %)`);
   for (const u of units) assert.ok(u.slot >= 0 && PLAN.slots[u.slot], 'every unit carries a roster sign');
+  // every open unit has storeBay's door in its entry bay; a gated one shows its gate instead
+  const unitFronts = new Set(PLAN.fronts.filter((f) => f.src === 2).map((f) => f.id));
+  const doors = result.features.filter((f) => f.kind === 'door' && unitFronts.has(f.front));
+  assert.equal(doors.length, units.filter((u) => u.gate === 0).length);
+  for (const f of PLAN.fronts.filter((x) => x.src === 2)) {
+    for (const u of f.units ?? []) {
+      if (u.gate !== 0) continue;
+      const w = u.w - 0.5, gwidth = Math.min(2.2, w * 0.4), du = u.u + u.side * (w / 2 - gwidth / 2);
+      const d = doors.find((x) => x.front === f.id && Math.abs(x.u - du) <= Math.max(0.06, (gwidth - 1.12) / 2) + 1e-6);
+      assert.ok(d, `${f.id} unit at ${u.u}: a door in its entry bay`);
+    }
+  }
   // every unit's glazing has a curtain to close at night: one per open or full unit, two per partial one
   const curtains = (['paint', 'detail'] as const).reduce((n, k) => n + result.buffers[k].extra.aGate!.filter((y, i) => i % 3 === 1 && y > -999).length / 6, 0);
   const want = units.reduce((n, u) => n + (u.gate === 1 ? 2 : 1), 0) + result.features.filter((f) => f.kind === 'gate').length;
@@ -133,4 +145,11 @@ test('the plan builds only on the tile it was baked for', async () => {
   const { planFitsTile } = await import('./index.ts');
   assert.ok(planFitsTile(toScene), 'harlem-apollo.json');
   assert.ok(!planFitsTile(valdradaToScene([-73.98, 40.75])), 'another origin');
+});
+
+test("the camera floor the culls rely on is the chase camera's lowest pose", async () => {
+  const { cameraPose, CAMERA_MIN_DISTANCE } = await import('../../../city-scene.ts');
+  const { EYE_FLOOR } = await import('./emit.ts');
+  const low = cameraPose({ x: 0, z: 0, yaw: 0, distance: CAMERA_MIN_DISTANCE });
+  assert.ok(low.position[1] - 0.14 > EYE_FLOOR, `camera ${low.position[1].toFixed(2)} m, floor ${EYE_FLOOR} m over the curb`);
 });
