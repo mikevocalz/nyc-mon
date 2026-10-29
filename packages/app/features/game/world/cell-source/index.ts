@@ -27,7 +27,9 @@ let configured: CellSource | null | undefined;
  * env names one — the lanes then read bundled copies only.
  */
 export function configureVdCellSource(config: VdCellSourceConfig = {}): CellSource | null {
-  const env = typeof process !== 'undefined' ? process.env?.EXPO_PUBLIC_VD_CELL_BASE : undefined;
+  // A literal `process.env.EXPO_PUBLIC_*` member access: Metro and Next inline it at build time, and neither matches
+  // an optional-chained `process.env?.X`.
+  const env = typeof process !== 'undefined' && process.env ? process.env.EXPO_PUBLIC_VD_CELL_BASE : undefined;
   const baseUrl = config.baseUrl ?? (env || undefined);
   configured = createCellSource({
     manifest: config.manifest ?? VD_CELL_MANIFEST,

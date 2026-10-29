@@ -9,6 +9,10 @@
 //                                    so clients and r2-verify.mjs use a literal releases/<id>/ base. Rollback rewrites
 //                                    this one object only.
 //
+// A new release only reaches players once the clients point at it: bump the literal release root
+// (https://city-assets.nyc-mon.city/releases/<id>) in apps/mobile/eas.json (preview + production
+// EXPO_PUBLIC_VD_CELL_BASE) and in apps/web/next.config.ts (the same variable's default), then ship those builds.
+//
 // Cell key -> baked file (mirrors vd-port/write-cells-manifest.mjs):
 //   structures/<cx>_<cz>  -> packages/app/features/game/world/vd-port/furniture/cells/<cx>_<cz>.bin
 //   near|lite/<cx>_<cz>   -> packages/app/features/game/world/vd-port/blocks/data/<level>/<cx>_<cz>.bin
