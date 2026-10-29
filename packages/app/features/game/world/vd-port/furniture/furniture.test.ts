@@ -6,11 +6,14 @@ import * as THREE from 'three/webgpu';
 import { valdradaToScene } from '../transform.ts';
 import { decodeAtlas, decodeInstances, INSTANCE_FLOATS } from './pool-data.ts';
 import { cullPool, indexCells, type CullView } from './pool-cull.ts';
-import { VD_POOLS } from './data/instances.ts';
-import { VD_POOL_GEOMETRY } from './data/geometry.ts';
+import { VD_PANEL_ATLAS, VD_POOL_GEOMETRY, VD_POOLS } from './data/pools.ts';
 import { VD_PLACEMENT_SAMPLES } from './data/placement-fixture.ts';
-import { VD_PANEL_ATLAS } from './data/panel-atlas.ts';
 import { vdLampSites } from './index.ts';
+import { VD_STRUCTURES } from './data/structures.ts';
+import { diskAssets, readAsset } from './disk-assets.test-support.ts';
+import { lampScale, LAMP, signalState } from './signal-clock.ts';
+
+const POOLS_BIN = readAsset('assets/pools.bin');
 
 const ORIGIN = [-73.94975, 40.81005] as const;
 const flat = () => 0;
@@ -20,7 +23,7 @@ test('every baked instance sits where Valdrada claimed it, within 5 cm (every po
   for (const pool of VD_POOLS) {
     const samples = VD_PLACEMENT_SAMPLES[pool.name];
     assert.ok(samples && samples.length > 0, `${pool.name}: no placement samples`);
-    const inst = decodeInstances(pool, flat);
+    const inst = decodeInstances(POOLS_BIN, pool, flat);
     for (const [vx, vz] of samples) {
       const [x, z] = toScene(vx!, vz!);
       let best = Infinity;
@@ -35,7 +38,7 @@ test('every baked instance sits where Valdrada claimed it, within 5 cm (every po
 test('the street-sign poles are Valdrada\'s placements: no two poles at one spot', () => {
   const poles: [number, number, string][] = [];
   for (const pool of VD_POOLS.filter((p) => p.name === 'signPole' || p.name === 'signPoleOneWay' || p.name === 'streetSign')) {
-    const inst = decodeInstances(pool, flat);
+    const inst = decodeInstances(POOLS_BIN, pool, flat);
     for (let i = 0; i < inst.count; i++) poles.push([inst.record[i * INSTANCE_FLOATS]!, inst.record[i * INSTANCE_FLOATS + 2]!, pool.name]);
   }
   assert.ok(poles.length > 100, `${poles.length} poles`);
@@ -54,10 +57,10 @@ test('the street-sign poles are Valdrada\'s placements: no two poles at one spot
 
 test('street pieces stand on the ground they are given; roof pieces keep their baked height', () => {
   const hydrant = VD_POOLS.find((p) => p.name === 'hydrant')!;
-  const a = decodeInstances(hydrant, () => 0), b = decodeInstances(hydrant, () => 0.14);
+  const a = decodeInstances(POOLS_BIN, hydrant, () => 0), b = decodeInstances(POOLS_BIN, hydrant, () => 0.14);
   for (let i = 0; i < a.count; i++) assert.ok(Math.abs(b.record[i * INSTANCE_FLOATS + 1]! - a.record[i * INSTANCE_FLOATS + 1]! - 0.14) < 1e-6);
   const tank = VD_POOLS.find((p) => p.name === 'waterTower')!;
-  const c = decodeInstances(tank, () => 0), d = decodeInstances(tank, () => 0.14);
+  const c = decodeInstances(POOLS_BIN, tank, () => 0), d = decodeInstances(POOLS_BIN, tank, () => 0.14);
   for (let i = 0; i < c.count; i++) {
     assert.equal(c.record[i * INSTANCE_FLOATS + 1], d.record[i * INSTANCE_FLOATS + 1]);
     assert.ok(c.record[i * INSTANCE_FLOATS + 1]! > 4, 'a water tank stands on a roof');
@@ -67,7 +70,8 @@ test('street pieces stand on the ground they are given; roof pieces keep their b
 test('the lamp sites are one per cobra head', () => {
   const cobra = VD_POOLS.find((p) => p.name === 'lampCobra')!;
   const sites = vdLampSites();
-  assert.equal(sites.length, cobra.count + (VD_POOLS.find((p) => p.name === 'lampCrook')?.count ?? 0));
+  assert.equal(sites.length, cobra.count + (VD_POOLS.find((p) => p.name === 'lampCrook')?.count ?? 0) + VD_STRUCTURES.lamps.length / 6);
+  assert.ok(VD_STRUCTURES.lamps.length > 0, '125th Street\'s pk lamps');
   for (const s of sites) assert.ok(s.kind >= -1 && s.kind <= 3 && s.head > 5);
 });
 
@@ -81,7 +85,7 @@ test('the pool cull draws exactly the instances whose sphere meets the padded fr
     ['lampCobra', [-300, 30, 200], [0, 0, 0]],
   ] as const) {
     const pool = VD_POOLS.find((p) => p.name === name)!;
-    const inst = decodeInstances(pool, flat);
+    const inst = decodeInstances(POOLS_BIN, pool, flat);
     const radius = VD_POOL_GEOMETRY[name]!.radius;
     const index = indexCells(inst.record, inst.count, radius);
     camera.position.set(pos[0], pos[1], pos[2]);
@@ -125,7 +129,8 @@ test('GPU budget: one pipeline per material kind across every pool, few shader m
   const part = build({
     THREE: THREE as never, group: group as never, night: night as never, physical: true, groundY: () => 0.14,
     toScene: valdradaToScene(ORIGIN), inBounds: () => true, register: () => {},
-  });
+  }, { assets: { ...diskAssets(), cell: () => new Promise(() => {}) } });
+  await part.ready;
   // a high oblique view over the square: every material kind in frame
   const camera = new THREE.PerspectiveCamera(70, 1.5, 1, 4000);
   camera.position.set(-200, 400, 600);
@@ -146,7 +151,7 @@ test('GPU budget: one pipeline per material kind across every pool, few shader m
   assert.ok(record.shaders.length <= 12 + 2, `${record.shaders.length} shader modules`);
   part.dispose();
   // the one texture this lane adds: the panel atlas, RGBA8 with its mip chain
-  const atlasBytes = decodeAtlas(VD_PANEL_ATLAS).byteLength * (4 / 3);
+  const atlasBytes = decodeAtlas(VD_PANEL_ATLAS, readAsset('assets/panel-atlas.bin')).byteLength * (4 / 3);
   assert.ok(atlasBytes <= 16 * 1024 * 1024, `${(atlasBytes / 1048576).toFixed(1)} MB`);
 });
 
@@ -172,7 +177,8 @@ test('GPU budget with the sun casting: the shadow pass adds one depth pipeline f
     const part = withPools ? build({
       THREE: THREE as never, group: group as never, night: THREE.TSL.uniform(0) as never, physical: true, groundY: () => 0.14,
       toScene: valdradaToScene(ORIGIN), inBounds: () => true, register: () => {},
-    }) : null;
+    }, { assets: { ...diskAssets(), cell: () => new Promise(() => {}) } }) : null;
+    await part?.ready;
     const camera = new THREE.PerspectiveCamera(70, 1.5, 1, 4000);
     camera.position.set(-200, 400, 600);
     camera.lookAt(0, 0, 0);
@@ -186,4 +192,20 @@ test('GPU budget with the sun casting: the shadow pass adds one depth pipeline f
   console.log(`added by the pools: ${added.modules} shader modules, ${added.pipelines} pipelines`);
   assert.ok(added.modules <= 12, `${added.modules} shader modules added`);
   assert.ok(added.pipelines <= 5, `${added.pipelines} pipelines added (the lit and glow shaders and their shadow-pass variants)`);
+});
+
+test('the signal clock is sim/signals.js: a 40 s cycle, N-S green first, the pooled lamps follow it', () => {
+  assert.equal(signalState(5, false), 'G'); assert.equal(signalState(16, false), 'A'); assert.equal(signalState(19, false), 'R');
+  assert.equal(signalState(25, true), 'G'); assert.equal(signalState(36, true), 'A'); assert.equal(signalState(5, true), 'R');
+  // a N-S red lens is off while N-S is green, on in the E-W phase; an E-W walking man walks in the E-W green
+  assert.equal(lampScale(LAMP.red, 5), 0.001); assert.equal(lampScale(LAMP.red, 25), 1);
+  assert.equal(lampScale(LAMP.man | LAMP.eastWest, 25), 1); assert.equal(lampScale(LAMP.hand | LAMP.eastWest, 25), 0.001);
+  // every lit lens and head in the bake carries a lamp code, and every mast head has its three lenses
+  const lit = ['sigR', 'sigA', 'sigG', 'pedHand', 'pedMan'].map((n) => VD_POOLS.find((p) => p.name === n)!);
+  for (const p of lit) {
+    const inst = decodeInstances(POOLS_BIN, p, flat);
+    for (let i = 0; i < inst.count; i++) assert.ok(inst.record[i * INSTANCE_FLOATS + 11]! > 0, `${p.name} ${i} has no lamp code`);
+  }
+  assert.equal(lit[0]!.count, lit[1]!.count);
+  assert.equal(lit[1]!.count, lit[2]!.count);
 });

@@ -38,6 +38,8 @@ type Interleaved = InstanceType<Three['InstancedInterleavedBuffer']>;
 type Camera = InstanceType<Three['Camera']>;
 
 export interface PoolInstancerInput {
+  /** assets/pools.bin. */
+  bytes: ArrayBuffer;
   pools: readonly PackedPool[];
   geometry: Readonly<Record<string, PackedGeometry>>;
   lod: Readonly<Record<string, { distance: number; geometry: PackedGeometry }>>;
@@ -45,6 +47,8 @@ export interface PoolInstancerInput {
   night: Node<'float'>;
   physical: boolean;
   atlas: Texture;
+  /** The signal clock, seconds (sim/signals.js's shared phase clock). */
+  clock: Node<'float'>;
 }
 
 interface Draw {
@@ -72,12 +76,14 @@ export interface PoolInstancer {
   cull(camera: Camera): void;
   /** Instances drawn after the last cull. */
   drawn(): number;
+  /** Called with the main camera every frame it draws the pools (structures.ts streams off it). */
+  onCamera(listener: (camera: Camera) => void): void;
   materials: PoolMaterials;
   dispose(): void;
 }
 
-function baseGeometry(THREE: Three, g: PackedGeometry): BufferGeometry {
-  const d = decodeGeometry(g);
+function baseGeometry(THREE: Three, buf: ArrayBuffer, g: PackedGeometry): BufferGeometry {
+  const d = decodeGeometry(buf, g);
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(d.position, 3));
   geo.setAttribute('normal', new THREE.BufferAttribute(d.normal, 3));
@@ -104,7 +110,7 @@ function makeDraw(THREE: Three, base: BufferGeometry, capacity: number, material
 }
 
 export function createPoolInstancer(THREE: Three, group: Group, input: PoolInstancerInput): PoolInstancer {
-  const materials = createPoolMaterials(THREE, input.night, input.physical, input.atlas);
+  const materials = createPoolMaterials(THREE, input.night, input.physical, input.atlas, input.clock);
   const pools: Pool[] = [];
   const meshes: Mesh[] = [];
   const counts: Record<string, number> = {};
@@ -112,10 +118,10 @@ export function createPoolInstancer(THREE: Three, group: Group, input: PoolInsta
   for (const p of input.pools) {
     const g = input.geometry[p.name];
     if (!g || p.count === 0) continue;
-    const inst = decodeInstances(p, input.groundY);
+    const inst = decodeInstances(input.bytes, p, input.groundY);
     const index = indexCells(inst.record, inst.count, g.radius);
     const material = materials.get(p.material);
-    const base = baseGeometry(THREE, g);
+    const base = baseGeometry(THREE, input.bytes, g);
     bases.push(base);
     const main = makeDraw(THREE, base, inst.count, material, `vd-pool:${p.name}`);
     main.mesh.castShadow = p.shadow;
@@ -123,7 +129,7 @@ export function createPoolInstancer(THREE: Three, group: Group, input: PoolInsta
     const lod = input.lod[p.name];
     let far: Draw | null = null;
     if (lod) {
-      const lb = baseGeometry(THREE, lod.geometry);
+      const lb = baseGeometry(THREE, input.bytes, lod.geometry);
       bases.push(lb);
       far = makeDraw(THREE, lb, inst.count, material, `vd-pool:${p.name}:lod`);
       far.mesh.castShadow = p.shadow;
@@ -182,10 +188,13 @@ export function createPoolInstancer(THREE: Three, group: Group, input: PoolInsta
   // The driver: the most populous street pool (lamp poles in practice) stays visible so its onBeforeRender always runs.
   const driverPool = pools.reduce<Pool | null>((best, p) => (!p.roofLow && (!best || p.index.count > best.index.count) ? p : best), null);
   const driver = driverPool ? driverPool.main.mesh : null;
+  const listeners: ((camera: Camera) => void)[] = [];
   if (driver) {
     driver.visible = true;
     driver.onBeforeRender = (_r: unknown, _s: unknown, camera: Camera) => {
-      if ((camera as { isPerspectiveCamera?: boolean }).isPerspectiveCamera) cull(camera);
+      if (!(camera as { isPerspectiveCamera?: boolean }).isPerspectiveCamera) return;
+      cull(camera);
+      for (const l of listeners) l(camera);
     };
   }
 
@@ -194,6 +203,7 @@ export function createPoolInstancer(THREE: Three, group: Group, input: PoolInsta
     counts,
     cull,
     drawn: () => drawnTotal,
+    onCamera(listener) { listeners.push(listener); },
     materials,
     dispose() {
       for (const m of meshes) { m.removeFromParent(); m.geometry.dispose(); }

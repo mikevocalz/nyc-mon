@@ -24,103 +24,34 @@
 //
 // Run (VD_TOOLS: a directory with @napi-rs/canvas and earcut installed, outside the repo):
 //   VD_TOOLS=/path/to/tools node tooling/city/vd-port/bake-furniture.mjs
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { REPO, THREE, vd } from './valdrada-runtime.mjs';
 import { assembleCity } from './assemble-city.mjs';
-import { ORIGIN, EXTENT_METERS, parseTile, tileIdsForSquare, unproject } from '../valdrada/decode.mjs';
-import { tileBytes } from './valdrada-runtime.mjs';
+import { EXTENT_METERS } from '../valdrada/decode.mjs';
+import { AFF, toSceneExact, valdradaGround } from './valdrada-ground.mjs';
 
 const OUT = join(REPO, 'packages/app/features/game/world/vd-port/furniture/data');
 const TILE = join(REPO, 'packages/app/features/game/data/harlem-apollo.json');
 
-// vd-port/transform.ts valdradaToSceneAffine, for the dataset origin
-const DEG = Math.PI / 180, R_M = 6_371_008.8;
-const LAT0 = 40.7831, LON0 = -73.9712, M_LAT = 111132.0, M_LON = 111320.0 * Math.cos((LAT0 * Math.PI) / 180);
-const kx = DEG * R_M * Math.cos(ORIGIN.latitude * DEG), kz = DEG * R_M;
-const AFF = { sx: kx / M_LON, ox: (LON0 - ORIGIN.longitude) * kx, sz: kz / M_LAT, oz: -(LAT0 - ORIGIN.latitude) * kz };
-const toScene = (x, z) => [x * AFF.sx + AFF.ox, z * AFF.sz + AFF.oz];
-{ // the affine agrees with decode.mjs's unproject + projectToScene
-  const [lon, lat] = unproject(1500, -3000);
-  const ex = (lon - ORIGIN.longitude) * kx, ez = -(lat - ORIGIN.latitude) * kz;
-  const [ax, az] = toScene(1500, -3000);
-  if (Math.hypot(ax - ex, az - ez) > 1e-6) throw new Error('affine transform drifted from decode.mjs');
-}
-
-// The ground under a point, in Valdrada's datum: world/assemble.js L1707-1805 (surfHash, sectionY, surfY, padYAt,
-// padYNear) over the tile's own compiled sections, as that file asks it. Most of the square is Valdrada's flat stack
-// (pavement 3.520, roadway 3.385); Morningside and the Manhattan Valley slope are not, so every piece is measured.
-const TILES = new Map(tileIdsForSquare().map((id) => { const t = parseTile(tileBytes(id)); return [`${t.header.tx}_${t.header.tz}`, t]; }));
-const SURF = new Map(), surfCell = 4;
-function surfHash(t, name) {
-  const key = `${t.header.tx}_${t.header.tz}:${name}`;
-  if (SURF.has(key)) return SURF.get(key);
-  const a = t.S[name], [ox, oz] = t.header.origin;
-  let rec = null;
-  if (a && a.length >= 9) {
-    const H = new Map();
-    for (let tr = 0, n = Math.floor(a.length / 9); tr < n; tr++) {
-      const o = tr * 9;
-      const x0 = a[o] + ox, z0 = a[o + 2] + oz, x1 = a[o + 3] + ox, z1 = a[o + 5] + oz, x2 = a[o + 6] + ox, z2 = a[o + 8] + oz;
-      const i0 = Math.floor(Math.min(x0, x1, x2) / surfCell), i1 = Math.floor(Math.max(x0, x1, x2) / surfCell);
-      const j0 = Math.floor(Math.min(z0, z1, z2) / surfCell), j1 = Math.floor(Math.max(z0, z1, z2) / surfCell);
-      if ((i1 - i0) > 64 || (j1 - j0) > 64) continue;
-      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) { const k = i + '_' + j; let arr = H.get(k); if (!arr) H.set(k, (arr = [])); arr.push(tr); }
-    }
-    rec = { a, H, ox, oz };
-  }
-  SURF.set(key, rec);
-  return rec;
-}
-function sectionY0(t, name, x, z, tol) {
-  const rec = surfHash(t, name);
-  if (!rec) return null;
-  const { a, H, ox, oz } = rec;
-  const list = H.get(Math.floor(x / surfCell) + '_' + Math.floor(z / surfCell));
-  if (!list) return null;
-  let bestY = null, bestD = 1e9;
-  for (const tr of list) {
-    const o = tr * 9;
-    const x0 = a[o] + ox, y0 = a[o + 1], z0 = a[o + 2] + oz, x1 = a[o + 3] + ox, y1 = a[o + 4], z1 = a[o + 5] + oz, x2 = a[o + 6] + ox, y2 = a[o + 7], z2 = a[o + 8] + oz;
-    const d = (z1 - z2) * (x0 - x2) + (x2 - x1) * (z0 - z2);
-    if (Math.abs(d) < 1e-9) continue;
-    const l0 = ((z1 - z2) * (x - x2) + (x2 - x1) * (z - z2)) / d, l1 = ((z2 - z0) * (x - x2) + (x0 - x2) * (z - z2)) / d, l2 = 1 - l0 - l1;
-    let out = 0;
-    if (l0 < 0) out = Math.max(out, -l0 * Math.abs(d) / Math.hypot(x1 - x2, z1 - z2));
-    if (l1 < 0) out = Math.max(out, -l1 * Math.abs(d) / Math.hypot(x2 - x0, z2 - z0));
-    if (l2 < 0) out = Math.max(out, -l2 * Math.abs(d) / Math.hypot(x0 - x1, z0 - z1));
-    if (out < bestD) {
-      bestD = out; bestY = l0 * y0 + l1 * y1 + l2 * y2;
-      if (out > 0) bestY = Math.min(Math.max(y0, y1, y2), Math.max(Math.min(y0, y1, y2), bestY));
-    }
-    if (bestD === 0) break;
-  }
-  return bestD <= tol ? bestY : null;
-}
-const sectionY = (t, name, x, z, tol) => { const y = sectionY0(t, name, x, z, tol); return y === null && name === 'grass' ? sectionY0(t, 'grassU', x, z, tol) : y; };
-const WALK_KINDS = ['sidewalk', 'path', 'brick', 'plaza', 'gravel'], ROAD_KINDS = ['gutter', 'busred', 'asphalt'];
-const surfY = (t, x, z, kinds, tol) => { for (const k of kinds) { const y = sectionY(t, k, x, z, tol); if (y !== null) return y; } return null; };
-const padYAt = (t, x, z, tol = 0.35) => surfY(t, x, z, WALK_KINDS, tol) ?? sectionY(t, 'grass', x, z, tol) ?? surfY(t, x, z, ROAD_KINDS, tol);
-const RING8 = [[1.2, 0], [-1.2, 0], [0, 1.2], [0, -1.2], [0.85, 0.85], [-0.85, 0.85], [0.85, -0.85], [-0.85, -0.85]];
-function sampleT(t, x, z) {
-  const res = t.header.res, n = res + 1, G = t.S.terrain, [ox, oz] = t.header.origin;
-  const fx = Math.min(res - 0.001, Math.max(0, ((x - ox) / 512) * res)), fz = Math.min(res - 0.001, Math.max(0, ((z - oz) / 512) * res));
-  const i = Math.floor(fx), j = Math.floor(fz), u = fx - i, v = fz - j;
-  return G[j * n + i] * (1 - u) * (1 - v) + G[j * n + i + 1] * u * (1 - v) + G[(j + 1) * n + i] * (1 - u) * v + G[(j + 1) * n + i + 1] * u * v;
-}
-/** padYNear (assemble.js L1797) in the tile that holds (x, z), Valdrada world metres. */
-function groundVd(x, z) {
-  const t = TILES.get(`${Math.floor(x / 512)}_${Math.floor(z / 512)}`);
-  if (!t) return null;
-  const at = padYAt(t, x, z); if (at !== null) return at;
-  let best = null;
-  for (const [dx, dz] of RING8) { const y = padYAt(t, x + dx, z + dz); if (y !== null && (best === null || y > best)) best = y; }
-  return best !== null ? best : sampleT(t, x, z) + 0.28;
-}
-
+const toScene = toSceneExact;
+const groundVd = valdradaGround;
 const log = (s) => process.stderr.write(s + '\n');
-const { instancer, roofOf } = await assembleCity(log);
+const { instancer, roofOf, signalReg } = await assembleCity(log);
+// sim/signals.js SignalController: which lit lens or pedestrian head each slot is, and the axis it serves. Code in the
+// instance flags (pool-data.ts): bits 1-3 the lamp (1 sigR, 2 sigA, 3 sigG, 4 pedHand, 5 pedMan), bit 4 serves E-W.
+const LAMP_CODE = { sigR: 1, sigA: 2, sigG: 3, pedHand: 4, pedMan: 5 };
+const signalCode = new Map();   // `${pool}:${slot}` -> flags bits
+for (const e of signalReg) {
+  if (e.heads) {
+    for (const lp of ['sigR', 'sigA', 'sigG']) for (const id of e.ids[lp] || []) if (id >= 0) signalCode.set(`${lp}:${id}`, (LAMP_CODE[lp] << 1) | (e.servesEW ? 16 : 0));
+    continue;
+  }
+  // a pedestrian head (and the pre-SG13 single-head mast): the axis from its own bearing (signals.js L49-L51)
+  const ew = Math.abs(Math.sin(e.rot)) > Math.abs(Math.cos(e.rot));
+  for (const lp of Object.keys(e.ids)) if (LAMP_CODE[lp] && e.ids[lp] >= 0) signalCode.set(`${lp}:${e.ids[lp]}`, (LAMP_CODE[lp] << 1) | (ew ? 16 : 0));
+}
 const K = await vd('city/furnitureKit.js');
 const { lampKind } = await vd('world/night11.js');
 
@@ -191,7 +122,11 @@ for (const [name, p] of instancer.pools) {
       ground = 1;
     }
     const yaw = Math.atan2(_m.elements[8], _m.elements[10]);
-    rows.push({ x, y, z, yaw, sx: _s.x, sy: _s.y, sz: _s.z, r: p.cols[slot * 3], g: p.cols[slot * 3 + 1], b: p.cols[slot * 3 + 2], ground, vx: _p.x, vy: _p.y, vz: _p.z });
+    // a lit lens is claimed at scale 1 (red) or 0.001 (assemble.js L2926): the signal clock sets it from now on, so the
+    // record carries the lamp at full scale and the shader collapses it when its lamp is off
+    const sig = signalCode.get(`${name}:${slot}`) ?? 0;
+    if (sig) { const k = 1 / Math.max(_s.x, 1e-6); _s.multiplyScalar(k); }
+    rows.push({ x, y, z, yaw, sx: _s.x, sy: _s.y, sz: _s.z, r: p.cols[slot * 3], g: p.cols[slot * 3 + 1], b: p.cols[slot * 3 + 2], ground: ground | sig, vx: _p.x, vy: _p.y, vz: _p.z });
     // city/props.js L296 / L300: the light a pole throws (N11 fixture kind, head height, arm yaw)
     if (name === 'lampCobra' || name === 'lampCrook') {
       const crook = name === 'lampCrook', out = crook ? 1.7 : 3.4;
@@ -265,7 +200,6 @@ const atlasRle = Buffer.concat(rle);
 
 // ---------------------------------------------------------------- write
 mkdirSync(OUT, { recursive: true });
-const b64 = (b) => b.toString('base64');
 const header = (what) => `// GENERATED by tooling/city/vd-port/bake-furniture.mjs — do not edit. ${what}
 // Valdrada v0.4.0 (2724c79, MIT: tooling/city/valdrada/LICENSE.valdrada); placements from Valdrada's tiles (ODbL 1.0,
 // © OpenStreetMap contributors and NYC Open Data, see Valdrada LICENSING.md).
@@ -276,17 +210,22 @@ const header = (what) => `// GENERATED by tooling/city/vd-port/bake-furniture.mj
 // shader (materials.ts) and differ only in their uniforms.
 const { blankUV } = await vd('city/panelArt.js');
 const uvFor = (p, geo) => (p.def.tex ? geo : blankUV(geo.clone()));
-const geoRows = pools.map((p) => {
-  const g = packGeometry(uvFor(p, p.def.geo));
-  return `  ${JSON.stringify(p.name)}: { vertices: ${g.n}, triangles: ${g.tris}, radius: ${g.radius.toFixed(3)}, position: '${b64(g.pos)}', normal: '${b64(g.nrm)}', color: '${b64(g.col)}', uv: '${b64(g.uv)}', index: '${b64(g.idx)}' },`;
-});
+// Everything bulky goes into one Metro asset, assets/pools.bin (the JS bundle carries only the offsets): pool geometry,
+// the subway's coarse level and every pool's instances, each block 4-byte aligned.
+const blob = [];
+let blobLen = 0;
+const put = (buf) => { const at = blobLen; const padded = buf.length % 4 ? Buffer.concat([buf, Buffer.alloc(4 - (buf.length % 4))]) : buf; blob.push(padded); blobLen += padded.length; return [at, buf.length]; };
+const geoRef = (g) => `{ vertices: ${g.n}, triangles: ${g.tris}, radius: ${g.radius.toFixed(3)}, position: [${put(g.pos)}], normal: [${put(g.nrm)}], color: [${put(g.col)}], uv: [${put(g.uv)}], index: [${put(g.idx)}] }`;
+const geoRows = pools.map((p) => `  ${JSON.stringify(p.name)}: ${geoRef(packGeometry(uvFor(p, p.def.geo)))},`);
 // the subway pool ships its own coarse level (furnitureKit G.subway.lod, instancer.js L451 setLOD)
-const lodRows = pools.filter((p) => p.def.lod && p.def.lod.geo).map((p) => {
-  const g = packGeometry(uvFor(p, p.def.lod.geo));
-  return `  ${JSON.stringify(p.name)}: { distance: ${p.def.lod.dist ?? 120}, geometry: { vertices: ${g.n}, triangles: ${g.tris}, radius: ${g.radius.toFixed(3)}, position: '${b64(g.pos)}', normal: '${b64(g.nrm)}', color: '${b64(g.col)}', uv: '${b64(g.uv)}', index: '${b64(g.idx)}' } },`;
-});
-writeFileSync(join(OUT, 'geometry.ts'), `${header('Pool geometry: city/furnitureKit.js buildFurnitureGeos().')}
-import type { PackedGeometry } from '../pool-data.ts';
+const lodRows = pools.filter((p) => p.def.lod && p.def.lod.geo).map((p) => `  ${JSON.stringify(p.name)}: { distance: ${p.def.lod.dist ?? 120}, geometry: ${geoRef(packGeometry(uvFor(p, p.def.lod.geo)))} },`);
+const poolRows = pools.map((p) => `  { name: ${JSON.stringify(p.name)}, material: '${p.material}', shadow: ${p.shadow}, roofLow: ${p.roofLow}, count: ${p.rows.length}, data: [${put(packInstances(p.rows))}] },`);
+const ASSETS = join(OUT, '../assets');
+mkdirSync(ASSETS, { recursive: true });
+writeFileSync(join(ASSETS, 'pools.bin'), Buffer.concat(blob));
+writeFileSync(join(ASSETS, 'panel-atlas.bin'), atlasRle);
+writeFileSync(join(OUT, 'pools.ts'), `${header('The pools: offsets into assets/pools.bin (city/furnitureKit.js geometry, Valdrada Instancer slots).')}
+import type { PackedGeometry, PackedPool } from '../pool-data.ts';
 
 export const VD_POOL_GEOMETRY: Readonly<Record<string, PackedGeometry>> = {
 ${geoRows.join('\n')}
@@ -295,21 +234,19 @@ ${geoRows.join('\n')}
 export const VD_POOL_LOD: Readonly<Record<string, { distance: number; geometry: PackedGeometry }>> = {
 ${lodRows.join('\n')}
 };
-`);
-const poolRows = pools.map((p) => `  { name: ${JSON.stringify(p.name)}, material: '${p.material}', shadow: ${p.shadow}, roofLow: ${p.roofLow}, count: ${p.rows.length}, data: '${b64(packInstances(p.rows))}' },`);
-writeFileSync(join(OUT, 'instances.ts'), `${header('Instances: Valdrada Instancer slots after assembleTile over the square.')}
-import type { PackedPool } from '../pool-data.ts';
 
 export const VD_POOLS: readonly PackedPool[] = [
 ${poolRows.join('\n')}
 ];
+
+/** assets/pools.bin's size, and assets/panel-atlas.bin's (city/panelArt.js, rows bottom-up, RLE [u16 run][rgba]). */
+export const VD_POOLS_BYTES = ${blobLen};
+export const VD_PANEL_ATLAS = { width: ${W}, height: ${H}, bytes: ${atlasRle.length} } as const;
 `);
+for (const f of ['geometry.ts', 'instances.ts', 'panel-atlas.ts']) rmSync(join(OUT, f), { force: true });
 writeFileSync(join(OUT, 'lamps.ts'), `${header('Lamp light spots: city/props.js L296/L300 over the claimed poles; kinds index world/night11.js FIXTURES.')}
 /** [x, y over ground, z, fixture kind (night11 FIXTURES; -1 legacy), mounting height m, arm yaw or NaN for a round throw] per lamp. */
 export const VD_LAMP_SPOTS: readonly number[] = ${JSON.stringify(lamps.flatMap((l) => [+l.x.toFixed(3), +l.y.toFixed(3), +l.z.toFixed(3), l.kind, l.head, l.yaw === null ? null : +l.yaw.toFixed(4)])).replace(/null/g, 'NaN')};
-`);
-writeFileSync(join(OUT, 'panel-atlas.ts'), `${header('city/panelArt.js, painted by its own canvas code; rows bottom-up (flipY baked); RLE [u16 run][rgba].')}
-export const VD_PANEL_ATLAS = { width: ${W}, height: ${H}, rle: '${b64(atlasRle)}' } as const;
 `);
 // placement fixture for the tests: Valdrada world point -> the instance it became, a sample per pool
 const fixture = {};

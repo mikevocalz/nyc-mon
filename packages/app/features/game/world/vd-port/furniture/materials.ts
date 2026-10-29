@@ -20,6 +20,7 @@
 import type { Three } from '@acme/ui/three';
 import type { Node } from 'three/webgpu';
 import type { PoolMaterialKind } from './pool-data.ts';
+import { lampScaleNode } from './signal-clock.ts';
 
 type Material = InstanceType<Three['Material']>;
 type Texture = InstanceType<Three['Texture']>;
@@ -32,16 +33,19 @@ export const VD_POOL_ATTRIBUTES = ['vdPoolA', 'vdPoolB', 'vdPoolC'] as const;
  * normal takes the inverse-transpose of that matrix, i.e. divided by the scale then turned, as three's InstanceNode
  * does for instanceMatrix. Divided by a positive scale it cannot vanish, so the normalize is safe.
  */
-export function poolPositionNode(THREE: Three): Node<'vec3'> {
+export function poolPositionNode(THREE: Three, clock: Node<'float'>): Node<'vec3'> {
   const T = THREE.TSL;
   const a = T.attribute<'vec4'>(VD_POOL_ATTRIBUTES[0], 'vec4');
   const b = T.attribute<'vec4'>(VD_POOL_ATTRIBUTES[1], 'vec4');
+  const lamp = T.attribute<'vec4'>(VD_POOL_ATTRIBUTES[2], 'vec4').w;
   return T.Fn(() => {
     const c = T.cos(a.w);
     const s = T.sin(a.w);
     const turn = (v: Node<'vec3'>) => T.vec3(c.mul(v.x).add(s.mul(v.z)), v.y, c.mul(v.z).sub(s.mul(v.x)));
-    T.normalLocal.assign(T.normalize(turn(T.normalLocal.div(b.xyz) as Node<'vec3'>)));
-    return turn(T.positionLocal.mul(b.xyz) as Node<'vec3'>).add(a.xyz);
+    // a signal lamp collapses to 0.001 when the clock has it off (sim/signals.js SignalController)
+    const scale = b.xyz.mul(lampScaleNode(THREE, lamp, clock)) as Node<'vec3'>;
+    T.normalLocal.assign(T.normalize(turn(T.normalLocal.div(scale) as Node<'vec3'>)));
+    return turn(T.positionLocal.mul(scale) as Node<'vec3'>).add(a.xyz);
   })() as unknown as Node<'vec3'>;
 }
 
@@ -67,9 +71,9 @@ export const POOL_KIND_PARAMS: Readonly<Record<PoolMaterialKind, { lit: true; ro
  * lit kinds are one node graph that differs only in the roughness and metalness uniforms, and the two glow kinds one
  * graph that differs only in its gain uniforms: two shaders (plus the lit one's shadow depth) for every pool.
  */
-export function createPoolMaterials(THREE: Three, night: Node<'float'>, physical: boolean, atlas: Texture): PoolMaterials {
+export function createPoolMaterials(THREE: Three, night: Node<'float'>, physical: boolean, atlas: Texture, clock: Node<'float'>): PoolMaterials {
   const T = THREE.TSL;
-  const position = poolPositionNode(THREE);
+  const position = poolPositionNode(THREE, clock);
   const tint = T.attribute<'vec4'>(VD_POOL_ATTRIBUTES[2], 'vec4').rgb;
   // kit vertex colour x instance colour x atlas, in the working space of the lane (vd-materials.ts `working`,
   // inverted: Valdrada's colours are linear, the direct path draws display values)
