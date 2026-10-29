@@ -102,6 +102,8 @@ export function RestScreen() {
       case 'overfed':
       case 'woke':
       case 'played':
+      case 'paused':
+      case 'resumed':
         return;
       default:
         return assertNever(outcome);
@@ -146,6 +148,8 @@ export function RestScreen() {
       case 'overfed':
       case 'fell-asleep':
       case 'played':
+      case 'paused':
+      case 'resumed':
         return;
       default:
         return assertNever(outcome);

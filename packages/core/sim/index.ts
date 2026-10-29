@@ -89,6 +89,30 @@ export {
   VOICE_SLOTS_PER_GENDER,
 } from './voice.ts';
 export { type CreateEntry, type CreateEntryInput, resolveCreateEntry } from './onboarding.ts';
+export { createInitialClassicCare } from './classic.ts';
+export { type ClassicTuning, DEFAULT_CLASSIC_TUNING, SNACK_FOOD_CLASS_ID, SNACK_NUTRITION } from './classic-tuning.ts';
+export {
+  applyMonCareAction,
+  careHistoryOf,
+  chooseEvolutionBranch,
+  evolutionReady,
+  heartsFor,
+  predictRealCalls,
+  selectMonCareView,
+  stepMonCare,
+} from './mon-care.ts';
+export type {
+  CareHistory,
+  ClassicEvent,
+  ClassicOptions,
+  Hearts,
+  MonCareAction,
+  MonCareOutcome,
+  MonCareResult,
+  MonCareState,
+  MonCareView,
+  StepMonCareOptions,
+} from './mon-care-types.ts';
 export { createRandom, hash128, mixSeed, toHex32 } from './random.ts';
 export type { ActivitySpan, CareEvent, SimState } from './state.ts';
 export { step, type StepOptions, type StepResult } from './step.ts';
