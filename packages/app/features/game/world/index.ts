@@ -29,6 +29,8 @@ import { buildLaneTopology } from '../living-city/topology.ts';
 import { createCellStream, type CellStream, type Vec3 } from './cells/cell-stream.ts';
 import { buildVdPort, vdNight } from './vd-port/index.ts';
 import { vdHiddenBuildings } from './vd-port/blocks/index.ts';
+import { vdLampSites } from './vd-port/furniture/index.ts';
+import { VD_POOLS } from './vd-port/furniture/data/instances.ts';
 import type { WorldPreset } from '../perf/tier-presets.ts';
 
 // Lane G1 "GPU budget" (EXPO_PUBLIC_WORLD_BUNDLES) was deleted 2026-11: the
@@ -269,12 +271,21 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
   const ledPools = faceliftModule ? faceliftModule.createFaceliftLampPools(THREE) : null;
   const furniture = buildStreetFurniture(THREE, dataset, ledPools ? { ...materials, lampPools: ledPools } : materials, clearance, city.texts);
   const props = buildStreetProps(THREE, dataset, materials, clearance, furniture.signs, furniture.lights);
+  // The vd port's lane C draws Valdrada's own furniture (vd-port/furniture: lamps, signals, sign poles, hydrants,
+  // shelters, kiosks, racks, subway entrances, roof plant). With it, the bundled tile's furniture meshes and the
+  // non-vehicle props stay out of the scene, so nothing stands twice; their placements still feed the props' layout.
+  const vdFurniture = vd && VD_POOLS.length > 0;
+  const VD_REPLACED_PROPS = new Set(['city:street-props', 'city:transit', 'city:transit-lights']);
+  const furnitureDrawn = vdFurniture ? [] : furniture.objects;
+  const propsDrawn = vdFurniture ? props.objects.filter((o) => !VD_REPLACED_PROPS.has(o.name)) : props.objects;
   // Real night light at the lamp heads and under the awnings, in the LED colour with the facelift.
   const night = nightPools
     ? (() => {
         const m = loadPhysicalNightLights();
         return m.createNightLights(THREE, {
-          streetlamps: m.streetlampSites(furniture.lights, LIGHT_POLE_HEIGHT - 0.05 + CURB_HEIGHT),
+          streetlamps: vdFurniture
+            ? m.vdStreetlampSites(vdLampSites(), createWalkQueries(dataset).groundHeight)
+            : m.streetlampSites(furniture.lights, LIGHT_POLE_HEIGHT - 0.05 + CURB_HEIGHT),
           storefronts: m.storefrontSites(city.physical?.storefronts ?? [], CURB_HEIGHT),
           streetlampCount: nightPools.streetlamps,
           storefrontCount: nightPools.storefronts,
@@ -313,14 +324,14 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
     cam.updateProjectionMatrix();
     const casters = new Set(['city:walls-masonry', 'city:walls-glass', 'city:roofs', 'city:landmarks', 'city:street-detail', 'city:poles']);
     const receivers = new Set(['city:ground', 'city:areas', 'city:sidewalks', 'city:roads', 'city:walls-masonry', 'city:walls-glass', 'city:roofs']);
-    for (const o of [ground, ...city.meshes, ...trees.objects, ...furniture.objects, ...props.objects]) {
+    for (const o of [ground, ...city.meshes, ...trees.objects, ...furnitureDrawn, ...propsDrawn]) {
       // Only the full tree models cast; the mid level, the far cross-cards and the plain crowns do not.
       const tree = o.name.startsWith('city:trees-vd-bark-') || o.name.startsWith('city:trees-vd-leaf-');
       o.castShadow = casters.has(o.name) || tree;
       o.receiveShadow = receivers.has(o.name);
     }
   }
-  group.add(ground, ...city.meshes, ...trees.objects, ...furniture.objects, ...props.objects, hemi, sun, sun.target);
+  group.add(ground, ...city.meshes, ...trees.objects, ...furnitureDrawn, ...propsDrawn, hemi, sun, sun.target);
   if (precipitation) group.add(precipitation.mesh);
   if (phys?.roadPaint) group.add(phys.roadPaint);
   if (phys) group.add(...phys.fireEscapes.meshes);
@@ -367,7 +378,7 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
   const stats: CityWorldStats = {
     ...city.stats, trees: trees.count, signs: furniture.stats.signs, streetlights: furniture.stats.streetlights, treeClearance: trees.report,
     props: props.stats,
-    drawCalls: city.stats.drawCalls + trees.objects.length + furniture.objects.length + props.objects.length + 2 + (facelift?.mesh ? 1 : 0),
+    drawCalls: city.stats.drawCalls + trees.objects.length + furnitureDrawn.length + propsDrawn.length + 2 + (facelift?.mesh ? 1 : 0),
   };
   let viewDistance = 220;
   const nightCamera = { x: 0, y: 0, z: 0, fwdX: 0, fwdZ: 1 };

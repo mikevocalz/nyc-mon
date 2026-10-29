@@ -44,6 +44,8 @@ export interface WalkSample {
   maxBuildMs: number;
   /** Loads the budget refused so far. */
   overBudget: number;
+  /** The layers held to their own budget (the vd port's blocks), inside the totals above. */
+  own: { cells: number; bytes: number; triangles: number; overBudget: number };
   /** V8 heap in use after a collection, bytes (NaN without --expose-gc). */
   heapUsed: number;
   arrayBuffers: number;
@@ -112,6 +114,7 @@ export async function measureWalk(): Promise<Walk> {
   const THREE = await import('three/webgpu');
   const { parseCityDataset } = await import('../../city-dataset.ts');
   const { createCityScene, cityStreamStats } = await import('../../city-scene.ts');
+  (await import('../vd-port/blocks/load-from-disk.test-support.ts')).loadVdBlocksFromDisk();
   const { physicalRendererParams } = await import('../physical-look.ts');
   const { advanceNodeFrame } = await import('@acme/ui/three/internals');
 
@@ -216,6 +219,7 @@ export async function measureWalk(): Promise<Walk> {
         evictions: s?.evictions ?? 0,
         maxBuildMs: s?.maxBuildMs ?? 0,
         overBudget: s?.overBudget ?? 0,
+        own: s?.own ? { ...s.own } : { cells: 0, bytes: 0, triangles: 0, overBudget: 0 },
         heapUsed: gc ? process.memoryUsage().heapUsed : NaN,
         arrayBuffers: process.memoryUsage().arrayBuffers,
       });

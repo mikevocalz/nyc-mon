@@ -99,6 +99,11 @@ export interface CellStreamStats {
   pending: number;
   /** Loads refused because a budget was full. */
   overBudget: number;
+  /**
+   * The layers held to their own budget (ExternalLayer.budget: the vd port's blocks): what they hold resident and the
+   * loads their budget refused. cells, bytes, triangles and overBudget above include them; the preset's budget does not.
+   */
+  own: { cells: number; bytes: number; triangles: number; overBudget: number };
   /** Packaged cells per layer, and their total bytes (the CPU store). */
   packages: number;
   packageBytes: number;
@@ -192,7 +197,7 @@ export function createCellStream(THREE: Three, meshes: readonly Mesh[], options:
   });
   const stats: CellStreamStats = {
     cells: 0, bytes: 0, triangles: 0, loads: 0, evictions: 0, builtThisFrame: 0, buildMsThisFrame: 0, maxBuildMs: 0,
-    pending: 0, overBudget: 0, packages: 0, packageBytes: 0,
+    pending: 0, overBudget: 0, packages: 0, packageBytes: 0, own: { cells: 0, bytes: 0, triangles: 0, overBudget: 0 },
   };
   const t0 = now();
   for (const mesh of meshes) {
@@ -266,10 +271,15 @@ export function createCellStream(THREE: Three, meshes: readonly Mesh[], options:
     layers.push(layer);
   }
   // What the budgeted (external) layers hold, kept out of the preset's budget.
-  const own = { bytes: 0, triangles: 0, cells: 0 };
+  const own = stats.own;
   log?.('packaged', {
     layers: layers.length, packages: stats.packages, mb: +(stats.packageBytes / 1e6).toFixed(1), ms: +(now() - t0).toFixed(1),
   });
+
+  function refuse(slot: Slot) {
+    stats.overBudget++;
+    if (slot.layer.budget) own.overBudget++;
+  }
 
   function hold(layer: Layer, pkg: CellPackage, sign: 1 | -1) {
     const t = triangleCount(pkg);
@@ -417,7 +427,7 @@ export function createCellStream(THREE: Three, meshes: readonly Mesh[], options:
       let built = 0;
       for (const slot of requests) {
         if (!slot.pinned && slot.distance > startRadius) continue;
-        if (!fits(slot)) { stats.overBudget++; continue; }
+        if (!fits(slot)) { refuse(slot); continue; }
         build(slot, false);
         built++;
       }
@@ -449,7 +459,7 @@ export function createCellStream(THREE: Three, meshes: readonly Mesh[], options:
         const slot = requests[i]!;
         if (slot.mesh !== null) continue;
         if (stats.builtThisFrame > 0 && (now() - start >= preset.stream.msPerFrame || uploaded + slot.pkg.bytes > preset.stream.uploadBytesPerFrame)) break;
-        if (!fits(slot)) { stats.overBudget++; continue; }
+        if (!fits(slot)) { refuse(slot); continue; }
         build(slot, true);
         uploaded += slot.pkg.bytes;
       }

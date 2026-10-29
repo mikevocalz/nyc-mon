@@ -37,12 +37,14 @@ export const NEAR_NAME = 'city:vd-blocks-near';
 export const SHELL_NAME = 'city:vd-blocks-shell';
 
 /**
- * The near layer's stream spec. Valdrada draws its kit's near level within 120 m (fk/facadeKit.js LOD_D). The streamer
- * wants a layer while errorM x K / distance is at least the preset's threshold, so errorM is chosen to reach 120 m on the
- * iPad preset: K = 1536 / (2 tan 30 deg) = 1330 px, threshold 2 px, errorM = 120 x 2 / 1330 = 0.18 (240 m on `high`,
- * threshold 1). It is a reach, not the level's own 2 cm error. Fades in with the dither.
+ * The near layer's stream spec. The streamer wants a layer while errorM x K / distance is at least the preset's
+ * threshold. Valdrada draws its kit's near level within 120 m (fk/facadeKit.js LOD_D) on desktop GPUs; on the iPad preset
+ * (K = 1536 / (2 tan 30 deg) = 1330 px, threshold 2 px) that reach held over a million near triangles resident along
+ * 125th Street on the walk (cell-stream.walk.test.ts), so the reach here is 60 m there (errorM = 60 x 2 / 1330 = 0.09)
+ * and 120 m on `high` (threshold 1). It is a reach, not the level's own 2 cm error. Fades in with the dither; never
+ * pinned (a landmark's near cells evict like the rest; its shell stays).
  */
-export const NEAR_LAYER = { errorM: 0.18, chunk: CELL, fade: true, pin: false } as const;
+export const NEAR_LAYER = { errorM: 0.09, chunk: CELL, fade: true, pin: false } as const;
 
 /** The near level's own budget per preset (the cells along 125th Street run to 345k triangles and 10.6 MB). */
 export const NEAR_BUDGET = { geometryBytes: 64 * 1024 * 1024, cellDraws: 24, triangles: 1_200_000 } as const;

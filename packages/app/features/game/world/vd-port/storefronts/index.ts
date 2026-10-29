@@ -41,11 +41,13 @@ type Mesh = InstanceType<Three['Mesh']>;
 // (0.12 m: 132 m on the harness's K. At the street detail's 0.25 m, 275 m, the far level's chunks at the edge of the
 // 360 m resident radius tipped the 125th walk's residency between visits, and with the dresser units and their doors
 // drawn the walk's 160 k triangle budget needs the shorter reach.)
-const FAR_LEVEL: VdStreamLayer = { errorM: 0.12, chunk: 256, fade: true };
+// pin: false (cell-stream.ts `pinned`): storefront detail around a landmark evicts like any other, so the 125th walk
+// does not keep the Apollo block's ~40 k storefront triangles resident from end to end
+const FAR_LEVEL: VdStreamLayer = { errorM: 0.12, chunk: 256, fade: true, pin: false };
 // The glass streams with the near level's reach in 256 m chunks: at 16 % opacity a pane past 66 m changes nothing
 // the room behind it does not already show, and a transparent draw per 128 m chunk would spend the cell draw budget.
-const NEAR_LEVEL: VdStreamLayer = { errorM: 0.06, chunk: 128, fade: true };
-const LAYER: Record<Slot, VdStreamLayer | null> = { paint: FAR_LEVEL, detail: NEAR_LEVEL, glass: { errorM: 0.06, chunk: 256, fade: false } };
+const NEAR_LEVEL: VdStreamLayer = { errorM: 0.06, chunk: 128, fade: true, pin: false };
+const LAYER: Record<Slot, VdStreamLayer | null> = { paint: FAR_LEVEL, detail: NEAR_LEVEL, glass: { errorM: 0.06, chunk: 256, fade: false, pin: false } };
 
 export const VD_STOREFRONT_LAYERS = LAYER;
 

@@ -149,6 +149,7 @@ export async function measureFirstFrame(options: MeasureOptions = {}): Promise<F
   const THREE = await import('three/webgpu');
   const { parseCityDataset } = await import('./city-dataset.ts');
   const { createCityScene } = await import('./city-scene.ts');
+  (await import('./world/vd-port/blocks/load-from-disk.test-support.ts')).loadVdBlocksFromDisk();
   const { physicalRendererParams } = await import('./world/physical-look.ts');
   const { createVehicleActor } = await import('./living-city/vehicle-actor.ts');
   const { RELEASE_SETTLE_FRAMES } = await import('./world/release-uploaded.ts');

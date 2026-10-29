@@ -10,6 +10,7 @@ import { test } from 'node:test';
 
 const { measureWalkInChild } = await import('./cell-stream.walk.test-support.ts');
 const { WORLD_PRESETS } = await import('../../perf/tier-presets.ts');
+const { NEAR_BUDGET } = await import('../vd-port/blocks/index.ts');
 
 const BASE = {
   EXPO_PUBLIC_WORLD_PHYSICAL: '1',
@@ -42,11 +43,14 @@ test('125th walk: streamed residency is flat by place, under the preset budget, 
     assert.ok(y.heapUsed <= x.heapUsed * 1.05, `heap ${x.heapUsed} at ${a} s -> ${y.heapUsed} at ${b} s`);
   }
   assert.ok(at(120).evictions > 0 && at(120).loads > at(1).loads, 'the walk streamed cells in and out');
-  // Under the budget, and the budget never had to refuse a wanted cell.
+  // Under the budget, and the budget never had to refuse a wanted cell. The preset's budget holds the near-detail layers;
+  // a layer with its own budget (the vd port's blocks, vd-port/blocks NEAR_BUDGET) is held to that one instead.
   const budget = WORLD_PRESETS['ipad-a12x'].budget;
   for (const s of on.samples) {
     assert.equal(s.overBudget, 0, `refused loads at ${s.t} s`);
-    assert.ok(s.cellBytes <= budget.geometryBytes && s.cells <= budget.cellDraws && s.cellTriangles <= budget.triangles, `budget at ${s.t} s`);
+    const cells = s.cells - s.own.cells, bytes = s.cellBytes - s.own.bytes, tris = s.cellTriangles - s.own.triangles;
+    assert.ok(bytes <= budget.geometryBytes && cells <= budget.cellDraws && tris <= budget.triangles, `budget at ${s.t} s: ${cells} cells, ${bytes} B, ${tris} triangles`);
+    assert.ok(s.own.bytes <= NEAR_BUDGET.geometryBytes && s.own.cells <= NEAR_BUDGET.cellDraws && s.own.triangles <= NEAR_BUDGET.triangles, `the blocks' near budget at ${s.t} s: ${JSON.stringify(s.own)}`);
   }
   // Fewer GPU buffer bytes than the whole tile, everywhere on the walk.
   for (let i = 0; i < on.samples.length; i++) {
