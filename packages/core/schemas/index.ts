@@ -53,6 +53,8 @@ export {
   VoiceStageSchema,
 } from './seams.ts';
 export {
+  AdoptMonRequestSchema,
+  AdoptMonResponseSchema,
   CareWriteSchema,
   CreateEggRequestSchema,
   CreateEggResponseSchema,

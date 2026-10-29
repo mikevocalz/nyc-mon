@@ -27,6 +27,7 @@ import { Route as PayloadPayloadApiSplatRouteImport } from './routes/_payload/pa
 import { Route as V1MeCompanionMemoryRouteImport } from './routes/v1/me/companion-memory'
 import { Route as V1MeEggsRouteImport } from './routes/v1/me/eggs'
 import { Route as V1MeMonsRouteImport } from './routes/v1/me/mons'
+import { Route as V1MonsAdoptRouteImport } from './routes/v1/mons/adopt'
 import { Route as V1EggsIdHatchRouteImport } from './routes/v1/eggs/$id/hatch'
 import { Route as V1MonsIdCareRouteImport } from './routes/v1/mons/$id/care'
 
@@ -120,6 +121,11 @@ const V1MeMonsRoute = V1MeMonsRouteImport.update({
   path: '/v1/me/mons',
   getParentRoute: () => rootRouteImport,
 } as any)
+const V1MonsAdoptRoute = V1MonsAdoptRouteImport.update({
+  id: '/v1/mons/adopt',
+  path: '/v1/mons/adopt',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const V1EggsIdHatchRoute = V1EggsIdHatchRouteImport.update({
   id: '/$id/hatch',
   path: '/$id/hatch',
@@ -148,6 +154,7 @@ export interface FileRoutesByFullPath {
   '/v1/me/companion-memory': typeof V1MeCompanionMemoryRoute
   '/v1/me/eggs': typeof V1MeEggsRoute
   '/v1/me/mons': typeof V1MeMonsRoute
+  '/v1/mons/adopt': typeof V1MonsAdoptRoute
   '/admin/': typeof PayloadAdminIndexRoute
   '/v1/eggs/$id/hatch': typeof V1EggsIdHatchRoute
   '/v1/mons/$id/care': typeof V1MonsIdCareRoute
@@ -169,6 +176,7 @@ export interface FileRoutesByTo {
   '/v1/me/companion-memory': typeof V1MeCompanionMemoryRoute
   '/v1/me/eggs': typeof V1MeEggsRoute
   '/v1/me/mons': typeof V1MeMonsRoute
+  '/v1/mons/adopt': typeof V1MonsAdoptRoute
   '/admin': typeof PayloadAdminIndexRoute
   '/v1/eggs/$id/hatch': typeof V1EggsIdHatchRoute
   '/v1/mons/$id/care': typeof V1MonsIdCareRoute
@@ -192,6 +200,7 @@ export interface FileRoutesById {
   '/v1/me/companion-memory': typeof V1MeCompanionMemoryRoute
   '/v1/me/eggs': typeof V1MeEggsRoute
   '/v1/me/mons': typeof V1MeMonsRoute
+  '/v1/mons/adopt': typeof V1MonsAdoptRoute
   '/_payload/admin/': typeof PayloadAdminIndexRoute
   '/v1/eggs/$id/hatch': typeof V1EggsIdHatchRoute
   '/v1/mons/$id/care': typeof V1MonsIdCareRoute
@@ -215,6 +224,7 @@ export interface FileRouteTypes {
     | '/v1/me/companion-memory'
     | '/v1/me/eggs'
     | '/v1/me/mons'
+    | '/v1/mons/adopt'
     | '/admin/'
     | '/v1/eggs/$id/hatch'
     | '/v1/mons/$id/care'
@@ -236,6 +246,7 @@ export interface FileRouteTypes {
     | '/v1/me/companion-memory'
     | '/v1/me/eggs'
     | '/v1/me/mons'
+    | '/v1/mons/adopt'
     | '/admin'
     | '/v1/eggs/$id/hatch'
     | '/v1/mons/$id/care'
@@ -258,6 +269,7 @@ export interface FileRouteTypes {
     | '/v1/me/companion-memory'
     | '/v1/me/eggs'
     | '/v1/me/mons'
+    | '/v1/mons/adopt'
     | '/_payload/admin/'
     | '/v1/eggs/$id/hatch'
     | '/v1/mons/$id/care'
@@ -279,6 +291,7 @@ export interface RootRouteChildren {
   V1MeCompanionMemoryRoute: typeof V1MeCompanionMemoryRoute
   V1MeEggsRoute: typeof V1MeEggsRoute
   V1MeMonsRoute: typeof V1MeMonsRoute
+  V1MonsAdoptRoute: typeof V1MonsAdoptRoute
   V1MonsIdCareRoute: typeof V1MonsIdCareRoute
 }
 
@@ -410,6 +423,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof V1MeMonsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/v1/mons/adopt': {
+      id: '/v1/mons/adopt'
+      path: '/v1/mons/adopt'
+      fullPath: '/v1/mons/adopt'
+      preLoaderRoute: typeof V1MonsAdoptRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/v1/eggs/$id/hatch': {
       id: '/v1/eggs/$id/hatch'
       path: '/$id/hatch'
@@ -470,6 +490,7 @@ const rootRouteChildren: RootRouteChildren = {
   V1MeCompanionMemoryRoute: V1MeCompanionMemoryRoute,
   V1MeEggsRoute: V1MeEggsRoute,
   V1MeMonsRoute: V1MeMonsRoute,
+  V1MonsAdoptRoute: V1MonsAdoptRoute,
   V1MonsIdCareRoute: V1MonsIdCareRoute,
 }
 export const routeTree = rootRouteImport

@@ -21,6 +21,8 @@
 import type { ThreeSetup } from '@acme/ui/three';
 import type { CitySceneParams } from './city-scene.ts';
 import { gameScreenActions, loadProgressAt, type LoadStage } from './game-session.ts';
+import { preloadVdBlocks } from './world/vd-port/blocks/load.ts';
+import { compileForFrames } from './compile-pass.ts';
 
 export interface GameSceneParams extends CitySceneParams {
   onFirstFrame: () => void;
@@ -175,11 +177,11 @@ export function withFirstFrameSignal(
       time('compile', fraction, `compile ${compileSteps}/${total || '?'}`);
     };
     // compileAsync collects its render list synchronously (the renderer is initialised), then builds one object per
-    // yield. It builds the main pass only: the first real frame still has the MRT scene pass, the post chain and the
-    // shadow cascades to build, 59 more pipelines at once in the node harness, all in one synchronous draw with no
-    // progress report (the likeliest 20 s stall on the A12X). So once the list is taken, every drawable waits on a
-    // hidden layer and the frames after the compile reveal a few materials each (planWarmUp), reporting between them.
-    const compile = context.renderer.compileAsync(built.scene, built.camera, null, onProgress as never);
+    // yield. compileForFrames runs it in the post pipeline's scene pass (its target and MRT), so the frames reuse those
+    // pipelines; the first real frame still has the post chain and the shadow cascades to build, in one synchronous draw
+    // with no progress report (the likeliest 20 s stall on the A12X). So once the list is taken, every drawable waits on
+    // a hidden layer and the frames after the compile reveal a few materials each (planWarmUp), reporting between them.
+    const compile = compileForFrames(context.renderer as never, built.scene, built.camera, onProgress);
     const warm = planWarmUp(built.scene as never);
     if (trace) {
       trace('compileAsync started');
@@ -226,7 +228,8 @@ export function withFirstFrameSignal(
 
 export const loadGameScene = (): Promise<ThreeSetup<GameSceneParams>> => {
   gameScreenActions.loadStage('requested');
-  return import('./city-scene.ts').then((m) => {
+  // The vd port's block packs are read while the scene module loads: the world is built synchronously and needs them there.
+  return Promise.all([import('./city-scene.ts'), preloadVdBlocks()]).then(([m]) => {
     gameScreenActions.loadStage('moduleLoaded');
     return withFirstFrameSignal(m.createCityScene);
   });

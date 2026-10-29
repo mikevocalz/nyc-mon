@@ -50,8 +50,10 @@ test('the LED pool material carries the LED colour and not sodium', () => {
   pools.dispose();
 });
 
+// The bundled tile's furniture lamps: drawn only off the vd port (on it, vd-port/furniture draws Valdrada's own lamps and
+// world/index.ts leaves these out), so the colour choice is checked with the port off.
 function lampPoolMaterial(options: { physical: boolean; future: boolean }): Mat {
-  const world = buildCityWorld(THREE, parseCityDataset(syntheticTileV3()), { ...options, pbr: options.physical });
+  const world = buildCityWorld(THREE, parseCityDataset(syntheticTileV3()), { ...options, pbr: options.physical, vd: false });
   let found: Mat | null = null;
   world.group.traverse((o) => { if (o.name === 'city:lamp-pools') found = (o as InstanceType<typeof THREE.Mesh>).material as Mat; });
   assert.ok(found, 'city:lamp-pools');
@@ -88,4 +90,12 @@ test('lamp actor: halos and pools take the given colour, and keep the sodium pai
   assert.equal(warm.mats.size, 2);
   for (const m of warm.mats.values()) assert.ok(!hasColour(m.colorNode, LED));
   warm.actor.dispose();
+});
+
+test('world: on the vd port the bundled furniture lamps stay out of the scene (Valdrada\'s lamps replace them)', () => {
+  const world = buildCityWorld(THREE, parseCityDataset(syntheticTileV3()), { physical: true, future: true, pbr: true, vd: true });
+  const names = new Set<string>();
+  world.group.traverse((o) => { names.add(o.name); });
+  assert.ok(!names.has('city:lamp-pools') && !names.has('city:poles'), [...names].filter((n) => n.startsWith('city:')).join(', '));
+  world.dispose();
 });

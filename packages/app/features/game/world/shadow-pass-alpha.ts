@@ -11,6 +11,13 @@
 // recording device, 48 moving cars): 27 % of all samples, frame JS p50 2.97 ms
 // to 1.16-1.30 ms with the bump skipped, no new pipelines or bind groups.
 //
+// The vd port (vd-port/shared/shadow-safe.ts) gives opaque casters one shared
+// shadow program but leaves alpha-tested ones as they are, so the flip remains.
+// Re-measured on main after #129 (vd scene at the Apollo, recording device):
+// 7 alpha-tested casters among 180 (vd tree leaves near/mid/far, the facelift);
+// over 10 steady frames, 2240 re-keys and 9.59 ms a frame without this, 0 and
+// 4.23 ms with it.
+//
 // Skipping the bump on the shadow-pass material is safe because each render
 // object's own alphaTest never changes: it is copied from its caster's
 // material, and no caster changes its alphaTest after creation. A render

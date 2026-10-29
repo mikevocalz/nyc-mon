@@ -1,6 +1,7 @@
 'use client';
 
 import { auth } from '../onboarding/auth';
+import { setSyncTransport } from '../system/sync.store';
 import { stopMonVoice } from '../voice/use-mon-voice';
 
 /**
@@ -12,7 +13,10 @@ export async function signOutHere(): Promise<boolean> {
   // The Mon stops mid-line: the next request would be unauthenticated anyway.
   stopMonVoice();
   try {
-    return (await auth().signOut()).ok;
+    const ok = (await auth().signOut()).ok;
+    // Queued care stays in the save; it syncs after the next sign-in.
+    if (ok) setSyncTransport(null);
+    return ok;
   } catch {
     return false;
   }
