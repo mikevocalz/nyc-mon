@@ -9,7 +9,6 @@ import {
 import { betterAuth } from 'better-auth';
 import { mcpPlugin } from '@payloadcms/plugin-mcp';
 import { APIError, buildConfig } from 'payload';
-import sharp from 'sharp';
 import { deleteDueCallersTask, selfDeletionOptions } from './auth/deletion';
 import { AUTH_BASE_PATH, PAYLOAD_API_ROUTE, PAYLOAD_CORS_ORIGINS, PAYLOAD_ORIGINS, betterAuthOptions, sendMail } from './auth/options';
 import { accountMerge } from './auth/plugins/account-merge';
@@ -143,7 +142,6 @@ export default buildConfig({
   cors: PAYLOAD_CORS_ORIGINS,
   csrf: PAYLOAD_ORIGINS,
   secret: process.env.PAYLOAD_SECRET || '',
-  sharp,
   typescript: {
     outputFile: path.resolve(dirname, 'payload-types.ts'),
   },
