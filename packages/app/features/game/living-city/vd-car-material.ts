@@ -59,6 +59,9 @@ export function createVdCarMaterial(THREE: Three, options: { readonly glow: F })
   const material = new THREE.MeshStandardNodeMaterial();
   material.name = 'living-city:vd-car';
   material.positionNode = vdXformPositionNode(THREE);
+  // Double-sided: the clustered `mid` level leaves small gaps in a panel, and through one the far panel's inside
+  // reads as body, not as street (world/vd-car-draw.test.ts).
+  material.side = THREE.DoubleSide;
   material.colorNode = colour;
 
   let rough = T.float(0.6) as F;

@@ -45,10 +45,17 @@ const REAL_TIMERS: WaitTimers = {
  *
  * @throws {WorldNotReadyError} `world-failed` when `viewState` turns terminal, `timeout` after `timeoutMs` with no load progress.
  */
+/** EXPO_PUBLIC_GAME_PERF=1: one `[NYC-Mon/load] watchdog` line a second while START waits. */
+const WATCHDOG_LOG = process.env.EXPO_PUBLIC_GAME_PERF === '1' ? (line: string) => console.info(line) : null;
+/** How often the GAME_PERF watchdog line prints. */
+export const WATCHDOG_LOG_MS = 1_000;
+
 export function awaitWorldReady(
   store: Pick<StoreApi<GameScreenState>, 'getState' | 'subscribe'>,
   timeoutMs: number = FIRST_FRAME_TIMEOUT_MS,
   timers: WaitTimers = REAL_TIMERS,
+  log: ((line: string) => void) | null = WATCHDOG_LOG,
+  clock: () => number = Date.now,
 ): Promise<void> {
   const settled = (state: GameScreenState): 'ready' | 'failed' | null => {
     if (state.firstFrame) return 'ready';
@@ -66,17 +73,30 @@ export function awaitWorldReady(
       done = true;
       unsubscribe();
       timers.clearTimeout(timer);
+      if (ticker !== null) timers.clearTimeout(ticker);
       outcome();
     };
     const expire = () => finish(() => reject(new WorldNotReadyError('timeout', `${timeoutMs} ms without progress`)));
     let timer = timers.setTimeout(expire, timeoutMs);
     let progress = initial.loadProgress;
+    // GAME_PERF: elapsed since START and since the last progress, so a device log shows where a stall sits.
+    const start = clock();
+    let lastProgressAt = start;
+    let ticker: unknown = null;
+    const tick = () => {
+      if (done || !log) return;
+      const t = clock();
+      log(`[NYC-Mon/load] watchdog ${t - start} sinceProgress=${t - lastProgressAt} progress=${progress.toFixed(1)}`);
+      ticker = timers.setTimeout(tick, WATCHDOG_LOG_MS);
+    };
+    if (log) ticker = timers.setTimeout(tick, WATCHDOG_LOG_MS);
     const unsubscribe = store.subscribe((state) => {
       const result = settled(state);
       if (result === 'ready') finish(resolve);
       else if (result === 'failed') finish(() => reject(new WorldNotReadyError('world-failed', String(state.viewState))));
       else if (state.loadProgress > progress) {
         progress = state.loadProgress;
+        lastProgressAt = clock();
         timers.clearTimeout(timer);
         timer = timers.setTimeout(expire, timeoutMs);
       }
