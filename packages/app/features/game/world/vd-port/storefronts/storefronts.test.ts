@@ -131,8 +131,8 @@ test('budgets: three materials, one power-of-two atlas, texture growth under 24 
   assert.ok(bytes <= 24 * 1024 * 1024, `${(bytes / 1048576).toFixed(1)} MB`);
   let tris = 0;
   for (const s of SLOTS) tris += result.buffers[s].position.length / 9;
-  // the union plan (home + rings 1-4, ~26k fronts) emits ~6.4 M triangles; the bound is the runaway check
-  assert.ok(tris > 0 && tris < 7_000_000, `${tris} triangles`);
+  // the union plan (home + rings 1-5, ~37k fronts) emits ~9.2 M triangles; the bound is the runaway check
+  assert.ok(tris > 0 && tris < 12_000_000, `${tris} triangles`);
 });
 
 test('no unguarded normalize(cross(...)) in the lane', () => {

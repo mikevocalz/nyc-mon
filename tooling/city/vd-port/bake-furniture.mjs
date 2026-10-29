@@ -39,13 +39,13 @@ const toScene = toSceneExact;
 const groundVd = valdradaGround;
 const log = (s) => process.stderr.write(s + '\n');
 // --ring ring1 (or VD_RING=ring1): assemble the ring's tiles too (VD_TILES, assemble-city.mjs) and keep the pieces
-// in its region as well as the square's. --ring ring2 .. --ring ring4: the union bake — home + rings 1..N tiles and
+// in its region as well as the square's. --ring ring2 .. --ring ring5: the union bake — home + rings 1..N tiles and
 // regions — so the earlier rings' pieces are regenerated alongside the new ring's rather than dropped. Furniture
 // pools are resident, self-culling draws, so the rings' instances join the same pools and assets (pools.bin,
 // lamps.ts) rather than streaming.
 const RING = process.argv.includes('--ring') ? process.argv[process.argv.indexOf('--ring') + 1] : process.env.VD_RING ?? null;
 let inRegion = null;
-if (RING === 'ring1' || RING === 'ring2' || RING === 'ring3' || RING === 'ring4') {
+if (RING === 'ring1' || RING === 'ring2' || RING === 'ring3' || RING === 'ring4' || RING === 'ring5') {
   const { RING1_TILES, ring1RectsScene, inRing1Scene, inHomeSquare } = await import('./ring1.mjs');
   const { tileIdsForSquare } = await import('../valdrada/decode.mjs');
   const tiles = [...tileIdsForSquare(), ...RING1_TILES.map((k) => `t_${k}`)];
@@ -57,18 +57,25 @@ if (RING === 'ring1' || RING === 'ring2' || RING === 'ring3' || RING === 'ring4'
     const R2S = ring2RectsScene(AFF);
     const keepR1 = inRegion;
     inRegion = (x, z) => keepR1(x, z) || inRing2Scene(x, z, R2S);
-    if (RING === 'ring3' || RING === 'ring4') {
+    if (RING === 'ring3' || RING === 'ring4' || RING === 'ring5') {
       const { RING3_TILES, ring3RectsScene, inRing3Scene } = await import('./ring3.mjs');
       for (const k of RING3_TILES) tiles.push(`t_${k}`);
       const R3S = ring3RectsScene(AFF);
       const keepR2 = inRegion;
       inRegion = (x, z) => keepR2(x, z) || inRing3Scene(x, z, R3S);
-      if (RING === 'ring4') {
+      if (RING === 'ring4' || RING === 'ring5') {
         const { RING4_TILES, ring4RectsScene, inRing4Scene } = await import('./ring4.mjs');
         for (const k of RING4_TILES) tiles.push(`t_${k}`);
         const R4S = ring4RectsScene(AFF);
         const keepR3 = inRegion;
         inRegion = (x, z) => keepR3(x, z) || inRing4Scene(x, z, R4S);
+        if (RING === 'ring5') {
+          const { RING5_TILES, ring5RectsScene, inRing5Scene } = await import('./ring5.mjs');
+          for (const k of RING5_TILES) tiles.push(`t_${k}`);
+          const R5S = ring5RectsScene(AFF);
+          const keepR4 = inRegion;
+          inRegion = (x, z) => keepR4(x, z) || inRing5Scene(x, z, R5S);
+        }
       }
     }
   }

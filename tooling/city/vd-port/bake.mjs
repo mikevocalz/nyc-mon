@@ -13,6 +13,9 @@
 //   node tooling/city/vd-port/bake.mjs --ring ring4                   ring 4 (ring4.mjs): packs to blocks/data-ring4/,
 //                                                                   structures already in VD_BLOCKS or
 //                                                                   VD_BLOCKS_RING1..3 skipped
+//   node tooling/city/vd-port/bake.mjs --ring ring5                   ring 5 (ring5.mjs): packs to blocks/data-ring5/,
+//                                                                   structures already in VD_BLOCKS or
+//                                                                   VD_BLOCKS_RING1..4 skipped
 //
 // Needs --deps (three 0.185.1 and earcut 3) or VD_BAKE_DEPS, and Playwright (VD_PLAYWRIGHT, the module path).
 import { writeFile } from 'node:fs/promises';
@@ -24,17 +27,18 @@ import { RING1_TILES, inRing1Vd, bakedBlockIds } from './ring1.mjs';
 import { RING2_TILES, inRing2Vd, bakedRing2Ids } from './ring2.mjs';
 import { RING3_TILES, inRing3Vd, bakedRing3Ids } from './ring3.mjs';
 import { RING4_TILES, inRing4Vd, bakedRing4Ids } from './ring4.mjs';
+import { RING5_TILES, inRing5Vd, bakedRing5Ids } from './ring5.mjs';
 
 const HERE = fileURLToPath(new URL('.', import.meta.url));
 const argv = process.argv.slice(2);
 const flag = (n) => argv.includes(`--${n}`);
 const val = (n, d) => { const i = argv.indexOf(`--${n}`); return i >= 0 ? argv[i + 1] : d; };
 
-/** The --ring argument: 'ring1' or 'ring2' (the ring module's tile list, region and dedupe), or none for the square. */
+/** The --ring argument: 'ring1' .. 'ring5' (the ring module's tile list, region and dedupe), or none for the square. */
 const RING = val('ring', null);
-if (RING && RING !== 'ring1' && RING !== 'ring2' && RING !== 'ring3' && RING !== 'ring4') throw new Error(`unknown --ring ${RING}`);
-const TILE_LIST = RING === 'ring1' ? RING1_TILES : RING === 'ring2' ? RING2_TILES : RING === 'ring3' ? RING3_TILES : RING === 'ring4' ? RING4_TILES : TILE_KEYS;
-const SKIP = RING === 'ring1' ? bakedBlockIds() : RING === 'ring2' ? bakedRing2Ids() : RING === 'ring3' ? bakedRing3Ids() : RING === 'ring4' ? bakedRing4Ids() : new Set();
+if (RING && RING !== 'ring1' && RING !== 'ring2' && RING !== 'ring3' && RING !== 'ring4' && RING !== 'ring5') throw new Error(`unknown --ring ${RING}`);
+const TILE_LIST = RING === 'ring1' ? RING1_TILES : RING === 'ring2' ? RING2_TILES : RING === 'ring3' ? RING3_TILES : RING === 'ring4' ? RING4_TILES : RING === 'ring5' ? RING5_TILES : TILE_KEYS;
+const SKIP = RING === 'ring1' ? bakedBlockIds() : RING === 'ring2' ? bakedRing2Ids() : RING === 'ring3' ? bakedRing3Ids() : RING === 'ring4' ? bakedRing4Ids() : RING === 'ring5' ? bakedRing5Ids() : new Set();
 /** A structure's Valdrada world box inside the bake's region (the bundled square for the home bake, the ring's two
  * rects for a ring; s.box is Valdrada world metres, so the home test transforms first). */
 const inRegion = (s) => {
@@ -42,6 +46,7 @@ const inRegion = (s) => {
   if (RING === 'ring2') return inRing2Vd(s.box);
   if (RING === 'ring3') return inRing3Vd(s.box);
   if (RING === 'ring4') return inRing4Vd(s.box);
+  if (RING === 'ring5') return inRing5Vd(s.box);
   const [ax, az] = toScene(s.box[0], s.box[2]), [bx, bz] = toScene(s.box[3], s.box[5]);
   return Math.max(ax, bx) >= -EXTENT_METERS && Math.min(ax, bx) <= EXTENT_METERS && Math.max(az, bz) >= -EXTENT_METERS && Math.min(az, bz) <= EXTENT_METERS;
 };
@@ -104,7 +109,8 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     const writer = RING === 'ring1' ? (await import('./write-ring1.mjs')).writeRing1Packs
       : RING === 'ring2' ? (await import('./write-ring2.mjs')).writeRing2Packs
       : RING === 'ring3' ? (await import('./write-ring3.mjs')).writeRing3Packs
-      : RING === 'ring4' ? (await import('./write-ring4.mjs')).writeRing4Packs : null;
+      : RING === 'ring4' ? (await import('./write-ring4.mjs')).writeRing4Packs
+      : RING === 'ring5' ? (await import('./write-ring5.mjs')).writeRing5Packs : null;
     if (writer) await writer(out, { nearErrM, heroErrM });
     else await writePacks(out, { nearErrM, heroErrM });
   }

@@ -57,20 +57,24 @@ export function harvest(root, finest = false) {
         const emL = mt.emissive && !nm.albedo ? [mt.emissive.r * ei, mt.emissive.g * ei, mt.emissive.b * ei] : [0, 0, 0];
         const end = Math.min(gr.start + gr.count, idx ? idx.count : pos.count);
         for (let q = gr.start; q + 2 < end; q += 3) {
+          // vd-port: a non-finite vertex (upstream builders emit a few — citigroup's skirt, ~16% of its triangles)
+          // poisons the weld's extent and the simplifier's assert; its triangles draw nothing, so the triangle goes
+          const tp = [], tc = [], te = [], tn = [];
           for (let w = 0; w < 3; w++) {
             const vi = idx ? idx.getX(q + w) : q + w;
             v.fromBufferAttribute(pos, vi).applyMatrix4(m4);
-            P.push(v.x, v.y, v.z);
+            tp.push(v.x, v.y, v.z);
             let r = base[0], gg = base[1], bb = base[2];
             if (col && mt.vertexColors) { r *= lin2s(col.getX(vi)); gg *= lin2s(col.getY(vi)); bb *= lin2s(col.getZ(vi)); }
-            C.push(r, gg, bb);
+            tc.push(r, gg, bb);
             if (tr) {
               // levelBase: totalEmissiveRadiance += diffuseColor.rgb * vFkTr.x * mix(dayK, nightK, night), on the linear albedo
               const lv = tr.getX(vi), s2l = (c) => (c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
-              E.push(lin2s(Math.min(1, s2l(r) * lv / 4)), lin2s(Math.min(1, s2l(gg) * lv / 4)), lin2s(Math.min(1, s2l(bb) * lv / 4)));
-            } else E.push(lin2s(Math.min(1, emL[0] / 4)), lin2s(Math.min(1, emL[1] / 4)), lin2s(Math.min(1, emL[2] / 4)));
-            N.push(nm.lo / 4, nm.hi / 4);
+              te.push(lin2s(Math.min(1, s2l(r) * lv / 4)), lin2s(Math.min(1, s2l(gg) * lv / 4)), lin2s(Math.min(1, s2l(bb) * lv / 4)));
+            } else te.push(lin2s(Math.min(1, emL[0] / 4)), lin2s(Math.min(1, emL[1] / 4)), lin2s(Math.min(1, emL[2] / 4)));
+            tn.push(nm.lo / 4, nm.hi / 4);
           }
+          if (tp.every(Number.isFinite)) { P.push(...tp); C.push(...tc); E.push(...te); N.push(...tn); }
         }
       }
     }
@@ -174,6 +178,7 @@ export function simplifyNear(P, C, E, N, errM) {
  * shell (Valdrada's persistent-tier simplifyTo at its LIMIT). Positions in Valdrada world metres.
  */
 export function packStructure(id, kind, root, lit, opts) {
+  try {
   const errM = (opts.heroes || []).includes(id) ? opts.heroErrM : opts.nearErrM;
   const fine = harvest(root, true);
   const tris0 = fine.P.length / 9;
@@ -192,6 +197,7 @@ export function packStructure(id, kind, root, lit, opts) {
     shell: { tris: shell.I.length / 3, nv: p.nv, err: shell.err, how: shell.how, origin: p.origin, bbox: p.bbox,
       P: opts.data ? b64(Int16Array.from(p.P)) : null, C: opts.data ? b64(Uint8Array.from(p.C)) : null },
   };
+  } catch (e) { throw new Error(`${id}: ${e.message}`); }
 }
 
 /** The structures one assembled tile holds: the landmarks' groups, each area part's pieces and each facade-kit spec. */

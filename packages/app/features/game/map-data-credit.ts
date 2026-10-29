@@ -113,6 +113,15 @@ export const CITY_MAP_STREAMED: readonly CityMapSourceCredit[] = [
     license: 'ODbL-1.0',
     licenseUrl: 'https://opendatacommons.org/licenses/odbl/1-0/',
   },
+  {
+    // ring 5 (Midtown: Times Square, Bryant Park, Grand Central, Herald Square, the Fifth Avenue corridor): the ring's
+    // block near/lite cells (world/vd-port/blocks/data-ring5) and lane-C structure cells (furniture/cells/ring5) bake
+    // from the same pinned tile set and stream through the same hash-pinned cell source (ring5-*/structures-ring5
+    // manifest keys)
+    attribution: 'Valdrada ring-5 near and structure cells (rev 09b5836), Mehmet Kerem Turkcan',
+    license: 'ODbL-1.0',
+    licenseUrl: 'https://opendatacommons.org/licenses/odbl/1-0/',
+  },
 ];
 
 // ODbL §4.4(a): the bundled tile is itself a Derivative Database of the
