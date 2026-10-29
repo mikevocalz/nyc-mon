@@ -1,12 +1,17 @@
-import { FALLBACK_MON_LINGO, monVoiceRef, planMonUtterance, type MonLingo, type MonVoicePort } from '@acme/content/voice';
+import { FALLBACK_MON_LINGO, gateMonLine, monVoiceRef, planMonUtterance, type MonLingo, type MonVoicePort, type MonVoiceRef } from '@acme/content/voice';
 import type { LifecycleStage, MonMood } from '@acme/core';
 
 /**
  * Plays the Mon's lines one at a time on any platform. The caption goes up
  * the moment a line is said (captionText: "Caller", no stage directions) and
- * stays while the voice plays; with Sound off, for an Egg, or when no clip
- * comes back, the caption alone carries the line for a reading time. A new
- * line, or `stop()`, cuts off the one playing.
+ * stays while the voice plays; with Sound off, for a stage with no pitch, or
+ * when no clip comes back, the caption alone carries the line for a reading
+ * time. A new line, or `stop()`, cuts off the one playing.
+ *
+ * Every line is gated by voice stage first (Decision 32): an Egg and a Baby
+ * in its first day say babble only, so the caption is the gated line. When
+ * the server answers with its own gated caption (`x-mon-caption`), that one
+ * replaces the local caption: the server clock decides.
  *
  * The speech engine is a `MonVoicePort` from the platform adapters
  * (mon-voice-port.native.ts, mon-voice-port.web.ts); this file never touches
@@ -18,6 +23,8 @@ export interface MonVoiceSubject {
   readonly monInstanceId: string;
   readonly voiceLineageId: string | null;
   readonly stage: LifecycleStage;
+  /** `MonInstance.hatchedAt`; sets the Baby's first-day babble. Null or absent for an Egg. */
+  readonly hatchedAt?: number | null;
   readonly mood?: MonMood;
 }
 
@@ -28,8 +35,11 @@ export interface MonLine {
   readonly owner?: object;
 }
 
-/** A platform port; `dispose` frees a clip that was prepared but never played (a blob URL). */
-export type SpeakerPort<C> = MonVoicePort<C> & { dispose?(clip: C): void };
+/**
+ * A platform port. `dispose` frees a clip that was prepared but never played
+ * (a blob URL); `captionOf` reads the caption the server gated the line to.
+ */
+export type SpeakerPort<C> = MonVoicePort<C> & { dispose?(clip: C): void; captionOf?(clip: C): string | undefined };
 
 export interface MonSpeakerDeps<C> {
   /** The platform port for this Mon; `lingo` is the table the line was planned with. */
@@ -40,6 +50,8 @@ export interface MonSpeakerDeps<C> {
   readonly soundEnabled: () => boolean;
   /** Keeps a caption up for `ms`, then calls `done`; returns a cancel. Tests drive it by hand. */
   readonly hold?: (ms: number, done: () => void) => () => void;
+  /** The clock the voice stage is read at. Defaults to `Date.now`. */
+  readonly now?: () => number;
 }
 
 export interface MonSpeaker {
@@ -47,6 +59,8 @@ export interface MonSpeaker {
   /** Stops the line playing; with `owner`, only if that owner started it. */
   stop(owner?: object): void;
   caption(): string | null;
+  /** True from `say` until its caption clears: a line is being voiced or read. */
+  speaking(): boolean;
   subscribe(listener: () => void): () => void;
 }
 
@@ -58,6 +72,30 @@ export function captionHoldMs(caption: string): number {
 /** After the voice ends, the caption lingers this long so it doesn't blink off mid-glance. */
 const TAIL_MS = 700;
 
+/** The Mon's voice ref at `now`, with the subject's mood. Undefined for a Mon from before voice lineages. */
+export function subjectRef(mon: MonVoiceSubject, now: number): MonVoiceRef | undefined {
+  const ref = monVoiceRef(mon, now);
+  if (ref === null) return undefined;
+  return mon.mood === undefined ? ref : { ...ref, mood: mon.mood };
+}
+
+/**
+ * A scripted babble line for a babbling Mon (an Egg, or a Baby in its first
+ * day): the gate's seeded babble from its own Bloodline's sounds. Undefined
+ * when the Mon may say more than babble at `now`, or has no voice lineage.
+ */
+export function babbleLine(mon: MonVoiceSubject, now: number, seed: string, lingo: MonLingo = FALLBACK_MON_LINGO): string | undefined {
+  const ref = subjectRef(mon, now);
+  if (ref?.voiceStage !== 'baby-talk') return undefined;
+  return gateMonLine('', ref, lingo, { seed }).text;
+}
+
+function serverCaption(err: unknown): string | undefined {
+  if (typeof err !== 'object' || err === null || !('caption' in err)) return undefined;
+  const { caption } = err as { caption?: unknown };
+  return typeof caption === 'string' && caption !== '' ? caption : undefined;
+}
+
 const defaultHold = (ms: number, done: () => void) => {
   const t = setTimeout(done, ms);
   return () => clearTimeout(t);
@@ -65,6 +103,7 @@ const defaultHold = (ms: number, done: () => void) => {
 
 export function createMonSpeaker<C>(deps: MonSpeakerDeps<C>): MonSpeaker {
   const hold = deps.hold ?? defaultHold;
+  const now = deps.now ?? Date.now;
   const listeners = new Set<() => void>();
   let current: string | null = null;
   let active: { controller: AbortController; cancelHold: () => void; owner: object | undefined } | null = null;
@@ -88,6 +127,7 @@ export function createMonSpeaker<C>(deps: MonSpeakerDeps<C>): MonSpeaker {
   return {
     stop,
     caption: () => current,
+    speaking: () => active !== null,
     subscribe(listener) {
       listeners.add(listener);
       return () => listeners.delete(listener);
@@ -95,8 +135,8 @@ export function createMonSpeaker<C>(deps: MonSpeakerDeps<C>): MonSpeaker {
     async say({ text, mon, owner }) {
       stop();
       const lingo = deps.lingo?.() ?? FALLBACK_MON_LINGO;
-      const ref = monVoiceRef(mon, Date.now());
-      const plan = planMonUtterance(text, ref === null ? undefined : { ...ref, ...(mon.mood === undefined ? {} : { mood: mon.mood }) }, lingo);
+      // The planner's default seed (lineage + text) is the one the server and the web fallback use too.
+      const plan = planMonUtterance(text, subjectRef(mon, now()), lingo);
       if (plan.caption === '') return;
 
       const controller = new AbortController();
@@ -120,16 +160,22 @@ export function createMonSpeaker<C>(deps: MonSpeakerDeps<C>): MonSpeaker {
       const port = deps.portFor(mon, lingo);
       let clip: C;
       try {
+        // The raw line: the server gates it again by its own clock and says what it captioned.
         clip = await port.prepare(text, controller.signal);
-      } catch {
-        // No clip (no key, offline, an Egg on the server): the caption carries the line.
-        if (isCurrent()) clearAfter(captionHoldMs(plan.caption));
+      } catch (err) {
+        // No clip (no key, offline, an Egg the server has no record for): the caption carries the line.
+        if (!isCurrent()) return;
+        const fromServer = serverCaption(err);
+        if (fromServer !== undefined) setCaption(fromServer);
+        clearAfter(captionHoldMs(fromServer ?? plan.caption));
         return;
       }
       if (!isCurrent()) {
         port.dispose?.(clip);
         return;
       }
+      const fromServer = port.captionOf?.(clip);
+      if (fromServer !== undefined && fromServer !== '') setCaption(fromServer);
       try {
         await port.play(clip, controller.signal);
       } catch {
