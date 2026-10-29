@@ -55,3 +55,7 @@ Round dots: filled `structure`, empty `concrete-300` outline (dots are progress;
 - No sad or disappointed reaction to a wrong peek.
 - No bond number (Q26).
 - No multiplayer UI. The seam is a type, not a screen (see `08-handoff.md`).
+
+## Amendment 2026-10-29
+
+Canon Decision #33: play burns weight on M32 Mon Space, and a Mon with a cold declines play until it is over the cold. Peek itself is unchanged: no score, no sad reaction.

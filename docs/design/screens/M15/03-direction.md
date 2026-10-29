@@ -57,3 +57,7 @@ Night scheme throughout the screen: text `#F8F8F8` on `#0A1230` scrim; ring fill
 - No "Are you sure?" guilt modal. The cost is one plain line, shown up front.
 - No sleep audio that plays when the app is backgrounded.
 - No snoring "Zzz" speech glyph over the Mon; sleep is body language.
+
+## Amendment 2026-10-29
+
+Canon Decision #33 adds lights-out at bedtime on M32 Mon Space: at bedtime the Mon falls asleep by itself, a bedtime call opens while the lights are on, and turning them off inverts the LCD. Manual rest here is unchanged. No countdown and no guilt modal, as before.

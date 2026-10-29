@@ -38,7 +38,7 @@ M01–M07 contain no character strings. The one `character` slot (`m05.denied.sa
 - **Lead with what the reader can do.** "You can keep playing" comes before "a parent needs to say yes" (M05).
 - **Errors: what happened, then what to do.** No blame, no "oops", no "invalid input". A cancelled Apple or Google sheet shows nothing. The player chose to close it.
 - **No pressure.** No countdowns, no "hurry", no streak guilt, no "your egg misses you". The egg waits (`M7 L388`). This follows Zagal et al. on playing by appointment (https://www.diva-portal.org/smash/get/diva2:1043332/FULLTEXT01.pdf) and ICO Children's Code standard 13 on nudges (https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/childrens-information/childrens-code-guidance-and-resources/age-appropriate-design-a-code-of-practice-for-online-services/).
-- **Promise only what ships.** One notification per egg (M23), so the copy says one. Nothing about features that are not in Phase 1.
+- **Promise only what ships.** One notification per egg (M23), so the copy says one. Nothing about features that are not in Phase 1. Amended 2026-10-29: Mon calls (Decision #36) are a separate, opt-in switch, so the egg-alert copy still promises one; see "Mon Space, keychain and Mon calls".
 - **Sentence case everywhere**, buttons included (`docs/DESIGN_SYSTEM.md` type rules). No all-caps, no exclamation marks in `ui` copy.
 - **Buttons start with a verb** and say what happens: "Send email", "Use this name", "Turn on notifications". "Continue" only where the next step is the whole point (M04).
 
@@ -999,3 +999,163 @@ M21 says "saved here" before it says "offline": the Caller can keep playing. A c
 | `m21.result.failed` | Sync didn't finish. Your changes are safe here. Try again in a minute. | ui | drafted (no answer, a 5xx, a 429, or an egg the server says is still incubating) |
 | `m21.result.rejected` | The server didn't accept these changes. They're still saved on this device. | ui | drafted (a 4xx refusal; retrying the same writes won't help) |
 | `m21.back` | Back | ui | drafted |
+
+## Mon Space, keychain and Mon calls (2026-10-29)
+
+Screen M32 (`docs/design/screens/M32/`), canon Decisions #32–#36, design D20. Mike, 2026-10-29: "good ideas, go (make sure ui/ux skills are used for designing this! i no longer want this experience inside the h-lynk but just in the screen!)". Keys are stable: `monspace.*` for the screen, `keychain.*` for the Lock Screen and Home Screen widget, `notify.call.<kind>.*` for Mon call notifications, `settings.mon_calls.*` for the opt-in. Every string is `ui` voice except the `.line` slots, which are `character` and ship only with a canon line.
+
+Word choices:
+
+- **"Set a boundary"** for discipline. A boundary is something friends set with each other, so the Caller and the Mon stay equals (Decision #8; v11 lets Mons disagree and refuse). "Discipline", "scold" and "punish" are not used.
+- **"A cold"**, never "sick". **"Piles"** and **"Clean up"** for poop. **"Weight {n}"**, never a band word.
+- Care mistakes are never written anywhere (D20e).
+- No pronoun for the Mon (PS-005); lines repeat `{name}`.
+
+### Screen
+
+| ID | String | Voice | Notes |
+|---|---|---|---|
+| `monspace.title` | Mon Space | ui | screen title, a11y header |
+| `monspace.back` | Back | ui | C key and top-left control |
+| `monspace.back.hint` | Leaves Mon Space | ui | |
+| `monspace.loading` | Opening Mon Space | ui | polite |
+| `monspace.empty.title` | No Mon yet | ui | |
+| `monspace.empty.body` | Pick an egg on Home. Your Mon hatches from it. | ui | |
+| `monspace.empty.action` | Go to Home | ui | |
+| `monspace.key.next` | Next | ui | A key |
+| `monspace.key.next.hint` | Moves to the next icon | ui | |
+| `monspace.key.select` | Select | ui | B key |
+| `monspace.key.select.hint` | Does the highlighted action | ui | |
+| `monspace.key.back` | Back | ui | C key |
+| `monspace.key.back.hint` | Goes back one step | ui | |
+| `monspace.menu.meal` | Share a meal | ui | same verb as M14 |
+| `monspace.menu.meal.hint` | Feeds {name} a full meal | ui | |
+| `monspace.menu.snack` | Give a snack | ui | |
+| `monspace.menu.snack.hint` | A small treat. Adds more weight than a meal | ui | |
+| `monspace.menu.play` | Play | ui | opens Peek |
+| `monspace.menu.play.hint` | Opens Peek | ui | |
+| `monspace.menu.lights_off` | Lights off | ui | label while lights are on |
+| `monspace.menu.lights_on` | Lights on | ui | label while lights are off |
+| `monspace.menu.lights.hint` | {name} sleeps when the lights are off | ui | |
+| `monspace.menu.clean` | Clean up | ui | |
+| `monspace.menu.clean.hint` | Clears every pile at once | ui | |
+| `monspace.menu.medicine` | Give medicine | ui | |
+| `monspace.menu.medicine.hint` | One dose for a cold | ui | |
+| `monspace.menu.boundary` | Set a boundary | ui | discipline |
+| `monspace.menu.boundary.hint` | For when {name} calls without needing anything | ui | |
+| `monspace.menu.status` | Status | ui | |
+| `monspace.menu.status.hint` | Shows hearts, boundaries, weight and age | ui | |
+| `monspace.menu.pause` | Pause | ui | |
+| `monspace.menu.resume` | Resume | ui | label while paused |
+| `monspace.menu.pause.hint` | Stops time for {name} until you resume | ui | |
+| `monspace.hearts.fullness` | Fullness | ui | canon meter name |
+| `monspace.hearts.energy` | Energy | ui | |
+| `monspace.hearts.social` | Social | ui | Q18 still open |
+| `monspace.a11y.hearts` | {count} of 4 hearts | ui | value for each heart row |
+| `monspace.a11y.mon` | {name} | ui | image label; value is the pose |
+| `monspace.a11y.lamp.call` | Status light on: {name} is calling | ui | |
+| `monspace.a11y.lamp.false_call` | Status light on: {name} is calling | ui | same as a real call on purpose |
+| `monspace.a11y.lamp.off` | Status light off | ui | |
+| `monspace.call.hunger` | Asking for food | ui | same words as M13 |
+| `monspace.call.energy` | Needs rest | ui | |
+| `monspace.call.social` | Wants to play | ui | |
+| `monspace.call.cold` | {name} has a cold | ui | |
+| `monspace.call.bedtime` | Bedtime. Lights off? | ui | |
+| `monspace.call.false_call` | Calling for you | ui | a false call; never says it is false |
+| `monspace.status.content` | Content | ui | |
+| `monspace.status.asleep` | Asleep | ui | |
+| `monspace.status.lights_out` | Lights out. {name} is asleep. | ui | inverted LCD |
+| `monspace.status.poop.one` | 1 pile to clean | ui | |
+| `monspace.status.poop.many` | {count} piles to clean | ui | 2–4 |
+| `monspace.status.cold` | {name} has a cold | ui | |
+| `monspace.status.cold.doses.one` | 1 more dose | ui | |
+| `monspace.status.cold.doses.many` | {count} more doses | ui | |
+| `monspace.status.boundaries` | Boundaries | ui | 4-segment bar label |
+| `monspace.status.boundaries.value` | {level} of 4 | ui | |
+| `monspace.status.weight` | Weight | ui | |
+| `monspace.status.weight.value` | {weight} | ui | number only, no unit, no band (D20f) |
+| `monspace.status.age` | Age | ui | |
+| `monspace.status.age.one` | 1 day | ui | unpaused days |
+| `monspace.status.age.many` | {days} days | ui | |
+| `monspace.status.stage` | {stage} stage | ui | same pattern as `hub.mon.stage` |
+| `monspace.status.paused` | Paused. Time is stopped for {name}. | ui | |
+| `monspace.result.meal` | {name} ate. | ui | |
+| `monspace.result.snack` | {name} enjoyed the snack. | ui | |
+| `monspace.result.play` | {name} had fun. | ui | after Peek |
+| `monspace.result.clean` | All clean. | ui | |
+| `monspace.result.dose.one` | Dose given. 1 more to go. | ui | |
+| `monspace.result.dose.many` | Dose given. {count} more to go. | ui | |
+| `monspace.result.cured` | {name} is over the cold. | ui | |
+| `monspace.result.boundary` | {name} heard you. | ui | answered a false call |
+| `monspace.result.lights_off` | Lights off. Good night, {name}. | ui | |
+| `monspace.result.lights_on` | Lights on. | ui | |
+| `monspace.result.paused` | Paused. | ui | |
+| `monspace.result.resumed` | Time is running again. | ui | |
+| `monspace.decline.paused` | Paused. Resume to care for {name}. | ui | every icon but Pause |
+| `monspace.decline.cold` | {name} has a cold. Meals are fine. Snacks and play can wait. | ui | snack or play during a cold |
+| `monspace.decline.no_cold` | {name} doesn't have a cold. | ui | medicine without a cold |
+| `monspace.decline.no_false_call` | Nothing to set a boundary about right now. | ui | no penalty |
+| `monspace.decline.nothing_to_clean` | Nothing to clean. | ui | |
+| `monspace.pause.confirm.title` | Pause time for {name}? | ui | |
+| `monspace.pause.confirm.body` | Nothing changes until you resume. No calls, no piles, no colds. | ui | |
+| `monspace.pause.confirm.action` | Pause | ui | |
+| `monspace.pause.confirm.cancel` | Cancel | ui | comes first |
+| `monspace.evolve.ready` | {name} is ready to change | ui | |
+| `monspace.evolve.title` | {name} is changing | ui | during the moment |
+| `monspace.evolve.done` | {name} is now {formName} | ui | `{formName}` from the authored event only |
+| `monspace.notify.ask.title` | Let {name} call you? | ui | one-time sheet, D20b |
+| `monspace.notify.ask.body` | You get an alert when {name} needs food, rest, play, medicine or bedtime. Never while paused. | ui | |
+| `monspace.notify.ask.action` | Turn on Mon calls | ui | |
+| `monspace.notify.ask.cancel` | Not now | ui | |
+
+### Keychain widget
+
+| ID | String | Voice | Notes |
+|---|---|---|---|
+| `keychain.title` | {name} | ui | small and rectangular |
+| `keychain.calling` | {name} is calling | ui | any open call, real or false |
+| `keychain.content` | {name} is content | ui | |
+| `keychain.asleep` | {name} is asleep | ui | |
+| `keychain.paused` | Paused | ui | |
+| `keychain.cold` | Has a cold | ui | second line |
+| `keychain.poop.one` | 1 pile | ui | second line |
+| `keychain.poop.many` | {count} piles | ui | |
+| `keychain.empty` | No Mon yet | ui | |
+| `keychain.stale` | Open NYC-MON to update | ui | snapshot too old to trust |
+| `keychain.a11y` | {name}. {state}. Fullness {fullness} of 4, Energy {energy} of 4, Social {social} of 4. | ui | VoiceOver on the Lock Screen |
+| `keychain.gallery.title` | Mon keychain | ui | widget gallery name |
+| `keychain.gallery.body` | See your Mon's hearts, and whether your Mon is calling. | ui | gallery description |
+
+### Mon call notifications
+
+The title is the Mon's name, so the alert reads as coming from the Mon. The body is one `ui` sentence. A `.line` slot holds the Mon's own words where canon gives them; when it is filled it replaces the body. Today only the Hood Ratti line has Baby words (Q32, 2026-10-23): "Food?" for hunger. Every other `.line` is `TODO(canon)` and ships empty. No exclamation marks, no urgency, no guilt.
+
+| ID | String | Voice | Notes |
+|---|---|---|---|
+| `notify.call.hunger.title` | {name} | ui | |
+| `notify.call.hunger.body` | {name} is asking for food. | ui | |
+| `notify.call.hunger.line` | Food? | character | Hood Ratti Bloodline Baby only (Q32 partial); other Bloodlines `TODO(canon)` |
+| `notify.call.energy.title` | {name} | ui | |
+| `notify.call.energy.body` | {name} is tired and needs rest. | ui | |
+| `notify.call.energy.line` | — | character | `TODO(canon)` |
+| `notify.call.social.title` | {name} | ui | |
+| `notify.call.social.body` | {name} wants to play. | ui | |
+| `notify.call.social.line` | — | character | `TODO(canon)` |
+| `notify.call.cold.title` | {name} | ui | |
+| `notify.call.cold.body` | {name} has a cold and could use medicine. | ui | |
+| `notify.call.cold.line` | — | character | `TODO(canon)` |
+| `notify.call.bedtime.title` | {name} | ui | |
+| `notify.call.bedtime.body` | It's bedtime. {name} wants the lights off. | ui | |
+| `notify.call.bedtime.line` | — | character | `TODO(canon)` |
+| `notify.call.thread` | Mon calls | ui | notification group / channel name |
+
+No key exists for a false call: false calls never notify (Decision #36).
+
+### Settings
+
+| ID | String | Voice | Notes |
+|---|---|---|---|
+| `settings.mon_calls.label` | Mon calls | ui | separate from `settings.notify.*` (egg alerts), off by default (D20b) |
+| `settings.mon_calls.caption` | An alert when your Mon needs food, rest, play, medicine or bedtime. Never while paused. | ui | |
+
+`settings.notify.caption` ("One alert when your egg is ready to hatch. Nothing else.") stays true: it describes the egg alert only, and Mon calls are their own switch.

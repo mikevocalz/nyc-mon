@@ -60,3 +60,7 @@ Tile name `type-label`; full/declined line `type-body`. Tile face `surface-raise
 - No calories, macros, prices, or "buy more".
 - No sick, vomiting, or pained animation; no "too much!" scolding text.
 - No timer on the tray.
+
+## Amendment 2026-10-29
+
+Canon Decision #33 adds a snack beside the meal on M32 Mon Space. A snack adds more weight than a meal; play burns weight off. The overfeed rule here (sluggish, never sick) is unchanged. A Mon with a cold still takes meals and declines snacks. "Sick" still never appears.
