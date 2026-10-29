@@ -68,29 +68,43 @@ test('gates: measured position by day, down after dark', () => {
   assert.ok(gates.filter((g) => gateDrop(g.dayDown!, 0) < 1).length > gates.length / 2, 'most measured gates are up by day');
   assert.ok(gates.every((g) => gateDrop(g.dayDown!, 1) === 1), 'every gate is down at night');
   // the curtain carries its day position for the shader
-  const gb = result.buffers.paint.extra.aGate!;
+  const gb = [...result.buffers.paint.extra.aGate!, ...result.buffers.detail.extra.aGate!];
   let curtains = 0;
   for (let i = 0; i < gb.length; i += 3) {
     if (gb[i + 1]! < -999) continue;
     curtains++;
     assert.ok(gb[i + 2]! >= 0 && gb[i + 2]! <= 1 && gb[i]! > gb[i + 1]!);
   }
-  assert.ok(curtains >= gates.length * 6, `${curtains / 6} curtains`);
+  assert.ok(curtains / 6 >= gates.length, `${curtains / 6} curtains`);
 });
 
-test('no invented names: units are blank and closed, every sign belongs to a recorded front', () => {
-  for (const f of PLAN.fronts.filter((x) => x.src === 2)) {
-    assert.equal(f.signs.length, 0);
-    assert.equal(f.awnings.length, 0);
-  }
-  assert.ok(result.features.filter((f) => f.kind === 'unit').every((f) => f.dayDown === 1));
-  for (const f of result.features.filter((x) => x.kind === 'sign')) assert.notEqual(byFront.get(f.front)!.src, 2);
-  // with a Valdrada checkout beside it, every lettered string is in Valdrada's own spec or namedShops source
+test("the dresser units: Valdrada's sign roster, its gates up by day on about three in four, all down after dark", () => {
+  const units = PLAN.fronts.flatMap((f) => (f.src === 2 ? f.units ?? [] : []));
+  assert.ok(units.length > 4000, `${units.length} units`);
+  const open = units.filter((u) => u.gate === 0).length / units.length;
+  assert.ok(open > 0.7 && open < 0.82, `${(open * 100).toFixed(1)} % of units open by day (nycDress FAC8: 76 %)`);
+  for (const u of units) assert.ok(u.slot >= 0 && PLAN.slots[u.slot], 'every unit carries a roster sign');
+  // every unit's glazing has a curtain to close at night: one per open or full unit, two per partial one
+  const curtains = (['paint', 'detail'] as const).reduce((n, k) => n + result.buffers[k].extra.aGate!.filter((y, i) => i % 3 === 1 && y > -999).length / 6, 0);
+  const want = units.reduce((n, u) => n + (u.gate === 1 ? 2 : 1), 0) + result.features.filter((f) => f.kind === 'gate').length;
+  assert.equal(curtains, want);
+});
+
+test("every lettered string is Valdrada's: its specs, namedShops, the sign rosters", () => {
+  // every sign sits on a front the plan names: a spec'd face, a named front, or a dresser unit
+  for (const f of result.features.filter((x) => x.kind === 'sign')) assert.ok(byFront.has(f.front));
+  // with a Valdrada checkout beside it, every string is in Valdrada's own source: the fk specs, namedShops.js, the
+  // facade rosters (fasciaAtlas.js, shopSigns.js) and the kit's storefront sign atlas (src/textures.js SIGN_TEXTS)
   const root = process.env.VALDRADA ?? join(homedir(), 'src/valdrada');
   const specs = join(root, 'client/src/city/fk/specs');
   if (!existsSync(specs)) return;
-  const fold = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^A-Z0-9]+/g, '');
-  const corpus = fold([...readdirSync(specs).map((f) => readFileSync(join(specs, f), 'utf8')), readFileSync(join(root, 'client/src/city/namedShops.js'), 'utf8')].join('\n'));
+  const fold = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z0-9]+/g, '');
+  const sources = [
+    ...readdirSync(specs).map((f) => join(specs, f)),
+    join(root, 'client/src/city/namedShops.js'), join(root, 'client/src/city/fasciaAtlas.js'),
+    join(root, 'client/src/city/shopSigns.js'), join(root, 'src/textures.js'),
+  ];
+  const corpus = fold(sources.map((f) => readFileSync(f, 'utf8')).join('\n'));
   for (const text of PLAN.slots) {
     for (const part of text.split(/\s{2,}| ➚ | • /)) assert.ok(corpus.includes(fold(part)), `"${part}" is not in Valdrada's data`);
   }

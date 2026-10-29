@@ -26,8 +26,9 @@ import type { AwningPlan, EntranceBay, Front, Rgb, SignPlan, StoreBay, Storefron
  *   paint   the far level's opaque pieces: kick plates, rails, soffits, gate boxes and curtains, sign boards and faces,
  *           awnings (roughness per vertex, the cloth drawn both ways), the named shopfronts, and the self-lit shop
  *           rooms and their light panels (written as 'lit': emission per vertex, aLit)
- *   detail  the near level (facadeKit's `near` sinks: mullions, stiles, door leaves and hardware, gate guides) and the
- *           dresser's storefront units, which Valdrada builds only within 150 m (nycDress.js DRESS_R)
+ *   detail  the near level, the same material: facadeKit's `near` sinks (mullions, stiles, door leaves and hardware,
+ *           gate guides) and the whole of every dresser storefront unit, which Valdrada builds only for the buildings
+ *           nearest the camera (nycDress.js MAX_DRESS, DRESS_R)
  *   glass   shop, door and transom glass
  */
 export const SLOTS = ['paint', 'detail', 'glass'] as const;
@@ -37,7 +38,7 @@ type WSlot = Slot | 'lit';
 
 /** Per-slot extra attributes beyond position, normal and colour (colour carries roughness in w). */
 export const EXTRA: Record<Slot, Record<string, number>> = {
-  paint: { aGate: 3, uv: 2, aBg: 4, aLit: 2 }, detail: {}, glass: { aGlass: 1 },
+  paint: { aGate: 3, uv: 2, aBg: 4, aLit: 2 }, detail: { aGate: 3, uv: 2, aBg: 4, aLit: 2 }, glass: { aGlass: 1 },
 };
 /**
  * What a vertex without the attribute carries: no gate (its foot far below the street), the atlas's solid cell under
@@ -72,8 +73,8 @@ const EYE_FLOOR = 1.2;
 
 const rgb = (c: Rgb | null | undefined, d: V3): V3 => (c ? [c[0]!, c[1]!, c[2]!] : d);
 
-/** kit.js storefront unit: the gate covers the whole glazing (gate = 2); units carry no name (see index.ts). */
-export const UNIT_FORWARD = 0.15;
+/** kit.js storefront units stand this far forward of where Valdrada puts them (its rd 0.18 plus 2 cm): see unit(). */
+export const UNIT_FORWARD = 0.2;
 
 /** Gate closed share for a measured day position and the night factor; the shader mirrors this (materials.ts). */
 export function gateDrop(dayDown: number, night: number): number {
@@ -111,6 +112,8 @@ export class Writer {
   rough: number | null = null;
   /** Emit every triangle a second time, reversed (the awning cloth, seen from under it). */
   twoSided = false;
+  /** Write the far level's pieces into the near level (a dresser unit is all near level: nycDress builds it within reach). */
+  near = false;
   /** The fascia atlas's solid cell, for lit surfaces that are not lettering (uv into a coverage of 1). */
   solidUv: [number, number] = [0, 0];
   constructor() {
@@ -130,7 +133,7 @@ export class Writer {
     if (this.twoSided) this.put(slot, p, [-n[0], -n[1], -n[2]], col, ex, [0, 2, 1]);
   }
   private put(ws: WSlot, p: V3[], n: V3, col: V3, ex: Record<string, number[][]>, order: number[]): void {
-    const slot: Slot = ws === 'lit' ? 'paint' : ws;
+    const slot: Slot = ws === 'glass' ? 'glass' : ws === 'detail' || this.near ? 'detail' : 'paint';
     const B = this.buffers[slot];
     const r = this.rough ?? ROUGH[ws];
     for (const i of order) {
@@ -144,14 +147,19 @@ export class Writer {
     }
   }
   /** Frame-aligned box [u0, u1] x [y0, y1] x [w0, w1]; the back face (w0) is never seen and is left out. */
-  box(slot: WSlot, F: Frame, u0: number, u1: number, y0: number, y1: number, w0: number, w1: number, col: V3, ex: Record<string, number[][]> = {}, skipBottom = false): void {
+  /**
+   * `skipTop`: the top is buried under a member laid on it (a mullion under its head or transom bar). `skipEnds`: the
+   * ends face panes on both sides, behind glass (an inner mullion; facadeKit's muntins skip theirs, SK.NU | SK.PU).
+   */
+  box(slot: WSlot, F: Frame, u0: number, u1: number, y0: number, y1: number, w0: number, w1: number, col: V3, ex: Record<string, number[][]> = {}, skipBottom = false, skipTop = false, skipEnds = false): void {
     if (!(u1 > u0) || !(y1 > y0) || !(w1 > w0)) return;
     const P = (u: number, y: number, w: number) => F.p(u, y, w);
     this.quad(slot, P(u0, y0, w1), P(u1, y0, w1), P(u1, y1, w1), P(u0, y1, w1), F.d(0, 0, 1), col, ex);    // front
-    this.quad(slot, P(u0, y1, w1), P(u1, y1, w1), P(u1, y1, w0), P(u0, y1, w0), F.d(0, 1, 0), col, ex);    // top
+    if (!skipTop) this.quad(slot, P(u0, y1, w1), P(u1, y1, w1), P(u1, y1, w0), P(u0, y1, w0), F.d(0, 1, 0), col, ex);    // top
     // a face turned down under eye height is never seen from the street or the chase camera (both stand above
     // EYE_FLOOR), so it is culled here as the GPU would cull it; higher soffits (sign boxes, gate hoods) stay
     if (!skipBottom && y0 >= EYE_FLOOR) this.quad(slot, P(u0, y0, w0), P(u1, y0, w0), P(u1, y0, w1), P(u0, y0, w1), F.d(0, -1, 0), col, ex);
+    if (skipEnds) return;
     this.quad(slot, P(u0, y0, w0), P(u0, y0, w1), P(u0, y1, w1), P(u0, y1, w0), F.d(-1, 0, 0), col, ex);   // left end
     this.quad(slot, P(u1, y0, w1), P(u1, y0, w0), P(u1, y1, w0), P(u1, y1, w1), F.d(1, 0, 0), col, ex);    // right end
   }
@@ -225,7 +233,7 @@ function storeBay(W: Writer, F: Frame, bay: StoreBay, front: Front, out: EmitRes
     const cuts = [a];
     for (let m = 1; m <= nm; m++) cuts.push(a + ((c - a) * m) / (nm + 1));
     cuts.push(c);
-    for (const u of cuts) W.box('detail', F, Math.max(a, u - fw / 2), Math.min(c, u + fw / 2), bh, ty, zb, zf + 0.004, fr);
+    cuts.forEach((u, m) => W.box('detail', F, Math.max(a, u - fw / 2), Math.min(c, u + fw / 2), bh, ty, zb, zf + 0.004, fr, {}, true, true, m > 0 && m < cuts.length - 1));
     for (let m = 1; m + 1 < cuts.length; m++) W.box('detail', F, cuts[m]! - fw / 2 - 0.008, cuts[m]! + fw / 2 + 0.008, bh + fw, ty - fw / 2, zf + 0.004, zf + 0.015, fr);
     W.box('paint', F, a, c, bh, bh + fw, zb, zf + 0.012, fr);
     for (let m = 0; m + 1 < cuts.length; m++) W.wall('glass', F, cuts[m]! + fw / 2, cuts[m + 1]! - fw / 2, bh + fw, ty - fw / 2, zf - fd / 2, [1, 1, 1], glassEx(g.frosted));
@@ -343,7 +351,7 @@ function entranceBay(W: Writer, F: Frame, bay: EntranceBay, front: Front, out: E
 }
 
 // ------------------------------------------------------------------ signs: one atlas cell on the sign's face
-function sign(W: Writer, F: Frame, s: SignPlan, plan: StorefrontPlan, front: Front, out: EmitResult): void {
+function sign(W: Writer, F: Frame, s: SignPlan, plan: StorefrontPlan, front: Front, out: EmitResult, level?: [number, number]): void {
   const A = plan.atlas;
   const col = s.slot % A.cols, row = Math.floor(s.slot / A.cols);
   const tu0 = (col * A.cellW) / A.width, tu1 = ((col + 1) * A.cellW) / A.width;
@@ -352,12 +360,12 @@ function sign(W: Writer, F: Frame, s: SignPlan, plan: StorefrontPlan, front: Fro
   const fg = rgb(s.fg, [1, 1, 1]);
   const bg: number[] = s.bg ? [s.bg[0]!, s.bg[1]!, s.bg[2]!, 1] : [0, 0, 0, 0];
   // the board behind a panel / lightbox (signKit's box depth), in the sign's ground colour
-  const depth = s.kind === 'lightbox' ? 0.24 : s.kind === 'channel' ? 0.06 : s.kind === 'painted' ? 0.005 : 0.1;
-  if (s.bg && s.kind !== 'painted') W.box('paint', F, s.u0, s.u1, s.y, s.y + s.h, s.z, s.z + depth - 0.004, rgb(s.bg, [0, 0, 0]));
+  const depth = s.kind === 'lightbox' ? 0.24 : s.kind === 'channel' ? 0.06 : s.kind === 'painted' || s.kind === 'kit' ? 0.005 : 0.1;
+  if (s.bg && s.kind !== 'painted' && s.kind !== 'kit') W.box('paint', F, s.u0, s.u1, s.y, s.y + s.h, s.z, s.z + depth - 0.004, rgb(s.bg, [0, 0, 0]));
   const w = s.z + depth;
   W.rough = 0.52;   // the sign faces (shopSigns.js FAC_rough 0.52)
   W.quad('lit', F.p(s.u0, s.y, w), F.p(s.u1, s.y, w), F.p(s.u1, s.y + s.h, w), F.p(s.u0, s.y + s.h, w), F.d(0, 0, 1), fg,
-    { uv: [[tu0, tv1], [tu1, tv1], [tu1, tv0], [tu0, tv0]], aBg: [bg], aLit: [[0.1 * s.lit, 1.2 * s.lit]] });
+    { uv: [[tu0, tv1], [tu1, tv1], [tu1, tv0], [tu0, tv0]], aBg: [bg], aLit: [level ?? [0.1 * s.lit, 1.2 * s.lit]] });
   W.rough = null;
   const c = F.p((s.u0 + s.u1) / 2, s.y + s.h / 2, w);
   out.features.push({ kind: 'sign', front: front.id, x: c[0], y: c[1], z: c[2], u: (s.u0 + s.u1) / 2, text: plan.slots[s.slot] });
@@ -471,22 +479,67 @@ function namedFront(W: Writer, F: Frame, front: Front, plan: StorefrontPlan, out
   }
 }
 
-// ------------------------------------------------------------------ kit.js K.storefront (L824-L971), gate = 2
-function unit(W: Writer, F: Frame, uc: number, width: number, front: Front, out: EmitResult): void {
-  const sfH = 2.9, signH = 0.75, rd = 0.18, w = width - 0.5;
+// ------------------------------------------------------------------ kit.js K.storefront (L824-L971)
+// Anchored at the unit's centre on the wall face, +w out. In Valdrada it stands in a punched wall (rd = 0.18 behind the
+// face); the city's shell walls are solid, so the unit comes forward by UNIT_FORWARD and the shop fill that stood 1.1 m
+// behind the glass is drawn on the wall face behind it.
+function unit(W: Writer, F: Frame, U: NonNullable<Front['units']>[number], front: Front, plan: StorefrontPlan, out: EmitResult): void {
+  W.near = true;
+  try { unitBody(W, F, U, front, plan, out); } finally { W.near = false; }
+}
+function unitBody(W: Writer, F: Frame, U: NonNullable<Front['units']>[number], front: Front, plan: StorefrontPlan, out: EmitResult): void {
+  const sfH = 2.9, signH = 0.75, rd = 0.18, w = U.w - 0.5, uc = U.u;
   const a = uc - w / 2, c = uc + w / 2;
-  // bulkhead box(w, 0.55, 0.12) at (0, 0.02, -rd + 0.06): z centred
+  // bulkhead box(w, 0.55, 0.12) at (0, 0.02, -rd + 0.06), z centred; colour 0.16, 0.15, 0.15
   W.box('detail', F, a, c, 0.02, 0.57, -rd, -rd + 0.12, [0.16, 0.15, 0.15], {}, true);
-  // the sign box sides box(w + 0.18, signH + 0.08, 0.14) at y sfH + 0.08, z 0.02 centred; no lettering (see index.ts)
+  // the sign: an atlas cell quad(w + 0.1, signH) at (0, sfH + 0.12, 0.10) and its box(w + 0.18, signH + 0.08, 0.14) at
+  // (0, sfH + 0.08, 0.02); the 'signs' material lights it at 0.05 of its colour
   W.box('detail', F, uc - (w + 0.18) / 2, uc + (w + 0.18) / 2, sfH + 0.08, sfH + 0.16 + signH, 0.02 - 0.07, 0.02 + 0.07, [0.12, 0.11, 0.11]);
-  // the gate quad(gwidth, sfH - 0.25) at (0, 0.02, -rd + 0.055) and its housing box(gwidth + 0.1, 0.3, 0.3) at (0, sfH - 0.28, -rd + 0.1)
-  const gy0 = 0.02 + sfH - 0.25;
-  W.rough = 0.48;
-  W.wall('paint', F, a, c, 0.02, gy0, -rd + 0.055, GATE_DEF, { aGate: [[F.y0 + gy0, F.y0 + 0.02, 1]] });
-  W.rough = null;
-  W.box('detail', F, a - 0.05, c + 0.05, sfH - 0.28, sfH + 0.02, -rd + 0.1 - 0.15, -rd + 0.1 + 0.15, [0.3, 0.3, 0.31]);
-  const p = F.p(uc, gy0, -rd + 0.055);
-  out.features.push({ kind: 'unit', front: front.id, x: p[0], y: p[1], z: p[2], u: uc, dayDown: 1 });
+  sign(W, F, { text: plan.slots[U.slot] ?? '', u0: uc - (w + 0.1) / 2, u1: uc + (w + 0.1) / 2, y: sfH + 0.12, h: signH, z: 0.1, kind: 'kit', lit: 0, fg: U.fg, bg: U.bg, slot: U.slot }, plan, front, out, [0.05, 0.05]);
+  // the glazing: quad(gw, sfH - 0.62) from y 0.6 at z -rd + 0.02, gw = q05(min(w - 0.1, 7)); the steelDark frame
+  const gw = Math.round(Math.min(w - 0.1, 7) * 20) / 20, g0 = uc - gw / 2, g1 = uc + gw / 2;
+  W.wall('glass', F, g0, g1, 0.6, 0.6 + sfH - 0.62, -rd + 0.02, [1, 1, 1], glassEx(false));
+  const steel: V3 = [0.12, 0.12, 0.13];
+  const nM = Math.max(1, Math.round(gw / 1.4));
+  for (let i = 0; i <= nM; i++) { const x = g0 + (gw / nM) * i; W.box('detail', F, x - 0.0275, x + 0.0275, 0.6, sfH, -rd + 0.03 - 0.035, -rd + 0.03 + 0.035, steel, {}, true, true, i > 0 && i < nM); }
+  W.box('detail', F, g0, g1, sfH - 0.06, sfH, -rd + 0.03 - 0.035, -rd + 0.03 + 0.035, steel);
+  W.box('detail', F, g0, g1, 0.55, 0.6, -rd + 0.03 - 0.045, -rd + 0.03 + 0.045, steel);
+  W.box('detail', F, g0, g1, sfH - 0.7, sfH - 0.65, -rd + 0.03 - 0.035, -rd + 0.03 + 0.035, steel);
+  // the shop fill (0.42, 0.38, 0.32, "a lit shop interior, not a black card") and the warm ceiling strips
+  if (U.gate !== 2) {
+    W.wall('lit', F, g0, g1, 0.55, sfH - 0.15, -UNIT_FORWARD + 0.005, [0.42, 0.38, 0.32], { aLit: [[1, 1]] });
+    W.wall('lit', F, g0 + gw * 0.05, g1 - gw * 0.05, sfH - 0.9, sfH - 0.83, -UNIT_FORWARD + 0.006, [1, 0.92, 0.78], { aLit: [[1, 1]] });
+  }
+  // the gates: by day as the dresser drew them; every unit's glazing closes after dark (the port's, gateDrop)
+  const gy0 = 0.02 + sfH - 0.25, zg = -rd + 0.055;
+  const curtain = (x0: number, x1: number, dayDown: number) => {
+    W.rough = 0.55;   // rollGate: roughness 0.55 (src/materials.js L170)
+    W.wall('paint', F, x0, x1, 0.02, gy0, zg, GATE_DEF, { aGate: [[F.y0 + gy0, F.y0 + 0.02, dayDown]] });
+    W.rough = null;
+  };
+  if (U.gate > 0) {
+    const gwidth = U.gate === 2 ? w : Math.min(2.2, w * 0.4);
+    const gx = U.gate === 2 ? uc : uc + U.side * (w / 2 - gwidth / 2);
+    curtain(gx - gwidth / 2, gx + gwidth / 2, 1);
+    if (U.gate === 1) curtain(U.side > 0 ? a : gx + gwidth / 2, U.side > 0 ? gx - gwidth / 2 : c, 0);
+    W.box('paint', F, gx - (gwidth + 0.1) / 2, gx + (gwidth + 0.1) / 2, sfH - 0.28, sfH + 0.02, -rd + 0.1 - 0.15, -rd + 0.1 + 0.15, [0.3, 0.3, 0.31]);
+  } else curtain(a, c, 0);
+  // the awning (L921-L970): fabric tipped 0.72 rad over L = 1.35 m, valance 0.3 m, gussets, from (0, sfH + 0.05, 0.02)
+  if (U.awning) {
+    const aw = Math.round(Math.min(w * 0.92, 6.5) * 20) / 20, x0 = uc - aw / 2, x1 = uc + aw / 2;
+    const theta = 0.72, L = 1.35, drop = L * Math.sin(theta), zOut = L * Math.cos(theta), top = sfH + 0.05, wz = 0.02;
+    const col = rgb(U.awning, [0.557, 0.184, 0.137]);
+    W.rough = 0.85; W.twoSided = true;
+    W.quad('paint', F.p(x0, top - drop, wz + zOut), F.p(x1, top - drop, wz + zOut), F.p(x1, top, wz), F.p(x0, top, wz), F.d(0, Math.cos(theta), Math.sin(theta)), col);
+    W.wall('paint', F, x0, x1, top - drop - 0.3, top - drop, wz + zOut - 0.015, col);
+    W.tri('paint', [F.p(x0, top, wz), F.p(x0, top - drop, wz + zOut), F.p(x0, top - drop, wz)], F.d(-1, 0, 0), col);
+    W.tri('paint', [F.p(x1, top, wz), F.p(x1, top - drop, wz), F.p(x1, top - drop, wz + zOut)], F.d(1, 0, 0), col);
+    W.rough = null; W.twoSided = false;
+    const p = F.p(uc, top - drop, wz + zOut);
+    out.features.push({ kind: 'awning', front: front.id, x: p[0], y: p[1], z: p[2], u: uc });
+  }
+  const p = F.p(uc, gy0, zg);
+  out.features.push({ kind: 'unit', front: front.id, x: p[0], y: p[1], z: p[2], u: uc, dayDown: U.gate === 2 ? 1 : 0, text: plan.slots[U.slot] });
 }
 
 /** Writes the whole plan. `groundY` is the walking surface under a scene point (ctx.groundY). */
@@ -507,7 +560,7 @@ export function emitPlan(plan: StorefrontPlan, groundY: (x: number, z: number) =
       if (bay.t === 's') storeBay(W, F, bay, front, out);
       else entranceBay(W, F, bay, front, out);
     }
-    for (const u of front.units ?? []) unit(W, F, u.u, u.w, front, out);
+    for (const u of front.units ?? []) unit(W, F, u, front, plan, out);
     for (const s of front.signs) sign(W, F, s, plan, front, out);
     for (const a of front.awnings) awning(W, F, a, plan, front, out);
   }

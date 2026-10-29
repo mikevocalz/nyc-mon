@@ -9,7 +9,7 @@
 //             the sign faces: lettering coverage (R8 atlas) in the sign's colour over its ground (aBg), lit boxes
 //             glowing after dark (shopSigns.js: "internally-lit sign boxes at night, plus a little by day")
 //           aLit is the (day, night) emission; a vertex that is not lettering samples the atlas's solid cell
-//   detail  the same sets for the near level (plain: no gate, no mask of its own)
+//   detail  the near level through the same graph
 //   glass   int_shopglass (kitMats.js L783: opacity 0.16, f0 0.07) and int_frosted (a milky pane, aGlass = 1)
 //
 // Every piece is a flat box face or quad, so the materials shade flat from derivatives and no normal is uploaded.
@@ -64,10 +64,8 @@ export function fasciaTexture(THREE: Three, base64: string, width: number, heigh
 
 export function createStorefrontMaterials(THREE: Three, night: Node<'float'>, physical: boolean, atlasB64: string, width: number, height: number): StorefrontMaterials {
   const T = THREE.TSL as unknown as L;
-  // ctx.night read per object, as the streamer's own dither fade reads cellFade (cell-stream.ts ditherFadeMask): it
-  // joins the object group every cell already has. The shared uniform node itself, in a group of its own, cost a
-  // buffer the first time a streamed cell drew in each new context (cell-stream.walk.test.ts: live GPU bytes at the
-  // far end differed between the first and the second visit)
+  // ctx.night read per object, as the streamer's own dither fade reads cellFade (cell-stream.ts ditherFadeMask), so it
+  // joins the object group every cell already has
   const source = night as unknown as { value: number };
   const n = T.uniform(source.value).onObjectUpdate(() => source.value);
   const node = (v: N) => v as unknown as Node;
@@ -83,36 +81,37 @@ export function createStorefrontMaterials(THREE: Three, night: Node<'float'>, ph
 
   const rough = T.attribute('color', 'vec4').w;
 
-  const detail = std('detail', { metalness: 0.25 });
-  detail.colorNode = node(T.vec4(vcol, 1)) as never;
-  detail.roughnessNode = node(rough) as never;
-
   const atlas = fasciaTexture(THREE, atlasB64, width, height);
-  const paint = std('paint', { metalness: 0.25 });
-  const cov = T.texture(atlas, T.uv()).r;
-  const bg = T.attribute('aBg', 'vec4');
-  const level = T.attribute('aLit', 'vec2');
-  const face = T.mix(working(bg.xyz), vcol, cov);
-  const g = T.attribute('aGate', 'vec3');   // x: the curtain's top (world y), y: its foot, z: down by day; y < -999 = no gate
-  const isGate = g.y.greaterThan(-999);
-  const down = T.mix(g.z, T.float(1), closed);
-  const yb = g.x.sub(g.x.sub(g.y).mul(down));
-  const y = T.positionWorld.y;
-  // 75 mm slats with a dark joint over the top 18 % of each, box-filtered over the pixel's footprint so the ladder
-  // settles to its mean far off (the integral of a periodic pulse, as Valdrada's mipmapped slat texture does)
-  const s = g.x.sub(y).div(0.075);
-  const hw = T.max(T.fwidth(s), 0.0001).mul(0.5);
-  const integral = (t: N) => T.floor(t).mul(0.18).add(T.clamp(T.fract(t), 0.82, 1).sub(0.82));
-  const joint = integral(s.add(hw)).sub(integral(s.sub(hw))).div(hw.mul(2));
-  const bar = T.smoothstep(0, 0.06, y.sub(yb));
-  const shutter = face.mul(T.float(1).sub(joint.mul(0.45))).mul(T.mix(T.float(0.55), T.float(1), bar));
-  paint.colorNode = node(T.vec4(T.select(isGate, shutter, face), 1)) as never;
-  paint.roughnessNode = node(rough) as never;
-  // the self-lit surfaces' emission, added to the lit output (what MeshStandardNodeMaterial does with emissiveNode;
-  // the emissive slot itself cost a lazily made GPU buffer on a streamed layer, cell-stream.walk.test.ts)
-  paint.outputNode = node(T.vec4(T.output.rgb.add(face.mul(T.mix(level.x, level.y, n))), T.output.w)) as never;
-  // a gate's curtain ends at its foot; a sign without a ground (channel letters, paint) keeps only its letters
-  (paint as unknown as { maskNode: Node }).maskNode = node(T.select(isGate, y.greaterThan(yb), bg.w.add(cov).greaterThan(0.5)));
+  // the far and the near level draw through one graph (two materials so the streamer fades each layer on its own)
+  const front = (name: string) => {
+    const paint = std(name, { metalness: 0.25 });
+    const cov = T.texture(atlas, T.uv()).r;
+    const bg = T.attribute('aBg', 'vec4');
+    const level = T.attribute('aLit', 'vec2');
+    const face = T.mix(working(bg.xyz), vcol, cov);
+    const g = T.attribute('aGate', 'vec3');   // x: the curtain's top (world y), y: its foot, z: down by day; y < -999 = no gate
+    const isGate = g.y.greaterThan(-999);
+    const down = T.mix(g.z, T.float(1), closed);
+    const yb = g.x.sub(g.x.sub(g.y).mul(down));
+    const y = T.positionWorld.y;
+    // 75 mm slats with a dark joint over the top 18 % of each, box-filtered over the pixel's footprint so the ladder
+    // settles to its mean far off (the integral of a periodic pulse, as Valdrada's mipmapped slat texture does)
+    const s = g.x.sub(y).div(0.075);
+    const hw = T.max(T.fwidth(s), 0.0001).mul(0.5);
+    const integral = (t: N) => T.floor(t).mul(0.18).add(T.clamp(T.fract(t), 0.82, 1).sub(0.82));
+    const joint = integral(s.add(hw)).sub(integral(s.sub(hw))).div(hw.mul(2));
+    const bar = T.smoothstep(0, 0.06, y.sub(yb));
+    const shutter = face.mul(T.float(1).sub(joint.mul(0.45))).mul(T.mix(T.float(0.55), T.float(1), bar));
+    paint.colorNode = node(T.vec4(T.select(isGate, shutter, face), 1)) as never;
+    paint.roughnessNode = node(rough) as never;
+    // the self-lit surfaces' emission, added to the lit output (as emissiveNode adds it)
+    paint.outputNode = node(T.vec4(T.output.rgb.add(face.mul(T.mix(level.x, level.y, n))), T.output.w)) as never;
+    // a gate's curtain ends at its foot; a sign without a ground (channel letters, paint) keeps only its letters
+    (paint as unknown as { maskNode: Node }).maskNode = node(T.select(isGate, y.greaterThan(yb), bg.w.add(cov).greaterThan(0.5)));
+    return paint;
+  };
+  const paint = front('paint');
+  const detail = front('detail');
 
   const glass = std('glass', { roughness: 0.04, metalness: 0, transparent: true, depthWrite: false });
   const frosted = T.attribute('aGlass', 'float');

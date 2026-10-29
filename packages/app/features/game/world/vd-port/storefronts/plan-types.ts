@@ -68,7 +68,11 @@ export interface Front extends FrontFrame {
   awnings: AwningPlan[];
   system?: { color: Rgb; height: number; head: number; fascia: number[]; bulk: number; cornice: Rgb };
   shops?: NamedShop[];
-  units?: { u: number; w: number }[];
+  /**
+   * kit.js K.storefront units (nycDress.js FAC8 draw): centre u and width (Valdrada metres), the gate (0 none, 1 over
+   * the entry on `side`, 2 the whole glazing), the kit sign's atlas cell and colours, the awning's colour or null.
+   */
+  units?: { u: number; w: number; gate: 0 | 1 | 2; side: 1 | -1; slot: number; fg: Rgb | null; bg: Rgb | null; awning: Rgb | null }[];
 }
 
 export interface StorefrontPlan {

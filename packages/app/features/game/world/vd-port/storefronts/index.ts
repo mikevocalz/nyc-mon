@@ -32,16 +32,19 @@ type Mesh = InstanceType<Three['Mesh']>;
  * Streaming, as Valdrada's levels: the far level streams like the city's street detail (cell-stream.ts CELL_LAYERS
  * 'city:street-detail': 256 m chunks, the dither fade). The near level reaches what Valdrada's does:
  * facadeKit's near level shows within 120 m (?fklod) and the dresser builds its units for the 48 nearest buildings
- * within 150 m (nycDress.js MAX_DRESS, DRESS_R), about 100 m of a commercial street either way; on the harness's
- * K (0.3 m reaches 330 m, cell-stream.ts) 0.09 m is 100 m, in 128 m chunks so the reach is not a 256 m square's corner away.
+ * within 150 m (nycDress.js MAX_DRESS, DRESS_R), so the reach is the dresser's cap, not its radius; on the harness's
+ * K (0.3 m reaches 330 m, cell-stream.ts) 0.06 m is 66 m: both frontages of 125th Street over 130 m of 8 m lots and the
+ * corners of the cross streets, about the 48 nearest storefront buildings; 128 m chunks keep the reach from being a
+ * 256 m square's corner away.
  */
-// (0.2 m: 220 m on the harness's K. At the street detail's 0.25 m, 275 m, the far level's chunks at the edge of the
-// 360 m resident radius tipped the 125th walk's residency between visits and its triangle budget; the signs and
-// gates are read well inside 220 m.)
-const FAR_LEVEL: VdStreamLayer = { errorM: 0.2, chunk: 256, fade: true };
-// The glass is resident (the persistent tier, one draw for the tile): 5 k triangles, and a transparent pass per chunk
-// would spend the cell draw budget on panes.
-const LAYER: Record<Slot, VdStreamLayer | null> = { paint: FAR_LEVEL, glass: null, detail: { errorM: 0.09, chunk: 128, fade: true } };
+// (0.16 m: 176 m on the harness's K. At the street detail's 0.25 m, 275 m, the far level's chunks at the edge of the
+// 360 m resident radius tipped the 125th walk's residency between visits, and with the dresser units drawn the walk's
+// 160 k triangle budget needs the shorter reach.)
+const FAR_LEVEL: VdStreamLayer = { errorM: 0.16, chunk: 256, fade: true };
+// The glass streams with the near level's reach in 256 m chunks: at 16 % opacity a pane past 66 m changes nothing
+// the room behind it does not already show, and a transparent draw per 128 m chunk would spend the cell draw budget.
+const NEAR_LEVEL: VdStreamLayer = { errorM: 0.06, chunk: 128, fade: true };
+const LAYER: Record<Slot, VdStreamLayer | null> = { paint: FAR_LEVEL, detail: NEAR_LEVEL, glass: { errorM: 0.06, chunk: 256, fade: false } };
 
 export const VD_STOREFRONT_LAYERS = LAYER;
 

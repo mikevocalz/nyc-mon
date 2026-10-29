@@ -31,6 +31,7 @@ const ROOT = dirname(fileURLToPath(import.meta.url));
 const VALDRADA = process.argv[2] ?? join(homedir(), 'src/valdrada');
 const CITY = join(VALDRADA, 'client/src/city');
 const FONTS = join(VALDRADA, 'client/public/fonts/ar33');
+const SYS_FONTS = '/System/Library/Fonts/Supplemental';   // the kit atlas's CSS families (macOS)
 const TILES = join(ROOT, '.cache/valdrada');
 const DATASET = join(ROOT, '../../packages/app/features/game/data/harlem-apollo.json');
 const OUT_DIR = join(ROOT, '../../packages/app/features/game/world/vd-port/storefronts');
@@ -192,7 +193,7 @@ const signText = (sg, bay) => {
 
 // ------------------------------------------------------------------ 1. the spec'd fronts
 const fronts = [];
-const stats = { specBuildings: 0, specFaces: 0, stores: 0, entrances: 0, doors: 0, gates: 0, signs: 0, awnings: 0, named: 0, units: 0, unitBuildings: 0 };
+const stats = { unitGates: [0, 0, 0], specBuildings: 0, specFaces: 0, stores: 0, entrances: 0, doors: 0, gates: 0, signs: 0, awnings: 0, named: 0, units: 0, unitBuildings: 0 };
 function frameOf(p0v, p1v) {
   // edgeFrame: p0 = the left end as seen from the street; U along, N = (-Uz, Ux) outward (the compiled winding)
   const p0 = toScene(p0v[0], p0v[1]), p1 = toScene(p1v[0], p1v[1]);
@@ -426,7 +427,26 @@ for (const NF of named) {
   stats.named++;
 }
 
-// ------------------------------------------------------------------ 3. the dresser's storefront units (nycDress.js L529, L592-L745)
+// ------------------------------------------------------------------ 3. the dresser's storefront units (nycDress.js L529, L592-L796)
+// Each unit is kit.js K.storefront with the dresser's FAC8 draw (nycDress.js L781-L796): its sign is one of the kit's
+// SIGN_TEXTS (src/textures.js L646-L664, the storefront sign atlas K.storefront reads through extra.signUvFor), about
+// 45 % carry an awning in one of AWNING_STYLES (textures.js L703-L708), 14 % a partial gate over the entry and 10 % a
+// full one. The strings and colours are read from textures.js itself.
+const KIT_TEXTURES = readFileSync(join(VALDRADA, 'src/textures.js'), 'utf8');
+const literal = (name) => {
+  const a = KIT_TEXTURES.indexOf(`export const ${name} = [`), b = KIT_TEXTURES.indexOf('\n];', a);
+  if (a < 0 || b < 0) throw new Error(`textures.js: ${name} not found`);
+  return new Function(`return ${KIT_TEXTURES.slice(a + `export const ${name} = `.length, b + 2)}`)();
+};
+const SIGN_TEXTS = literal('SIGN_TEXTS');
+const AWNING_STYLES = literal('AWNING_STYLES');
+// signAtlas's four faces by cell (textures.js L675: '900 62px Arial Black', '800 60px Arial', 'bold 62px Georgia',
+// '900 58px Verdana'), the macOS files of those families
+const KIT_FONTS = ['sys:Arial Black.ttf', 'sys:Arial Bold.ttf', 'sys:Georgia Bold.ttf', 'sys:Verdana Bold.ttf'];
+// the cell is 512 x 128 (4:1), stretched over the sign quad whatever the unit's width (kit.js L835-L837)
+const kitSlot = SIGN_TEXTS.map(([text, fg, bg], i) => slot(text, KIT_FONTS[i % 4], hexRgb(fg), hexRgb(bg), 4));
+const fract = (v) => v - Math.floor(v);
+const hash1 = (a, b = 0, c = 0) => fract(Math.sin(a * 12.9898 + b * 78.233 + c * 37.719) * 43758.5453);   // nycDress.js L269
 const replaceIds = new Set(LANDMARKS.filter((l) => l.mode === 'replace').map((l) => l.id));
 for (const r of recs) {
   if (claimedByRec.has(r)) continue;
@@ -447,7 +467,19 @@ for (const r of recs) {
     const nU = Math.max(1, Math.round((len - 0.6) / 5.8));
     const uw = (len - 0.4) / nU;
     const out = { src: 2, id: `${r.tile}:${b.i}:${i}`, addr: '', ...F, units: [], signs: [], awnings: [], bays: [] };
-    for (let j = 0; j < nU; j++) out.units.push({ u: r3(0.2 + (j + 0.5) * uw), w: r3(uw) });
+    const cv = b.colorVar;
+    for (let j = 0; j < nU; j++) {
+      const u = 0.2 + (j + 0.5) * uw, x = len / 2 - u;   // op.x = lx(u)
+      const sfR = hash1(cv * 311, i, x * 3.1);
+      const sign = Math.floor(hash1(cv * 211, i, x) * 64) % SIGN_TEXTS.length;
+      const awning = sfR < 0.45 ? Math.floor(hash1(cv * 407, i, x * 1.7) * 64) % AWNING_STYLES.length : -1;
+      out.units.push({
+        u: r3(u), w: r3(uw), gate: sfR > 0.9 ? 2 : sfR > 0.76 ? 1 : 0, side: hash1(cv * 5, i) < 0.5 ? 1 : -1,
+        slot: kitSlot[sign], fg: hexRgb(SIGN_TEXTS[sign][1]), bg: hexRgb(SIGN_TEXTS[sign][2]),
+        awning: awning >= 0 ? hexRgb(AWNING_STYLES[awning].base) : null,
+      });
+      stats.unitGates[sfR > 0.9 ? 2 : sfR > 0.76 ? 1 : 0]++;
+    }
     units += nU;
     fronts.push(out);
   }
@@ -478,9 +510,10 @@ function typeface(spec) {
     const named = { 400: 'Regular', 500: 'Medium', 600: 'SemiBold', 700: 'Bold', 800: 'ExtraBold', 900: 'Black' }[weight];
     return c.find((f) => f.includes(`-${named}.`)) || c.find((f) => /wght|Regular/.test(f)) || c[0];
   };
-  const file = pick(key) || pick('Oswald');
+  const sys = String(spec).startsWith('sys:') ? String(spec).slice(4) : null;
+  const file = sys ?? (pick(key) || pick('Oswald'));
   let tf = faces.get(file);
-  if (!tf) { tf = CK.Typeface.MakeTypefaceFromData(readFileSync(join(FONTS, file)).buffer.slice(0)); faces.set(file, tf); }
+  if (!tf) { tf = CK.Typeface.MakeTypefaceFromData(readFileSync(sys ? join(SYS_FONTS, sys) : join(FONTS, file)).buffer.slice(0)); faces.set(file, tf); }
   return { tf, file };
 }
 const atlas = new Uint8Array(AW * AH);
