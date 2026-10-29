@@ -1,11 +1,12 @@
 import { createHash } from 'node:crypto';
 import { babbleInventory, MAX_SPOKEN_TEXT, monVoiceRef, planMonUtterance, type MonLingo, type MonUtterance } from '@acme/content/voice';
-import { enforceVoiceStage, voiceStage, type MonInstance, type MonMood } from '@acme/core';
+import { deriveVoiceLineageId, enforceVoiceStage, voiceStage, type MonInstance, type MonMood } from '@acme/core';
 import { MonInstanceSchema, MonMoodSchema } from '@acme/core/schemas';
 import { getPayload } from 'payload';
 import type { Payload } from 'payload';
 import { z } from 'zod';
 import { parseRecord } from '../../../collections/guards.ts';
+import { EGGS_SLUG } from '../../../collections/Eggs.ts';
 import { MON_INSTANCES_SLUG, toMonInstance } from '../../../collections/MonInstances.ts';
 import { preflight, withCors } from './cors.ts';
 import { authenticateCaller, v1Error } from './game.ts';
@@ -148,7 +149,34 @@ function silent(reason: MonVoiceSilenceReason, plan: MonUtterance): Response {
  * planner gates the line itself; without one it has no ref to gate by, so the
  * line is gated here by species before planning.
  */
-function planFor(text: string, mon: MonInstance, mood: MonMood | undefined, lingo: MonLingo, now: number): MonUtterance {
+/** What the planner reads from a stored Mon, or from an unhatched egg standing in for one. */
+type VoiceHolder = Pick<MonInstance, 'monInstanceId' | 'speciesId' | 'stage' | 'voiceLineageId'> & { readonly hatchedAt: number | null };
+
+/**
+ * An unhatched egg of the Caller's, by the `monInstanceId` it reserves, as the
+ * Egg it voices (Decision 32): its line's lineage, stage Egg. Undefined when
+ * the Caller has no such egg.
+ */
+async function eggHolder(payload: Payload, monId: string, callerId: string): Promise<VoiceHolder | undefined> {
+  const found = await payload.find({
+    collection: EGGS_SLUG,
+    where: { monInstanceId: { equals: monId }, callerId: { equals: callerId }, hatched: { equals: false } },
+    limit: 1,
+    depth: 0,
+    overrideAccess: true,
+  });
+  const egg = found.docs[0] as Record<string, unknown> | undefined;
+  if (egg === undefined || typeof egg.eggId !== 'string' || typeof egg.speciesId !== 'string') return undefined;
+  return {
+    monInstanceId: monId,
+    speciesId: egg.speciesId,
+    stage: 'Egg',
+    hatchedAt: null,
+    voiceLineageId: deriveVoiceLineageId({ eggId: egg.eggId, speciesId: egg.speciesId }),
+  };
+}
+
+function planFor(text: string, mon: VoiceHolder, mood: MonMood | undefined, lingo: MonLingo, now: number): MonUtterance {
   const ref = monVoiceRef(mon, now);
   if (ref !== null) return planMonUtterance(text, { ...ref, ...(mood ? { mood } : {}) }, lingo);
   const stage = voiceStage(mon, now);
@@ -228,8 +256,9 @@ function speakHandler(deps: MonVoiceDeps): (request: Request) => Promise<Respons
         overrideAccess: true,
       });
       const doc = found.docs[0] as Record<string, unknown> | undefined;
-      if (doc === undefined) return v1Error('NOT_FOUND', 'Mon not found.', 404);
-      const mon = parseRecord(MonInstanceSchema, toMonInstance(doc), 'mon');
+      // Before the hatch the Mon is still its egg: the egg's reserved id voices the Egg's babble.
+      const mon = doc === undefined ? await eggHolder(payload, input.monId, caller.callerId) : parseRecord(MonInstanceSchema, toMonInstance(doc), 'mon');
+      if (mon === undefined) return v1Error('NOT_FOUND', 'Mon not found.', 404);
 
       const lingo = await deps.lingo(payload);
       const plan = planFor(input.text, mon, input.mood, lingo, (deps.now ?? Date.now)());

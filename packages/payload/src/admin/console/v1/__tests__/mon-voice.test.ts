@@ -2,6 +2,7 @@ import { babbleInventory, FALLBACK_MON_LINGO, monVoiceRef, planMonUtterance, MAX
 import { BABY_TALK_MS, isBabble } from '@acme/core';
 import type { Payload } from 'payload';
 import { describe, expect, it, vi } from 'vitest';
+import { EGGS_SLUG } from '../../../../collections/Eggs.ts';
 import { MON_INSTANCES_SLUG } from '../../../../collections/MonInstances.ts';
 import {
   createClipCache,
@@ -40,8 +41,8 @@ function monDoc(monInstanceId: string, callerId: string, extra: Doc = {}): Doc {
   };
 }
 
-function fakePayload(opts: { sessionUser?: Doc | null; mons?: Doc[] } = {}) {
-  const tables: Record<string, Doc[]> = { users: [], [MON_INSTANCES_SLUG]: opts.mons ?? [] };
+function fakePayload(opts: { sessionUser?: Doc | null; mons?: Doc[]; eggs?: Doc[] } = {}) {
+  const tables: Record<string, Doc[]> = { users: [], [MON_INSTANCES_SLUG]: opts.mons ?? [], [EGGS_SLUG]: opts.eggs ?? [] };
   const find = vi.fn<LocalApiCall>(async (args) => {
     const where = (args.where ?? {}) as Record<string, { equals?: unknown }>;
     const rows = tables[String(args.collection)] ?? [];
@@ -59,13 +60,14 @@ function upstreamOk() {
 function setup(opts: {
   sessionUser?: Doc | null;
   mons?: Doc[];
+  eggs?: Doc[];
   apiKey?: string | undefined;
   fetch?: ReturnType<typeof upstreamOk>;
   rateLimit?: (key: string) => boolean;
   lingo?: MonLingo;
   now?: number;
 } = {}) {
-  const fake = fakePayload({ sessionUser: 'sessionUser' in opts ? opts.sessionUser : { id: 'c1' }, mons: opts.mons ?? [monDoc('mon_1', 'c1')] });
+  const fake = fakePayload({ sessionUser: 'sessionUser' in opts ? opts.sessionUser : { id: 'c1' }, mons: opts.mons ?? [monDoc('mon_1', 'c1')], eggs: opts.eggs });
   const upstream = opts.fetch ?? upstreamOk();
   const handle = createMonVoiceHandler({
     getPayload: async () => fake.payload,
@@ -437,5 +439,24 @@ describe('POST /v1/mon-voice gates the line by voice stage on the server clock (
     const exposed = res.headers.get('access-control-expose-headers') ?? '';
     expect(exposed).toContain(MON_VOICE_STAGE_HEADER);
     expect(exposed).toContain(MON_CAPTION_HEADER);
+  });
+});
+
+describe('POST /v1/mon-voice for an unhatched egg (Decision 32)', () => {
+  const egg = (callerId: string, extra: Doc = {}): Doc => ({ eggId: 'egg_7', monInstanceId: 'mon_egg', speciesId: 'dex-001', callerId, hatched: false, ...extra });
+
+  it("babbles in the egg's line voice, by the id the egg reserves", async () => {
+    const { handle, upstream } = setup({ mons: [], eggs: [egg('c1')] });
+    const res = await handle(post({ monId: 'mon_egg', text: 'Hello Callah, I love you' }));
+    expect(res.status).toBe(200);
+    expect(res.headers.get(MON_VOICE_STAGE_HEADER)).toBe('baby-talk');
+    const sent = JSON.parse(String(upstream.mock.calls[0]![1].body)) as { text: string };
+    expect(sent.text).not.toMatch(/hello|callah|love/i);
+    expect(isBabble(decodeURIComponent(res.headers.get(MON_CAPTION_HEADER) ?? ''), babbleInventory({ lineageId: 'dex-001/female/1' }, 'Egg'))).toBe(true);
+  });
+
+  it("is a 404 for another Caller's egg or a hatched one", async () => {
+    expect((await setup({ mons: [], eggs: [egg('c2')] }).handle(post({ monId: 'mon_egg', text: 'Hi' }))).status).toBe(404);
+    expect((await setup({ mons: [], eggs: [egg('c1', { hatched: true })] }).handle(post({ monId: 'mon_egg', text: 'Hi' }))).status).toBe(404);
   });
 });
