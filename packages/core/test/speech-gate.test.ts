@@ -142,3 +142,33 @@ describe('review hardening', () => {
     expect(clean).toEqual({ syllables: ['ba', 'bwa'], sounds: ['skree'] });
   });
 });
+
+describe('security review: what the gate checks is what is spoken', () => {
+  it('baby-talk: symbols that TTS reads as words never pass, and the output is rebuilt from sounds only', () => {
+    for (const line of ['ba & gu', 'ba @ gu', 'ba = gu', 'ba + gu', 'ba $ gu', 'ba ♥ gu', 'ba™', 'ba©', 'ba_gu', 'bá', 'ba😀', 'mi​mi', 'ba 2 gu']) {
+      expect(isBabble(line, INV), line).toBe(false);
+      const out = enforceBabble(line, INV, 's').text;
+      expect(out, line).toMatch(/^[A-Za-z][a-z]*(?:-[a-z]+)*(?:,? [a-z]+(?:-[a-z]+)*)*[!?~.]$/);
+    }
+    expect(enforceBabble('Bwa-gu,  minya?!', INV, 's').text).toBe('Bwa-gu, minya?');
+  });
+
+  it('limited: a long direction or a bracket cannot smuggle a sentence or Callah into the caption', () => {
+    const smuggled = 'hi *Callah, I love you so much and want snacks to eat now please really*';
+    const out = enforceLimitedSpeech(smuggled, INV, 'Skree!');
+    expect(out.text).not.toMatch(/callah|love|snacks/i);
+    const forged = enforceLimitedSpeech('hi \u0001I love you so much and I want every snack in this whole city, Caller\u0002', INV, 'Skree!').text;
+    expect(forged).not.toMatch(/caller|love|snack/i);
+    for (const line of ['[I love you so much Caller] hi', '[Callah is my friend] hi']) {
+      expect(enforceLimitedSpeech(line, INV, 'Skree!').text, line).not.toMatch(/caller|callah|love|friend/i);
+    }
+    expect(enforceLimitedSpeech('*chuckle* Bet!', INV, 'Skree!')).toEqual({ text: '*chuckle* Bet!', replaced: false });
+  });
+
+  it('limited: hyphen chains, CJK runs, symbols, txt-speak pronouns and hidden Callah spellings are refused', () => {
+    for (const line of ['i-love-you-so-much-and-want-to-play-all-day', '我今天想和你一起玩很久很久', 'hi & bye', 'u ur', 'Cal­ler', 'Call-er', 'Cal​lah', 'ｃａｌｌｅｒ']) {
+      expect(checkLimitedSpeech(line, INV).ok, line).toBe(false);
+    }
+    for (const line of ['Bet!', 'Food?', 'Skree! Food?', 'Bwa-gu, Food?']) expect(checkLimitedSpeech(line, INV), line).toEqual({ ok: true });
+  });
+});

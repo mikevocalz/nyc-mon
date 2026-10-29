@@ -50,24 +50,53 @@ export const REAL_WORD_BLOCKLIST: readonly string[] = [
 
 const BLOCKED = new Set(REAL_WORD_BLOCKLIST);
 
-/** A pronoun or a contraction turns two words into a clause, which `limited` never says. */
-const CLAUSE_WORDS = new Set(['i', 'me', 'my', 'you', 'your', 'we', 'us', 'our', 'he', 'she', 'it', 'they', 'them', 'this', 'that', 'is', 'am', 'are']);
+/** A pronoun or a contraction (txt-speak included) turns two words into a clause, which `limited` never says. */
+const CLAUSE_WORDS = new Set([
+  'i', 'me', 'my', 'you', 'your', 'we', 'us', 'our', 'he', 'she', 'it', 'they', 'them', 'this', 'that', 'is', 'am', 'are',
+  'u', 'ur', 'im', 'ive', 'ill', 'id', 'ya', 'youre', 'thats', 'its', 'imma',
+]);
 
-/** Caller, Callah and the spoken "Call-uh", singular or plural. */
-const CALLAH = /\bcall(?:ah|er|-uh)s?\b|\bcall-uhz\b/i;
+/** Caller, Callah or "Call-uh", on the letters alone, so hyphens, soft hyphens and spaces inside the word don't hide it. */
+const CALLAH_LETTERS = /call(?:er|ah|uh)/;
 
-const DIRECTION = /\*[^*\n]{0,80}\*/g;
-const AUDIO_TAG = /\[[^\]\n]{0,40}\]/g;
+const DIRECTION = /\*[^*\n]*\*/g;
+const AUDIO_TAG = /\[[^\]\n]*\]/g;
 const TOKEN = /[\p{L}\p{N}][\p{L}\p{N}'-]*/gu;
+/** What may sit between tokens: spacing and plain punctuation. A symbol TTS reads aloud (&, @, +, $, ™) is not here. */
+const RESIDUE_OK = /^[\s,.!?~…'"-]*$/;
+/**
+ * A direction `limited` keeps: short, letters and spaces only. Every sink
+ * (captions, the voice, Web Speech) strips directions up to 60 characters, so
+ * a kept one never reaches a caption or the voice as words.
+ */
+const SHORT_DIRECTION = /^[a-z][a-z ]{0,29}$/i;
+
+/**
+ * One form for every check: NFKC (full-width letters become ASCII), format
+ * characters removed (zero-width space, soft hyphen, bidi marks), curly
+ * apostrophes straightened, control characters turned into spaces.
+ */
+function normalize(text: string): string {
+  return text
+    .normalize('NFKC')
+    .replace(/[\p{Cf}\u00ad]/gu, '')
+    .replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, ' ')
+    .replace(/[’‘]/g, "'");
+}
 
 function stripPerformance(text: string): string {
-  return text.replace(DIRECTION, ' ').replace(AUDIO_TAG, ' ').replace(/\*/g, ' ').replace(/\s+/g, ' ').trim();
+  return text.replace(DIRECTION, ' ').replace(AUDIO_TAG, ' ').replace(/[*[\]]/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
 /** The words of a line: stage directions and audio tags dropped, lower case, apostrophes kept. */
 export function speechTokens(text: string): string[] {
-  const plain = stripPerformance(text.replace(/[’‘]/g, "'"));
+  const plain = stripPerformance(normalize(text));
   return [...plain.matchAll(TOKEN)].map((m) => m[0].toLowerCase().replace(/['-]+$/, '')).filter((t) => t !== '');
+}
+
+/** True when nothing but spacing and plain punctuation sits between the tokens. */
+function residueOk(text: string): boolean {
+  return RESIDUE_OK.test(stripPerformance(normalize(text)).replace(TOKEN, ''));
 }
 
 interface CleanInventory {
@@ -119,11 +148,14 @@ export function isBabbleToken(token: string, inventory: BabbleInventory): boolea
   return tokenOk(token, clean(inventory));
 }
 
-/** A whole line is babble: at least one token, and every token is babble. Stage directions don't count. */
+/**
+ * A whole line is babble: at least one token, every token is babble, and
+ * nothing between them a voice would read as a word. Stage directions don't count.
+ */
 export function isBabble(text: string, inventory: BabbleInventory): boolean {
   const inv = clean(inventory);
   const tokens = speechTokens(text);
-  return tokens.length > 0 && tokens.every((t) => tokenOk(t, inv));
+  return tokens.length > 0 && tokens.every((t) => tokenOk(t, inv)) && residueOk(text);
 }
 
 function pick<T>(items: readonly T[], random: () => number): T {
@@ -166,17 +198,57 @@ export interface GatedLine {
   readonly replaced: boolean;
 }
 
+/** Rebuilds a babble line from its tokens alone: commas kept, one closing `!`, `?`, `~` or `.`. */
+function rebuildBabble(text: string): string {
+  const plain = stripPerformance(normalize(text));
+  const parts: string[] = [];
+  let ending = '!';
+  for (const match of plain.matchAll(TOKEN)) {
+    const token = match[0].toLowerCase().replace(/['-]+$/, '');
+    const after = plain.slice(match.index + match[0].length).match(/^[^\p{L}\p{N}]*/u)?.[0] ?? '';
+    const last = /[!?~.]/.exec(after)?.[0];
+    if (last !== undefined) ending = last;
+    parts.push(after.includes(',') ? `${token},` : token);
+  }
+  const line = parts.join(' ').replace(/,$/, '');
+  return `${line.charAt(0).toUpperCase()}${line.slice(1)}${ending}`;
+}
+
 /**
- * `baby-talk`: babble only. A line that is all babble keeps its sounds and
- * punctuation (directions and tags removed, so no English rides along in a
- * direction); anything else is replaced with {@link makeBabble} for `seed`.
+ * `baby-talk`: babble only. A line that is all babble is rebuilt from its
+ * sounds (no direction, tag, symbol or invisible character survives); anything
+ * else is replaced with {@link makeBabble} for `seed`.
  */
 export function enforceBabble(text: string, inventory: BabbleInventory, seed: string): GatedLine {
-  if (isBabble(text, inventory)) return { text: stripPerformance(text), replaced: false };
+  if (isBabble(text, inventory)) return { text: rebuildBabble(text), replaced: false };
   return { text: makeBabble(seed, inventory), replaced: true };
 }
 
-export type LimitedSpeechVerdict = { readonly ok: true } | { readonly ok: false; readonly reason: 'empty' | 'callah' | 'too-many-words' | 'sentence' };
+export type LimitedSpeechVerdict =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly reason: 'empty' | 'callah' | 'unreadable' | 'too-many-words' | 'sentence' };
+
+/**
+ * The form a `limited` line is spoken in: normalised, audio tags and brackets
+ * removed (the voice adds its own tags), and only short letters-only
+ * directions kept. A long direction could slip past the sinks' 60-character
+ * strip and be read out, so it is dropped here, where the check can see it.
+ */
+function limitedForm(text: string): string {
+  return normalize(text)
+    .replace(AUDIO_TAG, ' ')
+    .replace(/[[\]]/g, ' ')
+    .replace(DIRECTION, (direction) => {
+      const inner = direction.slice(1, -1).trim();
+      // Held as \u0001inner\u0002 (control characters are already spaces) while stray asterisks are removed.
+      return SHORT_DIRECTION.test(inner) && !CALLAH_LETTERS.test(inner.toLowerCase().replace(/[^a-z]/g, '')) ? ` \u0001${inner}\u0002 ` : ' ';
+    })
+    .replace(/\*/g, ' ')
+    .replace(/\u0001/g, '*')
+    .replace(/\u0002/g, '*')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 
 /**
  * `limited` (Q32, Mike 2026-10-23 and 2026-10-29): the family sound plus at
@@ -185,19 +257,28 @@ export type LimitedSpeechVerdict = { readonly ok: true } | { readonly ok: false;
  */
 export function checkLimitedSpeech(text: string, inventory: BabbleInventory): LimitedSpeechVerdict {
   const inv = clean(inventory);
-  const tokens = speechTokens(text);
+  const form = limitedForm(text);
+  const tokens = speechTokens(form);
   if (tokens.length === 0) return { ok: false, reason: 'empty' };
-  if (CALLAH.test(stripPerformance(text)) || tokens.some((t) => CALLAH.test(t))) return { ok: false, reason: 'callah' };
-  const words = tokens.filter((t) => !tokenOk(t, inv));
+  if (CALLAH_LETTERS.test(form.toLowerCase().replace(/[^a-z]/g, ''))) return { ok: false, reason: 'callah' };
+  if (!residueOk(form) || tokens.some((t) => !/^[a-z0-9'-]+$/.test(t))) return { ok: false, reason: 'unreadable' };
+  // A hyphen chain that is not babble is as many words as it has parts.
+  const words = tokens.flatMap((t) => (tokenOk(t, inv) ? [] : t.split('-').filter((part) => part !== '')));
   if (words.length > LIMITED_SPEECH_MAX_WORDS) return { ok: false, reason: 'too-many-words' };
   if (words.some((w) => w.includes("'") || CLAUSE_WORDS.has(w))) return { ok: false, reason: 'sentence' };
   return { ok: true };
 }
 
-/** Keeps a line that passes {@link checkLimitedSpeech}; otherwise the fallback, or babble when the fallback fails too. */
+/**
+ * Keeps a line that passes {@link checkLimitedSpeech}, in its spoken form
+ * (tags and long directions dropped); otherwise the fallback, or babble when
+ * the fallback fails too.
+ */
 export function enforceLimitedSpeech(text: string, inventory: BabbleInventory, fallback: string): GatedLine {
-  if (checkLimitedSpeech(text, inventory).ok) return { text, replaced: false };
-  if (checkLimitedSpeech(fallback, inventory).ok) return { text: fallback, replaced: true };
+  const form = limitedForm(text);
+  if (checkLimitedSpeech(form, inventory).ok) return { text: form, replaced: form !== text.trim() };
+  const fallbackForm = limitedForm(fallback);
+  if (checkLimitedSpeech(fallbackForm, inventory).ok) return { text: fallbackForm, replaced: true };
   return { text: makeBabble(fallback || text, inventory), replaced: true };
 }
 
