@@ -419,3 +419,25 @@ The supplied egg files carry their canon names and match the eggs by their Bible
 - The "Glossy Red Polka-Dot Racing Egg" image is #020 Signal Egg, the LanternFye bloodline's egg (as Decision 30 says). No 3D mesh has been made from it yet.
 
 `Fye-Egg.glb` (the tan "Glossy Spotted Alien Egg") is not assigned to any egg.
+
+## Decision 32 — an Egg and a first-day Baby babble
+
+- **Date:** 2026-10-29
+- **Decided by:** Mike (creator)
+- **Kind:** canon (voice)
+- **Answers:** `docs/canon/OPEN_QUESTIONS.md` Q32 (rest of it)
+
+Mike: "also while in egg form is supposed to be making baby gibberish sounds, and for the 1st day of the 1st form (ie squeaklet stops speaking the baby gibberish after 1 day - look in the docs about how we thought this through)".
+
+This is the first rung of v11's "baby-talk/gibberish, then limited speech, then full speech" (`V11 ¶56`), with a clock on it:
+
+- **Egg:** babbles. Wordless baby sounds from inside the shell, never a real word in any language.
+- **Baby, first 24 hours:** still babbles, counted from `hatchedAt`, the incubation end the hatch writes (not the moment the Caller watched it).
+- **Baby, after 24 hours:** `limited`, as answered for the Hood Ratti line on 2026-10-23: the family sound plus at most two words ("Bet!", "Food?"), never a sentence, no "Callah".
+- **Small, Mid, Max:** full speech, as before.
+
+The rule covers all three starter lines: Hood Ratti (Squeaklet), Bodega Baddiee Cee (Kittee Cee) and Yote (Yotito). A Mon keeps one `voiceLineageId` for life (`V11 ¶56`), so the babble, the first words and the full voice are the same voice growing up. A line's babble carries its family sound, so a Squeaklet's babble chirps like a Ratti.
+
+A Baby with no `hatchedAt` speaks `limited`, so missing data never leaves a Mon babbling forever. A clock that reads earlier than the hatch still babbles, so the first day is never skipped. The server's clock decides what is spoken; a client's clock only times local effects.
+
+Where it lives in code: `voiceStage` in `packages/core/sim/voice-stage.ts` maps stage and `hatchedAt` to `baby-talk`, `limited` or `full`; the speech gate in `packages/core/sim/speech-gate.ts` turns any line into babble or trims it to the limited rule before it is spoken. The babble sounds are Payload `language-lexicon` rows in category `babble` (seed: `packages/content/lingo/babble-seed.ts`), which Mike edits in the admin. The Egg's pitch is 1.45 in the `mon-voices` global; the Egg was silent before this.

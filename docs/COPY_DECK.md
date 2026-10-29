@@ -12,7 +12,7 @@ Every string carries `voice: "ui" | "character"`.
 
 **`character`** is a named character speaking: a Mon, Santoro, Malik, anyone in the story. Character strings come from canon only. If canon has no line, the string is `TODO(canon)` and ships empty. Nobody writes a character line from a vibe (§2.3, Law 1).
 
-M01–M07 contain no character strings. The one `character` slot (`m05.denied.santoro_line`) is `TODO(canon)`: v11 describes Dr. Santoro (`V11 ¶83`, `¶84`) but quotes no line from her. No Mon dialogue exists before the hatch, because no Mon exists (Decision #5), and Phase 1 Baby speech is open (Q32).
+M01–M07 contain no character strings. The one `character` slot (`m05.denied.santoro_line`) is `TODO(canon)`: v11 describes Dr. Santoro (`V11 ¶83`, `¶84`) but quotes no line from her. No Mon dialogue exists before the hatch, because no Mon exists (Decision #5), and a Phase 1 Baby babbles on its first day, then says at most two words (Decision 32).
 
 ## Caller and Callah
 

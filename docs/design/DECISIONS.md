@@ -25,7 +25,7 @@ Design and product decisions made by `design-director` or handed to it by the le
 ### P4 — The Caller-name preview uses the plain UI voice
 
 - **Ruled by:** lead, from research finding 6
-- **Reason:** `docs/design/screens/M07/01-research.md` (risk "Nobody to preview with"): no Mon exists until M12, and Phase 1 Babies may not speak (`V11 ¶56`, open Q32).
+- **Reason:** `docs/design/screens/M07/01-research.md` (risk "Nobody to preview with"): no Mon exists until M12, and Phase 1 Babies may not speak (`V11 ¶56`, open Q32; since closed by canon Decision 32: babble on the first day, then at most two words, never "Callah").
 - **Effect:** the preview shows the name as the H-Lynk would display it, `voice: "ui"`. No character line, no "Callah". Applied in `screens/M07`.
 
 ## Design-director decisions
