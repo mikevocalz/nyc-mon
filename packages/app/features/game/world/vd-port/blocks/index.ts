@@ -74,22 +74,18 @@ const inRing = (ring: readonly (readonly number[])[], x: number, z: number) => {
 };
 let ownedSpecs: Set<string> | null = null;
 
+// Every ring's lane-A structures. A ring baked with none (ring 3) types as `readonly []`; iterating the list drops it.
+const RING_STRUCTURES = [VD_BLOCKS.structures, VD_BLOCKS_RING1.structures, VD_BLOCKS_RING2.structures, VD_BLOCKS_RING3.structures, VD_BLOCKS_RING4.structures, VD_BLOCKS_RING5.structures, VD_BLOCKS_RING6.structures, VD_BLOCKS_RING7.structures];
+
 /**
  * Whether lane A draws this front whole, so another lane must not: a facade-kit face (`<spec>#<face>`, a spec lane A
  * baked) or any point inside a footprint lane A replaces. Always false when the packs did not load.
  */
 export function vdBlocksOwn(frontId: string | null, x: number, z: number): boolean {
   if (!vdBlockBytes()) return false;
-  ownedSpecs ??= new Set([...VD_BLOCKS.structures, ...VD_BLOCKS_RING1.structures, ...VD_BLOCKS_RING2.structures, ...VD_BLOCKS_RING3.structures, ...VD_BLOCKS_RING4.structures, ...VD_BLOCKS_RING5.structures, ...VD_BLOCKS_RING6.structures, ...VD_BLOCKS_RING7.structures].filter((s) => s.kind === 'fk').map((s) => s.id.slice(3)));
+  ownedSpecs ??= new Set(RING_STRUCTURES.flat().filter((s) => s.kind === 'fk').map((s) => s.id.slice(3)));
   if (frontId && ownedSpecs.has(frontId.split('#')[0]!)) return true;
-  for (const s of VD_BLOCKS.structures) for (const r of s.owned as readonly (readonly (readonly number[])[])[]) if (inRing(r, x, z)) return true;
-  for (const s of VD_BLOCKS_RING1.structures) for (const r of s.owned as readonly (readonly (readonly number[])[])[]) if (inRing(r, x, z)) return true;
-  for (const s of VD_BLOCKS_RING2.structures) for (const r of s.owned as readonly (readonly (readonly number[])[])[]) if (inRing(r, x, z)) return true;
-  for (const s of VD_BLOCKS_RING3.structures) for (const r of s.owned as readonly (readonly (readonly number[])[])[]) if (inRing(r, x, z)) return true;
-  for (const s of VD_BLOCKS_RING4.structures) for (const r of s.owned as readonly (readonly (readonly number[])[])[]) if (inRing(r, x, z)) return true;
-  for (const s of VD_BLOCKS_RING5.structures) for (const r of s.owned as readonly (readonly (readonly number[])[])[]) if (inRing(r, x, z)) return true;
-  for (const s of VD_BLOCKS_RING6.structures) for (const r of s.owned as readonly (readonly (readonly number[])[])[]) if (inRing(r, x, z)) return true;
-  for (const s of VD_BLOCKS_RING7.structures) for (const r of s.owned as readonly (readonly (readonly number[])[])[]) if (inRing(r, x, z)) return true;
+  for (const list of RING_STRUCTURES) for (const s of list) for (const r of s.owned as readonly (readonly (readonly number[])[])[]) if (inRing(r, x, z)) return true;
   return false;
 }
 

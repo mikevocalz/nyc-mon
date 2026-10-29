@@ -8,18 +8,25 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { decodeNearCell, decodeShellCell, type NearCellInfo, type ShellCellInfo } from './codec.ts';
 import { CELL } from '../../cells/cell-rules.ts';
+import { VD_BLOCKS_RING2 } from './data-ring2/manifest.ts';
 import { VD_BLOCKS_RING3 } from './data-ring3/manifest.ts';
+
+// Ring 3 bakes empty packs, so their literal types are `readonly []`; read them through ring 2's shape.
+type Of<K extends 'structures' | 'near' | 'shell'> = readonly (typeof VD_BLOCKS_RING2)[K][number][];
+const STRUCTURES: Of<'structures'> = VD_BLOCKS_RING3.structures;
+const NEAR: Of<'near'> = VD_BLOCKS_RING3.near;
+const SHELL: Of<'shell'> = VD_BLOCKS_RING3.shell;
 
 const DATA = new URL('./data-ring3/', import.meta.url);
 const shellBytes = new Uint8Array(readFileSync(new URL('shell.bin', DATA)));
-const nearBytes = new Map(VD_BLOCKS_RING3.near.map((c) => [c.key, new Uint8Array(readFileSync(new URL(`near/${c.key}.bin`, DATA)))]));
+const nearBytes = new Map(NEAR.map((c) => [c.key, new Uint8Array(readFileSync(new URL(`near/${c.key}.bin`, DATA)))]));
 const A = VD_BLOCKS_RING3.affine;
 const toScene = (x: number, z: number): [number, number] => [x * A.sx + A.ox, z * A.sz + A.oz];
 
 /** Every vertex the structure's index ranges reach, over all its cells, decoded as the streamer decodes them. */
 function structureVertices(id: string): number[][] {
   const out: number[][] = [];
-  for (const cell of VD_BLOCKS_RING3.near) {
+  for (const cell of NEAR) {
     const ranges = (cell.ranges as readonly (readonly [string, number, number])[]).filter((r) => r[0] === id);
     if (!ranges.length) continue;
     const a = decodeNearCell(nearBytes.get(cell.key)!, cell.cx, cell.cz);
@@ -35,7 +42,7 @@ function structureVertices(id: string): number[][] {
 
 test("every ring-3 structure matches the box of Valdrada's own output within 5 cm", () => {
   let worst = 0, worstId = '';
-  for (const s of VD_BLOCKS_RING3.structures) {
+  for (const s of STRUCTURES) {
     const vs = structureVertices(s.id);
     assert.ok(vs.length > 0, `${s.id}: no geometry`);
     const got = [Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity];
@@ -56,21 +63,21 @@ test('no ring-3 structure is already in the home, ring-1 or ring-2 packs', async
   const { VD_BLOCKS_RING1 } = await import('./data-ring1/manifest.ts');
   const { VD_BLOCKS_RING2 } = await import('./data-ring2/manifest.ts');
   const baked = new Set<string>([...VD_BLOCKS.structures, ...VD_BLOCKS_RING1.structures, ...VD_BLOCKS_RING2.structures].map((s) => s.id as string));
-  for (const s of VD_BLOCKS_RING3.structures) assert.ok(!baked.has(s.id), `${s.id} baked twice`);
+  for (const s of STRUCTURES) assert.ok(!baked.has(s.id), `${s.id} baked twice`);
   // the park's north end holds no lane-A w125*/fk structures: the empty pack is the expected bake
-  assert.equal(VD_BLOCKS_RING3.structures.length, 0);
+  assert.equal(STRUCTURES.length, 0);
 });
 
 test('the ring-3 shell cells decode to Valdrada\'s persistent-tier triangles, at most 2000 a structure', () => {
   let tris = 0;
-  for (const info of VD_BLOCKS_RING3.shell as readonly ShellCellInfo[]) {
+  for (const info of SHELL as readonly ShellCellInfo[]) {
     const a = decodeShellCell(shellBytes, info);
     assert.equal(a.position.length, info.vertices * 3);
     assert.equal(info.vertices, info.triangles * 3, 'per-face vertices');
     tris += info.triangles;
   }
   assert.equal(tris, VD_BLOCKS_RING3.totals.trisShell);
-  for (const s of VD_BLOCKS_RING3.structures) assert.ok(s.trisShell <= 2000, `${s.id}: ${s.trisShell}`);
+  for (const s of STRUCTURES) assert.ok(s.trisShell <= 2000, `${s.id}: ${s.trisShell}`);
 });
 
 test('only the home-overlap cells are bundled; the rest stream through the cell source', () => {
@@ -82,7 +89,7 @@ test('only the home-overlap cells are bundled; the rest stream through the cell 
 });
 
 test('the ring-3 cells hold cell-local frames that reconstruct their absolute positions', () => {
-  for (const cell of VD_BLOCKS_RING3.near) {
+  for (const cell of NEAR) {
     const file = nearBytes.get(cell.key)!;
     const absolute = decodeNearCell(file, cell.cx, cell.cz);
     const local = decodeNearCell(file, cell.cx, cell.cz, 'cell-local');
