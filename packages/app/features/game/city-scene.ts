@@ -12,6 +12,8 @@ import { livingCityAdaptiveBridge } from './living-city/adaptive-bridge.ts';
 import { EXPERIMENTAL_WORLD_RENDER_SCALE, mountRenderScale } from './perf/render-scale.ts';
 import { EXPERIMENTAL_WORLD_THERMAL, thermalSignal, thermalWorsened } from './perf/thermal.ts';
 import { TIER, tierBundle, WORLD_TIER, WORLD_TIER_SELECTED } from './perf/tier.ts';
+import { detectWorldPreset, screenErrorScale, worldStreamEnabled } from './perf/tier-presets.ts';
+import type { CellStreamStats } from './world/cells/cell-stream.ts';
 import { parseSkyRigFlag, type SkyName } from './world/sky-rig.ts';
 import { FrameSampleWindow } from './perf/frame-sampler.ts';
 import {
@@ -73,6 +75,17 @@ export function cityPhysicalFeatures(
 
 /** Log tag for every Phase 0 probe line. */
 const PROBE_LOG = '[NYC-Mon/probe]';
+/** Streaming stage timing (EXPO_PUBLIC_GAME_PERF=1): cells resident, bytes, build ms per cell, evictions. */
+const STREAM_LOG = '[NYC-Mon/stream]';
+const GAME_PERF = process.env.EXPO_PUBLIC_GAME_PERF === '1';
+/**
+ * The START set's radius as a share of the preset's resident radius: the cells nearest the first frame's camera are
+ * built with the scene, the rest stream in over the next frames, nearest first and fading in.
+ */
+export const STREAM_START_SHARE = 0.5;
+
+/** The streamer's live counts by scene, for tests and probes; absent for a scene built without streaming. */
+export const cityStreamStats = new WeakMap<object, Readonly<CellStreamStats>>();
 
 /** Camera distance clamp, metres. The floor is chase range for a 1.8 m Caller. */
 export const CAMERA_MIN_DISTANCE = 8;
@@ -140,7 +153,19 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
   // alone mounts nothing), and then nothing below differs from the path
   // before this lane.
   const physical = cityPhysicalFeatures();
-  const physicalTier = TIER[WORLD_TIER].physical;
+  // The streaming and budget preset (perf/tier-presets.ts), from the canvas's logical size; an unsized canvas takes
+  // the conservative iPad row. Its shadow tile and bloom scale cap the world tier row's.
+  const logical = renderer?.getSize(new THREE.Vector2()) ?? null;
+  const preset = logical && logical.x > 0 && logical.y > 0
+    ? detectWorldPreset({ width: logical.x, height: logical.y })
+    : detectWorldPreset({ width: 1366, height: 1024 });
+  const tierRow = TIER[WORLD_TIER].physical;
+  const physicalTier = {
+    ...tierRow,
+    shadowTile: Math.min(tierRow.shadowTile, preset.shadowTile),
+    bloomResolutionScale: Math.min(tierRow.bloomResolutionScale, preset.bloomResolutionScale),
+  };
+  const streamLog = GAME_PERF ? (line: string, data: Record<string, unknown>) => console.info(`${STREAM_LOG} ${line}`, data) : undefined;
   const world = buildCityWorld(THREE, dataset, {
     sky: initial.sky,
     ...(bundle ? { glassTier: bundle.glassTier, envWidth: bundle.envWidth } : {}),
@@ -149,6 +174,7 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
     ...(physical?.pbrMaterials && physical.clustered
       ? { nightLights: { streetlamps: physicalTier.streetlampLights, storefronts: physicalTier.storefrontLights } }
       : {}),
+    ...(worldStreamEnabled(physical !== null) ? { stream: { preset, log: streamLog } } : {}),
   });
   scene.add(world.sky, world.group);
   scene.fog = world.fog;
@@ -294,6 +320,13 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
       deviceLaneHook: isDeviceLaneProbe(WORLD_PROBE) ? deviceLaneProbeHooks[WORLD_PROBE] !== undefined : null,
     });
   }
+  // Screen-error scale K = drawing-buffer height / (2 tan(fov / 2)), re-read each frame (the render-scale
+  // controller moves the ratio).
+  const drawingBuffer = new THREE.Vector2();
+  const errorScale = () => {
+    const h = renderer ? renderer.getDrawingBufferSize(drawingBuffer).y : 0;
+    return screenErrorScale(h > 0 ? h : 1536, camera.fov);
+  };
   // Probe cadence: the gap between scene updates is the draw cadence on this
   // runtime, and cpuMs is update() alone (JS work, not GPU time). The
   // render/present split comes from EXPO_PUBLIC_GAME_PERF on either runtime.
@@ -327,6 +360,14 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
     world.sky.scale.setScalar(far * 0.9);
   }
   positionCamera(initial.camera);
+  // The START set, after every scene pass above (shadow roles, depth offsets) has reached the layer templates.
+  camera.updateMatrixWorld();
+  world.primeStream(camera.position, errorScale(), preset.residentRadiusM * STREAM_START_SHARE);
+  if (world.stream) cityStreamStats.set(scene, world.stream.stats);
+  if (streamLog && world.stream) {
+    streamLog('preset', { preset: preset.name, stream: true, radius: preset.residentRadiusM, k: Math.round(errorScale()) });
+  }
+  let streamLogAt = 0;
 
   // The canvas clock stands still while it is paused (on demand), so actors keep their own.
   let actorTime = 0;
@@ -385,6 +426,16 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
       }
       // After the actors: a chase camera reads the Caller's position in this frame's params.
       positionCamera(params.camera);
+      // Cells in and out for this camera; while some are still to build or fading, ask for the next frame.
+      if (world.updateStream(camera.position, errorScale(), now / 1000)) invalidate?.();
+      if (streamLog && world.stream && now - streamLogAt >= 5000) {
+        streamLogAt = now;
+        const st = world.stream.stats;
+        streamLog('resident', {
+          cells: st.cells, mb: +(st.bytes / 1e6).toFixed(1), tris: st.triangles, loads: st.loads, evictions: st.evictions,
+          maxBuildMs: +st.maxBuildMs.toFixed(2), pending: st.pending, overBudget: st.overBudget,
+        });
+      }
       if (rig) {
         rig.update(camera.position.y, params.camera.x, params.camera.z);
         const preset = params.preset ?? DEFAULT_PHYSICAL_PRESET;

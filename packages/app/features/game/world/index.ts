@@ -26,6 +26,8 @@ import { loadPhysicalCityMaterials, loadPhysicalFacelift, loadPhysicalNightLight
 import { LIGHT_POLE_HEIGHT } from './signage.ts';
 // Static: the living city's bundled-topology.ts evaluates topology.ts in every build, so a lazy load here saves nothing.
 import { buildLaneTopology } from '../living-city/topology.ts';
+import { createCellStream, type CellStream, type Vec3 } from './cells/cell-stream.ts';
+import type { WorldPreset } from '../perf/tier-presets.ts';
 
 // Lane G1 "GPU budget" (EXPO_PUBLIC_WORLD_BUNDLES) was deleted 2026-11: the
 // recorded bundle replayed the record-frame camera pose forever — three r186
@@ -150,6 +152,11 @@ export interface CityWorldOptions {
    * Absent, no light is built.
    */
   nightLights?: { streetlamps: number; storefronts: number };
+  /**
+   * Cell streaming (cells/cell-stream.ts): the merged near-detail layers are packaged into 256 m chunks after the bake
+   * and only the preset's want set is built; the shells and the ground stay whole. Absent, the whole tile is built.
+   */
+  stream?: { preset: WorldPreset; log?: (line: string, data: Record<string, unknown>) => void } | null;
 }
 
 export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: CityWorldOptions = {}) {
@@ -314,6 +321,26 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
   if (facelift?.mesh) group.add(facelift.mesh);
   if (night) group.add(night.group);
 
+  // Cell streaming: after every scene-graph pass above has run on the source meshes (shadow casters), so the
+  // templates carry it. Landmark buildings' chunks are pinned resident (Valdrada never evicts a landmark).
+  const landmarkBoxes = dataset.landmarks.flatMap((l) => {
+    const b = dataset.buildings.find((x) => x.id === l.buildingId);
+    if (!b) return [[l.x, l.z, l.x, l.z] as const];
+    let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
+    for (let i = 0; i < b.ring.length; i += 2) {
+      x0 = Math.min(x0, b.ring[i]!); x1 = Math.max(x1, b.ring[i]!);
+      z0 = Math.min(z0, b.ring[i + 1]!); z1 = Math.max(z1, b.ring[i + 1]!);
+    }
+    return [[x0, z0, x1, z1] as const];
+  });
+  const stream: CellStream | null = options.stream
+    ? createCellStream(THREE, [...city.meshes, ...(facelift?.mesh ? [facelift.mesh] : []), ...(phys?.roadPaint ? [phys.roadPaint] : [])], {
+        preset: options.stream.preset,
+        log: options.stream.log,
+        pinned: (x0, z0, size) => landmarkBoxes.some(([a, b, c, d]) => c >= x0 && a < x0 + size && d >= z0 && b < z0 + size),
+      })
+    : null;
+
   const horizon = skyRig?.horizon ?? linearColor(THREE, 'skyHorizon');
   const fog = skyRig?.fog ?? new THREE.Fog(horizon, 600, 2500);
 
@@ -375,7 +402,8 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
         sun.updateMatrixWorld();
       }
       trees.update(x, z, viewDistance);
-      city.setFocus(x, z);
+      // Streamed, the contact shadows and the street detail are per-cell meshes chosen by screen error, not a band.
+      if (!stream) city.setFocus(x, z);
       furniture.setFocus(x, z);
       shadowBands(z, bandMinZ, bandCount, bands);
       props.setFocus(x, z, bands[0], bands[1]);
@@ -397,6 +425,19 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
       nightCamera.x = x; nightCamera.y = y; nightCamera.z = z; nightCamera.fwdX = fwdX; nightCamera.fwdZ = fwdZ;
       night.update(nightCamera, interiorGlow);
     },
+    /** The cell streamer, null when the whole tile is built. */
+    stream,
+    /**
+     * Builds the START set (stream.prime): cells within `startRadius` of the camera, now. `k` is the screen-error
+     * scale (perf/tier-presets.ts screenErrorScale). No-op without streaming.
+     */
+    primeStream(camera: Vec3, k: number, startRadius: number) {
+      stream?.prime(camera, k, startRadius);
+    },
+    /** One streaming frame; true while cells are still to build or fading. No-op (false) without streaming. */
+    updateStream(camera: Vec3, k: number, nowS: number): boolean {
+      return stream ? stream.update(camera, k, nowS) : false;
+    },
     /** The night light pools, null unless `nightLights` was passed under `physical`. */
     nightLights: night,
     /** Advances the facelift's LED sweep; holds it still under Reduce Motion. No-op without the facelift. */
@@ -404,6 +445,7 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
       facelift?.update(time, reducedMotion);
     },
     dispose() {
+      stream?.dispose();
       night?.dispose();
       facelift?.dispose();
       ledPools?.dispose();
