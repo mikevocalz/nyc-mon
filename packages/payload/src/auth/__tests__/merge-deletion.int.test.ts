@@ -3,7 +3,7 @@
 // to an empty, disposable database; the schema is pushed on init.
 import type { Payload } from 'payload';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { deriveMonInstanceId } from '../../collections/core.ts';
+import { deriveMonGender, deriveMonInstanceId, deriveVoiceLineageId } from '../../collections/core.ts';
 import { deleteCallerAccount, releaseOwnAccount, SANCTUARY_CALLER_ID } from '../deletion.ts';
 import { transferAccount } from '../plugins/account-merge.ts';
 
@@ -45,7 +45,11 @@ describe.skipIf(url === undefined)('merge and deletion on Postgres', () => {
     });
     await payload.create({
       collection: 'mon-instances',
-      data: { monInstanceId, eggId, speciesId: 'dex-002', nickname: 'Pip', callerId, hatchedAt, bond: 0, stage: 'Baby' },
+      data: {
+        monInstanceId, eggId, speciesId: 'dex-002', nickname: 'Pip', callerId, hatchedAt, bond: 0, stage: 'Baby',
+        // The create hook requires the egg-derived gender and voice lineage (Bible v11 ¶54, ¶56).
+        gender: deriveMonGender(eggId), voiceLineageId: deriveVoiceLineageId({ eggId, speciesId: 'dex-001' }),
+      },
       overrideAccess: true,
     });
     return { eggId, monInstanceId };

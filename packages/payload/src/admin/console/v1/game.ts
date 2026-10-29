@@ -35,7 +35,7 @@ export function v1Error(code: V1ErrorCode, message: string, status: number): Res
   return Response.json({ ok: false, error: { code, message } }, { status });
 }
 
-function v1Ok<T>(data: T): Response {
+export function v1Ok<T>(data: T): Response {
   return Response.json({ ok: true, data }, { status: 200 });
 }
 
@@ -45,7 +45,7 @@ interface V1Context {
   req: PayloadRequest;
 }
 
-async function getPayloadInstance(): Promise<Payload> {
+export async function getPayloadInstance(): Promise<Payload> {
   const { default: config } = await import('../../../payload.config.ts');
   return getPayload({ config });
 }
@@ -120,8 +120,8 @@ export async function authenticateCaller(
   return { callerId, user };
 }
 
-async function buildContext(request: Request): Promise<V1Context | Response> {
-  const payload = await getPayloadInstance();
+async function buildContext(request: Request, getPayloadFor: () => Promise<Payload> = getPayloadInstance): Promise<V1Context | Response> {
+  const payload = await getPayloadFor();
   let caller: V1Caller | Response;
   try {
     caller = await authenticateCaller(payload, request);
@@ -137,7 +137,7 @@ async function buildContext(request: Request): Promise<V1Context | Response> {
   return { payload, callerId: caller.callerId, req };
 }
 
-async function withTransaction<T>(req: PayloadRequest, fn: () => Promise<T>): Promise<T> {
+export async function withTransaction<T>(req: PayloadRequest, fn: () => Promise<T>): Promise<T> {
   const ownTransaction = await initTransaction(req);
   try {
     const result = await fn();
@@ -149,7 +149,7 @@ async function withTransaction<T>(req: PayloadRequest, fn: () => Promise<T>): Pr
   }
 }
 
-function asRecord(value: unknown): Record<string, unknown> | undefined {
+export function asRecord(value: unknown): Record<string, unknown> | undefined {
   return typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : undefined;
 }
 
@@ -161,7 +161,7 @@ async function safeParseJSON(request: Request): Promise<unknown> {
   }
 }
 
-function handleAPIError(error: unknown): Response {
+export function handleAPIError(error: unknown): Response {
   if (error instanceof APIError) {
     const data = error.data as Record<string, unknown> | undefined;
     const code = typeof data?.code === 'string' ? data.code : 'INTERNAL_ERROR';
@@ -173,13 +173,13 @@ function handleAPIError(error: unknown): Response {
   return v1Error('INTERNAL_ERROR', 'Unknown error.', 500);
 }
 
-function monFromDoc(raw: unknown): MonInstance {
+export function monFromDoc(raw: unknown): MonInstance {
   const doc = asRecord(raw);
   if (doc === undefined) throw new Error('mon document is not a record');
   return parseRecord(MonInstanceSchema, toMonInstance(doc), 'mon');
 }
 
-async function findCareDoc(payload: Payload, req: PayloadRequest | undefined, monInstanceId: string): Promise<Record<string, unknown> | undefined> {
+export async function findCareDoc(payload: Payload, req: PayloadRequest | undefined, monInstanceId: string): Promise<Record<string, unknown> | undefined> {
   const result = await payload.find({
     collection: CARE_STATES_SLUG,
     where: { monInstanceId: { equals: monInstanceId } },
@@ -415,13 +415,18 @@ async function hatchEgg(context: V1Context, eggId: string): Promise<Response> {
  * PUT /v1/mons/:id/care (the ADR 0001 §1.4 contract; the route file also
  * mounts POST as an alias) — mutating; see {@link handleCreateEgg}.
  */
-export async function handleApplyCare(request: Request, monInstanceId: string): Promise<Response> {
-  const context = await buildContext(request);
-  if (context instanceof Response) return context;
-  return runIdempotent(context.payload, { callerId: context.callerId }, request, () =>
-    applyCare(context, request, monInstanceId),
-  );
+export function createApplyCareHandler(deps: { readonly getPayload: () => Promise<Payload> }): (request: Request, monInstanceId: string) => Promise<Response> {
+  return async (request, monInstanceId) => {
+    const context = await buildContext(request, deps.getPayload);
+    if (context instanceof Response) return context;
+    return runIdempotent(context.payload, { callerId: context.callerId }, request, () =>
+      applyCare(context, request, monInstanceId),
+    );
+  };
 }
+
+/** `PUT /v1/mons/:id/care`, wired to the live Payload. */
+export const handleApplyCare = createApplyCareHandler({ getPayload: getPayloadInstance });
 
 async function applyCare(context: V1Context, request: Request, monInstanceId: string): Promise<Response> {
   const { payload, callerId, req } = context;
@@ -530,13 +535,28 @@ async function applyCare(context: V1Context, request: Request, monInstanceId: st
         if (typeof seq === 'number' && seq > ackedSeq) ackedSeq = seq;
       }
 
-      return { mon: nextMon, care: nextCare, ackedSeq };
+      return { mon: nextMon, care: nextCare, ackedSeq, applied: countFreshWrites(writes, startingSeqs) };
     });
 
     return v1Ok(result);
   } catch (error) {
     return handleAPIError(error);
   }
+}
+
+/**
+ * The writes `applyCareWrites` applies rather than drops: seq above the
+ * device's last applied seq, first copy of each `(deviceId, seq)`.
+ */
+export function countFreshWrites(
+  writes: readonly { readonly deviceId: string; readonly seq: number }[],
+  lastSeqByDevice: Readonly<Record<string, number>>,
+): number {
+  const seen = new Set<string>();
+  for (const w of writes) {
+    if (w.seq > (lastSeqByDevice[w.deviceId] ?? 0)) seen.add(`${w.deviceId}#${w.seq}`);
+  }
+  return seen.size;
 }
 
 function toEggRecord(doc: Record<string, unknown>): unknown {

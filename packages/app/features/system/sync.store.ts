@@ -5,7 +5,7 @@ import { create } from 'zustand';
 import { saveIO } from '../onboarding/save-store';
 import { onboardingStorage } from '../onboarding/storage';
 import {
-  appendConflicts, applySyncReply, onlineFrom, parseConflictLog, runSync,
+  appendConflicts, applySyncReplyToSave, onlineFrom, parseConflictLog, runSync,
   type ConflictEntry, type Online, type SyncOutcome, type SyncTransport,
 } from './sync-model';
 
@@ -35,10 +35,9 @@ export const useSyncStore = create<SyncState>()(() => ({
 }));
 
 /**
- * The server sender. None ships in Phase 1: the care endpoint
- * (`PUT /v1/mons/:id/care`) speaks `{ seq, delta, clientTime }`, not the
- * client's `CareWrite`, and no client for it exists yet. Until one is set,
- * an attempt reports `no-server` and the queue stays as it is.
+ * The server sender (`sync-transport.ts`). `sync-session.ts` sets it while a
+ * Caller is signed in on this device and clears it on sign-out; with none
+ * set, an attempt reports `signed-out` and the queue stays as it is.
  */
 let transport: SyncTransport | null = null;
 
@@ -76,7 +75,7 @@ export async function syncNow(nowMs: number = Date.now()): Promise<SyncOutcome> 
     const result = await runSync({ online, queue: saveIO.read()?.queue, transport, nowMs });
     if (result.reply !== undefined) {
       const save = saveIO.read();
-      if (save !== undefined) saveIO.write({ ...save, queue: applySyncReply(save.queue, result.reply) });
+      if (save !== undefined) saveIO.write(applySyncReplyToSave(save, result.reply));
     }
     if (result.conflicts.length > 0) {
       const log = appendConflicts(useSyncStore.getState().log, result.conflicts);

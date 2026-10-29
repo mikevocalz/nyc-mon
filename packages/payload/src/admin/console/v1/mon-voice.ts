@@ -9,6 +9,7 @@ import { MON_INSTANCES_SLUG, toMonInstance } from '../../../collections/MonInsta
 import { preflight, withCors } from './cors.ts';
 import { authenticateCaller, v1Error } from './game.ts';
 import { monLingoReader } from './mon-lingo.ts';
+import { createFixedWindowLimiter } from './rate-limit.ts';
 
 /**
  * `POST /v1/mon-voice`: one line in the signed-in Caller's Mon's own voice,
@@ -93,25 +94,9 @@ export function createClipCache(options: { maxBytes?: number } = {}): ClipCache 
   };
 }
 
-/** Fixed-window limiter per key (the Caller id). */
+/** Fixed-window limiter per key (the Caller id): 30 lines a minute by default. */
 export function createMonVoiceRateLimiter(options: { limit?: number; windowMs?: number; now?: () => number } = {}): (key: string) => boolean {
-  const limit = options.limit ?? 30;
-  const windowMs = options.windowMs ?? 60_000;
-  const now = options.now ?? Date.now;
-  const windows = new Map<string, { start: number; count: number }>();
-  return (key) => {
-    const t = now();
-    const current = windows.get(key);
-    if (current === undefined || t - current.start >= windowMs) {
-      // Drop stale windows now and then so the map cannot grow without bound.
-      if (windows.size > 10_000) for (const [k, w] of windows) if (t - w.start >= windowMs) windows.delete(k);
-      windows.set(key, { start: t, count: 1 });
-      return true;
-    }
-    if (current.count >= limit) return false;
-    current.count += 1;
-    return true;
-  };
+  return createFixedWindowLimiter({ limit: options.limit ?? 30, windowMs: options.windowMs ?? 60_000, now: options.now });
 }
 
 export interface MonVoiceDeps {

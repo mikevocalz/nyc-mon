@@ -34,6 +34,10 @@
       "types": "./src/admin/console/v1/game.ts",
       "default": "./src/admin/console/v1/game.ts"
     },
+    "./admin/console/v1-adopt": {
+      "types": "./src/admin/console/v1/adopt.ts",
+      "default": "./src/admin/console/v1/adopt.ts"
+    },
     "./admin/console/v1-memory": {
       "types": "./src/admin/console/v1/companion-memory.ts",
       "default": "./src/admin/console/v1/companion-memory.ts"

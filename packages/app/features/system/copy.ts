@@ -66,9 +66,10 @@ export const SYSTEM_COPY = {
   'm21.retry': 'Sync now',
   'm21.retry.a11y.hint': 'Sends the waiting changes',
   'm21.result.offline': "Still offline. Your changes are safe here and sync when you're back online.",
-  'm21.result.no_server': "Saved on this device. Syncing with the server isn't switched on yet, so changes stay here for now.",
+  'm21.result.signed_out': 'Sign in to sync. Your changes are saved on this device until you do.',
   'm21.result.synced': 'Synced.',
-  'm21.result.failed': "Couldn't reach the server. Your changes are safe here. Try again in a minute.",
+  'm21.result.failed': "Sync didn't finish. Your changes are safe here. Try again in a minute.",
+  'm21.result.rejected': "The server didn't accept these changes. They're still saved on this device.",
   'm21.back': 'Back',
 } as const;
 

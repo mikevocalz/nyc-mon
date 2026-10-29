@@ -1,5 +1,5 @@
-import { acknowledgeEggCreate, acknowledgeWrites } from '@acme/core/sim';
-import type { CareAction, CreateEggResponse, WriteQueue } from '@acme/core/types';
+import { acknowledgeEggCreate, acknowledgeWrites, reconcileWithServer } from '@acme/core/sim';
+import type { CareAction, CareState, CreateEggResponse, MonInstance, SaveCurrent, WriteQueue } from '@acme/core/types';
 import type { SystemCopyId } from './copy.ts';
 
 /**
@@ -135,20 +135,55 @@ export interface SyncReply {
   readonly eggs: readonly CreateEggResponse[];
   /** Mons where the server's tie-break kept its own version, with how many writes it set aside. */
   readonly serverKept: readonly { readonly monInstanceId: string; readonly count: number }[];
+  /** The server's state for each Mon it answered for (its last answer). The device adopts it ({@linkcode applySyncReplyToSave}). */
+  readonly states?: readonly { readonly mon: MonInstance; readonly care: CareState }[];
 }
 
-/** Sends the queue. Throws on a network or server failure. */
+/**
+ * A send the server answered with an error. `retryable` is true for answers
+ * that can change on their own (5xx, 429, an egg still incubating); false
+ * when the server refused the writes as they are.
+ */
+export class SyncHttpError extends Error {
+  readonly status: number;
+  readonly code: string;
+  readonly retryable: boolean;
+  constructor(status: number, code: string, message: string) {
+    super(`sync: HTTP ${status} ${code}: ${message}`);
+    this.name = 'SyncHttpError';
+    this.status = status;
+    this.code = code;
+    this.retryable = status >= 500 || status === 429 || code === 'NOT_READY';
+  }
+}
+
+/** The server has no session for this device (401). */
+export class SyncSignedOutError extends SyncHttpError {
+  constructor(message = 'Sign in required.') {
+    super(401, 'UNAUTHORIZED', message);
+    this.name = 'SyncSignedOutError';
+  }
+}
+
+/** Sends the queue. Throws on a network or server failure ({@linkcode SyncHttpError} when the server answered). */
 export interface SyncTransport {
   send(queue: WriteQueue): Promise<SyncReply>;
 }
 
-export type SyncOutcome = 'offline' | 'no-server' | 'synced' | 'failed';
+/**
+ * `signed-out`: no transport (nobody is signed in on this device) or the
+ * server refused the session. `failed`: no answer, or one worth retrying.
+ * `rejected`: the server answered and refused the writes; retrying as they
+ * are will not help.
+ */
+export type SyncOutcome = 'offline' | 'signed-out' | 'synced' | 'failed' | 'rejected';
 
 export const OUTCOME_COPY: Readonly<Record<SyncOutcome, SystemCopyId>> = {
   offline: 'm21.result.offline',
-  'no-server': 'm21.result.no_server',
+  'signed-out': 'm21.result.signed_out',
   synced: 'm21.result.synced',
   failed: 'm21.result.failed',
+  rejected: 'm21.result.rejected',
 };
 
 export interface SyncResult {
@@ -170,6 +205,37 @@ export function applySyncReply(queue: WriteQueue, reply: SyncReply): WriteQueue 
 }
 
 /**
+ * {@linkcode applySyncReply} plus the server's state: each Mon the server
+ * answered for takes the server's care, bond, stage and form, and the writes
+ * still queued for it are replayed on top (`reconcileWithServer`), so care
+ * given during the send is kept. The device's own identity fields stay (the
+ * server owns the Mon under the account's id, the save under the local
+ * Caller's), and a name the server does not have yet is kept. A Mon the save
+ * does not hold is not added here; restoring from the server is its own flow.
+ */
+export function applySyncReplyToSave(save: SaveCurrent, reply: SyncReply): SaveCurrent {
+  const queue = applySyncReply(save.queue, reply);
+  let { mons, care } = save;
+  for (const server of reply.states ?? []) {
+    const local = mons.find((m) => m.monInstanceId === server.mon.monInstanceId);
+    if (local === undefined) continue;
+    const merged: MonInstance = {
+      ...local,
+      bond: server.mon.bond,
+      stage: server.mon.stage,
+      speciesId: server.mon.speciesId,
+      nickname: server.mon.nickname ?? local.nickname,
+    };
+    const next = reconcileWithServer({ mon: merged, care: server.care, ackedSeq: 0 }, queue).state;
+    mons = mons.map((m) => (m.monInstanceId === next.mon.monInstanceId ? next.mon : m));
+    care = care.some((c) => c.monInstanceId === next.care.monInstanceId)
+      ? care.map((c) => (c.monInstanceId === next.care.monInstanceId ? next.care : c))
+      : [...care, next.care];
+  }
+  return { ...save, queue, mons, care };
+}
+
+/**
  * One sync attempt. Offline and "no transport" return at once without
  * touching the queue; a failed send leaves it as it was, so nothing is lost.
  */
@@ -180,12 +246,14 @@ export async function runSync(input: {
   readonly nowMs: number;
 }): Promise<SyncResult> {
   if (input.online === false) return { outcome: 'offline', conflicts: [] };
-  if (input.transport === null) return { outcome: 'no-server', conflicts: [] };
+  if (input.transport === null) return { outcome: 'signed-out', conflicts: [] };
   if (input.queue === undefined || queuedCount(input.queue) === 0) return { outcome: 'synced', conflicts: [] };
   let reply: SyncReply;
   try {
     reply = await input.transport.send(input.queue);
-  } catch {
+  } catch (error) {
+    if (error instanceof SyncSignedOutError) return { outcome: 'signed-out', conflicts: [] };
+    if (error instanceof SyncHttpError && !error.retryable) return { outcome: 'rejected', conflicts: [] };
     return { outcome: 'failed', conflicts: [] };
   }
   const conflicts = reply.serverKept
