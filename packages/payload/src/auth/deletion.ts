@@ -5,6 +5,7 @@
 // #15 does the same when a guardian says no.
 import type { CollectionSlug, Payload, PayloadRequest, TaskConfig } from 'payload';
 import { commitTransaction, createLocalReq, initTransaction, killTransaction } from 'payload';
+import { CALLER_DELETION_CONTEXT_KEY } from '../collections/MonInstances.ts';
 
 /**
  * The `callerId` a Mon or egg carries once it is in Santoro's care. A system
@@ -62,6 +63,8 @@ async function releaseCallerData(payload: Payload, userId: string, req: PayloadR
         id: String(doc.id),
         // Owner and nickname only; the id, care and history stay (Law 8).
         data: { callerId: SANCTUARY_CALLER_ID, nickname: null },
+        // The Mon hook refuses a nickname clear unless this flag is set.
+        context: { [CALLER_DELETION_CONTEXT_KEY]: true },
         overrideAccess: true,
         req,
       });

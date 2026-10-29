@@ -1,0 +1,90 @@
+# NVIDIA/Nebius hackathon staging only.
+# This Blueprint creates exactly two web services: no database, auth issuer,
+# production app, secret, migration, or domain changes.
+# Applying it provisions billable compute. Review and approve costs first.
+# Requires the backend/issuer and approved companion-memory migration separately.
+previews:
+  generation: off
+
+services:
+  - type: web
+    name: nyc-mon-nvidia-mcp-staging
+    runtime: node
+    region: virginia
+    plan: 0.5c-512mb
+    autoDeployTrigger: off
+    healthCheckPath: /healthz
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm --filter @acme/mcp-server build:ui
+    startCommand: pnpm --filter @acme/mcp-server exec node src/main.ts
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MCP_PORT
+        value: "10000"
+      - key: MCP_TOKEN_VERIFIER
+        value: jwt
+      - key: OAUTH_DEV_BYPASS
+        value: "0"
+      - key: MCP_DEV_MODE
+        value: "0"
+      # Enter exact HTTPS endpoint after verifying Render's assigned hostname.
+      # This also becomes the required JWT audience. Include the /mcp path.
+      - key: MCP_RESOURCE_URI
+        sync: false
+      # HTTPS origin of the companion page, no path; CORS allowlist only.
+      - key: MCP_ALLOWED_ORIGINS
+        sync: false
+      # Existing Better Auth/Payload issuer, never a replacement auth service.
+      - key: AUTH_ISSUER
+        sync: false
+      - key: AUTH_JWKS_URL
+        sync: false
+      # Existing /v1 API origin, backed by the current Payload/Neon stack.
+      - key: V1_BASE_URL
+        sync: false
+      # SAME value already configured on admin-vite and companion.
+      - key: V1_MCP_SERVICE_KEY
+        sync: false
+
+  - type: web
+    name: nyc-mon-nvidia-companion-staging
+    runtime: node
+    region: virginia
+    plan: 0.5c-512mb
+    autoDeployTrigger: off
+    healthCheckPath: /healthz
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm --filter @acme/web-sim build
+    # Use the .mjs launcher: it enables Node 24's TS transform for this runtime.
+    startCommand: pnpm --filter @acme/web-sim exec node server/nvidia-main.mjs
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SIM_PORT
+        value: "10000"
+      - key: OAUTH_SIM_CLIENT_ID
+        value: nyc-mon-sim
+      - key: SIM_NEBIUS_MODEL_ID
+        value: nvidia/Nemotron-3_5-Lightning
+      - key: SIM_MAX_OUTPUT_TOKENS
+        value: "4096"
+      - key: NEBIUS_BASE_URL
+        value: https://api.tokenfactory.us-central1.nebius.com/v1
+      - key: OAUTH_DEV_BYPASS
+        value: "0"
+      - key: MCP_DEV_MODE
+        value: "0"
+      # Exact HTTPS origin returned by Render for this service, no trailing path.
+      - key: SIM_PUBLIC_ORIGIN
+        sync: false
+      # Exact publicly reachable MCP_RESOURCE_URI above, including /mcp.
+      - key: SIM_MCP_URL
+        sync: false
+      - key: AUTH_ISSUER
+        sync: false
+      - key: V1_BASE_URL
+        sync: false
+      - key: V1_MCP_SERVICE_KEY
+        sync: false
+      # Store in Render secret manager, never source, PRs, logs, or chat.
+      - key: NEBIUS_API_KEY
+        sync: false

@@ -109,6 +109,15 @@ export function streetlampSites(lamps: readonly StreetlampSource[], headY: numbe
   return lamps.map((l) => ({ x: l.x + l.face[0] * out, y: headY - STREETLAMP_LIGHT.drop, z: l.z + l.face[1] * out, tint: 0 }));
 }
 
+/**
+ * Streetlamp light sites from Valdrada's lamp spots (vd-port/furniture vdLampSites: city/props.js's spots over its baked
+ * poles, the head's height over the ground). The spot is already where Valdrada hangs the light, so no `reach` offset;
+ * the light sits `drop` under the head as on the bundled poles.
+ */
+export function vdStreetlampSites(spots: readonly { x: number; y: number; z: number }[], groundY: (x: number, z: number) => number): LightSite[] {
+  return spots.map((s) => ({ x: s.x, y: groundY(s.x, s.z) + s.y - STREETLAMP_LIGHT.drop, z: s.z, tint: 0 }));
+}
+
 /** Storefront light sites, cycling the storefront colours by awning order as Slop cycles its sign themes. */
 export function storefrontSites(awnings: readonly StorefrontPlacement[], groundY = 0): LightSite[] {
   const tints = physicalCityLight.storefront.length;

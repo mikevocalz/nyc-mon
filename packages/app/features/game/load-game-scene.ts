@@ -15,6 +15,8 @@
 import type { ThreeSetup } from '@acme/ui/three';
 import type { CitySceneParams } from './city-scene.ts';
 import { gameScreenActions } from './game-session.ts';
+import { preloadVdBlocks } from './world/vd-port/blocks/load.ts';
+import { compileForFrames } from './compile-pass.ts';
 
 export interface GameSceneParams extends CitySceneParams {
   onFirstFrame: () => void;
@@ -44,7 +46,7 @@ export function withFirstFrameSignal(
     };
     if (trace) {
       trace('compileAsync started');
-      context.renderer.compileAsync(built.scene, built.camera).then(
+      compileForFrames(context.renderer, built.scene, built.camera).then(
         () => {
           trace('compileAsync resolved');
           ready();
@@ -55,7 +57,7 @@ export function withFirstFrameSignal(
         },
       );
     } else {
-      context.renderer.compileAsync(built.scene, built.camera).then(ready, ready);
+      compileForFrames(context.renderer, built.scene, built.camera).then(ready, ready);
     }
     let signalled = false;
     return {
@@ -73,7 +75,8 @@ export function withFirstFrameSignal(
 
 export const loadGameScene = (): Promise<ThreeSetup<GameSceneParams>> => {
   gameScreenActions.loadStage('requested');
-  return import('./city-scene.ts').then((m) => {
+  // The vd port's block packs are read while the scene module loads: the world is built synchronously and needs them there.
+  return Promise.all([import('./city-scene.ts'), preloadVdBlocks()]).then(([m]) => {
     gameScreenActions.loadStage('moduleLoaded');
     return withFirstFrameSignal(m.createCityScene);
   });

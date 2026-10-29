@@ -30,6 +30,11 @@ export interface FirstFrame {
   retainedArrayBytes: number;
   /** The same after the settle frames, once world/release-uploaded.ts (flag on) has dropped what the first uploaded. */
   retainedAfterReleaseBytes: number;
+  /**
+   * Of those, the geometry arrays the GPU never received (meshes outside every view so far: the vd blocks' shells past
+   * the frustum): the pass releases an array only once it is uploaded, so these stay until first drawn.
+   */
+  retainedNeverUploadedBytes: number;
   /** Draws of the frames after the first: they still render the released geometry. */
   secondFrameDraws: number;
   /** Upload bytes of the frames after the first: a released array must not be re-sent. */
@@ -149,6 +154,7 @@ export async function measureFirstFrame(options: MeasureOptions = {}): Promise<F
   const THREE = await import('three/webgpu');
   const { parseCityDataset } = await import('./city-dataset.ts');
   const { createCityScene } = await import('./city-scene.ts');
+  (await import('./world/vd-port/blocks/load-from-disk.test-support.ts')).loadVdBlocksFromDisk();
   const { physicalRendererParams } = await import('./world/physical-look.ts');
   const { createVehicleActor } = await import('./living-city/vehicle-actor.ts');
   const { RELEASE_SETTLE_FRAMES } = await import('./world/release-uploaded.ts');
@@ -207,6 +213,19 @@ export async function measureFirstFrame(options: MeasureOptions = {}): Promise<F
   for (let i = 0; i <= RELEASE_SETTLE_FRAMES; i++) frame();
   trap.pause();
   const retainedAfterRelease = retainedArrayBytes(objects, materials);
+  const { backendUploaded } = await import('./world/release-uploaded.ts');
+  const isUploaded = backendUploaded(renderer as never);
+  const neverUploaded = new Set<ArrayBufferLike>();
+  for (const o of objects) {
+    const g = o.geometry;
+    if (!g || (o as { isInstancedMesh?: boolean }).isInstancedMesh) continue;
+    for (const a of [...Object.values(g.attributes), g.index]) {
+      const v = a?.array;
+      if (a && v && ArrayBuffer.isView(v) && v.byteLength > 0 && !isUploaded(a as object)) neverUploaded.add(v.buffer);
+    }
+  }
+  let retainedNeverUploaded = 0;
+  for (const b of neverUploaded) retainedNeverUploaded += b.byteLength;
   trap.resume();
   const settled = {
     shaderModules: record.shaders.length,
@@ -246,6 +265,7 @@ export async function measureFirstFrame(options: MeasureOptions = {}): Promise<F
     draws: before.draws,
     retainedArrayBytes: retainedFirst,
     retainedAfterReleaseBytes: retainedAfterRelease,
+    retainedNeverUploadedBytes: retainedNeverUploaded,
     secondFrameDraws: settled.draws,
     secondFrameWriteBytes: settled.writeBytes,
     lateWriteBytes,
