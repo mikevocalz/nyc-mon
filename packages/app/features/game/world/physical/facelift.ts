@@ -47,7 +47,7 @@ import { createLampPoolMaterial } from '../materials.ts';
 import { PHYSICAL_GRADE, PHYSICAL_POST } from '../physical-look.ts';
 import { PRE_WAR } from '../physical-materials-constants.ts';
 import { SURFACES } from '../surfaces.ts';
-import type { StreetClearance } from '../walkability.ts';
+import { WALKWAY_CLASSES, type StreetClearance } from '../walkability.ts';
 import { CLASS_FAMILY } from './class-family.ts';
 import { facadeCell } from './facade.ts';
 import { FACADE_GRID_ATTRIBUTE, FACADE_WALL_ATTRIBUTE, WALL_KINDS } from './facade-attributes.ts';
@@ -90,11 +90,19 @@ export const FACELIFT = {
   trimTop: 0.02,
   trimBottom: 0.36,
   trimOffset: 0.09,
-  /** Kerb light line: inset from the carriageway edge onto the sidewalk, width, lift, longest piece, m. */
-  kerbInset: 0.15,
+  /**
+   * Kerb light line: inset of its inner edge from the carriageway edge onto
+   * the sidewalk, width, lift, longest piece, and the step it is clipped at
+   * where it meets another carriageway or a crossing, m. The line sits on
+   * the kerb's top edge: its centre is 8 cm from the kerb.
+   */
+  kerbInset: 0.03,
   kerbWidth: 0.1,
   kerbLift: 0.006,
   kerbPiece: 2,
+  kerbStep: 0.25,
+  /** Clearance kept between the line's long edges and any other carriageway or crossing, m. */
+  kerbClear: 0.02,
   /**
    * Share of commercial road ways (by road id hash) that carry the kerb
    * line. Both kerbs of every avenue way came to about 20 km of light on
@@ -613,16 +621,16 @@ export function buildFaceliftGeometry(THREE: Three, input: FaceliftInput): Facel
     }
   }
 
-  // The royal kerb light line along both kerbs of a share of the commercial avenue ways, broken where it would cross another carriageway.
+  // The royal kerb light line along both kerbs of a share of the commercial avenue ways (kerbLightSegments).
   const kerb = rgb(physicalFacelift.kerb);
-  const y = LAYER.sidewalks + CURB_HEIGHT + FACELIFT.kerbLift;
   glow(() => {
-    for (const road of dataset.roads) {
-      if (!COMMERCIAL.has(road.class) || hashUnit(`${road.id}:facelift:kerb`) >= FACELIFT.kerbShare) continue;
-      const points = pairs(road.points);
-      const offset = road.widthMeters / 2 + FACELIFT.kerbInset + FACELIFT.kerbWidth / 2;
-      const { left, right } = ribbon(points, offset);
-      for (const side of [left, right]) stats.kerbMetres += kerbLine(buffer, side, y, kerb, clearance);
+    const half = FACELIFT.kerbWidth / 2;
+    for (const s of kerbLightSegments(dataset, clearance)) {
+      const length = Math.hypot(s.bx - s.ax, s.bz - s.az);
+      const px = (-(s.bz - s.az) / length) * half; const pz = ((s.bx - s.ax) / length) * half;
+      // Counter-clockwise from above: right edge, then left edge.
+      buffer.quad([s.ax + px, s.y, s.az + pz], [s.bx + px, s.y, s.bz + pz], [s.bx - px, s.y, s.bz - pz], [s.ax - px, s.y, s.az - pz], [0, 1, 0], kerb);
+      stats.kerbMetres += length;
     }
   });
 
@@ -672,29 +680,111 @@ function flat(THREE: Three, buffer: VertexBuffer, ring: readonly Point[], y: num
   }
 }
 
-/** One kerb light line along a polyline, in pieces; returns the metres drawn. */
-function kerbLine(buffer: VertexBuffer, line: readonly Point[], y: number, color: Rgb, clearance: StreetClearance): number {
-  const half = FACELIFT.kerbWidth / 2;
-  let drawn = 0;
-  for (let i = 1; i < line.length; i++) {
-    const [ax, az] = line[i - 1]!;
-    const [bx, bz] = line[i]!;
-    const length = Math.hypot(bx - ax, bz - az);
-    if (length < 1e-3) continue;
-    const pieces = Math.ceil(length / FACELIFT.kerbPiece);
-    const dx = (bx - ax) / length; const dz = (bz - az) / length;
-    const px = -dz * half; const pz = dx * half;
-    for (let k = 0; k < pieces; k++) {
-      const t0 = (k / pieces) * length; const t1 = ((k + 1) / pieces) * length;
-      const x0 = ax + dx * t0; const z0 = az + dz * t0; const x1 = ax + dx * t1; const z1 = az + dz * t1;
-      const mx = (x0 + x1) / 2; const mz = (z0 + z1) / 2;
-      if (clearance.inCarriageway(mx, mz, 0) || clearance.inBuilding(mx, mz)) continue;
-      // Counter-clockwise from above: right edge, then left edge.
-      buffer.quad([x0 + px, y, z0 + pz], [x1 + px, y, z1 + pz], [x1 - px, y, z1 - pz], [x0 - px, y, z0 - pz], [0, 1, 0], color);
-      drawn += t1 - t0;
+/** One piece of the kerb light line: its centre line (scene metres) at height y; FACELIFT.kerbWidth wide. */
+export interface KerbLightSegment { ax: number; az: number; bx: number; bz: number; y: number }
+
+/**
+ * The royal kerb light line along both kerbs of a share of the commercial
+ * avenue ways, as centre-line pieces on the sidewalk side of each kerb.
+ * Pure (no three), so the bundled-tile test pins where it lies
+ * (kerb-light.test.ts).
+ *
+ * Each kerb line is walked in FACELIFT.kerbStep samples and drawn only
+ * between samples whose whole width is clear of every carriageway (its own
+ * included) and every crossing, and outside buildings: it breaks at
+ * crossings and junction mouths instead of running on across them. It used
+ * to keep any 2 m piece whose midpoint was clear, so pieces reached up to a
+ * metre into a crossing or a cross street (Mike, iPad 2026-10-28).
+ */
+export function kerbLightSegments(dataset: CityDatasetV3, clearance: StreetClearance): KerbLightSegment[] {
+  const y = LAYER.sidewalks + CURB_HEIGHT + FACELIFT.kerbLift;
+  const margin = FACELIFT.kerbWidth / 2 + FACELIFT.kerbClear;
+  const drawn = drawnCarriageways(dataset);
+  const edge = FACELIFT.kerbWidth / 2 + FACELIFT.kerbClear;
+  let nx = 0; let nz = 0;
+  // A sample is clear when its centre is `margin` past every carriageway
+  // buffer and both long edges miss every drawn carriageway quad (a bent
+  // crossing's mitred corner reaches past its buffer).
+  const clear = (x: number, z: number) => !clearance.inCarriageway(x, z, margin) && !clearance.inBuilding(x, z, 0)
+    && !drawn(x + nx * edge, z + nz * edge) && !drawn(x - nx * edge, z - nz * edge);
+  const out: KerbLightSegment[] = [];
+  for (const road of dataset.roads) {
+    if (!COMMERCIAL.has(road.class) || hashUnit(`${road.id}:facelift:kerb`) >= FACELIFT.kerbShare) continue;
+    const points = pairs(road.points);
+    const offset = road.widthMeters / 2 + FACELIFT.kerbInset + FACELIFT.kerbWidth / 2;
+    const { left, right } = ribbon(points, offset);
+    for (const line of [left, right]) {
+      for (let i = 1; i < line.length; i++) {
+        const [ax, az] = line[i - 1]!;
+        const [bx, bz] = line[i]!;
+        const length = Math.hypot(bx - ax, bz - az);
+        if (length < 1e-3) continue;
+        nx = -(bz - az) / length; nz = (bx - ax) / length;
+        const steps = Math.ceil(length / FACELIFT.kerbStep);
+        const at = (k: number): [number, number] => [ax + (bx - ax) * (k / steps), az + (bz - az) * (k / steps)];
+        // Runs of clear samples, cut into pieces no longer than kerbPiece.
+        const perPiece = Math.max(1, Math.floor(FACELIFT.kerbPiece / (length / steps)));
+        let start = -1;
+        for (let k = 0; k <= steps + 1; k++) {
+          const ok = k <= steps && clear(...at(k));
+          if (ok && start < 0) start = k;
+          if (start >= 0 && (!ok || k - start === perPiece)) {
+            const end = ok ? k : k - 1;
+            if (end > start) {
+              const [x0, z0] = at(start); const [x1, z1] = at(end);
+              out.push({ ax: x0, az: z0, bx: x1, bz: z1, y });
+            }
+            start = ok ? k : -1;
+          }
+        }
+      }
     }
   }
-  return drawn;
+  return out;
+}
+
+/**
+ * Inside a carriageway or crossing quad exactly as city-mesh.ts draws it
+ * (a mitred ribbon at widthMeters / 2), from a 16 m grid of quads.
+ */
+function drawnCarriageways(dataset: CityDatasetV3): (x: number, z: number) => boolean {
+  const cell = 16;
+  const grid = new Map<number, number[][]>();
+  const key = (gx: number, gz: number) => gx * 65_536 + gz;
+  for (const road of dataset.roads) {
+    if (WALKWAY_CLASSES.has(road.class)) continue;
+    const points = pairs(road.points);
+    if (points.length < 2) continue;
+    const { left, right } = ribbon(points, road.widthMeters / 2);
+    for (let i = 1; i < points.length; i++) {
+      const q = [left[i - 1]![0], left[i - 1]![1], left[i]![0], left[i]![1], right[i]![0], right[i]![1], right[i - 1]![0], right[i - 1]![1]];
+      const x0 = Math.floor(Math.min(q[0]!, q[2]!, q[4]!, q[6]!) / cell); const x1 = Math.floor(Math.max(q[0]!, q[2]!, q[4]!, q[6]!) / cell);
+      const z0 = Math.floor(Math.min(q[1]!, q[3]!, q[5]!, q[7]!) / cell); const z1 = Math.floor(Math.max(q[1]!, q[3]!, q[5]!, q[7]!) / cell);
+      for (let gx = x0; gx <= x1; gx++) {
+        for (let gz = z0; gz <= z1; gz++) {
+          const list = grid.get(key(gx, gz));
+          if (list) list.push(q); else grid.set(key(gx, gz), [q]);
+        }
+      }
+    }
+  }
+  const inQuad = (q: number[], x: number, z: number) => {
+    let sign = 0;
+    for (let i = 0; i < 4; i++) {
+      const ax = q[i * 2]!; const az = q[i * 2 + 1]!; const bx = q[((i + 1) % 4) * 2]!; const bz = q[((i + 1) % 4) * 2 + 1]!;
+      const cross = (bx - ax) * (z - az) - (bz - az) * (x - ax);
+      if (Math.abs(cross) < 1e-9) continue;
+      const s = cross > 0 ? 1 : -1;
+      if (sign === 0) sign = s; else if (s !== sign) return false;
+    }
+    return true;
+  };
+  return (x, z) => {
+    const list = grid.get(key(Math.floor(x / cell), Math.floor(z / cell)));
+    if (!list) return false;
+    for (const q of list) if (inQuad(q, x, z)) return true;
+    return false;
+  };
 }
 
 // ---- materials ------------------------------------------------------------------
