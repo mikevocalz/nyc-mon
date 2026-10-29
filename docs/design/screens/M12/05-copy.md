@@ -16,7 +16,7 @@ Fewer words than any other screen. The show carries the moment; text exists for 
 | `m12.first_look.hesitate.trackpad` | Stay close | ui | 16 | trackpad label and labelled button on the hesitate path | Decision #14 |
 | `m12.first_look.hesitate.hint` | Hold the trackpad to stay close. | ui | 40 | caption after 8 s without input; never earlier | — |
 | `m12.plate.a11y.label` | {babyName}, {bloodlineLabel} | ui | — | `SignagePlate`; `{bloodlineLabel}` e.g. "Hood Ratti Bloodline" (Decision #11) | #6, #11 |
-| `m12.cta.name` | Name {babyName} | ui | 24 | complete, `nickname === null` → M09 | Decision #5 |
+| `m12.cta.name` | Meet {babyName} | ui | 24 | complete, nickname question not yet seen → M09 (the optional nickname question) | Decision #5; Mike, 2026-10-27 |
 | `m12.cta.home` | Go to {monName} | ui | 24 | complete, nickname set → M13 | — |
 
 ## Announcements (polite, VoiceOver / TalkBack)

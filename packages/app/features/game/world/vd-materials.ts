@@ -1,7 +1,7 @@
 // world/vd-materials.ts — the "vd" lane: Valdrada's street look ported from
 // its GLSL (client/src/world/materials.js @ v0.4.0, makeFacadeMaterial and
 // makeGroundMaterial) to TSL on the PBR body. Behind EXPO_PUBLIC_WORLD_VD,
-// default OFF. Mike opened this port on 2026-10-18, overriding the v3
+// default ON (0 turns it off). Mike opened this port on 2026-10-18, overriding the v3
 // prompt's "no GLSL materials" rule; docs/adr/0022-vd-look-lane.md records it.
 //
 // Ported:
@@ -37,7 +37,7 @@ import { decodeBase64 } from './foliage.ts';
 import { cityShaderTools, createUnlitLayers, leafGraphs, roadsGraphs, TONE_ATTRIBUTE, type CityMaterials } from './materials.ts';
 import { createPbrCityMaterials, type PbrCityOptions } from './pbr-materials.ts';
 import type { CityColor } from './palette.ts';
-import { parseSkyRigFlag } from './sky-rig.ts';
+import { VD_LANE } from './curb.ts';
 import { VD_LEANMAT } from './vd-leanmat.ts';
 import { LIT_SHARE_CAP, LIT_SHARE_DAY, LIT_SHARE_GAIN, LIT_SHARE_TOD, WINDOW_GRID } from './windows.ts';
 import {
@@ -53,8 +53,8 @@ type TextureT = InstanceType<Three['Texture']>;
 type F = Node<'float'>;
 type V3 = Node<'vec3'>;
 
-/** Opt-in vd lane — default OFF, same truthy set as the other lane flags. */
-export const EXPERIMENTAL_WORLD_VD = parseSkyRigFlag(process.env.EXPO_PUBLIC_WORLD_VD);
+/** The vd lane — default ON (curb.ts VD_LANE); EXPO_PUBLIC_WORLD_VD=0 turns it off. */
+export const EXPERIMENTAL_WORLD_VD = VD_LANE;
 
 /** Starting weather from EXPO_PUBLIC_WORLD_WEATHER: `rain`, `snow` or anything else for clear. */
 export function weatherFromEnv(value = process.env.EXPO_PUBLIC_WORLD_WEATHER): { rain: number; snow: number } {
@@ -89,7 +89,22 @@ const TUNE = {
   flag: 1.524,
 } as const;
 
-function arrayTexture(THREE: Three, base64: string, layers: number, channels: 2 | 3) {
+/**
+ * Sampler anisotropy for the photo arrays: the walls and the road are seen at grazing angles all the way down a
+ * street, where an isotropic trilinear sample blurs a wall to its mean. 16 is WebGPU's maxAnisotropy ceiling; three
+ * applies it only with linear min, mag and mip filters, which these keep.
+ */
+export const VD_TEXTURE_ANISOTROPY = 16;
+
+/** The names the photo arrays carry (texture.name), for the sampler and mip tests. */
+export const VD_TEXTURE_NAMES = { walls: 'vd:walls', ground: 'vd:ground', normals: 'vd:normals' } as const;
+
+/**
+ * One 256 px photo array. Mips: generateMipmaps with a trilinear min filter, so three allocates the full chain
+ * (9 levels at 256 px) and builds it on upload (renderers/common/Textures.js). A wall several metres per pixel away
+ * then reads a filtered average, not one texel per pixel.
+ */
+function arrayTexture(THREE: Three, base64: string, layers: number, channels: 2 | 3, name: string) {
   const src = decodeBase64(base64);
   const n = VD_TEXTURE_SIZE * VD_TEXTURE_SIZE * layers;
   const rgba = new Uint8Array(n * 4);
@@ -105,6 +120,8 @@ function arrayTexture(THREE: Three, base64: string, layers: number, channels: 2 
   texture.magFilter = THREE.LinearFilter;
   texture.minFilter = THREE.LinearMipmapLinearFilter;
   texture.generateMipmaps = true;
+  texture.anisotropy = VD_TEXTURE_ANISOTROPY;
+  texture.name = name;
   texture.needsUpdate = true;
   return texture;
 }
@@ -118,22 +135,37 @@ function pickMean(T: Three['TSL'], means: readonly (readonly number[])[], layer:
   return out;
 }
 
+export interface VdCityOptions extends PbrCityOptions {
+  /**
+   * Under the physical stack (sRGB output, ACES in the RenderPipeline,
+   * bloom): the lane's colours are authored as display values fed straight
+   * to a linear output, so each albedo and glow is decoded to the linear
+   * working space here, and the near-future overrides that push neon and
+   * lettering past 1 for AgX stay off (the physical bloom already lifts
+   * them). Default false: the lane as tuned on the direct path.
+   */
+  physical?: boolean;
+}
+
 export function createVdCityMaterials(
-  THREE: Three, options: PbrCityOptions,
+  THREE: Three, options: VdCityOptions,
   /** Overridable for tests: the lean material bodies (vd-leanmat.ts). Defaults to the flag. */
   leanMat = VD_LEANMAT,
 ): VdCityMaterials {
   if (leanMat) return createLeanVdCityMaterials(THREE, options);
   const base = createPbrCityMaterials(THREE, options);
   const { T, c, vertexRgb } = cityShaderTools(THREE);
+  const physical = options.physical === true;
+  /** Display value to the working space: identity on the direct path, the sRGB decode under the physical stack. */
+  const working = (x: V3): V3 => (physical ? T.sRGBTransferEOTF(x) as V3 : x);
   const tod = options.timeOfDay ?? LIT_SHARE_TOD;
   const initial = weatherFromEnv();
   const wet = T.uniform(initial.rain);
   const snow = T.uniform(initial.snow);
 
-  const walls = arrayTexture(THREE, VD_WALLS_RGB, VD_WALL_LAYERS.length, 3);
-  const groundMaps = arrayTexture(THREE, VD_GROUND_RGB, 3, 3);
-  const normals = arrayTexture(THREE, VD_NORMALS_XY, VD_NORMAL_LAYERS.length, 2);
+  const walls = arrayTexture(THREE, VD_WALLS_RGB, VD_WALL_LAYERS.length, 3, VD_TEXTURE_NAMES.walls);
+  const groundMaps = arrayTexture(THREE, VD_GROUND_RGB, 3, 3, VD_TEXTURE_NAMES.ground);
+  const normals = arrayTexture(THREE, VD_NORMALS_XY, VD_NORMAL_LAYERS.length, 2, VD_TEXTURE_NAMES.normals);
   const NRM = { brick: 0, asphalt: 1, paving: 2 } as const;
   const GND = { asphalt: 0, paving: 1, concrete: 2 } as const;
 
@@ -188,8 +220,11 @@ export function createVdCityMaterials(
   const masonry = (() => {
     const grid = WINDOW_GRID.masonry;
     const material = base.masonry as StdMat;
-    const fac = T.attribute<'vec2'>('aFacade', 'vec2');
-    const layer = fac.x as F;
+    // aFacade is constant per wall: read it flat, so the layer index and the hash seeds below never see an
+    // interpolated 2.9999998 (i32() truncates that to the wrong photo; the hashes amplify the last bits).
+    const fac = (T.varying(T.attribute<'vec2'>('aFacade', 'vec2')) as unknown as { setInterpolation(t: string, s?: string): Node<'vec2'> })
+      .setInterpolation('flat', 'either');
+    const layer = T.round(fac.x) as F;
     const perMetre = fac.y as F;
     const hasPhoto = T.step(-0.5, layer);
     const u = T.uv().x as F;
@@ -227,16 +262,21 @@ export function createVdCityMaterials(
     const cy = v.div(courseH) as F;
     const cx = u.div(unitW).add(T.floor(cy).mod(2).mul(0.5)) as F;
     const aaY = T.max(T.fwidth(cy), 1e-4);
-    const aaX = T.max(T.fwidth(cx), 1e-4);
+    // The footprint along the course, without the half-brick row offset: fwidth(cx) jumps to 0.5 on every pixel
+    // quad that straddles a course line, which switched the bed joint on that line off and on as the Caller walked.
+    const aaX = T.max(T.fwidth(u.div(unitW)), 1e-4);
     // Mortar is 6 % of a brick course and 3 % of its length; stone joints are half that.
     const brickSolid = pcov(cy, 0.06, 1, aaY.mul(1.25)).mul(pcov(cx, 0.03, 1, aaX.mul(1.25)));
     const stoneSolid = pcov(cy, 0.03, 1, aaY.mul(1.25)).mul(pcov(cx, 0.015, 1, aaX.mul(1.25)));
     const solid = T.mix(brickSolid, stoneSolid, isStone);
-    const courseVis = T.smoothstep(0.55, 0.22, T.max(aaX, aaY));
+    // Edges in order (1 - smoothstep): Metal leaves smoothstep undefined for reversed edges (post/pipeline.ts).
+    const courseVis = T.float(1).sub(T.smoothstep(0.22, 0.55, T.max(aaX, aaY)));
+    // The per-brick tone is a hard-edged hash: it leaves before the joints do, while a brick is still ~10 px long.
+    const toneVis = T.float(1).sub(T.smoothstep(0.08, 0.2, T.max(aaX, aaY)));
     const joint = T.float(1).sub(solid).mul(courseVis).mul(T.max(isBrick, isStone)) as F;
     // Per-brick tone drift, the low-frequency variance Valdrada's MAT9 pass added.
     const unitTone = T.float(0.9).add(hash12(T.vec2(T.floor(cx), T.floor(cy)).add(T.vec2(fac.y.mul(97), 0))).mul(0.2));
-    wall = wall.mul(T.mix(T.float(1), unitTone, courseVis.mul(isBrick))) as V3;
+    wall = wall.mul(T.mix(T.float(1), unitTone, toneVis.mul(isBrick))) as V3;
     wall = T.mix(wall, wall.mul(0.62).add(T.vec3(0.05)), joint.mul(0.8)) as V3;
     // Street grime: the bottom 9 m darken toward the pavement (Valdrada splash term).
     wall = wall.mul(T.float(1).sub(T.float(0.24).mul(T.float(1).sub(T.smoothstep(0, 9, v))))) as V3;
@@ -279,7 +319,11 @@ export function createVdCityMaterials(
     const glass = T.mix(room, skyRefl, T.clamp(fres.mul(0.85).add(0.12), 0, 1)) as V3;
 
     // Lit rooms: windows.ts litShareAt per cell, the same hash as every lane.
-    const seed = T.fract(vertexRgb.x.mul(13.7).add(vertexRgb.y.mul(7.3))).mul(100);
+    // The building tone as a flat varying: the seed multiplies it by ~4e6 on the way through the hash, so an
+    // interpolated last bit would re-roll which rooms are lit from pixel to pixel.
+    const seedRgb = (T.varying(T.attribute<'vec3'>('color', 'vec3')) as unknown as { setInterpolation(t: string, s?: string): V3 })
+      .setInterpolation('flat', 'either');
+    const seed = T.fract(seedRgb.x.mul(13.7).add(seedRgb.y.mul(7.3))).mul(100);
     const column = T.floor(cu);
     const row = T.floor(cv);
     const hash = (a: F, b: F) => T.fract(T.sin(a.mul(12.9898).add(b.mul(78.233)).add(seed.mul(37.719))).mul(43758.5453)) as F;
@@ -304,7 +348,7 @@ export function createVdCityMaterials(
     // Damp masonry darkens; glass does not (Valdrada wet facades).
     const masonryShare = T.float(1).sub(T.max(pane, shop));
     albedo = albedo.mul(T.float(1).sub(wet.mul(0.26).mul(masonryShare))) as V3;
-    material.colorNode = T.vec4(albedo, 1);
+    material.colorNode = T.vec4(working(albedo), 1);
 
     const nSample = T.texture(normals, T.uv().mul(0.42)).depth(T.float(NRM.brick)).rgb as V3;
     const nStrength = T.float(TUNE.normal).mul(near).mul(hasPhoto).mul(masonryShare).mul(T.float(1).sub(reveal));
@@ -323,7 +367,7 @@ export function createVdCityMaterials(
     const glowNear = tone.mul(pane.mul(lit).mul(0.85).mul(roomLight).mul(reflectOver))
       .add(c('windowWarm').mul(shop.mul(T.float(1).sub(gate)).mul(0.45)));
     const glowFar = tone.mul(share.mul(0.22).mul(upper));
-    material.emissiveNode = T.mix(glowNear, glowFar, tiny);
+    material.emissiveNode = working(T.mix(glowNear, glowFar, tiny) as V3);
     return material;
   })();
 
@@ -356,7 +400,7 @@ export function createVdCityMaterials(
     const w = wetGround(xz);
     let albedo = (graphs.albedo as V3).mul(groundGrain(photo, GND.asphalt, fp, 0.8)) as V3;
     albedo = snowCap(albedo.mul(w.dark) as V3, T.float(0.7).add(vnoise(xz.mul(0.4)).mul(0.6)));
-    material.colorNode = T.vec4(albedo, 1);
+    material.colorNode = T.vec4(working(albedo), 1);
     const near = T.float(1).sub(T.smoothstep(0.01, 0.08, fp));
     const n = T.texture(normals, tuv).depth(T.float(NRM.asphalt)).rgb as V3;
     material.normalNode = perturb(flatFrame(), n, near.mul(T.float(1).sub(w.puddle)).mul(0.8));
@@ -399,7 +443,7 @@ export function createVdCityMaterials(
     const arris = T.smoothstep(0.17, 0.185, faceH).mul(0.25);
     const granite = vertexRgb.mul(blockTone).mul(T.mix(T.float(0.45), T.float(1), foot)).mul(T.float(1).sub(blockJoint.mul(0.4))).add(arris) as V3;
     albedo = T.mix(albedo, granite.mul(w.dark), face) as V3;
-    material.colorNode = T.vec4(albedo, 1);
+    material.colorNode = T.vec4(working(albedo), 1);
     const n = T.texture(normals, tuv).depth(T.float(NRM.paving)).rgb as V3;
     material.normalNode = perturb(flatFrame(), n, near.mul(0.6).mul(T.float(1).sub(w.puddle)));
     material.roughnessNode = T.mix(T.mix(T.float(0.85), T.float(0.32), w.damp.mul(0.65)), T.float(0.08), w.puddle);
@@ -414,7 +458,7 @@ export function createVdCityMaterials(
     const tuv = xz.div(3.0);
     const photo = T.texture(groundMaps, tuv).depth(T.float(GND.concrete)).rgb as V3;
     const albedo = albedoIn.mul(groundGrain(photo, GND.concrete, footprint(tuv), 0.5)) as V3;
-    material.colorNode = T.vec4(snowCap(albedo, T.float(snowK)), 1);
+    material.colorNode = T.vec4(working(snowCap(albedo, T.float(snowK))), 1);
   };
   concreteGrain(base.roofs as StdMat, vertexRgb as unknown as V3, 1);
   concreteGrain(base.areas as StdMat, vertexRgb as unknown as V3, 0.9);
@@ -428,6 +472,7 @@ export function createVdCityMaterials(
   // real street: the light is added, nothing real is replaced. Values run
   // past 1 on purpose: AgX rolls them into a glow (no bloom pass on rn-webgpu).
   const vrgb = T.attribute<'vec3'>('color', 'vec3');
+  if (!physical) {
   // Sign letters and LED edge strips burn like lit acrylic.
   (base.lettering as StdMat).colorNode = T.vec4(vrgb.mul(2.1), 1);
   // Roofline neon and sign boards.
@@ -449,13 +494,14 @@ export function createVdCityMaterials(
     holo.colorNode = T.vec4(vrgb.mul(band.add(sweep)).mul(shimmer).mul(1.8), 1);
     holo.opacityNode = T.float(0.85);
   }
+  }
 
   // Far crowns in the model trees' own leaf colour (atlas mean), varied a little per tree.
   const leafMean = VD_TREES.reduce((acc, t) => acc.map((v, i) => v + t.leafTone[i]! / VD_TREES.length), [0, 0, 0]);
   const farCrown = () => {
     const m = new THREE.MeshStandardNodeMaterial({ roughness: 0.85, metalness: 0 });
     const tone = T.attribute<'vec3'>(TONE_ATTRIBUTE, 'vec3');
-    m.colorNode = T.vec4(T.vec3(leafMean[0]!, leafMean[1]!, leafMean[2]!).mul(T.float(0.8).add(tone.g.mul(0.4))), 1);
+    m.colorNode = T.vec4(working(T.vec3(leafMean[0]!, leafMean[1]!, leafMean[2]!).mul(T.float(0.8).add(tone.g.mul(0.4))) as V3), 1);
     return m;
   };
 

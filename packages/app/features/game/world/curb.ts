@@ -2,10 +2,14 @@
 // above the carriageway. Valdrada compiles a 0.135 m reveal (client/src/world/
 // materials.js CURB_REVEAL; compile.mjs CURB = 0.14). Only the vd lane raises
 // the ground; every other lane keeps the flat city it was tuned on.
-import { parseSkyRigFlag } from './sky-rig.ts';
+import { parseDefaultOnFlag } from './sky-rig.ts';
 
-/** The vd lane is on (EXPO_PUBLIC_WORLD_VD): world geometry that only that lane draws keys off this. */
-export const VD_LANE = parseSkyRigFlag(process.env.EXPO_PUBLIC_WORLD_VD);
+/**
+ * The vd lane (Valdrada's look) is on: world geometry that only that lane
+ * draws keys off this. Default ON since Mike asked for the Valdrada city on
+ * the iPad (2026-10-28); EXPO_PUBLIC_WORLD_VD=0 is the kill switch.
+ */
+export const VD_LANE = parseDefaultOnFlag(process.env.EXPO_PUBLIC_WORLD_VD);
 export const CURB_HEIGHT = VD_LANE ? 0.14 : 0;
 /**
  * Real sun shadows on the vd lane (EXPO_PUBLIC_WORLD_VD_SHADOWS, default on

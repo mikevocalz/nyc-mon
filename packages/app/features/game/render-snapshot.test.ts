@@ -9,6 +9,7 @@ import {
   packSnapshot,
   readCaller,
   readCamera,
+  readPreset,
   readView,
   snapshotVersion,
 } from './render-snapshot.ts';
@@ -21,16 +22,33 @@ const caller: CallerState = {
 const view = { width: 540, height: 720, pixelRatio: 2, reducedMotion: false };
 
 test('a packed snapshot reads back the same camera, Caller and view', () => {
-  const snap = packSnapshot(emptySnapshot(), camera, caller, view);
+  const snap = packSnapshot(emptySnapshot(), camera, caller, view, 'midnight');
   assert.equal(snap.length, SNAPSHOT_LENGTH);
   assert.deepEqual(readCamera(snap), camera);
   assert.deepEqual(readCaller(snap), caller);
   assert.deepEqual(readView(snap), view);
+  assert.equal(readPreset(snap), 'midnight');
+});
+
+test('the time-of-day preset rides in a slot appended after the existing layout', () => {
+  // The slots before it keep their indices, so nothing that reads the old layout moves.
+  assert.equal(SNAPSHOT_SLOTS.jumpVelocity, 20);
+  assert.equal(SNAPSHOT_SLOTS.preset, 21);
+  assert.equal(SNAPSHOT_LENGTH, 22);
+  assert.equal(readPreset(emptySnapshot()), 'twilight', 'an empty snapshot reads the default preset');
+  for (const id of ['golden', 'midday', 'twilight', 'midnight'] as const) {
+    assert.equal(readPreset(packSnapshot(emptySnapshot(), camera, caller, view, id)), id);
+  }
+  const foreign = emptySnapshot();
+  foreign[SNAPSHOT_SLOTS.preset] = 99;
+  assert.equal(readPreset(foreign), 'twilight', 'an unknown index reads the default');
+  const a = packSnapshot(emptySnapshot(), camera, caller, view, 'golden');
+  assert.equal(readPreset(bumpSnapshot(a)), 'golden', 'invalidate keeps the preset');
 });
 
 test('every write bumps the version; invalidate bumps only the version', () => {
-  const a = packSnapshot(emptySnapshot(), camera, caller, view);
-  const b = packSnapshot(a, camera, caller, view);
+  const a = packSnapshot(emptySnapshot(), camera, caller, view, 'twilight');
+  const b = packSnapshot(a, camera, caller, view, 'twilight');
   assert.equal(snapshotVersion(a), 1);
   assert.equal(snapshotVersion(b), 2);
   const c = bumpSnapshot(b);
@@ -39,15 +57,15 @@ test('every write bumps the version; invalidate bumps only the version', () => {
 });
 
 test('packing never mutates the previous snapshot', () => {
-  const a = packSnapshot(emptySnapshot(), camera, caller, view);
+  const a = packSnapshot(emptySnapshot(), camera, caller, view, 'twilight');
   const copy = a.slice();
-  packSnapshot(a, { ...camera, x: 900 }, caller, view);
+  packSnapshot(a, { ...camera, x: 900 }, caller, view, 'twilight');
   assert.deepEqual(a, copy);
 });
 
 test('non-finite numbers keep the previous value instead of reaching the renderer', () => {
-  const a = packSnapshot(emptySnapshot(), camera, caller, view);
-  const b = packSnapshot(a, { ...camera, x: Number.NaN, yaw: Number.POSITIVE_INFINITY }, { ...caller, z: Number.NaN }, { ...view, width: Number.NaN });
+  const a = packSnapshot(emptySnapshot(), camera, caller, view, 'twilight');
+  const b = packSnapshot(a, { ...camera, x: Number.NaN, yaw: Number.POSITIVE_INFINITY }, { ...caller, z: Number.NaN }, { ...view, width: Number.NaN }, 'twilight');
   assert.equal(readCamera(b).x, camera.x);
   assert.equal(readCamera(b).yaw, camera.yaw);
   assert.equal(readCaller(b).z, caller.z);
@@ -55,21 +73,21 @@ test('non-finite numbers keep the previous value instead of reaching the rendere
 });
 
 test('the initial Caller round-trips as idle and not spawned', () => {
-  const back = readCaller(packSnapshot(emptySnapshot(), camera, INITIAL_CALLER_STATE, view));
+  const back = readCaller(packSnapshot(emptySnapshot(), camera, INITIAL_CALLER_STATE, view, 'twilight'));
   assert.deepEqual(back, { ...INITIAL_CALLER_STATE, jump: { ...INITIAL_CALLER_STATE.jump } });
   assert.equal(back.gait, 'idle');
 });
 
 test('a short or foreign array is replaced by a full-length one', () => {
-  const snap = packSnapshot([1, 2, 3], camera, caller, view);
+  const snap = packSnapshot([1, 2, 3], camera, caller, view, 'twilight');
   assert.equal(snap.length, SNAPSHOT_LENGTH);
   assert.equal(snap[SNAPSHOT_SLOTS.version], 1);
 });
 
 test('a reused out buffer is seeded from previous, not its own stale data', () => {
-  const a = packSnapshot(emptySnapshot(), camera, caller, view);
+  const a = packSnapshot(emptySnapshot(), camera, caller, view, 'twilight');
   const out = new Array<number>(SNAPSHOT_LENGTH).fill(-999);
-  const b = packSnapshot(a, { ...camera, x: Number.NaN }, caller, view, out);
+  const b = packSnapshot(a, { ...camera, x: Number.NaN }, caller, view, 'twilight', out);
   assert.equal(snapshotVersion(b), snapshotVersion(a) + 1);
   assert.equal(readCamera(b).x, camera.x);
   const c = bumpSnapshot(b, new Array<number>(SNAPSHOT_LENGTH).fill(-999));

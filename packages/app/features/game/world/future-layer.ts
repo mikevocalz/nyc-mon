@@ -41,18 +41,17 @@
 import type { BuildingClass, CityBuilding, CityDatasetV3, GeoPoint } from '../city-dataset.ts';
 import { hashUnit, mapArea, pointInRing, ringCentroid, type VertexBuffer } from './geometry.ts';
 import { box, cone, cylinder, frame, type Frame } from './parts.ts';
-import { parseSkyRigFlag } from './sky-rig.ts';
+import { parseDefaultOnFlag } from './sky-rig.ts';
 import { SURFACES } from './surfaces.ts';
 
 type Point = readonly [number, number];
 type Rgb = readonly number[];
 
 /**
- * The future layer is on (EXPO_PUBLIC_WORLD_FUTURE). Opt-in, default OFF,
- * like the rest of the flagged lanes: the overlays are an optional
- * decoration layer, never a replacement for the record city.
+ * The future layer is on (EXPO_PUBLIC_WORLD_FUTURE). Default ON;
+ * EXPO_PUBLIC_WORLD_FUTURE=0 is the kill switch.
  */
-export const FUTURE_LAYER = parseSkyRigFlag(process.env.EXPO_PUBLIC_WORLD_FUTURE);
+export const FUTURE_LAYER = parseDefaultOnFlag(process.env.EXPO_PUBLIC_WORLD_FUTURE);
 
 /** Per-kind counts for stats and tests. */
 export interface FutureLayerStats {
@@ -391,5 +390,164 @@ export function adSurface(
     eligibility: adEligibility(building.class),
     lodPriority: Math.max(0, 1 - distance / dataset.extentMeters),
     tileId: dataset.id,
+  };
+}
+
+// --- Physical facelift: which buildings carry which piece ---------------------
+//
+// The facelift restated for the physically lit city (Slop-grade city plan
+// § 5.5; docs/design/handoff/slop-grade-city.md § 4). Under
+// EXPO_PUBLIC_WORLD_PHYSICAL the kit stops being all-or-nothing on one
+// class: each block type carries each piece on a share of its buildings,
+// picked by a hash of the stable building id, so the same buildings always
+// carry the same pieces and the street stays lived-in rather than uniformly
+// lit. physical/facelift.ts builds the geometry from these plans. Nothing
+// above this section reads them, so the cel city's bytes do not change.
+//
+// FUT-01 is still open. `projectTower` is found by `class === 'nycha'`,
+// which is Valdrada STYLE 12 (PROJECT_BRICK) from classify() over PLUTO
+// records, not the verified NYCHA development dataset. The block type is a
+// look for tall project-brick slabs and carries no NYCHA claim or label.
+
+/** Block types of the density proposal, in the order classifyFaceliftBlock tests them. */
+export const FACELIFT_BLOCKS = ['civic', 'projectTower', 'glass', 'avenue', 'brownstoneSide', 'walkUp', 'other'] as const;
+export type FaceliftBlock = (typeof FACELIFT_BLOCKS)[number];
+
+/** Brick walk-ups are the `brick` class in D18's fire-escape band, metres. */
+export const WALK_UP_HEIGHT: readonly [number, number] = [12, 32];
+
+/**
+ * One block type's row. Every share is the fraction of that block type's
+ * buildings carrying the piece, 0..1.
+ */
+export interface FaceliftDensity {
+  /** Refined wall tone on the facade family. */
+  readonly palette: number;
+  /** Painted-aluminium window frames. */
+  readonly frames: number;
+  /** Modular panel joints over the wall. */
+  readonly panels: number;
+  /** Panels only on buildings with at least this many floors. */
+  readonly panelMinFloors: number;
+  readonly roofGarden: number;
+  /** Planted balconies, on rear walls (street faces keep their fire escapes). */
+  readonly balcony: number;
+  /** Vertical light strips up the ends of the street walls. */
+  readonly verticalLight: number;
+  /** Lit canopy over the door or a shop bay. */
+  readonly entrance: number;
+  /**
+   * Neon roofline trim. 'today' keeps city-mesh.ts neonTrimShare (D17,
+   * 18-85 % by height); a number is the share, capped by today's rule so
+   * every planned trim sits on a building that already has one.
+   */
+  readonly trim: number | 'today';
+  /**
+   * city-mesh.ts already builds this block's balconies, panel fins,
+   * entrance, light strips and roof garden (the 2026-10-18 kit); the
+   * physical facelift adds frames, joints and the glow over that kit
+   * instead of a second copy.
+   */
+  readonly celKit: boolean;
+}
+
+/**
+ * The handoff's proposed densities (§ 4, "Proposed density per block
+ * type"), for Mike to approve inside G6. None is measured: change a number
+ * here and the plan, the geometry and the tests follow. `other` is not in
+ * the proposal (brick under 12 m or over 32 m and plain fronts off the
+ * avenues) and stays as shipped: no facelift, today's trims.
+ */
+export const FACELIFT_DENSITY: Readonly<Record<FaceliftBlock, FaceliftDensity>> = {
+  avenue: {
+    palette: 0.6, frames: 0.6, panels: 0.25, panelMinFloors: 5, roofGarden: 0.1, balcony: 0,
+    verticalLight: 0.15, entrance: 0.5, trim: 'today', celKit: false,
+  },
+  brownstoneSide: {
+    palette: 0.3, frames: 0.3, panels: 0, panelMinFloors: 0, roofGarden: 0.1, balcony: 0,
+    verticalLight: 0, entrance: 0.2, trim: 0.1, celKit: false,
+  },
+  walkUp: {
+    palette: 0.4, frames: 0.4, panels: 0, panelMinFloors: 0, roofGarden: 0, balcony: 0.15,
+    verticalLight: 0.05, entrance: 0.25, trim: 0.15, celKit: false,
+  },
+  projectTower: {
+    palette: 1, frames: 1, panels: 1, panelMinFloors: 0, roofGarden: 1, balcony: 1,
+    verticalLight: 1, entrance: 1, trim: 0, celKit: true,
+  },
+  civic: {
+    palette: 0, frames: 0, panels: 0, panelMinFloors: 0, roofGarden: 0, balcony: 0,
+    verticalLight: 0, entrance: 0, trim: 0, celKit: false,
+  },
+  glass: {
+    palette: 0, frames: 0, panels: 0, panelMinFloors: 0, roofGarden: 0.2, balcony: 0,
+    verticalLight: 0.3, entrance: 0.5, trim: 'today', celKit: false,
+  },
+  other: {
+    palette: 0, frames: 0, panels: 0, panelMinFloors: 0, roofGarden: 0, balcony: 0,
+    verticalLight: 0, entrance: 0, trim: 'today', celKit: false,
+  },
+};
+
+/**
+ * A building's block type. `onAvenue` is the D17 fascia rule (a wall
+ * within 14 m of a primary, secondary or trunk road); landmarks, civic
+ * stone and churches come first so they stay the reference points.
+ */
+export function classifyFaceliftBlock(
+  building: Pick<CityBuilding, 'class' | 'heightMeters'>, context: { landmark: boolean; onAvenue: boolean },
+): FaceliftBlock {
+  if (context.landmark || building.class === 'civic' || building.class === 'church') return 'civic';
+  if (building.class === 'nycha') return 'projectTower';
+  if (building.class === 'glass') return 'glass';
+  if (context.onAvenue) return 'avenue';
+  if (building.class === 'brownstone') return 'brownstoneSide';
+  const [low, high] = WALK_UP_HEIGHT;
+  if (building.class === 'brick' && building.heightMeters >= low && building.heightMeters <= high) return 'walkUp';
+  return 'other';
+}
+
+export interface FaceliftPlan {
+  readonly block: FaceliftBlock;
+  readonly palette: boolean;
+  readonly frames: boolean;
+  readonly panels: boolean;
+  readonly roofGarden: boolean;
+  readonly balcony: boolean;
+  readonly verticalLight: boolean;
+  readonly entrance: boolean;
+  readonly trim: boolean;
+  readonly celKit: boolean;
+}
+
+/** Floors for the panel rule: the record's `f`, else the height over the record's or a 3.2 m pitch. */
+function floorCount(building: Pick<CityBuilding, 'heightMeters' | 'floors' | 'floorHeightMeters'>): number {
+  return building.floors ?? Math.round(building.heightMeters / (building.floorHeightMeters ?? 3.2));
+}
+
+/**
+ * Which pieces one building carries. Each piece has its own hash of the
+ * building id, so a share change moves only that piece. `todayTrimShare`
+ * is city-mesh.ts neonTrimShare(height); the trim uses the cel trim's own
+ * hash so a planned trim always lands on a building the cel city trims.
+ */
+export function faceliftPlan(
+  building: Pick<CityBuilding, 'id' | 'heightMeters' | 'floors' | 'floorHeightMeters'>, block: FaceliftBlock, todayTrimShare: number,
+  density: Readonly<Record<FaceliftBlock, FaceliftDensity>> = FACELIFT_DENSITY,
+): FaceliftPlan {
+  const row = density[block];
+  const pick = (piece: string, share: number) => share > 0 && hashUnit(`${building.id}:facelift:${piece}`) < share;
+  const trimShare = row.trim === 'today' ? todayTrimShare : Math.min(row.trim, todayTrimShare);
+  return {
+    block,
+    palette: pick('palette', row.palette),
+    frames: pick('frames', row.frames),
+    panels: floorCount(building) >= row.panelMinFloors && pick('panels', row.panels),
+    roofGarden: pick('garden', row.roofGarden),
+    balcony: pick('balcony', row.balcony),
+    verticalLight: pick('light', row.verticalLight),
+    entrance: pick('entrance', row.entrance),
+    trim: trimShare > 0 && hashUnit(`${building.id}:trim`) < trimShare,
+    celKit: row.celKit,
   };
 }

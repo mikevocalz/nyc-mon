@@ -5,13 +5,14 @@ import { useRouter } from 'expo-router';
 import { CALLER_NAME_MAX_LENGTH, callerNameErrorCopyId, isConsentRequired, validateCallerName } from '@acme/core/sim';
 import { MIN_BIRTH_YEAR } from '@acme/core/schemas';
 import type { CallerProfile } from '@acme/core/types';
-import { Button, Container, Heading, KeyboardAwareScroll, SignagePlate, StatusRow, TextField } from '@acme/ui';
+import { Button, Heading, KeyboardAwareScroll, SignagePlate, StatusRow, TextField } from '@acme/ui';
 import { Form } from '@acme/ui/primitives';
 import { View } from '@acme/ui/tw';
 import { announcePolitely } from './announce';
 import { defaultCallerNameFilter } from './caller-name-filter';
 import { MEET_PATH } from '../egg/egg-model.ts';
 import { copy } from './copy';
+import { OnboardingPanes, PANE_HEADING_CLASS } from './OnboardingPanes';
 import { useProfile } from '../profile/profile.store';
 import { readConsentRequested, useOnboarding } from './onboarding.store';
 import { readSave, storeCallerProfile } from './save-store';
@@ -90,16 +91,32 @@ export function CallerNameScreen() {
     router.replace(MEET_PATH);
   };
 
+  const plate = (
+    <SignagePlate
+      text={raw}
+      accessibilityLabel={copy('m07.plate.a11y.label', { name: raw })}
+    />
+  );
+
   return (
-    <KeyboardAwareScroll>
-      <Container width="full" className="flex-1 px-4 py-6">
-        {consentPending ? (
-          <StatusRow
-            items={[{ id: 'status-consent-pending', label: copy('m05.badge.pending'), tone: 'pending' }]}
-          />
-        ) : null}
-        <Form className="mx-auto w-full max-w-content-form gap-6">
-          <Heading level={1} size="title">{copy('m07.title')}</Heading>
+    <KeyboardAwareScroll contentContainerClassName="grow">
+      <OnboardingPanes
+        intro={
+          <View>
+            {consentPending ? (
+              <StatusRow
+                items={[{ id: 'status-consent-pending', label: copy('m05.badge.pending'), tone: 'pending' }]}
+              />
+            ) : null}
+            <Heading level={1} size="title" className={PANE_HEADING_CLASS}>{copy('m07.title')}</Heading>
+            {/* Landscape tablet: the plate is the left pane's picture, beside the field.
+                Only one plate is ever displayed; the hidden one is display:none, so
+                assistive tech never meets it. */}
+            <View className="mt-8 hidden md:landscape:flex">{plate}</View>
+          </View>
+        }
+      >
+        <Form className="gap-6 md:flex-1">
           <TextField
             surface="daylit"
             label={copy('m07.field.label')}
@@ -113,22 +130,22 @@ export function CallerNameScreen() {
             textContentType="nickname"
             clearButton={{ accessibilityLabel: copy('m07.field.clear.a11y.label') }}
           />
-          <View className="gap-6">
-            <SignagePlate
-              text={raw}
-              accessibilityLabel={copy('m07.plate.a11y.label', { name: raw })}
-            />
-            <Button
-              variant="cta"
-              size="lg"
-              fullWidth
-              title={copy('m07.continue')}
-              disabled={!canContinue}
-              onPress={confirm}
-            />
+          <View className="gap-6 md:flex-1">
+            <View className="md:landscape:hidden">{plate}</View>
+            {/* Tablet: Continue sits on the pane's bottom edge. */}
+            <View className="md:mt-auto">
+              <Button
+                variant="cta"
+                size="lg"
+                fullWidth
+                title={copy('m07.continue')}
+                disabled={!canContinue}
+                onPress={confirm}
+              />
+            </View>
           </View>
         </Form>
-      </Container>
+      </OnboardingPanes>
     </KeyboardAwareScroll>
   );
 }

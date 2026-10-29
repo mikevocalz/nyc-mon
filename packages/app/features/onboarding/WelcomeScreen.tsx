@@ -226,12 +226,16 @@ export interface WelcomeScreenProps {
 export function WelcomeScreen({ offline = false }: WelcomeScreenProps) {
   const router = useRouter();
   const [page, setPage] = useState(0);
-  const headingRef = useRef<unknown>(null);
+  // One heading ref per tree: the stacked tree and the landscape split are both
+  // mounted (Tailwind picks which shows), and focus goes to whichever is drawn.
+  const stackHeadingRef = useRef<unknown>(null);
+  const splitHeadingRef = useRef<unknown>(null);
   const announced = useRef(false);
-  const { height: winHeight } = useWindowDimensions();
+  const { width: winWidth, height: winHeight } = useWindowDimensions();
   // The spec's 62% share for the panel visual, bounded so the caption band,
-  // progress tiles and actions keep their space on an SE.
-  const figureHeight = Math.min(Math.round(winHeight * 0.44), 380);
+  // progress tiles and actions keep their space on an SE. From md (672pt at
+  // the native 14px rem) the tablet column is wider, so the photo grows with it.
+  const figureHeight = Math.min(Math.round(winHeight * 0.44), winWidth >= 672 ? 640 : 380);
 
   // Page-change announcement and focus move to the new heading (07-a11y).
   useEffect(() => {
@@ -240,9 +244,12 @@ export function WelcomeScreen({ offline = false }: WelcomeScreenProps) {
       return;
     }
     announcePolitely(copy('m02.progress.a11y', { n: page + 1 }));
-    if (Platform.OS !== 'web' && headingRef.current !== null) {
-      const tag = findNodeHandle(headingRef.current as never);
-      if (typeof tag === 'number') AccessibilityInfo.setAccessibilityFocus(tag);
+    if (Platform.OS !== 'web') {
+      // The hidden tree's heading is display:none, so focusing it is a no-op.
+      for (const ref of [stackHeadingRef, splitHeadingRef]) {
+        const tag = ref.current === null ? null : findNodeHandle(ref.current as never);
+        if (typeof tag === 'number') AccessibilityInfo.setAccessibilityFocus(tag);
+      }
     }
   }, [page]);
 
@@ -278,8 +285,10 @@ export function WelcomeScreen({ offline = false }: WelcomeScreenProps) {
 
   // One column: Skip, the slider, the actions. `withFigure` false is the copy
   // pane of a spanned foldable, whose photo sits in the left pane instead.
-  const column = (withFigure: boolean) => (
-          <View className="mx-auto w-full max-w-[560px] flex-1 px-4">
+  // From md up the stacked column widens for tablets in portrait; it stays
+  // top-aligned with the actions pinned at the bottom.
+  const column = (withFigure: boolean, headingRef: typeof stackHeadingRef) => (
+          <View className="mx-auto w-full max-w-[560px] flex-1 px-4 md:max-w-[760px] md:px-8 lg:max-w-[880px]">
             {/* Top gutter: Skip lives in the bottom row beside Next (hidden on panel 3, nothing to skip to). */}
             {withFigure ? <View className="h-6" /> : null}
 
@@ -319,10 +328,11 @@ export function WelcomeScreen({ offline = false }: WelcomeScreenProps) {
                         level={panel.n === 1 ? 1 : 2}
                         size="title"
                         testID={`m02-p${panel.n}-title`}
+                        className="md:text-4xl"
                       >
                         {copy(panel.titleId)}
                       </Heading>
-                      <Text testID={`m02-p${panel.n}-body`} className="mt-2">
+                      <Text testID={`m02-p${panel.n}-body`} className="mt-2 md:mt-3 md:text-xl">
                         {copy(panel.bodyId)}
                       </Text>
                     </View>
@@ -399,7 +409,7 @@ export function WelcomeScreen({ offline = false }: WelcomeScreenProps) {
             arrangement="split"
             primarySide="right"
             testID="m02-arrangement"
-            primary={(paired) => column(!paired)}
+            primary={(paired) => column(!paired, paired ? splitHeadingRef : stackHeadingRef)}
             secondary={(shown) =>
               shown ? (
                 <View className="flex-1 px-4 py-6">
@@ -409,7 +419,25 @@ export function WelcomeScreen({ offline = false }: WelcomeScreenProps) {
                 </View>
               ) : null
             }
-            fallback={() => column(true)}
+            // iOS before 27.1 (the iPad Pro is on 26.x), web and XR. Portrait,
+            // and anything narrower than md: the stacked column. Landscape from
+            // md up: the same split as an open foldable, photo left, copy right.
+            // Both trees stay mounted so rotating never remounts the slider state
+            // (page lives above them); the native carousel never has its slide
+            // content toggled, which broke its measurement.
+            fallback={() => (
+              <>
+                <View className="flex-1 md:landscape:hidden">{column(true, stackHeadingRef)}</View>
+                <View className="hidden flex-1 flex-row md:landscape:flex">
+                  <View className="flex-1 py-6 pl-6">
+                    <PanelFigure testID={`m02-p${current.n}-image-split`} alt={copy(current.altId)}>
+                      <CurrentArt />
+                    </PanelFigure>
+                  </View>
+                  <View className="w-[480px] lg:w-[560px]">{column(false, splitHeadingRef)}</View>
+                </View>
+              </>
+            )}
           />
         </Container>
       </SafeArea>

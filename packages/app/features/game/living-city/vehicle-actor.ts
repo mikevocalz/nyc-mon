@@ -17,10 +17,37 @@
 // Budget (audit scout-F: ≤ ~10 draws / ≤ ~50 k tris for dynamic actors):
 // one InstancedMesh per vehicle class = ≤ 4 draw calls; the box-car recipe
 // is 6 boxes = 72 triangles, so 64 vehicles stay under 5 k.
+//
+// Slop-grade fleet (EXPO_PUBLIC_WORLD_PHYSICAL, default off): the registry
+// gains one lofted recipe per VehicleKind (seed-assets.ts
+// LOFTED_VEHICLE_ASSETS), ranked above the box recipes, and the kind picks
+// its recipe, so the taxi's roof sign follows the taxi kind. Each lofted
+// class draws the nearest vehicles with the full model and the rest with
+// the coarse proxy (two draws per car class, one for the bus), paints from
+// the per-instance `paintColor` / `carState` attributes, and lights the
+// street through a tiered pool of road-pool PointLights plus night flare sprites
+// (vehicle-headlights.ts). With the flag off nothing below changes: the
+// default registry, the box recipes and the PR07 light quads are exactly
+// as before, and lofted-car.ts, lofted-car-material.ts and
+// vehicle-headlights.ts are never evaluated (physical-graph.ts loads them
+// inside createLoftedFleet).
+//
+// vd lane (VD_LANE, world/curb.ts, the default) on top of the physical
+// fleet: every vehicle is a Valdrada baked body (world/vd-car-mesh.ts). Cars
+// pick their body per vehicle id from VD_FLEET_BODIES; the bus is the MTA
+// XD40 (vd-car-mesh.ts VD_BUS_ID). Up to LOFTED_NEAR_VEHICLES of a kind
+// inside VD_FLEET_NEAR_METRES draw LOD2, the rest the same body's `mid`
+// decimation: one mesh per body and level, no lofted body or proxy and no
+// box car. The headlight pools and the flares are unchanged. The vd meshes
+// are plain Meshes over InstancedBufferGeometry with the transform in
+// `vdXform` (world/vd-instanced.ts), so all sixteen share one node build and
+// one pipeline; an InstancedMesh would compile its own.
 
 import type { Three } from '@acme/ui/three';
 import type { ActorFrame, SceneActor, SceneActorFactory } from '../scene-actor.ts';
+import { WORLD_TIER } from '../perf/tier.ts';
 import { parseSkyRigFlag } from '../world/sky-rig.ts';
+import { EXPERIMENTAL_WORLD_PHYSICAL, WORLD_CLUSTERED_LIGHTING } from '../world/physical-look.ts';
 import {
   candidates,
   createWorldAssetRegistry,
@@ -28,7 +55,12 @@ import {
   type WorldAssetRegistry,
 } from './asset-registry.ts';
 import { readEnvSection } from './clock.ts';
-import { SEED_ASSETS } from './seed-assets.ts';
+import type { VehicleMeshData } from './lofted-car.ts';
+import { loadLoftedCar, loadLoftedCarMaterial, loadVdCarMaterial, loadVdCarMesh, loadVehicleHeadlights } from '../physical-graph.ts';
+import { VD_LANE } from '../world/curb.ts';
+import type { VdCarId } from '../world/vd-car-mesh.ts';
+import { VD_XFORM_ATTRIBUTE, vdInstancedGeometry, writeVdXform } from '../world/vd-instanced.ts';
+import { PHYSICAL_SEED_ASSETS, SEED_ASSETS } from './seed-assets.ts';
 import { envSectionOffset } from './signal-viz.ts';
 import {
   VEHICLE_KINDS,
@@ -40,6 +72,15 @@ import {
   interpolateVehiclePose,
   type VehicleKind,
 } from './vehicle-sim.ts';
+import type { FlareMount, HeadlightTier, LightFocus } from './vehicle-headlights.ts';
+import {
+  FLARE_GLOW_ON,
+  HEADLIGHT_POOL,
+  LOFTED_NEAR_VEHICLES,
+  headlightBeamScale,
+  slopGlowFromLampLevel,
+} from './vehicle-physical-constants.ts';
+import { pushBox } from './box-faces.ts';
 
 /** Opt-in lane flag — default OFF, matching the L1–L6 realism lanes. `EXPO_PUBLIC_LIVING_CITY=1`. */
 export const EXPERIMENTAL_LIVING_CITY = parseSkyRigFlag(process.env.EXPO_PUBLIC_LIVING_CITY);
@@ -49,6 +90,8 @@ export const EXPERIMENTAL_LIVING_CITY = parseSkyRigFlag(process.env.EXPO_PUBLIC_
  * flag off returns [] — the scene's actors array is byte-identical to
  * pre-PR05 — flag on passes the factories through.
  */
+export { EXPERIMENTAL_WORLD_PHYSICAL };
+
 export function livingCityFactoriesFor(flag: boolean, factories: readonly SceneActorFactory[]): readonly SceneActorFactory[] {
   return flag ? factories : [];
 }
@@ -68,28 +111,6 @@ export interface BoxGeometryData {
 }
 
 /** Append an axis-aligned box to the position/normal/index lists (24 verts, 12 tris). */
-function pushBox(pos: number[], nrm: number[], idx: number[], cx: number, cy: number, cz: number, sx: number, sy: number, sz: number): void {
-  const hx = sx / 2;
-  const hy = sy / 2;
-  const hz = sz / 2;
-  const faces: [number, number, number, number[]][] = [
-    // normal, the four corners (ccw seen from outside)
-    [1, 0, 0, [hx, -hy, -hz, hx, -hy, hz, hx, hy, hz, hx, hy, -hz]],
-    [-1, 0, 0, [-hx, -hy, hz, -hx, -hy, -hz, -hx, hy, -hz, -hx, hy, hz]],
-    [0, 1, 0, [-hx, hy, -hz, hx, hy, -hz, hx, hy, hz, -hx, hy, hz]],
-    [0, -1, 0, [-hx, -hy, hz, hx, -hy, hz, hx, -hy, -hz, -hx, -hy, -hz]],
-    [0, 0, 1, [-hx, -hy, hz, hx, -hy, hz, hx, hy, hz, -hx, hy, hz]],
-    [0, 0, -1, [hx, -hy, -hz, -hx, -hy, -hz, -hx, hy, -hz, hx, hy, -hz]],
-  ];
-  for (const [nx, ny, nz, c] of faces) {
-    const base = pos.length / 3;
-    for (let i = 0; i < 4; i++) {
-      pos.push(cx + c[i * 3]!, cy + c[i * 3 + 1]!, cz + c[i * 3 + 2]!);
-      nrm.push(nx, ny, nz);
-    }
-    idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
-  }
-}
 
 /**
  * The `proc:box-car` / `proc:box-bus` recipe: a body box, a cabin box biased
@@ -121,18 +142,35 @@ export function boxCarGeometryData(bounds: { lengthM: number; widthM: number; he
   return { positions: pos, normals: nrm, indices: idx, triangles: idx.length / 3 };
 }
 
+/** URI prefix of the Slop-grade lofted recipes (seed-assets.ts LOFTED_VEHICLE_ASSETS). */
+export const LOFTED_RECIPE_PREFIX = 'proc:lofted-';
+
+export function isLoftedRecipe(entry: WorldAssetEntry | null | undefined): boolean {
+  return entry?.uri?.startsWith(LOFTED_RECIPE_PREFIX) ?? false;
+}
+
 /**
  * The first registry candidate we can actually build a mesh from, in
  * fallback-chain order. `glb:` URIs and `three:` generator URIs are PENDING
  * (no vendored file / unverified worklet import) — the `proc:` recipes are
  * the built tier today. Returns the last candidate as a last resort so an
  * entry can never render nothing.
+ *
+ * With `kind` (the physical flag's path), a lofted recipe drawn for that
+ * sim kind wins first; it sits in the procedural tier, so it ranks above
+ * the primitive box. Without `kind` the lofted recipes are skipped, which
+ * keeps the flag-off resolution exactly what it was.
  */
-export function resolveVehicleEntry(registry: WorldAssetRegistry, semanticId: string): WorldAssetEntry | null {
+export function resolveVehicleEntry(registry: WorldAssetRegistry, semanticId: string, kind?: VehicleKind): WorldAssetEntry | null {
   const chain = candidates(registry, semanticId);
   if (chain.length === 0) return null;
+  if (kind) {
+    for (const entry of chain) {
+      if (isLoftedRecipe(entry) && entry.status !== 'pending-verification' && entry.params?.vehicleKind === kind) return entry;
+    }
+  }
   for (const entry of chain) {
-    if (entry.uri?.startsWith('proc:')) return entry;
+    if (entry.uri?.startsWith('proc:') && !isLoftedRecipe(entry)) return entry;
   }
   return chain[chain.length - 1]!;
 }
@@ -242,6 +280,27 @@ export interface VehicleActorOptions {
   readonly onUnmount?: () => void;
   /** Instance capacity per vehicle class (default 48). */
   readonly capacity?: number;
+  /** Slop-grade fleet: lofted recipes, physical lights, flares. Default EXPO_PUBLIC_WORLD_PHYSICAL. */
+  readonly physical?: boolean;
+  /**
+   * Camera on the ground plane, for near/far detail, headlight ranking and flares. Without it every lofted vehicle
+   * draws the proxy past the near cap in snapshot order and no headlight light or flare is assigned.
+   */
+  readonly focus?: () => LightFocus | null;
+  /** Headlight pool and detail tier (default EXPO_PUBLIC_WORLD_TIER). */
+  readonly tier?: HeadlightTier;
+  /**
+   * Headlight PointLights on the road ahead of the nearest vehicles (default WORLD_CLUSTERED_LIGHTING: on when the
+   * scene mounts three's ClusteredLighting). Without ClusteredLighting each one is a light every lit material
+   * evaluates, so a renderer without it leaves them off.
+   */
+  readonly headlightLights?: boolean;
+  /** Rear plate atlas for the lofted cars (plateAtlasPixels layout); defaults to the pixel-font atlas. */
+  readonly plateTexture?: unknown;
+  /** vd lane: the near car set wears Valdrada's baked bodies (VD_FLEET_BODIES). Default VD_LANE; needs `physical`. */
+  readonly vd?: boolean;
+  /** Camera field of view (degrees) and viewport height (px) for flare sizing. */
+  readonly flareView?: { readonly fovDeg: number; readonly viewportPx: number };
 }
 
 /**
@@ -252,7 +311,8 @@ export interface VehicleActorOptions {
 export function createVehicleActor(options: VehicleActorOptions): SceneActorFactory {
   return (threeNamespace: unknown): SceneActor => {
     const THREE = threeNamespace as Three;
-    const registry = options.registry ?? createWorldAssetRegistry(SEED_ASSETS);
+    const physical = options.physical ?? EXPERIMENTAL_WORLD_PHYSICAL;
+    const registry = options.registry ?? createWorldAssetRegistry(physical ? PHYSICAL_SEED_ASSETS : SEED_ASSETS);
     const capacity = options.capacity ?? VEHICLE_CAPACITY;
     const group = new THREE.Group();
     group.name = 'living-city:vehicles';
@@ -270,7 +330,9 @@ export function createVehicleActor(options: VehicleActorOptions): SceneActorFact
     }
     const kindMeshes = new Map<VehicleKind, KindMesh>();
     const colors = new Map<number, InstanceType<typeof THREE.Color>>();
+    const lofted = physical ? createLoftedFleet(THREE, registry, capacity, options, group) : null;
     for (const kind of VEHICLE_KINDS) {
+      if (lofted?.kinds.has(kind)) continue;
       const entry = resolveVehicleEntry(registry, VEHICLE_SEMANTIC_ID[kind]);
       if (!entry) continue;
       const bounds = entry.bounds ?? { lengthM: 4.6, widthM: 1.9, heightM: 1.5 };
@@ -351,6 +413,7 @@ export function createVehicleActor(options: VehicleActorOptions): SceneActorFact
         const env = readEnvSection(snap, envSectionOffset(snap), snap && snap.length >= VSNAP_HEADER ? (snap[VSNAP.simTime] ?? 0) : 0);
         const blinkOn = indicatorBlink(env.simTime);
         for (const kind of VEHICLE_KINDS) counts.set(kind, 0);
+        lofted?.begin();
         let moving = false;
         let lightSlot = 0;
         if (snap && version >= 0) {
@@ -359,6 +422,11 @@ export function createVehicleActor(options: VehicleActorOptions): SceneActorFact
             const id = snap[o] ?? 0;
             const kindIdx = Math.max(0, Math.min(VEHICLE_KINDS.length - 1, snap[o + 1] ?? 0));
             const kind = VEHICLE_KINDS[kindIdx]!;
+            if (lofted?.kinds.has(kind)) {
+              if ((snap[o + 8] ?? 0) > 0.05) moving = true;
+              lofted.collect(snap, i, alpha, kind);
+              continue;
+            }
             const km = kindMeshes.get(kind);
             if (!km) continue;
             const slot = counts.get(kind)!;
@@ -430,6 +498,7 @@ export function createVehicleActor(options: VehicleActorOptions): SceneActorFact
             if (km.mesh.instanceColor) km.mesh.instanceColor.needsUpdate = true;
           }
         }
+        lofted?.commit(env.lampLevel, blinkOn);
         const changed = count !== lastCount;
         lastCount = count;
         // Keep the canvas drawing while the fleet moves or the roster changed this frame.
@@ -445,8 +514,431 @@ export function createVehicleActor(options: VehicleActorOptions): SceneActorFact
         lightGeometry.dispose();
         lightMaterial.dispose();
         lightMesh.dispose();
+        lofted?.dispose();
         group.clear();
       },
     };
+  };
+}
+
+// --- Slop-grade lofted fleet (EXPO_PUBLIC_WORLD_PHYSICAL) ---------------------------------------------------------
+
+/**
+ * vd lane near bodies per car kind, picked per vehicle id (vdCarHash). Sedans spread over the CARLA saloons and the
+ * SUV, taxis are mostly the TLC cab with some yellow-painted Lincolns, vans the Sprinter. The bus stays lofted.
+ */
+export const VD_FLEET_BODIES: Readonly<Record<Exclude<VehicleKind, 'bus'>, readonly VdCarId[]>> = {
+  sedan: ['lincoln', 'mercedes', 'charger', 'suv'],
+  taxi: ['taxinv200', 'taxinv200', 'lincoln'],
+  van: ['van'],
+};
+
+/**
+ * vd lane: a vehicle draws its full body (LOD2) only inside this distance of the camera focus, as the parked cars do
+ * (street-props.ts VD_PARKED_RADIUS); past it, or past the near cap, the same body's `mid` decimation.
+ */
+export const VD_FLEET_NEAR_METRES = 40;
+
+interface LoftedFleet {
+  /** Kinds this fleet draws; the box path skips them. */
+  readonly kinds: ReadonlySet<VehicleKind>;
+  begin(): void;
+  /** Queue one snapshot record for this frame. */
+  collect(snap: readonly number[], index: number, alpha: number, kind: VehicleKind): void;
+  /** Write instances, headlight lights and flares for the queued records. */
+  commit(lampLevel: number, blinkOn: boolean): void;
+  dispose(): void;
+}
+
+interface FleetRecord {
+  kind: VehicleKind;
+  id: number;
+  x: number;
+  z: number;
+  yaw: number;
+  flags: number;
+  grow: number;
+  dist: number;
+}
+
+/**
+ * Builds the lofted meshes for every kind whose registry resolution lands on a lofted recipe. Plain function of
+ * its arguments: the meshes, buffers and lights live in this closure, created on whichever runtime builds the
+ * scene.
+ */
+function createLoftedFleet(
+  THREE: Three,
+  registry: WorldAssetRegistry,
+  capacity: number,
+  options: VehicleActorOptions,
+  group: InstanceType<Three['Group']>,
+): LoftedFleet | null {
+  const { buildBusGeometryData, buildCarGeometryData, buildCarProxyGeometryData, bodySpecForKind, frontLampMount, rearLampMount } =
+    loadLoftedCar();
+  const { LOFTED_INSTANCE_ATTRIBUTES, carStateFromFlags, createLoftedBusMaterial, createLoftedCarMaterial, vehiclePaintToken } =
+    loadLoftedCarMaterial();
+  const {
+    FLARES_PER_VEHICLE,
+    FLARE_STRIDE,
+    createCarFlareMaterial,
+    createVehicleHeadlight,
+    headlightLightCount,
+    metresPerPixelAt1m,
+    placeVehicleHeadlight,
+    rankLitVehicles,
+    writeVehicleFlares,
+  } = loadVehicleHeadlights();
+  const T = THREE.TSL;
+  const tier: HeadlightTier = options.tier ?? WORLD_TIER;
+  const nearCap = LOFTED_NEAR_VEHICLES[tier];
+  const glow = T.uniform(slopGlowFromLampLevel(0));
+  const plateTexture = options.plateTexture as InstanceType<Three['Texture']> | undefined;
+  let ownedPlate: InstanceType<Three['Texture']> | null = null;
+
+  type Object3D = InstanceType<Three['Object3D']> & { geometry: { dispose(): void } };
+  /** One drawn body level: the lofted InstancedMesh or a vd instanced Mesh, behind one slot writer. */
+  interface Lod {
+    readonly mesh: Object3D;
+    readonly capacity: number;
+    count: number;
+    /** Writes the next slot: pose, paint (linear RGB) and carState. */
+    write(slot: number, x: number, z: number, yaw: number, grow: number, rgb: readonly number[], state: readonly number[]): void;
+    /** Publishes `count` and flags this frame's slots for upload. */
+    flush(): void;
+  }
+  interface LoftedKind {
+    readonly kind: VehicleKind;
+    /** One near mesh (lofted) or one per vd body; `pickNear` chooses the mesh for a vehicle id. */
+    readonly nears: readonly Lod[];
+    readonly pickNear: (id: number) => number;
+    /** Near slots across all `nears`. */
+    readonly nearCap: number;
+    /** Past the near cap: the lofted proxy (one), the vd `mid` body (one per near, same index), or none (lofted bus). */
+    readonly fars: readonly Lod[];
+    /** Near only within this focus distance (vd); Infinity keeps the lofted fleet's cap-only rule. */
+    readonly nearMetres: number;
+    readonly material: InstanceType<Three['MeshStandardNodeMaterial']>;
+    readonly head: { readonly headlight: readonly [number, number]; readonly zFront: number };
+    readonly flare: FlareMount;
+    readonly bus: boolean;
+  }
+
+  const loftedGeometry = (data: VehicleMeshData) => {
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(data.positions, 3));
+    geometry.setAttribute('normal', new THREE.BufferAttribute(data.normals, 3));
+    geometry.setAttribute('uv', new THREE.BufferAttribute(data.uvs, 2));
+    geometry.setAttribute('partId', new THREE.BufferAttribute(data.partIds, 1));
+    geometry.setIndex(new THREE.BufferAttribute(data.indices, 1));
+    return geometry;
+  };
+  const buildLod = (
+    kind: VehicleKind, data: VehicleMeshData | InstanceType<Three['InstancedMesh']>['geometry'], material: InstanceType<Three['Material']>, cap: number, name: string,
+  ): Lod => {
+    const geometry = 'isBufferGeometry' in data ? data : loftedGeometry(data);
+    const paint = new THREE.InstancedBufferAttribute(new Float32Array(cap * LOFTED_INSTANCE_ATTRIBUTES.paintColor), LOFTED_INSTANCE_ATTRIBUTES.paintColor);
+    const state = new THREE.InstancedBufferAttribute(new Float32Array(cap * LOFTED_INSTANCE_ATTRIBUTES.carState), LOFTED_INSTANCE_ATTRIBUTES.carState);
+    paint.setUsage(THREE.DynamicDrawUsage);
+    state.setUsage(THREE.DynamicDrawUsage);
+    geometry.setAttribute('paintColor', paint);
+    geometry.setAttribute('carState', state);
+    const mesh = new THREE.InstancedMesh(geometry, material, cap);
+    mesh.name = `living-city:vehicles:${kind}:${name}`;
+    mesh.count = 0;
+    mesh.frustumCulled = false;
+    mesh.castShadow = name.startsWith('near');
+    mesh.receiveShadow = true;
+    group.add(mesh);
+    const lod: Lod = {
+      mesh, capacity: cap, count: 0,
+      write: (slot, x, z, yaw, grow, rgb, carState) => {
+        quat.setFromAxisAngle(up, yaw);
+        matrix.compose(pos.set(x, 0, z), quat, scale.set(grow, grow, grow));
+        mesh.setMatrixAt(slot, matrix);
+        (paint.array as Float32Array).set(rgb, slot * 3);
+        (state.array as Float32Array).set(carState, slot * 4);
+      },
+      flush: () => {
+        if (mesh.count !== lod.count) mesh.count = lod.count;
+        if (lod.count > 0) {
+          mesh.instanceMatrix.needsUpdate = true;
+          paint.needsUpdate = true;
+          state.needsUpdate = true;
+        }
+      },
+    };
+    return lod;
+  };
+  // vd: one instanced Mesh per body and level over the body's geometry (world/vd-instanced.ts).
+  const buildVdLod = (
+    kind: VehicleKind, base: InstanceType<Three['BufferGeometry']>, material: InstanceType<Three['Material']>, cap: number, name: string,
+  ): Lod => {
+    const made = vdInstancedGeometry(THREE, base, cap, [
+      [VD_XFORM_ATTRIBUTE, 4], ['carState', LOFTED_INSTANCE_ATTRIBUTES.carState], ['paintColor', LOFTED_INSTANCE_ATTRIBUTES.paintColor],
+    ]);
+    const { geometry, buffer, stride } = made;
+    const at = { xform: made.offsets[VD_XFORM_ATTRIBUTE]!, state: made.offsets.carState!, paint: made.offsets.paintColor! };
+    const array = buffer.array as Float32Array;
+    // Visible while empty, as the lofted fleet's meshes are: instanceCount 0 skips the draw, and the one shared node
+    // build happens on frame 0 instead of when the first vehicle drives in.
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.name = `living-city:vehicles:${kind}:${name}`;
+    mesh.frustumCulled = false;
+    mesh.castShadow = name.startsWith('near');
+    mesh.receiveShadow = true;
+    group.add(mesh);
+    const lod: Lod = {
+      mesh, capacity: cap, count: 0,
+      write: (slot, x, z, yaw, grow, rgb, carState) => {
+        writeVdXform(array, slot, stride, at.xform, x, z, yaw, grow);
+        array.set(carState, slot * stride + at.state);
+        array.set(rgb, slot * stride + at.paint);
+      },
+      flush: () => {
+        geometry.instanceCount = lod.count;
+        if (lod.count > 0) buffer.needsUpdate = true;
+      },
+    };
+    return lod;
+  };
+
+  // vd lane: the baked bodies and their one shared material, loaded only when the lane is on.
+  const vd = options.vd ?? VD_LANE;
+  const vdMesh = vd ? loadVdCarMesh() : null;
+  const vdMaterial = vd ? loadVdCarMaterial().createVdCarMaterial(THREE, { glow }) : null;
+  const firstNear = (): number => 0;
+
+  const kinds = new Map<VehicleKind, LoftedKind>();
+  for (const kind of VEHICLE_KINDS) {
+    const entry = resolveVehicleEntry(registry, VEHICLE_SEMANTIC_ID[kind], kind);
+    if (!isLoftedRecipe(entry)) continue;
+    if (vdMesh && vdMaterial) {
+      // vd: the same baked body near (LOD2) and past the near cap (the `mid` decimation), per body.
+      const bodies: readonly VdCarId[] = kind === 'bus' ? [vdMesh.VD_BUS_ID] : VD_FLEET_BODIES[kind];
+      const ids = [...new Set(bodies)];
+      const cap = Math.min(capacity, nearCap);
+      const nears: Lod[] = [];
+      const fars: Lod[] = [];
+      for (const id of ids) {
+        const lods = vdMesh.vdCarLodGeometries(THREE, id);
+        nears.push(buildVdLod(kind, lods.near, vdMaterial, cap, `near-vd-${id}`));
+        fars.push(buildVdLod(kind, lods.mid, vdMaterial, capacity, `far-vd-${id}`));
+        lods.far.dispose();
+      }
+      const slot = bodies.map((id) => ids.indexOf(id));
+      const pickNear = slot.length === 1 ? firstNear : (id: number) => slot[Math.floor(vdMesh.vdCarHash(id) * slot.length) % slot.length]!;
+      const front = frontLampMount(kind);
+      const back = rearLampMount(kind);
+      // The XD40 runs 12.5 m over bumpers: its lamps sit at its own ends, not the lofted bus's.
+      const half = kind === 'bus' ? vdMesh.decodeVdCar(vdMesh.VD_BUS_ID).size[2] / 2 : 0;
+      const zFront = kind === 'bus' ? half : front.zFront;
+      const zRear = kind === 'bus' ? -half : back.zRear;
+      kinds.set(kind, {
+        kind, nears, pickNear, nearCap: cap, fars, nearMetres: VD_FLEET_NEAR_METRES, material: vdMaterial, bus: kind === 'bus',
+        head: { headlight: [front.x, front.y], zFront },
+        flare: { frontX: front.x, frontY: front.y, zFront, rearX: back.x, rearY: back.y, zRear },
+      });
+      continue;
+    }
+    if (kind === 'bus') {
+      const material = createLoftedBusMaterial(THREE, { glow });
+      const near = buildLod(kind, buildBusGeometryData(), material, capacity, 'near');
+      const front = frontLampMount(kind);
+      const back = rearLampMount(kind);
+      kinds.set(kind, {
+        kind, nears: [near], pickNear: firstNear, nearCap: capacity, fars: [], nearMetres: Infinity, material, bus: true,
+        head: { headlight: [front.x, front.y], zFront: front.zFront },
+        flare: { frontX: front.x, frontY: front.y, zFront: front.zFront, rearX: back.x, rearY: back.y, zRear: back.zRear },
+      });
+      continue;
+    }
+    const spec = bodySpecForKind(kind);
+    const made = createLoftedCarMaterial(THREE, spec, { glow, plateTexture: plateTexture ?? ownedPlate ?? undefined });
+    if (made.ownsPlateTexture) ownedPlate = made.plateTexture;
+    const cap = Math.min(capacity, nearCap);
+    const nears = [buildLod(kind, buildCarGeometryData(spec), made.material, cap, 'near')];
+    const far = buildLod(kind, buildCarProxyGeometryData(spec), made.material, capacity, 'far');
+    const front = frontLampMount(kind);
+    const back = rearLampMount(kind);
+    kinds.set(kind, {
+      kind, nears, pickNear: firstNear, nearCap: cap, fars: [far], nearMetres: Infinity, material: made.material, bus: false,
+      head: { headlight: [front.x, front.y], zFront: front.zFront },
+      flare: { frontX: front.x, frontY: front.y, zFront: front.zFront, rearX: back.x, rearY: back.y, zRear: back.zRear },
+    });
+  }
+  if (kinds.size === 0) return null;
+
+  // A road pool ahead of each of the nearest vehicles, parked under the street when unassigned.
+  const lightsOn = options.headlightLights ?? WORLD_CLUSTERED_LIGHTING;
+  const lightGroup = new THREE.Group();
+  lightGroup.name = 'living-city:vehicle-headlights';
+  const lights: InstanceType<Three['PointLight']>[] = [];
+  if (lightsOn) {
+    for (let i = 0; i < headlightLightCount(tier); i++) {
+      const light = createVehicleHeadlight(THREE);
+      light.position.set(0, -1000, 0);
+      lightGroup.add(light);
+      lights.push(light);
+    }
+    group.add(lightGroup);
+  }
+
+  // Night flares: four per vehicle, one instanced sprite draw.
+  const flareCapacity = Math.max(1, capacity * kinds.size * FLARES_PER_VEHICLE);
+  const flarePos = new Float32Array(flareCapacity * FLARE_STRIDE);
+  const flareCol = new Float32Array(flareCapacity * FLARE_STRIDE);
+  const flareGeometry = new THREE.PlaneGeometry(1, 1);
+  const flarePosAttr = new THREE.InstancedBufferAttribute(flarePos, FLARE_STRIDE);
+  const flareColAttr = new THREE.InstancedBufferAttribute(flareCol, FLARE_STRIDE);
+  flarePosAttr.setUsage(THREE.DynamicDrawUsage);
+  flareColAttr.setUsage(THREE.DynamicDrawUsage);
+  flareGeometry.setAttribute('flarePos', flarePosAttr);
+  flareGeometry.setAttribute('flareCol', flareColAttr);
+  const flareMaterial = createCarFlareMaterial(THREE, glow);
+  const flares = new THREE.Mesh(flareGeometry, flareMaterial);
+  flares.name = 'living-city:vehicle-flares';
+  flares.frustumCulled = false;
+  flares.visible = false;
+  flares.renderOrder = 2;
+  flares.count = 0;
+  group.add(flares);
+  const mpp = metresPerPixelAt1m(options.flareView?.fovDeg, options.flareView?.viewportPx);
+
+  const records: FleetRecord[] = [];
+  let recordCount = 0;
+  const byKind = new Map<VehicleKind, number[]>();
+  for (const kind of kinds.keys()) byKind.set(kind, []);
+  const paints = new Map<number, [number, number, number]>();
+  const paintColor = new THREE.Color();
+  const pose = { x: 0, z: 0, yaw: 0 };
+  const matrix = new THREE.Matrix4();
+  const quat = new THREE.Quaternion();
+  const up = new THREE.Vector3(0, 1, 0);
+  const pos = new THREE.Vector3();
+  const scale = new THREE.Vector3();
+  const one = new THREE.Vector3(1, 1, 1);
+  const litPositions: FleetRecord[] = [];
+
+  const writeInstance = (lod: Lod, rec: FleetRecord, blinkOn: boolean) => {
+    const slot = lod.count++;
+    let rgb = paints.get(rec.id);
+    if (!rgb) {
+      if (paints.size > capacity * 16) paints.clear();
+      paintColor.setStyle(vehiclePaintToken(rec.kind, rec.id));
+      rgb = [paintColor.r, paintColor.g, paintColor.b];
+      paints.set(rec.id, rgb);
+    }
+    lod.write(slot, rec.x, rec.z, rec.yaw, rec.grow, rgb, carStateFromFlags(rec.flags, blinkOn, VFLAG));
+  };
+
+  const flush = (lod: Lod) => lod.flush();
+
+  return {
+    kinds: new Set(kinds.keys()),
+    begin: () => {
+      recordCount = 0;
+    },
+    collect: (snap, index, alpha, kind) => {
+      const o = VSNAP_HEADER + index * VSNAP_STRIDE;
+      interpolateVehiclePose(snap, index, alpha, pose);
+      let rec = records[recordCount];
+      if (!rec) {
+        rec = { kind, id: 0, x: 0, z: 0, yaw: 0, flags: 0, grow: 1, dist: 0 };
+        records.push(rec);
+      }
+      rec.kind = kind;
+      rec.id = snap[o] ?? 0;
+      rec.x = pose.x;
+      rec.z = pose.z;
+      rec.yaw = pose.yaw;
+      rec.flags = snap[o + 9] ?? 0;
+      rec.grow = Math.min(1, 0.3 + ((snap[o + 10] ?? 99) / SPAWN_GROW_SECONDS) * 0.7);
+      rec.dist = 0;
+      recordCount++;
+    },
+    commit: (lampLevel, blinkOn) => {
+      glow.value = slopGlowFromLampLevel(lampLevel);
+      const focus = options.focus?.() ?? null;
+      for (const list of byKind.values()) list.length = 0;
+      for (let i = 0; i < recordCount; i++) {
+        const rec = records[i]!;
+        if (focus) rec.dist = Math.hypot(rec.x - focus.x, rec.z - focus.z);
+        byKind.get(rec.kind)?.push(i);
+      }
+      for (const [kind, lk] of kinds) {
+        const list = byKind.get(kind)!;
+        if (focus) list.sort((a, b) => records[a]!.dist - records[b]!.dist);
+        for (const near of lk.nears) near.count = 0;
+        for (const far of lk.fars) far.count = 0;
+        let nearUsed = 0;
+        for (const i of list) {
+          const rec = records[i]!;
+          const body = lk.pickNear(rec.id);
+          const near = lk.nears[body]!;
+          const far = lk.fars.length > 1 ? lk.fars[body] : lk.fars[0];
+          const close = !focus || rec.dist <= lk.nearMetres;
+          if (close && nearUsed < lk.nearCap && near.count < near.capacity) {
+            writeInstance(near, rec, blinkOn);
+            nearUsed++;
+          } else if (far && far.count < far.capacity) writeInstance(far, rec, blinkOn);
+        }
+        for (const near of lk.nears) flush(near);
+        for (const far of lk.fars) flush(far);
+      }
+
+      // Headlight pools: nearest effective distance first, faded at the cut-off, scaled by the night ramp.
+      let used = 0;
+      const beam = headlightBeamScale(glow.value);
+      if (lights.length > 0 && focus && beam > 0.001) {
+        litPositions.length = 0;
+        for (let i = 0; i < recordCount; i++) litPositions.push(records[i]!);
+        for (const lit of rankLitVehicles(litPositions, focus, lights.length)) {
+          const rec = litPositions[lit.index]!;
+          const lk = kinds.get(rec.kind)!;
+          quat.setFromAxisAngle(up, rec.yaw);
+          matrix.compose(pos.set(rec.x, 0, rec.z), quat, one);
+          const light = lights[used++]!;
+          placeVehicleHeadlight(light, lk.head, matrix);
+          light.intensity = (lk.bus ? HEADLIGHT_POOL.busIntensity : HEADLIGHT_POOL.intensity) * beam * lit.fade;
+        }
+      }
+      for (let i = used; i < lights.length; i++) {
+        const light = lights[i]!;
+        if (light.intensity === 0) continue;
+        light.intensity = 0;
+        light.position.set(0, -1000, 0);
+      }
+
+      // Flares past FLARE_NEAR_METRES once the glow says night.
+      let flareCount = 0;
+      if (focus && glow.value > FLARE_GLOW_ON) {
+        for (let i = 0; i < recordCount; i++) {
+          const rec = records[i]!;
+          flareCount = writeVehicleFlares(flarePos, flareCol, flareCount, rec, kinds.get(rec.kind)!.flare, focus, mpp);
+        }
+      }
+      flares.count = flareCount;
+      flares.visible = flareCount > 0;
+      if (flareCount > 0) {
+        flarePosAttr.needsUpdate = true;
+        flareColAttr.needsUpdate = true;
+      }
+    },
+    dispose: () => {
+      const materials = new Set<{ dispose(): void }>();
+      for (const lk of kinds.values()) {
+        for (const lod of [...lk.nears, ...lk.fars]) {
+          lod.mesh.geometry.dispose();
+          (lod.mesh as { dispose?: () => void }).dispose?.();
+        }
+        materials.add(lk.material);
+      }
+      if (vdMaterial) materials.add(vdMaterial);
+      for (const m of materials) m.dispose();
+      ownedPlate?.dispose();
+      for (const light of lights) light.dispose();
+      flareGeometry.dispose();
+      flareMaterial.dispose();
+    },
   };
 }

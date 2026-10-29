@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { permissionViewport } from './permissions-layout.ts';
+import { isWholeWindow, permissionViewport } from './permissions-layout.ts';
 
 describe('final onboarding fold-safe viewport', () => {
   it('uses the entire phone screen when there is no hinge', () => {
@@ -34,5 +34,16 @@ describe('final onboarding fold-safe viewport', () => {
     assert.deepEqual(permissionViewport(390, 844, [{
       kind: 'occlusion', x: 170, y: 0, width: 50, height: 28, active: true,
     }]), { left: 0, top: 0, width: 390, height: 844 });
+  });
+});
+
+describe('tablet classes apply only to a whole window', () => {
+  it('an iPad Pro in either orientation has the whole window', () => {
+    assert.equal(isWholeWindow(permissionViewport(1024, 1366, []), 1024, 1366), true);
+    assert.equal(isWholeWindow(permissionViewport(1366, 1024, []), 1366, 1024), true);
+  });
+  it('one segment of a book-posture foldable is not the whole window', () => {
+    const regions = [{ kind: 'division', x: 492, y: 0, width: 16, height: 800, orientation: 'vertical' as const, separating: true }];
+    assert.equal(isWholeWindow(permissionViewport(1000, 800, regions), 1000, 800), false);
   });
 });

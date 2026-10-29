@@ -1,7 +1,7 @@
 import { starterBloodlines } from '@acme/content';
 import { DISTRICT_COPY, DISTRICTS } from '@acme/spatial/copy';
 import { W01_COPY } from './copy.ts';
-import type { HudContent, HudMeter } from './hlynk-hud.ts';
+import type { HudContent, HudMeter } from '@acme/ui/three/hlynk/hud';
 
 /** Care meter colour on the screen, by the CARE section's tone for the same meter. */
 const METER_TONE: Record<(typeof W01_COPY.care.items)[number]['color'], HudMeter['tone']> = {

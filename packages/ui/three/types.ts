@@ -101,6 +101,11 @@ export interface ThreeCanvasHandle {
   invalidate: () => void;
 }
 
+/** Extra WebGPURenderer constructor options the app asks for (the physical city sets reversed depth). */
+export interface ThreeRendererParams {
+  reversedDepthBuffer?: boolean;
+}
+
 export interface ThreeCanvasProps<P> {
   /**
    * Loads the scene's setup. A module-level function with a stable identity,
@@ -114,6 +119,12 @@ export interface ThreeCanvasProps<P> {
   forceWebGL?: boolean;
   /** Stop the frame loop; the last frame stays on screen. */
   paused?: boolean;
+  /**
+   * Cap on frames drawn per second while the loop runs (the 3D H-Lynk's
+   * idle beam and Baby: 30). Unset: every display frame. Animation in scenes
+   * is delta-timed, so a cap only lowers the cost, not the speed.
+   */
+  maxFps?: number;
   /** Cap on device pixel ratio, to bound fill cost on 3x phones. Default 2. */
   maxPixelRatio?: number;
   /**
@@ -145,6 +156,8 @@ export interface ThreeCanvasProps<P> {
    * and on the worklet thread.
    */
   freeRun?: boolean;
+  /** Spread into the native WebGPURenderer constructor; read once per renderer. */
+  rendererParams?: ThreeRendererParams;
   /** Called with the backend once the renderer is up, or null when falling back. */
   onBackendChange?: (backend: ThreeBackend | null) => void;
   /** Opt-in JS renderer metrics. Worklet runtimes use their own reporting channel. */
@@ -166,9 +179,16 @@ export interface ThreeCanvasProps<P> {
 
 /** What the platform surface hands ThreeCanvas: a way to build a renderer on its canvas, and to present a frame. */
 export interface ThreeSurfaceHandle {
-  createRenderer: (THREE: Three, options: { backend: ThreeBackend; device: GPUDevice | null }) => ThreeWebGpu.WebGPURenderer;
+  createRenderer: (THREE: Three, options: { backend: ThreeBackend; device: GPUDevice | null; rendererParams?: ThreeRendererParams }) => ThreeWebGpu.WebGPURenderer;
   /** Native swaps the frame explicitly after each render; web presents on its own. */
   present: () => void;
   /** Native only: the raw react-native-webgpu context, for a worklet render runtime. Null on web. */
   getContext?: () => NativeCanvasContext | null;
+  /**
+   * Native only: whether the GPU canvas exists and has a size yet. A
+   * remounted react-native-webgpu Canvas can hand out its context (or a
+   * context without its `canvas`) a frame or two before it is laid out, and
+   * the renderer then reads `canvas.width` of undefined. Unset: always ready.
+   */
+  isReady?: () => boolean;
 }

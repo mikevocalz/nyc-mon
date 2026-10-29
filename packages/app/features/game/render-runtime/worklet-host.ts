@@ -1,10 +1,10 @@
 // The Game screen's WorkletRenderHost (ThreeCanvas `renderThread="worklet"`).
 // JS side of the worklet render runtime: it creates the runtime once, mirrors
-// gameCameraStore and callerStore into a Synchronizable snapshot on every
-// store change, relays the runtime's milestones to gameScreenStore, and wakes
+// gameCameraStore, callerStore and the time-of-day pick into a Synchronizable
+// snapshot on every store change, relays the runtime's milestones to gameScreenStore, and wakes
 // the runtime only when its loop is parked.
 //
-// Cost per input event on the JS thread: one packSnapshot (21 numbers) and one
+// Cost per input event on the JS thread: one packSnapshot (22 numbers) and one
 // Synchronizable write. A hop onto the render runtime happens only on the
 // parked-to-drawing edge, so a held stick costs one hop for the whole hold.
 //
@@ -27,7 +27,9 @@ import { callerStore } from '../character/caller-store.ts';
 import { gameCameraStore, gameScreenActions } from '../game-session.ts';
 import { EXPERIMENTAL_LIVING_CITY, livingCityHost } from '../living-city/bundled-host.ts';
 import { emptySnapshot, bumpSnapshot, packSnapshot, type SnapshotView } from '../render-snapshot.ts';
+import { readGpuDevice } from '@acme/ui/gpu';
 import { parseSkyRigFlag } from '../world/sky-rig.ts';
+import { onTimeOfDayChange, timeOfDayStore } from '../world/time-of-day.store.ts';
 import {
   setGameRenderRunning,
   startGameRender,
@@ -150,7 +152,7 @@ function start(options: WorkletRenderStart): WorkletRenderSession {
   const target = renderRuntime();
   const session = nextSession++;
   let view: SnapshotView = { width: options.width, height: options.height, pixelRatio: options.pixelRatio, reducedMotion: options.reducedMotion };
-  let latest = packSnapshot(emptySnapshot(), gameCameraStore.getState().camera, callerStore.getState(), view);
+  let latest = packSnapshot(emptySnapshot(), gameCameraStore.getState().camera, callerStore.getState(), view, timeOfDayStore.getState().preset);
   const snapshot: Synchronizable<number[]> = createSynchronizable(latest);
   const idle: Synchronizable<boolean> = createSynchronizable(false);
   // Vsync mode only: the UI driver exits when this goes false on dispose.
@@ -187,11 +189,14 @@ function start(options: WorkletRenderStart): WorkletRenderSession {
   // Each write must carry a FRESH array: worklets' createSerializable caches
   // serializables by JS-object identity (serializableMappingCache), so reusing
   // one buffer writes the first serialization forever — measured on the Duo,
-  // 2026-10-17 (every runtime tick read version 1). The slice is one 21-number
+  // 2026-10-17 (every runtime tick read version 1). The slice is one 22-number
   // array; the Serializable clone the Synchronizable builds allocates anyway.
-  const mirror = () => write(packSnapshot(latest, gameCameraStore.getState().camera, callerStore.getState(), view));
+  const mirror = () =>
+    write(packSnapshot(latest, gameCameraStore.getState().camera, callerStore.getState(), view, timeOfDayStore.getState().preset));
   const unsubscribeCamera = gameCameraStore.subscribe(mirror);
   const unsubscribeCaller = callerStore.subscribe(mirror);
+  // A new pick is a new version, so a parked loop wakes and city-scene re-lights.
+  const unsubscribeTimeOfDay = onTimeOfDayChange(timeOfDayStore, mirror);
 
   // Living City PR05 (EXPO_PUBLIC_LIVING_CITY=1): the JS-authoritative host
   // publishes one fresh packed array per sim tick. This is the camera
@@ -221,6 +226,7 @@ function start(options: WorkletRenderStart): WorkletRenderSession {
     session,
     context: options.context,
     device: options.device,
+    deviceSource: readGpuDevice()?.source ?? null,
     snapshot,
     vehicles,
     idle,
@@ -249,6 +255,7 @@ function start(options: WorkletRenderStart): WorkletRenderSession {
       driving?.setBlocking(false);
       unsubscribeCamera();
       unsubscribeCaller();
+      unsubscribeTimeOfDay();
       stopVehicles?.();
       lcHost?.detach();
       scheduleOnRuntime(target, stopOnRuntime, session, onRuntimeEvent);

@@ -17,6 +17,7 @@ import {
   livingCityCapsFor,
   parseLivingCityTier,
   parseWorldTier,
+  physicalPooledLights,
   resolveLivingCityTier,
   TIER,
   tierBundle,
@@ -172,4 +173,44 @@ test('PR09: the adaptive stepper walks high→medium→low on surrendering scale
   // 'xr' sits above 'high' in the walk: it steps down through it.
   const d = createLivingCityAdaptive();
   assert.equal(d.frame(0.5, 'xr'), 'high');
+});
+
+test('Slop-grade city start values (§5.7): phone = iPhone 17, high = iPad Pro', () => {
+  assert.deepEqual(TIER.phone.physical, {
+    shadowTile: 2048,
+    ssr: null,
+    bloomResolutionScale: 0.5,
+    clusteredMaxLights: 128,
+    headlightLights: 8,
+    streetlampLights: 24,
+    storefrontLights: 12,
+    interiorFootprintFade: true,
+    frameTarget: 60,
+  });
+  assert.deepEqual(TIER.high.physical, {
+    shadowTile: 3072,
+    ssr: { resolutionScale: 0.5, quality: 0.25, binaryRefine: true },
+    bloomResolutionScale: 0.5,
+    clusteredMaxLights: 256,
+    headlightLights: 24,
+    streetlampLights: 36,
+    storefrontLights: 28,
+    interiorFootprintFade: true,
+    frameTarget: 60,
+  });
+  // Shadow atlas memory at 4 bytes per texel, two tiles side by side.
+  const mib = (tile: number) => (tile * 2 * tile * 4) / 2 ** 20;
+  assert.equal(mib(TIER.phone.physical.shadowTile), 32);
+  assert.equal(mib(TIER.high.physical.shadowTile), 72);
+  // ClusteredLighting sizes its buffer by maxLights and a parked light still takes a slot: every pooled
+  // PointLight fits, with at least half the buffer to spare.
+  for (const tier of ['phone', 'high'] as const) {
+    const row = TIER[tier].physical;
+    assert.ok(row.clusteredMaxLights >= physicalPooledLights(row) * 2, `${tier}: ${physicalPooledLights(row)} pooled vs ${row.clusteredMaxLights}`);
+  }
+  assert.equal(physicalPooledLights(TIER.phone.physical), 44);
+  assert.equal(physicalPooledLights(TIER.high.physical), 88);
+  // The physical rows leave the selector and its defaults alone.
+  assert.equal(parseWorldTier(undefined), 'phone');
+  assert.equal(parseWorldTier('low'), 'phone');
 });

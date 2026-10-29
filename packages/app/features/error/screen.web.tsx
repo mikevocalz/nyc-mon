@@ -11,7 +11,7 @@ import { ErrorMessageBlock, type ErrorScreenProps } from './screen.shared';
  * the one place the site uses it. Either way the message sits on an ink
  * plate and the scene is dimmed under it.
  */
-export function ErrorScreen(props: Omit<ErrorScreenProps, 'onGoHome'>) {
+export function ErrorScreen(props: Omit<ErrorScreenProps, 'onGoHome' | 'onGoBack'>) {
   const router = useRouter();
   const notFound = (props.kind ?? 'not-found') === 'not-found';
   return (

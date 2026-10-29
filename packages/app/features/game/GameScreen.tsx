@@ -27,12 +27,12 @@
 // beginning and ending). `useWorldSaveLifecycle` is mounted here, once, with
 // the Caller identity read the way the boot screen reads it (`readSave()`).
 import { useEffect, useMemo, useRef } from 'react';
-import { AccessibilityInfo, I18nManager, Platform, type LayoutChangeEvent, type HostInstance } from 'react-native';
+import { AccessibilityInfo, I18nManager, Platform, useWindowDimensions, type LayoutChangeEvent, type HostInstance } from 'react-native';
+import { EXPERIMENTAL_WORLD_PHYSICAL } from './world/physical-look.ts';
 import { GestureDetector } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useStore } from 'zustand';
-import { IconButton, useInstanceStore, useReducedMotion } from '@acme/ui';
-import { ChevronLeft } from '@acme/ui/icons';
+import { BackButton, SafeArea, useInstanceStore, useReducedMotion } from '@acme/ui';
 import { useGpuSupport } from '@acme/ui/gpu';
 import { ThreeCanvas, type ThreeCanvasHandle } from '@acme/ui/three';
 import {
@@ -66,6 +66,13 @@ import { loadGameScene, type GameSceneParams } from './load-game-scene.ts';
 import { CITY_FRAME_SINK_ENABLED, onCityFrame } from './perf/on-city-frame.ts';
 import { GAME_SURFACE_TYPE } from './perf/surface-type.ts';
 import { GAME_FREERUN } from './perf/frame-pacing.ts';
+import { physicalRendererParams } from './world/physical-look.ts';
+import { onTimeOfDayChange, timeOfDayStore } from './world/time-of-day.store.ts';
+import { runJsDeviceProbe } from './render-runtime/run-js-device-probes.ts';
+
+// EXPO_PUBLIC_WORLD_PHYSICAL: reversed depth on the JS render path. Flag off: {}.
+const PHYSICAL_RENDERER_PARAMS = physicalRendererParams();
+import { budgetedPixelRatio } from './perf/pixel-budget.ts';
 import { useGamePerfMounts } from './perf/use-game-perf.ts';
 import { useGameRenderThread } from './render-thread-choice.ts';
 import { readLobbyIdentity } from './lobby/lobby-identity.ts';
@@ -132,6 +139,7 @@ export function GameScreen({ focused = true }: GameScreenProps = {}) {
   const { width, height, originX, originY } = useStore(geometry);
   const host = useRef<HostInstance>(null);
   const canvas = useRef<ThreeCanvasHandle>(null);
+  const windowSize = useWindowDimensions();
 
   const screen = useStore(gameScreenStore);
   const overMappedArea = useStore(gameCameraStore, (s) => (city.ok ? isOverMappedArea(s.camera, city.bounds) : true));
@@ -148,6 +156,10 @@ export function GameScreen({ focused = true }: GameScreenProps = {}) {
     gameScreenActions.viewStateChanged(state);
   }, [state]);
   useEffect(() => () => gameScreenActions.viewStateChanged(null), []);
+  // EXPO_PUBLIC_WORLD_PROBE=shared|skiatex on the RN runtime; a no-op otherwise.
+  useEffect(() => {
+    void runJsDeviceProbe();
+  }, []);
   // Gameplay input and the controller exist only once the lobby has handed over (review finding H1):
   // under the cover, neither touch, hardware nor a screen reader reaches the world.
   const lobbyPhase = useStore(lobbyStore, (s) => s.phase);
@@ -157,6 +169,8 @@ export function GameScreen({ focused = true }: GameScreenProps = {}) {
   useEffect(() => gameCameraStore.subscribe(() => canvas.current?.invalidate()), []);
   // The Caller moving (a jump in place moves no camera) -> one redraw, outside React render.
   useEffect(() => callerStore.subscribe(() => canvas.current?.invalidate()), []);
+  // A new time-of-day pick -> one redraw; city-scene re-lights from params.preset in that frame.
+  useEffect(() => onTimeOfDayChange(timeOfDayStore, () => canvas.current?.invalidate()), []);
 
   // Redraw once when the lobby hands over. The on-demand canvas drew its
   // first frame under the lobby cover, and on Android that frame does not
@@ -201,6 +215,8 @@ export function GameScreen({ focused = true }: GameScreenProps = {}) {
       // PR07: the world clock picks the sky preset (dusk at the slice's
       // starting hour). Flag off → undefined → the world's own default.
       sky: livingCitySky(),
+      // EXPO_PUBLIC_WORLD_PHYSICAL: the time-of-day pick; city-scene re-lights on change.
+      get preset() { return timeOfDayStore.getState().preset; },
       onFirstFrame: gameScreenActions.firstFrame,
     };
   }, [city]);
@@ -288,6 +304,10 @@ export function GameScreen({ focused = true }: GameScreenProps = {}) {
               // Off by default; EXPO_PUBLIC_GAME_FREERUN=1 lets the on-demand
               // loop outpace vsync — only meaningful on the superseding surface.
               freeRun={GAME_FREERUN}
+              rendererParams={PHYSICAL_RENDERER_PARAMS}
+              // The physical city's targets were sized for an iPhone 17 buffer; a bigger
+              // screen gets a lower ratio rather than running out of memory.
+              maxPixelRatio={EXPERIMENTAL_WORLD_PHYSICAL ? budgetedPixelRatio(windowSize.width, windowSize.height, 2) : undefined}
               load={loadGameScene}
               params={params}
               paused
@@ -341,20 +361,18 @@ export function GameScreen({ focused = true }: GameScreenProps = {}) {
           // Leave the city: pause (the session saves on pause), then back to
           // the lobby, which offers "Continue your game". The rail is hidden
           // while the city is up, so this is the way out.
-          <View className="absolute" style={{ top: insets.top + 12, left: insets.left + 12 }}>
-            <IconButton
-              aria-label="Back to the lobby"
-              icon={<ChevronLeft />}
-              variant="cornerCut"
-              tone="orange"
-              corner="bottom-right"
-              size="lg"
-              onPress={() => {
-                gameInputRouter.pauseRequest('touch');
-                lobbyStore.getState().returnToLobby();
-              }}
-            />
-          </View>
+          // The kit BackButton in the same top-left spot as every other screen.
+          <SafeArea edges={['top', 'left']} pointerEvents="box-none" className="absolute left-0 top-0">
+            <View className="flex-row px-4 pt-4">
+              <BackButton
+                label="Back to the lobby"
+                onPress={() => {
+                  gameInputRouter.pauseRequest('touch');
+                  lobbyStore.getState().returnToLobby();
+                }}
+              />
+            </View>
+          </SafeArea>
         ) : null}
       </View>
     </View>

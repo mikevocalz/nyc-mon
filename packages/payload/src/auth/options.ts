@@ -5,7 +5,7 @@
 import { passkey } from '@better-auth/passkey';
 import { isConsentRequired } from '@acme/core/sim';
 import type { BetterAuthOptions } from 'better-auth';
-import { APIError, createAuthMiddleware, getSessionFromCtx } from 'better-auth/api';
+import { addOAuthServerContext, APIError, createAuthMiddleware, getOAuthState, getSessionFromCtx } from 'better-auth/api';
 import { bearer } from 'better-auth/plugins/bearer';
 import { deviceAuthorization } from 'better-auth/plugins/device-authorization';
 import { oneTimeToken } from 'better-auth/plugins/one-time-token';
@@ -22,6 +22,13 @@ import { assertFreshSession } from './plugins/fresh';
 import { handoff, hashHandoffToken } from './plugins/handoff';
 import { browserClientOrigins, readOAuthConfig } from './oauth/config';
 import { alexaOAuthPlugins } from './oauth/plugins';
+import {
+  BIRTH_YEAR_REQUIRED,
+  birthYearFromAdditionalData,
+  isAgeGatedSocialProvider,
+  SOCIAL_BIRTH_YEAR_KEY,
+  socialProviderForCreate,
+} from './social-age';
 import { createSmsSender } from './sms';
 import { consumeSmsQuota, MAX_SMS_PER_NUMBER_PER_DAY, MAX_SMS_PER_USER_PER_DAY } from './sms-quota';
 import { isSurface, SURFACE_HEADER, type Surface, surfaceForClientId, surfaceLabel } from './surface';
@@ -84,10 +91,23 @@ function sendNotice(to: string | undefined, mail: ReturnType<typeof newSurfaceMa
 
 const socialProviders: NonNullable<BetterAuthOptions['socialProviders']> = {};
 if (env.google !== undefined) {
-  socialProviders.google = env.google;
+  const { nativeClientIds, ...google } = env.google;
+  // The web client id comes first: Better Auth uses it for the redirect flow.
+  // The iOS and Android ids are extra ID-token audiences for the app.
+  socialProviders.google = {
+    ...google,
+    clientId: nativeClientIds.length === 0 ? google.clientId : [google.clientId, ...nativeClientIds],
+  };
 }
 if (env.apple !== undefined) {
-  socialProviders.apple = env.apple;
+  const { appBundleIdentifier, ...apple } = env.apple;
+  socialProviders.apple = {
+    ...apple,
+    // Web sign-in sends an ID token minted for the Services ID (clientId);
+    // the native iOS sheet mints one for the app's bundle id. Accept both.
+    // Better Auth's own fallback picks only one of them.
+    audience: appBundleIdentifier === undefined ? apple.clientId : [appBundleIdentifier, apple.clientId],
+  };
 }
 
 const baseOrigin = new URL(env.baseURL);
@@ -244,7 +264,18 @@ export const betterAuthOptions = {
   baseURL: env.baseURL,
   basePath: `${PAYLOAD_API_ROUTE}${AUTH_BASE_PATH}`,
   secret: env.secret,
-  trustedOrigins: [baseOrigin.origin, NATIVE_APP_ORIGIN, ...env.trustedOrigins],
+  // The product site is first-party: M03's Apple/Google redirect returns there.
+  // PAYLOAD_ORIGINS adds the product site (first-party), where M03's Apple
+  // and Google redirect returns; env.trustedOrigins keeps non-http schemes.
+  // Apple's web flow posts the callback from appleid.apple.com (form_post).
+  trustedOrigins: [
+    ...new Set([
+      ...PAYLOAD_ORIGINS,
+      NATIVE_APP_ORIGIN,
+      ...(env.apple === undefined ? [] : ['https://appleid.apple.com']),
+      ...env.trustedOrigins,
+    ]),
+  ],
   // The stock verify would hand the second device the phone's own session;
   // `/handoff/redeem` creates a new one. Phone numbers are never a password.
   // The OAuth provider's client CRUD and OIDC paths are off: clients are
@@ -278,6 +309,8 @@ export const betterAuthOptions = {
       '/one-time-token/generate': { window: 60, max: 5 },
     },
   },
+  // `user.deleteUser` is enabled in payload.config.ts (selfDeletionOptions in
+  // ./deletion): its beforeDelete needs the live Payload to move Mons and eggs.
   user: {
     additionalFields: {
       role: { type: 'string', defaultValue: 'user', input: false },
@@ -393,6 +426,21 @@ export const betterAuthOptions = {
           }
           return;
         }
+        case '/sign-in/social': {
+          // Apple and Google carry no birth year. A create-intent client sends
+          // the M04 answer in additionalData; it is checked here and, for the
+          // redirect flow, kept in the OAuth state so the callback can read it.
+          const body: unknown = ctx.body;
+          if (!isAgeGatedSocialProvider(readField(body, 'provider'))) return;
+          const raw = birthYearFromAdditionalData(body);
+          if (raw === undefined) return;
+          const birthYear = parseBirthYear(raw, new Date().getUTCFullYear());
+          if (birthYear === undefined) {
+            throw APIError.from('BAD_REQUEST', { code: 'INVALID_BIRTH_YEAR', message: 'Birth year is not valid.' });
+          }
+          await addOAuthServerContext({ [SOCIAL_BIRTH_YEAR_KEY]: birthYear });
+          return;
+        }
         case '/device/approve':
         case '/one-time-token/generate': {
           // Handing a session to another screen needs a recent sign-in (ADR 0004 §9).
@@ -408,11 +456,28 @@ export const betterAuthOptions = {
   databaseHooks: {
     user: {
       create: {
-        before: async (user) => {
+        before: async (user, ctx) => {
           const nowMs = Date.now();
           const currentYear = new Date(nowMs).getUTCFullYear();
-          if (user.birthYear === undefined || user.birthYear === null) return;
-          const birthYear = parseBirthYear(user.birthYear, currentYear);
+          // A new Apple or Google identity takes its birth year from the M04
+          // answer the client attached; without one, no account is created
+          // and the client routes the Caller to the gate (BIRTH_YEAR_REQUIRED).
+          const social = socialProviderForCreate(ctx?.path, ctx?.body, ctx?.params);
+          let rawBirthYear: unknown = user.birthYear;
+          if (social !== undefined && (rawBirthYear === undefined || rawBirthYear === null)) {
+            rawBirthYear =
+              ctx?.path === '/sign-in/social'
+                ? birthYearFromAdditionalData(ctx.body)
+                : readField((await getOAuthState())?.serverContext, SOCIAL_BIRTH_YEAR_KEY);
+            if (rawBirthYear === undefined || rawBirthYear === null) {
+              throw APIError.from('FORBIDDEN', {
+                code: BIRTH_YEAR_REQUIRED,
+                message: 'Answer the birth-year question before making an account.',
+              });
+            }
+          }
+          if (rawBirthYear === undefined || rawBirthYear === null) return;
+          const birthYear = parseBirthYear(rawBirthYear, currentYear);
           if (birthYear === undefined) {
             throw APIError.from('BAD_REQUEST', {
               code: 'INVALID_BIRTH_YEAR',
@@ -427,6 +492,7 @@ export const betterAuthOptions = {
               message: 'A parent or guardian needs to approve this account first.',
             });
           }
+          if (social !== undefined) return { data: { ...user, birthYear } };
         },
       },
     },

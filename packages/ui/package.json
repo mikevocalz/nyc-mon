@@ -13,6 +13,8 @@
     "./gpu": "./gpu/index.ts",
     "./three": "./three/index.ts",
     "./three/cel": "./three/cel/index.ts",
+    "./three/hlynk": "./three/hlynk/index.ts",
+    "./three/hlynk/hud": "./three/hlynk/hud.ts",
     "./three/internals": "./three/renderer-internals.ts",
     "./neon": "./neon/index.ts",
     "./elements": "./elements/index.ts",

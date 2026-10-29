@@ -82,11 +82,22 @@ export const CITY_MAP_DERIVED: CityMapSourceCredit = {
 };
 
 // Bundled model/texture assets, separate from the map-data records above:
-// the vd lane ships compiled tree models and baked textures (vd-trees.ts,
-// vd-textures.ts). CC BY requires the author credit in-app.
+// the vd lane ships compiled tree and car models and baked textures
+// (vd-trees.ts, vd-cars.ts, vd-textures.ts). CC BY requires the author
+// credit in-app.
 export const CITY_MAP_ASSETS: readonly CityMapSourceCredit[] = [
   {
     attribution: 'Street tree models (Valdrada bxtrees), M. K. Turkcan',
+    license: 'CC BY 4.0',
+    licenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
+  },
+  {
+    attribution: 'Car models (Lincoln, SUV, van, Mercedes, Charger), CARLA Simulator (carla.org), via Valdrada',
+    license: 'CC BY 4.0',
+    licenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
+  },
+  {
+    attribution: 'Taxi model (Nissan NV200), memoov on Sketchfab, TLC build by Valdrada',
     license: 'CC BY 4.0',
     licenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
   },

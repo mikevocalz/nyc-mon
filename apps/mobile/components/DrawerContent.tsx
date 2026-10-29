@@ -10,6 +10,7 @@ import { useRouter, type Href } from 'expo-router';
 import { Pressable, Text, View } from '@acme/ui/tw';
 import { Avatar } from '@acme/ui';
 import { useProfile } from '@acme/app';
+import { useResolveClassNames } from 'uniwind';
 
 
 /**
@@ -30,6 +31,8 @@ export function DrawerContent(props: DrawerContentComponentProps) {
   // The signed-in user lives in the profile store; the drawer used to hardcode
   // a second copy of the name, so the two drifted apart.
   const profileName = useProfile((state) => state.name);
+  // Lucide sizes from a prop: 18 on phones, 24 from md (tablets), read through Uniwind.
+  const { width: iconSize } = useResolveClassNames('w-[18px] md:w-[24px]') as { width?: number };
 
   const router = useRouter();
   const navigate = (href: Href) => {
@@ -45,16 +48,16 @@ export function DrawerContent(props: DrawerContentComponentProps) {
       {/* Identity block. The 2px rule and the raised slab match every other
           bordered surface in the app; the old hairline was the only 1px border
           in the drawer and read as an unfinished divider. */}
-      <View className="mx-3 mb-4 flex-row items-center gap-3 rounded-none border-2 border-border bg-surface-raised p-3 shadow-card">
+      <View className="mx-3 mb-4 flex-row items-center gap-3 rounded-none border-2 border-border bg-surface-raised p-3 shadow-card md:mx-4 md:mb-6 md:gap-4 md:p-4">
         <Avatar name={profileName} />
         <View className="flex-1">
-          <Text numberOfLines={1} className="text-base font-semibold text-text">
+          <Text numberOfLines={1} className="text-base font-semibold text-text md:text-xl">
             {profileName}
           </Text>
         </View>
       </View>
 
-      <Text className="mx-5 mb-1 text-sm font-semibold text-text-muted">Menu</Text>
+      <Text className="mx-5 mb-1 text-sm font-semibold text-text-muted md:mx-6 md:text-base">Menu</Text>
 
       <View className="py-2">
         {MAIN_ITEMS.map((item) => {
@@ -76,15 +79,15 @@ export function DrawerContent(props: DrawerContentComponentProps) {
               // lift. It only ever fires on web and pointer-equipped devices,
               // so it is a refinement layered on top of the active state, never
               // the only signal that a row is interactive.
-              className={`mx-3 mb-1 min-h-11 flex-row items-center gap-3 rounded-none border-2 px-3 py-2.5 transition-colors duration-fast motion-reduce:transition-none ${
+              className={`mx-3 mb-1 min-h-11 flex-row items-center gap-3 rounded-none border-2 px-3 py-2.5 md:mx-4 md:mb-2 md:min-h-14 md:gap-4 md:px-4 md:py-3.5 transition-colors duration-fast motion-reduce:transition-none ${
                 active
                   ? 'border-border bg-primary shadow-card hover:bg-primary-pressed'
                   : 'border-transparent hover:bg-surface-sunken active:bg-surface-sunken'
               }`}
             >
-              <item.icon size={18} className={active ? 'text-on-primary' : 'text-text-muted'} />
+              <item.icon size={iconSize ?? 18} className={active ? 'text-on-primary' : 'text-text-muted'} />
               <Text
-                className={`flex-1 text-base ${
+                className={`flex-1 text-base md:text-xl ${
                   active ? 'font-semibold text-on-primary' : 'text-text'
                 }`}
               >

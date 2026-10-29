@@ -192,3 +192,14 @@ test('merge radius and class set are the documented constants', () => {
   assert.equal(NODE_MERGE_METRES, 20);
   assert.ok(CARRIAGEWAY_CLASSES.has('residential') && !CARRIAGEWAY_CLASSES.has('crossing') && !CARRIAGEWAY_CLASSES.has('sidewalk'));
 });
+
+test('every lane centre sits inside its carriageway, one-way pieces included', () => {
+  const topology = bundled();
+  const widthOf = new Map(topology.segments.map((s) => [s.roadId, s.widthMeters]));
+  const outside = topology.lanes.filter((lane) => {
+    const width = widthOf.get(lane.roadId);
+    return width !== undefined && Math.abs(lane.lateral) > width / 2 - lane.widthMeters / 2 + 1e-6;
+  });
+  assert.equal(topology.lanes.some((lane) => lane.oneway !== 0), true);
+  assert.deepEqual(outside.map((lane) => lane.id), []);
+});

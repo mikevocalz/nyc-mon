@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useWindowDimensions } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { bloodlines, eggs } from '@acme/content';
@@ -9,12 +9,17 @@ import type { EggRecord, IncubationMinutes } from '@acme/core/types';
 import {
   Button,
   ChoiceRows,
+  createIncubateScreen,
+  createStageReady,
+  DeviceStage,
   ErrorMessage,
   FIT_SIDE_GAP_PT,
   Heading,
   HLynkFit,
   HLynkShell,
   IncubationRing,
+  SafeArea,
+  StageReadyGate,
   StatusRow,
   Text,
   TrackpadActions,
@@ -26,7 +31,9 @@ import {
   type HLynkFitContext,
   type HLynkStatus,
   type IncubationRingStop,
+  type DeviceKey,
   type ShellTrackpadProps,
+  type StageReadyResource,
 } from '@acme/ui';
 import { haptics } from '@acme/ui/haptics';
 import { View } from '@acme/ui/tw';
@@ -47,7 +54,12 @@ import {
   readyAt,
   stepMinutes,
 } from './egg-model';
+import { CompanionStageHost, useTabletClass } from '../companion/CompanionStageHost';
 import { EggStill } from './EggStill';
+import { IncubationPane } from './IncubationPane';
+import { eggGlowTint, eggModelSource } from './egg-source';
+import { StageControls } from './StageControls';
+import { StageLoader } from './StageLoader';
 import { incubateArrangement, incubateFitBlocks, isAccessibilityTextSize } from './window-layout';
 
 const OPTION_ID: Record<IncubationMinutes, { label: EggCopyId; a11y: EggCopyId }> = {
@@ -93,7 +105,13 @@ interface IncubateStore {
   readonly permissionsShown: boolean;
   readonly nowMs: number;
   readonly scheme: 'daylit' | 'night';
+  /** The 3D H-Lynk: `starting` until its first frame with the egg, `ready`, or `failed` (the 2D shell then). */
+  readonly stage3d: 'starting' | 'ready' | 'failed';
+  readonly stageReady: StageReadyResource;
 }
+
+/** The kit's convention for a model that does not exist yet (MonView, EggStill). */
+const COMING_SOON = 'Coming Soon';
 
 /**
  * M10 incubation choice (docs/design/screens/M10/08-handoff.md, D-16b/c/e).
@@ -116,9 +134,77 @@ export function IncubateScreen() {
 
   const store = useInstanceStore<IncubateStore>(() => {
     const nowMs = Date.now();
-    return { minutes: null, phase: 'choose', egg: null, permissionsShown: false, nowMs, scheme: schemeForTime(nowMs) };
+    return {
+      minutes: null, phase: 'choose', egg: null, permissionsShown: false, nowMs, scheme: schemeForTime(nowMs),
+      stage3d: 'starting', stageReady: createStageReady(),
+    };
   });
   const s = useStore(store);
+  const tablet = useTabletClass();
+
+  // The 3D H-Lynk continues M08's device: the chosen egg's 3D model large on
+  // the glass, the times and Start as glass buttons, `<`/`>` and the trackpad
+  // as the controls. Handlers go through a ref so the screen stays stable.
+  // The latest handlers, written after each commit (an effect) and read only from event paths.
+  const handlers = useInstanceStore<{ option: (i: number) => void; start: () => void; key: (k: DeviceKey) => void }>(() => ({ option: () => undefined, start: () => undefined, key: () => undefined }));
+  const onStageKey = useCallback((key: DeviceKey) => handlers.getState().key(key), [handlers]);
+  const onStageReady = useCallback(() => {
+    store.setState({ stage3d: 'ready' });
+    store.getState().stageReady.settle();
+  }, [store]);
+  const onStageBackend = useCallback((backend: unknown) => {
+    if (backend !== null) return;
+    store.setState({ stage3d: 'failed' });
+    store.getState().stageReady.settle();
+  }, [store]);
+  const eggName = egg?.eggName;
+  const eggSource = useMemo(() => (egg === undefined ? null : { source: eggModelSource(egg), glow: eggGlowTint(egg) }), [egg?.bloodlineId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const incubateScreen = useMemo(() => createIncubateScreen({
+    title: eggCopy('m10.title'),
+    body: eggCopy('m10.body'),
+    status: () => {
+      const now = store.getState();
+      if (now.phase === 'confirmed' && now.egg !== null) {
+        const chip = ledChip(now.egg.incubationEndsAt - now.nowMs);
+        return eggCopy(chip.id, { minutes: chip.minutes });
+      }
+      return eggCopy('m10.egg.a11y.label', { eggName: eggName ?? '' });
+    },
+    egg: eggSource ?? { source: null },
+    comingSoon: COMING_SOON,
+    options: STOPS.map((stop) => stop.label),
+    selected: () => {
+      const { minutes } = store.getState();
+      return minutes === null ? null : INCUBATION_MINUTES.indexOf(minutes);
+    },
+    ready: () => {
+      const { minutes, nowMs } = store.getState();
+      if (minutes === null) return '';
+      const at = readyAt(nowMs, minutes, formatClock);
+      return eggCopy(at.id, { time: at.time });
+    },
+    start: () => {
+      const { minutes, phase } = store.getState();
+      if (phase === 'error') return { label: eggCopy('m10.error.retry'), disabled: false };
+      if (phase === 'starting') return { label: eggCopy('m10.cta.starting.a11y'), disabled: true };
+      return { label: eggCopy('m10.cta.start'), disabled: minutes === null || phase === 'confirmed' };
+    },
+    busy: () => {
+      const { phase } = store.getState();
+      return phase === 'starting' || phase === 'confirmed';
+    },
+    error: () => store.getState().phase === 'error'
+      ? { title: eggCopy('m10.error.title'), body: eggCopy('m10.error.body') }
+      : null,
+    // The egg glows warmer once it is incubating; holding the trackpad adds the rest (scene).
+    warmth: () => {
+      const { phase } = store.getState();
+      return phase === 'confirmed' ? 1 : phase === 'starting' ? 0.6 : 0;
+    },
+    subscribe: (onChange) => store.subscribe(onChange),
+    onOption: (i) => handlers.getState().option(i),
+    onStart: () => handlers.getState().start(),
+  }), [store, eggName, eggSource, handlers]);
 
   // Ready-at refreshes with the clock while a time is chosen but not started.
   useEffect(() => {
@@ -152,7 +238,6 @@ export function IncubateScreen() {
     if (closeTimer.current !== null) clearTimeout(closeTimer.current);
   }, []);
 
-  if (egg === undefined) return null;
 
   const busy = s.phase === 'starting' || s.phase === 'confirmed';
   const choose = (minutes: IncubationMinutes) => {
@@ -167,7 +252,7 @@ export function IncubateScreen() {
 
   const start = () => {
     const { minutes, phase } = store.getState();
-    if (phase === 'starting' || phase === 'confirmed') return;
+    if (phase === 'starting' || phase === 'confirmed' || egg === undefined) return;
     if (minutes === null) {
       // With no time chosen, activate picks nothing and says why (handoff "Trackpad").
       announcePolitely(eggCopy('m10.cta.start.a11y.hint.disabled'));
@@ -198,6 +283,30 @@ export function IncubateScreen() {
       reducedMotion ? 0 : AFTER_START_HOLD_MS,
     );
   };
+
+  const goBack = () => {
+    if (!busy) router.back();
+  };
+  useEffect(() => {
+    handlers.setState({
+    option: (i) => {
+      const minutes = INCUBATION_MINUTES[i];
+      if (minutes === undefined || busy) return;
+      haptics.selection();
+      choose(minutes);
+    },
+    start,
+    key: (k) => {
+      if (k === 'prev') step(-1);
+      else if (k === 'next') step(1);
+      else if (k === 'activate') start();
+      else if (k === 'home' && s.permissionsShown) router.replace(readPermissionReview() === 'pending' ? PERMISSIONS_PATH : MON_HOME_PATH);
+      else if (k === 'back' || k === 'home') goBack();
+    },
+    });
+  });
+
+  if (egg === undefined) return null;
 
   const ready = s.minutes === null ? undefined : readyAt(s.nowMs, s.minutes, formatClock);
   const status: HLynkStatus =
@@ -371,6 +480,86 @@ export function IncubateScreen() {
       )}
     </HLynkFit>
   );
+
+  // Same rule as M08: the 3D H-Lynk runs unless motion is reduced, the GPU
+  // never started, or large text switched to rows; then nothing 2D shows.
+  // The Rive loader covers it until the egg is on the glass.
+  const stageOn = !reducedMotion && !listLayout && s.stage3d !== 'failed';
+  if (stageOn) {
+    return (
+      <View className="flex-1 bg-ink-950" testID="m10-3d">
+        <SafeArea className="flex-1" edges={['top', 'bottom', 'left', 'right']}>
+          <CompanionStageHost
+            enabled={tablet.companion}
+            pane={
+              <IncubationPane
+                testID="m10-pane"
+                reducedMotion={reducedMotion}
+                input={eggName === undefined ? null : {
+                  eggName,
+                  stage: s.phase === 'confirmed' ? 'incubating' : 'choosing',
+                  duration: s.minutes === null ? null : eggCopy(OPTION_ID[s.minutes].a11y),
+                  startedAt: s.egg?.createdAt ?? null,
+                  readyAt: s.egg?.incubationEndsAt ?? (s.minutes === null ? null : s.nowMs + s.minutes * 60_000),
+                  clock: formatClock,
+                }}
+              />
+            }
+            device={<>
+            {/* Visually hidden: the times as a radio group for screen readers and keyboards. */}
+            <View className="absolute inset-0 opacity-0" pointerEvents="none" testID="m10-ring-a11y">
+              <ChoiceRows
+                rows={STOPS.map((stop) => ({ key: String(stop.value), label: stop.accessibilityLabel, accessibilityLabel: stop.accessibilityLabel }))}
+                value={s.minutes === null ? null : INCUBATION_MINUTES.indexOf(s.minutes)}
+                onChange={(i) => handlers.getState().option(i)}
+                accessibilityLabel={eggCopy('m10.ring.a11y.label')}
+                testID="m10-ring"
+                rowTestID={(row) => `m10-option-${row.key}`}
+              />
+            </View>
+            <View
+              testID="m10-device-stage"
+              aria-hidden
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+              className="absolute inset-0"
+            >
+              <DeviceStage
+                screen={incubateScreen}
+                label={incubatingLabel}
+                className="h-full"
+                stageClassName="min-h-0 w-full flex-1"
+                glassScale={tablet.glassScale}
+                onKey={onStageKey}
+                onReady={onStageReady}
+                onBackendChange={onStageBackend}
+              />
+            </View>
+            <Suspense fallback={<StageLoader label={titleText} testID="m10-stage-loader" />}>
+              <StageReadyGate resource={s.stageReady} />
+            </Suspense>
+            <StageControls
+              testID="m10-stage-controls"
+              controls={[
+                {
+                  key: 'start',
+                  label: s.phase === 'error' ? eggCopy('m10.error.retry') : eggCopy('m10.cta.start'),
+                  hint: s.minutes === null ? eggCopy('m10.cta.start.a11y.hint.disabled') : readyText,
+                  disabled: s.minutes === null || busy,
+                  onPress: start,
+                  testID: 'm10-start',
+                },
+                { key: 'shorter', label: eggCopy('m10.action.prev'), onPress: () => step(-1), disabled: busy, testID: 'm10-prev' },
+                { key: 'longer', label: eggCopy('m10.action.next'), onPress: () => step(1), disabled: busy, testID: 'm10-next' },
+                { key: 'back', label: eggCopy('m10.back.a11y.label'), onPress: goBack, disabled: busy, testID: 'm10-back' },
+              ]}
+            />
+            </>}
+          />
+        </SafeArea>
+      </View>
+    );
+  }
 
   return (
     <HLynkShell

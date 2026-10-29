@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useImperativeHandle, useRef } from 'react';
+import { useEffect, useImperativeHandle, useLayoutEffect, useRef } from 'react';
 import { PixelRatio, Platform, type GestureResponderEvent } from 'react-native';
 import { twMerge } from 'tailwind-merge';
 import { useReducedMotion } from '../backgrounds/use-reduced-motion';
@@ -9,7 +9,7 @@ import { useInstance, useInstanceStore, useStore } from '../use-instance-store';
 import { useLayoutSize } from '../use-layout-size';
 import { View } from '../tw';
 import { loadThree } from './load-three';
-import { advanceNodeFrame, stopInternalLoop } from './renderer-internals';
+import { advanceNodeFrame, releaseCanvasBuffers, stopInternalLoop } from './renderer-internals';
 import { resolveRenderThread } from './render-thread';
 import { WorkletThreeCanvas } from './WorkletThreeCanvas';
 import { toNdc } from './pointer';
@@ -17,6 +17,7 @@ import { ThreeSurface } from './surface';
 import type { ThreeBackend, ThreeCanvasProps, ThreeFrameTiming, ThreePointer, ThreeScene, ThreeSurfaceHandle } from './types';
 import type { WebGPURenderer } from 'three/webgpu';
 import { useOnScreen } from './use-on-screen';
+import { tickDue } from './loop-policy';
 
 type PointerLike = GestureResponderEvent & {
   currentTarget: { getBoundingClientRect?: () => { left: number; top: number } };
@@ -42,6 +43,8 @@ interface Runtime<P> {
   frame: { time: number; delta: number; width: number; height: number; pixelRatio: number; reducedMotion: boolean; pointer: ThreePointer };
   /** Reused when onFrameTiming is set: the opt-in probe allocates nothing per frame either. */
   probe: ThreeFrameTiming;
+  /** The latest `maxFps`, read per tick so a cap change never restarts the loop. */
+  maxFps: number | undefined;
 }
 
 const isWeb = Platform.OS === 'web';
@@ -89,6 +92,7 @@ function JsThreeCanvas<P>({
   params,
   forceWebGL = false,
   paused = false,
+  maxFps,
   maxPixelRatio = 2,
   fallback = null,
   tracksPointer = true,
@@ -98,6 +102,7 @@ function JsThreeCanvas<P>({
   background,
   androidSurfaceType,
   freeRun = false,
+  rendererParams,
   onBackendChange,
   onFrameTiming,
   children,
@@ -110,6 +115,13 @@ function JsThreeCanvas<P>({
   const status = useInstanceStore(() => ({ failed: [] as ThreeBackend[] }));
   const failed = useStore(status, (s) => s.failed);
   const { size, onLayout } = useLayoutSize({ width: 0, height: 0 });
+  // The renderer starts asynchronously; a layout change during that wait must
+  // still size it, so applySize reads the latest size, never a stale closure.
+  const latestSize = useRef(size);
+  // Synced before paint (and before any effect reads it), not during render.
+  useLayoutEffect(() => {
+    latestSize.current = size;
+  }, [size]);
   const surfaceRef = useRef<ThreeSurfaceHandle>(null);
   const runtime = useRef<Runtime<P>>(null);
   runtime.current ??= {
@@ -130,6 +142,7 @@ function JsThreeCanvas<P>({
     pointer: { x: 0, y: 0, inside: false, pressed: false },
     frame: { time: 0, delta: 0, width: 0, height: 0, pixelRatio: 1, reducedMotion, pointer: { x: 0, y: 0, inside: false, pressed: false } },
     probe: { cpuMs: 0, intervalMs: null, backend: 'webgpu' },
+    maxFps,
   };
 
   // Pick the backend. WebGPU when it works; the WebGL2 backend on web when it
@@ -246,6 +259,8 @@ function JsThreeCanvas<P>({
     const rt = runtime.current!;
     rt.params = params;
     rt.reducedMotion = reducedMotion;
+    // Read by the running loop's next tick; the loop itself is not restarted.
+    rt.maxFps = maxFps;
     invalidate();
   });
 
@@ -253,6 +268,7 @@ function JsThreeCanvas<P>({
   const applySize = () => {
     const rt = runtime.current!;
     const { renderer, built } = rt;
+    const size = latestSize.current;
     if (!renderer || !built || size.width <= 0 || size.height <= 0) return;
     const pixelRatio = Math.min(PixelRatio.get(), maxPixelRatio);
     if (rt.sized && rt.width === size.width && rt.height === size.height && rt.pixelRatio === pixelRatio) return;
@@ -276,12 +292,27 @@ function JsThreeCanvas<P>({
     let built: ThreeScene<P> | null = null;
     const start = async () => {
       const [THREE, setup] = await Promise.all([loadThree(), load()]);
+      // A remounted native canvas can be a frame or two from having a context
+      // with a sized canvas; wait for it (about half a second at most) instead
+      // of failing the backend on "width of undefined".
+      for (let tries = 0; tries < 30 && !cancelled; tries++) {
+        const pendingSurface = surfaceRef.current;
+        if (pendingSurface && (pendingSurface.isReady?.() ?? true)) break;
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      }
       const surface = surfaceRef.current;
       if (cancelled || !surface) return;
-      renderer = surface.createRenderer(THREE, { backend: using, device });
+      renderer = surface.createRenderer(THREE, { backend: using, device, rendererParams });
       await renderer.init();
       stopInternalLoop(renderer);
-      if (cancelled) return;
+      if (cancelled) {
+        // Unmounted while init was pending: the cleanup's dispose() was a no-op on an
+        // uninitialised renderer, so this initialised one would otherwise outlive the stage.
+        releaseCanvasBuffers(renderer);
+        void renderer.dispose().catch(() => undefined);
+        renderer = null;
+        return;
+      }
       built = setup({ THREE, renderer, backend: using, invalidate }, rt.params);
       rt.renderer = renderer;
       rt.built = built;
@@ -299,7 +330,8 @@ function JsThreeCanvas<P>({
     return () => {
       cancelled = true;
       built?.dispose?.();
-      renderer?.dispose();
+      if (renderer) releaseCanvasBuffers(renderer);
+      void renderer?.dispose().catch((error: unknown) => console.warn('[ThreeCanvas] dispose failed', error));
       rt.renderer = null;
       rt.built = null;
       rt.surface = null;
@@ -326,8 +358,16 @@ function JsThreeCanvas<P>({
     }
     let frame = 0;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    // With maxFps, display frames inside the budget are skipped (loop-policy.ts tickDue).
+    // Read per tick: a scene moving between active and ambient changes the cap
+    // without restarting the loop, so the clock never loses a frame of delta.
+    let lastDraw = 0;
     const tick = () => {
-      draw();
+      const now = performance.now();
+      if (tickDue(now, lastDraw, rt.maxFps)) {
+        lastDraw = now;
+        draw();
+      }
       if (freeRun) timer = setTimeout(tick, 0);
       else frame = requestAnimationFrame(tick);
     };
@@ -368,9 +408,14 @@ function JsThreeCanvas<P>({
     invalidate();
   };
   // Mouse hover on web; on native a finger down or dragging counts, and
-  // lifting it lets the blocks settle back.
+  // lifting it lets the blocks settle back. Native also gets touch handlers:
+  // pointer events are not delivered to this view on every RN build, and a
+  // touch carries the same locationX/locationY.
   const pointerHandlers = tracksPointer
-    ? { onPointerMove: setPointer, onPointerDown: pressPointer, onPointerUp: liftPointer, onPointerLeave: releasePointer, onPointerCancel: releasePointer }
+    ? {
+        onPointerMove: setPointer, onPointerDown: pressPointer, onPointerUp: liftPointer, onPointerLeave: releasePointer, onPointerCancel: releasePointer,
+        ...(Platform.OS === 'web' ? {} : { onTouchStart: pressPointer, onTouchMove: setPointer, onTouchEnd: liftPointer, onTouchCancel: releasePointer }),
+      }
     : {};
 
   let surface = null;

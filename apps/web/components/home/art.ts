@@ -105,7 +105,7 @@ const ART = {
   'world.primary': { ...fromPhoto('harlem-lenox-rowhouses', gridSizes(7)), focalPoint: { x: 0.45, y: 0.55 } },
   'world.secondary': { ...fromPhoto('downtown-nyse', gridSizes(5)), focalPoint: { x: 0.5, y: 0.5 } },
   'world.detail': fromPhoto('harlem-apollo', gridSizes(4)),
-  // H-Lynk Core renders from device-scene.ts at its rest pose on ink-950 (PS-017; HANDOFF §H-LYNK
+  // H-Lynk Core renders from packages/ui/three/hlynk/device-scene.ts at its rest pose on ink-950 (PS-017; HANDOFF §H-LYNK
   // "Static capture"). The stage box is 4:5: 32rem wide from `xl`, 28rem from `lg`, 24rem from `md`.
   // v3 (PS-037): the screen's tab bar on Crew, and the scanner fan inside the body width.
   'hlynk.static': {

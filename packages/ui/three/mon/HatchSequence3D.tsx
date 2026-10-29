@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { createHatchLight, whitener, type HatchLightTheme } from './hatch-light.ts';
 import { standFraming } from './framing.ts';
+import { weldSceneMorphSeams } from './morph-seams.ts';
 import { createHatchSound } from './hatch-sound.ts';
 import { hatchDuration, hatchFrame, soundCues, type HatchPhase } from './hatch-timeline.ts';
 
@@ -151,7 +152,12 @@ function loadGlb(url: string): Promise<GLTF> {
       parser.textureLoader = new THREE.TextureLoader(parser.options.manager);
       return { name: 'NYC_MON_IMG_TEXTURES' };
     })
-    .loadAsync(url);
+    .loadAsync(url)
+    .then((gltf) => {
+      // Shape keys must move both copies of a UV-split vertex alike (morph-seams.ts).
+      weldSceneMorphSeams(gltf.scene);
+      return gltf;
+    });
 }
 
 export function HatchSequence3D({ eggUrl, monUrl, monClips, width, height, label, announcements, reducedMotion, sound = true, theme: themeProp, onDone }: HatchSequence3DProps) {
