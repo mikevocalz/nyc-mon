@@ -29,6 +29,7 @@ export {
   selectEvolutionProgress,
   selectJournal,
   selectLastSeen,
+  selectMonCareViewAt,
   selectPendingEgg,
   selectSceneInput,
   selectStage,

@@ -5,6 +5,16 @@ import {
   appendCareToJournal,
   appendJournalEntry,
   applyCareAction,
+  applyMonCareAction,
+  type ClassicOptions,
+  createInitialClassicCare,
+  type MonCareAction,
+  type MonCareOutcome,
+  type MonCareResult,
+  type MonCareState,
+  type MonCareView,
+  selectMonCareView,
+  stepMonCare,
   buildMonSceneInput,
   type CareOutcome,
   countDaysTogether,
@@ -27,6 +37,7 @@ import {
 import type {
   BloodlineId,
   CareAction,
+  ClassicCareState,
   CareState,
   EggRecord,
   HatchState,
@@ -62,6 +73,25 @@ export interface MonStoreState {
    * overwritten. Throws when there is no active Mon with care state.
    */
   applyCare: (action: CareAction, atMs: number) => CareOutcome;
+  /**
+   * Mon Space (M32): applies a classic care action (feed, snack, play, rest,
+   * wake, lights, clean, medicine, boundary, pause, resume) through
+   * `applyMonCareAction`, queues every server-replayable care write (the
+   * action itself when it is a `CareAction`, plus the derived writes the
+   * classic layer caused), persists care and the local-first classic record
+   * in one save write and returns the result. Re-reads the save first.
+   * Throws when there is no active Mon with care state.
+   */
+  applyMonCare: (action: MonCareAction, atMs: number) => MonCareResult & { readonly outcome: MonCareOutcome };
+  /**
+   * The app's call to the sim tick (`stepMonCare`, which wraps `step()`):
+   * advances care and the classic layer to `nowMs`, queues derived writes
+   * (bedtime sleep, morning wake), persists when anything changed and
+   * returns the events and scheduled idle vignettes for the screen. The
+   * minute clock calls it once a minute and on every return to the
+   * foreground. Returns undefined when there is no active Mon.
+   */
+  tickMonCare: (nowMs: number) => MonCareResult | undefined;
   /**
    * Applies one `HatchEvent` to the egg's hatch state through
    * `transitionHatch` and persists the result in ONE write. On the edge into
@@ -125,6 +155,70 @@ function pickActive(save: SaveCurrent | undefined, preferred: string | undefined
   return save.mons[0]?.monInstanceId;
 }
 
+const speciesVignettes = new Map(allSpecies.map((s) => [s.speciesId, s.idleVignettes]));
+
+/** Local minute of day for the sim (Law 3 keeps the clock and the time zone out of core). */
+function localMinuteOfDay(ms: number): number {
+  const d = new Date(ms);
+  return d.getHours() * 60 + d.getMinutes();
+}
+
+/** A stable seed per Mon (FNV-1a over the id), so calls and piles replay the same on every read. */
+export function monSeed(monInstanceId: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < monInstanceId.length; i++) {
+    h ^= monInstanceId.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return h >>> 0;
+}
+
+function classicOptions(monInstanceId: string): ClassicOptions {
+  return { localMinuteOfDay, seed: monSeed(monInstanceId) };
+}
+
+/** The Mon, its care and its classic record; a Mon from before save v4 without one gets a fresh record at `atMs`. */
+function loadMonCare(save: SaveCurrent | undefined, monInstanceId: string | undefined, atMs: number): MonCareState | undefined {
+  const mon = save?.mons.find((m) => m.monInstanceId === monInstanceId);
+  const care = save?.care.find((c) => c.monInstanceId === monInstanceId);
+  if (save === undefined || mon === undefined || care === undefined) return undefined;
+  const classic = save.classic.find((c) => c.monInstanceId === monInstanceId) ?? createInitialClassicCare(mon, Math.min(atMs, care.updatedAt));
+  return { mon, care, classic };
+}
+
+function writeMonCare(
+  save: SaveCurrent,
+  state: MonCareState,
+  rest: { readonly queue: SaveCurrent['queue']; readonly journal: SaveCurrent['journal']; readonly savedAt: number },
+): SaveCurrent {
+  const id = state.mon.monInstanceId;
+  const classic: ClassicCareState[] = save.classic.some((c) => c.monInstanceId === id)
+    ? save.classic.map((c) => (c.monInstanceId === id ? state.classic : c))
+    : [...save.classic, state.classic];
+  return {
+    ...save,
+    savedAt: rest.savedAt,
+    mons: save.mons.map((m) => (m.monInstanceId === id ? state.mon : m)),
+    care: save.care.map((c) => (c.monInstanceId === id ? state.care : c)),
+    classic,
+    queue: rest.queue,
+    journal: rest.journal,
+  };
+}
+
+const CARE_ACTION_KINDS = new Set<string>(['feed', 'rest', 'wake', 'play', 'pause', 'resume']);
+
+/** Server-replayable actions go to the queue; clean, medicine, discipline and lights are local-first. */
+function isCareAction(action: MonCareAction): action is CareAction {
+  return CARE_ACTION_KINDS.has(action.kind);
+}
+
+const JOURNAL_OUTCOMES = new Set<string>(['eaten', 'overfed', 'fell-asleep', 'woke', 'played', 'declined']);
+
+function isJournalOutcome(outcome: MonCareOutcome): outcome is CareOutcome {
+  return JOURNAL_OUTCOMES.has(outcome.kind);
+}
+
 /**
  * Creates a Mon store bound to one save. The app binds it once, in
  * `mon.store.ts`. Every write through `io`, from this store or from another
@@ -175,6 +269,37 @@ export function createMonStore(io: SaveIO, options: MonStoreOptions = {}) {
       io.write(next);
       return result.outcome;
     },
+    applyMonCare: (action, atMs) => {
+      const save = io.read();
+      const loaded = loadMonCare(save, pickActive(save, get().activeMonInstanceId), atMs);
+      if (save === undefined || loaded === undefined) {
+        throw new Error('applyMonCare needs an active Mon with care state; hydrate the store first');
+      }
+      const result = applyMonCareAction(loaded, action, atMs, classicOptions(loaded.mon.monInstanceId));
+      const effectiveAt = result.state.care.updatedAt;
+      let { queue } = save;
+      if (isCareAction(action)) queue = enqueueCareWrite(queue, { monInstanceId: loaded.mon.monInstanceId, at: effectiveAt, action }).queue;
+      for (const w of result.derivedCareWrites) queue = enqueueCareWrite(queue, { monInstanceId: loaded.mon.monInstanceId, at: w.at, action: w.action }).queue;
+      const journal = isJournalOutcome(result.outcome)
+        ? appendCareToJournal(save.journal, { monInstanceId: loaded.mon.monInstanceId, at: effectiveAt, outcome: result.outcome, events: result.careEvents })
+        : save.journal;
+      io.write(writeMonCare(save, result.state, { queue, journal: [...journal], savedAt: effectiveAt }));
+      return result;
+    },
+    tickMonCare: (nowMs) => {
+      const save = io.read();
+      const loaded = loadMonCare(save, pickActive(save, get().activeMonInstanceId), nowMs);
+      if (save === undefined || loaded === undefined) return undefined;
+      const vignettes = speciesVignettes.get(loaded.mon.speciesId) ?? [];
+      const result = stepMonCare(loaded, nowMs, { ...classicOptions(loaded.mon.monInstanceId), vignettes });
+      const changed = result.classicEvents.length > 0 || result.careEvents.length > 0 || result.derivedCareWrites.length > 0
+        || !save.classic.some((c) => c.monInstanceId === loaded.mon.monInstanceId);
+      if (!changed) return result;
+      let { queue } = save;
+      for (const w of result.derivedCareWrites) queue = enqueueCareWrite(queue, { monInstanceId: loaded.mon.monInstanceId, at: w.at, action: w.action }).queue;
+      io.write(writeMonCare(save, result.state, { queue, journal: save.journal, savedAt: Math.max(save.savedAt, nowMs) }));
+      return result;
+    },
     applyHatch: (eggId, event, atMs) => {
       const save = io.read();
       const egg = save?.eggs.find((e) => e.eggId === eggId);
@@ -185,14 +310,15 @@ export function createMonStore(io: SaveIO, options: MonStoreOptions = {}) {
       const hatches = save.hatches.some((h) => h.eggId === eggId)
         ? save.hatches.map((h) => (h.eggId === eggId ? next : h))
         : [...save.hatches, next];
-      let { mons, care, journal } = save;
+      let { mons, care, journal, classic } = save;
       const newMon = next.kind === 'hatched' && !mons.some((m) => m.monInstanceId === next.mon.monInstanceId);
       if (newMon) {
         mons = [...mons, next.mon];
         care = [...care, createInitialCareState(next.mon.monInstanceId, atMs)];
+        classic = [...classic, createInitialClassicCare(next.mon, atMs)];
         journal = [...appendJournalEntry(journal, { monInstanceId: next.mon.monInstanceId, kind: 'hatched', at: atMs })];
       }
-      io.write({ ...save, savedAt: atMs, hatches, mons, care, journal });
+      io.write({ ...save, savedAt: atMs, hatches, mons, care, journal, classic });
       if (newMon) set({ activeMonInstanceId: next.mon.monInstanceId });
       return next;
     },
@@ -386,6 +512,23 @@ export function selectCareNow(nowMs: number): (state: MonStoreState) => CareStat
     if (last?.mon === mon && last.care === care) return last.result;
     const result = advanceCare({ mon, care }, nowMs).state.care;
     last = { mon, care, result };
+    return result;
+  };
+}
+
+/**
+ * Returns a selector for the active Mon's Mon Space view at `nowMs`
+ * (`selectMonCareView`): hearts, piles, cold, boundaries, weight, lights,
+ * pause, the call to show and the lamp. Read-only; the tick persists.
+ * Stable until the save or `nowMs` changes; create it once per `nowMs`.
+ */
+export function selectMonCareViewAt(nowMs: number): (state: MonStoreState) => MonCareView | undefined {
+  let last: { save: SaveCurrent | undefined; id: string | undefined; result: MonCareView | undefined } | undefined;
+  return (state) => {
+    if (last !== undefined && last.save === state.save && last.id === state.activeMonInstanceId) return last.result;
+    const loaded = loadMonCare(state.save, state.activeMonInstanceId, nowMs);
+    const result = loaded === undefined ? undefined : selectMonCareView(loaded, nowMs, classicOptions(loaded.mon.monInstanceId));
+    last = { save: state.save, id: state.activeMonInstanceId, result };
     return result;
   };
 }

@@ -13,12 +13,12 @@ function memory(): KeyValueStorage & { map: Map<string, string> } {
 }
 
 test('defaults: haptics and sound on, motion follows the OS, alerts wanted', () => {
-  assert.deepEqual(readDevicePrefs(memory()), { haptics: true, sound: true, forceReducedMotion: false, notifications: true });
+  assert.deepEqual(readDevicePrefs(memory()), { haptics: true, sound: true, forceReducedMotion: false, notifications: true, monCalls: false, monCallsAsked: false });
 });
 
 test('round trip through storage', () => {
   const store = memory();
-  const prefs = { haptics: false, sound: false, forceReducedMotion: true, notifications: false };
+  const prefs = { haptics: false, sound: false, forceReducedMotion: true, notifications: false, monCalls: true, monCallsAsked: true };
   writeDevicePrefs(store, prefs);
   assert.deepEqual(readDevicePrefs(store), prefs);
 });

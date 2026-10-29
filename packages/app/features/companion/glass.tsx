@@ -4,9 +4,8 @@ import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, type R
 import { useWindowDimensions } from 'react-native';
 import { useIsFocused, usePathname } from 'expo-router';
 import { lobbyStore } from '../game/lobby/lobby.store.ts';
-import { deriveMonMood } from '@acme/core/sim';
+import { deriveMonMood, heartsFor } from '@acme/core/sim';
 import type { CareNeed, CareState } from '@acme/core/types';
-import { hud } from '@acme/theme';
 import {
   createGlassScreen, createSwitchScreen, DeviceStage, GLASS_MON_TARGET, glbFraction, glassGeometry, glbProgressStore, KeyboardAwareScroll, releaseHLynkResources, SafeArea, useInstanceStore,
   useReducedMotion, useStore, type DeviceKey, type DeviceScreen, type GlassLayout, type GlassRing, type GlassView, type ScreenModelSource,
@@ -27,14 +26,14 @@ import { clipsFor, monModelSource } from './mon-models';
 /** The kit's convention for a model that does not exist yet (MonView, EggStill). */
 export const COMING_SOON = 'Coming Soon';
 
-/** Each need's ring tint on the glass (`hud` tokens). */
-export const RING_TINT: Record<CareNeed, string> = { energy: hud.amber, fullness: hud.green, social: hud.cyan };
-
-/** One care meter as a ring on the glass, with M13's label and low wording. */
+/**
+ * One care meter as a row of four hearts on the glass (M32 D20a), with M13's
+ * label and low wording. One tint for all three, no number, no red.
+ */
 export function glassRing(need: CareNeed, value: number): GlassRing {
   return {
-    id: need, label: companionCopy(NEED_RING[need]), value, low: isLow(value),
-    lowLabel: companionCopy('m13.ring.low'), tint: RING_TINT[need],
+    id: need, label: companionCopy(NEED_RING[need]), hearts: heartsFor(value), low: isLow(value),
+    lowLabel: companionCopy('m13.ring.low'),
   };
 }
 

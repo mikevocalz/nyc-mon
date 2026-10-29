@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { AppState } from 'react-native';
 import { create } from 'zustand';
 import { msToNextMinute } from './minute-clock-math';
+import { runCareTick } from '../mon-space/care-tick';
 
 /** Background time after which a return counts as "resumed" (M13 background-resumed: ≥ 60 s). */
 export const RESUME_AFTER_MS = 60_000;
@@ -32,6 +33,12 @@ export function tickMinuteClock(): void {
   useMinuteClock.setState({ nowMs: Date.now() });
 }
 
+/** The minute boundary and the return to the foreground: the clock moves and the sim ticks (`stepMonCare`). */
+function tickClockAndCare(nowMs: number): void {
+  runCareTick(nowMs);
+  useMinuteClock.setState({ nowMs });
+}
+
 /** Drives {@linkcode useMinuteClock}. Mount once, in the `/(home)` layout. */
 export function useMinuteClockDriver(): void {
   useEffect(() => {
@@ -39,17 +46,18 @@ export function useMinuteClockDriver(): void {
     const schedule = () => {
       if (timer !== undefined) clearTimeout(timer);
       timer = setTimeout(() => {
-        tickMinuteClock();
+        tickClockAndCare(Date.now());
         schedule();
       }, msToNextMinute(Date.now()));
     };
-    tickMinuteClock();
+    tickClockAndCare(Date.now());
     schedule();
     const sub = AppState.addEventListener('change', (next) => {
       const now = Date.now();
       if (next === 'active') {
         const { backgroundedAt, resumeCount } = useMinuteClock.getState();
         const resumed = backgroundedAt !== null && now - backgroundedAt >= RESUME_AFTER_MS;
+        runCareTick(now);
         useMinuteClock.setState({ nowMs: now, backgroundedAt: null, resumeCount: resumed ? resumeCount + 1 : resumeCount });
         schedule();
       } else if (next === 'background') {

@@ -6,6 +6,8 @@ import { lcdColors } from './care/lcd-model';
 import { PixelGlyph } from './care/PixelGlyph';
 import { PIXEL_GLYPHS, type PixelGlyphName } from './care/pixel-glyphs';
 import { SegmentBar } from './care/SegmentBar';
+import { CallLamp } from './care/CallLamp';
+import { ClassicKey } from './care/ClassicKey';
 import { SegmentNumber } from './care/SegmentNumber';
 import { Text, View } from './tw';
 
@@ -62,7 +64,7 @@ export const StatusPage: Story = {
             <HeartRow filled={3} label="Hunger" accessibilityLabel="Hunger, 3 of 4 hearts" color={c.ink} labelClassName="text-type-body" cell={4} />
             <HeartRow filled={1} label="Happy" accessibilityLabel="Happy, 1 of 4 hearts" color={c.ink} labelClassName="text-type-body" cell={4} />
             <HeartRow filled={4} label="Energy" accessibilityLabel="Energy, 4 of 4 hearts" color={c.ink} labelClassName="text-type-body" cell={4} />
-            <SegmentBar filled={2} label="Discipline" accessibilityLabel="Discipline, 2 of 4" color={c.ink} labelClassName="text-type-body" cell={4} />
+            <SegmentBar filled={2} label="Boundaries" accessibilityLabel="Boundaries, 2 of 4" color={c.ink} labelClassName="text-type-body" cell={4} />
             <View className="flex-row gap-6">
               <SegmentNumber value={7} color={c.ink} unlit={c.unlit} accessibilityLabel="Weight 7" suffix="wt" />
               <SegmentNumber value={3} color={c.ink} unlit={c.unlit} accessibilityLabel="Age 3 days" suffix="d" />
@@ -84,6 +86,28 @@ export const Glyphs: Story = {
           <Text className="text-type-caption text-text">{g}</Text>
         </View>
       ))}
+    </View>
+  ),
+};
+
+/** The attention lamp: off, calling, and the reduced-motion steady lamp with its dot. */
+export const Lamp: Story = {
+  render: () => (
+    <View className="flex-row gap-6 bg-concrete-200 p-6">
+      <CallLamp state="off" accessibilityLabel="Status light off" reducedMotion={false} />
+      <CallLamp state="call" accessibilityLabel="Status light on: Squeaklet is calling" reducedMotion={false} />
+      <CallLamp state="false-call" accessibilityLabel="Status light on: Squeaklet is calling" reducedMotion />
+    </View>
+  ),
+};
+
+/** The three classic keys under the thumb: A Next, B Select (primary), C Back. */
+export const Keys: Story = {
+  render: () => (
+    <View className="scheme-light flex-row justify-around bg-bg p-6">
+      <ClassicKey letter="A" label="Next" onPress={() => undefined} />
+      <ClassicKey letter="B" label="Select" primary onPress={() => undefined} />
+      <ClassicKey letter="C" label="Back" onPress={() => undefined} />
     </View>
   ),
 };

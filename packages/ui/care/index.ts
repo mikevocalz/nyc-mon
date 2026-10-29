@@ -23,3 +23,5 @@ export { LcdPanel, type LcdPanelProps } from './LcdPanel';
 export { LcdIconButton, type LcdIconButtonProps } from './LcdIconButton';
 export { PIXEL_GLYPHS, glyphPath, glyphSize, fourMarks, type PixelBitmap, type PixelGlyphName } from './pixel-glyphs';
 export { lcdColors, segmentDigits, segmentMask, type LcdColors, type SegmentMask } from './lcd-model';
+export { CallLamp, type CallLampProps } from './CallLamp';
+export { ClassicKey, type ClassicKeyProps } from './ClassicKey';
