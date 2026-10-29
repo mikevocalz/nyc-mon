@@ -58,6 +58,18 @@ export function linearColor(THREE: Three, key: CityColor): InstanceType<Three['C
 }
 
 /**
+ * The unit horizontal axis along a surface with normal `n`: normalize(cross(up, n)) on a wall. On a flat face
+ * (n = ±up) that cross product is zero and WGSL's normalize of it is undefined (NaN on Metal), so the face takes
+ * world x instead, which is horizontal and lies in its plane. The facade frames (vd-materials.ts, glass.ts) are built
+ * for walls, but the masonry draw also holds cornice soffits, hero marquees and the viaduct deck.
+ */
+export function horizontalAxis(T: Three['TSL'], n: Node<'vec3'>): Node<'vec3'> {
+  const across = T.cross(T.vec3(0, 1, 0), n);
+  const flat = T.step(T.dot(across, across), 1e-8);
+  return T.normalize(across.add(T.vec3(1, 0, 0).mul(flat))) as Node<'vec3'>;
+}
+
+/**
  * TSL shorthand shared by the cel and the PBR factory: palette colours as
  * nodes, the distance fade fine patterns die by, and the wall/vertex colour
  * attribute the facade seed reads.

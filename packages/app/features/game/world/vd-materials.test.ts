@@ -81,6 +81,29 @@ test('vd world: walls carry aFacade, weather moves the uniforms and the precipit
   world.dispose();
 });
 
+// The masonry draw is not walls only: cornice soffits, the 125th Street heroes (the Apollo marquee's 7.6 x 5.9 m
+// soffit at 3.05 m) and the Park Avenue Viaduct's deck put flat faces on it. The wall frame's cross(up, N) is zero
+// on those, and Metal's normalize of a zero vector is NaN: the face shaded to NaN and drew black (iPad 2026-10-28,
+// a black slab over the start view under the Apollo marquee). Every frame built from the normal must survive N = ±up.
+test('vd masonry carries flat faces, and its fragment never normalizes a bare cross product', async () => {
+  const world = buildCityWorld(THREE as never, dataset(), { vd: true });
+  const walls = world.group.getObjectByName('city:walls-masonry') as THREE.Mesh;
+  const normal = walls.geometry.getAttribute('normal');
+  let flat = 0;
+  for (let i = 0; i < normal.count; i++) if (Math.abs(normal.getY(i)) > 0.999) flat++;
+  assert.ok(flat > 0, 'the masonry draw holds horizontal faces');
+  const renderer = await stubRenderer();
+  const scene = new THREE.Scene();
+  scene.add(world.sky, world.group);
+  const material = walls.material as THREE.Material;
+  const b = new WGSLNodeBuilder(walls, renderer);
+  b.scene = scene; b.camera = new THREE.PerspectiveCamera(50, 1, 0.5, 10_000); b.material = material; b.context.material = material;
+  b.fogNode = null;
+  b.build();
+  assert.doesNotMatch(b.fragmentShader ?? '', /normalize\(\s*cross\(/, 'normalize(cross(up, N)) is NaN on a horizontal face');
+  world.dispose();
+});
+
 test('vd graphs compile to WGSL with the textures and aFacade bound', async () => {
   const renderer = await stubRenderer();
   const world = buildCityWorld(THREE as never, dataset(), { vd: true });

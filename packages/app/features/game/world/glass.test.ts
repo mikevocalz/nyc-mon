@@ -204,6 +204,8 @@ test('window material graphs compile to WGSL, both tiers and both flag states', 
         const size = b.fragmentShader?.length ?? 0;
         assert.ok(ms < 1000 && size > 400 && size < 80_000, `${name} ${tier} pbr=${pbr}: ${ms.toFixed(1)} ms, ${size} chars`);
         assert.match(b.fragmentShader ?? '', /fwidth/, `${name} ${tier} pbr=${pbr} uses the pixel fade`);
+        // A horizontal face makes cross(up, n) zero; Metal's normalize of a zero vector is NaN (vd-materials.test.ts).
+        assert.doesNotMatch(b.fragmentShader ?? '', /normalize\(\s*cross\(/, `${name} ${tier} pbr=${pbr} normalizes a bare cross product`);
         sizes[`${name}:${tier}:${pbr}`] = size;
       }
       world.dispose();

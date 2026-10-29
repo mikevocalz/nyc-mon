@@ -52,6 +52,7 @@ import {
   cityShaderTools,
   createCityMaterials,
   facadeGraphs,
+  horizontalAxis,
   type CityMaterials,
   type FacadeWindowGraphs,
 } from './materials.ts';
@@ -235,7 +236,7 @@ function windowLayer(
   // recurse through this material's own normalNode). Walls are vertical:
   // x along the wall (u grows along it), y up, z into the building.
   const n = T.normalWorldGeometry;
-  const tX = T.normalize(T.cross(T.vec3(0, 1, 0), n));
+  const tX = horizontalAxis(T, n);
   const tY = T.cross(n, tX);
 
   // Seeded per-pane tilt — the ±few-degree wobble real panes have.

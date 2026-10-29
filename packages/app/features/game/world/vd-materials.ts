@@ -34,7 +34,7 @@
 import type { Three } from '@acme/ui/three';
 import type { Node } from 'three/webgpu';
 import { decodeBase64 } from './foliage.ts';
-import { cityShaderTools, createUnlitLayers, leafGraphs, roadsGraphs, TONE_ATTRIBUTE, type CityMaterials } from './materials.ts';
+import { cityShaderTools, createUnlitLayers, horizontalAxis, leafGraphs, roadsGraphs, TONE_ATTRIBUTE, type CityMaterials } from './materials.ts';
 import { createPbrCityMaterials, type PbrCityOptions } from './pbr-materials.ts';
 import type { CityColor } from './palette.ts';
 import { VD_LANE } from './curb.ts';
@@ -192,10 +192,12 @@ export function createVdCityMaterials(
   // Tangent frame of a vertical wall from screen derivatives of the uv, so
   // the reveal and the normal map lean the right way whichever direction the
   // ring runs.
+  // The masonry draw also holds flat faces (cornice soffits, hero marquees, the viaduct deck), where cross(up, N)
+  // is zero and Metal's normalize returns NaN: those take world x, which is horizontal and lies in their plane.
   const wallFrame = () => {
     const N = T.normalWorld;
     const up = T.vec3(0, 1, 0);
-    const across = T.normalize(T.cross(up, N));
+    const across = horizontalAxis(T, N);
     const dpdx = T.dFdx(T.positionWorld);
     const dpdy = T.dFdy(T.positionWorld);
     const uvx = T.dFdx(T.uv());
