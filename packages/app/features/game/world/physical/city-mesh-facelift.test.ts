@@ -13,6 +13,8 @@ import { hashUnit } from '../geometry.ts';
 import { CITY_COLORS, hexToRgb } from '../palette.ts';
 import { createPbrCityMaterials } from '../pbr-materials.ts';
 import { createStreetClearance } from '../walkability.ts';
+import { VD_LANE } from '../curb.ts';
+import { facadeSpec } from '../vd-facades.ts';
 import { faceliftBakePicks, faceliftPlanner } from './facelift.ts';
 
 const SUN_AWAY: [number, number] = [0.5, -0.5];
@@ -57,7 +59,8 @@ test('future on, real tile: wall geometry and every other mesh are unchanged; tr
       assert.deepEqual(after.get(name)![key], data, `${name}.${key}`);
     }
   }
-  const nonLandmark = tile.buildings.filter((b) => !landmarks.has(b.id));
+  // A measured 125th Street building (vd-facade-specs.ts) keeps its real roofline under the vd lane: no cel trim.
+  const nonLandmark = tile.buildings.filter((b) => !landmarks.has(b.id) && !(VD_LANE && facadeSpec(b.id)));
   const celTrims = nonLandmark.filter((b) => hashUnit(`${b.id}:trim`) < neonTrimShare(b.heightMeters)).length;
   const keptTrims = nonLandmark.filter((b) => plan(b).trim).length;
   assert.equal(base.stats.neonTrims, celTrims);

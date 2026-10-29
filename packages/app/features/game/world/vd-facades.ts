@@ -8,6 +8,7 @@
 // t_wS at /3.4 for 4, 5, 8, 9; plaster t_wP at /3.0 for 6, 10. Styles 3 and 11
 // are curtain wall and take no photo.
 import type { CityBuilding } from '../city-dataset.ts';
+import { VD_FACADE_SPECS } from './vd-facade-specs.ts';
 
 export const VD_LAYER = { brownBrick: 0, redBrick: 1, whiteBrick: 2, stone: 3, plaster: 4 } as const;
 type Layer = (typeof VD_LAYER)[keyof typeof VD_LAYER];
@@ -31,5 +32,26 @@ const BY_CLASS: Record<CityBuilding['class'], Layer | -1> = {
 /** [layer, 1 / tile metres] for VertexBuffer.facade; layer -1 draws no photo. */
 export function facadePhoto(building: Pick<CityBuilding, 'class' | 'styleId'>): [number, number] {
   const layer = building.styleId !== undefined ? BY_STYLE[building.styleId] ?? -1 : BY_CLASS[building.class];
-  return layer < 0 ? [-1, 0] : [layer, 1 / TILE_METRES[layer as Layer]];
+  return photoFor(layer);
+}
+
+function photoFor(layer: number): [number, number] {
+  return layer < 0 || layer > 4 ? [-1, 0] : [layer, 1 / TILE_METRES[layer as Layer]];
+}
+
+/** One measured 125th Street building (vd-facade-specs.ts). */
+export type FacadeSpec = (typeof VD_FACADE_SPECS)[string];
+
+/**
+ * Valdrada's measured facade for a building (wall material, tint, floor pitch, base height, hero key), or undefined
+ * where no spec covers it. The real material and colour replace the class hash: these are the buildings a walker on
+ * 125th Street recognises, so nothing generic may paint over them.
+ */
+export function facadeSpec(id: string): FacadeSpec | undefined {
+  return Object.hasOwn(VD_FACADE_SPECS, id) ? VD_FACADE_SPECS[id] : undefined;
+}
+
+/** [layer, 1 / tile metres] for a measured spec's wall material. */
+export function specPhoto(spec: Pick<FacadeSpec, 'l'>): [number, number] {
+  return photoFor(spec.l);
 }

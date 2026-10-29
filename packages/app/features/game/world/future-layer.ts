@@ -43,6 +43,8 @@ import { hashUnit, mapArea, pointInRing, ringCentroid, type VertexBuffer } from 
 import { box, cone, cylinder, frame, type Frame } from './parts.ts';
 import { parseDefaultOnFlag } from './sky-rig.ts';
 import { SURFACES } from './surfaces.ts';
+import { VD_LANE } from './curb.ts';
+import { facadeSpec } from './vd-facades.ts';
 
 type Point = readonly [number, number];
 type Rgb = readonly number[];
@@ -520,6 +522,11 @@ export interface FaceliftPlan {
   readonly celKit: boolean;
 }
 
+const NO_FACELIFT: Omit<FaceliftPlan, 'block'> = {
+  palette: false, frames: false, panels: false, roofGarden: false, balcony: false, verticalLight: false,
+  entrance: false, trim: false, celKit: false,
+};
+
 /** Floors for the panel rule: the record's `f`, else the height over the record's or a 3.2 m pitch. */
 function floorCount(building: Pick<CityBuilding, 'heightMeters' | 'floors' | 'floorHeightMeters'>): number {
   return building.floors ?? Math.round(building.heightMeters / (building.floorHeightMeters ?? 3.2));
@@ -535,6 +542,9 @@ export function faceliftPlan(
   building: Pick<CityBuilding, 'id' | 'heightMeters' | 'floors' | 'floorHeightMeters'>, block: FaceliftBlock, todayTrimShare: number,
   density: Readonly<Record<FaceliftBlock, FaceliftDensity>> = FACELIFT_DENSITY,
 ): FaceliftPlan {
+  // A building Valdrada measured (vd-facade-specs.ts: the 125th Street fronts and the landmark heroes) keeps its real
+  // facade under the vd lane: no refreshed tone, frames, joints, canopies, light strips, gardens or trim on it.
+  if (VD_LANE && facadeSpec(building.id)) return { ...NO_FACELIFT, block };
   const row = density[block];
   const pick = (piece: string, share: number) => share > 0 && hashUnit(`${building.id}:facelift:${piece}`) < share;
   const trimShare = row.trim === 'today' ? todayTrimShare : Math.min(row.trim, todayTrimShare);

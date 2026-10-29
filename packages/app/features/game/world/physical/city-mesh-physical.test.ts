@@ -75,10 +75,11 @@ test('facade attributes cover every wall vertex, change no other byte and add no
       assert.ok(Object.values(WALL_KINDS).includes(wall[i * 4 + 3]! as never), `${name} vertex ${i} kind`);
     }
   }
-  // The measured cost on this tile, 32 bytes on each wall vertex.
+  // The measured cost on this tile, 32 bytes on each wall vertex. 2026-10-28: 247 812 -> 279 444 with the vd lane's
+  // landmark heroes and the Park Avenue Viaduct on the masonry draw (vd-heroes.ts, vd-viaduct.ts).
   assert.equal(on.built.physical!.facadeBytes, vertices * FACADE_FLOATS_PER_VERTEX * 4);
-  assert.equal(vertices, 247_812);
-  assert.equal(on.built.physical!.facadeBytes, 7_929_984);
+  assert.equal(vertices, 279_444);
+  assert.equal(on.built.physical!.facadeBytes, 8_942_208);
   // Other meshes get nothing.
   for (const m of on.built.meshes) {
     if (m.name === 'city:walls-masonry' || m.name === 'city:walls-glass') continue;

@@ -13,6 +13,7 @@ import {
 } from './future-layer.ts';
 import { createPbrCityMaterials } from './pbr-materials.ts';
 import { createStreetClearance } from './walkability.ts';
+import { VD_LANE } from './curb.ts';
 
 const SUN_AWAY: [number, number] = [0.5, -0.5];
 const SOURCE = { url: 'https://www.openstreetmap.org/copyright', attribution: 'Test only', license: 'ODbL-1.0', retrievedAt: '2026-10-17T00:00:00Z' };
@@ -117,16 +118,18 @@ test('flagged build: the facelift touches nycha towers only, and adds no draws',
   off.dispose(); on.dispose();
 });
 
-test('the real tile: 19 towers treated, ad inventory capped with unique stable ids', () => {
+test('the real tile: 15 towers treated, ad inventory capped with unique stable ids', () => {
   const dataset = parseCityDataset(JSON.parse(readFileSync(new URL('../data/harlem-apollo.json', import.meta.url), 'utf8')));
   const off = build(dataset, false);
   const on = build(dataset, true);
   const f = on.built.stats.future;
   // The real tile already draws neon and detail, so the layer adds no draw at all.
   assert.equal(on.built.stats.drawCalls, off.built.stats.drawCalls);
-  assert.equal(f.nychaTowers, 19);
-  assert.equal(f.roofGardens, 19);
-  assert.ok(f.nychaEntrances <= 19);
+  // 19 NYCHA towers; under the vd lane the four Grant Houses towers on 125th Street keep the brick Valdrada measured.
+  const towers = VD_LANE ? 15 : 19;
+  assert.equal(f.nychaTowers, towers);
+  assert.equal(f.roofGardens, towers);
+  assert.ok(f.nychaEntrances <= towers);
   assert.ok(f.bulkheads + f.acUnits + f.chimneyPots + f.standpipes > 0, 'the roofscape plan produced furniture');
   const ids = new Set(on.built.adSurfaces.map((s) => s.id));
   assert.ok(on.built.adSurfaces.length <= MAX_BILLBOARDS);

@@ -111,4 +111,16 @@ export const CITY_MAP_ASSETS: readonly CityMapSourceCredit[] = [
     license: 'CC0 1.0',
     licenseUrl: 'https://creativecommons.org/publicdomain/zero/1.0/',
   },
+  // vd-storefronts.ts, vd-facade-specs.ts and vd-heroes.ts carry Valdrada's measured 125th Street specs (shop signs
+  // and colours, wall materials and tints, floor pitch, the four landmark fronts); MIT asks for the copyright notice.
+  {
+    attribution: '125th Street storefronts, facade materials and landmark fronts measured by Valdrada v0.4.0, © 2026 Mehmet Kerem Turkcan',
+    license: 'MIT',
+    licenseUrl: 'https://opensource.org/license/mit',
+  },
+  {
+    attribution: 'Park Avenue Viaduct tracks, © OpenStreetMap contributors, via Valdrada',
+    license: 'ODbL-1.0',
+    licenseUrl: 'https://opendatacommons.org/licenses/odbl/1-0/',
+  },
 ];

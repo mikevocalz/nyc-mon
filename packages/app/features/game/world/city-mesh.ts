@@ -27,7 +27,10 @@ import { createStreetClearance, WALKWAY_CLASSES, type StreetClearance } from './
 import { AWNING_TONES, CITY_COLORS, hexToRgb, WALL_TONES, type CityColor } from './palette.ts';
 import { CURB_HEIGHT, VD_LANE } from './curb.ts';
 import { VD_STOREFRONTS } from './vd-storefronts.ts';
-import { facadePhoto } from './vd-facades.ts';
+import { facadePhoto, facadeSpec, specPhoto } from './vd-facades.ts';
+import { VD_VIADUCT } from './vd-facade-specs.ts';
+import { emitHero, type HeroKey } from './vd-heroes.ts';
+import { emitViaduct } from './vd-viaduct.ts';
 import { buildingSurface, ContactField, contactReach, surfacePick, SURFACES, wallAo } from './surfaces.ts';
 import { buildingFacade, CLASS_FAMILY } from './physical/class-family.ts';
 import { FACADE_FLOATS_PER_VERTEX, FacadeAttributeWriter, WALL_KINDS, type WallKind } from './physical/facade-attributes.ts';
@@ -270,6 +273,8 @@ export interface CityMeshStats {
   buildings: number; roads: number; areas: number; triangles: number; drawCalls: number; neonTrims: number; storefronts: number; billboards: number;
   cornices: number; stoops: number; fireEscapes: number; awnings: number; shopSigns: number; waterTowers: number;
   parapets: number;
+  /** vd lane: buildings wearing Valdrada's measured facade, the landmark heroes drawn, and the viaduct's spans and bents. */
+  realFacades: number; heroes: number; viaductSpans: number; viaductBents: number;
   /** The flagged future layer (future-layer.ts): all zero when FUTURE_LAYER is off. */
   future: FutureLayerStats;
 }
@@ -407,6 +412,8 @@ export function buildCityMeshes(
   let trims = 0;
   let fronts = 0;
   let boards = 0;
+  let realFacades = 0;
+  const heroes: { key: HeroKey; buildingId: string; signs: readonly string[] }[] = [];
 
   for (const { building, band: buildingBand } of banded) {
     while (band < buildingBand) bandStart[++band] = shadows.vertexCount;
@@ -424,18 +431,25 @@ export function buildCityMeshes(
     const holes = building.holes.map((hole) => counterClockwise(pairs(hole)).reverse());
     const landmark = landmarkByBuilding.get(building.id);
     const variation = 0.92 + hashUnit(building.id) * 0.16;
+    const target = building.class === 'glass' ? glass : masonry;
+    // vd lane: Valdrada's measured facade (vd-facade-specs.ts). Its wall tint and photo replace the class hash on the
+    // masonry walls; the curtain-wall class keeps the glass material and only takes the floor pitch.
+    const spec = VD_LANE ? facadeSpec(building.id) : undefined;
+    const measuredWall = spec && target === masonry ? spec.c : undefined;
     const wallKey: CityColor = landmark?.key === 'hotel-theresa' ? 'terracotta' : wallTone(building);
-    const wall = tint(rgb(wallKey), variation);
-    const pick = facelift?.(building);
+    const wall = measuredWall ?? tint(rgb(wallKey), variation);
+    // The facelift never repaints a measured building (future-layer.ts faceliftPlan gives it an empty plan; this
+    // keeps the bake honest when a caller passes picks from another planner).
+    const pick = spec ? undefined : facelift?.(building);
     // The refreshed tone recolours the wall quads only; roofs, cornices and stoops keep the record tone.
     const wallFace = pick?.wallTone ? tint(hexToRgb(pick.wallTone), variation) : wall;
-    const target = building.class === 'glass' ? glass : masonry;
     const h = building.heightMeters;
     // Surface family per building id, and the wall-base occlusion ramp over
     // this building's shadow reach (surfaces.ts). Cornices written into the
     // same buffer inherit the wall pick — stone trim belongs to the family.
     target.surface(...buildingSurface(building.class, building.id));
-    target.facade(...facadePhoto(building));
+    target.facade(...(measuredWall && spec ? specPhoto(spec) : facadePhoto(building)));
+    if (spec) realFacades++;
     let onWallQuad: ((edge: number, length: number) => void) | undefined;
     let onHoleQuad: ((edge: number, length: number) => void) | undefined;
     if (facadeWriters) {
@@ -456,7 +470,7 @@ export function buildCityMeshes(
     const grid = building.class === 'glass' ? WINDOW_GRID.glass : WINDOW_GRID.masonry;
     const uvScale: [number, number] = [
       grid.bay / (building.windowWidthMeters ?? grid.bay),
-      grid.floor / (building.floorHeightMeters ?? grid.floor),
+      grid.floor / (spec?.fh ?? building.floorHeightMeters ?? grid.floor),
     ];
     emitWalls(target, ring, 0, h, wallFace, 0, wallOcclusion, uvScale, onWallQuad);
     for (const hole of holes) emitWalls(target, hole, 0, h, wallFace, 0, wallOcclusion, uvScale, onHoleQuad);
@@ -464,11 +478,21 @@ export function buildCityMeshes(
     const roofColor = tint(rgb('roof').map((v, i) => v * 0.8 + wall[i]! * 0.2), variation);
     emitFlat(THREE, roofs, ring, holes, h, roofColor);
     emitShadow(shadows, ring, Math.max(1.2, Math.min(5, h * 0.12)), sunAway, shadowColor);
+    // A hero (vd-heroes.ts) is the measured landmark front; it replaces the generic landmark accents and, like them,
+    // skips the generic street detail below.
+    if (spec?.hero && spec.f) {
+      masonry.surface(...SURFACES.stone);
+      masonry.facade(-1, 0);
+      const drawn = emitHero(spec.hero, spec.f, ring, h, { walls: masonry, glow: accents, letters: landmarkText });
+      heroes.push({ key: spec.hero, buildingId: building.id, signs: drawn.signs });
+      continue;
+    }
     if (landmark) { landmarkAccents(accents, landmarkText, landmark, building, ring, dataset.roads); continue; }
 
-    // The near-future layer: a neon roofline, storefront light bands and the odd billboard.
+    // The near-future layer: a neon roofline, storefront light bands and the odd billboard. A measured 125th Street
+    // building keeps its real roofline: no trim.
     const neonColor = rgb(neonKeyFor(building.id));
-    if (pick ? pick.trim : hashUnit(`${building.id}:trim`) < neonTrimShare(h)) {
+    if (!spec && (pick ? pick.trim : hashUnit(`${building.id}:trim`) < neonTrimShare(h))) {
       emitWalls(neon, ring, h - 0.32, h - 0.06, neonColor, 0.06);
       trims++;
     }
@@ -492,7 +516,7 @@ export function buildCityMeshes(
     const mask = building.detailMask;
     const floorPitch = building.floorHeightMeters ?? FLOOR_HEIGHT;
     const escapeFloors = building.floors !== undefined ? Math.max(0, building.floors - 1) : fireEscapeFloors(h);
-    const shopTop = building.storefrontHeightMeters !== undefined && building.storefrontHeightMeters > 0 ? building.storefrontHeightMeters : undefined;
+    const shopTop = spec?.sh ?? (building.storefrontHeightMeters !== undefined && building.storefrontHeightMeters > 0 ? building.storefrontHeightMeters : undefined);
     // The wall uv's `u` is metres along the ring, continuous from vertex 0 —
     // the facade shader's column grid (gates, window panes) keys on it, so
     // storefront geometry must sit on the same lattice, not on edge-centred
@@ -517,7 +541,8 @@ export function buildCityMeshes(
       // panel grid, planted balconies and vertical light go on every long
       // edge — the towers stand in campuses, so the kit does not wait for a
       // street face. The upgraded entrance lands on the recorded front.
-      if (future && isNychaTower(building) && length >= 8) {
+      // A measured tower (the Grant Houses on 125th Street) keeps the red brick Valdrada recorded: no kit.
+      if (future && !spec && isNychaTower(building) && length >= 8) {
         emitNychaPanels(detail.buffer, f, length, h, floorPitch, rgb('iron'), tint(rgb('civic'), 0.8));
         futureStats.nychaPanels++;
         emitNychaLightStrip(neon, f, length, h, rgb('windowWarm'));
@@ -598,7 +623,8 @@ export function buildCityMeshes(
           if (physical.storefronts) storefrontPlacements.push({ x: f.x + f.oz * at, z: f.z - f.ox * at, outX: f.ox, outZ: f.oz });
           awnings++;
         }
-        if (hasShopSign(building.id, i)) {
+        // A measured building whose shops Valdrada did not letter keeps the plain fascia: no invented shop name.
+        if (!spec && hasShopSign(building.id, i)) {
           const width = Math.min(length * 0.75, 9);
           const panel = rgb(SHOP_SIGN_TONES[Math.floor(hashUnit(`${building.id}:${i}:panel`) * SHOP_SIGN_TONES.length) % SHOP_SIGN_TONES.length]!);
           const signTop = shopTop ?? 4.05;
@@ -622,7 +648,8 @@ export function buildCityMeshes(
         }
         fronts++;
       }
-      if (boards < MAX_BILLBOARDS && h >= 16 && length >= 8 && hashUnit(`${building.id}:${i}:board`) < 0.4) {
+      // Hologram billboards are the near-future layer's invention; a measured 125th Street front carries none.
+      if (!spec && boards < MAX_BILLBOARDS && h >= 16 && length >= 8 && hashUnit(`${building.id}:${i}:board`) < 0.4) {
         const [top, bottom] = BILLBOARD_PAIRS[Math.floor(hashUnit(`${building.id}:pair`) * BILLBOARD_PAIRS.length) % BILLBOARD_PAIRS.length]!;
         const bw = Math.min(length * 0.55, 9);
         const bh = Math.min(Math.min(h * 0.32, 7), BILLBOARD_TOP - 4.6);
@@ -669,7 +696,7 @@ export function buildCityMeshes(
       }
       // The facelift's roof garden: the planted patch and its low planter
       // wall on the tower roof (always drawn — it reads in the aerials).
-      if (isNychaTower(building)) {
+      if (isNychaTower(building) && !spec) {
         futureStats.nychaTowers++;
         const garden = scaledRing(ring, 0.55);
         roofs.surface(...SURFACES.wood);
@@ -681,6 +708,14 @@ export function buildCityMeshes(
   }
   const detailStart = detail.finish(bandCount);
   while (band < bandCount) bandStart[++band] = shadows.vertexCount;
+
+  // vd lane: the Park Avenue Viaduct over the tile's east edge (vd-viaduct.ts), lit steel on the masonry draw.
+  let viaduct = { spans: 0, bents: 0 };
+  if (VD_LANE) {
+    masonry.surface(...SURFACES.iron);
+    masonry.facade(-1, 0);
+    viaduct = emitViaduct(masonry, VD_VIADUCT, dataset.extentMeters + 40);
+  }
 
   // Draw order inside one mesh follows array order at equal depth; each kind also sits on its own step.
   const sortedAreas = [...dataset.areas].sort((a, b) => areaLayer(a.kind) - areaLayer(b.kind));
@@ -765,6 +800,7 @@ export function buildCityMeshes(
     buildings: dataset.buildings.length, roads: dataset.roads.length, areas: dataset.areas.length,
     triangles, drawCalls: meshes.length, neonTrims: trims, storefronts: fronts, billboards: boards,
     cornices, stoops, fireEscapes, awnings, shopSigns, waterTowers, parapets,
+    realFacades, heroes: heroes.length, viaductSpans: viaduct.spans, viaductBents: viaduct.bents,
     future: futureStats,
   };
   const shownBands: [number, number] = [-1, -1];
@@ -776,6 +812,8 @@ export function buildCityMeshes(
     texts,
     /** The AdSurface registry rows for the panels this build drew (future-layer.ts). */
     adSurfaces,
+    /** The measured landmark fronts this build drew (vd-heroes.ts), with every lettered line. */
+    heroes,
     /** Physical-lane outputs; absent unless a PhysicalMeshOptions flag asked for them. */
     physical: physical.facadeAttributes || physical.fireEscapes || physical.storefronts
       ? { fireEscapes: escapePlacements, storefronts: storefrontPlacements, facadeBytes }
