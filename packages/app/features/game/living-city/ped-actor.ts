@@ -202,7 +202,7 @@ export function createPedActor(options: PedActorOptions): SceneActorFactory {
             // Feet pivot: y lifts only for the stride bob while walking.
             const bob = speed > 0.1 ? Math.abs(Math.sin((frame.time ?? 0) * speed * Math.PI)) * BOB_METRES : 0;
             quat.setFromAxisAngle(up, pose.yaw);
-            pos.set(pose.x, bob + (options.groundY?.(pose.x, pose.z) ?? 0), pose.z);
+            pos.set(pose.x - (frame.originX ?? 0), bob + (options.groundY?.(pose.x, pose.z) ?? 0), pose.z - (frame.originZ ?? 0));
             scale.set(grow, grow, grow);
             matrix.compose(pos, quat, scale);
             km.mesh.setMatrixAt(slot, matrix);

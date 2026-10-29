@@ -44,6 +44,7 @@ import {
   VD_GROUND_MEANS, VD_GROUND_RGB, VD_NORMAL_LAYERS, VD_NORMALS_XY, VD_TEXTURE_SIZE, VD_WALL_LAYERS, VD_WALL_MEANS, VD_WALLS_RGB,
 } from './vd-textures.ts';
 import { VD_TREES } from './vd-trees.ts';
+import { worldPatternPosition } from './render-space.ts';
 
 type StdMat = InstanceType<Three['MeshStandardNodeMaterial']>;
 type BasicMat = InstanceType<Three['MeshBasicNodeMaterial']>;
@@ -393,7 +394,7 @@ export function createVdCityMaterials(
   const roads = (() => {
     const material = base.roads as StdMat;
     const graphs = roadsGraphs(THREE);
-    const xz = T.positionWorld.xz;
+    const xz = worldPatternPosition(THREE).xz;
     const tuv = xz.div(2.0);
     const photo = T.texture(groundMaps, tuv).depth(T.float(GND.asphalt)).rgb as V3;
     const fp = footprint(tuv);
@@ -414,7 +415,7 @@ export function createVdCityMaterials(
 
   const sidewalks = (() => {
     const material = base.sidewalks as StdMat;
-    const xz = T.positionWorld.xz;
+    const xz = worldPatternPosition(THREE).xz;
     const flag = xz.div(TUNE.flag);
     const cell = T.floor(flag);
     const aa = T.max(footprint(flag), 1e-4);
@@ -454,7 +455,7 @@ export function createVdCityMaterials(
   })();
 
   const concreteGrain = (material: StdMat, albedoIn: V3, snowK: number) => {
-    const xz = T.positionWorld.xz;
+    const xz = worldPatternPosition(THREE).xz;
     const tuv = xz.div(3.0);
     const photo = T.texture(groundMaps, tuv).depth(T.float(GND.concrete)).rgb as V3;
     const albedo = albedoIn.mul(groundGrain(photo, GND.concrete, footprint(tuv), 0.5)) as V3;
