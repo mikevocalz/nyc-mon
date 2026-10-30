@@ -5,7 +5,11 @@ import { sectionMarker } from './sections';
 import { sectionText, type CmsSectionProps } from './cms';
 
 type CareItem = { verb: string; meter: string; cue: string; answer: string; value: number; color: (typeof W01_COPY.care.items)[number]['color'] };
-const METER_FILL = { orange: 'border-orange-700 bg-orange-700', royal: 'border-royal-700 bg-royal-700', leaf: 'border-leaf-700 bg-leaf-700' } as const;
+const METER_FILL = {
+  orange: 'border-orange-700 bg-orange-700',
+  royal: 'border-royal-700 bg-royal-700',
+  leaf: 'border-leaf-700 bg-leaf-700',
+} as const;
 const METER_LOTS = 10;
 function CareMeter({ item, cms }: { item: CareItem } & CmsSectionProps) {
   const filled = Math.round((item.value / 100) * METER_LOTS);
