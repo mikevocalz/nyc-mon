@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
-import { decodeComponent, dequantizeGlb, isQuantizedGlb } from './glbDequantize.ts';
+import { decodeComponent, isQuantizedGlb, needsViroRewrite, viroReadableGlb } from './glbDequantize.ts';
 
 type Json = Record<string, any>;
 
@@ -88,11 +88,60 @@ describe('decodeComponent', () => {
   });
 });
 
-describe('dequantizeGlb', () => {
+/**
+ * One skinned vertex: float POSITION, and JOINTS_0 / WEIGHTS_0 as uint8
+ * interleaved in a 12-byte stride, the way glTF-Transform writes skinned Mons.
+ */
+function skinnedVertex(quantized: boolean): Uint8Array {
+  const bin = new DataView(new ArrayBuffer(24));
+  [0.5, 1, -0.25].forEach((v, i) => bin.setFloat32(i * 4, v, true));
+  [3, 86, 0, 1].forEach((v, i) => bin.setUint8(12 + i, v));
+  [255, 0, 0, 0].forEach((v, i) => bin.setUint8(16 + i, v));
+  return glb({
+    asset: { version: '2.0' },
+    ...(quantized ? { extensionsUsed: ['KHR_mesh_quantization'], extensionsRequired: ['KHR_mesh_quantization'] } : {}),
+    buffers: [{ byteLength: 24 }],
+    bufferViews: [
+      { buffer: 0, byteOffset: 0, byteLength: 12 },
+      { buffer: 0, byteOffset: 12, byteLength: 8, byteStride: 4 },
+    ],
+    accessors: [
+      { bufferView: 0, byteOffset: 0, componentType: 5126, count: 1, type: 'VEC3', min: [0.5, 1, -0.25], max: [0.5, 1, -0.25] },
+      { bufferView: 1, byteOffset: 0, componentType: 5121, count: 1, type: 'VEC4' },
+      { bufferView: 1, byteOffset: 4, componentType: 5121, normalized: true, count: 1, type: 'VEC4' },
+    ],
+    meshes: [{ primitives: [{ attributes: { POSITION: 0, JOINTS_0: 1, WEIGHTS_0: 2 } }] }],
+  }, new Uint8Array(bin.buffer));
+}
+
+function uints(file: Uint8Array, accessorIndex: number): number[] {
+  const { json, bin } = parse(file);
+  const accessor = json.accessors[accessorIndex];
+  const bufferView = json.bufferViews[accessor.bufferView];
+  return Array.from({ length: accessor.count * 4 }, (_, i) => bin.getUint32(bufferView.byteOffset + (accessor.byteOffset ?? 0) + i * 4, true));
+}
+
+describe('viroReadableGlb', () => {
+  it('widens 8-bit joints to uint32 so WebGL 2 accepts them for Viro\'s ivec4 bone_indices', () => {
+    for (const quantized of [true, false]) {
+      const source = skinnedVertex(quantized);
+      assert.equal(needsViroRewrite(source), true);
+      const out = viroReadableGlb(source);
+      const { json } = parse(out);
+      assert.equal(json.accessors[1].componentType, 5125);
+      assert.deepEqual(uints(out, 1), [3, 86, 0, 1]);
+      assert.equal(needsViroRewrite(out), false);
+      // Positions and the joint count are untouched; weights become float only when quantized.
+      assert.deepEqual(floats(out, 0), [0.5, 1, -0.25]);
+      assert.equal(json.accessors[2].componentType, quantized ? 5126 : 5121);
+      if (quantized) assert.deepEqual(floats(out, 2), [1, 0, 0, 0]);
+    }
+  });
+
   it('rewrites quantized vertex and sparse morph accessors as float32', () => {
     const source = quantizedTriangle();
     assert.equal(isQuantizedGlb(source), true);
-    const out = dequantizeGlb(source);
+    const out = viroReadableGlb(source);
     const { json } = parse(out);
 
     assert.deepEqual(json.extensionsUsed, ['KHR_materials_emissive_strength']);
@@ -120,8 +169,10 @@ describe('dequantizeGlb', () => {
 
   it('returns a file that is not quantized unchanged', () => {
     const plain = glb({ asset: { version: '2.0' }, buffers: [{ byteLength: 4 }] }, new Uint8Array(4));
-    assert.equal(dequantizeGlb(plain), plain);
+    assert.equal(viroReadableGlb(plain), plain);
+    assert.equal(needsViroRewrite(plain), false);
     assert.equal(isQuantizedGlb(new Uint8Array([1, 2, 3])), false);
+    assert.equal(needsViroRewrite(new Uint8Array([1, 2, 3])), false);
   });
 
   it('refuses accessors that point outside the file instead of allocating for them', () => {
@@ -130,24 +181,44 @@ describe('dequantizeGlb', () => {
       patch(json);
       return glb(json, new Uint8Array(32));
     };
-    assert.throws(() => dequantizeGlb(hostile((j) => { j.accessors[0].count = 2 ** 28; })), /past its own data/);
-    assert.throws(() => dequantizeGlb(hostile((j) => { j.bufferViews[0].byteStride = 1; })), /cannot read/);
-    assert.throws(() => dequantizeGlb(hostile((j) => { j.accessors[0].byteOffset = '4'; })), /cannot read/);
-    assert.throws(() => dequantizeGlb(hostile((j) => { j.accessors[0].bufferView = 9; })), /cannot read/);
-    assert.throws(() => dequantizeGlb(hostile((j) => { j.accessors[2].sparse.count = 5; })), /cannot read/);
+    assert.throws(() => viroReadableGlb(hostile((j) => { j.accessors[0].count = 2 ** 28; })), /past its own data/);
+    assert.throws(() => viroReadableGlb(hostile((j) => { j.bufferViews[0].byteStride = 1; })), /cannot read/);
+    assert.throws(() => viroReadableGlb(hostile((j) => { j.accessors[0].byteOffset = '4'; })), /cannot read/);
+    assert.throws(() => viroReadableGlb(hostile((j) => { j.accessors[0].bufferView = 9; })), /cannot read/);
+    assert.throws(() => viroReadableGlb(hostile((j) => { j.accessors[2].sparse.count = 5; })), /cannot read/);
   });
 
   it('accepts every model the repo ships', () => {
     for (const path of ['../assets/eggs/corner-egg/corner-egg-hatch.glb', '../assets/eggs/prism-egg/prism-egg-hatch.glb', '../assets/eggs/signal-egg/signal-egg-hatch.glb', '../../apps/web/public/mons/squeaklet.glb', '../../apps/web/public/mons/lil-ratti.glb']) {
-      const out = dequantizeGlb(new Uint8Array(readFileSync(new URL(path, import.meta.url))));
+      const out = viroReadableGlb(new Uint8Array(readFileSync(new URL(path, import.meta.url))));
       assert.equal(isQuantizedGlb(out), false, path);
+      assert.equal(needsViroRewrite(out), false, path);
+    }
+  });
+
+  it('keeps every joint index of the shipped skinned Mons and stores them as uint32', () => {
+    for (const path of ['../../apps/web/public/mons/squeaklet.glb', '../../apps/web/public/mons/lil-ratti.glb']) {
+      const source = new Uint8Array(readFileSync(new URL(path, import.meta.url)));
+      const before = parse(source);
+      const out = viroReadableGlb(source);
+      const after = parse(out);
+      for (const primitive of after.json.meshes[0].primitives) {
+        const index = primitive.attributes.JOINTS_0;
+        assert.equal(after.json.accessors[index].componentType, 5125, path);
+        const accessor = before.json.accessors[index];
+        const view = before.json.bufferViews[accessor.bufferView];
+        const stride = view.byteStride || 4;
+        const expected = Array.from({ length: accessor.count * 4 }, (_, i) => before.bin.getUint8(view.byteOffset + (accessor.byteOffset ?? 0) + Math.floor(i / 4) * stride + (i % 4)));
+        assert.deepEqual(uints(out, index), expected, path);
+        assert.ok(expected.every((joint) => joint < before.json.skins[0].joints.length), path);
+      }
     }
   });
 
   it('turns the shipped Metro egg into a float file with the same bounds', () => {
     const source = new Uint8Array(readFileSync(new URL('../assets/eggs/metro-egg/metro-egg-hatch.glb', import.meta.url)));
     const before = parse(source).json;
-    const out = dequantizeGlb(source);
+    const out = viroReadableGlb(source);
     const { json } = parse(out);
     assert.equal(json.extensionsUsed, undefined);
     for (const mesh of json.meshes) {
