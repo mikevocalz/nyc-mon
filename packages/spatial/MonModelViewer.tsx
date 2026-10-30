@@ -3,6 +3,7 @@
 import { useEffect, useState, type ComponentType } from 'react';
 import { palette } from '@acme/theme';
 import { dequantizeGlb, isQuantizedGlb } from './glbDequantize';
+import { PREVIEW_FOV, previewCamera } from './modelFraming';
 import { View } from '@acme/ui/tw';
 import {
   Viro3DObject,
@@ -36,10 +37,10 @@ export type MonModelViewerProps = {
 type SceneProps = Omit<MonModelViewerProps, 'assetBaseUrl'>;
 
 function MonModelScene({ url, scale, position, rotation, yaw = 0, heightMeters, clip, onLoad, onError }: SceneProps) {
-  const height = Math.max(0.1, (heightMeters ?? 1) * scale);
+  const camera = previewCamera(heightMeters, scale);
   return (
     <ViroScene>
-      <ViroOrbitCamera position={[0, height * 0.6, height * 2.4 + 0.4]} focalPoint={[0, height * 0.5, 0]} active />
+      <ViroOrbitCamera position={camera.position} focalPoint={camera.focalPoint} fieldOfView={PREVIEW_FOV} active />
       <ViroAmbientLight color={palette.white} intensity={300} />
       <ViroDirectionalLight color={palette.white} direction={[-0.5, -1, -0.6]} intensity={900} />
       {/* key: a new file is a new node, so the old model never lingers under the new one. */}
