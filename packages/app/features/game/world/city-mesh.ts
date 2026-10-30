@@ -705,7 +705,8 @@ export function buildCityMeshes(
     }
     if (CURB_HEIGHT > 0 && road.class !== 'crossing') {
       sidewalks.surface(...SURFACES.stone);
-      curbFaces(sidewalks, points, road.widthMeters / 2, LAYER.roads, LAYER.sidewalks + CURB_HEIGHT, rgb('curb'), clearance);
+      roofs.surface(...SURFACES.stone);
+      curbFaces(sidewalks, points, road.widthMeters / 2, LAYER.roads, LAYER.sidewalks + CURB_HEIGHT, rgb('curb'), clearance, { buffer: roofs, color: rgb('sidewalk') });
     }
     const zebra = road.class === 'crossing' ? 1 : 0;
     const centre = !zebra && road.widthMeters >= CENTRE_LINE_MIN_WIDTH ? 1 : 0;
@@ -965,8 +966,21 @@ function emitMeasuredFront(
  * the sidewalk top, facing the road. A face whose outside lands in another
  * carriageway (a junction mouth, a crossing) is left out, as Valdrada's
  * emitter skips faces inside `inCarriageway` (compile.mjs ~L2985).
+ *
+ * `occluder` gets the same faces turned toward the sidewalk, in a mesh that
+ * writes depth. The sidewalks and curb faces are a no-depth underlay drawn
+ * before the roads, so without it the carriageway (0.13 m lower) painted
+ * over the raised sidewalk wherever it showed through the kerb's line of
+ * sight: seen from the sidewalk, the kerb edge receded toward the camera
+ * by up to a metre and the facelift's kerb light line looked as if it lay
+ * in the road (Mike, iPad 2026-10-28). The back face fails the depth test
+ * for exactly the road pixels a solid kerb would hide; it is shaded as
+ * up-facing sidewalk so it reads as the kerb's top edge.
  */
-function curbFaces(buffer: VertexBuffer, points: Point[], half: number, y0: number, y1: number, color: readonly number[], clearance: StreetClearance): void {
+function curbFaces(
+  buffer: VertexBuffer, points: Point[], half: number, y0: number, y1: number, color: readonly number[], clearance: StreetClearance,
+  occluder?: { buffer: VertexBuffer; color: readonly number[] },
+): void {
   if (points.length < 2) return;
   const { left, right, v } = ribbon(points, half);
   for (const edge of [left, right]) {
@@ -982,6 +996,12 @@ function curbFaces(buffer: VertexBuffer, points: Point[], half: number, y0: numb
       const u0 = v[i - 1]!; const u1 = v[i]!;
       buffer.quad([a[0], y0, a[1]], [b[0], y0, b[1]], [b[0], y1, b[1]], [a[0], y1, a[1]], [nx, 0, nz], color,
         [[u0, y0], [u1, y0], [u1, y1], [u0, y1]]);
+      if (occluder) {
+        // Wind it so its front (along x up) faces away from the road, toward the sidewalk.
+        const gx = -(b[1] - a[1]); const gz = b[0] - a[0];
+        const [p, q] = gx * -nx + gz * -nz > 0 ? [a, b] : [b, a];
+        occluder.buffer.quad([p[0], y0, p[1]], [q[0], y0, q[1]], [q[0], y1, q[1]], [p[0], y1, p[1]], [0, 1, 0], occluder.color);
+      }
     }
   }
 }

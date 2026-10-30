@@ -200,6 +200,8 @@ export type LivingCityTier = 'low' | 'medium' | 'high' | 'xr';
 export interface LivingCityCaps {
   /** Ambient vehicle population target — total fleet cap including scripted spawns (VehicleSim.targetVehicles). */
   readonly vehicles: number;
+  /** Buses kept running on the bus-route lanes, inside `vehicles` (VehicleSim.busTarget). */
+  readonly buses: number;
   /** Ambient ped population target — total crowd cap including scripted spawns (PedSim.targetPeds). */
   readonly peds: number;
   /** Mount the streetlamp glow/pool actor. Off removes two instanced draws and the placement pass. */
@@ -211,18 +213,18 @@ export interface LivingCityCaps {
 }
 
 export const LIVING_CITY_CAPS: Record<LivingCityTier, LivingCityCaps> = {
-  low: { vehicles: 4, peds: 4, lampGlow: false, signalHeadCap: 160, pedBoxCap: 160 },
-  medium: { vehicles: 8, peds: 8, lampGlow: true, signalHeadCap: 224, pedBoxCap: 224 },
+  low: { vehicles: 4, buses: 1, peds: 4, lampGlow: false, signalHeadCap: 160, pedBoxCap: 160 },
+  medium: { vehicles: 8, buses: 1, peds: 8, lampGlow: true, signalHeadCap: 224, pedBoxCap: 224 },
   // 'high' must equal the PR05–07 authored defaults — the living-city
   // tests pin it against LIVING_CITY_AMBIENT / _PED_AMBIENT /
   // SIGNAL_HEAD_CAP / PED_BOX_CAP so a drift here fails loudly.
-  high: { vehicles: 12, peds: 16, lampGlow: true, signalHeadCap: 320, pedBoxCap: 320 },
+  high: { vehicles: 12, buses: 2, peds: 16, lampGlow: true, signalHeadCap: 320, pedBoxCap: 320 },
   // 'xr' is the headset-class rung the spec names: it intentionally
   // carries the authored ceiling today. There is no measured headset
   // budget to raise counts into — inflating numbers without a device to
   // validate them on would be dishonest; the rung exists so the selector
   // accepts the name and a future XR measurement can raise only this row.
-  xr: { vehicles: 12, peds: 16, lampGlow: true, signalHeadCap: 320, pedBoxCap: 320 },
+  xr: { vehicles: 12, buses: 2, peds: 16, lampGlow: true, signalHeadCap: 320, pedBoxCap: 320 },
 } as const;
 
 /**

@@ -15,7 +15,7 @@ describe('Bunny media URL projection', () => {
       height: 0,
       focalX: undefined,
       focalY: undefined,
-      sizes: {},
+      variants: {},
     };
 
     expect(withBunnyMediaURLs(doc).url).toBe(
@@ -35,7 +35,7 @@ describe('Bunny media URL projection', () => {
       height: 0,
       focalX: undefined,
       focalY: undefined,
-      sizes: {},
+      variants: {},
     };
 
     expect(withBunnyMediaURLs(doc).url).toBe('/api/media/file/local.mp4');
@@ -51,7 +51,7 @@ describe('Bunny media URL projection', () => {
       filesize: 1,
       width: 1000,
       height: 1000,
-      sizes: {
+      variants: {
         card: {
           filename: 'mon-art/hello world-640.jpg',
           width: 640,
@@ -62,7 +62,7 @@ describe('Bunny media URL projection', () => {
         },
       },
     };
-    expect(withBunnyMediaURLs(doc).sizes?.card?.url)
+    expect(withBunnyMediaURLs(doc).variants?.card?.url)
       .toBe('https://cdn.example.com/mon-art/hello%20world-640.jpg');
   });
 
@@ -80,7 +80,7 @@ describe('Bunny media URL projection', () => {
       height: 1000,
       focalX: 50,
       focalY: 50,
-      sizes: {
+      variants: {
         card: {
           filename: 'poster-640x640.jpg',
           width: 640,
@@ -94,7 +94,7 @@ describe('Bunny media URL projection', () => {
 
     const result = withBunnyMediaURLs(doc);
     expect(result.thumbnailURL).toBe('https://cdn.example.com/poster.jpg');
-    expect(result.sizes?.card?.url).toBe(
+    expect(result.variants?.card?.url).toBe(
       'https://cdn.example.com/poster-640x640.jpg',
     );
   });

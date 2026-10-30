@@ -11,6 +11,9 @@ import { createSkillLoader, resolveSkillPath } from './skill.ts';
 import { createA2fRenderer, createNvcfCall, mp3ToPcm16 } from './a2f.ts';
 import { createTtsHandler, findFfmpeg } from './tts.ts';
 import { createAsrSocket, createParakeetStream } from './asr.ts';
+import { FALLBACK_MON_LINGO } from '@acme/content/lingo';
+import { withVoiceStageGate } from './voice-stage-gate.ts';
+import { createMcpMonRoster } from './mon-roster.ts';
 
 /**
  * Two listeners:
@@ -46,14 +49,22 @@ const modelAuth =
         jwks: jwksUrl(env),
       })
     : undefined;
-const handleModel = createModelHandler({
-  backend,
+// The person's Mon as the MCP server reports it to their own token (mon-roster.ts). How much
+// a Mon may say comes from here, never from the page.
+const monRoster = createMcpMonRoster({ mcpUrl: env.SIM_MCP_URL });
+const modelDeps = {
   system: createSkillLoader(skillPath),
   allowedOrigin: hostOrigin,
   rateLimit: createRateLimiter(env.SIM_RATE_LIMIT_PER_MIN, { globalPerMinute: env.SIM_GLOBAL_RATE_LIMIT_PER_MIN }),
   // With sign-in on, a model turn needs the person's MCP token (issued to this client).
   ...(modelAuth ? { auth: modelAuth } : {}),
-});
+};
+// Per request, so the gate looks up this person's Mon: an Egg or a first-day Baby babbles whatever the model wrote (voice-stage-gate.ts).
+const handleModel = (request: Request, key: string) =>
+  createModelHandler({
+    ...modelDeps,
+    backend: withVoiceStageGate(backend, () => FALLBACK_MON_LINGO, () => monRoster(request.headers.get('authorization'))),
+  })(request, key);
 
 // Audio2Face-3D needs the NVIDIA key and ffmpeg (mp3 to 16 kHz PCM); without
 // either, /api/tts still sends character timing and the Mon lip-syncs from it.
@@ -74,6 +85,7 @@ const handleTts = createTtsHandler({
   rateLimit: createRateLimiter(env.SIM_TTS_RATE_LIMIT_PER_MIN, { globalPerMinute: env.SIM_GLOBAL_RATE_LIMIT_PER_MIN }),
   apiKey: env.ELEVENLABS_API_KEY,
   fetch,
+  roster: monRoster,
   ...(face ? { face } : {}),
   ...(modelAuth ? { auth: modelAuth } : {}),
 });

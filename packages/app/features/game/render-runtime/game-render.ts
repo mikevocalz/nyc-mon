@@ -32,7 +32,7 @@ import { createSignalActor } from '../living-city/signal-viz.ts';
 import { createVehicleActor } from '../living-city/vehicle-actor.ts';
 import { readCaller, readCamera, readPreset, readView, snapshotVersion, type MutableCallerState } from '../render-snapshot.ts';
 import { createStreetClearance } from '../world/walkability.ts';
-import { describeRuntimeError, installFrameGlobals, type GameRenderEventKind } from './runtime-report.ts';
+import { describeRuntimeError, formatRuntimeStage, installFrameGlobals, type GameRenderEventKind } from './runtime-report.ts';
 import { FrameSampleWindow, type MutableFrameTimingSample } from '../perf/frame-sampler.ts';
 import { physicalRendererParams, WORLD_DEVICE_PROBE } from '../world/physical-look.ts';
 import { readInteropGlobals, resolveRendererDevice, WORLD_PHYSICAL, type RendererDevice } from './shared-device.ts';
@@ -392,11 +392,13 @@ export function startGameRender(args: GameRenderArgs): void {
     };
     const setup = withFirstFrameSignal(
       createCityScene,
-      (stage) => {
-        pipecache?.mark(stage);
-        emit(s, 'stage', stage);
+      (stage, fraction) => {
+        if (fraction === undefined) pipecache?.mark(stage);
+        emit(s, 'stage', formatRuntimeStage(stage, fraction));
       },
       (event) => trace(s, event),
+      // The `[NYC-Mon/load]` timing lines (EXPO_PUBLIC_GAME_PERF), printed as-is on the JS thread.
+      GAME_PERF ? (line) => emit(s, 'load', line) : null,
     );
     const invalidate = () => {
       s.wantFrame = true;

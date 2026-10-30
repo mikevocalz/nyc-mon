@@ -96,12 +96,15 @@ describe('speakAs', () => {
     expect(bodies[1]).toEqual({ text: 'hi', lineageId: 'dex-001/male/2', stage: 'Small' });
   });
 
-  it('keeps an Egg silent without calling the server', async () => {
+  it('voices an Egg through the server, posting its voice stage', async () => {
     vi.stubGlobal('Audio', FakeAudio);
     const { fn, inits } = fakeFetch(mp3);
-    await speakAs('hi', { lineageId: 'dex-001/male/2', stage: 'Egg', mood: 'content' }, { fetchFn: fn });
-    expect(inits).toHaveLength(0);
-    expect(FakeAudio.created).toHaveLength(0);
+    const done = speakAs('hi', { lineageId: 'dex-001/male/2', stage: 'Egg', voiceStage: 'baby-talk', mood: 'content' }, { fetchFn: fn });
+    await vi.waitFor(() => expect(FakeAudio.created).toHaveLength(1));
+    FakeAudio.created[0]!.end();
+    await done;
+    expect(inits).toHaveLength(1);
+    expect(JSON.parse(String(inits[0]?.body))).toMatchObject({ text: 'hi', lineageId: 'dex-001/male/2', stage: 'Egg', voiceStage: 'baby-talk' });
   });
 
   it('uses the browser voice only when the server has no ElevenLabs (204), one voice for the session, stage pitch', async () => {

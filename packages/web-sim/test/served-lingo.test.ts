@@ -9,6 +9,7 @@ import type { MonLingoSource } from '../server/mon-lingo-source.ts';
 import { hostNote, stageDirectionNote } from '../server/skill.ts';
 import { createTtsHandler, type TtsFetch } from '../server/tts.ts';
 import { monFromTurn, withServedVoice, withVoiceGuide } from '../server/voice-guide.ts';
+import { trustClaim } from './fixtures/roster.ts';
 
 /**
  * The NVIDIA server reads the Mon's lingo from Payload (GET /v1/mon-lingo)
@@ -44,14 +45,14 @@ const speak = (text = 'Hi there.') =>
 describe('/api/tts plans with the served lingo', () => {
   it('createTtsHandler speaks in the voice the served table casts', async () => {
     const fetchFn = audio();
-    const handle = createTtsHandler({ allowedOrigin: ORIGIN, rateLimit: () => true, apiKey: 'x', fetch: fetchFn, pitchShift: null, lingo: async () => served });
+    const handle = createTtsHandler({ roster: trustClaim, allowedOrigin: ORIGIN, rateLimit: () => true, apiKey: 'x', fetch: fetchFn, pitchShift: null, lingo: async () => served });
     expect((await handle(speak(), 'ip')).status).toBe(200);
     expect(String(fetchFn.mock.calls[0]![0])).toContain('/served-');
   });
 
   it('keeps the bundled voice when no lingo dep is given', async () => {
     const fetchFn = audio();
-    const handle = createTtsHandler({ allowedOrigin: ORIGIN, rateLimit: () => true, apiKey: 'x', fetch: fetchFn, pitchShift: null });
+    const handle = createTtsHandler({ roster: trustClaim, allowedOrigin: ORIGIN, rateLimit: () => true, apiKey: 'x', fetch: fetchFn, pitchShift: null });
     expect((await handle(speak(), 'ip')).status).toBe(200);
     expect(String(fetchFn.mock.calls[0]![0])).not.toContain('/served-');
   });
@@ -60,7 +61,7 @@ describe('/api/tts plans with the served lingo', () => {
     const fetchFn = audio();
     const source = fixed(served);
     const env = loadNvidiaEnv({ NEBIUS_API_KEY: 'k', V1_MCP_SERVICE_KEY: 'v'.repeat(32), ELEVENLABS_API_KEY: 'x' });
-    const tts = createNvidiaTts(env, { auth: async () => ({ callerId: '12' }), fetch: fetchFn, pitchShift: null, lingo: source, log: () => {} });
+    const tts = createNvidiaTts(env, { auth: async () => ({ callerId: '12' }), roster: (_c, claim) => trustClaim(null, claim), fetch: fetchFn, pitchShift: null, lingo: source, log: () => {} });
     expect((await tts(speak(), 'ip')).status).toBe(200);
     expect(source.get).toHaveBeenCalledWith('12');
     expect(String(fetchFn.mock.calls[0]![0])).toContain('/served-');
@@ -122,7 +123,8 @@ describe('voice guide in the system prompt', () => {
   it('the Nebius request carries the guide built from the source on behalf of the owner', async () => {
     const inner: ModelBackend = { label: 'nebius', stream: vi.fn(async () => ({}) as never) };
     const source = fixed(served);
-    await withServedVoice(inner, source, () => '12').stream(turn(monNow), () => {}, new AbortController().signal);
+    const small = async () => [{ speciesId: 'dex-003', stage: 'Small' as const, hatchedAt: 0, voiceLineageId: 'dex-001/female/1' }];
+    await withServedVoice(inner, source, () => '12', small).stream(turn(monNow), () => {}, new AbortController().signal);
     expect(source.get).toHaveBeenCalledWith('12');
     const sent = vi.mocked(inner.stream).mock.calls[0]![0];
     expect(sent.system).toContain('facts: True.');

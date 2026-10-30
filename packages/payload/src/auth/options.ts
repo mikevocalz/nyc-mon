@@ -299,6 +299,7 @@ export const betterAuthOptions = {
     backgroundTasks: { handler: runInBackground },
   },
   rateLimit: {
+    enabled: false,
     // Per-instance memory does not hold on Vercel Functions (ADR 0004 §7).
     storage: 'database',
     customRules: {

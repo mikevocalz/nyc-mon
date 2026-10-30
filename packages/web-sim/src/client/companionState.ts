@@ -24,7 +24,11 @@ export interface CompanionState {
   voice: VoiceState;
 }
 /** Per-page protocol handles that are not UI state. */
-export interface CompanionRuntime { session: McpSession | null; history: Anthropic.MessageParam[]; abort: AbortController | null }
+export interface CompanionRuntime {
+  session: McpSession | null; history: Anthropic.MessageParam[]; abort: AbortController | null;
+  /** The newest tool result that carried the Mon, and when it arrived: each turn sends it as the "[Mon now …]" line. */
+  monStatus?: { readonly result: CallToolResult; readonly at: number } | null;
+}
 
 export const initialCompanionState = (): CompanionState => ({
   connected: false, busy: false, question: '', note: '', consent: false, memory: null,
@@ -92,7 +96,7 @@ export function errorMessage(error: unknown): string {
  * send()/memoryRequest() skip their own `busy:false`, so clear it here and say why.
  */
 export function expireSession(store: StoreApi<CompanionState>, runtime: StoreApi<CompanionRuntime>): void {
-  runtime.getState().abort?.abort(); runtime.setState({ history: [] });
+  runtime.getState().abort?.abort(); runtime.setState({ history: [], monStatus: null });
   store.setState({
     connected: false, busy: false, memory: null, note: '', consent: false, confirmForget: false, lines: [], status: '', mon: null, panel: 'chat',
     error: 'Your sign-in expired. Sign in again to keep talking.',

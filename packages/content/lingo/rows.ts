@@ -26,8 +26,11 @@ export type LexiconEntryType = (typeof LEXICON_ENTRY_TYPES)[number];
  *   `variants` are the keywords that pick it, `spokenForm` the tag.
  * - `word-palette`, `voice-rule`: guidance for a model writing the Mon's
  *   lines (the Agent Skill, the companion prompt). Served, never spoken.
+ * - `babble`: the sounds an Egg and a first-day Baby are made of
+ *   (Decision 32). `subcategory` is `syllable`, `family-sound` or
+ *   `egg-sound`; `canonicalText` is the sound.
  */
-export const MON_LINGO_CATEGORIES = ['mon-line', 'pronunciation', 'stage-direction', 'word-palette', 'voice-rule'] as const;
+export const MON_LINGO_CATEGORIES = ['mon-line', 'pronunciation', 'stage-direction', 'word-palette', 'voice-rule', 'babble'] as const;
 export type MonLingoCategory = (typeof MON_LINGO_CATEGORIES)[number];
 
 /** Payload's draft state; only `published` rows are canon and served. */

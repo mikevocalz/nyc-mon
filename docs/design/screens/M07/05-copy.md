@@ -2,7 +2,7 @@
 
 Owner: `ux-writer`. Inputs: `01-research.md`, `03-direction.md`, `04-components.md`, `06-critique.md`; `docs/design/DECISIONS.md` P4, D10; Law 9; `V11 ¶19`, `¶58`, `¶109`. Voice and glossary: `docs/COPY_DECK.md`.
 
-All strings are `voice: "ui"` (P4). The preview is the H-Lynk showing the name on a signage plate. No Mon, no Santoro, no "Callah": no Mon exists before the hatch (Decision #5), and Phase 1 Baby speech is open (Q32).
+All strings are `voice: "ui"` (P4). The preview is the H-Lynk showing the name on a signage plate. No Mon, no Santoro, no "Callah": no Mon exists before the hatch (Decision #5), and a Phase 1 Baby never says "Callah" (Decision 32: babble for its first day, then at most two words).
 
 ## Name rules (proposed; platform confirms)
 

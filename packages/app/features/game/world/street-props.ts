@@ -12,7 +12,7 @@
 // - city:cars-vd-<car>[-mid|-far] (vd lane, the default): every parked car
 //   in CAR_RADIUS is a Valdrada baked body (vd-car-mesh.ts), one
 //   InstancedMesh per body and detail level. The nearest VD_PARKED_CAP inside
-//   VD_PARKED_RADIUS draw LOD2; the rest out to VD_PARKED_MID_RADIUS draw the
+//   VD_PARKED_RADIUS draw the full body; the rest out to VD_PARKED_MID_RADIUS draw the
 //   `mid` decimation, and out to CAR_RADIUS the `far` one. No box car is
 //   built. Same material, same instance tone. Each is a Mesh over an
 //   InstancedBufferGeometry with the transform in `vdXform`
@@ -50,10 +50,10 @@ const PAINT = [-1, -1, -1] as const;
 
 export const CAR_RADIUS = 200;
 export const CAR_CAP = 220;
-/** vd lane: parked cars this close to the Caller may draw the full baked body (LOD2). */
+/** vd lane: parked cars this close to the Caller may draw the full baked body. */
 export const VD_PARKED_RADIUS = 40;
 /**
- * At most this many full bodies, about 4k triangles each. budget.test.ts at the Apollo spawn put 13 bodies (cap 40) at 48.6k
+ * At most this many full bodies, about 4.5k triangles each. budget.test.ts at the Apollo spawn put 13 bodies (cap 40) at 48.6k
  * triangles against a 320k frame budget the vd trees already exceed (2026-10-28), so the cap is the fleet's high-tier
  * near count. Cars past the cap draw the same body's `mid` decimation (~600 triangles), never a box.
  */
@@ -71,6 +71,16 @@ export function vdParkedCar(i: number, taxi: boolean): VdCarId {
   let acc = 0;
   for (const [id, share] of VD_PARKED_SHARE) { acc += share; if (h < acc) return id; }
   return 'lincoln';
+}
+
+/**
+ * Makes the parked-car material the vd bodies' (it is only theirs under vd): the transform comes from vdXform, and it
+ * draws double-sided, as the fleet's does (living-city/vd-car-material.ts), so a gap the clustered `mid` and `far`
+ * levels leave in a panel shows the panel behind it instead of the street (vd-car-draw.test.ts).
+ */
+export function vdParkedCarMaterial(THREE: Three, material: CityMaterials['cars']): void {
+  (material as unknown as { positionNode: unknown }).positionNode = vdXformPositionNode(THREE);
+  material.side = THREE.DoubleSide;
 }
 
 /** Every street prop for a tile, after the clearance. Pure apart from the clearance. */
@@ -321,8 +331,7 @@ export function buildStreetProps(
   const vdSlots: Record<VdLod, number>[] = [];
   const vdKindOf = new Uint8Array(n);
   if (vd && n > 0) {
-    // The parked-car material is only these meshes' under vd: it reads the transform from vdXform.
-    (materials.cars as unknown as { positionNode: unknown }).positionNode = vdXformPositionNode(THREE);
+    vdParkedCarMaterial(THREE, materials.cars);
     const used = new Set<VdCarId>();
     placed.cars.forEach((car, i) => used.add(vdParkedCar(i, car.taxi)));
     const slotOf = new Map<VdCarId, number>();
@@ -378,7 +387,7 @@ export function buildStreetProps(
       lastZ = z;
       const count = pickWithin(xs, zs, x, z, CAR_RADIUS, ids, scratch);
       if (vdMeshes.length > 0) {
-        // pickWithin returns the nearest first: LOD2 for the first VD_PARKED_CAP inside the near radius, then by distance.
+        // pickWithin returns the nearest first: the full body for the first VD_PARKED_CAP inside the near radius, then by distance.
         for (const m of vdMeshes) m.count = 0;
         for (let k = 0; k < count; k++) {
           const i = ids[k]!;
