@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { withBunnyMediaURLs } from '../../storage/bunnyMedia.ts';
+import { storageHost, withBunnyMediaURLs } from '../../storage/bunnyMedia.ts';
 
 describe('Bunny media URL projection', () => {
   it('returns the Bunny CDN URL as the canonical video URL', () => {
@@ -97,5 +97,19 @@ describe('Bunny media URL projection', () => {
     expect(result.variants?.card?.url).toBe(
       'https://cdn.example.com/poster-640x640.jpg',
     );
+  });
+});
+
+describe('Bunny storage host', () => {
+  it('uses the bare host for the main (Falkenstein) region', () => {
+    for (const region of [undefined, '', 'default', 'de', 'DE', 'falkenstein', 'storage.bunnycdn.com', 'https://storage.bunnycdn.com/']) {
+      expect(storageHost(region)).toBe('https://storage.bunnycdn.com');
+    }
+  });
+
+  it('prefixes the other regions, including a pasted hostname', () => {
+    expect(storageHost('ny')).toBe('https://ny.storage.bunnycdn.com');
+    expect(storageHost(' NY ')).toBe('https://ny.storage.bunnycdn.com');
+    expect(storageHost('https://la.storage.bunnycdn.com')).toBe('https://la.storage.bunnycdn.com');
   });
 });

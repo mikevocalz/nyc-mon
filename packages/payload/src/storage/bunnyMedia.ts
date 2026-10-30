@@ -24,10 +24,19 @@ if (process.env.NODE_ENV === 'production' && !configured) {
   throw new Error('Bunny Storage must be configured in production.');
 }
 
-const storageHost = (region?: string) =>
-  region && region !== 'default'
-    ? `https://${region}.storage.bunnycdn.com`
+// Falkenstein is Bunny's main region and has no subdomain: `de.storage.bunnycdn.com`
+// does not resolve, so a zone set up there must use the bare host. Accept a pasted
+// hostname too, since the Bunny dashboard shows the region as one.
+export const storageHost = (region?: string) => {
+  const code = (region ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, '')
+    .replace(/\.?storage\.bunnycdn\.com\/?$/, '');
+  return code && !['default', 'de', 'falkenstein'].includes(code)
+    ? `https://${code}.storage.bunnycdn.com`
     : 'https://storage.bunnycdn.com';
+};
 
 const objectURL = (filename: string) => {
   const base = process.env.BUNNY_CDN_URL!.replace(/\/$/, '');
