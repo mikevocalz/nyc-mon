@@ -16,7 +16,8 @@
       "react-native": "./audio/index.native.ts",
       "default": "./audio/index.web.ts"
     },
-    "./model-viewer": "./MonModelViewer.tsx"
+    "./model-viewer": "./MonModelViewer.tsx",
+    "./model-turn": "./modelTurn.ts"
   },
   "scripts": {
     "lint": "eslint",
