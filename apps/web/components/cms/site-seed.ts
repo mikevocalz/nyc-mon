@@ -51,7 +51,7 @@ export function buildSiteSeed(origin: string) {
   for (const [slot, image] of Object.entries(STORY_ART)) story.assets.push(...asset(origin, ({cleanCity: 'clean-city', rooftops: 'cascade', water: 'cascade'} as Record<string,string>)[slot] ?? slot, slot.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`), image));
   pages.push(story);
   const city = document('/city', 'The City', W03_COPY.districts.body, [section('districts', 'Districts', {...W03_COPY.districts, districts: DISTRICT_COPY}), section('grid', 'Street grid'), section('cast', 'People of the city', W03_COPY.cast)]);
-  for (const district of CITY_PHOTO_DISTRICTS) { const image = cityPhoto(district)!; city.assets.push(...asset(origin, 'districts', district, {...image, src: image.source, caption: {title: image.title, place: image.place}})); }
+  for (const district of CITY_PHOTO_DISTRICTS) { const image = cityPhoto(district)!; city.assets.push(...asset(origin, 'districts', district, {...image, district: undefined, src: image.source, caption: {title: image.title, place: image.place}})); }
   pages.push(city);
   const keys = ['meet','name','incubate','hatch','care'];
   const how = document('/how-it-works', 'How it works', W04_COPY.loop.body, [
