@@ -160,8 +160,19 @@ export default buildConfig({
     origins: PAYLOAD_CORS_ORIGINS,
     // The game app (nyc-mon.city → this origin) and the console mark their
     // sign-in requests with the surface header; without it the browser's
-    // CORS preflight would refuse the cross-origin call.
-    headers: [SURFACE_HEADER],
+    // CORS preflight would refuse the cross-origin call. The rest are
+    // Payload's defaults — dropping them broke every /v1 route that carries
+    // Authorization, Content-Type or the waitlist forward secret.
+    headers: [
+      SURFACE_HEADER,
+      'Origin',
+      'X-Requested-With',
+      'Content-Type',
+      'Accept',
+      'Authorization',
+      'Payload-HTTP-Method-Override',
+      'x-nycmon-forward-secret',
+    ],
   },
   csrf: PAYLOAD_ORIGINS,
   secret: process.env.PAYLOAD_SECRET || '',
