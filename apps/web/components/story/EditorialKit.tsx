@@ -110,7 +110,7 @@ export function PhotoFrame({
   eager?: boolean;
 }) {
   const image = (
-    <Image
+    <Image unoptimized={typeof entry.src === 'string' && entry.src.startsWith('https://')}
       src={entry.src as ImageProps['src']}
       alt={entry.alt}
       fill

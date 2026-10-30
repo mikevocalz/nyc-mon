@@ -199,6 +199,7 @@ export function DeviceStage({
   const cover = capture ? (
     <Image
       src={capture.src}
+      unoptimized={typeof capture.src === 'string' && capture.src.startsWith('https://')}
       alt=""
       fill
       framed={false}

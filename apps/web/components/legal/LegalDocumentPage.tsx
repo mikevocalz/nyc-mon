@@ -1,3 +1,7 @@
+import { copyTree } from '../cms/bindings';
+import { orderedSectionKeys, sectionFor } from '@acme/content/site-content';
+import { SectionContent } from '../cms/SectionContent';
+import type { CmsPageProps } from '../cms/PageSections';
 import { Article, Heading, Link, List, ListItem, Nav, OrderedList, Paragraph, Section, Text } from '@acme/ui/html';
 import { View } from '@acme/ui/tw';
 import { Eyebrow } from '../home/Eyebrow';
@@ -39,13 +43,20 @@ const FOCUS = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:rin
  * Calm on purpose: no motion and no scroll smoothing, so anchors and the
  * browser's own find and scroll behave as expected.
  */
-export function LegalDocumentPage({ doc, testId }: { doc: LegalDocument; testId: string }) {
+export function LegalDocumentPage({ doc: original, testId, page, embedOrigins = [], siteOrigin = '' }: CmsPageProps & { doc: LegalDocument; testId: string }) {
+  const header = copyTree({title: original.title, eyebrow: original.eyebrow, updated: original.updated}, sectionFor(page, 'hero'));
+  const doc = {...original, ...header, sections: orderedSectionKeys(page, original.sections.map(section => section.id))
+    .filter(key => key !== 'hero' && !sectionFor(page, key)?.hidden)
+    .map(key => {
+      const existing = original.sections.find(section => section.id === key);
+      return existing ? copyTree(existing, sectionFor(page, key)) : {id: key, title: sectionFor(page, key)?.label ?? key, body: []};
+    })};
   const titleId = `${testId}-title`;
   const tocId = `${testId}-contents`;
   return (
     <View className="w-full flex-1 bg-bg">
-      <Section aria-labelledby={titleId} data-testid={testId} className="w-full">
-        <View className="scheme-dark w-full bg-ink-950">
+      <Section aria-labelledby={sectionFor(page, 'hero')?.hidden ? undefined : titleId} aria-label={sectionFor(page, 'hero')?.hidden ? doc.title : undefined} data-testid={testId} className="w-full">
+        {sectionFor(page, 'hero')?.hidden ? null : <View className="scheme-dark w-full bg-ink-950">
           <View className="mx-auto w-full max-w-screen-xl gap-6 px-4 pb-10 pt-12 sm:px-6 md:pb-14 md:pt-16 lg:px-8">
             <Eyebrow night>{doc.eyebrow}</Eyebrow>
             <Heading
@@ -59,7 +70,7 @@ export function LegalDocumentPage({ doc, testId }: { doc: LegalDocument; testId:
             <Nav aria-label={doc.eyebrow} className="pt-2">
               <List className="m-0 list-none flex-row flex-wrap gap-2 p-0">
                 {DOCS.map(({ doc: other, href }) => {
-                  const current = other.title === doc.title;
+                  const current = other.title === original.title;
                   return (
                     <ListItem key={href}>
                       <Link
@@ -76,8 +87,9 @@ export function LegalDocumentPage({ doc, testId }: { doc: LegalDocument; testId:
             </Nav>
           </View>
           <View aria-hidden className="h-1 w-full bg-orange-500" />
-        </View>
+        </View>}
 
+        <SectionContent section={sectionFor(page, 'hero')} origins={embedOrigins} siteOrigin={siteOrigin} />
         <View className="mx-auto w-full max-w-screen-xl gap-10 px-4 py-12 sm:px-6 md:py-20 lg:grid lg:grid-cols-12 lg:items-start lg:gap-x-10 lg:px-8">
           <Nav aria-labelledby={tocId} className="min-w-0 lg:sticky lg:top-32 lg:col-span-4 lg:self-start">
             <Text id={tocId} className="block w-fit bg-signage-black px-3 pb-1.5 pt-2 font-display text-sm uppercase text-signage-white">
@@ -124,6 +136,7 @@ export function LegalDocumentPage({ doc, testId }: { doc: LegalDocument; testId:
                     <LegalParagraph key={legalParagraphKey(paragraph)} paragraph={paragraph} />
                   ))}
                 </View>
+                <SectionContent section={sectionFor(page, section.id)} origins={embedOrigins} siteOrigin={siteOrigin} />
               </Section>
             ))}
           </Article>
