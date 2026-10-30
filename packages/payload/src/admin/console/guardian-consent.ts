@@ -135,17 +135,19 @@ const DECISION_HEADERS = {
 
 /**
  * The page a parent lands on after answering the consent email. Same visual
- * language as the mail (`templates.ts` render): one centered column, the
- * wordmark, a heading and a paragraph — no scripts, no styling imports.
+ * language as the mail (`templates.ts` render): the night surface, the orange
+ * wordmark and keyline, a heading and a paragraph — no scripts, no styling
+ * imports.
  */
 function decisionPage(status: number, heading: string, body: string): Response {
   const html = [
     '<!doctype html><html lang="en"><head>',
     '<meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>',
     `<title>${escapeHtml(heading)} · NYC-MON</title>`,
-    '</head><body style="margin:0;padding:24px;font-family:system-ui,sans-serif;color:#111;background:#fff">',
+    '</head><body style="margin:0;padding:24px;font-family:\'Space Grotesk\',system-ui,sans-serif;color:#F8F8F8;background:#00041C">',
     '<main style="max-width:480px;margin:0 auto;padding-top:96px">',
-    '<p style="font-weight:700;letter-spacing:.04em">NYC-MON</p>',
+    '<p style="font-weight:700;letter-spacing:.05em;color:#FC7C00;text-transform:uppercase">NYC-MON</p>',
+    '<div aria-hidden="true" style="height:4px;background:#FC7C00;margin:18px 0 0"></div>',
     `<h1 style="font-size:22px;line-height:1.35;margin:24px 0 12px">${escapeHtml(heading)}</h1>`,
     `<p style="line-height:1.5">${escapeHtml(body)}</p>`,
     '</main></body></html>',
