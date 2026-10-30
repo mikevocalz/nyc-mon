@@ -476,6 +476,17 @@ export function createCellStream(THREE: Three, meshes: readonly Mesh[], options:
     } else if (counted) polling++;
   };
 
+  // Readiness is checked again at build time, not only at the pick: packages that decode off one shared file (the far
+  // tier's landmarks, a far chunk's buildings and ground) drop its bytes in release(), which the first sibling's build
+  // calls, and requests outlive a pick across frames. A package whose bytes went asks for them again and builds on a
+  // later frame; reading its attributes now would throw.
+  const lostBytes = (slot: Slot) => {
+    if (!slot.pkg.ready || slot.pkg.ready()) return false;
+    prefetch(slot, true);
+    stats.fetching++;
+    return true;
+  };
+
   const pick = (camera: Vec3, k: number, nowS: number, radius: number) => {
     requests.length = 0;
     stats.fetching = 0;
@@ -548,6 +559,7 @@ export function createCellStream(THREE: Three, meshes: readonly Mesh[], options:
       let built = 0;
       for (const slot of requests) {
         if (!slot.pinned && slot.distance > startRadius) continue;
+        if (lostBytes(slot)) continue;
         if (!fits(slot)) { refuse(slot); continue; }
         build(slot, false);
         built++;
@@ -578,6 +590,7 @@ export function createCellStream(THREE: Three, meshes: readonly Mesh[], options:
         const slot = requests[i]!;
         if (slot.mesh !== null) continue;
         if (stats.builtThisFrame > 0 && (now() - start >= preset.stream.msPerFrame || uploaded + slot.pkg.bytes > preset.stream.uploadBytesPerFrame)) break;
+        if (lostBytes(slot)) continue;
         if (!fits(slot)) { refuse(slot); continue; }
         build(slot, true);
         uploaded += slot.pkg.bytes;
