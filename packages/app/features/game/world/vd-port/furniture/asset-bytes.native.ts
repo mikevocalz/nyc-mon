@@ -5,6 +5,7 @@
 // lane code may not import the Image primitive (packages/config/eslint/boundaries.mjs), and it draws nothing here.
 // @ts-expect-error React Native ships this module untyped
 import resolveAssetSource from 'react-native/Libraries/Image/resolveAssetSource';
+import { binaryFetch } from '@acme/ui/net';
 import { VD_CELL_ASSETS, VD_PBR_ALBEDO_ASSET, VD_PBR_ORM_ASSET, VD_PROTOS_ASSET, VD_SIGN_ATLAS_ASSET, VD_VK_TEXTURES_ASSET } from './cells/index.ts';
 import { vdCellFetch } from '../../cell-source/index.ts';
 import type { FurnitureAssets } from './structures.ts';
@@ -13,7 +14,7 @@ import type { FurnitureAssets } from './structures.ts';
 async function bytesOf(id: number): Promise<ArrayBuffer> {
   const uri = (resolveAssetSource as (id: number) => { uri?: string } | null)(id)?.uri;
   if (!uri) throw new Error(`vd structures: no URI for asset ${id}`);
-  const response = await fetch(uri);
+  const response = await binaryFetch(uri);
   if (!response.ok) throw new Error(`vd structures: GET ${uri} answered ${response.status}`);
   return response.arrayBuffer();
 }

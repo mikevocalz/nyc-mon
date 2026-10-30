@@ -6,6 +6,7 @@ import { needsViroRewrite, viroReadableGlb } from './glbDequantize';
 import { readModelPoints, type ModelPoints } from './modelBounds';
 import { fallbackExtent, previewCamera, turnExtent, type TurnExtent } from './modelFraming';
 import { dragTurn, keyTurn, type Turn } from './modelTurn';
+import { binaryFetch } from '@acme/ui/net';
 import { View } from '@acme/ui/tw';
 import {
   Viro3DObject,
@@ -123,7 +124,7 @@ function useViroReadable(url: string, onError?: (error: unknown) => void): Reada
     let cancelled = false;
     let objectUrl: string | null = null;
     (async () => {
-      const response = await fetch(url);
+      const response = await binaryFetch(url);
       if (!response.ok) throw new Error(`Model request failed (${response.status})`);
       const bytes = new Uint8Array(await response.arrayBuffer());
       if (cancelled) return;
