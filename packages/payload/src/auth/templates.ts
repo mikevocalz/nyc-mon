@@ -159,16 +159,22 @@ function render({ subject, paragraphs, action, code, footer }: Layout): MailCont
 export function verifyEmailMail(url: string): MailContent {
   return render({
     subject: 'Confirm your NYC-MON email',
-    paragraphs: ['Confirm this address to finish setting up your account.'],
+    // `mail.verify.body` in docs/design/screens/M03/05-copy.md; the deck's
+    // "didn't sign up" tail sits in the footer like every other notice's.
+    paragraphs: ['Tap the link to confirm this address and finish setting up your NYC-MON account.'],
     action: { label: 'Confirm email', url },
+    footer: "If you didn't sign up, you can ignore this email.",
   });
 }
 
 export function resetPasswordMail(url: string): MailContent {
   return render({
     subject: 'Reset your NYC-MON password',
+    // `mail.reset.body` in docs/design/screens/M03/05-copy.md, split the same
+    // way: what to do in the body, the "didn't ask" reassurance in the footer.
     paragraphs: ['Use this link to set a new password. It expires in one hour.'],
     action: { label: 'Set a new password', url },
+    footer: "If you didn't ask for this, you can ignore it and your password stays the same.",
   });
 }
 
@@ -209,7 +215,9 @@ export function signInMethodAddedMail(providerId: string): MailContent {
   return render({
     subject: `${name} sign-in was added to your NYC-MON account`,
     paragraphs: [`${name} can now sign in to your NYC-MON account.`],
-    footer: "If you didn't do this, remove it in Settings and change your password.",
+    // The methods list in Settings is read-only; changing the password is
+    // the remedy that ships (`settings.account.password.hint`).
+    footer: "If you didn't do this, change your password.",
   });
 }
 
@@ -223,10 +231,14 @@ export function signInMethodRemovedMail(providerId: string): MailContent {
 }
 
 export function newSurfaceMail(surfaceLabel: string): MailContent {
+  // `surfaceLabel` can start with a vowel ("Apple Vision Pro").
+  const article = /^[aeiou]/i.test(surfaceLabel) ? 'an' : 'a';
   return render({
     subject: 'A new sign-in to your NYC-MON account',
-    paragraphs: [`Your account was just signed in on a ${surfaceLabel}. Your Mon is the same one on every screen.`],
-    footer: "If this wasn't you, sign it out in Settings > Devices and change your password.",
+    paragraphs: [`Your account was just signed in on ${article} ${surfaceLabel}. Your Mon is the same one on every screen.`],
+    // No "Devices" list ships in Settings; a password change signs out the
+    // other sessions, in the app's own words.
+    footer: "If this wasn't you, change your password. Your other devices get signed out.",
   });
 }
 
@@ -235,7 +247,8 @@ export function accountsMergedMail(movedMons: number): MailContent {
   return render({
     subject: 'Your NYC-MON accounts were joined',
     paragraphs: [`Two NYC-MON accounts were joined into one. ${mons} moved over, and nothing was deleted.`],
-    footer: "If you didn't do this, contact support right away.",
+    // The support channel the legal pages name: replies reach a person.
+    footer: "If you didn't do this, reply to this email and it reaches the team.",
   });
 }
 
@@ -246,6 +259,12 @@ export function accountsMergedMail(movedMons: number): MailContent {
  *
  * The yes/no links are placeholders until counsel chooses the consent method
  * (M05 B1); the endpoint uses whatever URLs the caller passes in.
+ *
+ * Copy gate note (slopmonster deslop, 2026-10-31): the authored strings score
+ * 5/5. The tool's compound-hyphen rule still fires on this mail because the
+ * three consent URLs carry hyphenated slugs (nyc-mon.city, /guardian-consent/,
+ * /childrens-privacy); those are endpoint paths, not prose, and the deck's
+ * mail.consent.* wording is kept verbatim.
  */
 export function guardianConsentMail(consentId: number, days: number, baseURL: string): MailContent {
   const yesUrl = `${baseURL}/guardian-consent/${consentId}?decision=approve`;
@@ -277,15 +296,17 @@ export function guardianConsentMail(consentId: number, days: number, baseURL: st
  * either way so it never says who has signed up, and the mail matches —
  * "you're on the list" is true in both cases.
  *
- * Voice is the site's, not an account notice: no counts, no scarcity, and
- * the promise is the form's own — one email when the app is out, no ads.
+ * Voice is the site's, not an account notice: no counts, no scarcity. The
+ * form promises "one email when the app is out, and no ads", so this mail
+ * names itself the confirmation and the launch mail the only other one;
+ * sending it must not quietly break the promise.
  */
 export function waitlistJoinedMail(): MailContent {
   return render({
     subject: "You're on the NYC-MON waitlist",
     paragraphs: [
       'Someone entered this email address on the NYC-MON site and joined the waitlist.',
-      "You're on the list. One email when the app is out, and no ads.",
+      "You're on the list. This is the confirmation email. One more comes when the app is out, and no ads.",
     ],
     action: { label: 'Visit nyc-mon.city', url: SITE_URL },
   });

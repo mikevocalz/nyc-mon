@@ -3,7 +3,19 @@ import { describe, expect, it } from 'vitest';
 import { createConsoleSmsSender, createSmsSender, createSnsSmsSender, maskPhoneNumber } from '../sms.ts';
 import { consumeSmsQuota, type QuotaStore } from '../sms-quota.ts';
 import { isValidUsername } from '../username.ts';
-import { twoFactorCodeMail, verifyEmailMail, waitlistJoinedMail } from '../templates.ts';
+import {
+  accountsMergedMail,
+  changeEmailMail,
+  guardianConsentMail,
+  newSurfaceMail,
+  resetPasswordMail,
+  signInMethodAddedMail,
+  signInMethodRemovedMail,
+  twoFactorCodeMail,
+  verifyEmailMail,
+  waitlistJoinedMail,
+  type MailContent,
+} from '../templates.ts';
 
 describe('SMS senders (ADR 0004 §6)', () => {
   it('is off when no transport is set', () => {
@@ -105,5 +117,69 @@ describe('mail templates', () => {
     // The CTA's URL is written out in the text part, like every mail's link.
     expect(mail.text).toContain('https://nyc-mon.city');
     expect(mail.html).toContain('https://nyc-mon.city');
+  });
+
+  it('echoes the form promise without breaking it: the confirmation names itself', () => {
+    // The form says "one email when the app is out, and no ads". The mail
+    // sent on join is a second email, so it says plainly that it is the
+    // confirmation and the launch mail is the only other one.
+    const mail = waitlistJoinedMail();
+    expect(mail.text).toContain('confirmation');
+    expect(mail.text).toContain('when the app is out');
+    expect(mail.text).toContain('no ads');
+  });
+
+  it('follows the copy deck for the verify and reset mails (M03)', () => {
+    const verify = verifyEmailMail('https://example.com/verify');
+    expect(verify.subject).toBe('Confirm your NYC-MON email');
+    expect(verify.text).toContain('finish setting up your NYC-MON account');
+    expect(verify.text).toContain("didn't sign up");
+
+    const reset = resetPasswordMail('https://example.com/reset');
+    expect(reset.subject).toBe('Reset your NYC-MON password');
+    expect(reset.text).toContain('expires in one hour');
+    expect(reset.text).toContain('password stays the same');
+  });
+
+  it('uses the right article before each surface name', () => {
+    expect(newSurfaceMail('phone').text).toContain('on a phone');
+    expect(newSurfaceMail('Apple Vision Pro').text).toContain('on an Apple Vision Pro');
+  });
+
+  it('points account notices only at remedies that ship', () => {
+    // No "Devices" list or method-removal control exists in Settings; a
+    // password change signs out the other sessions.
+    const added = signInMethodAddedMail('google');
+    expect(added.text).toContain('change your password');
+    const removed = signInMethodRemovedMail('google');
+    expect(removed.text).toContain('change your password');
+    const surface = newSurfaceMail('web browser');
+    expect(surface.text).toContain('change your password');
+    expect(surface.text).not.toContain('Settings > Devices');
+    const merged = accountsMergedMail(2);
+    expect(merged.text).toContain('reply to this email');
+  });
+
+  it('keeps every subject and text part inside the copy contract', () => {
+    const mails: MailContent[] = [
+      verifyEmailMail('https://example.com/v'),
+      resetPasswordMail('https://example.com/r'),
+      changeEmailMail('new@example.com', 'https://example.com/c'),
+      twoFactorCodeMail('123456', 5),
+      signInMethodAddedMail('google'),
+      signInMethodRemovedMail('credential'),
+      newSurfaceMail('phone'),
+      accountsMergedMail(3),
+      guardianConsentMail(1, 14, 'https://example.com'),
+      waitlistJoinedMail(),
+    ];
+    // The deck's rules for voice "ui": no em or en dashes, no exclamation
+    // marks, no "user" for a Caller, none of the site's banned hype words
+    // (tooling/site-qa/copy-lint.mjs).
+    const offVoice = /[—–!]|\busers?\b|unlock|reimagin|seamless|next[\s-]+gen|AI[\s-]+powered|immersive|best friend|the future is here|elevat|supercharg|journey/i;
+    for (const mail of mails) {
+      expect(mail.subject).not.toMatch(offVoice);
+      expect(mail.text).not.toMatch(offVoice);
+    }
   });
 });
