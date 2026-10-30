@@ -45,7 +45,7 @@ export function validateSiteManifest(manifest, sourceOrigin) {
     for (const asset of document.assets) {
       if (!record(asset) || typeof asset.source !== 'string' || typeof asset.slot !== 'string' || !/^[a-z][a-z0-9.-]{0,99}$/.test(asset.slot) || typeof asset.sectionKey !== 'string') throw new Error('Invalid image placement');
       const url = new URL(asset.source);
-      if (url.origin !== origin.origin || url.username || url.password || !/^\/(?:_next\/static\/media\/|home\/)/.test(url.pathname) || url.hash || url.search) throw new Error('Images must come from the approved site static media directories');
+      if (url.origin !== origin.origin || url.username || url.password || !/^\/(?:_next\/static\/(?:immutable\/)?media\/|home\/)/.test(url.pathname) || url.hash || url.search) throw new Error('Images must come from the approved site static media directories');
       if (!document.page.sections.some(section => section.sectionKey === asset.sectionKey)) throw new Error('Unknown image section');
       const key = `${asset.sectionKey}:${asset.slot}`; if (positions.has(key)) throw new Error('Duplicate image position'); positions.add(key);
     }
