@@ -14,7 +14,7 @@ import { getUiResources, MON_MODEL_ORIGIN, mcpAppsRegistration, parseUiManifest,
 /**
  * Budgets per view, measured 2026-10-08. The card is about 1398 KiB raw,
  * 475 KiB gzip: React, react-native-web and the kit pieces, the ext-apps App
- * runtime with zod (about 445 KiB), Tailwind's CSS, two WOFF2 fonts and three
+ * runtime with zod (about 445 KiB), Tailwind's CSS, two WOFF2 fonts and four
  * Baby stills. The room adds the GridBand backdrop (GridFloor, the TypeGPU
  * scene and the CanvasKit loader glue, not the WASM): about 2270 KiB raw,
  * 722 KiB gzip. Alexa+ names no byte limit; it asks for one gzipped,
@@ -27,9 +27,11 @@ const BUDGET: Readonly<Record<string, { raw: number; gzip: number }>> = {
   // three.js because the MCP Apps CSP refuses the Rive runtime's WebAssembly.
   // The fourth starter (Decision 38, 2026-10-29) brings the LanternFye forms,
   // their v8 records and the Signal Egg thumbnail into the starter bundle,
-  // which put the room about 1 KB over 2950 KiB; it gets 8 KiB more.
-  'mon-card': { raw: 2200 * 1024, gzip: 700 * 1024 },
-  'mon-room': { raw: 2958 * 1024, gzip: 920 * 1024 },
+  // which put the room about 1 KB over 2950 KiB; it gets 8 KiB more. Fye
+  // Dot's still (2026-10-30) joins the Baby set at full size instead of a
+  // thumbnail, about 40 KB raw and 19 KB gzip on each view.
+  'mon-card': { raw: 2272 * 1024, gzip: 736 * 1024 },
+  'mon-room': { raw: 3024 * 1024, gzip: 944 * 1024 },
 };
 
 /**

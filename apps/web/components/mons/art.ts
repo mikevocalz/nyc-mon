@@ -4,8 +4,8 @@
  * place.
  *
  * - `baby` is the home page's starter plate (`starterArt(N)` in ../home/art.ts):
- *   the same concept art, the same focal point. Null where a Baby has no art
- *   yet: the pages draw Coming Soon in its place.
+ *   the same art, the same focal point. Null where a Baby has no art yet: the
+ *   pages draw Coming Soon in its place.
  * - `egg` is the concept art of the egg the Baby hatches from
  *   (`@acme/assets/creatures`, PS-028).
  * - `street` is a bundled NYC photograph of the street the Baby's concept art
@@ -19,6 +19,7 @@
  */
 import { breakpoints } from '@acme/theme';
 import { creatureArt } from '@acme/assets/creatures';
+import { adminStill, starterSpeciesId } from './still-art.ts';
 import type { ControlTone, District } from '@acme/ui';
 import { art, starterArt, type ArtEntry, type StarterId } from '../home/art';
 import { NYC_PHOTOS } from '@acme/assets/photos';
@@ -47,7 +48,7 @@ const SLOT_ART: Record<StarterId, SlotArt> = {
   1: { tone: 'orange', egg: { id: 'metro-egg', focal: { x: 0.5, y: 0.55 } }, street: { id: 'harlem-brownstone-stoops', focal: { x: 0.5, y: 0.6 } } },
   2: { tone: 'royal', egg: { id: 'corner-egg', focal: { x: 0.5, y: 0.55 } }, street: { id: 'harlem-apollo', focal: { x: 0.5, y: 0.45 } } },
   3: { tone: 'leaf', egg: { id: 'prism-egg', focal: { x: 0.5, y: 0.55 } }, street: { id: 'midtown-times-square', focal: { x: 0.5, y: 0.5 } } },
-  // No street photo was art-directed for LanternFye.
+  // No street photo was art-directed for LanternFye; the Signal Egg and Fye Dot stills carry their own stoop.
   4: { tone: 'apple', egg: { id: 'signal-egg', focal: { x: 0.5, y: 0.55 } }, street: null },
 };
 
@@ -61,6 +62,12 @@ const PORTRAIT_SIZES = `${LG_UP} 44rem, ${MD_UP} 70vw, 100vw`;
 function eggEntry(id: string, focalPoint: { x: number; y: number }): ArtEntry {
   const a = creatureArt(id);
   return { src: a.source, width: a.width, height: a.height, alt: a.alt, blurDataURL: a.blurDataURL, sizes: EGG_SIZES, focalPoint };
+}
+
+/** The Egg still approved in the console, which wins over the bundled one (./still-art.ts). */
+function adminEgg(slot: StarterId, focalPoint: { x: number; y: number }): ArtEntry | null {
+  const a = adminStill(starterSpeciesId(slot, 'Egg'));
+  return a ? { src: a.src, width: a.width, height: a.height, alt: a.alt, sizes: EGG_SIZES, focalPoint } : null;
 }
 
 function photoEntry(id: string, sizes: string, focalPoint: { x: number; y: number }): ArtEntry {
@@ -86,7 +93,7 @@ export function monsArt(slot: StarterId): MonsArt {
   return {
     tone: s.tone,
     baby: baby === null ? null : { ...baby, sizes: PORTRAIT_SIZES },
-    egg: eggEntry(s.egg.id, s.egg.focal),
+    egg: adminEgg(slot, s.egg.focal) ?? eggEntry(s.egg.id, s.egg.focal),
     street,
     district: street?.district ?? 'midtown',
   };

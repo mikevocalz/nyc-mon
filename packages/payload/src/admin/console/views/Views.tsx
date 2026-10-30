@@ -4,6 +4,7 @@ import { hasStaffRole, STAFF_ROLES } from '../../../collections/access/roles.ts'
 import { ConsoleNotStaff } from '../Chrome';
 import { allSpecies, bloodlineLabel, eggs, starterBloodlines } from '@acme/content';
 import { ModelsViewClient, type ModelDoc } from './ModelsClient';
+import type { StillDoc } from './StillArtPanel';
 import { callerIdentity, CALLER_IDENTITY_SELECT } from '../caller-identity';
 import { AuditViewClient, CallersViewClient, ConsentViewClient, ContentViewClient, MonsViewClient, OverviewViewClient, SettingsViewClient } from './ViewsClient';
 
@@ -124,6 +125,7 @@ async function modelsView(props: AdminViewServerProps) {
   const route = await props.params; const selectedId = typeof route?.segments?.[1] === 'string' ? route.segments[1] : null;
   // ponytail: one page of 200 covers the roster (allSpecies is ~100 forms); paginate if it grows past that.
   const found = await read(req, 'mon models', () => req.payload.find({ collection: 'mon-models', limit: 200, depth: 0, user, overrideAccess: false, req }));
+  const foundStills = await read(req, 'mon stills', () => req.payload.find({ collection: 'mon-art', limit: 200, depth: 0, user, overrideAccess: false, req }));
   const result = found.ok ? found.data : { docs: [] };
   const labelByBloodlineId = new Map(starterBloodlines.map(({ bloodline }) => [bloodline.bloodlineId, bloodlineLabel(bloodline)]));
   const forms = allSpecies.map((species) => ({ id: species.speciesId, dex: species.dexId, name: species.formName ?? species.bloodlineName, stage: species.stage, bloodline: labelByBloodlineId.get(species.bloodlineId) ?? species.bloodlineName }));
@@ -137,7 +139,11 @@ async function modelsView(props: AdminViewServerProps) {
     credit: { author: doc.credit?.author ?? '', license: doc.credit?.license ?? 'owned', sourceUrl: doc.credit?.sourceUrl ?? '' },
     notes: doc.notes ?? '',
   }));
-  return <ModelsViewClient failed={!found.ok} forms={forms} models={models} selectedId={selectedId} canEdit={user.role === 'ops' || user.role === 'content'} />;
+  const stills: StillDoc[] = (foundStills.ok ? foundStills.data.docs : []).map((doc) => ({
+    id: String(doc.id), speciesId: doc.speciesId, status: doc.status, url: doc.url ?? null, alt: doc.alt, filename: doc.filename ?? null,
+    filesize: doc.filesize ?? null, width: doc.width ?? null, height: doc.height ?? null, updatedAt: doc.updatedAt,
+  }));
+  return <ModelsViewClient failed={!found.ok || !foundStills.ok} forms={forms} models={models} stills={stills} selectedId={selectedId} canEdit={user.role === 'ops' || user.role === 'content'} />;
 }
 
 async function auditView(props: AdminViewServerProps) {

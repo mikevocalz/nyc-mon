@@ -16,6 +16,7 @@ import { GlassStage, useGlassOn, useGlassScreen, useMonGlass } from './glass';
 import { useHomeStage } from './home-stage.store';
 import { CompanionPane } from './CompanionPane';
 import { dexNumber, monIdentity } from './mon-identity';
+import { useAdminStills } from '../mons/use-admin-stills';
 import { recoveryHref } from '../system/recovery-model';
 import { ScreenBack } from '../navigation/use-header-back';
 
@@ -107,6 +108,7 @@ export function DexProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const mon = useMonStore((s) => s.save?.mons.find((m) => m.monInstanceId === id));
   const caller = useMonStore((s) => s.save?.caller);
+  const stills = useAdminStills();
 
   // ---- the 3D H-Lynk: this Mon as its 3D model on the glass, the Dex facts drawn under it ----
   const ui = useInstanceStore(() => ({ failed: false, nudge: 0 }));
@@ -181,7 +183,7 @@ export function DexProfileScreen() {
     return <Redirect href={recoveryHref('dex-not-found')} />;
   }
 
-  const who = monIdentity(mon);
+  const who = monIdentity(mon, stills);
   const portrait = who.art ? (
     <View testID="m17-portrait" className="w-full" style={{ aspectRatio: 4 / 5 }}>
       <Image src={who.art.source as ImageProps['src']} alt={who.art.alt} fill unoptimized className="h-full w-full" />

@@ -9,6 +9,7 @@ import * as migration_20261028_200000_mon_lingo_seed from './20261028_200000_mon
 import * as migration_20261029_120000_mon_babble_seed from './20261029_120000_mon_babble_seed';
 import * as migration_20261029_234150_schema_rels_sync from './20261029_234150_schema_rels_sync';
 import * as migration_20261030_030536_website_editor from './20261030_030536_website_editor';
+import * as migration_20261030_164327_mon_art from './20261030_164327_mon_art';
 
 export const migrations = [
   {
@@ -64,6 +65,11 @@ export const migrations = [
   {
     up: migration_20261030_030536_website_editor.up,
     down: migration_20261030_030536_website_editor.down,
-    name: '20261030_030536_website_editor'
+    name: '20261030_030536_website_editor',
+  },
+  {
+    up: migration_20261030_164327_mon_art.up,
+    down: migration_20261030_164327_mon_art.down,
+    name: '20261030_164327_mon_art'
   },
 ];

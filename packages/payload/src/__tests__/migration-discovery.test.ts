@@ -41,6 +41,7 @@ describe('native Node Payload migration discovery', () => {
         { name: '20261029_120000_mon_babble_seed', up: 'function', down: 'function' },
         { name: '20261029_234150_schema_rels_sync', up: 'function', down: 'function' },
         { name: '20261030_030536_website_editor', up: 'function', down: 'function' },
+        { name: '20261030_164327_mon_art', up: 'function', down: 'function' },
       ]);
     }, 35_000);
   }

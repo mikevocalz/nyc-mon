@@ -60,9 +60,9 @@ test('world sizes describe the grid columns each frame occupies', () => {
   assert.match(art('world.secondary').sizes, /33rem/);
 });
 
-test('starter art keys off @acme/content slot numbers; every starter Baby has its own art', () => {
+test('starter art keys off @acme/content slot numbers; every starter Baby has art, Fye Dot included', () => {
   for (const id of [1, 2, 3, 4] as const) assert.ok(starterArt(id), `slot ${id}: art`);
-  assert.match(starterArt(4)!.alt, /^Fye Dot/, 'slot 4 is Fye Dot, never another Mon');
+  assert.match(artHref(starterArt(4)!), /fye-dot\.webp$/, 'slot 4 shows Fye Dot, never another Mon');
 });
 
 test('creature art fills the starter and hatch slots and carries no place caption (PS-028)', () => {
@@ -84,9 +84,9 @@ test('creature art fills the starter and hatch slots and carries no place captio
 });
 
 test('each starter poster names its own Baby form, with no pronoun for the Mon (PS-005)', () => {
-  const names = { 1: 'Squeaklet', 2: 'Kittee Cee', 3: 'Yotito' } as const;
+  const names = { 1: 'Squeaklet', 2: 'Kittee Cee', 3: 'Yotito', 4: 'Fye Dot' } as const;
   for (const [slot, name] of Object.entries(names)) {
-    const alt = starterArt(Number(slot) as 1 | 2 | 3)?.alt ?? '';
+    const alt = starterArt(Number(slot) as 1 | 2 | 3 | 4)?.alt ?? '';
     assert.ok(alt.startsWith(`${name}, `), `${slot}: alt names ${name}`);
     assert.doesNotMatch(alt, /\b(it|its|he|his|him|she|her)\b/i, `${slot}: no pronoun`);
   }

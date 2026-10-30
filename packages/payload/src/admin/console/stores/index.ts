@@ -4,6 +4,7 @@ export { useConsentStore } from './consent.ts';
 export { useContentStore } from './content.ts';
 export { useModelsStore, type ModelDraft, type ModelFilter, type ModelTurn, type ModelYaw, type PendingModel } from './models.ts';
 export { useMonsStore } from './mons.ts';
+export { useStillArtStore, type PendingStill } from './stillArt.ts';
 export { useOverviewStore } from './overview.ts';
 export { useSettingsStore } from './settings.ts';
 export { useShellStore } from './shell.ts';

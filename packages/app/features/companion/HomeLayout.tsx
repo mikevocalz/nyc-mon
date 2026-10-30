@@ -16,7 +16,10 @@ import { companionCopy } from './copy';
 import { PERSISTENT_LAYOUT, PersistentGlassStage, useGlassOn, useGlassScreen, useMonGlass } from './glass';
 import { setHomeMenuOpen, useHomeStageStore, type HomeChrome } from './home-stage.store';
 import { useMinuteClock, useMinuteClockDriver } from './minute-clock';
-import { artFor, monIdentity } from './mon-identity';
+import { monIdentity } from './mon-identity';
+import { CREATURE_ART } from '@acme/assets/creatures';
+import { stillFor, type AdminStillMap } from '../mons/admin-stills';
+import { useAdminStills } from '../mons/use-admin-stills';
 import { allSpecies } from '@acme/content';
 import { OfflineBanner } from '../system/OfflineBanner';
 import { recoveryHref } from '../system/recovery-model';
@@ -25,9 +28,9 @@ import { recoveryHref } from '../system/recovery-model';
 const PHONE_SCENE = resolveSceneMode({ platform: 'phone', capabilities: null, anchors: undefined, preference: 'screen' });
 const dexBySpecies = new Map(allSpecies.map((s) => [s.speciesId, s.dexId]));
 
-/** The 2D Baby still for a scene, until the renderer's model slot replaces it (CreatureStage.renderStill). */
-function renderStill(scene: MonSceneInput): ReactNode {
-  const art = artFor('baby', dexBySpecies.get(scene.mon.speciesId) ?? null);
+/** The 2D Baby still for a scene (console still first), until the renderer's model slot replaces it (CreatureStage.renderStill). */
+function renderStill(scene: MonSceneInput, stills: AdminStillMap): ReactNode {
+  const art = stillFor('baby', dexBySpecies.get(scene.mon.speciesId) ?? null, scene.mon.speciesId, stills, CREATURE_ART);
   if (art === undefined) return null;
   return (
     <View className="mb-[6%] w-[62%]" style={{ aspectRatio: art.width / art.height }}>
@@ -57,6 +60,7 @@ const IDLE_CHROME: HomeChrome = {
 const CreatureLayer = memo(function CreatureLayer({ chrome, reducedMotion }: { chrome: HomeChrome; reducedMotion: boolean }) {
   const selector = useMemo(() => selectSceneInput(PHONE_SCENE, IDLE_PRESENCE), []);
   const scene = useMonStore(selector);
+  const stills = useAdminStills();
   const reaction = chrome.reaction;
   return (
     <CreatureStage<MonSceneInput>
@@ -66,7 +70,7 @@ const CreatureLayer = memo(function CreatureLayer({ chrome, reducedMotion }: { c
       reducedMotion={reducedMotion}
       renderStill={(s) => (
         <MonStillReaction playKey={reaction?.key ?? 0} reaction={reaction?.kind ?? 'tilt'} reducedMotion={reducedMotion}>
-          {renderStill(s)}
+          {renderStill(s, stills)}
         </MonStillReaction>
       )}
     />
