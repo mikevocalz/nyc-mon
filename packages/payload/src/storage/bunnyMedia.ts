@@ -167,6 +167,8 @@ export const bunnyMediaAfterChange: CollectionAfterChangeHook<
       id: doc.id,
       data: { bunnyUrl: mainURL },
       depth: 0,
+      // bunnyUrl is read-only to people (field access update: false); this write is the server's own.
+      overrideAccess: true,
       req,
     });
   } finally {
