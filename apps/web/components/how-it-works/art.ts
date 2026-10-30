@@ -54,10 +54,9 @@ function photo(id: string, sizes: string, position?: RouteArt['position']): Rout
 
 /**
  * The egg and Baby art per starter slot (the order of `starterBloodlines`).
- * Slot 4's Baby (Fye Dot) has no art yet: null, drawn as Coming Soon by ArtTile.
  */
 const EGG_ID: Record<StarterId, string> = { 1: 'metro-egg', 2: 'corner-egg', 3: 'prism-egg', 4: 'signal-egg' };
-const BABY_ID: Record<StarterId, string | null> = { 1: 'squeaklet', 2: 'kittee-cee', 3: 'yotito', 4: null };
+const BABY_ID: Record<StarterId, string | null> = { 1: 'squeaklet', 2: 'kittee-cee', 3: 'yotito', 4: 'fye-dot' };
 
 /** An egg tile: a quarter of a route stop's art column. */
 export const eggArt = (slot: StarterId, sizes = `${LG_UP} 9rem, ${MD_UP} 18vw, 40vw`) =>
