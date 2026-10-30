@@ -20,7 +20,7 @@ export const W04_COPY = {
     body: 'Five steps, from the day you meet your egg to everyday care.',
     listLabel: 'The five steps',
     steps: [
-      { numeral: '01', verb: 'Meet', line: 'Dr. Santoro shows you three eggs. You pick one.' },
+      { numeral: '01', verb: 'Meet', line: 'Dr. Santoro shows you four eggs. You pick one.' },
       { numeral: '02', verb: 'Name', line: 'You pick a Caller name, the one your Mon will know you by.' },
       { numeral: '03', verb: 'Incubate', line: "15 minutes, 30 minutes or an hour, then one notification when it's ready." },
       { numeral: '04', verb: 'Hatch', line: 'Your Mon chooses too. The first look your Mon gives you is the yes.' },

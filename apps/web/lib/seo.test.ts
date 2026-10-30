@@ -4,7 +4,7 @@ import { APP_SHELL_ROUTES, MARKETING_ROUTES, NOINDEX, buildRobots, buildSitemap 
 import { FALLBACK_SITE_URL, resolveSiteUrl } from './site-url.ts';
 
 const BASE = 'https://nyc-mon.test';
-const SLUGS = ['hood-ratti', 'bodega-cee', 'yotes'];
+const SLUGS = ['hood-ratti', 'bodega-cee', 'yotes', 'lanternfye'];
 
 test('resolveSiteUrl: trims the trailing slash and falls back when unset or invalid', () => {
   assert.equal(resolveSiteUrl('https://nyc-mon.test/'), 'https://nyc-mon.test');
@@ -39,6 +39,7 @@ test('sitemap: lists the marketing routes and each /mons slug, absolute, and no 
     `${BASE}/mons/hood-ratti`,
     `${BASE}/mons/bodega-cee`,
     `${BASE}/mons/yotes`,
+    `${BASE}/mons/lanternfye`,
   ]);
   for (const route of APP_SHELL_ROUTES) {
     assert.ok(!urls.some((url) => url.startsWith(`${BASE}${route}`)), `${route} must not be in the sitemap`);

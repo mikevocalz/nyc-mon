@@ -52,16 +52,22 @@ function photo(id: string, sizes: string, position?: RouteArt['position']): Rout
   };
 }
 
-/** The egg and Baby art per starter slot (the order of `starterBloodlines`). */
-const EGG_ID: Record<StarterId, string> = { 1: 'metro-egg', 2: 'corner-egg', 3: 'prism-egg' };
-const BABY_ID: Record<StarterId, string> = { 1: 'squeaklet', 2: 'kittee-cee', 3: 'yotito' };
+/**
+ * The egg and Baby art per starter slot (the order of `starterBloodlines`).
+ * Slot 4's Baby (Fye Dot) has no art yet: null, drawn as Coming Soon by ArtTile.
+ */
+const EGG_ID: Record<StarterId, string> = { 1: 'metro-egg', 2: 'corner-egg', 3: 'prism-egg', 4: 'signal-egg' };
+const BABY_ID: Record<StarterId, string | null> = { 1: 'squeaklet', 2: 'kittee-cee', 3: 'yotito', 4: null };
 
-/** An egg tile: a third of a route stop's art column. */
-export const eggArt = (slot: StarterId, sizes = `${LG_UP} 14rem, ${MD_UP} 22vw, 30vw`) =>
+/** An egg tile: a quarter of a route stop's art column. */
+export const eggArt = (slot: StarterId, sizes = `${LG_UP} 9rem, ${MD_UP} 18vw, 40vw`) =>
   creature(EGG_ID[slot], sizes, at(50, 55));
 
-/** A Baby form, face kept in view by the crop. */
-export const babyArt = (slot: StarterId, sizes: string) => creature(BABY_ID[slot], sizes, at(50, 30));
+/** A Baby form, face kept in view by the crop; null while the Baby has no art. */
+export const babyArt = (slot: StarterId, sizes: string): RouteArt | null => {
+  const id = BABY_ID[slot];
+  return id === null ? null : creature(id, sizes, at(50, 30));
+};
 
 /** The egg in its open case on a Harlem stoop at night. */
 export const hatchNightArt = (sizes: string) => creature('hatch-night', sizes, at(70, 56));

@@ -33,7 +33,7 @@ const ROW = [
 
 /** Display colour of a giant Dex numeral: the slot tone's face, decorative. */
 // The giant Dex numerals use the 600 step: the 500 orange and leaf fall under 3:1 on light grounds.
-const NUMERAL_TEXT = { orange: 'text-orange-600', royal: 'text-royal-500', leaf: 'text-leaf-600' } as Record<string, string>;
+const NUMERAL_TEXT = { orange: 'text-orange-600', royal: 'text-royal-500', leaf: 'text-leaf-600', apple: 'text-apple-600' } as Record<string, string>;
 
 /**
  * One starter as a bento row (W02, after the Grail and Berd cards in
@@ -41,7 +41,9 @@ const NUMERAL_TEXT = { orange: 'text-orange-600', royal: 'text-royal-500', leaf:
  * rows with its Dex number at poster size behind it, a signage tile with the
  * name, Bloodline and the link to the Mon's page, then the egg and the street
  * the concept art is set on, side by side. Phones read it as one column:
- * portrait, signage, egg and street.
+ * portrait, signage, egg and street. A starter with no street photo shows the
+ * egg alone, square, across the cell; one with no Baby art shows Coming Soon
+ * in the portrait frame, with no "Concept art" plate.
  *
  * Motion (`trg-roster-<i>`): the portrait rises, the Dex number slides out
  * from behind it, then the tiles follow; the number drifts on desktop scroll.
@@ -74,7 +76,7 @@ function RosterRow({ starter, index }: { starter: MonsStarter; index: number }) 
             className="relative m-0 aspect-[4/5] w-full overflow-hidden border-2 border-ink-950 bg-ink-900 sm:aspect-[5/4] lg:aspect-[6/5]"
           >
             <ArtFill entry={a.baby} />
-            <ConceptCaption className={index % 2 === 0 ? 'bottom-0 right-0' : 'bottom-0 left-0'} />
+            {a.baby ? <ConceptCaption className={index % 2 === 0 ? 'bottom-0 right-0' : 'bottom-0 left-0'} /> : null}
           </Figure>
         </View>
 
@@ -109,14 +111,16 @@ function RosterRow({ starter, index }: { starter: MonsStarter; index: number }) 
         <View className={`min-w-0 flex-row gap-4 md:gap-6 ${place.pair}`}>
           <Figure
             id={`mfx-${beat}-egg`}
-            className="relative m-0 aspect-[4/5] w-2/5 shrink-0 overflow-hidden border-2 border-ink-950 bg-ink-900"
+            className={`relative m-0 shrink-0 overflow-hidden border-2 border-ink-950 bg-ink-900 ${a.street ? 'aspect-[4/5] w-2/5' : 'aspect-square w-full'}`}
           >
             <ArtFill entry={a.egg} />
             <ConceptCaption />
           </Figure>
-          <View id={`mfx-${beat}-street`} className="min-w-0 flex-1">
-            <StreetFigure entry={a.street} className="h-full w-full border-2 border-ink-950" />
-          </View>
+          {a.street ? (
+            <View id={`mfx-${beat}-street`} className="min-w-0 flex-1">
+              <StreetFigure entry={a.street} className="h-full w-full border-2 border-ink-950" />
+            </View>
+          ) : null}
         </View>
       </Article>
     </ListItem>
@@ -125,7 +129,7 @@ function RosterRow({ starter, index }: { starter: MonsStarter; index: number }) 
 
 /**
  * W02 index: the roster. A night hero with the page title at poster size and
- * the egg waiting on its stoop, a still skyline, the three starters as
+ * the egg waiting on its stoop, a still skyline, the four starters as
  * zig-zag bento rows on the daylit page, then a signage-black close with the
  * site's one call to action. Server HTML throughout; MonsMotion arms the
  * Kinetrell reveals after hydration.
