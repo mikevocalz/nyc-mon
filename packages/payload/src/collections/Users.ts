@@ -1,6 +1,5 @@
 import { betterAuthStrategy } from '@delmaredigital/payload-better-auth';
 import type { Access, CollectionConfig, FieldAccess } from 'payload';
-import { hasConsoleAccess } from '../auth/admin-allowlist.ts';
 import { hasStaffRole, readStaffRole, STAFF_ROLES } from './access/roles.ts';
 import { AUDIT_REASON_CODES } from './audit/codes.ts';
 
@@ -32,14 +31,8 @@ const opsOrSelf: Access = ({ req }) => {
  * switch stays off until the console's Settings view can enrol TOTP, so no
  * staff member is locked out with no way to enrol.
  */
-const canUseAdmin = ({ req }: { req: { user?: unknown; payload?: { logger: { warn: (msg: string) => void } } } }): boolean => {
+const canUseAdmin = ({ req }: { req: { user?: unknown } }): boolean => {
   if (readStaffRole(req.user) === undefined) return false;
-  if (!hasConsoleAccess(req.user)) {
-    // A staff-role account outside ADMIN_ALLOWED_EMAILS is a denied console
-    // attempt; it deserves a server log line (admin-allowlist.ts).
-    req.payload?.logger.warn(`[auth] console access denied: staff account is not in ADMIN_ALLOWED_EMAILS`);
-    return false;
-  }
   if (!requireStaffTwoFactor) return true;
   const user = req.user;
   return typeof user === 'object' && user !== null && 'twoFactorEnabled' in user && user.twoFactorEnabled === true;

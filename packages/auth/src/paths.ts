@@ -14,19 +14,3 @@ export const AUTH_BASE_PATH = '/payload-api/auth';
  * `packages/payload/src/auth/options.ts`.
  */
 export const APP_ORIGIN = 'nycmon://';
-
-/**
- * Header naming the surface a sign-in belongs to. The game's sign-in calls
- * send {@link APP_SURFACE} so the server's APP_ALLOWED_EMAILS gate
- * (packages/payload/src/auth/app-allowlist.ts) can tell them from the OAuth
- * linking flow the judges use — same endpoint, no header. Must match
- * `SURFACE_HEADER` in `packages/payload/src/auth/surface.ts`.
- */
-export const SURFACE_HEADER = 'x-nycmon-surface';
-
-/**
- * Marker for the game app's sign-in surface. Deliberately not a real session
- * surface label, so it can only ever deny, never claim privilege. Must match
- * `APP_SURFACE` in `packages/payload/src/auth/app-allowlist.ts`.
- */
-export const APP_SURFACE = 'app';

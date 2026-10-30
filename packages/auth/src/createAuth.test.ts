@@ -13,14 +13,13 @@ interface Seen {
   url: string;
   method: string;
   body: string;
-  headers: Record<string, string>;
 }
 
 function stubFetch(status: number, body: unknown): Seen[] {
   const seen: Seen[] = [];
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const request = input instanceof Request ? input : new Request(input, init);
-    seen.push({ url: request.url, method: request.method, body: await request.text(), headers: Object.fromEntries(request.headers) });
+    seen.push({ url: request.url, method: request.method, body: await request.text() });
     return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
   }) as typeof fetch;
   return seen;
@@ -139,25 +138,4 @@ test('a new social account without the M04 answer comes back as BIRTH_YEAR_REQUI
   assert.equal(result.ok, false);
   if (result.ok) return;
   assert.equal(result.error.code, 'BIRTH_YEAR_REQUIRED');
-});
-
-test('every session-creating call carries the app surface marker for APP_ALLOWED_EMAILS', async () => {
-  const seen = stubFetch(200, { redirect: false, token: 't', user: { id: '1' } });
-  const auth = createAuth({ baseURL: 'https://admin.example' });
-  await auth.signIn({ method: 'email', email: 'owner@example.com', password: 'x'.repeat(10) });
-  await auth.signUp({ email: 'owner@example.com', password: 'x'.repeat(10), name: 'owner', birthYear: 2000 });
-  await auth.signIn({ method: 'id-token', provider: 'apple', token: 'a' });
-  // The server's gate keys on this header; unmarked requests are never app sign-ins.
-  assert.equal(seen[0]?.headers['x-nycmon-surface'], 'app');
-  assert.equal(seen[1]?.headers['x-nycmon-surface'], 'app');
-  assert.equal(seen[2]?.headers['x-nycmon-surface'], 'app');
-});
-
-test('calls that create no session carry no surface marker', async () => {
-  const seen = stubFetch(200, { status: true });
-  const auth = createAuth({ baseURL: 'https://admin.example' });
-  await auth.requestPasswordReset('owner@example.com');
-  await auth.listAccounts();
-  assert.equal(seen[0]?.headers['x-nycmon-surface'], undefined);
-  assert.equal(seen[1]?.headers['x-nycmon-surface'], undefined);
 });

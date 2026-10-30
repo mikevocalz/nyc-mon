@@ -15,8 +15,6 @@ import { username } from 'better-auth/plugins/username';
 import { waitUntil } from '@vercel/functions';
 import { parseBirthYear } from './age';
 import { amazonOAuthPlugin } from './amazon';
-import { appSignInAttempt, isAllowedAppEmail } from './app-allowlist';
-import { invalidCredentials } from './admin-allowlist';
 import { createAuthMailer } from './email';
 import { readAuthEnv } from './env';
 import { isAllowedSmsNumber, parseSmsCountries, passesPhoneGate } from './phone';
@@ -483,13 +481,6 @@ export const betterAuthOptions = {
     user: {
       create: {
         before: async (user, ctx) => {
-          // APP_ALLOWED_EMAILS (app-allowlist.ts): an account created through
-          // a marked app sign-in — or an app-flagged social sign-in — must
-          // hold an allowlisted address. Unmarked flows (OAuth linking,
-          // console, server-side creates) are never read by this check.
-          if (await appSignInAttempt(ctx)) {
-            if (!isAllowedAppEmail(user.email)) throw invalidCredentials();
-          }
           const nowMs = Date.now();
           const currentYear = new Date(nowMs).getUTCFullYear();
           // A new Apple or Google identity takes its birth year from the M04
@@ -532,15 +523,6 @@ export const betterAuthOptions = {
     session: {
       create: {
         before: async (session, ctx) => {
-          // APP_ALLOWED_EMAILS (app-allowlist.ts): a session minted by a
-          // marked app sign-in — email, passkey or an app-flagged social
-          // callback — is refused for non-allowlisted accounts. This is the
-          // boundary the before-hook cannot reach: passkey and provider
-          // callbacks carry no email in the request body.
-          if (ctx !== null && ctx !== undefined && (await appSignInAttempt(ctx))) {
-            const accountOwner = await ctx.context.internalAdapter.findUserById(String(session.userId));
-            if (!isAllowedAppEmail(accountOwner?.email)) throw invalidCredentials();
-          }
           const fromOverride: unknown = readField(session, 'surface');
           const surface: Surface = isSurface(fromOverride)
             ? fromOverride
