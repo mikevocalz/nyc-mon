@@ -9,11 +9,22 @@
 // quantized GLB, its quantized accessors are rewritten as float32. The node
 // transforms that carry the quantization scale are left as they are, which is
 // exactly what a GPU does with a normalized attribute.
+//
+// Skinned meshes need one more rewrite. Viro's skinning shader declares
+// `in ivec4 bone_indices` (standard_vsh.glsl), and parseVertexFormat binds
+// 1-byte and 2-byte JOINTS_0 data as GL_UNSIGNED_BYTE / GL_UNSIGNED_SHORT, an
+// unsigned integer attribute. WebGL 2 checks that the attribute's base type
+// matches the shader input and rejects every draw that uses it with
+// INVALID_OPERATION, so a skinned Mon draws nothing in the browser. Native GL
+// does not check, which is why the same files animate on device. Only 4-byte
+// components map to GL_INT, so JOINTS_n are widened to 32-bit here. glTF only
+// allows 8- and 16-bit joints; this copy is for Viro alone and never saved.
 
 const GLB_MAGIC = 0x46546c67; // 'glTF'
 const CHUNK_JSON = 0x4e4f534a; // 'JSON'
 const CHUNK_BIN = 0x004e4942; // 'BIN\0'
 const FLOAT = 5126;
+const UNSIGNED_INT = 5125;
 const QUANTIZATION = 'KHR_mesh_quantization';
 
 type Accessor = {
@@ -85,10 +96,34 @@ function readChunks(glb: Uint8Array): Chunks | null {
   return { json, bin };
 }
 
-/** True when Viro would draw this GLB blank: it declares KHR_mesh_quantization. */
+/** True when the GLB declares KHR_mesh_quantization. */
 export function isQuantizedGlb(glb: Uint8Array): boolean {
   try {
     return readChunks(glb)?.json.extensionsUsed?.includes(QUANTIZATION) ?? false;
+  } catch {
+    return false;
+  }
+}
+
+/** JOINTS_n accessors stored narrower than 32 bits, which WebGL 2 refuses to feed Viro's ivec4 input. */
+function narrowJointAccessors(json: Gltf): Set<number> {
+  const out = new Set<number>();
+  for (const mesh of json.meshes ?? []) {
+    for (const primitive of mesh.primitives ?? []) {
+      for (const [name, index] of Object.entries(primitive.attributes ?? {})) {
+        if (name.startsWith('JOINTS_') && json.accessors?.[index] && json.accessors[index]!.componentType !== UNSIGNED_INT) out.add(index);
+      }
+    }
+  }
+  return out;
+}
+
+/** True when Viro would draw this GLB blank: it is quantized, or it is skinned with 8- or 16-bit joints. */
+export function needsViroRewrite(glb: Uint8Array): boolean {
+  try {
+    const json = readChunks(glb)?.json;
+    if (!json) return false;
+    return (json.extensionsUsed?.includes(QUANTIZATION) ?? false) || narrowJointAccessors(json).size > 0;
   } catch {
     return false;
   }
@@ -107,10 +142,10 @@ function floatAccessors(json: Gltf): Set<number> {
   return out;
 }
 
-/** The accessor's values as float32, dense, with any sparse substitution applied. */
-function decodeAccessor(json: Gltf, bin: Uint8Array, accessor: Accessor): Float32Array {
+/** The accessor's values, dense, with any sparse substitution applied, as float32 or (for joints) uint32. */
+function decodeAccessor<T extends Float32Array | Uint32Array>(json: Gltf, bin: Uint8Array, accessor: Accessor, make: (length: number) => T): T {
   const components = COMPONENTS[accessor.type] ?? 1;
-  const out = new Float32Array(accessor.count * components);
+  const out = make(accessor.count * components);
   const binView = new DataView(bin.buffer, bin.byteOffset, bin.byteLength);
   const size = BYTES[accessor.componentType] ?? 4;
   const normalized = accessor.normalized === true;
@@ -177,39 +212,53 @@ function checkAccessor(json: Gltf, bin: Uint8Array, accessor: Accessor) {
 }
 
 /**
- * A copy of `glb` with every quantized vertex, morph target and animation
- * accessor stored as float32, and KHR_mesh_quantization dropped. Returns the
- * input unchanged when it is not quantized.
+ * A copy of `glb` Viro can draw: every quantized vertex, morph target and
+ * animation accessor stored as float32, KHR_mesh_quantization dropped, and
+ * JOINTS_n widened to uint32. Returns the input unchanged when none of that
+ * applies.
  */
-export function dequantizeGlb(glb: Uint8Array): Uint8Array {
+export function viroReadableGlb(glb: Uint8Array): Uint8Array {
   const chunks = readChunks(glb);
-  if (!chunks?.bin || !chunks.json.extensionsUsed?.includes(QUANTIZATION)) return glb;
+  if (!chunks?.bin) return glb;
   const { json, bin } = chunks;
+  const quantized = json.extensionsUsed?.includes(QUANTIZATION) ?? false;
+  const joints = narrowJointAccessors(json);
+  if (!quantized && joints.size === 0) return glb;
   const accessors = json.accessors ?? [];
   json.bufferViews ??= [];
 
-  const appended: Float32Array[] = [];
+  const appended: (Float32Array | Uint32Array)[] = [];
   let tail = pad4(bin.byteLength);
-  for (const index of floatAccessors(json)) {
-    const accessor = accessors[index];
-    if (!accessor || (accessor.componentType === FLOAT && !accessor.sparse)) continue;
+  const append = (accessor: Accessor, componentType: number) => {
     checkAccessor(json, bin, accessor);
     const bytes = accessor.count * (COMPONENTS[accessor.type] ?? 1) * 4;
     if (tail + bytes > MAX_DEQUANTIZED_BYTES) throw new Error('This GLB is too large to preview.');
-    const floats = decodeAccessor(json, bin, accessor);
-    json.bufferViews.push({ buffer: 0, byteOffset: tail, byteLength: floats.byteLength });
-    const normalized = accessor.normalized === true;
-    const componentType = accessor.componentType;
-    accessor.bufferView = json.bufferViews.length - 1;
+    const values = componentType === FLOAT
+      ? decodeAccessor(json, bin, accessor, (n) => new Float32Array(n))
+      : decodeAccessor(json, bin, accessor, (n) => new Uint32Array(n));
+    json.bufferViews!.push({ buffer: 0, byteOffset: tail, byteLength: values.byteLength });
+    accessor.bufferView = json.bufferViews!.length - 1;
     accessor.byteOffset = 0;
-    accessor.componentType = FLOAT;
+    accessor.componentType = componentType;
     delete accessor.normalized;
     delete accessor.sparse;
-    if (accessor.min) accessor.min = accessor.min.map((v) => decodeComponent(v, componentType, normalized));
-    if (accessor.max) accessor.max = accessor.max.map((v) => decodeComponent(v, componentType, normalized));
-    appended.push(floats);
-    tail += floats.byteLength; // float32 data keeps 4-byte alignment
+    appended.push(values);
+    tail += values.byteLength; // 4-byte components keep 4-byte alignment
+  };
+
+  if (quantized) {
+    for (const index of floatAccessors(json)) {
+      const accessor = accessors[index];
+      if (!accessor || (accessor.componentType === FLOAT && !accessor.sparse)) continue;
+      const normalized = accessor.normalized === true;
+      const componentType = accessor.componentType;
+      append(accessor, FLOAT);
+      if (accessor.min) accessor.min = accessor.min.map((v) => decodeComponent(v, componentType, normalized));
+      if (accessor.max) accessor.max = accessor.max.map((v) => decodeComponent(v, componentType, normalized));
+    }
   }
+  // Joint indices are plain integers (never normalized), so min/max carry over.
+  for (const index of joints) append(accessors[index]!, UNSIGNED_INT);
 
   const drop = (list?: string[]) => list?.filter((name) => name !== QUANTIZATION);
   json.extensionsUsed = drop(json.extensionsUsed);
@@ -236,9 +285,9 @@ export function dequantizeGlb(glb: Uint8Array): Uint8Array {
   view.setUint32(binHeader + 4, CHUNK_BIN, true);
   out.set(bin, binHeader + 8);
   let offset = binHeader + 8 + pad4(bin.byteLength);
-  for (const floats of appended) {
-    out.set(new Uint8Array(floats.buffer, floats.byteOffset, floats.byteLength), offset);
-    offset += floats.byteLength;
+  for (const values of appended) {
+    out.set(new Uint8Array(values.buffer, values.byteOffset, values.byteLength), offset);
+    offset += values.byteLength;
   }
   return out;
 }
