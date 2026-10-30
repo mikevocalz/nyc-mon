@@ -1,7 +1,7 @@
 // Console strings are sourced from docs/design/admin/05-copy.md.
 export const consoleCopy = {
-  nav: { overview: 'Overview', callers: 'Callers', consent: 'Consent', mons: 'Mons', models: 'Models', content: 'Content', website: 'Website', audit: 'Audit log', settings: 'Settings', more: 'More' },
-  shell: { signOut: 'Sign out', brandLabel: 'NYC-MON console' },
+  nav: { overview: 'Overview', callers: 'Callers', consent: 'Consent', mons: 'Mons', models: 'Models', content: 'Content', website: 'Website', websitePages: 'Pages', websiteMedia: 'Media library', audit: 'Audit log', settings: 'Settings', more: 'More' },
+  shell: { signOut: 'Sign out', brandLabel: 'NYC-MON console', sectionsLabel: 'Console sections' },
   overview: { heading: 'Overview', healthy: '0 duplicated Mons', run: 'Run check', queues: 'Queues', recent: 'Recent activity', openAudit: 'Open audit log', countUnavailable: 'Not available', runUnavailable: "The integrity check results didn't load." },
   callers: { heading: 'Callers', privacy: 'Email, name and birth year are hidden for Callers under 18. Showing one asks for a reason and is logged.', empty: 'No Caller matches', identity: 'Identity', danger: 'Delete account', schedule: 'Schedule deletion', cancel: 'Cancel deletion', signout: 'Sign out everywhere', search: 'Search Callers', searchHint: 'Caller id, age band or consent', noMatch: 'No Caller matches that search.', none: 'No Callers have signed up yet.' },
   consent: { heading: 'Consent queue', rule: "We hold a parent's email and the child's birth year only to ask for consent. No child name or email exists here.", resend: 'Resend consent email', remove: 'Delete this record now', lanes: { pending: 'Pending', approved: 'Approved', denied: 'Denied', expired: 'Expired', all: 'All' }, lanesLabel: 'Consent status', empty: 'Nothing in this lane.', search: 'Search consents' },
