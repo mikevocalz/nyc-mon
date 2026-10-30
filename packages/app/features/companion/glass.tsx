@@ -319,7 +319,7 @@ export function PersistentGlassStage({
   const overlaid = pathname === '/mons' || pathname.startsWith('/mons/');
   // The city is a second WebGPU renderer and a large world. With both alive
   // the iPad runs out of memory, so the H-Lynk releases its renderer while
-  // the city is up, and with it the shared GLB parses (the Baby's 26-34 MB
+  // the city is up, and with it the shared GLB parses (the Baby's 19-24 MB
   // file decodes to ~110-190 MB of geometry, morphs and textures), their
   // decoded images and the glass's Skia rasters. On return the device
   // remounts and reloads under its Rive loader.

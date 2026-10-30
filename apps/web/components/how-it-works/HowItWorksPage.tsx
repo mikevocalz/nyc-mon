@@ -105,15 +105,15 @@ export function HowItWorksPage({ page = null, embedOrigins = [], siteOrigin = ''
       </OrderedList>
     </Nav>);
     }
-    /** Stop 01: the three eggs on Dr. Santoro's table, each named. */
+    /** Stop 01: the four eggs on Dr. Santoro's table, each named. Two by two on phones, one row from `md`; every second egg steps down. */
     function renderMeetArt({ cards }: {
         cards: readonly StarterCard[];
     }) {
         const eggArt: typeof defaultEggArt = (slot, sizes) => routeArt(page, 'meet', `egg.${slot}`, defaultEggArt(slot, sizes));
-        return (<List className="m-0 grid list-none grid-cols-3 gap-2 p-0 md:gap-4">
-      {cards.map((card, i) => (<ListItem key={card.key} className={`min-w-0 gap-0 ${i === 1 ? 'mt-6 md:mt-10' : ''}`}>
+        return (<List className="m-0 grid list-none grid-cols-2 gap-3 p-0 md:grid-cols-4 md:gap-4">
+      {cards.map((card, i) => (<ListItem key={card.key} className={`min-w-0 gap-0 ${i % 2 === 1 ? 'mt-6 md:mt-10' : ''}`}>
           <ArtTile art={eggArt(card.slot)} frame="aspect-[4/5] border-2 border-ink-950"/>
-          <Text className="bg-signage-black px-2 py-1.5 font-display text-xs uppercase leading-4 text-signage-white md:px-3 md:text-sm">
+          <Text className="bg-signage-black px-2 py-1.5 font-display text-xs uppercase leading-4 text-signage-white xl:px-3 xl:text-sm">
             {card.eggName}
           </Text>
         </ListItem>))}
@@ -144,7 +144,7 @@ export function HowItWorksPage({ page = null, embedOrigins = [], siteOrigin = ''
       </List>
     </View>);
     }
-    /** Stop 04: the three Baby forms, one large and two stacked, and the hatch band's closing line. */
+    /** Stop 04: the four Baby forms, one large and three stacked beside it, and the hatch band's closing line. */
     function renderHatchArt({ cards }: {
         cards: readonly StarterCard[];
     }) {
@@ -152,8 +152,8 @@ export function HowItWorksPage({ page = null, embedOrigins = [], siteOrigin = ''
         const [lead, ...rest] = cards;
         return (<View className="gap-3 md:gap-4">
       <View className="grid grid-cols-3 gap-3 md:gap-4">
-        {lead ? (<ArtTile art={babyArt(lead.slot, `${LG_UP} 30rem, 66vw`)} frame="col-span-2 row-span-2 aspect-[4/5] border-2 border-ink-950"/>) : null}
-        {rest.map((card) => (<ArtTile key={card.key} art={babyArt(card.slot, `${LG_UP} 14rem, 33vw`)} frame="aspect-auto min-h-0 border-2 border-ink-950"/>))}
+        {lead ? (<ArtTile art={babyArt(lead.slot, `${LG_UP} 30rem, 66vw`)} frame="col-span-2 row-span-3 aspect-[4/5] border-2 border-ink-950"/>) : null}
+        {rest.map((card) => (<ArtTile key={card.key} art={babyArt(card.slot, `${LG_UP} 14rem, 33vw`)} compact frame="aspect-auto min-h-0 border-2 border-ink-950"/>))}
       </View>
       <Paragraph className="my-0 w-fit bg-signage-black px-4 py-2.5 font-display text-lg uppercase leading-heading text-signage-white md:text-2xl">
         {W04_COPY.hatchClosing}

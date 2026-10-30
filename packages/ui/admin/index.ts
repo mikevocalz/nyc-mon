@@ -24,7 +24,7 @@ export { Checkbox, type CheckboxProps } from '../Checkbox';
 export { Checklist, CheckRow, type ChecklistProps, type CheckResult, type CheckRowProps } from '../Checklist';
 export { ConfirmDestructive, type ConfirmDestructiveProps } from '../ConfirmDestructive';
 export { CopyButton, type CopyButtonProps } from '../CopyButton';
-export { DataTable, type ColumnDef, type DataTableMode, type DataTableProps, type DataTableSelection, type SortState } from '../DataTable';
+export { DataTable, type ColumnDef, type DataTableError, type DataTableFilter, type DataTableMode, type DataTableProps, type DataTableSelection, type SortState } from '../DataTable';
 export { Dialog, DialogCard, type DialogProps } from '../Dialog';
 export { DropZone, type DropAsset, type DropZoneProps } from '../DropZone';
 export { EmptyState, type EmptyStateProps } from '../EmptyState';

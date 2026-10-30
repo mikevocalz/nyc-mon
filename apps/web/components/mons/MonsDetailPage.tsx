@@ -30,7 +30,7 @@ export function MonsDetailPage({ starter: defaultStarter, page = null, embedOrig
     const hatchArt: typeof defaultHatchArt = sizes => pageArt(page, 'hatch', 'hatch', defaultHatchArt(sizes));
     /** Giant Dex numerals: the slot tone's face, decorative (the Dex chip carries the number as text). */
     // The giant Dex numerals use the 600 step: the 500 orange and leaf fall under 3:1 on light grounds.
-    const NUMERAL_TEXT = { orange: 'text-orange-600', royal: 'text-royal-500', leaf: 'text-leaf-600' } as Record<string, string>;
+    const NUMERAL_TEXT = { orange: 'text-orange-600', royal: 'text-royal-500', leaf: 'text-leaf-600', apple: 'text-apple-600' } as Record<string, string>;
     /**
      * HERO: the Mon on night. The name is set as signage plates, one word a
      * plate, each line stepped right like the home headline; the Dex plate and
@@ -81,7 +81,7 @@ export function MonsDetailPage({ starter: defaultStarter, page = null, embedOrig
           </View>
           <Figure id="mfx-hero-portrait" className="relative m-0 aspect-[4/5] w-full overflow-hidden border-2 border-ink-800 bg-ink-900 sm:aspect-[5/4] lg:aspect-square">
             <ArtFill entry={a.baby} drift="mpx-hero-portrait-far" eager/>
-            <ConceptCaption label={sectionText(sectionFor(page, 'captions'), 'conceptArt', DEFAULT_COPY.conceptArt)} />
+            {a.baby ? <ConceptCaption label={sectionText(sectionFor(page, 'captions'), 'conceptArt', DEFAULT_COPY.conceptArt)} /> : null}
           </Figure>
         </View>
       </View>
@@ -93,7 +93,7 @@ export function MonsDetailPage({ starter: defaultStarter, page = null, embedOrig
      * stops on a route; the egg stands in a tall tile beside it; under the board
      * the street the concept art is set on, and, where the route copy has one,
      * the starter's line on the slot tone's face. Phones read board, egg,
-     * street, line.
+     * street, line. Without a street photo the line takes the street's columns.
      */
     function renderDossier({ starter }: {
         starter: MonsStarter;
@@ -141,11 +141,11 @@ export function MonsDetailPage({ starter: defaultStarter, page = null, embedOrig
           </View>
         </Article>
 
-        <View id="mfx-dossier-street" className={`min-w-0 lg:row-start-2 ${blurb ? 'lg:col-span-5' : 'lg:col-span-8'}`}>
+        {a.street ? (<View id="mfx-dossier-street" className={`min-w-0 lg:row-start-2 ${blurb ? 'lg:col-span-5' : 'lg:col-span-8'}`}>
           <StreetFigure entry={a.street} drift="mpx-dossier-street-near" className="aspect-[4/3] w-full border-2 border-ink-950 lg:aspect-auto lg:h-full lg:min-h-72"/>
-        </View>
+        </View>) : null}
 
-        {blurb ? (<View id="mfx-dossier-line" className={`min-w-0 justify-end px-6 py-7 lg:col-span-3 lg:col-start-6 lg:row-start-2 ${t.face}`}>
+        {blurb ? (<View id="mfx-dossier-line" className={`min-w-0 justify-end px-6 py-7 lg:row-start-2 ${a.street ? 'lg:col-span-3 lg:col-start-6' : 'lg:col-span-8 lg:col-start-1'} ${t.face}`}>
             <Paragraph className={`my-0 font-display text-xl uppercase leading-heading md:text-2xl ${t.onFace}`}>{blurb}</Paragraph>
           </View>) : null}
 
@@ -190,13 +190,13 @@ export function MonsDetailPage({ starter: defaultStarter, page = null, embedOrig
         const copy = copyTree(W02_COPY.index, sectionFor(page, 'others'));
         const a = monsArt(starter.slot);
         const t = TONE_CLASSES[a.tone];
-        return (<ListItem id={`mfx-others-${index}`} className="min-w-0 md:flex-1">
-      <Link href={siteHref(copy.cardHref(starter.slug))} aria-label={copy.cardLabel(starter.babyName)} className="group flex h-full flex-col border-2 border-ink-950 bg-surface-raised no-underline transition-transform duration-200 hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 sm:flex-row motion-reduce:transition-none motion-reduce:hover:translate-y-0">
-        <Figure className="relative m-0 aspect-square w-full shrink-0 overflow-hidden bg-ink-900 sm:w-1/2">
-          <ArtFill entry={{ ...a.baby, sizes: `(min-width: ${breakpoints.md}) 20rem, 100vw` }}/>
-          <ConceptCaption label={sectionText(sectionFor(page, 'captions'), 'conceptArt', DEFAULT_COPY.conceptArt)} />
+        return (<ListItem id={`mfx-others-${index}`} className="min-w-0">
+      <Link href={siteHref(copy.cardHref(starter.slug))} aria-label={copy.cardLabel(starter.babyName)} className="group flex h-full flex-col border-2 border-ink-950 bg-surface-raised no-underline transition-transform duration-200 hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 sm:flex-row md:flex-col motion-reduce:transition-none motion-reduce:hover:translate-y-0">
+        <Figure className="relative m-0 aspect-square w-full shrink-0 overflow-hidden bg-ink-900 sm:w-1/2 md:w-full">
+          <ArtFill entry={a.baby && { ...a.baby, sizes: `(min-width: ${breakpoints.lg}) 24rem, (min-width: ${breakpoints.md}) 33vw, (min-width: ${breakpoints.sm}) 50vw, 100vw` }}/>
+          {a.baby ? <ConceptCaption label={sectionText(sectionFor(page, 'captions'), 'conceptArt', DEFAULT_COPY.conceptArt)} /> : null}
         </Figure>
-        <View className="relative min-w-0 flex-1 justify-end gap-3 overflow-hidden border-t-2 border-ink-950 px-5 pb-6 pt-16 sm:border-l-2 sm:border-t-0">
+        <View className="relative min-w-0 flex-1 justify-end gap-3 overflow-hidden border-t-2 border-ink-950 px-5 pb-6 pt-16 sm:border-l-2 sm:border-t-0 md:border-l-0 md:border-t-2">
           <Text aria-hidden className={`absolute -right-2 top-0 font-display text-[6rem] leading-none ${NUMERAL_TEXT[a.tone]}`}>
             {dexDigits(starter.dexId)}
           </Text>
@@ -222,7 +222,7 @@ export function MonsDetailPage({ starter: defaultStarter, page = null, embedOrig
         </Heading>
         <LinkButton title={copy.back} href={siteHref(copy.backHref)} testID={`w02-${starter.slug}-back`}/>
       </View>
-      <List className="m-0 list-none gap-6 p-0 md:flex-row">
+      <List className="m-0 grid list-none grid-cols-1 gap-6 p-0 md:grid-cols-3">
         {others.map((other, i) => (<Fragment key={other.slug}>{renderOtherCard({ starter: other, index: i })}</Fragment>))}
       </List>
     </Section>);
@@ -231,7 +231,7 @@ export function MonsDetailPage({ starter: defaultStarter, page = null, embedOrig
      * W02 detail: one starter as a character page. Night hero with the portrait
      * and its Dex number, a still skyline of the district the concept art is set
      * in, the dossier bento (line, egg, street), the hatch band with the site's
-     * one call to action, then the other two starters. Server HTML; MonsMotion
+     * one call to action, then the other three starters. Server HTML; MonsMotion
      * arms the Kinetrell reveals after hydration.
      */
     const a = monsArt(starter.slot);

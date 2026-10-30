@@ -1,7 +1,7 @@
 import { DISTRICT_COPY } from '@acme/spatial/copy';
 import { W01_COPY } from './copy';
 import { WAITLIST_COPY } from '../waitlist/copy';
-import { art, artHref, type ArtSlot } from './art';
+import { art, artHref, starterArt, type ArtEntry, type ArtSlot } from './art';
 import { starterCards } from './StartersSection';
 
 /** Export the shipped copy, not freshly invented replacement marketing content. */
@@ -25,10 +25,14 @@ export function buildHomeSeed(origin: string) {
   const slots: [string, ArtSlot][] = [
     ['hero', 'hero'], ['world', 'world.primary'], ['world', 'world.secondary'],
     ['hlynk', 'hlynk.static'], ['hlynk', 'hlynk.scanner'], ['hlynk', 'hlynk.controls'],
-    ['starters', 'starter.1'], ['starters', 'starter.2'], ['starters', 'starter.3'], ['hatch', 'hatch'],
+    ['hatch', 'hatch'],
   ];
-  const assets = slots.map(([sectionKey, slot]) => {
-    const image = art(slot);
+  // Starter plates are keyed by slot number; a Baby without art yet (Coming Soon) exports no image.
+  const entries: [string, string, ArtEntry][] = [
+    ...slots.map(([sectionKey, slot]): [string, string, ArtEntry] => [sectionKey, slot, art(slot)]),
+    ...cards.flatMap((card): [string, string, ArtEntry][] => { const image = starterArt(card.slot); return image ? [['starters', `starter.${card.slot}`, image]] : []; }),
+  ];
+  const assets = entries.map(([sectionKey, slot, image]) => {
     return { sectionKey, slot, source: new URL(artHref(image), origin).href, alt: image.alt, decorative: Boolean(image.decorative),
       width: image.width, height: image.height, focalX: image.focalPoint?.x ?? 0.5, focalY: image.focalPoint?.y ?? 0.5,
       caption: image.caption ? slot === 'hero' ? W01_COPY.landmarkCaption(image.caption.title, image.caption.place) : image.district ? W01_COPY.placeCaption(image.district, image.caption.place) : image.caption.title : '' };

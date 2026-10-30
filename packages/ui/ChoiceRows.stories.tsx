@@ -16,9 +16,10 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 const EGG_ROWS: ChoiceRow[] = [
-  { key: 'F01', label: 'Metro Egg', detail: 'Fixture Bloodline A', accessibilityLabel: 'Metro Egg, 1 of 3', media: <View className="flex-1 bg-orange-300" /> },
-  { key: 'F02', label: 'Corner Egg', detail: 'Fixture Bloodline B', accessibilityLabel: 'Corner Egg, 2 of 3', media: <View className="flex-1 bg-carolina-300" /> },
-  { key: 'F12', label: 'Prism Egg', detail: 'Fixture Bloodline C', accessibilityLabel: 'Prism Egg, 3 of 3', media: <View className="flex-1 bg-leaf-300" /> },
+  { key: 'F01', label: 'Metro Egg', detail: 'Fixture Bloodline A', accessibilityLabel: 'Metro Egg, 1 of 4', media: <View className="flex-1 bg-orange-300" /> },
+  { key: 'F02', label: 'Corner Egg', detail: 'Fixture Bloodline B', accessibilityLabel: 'Corner Egg, 2 of 4', media: <View className="flex-1 bg-carolina-300" /> },
+  { key: 'F12', label: 'Prism Egg', detail: 'Fixture Bloodline C', accessibilityLabel: 'Prism Egg, 3 of 4', media: <View className="flex-1 bg-leaf-300" /> },
+  { key: 'F04', label: 'Signal Egg', detail: 'Fixture Bloodline D', accessibilityLabel: 'Signal Egg, 4 of 4', media: <View className="flex-1 bg-apple-300" /> },
 ];
 const TIME_ROWS: ChoiceRow[] = [
   { key: '15', label: '15 minutes', accessibilityLabel: '15 minutes' },

@@ -155,7 +155,7 @@ function readMood(value: unknown): MonMood | null {
   return typeof value === 'string' && Object.hasOwn(MOODS, value) ? (value as MonMood) : null;
 }
 
-// Phase 1 ships only the three starters, so the card resolves names from the
+// Phase 1 ships only the four starters, so the card resolves names from the
 // starter entry and never bundles the full 115-form roster (ui.test.ts budget).
 // A species outside the starters gets null names, the same as an unknown id.
 const speciesById = new Map(starterSpecies.map((s) => [s.speciesId, s]));

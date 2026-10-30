@@ -2,6 +2,7 @@ import { Image, TONE_CLASSES, type ControlTone, type ImageProps } from '@acme/ui
 import { Figcaption, Figure, Text } from '@acme/ui/html';
 import { View } from '@acme/ui/tw';
 import { artPosition, type ArtEntry } from '../home/art';
+import { ComingSoonArt } from '../home/ComingSoonArt';
 import { PlaceCaption } from '../home/PlaceCaption';
 import { W02_COPY } from './copy';
 
@@ -12,16 +13,18 @@ export const dexDigits = (dexId: number) => String(dexId).padStart(3, '0');
  * A picture filling its box. The box (aspect, size, border) comes from the
  * caller. `drift` wraps the image in a layer that overhangs the box by the
  * largest parallax step, so a scrubbed drift (motion.ts) never shows an edge.
+ * A null entry is a Mon with no art yet: the Coming Soon plate, with no drift.
  */
 export function ArtFill({
   entry,
   drift,
   eager = false,
 }: {
-  entry: ArtEntry;
+  entry: ArtEntry | null;
   drift?: string;
   eager?: boolean;
 }) {
+  if (entry === null) return <ComingSoonArt />;
   const image = (
     <Image
       src={entry.src as ImageProps['src']}

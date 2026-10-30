@@ -46,7 +46,7 @@ export function MonsIndexPage({ page = null, embedOrigins = [], siteOrigin = '' 
     ] as const;
     /** Display colour of a giant Dex numeral: the slot tone's face, decorative. */
     // The giant Dex numerals use the 600 step: the 500 orange and leaf fall under 3:1 on light grounds.
-    const NUMERAL_TEXT = { orange: 'text-orange-600', royal: 'text-royal-500', leaf: 'text-leaf-600' } as Record<string, string>;
+    const NUMERAL_TEXT = { orange: 'text-orange-600', royal: 'text-royal-500', leaf: 'text-leaf-600', apple: 'text-apple-600' } as Record<string, string>;
     /**
      * One starter as a bento row (W02, after the Grail and Berd cards in
      * MOBBIN_2026-10_ADDENDUM.md): the Baby's portrait over seven columns and two
@@ -79,7 +79,7 @@ export function MonsIndexPage({ page = null, embedOrigins = [], siteOrigin = '' 
           </View>
           <Figure id={`mfx-${beat}-portrait`} className="relative m-0 aspect-[4/5] w-full overflow-hidden border-2 border-ink-950 bg-ink-900 sm:aspect-[5/4] lg:aspect-[6/5]">
             <ArtFill entry={a.baby}/>
-            <ConceptCaption label={sectionText(sectionFor(page, 'captions'), 'conceptArt', DEFAULT_COPY.conceptArt)} className={index % 2 === 0 ? 'bottom-0 right-0' : 'bottom-0 left-0'}/>
+            {a.baby ? <ConceptCaption label={sectionText(sectionFor(page, 'captions'), 'conceptArt', DEFAULT_COPY.conceptArt)} className={index % 2 === 0 ? 'bottom-0 right-0' : 'bottom-0 left-0'}/> : null}
           </Figure>
         </View>
 
@@ -103,20 +103,20 @@ export function MonsIndexPage({ page = null, embedOrigins = [], siteOrigin = '' 
 
         {/* The egg and the street, side by side at every width. */}
         <View className={`min-w-0 flex-row gap-4 md:gap-6 ${place.pair}`}>
-          <Figure id={`mfx-${beat}-egg`} className="relative m-0 aspect-[4/5] w-2/5 shrink-0 overflow-hidden border-2 border-ink-950 bg-ink-900">
+          <Figure id={`mfx-${beat}-egg`} className={`relative m-0 shrink-0 overflow-hidden border-2 border-ink-950 bg-ink-900 ${a.street ? 'aspect-[4/5] w-2/5' : 'aspect-square w-full'}`}>
             <ArtFill entry={a.egg}/>
             <ConceptCaption label={sectionText(sectionFor(page, 'captions'), 'conceptArt', DEFAULT_COPY.conceptArt)} />
           </Figure>
-          <View id={`mfx-${beat}-street`} className="min-w-0 flex-1">
+          {a.street ? (<View id={`mfx-${beat}-street`} className="min-w-0 flex-1">
             <StreetFigure entry={a.street} className="h-full w-full border-2 border-ink-950"/>
-          </View>
+          </View>) : null}
         </View>
       </Article>
     </ListItem>);
     }
     /**
      * W02 index: the roster. A night hero with the page title at poster size and
-     * the egg waiting on its stoop, a still skyline, the three starters as
+     * the egg waiting on its stoop, a still skyline, the four starters as
      * zig-zag bento rows on the daylit page, then a signage-black close with the
      * site's one call to action. Server HTML throughout; MonsMotion arms the
      * Kinetrell reveals after hydration.

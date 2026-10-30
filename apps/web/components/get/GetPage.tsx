@@ -78,7 +78,7 @@ export function GetPage({ page = null, embedOrigins = [], siteOrigin = '' }: Cms
     /**
      * THE BENTO, on a night band: what NYC-MON is, in tiles of mixed size, each
      * in the site's existing words. From `lg`, a 12-column grid:
-     *   row 1-2: the three eggs (seven columns, two rows) | the H-Lynk Core on ink
+     *   row 1-2: the four eggs (seven columns, two rows) | the H-Lynk Core on ink
      *   row 2:                                            | the privacy plate
      *   row 3:   the route of How it works, full width, as a line of five stops.
      * Below `lg` the tiles stack in DOM order. The tiles stagger in on scroll.
@@ -102,9 +102,9 @@ export function GetPage({ page = null, embedOrigins = [], siteOrigin = '' }: Cms
             <Heading level={3} className="my-0 font-display text-2xl uppercase leading-heading text-text sm:text-display-sm sm:leading-heading md:text-display-md md:leading-heading">
               {copy.eggs.title}
             </Heading>
-            <List className="m-0 grid list-none grid-cols-3 gap-2 p-0 md:gap-4">
-              {cards.map((card, i) => (<ListItem key={card.key} className={`min-w-0 ${i === 1 ? 'mt-5 md:mt-8' : ''}`}>
-                  <ArtTile art={eggArt(card.slot, `${LG_UP} 13rem, 30vw`)} frame="aspect-[4/5] border-2 border-ink-950"/>
+            <List className="m-0 grid list-none grid-cols-2 gap-3 p-0 sm:grid-cols-4 md:gap-4">
+              {cards.map((card, i) => (<ListItem key={card.key} className={`min-w-0 ${i % 2 === 1 ? 'mt-5 md:mt-8' : ''}`}>
+                  <ArtTile art={eggArt(card.slot, `${LG_UP} 10rem, (min-width: ${breakpoints.sm}) 22vw, 46vw`)} frame="aspect-[4/5] border-2 border-ink-950"/>
                   <Text className="bg-signage-black px-2 py-1.5 font-display text-xs uppercase leading-4 text-signage-white md:px-3 md:text-sm">
                     {card.eggName}
                   </Text>

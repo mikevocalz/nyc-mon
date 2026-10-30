@@ -50,7 +50,7 @@ export interface HudContent {
   note: string;
   /** tab labels, also the DOM control's labels */
   tabs: Record<HudTab, string>;
-  /** the three starters with their Dex numbers, formatted ("No. 001") */
+  /** the starters with their Dex numbers, formatted ("No. 001") */
   dex: readonly { no: string; name: string }[];
   /** the three care meters and the line that says they are examples */
   care: { meters: readonly HudMeter[]; note: string };

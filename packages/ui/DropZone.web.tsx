@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef } from 'react';
-import { DropSurface } from './html/dom.web';
+import { DropSurface, FilePickerBase } from './html/dom.web';
 import { View } from './tw';
 import { CloudUpload } from './icons';
 import { Text } from './Text';
@@ -73,6 +73,8 @@ export function DropZone({
   disableObjectUrl = false,
   allowedMimeTypes,
   draggableSources,
+  browseLabel,
+  accept,
   style,
   ...rest
 }: DropZoneProps) {
@@ -148,6 +150,18 @@ export function DropZone({
           </View>
           <Text className={s.title()}>{title}</Text>
           <Text className={s.description()}>{description}</Text>
+          {browseLabel ? (
+            <FilePickerBase
+              label={browseLabel}
+              accept={accept}
+              testID="drop-zone-browse"
+              className={s.browse()}
+              onFiles={async (files) => {
+                const assets = await Promise.all(files.map((file) => fileToAsset(file, includeBase64, disableObjectUrl)));
+                onDrop?.({ assets });
+              }}
+            />
+          ) : null}
         </>
       )}
     </DropSurface>

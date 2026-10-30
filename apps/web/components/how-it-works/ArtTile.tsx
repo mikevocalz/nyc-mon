@@ -1,6 +1,7 @@
 import { DISTRICT_TONE, Image, TONE_CLASSES, type ImageProps } from '@acme/ui';
 import { Figcaption, Figure, Text } from '@acme/ui/html';
 import { View } from '@acme/ui/tw';
+import { ComingSoonArt } from '../home/ComingSoonArt';
 import { W01_COPY } from '../home/copy';
 import type { RouteArt } from './art';
 
@@ -9,7 +10,8 @@ import type { RouteArt } from './art';
  * loads. `frame` sets the box (aspect, grid placement, border); the image
  * fills it. A photograph with a place gets the home page's signage caption
  * plate (district disc, then district and cross streets); creature art has
- * none, because a Mon is not a place.
+ * none, because a Mon is not a place. A null `art` is a Mon with no picture
+ * yet: the frame keeps its size and shows the Coming Soon plate.
  */
 export function ArtTile({
   art,
@@ -18,14 +20,24 @@ export function ArtTile({
   fit = 'cover',
   eager = false,
   caption = true,
+  compact = false,
 }: {
-  art: RouteArt;
+  art: RouteArt | null;
   frame: string;
   id?: string;
   fit?: 'cover' | 'contain';
   eager?: boolean;
   caption?: boolean;
+  /** A small tile: the Coming Soon plate uses the smallest chip. */
+  compact?: boolean;
 }) {
+  if (art === null) {
+    return (
+      <Figure id={id} className={`relative m-0 min-w-0 overflow-hidden bg-ink-900 ${frame}`}>
+        <ComingSoonArt compact={compact} />
+      </Figure>
+    );
+  }
   const place = caption && art.place ? art : null;
   return (
     <Figure id={id} className={`relative m-0 min-w-0 overflow-hidden bg-ink-900 ${frame}`}>

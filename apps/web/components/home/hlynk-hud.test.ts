@@ -62,11 +62,12 @@ test('the default tab is the static screen: the first starter\'s Baby name and "
   assert.equal(hudCaption('crew', content), 'Crew: Squeaklet. Your Mon.');
 });
 
-test('Dex lists the three starters with their Dex numbers from @acme/content', () => {
-  assert.equal(content.dex.length, 3);
+test('Dex lists the four starters with their Dex numbers from @acme/content', () => {
+  assert.equal(content.dex.length, 4);
   for (const entry of content.dex) assert.match(entry.no, /^No\. \d{3}$/);
   assert.equal(content.dex[0]?.name, 'Squeaklet');
-  assert.equal(new Set(content.dex.map((d) => d.no)).size, 3);
+  assert.equal(content.dex[3]?.name, 'Fye Dot');
+  assert.equal(new Set(content.dex.map((d) => d.no)).size, 4);
 });
 
 test('Care shows Energy, Fullness and Social at the CARE section\'s example levels, labelled as examples', () => {
