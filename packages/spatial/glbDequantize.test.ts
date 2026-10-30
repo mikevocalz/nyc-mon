@@ -124,6 +124,26 @@ describe('dequantizeGlb', () => {
     assert.equal(isQuantizedGlb(new Uint8Array([1, 2, 3])), false);
   });
 
+  it('refuses accessors that point outside the file instead of allocating for them', () => {
+    const hostile = (patch: (json: Json) => void) => {
+      const { json } = parse(quantizedTriangle());
+      patch(json);
+      return glb(json, new Uint8Array(32));
+    };
+    assert.throws(() => dequantizeGlb(hostile((j) => { j.accessors[0].count = 2 ** 28; })), /past its own data/);
+    assert.throws(() => dequantizeGlb(hostile((j) => { j.bufferViews[0].byteStride = 1; })), /cannot read/);
+    assert.throws(() => dequantizeGlb(hostile((j) => { j.accessors[0].byteOffset = '4'; })), /cannot read/);
+    assert.throws(() => dequantizeGlb(hostile((j) => { j.accessors[0].bufferView = 9; })), /cannot read/);
+    assert.throws(() => dequantizeGlb(hostile((j) => { j.accessors[2].sparse.count = 5; })), /cannot read/);
+  });
+
+  it('accepts every model the repo ships', () => {
+    for (const path of ['../assets/eggs/corner-egg/corner-egg-hatch.glb', '../assets/eggs/prism-egg/prism-egg-hatch.glb', '../assets/eggs/signal-egg/signal-egg-hatch.glb', '../../apps/web/public/mons/squeaklet.glb', '../../apps/web/public/mons/lil-ratti.glb']) {
+      const out = dequantizeGlb(new Uint8Array(readFileSync(new URL(path, import.meta.url))));
+      assert.equal(isQuantizedGlb(out), false, path);
+    }
+  });
+
   it('turns the shipped Metro egg into a float file with the same bounds', () => {
     const source = new Uint8Array(readFileSync(new URL('../assets/eggs/metro-egg/metro-egg-hatch.glb', import.meta.url)));
     const before = parse(source).json;

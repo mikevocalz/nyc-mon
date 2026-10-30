@@ -134,6 +134,7 @@ function decodeAccessor(json: Gltf, bin: Uint8Array, accessor: Accessor): Float3
     const indexSize = BYTES[sparse.indices.componentType] ?? 4;
     for (let n = 0; n < sparse.count; n++) {
       const element = readComponent(binView, indexStart + n * indexSize, sparse.indices.componentType);
+      if (element >= accessor.count) throw new Error('This GLB has an accessor Viro cannot read.');
       for (let component = 0; component < components; component++) {
         const raw = readComponent(binView, valueStart + (n * components + component) * size, accessor.componentType);
         out[element * components + component] = decodeComponent(raw, accessor.componentType, normalized);
@@ -144,6 +145,36 @@ function decodeAccessor(json: Gltf, bin: Uint8Array, accessor: Accessor): Float3
 }
 
 const pad4 = (n: number) => (n + 3) & ~3;
+
+/** Float data the preview will build for one file; far above any real Mon (lil-ratti needs ~40 MB). */
+export const MAX_DEQUANTIZED_BYTES = 256 * 1024 * 1024;
+
+const isIndex = (value: unknown): value is number => typeof value === 'number' && Number.isInteger(value) && value >= 0;
+
+/** Throws unless every read `decodeAccessor` will make lies inside the BIN chunk. */
+function checkAccessor(json: Gltf, bin: Uint8Array, accessor: Accessor) {
+  const components = COMPONENTS[accessor.type];
+  const size = BYTES[accessor.componentType];
+  if (!components || !size || !isIndex(accessor.count) || !isIndex(accessor.byteOffset ?? 0)) throw new Error('This GLB has an accessor Viro cannot read.');
+  const span = (viewIndex: unknown, offset: unknown, count: number, elementBytes: number, stride?: unknown) => {
+    const view = isIndex(viewIndex) ? json.bufferViews?.[viewIndex] : undefined;
+    if (!view || view.buffer !== 0 || !isIndex(view.byteOffset ?? 0) || !isIndex(offset ?? 0) || !isIndex(stride ?? 0)) throw new Error('This GLB has an accessor Viro cannot read.');
+    const step = (stride as number | undefined) || elementBytes;
+    if (step < elementBytes) throw new Error('This GLB has an accessor Viro cannot read.');
+    const end = (view.byteOffset ?? 0) + ((offset as number | undefined) ?? 0) + (count > 0 ? (count - 1) * step + elementBytes : 0);
+    if (end > bin.byteLength) throw new Error('This GLB points past its own data.');
+  };
+  if (accessor.bufferView !== undefined) {
+    span(accessor.bufferView, accessor.byteOffset, accessor.count, size * components, json.bufferViews?.[accessor.bufferView]?.byteStride);
+  }
+  const sparse = accessor.sparse;
+  if (sparse) {
+    const indexSize = BYTES[sparse.indices.componentType];
+    if (!indexSize || !isIndex(sparse.count) || sparse.count > accessor.count) throw new Error('This GLB has an accessor Viro cannot read.');
+    span(sparse.indices.bufferView, sparse.indices.byteOffset, sparse.count, indexSize);
+    span(sparse.values.bufferView, sparse.values.byteOffset, sparse.count, size * components);
+  }
+}
 
 /**
  * A copy of `glb` with every quantized vertex, morph target and animation
@@ -162,6 +193,9 @@ export function dequantizeGlb(glb: Uint8Array): Uint8Array {
   for (const index of floatAccessors(json)) {
     const accessor = accessors[index];
     if (!accessor || (accessor.componentType === FLOAT && !accessor.sparse)) continue;
+    checkAccessor(json, bin, accessor);
+    const bytes = accessor.count * (COMPONENTS[accessor.type] ?? 1) * 4;
+    if (tail + bytes > MAX_DEQUANTIZED_BYTES) throw new Error('This GLB is too large to preview.');
     const floats = decodeAccessor(json, bin, accessor);
     json.bufferViews.push({ buffer: 0, byteOffset: tail, byteLength: floats.byteLength });
     const normalized = accessor.normalized === true;
