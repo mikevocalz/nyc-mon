@@ -40,6 +40,13 @@
       "outputs": [
         ".next/**",
         "!.next/cache/**"
+      ],
+      "env": [
+        "NYCMON_SITE_EDITOR",
+        "SITE_CONTENT_MODE",
+        "PAYLOAD_SITE_API_URL",
+        "SITE_EMBED_ORIGINS",
+        "SITE_PREVIEW_SECRET"
       ]
     },
     "storybook#build": {
