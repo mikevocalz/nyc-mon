@@ -106,6 +106,8 @@ class Bag {
     this.a[this.n++] = v;
   }
   finish(): Float32Array { return this.a.length === this.n ? this.a : this.a.slice(0, this.n); }
+  /** Floats written so far. */
+  get length(): number { return this.n; }
 }
 
 /** What the tests and the report count: doors, gates and signs where they were placed, in scene metres. */
@@ -601,8 +603,15 @@ function unitBody(W: Writer, F: Frame, U: NonNullable<Front['units']>[number], f
   out.features.push({ kind: 'unit', front: front.id, x: p[0], y: p[1], z: p[2], u: uc, dayDown: U.gate === 2 ? 1 : 0, text: plan.slots[U.slot] });
 }
 
-/** Writes the whole plan. `groundY` is the walking surface under a scene point (ctx.groundY). */
-export function emitPlan(plan: StorefrontPlan, groundY: (x: number, z: number) => number, filter?: (f: Front) => boolean): EmitResult {
+/**
+ * Writes the whole plan. `groundY` is the walking surface under a scene point (ctx.groundY). `onFront`, when given, is
+ * called after each front written with the vertices every slot holds by then, so a caller can tell which triangles
+ * came from which front (index.ts packages the ring fronts that way).
+ */
+export function emitPlan(
+  plan: StorefrontPlan, groundY: (x: number, z: number) => number, filter?: (f: Front) => boolean,
+  onFront?: (front: Front, vertices: Readonly<Record<Slot, number>>) => void,
+): EmitResult {
   const W = new Writer();
   // the atlas's last cell is solid (bake-vd-storefronts.mjs): a lit surface that is not lettering samples it
   const A = plan.atlas, last = (A.width / A.cellW) * (A.height / A.cellH) - 1;
@@ -623,6 +632,7 @@ export function emitPlan(plan: StorefrontPlan, groundY: (x: number, z: number) =
     for (const u of front.units ?? []) unit(W, F, u, front, plan, out);
     for (const s of front.signs) sign(W, F, s, plan, front, out);
     for (const a of front.awnings) awning(W, F, a, plan, front, out);
+    if (onFront) onFront(front, { paint: W.buffers.paint.position.length / 3, detail: W.buffers.detail.position.length / 3, glass: W.buffers.glass.position.length / 3 });
   }
   for (const s of SLOTS) {
     const B = W.buffers[s];

@@ -26,6 +26,7 @@ import { FASCIA_ATLAS_HEIGHT, FASCIA_ATLAS_R8, FASCIA_ATLAS_WIDTH } from './fasc
 import { createStorefrontMaterials } from './materials.ts';
 import { VD_STOREFRONT_PLAN } from './plan.generated.ts';
 import { vdBlocksOwn } from '../blocks/index.ts';
+import { packageRingStorefronts, storefrontLayout } from './ring-packages.ts';
 
 type Mesh = InstanceType<Three['Mesh']>;
 
@@ -77,12 +78,44 @@ export function build(ctx: VdPortCtx): VdPortPart {
     const mx = f.p0[0]! + f.u[0]! * f.len / 2 - f.n[0]! * 0.5, mz = f.p0[1]! + f.u[1]! * f.len / 2 - f.n[1]! * 0.5;
     return vdBlocksOwn(f.src === 0 ? f.id : null, mx, mz);
   };
-  const result = emitPlan(VD_STOREFRONT_PLAN, (x, z) => ctx.groundY(x, z), (f) => (f.ring != null || ctx.inBounds(f.p0[0]!, f.p0[1]!)) && !ownedByBlocks(f));
+  const inTile = (f: (typeof VD_STOREFRONT_PLAN.fronts)[number]) => ctx.inBounds(f.p0[0]!, f.p0[1]!);
+  // With a streamer (ctx.preset) every front the lane draws (the tile's, and the ring districts' whether or not the
+  // tile's square covers them) is a lazy chunk package (ring-packages.ts): written when the streamer wants the chunk,
+  // dropped when it leaves, the same chunks the streamer would cut from one resident mesh per slot. One template per
+  // slot keeps one material per slot, so the pipelines are the ones the resident meshes used. Without a streamer (the
+  // whole-world build, which nothing evicts) the tile's fronts are one resident mesh per slot and the ring districts
+  // are left out rather than held resident for the whole city.
+  const streamed = ctx.preset != null;
+  const result = streamed ? null : emitPlan(VD_STOREFRONT_PLAN, (x, z) => ctx.groundY(x, z), (f) => inTile(f) && !ownedByBlocks(f));
   const mats = createStorefrontMaterials(THREE, ctx.night, ctx.physical, FASCIA_ATLAS_R8, FASCIA_ATLAS_WIDTH, FASCIA_ATLAS_HEIGHT);
   const meshes: Mesh[] = [];
   let triangles = 0;
-  for (const slot of SLOTS) {
-    const B = result.buffers[slot];
+  let features: EmitResult['features'] = result?.features ?? [];
+  if (streamed) {
+    const fronts = VD_STOREFRONT_PLAN.fronts.filter((f) => (f.ring != null || inTile(f)) && !ownedByBlocks(f));
+    const packed = packageRingStorefronts(VD_STOREFRONT_PLAN, fronts, (x, z) => ctx.groundY(x, z), { paint: LAYER.paint!.chunk, detail: LAYER.detail!.chunk, glass: LAYER.glass!.chunk });
+    features = packed.features;
+    for (const slot of SLOTS) {
+      const pkgs = packed.packages[slot];
+      if (pkgs.length === 0) continue;
+      // the template: the slot's material over one zero-area triangle in the resident mesh's attribute layout
+      const geometry = new THREE.BufferGeometry();
+      for (const a of storefrontLayout(slot)) geometry.setAttribute(a.name, new THREE.BufferAttribute(a.unorm8 ? new Uint8Array(3 * a.itemSize) : new Float32Array(3 * a.itemSize), a.itemSize, a.unorm8));
+      const mesh = new THREE.Mesh(geometry, mats.bySlot[slot]);
+      mesh.name = `vd:storefronts:${slot}`;
+      mesh.matrixAutoUpdate = false;
+      mesh.updateMatrix();
+      mesh.castShadow = slot === 'paint';
+      mesh.receiveShadow = slot !== 'glass';
+      if (slot === 'glass') mesh.renderOrder = 2;
+      ctx.group.add(mesh);
+      ctx.registerChunks(mesh, LAYER[slot]!, pkgs);
+      meshes.push(mesh);
+      for (const p of pkgs) triangles += p.vertexCount / 3;
+    }
+  }
+  for (const slot of result ? SLOTS : []) {
+    const B = result!.buffers[slot];
     if (B.position.length < 9) continue;
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(B.position, 3));
@@ -115,7 +148,7 @@ export function build(ctx: VdPortCtx): VdPortPart {
     meshes.push(mesh);
     triangles += B.position.length / 9;
   }
-  const count = (k: string) => result.features.filter((f) => f.kind === k).length;
+  const count = (k: string) => features.filter((f) => f.kind === k).length;
   return {
     dispose() {
       for (const m of meshes) { m.removeFromParent(); m.geometry.dispose(); }
