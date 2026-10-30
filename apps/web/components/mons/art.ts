@@ -4,8 +4,8 @@
  * place.
  *
  * - `baby` is the home page's starter plate (`starterArt(N)` in ../home/art.ts):
- *   the same concept art, the same focal point. Null where the Baby has no art
- *   yet (slot 4, Fye Dot): the pages draw Coming Soon in its place.
+ *   the same concept art, the same focal point. Null where a Baby has no art
+ *   yet: the pages draw Coming Soon in its place.
  * - `egg` is the concept art of the egg the Baby hatches from
  *   (`@acme/assets/creatures`, PS-028).
  * - `street` is a bundled NYC photograph of the street the Baby's concept art
@@ -47,7 +47,7 @@ const SLOT_ART: Record<StarterId, SlotArt> = {
   1: { tone: 'orange', egg: { id: 'metro-egg', focal: { x: 0.5, y: 0.55 } }, street: { id: 'harlem-brownstone-stoops', focal: { x: 0.5, y: 0.6 } } },
   2: { tone: 'royal', egg: { id: 'corner-egg', focal: { x: 0.5, y: 0.55 } }, street: { id: 'harlem-apollo', focal: { x: 0.5, y: 0.45 } } },
   3: { tone: 'leaf', egg: { id: 'prism-egg', focal: { x: 0.5, y: 0.55 } }, street: { id: 'midtown-times-square', focal: { x: 0.5, y: 0.5 } } },
-  // The Signal Egg is creator reference art on white, with no street behind it, and no street was art-directed.
+  // No street photo was art-directed for LanternFye.
   4: { tone: 'apple', egg: { id: 'signal-egg', focal: { x: 0.5, y: 0.55 } }, street: null },
 };
 
