@@ -12,7 +12,7 @@ export function eggModelSource(view: EggView): ScreenModelSource | null {
 }
 
 /** Each egg's glow tint on the glass, by its 1-based index: the same colour on M08 and M10. */
-const GLOW_TINTS = [hud.amber, hud.cyan, hud.green] as const;
+const GLOW_TINTS = [hud.amber, hud.cyan, hud.green, hud.red] as const;
 export function eggGlowTint(view: EggView): string {
   return GLOW_TINTS[(view.index - 1) % GLOW_TINTS.length]!;
 }

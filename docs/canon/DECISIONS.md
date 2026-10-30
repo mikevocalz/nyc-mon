@@ -42,7 +42,7 @@ Until those land, any field that would come from them stays `TODO(canon)`.
 - **Decided by:** Mike (creator)
 - **Source:** `docs/phase-1-brief.md` §2.2
 
-The Phase 1 starters are three species lines:
+The Phase 1 starters are three species lines (Decision 38 adds a fourth, F04 LanternFye, in slot 4):
 
 | Slot | Line (species label) | Canon anchor | Content file |
 |---|---|---|---|
@@ -105,7 +105,7 @@ The default theme is daylit. Dark surfaces appear at night and during the hatch.
 - **Answers:** `docs/canon/OPEN_QUESTIONS.md` Q1
 - **Overrides:** `docs/phase-1-brief.md` M08 ("meet three living Mons")
 
-The Caller is shown three eggs, one per starter line (Decision 1), and chooses one, in the Pokémon "Professor Oak" pattern. Dr. Alessandra Santoro presents the eggs; the v11 cast list makes her a chemistry teacher, former biochemist, and the H-Lynk's inventor and mentor. The chosen egg hatches into the individual. Naming happens after the hatch, so the naming ceremony names the hatched Baby, not the egg.
+The Caller is shown three eggs, one per starter line (Decision 1; four eggs since Decision 38), and chooses one, in the Pokémon "Professor Oak" pattern. Dr. Alessandra Santoro presents the eggs; the v11 cast list makes her a chemistry teacher, former biochemist, and the H-Lynk's inventor and mentor. The chosen egg hatches into the individual. Naming happens after the hatch, so the naming ceremony names the hatched Baby, not the egg.
 
 ## Decision 6 — The starter card shows the Baby form name, labelled with its line
 
@@ -405,6 +405,8 @@ The Glossy Red Polka-Dot Racing Egg is the LanternFye bloodline's egg, #020 Sign
 
 When a shell cracks, its inside is the egg's own colour, never white: Metro Egg red, Corner Egg pink, Signal Egg light grey, Prism Egg charcoal.
 
+Decision 38 (2026-10-29) makes the Signal Egg the fourth starter egg.
+
 ## Decision 31 — which supplied egg is which
 
 - **Date:** 2026-10-21
@@ -419,6 +421,8 @@ The supplied egg files carry their canon names and match the eggs by their Bible
 - The "Glossy Red Polka-Dot Racing Egg" image is #020 Signal Egg, the LanternFye bloodline's egg (as Decision 30 says). No 3D mesh has been made from it yet.
 
 `Fye-Egg.glb` (the tan "Glossy Spotted Alien Egg") is not assigned to any egg.
+
+**Amended by Decision 38 (2026-10-29):** the Signal Egg ships with the mesh built from `Fye-Egg.glb` (`Signal-Egg.glb`, restored). The polka-dot image stays its art reference; the mesh does not match it.
 
 ## Decision 32 — an Egg and a first-day Baby babble
 
@@ -528,3 +532,24 @@ What is approved:
 - **Keychain.** A Lock Screen widget is the Mon's keychain. It shows the hearts and whether the Mon is calling. It carries no care buttons.
 - **Notifications.** Care alerts are local notifications, one for each real call: hunger, energy, social, a cold, bedtime. A false call never notifies. Nothing notifies while care is paused.
 - **Removed.** The daily "Breakfast/Lunch/Dinner time for {monName}" notifications in `packages/app/features/schedule/event-integrations.native.ts` (lines 85–89 on 2026-10-29) are removed. They were care reminders on a clock, which D-15c already ruled out, and real calls replace them.
+
+## Decision 38 — four starter eggs: the Signal Egg joins, on the restored mesh
+
+- **Date:** 2026-10-29
+- **Decided by:** Mike (creator)
+- **Kind:** canon (starters, art)
+- **Amends:** Decisions 1, 5, 30 and 31
+- **Overrides:** the 2026-10-21 removal of the Signal Egg mesh (commit `63e9557c`)
+
+NYC-Mon has four starter eggs, in this slot order:
+
+| Slot | Egg | Bloodline | Hatches into |
+|---|---|---|---|
+| 1 | #001 Metro Egg | F01 Hood Ratti | #002 Squeaklet |
+| 2 | #008 Corner Egg | F02 Bodega Baddiee Cee | #009 Kittee Cee |
+| 3 | #061 Prism Egg | F12 Yote | #062 Yotito |
+| 4 | #020 Signal Egg | F04 LanternFye | #021 Fye Dot |
+
+The Signal Egg's 3D egg is the mesh removed on 2026-10-21: `Signal-Egg.glb`, built from the supplied `Fye-Egg.glb`, the tan egg with black and red dots. Mike chose to ship that mesh. It does not match the Signal Egg's art reference, the Glossy Red Polka-Dot Racing Egg (Decisions 30 and 31), and nothing here says it does. The 2D still of the Signal Egg is that polka-dot reference art, so the still and the 3D egg look different until a mesh is made from the art.
+
+The LanternFye line is #020 Signal Egg → #021 Fye Dot → #022 Flicker Fye → #023 Scarlet Skippa → #024 LanternFye (roster v11.1), one Max form. No Fye Dot model, art or babble family sound exists yet.

@@ -25,14 +25,14 @@ import { isAccessibilityTextSize, isLandscapeWindow, ringSizeDp } from './window
 const views = buildEggViews(eggs, bloodlines);
 
 describe('buildEggViews', () => {
-  it('lists the three starter eggs in slot order with content-derived labels', () => {
+  it('lists the four starter eggs in slot order with content-derived labels', () => {
     assert.deepEqual(views.map((v) => v.bloodlineId), eggs.map((e) => e.bloodlineId));
-    assert.equal(views.length, 3);
+    assert.equal(views.length, 4);
     for (const v of views) {
       assert.match(v.dexNumber, /^\d{3}$/);
       assert.ok(v.bloodline.endsWith(' Bloodline'));
     }
-    assert.deepEqual(views.map((v) => v.index), [1, 2, 3]);
+    assert.deepEqual(views.map((v) => v.index), [1, 2, 3, 4]);
   });
 
   it('throws when content lacks a Bloodline (the M08 error state)', () => {
