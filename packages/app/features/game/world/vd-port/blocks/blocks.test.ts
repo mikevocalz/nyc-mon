@@ -298,7 +298,7 @@ test('lazy local package keeps absolute bounds, identical GPU layout and byte bu
 });
 
 test('lane B leaves the facade kit\'s fronts to lane A once the packs are in, and keeps every other front', async () => {
-  const { VD_STOREFRONT_PLAN } = await import('../storefronts/plan.generated.ts');
+  const VD_STOREFRONT_PLAN = (await import('../storefronts/load-from-disk.test-support.ts')).readVdStorefrontPlanFromDisk();
   const { vdBlocksOwn } = await import('./index.ts');
   const own = (f: (typeof VD_STOREFRONT_PLAN.fronts)[number]) =>
     vdBlocksOwn(f.src === 0 ? f.id : null, f.p0[0]! + f.u[0]! * f.len / 2 - f.n[0]! * 0.5, f.p0[1]! + f.u[1]! * f.len / 2 - f.n[1]! * 0.5);

@@ -1,5 +1,5 @@
 // Bakes every storefront Valdrada builds inside the bundled tile into
-// packages/app/features/game/world/vd-port/storefronts/plan.generated.ts (the plan: fronts, bays, signs, awnings in
+// packages/app/features/game/world/vd-port/storefronts/plan.bin (the plan as JSON: fronts, bays, signs, awnings in
 // scene metres) and fascia-atlas.generated.ts (one R8 coverage atlas holding every real sign's lettering).
 //
 // Source: Valdrada @ 2724c79 (github.com/mkturkcan/valdrada, MIT), ~/src/valdrada by default:
@@ -28,7 +28,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { BF, buildingsOf, LANDMARKS, parseTile, project, tileIdsForSquare, unproject } from './valdrada/decode.mjs';
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
-const VALDRADA = process.argv[2] ?? join(homedir(), 'src/valdrada');
+const VALDRADA = process.argv.slice(2).find((a, i) => !a.startsWith('--') && process.argv[i + 1] !== '--ring') ?? join(homedir(), 'src/valdrada');
 const CITY = join(VALDRADA, 'client/src/city');
 const FONTS = join(VALDRADA, 'client/public/fonts/ar33');
 const SYS_FONTS = '/System/Library/Fonts/Supplemental';   // the kit atlas's CSS families (macOS)
@@ -38,13 +38,37 @@ const OUT_DIR = join(ROOT, '../../packages/app/features/game/world/vd-port/store
 
 const dataset = JSON.parse(readFileSync(DATASET, 'utf8'));
 const HALF = dataset.extentMeters;
+// --ring ring1: the plan also holds the ring district's fronts (tagged ring: 1, baked from the ring's tiles);
+// --ring ring2: the union bake — ring 1's fronts are regenerated tagged 1 alongside ring 2's tagged 2.
+// storefronts/index.ts draws them, the cell manifest streams nothing extra (the plan is a bundled .ts).
+const RING = process.argv.includes('--ring') ? process.argv[process.argv.indexOf('--ring') + 1] : null;
+if (RING && RING !== 'ring1' && RING !== 'ring2' && RING !== 'ring3' && RING !== 'ring4' && RING !== 'ring5' && RING !== 'ring6' && RING !== 'ring7' && RING !== 'ring8' && RING !== 'ring9' && RING !== 'ring10') throw new Error(`unknown --ring ${RING}`);
+const { RING1_TILES = [], RING1_RECTS_VD = [] } = RING ? await import('./vd-port/ring1.mjs') : {};
+const { RING2_TILES = [], RING2_RECTS_VD = [] } = RING === 'ring2' || RING === 'ring3' || RING === 'ring4' || RING === 'ring5' || RING === 'ring6' || RING === 'ring7' || RING === 'ring8' || RING === 'ring9' || RING === 'ring10' ? await import('./vd-port/ring2.mjs') : {};
+const { RING3_TILES = [], RING3_RECTS_VD = [] } = RING === 'ring3' || RING === 'ring4' || RING === 'ring5' || RING === 'ring6' || RING === 'ring7' || RING === 'ring8' || RING === 'ring9' || RING === 'ring10' ? await import('./vd-port/ring3.mjs') : {};
+const { RING4_TILES = [], RING4_RECTS_VD = [] } = RING === 'ring4' || RING === 'ring5' || RING === 'ring6' || RING === 'ring7' || RING === 'ring8' || RING === 'ring9' || RING === 'ring10' ? await import('./vd-port/ring4.mjs') : {};
+const { RING5_TILES = [], RING5_RECTS_VD = [] } = RING === 'ring5' || RING === 'ring6' || RING === 'ring7' || RING === 'ring8' || RING === 'ring9' || RING === 'ring10' ? await import('./vd-port/ring5.mjs') : {};
+const { RING6_TILES = [], RING6_RECTS_VD = [] } = RING === 'ring6' || RING === 'ring7' || RING === 'ring8' || RING === 'ring9' || RING === 'ring10' ? await import('./vd-port/ring6.mjs') : {};
+const { RING7_TILES = [], RING7_RECTS_VD = [] } = RING === 'ring7' || RING === 'ring8' || RING === 'ring9' || RING === 'ring10' ? await import('./vd-port/ring7.mjs') : {};
+const RINGN = RING ? +RING.slice(4) : 0;
+const { RING8_TILES = [], RING8_RECTS_VD = [] } = RINGN >= 8 ? await import('./vd-port/ring8.mjs') : {};
+const { RING9_TILES = [], RING9_RECTS_VD = [] } = RINGN >= 9 ? await import('./vd-port/ring9.mjs') : {};
+const { RING10_TILES = [], RING10_RECTS_VD = [] } = RINGN >= 10 ? await import('./vd-port/ring10.mjs') : {};
+const RING_TILES = [...RING1_TILES, ...RING2_TILES, ...RING3_TILES, ...RING4_TILES, ...RING5_TILES, ...RING6_TILES, ...RING7_TILES, ...RING8_TILES, ...RING9_TILES, ...RING10_TILES];
 // vd-port/transform.ts valdradaToSceneAffine, for the dataset origin
 const R_M = 6_371_008.8, DEG = Math.PI / 180;
 const LAT0 = 40.7831, LON0 = -73.9712, MLAT = 111132.0, MLON = 111320.0 * Math.cos(LAT0 * DEG);
 const [lon0, lat0] = dataset.origin;
 const AF = { sx: (DEG * R_M * Math.cos(lat0 * DEG)) / MLON, ox: (LON0 - lon0) * DEG * R_M * Math.cos(lat0 * DEG), sz: (DEG * R_M) / MLAT, oz: -(LAT0 - lat0) * DEG * R_M };
 const toScene = (x, z) => [x * AF.sx + AF.ox, z * AF.sz + AF.oz];
-const inBounds = ([x, z]) => Math.abs(x) <= HALF && Math.abs(z) <= HALF;
+const inHome = ([x, z]) => Math.abs(x) <= HALF && Math.abs(z) <= HALF;
+// a point inside a ring region (scene metres; the Valdrada->scene map is affine, the rects stay rects); the ring
+// number each rect set belongs to, for the fronts' `ring` tag
+const sceneRects = (rects) => rects.map(([x0, z0, x1, z1]) => { const [ax, az] = toScene(x0, z0), [bx, bz] = toScene(x1, z1); return [Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz)]; });
+const R1_SCENE = sceneRects(RING1_RECTS_VD), R2_SCENE = sceneRects(RING2_RECTS_VD), R3_SCENE = sceneRects(RING3_RECTS_VD), R4_SCENE = sceneRects(RING4_RECTS_VD), R5_SCENE = sceneRects(RING5_RECTS_VD), R6_SCENE = sceneRects(RING6_RECTS_VD), R7_SCENE = sceneRects(RING7_RECTS_VD), R8_SCENE = sceneRects(RING8_RECTS_VD), R9_SCENE = sceneRects(RING9_RECTS_VD), R10_SCENE = sceneRects(RING10_RECTS_VD);
+const inRects = (rects) => ([x, z]) => rects.some(([x0, z0, x1, z1]) => x >= x0 && x <= x1 && z >= z0 && z <= z1);
+const inRingRect = (p) => inRects(R1_SCENE)(p) || inRects(R2_SCENE)(p) || inRects(R3_SCENE)(p) || inRects(R4_SCENE)(p) || inRects(R5_SCENE)(p) || inRects(R6_SCENE)(p) || inRects(R7_SCENE)(p) || inRects(R8_SCENE)(p) || inRects(R9_SCENE)(p) || inRects(R10_SCENE)(p);
+const inBounds = (p) => inHome(p) || inRingRect(p);
 void project; void unproject;
 
 // ------------------------------------------------------------------ colours: pbrLib.js L75-L140 set tints, kitMats.js L40-L55
@@ -81,7 +105,8 @@ const r3 = (v) => Math.round(v * 1000) / 1000;
 
 // ------------------------------------------------------------------ the compiled footprints in bounds (Valdrada world metres)
 const recs = [];
-for (const id of tileIdsForSquare(HALF, 40)) {
+const tileIds = [...new Set([...tileIdsForSquare(HALF, 40), ...RING_TILES.map((k) => `t_${k}`)])];
+for (const id of tileIds) {
   const f = join(TILES, `${id}.bin`);
   if (!existsSync(f)) throw new Error(`missing ${f}: run node tooling/city/valdrada/fetch.mjs`);
   const buf = readFileSync(f);
@@ -558,13 +583,28 @@ signs.forEach((s, i) => {
 }
 
 // ------------------------------------------------------------------ write
-const header = [
-  '// Generated by tooling/city/bake-vd-storefronts.mjs. Do not edit.',
-  '// Valdrada @ 2724c79 (github.com/mkturkcan/valdrada, MIT): fk/specs (the measured fronts), namedShops.js NAMED_FRONTS',
-  '// and world/nycDress.js storefront units, placed on the bundled tile in scene metres.',
-];
+// a ring's fronts carry ring: N (plan-types.ts): outside the home square, lane B still emits them under its own
+// inBounds (the plan's own rect, not the tile's). The tag is the ring the front's ends lie in; a front straddling
+// a ring edge keeps the lower ring, as the ring-1 bake tagged every out-of-home front 1.
+if (RING) for (const f of fronts) {
+  const end = [f.p0[0] + f.u[0] * f.len, f.p0[1] + f.u[1] * f.len];
+  f.ring = inHome(f.p0) && inHome(end) ? undefined : inRects(R6_SCENE)(f.p0) || inRects(R6_SCENE)(end) ? 6 : inRects(R7_SCENE)(f.p0) || inRects(R7_SCENE)(end) ? 7 : inRects(R5_SCENE)(f.p0) || inRects(R5_SCENE)(end) ? 5 : inRects(R4_SCENE)(f.p0) || inRects(R4_SCENE)(end) ? 4 : inRects(R3_SCENE)(f.p0) || inRects(R3_SCENE)(end) ? 3 : inRects(R2_SCENE)(f.p0) || inRects(R2_SCENE)(end) ? 2 : inRects(R8_SCENE)(f.p0) || inRects(R8_SCENE)(end) ? 8 : inRects(R9_SCENE)(f.p0) || inRects(R9_SCENE)(end) ? 9 : inRects(R10_SCENE)(f.p0) || inRects(R10_SCENE)(end) ? 10 : 1;
+  if (f.ring === undefined) delete f.ring;
+}
 const plan = { fronts, atlas: { width: AW, height: AH, cellW: CW, cellH: CH, cols: COLS, count: signs.length }, slots: signs.map((s) => s.text) };
-writeFileSync(join(OUT_DIR, 'plan.generated.ts'), `${header.join('\n')}\nimport type { StorefrontPlan } from './plan-types.ts';\n\nexport const VD_STOREFRONT_PLAN: StorefrontPlan = ${JSON.stringify(plan)};\n`);
+// The plan ships as JSON bytes in a Metro/Turbopack asset (storefronts/load.ts reads it while the game scene loads),
+// not as a TS module: with rings 1-10 it is 37 MB, and as a module every bundler and type pass parsed it (Turbopack's
+// loader workers on web hung on it). Valdrada @ 2724c79 (github.com/mkturkcan/valdrada, MIT): fk/specs (the measured
+// fronts), namedShops.js NAMED_FRONTS and world/nycDress.js storefront units, placed on the bundled tile in scene metres.
+writeFileSync(join(OUT_DIR, 'plan.bin'), JSON.stringify(plan));
+writeFileSync(join(OUT_DIR, 'plan-asset.ts'), [
+  '// Generated by tooling/city/bake-vd-storefronts.mjs. Do not edit.',
+  '// Metro registers .bin as an asset (apps/mobile/metro.config.js) and Turbopack emits it as a static file, so require()',
+  '// gives an asset id (native) or URL (web) that @acme/ui/three/asset-bytes reads (storefronts/load.ts).',
+  '/* eslint-disable @typescript-eslint/no-require-imports */',
+  "export const VD_STOREFRONT_PLAN_ASSET: number = require('./plan.bin');",
+  '',
+].join('\n'));
 writeFileSync(join(OUT_DIR, 'fascia-atlas.generated.ts'), [
   '// Generated by tooling/city/bake-vd-storefronts.mjs. Do not edit.',
   `// One R8 coverage atlas (${AW} x ${AH}, ${CW} x ${CH} cells) of the real sign lettering, set in Valdrada's sign fonts`,

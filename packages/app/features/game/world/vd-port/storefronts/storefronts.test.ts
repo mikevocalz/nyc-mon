@@ -9,11 +9,36 @@ import dataset from '../../../data/harlem-apollo.json' with { type: 'json' };
 import { valdradaToScene } from '../transform.ts';
 import { emitPlan, gateDrop, SLOTS, valdradaPoint, type Feature } from './emit.ts';
 import { FASCIA_ATLAS_HEIGHT, FASCIA_ATLAS_R8, FASCIA_ATLAS_WIDTH } from './fascia-atlas.generated.ts';
-import { VD_STOREFRONT_PLAN as PLAN } from './plan.generated.ts';
+import { loadVdStorefrontPlanFromDisk } from './load-from-disk.test-support.ts';
+
+const PLAN = loadVdStorefrontPlanFromDisk();
 
 const toScene = valdradaToScene(dataset.origin as [number, number]);
 const flat = () => 0;
-const result = emitPlan(PLAN, flat);
+// The whole union plan, written a batch of fronts at a time: what the tests read (the features, each slot's triangle
+// count, the gate curtains) is kept and the vertex buffers dropped, so the test holds one batch's buffers rather than
+// every ring's at once (~18 M triangles, several GB). A front writes the same whatever is written beside it
+// (ring-packages.test.ts holds the batched writes to the whole one).
+const result = (() => {
+  const features: Feature[] = [];
+  const tris = { paint: 0, detail: 0, glass: 0 };
+  // gates test: aGate entries not below -999 (and whether each is a well-formed curtain); dresser test: entries above it
+  let curtainVerts = 0, curtainAbove = 0, malformed = 0;
+  for (let b = 0; b < PLAN.fronts.length; b += 2000) {
+    const r = emitPlan({ ...PLAN, fronts: PLAN.fronts.slice(b, b + 2000) }, flat);
+    for (const f of r.features) features.push(f);
+    for (const s of SLOTS) tris[s] += r.buffers[s].position.length / 9;
+    for (const gb of [r.buffers.paint.extra.aGate!, r.buffers.detail.extra.aGate!]) {
+      for (let i = 0; i < gb.length; i += 3) {
+        if (gb[i + 1]! > -999) curtainAbove++;
+        if (gb[i + 1]! < -999) continue;
+        curtainVerts++;
+        if (!(gb[i + 2]! >= 0 && gb[i + 2]! <= 1 && gb[i]! > gb[i + 1]!)) malformed++;
+      }
+    }
+  }
+  return { features, tris, curtainVerts, curtainAbove, malformed };
+})();
 const byFront = new Map(PLAN.fronts.map((f) => [f.id, f]));
 
 /** Distance along the face between a feature and Valdrada's own point for its u, through transform.ts. */
@@ -68,13 +93,9 @@ test('gates: measured position by day, down after dark', () => {
   assert.ok(gates.filter((g) => gateDrop(g.dayDown!, 0) < 1).length > gates.length / 2, 'most measured gates are up by day');
   assert.ok(gates.every((g) => gateDrop(g.dayDown!, 1) === 1), 'every gate is down at night');
   // the curtain carries its day position for the shader
-  const gb = [...result.buffers.paint.extra.aGate!, ...result.buffers.detail.extra.aGate!];
-  let curtains = 0;
-  for (let i = 0; i < gb.length; i += 3) {
-    if (gb[i + 1]! < -999) continue;
-    curtains++;
-    assert.ok(gb[i + 2]! >= 0 && gb[i + 2]! <= 1 && gb[i]! > gb[i + 1]!);
-  }
+  // walked per buffer: the union plan's two Float32Arrays together pass V8's plain-array limit (ring 8), so no spread
+  const curtains = result.curtainVerts;
+  assert.equal(result.malformed, 0, 'every curtain vertex: day share in [0, 1], top above foot');
   assert.ok(curtains / 6 >= gates.length, `${curtains / 6} curtains`);
 });
 
@@ -97,7 +118,7 @@ test("the dresser units: Valdrada's sign roster, its gates up by day on about th
     }
   }
   // every unit's glazing has a curtain to close at night: one per open or full unit, two per partial one
-  const curtains = (['paint', 'detail'] as const).reduce((n, k) => n + result.buffers[k].extra.aGate!.filter((y, i) => i % 3 === 1 && y > -999).length / 6, 0);
+  const curtains = result.curtainAbove / 6;
   const want = units.reduce((n, u) => n + (u.gate === 1 ? 2 : 1), 0) + result.features.filter((f) => f.kind === 'gate').length;
   assert.equal(curtains, want);
 });
@@ -130,8 +151,10 @@ test('budgets: three materials, one power-of-two atlas, texture growth under 24 
   const bytes = FASCIA_ATLAS_WIDTH * FASCIA_ATLAS_HEIGHT * (4 / 3);   // R8 with its mip chain
   assert.ok(bytes <= 24 * 1024 * 1024, `${(bytes / 1048576).toFixed(1)} MB`);
   let tris = 0;
-  for (const s of SLOTS) tris += result.buffers[s].position.length / 9;
-  assert.ok(tris > 0 && tris < 1_000_000, `${tris} triangles`);
+  for (const s of SLOTS) tris += result.tris[s];
+  // the runaway check, per front so it holds as the plan grows: the union plan has emitted ~245 triangles a front at
+  // every size so far (rings 1-6: ~53k fronts, ~12.9 M; rings 1-8: 75,691, 18.4 M; a rings 1-9 trial bake: 87,404, 21.6 M)
+  assert.ok(tris > 0 && tris < 300 * PLAN.fronts.length, `${tris} triangles for ${PLAN.fronts.length} fronts`);
 });
 
 test('no unguarded normalize(cross(...)) in the lane', () => {
