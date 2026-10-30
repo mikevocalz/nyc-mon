@@ -31,6 +31,7 @@ test('sitemap: lists the marketing routes and each /mons slug, absolute, and no 
     `${BASE}/story`,
     `${BASE}/mons`,
     `${BASE}/city`,
+    `${BASE}/city/walk`,
     `${BASE}/how-it-works`,
     `${BASE}/get`,
     `${BASE}/legal/privacy`,

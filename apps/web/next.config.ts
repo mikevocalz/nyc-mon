@@ -93,6 +93,13 @@ const nextConfig: NextConfig = {
     'solito',
   ],
   turbopack: {
+    // The city's binary packs (block packs, far-tier chunks, systems packs, the storefront plan) are require()d as
+    // bundled assets, which Metro registers on native. Turbopack has no module type for .bin or .gz, so each is emitted
+    // as a static file and the require gives its URL (@acme/ui/three/asset-bytes fetches it).
+    rules: {
+      '*.bin': { type: 'asset' },
+      '*.bin.gz': { type: 'asset' },
+    },
     resolveAlias: {
       // React Native Skia's web bundle retains guarded Node/Metro branches.
       // Turbopack needs the browser-only aliases that Skia documents for

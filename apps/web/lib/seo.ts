@@ -14,6 +14,7 @@ export const MARKETING_ROUTES = [
   '/story',
   '/mons',
   '/city',
+  '/city/walk',
   '/how-it-works',
   '/get',
   '/legal/privacy',

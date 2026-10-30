@@ -14,6 +14,8 @@ export const W03_COPY = {
     title: 'The City',
     body: 'Mons live in New York, the real one, across four districts. Each has its own skyline, its own corners and its own legends.',
     listLabel: 'The four districts',
+    walk: 'Walk the city in 3D',
+    walkHref: '/city/walk',
   },
   cast: {
     eyebrow: 'The cast',
