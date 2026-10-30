@@ -12,14 +12,19 @@ import { readStaffRole } from '../collections/access/roles.ts';
 import { readAuthEnv } from './env';
 import { SURFACE_HEADER } from './surface';
 
+/** Case-insensitive list membership, shared by the admin and app allowlists. */
+export function emailInList(email: unknown, allowed: readonly string[]): boolean {
+  if (typeof email !== 'string') return false;
+  const normalized = email.trim().toLowerCase();
+  return normalized !== '' && allowed.some((entry) => entry.trim().toLowerCase() === normalized);
+}
+
 /**
  * Case-insensitive allowlist check; `allowed` is injectable for tests. The
  * default reads the env at call time, never empty (see env.ts).
  */
 export function isAllowedAdminEmail(email: unknown, allowed: readonly string[] = readAuthEnv().adminAllowedEmails): boolean {
-  if (typeof email !== 'string') return false;
-  const normalized = email.trim().toLowerCase();
-  return normalized !== '' && allowed.some((entry) => entry.trim().toLowerCase() === normalized);
+  return emailInList(email, allowed);
 }
 
 function userEmail(user: unknown): unknown {
@@ -48,7 +53,7 @@ export function isConsoleSignIn(path: string, headers: Headers | undefined): boo
 }
 
 /** The exact failure the endpoint returns for a wrong password: no tell, no enumeration. */
-function invalidCredentials(): APIError {
+export function invalidCredentials(): APIError {
   return APIError.from('UNAUTHORIZED', { code: 'INVALID_EMAIL_OR_PASSWORD', message: 'Invalid email or password' });
 }
 

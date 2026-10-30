@@ -11,6 +11,8 @@ import { mcpPlugin } from '@payloadcms/plugin-mcp';
 import { APIError, buildConfig } from 'payload';
 import { deleteDueCallersTask, selfDeletionOptions } from './auth/deletion';
 import { consoleSignInGate } from './auth/admin-allowlist';
+import { appSignInGate } from './auth/app-allowlist';
+import { SURFACE_HEADER } from './auth/surface';
 import { AUTH_BASE_PATH, PAYLOAD_API_ROUTE, PAYLOAD_CORS_ORIGINS, PAYLOAD_ORIGINS, betterAuthOptions, sendMail } from './auth/options';
 import { accountMerge } from './auth/plugins/account-merge';
 import { adminComponents } from './admin/components';
@@ -125,11 +127,13 @@ export default buildConfig({
           user: { ...betterAuthOptions.user, deleteUser: selfDeletionOptions(payload) },
           hooks: {
             ...betterAuthOptions.hooks,
-            // Console credential sign-in (marked x-nycmon-surface: admin by the
-            // login form) answers only to ADMIN_ALLOWED_EMAILS. Everything else
-            // — callers, the judges' OAuth linking sign-in, /v1 — falls through
-            // to the shared before-hook untouched.
-            before: consoleSignInGate(betterAuthOptions.hooks?.before, payload),
+            // Two allowlist gates ahead of the shared before-hook: the game
+            // app's sign-in (x-nycmon-surface: app) answers to
+            // APP_ALLOWED_EMAILS, and the console's credential sign-in
+            // (x-nycmon-surface: admin) to ADMIN_ALLOWED_EMAILS. Everything
+            // else — callers via linking, the judges' OAuth sign-in, /v1 —
+            // falls through untouched.
+            before: appSignInGate(consoleSignInGate(betterAuthOptions.hooks?.before, payload), payload),
           },
           database: payloadAdapter({ payloadClient: payload }),
         }),
@@ -152,7 +156,13 @@ export default buildConfig({
     // Account deletion after the 7-day grace (ADR 0001 as amended by L3).
     tasks: [deleteDueCallersTask],
   },
-  cors: PAYLOAD_CORS_ORIGINS,
+  cors: {
+    origins: PAYLOAD_CORS_ORIGINS,
+    // The game app (nyc-mon.city → this origin) and the console mark their
+    // sign-in requests with the surface header; without it the browser's
+    // CORS preflight would refuse the cross-origin call.
+    headers: [SURFACE_HEADER],
+  },
   csrf: PAYLOAD_ORIGINS,
   secret: process.env.PAYLOAD_SECRET || '',
   typescript: {
