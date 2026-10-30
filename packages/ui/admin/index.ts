@@ -19,6 +19,7 @@ export { BrandLogo, type BrandLogoProps } from '../brand/BrandLogo';
 export { BrandWordmark, type BrandWordmarkProps } from '../brand/BrandWordmark';
 export { Button, type ButtonProps } from '../Button';
 export { Card, type CardProps } from '../Card';
+export { CallerAvatar, type CallerAvatarProps } from './CallerAvatar';
 export { Checkbox, type CheckboxProps } from '../Checkbox';
 export { Checklist, CheckRow, type ChecklistProps, type CheckResult, type CheckRowProps } from '../Checklist';
 export { ConfirmDestructive, type ConfirmDestructiveProps } from '../ConfirmDestructive';

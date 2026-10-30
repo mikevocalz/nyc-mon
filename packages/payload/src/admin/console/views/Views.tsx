@@ -1,6 +1,7 @@
 import type { AdminViewServerProps } from 'payload';
 import { allSpecies, bloodlineLabel, eggs, starterBloodlines } from '@acme/content';
 import { ModelsViewClient, type ModelDoc } from './ModelsClient';
+import { callerIdentity, CALLER_IDENTITY_SELECT } from '../caller-identity';
 import { AuditViewClient, CallersViewClient, ConsentViewClient, ContentViewClient, MonsViewClient, OverviewViewClient, SettingsViewClient } from './ViewsClient';
 
 function requireUser({ initPageResult }: AdminViewServerProps): NonNullable<AdminViewServerProps['initPageResult']['req']['user']> | null {
@@ -26,8 +27,8 @@ export async function CallersView(props: AdminViewServerProps) {
   // Named view params (:callerId) are matched for routing but never extracted;
   // the adapter only supplies `params.segments`, so the id is segments[1].
   const route = await props.params; const selectedId = typeof route?.segments?.[1] === 'string' ? route.segments[1] : null;
-  const result = await req.payload.find({ collection: 'users', where: { role: { equals: 'user' } }, sort: '-createdAt', limit: 50, depth: 0, select: { email: true, name: true, birthYear: true, consentStatus: true, deletionScheduledFor: true, updatedAt: true, createdAt: true }, user, overrideAccess: false, req });
-  const callers = result.docs.map((doc) => ({ id: String(doc.id), email: doc.email.replace(/(^.).*(@.).*(\..+$)/, '$1•••$2•••$3'), name: doc.name ? 'Hidden' : 'Not given', age: doc.birthYear ? (new Date().getUTCFullYear() - doc.birthYear < 13 ? 'Under 13' : new Date().getUTCFullYear() - doc.birthYear < 18 ? '13 to 17' : '18 and over') : 'Not given', consent: doc.consentStatus ?? 'not-required', joined: doc.createdAt, updatedAt: doc.updatedAt, deletionScheduledFor: doc.deletionScheduledFor ?? null }));
+  const result = await req.payload.find({ collection: 'users', where: { role: { equals: 'user' } }, sort: '-createdAt', limit: 50, depth: 0, select: { ...CALLER_IDENTITY_SELECT, email: true, name: true, birthYear: true, consentStatus: true, deletionScheduledFor: true, updatedAt: true, createdAt: true }, user, overrideAccess: false, req });
+  const callers = result.docs.map((doc) => ({ ...callerIdentity(doc), email: doc.email.replace(/(^.).*(@.).*(\..+$)/, '$1•••$2•••$3'), name: doc.name ? 'Hidden' : 'Not given', age: doc.birthYear ? (new Date().getUTCFullYear() - doc.birthYear < 13 ? 'Under 13' : new Date().getUTCFullYear() - doc.birthYear < 18 ? '13 to 17' : '18 and over') : 'Not given', consent: doc.consentStatus ?? 'not-required', joined: doc.createdAt, updatedAt: doc.updatedAt, deletionScheduledFor: doc.deletionScheduledFor ?? null }));
   return <CallersViewClient callers={callers} selectedId={selectedId} page={result.page ?? 1} pageCount={result.totalPages} totalCount={result.totalDocs} />;
 }
 
