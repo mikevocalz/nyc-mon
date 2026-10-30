@@ -8,7 +8,7 @@
         "^build"
       ],
       "inputs": [
-        "$TURBO_DEFAULTS$",
+        "$TURBO_DEFAULT$",
         ".env*",
         "../../.env*"
       ],
@@ -30,7 +30,7 @@
         "^build"
       ],
       "inputs": [
-        "$TURBO_DEFAULTS$",
+        "$TURBO_DEFAULT$",
         ".env*",
         "../../.env*",
         "../../packages/ui/**",
@@ -54,7 +54,7 @@
         "^build"
       ],
       "inputs": [
-        "$TURBO_DEFAULTS$",
+        "$TURBO_DEFAULT$",
         "../../.env*",
         "../../packages/ui/**",
         "../../packages/app/**",
@@ -79,7 +79,7 @@
         "^build"
       ],
       "inputs": [
-        "$TURBO_DEFAULTS$"
+        "$TURBO_DEFAULT$"
       ]
     },
     "dev": {

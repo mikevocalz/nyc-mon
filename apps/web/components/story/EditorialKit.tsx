@@ -118,7 +118,7 @@ export function PhotoFrame({
       sizes={entry.sizes}
       loading={eager ? 'eager' : 'lazy'}
       priority={eager}
-      placeholder="blur"
+      placeholder={entry.blurDataURL ? 'blur' : 'empty'}
       blurDataURL={entry.blurDataURL}
       contentPosition={artPosition(entry)}
       className="h-full w-full"
