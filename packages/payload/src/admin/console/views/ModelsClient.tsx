@@ -252,7 +252,8 @@ export function ModelsViewClient({ forms, models, failed = false, selectedId, ca
             </Section>
             <Paragraph>{`${selected.stage}. ${selected.bloodline}.`}</Paragraph>
 
-            <Card elevation="raised">
+            {/* Unpadded: the 3D view fills the bordered frame edge to edge, so the model centres in what you see. */}
+            <Card elevation="raised" padded={false}>
             <Section className="h-80 md:h-[28rem]" aria-label={copy.viewer}>
               {!viewerUrl ? (
                 <EmptyState title={copy.viewer} description={copy.viewerEmpty} />

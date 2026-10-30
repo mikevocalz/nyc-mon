@@ -57,6 +57,15 @@ export function turnExtent(points: ModelPoints, scale: number): TurnExtent {
 export type PreviewCamera = {
   position: Vec3;
   focalPoint: Vec3;
+  /**
+   * Euler rotation in degrees that points the camera at `focalPoint`. The
+   * preview sets it on a plain ViroCamera rather than handing `focalPoint` to
+   * ViroOrbitCamera: ViroOrbitCamera.web's lookAtEuler negates the pitch
+   * (`-asin(ny)`), so a camera above the model looked up and away from it.
+   * A rotation of +x degrees about X turns the camera's -Z view upward, so
+   * looking down from above is a negative X rotation.
+   */
+  rotation: Vec3;
   /** Full visible height of the orthographic frame, in metres. */
   orthographicScale: number;
 };
@@ -80,6 +89,7 @@ export function previewCamera(extent: TurnExtent, position: Vec3, width: number,
   return {
     position: [position[0], middle + distance * Math.sin(p), position[2] + distance * Math.cos(p)],
     focalPoint: [position[0], middle, position[2]],
+    rotation: [-clampPitch(pitch), 0, 0],
     orthographicScale,
   };
 }

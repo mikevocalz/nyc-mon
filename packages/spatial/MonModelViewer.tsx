@@ -11,8 +11,8 @@ import {
   Viro3DObject,
   Viro3DSceneNavigator,
   ViroAmbientLight,
+  ViroCamera,
   ViroDirectionalLight,
-  ViroOrbitCamera,
   ViroScene,
 } from './viro';
 
@@ -55,9 +55,9 @@ function MonModelScene({ url, scale, position, rotation, yaw, pitch, extent, sta
   const camera = previewCamera(extent, position, stage.width, stage.height, pitch);
   return (
     <ViroScene>
-      <ViroOrbitCamera
+      <ViroCamera
         position={camera.position}
-        focalPoint={camera.focalPoint}
+        rotation={camera.rotation}
         projection="orthographic"
         orthographicScale={camera.orthographicScale}
         active
@@ -90,13 +90,31 @@ type NavigatorProps = {
 
 const Navigator = Viro3DSceneNavigator as unknown as ComponentType<NavigatorProps>;
 
-type Readable = { from: string; url: string; points: ModelPoints | null };
+/**
+ * The model's vertices as Viro draws them holding still, and the room it may
+ * need while a clip plays (modelBounds.ts). A clip that moves the joints draws
+ * the mesh in its glTF pose (Squeaklet's rat_run does), but some clips that
+ * target joints leave it in the still pose (Lil' Ratti's up_idle did on
+ * 2026-10-30), so a playing clip is framed to hold both.
+ */
+type Poses = { still: ModelPoints | null; playing: ModelPoints | null };
+type Readable = { from: string; url: string; poses: Poses };
+
+function readPoses(glb: Uint8Array): Poses {
+  const still = readModelPoints(glb, 'viro-still');
+  const bind = readModelPoints(glb, 'bind');
+  if (!still || !bind) return { still: still ?? bind, playing: bind ?? still };
+  const both = new Float32Array(still.length + bind.length);
+  both.set(still);
+  both.set(bind, still.length);
+  return { still, playing: both };
+}
 
 /**
  * The URL Viro should load for `url`: the same URL, or a blob: URL of a copy
  * Viro can draw when the file is quantized or skinned with 8- or 16-bit joints,
  * both of which Viro draws blank in the browser (glbDequantize.ts). Also the
- * model's bind-pose vertices, read from that float copy, to frame it. Null
+ * model's vertices, read from that float copy, to frame it. Null
  * while the file is being read.
  */
 function useViroReadable(url: string, onError?: (error: unknown) => void): Readable | null {
@@ -110,12 +128,12 @@ function useViroReadable(url: string, onError?: (error: unknown) => void): Reada
       const bytes = new Uint8Array(await response.arrayBuffer());
       if (cancelled) return;
       if (!needsViroRewrite(bytes)) {
-        setReadable({ from: url, url, points: readModelPoints(bytes) });
+        setReadable({ from: url, url, poses: readPoses(bytes) });
         return;
       }
       const copy = viroReadableGlb(bytes);
       objectUrl = URL.createObjectURL(new Blob([copy.buffer as ArrayBuffer], { type: 'model/gltf-binary' }));
-      setReadable({ from: url, url: objectUrl, points: readModelPoints(copy) });
+      setReadable({ from: url, url: objectUrl, poses: readPoses(copy) });
     })().catch((error: unknown) => {
       if (!cancelled) onError?.(error);
     });
@@ -221,7 +239,7 @@ export function MonModelViewer({ assetBaseUrl = '/viro/wasm/', yaw = 0, pitch = 
   const readable = useViroReadable(scene.url, scene.onError);
   const [stage, setStage] = useState({ width: 1, height: 1 });
   const stageRef = useStageTurn(Boolean(onTurn), { onTurn, onResetTurn, turn: { yaw, pitch } });
-  const points = readable?.points ?? null;
+  const points = (scene.clip ? readable?.poses.playing : readable?.poses.still) ?? null;
   const extent = useMemo(
     () => (points ? turnExtent(points, scene.scale) : fallbackExtent(heightMeters, scene.scale)),
     [points, scene.scale, heightMeters],
