@@ -427,6 +427,29 @@ export const betterAuthOptions = {
           }
           return;
         }
+        case '/sign-up/email': {
+          // The linking page asks the birth-year question before it posts
+          // (link-form.ts); a raw post without one still minted the account,
+          // which later hit the adults gate at OAuth linking with no way to
+          // answer. Same rules as the form: required, four digits, a
+          // plausible year — parseBirthYear holds 1900..this year. Internal
+          // creates that carry no request keep their own path, and the
+          // under-13 split stays in `user.create.before`.
+          const raw = readField(ctx.body, 'birthYear');
+          if (raw === undefined || raw === null) {
+            throw APIError.from('BAD_REQUEST', {
+              code: BIRTH_YEAR_REQUIRED,
+              message: 'Answer the birth-year question before making an account.',
+            });
+          }
+          if (parseBirthYear(raw, new Date().getUTCFullYear()) === undefined) {
+            throw APIError.from('BAD_REQUEST', {
+              code: 'INVALID_BIRTH_YEAR',
+              message: 'Birth year is not valid.',
+            });
+          }
+          return;
+        }
         case '/sign-in/social': {
           // Apple and Google carry no birth year. A create-intent client sends
           // the M04 answer in additionalData; it is checked here and, for the
