@@ -51,8 +51,9 @@ export function OverviewViewClient({ counts, run, runFailed = false, events }: {
   );
 }
 
+const consentLabel = (value: string) => consoleCopy.consentStatus[value] ?? value;
 type Caller = { id: string; email: string; name: string; age: string; consent: string; joined: string; updatedAt: string; deletionScheduledFor: string | null };
-const callerColumns: ColumnDef<Caller, unknown>[] = [{ accessorKey: 'id', header: 'Caller' }, { accessorKey: 'age', header: 'Age band' }, { accessorKey: 'consent', header: 'Consent' }, { accessorKey: 'joined', header: 'Joined', cell: ({ row }) => <Timestamp at={new Date(row.original.joined)} format="relative" /> }];
+const callerColumns: ColumnDef<Caller, unknown>[] = [{ accessorKey: 'id', header: 'Caller' }, { accessorKey: 'age', header: 'Age band' }, { accessorKey: 'consent', header: 'Consent', cell: ({ row }) => consentLabel(row.original.consent) }, { accessorKey: 'joined', header: 'Joined', cell: ({ row }) => <Timestamp at={new Date(row.original.joined)} format="relative" /> }];
 export function CallersViewClient({ callers, failed = false, selectedId, page, pageCount, totalCount }: { callers: Caller[]; failed?: boolean; selectedId: string | null; page: number; pageCount: number; totalCount: number }) {
  const router = useRouter(); const store = useCallersStore(); const selected = callers.find((row) => row.id === selectedId); const shown = store.revealed;
  const show = async (field: 'email' | 'name') => { if (!selected) return; const result = await reveal(api, { targetType: 'caller', targetId: selected.id, field, reasonCode: 'support_request' }); if (result.ok && typeof result.data.value === 'string') store.setRevealed(field, result.data.value); };
@@ -62,7 +63,7 @@ export function CallersViewClient({ callers, failed = false, selectedId, page, p
    <Section className={splitPanes}>
     <Section className="content-start gap-4">
      <DataTable testID="callers-table" surface="page" caption={consoleCopy.callers.heading} data={callers} columns={callerColumns} getRowId={(row) => row.id} getRowHref={(row) => `/admin/callers/${row.id}`} selectedRowId={selectedId ?? undefined} filter={{ label: consoleCopy.callers.search, placeholder: consoleCopy.callers.searchHint, noMatchText: consoleCopy.callers.noMatch }} emptyText={consoleCopy.callers.none} error={failed ? loadError(router.refresh) : undefined} />
-     <Pagination page={page} pageCount={pageCount} totalCount={totalCount} pageSize={50} onPageChange={(next) => router.push(`/admin/callers?page=${next}`)} />
+     {pageCount > 1 ? <Pagination page={page} pageCount={pageCount} totalCount={totalCount} pageSize={50} onPageChange={(next) => router.push(`/admin/callers?page=${next}`)} /> : null}
     </Section>
    {selected ? <Section testID="caller-detail" className={detailPane}>
     <Heading level={2} className={h2}>{consoleCopy.callers.identity}</Heading>
@@ -77,7 +78,7 @@ export function CallersViewClient({ callers, failed = false, selectedId, page, p
 }
 
 type Consent = { id: string; parentEmail: string; age: string; status: string; expiresAt: string; emailsSent: number; updatedAt: string };
-const consentColumns: ColumnDef<Consent, unknown>[] = [{ accessorKey: 'id', header: 'Consent' }, { accessorKey: 'status', header: 'Status' }, { accessorKey: 'expiresAt', header: 'Expires', cell: ({ row }) => <Timestamp at={new Date(row.original.expiresAt)} format="relative" /> }, { accessorKey: 'emailsSent', header: 'Emails sent', meta: { align: 'end' } }];
+const consentColumns: ColumnDef<Consent, unknown>[] = [{ accessorKey: 'id', header: 'Consent' }, { accessorKey: 'status', header: 'Status', cell: ({ row }) => consentLabel(row.original.status) }, { accessorKey: 'expiresAt', header: 'Expires', cell: ({ row }) => <Timestamp at={new Date(row.original.expiresAt)} format="relative" /> }, { accessorKey: 'emailsSent', header: 'Emails sent', meta: { align: 'end' } }];
 const consentLanes = (['pending', 'approved', 'denied', 'expired', 'all'] as const);
 export function ConsentViewClient({ consents, failed = false, selectedId }: { consents: Consent[]; failed?: boolean; selectedId: string | null }) {
  const router = useRouter(); const store = useConsentStore(); const selected = consents.find((row) => row.id === selectedId);
@@ -93,7 +94,7 @@ export function ConsentViewClient({ consents, failed = false, selectedId }: { co
      <DataTable testID="consents-table" surface="page" caption={consoleCopy.consent.heading} data={inLane} columns={consentColumns} getRowId={(row) => row.id} getRowHref={(row) => `/admin/consent/${row.id}`} selectedRowId={selectedId ?? undefined} filter={{ label: consoleCopy.consent.search }} emptyText={consoleCopy.consent.empty} error={failed ? loadError(router.refresh) : undefined} />
     </Section>
    {selected ? <Section testID="consent-detail" className={detailPane}>
-    <KeyValueList items={[{ key: 'email', label: "Parent's email", value: <MaskedValue state="masked" mask={selected.parentEmail} onRevealRequest={async () => { const result = await reveal(api, { targetType: 'consent', targetId: selected.id, field: 'parentEmail', reasonCode: 'parent_request' }); if (result.ok && typeof result.data.value === 'string') store.setRevealed('email', result.data.value); }} /> }, { key: 'status', label: 'Status', value: selected.status }, { key: 'age', label: "Child's age band", value: selected.age }]} />
+    <KeyValueList items={[{ key: 'email', label: "Parent's email", value: <MaskedValue state="masked" mask={selected.parentEmail} onRevealRequest={async () => { const result = await reveal(api, { targetType: 'consent', targetId: selected.id, field: 'parentEmail', reasonCode: 'parent_request' }); if (result.ok && typeof result.data.value === 'string') store.setRevealed('email', result.data.value); }} /> }, { key: 'status', label: 'Status', value: consentLabel(selected.status) }, { key: 'age', label: "Child's age band", value: selected.age }]} />
     <Button title={consoleCopy.consent.resend} onPress={async () => { const result = await resendConsentEmail(api, selected.id); if (result.ok) router.refresh(); }} />
     <Button title={consoleCopy.consent.remove} variant="danger" onPress={() => store.openDialog('delete')} />
     <ConfirmDestructive open={store.dialog === 'delete'} title="Delete this consent record?" consequences={["The parent's email and the child's birth year are deleted now. A receipt stays."]} confirmText={selected.id.slice(-6)} confirmLabel="Delete record" reasonOptions={reasonOptions} onClose={store.closeDialog} onConfirm={async ({ reasonCode }) => { if (!reasonCode) throw fail(); const result = await deleteConsentRecord(api, selected.id, { reasonCode, confirmText: selected.id.slice(-6) }); if (!result.ok) throw fail(); router.push('/admin/consent'); router.refresh(); }} />
@@ -112,8 +113,8 @@ export function MonsViewClient({ mons, eggs, run, runFailed = false }: { mons: M
   <ConsoleShell section="mons" heading={consoleCopy.mons.heading}>
    <Banner tone="neutral" title={consoleCopy.mons.readonly} />
    <SegmentedControl<MonsTab> aria-label="Mons and eggs" options={monsTabOptions} value={store.tab} onChange={store.setTab} />
-   {store.tab === 'mons' ? <DataTable testID="mons-table" surface="page" caption="Mons" data={mons ?? []} columns={monColumns} getRowId={(row) => row.id} filter={{ label: consoleCopy.mons.searchMons }} mode={{ kind: 'client', pageSize: 25 }} emptyText={consoleCopy.mons.noMons} error={mons ? undefined : loadError(router.refresh)} /> : null}
-   {store.tab === 'eggs' ? <DataTable testID="eggs-table" surface="page" caption="Eggs" data={eggs ?? []} columns={eggColumns} getRowId={(row) => row.id} filter={{ label: consoleCopy.mons.searchEggs }} mode={{ kind: 'client', pageSize: 25 }} emptyText={consoleCopy.mons.noEggs} error={eggs ? undefined : loadError(router.refresh)} /> : null}
+   {store.tab === 'mons' ? <DataTable testID="mons-table" surface="page" pageSize={25} caption="Mons" data={mons ?? []} columns={monColumns} getRowId={(row) => row.id} filter={{ label: consoleCopy.mons.searchMons }} mode={{ kind: 'client', pageSize: 25 }} emptyText={consoleCopy.mons.noMons} error={mons ? undefined : loadError(router.refresh)} /> : null}
+   {store.tab === 'eggs' ? <DataTable testID="eggs-table" surface="page" pageSize={25} caption="Eggs" data={eggs ?? []} columns={eggColumns} getRowId={(row) => row.id} filter={{ label: consoleCopy.mons.searchEggs }} mode={{ kind: 'client', pageSize: 25 }} emptyText={consoleCopy.mons.noEggs} error={eggs ? undefined : loadError(router.refresh)} /> : null}
    {store.tab === 'integrity' ? (
     <Section className="content-start gap-4" aria-labelledby="mons-integrity">
      <Heading level={2} id="mons-integrity" className={h2}>{consoleCopy.mons.integrity}</Heading>
@@ -170,7 +171,7 @@ export function AuditViewClient({ events, failed = false, selectedId }: { events
    <Banner tone="neutral" title={consoleCopy.audit.rule} action={<Link href="/payload-api/console/audit/export">{consoleCopy.audit.export}</Link>} />
    <Section className={splitPanes}>
     <Section className="content-start gap-4">
-     <DataTable testID="audit-table" surface="page" caption={consoleCopy.audit.heading} data={events} columns={auditColumns} getRowId={(row) => row.id} getRowHref={(row) => `/admin/audit/${row.id}`} selectedRowId={selectedId ?? undefined} filter={{ label: consoleCopy.audit.search, placeholder: consoleCopy.audit.searchHint }} mode={{ kind: 'client', pageSize: 25 }} emptyText={consoleCopy.audit.empty} error={failed ? loadError(router.refresh) : undefined} />
+     <DataTable testID="audit-table" surface="page" pageSize={25} caption={consoleCopy.audit.heading} data={events} columns={auditColumns} getRowId={(row) => row.id} getRowHref={(row) => `/admin/audit/${row.id}`} selectedRowId={selectedId ?? undefined} filter={{ label: consoleCopy.audit.search, placeholder: consoleCopy.audit.searchHint }} mode={{ kind: 'client', pageSize: 25 }} emptyText={consoleCopy.audit.empty} error={failed ? loadError(router.refresh) : undefined} />
     </Section>
    {selected ? <Section testID="audit-detail" className={detailPane}><KeyValueList items={[{ key: 'when', label: 'When', value: selected.at }, { key: 'who', label: 'Who', value: selected.actor }, { key: 'what', label: 'What', value: selected.action }, { key: 'why', label: 'Why', value: selected.reason }]} /></Section> : null}
    </Section>
@@ -178,7 +179,7 @@ export function AuditViewClient({ events, failed = false, selectedId }: { events
  );
 }
 
-type Staff = { id: string; email: string; role: string }; const staffColumns: ColumnDef<Staff, unknown>[] = [{ accessorKey: 'email', header: 'Email' }, { accessorKey: 'role', header: 'Role' }];
+type Staff = { id: string; email: string; role: string }; const staffColumns: ColumnDef<Staff, unknown>[] = [{ accessorKey: 'email', header: 'Email' }, { accessorKey: 'role', header: 'Role', cell: ({ row }) => consoleCopy.roles[row.original.role as StaffRole] ?? row.original.role }];
 const staffRoleOptions = STAFF_ROLES.map((role) => ({ value: role, label: consoleCopy.roles[role] }));
 const appearanceOptions = (['system', 'daylit', 'night'] as const).map((value) => ({ value, label: consoleCopy.settings.appearanceOptions[value] }));
 export function SettingsViewClient({ staff, failed = false, isOps }: { staff: Staff[]; failed?: boolean; isOps: boolean }) {
@@ -203,7 +204,7 @@ export function SettingsViewClient({ staff, failed = false, isOps }: { staff: St
         <DataTable testID="staff-table" surface="page" caption={consoleCopy.settings.staff} data={staff} columns={staffColumns} getRowId={(row) => row.id} error={failed ? loadError(router.refresh) : undefined} selection={isOps ? { selectedIds: store.selectedId ? [store.selectedId] : [], onSelectedIdsChange: (ids) => store.setSelectedId(ids[0] ?? null) } : undefined} />
         {selected && isOps ? <><Button title={consoleCopy.settings.remove} variant="danger" onPress={() => store.openDialog('remove')} /><ConfirmDestructive open={store.dialog === 'remove'} title="Remove staff access?" consequences={['This person can no longer use the console.']} confirmText={selected.id.slice(-6)} confirmLabel={consoleCopy.settings.remove} reasonOptions={reasonOptions} onClose={store.closeDialog} onConfirm={async ({ reasonCode }) => { if (!reasonCode) throw fail(); const result = await removeStaff(api, selected.id, { reasonCode }); if (!result.ok) throw fail(); store.setSelectedId(null); router.refresh(); }} /></> : null}
       </Section>
-      {isOps ? <Section testID="add-staff" className="content-start gap-3"><Heading level={3} className={h2}>{consoleCopy.settings.addStaff}</Heading><TextField surface="daylit" label={consoleCopy.settings.addEmail} value={store.addEmail} onChangeText={store.setAddEmail} keyboardType="email-address" autoCapitalize="none" /><Select label={consoleCopy.settings.addRole} value={store.addRole} options={staffRoleOptions} onValueChange={(role) => store.setAddRole(role as StaffRole)} />{addError ? <ErrorMessage message={addError} /> : null}<Button title={consoleCopy.settings.addStaff} loading={addPending} onPress={() => void submitStaff()} /></Section> : null}
+      {isOps ? <Section testID="add-staff" className="content-start gap-3"><Heading level={3} className={h2}>{consoleCopy.settings.addStaff}</Heading><TextField surface="daylit" label={consoleCopy.settings.addEmail} value={store.addEmail} onChangeText={store.setAddEmail} keyboardType="email-address" autoCapitalize="none" /><Select label={consoleCopy.settings.addRole} value={store.addRole} options={staffRoleOptions} onValueChange={(role) => store.setAddRole(role as StaffRole)} />{addError ? <ErrorMessage surface="page" message={addError} /> : null}<Button title={consoleCopy.settings.addStaff} loading={addPending} onPress={() => void submitStaff()} /></Section> : null}
     </ConsoleShell>
   );
 }

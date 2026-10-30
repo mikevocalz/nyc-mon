@@ -201,7 +201,7 @@ export function ModelsViewClient({ forms, models, failed = false, selectedId, ca
       />
       <Section className="grid gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
         <Section>
-          <DataTable testID="models-table" surface="page" caption={copy.heading} data={shown} columns={columns} getRowId={(row) => row.id} getRowHref={(row) => `/admin/models/${row.id}`} selectedRowId={selectedId ?? undefined} filter={{ label: copy.search }} emptyState={<Paragraph>{copy.emptyFilter}</Paragraph>} error={failed ? { message: consoleCopy.errors.load, retryLabel: consoleCopy.errors.retry, onRetry: router.refresh } : undefined} />
+          <DataTable testID="models-table" surface="page" pageSize={12} caption={copy.heading} data={shown} columns={columns} getRowId={(row) => row.id} getRowHref={(row) => `/admin/models/${row.id}`} selectedRowId={selectedId ?? undefined} filter={{ label: copy.search }} emptyState={<Paragraph>{copy.emptyFilter}</Paragraph>} error={failed ? { message: consoleCopy.errors.load, retryLabel: consoleCopy.errors.retry, onRetry: router.refresh } : undefined} />
         </Section>
         {selected ? (
           <Section className="gap-5" testID="model-detail">
@@ -216,7 +216,7 @@ export function ModelsViewClient({ forms, models, failed = false, selectedId, ca
               {!viewerUrl ? (
                 <EmptyState title={copy.viewer} description={copy.viewerEmpty} />
               ) : store.viewerError ? (
-                <ErrorMessage message={copy.viewerFailed} />
+                <ErrorMessage surface="page" message={copy.viewerFailed} />
               ) : hydrated ? (
                 <Suspense fallback={<LoadingSkeleton />}>
                   <MonModelViewer
@@ -269,7 +269,7 @@ export function ModelsViewClient({ forms, models, failed = false, selectedId, ca
                 ? <ProgressBar indeterminate label={copy.uploading} showLabel accessibilityLabel={copy.uploading} />
                 : <ProgressBar value={store.progress} label={copy.uploadingPercent(store.progress)} showLabel accessibilityLabel={copy.uploading} />
             ) : null}
-            {store.error ? <ErrorMessage message={store.error} /> : null}
+            {store.error ? <ErrorMessage surface="page" message={store.error} /> : null}
             {store.notice ? <Banner tone="success" title={store.notice} live="status" /> : null}
 
             {model ? (

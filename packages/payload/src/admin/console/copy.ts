@@ -74,6 +74,8 @@ export const consoleCopy = {
   audit: { heading: 'Audit log', rule: "Events can't be edited or deleted.", export: 'Export', search: 'Search the audit log', searchHint: 'Action, target or staff role', empty: 'No events yet.' },
   settings: { heading: 'Settings', appearance: 'Appearance', appearanceOptions: { system: 'Match system', daylit: 'Daylit', night: 'Night' }, staff: 'Staff', addStaff: 'Add staff', addEmail: 'Email', addRole: 'Role', remove: 'Remove access' },
   roles: { ops: 'Ops', support: 'Support', consent: 'Consent', content: 'Content' },
+  // Stored consent values (Users.consentStatus, GuardianConsents.status) in the console's words.
+  consentStatus: { 'not-required': 'Not needed', pending: 'Pending', approved: 'Approved', denied: 'Denied', expired: 'Expired' } as Record<string, string>,
   login: {
     heading: 'Sign in to the console',
     email: 'Email',
@@ -85,6 +87,9 @@ export const consoleCopy = {
     heroFoot: 'Staff only. Every action is logged.',
     passkeyUnsupported: "This browser can't use passkeys. Sign in with your email and password.",
     passkeyError: "That passkey sign-in didn't work. Try again or use your email and password.",
+    notStaffTitle: 'This console is for NYC-MON staff',
+    notStaffBody: "You're signed in, but your account has no staff role. Ask the console owner if you need access.",
+    notStaffSignOut: 'Sign out',
   },
   mask: { hidden: 'Hidden', title: 'Why do you need to see this?', body: "Your reason is saved in the audit log with your name. The value isn't." },
   errors: { load: "This didn't load.", action: "That action didn't finish. Nothing changed. Try again.", retry: 'Try again', page: "This page didn't load. The console is still signed in." },

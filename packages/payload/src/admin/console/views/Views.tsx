@@ -1,4 +1,7 @@
 import type { AdminViewServerProps } from 'payload';
+import type { ReactNode } from 'react';
+import { hasStaffRole, STAFF_ROLES } from '../../../collections/access/roles.ts';
+import { ConsoleNotStaff } from '../Chrome';
 import { allSpecies, bloodlineLabel, eggs, starterBloodlines } from '@acme/content';
 import { ModelsViewClient, type ModelDoc } from './ModelsClient';
 import { AuditViewClient, CallersViewClient, ConsentViewClient, ContentViewClient, MonsViewClient, OverviewViewClient, SettingsViewClient } from './ViewsClient';
@@ -22,13 +25,27 @@ async function read<T>(req: Req, label: string, run: () => Promise<T>): Promise<
   }
 }
 
+/**
+ * Every console view, staff only. A signed-in account with no staff role
+ * (a Caller who found the URL) gets the not-staff screen instead of a shell
+ * full of failed reads. The plugin's `requiredRole` guards the login view
+ * only; it does not stop a session that already exists.
+ */
+function staffOnly(view: (props: AdminViewServerProps) => Promise<ReactNode>) {
+  return async function StaffOnlyView(props: AdminViewServerProps): Promise<ReactNode> {
+    const { req } = props.initPageResult;
+    if (req.user && !hasStaffRole(req, STAFF_ROLES)) return <ConsoleNotStaff />;
+    return view(props);
+  };
+}
+
 function requireUser({ initPageResult }: AdminViewServerProps): NonNullable<AdminViewServerProps['initPageResult']['req']['user']> | null {
   const { req } = initPageResult;
   if (!req.user) { req.server?.redirect(`${req.payload.config.routes.admin}/login`); return null; }
   return req.user;
 }
 
-export async function OverviewView(props: AdminViewServerProps) {
+async function overviewView(props: AdminViewServerProps) {
   const user = requireUser(props); if (!user) return null;
   const { req } = props.initPageResult;
   const [consents, eggs, mons, runs, events] = await Promise.all([
@@ -48,7 +65,7 @@ export async function OverviewView(props: AdminViewServerProps) {
   );
 }
 
-export async function CallersView(props: AdminViewServerProps) {
+async function callersView(props: AdminViewServerProps) {
   const user = requireUser(props); if (!user) return null; const { req } = props.initPageResult;
   // Named view params (:callerId) are matched for routing but never extracted;
   // the adapter only supplies `params.segments`, so the id is segments[1].
@@ -63,14 +80,14 @@ export async function CallersView(props: AdminViewServerProps) {
   return <CallersViewClient callers={callers} selectedId={selectedId} page={result.page ?? 1} pageCount={result.totalPages} totalCount={result.totalDocs} />;
 }
 
-export async function ConsentView(props: AdminViewServerProps) {
+async function consentView(props: AdminViewServerProps) {
   const user = requireUser(props); if (!user) return null; const { req } = props.initPageResult; const route = await props.params;
   const found = await read(req, 'consents', () => req.payload.find({ collection: 'guardian-consents', sort: '-createdAt', limit: 50, depth: 0, select: { parentEmail: true, birthYear: true, status: true, expiresAt: true, emailsSent: true, parentRequest: true, updatedAt: true, createdAt: true }, user, overrideAccess: false, req }));
   const result = found.ok ? found.data : { docs: [] };
   return <ConsentViewClient failed={!found.ok} selectedId={typeof route?.segments?.[1] === 'string' ? route.segments[1] : null} consents={result.docs.map((doc) => ({ id: String(doc.id), parentEmail: doc.parentEmail.replace(/(^.).*(@.).*(\..+$)/, '$1•••$2•••$3'), age: new Date().getUTCFullYear() - doc.birthYear < 13 ? 'Under 13' : '13 to 17', status: doc.status, expiresAt: doc.expiresAt, emailsSent: doc.emailsSent, updatedAt: doc.updatedAt }))} />;
 }
 
-export async function MonsView(props: AdminViewServerProps) {
+async function monsView(props: AdminViewServerProps) {
   const user = requireUser(props); if (!user) return null; const { req } = props.initPageResult;
   const [mons, eggs, runs] = await Promise.all([
     read(req, 'mon instances', () => req.payload.find({ collection: 'mon-instances', sort: '-createdAt', limit: 50, depth: 0, select: { monInstanceId: true, eggId: true, speciesId: true, callerId: true, stage: true, bond: true, serverConfirmedAt: true }, user, overrideAccess: false, req })),
@@ -87,7 +104,7 @@ export async function MonsView(props: AdminViewServerProps) {
   );
 }
 
-export async function ContentView(props: AdminViewServerProps) {
+async function contentView(props: AdminViewServerProps) {
   if (!requireUser(props)) return null;
   // Authored content ships in code (packages/content); the roster's unsettled
   // TODO(canon) fields stay null here and render as — in the table.
@@ -96,7 +113,7 @@ export async function ContentView(props: AdminViewServerProps) {
   return <ContentViewClient speciesCount={allSpecies.length} bloodlines={starterBloodlines.map(({ bloodline, forms }) => ({ id: bloodline.bloodlineId, name: bloodlineLabel(bloodline), forms: forms.map((form) => ({ id: form.speciesId, dex: form.dexId, name: form.formName, stage: form.stage, culture: form.cultureNote, scale: form.scaleMeters, affinity: form.affinityId, clazz: form.classId, rig: form.rigDefinitionId, food: form.foodClassIds })) }))} eggs={eggs.map((egg) => ({ id: egg.speciesId, name: egg.eggName, hatches: nameBySpeciesId.get(egg.hatchesIntoSpeciesId) ?? egg.hatchesIntoSpeciesId, bloodline: labelByBloodlineId.get(egg.bloodlineId) ?? egg.bloodlineId }))} />;
 }
 
-export async function ModelsView(props: AdminViewServerProps) {
+async function modelsView(props: AdminViewServerProps) {
   const user = requireUser(props); if (!user) return null; const { req } = props.initPageResult;
   const route = await props.params; const selectedId = typeof route?.segments?.[1] === 'string' ? route.segments[1] : null;
   // ponytail: one page of 200 covers the roster (allSpecies is ~100 forms); paginate if it grows past that.
@@ -117,16 +134,25 @@ export async function ModelsView(props: AdminViewServerProps) {
   return <ModelsViewClient failed={!found.ok} forms={forms} models={models} selectedId={selectedId} canEdit={user.role === 'ops' || user.role === 'content'} />;
 }
 
-export async function AuditView(props: AdminViewServerProps) {
+async function auditView(props: AdminViewServerProps) {
   const user = requireUser(props); if (!user) return null; const { req } = props.initPageResult; const route = await props.params;
   const found = await read(req, 'audit events', () => req.payload.find({ collection: 'audit-events', sort: '-at', limit: 50, depth: 0, select: { at: true, actorRole: true, action: true, targetType: true, targetId: true, reasonCode: true }, user, overrideAccess: false, req }));
   const result = found.ok ? found.data : { docs: [] };
   return <AuditViewClient failed={!found.ok} selectedId={typeof route?.segments?.[1] === 'string' ? route.segments[1] : null} events={result.docs.map((event) => ({ id: String(event.id), at: event.at, actor: event.actorRole, action: event.action, target: `${event.targetType} ${event.targetId}`, reason: event.reasonCode ?? '—' }))} />;
 }
 
-export async function SettingsView(props: AdminViewServerProps) {
+async function settingsView(props: AdminViewServerProps) {
   const user = requireUser(props); if (!user) return null; const { req } = props.initPageResult;
   const found = await read(req, 'staff', () => req.payload.find({ collection: 'users', where: { role: { in: ['ops', 'support', 'consent', 'content'] } }, sort: 'email', limit: 100, depth: 0, select: { email: true, role: true }, user, overrideAccess: false, req }));
   const result = found.ok ? found.data : { docs: [] };
   return <SettingsViewClient failed={!found.ok} staff={result.docs.map((doc) => ({ id: String(doc.id), email: doc.email, role: doc.role ?? 'support' }))} isOps={user.role === 'ops'} />;
 }
+
+export const OverviewView = staffOnly(overviewView);
+export const CallersView = staffOnly(callersView);
+export const ConsentView = staffOnly(consentView);
+export const MonsView = staffOnly(monsView);
+export const ContentView = staffOnly(contentView);
+export const ModelsView = staffOnly(modelsView);
+export const AuditView = staffOnly(auditView);
+export const SettingsView = staffOnly(settingsView);
