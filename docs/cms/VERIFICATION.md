@@ -25,3 +25,18 @@ CodeRabbit 0.9.1 was installed. `auth status --agent` returned not_authenticated
 Production activation still requires the reviewed database migration, matching feature/preview/API/allowed-origin environment settings, a real Bunny content import, review/publish of the initial records, and switching from bootstrap to live mode. Those operations are documented in WEBSITE_EDITOR.md; they were not silently performed during code completion. Physical-device and final production visual checks remain separate from the browser width test.
 
 A concurrent caller-avatar/User ID commit on this same branch was retained. Its independent contracts were rerun rather than overwritten.
+
+## Local re-verification after merging main — 2026-10-30
+
+Run on a Mac against the merged branch (main through #146), Node 24.15.0, PostgreSQL 14 on a throwaway local cluster, built admin and website serving on localhost. No production database, storage, environment or content was changed.
+
+- Typecheck: `@acme/payload`, `web`, `admin-vite`, `@acme/content`, `@acme/ui` all exit 0.
+- Contracts: 93/93 (site-content plus caller identity). Website tests: 109/109. `@acme/payload` vitest: 431 passed, 17 skipped (DB-gated), 0 failed.
+- Payload integration (`verify-editor.mjs`) against the local database: 12/12.
+- Migration `20261030_030536_website_editor`: apply, rollback, apply on a baseline built by the real migration chain. Rollback restores the baseline schema byte for byte (pg_dump, schema only); re-apply matches the first apply. `accounts`, `sessions`, `_accounts_v` and `_sessions_v` stay in place at every step.
+- The empty-database chain still fails before this migration: `20261028_200000_mon_lingo_seed` reads `_language_lexicon_v_rels` through the Local API, and that table is created later by `20261029_234150_schema_rels_sync`. This is on main and unrelated to the editor. The local baseline marked the two seed migrations as applied to get past it.
+- `migrate:create` with the editor on reports one drift that is also on main: the `mon_models` species enum lists the same 109 values in a different order (from main's fourth-starter content). No migration was added for it here.
+- Seed export: 14 records and 76 image placements (main's fourth starter adds `/mons/lanternfye`). Local import created 14 drafts through the mock Bunny transport (21 objects written to a local directory); a second run skipped all 14.
+- Browser (one Chromium, built apps): content-editor sign-in plus 11 grouped checks with zero page errors, all 13 marketing and legal routes; `reorder-restore.mjs` 2/2 (admin Move up then publish changes the public order; Restore this version brings it back).
+- axe-core 4.14.0 on `/`, `/story`, `/city`, `/how-it-works`, `/get`, `/mons`, `/mons/lanternfye`, `/mons/hood-ratti`, `/legal/privacy` at 390 and 768, both motion settings: 0 violations, 0 contrast findings, after fixing a label-name mismatch on the Mon link cards that production also has.
+- No horizontal overflow at 390 or 1440 on `/`, `/mons`, `/mons/lanternfye`, `/how-it-works` or the admin editor, after fixing a 4px overflow in the 3D model cards that production also has.
