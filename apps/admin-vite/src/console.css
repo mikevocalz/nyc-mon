@@ -20,10 +20,15 @@
 
 /*
  * Text that names no colour of its own follows the surface it sits on.
- * react-native-web gives every root Text an unlayered `color: rgb(0, 0, 0)`
- * (class `css-text-<hash>`; nested Text gets `css-textHasAncestor-<hash>`
- * and inherits). A heading with only `font-display text-2xl` therefore
+ * react-native-web gives every root Text an unlayered `color: rgb(0, 0, 0)`;
+ * nested Text inherits. A heading with only `font-display text-2xl` therefore
  * stayed black on the night card, the sign-in defect of 2026-10-29.
+ *
+ * The selector is the root Text's `dir="auto"` (Text/index.js: set on root
+ * elements only; TextInput sets it too). Not the class: it is
+ * `css-text-<hash>` in a dev build and `css-<hash>` in production, so a
+ * class selector passed locally and matched nothing on admin.nyc-mon.city.
+ *
  * `var(--color-text)` resolves `light-dark()` on the element itself, so a
  * night facade (`scheme-dark`) on a daylit page gets night ink. This layer
  * comes after `utilities`, so a caller's own `text-*` colour, which is
@@ -31,8 +36,7 @@
  * reverse layer order).
  */
 @layer rnw-text {
-  [class^='css-text-'],
-  [class*=' css-text-'] {
+  [dir='auto'] {
     color: var(--color-text) !important;
   }
 }

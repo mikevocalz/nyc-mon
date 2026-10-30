@@ -98,8 +98,10 @@ test('root text with no colour of its own takes the surface ink, after utilities
   assert.ok(utilities >= 0, `utilities layer missing from ${layerNames.join(', ')}`);
   assert.ok(rnwText > utilities, `rnw-text must come after utilities: ${layerNames.join(', ')}`);
   const rule = consoleLayer.nodes[consoleLayer.nodes.findIndex((node) => node.type === 'atrule' && node.params === 'rnw-text')].first;
-  assert.match(rule.selector, /\[class\^='css-text-'\]/);
-  assert.doesNotMatch(rule.selector, /css-textHasAncestor/);
+  // dir="auto" is what a root Text renders in dev and production builds alike;
+  // its class name differs between them (css-text-<hash> vs css-<hash>).
+  assert.match(rule.selector, /^\[dir='auto'\]/);
+  assert.doesNotMatch(rule.selector, /css-/);
   const color = rule.nodes.find((decl) => decl.prop === 'color');
   assert.equal(color.value, 'var(--color-text)');
   assert.equal(color.important, true);
