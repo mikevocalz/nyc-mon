@@ -1,156 +1,90 @@
-# NYC-MON website editor — draft implementation and rollout gates
+# NYC-MON website editor
 
-## Scope and truthful status
+## Scope
 
-This extends the existing Payload 4 admin, existing Better Auth roles, Neon database,
-and Bunny-backed media collection. It does not introduce WordPress, a second CMS,
-Supabase, another login, or a new media provider. The R2 game-city pipeline is untouched.
+The existing Payload 4 admin is the sole editor. Better Auth, Neon and the existing Bunny Storage hooks remain in place; game-city R2 streaming, game canon, mechanics and native screens are not migrated.
 
-Implemented in this change:
+Website pages → page name/path → named sections → labeled copy and media placements. Supported routes: Home, Story, City, How it works, Get, Mons, the three starter detail pages, Privacy, Terms and Children's Privacy. The `/website-shell` document owns the shared header/footer, navigation, call-to-action labels/links and optional replacement logos; it is not a public website route. The initial manifest contains 13 documents and 68 image placements, with shared image bytes deduplicated during import.
 
-- A `site-pages` collection: page path/name/SEO → named sections → copy fields and
-  image/text/gallery/YouTube/approved-iframe blocks. Sections and content blocks are
-  sortable; copy rows have readable labels. Native upload controls support file
-  selection and drag/drop; the existing media library's redirect is removed.
-- Content and ops roles can edit; anonymous reads are published-only; saved drafts
-  and up to 30 revisions are enabled. Public reads never forward credentials.
-- Media's “Used on website pages” field is derived from actual relationships in
-  current pages, drafts and revisions. In-use image bytes cannot be replaced or
-  deleted: upload a new media record and select it in the relevant section. Other
-  game/app uses are not included in this website usage report.
-- Homepage integration for Hero, district board, World, H-Lynk marketing, starter
-  cards, Care, Hatch and Waitlist marketing. Text and named image slots preserve
-  the authored components, responsive classes and motion IDs. Inline blocks are
-  attached to their owning section. Gameplay definitions, form submission/consent
-  logic, and the internal H-Lynk HUD are not CMS-edited.
-- A protected read-only bootstrap export and an explicit, dry-run-first importer
-  for the existing homepage copy and ten rendered image placements. The importer
-  creates a DRAFT only and refuses to overwrite an existing Home record.
-- Pure validation/REST/placement regression tests. These are NOT browser, database,
-  full-repository, deployment, or device-test evidence.
+The frontend preserves its authored layouts, typography and components. The CMS changes content, section ordering/visibility, and additional content blocks, not arbitrary JavaScript/CSS or game definitions. Changing a label never changes a stable section identifier. Adding a page record does not invent a new frontend route.
 
-**Not complete / do not merge as production-ready:** other marketing route adapters
-(`/story`, `/city`, `/how-it-works`, `/mons`, Mon detail, `/get`, legal pages), shared
-header/footer/logo editing, generated schema migration/types/import map, live draft
-preview, production asset import, authenticated drag/drop-to-publish browser tests,
-and full app build/typechecks. Schema supports page identities, but creating a CMS
-record alone does not create or wire a website route. No live database, media bucket,
-production environment, or published content has been changed by this PR.
+## Editing
 
-## Operator setup, on isolated staging first
+Content and operations staff enter Website pages from the current console; content editors land there directly after login. Open a page and expand the named section. Edit its labeled copy rows, or expand Images, videos and extra content. An image's `slot` identifies its exact placement (for example `hero`, `world.primary`, `starter.1.baby`). Select an image, create a new image from that field, or drag a file into the Media library. An `inline` image adds content after the section rather than replacing a named placement.
 
-Set `NYCMON_SITE_EDITOR=1` for the Payload admin and web app only after preparing
-an isolated database. Keep `PAYLOAD_PUSH=false`. Generate the additive Payload
-migration, generated types and admin import map using this repository's existing
-Payload/admin-vite CLI setup. Review the SQL: it must not drop/recreate auth tables,
-users, content, or existing media. Apply to staging, then run the full typechecks,
-admin build and web build. These generated artifacts are intentionally not guessed
-or hand-written in this draft.
+The media picker offers existing images. Remove the current relationship and choose another media record to change one placement. Each media record has a derived **Used on website pages** report listing page, section and reference field, including draft and revision references. Uploaded bytes are immutable while this editor is enabled: replacing bytes/deleting records is blocked to protect shared references and rollback. Metadata such as alternative text remains editable. Permanent orphan cleanup is a separate maintenance operation, not an editor delete button.
 
-The marketing web app also needs `PAYLOAD_SITE_API_URL` set to the existing admin's
-public `/payload-api` base. It holds no database or storage credentials. Both apps
-need the same comma-separated `SITE_EMBED_ORIGINS`, each an exact HTTPS origin with
-no paths or wildcards. `NEXT_PUBLIC_SITE_URL` must accurately identify the public
-site: the renderer grants same-origin sandbox capability only for known
-cross-origin embeds. Missing/invalid origin configuration fails to an opaque-origin
-sandbox, rather than weakening it.
+Section blocks include text/links, images, galleries, YouTube links and allowlisted UI iframe links. Native Payload drag handles reorder sections, blocks and gallery rows. Named native sections can be hidden. Fixed choreography is disabled when its authored section order/visibility changes. Iframes never accept pasted script/HTML. YouTube watch/short URLs normalize to privacy-enhanced embeds. UI frames require a configured exact HTTPS origin, an accessible title and a supported aspect ratio. Cross-origin and same-origin sandbox permissions differ. The embedded application's own frame-ancestors/X-Frame-Options and authentication restrictions still apply; use a public embeddable UI route rather than an admin login page.
 
-Existing `BUNNY_STORAGE_ZONE`, `BUNNY_STORAGE_PASSWORD`, `BUNNY_STORAGE_REGION`,
-`BUNNY_CDN_URL`, `DATABASE_URL` and `PAYLOAD_SECRET` remain the existing server-side
-configuration. Never put them into `NEXT_PUBLIC_*`, commits, logs or seed manifests.
+**Save Draft** keeps published visitors unchanged. **Preview saved draft** opens a scoped private preview; unsaved form changes are not shown. Save again and the visible preview refreshes. **Publish changes** updates request-time website content without a code deployment. **Exit preview** clears the preview cookie. Versions restore previous copy and image relationships.
 
-Native editor routes, on the existing admin origin:
+## Security and delivery
 
-- `/admin/collections/site-pages`
-- `/admin/collections/media`
+Anonymous reads are published-only. Only `ops` and `content` can write. Public Local API operations do not bypass access controls. Preview grants are HMAC-signed, page/actor/route/audience scoped, valid for ten minutes, HttpOnly and secure on HTTPS; removing the editor role revokes further preview reads. Preview responses are private/no-store and noindex. Preview expiry is checked after `connection()` to remain compatible with Next cache components. Public content fetches use no-store and never share a private draft cache.
 
-The native editor navigation links these views back to Operations and Mon content.
-The custom Operations sidebar still needs its own Website shortcut before rollout.
+In `SITE_CONTENT_MODE=live`, a missing/unpublished page is not found; a backend failure errors rather than silently showing old content. The temporary `bootstrap` mode alone permits shipped fallback content during initial import. Do not leave bootstrap on after activation. Unpublishing a streamed Next route may send a 200 transport status if headers already streamed, but the route renders not-found and noindex, never the previously hardcoded page.
 
-## Import the shipped homepage without rewriting its copy
+All upload object names are randomized. The trusted Bunny hook persists its computed URL with an explicit system operation and the same request/transaction; the upload response immediately exposes the canonical CDN URL. Clients cannot write `bunnyUrl`. Image replacements clear stale blur/caption metadata and use CDN-safe UI image rendering. Browser file bytes remain outside Postgres.
 
-1. On a staging web deployment set `SITE_CONTENT_SEED_TOKEN` to a new secret of at
-   least 32 characters. With `NYCMON_SITE_EDITOR=1`, request
-   `GET /api/site-content/seed` using `Authorization: Bearer <token>` and save the
-   JSON locally. The endpoint is read-only, sends `Cache-Control: no-store`, and
-   returns 404 without the separate token. Remove this environment variable after
-   the import. Do not paste the secret into a tracked file.
-2. Set `SITE_SEED_MANIFEST` to that local JSON file and `SITE_IMPORT_SOURCE_ORIGIN`
-   to the exact staging origin that served it. Run from the payload package:
+## Environment and rollout
 
-   ```sh
-   pnpm exec payload run src/site-content/import-home.mjs
-   ```
+Admin and website:
 
-   Default is DRY RUN: validates the manifest and planned placements only; does
-   not fetch image bytes, connect to the database, upload, or publish.
-3. After reviewing the dry run and applying the staging schema migration, rerun
-   with `SITE_IMPORT_APPLY=1`. The script accepts only the approved origin's
-   `/_next/static/media/` and `/home/` asset paths, rejects redirects, bounds image
-   bytes to 12 MB and checks raster signatures. It uploads through Payload's
-   existing Bunny hooks and then creates the draft Home record with actual media
-   relationships. Each upload has a unique filename. A partial failure can leave
-   unused uploaded media; it never deletes existing data to undo a failure.
-4. Review the draft in Payload. Check all copy, labels, image placements and alt
-   text. Only publish manually after the browser acceptance checks below.
+```sh
+NYCMON_SITE_EDITOR=1
+NEXT_PUBLIC_SITE_URL=https://<public-site-host>
+SITE_PREVIEW_SECRET=<same-random-32-or-more-character-secret-in-both-apps>
+SITE_EMBED_ORIGINS=https://<approved-UI-embed-host>
+```
 
-The homepage manifest excludes unused reserved art slots and design-system
-branding. It is not an inventory/migration of every route or every site asset.
-Do not claim whole-site media migration until those adapters and inventories land.
+Website only:
 
-## Editing model
+```sh
+PAYLOAD_SITE_API_URL=https://<existing-admin-host>/payload-api
+SITE_CONTENT_MODE=bootstrap
+SITE_CONTENT_SEED_TOKEN=<temporary-random-32-or-more-character-secret>
+```
 
-Examples: `Home → Hero → title`, `Home → World → body2`, and
-`Home → World → image position world.primary`. `inline` adds a new image beneath
-that section. Named positions replace only their matching existing image. Use
-new media records for swaps; old page revisions keep their old image references.
+Retain existing Better Auth, Neon and Bunny environment variables. Never expose database/storage/preview secrets as NEXT_PUBLIC variables. Never enable `PAYLOAD_PUSH` in production.
 
-YouTube accepts watch/share/short/embed links, converts them to privacy-enhanced
-embed URLs, strips autoplay and rejects deceptive hosts. An iframe block accepts
-only a URL on the server allowlist, not HTML/JavaScript. Admin/auth/API paths,
-credentials and unsafe schemes are rejected. Frames have accessible titles,
-restricted sandbox permissions, responsive aspect presets and an external-open
-fallback. A target's CSP or X-Frame-Options can still block embedding; this code
-does not bypass those headers. Same-origin interactive demos may need a dedicated
-approved embed origin because the opaque sandbox deliberately removes origin
-privileges.
+1. Back up the database and retain the old deployment. Deploy the feature code with the editor off first where necessary. Review/apply the committed additive `20261030_030536_website_editor` migration to staging; it adds website/version/block tables and a locked-document relationship. It does not drop auth/version tables. Generate types and the admin import map with `NYCMON_SITE_EDITOR=1` when building an editor-enabled admin.
+2. Run the website in bootstrap mode. Fetch `/api/site-content/seed` with `Authorization: Bearer <SITE_CONTENT_SEED_TOKEN>` into a local manifest. The endpoint is read-only and must never be exposed without its bearer check.
+3. Run the import in dry-run mode, reviewing all page/section/asset mappings:
 
-Publishing updates content on subsequent server requests without a code rebuild.
-An already-open browser tab is not pushed a live refresh. GitHub Pages static
-snapshots remain snapshots, not a live CMS environment. Until migration is complete,
-missing/disabled/unavailable CMS content falls back to the shipped homepage. In
-particular, unpublishing Home restores that bootstrap fallback; a final whole-site
-rollout needs an explicit unpublish/error policy and a last-known-good snapshot.
-Custom section hiding/reordering disables the original fixed-layout motion timeline
-rather than running animations against missing or rearranged targets. Partial
-records preserve the default section order.
+```sh
+SITE_SEED_MANIFEST=/absolute/path/site-seed.json \
+SITE_IMPORT_SOURCE_ORIGIN=https://<public-site-host> \
+node packages/payload/src/site-content/import-site.mjs
+```
 
-## Acceptance gates before rollout
+4. After migration and credentials are verified, run the explicit import under the existing admin's Payload CLI:
 
-- Generate and review non-destructive migrations, types and import map with the
-  installed Payload 4 version. Run all touched-package typechecks and builds.
-- With an ops/content account, drag/drop PNG/WebP/JPEG and select an existing file.
-  Confirm upload progress/errors, save, reload, thumbnail and Bunny URL playback.
-- Change only World's primary image and a paragraph; save draft. Verify an
-  anonymous browser still sees the published version. Publish and verify the
-  changed text and image on a fresh request, with no code redeploy.
-- Check mobile, tablet and desktop layouts, long/empty copy, alt text, focus order,
-  unchanged submit/consent behavior, failed uploads and broken image responses.
-- Add/reorder an inline gallery, YouTube and approved UI iframe in several sections.
-  Test denied domains, unsafe schemes, blocked framing, browser sandbox behavior
-  and external-open fallback. Check the deployed CSP, not just URL validation.
-- Verify website usage on every shared image, deletion/replacement guards, revision
-  restore, roles, direct API draft requests, and concurrent edit/delete races. The
-  hook checks are not a substitute for a database-level concurrency guarantee.
-- Complete and test the remaining routes and shared site areas before calling the
-  requested whole-site editor finished. Never auto-merge based only on unit tests.
+```sh
+SITE_IMPORT_RUN=1 SITE_IMPORT_APPLY=1 \
+SITE_SEED_MANIFEST=/absolute/path/site-seed.json \
+SITE_IMPORT_SOURCE_ORIGIN=https://<public-site-host> \
+pnpm --filter admin-vite payload run ../../packages/payload/src/site-content/import-site.mjs
+```
 
-## Verification performed during authoring
+The import creates **drafts only** and skips an already-existing page, so reruns never overwrite editor work. Download URLs are limited to the approved origin's static image directories, have bounded byte/time limits, reject redirects and validate raster signatures. A failed run can leave unused uploaded records, which must not be automatically deleted while editors may reference them.
 
-`node --experimental-strip-types --test packages/content/site-content/core.node-test.ts packages/content/site-content/reader.node-test.ts`
+5. Verify the real Bunny URLs/bytes, compare each page with the shipped content, test roles and preview, then publish all reviewed documents including Shared header and footer. Set `SITE_CONTENT_MODE=live`; remove the temporary seed token. Test one production image swap and copy change, then restore the intended content.
+6. Code rollback can turn the flag off and revert the deployment without destroying CMS records. A database rollback removes website tables and loses their content/history; export first and use it only on an intentional maintenance rollback.
 
-69 tests passed. Standalone strict TypeScript checking passed for `core.ts` and
-`reader.ts`. This does not establish that Payload schema/hooks, React components,
-Next cache integration, importer uploads, or native admin views have passed their
-integration gates. CodeRabbit, authenticated browser checks and deployment
-were not run in this authoring environment.
+## Verification commands
+
+```sh
+node --test packages/content/site-content/*.node-test.ts
+pnpm --filter web test
+pnpm --filter @acme/payload exec vitest run src/collections/__tests__/media.test.ts
+pnpm --filter @acme/payload typecheck
+pnpm --filter web typecheck
+pnpm --filter admin-vite payload:types
+pnpm --filter admin-vite payload:importmap
+pnpm --filter admin-vite build
+pnpm --filter web build
+```
+
+`verify-editor.mjs` exercises actual Payload + migrated PostgreSQL operations and refuses any database that is not explicitly disposable and local. Its storage HTTP transport is intentionally isolated; it is not proof that production Bunny credentials work. `tooling/site-editor/mock-bunny.mjs` is a similarly guarded test-only Node preload and must never be imported by an app entry point or used in production. Browser fixtures create only disposable `.test` accounts. `tooling/site-editor/acceptance.mjs` tests built admin/web apps on localhost, including native drag/drop and image selection, private preview, draft/publish behavior and public routes. External image/embed responses are controlled test fixtures, not claims of live YouTube playback or a specific deployed UI's framing headers.
+
+See `VERIFICATION.md` for the run evidence and deployment boundaries.
