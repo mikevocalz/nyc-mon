@@ -60,7 +60,10 @@ went asks for them again and builds on a later frame. `cell-stream.test.ts` cove
 
 ## Storefront plan transfer
 
-`plan.bin` (the storefront plan, JSON) is 37,285,665 bytes. The website loads `plan.bin.gz` instead
+`plan.bin` (the storefront plan, JSON) is 37,285,665 bytes. Served by `next start` it went out raw
+(`application/octet-stream`, no `Content-Encoding`, 37,285,665 bytes transferred, measured 2026-10-30). Vercel's CDN
+br-encodes octet-stream responses on the fly, but that is the CDN's choice per response; a raw 37 MB plan was never
+deployed to measure. The website loads `plan.bin.gz` instead (6,019,502 bytes on every host, measured on the preview)
 (`storefronts/plan-asset.web.ts`), gzip -9, decompressed in the browser with `DecompressionStream`
 (`storefronts/load.ts`). Native keeps `plan.bin` through Metro. `plan.bin.gz` is written by
 `tooling/city/bake-vd-storefronts.mjs` next to `plan.bin`, and `storefronts/plan-gzip.test.ts` fails if it drifts.
