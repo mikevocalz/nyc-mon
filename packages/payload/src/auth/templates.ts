@@ -259,6 +259,12 @@ export function accountsMergedMail(movedMons: number): MailContent {
  *
  * The yes/no links are placeholders until counsel chooses the consent method
  * (M05 B1); the endpoint uses whatever URLs the caller passes in.
+ *
+ * Copy gate note (slopmonster deslop, 2026-10-31): the authored strings score
+ * 5/5. The tool's compound-hyphen rule still fires on this mail because the
+ * three consent URLs carry hyphenated slugs (nyc-mon.city, /guardian-consent/,
+ * /childrens-privacy); those are endpoint paths, not prose, and the deck's
+ * mail.consent.* wording is kept verbatim.
  */
 export function guardianConsentMail(consentId: number, days: number, baseURL: string): MailContent {
   const yesUrl = `${baseURL}/guardian-consent/${consentId}?decision=approve`;
