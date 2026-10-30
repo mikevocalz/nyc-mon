@@ -43,7 +43,8 @@ const dataTable = tv({
     titleBar: 'px-4 py-3',
     titleText: 'font-display text-lg',
     titlePlate: 'flex h-1.5',
-    headRow: 'border-b-2',
+    // A row lays its cells out side by side, the head row included (body rows get this from `row`).
+    headRow: 'flex-row border-b-2',
     headCell: 'flex-1 p-3 text-left font-display text-xs',
     headButton: 'flex-row items-center gap-1.5',
     headLabel: 'font-display text-xs',
@@ -129,6 +130,11 @@ const dataTable = tv({
       false: {},
     },
   },
+  compoundVariants: [
+    // The tone glyph steps (orange 400, royal 300, ...) are night inks; on the
+    // page surface's sunken head they measured under 2:1. Take the head's own ink.
+    ...(['orange', 'royal', 'carolina', 'leaf', 'apple'] as const).map((tone) => ({ surface: 'page' as const, tone, class: { sortGlyph: 'text-text-muted' } })),
+  ],
   defaultVariants: { surface: 'night', tone: 'orange', compact: false },
 });
 
@@ -605,7 +611,7 @@ export function DataTable<T extends RowData>({
       <TableCell className={`${s.empty()} flex-1 gap-3`} colSpan={columnCount}>
         {errorState ?? (
           <View role="alert" className="items-center gap-3">
-            <ErrorMessage message={error?.message} />
+            <ErrorMessage message={error?.message} surface={surface} />
             {error?.onRetry ? (
               <Button title={error.retryLabel ?? 'Try again'} variant="outline" loading={error.retrying} disabled={error.retrying} onPress={error.onRetry} />
             ) : null}

@@ -82,6 +82,29 @@ test('the kit tokens and a kit utility reach the console root', async () => {
   assert.match(css, /:root\[data-theme='dark'\] \.nycmon-console \{\s*color-scheme: dark;/);
 });
 
+// The 2026-10-29 sign-in defect: react-native-web gives every root Text an
+// unlayered `color: rgb(0, 0, 0)`, so a heading with no colour utility of its
+// own stayed black on the night card. The console's default ink must follow
+// the surface (var(--color-text)), be important, and sit in a layer after
+// `utilities`, so a caller's own text-* colour (also important) still wins.
+test('root text with no colour of its own takes the surface ink, after utilities', async () => {
+  const { root } = await build(consoleSheet);
+  const consoleLayer = root.nodes.find((node) => node.type === 'atrule' && node.name === 'layer' && node.params === CONSOLE_LAYER);
+  const layerNames = consoleLayer.nodes
+    .filter((node) => node.type === 'atrule' && node.name === 'layer')
+    .map((node) => node.params);
+  const utilities = layerNames.indexOf('utilities');
+  const rnwText = layerNames.indexOf('rnw-text');
+  assert.ok(utilities >= 0, `utilities layer missing from ${layerNames.join(', ')}`);
+  assert.ok(rnwText > utilities, `rnw-text must come after utilities: ${layerNames.join(', ')}`);
+  const rule = consoleLayer.nodes[consoleLayer.nodes.findIndex((node) => node.type === 'atrule' && node.params === 'rnw-text')].first;
+  assert.match(rule.selector, /\[class\^='css-text-'\]/);
+  assert.doesNotMatch(rule.selector, /css-textHasAncestor/);
+  const color = rule.nodes.find((decl) => decl.prop === 'color');
+  assert.equal(color.value, 'var(--color-text)');
+  assert.equal(color.important, true);
+});
+
 test('a sheet other than src/console.css passes through unscoped', async () => {
   const css = ':root { --color-text: red; } h1 { margin: 0; }';
   const { css: out } = await build(resolve(here, 'node_modules/@payloadcms/ui/dist/styles.css'), css);
