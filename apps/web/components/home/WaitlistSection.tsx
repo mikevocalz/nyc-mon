@@ -1,5 +1,6 @@
 import { Heading, Paragraph, Section } from '@acme/ui/html';
 import { View } from '@acme/ui/tw';
+import { YouTubeEmbed } from '@acme/app/features/editor';
 import { WAITLIST_COPY } from '../waitlist/copy';
 import { WaitlistForm } from '../waitlist/WaitlistForm';
 import { sectionMarker } from './sections';
@@ -13,6 +14,7 @@ export function WaitlistSection({ cms }: CmsSectionProps = {}) {
       <View className="min-w-0 gap-5 md:flex-[5_1_0%]">
         <Heading level={2} id="w01-waitlist-title" className="my-0 font-display text-display-md uppercase leading-heading text-text lg:text-display-lg lg:leading-heading">{sectionText(cms, 'title', copy.title)}</Heading>
         <Paragraph className="my-0 max-w-content-measure text-base leading-7 text-text-secondary md:text-lg md:leading-8">{sectionText(cms, 'body', copy.body)}</Paragraph>
+        <YouTubeEmbed videoId="OPtqsghXOLM" className="my-0" />
       </View>
       <View className="min-w-0 md:flex-[6_1_0%]"><WaitlistForm source="home" /></View>
     </View>
