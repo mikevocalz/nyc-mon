@@ -30,6 +30,7 @@
     "./native": "./native.ts",
     "./net": {
       "react-native": "./net/index.native.ts",
+      "browser": "./net/index.web.ts",
       "default": "./net/index.ts"
     },
     "./game-perf": {
