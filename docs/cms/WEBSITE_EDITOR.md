@@ -45,7 +45,17 @@ SITE_CONTENT_MODE=bootstrap
 SITE_CONTENT_SEED_TOKEN=<temporary-random-32-or-more-character-secret>
 ```
 
-Retain existing Better Auth, Neon and Bunny environment variables. Never expose database/storage/preview secrets as NEXT_PUBLIC variables. Never enable `PAYLOAD_PUSH` in production.
+Mon stills (the `mon-art` collection, uploaded on the console's Models page):
+
+```sh
+# Admin only: the site's revalidation route(s), comma-separated, and the shared
+# secret it checks. Without them an approved still still reaches the site within
+# a minute (its cache lifetime); with them it shows within seconds.
+MON_ART_REVALIDATE_URL=https://<public-site-host>/api/mon-art/revalidate
+MON_ART_REVALIDATE_SECRET=<same-random-32-or-more-character-secret-in-both-apps>
+```
+
+Retain existing Better Auth, Neon and Bunny environment variables. Never expose database/storage/preview secrets as NEXT_PUBLIC variables. Never enable `PAYLOAD_PUSH` in production. The additive `20261030_164327_mon_art` migration creates the `mon_art` tables (one still per Mon form) and drops nothing.
 
 1. Back up the database and retain the old deployment. Deploy the feature code with the editor off first where necessary. Review/apply the committed additive `20261030_030536_website_editor` migration to staging; it adds website/version/block tables and a locked-document relationship. It does not drop auth/version tables. Generate types and the admin import map with `NYCMON_SITE_EDITOR=1` when building an editor-enabled admin.
 2. Run the website in bootstrap mode. Fetch `/api/site-content/seed` with `Authorization: Bearer <SITE_CONTENT_SEED_TOKEN>` into a local manifest. The endpoint is read-only and must never be exposed without its bearer check.

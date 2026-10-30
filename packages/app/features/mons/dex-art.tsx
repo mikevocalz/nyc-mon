@@ -6,12 +6,16 @@ import { Badge, HatchEgg3D, Image, LoadingSkeleton, MonStage, useInstanceStore, 
 import { Text, View } from '@acme/ui/tw';
 import { monModelSource, type MonModelSource } from '../companion/mon-models';
 import { monsCopy } from './copy';
+import { currentAdminStills, stillFor, stillPlaceholder, type AdminStillMap } from './admin-stills';
 import { dexDigits, type DexEntry } from './dex-model';
+import { useAdminStills } from './use-admin-stills';
 
-/** The picture of a form: its still by Dex number (never the hatch scene), or undefined when none ships. */
-export function artForDex(dexId: number | null): CreatureArt | undefined {
-  if (dexId === null) return undefined;
-  return CREATURE_ART.find((a) => a.dexId === dexId && a.kind !== 'scene');
+/**
+ * The picture of a form (never the hatch scene): its approved console still,
+ * else its bundled still by Dex number, else undefined (Coming Soon).
+ */
+export function artForDex(dexId: number | null, speciesId?: string | null, stills: AdminStillMap = currentAdminStills()): CreatureArt | undefined {
+  return stillFor('any', dexId, speciesId, stills, CREATURE_ART);
 }
 
 /** What stands for an entry, best first: its live model, its still, or nothing yet. Unseen forms show none of these. */
@@ -22,9 +26,9 @@ export type DexVisual =
   | { readonly kind: 'still'; readonly art: CreatureArt }
   | { readonly kind: 'none' };
 
-export function dexVisual(entry: DexEntry): DexVisual {
+export function dexVisual(entry: DexEntry, stills: AdminStillMap = currentAdminStills()): DexVisual {
   if (!entry.seen) return { kind: 'unseen' };
-  const art = artForDex(entry.dexId);
+  const art = artForDex(entry.dexId, entry.speciesId, stills);
   const mon = monModelSource(entry.dexId);
   if (mon !== null) return { kind: 'mon3d', source: mon, art };
   const egg = entry.stage === 'Egg' ? eggHatchAssetForSpecies(entry.speciesId) : undefined;
@@ -40,8 +44,8 @@ function Still({ art, decorative }: { art: CreatureArt; decorative: boolean }) {
       unoptimized
       src={art.source as ImageProps['src']}
       alt={decorative ? '' : art.alt}
-      placeholder="blur"
-      blurDataURL={art.blurDataURL}
+      placeholder={stillPlaceholder(art)}
+      blurDataURL={art.blurDataURL || undefined}
       className="h-full w-full"
     />
   );
@@ -72,7 +76,7 @@ function Silhouette({ size }: { size: 'thumb' | 'hero' }) {
  * shows its still: for Lil' Ratti that still is a render of its GLB.
  */
 export function DexThumb({ entry }: { entry: DexEntry }) {
-  const visual = dexVisual(entry);
+  const visual = dexVisual(entry, useAdminStills());
   const art = visual.kind === 'still' ? visual.art : visual.kind === 'mon3d' || visual.kind === 'egg3d' ? visual.art : undefined;
   return (
     <View aria-hidden className="h-14 w-14 overflow-hidden border-2 border-structure/40 bg-surface-raised" style={{ borderCurve: 'continuous' }}>
@@ -94,7 +98,7 @@ export function DexThumb({ entry }: { entry: DexEntry }) {
  */
 export function DexHero({ entry, name }: { entry: DexEntry; name: string }) {
   const reducedMotion = useReducedMotion();
-  const visual = dexVisual(entry);
+  const visual = dexVisual(entry, useAdminStills());
   const ui = useInstanceStore(() => ({ readyKey: null as string | null }));
   const readyKey = useStore(ui, (s) => s.readyKey);
   const key = entry.speciesId;

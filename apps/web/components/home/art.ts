@@ -4,8 +4,8 @@
  *
  * The starter posters and the hatch band hold generated concept art from
  * `@acme/assets/creatures` (PS-028): the Baby forms and the egg at night.
- * Starter slot 4's Baby (Fye Dot) has no art yet, so `starterArt(4)` is null
- * and the poster draws a Coming Soon plate, never another Mon's picture. It stands in for final renders (PS-007) and carries no caption,
+ * Slot 4's Baby (Fye Dot) is the creator's own art. A starter with no art
+ * would read null and draw a Coming Soon plate, never another Mon's picture. The art stands in for final renders (PS-007) and carries no caption,
  * because a Mon is not a place. The other slots hold bundled, licensed NYC
  * photographs from `@acme/assets/photos` (1200x800 WebP with a blurDataURL;
  * never hotlinked). The `hlynk.*` slots are renders of the H-Lynk Core scene.
@@ -16,6 +16,7 @@ import { breakpoints, contentWidths } from '@acme/theme';
 import type { StarterBloodline } from '@acme/content';
 import { NYC_PHOTOS, type NycPhoto, type PhotoDistrict, type PhotoSource } from '@acme/assets/photos';
 import { creatureArt } from '@acme/assets/creatures';
+import { adminStill, starterSpeciesId } from '../mons/still-art.ts';
 
 /** A starter's slot number from @acme/content (DECISIONS.md #1). */
 export type StarterId = StarterBloodline['slot'];
@@ -146,14 +147,16 @@ export const ART_SLOTS = Object.keys(ART) as readonly ArtSlot[];
 /**
  * Starter posters (PS-020, PS-028), keyed by starter slot: each Baby form on a street of its
  * Bloodline's home turf (Hood Ratti: Harlem stoop; Bodega Baddiee Cee: 125th St bodega; Yote:
- * Times Square). Focal point is the Mon's face, so the 1:1 phone crop keeps it. Slot 4 (Fye Dot,
- * LanternFye) is null until its art exists: the poster shows Coming Soon (PS-007).
+ * Times Square; Fye Dot: a brownstone stoop). Focal point is the Mon's face, so the 1:1 phone crop keeps it.
+ * A slot with no art is null and the poster shows Coming Soon (PS-007).
  */
+const STARTER_FOCUS: Readonly<Record<StarterId, ArtFocalPoint>> = { 1: { x: 0.5, y: 0.3 }, 2: { x: 0.5, y: 0.28 }, 3: { x: 0.55, y: 0.33 }, 4: { x: 0.62, y: 0.45 } };
+
 const STARTER_ART: Readonly<Record<StarterId, ArtEntry | null>> = {
-  1: fromCreature('squeaklet', STARTER_SIZES, { x: 0.5, y: 0.3 }),
-  2: fromCreature('kittee-cee', STARTER_SIZES, { x: 0.5, y: 0.28 }),
-  3: fromCreature('yotito', STARTER_SIZES, { x: 0.55, y: 0.33 }),
-  4: null,
+  1: fromCreature('squeaklet', STARTER_SIZES, STARTER_FOCUS[1]),
+  2: fromCreature('kittee-cee', STARTER_SIZES, STARTER_FOCUS[2]),
+  3: fromCreature('yotito', STARTER_SIZES, STARTER_FOCUS[3]),
+  4: fromCreature('fye-dot', STARTER_SIZES, STARTER_FOCUS[4]),
 };
 
 /**
@@ -172,8 +175,13 @@ export function art(slot: ArtSlot): ArtEntry {
   return ART[slot];
 }
 
-/** A starter slot's Baby poster art, or null when the Baby has no art yet (Coming Soon). */
+/**
+ * A starter slot's Baby poster art: the still approved in the console, else the
+ * bundled still, else null (Coming Soon). See ../mons/still-art.ts.
+ */
 export function starterArt(id: StarterId): ArtEntry | null {
+  const admin = adminStill(starterSpeciesId(id, 'Baby'));
+  if (admin) return { src: admin.src, width: admin.width, height: admin.height, alt: admin.alt, sizes: STARTER_SIZES, focalPoint: STARTER_FOCUS[id] };
   return STARTER_ART[id];
 }
 

@@ -79,6 +79,7 @@ export interface Config {
     waitlist: Waitlist;
     'language-lexicon': LanguageLexicon;
     'mon-models': MonModel;
+    'mon-art': MonArt;
     sessions: Session;
     accounts: Account;
     verifications: Verification;
@@ -116,6 +117,7 @@ export interface Config {
     waitlist: WaitlistSelect<false> | WaitlistSelect<true>;
     'language-lexicon': LanguageLexiconSelect<false> | LanguageLexiconSelect<true>;
     'mon-models': MonModelsSelect<false> | MonModelsSelect<true>;
+    'mon-art': MonArtSelect<false> | MonArtSelect<true>;
     sessions: SessionsSelect<false> | SessionsSelect<true>;
     accounts: AccountsSelect<false> | AccountsSelect<true>;
     verifications: VerificationsSelect<false> | VerificationsSelect<true>;
@@ -781,6 +783,167 @@ export interface MonModel {
     sourceUrl?: string | null;
   };
   notes?: string | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedAt: string;
+  createdAt: string;
+  url?: string | null;
+  thumbnailURL?: string | null;
+  filename?: string | null;
+  mimeType?: string | null;
+  filesize?: number | null;
+  width?: number | null;
+  height?: number | null;
+  original?: {
+    filename?: string | null;
+    url?: string | null;
+    mimeType?: string | null;
+    filesize?: number | null;
+    width?: number | null;
+    height?: number | null;
+    prefix?: string | null;
+    _objectKey?: string | null;
+  };
+  focalX?: number | null;
+  focalY?: number | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "mon-art".
+ */
+export interface MonArt {
+  id: number;
+  speciesId:
+    | 'dex-001'
+    | 'dex-002'
+    | 'dex-003'
+    | 'dex-004'
+    | 'dex-005'
+    | 'dex-006'
+    | 'dex-007'
+    | 'dex-008'
+    | 'dex-009'
+    | 'dex-010'
+    | 'dex-011'
+    | 'dex-012'
+    | 'dex-013'
+    | 'dex-014'
+    | 'dex-061'
+    | 'dex-062'
+    | 'dex-063'
+    | 'dex-064'
+    | 'dex-065'
+    | 'dex-066'
+    | 'dex-067'
+    | 'dex-020'
+    | 'dex-021'
+    | 'dex-022'
+    | 'dex-023'
+    | 'dex-024'
+    | 'dex-015'
+    | 'dex-016'
+    | 'dex-017'
+    | 'dex-018'
+    | 'dex-019'
+    | 'dex-025'
+    | 'dex-026'
+    | 'dex-027'
+    | 'dex-028'
+    | 'dex-029'
+    | 'dex-030'
+    | 'dex-031'
+    | 'dex-032'
+    | 'dex-033'
+    | 'dex-034'
+    | 'dex-035'
+    | 'dex-036'
+    | 'dex-037'
+    | 'dex-038'
+    | 'dex-039'
+    | 'dex-040'
+    | 'dex-041'
+    | 'dex-042'
+    | 'dex-043'
+    | 'dex-044'
+    | 'dex-045'
+    | 'dex-046'
+    | 'dex-047'
+    | 'dex-048'
+    | 'dex-049'
+    | 'dex-050'
+    | 'dex-051'
+    | 'dex-052'
+    | 'dex-053'
+    | 'dex-054'
+    | 'dex-055'
+    | 'dex-056'
+    | 'dex-057'
+    | 'dex-058'
+    | 'dex-059'
+    | 'dex-060'
+    | 'dex-068'
+    | 'dex-069'
+    | 'dex-070'
+    | 'dex-071'
+    | 'dex-072'
+    | 'dex-073'
+    | 'dex-074'
+    | 'dex-075'
+    | 'dex-076'
+    | 'dex-077'
+    | 'dex-078'
+    | 'dex-079'
+    | 'dex-080'
+    | 'dex-081'
+    | 'dex-082'
+    | 'dex-083'
+    | 'dex-084'
+    | 'dex-085'
+    | 'dex-086'
+    | 'dex-087'
+    | 'dex-088'
+    | 'dex-089'
+    | 'dex-090'
+    | 'dex-091'
+    | 'dex-092'
+    | 'dex-093'
+    | 'dex-094'
+    | 'dex-095'
+    | 'dex-096'
+    | 'dex-097'
+    | 'dex-098'
+    | 'dex-099'
+    | 'dex-100'
+    | 'dex-101'
+    | 'dex-102'
+    | 'dex-103'
+    | 'dex-104'
+    | 'dex-105'
+    | 'dex-106'
+    | 'dex-107'
+    | 'dex-108'
+    | 'dex-109';
+  stage?: string | null;
+  bloodlineId?: string | null;
+  /**
+   * Only approved stills reach the site and apps. Uploading a new picture sets this back to In review.
+   */
+  status: 'in-review' | 'approved';
+  /**
+   * What the picture shows, for screen readers. Name the Mon; no pronoun for it.
+   */
+  alt: string;
+  bunnyUrl?: string | null;
+  credit?: {
+    author?: string | null;
+    sourceUrl?: string | null;
+  };
   createdBy?: {
     relationTo: 'users';
     value: number | User;
@@ -1735,6 +1898,10 @@ export interface PayloadLockedDocument {
         value: number | MonModel;
       } | null)
     | ({
+        relationTo: 'mon-art';
+        value: number | MonArt;
+      } | null)
+    | ({
         relationTo: 'sessions';
         value: number | Session;
       } | null)
@@ -2168,6 +2335,49 @@ export interface MonModelsSelect<T extends boolean = true> {
         sourceUrl?: T;
       };
   notes?: T;
+  createdBy?: T;
+  updatedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  url?: T;
+  thumbnailURL?: T;
+  filename?: T;
+  mimeType?: T;
+  filesize?: T;
+  width?: T;
+  height?: T;
+  original?:
+    | T
+    | {
+        filename?: T;
+        url?: T;
+        mimeType?: T;
+        filesize?: T;
+        width?: T;
+        height?: T;
+        prefix?: T;
+        _objectKey?: T;
+      };
+  focalX?: T;
+  focalY?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "mon-art_select".
+ */
+export interface MonArtSelect<T extends boolean = true> {
+  speciesId?: T;
+  stage?: T;
+  bloodlineId?: T;
+  status?: T;
+  alt?: T;
+  bunnyUrl?: T;
+  credit?:
+    | T
+    | {
+        author?: T;
+        sourceUrl?: T;
+      };
   createdBy?: T;
   updatedBy?: T;
   updatedAt?: T;
@@ -2887,6 +3097,7 @@ export interface CollectionQueryWidget {
       | 'media'
       | 'language-lexicon'
       | 'mon-models'
+      | 'mon-art'
       | 'sessions'
       | 'accounts'
       | 'verifications'
@@ -2930,6 +3141,7 @@ export interface ActivityWidget {
           | 'media'
           | 'language-lexicon'
           | 'mon-models'
+          | 'mon-art'
           | 'sessions'
           | 'accounts'
           | 'verifications'
@@ -2957,7 +3169,7 @@ export interface ActivityWidget {
  */
 export interface UploadDropzoneWidget {
   data?: {
-    excludedCollections?: ('media' | 'mon-models')[] | null;
+    excludedCollections?: ('media' | 'mon-models' | 'mon-art')[] | null;
   };
   width: 'x-small' | 'small' | 'medium' | 'large' | 'x-large' | 'full';
 }

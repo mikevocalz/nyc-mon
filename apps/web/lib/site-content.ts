@@ -4,6 +4,7 @@ import { activePreview, previewDocument } from './site-preview';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { readSitePage } from '@acme/content/site-content';
+import { loadMonArt } from './mon-art';
 
 export const siteEditorEnabled = () => process.env.NYCMON_SITE_EDITOR === '1';
 export const bootstrapContent = () => process.env.SITE_CONTENT_MODE === 'bootstrap';
@@ -15,7 +16,8 @@ export const getSitePage = cache(async (route: string) => {
   return readSitePage(process.env.PAYLOAD_SITE_API_URL, route);
 });
 export async function getPublishedSitePage(route: string) {
-  const page = await getSitePage(route);
+  // Every site page renders through here, so the console's approved Mon stills load once per request beside the page.
+  const [page] = await Promise.all([getSitePage(route), loadMonArt()]);
   if (!page && siteEditorEnabled() && !bootstrapContent()) notFound();
   return page;
 }

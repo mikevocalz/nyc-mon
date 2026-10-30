@@ -9,6 +9,7 @@ import { consoleCopy } from '../copy';
 import { presetFor } from '@acme/spatial/model-turn';
 import { useModelsStore, type ModelDraft, type ModelFilter, type ModelYaw } from '../stores';
 import { ConsoleShell } from '../Shell';
+import { StillArtPanel, type StillDoc } from './StillArtPanel';
 import { needsChunkedUpload, uploadModelInChunks, type ChunkTransport, type SendResult } from './modelUpload.ts';
 
 // The Viro web renderer is browser-only (WASM + WebGL), so it loads after hydration.
@@ -28,7 +29,7 @@ export type ModelDoc = {
   credit: { author: string; license: string; sourceUrl: string }; notes: string;
 };
 type Form = { id: string; dex: number | null; name: string; stage: string; bloodline: string };
-type Row = Form & { model: ModelDoc | null; state: 'missing' | ModelStatus };
+type Row = Form & { model: ModelDoc | null; state: 'missing' | ModelStatus; still: StillDoc | null; stillState: 'missing' | StillDoc['status'] };
 
 const dexLabel = (dex: number | null) => (dex === null ? '—' : `#${String(dex).padStart(3, '0')}`);
 const statusTone = { missing: 'neutral', 'in-review': 'info', approved: 'success' } as const;
@@ -38,6 +39,7 @@ const columns: ColumnDef<Row, unknown>[] = [
   { accessorKey: 'name', header: copy.colForm },
   { accessorKey: 'stage', header: copy.colStage },
   { accessorKey: 'state', header: copy.colModel, cell: ({ row }) => <Badge label={copy.status[row.original.state]} tone={statusTone[row.original.state]} size="sm" /> },
+  { accessorKey: 'stillState', header: copy.colStill, cell: ({ row }) => <Badge label={copy.stillStatus[row.original.stillState]} tone={statusTone[row.original.stillState]} size="sm" /> },
 ];
 
 function draftFrom(model: ModelDoc | null): ModelDraft {
@@ -129,12 +131,13 @@ const chunkTransport: ChunkTransport = {
   }),
 };
 
-export function ModelsViewClient({ forms, models, failed = false, selectedId, canEdit }: { forms: Form[]; models: ModelDoc[]; failed?: boolean; selectedId: string | null; canEdit: boolean }) {
+export function ModelsViewClient({ forms, models, stills = [], failed = false, selectedId, canEdit }: { forms: Form[]; models: ModelDoc[]; stills?: StillDoc[]; failed?: boolean; selectedId: string | null; canEdit: boolean }) {
   const router = useRouter();
   const store = useModelsStore();
   const hydrated = useHydrated();
   const bySpecies = new Map(models.map((model) => [model.speciesId, model]));
-  const rows: Row[] = forms.map((form) => { const model = bySpecies.get(form.id) ?? null; return { ...form, model, state: model?.status ?? 'missing' }; });
+  const stillBySpecies = new Map(stills.map((still) => [still.speciesId, still]));
+  const rows: Row[] = forms.map((form) => { const model = bySpecies.get(form.id) ?? null; const still = stillBySpecies.get(form.id) ?? null; return { ...form, model, state: model?.status ?? 'missing', still, stillState: still?.status ?? 'missing' }; });
   const shown = store.filter === 'all' ? rows : rows.filter((row) => row.state === store.filter);
   const selected = rows.find((row) => row.id === selectedId) ?? null;
   const model = selected?.model ?? null;
@@ -376,6 +379,7 @@ export function ModelsViewClient({ forms, models, failed = false, selectedId, ca
                 />
               </>
             ) : null}
+            <StillArtPanel speciesId={selected.id} formName={selected.name} still={selected.still} canEdit={canEdit} />
           </Section>
         ) : (
           <EmptyState title={copy.pickTitle} description={copy.pickBody} />
