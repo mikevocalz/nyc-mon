@@ -72,6 +72,33 @@ export const CustomContent: Story = {
   ),
 };
 
+/**
+ * Web: a browse button beside the drop target, for people who can't drag.
+ * Picked files arrive through `onDrop`, like dropped ones.
+ */
+export const WithBrowse: Story = {
+  render: function Render() {
+    const { active, setActive, dropped, addAssets } = useDropStory();
+    return (
+      <View className="max-w-content-form gap-4 p-6">
+        <DropZone
+          active={active}
+          title="Drop a .glb model"
+          description="One binary glTF file, up to 25 MB."
+          browseLabel="Choose a .glb file"
+          accept=".glb,model/gltf-binary"
+          onEnter={() => setActive(true)}
+          onExit={() => setActive(false)}
+          onDrop={({ assets }) => addAssets(assets)}
+        />
+        {dropped.map((a, i) => (
+          <Text key={i} variant="caption">{a.fileName ?? a.type}</Text>
+        ))}
+      </View>
+    );
+  },
+};
+
 /** District showcase: resting (dashed) and drag-over (solid border, accent glow). */
 export const Districts: Story = {
   render: () => (

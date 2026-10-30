@@ -25,15 +25,48 @@ import { resolveControlTone, toneHex, toneInput, toneVariants, type ControlTone,
   THIRD-PARTY-NOTICES.md).
 */
 /*
-  The notch face is the tone itself in both themes, so themed text dropped on
-  it takes the tone's on-face step: night ink on the light tones, white on
-  royal and brick. Muted and secondary collapse to the same step; no lighter
-  step holds 4.5:1 on a tone face.
+  The notch face is the tone itself in both themes, so every themed ink that
+  content dropped on it can name takes the tone's on-face step: night ink on
+  the light tones, white on royal and brick. That covers body text (muted and
+  secondary collapse to the same step; no lighter step holds 4.5:1 on a tone
+  face) and the status and page-tone inks: a form error (`danger`) or a ghost
+  button's label (`tone-*-text`) set in apple or orange on a carolina face
+  measured 1.2 to 2.9:1. The error keeps its apple block, so the state is not
+  carried by colour alone.
 */
-const NOTCH_ON_INK =
-  '[--color-text:var(--color-ink-950)] [--color-text-muted:var(--color-ink-950)] [--color-text-secondary:var(--color-ink-950)]';
-const NOTCH_ON_WHITE =
-  '[--color-text:var(--color-white)] [--color-text-muted:var(--color-white)] [--color-text-secondary:var(--color-white)]';
+// Literal class strings: Tailwind only generates what it can read in the source.
+const NOTCH_ON_INK = [
+  '[--color-text:var(--color-ink-950)]',
+  '[--color-text-muted:var(--color-ink-950)]',
+  '[--color-text-secondary:var(--color-ink-950)]',
+  '[--color-danger:var(--color-ink-950)]',
+  '[--color-success:var(--color-ink-950)]',
+  '[--color-info:var(--color-ink-950)]',
+  '[--color-primary:var(--color-ink-950)]',
+  '[--color-accent:var(--color-ink-950)]',
+  '[--color-tone-orange-text:var(--color-ink-950)]',
+  '[--color-tone-royal-text:var(--color-ink-950)]',
+  '[--color-tone-carolina-text:var(--color-ink-950)]',
+  '[--color-tone-leaf-text:var(--color-ink-950)]',
+  '[--color-tone-apple-text:var(--color-ink-950)]',
+  '[--color-tone-brick-text:var(--color-ink-950)]',
+].join(' ');
+const NOTCH_ON_WHITE = [
+  '[--color-text:var(--color-white)]',
+  '[--color-text-muted:var(--color-white)]',
+  '[--color-text-secondary:var(--color-white)]',
+  '[--color-danger:var(--color-white)]',
+  '[--color-success:var(--color-white)]',
+  '[--color-info:var(--color-white)]',
+  '[--color-primary:var(--color-white)]',
+  '[--color-accent:var(--color-white)]',
+  '[--color-tone-orange-text:var(--color-white)]',
+  '[--color-tone-royal-text:var(--color-white)]',
+  '[--color-tone-carolina-text:var(--color-white)]',
+  '[--color-tone-leaf-text:var(--color-white)]',
+  '[--color-tone-apple-text:var(--color-white)]',
+  '[--color-tone-brick-text:var(--color-white)]',
+].join(' ');
 
 const neonCard = tv({
   slots: {

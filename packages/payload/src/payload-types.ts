@@ -99,6 +99,7 @@ export interface Config {
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
     'payload-migrations': PayloadMigration;
+    'payload-llm-instructions': PayloadLlmInstruction;
   };
   collectionsJoins: {};
   collectionsSelect: {
@@ -134,6 +135,7 @@ export interface Config {
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
     'payload-migrations': PayloadMigrationsSelect<false> | PayloadMigrationsSelect<true>;
+    'payload-llm-instructions': PayloadLlmInstructionsSelect<false> | PayloadLlmInstructionsSelect<true>;
   };
   db: {
     defaultIDType: number;
@@ -149,9 +151,11 @@ export interface Config {
   };
   locale: null;
   widgets: {
+    welcome: WelcomeWidget;
     collections: CollectionsWidget;
     'collection-query': CollectionQueryWidget;
     activity: ActivityWidget;
+    'upload-dropzone': UploadDropzoneWidget;
   };
   user: User;
   jobs: {
@@ -217,6 +221,14 @@ export interface User {
         | 'sent_in_error'
       )
     | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
   collection: 'users';
@@ -229,6 +241,14 @@ export interface Media {
   id: number;
   bunnyUrl?: string | null;
   alt: string;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
   url?: string | null;
@@ -238,6 +258,16 @@ export interface Media {
   filesize?: number | null;
   width?: number | null;
   height?: number | null;
+  original?: {
+    filename?: string | null;
+    url?: string | null;
+    mimeType?: string | null;
+    filesize?: number | null;
+    width?: number | null;
+    height?: number | null;
+    prefix?: string | null;
+    _objectKey?: string | null;
+  };
   focalX?: number | null;
   focalY?: number | null;
 }
@@ -254,6 +284,14 @@ export interface GuardianConsent {
   emailsSent: number;
   lastEmailSentAt?: string | null;
   parentRequest: 'none' | 'review' | 'delete';
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -273,6 +311,14 @@ export interface Egg {
   createdAtMs: number;
   incubationEndsAt: number;
   hatched: boolean;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -293,6 +339,14 @@ export interface MonInstance {
   gender?: ('female' | 'male') | null;
   voiceLineageId?: string | null;
   serverConfirmedAt?: string | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -338,6 +392,14 @@ export interface CareState {
     | number
     | boolean
     | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -386,6 +448,14 @@ export interface AuditEvent {
       )
     | null;
   requestId?: string | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -402,6 +472,14 @@ export interface IntegrityRun {
   idMismatch: number;
   orphans: number;
   staleReady: number;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -416,6 +494,14 @@ export interface IdempotencyRecord {
   status: number;
   contentType: string;
   body: string;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -428,6 +514,14 @@ export interface Waitlist {
   email: string;
   district?: ('downtown' | 'midtown' | 'harlem' | 'megacity') | null;
   source?: string | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -496,6 +590,14 @@ export interface LanguageLexicon {
   sourceUrl?: string | null;
   editorNotes?: string | null;
   active: boolean;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
   _status?: ('draft' | 'published') | null;
@@ -673,6 +775,14 @@ export interface MonModel {
     sourceUrl?: string | null;
   };
   notes?: string | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
   url?: string | null;
@@ -682,6 +792,16 @@ export interface MonModel {
   filesize?: number | null;
   width?: number | null;
   height?: number | null;
+  original?: {
+    filename?: string | null;
+    url?: string | null;
+    mimeType?: string | null;
+    filesize?: number | null;
+    width?: number | null;
+    height?: number | null;
+    prefix?: string | null;
+    _objectKey?: string | null;
+  };
   focalX?: number | null;
   focalY?: number | null;
 }
@@ -699,6 +819,14 @@ export interface Session {
   userAgent?: string | null;
   user: number | User;
   surface?: string | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -720,6 +848,14 @@ export interface Account {
   refreshTokenExpiresAt?: string | null;
   scope?: string | null;
   password?: string | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -734,6 +870,14 @@ export interface Verification {
   identifier: string;
   value: string;
   expiresAt: string;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -754,6 +898,14 @@ export interface Passkey {
   backedUp: boolean;
   transports?: string | null;
   aaguid?: string | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -771,6 +923,14 @@ export interface TwoFactor {
   verified?: boolean | null;
   failedVerificationCount?: number | null;
   lockedUntil?: string | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -791,6 +951,14 @@ export interface DeviceCode {
   pollingInterval?: number | null;
   clientId?: string | null;
   scope?: string | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -807,6 +975,14 @@ export interface Jwk {
   expiresAt?: string | null;
   alg?: string | null;
   crv?: string | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -915,6 +1091,14 @@ export interface OauthClient {
     | number
     | boolean
     | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -962,6 +1146,14 @@ export interface OauthResource {
     | number
     | boolean
     | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -984,6 +1176,14 @@ export interface OauthClientResource {
     | number
     | boolean
     | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1043,6 +1243,14 @@ export interface OauthRefreshToken {
     | number
     | boolean
     | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1099,6 +1307,14 @@ export interface OauthAccessToken {
     | number
     | boolean
     | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1140,6 +1356,14 @@ export interface OauthConsent {
     | number
     | boolean
     | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1152,6 +1376,14 @@ export interface OauthConsent {
 export interface OauthClientAssertion {
   id: number;
   expiresAt: string;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1166,6 +1398,14 @@ export interface RateLimit {
   key: string;
   count: number;
   lastRequest: number;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1455,6 +1695,28 @@ export interface PayloadMigration {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "payload-llm-instructions".
+ */
+export interface PayloadLlmInstruction {
+  id: string;
+  entitySlug: string;
+  title?: string | null;
+  entityType: 'collection' | 'global';
+  additionalInstructions?: string | null;
+  systemInstructions?: string | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "users_select".
  */
 export interface UsersSelect<T extends boolean = true> {
@@ -1476,6 +1738,8 @@ export interface UsersSelect<T extends boolean = true> {
   deletionScheduledFor?: T;
   deletionScheduledBy?: T;
   deletionReason?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1486,6 +1750,8 @@ export interface UsersSelect<T extends boolean = true> {
 export interface MediaSelect<T extends boolean = true> {
   bunnyUrl?: T;
   alt?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
   url?: T;
@@ -1495,6 +1761,18 @@ export interface MediaSelect<T extends boolean = true> {
   filesize?: T;
   width?: T;
   height?: T;
+  original?:
+    | T
+    | {
+        filename?: T;
+        url?: T;
+        mimeType?: T;
+        filesize?: T;
+        width?: T;
+        height?: T;
+        prefix?: T;
+        _objectKey?: T;
+      };
   focalX?: T;
   focalY?: T;
 }
@@ -1510,6 +1788,8 @@ export interface GuardianConsentsSelect<T extends boolean = true> {
   emailsSent?: T;
   lastEmailSentAt?: T;
   parentRequest?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1528,6 +1808,8 @@ export interface EggsSelect<T extends boolean = true> {
   createdAtMs?: T;
   incubationEndsAt?: T;
   hatched?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1547,6 +1829,8 @@ export interface MonInstancesSelect<T extends boolean = true> {
   gender?: T;
   voiceLineageId?: T;
   serverConfirmedAt?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1567,6 +1851,8 @@ export interface CareStatesSelect<T extends boolean = true> {
   sluggishUntil?: T;
   pendingRequest?: T;
   lastSeqByDevice?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1583,6 +1869,8 @@ export interface AuditEventsSelect<T extends boolean = true> {
   targetId?: T;
   reasonCode?: T;
   requestId?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1598,6 +1886,8 @@ export interface IntegrityRunsSelect<T extends boolean = true> {
   idMismatch?: T;
   orphans?: T;
   staleReady?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1611,6 +1901,8 @@ export interface IdempotencyRecordsSelect<T extends boolean = true> {
   status?: T;
   contentType?: T;
   body?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1622,6 +1914,8 @@ export interface WaitlistSelect<T extends boolean = true> {
   email?: T;
   district?: T;
   source?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1666,6 +1960,8 @@ export interface LanguageLexiconSelect<T extends boolean = true> {
   sourceUrl?: T;
   editorNotes?: T;
   active?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
   _status?: T;
@@ -1724,6 +2020,8 @@ export interface MonModelsSelect<T extends boolean = true> {
         sourceUrl?: T;
       };
   notes?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
   url?: T;
@@ -1733,6 +2031,18 @@ export interface MonModelsSelect<T extends boolean = true> {
   filesize?: T;
   width?: T;
   height?: T;
+  original?:
+    | T
+    | {
+        filename?: T;
+        url?: T;
+        mimeType?: T;
+        filesize?: T;
+        width?: T;
+        height?: T;
+        prefix?: T;
+        _objectKey?: T;
+      };
   focalX?: T;
   focalY?: T;
 }
@@ -1747,6 +2057,8 @@ export interface SessionsSelect<T extends boolean = true> {
   userAgent?: T;
   user?: T;
   surface?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1765,6 +2077,8 @@ export interface AccountsSelect<T extends boolean = true> {
   refreshTokenExpiresAt?: T;
   scope?: T;
   password?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1776,6 +2090,8 @@ export interface VerificationsSelect<T extends boolean = true> {
   identifier?: T;
   value?: T;
   expiresAt?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1793,6 +2109,8 @@ export interface PasskeysSelect<T extends boolean = true> {
   backedUp?: T;
   transports?: T;
   aaguid?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1807,6 +2125,8 @@ export interface TwoFactorsSelect<T extends boolean = true> {
   verified?: T;
   failedVerificationCount?: T;
   lockedUntil?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1824,6 +2144,8 @@ export interface DeviceCodesSelect<T extends boolean = true> {
   pollingInterval?: T;
   clientId?: T;
   scope?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1837,6 +2159,8 @@ export interface JwksSelect<T extends boolean = true> {
   expiresAt?: T;
   alg?: T;
   crv?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1878,6 +2202,8 @@ export interface OauthClientsSelect<T extends boolean = true> {
   dpopBoundAccessTokens?: T;
   referenceId?: T;
   metadata?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1898,6 +2224,8 @@ export interface OauthResourcesSelect<T extends boolean = true> {
   disabled?: T;
   policyVersion?: T;
   metadata?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1909,6 +2237,8 @@ export interface OauthClientResourcesSelect<T extends boolean = true> {
   clientId?: T;
   resourceId?: T;
   metadata?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1933,6 +2263,8 @@ export interface OauthRefreshTokensSelect<T extends boolean = true> {
   authTime?: T;
   confirmation?: T;
   scopes?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1954,6 +2286,8 @@ export interface OauthAccessTokensSelect<T extends boolean = true> {
   revoked?: T;
   confirmation?: T;
   scopes?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1968,6 +2302,8 @@ export interface OauthConsentsSelect<T extends boolean = true> {
   resources?: T;
   requestedUserInfoClaims?: T;
   scopes?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1977,6 +2313,8 @@ export interface OauthConsentsSelect<T extends boolean = true> {
  */
 export interface OauthClientAssertionsSelect<T extends boolean = true> {
   expiresAt?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1988,6 +2326,8 @@ export interface RateLimitsSelect<T extends boolean = true> {
   key?: T;
   count?: T;
   lastRequest?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -2068,6 +2408,22 @@ export interface PayloadPreferencesSelect<T extends boolean = true> {
 export interface PayloadMigrationsSelect<T extends boolean = true> {
   name?: T;
   batch?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "payload-llm-instructions_select".
+ */
+export interface PayloadLlmInstructionsSelect<T extends boolean = true> {
+  id?: T;
+  entitySlug?: T;
+  title?: T;
+  entityType?: T;
+  additionalInstructions?: T;
+  systemInstructions?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -2162,6 +2518,14 @@ export interface MonVoice {
     styleFactor: number;
     maxSpeed: number;
   };
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt?: string | null;
   createdAt?: string | null;
 }
@@ -2232,6 +2596,8 @@ export interface MonVoicesSelect<T extends boolean = true> {
         styleFactor?: T;
         maxSpeed?: T;
       };
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
   globalType?: T;
@@ -2245,6 +2611,16 @@ export interface PayloadJobsStatsSelect<T extends boolean = true> {
   updatedAt?: T;
   createdAt?: T;
   globalType?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "welcome_widget".
+ */
+export interface WelcomeWidget {
+  data?: {
+    [k: string]: unknown;
+  };
+  width: 'full';
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -2327,6 +2703,16 @@ export interface ActivityWidget {
           | 'rateLimits'
         )[]
       | null;
+  };
+  width: 'small' | 'medium' | 'large' | 'x-large' | 'full';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "upload-dropzone_widget".
+ */
+export interface UploadDropzoneWidget {
+  data?: {
+    excludedCollections?: ('media' | 'mon-models')[] | null;
   };
   width: 'x-small' | 'small' | 'medium' | 'large' | 'x-large' | 'full';
 }
