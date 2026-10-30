@@ -78,6 +78,8 @@ export interface PoolInstancer {
   drawn(): number;
   /** Called with the main camera every frame it draws the pools (structures.ts streams off it). */
   onCamera(listener: (camera: Camera) => void): void;
+  /** Render-origin cell offset; the instance buffers stay render-local while culling stays absolute. */
+  setOrigin(x: number, z: number): void;
   materials: PoolMaterials;
   dispose(): void;
 }
@@ -119,7 +121,7 @@ export function createPoolInstancer(THREE: Three, group: Group, input: PoolInsta
     const g = input.geometry[p.name];
     if (!g || p.count === 0) continue;
     const inst = decodeInstances(input.bytes, p, input.groundY);
-    const index = indexCells(inst.record, inst.count, g.radius);
+    const index = indexCells(inst.record, inst.count, g.radius, inst.positions);
     const material = materials.get(p.material);
     const base = baseGeometry(THREE, input.bytes, g);
     bases.push(base);
@@ -148,6 +150,7 @@ export function createPoolInstancer(THREE: Three, group: Group, input: PoolInsta
   const view: CullView = { planes, x: 0, y: 0, z: 0 };
   const last = { x: NaN, y: NaN, z: NaN, dx: NaN, dy: NaN, dz: NaN };
   const dir = new THREE.Vector3();
+  const origin = { x: 0, z: 0 };
   let drawnTotal = 0;
 
   const commit = (d: Draw, n: number) => {
@@ -176,7 +179,7 @@ export function createPoolInstancer(THREE: Three, group: Group, input: PoolInsta
     view.x = e[12]!; view.y = e[13]!; view.z = e[14]!;
     drawnTotal = 0;
     for (const p of pools) {
-      const [n, f] = cullPool(p.index, view, { pad: PAD_MAIN, roofLow: p.roofLow, lodDistance: p.lodDistance }, p.main.array, p.far ? p.far.array : null);
+      const [n, f] = cullPool(p.index, view, { pad: PAD_MAIN, roofLow: p.roofLow, lodDistance: p.lodDistance }, p.main.array, p.far ? p.far.array : null, origin.x, origin.z);
       commit(p.main, n);
       if (p.far) commit(p.far, f);
       drawnTotal += n + f;
@@ -204,6 +207,11 @@ export function createPoolInstancer(THREE: Three, group: Group, input: PoolInsta
     cull,
     drawn: () => drawnTotal,
     onCamera(listener) { listeners.push(listener); },
+    setOrigin(x, z) {
+      origin.x = x; origin.z = z;
+      last.x = Number.NaN;
+      for (const m of meshes) { m.position.set(x, 0, z); m.updateMatrix(); }
+    },
     materials,
     dispose() {
       for (const m of meshes) { m.removeFromParent(); m.geometry.dispose(); }

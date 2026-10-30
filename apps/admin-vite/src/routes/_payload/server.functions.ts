@@ -53,11 +53,10 @@ const runPayloadServerFn = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     const { handleServerFunctions } = await import('@payloadcms/tanstack-start/server');
     /*
-      Since 4.0.0-beta.6 the adapter renders the result to a React Flight
-      stream and hands back a `Response` (`text/x-component`), which TanStack
-      Start passes through untouched. `createServerFunctionClient` decodes it
-      with `createFromReadableStream`, so form state and custom RSC components
-      keep their React elements instead of going through seroval.
+      The adapter (4.0.0-beta.6) renders the dispatcher's result to a React
+      Flight stream and returns it as a `text/x-component` Response;
+      `createServerFunctionClient` below decodes that stream on the client.
+      TanStack Start passes a returned Response through untouched.
     */
     return handleServerFunctions({
       args: data.args,
@@ -68,9 +67,9 @@ const runPayloadServerFn = createServerFn({ method: 'POST' })
   });
 
 /*
-  The panel's `ServerFunctionClient`: calls the server function above and
-  decodes its Flight response (adapter 4.0.0-beta.6,
-  utilities/serverFunctionClient.js).
+  Sanitises args for TanStack Start's seroval wire format before dispatch.
+  Payload's own callers (`getFormState`) can hand over live form state carrying
+  stray functions, which seroval throws on rather than dropping.
 */
 export const serverFunctionHandler = createServerFunctionClient({
   runServerFn: runPayloadServerFn,

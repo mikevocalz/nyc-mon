@@ -25,7 +25,8 @@ import type { Three } from '@acme/ui/three';
 import { EMPTY_PART, type VdPortCtx, type VdPortPart } from '../types.ts';
 import { cellNum, CELL } from '../../cells/cell-rules.ts';
 import { ditherFadeMask } from '../../cells/cell-stream.ts';
-import { decodeShellCell, lazyNearPackage, type NearCellInfo, type ShellCellInfo } from './codec.ts';
+import { decodeShellCell, type NearCellInfo, type ShellCellInfo } from './codec.ts';
+import { sourceNearPackage } from './on-demand.ts';
 import { vdBlockBytes } from './load.ts';
 import { makeBlocksMaterial } from './shell-material.ts';
 import { VD_BLOCKS, VD_FW14 } from './data/manifest.ts';
@@ -109,7 +110,7 @@ export function build(ctx: VdPortCtx): VdPortPart {
   for (let i = 0; i < maxShell; i++) identity[i] = i;
   const shellIndex = new THREE.BufferAttribute(identity, 1);
   for (const info of VD_BLOCKS.shell as readonly ShellCellInfo[]) {
-    const a = decodeShellCell(packs.shell, info);
+    const a = decodeShellCell(packs.shell, info, 'cell-local');
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(a.position, 3));
     g.setAttribute('color', new THREE.BufferAttribute(a.color, 4, true));
@@ -117,11 +118,13 @@ export function build(ctx: VdPortCtx): VdPortPart {
     g.setAttribute('emissive', shellEmissive);
     g.setIndex(shellIndex);
     g.setDrawRange(0, a.position.length / 3);
-    const b = info.bounds;
-    g.boundingBox = new THREE.Box3(new THREE.Vector3(b[0], b[1], b[2]), new THREE.Vector3(b[3], b[4], b[5]));
+    const b = info.bounds, o = a.positionFrame!.origin;
+    g.boundingBox = new THREE.Box3(new THREE.Vector3(b[0]! - o[0]!, b[1]! - o[1]!, b[2]! - o[2]!), new THREE.Vector3(b[3]! - o[0]!, b[4]! - o[1]!, b[5]! - o[2]!));
     g.boundingSphere = g.boundingBox.getBoundingSphere(new THREE.Sphere());
     const m = new THREE.Mesh(g, shellMat);
     m.name = SHELL_NAME;
+    m.position.set(o[0]!, o[1]!, o[2]!);
+    m.updateMatrix();
     m.matrixAutoUpdate = false;
     m.castShadow = true;
     m.receiveShadow = true;
@@ -152,7 +155,7 @@ export function build(ctx: VdPortCtx): VdPortPart {
   const packages = (VD_BLOCKS[packs.level] as readonly NearCellInfo[]).map((info) => {
     const file = packs.near.get(info.key);
     if (!file) throw new Error(`vd-port: near cell ${info.key} is in the manifest but not in the packs`);
-    return lazyNearPackage(info, () => file);
+    return sourceNearPackage(info, packs.level, () => Promise.resolve(file!.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength) as ArrayBuffer), 'cell-local');
   });
   const nearBudget = ctx.preset?.vdPort.blocksNear ?? NEAR_BUDGET;
   ctx.registerChunks(template, { ...NEAR_LAYER, errorM: nearBudget.errorM, sharedMaterial: true }, packages, { name: 'blocks', ...nearBudget });

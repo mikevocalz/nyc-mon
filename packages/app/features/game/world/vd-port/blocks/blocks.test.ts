@@ -9,7 +9,9 @@ import type { Three } from '@acme/ui/three';
 import { WORLD_PRESETS } from '../../../perf/tier-presets.ts';
 import { createCellStream } from '../../cells/cell-stream.ts';
 import { buildVdPort } from '../index.ts';
-import { decodeNearCell, decodeShellCell, type ShellCellInfo } from './codec.ts';
+import { decodeNearCell, decodeShellCell, lazyNearPackage, nearCellBytes, type ShellCellInfo } from './codec.ts';
+import { decodeVertexBuffer } from './meshopt.ts';
+import { CELL } from '../../cells/cell-rules.ts';
 import { NEAR_NAME, SHELL_NAME, vdHiddenBuildings } from './index.ts';
 import { setVdBlockBytes } from './load.ts';
 import { makeBlocksMaterial } from './shell-material.ts';
@@ -143,7 +145,7 @@ test('the blocks material (shell and near level) builds to WGSL with no WebGL-on
   }
 });
 
-test('the port builds: shells resident, the near layer streamed under its own budget, the shell yielding to it', () => {
+test('the port builds: shells resident, the near layer streamed under its own budget, the shell yielding to it', async () => {
   setVdBlockBytes({ shell: shellBytes, near: nearBytes, level: 'near' });
   try {
     const dataset = parseCityDataset(JSON.parse(readFileSync(new URL('../../../data/harlem-apollo.json', import.meta.url), 'utf8')));
@@ -160,6 +162,9 @@ test('the port builds: shells resident, the near layer streamed under its own bu
     const k = 1536 / (2 * Math.tan(Math.PI / 6));
     const [ax, az] = toScene(1775.45, -2978.2);
     stream.prime({ x: ax, y: 1.7, z: az + 10 }, k, 200);
+    // Cells fetch through the cell source: the bundled bytes land on the next microtask and build on the next update.
+    await new Promise((r) => setImmediate(r));
+    for (let t = 0; t < 30; t++) stream.update({ x: ax, y: 1.7, z: az + 10 }, k, t / 10);
     const near = port.group.children.filter((o) => o.name === NEAR_NAME && o.userData.cell !== undefined);
     assert.ok(near.length > 0, 'near cells built at the Apollo');
     assert.ok(stream.stats.triangles <= WORLD_PRESETS['ipad-a12x'].vdPort.blocksNear.triangles, `${stream.stats.triangles} near triangles`);
@@ -176,6 +181,119 @@ test('the port builds: shells resident, the near layer streamed under its own bu
     port.dispose();
   } finally {
     setVdBlockBytes(null);
+  }
+});
+
+test('opt-in near and shell positions retain encoded cell-local values at positive and negative 49 km', () => {
+  const near = VD_BLOCKS.near[0]!;
+  const file = nearBytes.get(near.key)!;
+  const header = new DataView(file.buffer, file.byteOffset, file.byteLength);
+  const rawNear = new Uint8Array(near.vertices * 16);
+  decodeVertexBuffer(rawNear, near.vertices, 16, file.subarray(16, 16 + (header.getUint32(12, true) & 0x7fffffff)));
+  const shell = VD_BLOCKS.shell[0]!;
+  const rawShell = new Uint8Array(shell.vertices * 16);
+  decodeVertexBuffer(rawShell, shell.vertices, 16, shellBytes.subarray(shell.offset, shell.offset + shell.length));
+  for (const sign of [1, -1]) {
+    const cx = Math.floor(sign * 49000 / CELL), cz = Math.floor(-sign * 49000 / CELL);
+    for (const [a, raw, q, absolute] of [
+      [decodeNearCell(file, cx, cz, 'cell-local'), rawNear, 128, decodeNearCell(file, cx, cz)],
+      [decodeShellCell(shellBytes, { ...shell, cx, cz }, 'cell-local'), rawShell, 8, decodeShellCell(shellBytes, { ...shell, cx, cz })],
+    ] as const) {
+      assert.deepEqual(a.positionFrame, { kind: 'cell-local', origin: [cx * CELL + CELL / 2, 0, cz * CELL + CELL / 2] });
+      const view = new DataView(raw.buffer);
+      for (let i = 0; i < a.position.length / 3; i++) {
+        for (let axis = 0; axis < 3; axis++) {
+          const quantized = view.getInt16(i * 16 + axis * 2, true) / q;
+          const local = a.position[i * 3 + axis]!;
+          const origin: number = a.positionFrame!.origin[axis]!;
+          assert.equal(local, quantized);
+          assert.equal(local + origin, quantized + origin);
+          assert.ok(Math.abs(local + origin - absolute.position[i * 3 + axis]!) <= 0.05);
+        }
+      }
+      const x = a.position[0]!;
+      const originX = a.positionFrame!.origin[0];
+      const delta = Math.fround(x + 0.001) - Math.fround(x);
+      assert.ok(Math.abs(delta - 0.001) < 0.00001, `local millimetre detail: ${delta}`);
+      assert.ok(Math.abs((Math.fround(x + originX + 0.001) - Math.fround(x + originX)) - 0.001) > 0.0005);
+    }
+  }
+});
+
+test('local decode reconstructs absolute double positions and preserves shell UVs, colour, emission and indices', () => {
+  for (const cell of VD_BLOCKS.near) {
+    const file = nearBytes.get(cell.key)!;
+    const absolute = decodeNearCell(file, cell.cx, cell.cz);
+    const local = decodeNearCell(file, cell.cx, cell.cz, 'cell-local');
+    assert.equal(absolute.positionFrame, undefined);
+    assert.deepEqual(local.color, absolute.color);
+    assert.deepEqual(local.emissive, absolute.emissive);
+    assert.deepEqual(local.index, absolute.index);
+    for (let i = 0; i < local.position.length; i++) assert.ok(Math.abs(local.position[i]! + local.positionFrame!.origin[i % 3]! - absolute.position[i]!) <= 0.05);
+  }
+  for (const cell of VD_BLOCKS.shell) {
+    const absolute = decodeShellCell(shellBytes, cell);
+    const local = decodeShellCell(shellBytes, cell, 'cell-local');
+    assert.equal(absolute.positionFrame, undefined);
+    assert.deepEqual(local.uv, absolute.uv);
+    assert.deepEqual(local.color, absolute.color);
+    for (let i = 0; i < local.position.length; i++) assert.ok(Math.abs(local.position[i]! + local.positionFrame!.origin[i % 3]! - absolute.position[i]!) <= 0.05);
+    for (let i = 0; i < local.position.length; i += 9) {
+      const p = (vertex: number) => new THREE.Vector3(local.position[i + vertex * 3], local.position[i + vertex * 3 + 1], local.position[i + vertex * 3 + 2]);
+      const a = p(0), b = p(1), c = p(2);
+      const normal = b.clone().sub(a).cross(c.clone().sub(a)).normalize();
+      const offset = new THREE.Vector3(...local.positionFrame!.origin);
+      a.add(offset); b.add(offset); c.add(offset);
+      const reconstructed = b.sub(a).cross(c.sub(a)).normalize();
+      assert.ok(normal.distanceTo(reconstructed) < 1e-10);
+    }
+  }
+});
+
+test('lazy local package keeps absolute bounds, identical GPU layout and byte budget, and its frame across release', () => {
+  const source = VD_BLOCKS.near[0]!;
+  const file = nearBytes.get(source.key)!;
+  for (const sign of [1, -1]) {
+    const cx = Math.floor(sign * 49000 / CELL), cz = Math.floor(-sign * 49000 / CELL);
+    const dx = (cx - source.cx) * CELL, dz = (cz - source.cz) * CELL;
+    const bounds = source.bounds.map((v, i) => v + (i % 3 === 0 ? dx : i % 3 === 2 ? dz : 0));
+    const info = { ...source, cx, cz, bounds };
+    let loads = 0;
+    const read = () => { loads++; return file; };
+    const local = lazyNearPackage(info, read, 'cell-local');
+    const legacy = lazyNearPackage(info, () => file);
+    const explicit = lazyNearPackage(info, () => file, 'absolute');
+    assert.equal(loads, 0);
+    assert.deepEqual(local.positionFrame, { kind: 'cell-local', origin: [cx * CELL + CELL / 2, 0, cz * CELL + CELL / 2] });
+    assert.equal(loads, 0);
+    assert.equal(legacy.positionFrame, undefined);
+    assert.deepEqual(local.bounds, Float64Array.from(bounds));
+    assert.deepEqual(local.bounds, legacy.bounds);
+    assert.equal(local.bytes, nearCellBytes(info));
+    assert.equal(local.bytes, legacy.bytes);
+    assert.equal(local.vertexCount, legacy.vertexCount);
+    assert.equal(local.triangles, legacy.triangles);
+    const first = local.attributes;
+    assert.equal(loads, 1);
+    assert.deepEqual(Object.keys(first), Object.keys(legacy.attributes));
+    for (const [name, attribute] of Object.entries(first)) {
+      const old = legacy.attributes[name]!;
+      assert.equal(attribute.itemSize, old.itemSize);
+      assert.equal(attribute.normalized, old.normalized);
+      assert.equal(attribute.array.constructor, old.array.constructor);
+      assert.equal(attribute.array.byteLength, old.array.byteLength);
+      assert.deepEqual(old.array, explicit.attributes[name]!.array);
+      if (name !== 'position') assert.deepEqual(attribute.array, old.array);
+    }
+    const frame = local.positionFrame;
+    const index = local.index;
+    assert.equal(loads, 1);
+    local.release!();
+    assert.equal(local.positionFrame, frame);
+    assert.deepEqual(local.attributes.position!.array, first.position!.array);
+    assert.notEqual(local.attributes.position!.array, first.position!.array);
+    assert.deepEqual(local.index, index);
+    assert.equal(loads, 2);
   }
 });
 

@@ -1,7 +1,13 @@
 // The vd-port block packs (tooling/city/vd-port/write.mjs) to vertex arrays, decoded with the meshopt reference decoder
 // (meshopt.ts). Scene metres throughout.
-import { CELL, cellNum, type CellAttribute, type CellPackage } from '../../cells/cell-rules.ts';
+import { CELL, cellNum, type CellAttribute, type CellLocalPositionFrame, type CellPackage } from '../../cells/cell-rules.ts';
 import { decodeIndexBuffer, decodeVertexBuffer } from './meshopt.ts';
+
+export type BlockCoordinateFrame = 'absolute' | 'cell-local';
+
+function cellLocalPositionFrame(cx: number, cz: number): CellLocalPositionFrame {
+  return Object.freeze({ kind: 'cell-local', origin: Object.freeze([cx * CELL + CELL / 2, 0, cz * CELL + CELL / 2] as const) });
+}
 
 export interface NearCellInfo {
   readonly key: string;
@@ -29,6 +35,7 @@ export interface ShellCellInfo {
 }
 
 export interface NearArrays {
+  readonly positionFrame?: CellLocalPositionFrame;
   /** float32x3, scene metres. */
   position: Float32Array;
   /** RGBA8: sRGB albedo; alpha the emission's day share (lo / 4). */
@@ -41,7 +48,7 @@ export interface NearArrays {
 const NEAR_Q = 128;
 
 /** A near cell file: 'VDN1', vertex count, index count, encoded vertex length (bit 31: 32-bit indices), the two streams. */
-export function decodeNearCell(file: Uint8Array, cx: number, cz: number): NearArrays {
+export function decodeNearCell(file: Uint8Array, cx: number, cz: number, coordinateFrame: BlockCoordinateFrame = 'absolute'): NearArrays {
   if (file[0] !== 0x56 || file[1] !== 0x44 || file[2] !== 0x4e || file[3] !== 0x31) throw new Error('not a VDN1 near cell');
   const dv = new DataView(file.buffer, file.byteOffset, file.byteLength);
   const n = dv.getUint32(4, true), count = dv.getUint32(8, true), word = dv.getUint32(12, true);
@@ -50,7 +57,8 @@ export function decodeNearCell(file: Uint8Array, cx: number, cz: number): NearAr
   decodeVertexBuffer(vb, n, 16, file.subarray(16, 16 + evLen));
   const index = wide ? new Uint32Array(count) : new Uint16Array(count);
   decodeIndexBuffer(index, count, file.subarray(16 + evLen));
-  const ox = cx * CELL + CELL / 2, oz = cz * CELL + CELL / 2;
+  const ox = coordinateFrame === 'cell-local' ? 0 : cx * CELL + CELL / 2;
+  const oz = coordinateFrame === 'cell-local' ? 0 : cz * CELL + CELL / 2;
   const position = new Float32Array(n * 3), color = new Uint8Array(n * 4), emissive = new Uint8Array(n * 4);
   const v = new DataView(vb.buffer);
   for (let i = 0; i < n; i++) {
@@ -60,10 +68,13 @@ export function decodeNearCell(file: Uint8Array, cx: number, cz: number): NearAr
     color.set(vb.subarray(i * 16 + 8, i * 16 + 12), i * 4);
     emissive.set(vb.subarray(i * 16 + 12, i * 16 + 16), i * 4);
   }
-  return { position, color, emissive, index };
+  return coordinateFrame === 'cell-local'
+    ? { position, color, emissive, index, positionFrame: cellLocalPositionFrame(cx, cz) }
+    : { position, color, emissive, index };
 }
 
 export interface ShellArrays {
+  readonly positionFrame?: CellLocalPositionFrame;
   position: Float32Array;
   /** RGBA8: sRGB albedo, the building's lit share in alpha. */
   color: Uint8Array;
@@ -72,11 +83,12 @@ export interface ShellArrays {
 }
 
 /** One shell cell out of shell.bin: per-face vertices, int16x4 at 1/8 m about the cell centre, RGBA8, int16x2 uv / 1024. */
-export function decodeShellCell(all: Uint8Array, info: ShellCellInfo): ShellArrays {
+export function decodeShellCell(all: Uint8Array, info: ShellCellInfo, coordinateFrame: BlockCoordinateFrame = 'absolute'): ShellArrays {
   const n = info.vertices;
   const vb = new Uint8Array(n * 16);
   decodeVertexBuffer(vb, n, 16, all.subarray(info.offset, info.offset + info.length));
-  const ox = info.cx * CELL + CELL / 2, oz = info.cz * CELL + CELL / 2;
+  const ox = coordinateFrame === 'cell-local' ? 0 : info.cx * CELL + CELL / 2;
+  const oz = coordinateFrame === 'cell-local' ? 0 : info.cz * CELL + CELL / 2;
   const position = new Float32Array(n * 3), color = new Uint8Array(n * 4), uv = new Float32Array(n * 2);
   const v = new DataView(vb.buffer);
   for (let i = 0; i < n; i++) {
@@ -87,19 +99,22 @@ export function decodeShellCell(all: Uint8Array, info: ShellCellInfo): ShellArra
     uv[i * 2] = v.getInt16(i * 16 + 12, true) / 1024;
     uv[i * 2 + 1] = v.getInt16(i * 16 + 14, true) / 1024;
   }
-  return { position, color, uv };
+  return coordinateFrame === 'cell-local'
+    ? { position, color, uv, positionFrame: cellLocalPositionFrame(info.cx, info.cz) }
+    : { position, color, uv };
 }
 
 /**
  * A near cell as a streamer package that decodes when the streamer first builds it and drops its arrays on eviction.
  * `bytes` is the GPU upload: float32x3 + RGBA8 + RGBA8 per vertex, and the index.
  */
-export function lazyNearPackage(info: NearCellInfo, file: () => Uint8Array): CellPackage {
+export function lazyNearPackage(info: NearCellInfo, file: () => Uint8Array, coordinateFrame: BlockCoordinateFrame = 'absolute'): CellPackage {
   let arrays: NearArrays | null = null;
-  const get = () => (arrays ??= decodeNearCell(file(), info.cx, info.cz));
+  const get = () => (arrays ??= decodeNearCell(file(), info.cx, info.cz, coordinateFrame));
   const b = info.bounds;
   return {
     cx: info.cx, cz: info.cz, num: cellNum(info.cx, info.cz), size: CELL,
+    ...(coordinateFrame === 'cell-local' ? { positionFrame: cellLocalPositionFrame(info.cx, info.cz) } : {}),
     get attributes(): Readonly<Record<string, CellAttribute>> {
       const a = get();
       return {
