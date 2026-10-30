@@ -5,7 +5,7 @@ import { SectionRowLabel as SectionRowLabel_90676324955cc43725bf40e7e73aa6af } f
 import { WebsitePreviewButton as WebsitePreviewButton_8dd5b4bf8f7ba7b299a4269ecdc78558 } from '../../../../../packages/payload/src/site-content/PreviewButton'
 import { LLMInstructionsDescription as LLMInstructionsDescription_3817bf644402e67bfe6577f60ef982de } from '@payloadcms/ui'
 import { LLMInstructionsCell as LLMInstructionsCell_ab83ff7e88da8d3530831f296ec4756a } from '@payloadcms/ui/rsc'
-import { WebsiteNavigation as WebsiteNavigation_b5f446a495f1531072708caa6f96f360 } from '../../../../../packages/payload/src/site-content/Navigation'
+import { ConsoleEditorNav as ConsoleEditorNav_cd4eb3cc70eaa3aa9390e47175c29525 } from '../../../../../packages/payload/src/admin/console/Shell'
 import { LogoutButton as LogoutButton_aa8e4427b70b37c7820895ace344eb78 } from '@delmaredigital/payload-better-auth/components'
 import { ConsoleIcon as ConsoleIcon_b2dc090577a65eb908914d2ced8d0049 } from '../../../../../packages/payload/src/admin/console/Chrome'
 import { ConsoleLogo as ConsoleLogo_cd4eb3cc70eaa3aa9390e47175c29525 } from '../../../../../packages/payload/src/admin/console/Shell'
@@ -39,7 +39,7 @@ export const importMap = {
   "./site-content/PreviewButton#WebsitePreviewButton": WebsitePreviewButton_8dd5b4bf8f7ba7b299a4269ecdc78558,
   "@payloadcms/ui#LLMInstructionsDescription": LLMInstructionsDescription_3817bf644402e67bfe6577f60ef982de,
   "@payloadcms/ui/rsc#LLMInstructionsCell": LLMInstructionsCell_ab83ff7e88da8d3530831f296ec4756a,
-  "./site-content/Navigation#WebsiteNavigation": WebsiteNavigation_b5f446a495f1531072708caa6f96f360,
+  "./admin/console/Shell#ConsoleEditorNav": ConsoleEditorNav_cd4eb3cc70eaa3aa9390e47175c29525,
   "@delmaredigital/payload-better-auth/components#LogoutButton": LogoutButton_aa8e4427b70b37c7820895ace344eb78,
   "./admin/console/Chrome#ConsoleIcon": ConsoleIcon_b2dc090577a65eb908914d2ced8d0049,
   "./admin/console/Shell#ConsoleLogo": ConsoleLogo_cd4eb3cc70eaa3aa9390e47175c29525,

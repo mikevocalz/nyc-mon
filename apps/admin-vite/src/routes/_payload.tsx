@@ -13,10 +13,13 @@
 import { payloadLayoutRoute } from '@payloadcms/tanstack-start/client';
 import { createFileRoute } from '@tanstack/react-router';
 
-// Payload's own panel stylesheet, then the ops console's. The console sheet
-// is scoped to `.nycmon-console` and layered after `payload-default`
+// Payload's own panel stylesheet, the Website editor's theme over it, then the
+// ops console's. editor.css sets Payload's custom properties to the console's
+// tokens in Payload's `payload` override layer. The console sheet is scoped to
+// `.nycmon-console` and layered after `payload-default`
 // (console-scope.postcss.mjs), so on a stock Payload screen it matches nothing.
 import '@payloadcms/ui/css/app.css';
+import '../editor.css';
 import '../console.css';
 
 import { getLayoutDataFn, serverFunctionHandler } from './_payload/server.functions';

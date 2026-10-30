@@ -8,10 +8,12 @@ import { nameWebsiteUpload, protectWebsiteMediaDelete, protectWebsiteMediaReplac
 export const siteContentPlugin: Plugin = (config) => ({
   ...config,
   endpoints: [...(config.endpoints ?? []), ...websitePreviewEndpoints],
-  admin: { ...config.admin, components: { ...config.admin?.components, Nav: './site-content/Navigation#WebsiteNavigation' } },
+  admin: { ...config.admin, components: { ...config.admin?.components, Nav: './admin/console/Shell#ConsoleEditorNav' } },
   collections: [
     ...(config.collections ?? []).map((collection) => collection.slug !== 'media' ? collection : {
       ...collection,
+      // The console sidebar calls this Website → Media library; the list title and crumbs match it.
+      labels: { singular: 'Media file', plural: 'Media library' },
       // Website objects are immutable. Swap relationships rather than racing a shared-byte overwrite/delete.
       access: {...collection.access, admin: ({req}: {req: PayloadRequest}) => ['ops', 'content'].includes(String(req.user?.role)), create: staffRoles(['ops', 'content']), update: staffRoles(['ops', 'content']), delete: () => false},
       admin: {

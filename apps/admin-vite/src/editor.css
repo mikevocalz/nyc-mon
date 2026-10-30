@@ -1,0 +1,678 @@
+/*
+ * The Website editor in the console's clothes.
+ *
+ * The editor is Payload's own list, edit, version and upload views (PR #140),
+ * kept native so drafts, preview, publish, versions and restore keep working.
+ * This sheet gives those views the console's tokens and frame instead of
+ * Payload's grey-and-blue defaults:
+ *
+ * 1. Payload's CSS custom properties (`--color-*`, `--field-*`, `--radius-*`,
+ *    `--text-*-family`, `--accessibility-*`) are set to the console's values
+ *    from @acme/theme (docs/design/admin/03-direction.md, Themes). Values are
+ *    literal because @acme/theme's own `--color-*` names collide with
+ *    Payload's and are confined to `.nycmon-console` (console-scope.postcss.mjs).
+ *    editor-theme.test.mjs fails if any value here drifts from
+ *    packages/theme/tokens.ts.
+ * 2. A few component rules (page title, primary action, tables, the header)
+ *    match the console's Heading, Button `cta`, DataTable `page` and shell.
+ * 3. Payload's template grid holds the console's own navigation
+ *    (ConsoleEditorNav in packages/payload/src/admin/console/Shell.tsx).
+ *
+ * Light and dark follow `html[data-theme]`, which Payload sets from the OS
+ * (or the console's Appearance pin, mirrored by ConsoleEditorNav). The
+ * console's own views key off the same attribute.
+ *
+ * Everything sits in `@layer payload`, the override layer Payload declares
+ * after `payload-default` (@payloadcms/ui/css/app.css), so it beats Payload's
+ * component rules without !important. Inside a `.nycmon-console` element the
+ * console redeclares every `--color-*` it reads, so nothing here repaints the
+ * console's own screens.
+ */
+@layer payload-default, payload;
+
+@layer payload {
+  :root {
+    /* Surfaces: concrete page, white raised panes, sunken wells. */
+    --color-bg: #F3F4F4;
+    --color-bg-elevated: #FFFFFF;
+    --color-bg-secondary: #EBECED;
+    --color-bg-secondary-hover: #D2D4D6;
+    --color-bg-secondary-pressed: #D2D4D6;
+    --color-bg-tertiary: #D2D4D6;
+    --color-bg-hover: #EBECED;
+    --color-bg-pressed: #D2D4D6;
+    --color-bg-transparent-hover: #0000000D;
+    --color-bg-transparent-pressed: #0000001A;
+    --special-bg-hover-transparent: #0000000D;
+    --color-bg-inverse: #000000;
+    --color-bg-menu: #000000;
+    --color-bg-tooltip: #000000;
+
+    /* Ink. */
+    --color-text: #000000;
+    --color-text-secondary: #484C51;
+    --color-text-tertiary: #61656A;
+    --color-text-disabled: #61656A;
+    --color-text-oninverse: #F8F8F8;
+    --color-text-ontooltip: #F8F8F8;
+    --color-icon: #000000;
+    --color-icon-hover: #000000;
+    --color-icon-secondary: #484C51;
+    --color-icon-secondary-hover: #000000;
+    --color-icon-tertiary: #61656A;
+    --color-icon-oninverse: #F8F8F8;
+
+    /* Keylines. Field and control edges use text-muted, as TextField does. */
+    --color-border: #D2D4D6;
+    --color-border-strong: #484C51;
+    --color-border-disabled: #D2D4D6;
+    --special-border-translucent: #61656A;
+    --special-border-translucent-strong: #000000;
+
+    /*
+     * Payload's "brand" fills checkboxes, switches, date pickers and menu
+     * hovers, so it takes the accent. Orange keeps its canon job only: the
+     * face of the one primary action (Decision #7), via --console-cta below.
+     */
+    --color-bg-brand: #0058F8;
+    --color-bg-brand-hover: #004CD9;
+    --color-bg-brand-pressed: #004CD9;
+    --color-bg-brand-secondary: #004CD9;
+    --color-text-onbrand: #FFFFFF;
+    --color-text-onbrand-secondary: #FFFFFF;
+    --color-icon-onbrand: #FFFFFF;
+    --console-cta: #FC7C00;
+    --console-cta-pressed: #FD9D40;
+    --console-on-cta: #000000;
+
+    /* Links, selection and focus: accent (royal on daylit, carolina at night). */
+    --color-text-brand: #004CD9;
+    --color-text-brand-secondary: #004CD9;
+    --color-icon-brand: #0058F8;
+    --color-bg-brand-tertiary: #0058F81A;
+    --color-bg-brand-tertiary-hover: #0058F833;
+    --color-border-brand: #0058F8;
+    --color-border-brand-strong: #0058F8;
+    --color-bg-selected: #0058F81A;
+    --color-bg-selected-hover: #0058F833;
+    --color-bg-selected-pressed: #0058F84D;
+    --color-bg-selected-strong: #0058F8;
+    --color-bg-selected-strong-hover: #004CD9;
+    --color-bg-selected-strong-pressed: #004CD9;
+    --color-text-selected: #004CD9;
+    --color-text-onselected-strong: #FFFFFF;
+    --color-icon-selected: #0058F8;
+    --color-icon-onselected-strong: #FFFFFF;
+    --color-border-selected: #0058F8;
+    --color-border-selected-strong: #0058F8;
+    --accessibility-focus-color: #0058F8;
+    --accessibility-outline: 2px solid var(--accessibility-focus-color);
+    --accessibility-outline-offset: 2px;
+
+    /* Status. */
+    --color-bg-success: #2C7A29;
+    --color-bg-success-hover: #2C7A29;
+    --color-text-success: #225E1F;
+    --color-icon-success: #2C7A29;
+    --color-text-onsuccess: #FFFFFF;
+    --color-bg-success-tertiary: #2C7A291A;
+    --color-border-success: #2C7A29;
+    --color-border-success-strong: #2C7A29;
+    --color-bg-danger: #D50000;
+    --color-bg-danger-hover: #AE0000;
+    --color-bg-danger-pressed: #AE0000;
+    --color-text-danger: #D50000;
+    --color-text-danger-secondary: #D50000;
+    --color-icon-danger: #D50000;
+    --color-text-ondanger: #FFFFFF;
+    --color-bg-danger-tertiary: #D500001A;
+    --color-bg-danger-tertiary-hover: #D5000033;
+    --color-border-danger: #D50000;
+    --color-border-danger-strong: #D50000;
+
+    /* Fields: TextField's raised well, 2px muted edge, focus edge. */
+    --field-color-bg: #FFFFFF;
+    --field-color-bg-readonly: #EBECED;
+    --field-color-border-focus: #0058F8;
+    --field-color-toggle-bg-checked: #0058F8;
+    --field-color-toggle-border-checked: #0058F8;
+    --field-color-toggle-icon: #FFFFFF;
+    --field-color-upload-bg: #EBECED;
+    --field-min-height-large: 44px;
+    --field-min-height-medium: 44px;
+    --stroke-width-small: 1px;
+
+    /* Square by default (radius tokens are 0 in @acme/theme); pills stay round. */
+    --radius-small: 0;
+    --radius-chip: 0;
+    --radius-medium: 0;
+    --radius-large: 0;
+
+    /* Space Grotesk does the work; Archivo Black is the one h1 per screen. */
+    --text-body-family: 'Space Grotesk', system-ui, -apple-system;
+    --text-heading-family: 'Space Grotesk', system-ui, -apple-system;
+    --console-display: 'Archivo Black', 'Arial Black', sans-serif;
+
+    /* Keylines instead of drop shadows (03-direction.md). */
+    --elevation-100-canvas: 0 0 0 1px #D2D4D6;
+  }
+
+  html[data-theme='dark'] {
+    --color-bg: #00041C;
+    --color-bg-elevated: #0A1230;
+    --color-bg-secondary: #000212;
+    --color-bg-secondary-hover: #1A2E6E;
+    --color-bg-secondary-pressed: #1A2E6E;
+    --color-bg-tertiary: #1A2E6E;
+    --color-bg-hover: #0A1230;
+    --color-bg-pressed: #1A2E6E;
+    --color-bg-transparent-hover: #F8F8F814;
+    --color-bg-transparent-pressed: #F8F8F826;
+    --special-bg-hover-transparent: #F8F8F814;
+    --color-bg-inverse: #F8F8F8;
+    --color-bg-menu: #0A1230;
+    --color-bg-tooltip: #0A1230;
+
+    --color-text: #F8F8F8;
+    --color-text-secondary: #BEC0C2;
+    --color-text-tertiary: #BEC0C2;
+    --color-text-disabled: #BEC0C2;
+    --color-text-oninverse: #00041C;
+    --color-icon: #F8F8F8;
+    --color-icon-hover: #F8F8F8;
+    --color-icon-secondary: #BEC0C2;
+    --color-icon-secondary-hover: #F8F8F8;
+    --color-icon-tertiary: #BEC0C2;
+    --color-icon-oninverse: #00041C;
+
+    --color-border: #1A2E6E;
+    --color-border-strong: #BEC0C2;
+    --color-border-disabled: #1A2E6E;
+    --special-border-translucent: #BEC0C2;
+    --special-border-translucent-strong: #F8F8F8;
+
+    --color-bg-brand: #4BA8F0;
+    --color-bg-brand-hover: #78BEF4;
+    --color-bg-brand-pressed: #78BEF4;
+    --color-bg-brand-secondary: #78BEF4;
+    --color-text-onbrand: #00041C;
+    --color-text-onbrand-secondary: #00041C;
+    --color-icon-onbrand: #00041C;
+    --console-cta: #FC7C00;
+    --console-cta-pressed: #FD9D40;
+    --console-on-cta: #00041C;
+
+    --color-text-brand: #78BEF4;
+    --color-text-brand-secondary: #78BEF4;
+    --color-icon-brand: #4BA8F0;
+    --color-bg-brand-tertiary: #4BA8F026;
+    --color-bg-brand-tertiary-hover: #4BA8F040;
+    --color-border-brand: #4BA8F0;
+    --color-border-brand-strong: #4BA8F0;
+    --color-bg-selected: #4BA8F026;
+    --color-bg-selected-hover: #4BA8F040;
+    --color-bg-selected-pressed: #4BA8F059;
+    --color-bg-selected-strong: #4BA8F0;
+    --color-bg-selected-strong-hover: #78BEF4;
+    --color-bg-selected-strong-pressed: #78BEF4;
+    --color-text-selected: #78BEF4;
+    --color-text-onselected-strong: #00041C;
+    --color-icon-selected: #4BA8F0;
+    --color-icon-onselected-strong: #00041C;
+    --color-border-selected: #4BA8F0;
+    --color-border-selected-strong: #4BA8F0;
+    --accessibility-focus-color: #4BA8F0;
+
+    --color-bg-success: #3FAE3A;
+    --color-bg-success-hover: #3FAE3A;
+    --color-text-success: #6FC26B;
+    --color-icon-success: #3FAE3A;
+    --color-text-onsuccess: #00041C;
+    --color-bg-success-tertiary: #3FAE3A26;
+    --color-border-success: #3FAE3A;
+    --color-border-success-strong: #3FAE3A;
+    --color-bg-danger: #FA4040;
+    --color-bg-danger-hover: #FA4040;
+    --color-bg-danger-pressed: #FA4040;
+    --color-text-danger: #FA4040;
+    --color-text-danger-secondary: #FA4040;
+    --color-icon-danger: #FA4040;
+    --color-text-ondanger: #00041C;
+    --color-bg-danger-tertiary: #FA404026;
+    --color-bg-danger-tertiary-hover: #FA404040;
+    --color-border-danger: #FA4040;
+    --color-border-danger-strong: #FA4040;
+
+    --field-color-bg: #0A1230;
+    --field-color-bg-readonly: #000212;
+    --field-color-border-focus: #4BA8F0;
+    --field-color-toggle-bg-checked: #4BA8F0;
+    --field-color-toggle-border-checked: #4BA8F0;
+    --field-color-toggle-icon: #00041C;
+    --field-color-upload-bg: #000212;
+
+    --elevation-100-canvas: 0 0 0 1px #1A2E6E;
+  }
+
+  /* Type: the console's dense scale (03-direction.md, Type and density). Never under 13px. */
+  :root {
+    --text-body-small-font-size: 13px;
+    --text-body-small-line-height: 18px;
+    --text-body-small-bold-font-size: 13px;
+    --text-body-small-bold-line-height: 18px;
+    --text-body-small-paragraph-font-size: 13px;
+    --text-body-small-paragraph-line-height: 18px;
+    --text-body-medium-font-size: 14px;
+    --text-body-medium-line-height: 20px;
+    --text-body-medium-bold-font-size: 14px;
+    --text-body-medium-bold-line-height: 20px;
+    --text-body-medium-paragraph-font-size: 14px;
+    --text-body-medium-paragraph-line-height: 20px;
+    --text-body-large-font-size: 15px;
+    --text-body-large-line-height: 22px;
+    --text-body-large-bold-font-size: 15px;
+    --text-body-large-bold-line-height: 22px;
+    --text-body-large-paragraph-font-size: 15px;
+    --text-body-large-paragraph-line-height: 22px;
+    --text-body-small-font-weight: 400;
+    --text-body-medium-font-weight: 400;
+    --text-body-large-font-weight: 400;
+    --text-body-small-bold-font-weight: 600;
+    --text-body-medium-bold-font-weight: 600;
+    --text-body-large-bold-font-weight: 600;
+    --text-heading-small-font-size: 15px;
+    --text-heading-small-line-height: 22px;
+    --text-heading-small-font-weight: 700;
+    --text-heading-medium-font-size: 18px;
+    --text-heading-medium-line-height: 24px;
+    --text-heading-medium-font-weight: 700;
+    --text-heading-large-font-size: 18px;
+    --text-heading-large-line-height: 24px;
+    --text-heading-large-font-weight: 700;
+
+    /* Every control is a 44px target (03-direction.md, Density). */
+    --button-height: 44px;
+    --control-height: 44px;
+  }
+
+  /* The one h1 per screen: console-station, Archivo Black 24/30, sentence case. */
+  .list-header__title,
+  .doc-header__title {
+    font-family: var(--console-display);
+    font-size: 24px;
+    line-height: 30px;
+    font-weight: 400;
+    letter-spacing: 0;
+    text-wrap: balance;
+  }
+
+  /*
+   * Frame: the console's navigation sits in Payload's template grid, as wide
+   * as the console sidebar (16rem from 840px, 20rem from 1200px). Below 840px
+   * it is the brand strip above the page, and the bottom TabBar is fixed, so
+   * the page leaves room for it, as ConsoleShell's Main does (pb-28).
+   */
+  .template-default,
+  .template-default.template-default--nav-open,
+  .template-default.template-default--nav-hydrated {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .template-default .template-default__wrap {
+    padding-bottom: 7rem;
+  }
+  @media (min-width: 840px) {
+    .template-default,
+    .template-default.template-default--nav-open,
+    .template-default.template-default--nav-hydrated {
+      grid-template-columns: 16rem minmax(0, 1fr);
+    }
+    .template-default .template-default__wrap {
+      padding-bottom: 0;
+    }
+  }
+  @media (min-width: 1200px) {
+    .template-default,
+    .template-default.template-default--nav-open,
+    .template-default.template-default--nav-hydrated {
+      grid-template-columns: 20rem minmax(0, 1fr);
+    }
+  }
+  /* The console sidebar is always there; Payload's nav toggle has nothing to open. */
+  .app-header__sidebar-toggle {
+    display: none;
+  }
+
+  /*
+   * Breadcrumbs: the console has none on a section's own screen, so the list
+   * view shows only its h1. A document keeps one crumb back to its list.
+   * "Dashboard" is dropped: /admin is a redirect to Overview, which the
+   * sidebar already carries.
+   */
+  .step-nav__first,
+  .step-nav__first + .step-nav__separator {
+    display: none;
+  }
+  .step-nav:not(:has(.step-nav__item ~ .step-nav__item ~ .step-nav__item)) {
+    display: none;
+  }
+  .step-nav .step-nav__item {
+    color: var(--color-text-secondary);
+    font-size: 14px;
+  }
+  .step-nav .step-nav__last {
+    color: var(--color-text);
+    font-weight: 600;
+  }
+
+  /*
+   * The primary action: Button variant="cta". An orange face with a black
+   * label in Archivo Black, a 2px keyline, the corner cut at the bottom
+   * right and a 4px depth plate down and right, built in three layers the way
+   * the kit's CornerCutFrame.web.tsx builds it (plate, keyline, inset face).
+   */
+  .btn.btn--style-primary {
+    --cta-cut: 14px;
+    --cta-clip: polygon(0 0, 100% 0, 100% calc(100% - var(--cta-cut)), calc(100% - var(--cta-cut)) 100%, 0 100%);
+    --cta-face-clip: polygon(0 0, 100% 0, 100% calc(100% - var(--cta-cut) + 1px), calc(100% - var(--cta-cut) + 1px) 100%, 0 100%);
+    position: relative;
+    isolation: isolate;
+    background: transparent;
+    color: var(--console-on-cta);
+    padding: 0;
+    margin-right: 4px;
+    margin-bottom: 4px;
+    border-radius: 0;
+    transition-property: transform;
+    transition-duration: 120ms;
+    transition-timing-function: ease-out;
+  }
+  .btn.btn--style-primary::before,
+  .btn.btn--style-primary::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    clip-path: var(--cta-clip);
+    pointer-events: none;
+  }
+  /* Depth plate. */
+  .btn.btn--style-primary::before {
+    z-index: -2;
+    transform: translate(4px, 4px);
+    background: #A35100;
+  }
+  /* Keyline. */
+  .btn.btn--style-primary::after {
+    z-index: -1;
+    background: #3C1E00;
+  }
+  .btn.btn--style-primary > .btn__content {
+    position: relative;
+    margin: 2px;
+    min-height: calc(var(--button-height) - 4px);
+    padding-inline: 20px;
+    background: var(--console-cta);
+    clip-path: var(--cta-face-clip);
+    font-family: var(--console-display);
+    font-weight: 400;
+    letter-spacing: 0.025em;
+  }
+  .btn.btn--style-primary:hover:not(.btn--disabled) {
+    background: transparent;
+  }
+  .btn.btn--style-primary:hover:not(.btn--disabled) > .btn__content {
+    background: var(--console-cta-pressed);
+  }
+  /* The press sinks the face into its plate. */
+  .btn.btn--style-primary:active:not(.btn--disabled) {
+    background: transparent;
+    transform: translate(3px, 3px);
+  }
+  /* Unavailable reads as unavailable: no tone, no plate, a muted label. */
+  .btn.btn--style-primary.btn--disabled {
+    background: transparent;
+    color: var(--color-text-tertiary);
+  }
+  .btn.btn--style-primary.btn--disabled::before {
+    display: none;
+  }
+  .btn.btn--style-primary.btn--disabled::after {
+    background: var(--color-border);
+  }
+  .btn.btn--style-primary.btn--disabled > .btn__content {
+    background: var(--color-bg-secondary);
+  }
+  /* A long label wraps inside the face rather than push the page sideways. */
+  .btn.btn--style-primary .btn__label {
+    white-space: normal;
+    text-align: center;
+  }
+  @media (max-width: 599px) {
+    .btn.btn--style-primary > .btn__content {
+      padding-inline: 12px;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .btn.btn--style-primary {
+      transition: none;
+    }
+  }
+
+  /* Secondary actions: the outline look, a 2px ink edge on the raised surface. */
+  .btn.btn--style-secondary {
+    background-color: var(--color-bg-elevated);
+    border: 2px solid var(--color-text);
+    font-weight: 600;
+  }
+  .btn.btn--style-secondary.btn--disabled {
+    border-color: var(--color-border);
+  }
+
+  /*
+   * Edit / Versions / API: the active tab takes the console's active nav
+   * block, inverted ink with the corner notch at the top right.
+   */
+  .doc-tab {
+    font-weight: 500;
+  }
+  .btn.doc-tab.doc-tab--active,
+  .btn.doc-tab.doc-tab--active:hover {
+    background-color: var(--color-text);
+    color: var(--color-bg);
+    clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%);
+  }
+  .doc-tab--active .pill-version-count {
+    color: var(--color-text);
+  }
+
+  /*
+   * Tables: DataTable on the page surface. A raised pane in a 2px keyline,
+   * a sunken head row in Archivo Black over a 2px orange rule, 44px rows, and
+   * the orange edge on the row under the pointer.
+   */
+  .table {
+    border: 2px solid var(--color-border);
+    background: var(--color-bg-elevated);
+  }
+  .table thead tr {
+    background: var(--color-bg-secondary);
+  }
+  .table thead th,
+  .table thead th :is(button, span, a) {
+    font-family: var(--console-display);
+    font-weight: 400;
+  }
+  .table thead th {
+    border-bottom: 2px solid var(--console-cta);
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 400;
+    letter-spacing: 0.02em;
+    color: var(--color-text-secondary);
+    height: 44px;
+  }
+  .table tbody td {
+    height: 44px;
+    border-bottom: 1px solid var(--color-border);
+    font-variant-numeric: tabular-nums;
+  }
+  .table tbody tr {
+    box-shadow: inset 4px 0 0 transparent;
+    transition-property: box-shadow, background-color;
+    transition-duration: 120ms;
+  }
+  .table tbody tr:hover {
+    box-shadow: inset 4px 0 0 var(--console-cta);
+    background-color: #FC7C001A;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .table tbody tr {
+      transition: none;
+    }
+  }
+
+  /* Status: the kit Badge tones. Published reads as success, a draft as neutral, unpublished changes as info. */
+  .status-cell {
+    border-radius: 0;
+    font-weight: 600;
+  }
+  .status-cell--published {
+    background: var(--color-bg-success-tertiary);
+    color: var(--color-text-success);
+  }
+  .status-cell--draft {
+    background: var(--color-bg-secondary);
+    color: var(--color-text-secondary);
+  }
+  .status-cell--changed {
+    background: var(--color-bg-selected);
+    color: var(--color-text-selected);
+  }
+
+  /* Focus: the console ring, 2px in the focus colour with a 2px gap. */
+  :focus-visible {
+    outline: 2px solid var(--accessibility-focus-color);
+    outline-offset: 2px;
+    border-radius: 0;
+  }
+
+  /* Fields: TextField's 2px edge in text-muted, the focus colour on focus. */
+  .form-input,
+  .search-input,
+  .react-select .rs__control {
+    border-width: 2px;
+  }
+
+  /* "Preview saved draft" (site-content/PreviewButton.tsx): a link in the accent ink. */
+  .nycmon-preview-link {
+    display: inline-flex;
+    align-self: center;
+    align-items: center;
+    min-height: 44px;
+    padding-inline: 12px;
+    color: var(--color-text-brand);
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  /*
+   * Record rows below 600px, the DataTable rule for a narrow pane
+   * (03-direction.md, Responsive tables): each row is one record, the
+   * page name on the first line and the other values under it as captions.
+   * The head row is visually hidden but stays in the accessibility tree, and
+   * Payload's cells carry explicit grid roles, so screen readers keep the
+   * column names.
+   */
+  @media (max-width: 599px) {
+    .table {
+      overflow: visible;
+    }
+    .table table,
+    .table tbody {
+      display: block;
+      min-width: 0;
+      width: 100%;
+    }
+    .table thead {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+    .table tbody tr {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      column-gap: 12px;
+      align-items: center;
+      min-height: 56px;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--color-border);
+    }
+    .table tbody td,
+    .table tbody td:first-child,
+    .table tbody td:last-child {
+      display: block;
+      height: auto;
+      min-width: 0;
+      padding: 0;
+      border: 0;
+      grid-column: 2;
+      color: var(--color-text-secondary);
+      font-size: 13px;
+      line-height: 18px;
+    }
+    .table tbody td[data-column='_select'] {
+      grid-column: 1;
+      grid-row: 1 / span 4;
+    }
+    .table tbody td.cell--linked,
+    .table tbody td.cell--linked:first-child {
+      color: var(--color-text);
+      font-size: 15px;
+      line-height: 22px;
+    }
+    .table tbody td.cell--linked > :is(a, button),
+    .table tbody td.cell--linked:first-child > :is(a, button) {
+      min-height: 0;
+      padding: 0;
+    }
+  }
+
+  /*
+   * Kit components rendered inside Payload's views (the preview link, the
+   * section row labels) are react-native-web Text, which carries an unlayered
+   * `color: rgb(0, 0, 0)`: black on the night page. Outside the console root
+   * they take the ink of the Payload element around them instead. The
+   * console's own Text keeps its rule (console.css, rnw-text).
+   */
+  [dir='auto']:not(.nycmon-console, .nycmon-console *, input, textarea) {
+    color: inherit !important;
+  }
+  .nycmon-preview-link.nycmon-preview-link {
+    color: var(--color-text-brand) !important;
+  }
+
+  /*
+   * Version diffs: changed words keep the ink colour on their accent or danger
+   * tint (Payload's enhanced-contrast choice), so they hold 4.5:1 when the
+   * pill tint sits on the row tint.
+   */
+  * {
+    --diff-create-pill-color: var(--color-text);
+    --diff-delete-pill-color: var(--color-text);
+  }
+
+  /* The version picker wraps at phone width instead of pushing the page sideways at the console's 14px body size. */
+  .view-version__version-to,
+  .view-version__version-to-labels,
+  .view-version__version-to-version,
+  .view-version .react-select {
+    min-width: 0;
+    max-width: 100%;
+  }
+  .view-version__version-to-version {
+    flex-wrap: wrap;
+  }
+}
