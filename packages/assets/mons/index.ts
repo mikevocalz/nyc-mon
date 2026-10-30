@@ -3,9 +3,10 @@
  * apps/web/public/mons, which the website, the Alexa views
  * (packages/mcp-server, NYC_MON_MODEL_ORIGIN) and their boot tests already
  * serve and read. On web the app fetches the same public path, so the
- * 26-34 MB files are never emitted a second time; on native,
+ * 19-24 MB files are never emitted a second time; on native,
  * index.native.ts requires those files as Metro assets. Every file is plain
- * glTF (no Draco or Meshopt: Hermes has no WebAssembly).
+ * glTF with KHR_mesh_quantization (no Draco or Meshopt: Hermes has no
+ * WebAssembly).
  */
 
 export interface MonModelAsset {

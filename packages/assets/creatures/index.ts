@@ -1,7 +1,7 @@
 /// <reference path='../photos/webp.d.ts' />
 /**
- * Generated concept art of the three starter Baby forms, their eggs and the
- * hatch night scene (PS-028). Bundled WebP, never hotlinked. These are
+ * Generated concept art of three starter Baby forms (Fye Dot has none yet),
+ * the starter eggs and the hatch night scene (PS-028). Bundled WebP, never hotlinked. These are
  * stand-ins for final renders (PS-007): replace a file under a new name and
  * update the entry, and the slots that read it keep their layout.
  *
@@ -14,7 +14,12 @@
  * frames are cropped to 4:5 (960×1200). `blurDataURL` is a 20×25 (24×16 for
  * the wide frame) WebP of the same crop.
  *
- * Lil' Ratti is the exception: a render of apps/web/public/mons/lil-ratti.glb
+ * The Signal Egg is the creator's own reference art (Decision 30: the Glossy
+ * Red Polka-Dot Racing Egg), padded on white to 4:5. It has no scene behind
+ * it. Its 3D mesh is a different, tan spotted egg (Decision 38), so the
+ * still and the model do not match. No Fye Dot art exists yet.
+ *
+ * Lil' Ratti is another exception: a render of apps/web/public/mons/lil-ratti.glb
  * (three.js, `up_idle` at 0.4 s, front three-quarter, transparent background)
  * at 960×1200, so the 34 MB model is never needed where one picture will do.
  */
@@ -25,6 +30,7 @@ import kitteeCee from './kittee-cee.webp';
 import lilRatti from './lil-ratti.webp';
 import metroEgg from './metro-egg.webp';
 import prismEgg from './prism-egg.webp';
+import signalEgg from './signal-egg.webp';
 import squeaklet from './squeaklet.webp';
 import yotito from './yotito.webp';
 
@@ -49,6 +55,7 @@ export interface CreatureArt {
 }
 
 const GENERATED = { tool: 'Figma generate_image', model: 'gpt-image-2.5-sunburst', date: '2026-10-07' } as const;
+const CREATOR_SIGNAL_EGG = { tool: 'creator reference art, padded to 4:5', model: 'signal-egg/source/reference-front.png', date: '2026-10-29' } as const;
 const RENDERED_LIL_RATTI = { tool: 'three.js render of lil-ratti.glb', model: 'lil-ratti.glb up_idle', date: '2026-10-23' } as const;
 
 export const CREATURE_ART: readonly CreatureArt[] = [
@@ -135,6 +142,18 @@ export const CREATURE_ART: readonly CreatureArt[] = [
     blurDataURL:
       'data:image/webp;base64,UklGRg4BAABXRUJQVlA4IAIBAAAwBgCdASoUABkAPu1oqk+ppiOiKA1RMB2JbACdMoSCntVsf4W4Ox8+cQCfifMIArnqZG/Of5RpkU0AAPZCi9W5YsIMBC6mGC5bwwncaUg/s9kFGBBYnrqMok+ULijkRGtmOD6+JAFPztCwIm73QsUptkyFxTP5FWBifOMDph07NR8baAh4T2puBny3YhgjFleKmDtlKs433ip8LqG/LUKI601yIH8x/z/0UJeTd/yr5w/7f1H3NnzQsB3ZjLd/vEZ1y/Xv2Sq8pHfs1CuzYaD3o2OFpQLbacqLwuOUpP25u26y3fVQBZwxv3UnmpMVviPUvAbmkLIX0sCWkzV18HeAAAA=',
     generatedWith: GENERATED,
+  },
+  {
+    id: 'signal-egg',
+    kind: 'egg',
+    dexId: 20,
+    source: signalEgg,
+    alt: 'The Signal Egg, glossy red with dark red polka dots and two white bands, on a white background.',
+    width: 960,
+    height: 1200,
+    blurDataURL:
+      'data:image/webp;base64,UklGRqgAAABXRUJQVlA4IJwAAADwBACdASoUABkAPtFSpU2oJCOiMBgIAQAaCWwAvdGLQG+2zcj8RCHcA/bUEFLtiwAA/vYC/3TD032wAZFsVkjQmWjZa+gkvuFSpUMvZ2EPtu1SEln5amG6+Yv0PXbr8BvOKN+UeghPBipFZP1233AbqHvkVHO1R1/19asJve6nKbuIlThQsOmU9dL5TEVob5fSX0mXPambULDQAAA=',
+    generatedWith: CREATOR_SIGNAL_EGG,
   },
   {
     id: 'hatch-night',

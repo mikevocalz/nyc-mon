@@ -23,7 +23,7 @@ test('the copy lengths the ui fit test mirrors', () => {
   assert.equal(EGG_COPY['m10.title'].length, 33);
   assert.equal(EGG_COPY['m10.body'].length, 76);
   assert.equal(EGG_COPY['m08.title'].length, 13);
-  assert.equal(EGG_COPY['m08.santoro.caption'].length, 42);
+  assert.equal(EGG_COPY['m08.santoro.caption'].length, 41);
 });
 
 test('M10 stack: title, body, ring, ready, actions, Start', () => {
@@ -64,11 +64,11 @@ test('M10 arrangement: side on a landscape screen, never in the list layout', ()
 
 test('M08 browsing: head, triptych, actions', () => {
   assert.deepEqual(meetFitBlocks({
-    titleChars: 13, captionChars: 42, santoroChars: 0, headInScreen: true, listLayout: false,
+    titleChars: 13, captionChars: 41, santoroChars: 0, headInScreen: true, listLayout: false,
     cardShown: false, confirming: false, actionsShown: true, fontScale: 1,
   }), [
     { kind: 'text', role: 'title', chars: 13 },
-    { kind: 'text', role: 'body', chars: 42, tight: true },
+    { kind: 'text', role: 'body', chars: 41, tight: true },
     { kind: 'media', minPt: TRIPTYCH_MIN_DP, maxPt: 10_000 },
     { kind: 'controls', size: 'sm', minRowWidthPt: 320 },
   ]);

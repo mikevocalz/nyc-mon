@@ -25,8 +25,11 @@ const BUDGET: Readonly<Record<string, { raw: number; gzip: number }>> = {
   // evolution light, shards and synthesized sound (hatch-light.ts,
   // hatch-sound.ts, 2026-10-23) add about 37 KB raw, 12 KB gzip: drawn in
   // three.js because the MCP Apps CSP refuses the Rive runtime's WebAssembly.
+  // The fourth starter (Decision 38, 2026-10-29) brings the LanternFye forms,
+  // their v8 records and the Signal Egg thumbnail into the starter bundle,
+  // which put the room about 1 KB over 2950 KiB; it gets 8 KiB more.
   'mon-card': { raw: 2200 * 1024, gzip: 700 * 1024 },
-  'mon-room': { raw: 2950 * 1024, gzip: 920 * 1024 },
+  'mon-room': { raw: 2958 * 1024, gzip: 920 * 1024 },
 };
 
 /**

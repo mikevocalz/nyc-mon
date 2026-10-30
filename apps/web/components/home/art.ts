@@ -3,8 +3,9 @@
  * reads through `art(slot)`; the slot name is the contract final art replaces.
  *
  * The starter posters and the hatch band hold generated concept art from
- * `@acme/assets/creatures` (PS-028): the three Baby forms and the egg at
- * night. It stands in for final renders (PS-007) and carries no caption,
+ * `@acme/assets/creatures` (PS-028): the Baby forms and the egg at night.
+ * Starter slot 4's Baby (Fye Dot) has no art yet, so `starterArt(4)` is null
+ * and the poster draws a Coming Soon plate, never another Mon's picture. It stands in for final renders (PS-007) and carries no caption,
  * because a Mon is not a place. The other slots hold bundled, licensed NYC
  * photographs from `@acme/assets/photos` (1200x800 WebP with a blurDataURL;
  * never hotlinked). The `hlynk.*` slots are renders of the H-Lynk Core scene.
@@ -27,7 +28,6 @@ export type ArtSlot =
   | 'hlynk.static'
   | 'hlynk.scanner'
   | 'hlynk.controls'
-  | `starter.${StarterId}`
   | 'care'
   | 'hatch';
 
@@ -71,8 +71,8 @@ const sizes = (desktopVw: number) => `${MD_UP} ${desktopVw}vw, 92vw`;
 const gridSizes = (cols: number) =>
   `${XL_UP} ${Math.round((80 * cols) / 12)}rem, ${MD_UP} ${Math.round((100 * cols) / 12)}vw, 100vw`;
 
-/** Starter posters: a third of the 80rem grid from `lg`, half the row as a side-on poster from `md`. */
-const starterSizes = `${LG_UP} 26rem, ${MD_UP} 50vw, 100vw`;
+/** Starter posters: a quarter of the 80rem grid from `xl`, half the row from `md`, the full column on phones. */
+const starterSizes = `${XL_UP} 20rem, ${MD_UP} 50vw, 100vw`;
 
 function photoById(id: string): NycPhoto {
   const photo = NYC_PHOTOS.find((p) => p.id === id);
@@ -133,13 +133,7 @@ const ART = {
     decorative: { reason: 'The proof row names the control row in its headline and line.' },
     sizes: `${LG_UP} 12rem, 9rem`,
   },
-  // Starter posters (PS-020, PS-028): each Baby form on a street of its Bloodline's home turf
-  // (Hood Ratti: Harlem stoop; Bodega Baddiee Cee: 125th St bodega; Yote: Times Square). Focal
-  // point is the Mon's face, so the 1:1 phone crop and the side-on crop keep it.
-  'starter.1': fromCreature('squeaklet', starterSizes, { x: 0.5, y: 0.3 }),
-  'starter.2': fromCreature('kittee-cee', starterSizes, { x: 0.5, y: 0.28 }),
-  'starter.3': fromCreature('yotito', starterSizes, { x: 0.55, y: 0.33 }),
-  // Reserved for the Mon reaction art (audit §11 CARE); not rendered until it exists (PS-021).
+   // Reserved for the Mon reaction art (audit §11 CARE); not rendered until it exists (PS-021).
   care: fromPhoto('harlem-brownstone-stoops', sizes(40)),
   // The egg waiting at night (HANDOFF §HATCH, PS-028): an open case on a Harlem stoop, lit only by
   // the crack in the shell. Focal point on the egg, so the 4:5 phone crop keeps it; the dark left
@@ -148,6 +142,19 @@ const ART = {
 } as const satisfies Record<ArtSlot, ArtEntry>;
 
 export const ART_SLOTS = Object.keys(ART) as readonly ArtSlot[];
+
+/**
+ * Starter posters (PS-020, PS-028), keyed by starter slot: each Baby form on a street of its
+ * Bloodline's home turf (Hood Ratti: Harlem stoop; Bodega Baddiee Cee: 125th St bodega; Yote:
+ * Times Square). Focal point is the Mon's face, so the 1:1 phone crop keeps it. Slot 4 (Fye Dot,
+ * LanternFye) is null until its art exists: the poster shows Coming Soon (PS-007).
+ */
+const STARTER_ART: Readonly<Record<StarterId, ArtEntry | null>> = {
+  1: fromCreature('squeaklet', starterSizes, { x: 0.5, y: 0.3 }),
+  2: fromCreature('kittee-cee', starterSizes, { x: 0.5, y: 0.28 }),
+  3: fromCreature('yotito', starterSizes, { x: 0.55, y: 0.33 }),
+  4: null,
+};
 
 /**
  * World frames in DOM (= mobile reading) order: the dominant frame, then the
@@ -165,8 +172,9 @@ export function art(slot: ArtSlot): ArtEntry {
   return ART[slot];
 }
 
-export function starterSlot(id: StarterId): `starter.${StarterId}` {
-  return `starter.${id}`;
+/** A starter slot's Baby poster art, or null when the Baby has no art yet (Coming Soon). */
+export function starterArt(id: StarterId): ArtEntry | null {
+  return STARTER_ART[id];
 }
 
 /** A URL for `<link rel="preload">`: the bundler gives a string or StaticImageData. */

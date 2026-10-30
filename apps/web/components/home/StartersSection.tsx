@@ -2,7 +2,8 @@ import { bloodlineLabel, eggs, starterBloodlines } from '@acme/content';
 import { Image, type ImageProps } from '@acme/ui';
 import { Article, Figure, Heading, List, ListItem, Paragraph, Section, Text } from '@acme/ui/html';
 import { View } from '@acme/ui/tw';
-import { art, artPosition, starterSlot, type StarterId } from './art';
+import { artPosition, starterArt, type StarterId } from './art';
+import { ComingSoonArt } from './ComingSoonArt';
 import { Eyebrow } from './Eyebrow';
 import { W01_COPY } from './copy';
 import { sectionMarker } from './sections';
@@ -17,7 +18,7 @@ export interface StarterCard {
 }
 
 /**
- * The three starters from @acme/content: Baby name, its Dex number, its
+ * The four starters from @acme/content: Baby name, its Dex number, its
  * Bloodline label and the egg it hatches from. Nothing past Baby is read, so
  * no Small, Mid or Max name can reach the page. The egg is matched by
  * BloodlineId, not by array position.
@@ -35,37 +36,38 @@ export function starterCards(): StarterCard[] {
 
 /**
  * One starter as a poster (PS-020): the art plate first (the Baby form,
- * PS-028; no place caption, because the picture is a Mon, not a street), then the egg, the
- * Dex plate, the Baby name large, and the Bloodline on a ruled line. Nothing
- * is interactive, so nothing changes on hover. Below `md` the poster is a
- * column; from `md` to `lg` it lies on its side (art the left half); from `lg` the
- * three stand side by side.
+ * PS-028; no place caption, because the picture is a Mon, not a street; a
+ * Coming Soon plate where the Baby has no art yet), then the egg, the Dex
+ * plate, the Baby name large, and the Bloodline on a ruled line. Nothing is
+ * interactive, so nothing changes on hover. The poster is always a column:
+ * one per row on phones, two per row from `md`, all four side by side from `xl`.
  */
 function StarterPoster({ card, index }: { card: StarterCard; index: number }) {
   const copy = W01_COPY.starters;
-  const plate = art(starterSlot(card.slot));
+  const plate = starterArt(card.slot);
   const nameId = `w01-starter-${card.slot}`;
   return (
-    <ListItem id={`mfx-starter-${index}`} className="min-w-0 lg:flex-1">
-      <Article
-        aria-labelledby={nameId}
-        className="h-full gap-0 border-2 border-ink-950 bg-surface-raised md:flex-row lg:flex-col"
-      >
-        <Figure className="relative m-0 aspect-square w-full overflow-hidden bg-ink-900 md:aspect-auto md:min-h-80 md:w-1/2 md:shrink-0 lg:aspect-[4/5] lg:min-h-0 lg:w-full">
-          <Image
-            src={plate.src as ImageProps['src']}
-            alt={plate.alt}
-            fill
-            framed={false}
-            sizes={plate.sizes}
-            loading="lazy"
-            placeholder="blur"
-            blurDataURL={plate.blurDataURL}
-            contentPosition={artPosition(plate)}
-            className="h-full w-full"
-          />
+    <ListItem id={`mfx-starter-${index}`} className="min-w-0">
+      <Article aria-labelledby={nameId} className="h-full gap-0 border-2 border-ink-950 bg-surface-raised">
+        <Figure className="relative m-0 aspect-square w-full overflow-hidden bg-ink-900 md:aspect-[4/5]">
+          {plate === null ? (
+            <ComingSoonArt />
+          ) : (
+            <Image
+              src={plate.src as ImageProps['src']}
+              alt={plate.alt}
+              fill
+              framed={false}
+              sizes={plate.sizes}
+              loading="lazy"
+              placeholder="blur"
+              blurDataURL={plate.blurDataURL}
+              contentPosition={artPosition(plate)}
+              className="h-full w-full"
+            />
+          )}
         </Figure>
-        <View className="min-w-0 flex-1 gap-3 border-t-2 border-ink-950 px-5 pb-6 pt-5 md:justify-end md:border-l-2 md:border-t-0 md:px-7 lg:border-l-0 lg:border-t-2 lg:px-6">
+        <View className="min-w-0 flex-1 justify-end gap-3 border-t-2 border-ink-950 px-5 pb-6 pt-5 md:px-6">
           <View className="flex-row flex-wrap items-center gap-x-4 gap-y-2">
             <Text className="bg-ink-950 px-2.5 py-1 font-display text-sm text-signage-white">{copy.dex(card.dexId)}</Text>
             <Text className="text-sm font-semibold text-text-secondary">{copy.hatchesFrom(card.eggName)}</Text>
@@ -73,7 +75,7 @@ function StarterPoster({ card, index }: { card: StarterCard; index: number }) {
           <Heading
             level={3}
             id={nameId}
-            className="my-0 break-words font-display text-display-md uppercase leading-heading text-text xl:text-display-lg xl:leading-heading"
+            className="my-0 break-words font-display text-display-md uppercase leading-heading text-text md:text-display-lg md:leading-heading xl:text-display-sm xl:leading-heading"
           >
             {card.babyName}
           </Heading>
@@ -87,11 +89,11 @@ function StarterPoster({ card, index }: { card: StarterCard; index: number }) {
 }
 
 /**
- * STARTERS (PS-020): three eggs on Dr. Santoro's table, introduced as
- * characters. A poster triptych from `lg`, side-on posters from `md`, a
- * single column on phones; DOM order is slot order at every width. The
- * posters are a list, so a screen reader hears "list, 3 items".
- * `mfx-starters-head` and `mfx-starter-0..2` are the entrance in ./motion.ts.
+ * STARTERS (PS-020): four eggs on Dr. Santoro's table, introduced as
+ * characters. Four posters in a row from `xl`, a two-by-two grid from `md`,
+ * a single column on phones; DOM order is slot order at every width. The
+ * posters are a list, so a screen reader hears "list, 4 items".
+ * `mfx-starters-head` and `mfx-starter-0..3` are the entrance in ./motion.ts.
  */
 export function StartersSection({ cards }: { cards: readonly StarterCard[] }) {
   const copy = W01_COPY.starters;
@@ -119,7 +121,7 @@ export function StartersSection({ cards }: { cards: readonly StarterCard[] }) {
           {copy.body2}
         </Paragraph>
       </View>
-      <List className="m-0 list-none gap-6 p-0 lg:flex-row lg:items-stretch">
+      <List className="m-0 grid list-none grid-cols-1 gap-6 p-0 md:grid-cols-2 xl:grid-cols-4">
         {cards.map((card, i) => (
           <StarterPoster key={card.key} card={card} index={i} />
         ))}

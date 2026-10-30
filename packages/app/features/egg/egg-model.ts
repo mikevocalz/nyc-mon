@@ -10,7 +10,7 @@ import type { Bloodline, BloodlineId, IncubationMinutes } from '@acme/core/types
 export const MON_HOME_PATH = '/(home)' as const;
 /** M08 (D-16a). */
 export const MEET_PATH = '/(onboarding)/meet' as const;
-/** M10, `?bloodline=F01|F02|F12`. */
+/** M10, `?bloodline=F01|F02|F12|F04`. */
 export const INCUBATE_PATH = '/(onboarding)/incubate' as const;
 /** M06 form sheet over M10. */
 export const NOTIFY_SHEET_PATH = '/(onboarding)/notify' as const;
@@ -26,7 +26,7 @@ export interface EggView {
   readonly dexNumber: string;
   /** `bloodlineLabel` from `@acme/content` (Decision #11). */
   readonly bloodline: string;
-  /** 1-based slot (`{index} of 3`). */
+  /** 1-based slot (`{index} of 4`). */
   readonly index: number;
 }
 

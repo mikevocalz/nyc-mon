@@ -32,7 +32,7 @@ export function chainPathTo(node: EvolutionNode, speciesId: string): readonly Ev
  * The "seen" rule. A form counts as seen when the save shows the Caller met it:
  *
  * 1. M08 eggs. Any save holding an egg or a Mon went through M08, where
- *    Dr. Santoro shows all three starter eggs (Decision #5), so every Egg form
+ *    Dr. Santoro shows all four starter eggs (Decisions #5, #38), so every Egg form
  *    in `eggs` is seen.
  * 2. Each egg record in the save: its Egg form.
  * 3. Each Mon in the save: its current form and every form on its chain from
@@ -105,7 +105,7 @@ export function seenCount(entries: readonly DexEntry[]): { readonly seen: number
   return { seen: entries.filter((e) => e.seen).length, total: entries.length };
 }
 
-/** The Bloodline filter options in content order: the three starter Bloodlines, then F03 to F18. */
+/** The Bloodline filter options in content order: the four starter Bloodlines, then the other fourteen in Dex order. */
 export function bloodlineFilters(): readonly { readonly id: BloodlineId; readonly label: string }[] {
   return bloodlines.map((b) => ({ id: b.bloodlineId, label: bloodlineLabel(b) }));
 }
