@@ -27,7 +27,9 @@ export function Composer({ question, busy, onChange, onSend }: ComposerProps) {
           <TextField surface="daylit" label="Ask your Mon" value={question} onChangeText={onChange}
             onSubmitEditing={submit} returnKeyType="send" disabled={busy}/>
         </View>
-        <Button title="Send" variant="cta" icon={<ArrowUp size={18} />} onPress={submit} disabled={busy || !question.trim()}/>
+        {/* A Button's own root is self-start; self-end lands it on the input's
+            edge, below the field's label, instead of the top of the block. */}
+        <Button title="Send" variant="cta" className="self-end" icon={<ArrowUp size={18} />} onPress={submit} disabled={busy || !question.trim()}/>
       </View>
       <Text className="text-type-caption text-text-muted">Press Enter to send. Typing while your Mon talks cuts it off.</Text>
     </View>

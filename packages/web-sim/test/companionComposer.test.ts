@@ -30,6 +30,13 @@ describe('Ask your Mon', () => {
     expect(onSend).toHaveBeenCalledTimes(2);
   });
 
+  it('aligns Send to the input’s edge, not the top of the labelled field', () => {
+    const tree = Composer({ question: '', busy: false, onChange: () => {}, onSend: () => {} });
+    // The kit Button's own root is self-start; without this override it wins
+    // over the row's items-end and the button floats at the label's height.
+    expect(String(find(tree, 'Button')?.props.className)).toContain('self-end');
+  });
+
   it('does not send a blank question or while a turn is running', () => {
     const onSend = vi.fn();
     (find(Composer({ question: '  ', busy: false, onChange: () => {}, onSend }), 'TextField')?.props.onSubmitEditing as () => void)();
