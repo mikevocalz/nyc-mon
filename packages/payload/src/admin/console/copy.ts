@@ -24,6 +24,7 @@ export const consoleCopy = {
     viewerFailed: "This model didn't load. Check that it's a glTF 2.0 binary and try again.",
     viewerLoading: 'Loading the 3D viewer…',
     angle: 'Viewing angle',
+    viewerTurn: 'Model preview. Drag to turn it, or use the arrow keys. Double-click or press Home to face the front.',
     angles: { '0': 'Front', '90': 'Side', '180': 'Back', '270': 'Other side' },
     play: 'Play animation',
     still: 'Hold still',

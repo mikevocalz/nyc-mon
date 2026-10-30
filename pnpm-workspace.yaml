@@ -134,6 +134,7 @@ catalog:
   react-native-keyboard-controller: 1.22.7
   react-native-mmkv: 4.3.2
   react-native-nitro-modules: 0.37.1
+  react-native-nitro-fetch: 1.9.0
   react-native-enriched-html: 1.1.1
   react-native-gesture-handler: ~3.3.0
   react-native-reanimated: 4.7.1
@@ -319,6 +320,7 @@ patchedDependencies:
   metro@0.87.1: patches/metro@0.87.1.patch
   react-native-enriched-html@1.1.1: patches/react-native-enriched-html@1.1.1.patch
   react-native-graph@1.4.0: patches/react-native-graph@1.4.0.patch
+  react-native-nitro-fetch@1.9.0: patches/react-native-nitro-fetch@1.9.0.patch
   react-native-skia@3.6.1: patches/react-native-skia@3.6.1.patch
   react-native-webgpu@0.16.0: patches/react-native-webgpu@0.16.0.patch
   react-native-worklets@0.13.0: patches/react-native-worklets@0.13.0.patch
