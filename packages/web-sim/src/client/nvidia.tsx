@@ -1,6 +1,6 @@
 import './rn-globals.ts';
 import './globals.css';
-import { useCallback, useEffect, useMemo, useRef, type ComponentRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
 import { createRoot } from 'react-dom/client';
 import { z } from 'zod';
 import type { CallToolResult } from '@modelcontextprotocol/client';
@@ -11,6 +11,8 @@ import {
 import { Aside, Details, Footer, Header, Heading, List, ListItem, Main, Paragraph, Section, Summary, Text } from '@acme/ui/html';
 import { Mic, Square } from '@acme/ui/icons';
 import { ScrollView, View } from '@acme/ui/tw';
+import { MonModel3D } from '@acme/ui/three/mon';
+import type { MonSpeechCue } from '@acme/ui/three/mon/lipsync';
 import { SimOAuthProvider, parseCallback, revokeRefreshToken } from '../shared/auth.ts';
 import { runAgentTurn } from '../shared/agentLoop.ts';
 import { mcpToolsToClaude } from '../shared/toolSpec.ts';
@@ -35,6 +37,8 @@ import { nextVoice, voiceAnnouncement, type VoiceEvent } from './voiceState.ts';
 import { MemorySnapshotSchema } from '@acme/core/schemas';
 import { Composer } from './CompanionComposer.tsx';
 import { STARTER_ART, artForDex, type CompanionArt } from './companionArt.ts';
+import { companionModelClips, companionModelForDex } from './companionModels.ts';
+import { addSpeechCueListener, currentSpeechCue } from './speechCues.ts';
 import { mergeMonCard, type MonCard } from './companionMon.ts';
 
 const ConfigSchema = z.object({ mcpUrl:z.string().url(),clientId:z.string().min(1),issuer:z.string().url(),modelBackend:z.literal('nebius'),modelLabel:z.string(),
@@ -405,6 +409,63 @@ function MonArt({ art, className }: { art:CompanionArt; className:string }) {
   </View>;
 }
 
+/**
+ * The Caller's Mon figure: the rigged GLB (the same files the app's stages
+ * and the Alexa view play) when the form has one, over the still so the
+ * picture stays while the model streams in — and if the GLB cannot play, the
+ * still never left. A form with no model keeps the still alone; nothing is
+ * stubbed. Speech cues (speechCues.ts) lip-sync the forms that have a mouth.
+ */
+function MonFigure({ mon, art, speaking }: { mon:MonCard; art:CompanionArt|null; speaking:boolean }) {
+  const model = companionModelForDex(mon.dexId);
+  const [failed, setFailed] = useState(false);
+  const [ready, setReady] = useState(false);
+  const [speech, setSpeech] = useState<MonSpeechCue|null>(() => currentSpeechCue());
+  const host = useRef<HTMLDivElement|null>(null);
+  const [size, setSize] = useState<{ width:number; height:number }|null>(null);
+  // Speech cues only matter while a rigged mouth can play them.
+  useEffect(() => (model?.mouth ? addSpeechCueListener(setSpeech) : undefined),[model]);
+  // The canvas wants pixels: it follows the still's box and resizes in place.
+  useEffect(() => {
+    const el = host.current;
+    if (el === null || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver((entries) => {
+      const box = entries[0]?.contentRect;
+      if (box && box.width > 0 && box.height > 0) setSize({ width:Math.round(box.width), height:Math.round(box.height) });
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  },[]);
+  // aria-busy flips off when the GLB paints (the hand-off MonView's HatchStage
+  // watches); the still then steps aside. On an error `failed` brings it back.
+  useEffect(() => {
+    const el = host.current;
+    if (el === null || model === null) return;
+    const painted = () => el.querySelector('[role=img][aria-busy="false"]') !== null;
+    if (painted()) { setReady(true); return; }
+    const watch = new MutationObserver(() => { if (painted()) setReady(true); });
+    watch.observe(el,{ subtree:true, attributes:true, attributeFilter:['aria-busy'] });
+    return () => watch.disconnect();
+  },[model]);
+  if (art === null && model === null) return null;
+  const showStill = model === null || !ready || failed;
+  return <View className="relative w-28 shrink-0 sm:w-36 lg:w-36 xl:w-48">
+    {/* Speaking: an orange keyline breathes around the Mon while the voice plays (still under reduced motion). */}
+    {speaking ? <View aria-hidden className="absolute -inset-1.5 border-4 border-cta motion-safe:animate-pulse"/> : null}
+    <div ref={host} className="relative w-full">
+      {art !== null ? <View aria-hidden={!showStill} className={showStill ? 'w-full' : 'invisible w-full'}><MonArt art={art} className="w-full"/></View> : null}
+      {art === null ? <div aria-hidden style={{ aspectRatio:4 / 5 }}/> : null}
+      {model !== null && !failed && size !== null ? (
+        <div className="absolute inset-0">
+          <MonModel3D url={`/mons/${model.file}.glb`} clips={companionModelClips(model,mon.mood,mon.asleep)}
+            width={size.width} height={size.height} label={mon.name} onError={() => setFailed(true)}
+            {...(model.mouth ? { mouth:model.mouth, speech } : {})}/>
+        </div>
+      ) : null}
+    </div>
+  </View>;
+}
+
 function MonPanel({ mon, speaking, caption }: { mon:MonCard|null; speaking:boolean; caption:string }) {
   const reducedMotion = useReducedMotion();
   if (!mon) return <Paragraph className="my-0 text-type-body text-text-muted">Checking on your Mon…</Paragraph>;
@@ -413,11 +474,8 @@ function MonPanel({ mon, speaking, caption }: { mon:MonCard|null; speaking:boole
   const low = (k:string) => mon.needs.includes(k);
   return <View className="gap-4">
     <View className="flex-row items-center gap-4">
-      {art ? <View className="relative w-28 shrink-0 sm:w-36 lg:w-36 xl:w-48">
-        {/* Speaking: an orange keyline breathes around the Mon while the voice plays (still under reduced motion). */}
-        {speaking ? <View aria-hidden className="absolute -inset-1.5 border-4 border-cta motion-safe:animate-pulse"/> : null}
-        <MonArt art={art} className="w-full"/>
-      </View> : null}
+      {/* Keyed by form: a hatch swaps species, so load state never sticks to the wrong Mon. */}
+      <MonFigure key={mon.dexId ?? 'none'} mon={mon} art={art} speaking={speaking}/>
       <View className="min-w-0 flex-1 gap-1">
         <Heading level={1} className="my-0 font-display text-type-title text-text">{mon.name}</Heading>
         {form ? <Paragraph className="my-0 text-type-body text-text">{form}</Paragraph> : null}
