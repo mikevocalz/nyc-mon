@@ -71,6 +71,13 @@ jobs:
       BUNNY_STORAGE_ZONE: isolated-ci-no-upload
       BUNNY_STORAGE_PASSWORD: isolated-ci-no-upload
       BUNNY_CDN_URL: https://media.invalid
+      # The editor-enabled website build needs its content API and preview settings.
+      # Pages read content at request time, so nothing listens on this URL during the build.
+      PAYLOAD_SITE_API_URL: http://localhost:3001/payload-api
+      NEXT_PUBLIC_SITE_URL: http://localhost:3000
+      SITE_CONTENT_MODE: bootstrap
+      SITE_PREVIEW_SECRET: isolated-ci-only-preview-secret-not-used-in-production
+      SITE_EMBED_ORIGINS: https://nyc-mon.vercel.app
     steps:
       - uses: actions/checkout@v4
         with:
