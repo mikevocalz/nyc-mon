@@ -27,6 +27,8 @@ export interface VdBlockBytes {
   ring7?: { shell: Uint8Array; bundled: ReadonlyMap<string, Uint8Array> } | null;
   /** Ring 8's packs (blocks/data-ring8), same contract under `ring8-<level>/<cell>`. */
   ring8?: { shell: Uint8Array; bundled: ReadonlyMap<string, Uint8Array> } | null;
+  /** Ring 9's packs (blocks/data-ring9), same contract under `ring9-<level>/<cell>`. */
+  ring9?: { shell: Uint8Array; bundled: ReadonlyMap<string, Uint8Array> } | null;
 }
 
 let bytes: VdBlockBytes | null = null;
@@ -198,6 +200,22 @@ export function preloadVdBlocks(): Promise<VdBlockBytes | null> {
       } catch (cause) {
         console.warn('[vd-port] the ring-8 block packs did not load; its cells stay with the cell source', cause);
       }
+      // Ring 9's packs: same contract — resident bundled shell, home-overlap cells bundled, the rest stream.
+      let ring9: VdBlockBytes['ring9'] = null;
+      try {
+        const r9 = await import('./data-ring9/assets.ts');
+        const r9Entries = Object.entries(level === 'lite' ? r9.VD_LITE_ASSETS : r9.VD_NEAR_ASSETS);
+        const [r9Shell, ...r9Cells] = await Promise.all([
+          fetchAssetBytes(r9.VD_SHELL_ASSET),
+          ...r9Entries.map(([key, src]) => vdCellFetch(`ring9-${level}/${key}`, () => fetchAssetBytes(src))),
+        ]);
+        ring9 = {
+          shell: new Uint8Array(r9Shell!),
+          bundled: new Map(r9Entries.map(([key], i) => [key, r9Cells[i]! instanceof Uint8Array ? r9Cells[i]! as Uint8Array : r9Cells[i]! ? new Uint8Array(r9Cells[i]!) : new Uint8Array(0)])),
+        };
+      } catch (cause) {
+        console.warn('[vd-port] the ring-9 block packs did not load; its cells stay with the cell source', cause);
+      }
       bytes = {
         shell: new Uint8Array(shell!),
         near: new Map(entries.map(([key], i) => [key, near[i]! instanceof Uint8Array ? near[i]! as Uint8Array : new Uint8Array(near[i]!)])),
@@ -210,6 +228,7 @@ export function preloadVdBlocks(): Promise<VdBlockBytes | null> {
         ring6,
         ring7,
         ring8,
+        ring9,
       };
       return bytes;
     } catch (cause) {

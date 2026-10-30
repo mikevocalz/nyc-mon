@@ -36,22 +36,25 @@ test('every baked instance sits where Valdrada claimed it, within 5 cm (every po
 });
 
 test('the street-sign poles are Valdrada\'s placements: no two poles at one spot', () => {
-  const poles: [number, number, string][] = [];
+  const poles: [number, number, string, number][] = [];
   for (const pool of VD_POOLS.filter((p) => p.name === 'signPole' || p.name === 'signPoleOneWay' || p.name === 'streetSign')) {
     const inst = decodeInstances(POOLS_BIN, pool, flat);
-    for (let i = 0; i < inst.count; i++) poles.push([inst.record[i * INSTANCE_FLOATS]!, inst.record[i * INSTANCE_FLOATS + 2]!, pool.name]);
+    for (let i = 0; i < inst.count; i++) poles.push([inst.record[i * INSTANCE_FLOATS]!, inst.record[i * INSTANCE_FLOATS + 2]!, pool.name, inst.record[i * INSTANCE_FLOATS + 3]!]);
   }
   assert.ok(poles.length > 100, `${poles.length} poles`);
-  const grid = new Map<string, [number, number, string][]>();
+  const grid = new Map<string, [number, number, string, number][]>();
   for (const p of poles) {
     const k = `${Math.floor(p[0] / 2)}_${Math.floor(p[1] / 2)}`;
     for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) {
       for (const q of grid.get(`${Math.floor(p[0] / 2) + dx}_${Math.floor(p[1] / 2) + dz}`) ?? []) {
         // two compiled records may sit at one corner (a one-way pair on the adjoining streets, ~0.25 m apart facing
         // opposite ways — the Morningside pair at (-1584.65, 581.5) is one); one record claimed twice would coincide
-        // exactly, so the double-claim check is the near-zero pair
+        // exactly, so the double-claim check is the near-zero pair. Two records may also share the exact spot facing
+        // opposite ways (ring 9's Bronx one-way pair at (5147.29, -858.79), yaws pi apart): they differ in yaw, so they
+        // are two records, as bake-furniture.mjs's dedupe key (every field, yaw included) counts them
         const d = Math.hypot(p[0] - q[0], p[1] - q[1]);
-        assert.ok(d > 0.15, `${p[2]} and ${q[2]} at (${p[0].toFixed(2)}, ${p[1].toFixed(2)})`);
+        const turn = Math.abs(((p[3] - q[3]) % (2 * Math.PI) + 3 * Math.PI) % (2 * Math.PI) - Math.PI);
+        assert.ok(d > 0.15 || turn > 0.01, `${p[2]} and ${q[2]} at (${p[0].toFixed(2)}, ${p[1].toFixed(2)})`);
       }
     }
     if (!grid.has(k)) grid.set(k, []);

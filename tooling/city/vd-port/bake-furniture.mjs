@@ -31,6 +31,7 @@ import { REPO, THREE, vd } from './valdrada-runtime.mjs';
 import { assembleCity } from './assemble-city.mjs';
 import { EXTENT_METERS } from '../valdrada/decode.mjs';
 import { AFF, toSceneExact, valdradaGround } from './valdrada-ground.mjs';
+import { packLampSpots } from './lamp-pack.mjs';
 
 const OUT = join(REPO, 'packages/app/features/game/world/vd-port/furniture/data');
 const TILE = join(REPO, 'packages/app/features/game/data/harlem-apollo.json');
@@ -325,8 +326,11 @@ export const VD_PANEL_ATLAS = { width: ${W}, height: ${H}, bytes: ${atlasRle.len
 `);
 for (const f of ['geometry.ts', 'instances.ts', 'panel-atlas.ts']) rmSync(join(OUT, f), { force: true });
 writeFileSync(join(OUT, 'lamps.ts'), `${header('Lamp light spots: city/props.js L296/L300 over the claimed poles; kinds index world/night11.js FIXTURES.')}
-/** [x, y over ground, z, fixture kind (night11 FIXTURES; -1 legacy), mounting height m, arm yaw or NaN for a round throw] per lamp. */
-export const VD_LAMP_SPOTS: readonly number[] = ${JSON.stringify(lamps.flatMap((l) => [+l.x.toFixed(3), +l.y.toFixed(3), +l.z.toFixed(3), l.kind, l.head, l.yaw === null ? null : +l.yaw.toFixed(4)])).replace(/null/g, 'NaN')};
+import { decodeLampSpots } from '../lamp-codec.ts';
+
+/** [x, y over ground, z, fixture kind (night11 FIXTURES; -1 legacy), mounting height m, arm yaw or NaN for a round throw] per lamp,
+ * packed 16 bytes a lamp (lamp-codec.ts; tooling/city/vd-port/lamp-pack.mjs). */
+export const VD_LAMP_SPOTS: readonly number[] = decodeLampSpots(${JSON.stringify(packLampSpots(lamps))});
 `);
 // placement fixture for the tests: Valdrada world point -> the instance it became, a sample per pool
 const fixture = {};

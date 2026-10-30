@@ -38,6 +38,7 @@ import { VD_BLOCKS_RING5 } from './data-ring5/manifest.ts';
 import { VD_BLOCKS_RING6 } from './data-ring6/manifest.ts';
 import { VD_BLOCKS_RING7 } from './data-ring7/manifest.ts';
 import { VD_BLOCKS_RING8 } from './data-ring8/manifest.ts';
+import { VD_BLOCKS_RING9 } from './data-ring9/manifest.ts';
 import { decodeBase64 } from '../../foliage.ts';
 import { WORLD_PRESETS } from '../../../perf/tier-presets.ts';
 
@@ -76,7 +77,7 @@ const inRing = (ring: readonly (readonly number[])[], x: number, z: number) => {
 let ownedSpecs: Set<string> | null = null;
 
 // Every ring's lane-A structures. A ring baked with none (ring 3) types as `readonly []`; iterating the list drops it.
-const RING_STRUCTURES = [VD_BLOCKS.structures, VD_BLOCKS_RING1.structures, VD_BLOCKS_RING2.structures, VD_BLOCKS_RING3.structures, VD_BLOCKS_RING4.structures, VD_BLOCKS_RING5.structures, VD_BLOCKS_RING6.structures, VD_BLOCKS_RING7.structures, VD_BLOCKS_RING8.structures];
+const RING_STRUCTURES = [VD_BLOCKS.structures, VD_BLOCKS_RING1.structures, VD_BLOCKS_RING2.structures, VD_BLOCKS_RING3.structures, VD_BLOCKS_RING4.structures, VD_BLOCKS_RING5.structures, VD_BLOCKS_RING6.structures, VD_BLOCKS_RING7.structures, VD_BLOCKS_RING8.structures, VD_BLOCKS_RING9.structures];
 
 /**
  * Whether lane A draws this front whole, so another lane must not: a facade-kit face (`<spec>#<face>`, a spec lane A
@@ -124,6 +125,7 @@ export function build(ctx: VdPortCtx): VdPortPart {
   if (packs.ring6) shellSets.push({ infos: VD_BLOCKS_RING6.shell as readonly ShellCellInfo[], bytes: packs.ring6.shell });
   if (packs.ring7) shellSets.push({ infos: VD_BLOCKS_RING7.shell as readonly ShellCellInfo[], bytes: packs.ring7.shell });
   if (packs.ring8) shellSets.push({ infos: VD_BLOCKS_RING8.shell as readonly ShellCellInfo[], bytes: packs.ring8.shell });
+  if (packs.ring9) shellSets.push({ infos: VD_BLOCKS_RING9.shell as readonly ShellCellInfo[], bytes: packs.ring9.shell });
   const maxShell = Math.max(3, ...shellSets.flatMap((s) => s.infos.map((c) => c.triangles * 3)));
   const shellEmissive = new THREE.BufferAttribute(new Uint8Array(maxShell * 4), 4, true);
   const identity = maxShell > 65535 ? new Uint32Array(maxShell) : new Uint16Array(maxShell);
@@ -257,6 +259,16 @@ export function build(ctx: VdPortCtx): VdPortPart {
         info, packs.level,
         file ? () => Promise.resolve(file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength) as ArrayBuffer) : undefined,
         'cell-local', `ring8-${packs.level}/${info.key}`,
+      ));
+    }
+  }
+  if (packs.ring9) {
+    for (const info of VD_BLOCKS_RING9[packs.level] as readonly NearCellInfo[]) {
+      const file = info.bundled === false ? null : packs.ring9.bundled.get(info.key) ?? null;
+      packages.push(sourceNearPackage(
+        info, packs.level,
+        file ? () => Promise.resolve(file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength) as ArrayBuffer) : undefined,
+        'cell-local', `ring9-${packs.level}/${info.key}`,
       ));
     }
   }

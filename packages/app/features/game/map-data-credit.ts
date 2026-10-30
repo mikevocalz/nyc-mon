@@ -154,6 +154,16 @@ export const CITY_MAP_STREAMED: readonly CityMapSourceCredit[] = [
     license: 'ODbL-1.0',
     licenseUrl: 'https://opendatacommons.org/licenses/odbl/1-0/',
   },
+  {
+    // ring 9 (the South Bronx: Mott Haven, Port Morris, Melrose, Longwood, west Hunts Point, the Concourse,
+    // Highbridge, Morrisania and Crotona; the Harlem River and Bronx Kill bridges): the ring's block near/lite cells
+    // (world/vd-port/blocks/data-ring9) bake from the same pinned tile set and stream through the same hash-pinned
+    // cell source (ring9-near/ring9-lite manifest keys); the ring adds no lane-C structure cells. Its bridges are the
+    // bridge kit on the CSCL alignments in tiles/bridges.json (the kit credit in CITY_MAP_ASSETS).
+    attribution: 'Valdrada ring-9 near and structure cells (rev 09b5836), Mehmet Kerem Turkcan',
+    license: 'ODbL-1.0',
+    licenseUrl: 'https://opendatacommons.org/licenses/odbl/1-0/',
+  },
 ];
 
 // ODbL §4.4(a): the bundled tile is itself a Derivative Database of the
