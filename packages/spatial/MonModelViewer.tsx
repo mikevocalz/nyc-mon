@@ -90,11 +90,25 @@ type NavigatorProps = {
 
 const Navigator = Viro3DSceneNavigator as unknown as ComponentType<NavigatorProps>;
 
-/** The model's vertices as Viro draws them holding still, and while a clip plays (modelBounds.ts). */
+/**
+ * The model's vertices as Viro draws them holding still, and the room it may
+ * need while a clip plays (modelBounds.ts). A clip that moves the joints draws
+ * the mesh in its glTF pose (Squeaklet's rat_run does), but some clips that
+ * target joints leave it in the still pose (Lil' Ratti's up_idle did on
+ * 2026-10-30), so a playing clip is framed to hold both.
+ */
 type Poses = { still: ModelPoints | null; playing: ModelPoints | null };
 type Readable = { from: string; url: string; poses: Poses };
 
-const readPoses = (glb: Uint8Array): Poses => ({ still: readModelPoints(glb, 'viro-still'), playing: readModelPoints(glb, 'bind') });
+function readPoses(glb: Uint8Array): Poses {
+  const still = readModelPoints(glb, 'viro-still');
+  const bind = readModelPoints(glb, 'bind');
+  if (!still || !bind) return { still: still ?? bind, playing: bind ?? still };
+  const both = new Float32Array(still.length + bind.length);
+  both.set(still);
+  both.set(bind, still.length);
+  return { still, playing: both };
+}
 
 /**
  * The URL Viro should load for `url`: the same URL, or a blob: URL of a copy
