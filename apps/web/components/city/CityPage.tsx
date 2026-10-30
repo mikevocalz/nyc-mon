@@ -1,5 +1,5 @@
 import { DISTRICTS, DISTRICT_COPY as DEFAULT_DISTRICTS } from '@acme/spatial';
-import { Image, SolidPanel } from '@acme/ui';
+import { Image, LinkButton, SolidPanel } from '@acme/ui';
 import { Article, Figure, Figcaption, Heading, List, ListItem, Paragraph, Section } from '@acme/ui/html';
 import { View } from '@acme/ui/tw';
 import { Eyebrow } from '../home/Eyebrow';
@@ -46,6 +46,7 @@ const CARD_ACCENTS = ['bg-orange-500', 'bg-royal-500', 'bg-carolina-500', 'bg-le
             {districts.title}
           </Heading>
           <Paragraph className="my-0 text-base leading-7 text-text-secondary md:text-lg md:leading-8">{districts.body}</Paragraph>
+          <LinkButton href={districts.walkHref} title={districts.walk} district="harlem" className="self-start" testID="w03-walk" />
         </View>
         <View id="w03-atlas-start" className="h-px w-full" aria-hidden />
         <List id="w03-district-atlas" aria-label={districts.listLabel} className="m-0 grid list-none grid-cols-1 gap-6 p-0 md:grid-cols-12">

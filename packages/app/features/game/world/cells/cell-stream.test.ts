@@ -331,3 +331,43 @@ test('a layer with pin: false is not pinned by the landmark rule and evicts; the
   assert.equal(byName('vd:test-unpinned'), 0, 'the opted-out layer evicts');
   stream.dispose();
 });
+
+test('packages sharing one file: building the first releases the bytes, so the second waits and refetches instead of throwing', () => {
+  // The far tier's landmarks (and a chunk's buildings + ground) decode off one shared file whose bytes release() drops
+  // (far-tier/on-demand.ts). Both are ready at the pick; the first build releases the file before the second builds.
+  const f = externalFixture();
+  const shared: { bytes: Float32Array | null } = { bytes: null };
+  let prefetches = 0;
+  // A getter, like the far tier's packages: trianglePackage's spread would read it once, so it is defined after.
+  const sibling = (num: number, x: number): CellPackage => Object.defineProperty(trianglePackage({
+    num,
+    attributes: {},
+    bounds: Float64Array.from([x, 0, 0, x + 2, 1, 2]),
+    ready: () => shared.bytes !== null,
+    prefetch: () => { prefetches++; },
+    release: () => { shared.bytes = null; },
+  }), 'attributes', {
+    get() {
+      if (!shared.bytes) throw new Error(`package ${num} built before its bytes`);
+      return {
+        position: { array: shared.bytes, itemSize: 3, normalized: false },
+        color: { array: new Uint8Array(12).fill(255), itemSize: 4, normalized: true },
+      };
+    },
+  });
+  const a = sibling(1, 0);
+  const b = sibling(2, 4);
+  const stream = createCellStream(T, [], {
+    preset: preset({ residentRadiusM: 1000, stream: { msPerFrame: 1e9, uploadBytesPerFrame: 1e9 } }),
+    external: [{ template: f.template, spec: f.spec, packages: [a, b] }],
+  });
+  const camera = { x: 2, y: 0, z: 1 };
+  shared.bytes = new Float32Array([0, 0, 0, 2, 0, 0, 0, 1, 2]);
+  assert.doesNotThrow(() => stream.prime(camera, K, 1000));
+  assert.equal(cells(f.root).length, 1, 'one sibling built; the other lost its bytes to that build');
+  assert.equal(prefetches, 1, 'the sibling asked for its bytes again');
+  shared.bytes = new Float32Array([4, 0, 0, 6, 0, 0, 4, 1, 2]);
+  assert.doesNotThrow(() => stream.update(camera, K, 1));
+  assert.equal(cells(f.root).length, 2);
+  stream.dispose();
+});
