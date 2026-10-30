@@ -44,7 +44,7 @@ async function main() {
   for (const asset of manifest.assets) {
     if (!record(asset) || typeof asset.source !== 'string' || typeof asset.slot !== 'string' || typeof asset.sectionKey !== 'string') throw new Error('Invalid asset placement');
     const url = new URL(asset.source);
-    if (url.origin !== origin.origin || url.username || url.password || !/^\/(?:_next\/static\/media\/|home\/)/.test(url.pathname)) throw new Error('Assets must come from the approved site static-media or home directory');
+    if (url.origin !== origin.origin || url.username || url.password || !/^\/(?:_next\/static\/(?:immutable\/)?media\/|home\/)/.test(url.pathname)) throw new Error('Assets must come from the approved site static-media or home directory');
     if (!manifest.page.sections.some((section) => section.sectionKey === asset.sectionKey)) throw new Error('Asset refers to an unknown section');
     const key = `${asset.sectionKey}:${asset.slot}`;
     if (positions.has(key)) throw new Error('Duplicate image slot');
