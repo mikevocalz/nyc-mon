@@ -17,7 +17,7 @@ export const loadHatchSequence = (): Promise<ThreeSetup<import('./hatch-sequence
 export const loadMonScene = (): Promise<ThreeSetup<import('../mon/mon-scene').MonSceneParams>> =>
   import('../mon/mon-scene').then((m) => m.createMonScene);
 
-/** Starts fetching a Baby's GLB bytes (26-34 MB) without loading three.js into the caller's chunk. */
+/** Starts fetching a Baby's GLB bytes (19-24 MB) without loading three.js into the caller's chunk. */
 export const preloadMonModel = (...args: Parameters<typeof import('../mon/mon-rig').preloadMonRig>): void => {
   void import('../mon/mon-rig').then((m) => m.preloadMonRig(...args));
 };
