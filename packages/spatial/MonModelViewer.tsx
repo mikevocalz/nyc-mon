@@ -1,7 +1,8 @@
 'use client';
 
-import type { ComponentType } from 'react';
+import { useEffect, useState, type ComponentType } from 'react';
 import { palette } from '@acme/theme';
+import { dequantizeGlb, isQuantizedGlb } from './glbDequantize';
 import { View } from '@acme/ui/tw';
 import {
   Viro3DObject,
@@ -67,13 +68,50 @@ type NavigatorProps = {
 
 const Navigator = Viro3DSceneNavigator as unknown as ComponentType<NavigatorProps>;
 
+/**
+ * The URL Viro should load for `url`: the same URL, or a blob: URL of a float
+ * copy when the file uses KHR_mesh_quantization, which Viro draws blank
+ * (glbDequantize.ts). Null while the file is being read.
+ */
+function useViroReadableUrl(url: string, onError?: (error: unknown) => void): string | null {
+  const [readable, setReadable] = useState<{ from: string; url: string } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    let objectUrl: string | null = null;
+    (async () => {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`Model request failed (${response.status})`);
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      if (cancelled) return;
+      if (!isQuantizedGlb(bytes)) {
+        setReadable({ from: url, url });
+        return;
+      }
+      const floats = dequantizeGlb(bytes);
+      objectUrl = URL.createObjectURL(new Blob([floats.buffer as ArrayBuffer], { type: 'model/gltf-binary' }));
+      setReadable({ from: url, url: objectUrl });
+    })().catch((error: unknown) => {
+      if (!cancelled) onError?.(error);
+    });
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+    // A new file is a new read; onError changes identity every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [url]);
+  return readable?.from === url ? readable.url : null;
+}
+
 /** One Mon model on a lit stage, rendered by the same Viro runtime the game uses. */
 export function MonModelViewer({ assetBaseUrl = '/viro/wasm/', ...scene }: MonModelViewerProps) {
+  const url = useViroReadableUrl(scene.url, scene.onError);
+  if (url === null) return <View className="relative flex-1" />;
   return (
     <View className="relative flex-1">
       <Navigator
         initialScene={{ scene: MonModelScene }}
-        viroAppProps={scene}
+        viroAppProps={{ ...scene, url }}
         webRendererOptions={{ assetBaseUrl }}
         showReticle={false}
         // Navigator host props are a style object, not a className target.

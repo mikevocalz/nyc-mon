@@ -4,6 +4,7 @@ import { cancelCallerDeletion, scheduleCallerDeletion, signOutCallerEverywhere }
 import { decideConsent, deleteConsentRecord, resendConsentEmail } from './consents.ts';
 import { handleReveal } from './reveal.ts';
 import { runIntegrityCheck } from './integrity.ts';
+import { abortModelUpload, completeModelUpload, putModelChunk, startModelUpload } from './models.ts';
 import { createStaff, removeStaff, updateStaff } from './staff.ts';
 
 export const consoleEndpoints: Endpoint[] = [
@@ -19,4 +20,8 @@ export const consoleEndpoints: Endpoint[] = [
   { path: '/console/staff/:id', method: 'patch', handler: updateStaff },
   { path: '/console/staff/:id', method: 'delete', handler: removeStaff },
   { path: '/console/audit/export', method: 'get', handler: exportAuditLog },
+  { path: '/console/models/uploads', method: 'post', handler: startModelUpload },
+  { path: '/console/models/uploads/:token/complete', method: 'post', handler: completeModelUpload },
+  { path: '/console/models/uploads/:token/:index', method: 'put', handler: putModelChunk },
+  { path: '/console/models/uploads/:token', method: 'delete', handler: abortModelUpload },
 ];
