@@ -42,6 +42,9 @@ export interface ModelsPage {
   editDraft: (patch: Partial<ModelDraft>) => void;
   busy: 'upload' | 'save' | 'status' | null;
   setBusy: (busy: ModelsPage['busy']) => void;
+  /** Upload progress 0..100 while the file is sent; null when the size is unknown or nothing is uploading. */
+  progress: number | null;
+  setProgress: (progress: number | null) => void;
   error: string | null;
   setError: (error: string | null) => void;
   /** Confirmation after a save; cleared by the next action. */
@@ -71,6 +74,8 @@ export const useModelsStore = createConsoleStore<ModelsPage>((set) => ({
   editDraft: (patch) => set((state) => ({ notice: null, draft: state.draft ? { ...state.draft, ...patch } : state.draft })),
   busy: null,
   setBusy: (busy) => set({ busy }),
+  progress: null,
+  setProgress: (progress) => set({ progress }),
   error: null,
   setError: (error) => set({ error, notice: null }),
   notice: null,

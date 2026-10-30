@@ -4,6 +4,7 @@ import { lazy, Suspense, useEffect, useSyncExternalStore } from 'react';
 import { Badge, Banner, Button, Card, ConfirmDestructive, DataTable, DropZone, EmptyState, ErrorMessage, FieldGroup, KeyValueList, LoadingSkeleton, ProgressBar, SegmentedControl, Select, SignageBand, Textarea, TextField, Timestamp, type ColumnDef, type DropAsset } from '@acme/ui/admin';
 import { Heading, Paragraph, Section } from '@acme/ui/html';
 import { MON_ANIMATION_ROLES, MON_MODEL_LICENSES } from '../../../collections/monModelOptions.ts';
+import { checkGlbHeader, checkMonModelFile, MON_MODEL_FILE_MESSAGES } from '../../../collections/monModelFile.ts';
 import { consoleCopy } from '../copy';
 import { useModelsStore, type ModelDraft, type ModelFilter, type ModelYaw } from '../stores';
 import { ConsoleShell } from '../Shell';
@@ -66,9 +67,35 @@ async function send(url: string, init: RequestInit): Promise<string | null> {
   }
 }
 
+/**
+ * Multipart upload through XMLHttpRequest, the one browser API that reports
+ * upload progress. Same result shape as `send`.
+ */
+function sendWithProgress(url: string, method: 'POST' | 'PATCH', body: FormData, onProgress: (percent: number | null) => void): Promise<string | null> {
+  return new Promise((resolve) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open(method, url);
+    xhr.withCredentials = true;
+    xhr.upload.onprogress = (event) => onProgress(event.lengthComputable ? Math.round((event.loaded / event.total) * 100) : null);
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) { resolve(null); return; }
+      if (xhr.status === 413) { resolve(copy.tooLarge); return; }
+      try {
+        const parsed = JSON.parse(xhr.responseText) as { errors?: { message?: string }[] };
+        resolve(parsed.errors?.[0]?.message ?? consoleCopy.errors.action);
+      } catch {
+        resolve(consoleCopy.errors.action);
+      }
+    };
+    xhr.onerror = () => resolve(copy.uploadNetwork);
+    xhr.onabort = () => resolve(copy.uploadNetwork);
+    xhr.send(body);
+  });
+}
+
 const json = (method: string, data: unknown): RequestInit => ({ method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
 
-export function ModelsViewClient({ forms, models, selectedId, canEdit }: { forms: Form[]; models: ModelDoc[]; selectedId: string | null; canEdit: boolean }) {
+export function ModelsViewClient({ forms, models, failed = false, selectedId, canEdit }: { forms: Form[]; models: ModelDoc[]; failed?: boolean; selectedId: string | null; canEdit: boolean }) {
   const router = useRouter();
   const store = useModelsStore();
   const hydrated = useHydrated();
@@ -93,12 +120,23 @@ export function ModelsViewClient({ forms, models, selectedId, canEdit }: { forms
   const viewerUrl = store.pending?.url ?? model?.url ?? null;
   const clips = store.pending ? [] : (model?.animationClips ?? []);
 
-  const onDrop = ({ assets }: { assets: DropAsset[] }) => {
+  const onDrop = async ({ assets }: { assets: DropAsset[] }) => {
     store.setDragging(false);
     const [asset, ...extra] = assets;
     extra.forEach((item) => item.release?.());
-    if (!asset?.file || !asset.uri || !asset.file.name.toLowerCase().endsWith('.glb')) { asset?.release?.(); store.setError(copy.wrongType); return; }
+    if (!asset?.file || !asset.uri) { asset?.release?.(); store.setError(copy.wrongType); return; }
+    // Name and size first, then the 12-byte GLB header, before the viewer or the server sees it.
+    let check = checkMonModelFile(asset.file);
+    if (check.ok) {
+      try {
+        check = checkGlbHeader(new Uint8Array(await asset.file.slice(0, 12).arrayBuffer()), asset.file.size);
+      } catch {
+        check = { ok: false, problem: 'header' };
+      }
+    }
+    if (!check.ok) { asset.release?.(); store.setError(MON_MODEL_FILE_MESSAGES[check.problem]); return; }
     store.setPending({ url: asset.uri, name: asset.file.name, file: asset.file, release: asset.release });
+    if (extra.length) store.setNotice(copy.oneFile);
   };
 
   const uploadPending = async () => {
@@ -108,8 +146,10 @@ export function ModelsViewClient({ forms, models, selectedId, canEdit }: { forms
     // A new form's placement starts from defaults; a replacement keeps its saved placement and credit.
     body.append('_payload', JSON.stringify(model ? {} : { speciesId: selected.id }));
     store.setBusy('upload');
-    const error = await send(model ? `${API}/${model.id}` : API, { method: model ? 'PATCH' : 'POST', body });
+    store.setProgress(0);
+    const error = await sendWithProgress(model ? `${API}/${model.id}` : API, model ? 'PATCH' : 'POST', body, store.setProgress);
     store.setBusy(null);
+    store.setProgress(null);
     // The editor may have opened another form while this uploaded.
     if (useModelsStore.getState().draftKey !== draftKey) { router.refresh(); return; }
     if (error) { store.setError(error); return; }
@@ -161,7 +201,7 @@ export function ModelsViewClient({ forms, models, selectedId, canEdit }: { forms
       />
       <Section className="grid gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
         <Section>
-          <DataTable surface="page" caption={copy.heading} data={shown} columns={columns} getRowId={(row) => row.id} getRowHref={(row) => `/admin/models/${row.id}`} selectedRowId={selectedId ?? undefined} emptyState={<Paragraph>{copy.emptyFilter}</Paragraph>} />
+          <DataTable testID="models-table" surface="page" caption={copy.heading} data={shown} columns={columns} getRowId={(row) => row.id} getRowHref={(row) => `/admin/models/${row.id}`} selectedRowId={selectedId ?? undefined} filter={{ label: copy.search }} emptyState={<Paragraph>{copy.emptyFilter}</Paragraph>} error={failed ? { message: consoleCopy.errors.load, retryLabel: consoleCopy.errors.retry, onRetry: router.refresh } : undefined} />
         </Section>
         {selected ? (
           <Section className="gap-5" testID="model-detail">
@@ -210,9 +250,11 @@ export function ModelsViewClient({ forms, models, selectedId, canEdit }: { forms
                 active={store.dragging}
                 title={model ? copy.dropReplace : copy.dropAdd}
                 description={copy.dropHint}
+                browseLabel={copy.browse}
+                accept=".glb,model/gltf-binary"
                 onEnter={() => store.setDragging(true)}
                 onExit={() => store.setDragging(false)}
-                onDrop={onDrop}
+                onDrop={(event) => void onDrop(event)}
               />
             ) : null}
             {store.pending ? (
@@ -222,7 +264,11 @@ export function ModelsViewClient({ forms, models, selectedId, canEdit }: { forms
                 action={<Section className="flex-row gap-2"><Button title={model ? copy.replaceModel : copy.saveModel} loading={store.busy === 'upload'} onPress={() => void uploadPending()} /><Button title={copy.discard} variant="ghost" onPress={() => store.setPending(null)} /></Section>}
               />
             ) : null}
-            {store.busy === 'upload' ? <ProgressBar indeterminate label={copy.uploading} showLabel /> : null}
+            {store.busy === 'upload' ? (
+              store.progress === null
+                ? <ProgressBar indeterminate label={copy.uploading} showLabel accessibilityLabel={copy.uploading} />
+                : <ProgressBar value={store.progress} label={copy.uploadingPercent(store.progress)} showLabel accessibilityLabel={copy.uploading} />
+            ) : null}
             {store.error ? <ErrorMessage message={store.error} /> : null}
             {store.notice ? <Banner tone="success" title={store.notice} live="status" /> : null}
 

@@ -15,6 +15,10 @@ import {
   type Updater,
 } from '@tanstack/react-table';
 import { useInstanceStore, useStore } from './use-instance-store';
+import { filterRows, pageWindow, toggleId, toggleVisible, visibleSelection } from './data-table-model';
+import { SearchBar } from './SearchBar';
+import { ErrorMessage } from './ErrorMessage';
+import { Button } from './Button';
 import { useLayoutSize } from './use-layout-size';
 import {
   Table, TableHeader, TableBody, TableRow, TableCell, TableHeaderCell, TableCaption, VisuallyHidden,
@@ -55,6 +59,7 @@ const dataTable = tv({
     skeleton: 'h-3 w-3/4',
     corner: 'absolute flex h-4 w-4',
     pager: 'flex-row items-center justify-between gap-3 border-t-2 px-3 py-2',
+    toolbar: 'flex-row items-center gap-3 border-b-2 p-3',
     pagerText: 'text-xs',
     pagerButton: 'min-h-11 justify-center border-2 px-3 disabled:opacity-40',
     pagerLabel: 'text-sm font-semibold',
@@ -82,6 +87,7 @@ const dataTable = tv({
         emptyText: 'text-silver-400',
         skeleton: 'bg-ink-800',
         pager: 'border-ink-800 bg-ink-900',
+        toolbar: 'border-ink-800 bg-ink-900',
         pagerText: 'text-silver-400',
         pagerButton: 'border-ink-700 bg-ink-950',
         pagerLabel: 'text-silver-100',
@@ -101,6 +107,7 @@ const dataTable = tv({
         emptyText: 'text-text-muted',
         skeleton: 'bg-surface-sunken',
         pager: 'border-border bg-surface-sunken',
+        toolbar: 'border-border bg-surface-raised',
         pagerText: 'text-text-muted',
         pagerButton: 'border-border-strong bg-surface-raised',
         pagerLabel: 'text-text',
@@ -154,6 +161,8 @@ declare module '@tanstack/react-table' {
     priority?: 1 | 2 | 3 | 4;
     /** 'end' right-aligns the cell; numbers take it. Default 'start'. */
     align?: 'start' | 'end';
+    /** false keeps the column out of the text filter. Default true. */
+    searchable?: boolean;
   }
 }
 
@@ -164,6 +173,29 @@ export type SortState = { columnId: string; direction: 'asc' | 'desc' } | undefi
 export interface DataTableSelection {
   selectedIds: readonly string[];
   onSelectedIdsChange: (ids: string[]) => void;
+}
+
+/** A search field above the table that narrows the rows. */
+export interface DataTableFilter {
+  /** Accessible name and placeholder for the search field, e.g. "Search Callers". */
+  label: string;
+  placeholder?: string;
+  /** Controlled query; omit to let the table hold it. */
+  query?: string;
+  /** Called with every edit. In server mode this is the only effect: the server filters. */
+  onQueryChange?: (query: string) => void;
+  /** Shown when the query matches nothing. Default "Nothing matches that search." */
+  noMatchText?: string;
+}
+
+/** A failed read: the message and a way to try again. */
+export interface DataTableError {
+  message: string;
+  onRetry?: () => void;
+  /** Default "Try again". */
+  retryLabel?: string;
+  /** True while the retry is in flight; the button shows its loading state. */
+  retrying?: boolean;
 }
 
 /** Where the rows come from (04-components.md G2). */
@@ -214,6 +246,10 @@ export interface DataTableProps<T extends RowData> {
   emptyState?: ReactNode;
   /** Replaces the body when the server read failed. */
   errorState?: ReactNode;
+  /** A failed read rendered as an error message with a retry button. `errorState` wins when both are set. */
+  error?: DataTableError;
+  /** A search field above the table (client mode filters in memory). */
+  filter?: DataTableFilter;
   /** Enable click-to-sort headers (client) / sort buttons (server). Default true. */
   sortable?: boolean;
   /** 'night' (default) is the scoreboard facade; 'page' is the daylit console face. */
@@ -247,6 +283,8 @@ export interface DataTableProps<T extends RowData> {
   /** Opt-in rounded corners (rounded-soft). Default false: square. */
   rounded?: boolean;
   className?: string;
+  /** Becomes `data-testid` on web. */
+  testID?: string;
 }
 
 // The same declarations as Tailwind's `sr-only`, applied to the records-mode
@@ -273,6 +311,8 @@ export function DataTable<T extends RowData>({
   selection,
   emptyState,
   errorState,
+  error,
+  filter,
   sortable = true,
   surface = 'night',
   variant: _variant,
@@ -288,18 +328,35 @@ export function DataTable<T extends RowData>({
   emptyText = 'No rows yet',
   loading = false,
   loadingRows = 5,
-  className, rounded = false,
+  className, rounded = false, testID,
 }: DataTableProps<T>) {
   const server = mode?.kind === 'server' ? mode : undefined;
   const rows_ = server ? server.rows : (data ?? []);
   const pageSize = mode?.kind === 'client' && mode.pageSize !== undefined ? mode.pageSize : pageSizeProp;
 
-  const store = useInstanceStore<{ sorting: SortingState; page: number; expanded: string[] }>(
-    () => ({ sorting: [], page: 0, expanded: [] }),
+  const store = useInstanceStore<{ sorting: SortingState; page: number; expanded: string[]; query: string }>(
+    () => ({ sorting: [], page: 0, expanded: [], query: '' }),
   );
   const sorting = useStore(store, (s) => s.sorting);
   const page = useStore(store, (s) => s.page);
   const expanded = useStore(store, (s) => s.expanded);
+  const ownQuery = useStore(store, (s) => s.query);
+  const query = filter?.query ?? ownQuery;
+  const onQueryChange = (next: string) => {
+    store.setState({ query: next, page: 0 });
+    filter?.onQueryChange?.(next);
+  };
+  // Client mode filters in memory over every searchable accessor column;
+  // server mode hands the query to the caller and shows its rows as given.
+  const searchable = columns.flatMap((col) => {
+    if (col.meta?.searchable === false) return [];
+    const key = 'accessorKey' in col && typeof col.accessorKey === 'string' ? col.accessorKey : null;
+    const fn = 'accessorFn' in col && typeof col.accessorFn === 'function' ? col.accessorFn : null;
+    return key || fn ? [{ key, fn }] : [];
+  });
+  const filteredRows = filter && !server
+    ? filterRows(rows_, query, (row) => searchable.map(({ key, fn }) => (fn ? (fn as (r: T, i: number) => unknown)(row, 0) : (row as Record<string, unknown>)[key as string])))
+    : rows_;
   const onSortingChange = (updater: Updater<SortingState>) =>
     store.setState((s) => ({
       sorting: typeof updater === 'function' ? updater(s.sorting) : updater,
@@ -312,7 +369,7 @@ export function DataTable<T extends RowData>({
 
   const table = useTable({
     features,
-    data: rows_,
+    data: filteredRows,
     columns,
     // Server mode hands back sorted rows: keep the local sort state empty so
     // the sorted row model is a pass-through; header clicks go to onSortChange.
@@ -325,9 +382,10 @@ export function DataTable<T extends RowData>({
   const s = dataTable({ tone, compact, surface });
   const showGrid = gridProp ?? true;
   const rows = table.getRowModel().rows;
-  const pages = pageSize > 0 ? Math.max(1, Math.ceil(rows.length / pageSize)) : 1;
-  const current = Math.min(page, pages - 1);
-  const visible = pageSize > 0 ? rows.slice(current * pageSize, current * pageSize + pageSize) : rows;
+  const win = pageWindow(rows.length, page, pageSize);
+  const pages = win.pageCount;
+  const current = win.page;
+  const visible = rows.slice(win.start, win.end);
 
   // Column-priority drops: a column with meta.priority p renders only when the
   // pane is wide enough for it. Priority 1 never drops.
@@ -390,25 +448,26 @@ export function DataTable<T extends RowData>({
     );
   };
 
-  const selectBox = (checked: boolean, onChange: () => void, label: string) => (
+  const selectBox = (checked: boolean | 'mixed', onChange: () => void, label: string) => (
     <Pressable
       role="checkbox"
-      aria-checked={checked}
-      aria-label={label}
+      // The kit's Pressable types aria-checked as boolean, so a part-selected
+      // page reads as unchecked and says so in its name.
+      aria-checked={checked === true}
+      aria-label={checked === 'mixed' ? `${label}, some selected` : label}
       onPress={onChange}
       className={s.selectBox()}
     >
-      {checked ? <Text className="text-sm">✓</Text> : null}
+      {checked === 'mixed' ? <Text className="text-sm">–</Text> : checked ? <Text className="text-sm">✓</Text> : null}
     </Pressable>
   );
 
   const allIds = visible.map((row) => getRowId?.(row.original) ?? row.id);
-  const allSelected = !!selection && allIds.length > 0 && allIds.every((id) => selection.selectedIds.includes(id));
+  const pageSelection = selection ? visibleSelection(selection.selectedIds, allIds) : 'none';
+  const allSelected = pageSelection === 'all';
   const toggleAll = () => {
     if (!selection) return;
-    selection.onSelectedIdsChange(
-      allSelected ? [] : [...new Set([...selection.selectedIds, ...allIds])],
-    );
+    selection.onSelectedIdsChange(toggleVisible(selection.selectedIds, allIds));
   };
 
   // Row chrome shared by both layouts: selection state, tint, hover, link.
@@ -426,11 +485,7 @@ export function DataTable<T extends RowData>({
     const checked = selection.selectedIds.includes(id);
     return (
       <TableCell key="__select" className={s.selectCell()}>
-        {selectBox(checked, () => {
-          selection.onSelectedIdsChange(
-            checked ? selection.selectedIds.filter((x) => x !== id) : [...selection.selectedIds, id],
-          );
-        }, 'Select row')}
+        {selectBox(checked, () => selection.onSelectedIdsChange(toggleId(selection.selectedIds, id)), 'Select row')}
       </TableCell>
     );
   };
@@ -545,14 +600,25 @@ export function DataTable<T extends RowData>({
         ))}
       </TableRow>
     ))
-  ) : errorState ? (
+  ) : errorState || error ? (
     <TableRow className="flex-row">
-      <TableCell className={`${s.empty()} flex-1`} colSpan={columnCount}>{errorState}</TableCell>
+      <TableCell className={`${s.empty()} flex-1 gap-3`} colSpan={columnCount}>
+        {errorState ?? (
+          <View role="alert" className="items-center gap-3">
+            <ErrorMessage message={error?.message} />
+            {error?.onRetry ? (
+              <Button title={error.retryLabel ?? 'Try again'} variant="outline" loading={error.retrying} disabled={error.retrying} onPress={error.onRetry} />
+            ) : null}
+          </View>
+        )}
+      </TableCell>
     </TableRow>
   ) : visible.length === 0 ? (
     <TableRow className="flex-row">
       <TableCell className={`${s.empty()} flex-1`} colSpan={columnCount}>
-        {emptyState ?? <Text className={s.emptyText()}>{emptyText}</Text>}
+        {filter && query.trim() && rows_.length > 0
+          ? <Text className={s.emptyText()}>{filter.noMatchText ?? 'Nothing matches that search.'}</Text>
+          : (emptyState ?? <Text className={s.emptyText()}>{emptyText}</Text>)}
       </TableCell>
     </TableRow>
   ) : (
@@ -578,7 +644,7 @@ export function DataTable<T extends RowData>({
             <TableRow key={headerGroup.id} className={s.headRow()} style={recordsLayout && gi === 0 ? VISUALLY_HIDDEN_ROW : undefined}>
               {selection ? (
                 <TableHeaderCell className={s.selectCell()}>
-                  {selectBox(allSelected, toggleAll, 'Select all rows')}
+                  {selectBox(pageSelection === 'some' ? 'mixed' : allSelected, toggleAll, 'Select all rows on this page')}
                 </TableHeaderCell>
               ) : null}
               {headers.map((header, i) => headerCell(header, i, headers.length))}
@@ -591,13 +657,23 @@ export function DataTable<T extends RowData>({
   );
 
   return (
-    <View onLayout={onLayout} className={s.root({ className: `${rounded ? 'rounded-soft overflow-hidden' : ''} ${className ?? ''}` })}>
+    <View testID={testID} onLayout={onLayout} className={s.root({ className: `${rounded ? 'rounded-soft overflow-hidden' : ''} ${className ?? ''}` })}>
       {title ? (
         <View>
           <View className={s.titleBar()}>
             <Text role="heading" aria-level={2} className={s.titleText()}>{title}</Text>
           </View>
           <View aria-hidden className={s.titlePlate()} />
+        </View>
+      ) : null}
+      {filter ? (
+        <View className={s.toolbar()}>
+          <SearchBar value={query} onChangeText={onQueryChange} placeholder={filter.placeholder ?? filter.label} aria-label={filter.label} tone={tone} className="flex-1" />
+          {!server && !loading && !error && !errorState ? (
+            <Text aria-live="polite" className={s.pagerText()}>
+              {query.trim() ? `${rows.length} of ${rows_.length}` : `${rows_.length}`}
+            </Text>
+          ) : null}
         </View>
       ) : null}
       {recordsLayout ? grid : (

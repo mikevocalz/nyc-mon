@@ -29,6 +29,9 @@ export function DropZone({
   children,
   tone,
   district,
+  // Web-only browse button; native drops come from the system drag session.
+  browseLabel: _browseLabel,
+  accept: _accept,
   ...props
 }: DropZoneProps) {
   const s = dropZone({ active, tone: resolveControlTone(tone, district) });

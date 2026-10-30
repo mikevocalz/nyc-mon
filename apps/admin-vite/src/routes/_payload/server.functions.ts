@@ -12,7 +12,6 @@
  * SOT: node_modules/@payloadcms/tanstack-start/dist/exports/server.d.ts (loadAdminPage, handleServerFunctions)
  *      node_modules/@payloadcms/tanstack-start/dist/exports/layouts.d.ts (loadLayoutData)
  */
-import type { SerializableRecord } from '@payloadcms/tanstack-start/server';
 import type { ServerFunctionClientArgs } from 'payload';
 
 import { createServerFunctionClient } from '@payloadcms/tanstack-start/client';
@@ -54,28 +53,24 @@ const runPayloadServerFn = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     const { handleServerFunctions } = await import('@payloadcms/tanstack-start/server');
     /*
-      Payload types every server function's result as `unknown` — one dispatcher
-      serves `getFormState`, document locks, folder queries and custom RSC
-      components, which share no shape. TanStack Start refuses `unknown` at a
-      server-fn boundary because it cannot prove it serializable, so the result
-      is asserted to the adapter's OWN transport brand rather than widened to
-      `any`. `SerializableRecord` is `Record<string, unknown>` intersected with
-      TanStack's `TsrSerializable` marker — the type the adapter's `toSerializable`
-      produces and the one `loadLayoutData` already returns through this same
-      boundary — so the assertion names the contract instead of erasing it.
+      Since 4.0.0-beta.6 the adapter renders the result to a React Flight
+      stream and hands back a `Response` (`text/x-component`), which TanStack
+      Start passes through untouched. `createServerFunctionClient` decodes it
+      with `createFromReadableStream`, so form state and custom RSC components
+      keep their React elements instead of going through seroval.
     */
-    return (await handleServerFunctions({
+    return handleServerFunctions({
       args: data.args,
       config: await getConfig(),
       importMap: await getImportMap(),
       name: data.name,
-    })) as SerializableRecord;
+    });
   });
 
 /*
-  Sanitises args for TanStack Start's seroval wire format before dispatch.
-  Payload's own callers (`getFormState`) can hand over live form state carrying
-  stray functions, which seroval throws on rather than dropping.
+  The panel's `ServerFunctionClient`: calls the server function above and
+  decodes its Flight response (adapter 4.0.0-beta.6,
+  utilities/serverFunctionClient.js).
 */
 export const serverFunctionHandler = createServerFunctionClient({
   runServerFn: runPayloadServerFn,
