@@ -164,6 +164,16 @@ export const CITY_MAP_STREAMED: readonly CityMapSourceCredit[] = [
     license: 'ODbL-1.0',
     licenseUrl: 'https://opendatacommons.org/licenses/odbl/1-0/',
   },
+  {
+    // ring 10 (Staten Island's North Shore: St. George, Tompkinsville, Stapleton, Clifton, Rosebank and Fort
+    // Wadsworth; the Verrazzano-Narrows Bridge): the ring's block near/lite cells (world/vd-port/blocks/data-ring10)
+    // bake from the same pinned tile set and stream through the same hash-pinned cell source (ring10-near/ring10-lite
+    // manifest keys); the ring adds no lane-C structure cells. Its bridge is the bridge kit on the CSCL alignment in
+    // tiles/bridges.json (the kit credit in CITY_MAP_ASSETS).
+    attribution: 'Valdrada ring-10 near and structure cells (rev 09b5836), Mehmet Kerem Turkcan',
+    license: 'ODbL-1.0',
+    licenseUrl: 'https://opendatacommons.org/licenses/odbl/1-0/',
+  },
 ];
 
 // ODbL §4.4(a): the bundled tile is itself a Derivative Database of the
