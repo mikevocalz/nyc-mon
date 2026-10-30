@@ -17,7 +17,7 @@ export function buildHomeSeed(origin: string) {
     section('district-divider', 'District divider'),
     section('hlynk', 'H-Lynk', { title: hlynk.title, lede: hlynk.lede, body: hlynk.body, bond: hlynk.bond, stageLabel: hlynk.stageLabel, caption: hlynk.caption, 'screen.controlLabel': hlynk.screen.controlLabel, 'screen.sideKey': hlynk.screen.sideKey, 'screen.sound': hlynk.screen.sound, ...Object.fromEntries(hlynk.proof.flatMap((item, i) => [[`proof.${i}.title`, item.title], [`proof.${i}.line`, item.line]])) }),
     section('starters', 'Starter Mons', { eyebrow: starters.eyebrow, title: starters.title, body: starters.body(cards.map((card) => card.eggName)), body2: starters.body2, ...Object.fromEntries(cards.flatMap((card) => [[`cards.${card.slot}.name`, card.babyName], [`cards.${card.slot}.bloodline`, card.bloodline], [`cards.${card.slot}.hatchesFrom`, starters.hatchesFrom(card.eggName)]])) }),
-    section('grid', 'Grid animation', { ...W01_COPY.grid }),
+    section('grid', 'Grid animation'),
     section('care', 'Care', { title: care.title, body: care.body, closing: care.closing, example: care.example, cueLabel: care.cueLabel, answerLabel: care.answerLabel, meterLabel: '{meter}, example level', ...Object.fromEntries(care.items.flatMap((item, i) => (['verb', 'meter', 'cue', 'answer'] as const).map((key) => [`items.${i}.${key}`, item[key]]))) }),
     section('hatch', 'Hatch', { eyebrow: hatch.eyebrow, 'title.0': hatch.title[0], 'title.1': hatch.title[1], body: hatch.body, body2: hatch.body2, closing: hatch.closing }),
     section('waitlist', 'Waitlist', { title: WAITLIST_COPY.section.title, body: WAITLIST_COPY.section.body }),

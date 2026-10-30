@@ -1,26 +1,46 @@
+import { breakpoints } from '@acme/theme';
 import { Image, LinkButton, SkylineDivider, TONE_CLASSES, type ImageProps, type Tone } from '@acme/ui';
 import { Figure, Heading, Link, List, ListItem, Nav, Paragraph, Section, Text } from '@acme/ui/html';
 import { View } from '@acme/ui/tw';
 import { artPosition } from '../home/art';
 import { Eyebrow } from '../home/Eyebrow';
 import { PlaceCaption } from '../home/PlaceCaption';
-import { STORY_COPY as DEFAULT_STORY_COPY } from './copy';
-import { storyCopy, storyPhotos } from './cms';
-import { PageSections, originalLayout, type PageProps, type WebsitePageProps } from '../cms/PageContent';
-import { chapterNumber } from './editorial';
+import { STORY_COPY } from './copy';
+import { chapterNumber, placePhoto } from './editorial';
 import { ChapterNumeral, PhotoFrame, SignageHeadline } from './EditorialKit';
 import { StoryMotion } from './StoryMotion';
 import { siteHref } from '../../lib/site-href';
 
+const MD_UP = `(min-width: ${breakpoints.md})`;
+const XL_UP = `(min-width: ${breakpoints.xl})`;
+/** Columns of the 80rem-capped 12-column grid, as rendered widths. */
+const cols = (n: number) => `${XL_UP} ${Math.round((80 * n) / 12)}rem, ${MD_UP} ${Math.round((100 * n) / 12)}vw, 100vw`;
+
+/**
+ * Every photograph on the page, by role. Night photographs carry the dark
+ * chapters (the hero and the false extinction); daylight ones the city that
+ * thought it had won. Each prints its place caption.
+ */
+const PHOTOS = {
+  hero: placePhoto('megacity-brooklyn-bridge-night', '100vw', { x: 0.5, y: 0.6 }),
+  cleanCity: placePhoto('harlem-brownstone-stoops', cols(5), { x: 0.5, y: 0.5 }),
+  sunset: placePhoto('midtown-empire-sunset', '100vw', { x: 0.5, y: 0.45 }),
+  vale: placePhoto('harlem-apollo', cols(5), { x: 0.5, y: 0.4 }),
+  extinction: placePhoto('megacity-bridge-deck', '100vw', { x: 0.5, y: 0.5 }),
+  rooftops: placePhoto('midtown-chrysler-spire', cols(5), { x: 0.5, y: 0.3 }),
+  water: placePhoto('downtown-one-wtc', cols(4), { x: 0.5, y: 0.35 }),
+  returned: placePhoto('midtown-times-square', '100vw', { x: 0.5, y: 0.5 }),
+} as const;
+
 /** The chapters in reading order: the hero's line map links to each one. */
 const CHAPTERS = [
-  { id: 'story-clean-city', label: DEFAULT_STORY_COPY.cleanCity.eyebrow },
-  { id: 'story-project-zero', label: DEFAULT_STORY_COPY.projectZero.eyebrow },
-  { id: 'story-vale', label: DEFAULT_STORY_COPY.vale.eyebrow },
-  { id: 'story-extinction', label: DEFAULT_STORY_COPY.extinction.eyebrow },
-  { id: 'story-cascade', label: DEFAULT_STORY_COPY.cascade.eyebrow },
-  { id: 'story-returned', label: DEFAULT_STORY_COPY.returned.eyebrow },
-  { id: 'story-enginex', label: DEFAULT_STORY_COPY.enginex.eyebrow },
+  { id: 'story-clean-city', label: STORY_COPY.cleanCity.eyebrow },
+  { id: 'story-project-zero', label: STORY_COPY.projectZero.eyebrow },
+  { id: 'story-vale', label: STORY_COPY.vale.eyebrow },
+  { id: 'story-extinction', label: STORY_COPY.extinction.eyebrow },
+  { id: 'story-cascade', label: STORY_COPY.cascade.eyebrow },
+  { id: 'story-returned', label: STORY_COPY.returned.eyebrow },
+  { id: 'story-enginex', label: STORY_COPY.enginex.eyebrow },
 ] as const;
 
 const num = (id: (typeof CHAPTERS)[number]['id']) => chapterNumber(CHAPTERS.findIndex((c) => c.id === id));
@@ -34,16 +54,13 @@ const nightBody = 'my-0 max-w-content-measure text-base leading-7 text-silver-20
  * plates over it. The line map along the foot links to the seven chapters,
  * like the stops on a line.
  */
-function StoryHero({ page }: PageProps) {
-  const DEFAULT_STORY_COPY = storyCopy(page);
-  const PHOTOS = storyPhotos(page);
-  const copy = DEFAULT_STORY_COPY.hero;
+function StoryHero() {
+  const copy = STORY_COPY.hero;
   return (
     <Section aria-labelledby="story-title" data-testid="story-hero" className="relative w-full overflow-hidden bg-ink-950">
       <Figure className="absolute inset-0 m-0">
         <View id="mfx-hero-art" className="absolute inset-0">
           <Image
-        unoptimized
             src={PHOTOS.hero.src as ImageProps['src']}
             alt={PHOTOS.hero.alt}
             fill
@@ -51,7 +68,7 @@ function StoryHero({ page }: PageProps) {
             priority
             loading="eager"
             sizes={PHOTOS.hero.sizes}
-            placeholder={PHOTOS.hero.blurDataURL ? 'blur' : undefined}
+            placeholder="blur"
             blurDataURL={PHOTOS.hero.blurDataURL}
             contentPosition={artPosition(PHOTOS.hero)}
             className="h-full w-full"
@@ -76,7 +93,7 @@ function StoryHero({ page }: PageProps) {
 
         <Nav aria-label="Chapters" className="mt-4 w-full">
           <List role="list" className="m-0 grid list-none grid-cols-1 gap-0 p-0 sm:grid-cols-2 lg:grid-cols-7">
-            {CHAPTERS.filter((chapter) => !page?.sections.find((section) => `story-${section.sectionKey}` === chapter.id)?.hidden).map((chapter, i) => (
+            {CHAPTERS.map((chapter, i) => (
               <ListItem key={chapter.id} className="relative border-t-2 border-silver-500 lg:border-t-4">
                 <Link
                   href={`#${chapter.id}`}
@@ -97,10 +114,8 @@ function StoryHero({ page }: PageProps) {
 }
 
 /** 01, daylight: the cleanup that worked, set beside a sealed brownstone row. */
-function CleanCityChapter({ page }: PageProps) {
-  const DEFAULT_STORY_COPY = storyCopy(page);
-  const PHOTOS = storyPhotos(page);
-  const copy = DEFAULT_STORY_COPY.cleanCity;
+function CleanCityChapter() {
+  const copy = STORY_COPY.cleanCity;
   return (
     <Section aria-labelledby="story-clean-city-title" data-testid="story-clean-city" id="trg-clean" className="w-full bg-bg">
       <View id="story-clean-city" className={`${shell} gap-10 py-20 md:grid md:grid-cols-12 md:gap-x-10 md:py-28`}>
@@ -127,10 +142,8 @@ function CleanCityChapter({ page }: PageProps) {
 }
 
 /** 02, night: the serum. The quote is the chapter, set at display size. */
-function ProjectZeroChapter({ page }: PageProps) {
-  const DEFAULT_STORY_COPY = storyCopy(page);
-  const PHOTOS = storyPhotos(page);
-  const copy = DEFAULT_STORY_COPY.projectZero;
+function ProjectZeroChapter() {
+  const copy = STORY_COPY.projectZero;
   return (
     <Section aria-labelledby="story-project-zero-title" data-testid="story-project-zero" id="trg-zero" className="w-full bg-ink-950">
       <View aria-hidden className="h-1 w-full bg-orange-500" />
@@ -159,17 +172,15 @@ function ProjectZeroChapter({ page }: PageProps) {
 }
 
 /** A full-bleed photograph between chapters: the city carrying on. */
-function PhotoBand({ entry, id }: { entry: import('../home/art').ArtEntry; id: string }) {
+function PhotoBand({ entry, id }: { entry: (typeof PHOTOS)[keyof typeof PHOTOS]; id: string }) {
   return (
     <PhotoFrame entry={entry} driftId={id} className="aspect-[4/3] sm:aspect-[21/9] lg:aspect-[3/1]" captionAt="bottom-0 right-0" />
   );
 }
 
 /** 03, daylight: Dr. Vale. Photograph left, the chapter right: the mirror of 01. */
-function ValeChapter({ page }: PageProps) {
-  const DEFAULT_STORY_COPY = storyCopy(page);
-  const PHOTOS = storyPhotos(page);
-  const copy = DEFAULT_STORY_COPY.vale;
+function ValeChapter() {
+  const copy = STORY_COPY.vale;
   return (
     <Section aria-labelledby="story-vale-title" data-testid="story-vale" id="trg-vale" className="w-full bg-bg">
       <View id="story-vale" className={`${shell} gap-10 py-20 md:grid md:grid-cols-12 md:gap-x-10 md:py-28`}>
@@ -200,10 +211,8 @@ function ValeChapter({ page }: PageProps) {
  * bridge at night. On desktop the scroll plays it (StoryMotionRoot.tsx); its
  * resting state, which phones and reduced motion get, is this markup.
  */
-function ExtinctionChapter({ page }: PageProps) {
-  const DEFAULT_STORY_COPY = storyCopy(page);
-  const PHOTOS = storyPhotos(page);
-  const copy = DEFAULT_STORY_COPY.extinction;
+function ExtinctionChapter() {
+  const copy = STORY_COPY.extinction;
   return (
     <Section aria-labelledby="story-extinction-title" data-testid="story-extinction" className="w-full bg-ink-950">
       {/* The pinned element carries no position utility: utilities are !important (globals.css) and would beat the pin's inline position. */}
@@ -212,14 +221,13 @@ function ExtinctionChapter({ page }: PageProps) {
         <Figure className="absolute inset-0 m-0">
           <View id="mpx-extinction-art" className="absolute inset-0">
             <Image
-        unoptimized
               src={PHOTOS.extinction.src as ImageProps['src']}
               alt={PHOTOS.extinction.alt}
               fill
               framed={false}
               sizes={PHOTOS.extinction.sizes}
               loading="lazy"
-              placeholder={PHOTOS.extinction.blurDataURL ? 'blur' : undefined}
+              placeholder="blur"
               blurDataURL={PHOTOS.extinction.blurDataURL}
               contentPosition={artPosition(PHOTOS.extinction)}
               className="h-full w-full"
@@ -265,10 +273,8 @@ const LINEAGE_TILES: readonly { tone: Tone | 'signage'; place: string }[] = [
   { tone: 'orange', place: 'lg:col-span-7 lg:row-start-4' },
 ];
 
-function CascadeChapter({ page }: PageProps) {
-  const DEFAULT_STORY_COPY = storyCopy(page);
-  const PHOTOS = storyPhotos(page);
-  const copy = DEFAULT_STORY_COPY.cascade;
+function CascadeChapter() {
+  const copy = STORY_COPY.cascade;
   return (
     <Section aria-labelledby="story-cascade-title" data-testid="story-cascade" id="trg-cascade" className="w-full bg-bg">
       <View id="story-cascade" className={`${shell} gap-4 py-20 md:py-28 lg:grid lg:grid-cols-12 lg:gap-4`}>
@@ -321,10 +327,8 @@ function CascadeChapter({ page }: PageProps) {
 }
 
 /** 06: the return. The headline at the page's largest size, the quote on an orange plate, then Times Square full bleed. */
-function ReturnedChapter({ page }: PageProps) {
-  const DEFAULT_STORY_COPY = storyCopy(page);
-  const PHOTOS = storyPhotos(page);
-  const copy = DEFAULT_STORY_COPY.returned;
+function ReturnedChapter() {
+  const copy = STORY_COPY.returned;
   return (
     <Section aria-labelledby="story-returned-title" data-testid="story-returned" id="trg-returned" className="w-full bg-bg">
       <View id="story-returned" className={`${shell} gap-10 pb-16 pt-20 md:pb-20 md:pt-28`}>
@@ -357,10 +361,8 @@ function ReturnedChapter({ page }: PageProps) {
 }
 
 /** 07, night: three eras of one company, as three giant numerals in a row. */
-function EngineXChapter({ page }: PageProps) {
-  const DEFAULT_STORY_COPY = storyCopy(page);
-  const PHOTOS = storyPhotos(page);
-  const copy = DEFAULT_STORY_COPY.enginex;
+function EngineXChapter() {
+  const copy = STORY_COPY.enginex;
   // The closing sentence is the line the page lands on; the copy is unchanged, only set apart.
   const sentences = copy.body.split(/(?<=\.)\s+/);
   const closing = sentences.pop() ?? '';
@@ -407,10 +409,8 @@ function EngineXChapter({ page }: PageProps) {
 }
 
 /** The close: the slogan on two plates over a Harlem skyline, and the one action. */
-function StoryOutro({ page }: PageProps) {
-  const DEFAULT_STORY_COPY = storyCopy(page);
-  const PHOTOS = storyPhotos(page);
-  const copy = DEFAULT_STORY_COPY.footer;
+function StoryOutro() {
+  const copy = STORY_COPY.footer;
   return (
     <Section aria-labelledby="story-outro-title" data-testid="story-outro" id="trg-outro" className="w-full bg-ink-950">
       <SkylineDivider district="harlem" seed={7} size="lg" still />
@@ -433,20 +433,23 @@ function StoryOutro({ page }: PageProps) {
  * the dark ones; full-bleed photographs sit between them; the hidden decades
  * are a bento. Server HTML throughout; StoryMotion binds the Kinetrell beats.
  */
-export function StoryPage({ page, embedOrigins, siteOrigin }: WebsitePageProps = {}) {
-  const PHOTOS = storyPhotos(page);
-  const sections = {
-    hero: <StoryHero page={page} />,
-    skyline: <SkylineDivider district="megacity" seed={3} size="md" still />,
-    'clean-city': <CleanCityChapter page={page} />,
-    'project-zero': <ProjectZeroChapter page={page} />,
-    sunset: <PhotoBand entry={PHOTOS.sunset} id="mpx-sunset-drift" />,
-    vale: <ValeChapter page={page} />,
-    extinction: <ExtinctionChapter page={page} />,
-    cascade: <CascadeChapter page={page} />,
-    returned: <ReturnedChapter page={page} />,
-    enginex: <EngineXChapter page={page} />,
-    outro: <StoryOutro page={page} />,
-  };
-  return <>{originalLayout(page, Object.keys(sections)) ? <StoryMotion /> : null}<View className="w-full flex-1 bg-bg"><PageSections page={page} embedOrigins={embedOrigins} siteOrigin={siteOrigin} sections={sections} /></View></>;
+export function StoryPage() {
+  return (
+    <>
+      <StoryMotion />
+      <View className="w-full flex-1 bg-bg">
+        <StoryHero />
+        <SkylineDivider district="megacity" seed={3} size="md" still />
+        <CleanCityChapter />
+        <ProjectZeroChapter />
+        <PhotoBand entry={PHOTOS.sunset} id="mpx-sunset-drift" />
+        <ValeChapter />
+        <ExtinctionChapter />
+        <CascadeChapter />
+        <ReturnedChapter />
+        <EngineXChapter />
+        <StoryOutro />
+      </View>
+    </>
+  );
 }

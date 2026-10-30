@@ -1,13 +1,11 @@
 import { Heading, List, ListItem, Paragraph, Text } from '@acme/ui/html';
 import { View } from '@acme/ui/tw';
 import { ArtTile } from './ArtTile';
-import { howCopy } from './cms';
-import { sectionFor } from '@acme/content/site-content';
-import type { PageProps } from '../cms/PageContent';
-import { routeArtFor } from '../cms/route-art';
+import { babyArt } from './art';
+import { W04_COPY } from './copy';
 import { breakpoints } from '@acme/theme';
 
-type CareItem = ReturnType<typeof howCopy>['care']['items'][number];
+type CareItem = (typeof W04_COPY.care.items)[number];
 
 /** Per meter: the filled lot (700 step, 3:1 on the daylight surface, as on home) and the tile's top keyline. */
 const TONE = {
@@ -24,9 +22,7 @@ const LOTS = 10;
  * hollow above it, so filled versus empty never depends on colour. No
  * percentage on screen and nothing counts up.
  */
-function Meter({ item, page }: { item: CareItem } & PageProps) {
-  const W04_COPY = howCopy(page);
-  const { babyArt, photoArt } = routeArtFor(sectionFor(page, 'journey'), 'care');
+function Meter({ item }: { item: CareItem }) {
   const filled = Math.round((item.value / 100) * LOTS);
   return (
     <View className="gap-2">
@@ -54,9 +50,7 @@ function Meter({ item, page }: { item: CareItem } & PageProps) {
   );
 }
 
-function CareTile({ item, index, page }: { item: CareItem; index: number } & PageProps) {
-  const W04_COPY = howCopy(page);
-  const { babyArt, photoArt } = routeArtFor(sectionFor(page, 'journey'), 'care');
+function CareTile({ item, index }: { item: CareItem; index: number }) {
   const copy = W04_COPY.care;
   return (
     <ListItem
@@ -78,7 +72,7 @@ function CareTile({ item, index, page }: { item: CareItem; index: number } & Pag
             {item.answer}
           </Paragraph>
         </View>
-        <Meter page={page} item={item} />
+        <Meter item={item} />
       </View>
     </ListItem>
   );
@@ -91,9 +85,7 @@ function CareTile({ item, index, page }: { item: CareItem; index: number } & Pag
  * closing line runs under all of it as a full-width signage strip. Below `lg` it
  * stacks in DOM order. The meters are labelled as example levels.
  */
-export function CareBento({ page }: PageProps) {
-  const W04_COPY = howCopy(page);
-  const { babyArt, photoArt } = routeArtFor(sectionFor(page, 'journey'), 'care');
+export function CareBento() {
   const copy = W04_COPY.care;
   return (
     <View className="gap-4 md:gap-5">
@@ -113,7 +105,7 @@ export function CareBento({ page }: PageProps) {
         </View>
         <List className="m-0 list-none gap-4 p-0 md:col-span-2 md:grid md:grid-cols-3 md:gap-5 lg:col-span-8 lg:col-start-5 lg:row-start-2">
           {copy.items.map((item, i) => (
-            <CareTile page={page} key={item.verb} item={item} index={i} />
+            <CareTile key={item.verb} item={item} index={i} />
           ))}
         </List>
       </View>

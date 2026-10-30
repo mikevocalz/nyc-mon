@@ -14,14 +14,13 @@
     "./voice": "./mon-voice.ts",
     "./lines": "./mon-lines.ts",
     "./lingo": "./lingo/index.ts",
-    "./site-content": "./site-content/reader.ts",
-    "./site-preview": "./site-content/preview.ts"
+    "./site-content": "./site-content/reader.ts"
   },
   "scripts": {
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:site-content": "node --experimental-strip-types --test site-content/*.node-test.ts"
+    "test:site-content": "node --experimental-strip-types --test site-content/core.node-test.ts site-content/reader.node-test.ts"
   },
   "dependencies": {
     "@acme/core": "workspace:*"

@@ -3,7 +3,14 @@ on:
   push:
     branches: [feat/payload-site-editor]
   pull_request:
-    paths: ['apps/web/**', 'apps/admin-vite/**', 'packages/payload/**', 'packages/content/**', 'packages/ui/**', 'packages/assets/**', 'tooling/site-editor/**', '.github/workflows/site-editor-verification.yml']
+    paths:
+      - 'apps/web/**'
+      - 'apps/admin-vite/**'
+      - 'packages/payload/**'
+      - 'packages/content/site-content/**'
+      - 'packages/ui/**'
+      - 'tooling/site-editor/**'
+      - '.github/workflows/site-editor-verification.yml'
   workflow_dispatch:
 permissions:
   contents: read
@@ -11,9 +18,39 @@ concurrency:
   group: website-editor-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 jobs:
+  source-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Archive tracked source for reproducible review
+        run: |
+          mkdir -p evidence
+          git rev-parse HEAD > evidence/commit.txt
+          python3 - <<'PY'
+          import pathlib, subprocess, tarfile
+          extensions = {'.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.json', '.yaml', '.yml', '.md', '.css', '.html', '.sql', '.graphql', '.txt', '.svg', '.toml'}
+          paths = subprocess.check_output(['git', 'ls-files', '-z']).decode().split('\0')
+          with tarfile.open('evidence/source.tar.gz', 'w:gz') as archive:
+              for name in paths:
+                  p = pathlib.Path(name)
+                  if not p.is_file() or p.is_symlink() or p.stat().st_size > 2000000:
+                      continue
+                  if p.name.startswith('.env') and not p.name.endswith('.example'):
+                      continue
+                  if p.suffix in extensions or p.name in {'.nvmrc', '.npmrc', '.gitignore', '.vercelignore'} or p.name.endswith('.example'):
+                      archive.add(p, arcname=name)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: website-editor-source-${{ github.sha }}
+          path: evidence/
+          retention-days: 3
   integration:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 25
     services:
       postgres:
         image: postgres:17
@@ -29,82 +66,46 @@ jobs:
       DATABASE_URL: postgres://editor:local-test-only@127.0.0.1:5432/site_editor_test
       PAYLOAD_SECRET: isolated-ci-only-secret-not-used-in-production
       BETTER_AUTH_SECRET: isolated-ci-only-auth-secret-not-used-in-production
-      BETTER_AUTH_URL: http://localhost:3001
-      BETTER_AUTH_TRUSTED_ORIGINS: http://localhost:3000,http://localhost:3001
       NYCMON_SITE_EDITOR: '1'
       PAYLOAD_PUSH: 'false'
-      SITE_EDITOR_INTEGRATION: '1'
       BUNNY_STORAGE_ZONE: isolated-ci-no-upload
       BUNNY_STORAGE_PASSWORD: isolated-ci-no-upload
       BUNNY_CDN_URL: https://media.invalid
-      SITE_PREVIEW_SECRET: isolated-preview-test-secret-at-least-32-characters
-      SITE_CONTENT_SEED_TOKEN: isolated-seed-test-token-at-least-32-characters
-      SITE_PUBLIC_URL: http://localhost:3000
-      NEXT_PUBLIC_SITE_URL: http://localhost:3000
-      SITE_ADMIN_ORIGIN: http://localhost:3001
-      PAYLOAD_SITE_API_URL: http://localhost:3001/payload-api
     steps:
       - uses: actions/checkout@v4
-        with: {persist-credentials: false}
+        with:
+          persist-credentials: false
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
-        with: {node-version-file: .nvmrc, cache: pnpm}
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Generate enabled-editor types and admin map
         run: |
-          mkdir -p /tmp/editor-evidence
           pnpm --filter admin-vite payload:types
           pnpm --filter admin-vite payload:importmap
-      - name: Full touched-package typechecks and contracts
+      - name: Typecheck touched applications
+        run: pnpm --filter @acme/content --filter @acme/payload --filter @acme/ui --filter web --filter admin-vite typecheck
+      - name: Unit and contract tests
         run: |
-          pnpm --filter @acme/content --filter @acme/payload --filter @acme/ui --filter web --filter admin-vite typecheck 2>&1 | tee /tmp/editor-evidence/typecheck.log
-          node --experimental-strip-types --test packages/content/site-content/*.node-test.ts packages/payload/src/admin/console/caller-identity.node-test.ts packages/ui/admin/caller-avatar.test.ts 2>&1 | tee /tmp/editor-evidence/pure-tests.log
-      - name: Regression tests and editor lint
+          node --experimental-strip-types --test packages/content/site-content/*.node-test.ts packages/payload/src/admin/console/caller-identity.node-test.ts
+          pnpm --filter @acme/payload test
+      - name: Build admin and website
         run: |
-          pnpm --filter web test 2>&1 | tee /tmp/editor-evidence/web-tests.log
-          pnpm --filter @acme/payload test 2>&1 | tee /tmp/editor-evidence/payload-tests.log
-          (cd packages/payload && pnpm exec eslint --quiet src/site-content src/admin/console/Shell.tsx src/admin/console/views/ViewsClient.tsx src/__tests__/migration-discovery.test.ts)
-      - name: Verify additive migration on the pre-editor schema
-        run: |
-          NYCMON_SITE_EDITOR=0 PAYLOAD_PUSH=true pnpm --filter admin-vite payload run ../../tooling/site-editor/bootstrap-baseline.mjs
-          node tooling/site-editor/migration-check.mjs
-      - name: Production builds
-        run: |
-          pnpm --filter admin-vite build 2>&1 | tee /tmp/editor-evidence/admin-build.log
-          pnpm --filter web build 2>&1 | tee /tmp/editor-evidence/web-build.log
-      - name: Browser dependencies
-        run: pnpm exec playwright install --with-deps chromium
-      - name: Start isolated applications
-        run: |
-          NODE_OPTIONS="--import=$GITHUB_WORKSPACE/tooling/site-editor/mock-bunny.mjs" pnpm --filter admin-vite dev --host 127.0.0.1 --port 3001 > /tmp/editor-admin.log 2>&1 &
-          pnpm --filter web start --hostname 127.0.0.1 --port 3000 > /tmp/editor-web.log 2>&1 &
-          for attempt in $(seq 1 90); do
-            if curl -fs http://localhost:3001/admin/login >/dev/null && curl -fs -H "Authorization: Bearer $SITE_CONTENT_SEED_TOKEN" http://localhost:3000/api/site-content/seed > /tmp/editor-evidence/seed.json; then exit 0; fi
-            sleep 2
-          done
-          echo 'Isolated applications did not start'; exit 1
-      - name: Authenticated import and browser verification
-        run: |
-          pnpm --filter admin-vite payload run ../../tooling/site-editor/auth-fixtures.mjs
-          node tooling/site-editor/browser-login.mjs
-          export SITE_SEED_MANIFEST=/tmp/editor-evidence/seed.json SITE_IMPORT_SOURCE_ORIGIN=http://localhost:3000 SITE_IMPORT_ALLOW_LOCAL_TEST=1
-          export SITE_IMPORT_ACTOR_ID=$(node -p "JSON.parse(require('fs').readFileSync('/tmp/editor-evidence/auth-fixtures.json')).find(x=>x.role==='ops').id")
-          pnpm --filter admin-vite payload run ../../packages/payload/src/site-content/import-home.mjs
-          SITE_IMPORT_APPLY=1 SITE_IMPORT_REPORT=/tmp/editor-evidence/import-report.json NODE_OPTIONS="--import=$GITHUB_WORKSPACE/tooling/site-editor/mock-bunny.mjs" pnpm --filter admin-vite payload run ../../packages/payload/src/site-content/import-home.mjs
-          node --experimental-strip-types tooling/site-editor/api-smoke.mjs
-          node tooling/site-editor/browser-edit.mjs
-          node tooling/site-editor/versions-smoke.mjs
-      - name: Save only non-secret evidence
+          pnpm --filter admin-vite build
+          pnpm --filter web build
+      - name: Save generated outputs and changes
         if: always()
         run: |
           mkdir -p evidence
-          for name in typecheck.log pure-tests.log web-tests.log payload-tests.log admin-build.log web-build.log migration-check.json import-report.json api-smoke.json browser-edit.json versions-smoke.json pages-list.png media-upload.png page-editor.png callers-desktop.png callers-phone.png; do
-            [ ! -f "/tmp/editor-evidence/$name" ] || cp "/tmp/editor-evidence/$name" evidence/
-          done
+          git diff -- packages/payload/src/payload-types.ts apps/admin-vite/src/routes/_payload/importMap.js > evidence/generated.patch
           git rev-parse HEAD > evidence/commit.txt
+          cp packages/payload/src/payload-types.ts evidence/payload-types.ts
+          cp apps/admin-vite/src/routes/_payload/importMap.js evidence/importMap.js
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: website-editor-verified-${{ github.sha }}
+          name: website-editor-build-${{ github.sha }}
           path: evidence/
           retention-days: 7

@@ -11,7 +11,7 @@ function InlineImage({ value }: { value: unknown }) {
   const image = blockImage(value);
   if (!image) return null;
   return <Figure className="m-0 w-full">
-    <View className="relative w-full" style={{ aspectRatio: image.width / image.height }}><Image src={image.src} alt={image.alt} fill framed={false} unoptimized loading="lazy" sizes="(min-width: 1280px) 1200px, 100vw" className="h-full w-full" /></View>
+    <Image src={image.src} alt={image.alt} width={image.width} height={image.height} unoptimized loading="lazy" sizes="(min-width: 1280px) 1200px, 100vw" className="h-auto w-full" />
     <Caption value={image.caption} />
   </Figure>;
 }

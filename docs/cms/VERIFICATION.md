@@ -1,27 +1,27 @@
 # Website editor verification — 2026-10-30
 
-This report supersedes the earlier partial draft report. The implementation was tested against the installed workspace dependencies in an isolated Vercel sandbox (Node 24.22.1, pnpm 12.8.1, PostgreSQL 17), with real Payload 4, Better Auth, Next.js and Chromium. No production database, secrets, published content or storage was changed.
+The expanded implementation was built and tested in an isolated Vercel sandbox with Node 24.22.1, pnpm 12.8.1, frozen workspace dependencies and PostgreSQL 18 on a private Unix socket. No production database, storage, credentials, published content, merge or deployment was changed.
 
-## Passed
+## Verified results
 
-- Full dependency-aware TypeScript checks: @acme/content, @acme/ui, @acme/payload, web and admin-vite.
-- Production admin build and production website build with the editor enabled.
-- 132 dependency-free content/copy/preview/URL/seed/avatar checks; 0 failures.
-- 109 existing website tests; 0 failures.
-- Payload regression suite: 408 passed, 17 pre-existing skipped, 0 failed (29 passing files, 5 skipped).
-- Changed-source ESLint checks for website, Payload/editor, content and assets; 0 errors.
-- Actual additive migration UP against the pre-editor schema preserved all 1,005 existing columns and the sentinel user; no tables removed. DOWN also executed successfully on a separate disposable test database and preserved the sentinel user. Historical migrations were not rewritten.
-- Whole-site import: 13 draft records, 74 image placements, 22 unique source images. A second apply skipped all 13 existing routes without overwriting them.
-- 11 authenticated HTTP integration checks: imported drafts excluded from anonymous reads; publish; draft isolation; signed private preview; public Next.js updates; all 12 public marketing routes; unpublish without hardcoded fallback; referenced-media deletion guard; Caller edit denial; unsafe iframe rejection; published-only sitemap.
-- 5 native Chromium browser checks with zero page errors: drag/drop upload and Save, private autosave, Publish changing the actual public page, Avatar first / full User ID second, and avatar visibility at phone width.
-- 5 additional media/revision checks: image relationship replacement, ordered gallery and YouTube rendering, accurate page/section usage, version restoration of the original image, rejection of referenced-byte overwrite, and restored public content.
+- 81 content, embed-URL, reference, copy-binding and signed-preview contracts passed.
+- All 109 existing website tests passed.
+- Four existing media URL tests passed.
+- Twelve actual Payload/PostgreSQL integration checks passed: editor access, anonymous draft exclusion, role-denied writes, unique media names and CDN URLs, publish, draft isolation, page/section usage reporting, immutable bytes/deletion safety, revision restore, iframe rejection, scoped preview and immediate preview revocation after role removal.
+- Eleven grouped end-to-end browser checks passed with zero website page errors: native drag/drop upload, selecting an image from the library into Home/Hero, Save Draft without changing the public page, saved-draft preview/noindex, preview refresh after saving, exit preview, Publish changing copy and images without redeployment, gallery/YouTube/UI iframe rendering, all twelve public marketing/legal routes, unpublish without hardcoded fallback, and a phone-width Story page without horizontal overflow. A fresh content-editor login also landed directly on Website pages.
+- Whole-site export contains 13 page/settings records and 68 image placements. The isolated import created drafts; repeating it skipped all 13 existing records without overwriting content.
+- The additive migration passed apply → rollback → apply. Existing auth/account/session/version table names were unchanged.
+- Full website and Payload package typechecks, changed-source lint, generated types/import map, production admin build and feature-on/live-mode production website build passed.
+- The concurrent caller-avatar/User ID change was preserved and its 33 isolated contracts passed.
 
-## Storage and environment boundaries
+## Boundaries
 
-The real Payload storage hook ran, but its Bunny HTTP transport was replaced with the explicitly guarded test double in tooling/site-editor/mock-bunny.mjs. Bytes were persisted under /tmp/editor-bunny and image relationships were persisted in PostgreSQL. This proves the upload/import-to-publish path, not production Bunny credentials or remote CDN behavior. Browser checks used Chromium desktop and a phone-sized viewport, not physical iPad/iPhone hardware. YouTube embed URL generation/rendering is verified, not remote video playback. Actual UI iframe providers must be configured in SITE_EMBED_ORIGINS and permit framing through their own headers.
+Bunny's external storage PUT transport was replaced with a guarded local test transport. Actual Payload processing, upload hooks, database writes and CDN URL rendering were tested, but production Bunny credentials and cache propagation were not. YouTube and the approved UI iframe used controlled browser responses; this is not a claim of live YouTube playback or the deployed UI host's framing/CSP compatibility.
 
-## Rollout gate
+An older migration in the pre-existing full empty-database chain references mon_voices before its table exists. The new migration was therefore tested against an isolated declared feature-off baseline. No historical migration was rewritten and production schema push was never enabled.
 
-Code and isolated verification are complete. Production enablement still requires the reviewed additive migration, matching admin/website configuration, a dry-run then draft import using an existing ops/content actor, inspection of actual CDN media and draft previews, and publication of the original-content records before switching the public website to CMS reads. Do not run PAYLOAD_PUSH in production. Keep the feature off until those steps are complete. CodeRabbit was not run and no CodeRabbit approval is claimed.
+CodeRabbit 0.9.1 was installed but not authenticated. Its agent login returned environment_unsupported and requires an Agentic API key. No CodeRabbit review was executed or claimed.
 
-The repeatable integration workflow is .github/workflows/site-editor-verification.yml. Evidence artifacts exclude generated passwords, authentication cookies, preview tokens and full server logs. Test scripts and production rollout commands are documented in docs/cms/WEBSITE_EDITOR.md.
+Production activation requires the reviewed migration, feature/API/preview/allowed-origin environment settings, actual Bunny import, review/publication of initial records and switching bootstrap mode to live mode. Physical-device and final production visual checks remain separate.
+
+The implementation is being transferred to this PR through direct repository file operations after the bulk commit operation was blocked. This verification record alone does not imply that every implementation file has been committed yet.

@@ -1,7 +1,3 @@
-import { copyFor, sectionFor, sectionText } from '@acme/content/site-content';
-import { PageSections, originalLayout, type PageProps, type WebsitePageProps } from '../cms/PageContent';
-import { placedArt } from '../cms/art';
-import { placedMonArt } from './cms';
 import { breakpoints } from '@acme/theme';
 import { LinkButton, SkylineDivider, TONE_CLASSES } from '@acme/ui';
 import { Article, Figure, Heading, Link, List, ListItem, Paragraph, Section, Text } from '@acme/ui/html';
@@ -50,12 +46,9 @@ const NUMERAL_TEXT = { orange: 'text-orange-600', royal: 'text-royal-500', leaf:
  * Motion (`trg-roster-<i>`): the portrait rises, the Dex number slides out
  * from behind it, then the tiles follow; the number drifts on desktop scroll.
  */
-function RosterRow({ starter, index, page }: { starter: MonsStarter; index: number } & PageProps) {
-  const section = sectionFor(page, 'roster');
-  const copy = copyFor(section, W02_COPY.index);
-  const labels = copyFor(section, { name: starter.babyName, bloodline: starter.bloodline, hatchesFrom: copy.hatchesFrom(starter.eggName), cardLabel: copy.cardLabel(starter.babyName) }, `cards.${starter.slot}`);
-  const conceptArt = sectionText(section, 'conceptArt', W02_COPY.conceptArt);
-  const a = placedMonArt(section, starter.slot);
+function RosterRow({ starter, index }: { starter: MonsStarter; index: number }) {
+  const copy = W02_COPY.index;
+  const a = monsArt(starter.slot);
   const place = ROW[index % 2]!;
   const nameId = `w02-roster-${starter.slug}`;
   const beat = `roster-${index}`;
@@ -81,7 +74,7 @@ function RosterRow({ starter, index, page }: { starter: MonsStarter; index: numb
             className="relative m-0 aspect-[4/5] w-full overflow-hidden border-2 border-ink-950 bg-ink-900 sm:aspect-[5/4] lg:aspect-[6/5]"
           >
             <ArtFill entry={a.baby} />
-            <ConceptCaption label={conceptArt} className={index % 2 === 0 ? 'bottom-0 right-0' : 'bottom-0 left-0'} />
+            <ConceptCaption className={index % 2 === 0 ? 'bottom-0 right-0' : 'bottom-0 left-0'} />
           </Figure>
         </View>
 
@@ -90,22 +83,22 @@ function RosterRow({ starter, index, page }: { starter: MonsStarter; index: numb
           <View className="gap-4">
             <View className="flex-row flex-wrap items-center gap-3">
               <DexChip dexId={starter.dexId} tone={a.tone} />
-              <Text className="text-sm font-semibold text-silver-200">{labels.hatchesFrom}</Text>
+              <Text className="text-sm font-semibold text-silver-200">{copy.hatchesFrom(starter.eggName)}</Text>
             </View>
             <Heading
               level={2}
               id={nameId}
               className="my-0 break-words font-display text-[2.5rem] uppercase leading-display text-signage-white sm:text-display-lg sm:leading-display xl:text-display-xl xl:leading-display"
             >
-              {labels.name}
+              {starter.babyName}
             </Heading>
             <View className="flex-row items-center gap-3 border-t-2 border-ink-700 pt-4">
               <RouteDisc tone={a.tone} />
-              <Text className={`text-base font-semibold ${t.text}`}>{labels.bloodline}</Text>
+              <Text className={`text-base font-semibold ${t.text}`}>{starter.bloodline}</Text>
             </View>
           </View>
           <LinkButton
-            title={labels.cardLabel}
+            title={copy.cardLabel(starter.babyName)}
             href={siteHref(copy.cardHref(starter.slug))}
             tone="royal"
             testID={`w02-roster-${starter.slug}-link`}
@@ -119,7 +112,7 @@ function RosterRow({ starter, index, page }: { starter: MonsStarter; index: numb
             className="relative m-0 aspect-[4/5] w-2/5 shrink-0 overflow-hidden border-2 border-ink-950 bg-ink-900"
           >
             <ArtFill entry={a.egg} />
-            <ConceptCaption label={conceptArt} />
+            <ConceptCaption />
           </Figure>
           <View id={`mfx-${beat}-street`} className="min-w-0 flex-1">
             <StreetFigure entry={a.street} className="h-full w-full border-2 border-ink-950" />
@@ -137,12 +130,15 @@ function RosterRow({ starter, index, page }: { starter: MonsStarter; index: numb
  * site's one call to action. Server HTML throughout; MonsMotion arms the
  * Kinetrell reveals after hydration.
  */
-export function MonsIndexPage({ page, embedOrigins, siteOrigin }: WebsitePageProps = {}) {
-  const copy = { ...copyFor(sectionFor(page, 'hero'), W02_COPY.index), ...copyFor(sectionFor(page, 'closing'), { closing: W02_COPY.index.closing, cta: W02_COPY.index.cta }) };
-  const conceptArt = sectionText(sectionFor(page, 'hero'), 'conceptArt', W02_COPY.conceptArt);
+export function MonsIndexPage() {
+  const copy = W02_COPY.index;
   const starters = monsStarters();
-  const hero = placedArt(sectionFor(page, 'hero'), 'hero', hatchArt(`(min-width: ${breakpoints.lg}) 34rem, 100vw`));
-  const sections = { hero: (<Section
+  const hero = hatchArt(`(min-width: ${breakpoints.lg}) 34rem, 100vw`);
+  return (
+    <>
+      <MonsMotion />
+      <View className="w-full flex-1 bg-bg">
+        <Section
           aria-labelledby="w02-mons-title"
           data-testid="w02-mons"
           id="trg-hero"
@@ -175,17 +171,16 @@ export function MonsIndexPage({ page, embedOrigins, siteOrigin }: WebsitePagePro
               <List id="mfx-hero-bullets" className="m-0 list-none flex-row flex-wrap gap-3 p-0">
                 {starters.map((starter) => {
                   const tone = monsArt(starter.slot).tone;
-                  const displayName = sectionText(sectionFor(page, 'hero'), `starterNames.${starter.slot}`, starter.babyName);
                   return (
                     <ListItem key={starter.slug}>
                       <Link
                         href={siteHref(copy.cardHref(starter.slug))}
-                        aria-label={copy.cardLabel(displayName)}
+                        aria-label={copy.cardLabel(starter.babyName)}
                         className="flex min-h-12 flex-row items-center gap-3 border-2 border-ink-700 bg-signage-black py-2 pl-2 pr-4 no-underline transition-colors duration-200 hover:border-orange-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus motion-reduce:transition-none"
                       >
                         <RouteDisc tone={tone} className="h-8 w-8" />
                         <Text className="font-display text-sm text-signage-white">{dexDigits(starter.dexId)}</Text>
-                        <Text className="text-sm font-semibold text-silver-200">{displayName}</Text>
+                        <Text className="text-sm font-semibold text-silver-200">{starter.babyName}</Text>
                       </Link>
                     </ListItem>
                   );
@@ -197,14 +192,22 @@ export function MonsIndexPage({ page, embedOrigins, siteOrigin }: WebsitePagePro
               className="relative m-0 aspect-[4/5] w-full min-w-0 overflow-hidden border-2 border-ink-800 bg-ink-900 sm:aspect-[3/2] lg:col-span-5 lg:aspect-[4/5]"
             >
               <ArtFill entry={hero} eager />
-              <ConceptCaption label={conceptArt} className="right-0 top-0" />
+              <ConceptCaption className="right-0 top-0" />
             </Figure>
           </View>
-        </Section>), skyline: <SkylineDivider district="harlem" seed={11} size="lg" still />, models: <MonsModels3D cms={sectionFor(page, 'models')} />, roster: (<List aria-label={copy.eyebrow} className="m-0 w-full list-none p-0 pb-6 pt-6 md:pt-10">
+        </Section>
+
+        <SkylineDivider district="harlem" seed={11} size="lg" still />
+
+        <MonsModels3D />
+
+        <List aria-label={copy.eyebrow} className="m-0 w-full list-none p-0 pb-6 pt-6 md:pt-10">
           {starters.map((starter, i) => (
-            <RosterRow page={page} key={starter.slug} starter={starter} index={i} />
+            <RosterRow key={starter.slug} starter={starter} index={i} />
           ))}
-        </List>), closing: (<Section aria-labelledby="w02-mons-close" id="trg-close" className="w-full bg-signage-black">
+        </List>
+
+        <Section aria-labelledby="w02-mons-close" id="trg-close" className="w-full bg-signage-black">
           <View className="h-1 w-full bg-orange-500" aria-hidden />
           <View className="mx-auto w-full max-w-screen-xl gap-8 px-4 py-16 sm:px-6 md:flex-row md:items-end md:justify-between md:py-24 lg:px-8">
             <Heading
@@ -220,6 +223,8 @@ export function MonsIndexPage({ page, embedOrigins, siteOrigin }: WebsitePagePro
               <LinkButton title={copy.cta.label} href={siteHref(copy.cta.href)} tone="royal" size="lg" testID="w02-mons-cta" />
             </View>
           </View>
-        </Section>) };
-  return <>{originalLayout(page, Object.keys(sections)) ? <MonsMotion /> : null}<View className="w-full flex-1 bg-bg"><PageSections page={page} embedOrigins={embedOrigins} siteOrigin={siteOrigin} sections={sections} /></View></>;
+        </Section>
+      </View>
+    </>
+  );
 }

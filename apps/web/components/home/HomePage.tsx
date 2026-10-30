@@ -25,7 +25,7 @@ export function HomePage({ page, embedOrigins = [], siteOrigin = '' }: { page?: 
     'district-divider': <DistrictDivider seed={3} />,
     hlynk: <HLynkSection cms={sectionFor(page, 'hlynk')} />,
     starters: <StartersSection cards={starterCards()} cms={sectionFor(page, 'starters')} />,
-    grid: <GridBand cms={sectionFor(page, 'grid')} />,
+    grid: <GridBand />,
     care: <CareSection cms={sectionFor(page, 'care')} />,
     hatch: <HatchBand cms={sectionFor(page, 'hatch')} />,
     waitlist: <WaitlistSection cms={sectionFor(page, 'waitlist')} />,

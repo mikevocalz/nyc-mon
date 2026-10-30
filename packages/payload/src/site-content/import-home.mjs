@@ -1,10 +1,8 @@
-import { Buffer } from 'node:buffer';
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { createHash, randomUUID } from 'node:crypto';
-import { validateWebsiteSeed } from '../../../content/site-content/seed.ts';
+import { record, sectionKeysAreUnique } from '../../../content/site-content/core.ts';
 
-// Retained command path for compatibility. Version 2 imports the complete website.
-// Dry run is the default. The script never overwrites a page or publishes content.
+// Run with the repository's Payload CLI. Dry-run by default; no automatic publish or overwrite.
 const maxBytes = 12 * 1024 * 1024;
 function imageType(bytes) {
   if (bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) return ['image/png', 'png'];
@@ -15,8 +13,8 @@ function imageType(bytes) {
   throw new Error('Source is not a supported raster image');
 }
 async function boundedImage(url) {
-  const response = await fetch(url, { redirect: 'error', signal: AbortSignal.timeout(20000), credentials: 'omit' });
-  if (!response.ok || !response.body) throw new Error(`Asset fetch failed: ${response.status} ${url}`);
+  const response = await fetch(url, { redirect: 'error', signal: AbortSignal.timeout(20000) });
+  if (!response.ok || !response.body) throw new Error(`Asset fetch failed: ${response.status}`);
   if (Number(response.headers.get('content-length')) > maxBytes) throw new Error('Source image exceeds 12 MB');
   const reader = response.body.getReader();
   const chunks = []; let size = 0;
@@ -31,55 +29,52 @@ async function boundedImage(url) {
   } finally { reader.releaseLock(); }
   return Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)), size);
 }
+
 async function main() {
-  const filename = process.env.SITE_SEED_MANIFEST, sourceOrigin = process.env.SITE_IMPORT_SOURCE_ORIGIN;
-  if (!filename || !sourceOrigin) throw new Error('Set SITE_SEED_MANIFEST and SITE_IMPORT_SOURCE_ORIGIN');
+  const filename = process.env.SITE_SEED_MANIFEST;
+  const sourceOrigin = process.env.SITE_IMPORT_SOURCE_ORIGIN;
+  if (!filename || !sourceOrigin) throw new Error('Set SITE_SEED_MANIFEST and SITE_IMPORT_SOURCE_ORIGIN. No database changes made.');
+  const origin = new URL(sourceOrigin);
+  if (origin.protocol !== 'https:' || origin.username || origin.password || origin.pathname !== '/' || origin.search || origin.hash) throw new Error('The source must be one explicit HTTPS origin');
   const manifest = JSON.parse(await readFile(filename, 'utf8'));
-  const pages = validateWebsiteSeed(manifest, sourceOrigin, process.env.SITE_IMPORT_ALLOW_LOCAL_TEST === '1' && process.env.NODE_ENV !== 'production');
-  const assets = new Map();
-  // Verify every unique source before opening the database, even during dry run.
-  for (const entry of pages) for (const asset of entry.assets) {
-    if (assets.has(asset.source)) continue;
-    const bytes = await boundedImage(asset.source);
-    const [mimetype, extension] = imageType(bytes);
-    assets.set(asset.source, { bytes, mimetype, extension, digest: createHash('sha256').update(bytes).digest('hex') });
+  if (!record(manifest) || manifest.schemaVersion !== 1 || !record(manifest.page) || manifest.page.route !== '/' || manifest.page._status !== 'draft' || !sectionKeysAreUnique(manifest.page.sections) || !Array.isArray(manifest.assets) || manifest.assets.length > 40) throw new Error('Invalid homepage seed manifest');
+  if (!manifest.page.sections.every((section) => Array.isArray(section.copy) && Array.isArray(section.content) && section.content.length === 0)) throw new Error('Seed sections must have copy arrays and no pre-existing media relationships');
+  const positions = new Set();
+  for (const asset of manifest.assets) {
+    if (!record(asset) || typeof asset.source !== 'string' || typeof asset.slot !== 'string' || typeof asset.sectionKey !== 'string') throw new Error('Invalid asset placement');
+    const url = new URL(asset.source);
+    if (url.origin !== origin.origin || url.username || url.password || !/^\/(?:_next\/static\/media\/|home\/)/.test(url.pathname)) throw new Error('Assets must come from the approved site static-media or home directory');
+    if (!manifest.page.sections.some((section) => section.sectionKey === asset.sectionKey)) throw new Error('Asset refers to an unknown section');
+    const key = `${asset.sectionKey}:${asset.slot}`;
+    if (positions.has(key)) throw new Error('Duplicate image slot');
+    positions.add(key);
   }
-  const report = { pages: pages.length, placements: pages.reduce((n, p) => n + p.assets.length, 0), uniqueSources: assets.size, created: [], skipped: [], published: false };
   if (process.env.SITE_IMPORT_APPLY !== '1') {
-    console.log(`DRY RUN: verified ${report.pages} pages, ${report.placements} placements, ${report.uniqueSources} source images. No writes or publishing.`);
+    console.log(`DRY RUN: ${manifest.page.sections.length} homepage sections, ${manifest.assets.length} image placements. No uploads, database writes, or publishing performed.`);
     return;
   }
-  if (process.env.NYCMON_SITE_EDITOR !== '1' || process.env.PAYLOAD_PUSH === 'true') throw new Error('Apply the reviewed migration first; enable the admin editor and leave PAYLOAD_PUSH off');
+  if (process.env.NYCMON_SITE_EDITOR !== '1' || process.env.PAYLOAD_PUSH === 'true') throw new Error('Enable the editor only after applying its reviewed migration. PAYLOAD_PUSH must remain off.');
   const { getPayload } = await import('payload');
   const { default: config } = await import('../payload.config.ts');
   const payload = await getPayload({ config });
-  const uploaded = new Map();
   try {
-    const actorId = process.env.SITE_IMPORT_ACTOR_ID;
-    if (!actorId) throw new Error('SITE_IMPORT_ACTOR_ID must identify an existing ops/content staff member');
-    const actor = await payload.findByID({ collection: 'users', id: actorId, overrideAccess: true });
-    if (!['ops', 'content'].includes(actor.role)) throw new Error('The import actor must be ops or content staff');
-    for (const entry of pages) {
-      const existing = await payload.find({ collection: 'site-pages', where: { route: { equals: entry.page.route } }, draft: true, limit: 1, depth: 0, overrideAccess: true, user: actor });
-      if (existing.docs.length) { report.skipped.push({ route: entry.page.route, id: existing.docs[0].id }); continue; }
-      for (const asset of entry.assets) {
-        const file = assets.get(asset.source);
-        let media = uploaded.get(file.digest);
-        if (!media) {
-          // The fingerprint field cannot be set through REST by any role; only this trusted import writes it.
-          const reused = await payload.find({ collection: 'media', where: { siteSourceHash: { equals: file.digest } }, limit: 1, depth: 0, overrideAccess: true, user: actor });
-          media = reused.docs[0];
-          if (!media) media = await payload.create({ collection: 'media', data: { alt: asset.alt || `Decorative website image: ${asset.slot}`, width: asset.width, height: asset.height, siteSourceHash: file.digest }, file: { data: file.bytes, mimetype: file.mimetype, name: `website-${file.digest.slice(0, 16)}-${randomUUID()}.${file.extension}`, size: file.bytes.length }, overrideAccess: true, user: actor });
-          uploaded.set(file.digest, media);
-        }
-        const section = entry.page.sections.find((item) => item.sectionKey === asset.sectionKey);
-        section.content.push({ blockType: 'image', blockName: asset.slot, slot: asset.slot, image: media.id, alt: asset.alt, decorative: asset.decorative, caption: asset.caption, focalX: asset.focalX, focalY: asset.focalY });
-      }
-      const page = await payload.create({ collection: 'site-pages', data: entry.page, draft: true, overrideAccess: true, user: actor });
-      report.created.push({ route: entry.page.route, id: page.id });
+    const existing = await payload.find({ collection: 'site-pages', where: { route: { equals: '/' } }, draft: true, limit: 1, depth: 0, overrideAccess: true });
+    if (existing.docs.length) throw new Error('A Home page already exists. It was not overwritten, published, or reseeded.');
+    for (const asset of manifest.assets) {
+      const bytes = await boundedImage(asset.source);
+      const [mimetype, extension] = imageType(bytes);
+      const digest = createHash('sha256').update(bytes).digest('hex');
+      const name = `site-home-${digest.slice(0, 16)}-${randomUUID()}.${extension}`;
+      // Do not trust a caller-uploaded file merely because it has the expected name.
+      const media = await payload.create({ collection: 'media', data: { alt: asset.alt || `Decorative image for ${asset.slot}`, width: asset.width, height: asset.height }, file: { data: bytes, mimetype, name, size: bytes.length }, overrideAccess: true });
+      const section = manifest.page.sections.find((item) => item.sectionKey === asset.sectionKey);
+      section.content.push({ blockType: 'image', blockName: asset.slot, slot: asset.slot, image: media.id, alt: asset.alt, decorative: Boolean(asset.decorative), caption: asset.caption, focalX: asset.focalX, focalY: asset.focalY });
     }
-    console.log(JSON.stringify(report, null, 2));
-    if (process.env.SITE_IMPORT_REPORT) await writeFile(process.env.SITE_IMPORT_REPORT, JSON.stringify(report, null, 2));
-  } finally { await payload.destroy(); }
+    const page = await payload.create({ collection: 'site-pages', data: { ...manifest.page, _status: 'draft' }, draft: true, overrideAccess: true });
+    console.log(`Created draft Home page ${page.id}. Review and publish it in Payload. Nothing was published by this script.`);
+  } finally {
+    if (typeof payload.destroy === 'function') await payload.destroy();
+    else if (typeof payload.db.destroy === 'function') await payload.db.destroy();
+  }
 }
-try { await main(); } catch (error) { console.error(error instanceof Error ? error.message : 'Website import failed'); process.exitCode = 1; }
+main().catch((error) => { console.error(error instanceof Error ? error.message : 'Website import failed'); process.exitCode = 1; });

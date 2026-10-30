@@ -15,8 +15,7 @@ test('empty authored copy does not resurrect fallback text', () => {
   const page = parseSitePage(doc({ sections: [{ sectionKey: 'hero', copy: [{ key: 'body', value: '' }] }] }));
   assert.equal(sectionText(sectionFor(page, 'hero'), 'body', 'fallback'), '');
 });
-test('authored section list controls removal without resurrecting legacy sections', () => assert.deepEqual(orderedSectionKeys(parseSitePage(doc()), ['hero', 'world', 'hatch']), ['world']));
-test('legacy page keeps original order only when CMS is not active', () => assert.deepEqual(orderedSectionKeys(null, ['hero', 'world']), ['hero', 'world']));
+test('partial edits preserve existing layout order', () => assert.deepEqual(orderedSectionKeys(parseSitePage(doc()), ['hero', 'world', 'hatch']), ['hero', 'world', 'hatch']));
 test('complete layout permits intentional reordering', () => assert.deepEqual(orderedSectionKeys(parseSitePage(doc({ sections: [{ sectionKey: 'world' }, { sectionKey: 'hero' }] })), ['hero', 'world']), ['world', 'hero']));
 test('unknown block types cannot reach the renderer', () => {
   const page = parseSitePage(doc({ sections: [{ sectionKey: 'hero', content: [{ blockType: 'html', html: '<script>' }, { blockType: 'youtube', url: 'https://youtu.be/abcdefghijk' }] }] }));

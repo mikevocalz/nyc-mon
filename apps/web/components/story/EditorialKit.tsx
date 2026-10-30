@@ -111,7 +111,6 @@ export function PhotoFrame({
 }) {
   const image = (
     <Image
-        unoptimized
       src={entry.src as ImageProps['src']}
       alt={entry.alt}
       fill
@@ -119,7 +118,7 @@ export function PhotoFrame({
       sizes={entry.sizes}
       loading={eager ? 'eager' : 'lazy'}
       priority={eager}
-      placeholder={entry.blurDataURL ? 'blur' : undefined}
+      placeholder="blur"
       blurDataURL={entry.blurDataURL}
       contentPosition={artPosition(entry)}
       className="h-full w-full"

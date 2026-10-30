@@ -7,22 +7,20 @@ import { Eyebrow } from '../home/Eyebrow';
 import { HeroCity } from '../home/HeroDistrictIsland';
 import { starterCards, type StarterCard } from '../home/StartersSection';
 import { ArtTile } from './ArtTile';
-import { routeArtFor } from '../cms/route-art';
-import { sectionFor } from '@acme/content/site-content';
-import { PageSections, originalLayout, type PageProps, type WebsitePageProps } from '../cms/PageContent';
+import { babyArt, eggArt, hatchNightArt, hlynkArt } from './art';
 import { CareBento } from './CareBento';
 import { CityTerminus } from './CityTerminus';
-import { howCopy } from './cms';
+import { W04_COPY } from './copy';
 import { HowItWorksMotion } from './HowItWorksMotion';
 import { siteHref } from '../../lib/site-href';
 
-type Step = ReturnType<typeof howCopy>['loop']['steps'][number];
+type Step = (typeof W04_COPY.loop.steps)[number];
 
 const MD_UP = `(min-width: ${breakpoints.md})`;
 const LG_UP = `(min-width: ${breakpoints.lg})`;
 
 /** The in-page anchor for a stop, shared by the hero's line map and the stop itself. */
-const stepId = (step: Step) => `hiw-${({ '01': 'meet', '02': 'name', '03': 'incubate', '04': 'hatch', '05': 'care' } as const)[step.numeral]}`;
+const stepId = (step: Step) => `hiw-${step.verb.toLowerCase()}`;
 
 /**
  * HERO: the title as two signage plates (the second set off to the right, as
@@ -32,9 +30,7 @@ const stepId = (step: Step) => `hiw-${({ '01': 'meet', '02': 'name', '03': 'incu
  * Transform-only entrance (`mfx-hero-*` is never pre-hidden), so nothing in
  * the first view ever goes transparent.
  */
-function Hero({ cards, page }: { cards: readonly StarterCard[] } & PageProps) {
-  const W04_COPY = howCopy(page);
-  const { babyArt, eggArt, hatchNightArt, hlynkArt } = routeArtFor(sectionFor(page, 'hero'), '');
+function Hero({ cards }: { cards: readonly StarterCard[] }) {
   const loop = W04_COPY.loop;
   const [first] = cards;
   return (
@@ -61,7 +57,7 @@ function Hero({ cards, page }: { cards: readonly StarterCard[] } & PageProps) {
           <Paragraph className="my-0 max-w-content-measure border-l-4 border-orange-500 bg-surface-raised px-4 py-3 text-lg leading-8 text-text md:text-xl md:leading-8">
             {loop.body}
           </Paragraph>
-          <LineMap page={page} />
+          <LineMap />
         </View>
 
         <View id="mfx-hero-hiw-art" className="min-w-0 lg:col-span-5">
@@ -91,9 +87,7 @@ function Hero({ cards, page }: { cards: readonly StarterCard[] } & PageProps) {
  * stop, each a link to that stop below. Five columns at every width; the
  * verb sits under its number.
  */
-function LineMap({ page }: PageProps) {
-  const W04_COPY = howCopy(page);
-  const { babyArt, eggArt, hatchNightArt, hlynkArt } = routeArtFor(sectionFor(page, 'hero'), '');
+function LineMap() {
   const loop = W04_COPY.loop;
   return (
     <Nav aria-label={loop.listLabel} className="w-full max-w-xl bg-ink-950 px-2 pb-2 pt-3 md:px-4">
@@ -120,9 +114,7 @@ function LineMap({ page }: PageProps) {
 }
 
 /** Stop 01: the three eggs on Dr. Santoro's table, each named. */
-function MeetArt({ cards, page }: { cards: readonly StarterCard[] } & PageProps) {
-  const W04_COPY = howCopy(page);
-  const { babyArt, eggArt, hatchNightArt, hlynkArt } = routeArtFor(sectionFor(page, 'journey'), 'meet');
+function MeetArt({ cards }: { cards: readonly StarterCard[] }) {
   return (
     <List className="m-0 grid list-none grid-cols-3 gap-2 p-0 md:gap-4">
       {cards.map((card, i) => (
@@ -138,9 +130,7 @@ function MeetArt({ cards, page }: { cards: readonly StarterCard[] } & PageProps)
 }
 
 /** Stop 02: the H-Lynk Core on its ink stage, named and with its line. */
-function NameArt({ page }: PageProps) {
-  const W04_COPY = howCopy(page);
-  const { babyArt, eggArt, hatchNightArt, hlynkArt } = routeArtFor(sectionFor(page, 'journey'), 'name');
+function NameArt() {
   const copy = W04_COPY.hlynk;
   return (
     <View className="scheme-dark relative min-h-80 flex-row items-center justify-center overflow-hidden bg-ink-950 px-4 py-8 md:min-h-[26rem]">
@@ -154,9 +144,7 @@ function NameArt({ page }: PageProps) {
 }
 
 /** Stop 03: the egg waiting at night, and the three incubation times as plates. */
-function IncubateArt({ page }: PageProps) {
-  const W04_COPY = howCopy(page);
-  const { babyArt, eggArt, hatchNightArt, hlynkArt } = routeArtFor(sectionFor(page, 'journey'), 'incubate');
+function IncubateArt() {
   const copy = W04_COPY.incubation;
   return (
     <View className="gap-0">
@@ -176,9 +164,7 @@ function IncubateArt({ page }: PageProps) {
 }
 
 /** Stop 04: the three Baby forms, one large and two stacked, and the hatch band's closing line. */
-function HatchArt({ cards, page }: { cards: readonly StarterCard[] } & PageProps) {
-  const W04_COPY = howCopy(page);
-  const { babyArt, eggArt, hatchNightArt, hlynkArt } = routeArtFor(sectionFor(page, 'journey'), 'hatch');
+function HatchArt({ cards }: { cards: readonly StarterCard[] }) {
   const [lead, ...rest] = cards;
   return (
     <View className="gap-3 md:gap-4">
@@ -256,24 +242,31 @@ function Stop({ step, index, art, wide = false }: { step: Step; index: number; a
  * line reaches it; stop copy, bento tiles and the city tiles stagger in.
  * Reduced motion or no JavaScript: all of it is drawn, lit and at rest.
  */
-export function HowItWorksPage({ page, embedOrigins, siteOrigin }: WebsitePageProps = {}) {
-  const W04_COPY = howCopy(page);
-  const { babyArt, eggArt, hatchNightArt, hlynkArt } = routeArtFor(sectionFor(page, 'cta'), '');
+export function HowItWorksPage() {
   const cards = starterCards();
   const [meet, name, incubate, hatch, care] = W04_COPY.loop.steps;
   const cta = W04_COPY.cta;
-  const sections = { hero: (<Hero page={page} cards={cards} />), journey: (<View className="w-full border-t-4 border-signage-black">
+  return (
+    <>
+      <HowItWorksMotion />
+      <View className="w-full flex-1 bg-bg">
+        <Hero cards={cards} />
+
+        <View className="w-full border-t-4 border-signage-black">
           <View className="relative mx-auto w-full max-w-screen-xl gap-24 px-4 py-16 sm:px-6 md:gap-32 md:py-28 lg:px-8">
             <OrderedList aria-label={W04_COPY.loop.listLabel} className="m-0 list-none gap-24 p-0 md:gap-32">
-              {meet ? <Stop step={meet} index={0} art={<MeetArt page={page} cards={cards} />} /> : null}
-              {name ? <Stop step={name} index={1} art={<NameArt page={page} />} /> : null}
-              {incubate ? <Stop step={incubate} index={2} art={<IncubateArt page={page} />} /> : null}
-              {hatch ? <Stop step={hatch} index={3} art={<HatchArt page={page} cards={cards} />} /> : null}
-              {care ? <Stop step={care} index={4} art={<CareBento page={page} />} wide /> : null}
+              {meet ? <Stop step={meet} index={0} art={<MeetArt cards={cards} />} /> : null}
+              {name ? <Stop step={name} index={1} art={<NameArt />} /> : null}
+              {incubate ? <Stop step={incubate} index={2} art={<IncubateArt />} /> : null}
+              {hatch ? <Stop step={hatch} index={3} art={<HatchArt cards={cards} />} /> : null}
+              {care ? <Stop step={care} index={4} art={<CareBento />} wide /> : null}
             </OrderedList>
-            <CityTerminus page={page} />
+            <CityTerminus />
           </View>
-        </View>), cta: (<Section aria-labelledby="w04-cta-title" data-testid="w04-cta" id="trg-hiw-cta" className="w-full bg-ink-950">
+        </View>
+
+        {/* The page's one night band, like W01's HatchBand: the one action. */}
+        <Section aria-labelledby="w04-cta-title" data-testid="w04-cta" id="trg-hiw-cta" className="w-full bg-ink-950">
           <View className="h-1 w-full bg-orange-500" aria-hidden />
           <View className="mx-auto w-full max-w-screen-xl gap-10 px-4 py-20 sm:px-6 md:py-28 lg:grid lg:grid-cols-12 lg:items-end lg:gap-x-10 lg:px-8">
             <View id="mfx-hiw-cta-copy" className="min-w-0 items-start gap-6 lg:col-span-7">
@@ -292,6 +285,8 @@ export function HowItWorksPage({ page, embedOrigins, siteOrigin }: WebsitePagePr
               <ArtTile art={eggArt(3, `${LG_UP} 28rem, 92vw`)} frame="aspect-[4/3] lg:aspect-[4/5]" />
             </View>
           </View>
-        </Section>) };
-  return <>{originalLayout(page, Object.keys(sections)) ? <HowItWorksMotion /> : null}<View className="w-full flex-1 bg-bg"><PageSections page={page} embedOrigins={embedOrigins} siteOrigin={siteOrigin} sections={sections} /></View></>;
+        </Section>
+      </View>
+    </>
+  );
 }

@@ -1,10 +1,8 @@
 import { LLMInstructionsMenuItem as LLMInstructionsMenuItem_3817bf644402e67bfe6577f60ef982de } from '@payloadcms/ui'
 import { CollectionRedirect as CollectionRedirect_8c713bc6378ad4c5e1b81b689b57690a } from '../../../../../packages/payload/src/admin/console/Redirects'
-import { CopyRowLabel as CopyRowLabel_90676324955cc43725bf40e7e73aa6af } from '../../../../../packages/payload/src/site-content/RowLabels'
-import { SectionRowLabel as SectionRowLabel_90676324955cc43725bf40e7e73aa6af } from '../../../../../packages/payload/src/site-content/RowLabels'
 import { LLMInstructionsDescription as LLMInstructionsDescription_3817bf644402e67bfe6577f60ef982de } from '@payloadcms/ui'
 import { LLMInstructionsCell as LLMInstructionsCell_ab83ff7e88da8d3530831f296ec4756a } from '@payloadcms/ui/rsc'
-import { WebsiteNavigation as WebsiteNavigation_b5f446a495f1531072708caa6f96f360 } from '../../../../../packages/payload/src/site-content/Navigation'
+import { ConsoleNavFallback as ConsoleNavFallback_cd4eb3cc70eaa3aa9390e47175c29525 } from '../../../../../packages/payload/src/admin/console/Shell'
 import { LogoutButton as LogoutButton_aa8e4427b70b37c7820895ace344eb78 } from '@delmaredigital/payload-better-auth/components'
 import { ConsoleIcon as ConsoleIcon_b2dc090577a65eb908914d2ced8d0049 } from '../../../../../packages/payload/src/admin/console/Chrome'
 import { ConsoleLogo as ConsoleLogo_cd4eb3cc70eaa3aa9390e47175c29525 } from '../../../../../packages/payload/src/admin/console/Shell'
@@ -33,11 +31,9 @@ import { UploadDropzoneCollectionsField as UploadDropzoneCollectionsField_3817bf
 export const importMap = {
   "@payloadcms/ui#LLMInstructionsMenuItem": LLMInstructionsMenuItem_3817bf644402e67bfe6577f60ef982de,
   "./admin/console/Redirects#CollectionRedirect": CollectionRedirect_8c713bc6378ad4c5e1b81b689b57690a,
-  "./site-content/RowLabels#CopyRowLabel": CopyRowLabel_90676324955cc43725bf40e7e73aa6af,
-  "./site-content/RowLabels#SectionRowLabel": SectionRowLabel_90676324955cc43725bf40e7e73aa6af,
   "@payloadcms/ui#LLMInstructionsDescription": LLMInstructionsDescription_3817bf644402e67bfe6577f60ef982de,
   "@payloadcms/ui/rsc#LLMInstructionsCell": LLMInstructionsCell_ab83ff7e88da8d3530831f296ec4756a,
-  "./site-content/Navigation#WebsiteNavigation": WebsiteNavigation_b5f446a495f1531072708caa6f96f360,
+  "./admin/console/Shell#ConsoleNavFallback": ConsoleNavFallback_cd4eb3cc70eaa3aa9390e47175c29525,
   "@delmaredigital/payload-better-auth/components#LogoutButton": LogoutButton_aa8e4427b70b37c7820895ace344eb78,
   "./admin/console/Chrome#ConsoleIcon": ConsoleIcon_b2dc090577a65eb908914d2ced8d0049,
   "./admin/console/Shell#ConsoleLogo": ConsoleLogo_cd4eb3cc70eaa3aa9390e47175c29525,

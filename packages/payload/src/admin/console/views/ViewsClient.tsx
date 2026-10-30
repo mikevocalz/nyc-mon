@@ -73,7 +73,7 @@ export function CallersViewClient({ callers, selectedId, page, pageCount, totalC
  return (
   <ConsoleShell section="callers" heading={consoleCopy.callers.heading}>
    <Banner tone="info" title={consoleCopy.callers.privacy} />
-   <Section className={selected ? splitPanes : 'gap-6'}>
+   <Section className={splitPanes}>
     <Section className="content-start gap-4">
      <DataTable surface="page" caption={consoleCopy.callers.heading} data={callers} columns={callerColumns} getRowId={(row) => row.id} getRowHref={(row) => `/admin/callers/${row.id}`} selectedRowId={selectedId ?? undefined} emptyState={<Paragraph>{consoleCopy.callers.empty}</Paragraph>} />
      <Pagination page={page} pageCount={pageCount} totalCount={totalCount} pageSize={50} onPageChange={(next) => router.push(`/admin/callers?page=${next}`)} />

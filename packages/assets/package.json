@@ -13,8 +13,7 @@
     "./mons": {
       "react-native": "./mons/index.native.ts",
       "default": "./mons/index.ts"
-    },
-    "./brand": "./brand/index.ts"
+    }
   },
   "scripts": {
     "lint": "eslint",
