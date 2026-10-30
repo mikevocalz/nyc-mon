@@ -87,7 +87,11 @@ test('every licence link in Legal & credits is a 48pt target announced as a link
   const legal = settings.slice(settings.indexOf('Legal &amp; credits'));
   // No bare caption-sized Text link is left: the only openURL is inside LicenceLink.
   assert.equal(settings.match(/Linking\.openURL/g)?.length, 1);
-  assert.equal(legal.match(/<LicenceLink /g)?.length, 4);
+  // Five call sites: the tile source, the derived tile, the streamed Valdrada far tier (CITY_MAP_STREAMED, the ODbL
+  // credit added with the R2 streaming), the model and texture assets, and the Software row. Each goes through
+  // LicenceLink, so each is the same 48pt role="link" target asserted above.
+  assert.equal(legal.match(/<LicenceLink /g)?.length, 5);
+  assert.match(legal, /CITY_MAP_STREAMED\.map[\s\S]*?<LicenceLink label=\{source\.license\} url=\{source\.licenseUrl\} \/>/);
 });
 
 test('the Preferences switches are gone: nothing stored or read them', () => {

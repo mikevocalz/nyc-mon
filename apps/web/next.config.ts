@@ -15,10 +15,16 @@ const nextConfig: NextConfig = {
     ? {
         basePath: process.env.NEXT_BASE_PATH,
         images: { unoptimized: true },
-        // Hand-written public/ URLs (CanvasKit, Viro wasm, H-Lynk captures) read this.
-        env: { NEXT_PUBLIC_BASE_PATH: process.env.NEXT_BASE_PATH },
       }
     : {}),
+  // Next inlines only NEXT_PUBLIC_* into the client bundle, so the cell source's EXPO_PUBLIC_VD_CELL_BASE (the R2
+  // release root, world/cell-source/index.ts) is passed through here. A new release (r2-publish.mjs) means bumping
+  // this default, the two EAS profiles in apps/mobile/eas.json and the .env.r2.example sample together.
+  env: {
+    EXPO_PUBLIC_VD_CELL_BASE: process.env.EXPO_PUBLIC_VD_CELL_BASE ?? 'https://city-assets.nyc-mon.city/releases/r20261029-cd5483ac',
+    // Hand-written public/ URLs (CanvasKit, Viro wasm, H-Lynk captures) read this; set only on the Pages preview.
+    ...(process.env.NEXT_BASE_PATH ? { NEXT_PUBLIC_BASE_PATH: process.env.NEXT_BASE_PATH } : {}),
+  },
   // React Compiler — auto-memoization, same as the mobile app's
   // experiments.reactCompiler in app.config.ts.
   reactCompiler: true,

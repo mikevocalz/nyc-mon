@@ -144,10 +144,10 @@ export function createCallerProxyWith(store: CallerStoreLike): SceneActorFactory
     leftArm.add(mesh(geometry(new THREE.SphereGeometry(0.01, 6, 4)), led, 0.077, -0.415, 0));
 
     const pose: MutableCallerPose = { leg: 0, arm: 0, bob: 0, lean: 0 };
-    const apply = (state: CallerState): boolean => {
+    const apply = (state: CallerState, frame?: ActorFrame): boolean => {
       root.visible = state.spawned;
       if (!state.spawned) return false;
-      root.position.set(state.x, state.groundY, state.z);
+      root.position.set(state.x - (frame?.originX ?? 0), state.groundY, state.z - (frame?.originZ ?? 0));
       root.rotation.y = state.heading;
       figure.position.y = state.jump.height;
       poseFor(state, pose);
@@ -165,7 +165,7 @@ export function createCallerProxyWith(store: CallerStoreLike): SceneActorFactory
     return {
       id: 'caller-proxy',
       object: root,
-      update: (_frame: ActorFrame) => apply(store.getState()),
+      update: (frame: ActorFrame) => apply(store.getState(), frame),
       dispose: () => {
         if (disposed) return;
         disposed = true;
