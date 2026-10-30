@@ -1,0 +1,111 @@
+name: Website editor integration
+on:
+  push:
+    branches: [feat/payload-site-editor]
+  pull_request:
+    paths:
+      - 'apps/web/**'
+      - 'apps/admin-vite/**'
+      - 'packages/payload/**'
+      - 'packages/content/site-content/**'
+      - 'packages/ui/**'
+      - 'tooling/site-editor/**'
+      - '.github/workflows/site-editor-verification.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: website-editor-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  source-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Archive tracked source for reproducible review
+        run: |
+          mkdir -p evidence
+          git rev-parse HEAD > evidence/commit.txt
+          python3 - <<'PY'
+          import pathlib, subprocess, tarfile
+          extensions = {'.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.json', '.yaml', '.yml', '.md', '.css', '.html', '.sql', '.graphql', '.txt', '.svg', '.toml'}
+          paths = subprocess.check_output(['git', 'ls-files', '-z']).decode().split('\0')
+          with tarfile.open('evidence/source.tar.gz', 'w:gz') as archive:
+              for name in paths:
+                  p = pathlib.Path(name)
+                  if not p.is_file() or p.is_symlink() or p.stat().st_size > 2000000:
+                      continue
+                  if p.name.startswith('.env') and not p.name.endswith('.example'):
+                      continue
+                  if p.suffix in extensions or p.name in {'.nvmrc', '.npmrc', '.gitignore', '.vercelignore'} or p.name.endswith('.example'):
+                      archive.add(p, arcname=name)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: website-editor-source-${{ github.sha }}
+          path: evidence/
+          retention-days: 3
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: editor
+          POSTGRES_PASSWORD: local-test-only
+          POSTGRES_DB: site_editor_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U editor -d site_editor_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgres://editor:local-test-only@127.0.0.1:5432/site_editor_test
+      PAYLOAD_SECRET: isolated-ci-only-secret-not-used-in-production
+      BETTER_AUTH_SECRET: isolated-ci-only-auth-secret-not-used-in-production
+      NYCMON_SITE_EDITOR: '1'
+      PAYLOAD_PUSH: 'false'
+      BUNNY_STORAGE_ZONE: isolated-ci-no-upload
+      BUNNY_STORAGE_PASSWORD: isolated-ci-no-upload
+      BUNNY_CDN_URL: https://media.invalid
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Generate enabled-editor types and admin map
+        run: |
+          pnpm --filter admin-vite payload:types
+          pnpm --filter admin-vite payload:importmap
+      - name: Typecheck touched applications
+        run: pnpm --filter @acme/content --filter @acme/payload --filter @acme/ui --filter web --filter admin-vite typecheck
+      - name: Unit and contract tests
+        run: |
+          node --experimental-strip-types --test packages/content/site-content/*.node-test.ts packages/payload/src/admin/console/caller-identity.node-test.ts
+          pnpm --filter @acme/payload test
+      - name: Build admin and website
+        run: |
+          pnpm --filter admin-vite build
+          pnpm --filter web build
+      - name: Save generated outputs and changes
+        if: always()
+        run: |
+          mkdir -p evidence
+          git diff -- packages/payload/src/payload-types.ts apps/admin-vite/src/routes/_payload/importMap.js > evidence/generated.patch
+          git rev-parse HEAD > evidence/commit.txt
+          cp packages/payload/src/payload-types.ts evidence/payload-types.ts
+          cp apps/admin-vite/src/routes/_payload/importMap.js evidence/importMap.js
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: website-editor-build-${{ github.sha }}
+          path: evidence/
+          retention-days: 7
