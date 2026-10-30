@@ -1,7 +1,7 @@
 // Auth version tables (_accounts_v, _sessions_v, _oauth_*_v, ...) are deliberately not dropped here:
 // the better-auth adapter writes versioned rows to them even though the Payload snapshot omits them.
 // migrate:create proposed dropping them; dropping them makes sign-in 500. Answer rename/none for them.
-import { MigrateUpArgs, MigrateDownArgs, sql } from '@payloadcms/db-postgres'
+import { sql, type MigrateDownArgs, type MigrateUpArgs } from '@payloadcms/db-postgres'
 
 export async function up({ db, payload, req }: MigrateUpArgs): Promise<void> {
   await db.execute(sql`

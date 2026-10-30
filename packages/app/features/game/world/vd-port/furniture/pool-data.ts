@@ -31,6 +31,8 @@ export interface PackedPool {
   count: number;
   /** INSTANCE_BYTES per instance, see decodeInstances. */
   data: Block;
+  /** Expanded manifests may store each x/y/z relative to this per-instance absolute origin. */
+  instanceOrigins?: Float64Array;
 }
 
 export const INSTANCE_BYTES = 24;
@@ -41,6 +43,8 @@ export interface Instances {
   /** x, y, z, yaw, sx, sy, sz, maxScale, r, g, b, lamp per instance (the three vec4 attributes, in order). `lamp` is
    *  the signal lamp code (signal-clock.ts): 0 none, 1-3 vehicle R/A/G, 4 pedestrian hand, 5 walking man, +8 serves E-W. */
   record: Float32Array;
+  /** Absolute CPU-side x/y/z for culling and floating-origin writes (same length/order as record/3). */
+  positions: Float64Array;
 }
 export const INSTANCE_FLOATS = 12;
 
@@ -53,6 +57,9 @@ export function decodeInstances(buf: ArrayBuffer, pool: PackedPool, groundY: (x:
   if (bytes.byteLength !== pool.count * INSTANCE_BYTES) throw new Error(`vd furniture ${pool.name}: ${bytes.byteLength} bytes for ${pool.count} instances`);
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const record = new Float32Array(pool.count * INSTANCE_FLOATS);
+  const positions = new Float64Array(pool.count * 3);
+  const origins = pool.instanceOrigins;
+  if (origins && origins.length !== pool.count * 3) throw new Error(`vd furniture ${pool.name}: ${origins.length / 3} instance origins for ${pool.count} instances`);
   const TURN = (2 * Math.PI) / 65536;
   for (let i = 0; i < pool.count; i++) {
     const o = i * INSTANCE_BYTES;
@@ -61,7 +68,11 @@ export function decodeInstances(buf: ArrayBuffer, pool: PackedPool, groundY: (x:
     const z = view.getFloat32(o + 8, true);
     let y = view.getFloat32(o + 4, true);
     const flags = view.getUint8(o + 23);
-    if (flags & 1) y += groundY(x, z);
+    const wx = origins ? origins[i * 3]! + x : x;
+    const wy = origins ? origins[i * 3 + 1]! + y : y;
+    const wz = origins ? origins[i * 3 + 2]! + z : z;
+    if (flags & 1) y += groundY(wx, wz);
+    positions[i * 3] = wx; positions[i * 3 + 1] = origins ? wy + (origins ? y - view.getFloat32(o + 4, true) : 0) : y; positions[i * 3 + 2] = wz;
     const sx = view.getUint16(o + 14, true) / 4096;
     const sy = view.getUint16(o + 16, true) / 4096;
     const sz = view.getUint16(o + 18, true) / 4096;
@@ -72,7 +83,7 @@ export function decodeInstances(buf: ArrayBuffer, pool: PackedPool, groundY: (x:
     record[r + 10] = (view.getUint8(o + 22) / 255) * 2;
     record[r + 11] = flags >> 1;
   }
-  return { count: pool.count, record };
+  return { count: pool.count, record, positions };
 }
 
 export interface DecodedGeometry {

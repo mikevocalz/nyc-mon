@@ -27,6 +27,7 @@
 //     mat3(instanceMatrix); the two agree for the rotations and uniform scales the rivet heads use.
 import type { Three } from '@acme/ui/three';
 import type { Node } from 'three/webgpu';
+import { worldPatternPosition } from '../../render-space.ts';
 
 type Material = InstanceType<Three['Material']>;
 type Texture = InstanceType<Three['Texture']>;
@@ -239,7 +240,7 @@ function steelGraph(THREE: Three, night: Node<'float'>, physical: boolean): Stee
   const vUvM = T.uv().toVar();
   const vRv = T.attribute('aRv', 'vec4');
   const vJ = T.attribute('aJ', 'vec2');
-  const vWp = T.positionWorld;
+  const vWp = worldPatternPosition(THREE) as unknown as V;
   const vWn = T.varying(T.normalize(T.modelWorldMatrix.mul(T.vec4(T.normalLocal, 0)).xyz));
 
   // STEEL_FS_COLOR (L72-L141)

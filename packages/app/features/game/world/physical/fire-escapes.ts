@@ -229,7 +229,7 @@ export interface FireEscapes {
   /** The three instanced meshes: near (two mirrored modules) and far. */
   meshes: InstancedMesh[];
   /** Re-sort the placements around a focus; call when the focus moves a few metres, not every frame. */
-  update(placements: readonly FireEscapePlacement[], focusX: number, focusZ: number): void;
+  update(placements: readonly FireEscapePlacement[], focusX: number, focusZ: number, originX?: number, originZ?: number): void;
   dispose(): void;
 }
 
@@ -275,7 +275,7 @@ export function createFireEscapes(THREE: Three, materials = createFireEscapeMate
   const dummy = new THREE.Object3D();
   return {
     meshes,
-    update(placements, focusX, focusZ) {
+    update(placements, focusX, focusZ, originX = 0, originZ = 0) {
       const counts = [0, 0];
       let total = 0; let nearFloors = 0; let farCount = 0;
       const nearSq = FIRE_ESCAPE.nearDistance * FIRE_ESCAPE.nearDistance;
@@ -289,7 +289,7 @@ export function createFireEscapes(THREE: Three, materials = createFireEscapeMate
           for (let i = 0; i < fe.landings; i++) {
             const parity = i % 2;
             const n = counts[parity]!++;
-            dummy.position.set(fe.x, fe.y + i * fe.storey, fe.z);
+            dummy.position.set(fe.x - originX, fe.y + i * fe.storey, fe.z - originZ);
             dummy.updateMatrix();
             near[parity]!.setMatrixAt(n, dummy.matrix);
             // Flight up from every landing but the top; drop ladder under the first only.
@@ -299,7 +299,7 @@ export function createFireEscapes(THREE: Three, materials = createFireEscapeMate
           nearFloors += fe.landings;
         } else {
           const scale = fe.storey / STOREY;
-          dummy.position.set(fe.x, fe.y - scale * 2.2, fe.z);
+          dummy.position.set(fe.x - originX, fe.y - scale * 2.2, fe.z - originZ);
           dummy.scale.set(1, fe.h - 1 + scale * 3.2, 1);
           dummy.updateMatrix();
           far.setMatrixAt(farCount, dummy.matrix);

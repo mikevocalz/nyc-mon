@@ -37,6 +37,17 @@ export function cellKey(cx: number, cz: number): string {
   return `${cx}_${cz}`;
 }
 
+export interface CellLocalPositionFrame {
+  readonly kind: 'cell-local';
+  readonly origin: readonly [x: number, y: number, z: number];
+  /**
+   * A non-unit scale the built mesh carries with the origin (the far tier's quantized int16 positions, scaled by the
+   * chunk's 1/4 m or 1/8 m step x the tile affine). Positive components; the local bounding box is the package's
+   * scene-space bounds shifted by `origin` and divided by it. Absent: unit scale.
+   */
+  readonly scale?: readonly [x: number, y: number, z: number];
+}
+
 export interface CellAttribute {
   readonly array: Float32Array | Uint16Array | Uint32Array | Int16Array | Uint8Array | Int8Array | Int32Array | Float64Array;
   readonly itemSize: number;
@@ -45,6 +56,7 @@ export interface CellAttribute {
 
 /** One cell's share of a merged mesh: non-indexed triangles in the source's attribute layout. */
 export interface CellPackage {
+  readonly positionFrame?: CellLocalPositionFrame;
   /** Chunk coordinates, in units of the chunk size the package was cut at. */
   readonly cx: number;
   readonly cz: number;
@@ -69,9 +81,14 @@ export interface CellPackage {
    * A package whose bytes arrive asynchronously (a Metro asset fetched on demand: world/vd-port/furniture): `ready` is
    * false until they are in, and the streamer calls `prefetch` for it inside its layer's reach plus a one-chunk ring and
    * builds it once `ready`. Absent: always ready.
+   *
+   * A package whose fetch can end without bytes (world/cell-source: no host configured, host down, cooldown) returns the
+   * fetch's promise from `prefetch` (the same promise while it is in flight), resolving true once the bytes are in. The
+   * streamer then wakes the canvas on arrival instead of redrawing every frame while it waits, so an unreachable source
+   * lets an on-demand canvas rest. A `prefetch` that returns nothing is polled: the streamer keeps asking for frames.
    */
   ready?(): boolean;
-  prefetch?(): void;
+  prefetch?(): void | Promise<boolean>;
   /**
    * True while a finer package of the same ground is in (a far level under its near level, world/vd-port/furniture):
    * the streamer treats it as unwanted, so it leaves as any other cell does and gives its budget back.

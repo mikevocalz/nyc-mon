@@ -13,12 +13,14 @@
     "preview": {
       "extends": "base",
       "distribution": "internal",
-      "channel": "preview"
+      "channel": "preview",
+      "env": { "EXPO_PUBLIC_VD_CELL_BASE": "https://city-assets.nyc-mon.city/releases/r20261029-cd5483ac" }
     },
     "production": {
       "extends": "base",
       "autoIncrement": true,
-      "channel": "production"
+      "channel": "production",
+      "env": { "EXPO_PUBLIC_VD_CELL_BASE": "https://city-assets.nyc-mon.city/releases/r20261029-cd5483ac" }
     }
   },
   "submit": {
