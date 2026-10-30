@@ -25,6 +25,11 @@
 //                                                                   no landmark/fk/part structure, so the pack is
 //                                                                   the ring's bridges (ring7.mjs RING7_BRIDGES,
 //                                                                   harvest.js bridgeStructures)
+//   node tooling/city/vd-port/bake.mjs --ring ring8 | ring9 | ring10  rings 8-10 (ring8.mjs .. ring10.mjs: western
+//                                                                   Queens, the South Bronx, Staten Island's North
+//                                                                   Shore): packs to blocks/data-ringN/, structures
+//                                                                   in VD_BLOCKS or VD_BLOCKS_RING1..N-1 skipped,
+//                                                                   plus each ring's RINGN_BRIDGES
 //
 // Needs --deps (three 0.185.1 and earcut 3) or VD_BAKE_DEPS, and Playwright (VD_PLAYWRIGHT, the module path).
 import { writeFile } from 'node:fs/promises';
@@ -45,11 +50,16 @@ const argv = process.argv.slice(2);
 const flag = (n) => argv.includes(`--${n}`);
 const val = (n, d) => { const i = argv.indexOf(`--${n}`); return i >= 0 ? argv[i + 1] : d; };
 
-/** The --ring argument: 'ring1' .. 'ring6' (the ring module's tile list, region and dedupe), or none for the square. */
+/** The --ring argument: 'ring1' .. 'ring10' (the ring module's tile list, region and dedupe), or none for the square. */
 const RING = val('ring', null);
-if (RING && RING !== 'ring1' && RING !== 'ring2' && RING !== 'ring3' && RING !== 'ring4' && RING !== 'ring5' && RING !== 'ring6' && RING !== 'ring7') throw new Error(`unknown --ring ${RING}`);
-const TILE_LIST = RING === 'ring1' ? RING1_TILES : RING === 'ring2' ? RING2_TILES : RING === 'ring3' ? RING3_TILES : RING === 'ring4' ? RING4_TILES : RING === 'ring5' ? RING5_TILES : RING === 'ring6' ? RING6_TILES : RING === 'ring7' ? RING7_TILES : TILE_KEYS;
-const SKIP = RING === 'ring1' ? bakedBlockIds() : RING === 'ring2' ? bakedRing2Ids() : RING === 'ring3' ? bakedRing3Ids() : RING === 'ring4' ? bakedRing4Ids() : RING === 'ring5' ? bakedRing5Ids() : RING === 'ring6' ? bakedRing6Ids() : RING === 'ring7' ? bakedRing7Ids() : new Set();
+if (RING && RING !== 'ring1' && RING !== 'ring2' && RING !== 'ring3' && RING !== 'ring4' && RING !== 'ring5' && RING !== 'ring6' && RING !== 'ring7' && RING !== 'ring8' && RING !== 'ring9' && RING !== 'ring10') throw new Error(`unknown --ring ${RING}`);
+/** Rings 8 and later load only their own module (ring<N>.mjs: RING<N>_TILES, RING<N>_BRIDGES, inRing<N>Vd, bakedRing<N>Ids). */
+const RN = RING ? +RING.slice(4) : 0;
+const LATER = RN >= 8 ? await import(`./${RING}.mjs`) : null;
+const TILE_LIST = RING === 'ring1' ? RING1_TILES : RING === 'ring2' ? RING2_TILES : RING === 'ring3' ? RING3_TILES : RING === 'ring4' ? RING4_TILES : RING === 'ring5' ? RING5_TILES : RING === 'ring6' ? RING6_TILES : RING === 'ring7' ? RING7_TILES : LATER ? LATER[`RING${RN}_TILES`] : TILE_KEYS;
+const SKIP = RING === 'ring1' ? bakedBlockIds() : RING === 'ring2' ? bakedRing2Ids() : RING === 'ring3' ? bakedRing3Ids() : RING === 'ring4' ? bakedRing4Ids() : RING === 'ring5' ? bakedRing5Ids() : RING === 'ring6' ? bakedRing6Ids() : RING === 'ring7' ? bakedRing7Ids() : LATER ? LATER[`bakedRing${RN}Ids`]() : new Set();
+/** The bridges a ring bakes (harvest.js bridgeStructures): the ring module's explicit selection. */
+const BRIDGES = RING === 'ring7' ? RING7_BRIDGES : LATER ? LATER[`RING${RN}_BRIDGES`] : [];
 /** A structure's Valdrada world box inside the bake's region (the bundled square for the home bake, the ring's two
  * rects for a ring; s.box is Valdrada world metres, so the home test transforms first). */
 const inRegion = (s) => {
@@ -60,6 +70,7 @@ const inRegion = (s) => {
   if (RING === 'ring5') return inRing5Vd(s.box);
   if (RING === 'ring6') return inRing6Vd(s.box);
   if (RING === 'ring7') return inRing7Vd(s.box);
+  if (LATER) return LATER[`inRing${RN}Vd`](s.box);
   const [ax, az] = toScene(s.box[0], s.box[2]), [bx, bz] = toScene(s.box[3], s.box[5]);
   return Math.max(ax, bx) >= -EXTENT_METERS && Math.min(ax, bx) <= EXTENT_METERS && Math.max(az, bz) >= -EXTENT_METERS && Math.min(az, bz) <= EXTENT_METERS;
 };
@@ -95,15 +106,15 @@ export async function bakeStructures({ measure, nearErrM, heroErrM }) {
       }
       console.log(`${key}: ${list.length} structures, ${kept} in bounds (${Date.now() - t0} ms)`);
     }
-    // Ring 7: Valdrada builds its bridges at boot (main.js buildBridges over tiles/bridges.json), never inside a
-    // tile, so no tile's harvest reaches them; the ring's own call bakes them here, once each.
-    if (RING === 'ring7' && RING7_BRIDGES.length) {
-      const list = await page.evaluate(async ({ keys, opts }) => window.__vdH.bridgeStructures(keys, opts), { keys: RING7_BRIDGES, opts: { parts: LANE_A_PARTS, fk: true, data: !measure, nearErrM, heroErrM, heroes: HEROES } });
+    // Rings 7-10: Valdrada builds its bridges at boot (main.js buildBridges over tiles/bridges.json), never inside a
+    // tile, so no tile's harvest reaches them; the ring's own call bakes them here, once each. The ring module's
+    // list is the selection: ring 9's Harlem River decks lie over ring 3/4 ground, where no ring baked a bridge.
+    if (BRIDGES.length) {
+      const list = await page.evaluate(async ({ keys, opts }) => window.__vdH.bridgeStructures(keys, opts), { keys: BRIDGES, opts: { parts: LANE_A_PARTS, fk: true, data: !measure, nearErrM, heroErrM, heroes: HEROES } });
       let kept = 0;
       for (const s of list) {
         if (seen.has(s.id)) continue;
         if (SKIP.has(s.id)) { seen.add(s.id); continue; }
-        if (!inRegion(s)) continue;
         seen.add(s.id);
         out.push(s);
         kept++;
@@ -140,7 +151,10 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       : RING === 'ring4' ? (await import('./write-ring4.mjs')).writeRing4Packs
       : RING === 'ring5' ? (await import('./write-ring5.mjs')).writeRing5Packs
       : RING === 'ring6' ? (await import('./write-ring6.mjs')).writeRing6Packs
-      : RING === 'ring7' ? (await import('./write-ring7.mjs')).writeRing7Packs : null;
+      : RING === 'ring7' ? (await import('./write-ring7.mjs')).writeRing7Packs
+      : RING === 'ring8' ? (await import('./write-ring8.mjs')).writeRing8Packs
+      : RING === 'ring9' ? (await import('./write-ring9.mjs')).writeRing9Packs
+      : RING === 'ring10' ? (await import('./write-ring10.mjs')).writeRing10Packs : null;
     if (writer) await writer(out, { nearErrM, heroErrM });
     else await writePacks(out, { nearErrM, heroErrM });
   }

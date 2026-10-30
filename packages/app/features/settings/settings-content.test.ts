@@ -87,7 +87,8 @@ test('every licence link in Legal & credits is a 48pt target announced as a link
   const legal = settings.slice(settings.indexOf('Legal &amp; credits'));
   // No bare caption-sized Text link is left: the only openURL is inside LicenceLink.
   assert.equal(settings.match(/Linking\.openURL/g)?.length, 1);
-  assert.equal(legal.match(/<LicenceLink /g)?.length, 4);
+  // sources, the derived tile, the streamed ring cells, the bundled assets, the app credits
+  assert.equal(legal.match(/<LicenceLink /g)?.length, 5);
 });
 
 test('the Preferences switches are gone: nothing stored or read them', () => {

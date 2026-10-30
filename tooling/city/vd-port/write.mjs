@@ -89,14 +89,49 @@ export async function writePacks(structures, { nearErrM, heroErrM, outDir = OUT,
     const dy = CURB - s.base;
     const T = (x, y, z) => { const [sx, sz] = toScene(x, z); return [sx, y + dy, sz]; };
     // ---- the near level
-    const P = fromB64(s.near.pos, Float32Array), C = fromB64(s.near.col, Uint8Array), E = fromB64(s.near.emi, Uint8Array), NM = fromB64(s.near.nmix, Uint8Array), I = fromB64(s.near.idx, Uint32Array);
-    const V = new Float64Array(P.length);
+    const P = fromB64(s.near.pos, Float32Array), I = fromB64(s.near.idx, Uint32Array);
+    // plain arrays: splitFar below appends midpoint vertices
+    const C = Array.from(fromB64(s.near.col, Uint8Array)), E = Array.from(fromB64(s.near.emi, Uint8Array)), NM = Array.from(fromB64(s.near.nmix, Uint8Array));
+    const V = new Array(P.length);
     for (let i = 0; i < P.length; i += 3) { const [x, y, z] = T(P[i], P[i + 1], P[i + 2]); V[i] = x; V[i + 1] = y; V[i + 2] = z; }
+    // vd-port: a near vertex is int16 at 1/128 m about its triangle's cell centre (±256 m), so a triangle with a
+    // vertex further than that from the centre of the cell its centroid falls in can't be written. Bridges have
+    // them (ring 8: the lite level's simplification leaves single triangles hundreds of metres long on the long
+    // spans; near cell 18_15 overflowed at -276.8 m). Such a triangle splits at its
+    // longest edge's midpoint (attributes interpolated) until every piece fits; the surface is unchanged and the
+    // new vertices lie on the old edges, so the structure's box is too. Nothing else in the packs reaches this.
+    const FAR = 250;
+    const mid = (a, b) => {
+      const v = V.length / 3;
+      for (let k = 0; k < 3; k++) V.push((V[a * 3 + k] + V[b * 3 + k]) / 2);
+      for (let k = 0; k < 3; k++) C.push(Math.round((C[a * 3 + k] + C[b * 3 + k]) / 2));
+      for (let k = 0; k < 3; k++) E.push(Math.round((E[a * 3 + k] + E[b * 3 + k]) / 2));
+      for (let k = 0; k < 2; k++) NM.push(Math.round((NM[a * 2 + k] + NM[b * 2 + k]) / 2));
+      return v;
+    };
+    const splitFar = (IL) => {
+      const out = [];
+      const stack = [];
+      for (let t = IL.length - 3; t >= 0; t -= 3) stack.push([IL[t], IL[t + 1], IL[t + 2]]);
+      while (stack.length) {
+        const tri = stack.pop();
+        const mx = (V[tri[0] * 3] + V[tri[1] * 3] + V[tri[2] * 3]) / 3, mz = (V[tri[0] * 3 + 2] + V[tri[1] * 3 + 2] + V[tri[2] * 3 + 2]) / 3;
+        const ox = Math.floor(mx / CELL) * CELL + CELL / 2, oz = Math.floor(mz / CELL) * CELL + CELL / 2;
+        if (tri.every((v) => Math.abs(V[v * 3] - ox) <= FAR && Math.abs(V[v * 3 + 2] - oz) <= FAR)) { out.push(...tri); continue; }
+        const len = (a, b) => Math.hypot(V[a * 3] - V[b * 3], V[a * 3 + 2] - V[b * 3 + 2]);
+        const e = [len(tri[0], tri[1]), len(tri[1], tri[2]), len(tri[2], tri[0])];
+        const k = e.indexOf(Math.max(...e)), a = tri[k], b = tri[(k + 1) % 3], c = tri[(k + 2) % 3];
+        const m = mid(a, b);
+        // keep the winding: (a, m, c) then (m, b, c)
+        stack.push([m, b, c], [a, m, c]);
+      }
+      return out;
+    };
     const sBox = [Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity];
     const levelTris = {};
     for (const L of LEVELS) {
       const cells = levelCells.get(L.name);
-      const IL = L.index(s, V, C, E, I);
+      const IL = splitFar(L.index(s, V, C, E, I));
       levelTris[L.name] = IL.length / 3;
       const remap = new Map();   // cellKey -> Int32Array(vertex -> cell vertex)
       for (let t = 0; t < IL.length; t += 3) {
@@ -109,7 +144,7 @@ export async function writePacks(structures, { nearErrM, heroErrM, outDir = OUT,
         const last = cell.ranges[cell.ranges.length - 1];
         if (last && last[0] === s.id) last[2] += 3; else cell.ranges.push([s.id, cell.idx.length, 3]);
         let rm2 = remap.get(key);
-        if (!rm2) remap.set(key, (rm2 = new Int32Array(P.length / 3).fill(-1)));
+        if (!rm2) remap.set(key, (rm2 = new Int32Array(V.length / 3).fill(-1)));
         for (const v of [a, b, c]) {
           if (rm2[v] < 0) {
             rm2[v] = cell.pos.length / 3;

@@ -68,12 +68,14 @@ test('gates: measured position by day, down after dark', () => {
   assert.ok(gates.filter((g) => gateDrop(g.dayDown!, 0) < 1).length > gates.length / 2, 'most measured gates are up by day');
   assert.ok(gates.every((g) => gateDrop(g.dayDown!, 1) === 1), 'every gate is down at night');
   // the curtain carries its day position for the shader
-  const gb = [...result.buffers.paint.extra.aGate!, ...result.buffers.detail.extra.aGate!];
+  // walked per buffer: the union plan's two Float32Arrays together pass V8's plain-array limit (ring 8), so no spread
   let curtains = 0;
-  for (let i = 0; i < gb.length; i += 3) {
-    if (gb[i + 1]! < -999) continue;
-    curtains++;
-    assert.ok(gb[i + 2]! >= 0 && gb[i + 2]! <= 1 && gb[i]! > gb[i + 1]!);
+  for (const gb of [result.buffers.paint.extra.aGate!, result.buffers.detail.extra.aGate!]) {
+    for (let i = 0; i < gb.length; i += 3) {
+      if (gb[i + 1]! < -999) continue;
+      curtains++;
+      assert.ok(gb[i + 2]! >= 0 && gb[i + 2]! <= 1 && gb[i]! > gb[i + 1]!);
+    }
   }
   assert.ok(curtains / 6 >= gates.length, `${curtains / 6} curtains`);
 });
@@ -131,8 +133,9 @@ test('budgets: three materials, one power-of-two atlas, texture growth under 24 
   assert.ok(bytes <= 24 * 1024 * 1024, `${(bytes / 1048576).toFixed(1)} MB`);
   let tris = 0;
   for (const s of SLOTS) tris += result.buffers[s].position.length / 9;
-  // the union plan (home + rings 1-6, ~53k fronts) emits ~12.9 M triangles; the bound is the runaway check
-  assert.ok(tris > 0 && tris < 16_000_000, `${tris} triangles`);
+  // the union plan (home + rings 1-6, ~53k fronts) emitted ~12.9 M triangles; with ring 8 (~75.7k fronts) it emits
+  // ~18.4 M. The bound is the runaway check and moves with the rings' fronts
+  assert.ok(tris > 0 && tris < 20_000_000, `${tris} triangles`);
 });
 
 test('no unguarded normalize(cross(...)) in the lane', () => {

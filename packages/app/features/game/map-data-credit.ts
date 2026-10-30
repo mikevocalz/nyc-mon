@@ -127,7 +127,7 @@ export const CITY_MAP_STREAMED: readonly CityMapSourceCredit[] = [
     // on Liberty Island): the ring's block near/lite cells (world/vd-port/blocks/data-ring6) and lane-C structure
     // cells (furniture/cells/ring6) bake from the same pinned tile set and stream through the same hash-pinned cell
     // source (ring6-*/structures-ring6 manifest keys). The statue's own credits are in CITY_MAP_ASSETS below: her
-    // model is jerryfisher's CC BY 4.0 scan via Objaverse, her pedestal and island the public-domain HAER NY-138
+    // model is jerryfisher's CC BY 4.0 scan via Objaverse, her pedestal and site the public-domain HAER NY-138
     // measured drawings.
     attribution: 'Valdrada ring-6 near and structure cells (rev 09b5836), Mehmet Kerem Turkcan',
     license: 'ODbL-1.0',
@@ -141,6 +141,16 @@ export const CITY_MAP_STREAMED: readonly CityMapSourceCredit[] = [
     // are Valdrada's bridge kit (city/bridgeKit.js, MIT, the kit credit in CITY_MAP_ASSETS) laid on the NYC Street
     // Centerline (CSCL) alignments in the pinned tiles/bridges.json, so they carry this ODbL credit too.
     attribution: 'Valdrada ring-7 near and structure cells (rev 09b5836), Mehmet Kerem Turkcan',
+    license: 'ODbL-1.0',
+    licenseUrl: 'https://opendatacommons.org/licenses/odbl/1-0/',
+  },
+  {
+    // ring 8 (western Queens: Long Island City, Hunters Point, Queensbridge, Astoria, Sunnyside and the Newtown Creek
+    // corridor; the Queensboro, Roosevelt Island, Pulaski, Kosciuszko, Triborough and Hell Gate bridges): the ring's
+    // block near/lite cells (world/vd-port/blocks/data-ring8) bake from the same pinned tile set and stream through
+    // the same hash-pinned cell source (ring8-near/ring8-lite manifest keys); the ring adds no lane-C structure cells.
+    // Its bridges are the bridge kit on the CSCL alignments in tiles/bridges.json (the kit credit in CITY_MAP_ASSETS).
+    attribution: 'Valdrada ring-8 near and structure cells (rev 09b5836), Mehmet Kerem Turkcan',
     license: 'ODbL-1.0',
     licenseUrl: 'https://opendatacommons.org/licenses/odbl/1-0/',
   },
@@ -202,11 +212,21 @@ export const CITY_MAP_ASSETS: readonly CityMapSourceCredit[] = [
     licenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
   },
   {
-    // the far tier's bridge silhouettes and the Liberty pedestal/island geometry are built from the Historic American
-    // Engineering Record's measured drawings (HAER NY-138, public domain)
-    attribution: 'Bridge and Statue of Liberty site geometry from HAER NY-138 drawings, via Valdrada',
+    // the Statue of Liberty: Valdrada's ACKNOWLEDGEMENTS ties HAER NY-138 (the Historic American Engineering Record's
+    // measured drawings, public domain) to the statue alone: her scan is fitted to its elevations and the pedestal
+    // and island are drawn from its sheets (city/liberty.js, libertyPedestal.js, libertyData.js)
+    attribution: 'Statue of Liberty pedestal and site geometry from HAER NY-138 drawings, via Valdrada',
     license: 'Public domain',
     licenseUrl: 'https://www.loc.gov/pictures/item/ny1254/',
+  },
+  {
+    // every bridge (the far tier's silhouettes, bake-far.mjs, and the ring packs' near/shell bridges, harvest.js
+    // bridgeStructures) is Valdrada's parametric bridge kit (client/src/city/bridgeKit.js and city/br/*, MIT) laid on
+    // the NYC Street Centerline (CSCL) alignments in the pinned tiles/bridges.json; the CSCL credit is in
+    // CITY_MAP_SOURCES and the alignments' ODbL in the streamed ring entries
+    attribution: 'Bridge geometry: Valdrada v0.4.0 bridge kit on NYC Street Centerline (CSCL) alignments, Mehmet Kerem Turkcan',
+    license: 'MIT',
+    licenseUrl: 'https://github.com/mkturkcan/valdrada/blob/main/LICENSE',
   },
   {
     attribution: 'meshoptimizer decoder (reference implementation), Arseny Kapoulkine and Jasper St. Pierre',
