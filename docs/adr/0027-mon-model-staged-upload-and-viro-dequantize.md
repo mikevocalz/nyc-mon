@@ -46,9 +46,10 @@ The files are valid glTF. three.js, which the game uses for eggs and Mons, reads
 
 ### Decision
 
-Leave the shipped files quantized. `MonModelViewer` fetches the GLB, and when it declares `KHR_mesh_quantization`, `dequantizeGlb` rewrites the quantized vertex, morph target and animation accessors as float32 (sparse accessors are expanded) and drops the extension. Node transforms, which carry the quantization scale, stay as they are. Viro loads the float copy from a `blob:` URL that is revoked when the file changes.
+Leave the shipped files quantized. `MonModelViewer` fetches the GLB, and when it declares `KHR_mesh_quantization`, `viroReadableGlb` (formerly `dequantizeGlb`) rewrites the quantized vertex, morph target and animation accessors as float32 (sparse accessors are expanded) and drops the extension. Node transforms, which carry the quantization scale, stay as they are. Viro loads the float copy from a `blob:` URL that is revoked when the file changes.
 
 ### Consequences
 
 - The preview costs one extra read of the file in the browser and about 1.8 times its size in memory while it is shown.
+- Skinned Mons need one more rewrite (added after Squeaklet and Lil' Ratti still drew blank). Viro's shader declares `in ivec4 bone_indices`, and `parseVertexFormat` binds 1- and 2-byte `JOINTS_0` as `GL_UNSIGNED_BYTE`/`GL_UNSIGNED_SHORT` through `glVertexAttribIPointer`. WebGL 2 rejects that uint-to-int mismatch: every `drawElements` for the mesh returned `INVALID_OPERATION`. Native GL does not check it. `viroReadableGlb` stores `JOINTS_n` as uint32, which Viro binds as `GL_INT`, and runs for skinned files that are not quantized too (`needsViroRewrite`). glTF allows only 8- and 16-bit joints, so the copy is valid for Viro and nothing else, and it is never saved.
 - Viro still cannot draw quantized meshes anywhere else. If a Viro scene in the game ever loads these files, it needs the same step, or virocore needs to honour `accessor.normalized` and signed component types.

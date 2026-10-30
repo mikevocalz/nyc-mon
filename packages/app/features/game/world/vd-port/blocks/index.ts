@@ -30,6 +30,16 @@ import { sourceNearPackage } from './on-demand.ts';
 import { vdBlockBytes } from './load.ts';
 import { makeBlocksMaterial } from './shell-material.ts';
 import { VD_BLOCKS, VD_FW14 } from './data/manifest.ts';
+import { VD_BLOCKS_RING1 } from './data-ring1/manifest.ts';
+import { VD_BLOCKS_RING2 } from './data-ring2/manifest.ts';
+import { VD_BLOCKS_RING3 } from './data-ring3/manifest.ts';
+import { VD_BLOCKS_RING4 } from './data-ring4/manifest.ts';
+import { VD_BLOCKS_RING5 } from './data-ring5/manifest.ts';
+import { VD_BLOCKS_RING6 } from './data-ring6/manifest.ts';
+import { VD_BLOCKS_RING7 } from './data-ring7/manifest.ts';
+import { VD_BLOCKS_RING8 } from './data-ring8/manifest.ts';
+import { VD_BLOCKS_RING9 } from './data-ring9/manifest.ts';
+import { VD_BLOCKS_RING10 } from './data-ring10/manifest.ts';
 import { decodeBase64 } from '../../foliage.ts';
 import { WORLD_PRESETS } from '../../../perf/tier-presets.ts';
 
@@ -67,15 +77,18 @@ const inRing = (ring: readonly (readonly number[])[], x: number, z: number) => {
 };
 let ownedSpecs: Set<string> | null = null;
 
+// Every ring's lane-A structures. A ring baked with none (ring 3) types as `readonly []`; iterating the list drops it.
+const RING_STRUCTURES = [VD_BLOCKS.structures, VD_BLOCKS_RING1.structures, VD_BLOCKS_RING2.structures, VD_BLOCKS_RING3.structures, VD_BLOCKS_RING4.structures, VD_BLOCKS_RING5.structures, VD_BLOCKS_RING6.structures, VD_BLOCKS_RING7.structures, VD_BLOCKS_RING8.structures, VD_BLOCKS_RING9.structures, VD_BLOCKS_RING10.structures];
+
 /**
  * Whether lane A draws this front whole, so another lane must not: a facade-kit face (`<spec>#<face>`, a spec lane A
  * baked) or any point inside a footprint lane A replaces. Always false when the packs did not load.
  */
 export function vdBlocksOwn(frontId: string | null, x: number, z: number): boolean {
   if (!vdBlockBytes()) return false;
-  ownedSpecs ??= new Set(VD_BLOCKS.structures.filter((s) => s.kind === 'fk').map((s) => s.id.slice(3)));
+  ownedSpecs ??= new Set(RING_STRUCTURES.flat().filter((s) => s.kind === 'fk').map((s) => s.id.slice(3)));
   if (frontId && ownedSpecs.has(frontId.split('#')[0]!)) return true;
-  for (const s of VD_BLOCKS.structures) for (const r of s.owned as readonly (readonly (readonly number[])[])[]) if (inRing(r, x, z)) return true;
+  for (const list of RING_STRUCTURES) for (const s of list) for (const r of s.owned as readonly (readonly (readonly number[])[])[]) if (inRing(r, x, z)) return true;
   return false;
 }
 
@@ -98,19 +111,30 @@ export function build(ctx: VdPortCtx): VdPortPart {
   (blocksMat as unknown as { maskNode: unknown }).maskNode = ditherFadeMask(THREE);
   const shellMat = blocksMat, nearMat = blocksMat;
 
-  // ---- the shell: resident, one mesh per 128 m cell
-  const shells = new Map<number, Mesh>();
+  // ---- the shell: resident, one mesh per 128 m cell (the home pack's cells and, with its bytes in, ring 1's)
+  const shells = new Map<number, Mesh[]>();
   let triangles = 0;
   // One layout with the near level (makeBlocksMaterial): the shell has no emission and no shared vertices, so every
   // shell cell reads one zero emission attribute and one identity index, sized to the largest cell and cut by its draw
   // range (one CPU array and one GPU buffer each, not one per cell).
-  const maxShell = Math.max(3, ...(VD_BLOCKS.shell as readonly ShellCellInfo[]).map((c) => c.triangles * 3));
+  const shellSets: { infos: readonly ShellCellInfo[]; bytes: Uint8Array }[] = [{ infos: VD_BLOCKS.shell as readonly ShellCellInfo[], bytes: packs.shell }];
+  if (packs.ring1) shellSets.push({ infos: VD_BLOCKS_RING1.shell as readonly ShellCellInfo[], bytes: packs.ring1.shell });
+  if (packs.ring2) shellSets.push({ infos: VD_BLOCKS_RING2.shell as readonly ShellCellInfo[], bytes: packs.ring2.shell });
+  if (packs.ring3) shellSets.push({ infos: VD_BLOCKS_RING3.shell as readonly ShellCellInfo[], bytes: packs.ring3.shell });
+  if (packs.ring4) shellSets.push({ infos: VD_BLOCKS_RING4.shell as readonly ShellCellInfo[], bytes: packs.ring4.shell });
+  if (packs.ring5) shellSets.push({ infos: VD_BLOCKS_RING5.shell as readonly ShellCellInfo[], bytes: packs.ring5.shell });
+  if (packs.ring6) shellSets.push({ infos: VD_BLOCKS_RING6.shell as readonly ShellCellInfo[], bytes: packs.ring6.shell });
+  if (packs.ring7) shellSets.push({ infos: VD_BLOCKS_RING7.shell as readonly ShellCellInfo[], bytes: packs.ring7.shell });
+  if (packs.ring8) shellSets.push({ infos: VD_BLOCKS_RING8.shell as readonly ShellCellInfo[], bytes: packs.ring8.shell });
+  if (packs.ring9) shellSets.push({ infos: VD_BLOCKS_RING9.shell as readonly ShellCellInfo[], bytes: packs.ring9.shell });
+  if (packs.ring10) shellSets.push({ infos: VD_BLOCKS_RING10.shell as readonly ShellCellInfo[], bytes: packs.ring10.shell });
+  const maxShell = Math.max(3, ...shellSets.flatMap((s) => s.infos.map((c) => c.triangles * 3)));
   const shellEmissive = new THREE.BufferAttribute(new Uint8Array(maxShell * 4), 4, true);
   const identity = maxShell > 65535 ? new Uint32Array(maxShell) : new Uint16Array(maxShell);
   for (let i = 0; i < maxShell; i++) identity[i] = i;
   const shellIndex = new THREE.BufferAttribute(identity, 1);
-  for (const info of VD_BLOCKS.shell as readonly ShellCellInfo[]) {
-    const a = decodeShellCell(packs.shell, info, 'cell-local');
+  for (const { infos, bytes: shellBytes } of shellSets) for (const info of infos) {
+    const a = decodeShellCell(shellBytes, info, 'cell-local');
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(a.position, 3));
     g.setAttribute('color', new THREE.BufferAttribute(a.color, 4, true));
@@ -132,7 +156,8 @@ export function build(ctx: VdPortCtx): VdPortPart {
     m.userData.vdShell = 1;
     ctx.group.add(m);
     ctx.register(m, null);
-    shells.set(m.userData.cell as number, m);
+    const num = m.userData.cell as number;
+    (shells.get(num) ?? shells.set(num, []).get(num)!).push(m);
     triangles += info.triangles;
   }
 
@@ -157,6 +182,108 @@ export function build(ctx: VdPortCtx): VdPortPart {
     if (!file) throw new Error(`vd-port: near cell ${info.key} is in the manifest but not in the packs`);
     return sourceNearPackage(info, packs.level, () => Promise.resolve(file!.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength) as ArrayBuffer), 'cell-local');
   });
+  // Ring 1's cells join the same layer under 'ring1-<level>/<cell>': the home-overlap cells carry a bundled loader,
+  // the rest prefetch through the cell source only (a cell that never arrives keeps its far shell).
+  if (packs.ring1) {
+    for (const info of VD_BLOCKS_RING1[packs.level] as readonly NearCellInfo[]) {
+      const file = info.bundled === false ? null : packs.ring1.bundled.get(info.key) ?? null;
+      packages.push(sourceNearPackage(
+        info, packs.level,
+        file ? () => Promise.resolve(file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength) as ArrayBuffer) : undefined,
+        'cell-local', `ring1-${packs.level}/${info.key}`,
+      ));
+    }
+  }
+  if (packs.ring2) {
+    for (const info of VD_BLOCKS_RING2[packs.level] as readonly NearCellInfo[]) {
+      const file = info.bundled === false ? null : packs.ring2.bundled.get(info.key) ?? null;
+      packages.push(sourceNearPackage(
+        info, packs.level,
+        file ? () => Promise.resolve(file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength) as ArrayBuffer) : undefined,
+        'cell-local', `ring2-${packs.level}/${info.key}`,
+      ));
+    }
+  }
+  if (packs.ring3) {
+    for (const info of VD_BLOCKS_RING3[packs.level] as readonly NearCellInfo[]) {
+      const file = info.bundled === false ? null : packs.ring3.bundled.get(info.key) ?? null;
+      packages.push(sourceNearPackage(
+        info, packs.level,
+        file ? () => Promise.resolve(file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength) as ArrayBuffer) : undefined,
+        'cell-local', `ring3-${packs.level}/${info.key}`,
+      ));
+    }
+  }
+  if (packs.ring4) {
+    for (const info of VD_BLOCKS_RING4[packs.level] as readonly NearCellInfo[]) {
+      const file = info.bundled === false ? null : packs.ring4.bundled.get(info.key) ?? null;
+      packages.push(sourceNearPackage(
+        info, packs.level,
+        file ? () => Promise.resolve(file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength) as ArrayBuffer) : undefined,
+        'cell-local', `ring4-${packs.level}/${info.key}`,
+      ));
+    }
+  }
+  if (packs.ring5) {
+    for (const info of VD_BLOCKS_RING5[packs.level] as readonly NearCellInfo[]) {
+      const file = info.bundled === false ? null : packs.ring5.bundled.get(info.key) ?? null;
+      packages.push(sourceNearPackage(
+        info, packs.level,
+        file ? () => Promise.resolve(file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength) as ArrayBuffer) : undefined,
+        'cell-local', `ring5-${packs.level}/${info.key}`,
+      ));
+    }
+  }
+  if (packs.ring6) {
+    for (const info of VD_BLOCKS_RING6[packs.level] as readonly NearCellInfo[]) {
+      const file = info.bundled === false ? null : packs.ring6.bundled.get(info.key) ?? null;
+      packages.push(sourceNearPackage(
+        info, packs.level,
+        file ? () => Promise.resolve(file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength) as ArrayBuffer) : undefined,
+        'cell-local', `ring6-${packs.level}/${info.key}`,
+      ));
+    }
+  }
+  if (packs.ring7) {
+    for (const info of VD_BLOCKS_RING7[packs.level] as readonly NearCellInfo[]) {
+      const file = info.bundled === false ? null : packs.ring7.bundled.get(info.key) ?? null;
+      packages.push(sourceNearPackage(
+        info, packs.level,
+        file ? () => Promise.resolve(file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength) as ArrayBuffer) : undefined,
+        'cell-local', `ring7-${packs.level}/${info.key}`,
+      ));
+    }
+  }
+  if (packs.ring8) {
+    for (const info of VD_BLOCKS_RING8[packs.level] as readonly NearCellInfo[]) {
+      const file = info.bundled === false ? null : packs.ring8.bundled.get(info.key) ?? null;
+      packages.push(sourceNearPackage(
+        info, packs.level,
+        file ? () => Promise.resolve(file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength) as ArrayBuffer) : undefined,
+        'cell-local', `ring8-${packs.level}/${info.key}`,
+      ));
+    }
+  }
+  if (packs.ring9) {
+    for (const info of VD_BLOCKS_RING9[packs.level] as readonly NearCellInfo[]) {
+      const file = info.bundled === false ? null : packs.ring9.bundled.get(info.key) ?? null;
+      packages.push(sourceNearPackage(
+        info, packs.level,
+        file ? () => Promise.resolve(file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength) as ArrayBuffer) : undefined,
+        'cell-local', `ring9-${packs.level}/${info.key}`,
+      ));
+    }
+  }
+  if (packs.ring10) {
+    for (const info of VD_BLOCKS_RING10[packs.level] as readonly NearCellInfo[]) {
+      const file = info.bundled === false ? null : packs.ring10.bundled.get(info.key) ?? null;
+      packages.push(sourceNearPackage(
+        info, packs.level,
+        file ? () => Promise.resolve(file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength) as ArrayBuffer) : undefined,
+        'cell-local', `ring10-${packs.level}/${info.key}`,
+      ));
+    }
+  }
   const nearBudget = ctx.preset?.vdPort.blocksNear ?? NEAR_BUDGET;
   ctx.registerChunks(template, { ...NEAR_LAYER, errorM: nearBudget.errorM, sharedMaterial: true }, packages, { name: 'blocks', ...nearBudget });
 
@@ -175,15 +302,15 @@ export function build(ctx: VdPortCtx): VdPortPart {
         const ud = o.userData as { cell?: number; cellFade?: number };
         if (ud.cell !== undefined && (ud.cellFade ?? 1) >= 1) nearIn.add(ud.cell);
       }
-      for (const [num, m] of shells) m.visible = !nearIn.has(num);
+      for (const [num, list] of shells) for (const m of list) m.visible = !nearIn.has(num);
     },
     dispose() {
-      for (const m of shells.values()) m.geometry.dispose();
+      for (const list of shells.values()) for (const m of list) m.geometry.dispose();
       tg.dispose();
       blocksMat.dispose();
       fw14.dispose();
     },
-    stats: { meshes: shells.size + 1, triangles, structures: VD_BLOCKS.structures.length },
+    stats: { meshes: [...shells.values()].reduce((a, l) => a + l.length, 0) + 1, triangles, structures: VD_BLOCKS.structures.length + VD_BLOCKS_RING1.structures.length },
   };
 }
 

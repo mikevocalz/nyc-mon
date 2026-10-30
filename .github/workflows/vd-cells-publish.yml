@@ -50,7 +50,7 @@ jobs:
             if (new Set(keys.map((k) => m.cells[k].path)).size !== keys.length) throw new Error('duplicate cell paths');
             for (const k of keys) {
               const p = m.cells[k].path;
-              if (!/^(structures|near|lite|far)\/[^/]+\.bin$/.test(p)) throw new Error('bad cell path ' + p);
+              if (!/^((structures|near|lite|far|ring[1-9][0-9]?-(near|lite))\/|structures\/ring[1-9][0-9]?\/)[^/]+\.bin$/.test(p)) throw new Error('bad cell path ' + p);
             }
             console.log('manifest ok:', keys.length, 'cells,', (Object.values(m.cells).reduce((a, c) => a + c.bytes, 0) / 1e6).toFixed(1), 'MB');
           "

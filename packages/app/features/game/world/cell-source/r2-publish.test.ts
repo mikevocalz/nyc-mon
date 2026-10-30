@@ -177,15 +177,18 @@ describe('r2-publish SigV4', () => {
 // ---------------------------------------------------------------- manifest + plan
 
 describe('r2-publish manifest', () => {
-  it('parses the real generated manifest (458 pinned cells)', () => {
+  // 458 home and far cells (75 structures, 50 near, 50 lite, 290 far) plus rings 1-10: 1,022 ring<N>-near|lite block
+  // cells and 205 structures/ring<N> cells.
+  it('parses the real generated manifest (1,692 pinned cells), every one mapping to a baked file', () => {
     const text = readFileSync(new URL('./data/vd-cells-manifest.ts', import.meta.url), 'utf8');
     const m = parseCellsManifest(text);
-    assert.equal(Object.keys(m.cells).length, 458);
+    assert.equal(Object.keys(m.cells).length, 1692);
     assert.ok(m.cells['far/landmarks_l6.bin']);
     for (const [k, c] of Object.entries(m.cells)) {
       assert.match(c.sha256, /^[0-9a-f]{64}$/);
       assert.ok(c.bytes > 0, k);
-      assert.ok(c.path.startsWith(k.split('/')[0] + '/'));
+      assert.ok(c.path.startsWith(k.slice(0, k.lastIndexOf('/')) + '/'), k);
+      assert.ok(cellDiskPath(ROOT, k, c.path).startsWith(`${ROOT}/`), k);
     }
   });
 
@@ -201,6 +204,12 @@ describe('r2-publish manifest', () => {
     assert.equal(cellDiskPath(ROOT, 'near/0_0', 'near/0_0.bin'), `${ROOT}/packages/app/features/game/world/vd-port/blocks/data/near/0_0.bin`);
     assert.equal(cellDiskPath(ROOT, 'lite/0_0', 'lite/0_0.bin'), `${ROOT}/packages/app/features/game/world/vd-port/blocks/data/lite/0_0.bin`);
     assert.equal(cellDiskPath(ROOT, 'far/L4_0_0.bin', 'far/L4_0_0.bin'), `${ROOT}/tooling/city/.cache/vd-lod16/L4_0_0.bin`);
+    assert.equal(cellDiskPath(ROOT, 'ring10-near/-55_173', 'ring10-near/-55_173.bin'), `${ROOT}/packages/app/features/game/world/vd-port/blocks/data-ring10/near/-55_173.bin`);
+    assert.equal(cellDiskPath(ROOT, 'ring1-lite/0_0', 'ring1-lite/0_0.bin'), `${ROOT}/packages/app/features/game/world/vd-port/blocks/data-ring1/lite/0_0.bin`);
+    assert.equal(cellDiskPath(ROOT, 'structures/ring4/1_2', 'structures/ring4/1_2.bin'), `${ROOT}/packages/app/features/game/world/vd-port/furniture/cells/ring4/1_2.bin`);
+    assert.throws(() => cellDiskPath(ROOT, 'structures/ring4/1_2', 'structures/1_2.bin'), /outside/);
+    assert.throws(() => cellDiskPath(ROOT, 'ring0-near/0_0', 'ring0-near/0_0.bin'), /unknown tier/);
+    assert.throws(() => cellDiskPath(ROOT, 'structures/x/1_2', 'structures/x/1_2.bin'), /unsafe/);
     assert.throws(() => cellDiskPath(ROOT, 'bogus/x', 'bogus/x.bin'), /unknown tier/);
     assert.throws(() => cellDiskPath(ROOT, 'near/0_0', 'near/../evil.bin'), /outside|unsafe/);
   });

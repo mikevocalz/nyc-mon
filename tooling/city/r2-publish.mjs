@@ -17,6 +17,8 @@
 //   structures/<cx>_<cz>  -> packages/app/features/game/world/vd-port/furniture/cells/<cx>_<cz>.bin
 //   near|lite/<cx>_<cz>   -> packages/app/features/game/world/vd-port/blocks/data/<level>/<cx>_<cz>.bin
 //   far/<file>.bin        -> tooling/city/.cache/vd-lod16/<file>   (landmarks_l6.bin included)
+//   ring<N>-near|lite/<cx>_<cz>   -> packages/app/features/game/world/vd-port/blocks/data-ring<N>/<level>/<cx>_<cz>.bin
+//   structures/ring<N>/<cx>_<cz>  -> packages/app/features/game/world/vd-port/furniture/cells/ring<N>/<cx>_<cz>.bin
 //
 // Env (never logged): R2_ACCOUNT_ID, R2_BUCKET_NAME, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY;
 // optional R2_ENDPOINT (default https://<account>.r2.cloudflarestorage.com), VD_RELEASE_ID.
@@ -88,11 +90,23 @@ const CELL_DIRS = (root) => ({
   far: join(root, 'tooling/city/.cache/vd-lod16'),
 });
 
+const RING_BLOCKS = /^ring([1-9][0-9]?)-(near|lite)$/;
+const RING_STRUCTURES = /^structures\/ring([1-9][0-9]?)$/;
+
 /** Maps a manifest cell to its baked file on disk. Fails closed on an unknown tier or an escaping path. */
 export function cellDiskPath(root, key, cellPath) {
-  const slash = key.indexOf('/');
+  // Ring structure cells sit one level down (structures/ring<N>/<cx>_<cz>), so their tier is the key up to the last
+  // slash; every other tier is the first path segment.
+  const last = key.lastIndexOf('/');
+  const ringStructures = last > 0 && RING_STRUCTURES.exec(key.slice(0, last));
+  const slash = ringStructures ? last : key.indexOf('/');
   const prefix = slash > 0 ? key.slice(0, slash) : '';
-  const dir = CELL_DIRS(root)[prefix];
+  const ringBlocks = RING_BLOCKS.exec(prefix);
+  const dir = ringStructures
+    ? join(CELL_DIRS(root).structures, `ring${ringStructures[1]}`)
+    : ringBlocks
+      ? join(root, `packages/app/features/game/world/vd-port/blocks/data-ring${ringBlocks[1]}/${ringBlocks[2]}`)
+      : Object.hasOwn(CELL_DIRS(root), prefix) ? CELL_DIRS(root)[prefix] : undefined;
   if (!dir) throw new Error(`cell '${key}': unknown tier prefix '${prefix}'`);
   if (!cellPath.startsWith(`${prefix}/`)) {
     throw new Error(`cell '${key}': path '${cellPath}' is outside its tier`);

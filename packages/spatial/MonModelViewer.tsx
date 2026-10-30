@@ -2,7 +2,8 @@
 
 import { useEffect, useState, type ComponentType } from 'react';
 import { palette } from '@acme/theme';
-import { dequantizeGlb, isQuantizedGlb } from './glbDequantize';
+import { needsViroRewrite, viroReadableGlb } from './glbDequantize';
+import { PREVIEW_FOV, previewCamera } from './modelFraming';
 import { View } from '@acme/ui/tw';
 import {
   Viro3DObject,
@@ -36,10 +37,10 @@ export type MonModelViewerProps = {
 type SceneProps = Omit<MonModelViewerProps, 'assetBaseUrl'>;
 
 function MonModelScene({ url, scale, position, rotation, yaw = 0, heightMeters, clip, onLoad, onError }: SceneProps) {
-  const height = Math.max(0.1, (heightMeters ?? 1) * scale);
+  const camera = previewCamera(heightMeters, scale);
   return (
     <ViroScene>
-      <ViroOrbitCamera position={[0, height * 0.6, height * 2.4 + 0.4]} focalPoint={[0, height * 0.5, 0]} active />
+      <ViroOrbitCamera position={camera.position} focalPoint={camera.focalPoint} fieldOfView={PREVIEW_FOV} active />
       <ViroAmbientLight color={palette.white} intensity={300} />
       <ViroDirectionalLight color={palette.white} direction={[-0.5, -1, -0.6]} intensity={900} />
       {/* key: a new file is a new node, so the old model never lingers under the new one. */}
@@ -69,9 +70,10 @@ type NavigatorProps = {
 const Navigator = Viro3DSceneNavigator as unknown as ComponentType<NavigatorProps>;
 
 /**
- * The URL Viro should load for `url`: the same URL, or a blob: URL of a float
- * copy when the file uses KHR_mesh_quantization, which Viro draws blank
- * (glbDequantize.ts). Null while the file is being read.
+ * The URL Viro should load for `url`: the same URL, or a blob: URL of a copy
+ * Viro can draw when the file is quantized or skinned with 8- or 16-bit joints,
+ * both of which Viro draws blank in the browser (glbDequantize.ts). Null while
+ * the file is being read.
  */
 function useViroReadableUrl(url: string, onError?: (error: unknown) => void): string | null {
   const [readable, setReadable] = useState<{ from: string; url: string } | null>(null);
@@ -83,12 +85,12 @@ function useViroReadableUrl(url: string, onError?: (error: unknown) => void): st
       if (!response.ok) throw new Error(`Model request failed (${response.status})`);
       const bytes = new Uint8Array(await response.arrayBuffer());
       if (cancelled) return;
-      if (!isQuantizedGlb(bytes)) {
+      if (!needsViroRewrite(bytes)) {
         setReadable({ from: url, url });
         return;
       }
-      const floats = dequantizeGlb(bytes);
-      objectUrl = URL.createObjectURL(new Blob([floats.buffer as ArrayBuffer], { type: 'model/gltf-binary' }));
+      const copy = viroReadableGlb(bytes);
+      objectUrl = URL.createObjectURL(new Blob([copy.buffer as ArrayBuffer], { type: 'model/gltf-binary' }));
       setReadable({ from: url, url: objectUrl });
     })().catch((error: unknown) => {
       if (!cancelled) onError?.(error);
