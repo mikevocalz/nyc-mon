@@ -61,8 +61,8 @@ describe('previewCamera', () => {
   });
 
   it('never lets any yaw or pitch push a shipped Mon past FILL', () => {
-    for (const name of ['squeaklet', 'lil-ratti', 'metro-egg']) {
-      const points = readModelPoints(viroReadableGlb(new Uint8Array(readFileSync(new URL(`../../apps/web/public/mons/${name}.glb`, import.meta.url)))))!;
+    for (const [name, pose] of [['squeaklet', 'bind'], ['squeaklet', 'viro-still'], ['lil-ratti', 'bind'], ['lil-ratti', 'viro-still'], ['metro-egg', 'bind']] as const) {
+      const points = readModelPoints(viroReadableGlb(new Uint8Array(readFileSync(new URL(`../../apps/web/public/mons/${name}.glb`, import.meta.url)))), pose)!;
       for (const [width, height] of [[413, 448], [800, 448], [360, 320]] as const) {
         const { vertical, horizontal } = worstFill(points, 1, width, height);
         assert.ok(vertical <= FILL + 1e-6, `${name} ${width}x${height} vertical ${vertical}`);
@@ -84,6 +84,19 @@ describe('previewCamera', () => {
     assert.equal(tilted.orthographicScale, level.orthographicScale);
     const beyond = previewCamera(extent, [1, 2, 3], 400, 400, 90);
     assert.deepEqual(beyond.position, previewCamera(extent, [1, 2, 3], 400, 400, MAX_PITCH).position);
+  });
+
+  it('points the camera at the model at every pitch', () => {
+    const extent = turnExtent(box(0.1, 0.4, 0.1), 1);
+    for (const pitch of [-MAX_PITCH, -7, 0, 7, MAX_PITCH]) {
+      const camera = previewCamera(extent, [0, 0, 0], 400, 400, pitch);
+      // Viro cameras look down -Z; rotating by x degrees about X gives (0, sin x, -cos x).
+      const x = camera.rotation[0] * RAD;
+      const forward = [0, Math.sin(x), -Math.cos(x)];
+      const to = camera.focalPoint.map((v, i) => v - camera.position[i]!);
+      const length = Math.hypot(...to);
+      to.forEach((v, i) => assert.ok(Math.abs(v / length - forward[i]!) < 1e-9, `pitch ${pitch} axis ${i}`));
+    }
   });
 
   it('clamps pitch and treats junk as level', () => {

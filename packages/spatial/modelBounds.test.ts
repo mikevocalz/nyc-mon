@@ -25,6 +25,21 @@ describe('readModelPoints', () => {
     });
   }
 
+  // Holding still, Viro web ignores the skin: mesh-space positions under the rig node (Squeaklet's rig is scaled 0.4).
+  for (const [name, bottom, top] of [['squeaklet', -0.219, 0.4], ['lil-ratti', -0.766, 1]] as const) {
+    it(`reads ${name} where Viro draws it holding still`, () => {
+      const points = readModelPoints(viroReadableGlb(new Uint8Array(readFileSync(new URL(`../../apps/web/public/mons/${name}.glb`, import.meta.url)))), 'viro-still')!;
+      const [lo, hi] = range(points, 1);
+      assert.ok(Math.abs(lo! - bottom) < 0.005, `${name} base ${lo}`);
+      assert.ok(Math.abs(hi! - top) < 0.005, `${name} top ${hi}`);
+    });
+  }
+
+  it('reads an unskinned model the same in both poses', () => {
+    const egg = viroReadableGlb(new Uint8Array(readFileSync(new URL('../../apps/web/public/mons/metro-egg.glb', import.meta.url))));
+    assert.deepEqual(readModelPoints(egg, 'viro-still'), readModelPoints(egg, 'bind'));
+  });
+
   it('falls back to the accessor box for quantized positions and returns null for junk', () => {
     const quantized = readModelPoints(new Uint8Array(readFileSync(new URL('../../apps/web/public/mons/metro-egg.glb', import.meta.url))))!;
     assert.equal(quantized.length % 3, 0);

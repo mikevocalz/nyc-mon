@@ -1,9 +1,16 @@
-// The preview frames a model by how much room it needs while it turns. That
-// takes the model's vertices in its bind pose around the origin it spins
-// about. glb.ts stores a height at upload, but it reads a skinned mesh through
-// its node transform, which glTF says a skinned mesh ignores (Squeaklet is
-// 0.68 m tall in its bind pose, glb.ts says 0.619), so the preview reads the
-// points itself from the bytes it already fetched.
+// The preview frames a model by how much room it needs while it turns, which
+// takes the model's vertices around the origin it spins about.
+//
+// A skinned Mon has two poses in Viro web. While a clip plays, its joints put
+// it where glTF says (joint world matrix times inverse bind matrix). While it
+// holds still, Viro draws it with the skin ignored: VROBone starts with an
+// identity transform (VROBone.h, `_transformType(Legacy)`), and the Legacy
+// branch of VROSkinner::getModelTransform (VROSkinner.cpp) returns
+// inverseBind * identity * bind, which is identity, so each vertex stays at
+// its mesh-space position under the mesh node's parents (the loader resets the
+// skinned node's own transform, VROGLTFLoader::processNode). Squeaklet stands
+// from 0 to 0.68 m in its glTF bind pose but from -0.22 to 0.40 m holding still.
+// The preview frames whichever pose is on screen.
 
 const GLB_MAGIC = 0x46546c67; // 'glTF'
 const CHUNK_JSON = 0x4e4f534a; // 'JSON'
@@ -22,7 +29,7 @@ type Gltf = {
   scene?: number;
 };
 
-/** Bind-pose vertex positions in metres, before the placement scale, as x, y, z triples. */
+/** Vertex positions in metres, before the placement scale, as x, y, z triples. */
 export type ModelPoints = Float32Array;
 
 type Mat4 = number[];
@@ -97,16 +104,21 @@ function floatVec3(json: Gltf, bin: DataView | null, accessor: Accessor): Float3
   return out;
 }
 
+/** `bind`: where glTF puts the vertices, which is where Viro puts a skinned mesh while a clip plays. `viro-still`: where Viro draws it while it holds still. */
+export type ModelPose = 'bind' | 'viro-still';
+
 /**
- * Bind-pose vertex positions of every mesh in the default scene. A skinned mesh
- * is placed by its first joint (joint world matrix times that joint's inverse
- * bind matrix), which in the bind pose is where every joint puts it; its own
- * node transform is ignored, as glTF requires. A primitive whose positions are
+ * Vertex positions of every mesh in the default scene, in `pose`. In `bind`, a
+ * skinned mesh is placed by its first joint (joint world matrix times that
+ * joint's inverse bind matrix), which in the bind pose is where every joint
+ * puts it, and its own node transform is ignored, as glTF requires. In
+ * `viro-still`, a skinned mesh sits under its node's parents with its skin and
+ * its own node transform ignored. A primitive whose positions are
  * not float32 (pass the Viro-readable copy to get them) adds the eight corners
  * of its accessor box instead. Morph targets and animation are not applied.
  * Null when nothing is readable.
  */
-export function readModelPoints(glb: Uint8Array): ModelPoints | null {
+export function readModelPoints(glb: Uint8Array, pose: ModelPose = 'bind'): ModelPoints | null {
   let chunks: ReturnType<typeof readChunks>;
   try {
     chunks = readChunks(glb);
@@ -117,13 +129,15 @@ export function readModelPoints(glb: Uint8Array): ModelPoints | null {
   const { json, bin } = chunks;
   const nodes = json.nodes ?? [];
 
-  // World matrix of every node reachable from the scene.
+  // World matrix of every node reachable from the scene, and of its parent.
   const world = new Map<number, Mat4>();
+  const parentWorld = new Map<number, Mat4>();
   const walk = (index: number, parent: Mat4, depth: number) => {
     const node = nodes[index];
     if (!node || depth > 64 || world.has(index)) return;
     const matrix = multiply(parent, localMatrix(node));
     world.set(index, matrix);
+    parentWorld.set(index, parent);
     for (const child of node.children ?? []) walk(child, matrix, depth + 1);
   };
   const roots = json.scenes?.[json.scene ?? 0]?.nodes ?? nodes.map((_, i) => i).filter((i) => !nodes.some((n) => n.children?.includes(i)));
@@ -135,7 +149,9 @@ export function readModelPoints(glb: Uint8Array): ModelPoints | null {
     const mesh = node.mesh === undefined ? undefined : json.meshes?.[node.mesh];
     if (!mesh) continue;
     let m = nodeWorld;
-    if (node.skin !== undefined) {
+    if (node.skin !== undefined && pose === 'viro-still') {
+      m = parentWorld.get(index) ?? IDENTITY;
+    } else if (node.skin !== undefined) {
       const joint = json.skins?.[node.skin]?.joints?.[0];
       const jointWorld = joint === undefined ? undefined : world.get(joint);
       const ibm = inverseBind(json, bin, node.skin);
