@@ -6,6 +6,7 @@ import { Heading, Paragraph, Section } from '@acme/ui/html';
 import { MON_ANIMATION_ROLES, MON_MODEL_LICENSES } from '../../../collections/monModelOptions.ts';
 import { checkGlbHeader, checkMonModelFile, MON_MODEL_FILE_MESSAGES } from '../../../collections/monModelFile.ts';
 import { consoleCopy } from '../copy';
+import { presetFor } from '@acme/spatial/model-turn';
 import { useModelsStore, type ModelDraft, type ModelFilter, type ModelYaw } from '../stores';
 import { ConsoleShell } from '../Shell';
 import { needsChunkedUpload, uploadModelInChunks, type ChunkTransport, type SendResult } from './modelUpload.ts';
@@ -264,7 +265,11 @@ export function ModelsViewClient({ forms, models, failed = false, selectedId, ca
                     scale={placement.scale}
                     position={placement.position}
                     rotation={placement.rotation}
-                    yaw={Number(store.yaw)}
+                    yaw={store.turn.yaw}
+                    pitch={store.turn.pitch}
+                    onTurn={store.setTurn}
+                    onResetTurn={() => store.setYaw('0')}
+                    turnLabel={copy.viewerTurn}
                     heightMeters={store.pending ? null : model?.heightMeters}
                     clip={store.clip || undefined}
                     onError={(error) => { console.error('[models] viewer failed', error); store.setViewerError(true); }}
@@ -275,11 +280,12 @@ export function ModelsViewClient({ forms, models, failed = false, selectedId, ca
             </Card>
             {viewerUrl ? (
               <Section className="gap-4 md:flex-row md:items-end">
-                <SegmentedControl<ModelYaw>
+                {/* Between buttons after a drag, no angle is checked; picking one squares the model up again. */}
+                <SegmentedControl<ModelYaw | 'free'>
                   aria-label={copy.angle}
                   options={(['0', '90', '180', '270'] as const).map((value) => ({ value, label: copy.angles[value] }))}
-                  value={store.yaw}
-                  onChange={store.setYaw}
+                  value={presetFor(store.turn) ?? 'free'}
+                  onChange={(yaw) => { if (yaw !== 'free') store.setYaw(yaw); }}
                 />
                 {clips.length ? <Select label={copy.play} value={store.clip} options={[{ value: '', label: copy.still }, ...clips.map((clip) => ({ value: clip }))]} onValueChange={store.setClip} /> : null}
               </Section>
