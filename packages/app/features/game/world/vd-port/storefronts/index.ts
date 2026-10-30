@@ -24,7 +24,8 @@ import { EMPTY_PART, type VdPortCtx, type VdPortPart, type VdStreamLayer } from 
 import { emitPlan, EXTRA, SLOTS, type EmitResult, type Slot } from './emit.ts';
 import { FASCIA_ATLAS_HEIGHT, FASCIA_ATLAS_R8, FASCIA_ATLAS_WIDTH } from './fascia-atlas.generated.ts';
 import { createStorefrontMaterials } from './materials.ts';
-import { VD_STOREFRONT_PLAN } from './plan.generated.ts';
+import type { Front } from './plan-types.ts';
+import { vdStorefrontPlan } from './load.ts';
 import { vdBlocksOwn } from '../blocks/index.ts';
 import { packageRingStorefronts, storefrontLayout } from './ring-packages.ts';
 
@@ -54,7 +55,8 @@ export const VD_STOREFRONT_LAYERS = LAYER;
 
 /** The openings the blocks' walls leave for the spec'd stores (facadeKit `holes`), for lane A. */
 export function storefrontHoles(groundY: (x: number, z: number) => number = () => 0): EmitResult['holes'] {
-  return emitPlan(VD_STOREFRONT_PLAN, groundY, (f) => f.src === 0).holes;
+  const plan = vdStorefrontPlan();
+  return plan ? emitPlan(plan, groundY, (f) => f.src === 0).holes : [];
 }
 
 /**
@@ -62,23 +64,25 @@ export function storefrontHoles(groundY: (x: number, z: number) => number = () =
  * maps Valdrada's points elsewhere: checked through the ctx's own transform, so nothing is built off its street.
  */
 export function planFitsTile(toScene: VdPortCtx['toScene']): boolean {
-  const f = VD_STOREFRONT_PLAN.fronts[0];
+  const f = vdStorefrontPlan()?.fronts[0];
   if (!f) return false;
   const [x, z] = toScene(f.vp0[0]!, f.vp0[1]!);
   return Math.hypot(x - f.p0[0]!, z - f.p0[1]!) < 0.05;
 }
 
 export function build(ctx: VdPortCtx): VdPortPart {
-  if (!planFitsTile(ctx.toScene)) return EMPTY_PART;
+  // preloaded with the block packs (load.ts, load-game-scene.ts); null when plan.bin did not load, which load.ts logged
+  const plan = vdStorefrontPlan();
+  if (!plan || !planFitsTile(ctx.toScene)) return EMPTY_PART;
   const { THREE } = ctx;
   // Lane A draws the facade kit's buildings whole, their storefront bays with them (vd-port/blocks): a front on one of
   // them (its spec face, or any front whose midpoint, half a metre inside the wall, lies in a footprint lane A replaces)
   // is left to lane A, so no bay is drawn twice.
-  const ownedByBlocks = (f: (typeof VD_STOREFRONT_PLAN.fronts)[number]) => {
+  const ownedByBlocks = (f: Front) => {
     const mx = f.p0[0]! + f.u[0]! * f.len / 2 - f.n[0]! * 0.5, mz = f.p0[1]! + f.u[1]! * f.len / 2 - f.n[1]! * 0.5;
     return vdBlocksOwn(f.src === 0 ? f.id : null, mx, mz);
   };
-  const inTile = (f: (typeof VD_STOREFRONT_PLAN.fronts)[number]) => ctx.inBounds(f.p0[0]!, f.p0[1]!);
+  const inTile = (f: Front) => ctx.inBounds(f.p0[0]!, f.p0[1]!);
   // With a streamer (ctx.preset) every front the lane draws (the tile's, and the ring districts' whether or not the
   // tile's square covers them) is a lazy chunk package (ring-packages.ts): written when the streamer wants the chunk,
   // dropped when it leaves, the same chunks the streamer would cut from one resident mesh per slot. One template per
@@ -86,14 +90,14 @@ export function build(ctx: VdPortCtx): VdPortPart {
   // whole-world build, which nothing evicts) the tile's fronts are one resident mesh per slot and the ring districts
   // are left out rather than held resident for the whole city.
   const streamed = ctx.preset != null;
-  const result = streamed ? null : emitPlan(VD_STOREFRONT_PLAN, (x, z) => ctx.groundY(x, z), (f) => inTile(f) && !ownedByBlocks(f));
+  const result = streamed ? null : emitPlan(plan, (x, z) => ctx.groundY(x, z), (f) => inTile(f) && !ownedByBlocks(f));
   const mats = createStorefrontMaterials(THREE, ctx.night, ctx.physical, FASCIA_ATLAS_R8, FASCIA_ATLAS_WIDTH, FASCIA_ATLAS_HEIGHT);
   const meshes: Mesh[] = [];
   let triangles = 0;
   let features: EmitResult['features'] = result?.features ?? [];
   if (streamed) {
-    const fronts = VD_STOREFRONT_PLAN.fronts.filter((f) => (f.ring != null || inTile(f)) && !ownedByBlocks(f));
-    const packed = packageRingStorefronts(VD_STOREFRONT_PLAN, fronts, (x, z) => ctx.groundY(x, z), { paint: LAYER.paint!.chunk, detail: LAYER.detail!.chunk, glass: LAYER.glass!.chunk });
+    const fronts = plan.fronts.filter((f) => (f.ring != null || inTile(f)) && !ownedByBlocks(f));
+    const packed = packageRingStorefronts(plan, fronts, (x, z) => ctx.groundY(x, z), { paint: LAYER.paint!.chunk, detail: LAYER.detail!.chunk, glass: LAYER.glass!.chunk });
     features = packed.features;
     for (const slot of SLOTS) {
       const pkgs = packed.packages[slot];

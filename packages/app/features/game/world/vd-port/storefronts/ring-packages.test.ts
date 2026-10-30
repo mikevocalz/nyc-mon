@@ -5,9 +5,10 @@ import { test } from 'node:test';
 import * as THREE from 'three';
 import { splitByCell } from '../../cells/cell-rules.ts';
 import { emitPlan, SLOTS } from './emit.ts';
-import { VD_STOREFRONT_PLAN as PLAN } from './plan.generated.ts';
+import { readVdStorefrontPlanFromDisk } from './load-from-disk.test-support.ts';
 import { packageRingStorefronts, storefrontLayout } from './ring-packages.ts';
 
+const PLAN = readVdStorefrontPlanFromDisk();
 const CHUNK = { paint: 256, detail: 128, glass: 256 } as const;
 // a varying ground, so a front written in a chunk's batch must read the same height it reads in the whole plan
 const groundY = (x: number, z: number) => ((Math.floor(x / 7) + Math.floor(z / 11)) & 1) * 0.14;

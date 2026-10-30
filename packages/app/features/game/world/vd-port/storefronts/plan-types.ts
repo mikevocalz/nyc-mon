@@ -1,4 +1,4 @@
-// The storefront plan tooling/city/bake-vd-storefronts.mjs writes (plan.generated.ts). Scene metres; colours are
+// The storefront plan tooling/city/bake-vd-storefronts.mjs writes (plan.bin, read by load.ts). Scene metres; colours are
 // display-space RGB floats (sRGB), decoded to linear by the materials on the physical stack.
 export type Rgb = readonly [number, number, number] | number[];
 

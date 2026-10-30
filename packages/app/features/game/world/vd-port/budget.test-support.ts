@@ -31,6 +31,7 @@ export async function measureVdBudget(): Promise<VdBudget> {
   const { physicalRendererParams } = await import('../physical-look.ts');
   const { advanceNodeFrame } = await import('@acme/ui/three/internals');
   (await import('./blocks/load-from-disk.test-support.ts')).loadVdBlocksFromDisk();
+  (await import('./storefronts/load-from-disk.test-support.ts')).loadVdStorefrontPlanFromDisk();
   // the far tier streams from the same disk copies (the bundled home chunks always, the full bake when .cache is here)
   (await import('./far-tier/load-from-disk.test-support.ts')).loadVdFarFromDisk();
   const furniture = await import('./furniture/index.ts');

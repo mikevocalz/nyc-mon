@@ -9,7 +9,9 @@ import dataset from '../../../data/harlem-apollo.json' with { type: 'json' };
 import { valdradaToScene } from '../transform.ts';
 import { emitPlan, gateDrop, SLOTS, valdradaPoint, type Feature } from './emit.ts';
 import { FASCIA_ATLAS_HEIGHT, FASCIA_ATLAS_R8, FASCIA_ATLAS_WIDTH } from './fascia-atlas.generated.ts';
-import { VD_STOREFRONT_PLAN as PLAN } from './plan.generated.ts';
+import { loadVdStorefrontPlanFromDisk } from './load-from-disk.test-support.ts';
+
+const PLAN = loadVdStorefrontPlanFromDisk();
 
 const toScene = valdradaToScene(dataset.origin as [number, number]);
 const flat = () => 0;
