@@ -1,5 +1,6 @@
 import type { Payload } from 'payload';
 import { describe, expect, it, vi } from 'vitest';
+import type { SendAuthMail } from '../../../auth/email.ts';
 import { WAITLIST_SLUG } from '../../../collections/Waitlist.ts';
 import {
   createJoinWaitlistHandler,
@@ -63,9 +64,17 @@ function fakePayload() {
   return { payload, rows, find, create, update, logger };
 }
 
-function handlerFor(payload: Payload, maxAttemptsPerHour?: number) {
-  return createJoinWaitlistHandler({ payload, ipHashSecret: SECRET, nowMs: () => NOW, maxAttemptsPerHour });
+/**
+ * Every handler the tests build gets a mail stub: the confirmation is a
+ * background task, and without a stub a joined path would resolve the real
+ * Resend sender from the environment.
+ */
+function handlerFor(payload: Payload, maxAttemptsPerHour?: number, sendMail: SendAuthMail = async () => {}) {
+  return createJoinWaitlistHandler({ payload, ipHashSecret: SECRET, nowMs: () => NOW, maxAttemptsPerHour, sendMail });
 }
+
+/** The confirmation send is queued one microtask out; a macrotask flushes it. */
+const flushMail = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 function post(body: unknown, headers: Record<string, string> = {}): Request {
   return new Request('https://admin.test/v1/waitlist', {
@@ -278,6 +287,108 @@ describe('handleJoinWaitlist', () => {
 
     expect(response.status).toBe(500);
     expect(await response.json()).toEqual({ status: 'error' });
+  });
+
+  describe('confirmation mail', () => {
+    it('sends the branded confirmation to the normalized address on join', async () => {
+      const { payload } = fakePayload();
+      const sendMail = vi.fn<SendAuthMail>(async () => {});
+      const response = await handlerFor(payload, undefined, sendMail)(post(adult));
+      await flushMail();
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ status: 'joined' });
+      expect(sendMail).toHaveBeenCalledTimes(1);
+      const mail = sendMail.mock.calls[0]?.[0];
+      expect(mail).toMatchObject({ to: 'kid.grown@example.com', subject: "You're on the NYC-MON waitlist" });
+      // The shared layout's CTA links back to the site in both parts.
+      expect(mail?.html).toContain('https://nyc-mon.city');
+      expect(mail?.text).toContain('https://nyc-mon.city');
+    });
+
+    it('resends the identical confirmation on a repeat join', async () => {
+      const { payload } = fakePayload();
+      const sendMail = vi.fn<SendAuthMail>(async () => {});
+      const handler = handlerFor(payload, undefined, sendMail);
+
+      expect((await handler(post(adult))).status).toBe(200);
+      expect((await handler(post({ ...adult, email: 'kid.grown@example.com' }))).status).toBe(200);
+      await flushMail();
+
+      expect(sendMail).toHaveBeenCalledTimes(2);
+      expect(sendMail.mock.calls[1]?.[0]).toEqual(sendMail.mock.calls[0]?.[0]);
+    });
+
+    it('sends nothing for an under-13 answer', async () => {
+      const { payload } = fakePayload();
+      const sendMail = vi.fn<SendAuthMail>(async () => {});
+      const response = await handlerFor(payload, undefined, sendMail)(post({ ...adult, birthYear: 2020 }));
+      await flushMail();
+
+      expect(response.status).toBe(422);
+      expect(await response.json()).toEqual({ status: 'under13' });
+      expect(sendMail).not.toHaveBeenCalled();
+    });
+
+    it('sends nothing to a honeypot hit even though it answers joined', async () => {
+      const { payload } = fakePayload();
+      const sendMail = vi.fn<SendAuthMail>(async () => {});
+      const response = await handlerFor(payload, undefined, sendMail)(post({ ...adult, website: 'https://spam.example' }));
+      await flushMail();
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ status: 'joined' });
+      expect(sendMail).not.toHaveBeenCalled();
+    });
+
+    it('sends nothing when the sign-up is refused', async () => {
+      const { payload } = fakePayload();
+      const sendMail = vi.fn<SendAuthMail>(async () => {});
+      const handler = handlerFor(payload, undefined, sendMail);
+
+      await handler(post({ ...adult, email: 'not-an-email' }));
+      await handler(post({ ...adult, birthYear: '1990' }));
+      await flushMail();
+
+      expect(sendMail).not.toHaveBeenCalled();
+    });
+
+    it('still answers joined when the send throws, and logs the failure', async () => {
+      const { payload, logger } = fakePayload();
+      const sendMail = vi.fn<SendAuthMail>(async () => {
+        throw new Error('Resend refused: domain not verified');
+      });
+      const response = await handlerFor(payload, undefined, sendMail)(post(adult));
+      await flushMail();
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ status: 'joined' });
+      expect(logger.error).toHaveBeenCalledTimes(1);
+      const logged = logger.error.mock.calls[0]?.[0] as { err?: Error } | undefined;
+      expect(logged?.err?.message).toContain('Resend refused');
+    });
+
+    it('answers joined and logs a skip when no mail sender is configured', async () => {
+      const { payload, logger } = fakePayload();
+      const savedKey = process.env.RESEND_API_KEY;
+      const savedFrom = process.env.AUTH_EMAIL_FROM;
+      delete process.env.RESEND_API_KEY;
+      delete process.env.AUTH_EMAIL_FROM;
+      try {
+        // No sendMail seam: the handler resolves the sender from the env.
+        const handler = createJoinWaitlistHandler({ payload, ipHashSecret: SECRET, nowMs: () => NOW });
+        const response = await handler(post(adult));
+        await flushMail();
+
+        expect(response.status).toBe(200);
+        expect(await response.json()).toEqual({ status: 'joined' });
+        expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('no mail sender'));
+        expect(logger.error).not.toHaveBeenCalled();
+      } finally {
+        if (savedKey !== undefined) process.env.RESEND_API_KEY = savedKey;
+        if (savedFrom !== undefined) process.env.AUTH_EMAIL_FROM = savedFrom;
+      }
+    });
   });
 });
 

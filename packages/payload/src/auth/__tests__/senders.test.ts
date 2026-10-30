@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { createConsoleSmsSender, createSmsSender, createSnsSmsSender, maskPhoneNumber } from '../sms.ts';
 import { consumeSmsQuota, type QuotaStore } from '../sms-quota.ts';
 import { isValidUsername } from '../username.ts';
-import { twoFactorCodeMail, verifyEmailMail } from '../templates.ts';
+import { twoFactorCodeMail, verifyEmailMail, waitlistJoinedMail } from '../templates.ts';
 
 describe('SMS senders (ADR 0004 §6)', () => {
   it('is off when no transport is set', () => {
@@ -96,5 +96,14 @@ describe('mail templates', () => {
     expect(mail.text).toContain('482913');
     expect(mail.html).toContain('482913');
     expect(mail.text).toContain('5 minutes');
+  });
+
+  it('renders the waitlist confirmation in the shared layout with a CTA to the site', () => {
+    const mail = waitlistJoinedMail();
+    expect(mail.subject).toBe("You're on the NYC-MON waitlist");
+    expect(mail.text).toContain('the app is out');
+    // The CTA's URL is written out in the text part, like every mail's link.
+    expect(mail.text).toContain('https://nyc-mon.city');
+    expect(mail.html).toContain('https://nyc-mon.city');
   });
 });

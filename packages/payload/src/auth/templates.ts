@@ -1,4 +1,5 @@
-// Every Better Auth email (ADR 0004 §5). Pure functions: input in, subject,
+// Every Better Auth email (ADR 0004 §5), plus the waitlist confirmation the
+// site's sign-up endpoint sends (PS-001). Pure functions: input in, subject,
 // HTML and text out. Copy rules: `Caller`, never "user"; no Mon speaks in
 // mail; a link is always written out in the text part too.
 import type { AuthMail } from './email';
@@ -267,5 +268,25 @@ export function guardianConsentMail(consentId: number, days: number, baseURL: st
       '{days}',
       String(days),
     ),
+  });
+}
+
+/**
+ * Waitlist confirmation (PS-001). `POST /v1/waitlist` sends it when an
+ * address joins, and again on a repeat join: the endpoint answers `joined`
+ * either way so it never says who has signed up, and the mail matches —
+ * "you're on the list" is true in both cases.
+ *
+ * Voice is the site's, not an account notice: no counts, no scarcity, and
+ * the promise is the form's own — one email when the app is out, no ads.
+ */
+export function waitlistJoinedMail(): MailContent {
+  return render({
+    subject: "You're on the NYC-MON waitlist",
+    paragraphs: [
+      'Someone entered this email address on the NYC-MON site and joined the waitlist.',
+      "You're on the list. One email when the app is out, and no ads.",
+    ],
+    action: { label: 'Visit nyc-mon.city', url: SITE_URL },
   });
 }
