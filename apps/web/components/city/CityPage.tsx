@@ -1,3 +1,6 @@
+import { copyFor, sectionFor, type SitePage } from '@acme/content/site-content';
+import { PageSections, originalLayout, type WebsitePageProps } from '../cms/PageContent';
+import { placement } from '../cms/art';
 import { DISTRICTS, DISTRICT_COPY } from '@acme/spatial';
 import { Image, SolidPanel } from '@acme/ui';
 import { Article, Figure, Figcaption, Heading, List, ListItem, Paragraph, Section } from '@acme/ui/html';
@@ -13,13 +16,11 @@ import { cityCardLayout } from './layout';
 const CARD_ACCENTS = ['bg-orange-500', 'bg-royal-500', 'bg-carolina-500', 'bg-leaf-500'] as const;
 
 /** W03, the product site's setting page: the four districts, then who shares them. */
-export function CityPage() {
-  const districts = W03_COPY.districts;
-  const cast = W03_COPY.cast;
-  return (
-    <View id="w03-city" className="w-full flex-1 bg-bg">
-      <CityMotion />
-      <Section
+export function CityPage({ page, embedOrigins, siteOrigin }: WebsitePageProps = {}) {
+  const districts = copyFor(sectionFor(page, 'districts'), W03_COPY.districts);
+  const districtNames = copyFor(sectionFor(page, 'districts'), DISTRICT_COPY, 'places');
+  const cast = copyFor(sectionFor(page, 'cast'), W03_COPY.cast);
+  const sections = { districts: (<Section
         aria-labelledby="w03-districts-title"
         data-testid="w03-districts"
         data-section="city-districts"
@@ -35,7 +36,9 @@ export function CityPage() {
         <View id="w03-atlas-start" className="h-px w-full" aria-hidden />
         <List id="w03-district-atlas" aria-label={districts.listLabel} className="m-0 grid list-none grid-cols-1 gap-6 p-0 md:grid-cols-12">
           {DISTRICTS.map((district, i) => {
-            const photo = cityPhoto(district);
+            const original = cityPhoto(district);
+            const replacement = placement(sectionFor(page, 'districts'), `district.${district}`);
+            const photo = replacement ? { source: replacement.src, alt: replacement.alt, title: replacement.caption ?? '', sizes: original?.sizes ?? '100vw', position: { left: `${replacement.focalPoint.x * 100}%` as const, top: `${replacement.focalPoint.y * 100}%` as const }, blurDataURL: undefined } : original;
             const leading = district === 'downtown';
             return (
               <ListItem key={district} className={cityCardLayout(district)}>
@@ -49,7 +52,7 @@ export function CityPage() {
                               src={cityPhotoHref(photo.source)} alt={photo.alt} fill framed={false}
                               className="h-full w-full" sizes={photo.sizes}
                               contentPosition={photo.position} loading={leading ? 'eager' : 'lazy'}
-                              placeholder="blur" blurDataURL={photo.blurDataURL}
+                              unoptimized placeholder={photo.blurDataURL ? 'blur' : undefined} blurDataURL={photo.blurDataURL}
                             />
                           </View>
                         </View>
@@ -59,9 +62,9 @@ export function CityPage() {
                     <View className="gap-3 px-5 py-6">
                       <View className={`h-1.5 w-12 ${CARD_ACCENTS[i % CARD_ACCENTS.length]}`} aria-hidden />
                       <Heading level={2} id={`w03-${district}-title`} className="my-0 font-display text-2xl leading-tight text-text">
-                        {DISTRICT_COPY[district].name}
+                        {districtNames[district].name}
                       </Heading>
-                      <Paragraph className="my-0 text-base leading-7 text-text-secondary">{DISTRICT_COPY[district].line}</Paragraph>
+                      <Paragraph className="my-0 text-base leading-7 text-text-secondary">{districtNames[district].line}</Paragraph>
                     </View>
                   </Article>
                 </SolidPanel>
@@ -69,11 +72,7 @@ export function CityPage() {
             );
           })}
         </List>
-      </Section>
-
-      <StreetGridBand />
-
-      <Section
+      </Section>), 'street-grid': <StreetGridBand cms={sectionFor(page, 'street-grid')} />, cast: (<Section
         aria-labelledby="w03-cast-title"
         data-testid="w03-cast"
         data-section="city-cast"
@@ -98,7 +97,6 @@ export function CityPage() {
             </ListItem>
           ))}
         </List>
-      </Section>
-    </View>
-  );
+      </Section>) };
+  return <View id="w03-city" className="w-full flex-1 bg-bg">{originalLayout(page, Object.keys(sections)) ? <CityMotion /> : null}<PageSections page={page} embedOrigins={embedOrigins} siteOrigin={siteOrigin} sections={sections} /></View>;
 }

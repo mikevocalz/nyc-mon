@@ -1,6 +1,6 @@
 'use client';
 import type { ReactNode } from 'react';
-import { useRouter } from '@payloadcms/ui';
+import { useRouter, useConfig } from '@payloadcms/ui';
 import { BottomSheet, BrandWordmark, TabBar, Toaster, type TabBarTab } from '@acme/ui/admin';
 import { Aside, Button, Footer, Header, Heading, Link, List, ListItem, Main, Nav, Page, Section, Text } from '@acme/ui/html';
 import { Box, Home, MoreHorizontal, ShieldCheck, Users } from '@acme/ui/icons';
@@ -38,6 +38,8 @@ const navItem = (active: boolean) =>
 
 export function ConsoleShell({ section, heading, children }: { section: keyof typeof consoleCopy.nav; heading: string; children: ReactNode }) {
   const router = useRouter();
+  const { config } = useConfig();
+  const websiteEnabled = config.collections.some((collection) => collection.slug === 'site-pages');
   const appearance = useShellStore((state) => state.appearance);
   const moreOpen = useShellStore((state) => state.moreOpen);
   const setMoreOpen = useShellStore((state) => state.setMoreOpen);
@@ -62,6 +64,7 @@ export function ConsoleShell({ section, heading, children }: { section: keyof ty
           </Link>
         </Header>
         <Nav aria-label="Console" className="flex-1 gap-1 overflow-y-auto px-3 py-4">
+          {websiteEnabled ? <Link href="/admin/collections/site-pages" className={navItem(false)} testID="console-nav-website">Website pages &amp; media</Link> : null}
           {links.map(([href, key]) => <Link key={key} href={href} aria-current={key === section ? 'page' : undefined} className={navItem(key === section)} testID={`console-nav-${key}`}>{consoleCopy.nav[key]}</Link>)}
         </Nav>
         <Footer className="border-t border-border px-3 py-3">
@@ -86,6 +89,7 @@ export function ConsoleShell({ section, heading, children }: { section: keyof ty
       <BottomSheet open={moreOpen} onClose={() => setMoreOpen(false)} closeLabel="Close" title={consoleCopy.nav.more} scheme="system" testID="console-more-sheet">
         <Nav aria-label="More sections" className="gap-1 pb-4">
           <List className="gap-1">
+            <ListItem>{websiteEnabled ? <Link href="/admin/collections/site-pages" onPress={() => setMoreOpen(false)} className={navItem(false)}>Website pages &amp; media</Link> : null}</ListItem>
             {moreLinks.map(([href, key]) => (
               <ListItem key={key}>
                 <Link href={href} aria-current={key === section ? 'page' : undefined} onPress={() => setMoreOpen(false)} className={navItem(key === section)} testID={`console-more-${key}`}>{consoleCopy.nav[key]}</Link>

@@ -1,4 +1,5 @@
 'use client';
+import { copyFor, type SiteSection } from '@acme/content/site-content';
 
 import { Button, GridFloor, LazyScene, THEMES, useInstanceStore, useStore } from '@acme/ui';
 import { View } from '@acme/ui/tw';
@@ -13,10 +14,10 @@ const DISTRICT = 'midtown';
  * and args. It keeps moving while on screen; the pause button is what lets
  * continuous motion pass WCAG 2.2.2. Reduced motion draws it still.
  */
-export function GridBand() {
+export function GridBand({ cms }: { cms?: SiteSection } = {}) {
   const control = useInstanceStore(() => ({ stopped: false }));
   const stopped = useStore(control, (s) => s.stopped);
-  const copy = W01_COPY.grid;
+  const copy = copyFor(cms, W01_COPY.grid);
   return (
     <View className="relative h-svh min-h-[32.5rem] w-full">
       <View aria-hidden className="absolute inset-0">

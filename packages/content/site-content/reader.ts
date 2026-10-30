@@ -50,10 +50,7 @@ export function sectionText(section: SiteSection | undefined, key: string, fallb
   return section?.copy.find((row) => row.key === key)?.value ?? fallback;
 }
 export function orderedSectionKeys(page: SitePage | null | undefined, fallback: readonly string[]): string[] {
-  const edited = page?.sections.map((section) => section.sectionKey) ?? [];
-  // A partial record which edits only World must not accidentally move World above Hero.
-  if (!fallback.every((key) => edited.includes(key))) return [...fallback, ...edited.filter((key) => !fallback.includes(key))];
-  return edited;
+  return page ? page.sections.map((section) => section.sectionKey) : [...fallback];
 }
 
 /** Anonymous, published-only REST reader; never imports Payload's server config. */
@@ -97,9 +94,37 @@ export function blockImage(block: unknown): SiteImage | null {
     const alt = block.decorative === true ? '' : typeof block.alt === 'string' && block.alt.trim() ? block.alt : typeof media.alt === 'string' ? media.alt : '';
     if (!alt && block.decorative !== true) return null;
     const point = (value: unknown) => typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 0.5;
-    return { src: url.href, alt, width: dimension(media.width, 1200), height: dimension(media.height, 800),
+    return { src: url.href, alt, width: dimension(media.width ?? (record(media.original) ? media.original.width : undefined), 1200), height: dimension(media.height ?? (record(media.original) ? media.original.height : undefined), 800),
       caption: typeof block.caption === 'string' && block.caption ? block.caption : undefined,
       focalPoint: { x: point(block.focalX), y: point(block.focalY) } };
   } catch { return null; }
 }
 export * from './core.ts';
+
+export { copyFor, copyFields, type Editable } from './copy.ts';
+
+/** Published routes only, including newly authored pages; no private chrome or previews in search engines. */
+export async function readPublishedSiteRoutes(baseURL: string, request: typeof fetch = fetch): Promise<{ route: string; updatedAt?: string }[]> {
+  const base = new URL(baseURL);
+  if ((base.protocol !== 'https:' && !(base.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(base.hostname))) || base.username || base.password || base.search || base.hash) throw new Error('Invalid CMS API base');
+  const routes = new Map<string, { route: string; updatedAt?: string }>();
+  let page = 1;
+  for (;;) {
+    const url = new URL(`${base.href.replace(/\/$/, '')}/site-pages`);
+    url.search = new URLSearchParams({ 'where[_status][equals]': 'published', draft: 'false', depth: '0', limit: '100', page: String(page), 'select[route]': 'true', 'select[updatedAt]': 'true', 'select[_status]': 'true' }).toString();
+    const response = await request(url, { headers: { Accept: 'application/json' }, credentials: 'omit', cache: 'no-store', signal: AbortSignal.timeout(5000) });
+    if (!response.ok) throw new Error(`Website CMS returned ${response.status}`);
+    const result: unknown = await response.json();
+    if (!record(result) || !Array.isArray(result.docs)) throw new Error('Invalid website CMS response');
+    for (const doc of result.docs) {
+      if (!record(doc) || doc._status !== 'published') continue;
+      const route = safeRoute(doc.route);
+      if (!route || route === '/site-chrome') continue;
+      const updatedAt = typeof doc.updatedAt === 'string' && Number.isFinite(Date.parse(doc.updatedAt)) ? doc.updatedAt : undefined;
+      routes.set(route, { route, ...(updatedAt ? { updatedAt } : {}) });
+    }
+    if (!result.hasNextPage) return [...routes.values()];
+    if (typeof result.nextPage !== 'number' || result.nextPage !== page + 1 || page >= 1000) throw new Error('Invalid website CMS pagination');
+    page = result.nextPage;
+  }
+}

@@ -1,7 +1,7 @@
 import { BrandLogo, Image, LinkButton, type ImageProps } from '@acme/ui';
 import { Figure, Heading, Paragraph, Text } from '@acme/ui/html';
 import { View } from '@acme/ui/tw';
-import { safeLink } from '@acme/content/site-content';
+import { blockImage, safeLink } from '@acme/content/site-content';
 import { siteHref } from '../../lib/site-href';
 import { art, artHref, artPosition } from './art';
 import { W01_COPY } from './copy';
@@ -15,6 +15,7 @@ const SEAL_SIZE = 240;
 /** Keep the authored W01 scene, motion IDs, image priority and responsive composition. */
 export function HomeHero({ cms }: CmsSectionProps = {}) {
   const copy = W01_COPY.hero;
+  const seal = blockImage(cms?.content.find((block) => block.blockType === 'image' && block.slot === 'seal'));
   const heroArt = sectionArt(cms, 'hero', art('hero'));
   const title = sectionText(cms, 'title', copy.title);
   const titleLines = title === copy.title ? copy.titleLines : title.split('\n').map((line) => [line]);
@@ -41,7 +42,7 @@ export function HomeHero({ cms }: CmsSectionProps = {}) {
           <Figure id="mfx-hero-art" className="relative m-0 min-w-0 lg:col-span-4 short:col-span-5">
             <View className="relative w-full lg:ml-auto lg:max-w-content-hero-art short:ml-auto short:max-w-56">
               <Image src={heroArt.src as ImageProps['src']} alt={heroArt.alt} fill priority loading="eager" {...({ fetchPriority: 'high' } as object)} sizes={heroArt.sizes} unoptimized placeholder={heroArt.blurDataURL ? 'blur' : 'empty'} blurDataURL={heroArt.blurDataURL} contentPosition={artPosition(heroArt)} className="aspect-[4/3] w-full md:aspect-[16/9] lg:aspect-[4/5] short:aspect-[4/5]" />
-              <View id="mfx-hero-seal" aria-hidden className="pointer-events-none absolute -bottom-8 -left-3 origin-bottom-left scale-50 md:scale-75 lg:-bottom-10 lg:-left-16 xl:-left-24 xl:scale-100 short:-bottom-3 short:-left-10 short:scale-40"><BrandLogo size={SEAL_SIZE} /></View>
+              <View id="mfx-hero-seal" aria-hidden className="pointer-events-none absolute -bottom-8 -left-3 origin-bottom-left scale-50 md:scale-75 lg:-bottom-10 lg:-left-16 xl:-left-24 xl:scale-100 short:-bottom-3 short:-left-10 short:scale-40">{seal ? <Image src={seal.src} alt="" width={SEAL_SIZE} height={SEAL_SIZE} fill={false} framed={false} unoptimized /> : <BrandLogo size={SEAL_SIZE} />}</View>
             </View>
             <PlaceCaption entry={heroArt} landmark className="right-0 top-0 short:hidden" />
           </Figure>

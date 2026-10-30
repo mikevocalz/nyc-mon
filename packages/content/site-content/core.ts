@@ -6,7 +6,7 @@ export const record = (value: unknown): value is UnknownRecord =>
 export function safeRoute(value: unknown): string | null {
   if (typeof value !== 'string' || !/^\/(?:[a-z0-9]+(?:-[a-z0-9]+)*\/?)*$/.test(value)) return null;
   const route = value === '/' ? '/' : value.replace(/\/$/, '');
-  if (/^\/(admin|api|payload-api|auth|_next)(\/|$)/.test(route)) return null;
+  if (/^\/(admin|api|payload-api|auth|_next|cms-preview)(\/|$)/.test(route)) return null;
   return route;
 }
 
@@ -54,7 +54,7 @@ export function iframeEmbed(value: unknown, allowedOrigins: readonly string[]): 
     });
     const pathname = decodeURIComponent(url.pathname);
     if (!origins.includes(url.origin) || /[\\\u0000-\u001f]/.test(pathname) ||
-        /^\/(admin|api|payload-api|auth|_next)(\/|$)/i.test(pathname)) return null;
+        /^\/(admin|api|payload-api|auth|_next|cms-preview)(\/|$)/i.test(pathname)) return null;
     return url.href;
   } catch { return null; }
 }

@@ -4,9 +4,11 @@ import { Heading, Link, List, ListItem, Paragraph, Section, Text } from '@acme/u
 import { View } from '@acme/ui/tw';
 import { starterCards } from '../home/StartersSection';
 import { ArtTile } from '../how-it-works/ArtTile';
-import { eggArt, hatchNightArt, hlynkArt } from '../how-it-works/art';
+import { routeArtFor } from '../cms/route-art';
+import { sectionFor } from '@acme/content/site-content';
+import { PageSections, originalLayout, type PageProps, type WebsitePageProps } from '../cms/PageContent';
 import { WaitlistForm } from '../waitlist/WaitlistForm';
-import { W05_COPY } from './copy';
+import { getCopy } from './cms';
 import { GetMotion } from './GetMotion';
 import { siteHref } from '../../lib/site-href';
 
@@ -14,7 +16,8 @@ const MD_UP = `(min-width: ${breakpoints.md})`;
 const LG_UP = `(min-width: ${breakpoints.lg})`;
 
 /** The two stores as signage plates: the name, then when. Text only; no store marks ship in the repo. */
-function StoreBadges({ night = false }: { night?: boolean }) {
+function StoreBadges({ night = false, page }: { night?: boolean } & PageProps) {
+  const W05_COPY = getCopy(page);
   const copy = W05_COPY.stores;
   return (
     <List aria-label={copy.label} className="m-0 list-none flex-row flex-wrap gap-3 p-0">
@@ -42,7 +45,9 @@ function StoreBadges({ night = false }: { night?: boolean }) {
  * transform-only (`mfx-hero-*` is never pre-hidden), plays with the art as
  * one beat, and is skipped when the motion chunk arrives late.
  */
-function Hero() {
+function Hero({ page }: PageProps) {
+  const W05_COPY = getCopy(page);
+  const { eggArt, hatchNightArt, hlynkArt } = routeArtFor(sectionFor(page, 'hero'));
   const copy = W05_COPY.hero;
   return (
     <Section aria-labelledby="w05-get-title" data-testid="w05-get" className="w-full overflow-hidden bg-bg">
@@ -65,7 +70,7 @@ function Hero() {
           <Paragraph className="my-0 max-w-content-measure border-l-4 border-orange-500 bg-surface-raised px-4 py-3 text-lg leading-8 text-text md:text-xl md:leading-8">
             {copy.body}
           </Paragraph>
-          <StoreBadges />
+          <StoreBadges page={page} />
         </View>
 
         {/* The form plate: an orange plate under a raised face, the CTA's shadow at panel size. */}
@@ -103,7 +108,9 @@ function Hero() {
  *   row 3:   the route of How it works, full width, as a line of five stops.
  * Below `lg` the tiles stack in DOM order. The tiles stagger in on scroll.
  */
-function Bento() {
+function Bento({ page }: PageProps) {
+  const W05_COPY = getCopy(page);
+  const { eggArt, hatchNightArt, hlynkArt } = routeArtFor(sectionFor(page, 'features'));
   const copy = W05_COPY.bento;
   const cards = starterCards();
   return (
@@ -208,14 +215,7 @@ function Bento() {
 }
 
 /** W05, the waitlist page: the hero bento with the form (PS-023), then what is on its way. */
-export function GetPage() {
-  return (
-    <>
-      <GetMotion />
-      <View className="w-full flex-1 bg-bg">
-        <Hero />
-        <Bento />
-      </View>
-    </>
-  );
+export function GetPage({ page, embedOrigins, siteOrigin }: WebsitePageProps = {}) {
+  const sections = { hero: <Hero page={page} />, features: <Bento page={page} /> };
+  return <>{originalLayout(page, Object.keys(sections)) ? <GetMotion /> : null}<View className="w-full flex-1 bg-bg"><PageSections page={page} embedOrigins={embedOrigins} siteOrigin={siteOrigin} sections={sections} /></View></>;
 }

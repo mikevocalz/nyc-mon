@@ -1,3 +1,6 @@
+import { copyFor, orderedSectionKeys, sectionFor } from '@acme/content/site-content';
+import type { WebsitePageProps } from '../cms/PageContent';
+import { SectionContent } from '../cms/SectionContent';
 import { Article, Heading, Link, List, ListItem, Nav, OrderedList, Paragraph, Section, Text } from '@acme/ui/html';
 import { View } from '@acme/ui/tw';
 import { Eyebrow } from '../home/Eyebrow';
@@ -39,13 +42,20 @@ const FOCUS = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:rin
  * Calm on purpose: no motion and no scroll smoothing, so anchors and the
  * browser's own find and scroll behave as expected.
  */
-export function LegalDocumentPage({ doc, testId }: { doc: LegalDocument; testId: string }) {
+export function LegalDocumentPage({ doc: original, testId, page, embedOrigins = [], siteOrigin = '' }: { doc: LegalDocument; testId: string } & WebsitePageProps) {
+  const masthead = copyFor(sectionFor(page, 'masthead'), { title: original.title, eyebrow: original.eyebrow, updated: original.updated, description: original.description });
+  const keys = orderedSectionKeys(page, original.sections.map((section) => section.id)).filter((key) => key !== 'masthead');
+  const doc = { ...masthead, sections: keys.flatMap((key) => {
+    const section = original.sections.find((item) => item.id === key);
+    return section && !sectionFor(page, key)?.hidden ? [copyFor(sectionFor(page, key), section)] : [];
+  }) };
+
   const titleId = `${testId}-title`;
   const tocId = `${testId}-contents`;
   return (
     <View className="w-full flex-1 bg-bg">
       <Section aria-labelledby={titleId} data-testid={testId} className="w-full">
-        <View className="scheme-dark w-full bg-ink-950">
+        {sectionFor(page, 'masthead')?.hidden ? <Heading level={1} id={titleId} className="sr-only">{doc.title}</Heading> : <View className="scheme-dark w-full bg-ink-950">
           <View className="mx-auto w-full max-w-screen-xl gap-6 px-4 pb-10 pt-12 sm:px-6 md:pb-14 md:pt-16 lg:px-8">
             <Eyebrow night>{doc.eyebrow}</Eyebrow>
             <Heading
@@ -59,7 +69,7 @@ export function LegalDocumentPage({ doc, testId }: { doc: LegalDocument; testId:
             <Nav aria-label={doc.eyebrow} className="pt-2">
               <List className="m-0 list-none flex-row flex-wrap gap-2 p-0">
                 {DOCS.map(({ doc: other, href }) => {
-                  const current = other.title === doc.title;
+                  const current = other.title === original.title;
                   return (
                     <ListItem key={href}>
                       <Link
@@ -76,8 +86,9 @@ export function LegalDocumentPage({ doc, testId }: { doc: LegalDocument; testId:
             </Nav>
           </View>
           <View aria-hidden className="h-1 w-full bg-orange-500" />
-        </View>
+        </View>}
 
+        <SectionContent section={sectionFor(page, 'masthead')} origins={embedOrigins} siteOrigin={siteOrigin} />
         <View className="mx-auto w-full max-w-screen-xl gap-10 px-4 py-12 sm:px-6 md:py-20 lg:grid lg:grid-cols-12 lg:items-start lg:gap-x-10 lg:px-8">
           <Nav aria-labelledby={tocId} className="min-w-0 lg:sticky lg:top-32 lg:col-span-4 lg:self-start">
             <Text id={tocId} className="block w-fit bg-signage-black px-3 pb-1.5 pt-2 font-display text-sm uppercase text-signage-white">
@@ -124,8 +135,10 @@ export function LegalDocumentPage({ doc, testId }: { doc: LegalDocument; testId:
                     <LegalParagraph key={legalParagraphKey(paragraph)} paragraph={paragraph} />
                   ))}
                 </View>
+                <SectionContent section={sectionFor(page, section.id)} origins={embedOrigins} siteOrigin={siteOrigin} />
               </Section>
             ))}
+            {keys.filter((key) => !original.sections.some((section) => section.id === key)).map((key) => <SectionContent key={key} section={sectionFor(page, key)} origins={embedOrigins} siteOrigin={siteOrigin} />)}
           </Article>
         </View>
       </Section>

@@ -13,6 +13,7 @@ import type { StarterId } from '../home/art';
 import { W01_COPY } from '../home/copy';
 
 export interface RouteArt {
+  editorialCaption?: string;
   src: PhotoSource;
   width: number;
   height: number;

@@ -1,4 +1,5 @@
 'use client';
+import { copyFor, type SiteSection } from '@acme/content/site-content';
 
 import { Button, LazyScene, StreetPulse, THEMES, useInstanceStore, useStore } from '@acme/ui';
 import { View } from '@acme/ui/tw';
@@ -12,10 +13,10 @@ const DISTRICT = 'midtown';
  * and size. The block under the mouse pointer lights up. Pulses keep running
  * while on screen; the pause button is what lets that pass WCAG 2.2.2.
  */
-export function StreetGridBand() {
+export function StreetGridBand({ cms }: { cms?: SiteSection } = {}) {
   const control = useInstanceStore(() => ({ stopped: false }));
   const stopped = useStore(control, (s) => s.stopped);
-  const copy = W03_COPY.blocks;
+  const copy = copyFor(cms, W03_COPY.blocks);
   return (
     <View className="relative h-svh min-h-[32.5rem] w-full">
       <View aria-hidden className="absolute inset-0">

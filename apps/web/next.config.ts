@@ -5,6 +5,21 @@ import type { NextConfig } from 'next'
 // forest. RN globals (__DEV__) come from a runtime shim imported in the root
 // layout instead of DefinePlugin.
 const nextConfig: NextConfig = {
+  async headers() {
+    const admin = process.env.SITE_ADMIN_ORIGIN;
+    let frameAncestor = "'self'";
+    if (admin) {
+      const url = new URL(admin);
+      if (url.username || url.password || url.pathname !== '/' || url.search || url.hash || (url.protocol !== 'https:' && !(url.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(url.hostname)))) throw new Error('Invalid SITE_ADMIN_ORIGIN');
+      frameAncestor += ` ${url.origin}`;
+    }
+    return [{ source: '/cms-preview/:path*', headers: [
+      { key: 'Cache-Control', value: 'private, no-store, max-age=0' },
+      { key: 'Referrer-Policy', value: 'no-referrer' },
+      { key: 'X-Robots-Tag', value: 'noindex, nofollow, noarchive' },
+      { key: 'Content-Security-Policy', value: `frame-ancestors ${frameAncestor}` },
+    ] }];
+  },
   // NEXT_DIST_DIR lets a second build (perf lanes, bisects) write beside the
   // served `.next` without clobbering it. Must stay inside apps/web.
   distDir: process.env.NEXT_DIST_DIR || '.next',

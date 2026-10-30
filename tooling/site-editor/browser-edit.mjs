@@ -1,0 +1,48 @@
+import { chromium } from 'playwright';
+import assert from 'node:assert/strict';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+const browser=await chromium.launch({headless:true,channel:'chromium'});
+const context=await browser.newContext({storageState:'/tmp/editor-evidence/admin-state.json',viewport:{width:1440,height:1000}});
+const page=await context.newPage();const errors=[];const checks=[];page.on('pageerror',e=>errors.push(e.message));
+await context.route('https://media.invalid/**',async(route)=>{const file='/tmp/editor-bunny/'+decodeURIComponent(new URL(route.request().url()).pathname.slice(1));if(file.includes('..')||!existsSync(file))return route.fulfill({status:404});return route.fulfill({path:file});});
+async function poll(fn){for(let i=0;i<40;i++){if(await fn())return;await new Promise(r=>setTimeout(r,250));}throw Error('Integration state did not settle');}
+try{
+ await page.goto('http://localhost:3001/admin/collections/media/create');
+ await page.waitForTimeout(2000);
+ const buffer=readFileSync('packages/assets/photos/harlem-apollo.webp');
+ const transfer=await page.evaluateHandle(({bytes})=>{const dt=new DataTransfer();dt.items.add(new File([new Uint8Array(bytes)],'editor-drag-test.webp',{type:'image/webp'}));return dt;},{bytes:Array.from(buffer)});
+ await page.locator('.dropzone').dispatchEvent('dragenter',{dataTransfer:transfer});
+ await page.locator('.dropzone').dispatchEvent('dragover',{dataTransfer:transfer});
+ await page.locator('.dropzone').dispatchEvent('drop',{dataTransfer:transfer});
+ await page.getByText('editor-drag-test.webp',{exact:false}).first().waitFor({state:'attached',timeout:15000});
+ await page.locator('#field-alt').fill('Integration drag-and-drop photo');
+ await page.getByRole('button',{name:'Save',exact:true}).click();
+ await page.waitForURL(/\/admin\/collections\/media\/\d+$/,{timeout:25000});
+ const uploadedID=page.url().split('/').at(-1);
+ const uploaded=await(await context.request.get(`http://localhost:3001/payload-api/media/${uploadedID}`)).json();
+ assert.match(uploaded.url,/^https:\/\/media\.invalid\//);assert.ok(existsSync('/tmp/editor-bunny/'+uploaded.filename));
+ checks.push('Native media drag/drop uploads bytes through the existing Bunny hook (mock transport)');
+ await page.screenshot({path:'/tmp/editor-evidence/media-upload.png',fullPage:true});
+ await page.goto('http://localhost:3001/admin/collections/site-pages/1');
+ const title=page.locator('[name="sections.0.copy.0.value"]');
+ await poll(async()=>!(await title.isDisabled()));
+ await page.getByRole('button',{name:'Show All: Sections',exact:true}).click();
+ await page.waitForTimeout(300);
+ if(!(await title.isVisible())) await page.getByRole('button',{name:'Show All: Existing section copy',exact:true}).first().click();
+ await title.waitFor({state:'visible'});
+ const original=await title.inputValue();const marker='Browser edited NYC-MON headline';
+ await title.fill(marker);await title.blur();
+ await poll(async()=>{const d=await(await context.request.get('http://localhost:3001/payload-api/site-pages/1?draft=true')).json();return JSON.stringify(d).includes(marker);});
+ assert.ok(!(await(await fetch('http://localhost:3000/')).text()).includes(marker));checks.push('Browser autosave creates a private draft without changing the public homepage');
+ await page.getByRole('button',{name:/^Publish/}).first().click();
+ await poll(async()=> (await(await fetch('http://localhost:3000/')).text()).includes(marker));checks.push('The native Publish button updates the public homepage');
+ await page.screenshot({path:'/tmp/editor-evidence/page-editor.png'});
+ await title.fill(original);await title.blur();await page.getByRole('button',{name:/^Publish/}).first().click();
+ await poll(async()=>!(await(await fetch('http://localhost:3000/')).text()).includes(marker));
+ await page.goto('http://localhost:3001/admin/callers');
+ const headers=await page.getByRole('columnheader').allTextContents();assert.ok(headers[0].includes('Avatar'));assert.ok(headers[1].includes('User ID'));assert.ok(await page.getByTestId('caller-avatar').count()>0);checks.push('Callers renders Avatar first and full User ID second');
+ await page.screenshot({path:'/tmp/editor-evidence/callers-desktop.png'});
+ await page.setViewportSize({width:390,height:844});await page.waitForTimeout(500);assert.ok(await page.getByTestId('caller-avatar').first().isVisible());checks.push('Caller avatar remains visible at phone width');await page.screenshot({path:'/tmp/editor-evidence/callers-phone.png'});
+ assert.deepEqual(errors,[]);
+ writeFileSync('/tmp/editor-evidence/browser-edit.json',JSON.stringify({checks,errors},null,2));console.log(JSON.stringify({passed:checks.length,checks}));
+}finally{await browser.close();}

@@ -1,13 +1,12 @@
-import type { Metadata } from 'next';
 import { CityPage } from '../../../components/city/CityPage';
 import { W03_COPY } from '../../../components/city/copy';
 
-export const metadata: Metadata = {
+import { websiteRoute } from '../../../lib/site-route';
+
+const route = websiteRoute('/city', CityPage, {
   title: { absolute: 'NYC-MON | The City' },
   description: W03_COPY.districts.body,
   alternates: { canonical: '/city' },
-};
-
-export default function Page() {
-  return <CityPage />;
-}
+});
+export const generateMetadata = route.generateMetadata;
+export default route.Page;

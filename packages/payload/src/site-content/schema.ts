@@ -1,3 +1,4 @@
+import { previewURL } from './preview';
 import type { Block, CollectionConfig, Field } from 'payload';
 import { hasStaffRole, staffRoles } from '../collections/access/roles';
 import { iframeEmbed, safeLink, safeRoute, sectionKeysAreUnique, youtubeEmbed } from '@acme/content/site-content';
@@ -22,15 +23,15 @@ const blocks: Block[] = [
       { name: 'heading', type: 'text', maxLength: 200 },
       { name: 'body', type: 'textarea', required: true, maxLength: 20000 },
       { name: 'linkLabel', type: 'text', maxLength: 120 },
-      { name: 'link', type: 'text', validate: (value) => !value || Boolean(safeLink(value)) || 'Use a local path, an anchor, or an HTTPS URL.' },
+      { name: 'link', type: 'text', validate: (value: unknown) => !value || Boolean(safeLink(value)) || 'Use a local path, an anchor, or an HTTPS URL.' },
     ],
   },
   {
     slug: 'image', labels: { singular: 'Image', plural: 'Images' },
     fields: [
       { name: 'slot', label: 'Image position', type: 'text', defaultValue: 'inline', required: true, maxLength: 100,
-        validate: (value) => (typeof value === 'string' && /^[a-z][a-z0-9.-]{0,99}$/.test(value)) || 'Use the existing image-position key or inline.',
-        admin: { description: 'inline adds an image below the section. Existing homepage positions include hero, world.primary, world.secondary, hlynk.static, hlynk.scanner, hlynk.controls, starter.1, starter.2, starter.3, and hatch.' } },
+        validate: (value: unknown) => (typeof value === 'string' && /^[a-z][a-z0-9.-]{0,99}$/.test(value)) || 'Use the existing image-position key or inline.',
+        admin: { description: 'inline adds an image below the section. Existing positions are populated by the site import and name the placement within this section. Keep the position key to replace that image; choose inline to add another.' } },
       image(), alternative(), { name: 'decorative', type: 'checkbox', defaultValue: false }, caption(),
       { name: 'focalX', label: 'Horizontal focal point (0 = left, 1 = right)', type: 'number', min: 0, max: 1, defaultValue: 0.5 },
       { name: 'focalY', label: 'Vertical focal point (0 = top, 1 = bottom)', type: 'number', min: 0, max: 1, defaultValue: 0.5 },
@@ -43,12 +44,12 @@ const blocks: Block[] = [
   {
     slug: 'youtube', labels: { singular: 'YouTube video', plural: 'YouTube videos' },
     fields: [title(), { name: 'url', label: 'YouTube URL', type: 'text', required: true,
-      validate: (value) => Boolean(youtubeEmbed(value)) || 'Paste a valid HTTPS YouTube watch, short, share, or embed URL.' }, caption()],
+      validate: (value: unknown) => Boolean(youtubeEmbed(value)) || 'Paste a valid HTTPS YouTube watch, short, share, or embed URL.' }, caption()],
   },
   {
     slug: 'iframe', labels: { singular: 'UI / iframe embed', plural: 'UI / iframe embeds' },
     fields: [title(), { name: 'url', label: 'Approved UI embed URL', type: 'text', required: true,
-      validate: (value) => Boolean(iframeEmbed(value, (process.env.SITE_EMBED_ORIGINS ?? '').split(','))) || 'Use an HTTPS URL from SITE_EMBED_ORIGINS. Admin and authentication routes cannot be embedded.',
+      validate: (value: unknown) => Boolean(iframeEmbed(value, (process.env.SITE_EMBED_ORIGINS ?? '').split(','))) || 'Use an HTTPS URL from SITE_EMBED_ORIGINS. Admin and authentication routes cannot be embedded.',
       admin: { description: 'Paste the URL only, not iframe HTML. Embed hosts are approved on the server. The target must allow this website to frame it.' } },
       { name: 'aspect', label: 'Frame aspect ratio', type: 'select', defaultValue: '16:9', options: ['16:9', '4:3', '1:1', '9:16'] }, caption()],
   },
@@ -60,6 +61,8 @@ export const SitePages: CollectionConfig = {
   labels: { singular: 'Website page', plural: 'Website pages' },
   admin: {
     group: 'Website', useAsTitle: 'title',
+    preview: (doc, { req }) => previewURL(doc, req),
+    livePreview: { url: ({ data, req }) => previewURL(data, req) ?? '', breakpoints: [{ label: 'Phone', name: 'phone', width: 390, height: 844 }, { label: 'Tablet', name: 'tablet', width: 834, height: 1112 }, { label: 'Desktop', name: 'desktop', width: 1440, height: 900 }] },
     defaultColumns: ['title', 'route', '_status', 'updatedAt'],
     description: 'Choose the page, then its named section. Copy, image positions and embeds stay attached to that section. Save a draft before publishing.',
   },
@@ -67,29 +70,29 @@ export const SitePages: CollectionConfig = {
     read: ({ req }) => hasStaffRole(req, ['ops', 'content']) ? true : { _status: { equals: 'published' } },
     create: canEdit, update: canEdit, delete: staffRoles(['ops']), readVersions: canEdit,
   },
-  versions: { drafts: true, maxPerDoc: 30 },
+  versions: { drafts: { autosave: { interval: 1500 } }, maxPerDoc: 30 },
   fields: [
     { name: 'title', label: 'Page name', type: 'text', required: true, maxLength: 160 },
     { name: 'route', label: 'Website path', type: 'text', required: true, unique: true, index: true,
-      validate: (value) => Boolean(safeRoute(value)) || 'Use / for Home or a lowercase path such as /how-it-works.',
+      validate: (value: unknown) => Boolean(safeRoute(value)) || 'Use / for Home or a lowercase path such as /how-it-works.',
       hooks: { beforeValidate: [({ value }) => safeRoute(value) ?? value] },
-      admin: { description: 'Examples: /, /story, /city, /mons, /how-it-works, /get. Creating a record alone does not register a new website route.' } },
+      admin: { description: 'Examples: /, /story, /city, /mons, /how-it-works, /get. New public paths render their content blocks. /site-chrome edits the shared header and footer.' } },
     { name: 'seo', label: 'Search / sharing copy', type: 'group', fields: [
       { name: 'title', type: 'text', maxLength: 200 }, { name: 'description', type: 'textarea', maxLength: 500 },
     ] },
     { name: 'sections', type: 'array', required: true, minRows: 1, maxRows: 40,
       admin: { initCollapsed: true, components: { RowLabel: './site-content/RowLabels#SectionRowLabel' } },
-      validate: (value) => sectionKeysAreUnique(value) || 'Each section needs a unique lowercase key, for example hero or world.',
+      validate: (value: unknown) => sectionKeysAreUnique(value) || 'Each section needs a unique lowercase key, for example hero or world.',
       fields: [
         { name: 'label', label: 'Section name', type: 'text', required: true, maxLength: 160 },
         { name: 'sectionKey', label: 'Section identifier', type: 'text', required: true, maxLength: 64,
-          admin: { description: 'Keep this stable when editing an existing section. Homepage identifiers: hero, signage, world, district-divider, hlynk, starters, grid, care, hatch, waitlist.' } },
+          admin: { description: 'Keep this stable when editing an existing section. Existing section identifiers come from the site import. Keep them unchanged; edit the friendly section name instead.' } },
         { name: 'hidden', label: 'Hide this section', type: 'checkbox', defaultValue: false },
         { name: 'copy', label: 'Existing section copy', type: 'array', maxRows: 100,
           admin: { isSortable: false, components: { RowLabel: './site-content/RowLabels#CopyRowLabel' } }, fields: [
           { name: 'label', label: 'Field name', type: 'text', required: true, maxLength: 160 },
           { name: 'key', label: 'Field identifier', type: 'text', required: true, maxLength: 100,
-            validate: (value) => (typeof value === 'string' && /^[a-zA-Z][a-zA-Z0-9.-]{0,99}$/.test(value)) || 'Use a field key such as title, body, or proof.0.title.' },
+            validate: (value: unknown) => (typeof value === 'string' && /^[a-zA-Z][a-zA-Z0-9.-]{0,99}$/.test(value)) || 'Use a field key such as title, body, or proof.0.title.' },
           { name: 'value', label: 'Copy', type: 'textarea', maxLength: 20000 },
         ] },
         { name: 'content', label: 'Images, videos and extra content', type: 'blocks', maxRows: 40, blocks,

@@ -50,6 +50,7 @@ export interface ArtCaption {
 }
 
 export interface ArtEntry {
+  editorialCaption?: string;
   src: PhotoSource;
   width: number;
   height: number;

@@ -1,3 +1,4 @@
+import { LoadingContent } from '../../components/cms/LoadingContent';
 import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import { sectionFor, sectionText } from '@acme/content/site-content';
@@ -20,5 +21,5 @@ async function PublishedHome() {
 }
 export default function Page() {
   // Required for uncached content in this app's cacheComponents configuration.
-  return <Suspense fallback={<HomePage />}><PublishedHome /></Suspense>;
+  return <Suspense fallback={<LoadingContent />}><PublishedHome /></Suspense>;
 }

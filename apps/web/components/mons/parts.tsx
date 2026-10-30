@@ -24,6 +24,7 @@ export function ArtFill({
 }) {
   const image = (
     <Image
+        unoptimized
       src={entry.src as ImageProps['src']}
       alt={entry.alt}
       fill
@@ -31,7 +32,7 @@ export function ArtFill({
       sizes={entry.sizes}
       priority={eager}
       loading={eager ? 'eager' : 'lazy'}
-      placeholder="blur"
+      placeholder={entry.blurDataURL ? 'blur' : undefined}
       blurDataURL={entry.blurDataURL}
       contentPosition={artPosition(entry)}
       className="h-full w-full"
@@ -46,10 +47,10 @@ export function ArtFill({
 }
 
 /** "Concept art" as a signage plate pinned to a corner of a creature picture. */
-export function ConceptCaption({ className = 'bottom-0 left-0' }: { className?: string }) {
+export function ConceptCaption({ label = W02_COPY.conceptArt, className = 'bottom-0 left-0' }: { label?: string; className?: string }) {
   return (
     <Figcaption className={`absolute m-0 bg-signage-black px-3 py-1.5 ${className}`}>
-      <Text className="text-xs font-semibold uppercase tracking-widest text-signage-white">{W02_COPY.conceptArt}</Text>
+      <Text className="text-xs font-semibold uppercase tracking-widest text-signage-white">{label}</Text>
     </Figcaption>
   );
 }

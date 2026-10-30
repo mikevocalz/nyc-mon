@@ -2,7 +2,7 @@ import type { FooterLinkGroup, NavCta, NavItem } from '@acme/ui';
 import { HOME_COPY } from '@acme/spatial/copy';
 
 /** Product-site pages, the marketing map from BUILD_PROMPT §5 — not the app's tabs. */
-const PAGES = [
+export const PAGES = [
   { label: 'Home', href: '/' },
   { label: 'The Story', href: '/story' },
   { label: 'The Mons', href: '/mons' },
@@ -30,7 +30,7 @@ export const navItems = (pathname: string): NavItem[] =>
   PAGES.map((page) => ({ ...page, active: isActive(pathname, page.href) }));
 
 /** Routes that draw no site header/footer: spatial's full-bleed city, and the auth screens' own chrome. */
-const CHROMELESS = ['/spatial', '/sign-in'];
+const CHROMELESS = ['/spatial', '/sign-in', '/cms-preview'];
 export const showsSiteChrome = (pathname: string) =>
   !CHROMELESS.some((route) => pathname.startsWith(route));
 

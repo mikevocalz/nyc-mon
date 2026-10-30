@@ -1,13 +1,12 @@
-import type { Metadata } from 'next';
 import { MonsIndexPage } from '../../../components/mons/MonsIndexPage';
 import { W02_COPY } from '../../../components/mons/copy';
 
-export const metadata: Metadata = {
+import { websiteRoute } from '../../../lib/site-route';
+
+const route = websiteRoute('/mons', MonsIndexPage, {
   title: { absolute: 'NYC-MON | The Mons' },
   description: W02_COPY.meta.indexDescription,
   alternates: { canonical: '/mons' },
-};
-
-export default function Page() {
-  return <MonsIndexPage />;
-}
+});
+export const generateMetadata = route.generateMetadata;
+export default route.Page;

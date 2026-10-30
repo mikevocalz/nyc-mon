@@ -1,5 +1,5 @@
-import { APIError, type CollectionBeforeChangeHook, type CollectionBeforeDeleteHook, type Field, type PayloadRequest } from 'payload';
 import { hasStaffRole } from '../collections/access/roles';
+import { APIError, type CollectionBeforeChangeHook, type CollectionBeforeDeleteHook, type Field, type PayloadRequest } from 'payload';
 import { mediaPlacements, record } from '@acme/content/site-content';
 
 type Snapshot = { page: unknown; state: 'published/current' | 'latest draft' | 'revision' };
@@ -61,15 +61,12 @@ export const websiteMediaUsage: Field = {
   }] },
 };
 
-export const protectWebsiteMediaReplacement: CollectionBeforeChangeHook = async ({ req, operation, originalDoc, data }) => {
-  if (operation !== 'update' || !originalDoc?.id) return data;
-  if (!req.file && hasStaffRole(req, ['ops', 'content'])) return data;
-  if ((await usedOn(req, originalDoc.id)).length) {
-    if (!hasStaffRole(req, ['ops', 'content'])) throw new APIError('Only website editors can change media used by a website page.', 403);
-    if (req.file) throw new APIError('This image is used by a website page or revision. Upload a new image and select it in the section; replacing the shared file would also change published pages.', 409);
-  }
+export const protectWebsiteMediaReplacement: CollectionBeforeChangeHook = ({ req, operation, data }) => {
+  if (operation === 'update' && req.file) throw new APIError('Media files are version-safe and cannot be overwritten. Upload a new image and select it in the page section; saved revisions keep their original image.', 409);
   return data;
 };
-export const protectWebsiteMediaDelete: CollectionBeforeDeleteHook = async ({ req, id }) => {
-  if ((await usedOn(req, id)).length) throw new APIError('This image is used by a website page, draft, or revision. Remove those references before deleting it.', 409);
+export const protectWebsiteMediaDelete: CollectionBeforeDeleteHook = () => {
+  // Do not race a simultaneous draft/page save or erase bytes needed by a revision.
+  // Storage garbage collection is a separate audited maintenance operation, not a CMS user action.
+  throw new APIError('Media deletion is disabled to protect website drafts and revisions. Swap the image in its section instead.', 409);
 };

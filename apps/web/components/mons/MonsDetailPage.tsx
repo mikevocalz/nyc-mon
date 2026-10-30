@@ -1,3 +1,7 @@
+import { copyFor, sectionFor, sectionText } from '@acme/content/site-content';
+import { PageSections, originalLayout, type PageProps, type WebsitePageProps } from '../cms/PageContent';
+import { placedArt } from '../cms/art';
+import { placedMonArt, monDetailCopy } from './cms';
 import { breakpoints } from '@acme/theme';
 import { LinkButton, SkylineDivider, TONE_CLASSES } from '@acme/ui';
 import { Article, Figure, Heading, Link, List, ListItem, Paragraph, Section, Text } from '@acme/ui/html';
@@ -25,11 +29,14 @@ const NUMERAL_TEXT = { orange: 'text-orange-600', royal: 'text-royal-500', leaf:
  * behind it drifts the other way, so the Mon reads as standing in front of
  * its number (`mpx-hero-*`, desktop only).
  */
-function Hero({ starter }: { starter: MonsStarter }) {
-  const copy = W02_COPY.detail;
-  const a = monsArt(starter.slot);
+function Hero({ starter, page }: { starter: MonsStarter } & PageProps) {
+  const cms = sectionFor(page, 'hero');
+  const labels = copyFor(cms, { name: starter.babyName, bloodline: starter.bloodline, eggName: starter.eggName, cultureNote: starter.cultureNote ?? '' }, `cards.${starter.slot}`);
+  const conceptArt = sectionText(cms, 'conceptArt', W02_COPY.conceptArt);
+  const copy = monDetailCopy(page, 'hero');
+  const a = placedMonArt(cms, starter.slot);
   const t = TONE_CLASSES[a.tone];
-  const words = starter.babyName.split(' ');
+  const words = labels.name.split(' ');
   return (
     <Section
       aria-labelledby={`w02-${starter.slug}-title`}
@@ -84,7 +91,7 @@ function Hero({ starter }: { starter: MonsStarter }) {
             className="relative m-0 aspect-[4/5] w-full overflow-hidden border-2 border-ink-800 bg-ink-900 sm:aspect-[5/4] lg:aspect-square"
           >
             <ArtFill entry={a.baby} drift="mpx-hero-portrait-far" eager />
-            <ConceptCaption />
+            <ConceptCaption label={conceptArt} />
           </Figure>
         </View>
       </View>
@@ -100,9 +107,12 @@ function Hero({ starter }: { starter: MonsStarter }) {
  * the starter's line on the slot tone's face. Phones read board, egg,
  * street, line.
  */
-function Dossier({ starter }: { starter: MonsStarter }) {
-  const copy = W02_COPY.detail;
-  const a = monsArt(starter.slot);
+function Dossier({ starter, page }: { starter: MonsStarter } & PageProps) {
+  const cms = sectionFor(page, 'dossier');
+  const labels = copyFor(cms, { name: starter.babyName, bloodline: starter.bloodline, eggName: starter.eggName, cultureNote: starter.cultureNote ?? '' }, `cards.${starter.slot}`);
+  const conceptArt = sectionText(cms, 'conceptArt', W02_COPY.conceptArt);
+  const copy = monDetailCopy(page, 'dossier');
+  const a = placedMonArt(cms, starter.slot);
   const t = TONE_CLASSES[a.tone];
   const blurb = copy.blurb[starter.slug];
   return (
@@ -110,7 +120,7 @@ function Dossier({ starter }: { starter: MonsStarter }) {
       <View className="gap-6 lg:grid lg:grid-cols-12 lg:gap-6">
         <View id="mfx-dossier-board" className="min-w-0 gap-8 bg-signage-black px-6 py-8 md:px-10 md:py-10 lg:col-span-8 lg:row-start-1">
           <View className="gap-3">
-            <Text className={`text-type-tag font-extrabold uppercase ${t.text}`}>{starter.bloodline}</Text>
+            <Text className={`text-type-tag font-extrabold uppercase ${t.text}`}>{labels.bloodline}</Text>
             <Heading level={2} id="w02-line-title" className="my-0 font-display text-display-md uppercase leading-heading text-signage-white md:text-display-lg md:leading-heading">
               {copy.lineTitle}
             </Heading>
@@ -146,11 +156,11 @@ function Dossier({ starter }: { starter: MonsStarter }) {
         >
           <Figure className="relative m-0 aspect-[4/5] w-full overflow-hidden bg-ink-900 sm:aspect-[3/2] lg:aspect-[4/5]">
             <ArtFill entry={a.egg} />
-            <ConceptCaption />
+            <ConceptCaption label={conceptArt} />
           </Figure>
           <View className="gap-3 border-t-2 border-ink-950 px-6 pb-7 pt-5">
             <Heading level={3} id="w02-egg-title" className="my-0 font-display text-display-sm uppercase leading-heading text-text">
-              {starter.eggName}
+              {labels.eggName}
             </Heading>
             <Paragraph className="my-0 text-base leading-7 text-text-secondary">{copy.eggBody(starter.eggName, starter.babyName)}</Paragraph>
           </View>
@@ -167,7 +177,7 @@ function Dossier({ starter }: { starter: MonsStarter }) {
         ) : null}
 
         {starter.cultureNote ? (
-          <Paragraph className="my-0 text-sm leading-6 text-text-muted lg:col-span-12">{starter.cultureNote}</Paragraph>
+          <Paragraph className="my-0 text-sm leading-6 text-text-muted lg:col-span-12">{labels.cultureNote}</Paragraph>
         ) : null}
       </View>
     </Section>
@@ -179,10 +189,12 @@ function Dossier({ starter }: { starter: MonsStarter }) {
  * line, same picture): the egg in its case with the crack lit, then the
  * site's one call to action.
  */
-function HatchBand() {
-  const copy = W02_COPY.detail;
+function HatchBand({ page }: PageProps) {
+  const cms = sectionFor(page, 'hatch');
+  const conceptArt = sectionText(cms, 'conceptArt', W02_COPY.conceptArt);
+  const copy = monDetailCopy(page, 'hatch');
   const [lead, payoff] = copy.hatchTitle;
-  const picture = hatchArt(`(min-width: ${breakpoints.xl}) 80rem, 100vw`);
+  const picture = placedArt(cms, 'hatch', hatchArt(`(min-width: ${breakpoints.xl}) 80rem, 100vw`));
   return (
     <Section aria-labelledby="w02-hatch-title" id="trg-hatch" className="scheme-dark w-full bg-ink-950">
       <View className="h-1 w-full bg-orange-500" aria-hidden />
@@ -199,7 +211,7 @@ function HatchBand() {
         </Heading>
         <Figure id="mfx-hatch-art" className="relative m-0 aspect-[4/5] w-full overflow-hidden bg-ink-900 sm:aspect-[3/2] md:aspect-[21/9]">
           <ArtFill entry={picture} drift="mpx-hatch-art-mid" />
-          <ConceptCaption />
+          <ConceptCaption label={conceptArt} />
         </Figure>
         <View id="mfx-hatch-cta" className="gap-6 md:flex-row md:items-center md:justify-between">
           <Paragraph className="my-0 font-display text-2xl uppercase leading-heading text-ink-50 md:text-3xl">{copy.hatchClosing}</Paragraph>
@@ -211,9 +223,12 @@ function HatchBand() {
 }
 
 /** One of the other starters as a link card: portrait, number behind the name, Bloodline. */
-function OtherCard({ starter, index }: { starter: MonsStarter; index: number }) {
-  const copy = W02_COPY.index;
-  const a = monsArt(starter.slot);
+function OtherCard({ starter, index, page }: { starter: MonsStarter; index: number } & PageProps) {
+  const cms = sectionFor(page, 'others');
+  const labels = copyFor(cms, { name: starter.babyName, bloodline: starter.bloodline, eggName: starter.eggName, cultureNote: starter.cultureNote ?? '' }, `cards.${starter.slot}`);
+  const conceptArt = sectionText(cms, 'conceptArt', W02_COPY.conceptArt);
+  const copy = copyFor(cms, W02_COPY.index);
+  const a = placedMonArt(cms, starter.slot);
   const t = TONE_CLASSES[a.tone];
   return (
     <ListItem id={`mfx-others-${index}`} className="min-w-0 md:flex-1">
@@ -224,16 +239,16 @@ function OtherCard({ starter, index }: { starter: MonsStarter; index: number }) 
       >
         <Figure className="relative m-0 aspect-square w-full shrink-0 overflow-hidden bg-ink-900 sm:w-1/2">
           <ArtFill entry={{ ...a.baby, sizes: `(min-width: ${breakpoints.md}) 20rem, 100vw` }} />
-          <ConceptCaption />
+          <ConceptCaption label={conceptArt} />
         </Figure>
         <View className="relative min-w-0 flex-1 justify-end gap-3 overflow-hidden border-t-2 border-ink-950 px-5 pb-6 pt-16 sm:border-l-2 sm:border-t-0">
           <Text aria-hidden className={`absolute -right-2 top-0 font-display text-[6rem] leading-none ${NUMERAL_TEXT[a.tone]}`}>
             {dexDigits(starter.dexId)}
           </Text>
           <DexChip dexId={starter.dexId} tone={a.tone} />
-          <Text className="relative font-display text-display-sm uppercase leading-heading text-text">{starter.babyName}</Text>
+          <Text className="relative font-display text-display-sm uppercase leading-heading text-text">{labels.name}</Text>
           <View className="flex-row items-center gap-2 border-l-4 border-ink-950 pl-3">
-            <Text className="text-base font-semibold text-text">{starter.bloodline}</Text>
+            <Text className="text-base font-semibold text-text">{labels.bloodline}</Text>
           </View>
           <Text className={`text-sm font-bold uppercase tracking-widest ${t.pageText}`}>{copy.cardLabel(starter.babyName)}</Text>
         </View>
@@ -242,8 +257,10 @@ function OtherCard({ starter, index }: { starter: MonsStarter; index: number }) 
   );
 }
 
-function Others({ starter }: { starter: MonsStarter }) {
-  const copy = W02_COPY.detail;
+function Others({ starter, page }: { starter: MonsStarter } & PageProps) {
+  const cms = sectionFor(page, 'others');
+  const conceptArt = sectionText(cms, 'conceptArt', W02_COPY.conceptArt);
+  const copy = monDetailCopy(page, 'others');
   const others = monsStarters().filter((s) => s.slug !== starter.slug);
   return (
     <Section aria-labelledby="w02-others-title" id="trg-others" className="mx-auto w-full max-w-screen-xl gap-8 px-4 py-16 sm:px-6 md:py-24 lg:px-8">
@@ -255,7 +272,7 @@ function Others({ starter }: { starter: MonsStarter }) {
       </View>
       <List className="m-0 list-none gap-6 p-0 md:flex-row">
         {others.map((other, i) => (
-          <OtherCard key={other.slug} starter={other} index={i} />
+          <OtherCard page={page} key={other.slug} starter={other} index={i} />
         ))}
       </List>
     </Section>
@@ -269,18 +286,14 @@ function Others({ starter }: { starter: MonsStarter }) {
  * one call to action, then the other two starters. Server HTML; MonsMotion
  * arms the Kinetrell reveals after hydration.
  */
-export function MonsDetailPage({ starter }: { starter: MonsStarter }) {
+export function MonsDetailPage({ starter, page, embedOrigins, siteOrigin }: { starter: MonsStarter } & WebsitePageProps) {
   const a = monsArt(starter.slot);
-  return (
-    <>
-      <MonsMotion />
-      <View className="w-full flex-1 bg-bg">
-        <Hero starter={starter} />
-        <SkylineDivider district={a.district} seed={starter.slot * 5} size="md" still />
-        <Dossier starter={starter} />
-        <HatchBand />
-        <Others starter={starter} />
-      </View>
-    </>
-  );
+  const sections = {
+    hero: <Hero starter={starter} page={page} />,
+    skyline: <SkylineDivider district={a.district} seed={starter.slot * 5} size="md" still />,
+    dossier: <Dossier starter={starter} page={page} />,
+    hatch: <HatchBand page={page} />,
+    others: <Others starter={starter} page={page} />,
+  };
+  return <>{originalLayout(page, Object.keys(sections)) ? <MonsMotion /> : null}<View className="w-full flex-1 bg-bg"><PageSections page={page} embedOrigins={embedOrigins} siteOrigin={siteOrigin} sections={sections} /></View></>;
 }
