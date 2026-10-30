@@ -261,8 +261,8 @@ describe('selectors', () => {
 
 describe('model slots', () => {
   it('ship one empty slot per bloodline × stage', () => {
-    assert.equal(MON_MODEL_SLOTS.length, 3 * 5);
-    assert.deepEqual([...new Set(MON_MODEL_SLOTS.map((slot) => slot.bloodlineId))], ['F01', 'F02', 'F12']);
+    assert.equal(MON_MODEL_SLOTS.length, 4 * 5);
+    assert.deepEqual([...new Set(MON_MODEL_SLOTS.map((slot) => slot.bloodlineId))], ['F01', 'F02', 'F12', 'F04']);
     for (const slot of MON_MODEL_SLOTS) {
       assert.equal(slot.glbUri, null);
       assert.ok(Object.values(slot.clips).every((clip) => clip === null));

@@ -30,6 +30,7 @@ import { eggSpeciesModel } from '../egg/egg-source';
 import { StageControls } from '../egg/StageControls';
 import { StageLoader } from '../egg/StageLoader';
 import { isAccessibilityTextSize } from '../egg/window-layout';
+import { useEggVoice } from '../voice/use-mon-voice';
 import { hatchCopy } from './copy';
 import { detailLine, incubationProgress, incubationView, minutesLeft, timeLine } from './incubation-model';
 
@@ -90,7 +91,9 @@ interface LocalState {
  * readiness is the hatch state ticked to the minute clock, not persisted
  * (Law 6); the only commit is M12's `open`. "Keep it warm" is haptic and
  * announced only, with no sim effect (a reviewer should reject any
- * `applyCare` or bond change wired to it).
+ * `applyCare` or bond change wired to it). The egg answers a warm with a
+ * babble from inside the shell, and babbles now and then on its own
+ * (Decision 32); its babble takes the caption line while it shows.
  */
 export function IncubatingScreen({ pending }: { pending: PendingEgg }) {
   const router = useRouter();
@@ -99,6 +102,7 @@ export function IncubatingScreen({ pending }: { pending: PendingEgg }) {
   const nowMs = useMinuteClock((s) => s.nowMs);
   const { egg, hatch } = pending;
   const id = eggIdentity(egg);
+  const voice = useEggVoice(egg);
   // Fetch and parse the hatch GLB while the egg incubates, so M12 starts on time.
   useEffect(() => {
     const asset = eggHatchAssetForSpecies(egg.speciesId);
@@ -183,6 +187,7 @@ export function IncubatingScreen({ pending }: { pending: PendingEgg }) {
 
   const warmStart = (haptic: () => void = haptics.warm) => {
     haptic();
+    voice.babble();
     const now = Date.now();
     const last = local.getState().lastWarmAnnounceMs;
     if (last === undefined || now - last >= WARM_ANNOUNCE_MS) {
@@ -235,7 +240,7 @@ export function IncubatingScreen({ pending }: { pending: PendingEgg }) {
   const detail = detailLine(view, id.eggName, egg.incubationEndsAt, nowMs);
   const eggLabel = hatchCopy(ready ? 'm11.egg.a11y.label.ready' : 'm11.egg.a11y.label', { eggName: id.eggName });
   const timeText = timeLine(view, egg.incubationEndsAt, nowMs);
-  const captionText = s.showCaption && view === 'counting' ? hatchCopy('m11.caption.counting') : '';
+  const captionText = voice.caption ?? (s.showCaption && view === 'counting' ? hatchCopy('m11.caption.counting') : '');
   const actionLabel = hatchCopy(ready ? 'm11.trackpad.open' : 'm11.trackpad.warm');
   const notifyRow = notifyRows[0];
   const notifyAction = notifyRow?.action;

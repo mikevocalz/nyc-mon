@@ -14,6 +14,7 @@ export type { BoroughName, EncounterTier, BloodlineEncounterProfile } from './bo
 export { hoodRattiBloodline, hoodRattiForms } from './hood-ratti.ts';
 export { bodegaBaddieeCeeBloodline, bodegaBaddieeCeeForms } from './bodega-cee.ts';
 export { yoteBloodline, yoteForms } from './yotes.ts';
+export { lanternFyeBloodline, lanternFyeForms } from './lanternfye.ts';
 export { bloodlineLabel, starterBloodlines, starterSpecies } from './starters.ts';
 export type { StarterBloodline } from './starters.ts';
 
@@ -46,7 +47,7 @@ const additionalBloodlines = additionalRefs.map((ref) => {
   return { bloodline: buildBloodline(ref, forms), forms };
 });
 
-/** Three starters first, followed by the other 15 complete Bloodlines. */
+/** Four starters first, followed by the other 14 complete Bloodlines. */
 export const bloodlines: readonly Bloodline[] = [
   ...starterBloodlines.map(({ bloodline }) => bloodline),
   ...additionalBloodlines.map(({ bloodline }) => bloodline),

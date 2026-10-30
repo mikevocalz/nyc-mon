@@ -15,6 +15,11 @@ type Story = StoryObj<typeof meta>;
 
 export const Visible: Story = {};
 
+/** The ops console's form error (surface="page"): body face, regular weight, on a page card. */
+export const PageSurface: Story = {
+  args: { surface: 'page', message: "That email and password don't match. Check both and try again." },
+};
+
 // Story state — zustand always (repo rule).
 const useErrorDemo = create<{ show: boolean; toggle: () => void }>((set) => ({
   show: true,

@@ -1,7 +1,7 @@
 import type { CollectionConfig, Validate } from 'payload';
 import { allSpecies, bloodlines } from '@acme/content';
 import { MON_LINGO_CATEGORIES } from '@acme/content/lingo';
-import { LIFECYCLE_STAGES, MON_MOODS } from '@acme/core';
+import { cleanBabbleInventory, LIFECYCLE_STAGES, MON_MOODS } from '@acme/core';
 import { invalidateMonLingo } from '../admin/console/v1/mon-lingo-cache.ts';
 import { STAFF_ROLES, staffRoles } from './access/roles.ts';
 
@@ -19,12 +19,39 @@ const knownBloodline: Validate<string | null | undefined> = (value) =>
   value === null || value === undefined || value === '' || BLOODLINE_IDS.has(value) ? true : 'Use a bloodlineId from the roster, such as F01.';
 
 /**
+ * A `babble` row's sound must be one the speech gate would use: lower-case
+ * letters (a syllable 1 to 5, a family or egg sound 2 to 10) and not on the
+ * gate's real-word list. The gate drops a bad row anyway; this tells the
+ * editor why instead of letting the row silently do nothing. Words the list
+ * does not know still need an editor's eye.
+ */
+export function validateBabbleSound(text: unknown, subcategory: unknown): true | string {
+  const sound = typeof text === 'string' ? text.trim().toLowerCase() : '';
+  if (subcategory === 'syllable') {
+    return /^[a-z]{1,5}$/.test(sound) && cleanBabbleInventory({ syllables: [sound], sounds: [] }).syllables.includes(sound)
+      ? true
+      : 'A babble syllable is 1 to 5 lower-case letters and never a real word (Decision 32).';
+  }
+  if (subcategory === 'family-sound' || subcategory === 'egg-sound') {
+    return cleanBabbleInventory({ syllables: [], sounds: [sound] }).sounds.includes(sound)
+      ? true
+      : 'A babble sound is 2 to 10 lower-case letters and never a real word (Decision 32).';
+  }
+  return 'A babble row needs subcategory syllable, family-sound or egg-sound.';
+}
+
+const babbleSound: Validate<string | null | undefined> = (value, { siblingData }) => {
+  const row = siblingData as { category?: unknown; subcategory?: unknown } | undefined;
+  return row?.category === 'babble' ? validateBabbleSound(value, typeof row.subcategory === 'string' ? row.subcategory.trim() : row.subcategory) : true;
+};
+
+/**
  * The Mon's lines and lingo live here (Mike, 2026-10-28: "all of this should
  * be in payload as far as the lines/lingo"). The rows in the categories below
  * are what the Mon's voice reads, served by `GET /v1/mon-lingo`; only
  * published (canon), active rows reach it. See packages/content/lingo/rows.ts.
  */
-const VOICE_CATEGORY_HELP = `Categories the Mon's voice reads: ${MON_LINGO_CATEGORIES.join(', ')}. mon-line: triggerText is the occasion (hello, first-words, hungry…), responseText the line, with speciesId and stage. pronunciation: canonicalText is the screen word, variants the other spellings, spokenForm what the voice says. stage-direction: variants are the keywords, spokenForm the audio tag.`;
+const VOICE_CATEGORY_HELP = `Categories the Mon's voice reads: ${MON_LINGO_CATEGORIES.join(', ')}. mon-line: triggerText is the occasion (hello, first-words, hungry…), responseText the line, with speciesId and stage. pronunciation: canonicalText is the screen word, variants the other spellings, spokenForm what the voice says. stage-direction: variants are the keywords, spokenForm the audio tag. babble: the wordless sounds an Egg and a Baby in its first 24 hours make (Decision 32); subcategory syllable, family-sound (with bloodlineId) or egg-sound, canonicalText the sound.`;
 
 export const LanguageLexicon: CollectionConfig = {
   slug: LANGUAGE_LEXICON_SLUG,
@@ -65,7 +92,7 @@ export const LanguageLexicon: CollectionConfig = {
         'style_rule',
       ],
     },
-    { name: 'canonicalText', type: 'text', required: true, index: true, maxLength: 220 },
+    { name: 'canonicalText', type: 'text', required: true, index: true, maxLength: 220, validate: babbleSound },
     { name: 'spokenForm', type: 'text', maxLength: 260 },
     { name: 'meaning', type: 'textarea', required: true },
     { name: 'category', type: 'text', required: true, index: true, maxLength: 120, admin: { description: VOICE_CATEGORY_HELP } },

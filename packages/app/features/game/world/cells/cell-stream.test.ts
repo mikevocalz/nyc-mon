@@ -255,6 +255,65 @@ test('a lazy local package keeps absolute stream bounds, decodes after ready, an
   stream.dispose();
 });
 
+test('a prefetch that reports by promise lets the canvas rest, then wakes it once on arrival; a failed one never wakes', async () => {
+  const f = externalFixture();
+  let ready = false;
+  let resolve!: (landed: boolean) => void;
+  const fetch = new Promise<boolean>((r) => { resolve = r; });
+  const polled = trianglePackage({
+    num: 9, bounds: Float64Array.from([-49000, 0, 49000, -48998, 1, 49002]),
+    attributes: {
+      position: { array: new Float32Array([24, -3, -24, 26, -3, -24, 24, -2, -22]), itemSize: 3, normalized: false },
+      color: { array: new Uint8Array(12).fill(255), itemSize: 4, normalized: true },
+    },
+    ready: () => ready,
+    prefetch: () => fetch,
+  });
+  let wakes = 0;
+  const stream = createCellStream(T, [], {
+    preset: preset({ residentRadiusM: 1000, evictAfterS: 0, stream: { msPerFrame: 1e9, uploadBytesPerFrame: 1e9 } }),
+    external: [{ template: f.template, spec: f.spec, packages: [polled] }],
+    wake: () => { wakes++; },
+  });
+  const camera = { x: -49000, y: 0, z: 49000 };
+  stream.prime(camera, K, 1000);
+  assert.equal(stream.stats.fetching, 1);
+  assert.equal(stream.update(camera, K, 1), false, 'bytes on their way through a promise do not hold the frame loop');
+  assert.equal(wakes, 0);
+  ready = true;
+  resolve(true);
+  await fetch;
+  await Promise.resolve();
+  assert.equal(wakes, 1, 'arrival asks for one frame');
+  assert.equal(stream.update(camera, K, 1.01), false);
+  assert.equal(cells(f.root).length, 1, 'the landed cell builds on that frame even inside the 0.25 s re-pick window');
+  stream.dispose();
+
+  const g = externalFixture();
+  const failed = Promise.resolve(false);
+  const lost = trianglePackage({
+    num: 10, bounds: Float64Array.from([-49000, 0, 49000, -48998, 1, 49002]),
+    attributes: {
+      position: { array: new Float32Array([24, -3, -24, 26, -3, -24, 24, -2, -22]), itemSize: 3, normalized: false },
+      color: { array: new Uint8Array(12).fill(255), itemSize: 4, normalized: true },
+    },
+    ready: () => false,
+    prefetch: () => failed,
+  });
+  let lostWakes = 0;
+  const s2 = createCellStream(T, [], {
+    preset: preset({ residentRadiusM: 1000, evictAfterS: 0, stream: { msPerFrame: 1e9, uploadBytesPerFrame: 1e9 } }),
+    external: [{ template: g.template, spec: g.spec, packages: [lost] }],
+    wake: () => { lostWakes++; },
+  });
+  s2.prime(camera, K, 1000);
+  await failed;
+  await Promise.resolve();
+  assert.equal(s2.update(camera, K, 1), false);
+  assert.equal(lostWakes, 0, 'a fetch that ends without bytes (no host, host down) never loops the canvas');
+  s2.dispose();
+});
+
 test('a layer with pin: false is not pinned by the landmark rule and evicts; the default layer stays pinned', () => {
   const pinnedLayer = detailLayer(2);
   const detail = detailLayer(2, new THREE.MeshStandardNodeMaterial());

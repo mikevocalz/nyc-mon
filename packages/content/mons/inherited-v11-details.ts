@@ -2,7 +2,7 @@ import { type InheritedDexDetail, starterDexDetails } from './inherited-v11-star
 
 export type { InheritedDexDetail } from './inherited-v11-starters.ts';
 
-/** Records for the 15 non-starter Bloodlines; the starters live in inherited-v11-starters.ts. */
+/** Records for the 14 non-starter Bloodlines; the starters live in inherited-v11-starters.ts. */
 const otherDexDetails: Readonly<Partial<Record<number, InheritedDexDetail>>> = {
   "15": {
     "legacyTypeNames": [],
@@ -43,47 +43,6 @@ const otherDexDetails: Readonly<Partial<Record<number, InheritedDexDetail>>> = {
     "evolutionUnlock": {
       "itemName": "Skyline Orb",
       "mastery": "Rally-point trial"
-    }
-  },
-  "20": {
-    "legacyTypeNames": [],
-    "scaleTargetDescription": "Hand-held collectible scale; absolute dimensions are a design target to set at art lock, not a measured biological egg.",
-    "loreSummary": "Signal Egg — dormant potential. A wingless spotted hopper learns to turn scarlet electricity into a readable relay network.",
-    "evolutionUnlock": null
-  },
-  "21": {
-    "legacyTypeNames": [
-      "Electric"
-    ],
-    "scaleTargetDescription": "Small cuddle-scale character; exaggerate head/body ratio without shrinking the finished adult costume.",
-    "loreSummary": "Fye Dot — first trust. A wingless spotted hopper learns to turn scarlet electricity into a readable relay network.",
-    "evolutionUnlock": null
-  },
-  "22": {
-    "legacyTypeNames": [
-      "Electric"
-    ],
-    "scaleTargetDescription": "Intermediate adventure scale; establish a measured concept-sheet height before final rigging.",
-    "loreSummary": "Flicker Fye — learning independence. A wingless spotted hopper learns to turn scarlet electricity into a readable relay network.",
-    "evolutionUnlock": null
-  },
-  "23": {
-    "legacyTypeNames": [
-      "Electric"
-    ],
-    "scaleTargetDescription": "Companion scale; use a shared ground line against Baby, Small and Max. Exact dimensions remain design targets.",
-    "loreSummary": "Scarlet Skippa — capable companion. A wingless spotted hopper learns to turn scarlet electricity into a readable relay network.",
-    "evolutionUnlock": null
-  },
-  "24": {
-    "legacyTypeNames": [
-      "Electric"
-    ],
-    "scaleTargetDescription": "0.8 m body-length concept with about 1.8 m maximum wing span; scale is provisional.",
-    "loreSummary": "LanternFye — mastered identity. A wingless spotted hopper learns to turn scarlet electricity into a readable relay network.",
-    "evolutionUnlock": {
-      "itemName": "Redline Orb",
-      "mastery": "Red-nymph landing trial"
     }
   },
   "25": {

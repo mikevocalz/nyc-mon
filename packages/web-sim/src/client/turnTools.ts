@@ -50,13 +50,16 @@ const pct = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? `${Ma
  */
 export function monStateLine(result: { readonly structuredContent?: unknown; readonly isError?: boolean } | undefined, ageMs: number): string | null {
   if (!result || result.isError || ageMs < 0 || ageMs > STATE_MAX_AGE_MS) return null;
-  const sc = result.structuredContent as { mon?: { stage?: unknown; speciesId?: unknown; name?: unknown }; care?: Record<string, unknown>; mood?: unknown; needs?: unknown } | undefined;
+  const sc = result.structuredContent as { mon?: { stage?: unknown; speciesId?: unknown; name?: unknown; voice?: { voiceStage?: unknown } | null }; care?: Record<string, unknown>; mood?: unknown; needs?: unknown } | undefined;
   if (!sc?.mon || typeof sc.mood !== 'string') return null;
   const parts: string[] = [];
   // The skill names the form from the dex id (its roster table), so the line carries it.
   if (typeof sc.mon.speciesId === 'string') parts.push(sc.mon.speciesId);
   if (typeof sc.mon.name === 'string' && sc.mon.name) parts.push(`named ${sc.mon.name}`);
   if (typeof sc.mon.stage === 'string') parts.push(sc.mon.stage);
+  // Babble or a few words (Decision 32): the model writes to it, and the server's gate may only lower speech by it.
+  const voiceStage = sc.mon.voice?.voiceStage;
+  if (voiceStage === 'baby-talk' || voiceStage === 'limited') parts.push(`voice ${voiceStage}`);
   parts.push(`mood ${sc.mood}`);
   const care = sc.care;
   if (care) {

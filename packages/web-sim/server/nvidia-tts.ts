@@ -1,4 +1,5 @@
 import { createRequire } from 'node:module';
+import type { MonRoster, MonRosterLookup } from './mon-roster.ts';
 import type { ModelAuthCheck } from './model-auth.ts';
 import type { MonLingoSource } from './mon-lingo-source.ts';
 import { createRateLimiter } from './model.ts';
@@ -81,6 +82,8 @@ export interface NvidiaTtsDeps {
   readonly log?: (line: string) => void;
   /** The served lingo, read on behalf of the signed-in Caller. Omitted: the bundled fallback. */
   readonly lingo?: MonLingoSource;
+  /** The signed-in Caller's Mons from /v1 (mon-roster.ts createV1MonRoster): the voice stage comes from here. */
+  readonly roster: (callerId: string, claim?: Parameters<MonRosterLookup>[1]) => Promise<MonRoster>;
 }
 
 const LINEAGE = /^[a-z0-9-]+\/[a-z]+\/\d+$/;
@@ -134,6 +137,8 @@ export function createNvidiaTts(env: NvidiaEnv, deps: NvidiaTtsDeps): (req: Requ
         return actor;
       },
       rateLimit: () => limit(owner ?? `unauthenticated:${clientKey}`),
+      // Auth runs first, so `owner` is set by the time the handler asks.
+      roster: async (_authorization, claim) => (owner === undefined ? null : deps.roster(owner, claim)),
       ...(pitchShift === undefined ? {} : { pitchShift }),
       ...(deps.lingo === undefined ? {} : { lingo: async () => (owner === undefined ? deps.lingo!.latest() : deps.lingo!.get(owner)) }),
     });

@@ -94,7 +94,7 @@ The burst is one rise and fall of `orange-300` at ≤ 60% opacity (≤ 40% in th
 - No turned back, step away or "no" in the hesitate performance.
 - No Mon name before M09; the plate shows the Baby form name only (Decision #6).
 - No pronoun for the Mon (PS-005).
-- No speech or baby-talk from the Baby (Q32 open); species sounds only, when audio lands.
+- No words from the new Baby: it is on its first day, so it babbles (Decision 32), in its family sound, when audio lands.
 - No `evolve` intent and no evolution language (Law 7).
 - No network spinner during the show. The server confirmation is never awaited.
 - No auto-advance from complete to Home: the Caller leaves when ready.

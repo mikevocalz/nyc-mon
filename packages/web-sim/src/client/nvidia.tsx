@@ -18,7 +18,8 @@ import { beginSignIn, completeSignIn, connectMcp } from './mcp.ts';
 import { createAuthorize, bearer, sdkRefresh } from './freshToken.ts';
 import { httpModelClient } from './modelClient.ts';
 import { safeStorage } from './session.ts';
-import { createTurnToolCaller } from './turnTools.ts';
+import { createTurnToolCaller, monStateLine, withMonState } from './turnTools.ts';
+import { startAmbientBabble } from './ambientBabble.ts';
 import { createCompanionVoice } from './companionVoice.ts';
 import { monSpeechPort } from './monSpeechPort.ts';
 import { canListen, clearSessionVoice, listen, onPlayback, playbackStartedAt, setSessionVoice, stopSpeaking, type Listening } from './speech.ts';
@@ -69,7 +70,7 @@ function Companion({ config }: { config:Config }) {
   const store = useInstanceStore<CompanionState>(initialCompanionState);
   const state = useStore(store);
   // Per-mounted-page protocol handles, not UI state. Visible state stays in the instance store.
-  const runtime = useInstanceStore<CompanionRuntime>(() => ({ session:null,history:[],abort:null }));
+  const runtime = useInstanceStore<CompanionRuntime>(() => ({ session:null,history:[],abort:null,monStatus:null }));
   const provider = useMemo(() => {
     const storage = safeStorage('session');
     // boot() checks storage before rendering; this stays as a guard.
@@ -171,6 +172,11 @@ function Companion({ config }: { config:Config }) {
     return () => { window.removeEventListener('keydown',down);window.removeEventListener('keyup',up); };
   },[controller,store]);
 
+  /** Keeps the newest result that carries the Mon: the next turn sends it as the "[Mon now …]" line. */
+  const rememberMon = useCallback((result:CallToolResult) => {
+    if (monStateLine(result,0) !== null) runtime.setState({ monStatus:{ result,at:Date.now() } });
+  },[runtime]);
+
   const memoryRequest = useCallback(async (method:'GET'|'PUT'|'DELETE') => {
     if (store.getState().busy) return;
     const current=store.getState();
@@ -215,14 +221,40 @@ function Companion({ config }: { config:Config }) {
       // The same status read draws the Mon card (art, name, meters) before the Caller says anything.
       void voice.prime(async () => {
         const result=(await connected.client.callTool({ name:'get_mon_status',arguments:{} })) as CallToolResult;
-        if (!disposed) store.setState((st) => ({ mon:mergeMonCard(st.mon,result) }));
+        if (!disposed) { store.setState((st) => ({ mon:mergeMonCard(st.mon,result) }));rememberMon(result); }
         return result;
       });
       store.setState({ connected:true,status:'Signed in. Your Mon and its memory belong to this account.' });
       void memoryRequest('GET');
     })().catch((error:unknown) => { if (!disposed) showError(error); });
     return () => { disposed=true;runtime.getState().abort?.abort();void runtime.getState().session?.close();runtime.setState({ session:null }); };
-  },[provider,config.mcpUrl,store,showError,runtime,memoryRequest,voice]);
+  },[provider,config.mcpUrl,store,showError,runtime,memoryRequest,voice,rememberMon]);
+
+  // An Egg, or a Baby in its first day, babbles now and then on its own (ambientBabble.ts): a scripted line, no model call.
+  // This page has no mute control; a hidden tab counts as muted. `babbling` covers the TTS fetch, before any clip plays,
+  // so a second line never starts on top; the caption comes from the sentence the voice actually starts.
+  const babbling = useRef(false);
+  useEffect(() => {
+    if (!state.connected) return;
+    return startAmbientBabble({
+      voice:() => voice.current(),hatchedAt:() => voice.hatchedAt(),
+      quiet:() => { const st=store.getState();return babbling.current || st.busy || st.voice.phase !== 'off' || playbackStartedAt() !== null || handles.getState().speakingLine !== null; },
+      muted:() => document.visibilityState !== 'visible',
+      say:(line) => {
+        babbling.current=true;
+        void voice.speak(line,authorize,(sentence) => {
+          // The Caller started talking while the clip was being fetched: drop the babble instead of playing over them.
+          if (store.getState().busy || store.getState().voice.phase !== 'off') { voice.stop();return; }
+          push({ who:'Mon',text:sentence });
+        }).finally(() => { babbling.current=false; });
+      },
+    });
+  },[state.connected,store,voice,handles,push,authorize]);
+
+  // Talk, a conversation or a turn cuts an ambient babble off (barge-in does the same for a reply).
+  useEffect(() => {
+    if (babbling.current && (state.busy || state.voice.phase !== 'off')) { voice.stop();babbling.current=false; }
+  },[state.busy,state.voice.phase,voice]);
 
   /** One turn, typed or spoken. The reply is spoken sentence by sentence and captioned as each sentence starts. */
   async function runTurn(question:string, source:'typed'|'voice', startedAt:number) {
@@ -238,12 +270,14 @@ function Companion({ config }: { config:Config }) {
     try {
       const tools=mcpToolsToClaude(connection.tools.filter((tool) => toolsAllowed.has(tool.name))).tools;
       const result=await runAgentTurn({ model,mcp:createTurnToolCaller({ client:connection.client,signal:controller.signal }),
-        tools,history:runtime.getState().history,userText:question,signal:controller.signal,maxSteps:6,
+        tools,history:runtime.getState().history,signal:controller.signal,maxSteps:6,
+        // The Mon's state rides along, so the server knows which Mon talks and how much it may say (voice-stage-gate.ts).
+        userText:withMonState(question,monLineNow()),
         onEvent:(event) => {
           if (controller.signal.aborted) return;
           if (event.type!=='tool-result') return;
           // A result that carries the Mon sets the voice before its reply is spoken.
-          voice.learn(event.result);push(toolResultLine(event.name,event.result));
+          voice.learn(event.result);rememberMon(event.result as CallToolResult);push(toolResultLine(event.name,event.result));
           // Care results carry the Mon and its meters: the card follows the server, never the model's account.
           store.setState((st) => ({ mon:mergeMonCard(st.mon,event.result as CallToolResult) }));
         } });
@@ -263,6 +297,10 @@ function Companion({ config }: { config:Config }) {
     }
     finally { if (!controller.signal.aborted) store.setState({ busy:false }); }
   }
+  function monLineNow() {
+    const status=runtime.getState().monStatus;
+    return status ? monStateLine(status.result,Date.now()-status.at) : null;
+  }
   function finishTurn(turn:TurnRecord, outcome:TurnRecord['outcome']) {
     if (turn.outcome!=='pending') return;
     turn.outcome=outcome;turn.doneAt=performance.now();
@@ -278,7 +316,7 @@ function Companion({ config }: { config:Config }) {
     voice.reset();runtime.getState().abort?.abort();void runtime.getState().session?.close();runtime.setState({ session:null });
     // Revoke at the server (RFC 7009) as well as forgetting it here: a copied refresh token stops working too.
     void revokeRefreshToken({ issuer:config.issuer,clientId:config.clientId,refreshToken:(provider.tokens() as { refresh_token?:string } | undefined)?.refresh_token });
-    provider.signOut();runtime.setState({ history:[] });
+    provider.signOut();runtime.setState({ history:[],monStatus:null });
     store.setState({ ...initialCompanionState(),status:'Signed out. This page no longer holds your conversation or preferences.' });
   }
   function exportMemory() {

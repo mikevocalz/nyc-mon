@@ -24,10 +24,19 @@ if (process.env.NODE_ENV === 'production' && !configured) {
   throw new Error('Bunny Storage must be configured in production.');
 }
 
-const storageHost = (region?: string) =>
-  region && region !== 'default'
-    ? `https://${region}.storage.bunnycdn.com`
+// Falkenstein is Bunny's main region and has no subdomain: `de.storage.bunnycdn.com`
+// does not resolve, so a zone set up there must use the bare host. Accept a pasted
+// hostname too, since the Bunny dashboard shows the region as one.
+export const storageHost = (region?: string) => {
+  const code = (region ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, '')
+    .replace(/\.?storage\.bunnycdn\.com\/?$/, '');
+  return code && !['default', 'de', 'falkenstein'].includes(code)
+    ? `https://${code}.storage.bunnycdn.com`
     : 'https://storage.bunnycdn.com';
+};
 
 const objectURL = (filename: string) => {
   const base = process.env.BUNNY_CDN_URL!.replace(/\/$/, '');
@@ -66,8 +75,8 @@ const getIncomingFiles = (
     },
   ];
 
-  if (data.sizes) {
-    for (const [sizeName, resized] of Object.entries(data.sizes)) {
+  if (data.variants) {
+    for (const [sizeName, resized] of Object.entries(data.variants)) {
       const buffer = uploadSizes?.[sizeName];
       if (buffer && resized?.mimeType && resized.filename) {
         files.push({
@@ -126,8 +135,8 @@ const filenamesFor = (doc: Partial<FileData>) => {
   const filenames: string[] = [];
   if (typeof doc.filename === 'string') filenames.push(doc.filename);
 
-  if (doc.sizes && typeof doc.sizes === 'object') {
-    for (const size of Object.values(doc.sizes)) {
+  if (doc.variants && typeof doc.variants === 'object') {
+    for (const size of Object.values(doc.variants)) {
       if (size?.filename && typeof size.filename === 'string') {
         filenames.push(size.filename);
       }
@@ -158,6 +167,8 @@ export const bunnyMediaAfterChange: CollectionAfterChangeHook<
       id: doc.id,
       data: { bunnyUrl: mainURL },
       depth: 0,
+      // bunnyUrl is read-only to people (field access update: false); this write is the server's own.
+      overrideAccess: true,
       req,
     });
   } finally {
@@ -226,10 +237,10 @@ export const withBunnyMediaURLs = <T extends BunnyReadableMedia>(doc: T): T => {
   const publicURL = doc.bunnyUrl;
   if (typeof publicURL !== 'string' || publicURL.length === 0) return doc;
 
-  const sizes =
-    doc.sizes && typeof doc.sizes === 'object'
+  const variants =
+    doc.variants && typeof doc.variants === 'object'
       ? Object.fromEntries(
-          Object.entries(doc.sizes).map(([name, size]) => {
+          Object.entries(doc.variants).map(([name, size]) => {
             if (
               size &&
               typeof size === 'object' &&
@@ -241,13 +252,13 @@ export const withBunnyMediaURLs = <T extends BunnyReadableMedia>(doc: T): T => {
             return [name, size];
           }),
         )
-      : doc.sizes;
+      : doc.variants;
 
   return {
     ...doc,
     url: publicURL,
     ...(doc.mimeType?.startsWith('image/') ? { thumbnailURL: publicURL } : {}),
-    ...(sizes ? { sizes } : {}),
+    ...(variants ? { variants } : {}),
   };
 };
 

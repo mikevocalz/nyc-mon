@@ -23,7 +23,7 @@ export function sourceNearPackage(
 ): CellPackage {
   let file: Uint8Array | null = null;
   let arrays: NearArrays | null = null;
-  let pending = false;
+  let pending: Promise<boolean> | null = null;
   const get = () => {
     if (!file) throw new Error(`vd-port: near cell ${info.key} built before its bytes`);
     return (arrays ??= decodeNearCell(file, info.cx, info.cz, coordinateFrame));
@@ -51,11 +51,11 @@ export function sourceNearPackage(
     release() { arrays = null; },
     ready: () => file !== null,
     prefetch() {
-      if (file || pending) return;
-      pending = true;
-      void vdCellFetch(sourceKey ?? `${level}/${info.key}`, bundled)
-        .then((got) => { file = got instanceof Uint8Array ? got : got ? new Uint8Array(got) : null; })
-        .finally(() => { pending = false; });
+      if (file) return;
+      if (pending) return pending;
+      return (pending = vdCellFetch(sourceKey ?? `${level}/${info.key}`, bundled)
+        .then((got) => { file = got instanceof Uint8Array ? got : got ? new Uint8Array(got) : null; return file !== null; })
+        .finally(() => { pending = null; }));
     },
   };
 }

@@ -46,7 +46,7 @@ export function hostNote(lingo: MonLingo): string {
     stageDirectionNote(lingo),
     'When a tool result has an interactive view, the host shows it on screen next to your reply.',
     'A user turn may end with a line "[Presence: <name> is speaking.]". The host adds it from its presence sensor, never the person, and care tools already act as that person. Treat it as who is speaking. Without it, the Caller is speaking.',
-    'A user turn may also end with a line "[Mon now, <n> s ago: …]". The host adds it from its own get_mon_status or care result, and the card on screen already shows it. It is the current state: for chat, greetings and banter, use its mood and reply at once, without calling check_on_mon or get_mon_status first. Call a tool when the person asks for something the line does not answer (the card, exact meters, the journal, presence) or for care.',
+    'A user turn may also end with a line "[Mon now, <n> s ago: …]". The host adds it from its own get_mon_status or care result, and the card on screen already shows it. It is the current state: for chat, greetings and banter, use its mood and reply at once, without calling check_on_mon or get_mon_status first. Call a tool when the person asks for something the line does not answer (the card, exact meters, the journal, presence) or for care. "voice baby-talk" on the line means the Mon only babbles, with no words at all; "voice limited" means its family sound and at most two words.',
   ].join('\n');
 }
 

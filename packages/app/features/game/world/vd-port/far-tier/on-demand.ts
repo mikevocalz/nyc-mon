@@ -29,6 +29,8 @@ interface FarFileState {
   file: U8 | null;
   tile: CtlTile | null;
   pending: boolean;
+  /** The fetch in flight (resolves true once the bytes are in), handed back to the streamer by prefetch. */
+  fetch: Promise<boolean> | null;
   /** Landmark ground colours/uv are synthesized at decode and kept here between the two reads. */
   aux: Map<string, U8 | Float32Array>;
   /** False: drop the bytes on release (a fetched chunk re-reads from the disk cache). True: keep (the eager set). */
@@ -39,7 +41,7 @@ const states = new Map<string, FarFileState>();
 
 const stateOf = (key: string): FarFileState => {
   let s = states.get(key);
-  if (!s) states.set(key, (s = { file: null, tile: null, pending: false, aux: new Map(), keep: false }));
+  if (!s) states.set(key, (s = { file: null, tile: null, pending: false, fetch: null, aux: new Map(), keep: false }));
   return s;
 };
 
@@ -51,8 +53,9 @@ const eager = (file: string): U8 | null => {
   return e.chunks.get(file) ?? null;
 };
 
-const ensure = (st: FarFileState, file: string): void => {
-  if (st.file || st.pending) return;
+const ensure = (st: FarFileState, file: string): Promise<boolean> | void => {
+  if (st.file) return;
+  if (st.pending) return st.fetch ?? undefined;
   const e = eager(file);
   if (e) {
     st.file = e;
@@ -60,13 +63,15 @@ const ensure = (st: FarFileState, file: string): void => {
     return;
   }
   st.pending = true;
-  void vdCellFetch(`far/${file}`, vdFarBundled(file))
+  return (st.fetch = vdCellFetch(`far/${file}`, vdFarBundled(file))
     .then((got) => {
       st.file = got ? (got instanceof Uint8Array ? got : new Uint8Array(got)) : null;
+      return st.file !== null;
     })
     .finally(() => {
       st.pending = false;
-    });
+      st.fetch = null;
+    }));
 };
 
 const tileOf = (st: FarFileState, file: string): CtlTile => {
@@ -135,7 +140,7 @@ const base = (st: FarFileState, file: string): Pick<CellPackage, 'ready' | 'pref
   ready: () => st.file !== null || eager(file) !== null,
   prefetch() {
     if (st.keep) return;
-    ensure(st, file);
+    return ensure(st, file);
   },
   release() {
     release(st);

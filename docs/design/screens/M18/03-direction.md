@@ -52,3 +52,7 @@ Month change: `motion-step` slide 24 pt; reduced: cross-fade. New entry since la
 - No visual difference between a missed past day and a future day.
 - No entry for needs-attention, food requests, or anything that records the Caller being away.
 - No later form names, no evolution teasers.
+
+## Amendment 2026-10-29
+
+Canon Decision #34 adds care mistakes. They are never logged here (D20e), and neither are false calls, colds or missed bedtimes. The Journal may record positive firsts the new care adds (first clean-up, first boundary, over a first cold) when lane (c) wires them; that is optional.

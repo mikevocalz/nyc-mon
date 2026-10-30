@@ -1,8 +1,8 @@
-import type { MonLingo, MonVoicePort } from '@acme/content/voice';
+import type { MonLingo } from '@acme/content/voice';
 import { AudioContext, AudioManager, type AudioBuffer, type SessionOptions } from 'react-native-audio-api';
 import { APP_ORIGIN } from '@acme/auth';
 import { AUTH_BASE_URL } from '../onboarding/auth';
-import type { MonVoiceSubject } from './mon-speaker';
+import type { MonVoiceSubject, SpeakerPort } from './mon-speaker';
 import { requestMonVoice } from './mon-voice-request';
 
 /**
@@ -23,12 +23,19 @@ import { requestMonVoice } from './mon-voice-request';
  * media volume decides.
  *
  * No Web Speech or other TTS on native: when the server sends no clip, the
- * caption carries the line (mon-speaker.ts).
+ * caption carries the line (mon-speaker.ts). That includes an Egg: the server
+ * looks the Mon up in `mon-instances`, which has no row until the hatch, so
+ * an Egg's babble is a 404 and shows as a caption only.
+ *
+ * The server gates the line by its own clock and sends the caption it gated
+ * to (`x-mon-caption`); `captionOf` hands it to the speaker, which shows it
+ * in place of the local one.
  */
 
 export interface NativeMonClip {
   readonly buffer: AudioBuffer;
   readonly pitch: number;
+  readonly caption?: string;
 }
 
 let context: AudioContext | null = null;
@@ -64,8 +71,9 @@ export const MON_VOICE_HEADERS: Readonly<Record<string, string>> = { origin: APP
  * pitch left to apply, so native needs nothing from `_lingo` itself; the
  * parameter keeps both ports one shape.
  */
-export function createMonVoicePort(mon: MonVoiceSubject, _lingo?: MonLingo): MonVoicePort<NativeMonClip> {
+export function createMonVoicePort(mon: MonVoiceSubject, _lingo?: MonLingo): SpeakerPort<NativeMonClip> {
   return {
+    captionOf: (clip) => clip.caption,
     async prepare(text, signal) {
       const clip = await requestMonVoice({ monId: mon.monInstanceId, text, ...(mon.mood === undefined ? {} : { mood: mon.mood }) }, signal, {
         baseUrl: AUTH_BASE_URL,
@@ -74,7 +82,7 @@ export function createMonVoicePort(mon: MonVoiceSubject, _lingo?: MonLingo): Mon
       });
       if (signal.aborted) throw abortError();
       const buffer = await audioContext().decodeAudioData(clip.bytes);
-      return { buffer, pitch: clip.pitch };
+      return { buffer, pitch: clip.pitch, ...(clip.caption === undefined ? {} : { caption: clip.caption }) };
     },
     play(clip, signal) {
       return new Promise<void>((resolve) => {

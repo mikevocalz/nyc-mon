@@ -23,7 +23,7 @@ export { Checkbox, type CheckboxProps } from '../Checkbox';
 export { Checklist, CheckRow, type ChecklistProps, type CheckResult, type CheckRowProps } from '../Checklist';
 export { ConfirmDestructive, type ConfirmDestructiveProps } from '../ConfirmDestructive';
 export { CopyButton, type CopyButtonProps } from '../CopyButton';
-export { DataTable, type ColumnDef, type DataTableMode, type DataTableProps, type DataTableSelection, type SortState } from '../DataTable';
+export { DataTable, type ColumnDef, type DataTableError, type DataTableFilter, type DataTableMode, type DataTableProps, type DataTableSelection, type SortState } from '../DataTable';
 export { Dialog, DialogCard, type DialogProps } from '../Dialog';
 export { DropZone, type DropAsset, type DropZoneProps } from '../DropZone';
 export { EmptyState, type EmptyStateProps } from '../EmptyState';
@@ -49,7 +49,7 @@ export { SegmentedControl, type SegmentedControlProps, type SegmentedOption } fr
 export { Select, type SelectOption, type SelectProps } from '../Select';
 export { SignageBand, type SignageBandProps } from '../SignageBand';
 export { Switch, type SwitchProps } from '../Switch';
-export { TabBar, type TabBarProps } from '../TabBar';
+export { TabBar, type TabBarProps, type TabBarTab, type TabIconState } from '../TabBar';
 export { Text, type TextProps } from '../Text';
 export { Textarea, type TextareaProps } from '../Textarea';
 export { TextField, type TextFieldProps } from '../TextField';

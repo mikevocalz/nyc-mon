@@ -45,6 +45,17 @@ describe('readGlb', () => {
     expect(() => readGlb(glb({ ...yote, animations: Array.from({ length: 201 }, () => ({})) }))).toThrow(/201 animation clips/);
   });
 
+  it('reads a quantized mesh through its node scale, not as raw integers', () => {
+    // KHR_mesh_quantization: normalized unsigned shorts, scaled back to metres by the node.
+    const quantized = {
+      ...yote,
+      accessors: [{ bufferView: 0, normalized: true, componentType: 5123, min: [0, 0, 0], max: [65535, 65535, 65535] }],
+      nodes: [{ children: [1], scale: [2, 2, 2] }, { mesh: 0, scale: [0.1, 0.0755, 0.1], translation: [0, 1, 0] }],
+      scenes: [{ nodes: [0] }],
+    };
+    expect(readGlb(glb(quantized)).heightMeters).toBe(0.151);
+  });
+
   it('has no height when the meshes declare no bounds', () => {
     expect(readGlb(glb({ asset: { version: '2.0' } })).heightMeters).toBeNull();
   });

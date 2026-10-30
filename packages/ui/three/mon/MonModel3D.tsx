@@ -319,7 +319,7 @@ export function MonModel3D({
   /** The host's microphone is open: the Mon looks and listens. */
   const listening = useRef(false);
 
-  // Renderer, scene and GLB: once per url (the files are 26-34 MB).
+  // Renderer, scene and GLB: once per url (the files are 19-24 MB).
   useEffect(() => {
     const el = host.current;
     if (!el) return;

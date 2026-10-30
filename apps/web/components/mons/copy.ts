@@ -11,7 +11,7 @@ export const W02_COPY = {
   index: {
     eyebrow: 'The starters',
     title: 'The Mons',
-    body: 'Three Bloodlines hatch in this city, each from its own egg. Whoever hatches for you comes out a Baby and grows up beside a Caller. Meet them before one chooses you.',
+    body: 'Four Bloodlines hatch in this city, each from its own egg. Whoever hatches for you comes out a Baby and grows up beside a Caller. Meet them before one chooses you.',
     hatchesFrom: (egg: string) => `Hatches from the ${egg}`,
     dex: (dexId: number) => `No. ${String(dexId).padStart(3, '0')}`,
     cardHref: (slug: string) => `/mons/${slug}`,
@@ -33,6 +33,8 @@ export const W02_COPY = {
     blurb: {
       'bodega-cee': 'Corner-store hours, corner-store loyalty. This Bloodline knows every regular on the avenue.',
       yotes: 'Bright, loud and out late. This Bloodline treats the whole borough as its yard.',
+      // Canon: the LanternFye loreSummary, roster v11.1 (packages/content/mons/inherited-v11-starters.ts).
+      lanternfye: 'A wingless spotted hopper learns to turn scarlet electricity into a readable relay network.',
     } as Record<string, string>,
     lineTitle: 'Egg to Baby',
     unnamedForm: 'Unnamed form',
@@ -46,7 +48,7 @@ export const W02_COPY = {
   },
   meta: {
     indexDescription:
-      'Meet the three NYC-MON starters: the eggs they hatch from and the Bloodlines they come from.',
+      'Meet the four NYC-MON starters: the eggs they hatch from and the Bloodlines they come from.',
     detailTitle: (baby: string) => `NYC-MON | The Mons | ${baby}`,
     detailDescription: (baby: string, bloodline: string) =>
       `${baby}, the Baby form of the ${bloodline}, and the egg ${baby} hatches from.`,

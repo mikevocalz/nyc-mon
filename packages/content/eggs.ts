@@ -30,5 +30,5 @@ function toStarterEgg(bloodline: Bloodline): StarterEgg {
   };
 }
 
-/** The three eggs Santoro presents (DECISIONS.md #5), in starter slot order. */
+/** The four eggs Santoro presents (DECISIONS.md #5, #38), in starter slot order. */
 export const eggs: readonly StarterEgg[] = starterBloodlines.map(({ bloodline }) => toStarterEgg(bloodline));

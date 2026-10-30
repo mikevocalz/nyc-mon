@@ -4,7 +4,7 @@ import { hatchCopy } from '@acme/app/features/hatch/copy.ts';
 import { detailLine, timeLine } from '@acme/app/features/hatch/incubation-model.ts';
 import { bloodlineLabel, starterBloodlines, starterSpecies } from '@acme/content/starters';
 import { deriveMonMood } from '@acme/core/sim';
-import type { CareState, JournalEntry, MonMood } from '@acme/core/types';
+import type { CareState, JournalEntry, MonMood, VoiceStage } from '@acme/core/types';
 
 /**
  * The data adapter between a tool result and the existing companion
@@ -72,6 +72,26 @@ export interface MonViewModel {
   readonly egg: EggViewModel | null;
   /** Set only on the hatch_egg result that hatched the egg; null on every other result. */
   readonly hatching: HatchingViewModel | null;
+  /**
+   * The server-gated Mon line (`say`) while the Mon babbles or is limited:
+   * the caption a card can show for what Alexa says. Null when the Mon speaks
+   * in full or the result has no line.
+   */
+  readonly say: MonSayViewModel | null;
+}
+
+export interface MonSayViewModel {
+  readonly caption: string;
+  readonly voiceStage: VoiceStage;
+}
+
+const VOICE_STAGES: Readonly<Record<VoiceStage, true>> = { 'baby-talk': true, limited: true, full: true };
+
+/** A result's `say`, or null for anything that is not a well-formed one. */
+function readSay(value: unknown): MonSayViewModel | null {
+  if (!isRecord(value) || typeof value.caption !== 'string' || typeof value.voiceStage !== 'string') return null;
+  if (!Object.hasOwn(VOICE_STAGES, value.voiceStage)) return null;
+  return { caption: value.caption, voiceStage: value.voiceStage as VoiceStage };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -135,7 +155,7 @@ function readMood(value: unknown): MonMood | null {
   return typeof value === 'string' && Object.hasOwn(MOODS, value) ? (value as MonMood) : null;
 }
 
-// Phase 1 ships only the three starters, so the card resolves names from the
+// Phase 1 ships only the four starters, so the card resolves names from the
 // starter entry and never bundles the full 115-form roster (ui.test.ts budget).
 // A species outside the starters gets null names, the same as an unknown id.
 const speciesById = new Map(starterSpecies.map((s) => [s.speciesId, s]));
@@ -238,6 +258,7 @@ function eggViewModel(eggs: unknown[]): MonViewModel | null {
     journal: [],
     egg,
     hatching: null,
+    say: readSay(first.say),
   };
 }
 
@@ -275,6 +296,7 @@ export function toMonViewModel(structured: unknown): MonViewModel | null {
     journal: readJournal(structured.journal, monInstanceId),
     egg: null,
     hatching: readHatching(structured),
+    say: readSay(structured.say),
   };
 }
 

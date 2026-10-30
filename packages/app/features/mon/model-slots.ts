@@ -4,7 +4,7 @@ import type { MonModelSlot } from '@acme/core/types';
 
 /**
  * One model slot per shipped bloodline × lifecycle stage. Phase 1 ships only
- * the three starters (F01, F02, F12; Law 7), so the other roster Bloodlines
+ * the four starters (F01, F02, F12, F04; Law 7, Decision 38), so the other roster Bloodlines
  * get no slot until they ship. Every glb and clip is null until Mike delivers
  * the models; a renderer that finds null draws its placeholder.
  */

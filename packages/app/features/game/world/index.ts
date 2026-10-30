@@ -73,6 +73,12 @@ export interface CityWorldStats extends CityMeshStats {
 
 export interface CityWorldOptions {
   /**
+   * Build progress, 0..1, at the build's checkpoints (materials, meshes, facelift, trees, props, lights). The load
+   * bar and START's no-progress watchdog read it (load-game-scene.ts): the build is synchronous, but on the render
+   * runtime each call reaches the JS thread while the build runs.
+   */
+  onProgress?: (fraction: number) => void;
+  /**
    * Lane L1 "one light" rig: dome, sun, exp² fog and env from one committed
    * sky JSON. Defaults to EXPO_PUBLIC_WORLD_SKY_RIG — off unless set.
    */
@@ -160,7 +166,7 @@ export interface CityWorldOptions {
    * Cell streaming (cells/cell-stream.ts): the merged near-detail layers are packaged into 256 m chunks after the bake
    * and only the preset's want set is built; the shells and the ground stay whole. Absent, the whole tile is built.
    */
-  stream?: { preset: WorldPreset; log?: (line: string, data: Record<string, unknown>) => void } | null;
+  stream?: { preset: WorldPreset; log?: (line: string, data: Record<string, unknown>) => void; wake?: () => void } | null;
 }
 
 export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: CityWorldOptions = {}) {
@@ -230,14 +236,17 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
     (materials.ground as InstanceType<Three['Material']>).depthWrite = false;
   }
 
+  const progress = options.onProgress ?? (() => {});
   // One street-clearance index for every tree, pole, sign, stoop and prop.
   const clearance = createStreetClearance(dataset);
+  progress(0.1);
   // The physical modules load only on this branch (physical-graph.ts).
   const phys = options.physical
     ? loadPhysicalCityMaterials().buildPhysicalCityMaterials(
         THREE, loadPhysicalRig().cityUniforms(THREE), dataset, { topology: buildLaneTopology(dataset) },
       )
     : null;
+  progress(0.2);
   const future = options.future ?? EXPERIMENTAL_WORLD_FUTURE;
   const faceliftModule = phys && future ? loadPhysicalFacelift() : null;
   const nightPools = phys ? options.nightLights : undefined;
@@ -264,13 +273,17 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
         },
       )
     : buildCityMeshes(THREE, meshDataset, materials, away, clearance, future);
+  progress(0.55);
   // The facelift reads the built masonry walls, so it follows buildCityMeshes.
   const facelift = faceliftModule ? faceliftModule.buildPhysicalFacelift(THREE, meshDataset, city.meshes, clearance) : null;
+  progress(0.65);
   const trees = buildTrees(THREE, dataset, materials, clearance, vd, VD_LEAN, leanMat, leanDraw, phys !== null);
+  progress(0.75);
   // The facelift's LED streetlights: the furniture lamps pool in the LED colour instead of sodium.
   const ledPools = faceliftModule ? faceliftModule.createFaceliftLampPools(THREE) : null;
   const furniture = buildStreetFurniture(THREE, dataset, ledPools ? { ...materials, lampPools: ledPools } : materials, clearance, city.texts);
   const props = buildStreetProps(THREE, dataset, materials, clearance, furniture.signs, furniture.lights);
+  progress(0.9);
   // The vd port's lane C draws Valdrada's own furniture (vd-port/furniture: lamps, signals, sign poles, hydrants,
   // shelters, kiosks, racks, subway entrances, roof plant). With it, the bundled tile's furniture meshes and the
   // non-vehicle props stay out of the scene, so nothing stands twice; their placements still feed the props' layout.
@@ -368,6 +381,7 @@ export function buildCityWorld(THREE: Three, dataset: CityDatasetV3, options: Ci
     ? createCellStream(THREE, [...city.meshes, ...(facelift?.mesh ? [facelift.mesh] : []), ...(phys?.roadPaint ? [phys.roadPaint] : []), ...(vdPort?.streamMeshes ?? [])], {
         preset: options.stream.preset,
         log: options.stream.log,
+        wake: options.stream.wake,
         external: vdPort?.streamLayers ?? [],
         pinned: (x0, z0, size) => landmarkBoxes.some(([a, b, c, d]) => c >= x0 && a < x0 + size && d >= z0 && b < z0 + size),
       })

@@ -78,6 +78,10 @@ describe('monStateLine', () => {
   });
 
   it('says nothing for an error, an egg, or stale state', () => {
+    expect(monStateLine({ structuredContent: { mon: { speciesId: 'dex-001', stage: 'Egg', voice: { voiceStage: 'baby-talk' } }, mood: 'content' } }, 2_000))
+      .toBe('[Mon now, 2 s ago: dex-001, Egg, voice baby-talk, mood content, no needs.]');
+    expect(monStateLine({ structuredContent: { mon: { speciesId: 'dex-003', stage: 'Small', voice: { voiceStage: 'full' } }, mood: 'content' } }, 2_000))
+      .toBe('[Mon now, 2 s ago: dex-003, Small, mood content, no needs.]');
     expect(monStateLine({ ...status, isError: true }, 1_000)).toBeNull();
     expect(monStateLine({ structuredContent: { egg: { eggId: 'e1' } } }, 1_000)).toBeNull();
     expect(monStateLine(status, 16 * 60_000)).toBeNull();

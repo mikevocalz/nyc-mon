@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
-const packageDir = fileURLToPath(new URL('../..', import.meta.url));
+const packageDir = fileURLToPath(new URL('../..', import.meta.url).href);
 const repoRoot = resolve(packageDir, '../..');
 const require = createRequire(import.meta.url);
 const payloadModule = pathToFileURL(require.resolve('payload')).href;
@@ -38,6 +38,8 @@ describe('native Node Payload migration discovery', () => {
         { name: '20261024_164500_companion_memory', up: 'function', down: 'function' },
         { name: '20261028_192132_mon_lingo', up: 'function', down: 'function' },
         { name: '20261028_200000_mon_lingo_seed', up: 'function', down: 'function' },
+        { name: '20261029_120000_mon_babble_seed', up: 'function', down: 'function' },
+        { name: '20261029_234150_schema_rels_sync', up: 'function', down: 'function' },
       ]);
     }, 35_000);
   }

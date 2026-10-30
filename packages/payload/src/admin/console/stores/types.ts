@@ -32,4 +32,8 @@ export interface ShellStore {
   /** Persisted appearance preference. */
   appearance: Appearance;
   setAppearance: (appearance: Appearance) => void;
+
+  /** Whether the compact "More" navigation sheet is open. */
+  moreOpen: boolean;
+  setMoreOpen: (open: boolean) => void;
 }

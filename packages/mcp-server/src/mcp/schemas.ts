@@ -1,4 +1,4 @@
-import { CARE_NEEDS, EpochMsSchema, IdSchema, LifecycleStageSchema, MonGenderSchema, MonMoodSchema, UnitIntervalSchema } from '@acme/core';
+import { CARE_NEEDS, EpochMsSchema, IdSchema, LifecycleStageSchema, MonGenderSchema, MonMoodSchema, UnitIntervalSchema, VoiceStageSchema } from '@acme/core';
 import { z } from 'zod';
 import { PermissionSchema, PresenceEventSchema, PresenceTierSchema } from '../presence/types.ts';
 
@@ -77,6 +77,9 @@ export const MonViewSchema = z.object({
     .object({
       lineageId: IdSchema.describe('The one voice this Mon keeps for life.'),
       stage: LifecycleStageSchema.describe('Pitch follows the stage: higher when young, lower when grown. An Egg is silent.'),
+      voiceStage: VoiceStageSchema.optional().describe(
+        'How much the Mon may say right now: baby-talk (wordless babble: an Egg, or a Baby in its first 24 hours), limited (a Baby after that: family sound plus at most two words), full.',
+      ),
       voiced: z.boolean().describe('False for an Egg, or when no voice is cast for this lineage yet: show the reply, do not speak it.'),
     })
     .nullable()
@@ -93,10 +96,30 @@ export const CareViewSchema = z.object({
   lastFedAt: EpochMsSchema.nullable(),
 });
 
+/** A ready-made Mon line, gated on the server for the Mon's voice stage. */
+export const MonSaySchema = z
+  .object({
+    text: z.string().describe("The Mon's words, ready to read aloud."),
+    caption: z.string().describe('The same line as a screen shows it.'),
+    voiceStage: VoiceStageSchema,
+    verbatim: z.boolean().describe("True: say text exactly and add no words for the Mon. False: a canon line you may use; any line of your own stays inside speechRule's limit."),
+  })
+  .describe('Present while the Mon babbles or is limited. Absent when the Mon speaks in full.');
+
+/** Speech fields on every result that carries a Mon. Optional, so older clients ignore them. */
+const speechFields = {
+  say: MonSaySchema.optional(),
+  speechRule: z
+    .string()
+    .optional()
+    .describe("How the Mon may speak right now, when it is limited. Follow it; never read it out."),
+};
+
 const NeedsSchema = z.array(z.enum(CARE_NEEDS)).describe('Meters low enough that the Mon needs the Caller.');
 
 export const MonStatusOutput = z.object({
   mon: MonViewSchema,
+  ...speechFields,
   care: CareViewSchema,
   mood: MonMoodSchema,
   needs: NeedsSchema,
@@ -114,6 +137,7 @@ export const PresentPersonSchema = z.object({
 export function checkOnMonOutput(devMode: boolean) {
   const base = z.object({
     mon: MonViewSchema,
+    ...speechFields,
     mood: MonMoodSchema,
     needs: NeedsSchema,
     suggestedCare: z.array(z.enum(CARE_SUGGESTIONS)).describe('Care that would help most right now, best first.'),
@@ -135,6 +159,7 @@ export const CareResultOutput = z.object({
   effect: z.enum(CARE_EFFECTS).optional(),
   declinedBecause: z.enum(DECLINE_REASONS).optional(),
   mon: MonViewSchema,
+  ...speechFields,
   care: CareViewSchema,
   mood: MonMoodSchema,
 });
@@ -148,8 +173,14 @@ export const IncubationOutput = z.object({
       incubationEndsAt: EpochMsSchema,
       minutesRemaining: z.number().int().nonnegative(),
       readyToHatch: z.boolean(),
+      voice: z
+        .object({ lineageId: IdSchema, stage: z.literal('Egg'), voiceStage: z.literal('baby-talk') })
+        .optional()
+        .describe('The voice the Mon will keep for life. An Egg babbles.'),
+      say: MonSaySchema.optional().describe("The egg's babble. When the Caller talks to the egg, say text exactly."),
     }),
   ),
+  speechRule: speechFields.speechRule,
 });
 
 export const HatchEggOutput = z.object({
@@ -158,6 +189,7 @@ export const HatchEggOutput = z.object({
   hatching: z.boolean().describe('True when this call hatched the egg: the card plays the hatch, then shows the Mon.'),
   egg: z.object({ eggId: IdSchema, speciesId: IdSchema.describe("The Egg form's Dex record, e.g. dex-001 (Metro Egg).") }),
   mon: MonViewSchema,
+  ...speechFields,
   care: CareViewSchema,
   mood: MonMoodSchema,
 });
@@ -165,6 +197,7 @@ export const HatchEggOutput = z.object({
 export function talkToMonOutput(devMode: boolean) {
   const base = z.object({
     mon: MonViewSchema,
+    ...speechFields,
     mood: MonMoodSchema,
     voiceGuide: z
       .array(z.string())
