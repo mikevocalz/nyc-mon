@@ -28,7 +28,7 @@ const server = readFileSync(new URL('./views/Views.tsx', import.meta.url), 'utf8
 const client = readFileSync(new URL('./views/ViewsClient.tsx', import.meta.url), 'utf8');
 const avatar = readFileSync(new URL('../../../../ui/admin/CallerAvatar.tsx', import.meta.url), 'utf8');
 const list = client.slice(client.indexOf('const callerColumns'), client.indexOf('export function CallersViewClient'));
-const query = server.slice(server.indexOf('export async function CallersView'), server.indexOf('export async function ConsentView'));
+const query = server.slice(server.indexOf('async function callersView'), server.indexOf('async function consentView'));
 
 test('avatar is the first column and User ID is second', () => {
   assert.deepEqual([...list.matchAll(/header: '([^']+)'/g)].map((match) => match[1]), ['Avatar', 'User ID', 'Age band', 'Consent', 'Joined']);
