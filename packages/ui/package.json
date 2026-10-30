@@ -48,7 +48,8 @@
     "./three/mon/lipsync": "./three/mon/lipsync/index.ts",
     "./three/mon/hatch-sound": "./three/mon/hatch-sound.ts",
     "./three/mon/hatch-timeline": "./three/mon/hatch-timeline.ts",
-    "./three/mon/idle": "./three/mon/idle/index.ts"
+    "./three/mon/idle": "./three/mon/idle/index.ts",
+    "./site-embed": "./html/SiteEmbed.tsx"
   },
   "sideEffects": [
     "./rn-globals-shim.ts",
