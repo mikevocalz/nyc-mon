@@ -3,6 +3,7 @@
 import { useEffect, useState, type ComponentType } from 'react';
 import { palette } from '@acme/theme';
 import { dequantizeGlb, isQuantizedGlb } from './glbDequantize';
+import { binaryFetch } from '@acme/ui/net';
 import { View } from '@acme/ui/tw';
 import {
   Viro3DObject,
@@ -79,7 +80,7 @@ function useViroReadableUrl(url: string, onError?: (error: unknown) => void): st
     let cancelled = false;
     let objectUrl: string | null = null;
     (async () => {
-      const response = await fetch(url);
+      const response = await binaryFetch(url);
       if (!response.ok) throw new Error(`Model request failed (${response.status})`);
       const bytes = new Uint8Array(await response.arrayBuffer());
       if (cancelled) return;

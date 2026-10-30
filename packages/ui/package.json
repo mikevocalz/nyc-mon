@@ -28,6 +28,10 @@
       "default": "./icons.web.ts"
     },
     "./native": "./native.ts",
+    "./net": {
+      "react-native": "./net/index.native.ts",
+      "default": "./net/index.ts"
+    },
     "./game-perf": {
       "react-native": "./game-perf.native.ts",
       "default": "./game-perf.ts"
@@ -86,6 +90,7 @@
     "react-native-gesture-handler": "catalog:",
     "react-native-graph": "catalog:",
     "react-native-keyboard-controller": "catalog:",
+    "react-native-nitro-fetch": "catalog:",
     "react-native-nitro-modules": "catalog:",
     "react-native-pulsar": "catalog:",
     "react-native-reanimated": "catalog:",
