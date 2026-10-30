@@ -8,6 +8,7 @@ import { checkGlbHeader, checkMonModelFile, MON_MODEL_FILE_MESSAGES } from '../.
 import { consoleCopy } from '../copy';
 import { useModelsStore, type ModelDraft, type ModelFilter, type ModelYaw } from '../stores';
 import { ConsoleShell } from '../Shell';
+import { needsChunkedUpload, uploadModelInChunks, type ChunkTransport, type SendResult } from './modelUpload.ts';
 
 // The Viro web renderer is browser-only (WASM + WebGL), so it loads after hydration.
 const MonModelViewer = lazy(() => import('@acme/spatial/model-viewer').then((module) => ({ default: module.MonModelViewer })));
@@ -95,6 +96,38 @@ function sendWithProgress(url: string, method: 'POST' | 'PATCH', body: FormData,
 
 const json = (method: string, data: unknown): RequestInit => ({ method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
 
+const errorMessage = (text: string) => {
+  try {
+    return (JSON.parse(text) as { errors?: { message?: string }[] }).errors?.[0]?.message ?? consoleCopy.errors.action;
+  } catch {
+    return consoleCopy.errors.action;
+  }
+};
+
+/** fetch for the JSON calls, XMLHttpRequest for chunk bytes (the one API with upload progress). */
+const chunkTransport: ChunkTransport = {
+  json: async <T,>(url: string, method: 'POST' | 'DELETE', body?: unknown): Promise<SendResult<T>> => {
+    try {
+      const response = await fetch(url, { credentials: 'include', ...(body === undefined ? { method } : json(method, body)) });
+      const text = await response.text();
+      return response.ok ? { ok: true, data: (text ? JSON.parse(text) : {}) as T } : { ok: false, message: errorMessage(text) };
+    } catch {
+      return { ok: false, message: copy.uploadNetwork };
+    }
+  },
+  chunk: (url, body, onSent) => new Promise((resolve) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('PUT', url);
+    xhr.withCredentials = true;
+    xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+    xhr.upload.onprogress = (event) => onSent(event.loaded);
+    xhr.onload = () => resolve(xhr.status >= 200 && xhr.status < 300 ? { ok: true, data: null } : { ok: false, message: xhr.status === 413 ? copy.tooLarge : errorMessage(xhr.responseText) });
+    xhr.onerror = () => resolve({ ok: false, message: copy.uploadNetwork });
+    xhr.onabort = () => resolve({ ok: false, message: copy.uploadNetwork });
+    xhr.send(body);
+  }),
+};
+
 export function ModelsViewClient({ forms, models, failed = false, selectedId, canEdit }: { forms: Form[]; models: ModelDoc[]; failed?: boolean; selectedId: string | null; canEdit: boolean }) {
   const router = useRouter();
   const store = useModelsStore();
@@ -141,13 +174,20 @@ export function ModelsViewClient({ forms, models, failed = false, selectedId, ca
 
   const uploadPending = async () => {
     if (!selected || !store.pending) return;
-    const body = new FormData();
-    body.append('file', store.pending.file, store.pending.name);
-    // A new form's placement starts from defaults; a replacement keeps its saved placement and credit.
-    body.append('_payload', JSON.stringify(model ? {} : { speciesId: selected.id }));
+    const { file, name } = store.pending;
     store.setBusy('upload');
     store.setProgress(0);
-    const error = await sendWithProgress(model ? `${API}/${model.id}` : API, model ? 'PATCH' : 'POST', body, store.setProgress);
+    let error: string | null;
+    if (needsChunkedUpload(file.size)) {
+      // Over the 4.5 MB function body limit: staged chunks, joined on the server.
+      error = await uploadModelInChunks(file, name, model ? { id: model.id } : { speciesId: selected.id }, chunkTransport, store.setProgress);
+    } else {
+      const body = new FormData();
+      body.append('file', file, name);
+      // A new form's placement starts from defaults; a replacement keeps its saved placement and credit.
+      body.append('_payload', JSON.stringify(model ? {} : { speciesId: selected.id }));
+      error = await sendWithProgress(model ? `${API}/${model.id}` : API, model ? 'PATCH' : 'POST', body, store.setProgress);
+    }
     store.setBusy(null);
     store.setProgress(null);
     // The editor may have opened another form while this uploaded.

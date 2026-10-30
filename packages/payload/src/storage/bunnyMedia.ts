@@ -131,6 +131,43 @@ const deleteFile = async (slug: string, filename: string) => {
   }
 };
 
+/**
+ * Raw object access for staged uploads (storage/stagedUpload.ts). Keys are
+ * zone-relative and never pass through keyFor, so staging stays out of every
+ * collection's folder. The AccessKey only ever leaves this module in a
+ * server-to-server request.
+ */
+export const bunnyStorageConfigured = () => configured;
+
+export const putStorageObject = async (key: string, body: Uint8Array) => {
+  const response = await fetch(storageURL(getKey(key)), {
+    method: 'PUT',
+    headers: { AccessKey: process.env.BUNNY_STORAGE_PASSWORD!, 'Content-Type': 'application/octet-stream' },
+    body: new Uint8Array(body),
+  });
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    throw new Error(`Bunny Storage upload failed (${response.status}): ${detail || response.statusText}`);
+  }
+};
+
+export const getStorageObject = async (key: string): Promise<Uint8Array> => {
+  const response = await fetch(storageURL(getKey(key)), {
+    headers: { AccessKey: process.env.BUNNY_STORAGE_PASSWORD! },
+  });
+  if (!response.ok) throw new Error(`Bunny Storage read failed (${response.status})`);
+  return new Uint8Array(await response.arrayBuffer());
+};
+
+/** Deletes an object, or a whole folder when `key` ends in `/`. A missing key is not an error. */
+export const deleteStorageObject = async (key: string) => {
+  const response = await fetch(storageURL(getKey(key)), {
+    method: 'DELETE',
+    headers: { AccessKey: process.env.BUNNY_STORAGE_PASSWORD! },
+  });
+  if (!response.ok && response.status !== 404) throw new Error(`Bunny Storage delete failed (${response.status})`);
+};
+
 const filenamesFor = (doc: Partial<FileData>) => {
   const filenames: string[] = [];
   if (typeof doc.filename === 'string') filenames.push(doc.filename);
