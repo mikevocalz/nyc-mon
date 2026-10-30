@@ -1,8 +1,8 @@
 'use client';
 import { useRouter } from '@payloadcms/ui';
 import { useState } from 'react';
-import { Banner, Button, Card, CheckRow, Checklist, ConfirmDestructive, CopyButton, DataTable, ErrorMessage, KeyValueList, MaskedValue, Pagination, SegmentedControl, Select, SignageBand, TextField, Timestamp, type ColumnDef } from '@acme/ui/admin';
-import { Heading, Link, Paragraph, Section } from '@acme/ui/html';
+import { Banner, Button, CallerAvatar, Card, CheckRow, Checklist, ConfirmDestructive, CopyButton, DataTable, ErrorMessage, KeyValueList, MaskedValue, Pagination, SegmentedControl, Select, SignageBand, TextField, Timestamp, type ColumnDef } from '@acme/ui/admin';
+import { Heading, Link, Paragraph, Section, Text } from '@acme/ui/html';
 import { cancelCallerDeletion, createStaff, deleteConsentRecord, removeStaff, resendConsentEmail, reveal, runIntegrityCheck, scheduleCallerDeletion } from '../api';
 import { consoleCopy, reasonOptions } from '../copy';
 import { useCallersStore, useConsentStore, useMonsStore, useOverviewStore, useSettingsStore, useShellStore } from '../stores';
@@ -52,8 +52,26 @@ export function OverviewViewClient({ counts, run, runFailed = false, events }: {
 }
 
 const consentLabel = (value: string) => consoleCopy.consentStatus[value] ?? value;
-type Caller = { id: string; email: string; name: string; age: string; consent: string; joined: string; updatedAt: string; deletionScheduledFor: string | null };
-const callerColumns: ColumnDef<Caller, unknown>[] = [{ accessorKey: 'id', header: 'Caller' }, { accessorKey: 'age', header: 'Age band' }, { accessorKey: 'consent', header: 'Consent', cell: ({ row }) => consentLabel(row.original.consent) }, { accessorKey: 'joined', header: 'Joined', cell: ({ row }) => <Timestamp at={new Date(row.original.joined)} format="relative" /> }];
+type Caller = { id: string; image: string | null; email: string; name: string; age: string; consent: string; joined: string; updatedAt: string; deletionScheduledFor: string | null };
+const callerColumns: ColumnDef<Caller, unknown>[] = [
+  {
+    id: 'avatar',
+    accessorKey: 'image',
+    header: 'Avatar',
+    enableSorting: false,
+    meta: { priority: 1 },
+    cell: ({ row }) => <CallerAvatar userId={row.original.id} imageUri={row.original.image} />,
+  },
+  {
+    accessorKey: 'id',
+    header: 'User ID',
+    meta: { priority: 1 },
+    cell: ({ row }) => <Text className="break-all font-mono text-sm">{row.original.id}</Text>,
+  },
+  { accessorKey: 'age', header: 'Age band' },
+  { accessorKey: 'consent', header: 'Consent', cell: ({ row }) => consentLabel(row.original.consent) },
+  { accessorKey: 'joined', header: 'Joined', cell: ({ row }) => <Timestamp at={new Date(row.original.joined)} format="relative" /> },
+];
 export function CallersViewClient({ callers, failed = false, selectedId, page, pageCount, totalCount }: { callers: Caller[]; failed?: boolean; selectedId: string | null; page: number; pageCount: number; totalCount: number }) {
  const router = useRouter(); const store = useCallersStore(); const selected = callers.find((row) => row.id === selectedId); const shown = store.revealed;
  const show = async (field: 'email' | 'name') => { if (!selected) return; const result = await reveal(api, { targetType: 'caller', targetId: selected.id, field, reasonCode: 'support_request' }); if (result.ok && typeof result.data.value === 'string') store.setRevealed(field, result.data.value); };
@@ -67,7 +85,7 @@ export function CallersViewClient({ callers, failed = false, selectedId, page, p
     </Section>
    {selected ? <Section testID="caller-detail" className={detailPane}>
     <Heading level={2} className={h2}>{consoleCopy.callers.identity}</Heading>
-    <KeyValueList items={[{ key: 'id', label: 'Caller id', value: selected.id, action: <CopyButton value={selected.id} label="Copy Caller id" /> }, { key: 'email', label: 'Email', value: shown.email ? <MaskedValue state="revealed" value={shown.email} onHide={store.clearRevealed} /> : <MaskedValue state="masked" mask={selected.email} onRevealRequest={() => void show('email')} /> }, { key: 'name', label: 'Name', value: shown.name ? <MaskedValue state="revealed" value={shown.name} onHide={store.clearRevealed} /> : <MaskedValue state="masked" mask={selected.name} onRevealRequest={() => void show('name')} /> }, { key: 'age', label: 'Age band', value: selected.age }]} />
+    <KeyValueList items={[{ key: 'id', label: 'User ID', value: selected.id, action: <CopyButton value={selected.id} label="Copy user ID" /> }, { key: 'email', label: 'Email', value: shown.email ? <MaskedValue state="revealed" value={shown.email} onHide={store.clearRevealed} /> : <MaskedValue state="masked" mask={selected.email} onRevealRequest={() => void show('email')} /> }, { key: 'name', label: 'Name', value: shown.name ? <MaskedValue state="revealed" value={shown.name} onHide={store.clearRevealed} /> : <MaskedValue state="masked" mask={selected.name} onRevealRequest={() => void show('name')} /> }, { key: 'age', label: 'Age band', value: selected.age }]} />
     <Button title={selected.deletionScheduledFor ? consoleCopy.callers.cancel : consoleCopy.callers.schedule} variant="danger" onPress={() => store.openDialog(selected.deletionScheduledFor ? 'cancel' : 'delete')} />
     <ConfirmDestructive open={store.dialog === 'delete'} title="Schedule deletion for this Caller?" consequences={["Their personal data is deleted after 7 days. Their Mons move into Dr. Santoro's care."]} confirmText={selected.id.slice(-6)} confirmLabel={consoleCopy.callers.schedule} reasonOptions={reasonOptions} onClose={store.closeDialog} onConfirm={async ({ reasonCode }) => { if (!reasonCode) throw fail(); const result = await scheduleCallerDeletion(api, selected.id, { reasonCode, confirmText: selected.id.slice(-6), expectedUpdatedAt: selected.updatedAt }); if (!result.ok) throw fail(); router.refresh(); }} />
     <ConfirmDestructive open={store.dialog === 'cancel'} title="Cancel deletion?" consequences={['The Caller keeps their account.']} confirmText={selected.id.slice(-6)} confirmLabel={consoleCopy.callers.cancel} onClose={store.closeDialog} onConfirm={async () => { const result = await cancelCallerDeletion(api, selected.id, { expectedUpdatedAt: selected.updatedAt }); if (!result.ok) throw fail(); router.refresh(); }} />

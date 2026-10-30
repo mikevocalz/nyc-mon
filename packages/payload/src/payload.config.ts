@@ -28,6 +28,7 @@ import { MonModels } from './collections/MonModels';
 import { LanguageLexicon } from './collections/LanguageLexicon';
 import { Waitlist } from './collections/Waitlist';
 import { MonVoices } from './globals/MonVoices';
+import { siteContentPlugin } from './site-content/plugin';
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 const isProduction = process.env.NODE_ENV === 'production';
@@ -123,6 +124,8 @@ export default buildConfig({
           database: payloadAdapter({ payloadClient: payload }),
         }),
     }),
+    // Opt in on an isolated database after generating/reviewing the additive migration.
+    ...(process.env.NYCMON_SITE_EDITOR === '1' ? [siteContentPlugin] : []),
   ],
   db: postgresAdapter({
     pool: {

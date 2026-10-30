@@ -72,7 +72,7 @@ const gridSizes = (cols: number) =>
   `${XL_UP} ${Math.round((80 * cols) / 12)}rem, ${MD_UP} ${Math.round((100 * cols) / 12)}vw, 100vw`;
 
 /** Starter posters: a quarter of the 80rem grid from `xl`, half the row from `md`, the full column on phones. */
-const starterSizes = `${XL_UP} 20rem, ${MD_UP} 50vw, 100vw`;
+export const STARTER_SIZES = `${XL_UP} 20rem, ${MD_UP} 50vw, 100vw`;
 
 function photoById(id: string): NycPhoto {
   const photo = NYC_PHOTOS.find((p) => p.id === id);
@@ -150,9 +150,9 @@ export const ART_SLOTS = Object.keys(ART) as readonly ArtSlot[];
  * LanternFye) is null until its art exists: the poster shows Coming Soon (PS-007).
  */
 const STARTER_ART: Readonly<Record<StarterId, ArtEntry | null>> = {
-  1: fromCreature('squeaklet', starterSizes, { x: 0.5, y: 0.3 }),
-  2: fromCreature('kittee-cee', starterSizes, { x: 0.5, y: 0.28 }),
-  3: fromCreature('yotito', starterSizes, { x: 0.55, y: 0.33 }),
+  1: fromCreature('squeaklet', STARTER_SIZES, { x: 0.5, y: 0.3 }),
+  2: fromCreature('kittee-cee', STARTER_SIZES, { x: 0.5, y: 0.28 }),
+  3: fromCreature('yotito', STARTER_SIZES, { x: 0.55, y: 0.33 }),
   4: null,
 };
 

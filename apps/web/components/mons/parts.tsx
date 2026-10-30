@@ -32,9 +32,10 @@ export function ArtFill({
       fill
       framed={false}
       sizes={entry.sizes}
+      unoptimized={typeof entry.src === 'string' && entry.src.startsWith('https://')}
       priority={eager}
       loading={eager ? 'eager' : 'lazy'}
-      placeholder="blur"
+      placeholder={entry.blurDataURL ? 'blur' : undefined}
       blurDataURL={entry.blurDataURL}
       contentPosition={artPosition(entry)}
       className="h-full w-full"
@@ -49,10 +50,10 @@ export function ArtFill({
 }
 
 /** "Concept art" as a signage plate pinned to a corner of a creature picture. */
-export function ConceptCaption({ className = 'bottom-0 left-0' }: { className?: string }) {
+export function ConceptCaption({ className = 'bottom-0 left-0', label = W02_COPY.conceptArt }: { className?: string; label?: string }) {
   return (
     <Figcaption className={`absolute m-0 bg-signage-black px-3 py-1.5 ${className}`}>
-      <Text className="text-xs font-semibold uppercase tracking-widest text-signage-white">{W02_COPY.conceptArt}</Text>
+      <Text className="text-xs font-semibold uppercase tracking-widest text-signage-white">{label}</Text>
     </Figcaption>
   );
 }
@@ -68,13 +69,13 @@ export function StreetFigure({ entry, className, drift }: { entry: ArtEntry; cla
 }
 
 /** The Dex chip: "No. 002" on the slot tone's face. */
-export function DexChip({ dexId, tone, large = false }: { dexId: number; tone: ControlTone; large?: boolean }) {
+export function DexChip({ dexId, tone, large = false, label }: { dexId: number; tone: ControlTone; large?: boolean; label?: string }) {
   const t = TONE_CLASSES[tone];
   return (
     <Text
       className={`self-start font-display ${t.face} ${t.onFace} ${large ? 'px-4 pb-1.5 pt-2 text-2xl md:text-3xl' : 'px-2.5 py-1 text-sm'}`}
     >
-      {W02_COPY.index.dex(dexId)}
+      {label ?? W02_COPY.index.dex(dexId)}
     </Text>
   );
 }

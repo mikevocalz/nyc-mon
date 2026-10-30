@@ -226,7 +226,7 @@ export const bunnyMediaAfterChange: CollectionAfterChangeHook<
     );
   }
 
-  return { ...doc, bunnyUrl: mainURL };
+  return withBunnyMediaURLs({ ...doc, bunnyUrl: mainURL });
 };
 
 export const bunnyMediaAfterDelete: CollectionAfterDeleteHook<

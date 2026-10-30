@@ -1,8 +1,10 @@
 'use client';
 import type { ReactNode } from 'react';
+import { copyTree } from '@acme/content/site-content-bindings';
+import { blockImage, sectionFor, type SitePage } from '@acme/content/site-content';
 import { Link } from 'solito/link';
 import { usePathname } from 'solito/navigation';
-import { BrandWordmark, NavBar, SiteFooter, type FooterLink, type NavItem } from '@acme/ui';
+import { BrandWordmark, Image, NavBar, SiteFooter, type FooterLink, type NavItem } from '@acme/ui';
 import { View } from '@acme/ui/tw';
 import { siteHref } from '../../lib/site-href';
 import { CONTENT_ID, FOOTER_DESCRIPTION, FOOTER_GROUPS, NAV_CTA, navItems, showsSiteChrome } from './nav';
@@ -50,19 +52,22 @@ const siteLogo = (
  *  waitlist CTA need about 900px. The waitlist is the site's primary action,
  *  so it wears the orange CTA face. The skyline strip shows from `md` and is
  *  dropped on phones, upright or sideways, where height is scarce. */
-export function SiteNavBar() {
+export function SiteNavBar({ content }: { content?: SitePage | null } = {}) {
+  const header = sectionFor(content, 'header');
+  const logo = blockImage(header?.content.find(block => block.blockType === 'image' && block.slot === 'logo'));
+  const logoAt = (height: number) => logo ? <Image src={logo.src} alt={logo.alt} width={Math.round(height * logo.width / logo.height)} height={height} unoptimized contentFit="contain" /> : null;
   const pathname = usePathname() ?? '/';
-  if (!showsSiteChrome(pathname)) return null;
+  if (!showsSiteChrome(pathname) || header?.hidden) return null;
 
   return (
     <NavBar
-      items={navItems(pathname)}
-      cta={NAV_CTA}
+      items={copyTree(navItems(pathname), header, 'links')}
+      cta={copyTree(NAV_CTA, header, 'cta')}
       ctaTone="royal"
       skylineClassName="hidden h-5 md:flex short:hidden"
       skipTo={CONTENT_ID}
       district="midtown"
-      logo={siteLogo}
+      logo={logo ? <><View className="flex short:hidden">{logoAt(66)}</View><View className="hidden short:flex">{logoAt(40)}</View></> : siteLogo}
       collapseBelow="lg"
       renderLink={navLink}
     />
@@ -74,20 +79,26 @@ export function SiteNavBar() {
  * skyline along the top (PS-025): a static band, so the page ends on the city
  * without a second moving scene after the hatch, and no canvas code ships.
  */
-export function SiteFooterBar() {
+export function SiteFooterBar({ content }: { content?: SitePage | null } = {}) {
+  const footer = sectionFor(content, 'footer');
+  const logo = blockImage(footer?.content.find(block => block.blockType === 'image' && block.slot === 'logo'));
+  const copy = copyTree({description: FOOTER_DESCRIPTION, tagline: 'Every block has a legend.', copyright: '© NYC-MON', logoHref: '/', groups: FOOTER_GROUPS}, footer);
   const pathname = usePathname() ?? '/';
-  if (!showsSiteChrome(pathname)) return null;
+  if (!showsSiteChrome(pathname) || footer?.hidden) return null;
 
   return (
     <View {...sectionMarker('footer')} className="w-full">
     <SiteFooter
       variant="columns"
       mark="badge"
-      logoHref={siteHref('/')}
+      logoHref={siteHref(copy.logoHref)}
+      logo={logo ? <Image src={logo.src} alt={logo.alt} width={Math.round(100 * logo.width / logo.height)} height={100} unoptimized contentFit="contain" /> : undefined}
+      tagline={copy.tagline}
+      copyright={copy.copyright}
       district="harlem"
       scene="skyline"
-      description={FOOTER_DESCRIPTION}
-      linkGroups={FOOTER_GROUPS}
+      description={copy.description}
+      linkGroups={copy.groups}
       renderLink={footerLink}
       containerClassName="max-w-screen-xl sm:px-6 lg:px-8"
     />

@@ -4,6 +4,7 @@ import { hasStaffRole, STAFF_ROLES } from '../../../collections/access/roles.ts'
 import { ConsoleNotStaff } from '../Chrome';
 import { allSpecies, bloodlineLabel, eggs, starterBloodlines } from '@acme/content';
 import { ModelsViewClient, type ModelDoc } from './ModelsClient';
+import { callerIdentity, CALLER_IDENTITY_SELECT } from '../caller-identity';
 import { AuditViewClient, CallersViewClient, ConsentViewClient, ContentViewClient, MonsViewClient, OverviewViewClient, SettingsViewClient } from './ViewsClient';
 
 type Req = AdminViewServerProps['initPageResult']['req'];
@@ -48,6 +49,11 @@ function requireUser({ initPageResult }: AdminViewServerProps): NonNullable<Admi
 async function overviewView(props: AdminViewServerProps) {
   const user = requireUser(props); if (!user) return null;
   const { req } = props.initPageResult;
+  // Content editors have no caller/consent access; take them straight to their editing workspace.
+  if (user.role === 'content' && req.payload.collections['site-pages']) {
+    req.server?.redirect(`${req.payload.config.routes.admin}/collections/site-pages`);
+    return null;
+  }
   const [consents, eggs, mons, runs, events] = await Promise.all([
     read(req, 'pending consents', () => req.payload.count({ collection: 'guardian-consents', where: { status: { equals: 'pending' } }, user, overrideAccess: false, req })),
     read(req, 'eggs', () => req.payload.count({ collection: 'eggs', user, overrideAccess: false, req })),
@@ -73,10 +79,10 @@ async function callersView(props: AdminViewServerProps) {
   const search = await props.searchParams;
   const pageParam = Number(Array.isArray(search?.page) ? search.page[0] : search?.page);
   const page = Number.isInteger(pageParam) && pageParam > 0 ? pageParam : 1;
-  const found = await read(req, 'callers', () => req.payload.find({ collection: 'users', where: { role: { equals: 'user' } }, sort: '-createdAt', limit: 50, page, depth: 0, select: { email: true, name: true, birthYear: true, consentStatus: true, deletionScheduledFor: true, updatedAt: true, createdAt: true }, user, overrideAccess: false, req }));
+  const found = await read(req, 'callers', () => req.payload.find({ collection: 'users', where: { role: { equals: 'user' } }, sort: '-createdAt', limit: 50, page, depth: 0, select: { ...CALLER_IDENTITY_SELECT, email: true, name: true, birthYear: true, consentStatus: true, deletionScheduledFor: true, updatedAt: true, createdAt: true }, user, overrideAccess: false, req }));
   if (!found.ok) return <CallersViewClient callers={[]} failed selectedId={selectedId} page={1} pageCount={1} totalCount={0} />;
   const result = found.data;
-  const callers = result.docs.map((doc) => ({ id: String(doc.id), email: doc.email.replace(/(^.).*(@.).*(\..+$)/, '$1•••$2•••$3'), name: doc.name ? 'Hidden' : 'Not given', age: doc.birthYear ? (new Date().getUTCFullYear() - doc.birthYear < 13 ? 'Under 13' : new Date().getUTCFullYear() - doc.birthYear < 18 ? '13 to 17' : '18 and over') : 'Not given', consent: doc.consentStatus ?? 'not-required', joined: doc.createdAt, updatedAt: doc.updatedAt, deletionScheduledFor: doc.deletionScheduledFor ?? null }));
+  const callers = result.docs.map((doc) => ({ ...callerIdentity(doc), email: doc.email.replace(/(^.).*(@.).*(\..+$)/, '$1•••$2•••$3'), name: doc.name ? 'Hidden' : 'Not given', age: doc.birthYear ? (new Date().getUTCFullYear() - doc.birthYear < 13 ? 'Under 13' : new Date().getUTCFullYear() - doc.birthYear < 18 ? '13 to 17' : '18 and over') : 'Not given', consent: doc.consentStatus ?? 'not-required', joined: doc.createdAt, updatedAt: doc.updatedAt, deletionScheduledFor: doc.deletionScheduledFor ?? null }));
   return <CallersViewClient callers={callers} selectedId={selectedId} page={result.page ?? 1} pageCount={result.totalPages} totalCount={result.totalDocs} />;
 }
 

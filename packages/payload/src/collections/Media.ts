@@ -29,6 +29,7 @@ export const Media: CollectionConfig = {
     {
       name: 'bunnyUrl',
       type: 'text',
+      access: { create: () => false, update: () => false },
       admin: { readOnly: true, hidden: true },
     },
     { name: 'alt', type: 'text', required: true },

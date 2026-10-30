@@ -1,25 +1,40 @@
-import { DISTRICTS, DISTRICT_COPY } from '@acme/spatial';
+import { DISTRICTS, DISTRICT_COPY as DEFAULT_DISTRICTS } from '@acme/spatial';
 import { Image, SolidPanel } from '@acme/ui';
 import { Article, Figure, Figcaption, Heading, List, ListItem, Paragraph, Section } from '@acme/ui/html';
 import { View } from '@acme/ui/tw';
 import { Eyebrow } from '../home/Eyebrow';
 import { StreetGridBand } from './StreetGridBand';
-import { W03_COPY } from './copy';
-import { cityPhoto, cityPhotoHref } from './art';
+import { W03_COPY as DEFAULT_COPY } from './copy';
+import { cityPhoto as defaultCityPhoto, cityPhotoHref } from './art';
 import { CityMotion } from './CityMotion';
 import { cityCardLayout } from './layout';
+import { PageSections, defaultSectionOrder, type CmsPageProps } from '../cms/PageSections';
+import { copyGroups, copyTree, pageArt, artMap } from '../cms/bindings';
+import { sectionFor, sectionText } from '@acme/content/site-content';
+
+export function CityPage({ page = null, embedOrigins = [], siteOrigin = '' }: CmsPageProps = {}) {
+const W03_COPY = copyGroups(DEFAULT_COPY, page);
+const DISTRICT_COPY = copyTree(DEFAULT_DISTRICTS, sectionFor(page, 'districts'), 'districts');
+const cityPhoto = (district: Parameters<typeof defaultCityPhoto>[0]) => {
+ const original = defaultCityPhoto(district); if (!original) return null;
+ const replacement = pageArt(page, 'districts', district, {src: original.source, width: original.width, height: original.height, alt: original.alt, sizes: original.sizes, blurDataURL: original.blurDataURL});
+ return {...original, source: replacement.src, alt: replacement.alt, blurDataURL: replacement.blurDataURL,
+ title: replacement.caption?.title ?? (replacement.src === original.source ? original.title : ''),
+ position: replacement.focalPoint ? {left: (replacement.focalPoint.x * 100 + '%') as `${number}%`, top: (replacement.focalPoint.y * 100 + '%') as `${number}%`} : original.position};
+};
+
 
 /** District accent bars, one brand colour per card. */
 const CARD_ACCENTS = ['bg-orange-500', 'bg-royal-500', 'bg-carolina-500', 'bg-leaf-500'] as const;
 
 /** W03, the product site's setting page: the four districts, then who shares them. */
-export function CityPage() {
+
   const districts = W03_COPY.districts;
   const cast = W03_COPY.cast;
   return (
-    <View id="w03-city" className="w-full flex-1 bg-bg">
-      <CityMotion />
-      <Section
+    <View id="w03-city" className="w-full flex-1 bg-bg">{defaultSectionOrder(page, ["districts","grid","cast"]) ? <CityMotion /> : null}
+<PageSections page={page} embedOrigins={embedOrigins} siteOrigin={siteOrigin} sections={[
+{key: 'districts', node: (<Section
         aria-labelledby="w03-districts-title"
         data-testid="w03-districts"
         data-section="city-districts"
@@ -69,11 +84,9 @@ export function CityPage() {
             );
           })}
         </List>
-      </Section>
-
-      <StreetGridBand />
-
-      <Section
+      </Section>)},
+{key: 'grid', node: (<StreetGridBand />)},
+{key: 'cast', node: (<Section
         aria-labelledby="w03-cast-title"
         data-testid="w03-cast"
         data-section="city-cast"
@@ -98,7 +111,9 @@ export function CityPage() {
             </ListItem>
           ))}
         </List>
-      </Section>
-    </View>
+      </Section>)}
+]} />
+</View>
   );
+
 }

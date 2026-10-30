@@ -1,0 +1,23 @@
+name: Caller identity contracts
+on:
+  pull_request:
+    paths:
+      - 'packages/payload/src/admin/console/views/Views.tsx'
+      - 'packages/payload/src/admin/console/views/ViewsClient.tsx'
+      - 'packages/payload/src/admin/console/caller-identity*'
+      - 'packages/ui/admin/**'
+      - '.github/workflows/caller-identity-contracts.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  identity-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+      - name: User ID projection, avatar fallback and column order
+        run: node --experimental-strip-types --test packages/ui/admin/caller-avatar.test.ts packages/payload/src/admin/console/caller-identity.node-test.ts

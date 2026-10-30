@@ -38,7 +38,7 @@ export function ArtTile({
       </Figure>
     );
   }
-  const place = caption && art.district && art.place ? art : null;
+  const place = caption && art.place ? art : null;
   return (
     <Figure id={id} className={`relative m-0 min-w-0 overflow-hidden bg-ink-900 ${frame}`}>
       <Image
@@ -47,6 +47,7 @@ export function ArtTile({
         fill
         framed={false}
         sizes={art.sizes}
+        unoptimized={typeof art.src === 'string' && art.src.startsWith('https://')}
         loading={eager ? 'eager' : 'lazy'}
         placeholder={art.blurDataURL ? 'blur' : undefined}
         blurDataURL={art.blurDataURL}
@@ -54,11 +55,11 @@ export function ArtTile({
         {...({ contentFit: fit } as object)}
         className="h-full w-full"
       />
-      {place?.district && place.place ? (
+      {place?.place ? (
         <Figcaption className="absolute bottom-0 left-0 m-0 flex max-w-full flex-row items-center gap-2.5 bg-signage-black px-3 py-2">
-          <View aria-hidden className={`h-3.5 w-3.5 shrink-0 rounded-full ${TONE_CLASSES[DISTRICT_TONE[place.district]].face}`} />
+          {place.district ? <View aria-hidden className={`h-3.5 w-3.5 shrink-0 rounded-full ${TONE_CLASSES[DISTRICT_TONE[place.district]].face}`} /> : null}
           <Text className="text-sm font-semibold text-signage-white">
-            {W01_COPY.placeCaption(place.district, place.place.place)}
+            {place.district ? W01_COPY.placeCaption(place.district, place.place.place) : place.place.title}
           </Text>
         </Figcaption>
       ) : null}

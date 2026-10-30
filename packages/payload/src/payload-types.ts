@@ -94,6 +94,7 @@ export interface Config {
     oauthConsents: OauthConsent;
     oauthClientAssertions: OauthClientAssertion;
     rateLimits: RateLimit;
+    'site-pages': SitePage;
     'payload-kv': PayloadKv;
     'payload-jobs': PayloadJob;
     'payload-locked-documents': PayloadLockedDocument;
@@ -130,6 +131,7 @@ export interface Config {
     oauthConsents: OauthConsentsSelect<false> | OauthConsentsSelect<true>;
     oauthClientAssertions: OauthClientAssertionsSelect<false> | OauthClientAssertionsSelect<true>;
     rateLimits: RateLimitsSelect<false> | RateLimitsSelect<true>;
+    'site-pages': SitePagesSelect<false> | SitePagesSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-jobs': PayloadJobsSelect<false> | PayloadJobsSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
@@ -241,6 +243,10 @@ export interface Media {
   id: number;
   bunnyUrl?: string | null;
   alt: string;
+  /**
+   * Derived from real page, section and image references, including saved revisions.
+   */
+  websiteUsage?: string | null;
   createdBy?: {
     relationTo: 'users';
     value: number | User;
@@ -630,16 +636,16 @@ export interface MonModel {
     | 'dex-065'
     | 'dex-066'
     | 'dex-067'
-    | 'dex-015'
-    | 'dex-016'
-    | 'dex-017'
-    | 'dex-018'
-    | 'dex-019'
     | 'dex-020'
     | 'dex-021'
     | 'dex-022'
     | 'dex-023'
     | 'dex-024'
+    | 'dex-015'
+    | 'dex-016'
+    | 'dex-017'
+    | 'dex-018'
+    | 'dex-019'
     | 'dex-025'
     | 'dex-026'
     | 'dex-027'
@@ -1410,6 +1416,143 @@ export interface RateLimit {
   createdAt: string;
 }
 /**
+ * Choose the page, then its named section. Copy, image positions and embeds stay attached to that section. Save a draft before publishing.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "site-pages".
+ */
+export interface SitePage {
+  id: number;
+  title: string;
+  /**
+   * Examples: /, /story, /city, /mons, /how-it-works, /get. Creating a record alone does not register a new website route.
+   */
+  route: string;
+  seo?: {
+    title?: string | null;
+    description?: string | null;
+  };
+  sections: {
+    label: string;
+    /**
+     * Keep this stable when editing an existing section. Homepage identifiers: hero, signage, world, district-divider, hlynk, starters, grid, care, hatch, waitlist.
+     */
+    sectionKey: string;
+    hidden?: boolean | null;
+    copy?:
+      | {
+          label: string;
+          key: string;
+          value?: string | null;
+          id?: string | null;
+        }[]
+      | null;
+    /**
+     * Reorder these blocks with their drag handles. Image positions replace an existing slot; inline images, galleries, text, YouTube and UI embeds appear after the section.
+     */
+    content?: (Text | Image | Gallery | Youtube | Iframe)[] | null;
+    id?: string | null;
+  }[];
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedAt: string;
+  createdAt: string;
+  _status?: ('draft' | 'published') | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "Text".
+ */
+export interface Text {
+  heading?: string | null;
+  body: string;
+  linkLabel?: string | null;
+  link?: string | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'text';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "Image".
+ */
+export interface Image {
+  /**
+   * inline adds an image below the section. Existing homepage positions include hero, world.primary, world.secondary, hlynk.static, hlynk.scanner, hlynk.controls, starter.1, starter.2, starter.3, and hatch.
+   */
+  slot: string;
+  /**
+   * Drop an image into the upload control, upload a new file, or choose from the media library. To change one placement, select a new media item rather than replacing a shared file.
+   */
+  image: number | Media;
+  /**
+   * Leave blank to use the media library alternative text.
+   */
+  alt?: string | null;
+  decorative?: boolean | null;
+  caption?: string | null;
+  focalX?: number | null;
+  focalY?: number | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'image';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "Gallery".
+ */
+export interface Gallery {
+  images: {
+    /**
+     * Drop an image into the upload control, upload a new file, or choose from the media library. To change one placement, select a new media item rather than replacing a shared file.
+     */
+    image: number | Media;
+    /**
+     * Leave blank to use the media library alternative text.
+     */
+    alt?: string | null;
+    caption?: string | null;
+    id?: string | null;
+  }[];
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'gallery';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "Youtube".
+ */
+export interface Youtube {
+  title: string;
+  url: string;
+  caption?: string | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'youtube';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "Iframe".
+ */
+export interface Iframe {
+  title: string;
+  /**
+   * Paste the URL only, not iframe HTML. Embed hosts are approved on the server. The target must allow this website to frame it.
+   */
+  url: string;
+  aspect?: ('16:9' | '4:3' | '1:1' | '9:16') | null;
+  caption?: string | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'iframe';
+}
+/**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv".
  */
@@ -1650,6 +1793,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'rateLimits';
         value: number | RateLimit;
+      } | null)
+    | ({
+        relationTo: 'site-pages';
+        value: number | SitePage;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -1750,6 +1897,7 @@ export interface UsersSelect<T extends boolean = true> {
 export interface MediaSelect<T extends boolean = true> {
   bunnyUrl?: T;
   alt?: T;
+  websiteUsage?: T;
   createdBy?: T;
   updatedBy?: T;
   updatedAt?: T;
@@ -2333,6 +2481,101 @@ export interface RateLimitsSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "site-pages_select".
+ */
+export interface SitePagesSelect<T extends boolean = true> {
+  title?: T;
+  route?: T;
+  seo?:
+    | T
+    | {
+        title?: T;
+        description?: T;
+      };
+  sections?:
+    | T
+    | {
+        label?: T;
+        sectionKey?: T;
+        hidden?: T;
+        copy?:
+          | T
+          | {
+              label?: T;
+              key?: T;
+              value?: T;
+              id?: T;
+            };
+        content?:
+          | T
+          | {
+              text?:
+                | T
+                | {
+                    heading?: T;
+                    body?: T;
+                    linkLabel?: T;
+                    link?: T;
+                    id?: T;
+                    blockName?: T;
+                  };
+              image?:
+                | T
+                | {
+                    slot?: T;
+                    image?: T;
+                    alt?: T;
+                    decorative?: T;
+                    caption?: T;
+                    focalX?: T;
+                    focalY?: T;
+                    id?: T;
+                    blockName?: T;
+                  };
+              gallery?:
+                | T
+                | {
+                    images?:
+                      | T
+                      | {
+                          image?: T;
+                          alt?: T;
+                          caption?: T;
+                          id?: T;
+                        };
+                    id?: T;
+                    blockName?: T;
+                  };
+              youtube?:
+                | T
+                | {
+                    title?: T;
+                    url?: T;
+                    caption?: T;
+                    id?: T;
+                    blockName?: T;
+                  };
+              iframe?:
+                | T
+                | {
+                    title?: T;
+                    url?: T;
+                    aspect?: T;
+                    caption?: T;
+                    id?: T;
+                    blockName?: T;
+                  };
+            };
+        id?: T;
+      };
+  createdBy?: T;
+  updatedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  _status?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv_select".
  */
 export interface PayloadKvSelect<T extends boolean = true> {
@@ -2658,7 +2901,8 @@ export interface CollectionQueryWidget {
       | 'oauthAccessTokens'
       | 'oauthConsents'
       | 'oauthClientAssertions'
-      | 'rateLimits';
+      | 'rateLimits'
+      | 'site-pages';
     where?:
       | {
           [k: string]: unknown;
@@ -2701,6 +2945,7 @@ export interface ActivityWidget {
           | 'oauthConsents'
           | 'oauthClientAssertions'
           | 'rateLimits'
+          | 'site-pages'
         )[]
       | null;
   };
