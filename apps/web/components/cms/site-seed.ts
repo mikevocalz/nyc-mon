@@ -51,7 +51,7 @@ export function buildSiteSeed(origin: string) {
   for (const [slot, image] of Object.entries(STORY_ART)) story.assets.push(...asset(origin, ({cleanCity: 'clean-city', rooftops: 'cascade', water: 'cascade'} as Record<string,string>)[slot] ?? slot, slot.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`), image));
   pages.push(story);
   const city = document('/city', 'The City', W03_COPY.districts.body, [section('districts', 'Districts', {...W03_COPY.districts, districts: DISTRICT_COPY}), section('grid', 'Street grid'), section('cast', 'People of the city', W03_COPY.cast)]);
-  for (const district of CITY_PHOTO_DISTRICTS) { const image = cityPhoto(district)!; city.assets.push(...asset(origin, 'districts', district, {...image, src: image.source, caption: {title: image.title, place: image.place}})); }
+  for (const district of CITY_PHOTO_DISTRICTS) { const image = cityPhoto(district)!; city.assets.push(...asset(origin, 'districts', district, {...image, district: undefined, src: image.source, caption: {title: image.title, place: image.place}})); }
   pages.push(city);
   const keys = ['meet','name','incubate','hatch','care'];
   const how = document('/how-it-works', 'How it works', W04_COPY.loop.body, [
@@ -79,6 +79,7 @@ export function buildSiteSeed(origin: string) {
       section('dossier','Egg and Bloodline',{...W02_COPY.detail,blurb:W02_COPY.detail.blurb[mon.slug]??'',line:mon.line,cultureNote:mon.cultureNote??''}),
       section('hatch','Hatch',W02_COPY.detail),section('others','Other Mons',{...W02_COPY.detail,...W02_COPY.index}),
     ]);
+    detail.page.seo.title=W02_COPY.meta.detailTitle(mon.babyName);
     const art=monsArt(mon.slot); detail.assets.push(...asset(origin,'hero',`starter.${mon.slot}.baby`,art.baby),...asset(origin,'dossier',`starter.${mon.slot}.egg`,art.egg),...asset(origin,'dossier',`starter.${mon.slot}.street`,art.street),...asset(origin,'hatch','hatch',hatchArt('100vw')));
     for(const other of starters.filter(other=>other.slot!==mon.slot)) detail.assets.push(...asset(origin,'others',`starter.${other.slot}.baby`,monsArt(other.slot).baby)); pages.push(detail);
   }
