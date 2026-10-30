@@ -11,7 +11,7 @@
 //
 //   node tooling/city/vd-port/write-cells-manifest.mjs
 import { createHash } from 'node:crypto';
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -39,6 +39,29 @@ for (const [level, dir] of [
 ]) {
   for (const f of readdirSync(dir).filter((n) => n.endsWith('.bin')).sort()) {
     add(`${level}/${f.slice(0, -4)}`, join(dir, f), true);
+  }
+}
+
+// The rings (ring1.mjs, ring2.mjs): a ring's cells stream (bundled: false) except the ones overlapping the home
+// square. Lane A's ring packs mark bundled per cell in their own manifest; lane C's ring cells are the ones packed
+// under cells/<ring>/.
+const HOME_EDGE = (cx, cz, size) => cx * size < 850 && cx * size + size > -850 && cz * size < 850 && cz * size + size > -850;
+for (const [ring, constName] of [['ring1', 'VD_BLOCKS_RING1'], ['ring2', 'VD_BLOCKS_RING2'], ['ring3', 'VD_BLOCKS_RING3'], ['ring4', 'VD_BLOCKS_RING4'], ['ring5', 'VD_BLOCKS_RING5'], ['ring6', 'VD_BLOCKS_RING6'], ['ring7', 'VD_BLOCKS_RING7'], ['ring8', 'VD_BLOCKS_RING8'], ['ring9', 'VD_BLOCKS_RING9'], ['ring10', 'VD_BLOCKS_RING10']]) {
+  const ringBlocksTs = join(APP, `world/vd-port/blocks/data-${ring}/manifest.ts`);
+  if (existsSync(ringBlocksTs)) {
+    const m = JSON.parse(readFileSync(ringBlocksTs, 'utf8').replace(new RegExp(`^[\\s\\S]*?${constName} = `), '').replace(/ as const;[\s\S]*$/, ''));
+    for (const level of ['near', 'lite']) {
+      for (const c of m[level]) {
+        const bundled = c.bundled !== false && HOME_EDGE(c.cx, c.cz, 128);
+        add(`${ring}-${level}/${c.key}`, join(APP, `world/vd-port/blocks/data-${ring}/${level}/${c.key}.bin`), bundled);
+      }
+    }
+  }
+  const ringCellsDir = join(APP, `world/vd-port/furniture/cells/${ring}`);
+  if (existsSync(ringCellsDir)) {
+    for (const f of readdirSync(ringCellsDir).filter((n) => n.endsWith('.bin')).sort()) {
+      add(`structures/${ring}/${f.slice(0, -4)}`, join(ringCellsDir, f), false);
+    }
   }
 }
 

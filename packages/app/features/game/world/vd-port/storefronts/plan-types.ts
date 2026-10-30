@@ -1,4 +1,4 @@
-// The storefront plan tooling/city/bake-vd-storefronts.mjs writes (plan.generated.ts). Scene metres; colours are
+// The storefront plan tooling/city/bake-vd-storefronts.mjs writes (plan.bin, read by load.ts). Scene metres; colours are
 // display-space RGB floats (sRGB), decoded to linear by the materials on the physical stack.
 export type Rgb = readonly [number, number, number] | number[];
 
@@ -61,6 +61,9 @@ export interface NamedShop {
 export interface Front extends FrontFrame {
   /** 0 a spec'd face (fk/specs), 1 a namedShops.js front, 2 nycDress storefront units. */
   src: 0 | 1 | 2;
+  /** The ring district the front belongs to (bake-vd-storefronts.mjs --ring ringN): drawn whether or not the
+   * tile's playable square covers it. */
+  ring?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
   id: string;
   addr: string;
   bays: (StoreBay | EntranceBay)[];

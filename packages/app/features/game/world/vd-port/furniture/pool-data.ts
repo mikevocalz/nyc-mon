@@ -31,6 +31,9 @@ export interface PackedPool {
   count: number;
   /** INSTANCE_BYTES per instance, see decodeInstances. */
   data: Block;
+  /** The u16 scale step's inverse (sx = u16 / scaleQ); absent = 4096. A pool with a piece longer than 16 units (ring 8's
+   *  18.2 m Long Island City scaffold) is written at a coarser power-of-two step so the u16 still holds it. */
+  scaleQ?: number;
   /** Expanded manifests may store each x/y/z relative to this per-instance absolute origin. */
   instanceOrigins?: Float64Array;
 }
@@ -61,6 +64,7 @@ export function decodeInstances(buf: ArrayBuffer, pool: PackedPool, groundY: (x:
   const origins = pool.instanceOrigins;
   if (origins && origins.length !== pool.count * 3) throw new Error(`vd furniture ${pool.name}: ${origins.length / 3} instance origins for ${pool.count} instances`);
   const TURN = (2 * Math.PI) / 65536;
+  const SQ = pool.scaleQ ?? 4096;
   for (let i = 0; i < pool.count; i++) {
     const o = i * INSTANCE_BYTES;
     const r = i * INSTANCE_FLOATS;
@@ -73,9 +77,9 @@ export function decodeInstances(buf: ArrayBuffer, pool: PackedPool, groundY: (x:
     const wz = origins ? origins[i * 3 + 2]! + z : z;
     if (flags & 1) y += groundY(wx, wz);
     positions[i * 3] = wx; positions[i * 3 + 1] = origins ? wy + (origins ? y - view.getFloat32(o + 4, true) : 0) : y; positions[i * 3 + 2] = wz;
-    const sx = view.getUint16(o + 14, true) / 4096;
-    const sy = view.getUint16(o + 16, true) / 4096;
-    const sz = view.getUint16(o + 18, true) / 4096;
+    const sx = view.getUint16(o + 14, true) / SQ;
+    const sy = view.getUint16(o + 16, true) / SQ;
+    const sz = view.getUint16(o + 18, true) / SQ;
     record[r] = x; record[r + 1] = y; record[r + 2] = z; record[r + 3] = view.getUint16(o + 12, true) * TURN;
     record[r + 4] = sx; record[r + 5] = sy; record[r + 6] = sz; record[r + 7] = Math.max(sx, sy, sz);
     record[r + 8] = (view.getUint8(o + 20) / 255) * 2;

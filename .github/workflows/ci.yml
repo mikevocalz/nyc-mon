@@ -7,6 +7,9 @@ on:
 jobs:
   ci:
     runs-on: ubuntu-latest
+    # main finishes in ~25 min; a hung task (PR #147: web build stuck 2h44m in turbo until cancelled) fails here
+    # instead of holding the runner for hours.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - name: Fail on committed .env files
@@ -29,7 +32,9 @@ jobs:
       - run: pnpm --filter mobile exec expo prebuild --platform android --no-install
       - run: pnpm spatial:verify-android
       - run: pnpm spatial:verify-typegpu
-      - run: pnpm turbo build typecheck lint
+      - name: pnpm turbo build typecheck lint
+        timeout-minutes: 30
+        run: pnpm turbo build typecheck lint
       - name: Verify City atlas responsive layout
         timeout-minutes: 5
         run: |

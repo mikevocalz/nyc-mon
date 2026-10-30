@@ -18,6 +18,8 @@ export function sourceNearPackage(
   level: 'near' | 'lite',
   bundled?: () => Promise<ArrayBuffer>,
   coordinateFrame: BlockCoordinateFrame = 'absolute',
+  /** The cell-source key; defaults to '<level>/<cell>'. Ring cells live under 'ring1-<level>/<cell>'. */
+  sourceKey?: string,
 ): CellPackage {
   let file: Uint8Array | null = null;
   let arrays: NearArrays | null = null;
@@ -51,7 +53,7 @@ export function sourceNearPackage(
     prefetch() {
       if (file) return;
       if (pending) return pending;
-      return (pending = vdCellFetch(`${level}/${info.key}`, bundled)
+      return (pending = vdCellFetch(sourceKey ?? `${level}/${info.key}`, bundled)
         .then((got) => { file = got instanceof Uint8Array ? got : got ? new Uint8Array(got) : null; return file !== null; })
         .finally(() => { pending = null; }));
     },
