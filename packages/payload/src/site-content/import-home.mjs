@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer';
 import { readFile } from 'node:fs/promises';
 import { createHash, randomUUID } from 'node:crypto';
 import { record, sectionKeysAreUnique } from '../../../content/site-content/core.ts';
@@ -77,4 +78,4 @@ async function main() {
     else if (typeof payload.db.destroy === 'function') await payload.db.destroy();
   }
 }
-main().catch((error) => { console.error(error instanceof Error ? error.message : 'Website import failed'); process.exitCode = 1; });
+await main().catch((error) => { console.error(error instanceof Error ? error.message : 'Website import failed'); process.exitCode = 1; });

@@ -157,6 +157,9 @@ export const bunnyMediaAfterChange: CollectionAfterChangeHook<
       collection: collection.slug as 'media',
       id: doc.id,
       data: { bunnyUrl: mainURL },
+      // This trusted hook persists its own computed URL after the outer write was authorized.
+      // Payload 4 defaults Local API access enforcement on, including service imports with no user.
+      overrideAccess: true,
       depth: 0,
       req,
     });
@@ -178,7 +181,7 @@ export const bunnyMediaAfterChange: CollectionAfterChangeHook<
     );
   }
 
-  return { ...doc, bunnyUrl: mainURL };
+  return withBunnyMediaURLs({ ...doc, bunnyUrl: mainURL });
 };
 
 export const bunnyMediaAfterDelete: CollectionAfterDeleteHook<

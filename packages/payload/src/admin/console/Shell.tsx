@@ -1,6 +1,6 @@
 'use client';
 import type { ReactNode } from 'react';
-import { useRouter } from '@payloadcms/ui';
+import { useAuth, useConfig, useRouter } from '@payloadcms/ui';
 import { BottomSheet, BrandWordmark, TabBar, Toaster, type TabBarTab } from '@acme/ui/admin';
 import { Aside, Button, Footer, Header, Heading, Link, List, ListItem, Main, Nav, Page, Section, Text } from '@acme/ui/html';
 import { Box, Home, MoreHorizontal, ShieldCheck, Users } from '@acme/ui/icons';
@@ -10,11 +10,11 @@ import { useShellStore } from './stores';
 
 const links = [
   ['/admin/overview', 'overview'], ['/admin/callers', 'callers'], ['/admin/consent', 'consent'],
-  ['/admin/mons', 'mons'], ['/admin/models', 'models'], ['/admin/content', 'content'], ['/admin/audit', 'audit'], ['/admin/settings', 'settings'],
+  ['/admin/mons', 'mons'], ['/admin/models', 'models'], ['/admin/content', 'content'], ['/admin/collections/site-pages', 'website'], ['/admin/audit', 'audit'], ['/admin/settings', 'settings'],
 ] as const;
 
 const moreLinks = [
-  ['/admin/models', 'models'], ['/admin/content', 'content'], ['/admin/audit', 'audit'], ['/admin/settings', 'settings'],
+  ['/admin/models', 'models'], ['/admin/content', 'content'], ['/admin/collections/site-pages', 'website'], ['/admin/audit', 'audit'], ['/admin/settings', 'settings'],
 ] as const;
 
 const icon = (Icon: typeof Home, name: string) => {
@@ -38,6 +38,11 @@ const navItem = (active: boolean) =>
 
 export function ConsoleShell({ section, heading, children }: { section: keyof typeof consoleCopy.nav; heading: string; children: ReactNode }) {
   const router = useRouter();
+  const {config} = useConfig();
+  const {user} = useAuth();
+  const websiteEnabled = config.collections.some(collection => collection.slug === 'site-pages') && ['ops', 'content'].includes(String(user?.role));
+  const visibleLinks = links.filter(([,key]) => key !== 'website' || websiteEnabled);
+  const visibleMoreLinks = moreLinks.filter(([,key]) => key !== 'website' || websiteEnabled);
   const appearance = useShellStore((state) => state.appearance);
   const moreOpen = useShellStore((state) => state.moreOpen);
   const setMoreOpen = useShellStore((state) => state.setMoreOpen);
@@ -50,7 +55,7 @@ export function ConsoleShell({ section, heading, children }: { section: keyof ty
     { key: 'callers', label: consoleCopy.nav.callers, href: '/admin/callers', icon: icon(Users, 'CallersIcon'), active: section === 'callers' },
     { key: 'consent', label: consoleCopy.nav.consent, href: '/admin/consent', icon: icon(ShieldCheck, 'ConsentIcon'), active: section === 'consent' },
     { key: 'mons', label: consoleCopy.nav.mons, href: '/admin/mons', icon: icon(Box, 'MonsIcon'), active: section === 'mons' },
-    { key: 'more', label: consoleCopy.nav.more, icon: icon(MoreHorizontal, 'MoreIcon'), onPress: () => setMoreOpen(true), active: moreLinks.some(([, key]) => key === section) },
+    { key: 'more', label: consoleCopy.nav.more, icon: icon(MoreHorizontal, 'MoreIcon'), onPress: () => setMoreOpen(true), active: visibleMoreLinks.some(([, key]) => key === section) },
   ];
   return (
     <Page className={`nycmon-console min-h-dvh bg-bg font-sans text-text ${appearance === 'night' ? 'scheme-dark' : appearance === 'daylit' ? 'scheme-light' : ''}`} testID="console-root">
@@ -62,7 +67,7 @@ export function ConsoleShell({ section, heading, children }: { section: keyof ty
           </Link>
         </Header>
         <Nav aria-label="Console" className="flex-1 gap-1 overflow-y-auto px-3 py-4">
-          {links.map(([href, key]) => <Link key={key} href={href} aria-current={key === section ? 'page' : undefined} className={navItem(key === section)} testID={`console-nav-${key}`}>{consoleCopy.nav[key]}</Link>)}
+          {visibleLinks.map(([href, key]) => <Link key={key} href={href} aria-current={key === section ? 'page' : undefined} className={navItem(key === section)} testID={`console-nav-${key}`}>{consoleCopy.nav[key]}</Link>)}
         </Nav>
         <Footer className="border-t border-border px-3 py-3">
           <Button onPress={() => void signOut()} className={`${navItem(false)} w-full`} accessibilityLabel={consoleCopy.shell.signOut}>
@@ -86,7 +91,7 @@ export function ConsoleShell({ section, heading, children }: { section: keyof ty
       <BottomSheet open={moreOpen} onClose={() => setMoreOpen(false)} closeLabel="Close" title={consoleCopy.nav.more} scheme="system" testID="console-more-sheet">
         <Nav aria-label="More sections" className="gap-1 pb-4">
           <List className="gap-1">
-            {moreLinks.map(([href, key]) => (
+            {visibleMoreLinks.map(([href, key]) => (
               <ListItem key={key}>
                 <Link href={href} aria-current={key === section ? 'page' : undefined} onPress={() => setMoreOpen(false)} className={navItem(key === section)} testID={`console-more-${key}`}>{consoleCopy.nav[key]}</Link>
               </ListItem>

@@ -1,4 +1,5 @@
-import { APIError, type CollectionBeforeChangeHook, type CollectionBeforeDeleteHook, type Field, type PayloadRequest } from 'payload';
+import { randomUUID } from 'node:crypto';
+import { APIError, type CollectionBeforeOperationHook, type CollectionBeforeChangeHook, type CollectionBeforeDeleteHook, type Field, type PayloadRequest } from 'payload';
 import { hasStaffRole } from '../collections/access/roles';
 import { mediaPlacements, record } from '@acme/content/site-content';
 
@@ -61,15 +62,19 @@ export const websiteMediaUsage: Field = {
   }] },
 };
 
-export const protectWebsiteMediaReplacement: CollectionBeforeChangeHook = async ({ req, operation, originalDoc, data }) => {
-  if (operation !== 'update' || !originalDoc?.id) return data;
-  if (!req.file && hasStaffRole(req, ['ops', 'content'])) return data;
-  if ((await usedOn(req, originalDoc.id)).length) {
-    if (!hasStaffRole(req, ['ops', 'content'])) throw new APIError('Only website editors can change media used by a website page.', 403);
-    if (req.file) throw new APIError('This image is used by a website page or revision. Upload a new image and select it in the section; replacing the shared file would also change published pages.', 409);
-  }
+export const protectWebsiteMediaReplacement: CollectionBeforeChangeHook = ({ req, operation, data }) => {
+  if (operation === 'update' && req.file) throw new APIError('Upload a new media item and select it in the section. Files stay immutable so published pages and revision restores remain safe.', 409);
   return data;
 };
-export const protectWebsiteMediaDelete: CollectionBeforeDeleteHook = async ({ req, id }) => {
-  if ((await usedOn(req, id)).length) throw new APIError('This image is used by a website page, draft, or revision. Remove those references before deleting it.', 409);
+export const protectWebsiteMediaDelete: CollectionBeforeDeleteHook = () => {
+  throw new APIError('Media files are retained for published pages and revisions. Use a new upload to replace a section image; permanent cleanup is a separate maintenance operation.', 409);
+};
+
+/** Generate collision-free object names before Payload computes upload metadata. */
+export const nameWebsiteUpload: CollectionBeforeOperationHook = ({operation, req, args}) => {
+  if (operation === 'create' && req.file) {
+    const extension = /\.([a-z0-9]{1,10})$/i.exec(req.file.name)?.[1]?.toLowerCase();
+    req.file.name = `website-${randomUUID()}${extension ? `.${extension}` : ''}`;
+  }
+  return args;
 };

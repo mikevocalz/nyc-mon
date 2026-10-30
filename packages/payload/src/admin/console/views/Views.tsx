@@ -13,6 +13,11 @@ function requireUser({ initPageResult }: AdminViewServerProps): NonNullable<Admi
 export async function OverviewView(props: AdminViewServerProps) {
   const user = requireUser(props); if (!user) return null;
   const { req } = props.initPageResult;
+  // Content editors have no caller/consent access; take them straight to their editing workspace.
+  if (user.role === 'content' && req.payload.collections['site-pages']) {
+    req.server?.redirect(`${req.payload.config.routes.admin}/collections/site-pages`);
+    return null;
+  }
   const [consents, eggs, mons, runs, events] = await Promise.all([
     req.payload.count({ collection: 'guardian-consents', where: { status: { equals: 'pending' } }, user, overrideAccess: false, req }),
     req.payload.count({ collection: 'eggs', user, overrideAccess: false, req }), req.payload.count({ collection: 'mon-instances', user, overrideAccess: false, req }),
