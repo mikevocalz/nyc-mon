@@ -15,7 +15,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: website-editor-${{ github.head_ref || github.ref_name }}
+  group: website-editor-${{ github.event_name }}-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 jobs:
   source-evidence:
