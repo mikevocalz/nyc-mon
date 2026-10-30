@@ -65,7 +65,8 @@ const CARD_ACCENTS = ['bg-orange-500', 'bg-royal-500', 'bg-carolina-500', 'bg-le
                               src={cityPhotoHref(photo.source)} alt={photo.alt} fill framed={false}
                               className="h-full w-full" sizes={photo.sizes}
                               contentPosition={photo.position} loading={leading ? 'eager' : 'lazy'}
-                              placeholder="blur" blurDataURL={photo.blurDataURL}
+                              placeholder={photo.blurDataURL ? 'blur' : 'empty'} blurDataURL={photo.blurDataURL}
+                              unoptimized={cityPhotoHref(photo.source).startsWith('https://')}
                             />
                           </View>
                         </View>

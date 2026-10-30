@@ -51,7 +51,7 @@ export function StoryPage({ page = null, embedOrigins = [], siteOrigin = '' }: C
         return (<Section aria-labelledby="story-title" data-testid="story-hero" className="relative w-full overflow-hidden bg-ink-950">
       <Figure className="absolute inset-0 m-0">
         <View id="mfx-hero-art" className="absolute inset-0">
-          <Image src={PHOTOS.hero.src as ImageProps['src']} alt={PHOTOS.hero.alt} fill framed={false} priority loading="eager" sizes={PHOTOS.hero.sizes} placeholder="blur" blurDataURL={PHOTOS.hero.blurDataURL} contentPosition={artPosition(PHOTOS.hero)} className="h-full w-full"/>
+          <Image src={PHOTOS.hero.src as ImageProps['src']} alt={PHOTOS.hero.alt} fill framed={false} priority loading="eager" sizes={PHOTOS.hero.sizes} placeholder={PHOTOS.hero.blurDataURL ? 'blur' : 'empty'} blurDataURL={PHOTOS.hero.blurDataURL} unoptimized={typeof PHOTOS.hero.src === 'string' && PHOTOS.hero.src.startsWith('https://')} contentPosition={artPosition(PHOTOS.hero)} className="h-full w-full"/>
         </View>
         <View aria-hidden className="absolute inset-0 bg-ink-950/55"/>
         <View aria-hidden className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-ink-950 to-transparent"/>
@@ -171,7 +171,7 @@ export function StoryPage({ page = null, embedOrigins = [], siteOrigin = '' }: C
       <View className="relative h-full w-full overflow-hidden">
         <Figure className="absolute inset-0 m-0">
           <View id="mpx-extinction-art" className="absolute inset-0">
-            <Image src={PHOTOS.extinction.src as ImageProps['src']} alt={PHOTOS.extinction.alt} fill framed={false} sizes={PHOTOS.extinction.sizes} loading="lazy" placeholder="blur" blurDataURL={PHOTOS.extinction.blurDataURL} contentPosition={artPosition(PHOTOS.extinction)} className="h-full w-full"/>
+            <Image src={PHOTOS.extinction.src as ImageProps['src']} alt={PHOTOS.extinction.alt} fill framed={false} sizes={PHOTOS.extinction.sizes} loading="lazy" placeholder={PHOTOS.extinction.blurDataURL ? 'blur' : 'empty'} blurDataURL={PHOTOS.extinction.blurDataURL} unoptimized={typeof PHOTOS.extinction.src === 'string' && PHOTOS.extinction.src.startsWith('https://')} contentPosition={artPosition(PHOTOS.extinction)} className="h-full w-full"/>
           </View>
           <View id="mpx-extinction-scrim" aria-hidden className="absolute inset-0 bg-ink-950/70"/>
           <PlaceCaption entry={PHOTOS.extinction} className="bottom-0 right-0"/>
