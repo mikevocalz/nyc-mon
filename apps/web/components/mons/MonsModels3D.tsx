@@ -28,7 +28,9 @@ function useStageWidth() {
   const w = useStageStore(state => state.width);
   const setW = (width: number) => useStageStore.setState({width});
   useEffect(() => {
-    const fit = () => setW(Math.max(260, Math.min(420, window.innerWidth - 48)));
+    // A card is the stage plus 36px (p-4 and border-2 per side) inside the page's 16px
+    // gutters, so the stage gets innerWidth - 68 to keep the card inside a phone screen.
+    const fit = () => setW(Math.max(220, Math.min(420, window.innerWidth - 68)));
     let t: ReturnType<typeof setTimeout> | undefined;
     const onResize = () => {
       clearTimeout(t);

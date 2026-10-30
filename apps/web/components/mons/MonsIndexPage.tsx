@@ -147,7 +147,7 @@ export function MonsIndexPage({ page = null, embedOrigins = [], siteOrigin = '' 
                 {starters.map((starter) => {
                         const tone = monsArt(starter.slot).tone;
                         return (<ListItem key={starter.slug}>
-                      <Link href={siteHref(copy.cardHref(starter.slug))} aria-label={copy.cardLabel(starter.babyName)} className="flex min-h-12 flex-row items-center gap-3 border-2 border-ink-700 bg-signage-black py-2 pl-2 pr-4 no-underline transition-colors duration-200 hover:border-orange-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus motion-reduce:transition-none">
+                      <Link href={siteHref(copy.cardHref(starter.slug))} className="flex min-h-12 flex-row items-center gap-3 border-2 border-ink-700 bg-signage-black py-2 pl-2 pr-4 no-underline transition-colors duration-200 hover:border-orange-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus motion-reduce:transition-none">
                         <RouteDisc tone={tone} className="h-8 w-8"/>
                         <Text className="font-display text-sm text-signage-white">{dexDigits(starter.dexId)}</Text>
                         <Text className="text-sm font-semibold text-silver-200">{starter.babyName}</Text>

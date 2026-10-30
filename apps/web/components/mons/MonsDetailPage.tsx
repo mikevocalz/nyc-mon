@@ -191,7 +191,7 @@ export function MonsDetailPage({ starter: defaultStarter, page = null, embedOrig
         const a = monsArt(starter.slot);
         const t = TONE_CLASSES[a.tone];
         return (<ListItem id={`mfx-others-${index}`} className="min-w-0">
-      <Link href={siteHref(copy.cardHref(starter.slug))} aria-label={copy.cardLabel(starter.babyName)} className="group flex h-full flex-col border-2 border-ink-950 bg-surface-raised no-underline transition-transform duration-200 hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 sm:flex-row md:flex-col motion-reduce:transition-none motion-reduce:hover:translate-y-0">
+      <Link href={siteHref(copy.cardHref(starter.slug))} className="group flex h-full flex-col border-2 border-ink-950 bg-surface-raised no-underline transition-transform duration-200 hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 sm:flex-row md:flex-col motion-reduce:transition-none motion-reduce:hover:translate-y-0">
         <Figure className="relative m-0 aspect-square w-full shrink-0 overflow-hidden bg-ink-900 sm:w-1/2 md:w-full">
           <ArtFill entry={a.baby && { ...a.baby, sizes: `(min-width: ${breakpoints.lg}) 24rem, (min-width: ${breakpoints.md}) 33vw, (min-width: ${breakpoints.sm}) 50vw, 100vw` }}/>
           {a.baby ? <ConceptCaption label={sectionText(sectionFor(page, 'captions'), 'conceptArt', DEFAULT_COPY.conceptArt)} /> : null}
