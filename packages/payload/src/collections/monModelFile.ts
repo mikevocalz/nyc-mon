@@ -5,6 +5,20 @@
 /** Bunny and the viewer both load the whole file; keep Mons phone-sized. */
 export const MON_MODEL_MAX_BYTES = 25 * 1024 * 1024;
 
+/**
+ * Vercel rejects a function request body over 4.5 MB with a 413 before Payload
+ * runs. Files up to this size go up in one multipart request; larger ones go
+ * up in raw chunks of this size through the staged upload endpoints.
+ */
+export const MON_MODEL_CHUNK_BYTES = 4 * 1024 * 1024;
+
+/** How many chunks a file of `size` bytes takes. */
+export const chunkCount = (size: number) => Math.max(1, Math.ceil(size / MON_MODEL_CHUNK_BYTES));
+
+/** The exact byte length chunk `index` must have for a file of `size` bytes. */
+export const chunkLength = (size: number, index: number) =>
+  Math.min(MON_MODEL_CHUNK_BYTES, size - index * MON_MODEL_CHUNK_BYTES);
+
 const GLB_MAGIC = 0x46546c67; // 'glTF'
 
 export type MonModelFileProblem = 'type' | 'empty' | 'size' | 'header' | 'version' | 'length';
