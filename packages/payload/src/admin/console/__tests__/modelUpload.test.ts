@@ -160,7 +160,8 @@ describe('staged upload endpoints', () => {
     const update = vi.fn(async (args: Record<string, unknown>) => ({ id: args.id, args }));
     const body = options.body;
     const req = {
-      user: options.role ? { id: 7, role: options.role, collection: 'users' } : null,
+      // Console access needs an ADMIN_ALLOWED_EMAILS email; the owner default is used here.
+      user: options.role ? { id: 7, role: options.role, collection: 'users', email: 'mikefacesny@gmail.com' } : null,
       method: body ? 'PUT' : 'POST',
       data: options.data,
       routeParams: options.params ?? {},

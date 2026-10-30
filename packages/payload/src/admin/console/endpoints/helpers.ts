@@ -1,5 +1,6 @@
 import { addDataAndFileToRequest, commitTransaction, initTransaction, killTransaction } from 'payload';
 import type { PayloadRequest } from 'payload';
+import { hasConsoleAccess } from '../../../auth/admin-allowlist.ts';
 import { hasStaffRole, type StaffRole } from '../../../collections/access/roles.ts';
 import { isAuditReasonCode, type AuditReasonCode } from '../../../collections/audit/codes.ts';
 import { ConsoleError } from './errors.ts';
@@ -21,7 +22,9 @@ export async function readBody(req: PayloadRequest): Promise<Record<string, unkn
 }
 
 export function requireStaff(req: PayloadRequest, roles: readonly StaffRole[]): void {
-  if (!hasStaffRole(req, roles)) {
+  // hasConsoleAccess adds the ADMIN_ALLOWED_EMAILS check on top of the role:
+  // a signed-in account outside the allowlist is refused like a non-staff one.
+  if (!hasStaffRole(req, roles) || !hasConsoleAccess(req.user)) {
     throw new ConsoleError('FORBIDDEN_ROLE', 403, 'This action requires a staff role.');
   }
 }

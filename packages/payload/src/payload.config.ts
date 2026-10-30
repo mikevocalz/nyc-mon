@@ -10,6 +10,7 @@ import { betterAuth } from 'better-auth';
 import { mcpPlugin } from '@payloadcms/plugin-mcp';
 import { APIError, buildConfig } from 'payload';
 import { deleteDueCallersTask, selfDeletionOptions } from './auth/deletion';
+import { consoleSignInGate } from './auth/admin-allowlist';
 import { AUTH_BASE_PATH, PAYLOAD_API_ROUTE, PAYLOAD_CORS_ORIGINS, PAYLOAD_ORIGINS, betterAuthOptions, sendMail } from './auth/options';
 import { accountMerge } from './auth/plugins/account-merge';
 import { adminComponents } from './admin/components';
@@ -122,6 +123,14 @@ export default buildConfig({
           // Self-service deletion (M20): Mons and eggs pass to the sanctuary
           // before Better Auth removes the user (deletion.ts, DECISIONS L3).
           user: { ...betterAuthOptions.user, deleteUser: selfDeletionOptions(payload) },
+          hooks: {
+            ...betterAuthOptions.hooks,
+            // Console credential sign-in (marked x-nycmon-surface: admin by the
+            // login form) answers only to ADMIN_ALLOWED_EMAILS. Everything else
+            // — callers, the judges' OAuth linking sign-in, /v1 — falls through
+            // to the shared before-hook untouched.
+            before: consoleSignInGate(betterAuthOptions.hooks?.before, payload),
+          },
           database: payloadAdapter({ payloadClient: payload }),
         }),
     }),
