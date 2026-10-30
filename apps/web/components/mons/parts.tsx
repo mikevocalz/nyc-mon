@@ -75,7 +75,7 @@ export function DexChip({ dexId, tone, large = false, label }: { dexId: number; 
     <Text
       className={`self-start font-display ${t.face} ${t.onFace} ${large ? 'px-4 pb-1.5 pt-2 text-2xl md:text-3xl' : 'px-2.5 py-1 text-sm'}`}
     >
-      {label ?? W02_COPY.index.dex(dexId)}
+      {label ?? W02_COPY.index.dex(dexDigits(dexId))}
     </Text>
   );
 }

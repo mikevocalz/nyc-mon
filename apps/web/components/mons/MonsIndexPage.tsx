@@ -87,7 +87,7 @@ export function MonsIndexPage({ page = null, embedOrigins = [], siteOrigin = '' 
         <View id={`mfx-${beat}-sign`} className={`min-w-0 justify-between gap-6 bg-signage-black px-6 py-7 md:px-8 md:py-9 ${place.sign}`}>
           <View className="gap-4">
             <View className="flex-row flex-wrap items-center gap-3">
-              <DexChip label={copyTree(DEFAULT_COPY.index, sectionFor(page, 'captions')).dex(starter.dexId)} dexId={starter.dexId} tone={a.tone}/>
+              <DexChip label={copyTree(DEFAULT_COPY.index, sectionFor(page, 'captions')).dex(dexDigits(starter.dexId))} dexId={starter.dexId} tone={a.tone}/>
               <Text className="text-sm font-semibold text-silver-200">{copy.hatchesFrom(starter.eggName)}</Text>
             </View>
             <Heading level={2} id={nameId} className="my-0 break-words font-display text-[2.5rem] uppercase leading-display text-signage-white sm:text-display-lg sm:leading-display xl:text-display-xl xl:leading-display">

@@ -13,7 +13,8 @@ export const W02_COPY = {
     title: 'The Mons',
     body: 'Four Bloodlines hatch in this city, each from its own egg. Whoever hatches for you comes out a Baby and grows up beside a Caller. Meet them before one chooses you.',
     hatchesFrom: (egg: string) => `Hatches from the ${egg}`,
-    dex: (dexId: number) => `No. ${String(dexId).padStart(3, '0')}`,
+    /** Takes dexDigits(dexId), so an edited "No. {0}" row keeps the zero padding. */
+    dex: (digits: string) => `No. ${digits}`,
     cardHref: (slug: string) => `/mons/${slug}`,
     cardLabel: (baby: string) => `Meet ${baby}`,
     /** The closing band: the home page's hatch line, then the site's one CTA. */
@@ -24,7 +25,8 @@ export const W02_COPY = {
   conceptArt: 'Concept art',
   detail: {
     eyebrow: (bloodline: string) => bloodline,
-    dex: (dexId: number) => `No. ${String(dexId).padStart(3, '0')}`,
+    /** Takes dexDigits(dexId), so an edited "No. {0}" row keeps the zero padding. */
+    dex: (digits: string) => `No. ${digits}`,
     bloodlineBody: (bloodline: string) =>
       `A Bloodline is a Dex family: the same roots under every Mon in it. The ${bloodline} starts as an Egg and hatches a Baby, and the Baby grows up beside a Caller.`,
     eggBody: (egg: string, baby: string) =>

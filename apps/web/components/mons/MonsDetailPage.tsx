@@ -62,7 +62,7 @@ export function MonsDetailPage({ starter: defaultStarter, page = null, embedOrig
               </Text>))}
           </Heading>
           <View id="mfx-hero-meta" className="flex-row flex-wrap items-center gap-4">
-            <DexChip label={copyTree(DEFAULT_COPY.index, sectionFor(page, 'captions')).dex(starter.dexId)} dexId={starter.dexId} tone={a.tone} large/>
+            <DexChip label={copyTree(DEFAULT_COPY.index, sectionFor(page, 'captions')).dex(dexDigits(starter.dexId))} dexId={starter.dexId} tone={a.tone} large/>
             <View className="flex-row items-center gap-3">
               <RouteDisc tone={a.tone}/>
               <Text className="text-base font-semibold text-silver-200">{W02_COPY.index.hatchesFrom(starter.eggName)}</Text>
@@ -119,7 +119,7 @@ export function MonsDetailPage({ starter: defaultStarter, page = null, embedOrig
                   <RouteDisc tone={a.tone} className="relative h-8 w-8"/>
                   <View className="min-w-0 flex-1 gap-1 md:flex-none">
                     <Text className="text-sm font-semibold uppercase tracking-widest text-silver-300">
-                      {step.dexId === null ? step.stage : `${step.stage} · ${copy.dex(step.dexId)}`}
+                      {step.dexId === null ? step.stage : `${step.stage} · ${copy.dex(dexDigits(step.dexId))}`}
                     </Text>
                     <Text className="break-words font-display text-2xl uppercase leading-heading text-signage-white sm:text-display-board">{step.name ?? copy.unnamedForm}</Text>
                   </View>
@@ -200,7 +200,7 @@ export function MonsDetailPage({ starter: defaultStarter, page = null, embedOrig
           <Text aria-hidden className={`absolute -right-2 top-0 font-display text-[6rem] leading-none ${NUMERAL_TEXT[a.tone]}`}>
             {dexDigits(starter.dexId)}
           </Text>
-          <DexChip label={copyTree(DEFAULT_COPY.index, sectionFor(page, 'captions')).dex(starter.dexId)} dexId={starter.dexId} tone={a.tone}/>
+          <DexChip label={copyTree(DEFAULT_COPY.index, sectionFor(page, 'captions')).dex(dexDigits(starter.dexId))} dexId={starter.dexId} tone={a.tone}/>
           <Text className="relative font-display text-display-sm uppercase leading-heading text-text">{starter.babyName}</Text>
           <View className="flex-row items-center gap-2 border-l-4 border-ink-950 pl-3">
             <Text className="text-base font-semibold text-text">{starter.bloodline}</Text>

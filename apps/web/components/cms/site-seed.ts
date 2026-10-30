@@ -79,6 +79,7 @@ export function buildSiteSeed(origin: string) {
       section('dossier','Egg and Bloodline',{...W02_COPY.detail,blurb:W02_COPY.detail.blurb[mon.slug]??'',line:mon.line,cultureNote:mon.cultureNote??''}),
       section('hatch','Hatch',W02_COPY.detail),section('others','Other Mons',{...W02_COPY.detail,...W02_COPY.index}),
     ]);
+    detail.page.seo.title=W02_COPY.meta.detailTitle(mon.babyName);
     const art=monsArt(mon.slot); detail.assets.push(...asset(origin,'hero',`starter.${mon.slot}.baby`,art.baby),...asset(origin,'dossier',`starter.${mon.slot}.egg`,art.egg),...asset(origin,'dossier',`starter.${mon.slot}.street`,art.street),...asset(origin,'hatch','hatch',hatchArt('100vw')));
     for(const other of starters.filter(other=>other.slot!==mon.slot)) detail.assets.push(...asset(origin,'others',`starter.${other.slot}.baby`,monsArt(other.slot).baby)); pages.push(detail);
   }
