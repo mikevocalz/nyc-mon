@@ -14,7 +14,9 @@
     "./voice": "./mon-voice.ts",
     "./lines": "./mon-lines.ts",
     "./lingo": "./lingo/index.ts",
-    "./site-content": "./site-content/reader.ts"
+    "./site-content": "./site-content/reader.ts",
+    "./site-content-bindings": "./site-content/bindings.ts",
+    "./site-preview": "./site-content/preview.ts"
   },
   "scripts": {
     "lint": "eslint",
