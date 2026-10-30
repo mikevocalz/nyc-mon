@@ -21,7 +21,7 @@ const nextConfig: NextConfig = {
   // release root, world/cell-source/index.ts) is passed through here. A new release (r2-publish.mjs) means bumping
   // this default, the two EAS profiles in apps/mobile/eas.json and the .env.r2.example sample together.
   env: {
-    EXPO_PUBLIC_VD_CELL_BASE: process.env.EXPO_PUBLIC_VD_CELL_BASE ?? 'https://city-assets.nyc-mon.city/releases/r20261029-cd5483ac',
+    EXPO_PUBLIC_VD_CELL_BASE: process.env.EXPO_PUBLIC_VD_CELL_BASE ?? 'https://city-assets.nyc-mon.city/releases/r20261030-c98106d6',
     // Hand-written public/ URLs (CanvasKit, Viro wasm, H-Lynk captures) read this; set only on the Pages preview.
     ...(process.env.NEXT_BASE_PATH ? { NEXT_PUBLIC_BASE_PATH: process.env.NEXT_BASE_PATH } : {}),
   },
