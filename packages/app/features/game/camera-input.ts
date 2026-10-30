@@ -88,10 +88,14 @@ export function headingDegrees(camera: CityCamera): number {
 
 const POINTS = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'] as const;
 
+/** The compass point the camera faces, for status lines as well as speech. */
+export function headingPoint(camera: CityCamera): (typeof POINTS)[number] {
+  return POINTS[Math.round(headingDegrees(camera) / 45) % 8]!;
+}
+
 /** Spoken after an accessibility action, so a screen-reader user hears where the view went. */
 export function describeCamera(camera: CityCamera): string {
-  const point = POINTS[Math.round(headingDegrees(camera) / 45) % 8]!;
-  return `Facing ${point}, ${Math.round(camera.distance)} metres away`;
+  return `Facing ${headingPoint(camera)}, ${Math.round(camera.distance)} metres away`;
 }
 
 /** Fling glide after a drag. Off under reduced motion: the camera stops where the finger lifts. */

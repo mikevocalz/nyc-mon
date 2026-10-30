@@ -7,13 +7,16 @@ export const CITY_WALK_COPY = {
     'This is the New York the Game is built on, starting on 125th Street by the Apollo. Streets, storefronts and towers stream in as you move. Your Caller and Mon join you in the app.',
   stageLabel: '3D map of the city',
   stageHint:
-    'Arrow keys or W A S D move, Q and E turn, plus and minus zoom, R goes back to the start. Drag to move, pinch to zoom, twist to turn.',
+    'Tap the map to walk there. Arrow keys or W A S D move, Q and E turn, plus and minus zoom, R goes back to the start. Drag to move, pinch to zoom, twist to turn.',
   keysTitle: 'Controls',
   keys: [
+    { keys: 'Tap or click the map', action: 'Walk there' },
     { keys: 'Arrow keys or W A S D', action: 'Move' },
     { keys: 'Q and E', action: 'Turn' },
     { keys: '+ and −, or the scroll wheel', action: 'Zoom' },
     { keys: 'R', action: 'Back to the start' },
+    { keys: 'The pad', action: 'Hold a button to keep moving' },
+    { keys: 'Go to', action: 'Jump to a landmark' },
     { keys: 'Drag, pinch, twist', action: 'Move, zoom and turn on a touch screen' },
   ],
   focusPrompt: 'Select the map to use the keyboard',
@@ -31,6 +34,17 @@ export const CITY_WALK_COPY = {
     zoomIn: 'Zoom in',
     zoomOut: 'Zoom out',
     reset: 'Back to the start',
+    padHint: 'Hold a button to keep moving. Tap the map to walk there.',
+  },
+  goTo: {
+    label: 'Go to',
+    hint: 'Jump to a named place in the city',
+    start: '125th Street, by the Apollo',
+    arrived: (name: string) => `Now at ${name}.`,
+  },
+  status: {
+    near: (name: string) => `Near ${name}`,
+    facing: (point: string) => `Facing ${point}`,
   },
   unsupported: {
     title: 'This browser can’t draw the 3D city',

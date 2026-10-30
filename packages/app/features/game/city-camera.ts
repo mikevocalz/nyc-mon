@@ -11,14 +11,35 @@ export const INITIAL_CITY_CAMERA: Readonly<CityCamera> = Object.freeze({ x: -28,
 const TAU = Math.PI * 2;
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 
+/**
+ * Where the look-at point may go, scene metres. The default square is the bundled tile's neighbourhood; the
+ * website's walk (city-walk) hands a wider rect so it can travel the streamed rings and far tier.
+ */
+export interface CameraBounds {
+  readonly minX: number;
+  readonly maxX: number;
+  readonly minZ: number;
+  readonly maxZ: number;
+}
+export const DEFAULT_CAMERA_BOUNDS: CameraBounds = Object.freeze({ minX: -2000, maxX: 2000, minZ: -2000, maxZ: 2000 });
+
 export type CityCameraAction =
   | { type: 'pan'; right: number; forward: number }
   | { type: 'orbit'; radians: number }
   | { type: 'zoom'; factor: number }
+  | { type: 'travel'; x: number; z: number; distance?: number }
   | { type: 'reset' };
 
 /** Screen-relative metre deltas allow touch and accessible buttons to share controls. */
 export function moveCityCamera(camera: CityCamera, action: CityCameraAction): CityCamera {
+  return moveCityCameraBounded(camera, action, DEFAULT_CAMERA_BOUNDS);
+}
+
+/**
+ * The same move under a caller's pan rect (the website's walk covers the whole streamed city). Kept separate from
+ * moveCityCamera's arity-2 contract: callers reduce() over it, and a third parameter would read reduce's index.
+ */
+export function moveCityCameraBounded(camera: CityCamera, action: CityCameraAction, bounds: CameraBounds): CityCamera {
   if (action.type === 'reset') return { ...INITIAL_CITY_CAMERA };
   if (![camera.x, camera.z, camera.yaw, camera.distance].every(Number.isFinite)) return { ...INITIAL_CITY_CAMERA };
   switch (action.type) {
@@ -28,9 +49,23 @@ export function moveCityCamera(camera: CityCamera, action: CityCameraAction): Ci
       const forward = clamp(action.forward, -500, 500);
       return {
         ...camera,
-        x: clamp(camera.x + Math.cos(camera.yaw) * right - Math.sin(camera.yaw) * forward, -2000, 2000),
-        z: clamp(camera.z - Math.sin(camera.yaw) * right - Math.cos(camera.yaw) * forward, -2000, 2000),
+        x: clamp(camera.x + Math.cos(camera.yaw) * right - Math.sin(camera.yaw) * forward, bounds.minX, bounds.maxX),
+        z: clamp(camera.z - Math.sin(camera.yaw) * right - Math.cos(camera.yaw) * forward, bounds.minZ, bounds.maxZ),
       };
+    }
+    case 'travel': {
+      // A jump straight to a ground point (tap-to-move, the walk's Go to list): same clamps as a pan, one step.
+      if (![action.x, action.z].every(Number.isFinite)) return camera;
+      const next: CityCamera = {
+        ...camera,
+        x: clamp(action.x, bounds.minX, bounds.maxX),
+        z: clamp(action.z, bounds.minZ, bounds.maxZ),
+      };
+      if (action.distance !== undefined) {
+        if (!Number.isFinite(action.distance)) return camera;
+        next.distance = clamp(action.distance, MIN_CAMERA_DISTANCE, 3000);
+      }
+      return next;
     }
     case 'orbit':
       if (!Number.isFinite(action.radians)) return camera;
@@ -42,10 +77,10 @@ export function moveCityCamera(camera: CityCamera, action: CityCameraAction): Ci
 }
 
 /** Owned by the game shell, separate from the player's persisted Mon save. */
-export function createCityCameraStore() {
+export function createCityCameraStore(bounds: CameraBounds = DEFAULT_CAMERA_BOUNDS) {
   return createStore<{ camera: CityCamera; move: (action: CityCameraAction) => void }>((set) => ({
     camera: { ...INITIAL_CITY_CAMERA },
-    move: (action) => set((state) => ({ camera: moveCityCamera(state.camera, action) })),
+    move: (action) => set((state) => ({ camera: moveCityCameraBounded(state.camera, action, bounds) })),
   }));
 }
 
