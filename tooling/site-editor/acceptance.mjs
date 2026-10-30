@@ -90,9 +90,9 @@ try {
  assert.match(await publicPage.locator('iframe[title="CMS YouTube video"]').getAttribute('src'),/^https:\/\/www.youtube-nocookie.com\/embed\//);
  const frame=publicPage.locator('iframe[title="CMS UI embed"]');assert.equal(await frame.getAttribute('sandbox'),'allow-scripts allow-same-origin allow-presentation');
  pass('section copy, gallery, YouTube and allowlisted UI iframe render through the existing UI');
- const routes=['/story','/city','/how-it-works','/get','/mons','/mons/hood-ratti','/mons/bodega-cee','/mons/yotes','/legal/privacy','/legal/terms','/legal/childrens-privacy'];
+ const routes=['/story','/city','/how-it-works','/get','/mons','/mons/hood-ratti','/mons/bodega-cee','/mons/yotes','/mons/lanternfye','/legal/privacy','/legal/terms','/legal/childrens-privacy'];
  for(const route of routes){await publicPage.goto(site+route,{waitUntil:'domcontentloaded',timeout:60000});await publicPage.locator('h1').waitFor({timeout:30000});assert.ok((await publicPage.locator('h1').innerText()).length,route);}
- pass('all twelve marketing and legal page routes render published CMS records');
+ pass('all thirteen marketing and legal page routes render published CMS records');
  await api('PATCH',`/payload-api/site-pages/${id}`,{_status:'draft'});
  await publicPage.goto(site+'/',{waitUntil:'domcontentloaded',timeout:60000});await publicPage.waitForTimeout(500);
  assert.equal(await publicPage.locator('#mfx-hero-title').count(),0);assert.match(await publicPage.locator('body').innerText(),/404|not found|wrong block|lost/i);pass('unpublishing does not resurrect the old hardcoded homepage');
