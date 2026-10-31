@@ -103,16 +103,33 @@ function skylineRow(profile: readonly Building[], stripPx: number): string {
 
 const KEYLINE = `<tr><td height="4" style="height:4px;background:${ORANGE};font-size:0;line-height:0;padding:0;">&nbsp;</td></tr>`;
 
-// The footer nav mirrors the product site's Explore column (apps/web nav.ts).
-const FOOTER_NAV = [
+// The header nav mirrors the site chrome's top links (apps/web nav.ts).
+const FOOTER_NAV_PRE: readonly (readonly [string, string])[] = [
   ['Home', '/'],
   ['The Story', '/story'],
   ['The Mons', '/mons'],
   ['The City', '/city'],
   ['How it works', '/how-it-works'],
-]
+];
+
+const HEADER_NAV = FOOTER_NAV_PRE.map(
+  ([label, href]) =>
+    `<a href="${SITE_URL}${href}" style="font-family:${SANS};font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:${MUTED};text-decoration:none;">${label}</a>`,
+).join(`<span style="color:${SUBTLE};font-size:11px;">&nbsp;&nbsp;&nbsp;</span>`);
+
+// The footer nav mirrors the product site's Explore column (apps/web nav.ts).
+const FOOTER_NAV = FOOTER_NAV_PRE
   .map(([label, href]) => `<a href="${SITE_URL}${href}" style="font-family:${SANS};font-size:13px;line-height:20px;color:${LINK};text-decoration:none;">${label}</a>`)
   .join(`<span style="color:${SUBTLE};font-size:13px;">&nbsp;&nbsp;·&nbsp;&nbsp;</span>`);
+
+// The site CTA's chamfered bottom-right corner: a 14×14 cell split along its
+// diagonal — orange above, page navy below — flush against the button's right
+// edge. Email-safe (no clip-path); MSO reads it as a bordered cell.
+const CTA_CHAMFER = `<td width="14" valign="bottom" style="padding:0;font-size:0;line-height:0;"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td width="14" height="14" style="padding:0;font-size:0;line-height:0;border-top:14px solid ${ORANGE};border-right:14px solid ${NAVY};">&nbsp;</td></tr></table></td>`;
+
+function ctaButton(url: string, label: string): string {
+  return `<table role="presentation" cellpadding="0" cellspacing="0"><tr><td><a href="${escapeHtml(url)}" style="display:inline-block;background:${ORANGE};color:${ON_CTA};font-family:${SANS};font-size:16px;font-weight:700;letter-spacing:.02em;text-decoration:none;padding:14px 28px;border-bottom:4px solid ${ORANGE_DEEP};">${escapeHtml(label)}</a></td>${CTA_CHAMFER}</tr></table>`;
+}
 
 function render({ subject, paragraphs, action, code, footer }: Layout): MailContent {
   const footerLine = footer ?? "If this wasn't you, you can ignore this email.";
@@ -124,8 +141,9 @@ function render({ subject, paragraphs, action, code, footer }: Layout): MailCont
     `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="${NAVY}" style="background-color:${NAVY};"><tr><td align="center" style="padding:28px 12px;">`,
     `<!--[if mso]><table role="presentation" width="600" align="center" cellpadding="0" cellspacing="0"><tr><td><![endif]-->`,
     `<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:100%;max-width:600px;">`,
-    // Site header: the real wordmark on navy, the orange keyline, Midtown's skyline.
-    `<tr><td style="padding:4px 0 18px;"><a href="${SITE_URL}"><img src="${SITE_URL}/brand/nyc-mon-wordmark.png" alt="NYC-MON" width="144" height="48" style="display:block;border:0;height:48px;width:144px;"></a></td></tr>`,
+    // Site header: the real wordmark on navy, the nav row, the orange keyline, Midtown's skyline.
+    `<tr><td style="padding:4px 0 10px;"><a href="${SITE_URL}"><img src="${SITE_URL}/brand/nyc-mon-wordmark.png" alt="NYC-MON" width="144" height="48" style="display:block;border:0;height:48px;width:144px;"></a></td></tr>`,
+    `<tr><td style="padding:0 0 18px;">${HEADER_NAV}</td></tr>`,
     KEYLINE,
     `<tr><td style="padding:0;">${skylineRow(MIDTOWN_SKYLINE, 24)}</td></tr>`,
     `<tr><td style="padding:36px 0 8px;">`,
@@ -138,7 +156,7 @@ function render({ subject, paragraphs, action, code, footer }: Layout): MailCont
       : `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px 0 16px;"><tr><td style="background:${RAISED};border:2px solid ${HAIRLINE};padding:18px 24px;"><span style="font-family:${MONO};font-size:30px;font-weight:700;letter-spacing:.2em;color:${TEXT};">${escapeHtml(code)}</span></td></tr></table>`,
     action === undefined
       ? ''
-      : `<table role="presentation" cellpadding="0" cellspacing="0"><tr><td><a href="${escapeHtml(action.url)}" style="display:inline-block;background:${ORANGE};color:${ON_CTA};font-family:${SANS};font-size:16px;font-weight:700;text-decoration:none;padding:14px 28px;border-bottom:4px solid ${ORANGE_DEEP};">${escapeHtml(action.label)}</a></td></tr></table><p style="margin:16px 0 0;font-family:${SANS};font-size:13px;line-height:20px;color:${MUTED};word-break:break-all;">${escapeHtml(action.url)}</p>`,
+      : `${ctaButton(action.url, action.label)}<p style="margin:16px 0 0;font-family:${SANS};font-size:13px;line-height:20px;color:${MUTED};word-break:break-all;">${escapeHtml(action.url)}</p>`,
     `<p style="margin:24px 0 0;font-family:${SANS};font-size:13px;line-height:20px;color:${MUTED};">${escapeHtml(footerLine)}</p>`,
     `</td></tr>`,
     // Site footer: Harlem's skyline, the keyline, tagline, nav, legal strip.
