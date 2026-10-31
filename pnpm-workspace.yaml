@@ -83,7 +83,6 @@ minimumReleaseAgeExclude:
   - "@payloadcms/translations@4.0.0-beta.6"
   - "@payloadcms/ui@4.0.0-beta.6"
   - payload@4.0.0-beta.6
-  - three@0.187.0
 
 # One version per dependency, declared once. Package manifests consume catalog:.
 catalog:
@@ -170,7 +169,7 @@ catalog:
   typegpu: 0.12.7
   # three.js on its WebGPU renderer (WebGL2 backend as the web fallback),
   # with TypeGPU functions bridged into TSL by @typegpu/three.
-  three: 0.187.0
+  three: 0.186.1
   "@typegpu/three": 0.12.1
   "@typegpu/gl": 0.12.6
 
@@ -325,4 +324,4 @@ patchedDependencies:
   react-native-skia@3.6.1: patches/react-native-skia@3.6.1.patch
   react-native-webgpu@0.16.0: patches/react-native-webgpu@0.16.0.patch
   react-native-worklets@0.13.0: patches/react-native-worklets@0.13.0.patch
-  three@0.187.0: patches/three@0.187.0.patch
+  three@0.186.1: patches/three@0.186.1.patch
