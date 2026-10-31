@@ -122,10 +122,10 @@ const FOOTER_NAV = FOOTER_NAV_PRE
   .map(([label, href]) => `<a href="${SITE_URL}${href}" style="font-family:${SANS};font-size:13px;line-height:20px;color:${LINK};text-decoration:none;">${label}</a>`)
   .join(`<span style="color:${SUBTLE};font-size:13px;">&nbsp;&nbsp;·&nbsp;&nbsp;</span>`);
 
-// The site CTA's chamfered bottom-right corner: a 14×14 cell split along its
+// The site CTA's chamfered bottom-right corner: a 10×10 cell split along its
 // diagonal — orange above, page navy below — flush against the button's right
-// edge. Email-safe (no clip-path); MSO reads it as a bordered cell.
-const CTA_CHAMFER = `<td width="14" valign="bottom" style="padding:0;font-size:0;line-height:0;"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td width="14" height="14" style="padding:0;font-size:0;line-height:0;border-top:14px solid ${ORANGE};border-right:14px solid ${NAVY};">&nbsp;</td></tr></table></td>`;
+// edge, matching the Join-the-waitlist button's clipped corner exactly.
+const CTA_CHAMFER = `<td width="10" valign="bottom" style="padding:0;font-size:0;line-height:0;"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td width="10" height="10" style="padding:0;font-size:0;line-height:0;border-top:10px solid ${ORANGE};border-right:10px solid ${NAVY};">&nbsp;</td></tr></table></td>`;
 
 function ctaButton(url: string, label: string): string {
   return `<table role="presentation" cellpadding="0" cellspacing="0"><tr><td><a href="${escapeHtml(url)}" style="display:inline-block;background:${ORANGE};color:${ON_CTA};font-family:${SANS};font-size:16px;font-weight:700;letter-spacing:.02em;text-decoration:none;padding:14px 28px;border-bottom:4px solid ${ORANGE_DEEP};">${escapeHtml(label)}</a></td>${CTA_CHAMFER}</tr></table>`;
