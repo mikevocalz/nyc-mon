@@ -1,24 +1,21 @@
 diff --git a/examples/jsm/lights/SunShadowNode.js b/examples/jsm/lights/SunShadowNode.js
+index 3d54054..3c17a46 100644
 --- a/examples/jsm/lights/SunShadowNode.js
 +++ b/examples/jsm/lights/SunShadowNode.js
-@@ -10,7 +10,7 @@
+@@ -10,7 +10,7 @@ import {
  	Vector2,
  	VSMShadowMap
  } from 'three/webgpu';
 -import { Fn, If, float, mix, normalWorld, positionView, reference, renderGroup, shadowPositionWorld, smoothstep, texture, uniform, vec4 } from 'three/tsl';
 +import { Fn, If, float, mix, normalWorldGeometry, positionView, reference, renderGroup, shadowPositionWorld, smoothstep, texture, uniform, vec4 } from 'three/tsl';
  
- /**
-  * Shadow node for directional light that supports cascaded shadow mapping.
-@@ -123,7 +123,11 @@
+ let _vsmWarned = false;
+ 
+@@ -123,7 +123,7 @@ class SunShadowNode extends ShadowNode {
  		// evaluated outside the cascade branches so nodes shared with the rest of
  		// the shader, like the world normal, are not trapped in a branch scope
  
 -		const shadowPosition = vec4( shadowPositionWorld.add( normalWorld.mul( normalBias ) ), 1 ).toVar();
-+		// nyc-mon patch: offset along the geometric normal, not normalWorld. In the
-+		// fragment stage normalWorld is the material's normalNode, so a bump-mapped
-+		// facade moved every brick's shadow lookup by a different amount and wall
-+		// shadows broke into patches that changed with camera distance.
 +		const shadowPosition = vec4( shadowPositionWorld.add( normalWorldGeometry.mul( normalBias ) ), 1 ).toVar();
  		const viewDepth = positionView.z.negate().toVar();
  
