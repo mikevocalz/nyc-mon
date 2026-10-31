@@ -124,8 +124,8 @@ function render({ subject, paragraphs, action, code, footer }: Layout): MailCont
     `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="${NAVY}" style="background-color:${NAVY};"><tr><td align="center" style="padding:28px 12px;">`,
     `<!--[if mso]><table role="presentation" width="600" align="center" cellpadding="0" cellspacing="0"><tr><td><![endif]-->`,
     `<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:100%;max-width:600px;">`,
-    // Site header: wordmark on navy, the orange keyline, Midtown's skyline.
-    `<tr><td style="padding:4px 0 18px;"><a href="${SITE_URL}" style="text-decoration:none;"><span style="font-family:${SANS};font-size:28px;font-weight:700;letter-spacing:.05em;color:${ORANGE};text-transform:uppercase;">NYC-MON</span></a></td></tr>`,
+    // Site header: the real wordmark on navy, the orange keyline, Midtown's skyline.
+    `<tr><td style="padding:4px 0 18px;"><a href="${SITE_URL}"><img src="${SITE_URL}/brand/nyc-mon-wordmark.png" alt="NYC-MON" width="144" height="48" style="display:block;border:0;height:48px;width:144px;"></a></td></tr>`,
     KEYLINE,
     `<tr><td style="padding:0;">${skylineRow(MIDTOWN_SKYLINE, 24)}</td></tr>`,
     `<tr><td style="padding:36px 0 8px;">`,
