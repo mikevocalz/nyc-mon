@@ -7,7 +7,6 @@ import type { ThreeContext, ThreeScene } from '@acme/ui/three';
 import type { CityDatasetV3 } from './city-dataset.ts';
 import type { ActorFrame, SceneActor, SceneActorFactory } from './scene-actor.ts';
 import { buildCityWorld } from './world/index.ts';
-import { installShadowPassAlphaTest } from './world/shadow-pass-alpha.ts';
 import { shadowSafeCasters } from './world/vd-port/shared/shadow-safe.ts';
 import { cityCompilePass, type CompilePass } from './compile-pass.ts';
 import { EXPERIMENTAL_WORLD_POST, mountCityPostPipeline, resolvePostOptions } from './post/pipeline.ts';
@@ -112,8 +111,7 @@ export {
 
 export function createCityScene(context: ThreeContext, initial: CitySceneParams): ThreeScene<CitySceneParams> {
   const { THREE, invalidate, renderer } = context;
-  // The shadow pass re-keyed every caster every frame without it (world/shadow-pass-alpha.ts).
-  installShadowPassAlphaTest(THREE);
+  // r187 upstreamed the shadow-pass alphaTest bypass (world/shadow-pass-alpha.test.ts pins it).
   if (![initial.camera.x, initial.camera.z, initial.camera.yaw, initial.camera.distance].every(Number.isFinite)) throw new Error('Invalid city camera');
   // The dataset arrives parsed (city-data.ts runs parseCityDataset once per runtime); only check the shape here.
   const dataset = initial.dataset;

@@ -1,0 +1,99 @@
+diff --git a/examples/jsm/lights/SunShadowNode.js b/examples/jsm/lights/SunShadowNode.js
+index 3d54054..3c17a46 100644
+--- a/examples/jsm/lights/SunShadowNode.js
++++ b/examples/jsm/lights/SunShadowNode.js
+@@ -10,7 +10,7 @@ import {
+ 	Vector2,
+ 	VSMShadowMap
+ } from 'three/webgpu';
+-import { Fn, If, float, mix, normalWorld, positionView, reference, renderGroup, shadowPositionWorld, smoothstep, texture, uniform, vec4 } from 'three/tsl';
++import { Fn, If, float, mix, normalWorldGeometry, positionView, reference, renderGroup, shadowPositionWorld, smoothstep, texture, uniform, vec4 } from 'three/tsl';
+ 
+ let _vsmWarned = false;
+ 
+@@ -123,7 +123,7 @@ class SunShadowNode extends ShadowNode {
+ 		// evaluated outside the cascade branches so nodes shared with the rest of
+ 		// the shader, like the world normal, are not trapped in a branch scope
+ 
+-		const shadowPosition = vec4( shadowPositionWorld.add( normalWorld.mul( normalBias ) ), 1 ).toVar();
++		const shadowPosition = vec4( shadowPositionWorld.add( normalWorldGeometry.mul( normalBias ) ), 1 ).toVar();
+ 		const viewDepth = positionView.z.negate().toVar();
+ 
+ 		const shadowValue = float( 1 ).toVar( 'shadowValue' );
+diff --git a/build/three.webgpu.js b/build/three.webgpu.js
+@@ -10770,8 +10770,12 @@
+ 
+ 			texture.removeEventListener( 'dispose', textureData.onDispose );
+ 
+-			this._tracked.delete( textureData.ref );
+-			this._registry.unregister( textureData.ref );
++			if ( textureData.ref !== undefined ) {
++
++				this._tracked.delete( textureData.ref );
++				this._registry.unregister( textureData.ref );
++
++			}
+ 
+ 			// if a texture is not ready for use, it falls back to a default texture so it's possible
+ 			// to use it for rendering. If a texture in this state is disposed, it's important to
+@@ -13129,7 +13133,7 @@
+ 
+ 		let bindGroup = new BindGroup( groupName, bindings );
+ 
+-		if ( sharedGroup && this.renderer._bindings !== undefined ) {
++		if ( sharedGroup && this.renderer._bindings != null ) {
+ 
+ 			bindGroup = this.renderer._bindings.getSharedBindGroup( bindGroup );
+ 
+diff --git a/build/three.webgpu.nodes.js b/build/three.webgpu.nodes.js
+@@ -37304,8 +37304,12 @@
+ 
+ 			texture.removeEventListener( 'dispose', textureData.onDispose );
+ 
+-			this._tracked.delete( textureData.ref );
+-			this._registry.unregister( textureData.ref );
++			if ( textureData.ref !== undefined ) {
++
++				this._tracked.delete( textureData.ref );
++				this._registry.unregister( textureData.ref );
++
++			}
+ 
+ 			// if a texture is not ready for use, it falls back to a default texture so it's possible
+ 			// to use it for rendering. If a texture in this state is disposed, it's important to
+@@ -54331,7 +54335,7 @@
+ 
+ 		let bindGroup = new BindGroup( groupName, bindings );
+ 
+-		if ( sharedGroup && this.renderer._bindings !== undefined ) {
++		if ( sharedGroup && this.renderer._bindings != null ) {
+ 
+ 			bindGroup = this.renderer._bindings.getSharedBindGroup( bindGroup );
+ 
+diff --git a/src/nodes/core/NodeBuilder.js b/src/nodes/core/NodeBuilder.js
+@@ -734,7 +734,7 @@
+ 
+ 		let bindGroup = new BindGroup( groupName, bindings );
+ 
+-		if ( sharedGroup && this.renderer._bindings !== undefined ) {
++		if ( sharedGroup && this.renderer._bindings != null ) {
+ 
+ 			bindGroup = this.renderer._bindings.getSharedBindGroup( bindGroup );
+ 
+diff --git a/src/renderers/common/Textures.js b/src/renderers/common/Textures.js
+@@ -703,9 +703,13 @@
+ 
+ 			texture.removeEventListener( 'dispose', textureData.onDispose );
+ 
+-			this._tracked.delete( textureData.ref );
+-			this._registry.unregister( textureData.ref );
++			if ( textureData.ref !== undefined ) {
++
++				this._tracked.delete( textureData.ref );
++				this._registry.unregister( textureData.ref );
+ 
++			}
++
+ 			// if a texture is not ready for use, it falls back to a default texture so it's possible
+ 			// to use it for rendering. If a texture in this state is disposed, it's important to
+ 			// not destroy/delete the underlying GPU texture object since it is cached and shared with

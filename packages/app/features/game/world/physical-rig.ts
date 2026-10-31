@@ -11,9 +11,8 @@
 //
 // r186 against Slop's three@dev, checked before porting:
 // - SunLight has no static registerNode in r186 (examples/jsm/lights/SunLight.js);
-//   the light node is registered with renderer.library.addLight, Slop's
-//   fallback branch. NodeLibrary.addClass warns on a second registration,
-//   so it is guarded with getLightNodeClass.
+//   the light node is registered with SunLight.registerNode, Slop's
+//   fallback branch (r187 deprecated library.addLight/getLightNodeClass).
 // - SunLightShadow fixes the cascade count at 2 (SunLightShadow.js _cascadeCount),
 //   so the shadow1 probe uses a DirectionalLight with one map instead.
 // - SkyMesh's vertexNode writes z = w (objects/SkyMesh.js); the reversed-depth
@@ -110,10 +109,7 @@ export interface PhysicalRig {
   dispose(): void;
 }
 
-function isLightNodeRegistered(renderer: RendererT, lightClass: unknown): boolean {
-  const library = renderer.library as unknown as { getLightNodeClass(light: unknown): unknown };
-  return library.getLightNodeClass(lightClass) !== null;
-}
+
 
 function maxTextureDimension(renderer: RendererT | null): number | undefined {
   const backend = renderer?.backend as unknown as { device?: { limits?: { maxTextureDimension2D?: number } } } | undefined;
@@ -214,8 +210,8 @@ export function createPhysicalRig(
   const shadowTile = sunShadowTile(options.shadowTile, maxTextureDimension(renderer));
   let sun: SunLight | InstanceType<Three['DirectionalLight']> | null = null;
   if (features.sunShadow === 2) {
-    if (renderer && !isLightNodeRegistered(renderer, SunLight)) {
-      renderer.library.addLight(SunLightNode as never, SunLight as never);
+    if (renderer) {
+      (SunLight as unknown as { registerNode(node: unknown): void }).registerNode(SunLightNode);
     }
     const s = new SunLight(new THREE.Color(start.colors.sun), start.sunIntensity);
     s.name = 'city:physical-sun';
