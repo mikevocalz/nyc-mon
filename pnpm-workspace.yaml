@@ -159,19 +159,19 @@ catalog:
   # Skia v3 (Graphite by default; Android minSdk 26+). One package under two
   # names: react-native-graph imports @shopify/react-native-skia, our code
   # imports react-native-skia, and both resolve to the same 3.6.1 install.
-  react-native-skia: 3.6.1
-  "@shopify/react-native-skia": npm:react-native-skia@3.6.1
+  react-native-skia: 3.8.1
+  "@shopify/react-native-skia": npm:react-native-skia@3.8.1
   react-native-graph: 1.4.0
   # Exact match for react-native-skia 3.6.1's own dependency (npm latest is
   # 0.42.0; a second copy would pair skia's web glue with a different wasm).
   canvaskit-wasm: 0.41.1
-  react-native-webgpu: 0.16.0
-  typegpu: 0.12.7
+  react-native-webgpu: 0.19.2
+  typegpu: 0.12.9
   # three.js on its WebGPU renderer (WebGL2 backend as the web fallback),
   # with TypeGPU functions bridged into TSL by @typegpu/three.
-  three: 0.186.1
-  "@typegpu/three": 0.12.1
-  "@typegpu/gl": 0.12.6
+  three: 0.187.0
+  "@typegpu/three": 0.12.2
+  "@typegpu/gl": 0.12.8
 
   # spatial / XR / Rive
   "@reactvision/react-viro": file:vendor/reactvision-react-viro-3.0.2-moyo.1.tgz
@@ -298,7 +298,7 @@ catalog:
   "@types/node": ^26.6.5
   "@types/react-dom": ^19.3.0
   "@webgpu/types": 0.1.74
-  "@types/three": 0.186.0
+  "@types/three": 0.187.0
   unplugin-typegpu: 0.12.5
   # Held on 9.x: eslint-config-expo 58 pulls eslint-plugin-react 7 and
   # eslint-plugin-import, which peer eslint <=9 (npm latest is 10.12.0).
@@ -322,7 +322,5 @@ patchedDependencies:
   react-native-enriched-html@1.1.1: patches/react-native-enriched-html@1.1.1.patch
   react-native-graph@1.4.0: patches/react-native-graph@1.4.0.patch
   react-native-nitro-fetch@1.9.0: patches/react-native-nitro-fetch@1.9.0.patch
-  react-native-skia@3.6.1: patches/react-native-skia@3.6.1.patch
-  react-native-webgpu@0.16.0: patches/react-native-webgpu@0.16.0.patch
+  react-native-skia@3.8.1: patches/react-native-skia@3.8.1.patch
   react-native-worklets@0.13.0: patches/react-native-worklets@0.13.0.patch
-  three@0.186.1: patches/three@0.186.1.patch

@@ -22,7 +22,7 @@
 //   (tsl/lighting/ClusteredLightsNode.js); SpotLights and the sun stay on the
 //   per-material path.
 import type { Three } from '@acme/ui/three';
-import type { Node, RenderTarget, Texture, UniformNode } from 'three/webgpu';
+import type { CubeRenderTarget, Node, RenderTarget, Texture, UniformNode } from 'three/webgpu';
 import { SkyMesh } from 'three/examples/jsm/objects/SkyMesh.js';
 import { SunLight } from 'three/examples/jsm/lights/SunLight.js';
 import { SunLightNode } from 'three/examples/jsm/lights/SunLightNode.js';
@@ -174,7 +174,7 @@ export function createPhysicalRig(
   }
   const pmrem = renderer && sky ? new THREE.PMREMGenerator(renderer) : null;
   const envScene = new THREE.Scene();
-  let envTarget: RenderTargetT | null = null;
+  let envTarget: CubeRenderTarget | null = null;
   const priorFog = scene.fog;
   const priorEnvironment = scene.environment;
   const priorEnvIntensity = scene.environmentIntensity;
@@ -186,7 +186,7 @@ export function createPhysicalRig(
     envScene.add(sky);
     envTarget = pmrem.fromScene(envScene, PHYSICAL_RIG.pmremSigma, PHYSICAL_RIG.pmremNear, PHYSICAL_RIG.pmremFar, {
       renderTarget: envTarget,
-    }) as RenderTargetT;
+    });
     scene.environment = envTarget.texture;
     sky.showSunDisc.value = 1;
     scene.add(sky);
@@ -338,7 +338,7 @@ export function createPhysicalRig(
   // The fog node needs the baked texture; Slop also attaches it only when a bake happened.
   const priorFogNode = (scene as unknown as { fogNode?: unknown }).fogNode;
   // TS narrows the closure-assigned target to null here; applyPreset above may have baked it.
-  const baked = envTarget as RenderTargetT | null;
+  const baked = envTarget as CubeRenderTarget | null;
   if (baked && uFogDensity) {
     (scene as unknown as { fogNode: unknown }).fogNode = aerialFogNode(baked.texture, uFogDensity);
   }
