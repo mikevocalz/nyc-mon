@@ -110,10 +110,29 @@ export const OAUTH_PAGE_PATHS = OAUTH_PAGES;
  * sends `MCP-Protocol-Version` with the GET, which makes the browser send a
  * preflight `OPTIONS` first; that answers 204 here instead of reaching the app.
  */
+type MetadataResult = { headers?: unknown; response?: unknown } | Record<string, unknown> | Response | undefined;
+
+// better-call's api invoker can hand back the endpoint envelope
+// `{headers, response}` instead of the document; unwrap whichever shape lands.
+async function unwrapMetadata(raw: MetadataResult): Promise<unknown> {
+  if (raw instanceof Response) return raw.json();
+  if (raw && typeof raw === 'object' && (raw as { response?: unknown }).response instanceof Response) {
+    return (raw as { response: Response }).response.json();
+  }
+  return raw;
+}
+
 export function createAuthServerMetadataHandler(auth: Parameters<typeof oauthProviderAuthServerMetadata>[0]) {
-  const serve = oauthProviderAuthServerMetadata(auth, { headers: { 'Access-Control-Allow-Origin': '*' } });
   return async (request: Request): Promise<Response> => {
-    if (request.method !== 'OPTIONS') return serve(request);
+    if (request.method !== 'OPTIONS') {
+      const body = await unwrapMetadata(
+        (await auth.api.getOAuthServerConfig({ request, asResponse: false })) as MetadataResult,
+      );
+      return new Response(JSON.stringify(body), {
+        status: 200,
+        headers: { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' },
+      });
+    }
     return new Response(null, {
       status: 204,
       headers: {
