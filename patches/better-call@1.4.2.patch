@@ -30,3 +30,55 @@ index c00fd6ef78d0985906014a2d9969728a45c2c056..d01118f59f6d06008ac25eca29feef64
  }
  function tryDecode(str) {
  	try {
+diff --git a/dist/to-response.mjs b/dist/to-response.mjs
+index 13c91a6..8395827 100644
+--- a/dist/to-response.mjs
++++ b/dist/to-response.mjs
+@@ -129,6 +129,21 @@ function toResponse(data, init) {
+ 		statusText: data.status.toString(),
+ 		headers: init?.headers || data.headers
+ 	});
++	// Endpoint-result envelope ({headers, response: <Response>}) — the api
++	// invoker's returnHeaders shape reaching toResponse would otherwise be
++	// JSON.stringify'd into the body, losing the inner Response entirely.
++	if (data && typeof data === "object" && data.response && typeof data.response === "object" && "body" in data.response) {
++		const inner = data.response;
++		const merged = new Headers(init?.headers);
++		stripRequestOnlyHeaders(merged);
++		copyHeaders(merged, data.headers);
++		copyHeaders(merged, inner.headers);
++		return new Response(inner.body, {
++			status: inner.status,
++			statusText: inner.statusText,
++			headers: merged
++		});
++	}
+ 	let body = data;
+ 	const headers = new Headers(init?.headers);
+ 	stripRequestOnlyHeaders(headers);
+diff --git a/dist/to-response.cjs b/dist/to-response.cjs
+index cbf5255..ade8a6e 100644
+--- a/dist/to-response.cjs
++++ b/dist/to-response.cjs
+@@ -129,6 +129,21 @@ function toResponse(data, init) {
+ 		statusText: data.status.toString(),
+ 		headers: init?.headers || data.headers
+ 	});
++	// Endpoint-result envelope ({headers, response: <Response>}) — the api
++	// invoker's returnHeaders shape reaching toResponse would otherwise be
++	// JSON.stringify'd into the body, losing the inner Response entirely.
++	if (data && typeof data === "object" && data.response && typeof data.response === "object" && "body" in data.response) {
++		const inner = data.response;
++		const merged = new Headers(init?.headers);
++		stripRequestOnlyHeaders(merged);
++		copyHeaders(merged, data.headers);
++		copyHeaders(merged, inner.headers);
++		return new Response(inner.body, {
++			status: inner.status,
++			statusText: inner.statusText,
++			headers: merged
++		});
++	}
+ 	let body = data;
+ 	const headers = new Headers(init?.headers);
+ 	stripRequestOnlyHeaders(headers);
