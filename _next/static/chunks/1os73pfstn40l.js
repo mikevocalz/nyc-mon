@@ -1,0 +1,1 @@
+(globalThis.TURBOPACK||(globalThis.TURBOPACK=[])).push(["object"==typeof document?document.currentScript:void 0,751981,t=>{"use strict";let e=t.r(57067);t.s(["VD_LITE_ASSETS",0,{},"VD_NEAR_ASSETS",0,{},"VD_SHELL_ASSET",0,e])},57067,t=>{t.q("/nyc-mon/_next/static/media/shell.01w9fusqozdo4.bin")}]);
