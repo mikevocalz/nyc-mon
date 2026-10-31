@@ -150,7 +150,9 @@ const PAGE_CSP = [
   "media-src 'self' blob:",
   "font-src 'self' data:",
   // The MCP server and the authorization server (OAuth discovery, token exchange).
-  `connect-src 'self' ${mcpOrigin} ${issuerOrigin}`,
+  // The GLB chain ends on the Bunny CDN: /v1/mon-models/glb 302s there, and a
+  // browser fetch needs the CDN origin allowed or the redirect hop dies.
+  `connect-src 'self' ${mcpOrigin} ${issuerOrigin} https://nyc-mon.b-cdn.net`,
   `frame-src ${sandboxOrigin}`,
   "object-src 'none'",
   "base-uri 'self'",
