@@ -15,6 +15,8 @@ import type { MouthRig } from '@acme/ui/three/mon';
 export interface CompanionModel {
   /** /mons/<file>.glb on this server. */
   readonly file: string;
+  /** The mon-models collection key, e.g. 'dex-002', for /v1/mon-models/glb/. */
+  readonly speciesId: string;
   readonly idle: readonly string[];
   readonly byMood: Partial<Record<MonMood, readonly string[]>>;
   /** Jaw + resting morphs for lip-sync; absent on forms with no mouth rig. */
@@ -23,11 +25,11 @@ export interface CompanionModel {
 
 const MODELS: Readonly<Record<number, CompanionModel>> = {
   // Metro Egg: the hatch rig on its idle wobble. No mouth.
-  1: { file: 'metro-egg', idle: ['egg_idle'], byMood: {} },
+  1: { file: 'metro-egg', speciesId: 'dex-001', idle: ['egg_idle'], byMood: {} },
   // Squeaklet: jaw_chomp, mouth_close, rat_run, tail_swish, blink. No clip
   // reads as asleep, so an asleep Squeaklet holds its bind pose ([]).
   2: {
-    file: 'squeaklet',
+    file: 'squeaklet', speciesId: 'dex-002',
     idle: ['tail_swish', 'rat_run'],
     byMood: {
       asleep: [],
@@ -38,7 +40,7 @@ const MODELS: Readonly<Record<number, CompanionModel>> = {
   },
   // Lil' Ratti: full-body emotes and up/quad locomotion.
   3: {
-    file: 'lil-ratti',
+    file: 'lil-ratti', speciesId: 'dex-003',
     idle: ['up_idle', 'up_breathe', 'quad_idle_sniff'],
     byMood: {
       asleep: ['emote_tired', 'up_breathe'],

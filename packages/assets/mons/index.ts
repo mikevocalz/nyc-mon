@@ -14,8 +14,8 @@ export interface MonModelAsset {
 }
 
 export const MON_MODEL_ASSETS: readonly MonModelAsset[] = [
-  { dexId: 2, key: 'squeaklet', glb: 'https://admin.nyc-mon.city/v1/mon-models/glb/squeaklet' },
-  { dexId: 3, key: 'lil-ratti', glb: 'https://admin.nyc-mon.city/v1/mon-models/glb/lil-ratti' },
+  { dexId: 2, key: 'squeaklet', glb: 'https://admin.nyc-mon.city/v1/mon-models/glb/dex-002' },
+  { dexId: 3, key: 'lil-ratti', glb: 'https://admin.nyc-mon.city/v1/mon-models/glb/dex-003' },
 ];
 
 /** The model for a Dex number, or undefined when that form has none yet. */

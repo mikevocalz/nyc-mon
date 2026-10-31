@@ -8,8 +8,8 @@ import type { MonModelAsset } from './index.ts';
 export type { MonModelAsset } from './index.ts';
 
 export const MON_MODEL_ASSETS: readonly MonModelAsset[] = [
-  { dexId: 2, key: 'squeaklet', glb: 'https://admin.nyc-mon.city/v1/mon-models/glb/squeaklet' },
-  { dexId: 3, key: 'lil-ratti', glb: 'https://admin.nyc-mon.city/v1/mon-models/glb/lil-ratti' },
+  { dexId: 2, key: 'squeaklet', glb: 'https://admin.nyc-mon.city/v1/mon-models/glb/dex-002' },
+  { dexId: 3, key: 'lil-ratti', glb: 'https://admin.nyc-mon.city/v1/mon-models/glb/dex-003' },
 ];
 
 export function monModelAssetForDex(dexId: number | null): MonModelAsset | undefined {

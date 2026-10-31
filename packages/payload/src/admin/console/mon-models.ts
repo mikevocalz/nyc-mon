@@ -15,8 +15,16 @@ export async function handleMonModelGlb(request: Request, speciesId: string): Pr
   if (request.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, OPTIONS' } });
   }
-  const species = speciesId.replace(/[^a-z0-9-]/g, '');
-  if (!species) return new Response(null, { status: 404 });
+  // Accept the dex key (dex-002) or the old file stem (squeaklet): /mons/*.glb
+  // links keep working while every client moves to the dex key.
+  const STEM_TO_DEX: Readonly<Record<string, string>> = {
+    'metro-egg': 'dex-001',
+    squeaklet: 'dex-002',
+    'lil-ratti': 'dex-003',
+  };
+  const cleaned = speciesId.replace(/[^a-z0-9-]/g, '');
+  const species = cleaned.startsWith('dex-') ? cleaned : STEM_TO_DEX[cleaned];
+  if (species === undefined || !/^dex-\d+$/.test(species)) return new Response(null, { status: 404 });
   const payload = await livePayload();
   const found = await payload.find({
     collection: 'mon-models',
@@ -25,8 +33,12 @@ export async function handleMonModelGlb(request: Request, speciesId: string): Pr
     depth: 0,
   });
   const doc = found.docs[0] as { url?: string; filename?: string } | undefined;
-  const url = doc?.url ?? (doc?.filename ? undefined : undefined);
-  if (!url) return new Response(null, { status: 404 });
+  const raw = doc?.url;
+  if (raw === undefined) return new Response(null, { status: 404 });
+  // `url` is a relative /payload-api/mon-models/file/... path: the caller's
+  // origin here is the admin host, so serve the file through it.
+  const origin = new URL(request.url).origin;
+  const url = raw.startsWith('/') ? `${origin}${raw}` : raw;
   return new Response(null, {
     status: 302,
     headers: { Location: url, 'Cache-Control': 'public, max-age=300', 'Access-Control-Allow-Origin': '*' },

@@ -425,7 +425,7 @@ function MonFigure({ mon, art, speaking, issuer }: { mon:MonCard; art:CompanionA
   const [size, setSize] = useState<{ width:number; height:number }|null>(null);
   // The GLB comes from Payload's mon-models collection via the admin origin's
   // 302 to the approved row's CDN object — never bundled under /mons/.
-  const modelUrl = `${issuer}/v1/mon-models/glb/${model.file}`;
+  const modelUrl = `${issuer}/v1/mon-models/glb/${model.speciesId}`;
   // Speech cues only matter while a rigged mouth can play them.
   useEffect(() => (model?.mouth ? addSpeechCueListener(setSpeech) : undefined),[model]);
   // The canvas wants pixels: it follows the still's box and resizes in place.
