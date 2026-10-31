@@ -316,6 +316,7 @@ patchedDependencies:
   '@delmaredigital/payload-better-auth@0.40.0-next.0': patches/@delmaredigital__payload-better-auth@0.40.0-next.0.patch
   '@reactvision/react-viro': patches/@reactvision__react-viro.patch
   '@rive-app/react-native@0.5.5': patches/@rive-app__react-native@0.5.5.patch
+  better-auth@1.7.10: patches/better-auth@1.7.10.patch
   better-call@1.4.2: patches/better-call@1.4.2.patch
   metro@0.87.1: patches/metro@0.87.1.patch
   react-native-enriched-html@1.1.1: patches/react-native-enriched-html@1.1.1.patch
