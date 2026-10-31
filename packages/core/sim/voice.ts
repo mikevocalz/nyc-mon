@@ -22,6 +22,7 @@ function voiceWords(eggId: string): readonly [number, number, number, number] {
 const CANON_EGG_DEX_GENDERS: Readonly<Record<number, MonGender>> = {
   1: 'male',   // F01 Hood Ratti — the Metro Egg (dex-001)
   8: 'female', // F02 Bodega Baddiee Cee — its Egg form (dex-008)
+  20: 'female', // F04 LanternFye — the Signal Egg (dex-020)
 };
 
 /**
