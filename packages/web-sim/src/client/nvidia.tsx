@@ -36,7 +36,7 @@ import { createVoiceController, type BargeInRecord, type EarHandlers, type Voice
 import { nextVoice, voiceAnnouncement, type VoiceEvent } from './voiceState.ts';
 import { MemorySnapshotSchema } from '@acme/core/schemas';
 import { Composer } from './CompanionComposer.tsx';
-import { STARTER_ART, artForDex, type CompanionArt } from './companionArt.ts';
+import { STARTER_ART, type CompanionArt } from './companionArt.ts';
 import { companionModelClips, companionModelForDex } from './companionModels.ts';
 import { addSpeechCueListener, currentSpeechCue } from './speechCues.ts';
 import { mergeMonCard, type MonCard } from './companionMon.ts';
@@ -416,10 +416,9 @@ function MonArt({ art, className }: { art:CompanionArt; className:string }) {
  * still never left. A form with no model keeps the still alone; nothing is
  * stubbed. Speech cues (speechCues.ts) lip-sync the forms that have a mouth.
  */
-function MonFigure({ mon, art, speaking, issuer }: { mon:MonCard; art:CompanionArt|null; speaking:boolean; issuer:string }) {
+function MonFigure({ mon, speaking, issuer }: { mon:MonCard; speaking:boolean; issuer:string }) {
   const model = companionModelForDex(mon.dexId);
   const [failed, setFailed] = useState(false);
-  const [ready, setReady] = useState(false);
   const [speech, setSpeech] = useState<MonSpeechCue|null>(() => currentSpeechCue());
   const host = useRef<HTMLDivElement|null>(null);
   const [size, setSize] = useState<{ width:number; height:number }|null>(null);
@@ -439,26 +438,14 @@ function MonFigure({ mon, art, speaking, issuer }: { mon:MonCard; art:CompanionA
     observer.observe(el);
     return () => observer.disconnect();
   },[]);
-  // aria-busy flips off when the GLB paints (the hand-off MonView's HatchStage
-  // watches); the still then steps aside. On an error `failed` brings it back.
-  useEffect(() => {
-    const el = host.current;
-    if (el === null || model === null) return;
-    const painted = () => el.querySelector('[role=img][aria-busy="false"]') !== null;
-    if (painted()) { setReady(true); return; }
-    const watch = new MutationObserver(() => { if (painted()) setReady(true); });
-    watch.observe(el,{ subtree:true, attributes:true, attributeFilter:['aria-busy'] });
-    return () => watch.disconnect();
-  },[model]);
-  if (art === null && model === null) return null;
-  const showStill = model === null || !ready || failed;
+  if (model === null) return null;
   return <View className="relative w-28 shrink-0 sm:w-36 lg:w-36 xl:w-48">
     {/* Speaking: an orange keyline breathes around the Mon while the voice plays (still under reduced motion). */}
     {speaking ? <View aria-hidden className="absolute -inset-1.5 border-4 border-cta motion-safe:animate-pulse"/> : null}
     <div ref={host} className="relative w-full">
-      {art !== null ? <View aria-hidden={!showStill} className={showStill ? 'w-full' : 'invisible w-full'}><MonArt art={art} className="w-full"/></View> : null}
-      {art === null ? <div aria-hidden style={{ aspectRatio:4 / 5 }}/> : null}
-      {model !== null && !failed && size !== null ? (
+      {/* No 2D stand-in: the box holds the model's aspect while the GLB streams. */}
+      <div aria-hidden style={{ aspectRatio:4 / 5 }}/>
+      {!failed && size !== null ? (
         <div className="absolute inset-0">
           <MonModel3D url={modelUrl} clips={companionModelClips(model,mon.mood,mon.asleep)}
             width={size.width} height={size.height} label={mon.name} onError={() => setFailed(true)}
@@ -472,13 +459,12 @@ function MonFigure({ mon, art, speaking, issuer }: { mon:MonCard; art:CompanionA
 function MonPanel({ mon, speaking, caption, issuer }: { mon:MonCard|null; speaking:boolean; caption:string; issuer:string }) {
   const reducedMotion = useReducedMotion();
   if (!mon) return <Paragraph className="my-0 text-type-body text-text-muted">Checking on your Mon…</Paragraph>;
-  const art = artForDex(mon.dexId);
   const form = [mon.name === mon.formName ? null : mon.formName, mon.stage ? `${mon.stage} stage` : null].filter(Boolean).join(', ');
   const low = (k:string) => mon.needs.includes(k);
   return <View className="gap-4">
     <View className="flex-row items-center gap-4">
       {/* Keyed by form: a hatch swaps species, so load state never sticks to the wrong Mon. */}
-      <MonFigure key={mon.dexId ?? 'none'} mon={mon} art={art} speaking={speaking} issuer={issuer}/>
+      <MonFigure key={mon.dexId ?? 'none'} mon={mon} speaking={speaking} issuer={issuer}/>
       <View className="min-w-0 flex-1 gap-1">
         <Heading level={1} className="my-0 font-display text-type-title text-text">{mon.name}</Heading>
         {form ? <Paragraph className="my-0 text-type-body text-text">{form}</Paragraph> : null}
