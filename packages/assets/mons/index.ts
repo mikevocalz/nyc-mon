@@ -1,12 +1,8 @@
 /**
- * Rigged Mon models by Dex number. One copy of each file exists:
- * apps/web/public/mons, which the website, the Alexa views
- * (packages/mcp-server, NYC_MON_MODEL_ORIGIN) and their boot tests already
- * serve and read. On web the app fetches the same public path, so the
- * 19-24 MB files are never emitted a second time; on native,
- * index.native.ts requires those files as Metro assets. Every file is plain
- * glTF with KHR_mesh_quantization (no Draco or Meshopt: Hermes has no
- * WebAssembly).
+ * Rigged Mon models by Dex number. Files live in Payload's mon-models
+ * collection, served from the CDN; the URL is the admin origin's stable
+ * 302 to the approved row (/v1/mon-models/glb/<species>), so every client —
+ * website, Alexa views, companion — reads the same model Payload ships.
  */
 
 export interface MonModelAsset {
@@ -18,8 +14,8 @@ export interface MonModelAsset {
 }
 
 export const MON_MODEL_ASSETS: readonly MonModelAsset[] = [
-  { dexId: 2, key: 'squeaklet', glb: '/mons/squeaklet.glb' },
-  { dexId: 3, key: 'lil-ratti', glb: '/mons/lil-ratti.glb' },
+  { dexId: 2, key: 'squeaklet', glb: 'https://admin.nyc-mon.city/v1/mon-models/glb/squeaklet' },
+  { dexId: 3, key: 'lil-ratti', glb: 'https://admin.nyc-mon.city/v1/mon-models/glb/lil-ratti' },
 ];
 
 /** The model for a Dex number, or undefined when that form has none yet. */

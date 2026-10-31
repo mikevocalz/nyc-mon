@@ -224,21 +224,24 @@ async function main(): Promise<void> {
       const key = clientKey(req.socket.remoteAddress, typeof forwarded === 'string' ? forwarded : null, env.SIM_TRUST_PROXY === '1');
       return void handleTts(toRequest(req), key).then((r) => sendResponse(res, r)).catch(fail);
     }
-    // Mon GLBs: fetched by the view from the sandbox origin, so they carry CORS.
+    // Mon GLBs: Payload's mon-models collection holds them; the admin origin's
+    // /v1/mon-models/glb/<species> 302s to the approved CDN object, so this
+    // origin just forwards the redirect (keeps old /mons/*.glb links working).
     const glb = /^\/mons\/([a-z0-9-]+)\.glb$/.exec(url.pathname);
     if (glb && req.method === 'GET') {
-      const file = join(root, 'public', 'mons', `${glb[1]}.glb`);
-      if (!existsSync(file)) {
+      const upstream = `${env.AUTH_ISSUER}/v1/mon-models/glb/${glb[1]}`;
+      const head = await fetch(upstream, { redirect: 'manual' });
+      const location = head.headers.get('location');
+      if (location === null) {
         res.writeHead(404, { 'content-type': 'text/plain' });
         return void res.end('No such model.');
       }
-      res.writeHead(200, {
-        'content-type': 'model/gltf-binary',
+      res.writeHead(302, {
+        location,
         'access-control-allow-origin': '*',
-        'cache-control': 'public, max-age=3600',
-        'x-content-type-options': 'nosniff',
+        'cache-control': 'public, max-age=300',
       });
-      return void createReadStream(file).on('error', () => res.destroy()).pipe(res);
+      return void res.end();
     }
     if (url.pathname.startsWith('/api/')) {
       res.writeHead(404, { 'content-type': 'application/json' });

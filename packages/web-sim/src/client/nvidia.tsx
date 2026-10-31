@@ -347,7 +347,7 @@ function Companion({ config }: { config:Config }) {
     {!state.connected ? <Landing onSignIn={signIn}/> : <>
       <View className="min-h-0 flex-1 gap-4 lg:flex-row lg:gap-6">
         <Aside aria-label="Your Mon" className="gap-4 lg:w-80 lg:shrink-0 lg:overflow-y-auto xl:w-96">
-          <MonPanel mon={state.mon} speaking={speaking} caption={speaking ? lastMon?.text ?? '' : ''}/>
+          <MonPanel mon={state.mon} speaking={speaking} caption={speaking ? lastMon?.text ?? '' : ''} issuer={config.issuer}/>
           <Section aria-label="Talk to your Mon" className="gap-3">
             <Button title={talkTitle(state.voice.phase)} variant="cta" size="lg" fullWidth
               icon={state.voice.phase === 'listening' ? <Square size={20}/> : <Mic size={20}/>}
@@ -416,13 +416,16 @@ function MonArt({ art, className }: { art:CompanionArt; className:string }) {
  * still never left. A form with no model keeps the still alone; nothing is
  * stubbed. Speech cues (speechCues.ts) lip-sync the forms that have a mouth.
  */
-function MonFigure({ mon, art, speaking }: { mon:MonCard; art:CompanionArt|null; speaking:boolean }) {
+function MonFigure({ mon, art, speaking, issuer }: { mon:MonCard; art:CompanionArt|null; speaking:boolean; issuer:string }) {
   const model = companionModelForDex(mon.dexId);
   const [failed, setFailed] = useState(false);
   const [ready, setReady] = useState(false);
   const [speech, setSpeech] = useState<MonSpeechCue|null>(() => currentSpeechCue());
   const host = useRef<HTMLDivElement|null>(null);
   const [size, setSize] = useState<{ width:number; height:number }|null>(null);
+  // The GLB comes from Payload's mon-models collection via the admin origin's
+  // 302 to the approved row's CDN object — never bundled under /mons/.
+  const modelUrl = `${issuer}/v1/mon-models/glb/${model.file}`;
   // Speech cues only matter while a rigged mouth can play them.
   useEffect(() => (model?.mouth ? addSpeechCueListener(setSpeech) : undefined),[model]);
   // The canvas wants pixels: it follows the still's box and resizes in place.
@@ -457,7 +460,7 @@ function MonFigure({ mon, art, speaking }: { mon:MonCard; art:CompanionArt|null;
       {art === null ? <div aria-hidden style={{ aspectRatio:4 / 5 }}/> : null}
       {model !== null && !failed && size !== null ? (
         <div className="absolute inset-0">
-          <MonModel3D url={`/mons/${model.file}.glb`} clips={companionModelClips(model,mon.mood,mon.asleep)}
+          <MonModel3D url={modelUrl} clips={companionModelClips(model,mon.mood,mon.asleep)}
             width={size.width} height={size.height} label={mon.name} onError={() => setFailed(true)}
             {...(model.mouth ? { mouth:model.mouth, speech } : {})}/>
         </div>
@@ -466,7 +469,7 @@ function MonFigure({ mon, art, speaking }: { mon:MonCard; art:CompanionArt|null;
   </View>;
 }
 
-function MonPanel({ mon, speaking, caption }: { mon:MonCard|null; speaking:boolean; caption:string }) {
+function MonPanel({ mon, speaking, caption, issuer }: { mon:MonCard|null; speaking:boolean; caption:string; issuer:string }) {
   const reducedMotion = useReducedMotion();
   if (!mon) return <Paragraph className="my-0 text-type-body text-text-muted">Checking on your Mon…</Paragraph>;
   const art = artForDex(mon.dexId);
@@ -475,7 +478,7 @@ function MonPanel({ mon, speaking, caption }: { mon:MonCard|null; speaking:boole
   return <View className="gap-4">
     <View className="flex-row items-center gap-4">
       {/* Keyed by form: a hatch swaps species, so load state never sticks to the wrong Mon. */}
-      <MonFigure key={mon.dexId ?? 'none'} mon={mon} art={art} speaking={speaking}/>
+      <MonFigure key={mon.dexId ?? 'none'} mon={mon} art={art} speaking={speaking} issuer={issuer}/>
       <View className="min-w-0 flex-1 gap-1">
         <Heading level={1} className="my-0 font-display text-type-title text-text">{mon.name}</Heading>
         {form ? <Paragraph className="my-0 text-type-body text-text">{form}</Paragraph> : null}
