@@ -1,6 +1,6 @@
 import type { AdminViewServerProps } from 'payload';
 import type { ReactNode } from 'react';
-import { hasStaffRole, STAFF_ROLES } from '../../../collections/access/roles.ts';
+import { hasConsoleAccess } from '../../../auth/admin-allowlist.ts';
 import { ConsoleNotStaff } from '../Chrome';
 import { allSpecies, bloodlineLabel, eggs, starterBloodlines } from '@acme/content';
 import { ModelsViewClient, type ModelDoc } from './ModelsClient';
@@ -29,14 +29,15 @@ async function read<T>(req: Req, label: string, run: () => Promise<T>): Promise<
 
 /**
  * Every console view, staff only. A signed-in account with no staff role
- * (a Caller who found the URL) gets the not-staff screen instead of a shell
- * full of failed reads. The plugin's `requiredRole` guards the login view
- * only; it does not stop a session that already exists.
+ * (a Caller who found the URL) or outside ADMIN_ALLOWED_EMAILS gets the
+ * not-staff screen instead of a shell full of failed reads. The plugin's
+ * `requiredRole` guards the login view only; it does not stop a session that
+ * already exists.
  */
 function staffOnly(view: (props: AdminViewServerProps) => Promise<ReactNode>) {
   return async function StaffOnlyView(props: AdminViewServerProps): Promise<ReactNode> {
     const { req } = props.initPageResult;
-    if (req.user && !hasStaffRole(req, STAFF_ROLES)) return <ConsoleNotStaff />;
+    if (req.user && !hasConsoleAccess(req.user)) return <ConsoleNotStaff />;
     return view(props);
   };
 }

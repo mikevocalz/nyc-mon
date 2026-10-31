@@ -4,6 +4,7 @@ import { useRouter } from '@payloadcms/ui';
 import { BrandLogo, BrandWordmark, Button, Card, ErrorMessage, TextField } from '@acme/ui/admin';
 import { View } from '@acme/ui/tw';
 import { Aside, Form, Header, Heading, List, ListItem, Main, Page, Paragraph, Section, Text } from '@acme/ui/html';
+import { SURFACE_HEADER } from '../../auth/surface';
 import { consoleAuth } from './auth-client';
 import { consoleCopy } from './copy';
 
@@ -35,7 +36,10 @@ export function ConsoleLogin() {
   const submit = async () => {
     setPending(true); setError(undefined);
     try {
-      const response = await fetch('/payload-api/auth/sign-in/email', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
+      // The admin surface header marks this as a console credential sign-in,
+      // which is what the ADMIN_ALLOWED_EMAILS gate keys on (auth/admin-allowlist.ts).
+      // It cannot mint an 'admin' session label — requestedSurface refuses it.
+      const response = await fetch('/payload-api/auth/sign-in/email', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', [SURFACE_HEADER]: 'admin' }, body: JSON.stringify({ email, password }) });
       if (!response.ok) { setError("That email and password don't match. Check both and try again."); return; }
       router.push('/admin/overview');
     } catch { setError("Couldn't reach the server. Check your connection and try again."); }
