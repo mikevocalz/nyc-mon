@@ -23,7 +23,9 @@ export function nvidiaCsp(env: NvidiaEnv): string {
     "default-src 'self'",
     "script-src 'self'",
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data:",
+    // GLB textures decode through blob: URLs — blocked without this, leaving
+    // the model white/untextured.
+    "img-src 'self' data: blob:",
     "font-src 'self' data:",
     "media-src 'self' blob:",
     // /api/asr is a WebSocket on this origin; older engines don't match ws(s): against 'self'.

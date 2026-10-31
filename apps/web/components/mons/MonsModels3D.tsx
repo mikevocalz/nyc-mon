@@ -12,9 +12,11 @@ import { View } from '@acme/ui/tw';
  * the roster as "Coming Soon". New models arrive through the Payload console
  * (mon-models); this list grows with them.
  */
+// GLBs live in Payload's mon-models collection; the admin origin 302s to the
+// approved row's CDN object (CORS is open on both hops). Never bundled.
 const LIVE = [
-  { name: 'Squeaklet', dex: 2, line: 'Hood Ratti · Baby', url: '/mons/squeaklet.glb', clips: ['tail_swish', 'rat_run'] },
-  { name: 'Lil’ Ratti', dex: 3, line: 'Hood Ratti · Small', url: '/mons/lil-ratti.glb', clips: ['up_idle', 'up_breathe'] },
+  { name: 'Squeaklet', dex: 2, line: 'Hood Ratti · Baby', url: 'https://admin.nyc-mon.city/v1/mon-models/glb/dex-002', clips: ['tail_swish', 'rat_run'] },
+  { name: 'Lil’ Ratti', dex: 3, line: 'Hood Ratti · Small', url: 'https://admin.nyc-mon.city/v1/mon-models/glb/dex-003', clips: ['up_idle', 'up_breathe'] },
 ] as const;
 
 const SOON = [
