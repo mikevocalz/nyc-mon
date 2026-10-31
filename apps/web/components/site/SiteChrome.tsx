@@ -1,5 +1,5 @@
 'use client';
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { copyTree } from '@acme/content/site-content-bindings';
 import { blockImage, sectionFor, type SitePage } from '@acme/content/site-content';
 import { Link } from 'solito/link';
@@ -52,6 +52,16 @@ const siteLogo = (
  *  waitlist CTA need about 900px. The waitlist is the site's primary action,
  *  so it wears the orange CTA face. The skyline strip shows from `md` and is
  *  dropped on phones, upright or sideways, where height is scarce. */
+/** Header links route to other pages; reset scroll so the new page opens at the top. */
+function ScrollRestoration() {
+  const pathname = usePathname() ?? '/';
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    document.scrollingElement?.scrollTo?.(0, 0);
+  }, [pathname]);
+  return null;
+}
+
 export function SiteNavBar({ content }: { content?: SitePage | null } = {}) {
   const header = sectionFor(content, 'header');
   const logo = blockImage(header?.content.find(block => block.blockType === 'image' && block.slot === 'logo'));
@@ -60,7 +70,7 @@ export function SiteNavBar({ content }: { content?: SitePage | null } = {}) {
   if (!showsSiteChrome(pathname) || header?.hidden) return null;
 
   return (
-    <NavBar
+    <><ScrollRestoration /><NavBar
       items={copyTree(navItems(pathname), header, 'links')}
       cta={copyTree(NAV_CTA, header, 'cta')}
       ctaTone="royal"
@@ -70,7 +80,7 @@ export function SiteNavBar({ content }: { content?: SitePage | null } = {}) {
       logo={logo ? <><View className="flex short:hidden">{logoAt(66)}</View><View className="hidden short:flex">{logoAt(40)}</View></> : siteLogo}
       collapseBelow="lg"
       renderLink={navLink}
-    />
+    /></>
   );
 }
 
