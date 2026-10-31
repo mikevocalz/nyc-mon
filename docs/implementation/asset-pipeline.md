@@ -29,7 +29,7 @@ the repo actually has, with the verified bits marked.
 | Procedural geometry | Proven, egg-scoped | `tooling/blender/hatching/` (fracture/goo/baby_proxy/build) — headless `blender -b -P build.py -- manifests/<egg>.json` | Nothing general-purpose |
 | GLB output | Proven | `packages/assets/eggs/<egg>/<egg>-hatch.glb` (4 eggs shipped) + Blender export verified today | — |
 | Optimization | Partial | `compress.sh` = gltf-transform dedup+quantize only (deliberately no meshopt/Draco — Hermes lacks WASM); `MeshoptSimplifier` powers city LOD | No generic asset optimize pass; Mon GLBs ship 19–24 MB unoptimized |
-| LOD/HLOD | City: proven (3 tiers + far L4/L6 + imposters). Assets: **none** | `harvest.js`, `write.mjs`, `bake-cars.mjs` (near/mid/far index lists) | No per-GLB LOD0/1/2 generation; no per-asset HLOD |
+| LOD/HLOD | City: proven (3 tiers + far L4/L6 + imposters). Assets: near/mid/far bake landed | `harvest.js`, `write.mjs`, `bake-cars.mjs` (near/mid/far index lists), `tooling/assets/lod.mjs` (per-GLB tiers + pinned manifest) | No per-asset HLOD |
 | KTX2 | Decode only | `bake-cars.mjs`, `bake-pbr.mjs` transcode `KHR_texture_basisu` in | No encoder stage anywhere |
 | Manifest | Per-lane | `hatch.manifest.json`, `vd-cells-manifest.ts`, `vd-systems-manifest.ts`, Payload `mon-models` rows | No asset→manifest for new GLB geometry |
 | R2 release | Proven, city-only | `r2-publish.mjs` (SigV4, sha256 re-hash, immutable, release-last manifest, rollback) + `r2-verify.mjs` | Locked to vd-cell manifest shape; no GLB asset lane (eggs bundle, Mons go Bunny) |
@@ -39,9 +39,12 @@ the repo actually has, with the verified bits marked.
 
 ## Next slices (PR 2 continues)
 
-1. `tooling/assets/lod.mjs` — generic LOD0/1/2 bake via `MeshoptSimplifier`
+1. ~~`tooling/assets/lod.mjs` — generic LOD0/1/2 bake via `MeshoptSimplifier`
    (already a dependency) + manifest entry reusing `asset-validation.ts`'s
-   near/medium/far tier vocabulary. Cheapest real win.
+   near/medium/far tier vocabulary. Cheapest real win.~~ **Done** —
+   `tooling/assets/lod.mjs` (index-only decimation, sha256-pinned manifest;
+   bake tier names near/mid/far, `mid` = descriptor `medium`) +
+   `tooling/assets/lod.test.mjs`.
 2. Asset manifest writer + R2 publish lane for GLB geometry, or a deliberate
    decision to keep GLB assets on Bunny — record the choice here.
 3. KTX2 encode stage (toktx/basisu or gltf-transform `uastc`/`etc1s`) — needs a
