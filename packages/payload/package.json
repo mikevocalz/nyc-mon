@@ -82,7 +82,8 @@
   "scripts": {
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "migrate": "payload migrate --force-accept-warning"
   },
   "dependencies": {
     "@acme/assets": "workspace:*",
