@@ -113,11 +113,19 @@ export const OAUTH_PAGE_PATHS = OAUTH_PAGES;
 export function createAuthServerMetadataHandler(auth: Parameters<typeof oauthProviderAuthServerMetadata>[0]) {
   return async (request: Request): Promise<Response> => {
     if (request.method !== 'OPTIONS') {
-      // asResponse: true hands back a real Response — the RFC 8414 document is
-      // its JSON body. (asResponse: false returns the better-call envelope
-      // {headers, response}, which serializes the body away entirely.)
-      const res = (await auth.api.getOAuthServerConfig({ request, asResponse: true })) as unknown;
-      const body = res instanceof Response ? await res.json() : res;
+      // The api invoker can hand back {headers, response} where `response` is a
+      // Response built in another module realm — `instanceof` misses it, so
+      // duck-type on .json(). The RFC 8414 document is that response's body.
+      const raw = (await auth.api.getOAuthServerConfig({ request, asResponse: false })) as {
+        response?: { json?: () => Promise<unknown> } | unknown;
+      } & { json?: () => Promise<unknown> };
+      const inner = raw?.response;
+      const body =
+        typeof (inner as { json?: () => Promise<unknown> })?.json === 'function'
+          ? await (inner as { json: () => Promise<unknown> }).json()
+          : typeof raw?.json === 'function'
+            ? await raw.json()
+            : (inner ?? raw);
       return new Response(JSON.stringify(body), {
         status: 200,
         headers: { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' },
