@@ -40,11 +40,12 @@ const HAIRLINE = '#25293D'; // ink-800: the footer's legal border
 const LIT_WINDOW = '#FEBE80'; // orange-300: SkylineBand's lit windows
 const ROYAL_SHADES = ['#003FB6', '#003193', '#002470'] as const; // royal-700/800/900
 const SANS = "'Space Grotesk', Arial, Helvetica, sans-serif";
+const DISPLAY = "'Archivo Black', 'Arial Black', Impact, sans-serif";
 const MONO = 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
 const SITE_URL = 'https://nyc-mon.city';
 // The site sans over Google Fonts; clients that strip <link> fall back to the
 // system sans stack. display=swap so text never waits on the file.
-const FONT_LINK = `<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&amp;display=swap">`;
+const FONT_LINK = `<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&amp;family=Space+Grotesk:wght@400;500;700&amp;display=swap">`;
 
 /**
  * One skyline silhouette: height and width as fractions of the strip, the
@@ -128,6 +129,9 @@ function render({ subject, paragraphs, action, code, footer }: Layout): MailCont
     KEYLINE,
     `<tr><td style="padding:0;">${skylineRow(MIDTOWN_SKYLINE, 24)}</td></tr>`,
     `<tr><td style="padding:36px 0 8px;">`,
+    // The site's display style: Archivo Black, uppercase, giant — the same
+    // voice the home sections use for their headings (text-display-md).
+    `<p style="margin:0 0 20px;font-family:${DISPLAY};font-size:42px;line-height:46px;font-weight:400;letter-spacing:0;text-transform:uppercase;color:${TEXT};">${escapeHtml(subject)}</p>`,
     ...paragraphs.map((p) => `<p style="margin:0 0 16px;font-family:${SANS};font-size:16px;line-height:26px;color:${TEXT};">${escapeHtml(p)}</p>`),
     code === undefined
       ? ''
