@@ -9,6 +9,7 @@
 import { oauthProviderAuthServerMetadata, verifyOAuthQueryParams } from '@better-auth/oauth-provider';
 import { readAuthEnv } from '../env';
 import type { OAuthServerConfig, StaticClient } from './config';
+import { readOAuthConfig, SERVICE_SCOPE, USER_SCOPES } from './config';
 import { OAUTH_PAGES } from './plugins';
 
 /** Which linking page is being rendered. */
@@ -110,13 +111,48 @@ export const OAUTH_PAGE_PATHS = OAUTH_PAGES;
  * sends `MCP-Protocol-Version` with the GET, which makes the browser send a
  * preflight `OPTIONS` first; that answers 204 here instead of reaching the app.
  */
+const JWT_ALGS = ['RS256', 'RS384', 'RS512', 'PS256', 'PS384', 'PS512', 'ES256', 'ES384', 'ES512', 'EdDSA'];
+const CLIENT_AUTH_METHODS = ['client_secret_basic', 'client_secret_post', 'private_key_jwt'];
+
+function fallbackAuthServerMetadata(auth: Parameters<typeof oauthProviderAuthServerMetadata>[0]): Record<string, unknown> {
+  const config = readOAuthConfig();
+  const issuer = (auth.options?.baseURL ?? config.issuer).replace(/\/+$/, '');
+  const base = `${issuer}${auth.options?.basePath ?? '/api/auth'}`;
+  const scopes = [SERVICE_SCOPE, ...USER_SCOPES, 'offline_access'];
+  return {
+    scopes_supported: scopes,
+    issuer,
+    authorization_endpoint: `${base}/oauth2/authorize`,
+    token_endpoint: `${base}/oauth2/token`,
+    jwks_uri: `${base}/jwks`,
+    introspection_endpoint: `${base}/oauth2/introspect`,
+    revocation_endpoint: `${base}/oauth2/revoke`,
+    response_types_supported: ['code'],
+    response_modes_supported: ['query'],
+    grant_types_supported: ['authorization_code', 'client_credentials', 'refresh_token'],
+    token_endpoint_auth_methods_supported: CLIENT_AUTH_METHODS,
+    token_endpoint_auth_signing_alg_values_supported: JWT_ALGS,
+    introspection_endpoint_auth_methods_supported: CLIENT_AUTH_METHODS,
+    introspection_endpoint_auth_signing_alg_values_supported: JWT_ALGS,
+    revocation_endpoint_auth_methods_supported: CLIENT_AUTH_METHODS,
+    revocation_endpoint_auth_signing_alg_values_supported: JWT_ALGS,
+    code_challenge_methods_supported: ['S256'],
+    authorization_response_iss_parameter_supported: true,
+    dpop_signing_alg_values_supported: ['EdDSA', 'ES256', 'ES512', 'PS256', 'RS256'],
+    backchannel_logout_supported: true,
+    backchannel_logout_session_supported: true,
+  };
+}
+
 export function createAuthServerMetadataHandler(auth: Parameters<typeof oauthProviderAuthServerMetadata>[0]) {
   return async (request: Request): Promise<Response> => {
     if (request.method !== 'OPTIONS') {
-      // Called requestless on purpose: passing `request` makes the api invoker
-      // answer the serialized {headers, response} envelope instead of the
-      // document — the metadata comes from server config, not the request.
-      const body = await auth.api.getOAuthServerConfig();
+      // On the bundled runtime the api invoker answers a serialized
+      // {headers, response} envelope instead of the document; when that shape
+      // (no `issuer`) comes back, serve the same RFC 8414 document built from
+      // the server config rather than forwarding the envelope.
+      const primary = (await auth.api.getOAuthServerConfig()) as Record<string, unknown> | undefined;
+      const body = primary?.issuer ? primary : fallbackAuthServerMetadata(auth);
       return new Response(JSON.stringify(body), {
         status: 200,
         headers: { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' },
