@@ -120,7 +120,7 @@ export const validateMonInstance: CollectionBeforeChangeHook = async ({ data, op
       throw new RecordError('INVALID_RECORD', `mon ${mon.monInstanceId} must be minted from egg ${eggId} as its Baby form`);
     }
     const eggSpeciesId = typeof egg.speciesId === 'string' ? egg.speciesId : '';
-    if (mon.gender !== deriveMonGender(eggId) || mon.voiceLineageId !== deriveVoiceLineageId({ eggId, speciesId: eggSpeciesId })) {
+    if (mon.gender !== deriveMonGender(eggId, eggSpeciesId) || mon.voiceLineageId !== deriveVoiceLineageId({ eggId, speciesId: eggSpeciesId })) {
       throw new RecordError('INVALID_RECORD', `mon ${mon.monInstanceId} must carry the gender and voice lineage minted from egg ${eggId}`);
     }
   }

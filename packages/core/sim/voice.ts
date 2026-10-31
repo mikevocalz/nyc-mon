@@ -15,10 +15,26 @@ function voiceWords(eggId: string): readonly [number, number, number, number] {
 }
 
 /**
- * The individual's gender (Bible v11 ¶54), a pure function of the egg id so
- * every device and the server replay agree. Uses bit 0 of the first hash word.
+ * Canon line genders keyed by the line's Egg form's Dex number (v7: the rat
+ * line reads "he" — M7 L476, L641 — the cat line "she" — M7 L1405). Lines
+ * without a canon gender still mint one from the egg id.
  */
-export function deriveMonGender(eggId: string): MonGender {
+const CANON_EGG_DEX_GENDERS: Readonly<Record<number, MonGender>> = {
+  1: 'male',   // F01 Hood Ratti — the Metro Egg (dex-001)
+  8: 'female', // F02 Bodega Baddiee Cee — its Egg form (dex-008)
+};
+
+/**
+ * The individual's gender (Bible v11 ¶54). A line with a canon gender mints it;
+ * the rest derive a pure function of the egg id so every device and the server
+ * replay agree. Uses bit 0 of the first hash word.
+ */
+export function deriveMonGender(eggId: string, eggSpeciesId?: string): MonGender {
+  if (eggSpeciesId !== undefined) {
+    const dex = /^dex-0*(\d+)$/i.exec(eggSpeciesId);
+    const canon = dex === null ? undefined : CANON_EGG_DEX_GENDERS[Number(dex[1])];
+    if (canon !== undefined) return canon;
+  }
   const [first] = voiceWords(eggId);
   return (first & 1) === 0 ? 'female' : 'male';
 }
@@ -35,7 +51,7 @@ function deriveVoiceSlot(eggId: string): number {
  * registry in `@acme/content` maps that key to its bloodline's pool.
  */
 export function deriveVoiceLineageId(egg: Pick<EggRecord, 'eggId' | 'speciesId'>): string {
-  return `${egg.speciesId}/${deriveMonGender(egg.eggId)}/${deriveVoiceSlot(egg.eggId)}`;
+  return `${egg.speciesId}/${deriveMonGender(egg.eggId, egg.speciesId)}/${deriveVoiceSlot(egg.eggId)}`;
 }
 
 export interface ParsedVoiceLineage {

@@ -79,7 +79,7 @@ export function adoptRuleViolation(input: AdoptMonRequest, nowMs: number): strin
   if (form === undefined || form.stage !== mon.stage || mon.stage === 'Egg') {
     return `${mon.speciesId} at stage ${mon.stage} is not a form this egg grows into.`;
   }
-  if (mon.gender !== null && mon.gender !== deriveMonGender(egg.eggId)) return 'gender is not the egg-derived gender.';
+  if (mon.gender !== null && mon.gender !== deriveMonGender(egg.eggId, egg.speciesId)) return 'gender is not the egg-derived gender.';
   if (mon.voiceLineageId !== null && mon.voiceLineageId !== deriveVoiceLineageId(egg)) {
     return 'voiceLineageId is not the egg-derived voice lineage.';
   }
