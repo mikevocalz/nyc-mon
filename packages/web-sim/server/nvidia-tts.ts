@@ -27,7 +27,10 @@ export function nvidiaCsp(env: NvidiaEnv): string {
     "font-src 'self' data:",
     "media-src 'self' blob:",
     // /api/asr is a WebSocket on this origin; older engines don't match ws(s): against 'self'.
-    `connect-src 'self' ${socketOrigin(env.SIM_PUBLIC_ORIGIN)} ${new URL(env.SIM_MCP_URL).origin} ${new URL(env.AUTH_ISSUER).origin}`,
+    // /api/asr is a WebSocket on this origin; older engines don't match ws(s): against 'self'.
+    // The GLB chain ends on the Bunny CDN: /v1/mon-models/glb 302s there, and a
+    // browser fetch needs the CDN origin allowed or the redirect hop dies.
+    `connect-src 'self' ${socketOrigin(env.SIM_PUBLIC_ORIGIN)} ${new URL(env.SIM_MCP_URL).origin} ${new URL(env.AUTH_ISSUER).origin} https://*.b-cdn.net`,
     "object-src 'none'",
     "base-uri 'self'",
     "frame-ancestors 'none'",
