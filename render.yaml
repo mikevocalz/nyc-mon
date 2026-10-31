@@ -88,3 +88,7 @@ services:
       # Store in Render secret manager, never source, PRs, logs, or chat.
       - key: NEBIUS_API_KEY
         sync: false
+      # Mon voices: lineage -> ElevenLabs voiceId (eleven_v4_turbo); without it
+      # /api/tts 204s and the page falls back to the browser's speech voice.
+      - key: ELEVENLABS_API_KEY
+        sync: false

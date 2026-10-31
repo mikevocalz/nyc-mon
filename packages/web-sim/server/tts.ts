@@ -1,4 +1,5 @@
 import { spawn, spawnSync } from 'node:child_process';
+import ffmpegStatic from 'ffmpeg-static';
 import { randomUUID } from 'node:crypto';
 import { Readable } from 'node:stream';
 import { MAX_SPOKEN_TEXT, planMonUtterance, type MonLingo } from '@acme/content/voice';
@@ -92,10 +93,15 @@ export function pitchShiftArgs(factor: number): string[] {
  */
 export type PitchShifter = (audio: ReadableStream<Uint8Array>, factor: number, signal: AbortSignal) => ReadableStream<Uint8Array>;
 
-/** The ffmpeg binary to use: FFMPEG_PATH, else `ffmpeg` on PATH; null when neither runs. */
+/** The ffmpeg binary to use: FFMPEG_PATH, `ffmpeg` on PATH, else the bundled
+ * ffmpeg-static binary (Render's node runtime ships no system ffmpeg). */
 export function findFfmpeg(candidate = process.env.FFMPEG_PATH ?? 'ffmpeg'): string | null {
-  const probe = spawnSync(candidate, ['-version'], { stdio: 'ignore', timeout: 5_000 });
-  return probe.status === 0 ? candidate : null;
+  for (const bin of [candidate, ffmpegStatic]) {
+    if (typeof bin !== 'string' || bin === '') continue;
+    const probe = spawnSync(bin, ['-version'], { stdio: 'ignore', timeout: 5_000 });
+    if (probe.status === 0) return bin;
+  }
+  return null;
 }
 
 export function createFfmpegPitchShifter(binary: string): PitchShifter {

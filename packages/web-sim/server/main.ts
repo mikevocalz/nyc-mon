@@ -204,7 +204,7 @@ async function main(): Promise<void> {
     viteMiddleware = vite.middlewares;
   }
 
-  const app = createServer((req, res) => {
+  const app = createServer(async (req, res) => {
     const url = new URL(req.url ?? '/', hostOrigin);
     const fail = (err: unknown) => {
       console.error('[web-sim]', err);
