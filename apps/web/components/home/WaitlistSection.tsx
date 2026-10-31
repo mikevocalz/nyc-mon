@@ -1,6 +1,6 @@
 import { Heading, Paragraph, Section } from '@acme/ui/html';
 import { View } from '@acme/ui/tw';
-import { YouTubeEmbed } from '@acme/app/features/editor';
+import { YouTubeEmbed } from '@acme/app/features/editor/YouTubeEmbed';
 import { WAITLIST_COPY } from '../waitlist/copy';
 import { WaitlistForm } from '../waitlist/WaitlistForm';
 import { sectionMarker } from './sections';
