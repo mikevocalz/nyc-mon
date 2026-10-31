@@ -34,6 +34,10 @@ function hillGlb(n = 24) {
       pos[i * 3 + 2] = z / n - 0.5;
     }
   }
+  // Up-facing normals — the bake never reads them, but validate-glb flags a
+  // primitive without NORMAL, and this fixture must stay warning-free.
+  const nrm = new Float32Array(side * side * 3);
+  for (let i = 0; i < side * side; i++) nrm[i * 3 + 1] = 1;
   const idx = new Uint16Array(n * n * 6);
   let t = 0;
   for (let z = 0; z < n; z++) {
@@ -47,9 +51,10 @@ function hillGlb(n = 24) {
     }
   }
   const posBytes = Buffer.from(pos.buffer, pos.byteOffset, pos.byteLength);
+  const nrmBytes = Buffer.from(nrm.buffer, nrm.byteOffset, nrm.byteLength);
   const idxPad = (4 - (idx.byteLength & 3)) & 3;
   const idxBytes = Buffer.concat([Buffer.from(idx.buffer, idx.byteOffset, idx.byteLength), Buffer.alloc(idxPad)]);
-  const bin = Buffer.concat([posBytes, idxBytes]);
+  const bin = Buffer.concat([posBytes, nrmBytes, idxBytes]);
   const lo = [0, 1, 2].map((c) => Math.min(...pos.filter((_, i) => i % 3 === c)));
   const hi = [0, 1, 2].map((c) => Math.max(...pos.filter((_, i) => i % 3 === c)));
   const json = {
@@ -57,14 +62,16 @@ function hillGlb(n = 24) {
     scene: 0,
     scenes: [{ nodes: [0] }],
     nodes: [{ mesh: 0, name: 'hill' }],
-    meshes: [{ name: 'hill', primitives: [{ attributes: { POSITION: 0 }, indices: 1, mode: 4 }] }],
+    meshes: [{ name: 'hill', primitives: [{ attributes: { POSITION: 0, NORMAL: 1 }, indices: 2, mode: 4 }] }],
     accessors: [
       { bufferView: 0, componentType: 5126, count: side * side, type: 'VEC3', min: lo, max: hi },
-      { bufferView: 1, componentType: 5123, count: idx.length, type: 'SCALAR' },
+      { bufferView: 1, componentType: 5126, count: side * side, type: 'VEC3' },
+      { bufferView: 2, componentType: 5123, count: idx.length, type: 'SCALAR' },
     ],
     bufferViews: [
       { buffer: 0, byteOffset: 0, byteLength: posBytes.length },
-      { buffer: 0, byteOffset: posBytes.length, byteLength: idx.length * 2 },
+      { buffer: 0, byteOffset: posBytes.length, byteLength: nrmBytes.length },
+      { buffer: 0, byteOffset: posBytes.length + nrmBytes.length, byteLength: idx.length * 2 },
     ],
     buffers: [{ byteLength: bin.length }],
   };

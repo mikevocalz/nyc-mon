@@ -30,7 +30,7 @@ the repo actually has, with the verified bits marked.
 | GLB output | Proven | `packages/assets/eggs/<egg>/<egg>-hatch.glb` (4 eggs shipped) + Blender export verified today | — |
 | Optimization | Partial | `compress.sh` = gltf-transform dedup+quantize only (deliberately no meshopt/Draco — Hermes lacks WASM); `MeshoptSimplifier` powers city LOD | No generic asset optimize pass; Mon GLBs ship 19–24 MB unoptimized |
 | LOD/HLOD | City: proven (3 tiers + far L4/L6 + imposters). Assets: near/mid/far bake landed | `harvest.js`, `write.mjs`, `bake-cars.mjs` (near/mid/far index lists), `tooling/assets/lod.mjs` (per-GLB tiers + pinned manifest) | No per-asset HLOD |
-| KTX2 | Decode only | `bake-cars.mjs`, `bake-pbr.mjs` transcode `KHR_texture_basisu` in | No encoder stage anywhere |
+| KTX2 | Decode only; platform verdict in | `bake-cars.mjs`, `bake-pbr.mjs` transcode `KHR_texture_basisu` in; verdict: **web GO** (needs `requiredFeatures` on the shared device + `setKTX2Loader` + transcoder assets), **native NO-GO for BasisU** (no WASM on Hermes) but GO for raw-vkFormat KTX2, **Viro NO-GO** (virocore has no basisu) | No encoder installed (`gltfpack` present, needs `toktx`); shared `GPUDevice` requests no features (`gpu-store.ts:51`, `acquire-device.ts:56`); no `setKTX2Loader` wiring (`mon-rig.ts:139`, `egg-hatch-rig.ts:58`, `MonModel3D.tsx:395`) |
 | Manifest | Per-lane | `hatch.manifest.json`, `vd-cells-manifest.ts`, `vd-systems-manifest.ts`, Payload `mon-models` rows | No asset→manifest for new GLB geometry |
 | R2 release | Proven, city-only | `r2-publish.mjs` (SigV4, sha256 re-hash, immutable, release-last manifest, rollback) + `r2-verify.mjs` | Locked to vd-cell manifest shape; no GLB asset lane (eggs bundle, Mons go Bunny) |
 | Validation | Working, fragmented | `validate.py` (egg-deep), `validate-glb.mjs` (container+bounds), `glb.ts` (upload gate), `asset-validation.ts` (descriptors), city tests | No tri/material/UV/normals checks on GLBs; nothing runs in CI |
@@ -47,10 +47,17 @@ the repo actually has, with the verified bits marked.
    `tooling/assets/lod.test.mjs`.
 2. Asset manifest writer + R2 publish lane for GLB geometry, or a deliberate
    decision to keep GLB assets on Bunny — record the choice here.
-3. KTX2 encode stage (toktx/basisu or gltf-transform `uastc`/`etc1s`) — needs a
-   runtime proof that the three/Viro texture path handles `KHR_texture_basisu`
-   before mass conversion.
-4. CI: wire `validate-glb.mjs` + a tri/UV/normals check into a workflow.
+3. KTX2: platform verdict done (see stage row). Next steps: populate
+   `requiredFeatures` from `adapter.features` in `gpu-store.ts:51` /
+   `acquire-device.ts:56`, wire `setKTX2Loader` on the three GLTFLoader sites,
+   serve `basis_transcoder` assets on web, install `toktx`, encode per-platform
+   (UASTC web / raw-vkFormat ASTC native / leave Viro lanes uncompressed or
+   dual-emit). Runtime sampling proof still owed on browser+simulator.
+4. ~~CI: wire `validate-glb.mjs` + a tri/UV/normals check into a workflow.~~
+   **Done** — `.github/workflows/asset-validation.yml` + extended validator
+   (tri budget 100k, NORMAL/TEXCOORD_0 checks, quantized-units fix).
+   `corner-egg-hatch.glb` (152,850 tris) now fails the gate — real finding,
+   open decision: bake LODs or raise budget.
 5. Mon batch conformance check against `mon-rig.ts` expectations.
 
 ## Notes for lanes
