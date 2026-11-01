@@ -1,7 +1,7 @@
 // vd-instanced.ts: the vdXform pose places a vertex where the InstancedMesh
 // matrix did (Matrix4.compose of (x, 0, z), a yaw about +Y and a uniform
 // scale), and meshes over vdInstancedGeometry sharing one material run one
-// node build between them where InstancedMeshes ran one each.
+// node build between them. r187 also shares compatible InstancedMesh builds.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import * as THREE from 'three/webgpu';
@@ -31,7 +31,7 @@ test('vdXform matches Matrix4.compose with a yaw about +Y and a uniform scale', 
   }
 });
 
-test('meshes over vdInstancedGeometry with one material share one node build; InstancedMeshes do not', async () => {
+test('vdInstancedGeometry and compatible InstancedMeshes each share node builds in r187', async () => {
   const { installGpuGlobals, recordingCanvas, recordingGpuDevice } = await import('../render-runtime/recording-gpu.test-support.ts');
   installGpuGlobals();
   const builds = async (instanced: boolean, meshes: number) => {
@@ -68,5 +68,5 @@ test('meshes over vdInstancedGeometry with one material share one node build; In
   };
   // The frame's own builds (the output pass) come on top of the meshes'.
   assert.equal(await builds(false, 4), await builds(false, 1), 'four vdXform meshes build no more than one');
-  assert.equal(await builds(true, 4), (await builds(true, 1)) + 3, 'four InstancedMeshes, a build each (three r186 keys them on uuid)');
+  assert.equal(await builds(true, 4), await builds(true, 1), 'r187 keys compatible InstancedMeshes by instance layout, not uuid');
 });

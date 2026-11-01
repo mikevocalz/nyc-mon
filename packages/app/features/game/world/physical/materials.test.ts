@@ -55,8 +55,8 @@ test('N2: no hex colour literal in the lane, its constants or the city-mesh chan
 
 test("token colours convert exactly as Slop's color(0x…) does", () => {
   const { c } = physicalTsl(THREE);
-  // TSL color() wraps a constant in a VarNode; the Color sits on `.node.value`.
-  const value = (n: unknown) => (n as { node: { value: THREE.Color } }).node.value;
+  // In the installed r187, TSL color() returns the ConstNode directly.
+  const value = (n: unknown) => (n as { value: THREE.Color }).value;
   const ours = value(c(physicalCityMaterials.interior.bulbWarmA));
   const slop = value(THREE.TSL.color(0xffb845));
   assert.ok(ours.equals(slop), `${ours.getHexString()} vs ${slop.getHexString()}`);
