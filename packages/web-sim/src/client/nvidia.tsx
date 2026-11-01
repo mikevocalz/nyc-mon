@@ -1,6 +1,6 @@
 import './rn-globals.ts';
 import './globals.css';
-import { useCallback, useEffect, useMemo, useRef, type ComponentRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
 import { createRoot } from 'react-dom/client';
 import { z } from 'zod';
 import type { CallToolResult } from '@modelcontextprotocol/client';
@@ -11,6 +11,8 @@ import {
 import { Aside, Details, Footer, Header, Heading, List, ListItem, Main, Paragraph, Section, Summary, Text } from '@acme/ui/html';
 import { Mic, Square } from '@acme/ui/icons';
 import { ScrollView, View } from '@acme/ui/tw';
+import { MonModel3D } from '@acme/ui/three/mon';
+import type { MonSpeechCue } from '@acme/ui/three/mon/lipsync';
 import { SimOAuthProvider, parseCallback, revokeRefreshToken } from '../shared/auth.ts';
 import { runAgentTurn } from '../shared/agentLoop.ts';
 import { mcpToolsToClaude } from '../shared/toolSpec.ts';
@@ -18,7 +20,8 @@ import { beginSignIn, completeSignIn, connectMcp } from './mcp.ts';
 import { createAuthorize, bearer, sdkRefresh } from './freshToken.ts';
 import { httpModelClient } from './modelClient.ts';
 import { safeStorage } from './session.ts';
-import { createTurnToolCaller } from './turnTools.ts';
+import { createTurnToolCaller, monStateLine, withMonState } from './turnTools.ts';
+import { startAmbientBabble } from './ambientBabble.ts';
 import { createCompanionVoice } from './companionVoice.ts';
 import { monSpeechPort } from './monSpeechPort.ts';
 import { canListen, clearSessionVoice, listen, onPlayback, playbackStartedAt, setSessionVoice, stopSpeaking, type Listening } from './speech.ts';
@@ -33,7 +36,9 @@ import { createVoiceController, type BargeInRecord, type EarHandlers, type Voice
 import { nextVoice, voiceAnnouncement, type VoiceEvent } from './voiceState.ts';
 import { MemorySnapshotSchema } from '@acme/core/schemas';
 import { Composer } from './CompanionComposer.tsx';
-import { STARTER_ART, artForDex, type CompanionArt } from './companionArt.ts';
+import { STARTER_ART, type CompanionArt } from './companionArt.ts';
+import { companionModelClips, companionModelForDex } from './companionModels.ts';
+import { addSpeechCueListener, currentSpeechCue } from './speechCues.ts';
 import { mergeMonCard, type MonCard } from './companionMon.ts';
 
 const ConfigSchema = z.object({ mcpUrl:z.string().url(),clientId:z.string().min(1),issuer:z.string().url(),modelBackend:z.literal('nebius'),modelLabel:z.string(),
@@ -69,7 +74,7 @@ function Companion({ config }: { config:Config }) {
   const store = useInstanceStore<CompanionState>(initialCompanionState);
   const state = useStore(store);
   // Per-mounted-page protocol handles, not UI state. Visible state stays in the instance store.
-  const runtime = useInstanceStore<CompanionRuntime>(() => ({ session:null,history:[],abort:null }));
+  const runtime = useInstanceStore<CompanionRuntime>(() => ({ session:null,history:[],abort:null,monStatus:null }));
   const provider = useMemo(() => {
     const storage = safeStorage('session');
     // boot() checks storage before rendering; this stays as a guard.
@@ -171,6 +176,11 @@ function Companion({ config }: { config:Config }) {
     return () => { window.removeEventListener('keydown',down);window.removeEventListener('keyup',up); };
   },[controller,store]);
 
+  /** Keeps the newest result that carries the Mon: the next turn sends it as the "[Mon now …]" line. */
+  const rememberMon = useCallback((result:CallToolResult) => {
+    if (monStateLine(result,0) !== null) runtime.setState({ monStatus:{ result,at:Date.now() } });
+  },[runtime]);
+
   const memoryRequest = useCallback(async (method:'GET'|'PUT'|'DELETE') => {
     if (store.getState().busy) return;
     const current=store.getState();
@@ -215,14 +225,40 @@ function Companion({ config }: { config:Config }) {
       // The same status read draws the Mon card (art, name, meters) before the Caller says anything.
       void voice.prime(async () => {
         const result=(await connected.client.callTool({ name:'get_mon_status',arguments:{} })) as CallToolResult;
-        if (!disposed) store.setState((st) => ({ mon:mergeMonCard(st.mon,result) }));
+        if (!disposed) { store.setState((st) => ({ mon:mergeMonCard(st.mon,result) }));rememberMon(result); }
         return result;
       });
       store.setState({ connected:true,status:'Signed in. Your Mon and its memory belong to this account.' });
       void memoryRequest('GET');
     })().catch((error:unknown) => { if (!disposed) showError(error); });
     return () => { disposed=true;runtime.getState().abort?.abort();void runtime.getState().session?.close();runtime.setState({ session:null }); };
-  },[provider,config.mcpUrl,store,showError,runtime,memoryRequest,voice]);
+  },[provider,config.mcpUrl,store,showError,runtime,memoryRequest,voice,rememberMon]);
+
+  // An Egg, or a Baby in its first day, babbles now and then on its own (ambientBabble.ts): a scripted line, no model call.
+  // This page has no mute control; a hidden tab counts as muted. `babbling` covers the TTS fetch, before any clip plays,
+  // so a second line never starts on top; the caption comes from the sentence the voice actually starts.
+  const babbling = useRef(false);
+  useEffect(() => {
+    if (!state.connected) return;
+    return startAmbientBabble({
+      voice:() => voice.current(),hatchedAt:() => voice.hatchedAt(),
+      quiet:() => { const st=store.getState();return babbling.current || st.busy || st.voice.phase !== 'off' || playbackStartedAt() !== null || handles.getState().speakingLine !== null; },
+      muted:() => document.visibilityState !== 'visible',
+      say:(line) => {
+        babbling.current=true;
+        void voice.speak(line,authorize,(sentence) => {
+          // The Caller started talking while the clip was being fetched: drop the babble instead of playing over them.
+          if (store.getState().busy || store.getState().voice.phase !== 'off') { voice.stop();return; }
+          push({ who:'Mon',text:sentence });
+        }).finally(() => { babbling.current=false; });
+      },
+    });
+  },[state.connected,store,voice,handles,push,authorize]);
+
+  // Talk, a conversation or a turn cuts an ambient babble off (barge-in does the same for a reply).
+  useEffect(() => {
+    if (babbling.current && (state.busy || state.voice.phase !== 'off')) { voice.stop();babbling.current=false; }
+  },[state.busy,state.voice.phase,voice]);
 
   /** One turn, typed or spoken. The reply is spoken sentence by sentence and captioned as each sentence starts. */
   async function runTurn(question:string, source:'typed'|'voice', startedAt:number) {
@@ -238,12 +274,14 @@ function Companion({ config }: { config:Config }) {
     try {
       const tools=mcpToolsToClaude(connection.tools.filter((tool) => toolsAllowed.has(tool.name))).tools;
       const result=await runAgentTurn({ model,mcp:createTurnToolCaller({ client:connection.client,signal:controller.signal }),
-        tools,history:runtime.getState().history,userText:question,signal:controller.signal,maxSteps:6,
+        tools,history:runtime.getState().history,signal:controller.signal,maxSteps:6,
+        // The Mon's state rides along, so the server knows which Mon talks and how much it may say (voice-stage-gate.ts).
+        userText:withMonState(question,monLineNow()),
         onEvent:(event) => {
           if (controller.signal.aborted) return;
           if (event.type!=='tool-result') return;
           // A result that carries the Mon sets the voice before its reply is spoken.
-          voice.learn(event.result);push(toolResultLine(event.name,event.result));
+          voice.learn(event.result);rememberMon(event.result as CallToolResult);push(toolResultLine(event.name,event.result));
           // Care results carry the Mon and its meters: the card follows the server, never the model's account.
           store.setState((st) => ({ mon:mergeMonCard(st.mon,event.result as CallToolResult) }));
         } });
@@ -263,6 +301,10 @@ function Companion({ config }: { config:Config }) {
     }
     finally { if (!controller.signal.aborted) store.setState({ busy:false }); }
   }
+  function monLineNow() {
+    const status=runtime.getState().monStatus;
+    return status ? monStateLine(status.result,Date.now()-status.at) : null;
+  }
   function finishTurn(turn:TurnRecord, outcome:TurnRecord['outcome']) {
     if (turn.outcome!=='pending') return;
     turn.outcome=outcome;turn.doneAt=performance.now();
@@ -278,7 +320,7 @@ function Companion({ config }: { config:Config }) {
     voice.reset();runtime.getState().abort?.abort();void runtime.getState().session?.close();runtime.setState({ session:null });
     // Revoke at the server (RFC 7009) as well as forgetting it here: a copied refresh token stops working too.
     void revokeRefreshToken({ issuer:config.issuer,clientId:config.clientId,refreshToken:(provider.tokens() as { refresh_token?:string } | undefined)?.refresh_token });
-    provider.signOut();runtime.setState({ history:[] });
+    provider.signOut();runtime.setState({ history:[],monStatus:null });
     store.setState({ ...initialCompanionState(),status:'Signed out. This page no longer holds your conversation or preferences.' });
   }
   function exportMemory() {
@@ -305,7 +347,7 @@ function Companion({ config }: { config:Config }) {
     {!state.connected ? <Landing onSignIn={signIn}/> : <>
       <View className="min-h-0 flex-1 gap-4 lg:flex-row lg:gap-6">
         <Aside aria-label="Your Mon" className="gap-4 lg:w-80 lg:shrink-0 lg:overflow-y-auto xl:w-96">
-          <MonPanel mon={state.mon} speaking={speaking} caption={speaking ? lastMon?.text ?? '' : ''}/>
+          <MonPanel mon={state.mon} speaking={speaking} caption={speaking ? lastMon?.text ?? '' : ''} issuer={config.issuer}/>
           <Section aria-label="Talk to your Mon" className="gap-3">
             <Button title={talkTitle(state.voice.phase)} variant="cta" size="lg" fullWidth
               icon={state.voice.phase === 'listening' ? <Square size={20}/> : <Mic size={20}/>}
@@ -367,19 +409,62 @@ function MonArt({ art, className }: { art:CompanionArt; className:string }) {
   </View>;
 }
 
-function MonPanel({ mon, speaking, caption }: { mon:MonCard|null; speaking:boolean; caption:string }) {
+/**
+ * The Caller's Mon figure: the rigged GLB (the same files the app's stages
+ * and the Alexa view play) when the form has one, over the still so the
+ * picture stays while the model streams in — and if the GLB cannot play, the
+ * still never left. A form with no model keeps the still alone; nothing is
+ * stubbed. Speech cues (speechCues.ts) lip-sync the forms that have a mouth.
+ */
+function MonFigure({ mon, speaking, issuer }: { mon:MonCard; speaking:boolean; issuer:string }) {
+  const model = companionModelForDex(mon.dexId);
+  const [failed, setFailed] = useState(false);
+  const [speech, setSpeech] = useState<MonSpeechCue|null>(() => currentSpeechCue());
+  const host = useRef<HTMLDivElement|null>(null);
+  const [size, setSize] = useState<{ width:number; height:number }|null>(null);
+  // The GLB comes from Payload's mon-models collection via the admin origin's
+  // 302 to the approved row's CDN object — never bundled under /mons/.
+  const modelUrl = model === null ? '' : `${issuer}/v1/mon-models/glb/${model.speciesId}`;
+  // Speech cues only matter while a rigged mouth can play them.
+  useEffect(() => (model?.mouth ? addSpeechCueListener(setSpeech) : undefined),[model]);
+  // The canvas wants pixels: it follows the still's box and resizes in place.
+  useEffect(() => {
+    const el = host.current;
+    if (el === null || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver((entries) => {
+      const box = entries[0]?.contentRect;
+      if (box && box.width > 0 && box.height > 0) setSize({ width:Math.round(box.width), height:Math.round(box.height) });
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  },[]);
+  if (model === null) return null;
+  return <View className="relative w-28 shrink-0 sm:w-36 lg:w-36 xl:w-48">
+    {/* Speaking: an orange keyline breathes around the Mon while the voice plays (still under reduced motion). */}
+    {speaking ? <View aria-hidden className="absolute -inset-1.5 border-4 border-cta motion-safe:animate-pulse"/> : null}
+    <div ref={host} className="relative w-full">
+      {/* No 2D stand-in: the box holds the model's aspect while the GLB streams. */}
+      <div aria-hidden style={{ aspectRatio:4 / 5 }}/>
+      {!failed && size !== null ? (
+        <div className="absolute inset-0">
+          <MonModel3D url={modelUrl} clips={companionModelClips(model,mon.mood,mon.asleep)}
+            width={size.width} height={size.height} label={mon.name} onError={() => setFailed(true)}
+            {...(model.mouth ? { mouth:model.mouth, speech } : {})}/>
+        </div>
+      ) : null}
+    </div>
+  </View>;
+}
+
+function MonPanel({ mon, speaking, caption, issuer }: { mon:MonCard|null; speaking:boolean; caption:string; issuer:string }) {
   const reducedMotion = useReducedMotion();
   if (!mon) return <Paragraph className="my-0 text-type-body text-text-muted">Checking on your Mon…</Paragraph>;
-  const art = artForDex(mon.dexId);
   const form = [mon.name === mon.formName ? null : mon.formName, mon.stage ? `${mon.stage} stage` : null].filter(Boolean).join(', ');
   const low = (k:string) => mon.needs.includes(k);
   return <View className="gap-4">
     <View className="flex-row items-center gap-4">
-      {art ? <View className="relative w-28 shrink-0 sm:w-36 lg:w-36 xl:w-48">
-        {/* Speaking: an orange keyline breathes around the Mon while the voice plays (still under reduced motion). */}
-        {speaking ? <View aria-hidden className="absolute -inset-1.5 border-4 border-cta motion-safe:animate-pulse"/> : null}
-        <MonArt art={art} className="w-full"/>
-      </View> : null}
+      {/* Keyed by form: a hatch swaps species, so load state never sticks to the wrong Mon. */}
+      <MonFigure key={mon.dexId ?? 'none'} mon={mon} speaking={speaking} issuer={issuer}/>
       <View className="min-w-0 flex-1 gap-1">
         <Heading level={1} className="my-0 font-display text-type-title text-text">{mon.name}</Heading>
         {form ? <Paragraph className="my-0 text-type-body text-text">{form}</Paragraph> : null}

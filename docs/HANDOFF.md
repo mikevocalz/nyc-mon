@@ -152,7 +152,6 @@ The kit is Mike's. Feature work doesn't edit `packages/ui` or Storybook; the onl
   - the capture case look
   - whether "Ratti" is allowed as a Mon's name
   - foods, care numbers and the Baby scale (interim values are D-15/D-16 in `docs/design/DECISIONS.md` and Q43–Q46 in `docs/canon/OPEN_QUESTIONS.md`)
-  - Baby speech (Q32)
 - **`.p6`:** an agent-made folder at `~/nyc-mon/.p6` with a line in `.git/info/exclude`. Mike to delete; agents were denied `rm -rf` on it.
 - **Voice enrollment:** real voiceprints need a COPPA/BIPA decision and their own ADR before any code collects audio (ADR 0015 §2).
 - **PayPal E-Card:** not in canon or code. The PayPal AI hackathon closes 2026-11-12. Ask Mike before building anything.

@@ -15,6 +15,8 @@ import { username } from 'better-auth/plugins/username';
 import { waitUntil } from '@vercel/functions';
 import { parseBirthYear } from './age';
 import { amazonOAuthPlugin } from './amazon';
+import { appSignInAttempt, isAllowedAppEmail } from './app-allowlist';
+import { invalidCredentials } from './admin-allowlist';
 import { createAuthMailer } from './email';
 import { readAuthEnv } from './env';
 import { isAllowedSmsNumber, parseSmsCountries, passesPhoneGate } from './phone';
@@ -299,6 +301,7 @@ export const betterAuthOptions = {
     backgroundTasks: { handler: runInBackground },
   },
   rateLimit: {
+    enabled: false,
     // Per-instance memory does not hold on Vercel Functions (ADR 0004 §7).
     storage: 'database',
     customRules: {
@@ -426,6 +429,29 @@ export const betterAuthOptions = {
           }
           return;
         }
+        case '/sign-up/email': {
+          // The linking page asks the birth-year question before it posts
+          // (link-form.ts); a raw post without one still minted the account,
+          // which later hit the adults gate at OAuth linking with no way to
+          // answer. Same rules as the form: required, four digits, a
+          // plausible year — parseBirthYear holds 1900..this year. Internal
+          // creates that carry no request keep their own path, and the
+          // under-13 split stays in `user.create.before`.
+          const raw = readField(ctx.body, 'birthYear');
+          if (raw === undefined || raw === null) {
+            throw APIError.from('BAD_REQUEST', {
+              code: BIRTH_YEAR_REQUIRED,
+              message: 'Answer the birth-year question before making an account.',
+            });
+          }
+          if (parseBirthYear(raw, new Date().getUTCFullYear()) === undefined) {
+            throw APIError.from('BAD_REQUEST', {
+              code: 'INVALID_BIRTH_YEAR',
+              message: 'Birth year is not valid.',
+            });
+          }
+          return;
+        }
         case '/sign-in/social': {
           // Apple and Google carry no birth year. A create-intent client sends
           // the M04 answer in additionalData; it is checked here and, for the
@@ -457,6 +483,13 @@ export const betterAuthOptions = {
     user: {
       create: {
         before: async (user, ctx) => {
+          // APP_ALLOWED_EMAILS (app-allowlist.ts): an account created through
+          // a marked app sign-in — or an app-flagged social sign-in — must
+          // hold an allowlisted address. Unmarked flows (OAuth linking,
+          // console, server-side creates) are never read by this check.
+          if (await appSignInAttempt(ctx)) {
+            if (!isAllowedAppEmail(user.email)) throw invalidCredentials();
+          }
           const nowMs = Date.now();
           const currentYear = new Date(nowMs).getUTCFullYear();
           // A new Apple or Google identity takes its birth year from the M04
@@ -499,6 +532,15 @@ export const betterAuthOptions = {
     session: {
       create: {
         before: async (session, ctx) => {
+          // APP_ALLOWED_EMAILS (app-allowlist.ts): a session minted by a
+          // marked app sign-in — email, passkey or an app-flagged social
+          // callback — is refused for non-allowlisted accounts. This is the
+          // boundary the before-hook cannot reach: passkey and provider
+          // callbacks carry no email in the request body.
+          if (ctx !== null && ctx !== undefined && (await appSignInAttempt(ctx))) {
+            const accountOwner = await ctx.context.internalAdapter.findUserById(String(session.userId));
+            if (!isAllowedAppEmail(accountOwner?.email)) throw invalidCredentials();
+          }
           const fromOverride: unknown = readField(session, 'surface');
           const surface: Surface = isSurface(fromOverride)
             ? fromOverride

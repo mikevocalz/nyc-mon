@@ -1,3 +1,4 @@
+import { binaryFetch } from '@acme/ui/net';
 import { readWithProgress } from '../mon/load-progress';
 
 /**
@@ -9,9 +10,9 @@ export async function fetchEggBytes(
   onProgress?: (loaded: number, total: number | null) => void,
 ): Promise<ArrayBuffer> {
   if (typeof source !== 'string') throw new Error(`expected a URL for the egg GLB on web, got ${typeof source}`);
-  const response = await fetch(source);
+  const response = await binaryFetch(source);
   if (!response.ok) throw new Error(`GET ${source} answered ${response.status}`);
-  // With a listener, stream the body when the platform exposes one (web);
-  // React Native's fetch has none, so it reads in one go as before.
+  // With a listener, stream the body: nitro-fetch's web entry returns the
+  // browser's own Response, so progress arrives chunk by chunk.
   return onProgress ? readWithProgress(response, onProgress) : response.arrayBuffer();
 }

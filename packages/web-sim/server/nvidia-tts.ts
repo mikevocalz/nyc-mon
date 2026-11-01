@@ -1,4 +1,5 @@
 import { createRequire } from 'node:module';
+import type { MonRoster, MonRosterLookup } from './mon-roster.ts';
 import type { ModelAuthCheck } from './model-auth.ts';
 import type { MonLingoSource } from './mon-lingo-source.ts';
 import { createRateLimiter } from './model.ts';
@@ -22,11 +23,16 @@ export function nvidiaCsp(env: NvidiaEnv): string {
     "default-src 'self'",
     "script-src 'self'",
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data:",
+    // GLB textures decode through blob: URLs — blocked without this, leaving
+    // the model white/untextured.
+    "img-src 'self' data: blob:",
     "font-src 'self' data:",
     "media-src 'self' blob:",
     // /api/asr is a WebSocket on this origin; older engines don't match ws(s): against 'self'.
-    `connect-src 'self' ${socketOrigin(env.SIM_PUBLIC_ORIGIN)} ${new URL(env.SIM_MCP_URL).origin} ${new URL(env.AUTH_ISSUER).origin}`,
+    // /api/asr is a WebSocket on this origin; older engines don't match ws(s): against 'self'.
+    // The GLB chain ends on the Bunny CDN: /v1/mon-models/glb 302s there, and a
+    // browser fetch needs the CDN origin allowed or the redirect hop dies.
+    `connect-src 'self' ${socketOrigin(env.SIM_PUBLIC_ORIGIN)} ${new URL(env.SIM_MCP_URL).origin} ${new URL(env.AUTH_ISSUER).origin} https://*.b-cdn.net`,
     "object-src 'none'",
     "base-uri 'self'",
     "frame-ancestors 'none'",
@@ -81,6 +87,8 @@ export interface NvidiaTtsDeps {
   readonly log?: (line: string) => void;
   /** The served lingo, read on behalf of the signed-in Caller. Omitted: the bundled fallback. */
   readonly lingo?: MonLingoSource;
+  /** The signed-in Caller's Mons from /v1 (mon-roster.ts createV1MonRoster): the voice stage comes from here. */
+  readonly roster: (callerId: string, claim?: Parameters<MonRosterLookup>[1]) => Promise<MonRoster>;
 }
 
 const LINEAGE = /^[a-z0-9-]+\/[a-z]+\/\d+$/;
@@ -134,6 +142,8 @@ export function createNvidiaTts(env: NvidiaEnv, deps: NvidiaTtsDeps): (req: Requ
         return actor;
       },
       rateLimit: () => limit(owner ?? `unauthenticated:${clientKey}`),
+      // Auth runs first, so `owner` is set by the time the handler asks.
+      roster: async (_authorization, claim) => (owner === undefined ? null : deps.roster(owner, claim)),
       ...(pitchShift === undefined ? {} : { pitchShift }),
       ...(deps.lingo === undefined ? {} : { lingo: async () => (owner === undefined ? deps.lingo!.latest() : deps.lingo!.get(owner)) }),
     });

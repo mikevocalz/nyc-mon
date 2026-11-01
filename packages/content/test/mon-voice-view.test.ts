@@ -2,18 +2,26 @@ import { describe, expect, it } from 'vitest';
 import { FALLBACK_MON_LINGO, type MonLingo } from '../lingo/index.ts';
 import { monVoiceView, voiceGuideFor } from '../mon-voice.ts';
 
-const ratti = { speciesId: 'dex-003', stage: 'Small' as const, voiceLineageId: 'dex-001/female/1' };
+const NOW = Date.UTC(2026, 9, 29, 12);
+const ratti = { speciesId: 'dex-003', stage: 'Small' as const, voiceLineageId: 'dex-001/female/1', hatchedAt: NOW - 3 * 86_400_000 };
 
 describe('monVoiceView (mon.voice in MCP tool results)', () => {
   it('reports the lineage and stage, and whether the served lingo can voice it', () => {
-    expect(monVoiceView(ratti, FALLBACK_MON_LINGO)).toEqual({ lineageId: 'dex-001/female/1', stage: 'Small', voiced: true });
-    expect(monVoiceView({ ...ratti, stage: 'Egg' }, FALLBACK_MON_LINGO)).toEqual({ lineageId: 'dex-001/female/1', stage: 'Egg', voiced: false });
-    expect(monVoiceView({ ...ratti, voiceLineageId: null }, FALLBACK_MON_LINGO)).toBeNull();
+    expect(monVoiceView(ratti, NOW, FALLBACK_MON_LINGO)).toEqual({ lineageId: 'dex-001/female/1', stage: 'Small', voiceStage: 'full', voiced: true });
+    // Decision 32: an Egg babbles in its lineage voice, pitched up.
+    expect(monVoiceView({ ...ratti, stage: 'Egg' }, NOW, FALLBACK_MON_LINGO)).toEqual({ lineageId: 'dex-001/female/1', stage: 'Egg', voiceStage: 'baby-talk', voiced: true });
+    expect(monVoiceView({ ...ratti, voiceLineageId: null }, NOW, FALLBACK_MON_LINGO)).toBeNull();
+  });
+
+  it('reports the first-day babble and the limited speech after it', () => {
+    const squeaklet = { ...ratti, speciesId: 'dex-002', stage: 'Baby' as const };
+    expect(monVoiceView({ ...squeaklet, hatchedAt: NOW - 3_600_000 }, NOW)?.voiceStage).toBe('baby-talk');
+    expect(monVoiceView(squeaklet, NOW)?.voiceStage).toBe('limited');
   });
 
   it('follows the served tables, not the bundled ones', () => {
     const noVoices: MonLingo = { ...FALLBACK_MON_LINGO, voices: { ...FALLBACK_MON_LINGO.voices, lineages: [] } };
-    expect(monVoiceView(ratti, noVoices)?.voiced).toBe(false);
+    expect(monVoiceView(ratti, NOW, noVoices)?.voiced).toBe(false);
   });
 });
 
@@ -34,6 +42,17 @@ describe('voiceGuideFor (the served voice rules for one Mon)', () => {
     expect(guide).not.toContain('Mood content'); // another mood
     expect(guide).not.toContain("You ain't my Callah"); // story canon, inactive
     expect(guide).toContain('Mood asleep: `*whisper*`');
+  });
+
+  it('gives a babbling Mon only the babble rules and its sounds, no palette, lines or Callah', () => {
+    const guide = voiceGuideFor({ speciesId: 'dex-002', stage: 'Baby' }, 'content', FALLBACK_MON_LINGO, 'baby-talk').join('\n');
+    expect(guide).toContain('baby talk only');
+    expect(guide).toContain('skree');
+    expect(guide).not.toContain('bet: ');
+    expect(guide).not.toContain('Canon line');
+    const egg = voiceGuideFor({ speciesId: 'dex-001', stage: 'Egg' }, undefined, FALLBACK_MON_LINGO).join('\n');
+    expect(egg).toContain('still an Egg');
+    expect(egg).toContain('mm');
   });
 
   it('gives a Mon of another bloodline no Hood Ratti palette or cadence', () => {

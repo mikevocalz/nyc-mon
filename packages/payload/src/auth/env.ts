@@ -44,6 +44,24 @@ export interface SmsEnv {
 /** Headset and tablet client ids allowed to request a device code (ADR 0004 §9). */
 export const DEFAULT_DEVICE_CLIENT_IDS = ['nyc-mon-quest', 'nyc-mon-visionos', 'nyc-mon-tablet'] as const;
 
+/** The owner's account, the one entry of both dev-only allowlist defaults. */
+const OWNER_EMAIL = 'mikefacesny@gmail.com';
+
+/**
+ * Emails allowed into the staff console when `ADMIN_ALLOWED_EMAILS` is unset
+ * or empty (developer-only allowlist). The fallback keeps the owner in so a
+ * blank variable can never lock the console down to nobody; set the list
+ * explicitly to name additional accounts.
+ */
+export const DEFAULT_ADMIN_ALLOWED_EMAILS = [OWNER_EMAIL] as const;
+
+/**
+ * Emails allowed to sign in to the game app when `APP_ALLOWED_EMAILS` is
+ * unset or empty (developer-only allowlist, same fallback rule as the
+ * console list).
+ */
+export const DEFAULT_APP_ALLOWED_EMAILS = [OWNER_EMAIL] as const;
+
 function smsTransport(raw: string | undefined): SmsTransport | undefined {
   const value = clean(raw);
   if (value === undefined) return undefined;
@@ -58,6 +76,20 @@ export interface AuthEnv {
   sms: SmsEnv | undefined;
   /** Client ids `deviceAuthorization` accepts. */
   deviceClientIds: string[];
+  /**
+   * Staff-console email allowlist from `ADMIN_ALLOWED_EMAILS` (comma-separated).
+   * Applies to the Payload admin console only — caller sign-in, the OAuth
+   * linking flow and /v1 never read it. Never empty: unset or blank falls
+   * back to {@link DEFAULT_ADMIN_ALLOWED_EMAILS}.
+   */
+  adminAllowedEmails: string[];
+  /**
+   * Game-app sign-in allowlist from `APP_ALLOWED_EMAILS` (comma-separated).
+   * Applies to requests the app's own sign-in surfaces mark; the OAuth
+   * linking flow (judges), /v1 and the staff console never read it. Never
+   * empty: unset or blank falls back to {@link DEFAULT_APP_ALLOWED_EMAILS}.
+   */
+  appAllowedEmails: string[];
   /** Public origin of apps/admin-vite, where Better Auth issues links and cookies. */
   baseURL: string;
   /** Public origin of the product site (apps/web), if configured. */
@@ -101,6 +133,8 @@ export function readAuthEnv(): AuthEnv {
 
   const transport = smsTransport(process.env.AUTH_SMS_TRANSPORT);
   const deviceClientIds = list(process.env.AUTH_DEVICE_CLIENT_IDS);
+  const adminAllowedEmails = list(process.env.ADMIN_ALLOWED_EMAILS);
+  const appAllowedEmails = list(process.env.APP_ALLOWED_EMAILS);
 
   return {
     isProduction: process.env.NODE_ENV === 'production',
@@ -114,6 +148,8 @@ export function readAuthEnv(): AuthEnv {
             originationNumber: clean(process.env.AWS_SNS_ORIGINATION_NUMBER),
           },
     deviceClientIds: deviceClientIds.length > 0 ? deviceClientIds : [...DEFAULT_DEVICE_CLIENT_IDS],
+    adminAllowedEmails: adminAllowedEmails.length > 0 ? adminAllowedEmails : [...DEFAULT_ADMIN_ALLOWED_EMAILS],
+    appAllowedEmails: appAllowedEmails.length > 0 ? appAllowedEmails : [...DEFAULT_APP_ALLOWED_EMAILS],
     // Better Auth lives on the admin/API host (docs/adr/0003-admin-app-split.md),
     // never on the product site, so NEXT_PUBLIC_SITE_URL is not a fallback.
     baseURL: clean(process.env.BETTER_AUTH_URL) ?? 'http://localhost:5174',

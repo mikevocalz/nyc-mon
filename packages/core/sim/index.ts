@@ -88,6 +88,25 @@ export {
   parseVoiceLineageId,
   VOICE_SLOTS_PER_GENDER,
 } from './voice.ts';
+export { BABY_TALK_MS, babyTalkEndsAt, capVoiceStage, voiceStage, type VoiceStageSubject } from './voice-stage.ts';
+export {
+  type BabbleInventory,
+  checkLimitedSpeech,
+  cleanBabbleInventory,
+  DEFAULT_BABBLE_SYLLABLES,
+  enforceBabble,
+  enforceLimitedSpeech,
+  enforceVoiceStage,
+  type GatedLine,
+  isBabble,
+  isBabbleToken,
+  LIMITED_SPEECH_MAX_WORDS,
+  type LimitedSpeechVerdict,
+  makeBabble,
+  MAX_BABBLE_SYLLABLES,
+  REAL_WORD_BLOCKLIST,
+  speechTokens,
+} from './speech-gate.ts';
 export { type CreateEntry, type CreateEntryInput, resolveCreateEntry } from './onboarding.ts';
 export { createRandom, hash128, mixSeed, toHex32 } from './random.ts';
 export type { ActivitySpan, CareEvent, SimState } from './state.ts';

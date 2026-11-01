@@ -2,6 +2,8 @@ import { createConsoleStore } from './base.ts';
 
 export type ModelFilter = 'all' | 'missing' | 'in-review' | 'approved';
 export type ModelYaw = '0' | '90' | '180' | '270';
+/** Where the preview looks from, in degrees: yaw turns the model, pitch tilts the camera. */
+export interface ModelTurn { yaw: number; pitch: number }
 
 /** The editable fields of a Mon model, as the console form holds them (numbers as typed text). */
 export interface ModelDraft {
@@ -27,7 +29,10 @@ export interface PendingModel {
 export interface ModelsPage {
   filter: ModelFilter;
   setFilter: (filter: ModelFilter) => void;
-  yaw: ModelYaw;
+  /** Set by dragging the preview or its arrow keys; an angle button sets it back to level. */
+  turn: ModelTurn;
+  setTurn: (turn: ModelTurn) => void;
+  /** An angle button: that yaw, level. */
   setYaw: (yaw: ModelYaw) => void;
   clip: string;
   setClip: (clip: string) => void;
@@ -42,6 +47,9 @@ export interface ModelsPage {
   editDraft: (patch: Partial<ModelDraft>) => void;
   busy: 'upload' | 'save' | 'status' | null;
   setBusy: (busy: ModelsPage['busy']) => void;
+  /** Upload progress 0..100 while the file is sent; null when the size is unknown or nothing is uploading. */
+  progress: number | null;
+  setProgress: (progress: number | null) => void;
   error: string | null;
   setError: (error: string | null) => void;
   /** Confirmation after a save; cleared by the next action. */
@@ -54,8 +62,9 @@ export interface ModelsPage {
 export const useModelsStore = createConsoleStore<ModelsPage>((set) => ({
   filter: 'all',
   setFilter: (filter) => set({ filter }),
-  yaw: '0',
-  setYaw: (yaw) => set({ yaw }),
+  turn: { yaw: 0, pitch: 0 },
+  setTurn: (turn) => set({ turn }),
+  setYaw: (yaw) => set({ turn: { yaw: Number(yaw), pitch: 0 } }),
   clip: '',
   setClip: (clip) => set({ clip }),
   dragging: false,
@@ -67,10 +76,12 @@ export const useModelsStore = createConsoleStore<ModelsPage>((set) => ({
   }),
   draftKey: null,
   draft: null,
-  loadDraft: (draftKey, draft) => set({ draftKey, draft, clip: '', yaw: '0', viewerError: false, error: null, notice: null }),
+  loadDraft: (draftKey, draft) => set({ draftKey, draft, clip: '', turn: { yaw: 0, pitch: 0 }, viewerError: false, error: null, notice: null }),
   editDraft: (patch) => set((state) => ({ notice: null, draft: state.draft ? { ...state.draft, ...patch } : state.draft })),
   busy: null,
   setBusy: (busy) => set({ busy }),
+  progress: null,
+  setProgress: (progress) => set({ progress }),
   error: null,
   setError: (error) => set({ error, notice: null }),
   notice: null,

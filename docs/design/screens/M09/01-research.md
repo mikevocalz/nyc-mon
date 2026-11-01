@@ -14,7 +14,7 @@ Route `/(onboarding)/name` · Shell: H-Lynk Core · States: empty / typing / con
 ## Risks
 
 - **The Mon's choice is already made.** Decision #14 puts the Mon's choice at the hatch (the Baby's first look at the Caller). Any reaction on M09 must read as noticing, never as approving or refusing a name. A head tilt on a typing pause is attention; a frown at a name would be a judgment the canon doesn't give the Baby.
-- **Baby voice is open (Q32).** The brief asks for a species sound as the Mon reacts. v11 allows baby-talk (`V11 ¶56`); v7 lists species sounds (chirps, chirrup and purr, yips). No sound asset exists and Q32 is open. Sound is a slot, off until both land.
+- **Baby voice is set (Decision 32, closing Q32).** The brief asks for a species sound as the Mon reacts. A Baby babbles for its first 24 hours after the hatch, then uses the family sound plus at most two words (`V11 ¶56`); v7 lists the family sounds (chirps, chirrup and purr, yips). Naming falls on the first day, so a reaction here is babble. No sound asset exists yet. Sound is a slot, off until assets land.
 - **"Ratti" (Decision #1).** "The player's Hood Ratti is never named 'Ratti' by default." Canon rules out a default; it doesn't say the Caller is barred from typing it. `JOURNEY.md` risk 7 assumed a refusal. Blocking a name a Caller chose is a sharp moment; letting it through could blur Malik's individual. Open for Mike; the rule is built as a list that ships empty.
 - **No suggestions.** No canon names exist for the player's starters (Q17). A shuffle button (Finch) would mean inventing names (Law 1).
 - **No rename in Phase 1.** M17 shows the nickname; nothing in §4.3/§4.4 edits it. The copy says so plainly rather than promising "you can change this later".

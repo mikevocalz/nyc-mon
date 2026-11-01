@@ -60,7 +60,7 @@ export function mintMonInstance(egg: EggRecord): MonInstance {
     // TODO(canon): starting bond for a hatchling.
     bond: 0,
     stage: 'Baby',
-    gender: deriveMonGender(egg.eggId),
+    gender: deriveMonGender(egg.eggId, egg.speciesId),
     voiceLineageId: deriveVoiceLineageId(egg),
     originBlock: null,
     habitatTags: [],

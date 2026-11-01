@@ -24,10 +24,19 @@ if (process.env.NODE_ENV === 'production' && !configured) {
   throw new Error('Bunny Storage must be configured in production.');
 }
 
-const storageHost = (region?: string) =>
-  region && region !== 'default'
-    ? `https://${region}.storage.bunnycdn.com`
+// Falkenstein is Bunny's main region and has no subdomain: `de.storage.bunnycdn.com`
+// does not resolve, so a zone set up there must use the bare host. Accept a pasted
+// hostname too, since the Bunny dashboard shows the region as one.
+export const storageHost = (region?: string) => {
+  const code = (region ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, '')
+    .replace(/\.?storage\.bunnycdn\.com\/?$/, '');
+  return code && !['default', 'de', 'falkenstein'].includes(code)
+    ? `https://${code}.storage.bunnycdn.com`
     : 'https://storage.bunnycdn.com';
+};
 
 const objectURL = (filename: string) => {
   const base = process.env.BUNNY_CDN_URL!.replace(/\/$/, '');
@@ -66,8 +75,8 @@ const getIncomingFiles = (
     },
   ];
 
-  if (data.sizes) {
-    for (const [sizeName, resized] of Object.entries(data.sizes)) {
+  if (data.variants) {
+    for (const [sizeName, resized] of Object.entries(data.variants)) {
       const buffer = uploadSizes?.[sizeName];
       if (buffer && resized?.mimeType && resized.filename) {
         files.push({
@@ -122,12 +131,49 @@ const deleteFile = async (slug: string, filename: string) => {
   }
 };
 
+/**
+ * Raw object access for staged uploads (storage/stagedUpload.ts). Keys are
+ * zone-relative and never pass through keyFor, so staging stays out of every
+ * collection's folder. The AccessKey only ever leaves this module in a
+ * server-to-server request.
+ */
+export const bunnyStorageConfigured = () => configured;
+
+export const putStorageObject = async (key: string, body: Uint8Array) => {
+  const response = await fetch(storageURL(getKey(key)), {
+    method: 'PUT',
+    headers: { AccessKey: process.env.BUNNY_STORAGE_PASSWORD!, 'Content-Type': 'application/octet-stream' },
+    body: new Uint8Array(body),
+  });
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    throw new Error(`Bunny Storage upload failed (${response.status}): ${detail || response.statusText}`);
+  }
+};
+
+export const getStorageObject = async (key: string): Promise<Uint8Array> => {
+  const response = await fetch(storageURL(getKey(key)), {
+    headers: { AccessKey: process.env.BUNNY_STORAGE_PASSWORD! },
+  });
+  if (!response.ok) throw new Error(`Bunny Storage read failed (${response.status})`);
+  return new Uint8Array(await response.arrayBuffer());
+};
+
+/** Deletes an object, or a whole folder when `key` ends in `/`. A missing key is not an error. */
+export const deleteStorageObject = async (key: string) => {
+  const response = await fetch(storageURL(getKey(key)), {
+    method: 'DELETE',
+    headers: { AccessKey: process.env.BUNNY_STORAGE_PASSWORD! },
+  });
+  if (!response.ok && response.status !== 404) throw new Error(`Bunny Storage delete failed (${response.status})`);
+};
+
 const filenamesFor = (doc: Partial<FileData>) => {
   const filenames: string[] = [];
   if (typeof doc.filename === 'string') filenames.push(doc.filename);
 
-  if (doc.sizes && typeof doc.sizes === 'object') {
-    for (const size of Object.values(doc.sizes)) {
+  if (doc.variants && typeof doc.variants === 'object') {
+    for (const size of Object.values(doc.variants)) {
       if (size?.filename && typeof size.filename === 'string') {
         filenames.push(size.filename);
       }
@@ -158,6 +204,8 @@ export const bunnyMediaAfterChange: CollectionAfterChangeHook<
       id: doc.id,
       data: { bunnyUrl: mainURL },
       depth: 0,
+      // bunnyUrl is read-only to people (field access update: false); this write is the server's own.
+      overrideAccess: true,
       req,
     });
   } finally {
@@ -178,7 +226,7 @@ export const bunnyMediaAfterChange: CollectionAfterChangeHook<
     );
   }
 
-  return { ...doc, bunnyUrl: mainURL };
+  return withBunnyMediaURLs({ ...doc, bunnyUrl: mainURL });
 };
 
 export const bunnyMediaAfterDelete: CollectionAfterDeleteHook<
@@ -226,10 +274,10 @@ export const withBunnyMediaURLs = <T extends BunnyReadableMedia>(doc: T): T => {
   const publicURL = doc.bunnyUrl;
   if (typeof publicURL !== 'string' || publicURL.length === 0) return doc;
 
-  const sizes =
-    doc.sizes && typeof doc.sizes === 'object'
+  const variants =
+    doc.variants && typeof doc.variants === 'object'
       ? Object.fromEntries(
-          Object.entries(doc.sizes).map(([name, size]) => {
+          Object.entries(doc.variants).map(([name, size]) => {
             if (
               size &&
               typeof size === 'object' &&
@@ -241,13 +289,13 @@ export const withBunnyMediaURLs = <T extends BunnyReadableMedia>(doc: T): T => {
             return [name, size];
           }),
         )
-      : doc.sizes;
+      : doc.variants;
 
   return {
     ...doc,
     url: publicURL,
     ...(doc.mimeType?.startsWith('image/') ? { thumbnailURL: publicURL } : {}),
-    ...(sizes ? { sizes } : {}),
+    ...(variants ? { variants } : {}),
   };
 };
 

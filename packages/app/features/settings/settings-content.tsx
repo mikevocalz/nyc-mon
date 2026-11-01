@@ -9,7 +9,7 @@ import { AuthProviderButton, Button, Card, ErrorMessage, Heading, ResponsiveDial
 import { useProfile } from '../profile/profile.store';
 import { auth } from '../onboarding/auth';
 import { copy } from '../onboarding/copy';
-import { CITY_MAP_ASSETS, CITY_MAP_DERIVED, CITY_MAP_SOURCES } from '../game/map-data-credit';
+import { CITY_MAP_ASSETS, CITY_MAP_DERIVED, CITY_MAP_SOURCES, CITY_MAP_STREAMED } from '../game/map-data-credit';
 import { EXPERIMENTAL_WORLD_PHYSICAL } from '../game/world/physical-look.ts';
 import { useTimeOfDay } from '../game/world/time-of-day.store.ts';
 import { SOFTWARE_CREDITS, SOFTWARE_CREDITS_GROUP } from './software-credits.ts';
@@ -287,6 +287,13 @@ export function SettingsAccountCards() {
               <Text variant="caption">{CITY_MAP_DERIVED.attribution}</Text>
               <LicenceLink label={CITY_MAP_DERIVED.license} url={CITY_MAP_DERIVED.licenseUrl} />
             </View>
+            <Text variant="caption" tone="muted">Streamed map data</Text>
+            {CITY_MAP_STREAMED.map((source) => (
+              <View key={source.attribution} className="gap-0.5">
+                <Text variant="caption">{source.attribution}</Text>
+                <LicenceLink label={source.license} url={source.licenseUrl} />
+              </View>
+            ))}
             <Text variant="caption" tone="muted">Models &amp; textures</Text>
             {CITY_MAP_ASSETS.map((source) => (
               <View key={source.attribution} className="gap-0.5">

@@ -1,4 +1,4 @@
-import { FALLBACK_MON_LINGO, MON_LINGO_SEED_ROWS, MON_VOICES_SEED, parseMonLingo, type MonLingo } from '@acme/content/lingo';
+import { FALLBACK_MON_LINGO, MON_BABBLE_SEED_ROWS, MON_EGG_STAGE_PITCH, MON_LINGO_SEED_ROWS, MON_VOICES_SEED, parseMonLingo, type MonLingo } from '@acme/content/lingo';
 import type { Payload } from 'payload';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -105,16 +105,35 @@ describe('GET /v1/mon-lingo', () => {
 });
 
 describe('reading the lingo from Payload', () => {
-  const docs = MON_LINGO_SEED_ROWS.map((row, i) => ({ id: i + 1, ...row }));
+  // What migrations 20261028_200000_mon_lingo_seed and 20261029_120000_mon_babble_seed leave in Payload.
+  const docs = [...MON_LINGO_SEED_ROWS, ...MON_BABBLE_SEED_ROWS].map((row, i) => ({ id: i + 1, ...row }));
+  const seededVoices = () => ({ id: 1, ...MON_VOICES_SEED, stagePitch: { ...MON_VOICES_SEED.stagePitch, egg: MON_EGG_STAGE_PITCH } });
 
   it('turns the seeded Payload documents into exactly the offline fallback', async () => {
     const find = vi.fn(async () => ({ docs }));
-    const findGlobal = vi.fn(async () => ({ id: 1, ...MON_VOICES_SEED, stagePitch: { ...MON_VOICES_SEED.stagePitch } }));
+    const findGlobal = vi.fn(async () => seededVoices());
     const lingo = await readMonLingoFromPayload({ find, findGlobal } as unknown as Payload);
     expect(lingo).toEqual(FALLBACK_MON_LINGO);
     const query = find.mock.calls[0] as unknown as [{ where: unknown; draft: boolean }];
     expect(JSON.stringify(query[0].where)).toContain('"published"');
     expect(query[0].draft).toBe(false);
+  });
+
+  it('asks Payload for the babble rows and serves them (Decision 32)', async () => {
+    const find = vi.fn(async () => ({ docs }));
+    const lingo = await readMonLingoFromPayload({ find, findGlobal: vi.fn(async () => seededVoices()) } as unknown as Payload);
+    const query = find.mock.calls[0] as unknown as [{ where: unknown }];
+    expect(JSON.stringify(query[0].where)).toContain('"babble"');
+    expect(lingo.babble).toHaveLength(MON_BABBLE_SEED_ROWS.length);
+    expect(new Set(lingo.babble.map((row) => row.kind))).toEqual(new Set(['syllable', 'family-sound', 'egg-sound']));
+    expect(lingo.voices.stagePitch.Egg).toBe(MON_EGG_STAGE_PITCH);
+  });
+
+  it('serves babble through GET /v1/mon-lingo', async () => {
+    const { handle } = setup();
+    const body = (await (await handle(get())).json()) as { data: unknown };
+    expect(parseMonLingo(body.data)?.babble).toEqual(FALLBACK_MON_LINGO.babble);
+    expect(FALLBACK_MON_LINGO.babble.length).toBeGreaterThan(0);
   });
 
   it('skips a malformed row instead of failing the whole table', () => {

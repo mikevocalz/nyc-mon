@@ -79,6 +79,7 @@ export interface Config {
     waitlist: Waitlist;
     'language-lexicon': LanguageLexicon;
     'mon-models': MonModel;
+    'mon-art': MonArt;
     sessions: Session;
     accounts: Account;
     verifications: Verification;
@@ -99,6 +100,7 @@ export interface Config {
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
     'payload-migrations': PayloadMigration;
+    'payload-llm-instructions': PayloadLlmInstruction;
   };
   collectionsJoins: {};
   collectionsSelect: {
@@ -114,6 +116,7 @@ export interface Config {
     waitlist: WaitlistSelect<false> | WaitlistSelect<true>;
     'language-lexicon': LanguageLexiconSelect<false> | LanguageLexiconSelect<true>;
     'mon-models': MonModelsSelect<false> | MonModelsSelect<true>;
+    'mon-art': MonArtSelect<false> | MonArtSelect<true>;
     sessions: SessionsSelect<false> | SessionsSelect<true>;
     accounts: AccountsSelect<false> | AccountsSelect<true>;
     verifications: VerificationsSelect<false> | VerificationsSelect<true>;
@@ -134,6 +137,7 @@ export interface Config {
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
     'payload-migrations': PayloadMigrationsSelect<false> | PayloadMigrationsSelect<true>;
+    'payload-llm-instructions': PayloadLlmInstructionsSelect<false> | PayloadLlmInstructionsSelect<true>;
   };
   db: {
     defaultIDType: number;
@@ -149,9 +153,11 @@ export interface Config {
   };
   locale: null;
   widgets: {
+    welcome: WelcomeWidget;
     collections: CollectionsWidget;
     'collection-query': CollectionQueryWidget;
     activity: ActivityWidget;
+    'upload-dropzone': UploadDropzoneWidget;
   };
   user: User;
   jobs: {
@@ -217,6 +223,14 @@ export interface User {
         | 'sent_in_error'
       )
     | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
   collection: 'users';
@@ -229,6 +243,14 @@ export interface Media {
   id: number;
   bunnyUrl?: string | null;
   alt: string;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
   url?: string | null;
@@ -238,6 +260,16 @@ export interface Media {
   filesize?: number | null;
   width?: number | null;
   height?: number | null;
+  original?: {
+    filename?: string | null;
+    url?: string | null;
+    mimeType?: string | null;
+    filesize?: number | null;
+    width?: number | null;
+    height?: number | null;
+    prefix?: string | null;
+    _objectKey?: string | null;
+  };
   focalX?: number | null;
   focalY?: number | null;
 }
@@ -254,6 +286,14 @@ export interface GuardianConsent {
   emailsSent: number;
   lastEmailSentAt?: string | null;
   parentRequest: 'none' | 'review' | 'delete';
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -273,6 +313,14 @@ export interface Egg {
   createdAtMs: number;
   incubationEndsAt: number;
   hatched: boolean;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -293,6 +341,14 @@ export interface MonInstance {
   gender?: ('female' | 'male') | null;
   voiceLineageId?: string | null;
   serverConfirmedAt?: string | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -338,6 +394,14 @@ export interface CareState {
     | number
     | boolean
     | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -386,6 +450,14 @@ export interface AuditEvent {
       )
     | null;
   requestId?: string | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -402,6 +474,14 @@ export interface IntegrityRun {
   idMismatch: number;
   orphans: number;
   staleReady: number;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -416,6 +496,14 @@ export interface IdempotencyRecord {
   status: number;
   contentType: string;
   body: string;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -428,6 +516,14 @@ export interface Waitlist {
   email: string;
   district?: ('downtown' | 'midtown' | 'harlem' | 'megacity') | null;
   source?: string | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -445,7 +541,7 @@ export interface LanguageLexicon {
   spokenForm?: string | null;
   meaning: string;
   /**
-   * Categories the Mon's voice reads: mon-line, pronunciation, stage-direction, word-palette, voice-rule. mon-line: triggerText is the occasion (hello, first-words, hungry…), responseText the line, with speciesId and stage. pronunciation: canonicalText is the screen word, variants the other spellings, spokenForm what the voice says. stage-direction: variants are the keywords, spokenForm the audio tag.
+   * Categories the Mon's voice reads: mon-line, pronunciation, stage-direction, word-palette, voice-rule, babble. mon-line: triggerText is the occasion (hello, first-words, hungry…), responseText the line, with speciesId and stage. pronunciation: canonicalText is the screen word, variants the other spellings, spokenForm what the voice says. stage-direction: variants are the keywords, spokenForm the audio tag. babble: the wordless sounds an Egg and a Baby in its first 24 hours make (Decision 32); subcategory syllable, family-sound (with bloodlineId) or egg-sound, canonicalText the sound.
    */
   category: string;
   subcategory?: string | null;
@@ -496,6 +592,14 @@ export interface LanguageLexicon {
   sourceUrl?: string | null;
   editorNotes?: string | null;
   active: boolean;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
   _status?: ('draft' | 'published') | null;
@@ -528,16 +632,16 @@ export interface MonModel {
     | 'dex-065'
     | 'dex-066'
     | 'dex-067'
-    | 'dex-015'
-    | 'dex-016'
-    | 'dex-017'
-    | 'dex-018'
-    | 'dex-019'
     | 'dex-020'
     | 'dex-021'
     | 'dex-022'
     | 'dex-023'
     | 'dex-024'
+    | 'dex-015'
+    | 'dex-016'
+    | 'dex-017'
+    | 'dex-018'
+    | 'dex-019'
     | 'dex-025'
     | 'dex-026'
     | 'dex-027'
@@ -673,6 +777,14 @@ export interface MonModel {
     sourceUrl?: string | null;
   };
   notes?: string | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
   url?: string | null;
@@ -682,6 +794,177 @@ export interface MonModel {
   filesize?: number | null;
   width?: number | null;
   height?: number | null;
+  original?: {
+    filename?: string | null;
+    url?: string | null;
+    mimeType?: string | null;
+    filesize?: number | null;
+    width?: number | null;
+    height?: number | null;
+    prefix?: string | null;
+    _objectKey?: string | null;
+  };
+  focalX?: number | null;
+  focalY?: number | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "mon-art".
+ */
+export interface MonArt {
+  id: number;
+  speciesId:
+    | 'dex-001'
+    | 'dex-002'
+    | 'dex-003'
+    | 'dex-004'
+    | 'dex-005'
+    | 'dex-006'
+    | 'dex-007'
+    | 'dex-008'
+    | 'dex-009'
+    | 'dex-010'
+    | 'dex-011'
+    | 'dex-012'
+    | 'dex-013'
+    | 'dex-014'
+    | 'dex-061'
+    | 'dex-062'
+    | 'dex-063'
+    | 'dex-064'
+    | 'dex-065'
+    | 'dex-066'
+    | 'dex-067'
+    | 'dex-020'
+    | 'dex-021'
+    | 'dex-022'
+    | 'dex-023'
+    | 'dex-024'
+    | 'dex-015'
+    | 'dex-016'
+    | 'dex-017'
+    | 'dex-018'
+    | 'dex-019'
+    | 'dex-025'
+    | 'dex-026'
+    | 'dex-027'
+    | 'dex-028'
+    | 'dex-029'
+    | 'dex-030'
+    | 'dex-031'
+    | 'dex-032'
+    | 'dex-033'
+    | 'dex-034'
+    | 'dex-035'
+    | 'dex-036'
+    | 'dex-037'
+    | 'dex-038'
+    | 'dex-039'
+    | 'dex-040'
+    | 'dex-041'
+    | 'dex-042'
+    | 'dex-043'
+    | 'dex-044'
+    | 'dex-045'
+    | 'dex-046'
+    | 'dex-047'
+    | 'dex-048'
+    | 'dex-049'
+    | 'dex-050'
+    | 'dex-051'
+    | 'dex-052'
+    | 'dex-053'
+    | 'dex-054'
+    | 'dex-055'
+    | 'dex-056'
+    | 'dex-057'
+    | 'dex-058'
+    | 'dex-059'
+    | 'dex-060'
+    | 'dex-068'
+    | 'dex-069'
+    | 'dex-070'
+    | 'dex-071'
+    | 'dex-072'
+    | 'dex-073'
+    | 'dex-074'
+    | 'dex-075'
+    | 'dex-076'
+    | 'dex-077'
+    | 'dex-078'
+    | 'dex-079'
+    | 'dex-080'
+    | 'dex-081'
+    | 'dex-082'
+    | 'dex-083'
+    | 'dex-084'
+    | 'dex-085'
+    | 'dex-086'
+    | 'dex-087'
+    | 'dex-088'
+    | 'dex-089'
+    | 'dex-090'
+    | 'dex-091'
+    | 'dex-092'
+    | 'dex-093'
+    | 'dex-094'
+    | 'dex-095'
+    | 'dex-096'
+    | 'dex-097'
+    | 'dex-098'
+    | 'dex-099'
+    | 'dex-100'
+    | 'dex-101'
+    | 'dex-102'
+    | 'dex-103'
+    | 'dex-104'
+    | 'dex-105'
+    | 'dex-106'
+    | 'dex-107'
+    | 'dex-108'
+    | 'dex-109';
+  stage?: string | null;
+  bloodlineId?: string | null;
+  /**
+   * Only approved stills reach the site and apps. Uploading a new picture sets this back to In review.
+   */
+  status: 'in-review' | 'approved';
+  /**
+   * What the picture shows, for screen readers. Name the Mon; no pronoun for it.
+   */
+  alt: string;
+  bunnyUrl?: string | null;
+  credit?: {
+    author?: string | null;
+    sourceUrl?: string | null;
+  };
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedAt: string;
+  createdAt: string;
+  url?: string | null;
+  thumbnailURL?: string | null;
+  filename?: string | null;
+  mimeType?: string | null;
+  filesize?: number | null;
+  width?: number | null;
+  height?: number | null;
+  original?: {
+    filename?: string | null;
+    url?: string | null;
+    mimeType?: string | null;
+    filesize?: number | null;
+    width?: number | null;
+    height?: number | null;
+    prefix?: string | null;
+    _objectKey?: string | null;
+  };
   focalX?: number | null;
   focalY?: number | null;
 }
@@ -699,6 +982,14 @@ export interface Session {
   userAgent?: string | null;
   user: number | User;
   surface?: string | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -720,6 +1011,14 @@ export interface Account {
   refreshTokenExpiresAt?: string | null;
   scope?: string | null;
   password?: string | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -734,6 +1033,14 @@ export interface Verification {
   identifier: string;
   value: string;
   expiresAt: string;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -754,6 +1061,14 @@ export interface Passkey {
   backedUp: boolean;
   transports?: string | null;
   aaguid?: string | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -771,6 +1086,14 @@ export interface TwoFactor {
   verified?: boolean | null;
   failedVerificationCount?: number | null;
   lockedUntil?: string | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -791,6 +1114,14 @@ export interface DeviceCode {
   pollingInterval?: number | null;
   clientId?: string | null;
   scope?: string | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -807,6 +1138,14 @@ export interface Jwk {
   expiresAt?: string | null;
   alg?: string | null;
   crv?: string | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -915,6 +1254,14 @@ export interface OauthClient {
     | number
     | boolean
     | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -962,6 +1309,14 @@ export interface OauthResource {
     | number
     | boolean
     | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -984,6 +1339,14 @@ export interface OauthClientResource {
     | number
     | boolean
     | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1043,6 +1406,14 @@ export interface OauthRefreshToken {
     | number
     | boolean
     | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1099,6 +1470,14 @@ export interface OauthAccessToken {
     | number
     | boolean
     | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1140,6 +1519,14 @@ export interface OauthConsent {
     | number
     | boolean
     | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1152,6 +1539,14 @@ export interface OauthConsent {
 export interface OauthClientAssertion {
   id: number;
   expiresAt: string;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1166,6 +1561,14 @@ export interface RateLimit {
   key: string;
   count: number;
   lastRequest: number;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1352,6 +1755,10 @@ export interface PayloadLockedDocument {
         value: number | MonModel;
       } | null)
     | ({
+        relationTo: 'mon-art';
+        value: number | MonArt;
+      } | null)
+    | ({
         relationTo: 'sessions';
         value: number | Session;
       } | null)
@@ -1455,6 +1862,28 @@ export interface PayloadMigration {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "payload-llm-instructions".
+ */
+export interface PayloadLlmInstruction {
+  id: string;
+  entitySlug: string;
+  title?: string | null;
+  entityType: 'collection' | 'global';
+  additionalInstructions?: string | null;
+  systemInstructions?: string | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "users_select".
  */
 export interface UsersSelect<T extends boolean = true> {
@@ -1476,6 +1905,8 @@ export interface UsersSelect<T extends boolean = true> {
   deletionScheduledFor?: T;
   deletionScheduledBy?: T;
   deletionReason?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1486,6 +1917,8 @@ export interface UsersSelect<T extends boolean = true> {
 export interface MediaSelect<T extends boolean = true> {
   bunnyUrl?: T;
   alt?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
   url?: T;
@@ -1495,6 +1928,18 @@ export interface MediaSelect<T extends boolean = true> {
   filesize?: T;
   width?: T;
   height?: T;
+  original?:
+    | T
+    | {
+        filename?: T;
+        url?: T;
+        mimeType?: T;
+        filesize?: T;
+        width?: T;
+        height?: T;
+        prefix?: T;
+        _objectKey?: T;
+      };
   focalX?: T;
   focalY?: T;
 }
@@ -1510,6 +1955,8 @@ export interface GuardianConsentsSelect<T extends boolean = true> {
   emailsSent?: T;
   lastEmailSentAt?: T;
   parentRequest?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1528,6 +1975,8 @@ export interface EggsSelect<T extends boolean = true> {
   createdAtMs?: T;
   incubationEndsAt?: T;
   hatched?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1547,6 +1996,8 @@ export interface MonInstancesSelect<T extends boolean = true> {
   gender?: T;
   voiceLineageId?: T;
   serverConfirmedAt?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1567,6 +2018,8 @@ export interface CareStatesSelect<T extends boolean = true> {
   sluggishUntil?: T;
   pendingRequest?: T;
   lastSeqByDevice?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1583,6 +2036,8 @@ export interface AuditEventsSelect<T extends boolean = true> {
   targetId?: T;
   reasonCode?: T;
   requestId?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1598,6 +2053,8 @@ export interface IntegrityRunsSelect<T extends boolean = true> {
   idMismatch?: T;
   orphans?: T;
   staleReady?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1611,6 +2068,8 @@ export interface IdempotencyRecordsSelect<T extends boolean = true> {
   status?: T;
   contentType?: T;
   body?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1622,6 +2081,8 @@ export interface WaitlistSelect<T extends boolean = true> {
   email?: T;
   district?: T;
   source?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1666,6 +2127,8 @@ export interface LanguageLexiconSelect<T extends boolean = true> {
   sourceUrl?: T;
   editorNotes?: T;
   active?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
   _status?: T;
@@ -1724,6 +2187,8 @@ export interface MonModelsSelect<T extends boolean = true> {
         sourceUrl?: T;
       };
   notes?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
   url?: T;
@@ -1733,6 +2198,61 @@ export interface MonModelsSelect<T extends boolean = true> {
   filesize?: T;
   width?: T;
   height?: T;
+  original?:
+    | T
+    | {
+        filename?: T;
+        url?: T;
+        mimeType?: T;
+        filesize?: T;
+        width?: T;
+        height?: T;
+        prefix?: T;
+        _objectKey?: T;
+      };
+  focalX?: T;
+  focalY?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "mon-art_select".
+ */
+export interface MonArtSelect<T extends boolean = true> {
+  speciesId?: T;
+  stage?: T;
+  bloodlineId?: T;
+  status?: T;
+  alt?: T;
+  bunnyUrl?: T;
+  credit?:
+    | T
+    | {
+        author?: T;
+        sourceUrl?: T;
+      };
+  createdBy?: T;
+  updatedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  url?: T;
+  thumbnailURL?: T;
+  filename?: T;
+  mimeType?: T;
+  filesize?: T;
+  width?: T;
+  height?: T;
+  original?:
+    | T
+    | {
+        filename?: T;
+        url?: T;
+        mimeType?: T;
+        filesize?: T;
+        width?: T;
+        height?: T;
+        prefix?: T;
+        _objectKey?: T;
+      };
   focalX?: T;
   focalY?: T;
 }
@@ -1747,6 +2267,8 @@ export interface SessionsSelect<T extends boolean = true> {
   userAgent?: T;
   user?: T;
   surface?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1765,6 +2287,8 @@ export interface AccountsSelect<T extends boolean = true> {
   refreshTokenExpiresAt?: T;
   scope?: T;
   password?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1776,6 +2300,8 @@ export interface VerificationsSelect<T extends boolean = true> {
   identifier?: T;
   value?: T;
   expiresAt?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1793,6 +2319,8 @@ export interface PasskeysSelect<T extends boolean = true> {
   backedUp?: T;
   transports?: T;
   aaguid?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1807,6 +2335,8 @@ export interface TwoFactorsSelect<T extends boolean = true> {
   verified?: T;
   failedVerificationCount?: T;
   lockedUntil?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1824,6 +2354,8 @@ export interface DeviceCodesSelect<T extends boolean = true> {
   pollingInterval?: T;
   clientId?: T;
   scope?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1837,6 +2369,8 @@ export interface JwksSelect<T extends boolean = true> {
   expiresAt?: T;
   alg?: T;
   crv?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1878,6 +2412,8 @@ export interface OauthClientsSelect<T extends boolean = true> {
   dpopBoundAccessTokens?: T;
   referenceId?: T;
   metadata?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1898,6 +2434,8 @@ export interface OauthResourcesSelect<T extends boolean = true> {
   disabled?: T;
   policyVersion?: T;
   metadata?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1909,6 +2447,8 @@ export interface OauthClientResourcesSelect<T extends boolean = true> {
   clientId?: T;
   resourceId?: T;
   metadata?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1933,6 +2473,8 @@ export interface OauthRefreshTokensSelect<T extends boolean = true> {
   authTime?: T;
   confirmation?: T;
   scopes?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1954,6 +2496,8 @@ export interface OauthAccessTokensSelect<T extends boolean = true> {
   revoked?: T;
   confirmation?: T;
   scopes?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1968,6 +2512,8 @@ export interface OauthConsentsSelect<T extends boolean = true> {
   resources?: T;
   requestedUserInfoClaims?: T;
   scopes?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1977,6 +2523,8 @@ export interface OauthConsentsSelect<T extends boolean = true> {
  */
 export interface OauthClientAssertionsSelect<T extends boolean = true> {
   expiresAt?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1988,6 +2536,8 @@ export interface RateLimitsSelect<T extends boolean = true> {
   key?: T;
   count?: T;
   lastRequest?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -2072,6 +2622,22 @@ export interface PayloadMigrationsSelect<T extends boolean = true> {
   createdAt?: T;
 }
 /**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "payload-llm-instructions_select".
+ */
+export interface PayloadLlmInstructionsSelect<T extends boolean = true> {
+  id?: T;
+  entitySlug?: T;
+  title?: T;
+  entityType?: T;
+  additionalInstructions?: T;
+  systemInstructions?: T;
+  createdBy?: T;
+  updatedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
  * The voice each Mon lineage speaks with, pitch by stage, and delivery by mood. Words and pronunciations are in the Language Lexicon.
  *
  * This interface was referenced by `Config`'s JSON-Schema
@@ -2102,7 +2668,7 @@ export interface MonVoice {
     | null;
   stagePitch?: {
     /**
-     * Empty: an Egg is silent.
+     * Pitch for the Egg's babble from inside the shell (Decision 32), set higher than the Baby's. Empty: silent.
      */
     egg?: number | null;
     /**
@@ -2162,6 +2728,14 @@ export interface MonVoice {
     styleFactor: number;
     maxSpeed: number;
   };
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt?: string | null;
   createdAt?: string | null;
 }
@@ -2232,6 +2806,8 @@ export interface MonVoicesSelect<T extends boolean = true> {
         styleFactor?: T;
         maxSpeed?: T;
       };
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
   globalType?: T;
@@ -2245,6 +2821,16 @@ export interface PayloadJobsStatsSelect<T extends boolean = true> {
   updatedAt?: T;
   createdAt?: T;
   globalType?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "welcome_widget".
+ */
+export interface WelcomeWidget {
+  data?: {
+    [k: string]: unknown;
+  };
+  width: 'full';
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -2268,6 +2854,7 @@ export interface CollectionQueryWidget {
       | 'media'
       | 'language-lexicon'
       | 'mon-models'
+      | 'mon-art'
       | 'sessions'
       | 'accounts'
       | 'verifications'
@@ -2310,6 +2897,7 @@ export interface ActivityWidget {
           | 'media'
           | 'language-lexicon'
           | 'mon-models'
+          | 'mon-art'
           | 'sessions'
           | 'accounts'
           | 'verifications'
@@ -2327,6 +2915,16 @@ export interface ActivityWidget {
           | 'rateLimits'
         )[]
       | null;
+  };
+  width: 'small' | 'medium' | 'large' | 'x-large' | 'full';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "upload-dropzone_widget".
+ */
+export interface UploadDropzoneWidget {
+  data?: {
+    excludedCollections?: ('media' | 'mon-models' | 'mon-art')[] | null;
   };
   width: 'x-small' | 'small' | 'medium' | 'large' | 'x-large' | 'full';
 }

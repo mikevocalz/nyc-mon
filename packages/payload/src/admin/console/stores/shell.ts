@@ -31,4 +31,6 @@ export const useShellStore = create<ShellStore>((set) => ({
     writeStoredAppearance(appearance);
     set({ appearance });
   },
+  moreOpen: false,
+  setMoreOpen: (moreOpen) => set({ moreOpen }),
 }));

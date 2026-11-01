@@ -22,6 +22,7 @@ import { needsNicknamePrompt } from '../onboarding/onboarding.store';
 import { useHomeStage } from '../companion/home-stage.store';
 import { tickMinuteClock } from '../companion/minute-clock';
 import { eggIdentity, monIdentity } from '../companion/mon-identity';
+import { useAdminStills } from '../mons/use-admin-stills';
 import { StageControls, type StageControl } from '../egg/StageControls';
 import { StageLoader } from '../egg/StageLoader';
 import { COMING_SOON } from '../companion/glass';
@@ -113,6 +114,7 @@ export function HatchScreen() {
     : undefined;
   const hatch = replay ? replayHatch : (stored ?? (egg === undefined ? undefined : createHatchState(egg)));
   const activeMon = useMonStore(selectActiveMon);
+  const stills = useAdminStills();
   const under13 = useMonStore(useMemo(() => selectCallerIsUnder13(Date.now()), []));
 
   const eggId_ = eggId ?? '';
@@ -128,7 +130,7 @@ export function HatchScreen() {
   };
 
   const mon = hatch?.kind === 'presenting' || hatch?.kind === 'hatched' ? hatch.mon : activeMon;
-  const eggId0 = egg === undefined ? undefined : eggIdentity(egg);
+  const eggId0 = egg === undefined ? undefined : eggIdentity(egg, stills);
   const babyName = eggId0?.babyName ?? (mon ? monIdentity(mon).name : '');
   const monName = mon ? monIdentity(mon).name : babyName;
   const firstLook = mon === undefined ? 'lean-in' : deriveFirstLook(mon.monInstanceId, under13 ?? true);

@@ -8,12 +8,16 @@
   "babyName": "Fye Dot",
   "bloodlineId": "F04",
   "source": {
-    "mesh": null,
-    "meshSha256": null,
+    "mesh": "packages/assets/eggs/signal-egg/source/Signal-Egg.glb",
+    "meshSha256": "b3d0da5a18e0eb2465d6df3da38530236dd1c0034b2c026d47835e2cfe8d0a0b",
+    "sourceRevision": "creator upload 2026-10-21, optimized GLB",
+    "approval": "approved",
+    "approvalNote": "Mike (creator) 2026-10-29, Decision 38: approved to ship this mesh as the Signal Egg, a starter. The mesh is the tan spotted egg supplied as Fye-Egg.glb and does not match the red polka-dot reference art.",
     "reference": "packages/assets/eggs/signal-egg/source/reference-front.png",
     "referenceSha256": "59e007c825c00cface3fa155914f054bb74bb4aec59321be39768991e2a6db50",
-    "canonMatch": "Creator 2026-10-21 (Decision 31): the Glossy Red Polka-Dot Racing Egg is the LanternFye bloodline's egg.",
-    "approval": "blocked: no 3D mesh made from this art yet"
+    "referenceMesh": "packages/assets/eggs/signal-egg/source/reference-fye-egg.png",
+    "referenceMeshSha256": "13f29728cf375ded30c398f7b3b96ee15f6c6e1dca5e5c4ecd6f13b2bd0d7df2",
+    "canonMatch": "Decision 31: the Glossy Red Polka-Dot Racing Egg (reference-front.png) is the LanternFye bloodline's egg. The mesh is the Glossy Spotted Alien Egg (reference-fye-egg.png), tan with black and red dots, supplied as Fye-Egg.glb. Shipped by Mike's 2026-10-29 decision (Decision 38)."
   },
   "baby": {
     "model": null,
@@ -75,5 +79,61 @@
       0.55,
       0.85
     ]
+  },
+  "runtime": {
+    "glb": "signal-egg-hatch.glb",
+    "coordinates": "glTF Y-up, metres, egg base at origin, Caller faces -Z",
+    "clipMap": {
+      "idle": "egg_idle",
+      "hatch": "hatch",
+      "leanIn": "attention_lean_in",
+      "hesitate": "attention_hesitate"
+    },
+    "phaseSeconds": {
+      "stir": [
+        0.0,
+        1.0
+      ],
+      "pressure": [
+        1.0,
+        1.8
+      ],
+      "crack": [
+        1.8,
+        4.2
+      ],
+      "burst": [
+        4.2,
+        4.7
+      ],
+      "emerge": [
+        4.7,
+        6.5
+      ]
+    },
+    "crackBeatSeconds": [
+      2.4,
+      3.1333333333333333,
+      3.8333333333333335
+    ],
+    "shellPieceNames": [
+      "Shell_Cup",
+      "Shell_Crown",
+      "Shell_Shard_01",
+      "Shell_Shard_02",
+      "Shell_Shard_03",
+      "Shell_Shard_04"
+    ],
+    "crackOrder": [
+      "Shell_Shard_03",
+      "Shell_Shard_04",
+      "Shell_Shard_02"
+    ],
+    "babyLanding": [
+      0.0836,
+      -0.0996,
+      0.0
+    ],
+    "glbBytes": 1393848
   }
 }

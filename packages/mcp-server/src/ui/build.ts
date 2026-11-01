@@ -42,7 +42,7 @@ const BABY_WIDTH = 400;
  */
 function creatureArt(): Plugin {
   const creatures = join(repoRoot, 'packages', 'assets', 'creatures');
-  const babies = new Set(['squeaklet', 'kittee-cee', 'yotito']);
+  const babies = new Set(['squeaklet', 'kittee-cee', 'yotito', 'fye-dot']);
   return {
     name: 'nyc-mon:creature-art',
     enforce: 'pre',

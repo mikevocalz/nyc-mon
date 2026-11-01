@@ -161,7 +161,7 @@ class SkiaContext2D implements Ctx2D {
   }
   putImageData(image: ImageData2D, x: number, y: number): void {
     const bytes = new Uint8Array(image.data.buffer, image.data.byteOffset, image.data.byteLength);
-    const img = Skia.Image.MakeRasterImage(
+    const img = Skia.Image.MakeRaster(
       { width: image.width, height: image.height, colorType: ColorType.RGBA_8888, alphaType: AlphaType.Unpremul },
       Skia.Data.fromBytes(bytes),
       image.width * 4,

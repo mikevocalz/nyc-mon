@@ -34,6 +34,7 @@ import { facadeFrame, facadeProjection, type FacadeFrame } from './facade-frame.
 import { apartmentInterior } from './interior.ts';
 import { asColorNode, asNode, asTsl, type TslNode } from './loose-tsl.ts';
 import { physicalTsl, type PhysicalMaterialUniforms } from './tsl-common.ts';
+import { worldPatternPosition } from '../render-space.ts';
 
 type StdMat = InstanceType<Three['MeshStandardNodeMaterial']>;
 const PW = physicalCityMaterials.preWar;
@@ -66,7 +67,7 @@ export function facadeCell(
 ): FacadeCell {
   const { T } = physicalTsl(THREE);
   const frame = facadeFrame(THREE);
-  const { nWall, uCoord: worldU, isRoof } = facadeProjection(THREE, frame, opts.wallLocal);
+  const { nWall, uCoord: worldU, isRoof } = facadeProjection(THREE, frame, opts.wallLocal, asTsl(worldPatternPosition(THREE)));
   let uCoord = worldU;
   let windowWidth = T.float(opts.windowWidth ?? MASONRY_FAMILY.limestone.windowWidth);
   let floorHeight = T.float(opts.floorHeight ?? MASONRY_FAMILY.limestone.floorHeight);
@@ -374,7 +375,7 @@ export function createPreWarMaterial(THREE: Three, uniforms: PhysicalMaterialUni
     const glassCol = T.mix(glassBase, U.skyHorizon, fresnel.mul(0.52).add(0.08)).mul(recessShade);
 
     const frameCol = masonryTint.mul(0.46).mul(recessShade);
-    const roofNoise = noise2D(T.positionWorld.xz.mul(0.35));
+    const roofNoise = noise2D(asTsl(worldPatternPosition(THREE)).xz.mul(0.35));
     const roofCol = T.mix(cTrim.mul(0.42), cTrim.mul(0.62), roofNoise);
 
     const wallOrRoof = T.mix(masonryWeathered, roofCol, isRoof);
@@ -577,7 +578,7 @@ export function createCurtainWallMaterial(THREE: Three, uniforms: PhysicalMateri
     const frameBase = T.mix(cFrame, spandrelDark, filteredPulse(cellUV.y, 0.0, spandrelRatio, fw.y));
     const canyonBand = T.smoothstep(0.0, 14.0, vCoord).mul(T.float(1.0).sub(T.smoothstep(22.0, 75.0, vCoord)));
     const canyonGlow = cCanyonBounce.mul(canyonBand.mul(U.bounce).mul(0.16));
-    const roofNoise = noise2D(T.positionWorld.xz.mul(0.35));
+    const roofNoise = noise2D(asTsl(worldPatternPosition(THREE)).xz.mul(0.35));
     const roofColor = T.mix(c(CW.roofA), c(CW.roofB), roofNoise);
 
     const facadeCol = T.mix(frameBase, glassColor, isGlassPane.mul(T.float(1.0).sub(isMechFloor))).add(canyonGlow);

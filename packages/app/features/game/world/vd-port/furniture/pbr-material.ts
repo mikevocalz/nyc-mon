@@ -54,6 +54,7 @@
 import type { Three } from '@acme/ui/three';
 import type { Node } from 'three/webgpu';
 import { VD_PBR_BIN, VD_PBR_LAYER_SIZE, VD_PBR_LAYERS, VD_PBR_SETS } from './data/pbr-sets.ts';
+import { worldPatternPosition } from '../../render-space.ts';
 
 type DataArrayTexture = InstanceType<Three['DataArrayTexture']>;
 type StdMat = InstanceType<Three['MeshStandardNodeMaterial']>;
@@ -206,7 +207,7 @@ export function createPbrMaterial(THREE: Three, desc: PbrDescriptor, env: PbrEnv
   const sel = (c: N, a: A, b: A) => T.mix(b, a, c);   // c in {0, 1}
 
   // ---- the mapping
-  const W = T.positionWorld;
+  const W = worldPatternPosition(THREE) as unknown as N;
   const wn = T.normalize(T.normalWorldGeometry);
   const tW = T.normalize(T.vec2(wn.z, wn.x.negate()));
   const mWorld = sel(gt(T.abs(wn.y), 0.7), T.vec2(W.x, W.z.negate()), T.vec2(T.dot(W.xz, tW), W.y));

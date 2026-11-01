@@ -43,5 +43,5 @@ export function ThreeSurface({ ref, androidSurfaceType }: { ref?: Ref<ThreeSurfa
   // AHB-pool HardwareBufferView (mailbox present — never stalls the producer
   // on the window queue) or a SurfaceView; see AndroidSurfaceType. GPU surface:
   // the Canvas takes a style, not a className.
-  return <Canvas ref={canvasRef} opaque={false} android={{ surfaceType: androidSurfaceType }} style={{ flex: 1 }} />;
+  return <Canvas ref={canvasRef} android={{ backingView: androidSurfaceType, opaque: false }} style={{ flex: 1 }} />;
 }

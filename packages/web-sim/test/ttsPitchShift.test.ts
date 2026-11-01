@@ -43,7 +43,7 @@ describe.skipIf(ffmpeg === null)('ffmpeg pitch shift on a tone', () => {
   const tone = () =>
     run(['-f', 'lavfi', '-i', `sine=frequency=${TONE_HZ}:sample_rate=${RATE}:duration=${TONE_SECONDS}`, '-f', 'mp3', '-b:a', '128k', 'pipe:1']);
 
-  it.each([1.3, 1.15, 0.92])('factor %s moves pitch by the factor and keeps duration within 5 percent', async (factor) => {
+  it.each([1.45, 1.3, 1.15, 0.92])('factor %s moves pitch by the factor and keeps duration within 5 percent', async (factor) => {
     const input = tone();
     const before = decode(input);
     const shifter = createFfmpegPitchShifter(ffmpeg ?? 'ffmpeg');

@@ -1,11 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { bloodlines } from '@acme/content';
-import { captionText, monVoiceRef, planMonUtterance, readMonVoiceRef, type MonVoiceRef } from '@acme/content/voice';
+import { babbleInventory, captionText, gateMonLine, monVoiceRef, planMonUtterance, readMonVoiceRef, type MonVoiceRef } from '@acme/content/voice';
+import { MON_EGG_STAGE_PITCH } from '@acme/content/lingo';
+import { isBabble } from '@acme/core';
 import { createRateLimiter } from '../server/model.ts';
 import { createTtsHandler, type PitchShifter, type TtsFetch } from '../server/tts.ts';
 import { currentMonVoice } from '../src/client/monVoice.ts';
 import { speakAs, stopSpeaking } from '../src/client/speech.ts';
 import type { TranscriptItem } from '../src/client/session.ts';
+import { trustClaim } from './fixtures/roster.ts';
 
 /**
  * One Mon line, every adapter: the MCP tool result (the Alexa+ path), the
@@ -22,10 +25,11 @@ const LINES = [
   'Bet!',
 ] as const;
 
+/** As the MCP tool result reports them: a Baby past its first day speaks `limited`. */
 const VOICED: readonly MonVoiceRef[] = [
-  { lineageId: 'dex-001/female/1', stage: 'Small', mood: 'content' },
-  { lineageId: 'dex-001/male/3', stage: 'Baby', mood: 'asleep' },
-  { lineageId: 'dex-001/female/4', stage: 'Max' },
+  { lineageId: 'dex-001/female/1', stage: 'Small', voiceStage: 'full', mood: 'content' },
+  { lineageId: 'dex-001/male/3', stage: 'Baby', voiceStage: 'limited', mood: 'asleep' },
+  { lineageId: 'dex-001/female/4', stage: 'Max', voiceStage: 'full' },
 ];
 
 class FakeAudio {
@@ -69,7 +73,7 @@ function stubWebSpeech() {
 async function serverSends(body: unknown) {
   const upstream = vi.fn<TtsFetch>(async () => new Response(new Uint8Array([0xff, 0xfb, 0x90]), { status: 200, headers: { 'content-type': 'audio/mpeg' } }));
   const shift = vi.fn<PitchShifter>((audio) => audio);
-  const res = await createTtsHandler({ allowedOrigin: ORIGIN, rateLimit: createRateLimiter(100), apiKey: 'k', fetch: upstream, pitchShift: shift })(
+  const res = await createTtsHandler({ roster: trustClaim, allowedOrigin: ORIGIN, rateLimit: createRateLimiter(100), apiKey: 'k', fetch: upstream, pitchShift: shift })(
     new Request(`${ORIGIN}/api/tts`, { method: 'POST', headers: { 'content-type': 'application/json', origin: ORIGIN }, body: JSON.stringify(body) }),
     'ip',
   );
@@ -80,6 +84,7 @@ async function serverSends(body: unknown) {
     url: call ? String(call[0]) : null,
     sent: call ? (JSON.parse(String(call[1].body)) as { text: string; model_id: string; voice_settings: unknown }) : null,
     factor: shift.mock.calls[0]?.[1] ?? 1,
+    caption: decodeURIComponent(res.headers.get('x-mon-caption') ?? ''),
   };
 }
 
@@ -99,7 +104,7 @@ async function browserPosts(line: string, ref: MonVoiceRef): Promise<unknown> {
 
 /** The MCP path: the tool result's `mon.voice` and `mood`, read back by the client. */
 function viaToolResult(ref: MonVoiceRef): MonVoiceRef | undefined {
-  const mon = { monId: 'mon_1', voice: monVoiceRef({ voiceLineageId: ref.lineageId, stage: ref.stage }) };
+  const mon = { monId: 'mon_1', voice: monVoiceRef({ voiceLineageId: ref.lineageId, stage: ref.stage }, Date.now()) };
   const item = { kind: 'tool', result: { content: [], structuredContent: { mon, ...(ref.mood ? { mood: ref.mood } : {}) } } } as unknown as TranscriptItem;
   return currentMonVoice([item]);
 }
@@ -130,9 +135,10 @@ describe('one Mon voice across adapters', () => {
         expect(server.sent).toEqual({ text: plan.spoken, model_id: plan.voice.model, voice_settings: plan.voice.settings });
         expect(server.factor).toBe(plan.voice.pitchFactor);
 
-        // The caption every surface shows.
-        expect(plan.caption).toBe(captionText(line));
+        // The caption every surface shows: the line after the speech gate (a Baby keeps two words at most).
+        expect(plan.caption).toBe(captionText(gateMonLine(line, ref).text));
         expect(plan.caption).not.toMatch(/Callah|\*/);
+        expect(server.caption).toBe(plan.caption);
       });
     }
   }
@@ -149,16 +155,20 @@ describe('one Mon voice across adapters', () => {
     for (const s of spoken) expect(s.text).not.toMatch(/\*|chuckle|yawn/);
   });
 
-  it('an Egg is silent everywhere', async () => {
-    const egg: MonVoiceRef = { lineageId: 'dex-001/female/1', stage: 'Egg' };
-    expect(planMonUtterance('hi', egg).voice).toEqual({ kind: 'silent' });
-    expect((await serverSends({ text: 'hi', lineageId: egg.lineageId, stage: 'Egg' })).status).toBe(204);
-    vi.stubGlobal('Audio', FakeAudio);
-    const spoken = stubWebSpeech();
-    const fetchFn = vi.fn() as unknown as typeof fetch;
-    await speakAs('hi', egg, { fetchFn });
-    expect(fetchFn).not.toHaveBeenCalled();
-    expect(spoken).toEqual([]);
+  it('an Egg babbles everywhere, in its lineage voice at the Egg pitch (Decision 32)', async () => {
+    const egg: MonVoiceRef = { lineageId: 'dex-001/female/1', stage: 'Egg', voiceStage: 'baby-talk' };
+    const plan = planMonUtterance('hi Callah', egg);
+    if (plan.voice.kind !== 'lineage') throw new Error('expected the lineage voice');
+    expect(plan.voice.pitchFactor).toBe(MON_EGG_STAGE_PITCH);
+    expect(plan.gated).toBe(true);
+    expect(isBabble(plan.caption, babbleInventory({ lineageId: egg.lineageId }, 'Egg'))).toBe(true);
+    const body = await browserPosts('hi Callah', egg);
+    expect(body).toMatchObject({ stage: 'Egg', voiceStage: 'baby-talk' });
+    const server = await serverSends(body);
+    expect(server.status).toBe(200);
+    expect(server.sent?.text).toBe(plan.spoken);
+    expect(server.factor).toBe(MON_EGG_STAGE_PITCH);
+    expect(server.caption).toBe(plan.caption);
   });
 
   it('a line with no lineage voice yet falls back the same way on server and browser', async () => {

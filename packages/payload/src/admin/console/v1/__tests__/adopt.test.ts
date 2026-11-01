@@ -202,6 +202,18 @@ describe('adopt rules (content and egg-derived ids)', () => {
     expect(check(body({ mon: { gender: null, voiceLineageId: null } }))).toBeNull();
   });
 
+  it('accepts a Fye Dot hatched from the Signal Egg, the fourth starter (Decision 38)', () => {
+    const signal = starterEggs.find((e) => e.bloodlineId === 'F04')!;
+    expect([signal.speciesId, signal.hatchesIntoSpeciesId]).toEqual(['dex-020', 'dex-021']);
+    const fromSignal = body({
+      egg: { speciesId: signal.speciesId, hatchesIntoSpeciesId: signal.hatchesIntoSpeciesId },
+      mon: { speciesId: signal.hatchesIntoSpeciesId, voiceLineageId: deriveVoiceLineageId({ eggId: EGG_ID, speciesId: signal.speciesId }) },
+    });
+    expect(check(fromSignal)).toBeNull();
+    expect(check({ ...fromSignal, mon: { ...fromSignal.mon, speciesId: 'dex-022', stage: 'Small' } })).toBeNull();
+    expect(check({ ...fromSignal, mon: { ...fromSignal.mon, speciesId: starter.hatchesIntoSpeciesId } })).toMatch(/not a form/);
+  });
+
   it('refuses an id the egg does not derive', () => {
     expect(check(body({ mon: { monInstanceId: 'mon_mine' } }))).toMatch(/derived/);
   });

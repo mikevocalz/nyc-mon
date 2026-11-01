@@ -129,7 +129,7 @@ function fetchMon(source: Pick<MonRigSource, 'key' | 'glb'>): Promise<ArrayBuffe
   });
 }
 
-/** Starts fetching a Mon's GLB bytes (26-34 MB) ahead of its first stage. Safe to call repeatedly; a no-op once parsed. */
+/** Starts fetching a Mon's GLB bytes (19-24 MB) ahead of its first stage. Safe to call repeatedly; a no-op once parsed. */
 export function preloadMonRig(source: Pick<MonRigSource, 'key' | 'glb'>): void {
   cache.preload(source.key, () => fetchMon(source));
 }

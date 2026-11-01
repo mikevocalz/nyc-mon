@@ -20,7 +20,40 @@ type GltfJson = {
   asset?: { version?: string };
   animations?: { name?: string; samplers?: { interpolation?: string }[] }[];
   meshes?: { extras?: { targetNames?: unknown }; primitives?: { attributes?: { POSITION?: number } }[] }[];
-  accessors?: { bufferView?: number; sparse?: unknown; min?: number[]; max?: number[] }[];
+  accessors?: { bufferView?: number; sparse?: unknown; min?: number[]; max?: number[]; normalized?: boolean; componentType?: number }[];
+  nodes?: { mesh?: number; children?: number[]; matrix?: number[]; translation?: number[]; rotation?: number[]; scale?: number[] }[];
+  scenes?: { nodes?: number[] }[];
+  scene?: number;
+};
+
+type Mat4 = number[];
+const IDENTITY: Mat4 = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+
+// Column-major, as glTF stores it.
+const multiply = (a: Mat4, b: Mat4): Mat4 => {
+  const out = new Array<number>(16).fill(0);
+  for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) for (let k = 0; k < 4; k++) out[c * 4 + r] = (out[c * 4 + r] ?? 0) + (a[k * 4 + r] ?? 0) * (b[c * 4 + k] ?? 0);
+  return out;
+};
+
+const localMatrix = (node: NonNullable<GltfJson['nodes']>[number]): Mat4 => {
+  if (node.matrix?.length === 16) return node.matrix;
+  const [tx = 0, ty = 0, tz = 0] = node.translation ?? [];
+  const [x = 0, y = 0, z = 0, w = 1] = node.rotation ?? [];
+  const [sx = 1, sy = 1, sz = 1] = node.scale ?? [];
+  return [
+    (1 - 2 * (y * y + z * z)) * sx, 2 * (x * y + z * w) * sx, 2 * (x * z - y * w) * sx, 0,
+    2 * (x * y - z * w) * sy, (1 - 2 * (x * x + z * z)) * sy, 2 * (y * z + x * w) * sy, 0,
+    2 * (x * z + y * w) * sz, 2 * (y * z - x * w) * sz, (1 - 2 * (x * x + y * y)) * sz, 0,
+    tx, ty, tz, 1,
+  ];
+};
+
+// KHR_mesh_quantization stores POSITION as normalized integers; min/max are in that integer space.
+const NORMALIZED_MAX: Record<number, number> = { 5120: 127, 5121: 255, 5122: 32767, 5123: 65535 };
+const dequantize = (value: number, accessor: { normalized?: boolean; componentType?: number }) => {
+  const max = accessor.normalized && accessor.componentType ? NORMALIZED_MAX[accessor.componentType] : undefined;
+  return max ? Math.max(value / max, -1) : value;
 };
 
 /** Throws with a plain-language reason when `buf` is not a glTF 2.0 binary. */
@@ -55,18 +88,34 @@ export function readGlb(buf: Uint8Array): GlbFacts {
   }
   if (morphTargets.length > MAX_MORPH_TARGETS) throw new Error(`This GLB has ${morphTargets.length} morph targets. Keep it to ${MAX_MORPH_TARGETS} or fewer.`);
 
-  // ponytail: ignores node transforms, so a model scaled at its root node reads
-  // at its mesh size. Walk the node tree if that ever misleads the framing.
+  // World-space Y extent: each mesh's dequantized POSITION box, through its node's world matrix.
   let minY = Infinity;
   let maxY = -Infinity;
-  for (const mesh of meshes) {
+  const nodes = Array.isArray(json.nodes) ? [...json.nodes] : [];
+  const visit = (index: number, parent: Mat4, depth: number) => {
+    const node = nodes[index];
+    if (!node || depth > 64) return;
+    const world = multiply(parent, localMatrix(node));
+    const mesh = node.mesh === undefined ? undefined : meshes[node.mesh];
     for (const primitive of Array.isArray(mesh?.primitives) ? mesh.primitives : []) {
       const accessor = primitive.attributes?.POSITION === undefined ? undefined : json.accessors?.[primitive.attributes.POSITION];
-      if (accessor?.min?.[1] !== undefined && accessor.max?.[1] !== undefined) {
-        minY = Math.min(minY, accessor.min[1]);
-        maxY = Math.max(maxY, accessor.max[1]);
+      if (accessor?.min?.length !== 3 || accessor.max?.length !== 3) continue;
+      const [x0 = 0, y0 = 0, z0 = 0] = accessor.min.map((v) => dequantize(v, accessor));
+      const [x1 = 0, y1 = 0, z1 = 0] = accessor.max.map((v) => dequantize(v, accessor));
+      const [, m1 = 0, , , , m5 = 0, , , , m9 = 0, , , , m13 = 0] = world;
+      for (const cx of [x0, x1]) for (const cy of [y0, y1]) for (const cz of [z0, z1]) {
+        const y = m1 * cx + m5 * cy + m9 * cz + m13;
+        minY = Math.min(minY, y);
+        maxY = Math.max(maxY, y);
       }
     }
+    for (const child of node.children ?? []) visit(child, world, depth + 1);
+  };
+  if (nodes.length === 0) {
+    // No node tree: read every mesh at its own size.
+    nodes.push(...meshes.map((_, mesh) => ({ mesh })));
   }
+  const roots = json.scenes?.[json.scene ?? 0]?.nodes ?? nodes.map((_, i) => i).filter((i) => !nodes.some((n) => n.children?.includes(i)));
+  for (const root of roots) visit(root, IDENTITY, 0);
   return { animationClips, morphTargets, heightMeters: Number.isFinite(maxY - minY) ? Math.round((maxY - minY) * 1000) / 1000 : null };
 }

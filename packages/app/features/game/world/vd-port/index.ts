@@ -13,6 +13,7 @@ import type { CityDatasetV3 } from '../../city-dataset.ts';
 import { build as buildBlocks } from './blocks/index.ts';
 import { build as buildStorefronts } from './storefronts/index.ts';
 import { build as buildFurniture } from './furniture/index.ts';
+import { build as buildFarTier } from './far-tier/index.ts';
 import { valdradaToScene } from './transform.ts';
 import type { VdEnv, VdLayerBudget, VdPortCtx, VdPortPart, VdStreamLayer } from './types.ts';
 import type { CellPackage } from '../cells/cell-rules.ts';
@@ -109,7 +110,7 @@ export function buildVdPort(THREE: Three, dataset: CityDatasetV3, options: VdPor
       stream?.addExternal(ext);
     },
   };
-  const parts: VdPortPart[] = [buildBlocks(ctx), buildStorefronts(ctx), buildFurniture(ctx)];
+  const parts: VdPortPart[] = [buildBlocks(ctx), buildStorefronts(ctx), buildFurniture(ctx), buildFarTier(ctx)];
   const stats = { meshes: 0, triangles: 0, structures: 0, streamed: streamMeshes.length + streamLayers.reduce((a, l) => a + l.packages.length, 0) };
   for (const p of parts) {
     stats.meshes += p.stats.meshes;

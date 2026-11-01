@@ -416,6 +416,7 @@ export function createVehicleActor(options: VehicleActorOptions): SceneActorFact
         lofted?.begin();
         let moving = false;
         let lightSlot = 0;
+        const ox = frame.originX ?? 0, oz = frame.originZ ?? 0;
         if (snap && version >= 0) {
           for (let i = 0; i < count; i++) {
             const o = VSNAP_HEADER + i * VSNAP_STRIDE;
@@ -439,7 +440,7 @@ export function createVehicleActor(options: VehicleActorOptions): SceneActorFact
             // Spawn grow-in: a mid-block spawn eases from 30 % scale over ~0.7 s instead of popping.
             const grow = Math.min(1, 0.3 + (age / SPAWN_GROW_SECONDS) * 0.7);
             quat.setFromAxisAngle(up, pose.yaw);
-            pos.set(pose.x, 0, pose.z);
+            pos.set(pose.x - ox, 0, pose.z - oz);
             scale.set(grow, grow, grow);
             matrix.compose(pos, quat, scale);
             km.mesh.setMatrixAt(slot, matrix);
@@ -472,7 +473,7 @@ export function createVehicleActor(options: VehicleActorOptions): SceneActorFact
                 const wz = pose.z + cy * lz - sy * lx;
                 quat.setFromAxisAngle(up, m[3] ? pose.yaw : pose.yaw + Math.PI);
                 matrix.compose(
-                  pos.set(wx, ly, wz),
+                  pos.set(wx - ox, ly, wz - oz),
                   quat,
                   scale.set(LIGHT_QUAD_SIZE, LIGHT_QUAD_SIZE, 1),
                 );
@@ -498,7 +499,7 @@ export function createVehicleActor(options: VehicleActorOptions): SceneActorFact
             if (km.mesh.instanceColor) km.mesh.instanceColor.needsUpdate = true;
           }
         }
-        lofted?.commit(env.lampLevel, blinkOn);
+        lofted?.commit(env.lampLevel, blinkOn, ox, oz);
         const changed = count !== lastCount;
         lastCount = count;
         // Keep the canvas drawing while the fleet moves or the roster changed this frame.
@@ -561,7 +562,7 @@ interface LoftedFleet {
   /** Queue one snapshot record for this frame. */
   collect(snap: readonly number[], index: number, alpha: number, kind: VehicleKind): void;
   /** Write instances, headlight lights and flares for the queued records. */
-  commit(lampLevel: number, blinkOn: boolean): void;
+  commit(lampLevel: number, blinkOn: boolean, originX?: number, originZ?: number): void;
   dispose(): void;
 }
 
@@ -835,7 +836,7 @@ function createLoftedFleet(
   const one = new THREE.Vector3(1, 1, 1);
   const litPositions: FleetRecord[] = [];
 
-  const writeInstance = (lod: Lod, rec: FleetRecord, blinkOn: boolean) => {
+  const writeInstance = (lod: Lod, rec: FleetRecord, blinkOn: boolean, originX: number, originZ: number) => {
     const slot = lod.count++;
     let rgb = paints.get(rec.id);
     if (!rgb) {
@@ -844,7 +845,7 @@ function createLoftedFleet(
       rgb = [paintColor.r, paintColor.g, paintColor.b];
       paints.set(rec.id, rgb);
     }
-    lod.write(slot, rec.x, rec.z, rec.yaw, rec.grow, rgb, carStateFromFlags(rec.flags, blinkOn, VFLAG));
+    lod.write(slot, rec.x - originX, rec.z - originZ, rec.yaw, rec.grow, rgb, carStateFromFlags(rec.flags, blinkOn, VFLAG));
   };
 
   const flush = (lod: Lod) => lod.flush();
@@ -872,7 +873,7 @@ function createLoftedFleet(
       rec.dist = 0;
       recordCount++;
     },
-    commit: (lampLevel, blinkOn) => {
+    commit: (lampLevel, blinkOn, originX = 0, originZ = 0) => {
       glow.value = slopGlowFromLampLevel(lampLevel);
       const focus = options.focus?.() ?? null;
       for (const list of byKind.values()) list.length = 0;
@@ -894,9 +895,9 @@ function createLoftedFleet(
           const far = lk.fars.length > 1 ? lk.fars[body] : lk.fars[0];
           const close = !focus || rec.dist <= lk.nearMetres;
           if (close && nearUsed < lk.nearCap && near.count < near.capacity) {
-            writeInstance(near, rec, blinkOn);
+            writeInstance(near, rec, blinkOn, originX, originZ);
             nearUsed++;
-          } else if (far && far.count < far.capacity) writeInstance(far, rec, blinkOn);
+          } else if (far && far.count < far.capacity) writeInstance(far, rec, blinkOn, originX, originZ);
         }
         for (const near of lk.nears) flush(near);
         for (const far of lk.fars) flush(far);
@@ -912,7 +913,7 @@ function createLoftedFleet(
           const rec = litPositions[lit.index]!;
           const lk = kinds.get(rec.kind)!;
           quat.setFromAxisAngle(up, rec.yaw);
-          matrix.compose(pos.set(rec.x, 0, rec.z), quat, one);
+          matrix.compose(pos.set(rec.x - originX, 0, rec.z - originZ), quat, one);
           const light = lights[used++]!;
           placeVehicleHeadlight(light, lk.head, matrix);
           light.intensity = (lk.bus ? HEADLIGHT_POOL.busIntensity : HEADLIGHT_POOL.intensity) * beam * lit.fade;
@@ -930,7 +931,7 @@ function createLoftedFleet(
       if (focus && glow.value > FLARE_GLOW_ON) {
         for (let i = 0; i < recordCount; i++) {
           const rec = records[i]!;
-          flareCount = writeVehicleFlares(flarePos, flareCol, flareCount, rec, kinds.get(rec.kind)!.flare, focus, mpp);
+          flareCount = writeVehicleFlares(flarePos, flareCol, flareCount, rec, kinds.get(rec.kind)!.flare, focus, mpp, originX, originZ);
         }
       }
       flares.count = flareCount;

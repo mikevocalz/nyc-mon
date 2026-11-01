@@ -273,3 +273,35 @@ export const Loading: Story = {
     </View>
   ),
 };
+
+/** `filter` adds a search field; client mode narrows the rows in memory and pages them. */
+export const SearchAndPages: Story = {
+  render: () => (
+    <View className="max-w-3xl p-4">
+      <DataTable
+        surface="page"
+        caption="Callers"
+        data={[...CALLERS, ...CALLERS.map((c) => ({ ...c, callerId: `${c.callerId}-2` }))]}
+        columns={CALLER_COLUMNS}
+        getRowId={(r) => r.callerId}
+        filter={{ label: 'Search Callers', placeholder: 'Caller id or consent' }}
+        mode={{ kind: 'client', pageSize: 4 }}
+      />
+    </View>
+  ),
+};
+
+/** `error` renders the message with a retry button in place of the rows. */
+export const ErrorWithRetry: Story = {
+  render: () => (
+    <View className="max-w-3xl p-4">
+      <DataTable
+        surface="page"
+        caption="Callers"
+        data={[]}
+        columns={CALLER_COLUMNS}
+        error={{ message: "Couldn't load Callers.", onRetry: () => {} }}
+      />
+    </View>
+  ),
+};

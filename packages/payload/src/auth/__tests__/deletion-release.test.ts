@@ -5,7 +5,7 @@ import { releaseOwnAccount, SANCTUARY_CALLER_ID } from '../deletion.ts';
 
 vi.mock('payload', async (importOriginal) => ({
   ...(await importOriginal<typeof import('payload')>()),
-  createLocalReq: async () => ({ context: {} }),
+  createPayloadRequest: async () => ({ context: {} }),
   initTransaction: async () => false,
 }));
 

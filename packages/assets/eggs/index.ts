@@ -16,6 +16,8 @@ import metroManifest from './metro-egg/hatch.manifest.json';
 import metroGlb from './metro-egg/metro-egg-hatch.glb';
 import prismManifest from './prism-egg/hatch.manifest.json';
 import prismGlb from './prism-egg/prism-egg-hatch.glb';
+import signalManifest from './signal-egg/hatch.manifest.json';
+import signalGlb from './signal-egg/signal-egg-hatch.glb';
 
 export interface EggHatchAsset {
   /** Folder name and manifest `eggId`. */
@@ -39,7 +41,8 @@ export const EGG_HATCH_ASSETS: readonly EggHatchAsset[] = [
   entry(metroManifest, metroGlb),
   entry(cornerManifest, cornerGlb),
   entry(prismManifest, prismGlb),
-  // dex-020 is not in packages/content yet, so no save reaches this egg until that species lands.
+  // Starter slot 4 (Decision 38). The mesh is the tan spotted egg, not the red polka-dot art.
+  entry(signalManifest, signalGlb),
 ];
 
 /** The hatch asset for an egg species, or undefined when that egg has no GLB (the screen keeps the 2D egg). */

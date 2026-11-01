@@ -1,0 +1,18 @@
+diff --git a/dist/api/dispatch.mjs b/dist/api/dispatch.mjs
+index 085e342..482af25 100644
+--- a/dist/api/dispatch.mjs
++++ b/dist/api/dispatch.mjs
+@@ -100,7 +100,12 @@ async function runBeforeHooks(context, hooks, endpoint, operationId) {
+ 				modifiedContext = defuReplaceArrays(rest, modifiedContext);
+ 				continue;
+ 			}
+-			return hookReturn;
++			// An inner api-invoker envelope ({headers, response}) is not a real
++			// endpoint result; returning it makes toResponse stringify the
++			// envelope into the body (authorize answered {"headers":{},"response":
++			// {"headers":{}}} instead of the sign-in redirect). Skip it so the
++			// endpoint's own handler produces the real result.
++			if (!("response" in hookReturn && "headers" in hookReturn)) return hookReturn;
+ 		}
+ 	}
+ 	return { context: modifiedContext };

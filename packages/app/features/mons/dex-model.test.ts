@@ -23,7 +23,7 @@ describe('MONS seen rule', () => {
     assert.equal(seenSpeciesIds(EMPTY).size, 0);
   });
 
-  it('counts all three starter eggs as met at M08, and never the Baby inside an unhatched egg', () => {
+  it('counts all four starter eggs as met at M08, and never the Baby inside an unhatched egg', () => {
     const seen = seenSpeciesIds(INCUBATING);
     assert.deepEqual([...seen].sort(), eggs.map((e) => e.speciesId).sort());
     assert.equal(seen.has('dex-002'), false, 'Squeaklet stays ??? until the hatch');
@@ -65,7 +65,7 @@ describe('MONS index', () => {
   });
 
   it('counts seen of total', () => {
-    assert.deepEqual(seenCount(dexIndex(seenSpeciesIds(HATCHED))), { seen: 4, total: allSpecies.length });
+    assert.deepEqual(seenCount(dexIndex(seenSpeciesIds(HATCHED))), { seen: 5, total: allSpecies.length });
   });
 
   it('filters by Bloodline and groups the list under one heading per Bloodline', () => {
@@ -96,7 +96,7 @@ describe('MONS index', () => {
 
   it('filters by stage among seen forms only', () => {
     const index = dexIndex(seenSpeciesIds(HATCHED));
-    assert.deepEqual(filterDex(index, { ...ALL_DEX, stage: 'Egg' }).map((e) => e.dexId), [1, 8, 61]);
+    assert.deepEqual(filterDex(index, { ...ALL_DEX, stage: 'Egg' }).map((e) => e.dexId), [1, 8, 20, 61]);
     assert.equal(filterDex(index, { ...ALL_DEX, stage: 'Max' }).length, 0);
   });
 

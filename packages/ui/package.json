@@ -28,6 +28,11 @@
       "default": "./icons.web.ts"
     },
     "./native": "./native.ts",
+    "./net": {
+      "react-native": "./net/index.native.ts",
+      "browser": "./net/index.web.ts",
+      "default": "./net/index.ts"
+    },
     "./audio-session": {
       "react-native": "./audio/session.native.ts",
       "default": "./audio/session.ts"
@@ -52,7 +57,8 @@
     "./three/mon/lipsync": "./three/mon/lipsync/index.ts",
     "./three/mon/hatch-sound": "./three/mon/hatch-sound.ts",
     "./three/mon/hatch-timeline": "./three/mon/hatch-timeline.ts",
-    "./three/mon/idle": "./three/mon/idle/index.ts"
+    "./three/mon/idle": "./three/mon/idle/index.ts",
+    "./site-embed": "./html/SiteEmbed.tsx"
   },
   "sideEffects": [
     "./rn-globals-shim.ts",
@@ -90,6 +96,7 @@
     "react-native-gesture-handler": "catalog:",
     "react-native-graph": "catalog:",
     "react-native-keyboard-controller": "catalog:",
+    "react-native-nitro-fetch": "catalog:",
     "react-native-nitro-modules": "catalog:",
     "react-native-pulsar": "catalog:",
     "react-native-reanimated": "catalog:",

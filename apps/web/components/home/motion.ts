@@ -153,7 +153,7 @@ const hlynkReveal = compileMotion(
   }),
 );
 
-/** Starters: header, then the three cards as a staggered first-entrance. */
+/** Starters: header, then the four cards as a staggered first-entrance. */
 const startersEntrance = compileMotion(
   defineMotion({
     id: 'w01.starters.enter',
@@ -162,12 +162,14 @@ const startersEntrance = compileMotion(
       'starter-0': { opacity: 0, y: Y.rise },
       'starter-1': { opacity: 0, y: Y.rise },
       'starter-2': { opacity: 0, y: Y.rise },
+      'starter-3': { opacity: 0, y: Y.rise },
     },
     tracks: [
       { target: 'starters-head', to: { opacity: 1, y: 0 }, atMs: 0, durationMs: ms(D.sm), ease: OUT },
       { target: 'starter-0', to: { opacity: 1, y: 0 }, atMs: 100, durationMs: ms(D.sm), ease: OUT },
       { target: 'starter-1', to: { opacity: 1, y: 0 }, atMs: 200, durationMs: ms(D.sm), ease: OUT },
       { target: 'starter-2', to: { opacity: 1, y: 0 }, atMs: 300, durationMs: ms(D.sm), ease: OUT },
+      { target: 'starter-3', to: { opacity: 1, y: 0 }, atMs: 400, durationMs: ms(D.sm), ease: OUT },
     ],
   }),
 );

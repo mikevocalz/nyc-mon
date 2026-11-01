@@ -652,7 +652,7 @@ export function createSignalActor(options: SignalActorOptions): SceneActorFactor
     let lastBlink = -1;
     let lensesDirty = true;
 
-    const refreshFocus = (x: number, z: number) => {
+    const refreshFocus = (x: number, z: number, originX = 0, originZ = 0) => {
       lastFocusX = x;
       lastFocusZ = z;
       // Signal heads.
@@ -661,7 +661,7 @@ export function createSignalActor(options: SignalActorOptions): SceneActorFactor
         const h = heads[headIds[k]!]!;
         activeHeads[k] = headIds[k]!;
         quat.setFromAxisAngle(up, h.yaw);
-        matrix.compose(pos.set(h.x, CURB_HEIGHT, h.z), quat, scale.set(1, 1, 1));
+        matrix.compose(pos.set(h.x - originX, CURB_HEIGHT, h.z - originZ), quat, scale.set(1, 1, 1));
         headMesh.setMatrixAt(k, matrix);
         // Lens anchors → world matrices (static per placement).
         for (let l = 0; l < LENSES_PER_HEAD; l++) {
@@ -672,7 +672,7 @@ export function createSignalActor(options: SignalActorOptions): SceneActorFactor
           // Local offset rotated by the head yaw.
           const wx = h.x + Math.sin(h.yaw) * lz + Math.cos(h.yaw) * lx;
           const wz = h.z + Math.cos(h.yaw) * lz - Math.sin(h.yaw) * lx;
-          matrix.compose(pos.set(wx, ly + CURB_HEIGHT, wz), quat, scale.set(LENS_RADIUS * 2, LENS_RADIUS * 2, 1));
+          matrix.compose(pos.set(wx - originX, ly + CURB_HEIGHT, wz - originZ), quat, scale.set(LENS_RADIUS * 2, LENS_RADIUS * 2, 1));
           lensMesh.setMatrixAt(k * LENSES_PER_HEAD + l, matrix);
         }
       }
@@ -684,7 +684,7 @@ export function createSignalActor(options: SignalActorOptions): SceneActorFactor
         const b = boxes[boxIds[k]!]!;
         activeBoxes[k] = boxIds[k]!;
         quat.setFromAxisAngle(up, b.yaw);
-        matrix.compose(pos.set(b.x, CURB_HEIGHT, b.z), quat, scale.set(1, 1, 1));
+        matrix.compose(pos.set(b.x - originX, CURB_HEIGHT, b.z - originZ), quat, scale.set(1, 1, 1));
         boxMesh.setMatrixAt(k, matrix);
         for (let l = 0; l < LENSES_PER_BOX; l++) {
           const a = boxData.lensAnchors;
@@ -693,7 +693,7 @@ export function createSignalActor(options: SignalActorOptions): SceneActorFactor
           const lz = a[l * 3 + 2]!;
           const wx = b.x + Math.sin(b.yaw) * lz + Math.cos(b.yaw) * lx;
           const wz = b.z + Math.cos(b.yaw) * lz - Math.sin(b.yaw) * lx;
-          matrix.compose(pos.set(wx, ly + CURB_HEIGHT, wz), quat, scale.set(LENS_RADIUS * 2.2, LENS_RADIUS * 2.2, 1));
+          matrix.compose(pos.set(wx - originX, ly + CURB_HEIGHT, wz - originZ), quat, scale.set(LENS_RADIUS * 2.2, LENS_RADIUS * 2.2, 1));
           lensMesh.setMatrixAt(headCap * LENSES_PER_HEAD + k * LENSES_PER_BOX + l, matrix);
         }
       }
@@ -736,14 +736,13 @@ export function createSignalActor(options: SignalActorOptions): SceneActorFactor
       id: 'living-city:signals',
       object: group,
       update: (frame: ActorFrame): boolean => {
-        void frame; // state derives from the packed snapshot + env simTime, never wall time
-        const snap = options.read();
+        const snap = options.read(); // state derives from the packed snapshot + env simTime, never wall time
         const version = snap && snap.length >= VSNAP_HEADER ? (snap[VSNAP.version] ?? 0) : -1;
         const env = readEnvSection(snap, envSectionOffset(snap), snap && snap.length >= VSNAP_HEADER ? (snap[VSNAP.simTime] ?? 0) : 0);
         const blink = fdwBlink(env.simTime) ? 1 : 0;
         const f = options.focus?.() ?? null;
         const moved = f !== null && (!Number.isFinite(lastFocusX) || Math.hypot(f.x - lastFocusX, f.z - lastFocusZ) > TREE_REFRESH_METRES);
-        if (moved && f) refreshFocus(f.x, f.z);
+        if ((moved && f) || frame.originChanged === true) refreshFocus(f?.x ?? lastFocusX, f?.z ?? lastFocusZ, frame.originX ?? 0, frame.originZ ?? 0);
         const versionChanged = version !== lastVersion;
         if (versionChanged) lastVersion = version;
         const blinkChanged = blink !== lastBlink;

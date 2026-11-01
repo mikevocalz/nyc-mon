@@ -7,6 +7,7 @@ import { Button, EmptyState, FadeIn, Heading, Image, LoadingSkeleton, PressScale
 import { ChevronRight, Play, Smartphone } from '@acme/ui/icons';
 import { View } from '@acme/ui/tw';
 import { monIdentity, eggIdentity } from '../companion/mon-identity';
+import { useAdminStills } from '../mons/use-admin-stills';
 import { tickMinuteClock, useMinuteClock } from '../companion/minute-clock';
 import { useLobbyResume } from '../game/lobby/use-lobby-resume';
 import { toResumeSummary } from '../game/lobby/resume-summary';
@@ -56,7 +57,7 @@ function Still({ art, testID }: { art: ReturnType<typeof monIdentity>['art']; te
 function MonCard({ mon, nowMs }: { mon: MonInstance; nowMs: number }) {
   const router = useRouter();
   const care = useMonStore(useMemo(() => selectCareNow(nowMs), [nowMs]));
-  const who = monIdentity(mon);
+  const who = monIdentity(mon, useAdminStills());
   const need = care === undefined ? undefined : careNeedNow(care);
   const stage = hubCopy('hub.mon.stage', { stage: mon.stage });
   const status = need?.status ?? '';
@@ -90,7 +91,7 @@ function MonCard({ mon, nowMs }: { mon: MonInstance; nowMs: number }) {
 
 /** Before the hatch, the egg holds the Mon's place. */
 function EggCard({ egg }: { egg: EggRecord }) {
-  const who = eggIdentity(egg);
+  const who = eggIdentity(egg, useAdminStills());
   return (
     <View testID="hub-egg" className="gap-3" accessible accessibilityLabel={who.eggName}>
       <Text variant="label" tone="muted">{hubCopy('hub.egg.label')}</Text>

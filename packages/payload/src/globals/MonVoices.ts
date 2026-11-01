@@ -28,7 +28,7 @@ const STAGE_FIELDS = LIFECYCLE_STAGES.map((stage) => ({
   type: 'number' as const,
   min: 0.5,
   max: 2,
-  admin: { description: stage === 'Egg' ? 'Empty: an Egg is silent.' : 'Pitch factor, 1 is the voice as cast. Empty: silent.', step: 0.01 },
+  admin: { description: stage === 'Egg' ? 'Pitch for the Egg\'s babble from inside the shell (Decision 32), set higher than the Baby\'s. Empty: silent.' : 'Pitch factor, 1 is the voice as cast. Empty: silent.', step: 0.01 },
 }));
 
 export const MonVoices: GlobalConfig = {

@@ -22,6 +22,7 @@ import { ROADS } from '../physical-materials-constants.ts';
 import { canyonSkyAO, type OpenSkyInput } from './canyon-ao.ts';
 import { asColorNode, asNode, asTsl, type LooseTsl, type TslNode } from './loose-tsl.ts';
 import { physicalTsl, type PhysicalMaterialUniforms } from './tsl-common.ts';
+import { worldPatternPosition } from '../render-space.ts';
 
 type StdMat = InstanceType<Three['MeshStandardNodeMaterial']>;
 type BasicMat = InstanceType<Three['MeshBasicNodeMaterial']>;
@@ -64,8 +65,9 @@ export function createRoadSurfaceMaterial(THREE: Three, uniforms: PhysicalMateri
   const { T, c, hash2D, noise2D, bumpNormal } = physicalTsl(THREE);
   const wetness = asTsl(uniforms.uRoadWetness);
   const mat = new THREE.MeshStandardNodeMaterial({ metalness: 0.24, roughness: 0.48 });
-  const wx = T.positionWorld.x;
-  const wz = T.positionWorld.z;
+  const wp = asTsl(worldPatternPosition(THREE));
+  const wx = wp.x;
+  const wz = wp.z;
   const wet = roadWetMasks(T, wetness, roadPuddleField(THREE, wx, wz));
   const damp = wet.x; const puddle = wet.y; const film = wet.z;
   // World size of a pixel: fine texture settles to its mean before it can alias.
@@ -100,7 +102,7 @@ export function createRoadSurfaceMaterial(THREE: Three, uniforms: PhysicalMateri
   })());
 
   mat.roughnessNode = asNode(T.Fn(() => {
-    const microRough = T.mix(T.float(0.04), noise2D(T.positionWorld.xz.mul(12.0)).mul(0.08), T.smoothstep(0.08, 0.03, pixelSize));
+    const microRough = T.mix(T.float(0.04), noise2D(wp.xz.mul(12.0)).mul(0.08), T.smoothstep(0.08, 0.03, pixelSize));
     const wetRough = T.mix(T.float(0.9).add(microRough), T.float(0.38), T.max(film.mul(0.9), damp.mul(0.8)));
     return T.mix(wetRough, T.float(0.1), puddle);
   })());
@@ -132,8 +134,9 @@ export function createSidewalkMaterial(THREE: Three, uniforms: PhysicalMaterialU
   const { T, c, hash2D, noise2D, bumpNormal, gridLine } = physicalTsl(THREE);
   const wetness = asTsl(uniforms.uRoadWetness);
   const mat = new THREE.MeshStandardNodeMaterial({ metalness: 0.0, roughness: 0.88 });
-  const wx = T.positionWorld.x;
-  const wz = T.positionWorld.z;
+  const wp = asTsl(worldPatternPosition(THREE));
+  const wx = wp.x;
+  const wz = wp.z;
   const flag = ROADS.sidewalkFlag;
   // Damp patches and pools on the flags (their own field; they drain better than the roadway).
   const swField = noise2D(T.vec2(wx.mul(0.14).add(7.4), wz.mul(0.14).sub(13.1))).mul(0.65)

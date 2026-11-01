@@ -76,12 +76,41 @@ test('actors join the scene once, update before the camera, keep the canvas draw
   assert.ok(built.scene.getObjectByName('actor:test'));
   built.update!(frame(0.016), input);
   assert.deepEqual(calls, ['update:0.016']);
-  assert.equal(invalidations.count, 1, 'a moving actor asks for the next frame');
+  // the streamer may add its own redraws while cells are still to build or fading (cell-stream.ts update's busy flag)
+  assert.ok(invalidations.count >= 1, 'a moving actor asks for the next frame');
+  const movingCount = invalidations.count;
   moving = false;
   built.update!(frame(0.016), input);
-  assert.equal(invalidations.count, 1, 'at rest the on-demand canvas stops');
+  // at rest the actor adds no redraw of its own (any growth is the streamer's own pending cells)
+  assert.ok(invalidations.count - movingCount <= 1, 'the actor at rest adds no redraw');
   built.dispose!(); built.dispose!();
   assert.equal(disposed, 1);
+});
+
+test('rebases the render root to whole cells while actors receive the absolute origin', () => {
+  let seen: { x?: number; z?: number; changed?: boolean } = {};
+  const input = params({
+    actors: [(three) => {
+      const object = new (three as typeof THREE).Object3D();
+      return { id: 'test', object, update: (f) => { seen = { x: f.originX, z: f.originZ, changed: f.originChanged }; return false; }, dispose: () => {} };
+    }],
+  });
+  const built = createCityScene(context(), input);
+  built.update!(frame(), { ...input, camera: { ...input.camera, x: 49000, z: -49000, yaw: 0 } });
+  const root = built.scene.children[0]!;
+  assert.deepEqual([Math.round(root.position.x), Math.round(root.position.z)], [-48896, 49024]);
+  assert.equal(seen.x, 48896);
+  assert.equal(seen.z, -49024);
+  assert.equal(seen.changed, true);
+  const absolute = cameraPose({ x: 49000, z: -49000, yaw: 0, distance: input.camera.distance });
+  assert.equal(built.camera.position.x, absolute.position[0]! - 48896);
+  assert.equal(built.camera.position.z, absolute.position[2]! + 49024);
+  built.update!(frame(), { ...input, camera: { ...input.camera, x: 0, z: 0, yaw: 0 } });
+  assert.deepEqual([root.position.x + 0, root.position.z + 0], [0, 0]);
+  assert.equal(seen.x, 0);
+  assert.equal(seen.z, 0);
+  assert.equal(seen.changed, true);
+  built.dispose!();
 });
 
 test('disposes every geometry and material exactly once', () => {

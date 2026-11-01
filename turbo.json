@@ -8,7 +8,7 @@
         "^build"
       ],
       "inputs": [
-        "$TURBO_DEFAULTS$",
+        "$TURBO_DEFAULT$",
         ".env*",
         "../../.env*"
       ],
@@ -30,7 +30,7 @@
         "^build"
       ],
       "inputs": [
-        "$TURBO_DEFAULTS$",
+        "$TURBO_DEFAULT$",
         ".env*",
         "../../.env*",
         "../../packages/ui/**",
@@ -40,6 +40,13 @@
       "outputs": [
         ".next/**",
         "!.next/cache/**"
+      ],
+      "env": [
+        "NYCMON_SITE_EDITOR",
+        "SITE_CONTENT_MODE",
+        "PAYLOAD_SITE_API_URL",
+        "SITE_EMBED_ORIGINS",
+        "SITE_PREVIEW_SECRET"
       ]
     },
     "storybook#build": {
@@ -47,7 +54,7 @@
         "^build"
       ],
       "inputs": [
-        "$TURBO_DEFAULTS$",
+        "$TURBO_DEFAULT$",
         "../../.env*",
         "../../packages/ui/**",
         "../../packages/app/**",
@@ -72,7 +79,7 @@
         "^build"
       ],
       "inputs": [
-        "$TURBO_DEFAULTS$"
+        "$TURBO_DEFAULT$"
       ]
     },
     "dev": {

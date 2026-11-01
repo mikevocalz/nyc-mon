@@ -5,6 +5,7 @@ import { bunnyMediaAfterChange, bunnyMediaAfterDelete, bunnyMediaAfterRead } fro
 import { hasStaffRole, STAFF_ROLES, staffRoles } from './access/roles.ts';
 import { readGlb } from './glb.ts';
 import { MON_ANIMATION_ROLES, MON_MODEL_LICENSES } from './monModelOptions.ts';
+import { checkMonModelFile, MON_MODEL_FILE_MESSAGES } from './monModelFile.ts';
 
 /**
  * One 3D model per Mon form (a species at one lifecycle stage). The file is a
@@ -13,8 +14,7 @@ import { MON_ANIMATION_ROLES, MON_MODEL_LICENSES } from './monModelOptions.ts';
  * @acme/content, so `speciesId` is a select over that roster.
  */
 
-/** Bunny and the viewer both load the whole file; keep Mons phone-sized. */
-export const MON_MODEL_MAX_BYTES = 25 * 1024 * 1024;
+export { MON_MODEL_MAX_BYTES } from './monModelFile.ts';
 
 const speciesById = new Map(allSpecies.map((species) => [species.speciesId, species]));
 
@@ -35,8 +35,8 @@ const inspectUpload: CollectionBeforeChangeHook = async ({ data, originalDoc, re
   }
   const file = req.file;
   if (file) {
-    if (!file.name.toLowerCase().endsWith('.glb')) throw new APIError('Only .glb files work here. Export from Blender as glTF Binary.', 400);
-    if (file.size > MON_MODEL_MAX_BYTES) throw new APIError('This model is over 25 MB. Reduce textures or polygons and export again.', 400);
+    const check = checkMonModelFile(file);
+    if (!check.ok) throw new APIError(MON_MODEL_FILE_MESSAGES[check.problem], 400);
     let facts;
     try {
       facts = readGlb(file.data);

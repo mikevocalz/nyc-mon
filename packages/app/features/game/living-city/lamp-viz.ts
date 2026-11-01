@@ -239,14 +239,14 @@ export function createLampActor(options: LampActorOptions): SceneActorFactory {
     let lastVersion = -1;
     let lastDrive = -1;
 
-    const refreshFocus = (x: number, z: number) => {
+    const refreshFocus = (x: number, z: number, originX = 0, originZ = 0) => {
       lastFocusX = x;
       lastFocusZ = z;
       const gn = pickWithin(glowX, glowZ, x, z, glowRadiusMeters, glowIds, glowScratch);
       for (let k = 0; k < gn; k++) {
         const l = lamps[glowIds[k]!]!;
         matrix.compose(
-          pos.set(l.glowX, l.glowY, l.glowZ),
+          pos.set(l.glowX - originX, l.glowY, l.glowZ - originZ),
           quat.identity(),
           scale.set(LAMP_GLOW_RADIUS * 2, LAMP_GLOW_RADIUS * 2, 1),
         );
@@ -258,7 +258,7 @@ export function createLampActor(options: LampActorOptions): SceneActorFactory {
       for (let k = 0; k < pn; k++) {
         const l = lamps[poolIds[k]!]!;
         matrix.compose(
-          pos.set(l.poolX, 0.09, l.poolZ),
+          pos.set(l.poolX - originX, 0.09, l.poolZ - originZ),
           quat.identity(),
           scale.set(LAMP_POOL_RADIUS, 1, LAMP_POOL_RADIUS),
         );
@@ -274,7 +274,6 @@ export function createLampActor(options: LampActorOptions): SceneActorFactory {
       id: 'living-city:lamps',
       object: group,
       update: (frame: ActorFrame): boolean => {
-        void frame;
         const snap = options.read();
         const version = snap && snap.length >= VSNAP_HEADER ? (snap[VSNAP.version] ?? 0) : -1;
         const env = readEnvSection(snap, envSectionOffset(snap), snap && snap.length >= VSNAP_HEADER ? (snap[VSNAP.simTime] ?? 0) : 0);
@@ -286,7 +285,7 @@ export function createLampActor(options: LampActorOptions): SceneActorFactory {
         }
         const f = options.focus?.() ?? null;
         const moved = f !== null && (!Number.isFinite(lastFocusX) || Math.hypot(f.x - lastFocusX, f.z - lastFocusZ) > TREE_REFRESH_METRES);
-        if (moved && f) refreshFocus(f.x, f.z);
+        if ((moved && f) || frame.originChanged === true) refreshFocus(f?.x ?? lastFocusX, f?.z ?? lastFocusZ, frame.originX ?? 0, frame.originZ ?? 0);
         const versionChanged = version !== lastVersion;
         if (versionChanged) lastVersion = version;
         return versionChanged || moved;

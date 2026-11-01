@@ -3,7 +3,7 @@ import { starterBloodlines } from '@acme/content/starters';
 import { AdoptMonRequestSchema, CareStateSchema, EggRecordSchema } from '@acme/core/schemas';
 import type { AdoptMonRequest, CareState, EvolutionNode, MonInstance } from '@acme/core/types';
 import { deriveMonGender, deriveMonInstanceId, deriveVoiceLineageId, mintMonInstance } from '@acme/core/sim';
-import { createLocalReq } from 'payload';
+import { createPayloadRequest } from 'payload';
 import type { Payload, PayloadRequest, User } from 'payload';
 import type {} from '../../../payload-types.ts';
 import { CARE_STATES_SLUG, parseLastSeqByDevice, toCareState } from '../../../collections/CareStates.ts';
@@ -47,12 +47,12 @@ export interface AdoptMonDeps {
   readonly serviceKey?: string;
   /** Per-Caller limiter; returns false once the Caller is over budget. */
   readonly rateLimit: (callerId: string) => boolean;
-  /** Builds the request the Local API calls share (one transaction). Defaults to `createLocalReq`. */
+  /** Builds the request the Local API calls share (one transaction). Defaults to `createPayloadRequest`. */
   readonly makeReq?: (payload: Payload, user: Record<string, unknown>, request: Request) => Promise<PayloadRequest>;
 }
 
 async function defaultMakeReq(payload: Payload, user: Record<string, unknown>, request: Request): Promise<PayloadRequest> {
-  return createLocalReq({ user: user as unknown as User, req: { headers: request.headers } as Partial<PayloadRequest> }, payload);
+  return createPayloadRequest({ user: user as unknown as User, req: { headers: request.headers } as Partial<PayloadRequest>, payload });
 }
 
 function findNode(node: EvolutionNode, speciesId: string): EvolutionNode | undefined {
@@ -79,7 +79,7 @@ export function adoptRuleViolation(input: AdoptMonRequest, nowMs: number): strin
   if (form === undefined || form.stage !== mon.stage || mon.stage === 'Egg') {
     return `${mon.speciesId} at stage ${mon.stage} is not a form this egg grows into.`;
   }
-  if (mon.gender !== null && mon.gender !== deriveMonGender(egg.eggId)) return 'gender is not the egg-derived gender.';
+  if (mon.gender !== null && mon.gender !== deriveMonGender(egg.eggId, egg.speciesId)) return 'gender is not the egg-derived gender.';
   if (mon.voiceLineageId !== null && mon.voiceLineageId !== deriveVoiceLineageId(egg)) {
     return 'voiceLineageId is not the egg-derived voice lineage.';
   }
