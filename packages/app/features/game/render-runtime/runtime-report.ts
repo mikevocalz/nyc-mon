@@ -56,12 +56,13 @@ export function describeRuntimeError(where: string, error: unknown): string {
 /**
  * three.js reads the frame loop through `self`: Renderer.init() builds an
  * Animation whose `_context` is `typeof self !== 'undefined' ? self : null`
- * and then calls `_context.requestAnimationFrame` (three r186,
- * renderers/common/Animation.js). React Native defines `self` in
+ * and calls `_context.requestAnimationFrame` when Animation starts. In r186
+ * that happened during init; r187 defers it until rendering or setAnimationLoop.
+ * React Native defines `self` in
  * setUpGlobals.js, but that runs from InitializeCore, which a worklet runtime
  * never runs (worklets' ScriptLoader intercepts Metro's entry points). With
- * `self` undefined the call throws inside init()'s async promise executor:
- * the rejection is unhandled and `init()` never settles, so the city is never
+ * `self` undefined in r186 the call threw inside init()'s async promise executor:
+ * the rejection was unhandled and `init()` never settled, so the city was never
  * built and no milestone after `requested` ever arrives.
  *
  * This aliases `self` to the runtime's global, as setUpGlobals.js does on the

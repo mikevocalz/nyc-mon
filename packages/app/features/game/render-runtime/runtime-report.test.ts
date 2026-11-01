@@ -75,11 +75,10 @@ test('installFrameGlobals aliases self once and never replaces an existing one',
   assert.equal(browserLike.self, 'window');
 });
 
-// The stall seen on the Surface Duo, reproduced against the installed three:
-// on a runtime with requestAnimationFrame but no `self` (a worklet runtime),
-// Renderer.init() never settles. With the alias it resolves. Each case runs
-// in its own node process so the missing `self` and the unhandled rejection
-// stay out of this one.
+// r186 stalled during init without `self`; r187 defers starting Animation
+// until rendering or setAnimationLoop. Keep the installed-version contract:
+// init settles, but a worklet still needs the alias before its frame loop starts.
+// Isolate globals in subprocesses and exercise the public animation API.
 const initProbe = (aliasSelf: boolean) => `
 const THREE = await import(${JSON.stringify(import.meta.resolve('three/webgpu'))});
 globalThis.requestAnimationFrame = (cb) => setTimeout(() => cb(performance.now()), 16);
@@ -98,22 +97,28 @@ const outcome = await Promise.race([
   renderer.init().then(() => 'resolved', (e) => 'rejected ' + e),
   new Promise((r) => setTimeout(() => r('pending'), 500)),
 ]);
+let animation = '';
+if (outcome === 'resolved') {
+  try { await renderer.setAnimationLoop(() => {}); animation = 'started'; }
+  catch (error) { animation = String(error); }
+}
 renderer._animation?.stop?.();
-console.log(JSON.stringify({ outcome, unhandled }));
+console.log(JSON.stringify({ outcome, unhandled, animation }));
 process.exit(0);
 `;
-const runProbe = (aliasSelf: boolean): { outcome: string; unhandled: string } => {
+const runProbe = (aliasSelf: boolean): { outcome: string; unhandled: string; animation: string } => {
   const result = spawnSync(process.execPath, ['--input-type=module', '-e', initProbe(aliasSelf)], { encoding: 'utf8', timeout: 20_000 });
   assert.equal(result.status, 0, result.stderr);
   return JSON.parse(result.stdout.trim().split('\n').at(-1) ?? '{}');
 };
 
-test('three Renderer.init() hangs silently without self, the stall the Duo showed', () => {
-  const { outcome, unhandled } = runProbe(false);
-  assert.equal(outcome, 'pending');
-  assert.match(unhandled, /reading 'requestAnimationFrame'/);
+test('three init settles without self but its animation loop requires a frame context', () => {
+  const { outcome, unhandled, animation } = runProbe(false);
+  assert.equal(outcome, 'resolved');
+  assert.equal(unhandled, '');
+  assert.match(animation, /reading 'requestAnimationFrame'/);
 });
 
-test('three Renderer.init() resolves once self is aliased', () => {
-  assert.deepEqual(runProbe(true), { outcome: 'resolved', unhandled: '' });
+test('three init and animation loop work once self is aliased', () => {
+  assert.deepEqual(runProbe(true), { outcome: 'resolved', unhandled: '', animation: 'started' });
 });
