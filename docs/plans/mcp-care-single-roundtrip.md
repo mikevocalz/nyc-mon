@@ -25,14 +25,22 @@ Measured against a stub `/v1` with 150 ms latency, `feed_mon` takes 308 ms p50 a
 
 ## Proposed change
 
-- The PUT accepts an optional Mon selector (the Caller's active Mon when no id is given). It applies the action with `applyCareAction` on the server and returns `{ applied, declinedBecause?, mon, care }`.
+This remains a deferred plan, not permission to deploy or run live mutations. Preserve the accepted [MCP care-call contract](https://github.com/mikevocalz/nyc-mon/blob/main/docs/nvidia/decisions/mcp-care-contract.md) recorded on 2026-10-28:
+
+- Applied MCP result: `{ applied: true, effect, mon, care, mood }`, with `isError` absent.
+- Declined MCP result: `{ applied: false, declinedBecause, mon, care, mood }`, with `isError` absent and no write.
+- Tool failure: `isError: true` and `{ error: { reason, message, nextStep } }`. After a dropped write, re-read before claiming that nothing changed.
+- Preserve existing optional speech fields and the `CareResultOutput` schema. The MCP UI uses `effect` for live-region copy; the live proof requires both `applied: true` and an independently observed `lastFedAt` advance.
+
+- The PUT accepts an optional Mon selector (the Caller's active Mon when no id is given). It applies the action with `applyCareAction` on the server and returns the authoritative outcome and state needed to produce the complete MCP result above, including `effect` on application and `mood` on both application and decline.
 - A decline writes nothing and returns `applied: false`, so the MCP server no longer needs its own prediction step.
 - `runCare` makes one call. Keep the existing idempotency key, so a retry still replays.
 - One shared deadline of about 450 ms for the whole tool call instead of 400 ms per request.
 
 ## Steps
 
-- [ ] Measure against the real database first (deploy PR #14, run `alexa-live-smoke.yml`, read `live.json`). Stop here if p95 is comfortably under 500 ms and record the numbers in the status section above.
+- [ ] Obtain authorized live baseline measurements first: care read p50/p95, care write p50/p95, complete care-tool p50/p95, full turn latency, and duplicate/retry behaviour. Use repeated samples or an existing percentile source; a single `live.json` sample cannot decide this gate. Stop here if p95 is comfortably under 500 ms and record the numbers in the status section above.
 - [ ] `/v1`: Mon selector, server-side decline, and the response shape above, with tests.
 - [ ] MCP server: single-call `runCare`, shared deadline, tests for decline, applied, replay and timeout.
-- [ ] Re-measure.
+- [ ] Run `packages/web-sim/test/toolOutcome.test.ts` and the MCP care tests unchanged; verify applied, declined, failed, idempotent replay and dropped-write outcomes.
+- [ ] Re-measure with the same baseline method and show before/after latency.
