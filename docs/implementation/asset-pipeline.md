@@ -45,8 +45,10 @@ the repo actually has, with the verified bits marked.
    `tooling/assets/lod.mjs` (index-only decimation, sha256-pinned manifest;
    bake tier names near/mid/far, `mid` = descriptor `medium`) +
    `tooling/assets/lod.test.mjs`.
-2. Asset manifest writer + R2 publish lane for GLB geometry, or a deliberate
-   decision to keep GLB assets on Bunny — record the choice here.
+2. Asset manifest writer + publish lane for GLB geometry — **decided
+   2026-10-31: Bunny CDN via the Payload staged-upload path** (the mon-models
+   `_staging` flow + `beforeChange` gate), not a new R2 lane. Next slice: a
+   manifest writer + Payload collection shape for general assets.
 3. KTX2: platform verdict done (see stage row). Next steps: populate
    `requiredFeatures` from `adapter.features` in `gpu-store.ts:51` /
    `acquire-device.ts:56`, wire `setKTX2Loader` on the three GLTFLoader sites,

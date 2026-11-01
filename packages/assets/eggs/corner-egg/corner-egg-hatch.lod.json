@@ -1,0 +1,33 @@
+{
+  "input": {
+    "path": "packages/assets/eggs/corner-egg/corner-egg-hatch.glb",
+    "sha256": "e212c7a8da94f52b0a3ba33eaa8d38b1c0b86537110a144db2dbf7a00be00591",
+    "bytes": 4998988
+  },
+  "tiers": {
+    "near": {
+      "path": "corner-egg-hatch.near.glb",
+      "sha256": "ba7ef5463ff83e4920e66ae3f3ffb2e4faa3002068b92ddb54ba36215ac1bce3",
+      "bytes": 6836732,
+      "triangles": 152850,
+      "ratio": 1,
+      "simplifierMs": 0.1
+    },
+    "mid": {
+      "path": "corner-egg-hatch.mid.glb",
+      "sha256": "2dd3bb575a7e3d4205a77a19788386a61416644e5b2109b38322badedad32036",
+      "bytes": 5435444,
+      "triangles": 36079,
+      "ratio": 0.25,
+      "simplifierMs": 684.8
+    },
+    "far": {
+      "path": "corner-egg-hatch.far.glb",
+      "sha256": "69ef19b7872a146f82668cf3d40f6ae696be806b6bf24a80ec015a9d30902414",
+      "bytes": 5082104,
+      "triangles": 6638,
+      "ratio": 0.05,
+      "simplifierMs": 705.2
+    }
+  }
+}

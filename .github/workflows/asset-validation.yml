@@ -33,9 +33,17 @@ jobs:
       - name: Validate every committed GLB under packages/assets/eggs
         run: |
           shopt -s globstar nullglob
-          files=(packages/assets/eggs/**/*.glb)
-          echo "corpus: ${#files[@]} file(s)"
-          node tooling/assets/validate-glb.mjs "${files[@]}"
+          tiered=() plain=()
+          for f in packages/assets/eggs/**/*.glb; do
+            base="${f%.glb}"; base="${base%.near}"; base="${base%.mid}"; base="${base%.far}"
+            if [[ -f "${base}.lod.json" ]]; then tiered+=("$f"); else plain+=("$f"); fi
+          done
+          echo "corpus: $((${#tiered[@]} + ${#plain[@]})) file(s) — ${#tiered[@]} tier-documented"
+          # A GLB with a <name>.lod.json ships documented LOD tiers (lod.mjs);
+          # its near tier is deliberately full-res — relax only the tri cap,
+          # every other check still applies.
+          ((${#plain[@]})) && node tooling/assets/validate-glb.mjs "${plain[@]}"
+          ((${#tiered[@]})) && node tooling/assets/validate-glb.mjs --max-tris 500000 "${tiered[@]}"
       # lod.mjs decodes through meshoptimizer — needs the pnpm install above.
       - name: LOD bake roundtrip test
         run: node --test tooling/assets/lod.test.mjs
