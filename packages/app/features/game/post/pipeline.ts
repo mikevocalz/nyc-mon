@@ -47,6 +47,16 @@
 // same mount; there is never a second RenderPipeline. ACES and the output
 // conversion run once, in the pipeline's own renderOutput after the graph.
 // The legacy bloom/AO/FXAA/grade picks are not wired in that mode.
+//
+// The physical chain's upscale slot (EXPO_PUBLIC_WORLD_UPSCALE = fsr1|taau,
+// default off, docs/implementation/upscaling-eval.md): the scene pass
+// renders at `upscaleScale` and the pick resolves it to the output buffer,
+// so the chain keeps running once at output res. 'fsr1' adds only the two
+// FSR passes; 'taau' adds the velocity MRT output, the {samples:0} MSAA
+// opt-out and the pipeline's jitter ownership — and refuses to mount when
+// the camera already carries a live view offset (one temporal owner per
+// pipeline). While the slot is on, the render-scale controller drives
+// scenePass.setResolutionScale, never setPixelRatio (city-scene.ts).
 
 import type { Three } from '@acme/ui/three';
 import type { Node } from 'three/webgpu';
@@ -54,9 +64,14 @@ import { bloom } from 'three/examples/jsm/tsl/display/BloomNode.js';
 import { ssao } from 'three/examples/jsm/tsl/display/SSAONode.js';
 import { fxaa } from 'three/examples/jsm/tsl/display/FXAANode.js';
 import type { ssr } from 'three/examples/jsm/tsl/display/SSRNode.js';
-import { loadSsrNode } from '../physical-graph.ts';
+import { loadFsr1Node, loadSsrNode, loadTaauNode } from '../physical-graph.ts';
 import { parseSkyRigFlag } from '../world/sky-rig.ts';
-import { PHYSICAL_POST, type PhysicalGradeNumbers, type PhysicalPostSettings } from '../world/physical-look.ts';
+import {
+  PHYSICAL_POST,
+  type PhysicalGradeNumbers,
+  type PhysicalPostSettings,
+  type WorldUpscale,
+} from '../world/physical-look.ts';
 
 type RendererT = InstanceType<Three['WebGPURenderer']>;
 type SceneT = InstanceType<Three['Scene']>;
@@ -68,6 +83,8 @@ type BloomT = ReturnType<typeof bloom>;
 type SsaoT = ReturnType<typeof ssao>;
 type FxaaT = ReturnType<typeof fxaa>;
 type SsrT = ReturnType<typeof ssr>;
+type Fsr1T = ReturnType<typeof import('three/examples/jsm/tsl/display/FSR1Node.js').fsr1>;
+type TaauT = ReturnType<typeof import('three/examples/jsm/tsl/display/TAAUNode.js').taau>;
 
 /**
  * The pinned look constants — the Flying Roadster measured values from the
@@ -97,6 +114,14 @@ export const POST = {
   aoSamples: 12,
   /** AO render-target scale; SSAONode's own default, kept explicit as the tier knob. TODO(tune). */
   aoResolutionScale: 0.5,
+  /**
+   * The upscale slot's fallback scene-pass input scale — the eval's
+   * measured start (docs/implementation/upscaling-eval.md §6). The
+   * per-preset row (perf/tier-presets.ts upscaleScale) feeds it on the
+   * city path; this only fires for callers that set `upscale` without a
+   * scale.
+   */
+  upscaleInputScale: 0.5,
 } as const;
 
 /** The tone-mapping selector values accepted by EXPO_PUBLIC_WORLD_POST_TONEMAPPING. */
@@ -233,14 +258,26 @@ export interface PhysicalPostRequest {
   grade: boolean;
   /** scenePass.renderTarget.storeMultisampledColorBuffer = false. */
   msaaDiscard: boolean;
+  /**
+   * The upscale slot — EXPO_PUBLIC_WORLD_UPSCALE. 'fsr1': the scene pass
+   * renders at `upscaleScale` and fsr1 resolves it spatially (no temporal
+   * state, composes with MSAA). 'taau': the pass also drops MSAA
+   * ({samples:0} at construction) and gains a velocity MRT output, and
+   * taau claims the pipeline's jitter owner. null/unset: no stage.
+   */
+  upscale?: WorldUpscale | null;
+  /** Scene-pass input resolution scale for the upscale slot. Default POST.upscaleInputScale. */
+  upscaleScale?: number;
   settings: PhysicalPostSettings;
 }
 
 /** What the physical chain wired, and the per-preset look switch. */
 export interface PhysicalPostHandle {
-  applied: { mrt: boolean; ssr: boolean; bloom: boolean; grade: boolean; msaaDiscard: boolean };
+  applied: { mrt: boolean; ssr: boolean; bloom: boolean; grade: boolean; msaaDiscard: boolean; upscale: WorldUpscale | null };
   ssrNode: SsrT | null;
   bloomNode: BloomT | null;
+  /** The mounted upscaler; null with the slot off, or when 'taau' was refused by the temporal guard. */
+  upscaleNode: Fsr1T | TaauT | null;
   /** js/post-processing.js applyPreset: exposure, balance, contrast, saturation, bloom strength and threshold. */
   applyLook(look: PhysicalGradeNumbers): void;
 }
@@ -293,7 +330,11 @@ export function mountCityPostPipeline(THREE: Three, request: CityPostRequest): C
       };
 
   const T = THREE.TSL;
-  const scenePass = T.pass(scene, camera);
+  // TAAU's documented requirement is MSAA off on the beauty pass — the
+  // {samples:0} opt-out. PassNode re-derives renderTarget.samples from
+  // options.samples in setup(), so the opt-out must land at construction;
+  // stamping renderTarget.samples afterwards would be overwritten.
+  const scenePass = T.pass(scene, camera, physicalRequest?.upscale === 'taau' ? { samples: 0 } : undefined);
   if (physicalRequest) return mountPhysical(THREE, request, physicalRequest, options, applied, scenePass);
   // AO needs view-space normals — a second render-target output on the same
   // scene pass, so the geometry still renders once.
@@ -427,25 +468,73 @@ function mountPhysical(
   const P = PHYSICAL_POST;
   const settings = physical.settings;
 
+  // The upscale slot (EXPO_PUBLIC_WORLD_UPSCALE). One temporal owner per
+  // pipeline: 'taau' claims renderPipelineState.viewOffsetOwner for the
+  // jitter — if the camera already carries a live view offset, another
+  // temporal system owns it and a stacked TAAU would resolve against a
+  // jitter it never applied. Refuse the stage, loudly (upscaling-eval §4).
+  let upscale = physical.upscale ?? null;
+  const liveView = (camera as unknown as { view?: { enabled?: boolean } | null }).view;
+  if (upscale === 'taau' && liveView != null && liveView.enabled === true) {
+    globalThis.console?.error?.(
+      '[NYC-Mon/post] EXPO_PUBLIC_WORLD_UPSCALE=taau refused: the camera already has a live view offset — only one temporal jitter owner may exist in a pipeline',
+    );
+    upscale = null;
+  }
+
   // The multisampled colour attachments only need resolving, never storing;
   // the multisampled depth stays stored because SSR reads it.
   if (physical.msaaDiscard) scenePass.renderTarget.storeMultisampledColorBuffer = false;
 
   const wireSsr = physical.mrt && physical.ssr && settings.ssr !== null;
-  if (physical.mrt) {
-    // Metalness fades out from 180 to 360 m; SSR skips roughness >= 0.75.
-    const ssrFade = T.float(1).sub(T.smoothstep(P.ssrFadeNear, P.ssrFadeFar, T.positionView.z.negate()));
-    const sceneMRT = T.mrt({
-      output: T.output,
-      normal: T.normalView,
-      metalRough: T.vec2(T.roughness.lessThan(P.maxSsrRoughness).select(T.metalness.mul(ssrFade), 0), T.roughness),
-    });
-    sceneMRT.setBlendMode('normal', new THREE.BlendMode(THREE.MaterialBlending));
-    sceneMRT.setBlendMode('metalRough', new THREE.BlendMode(THREE.MaterialBlending));
+  if (physical.mrt || upscale === 'taau') {
+    const mrtOutputs: { [name: string]: Node } = { output: T.output };
+    if (physical.mrt) {
+      // Metalness fades out from 180 to 360 m; SSR skips roughness >= 0.75.
+      const ssrFade = T.float(1).sub(T.smoothstep(P.ssrFadeNear, P.ssrFadeFar, T.positionView.z.negate()));
+      mrtOutputs.normal = T.normalView;
+      mrtOutputs.metalRough = T.vec2(T.roughness.lessThan(P.maxSsrRoughness).select(T.metalness.mul(ssrFade), 0), T.roughness);
+    }
+    if (upscale === 'taau') {
+      // The velocity attachment is TAAU's third input — and the wiring cost:
+      // it flips every render object to a per-frame FULL refresh
+      // (NodeMaterialObserver.needsVelocity), the eval's Duo disqualifier.
+      mrtOutputs.velocity = T.velocity;
+    }
+    const sceneMRT = T.mrt(mrtOutputs);
+    if (physical.mrt) {
+      sceneMRT.setBlendMode('normal', new THREE.BlendMode(THREE.MaterialBlending));
+      sceneMRT.setBlendMode('metalRough', new THREE.BlendMode(THREE.MaterialBlending));
+    }
     scenePass.setMRT(sceneMRT);
   }
 
-  const sceneColor = scenePass.getTextureNode('output') as Node<'vec4'>;
+  let sceneColor = scenePass.getTextureNode('output') as Node<'vec4'>;
+  let upscaleNode: Fsr1T | TaauT | null = null;
+  if (upscale !== null) {
+    // The scene pass renders below output res and the pick resolves it back,
+    // so SSR/bloom/grade/ACES keep running once, at output res, on the
+    // resolved image (upscaling-eval §8). 'fsr1' is the spatial pick — no
+    // velocity, no history, no jitter owner; 'taau' is temporal and gets
+    // its velocity MRT above plus the MSAA opt-out at pass construction.
+    scenePass.setResolutionScale(physical.upscaleScale ?? POST.upscaleInputScale);
+    if (upscale === 'taau') {
+      const taauNode = loadTaauNode().taau(
+        scenePass.getTextureNode('output'),
+        scenePass.getTextureNode('depth'),
+        scenePass.getTextureNode('velocity'),
+        camera,
+      );
+      upscaleNode = taauNode;
+      sceneColor = taauNode.getTextureNode() as Node<'vec4'>;
+    } else {
+      const fsrNode = loadFsr1Node().fsr1(sceneColor);
+      upscaleNode = fsrNode;
+      // FSR1Node.getTextureNode exists at runtime but is missing from the
+      // @types/three declaration (same gap as TRAANode's).
+      sceneColor = (fsrNode as unknown as { getTextureNode(): Node<'vec4'> }).getTextureNode();
+    }
+  }
   let reflections: Node<'vec3'> | null = null;
   let ssrNode: SsrT | null = null;
   if (wireSsr && settings.ssr) {
@@ -537,9 +626,11 @@ function mountPhysical(
       bloom: bloomNode !== null,
       grade: physical.grade,
       msaaDiscard: physical.msaaDiscard,
+      upscale,
     },
     ssrNode,
     bloomNode,
+    upscaleNode,
     applyLook(look) {
       exposure.value = look.exposure;
       contrast.value = look.contrast;
@@ -569,6 +660,7 @@ function mountPhysical(
       renderer.toneMappingExposure = priorExposure;
       ssrNode?.dispose();
       bloomNode?.dispose();
+      upscaleNode?.dispose();
       scenePass.dispose();
       pipeline.dispose();
     },

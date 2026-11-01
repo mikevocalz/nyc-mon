@@ -27,6 +27,8 @@ import '../classic-flags.test-support.ts';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import * as THREE from 'three/webgpu';
+import { mountCityPostPipeline } from './pipeline.ts';
+import { PHYSICAL_GRADE, parseWorldUpscale, physicalFeaturesFor, type PhysicalPostSettings } from '../world/physical-look.ts';
 
 type GpuRecord = {
   shaders: string[];
@@ -229,4 +231,137 @@ test('FSR1 upscales without velocity, MRT or a jitter owner', async () => {
     renderPipelines: record.renderPipelines,
     fsrTargets: fsrTargets.map((t) => `${t.label}:${t.width}x${t.height}`),
   }));
+});
+
+// ---- Phase 4 slice 3: the EXPO_PUBLIC_WORLD_UPSCALE slot ------------------
+//
+// The same harness through the real mount — mountCityPostPipeline with
+// request.physical.upscale (post/pipeline.ts mountPhysical): flag parsing,
+// the stage truth table, TAAU's documented invariants on the pass itself,
+// the temporal-exclusivity guard, and the flag-off byte-identical claim.
+
+const minimalSettings = (): PhysicalPostSettings => ({
+  look: PHYSICAL_GRADE.twilight,
+  ssr: null,
+  bloomResolutionScale: 0.5,
+});
+
+const barePhysical = (upscale: 'fsr1' | 'taau' | null = null) => ({
+  mrt: false,
+  ssr: false,
+  bloom: false,
+  grade: false,
+  msaaDiscard: false,
+  upscale,
+  upscaleScale: 0.5,
+  settings: minimalSettings(),
+});
+
+test('flag parsing: fsr1 and taau are the only picks, injected into the full stack only', () => {
+  assert.equal(parseWorldUpscale('fsr1'), 'fsr1');
+  assert.equal(parseWorldUpscale(' TAAU '), 'taau');
+  assert.equal(parseWorldUpscale(undefined), null);
+  assert.equal(parseWorldUpscale('1'), null, 'a truthy-flag value is not a pick — the selector names the stage');
+  assert.equal(parseWorldUpscale('off'), null);
+  // The features field: the full stack takes the pick, a probe keeps null
+  // (one feature per probe), and the master flag off is today's path.
+  assert.equal(physicalFeaturesFor(true, null, false, 'fsr1')?.upscale, 'fsr1');
+  assert.equal(physicalFeaturesFor(true, 'ssr', false, 'taau')?.upscale, null, 'a probe isolates one feature');
+  assert.equal(physicalFeaturesFor(false, null, true, 'taau'), null);
+  process.env.EXPO_PUBLIC_WORLD_DROP = 'upscale';
+  try {
+    assert.equal(physicalFeaturesFor(true, null, true, 'taau')?.upscale, null, 'WORLD_DROP sheds the slot');
+  } finally {
+    delete process.env.EXPO_PUBLIC_WORLD_DROP;
+  }
+});
+
+test('flag off: the mounted chain is byte-identical — no stage, scale 1, inherited samples', async () => {
+  const { renderer } = await makeRenderer();
+  const scene = smallScene();
+  const cam = camera();
+  const post = mountCityPostPipeline(THREE, { renderer, scene, camera: cam, physical: barePhysical() });
+  assert.deepEqual(post.physical!.applied, {
+    mrt: false, ssr: false, bloom: false, grade: false, msaaDiscard: false, upscale: null,
+  });
+  assert.equal(post.physical!.upscaleNode, null);
+  assert.equal(post.scenePass.getResolutionScale(), 1, 'the pass keeps full input resolution');
+  assert.equal(post.scenePass.renderTarget.samples, renderer.samples, 'the pass inherits renderer.samples');
+  assert.equal(
+    post.pipeline.outputNode,
+    post.scenePass.getTextureNode('output'),
+    'the output is the bare scene texture — zero stage diff from today',
+  );
+  post.dispose();
+});
+
+test('fsr1 through the mount: attaches only under the pick, keeps MSAA, claims no jitter owner', async () => {
+  const { renderer, record } = await makeRenderer();
+  const scene = smallScene();
+  const cam = camera();
+  const post = mountCityPostPipeline(THREE, { renderer, scene, camera: cam, physical: barePhysical('fsr1') });
+  assert.equal(post.physical!.applied.upscale, 'fsr1');
+  assert.ok(post.physical!.upscaleNode, 'the FSR1 stage is mounted');
+  assert.equal(post.scenePass.getResolutionScale(), 0.5);
+  assert.equal(post.scenePass.renderTarget.samples, renderer.samples, 'FSR1 composes with MSAA — no opt-out');
+  renderer.render(scene, cam);
+  renderer.render(scene, cam);
+  const state = (post.pipeline as unknown as PipelineInternals)._contextData.renderPipelineState;
+  assert.equal(state.viewOffsetOwner, null, 'FSR1 claims no temporal owner');
+  assert.equal(post.scenePass.renderTarget.texture.width, 160, 'the scene pass rendered at half input res');
+  assert.equal(post.scenePass.renderTarget.textures.length, 1, 'no velocity attachment');
+  assert.ok(
+    record.textures.some((t) => t.label.includes('FSR1Node')),
+    `EASU/RCAS targets allocated: ${record.textures.map((t) => t.label).join(', ')}`,
+  );
+  post.dispose();
+});
+
+test('taau through the mount: velocity MRT, samples 0, jitter owner claimed', async () => {
+  const { renderer } = await makeRenderer();
+  const scene = smallScene();
+  const cam = camera();
+  const post = mountCityPostPipeline(THREE, { renderer, scene, camera: cam, physical: barePhysical('taau') });
+  assert.equal(post.physical!.applied.upscale, 'taau');
+  assert.ok(post.physical!.upscaleNode, 'the TAAU stage is mounted');
+  // The documented requirements, through the real mount: the {samples:0}
+  // opt-out landed at pass construction (setup() re-reads options.samples),
+  // and the velocity attachment joined the scene pass's MRT even without
+  // the SSR mrt request.
+  assert.equal(post.scenePass.renderTarget.samples, 0, 'the MSAA opt-out is on the pass target');
+  const mrt = (post.scenePass as unknown as { _mrt: { outputNodes: Record<string, unknown> } })._mrt;
+  assert.deepEqual(Object.keys(mrt.outputNodes).sort(), ['output', 'velocity'], 'velocity joined without the SSR MRT');
+  renderer.render(scene, cam);
+  renderer.render(scene, cam);
+  const state = (post.pipeline as unknown as PipelineInternals)._contextData.renderPipelineState;
+  assert.equal(state.viewOffsetOwner, post.physical!.upscaleNode, 'TAAU owns the pipeline jitter seam');
+  assert.equal(post.scenePass.renderTarget.textures.length, 2, 'output + velocity attachments');
+  assert.equal(post.scenePass.renderTarget.texture.width, 160, 'input at half res, history at output res');
+  post.dispose();
+});
+
+test('the temporal guard: a live camera view offset refuses taau with a clear error', async () => {
+  const { renderer } = await makeRenderer();
+  const scene = smallScene();
+  const cam = camera();
+  // Another temporal system got the jitter seam first.
+  cam.view = { enabled: true, fullWidth: 320, fullHeight: 240, offsetX: 0, offsetY: 0, width: 320, height: 240 };
+  const errors: string[] = [];
+  const originalError = console.error;
+  console.error = (...args: unknown[]) => {
+    errors.push(String(args[0]));
+  };
+  try {
+    const post = mountCityPostPipeline(THREE, { renderer, scene, camera: cam, physical: barePhysical('taau') });
+    assert.equal(post.physical!.applied.upscale, null, 'the stage is refused');
+    assert.equal(post.physical!.upscaleNode, null);
+    assert.equal(post.scenePass.getResolutionScale(), 1, 'the refused stage leaves the input scale alone');
+    assert.ok(
+      errors.some((e) => e.includes('WORLD_UPSCALE=taau')),
+      `expected a refusal error, got: ${errors.join(' | ')}`,
+    );
+    post.dispose();
+  } finally {
+    console.error = originalError;
+  }
 });

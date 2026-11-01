@@ -77,6 +77,14 @@ export interface WorldPreset {
   /** Cap on the physical bloom chain's resolution scale. */
   readonly bloomResolutionScale: number;
   /**
+   * The upscale slot's scene-pass input scale (EXPO_PUBLIC_WORLD_UPSCALE):
+   * the pass renders at this share of the output buffer and the pick
+   * resolves it back. 0.5 is the eval's measured start on the recording
+   * device (docs/implementation/upscaling-eval.md §6); every row is
+   * TODO(device) until the iPad/web pass retunes it.
+   */
+  readonly upscaleScale: number;
+  /**
    * The vd port's own budgets (world/vd-port), outside `budget`: the blocks' near level (cells/cell-stream.ts external
    * layer budget) and the resident vertices of lane C's streamed structures (vk, pk, lk).
    */
@@ -113,6 +121,8 @@ export const WORLD_PRESETS: Readonly<Record<WorldPresetName, WorldPreset>> = {
     shadowTile: 2048,
     // Bloom's first level is 3 rgba16float targets at the scale (11.2 MB each at 0.5 of 2732 x 2048).
     bloomResolutionScale: 0.35,
+    // TAAU at 0.5 costs ~80-90 MB of history/velocity on this tier's capped buffer (eval §5).
+    upscaleScale: 0.5,
     // The blocks' near level held to 350k triangles on the A12X until a device measurement says otherwise: the lite cells
     // (Valdrada's near mesh simplified to 10 cm, 2 cm on the heroes) inside a third of the high tier's reach. Walk peak
     // (cell-stream.walk.test.ts) 305k triangles, no refused load. Lane C's structures 250k vertices (structures.test.ts).
@@ -135,6 +145,7 @@ export const WORLD_PRESETS: Readonly<Record<WorldPresetName, WorldPreset>> = {
     fadeS: 0.45,
     shadowTile: 2048,
     bloomResolutionScale: 0.5,
+    upscaleScale: 0.5,
     vdPort: { blocksNear: { geometryBytes: 24 * MiB, cellDraws: 12, triangles: 350_000, errorM: 0.03, level: 'lite' }, structureVertices: 250_000,
       far: { geometryBytes: 64 * MiB, cellDraws: 160, triangles: 1_200_000 },
       gen: { geometryBytes: 4 * MiB, cellDraws: 48, triangles: 60_000 } },
@@ -150,6 +161,7 @@ export const WORLD_PRESETS: Readonly<Record<WorldPresetName, WorldPreset>> = {
     fadeS: 0.45,
     shadowTile: 3072,
     bloomResolutionScale: 0.5,
+    upscaleScale: 0.5,
     vdPort: { blocksNear: { geometryBytes: 256 * MiB, cellDraws: 64, triangles: 4_000_000, errorM: 0.09, level: 'near' }, structureVertices: 2_000_000,
       // 'high' holds every chunk inside the 13 km macro radius (289 chunks, ~294 MB of quantized geometry)
       far: { geometryBytes: 384 * MiB, cellDraws: 512, triangles: 6_000_000 },

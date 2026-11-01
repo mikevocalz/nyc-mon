@@ -219,6 +219,8 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
           bloom: physical.bloom,
           grade: physical.grade,
           msaaDiscard: physical.msaaDiscard,
+          upscale: physical.upscale,
+          upscaleScale: preset.upscaleScale,
           settings: {
             look: PHYSICAL_PRESETS[rig?.preset ?? DEFAULT_PHYSICAL_PRESET].grade,
             ssr: physicalTier.ssr,
@@ -246,13 +248,34 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
   // the pipeline sizes its own targets, so the vd lane leaves the physical
   // path's scale as it was. An explicit EXPO_PUBLIC_WORLD_RENDER_SCALE=0
   // still turns it off.
+  //
+  // The upscale slot and the pixel-ratio scale path are mutually exclusive
+  // mechanisms (upscaling-eval §4): under EXPO_PUBLIC_WORLD_UPSCALE the
+  // dynamic knob is the scene pass's setResolutionScale — input-only, so
+  // the output buffer (and TAAU's history targets) stays fixed — and the
+  // controller must never drive setPixelRatio. The adapter's base ratio is
+  // 1, so `base × scale` lands on the pass as the bare scale.
+  const upscalePass = physical?.upscale != null ? (post?.scenePass ?? null) : null;
   const renderScaleEnv = process.env.EXPO_PUBLIC_WORLD_RENDER_SCALE;
   const renderScaleOff =
     renderScaleEnv != null && renderScaleEnv.trim() !== '' && !parseSkyRigFlag(renderScaleEnv);
   const renderScale =
     renderer && !renderScaleOff && (EXPERIMENTAL_WORLD_RENDER_SCALE || (VD_LANE && physical === null))
-      ? mountRenderScale(renderer, (bundle ?? tierBundle(WORLD_TIER)).scale)
+      ? upscalePass
+        ? mountRenderScale(
+            {
+              getPixelRatio: () => 1,
+              setPixelRatio: (v: number) => upscalePass.setResolutionScale(v),
+            },
+            { ...(bundle ?? tierBundle(WORLD_TIER)).scale, startScale: upscalePass.getResolutionScale() },
+          )
+        : mountRenderScale(renderer, (bundle ?? tierBundle(WORLD_TIER)).scale)
       : null;
+  if (renderScale && upscalePass) {
+    console.info(
+      '[NYC-Mon/perf] render scale drives the scene pass setResolutionScale — EXPO_PUBLIC_WORLD_UPSCALE owns the output buffer',
+    );
+  }
   // Last consumed thermalSignal sample — the monitor (perf/thermal.ts,
   // flag-gated) bumps seq on each poll; a move to a worse level forces a
   // render-scale down-step so the tier drops before the device throttles.
@@ -390,7 +413,9 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
       // Frame pacing for the scale controller: the interval between these
       // calls is the draw cadence — JS submission pacing, not GPU or UI
       // thread time (perf/render-scale.ts header says what it is not).
-      renderScale?.frame(now, frame.pixelRatio);
+      // Under the upscale slot the adapter's base ratio is 1, so the
+      // controller's output lands on setResolutionScale as the bare scale.
+      renderScale?.frame(now, upscalePass ? 1 : frame.pixelRatio);
       // PR09: adaptive living-city crowd caps — once the controller has
       // surrendered real fill rate, thin the ambient population one tier
       // (living-city/bundled-host.ts owns the marks; one-way). The bridge

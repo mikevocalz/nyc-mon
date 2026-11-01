@@ -1,6 +1,8 @@
 # Upscaling evaluation — Phase 4 (PR 4), slice 2
 
-Status: evaluation only. No runtime change beyond a committed host test, no
+Status: implemented in slice 3 behind `EXPO_PUBLIC_WORLD_UPSCALE` — see
+§9 "What slice 3 wired" at the end. Evaluation below is unchanged. No
+runtime change beyond a committed host test, no
 commit. Measured against the installed, patched `three@0.187.0` (patch hash
 `605a4c87…`; the patch does not touch `examples/jsm/tsl/` or
 `examples/jsm/postprocessing/`). Evidence is host-side on the recording
@@ -281,3 +283,82 @@ author calls TAAU's flicker a problem on good hardware.
 - `docs/performance/*`: iPad + Duo baselines before any merge. No device was
   attached for this eval (`adb devices` empty, iPhone paired but unreachable)
   — every device claim above is explicitly pending.
+
+## 9. What slice 3 wired (implementation)
+
+**Flag**: `EXPO_PUBLIC_WORLD_UPSCALE = fsr1 | taau`, unset/anything-else =
+off, default off. `parseWorldUpscale` + `WORLD_UPSCALE`
+(`world/physical-look.ts`) parse it like the other selectors — it is a pick,
+not a truthy flag: `=1` mounts nothing. The pick lands on
+`PhysicalFeatures.upscale` inside `physicalFeaturesFor` only for the full
+stack — a probe keeps `null` (one feature per probe) and
+`EXPO_PUBLIC_WORLD_DROP=upscale` sheds it like any feature.
+
+**The mount** (`post/pipeline.ts`, inside `mountPhysical`, one seam as §8
+prescribes): `PhysicalPostRequest.upscale` + `upscaleScale`. The scene pass
+renders at the input scale and the pick's resolved texture replaces
+`sceneColor`, so SSR/bloom/grade/ACES keep running once, at output res, on
+the resolved image. Dispose frees the node next to `ssrNode`/`bloomNode`;
+`physical.applied.upscale` and `physical.upscaleNode` are the truth table.
+
+- **fsr1**: `fsr1(sceneColor)` → `getTextureNode()` (runtime method the
+  @types declaration misses, same gap as TRAANode's). No MRT change, no
+  MSAA change — the pass keeps `renderer.samples`. Lazy-loaded via
+  `loadFsr1Node()` so a flag-off build never evaluates the module.
+- **taau**: `{samples:0}` is passed at `pass()` construction — PassNode
+  re-derives `renderTarget.samples` from `options.samples` in `setup()`, so
+  stamping the target afterwards would be overwritten (the "plumbing"
+  option §8 named); `velocity: T.velocity` joins the scene MRT whether or
+  not the SSR `mrt` stage is on (velocity-only MRT `{output, velocity}`);
+  `taau(output, depth, velocity, camera)` → `getTextureNode()`. Lazy-loaded
+  via `loadTaauNode()`.
+- **Input scale**: `perf/tier-presets.ts` gains `WorldPreset.upscaleScale`
+  (0.5 on all three rows — the eval's measured start, every row
+  TODO(device)); `PhysicalPostRequest.upscaleScale` overrides it, and
+  `POST.upscaleInputScale` is the fallback when neither is given.
+
+**Conflict guards** (§4):
+
+- *renderScale → setResolutionScale*: under the upscale slot the
+  render-scale controller is mounted against a `setResolutionScale`
+  adapter, never `setPixelRatio` — input-only scaling keeps the output
+  buffer and TAAU's history stable (city-scene.ts). The adapter's base
+  ratio is 1 so `base × scale` lands as the bare scale, and the controller
+  starts from the pass's own `getResolutionScale()`. One `[NYC-Mon/perf]`
+  line logs the routing. `EXPO_PUBLIC_WORLD_RENDER_SCALE=0` still wins.
+- *one temporal owner*: `taau` refuses to mount (console.error, stage
+  skipped — the chain still runs without it) when the camera already
+  carries a live `view` offset — another system owns the jitter seam and a
+  stacked TAAU would resolve against a jitter it never applied. Inside the
+  mount only one temporal node is ever wired, so `viewOffsetOwner` is
+  structurally single-owner.
+- *flag off = zero diff*: `T.pass(scene, camera, undefined)` is the
+  identical constructor call, no MRT key is added, no node loads, and the
+  truth-table test asserts `outputNode === scenePass.getTextureNode(
+  'output')` — byte-identical to before the slot existed.
+
+**Tests**: `post/temporal-upscale.test.ts` (now 9 tests) adds the
+mount-level pins on the recording device: flag parsing and the features
+injection, flag-off byte-identity, `fsr1` attaches only under the pick
+(MSAA inherited, no jitter owner, half-res input, no velocity attachment),
+`taau` attaches only under the pick (samples 0, `{output, velocity}` MRT,
+`viewOffsetOwner === upscaleNode`, 160×120 input / 320×240 output), and the
+guard fires. `post/pipeline.physical.test.ts` assertions gained
+`upscale: null` in the applied table.
+
+**Still device-pending** (unchanged from the eval): every quality and cost
+judgement — velocity FULL-refresh JS cost, the `positionNode` velocity gap
+ghosting cars/trees/weather under `taau`, WGSL validity under Dawn,
+resolve-pass bandwidth, the per-preset input scales, and whether FSR1 pays
+at all where we are encode-bound. The `positionPrevious` channel for the
+custom instancing remains the follow-up slice before `taau` can ship
+unflagged; `EXPO_PUBLIC_WORLD_UPSCALE` stays an experiment flag.
+
+## Also in slice 3: the meshlet hazard hunk
+
+`patches/three@0.187.0.patch` gained a ninth hunk (new lockfile patch hash
+`48996c59…`): `MeshletDrawingPipeline.js`'s `isSupportedObject` now rejects
+`geometry.isInstancedBufferGeometry === true` — the silent
+single-instance misdraw the meshlet eval measured. `world/
+meshlet-pipeline.test.ts` pins the rejection (the vd-instanced shape falls
+back to the standard path instead of being claimed).

@@ -10,9 +10,10 @@
 //     per-object draws with compute pipelines plus one indirect draw batch
 //     per (geometry, material, shadow) entry;
 //   * a plain Mesh over an InstancedBufferGeometry (the vd-instanced and
-//     pool-instancer shape) is CLAIMED by the object gate but drawn as a
-//     single instance (r187 gives Mesh.count = 1): a silent misdraw, not a
-//     fallback;
+//     pool-instancer shape) — claimed and silently drawn as a single
+//     instance on the unpatched r187 gate — is now REJECTED by the
+//     isInstancedBufferGeometry hunk in patches/three@0.187.0.patch and
+//     falls back to the standard per-object path;
 //   * our blocks cell geometry shape (no `normal` attribute; shells also
 //     carry a finite drawRange) is rejected and stays on the standard path;
 //   * reversedDepthBuffer (physicalRendererParams under the default
@@ -133,7 +134,7 @@ test('supported meshes share one indirect draw batch; unsupported stay per-objec
   }));
 });
 
-test('HAZARD: a plain Mesh over an InstancedBufferGeometry is claimed but drawn as one instance', async () => {
+test('the InstancedBufferGeometry reject hunk: the vd-instanced shape falls back to the standard path', async () => {
   const { renderer, pipeline } = await makeRenderer({ meshlets: true });
   const material = new THREE.MeshStandardNodeMaterial();
   material.positionNode = vdXformPositionNode(THREE as never);
@@ -154,15 +155,14 @@ test('HAZARD: a plain Mesh over an InstancedBufferGeometry is claimed but drawn 
   } catch (error) {
     threw = error instanceof Error ? error.message : String(error);
   }
-  // r187 Mesh.count = 1: the pipeline's gate sees a supported single-instance
-  // mesh while the geometry wants instanceCount = 2. Either it renders once
-  // (every other slot silently dropped and the vdXform attribute unresolved)
-  // or the node build throws — never a clean fallback. An InstancedBufferGeometry
-  // must be excluded upstream of the gate before this pipeline can ship.
-  assert.equal(pipeline!._hasClusters(made.geometry, null), true, 'the pipeline claimed the vd-instanced shape');
-  assert.equal(mesh.count, 1, 'r187 Mesh.count is 1 — the batch draws exactly one instance');
+  // r187 Mesh.count = 1: the unpatched gate claimed this shape and the
+  // batch drew it as a single instance — every other slot silently dropped.
+  // The isInstancedBufferGeometry hunk in patches/three@0.187.0.patch
+  // rejects it at isSupportedObject, so the object takes the per-object
+  // fallback (super.pushRenderItem) and draws through the standard path.
+  assert.equal(pipeline!._hasClusters(made.geometry, null), false, 'the patched gate rejects the vd-instanced shape');
+  assert.equal(threw, null, 'the standard-path fallback draws without throwing');
   assert.equal(made.geometry.instanceCount, 2, 'the geometry carries two live slots');
-  console.info('[meshlet-eval] vd-instanced render', threw ? `threw: ${threw}` : 'did not throw (draws a single instance at slot-0/unresolved transform)');
 });
 
 test('blocks cell geometry (position/color/emissive/uv, no normal) is not meshletized', async () => {

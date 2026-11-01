@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import * as THREE from 'three/webgpu';
 import { physicalCityLight } from '@acme/theme';
 import { SunLight } from 'three/examples/jsm/lights/SunLight.js';
+import { SunLightNode } from 'three/examples/jsm/lights/SunLightNode.js';
 import { SkyMesh } from 'three/examples/jsm/objects/SkyMesh.js';
 import { parseDefaultOnFlag } from './sky-rig.ts';
 import {
@@ -71,7 +72,7 @@ test('probe names: exact, case-insensitive, unknown is null', () => {
 
 test('each rig probe turns on exactly its feature and the ones it needs', () => {
   const on = (f: PhysicalFeatures) =>
-    Object.entries(f).filter(([, v]) => v !== false && v !== 0).map(([k, v]) => (k === 'sunShadow' ? `sunShadow${v}` : k)).sort();
+    Object.entries(f).filter(([, v]) => v !== false && v !== 0 && v !== null).map(([k, v]) => (k === 'sunShadow' ? `sunShadow${v}` : k)).sort();
   const expected: Record<string, string[]> = {
     srgb: ['srgbOutput'],
     aces: ['pipeline'],
@@ -237,20 +238,19 @@ test('with a renderer: SunLightNode registered once, PMREM baked into one reused
     return options.renderTarget ?? new THREE.RenderTarget(4, 4);
   };
   try {
-    const registered = new Map<unknown, unknown>();
+    // r187 registers the light's node class on the constructor —
+    // Light.registerNode writes SunLight.prototype._lightNode — not the
+    // deprecated renderer.library.addLight this test faked under r186.
     const renderer = {
       reversedDepthBuffer: true,
-      library: {
-        getLightNodeClass: (light: unknown) => registered.get(light) ?? null,
-        addLight: (node: unknown, light: unknown) => { registered.set(light, node); },
-      },
       lighting: new THREE.Lighting(),
       backend: { device: { limits: { maxTextureDimension2D: 8192 } } },
     } as unknown as THREE.WebGPURenderer;
     const priorLighting = renderer.lighting;
     const scene = new THREE.Scene();
     const rig = createPhysicalRig(THREE, renderer, scene, { features: full, shadowTile: 3072, clusteredMaxLights: 256 });
-    assert.equal(registered.get(SunLight)?.constructor !== undefined, true, 'SunLightNode registered');
+    const sunPrototype = SunLight.prototype as unknown as { _lightNode?: unknown };
+    assert.equal(sunPrototype._lightNode, SunLightNode, 'SunLightNode registered');
     assert.equal(rig.shadowTile, 3072, '8192 limit fits the 6144 atlas');
     assert.equal(calls.length, 1);
     assert.deepEqual(calls[0], { sigma: 0, near: 0.1, far: 100, reused: null });
@@ -273,9 +273,10 @@ test('with a renderer: SunLightNode registered once, PMREM baked into one reused
     rig.applyPreset('midnight');
     assert.equal(calls.length, 2, 'same preset, no rebake');
 
-    // A second rig on the same renderer does not register the node again.
+    // A second rig on the same renderer keeps the same node class — the
+    // prototype write is idempotent.
     const again = createPhysicalRig(THREE, renderer, new THREE.Scene(), { features: probeFeatures('shadow2'), shadowTile: 2048, clusteredMaxLights: 128 });
-    assert.equal(registered.size, 1);
+    assert.equal(sunPrototype._lightNode, SunLightNode);
     again.dispose();
 
     rig.dispose();

@@ -97,3 +97,17 @@ diff --git a/src/renderers/common/Textures.js b/src/renderers/common/Textures.js
  			// if a texture is not ready for use, it falls back to a default texture so it's possible
  			// to use it for rendering. If a texture in this state is disposed, it's important to
  			// not destroy/delete the underlying GPU texture object since it is cached and shared with
+diff --git a/examples/jsm/pipelines/MeshletDrawingPipeline.js b/examples/jsm/pipelines/MeshletDrawingPipeline.js
+--- a/examples/jsm/pipelines/MeshletDrawingPipeline.js
++++ b/examples/jsm/pipelines/MeshletDrawingPipeline.js
+@@ -576,6 +576,10 @@
+ 		return false;
+ 
+ 	}
++
++	// a Mesh over an InstancedBufferGeometry carries instanced attributes the batch never fetches; it would be drawn as a single instance
++
++	if ( geometry.isInstancedBufferGeometry === true ) return false;
+ 
+ 	if ( object.morphTargetInfluences !== undefined && object.morphTargetInfluences.length > 0 ) return false;
+ 	if ( object.onBeforeRender !== Mesh.prototype.onBeforeRender || object.onAfterRender !== Mesh.prototype.onAfterRender ) return false;

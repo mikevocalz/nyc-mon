@@ -63,6 +63,26 @@ export const WORLD_PROBE: WorldProbe | null = activeWorldProbe(
   parseWorldProbe(process.env.EXPO_PUBLIC_WORLD_PROBE),
 );
 
+// ---- Upscale slot (Phase 4, docs/implementation/upscaling-eval.md) ----------
+
+/**
+ * The post chain's upscale pick — EXPO_PUBLIC_WORLD_UPSCALE. 'fsr1' is the
+ * spatial upscaler (no temporal state; composes with the existing MSAA
+ * chain); 'taau' is the temporal one (velocity MRT, MSAA off, claims the
+ * pipeline's single jitter owner). Anything else — including unset —
+ * mounts neither. A selector like the tone-mapping flag, not a truthy flag.
+ */
+export type WorldUpscale = 'fsr1' | 'taau';
+
+/** Exact pick names, case- and space-insensitive; anything else is null (off). */
+export function parseWorldUpscale(value: string | undefined | null): WorldUpscale | null {
+  const v = value?.trim().toLowerCase();
+  return v === 'fsr1' || v === 'taau' ? v : null;
+}
+
+/** The upscale pick, inlined at bundle time; null when unset or invalid. */
+export const WORLD_UPSCALE: WorldUpscale | null = parseWorldUpscale(process.env.EXPO_PUBLIC_WORLD_UPSCALE);
+
 /**
  * The shared-device lane's probe (shared, skiatex, pipecache); null for a rig
  * probe or none. Here rather than in render-runtime/device-probes.ts so a
@@ -104,12 +124,18 @@ export interface PhysicalFeatures {
   msaaDiscard: boolean;
   /** Use the PBR city materials so the rig has surfaces to light. */
   pbrMaterials: boolean;
+  /**
+   * The upscale slot — EXPO_PUBLIC_WORLD_UPSCALE. The scene pass renders
+   * below output res and the pick resolves it back; null mounts neither.
+   * Needs `pipeline`. Probes keep null: a probe isolates one feature.
+   */
+  upscale: WorldUpscale | null;
 }
 
 const NONE: PhysicalFeatures = {
   srgbOutput: false, pipeline: false, sunShadow: 0, colorBackground: false, skyPmrem: false, hemisphere: false,
   mrt: false, ssr: false, bloom: false, grade: false, clustered: false, storage: false, msaaDiscard: false,
-  pbrMaterials: false,
+  pbrMaterials: false, upscale: null,
 };
 
 /** Every piece on: the EXPO_PUBLIC_WORLD_PHYSICAL stack. SSR follows the tier (§5.7: off first on the phone). */
@@ -117,6 +143,7 @@ export function fullPhysicalFeatures(ssr: boolean): PhysicalFeatures {
   return {
     srgbOutput: true, pipeline: true, sunShadow: 2, colorBackground: false, skyPmrem: true, hemisphere: true,
     mrt: true, ssr, bloom: true, grade: true, clustered: true, storage: true, msaaDiscard: true, pbrMaterials: true,
+    upscale: null, // the env pick lands in physicalFeaturesFor, which alone reads the flags
   };
 }
 
@@ -156,15 +183,19 @@ export function physicalFeaturesFor(
   physical: boolean,
   probe: WorldProbe | null,
   tierSsr: boolean,
+  upscale: WorldUpscale | null = WORLD_UPSCALE,
 ): PhysicalFeatures | null {
   if (!physical) return null;
   if (probe !== null) return probeFeatures(probe);
   const full = fullPhysicalFeatures(tierSsr);
+  full.upscale = upscale;
   // EXPO_PUBLIC_WORLD_DROP=bloom,ssr: the full stack minus named features,
   // to measure a feature's cost on hardware. Unknown names are ignored.
   for (const name of (process.env.EXPO_PUBLIC_WORLD_DROP ?? '').split(',')) {
     const key = name.trim() as keyof PhysicalFeatures;
-    if (key in full) (full as unknown as Record<string, unknown>)[key] = key === 'sunShadow' ? 0 : false;
+    if (key in full) {
+      (full as unknown as Record<string, unknown>)[key] = key === 'sunShadow' ? 0 : key === 'upscale' ? null : false;
+    }
   }
   return full;
 }
