@@ -1,0 +1,7 @@
+[23:07:52.199] rive  deferred replay: inline
+[23:07:52.200] rive  compiling 2 markup files as one document: ../game-lobby/shared-vm.rml, scene.rml
+[23:07:52.238] rive  built /Users/mikevocalz/nyc-mon/packages/ui/rive/lobby/start-angled/build/start-angled.riv (142704 bytes, 38ms, 0 errors, 0 warnings)
+[23:07:52.239] rive  data: lobby/resume/eligible = true
+[23:07:52.239] rive  data: lobby/resume/district = Harlem
+[23:07:52.239] rive  showing StartAngledHost [1/2]
+[23:07:52.239] rive  wrote /Users/mikevocalz/nyc-mon/docs/evidence/rive/start-angled/data-continue.data.json

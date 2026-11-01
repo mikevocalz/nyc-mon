@@ -1,0 +1,5 @@
+[23:07:39.750] rive  deferred replay: inline
+[23:07:39.753] rive  compiling 2 markup files as one document: ../game-lobby/shared-vm.rml, scene.rml
+[23:07:39.819] rive  built /Users/mikevocalz/nyc-mon/packages/ui/rive/lobby/leaderboard/build/leaderboard.riv (145346 bytes, 67ms, 0 errors, 0 warnings)
+[23:07:39.820] rive  showing Leaderboard [1/3]
+[23:07:39.822] rive  wrote /Users/mikevocalz/nyc-mon/docs/evidence/rive/leaderboard/data.data.json

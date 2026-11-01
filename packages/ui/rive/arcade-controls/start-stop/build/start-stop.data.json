@@ -1,0 +1,121 @@
+{
+  "schema": 1,
+  "artboard": "StartStop",
+  "stateMachine": "Pill",
+  "viewModel": {
+    "name": "Default",
+    "viewModel": "StartStop",
+    "properties": [
+      {
+        "name": "pill",
+        "path": "pill",
+        "type": "viewModel",
+        "value": {
+          "name": "Default",
+          "viewModel": "Pill",
+          "properties": [
+            {
+              "name": "state",
+              "path": "pill/state",
+              "type": "enum",
+              "enumType": "PillState",
+              "value": "start",
+              "index": 0,
+              "values": ["start", "playing", "paused", "stopConfirm"],
+              "changed": false
+            },
+            {
+              "name": "pressed",
+              "path": "pill/pressed",
+              "type": "boolean",
+              "value": false,
+              "changed": false
+            },
+            {
+              "name": "focused",
+              "path": "pill/focused",
+              "type": "boolean",
+              "value": true,
+              "changed": true
+            },
+            {
+              "name": "activate",
+              "path": "pill/activate",
+              "type": "trigger",
+              "changed": false
+            },
+            {
+              "name": "holdProgress",
+              "path": "pill/holdProgress",
+              "type": "number",
+              "value": 0,
+              "changed": false
+            }
+          ]
+        }
+      },
+      {
+        "name": "theme",
+        "path": "theme",
+        "type": "viewModel",
+        "value": {
+          "name": "Default",
+          "viewModel": "Theme",
+          "properties": [
+            {
+              "name": "variant",
+              "path": "theme/variant",
+              "type": "enum",
+              "enumType": "ThemeVariant",
+              "value": "night",
+              "index": 1,
+              "values": ["daylit", "night"],
+              "changed": false
+            }
+          ]
+        }
+      },
+      {
+        "name": "layout",
+        "path": "layout",
+        "type": "viewModel",
+        "value": {
+          "name": "Default",
+          "viewModel": "Layout",
+          "properties": [
+            {
+              "name": "profile",
+              "path": "layout/profile",
+              "type": "enum",
+              "enumType": "LayoutProfile",
+              "value": "phone-portrait",
+              "index": 0,
+              "values": ["phone-portrait", "phone-landscape", "fold-outer", "fold-book", "fold-tabletop", "tablet", "web"],
+              "changed": false
+            }
+          ]
+        }
+      },
+      {
+        "name": "a11y",
+        "path": "a11y",
+        "type": "viewModel",
+        "value": {
+          "name": "Default",
+          "viewModel": "A11y",
+          "properties": [
+            {
+              "name": "reducedMotion",
+              "path": "a11y/reducedMotion",
+              "type": "boolean",
+              "value": false,
+              "changed": false
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "globals": [],
+  "nested": []
+}

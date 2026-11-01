@@ -1,0 +1,115 @@
+{
+  "schema": 1,
+  "artboard": "LeftStick",
+  "stateMachine": "Stick",
+  "viewModel": {
+    "name": "Default",
+    "viewModel": "LeftStick",
+    "properties": [
+      {
+        "name": "stick",
+        "path": "stick",
+        "type": "viewModel",
+        "value": {
+          "name": "Default",
+          "viewModel": "Stick",
+          "properties": [
+            {
+              "name": "x",
+              "path": "stick/x",
+              "type": "number",
+              "value": 0,
+              "changed": false
+            },
+            {
+              "name": "y",
+              "path": "stick/y",
+              "type": "number",
+              "value": 0,
+              "changed": false
+            },
+            {
+              "name": "engaged",
+              "path": "stick/engaged",
+              "type": "boolean",
+              "value": false,
+              "changed": false
+            },
+            {
+              "name": "mode",
+              "path": "stick/mode",
+              "type": "enum",
+              "enumType": "StickMode",
+              "value": "analog",
+              "index": 0,
+              "values": ["analog", "dpad"],
+              "changed": false
+            }
+          ]
+        }
+      },
+      {
+        "name": "theme",
+        "path": "theme",
+        "type": "viewModel",
+        "value": {
+          "name": "Default",
+          "viewModel": "Theme",
+          "properties": [
+            {
+              "name": "variant",
+              "path": "theme/variant",
+              "type": "enum",
+              "enumType": "ThemeVariant",
+              "value": "night",
+              "index": 1,
+              "values": ["daylit", "night"],
+              "changed": false
+            }
+          ]
+        }
+      },
+      {
+        "name": "layout",
+        "path": "layout",
+        "type": "viewModel",
+        "value": {
+          "name": "Default",
+          "viewModel": "Layout",
+          "properties": [
+            {
+              "name": "profile",
+              "path": "layout/profile",
+              "type": "enum",
+              "enumType": "LayoutProfile",
+              "value": "phone-portrait",
+              "index": 0,
+              "values": ["phone-portrait", "phone-landscape", "fold-outer", "fold-book", "fold-tabletop", "tablet", "web"],
+              "changed": false
+            }
+          ]
+        }
+      },
+      {
+        "name": "a11y",
+        "path": "a11y",
+        "type": "viewModel",
+        "value": {
+          "name": "Default",
+          "viewModel": "A11y",
+          "properties": [
+            {
+              "name": "reducedMotion",
+              "path": "a11y/reducedMotion",
+              "type": "boolean",
+              "value": false,
+              "changed": false
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "globals": [],
+  "nested": []
+}

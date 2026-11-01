@@ -1,0 +1,6 @@
+[23:08:08.321] rive  deferred replay: inline
+[23:08:08.323] rive  compiling 5 markup files as one document: ../game-transition/scene.rml, ../leaderboard/scene.rml, ../start-angled/scene.rml, scene.rml, shared-vm.rml
+[23:08:08.465] rive  built /Users/mikevocalz/nyc-mon/packages/ui/rive/lobby/game-lobby/build/game-lobby.riv (614266 bytes, 143ms, 0 errors, 0 warnings)
+[23:08:08.466] rive  data: transition/phase = done
+[23:08:08.467] rive  showing GameLobby [1/8]
+[23:08:08.470] rive  wrote /Users/mikevocalz/nyc-mon/docs/evidence/rive/game-lobby/data-contract.data.json

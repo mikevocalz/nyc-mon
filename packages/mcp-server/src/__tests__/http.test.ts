@@ -1,5 +1,7 @@
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
+import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT, UnsecuredJWT } from 'jose';
 import { afterEach, describe, expect, it } from 'vitest';
+import { createJwtVerifier, type TokenVerifier } from '../auth/verifier.ts';
 import { CORE_TOOL_NAMES, DEV_TOOL_NAMES } from '../mcp/tools.ts';
 import { ALLOWED_ORIGIN, callTool, fakeV1, initialize, row, rpc, start, type Running } from './harness.ts';
 
@@ -91,7 +93,94 @@ describe('protected resource metadata', () => {
   });
 });
 
+describe('protected resource metadata from a browser', () => {
+  const PRM_PATHS = ['/.well-known/oauth-protected-resource', '/.well-known/oauth-protected-resource/mcp'];
+
+  it('answers a CORS preflight on both well-known paths with 204 and Allow-Origin *', async () => {
+    running = await start();
+    for (const path of PRM_PATHS) {
+      for (const origin of [ALLOWED_ORIGIN, 'https://elsewhere.example']) {
+        const response = await fetch(`${running.url}${path}`, {
+          method: 'OPTIONS',
+          headers: { origin, 'access-control-request-method': 'GET', 'access-control-request-headers': 'mcp-protocol-version' },
+        });
+        expect(response.status, `${path} ${origin}`).toBe(204);
+        expect(response.headers.get('access-control-allow-origin')).toBe('*');
+        expect(response.headers.get('access-control-allow-methods')).toBe('GET, OPTIONS');
+        expect(response.headers.get('access-control-allow-headers')).toContain('mcp-protocol-version');
+      }
+    }
+  });
+
+  it('serves the document cross-origin with Allow-Origin *', async () => {
+    running = await start();
+    for (const path of PRM_PATHS) {
+      const response = await fetch(`${running.url}${path}`, { headers: { origin: 'https://elsewhere.example', 'mcp-protocol-version': '2025-11-25' } });
+      expect(response.status, path).toBe(200);
+      expect(response.headers.get('access-control-allow-origin')).toBe('*');
+      expect(((await json(response)) as { resource: string }).resource).toBe(running.mcpUrl);
+    }
+  });
+});
+
+describe('WWW-Authenticate challenge (MCP_WWW_AUTHENTICATE=1)', () => {
+  const challenge = (r: Running) => `resource_metadata="${r.url}/.well-known/oauth-protected-resource/mcp"`;
+
+  it('answers a request with no token with 401 and a Bearer resource_metadata challenge', async () => {
+    running = await start({ wwwAuthenticate: true });
+    const response = await rpc(running, initialize('2025-11-25'));
+    expect(response.status).toBe(401);
+    const header = response.headers.get('www-authenticate') ?? '';
+    expect(header.startsWith('Bearer ')).toBe(true);
+    expect(header).toContain(challenge(running));
+    expect(header).not.toContain('error=');
+  });
+
+  it('checks auth before the body, so an anonymous bodyless POST gets 401 with the challenge, not 400', async () => {
+    running = await start({ wwwAuthenticate: true });
+    const response = await fetch(running.mcpUrl, { method: 'POST', headers: { origin: ALLOWED_ORIGIN } });
+    expect(response.status).toBe(401);
+    expect(response.headers.get('www-authenticate')).toContain(challenge(running));
+  });
+
+  it('marks a bad token error="invalid_token"', async () => {
+    running = await start({ wwwAuthenticate: true });
+    const response = await rpc(running, initialize('2025-11-25'), { token: 'forged' });
+    expect(response.status).toBe(401);
+    const header = response.headers.get('www-authenticate') ?? '';
+    expect(header).toContain('error="invalid_token"');
+    expect(header).toContain(challenge(running));
+  });
+
+  it('marks a missing care scope 403 error="insufficient_scope"', async () => {
+    running = await start({ wwwAuthenticate: true, v1: fakeV1({ rows: [row('caller-adult')] }) });
+    const response = await rpc(running, callTool('feed_mon'), { token: 'read-only' });
+    expect(response.status).toBe(403);
+    const header = response.headers.get('www-authenticate') ?? '';
+    expect(header).toContain('error="insufficient_scope"');
+    expect(header).toContain('scope="mcp:caller mcp:care"');
+    expect(header).toContain(challenge(running));
+  });
+
+  it('lets a browser client read the challenge through Access-Control-Expose-Headers', async () => {
+    running = await start({ wwwAuthenticate: true });
+    const response = await rpc(running, initialize('2025-11-25'), { origin: ALLOWED_ORIGIN });
+    expect(response.status).toBe(401);
+    expect(response.headers.get('access-control-allow-origin')).toBe(ALLOWED_ORIGIN);
+    const exposed = (response.headers.get('access-control-expose-headers') ?? '').split(',').map((h) => h.trim().toLowerCase());
+    expect(exposed).toContain('www-authenticate');
+    expect(exposed).toContain('mcp-protocol-version');
+  });
+});
+
 describe('auth tiers', () => {
+  it('answers an anonymous bodyless POST with 401, not a JSON parse error', async () => {
+    running = await start();
+    const response = await fetch(running.mcpUrl, { method: 'POST' });
+    expect(response.status).toBe(401);
+    expect(response.headers.get('www-authenticate')).toBeNull();
+  });
+
   it('returns 401 with no WWW-Authenticate when no token is sent', async () => {
     running = await start();
     const response = await rpc(running, initialize('2025-11-25'));
@@ -223,5 +312,187 @@ describe('dev-only tools', () => {
         declinedBecause: { enum: ['asleep', 'sluggish', 'already-asleep', 'already-awake', 'too-tired'] },
       },
     });
+  });
+});
+
+/** No stack frames, file paths or internal error names in a response body. */
+function expectNoLeak(text: string): void {
+  expect(text).not.toMatch(/\n\s+at |\.ts:\d+|node_modules|InvalidTokenError|ECONN|stack/);
+}
+
+async function postRaw(target: Running, body: string, token = 'adult'): Promise<{ status: number; text: string }> {
+  const response = await fetch(target.mcpUrl, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      accept: 'application/json, text/event-stream',
+      authorization: `Bearer ${token}`,
+      'mcp-protocol-version': '2025-11-25',
+    },
+    body,
+  });
+  return { status: response.status, text: await response.text() };
+}
+
+describe('malformed JSON-RPC', () => {
+  it('answers broken JSON, a wrong jsonrpc version and non-request shapes with 4xx, never 500, and leaks nothing', async () => {
+    const v1 = fakeV1({ rows: [row('caller-adult')] });
+    running = await start({ v1 });
+    const cases: [string, number, number][] = [
+      ['{"jsonrpc":', 400, -32700],
+      [JSON.stringify({ jsonrpc: '1.0', id: 1, method: 'tools/list' }), 400, -32700],
+      [JSON.stringify({ id: 1, method: 'tools/list' }), 400, -32700],
+      [JSON.stringify({ jsonrpc: '2.0', id: 1 }), 400, -32700],
+      [JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: 'feed_mon' }), 400, -32700],
+      ['42', 400, -32700],
+      ['null', 400, -32700],
+    ];
+    for (const [body, status, code] of cases) {
+      const { status: got, text } = await postRaw(running, body);
+      expect(got, body).toBe(status);
+      expect((JSON.parse(text) as { error: { code: number } }).error.code, body).toBe(code);
+      expectNoLeak(text);
+    }
+    expect(v1.calls).toHaveLength(0);
+  });
+
+  it('answers an unknown method and an unknown or removed tool as JSON-RPC errors', async () => {
+    const v1 = fakeV1({ rows: [row('caller-adult')] });
+    running = await start({ v1 });
+    const method = await postRaw(running, JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'admin/dump' }));
+    expect(method.status).toBe(200);
+    expect(JSON.parse(method.text)).toMatchObject({ error: { code: -32601 } });
+    for (const name of ['heal_mon', 'get_inventory', '__proto__']) {
+      const tool = await postRaw(running, JSON.stringify(callTool(name)));
+      expect(tool.status, name).toBe(200);
+      expect(JSON.parse(tool.text), name).toMatchObject({ error: { code: -32602 } });
+      expectNoLeak(tool.text);
+    }
+    expect(v1.calls).toHaveLength(0);
+  });
+
+  it('rejects wrongly typed tool arguments without touching /v1', async () => {
+    const v1 = fakeV1({ rows: [row('caller-adult')] });
+    running = await start({ v1 });
+    for (const call of [callTool('play_with_mon', { quality: 'lots' }), callTool('get_mon_status', { monId: { $ne: null } })]) {
+      const { status, text } = await postRaw(running, JSON.stringify(call));
+      expect(status).toBe(200);
+      expect(JSON.parse(text)).toMatchObject({ result: { isError: true } });
+      expectNoLeak(text);
+    }
+    expect(v1.calls.some((c) => c.method === 'PUT')).toBe(false);
+  });
+
+  it('answers a body over 1 MB with a 413 the client can read, and a forged token with a readable 401 without buffering it', async () => {
+    running = await start();
+    const big = JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: { pad: 'x'.repeat(1_100_000) } });
+    const signedIn = await postRaw(running, big, 'adult');
+    expect(signedIn.status).toBe(413);
+    expect(JSON.parse(signedIn.text)).toMatchObject({ jsonrpc: '2.0', id: null, error: { code: -32600 } });
+    // Auth runs before the body is read, so a bad token never gets as far as the size check.
+    const forged = await postRaw(running, big, 'forged');
+    expect(forged.status).toBe(401);
+    expect(JSON.parse(forged.text)).toEqual({ error: 'unauthorized' });
+    // The listener still serves the next request.
+    expect((await rpc(running, initialize('2025-11-25'), { token: 'service' })).status).toBe(200);
+  });
+
+  it('refuses JSON-RPC batches before any tool runs, whoever sends them', async () => {
+    const v1 = fakeV1({ rows: [row('caller-adult')] });
+    running = await start({ v1 });
+    const twoMeals = JSON.stringify([callTool('feed_mon', {}, 1), callTool('feed_mon', {}, 2)]);
+    for (const token of ['adult', 'service', 'read-only', undefined]) {
+      const { status, text } = await postRaw(running, twoMeals, token);
+      expect(status).toBe(400);
+      expect(JSON.parse(text)).toMatchObject({ jsonrpc: '2.0', id: null, error: { code: -32600 } });
+    }
+    expect((await postRaw(running, '[]', 'adult')).status).toBe(400);
+    expect(v1.calls).toHaveLength(0);
+  });
+});
+
+describe('real JWT verification over HTTP', () => {
+  const ISSUER = 'http://127.0.0.1:5174';
+
+  async function jwtServer(v1 = fakeV1({ rows: [row('caller-adult')] })) {
+    const { privateKey, publicKey } = await generateKeyPair('EdDSA', { crv: 'Ed25519' });
+    const jwks = createLocalJWKSet({ keys: [{ ...(await exportJWK(publicKey)), kid: 'k1', alg: 'EdDSA' }] });
+    const holder: { audience?: string } = {};
+    const verifier: TokenVerifier = { verify: (t) => createJwtVerifier({ issuer: ISSUER, audience: holder.audience ?? '', jwks }).verify(t) };
+    running = await start({ v1, verifier });
+    holder.audience = running.mcpUrl;
+    const mint = (claims: Record<string, unknown>, opts: { exp?: number; aud?: string } = {}) =>
+      new SignJWT(claims)
+        .setProtectedHeader({ alg: 'EdDSA', kid: 'k1', typ: 'at+jwt' })
+        .setIssuer(ISSUER)
+        .setAudience(opts.aud ?? running!.mcpUrl)
+        .setIssuedAt()
+        .setExpirationTime(opts.exp ?? Math.floor(Date.now() / 1000) + 600)
+        .sign(privateKey);
+    return { v1, mint };
+  }
+
+  it('lets a client_credentials token discover tools but not read or change Caller data', async () => {
+    const { v1, mint } = await jwtServer();
+    const service = await mint({ sub: 'alexa', client_id: 'alexa', scope: 'mcp:service' });
+    expect((await rpc(running!, { jsonrpc: '2.0', id: 1, method: 'tools/list' }, { token: service })).status).toBe(200);
+    for (const name of ['get_mon_status', 'check_on_mon', 'check_incubation', 'feed_mon']) {
+      const response = await rpc(running!, callTool(name), { token: service });
+      expect(response.status, name).toBe(401);
+    }
+    // A service token that also names a user in `sub` is still a service token.
+    const spoofed = await mint({ sub: 'caller-adult', client_id: 'alexa', scope: 'mcp:service' });
+    expect((await rpc(running!, callTool('get_mon_status'), { token: spoofed })).status).toBe(401);
+    expect(v1.calls).toHaveLength(0);
+  });
+
+  it('answers 401 for an expired, wrong-audience or unsigned user token and never calls /v1', async () => {
+    const { v1, mint } = await jwtServer();
+    const user = { sub: 'caller-adult', client_id: 'alexa', scope: 'mcp:caller mcp:care', birth_year: 1990 };
+    expect((await rpc(running!, callTool('get_mon_status'), { token: await mint(user) })).status).toBe(200);
+    const readsBefore = v1.calls.length;
+    const bad = [
+      await mint(user, { exp: Math.floor(Date.now() / 1000) - 60 }),
+      await mint(user, { aud: `${running!.mcpUrl}/` }),
+      new UnsecuredJWT(user).setIssuer(ISSUER).setAudience(running!.mcpUrl).setExpirationTime('10m').encode(),
+    ];
+    for (const token of bad) {
+      const response = await rpc(running!, callTool('feed_mon'), { token });
+      expect(response.status).toBe(401);
+      expect(response.headers.get('www-authenticate')).toBeNull();
+    }
+    expect(v1.calls.length).toBe(readsBefore);
+  });
+});
+
+describe('rate limit', () => {
+  const ping = { jsonrpc: '2.0', id: 7, method: 'ping' };
+
+  it('answers 429 with Retry-After once a Caller passes the per-minute limit, and only for that Caller', async () => {
+    let clock = Date.parse('2026-10-28T12:00:00Z');
+    running = await start({ rateLimitPerMinute: 3, now: () => clock });
+    for (let i = 0; i < 3; i++) expect((await rpc(running, ping, { token: 'adult' })).status).toBe(200);
+    const limited = await rpc(running, ping, { token: 'adult' });
+    expect(limited.status).toBe(429);
+    expect(Number(limited.headers.get('retry-after'))).toBeGreaterThan(0);
+    expect(await json(limited)).toMatchObject({ jsonrpc: '2.0', error: { code: -32000 } });
+    // Another Caller has its own window.
+    expect((await rpc(running, ping, { token: 'minor' })).status).toBe(200);
+    // A minute later the first Caller is let through again.
+    clock += 60_001;
+    expect((await rpc(running, ping, { token: 'adult' })).status).toBe(200);
+  });
+
+  it('limits a service client by its client id', async () => {
+    running = await start({ rateLimitPerMinute: 2 });
+    expect((await rpc(running, ping, { token: 'service' })).status).toBe(200);
+    expect((await rpc(running, ping, { token: 'service' })).status).toBe(200);
+    expect((await rpc(running, ping, { token: 'service' })).status).toBe(429);
+  });
+
+  it('never counts a request that failed auth', async () => {
+    running = await start({ rateLimitPerMinute: 1 });
+    for (let i = 0; i < 5; i++) expect((await rpc(running, ping, { token: 'nope' })).status).toBe(401);
+    expect((await rpc(running, ping, { token: 'adult' })).status).toBe(200);
   });
 });

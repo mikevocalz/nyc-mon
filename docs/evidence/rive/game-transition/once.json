@@ -1,0 +1,3 @@
+[23:07:52.746] rive  compiling 2 markup files as one document: ../game-lobby/shared-vm.rml, scene.rml
+[23:07:52.793] rive  built /Users/mikevocalz/nyc-mon/packages/ui/rive/lobby/game-transition/build/game-transition.riv (234928 bytes, 47ms, 0 errors, 0 warnings)
+{"success": true, "command": "build", "data": {"riv": "/Users/mikevocalz/nyc-mon/packages/ui/rive/lobby/game-transition/build/game-transition.riv", "bytes": 234928, "buildMs": 47.9, "problems": []}, "errors": [], "warnings": []}

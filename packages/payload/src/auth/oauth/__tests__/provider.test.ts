@@ -6,9 +6,9 @@ import { memoryAdapter } from 'better-auth/adapters/memory';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { linkRefusal } from '../adult';
 import { checkResource, withOfflineAccess } from '../guards';
-import { readOAuthConfig } from '../config';
-import { loadLinkPage } from '../pages';
-import { alexaOAuthPlugins, OAUTH_PAGES } from '../plugins';
+import { browserClientOrigins, readOAuthConfig } from '../config';
+import { createAuthServerMetadataHandler, loadLinkPage } from '../pages';
+import { alexaOAuthPlugins, OAUTH_PAGES, USER_ACCESS_TOKEN_TTL_SECONDS } from '../plugins';
 
 const ORIGIN = 'http://localhost:5174';
 const BASE = `${ORIGIN}/payload-api/auth`;
@@ -185,6 +185,39 @@ describe('Alexa+ authorization server', () => {
     ]);
   });
 
+  it('serves the root RFC 8414 document to a browser on any origin, preflight included', async () => {
+    const handler = createAuthServerMetadataHandler(auth);
+    const url = `${ORIGIN}/.well-known/oauth-authorization-server`;
+    const browser = 'https://companion.example';
+    // The MCP SDK sends MCP-Protocol-Version on discovery, which makes the browser preflight first.
+    const preflight = await handler(
+      new Request(url, {
+        method: 'OPTIONS',
+        headers: { origin: browser, 'access-control-request-method': 'GET', 'access-control-request-headers': 'mcp-protocol-version' },
+      }),
+    );
+    expect(preflight.status).toBe(204);
+    expect(preflight.headers.get('access-control-allow-origin')).toBe('*');
+    expect(preflight.headers.get('access-control-allow-methods')).toBe('GET, OPTIONS');
+    expect(preflight.headers.get('access-control-allow-headers')).toContain('mcp-protocol-version');
+    const get = await handler(new Request(url, { headers: { origin: browser, 'mcp-protocol-version': '2025-11-25' } }));
+    expect(get.status).toBe(200);
+    expect(get.headers.get('access-control-allow-origin')).toBe('*');
+    expect(((await get.json()) as { issuer: string }).issuer).toBe(ORIGIN);
+  });
+
+  it('uses the configured origin and auth path when metadata arrives in an envelope', async () => {
+    const handler = createAuthServerMetadataHandler({
+      api: { getOAuthServerConfig: async () => ({ response: {}, headers: {} }) },
+      options: { baseURL: 'https://configured.example/', basePath: '/custom/auth' },
+    });
+    const result = await handler(new Request('https://configured.example/.well-known/oauth-authorization-server'));
+    const metadata = await result.json();
+    expect(metadata.issuer).toBe('https://configured.example');
+    expect(metadata.authorization_endpoint).toBe('https://configured.example/custom/auth/oauth2/authorize');
+    expect(metadata.token_endpoint).toBe('https://configured.example/custom/auth/oauth2/token');
+  });
+
   it('publishes RFC 8414 metadata Amazon accepts, with no OIDC', async () => {
     const metadata = (await auth.api.getOAuthServerConfig()) as unknown as Record<string, unknown>;
     expect(metadata.issuer).toBe(ORIGIN);
@@ -308,6 +341,49 @@ describe('Alexa+ authorization server', () => {
       expect(response.status).toBeLessThan(500);
     });
 
+    it('refuses a code exchange with no code_verifier, and the code stays unusable afterwards', async () => {
+      const cookie = await signUp(auth, 'adult-noverifier@example.com', ADULT_YEAR);
+      const { verifier, challenge } = await pkcePair();
+      const code = await obtainCode(auth, cookie, challenge);
+      const missing = await token(
+        auth,
+        { grant_type: 'authorization_code', code, redirect_uri: ALEXA_REDIRECT, resource: RESOURCE },
+        basic('alexa', ALEXA_SECRET),
+      );
+      expect(missing.status).toBeGreaterThanOrEqual(400);
+      expect(missing.status).toBeLessThan(500);
+      const body = (await missing.json()) as Record<string, unknown>;
+      expect(body.access_token).toBeUndefined();
+      expect(['invalid_request', 'invalid_grant']).toContain(body.error);
+      // The verifier that matches the challenge is no rescue once the code was presented without it.
+      const retried = await token(
+        auth,
+        { grant_type: 'authorization_code', code, code_verifier: verifier, redirect_uri: ALEXA_REDIRECT, resource: RESOURCE },
+        basic('alexa', ALEXA_SECRET),
+      );
+      expect(retried.status).toBeGreaterThanOrEqual(400);
+      expect(retried.status).toBeLessThan(500);
+    });
+
+    it("refuses another client's refresh token without revoking the real holder's", async () => {
+      const cookie = await signUp(auth, 'adult-crossclient@example.com', ADULT_YEAR);
+      const { verifier, challenge } = await pkcePair();
+      const code = await obtainCode(auth, cookie, challenge);
+      const exchanged = await token(
+        auth,
+        { grant_type: 'authorization_code', code, code_verifier: verifier, redirect_uri: ALEXA_REDIRECT, resource: RESOURCE },
+        basic('alexa', ALEXA_SECRET),
+      );
+      const refresh = String(((await exchanged.json()) as Record<string, unknown>).refresh_token);
+      const stolen = await token(auth, { grant_type: 'refresh_token', client_id: 'nyc-mon-sim', refresh_token: refresh });
+      expect(stolen.status).toBeGreaterThanOrEqual(400);
+      expect(stolen.status).toBeLessThan(500);
+      expect(((await stolen.json()) as Record<string, unknown>).access_token).toBeUndefined();
+      const legit = await token(auth, { grant_type: 'refresh_token', refresh_token: refresh }, basic('alexa', ALEXA_SECRET));
+      // The foreign attempt does not burn the family, so it cannot be used to unlink someone.
+      expect(legit.status).toBe(200);
+    });
+
     it('refuses the plain challenge method and a missing challenge', async () => {
       const cookie = await signUp(auth, 'adult3@example.com', ADULT_YEAR);
       const plain = await authorize(auth, cookie, alexaAuthorizeParams('a'.repeat(43), { code_challenge_method: 'plain' }));
@@ -374,6 +450,13 @@ describe('Alexa+ authorization server', () => {
         resource: RESOURCE,
       });
       expect(response.status).toBe(200);
+      // Gate 4: MCP verifies JWTs locally, so a user token lives 10 minutes,
+      // not an hour, after sign-out revokes its refresh token.
+      const body = (await response.json()) as Record<string, unknown>;
+      expect(body.expires_in).toBe(USER_ACCESS_TOKEN_TTL_SECONDS);
+      expect(USER_ACCESS_TOKEN_TTL_SECONDS).toBe(600);
+      const claims = await verifyAccessToken(auth, String(body.access_token));
+      expect(Number(claims.exp) - Number(claims.iat)).toBe(600);
     });
   });
 
@@ -462,9 +545,23 @@ describe('linking page data', () => {
     expect(await loadLinkPage('consent', consentUrl.search, options)).toEqual({
       kind: 'consent',
       clientName: 'Alexa',
+      clientKind: 'alexa',
       scopes: ['mcp:caller', 'mcp:care', 'offline_access'],
     });
-    expect(await loadLinkPage('sign-in', consentUrl.search, options)).toEqual({ kind: 'sign-in', clientName: 'Alexa' });
+    expect(await loadLinkPage('sign-in', consentUrl.search, { ...options, amazonEnabled: false, passwordResetEnabled: false })).toEqual({
+      kind: 'sign-in',
+      clientName: 'Alexa',
+      clientKind: 'alexa',
+      amazonEnabled: false,
+      passwordResetEnabled: false,
+    });
+    expect(await loadLinkPage('sign-in', consentUrl.search, { ...options, amazonEnabled: true, passwordResetEnabled: true })).toEqual({
+      kind: 'sign-in',
+      clientName: 'Alexa',
+      clientKind: 'alexa',
+      amazonEnabled: true,
+      passwordResetEnabled: true,
+    });
 
     const forged = new URL(consentUrl);
     forged.searchParams.set('redirect_uri', 'https://evil.test/cb');
@@ -472,6 +569,50 @@ describe('linking page data', () => {
     expect(await loadLinkPage('sign-in', forged.search, options)).toEqual({ kind: 'expired' });
     expect(await loadLinkPage('refused', forged.search, options)).toEqual({ kind: 'refused', clientName: undefined, backHref: undefined });
     expect(await loadLinkPage('consent', '', options)).toEqual({ kind: 'expired' });
+  });
+
+  it('names the companion client "NYC-Mon Personal Companion" and marks it as the companion', async () => {
+    const { auth } = makeAuth();
+    await auth.$context;
+    const cookie = await signUp(auth, 'companion-page@example.com', ADULT_YEAR);
+    const { challenge } = await pkcePair();
+    const first = await authorize(auth, cookie, alexaAuthorizeParams(challenge, { client_id: 'nyc-mon-sim', redirect_uri: SIM_REDIRECT }));
+    const consentUrl = new URL(first.headers.get('location') ?? '', ORIGIN);
+    expect(await loadLinkPage('consent', consentUrl.search, { config: CONFIG, secret: SECRET })).toEqual({
+      kind: 'consent',
+      clientName: 'NYC-Mon Personal Companion',
+      clientKind: 'companion',
+      scopes: ['mcp:caller', 'mcp:care', 'offline_access'],
+    });
+  });
+
+  it('lets a Caller with no account sign up on the sign-in page and land on consent', async () => {
+    const { auth, db } = makeAuth();
+    await auth.$context;
+    const { challenge } = await pkcePair();
+    // A signed-out Caller is sent to the sign-in page with a signed query.
+    const first = await authorize(auth, '', alexaAuthorizeParams(challenge, { client_id: 'nyc-mon-sim', redirect_uri: SIM_REDIRECT }));
+    expect(first.status).toBe(302);
+    const signInUrl = new URL(first.headers.get('location') ?? '', ORIGIN);
+    expect(signInUrl.pathname).toBe(OAUTH_PAGES.signIn);
+    // The page posts sign-up with the signed query attached (oauthProviderClient does this in the browser).
+    const response = await auth.handler(
+      new Request(`${BASE}/sign-up/email`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: ORIGIN },
+        body: JSON.stringify({
+          email: 'new-caller@example.com',
+          password: 'correct-horse-battery',
+          name: 'new-caller',
+          birthYear: ADULT_YEAR,
+          oauth_query: signInUrl.search.slice(1),
+        }),
+      }),
+    );
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { url?: string };
+    expect(new URL(body.url ?? '', ORIGIN).pathname).toBe(OAUTH_PAGES.consent);
+    expect(db.user?.find((user) => user.email === 'new-caller@example.com')?.birthYear).toBe(ADULT_YEAR);
   });
 
   it('gives a refused account a way back to the app with access_denied', async () => {
@@ -536,5 +677,11 @@ describe('readOAuthConfig', () => {
   it('takes the issuer origin from AUTH_ISSUER, then BETTER_AUTH_URL', () => {
     expect(readOAuthConfig({ BETTER_AUTH_URL: 'https://admin.test/some/path' }).issuer).toBe('https://admin.test');
     expect(readOAuthConfig({ AUTH_ISSUER: 'https://auth.test', BETTER_AUTH_URL: 'https://admin.test' }).issuer).toBe('https://auth.test');
+  });
+
+  it('gives CORS the public simulator origin and never the confidential Alexa one', () => {
+    expect(browserClientOrigins(CONFIG)).toEqual(['http://localhost:5180']);
+    const withSimSecret = readOAuthConfig({ OAUTH_SIM_CLIENT_SECRET: SECRET, OAUTH_SIM_REDIRECT_URIS: SIM_REDIRECT });
+    expect(browserClientOrigins(withSimSecret)).toEqual([]);
   });
 });

@@ -6,6 +6,7 @@ import {
   type GainNode,
   type PannerNode,
 } from 'react-native-audio-api';
+import { binaryFetch } from '@acme/ui/net';
 import type {
   AmbientAudioOptions,
   PositionalAudioOptions,
@@ -68,7 +69,7 @@ export class SpatialAudioEngine {
     }
 
     const context = this.ensureContext();
-    const buffer = await fetch(uri)
+    const buffer = await binaryFetch(uri)
       .then((response) => {
         if (!response.ok) {
           throw new Error(

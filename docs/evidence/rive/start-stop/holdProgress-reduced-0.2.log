@@ -1,0 +1,8 @@
+[21:06:32.946] rive  deferred replay: inline
+[21:06:32.981] rive  built packages/ui/rive/arcade-controls/start-stop/build/start-stop.riv (142340 bytes, 35ms, 0 errors, 0 warnings)
+[21:06:32.982] rive  data: a11y/reducedMotion = true
+[21:06:32.982] rive  data: pill/state = stopConfirm
+[21:06:32.982] rive  data: pill/holdProgress = 0.2
+[21:06:32.982] rive  showing StartStop [1/1]
+[21:06:32.982] rive  viewport 512x208 @1x
+[21:06:33.000] rive  wrote docs/evidence/rive/start-stop/holdProgress-reduced-0.2.png

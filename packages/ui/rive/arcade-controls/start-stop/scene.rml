@@ -1,0 +1,579 @@
+<Rive version="1" kind="fragment">
+    <!-- NYC-MON START/STOP pill (Master Directive v2 §2C, §8).
+         The game session owns pill/state; Rive reflects it. The internal
+         properties pill/pressed, pill/focused and pill/activate are the
+         control's own (pointer, keyboard, screen reader) and are not part
+         of the §8 contract. STOP is hold-and-confirm: stopConfirm shows the
+         hold ring; the session decides when the stop lands.
+         The ring has no clock of its own. Its trim end is bound to
+         pill/holdProgress (0..1, written by the host during the hold; the
+         code's hold is STOP_HOLD_MS = 1000 ms), so the ring full and the stop
+         landing are the same moment. Under a11y/reducedMotion the Motion
+         layer swaps in an authored stepped ring whose trim reads
+         floor(holdProgress * 4) / 4: five poses, 0, .25, .5, .75, 1.
+         Decision: BUILD the ring from holdProgress (finding C2) instead of
+         the 72-frame StopConfirm sweep, which ran on its own 1.2 s clock
+         while the session stopped at a different time.
+
+         Geometry: docs/design/research/arcade-ergonomics.md §8. The pill is
+         120 x 44 with 8 pt cuts on the top-left and bottom-right corners (the
+         kit's CornerCutFrame corner="all"), centred in a 128 x 52 artboard;
+         the 4 pt margin holds the focus ring and the glow. The pill never
+         scales with the controller.
+         Tokens: docs/design/screens/G01-arcade-controller/08-handoff.md.
+         start is the CTA (orange-500 face, signage-black legend, orange-950
+         keyline); playing and paused are graphite with a royal-400 or
+         carolina-500 keyline; stopConfirm fills the apple-500 hold ring.
+         Decision: BUILD the legend at 13 pt (type-caption, the ramp's floor)
+         with 1 pt tracking; HOLD TO STOP at the handoff's 14 pt type-tag
+         tracking does not fit a 120 pt pill.
+         Decision: BUILD the reduced-motion press as a carolina-400 tint over
+         the whole pill (PressTint), so the State layer alone owns the legend
+         colour and no two layers key one property. -->
+    <Artboard defaultStateMachineId="0:7" viewModelId="0:40" viewModelInstanceId="0:41"
+              width="128" height="52" styleId="0:5" name="StartStop" id="0:2">
+        <LayoutComponentStyle name="Artboard Style" id="0:5"/>
+
+        <!-- Keyboard focus ring, outside the pill. Opacity keyed by the Focus layer. -->
+        <Shape x="64" y="26" opacity="0" name="FocusRing" id="0:150">
+            <Rectangle width="126" height="50" cornerRadiusTL="4" name="Path"/>
+            <Stroke thickness="2" name="Ring"><SolidColor colorValue="FF4BA8F0" name="C"/></Stroke>
+        </Shape>
+
+        <!-- Everything that compresses on press -->
+        <Node x="64" y="26" name="Pill" id="0:190">
+            <!-- reduced-motion press feedback: a carolina-400 tint, topmost -->
+            <Shape opacity="0" name="PressTint" id="0:245">
+                <PointsPath isClosed="true" isClockwise="true" name="Path">
+                    <StraightVertex x="-60" y="-14"/>
+                    <StraightVertex x="-52" y="-22"/>
+                    <StraightVertex x="60" y="-22"/>
+                    <StraightVertex x="60" y="14"/>
+                    <StraightVertex x="52" y="22"/>
+                    <StraightVertex x="-60" y="22"/>
+                </PointsPath>
+                <Fill name="Fill"><SolidColor colorValue="FF78BEF4" name="C"/></Fill>
+            </Shape>
+            <Text x="0" y="0" originX="0.5" originY="0.5" sizingValue="autoWidth" name="Label" id="0:200">
+                <TextStylePaint fontSize="13" letterSpacing="1" fontAssetId="0:900" familyName="Space Grotesk" styleName="Bold" name="Label Style" id="0:201">
+                    <Fill name="Fill"><SolidColor colorValue="FF000000" name="C" id="0:202"/></Fill>
+                    <TextStyleAxis tag="2003265652" axisValue="700" name="Weight"/>
+                </TextStylePaint>
+                <TextValueRun styleId="0:201" text="START" name="Run" id="0:203"/>
+            </Text>
+
+            <!-- hold-to-stop progress: a trimmed stroke on the pill outline.
+                 HoldRings opacity is keyed by the State layer (shown only in
+                 stopConfirm); which child shows is keyed by the Motion layer;
+                 each trim end is data bound to pill/holdProgress, so no
+                 timeline keys `end`. -->
+            <Node x="0" y="0" opacity="0" name="HoldRings" id="0:232">
+                <Shape name="HoldRing" id="0:230">
+                    <PointsPath isClosed="true" isClockwise="true" name="Path">
+                        <StraightVertex x="-60" y="-14"/>
+                        <StraightVertex x="-52" y="-22"/>
+                        <StraightVertex x="60" y="-22"/>
+                        <StraightVertex x="60" y="14"/>
+                        <StraightVertex x="52" y="22"/>
+                        <StraightVertex x="-60" y="22"/>
+                    </PointsPath>
+                    <Stroke thickness="3" cap="round" join="round" name="Progress">
+                        <SolidColor colorValue="FFF80000" name="C"/>
+                        <TrimPath start="0" end="0" offset="0.25" name="Trim" id="0:231">
+                            <DataBindContext sourcePathIds="0:40-0:45-0:56" propertyKey="115" converterId="0:131"/>
+                        </TrimPath>
+                    </Stroke>
+                </Shape>
+                <!-- reduced motion: the same ring in quarter steps -->
+                <Shape opacity="0" name="HoldRingStepped" id="0:233">
+                    <PointsPath isClosed="true" isClockwise="true" name="Path">
+                        <StraightVertex x="-60" y="-14"/>
+                        <StraightVertex x="-52" y="-22"/>
+                        <StraightVertex x="60" y="-22"/>
+                        <StraightVertex x="60" y="14"/>
+                        <StraightVertex x="52" y="22"/>
+                        <StraightVertex x="-60" y="22"/>
+                    </PointsPath>
+                    <Stroke thickness="3" cap="round" join="round" name="Progress">
+                        <SolidColor colorValue="FFF80000" name="C"/>
+                        <TrimPath start="0" end="0" offset="0.25" name="Trim" id="0:234">
+                            <DataBindContext sourcePathIds="0:40-0:45-0:56" propertyKey="115" converterId="0:132"/>
+                        </TrimPath>
+                    </Stroke>
+                </Shape>
+            </Node>
+
+            <!-- perimeter illumination: feathered glow under a crisp line, colour keyed per state -->
+            <Shape name="Perimeter" id="0:220">
+                <PointsPath isClosed="true" isClockwise="true" name="Path">
+                    <StraightVertex x="-60" y="-14"/>
+                    <StraightVertex x="-52" y="-22"/>
+                    <StraightVertex x="60" y="-22"/>
+                    <StraightVertex x="60" y="14"/>
+                    <StraightVertex x="52" y="22"/>
+                    <StraightVertex x="-60" y="22"/>
+                </PointsPath>
+                <Stroke thickness="4" join="round" name="Glow" id="0:221">
+                    <SolidColor colorValue="FFFC7C00" name="C" id="0:222"/>
+                    <Feather strength="10" name="Soft"/>
+                </Stroke>
+                <Stroke thickness="1.5" join="round" name="Crisp">
+                    <SolidColor colorValue="FFFC7C00" name="C" id="0:223"/>
+                </Stroke>
+            </Shape>
+
+            <!-- CTA face: orange-500 in start, orange-400 while pressed; the
+                 State layer keys its opacity, the Press layer its colour -->
+            <Shape opacity="1" name="FaceCta" id="0:240">
+                <PointsPath isClosed="true" isClockwise="true" name="Path">
+                    <StraightVertex x="-60" y="-14"/>
+                    <StraightVertex x="-52" y="-22"/>
+                    <StraightVertex x="60" y="-22"/>
+                    <StraightVertex x="60" y="14"/>
+                    <StraightVertex x="52" y="22"/>
+                    <StraightVertex x="-60" y="22"/>
+                </PointsPath>
+                <Fill name="Fill"><SolidColor colorValue="FFFC7C00" name="C" id="0:241"/></Fill>
+            </Shape>
+
+            <!-- machined face: corner cuts on TL and BR, as CornerCutFrame corner="all" -->
+            <Shape name="Face" id="0:210">
+                <FocusData name="Focus"/>
+                <SemanticData role="button" label="Start" hint="Starts the game. In play, press to pause; hold to stop."
+                              name="Semantics" id="0:211"/>
+                <PointsPath isClosed="true" isClockwise="true" name="Path">
+                    <StraightVertex x="-60" y="-14"/>
+                    <StraightVertex x="-52" y="-22"/>
+                    <StraightVertex x="60" y="-22"/>
+                    <StraightVertex x="60" y="14"/>
+                    <StraightVertex x="52" y="22"/>
+                    <StraightVertex x="-60" y="22"/>
+                </PointsPath>
+                <Fill name="Fill">
+                    <LinearGradient startX="0" startY="-22" endX="0" endY="22" name="Metal">
+                        <GradientStop colorValue="FF303337" position="0"/>
+                        <GradientStop colorValue="FF1C1E21" position="0.5"/>
+                        <GradientStop colorValue="FF000000" position="1"/>
+                    </LinearGradient>
+                </Fill>
+                <Stroke thickness="1" join="round" name="Bevel"><SolidColor colorValue="FF61656A" name="C"/></Stroke>
+            </Shape>
+        </Node>
+
+        <!-- host notifications -->
+        <Event name="pillActivated" id="0:300"/>
+
+        <!-- State timelines: label text and colour, CTA face opacity,
+             perimeter colour, hold ring -->
+        <LinearAnimation duration="1" name="Start" id="0:400">
+            <KeyedObject objectId="0:203"><KeyedProperty property="text"><KeyFrameString value="START" interpolationType="hold"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="0:202"><KeyedProperty property="colorValue"><KeyFrameColor value="FF000000" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="0:240"><KeyedProperty property="opacity"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="0:222"><KeyedProperty property="colorValue"><KeyFrameColor value="FFFC7C00" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="0:223"><KeyedProperty property="colorValue"><KeyFrameColor value="FF3C1E00" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="0:232"><KeyedProperty property="opacity"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="0:211"><KeyedProperty property="label"><KeyFrameString value="Start" interpolationType="hold"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+        <LinearAnimation duration="1" name="Playing" id="0:401">
+            <KeyedObject objectId="0:203"><KeyedProperty property="text"><KeyFrameString value="PAUSE" interpolationType="hold"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="0:202"><KeyedProperty property="colorValue"><KeyFrameColor value="FFDFE0E1" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="0:240"><KeyedProperty property="opacity"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="0:222"><KeyedProperty property="colorValue"><KeyFrameColor value="FF4082FA" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="0:223"><KeyedProperty property="colorValue"><KeyFrameColor value="FF4082FA" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="0:232"><KeyedProperty property="opacity"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="0:211"><KeyedProperty property="label"><KeyFrameString value="Pause" interpolationType="hold"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+        <LinearAnimation duration="1" name="Paused" id="0:402">
+            <KeyedObject objectId="0:203"><KeyedProperty property="text"><KeyFrameString value="RESUME" interpolationType="hold"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="0:202"><KeyedProperty property="colorValue"><KeyFrameColor value="FFDFE0E1" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="0:240"><KeyedProperty property="opacity"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="0:222"><KeyedProperty property="colorValue"><KeyFrameColor value="FF4BA8F0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="0:223"><KeyedProperty property="colorValue"><KeyFrameColor value="FF4BA8F0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="0:232"><KeyedProperty property="opacity"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="0:211"><KeyedProperty property="label"><KeyFrameString value="Resume" interpolationType="hold"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+        <!-- stopConfirm: label and colour pose; the ring shows and follows
+             pill/holdProgress (no `end` key here) -->
+        <LinearAnimation duration="1" name="StopConfirm" id="0:403">
+            <KeyedObject objectId="0:203"><KeyedProperty property="text"><KeyFrameString value="HOLD TO STOP" interpolationType="hold"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="0:202"><KeyedProperty property="colorValue"><KeyFrameColor value="FFFFFFFF" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="0:240"><KeyedProperty property="opacity"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="0:222"><KeyedProperty property="colorValue"><KeyFrameColor value="FFF80000" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="0:223"><KeyedProperty property="colorValue"><KeyFrameColor value="FFFA4040" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="0:232"><KeyedProperty property="opacity"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="0:211"><KeyedProperty property="label"><KeyFrameString value="Hold to stop" interpolationType="hold"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+        <!-- stopConfirm, reduced motion: the same pose with no fade in; the
+             Motion layer shows the stepped ring -->
+        <LinearAnimation duration="1" name="StopConfirmReduced" id="0:404">
+            <KeyedObject objectId="0:203"><KeyedProperty property="text"><KeyFrameString value="HOLD TO STOP" interpolationType="hold"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="0:202"><KeyedProperty property="colorValue"><KeyFrameColor value="FFFFFFFF" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="0:240"><KeyedProperty property="opacity"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="0:222"><KeyedProperty property="colorValue"><KeyFrameColor value="FFF80000" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="0:223"><KeyedProperty property="colorValue"><KeyFrameColor value="FFFA4040" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="0:232"><KeyedProperty property="opacity"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="0:211"><KeyedProperty property="label"><KeyFrameString value="Hold to stop" interpolationType="hold"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+
+        <!-- Press timelines: compression plus the CTA face going orange-400;
+             the reduced sibling keeps the scale and shows the tint instead -->
+        <LinearAnimation duration="1" name="Rest" id="0:410">
+            <KeyedObject objectId="0:190">
+                <KeyedProperty property="scaleX"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty>
+                <KeyedProperty property="scaleY"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:241"><KeyedProperty property="colorValue"><KeyFrameColor value="FFFC7C00" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="0:245"><KeyedProperty property="opacity"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+        <LinearAnimation duration="1" name="Pressed" id="0:411">
+            <KeyedObject objectId="0:190">
+                <KeyedProperty property="scaleX"><KeyFrameDouble value="0.97" interpolationType="linear"/></KeyedProperty>
+                <KeyedProperty property="scaleY"><KeyFrameDouble value="0.97" interpolationType="linear"/></KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:241"><KeyedProperty property="colorValue"><KeyFrameColor value="FFFD9D40" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="0:245"><KeyedProperty property="opacity"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+        <LinearAnimation duration="1" name="PressedReduced" id="0:412">
+            <KeyedObject objectId="0:190">
+                <KeyedProperty property="scaleX"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty>
+                <KeyedProperty property="scaleY"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:241"><KeyedProperty property="colorValue"><KeyFrameColor value="FFFD9D40" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="0:245"><KeyedProperty property="opacity"><KeyFrameDouble value="0.3" interpolationType="linear"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+
+        <!-- Confirmation pulse on activate: glow swells and settles (18 frames);
+             reduced sibling holds the glow bright for 12 frames, one step. -->
+        <LinearAnimation duration="1" name="GlowRest" id="0:420">
+            <KeyedObject objectId="0:221"><KeyedProperty property="thickness"><KeyFrameDouble value="4" interpolationType="linear"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+        <LinearAnimation duration="18" name="Pulse" id="0:421">
+            <KeyedObject objectId="0:221"><KeyedProperty property="thickness">
+                <KeyFrameDouble value="4" frame="0" interpolationType="cubic"><CubicEaseInterpolator x1="0" y1="0" x2="0.58" y2="1"/></KeyFrameDouble>
+                <KeyFrameDouble value="10" frame="6" interpolationType="cubic"><CubicEaseInterpolator x1="0.42" y1="0" x2="0.58" y2="1"/></KeyFrameDouble>
+                <KeyFrameDouble value="4" frame="18" interpolationType="linear"/>
+            </KeyedProperty></KeyedObject>
+        </LinearAnimation>
+        <LinearAnimation duration="12" name="PulseReduced" id="0:422">
+            <KeyedObject objectId="0:221"><KeyedProperty property="thickness">
+                <KeyFrameDouble value="8" frame="0" interpolationType="hold"/>
+                <KeyFrameDouble value="4" frame="12" interpolationType="hold"/>
+            </KeyedProperty></KeyedObject>
+        </LinearAnimation>
+
+        <!-- Motion timelines: which hold ring shows -->
+        <LinearAnimation duration="1" name="RingSmooth" id="0:440">
+            <KeyedObject objectId="0:230"><KeyedProperty property="opacity"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="0:233"><KeyedProperty property="opacity"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+        <LinearAnimation duration="1" name="RingStepped" id="0:441">
+            <KeyedObject objectId="0:230"><KeyedProperty property="opacity"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="0:233"><KeyedProperty property="opacity"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+
+        <LinearAnimation duration="1" name="Blurred" id="0:430">
+            <KeyedObject objectId="0:150"><KeyedProperty property="opacity"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+        <LinearAnimation duration="1" name="Focused" id="0:431">
+            <KeyedObject objectId="0:150"><KeyedProperty property="opacity"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+
+        <StateMachine name="Pill" id="0:7">
+            <StateMachineListenerSingle targetId="0:210" listenerTypeValue="down" name="Face Down" id="0:500">
+                <ListenerViewModelChange><BindablePropertyBoolean propertyValue="true"><DataBindContext sourcePathIds="0:40-0:45-0:53" propertyKey="634" direction="true"/></BindablePropertyBoolean></ListenerViewModelChange>
+            </StateMachineListenerSingle>
+            <StateMachineListenerSingle targetId="0:210" listenerTypeValue="up" name="Face Up" id="0:501">
+                <ListenerViewModelChange><BindablePropertyBoolean propertyValue="false"><DataBindContext sourcePathIds="0:40-0:45-0:53" propertyKey="634" direction="true"/></BindablePropertyBoolean></ListenerViewModelChange>
+            </StateMachineListenerSingle>
+            <StateMachineListenerSingle targetId="0:210" listenerTypeValue="exit" name="Face Exit" id="0:502">
+                <ListenerViewModelChange><BindablePropertyBoolean propertyValue="false"><DataBindContext sourcePathIds="0:40-0:45-0:53" propertyKey="634" direction="true"/></BindablePropertyBoolean></ListenerViewModelChange>
+            </StateMachineListenerSingle>
+            <!-- activate: click, enter/space, screen-reader tap, gamepad start (W3C 9) -->
+            <StateMachineListener targetId="0:210" name="Activate" id="0:503">
+                <ListenerInputType listenerTypeValue="click"/>
+                <ListenerInputTypeKeyboard listenerTypeValue="keyboard">
+                    <KeyboardInput keyType="enter" keyPhase="1"/>
+                    <KeyboardInput keyType="kpEnter" keyPhase="1"/>
+                    <KeyboardInput keyType="space" keyPhase="1"/>
+                </ListenerInputTypeKeyboard>
+                <ListenerInputTypeSemantic listenerTypeValue="semanticAction">
+                    <SemanticInput actionType="tap"/>
+                </ListenerInputTypeSemantic>
+                <ListenerFireEvent eventId="0:300"/>
+                <ListenerViewModelChange>
+                    <BindablePropertyTrigger propertyValue="1"><DataBindContext sourcePathIds="0:40-0:45-0:55" propertyKey="686" direction="true"/></BindablePropertyTrigger>
+                </ListenerViewModelChange>
+            </StateMachineListener>
+            <!-- Gamepad start (W3C slot 9) on its own listener: grouped with the
+                 click/keyboard/semantic input types above it never fired
+                 (proved by hash-identical captures), alone it does. -->
+            <StateMachineListener targetId="0:210" name="Activate Pad" id="0:506">
+                <ListenerInputTypeGamepad listenerTypeValue="gamepad">
+                    <GamepadInput kind="button" mapping="standard" inputIndex="9" buttonPhase="1"/>
+                </ListenerInputTypeGamepad>
+                <ListenerFireEvent eventId="0:300"/>
+                <ListenerViewModelChange>
+                    <BindablePropertyTrigger propertyValue="1"><DataBindContext sourcePathIds="0:40-0:45-0:55" propertyKey="686" direction="true"/></BindablePropertyTrigger>
+                </ListenerViewModelChange>
+            </StateMachineListener>
+            <StateMachineListener targetId="0:210" name="Got Focus" id="0:504">
+                <ListenerInputType listenerTypeValue="focus"/>
+                <ListenerViewModelChange><BindablePropertyBoolean propertyValue="true"><DataBindContext sourcePathIds="0:40-0:45-0:54" propertyKey="634" direction="true"/></BindablePropertyBoolean></ListenerViewModelChange>
+            </StateMachineListener>
+            <StateMachineListener targetId="0:210" name="Lost Focus" id="0:505">
+                <ListenerInputType listenerTypeValue="blur"/>
+                <ListenerViewModelChange><BindablePropertyBoolean propertyValue="false"><DataBindContext sourcePathIds="0:40-0:45-0:54" propertyKey="634" direction="true"/></BindablePropertyBoolean></ListenerViewModelChange>
+            </StateMachineListener>
+
+            <!-- State layer: start / playing / paused / stopConfirm (+ reduced sibling) -->
+            <StateMachineLayer name="State" id="0:8">
+                <AnyState x="900" y="-200"/>
+                <ExitState x="1100" y="-200"/>
+                <EntryState x="0" y="0"><StateTransition stateToId="0:600"/></EntryState>
+                <AnimationState x="160" y="0" animationId="0:400" id="0:600">
+                    <StateTransition stateToId="0:601" duration="120">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="0:40-0:45-0:52" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="0:92"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="0:602" duration="120">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="0:40-0:45-0:52" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="0:93"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="0:603" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="0:40-0:45-0:52" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="0:94"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="0:40-0:48-0:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="false"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="0:604" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="0:40-0:45-0:52" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="0:94"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="0:40-0:48-0:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="true"/></TransitionViewModelCondition>
+                    </StateTransition>
+                </AnimationState>
+                <AnimationState x="400" y="-160" animationId="0:401" id="0:601">
+                    <StateTransition stateToId="0:600" duration="120">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="0:40-0:45-0:52" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="0:91"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="0:602" duration="120">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="0:40-0:45-0:52" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="0:93"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="0:603" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="0:40-0:45-0:52" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="0:94"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="0:40-0:48-0:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="false"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="0:604" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="0:40-0:45-0:52" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="0:94"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="0:40-0:48-0:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="true"/></TransitionViewModelCondition>
+                    </StateTransition>
+                </AnimationState>
+                <AnimationState x="640" y="0" animationId="0:402" id="0:602">
+                    <StateTransition stateToId="0:600" duration="120">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="0:40-0:45-0:52" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="0:91"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="0:601" duration="120">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="0:40-0:45-0:52" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="0:92"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="0:603" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="0:40-0:45-0:52" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="0:94"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="0:40-0:48-0:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="false"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="0:604" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="0:40-0:45-0:52" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="0:94"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="0:40-0:48-0:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="true"/></TransitionViewModelCondition>
+                    </StateTransition>
+                </AnimationState>
+                <AnimationState x="400" y="160" animationId="0:403" reset="true" id="0:603">
+                    <StateTransition stateToId="0:600" duration="120">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="0:40-0:45-0:52" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="0:91"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="0:601" duration="120">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="0:40-0:45-0:52" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="0:92"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="0:602" duration="120">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="0:40-0:45-0:52" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="0:93"/></TransitionViewModelCondition>
+                    </StateTransition>
+                </AnimationState>
+                <AnimationState x="640" y="260" animationId="0:404" reset="true" id="0:604">
+                    <StateTransition stateToId="0:600" duration="120">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="0:40-0:45-0:52" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="0:91"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="0:601" duration="120">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="0:40-0:45-0:52" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="0:92"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="0:602" duration="120">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="0:40-0:45-0:52" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="0:93"/></TransitionViewModelCondition>
+                    </StateTransition>
+                </AnimationState>
+            </StateMachineLayer>
+
+            <!-- Press layer -->
+            <StateMachineLayer name="Press" id="0:9">
+                <AnyState x="700" y="-120"/>
+                <ExitState x="900" y="-120"/>
+                <EntryState x="0" y="0"><StateTransition stateToId="0:610"/></EntryState>
+                <AnimationState x="160" y="0" animationId="0:410" id="0:610">
+                    <!-- focus the pill on entry so keys and the pad reach it when embedded without a host focus call -->
+                    <FocusActionTarget targetId="0:210"/>
+                    <StateTransition stateToId="0:611" duration="60">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="0:40-0:45-0:53" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="true"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="0:40-0:48-0:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="false"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="0:612" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="0:40-0:45-0:53" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="true"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="0:40-0:48-0:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="true"/></TransitionViewModelCondition>
+                    </StateTransition>
+                </AnimationState>
+                <AnimationState x="400" y="-100" animationId="0:411" id="0:611">
+                    <StateTransition stateToId="0:610" duration="120">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="0:40-0:45-0:53" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="false"/></TransitionViewModelCondition>
+                    </StateTransition>
+                </AnimationState>
+                <AnimationState x="400" y="100" animationId="0:412" id="0:612">
+                    <StateTransition stateToId="0:610" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="0:40-0:45-0:53" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="false"/></TransitionViewModelCondition>
+                    </StateTransition>
+                </AnimationState>
+            </StateMachineLayer>
+
+            <!-- Pulse layer: activate trigger fires the confirmation pulse -->
+            <StateMachineLayer name="Pulse" id="0:10">
+                <AnyState x="700" y="-120"/>
+                <ExitState x="900" y="-120"/>
+                <EntryState x="0" y="0"><StateTransition stateToId="0:620"/></EntryState>
+                <AnimationState x="160" y="0" animationId="0:420" id="0:620">
+                    <StateTransition stateToId="0:621" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyTrigger><DataBindContext sourcePathIds="0:40-0:45-0:55" propertyKey="686"/></BindablePropertyTrigger></TransitionPropertyViewModelComparator><TransitionValueTriggerComparator/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="0:40-0:48-0:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="false"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="0:622" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyTrigger><DataBindContext sourcePathIds="0:40-0:45-0:55" propertyKey="686"/></BindablePropertyTrigger></TransitionPropertyViewModelComparator><TransitionValueTriggerComparator/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="0:40-0:48-0:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="true"/></TransitionViewModelCondition>
+                    </StateTransition>
+                </AnimationState>
+                <AnimationState x="400" y="-100" animationId="0:421" reset="true" id="0:621">
+                    <StateTransition stateToId="0:620" enableExitTime="true" exitTimeIsPercetange="true" exitTime="100"/>
+                </AnimationState>
+                <AnimationState x="400" y="100" animationId="0:422" reset="true" id="0:622">
+                    <StateTransition stateToId="0:620" enableExitTime="true" exitTimeIsPercetange="true" exitTime="100"/>
+                </AnimationState>
+            </StateMachineLayer>
+
+            <!-- Focus layer -->
+            <StateMachineLayer name="Focus" id="0:11">
+                <AnyState x="500" y="-120"/>
+                <ExitState x="700" y="-120"/>
+                <EntryState x="0" y="0"><StateTransition stateToId="0:630"/></EntryState>
+                <AnimationState x="160" y="0" animationId="0:430" id="0:630">
+                    <StateTransition stateToId="0:631" duration="80">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="0:40-0:45-0:54" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="true"/></TransitionViewModelCondition>
+                    </StateTransition>
+                </AnimationState>
+                <AnimationState x="360" y="0" animationId="0:431" id="0:631">
+                    <StateTransition stateToId="0:630" duration="80">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="0:40-0:45-0:54" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="false"/></TransitionViewModelCondition>
+                    </StateTransition>
+                </AnimationState>
+            </StateMachineLayer>
+
+            <!-- Motion layer: a11y/reducedMotion picks the smooth or the stepped
+                 hold ring; instant both ways -->
+            <StateMachineLayer name="Motion" id="0:12">
+                <AnyState x="500" y="-120"/>
+                <ExitState x="700" y="-120"/>
+                <EntryState x="0" y="0"><StateTransition stateToId="0:640"/></EntryState>
+                <AnimationState x="160" y="0" animationId="0:440" id="0:640">
+                    <StateTransition stateToId="0:641" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="0:40-0:48-0:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="true"/></TransitionViewModelCondition>
+                    </StateTransition>
+                </AnimationState>
+                <AnimationState x="360" y="0" animationId="0:441" id="0:641">
+                    <StateTransition stateToId="0:640" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="0:40-0:48-0:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="false"/></TransitionViewModelCondition>
+                    </StateTransition>
+                </AnimationState>
+            </StateMachineLayer>
+        </StateMachine>
+    </Artboard>
+
+    <FontAsset file="../../../../assets/fonts/SpaceGrotesk-Variable.ttf" name="Space Grotesk" id="0:900"/>
+
+    <!-- holdProgress converters: clamp to 0..1; the reduced ring then
+         quantises to quarters, floor(x * 4) / 4 -->
+    <DataConverterRangeMapper minInput="0" maxInput="1" minOutput="0" maxOutput="1"
+                              clampLower="true" clampUpper="true" name="HoldClamp" id="0:131"/>
+    <DataConverterFormula name="Quarters" id="0:133">
+        <FormulaTokenFunction functionType="4"/>
+        <FormulaTokenInput/>
+        <FormulaTokenOperation operationType="2"/>
+        <FormulaTokenValue operationValue="4"/>
+        <FormulaTokenParenthesisClose/>
+        <FormulaTokenOperation operationType="3"/>
+        <FormulaTokenValue operationValue="4"/>
+    </DataConverterFormula>
+    <DataConverterGroup name="HoldStepped" id="0:132">
+        <DataConverterGroupItem converterId="0:131"/>
+        <DataConverterGroupItem converterId="0:133"/>
+    </DataConverterGroup>
+
+    <DataEnumCustom name="PillState" id="0:90">
+        <DataEnumValue key="start" value="Start" id="0:91"/>
+        <DataEnumValue key="playing" value="Playing" id="0:92"/>
+        <DataEnumValue key="paused" value="Paused" id="0:93"/>
+        <DataEnumValue key="stopConfirm" value="Stop confirm" id="0:94"/>
+    </DataEnumCustom>
+    <DataEnumCustom name="ThemeVariant" id="0:110">
+        <DataEnumValue key="daylit" value="Daylit" id="0:111"/>
+        <DataEnumValue key="night" value="Night" id="0:112"/>
+    </DataEnumCustom>
+    <DataEnumCustom name="LayoutProfile" id="0:113">
+        <DataEnumValue key="phone-portrait" value="Phone portrait" id="0:114"/>
+        <DataEnumValue key="phone-landscape" value="Phone landscape" id="0:115"/>
+        <DataEnumValue key="fold-outer" value="Fold outer" id="0:116"/>
+        <DataEnumValue key="fold-book" value="Fold book" id="0:117"/>
+        <DataEnumValue key="fold-tabletop" value="Fold tabletop" id="0:118"/>
+        <DataEnumValue key="tablet" value="Tablet" id="0:119"/>
+        <DataEnumValue key="web" value="Web" id="0:120"/>
+    </DataEnumCustom>
+
+    <ViewModel defaultInstanceId="0:51" name="Pill" id="0:50">
+        <ViewModelPropertyEnumCustom enumId="0:90" name="state" id="0:52"/>
+        <ViewModelPropertyBoolean name="pressed" id="0:53"/>
+        <ViewModelPropertyBoolean name="focused" id="0:54"/>
+        <ViewModelPropertyTrigger name="activate" id="0:55"/>
+        <!-- §8: hold-to-stop progress, 0..1, host-written -->
+        <ViewModelPropertyNumber name="holdProgress" id="0:56"/>
+        <ViewModelInstance exports="true" name="Default" id="0:51">
+            <ViewModelInstanceEnum propertyValue="0:91" viewModelPropertyId="0:52"/>
+            <ViewModelInstanceBoolean propertyValue="false" viewModelPropertyId="0:53"/>
+            <ViewModelInstanceBoolean propertyValue="false" viewModelPropertyId="0:54"/>
+            <ViewModelInstanceTrigger viewModelPropertyId="0:55"/>
+            <ViewModelInstanceNumber propertyValue="0" viewModelPropertyId="0:56"/>
+        </ViewModelInstance>
+    </ViewModel>
+    <ViewModel defaultInstanceId="0:61" name="Theme" id="0:60">
+        <ViewModelPropertyEnumCustom enumId="0:110" name="variant" id="0:62"/>
+        <ViewModelInstance exports="true" name="Default" id="0:61">
+            <ViewModelInstanceEnum propertyValue="0:112" viewModelPropertyId="0:62"/>
+        </ViewModelInstance>
+    </ViewModel>
+    <ViewModel defaultInstanceId="0:71" name="Layout" id="0:70">
+        <ViewModelPropertyEnumCustom enumId="0:113" name="profile" id="0:72"/>
+        <ViewModelInstance exports="true" name="Default" id="0:71">
+            <ViewModelInstanceEnum propertyValue="0:114" viewModelPropertyId="0:72"/>
+        </ViewModelInstance>
+    </ViewModel>
+    <ViewModel defaultInstanceId="0:81" name="A11y" id="0:80">
+        <ViewModelPropertyBoolean name="reducedMotion" id="0:82"/>
+        <ViewModelInstance exports="true" name="Default" id="0:81">
+            <ViewModelInstanceBoolean propertyValue="false" viewModelPropertyId="0:82"/>
+        </ViewModelInstance>
+    </ViewModel>
+    <ViewModel defaultInstanceId="0:41" name="StartStop" id="0:40">
+        <ViewModelPropertyViewModel viewModelReferenceId="0:50" name="pill" id="0:45"/>
+        <ViewModelPropertyViewModel viewModelReferenceId="0:60" name="theme" id="0:46"/>
+        <ViewModelPropertyViewModel viewModelReferenceId="0:70" name="layout" id="0:47"/>
+        <ViewModelPropertyViewModel viewModelReferenceId="0:80" name="a11y" id="0:48"/>
+        <ViewModelInstance exports="true" name="Default" id="0:41">
+            <ViewModelInstanceViewModel propertyValue="0:51" viewModelPropertyId="0:45"/>
+            <ViewModelInstanceViewModel propertyValue="0:61" viewModelPropertyId="0:46"/>
+            <ViewModelInstanceViewModel propertyValue="0:71" viewModelPropertyId="0:47"/>
+            <ViewModelInstanceViewModel propertyValue="0:81" viewModelPropertyId="0:48"/>
+        </ViewModelInstance>
+    </ViewModel>
+</Rive>

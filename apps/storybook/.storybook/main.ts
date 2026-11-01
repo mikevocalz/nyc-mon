@@ -64,12 +64,11 @@ const config: StorybookConfig = {
   stories: [
     '../../../packages/ui/*.stories.@(ts|tsx)',
     '../../../packages/ui/primitives/*.stories.@(ts|tsx)',
-    // packages/app has no stories yet, and Storybook warns on every pattern
-    // that matches nothing. Re-add this line when the first feature story
-    // lands (features live at packages/app/features/<name>/, so the glob
-    // needs the feature-name level — the old `app/*/components/*` pattern
-    // resolved to packages/app/features/components/ and never matched):
-    //   '../../../packages/app/features/*/**/*.stories.@(ts|tsx)',
+    '../../../packages/ui/game-controls/**/*.stories.@(ts|tsx)',
+    '../../../packages/ui/lobby/**/*.stories.@(ts|tsx)',
+    // Feature stories live at packages/app/features/<name>/ (the first is
+    // settings/TimeOfDayRow), so the glob needs the feature-name level.
+    '../../../packages/app/features/*/**/*.stories.@(ts|tsx)',
   ],
   viteFinal: async (viteConfig) => {
     // TypeGPU's 'use gpu' functions are compiled to WGSL by unplugin-typegpu
@@ -132,6 +131,20 @@ const config: StorybookConfig = {
           find: /^@react-native\/assets-registry\/registry$/,
           replacement: resolve(here, '../node_modules/react-native-web/dist/modules/AssetRegistry/index.js'),
         },
+        // react-native-skia 3.6's Platform.web requires `react-native/asset-registry`,
+        // falling back to `react-native/Libraries/Image/AssetRegistry`. On RN 0.88 both
+        // resolve to React Native's Flow source, which a web build can't parse
+        // (mcp-server's UI build failed on it). Same registry, web copy.
+        {
+          find: /^react-native\/(asset-registry|Libraries\/Image\/AssetRegistry)$/,
+          replacement: resolve(here, '../node_modules/react-native-web/dist/modules/AssetRegistry/index.js'),
+        },
+        // react-native-svg 15.16 statically reaches an Android-only TurboModule
+        // (lazy require behind Platform.OS === 'android'); give web a no-op.
+        {
+          find: /^.*\/fabric\/NativeSvgSoundModule(\.js)?$/,
+          replacement: resolve(here, '../../../packages/config/vite/svg-sound-module.web.ts'),
+        },
         { find: /^@legendapp\/motion$/, replacement: legendMotionEsm },
         {
           find: /^react-native$/,
@@ -148,6 +161,14 @@ const config: StorybookConfig = {
         'react-native-web',
       ],
     };
+    // Egg hatch GLBs (@acme/assets/eggs) load as URLs, the way Metro's
+    // assetExts hands native a numeric asset id. Without this Vite parses
+    // them as source and fails on the binary.
+    const existingAssets = viteConfig.assetsInclude;
+    viteConfig.assetsInclude = [
+      ...(Array.isArray(existingAssets) ? existingAssets : existingAssets ? [existingAssets] : []),
+      '**/*.glb',
+    ];
     viteConfig.server = { ...(viteConfig.server ?? {}), hmr: false };
     viteConfig.optimizeDeps = {
       ...(viteConfig.optimizeDeps ?? {}),

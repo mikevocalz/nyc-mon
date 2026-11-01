@@ -1,0 +1,113 @@
+name: Valdrada cells to R2
+
+# Publishes the pinned cell set (cell-source/data/vd-cells-manifest.ts) to the R2 bucket as
+# releases/<id>/<path> + releases/<id>/manifest.json, then flips releases/current. Dispatch only:
+# the publish job runs under the `production` environment's protection. The far tier's baked bytes
+# live in tooling/city/.cache (gitignored — ODbL data is not committed); CI restores them from the
+# actions cache a maintainer seeds (see tooling/city/R2.md) or the run fails closed on the pin check.
+on:
+  workflow_dispatch:
+    inputs:
+      release_id:
+        description: 'Release id (blank = r<yyyymmdd UTC>-<manifest sha8>)'
+        required: false
+        default: ''
+      no_activate:
+        description: 'Upload only; do not flip releases/current'
+        type: boolean
+        required: true
+        default: false
+  pull_request:
+    paths:
+      - 'packages/app/features/game/world/cell-source/**'
+      - 'tooling/city/r2-*.mjs'
+      - 'tooling/city/r2-publish.d.mts'
+      - '.github/workflows/vd-cells-publish.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  cells:
+    name: Manifest + cell-source tests (no creds)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version-file: .nvmrc
+      - name: Validate the generated manifest (parse, unique paths, pin shape)
+        run: |
+          node --input-type=module -e "
+            import { readFileSync } from 'node:fs';
+            import { parseCellsManifest } from './tooling/city/r2-publish.mjs';
+            const m = parseCellsManifest(readFileSync('packages/app/features/game/world/cell-source/data/vd-cells-manifest.ts', 'utf8'));
+            const keys = Object.keys(m.cells);
+            if (new Set(keys.map((k) => m.cells[k].path)).size !== keys.length) throw new Error('duplicate cell paths');
+            for (const k of keys) {
+              const p = m.cells[k].path;
+              if (!/^((structures|near|lite|far|ring[1-9][0-9]?-(near|lite))\/|structures\/ring[1-9][0-9]?\/)[^/]+\.bin$/.test(p)) throw new Error('bad cell path ' + p);
+            }
+            console.log('manifest ok:', keys.length, 'cells,', (Object.values(m.cells).reduce((a, c) => a + c.bytes, 0) / 1e6).toFixed(1), 'MB');
+          "
+      - name: cell-source tests (incl. r2-publish signing/dry-run/rollback)
+        working-directory: packages/app
+        run: node --test 'features/game/world/cell-source/*.test.ts'
+
+  publish:
+    name: Publish cells to R2
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    environment: production
+    env:
+      R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+      R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version-file: .nvmrc
+      - name: Resolve release id
+        id: rel
+        run: |
+          SHA8=$(node --input-type=module -e "
+            import { readFileSync } from 'node:fs';
+            import { parseCellsManifest, manifestSha } from './tooling/city/r2-publish.mjs';
+            const m = parseCellsManifest(readFileSync('packages/app/features/game/world/cell-source/data/vd-cells-manifest.ts', 'utf8'));
+            console.log(manifestSha(m.cells).slice(0, 8));
+          ")
+          RID="${{ inputs.release_id }}"
+          if [ -z "$RID" ]; then RID="r$(date -u +%Y%m%d)-${SHA8}"; fi
+          echo "id=$RID" >> "$GITHUB_OUTPUT"
+          echo "sha8=$SHA8" >> "$GITHUB_OUTPUT"
+          echo "release id: $RID"
+      - name: Restore the far-tier bake cache (maintainer-seeded)
+        uses: actions/cache/restore@v4
+        with:
+          path: tooling/city/.cache/vd-lod16
+          key: vd-lod16-${{ steps.rel.outputs.sha8 }}
+          restore-keys: vd-lod16-
+      - name: Dry run — re-verify every pin on disk, plan uploads
+        run: node tooling/city/r2-publish.mjs --dry-run --release "${{ steps.rel.outputs.id }}"
+      - name: Publish — upload cells, manifest.json last, flip releases/current
+        run: |
+          EXTRA=""
+          if [ "${{ inputs.no_activate }}" = "true" ]; then EXTRA="--no-activate"; fi
+          node tooling/city/r2-publish.mjs --release "${{ steps.rel.outputs.id }}" $EXTRA
+      - name: Verify — GET every object back over the S3 API and re-hash
+        run: node tooling/city/r2-publish.mjs --verify --release "${{ steps.rel.outputs.id }}"
+      - name: Verify remote — public URL pin check, CORS + Range probes
+        if: ${{ !inputs.no_activate }}
+        env:
+          # A literal release root: R2 does not resolve releases/current/<path>.
+          R2_PUBLIC_BASE_URL: https://city-assets.nyc-mon.city/releases/${{ steps.rel.outputs.id }}/
+        run: node tooling/city/r2-verify.mjs

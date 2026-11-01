@@ -1,0 +1,401 @@
+<Rive version="1" kind="fragment">
+  <!--
+    NYC Mon loader: the H-Lynk scanner ring. A corner-cut frame (an octagon
+    with flat sides on the axes, the kit's chamfered-corner shape) carries a
+    quiet track and the real-progress fill. Inside it three arc rotors
+    counter-rotate at whole-turn speeds so the loop is seamless, a graduated
+    scanner dial ticks past, and a corner-cut core pulses like the scanner
+    lens.
+
+    Colours bind to the RiveLoader view model. The defaults below are the
+    night-scheme tokens from packages/theme/tokens.ts (led.on F80000,
+    orange-500 FC7C00, signage white FFFFFF, ink-800 25293D) so the file
+    renders on-brand before the host writes anything; the host binds the
+    real values per scheme at runtime, so a theme change rebuilds nothing.
+
+    State machine `Loader` follows the `phase` string: enter, then loading.
+    Every state has an explicit transition to every phase the host can set
+    next, so the phase can change at any moment.
+  -->
+  <Artboard width="320" height="320" name="RiveLoader" id="0:2" defaultStateMachineId="0:70" viewModelId="0:900" viewModelInstanceId="0:910" styleId="0:3">
+    <LayoutComponentStyle name="Artboard Style" id="0:3"/>
+
+    <!-- Stage wraps the scene so enter/complete transform everything at once. -->
+    <Node x="160" y="160" name="Stage" id="0:5" opacity="1">
+
+      <!-- Real progress: `progress` 0-1 fills the frame. Never faked. -->
+      <Shape name="ProgressFrame" rotation="0.3926991">
+        <Polygon points="8" width="300" height="300" originX="0.5" originY="0.5"/>
+        <Stroke thickness="4" cap="square">
+          <SolidColor colorValue="FFFC7C00"><DataBindContext sourcePathIds="0:900-0:902" propertyKey="37"/></SolidColor>
+          <TrimPath start="0" end="0"><DataBindContext sourcePathIds="0:900-0:905" propertyKey="115"/></TrimPath>
+        </Stroke>
+      </Shape>
+
+      <!-- Corner-cut frame: an octagon turned 22.5 degrees so its flat sides face the axes. -->
+      <Shape name="Track" rotation="0.3926991" opacity="0.9">
+        <Polygon points="8" width="300" height="300" originX="0.5" originY="0.5"/>
+        <Stroke thickness="2">
+          <SolidColor colorValue="FF25293D"><DataBindContext sourcePathIds="0:900-0:906" propertyKey="37"/></SolidColor>
+        </Stroke>
+      </Shape>
+
+      <Node name="OuterRotor" id="0:10">
+        <Shape name="OuterArc">
+          <Ellipse width="264" height="264" originX="0.5" originY="0.5"/>
+          <Stroke thickness="5" cap="butt">
+            <SolidColor colorValue="FFF80000"><DataBindContext sourcePathIds="0:900-0:901" propertyKey="37"/></SolidColor>
+            <TrimPath start="0.02" end="0.30"/>
+          </Stroke>
+        </Shape>
+        <Shape name="OuterArcOpposite">
+          <Ellipse width="264" height="264" originX="0.5" originY="0.5"/>
+          <Stroke thickness="5" cap="butt">
+            <SolidColor colorValue="FFF80000"><DataBindContext sourcePathIds="0:900-0:901" propertyKey="37"/></SolidColor>
+            <TrimPath start="0.52" end="0.80"/>
+          </Stroke>
+        </Shape>
+        <Shape name="OuterAccent" rotation="0.9">
+          <Ellipse width="244" height="244" originX="0.5" originY="0.5"/>
+          <Stroke thickness="2">
+            <SolidColor colorValue="FFFC7C00"><DataBindContext sourcePathIds="0:900-0:902" propertyKey="37"/></SolidColor>
+            <TrimPath start="0.58" end="0.70"/>
+          </Stroke>
+        </Shape>
+      </Node>
+
+      <!-- Scanner dial: graduations that sweep against the outer rotor. -->
+      <Node name="DialRotor" id="0:20">
+        <Shape name="DialTicks" opacity="0.8">
+          <Ellipse width="208" height="208" originX="0.5" originY="0.5"/>
+          <Stroke thickness="8">
+            <SolidColor colorValue="FF25293D"><DataBindContext sourcePathIds="0:900-0:906" propertyKey="37"/></SolidColor>
+            <DashPath><Dash length="2"/><Dash length="11"/></DashPath>
+          </Stroke>
+        </Shape>
+        <Shape name="DialSweep" opacity="0.9">
+          <Ellipse width="208" height="208" originX="0.5" originY="0.5"/>
+          <Stroke thickness="8">
+            <SolidColor colorValue="FFFC7C00"><DataBindContext sourcePathIds="0:900-0:902" propertyKey="37"/></SolidColor>
+            <TrimPath start="0.10" end="0.22"/>
+          </Stroke>
+        </Shape>
+      </Node>
+
+      <Node name="InnerRotor" id="0:30">
+        <Shape name="InnerArc">
+          <Ellipse width="148" height="148" originX="0.5" originY="0.5"/>
+          <Stroke thickness="3" cap="butt">
+            <SolidColor colorValue="FFF80000"><DataBindContext sourcePathIds="0:900-0:901" propertyKey="37"/></SolidColor>
+            <TrimPath start="0.12" end="0.38"/>
+          </Stroke>
+        </Shape>
+        <Shape name="InnerDash" opacity="0.6">
+          <Ellipse width="132" height="132" originX="0.5" originY="0.5"/>
+          <Stroke thickness="1.5">
+            <SolidColor colorValue="FF25293D"><DataBindContext sourcePathIds="0:900-0:906" propertyKey="37"/></SolidColor>
+            <DashPath><Dash length="1"/><Dash length="6"/></DashPath>
+          </Stroke>
+        </Shape>
+      </Node>
+
+      <!-- Scan pulse: a corner-cut ring that leaves the core and fades each cycle. -->
+      <Shape name="PulseRing" id="0:35" rotation="0.3926991" scaleX="0.7" scaleY="0.7" opacity="0">
+        <Polygon points="8" width="104" height="104" originX="0.5" originY="0.5"/>
+        <Stroke thickness="2">
+          <SolidColor colorValue="FFF80000"><DataBindContext sourcePathIds="0:900-0:901" propertyKey="37"/></SolidColor>
+        </Stroke>
+      </Shape>
+
+      <!-- Core: the scanner lens, a corner-cut plate in a red halo. The first
+           sibling draws on top, so the lens leads and the halo trails. -->
+      <Node name="Core" id="0:40">
+        <Shape name="CoreLens" rotation="0.3926991">
+          <Polygon points="8" width="32" height="32" originX="0.5" originY="0.5"/>
+          <Fill>
+            <SolidColor colorValue="FFFFFFFF"><DataBindContext sourcePathIds="0:900-0:903" propertyKey="37"/></SolidColor>
+          </Fill>
+        </Shape>
+        <Shape name="CoreFrame" rotation="0.3926991" opacity="0.9">
+          <Polygon points="8" width="72" height="72" originX="0.5" originY="0.5"/>
+          <Stroke thickness="1.5">
+            <SolidColor colorValue="FF25293D"><DataBindContext sourcePathIds="0:900-0:906" propertyKey="37"/></SolidColor>
+          </Stroke>
+        </Shape>
+        <Shape name="CoreHalo" rotation="0.3926991" opacity="0.22">
+          <Polygon points="8" width="58" height="58" originX="0.5" originY="0.5"/>
+          <Fill>
+            <SolidColor colorValue="FFF80000"><DataBindContext sourcePathIds="0:900-0:901" propertyKey="37"/></SolidColor>
+          </Fill>
+        </Shape>
+      </Node>
+    </Node>
+
+    <!-- Phase transitions leave each state explicitly. AnyState is not used:
+         its condition stays true while the phase holds, so it would re-enter
+         the target every frame and freeze the blend half way. -->
+    <StateMachine name="Loader" id="0:70">
+      <StateMachineLayer name="Phase" id="0:71">
+        <AnyState x="160" y="-140"/>
+        <ExitState x="880" y="-140"/>
+        <EntryState x="0" y="0">
+          <StateTransition stateToId="0:72"/>
+        </EntryState>
+
+        <AnimationState x="180" y="0" animationId="0:60" id="0:72" stateName="ENTER">
+          <StateTransition stateToId="0:76" duration="150">
+            <TransitionViewModelCondition opValue="equal">
+              <TransitionPropertyViewModelComparator>
+                <BindablePropertyString>
+                  <DataBindContext sourcePathIds="0:900-0:904" propertyKey="635"/>
+                </BindablePropertyString>
+              </TransitionPropertyViewModelComparator>
+              <TransitionValueStringComparator value="reduced"/>
+            </TransitionViewModelCondition>
+          </StateTransition>
+          <StateTransition stateToId="0:74" duration="100">
+            <TransitionViewModelCondition opValue="equal">
+              <TransitionPropertyViewModelComparator>
+                <BindablePropertyString>
+                  <DataBindContext sourcePathIds="0:900-0:904" propertyKey="635"/>
+                </BindablePropertyString>
+              </TransitionPropertyViewModelComparator>
+              <TransitionValueStringComparator value="complete"/>
+            </TransitionViewModelCondition>
+          </StateTransition>
+          <StateTransition stateToId="0:75" duration="100">
+            <TransitionViewModelCondition opValue="equal">
+              <TransitionPropertyViewModelComparator>
+                <BindablePropertyString>
+                  <DataBindContext sourcePathIds="0:900-0:904" propertyKey="635"/>
+                </BindablePropertyString>
+              </TransitionPropertyViewModelComparator>
+              <TransitionValueStringComparator value="error"/>
+            </TransitionViewModelCondition>
+          </StateTransition>
+          <StateTransition stateToId="0:73" duration="80" enableExitTime="true" exitTimeIsPercetange="true" exitTime="100"/>
+        </AnimationState>
+        <AnimationState x="400" y="0" animationId="0:61" id="0:73" stateName="LOADING">
+          <StateTransition stateToId="0:74" duration="100">
+            <TransitionViewModelCondition opValue="equal">
+              <TransitionPropertyViewModelComparator>
+                <BindablePropertyString>
+                  <DataBindContext sourcePathIds="0:900-0:904" propertyKey="635"/>
+                </BindablePropertyString>
+              </TransitionPropertyViewModelComparator>
+              <TransitionValueStringComparator value="complete"/>
+            </TransitionViewModelCondition>
+          </StateTransition>
+          <StateTransition stateToId="0:75" duration="100">
+            <TransitionViewModelCondition opValue="equal">
+              <TransitionPropertyViewModelComparator>
+                <BindablePropertyString>
+                  <DataBindContext sourcePathIds="0:900-0:904" propertyKey="635"/>
+                </BindablePropertyString>
+              </TransitionPropertyViewModelComparator>
+              <TransitionValueStringComparator value="error"/>
+            </TransitionViewModelCondition>
+          </StateTransition>
+          <StateTransition stateToId="0:76" duration="150">
+            <TransitionViewModelCondition opValue="equal">
+              <TransitionPropertyViewModelComparator>
+                <BindablePropertyString>
+                  <DataBindContext sourcePathIds="0:900-0:904" propertyKey="635"/>
+                </BindablePropertyString>
+              </TransitionPropertyViewModelComparator>
+              <TransitionValueStringComparator value="reduced"/>
+            </TransitionViewModelCondition>
+          </StateTransition>
+        </AnimationState>
+        <AnimationState x="400" y="160" animationId="0:62" id="0:74" stateName="COMPLETE">
+          <StateTransition stateToId="0:73" duration="120">
+            <TransitionViewModelCondition opValue="equal">
+              <TransitionPropertyViewModelComparator>
+                <BindablePropertyString>
+                  <DataBindContext sourcePathIds="0:900-0:904" propertyKey="635"/>
+                </BindablePropertyString>
+              </TransitionPropertyViewModelComparator>
+              <TransitionValueStringComparator value="loading"/>
+            </TransitionViewModelCondition>
+          </StateTransition>
+          <StateTransition stateToId="0:76" duration="150">
+            <TransitionViewModelCondition opValue="equal">
+              <TransitionPropertyViewModelComparator>
+                <BindablePropertyString>
+                  <DataBindContext sourcePathIds="0:900-0:904" propertyKey="635"/>
+                </BindablePropertyString>
+              </TransitionPropertyViewModelComparator>
+              <TransitionValueStringComparator value="reduced"/>
+            </TransitionViewModelCondition>
+          </StateTransition>
+        </AnimationState>
+        <AnimationState x="400" y="320" animationId="0:63" id="0:75" stateName="ERROR">
+          <StateTransition stateToId="0:73" duration="120">
+            <TransitionViewModelCondition opValue="equal">
+              <TransitionPropertyViewModelComparator>
+                <BindablePropertyString>
+                  <DataBindContext sourcePathIds="0:900-0:904" propertyKey="635"/>
+                </BindablePropertyString>
+              </TransitionPropertyViewModelComparator>
+              <TransitionValueStringComparator value="loading"/>
+            </TransitionViewModelCondition>
+          </StateTransition>
+          <StateTransition stateToId="0:76" duration="150">
+            <TransitionViewModelCondition opValue="equal">
+              <TransitionPropertyViewModelComparator>
+                <BindablePropertyString>
+                  <DataBindContext sourcePathIds="0:900-0:904" propertyKey="635"/>
+                </BindablePropertyString>
+              </TransitionPropertyViewModelComparator>
+              <TransitionValueStringComparator value="reduced"/>
+            </TransitionViewModelCondition>
+          </StateTransition>
+          <StateTransition stateToId="0:74" duration="100">
+            <TransitionViewModelCondition opValue="equal">
+              <TransitionPropertyViewModelComparator>
+                <BindablePropertyString>
+                  <DataBindContext sourcePathIds="0:900-0:904" propertyKey="635"/>
+                </BindablePropertyString>
+              </TransitionPropertyViewModelComparator>
+              <TransitionValueStringComparator value="complete"/>
+            </TransitionViewModelCondition>
+          </StateTransition>
+        </AnimationState>
+        <AnimationState x="640" y="160" animationId="0:64" id="0:76" stateName="REDUCED">
+          <StateTransition stateToId="0:73" duration="120">
+            <TransitionViewModelCondition opValue="equal">
+              <TransitionPropertyViewModelComparator>
+                <BindablePropertyString>
+                  <DataBindContext sourcePathIds="0:900-0:904" propertyKey="635"/>
+                </BindablePropertyString>
+              </TransitionPropertyViewModelComparator>
+              <TransitionValueStringComparator value="loading"/>
+            </TransitionViewModelCondition>
+          </StateTransition>
+          <StateTransition stateToId="0:74" duration="100">
+            <TransitionViewModelCondition opValue="equal">
+              <TransitionPropertyViewModelComparator>
+                <BindablePropertyString>
+                  <DataBindContext sourcePathIds="0:900-0:904" propertyKey="635"/>
+                </BindablePropertyString>
+              </TransitionPropertyViewModelComparator>
+              <TransitionValueStringComparator value="complete"/>
+            </TransitionViewModelCondition>
+          </StateTransition>
+          <StateTransition stateToId="0:75" duration="100">
+            <TransitionViewModelCondition opValue="equal">
+              <TransitionPropertyViewModelComparator>
+                <BindablePropertyString>
+                  <DataBindContext sourcePathIds="0:900-0:904" propertyKey="635"/>
+                </BindablePropertyString>
+              </TransitionPropertyViewModelComparator>
+              <TransitionValueStringComparator value="error"/>
+            </TransitionViewModelCondition>
+          </StateTransition>
+        </AnimationState>
+      </StateMachineLayer>
+    </StateMachine>
+
+    <!-- Enter: the rings draw in from the core. -->
+    <LinearAnimation duration="24" fps="60" loopValue="oneShot" name="Enter" id="0:60">
+      <KeyedObject objectId="0:5">
+        <KeyedProperty propertyKey="18"><KeyFrameDouble frame="0" value="0"/><KeyFrameDouble frame="18" value="1"/></KeyedProperty>
+        <KeyedProperty propertyKey="16"><KeyFrameDouble frame="0" value="0.6"/><KeyFrameDouble frame="24" value="1"/></KeyedProperty>
+        <KeyedProperty propertyKey="17"><KeyFrameDouble frame="0" value="0.6"/><KeyFrameDouble frame="24" value="1"/></KeyedProperty>
+      </KeyedObject>
+      <KeyedObject objectId="0:40">
+        <KeyedProperty propertyKey="16"><KeyFrameDouble frame="0" value="0"/><KeyFrameDouble frame="16" value="1.15"/><KeyFrameDouble frame="24" value="1"/></KeyedProperty>
+        <KeyedProperty propertyKey="17"><KeyFrameDouble frame="0" value="0"/><KeyFrameDouble frame="16" value="1.15"/><KeyFrameDouble frame="24" value="1"/></KeyedProperty>
+      </KeyedObject>
+    </LinearAnimation>
+
+    <!-- Loading: whole turns per 3 s cycle so the loop is seamless.
+         Outer +1 turn, dial -1 turn, inner +2 turns. -->
+    <LinearAnimation duration="180" fps="60" loopValue="loop" name="Loading" id="0:61">
+      <KeyedObject objectId="0:5">
+        <KeyedProperty propertyKey="16"><KeyFrameDouble frame="0" value="1"/></KeyedProperty>
+        <KeyedProperty propertyKey="17"><KeyFrameDouble frame="0" value="1"/></KeyedProperty>
+        <KeyedProperty propertyKey="18"><KeyFrameDouble frame="0" value="1"/></KeyedProperty>
+      </KeyedObject>
+      <KeyedObject objectId="0:10">
+        <KeyedProperty propertyKey="15"><KeyFrameDouble frame="0" value="0" interpolationType="linear"/><KeyFrameDouble frame="180" value="6.2831855" interpolationType="linear"/></KeyedProperty>
+      </KeyedObject>
+      <KeyedObject objectId="0:20">
+        <KeyedProperty propertyKey="15"><KeyFrameDouble frame="0" value="0" interpolationType="linear"/><KeyFrameDouble frame="180" value="-6.2831855" interpolationType="linear"/></KeyedProperty>
+      </KeyedObject>
+      <KeyedObject objectId="0:30">
+        <KeyedProperty propertyKey="15"><KeyFrameDouble frame="0" value="0" interpolationType="linear"/><KeyFrameDouble frame="180" value="12.566371" interpolationType="linear"/></KeyedProperty>
+      </KeyedObject>
+      <KeyedObject objectId="0:35">
+        <KeyedProperty propertyKey="16"><KeyFrameDouble frame="0" value="0.7" interpolationType="linear"/><KeyFrameDouble frame="180" value="1.3" interpolationType="linear"/></KeyedProperty>
+        <KeyedProperty propertyKey="17"><KeyFrameDouble frame="0" value="0.7" interpolationType="linear"/><KeyFrameDouble frame="180" value="1.3" interpolationType="linear"/></KeyedProperty>
+        <KeyedProperty propertyKey="18"><KeyFrameDouble frame="0" value="0.8"/><KeyFrameDouble frame="150" value="0.05"/><KeyFrameDouble frame="180" value="0"/></KeyedProperty>
+      </KeyedObject>
+      <KeyedObject objectId="0:40">
+        <KeyedProperty propertyKey="16"><KeyFrameDouble frame="0" value="0.94"/><KeyFrameDouble frame="90" value="1.06"/><KeyFrameDouble frame="180" value="0.94"/></KeyedProperty>
+        <KeyedProperty propertyKey="17"><KeyFrameDouble frame="0" value="0.94"/><KeyFrameDouble frame="90" value="1.06"/><KeyFrameDouble frame="180" value="0.94"/></KeyedProperty>
+      </KeyedObject>
+    </LinearAnimation>
+
+    <!-- Complete: everything collapses into the core and fades, the exit a
+         reveal can sync to. -->
+    <LinearAnimation duration="20" fps="60" loopValue="oneShot" name="Complete" id="0:62">
+      <KeyedObject objectId="0:5">
+        <KeyedProperty propertyKey="16"><KeyFrameDouble frame="0" value="1"/><KeyFrameDouble frame="20" value="0.55"/></KeyedProperty>
+        <KeyedProperty propertyKey="17"><KeyFrameDouble frame="0" value="1"/><KeyFrameDouble frame="20" value="0.55"/></KeyedProperty>
+        <KeyedProperty propertyKey="18"><KeyFrameDouble frame="0" value="1"/><KeyFrameDouble frame="14" value="0.5"/><KeyFrameDouble frame="20" value="0"/></KeyedProperty>
+      </KeyedObject>
+      <KeyedObject objectId="0:40">
+        <KeyedProperty propertyKey="16"><KeyFrameDouble frame="0" value="1"/><KeyFrameDouble frame="8" value="1.2"/><KeyFrameDouble frame="20" value="0"/></KeyedProperty>
+        <KeyedProperty propertyKey="17"><KeyFrameDouble frame="0" value="1"/><KeyFrameDouble frame="8" value="1.2"/><KeyFrameDouble frame="20" value="0"/></KeyedProperty>
+      </KeyedObject>
+    </LinearAnimation>
+
+    <!-- Error: the rings stop and dim; the host's error UI takes over. -->
+    <LinearAnimation duration="18" fps="60" loopValue="oneShot" name="Error" id="0:63">
+      <KeyedObject objectId="0:5">
+        <KeyedProperty propertyKey="16"><KeyFrameDouble frame="0" value="1"/></KeyedProperty>
+        <KeyedProperty propertyKey="17"><KeyFrameDouble frame="0" value="1"/></KeyedProperty>
+        <KeyedProperty propertyKey="18"><KeyFrameDouble frame="0" value="1"/><KeyFrameDouble frame="18" value="0.35"/></KeyedProperty>
+      </KeyedObject>
+      <KeyedObject objectId="0:40">
+        <KeyedProperty propertyKey="16"><KeyFrameDouble frame="0" value="1"/></KeyedProperty>
+        <KeyedProperty propertyKey="17"><KeyFrameDouble frame="0" value="1"/></KeyedProperty>
+        <KeyedProperty propertyKey="18"><KeyFrameDouble frame="0" value="1"/><KeyFrameDouble frame="18" value="0.4"/></KeyedProperty>
+      </KeyedObject>
+    </LinearAnimation>
+
+    <!-- Reduced motion: a slow opacity pulse, no rotation (4 s cycle).
+         Error, Reduced and Loading key the stage and core scale they need, so
+         a phase set before Enter finishes never inherits Enter's first frame. -->
+    <LinearAnimation duration="240" fps="60" loopValue="loop" name="Reduced" id="0:64">
+      <KeyedObject objectId="0:5">
+        <KeyedProperty propertyKey="16"><KeyFrameDouble frame="0" value="1"/></KeyedProperty>
+        <KeyedProperty propertyKey="17"><KeyFrameDouble frame="0" value="1"/></KeyedProperty>
+        <KeyedProperty propertyKey="18"><KeyFrameDouble frame="0" value="0.45"/><KeyFrameDouble frame="120" value="1"/><KeyFrameDouble frame="240" value="0.45"/></KeyedProperty>
+      </KeyedObject>
+      <KeyedObject objectId="0:40">
+        <KeyedProperty propertyKey="16"><KeyFrameDouble frame="0" value="1"/></KeyedProperty>
+        <KeyedProperty propertyKey="17"><KeyFrameDouble frame="0" value="1"/></KeyedProperty>
+      </KeyedObject>
+    </LinearAnimation>
+
+  </Artboard>
+
+  <ViewModel defaultInstanceId="0:910" name="RiveLoader" id="0:900">
+    <ViewModelPropertyColor name="ringPrimary" id="0:901"/>
+    <ViewModelPropertyColor name="ringAccent" id="0:902"/>
+    <ViewModelPropertyColor name="core" id="0:903"/>
+    <ViewModelPropertyString name="phase" id="0:904"/>
+    <ViewModelPropertyNumber name="progress" id="0:905"/>
+    <ViewModelPropertyColor name="track" id="0:906"/>
+    <ViewModelInstance exports="true" name="Default" id="0:910">
+      <ViewModelInstanceColor propertyValue="FFF80000" viewModelPropertyId="0:901"/>
+      <ViewModelInstanceColor propertyValue="FFFC7C00" viewModelPropertyId="0:902"/>
+      <ViewModelInstanceColor propertyValue="FFFFFFFF" viewModelPropertyId="0:903"/>
+      <ViewModelInstanceString propertyValue="loading" viewModelPropertyId="0:904"/>
+      <ViewModelInstanceNumber propertyValue="0" viewModelPropertyId="0:905"/>
+      <ViewModelInstanceColor propertyValue="FF25293D" viewModelPropertyId="0:906"/>
+    </ViewModelInstance>
+  </ViewModel>
+</Rive>

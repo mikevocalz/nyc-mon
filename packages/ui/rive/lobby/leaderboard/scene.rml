@@ -1,0 +1,536 @@
+<Rive version="1" kind="fragment">
+    <!-- NYC-MON lobby leaderboard (Master Directive v2 §3, §8; G02 handoff
+         docs/design/screens/G02-game-lobby/08-handoff.md). Client id 2: this
+         file is symlinked into lobby/game-lobby beside the other lobby
+         projects, so no id here may collide with theirs. Theme, Layout and
+         A11y view models come from shared-vm.rml (client 9).
+
+         Two artboards. LeaderboardPanel is the component: it binds the Panel
+         view model (status, rows, a11y) and is what game-lobby nests.
+         Leaderboard is the standalone host: it binds the root view model so
+         the contract paths leaderboard/status, leaderboard/rows[n]/rank,
+         /name, /score, /isSelf and a11y/reducedMotion resolve from the top,
+         and hands the panel its instance through dataBindPathIds. A nested
+         artboard without that handoff keeps its authored literals (proved by
+         probe in this session).
+
+         Rows: ViewModelPropertyList "rows" on Panel, one ViewModelInstanceListItem
+         per fixture row, LeaderboardRow (viewModelId = Row) repeated by an
+         ArtboardComponentList bound with propertyKey 800 (rive docs data, "Lists
+         and repeated artboards"). The CLI cannot set a row through --data
+         (leaderboard/rows[0]/name reports no property at this path); the host
+         runtime writes rows, and --data-dump proves the paths.
+
+         Decision: BUILD a sixth status value, unavailable, on top of the
+         directive's five, because the G02 handoff makes it the default until a
+         ranking authority exists. Decision: STRIKE theme binding inside the
+         panel; SolidPanel tone="ink" is the same ink in both schemes.
+         Colours are tokens.ts hexes only (scripts/rive/check-colors.mjs). -->
+    <Artboard defaultStateMachineId="2:7" viewModelId="2:40" viewModelInstanceId="2:41"
+              width="343" height="264" styleId="2:5" name="Leaderboard" id="2:2">
+        <LayoutComponentStyle name="Artboard Style" id="2:5"/>
+        <!-- NestedStateMachine is required: without it the panel's machine never runs and every bind stays at its literal -->
+        <NestedArtboard artboardId="2:30" dataBindPathIds="2:40-2:45" x="0" y="0" name="Panel" id="2:10">
+            <NestedStateMachine animationId="2:37" name="Machine"/>
+        </NestedArtboard>
+        <StateMachine name="Host" id="2:7">
+            <StateMachineLayer name="Host" id="2:8">
+                <AnyState x="400" y="-120"/>
+                <ExitState x="600" y="-120"/>
+                <EntryState x="0" y="0"><StateTransition stateToId="2:20"/></EntryState>
+                <AnimationState x="160" y="0" animationId="2:21" id="2:20"/>
+            </StateMachineLayer>
+        </StateMachine>
+        <LinearAnimation duration="1" name="Rest" id="2:21"/>
+    </Artboard>
+
+    <!-- The panel. 343 x 264: header band 40, four 56 pt rows. Draw order is
+         declaration order, first on top. -->
+    <Artboard isComponent="true" defaultStateMachineId="2:37" viewModelId="2:50" viewModelInstanceId="2:53"
+              x="400" y="0" width="343" height="264" styleId="2:35" name="LeaderboardPanel" id="2:30">
+        <LayoutComponentStyle layoutWidthScaleType="fixed" layoutHeightScaleType="fixed" name="Panel Style" id="2:35"/>
+
+        <!-- status line for empty / error / unavailable; a live region so a
+             status change is announced once -->
+        <Text x="16" y="64" opacity="0" sizingValue="autoWidth" name="Message" id="2:230">
+            <SemanticData role="text" label="NYC Rank, ready" isLiveRegion="true" name="Semantics" id="2:265"/>
+            <TextStylePaint fontSize="15" fontAssetId="2:900" familyName="Space Grotesk" styleName="Medium" name="Message Style" id="2:231">
+                <Fill name="Fill"><SolidColor colorValue="FFDFE0E1" name="C"/></Fill>
+                <TextStyleAxis tag="2003265652" axisValue="500" name="Weight"/>
+            </TextStylePaint>
+            <TextValueRun styleId="2:231" text="No ranks yet. Play a round to be ranked." name="Run" id="2:232"/>
+        </Text>
+        <!-- stale strip, bottom of the panel -->
+        <Text x="327" y="20" originX="1" originY="0.5" alignValue="right" opacity="0" sizingValue="autoWidth" name="Strip" id="2:235">
+            <TextStylePaint fontSize="13" fontAssetId="2:900" familyName="Space Grotesk" styleName="Medium" name="Strip Style" id="2:236">
+                <Fill name="Fill"><SolidColor colorValue="FFFA4040" name="C"/></Fill>
+                <TextStyleAxis tag="2003265652" axisValue="500" name="Weight"/>
+            </TextStylePaint>
+            <TextValueRun styleId="2:236" text="Rankings may be out of date." name="Run"/>
+        </Text>
+
+        <!-- loading skeleton: three lines, the full-motion timeline breathes
+             them, the reduced sibling holds them still -->
+        <Node opacity="0" name="Skeleton" id="2:220">
+            <Shape x="16" y="63" name="Line 1" id="2:221"><Rectangle originX="0" originY="0" width="180" height="10" cornerRadiusTL="2" cornerRadiusTR="2" cornerRadiusBL="2" cornerRadiusBR="2" name="Path"/><Fill name="Fill"><SolidColor colorValue="FF484C51" name="C"/></Fill></Shape>
+            <Shape x="16" y="119" name="Line 2" id="2:222"><Rectangle originX="0" originY="0" width="140" height="10" cornerRadiusTL="2" cornerRadiusTR="2" cornerRadiusBL="2" cornerRadiusBR="2" name="Path"/><Fill name="Fill"><SolidColor colorValue="FF484C51" name="C"/></Fill></Shape>
+            <Shape x="16" y="175" name="Line 3" id="2:223"><Rectangle originX="0" originY="0" width="160" height="10" cornerRadiusTL="2" cornerRadiusTR="2" cornerRadiusBL="2" cornerRadiusBR="2" name="Path"/><Fill name="Fill"><SolidColor colorValue="FF484C51" name="C"/></Fill></Shape>
+        </Node>
+
+        <!-- the rows: a column of LeaderboardRow instances, one per list item -->
+        <LayoutComponent x="0" y="40" width="343" height="224" styleId="2:241" name="Rows" id="2:240">
+            <SemanticData role="list" label="NYC Rank" name="Semantics" id="2:266"/>
+            <LayoutComponentStyle flexDirectionValue="column" layoutWidthScaleType="fixed" layoutHeightScaleType="fixed" name="Rows Style" id="2:241"/>
+            <ArtboardComponentList name="List" id="2:242">
+                <DataBindContext sourcePathIds="2:50-2:52" propertyKey="800"/>
+            </ArtboardComponentList>
+        </LayoutComponent>
+
+        <!-- header: title, five lit segments, 2 dp royal keyline under the band -->
+        <Text x="16" y="20" originY="0.5" sizingValue="autoWidth" name="Title" id="2:200">
+            <SemanticData role="text" label="NYC Rank" headingLevel="2" name="Semantics"/>
+            <TextStylePaint fontSize="14" letterSpacing="2.5" fontAssetId="2:900" familyName="Space Grotesk" styleName="SemiBold" name="Title Style" id="2:201">
+                <Fill name="Fill"><SolidColor colorValue="FFF8F8F8" name="C"/></Fill>
+                <TextStyleAxis tag="2003265652" axisValue="600" name="Weight"/>
+            </TextStylePaint>
+            <TextValueRun styleId="2:201" text="NYC RANK" name="Run"/>
+        </Text>
+        <Node name="Segments" id="2:209">
+            <Shape x="245" y="20" opacity="0.25" name="Seg 1" id="2:210"><Rectangle width="12" height="6" name="Path"/><Fill name="Fill"><SolidColor colorValue="FF0058F8" name="C"/></Fill></Shape>
+            <Shape x="263" y="20" opacity="0.25" name="Seg 2" id="2:211"><Rectangle width="12" height="6" name="Path"/><Fill name="Fill"><SolidColor colorValue="FF0058F8" name="C"/></Fill></Shape>
+            <Shape x="281" y="20" opacity="0.25" name="Seg 3" id="2:212"><Rectangle width="12" height="6" name="Path"/><Fill name="Fill"><SolidColor colorValue="FF0058F8" name="C"/></Fill></Shape>
+            <Shape x="299" y="20" opacity="0.25" name="Seg 4" id="2:213"><Rectangle width="12" height="6" name="Path"/><Fill name="Fill"><SolidColor colorValue="FF0058F8" name="C"/></Fill></Shape>
+            <Shape x="317" y="20" opacity="0.25" name="Seg 5" id="2:214"><Rectangle width="12" height="6" name="Path"/><Fill name="Fill"><SolidColor colorValue="FFFC7C00" name="C"/></Fill></Shape>
+        </Node>
+        <Shape x="171.5" y="40" name="Header Rule" id="2:250">
+            <Rectangle width="343" height="2" name="Path"/>
+            <Fill name="Fill"><SolidColor colorValue="FF0058F8" name="C"/></Fill>
+        </Shape>
+
+        <!-- face and plate: the kit's SolidPanel tone="ink" inside a
+             CornerCutFrame corner="bottom-right" cut 16 -->
+        <Shape name="Face" id="2:251">
+            <PointsPath isClosed="true" isClockwise="true" name="Path">
+                <StraightVertex x="2" y="2"/>
+                <StraightVertex x="341" y="2"/>
+                <StraightVertex x="341" y="246.8"/>
+                <StraightVertex x="325.8" y="262"/>
+                <StraightVertex x="2" y="262"/>
+            </PointsPath>
+            <Fill name="Fill"><SolidColor colorValue="FF00041C" name="C"/></Fill>
+        </Shape>
+        <Shape name="Plate" id="2:252">
+            <PointsPath isClosed="true" isClockwise="true" name="Path">
+                <StraightVertex x="0" y="0"/>
+                <StraightVertex x="343" y="0"/>
+                <StraightVertex x="343" y="248"/>
+                <StraightVertex x="327" y="264"/>
+                <StraightVertex x="0" y="264"/>
+            </PointsPath>
+            <Fill name="Fill"><SolidColor colorValue="FF25293D" name="C"/></Fill>
+        </Shape>
+
+        <!-- Status poses. Loading breathes the skeleton (loop); LoadingReduced
+             holds it. Stale keeps the rows at 0.6 and shows the strip. -->
+        <LinearAnimation duration="72" loopValue="loop" name="Loading" id="2:400">
+            <KeyedObject objectId="2:240"><KeyedProperty property="opacity"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:220"><KeyedProperty property="opacity">
+                <KeyFrameDouble value="0.5" frame="0" interpolationType="cubic"><CubicEaseInterpolator x1="0.42" y1="0" x2="0.58" y2="1"/></KeyFrameDouble>
+                <KeyFrameDouble value="1" frame="36" interpolationType="cubic"><CubicEaseInterpolator x1="0.42" y1="0" x2="0.58" y2="1"/></KeyFrameDouble>
+                <KeyFrameDouble value="0.5" frame="72" interpolationType="linear"/>
+            </KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:232"><KeyedProperty property="text"><KeyFrameString value="Loading rankings" interpolationType="hold"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:230"><KeyedProperty property="opacity"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:235"><KeyedProperty property="opacity"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:209"><KeyedProperty property="opacity"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:265"><KeyedProperty property="label"><KeyFrameString value="Loading rankings" interpolationType="hold"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:265"><KeyedProperty property="isHidden"><KeyFrameBool value="true" interpolationType="hold"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:266"><KeyedProperty property="isHidden"><KeyFrameBool value="true" interpolationType="hold"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+        <LinearAnimation duration="1" name="LoadingReduced" id="2:401">
+            <KeyedObject objectId="2:240"><KeyedProperty property="opacity"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:220"><KeyedProperty property="opacity"><KeyFrameDouble value="0.7" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:232"><KeyedProperty property="text"><KeyFrameString value="Loading rankings" interpolationType="hold"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:230"><KeyedProperty property="opacity"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:235"><KeyedProperty property="opacity"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:209"><KeyedProperty property="opacity"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:265"><KeyedProperty property="label"><KeyFrameString value="NYC Rank, ready" interpolationType="hold"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:265"><KeyedProperty property="isHidden"><KeyFrameBool value="true" interpolationType="hold"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:266"><KeyedProperty property="isHidden"><KeyFrameBool value="true" interpolationType="hold"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+        <LinearAnimation duration="1" name="Ready" id="2:402">
+            <KeyedObject objectId="2:240"><KeyedProperty property="opacity"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:220"><KeyedProperty property="opacity"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:232"><KeyedProperty property="text"><KeyFrameString value="No ranks yet. Play a round to be ranked." interpolationType="hold"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:230"><KeyedProperty property="opacity"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:235"><KeyedProperty property="opacity"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:209"><KeyedProperty property="opacity"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:265"><KeyedProperty property="label"><KeyFrameString value="NYC Rank, ready" interpolationType="hold"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:265"><KeyedProperty property="isHidden"><KeyFrameBool value="true" interpolationType="hold"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:266"><KeyedProperty property="isHidden"><KeyFrameBool value="false" interpolationType="hold"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+        <LinearAnimation duration="1" name="Empty" id="2:403">
+            <KeyedObject objectId="2:240"><KeyedProperty property="opacity"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:220"><KeyedProperty property="opacity"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:232"><KeyedProperty property="text"><KeyFrameString value="No ranks yet. Play a round to be ranked." interpolationType="hold"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:230"><KeyedProperty property="opacity"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:235"><KeyedProperty property="opacity"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:209"><KeyedProperty property="opacity"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:265"><KeyedProperty property="label"><KeyFrameString value="No ranks yet. Play a round to be ranked." interpolationType="hold"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:265"><KeyedProperty property="isHidden"><KeyFrameBool value="false" interpolationType="hold"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:266"><KeyedProperty property="isHidden"><KeyFrameBool value="true" interpolationType="hold"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+        <LinearAnimation duration="1" name="Stale" id="2:404">
+            <KeyedObject objectId="2:240"><KeyedProperty property="opacity"><KeyFrameDouble value="0.6" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:220"><KeyedProperty property="opacity"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:232"><KeyedProperty property="text"><KeyFrameString value="Rankings may be out of date." interpolationType="hold"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:230"><KeyedProperty property="opacity"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:235"><KeyedProperty property="opacity"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:209"><KeyedProperty property="opacity"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:265"><KeyedProperty property="label"><KeyFrameString value="NYC Rank, ready" interpolationType="hold"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:265"><KeyedProperty property="isHidden"><KeyFrameBool value="true" interpolationType="hold"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:266"><KeyedProperty property="isHidden"><KeyFrameBool value="false" interpolationType="hold"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+        <LinearAnimation duration="1" name="Error" id="2:405">
+            <KeyedObject objectId="2:240"><KeyedProperty property="opacity"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:220"><KeyedProperty property="opacity"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:232"><KeyedProperty property="text"><KeyFrameString value="Rankings did not load. Try again." interpolationType="hold"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:230"><KeyedProperty property="opacity"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:235"><KeyedProperty property="opacity"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:209"><KeyedProperty property="opacity"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:265"><KeyedProperty property="label"><KeyFrameString value="Rankings did not load. Try again." interpolationType="hold"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:265"><KeyedProperty property="isHidden"><KeyFrameBool value="false" interpolationType="hold"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:266"><KeyedProperty property="isHidden"><KeyFrameBool value="true" interpolationType="hold"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+        <LinearAnimation duration="1" name="Unavailable" id="2:406">
+            <KeyedObject objectId="2:240"><KeyedProperty property="opacity"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:220"><KeyedProperty property="opacity"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:232"><KeyedProperty property="text"><KeyFrameString value="NYC Rank is not available yet." interpolationType="hold"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:230"><KeyedProperty property="opacity"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:235"><KeyedProperty property="opacity"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:209"><KeyedProperty property="opacity"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:265"><KeyedProperty property="label"><KeyFrameString value="NYC Rank is not available yet." interpolationType="hold"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:265"><KeyedProperty property="isHidden"><KeyFrameBool value="false" interpolationType="hold"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:266"><KeyedProperty property="isHidden"><KeyFrameBool value="true" interpolationType="hold"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+
+        <!-- Header segments: lit left to right over 18 frames on enter, then
+             still. The reduced sibling is drawn lit. -->
+        <LinearAnimation duration="18" name="SegmentsIn" id="2:410">
+            <KeyedObject objectId="2:210"><KeyedProperty property="opacity"><KeyFrameDouble value="0.25" frame="0" interpolationType="linear"/><KeyFrameDouble value="1" frame="4" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:211"><KeyedProperty property="opacity"><KeyFrameDouble value="0.25" frame="3" interpolationType="linear"/><KeyFrameDouble value="1" frame="7" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:212"><KeyedProperty property="opacity"><KeyFrameDouble value="0.25" frame="6" interpolationType="linear"/><KeyFrameDouble value="1" frame="10" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:213"><KeyedProperty property="opacity"><KeyFrameDouble value="0.25" frame="9" interpolationType="linear"/><KeyFrameDouble value="1" frame="13" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:214"><KeyedProperty property="opacity"><KeyFrameDouble value="0.25" frame="12" interpolationType="linear"/><KeyFrameDouble value="1" frame="18" interpolationType="linear"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+        <LinearAnimation duration="1" name="SegmentsLit" id="2:411">
+            <KeyedObject objectId="2:210"><KeyedProperty property="opacity"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:211"><KeyedProperty property="opacity"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:212"><KeyedProperty property="opacity"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:213"><KeyedProperty property="opacity"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:214"><KeyedProperty property="opacity"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+
+        <StateMachine name="Panel" id="2:37">
+            <StateMachineLayer name="Status" id="2:38">
+                <AnyState x="1200" y="-200"/>
+                <ExitState x="1400" y="-200"/>
+                <EntryState x="0" y="0">
+                    <StateTransition stateToId="2:600"><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="2:50-2:54-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="false"/></TransitionViewModelCondition></StateTransition>
+                    <StateTransition stateToId="2:601"><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="2:50-2:54-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="true"/></TransitionViewModelCondition></StateTransition>
+                </EntryState>
+                <AnimationState x="160" y="-120" animationId="2:400" id="2:600">
+                        <StateTransition stateToId="2:601" duration="0"><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="2:50-2:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="2:91"/></TransitionViewModelCondition><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="2:50-2:54-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="true"/></TransitionViewModelCondition></StateTransition>
+                        <StateTransition stateToId="2:602" duration="200"><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="2:50-2:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="2:92"/></TransitionViewModelCondition></StateTransition>
+                        <StateTransition stateToId="2:603" duration="200"><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="2:50-2:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="2:93"/></TransitionViewModelCondition></StateTransition>
+                        <StateTransition stateToId="2:604" duration="200"><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="2:50-2:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="2:94"/></TransitionViewModelCondition></StateTransition>
+                        <StateTransition stateToId="2:605" duration="200"><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="2:50-2:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="2:95"/></TransitionViewModelCondition></StateTransition>
+                        <StateTransition stateToId="2:606" duration="200"><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="2:50-2:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="2:96"/></TransitionViewModelCondition></StateTransition>
+                </AnimationState>
+                <AnimationState x="160" y="120" animationId="2:401" id="2:601">
+                        <StateTransition stateToId="2:600" duration="200"><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="2:50-2:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="2:91"/></TransitionViewModelCondition><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="2:50-2:54-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="false"/></TransitionViewModelCondition></StateTransition>
+                        <StateTransition stateToId="2:602" duration="200"><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="2:50-2:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="2:92"/></TransitionViewModelCondition></StateTransition>
+                        <StateTransition stateToId="2:603" duration="200"><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="2:50-2:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="2:93"/></TransitionViewModelCondition></StateTransition>
+                        <StateTransition stateToId="2:604" duration="200"><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="2:50-2:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="2:94"/></TransitionViewModelCondition></StateTransition>
+                        <StateTransition stateToId="2:605" duration="200"><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="2:50-2:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="2:95"/></TransitionViewModelCondition></StateTransition>
+                        <StateTransition stateToId="2:606" duration="200"><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="2:50-2:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="2:96"/></TransitionViewModelCondition></StateTransition>
+                </AnimationState>
+                <AnimationState x="400" y="-160" animationId="2:402" id="2:602">
+                        <StateTransition stateToId="2:600" duration="200"><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="2:50-2:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="2:91"/></TransitionViewModelCondition><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="2:50-2:54-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="false"/></TransitionViewModelCondition></StateTransition>
+                        <StateTransition stateToId="2:601" duration="0"><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="2:50-2:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="2:91"/></TransitionViewModelCondition><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="2:50-2:54-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="true"/></TransitionViewModelCondition></StateTransition>
+                        <StateTransition stateToId="2:603" duration="200"><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="2:50-2:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="2:93"/></TransitionViewModelCondition></StateTransition>
+                        <StateTransition stateToId="2:604" duration="200"><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="2:50-2:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="2:94"/></TransitionViewModelCondition></StateTransition>
+                        <StateTransition stateToId="2:605" duration="200"><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="2:50-2:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="2:95"/></TransitionViewModelCondition></StateTransition>
+                        <StateTransition stateToId="2:606" duration="200"><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="2:50-2:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="2:96"/></TransitionViewModelCondition></StateTransition>
+                </AnimationState>
+                <AnimationState x="400" y="0" animationId="2:403" id="2:603">
+                        <StateTransition stateToId="2:600" duration="200"><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="2:50-2:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="2:91"/></TransitionViewModelCondition><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="2:50-2:54-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="false"/></TransitionViewModelCondition></StateTransition>
+                        <StateTransition stateToId="2:601" duration="0"><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="2:50-2:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="2:91"/></TransitionViewModelCondition><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="2:50-2:54-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="true"/></TransitionViewModelCondition></StateTransition>
+                        <StateTransition stateToId="2:602" duration="200"><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="2:50-2:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="2:92"/></TransitionViewModelCondition></StateTransition>
+                        <StateTransition stateToId="2:604" duration="200"><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="2:50-2:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="2:94"/></TransitionViewModelCondition></StateTransition>
+                        <StateTransition stateToId="2:605" duration="200"><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="2:50-2:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="2:95"/></TransitionViewModelCondition></StateTransition>
+                        <StateTransition stateToId="2:606" duration="200"><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="2:50-2:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="2:96"/></TransitionViewModelCondition></StateTransition>
+                </AnimationState>
+                <AnimationState x="400" y="160" animationId="2:404" id="2:604">
+                        <StateTransition stateToId="2:600" duration="200"><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="2:50-2:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="2:91"/></TransitionViewModelCondition><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="2:50-2:54-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="false"/></TransitionViewModelCondition></StateTransition>
+                        <StateTransition stateToId="2:601" duration="0"><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="2:50-2:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="2:91"/></TransitionViewModelCondition><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="2:50-2:54-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="true"/></TransitionViewModelCondition></StateTransition>
+                        <StateTransition stateToId="2:602" duration="200"><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="2:50-2:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="2:92"/></TransitionViewModelCondition></StateTransition>
+                        <StateTransition stateToId="2:603" duration="200"><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="2:50-2:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="2:93"/></TransitionViewModelCondition></StateTransition>
+                        <StateTransition stateToId="2:605" duration="200"><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="2:50-2:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="2:95"/></TransitionViewModelCondition></StateTransition>
+                        <StateTransition stateToId="2:606" duration="200"><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="2:50-2:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="2:96"/></TransitionViewModelCondition></StateTransition>
+                </AnimationState>
+                <AnimationState x="640" y="-80" animationId="2:405" id="2:605">
+                        <StateTransition stateToId="2:600" duration="200"><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="2:50-2:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="2:91"/></TransitionViewModelCondition><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="2:50-2:54-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="false"/></TransitionViewModelCondition></StateTransition>
+                        <StateTransition stateToId="2:601" duration="0"><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="2:50-2:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="2:91"/></TransitionViewModelCondition><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="2:50-2:54-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="true"/></TransitionViewModelCondition></StateTransition>
+                        <StateTransition stateToId="2:602" duration="200"><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="2:50-2:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="2:92"/></TransitionViewModelCondition></StateTransition>
+                        <StateTransition stateToId="2:603" duration="200"><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="2:50-2:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="2:93"/></TransitionViewModelCondition></StateTransition>
+                        <StateTransition stateToId="2:604" duration="200"><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="2:50-2:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="2:94"/></TransitionViewModelCondition></StateTransition>
+                        <StateTransition stateToId="2:606" duration="200"><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="2:50-2:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="2:96"/></TransitionViewModelCondition></StateTransition>
+                </AnimationState>
+                <AnimationState x="640" y="80" animationId="2:406" id="2:606">
+                        <StateTransition stateToId="2:600" duration="200"><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="2:50-2:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="2:91"/></TransitionViewModelCondition><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="2:50-2:54-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="false"/></TransitionViewModelCondition></StateTransition>
+                        <StateTransition stateToId="2:601" duration="0"><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="2:50-2:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="2:91"/></TransitionViewModelCondition><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="2:50-2:54-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="true"/></TransitionViewModelCondition></StateTransition>
+                        <StateTransition stateToId="2:602" duration="200"><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="2:50-2:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="2:92"/></TransitionViewModelCondition></StateTransition>
+                        <StateTransition stateToId="2:603" duration="200"><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="2:50-2:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="2:93"/></TransitionViewModelCondition></StateTransition>
+                        <StateTransition stateToId="2:604" duration="200"><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="2:50-2:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="2:94"/></TransitionViewModelCondition></StateTransition>
+                        <StateTransition stateToId="2:605" duration="200"><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="2:50-2:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="2:95"/></TransitionViewModelCondition></StateTransition>
+                </AnimationState>
+            </StateMachineLayer>
+            <StateMachineLayer name="Enter" id="2:39">
+                <AnyState x="600" y="-120"/>
+                <ExitState x="800" y="-120"/>
+                <EntryState x="0" y="0">
+                    <StateTransition stateToId="2:610"><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="2:50-2:54-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="false"/></TransitionViewModelCondition></StateTransition>
+                    <StateTransition stateToId="2:611"><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="2:50-2:54-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="true"/></TransitionViewModelCondition></StateTransition>
+                </EntryState>
+                <AnimationState x="160" y="0" animationId="2:410" id="2:610">
+                    <StateTransition stateToId="2:611" enableExitTime="true" exitTimeIsPercetange="true" exitTime="100"/>
+                </AnimationState>
+                <AnimationState x="400" y="0" animationId="2:411" id="2:611"/>
+            </StateMachineLayer>
+        </StateMachine>
+    </Artboard>
+    <ComponentAsset artboardId="2:30" name="LeaderboardPanel"/>
+
+    <!-- One row. 343 x 56, fixed on both axes so the list sizes rows from the
+         artboard (rive docs data, "Laying the rows out"). Bound to Row. -->
+    <Artboard isComponent="true" defaultStateMachineId="2:67" viewModelId="2:70" viewModelInstanceId="2:79"
+              x="800" y="0" width="343" height="56" styleId="2:65" name="LeaderboardRow" id="2:60">
+        <LayoutComponentStyle layoutWidthScaleType="fixed" layoutHeightScaleType="fixed" name="Row Style" id="2:65"/>
+        <Node name="Row" id="2:299">
+            <SemanticData role="listItem" label="Rank" name="Semantics" id="2:261">
+                <DataBindContext sourcePathIds="2:70-2:72" propertyKey="983"/>
+                <DataBindContext sourcePathIds="2:70-2:73" propertyKey="984" converterId="2:150"/>
+            </SemanticData>
+            <!-- rank numeral; the orange mark to its left is rank 1 only -->
+            <Shape x="9.5" y="28" opacity="0" name="Rank Mark" id="2:300">
+                <Rectangle width="3" height="20" name="Path"/>
+                <Fill name="Fill"><SolidColor colorValue="FFFC7C00" name="C"/></Fill>
+            </Shape>
+            <Text x="20" y="28" originY="0.5" sizingValue="autoWidth" name="Rank" id="2:301">
+                <TextStylePaint fontSize="17" fontAssetId="2:900" familyName="Space Grotesk" styleName="SemiBold" name="Rank Style" id="2:302">
+                    <Fill name="Fill"><SolidColor colorValue="FFDFE0E1" name="C" id="2:313"/></Fill>
+                    <TextStyleAxis tag="2003265652" axisValue="600" name="Weight" id="2:315"/>
+                </TextStylePaint>
+                <TextValueRun styleId="2:302" text="0" name="Run">
+                    <DataBindContext sourcePathIds="2:70-2:71" propertyKey="268" converterId="2:150"/>
+                </TextValueRun>
+            </Text>
+            <Text x="60" y="28" originY="0.5" sizingValue="autoWidth" name="Name" id="2:304">
+                <TextStylePaint fontSize="17" fontAssetId="2:900" familyName="Space Grotesk" styleName="Medium" name="Name Style" id="2:305">
+                    <Fill name="Fill"><SolidColor colorValue="FFDFE0E1" name="C" id="2:314"/></Fill>
+                    <TextStyleAxis tag="2003265652" axisValue="500" name="Weight"/>
+                </TextStylePaint>
+                <TextValueRun styleId="2:305" text="NAME-LITERAL" name="Run">
+                    <DataBindContext sourcePathIds="2:70-2:72" propertyKey="268"/>
+                </TextValueRun>
+            </Text>
+            <Text x="327" y="28" originX="1" originY="0.5" alignValue="right" sizingValue="autoWidth" name="Score" id="2:307">
+                <TextStylePaint fontSize="17" fontAssetId="2:900" familyName="Space Grotesk" styleName="SemiBold" name="Score Style" id="2:308">
+                    <Fill name="Fill"><SolidColor colorValue="FFF8F8F8" name="C"/></Fill>
+                    <TextStyleAxis tag="2003265652" axisValue="600" name="Weight"/>
+                </TextStylePaint>
+                <TextValueRun styleId="2:308" text="0" name="Run">
+                    <DataBindContext sourcePathIds="2:70-2:73" propertyKey="268" converterId="2:150"/>
+                </TextValueRun>
+            </Text>
+            <!-- current player: carolina edge and an ink-900 face -->
+            <Shape x="1.5" y="28" opacity="0" name="Self Edge" id="2:310">
+                <Rectangle width="3" height="56" name="Path"/>
+                <Fill name="Fill"><SolidColor colorValue="FF4BA8F0" name="C"/></Fill>
+            </Shape>
+            <Shape x="171.5" y="28" opacity="0" name="Self Face" id="2:311">
+                <Rectangle width="343" height="56" name="Path"/>
+                <Fill name="Fill"><SolidColor colorValue="FF14182E" name="C"/></Fill>
+            </Shape>
+            <!-- 1 dp row rule -->
+            <Shape x="171.5" y="55.5" opacity="0.6" name="Rule" id="2:312">
+                <Rectangle width="343" height="1" name="Path"/>
+                <Fill name="Fill"><SolidColor colorValue="FF003FB6" name="C"/></Fill>
+            </Shape>
+        </Node>
+
+        <LinearAnimation duration="1" name="Top1" id="2:420">
+            <KeyedObject objectId="2:300"><KeyedProperty property="opacity"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:313"><KeyedProperty property="colorValue"><KeyFrameColor value="FFFC7C00" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:315"><KeyedProperty property="axisValue"><KeyFrameDouble value="700" interpolationType="linear"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+        <LinearAnimation duration="1" name="Top3" id="2:421">
+            <KeyedObject objectId="2:300"><KeyedProperty property="opacity"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:313"><KeyedProperty property="colorValue"><KeyFrameColor value="FFF8F8F8" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:315"><KeyedProperty property="axisValue"><KeyFrameDouble value="700" interpolationType="linear"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+        <LinearAnimation duration="1" name="Other" id="2:422">
+            <KeyedObject objectId="2:300"><KeyedProperty property="opacity"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:313"><KeyedProperty property="colorValue"><KeyFrameColor value="FFBEC0C2" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:315"><KeyedProperty property="axisValue"><KeyFrameDouble value="500" interpolationType="linear"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+        <LinearAnimation duration="1" name="Plain" id="2:423">
+            <KeyedObject objectId="2:310"><KeyedProperty property="opacity"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:311"><KeyedProperty property="opacity"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:314"><KeyedProperty property="colorValue"><KeyFrameColor value="FFDFE0E1" interpolationType="linear"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+        <LinearAnimation duration="1" name="Self" id="2:424">
+            <KeyedObject objectId="2:310"><KeyedProperty property="opacity"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:311"><KeyedProperty property="opacity"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="2:314"><KeyedProperty property="colorValue"><KeyFrameColor value="FFF8F8F8" interpolationType="linear"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+        <LinearAnimation duration="1" name="ScoreShown" id="2:425">
+            <KeyedObject objectId="2:307"><KeyedProperty property="opacity"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+        <LinearAnimation duration="1" name="ScoreHidden" id="2:426">
+            <KeyedObject objectId="2:307"><KeyedProperty property="opacity"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+
+        <StateMachine name="Row" id="2:67">
+            <!-- rank 1, ranks 2 and 3, the rest -->
+            <StateMachineLayer name="Rank" id="2:68">
+                <AnyState x="700" y="-120"/>
+                <ExitState x="900" y="-120"/>
+                <EntryState x="0" y="0"><StateTransition stateToId="2:622"/></EntryState>
+                <AnimationState x="160" y="-100" animationId="2:420" id="2:620">
+                    <StateTransition stateToId="2:621" duration="0"><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyNumber><DataBindContext sourcePathIds="2:70-2:71" propertyKey="636"/></BindablePropertyNumber></TransitionPropertyViewModelComparator><TransitionValueNumberComparator value="2"/></TransitionViewModelCondition></StateTransition>
+                    <StateTransition stateToId="2:621" duration="0"><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyNumber><DataBindContext sourcePathIds="2:70-2:71" propertyKey="636"/></BindablePropertyNumber></TransitionPropertyViewModelComparator><TransitionValueNumberComparator value="3"/></TransitionViewModelCondition></StateTransition>
+                    <StateTransition stateToId="2:622" duration="0"><TransitionViewModelCondition opValue="greaterThan"><TransitionPropertyViewModelComparator><BindablePropertyNumber><DataBindContext sourcePathIds="2:70-2:71" propertyKey="636"/></BindablePropertyNumber></TransitionPropertyViewModelComparator><TransitionValueNumberComparator value="3"/></TransitionViewModelCondition></StateTransition>
+                </AnimationState>
+                <AnimationState x="160" y="0" animationId="2:421" id="2:621">
+                    <StateTransition stateToId="2:620" duration="0"><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyNumber><DataBindContext sourcePathIds="2:70-2:71" propertyKey="636"/></BindablePropertyNumber></TransitionPropertyViewModelComparator><TransitionValueNumberComparator value="1"/></TransitionViewModelCondition></StateTransition>
+                    <StateTransition stateToId="2:622" duration="0"><TransitionViewModelCondition opValue="greaterThan"><TransitionPropertyViewModelComparator><BindablePropertyNumber><DataBindContext sourcePathIds="2:70-2:71" propertyKey="636"/></BindablePropertyNumber></TransitionPropertyViewModelComparator><TransitionValueNumberComparator value="3"/></TransitionViewModelCondition></StateTransition>
+                </AnimationState>
+                <AnimationState x="160" y="100" animationId="2:422" id="2:622">
+                    <StateTransition stateToId="2:620" duration="0"><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyNumber><DataBindContext sourcePathIds="2:70-2:71" propertyKey="636"/></BindablePropertyNumber></TransitionPropertyViewModelComparator><TransitionValueNumberComparator value="1"/></TransitionViewModelCondition></StateTransition>
+                    <StateTransition stateToId="2:621" duration="0"><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyNumber><DataBindContext sourcePathIds="2:70-2:71" propertyKey="636"/></BindablePropertyNumber></TransitionPropertyViewModelComparator><TransitionValueNumberComparator value="2"/></TransitionViewModelCondition></StateTransition>
+                    <StateTransition stateToId="2:621" duration="0"><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyNumber><DataBindContext sourcePathIds="2:70-2:71" propertyKey="636"/></BindablePropertyNumber></TransitionPropertyViewModelComparator><TransitionValueNumberComparator value="3"/></TransitionViewModelCondition></StateTransition>
+                </AnimationState>
+            </StateMachineLayer>
+            <StateMachineLayer name="Self" id="2:69">
+                <AnyState x="500" y="-120"/>
+                <ExitState x="700" y="-120"/>
+                <EntryState x="0" y="0"><StateTransition stateToId="2:630"/></EntryState>
+                <AnimationState x="160" y="0" animationId="2:423" id="2:630">
+                    <StateTransition stateToId="2:631" duration="0"><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="2:70-2:74" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="true"/></TransitionViewModelCondition></StateTransition>
+                </AnimationState>
+                <AnimationState x="360" y="0" animationId="2:424" id="2:631">
+                    <StateTransition stateToId="2:630" duration="0"><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="2:70-2:74" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="false"/></TransitionViewModelCondition></StateTransition>
+                </AnimationState>
+            </StateMachineLayer>
+            <!-- a score of 0 means the authority defines no metric yet: hide it -->
+            <StateMachineLayer name="Score" id="2:66">
+                <AnyState x="500" y="-120"/>
+                <ExitState x="700" y="-120"/>
+                <EntryState x="0" y="0"><StateTransition stateToId="2:640"/></EntryState>
+                <AnimationState x="160" y="0" animationId="2:425" id="2:640">
+                    <StateTransition stateToId="2:641" duration="0"><TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyNumber><DataBindContext sourcePathIds="2:70-2:73" propertyKey="636"/></BindablePropertyNumber></TransitionPropertyViewModelComparator><TransitionValueNumberComparator value="0"/></TransitionViewModelCondition></StateTransition>
+                </AnimationState>
+                <AnimationState x="360" y="0" animationId="2:426" id="2:641">
+                    <StateTransition stateToId="2:640" duration="0"><TransitionViewModelCondition opValue="notEqual"><TransitionPropertyViewModelComparator><BindablePropertyNumber><DataBindContext sourcePathIds="2:70-2:73" propertyKey="636"/></BindablePropertyNumber></TransitionPropertyViewModelComparator><TransitionValueNumberComparator value="0"/></TransitionViewModelCondition></StateTransition>
+                </AnimationState>
+            </StateMachineLayer>
+        </StateMachine>
+    </Artboard>
+    <ComponentAsset artboardId="2:60" name="LeaderboardRow"/>
+
+    <DataConverterToString round="true" decimals="0" name="Whole" id="2:150"/>
+    <FontAsset file="../../../../assets/fonts/SpaceGrotesk-Variable.ttf" name="Space Grotesk" id="2:900"/>
+
+    <DataEnumCustom name="LeaderboardStatus" id="2:90">
+        <DataEnumValue key="loading" value="Loading" id="2:91"/>
+        <DataEnumValue key="ready" value="Ready" id="2:92"/>
+        <DataEnumValue key="empty" value="Empty" id="2:93"/>
+        <DataEnumValue key="stale" value="Stale" id="2:94"/>
+        <DataEnumValue key="error" value="Error" id="2:95"/>
+        <DataEnumValue key="unavailable" value="Unavailable" id="2:96"/>
+    </DataEnumCustom>
+
+    <!-- Row: rank, name, score, isSelf. Fixture instances are the authored
+         test data; names are Caller handles, never real names. -->
+    <ViewModel defaultInstanceId="2:79" name="Row" id="2:70">
+        <ViewModelPropertyNumber name="rank" id="2:71"/>
+        <ViewModelPropertyString name="name" id="2:72"/>
+        <ViewModelPropertyNumber name="score" id="2:73"/>
+        <ViewModelPropertyBoolean name="isSelf" id="2:74"/>
+        <ViewModelInstance exports="true" name="Default" id="2:79">
+            <ViewModelInstanceNumber propertyValue="0" viewModelPropertyId="2:71"/>
+            <ViewModelInstanceString propertyValue="" viewModelPropertyId="2:72"/>
+            <ViewModelInstanceNumber propertyValue="0" viewModelPropertyId="2:73"/>
+            <ViewModelInstanceBoolean propertyValue="false" viewModelPropertyId="2:74"/>
+        </ViewModelInstance>
+        <ViewModelInstance exports="true" name="Row 1" id="2:75">
+            <ViewModelInstanceNumber propertyValue="1" viewModelPropertyId="2:71"/>
+            <ViewModelInstanceString propertyValue="Vesper" viewModelPropertyId="2:72"/>
+            <ViewModelInstanceNumber propertyValue="48200" viewModelPropertyId="2:73"/>
+            <ViewModelInstanceBoolean propertyValue="false" viewModelPropertyId="2:74"/>
+        </ViewModelInstance>
+        <ViewModelInstance exports="true" name="Row 2" id="2:76">
+            <ViewModelInstanceNumber propertyValue="2" viewModelPropertyId="2:71"/>
+            <ViewModelInstanceString propertyValue="Nimbus" viewModelPropertyId="2:72"/>
+            <ViewModelInstanceNumber propertyValue="41750" viewModelPropertyId="2:73"/>
+            <ViewModelInstanceBoolean propertyValue="false" viewModelPropertyId="2:74"/>
+        </ViewModelInstance>
+        <ViewModelInstance exports="true" name="Row 3" id="2:77">
+            <ViewModelInstanceNumber propertyValue="3" viewModelPropertyId="2:71"/>
+            <ViewModelInstanceString propertyValue="Kestrel" viewModelPropertyId="2:72"/>
+            <ViewModelInstanceNumber propertyValue="39900" viewModelPropertyId="2:73"/>
+            <ViewModelInstanceBoolean propertyValue="false" viewModelPropertyId="2:74"/>
+        </ViewModelInstance>
+        <ViewModelInstance exports="true" name="Row Self" id="2:78">
+            <ViewModelInstanceNumber propertyValue="17" viewModelPropertyId="2:71"/>
+            <ViewModelInstanceString propertyValue="Sable" viewModelPropertyId="2:72"/>
+            <ViewModelInstanceNumber propertyValue="12300" viewModelPropertyId="2:73"/>
+            <ViewModelInstanceBoolean propertyValue="true" viewModelPropertyId="2:74"/>
+        </ViewModelInstance>
+    </ViewModel>
+
+    <!-- Panel: what the component binds. a11y points at the shared A11y
+         instance so a11y/reducedMotion written at any root reaches it. -->
+    <ViewModel defaultInstanceId="2:53" name="LeaderboardPanel" id="2:50">
+        <ViewModelPropertyEnumCustom enumId="2:90" componentProps="1" name="status" id="2:51"/>
+        <ViewModelPropertyList componentProps="1" name="rows" id="2:52"/>
+        <ViewModelPropertyViewModel viewModelReferenceId="9:80" name="a11y" id="2:54"/>
+        <ViewModelInstance exports="true" name="Default" id="2:53">
+            <ViewModelInstanceEnum propertyValue="2:92" viewModelPropertyId="2:51"/>
+            <ViewModelInstanceList viewModelPropertyId="2:52">
+                <ViewModelInstanceListItem viewModelId="2:70" viewModelInstanceId="2:75"/>
+                <ViewModelInstanceListItem viewModelId="2:70" viewModelInstanceId="2:76"/>
+                <ViewModelInstanceListItem viewModelId="2:70" viewModelInstanceId="2:77"/>
+                <ViewModelInstanceListItem viewModelId="2:70" viewModelInstanceId="2:78"/>
+            </ViewModelInstanceList>
+            <ViewModelInstanceViewModel propertyValue="9:81" viewModelPropertyId="2:54"/>
+        </ViewModelInstance>
+    </ViewModel>
+
+    <!-- Root: the standalone contract. leaderboard/status, leaderboard/rows[n]/*,
+         theme/variant, layout/profile, a11y/reducedMotion. -->
+    <ViewModel defaultInstanceId="2:41" name="Leaderboard" id="2:40">
+        <ViewModelPropertyViewModel viewModelReferenceId="2:50" name="leaderboard" id="2:45"/>
+        <ViewModelPropertyViewModel viewModelReferenceId="9:60" name="theme" id="2:46"/>
+        <ViewModelPropertyViewModel viewModelReferenceId="9:70" name="layout" id="2:47"/>
+        <ViewModelPropertyViewModel viewModelReferenceId="9:80" name="a11y" id="2:48"/>
+        <ViewModelInstance exports="true" name="Default" id="2:41">
+            <ViewModelInstanceViewModel propertyValue="2:53" viewModelPropertyId="2:45"/>
+            <ViewModelInstanceViewModel propertyValue="9:61" viewModelPropertyId="2:46"/>
+            <ViewModelInstanceViewModel propertyValue="9:71" viewModelPropertyId="2:47"/>
+            <ViewModelInstanceViewModel propertyValue="9:81" viewModelPropertyId="2:48"/>
+        </ViewModelInstance>
+    </ViewModel>
+</Rive>

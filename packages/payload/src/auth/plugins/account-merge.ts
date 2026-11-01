@@ -9,7 +9,7 @@
 import type { BetterAuthPlugin } from 'better-auth';
 import { APIError, createAuthEndpoint, sessionMiddleware } from 'better-auth/api';
 import type { CollectionSlug, Payload, PayloadRequest } from 'payload';
-import { commitTransaction, createLocalReq, initTransaction, killTransaction } from 'payload';
+import { commitTransaction, createPayloadRequest, initTransaction, killTransaction } from 'payload';
 import * as z from 'zod';
 import type { SendAuthMail } from '../email';
 import { accountsMergedMail } from '../templates';
@@ -94,7 +94,7 @@ function idOf(doc: Record<string, unknown>): string {
  */
 export async function transferAccount(payload: Payload, survivorId: string, mergedId: string): Promise<MergeResult> {
   const survivorDoc = (await payload.findByID({ collection: 'users', id: survivorId, depth: 0, overrideAccess: true })) as unknown as Record<string, unknown>;
-  const req = await createLocalReq({ user: { ...survivorDoc, collection: 'users' } as never }, payload);
+  const req = await createPayloadRequest({ payload, user: { ...survivorDoc, collection: 'users' } as never });
   const ownTransaction = await initTransaction(req);
   try {
     const mergedDoc = (await payload.findByID({ collection: 'users', id: mergedId, depth: 0, overrideAccess: true, req })) as unknown as Record<string, unknown>;

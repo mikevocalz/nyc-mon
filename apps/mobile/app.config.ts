@@ -2,7 +2,7 @@ import type { ExpoConfig } from 'expo/config';
 import { loadProjectEnv } from '@expo/env';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { palette } from '@acme/theme';
+import { brand } from '@acme/theme';
 
 const appDir = dirname(fileURLToPath(import.meta.url));
 loadProjectEnv(join(appDir, '../..'), { silent: true, force: true });
@@ -13,20 +13,41 @@ loadProjectEnv(join(appDir, '../..'), { silent: true, force: true });
 const config: ExpoConfig & { newArchEnabled: true } = {
   name: 'NYC-MON',
   slug: 'nyc-mon',
-  scheme: 'nycmon',
+  // `nycmon` stays first: expo-linking builds the app's own URLs from it.
+  // `com.nycmon.app` is the Google OAuth redirect scheme (M03,
+  // packages/app/features/onboarding/social-sign-in.native.ts).
+  scheme: ['nycmon', 'com.nycmon.app'],
   version: '0.1.0',
   orientation: 'default',
   icon: './assets/images/icon.png',
   userInterfaceStyle: 'automatic',
+  // Root window background (expo-system-ui): brand night, so the gap between the
+  // system splash and the first JS frame is never black.
+  backgroundColor: brand.night,
   ios: {
     bundleIdentifier: 'com.nycmon.app',
     supportsTablet: true,
+    // Sign in with Apple entitlement (M03). The App ID needs the capability too.
+    usesAppleSignIn: true,
+    infoPlist: {
+      // Profiles the app handles. Every supported pad (Xbox, DualShock 4, DualSense,
+      // Switch Pro, Joy-Con pair, MFi) presents ExtendedGamepad; DirectionalGamepad
+      // covers d-pad-only MFi remotes. No MicroGamepad: the Siri Remote is not a game controller here.
+      GCSupportedGameControllers: [{ ProfileName: 'ExtendedGamepad' }, { ProfileName: 'DirectionalGamepad' }],
+      // false: the pad drives gameplay, not UIKit focus. true would let Start/A move and
+      // activate focus in the React Native view tree.
+      GCSupportsControllerUserInteraction: false,
+      // ProMotion: without this key Core Animation clamps the app's frame
+      // interval at 1/60 s, so CADisplayLink-driven content can never reach
+      // 120 Hz on ProMotion iPhones. The system still picks the actual rate.
+      CADisableMinimumFrameDurationOnPhone: true,
+    },
   },
   android: {
     package: 'com.nycmon.app',
     adaptiveIcon: {
       foregroundImage: './assets/images/adaptive-icon.png',
-      backgroundColor: palette.ink[50],
+      backgroundColor: brand.night,
     },
   },
   web: {
@@ -35,6 +56,11 @@ const config: ExpoConfig & { newArchEnabled: true } = {
     favicon: './assets/images/favicon.png',
   },
   plugins: [
+    // First in the list so it runs after expo-horizon-core, whose manifest
+    // plugin rebuilds `uses-feature` (docs/implementation/hardware-input.md §5).
+    './plugins/with-optional-gamepad',
+    // Keeps rnskia_getWGPUInstance linked on iOS so react-native-webgpu can share Skia's device (ADR 0026).
+    './plugins/with-skia-wgpu-instance',
     'expo-router',
     // Quest and PICO run Android 12+; Skia v3 (Graphite) needs 26+, and Meta's
     // layout library and react-native-webgpu's AHardwareBuffer use need 29.
@@ -43,10 +69,11 @@ const config: ExpoConfig & { newArchEnabled: true } = {
       'expo-splash-screen',
       {
         image: './assets/images/splash-icon.png',
+        // The NYC-MON seal on the brand night; the animated splash (components/splash) picks up from this frame.
         imageWidth: 200,
         resizeMode: 'contain',
-        backgroundColor: palette.ink[50],
-        dark: { backgroundColor: palette.ink[50] },
+        backgroundColor: brand.night,
+        dark: { backgroundColor: brand.night },
       },
     ],
     [
@@ -59,6 +86,8 @@ const config: ExpoConfig & { newArchEnabled: true } = {
       },
     ],
     'expo-image',
+    'expo-apple-authentication',
+    'expo-web-browser',
     [
       'expo-calendar',
       {
@@ -67,6 +96,32 @@ const config: ExpoConfig & { newArchEnabled: true } = {
       },
     ],
     'expo-notifications',
+    [
+      'expo-image-picker',
+      {
+        photosPermission: 'Allow NYC-MON to save Mon photos to your photo library.',
+        cameraPermission: 'Allow NYC-MON to scan objects and place Mons in AR.',
+      },
+    ],
+    [
+      'expo-audio',
+      {
+        microphonePermission: 'Allow NYC-MON to hear you when you choose to speak to your Mon.',
+        recordAudioAndroid: true,
+        enableBackgroundRecording: false,
+        enableBackgroundPlayback: false,
+      },
+    ],
+    [
+      'expo-location',
+      {
+        locationWhenInUsePermission: 'Allow NYC-MON to find encounters while you explore.',
+        isIosBackgroundLocationEnabled: false,
+        isAndroidBackgroundLocationEnabled: false,
+        isAndroidForegroundServiceEnabled: false,
+      },
+    ],
+    ['expo-sensors', { motionPermission: 'Allow NYC-MON to place AR objects with device motion.' }],
     'react-native-webgpu',
     // Adds the device flavors (mobile, quest) and the Quest manifest: VR
     // intent category, headtracking, hand tracking and supported devices.

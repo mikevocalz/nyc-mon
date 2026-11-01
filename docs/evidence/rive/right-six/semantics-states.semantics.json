@@ -1,0 +1,98 @@
+{
+  "schema": 1,
+  "artboard": "RightSix",
+  "roots": [
+    {
+      "id": 1,
+      "role": "group",
+      "roleValue": 9,
+      "label": "Action buttons",
+      "value": "",
+      "hint": "",
+      "headingLevel": 0,
+      "stateFlags": 128,
+      "traitFlags": 64,
+      "bounds": {"x": 0, "y": 0, "width": 209, "height": 204},
+      "children": [
+        {
+          "id": 7,
+          "role": "button",
+          "roleValue": 1,
+          "label": "Z",
+          "value": "",
+          "hint": "",
+          "headingLevel": 0,
+          "stateFlags": 64,
+          "traitFlags": 96,
+          "bounds": {"x": 96, "y": 8, "width": 56, "height": 56},
+          "children": []
+        },
+        {
+          "id": 13,
+          "role": "button",
+          "roleValue": 1,
+          "label": "C",
+          "value": "",
+          "hint": "",
+          "headingLevel": 0,
+          "stateFlags": 64,
+          "traitFlags": 96,
+          "bounds": {"x": 145, "y": 46, "width": 56, "height": 56},
+          "children": []
+        },
+        {
+          "id": 5,
+          "role": "button",
+          "roleValue": 1,
+          "label": "Y",
+          "value": "",
+          "hint": "",
+          "headingLevel": 0,
+          "stateFlags": 0,
+          "traitFlags": 96,
+          "bounds": {"x": 46, "y": 49, "width": 56, "height": 56},
+          "children": []
+        },
+        {
+          "id": 11,
+          "role": "button",
+          "roleValue": 1,
+          "label": "B",
+          "value": "",
+          "hint": "",
+          "headingLevel": 0,
+          "stateFlags": 0,
+          "traitFlags": 96,
+          "bounds": {"x": 96, "y": 87, "width": 56, "height": 56},
+          "children": []
+        },
+        {
+          "id": 3,
+          "role": "button",
+          "roleValue": 1,
+          "label": "X",
+          "value": "",
+          "hint": "",
+          "headingLevel": 0,
+          "stateFlags": 0,
+          "traitFlags": 96,
+          "bounds": {"x": 8, "y": 101, "width": 56, "height": 56},
+          "children": []
+        },
+        {
+          "id": 9,
+          "role": "button",
+          "roleValue": 1,
+          "label": "A",
+          "value": "",
+          "hint": "",
+          "headingLevel": 0,
+          "stateFlags": 0,
+          "traitFlags": 96,
+          "bounds": {"x": 57, "y": 140, "width": 56, "height": 56},
+          "children": []
+        }
+      ]
+    }
+  ]
+}

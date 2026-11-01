@@ -57,6 +57,9 @@ export function DevPanel(props: {
   readonly injectTool: Tool | undefined;
   readonly conversion: ConversionResult | null;
   readonly onNotice: (text: string, tone: 'info' | 'error') => void;
+  /** '' is the Caller. Sent to care tools as `speakerHint`; the model never chooses it. */
+  readonly speakerId: string;
+  readonly onSpeakerChange: (personId: string, displayName: string) => void;
 }) {
   const { client, injectTool, onNotice } = props;
   const hasInjectTool = injectTool !== undefined;
@@ -151,6 +154,18 @@ export function DevPanel(props: {
             <View className="flex-row">
               <Button variant="outline" title="Seed presence event" loading={busy} disabled={!person} onPress={() => void inject()} />
             </View>
+            <Select
+              district="midtown"
+              label="Speaking as"
+              value={props.speakerId}
+              onValueChange={(id) => props.onSpeakerChange(id, people.find((p) => p.personId === id)?.displayName ?? '')}
+              options={[{ value: '', label: 'The Caller' }, ...people.map((p) => ({ value: p.personId, label: p.displayName }))]}
+            />
+            <Paragraph className="my-0 text-sm text-text-secondary">
+              {props.speakerId
+                ? `Care requests go out as ${people.find((p) => p.personId === props.speakerId)?.displayName ?? 'this person'}. They count only after a presence event for them.`
+                : 'Care requests go out as the Caller.'}
+            </Paragraph>
           </View>
         )}
 

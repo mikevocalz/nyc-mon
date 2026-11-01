@@ -8,8 +8,14 @@
 import { payloadAdminSplatRoute } from '@payloadcms/tanstack-start/client';
 import { createFileRoute } from '@tanstack/react-router';
 
+import { ConsoleRouteError } from '../../console-route-error';
 import { loadAdminPageRSC } from './server.functions';
 
 export const Route = createFileRoute('/_payload/admin/$')(
-  payloadAdminSplatRoute({ load: loadAdminPageRSC }),
+  {
+    ...payloadAdminSplatRoute({ load: loadAdminPageRSC }),
+    // A stable error state with a manual retry (src/console-route-error.tsx).
+    // Both admin routes share it so index <-> splat keeps one boundary type.
+    errorComponent: ConsoleRouteError,
+  },
 );

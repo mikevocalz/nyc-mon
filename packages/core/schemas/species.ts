@@ -54,4 +54,17 @@ export const MonSpeciesDefSchema = z.object({
   affinityId: IdSchema.nullable(),
   /** TODO(canon): combat Class is a v11 concept without a published list. */
   classId: IdSchema.nullable(),
+  /** Historical v8 ten-type labels, NOT the active eight-Affinity combat system. [] for noncombat Eggs. */
+  legacyTypeNames: z.array(z.enum(['Neutral', 'Water', 'Ghost', 'Wind', 'Electric', 'Nature', 'Spirit', 'Poison', 'Fire', 'Rock'])).nullable().optional(),
+  /** Verbatim art-direction size target; never convert prose/ranges into an invented collision scale. */
+  scaleTargetDescription: z.string().min(1).nullable().optional(),
+  /** Source-backed form introduction. Not the individual Mon's biography or culture. */
+  loreSummary: z.string().min(1).nullable().optional(),
+  /** TODO(canon): no authoritative per-form home district; borough encounter weights are not home districts. */
+  districtId: IdSchema.nullable().optional(),
+  /** Inherited Max evolution item + mastery cue; not an executable EvolutionEvent. */
+  evolutionUnlock: z.object({
+    itemName: z.string().min(1),
+    mastery: z.string().min(1),
+  }).nullable().optional(),
 });

@@ -8,6 +8,7 @@
  */
 import { breakpoints } from '@acme/theme';
 import { creatureArt } from '@acme/assets/creatures';
+import { adminStill, starterSpeciesId } from '../mons/still-art.ts';
 import { NYC_PHOTOS, type PhotoDistrict, type PhotoSource } from '@acme/assets/photos';
 import type { StarterId } from '../home/art';
 import { W01_COPY } from '../home/copy';
@@ -36,6 +37,12 @@ function creature(id: string, sizes: string, position?: RouteArt['position']): R
   return { src: a.source, width: a.width, height: a.height, alt: a.alt, blurDataURL: a.blurDataURL, sizes, position };
 }
 
+/** The still approved in the console for a form, which wins over the bundled one (../mons/still-art.ts). */
+function fromAdmin(speciesId: string | null, sizes: string, position: RouteArt['position']): RouteArt | null {
+  const a = adminStill(speciesId);
+  return a ? { src: a.src, width: a.width, height: a.height, alt: a.alt, sizes, position } : null;
+}
+
 function photo(id: string, sizes: string, position?: RouteArt['position']): RouteArt {
   const p = NYC_PHOTOS.find((entry) => entry.id === id);
   if (!p) throw new Error(`@acme/assets/photos has no bundled photo "${id}"`);
@@ -52,16 +59,25 @@ function photo(id: string, sizes: string, position?: RouteArt['position']): Rout
   };
 }
 
-/** The egg and Baby art per starter slot (the order of `starterBloodlines`). */
-const EGG_ID: Record<StarterId, string> = { 1: 'metro-egg', 2: 'corner-egg', 3: 'prism-egg' };
-const BABY_ID: Record<StarterId, string> = { 1: 'squeaklet', 2: 'kittee-cee', 3: 'yotito' };
+/**
+ * The egg and Baby art per starter slot (the order of `starterBloodlines`).
+ * Each reads the console's approved still first, then the bundled one; a Baby
+ * with neither is null, drawn as Coming Soon by ArtTile.
+ */
+const EGG_ID: Record<StarterId, string> = { 1: 'metro-egg', 2: 'corner-egg', 3: 'prism-egg', 4: 'signal-egg' };
+const BABY_ID: Record<StarterId, string | null> = { 1: 'squeaklet', 2: 'kittee-cee', 3: 'yotito', 4: 'fye-dot' };
 
-/** An egg tile: a third of a route stop's art column. */
-export const eggArt = (slot: StarterId, sizes = `${LG_UP} 14rem, ${MD_UP} 22vw, 30vw`) =>
-  creature(EGG_ID[slot], sizes, at(50, 55));
+/** An egg tile: a quarter of a route stop's art column. */
+export const eggArt = (slot: StarterId, sizes = `${LG_UP} 9rem, ${MD_UP} 18vw, 40vw`): RouteArt =>
+  fromAdmin(starterSpeciesId(slot, 'Egg'), sizes, at(50, 55)) ?? creature(EGG_ID[slot], sizes, at(50, 55));
 
-/** A Baby form, face kept in view by the crop. */
-export const babyArt = (slot: StarterId, sizes: string) => creature(BABY_ID[slot], sizes, at(50, 30));
+/** A Baby form, face kept in view by the crop; null while the Baby has no art. */
+export const babyArt = (slot: StarterId, sizes: string): RouteArt | null => {
+  const admin = fromAdmin(starterSpeciesId(slot, 'Baby'), sizes, at(50, 30));
+  if (admin) return admin;
+  const id = BABY_ID[slot];
+  return id === null ? null : creature(id, sizes, at(50, 30));
+};
 
 /** The egg in its open case on a Harlem stoop at night. */
 export const hatchNightArt = (sizes: string) => creature('hatch-night', sizes, at(70, 56));

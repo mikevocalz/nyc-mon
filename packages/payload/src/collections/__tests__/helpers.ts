@@ -1,6 +1,6 @@
 import type { Payload, PayloadRequest, SanitizedCollectionConfig } from 'payload';
 import { type Mock, vi } from 'vitest';
-import { deriveMonInstanceId } from '../core.ts';
+import { deriveMonGender, deriveMonInstanceId, deriveVoiceLineageId } from '../core.ts';
 
 type FakeRequest = Partial<Omit<PayloadRequest, 'payload'>> & { payload: Partial<Payload> };
 
@@ -76,7 +76,8 @@ export function validMonDoc(overrides: Record<string, unknown> = {}): Record<str
     hatchedAt: egg.incubationEndsAt,
     bond: 0,
     stage: 'Baby',
-    voiceLineageId: null,
+    gender: deriveMonGender(egg.eggId as string),
+    voiceLineageId: deriveVoiceLineageId({ eggId: egg.eggId as string, speciesId: egg.speciesId as string }),
     ...overrides,
   };
 }

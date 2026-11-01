@@ -2,8 +2,13 @@ import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { isConsentRequired, utcYearFromEpochMs } from '@acme/core/sim';
 import { getPayload } from 'payload';
 import type { Payload } from 'payload';
+import { waitUntil } from '@vercel/functions';
 import * as z from 'zod';
 import { parseBirthYear } from '../../auth/age.ts';
+import { createAuthMailer } from '../../auth/email.ts';
+import type { SendAuthMail } from '../../auth/email.ts';
+import { readAuthEnv } from '../../auth/env.ts';
+import { waitlistJoinedMail } from '../../auth/templates.ts';
 import {
   normalizeWaitlistEmail,
   WAITLIST_DISTRICTS,
@@ -33,6 +38,11 @@ import type { V1Handler } from './v1/idempotency.ts';
  * | 400  | `{ status: 'invalid' }`                    | bad JSON or body shape                       |
  * | 429  | `{ status: 'rate_limited' }`               | over the per-IP hourly budget                |
  * | 500  | `{ status: 'error' }`                      | anything unexpected; details only in logs    |
+ *
+ * Every real `joined` — new row or repeat address — also queues the branded
+ * confirmation mail ({@link waitlistJoinedMail}) through the auth sender, in
+ * the background; a send failure is logged and never changes the answer.
+ * Honeypot and `under13` answers send nothing.
  *
  * The old `ageConfirmed` checkbox flag is no longer accepted: a body without a
  * valid `birthYear` answers `invalid` / `birthYear`, whatever `ageConfirmed`
@@ -66,6 +76,13 @@ export interface JoinWaitlistOptions {
   nowMs?: () => number;
   /** Per-IP hourly budget; defaults to {@link WAITLIST_MAX_ATTEMPTS_PER_HOUR}. */
   maxAttemptsPerHour?: number;
+  /**
+   * Sender for the joined confirmation. Defaults to the auth mailer built
+   * from `RESEND_API_KEY` and `AUTH_EMAIL_FROM` ({@link createAuthMailer});
+   * when that resolves to `undefined` this environment cannot send mail, the
+   * skip is logged and the join still answers `joined`.
+   */
+  sendMail?: SendAuthMail;
 }
 
 const BodySchema = z.object({
@@ -219,6 +236,47 @@ export function createJoinWaitlistHandler(options: JoinWaitlistOptions = {}): V1
   const now = options.nowMs ?? Date.now;
   const max = options.maxAttemptsPerHour ?? WAITLIST_MAX_ATTEMPTS_PER_HOUR;
 
+  // The sender resolves on the first send and is kept: the env read and the
+  // Resend client happen once per handler, not once per request.
+  let mailerResolved = false;
+  let cachedMailer: SendAuthMail | undefined;
+  const mailer = (): SendAuthMail | undefined => {
+    if (options.sendMail !== undefined) return options.sendMail;
+    if (!mailerResolved) {
+      const { resendApiKey, emailFrom } = readAuthEnv();
+      cachedMailer = createAuthMailer({ resendApiKey, emailFrom });
+      mailerResolved = true;
+    }
+    return cachedMailer;
+  };
+
+  /**
+   * Queues the joined confirmation and answers `joined`. The response never
+   * waits on Resend and a send failure is logged, never surfaced: the sign-up
+   * itself already succeeded, and mail must never block it. A repeat address
+   * gets the same mail — "you're on the list" is true either way, and mail
+   * behavior stays identical for new and repeat joins. Honeypot hits never
+   * reach here, so a bot can't mail an address it doesn't own.
+   */
+  function confirmJoined(payload: Payload, address: string): Response {
+    const send = mailer();
+    if (send === undefined) {
+      payload.logger.warn('[waitlist] confirmation email skipped: no mail sender configured');
+      return reply(200, { status: 'joined' });
+    }
+    const settled = Promise.resolve()
+      .then(() => send({ to: address, ...waitlistJoinedMail() }))
+      .then(
+        () => undefined,
+        (error: unknown) => {
+          payload.logger.error({ err: error }, '[waitlist] confirmation email failed');
+        },
+      );
+    // Keeps the Vercel Function alive until Resend answers; a no-op elsewhere.
+    waitUntil(settled);
+    return reply(200, { status: 'joined' });
+  }
+
   async function joinWaitlist(request: Request): Promise<Response> {
     let payload: Payload | undefined = options.payload;
     try {
@@ -261,7 +319,7 @@ export function createJoinWaitlistHandler(options: JoinWaitlistOptions = {}): V1
 
       // A repeat address gets the same body as a new one, so the endpoint
       // never says who has signed up, and no second row is written.
-      if (await emailExists(payload, address)) return reply(200, { status: 'joined' });
+      if (await emailExists(payload, address)) return confirmJoined(payload, address);
 
       try {
         await payload.create({
@@ -271,10 +329,10 @@ export function createJoinWaitlistHandler(options: JoinWaitlistOptions = {}): V1
         });
       } catch (error) {
         // A concurrent sign-up with the same address won the unique index.
-        if (await emailExists(payload, address)) return reply(200, { status: 'joined' });
+        if (await emailExists(payload, address)) return confirmJoined(payload, address);
         throw error;
       }
-      return reply(200, { status: 'joined' });
+      return confirmJoined(payload, address);
     } catch (error) {
       if (payload !== undefined) {
         payload.logger.error({ err: error }, '[waitlist] sign-up failed');

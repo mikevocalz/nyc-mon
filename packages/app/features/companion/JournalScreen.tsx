@@ -1,19 +1,22 @@
 'use client';
 
-import { useMemo, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, type ReactNode } from 'react';
 import { useRouter } from 'expo-router';
 import type { JournalEntry } from '@acme/core/types';
 import {
-  Badge, DaysCalendar, Heading, SafeArea, VirtualList, monthOf, shiftMonth, useHLynkStageWide, useInstanceStore,
-  useReducedMotion, useStore, type YearMonth,
+  Badge, Button, DaysCalendar, Heading, SafeArea, VirtualList, monthOf, shiftMonth, useInstanceStore,
+  useReducedMotion, useStore, type DeviceKey, type GlassLine, type GlassView, type YearMonth,
 } from '@acme/ui';
-import { Pressable, Text, View } from '@acme/ui/tw';
+import { ScrollView, Text, View } from '@acme/ui/tw';
 import { localDayKey, selectActiveMon, selectDaysTogether, selectJournal, useMonStore } from '../mon/mon.store';
 import { companionCopy } from './copy';
+import { GlassStage, useGlassOn, useGlassScreen, useMonGlass } from './glass';
 import { useHomeStage } from './home-stage.store';
+import { CompanionPane } from './CompanionPane';
 import { groupJournalByDay, journalDays, journalEntryCopyId, showsFirstBadge, type DayHeading } from './journal-model';
 import { useMinuteClock } from './minute-clock';
 import { monIdentity } from './mon-identity';
+import { ScreenBack } from '../navigation/use-header-back';
 
 type Row =
   | { readonly type: 'top' }
@@ -21,6 +24,9 @@ type Row =
   | { readonly type: 'entry'; readonly entry: JournalEntry };
 
 const EMPTY: readonly JournalEntry[] = [];
+/** The Baby small at the top, seven timeline rows, then Newer / Older / Back. */
+const LAYOUT = { model: 'small', rings: false, lineRows: 7, actionRows: 1, perRow: 3 } as const;
+const PAGE = 7;
 
 function headingText(heading: DayHeading): string {
   switch (heading.kind) {
@@ -33,22 +39,6 @@ function headingText(heading: DayHeading): string {
   }
 }
 
-function BackButton() {
-  const router = useRouter();
-  const label = companionCopy('m17.back.a11y');
-  return (
-    <View testID="m18-back" className="self-start">
-    <Pressable
-      accessibilityLabel={label}
-      onPress={() => router.back()}
-      className="min-h-target min-w-target items-start justify-center self-start focus-visible:ring-2 focus-visible:ring-focus"
-    >
-      <Text className="text-xr-label text-text">{`‹ ${label}`}</Text>
-    </Pressable>
-    </View>
-  );
-}
-
 /**
  * M18 Journal: "{name} and you", the days-together count (D-15a: days with
  * any entry, so it only rises; gaps look like future days), the calendar and
@@ -57,8 +47,7 @@ function BackButton() {
  * shows every day.
  */
 export function JournalScreen() {
-  useHomeStage({});
-  const wide = useHLynkStageWide();
+  const router = useRouter();
   const reducedMotion = useReducedMotion();
   const nowMs = useMinuteClock((s) => s.nowMs);
   const mon = useMonStore(selectActiveMon);
@@ -75,11 +64,129 @@ export function JournalScreen() {
   const days = useMemo(() => journalDays(entries), [entries]);
   const groups = useMemo(() => groupJournalByDay(entries, nowMs), [entries, nowMs]);
 
+  // ---- the 3D H-Lynk: the Baby on the glass over the timeline, a page of rows at a time ----
+  const glassUi = useInstanceStore(() => ({ failed: false, page: 0, nudge: 0 }));
+  const { failed, page, nudge } = useStore(glassUi);
+  const glassOn = useGlassOn(failed) && mon !== undefined;
+  const { model, monClips } = useMonGlass(mon === undefined ? null : monIdentity(mon).dexId, undefined);
+  const glassName = mon === undefined ? '' : monIdentity(mon).name;
+  // The pane's calendar narrows the glass timeline to one day, as it does the 2D list.
+  const glassGroups = selected === undefined ? groups : groups.filter((g) => g.iso === selected);
+  const rows: GlassLine[] = glassGroups.flatMap((g) => [
+    { text: headingText(g.heading), size: 'caption' as const, tone: 'dim' as const, align: 'left' as const },
+    ...g.entries.map((entry): GlassLine => ({
+      text: companionCopy(journalEntryCopyId(entry), { name: glassName }),
+      align: 'left',
+      ...(showsFirstBadge(entry) ? { badge: companionCopy('m18.first') } : {}),
+    })),
+  ]);
+  const pages = Math.max(1, Math.ceil(rows.length / PAGE));
+  const at = Math.min(page, pages - 1);
+  const turn = (by: -1 | 1) => glassUi.setState({ page: Math.min(pages - 1, Math.max(0, at + by)) });
+  const glassView: GlassView = {
+    status: { text: daysTogether === 1 ? companionCopy('m18.days.one') : companionCopy('m18.days.other', { n: daysTogether }), tone: 'neutral' },
+    title: companionCopy('m18.heading', { name: glassName }),
+    subtitle: '',
+    rings: [],
+    lines: rows.slice(at * PAGE, at * PAGE + PAGE),
+    actions: [
+      { target: 'newer', label: companionCopy('m18.page.newer'), tone: 'secondary', disabled: at === 0 },
+      { target: 'older', label: companionCopy('m18.page.older'), tone: 'secondary', disabled: at >= pages - 1 },
+      { target: 'back', label: companionCopy('m17.back.a11y'), tone: 'primary' },
+    ],
+  };
+  const onAction = (target: string) => {
+    if (target === 'newer') turn(-1);
+    else if (target === 'older') turn(1);
+    else if (target === 'back') router.back();
+  };
+  const glass = useGlassScreen({ layout: LAYOUT, model, view: glassView, nudge });
+  useEffect(() => {
+    glass.bind({ onAction, monClips, onModel: () => glassUi.setState({ nudge: glassUi.getState().nudge + 1 }) });
+  });
+  const onKey = (key: DeviceKey) => {
+    if (key === 'prev') turn(-1);
+    else if (key === 'next') turn(1);
+    else if (key === 'back') router.back();
+    else if (key === 'home') router.replace('/(home)');
+  };
+  const onFailed = useCallback(() => glassUi.setState({ failed: true }), [glassUi]);
+  const selectDay = (iso: string) => {
+    if (!days.has(iso)) return;
+    ui.setState({ selected: ui.getState().selected === iso ? undefined : iso });
+    glassUi.setState({ page: 0 });
+  };
+  const calendarLabels = {
+    together: companionCopy('m18.cal.day.together', { date: '' }).replace(/^,\s*/, ''),
+    previousMonth: companionCopy('m18.cal.prev'),
+    nextMonth: companionCopy('m18.cal.next'),
+  };
+  const selectedLabel = selected === undefined
+    ? null
+    : new Intl.DateTimeFormat(undefined, { dateStyle: 'long' }).format(new Date(`${selected}T12:00:00`));
+  const companion = mon === undefined ? undefined : (
+    <CompanionPane
+      title={companionCopy('pane.journal.title')}
+      testID="m18-pane"
+      empty={entries.length === 0 ? { title: companionCopy('pane.home.recent.empty.title'), description: companionCopy('pane.home.recent.empty.body', { name: glassName }) } : null}
+    >
+      <Text testID="m18-pane-days" className="text-xr-body text-text-muted">{glassView.status?.text ?? ''}</Text>
+      <DaysCalendar
+        testID="m18-pane-calendar"
+        month={month}
+        daysTogether={days}
+        today={today}
+        selected={selected}
+        onSelectDay={selectDay}
+        onMonthChange={(direction) => ui.setState({ month: shiftMonth(ui.getState().month, direction) })}
+        minMonth={monthOf(localDayKey(mon.hatchedAt))}
+        reducedMotion={reducedMotion}
+        labels={calendarLabels}
+      />
+      {selectedLabel === null ? null : (
+        <View className="gap-2" testID="m18-pane-filter">
+          <Text accessibilityLiveRegion="polite" className="text-xr-body text-text">{companionCopy('pane.journal.filtered', { date: selectedLabel })}</Text>
+          <Button
+            variant="outline"
+            size="lg"
+            fullWidth
+            title={companionCopy('pane.journal.all')}
+            onPress={() => { ui.setState({ selected: undefined }); glassUi.setState({ page: 0 }); }}
+            className="min-h-target"
+          />
+        </View>
+      )}
+    </CompanionPane>
+  );
+  useHomeStage(glassOn ? {} : {});
+  if (glassOn) {
+    return (
+      <GlassStage
+        screen={glass.screen}
+        label={glassView.title}
+        testIDPrefix="m18"
+        onKey={onKey}
+        onFailed={onFailed}
+        companion={companion}
+        a11y={
+          <View testID="m18-timeline" accessibilityLabel={companionCopy('m18.timeline.a11y')}>
+            <Text testID="m18-heading" accessibilityRole="header">{glassView.title}</Text>
+            <Text testID="m18-days">{glassView.status?.text ?? ''}</Text>
+            {rows.map((r, i) => <Text key={`${i}-${r.text}`}>{r.badge ? `${r.text}, ${r.badge}` : r.text}</Text>)}
+          </View>
+        }
+        controls={glassView.actions.map((a) => ({
+          key: a.target, label: a.label, disabled: a.disabled, onPress: () => onAction(a.target), testID: `m18-${a.target}`,
+        }))}
+      />
+    );
+  }
+
   // Before the hatch the Menu never offers Journal (M18 States); a direct link gets the back control only.
   if (mon === undefined) {
     return (
       <SafeArea className="flex-1 bg-bg">
-        <View className="px-4 py-2"><BackButton /></View>
+        <ScreenBack testID="m18-back" />
       </SafeArea>
     );
   }
@@ -92,7 +199,6 @@ export function JournalScreen() {
 
   const header = (
     <View className="gap-2">
-      <BackButton />
       <Heading level={1} testID="m18-heading" className="text-xr-title">{companionCopy('m18.heading', { name })}</Heading>
       <Text testID="m18-days" className="text-xr-body text-text-muted">
         {daysTogether === 1 ? companionCopy('m18.days.one') : companionCopy('m18.days.other', { n: daysTogether })}
@@ -101,7 +207,7 @@ export function JournalScreen() {
   );
 
   const calendar = (
-    <View className="mt-6">
+    <View className="mt-6 md:portrait:mt-0">
       <DaysCalendar
         testID="m18-calendar"
         month={month}
@@ -145,22 +251,31 @@ export function JournalScreen() {
   };
   const key = (row: Row, i: number) => (row.type === 'entry' ? row.entry.entryId : row.type === 'day' ? `day-${row.iso}` : `top-${i}`);
 
-  if (wide) {
-    return (
-      <SafeArea className="flex-1 bg-bg">
-        <View className="mx-auto w-full max-w-content-screen flex-1 flex-row gap-8 px-4">
-          <View style={{ width: '41.6667%' }}>{header}{calendar}</View>
-          <View testID="m18-timeline" accessibilityLabel={companionCopy('m18.timeline.a11y')} className="flex-1">
-            <VirtualList data={timeline} renderItem={renderRow} keyExtractor={key} estimatedItemSize={52} className="flex-1" />
-          </View>
-        </View>
-      </SafeArea>
-    );
-  }
+  const timelineLabel = companionCopy('m18.timeline.a11y');
   return (
     <SafeArea className="flex-1 bg-bg">
-      <View testID="m18-timeline" accessibilityLabel={companionCopy('m18.timeline.a11y')} className="flex-1 px-4">
+      <ScreenBack testID="m18-back" />
+      {/* Below md (phones in portrait): one list, the header and calendar as its first row. As before. */}
+      <View testID="m18-timeline" accessibilityLabel={timelineLabel} className="flex-1 px-4 md:hidden">
         <VirtualList data={[{ type: 'top' }, ...timeline]} renderItem={renderRow} keyExtractor={key} estimatedItemSize={52} className="flex-1" />
+      </View>
+      {/*
+        From md, two panes that each scroll on their own. Portrait: the header
+        and the calendar side by side at the top, the timeline under them.
+        Landscape (the open foldable): calendar left, timeline right.
+      */}
+      <View className="hidden flex-1 gap-6 px-8 md:flex md:landscape:flex-row md:landscape:gap-10">
+        <ScrollView
+          testID="m18-calendar-pane"
+          className="grow-0 md:portrait:max-h-[55%] md:landscape:w-5/12"
+          contentContainerClassName="pb-6 md:portrait:flex-row md:portrait:gap-8"
+        >
+          <View className="md:portrait:flex-1">{header}</View>
+          <View className="md:portrait:flex-1">{calendar}</View>
+        </ScrollView>
+        <View testID="m18-timeline" accessibilityLabel={timelineLabel} className="w-full flex-1 md:portrait:max-w-content-detail md:portrait:self-center">
+          <VirtualList data={timeline} renderItem={renderRow} keyExtractor={key} estimatedItemSize={52} className="flex-1" />
+        </View>
       </View>
     </SafeArea>
   );

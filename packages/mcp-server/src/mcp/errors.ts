@@ -10,6 +10,8 @@ export type FailureReason =
   | 'not-linked'
   | 'adults-only'
   | 'no-mon'
+  | 'no-egg'
+  | 'egg-not-ready'
   | 'mon-not-found'
   | 'not-permitted'
   | 'person-not-found'
@@ -30,6 +32,15 @@ const COPY: Record<FailureReason, { readonly message: string; readonly nextStep:
   'no-mon': {
     message: "You don't have a hatched Mon yet.",
     nextStep: 'Hatch your egg in the NYC-MON app, then ask again.',
+  },
+  'no-egg': {
+    message: "You don't have an egg waiting to hatch.",
+    nextStep: 'Ask how your Mon is doing instead.',
+  },
+  // Spoken as is by Alexa. `{timeLeft}` comes from the call ("12 minutes", "1 minute").
+  'egg-not-ready': {
+    message: "Your egg isn't ready yet — about {timeLeft} left.",
+    nextStep: 'Ask me to hatch it then.',
   },
   'mon-not-found': {
     message: "I couldn't find that Mon on your account.",
@@ -63,7 +74,13 @@ const COPY: Record<FailureReason, { readonly message: string; readonly nextStep:
 
 /** A failed call: `isError`, plain text, and `{ error: { reason, message, nextStep } }`. */
 export function failure(reason: FailureReason, extra: Record<string, unknown> = {}): CallToolResult {
-  const { message, nextStep } = COPY[reason];
+  const fill = (text: string) =>
+    text.replace(/\{(\w+)\}/g, (whole, key: string) => {
+      const value = extra[key];
+      return typeof value === 'string' || typeof value === 'number' ? String(value) : whole;
+    });
+  const message = fill(COPY[reason].message);
+  const nextStep = fill(COPY[reason].nextStep);
   return {
     isError: true,
     content: [{ type: 'text', text: `${message} ${nextStep}` }],

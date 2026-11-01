@@ -1,0 +1,2 @@
+[23:07:13.255] rive  verified (0 bytes, 44ms, 0 errors, 0 warnings)
+{"success": true, "command": "verify", "data": {"riv": null, "bytes": 0, "buildMs": 44.7, "problems": []}, "errors": [], "warnings": []}

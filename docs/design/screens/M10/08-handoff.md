@@ -1,5 +1,7 @@
 # M10 Incubation choice: handoff
 
+> Superseded by Decision 29 (2026-10-21): M10 no longer renders `EggCase` or closes a case around the egg. On confirm the egg stays in view (`m10-egg`, label `m10.egg.a11y.incubating`), `haptics.success` and the announcement fire at once, and the route changes after a 400 ms hold (0 under reduced motion). Case rows below are kept for the record only.
+
 Implementation contract for `platform`, `sim-core`, `render` and the kit. Inputs: `01-research.md` to `07-a11y.md`; `V11 ¶49`, `¶65`; canon #5, #7, #8, #9; design D5, D8, D11, P2; `screens/M06/08-handoff.md`; `screens/M08/08-handoff.md`; `packages/core/sim/hatch.ts`; `packages/app/features/mon/create-mon-store.ts`.
 
 ## Blockers before implementation
@@ -202,3 +204,11 @@ Open; no device yet.
 - [ ] Kill the app during the case animation: relaunch lands on M11 with one egg (boot `incubating`).
 - [ ] Airplane mode at Start: egg created, chip shows, server post replays later with the same `eggId`.
 - [ ] VoiceOver / TalkBack: stops read as radios; adjustable trackpad steps time.
+
+## 2026-10-15 addendum: M24 final permission review (supersedes M06 first-run handoff)
+
+P5 in `docs/design/DECISIONS.md` supersedes P2 **only for the first-run destination** after the case closes. M10 now writes the `pending` M24 permission checkpoint after `startIncubation` succeeds. Closing the case routes to `/(onboarding)/permissions`, not to the original M06 form sheet, regardless of current OS notification status. This is deliberate: the last onboarding screen also explains camera/AR, optional voice and foreground location.
+
+M24 owns the notification ask and, only if granted while the egg still incubates, schedules the existing unique local egg-ready reminder. M06 continues to serve an in-app later opt-in if needed.
+
+Updated device test: force-quit after Start, including during the case animation, relaunch and confirm **M24** appears with exactly one existing egg; completing M24 must land on M11 without creating another egg. Compact, large-text, Android book/tabletop/trifold, and iPhone Duo checks must verify all controls stay outside physical hinges. Historical M06 assertions above are retained as original handoff context, but are superseded for first-run.

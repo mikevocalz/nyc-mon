@@ -1,0 +1,9 @@
+[23:07:47.610] rive  deferred replay: inline
+[23:07:47.610] rive  baking release scripts, as a publish ships them, with watchdog checks
+[23:07:47.611] rive  compiling 2 markup files as one document: ../game-lobby/shared-vm.rml, scene.rml
+[23:07:47.659] rive  built /Users/mikevocalz/nyc-mon/packages/ui/rive/lobby/start-angled/build/start-angled.riv (142704 bytes, 49ms, 0 errors, 0 warnings)
+[23:07:47.660] rive  showing StartAngledHost [1/2]
+[23:07:47.660] rive  viewport 343x128 @1x
+[23:07:47.810] rive  bench advance: mean 0.001ms p50 0.001ms p95 0.002ms max 0.023ms
+[23:07:47.810] rive  bench render: mean 0.102ms p50 0.092ms p95 0.193ms max 1.008ms
+[23:07:47.810] rive  bench memory: 0 -> 0 wasm pages (+0) over 600 frames

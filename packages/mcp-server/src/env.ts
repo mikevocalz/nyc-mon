@@ -63,6 +63,18 @@ export const EnvSchema = z
      * presence tools over seeded fictional fixtures. Off for the Alexa build.
      */
     MCP_DEV_MODE: flag,
+    /**
+     * Send `WWW-Authenticate: Bearer resource_metadata=…` on 401 and 403, as
+     * the MCP authorization spec describes. Off for the Alexa deployment,
+     * which wants a bare 401 (PLATFORM-DOCS §2.3); on for the browser
+     * companion's MCP host.
+     */
+    MCP_WWW_AUTHENTICATE: flag,
+    /**
+     * Requests one Caller (or one service client) may make per minute before a
+     * 429 with Retry-After. 0 turns the limit off.
+     */
+    MCP_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(0).default(120),
   })
   .superRefine((env, ctx) => {
     if (env.OAUTH_DEV_BYPASS === '1') {

@@ -13,6 +13,8 @@ All `voice: "ui"`. `{name}` as in M13. No pronoun for the Mon. Dates in plain sp
 | `m18.cal.day.plain` | {date} | ui | — | missed and future days read the same | |
 | `m18.cal.prev` | Previous month | ui | — | | |
 | `m18.cal.next` | Next month | ui | — | | |
+| `m18.page.newer` | Newer | ui | 12 | The timeline on the 3D H-Lynk's glass: the page of newer rows (also the `<` key) | Mike, 2026-10-27 |
+| `m18.page.older` | Older | ui | 12 | The page of older rows (also the `>` key) | Mike, 2026-10-27 |
 | `m18.day.today` | Today | ui | 12 | | |
 | `m18.day.yesterday` | Yesterday | ui | 12 | | |
 | `m18.entry.hatched` | {name} hatched | ui | 40 | | `V11 ¶25` |

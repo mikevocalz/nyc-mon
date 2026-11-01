@@ -1,0 +1,4 @@
+[23:07:29.543] rive  built (142340 bytes, 36ms, 0 errors, 0 warnings)
+[23:07:29.544] rive  no Tests scripts found. A script qualifies by returning the Tests protocol, not by filename.
+[23:07:29.544] rive    no protocol scripts in this project at all
+{"success": true, "command": "test", "data": {"passed": 0, "failed": 0, "noTestsFound": true, "failures": []}, "errors": [], "warnings": []}

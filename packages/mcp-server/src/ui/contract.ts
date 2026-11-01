@@ -1,7 +1,10 @@
 import { companionCopy } from '@acme/app/features/companion/copy.ts';
 import { askRoute, homeStatus } from '@acme/app/features/companion/home-model.ts';
-import { allSpecies, bloodlineLabel, bloodlines } from '@acme/content';
-import type { CareState, JournalEntry } from '@acme/core/types';
+import { hatchCopy } from '@acme/app/features/hatch/copy.ts';
+import { detailLine, timeLine } from '@acme/app/features/hatch/incubation-model.ts';
+import { bloodlineLabel, starterBloodlines, starterSpecies } from '@acme/content/starters';
+import { deriveMonMood } from '@acme/core/sim';
+import type { CareState, JournalEntry, MonMood, VoiceStage } from '@acme/core/types';
 
 /**
  * The data adapter between a tool result and the existing companion
@@ -12,13 +15,14 @@ import type { CareState, JournalEntry } from '@acme/core/types';
  *
  * The MCP server imports this file (through index.ts), so it stays free of
  * asset imports: the Baby still is looked up in the view bundle
- * (view/MonView.tsx, `artFor` from mon-identity), never here. The names
+ * (view/MonView.tsx, `artFor` from creature-art.ts), never here. The names
  * follow `monIdentity` (packages/app/features/companion/mon-identity.ts).
  * No copy is written here: every string comes from
- * packages/app/features/companion/copy.ts.
+ * packages/app/features/companion/copy.ts, or for an egg from M11's
+ * packages/app/features/hatch/copy.ts.
  */
 
-export type ActionId = 'feed' | 'rest' | 'wake' | 'play';
+export type ActionId = 'feed' | 'rest' | 'wake' | 'play' | 'hatch';
 
 /** The text half of `MonIdentity`: everything but the art. */
 export interface MonNames {
@@ -30,7 +34,28 @@ export interface MonNames {
   readonly bloodlineLabel: string | null;
 }
 
+/** An egg still incubating (check_incubation's result): no meters, no care. */
+export interface EggViewModel {
+  readonly eggId: string;
+  /** Epoch ms; the view words the time left from it against its own clock. */
+  readonly incubationEndsAt: number;
+  /** The server's verdict when the result was made. */
+  readonly ready: boolean;
+}
+
+/**
+ * hatch_egg's `hatching: true`: this result is the moment the egg hatched, so
+ * the card plays the egg cracking open before it shows the Mon.
+ */
+export interface HatchingViewModel {
+  readonly eggId: string;
+  /** The Egg form's Dex number (1, the Metro Egg), or null when content has none. */
+  readonly eggDexId: number | null;
+  readonly eggName: string;
+}
+
 export interface MonViewModel {
+  /** The Mon's id, or the egg's id while it incubates. */
   readonly monInstanceId: string;
   readonly identity: MonNames;
   readonly name: string;
@@ -38,9 +63,35 @@ export interface MonViewModel {
   readonly care: CareState | null;
   readonly status: { readonly text: string; readonly tone: 'neutral' | 'request' } | null;
   readonly asleep: boolean;
+  /** The result's `mood`, else derived from the meters (`deriveMonMood`); null when neither is there. */
+  readonly mood: MonMood | null;
   /** The action that answers the Mon's ask (M13 `askRoute`), or null when nothing is asked. */
   readonly suggested: ActionId | null;
   readonly journal: readonly JournalEntry[];
+  /** Set while the companion is still an egg; care actions do not apply then. */
+  readonly egg: EggViewModel | null;
+  /** Set only on the hatch_egg result that hatched the egg; null on every other result. */
+  readonly hatching: HatchingViewModel | null;
+  /**
+   * The server-gated Mon line (`say`) while the Mon babbles or is limited:
+   * the caption a card can show for what Alexa says. Null when the Mon speaks
+   * in full or the result has no line.
+   */
+  readonly say: MonSayViewModel | null;
+}
+
+export interface MonSayViewModel {
+  readonly caption: string;
+  readonly voiceStage: VoiceStage;
+}
+
+const VOICE_STAGES: Readonly<Record<VoiceStage, true>> = { 'baby-talk': true, limited: true, full: true };
+
+/** A result's `say`, or null for anything that is not a well-formed one. */
+function readSay(value: unknown): MonSayViewModel | null {
+  if (!isRecord(value) || typeof value.caption !== 'string' || typeof value.voiceStage !== 'string') return null;
+  if (!Object.hasOwn(VOICE_STAGES, value.voiceStage)) return null;
+  return { caption: value.caption, voiceStage: value.voiceStage as VoiceStage };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -90,8 +141,25 @@ function statusFromMood(mood: unknown): MonViewModel['status'] {
   }
 }
 
-const speciesById = new Map(allSpecies.map((s) => [s.speciesId, s]));
-const bloodlineById = new Map(bloodlines.map((b) => [b.bloodlineId, b]));
+/** Exhaustive over core's MON_MOODS: a new mood fails the type check here. */
+const MOODS: Readonly<Record<MonMood, true>> = {
+  content: true,
+  asleep: true,
+  sluggish: true,
+  'needs-fullness': true,
+  'needs-energy': true,
+  'needs-social': true,
+};
+
+function readMood(value: unknown): MonMood | null {
+  return typeof value === 'string' && Object.hasOwn(MOODS, value) ? (value as MonMood) : null;
+}
+
+// Phase 1 ships only the four starters, so the card resolves names from the
+// starter entry and never bundles the full 115-form roster (ui.test.ts budget).
+// A species outside the starters gets null names, the same as an unknown id.
+const speciesById = new Map(starterSpecies.map((s) => [s.speciesId, s]));
+const bloodlineById = new Map(starterBloodlines.map(({ bloodline }) => [bloodline.bloodlineId, bloodline]));
 
 /** `monIdentity` without the art: nickname, else form name, else Bloodline label. */
 function monNames(speciesId: string, nickname: string | null): MonNames {
@@ -144,9 +212,69 @@ function readJournal(value: unknown, monInstanceId: string): JournalEntry[] {
     }));
 }
 
-/** Builds the view model, or null when the payload has no Mon. */
+/** True once the egg's end time has passed on this clock, or the server said so. */
+export function eggReady(egg: EggViewModel, nowMs: number): boolean {
+  return egg.ready || egg.incubationEndsAt <= nowMs;
+}
+
+/** M11's time line: "12 min left", "Less than a minute left" or "Ready to hatch". */
+export function eggTimeText(egg: EggViewModel, nowMs: number): string {
+  return timeLine(eggReady(egg, nowMs) ? 'ready' : 'counting', egg.incubationEndsAt, nowMs);
+}
+
+/** M11's detail line while counting ("Metro Egg · ready at 4:12 PM"), else null. */
+export function eggDetailText(egg: EggViewModel, eggName: string, nowMs: number): string | null {
+  return eggReady(egg, nowMs) ? null : detailLine('counting', eggName, egg.incubationEndsAt, nowMs) ?? null;
+}
+
+/**
+ * check_incubation's `{ incubating, eggs }` as a view model: the egg that
+ * hatches first, named as its Egg form (dex-001 is "Metro Egg").
+ */
+function eggViewModel(eggs: unknown[]): MonViewModel | null {
+  const valid = eggs.filter(
+    (e): e is Record<string, unknown> & { eggId: string; speciesId: string; incubationEndsAt: number } =>
+      isRecord(e) && typeof e.eggId === 'string' && typeof e.speciesId === 'string' && typeof e.incubationEndsAt === 'number' && Number.isFinite(e.incubationEndsAt),
+  );
+  const first = [...valid].sort((a, b) => a.incubationEndsAt - b.incubationEndsAt)[0];
+  if (first === undefined) return null;
+  const identity = monNames(first.speciesId, null);
+  const egg: EggViewModel = { eggId: first.eggId, incubationEndsAt: first.incubationEndsAt, ready: first.readyToHatch === true };
+  const minutes = typeof first.minutesRemaining === 'number' && Number.isFinite(first.minutesRemaining) ? first.minutesRemaining : null;
+  const ready = egg.ready || minutes === 0;
+  // The server's own minutes, so the summary matches what Alexa says aloud.
+  const text = ready
+    ? hatchCopy('m11.time.ready')
+    : minutes === null ? hatchCopy('m11.caption.counting') : hatchCopy('m11.time.minutes', { minutes });
+  return {
+    monInstanceId: first.eggId,
+    identity,
+    name: identity.name,
+    care: null,
+    status: { text, tone: ready ? 'request' : 'neutral' },
+    asleep: false,
+    mood: null,
+    suggested: null,
+    journal: [],
+    egg,
+    hatching: null,
+    say: readSay(first.say),
+  };
+}
+
+/** hatch_egg's `hatching: true` and `egg`, else null (a repeat call has `hatching: false`). */
+function readHatching(structured: Record<string, unknown>): HatchingViewModel | null {
+  if (structured.hatching !== true) return null;
+  const egg = isRecord(structured.egg) ? structured.egg : {};
+  const eggId = typeof egg.eggId === 'string' ? egg.eggId : '';
+  const names = monNames(typeof egg.speciesId === 'string' ? egg.speciesId : 'dex-001', null);
+  return { eggId, eggDexId: names.dexId, eggName: names.name };
+}
+
+/** Builds the view model, or null when the payload has neither a Mon nor an incubating egg. */
 export function toMonViewModel(structured: unknown): MonViewModel | null {
   if (!isRecord(structured)) return null;
+  if (!isRecord(structured.mon) && Array.isArray(structured.eggs)) return eggViewModel(structured.eggs);
   const mon = structured.mon;
   if (!isRecord(mon)) return null;
   const monInstanceId = typeof mon.monId === 'string' ? mon.monId : mon.monInstanceId;
@@ -163,8 +291,12 @@ export function toMonViewModel(structured: unknown): MonViewModel | null {
     care,
     status: status ? { text: status.text, tone: status.tone } : null,
     asleep: care ? care.activity.kind === 'asleep' : structured.mood === 'asleep',
+    mood: readMood(structured.mood) ?? (care ? deriveMonMood(care) : null),
     suggested: suggestedAction(care, structured.mood),
     journal: readJournal(structured.journal, monInstanceId),
+    egg: null,
+    hatching: readHatching(structured),
+    say: readSay(structured.say),
   };
 }
 
@@ -186,6 +318,9 @@ export function careOutcomeText(structured: unknown, vm: MonViewModel): string |
   if (!isRecord(structured)) return null;
   const name = vm.name;
   const percent = vm.care ? Math.round(vm.care.fullness * 100) : 0;
+  if (structured.hatched === true) {
+    return vm.hatching ? hatchCopy('m12.a11y.emerge', { babyName: name }) : hatchCopy('m12.a11y.already', { monName: name });
+  }
   if (structured.applied === false) {
     switch (structured.declinedBecause) {
       case 'asleep': return companionCopy('m14.declined.asleep', { name });
@@ -206,3 +341,6 @@ export function careOutcomeText(structured: unknown, vm: MonViewModel): string |
     default: return null;
   }
 }
+
+// The clip table lives with the app's Mon models (one table for the app and these views).
+export { MON_CLIPS, clipsFor } from '@acme/app/features/companion/mon-models.ts';

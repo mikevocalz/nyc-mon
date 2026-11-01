@@ -1,0 +1,55 @@
+{
+  "schema": 1,
+  "artboard": "LeftStick",
+  "stateMachine": "Stick",
+  "viewModel": {
+    "name": "Default",
+    "viewModel": "LeftStick",
+    "properties": [
+      {
+        "name": "stick",
+        "path": "stick",
+        "type": "viewModel",
+        "value": {
+          "name": "Default",
+          "viewModel": "Stick",
+          "properties": [
+            {
+              "name": "x",
+              "path": "stick/x",
+              "type": "number",
+              "value": 0.699999988,
+              "changed": true
+            },
+            {
+              "name": "y",
+              "path": "stick/y",
+              "type": "number",
+              "value": -0.699999988,
+              "changed": true
+            },
+            {
+              "name": "engaged",
+              "path": "stick/engaged",
+              "type": "boolean",
+              "value": true,
+              "changed": true
+            },
+            {
+              "name": "mode",
+              "path": "stick/mode",
+              "type": "enum",
+              "enumType": "StickMode",
+              "value": "analog",
+              "index": 0,
+              "values": ["analog", "dpad"],
+              "changed": false
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "globals": [],
+  "nested": []
+}

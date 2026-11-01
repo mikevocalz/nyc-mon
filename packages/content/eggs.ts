@@ -1,5 +1,5 @@
 import type { Bloodline, BloodlineId } from '@acme/core';
-import { bloodlines } from './mons/index.ts';
+import { starterBloodlines } from './mons/starters.ts';
 
 export interface StarterEgg {
   readonly bloodlineId: BloodlineId;
@@ -30,5 +30,5 @@ function toStarterEgg(bloodline: Bloodline): StarterEgg {
   };
 }
 
-/** The three eggs Santoro presents (DECISIONS.md #5), in starter slot order. */
-export const eggs: readonly StarterEgg[] = bloodlines.map(toStarterEgg);
+/** The four eggs Santoro presents (DECISIONS.md #5, #38), in starter slot order. */
+export const eggs: readonly StarterEgg[] = starterBloodlines.map(({ bloodline }) => toStarterEgg(bloodline));

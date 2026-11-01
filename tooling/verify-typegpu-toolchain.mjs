@@ -33,7 +33,9 @@ for (const [label, configPath] of [
     }
 
     const config = factory({
-      cache() {},
+      // Babel's api.cache is callable and carries .forever/.never/.using/.invalidate
+      // (apps/mobile/babel.config.js uses .using to key on the worklet flag).
+      cache: Object.assign(() => {}, { forever() {}, never() {}, using(fn) { return fn(); }, invalidate(fn) { return fn(); } }),
     });
 
     const plugins = Array.isArray(config?.plugins) ? config.plugins : [];

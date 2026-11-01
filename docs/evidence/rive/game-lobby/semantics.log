@@ -1,0 +1,6 @@
+[23:08:01.010] rive  deferred replay: inline
+[23:08:01.012] rive  compiling 5 markup files as one document: ../game-transition/scene.rml, ../leaderboard/scene.rml, ../start-angled/scene.rml, scene.rml, shared-vm.rml
+[23:08:01.155] rive  built /Users/mikevocalz/nyc-mon/packages/ui/rive/lobby/game-lobby/build/game-lobby.riv (614266 bytes, 143ms, 0 errors, 0 warnings)
+[23:08:01.157] rive  showing GameLobby [1/8]
+[23:08:01.159] rive  viewport 390x844 @1x
+[23:08:01.159] rive  wrote /Users/mikevocalz/nyc-mon/docs/evidence/rive/game-lobby/semantics.semantics.json

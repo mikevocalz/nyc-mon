@@ -36,7 +36,7 @@ function workletsTransform() {
     enforce: 'pre',
     async transform(code, id) {
       const file = id.split('?')[0] ?? id;
-      if (!file.startsWith(packagesRoot) || !/\.[jt]sx?$/.test(file) || !WORKLET_HINT.test(code)) return null;
+      if (!file.startsWith(packagesRoot) || file.includes('/node_modules/') || !/\.[jt]sx?$/.test(file) || !WORKLET_HINT.test(code)) return null;
       const babel = await import(pathToFileURL(babelCorePath).href);
       const out = await babel.transformAsync(code, {
         filename: file,
@@ -104,6 +104,13 @@ export async function withKitWeb(viteConfig, { appRoot, react }) {
         // IncubationRing). react-native-web ships the same registry
         // (registerAsset / getAssetByID); point at it like the RNW aliases above.
         { find: /^@react-native\/assets-registry\/registry$/, replacement: resolve(rnw, 'dist/modules/AssetRegistry/index.js') },
+        // react-native-skia 3.6's Platform.web requires `react-native/asset-registry`
+        // (falling back to `react-native/Libraries/Image/AssetRegistry`); on RN 0.88 both
+        // are Flow source a web build can't parse. Same registry, web copy.
+        { find: /^react-native\/(asset-registry|Libraries\/Image\/AssetRegistry)$/, replacement: resolve(rnw, 'dist/modules/AssetRegistry/index.js') },
+        // react-native-svg 15.16 statically reaches an Android-only TurboModule
+        // (lazy require behind Platform.OS === 'android'); give web a no-op.
+        { find: /^.*\/fabric\/NativeSvgSoundModule(\.js)?$/, replacement: resolve(packagesRoot, 'config/vite/svg-sound-module.web.ts') },
         { find: /^@legendapp\/motion$/, replacement: legendMotionEsm },
         { find: /^react-native$/, replacement: resolve(rnw, 'dist/index.js') },
         ...aliasEntries.filter((entry) => entry.find !== 'react-native' && entry.find !== 'react-native-web'),
@@ -147,6 +154,24 @@ export async function withKitWeb(viteConfig, { appRoot, react }) {
       ],
       rolldownOptions: {
         ...(viteConfig.optimizeDeps?.rolldownOptions ?? {}),
+        // The optimizer's CommonJS require pass does not use Vite's alias
+        // plugin for SvgTouchableMixin's lazy Android sound import.
+        plugins: [
+          ...(viteConfig.optimizeDeps?.rolldownOptions?.plugins ?? []),
+          {
+            name: 'nyc-mon:optimizer-svg-sound-web',
+            resolveId(source) {
+              if (/(?:^|\/)NativeSvgSoundModule(?:\.js)?$/.test(source)) {
+                return '\0nyc-mon:svg-sound-web';
+              }
+            },
+            load(id) {
+              if (id === '\0nyc-mon:svg-sound-web') {
+                return 'export default { playTouchSound() {} };';
+              }
+            },
+          },
+        ],
         resolve: {
           ...(viteConfig.optimizeDeps?.rolldownOptions?.resolve ?? {}),
           // The optimizer bundles with its own extension list

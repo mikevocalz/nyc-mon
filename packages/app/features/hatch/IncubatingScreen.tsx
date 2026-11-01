@@ -1,13 +1,15 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
-import { Linking } from 'react-native';
+import { Suspense, useCallback, useEffect, useMemo, useRef } from 'react';
+import { Linking, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useAnimatedReaction, useDerivedValue, useSharedValue, withTiming } from 'react-native-reanimated';
+import { eggHatchAssetForSpecies } from '@acme/assets/eggs';
+import { useAnimatedReaction, useSharedValue, withTiming } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 import {
-  CaptureCase, HLYNK_COPY, IncubationRing, StatusRow, TrackpadActions, inhaleStarted, padGlowAt,
-  useInstanceStore, useLedBreathPhase, useReducedMotion, useStore, type HLynkStatus, type StatusRowItem,
+  HLYNK_COPY, IncubationRing, SafeArea, StageReadyGate, StatusRow, TrackpadActions, createIncubatingScreen, createStageReady,
+  DeviceStage, inhaleStarted, preloadEggHatch, useInstanceStore, useLedBreathPhase, useReducedMotion, useStore,
+  type DeviceKey, type HLynkStatus, type IncubatingView, type StageReadyResource, type StatusRowItem,
 } from '@acme/ui';
 import { haptics } from '@acme/ui/haptics';
 import { Text, View } from '@acme/ui/tw';
@@ -17,17 +19,55 @@ import { copy as onboardingCopy } from '../onboarding/copy';
 import { getNotifyPermission, requestNotifyPermission, scheduleReadyNotification, type NotifyPermission } from '../onboarding/notify-permission';
 import { readyBannerHold } from '../onboarding/notify-foreground';
 import { schemeForTime } from '../onboarding/time-scheme';
-import { useHomeStage } from '../companion/home-stage.store';
+import { setHomeMenuOpen, useHomeStage, useHomeStageStore } from '../companion/home-stage.store';
 import { useMinuteClock } from '../companion/minute-clock';
 import { eggIdentity } from '../companion/mon-identity';
+import { CompanionStageHost, useTabletClass } from '../companion/CompanionStageHost';
+import { eggCopy } from '../egg/copy';
+import { EggStill } from '../egg/EggStill';
+import { IncubationPane } from '../egg/IncubationPane';
+import { eggSpeciesModel } from '../egg/egg-source';
+import { StageControls } from '../egg/StageControls';
+import { StageLoader } from '../egg/StageLoader';
+import { isAccessibilityTextSize } from '../egg/window-layout';
+import { useEggVoice } from '../voice/use-mon-voice';
 import { hatchCopy } from './copy';
 import { detailLine, incubationProgress, incubationView, minutesLeft, timeLine } from './incubation-model';
 
+/** The picked wait in words, for the incubation pane (M10's option labels). */
+const INCUBATION_A11Y = { 15: 'm10.option.15.a11y', 30: 'm10.option.30.a11y', 60: 'm10.option.60.a11y' } as const;
+const PANE_CLOCK = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
+
 /** One warm announcement per this window at most (M11 copy). */
 const WARM_ANNOUNCE_MS = 10_000;
-/** The "resting in its case" caption shows only when the egg was just created (first arrival from M10). */
+/** Egg size, matching M12's `HatchEgg` so the egg does not jump between M11 and M12. */
+const EGG_PT = 120;
+/** The "resting" caption shows only when the egg was just created (first arrival from M10). */
 const FIRST_ARRIVAL_MS = 5 * 60_000;
 const captionSeen = new Set<string>();
+/** The kit's convention for a model that does not exist yet (MonView, EggStill). */
+const COMING_SOON = 'Coming Soon';
+
+/** The egg's glow on the glass: it warms as incubation runs, a tap of "Keep it warm" adds a breath, ready is full. */
+function glassWarmth(view: IncubatingView, holding: boolean): number {
+  if (view.ready) return 1;
+  return Math.min(1, 0.2 + 0.5 * view.progress + (holding ? 0.4 : 0));
+}
+
+function sameNotify(a: IncubatingView['notify'], b: IncubatingView['notify']): boolean {
+  return a === b || (a !== null && b !== null && a.label === b.label && a.action === b.action);
+}
+function sameView(a: IncubatingView, b: IncubatingView): boolean {
+  return a.status === b.status && a.progress === b.progress && a.ready === b.ready && a.time === b.time
+    && a.detail === b.detail && a.caption === b.caption && a.action === b.action && sameNotify(a.notify, b.notify);
+}
+
+interface Handlers {
+  readonly action: () => void;
+  readonly egg: () => void;
+  readonly notify: () => void;
+  readonly key: (key: DeviceKey) => void;
+}
 
 interface LocalState {
   entryMs: number;
@@ -38,21 +78,36 @@ interface LocalState {
   holding: boolean;
   lastWarmAnnounceMs: number | undefined;
   showCaption: boolean;
+  /** The 3D H-Lynk: `starting` until its first frame with the egg, `ready`, or `failed` (the 2D shell then). */
+  stage3d: 'starting' | 'ready' | 'failed';
+  stageReady: StageReadyResource;
+  /** "Keep it warm" presses on the 3D stage: each one wobbles the egg once (DeviceScreen.nudge). */
+  nudges: number;
 }
 
 /**
- * M11 Incubating, rendered at `/(home)` while the egg is in its case. Writes
- * nothing: readiness is the hatch state ticked to the minute clock, not
- * persisted (Law 6); the only commit is M12's `open`. "Warm the case" is
- * haptic and visual only, with no sim effect (a reviewer should reject any
- * `applyCare` or bond change wired to it).
+ * M11 Incubating, rendered at `/(home)` while the egg incubates. The egg sits
+ * in the scene on its own, with no case (Decision 29). Writes nothing:
+ * readiness is the hatch state ticked to the minute clock, not persisted
+ * (Law 6); the only commit is M12's `open`. "Keep it warm" is haptic and
+ * announced only, with no sim effect (a reviewer should reject any
+ * `applyCare` or bond change wired to it). The egg answers a warm with a
+ * babble from inside the shell, and babbles now and then on its own
+ * (Decision 32); its babble takes the caption line while it shows.
  */
 export function IncubatingScreen({ pending }: { pending: PendingEgg }) {
   const router = useRouter();
   const reducedMotion = useReducedMotion();
+  const { fontScale } = useWindowDimensions();
   const nowMs = useMinuteClock((s) => s.nowMs);
   const { egg, hatch } = pending;
   const id = eggIdentity(egg);
+  const voice = useEggVoice(egg);
+  // Fetch and parse the hatch GLB while the egg incubates, so M12 starts on time.
+  useEffect(() => {
+    const asset = eggHatchAssetForSpecies(egg.speciesId);
+    if (asset) preloadEggHatch(asset.eggId, asset);
+  }, [egg.speciesId]);
 
   const local = useInstanceStore<LocalState>(() => {
     const entryMs = Date.now();
@@ -61,9 +116,11 @@ export function IncubatingScreen({ pending }: { pending: PendingEgg }) {
     return {
       entryMs, readyLatched: false, announcedReady: false, permission: undefined, scheduleFailed: false,
       holding: false, lastWarmAnnounceMs: undefined, showCaption: fresh,
+      stage3d: 'starting', stageReady: createStageReady(), nudges: 0,
     };
   });
   const s = useStore(local);
+  const tablet = useTabletClass();
 
   const view = incubationView(hatch, egg, nowMs, s.entryMs, s.readyLatched);
   const ready = view === 'ready' || view === 'overdue' || view === 'resume';
@@ -115,13 +172,12 @@ export function IncubatingScreen({ pending }: { pending: PendingEgg }) {
     if (warmTimer.current !== null) clearTimeout(warmTimer.current);
   }, []);
 
-  // Pad glow follows the shared breath clock while held; the warm haptic lands on each inhale.
+  // While held, the warm haptic lands on each inhale of the shared breath clock.
   const breath = useLedBreathPhase(s.holding && !reducedMotion);
   const holding = useSharedValue(0);
   useEffect(() => {
     holding.set(s.holding ? 1 : withTiming(0, { duration: reducedMotion ? 0 : 200 }));
   }, [s.holding, reducedMotion, holding]);
-  const padGlow = useDerivedValue(() => holding.get() * padGlowAt(breath.get(), reducedMotion));
   useAnimatedReaction(
     () => breath.get(),
     (phase, prev) => {
@@ -129,8 +185,9 @@ export function IncubatingScreen({ pending }: { pending: PendingEgg }) {
     },
   );
 
-  const warmStart = () => {
-    haptics.warm();
+  const warmStart = (haptic: () => void = haptics.warm) => {
+    haptic();
+    voice.babble();
     const now = Date.now();
     const last = local.getState().lastWarmAnnounceMs;
     if (last === undefined || now - last >= WARM_ANNOUNCE_MS) {
@@ -141,10 +198,15 @@ export function IncubatingScreen({ pending }: { pending: PendingEgg }) {
   };
   const warmEnd = () => local.setState({ holding: false });
   /** Tap while counting: one breath of warm. */
-  const warmOnce = () => {
-    warmStart();
+  const warmOnce = (haptic?: () => void) => {
+    warmStart(haptic);
     if (warmTimer.current !== null) clearTimeout(warmTimer.current);
     warmTimer.current = setTimeout(warmEnd, reducedMotion ? 600 : 4000);
+  };
+  /** A press on the 3D stage: a light tap, one wobble of the egg, and the one-breath warm. */
+  const pressWarm = () => {
+    local.setState({ nudges: local.getState().nudges + 1 });
+    warmOnce(haptics.tap);
   };
   const open = () => router.push({ pathname: '/(home)/hatch', params: { from: 'm11' } });
 
@@ -176,9 +238,75 @@ export function IncubatingScreen({ pending }: { pending: PendingEgg }) {
 
   const scheme = schemeForTime(nowMs);
   const detail = detailLine(view, id.eggName, egg.incubationEndsAt, nowMs);
-  const caseLabel = hatchCopy(ready ? 'm11.case.a11y.label.ready' : 'm11.case.a11y.label', { eggName: id.eggName });
+  const eggLabel = hatchCopy(ready ? 'm11.egg.a11y.label.ready' : 'm11.egg.a11y.label', { eggName: id.eggName });
+  const timeText = timeLine(view, egg.incubationEndsAt, nowMs);
+  const captionText = voice.caption ?? (s.showCaption && view === 'counting' ? hatchCopy('m11.caption.counting') : '');
+  const actionLabel = hatchCopy(ready ? 'm11.trackpad.open' : 'm11.trackpad.warm');
+  const notifyRow = notifyRows[0];
+  const notifyAction = notifyRow?.action;
 
-  useHomeStage({
+  // The 3D H-Lynk (same rule as M08 and M10): it runs unless motion is
+  // reduced, the GPU never started, or the text is at an accessibility size.
+  // Then there is no 2D shell and no photo: the egg's hatch GLB stands on the
+  // glass, and the Rive loader covers the stage until its first frame.
+  const stageOn = !reducedMotion && !isAccessibilityTextSize(fontScale) && s.stage3d !== 'failed';
+
+  const glassView: IncubatingView = {
+    status: status.label ?? '',
+    progress: incubationProgress(egg, nowMs),
+    ready,
+    time: timeText,
+    detail: detail ?? '',
+    caption: captionText,
+    action: actionLabel,
+    notify: notifyRow === undefined ? null : { label: notifyRow.label, action: notifyAction?.label ?? null },
+  };
+  // What the glass reads. Written only when a value changes, so the texture repaints on change, not per render.
+  const glass = useInstanceStore<{ view: IncubatingView }>(() => ({ view: glassView }));
+  useEffect(() => {
+    if (!sameView(glass.getState().view, glassView)) glass.setState({ view: glassView });
+  });
+
+  // The latest handlers, written after each commit and read only from event paths, so the screen stays stable.
+  const handlers = useInstanceStore<Handlers>(() => ({ action: () => undefined, egg: () => undefined, notify: () => undefined, key: () => undefined }));
+  useEffect(() => {
+    handlers.setState({
+      action: ready ? open : pressWarm,
+      egg: ready ? () => undefined : pressWarm,
+      notify: () => notifyAction?.onPress(),
+      key: (k) => {
+        if (k === 'activate') (ready ? open : pressWarm)();
+        else if (k === 'back') router.back();
+        else if (k === 'menu') setHomeMenuOpen(!useHomeStageStore.getState().menuOpen);
+        // home is disabled on M11; `<` and `>` have nothing to step.
+      },
+    });
+  });
+
+  const eggModel = useMemo(() => eggSpeciesModel(egg.speciesId), [egg.speciesId]);
+  const incubatingScreen = useMemo(() => createIncubatingScreen({
+    egg: eggModel,
+    comingSoon: COMING_SOON,
+    view: () => glass.getState().view,
+    warmth: () => glassWarmth(glass.getState().view, local.getState().holding),
+    nudge: () => local.getState().nudges,
+    subscribe: (onChange) => glass.subscribe(onChange),
+    onAction: () => handlers.getState().action(),
+    onEgg: () => handlers.getState().egg(),
+    onNotify: () => handlers.getState().notify(),
+  }), [eggModel, glass, local, handlers]);
+  const onStageKey = useCallback((key: DeviceKey) => handlers.getState().key(key), [handlers]);
+  const onStageReady = useCallback(() => {
+    local.setState({ stage3d: 'ready' });
+    local.getState().stageReady.settle();
+  }, [local]);
+  const onStageBackend = useCallback((backend: unknown) => {
+    if (backend !== null) return;
+    local.setState({ stage3d: 'failed' });
+    local.getState().stageReady.settle();
+  }, [local]);
+
+  useHomeStage(stageOn ? { immersive: true } : {
     chrome: {
       status,
       scheme,
@@ -190,16 +318,16 @@ export function IncubatingScreen({ pending }: { pending: PendingEgg }) {
         : {
             label: hatchCopy('m11.trackpad.warm'),
             hint: hatchCopy('m11.trackpad.warm.a11y.hint'),
-            onActivate: warmOnce,
-            onHoldStart: warmStart,
+            onActivate: () => warmOnce(),
+            onHoldStart: () => warmStart(),
             onHoldEnd: warmEnd,
           },
       keys: { home: { disabled: true } },
       statusRow: (
         <TrackpadActions
           testID={ready ? 'm11-action-open' : 'm11-action-warm'}
-          onActivate={ready ? open : warmOnce}
-          activateLabel={hatchCopy(ready ? 'm11.trackpad.open' : 'm11.trackpad.warm')}
+          onActivate={ready ? open : () => warmOnce()}
+          activateLabel={actionLabel}
         />
       ),
     },
@@ -210,32 +338,111 @@ export function IncubatingScreen({ pending }: { pending: PendingEgg }) {
             <StatusRow items={notifyRows} />
           </View>
         ) : <View />}
-        <CaptureCase
-          testID="m11-case"
-          lid="closed"
-          padGlow={padGlow}
-          seam={ready ? 'lit' : 'off'}
-          scheme={scheme}
-          reducedMotion={reducedMotion}
-          accessibilityLabel={caseLabel}
-        />
+        <View
+          testID="m11-egg"
+          accessible
+          accessibilityRole="image"
+          accessibilityLabel={eggLabel}
+          aria-label={eggLabel}
+          style={{ width: EGG_PT, height: EGG_PT }}
+        >
+          {id.eggDexId === null ? null : <EggStill dexId={id.eggDexId} decorative />}
+        </View>
         <View className="w-full items-center gap-2 bg-scrim-scene px-4 py-3" style={{ minHeight: 96 }}>
           <View className="flex-row items-center gap-3">
             {view === 'counting' ? (
               <IncubationRing testID="m11-ring" startedAt={egg.createdAt} endsAt={egg.incubationEndsAt} reducedMotion={reducedMotion} sizePt={48} />
             ) : null}
             <Text testID="m11-time" className="text-xr-title text-signage-white" accessibilityRole="header">
-              {timeLine(view, egg.incubationEndsAt, nowMs)}
+              {timeText}
             </Text>
           </View>
           {detail ? <Text testID="m11-time-detail" className="text-xr-caption text-silver-300">{detail}</Text> : null}
-          {s.showCaption && view === 'counting' ? (
-            <Text testID="m11-caption" className="text-xr-caption text-silver-300">{hatchCopy('m11.caption.counting')}</Text>
+          {captionText !== '' ? (
+            <Text testID="m11-caption" className="text-xr-caption text-silver-300">{captionText}</Text>
           ) : null}
         </View>
       </View>
     ),
   });
 
-  return null;
+  if (!stageOn) return null;
+
+  return (
+    <View className="flex-1 bg-ink-950" testID="m11-3d">
+      <SafeArea className="flex-1" edges={['top', 'bottom', 'left', 'right']}>
+        <CompanionStageHost
+          enabled={tablet.companion}
+          pane={
+            <IncubationPane
+              testID="m11-pane"
+              reducedMotion={reducedMotion}
+              input={{
+                eggName: id.eggName,
+                stage: ready ? 'ready' : 'incubating',
+                duration: eggCopy(INCUBATION_A11Y[egg.incubationMinutes]),
+                startedAt: egg.createdAt,
+                readyAt: egg.incubationEndsAt,
+                clock: (ms) => PANE_CLOCK.format(new Date(ms)),
+              }}
+            />
+          }
+          device={<>
+          {/* Visually hidden: what the glass says, for screen readers (the canvas is hidden from them). */}
+          <View className="absolute left-0 top-0 h-px w-px overflow-hidden opacity-0" testID="m11-glass-a11y">
+            <View testID="m11-status" accessible accessibilityLabel={status.label ?? ''}>
+              <Text>{status.label ?? ''}</Text>
+            </View>
+            <View testID="m11-egg" accessible accessibilityRole="image" accessibilityLabel={eggLabel} aria-label={eggLabel} />
+            <Text testID="m11-time" accessibilityRole="header">{timeText}</Text>
+            {detail ? <Text testID="m11-time-detail">{detail}</Text> : null}
+            {captionText !== '' ? <Text testID="m11-caption">{captionText}</Text> : null}
+            {notifyRow ? <Text testID={notifyRow.id}>{notifyRow.label}</Text> : null}
+          </View>
+          <View
+            testID="m11-device-stage"
+            aria-hidden
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            className="absolute inset-0"
+          >
+            <DeviceStage
+              screen={incubatingScreen}
+              label={eggLabel}
+              className="h-full"
+              stageClassName="min-h-0 w-full flex-1"
+              glassScale={tablet.glassScale}
+              onKey={onStageKey}
+              onReady={onStageReady}
+              onBackendChange={onStageBackend}
+            />
+          </View>
+          <Suspense fallback={<StageLoader label={eggLabel} testID="m11-stage-loader" />}>
+            <StageReadyGate resource={s.stageReady} />
+          </Suspense>
+          <StageControls
+            testID="m11-stage-controls"
+            controls={[
+              {
+                key: 'action',
+                label: actionLabel,
+                hint: hatchCopy(ready ? 'm11.trackpad.open.a11y.hint' : 'm11.trackpad.warm.a11y.hint'),
+                onPress: ready ? open : pressWarm,
+                testID: ready ? 'm11-action-open' : 'm11-action-warm',
+              },
+              ...(notifyAction ? [{
+                key: 'notify',
+                label: notifyAction.label,
+                hint: notifyAction.accessibilityHint,
+                onPress: notifyAction.onPress,
+                testID: 'm11-action-notify',
+              }] : []),
+              { key: 'back', label: HLYNK_COPY['hlynk.key.back.label'], onPress: () => router.back(), testID: 'm11-back' },
+            ]}
+          />
+          </>}
+        />
+      </SafeArea>
+    </View>
+  );
 }

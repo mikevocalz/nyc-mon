@@ -2,8 +2,10 @@
 // Notifications — mirrors the liquid-glass template (unread header + mark-all,
 // Today/Earlier groups, icon-well rows, tap to read) with Legend Motion.
 import { Section, View, Text as TWText, Pressable } from '@acme/ui/tw';
-import { Button, Heading, StatusRow, Text, FadeIn } from '@acme/ui';
+import { Button, EmptyState, Heading, StatusRow, Text, FadeIn } from '@acme/ui';
+import { Bell } from '@acme/ui/icons';
 import { WELL, INK } from '../home/home.data';
+import { copy } from '../onboarding/copy';
 import { useOnboarding } from '../onboarding/onboarding.store';
 import { notifyOffStatusItem } from '../onboarding/notify-status';
 import { useNotifyActions } from './notify-nav';
@@ -14,7 +16,10 @@ function NotificationRow({ item, index }: { item: Notification; index: number })
   return (
     <FadeIn delay={80 + index * 45}>
       <Pressable
-        aria-label={item.title}
+        // The whole row is read out, with its state: the title alone left the
+        // body, the time and "unread" (shown only as a dot) unheard.
+        aria-label={[item.title, item.body, item.time, item.read ? undefined : copy('inbox.row.unread.a11y')].filter(Boolean).join('. ')}
+        accessibilityHint={item.read ? undefined : copy('inbox.row.a11y.hint')}
         onPress={() => markRead(item.id)}
         className={`flex-row items-start gap-3 px-4 py-3.5 transition-colors duration-fast hover:bg-surface-sunken ${
           item.read ? '' : 'bg-primary/5'
@@ -25,7 +30,7 @@ function NotificationRow({ item, index }: { item: Notification; index: number })
         </View>
         <View className="flex-1 gap-0.5">
           <View className="flex-row items-center gap-2">
-            <TWText className={`flex-1 text-sm text-text ${item.read ? 'font-medium' : 'font-bold'}`}>
+            <TWText className={`flex-1 text-sm text-text md:text-base ${item.read ? 'font-medium' : 'font-bold'}`}>
               {item.title}
             </TWText>
             {!item.read ? <View className="h-2 w-2 rounded-full bg-primary" /> : null}
@@ -54,25 +59,33 @@ function Group({ label, items, offset }: { label: string; items: Notification[];
   );
 }
 
-export function NotificationsContent() {
+/**
+ * The summary: title, unread count, Mark all read and the notifications-off
+ * status. Rendered as siblings so it drops into any `gap-*` column.
+ */
+export function NotificationsSummary() {
   const items = useNotifications((s) => s.items);
   const markAllRead = useNotifications((s) => s.markAllRead);
   const notifyOff = useOnboarding((s) => s.notifyOff);
   const { ask, openSettings } = useNotifyActions();
   const unread = items.filter((n) => !n.read).length;
-  const today = items.slice(0, 3);
-  const earlier = items.slice(3);
 
   return (
-    <View className="gap-6 md:gap-10 lg:gap-12">
+    <>
       <FadeIn>
         <Section className="flex-row items-end justify-between gap-3">
-          <View className="gap-0.5">
-            <Heading level={1} size="display-sm">Notifications</Heading>
-            {unread > 0 ? <Text variant="caption" tone="muted">{unread} unread</Text> : null}
+          <View className="flex-1 gap-0.5">
+            <Heading level={1} size="display-sm">{copy('inbox.title')}</Heading>
+            {/* Says where the count went after Mark all read, rather than going blank. */}
+            {unread > 0 ? (
+              <Text variant="caption" tone="muted">{copy('inbox.unread', { count: unread })}</Text>
+            ) : items.length > 0 ? (
+              <Text variant="caption" tone="muted">{copy('inbox.all_read')}</Text>
+            ) : null}
           </View>
+          {/* Default size: the sm face is under the 44 pt target. */}
           {unread > 0 ? (
-            <Button title="Mark all read" size="sm" className="self-end" aria-label="Mark all notifications read" onPress={markAllRead} />
+            <Button title={copy('inbox.mark_all_read')} className="self-end" aria-label={copy('inbox.mark_all_read.a11y.label')} onPress={markAllRead} />
           ) : null}
         </Section>
       </FadeIn>
@@ -86,9 +99,32 @@ export function NotificationsContent() {
           />
         </View>
       ) : null}
+    </>
+  );
+}
 
-      <Group label="Today" items={today} offset={0} />
-      <Group label="Earlier" items={earlier} offset={3} />
+/** The Today and Earlier groups, or the empty state before the first notification. */
+export function NotificationsList() {
+  const items = useNotifications((s) => s.items);
+  // One notification per egg, so the inbox is honestly empty before the first egg is ready.
+  if (!items.length) {
+    return <EmptyState icon={<Bell size={28} />} title={copy('inbox.empty.title')} description={copy('inbox.empty.body')} />;
+  }
+  const today = items.slice(0, 3);
+  const earlier = items.slice(3);
+  return (
+    <>
+      <Group label={copy('inbox.today')} items={today} offset={0} />
+      <Group label={copy('inbox.earlier')} items={earlier} offset={3} />
+    </>
+  );
+}
+
+export function NotificationsContent() {
+  return (
+    <View className="gap-6 md:gap-10 lg:gap-12">
+      <NotificationsSummary />
+      <NotificationsList />
     </View>
   );
 }

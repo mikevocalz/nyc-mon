@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'react';
 import { createStore, useStore } from 'zustand';
 import { AudioContext, decodeAudioData } from 'react-native-audio-api';
 import { haptics } from '../haptics';
+import { useInstance } from '../use-instance-store';
 import { PlayerShell } from './PlayerShell';
 import { summarise } from './waveform.ts';
 import type { AudioPlayerProps } from './AudioPlayer.types.ts';
@@ -41,13 +42,12 @@ function createPlayerStore() {
  * cannot drift away from the audio.
  */
 export function AudioPlayer({ uri, duration, levels, label, tone, district, className }: AudioPlayerProps) {
-  const store = useRef<ReturnType<typeof createPlayerStore> | null>(null);
-  store.current ??= createPlayerStore();
-  const playing = useStore(store.current, (state) => state.playing);
-  const elapsed = useStore(store.current, (state) => state.elapsed);
-  const total = useStore(store.current, (state) => state.total);
-  const bars = useStore(store.current, (state) => state.bars);
-  const error = useStore(store.current, (state) => state.error);
+  const store = useInstance(createPlayerStore);
+  const playing = useStore(store, (state) => state.playing);
+  const elapsed = useStore(store, (state) => state.elapsed);
+  const total = useStore(store, (state) => state.total);
+  const bars = useStore(store, (state) => state.bars);
+  const error = useStore(store, (state) => state.error);
 
   const context = useRef<AudioContext | null>(null);
   const buffer = useRef<Awaited<ReturnType<typeof decodeAudioData>> | null>(null);
@@ -71,10 +71,10 @@ export function AudioPlayer({ uri, duration, levels, label, tone, district, clas
             ? summarise(levels)
             : summarise(Array.from(decoded.getChannelData(0)));
 
-        store.current?.getState().set({ total: duration ?? decoded.duration, bars: shape });
+        store.getState().set({ total: duration ?? decoded.duration, bars: shape });
       } catch {
         if (!cancelled) {
-          store.current?.getState().set({ error: 'This recording could not be opened.' });
+          store.getState().set({ error: 'This recording could not be opened.' });
         }
       }
     };
@@ -86,7 +86,7 @@ export function AudioPlayer({ uri, duration, levels, label, tone, district, clas
       source.current?.stop();
       void context.current?.close();
     };
-  }, [uri, duration, levels]);
+  }, [uri, duration, levels, store]);
 
   const play = () => {
     const decoded = buffer.current;
@@ -102,17 +102,17 @@ export function AudioPlayer({ uri, duration, levels, label, tone, district, clas
     node.onended = () => {
       if (ticker.current !== null) clearInterval(ticker.current);
       offset.current = 0;
-      store.current?.getState().set({ playing: false, elapsed: 0 });
+      store.getState().set({ playing: false, elapsed: 0 });
     };
 
     node.start(0, offset.current);
     source.current = node;
     startedAt.current = audioContext.currentTime;
-    store.current?.getState().set({ playing: true });
+    store.getState().set({ playing: true });
 
     ticker.current = setInterval(() => {
       const played = offset.current + (audioContext.currentTime - startedAt.current);
-      store.current?.getState().set({ elapsed: played });
+      store.getState().set({ elapsed: played });
     }, TICK_MS);
   };
 
@@ -125,7 +125,7 @@ export function AudioPlayer({ uri, duration, levels, label, tone, district, clas
     }
     source.current?.stop();
     source.current = null;
-    store.current?.getState().set({ playing: false });
+    store.getState().set({ playing: false });
   };
 
   /**
@@ -143,7 +143,7 @@ export function AudioPlayer({ uri, duration, levels, label, tone, district, clas
     source.current = null;
 
     offset.current = Math.max(0, Math.min(seconds, total));
-    store.current?.getState().set({ elapsed: offset.current, playing: false });
+    store.getState().set({ elapsed: offset.current, playing: false });
     if (wasPlaying) play();
   };
 

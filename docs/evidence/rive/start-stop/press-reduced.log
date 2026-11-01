@@ -1,0 +1,6 @@
+[23:07:35.134] rive  deferred replay: inline
+[23:07:35.172] rive  built /Users/mikevocalz/nyc-mon/packages/ui/rive/arcade-controls/start-stop/build/start-stop.riv (142340 bytes, 37ms, 0 errors, 0 warnings)
+[23:07:35.173] rive  data: a11y/reducedMotion = true
+[23:07:35.173] rive  showing StartStop [1/1]
+[23:07:35.173] rive  viewport 128x52 @1x
+[23:07:35.184] rive  wrote /Users/mikevocalz/nyc-mon/docs/evidence/rive/start-stop/press-reduced.png

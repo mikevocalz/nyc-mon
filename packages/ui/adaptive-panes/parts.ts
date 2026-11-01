@@ -51,7 +51,9 @@ export {
 export { ReservedRegionsOverride } from '../reserved-regions-override';
 export {
   resolveAdaptiveNavigationPlacement,
+  tabBarPositionForPlacement,
   type AdaptiveNavigationKind,
+  type HardwareFamily,
   type AdaptiveNavigationPlacement,
   type HardwareEdgeColumn,
   type ResolveAdaptiveNavigationPlacementInput,

@@ -1,4 +1,4 @@
-import { exportJWK, generateKeyPair, SignJWT, createLocalJWKSet } from 'jose';
+import { exportJWK, generateKeyPair, SignJWT, UnsecuredJWT, createLocalJWKSet } from 'jose';
 import { describe, expect, it, vi } from 'vitest';
 import { authenticateRequest, decideAccess, isAdultByBirthYear } from '../auth/request-auth.ts';
 import { createIntrospectionVerifier, createJwtVerifier, InvalidTokenError } from '../auth/verifier.ts';
@@ -48,6 +48,48 @@ describe('JWT verifier', () => {
       InvalidTokenError,
     );
     await expect(verifier.verify(await sign(privateKey, { sub: 'u', scope: 'openid' }))).rejects.toBeInstanceOf(InvalidTokenError);
+  });
+
+  it('rejects an expired token and an audience with a trailing slash', async () => {
+    const { privateKey, jwks } = await keys();
+    const verifier = createJwtVerifier({ issuer: ISSUER, audience: AUDIENCE, jwks });
+    const expired = await new SignJWT({ sub: 'u', scope: 'mcp:caller mcp:care' })
+      .setProtectedHeader({ alg: 'ES256', kid: 'k1' })
+      .setIssuer(ISSUER)
+      .setAudience(AUDIENCE)
+      .setIssuedAt(Math.floor(Date.now() / 1000) - 7_200)
+      .setExpirationTime(Math.floor(Date.now() / 1000) - 3_600)
+      .sign(privateKey);
+    await expect(verifier.verify(expired)).rejects.toBeInstanceOf(InvalidTokenError);
+    await expect(verifier.verify(await sign(privateKey, { sub: 'u', scope: 'mcp:caller' }, `${AUDIENCE}/`))).rejects.toBeInstanceOf(InvalidTokenError);
+  });
+
+  it('rejects alg confusion: an unsigned alg=none token and an HS256 token keyed with the public key', async () => {
+    const { publicKey, privateKey } = await generateKeyPair('ES256', { extractable: true });
+    // A JWKS entry with no `alg`, so only the verifier's own allowlist stands between HS256 and acceptance.
+    const publicJwk = await exportJWK(publicKey);
+    const jwks = createLocalJWKSet({ keys: [{ ...publicJwk, kid: 'k1' }] });
+    const verifier = createJwtVerifier({ issuer: ISSUER, audience: AUDIENCE, jwks });
+    const claims = { sub: 'attacker', scope: 'mcp:caller mcp:care', client_id: 'alexa' };
+    expect(await verifier.verify(await sign(privateKey, claims))).toMatchObject({ callerId: 'attacker' });
+
+    const unsigned = new UnsecuredJWT(claims).setIssuer(ISSUER).setAudience(AUDIENCE).setIssuedAt().setExpirationTime('10m').encode();
+    await expect(verifier.verify(unsigned)).rejects.toBeInstanceOf(InvalidTokenError);
+
+    const hmacSecret = new TextEncoder().encode(JSON.stringify(publicJwk));
+    const hs256 = await new SignJWT(claims)
+      .setProtectedHeader({ alg: 'HS256', kid: 'k1' })
+      .setIssuer(ISSUER)
+      .setAudience(AUDIENCE)
+      .setIssuedAt()
+      .setExpirationTime('10m')
+      .sign(hmacSecret);
+    await expect(verifier.verify(hs256)).rejects.toBeInstanceOf(InvalidTokenError);
+
+    // Re-labelling a real ES256 signature as EdDSA must not verify either.
+    const [, body, signature] = (await sign(privateKey, claims)).split('.');
+    const relabelled = `${Buffer.from(JSON.stringify({ alg: 'EdDSA', kid: 'k1' })).toString('base64url')}.${body}.${signature}`;
+    await expect(verifier.verify(relabelled)).rejects.toBeInstanceOf(InvalidTokenError);
   });
 
   it('rejects a token signed by another key', async () => {
@@ -180,5 +222,18 @@ describe('env', () => {
     expect(() => loadEnv({ NODE_ENV: 'production', AUTH_JWKS_URL: 'https://a.test/jwks' })).toThrow(/V1_MCP_SERVICE_KEY/);
     const env = loadEnv({ NODE_ENV: 'production', AUTH_JWKS_URL: 'https://a.test/jwks', V1_MCP_SERVICE_KEY: 'k'.repeat(32) });
     expect(env.MCP_RESOURCE_URI).toBe('http://localhost:8788/mcp');
+  });
+
+  it('keeps the WWW-Authenticate challenge off unless MCP_WWW_AUTHENTICATE=1 (Alexa wants a bare 401)', () => {
+    const base = { NODE_ENV: 'development', OAUTH_DEV_BYPASS: '1' };
+    expect(loadEnv(base).MCP_WWW_AUTHENTICATE).toBe('0');
+    expect(loadEnv({ ...base, MCP_WWW_AUTHENTICATE: '1' }).MCP_WWW_AUTHENTICATE).toBe('1');
+  });
+
+  it('limits each principal to 120 requests a minute unless MCP_RATE_LIMIT_PER_MINUTE says otherwise (0 turns it off)', () => {
+    const base = { NODE_ENV: 'development', OAUTH_DEV_BYPASS: '1' };
+    expect(loadEnv(base).MCP_RATE_LIMIT_PER_MINUTE).toBe(120);
+    expect(loadEnv({ ...base, MCP_RATE_LIMIT_PER_MINUTE: '0' }).MCP_RATE_LIMIT_PER_MINUTE).toBe(0);
+    expect(() => loadEnv({ ...base, MCP_RATE_LIMIT_PER_MINUTE: '-1' })).toThrow(/MCP_RATE_LIMIT_PER_MINUTE/);
   });
 });

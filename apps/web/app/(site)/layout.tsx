@@ -1,7 +1,9 @@
+import { PreviewBanner } from '../../components/cms/PreviewBanner';
+import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import { SITE_DESCRIPTION } from '@acme/spatial/copy';
 import { Document } from '../Document';
-import { SiteFooterBar, SiteNavBar } from '../../components/site/SiteChrome';
+import { SiteChromeServer } from '../../components/site/SiteChromeServer';
 import { CONTENT_ID } from '../../components/site/nav';
 import '../rn-globals';
 import '../globals.css';
@@ -33,11 +35,12 @@ export const metadata: Metadata = {
 export default function SiteLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <Document>
-      <SiteNavBar />
+      <Suspense fallback={null}><PreviewBanner /></Suspense>
+      <Suspense fallback={null}><SiteChromeServer part="header" /></Suspense>
       <Main id={CONTENT_ID} tabIndex={-1} className="min-h-screen flex-1 focus:outline-none">
         {children}
       </Main>
-      <SiteFooterBar />
+      <Suspense fallback={null}><SiteChromeServer part="footer" /></Suspense>
     </Document>
   );
 }

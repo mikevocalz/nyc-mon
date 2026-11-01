@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "artboard": "LeftStick",
+  "roots": [
+    {
+      "id": 1,
+      "role": "slider",
+      "roleValue": 5,
+      "label": "Movement stick",
+      "value": "",
+      "hint": "Drag to move. Left and right steer, up and down walk.",
+      "headingLevel": 0,
+      "stateFlags": 128,
+      "traitFlags": 96,
+      "bounds": {"x": 8, "y": 8, "width": 128, "height": 128},
+      "children": []
+    }
+  ]
+}

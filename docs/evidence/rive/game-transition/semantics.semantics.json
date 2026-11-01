@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "artboard": "GameTransitionHost",
+  "roots": [
+    {
+      "id": 2,
+      "role": "text",
+      "roleValue": 7,
+      "label": "Loading your game",
+      "value": "",
+      "hint": "",
+      "headingLevel": 0,
+      "stateFlags": 512,
+      "traitFlags": 0,
+      "bounds": {"x": 125.449219, "y": 436.925049, "width": 139.101562, "height": 19.1381836},
+      "children": []
+    }
+  ]
+}

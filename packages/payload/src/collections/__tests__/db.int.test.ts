@@ -5,7 +5,7 @@ import type { Payload } from 'payload';
 import type { User } from '../../payload-types.ts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { REVEAL_CONTEXT_KEY } from '../audit/reveal.ts';
-import { deriveMonInstanceId } from '../core.ts';
+import { deriveMonGender, deriveMonInstanceId, deriveVoiceLineageId } from '../core.ts';
 import { RecordError } from '../errors.ts';
 
 const url = process.env.X1_DATABASE_URL;
@@ -82,6 +82,9 @@ describe.skipIf(url === undefined)('X1 collections on Postgres', () => {
     hatchedAt: createdAtMs + 15 * 60_000,
     bond: 0,
     stage: 'Baby' as const,
+    // The create hook requires the egg-derived gender and voice lineage (Bible v11 ¶54, ¶56).
+    gender: deriveMonGender(eggId),
+    voiceLineageId: deriveVoiceLineageId({ eggId, speciesId: 'dex-001' }),
   });
 
   it('stores an egg and refuses a second row for the same eggId', async () => {

@@ -31,9 +31,12 @@ The phone becomes an H-Lynk Core. A red plastic handheld wraps the screen. Its b
 | M08 Meet, M10 Incubation, M11 Incubating, M12 Hatch, M09 Naming | Yes | Companion screens per §4.2 |
 | M13 Home, M14 Feed, M15 Rest, M16 Social | Yes | Companion loop per §4.3 |
 | M02–M07 onboarding and auth | Never | §2.4: never on auth or settings |
-| M17 Dex, M18 Journal, M19–M22 settings, system | Never | §4.3/§4.4 mark them `none` |
+| M17 Dex, M18 Journal, M19–M22 settings, system | Never | §4.3/§4.4 mark them `none`. Restated 2026-10-29 for M17 (D20g): the code that wraps `DexProfileScreen` in the H-Lynk is drift to remove |
+| M32 Mon Space | Never | Canon Decision #33 (2026-10-29). Mike: "i no longer want this experience inside the h-lynk but just in the screen!" The whole screen is the Memory LCD. The H-Lynk opens Mon Space; it does not frame it |
 
 M01 is the deliberate exception the screen map already gives (`docs/design/DECISIONS.md` D1).
+
+On Mon Space the attention LED is a red lamp in a black lens set into the LCD's top edge, not the scanner head. It keeps Decision #7 (red) and the rule that red light never sits on bare red plastic, because there is no red plastic on that screen (D20d).
 
 ## Anatomy on a phone
 
@@ -62,7 +65,7 @@ Measured fit (points, portrait):
 | iPhone 16 Pro Max | 440 × 956 | 62 / 34 | 416 × 555 | 956 − 62 − 40 − 555 − 34 = 265 |
 | Pixel 8 | 412 × 915 | 24 / 24 (gesture nav, approx.) | 388 × 517 | 915 − 24 − 40 − 517 − 24 = 310 |
 
-Width check on SE: 351 pt between the rails holds 4 keys × 48 pt plus the 112 pt trackpad (304 pt) with four gaps of about 11 pt. Height: 112 pt pad plus 12 pt top and bottom = 136 pt, inside 139. SE is the tightest case and it fits. Anything shorter (landscape, split view, iPad slide-over) drops to the compact layout: the screen goes full-bleed, the head shrinks to a 24 pt strip, and the control row becomes a 72 pt bar with the trackpad as a wide pill. Phase 1 is portrait-only on phones.
+Width check on SE: 351 pt between the rails holds 4 keys × 48 pt plus the 112 pt trackpad (304 pt) with four gaps of about 11 pt. Height: 112 pt pad plus 12 pt top and bottom = 136 pt, inside 139. SE is the tightest case and it fits. Anything shorter (landscape, split view, iPad slide-over) drops to the compact layout: the screen goes full-bleed, the head shrinks to a 24 pt strip, and the control row becomes a 72 pt bar with the trackpad as a wide pill. Phase 1 is portrait-only on phones. Windows wider than a phone, folded windows and the no-scroll rule for the screen's content are in `ADAPTIVE.md` (Decisions H-1 to H-3); they replace the 440 pt cap on medium windows.
 
 The whole control row sits in the bottom 40% of the window on every device in the table, which meets the thumb-reach rule in §4.
 

@@ -1,5 +1,6 @@
 import type { Bloodline, MonSpeciesDef } from '@acme/core';
 import { type BloodlineRef, buildBloodline, rosterForm } from './define.ts';
+import { starterDexDetails } from './inherited-v11-starters.ts';
 
 /**
  * F12 · Yote Bloodline. Starter slot 3 (DECISIONS.md #1, #11).
@@ -9,13 +10,13 @@ import { type BloodlineRef, buildBloodline, rosterForm } from './define.ts';
 const ref: BloodlineRef = { bloodlineId: 'F12', bloodlineName: 'Yote' };
 
 export const yoteForms: readonly MonSpeciesDef[] = [
-  rosterForm(ref, 61, 'Prism Egg', 'Egg'),
-  rosterForm(ref, 62, 'Yotito', 'Baby'),
-  rosterForm(ref, 63, 'Lil’ Yote', 'Small'),
-  rosterForm(ref, 64, 'Barrio-Yote', 'Mid'),
-  rosterForm(ref, 65, 'Fuego-Yote', 'Max'),
-  rosterForm(ref, 66, 'Yote del Eléctrico', 'Max'),
-  rosterForm(ref, 67, 'Agua-Yote', 'Max'),
+  rosterForm(ref, 61, 'Prism Egg', 'Egg', starterDexDetails),
+  rosterForm(ref, 62, 'Yotito', 'Baby', starterDexDetails),
+  rosterForm(ref, 63, 'Lil’ Yote', 'Small', starterDexDetails),
+  rosterForm(ref, 64, 'Barrio-Yote', 'Mid', starterDexDetails),
+  rosterForm(ref, 65, 'Fuego-Yote', 'Max', starterDexDetails),
+  rosterForm(ref, 66, 'Yote del Eléctrico', 'Max', starterDexDetails),
+  rosterForm(ref, 67, 'Agua-Yote', 'Max', starterDexDetails),
 ];
 
 /** Evolution chain, Egg-rooted; the Mid branches to each Max form (DECISIONS.md #12). */

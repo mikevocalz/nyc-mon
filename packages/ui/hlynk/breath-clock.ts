@@ -6,7 +6,10 @@ import { motionTokens } from '@acme/theme';
  * they never drift apart. The phase is taken from the wall clock modulo the
  * period, so every reader that mounts at any time lands on the same beat.
  * Every function here is a worklet and pure, so the UI thread and the tests
- * run the same code.
+ * run the same code. Defaults are resolved in the body, never as parameter
+ * defaults: the worklets plugin captures identifiers the body reads but not
+ * ones a default reads, so `p = LED_BREATH_PERIOD_MS` threw a ReferenceError
+ * on the UI runtime and killed the app on the incubation screen.
  */
 
 const BREATH = motionTokens['motion-led-breath'].full;
@@ -19,8 +22,9 @@ export const LED_BREATH_MIN = BREATH.kind === 'breathe' ? BREATH.minOpacity : 0.
 export const LED_BREATH_MAX = BREATH.kind === 'breathe' ? BREATH.maxOpacity : 1;
 
 /** Phase 0–1 of the breath at `nowMs` (epoch ms). Phase 0 is the brightest point. */
-export function breathPhaseAt(nowMs: number, periodMs: number = LED_BREATH_PERIOD_MS): number {
+export function breathPhaseAt(nowMs: number, period?: number): number {
   'worklet';
+  const periodMs = period ?? LED_BREATH_PERIOD_MS;
   if (periodMs <= 0) return 0;
   const r = nowMs % periodMs;
   return (r < 0 ? r + periodMs : r) / periodMs;
@@ -30,8 +34,10 @@ export function breathPhaseAt(nowMs: number, periodMs: number = LED_BREATH_PERIO
  * LED opacity at a phase: bright at 0 and 1, dimmest at 0.5, eased with a
  * cosine so it matches the LED's ease-in-out keyframes (max → min → max).
  */
-export function breathIntensity(phase: number, min: number = LED_BREATH_MIN, max: number = LED_BREATH_MAX): number {
+export function breathIntensity(phase: number, minOpacity?: number, maxOpacity?: number): number {
   'worklet';
+  const min = minOpacity ?? LED_BREATH_MIN;
+  const max = maxOpacity ?? LED_BREATH_MAX;
   const k = 0.5 + 0.5 * Math.cos(phase * 2 * Math.PI);
   return min + (max - min) * k;
 }
@@ -60,7 +66,7 @@ export function inhaleStarted(prevPhase: number, phase: number): boolean {
  * Gate for the warm haptic: never faster than once per period, even if
  * samples arrive late and two inhales seem to land close together.
  */
-export function canPulse(lastPulseMs: number | undefined, nowMs: number, periodMs: number = LED_BREATH_PERIOD_MS): boolean {
+export function canPulse(lastPulseMs: number | undefined, nowMs: number, periodMs?: number): boolean {
   'worklet';
-  return lastPulseMs === undefined || nowMs - lastPulseMs >= periodMs;
+  return lastPulseMs === undefined || nowMs - lastPulseMs >= (periodMs ?? LED_BREATH_PERIOD_MS);
 }

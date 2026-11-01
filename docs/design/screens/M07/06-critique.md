@@ -11,4 +11,4 @@
 
 1. `SignagePlate` and `TextField` `clearable` stories (R3).
 2. Name rules (length, characters, filter list) from `ux-writer` + platform; the filter must be tested on names from the communities in `V11 ¶53`.
-3. Q32 (do Babies speak) stays open; it no longer blocks M07 under P4.
+3. Q32 (do Babies speak) is closed by Decision 32; it never blocked M07 under P4.

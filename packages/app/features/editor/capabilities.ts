@@ -111,8 +111,11 @@ export interface Capability {
   stateKey?: EditorStateKey;
   /** Runs the capability. Every `toolbar` entry has one — enforced below. */
   run?: (context: CapabilityContext) => void | Promise<void>;
-  /** Whether the button can be pressed right now. Default: always. */
-  isEnabled?: (context: CapabilityContext) => boolean;
+  /**
+   * Whether the button can be pressed right now. Default: always. Decided at
+   * render, before the editor instance exists, so it never sees `editor`.
+   */
+  isEnabled?: (context: Omit<CapabilityContext, 'editor'>) => boolean;
 }
 
 /**

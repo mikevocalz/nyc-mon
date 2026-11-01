@@ -1,0 +1,6 @@
+[21:07:51.469] rive  deferred replay: inline
+[21:07:51.515] rive  built packages/ui/rive/arcade-controls/right-six/build/right-six.riv (144354 bytes, 45ms, 0 errors, 0 warnings)
+[21:07:51.516] rive  data: buttons/b/state = released
+[21:07:51.516] rive  showing RightSix [1/2]
+[21:07:51.516] rive  viewport 208x144 @1x
+[21:07:51.532] rive  wrote docs/evidence/rive/right-six/released-state.png

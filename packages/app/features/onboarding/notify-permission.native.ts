@@ -2,17 +2,22 @@
 
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
-// Named import: the `import/namespace` resolver cannot see through the
-// `export *` from NotificationChannelManager.types.d.ts in this version.
-import { AndroidImportance } from 'expo-notifications';
+// Named imports: the namespace resolver cannot follow the notification
+// enums re-exported through the package’s type modules.
+import { AndroidImportance, IosAuthorizationStatus } from 'expo-notifications';
 import type { ReadyNotification } from './notify-permission';
 import { readyNotificationId } from './notify-foreground';
+import { devicePrefs } from '../settings/device-prefs.store';
 
 export type { ReadyNotification };
 export type NotifyPermission = 'undetermined' | 'granted' | 'denied' | 'unsupported';
 
 function toNotifyPermission(status: Notifications.NotificationPermissionsStatus): NotifyPermission {
-  if (status.granted || status.status === Notifications.PermissionStatus.GRANTED) return 'granted';
+  if (
+    status.granted || status.status === Notifications.PermissionStatus.GRANTED ||
+    status.ios?.status === IosAuthorizationStatus.PROVISIONAL ||
+    status.ios?.status === IosAuthorizationStatus.EPHEMERAL
+  ) return 'granted';
   return status.status === Notifications.PermissionStatus.DENIED ? 'denied' : 'undetermined';
 }
 
@@ -28,6 +33,8 @@ export async function getNotifyPermission(): Promise<NotifyPermission> {
 /** The M06 CTA: the real OS prompt. Anything that is not a grant is `denied`. */
 export async function requestNotifyPermission(): Promise<NotifyPermission> {
   try {
+    // Android 13 requires at least one channel before it can show the prompt.
+    if (Platform.OS === 'android') await ensureReadyChannel();
     const status = await Notifications.requestPermissionsAsync({
       ios: { allowAlert: true, allowSound: true, allowBadge: true },
     });
@@ -40,6 +47,13 @@ export async function requestNotifyPermission(): Promise<NotifyPermission> {
 /** Android needs a channel for any notification; iOS ignores it. */
 const ANDROID_CHANNEL_ID = 'egg-ready';
 
+async function ensureReadyChannel(): Promise<void> {
+  await Notifications.setNotificationChannelAsync(ANDROID_CHANNEL_ID, {
+    name: 'Egg ready',
+    importance: AndroidImportance.DEFAULT,
+  });
+}
+
 /**
  * Schedules the one M23 notification for an egg, fired at its
  * `incubationEndsAt`. The identifier derives from `eggId`, so a repeat call
@@ -47,12 +61,12 @@ const ANDROID_CHANNEL_ID = 'egg-ready';
  * `data.url` is the M12 deep link (`/(home)/hatch`) for the receipt handler.
  */
 export async function scheduleReadyNotification(input: ReadyNotification): Promise<boolean> {
+  // Notifications off in Settings (M19): nothing is scheduled. Resolves true:
+  // the Caller chose this, so M11 shows no "couldn't schedule" error.
+  if (!devicePrefs().notifications) return true;
   try {
     if (Platform.OS === 'android') {
-      await Notifications.setNotificationChannelAsync(ANDROID_CHANNEL_ID, {
-        name: 'Egg ready',
-        importance: AndroidImportance.DEFAULT,
-      });
+      await ensureReadyChannel();
     }
     await Notifications.scheduleNotificationAsync({
       identifier: readyNotificationId(input.eggId),
@@ -87,4 +101,18 @@ export async function clearReadyNotification(eggId: string): Promise<void> {
     Notifications.cancelScheduledNotificationAsync(id),
     Notifications.dismissNotificationAsync(id),
   ]);
+}
+
+/**
+ * M19 Notifications off: cancels every scheduled egg-ready alert. The egg
+ * alert is the only notification the app schedules (privacy notice), so
+ * "all scheduled" is exactly those. A failure is ignored; the preference
+ * still stops any new one.
+ */
+export async function cancelReadyNotifications(): Promise<void> {
+  try {
+    await Notifications.cancelAllScheduledNotificationsAsync();
+  } catch {
+    // Nothing to undo: the preference already blocks new schedules.
+  }
 }

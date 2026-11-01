@@ -3,7 +3,7 @@
 import { cookies, headers } from 'next/headers';
 import { joinWaitlist, toBirthYear, toWaitlistDistrict } from '../../../lib/waitlist.ts';
 import type { WaitlistResult } from '../../../lib/waitlist.ts';
-import { WAITLIST_AGE_HOLD_COOKIE, WAITLIST_AGE_HOLD_SECONDS } from '../../../lib/waitlist-hold.ts';
+import { WAITLIST_AGE_HOLD_COOKIE, WAITLIST_AGE_HOLD_VALUE, waitlistHoldCookieOptions } from '../../../lib/waitlist-hold.ts';
 
 /**
  * State for `useActionState(joinWaitlistAction, { status: 'idle', email: '' })`.
@@ -38,8 +38,8 @@ function visitorIp(requestHeaders: Headers): string | undefined {
  *
  * Age screen (docs/design/site/WAITLIST_AGE_SCREEN.md): admin-vite decides
  * under-13 from the year and stores nothing. When it answers `under13`, this
- * action sets a short-lived, httpOnly hold cookie that carries no personal
- * data; while it is present, a re-post (reload, back button, another year)
+ * action sets an httpOnly session cookie that carries no personal data and
+ * ends when the browser closes; while it is present, a re-post (reload, back button, another year)
  * gets the same `under13` answer without the year or address being sent
  * anywhere. The form itself also stays in its result state.
  */
@@ -58,13 +58,7 @@ export async function joinWaitlistAction(_previous: WaitlistFormState, formData:
     clientIp: visitorIp(await headers()),
   });
   if (result.status === 'under13') {
-    jar.set(WAITLIST_AGE_HOLD_COOKIE, '1', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/',
-      maxAge: WAITLIST_AGE_HOLD_SECONDS,
-    });
+    jar.set(WAITLIST_AGE_HOLD_COOKIE, WAITLIST_AGE_HOLD_VALUE, waitlistHoldCookieOptions(process.env.NODE_ENV === 'production'));
   }
   const keepEmail = result.status === 'invalid' || result.status === 'rate_limited' || result.status === 'error';
   return { ...result, email: keepEmail ? email : '' };

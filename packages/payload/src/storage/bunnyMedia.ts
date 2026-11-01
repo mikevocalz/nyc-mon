@@ -24,10 +24,19 @@ if (process.env.NODE_ENV === 'production' && !configured) {
   throw new Error('Bunny Storage must be configured in production.');
 }
 
-const storageHost = (region?: string) =>
-  region && region !== 'default'
-    ? `https://${region}.storage.bunnycdn.com`
+// Falkenstein is Bunny's main region and has no subdomain: `de.storage.bunnycdn.com`
+// does not resolve, so a zone set up there must use the bare host. Accept a pasted
+// hostname too, since the Bunny dashboard shows the region as one.
+export const storageHost = (region?: string) => {
+  const code = (region ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, '')
+    .replace(/\.?storage\.bunnycdn\.com\/?$/, '');
+  return code && !['default', 'de', 'falkenstein'].includes(code)
+    ? `https://${code}.storage.bunnycdn.com`
     : 'https://storage.bunnycdn.com';
+};
 
 const objectURL = (filename: string) => {
   const base = process.env.BUNNY_CDN_URL!.replace(/\/$/, '');
@@ -66,8 +75,8 @@ const getIncomingFiles = (
     },
   ];
 
-  if (data.sizes) {
-    for (const [sizeName, resized] of Object.entries(data.sizes)) {
+  if (data.variants) {
+    for (const [sizeName, resized] of Object.entries(data.variants)) {
       const buffer = uploadSizes?.[sizeName];
       if (buffer && resized?.mimeType && resized.filename) {
         files.push({
@@ -83,8 +92,12 @@ const getIncomingFiles = (
   return files;
 };
 
-const uploadFile = async (file: IncomingFile) => {
-  const filename = getKey(file.filename);
+/** Media keeps the zone root; every other upload collection gets its own folder so filenames never collide. */
+const keyFor = (slug: string, filename: string) =>
+  slug === 'media' ? getKey(filename) : `${slug}/${getKey(filename)}`;
+
+const uploadFile = async (slug: string, file: IncomingFile) => {
+  const filename = keyFor(slug, file.filename);
   const response = await fetch(storageURL(filename), {
     method: 'PUT',
     headers: {
@@ -104,8 +117,8 @@ const uploadFile = async (file: IncomingFile) => {
   return objectURL(filename);
 };
 
-const deleteFile = async (filename: string) => {
-  const response = await fetch(storageURL(getKey(filename)), {
+const deleteFile = async (slug: string, filename: string) => {
+  const response = await fetch(storageURL(keyFor(slug, filename)), {
     method: 'DELETE',
     headers: { AccessKey: process.env.BUNNY_STORAGE_PASSWORD! },
   });
@@ -118,12 +131,49 @@ const deleteFile = async (filename: string) => {
   }
 };
 
+/**
+ * Raw object access for staged uploads (storage/stagedUpload.ts). Keys are
+ * zone-relative and never pass through keyFor, so staging stays out of every
+ * collection's folder. The AccessKey only ever leaves this module in a
+ * server-to-server request.
+ */
+export const bunnyStorageConfigured = () => configured;
+
+export const putStorageObject = async (key: string, body: Uint8Array) => {
+  const response = await fetch(storageURL(getKey(key)), {
+    method: 'PUT',
+    headers: { AccessKey: process.env.BUNNY_STORAGE_PASSWORD!, 'Content-Type': 'application/octet-stream' },
+    body: new Uint8Array(body),
+  });
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    throw new Error(`Bunny Storage upload failed (${response.status}): ${detail || response.statusText}`);
+  }
+};
+
+export const getStorageObject = async (key: string): Promise<Uint8Array> => {
+  const response = await fetch(storageURL(getKey(key)), {
+    headers: { AccessKey: process.env.BUNNY_STORAGE_PASSWORD! },
+  });
+  if (!response.ok) throw new Error(`Bunny Storage read failed (${response.status})`);
+  return new Uint8Array(await response.arrayBuffer());
+};
+
+/** Deletes an object, or a whole folder when `key` ends in `/`. A missing key is not an error. */
+export const deleteStorageObject = async (key: string) => {
+  const response = await fetch(storageURL(getKey(key)), {
+    method: 'DELETE',
+    headers: { AccessKey: process.env.BUNNY_STORAGE_PASSWORD! },
+  });
+  if (!response.ok && response.status !== 404) throw new Error(`Bunny Storage delete failed (${response.status})`);
+};
+
 const filenamesFor = (doc: Partial<FileData>) => {
   const filenames: string[] = [];
   if (typeof doc.filename === 'string') filenames.push(doc.filename);
 
-  if (doc.sizes && typeof doc.sizes === 'object') {
-    for (const size of Object.values(doc.sizes)) {
+  if (doc.variants && typeof doc.variants === 'object') {
+    for (const size of Object.values(doc.variants)) {
       if (size?.filename && typeof size.filename === 'string') {
         filenames.push(size.filename);
       }
@@ -135,13 +185,13 @@ const filenamesFor = (doc: Partial<FileData>) => {
 
 export const bunnyMediaAfterChange: CollectionAfterChangeHook<
   FileData & TypeWithID
-> = async ({ doc, operation, previousDoc, req }) => {
+> = async ({ collection, doc, operation, previousDoc, req }) => {
   if (req.context?.skipBunnyMedia || !configured) return doc;
 
   const files = getIncomingFiles(doc, req);
   if (files.length === 0) return doc;
 
-  const uploaded = await Promise.all(files.map(uploadFile));
+  const uploaded = await Promise.all(files.map((file) => uploadFile(collection.slug, file)));
   const mainURL = uploaded[0];
 
   req.context.skipBunnyMedia = true;
@@ -150,10 +200,12 @@ export const bunnyMediaAfterChange: CollectionAfterChangeHook<
 
   try {
     await req.payload.update({
-      collection: 'media',
+      collection: collection.slug as 'media',
       id: doc.id,
       data: { bunnyUrl: mainURL },
       depth: 0,
+      // bunnyUrl is read-only to people (field access update: false); this write is the server's own.
+      overrideAccess: true,
       req,
     });
   } finally {
@@ -163,22 +215,26 @@ export const bunnyMediaAfterChange: CollectionAfterChangeHook<
   if (previousDoc && operation === 'update') {
     const previousFiles = filenamesFor(previousDoc);
     const newFiles = new Set(filenamesFor(doc));
+    // Best effort: the new file and row are already saved, so a failed delete
+    // leaves an orphan on Bunny instead of rolling back the replacement.
     await Promise.all(
       previousFiles
         .filter((filename) => !newFiles.has(filename))
-        .map(deleteFile),
+        .map((filename) => deleteFile(collection.slug, filename).catch((error: unknown) => {
+          req.payload.logger.warn({ err: error, filename }, 'Bunny Storage delete of a replaced file failed');
+        })),
     );
   }
 
-  return { ...doc, bunnyUrl: mainURL };
+  return withBunnyMediaURLs({ ...doc, bunnyUrl: mainURL });
 };
 
 export const bunnyMediaAfterDelete: CollectionAfterDeleteHook<
   FileData & TypeWithID
-> = async ({ doc }) => {
+> = async ({ collection, doc }) => {
   if (!configured) return;
 
-  await Promise.all(filenamesFor(doc).map(deleteFile));
+  await Promise.all(filenamesFor(doc).map((filename) => deleteFile(collection.slug, filename)));
 };
 
 
@@ -218,10 +274,10 @@ export const withBunnyMediaURLs = <T extends BunnyReadableMedia>(doc: T): T => {
   const publicURL = doc.bunnyUrl;
   if (typeof publicURL !== 'string' || publicURL.length === 0) return doc;
 
-  const sizes =
-    doc.sizes && typeof doc.sizes === 'object'
+  const variants =
+    doc.variants && typeof doc.variants === 'object'
       ? Object.fromEntries(
-          Object.entries(doc.sizes).map(([name, size]) => {
+          Object.entries(doc.variants).map(([name, size]) => {
             if (
               size &&
               typeof size === 'object' &&
@@ -233,13 +289,13 @@ export const withBunnyMediaURLs = <T extends BunnyReadableMedia>(doc: T): T => {
             return [name, size];
           }),
         )
-      : doc.sizes;
+      : doc.variants;
 
   return {
     ...doc,
     url: publicURL,
     ...(doc.mimeType?.startsWith('image/') ? { thumbnailURL: publicURL } : {}),
-    ...(sizes ? { sizes } : {}),
+    ...(variants ? { variants } : {}),
   };
 };
 

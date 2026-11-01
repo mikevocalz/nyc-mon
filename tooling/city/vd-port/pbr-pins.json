@@ -1,0 +1,144 @@
+{
+  "repo": "https://huggingface.co/datasets/mehmetkeremturkcan/valdrada",
+  "tag": "v0.4.0",
+  "commit": "2724c79",
+  "path": "Content/textures/pbr/<set>/<file>.ktx2",
+  "licence": "CC0 1.0 (per set: pbrSets.js)",
+  "files": {
+    "Content/textures/pbr/alu_brushed/albedo.ktx2": {
+      "sha256": "18d6d674a6ea9bc1d70e03cbf77dd811b4d423091e5de14af6591ed4cc58c9a0",
+      "bytes": 634592,
+      "retrievedAt": "2026-10-29T04:06:58.831Z"
+    },
+    "Content/textures/pbr/alu_brushed/normal.ktx2": {
+      "sha256": "abbdf42e2b745ba0c5955d72ab76eb8989f1d281f7548c87df156ffe734921c7",
+      "bytes": 416443,
+      "retrievedAt": "2026-10-29T04:06:59.169Z"
+    },
+    "Content/textures/pbr/alu_brushed/orm.ktx2": {
+      "sha256": "7cfe3a17b6f9df0b48b2a5f32b488e7b812b95bd555e428163aed544114301de",
+      "bytes": 840212,
+      "retrievedAt": "2026-10-29T04:06:59.389Z"
+    },
+    "Content/textures/pbr/brick_tan/albedo.ktx2": {
+      "sha256": "2b10a3672524bbe128476580de0640a5f42a8b138c2e421eec9fefd4bffad20a",
+      "bytes": 2605116,
+      "retrievedAt": "2026-10-29T04:06:59.962Z"
+    },
+    "Content/textures/pbr/brick_tan/normal.ktx2": {
+      "sha256": "2be95dafafa098e00a394f2ba7745abd78980f4f997f22a5eccdf9603ee0766a",
+      "bytes": 2338285,
+      "retrievedAt": "2026-10-29T04:07:00.239Z"
+    },
+    "Content/textures/pbr/brick_tan/orm.ktx2": {
+      "sha256": "34d7c78459db68250b502e96c6a92171ab860532d35b00f9c41eeed7aed16bc9",
+      "bytes": 2332690,
+      "retrievedAt": "2026-10-29T04:07:00.558Z"
+    },
+    "Content/textures/pbr/concrete_precast/albedo.ktx2": {
+      "sha256": "abb9a55ee028d6ad7e072c56fa84fb1a7d74daab4503e34dd170dc9749f809ee",
+      "bytes": 1578333,
+      "retrievedAt": "2026-10-29T04:07:00.806Z"
+    },
+    "Content/textures/pbr/concrete_precast/normal.ktx2": {
+      "sha256": "f521b7fe22609620acb9d3af80f2f276314325237c7f07a504b860bbf9e7639b",
+      "bytes": 2423644,
+      "retrievedAt": "2026-10-29T04:07:00.989Z"
+    },
+    "Content/textures/pbr/concrete_precast/orm.ktx2": {
+      "sha256": "b68f2d6a0a2e74f7f6ddaf5600c725d8f4123cfe393939b528f8ce644f16a028",
+      "bytes": 1820128,
+      "retrievedAt": "2026-10-29T04:07:01.170Z"
+    },
+    "Content/textures/pbr/concrete_smooth/albedo.ktx2": {
+      "sha256": "7d8628676f3b7c08d6971be60c6d467255c26eb03f57c1e453b6e45520aa860a",
+      "bytes": 1022380,
+      "retrievedAt": "2026-10-29T04:07:01.424Z"
+    },
+    "Content/textures/pbr/concrete_smooth/normal.ktx2": {
+      "sha256": "0dd6b3076bc24fcfa4c95e9d97d7cd9ab41cad1d642b8ffbbeb960b438ec79f3",
+      "bytes": 632522,
+      "retrievedAt": "2026-10-29T04:07:01.575Z"
+    },
+    "Content/textures/pbr/concrete_smooth/orm.ktx2": {
+      "sha256": "d60cf6c420d62b6c741b24f105b69d0cbbce78efaeb070ab0afeb765e3d033d0",
+      "bytes": 1118458,
+      "retrievedAt": "2026-10-29T04:07:01.773Z"
+    },
+    "Content/textures/pbr/granite/albedo.ktx2": {
+      "sha256": "7e2fe4b59ddccdf5b8658b942b95f6ecd55f45a7e4bd8a7da6788d4e722db93d",
+      "bytes": 5119810,
+      "retrievedAt": "2026-10-29T04:07:02.088Z"
+    },
+    "Content/textures/pbr/granite/normal.ktx2": {
+      "sha256": "9de64b46e3e016701b3fd577be6f61f82f86c922a2b41f5981c12cab978da2db",
+      "bytes": 1942330,
+      "retrievedAt": "2026-10-29T04:07:02.241Z"
+    },
+    "Content/textures/pbr/granite/orm.ktx2": {
+      "sha256": "d2762e746291ac7f9007bd451c34f34bb713321b690551ca9ff91974e4cb2e51",
+      "bytes": 3271456,
+      "retrievedAt": "2026-10-29T04:07:02.473Z"
+    },
+    "Content/textures/pbr/paint_steel/albedo.ktx2": {
+      "sha256": "6f5ad8dffd8c83340c3f5b311d980c0fcc8b82403a468377e695f396c69285a7",
+      "bytes": 1338799,
+      "retrievedAt": "2026-10-29T04:07:02.868Z"
+    },
+    "Content/textures/pbr/paint_steel/normal.ktx2": {
+      "sha256": "8130015e8e8e90d6ccdd00a33d8014ba29e5cdec52d118b190a86814cb3fcbac",
+      "bytes": 1281750,
+      "retrievedAt": "2026-10-29T04:07:03.077Z"
+    },
+    "Content/textures/pbr/paint_steel/orm.ktx2": {
+      "sha256": "896e5a89b06854b267c8f2936decfdd37e6e06e6c2087879812f318df9cc83a1",
+      "bytes": 1283159,
+      "retrievedAt": "2026-10-29T04:07:03.306Z"
+    },
+    "Content/textures/pbr/steel_galv/albedo.ktx2": {
+      "sha256": "422031e7193fd0c1b613e23a064ce5091a0774e7a2c016a3c815a57cc143b1c9",
+      "bytes": 739795,
+      "retrievedAt": "2026-10-29T04:07:03.667Z"
+    },
+    "Content/textures/pbr/steel_galv/normal.ktx2": {
+      "sha256": "86a9216eaf4e48ea3d5f2f54318e6927904c9a345faa875e802c3c89effb27b0",
+      "bytes": 514058,
+      "retrievedAt": "2026-10-29T04:07:03.953Z"
+    },
+    "Content/textures/pbr/steel_galv/orm.ktx2": {
+      "sha256": "67869ff83a0bafcd89a35c00dc930db3f2cce51e6a3d04fc32e7df48008aaf28",
+      "bytes": 1104852,
+      "retrievedAt": "2026-10-29T04:07:04.195Z"
+    },
+    "Content/textures/pbr/stone_plain/albedo.ktx2": {
+      "sha256": "720cb2eb0949c6731ddb39477d17a637054eba70814c349c1dbbabb15ff537b2",
+      "bytes": 4202388,
+      "retrievedAt": "2026-10-29T04:07:04.662Z"
+    },
+    "Content/textures/pbr/stone_plain/normal.ktx2": {
+      "sha256": "24696464be1b36b4a7282aead32692a788eb22cbbd308c05c13dec7b9c655695",
+      "bytes": 4548435,
+      "retrievedAt": "2026-10-29T04:07:04.967Z"
+    },
+    "Content/textures/pbr/stone_plain/orm.ktx2": {
+      "sha256": "187dcb373158fb711fffddf0ee76d2dff849045855046e3433cba449c33ce96f",
+      "bytes": 4797723,
+      "retrievedAt": "2026-10-29T04:07:05.386Z"
+    },
+    "Content/textures/pbr/wood_paint/albedo.ktx2": {
+      "sha256": "9cb12205f2b8f0c75495319b51395dee25a758c57820d2b84ce24b696cd7906b",
+      "bytes": 554229,
+      "retrievedAt": "2026-10-29T04:07:05.618Z"
+    },
+    "Content/textures/pbr/wood_paint/normal.ktx2": {
+      "sha256": "e2f1bb8051533fdc1d6dd0af85a81499fd16449c6b475b0ec17e5138a6f31d7d",
+      "bytes": 563004,
+      "retrievedAt": "2026-10-29T04:07:05.796Z"
+    },
+    "Content/textures/pbr/wood_paint/orm.ktx2": {
+      "sha256": "58bfb109c6d7d357b44150d7c784c3e6aac8908aba2bd5e45273fdcf74e9c7d2",
+      "bytes": 420603,
+      "retrievedAt": "2026-10-29T04:07:06.068Z"
+    }
+  }
+}

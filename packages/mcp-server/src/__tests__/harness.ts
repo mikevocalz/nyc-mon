@@ -1,6 +1,7 @@
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { applyCareAction, createInitialCareState, type CareState, type EggRecord, type MonInstance } from '@acme/core';
+import { FALLBACK_MON_LINGO, type MonLingo } from '@acme/content/lingo';
+import { applyCareAction, createInitialCareState, mintMonInstance, type CareState, type EggRecord, type MonInstance } from '@acme/core';
 import type { TokenVerifier, VerifiedToken } from '../auth/verifier.ts';
 import { InvalidTokenError } from '../auth/verifier.ts';
 import { V1CallerData } from '../data/v1.ts';
@@ -21,7 +22,8 @@ export function mon(callerId: string, overrides: Partial<MonInstance> = {}): Mon
     hatchedAt: NOW - 3_600_000,
     bond: 0.3,
     stage: 'Baby',
-    voiceLineageId: null,
+    gender: 'female',
+    voiceLineageId: 'dex-001/female/3',
     originBlock: null,
     habitatTags: [],
     activeHours: null,
@@ -50,11 +52,15 @@ export function fakeV1(
   options: {
     rows?: FakeV1Row[];
     eggs?: EggRecord[];
+    /** `activeMonInstanceId` per Caller; a Caller with no entry gets a response without the field (pre-field server). */
+    active?: Record<string, string | null>;
     refuse?: 'ADULT_REQUIRED';
     /** First PUT: apply it, then fail like a timeout so the caller never sees the answer. */
     timeoutAfterApplyOnce?: boolean;
     /** First PUT: fail like a dropped connection before anything is applied. */
     dropBeforeApplyOnce?: boolean;
+    /** What `GET /v1/mon-lingo` serves (default: the bundled seed); null answers 503. */
+    lingo?: MonLingo | null;
   } = {},
 ) {
   const rows = options.rows ?? [];
@@ -80,12 +86,34 @@ export function fakeV1(
     }
     const callerId = headers.get('X-NYC-MON-On-Behalf-Of') ?? '';
 
+    if (url.pathname === '/v1/mon-lingo') {
+      if (options.lingo === null) return Response.json({ ok: false, error: { code: 'INTERNAL_ERROR', message: 'x' } }, { status: 503 });
+      const body = JSON.stringify({ ok: true, data: options.lingo ?? FALLBACK_MON_LINGO });
+      const etag = `"${body.length}"`;
+      if (headers.get('if-none-match') === etag) return new Response(null, { status: 304, headers: { etag } });
+      return new Response(body, { status: 200, headers: { etag, 'content-type': 'application/json' } });
+    }
     if (url.pathname === '/v1/me/mons') {
-      return Response.json({ ok: true, data: { mons: rows.filter((r) => r.mon.callerId === callerId) } });
+      const mons = rows.filter((r) => r.mon.callerId === callerId);
+      const active = options.active !== undefined && callerId in options.active ? { activeMonInstanceId: options.active[callerId] } : {};
+      return Response.json({ ok: true, data: { mons, ...active } });
     }
     if (url.pathname === '/v1/me/eggs') {
-      const mine = eggs.filter((e) => e.callerId === callerId).map((egg) => ({ egg, readyToHatch: egg.incubationEndsAt <= NOW }));
+      const hatched = new Set(rows.map((r) => r.mon.monInstanceId));
+      const mine = eggs.filter((e) => e.callerId === callerId && !hatched.has(e.monInstanceId)).map((egg) => ({ egg, readyToHatch: egg.incubationEndsAt <= NOW }));
       return Response.json({ ok: true, data: { eggs: mine } });
+    }
+    const hatch = /^\/v1\/eggs\/([^/]+)\/hatch$/.exec(url.pathname);
+    if (hatch !== null && init?.method === 'POST') {
+      // payload game.ts hatchEgg: the Caller's own egg, its existing Mon on a repeat, 409 before it is ready.
+      const egg = eggs.find((e) => e.eggId === decodeURIComponent(hatch[1] ?? '') && e.callerId === callerId);
+      if (egg === undefined) return Response.json({ ok: false, error: { code: 'NOT_FOUND', message: 'x' } }, { status: 404 });
+      const existing = rows.find((r) => r.mon.monInstanceId === egg.monInstanceId);
+      if (existing !== undefined) return Response.json({ ok: true, data: { mon: existing.mon } });
+      if (egg.incubationEndsAt > NOW) return Response.json({ ok: false, error: { code: 'NOT_READY', message: 'x' } }, { status: 409 });
+      const minted = mintMonInstance(egg);
+      rows.push({ mon: minted, care: createInitialCareState(minted.monInstanceId, minted.hatchedAt) });
+      return Response.json({ ok: true, data: { mon: minted } });
     }
     const care = /^\/v1\/mons\/([^/]+)\/care$/.exec(url.pathname);
     if (care !== null && init?.method === 'PUT') {

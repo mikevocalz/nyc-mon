@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import {
   advanceCare,
+  createInitialCareState,
   applyCareAction,
   deriveMonMood,
   listUnmetNeeds,
@@ -8,23 +9,28 @@ import {
   type CareNeed,
   type CareState,
   type MonInstance,
+  type MonMood,
+  voiceStage,
 } from '@acme/core';
 import type { CallToolResult, McpServer } from '@modelcontextprotocol/server';
+import { FALLBACK_MON_LINGO, monVoiceView, voiceGuideFor, type MonLingo } from '@acme/content/voice';
 import type { z } from 'zod';
 import { permitted, resolveActingVoice, type ActingVoice, type SpeakerHint } from '../auth/actor.ts';
 import { isAdultByBirthYear } from '../auth/request-auth.ts';
 import type { CallerData, MonWithCare } from '../data/caller.ts';
-import { AdultRequiredError, NotFoundError, WriteUnconfirmedError } from '../data/errors.ts';
+import { AdultRequiredError, EggNotReadyError, NotFoundError, WriteUnconfirmedError } from '../data/errors.ts';
 import type { FamiliarDirectory } from '../presence/fixtures.ts';
 import type { PresenceService } from '../presence/service.ts';
 import type { Permission } from '../presence/types.ts';
 import { failure, success } from './errors.ts';
+import { BABY_TALK_RULE, eggSpeech, monSpeech, type MonOccasion } from './mon-speech.ts';
 import {
   AcknowledgeOutput,
   AcknowledgePersonInput,
   CARE_SUGGESTIONS,
   CareResultOutput,
   FamiliarPeopleOutput,
+  HatchEggOutput,
   IncubationOutput,
   InjectPresenceEventInput,
   MonIdInput,
@@ -38,6 +44,7 @@ import {
   SharedMemoriesOutput,
   careInput,
   checkOnMonOutput,
+  hatchEggInput,
   playInput,
   talkToMonOutput,
 } from './schemas.ts';
@@ -48,6 +55,7 @@ export const CORE_TOOL_NAMES = [
   'get_mon_status',
   'check_on_mon',
   'check_incubation',
+  'hatch_egg',
   'talk_to_mon',
   'feed_mon',
   'rest_mon',
@@ -107,7 +115,30 @@ async function guarded(fn: () => Promise<CallToolResult>): Promise<CallToolResul
   }
 }
 
-function monView(mon: MonInstance) {
+/**
+ * The Mon's lines and lingo as Payload publishes them (`GET /v1/mon-lingo`).
+ * When `/v1` can't answer, the bundled fallback keeps the tools working; the
+ * voice data is never a reason to fail a care call.
+ */
+async function lingoFor(ctx: ToolContext, callerId: string): Promise<MonLingo> {
+  if (ctx.data.monLingo === undefined) return FALLBACK_MON_LINGO;
+  try {
+    return await ctx.data.monLingo(callerId);
+  } catch (error) {
+    console.error('[mcp] mon-lingo unavailable, using the bundled fallback:', error instanceof Error ? error.message : String(error));
+    return FALLBACK_MON_LINGO;
+  }
+}
+
+/**
+ * The Mon as tools report it. `gender` and `voice` (from `@acme/content/voice`, the
+ * one Mon voice module, read against the lingo Payload serves) are for a
+ * client that voices the Mon itself (the web simulator); Alexa reads replies
+ * in its own voice (PLATFORM-DOCS §2.8) and copy never uses a pronoun for a
+ * Mon (PS-005).
+ */
+async function monView(ctx: ToolContext, callerId: string, mon: MonInstance, lingo?: MonLingo) {
+  const served = lingo ?? (await lingoFor(ctx, callerId));
   return {
     monId: mon.monInstanceId,
     name: mon.nickname,
@@ -115,7 +146,35 @@ function monView(mon: MonInstance) {
     stage: mon.stage,
     bond: mon.bond,
     hatchedAt: mon.hatchedAt,
+    gender: mon.gender,
+    voice: monVoiceView(mon, ctx.now(), served),
   };
+}
+
+/**
+ * `mon` plus what the Mon may say (`say`, `speechRule`), from one read of the
+ * lingo. Both speech fields are absent for a Mon that speaks in full.
+ */
+async function monAndSpeech(ctx: ToolContext, callerId: string, mon: MonInstance, mood: MonMood, occasion: MonOccasion) {
+  const lingo = await lingoFor(ctx, callerId);
+  return { mon: await monView(ctx, callerId, mon, lingo), ...monSpeech(mon, mood, occasion, lingo, ctx.now()) };
+}
+
+/**
+ * talk_to_mon for a Caller whose only companion is still an egg: the no-mon
+ * failure, carrying the egg's babble so Alexa can babble for the egg.
+ */
+async function eggOnlyTalk(ctx: ToolContext, callerId: string): Promise<CallToolResult> {
+  const eggs = [...(await ctx.data.listIncubatingEggs(callerId))].sort((a, b) => a.egg.incubationEndsAt - b.egg.incubationEndsAt);
+  const first = eggs[0];
+  if (first === undefined) return failure('no-mon');
+  const speech = eggSpeech(first.egg, await lingoFor(ctx, callerId), ctx.now());
+  return failure('no-mon', { egg: { eggId: first.egg.eggId, ...speech }, speechRule: BABY_TALK_RULE });
+}
+
+function isNoMon(result: CallToolResult): boolean {
+  const error = (result.structuredContent as { error?: { reason?: unknown } } | undefined)?.error;
+  return error?.reason === 'no-mon';
 }
 
 function careView(care: CareState) {
@@ -135,16 +194,96 @@ function current(entry: MonWithCare, now: number): MonWithCare {
   return advanceCare({ mon: entry.mon, care: entry.care }, now).state;
 }
 
-/** The named Mon, or the most recently hatched one. */
+/** Fallbacks already logged, so a stale or missing companion warns once per Caller, not per call. */
+const loggedFallbacks = new Set<string>();
+const MAX_LOGGED_FALLBACKS = 1_000;
+
+function logFallbackOnce(callerId: string, activeMonInstanceId: string | null): void {
+  const key = `${callerId}\u0000${activeMonInstanceId ?? ''}`;
+  if (loggedFallbacks.has(key)) return;
+  if (loggedFallbacks.size >= MAX_LOGGED_FALLBACKS) loggedFallbacks.clear();
+  loggedFallbacks.add(key);
+  const why = activeMonInstanceId === null ? 'no companion chosen' : `companion ${activeMonInstanceId} is not among the Caller's Mons`;
+  console.warn(`[mcp-server] ${why}; answering for the most recently hatched Mon`);
+}
+
+/**
+ * The Mon a tool acts on. A named `monId` wins. Otherwise the Caller's chosen
+ * companion (`users.activeMonInstanceId`), so every surface answers for, and
+ * speaks in the voice of, the same Mon the Caller picked. Only when no
+ * companion is chosen, or it names a Mon the Caller no longer has, does the
+ * most recently hatched Mon answer.
+ */
 async function resolveMon(ctx: ToolContext, callerId: string, monId: string | undefined): Promise<MonWithCare | CallToolResult> {
-  const mons = await ctx.data.listMons(callerId);
+  const { mons, activeMonInstanceId } = await ctx.data.listMons(callerId);
   if (mons.length === 0) return failure('no-mon');
+  const byId = (id: string) => mons.find((entry) => entry.mon.monInstanceId === id);
   if (monId !== undefined) {
-    const found = mons.find((entry) => entry.mon.monInstanceId === monId);
+    const found = byId(monId);
     return found === undefined ? failure('mon-not-found') : current(found, ctx.now());
   }
+  const active = activeMonInstanceId === null ? undefined : byId(activeMonInstanceId);
+  if (active !== undefined) return current(active, ctx.now());
+  if (mons.length > 1) logFallbackOnce(callerId, activeMonInstanceId);
   const latest = [...mons].sort((a, b) => b.mon.hatchedAt - a.mon.hatchedAt)[0];
   return latest === undefined ? failure('no-mon') : current(latest, ctx.now());
+}
+
+/** "12 minutes", "1 minute": how a speaker says the time left on an egg. */
+function timeLeft(incubationEndsAt: number, now: number): { minutesRemaining: number; timeLeft: string } {
+  const minutesRemaining = Math.max(1, Math.ceil((incubationEndsAt - now) / 60_000));
+  return { minutesRemaining, timeLeft: minutesRemaining === 1 ? '1 minute' : `${minutesRemaining} minutes` };
+}
+
+/**
+ * hatch_egg: the Caller's own egg only (the Caller-only rule, a familiar or
+ * unverified voice is refused before anything is read), never before its
+ * incubation ends. Safe to retry: `/v1` returns the Mon an egg already minted.
+ * The new Mon is returned explicitly, so the card shows it even while the
+ * Caller's chosen companion (`activeMonInstanceId`) stays another Mon.
+ */
+async function runHatch(ctx: ToolContext, args: { eggId?: string; speakerHint?: SpeakerHint }): Promise<CallToolResult> {
+  const linked = linkedCaller(ctx);
+  if (isResult(linked)) return linked;
+  const actor = actorFor(ctx, linked.callerId, args.speakerHint);
+  if (actor.kind !== 'caller') return failure('not-permitted', { speaker: speakerView(actor) });
+
+  return guarded(async () => {
+    const now = ctx.now();
+    const eggs = [...(await ctx.data.listIncubatingEggs(linked.callerId))].sort((a, b) => a.egg.incubationEndsAt - b.egg.incubationEndsAt);
+    const listed = args.eggId === undefined ? eggs[0] : eggs.find((e) => e.egg.eggId === args.eggId);
+    // A named egg that is no longer listed has hatched already (or is not the
+    // Caller's): /v1 answers with its Mon, or 404, which reads as no egg.
+    const eggId = listed?.egg.eggId ?? args.eggId;
+    if (eggId === undefined) return failure('no-egg');
+    if (listed !== undefined && listed.egg.incubationEndsAt > now) {
+      return failure('egg-not-ready', { eggId, ...timeLeft(listed.egg.incubationEndsAt, now) });
+    }
+    let mon: MonInstance;
+    try {
+      mon = await ctx.data.hatchEgg(linked.callerId, eggId);
+    } catch (error) {
+      // The server's clock says not yet (ours ran a little ahead).
+      if (error instanceof EggNotReadyError) {
+        return failure('egg-not-ready', { eggId, ...timeLeft(listed?.egg.incubationEndsAt ?? now + 60_000, now) });
+      }
+      if (error instanceof NotFoundError) return failure('no-egg');
+      throw error;
+    }
+    const { mons } = await ctx.data.listMons(linked.callerId);
+    const stored = mons.find((entry) => entry.mon.monInstanceId === mon.monInstanceId);
+    const state = current(stored ?? { mon, care: createInitialCareState(mon.monInstanceId, mon.hatchedAt) }, now);
+    const alreadyHatched = listed === undefined;
+    return success({
+      hatched: true,
+      alreadyHatched,
+      hatching: !alreadyHatched,
+      egg: { eggId, speciesId: listed?.egg.speciesId ?? 'dex-001' },
+      ...(await monAndSpeech(ctx, linked.callerId, state.mon, deriveMonMood(state.care), 'first-words')),
+      care: careView(state.care),
+      mood: deriveMonMood(state.care),
+    });
+  });
 }
 
 function suggestedCare(state: MonWithCare, needs: readonly CareNeed[]): (typeof CARE_SUGGESTIONS)[number][] {
@@ -204,7 +343,7 @@ async function runCare(
       return success({
         applied: false,
         declinedBecause: predicted.outcome.reason,
-        mon: monView(state.mon),
+        ...(await monAndSpeech(ctx, linked.callerId, state.mon, deriveMonMood(state.care), 'hello')),
         care: careView(state.care),
         mood: deriveMonMood(state.care),
       });
@@ -227,7 +366,7 @@ async function runCare(
     return success({
       applied: true,
       effect,
-      mon: monView(written.mon),
+      ...(await monAndSpeech(ctx, linked.callerId, written.mon, deriveMonMood(written.care), effect === 'played' ? 'played' : 'hello')),
       care: careView(written.care),
       mood: deriveMonMood(written.care),
     });
@@ -291,10 +430,11 @@ export function buildTools(ctx: ToolContext) {
         return guarded(async () => {
           const state = await resolveMon(ctx, linked.callerId, args.monId);
           if (isResult(state)) return state;
+          const mood = deriveMonMood(state.care);
           return success({
-            mon: monView(state.mon),
+            ...(await monAndSpeech(ctx, linked.callerId, state.mon, mood, state.care.pendingRequest !== null ? 'hungry' : 'hello')),
             care: careView(state.care),
-            mood: deriveMonMood(state.care),
+            mood,
             needs: listUnmetNeeds(state.care),
           });
         });
@@ -315,9 +455,10 @@ export function buildTools(ctx: ToolContext) {
           const state = await resolveMon(ctx, linked.callerId, args.monId);
           if (isResult(state)) return state;
           const needs = listUnmetNeeds(state.care);
+          const mood = deriveMonMood(state.care);
           return success({
-            mon: monView(state.mon),
-            mood: deriveMonMood(state.care),
+            ...(await monAndSpeech(ctx, linked.callerId, state.mon, mood, state.care.pendingRequest !== null ? 'hungry' : 'hello')),
+            mood,
             needs,
             suggestedCare: suggestedCare(state, needs),
             ...(devMode ? { presentPeople: presentPeople(ctx, linked.callerId) } : {}),
@@ -328,7 +469,7 @@ export function buildTools(ctx: ToolContext) {
     def({
       name: 'check_incubation',
       title: 'Check incubation',
-      description: "Whether the Caller has an egg incubating, how many minutes are left, and whether it is ready to hatch in the app.",
+      description: "Whether the Caller has an egg incubating, how many minutes are left, and whether it is ready to hatch (hatch_egg hatches it).",
       input: NoInput,
       output: IncubationOutput,
       annotations: READ,
@@ -337,22 +478,35 @@ export function buildTools(ctx: ToolContext) {
         if (isResult(linked)) return linked;
         return guarded(async () => {
           const now = ctx.now();
-          const eggs = (await ctx.data.listIncubatingEggs(linked.callerId)).map(({ egg }) => ({
+          const listed = await ctx.data.listIncubatingEggs(linked.callerId);
+          const lingo = listed.length === 0 ? undefined : await lingoFor(ctx, linked.callerId);
+          const eggs = listed.map(({ egg }) => ({
             eggId: egg.eggId,
             speciesId: egg.speciesId,
             incubationEndsAt: egg.incubationEndsAt,
             minutesRemaining: Math.max(0, Math.ceil((egg.incubationEndsAt - now) / 60_000)),
             readyToHatch: egg.incubationEndsAt <= now,
+            ...(lingo === undefined ? {} : eggSpeech(egg, lingo, now)),
           }));
-          return success({ incubating: eggs.length > 0, eggs });
+          return success({ incubating: eggs.length > 0, eggs, ...(eggs.length > 0 ? { speechRule: BABY_TALK_RULE } : {}) });
         });
       },
+    }),
+    def({
+      name: 'hatch_egg',
+      title: 'Hatch egg',
+      description:
+        "Hatch the Caller's egg once incubation has ended, and show it hatching. Returns the Mon it hatched into. Before the egg is ready it refuses and says how many minutes are left. Only the Caller can hatch. Safe to retry.",
+      input: hatchEggInput(devMode),
+      output: HatchEggOutput,
+      annotations: { ...WRITE, idempotentHint: true },
+      run: (args) => runHatch(ctx, args),
     }),
     def({
       name: 'talk_to_mon',
       title: 'Talk to Mon',
       description:
-        "Use when the Caller talks to their Mon. Returns the Mon's state (mood, needs, awake or asleep, whether it wants food) and who is speaking, so the reply can be voiced in character. Writes nothing.",
+        "Use when the Caller talks to their Mon, or to their egg. Returns the Mon's state (mood, needs, awake or asleep, whether it wants food) and who is speaking, so the reply can be voiced in character. When `say` is present with verbatim true, the Mon's words are exactly say.text. A Caller with only an egg gets no-mon with the egg's babble in error.egg.say. Writes nothing.",
       input: careInput(devMode),
       output: talkToMonOutput(devMode),
       annotations: READ,
@@ -363,13 +517,16 @@ export function buildTools(ctx: ToolContext) {
         const actor = actorFor(ctx, linked.callerId, hint);
         return guarded(async () => {
           const state = await resolveMon(ctx, linked.callerId, args.monId);
-          if (isResult(state)) return state;
+          if (isResult(state)) return args.monId === undefined && isNoMon(state) ? eggOnlyTalk(ctx, linked.callerId) : state;
+          const mood = deriveMonMood(state.care);
+          const wantsFood = state.care.pendingRequest !== null;
           return success({
-            mon: monView(state.mon),
-            mood: deriveMonMood(state.care),
+            ...(await monAndSpeech(ctx, linked.callerId, state.mon, mood, wantsFood ? 'hungry' : 'hello')),
+            mood,
+            voiceGuide: voiceGuideFor(state.mon, mood, await lingoFor(ctx, linked.callerId), voiceStage(state.mon, ctx.now())),
             needs: listUnmetNeeds(state.care),
             activity: state.care.activity.kind,
-            wantsFood: state.care.pendingRequest !== null,
+            wantsFood,
             speaker: speakerView(actor),
             ...(devMode ? { presentPeople: presentPeople(ctx, linked.callerId) } : {}),
           });

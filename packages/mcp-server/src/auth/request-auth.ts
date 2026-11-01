@@ -66,8 +66,8 @@ const SERVICE_METHODS = new Set([
   'prompts/list',
 ]);
 
-/** Tools that write care; they need `mcp:care`. Every other tool needs `mcp:caller`. */
-export const CARE_WRITE_TOOLS: ReadonlySet<string> = new Set(['feed_mon', 'rest_mon', 'wake_mon', 'play_with_mon']);
+/** Tools that write care or hatch an egg; they need `mcp:care`. Every other tool needs `mcp:caller`. */
+export const CARE_WRITE_TOOLS: ReadonlySet<string> = new Set(['feed_mon', 'rest_mon', 'wake_mon', 'play_with_mon', 'hatch_egg']);
 
 interface RpcMessage {
   readonly method: string;
@@ -87,7 +87,7 @@ function messagesIn(body: unknown): RpcMessage[] {
   return out;
 }
 
-/** The HTTP answer for a request: let it through, or 401 / 403 with no WWW-Authenticate. */
+/** The HTTP answer for a request: let it through, or 401 / 403 (the server adds any WWW-Authenticate challenge). */
 export type AccessDecision = 'allow' | 401 | 403;
 
 /**

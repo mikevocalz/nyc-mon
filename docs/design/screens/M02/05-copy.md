@@ -34,12 +34,13 @@ EngineX is not named. The origin is a season mystery (`V11 ¶33`, `¶90`) and ha
 
 | ID | String | Voice | Max | Notes | Canon |
 |---|---|---|---|---|---|
-| `m02.p2.title` | Three eggs. One of them hatches for you. | ui | 52 | | Three eggs, one chosen: Decision #5 |
+| `m02.p2.title` | Four eggs. One of them hatches for you. | ui | 52 | | Four eggs, one chosen: Decisions #5, #38 |
 | `m02.p2.body` | Each comes from a Bloodline. Whoever's inside is their own person. | ui | 74 | | Bloodline: Decision #11. "Mons are people": `V11 ¶42`, `¶43`; species vs individual: `V11 ¶44` |
 | `m02.p2.caption.f01` | Hood Ratti Bloodline | ui | 30 | Under #001, left | Decision #11, D7; `ROSTER L150` |
 | `m02.p2.caption.f02` | Bodega Baddiee Cee Bloodline | ui | 30 | Under #008, centre. Longest caption; at XXL it wraps to two lines, never truncates | Decision #11, D7; `ROSTER L157` |
-| `m02.p2.caption.f12` | Yote Bloodline | ui | 30 | Under #061, right | Decision #11, D7; `ROSTER L210` |
-| `m02.p2.image.alt` | Three eggs side by side: Metro Egg, Hood Ratti Bloodline. Corner Egg, Bodega Baddiee Cee Bloodline. Prism Egg, Yote Bloodline. | ui | — | Names only. No colours or markings until Q11 (egg skins) is answered | Egg names: Decision #9, `ROSTER L150`, `L157`, `L210` |
+| `m02.p2.caption.f12` | Yote Bloodline | ui | 30 | Under #061 | Decision #11, D7; `ROSTER L210` |
+| `m02.p2.caption.f04` | LanternFye Bloodline | ui | 30 | Under #020, right | Decisions #11, #38; `ROSTER L169` |
+| `m02.p2.image.alt` | Four eggs side by side: Metro Egg, Hood Ratti Bloodline. Corner Egg, Bodega Baddiee Cee Bloodline. Prism Egg, Yote Bloodline. Signal Egg, LanternFye Bloodline. | ui | — | Names only. No colours or markings until Q11 (egg skins) is answered | Egg names: Decision #9, `ROSTER L150`, `L157`, `L210` |
 
 The UI says "Bodega Baddiee Cee Bloodline", never the casual "Bodega Cee" (Decision #13 keeps that for story copy). Never "line" or "family" (Law 9, D7).
 

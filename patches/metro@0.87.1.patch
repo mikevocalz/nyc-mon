@@ -1,0 +1,40 @@
+diff --git a/src/node-haste/DependencyGraph.js b/src/node-haste/DependencyGraph.js
+index 3a76e63bee2e290aaec4dfc4ed160e0244441542..c3e7a7872b3c745d207ca94a62ef01d6e01c0794 100644
+--- a/src/node-haste/DependencyGraph.js
++++ b/src/node-haste/DependencyGraph.js
+@@ -33,6 +33,20 @@ function getOrCreateMap(map, field) {
+   }
+   return subMap;
+ }
++// react-native-worklets Bundle Mode writes react-native-worklets/.worklets/*.js
++// during transform, after the file map's crawl, so the watcher may not have
++// indexed them when their SHA-1 is asked for. Upstream workaround from
++// react-native-worklets/bundleMode/patches/patch-package/metro/metro+0.87.1.patch,
++// active only when nyc-mon's worklet render flag (EXPO_PUBLIC_WORKLET_RENDER,
++// the same test as apps/mobile/metro.config.js) is set for this Metro process.
++const workletsBundleMode = /^(1|true|worklet)$/i.test(
++  (process.env.EXPO_PUBLIC_WORKLET_RENDER ?? "").trim(),
++);
++const workletsDirPath = _nodePath.default.join(
++  "react-native-worklets",
++  ".worklets",
++);
++
+ class DependencyGraph extends _nodeEvents.default {
+   #packageCache;
+   #dependencyPlugin;
+@@ -137,6 +151,14 @@ class DependencyGraph extends _nodeEvents.default {
+     return (0, _nullthrows.default)(this._fileSystem).getAllFiles();
+   }
+   async getOrComputeSha1(mixedPath) {
++    if (workletsBundleMode && mixedPath.includes(workletsDirPath)) {
++      const createHash = require("crypto").createHash;
++      return {
++        sha1: createHash("sha1")
++          .update(performance.now().toString())
++          .digest("hex"),
++      };
++    }
+     const result = await this._fileSystem.getOrComputeSha1(mixedPath);
+     if (!result || !result.sha1) {
+       throw new Error(`Failed to get the SHA-1 for: ${mixedPath}.

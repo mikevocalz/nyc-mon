@@ -1,0 +1,192 @@
+{
+  "schema": 1,
+  "artboard": "GameTransitionHost",
+  "stateMachine": "Host",
+  "viewModel": {
+    "name": "Default",
+    "viewModel": "GameTransitionRoot",
+    "properties": [
+      {
+        "name": "transition",
+        "path": "transition",
+        "type": "viewModel",
+        "value": {
+          "name": "Default",
+          "viewModel": "Transition",
+          "properties": [
+            {
+              "name": "phase",
+              "path": "transition/phase",
+              "type": "enum",
+              "enumType": "TransitionPhase",
+              "value": "enter",
+              "index": 0,
+              "values": ["enter", "hold", "reveal", "done"],
+              "changed": false
+            },
+            {
+              "name": "theme",
+              "path": "transition/theme",
+              "type": "viewModel",
+              "value": {
+                "name": "Default",
+                "viewModel": "Theme",
+                "properties": [
+                  {
+                    "name": "variant",
+                    "path": "transition/theme/variant",
+                    "type": "enum",
+                    "enumType": "ThemeVariant",
+                    "value": "night",
+                    "index": 1,
+                    "values": ["daylit", "night"],
+                    "changed": false
+                  }
+                ]
+              }
+            },
+            {
+              "name": "a11y",
+              "path": "transition/a11y",
+              "type": "viewModel",
+              "value": {
+                "name": "Default",
+                "viewModel": "A11y",
+                "properties": [
+                  {
+                    "name": "reducedMotion",
+                    "path": "transition/a11y/reducedMotion",
+                    "type": "boolean",
+                    "value": false,
+                    "changed": false
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "theme",
+        "path": "theme",
+        "type": "viewModel",
+        "value": {
+          "name": "Default",
+          "viewModel": "Theme",
+          "properties": [
+            {
+              "name": "variant",
+              "path": "theme/variant",
+              "type": "enum",
+              "enumType": "ThemeVariant",
+              "value": "night",
+              "index": 1,
+              "values": ["daylit", "night"],
+              "changed": false
+            }
+          ]
+        }
+      },
+      {
+        "name": "layout",
+        "path": "layout",
+        "type": "viewModel",
+        "value": {
+          "name": "Default",
+          "viewModel": "Layout",
+          "properties": [
+            {
+              "name": "profile",
+              "path": "layout/profile",
+              "type": "enum",
+              "enumType": "LayoutProfile",
+              "value": "phone-portrait",
+              "index": 0,
+              "values": ["phone-portrait", "phone-landscape", "fold-outer", "fold-book", "fold-tabletop", "tablet", "web"],
+              "changed": false
+            }
+          ]
+        }
+      },
+      {
+        "name": "a11y",
+        "path": "a11y",
+        "type": "viewModel",
+        "value": {
+          "name": "Default",
+          "viewModel": "A11y",
+          "properties": [
+            {
+              "name": "reducedMotion",
+              "path": "a11y/reducedMotion",
+              "type": "boolean",
+              "value": false,
+              "changed": false
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "globals": [],
+  "nested": [
+    {
+      "path": "Transition",
+      "artboard": "GameTransition",
+      "viewModels": [
+        {
+          "name": "Default",
+          "viewModel": "Transition",
+          "properties": [
+            {
+              "name": "phase",
+              "path": "phase",
+              "type": "enum",
+              "enumType": "TransitionPhase",
+              "value": "enter",
+              "index": 0,
+              "values": ["enter", "hold", "reveal", "done"]
+            },
+            {
+              "name": "theme",
+              "path": "theme",
+              "type": "viewModel",
+              "value": {
+                "name": "Default",
+                "viewModel": "Theme",
+                "properties": [
+                  {
+                    "name": "variant",
+                    "path": "theme/variant",
+                    "type": "enum",
+                    "enumType": "ThemeVariant",
+                    "value": "night",
+                    "index": 1,
+                    "values": ["daylit", "night"]
+                  }
+                ]
+              }
+            },
+            {
+              "name": "a11y",
+              "path": "a11y",
+              "type": "viewModel",
+              "value": {
+                "name": "Default",
+                "viewModel": "A11y",
+                "properties": [
+                  {
+                    "name": "reducedMotion",
+                    "path": "a11y/reducedMotion",
+                    "type": "boolean",
+                    "value": false
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

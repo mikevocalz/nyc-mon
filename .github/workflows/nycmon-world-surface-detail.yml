@@ -1,0 +1,28 @@
+name: NYC-Mon surface detail candidate
+on:
+  pull_request:
+    paths:
+      - 'packages/app/features/game/world/materials.ts'
+      - 'packages/app/features/game/world/surface-detail*'
+      - 'packages/app/features/game/world/shader-graphs.test.ts'
+      - 'docs/design/nycmon-world-surface-pass-2026-10-16.md'
+      - '.github/workflows/nycmon-world-surface-detail.yml'
+permissions:
+  contents: read
+jobs:
+  surface-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # shader-graphs.test.ts compiles both surfaceDetail variants to WGSL
+      # (the real coverage for this flag); surface-detail.test.ts checks the
+      # CPU-side option plumbing.
+      - run: node --test packages/app/features/game/world/surface-detail.test.ts packages/app/features/game/world/shader-graphs.test.ts

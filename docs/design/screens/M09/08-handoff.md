@@ -15,7 +15,7 @@ Implementation contract for `platform`, `sim-core` and the kit. Inputs: `01-rese
 | B7 | M12 handoff routes `hatched` → M09 (not M13) and leaves the Baby in its last pose for the continuity arrival | `design-director` (M12) | entry |
 | B8 | Route path. This file keeps the brief's `/(onboarding)/name`; the M12 lane (`M12/08-handoff.md` B5) proposes `/(home)/name` so M09 shares `/(home)/_layout.tsx` and its `CreatureStage` for an unbroken creature canvas. Pick one before either screen ships; `/(home)/name` is the better fit for continuity, and nothing in this contract depends on the group | lead | route, boot `mon-name` path |
 
-Not blocking: Q32 (sound slot stays off), "Ratti" ruling (reserved list ships empty), Baby models (stills now).
+Not blocking: the sound slot stays off until assets exist (Q32 is closed by Decision 32: babble), "Ratti" ruling (reserved list ships empty), Baby models (stills now).
 
 ## Route and intent
 

@@ -29,11 +29,11 @@ Tokens: `{eggName}` from `eggs` (`@acme/content`) for the route's `bloodline`; `
 | `m10.trackpad.hint` | Flick to change the time. Tap to start. | ui | — | | DIRECTION.md "Controls" |
 | `m10.action.prev` | Shorter | ui | 10 | `TrackpadActions` `stepBackLabel` | |
 | `m10.action.next` | Longer | ui | 10 | `stepForwardLabel` | |
-| `m10.case.a11y.closed` | The {eggName} is in the case. | ui | — | Image label once closed | `V11 ¶65` ("case", never "capture", Q4) |
-| `m10.confirmed.a11y.announce` | Incubating. Ready at {time}. | ui | — | Polite, after the case closes | |
+| `m10.egg.a11y.incubating` | The {eggName} is incubating. | ui | — | Egg image label once confirmed (was `m10.case.a11y.closed`, "The {eggName} is in the case."; superseded by Decision 29, 2026-10-21) | Decision 29 |
+| `m10.confirmed.a11y.announce` | Incubating. Ready at {time}. | ui | — | Polite, on confirmation | |
 | `m10.led.chip` | Incubating, {minutes} minutes left | ui | 32 | The `hlynk.led.incubating` refinement DIRECTION.md specifies; `{minutes}` rounds up | DIRECTION.md LED table |
 | `m10.led.chip.hour` | Incubating, 1 hour left | ui | 32 | When 60 minutes remain | |
-| `m10.error.title` | The egg didn't go into the case. | ui | 40 | Save write threw | |
+| `m10.error.title` | Incubation didn't start. | ui | 40 | Save write threw | |
 | `m10.error.body` | Nothing was saved. Try again. If it keeps happening, restart NYC-MON. | ui | 90 | | |
 | `m10.error.retry` | Try again | ui | 20 | | |
 | `m10.back.a11y.label` | Back | ui | — | Back key before confirm → M08 with the egg still focused | |
@@ -60,4 +60,4 @@ No copy changes.
 ## Open questions
 
 1. **Q27.** Does incubation length change anything about the Mon? Drives `m10.body`.
-2. **Q4.** Is the case the incubation cradle in canon? The screen assumes yes (brief §2.4, M10) and never says "capture".
+2. **Q4.** Answered by Decision 29 (2026-10-21): no case; the egg incubates on its own. Original: Is the case the incubation cradle in canon? The screen assumes yes (brief §2.4, M10) and never says "capture".

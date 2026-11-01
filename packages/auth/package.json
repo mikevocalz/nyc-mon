@@ -10,7 +10,8 @@
   },
   "scripts": {
     "lint": "eslint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --test 'src/**/*.test.ts'"
   },
   "dependencies": {
     "@acme/core": "workspace:*",
@@ -23,6 +24,7 @@
   },
   "devDependencies": {
     "@acme/config": "workspace:*",
+    "@types/node": "catalog:",
     "@types/react": "catalog:",
     "eslint": "catalog:",
     "eslint-config-expo": "catalog:",

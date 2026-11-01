@@ -227,7 +227,7 @@ export const hlynk = {
 
 /**
  * The H-Lynk screen's own UI, drawn on a canvas inside the 3D device
- * (apps/web/components/home/device-scene.ts). Canvas can't read CSS variables,
+ * (packages/ui/three/hlynk: hud-draw.ts, choice-screen.ts). Canvas can't read CSS variables,
  * so these stay TS-only and are not emitted to theme.css.
  */
 export const hud = {
@@ -684,6 +684,297 @@ export const breakpoints = {
   lg: '64rem',
   xl: '80rem',
   '2xl': '96rem',
+} as const;
+
+// Slop-grade city: E1 light and output rig
+/**
+ * Time-of-day light colours for the physically lit city
+ * (EXPO_PUBLIC_WORLD_PHYSICAL). Values are mrdoob/slop-newyork @ be65d0a,
+ * js/lighting.js TIME_PRESETS (MIT, © 2026 Mr.doob), one row per preset.
+ * Scene-referred light colours for three.js, not UI colours: nothing here
+ * sits under text, so there is no contrast pair to measure. The world rig
+ * reads them through world/physical-presets.ts; build-css never emits them.
+ */
+export const physicalCityLight = {
+  golden: {
+    sun: '#FFCA92',
+    hemiSky: '#9ABBE6',
+    /** warm terracotta and limestone canyon bounce */
+    hemiGround: '#C88A62',
+    skyTop: '#2C568C',
+    skyHorizon: '#EBD1B5',
+    fog: '#DCC5AE',
+  },
+  midday: {
+    sun: '#FFF5E8',
+    hemiSky: '#AAD2FF',
+    /** sunlit masonry and pavement bounce */
+    hemiGround: '#B89678',
+    skyTop: '#225EA8',
+    skyHorizon: '#C8DFF5',
+    fog: '#C6DCF2',
+  },
+  twilight: {
+    sun: '#FF9466',
+    hemiSky: '#4C6CA8',
+    hemiGround: '#6E5048',
+    skyTop: '#102248',
+    skyHorizon: '#B86B6C',
+    fog: '#353C58',
+  },
+  midnight: {
+    /** moonlight */
+    sun: '#8CB0E8',
+    hemiSky: '#263A62',
+    hemiGround: '#382E36',
+    skyTop: '#060C1A',
+    skyHorizon: '#182640',
+    fog: '#0C1424',
+  },
+  /** The SkyMesh is mixed toward this by each preset's night factor. */
+  nightSky: '#0B1528',
+  /**
+   * Streetlamp PointLights without the facelift (js/street-details.js, the
+   * cobra-head SpotLight colour). With the facelift on they take
+   * physicalFacelift.streetLed instead.
+   */
+  streetlamp: '#FFE8C2',
+  /**
+   * Storefront PointLights under the shop awnings (js/buildings.js
+   * storeThemeColors): bistro gold, pharmacy white, bookstore amber, deli
+   * orange-gold, boutique ivory.
+   */
+  storefront: ['#FFD896', '#D8EEFF', '#FFE4AD', '#FFBE88', '#FFF2D6'],
+} as const;
+
+// Slop-grade city: vehicles
+/**
+ * Paint, lamp and livery colours for the lofted traffic
+ * (EXPO_PUBLIC_WORLD_PHYSICAL). Values are mrdoob/slop-newyork @ be65d0a:
+ * js/traffic.js PALETTES, js/actor-models.js createLoftedCarMaterial and
+ * createLoftedBusMaterial, the carPlateTexture colours, and
+ * js/vehicle-lights.js HEADLIGHTS.color (MIT, © 2026 Mr.doob). Scene-referred
+ * sRGB values the shaders convert to linear, not UI colours: nothing here
+ * sits under text. living-city/lofted-car-material.ts reads them; build-css
+ * never emits them.
+ */
+export const physicalVehicles = {
+  /** Per-kind paint pools. The van wears Slop's SUV body, so it takes the SUV pool. */
+  paint: {
+    taxi: ['#FFBE14'],
+    sedan: ['#1C2026', '#CFD6DE', '#1D3B6C', '#52575E', '#6E1F24', '#8A8F96', '#E9ECEF'],
+    suv: ['#16191E', '#F0F3F7', '#3A434D', '#28382E', '#BEC6CF', '#5B2A2A'],
+  },
+  car: {
+    taxiBadge: '#121417',
+    taxiGold: '#FFBE14',
+    cladding: '#1E2124',
+    /** cowl panel, rear valance, rear wiper */
+    blackPanel: '#15181B',
+    grille: '#111417',
+    lampHousing: '#30383E',
+    headLens: '#C2CCD2',
+    drl: '#E4E9EB',
+    frontAmber: '#C5802B',
+    tailRed: '#AE1821',
+    tailAmber: '#C56B18',
+    reverseLens: '#BAC4C9',
+    reflector: '#7A0A10',
+    tailHousing: '#222326',
+    trunkHandle: '#303438',
+    plateRecess: '#24292D',
+    underside: '#0E1013',
+    glassLow: '#0A1016',
+    glassHigh: '#1A2632',
+    seal: '#111315',
+    chrome: '#C9CED3',
+    chmsl: '#6A0A0E',
+    mirrorGlass: '#7C8A94',
+    signBody: '#F3EFE2',
+    signFace: '#FFF1B8',
+    trim: '#1B1E21',
+    alloyDark: '#0B0E12',
+    alloy: '#D8E0E8',
+    tyre: '#16181B',
+  },
+  bus: {
+    pearl: '#F0F4F8',
+    blueBand: '#0058B8',
+    cyanRibbon: '#00A8E8',
+    skirt: '#1C2026',
+    seal: '#15191E',
+    louvre: '#1A1E23',
+    lampPod: '#111418',
+    headLens: '#DCEFFF',
+    amberLens: '#FFA21A',
+    tailLens: '#9A0D14',
+    turnRear: '#C8641A',
+    reverseLens: '#E8EEF2',
+    glassLow: '#0E1A26',
+    glassHigh: '#1B3046',
+    trim: '#1B1F24',
+    roofPod: '#C9CED3',
+  },
+  /** NY plate: yellow field, dark ink (Slop carPlateTexture). */
+  plate: { field: '#F2B718', ink: '#17212C' },
+  /** Emitted light: low beams and the lamp emissives. */
+  lamp: {
+    headBeam: '#FFF8EC',
+    busHead: '#D9EFFF',
+    brake: '#FF0A12',
+    turn: '#FF9A14',
+    taxiSign: '#FFE28A',
+  },
+} as const;
+
+// Slop-grade city: materials
+/**
+ * Surface and emitted colours for the physically lit city's facade, interior,
+ * road and fire-escape materials (EXPO_PUBLIC_WORLD_PHYSICAL,
+ * packages/app/features/game/world/physical/). Values are
+ * mrdoob/slop-newyork @ be65d0a, js/tsl-materials.js, js/buildings.js and
+ * js/fire-escapes.js (MIT, © 2026 Mr.doob); each group names the Slop
+ * function it came from. sRGB, converted to linear by three.js Color.
+ * Scene colours only: nothing here sits under UI text, and build-css never
+ * emits them. Wall stone and curtain-wall glass are not here: those keep the
+ * class tones from world/palette.ts WALL_TONES (the G3 rule).
+ */
+export const physicalCityMaterials = {
+  /** evaluateApartmentInterior: bulbs, room shell, floor, back wall. */
+  interior: {
+    bulbWarmA: '#FFB845',
+    bulbWarmB: '#FFE49C',
+    bulbCoolA: '#DFE8FF',
+    bulbCoolB: '#9FB6FF',
+    plasterA: '#9A8B73',
+    plasterB: '#6F7A82',
+    plasterC: '#B9AD97',
+    boardsA: '#4A3320',
+    boardsB: '#6A4C30',
+    rugA: '#7A3B32',
+    rugB: '#3A5760',
+    ceiling: '#E8E2D5',
+    doorA: '#5A4631',
+    doorB: '#39383C',
+    pictureFrame: '#141210',
+    pictureA: '#2C3A4A',
+    pictureB: '#7A5A3A',
+  },
+  /** evaluateApartmentInterior drape palette: cream, taupe, warm grey, dusty blue, sage, faded terracotta (pairs). */
+  drapes: {
+    creamA: '#CABFA6',
+    creamB: '#D8CDB8',
+    taupeA: '#8A7A64',
+    taupeB: '#9B8C72',
+    greyA: '#5F7079',
+    greyB: '#6F818B',
+    sageA: '#6C7558',
+    sageB: '#79835F',
+    terracottaA: '#8C5A44',
+    terracottaB: '#9A6A52',
+  },
+  /** createPreWarBuildingMaterial constants. */
+  preWar: {
+    soot: '#4A4236',
+    windowWarm: '#FFCF86',
+    windowCool: '#CFE2FF',
+    canyonBounce: '#E89C68',
+    crownGlow: '#FFE0A3',
+    glazeTint: '#B6C6BF',
+    acPlasticA: '#F0EEE8',
+    acPlasticB: '#CAC6BC',
+    rearBrickRedA: '#6C3D30',
+    rearBrickRedB: '#8A503E',
+    rearBrickBuffA: '#9A8669',
+    rearBrickBuffB: '#B09A7A',
+    parging: '#8F8B84',
+    signGroundCream: '#D3C9AE',
+    signGroundOxblood: '#86392B',
+    signGroundNavy: '#2B3340',
+    signInkOxblood: '#6B2A20',
+    signInkCream: '#DDD2B6',
+    signInkGold: '#D5C086',
+    doorBlack: '#1C1B1A',
+    doorOxblood: '#4C2018',
+    doorGreen: '#203528',
+    doorBrown: '#6A4628',
+  },
+  /** js/buildings.js `facades` rows 0–2: trim stone and window glass per masonry family. */
+  masonryFamily: {
+    limestoneTrim: '#9E937F',
+    limestoneGlass: '#1A2836',
+    brickTrim: '#CAB9A0',
+    brickGlass: '#16222E',
+    brownstoneTrim: '#503A2E',
+    brownstoneGlass: '#151E26',
+  },
+  /** createCurtainWallMaterial constants and js/buildings.js row 3 frame tint. */
+  curtainWall: {
+    frame: '#3B4C5B',
+    warmLight: '#FFE1A6',
+    reflectedTower: '#0C1420',
+    reflectedWindow: '#FFD494',
+    roofA: '#202429',
+    roofB: '#3B4149',
+    panelA: '#8A867E',
+    panelB: '#AAA59B',
+    coping: '#C9CED3',
+  },
+  /** createRoadSurfaceMaterial, createSidewalkMaterial, createCurbMaterial, createContactShadowMaterial. */
+  street: {
+    asphaltDark: '#2B2E33',
+    asphaltLight: '#464A51',
+    manhole: '#4A433C',
+    concreteA: '#8E8D85',
+    concreteB: '#73726B',
+    graniteA: '#4C4C45',
+    graniteB: '#63635A',
+    contactShadow: '#020305',
+  },
+  /** js/road-paint.js WHITE and YELLOW. */
+  roadPaint: { white: '#E6E2D6', yellow: '#E8AD22' },
+  /** js/fire-escapes.js steel. */
+  fireEscape: { steel: '#25292C' },
+} as const;
+
+// Slop-grade city: facelift
+/**
+ * The futuristic facelift on the physically lit city
+ * (EXPO_PUBLIC_WORLD_PHYSICAL with EXPO_PUBLIC_WORLD_FUTURE;
+ * packages/app/features/game/world/physical/facelift.ts). The approved
+ * direction is MOBILE_WORLD_PR_PACK.md "Approved art direction"
+ * (2026-10-13), restated for PBR in docs/design/handoff/slop-grade-city.md
+ * § 4. Glow colours are brand 400/500 steps; the rest are nyc-mon picks,
+ * not Slop values, and each waits for an iPhone 17 / iPad Pro frame.
+ * Scene colours only: nothing here sits under UI text, and build-css never
+ * emits them.
+ */
+export const physicalFacelift = {
+  /** Refined wall tones per masonry family (the palette refresh); the brick bond and relief stay the shader's. */
+  wallRefresh: {
+    brick: ['#8E4B3B', '#A0624A', '#7A4436'],
+    brownstone: ['#6E4C3C', '#7E5A46', '#5E4236'],
+    limestone: ['#CFC8BA', '#BDB6A8', '#D9D2C4'],
+  },
+  /** Painted aluminium window frames and canopies: a dielectric paint, not bare metal. */
+  frame: '#2B2F33',
+  canopy: '#4A4F55',
+  /** Sealant in the modular panel joints. */
+  panelJoint: '#1F2225',
+  /**
+   * Neon roofline trims: brand 400 and 500. Royal 500 is left out: it is
+   * so saturated that the bloom pass's 8x peak limit caps its luminance
+   * below the threshold, so it could not glow.
+   */
+  trim: [orange[400], orange[500], royal[400], carolina[400], carolina[500], leaf[400], leaf[500], apple[400], apple[500]],
+  /** Vertical architectural light strips: brand 400. */
+  strip: [royal[400], carolina[400], orange[400]],
+  /** The light band under an upgraded entrance canopy. */
+  entrance: orange[400],
+  /** The royal kerb light line along the commercial avenues (400: 500 cannot clear the bloom threshold, see trim). */
+  kerb: royal[400],
+  /** LED streetlight, about 5000 K: cooler than the sodium-warm pools the city draws today. */
+  streetLed: '#DCE8FF',
 } as const;
 
 export type Palette = typeof palette;

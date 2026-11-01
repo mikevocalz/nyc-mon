@@ -93,8 +93,9 @@ export function toolResultContent(result: CallToolResult): Anthropic.ToolResultB
     }
   }
   // structuredContent is the authoritative data; add it when no text mirrors it.
+  // Errors always carry it: the reason slug and speaker are what the skill's refusal rules key on.
   const hasText = blocks.some((b) => b.type === 'text');
-  if (result.structuredContent !== undefined && !hasText) {
+  if (result.structuredContent !== undefined && (!hasText || result.isError)) {
     blocks.push({ type: 'text', text: JSON.stringify(result.structuredContent) });
   }
   if (blocks.length === 0) blocks.push({ type: 'text', text: result.isError ? 'The tool failed.' : 'Done.' });

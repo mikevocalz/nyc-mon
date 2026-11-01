@@ -21,8 +21,11 @@ export const ACTION_TOOLS: Readonly<Record<ActionId, string>> = {
   rest: 'rest_mon',
   wake: 'wake_mon',
   play: 'play_with_mon',
+  // The ready egg's "Hatch your egg" button: the touch twin of "hatch it".
+  hatch: 'hatch_egg',
 };
 
-export function actionArguments(_id: ActionId, monId: string): Record<string, unknown> {
-  return { monId };
+/** `id` is the Mon's id, or the egg's id for `hatch`. */
+export function actionArguments(action: ActionId, id: string): Record<string, unknown> {
+  return action === 'hatch' ? { eggId: id } : { monId: id };
 }

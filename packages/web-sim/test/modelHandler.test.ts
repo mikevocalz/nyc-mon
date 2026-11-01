@@ -38,6 +38,29 @@ describe('/api/model', () => {
     expect(res.status).toBe(403);
   });
 
+  it('refuses a missing Origin, the opaque "null" Origin of a sandboxed frame, the sandbox origin and look-alikes', async () => {
+    let backendCalls = 0;
+    const counting: ModelBackend = { label: 'x', stream: (p, onText, signal) => ((backendCalls += 1), mockBackend().stream(p, onText, signal)) };
+    const { h } = handler(counting);
+    const noOrigin = new Request(`${ORIGIN}/api/model`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: body() });
+    expect((await h(noOrigin, 'ip')).status).toBe(403);
+    for (const origin of ['null', 'http://localhost:5181', 'https://localhost:5180', 'http://localhost:51800', 'http://127.0.0.1:5180', `${ORIGIN}.evil.example`]) {
+      const res = await h(post(body(), origin), 'ip');
+      expect(res.status, origin).toBe(403);
+      expect(res.headers.get('access-control-allow-origin'), origin).toBeNull();
+    }
+    expect(backendCalls).toBe(0);
+  });
+
+  it('answers a CORS preflight with 405 and grants no cross-origin access', async () => {
+    const res = await handler().h(
+      new Request(`${ORIGIN}/api/model`, { method: 'OPTIONS', headers: { origin: 'https://evil.example', 'access-control-request-method': 'POST' } }),
+      'ip',
+    );
+    expect(res.status).toBe(405);
+    expect(res.headers.get('access-control-allow-origin')).toBeNull();
+  });
+
   it('rejects malformed bodies and oversized tool lists', async () => {
     expect((await handler().h(post('{'), 'ip')).status).toBe(400);
     const tools = Array.from({ length: 65 }, (_, i) => ({ name: `t${i}`, description: '', input_schema: { type: 'object' } }));
@@ -97,5 +120,42 @@ describe('/api/model', () => {
         () => {},
       ),
     ).rejects.toBeInstanceOf(ModelAuthExpiredError);
+  });
+});
+
+describe('mockBackend replies', () => {
+  const tools = [{ name: 'get_mon_status', description: 'x', input_schema: { type: 'object' as const, properties: {} } }];
+  const turn = (content: string, isError = false) =>
+    mockBackend().stream(
+      {
+        system: '',
+        tools,
+        messages: [
+          { role: 'user', content: 'hi' },
+          { role: 'assistant', content: [{ type: 'tool_use', id: 't1', name: 'get_mon_status', input: {} }] },
+          { role: 'user', content: [{ type: 'tool_result', tool_use_id: 't1', is_error: isError, content: [{ type: 'text', text: content }] }] },
+        ],
+      } as never,
+      () => {},
+      new AbortController().signal,
+    );
+  const text = async (p: ReturnType<typeof turn>) => ((await p).content[0] as Anthropic.TextBlock).text;
+
+  it('reads back the tool’s spoken text and never names the tool', async () => {
+    const t = await text(turn('Lil’ Ratti is full and slow.'));
+    expect(t).toBe('Lil’ Ratti is full and slow.');
+    expect(t).not.toMatch(/get_mon_status|Scripted/);
+  });
+
+  it('calls the tool the request names', async () => {
+    const two = [...tools, { name: 'hatch_egg', description: 'x', input_schema: { type: 'object' as const, properties: {} } }];
+    const reply = await mockBackend().stream({ system: '', tools: two, messages: [{ role: 'user', content: 'Hatch my egg' }] } as never, () => {}, new AbortController().signal);
+    expect(reply.content.find((b) => b.type === 'tool_use')).toMatchObject({ name: 'hatch_egg' });
+  });
+
+  it('speaks only the message of an error, never its code or JSON', async () => {
+    const t = await text(turn(JSON.stringify({ error: { reason: 'unavailable', message: 'NYC-MON can’t reach your Mon right now.' } }), true));
+    expect(t).toBe('NYC-MON can’t reach your Mon right now.');
+    expect(t).not.toMatch(/[{}]|unavailable/);
   });
 });
