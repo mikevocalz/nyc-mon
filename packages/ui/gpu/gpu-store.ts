@@ -34,7 +34,7 @@ let starting: Promise<void> | null = null;
 
 async function start(): Promise<void> {
   try {
-    const module = await loadWebGpu();
+    const module = await requestAdapterWithTimeout(loadWebGpu);
     const adapter = module ? await requestAdapterWithTimeout(() => navigator.gpu.requestAdapter()) : null;
     if (!module || !adapter) {
       // Distinguish "no navigator.gpu" from "adapter request resolved null":

@@ -66,9 +66,10 @@ export function ownDeviceDescriptor(adapter: GPUAdapter): GPUDeviceDescriptor {
  */
 export async function acquireSharedOrOwnDevice(deps: AcquireDeviceDeps): Promise<AcquiredDevice | null> {
   let sharedError: string;
+  const shared = await withTimeout(deps.importShared(), REQUEST_ADAPTER_TIMEOUT_MS);
+  if (shared) return { device: shared, source: 'shared', sharedError: null };
   try {
-    const device = await deps.importShared();
-    return { device, source: 'shared', sharedError: null };
+    throw new Error('importShared() timed out or returned no device');
   } catch (error) {
     sharedError = error instanceof Error ? error.message : String(error);
   }
