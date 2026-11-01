@@ -86,6 +86,13 @@ export interface WorldPreset {
     readonly structureVertices: number;
     /** The far tier (vd-port/far-tier): the streamed L4/L6 chunks and landmark silhouettes inside the 13 km reach. */
     readonly far: { readonly geometryBytes: number; readonly cellDraws: number; readonly triangles: number };
+    /**
+     * The gen lane (world/gen, opt-in EXPO_PUBLIC_WORLD_GEN): seeded infill cells inside its fixed
+     * 320 m reach. Sized like the lite cells, not the near ones — a gen cell is box massing
+     * (~20 verts x <=2 boxes x <=13 lots ≈ <=1 k verts, ~500 B-25 kB), so cell draws bind long
+     * before bytes or triangles do.
+     */
+    readonly gen: { readonly geometryBytes: number; readonly cellDraws: number; readonly triangles: number };
   };
 }
 
@@ -111,7 +118,10 @@ export const WORLD_PRESETS: Readonly<Record<WorldPresetName, WorldPreset>> = {
     // (cell-stream.walk.test.ts) 305k triangles, no refused load. Lane C's structures 250k vertices (structures.test.ts).
     vdPort: { blocksNear: { geometryBytes: 24 * MiB, cellDraws: 12, triangles: 350_000, errorM: 0.03, level: 'lite' }, structureVertices: 250_000,
       // the 13 km reach holds ~300 MB of far chunks on 'high'; the A12X keeps about the nearest fifth of it resident
-      far: { geometryBytes: 64 * MiB, cellDraws: 160, triangles: 1_200_000 } },
+      far: { geometryBytes: 64 * MiB, cellDraws: 160, triangles: 1_200_000 },
+      // gen: ~60 cells inside its 320 m reach on the Harlem tile; 48 draws keeps it a fill
+      // layer, not a second near level (lite: 12 draws / 350 k tris; a gen cell is ~0.4 k tris)
+      gen: { geometryBytes: 4 * MiB, cellDraws: 48, triangles: 60_000 } },
   },
   phone: {
     name: 'phone',
@@ -126,7 +136,8 @@ export const WORLD_PRESETS: Readonly<Record<WorldPresetName, WorldPreset>> = {
     shadowTile: 2048,
     bloomResolutionScale: 0.5,
     vdPort: { blocksNear: { geometryBytes: 24 * MiB, cellDraws: 12, triangles: 350_000, errorM: 0.03, level: 'lite' }, structureVertices: 250_000,
-      far: { geometryBytes: 64 * MiB, cellDraws: 160, triangles: 1_200_000 } },
+      far: { geometryBytes: 64 * MiB, cellDraws: 160, triangles: 1_200_000 },
+      gen: { geometryBytes: 4 * MiB, cellDraws: 48, triangles: 60_000 } },
   },
   high: {
     name: 'high',
@@ -141,7 +152,10 @@ export const WORLD_PRESETS: Readonly<Record<WorldPresetName, WorldPreset>> = {
     bloomResolutionScale: 0.5,
     vdPort: { blocksNear: { geometryBytes: 256 * MiB, cellDraws: 64, triangles: 4_000_000, errorM: 0.09, level: 'near' }, structureVertices: 2_000_000,
       // 'high' holds every chunk inside the 13 km macro radius (289 chunks, ~294 MB of quantized geometry)
-      far: { geometryBytes: 384 * MiB, cellDraws: 512, triangles: 6_000_000 } },
+      far: { geometryBytes: 384 * MiB, cellDraws: 512, triangles: 6_000_000 },
+      // gen's reach is fixed at 320 m, so its want set is the same as the small presets';
+      // 'high' just refuses fewer of the far-edge cells before the draws cap
+      gen: { geometryBytes: 8 * MiB, cellDraws: 128, triangles: 200_000 } },
   },
 };
 
