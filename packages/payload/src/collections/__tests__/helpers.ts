@@ -76,7 +76,7 @@ export function validMonDoc(overrides: Record<string, unknown> = {}): Record<str
     hatchedAt: egg.incubationEndsAt,
     bond: 0,
     stage: 'Baby',
-    gender: deriveMonGender(egg.eggId as string),
+    gender: deriveMonGender(egg.eggId as string, egg.speciesId as string),
     voiceLineageId: deriveVoiceLineageId({ eggId: egg.eggId as string, speciesId: egg.speciesId as string }),
     ...overrides,
   };
