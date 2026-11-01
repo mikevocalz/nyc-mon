@@ -105,6 +105,9 @@ function readCare(value: unknown, monInstanceId: string): CareState | null {
     activity: asleep ? { kind: 'asleep', since } : { kind: 'awake' },
     sluggishUntil: value.sluggish === true ? updatedAt + 1 : num(value.sluggishUntil),
     pendingRequest: value.wantsFood === true || isRecord(value.pendingRequest) ? { need: 'fullness', since: 0 } : null,
+    pause: isRecord(value.pause) && typeof value.pause.since === 'number'
+      && Number.isInteger(value.pause.since) && value.pause.since >= 0
+      ? { since: value.pause.since } : null,
   };
 }
 
