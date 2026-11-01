@@ -10,6 +10,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { buildUi } from './build.ts';
 import { getUiResources } from './index.ts';
 import { MON_MODEL_ORIGIN } from './model-origin.ts';
+import { modelFixturePath } from './test-host/model-fixtures.ts';
 
 /**
  * The hatch moment, booted in Playwright's bundled Chromium on the ext-apps
@@ -22,7 +23,6 @@ import { MON_MODEL_ORIGIN } from './model-origin.ts';
  */
 
 const here = dirname(fileURLToPath(import.meta.url));
-const MONS_DIR = join(here, '../../../../apps/web/public/mons');
 const now = Date.now();
 
 const hatchResult = {
@@ -75,7 +75,7 @@ async function boot(opts: { result: Record<string, unknown>; callResult?: Record
   await ctx.route(`${MON_MODEL_ORIGIN}/mons/*.glb`, async (route) => {
     const name = new URL(route.request().url()).pathname.split('/').pop()!;
     try {
-      await route.fulfill({ status: 200, body: await readFile(join(MONS_DIR, name)), headers: { 'content-type': 'model/gltf-binary', 'access-control-allow-origin': '*' } });
+      await route.fulfill({ status: 200, body: await readFile(modelFixturePath(name)), headers: { 'content-type': 'model/gltf-binary', 'access-control-allow-origin': '*' } });
     } catch {
       await route.fulfill({ status: 404, body: 'No such model.' });
     }

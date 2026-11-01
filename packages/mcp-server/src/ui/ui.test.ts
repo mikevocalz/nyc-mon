@@ -8,6 +8,7 @@ import { brand, palette, semantic } from '@acme/theme';
 import { CARE_COLORS } from '../../../ui/care/care-colors.ts';
 import { buildUi } from './build.ts';
 import { readFileSync } from 'node:fs';
+import { modelFixturePath } from './test-host/model-fixtures.ts';
 import { careOutcomeText, clipsFor, eggDetailText, eggTimeText, MON_CLIPS, spokenSummary, toMonViewModel } from './contract.ts';
 import { getUiResources, MON_MODEL_ORIGIN, mcpAppsRegistration, parseUiManifest, UI_MIME_TYPE, UI_TOOL_LINKS, type UiResource } from './index.ts';
 
@@ -117,6 +118,14 @@ describe('built MCP App views', () => {
     for (const { id, html } of resources) {
       expect(Buffer.byteLength(html), `${id} raw bytes`).toBeLessThanOrEqual(BUDGET[id]!.raw);
       expect(gzipSync(html, { level: 9 }).byteLength, `${id} gzip bytes`).toBeLessThanOrEqual(BUDGET[id]!.gzip);
+    }
+  });
+
+  it('does not embed the WASM texture decoders that the MCP sandbox cannot execute', () => {
+    for (const { html } of resources) {
+      expect(html).not.toContain('data:application/wasm');
+      expect(html).not.toContain('basis_transcoder.wasm');
+      expect(html).not.toContain('basis_transcoder.js');
     }
   });
 
@@ -276,9 +285,8 @@ describe('view model (adapter onto the companion models)', () => {
 
 describe('mood on screen (MonModel3D clip by mood)', () => {
   const careView = { energy: 0.72, fullness: 0.31, social: 0.58, activity: 'awake', sluggish: false, wantsFood: true, lastFedAt: null };
-  const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..');
   const glbClips = (file: string): Set<string> => {
-    const b = readFileSync(join(repoRoot, 'apps/web/public/mons', `${file}.glb`));
+    const b = readFileSync(modelFixturePath(`${file}.glb`));
     const json = JSON.parse(b.subarray(20, 20 + b.readUInt32LE(12)).toString('utf8')) as { animations?: { name: string }[] };
     return new Set((json.animations ?? []).map((a) => a.name));
   };

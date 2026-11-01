@@ -11,6 +11,7 @@
     "./html": "./html/index.tsx",
     "./backgrounds/CityBlocks": "./backgrounds/CityBlocks.tsx",
     "./gpu": "./gpu/index.ts",
+    "./gpu/gpu-store": "./gpu/gpu-store.ts",
     "./three": "./three/index.ts",
     "./three/cel": "./three/cel/index.ts",
     "./three/hlynk": "./three/hlynk/index.ts",

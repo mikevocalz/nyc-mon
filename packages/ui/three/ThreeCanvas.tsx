@@ -9,7 +9,7 @@ import { useInstance, useInstanceStore, useStore } from '../use-instance-store';
 import { useLayoutSize } from '../use-layout-size';
 import { View } from '../tw';
 import { loadThree } from './load-three';
-import { armGpuTimestamps, kickGpuTimestampResolve, WORLD_PERF_GPU_TIMESTAMPS, type GpuTimestampChannel } from './gpu-timestamps';
+import { armGpuTimestamps, consumeGpuTimestamp, kickGpuTimestampResolve, WORLD_PERF_GPU_TIMESTAMPS, type GpuTimestampChannel } from './gpu-timestamps';
 import { advanceNodeFrame, releaseCanvasBuffers, stopInternalLoop } from './renderer-internals';
 import { resolveRenderThread } from './render-thread';
 import { WorkletThreeCanvas } from './WorkletThreeCanvas';
@@ -229,12 +229,12 @@ function JsThreeCanvas<P>({
           probe.bufferW = renderer.domElement?.width ?? -1;
           probe.bufferH = renderer.domElement?.height ?? -1;
           // The GPU half of the split rides the same probe: the last
-          // resolved frame's gpuMs is attached (it lags at least one
-          // draw; undefined when unarmed so a stale value never survives
+          // resolved frame's gpuMs is consumed once (it lags at least one
+          // draw; null until fresh evidence, undefined when unarmed so a stale value never survives
           // a backend rebuild on this reused probe), then the next
           // resolve is kicked. Only while a timing consumer is attached
           // does the extra submit + mapAsync run.
-          probe.gpuMs = rt.gpuTiming?.gpuMs;
+          probe.gpuMs = rt.gpuTiming ? consumeGpuTimestamp(rt.gpuTiming) : undefined;
           if (rt.gpuTiming) void kickGpuTimestampResolve(renderer, rt.gpuTiming);
           onFrameTiming(probe);
         } catch (error) {

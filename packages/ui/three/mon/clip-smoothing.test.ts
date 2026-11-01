@@ -31,7 +31,7 @@ test('a trembling rotation track is smoothed; a clean one is left exactly as aut
 });
 
 test("Lil' Ratti's emote_tired shins and ears stop trembling", () => {
-  const glb = readFileSync(new URL('../../../../apps/web/public/mons/lil-ratti.glb', import.meta.url));
+  const glb = readFileSync(new URL('../test-fixtures/mons/lil-ratti.glb', import.meta.url));
   const jsonLen = glb.readUInt32LE(12);
   const json = JSON.parse(glb.subarray(20, 20 + jsonLen).toString('utf8')) as {
     animations: { name: string; channels: { sampler: number; target: { node: number; path: string } }[]; samplers: { input: number; output: number }[] }[];

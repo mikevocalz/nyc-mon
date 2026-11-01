@@ -188,8 +188,8 @@ describe('viroReadableGlb', () => {
     assert.throws(() => viroReadableGlb(hostile((j) => { j.accessors[2].sparse.count = 5; })), /cannot read/);
   });
 
-  it('accepts every model the repo ships', () => {
-    for (const path of ['../assets/eggs/corner-egg/corner-egg-hatch.glb', '../assets/eggs/prism-egg/prism-egg-hatch.glb', '../assets/eggs/signal-egg/signal-egg-hatch.glb', '../../apps/web/public/mons/squeaklet.glb', '../../apps/web/public/mons/lil-ratti.glb']) {
+  it('accepts bundled eggs and historical authored Mon fixtures', () => {
+    for (const path of ['../assets/eggs/corner-egg/corner-egg-hatch.glb', '../assets/eggs/prism-egg/prism-egg-hatch.glb', '../assets/eggs/signal-egg/signal-egg-hatch.glb', '../ui/three/test-fixtures/mons/squeaklet.glb', '../ui/three/test-fixtures/mons/lil-ratti.glb']) {
       const out = viroReadableGlb(new Uint8Array(readFileSync(new URL(path, import.meta.url))));
       assert.equal(isQuantizedGlb(out), false, path);
       assert.equal(needsViroRewrite(out), false, path);
@@ -197,7 +197,7 @@ describe('viroReadableGlb', () => {
   });
 
   it('keeps every joint index of the shipped skinned Mons and stores them as uint32', () => {
-    for (const path of ['../../apps/web/public/mons/squeaklet.glb', '../../apps/web/public/mons/lil-ratti.glb']) {
+    for (const path of ['../ui/three/test-fixtures/mons/squeaklet.glb', '../ui/three/test-fixtures/mons/lil-ratti.glb']) {
       const source = new Uint8Array(readFileSync(new URL(path, import.meta.url)));
       const before = parse(source);
       const out = viroReadableGlb(source);

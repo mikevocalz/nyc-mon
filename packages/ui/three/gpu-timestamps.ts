@@ -46,10 +46,17 @@ export function parseGpuPerfFlag(value: string | undefined | null): boolean {
 export const WORLD_PERF_GPU_TIMESTAMPS = parseGpuPerfFlag(process.env.EXPO_PUBLIC_WORLD_PERF);
 
 export interface GpuTimestampChannel {
-  /** Last resolved render-frame GPU duration in ms; null until the first resolve lands. */
+  /** Unconsumed resolved render-frame GPU duration in ms; null while awaiting a fresh result. */
   gpuMs: number | null;
   /** One resolve in flight at a time — the pool dedupes too, but this keeps the draw path promise-free. */
   pending: boolean;
+}
+
+/** Each resolved duration is evidence for one sample only, never every frame while the next resolve waits. */
+export function consumeGpuTimestamp(channel: GpuTimestampChannel): number | null {
+  const ms = channel.gpuMs;
+  channel.gpuMs = null;
+  return ms;
 }
 
 /**
@@ -98,7 +105,7 @@ export function armGpuTimestamps(renderer: WebGPURenderer): GpuTimestampChannel 
  * frame. Never throws: a diagnostics hook must not take down the renderer.
  * The returned promise exists for tests; callers discard it.
  */
-export function kickGpuTimestampResolve(renderer: WebGPURenderer, channel: GpuTimestampChannel): Promise<void> {
+export function kickGpuTimestampResolve(renderer: Pick<WebGPURenderer, 'resolveTimestampsAsync'>, channel: GpuTimestampChannel): Promise<void> {
   if (channel.pending) return Promise.resolve();
   channel.pending = true;
   return renderer

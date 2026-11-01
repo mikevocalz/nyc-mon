@@ -184,7 +184,7 @@ export default function CityWalkStage() {
         : [],
     [city],
   );
-  const allLabels = useMemo(() => [...landmarks, ...signs, ...streetLabels], [landmarks, signs, streetLabels]);
+  const allLabels = useMemo(() => [...landmarks, ...genPoi, ...signs, ...streetLabels], [landmarks, genPoi, signs, streetLabels]);
   const goToOptions = useMemo(() => destinations.map((d) => ({ value: d.key, label: d.name })), [destinations]);
 
   // A fresh mount has drawn nothing: a first frame from an earlier visit must not count.

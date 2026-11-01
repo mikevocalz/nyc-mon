@@ -7,8 +7,8 @@ import { disposeObjectTree } from './dispose-object.ts';
 import { SharedParseCache } from './parse-cache.ts';
 import { releaseHLynkResources } from './release.ts';
 
-// The shipped files the H-Lynk stages share: a Baby (Squeaklet, 25 MB) and an egg (Metro Egg).
-const SQUEAKLET = new URL('../../../apps/web/public/mons/squeaklet.glb', import.meta.url);
+// Historical authored regression fixture plus the canonical bundled Metro Egg.
+const SQUEAKLET = new URL('./test-fixtures/mons/squeaklet.glb', import.meta.url);
 const METRO_EGG = new URL('../../assets/eggs/metro-egg/metro-egg-hatch.glb', import.meta.url);
 
 interface FakeBitmap {
