@@ -9,7 +9,10 @@ enum KeychainTimeline {
     let staleDate = snapshot.staleDate
     guard now < staleDate else { return [KeychainEntry(date: now, state: .stale(snapshot))] }
 
-    var entries = [KeychainEntry(date: now, state: .live(snapshot, calling: snapshot.isCalling))]
+    // A timeline may first be requested after the predicted call has opened.
+    let predictedCallOpened = snapshot.nextCallDate.map { $0 <= now } ?? false
+    let calling = !snapshot.paused && (snapshot.isCalling || predictedCallOpened)
+    var entries = [KeychainEntry(date: now, state: .live(snapshot, calling: calling))]
     if !snapshot.isCalling, !snapshot.paused, let callDate = snapshot.nextCallDate, callDate > now, callDate < staleDate {
       entries.append(KeychainEntry(date: callDate, state: .live(snapshot, calling: true)))
     }

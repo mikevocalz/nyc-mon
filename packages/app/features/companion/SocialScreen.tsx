@@ -104,6 +104,8 @@ export function SocialScreen() {
         case 'overfed':
         case 'fell-asleep':
         case 'woke':
+        case 'paused':
+        case 'resumed':
           return;
         default:
           return assertNever(outcome);
