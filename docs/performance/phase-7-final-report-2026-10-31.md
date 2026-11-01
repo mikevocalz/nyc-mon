@@ -56,7 +56,8 @@ Loaded/consulted per phase (each handoff section records its roster):
 | Device | Status | Numbers |
 |---|---|---|
 | Host (this machine, recording-GPU harness) | Measured | All numbers above — JS submit + pipeline counts, mock-GPU where noted |
-| iPad (A12X-class) | **Device-pending** | `upscaleScale 0.5`, adaptive budgets, FSR1/TAAU, gpuMs — all defaults awaiting the iPad run |
+| Host Chrome (`/city/walk`, web) | Measured 2026-11-01 | **3D renders** — full WebGPU world, Apollo/125th view, district picker live. Caveat: `city-assets.nyc-mon.city` CORS-blocks `localhost` origin → far-cell fetches fail without `--disable-web-security`; needs CDN allowlist or dev proxy. |
+| iPad Pro 12.9" 3rd gen (A12X, iPadOS 26.7.1) | **Measured 2026-11-01** | **3D NO-GO** — app's own capability gate fires `webgpu-unavailable` (shared-device throw → `requestAdapter()` null in `acquire-device.ts:75-77`); "Try 3D again" reproduces it deterministically. 2D fallback engages as designed. App builds/installs/launches after ViroKit.framework embed fix (vendored tgz ships 0-byte binaries; real ones from `~/viro`, embedded + resigned). |
 | Surface Duo 1 (Android 14) | Previously measured (repo docs only; not re-run this session) | Older Duo baselines in repo docs; `timestamp-query`/`core-features-and-limits` Dawn exposure device-pending |
 | iPhone / Android (other) | Untested | No device attached (`adb devices` empty); nothing claimed |
 
