@@ -7,6 +7,7 @@
 // the kit. Sign-in, consent and the 18+ checks all run in Better Auth
 // (plugins.ts, guards.ts), never here.
 import { oauthProviderAuthServerMetadata, verifyOAuthQueryParams } from '@better-auth/oauth-provider';
+import type { BetterAuthOptions } from 'better-auth';
 import { readAuthEnv } from '../env';
 import type { OAuthServerConfig, StaticClient } from './config';
 import { readOAuthConfig, SERVICE_SCOPE, USER_SCOPES } from './config';
@@ -114,9 +115,16 @@ export const OAUTH_PAGE_PATHS = OAUTH_PAGES;
 const JWT_ALGS = ['RS256', 'RS384', 'RS512', 'PS256', 'PS384', 'PS512', 'ES256', 'ES384', 'ES512', 'EdDSA'];
 const CLIENT_AUTH_METHODS = ['client_secret_basic', 'client_secret_post', 'private_key_jwt'];
 
-function fallbackAuthServerMetadata(auth: Parameters<typeof oauthProviderAuthServerMetadata>[0]): Record<string, unknown> {
+// The provider helper only requires `api`; our envelope fallback also reads the
+// configured origin/path. Keep those options typed against Better Auth itself.
+type MetadataAuth = Parameters<typeof oauthProviderAuthServerMetadata>[0] & {
+  options?: Pick<BetterAuthOptions, 'baseURL' | 'basePath'>;
+};
+
+function fallbackAuthServerMetadata(auth: MetadataAuth): Record<string, unknown> {
   const config = readOAuthConfig();
-  const issuer = (auth.options?.baseURL ?? config.issuer).replace(/\/+$/, '');
+  const configuredOrigin = auth.options?.baseURL;
+  const issuer = (typeof configuredOrigin === 'string' ? configuredOrigin : config.issuer).replace(/\/+$/, '');
   const base = `${issuer}${auth.options?.basePath ?? '/api/auth'}`;
   const scopes = [SERVICE_SCOPE, ...USER_SCOPES, 'offline_access'];
   return {
@@ -144,7 +152,7 @@ function fallbackAuthServerMetadata(auth: Parameters<typeof oauthProviderAuthSer
   };
 }
 
-export function createAuthServerMetadataHandler(auth: Parameters<typeof oauthProviderAuthServerMetadata>[0]) {
+export function createAuthServerMetadataHandler(auth: MetadataAuth) {
   return async (request: Request): Promise<Response> => {
     if (request.method !== 'OPTIONS') {
       // On the bundled runtime the api invoker answers a serialized

@@ -62,7 +62,7 @@ describe('previewCamera', () => {
 
   it('never lets any yaw or pitch push a shipped Mon past FILL', () => {
     for (const [name, pose] of [['squeaklet', 'bind'], ['squeaklet', 'viro-still'], ['lil-ratti', 'bind'], ['lil-ratti', 'viro-still'], ['metro-egg', 'bind']] as const) {
-      const points = readModelPoints(viroReadableGlb(new Uint8Array(readFileSync(new URL(`../../apps/web/public/mons/${name}.glb`, import.meta.url)))), pose)!;
+      const points = readModelPoints(viroReadableGlb(new Uint8Array(readFileSync(new URL(name === 'metro-egg' ? '../assets/eggs/metro-egg/metro-egg-hatch.glb' : `../ui/three/test-fixtures/mons/${name}.glb`, import.meta.url)))), pose)!;
       for (const [width, height] of [[413, 448], [800, 448], [360, 320]] as const) {
         const { vertical, horizontal } = worstFill(points, 1, width, height);
         assert.ok(vertical <= FILL + 1e-6, `${name} ${width}x${height} vertical ${vertical}`);

@@ -5,9 +5,9 @@ import * as THREE from 'three';
 import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { weldMorphSeams, weldSceneMorphSeams } from './morph-seams.ts';
 
-const MONS = new URL('../../../../apps/web/public/mons/', import.meta.url);
+const MONS = new URL('../test-fixtures/mons/', import.meta.url);
 
-/** Parses a bundled Mon in Node: images are skipped (no decoder here), geometry and morphs are real. */
+/** Parses a historical authored Mon regression fixture in Node: images are skipped (no decoder here), geometry and morphs are real. */
 async function loadMon(file: string): Promise<GLTF> {
   const bytes = readFileSync(new URL(file, MONS));
   const loader = new GLTFLoader().register(() => ({
