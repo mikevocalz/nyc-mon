@@ -37,6 +37,27 @@ export interface AcquireDeviceDeps {
 }
 
 /**
+ * What the app's own device asks for: every feature the adapter advertises —
+ * compressed-format uploads (KTX2) validate against the device's features, not
+ * the adapter's — and the adapter's limits. three r187 does the same when it
+ * owns device creation (three.webgpu.js, WebGPUBackend init). Test doubles may
+ * expose neither, so both read defensively. `label` names the source in GPU
+ * traces (chrome://gpu, Dawn error text).
+ */
+export function ownDeviceDescriptor(adapter: GPUAdapter): GPUDeviceDescriptor {
+  // for...in reaches GPUSupportedLimits' WebIDL attributes; spread and
+  // Object.keys see none, which is why requiredLimits is not `adapter.limits`.
+  const requiredLimits: Record<string, number> = {};
+  const limits = (adapter.limits ?? {}) as unknown as Record<string, number>;
+  for (const name in limits) requiredLimits[name] = limits[name]!;
+  return {
+    label: 'nyc-mon:own',
+    requiredFeatures: (adapter.features ? [...adapter.features] : []) as GPUFeatureName[],
+    requiredLimits,
+  };
+}
+
+/**
  * The shared device first; on any failure the app's own device, with the
  * reason kept so the probe and the log can say which device three and
  * TypeGPU ended up on. G9 keeps separate devices when sharing fails, so a
@@ -53,5 +74,5 @@ export async function acquireSharedOrOwnDevice(deps: AcquireDeviceDeps): Promise
   }
   const adapter = await deps.requestAdapter();
   if (!adapter) return null;
-  return { device: await adapter.requestDevice(), source: 'own', sharedError };
+  return { device: await adapter.requestDevice(ownDeviceDescriptor(adapter)), source: 'own', sharedError };
 }

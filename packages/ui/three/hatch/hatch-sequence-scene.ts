@@ -419,7 +419,7 @@ export function createHatchSequenceScene({ renderer, invalidate }: ThreeContext,
     invalidate();
   };
 
-  EggHatchRig.create(initial.eggId, initial.egg).then(
+  EggHatchRig.create(initial.eggId, initial.egg, renderer).then(
     (rig) => {
       if (disposed) {
         rig.dispose();
@@ -452,7 +452,7 @@ export function createHatchSequenceScene({ renderer, invalidate }: ThreeContext,
   );
 
   if (initial.baby !== null) {
-    MonRig.create(initial.baby)
+    MonRig.create(initial.baby, renderer)
       .then((rig) => {
         if (disposed) {
           rig.dispose();

@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 import type { TgpuRoot } from 'typegpu';
 import { createStore } from 'zustand/vanilla';
 import { useStore } from 'zustand';
-import { acquireSharedOrOwnDevice, SHARED_GPU_DEVICE, type GpuDeviceSource } from './acquire-device';
+import { acquireSharedOrOwnDevice, ownDeviceDescriptor, SHARED_GPU_DEVICE, type GpuDeviceSource } from './acquire-device';
 import { loadWebGpu } from './load-webgpu';
 import type { GpuSupport, WebGpuModule } from './types';
 
@@ -48,7 +48,7 @@ async function start(): Promise<void> {
     }
     // TypeGPU (~110 KB gzip) loads only once a device exists: every page
     // that mounts a canvas would otherwise ship it, WebGPU or not.
-    const [device, { tgpu }] = await Promise.all([adapter.requestDevice(), import('typegpu')]);
+    const [device, { tgpu }] = await Promise.all([adapter.requestDevice(ownDeviceDescriptor(adapter)), import('typegpu')]);
     adopt(tgpu.initFromDevice({ device }), module, 'own');
   } catch (error) {
     console.warn('[GpuCanvas] WebGPU unavailable, using the fallback renderer.', error);
