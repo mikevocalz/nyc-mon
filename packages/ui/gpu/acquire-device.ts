@@ -83,12 +83,24 @@ export async function acquireSharedOrOwnDevice(deps: AcquireDeviceDeps): Promise
  * came from its own adapter (Dawn requestDevice rejects a requiredFeatures/
  * requiredLimits member it won't grant). Fall back to a bare requestDevice
  * before declaring the GPU unsupported — an adapterless failure must come
- * from requestAdapter returning null, not from a strict descriptor.
+ * from requestAdapter returning null, not from a strict descriptor. Both
+ * attempts are time-bounded: on wedged adapters requestDevice can stall
+ * without settling, which previously left the app on a black canvas instead
+ * of the 2D fallback (A12X iPad Pro, Dawn 157).
  */
+const REQUEST_DEVICE_TIMEOUT_MS = 8000;
+
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T | null> {
+  return Promise.race([
+    p.then((v) => v as T | null, () => null),
+    new Promise<null>((r) => setTimeout(() => r(null), ms)),
+  ]);
+}
+
 export async function requestDeviceWithFallback(adapter: GPUAdapter): Promise<GPUDevice> {
-  try {
-    return await adapter.requestDevice(ownDeviceDescriptor(adapter));
-  } catch {
-    return adapter.requestDevice();
-  }
+  const wide = await withTimeout(adapter.requestDevice(ownDeviceDescriptor(adapter)), REQUEST_DEVICE_TIMEOUT_MS);
+  if (wide) return wide;
+  const bare = await withTimeout(adapter.requestDevice(), REQUEST_DEVICE_TIMEOUT_MS);
+  if (!bare) throw new Error('requestDevice() timed out or returned no device');
+  return bare;
 }
