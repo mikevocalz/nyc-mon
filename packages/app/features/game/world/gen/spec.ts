@@ -1,16 +1,20 @@
-// The gen lane's cell spec (Phase 3 slice 1): what one 128 m cell of procedural infill holds,
-// derived from the dataset before a single vertex exists. Zero disk — the spec is the only
-// authority; buildings.ts emits the same arrays from the same spec every time, so an evicted
-// cell regenerates byte-identical instead of caching the city (gen.test.ts pins that).
+// The gen lane's cell spec (Phase 3 slices 1 + 4): what one 128 m cell of procedural infill
+// holds, derived before a single vertex exists. Zero disk — the spec is the only authority;
+// buildings.ts emits the same arrays from the same spec every time, so an evicted cell
+// regenerates byte-identical instead of caching the city (gen.test.ts pins that).
 //
-// Two lot sources, both cheap enough for the main thread:
+// Three lot sources, all cheap enough for the main thread:
 //   * marked areas (dataset.areas): a school's grounds get a school block, a pitch a low
 //     grandstand, and the green and hard open kinds are recorded as park markers — no massing
 //     today, but the use tag rides the spec so the later slices (district authority, the VGC1
 //     kinds, spawn/pednet consumers) never re-derive it;
 //   * block interiors: the record data leaves courtyards and back lots empty — a fixed lot
 //     grid per cell, seeded by cell key, fills a share of them, keeping clear of every
-//     footprint, road corridor and marked area the index knows.
+//     footprint, road corridor and marked area the index knows;
+//   * the district profile (slice 4): a cell outside the records square that the index does
+//     not know fills the same lot grid at its district's density and use mix — deterministic
+//     from the cell key alone, no dataset needed (genDistrictForCell). The spec's `source`
+//     field records which derivation ran.
 //
 // Determinism: one mulberry32 stream per cell off GEN_SEED, consumed in a fixed order (areas
 // in dataset order, then the 3 x 3 lot grid row-major), so the spec depends on nothing but the
@@ -87,6 +91,14 @@ export interface GenSpec {
   readonly num: number;
   /** genSeedFor(key): the mulberry32 seed the emission would have consumed, kept for inspection. */
   readonly seed: number;
+  /**
+   * Which derivation produced the lots (Phase 3 slice 4): 'records' — the
+   * dataset-aware path (marked areas + keep-out-gated interior fill), or
+   * 'district' — the dataset-free path for cells outside the records square
+   * (genDistrictForCell's profile fill). Consumers may treat them alike; the
+   * tag exists so coverage audits can tell seeded infill from record-derived.
+   */
+  readonly source: 'records' | 'district';
   readonly lots: readonly GenLotSpec[];
 }
 
@@ -120,13 +132,126 @@ export interface GenIndex {
 
 export interface GenSpecParams {
   readonly index: GenIndex;
-  /** Share of eligible interior lots to fill, 0..1 (default GEN_FILL_SHARE). */
+  /** Share of eligible interior lots to fill, 0..1 (default GEN_FILL_SHARE / the district's `fill`). */
   readonly fillShare?: number;
   /**
    * Interior lot centres must pass this to build (the vd port hands its playable-bounds test,
-   * so gen content stops with the tile). Default: everywhere.
+   * so gen content stops with the tile). Records-branch lots only: a district-fill cell is
+   * ungated — its whole cell box is the spec's claim, and the caller's enumeration is the bound.
+   * Default: everywhere.
    */
   readonly inside?: (x: number, z: number) => boolean;
+  /**
+   * Half the dataset's coverage square, metres (the tile's `extentMeters`). When set, a cell
+   * whose centre falls outside it AND that the index does not know takes the district profile
+   * (genDistrictForCell) instead of the records path: no keep-outs exist for it, so its fill is
+   * the district density and its use mix the district weights. Omitting it keeps every cell on
+   * the records path — the pre-slice-4 behaviour, byte-identical.
+   */
+  readonly recordsExtentMeters?: number;
+}
+
+// ---- the district profile (Phase 3 slice 4) --------------------------------------------------
+//
+// The dataset-free density model: where there are no records, a cell's fill and use mix come
+// from a plausible NYC-grade radial profile around the tile centre (125th St — x east, z south).
+// The bands are deterministic geometry plus a per-cell wobble from
+// `hashUnit('gen:district:'+key)`, so the district boundary is ragged like a real district's,
+// not a clean circle — the procedural-modeling skill's seed rule (expose the seed, deterministic
+// variation) applied at district scope.
+//
+//   core   the Manhattan spine: southerly cells within ~11 km (Midtown through Downtown) —
+//          office-led, near-full blocks, taller massing.
+//   mid    the near surroundings in every direction plus the spine continuing south —
+//          home+mixed, the Upper Manhattan / inner-borough texture.
+//   edge   the rest of the five-borough bbox scale (~19 km) — home-led, sparse, park share up.
+//   open   beyond the borough scale — scattered low fill, mostly open ground.
+//
+// `fill` is the keep-roll threshold over the interior lot grid; `parkShare` of kept slots
+// records open ground instead of massing; `weights` spreads the built uses; `floorsAdd`
+// stretches the top of every built use's floor range (the core's towers).
+
+/** The district vocabulary, lowest to highest density. */
+export const GEN_DISTRICT_NAMES = ['open', 'edge', 'mid', 'core'] as const;
+export type GenDistrictName = (typeof GEN_DISTRICT_NAMES)[number];
+
+/** The uses a district roll can build — 'park' comes from `parkShare`, not the weights. */
+const GEN_BUILT_USES = ['home', 'mixed', 'office', 'school', 'stadium'] as const;
+export type GenBuiltUse = (typeof GEN_BUILT_USES)[number];
+
+export interface GenDistrict {
+  readonly name: GenDistrictName;
+  /** Keep-roll threshold for the 15 non-anchor slots of the lot grid. */
+  readonly fill: number;
+  /** Share of kept slots recorded as open ground (a 'park' marker lot, no massing). */
+  readonly parkShare: number;
+  /** Built-use mix, sums to 1 over GEN_BUILT_USES. */
+  readonly weights: Readonly<Record<GenBuiltUse, number>>;
+  /** Added to the top of every built use's floor range — the district's skyline bias. */
+  readonly floorsAdd: number;
+}
+
+export const GEN_DISTRICTS: Readonly<Record<GenDistrictName, GenDistrict>> = {
+  core: {
+    name: 'core',
+    fill: 0.88,
+    parkShare: 0.02,
+    weights: { home: 0.11, mixed: 0.3, office: 0.55, school: 0.02, stadium: 0.02 },
+    floorsAdd: 6,
+  },
+  mid: {
+    name: 'mid',
+    fill: 0.6,
+    parkShare: 0.06,
+    weights: { home: 0.45, mixed: 0.3, office: 0.15, school: 0.03, stadium: 0.02 },
+    floorsAdd: 2,
+  },
+  edge: {
+    name: 'edge',
+    fill: 0.38,
+    parkShare: 0.15,
+    weights: { home: 0.55, mixed: 0.15, office: 0.05, school: 0.1, stadium: 0.15 },
+    floorsAdd: 0,
+  },
+  open: {
+    name: 'open',
+    fill: 0.14,
+    parkShare: 0.3,
+    weights: { home: 0.5, mixed: 0.08, office: 0.02, school: 0.1, stadium: 0.3 },
+    floorsAdd: 0,
+  },
+};
+
+/** The Manhattan core's reach down the southerly spine, metres from the tile centre — the
+ * office-led band runs between these radii (the nearer ground stays residential 'mid'). */
+export const GEN_CORE_MIN_R_M = 5_000;
+export const GEN_CORE_R_M = 11_000;
+/** Southerly cone half-angle as z/r: the spine is where the cell sits mostly south of the tile. */
+export const GEN_CORE_SOUTH = 0.45;
+/** The mid band: a near disc in every direction, and further down the spine. */
+export const GEN_MID_R_M = 3_200;
+export const GEN_MID_SPINE_R_M = 14_000;
+export const GEN_MID_SOUTH = 0.3;
+/** Five-borough scale — beyond it the profile thins to 'open'. */
+export const GEN_EDGE_R_M = 19_000;
+/** The per-cell radial wobble's full width, metres — band edges fray by half of it each way. */
+const GEN_DISTRICT_JITTER_M = 1_600;
+
+/**
+ * One cell's district, deterministic from its key alone: radial bands off the tile centre
+ * wobbled by `hashUnit('gen:district:'+key)` so district edges fray instead of drawing a clean
+ * circle. Cheap — one hash and a hypot — and pure: the same cell answers the same district on
+ * every call, on every host, with no dataset in scope.
+ */
+export function genDistrictForCell(cx: number, cz: number): GenDistrict {
+  const x = cx * CELL + CELL / 2, z = cz * CELL + CELL / 2;
+  const d = Math.hypot(x, z);
+  const r = d + (hashUnit(`gen:district:${cellKey(cx, cz)}`) - 0.5) * GEN_DISTRICT_JITTER_M;
+  const south = d > 1 ? z / d : 0;
+  if (south > GEN_CORE_SOUTH && r > GEN_CORE_MIN_R_M && r <= GEN_CORE_R_M) return GEN_DISTRICTS.core;
+  if (r <= GEN_MID_R_M || (south > GEN_MID_SOUTH && r <= GEN_MID_SPINE_R_M)) return GEN_DISTRICTS.mid;
+  if (r <= GEN_EDGE_R_M) return GEN_DISTRICTS.edge;
+  return GEN_DISTRICTS.open;
 }
 
 /** A road's extra keep-out past its carriageway edge and sidewalk, metres. */
@@ -145,6 +270,9 @@ const AREA_MIN_M = 12;      // a clipped area thinner than this builds nothing i
 const SCHOOL_COVER = 0.7;   // a school block fills this share of its clipped box
 const STAND_DEPTH_M = 12;   // a pitch's grandstand hugs the north edge
 const FLOOR_HEIGHT_M = 3.4;
+
+/** The tallest thing a district cell can raise: office's top range plus the core's floorsAdd. */
+export const GEN_MAX_HEIGHT_M = (USE_RULES.office.floors[1] + GEN_DISTRICTS.core.floorsAdd) * FLOOR_HEIGHT_M;
 
 function ringBox(ring: FlatPoints): [number, number, number, number] {
   let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
@@ -267,6 +395,15 @@ export function genSpecForCell(cx: number, cz: number, params: GenSpecParams): G
   const rng = mulberry32(seed);
   const x0 = cx * CELL, z0 = cz * CELL;
   const bucket = params.index.cells.get(cellNum(cx, cz));
+  // The slice-4 branch: a cell the index does not know and whose centre sits outside the
+  // records square fills from its district profile — no records exist for it, so nothing is
+  // kept out of and the `inside` gate does not apply. Every other cell takes the records path
+  // verbatim (a bucket-less cell inside the square included), which is what keeps covered-cell
+  // specs byte-identical to before the district path existed.
+  const district = bucket === undefined && params.recordsExtentMeters !== undefined &&
+    (Math.abs(x0 + CELL / 2) > params.recordsExtentMeters || Math.abs(z0 + CELL / 2) > params.recordsExtentMeters)
+    ? genDistrictForCell(cx, cz)
+    : null;
   const lots: GenLotSpec[] = [];
 
   // Marked areas. A school builds on the bulk of its clipped box; a pitch gets a low stand on
@@ -301,10 +438,11 @@ export function genSpecForCell(cx: number, cz: number, params: GenSpecParams): G
 
   // Block interiors. A candidate occupies one 38 m slot of the 3 x 3 grid; it is rejected by
   // the keep roll, a record footprint (its box — conservative, a triangular footprint keeps a
-  // little extra clearance), a road corridor, or a marked area's ring.
+  // little extra clearance), a road corridor, or a marked area's ring. Records cells only —
+  // a district cell's grid runs below, off its profile.
   const fill = params.fillShare ?? GEN_FILL_SHARE;
   const band = LOT_EDGE_M;
-  for (let i = 0; i < GEN_LOT_SLOTS; i++) {
+  if (!district) for (let i = 0; i < GEN_LOT_SLOTS; i++) {
     for (let j = 0; j < GEN_LOT_SLOTS; j++) {
       const jx = (rng() - 0.5) * LOT_JITTER_M;
       const jz = (rng() - 0.5) * LOT_JITTER_M;
@@ -339,5 +477,56 @@ export function genSpecForCell(cx: number, cz: number, params: GenSpecParams): G
     }
   }
 
-  return { cx, cz, key, num: cellNum(cx, cz), seed, lots };
+  // The district profile fill (Phase 3 slice 4): the same 4 x 4 slot grid and the same nine
+  // draws per candidate — the seeded-slot contract holds across both branches — but the keep
+  // roll answers the district's density, the use roll walks its weights after the park share,
+  // and slot (0, 0) is the anchor: always built, never park, so every district cell raises at
+  // least one massing box. No keep-outs run (the index knows nothing here) and `inside` is not
+  // consulted — the caller's enumeration bounds where district content may stand.
+  if (district) {
+    const fill = params.fillShare ?? district.fill;
+    const openTop = 1 - district.parkShare;
+    const pickUse = (useR: number, built: boolean): GenUse => {
+      if (built && useR >= openTop) return 'park';
+      const t = built ? useR / openTop : useR;
+      let acc = 0;
+      for (const u of GEN_BUILT_USES) {
+        acc += district.weights[u];
+        if (t < acc) return u;
+      }
+      return 'home';
+    };
+    for (let i = 0; i < GEN_LOT_SLOTS; i++) {
+      for (let j = 0; j < GEN_LOT_SLOTS; j++) {
+        const jx = (rng() - 0.5) * LOT_JITTER_M;
+        const jz = (rng() - 0.5) * LOT_JITTER_M;
+        const w = LOT_MIN_M + rng() * LOT_SPAN_M;
+        const d = LOT_MIN_M + rng() * LOT_SPAN_M;
+        const keep = rng();
+        const useR = rng();
+        const styleR = rng();
+        const floorR = rng();
+        const salt = rng();
+        const anchor = i === 0 && j === 0;
+        if (!anchor && keep >= fill) continue;
+        const gx = x0 + band + LOT_PITCH_M / 2 + i * LOT_PITCH_M + jx;
+        const gz = z0 + band + LOT_PITCH_M / 2 + j * LOT_PITCH_M + jz;
+        const lx = Math.min(Math.max(gx, x0 + band + w / 2), x0 + CELL - band - w / 2);
+        const lz = Math.min(Math.max(gz, z0 + band + d / 2), z0 + CELL - band - d / 2);
+        const rect: readonly [number, number, number, number] = [lx - w / 2, lz - d / 2, lx + w / 2, lz + d / 2];
+        const use = pickUse(useR, !anchor);
+        const rule = USE_RULES[use];
+        const [f0, f1] = rule.floors;
+        const top = use === 'park' ? f1 : f1 + district.floorsAdd;
+        lots.push({
+          use, rect, floors: f0 === top ? f0 : f0 + Math.floor(floorR * (top - f0 + 1)), floorHeightMeters: FLOOR_HEIGHT_M,
+          class: rule.class,
+          styleId: rule.styles[Math.floor(styleR * rule.styles.length) % rule.styles.length]!,
+          salt, salt2: styleR,
+        });
+      }
+    }
+  }
+
+  return { cx, cz, key, num: cellNum(cx, cz), seed, source: district ? 'district' : 'records', lots };
 }

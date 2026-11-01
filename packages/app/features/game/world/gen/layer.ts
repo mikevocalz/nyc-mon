@@ -1,7 +1,11 @@
-// The gen lane (Phase 3 slice 1): seeded procedural buildings riding the Valdrada cell stack.
-// Zero disk — a cell's package holds only its spec; `prefetch` runs the emission
+// The gen lane (Phase 3 slices 1 + 4): seeded procedural buildings riding the Valdrada cell
+// stack. Zero disk — a cell's package holds only its spec; `prefetch` runs the emission
 // (buildings.ts, pure) when the streamer enters the reach plus a ring, `release` drops the
 // arrays on eviction, and a regenerated cell is byte-identical to the one that left.
+// Slice 4 takes the layer past the dataset square: the district profile (spec.ts) fills
+// dataset-free cells deterministically from their keys, packages defer even the spec until
+// the streamer nears them (genCellPackageDeferred), and the registered set is the bounded
+// GEN_EXTENT square minus the cells the baked manifest already streams (genRecordCellAt).
 //
 // Content draws through lane A's blocks material (makeBlocksMaterial) on the near branch —
 // no `vdShell` marker — so generated massing gets the same facet-normal lighting, sky mirror,
@@ -26,13 +30,14 @@
 import type { Three } from '@acme/ui/three';
 import type { CityDatasetV3 } from '../../city-dataset.ts';
 import { EMPTY_PART, type VdPortCtx, type VdPortPart, type VdStreamLayer } from '../vd-port/types.ts';
-import { CELL, type CellAttribute, type CellLocalPositionFrame, type CellPackage } from '../cells/cell-rules.ts';
+import { CELL, cellNum, type CellAttribute, type CellLocalPositionFrame, type CellPackage } from '../cells/cell-rules.ts';
 import { ditherFadeMask } from '../cells/cell-stream.ts';
 import { makeBlocksMaterial } from '../vd-port/blocks/shell-material.ts';
 import type { NearArrays } from '../vd-port/blocks/codec.ts';
 import { WORLD_PRESETS } from '../../perf/tier-presets.ts';
-import { buildGenIndex, genSpecForCell, type GenDataset, type GenSpec } from './spec.ts';
-import { emitGenCell, genCellBounds, genCellBoxes, GEN_TRIS_PER_BOX, GEN_VERTS_PER_BOX } from './buildings.ts';
+import { VD_CELL_MANIFEST } from '../cell-source/data/vd-cells-manifest.ts';
+import { buildGenIndex, genSpecForCell, GEN_MAX_HEIGHT_M, type GenDataset, type GenSpec } from './spec.ts';
+import { emitGenCell, genCellBounds, genCellBoxes, GEN_TRIS_PER_BOX, GEN_VERTS_PER_BOX, type GenBox } from './buildings.ts';
 import { EXPERIMENTAL_WORLD_GEN } from './flag.ts';
 
 type Mesh = InstanceType<Three['Mesh']>;
@@ -111,22 +116,164 @@ export function genCellPackage(spec: GenSpec, groundY: (x: number, z: number) =>
 export const GEN_LAYER: VdStreamLayer = { errorM: 0.48, chunk: CELL, fade: true, pin: false, reachM: GEN_REACH_M, sharedMaterial: true };
 
 /**
- * The lane's packages: every 128 m cell intersecting the tile's square, specced once against
- * the bucketed keep-out geometry (spec.ts buildGenIndex) and packaged only where the spec left
- * massing. Specs are eager — a package's vertexCount/bytes/bounds must exist before it ever
- * prefetches — and the per-cell work is a few dozen rect tests, well under the frame's stream
- * budget; the arrays stay lazy.
+ * The gen coverage square, half-width in cells (Phase 3 slice 4): gen cells are registered for
+ * cx, cz in [-32, 31] — a [-4096, 4096) m region centred on the tile, ~67 km². It covers the
+ * home tile plus the near void the walk camera actually reaches at ground level (Morningside,
+ * Central Park, the near Bronx bank) — the ground where the gen layer is the only near-detail
+ * content. Bounded because every registered cell is a streamer slot paying a distance test a
+ * pick: ~4 k slots keeps that under a few tenths of a millisecond and registration O(1).
+ * Full five-borough ground (~18 k cells) needs a streamed/instanced gen tier, not more slots —
+ * a documented deferral, not a bigger square.
  */
-export function genCellPackages(dataset: GenDataset & { readonly extentMeters: number }, groundY: (x: number, z: number) => number, inside: (x: number, z: number) => boolean): CellPackage[] {
+export const GEN_EXTENT_CELLS = 32;
+
+/**
+ * Pre-spec estimates for a deferred package's stream fields. Registration reads `bytes` for
+ * the streamer's packaged-bytes stat before any spec exists; the conservative bound covers the
+ * densest cell the grid can raise (16 slots, two boxes each). Once a package's spec is computed
+ * its getters answer the real counts — every read that feeds a budget decision happens after
+ * prefetch, so the estimate only ever reaches the registration log.
+ */
+const GEN_DEFERRED_VERTS_EST = 16 * 2 * GEN_VERTS_PER_BOX;   // 640
+const GEN_DEFERRED_TRIS_EST = 16 * 2 * GEN_TRIS_PER_BOX;     // 320
+const GEN_DEFERRED_BYTES_EST = GEN_DEFERRED_VERTS_EST * 28 + GEN_DEFERRED_TRIS_EST * 3 * 2;
+
+/** The deferred package's conservative y band, metres — ground plus the district height cap. */
+const GEN_BOUNDS_DOWN_M = 24;
+const GEN_BOUNDS_UP_M = 16;
+
+/**
+ * A gen cell whose spec is deferred (Phase 3 slice 4): registration costs a conservative
+ * bounds estimate and field getters — no spec, no draws — so the layer can blanket the
+ * GEN_EXTENT square at O(1) per cell. First `prefetch` computes the spec (sub-millisecond,
+ * deterministic from the cell key), emits the arrays when the spec left massing, or marks the
+ * package suppressed when it did not (an all-open records cell — the streamer then treats it
+ * as unwanted and never asks again). `release` drops the arrays; the spec and boxes stay, so
+ * a regenerated cell is byte-identical with no respeccing.
+ */
+export function genCellPackageDeferred(cx: number, cz: number, specFor: () => GenSpec, groundY: (x: number, z: number) => number): CellPackage {
+  const x0 = cx * CELL, z0 = cz * CELL;
+  const gy = groundY(x0 + CELL / 2, z0 + CELL / 2);
+  let spec: GenSpec | null = null;
+  let boxes: readonly GenBox[] | null = null;
+  let arrays: NearArrays | null = null;
+  let empty = false;
+  let settled: Promise<boolean> | null = null;
+  const specOf = () => (spec ??= specFor());
+  const boxesOf = () => (boxes ??= genCellBoxes(specOf(), groundY));
+  const get = () => (arrays ??= emitGenCell(specOf(), boxesOf()));
+  return {
+    cx,
+    cz,
+    num: cellNum(cx, cz),
+    size: CELL,
+    positionFrame: {
+      kind: 'cell-local',
+      origin: [x0 + CELL / 2, 0, z0 + CELL / 2],
+    } as CellLocalPositionFrame,
+    get attributes(): Readonly<Record<string, CellAttribute>> {
+      const a = get();
+      return {
+        position: { array: a.position, itemSize: 3, normalized: false },
+        color: { array: a.color, itemSize: 4, normalized: true },
+        emissive: { array: a.emissive, itemSize: 4, normalized: true },
+        uv: { array: new Float32Array((a.position.length / 3) * 2), itemSize: 2, normalized: false },
+      };
+    },
+    get index() {
+      return get().index;
+    },
+    get vertexCount() {
+      return boxes ? boxes.length * GEN_VERTS_PER_BOX : GEN_DEFERRED_VERTS_EST;
+    },
+    get triangles() {
+      return boxes ? boxes.length * GEN_TRIS_PER_BOX : GEN_DEFERRED_TRIS_EST;
+    },
+    // Conservative until the spec is known: the cell box in plan (every lot lives inside it)
+    // and groundY at the centre padded down 24 m and up past GEN_MAX_HEIGHT_M. Covers the real
+    // triangles for the want-test and the mesh's bounding sphere alike; it never tightens.
+    bounds: Float64Array.from([
+      x0, gy - GEN_BOUNDS_DOWN_M, z0,
+      x0 + CELL, gy + GEN_MAX_HEIGHT_M + GEN_BOUNDS_UP_M, z0 + CELL,
+    ]),
+    get bytes() {
+      return boxes ? boxes.length * GEN_VERTS_PER_BOX * 28 + boxes.length * GEN_TRIS_PER_BOX * 3 * 2 : GEN_DEFERRED_BYTES_EST;
+    },
+    release() {
+      arrays = null;
+    },
+    ready: () => arrays !== null,
+    // An empty spec (a records cell that rolled only open ground) is a permanent suppress:
+    // the want test refuses it and the streamer never prefetches it twice.
+    suppressed: () => empty,
+    prefetch() {
+      // After a release the spec and boxes are cached, so a re-prefetch re-emits the same
+      // bytes and the memoized promise reports the same verdict — evict-and-regenerate stays
+      // byte-identical like the eager package.
+      if (!arrays) {
+        if (boxesOf().length === 0) empty = true;
+        else get();
+      }
+      return (settled ??= Promise.resolve(!empty));
+    },
+  };
+}
+
+/** Cells the baked manifest already streams — the home tile's near/lite and every baked ring.
+ * Built on first use: flag-off, the lane never asks and the manifest scan never runs. */
+let genRecordCells: ReadonlySet<number> | null = null;
+function recordCells(): ReadonlySet<number> {
+  if (genRecordCells) return genRecordCells;
+  const cells = new Set<number>();
+  for (const key of Object.keys(VD_CELL_MANIFEST.cells)) {
+    // Far-tier keys are file names ('far/L4_-10_10.bin'), not streamer cells.
+    if (key.startsWith('far/')) continue;
+    const m = /(?:^|\/)(-?\d+)_(-?\d+)$/.exec(key);
+    if (m) cells.add(cellNum(Number(m[1]), Number(m[2])));
+  }
+  return (genRecordCells = cells);
+}
+
+/**
+ * Whether a gen cell must stay out of the record stream's way: true for manifest-covered cells
+ * outside the dataset square — the baked ring districts stream their own near/lite there, and
+ * district fill on top would raise buildings inside record buildings. Cells inside the square
+ * are never record-suppressed: gen's whole job there is infill among the records.
+ */
+export function genRecordCellAt(cx: number, cz: number, extentMeters: number): boolean {
+  if (Math.abs(cx * CELL + CELL / 2) <= extentMeters && Math.abs(cz * CELL + CELL / 2) <= extentMeters) return false;
+  return recordCells().has(cellNum(cx, cz));
+}
+
+export interface GenCellPackagesOptions {
+  /** Half-width of the registered square, cells (default GEN_EXTENT_CELLS). */
+  readonly extentCells?: number;
+  /** Cells to leave out entirely — the baked-manifest keep-out (buildGen passes genRecordCellAt). */
+  readonly recordCell?: (cx: number, cz: number) => boolean;
+}
+
+/**
+ * The lane's packages (Phase 3 slice 4): every 128 m cell in the GEN_EXTENT square, each a
+ * deferred package — registration is O(1) a cell and the spec exists only once the streamer
+ * nears it. The spec path splits inside genSpecForCell: cells inside the dataset square (or
+ * known to its index) take the records path — byte-identical to before — and cells past it
+ * take the district profile. Cells the baked rings already cover are excluded by
+ * `recordCell` so gen never duplicates record massing.
+ */
+export function genCellPackages(
+  dataset: GenDataset & { readonly extentMeters: number },
+  groundY: (x: number, z: number) => number,
+  inside: (x: number, z: number) => boolean,
+  options?: GenCellPackagesOptions,
+): CellPackage[] {
   const index = buildGenIndex(dataset);
   const half = dataset.extentMeters;
+  const extent = options?.extentCells ?? GEN_EXTENT_CELLS;
   const packages: CellPackage[] = [];
-  for (let cx = Math.floor(-half / CELL); cx <= Math.floor(half / CELL); cx++) {
-    for (let cz = Math.floor(-half / CELL); cz <= Math.floor(half / CELL); cz++) {
-      const spec = genSpecForCell(cx, cz, { index, inside });
-      if (spec.lots.length === 0) continue;
-      const pkg = genCellPackage(spec, groundY);
-      if (pkg) packages.push(pkg);
+  for (let cx = -extent; cx < extent; cx++) {
+    for (let cz = -extent; cz < extent; cz++) {
+      if (options?.recordCell?.(cx, cz)) continue;
+      packages.push(genCellPackageDeferred(cx, cz, () => genSpecForCell(cx, cz, { index, inside, recordsExtentMeters: half }), groundY));
     }
   }
   return packages;
@@ -158,7 +305,9 @@ export function buildGen(ctx: VdPortCtx, dataset: CityDatasetV3): VdPortPart {
   template.receiveShadow = true;
   ctx.group.add(template);
 
-  const packages = genCellPackages(dataset, ctx.groundY, ctx.inBounds);
+  const packages = genCellPackages(dataset, ctx.groundY, ctx.inBounds, {
+    recordCell: (cx, cz) => genRecordCellAt(cx, cz, dataset.extentMeters),
+  });
   const budget = ctx.preset.vdPort.gen ?? GEN_BUDGET;
   ctx.registerChunks(template, GEN_LAYER, packages, { name: 'gen', ...budget });
 

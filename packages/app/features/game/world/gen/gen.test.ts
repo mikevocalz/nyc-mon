@@ -191,16 +191,23 @@ test('a generated cell stays under every preset gen row', async () => {
   assert.ok(GEN_REACH_M <= WORLD_PRESETS.phone.residentRadiusM);
 });
 
-test('genCellPackages covers the tile square and the inside predicate gates lot centres', () => {
-  // a one-cell-extent toy tile: cells -1..0 both axes intersect [-128, 128]^2
+test('genCellPackages enumerates the extent lazily and the inside predicate gates records lots', () => {
+  // the deferred contract (slice 4): a package per enumerated cell, spec uncomputed until the
+  // streamer nears it — a two-cell-extent toy registers 4x4
   const dataset = { ...emptyBlock(), extentMeters: CELL };
-  const packages = genCellPackages(dataset, () => 0, () => true);
-  assert.ok(packages.length > 0, 'an empty tile fills everywhere');
+  const packages = genCellPackages(dataset, () => 0, () => true, { extentCells: 2 });
+  assert.equal(packages.length, 16);
   for (const pkg of packages) {
     assert.equal(pkg.num, cellNum(pkg.cx, pkg.cz));
     assert.equal(pkg.size, CELL);
-    assert.ok(pkg.bounds[0]! >= -CELL * 2 && pkg.bounds[3]! <= CELL * 2, 'lot inside the tile box');
+    // the conservative bound covers the cell box: registration never reads a spec
+    assert.ok(pkg.bounds[0]! <= pkg.cx * CELL && pkg.bounds[3]! >= (pkg.cx + 1) * CELL, 'bounds cover the cell in x');
+    assert.ok(pkg.bounds[2]! <= pkg.cz * CELL && pkg.bounds[5]! >= (pkg.cz + 1) * CELL, 'bounds cover the cell in z');
+    assert.ok(pkg.bounds[0]! >= -CELL * 2 && pkg.bounds[3]! <= CELL * 2, 'inside the extent');
+    assert.equal(pkg.ready?.(), false, 'a deferred package starts unready');
   }
+  // record-covered cells outside the dataset square stay unregistered
+  assert.equal(genCellPackages(dataset, () => 0, () => true, { extentCells: 2, recordCell: () => true }).length, 0);
   // the inside predicate gates interior lots (spec level: the lot centre is what is tested)
   const index = buildGenIndex(emptyBlock());
   for (const [cx, cz] of [[0, 0], [-1, -1], [3, -4]] as const) {

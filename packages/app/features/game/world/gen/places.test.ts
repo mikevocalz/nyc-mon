@@ -33,7 +33,7 @@ const schoolBlock = (): GenDataset => ({
 
 /** A spec by hand, for use- and floor-exact cases the seeded roll may not produce. */
 const spec = (cx: number, cz: number, lots: readonly GenLotSpec[]): GenSpec => ({
-  cx, cz, key: cellKey(cx, cz), num: cellNum(cx, cz), seed: 0, lots,
+  cx, cz, key: cellKey(cx, cz), num: cellNum(cx, cz), seed: 0, source: 'records', lots,
 });
 
 const lot = (over: Partial<GenLotSpec>): GenLotSpec => ({

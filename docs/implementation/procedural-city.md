@@ -224,3 +224,114 @@ reach.
   reshape the lots.
 - **Device/visual verification**: still host-only — flag-on frames,
   residency, corner-link hops and district ticks unverified on device.
+
+## Slice 4 — coverage: the district profile and the deferred package
+
+The gen layer stops at the dataset square no longer. Two pieces:
+`genDistrictForCell` gives every cell a dataset-free density profile, and
+`genCellPackageDeferred` makes registration O(1) a cell so the layer can
+blanket a bounded region instead of spec'ing the tile up front.
+
+### The district profile (`spec.ts`)
+
+`genSpecForCell` splits on a new `GenSpecParams.recordsExtentMeters` (the
+layer passes `dataset.extentMeters`): a cell the index does not know AND
+whose centre sits outside the records square takes the **district branch**
+(`source: 'district'`); every other cell — bucketed, or bucket-less but
+inside the square — takes the **records path verbatim**. That condition is
+the whole byte-identity argument: the only cells that changed are cells
+that produced nothing before (no bucket ⇒ no area lots; outside the
+square ⇒ the `inside` gate rejected every interior candidate). Callers
+that omit `recordsExtentMeters` get the pre-slice-4 derivation on every
+cell, so `places.ts`/`pednet.ts` and the existing tests are untouched by
+construction.
+
+A district cell runs the same 4×4 slot grid and the same nine draws per
+candidate (the seeded-slot contract), with three changes:
+
+- the keep roll answers the district's `fill`, not `GEN_FILL_SHARE`
+  (`params.fillShare` still overrides, for tests);
+- the use roll first spends `parkShare` (a `park` marker lot, no
+  massing), then walks the district's built-use weights over
+  `home/mixed/office/school/stadium`; `floorsAdd` stretches the top of
+  every built use's floor range — the core's towers;
+- slot (0, 0) is the **anchor**: always built, never park, so every
+  district cell raises at least one box and no deferred package is ever
+  born empty on district ground.
+
+No keep-outs run (the index knows nothing here) and `inside` is not
+consulted — the caller's enumeration is the bound.
+
+`genDistrictForCell(cx, cz)` — deterministic from
+`hashUnit('gen:district:'+key)`: radial bands off the tile centre
+(125th St; x east, z south), wobbled ±800 m per cell so district edges
+fray instead of drawing a clean circle:
+
+| district | where | fill | park | built-use mix | floorsAdd |
+|----------|-------|------|------|---------------|-----------|
+| `core`   | southerly cone (z/r > 0.45), 5–11 km — the Manhattan spine (Midtown→Downtown) | 0.88 | 0.02 | office .55 / mixed .30 / home .11 / school .02 / stadium .02 | +6 |
+| `mid`    | ≤3.2 km any direction, or the spine to 14 km (z/r > 0.3) — inner borough texture | 0.60 | 0.06 | home .45 / mixed .30 / office .15 / school .03 / stadium .02 | +2 |
+| `edge`   | ≤19 km — borough scale | 0.38 | 0.15 | home .55 / mixed .15 / office .05 / school .10 / stadium .15 | 0 |
+| `open`   | beyond | 0.14 | 0.30 | home .50 / mixed .08 / office .02 / school .10 / stadium .30 | 0 |
+
+### The deferred package and the extent (`layer.ts`)
+
+The alternative designs were *eager spec over a bounded region* vs *lazy
+packages*. Eager over even a modest region repeats slice 1's ~42 ms spec
+build many times over; a truly unbounded "any `gen/` key on demand" scheme
+has no streamer seam (slots come from the registered `packages` array, and
+a pick already walks every slot for `boxDistance`). So the choice is a
+**bounded extent of lazy packages**: `GEN_EXTENT_CELLS = 32` — cells
+[-32, 31] each axis, a [-4096, 4096) m square, ~67 km², covering the home
+tile plus the near void a ground-level walk reaches (Morningside, Central
+Park, the near Bronx bank). 4,096 cells ⇒ ~4 k extra distance tests a
+pick (~0.35 ms steady-state measured on the host) and ~12–14 ms
+registration on the real tile — startup is O(1) per cell.
+
+`genCellPackageDeferred` registers conservative fields — cell-box plan
+bounds padded to `groundY ± (24, GEN_MAX_HEIGHT_M+16)` and densest-cell
+estimates for `bytes`/`vertexCount`/`triangles` — and computes nothing
+until `prefetch`, which specs, boxes and emits in one go when the
+streamer enters the reach ring (sub-ms a cell; ~0.008 ms/cell average
+measured eager over the whole extent, district cells far under the 2 ms
+budget). Every read that feeds a budget decision happens after prefetch,
+so the estimates only ever reach the registration stat. A records cell
+whose spec leaves no massing marks itself `suppressed()` after its first
+prefetch — the want test refuses it thereafter, the same net shape as
+slice 1's "no package" but discovered lazily. `release` drops the arrays
+only; spec and boxes stay, so a re-prefetch re-emits byte-identical.
+
+`genRecordCellAt` keeps gen out of cells the baked manifest already
+streams (every `lite`/`near`/`ringN-*`/`structures` cell in
+`VD_CELL_MANIFEST` outside the dataset square) — district fill on top of a
+baked ring would raise buildings inside record buildings. On the real
+tile: 309 cells kept out, **3,787 packages registered**; measured spec
+mix: 240 records cells (in-square or bucketed) + 3,547 district cells
+(mid 2,547 / edge 1,121 / core 119 corner cells past 5 km).
+
+### Coverage math — honest fraction of the 1.5 M target
+
+- Registered region: 3,787 cells → **~30,200 built lots** (+ ~2,400 open
+  park markers) — ~8× the tile's 3,742 record buildings, covering ~67 km².
+- Extrapolated to five-borough ground (~300 km² ≈ 18k cells) at this
+  granularity: ~110–150k buildings — **~8–10 % of the target**.
+- So slice 4 reaches **~2 % of 1.5 M** in registered cells. The 28 m grid
+  caps a cell at 16 lots; real NYC blocks run 30–40 buildings per cell —
+  parcelization could ~3× this, still not 1.5 M. The honest path to the
+  target is a coarser instanced/streamed gen tier (far-scale silhouettes
+  from the same spec), not denser near cells — per-cell work stays
+  sub-millisecond *by keeping* the 16-slot grid.
+
+### Still deferred (after slice 4)
+
+- **Systems records past the tile**: `genPlacesForTile`,
+  `genWalkEdgesFor`, `createGenBlockedFor` and `genPoiLabelsFor` still
+  enumerate the dataset square — district cells emit the same shapes
+  (coverage.test.ts proves it) but nothing indexes their prisms, walks
+  or anchors tile-wide yet. Walkability past the tile is already
+  record-false, so the gap is data, not correctness.
+- **Full-borough coverage**: 1.5 M needs the instanced far-gen tier
+  above; `GEN_EXTENT_CELLS` is a slot-count bound, not a coverage claim.
+- **VGC1 kind-6 packs / real parcelization / device proof**: unchanged
+  from slice 3 — flag-on frames, residency and walk-profile numbers
+  remain unverified on device.
