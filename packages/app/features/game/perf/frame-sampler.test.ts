@@ -87,6 +87,24 @@ test('window starts fresh after a completed report',()=>{
   assert.equal(out?.cpuP50Ms,1);
   assert.equal(out?.slowIntervals,0);
 });
+test('gpuMs populates its own block; absent and null samples leave it null',()=>{
+  const tracked = new FrameSampleWindow();
+  let report = null;
+  for (let i=1;i<=FRAME_SAMPLE_CAP;i++) {
+    report=tracked.push({cpuMs:i,intervalMs:16,gpuMs:i%2===0?4:null});
+  }
+  assert.ok(report);
+  assert.ok(report.gpu);
+  assert.equal(report.gpu.samples,60);
+  assert.equal(report.gpu.p50Ms,4);
+  assert.equal(report.gpu.worstMs,4);
+  assert.equal(report.cpuP50Ms,60,'JS stats are identical with the channel riding along');
+  const untracked = new FrameSampleWindow();
+  let empty = null;
+  for (let i=1;i<=FRAME_SAMPLE_CAP;i++) empty=untracked.push({cpuMs:i,intervalMs:16});
+  assert.equal(empty?.gpu,null);
+  assert.equal(empty?.cpuP50Ms,60);
+});
 test('counter percentiles ignore -1 "unknown" samples instead of counting them as zero',()=>{
   const sampler = new FrameSampleWindow();
   let r=null;

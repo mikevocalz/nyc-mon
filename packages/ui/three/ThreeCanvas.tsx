@@ -9,6 +9,7 @@ import { useInstance, useInstanceStore, useStore } from '../use-instance-store';
 import { useLayoutSize } from '../use-layout-size';
 import { View } from '../tw';
 import { loadThree } from './load-three';
+import { armGpuTimestamps, kickGpuTimestampResolve, WORLD_PERF_GPU_TIMESTAMPS, type GpuTimestampChannel } from './gpu-timestamps';
 import { advanceNodeFrame, releaseCanvasBuffers, stopInternalLoop } from './renderer-internals';
 import { resolveRenderThread } from './render-thread';
 import { WorkletThreeCanvas } from './WorkletThreeCanvas';
@@ -45,6 +46,8 @@ interface Runtime<P> {
   probe: ThreeFrameTiming;
   /** The latest `maxFps`, read per tick so a cap change never restarts the loop. */
   maxFps: number | undefined;
+  /** EXPO_PUBLIC_WORLD_PERF: three's timestamp-query channel; null when off or unsupported. */
+  gpuTiming: GpuTimestampChannel | null;
 }
 
 const isWeb = Platform.OS === 'web';
@@ -143,6 +146,7 @@ function JsThreeCanvas<P>({
     frame: { time: 0, delta: 0, width: 0, height: 0, pixelRatio: 1, reducedMotion, pointer: { x: 0, y: 0, inside: false, pressed: false } },
     probe: { cpuMs: 0, intervalMs: null, backend: 'webgpu' },
     maxFps,
+    gpuTiming: null,
   };
 
   // Pick the backend. WebGPU when it works; the WebGL2 backend on web when it
@@ -224,6 +228,14 @@ function JsThreeCanvas<P>({
           probe.triangles = info?.triangles ?? -1;
           probe.bufferW = renderer.domElement?.width ?? -1;
           probe.bufferH = renderer.domElement?.height ?? -1;
+          // The GPU half of the split rides the same probe: the last
+          // resolved frame's gpuMs is attached (it lags at least one
+          // draw; undefined when unarmed so a stale value never survives
+          // a backend rebuild on this reused probe), then the next
+          // resolve is kicked. Only while a timing consumer is attached
+          // does the extra submit + mapAsync run.
+          probe.gpuMs = rt.gpuTiming?.gpuMs;
+          if (rt.gpuTiming) void kickGpuTimestampResolve(renderer, rt.gpuTiming);
           onFrameTiming(probe);
         } catch (error) {
           // A diagnostics callback must never take down the game renderer.
@@ -313,6 +325,11 @@ function JsThreeCanvas<P>({
         renderer = null;
         return;
       }
+      // EXPO_PUBLIC_WORLD_PERF: arm three's timestamp-query pool — after
+      // init, because hasFeature throws earlier, and only where the device
+      // was granted 'timestamp-query' (gpu-timestamps.ts). Flag off: not
+      // even the hasFeature call runs.
+      rt.gpuTiming = WORLD_PERF_GPU_TIMESTAMPS ? armGpuTimestamps(renderer) : null;
       built = setup({ THREE, renderer, backend: using, invalidate }, rt.params);
       rt.renderer = renderer;
       rt.built = built;
@@ -336,6 +353,7 @@ function JsThreeCanvas<P>({
       rt.built = null;
       rt.surface = null;
       rt.lastProbeStart = 0;
+      rt.gpuTiming = null;
     };
     // invalidate, applySize and status are stable per instance; hasSize gates the first build only.
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -61,6 +61,23 @@ function encoder(record: GpuRecord): unknown {
   });
 }
 
+export interface RecordingGpuOptions {
+  /**
+   * Extra device features beyond 'float32-filterable' — e.g.
+   * 'timestamp-query' for the GPU timestamp channel's tests. WebGPUBackend's
+   * hasFeature reads this Set verbatim.
+   */
+  features?: readonly string[];
+  /**
+   * u64 nanosecond slots the timestamp result buffer's getMappedRange
+   * hands back, in query order — MOCK GPU clock readings; the harness
+   * draws nothing, so these are scripted values, not measured GPU time.
+   * three allocates begin/end pairs per render context: a frame's gpuMs
+   * is the sum of each pair's (end - start) / 1e6.
+   */
+  timestampValues?: readonly (number | bigint)[];
+}
+
 /** The WebGPU enums three reads as globals; node has none. Idempotent. */
 export function installGpuGlobals(): void {
   const g = globalThis as Record<string, unknown>;
@@ -82,7 +99,7 @@ export function installGpuGlobals(): void {
   g.cancelAnimationFrame ??= () => {};
 }
 
-export function recordingGpuDevice(): { device: unknown; record: GpuRecord } {
+export function recordingGpuDevice(options?: RecordingGpuOptions): { device: unknown; record: GpuRecord } {
   const record: GpuRecord = {
     shaders: [], renderPipelines: 0, computePipelines: 0, bufferBytes: 0, textureBytes: 0, writes: 0, writeBytes: 0, draws: 0,
     pipelineVertexBuffers: [], textures: [], samplers: [],
@@ -94,7 +111,7 @@ export function recordingGpuDevice(): { device: unknown; record: GpuRecord } {
     record.pipelineVertexBuffers.push({ label: d.label ?? '', buffers: d.vertex?.buffers?.length ?? 0 });
   };
   const device = {
-    features: new Set<string>(['float32-filterable']),
+    features: new Set<string>(['float32-filterable', ...(options?.features ?? [])]),
     limits,
     lost: new Promise(() => {}),
     queue: {
@@ -110,10 +127,27 @@ export function recordingGpuDevice(): { device: unknown; record: GpuRecord } {
     createRenderPipelineAsync: async (d: PipelineDescriptor) => { pipeline(d); return inert(); },
     createComputePipeline: () => { record.computePipelines++; return inert(); },
     createComputePipelineAsync: async () => { record.computePipelines++; return inert(); },
-    createBuffer: (d: { size: number }) => {
+    createBuffer: (d: { size: number; label?: string }) => {
       const size = d.size;
       record.bufferBytes += size;
-      return { size, getMappedRange: () => new ArrayBuffer(size), unmap() {}, destroy() {}, mapAsync: async () => {} };
+      const backing = new ArrayBuffer(size);
+      // The timestamp channel's result buffer gets the scripted u64 clock
+      // readings; every other buffer is zero-filled as before.
+      if (options?.timestampValues && d.label?.startsWith('buffer_timestamp_result')) {
+        const view = new BigUint64Array(backing);
+        for (let i = 0; i < options.timestampValues.length && i < view.length; i++) view[i] = BigInt(options.timestampValues[i]!);
+      }
+      let mapState: 'unmapped' | 'mapped' = 'unmapped';
+      return {
+        size,
+        // three's timestamp pool early-outs on mapState !== 'unmapped' —
+        // track it the way a real buffer does.
+        get mapState() { return mapState; },
+        getMappedRange: () => backing,
+        unmap() { mapState = 'unmapped'; },
+        destroy() {},
+        mapAsync: async () => { mapState = 'mapped'; },
+      };
     },
     createTexture: (d: { label?: string; size: { width: number; height?: number; depthOrArrayLayers?: number } | number[]; format: string; sampleCount?: number; mipLevelCount?: number }) => {
       const s = Array.isArray(d.size)

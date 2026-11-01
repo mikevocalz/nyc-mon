@@ -16,6 +16,7 @@
     "./three/hlynk": "./three/hlynk/index.ts",
     "./three/hlynk/hud": "./three/hlynk/hud.ts",
     "./three/internals": "./three/renderer-internals.ts",
+    "./three/gpu-timestamps": "./three/gpu-timestamps.ts",
     "./neon": "./neon/index.ts",
     "./elements": "./elements/index.ts",
     "./progress": "./progress/index.ts",
