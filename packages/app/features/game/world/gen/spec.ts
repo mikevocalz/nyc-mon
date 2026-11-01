@@ -64,6 +64,9 @@ const AREA_USE: Readonly<Record<AreaKind, GenUse>> = {
 
 export interface GenLotSpec {
   readonly use: GenUse;
+  /** The marked area kind the lot derives from, when it does — interior fills carry none.
+   * Lets places.ts name 'park' vs 'plaza' vs 'pitch' without re-deriving the AREA_USE fold. */
+  readonly area?: AreaKind;
   /** Footprint rect, scene metres: [x0, z0, x1, z1], inside the cell's box. */
   readonly rect: readonly [number, number, number, number];
   readonly floors: number;
@@ -289,7 +292,7 @@ export function genSpecForCell(cx: number, cz: number, params: GenSpecParams): G
       const [f0, f1] = rule.floors;
       const floors = f0 === f1 ? f0 : f0 + Math.floor(r1 * (f1 - f0 + 1));
       lots.push({
-        use, rect, floors, floorHeightMeters: FLOOR_HEIGHT_M, class: rule.class,
+        use, area: area.kind, rect, floors, floorHeightMeters: FLOOR_HEIGHT_M, class: rule.class,
         styleId: rule.styles[Math.floor(salt * rule.styles.length) % rule.styles.length]!,
         salt, salt2: 1 - salt,
       });

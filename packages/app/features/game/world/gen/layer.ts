@@ -30,15 +30,16 @@ import { CELL, type CellAttribute, type CellLocalPositionFrame, type CellPackage
 import { ditherFadeMask } from '../cells/cell-stream.ts';
 import { makeBlocksMaterial } from '../vd-port/blocks/shell-material.ts';
 import type { NearArrays } from '../vd-port/blocks/codec.ts';
-import { parseSkyRigFlag } from '../sky-rig.ts';
 import { WORLD_PRESETS } from '../../perf/tier-presets.ts';
 import { buildGenIndex, genSpecForCell, type GenDataset, type GenSpec } from './spec.ts';
 import { emitGenCell, genCellBounds, genCellBoxes, GEN_TRIS_PER_BOX, GEN_VERTS_PER_BOX } from './buildings.ts';
+import { EXPERIMENTAL_WORLD_GEN } from './flag.ts';
 
 type Mesh = InstanceType<Three['Mesh']>;
 
-/** Opt-in lane flag — default OFF, matching the other experimental world lanes. `EXPO_PUBLIC_WORLD_GEN=1`. */
-export const EXPERIMENTAL_WORLD_GEN = parseSkyRigFlag(process.env.EXPO_PUBLIC_WORLD_GEN);
+// The flag lives in flag.ts so the pure places/blocked consumers read it without
+// this module's three chain; re-exported — the slice-1 import path keeps working.
+export { EXPERIMENTAL_WORLD_GEN };
 
 /** The layer's mesh name (the streamer names its cells after the template). */
 export const GEN_NAME = 'city:vd-gen';

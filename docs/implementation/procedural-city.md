@@ -85,10 +85,75 @@ streamer to feed).
   28 m grid today — seeded slots, not real parcels. Overlaps with record
   footprints are prevented; adjacency to them is not modelled.
 - **Area massing** past school/pitch; plaza/parking/playground treatments.
-- **VGC1 kind producers**: colliders/pednet/spawns/labels read the spec's
-  use tags — the readers exist (`vd-port/systems/`), the gen emitters do
-  not.
-- **Consumers**: nothing reads `use`/`styleId` yet beyond facade params.
+- **VGC1 kind packs**: slice 2 emits the record *shapes* in memory
+  (places.ts); nothing writes or reads VGC1 packs for gen content, and no
+  VD_SYSTEM_MANIFEST merge exists — the baked kinds stay record-only.
 - **Visual verification**: host-tested only. No rendered frame, no device
   numbers, no walk-profile residency measurement with the flag on. Spec
   build on the real tile measured ~42 ms once per world build (host).
+
+## Slice 2 — places: generated content into the Mon systems
+
+`world/gen/places.ts` turns one cell's spec into the record shapes the
+systems already consume — same spec, same bytes, still pure and still
+behind `EXPO_PUBLIC_WORLD_GEN` (read via `gen/flag.ts`, extracted so pure
+consumers needn't pull the layer's three chain).
+
+### What a cell emits (`genCellPlaces(spec, groundY)`)
+
+- **`anchors`**: POI anchors for the place uses — `school`, `stadium`
+  (pitch), `park` (all open grounds, incl. plaza areas) and `office`.
+  `{use, position, radiusM, name?}`: position is f32x3 cell-local about
+  the cell centre (y absolute, the near convention), radiusM is half the
+  lot's shorter side. `home`/`mixed` infill anchors nothing. Names are
+  descriptor words off the marked area (`School`, `Park`, `Playing
+  pitch`, `Plaza`…) — the labels' no-invented-text rule keeps offices
+  anonymous; `GenLotSpec.area` now carries the source `AreaKind` so a
+  park marker names 'Plaza' where the area was one.
+- **`prisms`**: a collider prism per building lot (floors > 0), in the
+  `ColliderPrism` shape of `vd-port/systems/colliders.ts` — footprint
+  ring extruded `groundY → groundY + floors × floorHeight`, no holes,
+  `landmarkId`/`flags` 0, `style` = the lot's styleId. `srcId` takes the
+  u32 top bit plus packed (cell, lot index): record ids pack (tile,
+  index) below 2^27, so gen prisms can never alias record buildings.
+- **`walks`**: WalkEdge-compatible stubs (`living-city/topology.ts`
+  shape, `walk:gen:`/`node:gen:` ids): an 'edge' perimeter loop standing
+  1.4 m off each building lot, a 'gate' path along the longer axis
+  through each open lot (water skipped). Stubs — nothing stitches them
+  into `LaneTopology` yet.
+- **`spawnAnchors` + `habitats`**: `SpawnAnchor` records (the kind-4
+  decode shape) mapped into the six-habitat wire vocabulary via
+  `GEN_USE_HABITAT`: school → `community_hub` (CIVIC_STONE is the record
+  rule's civic style), open grounds → `plaza`, any lot ≥ 20 m →
+  `rooftop` on its roof — the write-spawns height rule verbatim. `park`
+  itself is not in the wire vocabulary: bloodlines listing it match
+  nothing baked today either.
+
+### Consumers wired
+
+- **Walkability** (`world/bundled-queries.ts`): `createGenBlockedFor`
+  builds a blocked index over the tile's gen prisms — the same
+  body-radius rim rule walkability.ts runs — ANDed into `isWalkable`
+  exactly like the obstacles layer, only when the flag is on. Flag off:
+  `genBlocked` is `null`, the composed query is unchanged.
+- **Spawn habitats**: no runtime spawn ring exists yet (the kind-4
+  decoders have no live reader). The seam is record-shape parity:
+  `spawnAnchors`/`habitats` drop verbatim into a spawn-zone table. Least
+  restructuring possible — there is no spawn code to restructure.
+- **POI labels** (`city-walk/CityWalkStage.tsx`): `genPoiLabelsFor`
+  feeds named gen places into the overlay's existing `'landmark'`
+  `WalkLabel` channel — no new kind, flag off the list is `[]`. The
+  Go-to destination list and `nearestDestination` are untouched:
+  generated places are labels, not travel targets.
+
+### Still deferred (after slice 2)
+
+- **VGC1 kind-6 packs**: gen content emits no packs; the systems
+  manifest merge (record + gen packs keyed `gen/<cx>_<cz>` or similar)
+  is the deferred integration when a real runtime reader lands.
+- **District-authority spec**: real parcelization still pending — walk
+  stubs skirt fixed-grid lots, not real block faces.
+- **Pednet stitching**: gen walk edges are stubs; a consumer that joins
+  them to `node:` junctions of the record graph is unwritten.
+- **Device/visual verification**: still host-only — flag-on frames,
+  residency and spawn behaviour unverified on device.
