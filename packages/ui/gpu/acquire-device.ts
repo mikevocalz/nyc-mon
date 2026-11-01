@@ -98,7 +98,7 @@ const REQUEST_ADAPTER_TIMEOUT_MS = 10000;
  * `pending` and covers the app with a black view). Bounded for the same
  * reason: a hang must end at unsupported, not a frozen screen.
  */
-export function requestAdapterWithTimeout(request: () => Promise<GPUAdapter | null>): Promise<GPUAdapter | null> {
+export function requestAdapterWithTimeout<T>(request: () => Promise<T | null>): Promise<T | null> {
   return withTimeout(request(), REQUEST_ADAPTER_TIMEOUT_MS);
 }
 
