@@ -294,14 +294,17 @@ export default function CityWalkStage() {
     void Promise.all([
       import('../world/vd-port/systems/data/assets.ts'),
       import('@acme/ui/three/asset-bytes'),
+      import('../world/cell-source/index.ts'),
       Promise.resolve(vdStorefrontPlan()),
-    ]).then(([{ VD_SYSTEM_ASSETS }, { fetchAssetBytes }, plan]) => {
+    ]).then(([{ VD_SYSTEM_ASSETS }, { fetchAssetBytes }, { vdSystemFetch }, plan]) => {
       if (!alive) return;
       setSigns(signLabels(plan));
       if (streets.current) return;
       streets.current = createStreetLabelSource(async (key) => {
         const id = VD_SYSTEM_ASSETS.labels?.[key];
-        return id === undefined ? null : fetchAssetBytes(id);
+        // The cell-source path pin-verifies the bundled copy against vd-systems-manifest (merged into
+        // VD_MANIFEST); a key outside the emitted cells resolves null, an empty labels cell as before.
+        return vdSystemFetch('labels', key, id === undefined ? undefined : () => fetchAssetBytes(id));
       });
       ensureStreetCells();
     });

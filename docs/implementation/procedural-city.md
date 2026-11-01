@@ -157,3 +157,70 @@ consumers needn't pull the layer's three chain).
   them to `node:` junctions of the record graph is unwritten.
 - **Device/visual verification**: still host-only — flag-on frames,
   residency and spawn behaviour unverified on device.
+
+## Slice 3 — manifest merge, district spec, pednet stitching
+
+### The systems manifest merge (the audit gap)
+
+`cell-source/index.ts` now ships `VD_MANIFEST`: `VD_SYSTEM_MANIFEST`'s
+1,708 pack refs spread over `VD_CELL_MANIFEST`'s 1,692 cell refs — the
+namespaces are disjoint (`colliders/`/`pednet/`/`traffic/`/`spawns/`/
+`labels/` against `far/`/`lite/`/`near/`/`ringN-*`/`structures/`), so the
+merge is a union, never an overwrite. `configureVdCellSource` defaults to
+it, which closes the engine-audit gap: system pack keys are now inside
+the pin, so their bundled copies verify sha256 + bytes like geometry
+cells instead of riding the unmanifested-bundled fallback unverified.
+`vdSystemFetch(kind, key, bundled?)` is the `<kind>/<cell>` key joiner
+for readers. The first runtime reader: `CityWalkStage`'s street-label
+source now loads `labels/` packs through `vdSystemFetch` — same bytes,
+now pin-checked. Colliders decode through the same path in the manifest
+test; pednet/traffic/spawns still have no live reader (the LaneTopology
+sidecar serves their job today), so their packs reach fetch-and-decode
+but not a simulation.
+
+### The generated-city district
+
+`core/realtime/gen-district.ts` holds `GEN_DISTRICT_ID`
+('harlem-apollo-gen') and `genDistrictSpec(walkable)`: the default
+district contract — 50 ms tick, same speeds and bounds — under the gen
+id, with the wall query injected (core stays env-free). The app seam
+`world/gen/district.ts` `worldDistrict()` returns that spec built on the
+tile's composed `isWalkable` — which already ANDs the gen-prism blocked
+layer in — only while `EXPO_PUBLIC_WORLD_GEN` is on; off, it returns
+null and nothing registers. `buildWorldSave` records the id on a fresh
+save the same way (`previous?.districtId` still wins), flag off the
+field stays null. Dex `districtId` stays null on every form — the canon
+field is unauthored and the generated city invents no Mon homes.
+
+### Pednet stitching
+
+`world/gen/pednet.ts` is where the walk stubs land: `genWalkEdgesFor`
+enumerates the tile's stubs, `stitchGenWalks` re-keys a **gate** end to
+the nearest record band end's junction node when it lands within
+`GEN_GATE_ATTACH_METRES` (12 m — inside the sim's own 28 m corner-link
+cap, so the sim's distance and jaywalk checks still gate the hop), and
+`appendGenWalks` folds the result into `LaneTopology.walks` sorted-by-id
+with `stats.walkEdges` counting it. **'edge' loops never re-key** — a
+closed circulate stub has no ends to attach, and PedSim's own
+`nodeA !== nodeB` spawn filter keeps ambient peds off them anyway. A
+gate with no junction in reach stays an isolated `node:gen:` stub:
+spawnable, but a ped reaching its end only turns back
+(`decideAtBandEnd`'s turnback option — the gen node isn't in
+`nodeById`, which that code already tolerates). `bundledTopology()`
+performs the append only flag-on; flag off the built sidecar is
+byte-identical, `walk:gen:` ids included. Measured on the bundled tile:
+1,126 record walks + 306 gen stubs (78 loops, 228 gates) — 34 gates
+attach at one end (one attaches at both); the rest stay isolated stubs,
+which is the honest shape of mid-block open lots with no junction in
+reach.
+
+### Still deferred (after slice 3)
+
+- **VGC1 kind-6 packs / gen pack emission**: gen content still emits no
+  packs, and pednet/traffic/spawns packs still have no live consumer —
+  the topology sidecar answers what they would.
+- **Real parcelization**: interior lots are still seeded slots on the
+  28 m grid; the district spec wraps the composed walkable, it does not
+  reshape the lots.
+- **Device/visual verification**: still host-only — flag-on frames,
+  residency, corner-link hops and district ticks unverified on device.

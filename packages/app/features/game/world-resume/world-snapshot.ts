@@ -8,8 +8,10 @@ import {
   type WorldPillState,
   type WorldSave,
 } from '@acme/core';
+import { GEN_DISTRICT_ID } from '@acme/core/realtime';
 import type { CityCamera } from '../city-scene.ts';
 import type { CityDataset } from '../city-dataset.ts';
+import { EXPERIMENTAL_WORLD_GEN } from '../world/gen/flag.ts';
 
 // Builds the save the cadence commits. Pure: the camera, dataset and clock
 // come in as arguments, so `node --test` covers it without MMKV or React.
@@ -107,7 +109,10 @@ export function buildWorldSave(input: WorldSnapshotInput): WorldSave {
     playerId: identity.playerId,
     sessionId: input.sessionId,
     worldInstanceId: previous === null ? mintWorldInstanceId(identity, dataset, now) : previous.worldInstanceId,
-    districtId: previous?.districtId ?? null,
+    // The world's district, once known (world-save.ts: 'when the dataset knows one'). The bundled
+    // tile still knows none; with EXPO_PUBLIC_WORLD_GEN the world runs the generated-city district
+    // (world/gen/district.ts), so the first save under the flag records it and resume keeps it.
+    districtId: previous?.districtId ?? (EXPERIMENTAL_WORLD_GEN ? GEN_DISTRICT_ID : null),
     position: unprojectFromScene({ x: camera.x, z: camera.z }, origin),
     dataset: { datasetId: dataset.id, datasetVersion: dataset.version, originRef: origin },
     headingRadians: headingRadiansFromYaw(camera.yaw),
