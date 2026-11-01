@@ -14,7 +14,8 @@ import { livingCityAdaptiveBridge } from './living-city/adaptive-bridge.ts';
 import { EXPERIMENTAL_WORLD_RENDER_SCALE, mountRenderScale } from './perf/render-scale.ts';
 import { EXPERIMENTAL_WORLD_THERMAL, thermalSignal, thermalWorsened } from './perf/thermal.ts';
 import { TIER, tierBundle, WORLD_TIER, WORLD_TIER_SELECTED } from './perf/tier.ts';
-import { detectWorldPreset, screenErrorScale, worldStreamEnabled } from './perf/tier-presets.ts';
+import { adaptiveFrameBridge, createAdaptiveTierController, EXPERIMENTAL_WORLD_ADAPTIVE } from './perf/adaptive-tiers.ts';
+import { detectWorldPreset, screenErrorScale, WORLD_PRESETS, WORLD_PRESET_SELECTED, worldStreamEnabled } from './perf/tier-presets.ts';
 import type { CellStreamStats } from './world/cells/cell-stream.ts';
 import { parseSkyRigFlag, type SkyName } from './world/sky-rig.ts';
 import { FrameSampleWindow } from './perf/frame-sampler.ts';
@@ -25,6 +26,7 @@ import {
   physicalFeaturesFor,
   WORLD_PROBE,
   WORLD_SHADOW_INTERVAL,
+  WORLD_SHADOW_INTERVAL_SELECTED,
   type DeviceLaneProbe,
   type PhysicalFeatures,
   type PhysicalPresetId,
@@ -278,6 +280,46 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
       '[NYC-Mon/perf] render scale drives the scene pass setResolutionScale — EXPO_PUBLIC_WORLD_UPSCALE owns the output buffer',
     );
   }
+  // Phase 6 (PR 6): adaptive quality tiers — the closed frame reports the
+  // probe channel already produces step the streaming preset row, the sun
+  // shadow interval and the scale channel down and back
+  // (perf/adaptive-tiers.ts, EXPO_PUBLIC_WORLD_ADAPTIVE). Explicit picks
+  // beat it: an env-pinned preset keeps its row, an env-pinned shadow
+  // interval its refresh, and an armed render-scale controller owns the
+  // scale channel outright — two controllers on one channel would fight.
+  let adaptiveScaleFactor = 1;
+  let adaptiveBaseRatio = renderer?.getPixelRatio() ?? 1;
+  const adaptive = EXPERIMENTAL_WORLD_ADAPTIVE
+    ? createAdaptiveTierController({
+        startPreset: preset.name,
+        scaleChannel: upscalePass ? 'upscaleScale' : 'renderScale',
+        startScale: upscalePass?.getResolutionScale() ?? 1,
+        tier: WORLD_PRESET_SELECTED === null && world.stream !== null,
+        shadowInterval: !WORLD_SHADOW_INTERVAL_SELECTED && rig?.sun != null,
+        scale: renderScale === null,
+        // The upscale slot starts at 0.5 input — the pixel-ratio floor would
+        // clamp every step; half the eval's start is the provisional bottom.
+        scaleFloor: upscalePass ? 0.25 : undefined,
+        apply: (action) => {
+          switch (action.kind) {
+            case 'tier':
+              world.stream?.setPreset(WORLD_PRESETS[action.to]);
+              break;
+            case 'shadowInterval':
+              rig?.setShadowInterval(action.to);
+              break;
+            case 'upscaleScale':
+              upscalePass?.setResolutionScale(action.to);
+              break;
+            case 'renderScale':
+              adaptiveScaleFactor = action.to;
+              renderer?.setPixelRatio(adaptiveBaseRatio * adaptiveScaleFactor);
+              break;
+          }
+        },
+      })
+    : null;
+  if (adaptive) adaptiveFrameBridge.push = adaptive.push;
   // Last consumed thermalSignal sample — the monitor (perf/thermal.ts,
   // flag-gated) bumps seq on each poll; a move to a worse level forces a
   // render-scale down-step so the tier drops before the device throttles.
@@ -418,6 +460,17 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
       // Under the upscale slot the adapter's base ratio is 1, so the
       // controller's output lands on setResolutionScale as the bare scale.
       renderScale?.frame(now, upscalePass ? 1 : frame.pixelRatio);
+      // The adaptive controller's render-scale channel: the canvas's
+      // applySize re-stamps the raw device ratio on resize, so re-assert the
+      // adaptive scale each frame the way mountRenderScale does (three
+      // early-returns when unchanged). The upscale slot's pass keeps its own
+      // resolution scale — it needs no per-frame assert.
+      if (adaptive) {
+        adaptiveBaseRatio = upscalePass ? 1 : frame.pixelRatio;
+        if (!upscalePass && adaptiveScaleFactor !== 1) {
+          renderer?.setPixelRatio(adaptiveBaseRatio * adaptiveScaleFactor);
+        }
+      }
       // PR09: adaptive living-city crowd caps — once the controller has
       // surrendered real fill rate, thin the ambient population one tier
       // (living-city/bundled-host.ts owns the marks; one-way). The bridge
@@ -518,6 +571,9 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
       camera.updateProjectionMatrix();
       // The canvas just re-stamped the raw device pixel ratio — re-apply the scale.
       renderScale?.resized();
+      if (adaptive && !upscalePass && adaptiveScaleFactor !== 1) {
+        renderer?.setPixelRatio(adaptiveBaseRatio * adaptiveScaleFactor);
+      }
     },
     dispose: () => {
       if (disposed) return;
@@ -525,6 +581,9 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
       // First, while every instanced mesh is still in the scene: their storage
       // instance matrices are freed by nothing else (physical-rig.ts).
       if (rigModule && renderer && storageSwapped > 0) rigModule.releaseStorageInstanceMatrices(renderer, scene);
+      // The adaptive sink detaches before anything it could actuate goes away.
+      if (adaptive && adaptiveFrameBridge.push === adaptive.push) adaptiveFrameBridge.push = null;
+      if (adaptive && !upscalePass && adaptiveScaleFactor !== 1) renderer?.setPixelRatio(adaptiveBaseRatio);
       renderScale?.dispose();
       probeCleanup?.();
       post?.dispose();

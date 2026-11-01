@@ -110,6 +110,15 @@ export interface PhysicalRig {
   readonly preset: PhysicalPresetId;
   /** Re-light for a preset; rebakes the environment into the same render target. */
   applyPreset(id: PhysicalPresetId, force?: boolean): void;
+  /**
+   * perf/adaptive-tiers.ts: the shadow refresh interval at runtime — the same
+   * autoUpdate/needsUpdate throttle EXPO_PUBLIC_WORLD_SHADOW_INTERVAL sets at
+   * construction. 1 restores every-frame refresh; >1 throttles and pokes one
+   * immediate refresh so the change lands on the next frame, not the next tick.
+   * No-op without a sun. The explicit env pick beats adaptive (the scene
+   * suppresses this action kind while EXPO_PUBLIC_WORLD_SHADOW_INTERVAL is set).
+   */
+  setShadowInterval(interval: number): void;
   /** Per frame: shadow far plane from camera altitude; the shadow1 light follows the focus. */
   update(cameraY: number, focusX: number, focusZ: number): void;
   dispose(): void;
@@ -259,9 +268,10 @@ export function createPhysicalRig(
   // shadow.autoUpdate/needsUpdate (three r187 ShadowNode.js:806-824), so the
   // atlas holds between ticks — a moving caster's shadow lags up to N-1
   // frames, which is why this stays a flag. needsUpdate starts true so the
-  // first frame still renders the map.
-  const shadowInterval = Math.max(1, Math.floor(options.shadowInterval ?? 1));
-  const throttled = shadowInterval > 1 && sun !== null;
+  // first frame still renders the map. `let`: the adaptive tier policy moves
+  // the interval at runtime through setShadowInterval.
+  let shadowInterval = Math.max(1, Math.floor(options.shadowInterval ?? 1));
+  let throttled = shadowInterval > 1 && sun !== null;
   const lightShadow = () => sun?.shadow as unknown as { autoUpdate: boolean; needsUpdate: boolean } | undefined;
   if (throttled) {
     const sh = lightShadow()!;
@@ -381,6 +391,19 @@ export function createPhysicalRig(
       return presetId;
     },
     applyPreset,
+    setShadowInterval(interval: number) {
+      const next = Math.max(1, Math.min(8, Math.floor(interval)));
+      if (next === shadowInterval || !sun) return;
+      shadowInterval = next;
+      throttled = shadowInterval > 1;
+      intervalTick = 0;
+      const sh = lightShadow();
+      if (sh) {
+        sh.autoUpdate = !throttled;
+        // The change itself can't wait for a tick — refresh the atlas once now.
+        sh.needsUpdate = true;
+      }
+    },
     update(cameraY, x, z) {
       if (!sun) return;
       // Every Nth frame the atlas re-renders; preset/far/focus changes poke it directly.

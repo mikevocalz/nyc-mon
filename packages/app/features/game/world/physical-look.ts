@@ -109,6 +109,15 @@ export function parseShadowInterval(value: string | undefined | null): number {
 export const WORLD_SHADOW_INTERVAL: number = parseShadowInterval(process.env.EXPO_PUBLIC_WORLD_SHADOW_INTERVAL);
 
 /**
+ * True when EXPO_PUBLIC_WORLD_SHADOW_INTERVAL was actually set — an explicit pick beats the
+ * adaptive tier policy (perf/adaptive-tiers.ts suppresses its shadowInterval actions while set).
+ */
+export const WORLD_SHADOW_INTERVAL_SELECTED: boolean = (() => {
+  const v = process.env.EXPO_PUBLIC_WORLD_SHADOW_INTERVAL;
+  return v != null && v.trim() !== '';
+})();
+
+/**
  * Which pieces of the physical stack a scene mounts. With the flag off,
  * `physicalFeaturesFor` returns null and city-scene runs today's
  * path untouched.
