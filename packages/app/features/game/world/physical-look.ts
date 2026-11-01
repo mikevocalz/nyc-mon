@@ -91,6 +91,24 @@ export const WORLD_UPSCALE: WorldUpscale | null = parseWorldUpscale(process.env.
 export const WORLD_DEVICE_PROBE: DeviceLaneProbe | null = isDeviceLaneProbe(WORLD_PROBE) ? WORLD_PROBE : null;
 
 /**
+ * EXPO_PUBLIC_WORLD_SHADOW_INTERVAL: how often the sun's cascades re-render,
+ * in drawn frames. 1 (default, unset or invalid) keeps every-frame refresh;
+ * N > 1 sets shadow.autoUpdate = false and raises needsUpdate every Nth
+ * frame — ShadowNode.updateBefore honours the standard LightShadow gate
+ * (three r187 src/nodes/lighting/ShadowNode.js:806-824), so the atlas holds
+ * between ticks. The cascades are ~60 % of the scene's submit encode on the
+ * recording harness, so interval 2 drops a third of the frame's draw calls.
+ * Visual cost: a moving caster's shadow lags up to N-1 frames — flag-gated.
+ */
+export function parseShadowInterval(value: string | undefined | null): number {
+  const n = Number(value?.trim());
+  return Number.isFinite(n) && n > 1 ? Math.min(8, Math.floor(n)) : 1;
+}
+
+/** The shadow refresh interval, inlined at bundle time; 1 when unset or invalid. */
+export const WORLD_SHADOW_INTERVAL: number = parseShadowInterval(process.env.EXPO_PUBLIC_WORLD_SHADOW_INTERVAL);
+
+/**
  * Which pieces of the physical stack a scene mounts. With the flag off,
  * `physicalFeaturesFor` returns null and city-scene runs today's
  * path untouched.

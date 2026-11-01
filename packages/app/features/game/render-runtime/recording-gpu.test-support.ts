@@ -16,6 +16,8 @@ export interface GpuRecord {
   writes: number;
   writeBytes: number;
   draws: number;
+  /** Draw calls inside each render/compute pass, in beginPass order. */
+  passDraws: number[];
   /** Every render pipeline's label and vertex buffer count, in creation order. */
   pipelineVertexBuffers: { label: string; buffers: number }[];
   /** Every texture's label, format, size and mip level count, in creation order. */
@@ -48,11 +50,15 @@ function inert(): unknown {
 }
 
 function encoder(record: GpuRecord): unknown {
-  const pass = () => new Proxy({}, {
-    get: (_t, p) => (p === 'then' ? undefined
-      : p === 'draw' || p === 'drawIndexed' || p === 'drawIndirect' || p === 'drawIndexedIndirect' ? () => { record.draws++; }
-        : () => undefined),
-  });
+  const pass = () => {
+    let draws = 0;
+    const index = record.passDraws.push(0) - 1;
+    return new Proxy({}, {
+      get: (_t, p) => (p === 'then' ? undefined
+        : p === 'draw' || p === 'drawIndexed' || p === 'drawIndirect' || p === 'drawIndexedIndirect' ? () => { record.draws++; draws++; record.passDraws[index] = draws; }
+          : () => undefined),
+    });
+  };
   return new Proxy({}, {
     get: (_t, p) => (p === 'then' ? undefined
       : p === 'beginRenderPass' || p === 'beginComputePass' ? pass
@@ -102,6 +108,7 @@ export function installGpuGlobals(): void {
 export function recordingGpuDevice(options?: RecordingGpuOptions): { device: unknown; record: GpuRecord } {
   const record: GpuRecord = {
     shaders: [], renderPipelines: 0, computePipelines: 0, bufferBytes: 0, textureBytes: 0, writes: 0, writeBytes: 0, draws: 0,
+    passDraws: [],
     pipelineVertexBuffers: [], textures: [], samplers: [],
   };
   // The iPad's real vertex-buffer limit; every other limit is effectively unbounded.

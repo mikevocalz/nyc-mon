@@ -288,6 +288,35 @@ test('with a renderer: SunLightNode registered once, PMREM baked into one reused
   }
 });
 
+test('shadow interval: autoUpdate off under the flag, needsUpdate on ticks and sun changes', () => {
+  const scene = new THREE.Scene();
+  const rig = createPhysicalRig(THREE, null, scene, { features: full, shadowTile: 2048, clusteredMaxLights: 128, shadowInterval: 3 });
+  const shadow = rig.sun!.shadow as unknown as { autoUpdate: boolean; needsUpdate: boolean };
+  assert.equal(shadow.autoUpdate, false, 'the interval flag takes the shadow off every-frame refresh');
+  assert.equal(shadow.needsUpdate, true, 'the first frame still renders the atlas');
+  shadow.needsUpdate = false;
+  // First update at a new altitude pokes the atlas (far 300 -> 420), then
+  // only the ticks fire while the far holds.
+  rig.update(100, 0, 0);
+  assert.equal(shadow.needsUpdate, true, 'a shadow-far change pokes the atlas');
+  shadow.needsUpdate = false;
+  for (let i = 0; i < 6; i++) {
+    rig.update(100, 0, 0);
+    // The settle update above was call 1, so ticks land on calls 3 and 6.
+    const expected = (i + 2) % 3 === 0;
+    assert.equal(shadow.needsUpdate, expected, `update ${i + 1}`);
+    shadow.needsUpdate = false;
+  }
+  rig.applyPreset('golden');
+  assert.equal(shadow.needsUpdate, true, 'a preset moves the sun: the atlas refreshes next frame');
+  shadow.needsUpdate = false;
+  rig.dispose();
+
+  const plain = createPhysicalRig(THREE, null, new THREE.Scene(), { features: full, shadowTile: 2048, clusteredMaxLights: 128 });
+  assert.equal((plain.sun!.shadow as unknown as { autoUpdate: boolean }).autoUpdate, true, 'no interval: the default path is untouched');
+  plain.dispose();
+});
+
 test('shadow roles: opaque meshes cast, flat ground layers and the sky do not', () => {
   const root = new THREE.Group();
   const mesh = (name: string, transparent = false) => {

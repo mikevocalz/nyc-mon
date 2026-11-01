@@ -88,6 +88,12 @@ export interface PhysicalRigOptions {
   /** ClusteredLighting maxLights from the tier. */
   clusteredMaxLights: number;
   preset?: PhysicalPresetId;
+  /**
+   * Drawn frames between sun shadow re-renders (EXPO_PUBLIC_WORLD_SHADOW_INTERVAL,
+   * physical-look.ts). >1 sets the light's shadow.autoUpdate = false and raises
+   * needsUpdate on ticks and on sun/preset/far changes. Default 1: every frame.
+   */
+  shadowInterval?: number;
 }
 
 export interface PhysicalRig {
@@ -248,6 +254,26 @@ export function createPhysicalRig(
     added.push(sun);
   }
 
+  // EXPO_PUBLIC_WORLD_SHADOW_INTERVAL: refresh the atlas every Nth drawn
+  // frame instead of every frame. ShadowNode.updateBefore honours
+  // shadow.autoUpdate/needsUpdate (three r187 ShadowNode.js:806-824), so the
+  // atlas holds between ticks — a moving caster's shadow lags up to N-1
+  // frames, which is why this stays a flag. needsUpdate starts true so the
+  // first frame still renders the map.
+  const shadowInterval = Math.max(1, Math.floor(options.shadowInterval ?? 1));
+  const throttled = shadowInterval > 1 && sun !== null;
+  const lightShadow = () => sun?.shadow as unknown as { autoUpdate: boolean; needsUpdate: boolean } | undefined;
+  if (throttled) {
+    const sh = lightShadow()!;
+    sh.autoUpdate = false;
+    sh.needsUpdate = true;
+  }
+  let intervalTick = 0;
+  /** A sun change that can't wait for the tick (preset direction, shadow far, focus move). */
+  const pokeShadow = () => {
+    if (throttled) lightShadow()!.needsUpdate = true;
+  };
+
   let hemi: InstanceType<Three['HemisphereLight']> | null = null;
   if (features.hemisphere) {
     hemi = new THREE.HemisphereLight(new THREE.Color(start.colors.hemiSky), new THREE.Color(start.colors.hemiGround), start.hemiIntensity);
@@ -295,6 +321,8 @@ export function createPhysicalRig(
       sun.color.set(p.colors.sun);
       sun.intensity = p.sunIntensity;
       placeSun(p.sunDirection);
+      // The sun moved: the atlas can't wait for the interval tick.
+      pokeShadow();
     }
     if (hemi) {
       hemi.color.set(p.colors.hemiSky);
@@ -355,12 +383,22 @@ export function createPhysicalRig(
     applyPreset,
     update(cameraY, x, z) {
       if (!sun) return;
+      // Every Nth frame the atlas re-renders; preset/far/focus changes poke it directly.
+      if (throttled) {
+        intervalTick = (intervalTick + 1) % shadowInterval;
+        if (intervalTick === 0) lightShadow()!.needsUpdate = true;
+      }
       if (features.sunShadow === 2) {
-        sun.shadow.camera.far = shadowFarForAltitude(cameraY);
+        const far = shadowFarForAltitude(cameraY);
+        if (sun.shadow.camera.far !== far) {
+          sun.shadow.camera.far = far;
+          pokeShadow();
+        }
       } else if (x !== focusX || z !== focusZ) {
         focusX = x;
         focusZ = z;
         placeSun(PHYSICAL_PRESETS[presetId].sunDirection);
+        pokeShadow();
       }
     },
     dispose() {

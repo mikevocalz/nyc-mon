@@ -24,6 +24,7 @@ import {
   isDeviceLaneProbe,
   physicalFeaturesFor,
   WORLD_PROBE,
+  WORLD_SHADOW_INTERVAL,
   type DeviceLaneProbe,
   type PhysicalFeatures,
   type PhysicalPresetId,
@@ -194,6 +195,7 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
         shadowTile: physicalTier.shadowTile,
         clusteredMaxLights: physicalTier.clusteredMaxLights,
         preset: initial.preset ?? DEFAULT_PHYSICAL_PRESET,
+        shadowInterval: WORLD_SHADOW_INTERVAL,
       })
     : null;
   if (rig) {
