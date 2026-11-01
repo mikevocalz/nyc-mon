@@ -98,4 +98,8 @@ test('vsync pacing: the loop waits for vsyncTickGameRender instead of self-sched
   const error = events.find((e) => e.kind === 'error');
   assert.match(error!.detail, /^(draw|frame tick): \w*Error: /);
   stopGameRender(11);
+  await new Promise((r) => setTimeout(r, 50));
+  const rafAfterStop = rafCalls;
+  await new Promise((r) => setTimeout(r, 100));
+  assert.equal(rafCalls, rafAfterStop, `no internal renderer loop survives a failed draw: ${JSON.stringify(events.filter((e) => e.kind === 'error'))}`);
 });
