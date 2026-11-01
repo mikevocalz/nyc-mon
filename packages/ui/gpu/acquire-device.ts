@@ -72,7 +72,7 @@ export async function acquireSharedOrOwnDevice(deps: AcquireDeviceDeps): Promise
   } catch (error) {
     sharedError = error instanceof Error ? error.message : String(error);
   }
-  const adapter = await deps.requestAdapter();
+  const adapter = await requestAdapterWithTimeout(deps.requestAdapter);
   if (!adapter) return null;
   return { device: await requestDeviceWithFallback(adapter), source: 'own', sharedError };
 }
@@ -89,6 +89,17 @@ export async function acquireSharedOrOwnDevice(deps: AcquireDeviceDeps): Promise
  * of the 2D fallback (A12X iPad Pro, Dawn 157).
  */
 const REQUEST_DEVICE_TIMEOUT_MS = 8000;
+const REQUEST_ADAPTER_TIMEOUT_MS = 10000;
+
+/**
+ * Adapter requests can also stall without settling on a wedged Dawn backend
+ * (same failure class as requestDevice — the canvas mounts while support is
+ * `pending` and covers the app with a black view). Bounded for the same
+ * reason: a hang must end at unsupported, not a frozen screen.
+ */
+export function requestAdapterWithTimeout(request: () => Promise<GPUAdapter | null>): Promise<GPUAdapter | null> {
+  return withTimeout(request(), REQUEST_ADAPTER_TIMEOUT_MS);
+}
 
 function withTimeout<T>(p: Promise<T>, ms: number): Promise<T | null> {
   return Promise.race([

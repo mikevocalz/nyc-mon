@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 import type { TgpuRoot } from 'typegpu';
 import { createStore } from 'zustand/vanilla';
 import { useStore } from 'zustand';
-import { acquireSharedOrOwnDevice, requestDeviceWithFallback, SHARED_GPU_DEVICE, type GpuDeviceSource } from './acquire-device';
+import { acquireSharedOrOwnDevice, requestAdapterWithTimeout, requestDeviceWithFallback, SHARED_GPU_DEVICE, type GpuDeviceSource } from './acquire-device';
 import { loadWebGpu } from './load-webgpu';
 import type { GpuSupport, WebGpuModule } from './types';
 
@@ -35,7 +35,7 @@ let starting: Promise<void> | null = null;
 async function start(): Promise<void> {
   try {
     const module = await loadWebGpu();
-    const adapter = module ? await navigator.gpu.requestAdapter() : null;
+    const adapter = module ? await requestAdapterWithTimeout(() => navigator.gpu.requestAdapter()) : null;
     if (!module || !adapter) {
       // Distinguish "no navigator.gpu" from "adapter request resolved null":
       // the unsupported state is terminal, so the cause must be in the log.
