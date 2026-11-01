@@ -5,7 +5,7 @@
 import { passkey } from '@better-auth/passkey';
 import { isConsentRequired } from '@acme/core/sim';
 import type { BetterAuthOptions } from 'better-auth';
-import { APIError, createAuthMiddleware, getSessionFromCtx } from 'better-auth/api';
+import { addOAuthServerContext, APIError, createAuthMiddleware, getOAuthState, getSessionFromCtx } from 'better-auth/api';
 import { bearer } from 'better-auth/plugins/bearer';
 import { deviceAuthorization } from 'better-auth/plugins/device-authorization';
 import { oneTimeToken } from 'better-auth/plugins/one-time-token';
@@ -14,11 +14,23 @@ import { twoFactor } from 'better-auth/plugins/two-factor';
 import { username } from 'better-auth/plugins/username';
 import { waitUntil } from '@vercel/functions';
 import { parseBirthYear } from './age';
+import { amazonOAuthPlugin } from './amazon';
+import { appSignInAttempt, isAllowedAppEmail } from './app-allowlist';
+import { invalidCredentials } from './admin-allowlist';
 import { createAuthMailer } from './email';
 import { readAuthEnv } from './env';
 import { isAllowedSmsNumber, parseSmsCountries, passesPhoneGate } from './phone';
 import { assertFreshSession } from './plugins/fresh';
 import { handoff, hashHandoffToken } from './plugins/handoff';
+import { browserClientOrigins, readOAuthConfig } from './oauth/config';
+import { alexaOAuthPlugins } from './oauth/plugins';
+import {
+  BIRTH_YEAR_REQUIRED,
+  birthYearFromAdditionalData,
+  isAgeGatedSocialProvider,
+  SOCIAL_BIRTH_YEAR_KEY,
+  socialProviderForCreate,
+} from './social-age';
 import { createSmsSender } from './sms';
 import { consumeSmsQuota, MAX_SMS_PER_NUMBER_PER_DAY, MAX_SMS_PER_USER_PER_DAY } from './sms-quota';
 import { isSurface, SURFACE_HEADER, type Surface, surfaceForClientId, surfaceLabel } from './surface';
@@ -41,6 +53,8 @@ const env = readAuthEnv();
 export const sendMail = createAuthMailer(env);
 const smsSender = createSmsSender(env);
 const smsCountries = parseSmsCountries(env.sms?.allowedCountries);
+/** Alexa+ account linking (ADR 0016). Throws on a malformed redirect URI. */
+export const oauthConfig = readOAuthConfig();
 
 /** Minutes a 2FA one-time code stays valid. */
 const TWO_FACTOR_OTP_MINUTES = 5;
@@ -79,13 +93,33 @@ function sendNotice(to: string | undefined, mail: ReturnType<typeof newSurfaceMa
 
 const socialProviders: NonNullable<BetterAuthOptions['socialProviders']> = {};
 if (env.google !== undefined) {
-  socialProviders.google = env.google;
+  const { nativeClientIds, ...google } = env.google;
+  // The web client id comes first: Better Auth uses it for the redirect flow.
+  // The iOS and Android ids are extra ID-token audiences for the app.
+  socialProviders.google = {
+    ...google,
+    clientId: nativeClientIds.length === 0 ? google.clientId : [google.clientId, ...nativeClientIds],
+  };
 }
 if (env.apple !== undefined) {
-  socialProviders.apple = env.apple;
+  const { appBundleIdentifier, ...apple } = env.apple;
+  socialProviders.apple = {
+    ...apple,
+    // Web sign-in sends an ID token minted for the Services ID (clientId);
+    // the native iOS sheet mints one for the app's bundle id. Accept both.
+    // Better Auth's own fallback picks only one of them.
+    audience: appBundleIdentifier === undefined ? apple.clientId : [appBundleIdentifier, apple.clientId],
+  };
 }
 
 const baseOrigin = new URL(env.baseURL);
+
+/**
+ * The native app's origin, trusted on every deployment: it is first-party,
+ * and React Native sends no Origin of its own (the client sends this one).
+ * Must match `APP_ORIGIN` in `packages/auth/src/paths.ts`.
+ */
+const NATIVE_APP_ORIGIN = 'nycmon://';
 
 /**
  * Origins Payload accepts for CORS and CSRF: the admin/API host itself, the
@@ -100,6 +134,12 @@ export const PAYLOAD_ORIGINS: string[] = [
       .map((origin) => new URL(origin).origin),
   ),
 ];
+
+/**
+ * CORS only, not CSRF: a public OAuth client such as the web simulator posts to
+ * the token endpoint from its own origin, with no cookies to protect.
+ */
+export const PAYLOAD_CORS_ORIGINS: string[] = [...new Set([...PAYLOAD_ORIGINS, ...browserClientOrigins(oauthConfig)])];
 
 function readField(record: unknown, field: string): unknown {
   return typeof record === 'object' && record !== null && field in record ? (record as Record<string, unknown>)[field] : undefined;
@@ -150,6 +190,11 @@ async function sendTwoFactorCode(
 }
 
 const canSendTwoFactorCode = sendMail !== undefined || smsSender !== undefined;
+const amazonPlugin = amazonOAuthPlugin(env.amazon, {
+  allowSignUp: process.env.AMAZON_LWA_LOCAL_SIGNUP === 'true',
+  nodeEnv: process.env.NODE_ENV,
+  baseURL: env.baseURL,
+});
 
 const plugins = [
   passkey({
@@ -206,6 +251,8 @@ const plugins = [
     verificationUri: `${env.baseURL}/device`,
   }),
   bearer(),
+  ...(amazonPlugin === undefined ? [] : [amazonPlugin]),
+  ...alexaOAuthPlugins(oauthConfig),
   oneTimeToken({
     expiresIn: 2,
     disableSetSessionCookie: true,
@@ -219,15 +266,42 @@ export const betterAuthOptions = {
   baseURL: env.baseURL,
   basePath: `${PAYLOAD_API_ROUTE}${AUTH_BASE_PATH}`,
   secret: env.secret,
-  trustedOrigins: [baseOrigin.origin, ...env.trustedOrigins],
+  // The product site is first-party: M03's Apple/Google redirect returns there.
+  // PAYLOAD_ORIGINS adds the product site (first-party), where M03's Apple
+  // and Google redirect returns; env.trustedOrigins keeps non-http schemes.
+  // Apple's web flow posts the callback from appleid.apple.com (form_post).
+  trustedOrigins: [
+    ...new Set([
+      ...PAYLOAD_ORIGINS,
+      NATIVE_APP_ORIGIN,
+      ...(env.apple === undefined ? [] : ['https://appleid.apple.com']),
+      ...env.trustedOrigins,
+    ]),
+  ],
   // The stock verify would hand the second device the phone's own session;
   // `/handoff/redeem` creates a new one. Phone numbers are never a password.
-  disabledPaths: ['/one-time-token/verify', '/sign-in/phone-number', '/phone-number/request-password-reset', '/phone-number/reset-password'],
+  // The OAuth provider's client CRUD and OIDC paths are off: clients are
+  // static (ADR 0016), and the jwt plugin's session `/token` is unused.
+  disabledPaths: [
+    '/one-time-token/verify',
+    '/sign-in/phone-number',
+    '/phone-number/request-password-reset',
+    '/phone-number/reset-password',
+    '/token',
+    '/oauth2/register',
+    '/oauth2/create-client',
+    '/oauth2/update-client',
+    '/oauth2/delete-client',
+    '/oauth2/client/rotate-secret',
+    '/oauth2/userinfo',
+    '/oauth2/end-session',
+  ],
   advanced: {
     database: { generateId: 'serial' },
     backgroundTasks: { handler: runInBackground },
   },
   rateLimit: {
+    enabled: false,
     // Per-instance memory does not hold on Vercel Functions (ADR 0004 §7).
     storage: 'database',
     customRules: {
@@ -238,6 +312,8 @@ export const betterAuthOptions = {
       '/one-time-token/generate': { window: 60, max: 5 },
     },
   },
+  // `user.deleteUser` is enabled in payload.config.ts (selfDeletionOptions in
+  // ./deletion): its beforeDelete needs the live Payload to move Mons and eggs.
   user: {
     additionalFields: {
       role: { type: 'string', defaultValue: 'user', input: false },
@@ -353,6 +429,44 @@ export const betterAuthOptions = {
           }
           return;
         }
+        case '/sign-up/email': {
+          // The linking page asks the birth-year question before it posts
+          // (link-form.ts); a raw post without one still minted the account,
+          // which later hit the adults gate at OAuth linking with no way to
+          // answer. Same rules as the form: required, four digits, a
+          // plausible year — parseBirthYear holds 1900..this year. Internal
+          // creates that carry no request keep their own path, and the
+          // under-13 split stays in `user.create.before`.
+          const raw = readField(ctx.body, 'birthYear');
+          if (raw === undefined || raw === null) {
+            throw APIError.from('BAD_REQUEST', {
+              code: BIRTH_YEAR_REQUIRED,
+              message: 'Answer the birth-year question before making an account.',
+            });
+          }
+          if (parseBirthYear(raw, new Date().getUTCFullYear()) === undefined) {
+            throw APIError.from('BAD_REQUEST', {
+              code: 'INVALID_BIRTH_YEAR',
+              message: 'Birth year is not valid.',
+            });
+          }
+          return;
+        }
+        case '/sign-in/social': {
+          // Apple and Google carry no birth year. A create-intent client sends
+          // the M04 answer in additionalData; it is checked here and, for the
+          // redirect flow, kept in the OAuth state so the callback can read it.
+          const body: unknown = ctx.body;
+          if (!isAgeGatedSocialProvider(readField(body, 'provider'))) return;
+          const raw = birthYearFromAdditionalData(body);
+          if (raw === undefined) return;
+          const birthYear = parseBirthYear(raw, new Date().getUTCFullYear());
+          if (birthYear === undefined) {
+            throw APIError.from('BAD_REQUEST', { code: 'INVALID_BIRTH_YEAR', message: 'Birth year is not valid.' });
+          }
+          await addOAuthServerContext({ [SOCIAL_BIRTH_YEAR_KEY]: birthYear });
+          return;
+        }
         case '/device/approve':
         case '/one-time-token/generate': {
           // Handing a session to another screen needs a recent sign-in (ADR 0004 §9).
@@ -368,11 +482,35 @@ export const betterAuthOptions = {
   databaseHooks: {
     user: {
       create: {
-        before: async (user) => {
+        before: async (user, ctx) => {
+          // APP_ALLOWED_EMAILS (app-allowlist.ts): an account created through
+          // a marked app sign-in — or an app-flagged social sign-in — must
+          // hold an allowlisted address. Unmarked flows (OAuth linking,
+          // console, server-side creates) are never read by this check.
+          if (await appSignInAttempt(ctx)) {
+            if (!isAllowedAppEmail(user.email)) throw invalidCredentials();
+          }
           const nowMs = Date.now();
           const currentYear = new Date(nowMs).getUTCFullYear();
-          if (user.birthYear === undefined || user.birthYear === null) return;
-          const birthYear = parseBirthYear(user.birthYear, currentYear);
+          // A new Apple or Google identity takes its birth year from the M04
+          // answer the client attached; without one, no account is created
+          // and the client routes the Caller to the gate (BIRTH_YEAR_REQUIRED).
+          const social = socialProviderForCreate(ctx?.path, ctx?.body, ctx?.params);
+          let rawBirthYear: unknown = user.birthYear;
+          if (social !== undefined && (rawBirthYear === undefined || rawBirthYear === null)) {
+            rawBirthYear =
+              ctx?.path === '/sign-in/social'
+                ? birthYearFromAdditionalData(ctx.body)
+                : readField((await getOAuthState())?.serverContext, SOCIAL_BIRTH_YEAR_KEY);
+            if (rawBirthYear === undefined || rawBirthYear === null) {
+              throw APIError.from('FORBIDDEN', {
+                code: BIRTH_YEAR_REQUIRED,
+                message: 'Answer the birth-year question before making an account.',
+              });
+            }
+          }
+          if (rawBirthYear === undefined || rawBirthYear === null) return;
+          const birthYear = parseBirthYear(rawBirthYear, currentYear);
           if (birthYear === undefined) {
             throw APIError.from('BAD_REQUEST', {
               code: 'INVALID_BIRTH_YEAR',
@@ -387,12 +525,22 @@ export const betterAuthOptions = {
               message: 'A parent or guardian needs to approve this account first.',
             });
           }
+          if (social !== undefined) return { data: { ...user, birthYear } };
         },
       },
     },
     session: {
       create: {
         before: async (session, ctx) => {
+          // APP_ALLOWED_EMAILS (app-allowlist.ts): a session minted by a
+          // marked app sign-in — email, passkey or an app-flagged social
+          // callback — is refused for non-allowlisted accounts. This is the
+          // boundary the before-hook cannot reach: passkey and provider
+          // callbacks carry no email in the request body.
+          if (ctx !== null && ctx !== undefined && (await appSignInAttempt(ctx))) {
+            const accountOwner = await ctx.context.internalAdapter.findUserById(String(session.userId));
+            if (!isAllowedAppEmail(accountOwner?.email)) throw invalidCredentials();
+          }
           const fromOverride: unknown = readField(session, 'surface');
           const surface: Surface = isSurface(fromOverride)
             ? fromOverride

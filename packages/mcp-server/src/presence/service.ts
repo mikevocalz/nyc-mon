@@ -15,11 +15,9 @@ import {
  * app/web's job, published to a Supabase Realtime channel. The Echo is never
  * a producer.
  *
- * Scaffold state: events live in a per-process in-memory ring fed by
- * `ingest()` (the dev tool `inject_presence_event` calls it) and by the
- * Supabase seam below. Swap `subscribeRealtime` for a real
- * `@supabase/supabase-js` channel subscription once credentials exist —
- * noted in FRICTION-LOG.
+ * Hackathon build (ADR 0015 §2): events live in a per-process in-memory ring
+ * fed only by `ingest()`, which the dev-mode `inject_presence_event` tool
+ * calls. Nothing listens to a microphone.
  */
 
 export interface PresentPerson {
@@ -44,17 +42,6 @@ export class PresenceService {
     if (list.length > MAX_EVENTS_PER_CALLER) list.splice(0, list.length - MAX_EVENTS_PER_CALLER);
     this.events.set(event.callerId, list);
     return event;
-  }
-
-  /**
-   * TODO(realtime): subscribe to Supabase channel `presence-events` filtered
-   * by callerId and feed each broadcast payload through `ingest()`.
-   * Signature kept so the swap is one method body.
-   */
-  async subscribeRealtime(_callerId: string): Promise<void> {
-    // TODO(supabase): const channel = supabase.channel(`presence:${callerId}`)
-    //   .on('broadcast', { event: 'presence' }, ({ payload }) => this.ingest(payload))
-    //   .subscribe();
   }
 
   /** Fresh, non-silent detections for a Caller, newest confidence wins. */
@@ -87,8 +74,6 @@ export class PresenceService {
   }
 }
 
-/** Shared instance for the process — one service per server, not per session. */
-export const presenceService = new PresenceService();
 
 export type PresenceEventInput = z.input<typeof PresenceEventSchema>;
 export { PresenceEventSchema };

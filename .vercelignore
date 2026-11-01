@@ -1,0 +1,25 @@
+# CLI deploys upload source only: the build installs its own dependencies.
+node_modules
+**/node_modules
+.git
+.turbo
+**/.turbo
+**/.next
+**/dist
+# Keep each workspace package.json: the frozen install must match pnpm-lock.yaml importers.
+apps/mobile/*
+!apps/mobile/package.json
+apps/storybook/*
+!apps/storybook/package.json
+apps/admin-vite/.vercel
+**/*.blend
+**/*.blend1
+**/*.zip
+**/*.mp4
+tooling/*
+!tooling/copy-viro-web-assets.mjs
+!tooling/copy-skia-web-assets.mjs
+docs
+.p6
+skills
+packages/web-sim/public

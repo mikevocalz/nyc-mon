@@ -1,0 +1,98 @@
+# Alexa+ authorization server: contract for the MCP server
+
+How admin-vite issues tokens for Alexa+ account linking, and what `packages/mcp-server` checks before it trusts one. The decision record is ADR 0016; the Amazon requirements are in `PLATFORM-DOCS.md` §2.3–2.5.
+
+Everything below was checked by `packages/payload/src/auth/oauth/__tests__/provider.test.ts`, which drives the real `@better-auth/oauth-provider` 1.7.7 endpoints with an in-memory database. The JWKS and token-endpoint CORS fixes below came from running the simulator's sign-in against a local admin-vite on 2026-10-23. Nothing has been run against Amazon's account linking or a deployed host.
+
+## Endpoints
+
+`{issuer}` is the admin-vite origin: `AUTH_ISSUER`, else the origin of `BETTER_AUTH_URL` (local: `http://localhost:5174`).
+
+| What | URL |
+|---|---|
+| RFC 8414 metadata | `{issuer}/.well-known/oauth-authorization-server` |
+| Authorization | `{issuer}/payload-api/auth/oauth2/authorize` |
+| Token | `{issuer}/payload-api/auth/oauth2/token` |
+| JWKS | `{issuer}/payload-api/auth/jwks` |
+| Introspection (RFC 7662) | `{issuer}/payload-api/auth/oauth2/introspect` |
+| Revocation (RFC 7009) | `{issuer}/payload-api/auth/oauth2/revoke` |
+
+The PRM document's `authorization_servers` must be `["{issuer}"]`, with no path and no trailing slash. `/.well-known/openid-configuration` answers 404: there is no OIDC.
+
+## Login with Amazon is a sign-in layer, not the Alexa client
+
+There are two separate Amazon-facing identities in this architecture:
+
+1. **`alexa` OAuth client** — the confidential client Alexa+ uses to obtain NYC-MON MCP access/refresh tokens. This is the account-linking protocol described below.
+2. **`amazon` social provider** — optional Login with Amazon (LWA) inside Better Auth. It lets an existing NYC-MON Caller attach an Amazon identity and later use **Continue with Amazon** on the Alexa linking page.
+
+LWA never replaces the `alexa` client and never receives NYC-MON MCP scopes.
+
+The LWA provider is enabled only when `AMAZON_LWA_CLIENT_ID` and `AMAZON_LWA_CLIENT_SECRET` are configured. Its registered return URL is:
+
+`{issuer}/payload-api/auth/callback/amazon`
+
+Locally that is `http://localhost:5174/payload-api/auth/callback/amazon`, and it is the URL the Security Profile's Allowed Return URLs must list. Better Auth 1.7.10 builds the authorize and token `redirect_uri` from `${baseURL}/callback/<id>` and ignores genericOAuth's per-provider `redirectURI`, so Amazon always received this URL, never the legacy callback path we had configured, and rejected it with `lwa-invalid-parameter-bad-redirect-uri-vendor` while the profile did not allow it. The legacy option is gone (3dc13ff).
+
+The provider requests Amazon's `profile` scope, maps the immutable Amazon `user_id` through Better Auth 1.7's `accountSubject`, and keeps implicit sign-up disabled. A person must first have a NYC-MON account and explicitly link Amazon; LWA cannot create an account that bypasses NYC-MON's birth-year/guardian flow.
+
+If LWA is unavailable or unlinked, email/password and passkey remain valid Alexa-linking paths.
+
+## Access tokens
+
+JWTs signed by Better Auth's `jwt` plugin.
+
+| Part | Value |
+|---|---|
+| header `alg` | `EdDSA` (Ed25519) |
+| header `typ` | `at+jwt` (RFC 9068) |
+| header `kid` | a key in the JWKS |
+| `iss` | `{issuer}` |
+| `aud` | `MCP_RESOURCE_URI`, as a single string. Compare it exactly; a trailing slash is a different resource. |
+| `exp` | at most 3600 s after `iat` |
+| `scope` | space-separated string |
+| `client_id`, `azp` | `alexa` or `nyc-mon-sim` |
+| `sub` | the Better Auth user id (the Caller id, ADR 0006 §4) for user tokens; the client id for client-credentials tokens |
+| `birth_year` | integer, user tokens only. The token was refused if the holder failed the 18+ rule at issue time, but re-check `/v1` data anyway. |
+| `jti`, `iat` | standard |
+
+Verify with any JOSE library, for example `jose`: `jwtVerify(token, createRemoteJWKSet(new URL(JWKS)), { issuer, audience: MCP_RESOURCE_URI, algorithms: ['EdDSA'] })`. Cache the JWKS. Keys rotate only if someone rotates them in the `jwks` table.
+
+Until 67de5df the JWKS endpoint answered status 200 with reason "500" and an empty body, and the `jwks` table stayed empty, so no token could be verified. Two bugs stacked: the payload-better-auth adapter sent every `jwks` query to a collection slug `jwkss` that does not exist, and better-call rendered Payload's own `APIError` (same class name) as a better-call error with a default status of 200. Both are fixed by pnpm patches to the adapter, better-call 1.4.2 and @better-auth/core 1.7.10. After the fix `curl {issuer}/payload-api/auth/jwks` returns one EdDSA/Ed25519 key, and any Payload `APIError` inside a Better Auth endpoint answers a real 500 and is logged as `# SERVER_ERROR:`. Details: `docs/FRICTION-LOG.md`.
+
+## Scopes
+
+| Scope | Grant | Meaning for the MCP server |
+|---|---|---|
+| `mcp:service` | client_credentials only | `initialize`, `tools/list`, health. No user; never allow a user tool on it. |
+| `mcp:caller` | authorization_code | Act as the Caller (`sub`). |
+| `mcp:care` | authorization_code | Read status and non-mutating care. |
+| `offline_access` | authorization_code | Added to every user request so a refresh token comes back. Ignore it. |
+
+A user tool called with no token, an expired token or an `mcp:service` token answers 401 (no `WWW-Authenticate` header for Alexa, PLATFORM-DOCS §2.3). That 401 is what starts linking.
+
+## What the server enforces
+
+- `resource` is required on the authorization request and on the `authorization_code` and `client_credentials` token requests, and must equal `MCP_RESOURCE_URI`; anything else gets `invalid_target`. Refresh requests carry no `resource` and keep the original audience.
+- PKCE S256 only. `plain` or a missing challenge redirects back with `invalid_request`.
+- CORS on the token endpoint lists the auth origins plus the redirect origins of public clients. The simulator (`nyc-mon-sim` with no secret) is a public client, so the browser at `http://localhost:5180` posts the code exchange itself; before 22b58d5 CORS blocked it and sign-in ended in "Failed to fetch". Confidential clients (`alexa`) call from a server and are not listed. CSRF checks are unchanged.
+- The token endpoint takes HTTP Basic for `alexa`. Credentials in the query string get `invalid_request`. A wrong secret or unknown client gets 401 `invalid_client`.
+- Refresh tokens rotate on every use. Reusing an old one fails with `invalid_grant` and revokes the rest of that family.
+- 18+ (ADR 0015 §1): `birthYear` from the Users collection with `currentYear - birthYear > 18`, and `consentStatus` must be `not-required`. Checked before consent (refusal page), on consent, and on every code exchange and refresh.
+
+## Env
+
+| Name | Used by |
+|---|---|
+| `AUTH_ISSUER` | both: admin-vite's issuer, the MCP server's expected `iss` |
+| `MCP_RESOURCE_URI` | both: the resource admin-vite accepts, the `aud` the MCP server expects |
+| `OAUTH_ALEXA_CLIENT_ID`, `OAUTH_ALEXA_CLIENT_SECRET`, `OAUTH_ALEXA_REDIRECT_URIS` | admin-vite |
+| `OAUTH_SIM_CLIENT_ID`, `OAUTH_SIM_CLIENT_SECRET`, `OAUTH_SIM_REDIRECT_URIS` | admin-vite |
+| `AMAZON_LWA_CLIENT_ID`, `AMAZON_LWA_CLIENT_SECRET` | Better Auth Login with Amazon provider |
+| `AUTH_JWKS_URL` | MCP server: `{issuer}/payload-api/auth/jwks` |
+
+## Known gaps
+
+- The linking page supports email/password, TOTP and passkey. Login with Amazon is available only after LWA credentials are configured and the Caller has explicitly linked Amazon to the existing NYC-MON account.
+- Migration `20261008_181202_alexa_oauth` is generated but not applied anywhere.
+- Not checked against Amazon: whether Better Auth's origin checks accept Amazon's server-to-server token request.

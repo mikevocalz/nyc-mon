@@ -1,0 +1,11 @@
+{
+  "name": "nyc-gamepad-input",
+  "platforms": ["apple", "android"],
+  "apple": {
+    "podspecPath": "NycGamepadInput.podspec",
+    "modules": []
+  },
+  "android": {
+    "modules": []
+  }
+}

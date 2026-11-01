@@ -8,6 +8,8 @@ const PAGES = [
   { label: 'The Mons', href: '/mons' },
   { label: 'The City', href: '/city' },
   { label: 'How it works', href: '/how-it-works' },
+  // Last, so the site editor's saved link copy (keyed links.0 to links.4) still lines up with the first five.
+  { label: 'Walk the city', href: '/city/walk' },
 ] as const;
 
 /**
@@ -22,8 +24,12 @@ export const NAV_CTA: NavCta = WAITLIST_CTA;
 /** The id of the content wrapper the header's skip link jumps to. */
 export const CONTENT_ID = 'content';
 
-export const isActive = (pathname: string, href: string) =>
-  href === '/' ? pathname === '/' : pathname.startsWith(href);
+/** The longest page href the path sits under, so /city/walk marks "Walk the city" and not "The City" too. */
+export const isActive = (pathname: string, href: string) => {
+  const under = (h: string) => (h === '/' ? pathname === '/' : pathname === h || pathname.startsWith(`${h}/`));
+  if (!under(href)) return false;
+  return !PAGES.some((page) => page.href !== href && page.href.length > href.length && under(page.href));
+};
 
 /** Header items with the current route marked. */
 export const navItems = (pathname: string): NavItem[] =>
@@ -45,6 +51,7 @@ export const FOOTER_GROUPS: FooterLinkGroup[] = [
       { label: 'The Mons', href: '/mons' },
       { label: 'The City', href: '/city' },
       { label: 'How it works', href: '/how-it-works' },
+      { label: 'Walk the city', href: '/city/walk' },
     ],
   },
   {

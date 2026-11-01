@@ -20,4 +20,4 @@ Gate: copy and factual assets are established above; independent contract review
 - Initial reduced motion: no timeline. Live change to reduce: revert/dispose immediately. Switching back does not replay the already-complete/static introduction. Missing IntersectionObserver or failed lazy import: static composition. Missing targets: skip before creating any timeline. A failed image keeps reserved geometry, alt/caption and district text; do not substitute a fabricated image.
 - Async import completion after unmount cannot create a timeline. Observer, media listener and timeline have one owner, idempotent cleanup, and repeated visibility callbacks cannot replay.
 
-The isolated local worktree was explicitly requested for this task to preserve an independently paused patch; it is a scoped exception to repository R1, not a new default. The atlas is composition of existing kit primitives, with no new app-only primitive or UI package.
+The atlas is composition of existing kit primitives, with no new app-only primitive or UI package.

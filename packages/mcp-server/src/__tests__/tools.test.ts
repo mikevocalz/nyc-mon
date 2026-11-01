@@ -1,0 +1,579 @@
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { FALLBACK_MON_LINGO, type MonLingo } from '@acme/content/lingo';
+import { checkLimitedSpeech, deriveMonInstanceId, deriveVoiceLineageId, isBabble, REAL_WORD_BLOCKLIST, speechTokens } from '@acme/core';
+import { babbleInventory } from '@acme/content/voice';
+import { deviceIdFor } from '../data/v1.ts';
+import { callTool, fakeV1, NOW, row, rpc, SERVICE_KEY, start, type Running } from './harness.ts';
+
+let running: Running | undefined;
+afterEach(async () => {
+  await running?.close();
+  running = undefined;
+});
+
+interface ToolResponse {
+  isError?: boolean;
+  content: { type: string; text: string }[];
+  structuredContent: Record<string, unknown> & { error?: { reason: string; message: string; nextStep: string } };
+}
+
+async function call(name: string, args: Record<string, unknown> = {}, id: number = nextId++): Promise<ToolResponse> {
+  if (running === undefined) throw new Error('server not started');
+  const response = await rpc(running, callTool(name, args, id), { token: 'adult', protocolVersion: '2025-11-25' });
+  expect(response.status).toBe(200);
+  const body = (await response.json()) as { result?: ToolResponse; error?: unknown };
+  if (body.result === undefined) throw new Error(`JSON-RPC error: ${JSON.stringify(body.error)}`);
+  return body.result;
+}
+
+const ADULT = 'caller-adult';
+const HOUR = 3_600_000;
+let nextId = 100;
+
+describe('read tools', () => {
+  it('get_mon_status returns current meters, mood and needs', async () => {
+    running = await start({ v1: fakeV1({ rows: [row(ADULT, { fullness: 0.1 })] }) });
+    const result = await call('get_mon_status');
+    expect(result.isError).toBeFalsy();
+    expect(result.structuredContent).toMatchObject({
+      mon: { monId: 'mon_ratti', name: 'Ratti', stage: 'Baby' },
+      care: { activity: 'awake' },
+      mood: 'needs-fullness',
+    });
+    expect(result.structuredContent.needs).toContain('fullness');
+    expect(JSON.parse(result.content[0]?.text ?? '')).toEqual(result.structuredContent);
+  });
+
+  it('exposes the Mon gender and voice lineage in structured content, with the voice stage', async () => {
+    running = await start({ v1: fakeV1({ rows: [row(ADULT)] }) });
+    for (const tool of ['get_mon_status', 'check_on_mon']) {
+      const result = await call(tool);
+      expect(result.structuredContent.mon, tool).toMatchObject({
+        gender: 'female',
+        voice: { lineageId: 'dex-001/female/3', stage: 'Baby' },
+      });
+    }
+  });
+
+  it('reads mon.voice and the voice guide from the lingo Payload serves, revalidating by ETag', async () => {
+    const served: MonLingo = { ...FALLBACK_MON_LINGO, voices: { ...FALLBACK_MON_LINGO.voices, lineages: [] }, guide: [{ ...FALLBACK_MON_LINGO.guide[0]!, text: 'Served rule only.' }] };
+    // Past its first day, so the served rules apply (a first-day Baby gets babble guidance only).
+    const v1 = fakeV1({ rows: [row(ADULT, {}, { hatchedAt: NOW - 25 * HOUR })], lingo: served });
+    running = await start({ v1 });
+    const talk = await call('talk_to_mon');
+    expect(talk.structuredContent.mon).toMatchObject({ voice: { lineageId: 'dex-001/female/3', stage: 'Baby', voiceStage: 'limited', voiced: false } });
+    expect(talk.structuredContent.voiceGuide).toContain('Served rule only.');
+    const lingoCalls = v1.calls.filter((c) => c.path === '/v1/mon-lingo');
+    expect(lingoCalls.length).toBeGreaterThan(1);
+    expect(lingoCalls[0]?.headers.get('if-none-match')).toBeNull();
+    expect(lingoCalls.at(-1)?.headers.get('if-none-match')).toMatch(/^"\d+"$/);
+  });
+
+  it('keeps working on the bundled lingo when /v1/mon-lingo is down', async () => {
+    running = await start({ v1: fakeV1({ rows: [row(ADULT)], lingo: null }) });
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const talk = await call('talk_to_mon');
+    errors.mockRestore();
+    expect(talk.isError).toBeFalsy();
+    expect(talk.structuredContent.mon).toMatchObject({ voice: { lineageId: 'dex-001/female/3', stage: 'Baby', voiced: true } });
+    expect((talk.structuredContent.voiceGuide as string[]).length).toBeGreaterThan(0);
+  });
+
+  it('reports gender and voice as null for a Mon hatched before either existed', async () => {
+    running = await start({ v1: fakeV1({ rows: [row(ADULT, {}, { gender: null, voiceLineageId: null })] }) });
+    const result = await call('get_mon_status');
+    expect(result.isError).toBeFalsy();
+    expect(result.structuredContent.mon).toMatchObject({ gender: null, voice: null });
+  });
+
+  it('check_on_mon suggests the care that helps most', async () => {
+    running = await start({ v1: fakeV1({ rows: [row(ADULT, { fullness: 0.1, social: 0.1 })] }) });
+    const result = await call('check_on_mon');
+    expect(result.structuredContent).toMatchObject({ mood: 'needs-fullness', suggestedCare: ['feed', 'play'] });
+    expect(result.structuredContent).not.toHaveProperty('presentPeople');
+  });
+
+  it('check_on_mon picks the named Mon when monId is given', async () => {
+    const second = row(ADULT, {}, { monInstanceId: 'mon_older', nickname: 'Pidge', hatchedAt: NOW - 86_400_000 });
+    running = await start({ v1: fakeV1({ rows: [row(ADULT), second] }) });
+    expect((await call('check_on_mon')).structuredContent).toMatchObject({ mon: { name: 'Ratti' } });
+    expect((await call('check_on_mon', { monId: 'mon_older' })).structuredContent).toMatchObject({ mon: { name: 'Pidge' } });
+  });
+
+  describe('which Mon answers when no monId is given', () => {
+    // mon_ratti hatched an hour ago; mon_chosen hatched a day ago and is the companion.
+    const chosen = () => row(ADULT, {}, { monInstanceId: 'mon_chosen', nickname: 'Pidge', hatchedAt: NOW - 86_400_000, voiceLineageId: 'dex-001/male/2' });
+
+    it('answers for the chosen companion, not a Mon hatched after it', async () => {
+      running = await start({ v1: fakeV1({ rows: [chosen(), row(ADULT)], active: { [ADULT]: 'mon_chosen' } }) });
+      for (const tool of ['get_mon_status', 'check_on_mon', 'talk_to_mon']) {
+        expect((await call(tool)).structuredContent, tool).toMatchObject({ mon: { monId: 'mon_chosen', name: 'Pidge' } });
+      }
+      expect((await call('get_mon_status')).structuredContent.mon).toMatchObject({ voice: { lineageId: 'dex-001/male/2' } });
+    });
+
+    it('applies care to the chosen companion', async () => {
+      const v1 = fakeV1({ rows: [chosen(), row(ADULT, { fullness: 0.1 })], active: { [ADULT]: 'mon_chosen' } });
+      running = await start({ v1 });
+      await call('feed_mon');
+      expect(v1.calls.find((c) => c.method === 'PUT')?.path).toBe('/v1/mons/mon_chosen/care');
+    });
+
+    it('falls back to the most recently hatched Mon when no companion is chosen', async () => {
+      running = await start({ v1: fakeV1({ rows: [chosen(), row(ADULT)], active: { [ADULT]: null } }) });
+      expect((await call('check_on_mon')).structuredContent).toMatchObject({ mon: { monId: 'mon_ratti' } });
+    });
+
+    it('falls back when the chosen id names no Mon the Caller owns', async () => {
+      running = await start({ v1: fakeV1({ rows: [chosen(), row(ADULT)], active: { [ADULT]: 'mon_gone' } }) });
+      expect((await call('check_on_mon')).structuredContent).toMatchObject({ mon: { monId: 'mon_ratti' } });
+    });
+
+    it('falls back when /v1 predates the field', async () => {
+      running = await start({ v1: fakeV1({ rows: [chosen(), row(ADULT)] }) });
+      expect((await call('check_on_mon')).structuredContent).toMatchObject({ mon: { monId: 'mon_ratti' } });
+    });
+
+    it('a named monId still wins over the chosen companion', async () => {
+      running = await start({ v1: fakeV1({ rows: [chosen(), row(ADULT)], active: { [ADULT]: 'mon_chosen' } }) });
+      expect((await call('check_on_mon', { monId: 'mon_ratti' })).structuredContent).toMatchObject({ mon: { monId: 'mon_ratti' } });
+    });
+  });
+
+  it('check_incubation reports minutes left and readiness from /v1/me/eggs', async () => {
+    const egg = {
+      eggId: 'egg_1',
+      monInstanceId: 'mon_egg_1',
+      speciesId: 'dex-001',
+      hatchesIntoSpeciesId: 'dex-002',
+      callerId: ADULT,
+      nickname: null,
+      incubationMinutes: 30 as const,
+      createdAt: NOW - 20 * 60_000,
+      incubationEndsAt: NOW + 10 * 60_000,
+    };
+    const v1 = fakeV1({ eggs: [egg] });
+    running = await start({ v1 });
+    const result = await call('check_incubation');
+    // Every field an older client read is unchanged; voice, say and speechRule are additions.
+    expect(result.structuredContent).toMatchObject({
+      incubating: true,
+      eggs: [{ eggId: 'egg_1', speciesId: 'dex-001', incubationEndsAt: NOW + 600_000, minutesRemaining: 10, readyToHatch: false }],
+    });
+    expect(v1.calls[0]?.path).toBe('/v1/me/eggs');
+  });
+
+  it('check_incubation says nothing is incubating when there are no eggs', async () => {
+    running = await start();
+    expect((await call('check_incubation')).structuredContent).toEqual({ incubating: false, eggs: [] });
+  });
+
+  it('talk_to_mon returns state for the client model and writes nothing', async () => {
+    const v1 = fakeV1({ rows: [row(ADULT)] });
+    running = await start({ v1 });
+    const result = await call('talk_to_mon');
+    expect(result.structuredContent).toMatchObject({ mon: { name: 'Ratti' }, activity: 'awake', speaker: { kind: 'caller' } });
+    expect(v1.calls.every((c) => c.method === 'GET')).toBe(true);
+  });
+});
+
+describe('care tools', () => {
+  it('feed_mon shares a meal through PUT /v1/mons/:id/care with no food item', async () => {
+    const v1 = fakeV1({ rows: [row(ADULT, { fullness: 0.2 })] });
+    running = await start({ v1 });
+    const result = await call('feed_mon');
+    expect(result.structuredContent).toMatchObject({ applied: true, effect: 'eaten' });
+    const put = v1.calls.find((c) => c.method === 'PUT');
+    expect(put?.path).toBe('/v1/mons/mon_ratti/care');
+    const write = (put?.body as { writes: Record<string, unknown>[] }).writes[0];
+    expect(write).toMatchObject({ action: { kind: 'feed' }, monInstanceId: 'mon_ratti', at: NOW, deviceId: deviceIdFor(ADULT) });
+    expect(put?.headers.get('X-NYC-MON-Service-Key')).toBe(SERVICE_KEY);
+    expect(put?.headers.get('X-NYC-MON-On-Behalf-Of')).toBe(ADULT);
+    expect(put?.headers.get('authorization')).toBeNull();
+  });
+
+  it('rest_mon then wake_mon round-trips through /v1', async () => {
+    const v1 = fakeV1({ rows: [row(ADULT, { energy: 0.9 })] });
+    running = await start({ v1 });
+    expect((await call('rest_mon')).structuredContent).toMatchObject({ applied: true, effect: 'fell-asleep', care: { activity: 'asleep' } });
+    expect((await call('wake_mon')).structuredContent).toMatchObject({ applied: true, effect: 'woke', care: { activity: 'awake' } });
+  });
+
+  it('play_with_mon sends the requested quality', async () => {
+    const v1 = fakeV1({ rows: [row(ADULT, { energy: 0.9, social: 0.2 })] });
+    running = await start({ v1 });
+    const result = await call('play_with_mon', { quality: 0.8 });
+    expect(result.structuredContent).toMatchObject({ applied: true, effect: 'played' });
+    const write = (v1.calls.find((c) => c.method === 'PUT')?.body as { writes: { action: unknown }[] }).writes[0];
+    expect(write?.action).toEqual({ kind: 'play', quality: 0.8 });
+  });
+
+  it('a declined action writes nothing and says why', async () => {
+    const v1 = fakeV1({ rows: [row(ADULT, { activity: { kind: 'asleep', since: NOW - 60_000 }, energy: 0.2 })] });
+    running = await start({ v1 });
+    const result = await call('feed_mon');
+    expect(result.isError).toBeFalsy();
+    expect(result.structuredContent).toMatchObject({ applied: false, declinedBecause: 'asleep' });
+    expect(v1.calls.some((c) => c.method === 'PUT')).toBe(false);
+  });
+
+  it('reuses key, seq and time only for an explicit retry-stable intent UUID', async () => {
+    const v1 = fakeV1({ rows: [row(ADULT, { fullness: 0.2 })] });
+    running = await start({ v1 });
+    const intentId = '43e358c8-97b5-4fd9-9217-70e0e65f6df4';
+    const first = await call('feed_mon', { intentId }, 7);
+    const resent = await call('feed_mon', { intentId }, 7);
+    expect(first.structuredContent).toMatchObject({ applied: true, effect: 'eaten' });
+    const puts = v1.calls.filter((c) => c.method === 'PUT');
+    expect(puts).toHaveLength(2);
+    expect(puts[1]?.headers.get('Idempotency-Key')).toBe(puts[0]?.headers.get('Idempotency-Key'));
+    expect(puts[1]?.body).toEqual(puts[0]?.body);
+    expect(v1.rows[0]?.care.fullness).toBeCloseTo(0.55);
+    expect((resent.structuredContent.care as { fullness: number }).fullness).toBeCloseTo(0.55);
+  });
+
+  it('separate care intents never collide when JSON-RPC ids are reused', async () => {
+    const v1 = fakeV1({ rows: [row(ADULT, { fullness: 0.2 })] });
+    running = await start({ v1 });
+    await call('feed_mon', {}, 7);
+    await call('feed_mon', {}, 7);
+    const puts = v1.calls.filter((c) => c.method === 'PUT');
+    expect(puts).toHaveLength(2);
+    expect(puts[0]?.headers.get('Idempotency-Key')).not.toBe(puts[1]?.headers.get('Idempotency-Key'));
+  });
+
+  it('a timed-out PUT that landed is confirmed by a re-read and reported once', async () => {
+    const v1 = fakeV1({ rows: [row(ADULT, { fullness: 0.2 })], timeoutAfterApplyOnce: true });
+    running = await start({ v1 });
+    const result = await call('feed_mon', {}, 8);
+    expect(result.isError).toBeFalsy();
+    expect(result.structuredContent).toMatchObject({ applied: true, effect: 'eaten' });
+    expect(v1.calls.filter((c) => c.path !== '/v1/mon-lingo').map((c) => `${c.method} ${c.path}`)).toEqual([
+      'GET /v1/me/mons',
+      'PUT /v1/mons/mon_ratti/care',
+      'GET /v1/me/mons',
+    ]);
+    expect(v1.rows[0]?.care.fullness).toBeCloseTo(0.55);
+  });
+
+  it('a PUT dropped before it applied says it could not confirm, and the resend applies exactly once', async () => {
+    const v1 = fakeV1({ rows: [row(ADULT, { fullness: 0.2 })], dropBeforeApplyOnce: true });
+    running = await start({ v1 });
+    const dropped = await call('feed_mon', {}, 9);
+    expect(dropped.isError).toBe(true);
+    expect(dropped.structuredContent.error?.reason).toBe('not-confirmed');
+    expect(dropped.content[0]?.text).toBe("I couldn't confirm that went through. Ask how your Mon is doing to check before trying again.");
+    expect(v1.rows[0]?.care.fullness).toBe(0.2);
+    expect((await call('feed_mon', {}, 9)).structuredContent).toMatchObject({ applied: true });
+    expect(v1.rows[0]?.care.fullness).toBeCloseTo(0.55);
+  });
+
+  it('sends a stable device id, a monotonic seq, and an Idempotency-Key per write', async () => {
+    const v1 = fakeV1({ rows: [row(ADULT, { energy: 1, social: 0.1 })] });
+    running = await start({ v1 });
+    await call('play_with_mon', { quality: 0.5 });
+    await call('play_with_mon', { quality: 0.5 });
+    const puts = v1.calls.filter((c) => c.method === 'PUT');
+    expect(puts).toHaveLength(2);
+    const writes = puts.map((p) => (p.body as { writes: { deviceId: string; seq: number }[] }).writes[0]);
+    expect(writes[0]?.deviceId).toBe(writes[1]?.deviceId);
+    expect(writes[1]?.seq).toBeGreaterThan(writes[0]?.seq ?? Infinity);
+    const keys = puts.map((p) => p.headers.get('Idempotency-Key'));
+    expect(keys[0]).toMatch(/^mcp-care-[0-9a-f]{40}$/);
+    expect(keys[0]).not.toBe(keys[1]);
+  });
+
+  it('returns no-mon when the Caller has not hatched a Mon', async () => {
+    running = await start();
+    const result = await call('feed_mon');
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent.error?.reason).toBe('no-mon');
+  });
+
+  it('returns mon-not-found for an unknown monId', async () => {
+    running = await start({ v1: fakeV1({ rows: [row(ADULT)] }) });
+    expect((await call('rest_mon', { monId: 'mon_nope' })).structuredContent.error?.reason).toBe('mon-not-found');
+  });
+
+  it('rejects a quality outside 0..1 as invalid input', async () => {
+    running = await start({ v1: fakeV1({ rows: [row(ADULT)] }) });
+    const result = await call('play_with_mon', { quality: 3 });
+    expect(result.isError).toBe(true);
+  });
+});
+
+describe('errors stay human', () => {
+  it('turns a /v1 outage into plain text with a next step and no codes', async () => {
+    const broken = { fetch: (async () => new Response('nope', { status: 502 })) as typeof fetch, calls: [], rows: [] };
+    running = await start({ v1: broken });
+    const result = await call('get_mon_status');
+    expect(result.isError).toBe(true);
+    expect(result.content[0]?.text).toBe("NYC-MON can't reach your Mon right now. Try again in a minute.");
+    expect(result.content[0]?.text).not.toMatch(/502|unavailable|_|\{/);
+  });
+});
+
+describe('familiar people (dev mode, fictional fixtures)', () => {
+  async function injectJames(confidence = 0.95) {
+    return call('inject_presence_event', { personId: 'person-james', confidence });
+  }
+
+  it('lists the seeded fictional people', async () => {
+    running = await start({ devMode: true });
+    const people = (await call('get_familiar_people')).structuredContent.people as { displayName: string; fictional: boolean }[];
+    expect(people.map((p) => p.displayName)).toEqual(['James', 'Dana']);
+    expect(people.every((p) => p.fictional)).toBe(true);
+  });
+
+  it('shows James present after a presence event, and in check_on_mon', async () => {
+    running = await start({ devMode: true, v1: fakeV1({ rows: [row(ADULT)] }) });
+    expect((await injectJames()).isError).toBeFalsy();
+    expect((await call('get_present_people')).structuredContent.people).toEqual([
+      { personId: 'person-james', displayName: 'James', tier: 'present', confidence: 0.95 },
+    ]);
+    expect((await call('check_on_mon')).structuredContent.presentPeople).toHaveLength(1);
+  });
+
+  it('refuses a meal from James but lets him play (the demo beat)', async () => {
+    const v1 = fakeV1({ rows: [row(ADULT, { energy: 1, fullness: 0.2 })] });
+    running = await start({ devMode: true, v1 });
+    await injectJames();
+    const feed = await call('feed_mon', { speakerHint: { personId: 'person-james' } });
+    expect(feed.isError).toBe(true);
+    expect(feed.structuredContent.error).toMatchObject({ reason: 'not-permitted', speaker: { kind: 'familiar', displayName: 'James' } });
+    expect(v1.calls.some((c) => c.method === 'PUT')).toBe(false);
+    const play = await call('play_with_mon', { speakerHint: { personId: 'person-james' } });
+    expect(play.structuredContent).toMatchObject({ applied: true });
+  });
+
+  it('talk_to_mon reads speakerHint and names the speaker', async () => {
+    running = await start({ devMode: true, v1: fakeV1({ rows: [row(ADULT)] }) });
+    await injectJames();
+    const result = await call('talk_to_mon', { speakerHint: { personId: 'person-james' } });
+    expect(result.structuredContent.speaker).toEqual({ kind: 'familiar', personId: 'person-james', displayName: 'James' });
+  });
+
+  it('a speaker hint with no presence event narrows to talking only', async () => {
+    running = await start({ devMode: true, v1: fakeV1({ rows: [row(ADULT)] }) });
+    const talk = await call('talk_to_mon', { speakerHint: { personId: 'person-dana' } });
+    expect(talk.structuredContent.speaker).toEqual({ kind: 'unverified', personId: 'person-dana' });
+    expect((await call('rest_mon', { speakerHint: { personId: 'person-dana' } })).structuredContent.error?.reason).toBe('not-permitted');
+  });
+
+  it('acknowledge_person records a memory only for someone present', async () => {
+    running = await start({ devMode: true });
+    expect((await call('acknowledge_person', { personId: 'person-james', acknowledgedAs: 'greeted' })).structuredContent.error?.reason).toBe(
+      'not-detected',
+    );
+    await injectJames();
+    expect((await call('acknowledge_person', { personId: 'person-james', acknowledgedAs: 'greeted' })).isError).toBeFalsy();
+    const memories = (await call('get_shared_memories', { personId: 'person-james' })).structuredContent.memories as { summary: string }[];
+    expect(memories.map((m) => m.summary)).toEqual(['Greeted James.', 'Played Peek on the stoop after school.']);
+  });
+
+  it('answers person-not-found for an unknown person on every person tool', async () => {
+    running = await start({ devMode: true });
+    for (const name of ['get_person_relationship', 'get_shared_memories', 'inject_presence_event']) {
+      const args = name === 'inject_presence_event' ? { personId: 'person-x', confidence: 0.9 } : { personId: 'person-x' };
+      expect((await call(name, args)).structuredContent.error?.reason).toBe('person-not-found');
+    }
+    const relationship = await call('get_person_relationship', { personId: 'person-james' });
+    expect(relationship.structuredContent).toMatchObject({ person: { relationship: 'friend', permissions: { feed: false } } });
+  });
+});
+
+describe('hatch_egg', () => {
+  const metroEgg = (endsIn: number, eggId = 'egg_metro', callerId = ADULT) => ({
+    eggId,
+    monInstanceId: deriveMonInstanceId(eggId),
+    speciesId: 'dex-001',
+    hatchesIntoSpeciesId: 'dex-002',
+    callerId,
+    nickname: null,
+    incubationMinutes: 15 as const,
+    createdAt: NOW + endsIn - 15 * 60_000,
+    incubationEndsAt: NOW + endsIn,
+  });
+  // Lil' Ratti is the chosen companion; the egg hatches beside it.
+  const ratti = () => row(ADULT, {}, { monInstanceId: 'mon_lil_ratti', speciesId: 'dex-003', nickname: null, stage: 'Small' });
+
+  it('hatches a ready egg into Squeaklet and says it is hatching', async () => {
+    const v1 = fakeV1({ rows: [ratti()], eggs: [metroEgg(-60_000)], active: { [ADULT]: 'mon_lil_ratti' } });
+    running = await start({ v1 });
+    const result = await call('hatch_egg');
+    expect(result.isError).toBeFalsy();
+    expect(result.structuredContent).toMatchObject({
+      hatched: true,
+      alreadyHatched: false,
+      hatching: true,
+      egg: { eggId: 'egg_metro', speciesId: 'dex-001' },
+      mon: { monId: deriveMonInstanceId('egg_metro'), speciesId: 'dex-002', stage: 'Baby' },
+      care: { activity: 'awake' },
+    });
+    const post = v1.calls.find((c) => c.method === 'POST');
+    expect(post?.path).toBe('/v1/eggs/egg_metro/hatch');
+    expect(post?.headers.get('X-NYC-MON-Service-Key')).toBe(SERVICE_KEY);
+    expect(post?.headers.get('X-NYC-MON-On-Behalf-Of')).toBe(ADULT);
+    // A stored 409 would replay forever; the route is idempotent without a key.
+    expect(post?.headers.get('Idempotency-Key')).toBeNull();
+    // The companion is still Lil' Ratti.
+    expect((await call('check_on_mon')).structuredContent).toMatchObject({ mon: { monId: 'mon_lil_ratti' } });
+  });
+
+  it('refuses before incubation ends, with the minutes left, and writes nothing', async () => {
+    const v1 = fakeV1({ eggs: [metroEgg(12 * 60_000 - 5_000)] });
+    running = await start({ v1 });
+    const result = await call('hatch_egg');
+    expect(result.isError).toBe(true);
+    expect(result.content[0]?.text).toBe("Your egg isn't ready yet — about 12 minutes left. Ask me to hatch it then.");
+    expect(result.structuredContent.error).toMatchObject({ reason: 'egg-not-ready', minutesRemaining: 12 });
+    expect(v1.calls.some((c) => c.method === 'POST')).toBe(false);
+  });
+
+  it('says "1 minute" in the singular', async () => {
+    running = await start({ v1: fakeV1({ eggs: [metroEgg(20_000)] }) });
+    expect((await call('hatch_egg')).content[0]?.text).toContain('about 1 minute left.');
+  });
+
+  it("surfaces the server's NOT_READY as the same plain refusal", async () => {
+    // Listed as ready on our clock, still incubating on the server's.
+    const egg = metroEgg(-1);
+    const v1 = fakeV1({ eggs: [{ ...egg, incubationEndsAt: NOW + 1 }] });
+    // The fake lists readiness against NOW; make our clock run ahead of it.
+    running = await start({ v1, now: () => NOW + 30_000 });
+    const result = await call('hatch_egg');
+    expect(result.structuredContent.error).toMatchObject({ reason: 'egg-not-ready' });
+    expect(result.content[0]?.text).toMatch(/^Your egg isn't ready yet — about \d+ minutes? left\./);
+  });
+
+  it('is idempotent: the same egg again returns the same Mon and does not replay the hatch', async () => {
+    const v1 = fakeV1({ eggs: [metroEgg(-60_000)] });
+    running = await start({ v1 });
+    const first = await call('hatch_egg', { eggId: 'egg_metro' });
+    const again = await call('hatch_egg', { eggId: 'egg_metro' });
+    expect(again.isError).toBeFalsy();
+    expect(again.structuredContent).toMatchObject({ alreadyHatched: true, hatching: false, mon: { monId: (first.structuredContent.mon as { monId: string }).monId } });
+    expect(v1.rows.filter((r) => r.mon.speciesId === 'dex-002')).toHaveLength(1);
+  });
+
+  it('with no egg says so in plain words', async () => {
+    running = await start({ v1: fakeV1({ rows: [ratti()] }) });
+    const result = await call('hatch_egg');
+    expect(result.structuredContent.error?.reason).toBe('no-egg');
+    expect(result.content[0]?.text).toBe("You don't have an egg waiting to hatch. Ask how your Mon is doing instead.");
+  });
+
+  it("never hatches another Caller's egg", async () => {
+    running = await start({ v1: fakeV1({ eggs: [metroEgg(-60_000, 'egg_theirs', 'someone-else')] }) });
+    expect((await call('hatch_egg', { eggId: 'egg_theirs' })).structuredContent.error?.reason).toBe('no-egg');
+  });
+
+  it('is Caller-only: a familiar or unverified voice is refused before anything is read', async () => {
+    const v1 = fakeV1({ eggs: [metroEgg(-60_000)] });
+    running = await start({ devMode: true, v1 });
+    await call('inject_presence_event', { personId: 'person-dana', confidence: 0.95 });
+    for (const personId of ['person-dana', 'person-james']) {
+      const result = await call('hatch_egg', { speakerHint: { personId } });
+      expect(result.structuredContent.error?.reason, personId).toBe('not-permitted');
+    }
+    expect(v1.calls.some((c) => c.path.startsWith('/v1/eggs') || c.path === '/v1/me/eggs')).toBe(false);
+  });
+});
+
+describe('voice stage on the Alexa path (Decision 32)', () => {
+  interface Say {
+    text: string;
+    caption: string;
+    voiceStage: string;
+    verbatim: boolean;
+  }
+  const blocked = (text: string) => speechTokens(text).filter((t) => REAL_WORD_BLOCKLIST.includes(t));
+  const babbleOk = (say: Say, lineageId: string, stage: 'Egg' | 'Baby') => {
+    const inventory = babbleInventory({ lineageId }, stage, FALLBACK_MON_LINGO);
+    expect(isBabble(say.text, inventory), say.text).toBe(true);
+    expect(blocked(say.text), say.text).toEqual([]);
+    expect(say.text).not.toMatch(/call/i);
+  };
+  const incubating = {
+    eggId: 'egg_talk',
+    monInstanceId: 'mon_egg_talk',
+    speciesId: 'dex-001',
+    hatchesIntoSpeciesId: 'dex-002',
+    callerId: ADULT,
+    nickname: null,
+    incubationMinutes: 30 as const,
+    createdAt: NOW - 20 * 60_000,
+    incubationEndsAt: NOW + 10 * 60_000,
+  };
+
+  it('an incubating egg babbles: check_incubation hands Alexa a verbatim babble line', async () => {
+    running = await start({ v1: fakeV1({ eggs: [incubating] }) });
+    const result = await call('check_incubation');
+    const egg = (result.structuredContent.eggs as { voice: unknown; say: Say }[])[0]!;
+    const lineageId = deriveVoiceLineageId(incubating);
+    expect(egg.voice).toEqual({ lineageId, stage: 'Egg', voiceStage: 'baby-talk' });
+    expect(egg.say).toMatchObject({ voiceStage: 'baby-talk', verbatim: true });
+    babbleOk(egg.say, lineageId, 'Egg');
+    expect(egg.say.caption.length).toBeGreaterThan(0);
+    expect(result.structuredContent.speechRule).toMatch(/say\.text/);
+  });
+
+  it('talking to an egg with no Mon yet still answers with the egg babble', async () => {
+    running = await start({ v1: fakeV1({ eggs: [incubating] }) });
+    const result = await call('talk_to_mon');
+    expect(result.structuredContent.error?.reason).toBe('no-mon');
+    const egg = (result.structuredContent.error as unknown as { egg: { eggId: string; say: Say } }).egg;
+    expect(egg.eggId).toBe('egg_talk');
+    babbleOk(egg.say, deriveVoiceLineageId(incubating), 'Egg');
+  });
+
+  it('a Baby an hour after hatching babbles only, the same line for the same turn', async () => {
+    running = await start({ v1: fakeV1({ rows: [row(ADULT, {}, { hatchedAt: NOW - HOUR })] }) });
+    const first = await call('talk_to_mon');
+    const say = first.structuredContent.say as Say;
+    expect(first.structuredContent.mon).toMatchObject({ voice: { voiceStage: 'baby-talk' } });
+    expect(say).toMatchObject({ voiceStage: 'baby-talk', verbatim: true });
+    babbleOk(say, 'dex-001/female/3', 'Baby');
+    expect(first.structuredContent.speechRule).toMatch(/exactly/);
+    expect((first.structuredContent.voiceGuide as string[]).join(' ')).toMatch(/baby talk only/i);
+    expect((await call('talk_to_mon')).structuredContent.say).toEqual(say);
+  });
+
+  it('care results for a first-day Baby carry the babble line too', async () => {
+    running = await start({ v1: fakeV1({ rows: [row(ADULT, { fullness: 0.2 }, { hatchedAt: NOW - HOUR })] }) });
+    const fed = await call('feed_mon');
+    expect(fed.structuredContent.applied).toBe(true);
+    babbleOk(fed.structuredContent.say as Say, 'dex-001/female/3', 'Baby');
+  });
+
+  it('a Baby 25 hours after hatching is limited: a canon line within the limit, no Callah', async () => {
+    running = await start({ v1: fakeV1({ rows: [row(ADULT, {}, { hatchedAt: NOW - 25 * HOUR })] }) });
+    const result = await call('talk_to_mon');
+    const say = result.structuredContent.say as Say;
+    expect(result.structuredContent.mon).toMatchObject({ voice: { voiceStage: 'limited' } });
+    expect(say).toMatchObject({ voiceStage: 'limited', verbatim: false });
+    const inventory = babbleInventory({ lineageId: 'dex-001/female/3' }, 'Baby', FALLBACK_MON_LINGO);
+    expect(checkLimitedSpeech(say.text, inventory)).toEqual({ ok: true });
+    expect(say.text).not.toMatch(/call/i);
+    expect(result.structuredContent.speechRule).toMatch(/two words/);
+    expect(result.structuredContent.speechRule).toMatch(/Callah/);
+  });
+
+  it('a Small speaks in full: no forced line and no speech rule', async () => {
+    running = await start({ v1: fakeV1({ rows: [row(ADULT, {}, { stage: 'Small', speciesId: 'dex-003' })] }) });
+    for (const tool of ['talk_to_mon', 'check_on_mon', 'get_mon_status']) {
+      const result = await call(tool);
+      expect(result.structuredContent.mon, tool).toMatchObject({ voice: { voiceStage: 'full' } });
+      expect(result.structuredContent.say, tool).toBeUndefined();
+      expect(result.structuredContent.speechRule, tool).toBeUndefined();
+    }
+  });
+
+  it('a just-hatched Baby from hatch_egg babbles its first sound', async () => {
+    const ready = { ...incubating, eggId: 'egg_ready', monInstanceId: deriveMonInstanceId('egg_ready'), incubationEndsAt: NOW - 60_000 };
+    running = await start({ v1: fakeV1({ eggs: [ready] }) });
+    const result = await call('hatch_egg');
+    expect(result.structuredContent.hatched).toBe(true);
+    babbleOk(result.structuredContent.say as Say, deriveVoiceLineageId(ready), 'Baby');
+  });
+});

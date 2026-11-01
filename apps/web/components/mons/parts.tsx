@@ -2,6 +2,7 @@ import { Image, TONE_CLASSES, type ControlTone, type ImageProps } from '@acme/ui
 import { Figcaption, Figure, Text } from '@acme/ui/html';
 import { View } from '@acme/ui/tw';
 import { artPosition, type ArtEntry } from '../home/art';
+import { ComingSoonArt } from '../home/ComingSoonArt';
 import { PlaceCaption } from '../home/PlaceCaption';
 import { W02_COPY } from './copy';
 
@@ -12,16 +13,18 @@ export const dexDigits = (dexId: number) => String(dexId).padStart(3, '0');
  * A picture filling its box. The box (aspect, size, border) comes from the
  * caller. `drift` wraps the image in a layer that overhangs the box by the
  * largest parallax step, so a scrubbed drift (motion.ts) never shows an edge.
+ * A null entry is a Mon with no art yet: the Coming Soon plate, with no drift.
  */
 export function ArtFill({
   entry,
   drift,
   eager = false,
 }: {
-  entry: ArtEntry;
+  entry: ArtEntry | null;
   drift?: string;
   eager?: boolean;
 }) {
+  if (entry === null) return <ComingSoonArt />;
   const image = (
     <Image
       src={entry.src as ImageProps['src']}
@@ -29,9 +32,10 @@ export function ArtFill({
       fill
       framed={false}
       sizes={entry.sizes}
+      unoptimized={typeof entry.src === 'string' && entry.src.startsWith('https://')}
       priority={eager}
       loading={eager ? 'eager' : 'lazy'}
-      placeholder="blur"
+      placeholder={entry.blurDataURL ? 'blur' : undefined}
       blurDataURL={entry.blurDataURL}
       contentPosition={artPosition(entry)}
       className="h-full w-full"
@@ -46,10 +50,10 @@ export function ArtFill({
 }
 
 /** "Concept art" as a signage plate pinned to a corner of a creature picture. */
-export function ConceptCaption({ className = 'bottom-0 left-0' }: { className?: string }) {
+export function ConceptCaption({ className = 'bottom-0 left-0', label = W02_COPY.conceptArt }: { className?: string; label?: string }) {
   return (
     <Figcaption className={`absolute m-0 bg-signage-black px-3 py-1.5 ${className}`}>
-      <Text className="text-xs font-semibold uppercase tracking-widest text-signage-white">{W02_COPY.conceptArt}</Text>
+      <Text className="text-xs font-semibold uppercase tracking-widest text-signage-white">{label}</Text>
     </Figcaption>
   );
 }
@@ -65,13 +69,13 @@ export function StreetFigure({ entry, className, drift }: { entry: ArtEntry; cla
 }
 
 /** The Dex chip: "No. 002" on the slot tone's face. */
-export function DexChip({ dexId, tone, large = false }: { dexId: number; tone: ControlTone; large?: boolean }) {
+export function DexChip({ dexId, tone, large = false, label }: { dexId: number; tone: ControlTone; large?: boolean; label?: string }) {
   const t = TONE_CLASSES[tone];
   return (
     <Text
       className={`self-start font-display ${t.face} ${t.onFace} ${large ? 'px-4 pb-1.5 pt-2 text-2xl md:text-3xl' : 'px-2.5 py-1 text-sm'}`}
     >
-      {W02_COPY.index.dex(dexId)}
+      {label ?? W02_COPY.index.dex(dexDigits(dexId))}
     </Text>
   );
 }

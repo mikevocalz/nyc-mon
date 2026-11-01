@@ -24,6 +24,8 @@ export interface SolidPanelProps {
    * without turning the page dark. Overrides `tone`. Default `tone`.
    */
   surface?: 'tone' | 'page';
+  /** Grow to fill the parent on the main axis (root and face both flex-1). Default false. */
+  fill?: boolean;
 }
 
 /**
@@ -61,7 +63,7 @@ const solid = tv({
   },
 });
 
-export function SolidPanel({ children, className, tone = 'orange', depth = 'md', rim = true, surface = 'tone' }: SolidPanelProps) {
+export function SolidPanel({ children, className, tone = 'orange', depth = 'md', rim = true, surface = 'tone', fill = false }: SolidPanelProps) {
   const page = surface === 'page';
   // A page face drops the tone classes so the surface ones are the only fill.
   const s = solid({ tone: page ? undefined : tone, depth, surface });
@@ -70,9 +72,9 @@ export function SolidPanel({ children, className, tone = 'orange', depth = 'md',
   // A page face follows the page scheme, so it never scopes night.
   const night = !page && tone === 'ink';
   const panel = (
-    <View className={s.root()}>
+    <View className={s.root({ className: fill ? 'flex-1' : undefined })}>
       <View aria-hidden className={s.plate()} />
-      <View className={s.face({ className: night ? `${NIGHT_SCHEME} ${className ?? ''}` : className })}>
+      <View className={s.face({ className: `${fill ? 'flex-1 ' : ''}${night ? `${NIGHT_SCHEME} ` : ''}${className ?? ''}` })}>
         {rim ? <View aria-hidden className={s.rim()} /> : null}
         {children}
       </View>

@@ -8,7 +8,7 @@ name: Pages preview
 # folder `/ (root)`. This workflow rewrites that branch on every push.
 on:
   push:
-    branches: [main, claude/jolly-dirac-dtzmjy]
+    branches: [main]
   workflow_dispatch:
 
 permissions:

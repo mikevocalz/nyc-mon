@@ -10,6 +10,9 @@ Text plate inside the screen on SE: 351 pt minus 32 pt padding = 319 pt. `type-b
 
 ## Strings
 
+
+> Superseded by Decision 29 (2026-10-21): every string that named the case (caption, warm and open labels, image labels, warm announcement) now names the egg. The old strings were "Your egg is resting in its case.", "Warm the case", "Open the case", "{eggName} in its closed case", "{eggName} in its case, ready to hatch" and "You warm the case."
+
 | ID | String | Voice | Max | Notes | Canon |
 |---|---|---|---|---|---|
 | `m11.time.minutes` | {minutes} min left | ui | 16 | counting, ≥ 1 minute; `{minutes}` rounds **up** so it never reads "0 min" | `V11 ¶49` |
@@ -20,16 +23,16 @@ Text plate inside the screen on SE: 351 pt minus 32 pt padding = 319 pt. `type-b
 | `m11.time.overdue.yesterday` | Ready since yesterday | ui | 24 | overdue, previous day | — |
 | `m11.time.overdue.earlier` | Ready since {weekday} | ui | 24 | overdue, 2–6 days; past 6 days use `{shortDate}` | — |
 | `m11.time.resume` | Your egg started hatching | ui | 30 | `resume` sub-state | Law 6 |
-| `m11.caption.counting` | Your egg is resting in its case. | ui | 44 | below the time line on first arrival from M10 only; hidden on later visits | v7 egg quiet state "rested" (`[v7] M7 L388`, via JOURNEY) |
+| `m11.caption.counting` | Your egg is resting. | ui | 44 | below the time line on first arrival from M10 only; hidden on later visits | v7 egg quiet state "rested" (`[v7] M7 L388`, via JOURNEY) |
 | `m11.led.incubating` | Incubating, {minutes} min left | ui | — | chip refinement of `hlynk.led.incubating`; spoken via `hlynk.led.a11y` as "Status light: Incubating, 12 minutes left" (spoken form spells "minutes") | — |
-| `m11.trackpad.warm` | Warm the case | ui | 20 | trackpad label and `TrackpadActions` button, counting | — |
+| `m11.trackpad.warm` | Keep it warm | ui | 20 | trackpad label and `TrackpadActions` button, counting | — |
 | `m11.trackpad.warm.a11y.hint` | Hold to keep your egg company. It won't hatch any sooner. | ui | — | states the truth: no sim effect | brief §4.2 M11 |
-| `m11.trackpad.open` | Open the case | ui | 20 | ready, overdue and resume; same label in all three | — |
+| `m11.trackpad.open` | Hatch your egg | ui | 20 | ready, overdue and resume; same label in all three | — |
 | `m11.trackpad.open.a11y.hint` | Starts the hatch | ui | — | | `V11 ¶49` |
-| `m11.case.a11y.label` | {eggName} in its closed case | ui | — | `CaptureCase` image label | — |
-| `m11.case.a11y.label.ready` | {eggName} in its case, ready to hatch | ui | — | | — |
+| `m11.egg.a11y.label` | {eggName}, incubating | ui | — | egg image label (was `m11.case.a11y.label`) | Decision 29 |
+| `m11.egg.a11y.label.ready` | {eggName}, ready to hatch | ui | — | also M12 pre (was `m11.case.a11y.label.ready`) | Decision 29 |
 | `m11.a11y.announce.ready` | Your egg is ready to hatch. | ui | — | polite, once, on the ready edge while foregrounded | — |
-| `m11.a11y.announce.warm` | You warm the case. | ui | — | polite, on hold start, at most once per 10 s | — |
+| `m11.a11y.announce.warm` | You keep your egg warm. | ui | — | polite, on hold start, at most once per 10 s | — |
 
 `m23.notification.title` "Your egg is ready to hatch" and `m23.notification.body` "Open NYC-MON whenever you're ready." are owned by M06 and scheduled from here unchanged.
 
@@ -44,4 +47,4 @@ Text plate inside the screen on SE: 351 pt minus 32 pt padding = 319 pt. `type-b
 
 ## Localization notes
 
-`{minutes}` needs plural rules (ICU `{minutes, plural, one {# min left} other {# min left}}` for English; other locales differ). Clock time and weekday come from `Intl.DateTimeFormat`, never hand-formatted. "Warm the case" is literal: translators should keep "warm" as a verb of touch, not temperature control.
+`{minutes}` needs plural rules (ICU `{minutes, plural, one {# min left} other {# min left}}` for English; other locales differ). Clock time and weekday come from `Intl.DateTimeFormat`, never hand-formatted. "Keep it warm" is literal: translators should keep "warm" as a verb of touch, not temperature control.

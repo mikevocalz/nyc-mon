@@ -1,0 +1,3 @@
+[23:07:44.299] rive  compiling 2 markup files as one document: ../game-lobby/shared-vm.rml, scene.rml
+[23:07:44.338] rive  verified (0 bytes, 40ms, 0 errors, 0 warnings)
+{"success": true, "command": "verify", "data": {"riv": null, "bytes": 0, "buildMs": 40.4, "problems": []}, "errors": [], "warnings": []}

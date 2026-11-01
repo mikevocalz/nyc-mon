@@ -1,6 +1,7 @@
 'use client';
-import { useRef, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useInstance } from '@acme/ui';
 
 /**
  * §4 data layer defaults — one QueryClient per app, composed in each app's
@@ -21,8 +22,7 @@ export function createQueryClient() {
 }
 
 export function AppQueryProvider({ children }: { children: ReactNode }) {
-  // Stable per-tree instance via ref (repo rule: no React useState).
-  const ref = useRef<QueryClient | null>(null);
-  ref.current ??= createQueryClient();
-  return <QueryClientProvider client={ref.current}>{children}</QueryClientProvider>;
+  // Stable per-tree instance (repo rule: no React useState).
+  const client = useInstance(createQueryClient);
+  return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
 }

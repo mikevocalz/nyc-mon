@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, Pause, Play } from '../icons';
 import { IconButton } from '../IconButton';
 import { Text } from '../Text';
 import { View } from '../tw';
+import { useNavGlyph } from './nav-glyph';
 import { autoplayNext, pad2, progressOf, stepIndex } from './card-slider-model';
 import type {
   CardSliderProgressStyle, CardSliderButtonPosition, CardSliderCornerAccentStyle, ButtonCorner,
@@ -20,12 +21,12 @@ export { CardSliderImageItem, CITY_PHOTO_ITEMS, photoItem, type CardSliderImageI
 
 const controls = tv({
   slots: {
-    bar: 'mt-4 flex-row items-center gap-3',
-    track: 'h-2 flex-1 overflow-hidden bg-ink-800',
+    bar: 'mt-4 flex-row items-center gap-3 md:mt-6 md:gap-4',
+    track: 'h-2 flex-1 overflow-hidden bg-ink-800 md:h-3',
     fill: 'h-full',
-    dots: 'flex-1 flex-row flex-wrap items-center gap-1.5',
-    dot: 'h-2.5 w-2.5',
-    counter: 'flex-1 font-display text-sm tracking-wide',
+    dots: 'flex-1 flex-row flex-wrap items-center gap-1.5 md:gap-2.5',
+    dot: 'h-2.5 w-2.5 md:h-4 md:w-4',
+    counter: 'flex-1 font-display text-sm tracking-wide md:text-lg',
   },
   variants: { tone: toneVariants(() => ({})) },
   compoundVariants: (Object.entries(toneVariants((c) => c)) as [ControlTone, ToneClasses][]).map(([tone, c]) => ({
@@ -94,7 +95,7 @@ export function SliderControls({
         <IconButton
           variant="cornerCut"
           tone={tone}
-          size="sm"
+          size="adaptive"
           corner="top-right"
           aria-label={autoplay.playing ? 'Pause autoplay' : 'Start autoplay'}
           onPress={autoplay.onToggle}
@@ -148,15 +149,17 @@ export function NavButton({
   dir, tone, corner, disabled, onPress,
 }: { dir: 'prev' | 'next'; tone: ControlTone; corner: ButtonCorner; disabled: boolean; onPress: () => void }) {
   const Icon = dir === 'prev' ? ChevronLeft : ChevronRight;
+  const glyph = useNavGlyph();
   return (
     <IconButton
       variant="cornerCut"
       tone={tone}
       corner={corner}
+      size="adaptive"
       aria-label={dir === 'prev' ? 'Previous card' : 'Next card'}
       disabled={disabled}
       onPress={onPress}
-      icon={<Icon size={20} className={disabled ? 'text-ink-700' : TONE_CLASSES[tone].onFace} />}
+      icon={<Icon size={glyph.size} className={`${glyph.className} ${disabled ? 'text-ink-700' : TONE_CLASSES[tone].onFace}`} />}
     />
   );
 }

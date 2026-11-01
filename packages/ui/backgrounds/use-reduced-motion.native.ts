@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import { AccessibilityInfo } from 'react-native';
 import { useReducedMotion as useReanimatedReducedMotion } from 'react-native-reanimated';
+import { useForcedReducedMotion } from '../device-preferences';
 
 // The OS "Reduce motion" switch. Reanimated's useReducedMotion gives the right
 // value synchronously on the first frame, but it is read once at startup and
@@ -33,7 +34,10 @@ function subscribe(onChange: () => void): () => void {
   };
 }
 
+/** The OS setting OR the Caller's Settings override (M19: mirrors the OS, can force on). */
 export function useReducedMotion(): boolean {
   const atLaunch = useReanimatedReducedMotion();
-  return useSyncExternalStore(subscribe, () => live ?? atLaunch, () => atLaunch);
+  const forced = useForcedReducedMotion();
+  const system = useSyncExternalStore(subscribe, () => live ?? atLaunch, () => atLaunch);
+  return forced || system;
 }

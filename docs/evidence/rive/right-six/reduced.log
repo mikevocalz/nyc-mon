@@ -1,0 +1,7 @@
+[23:07:26.401] rive  deferred replay: inline
+[23:07:26.453] rive  built /Users/mikevocalz/nyc-mon/packages/ui/rive/arcade-controls/right-six/build/right-six.riv (144444 bytes, 51ms, 0 errors, 0 warnings)
+[23:07:26.454] rive  data: a11y/reducedMotion = true
+[23:07:26.454] rive  data: buttons/b/state = pressed
+[23:07:26.454] rive  showing RightSix [1/2]
+[23:07:26.454] rive  viewport 209x204 @1x
+[23:07:26.474] rive  wrote /Users/mikevocalz/nyc-mon/docs/evidence/rive/right-six/reduced.png

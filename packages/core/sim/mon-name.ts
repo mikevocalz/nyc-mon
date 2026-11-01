@@ -71,6 +71,30 @@ export function isStoredMonName(value: string): boolean {
   return value === canonicaliseName(value) && nameShapeRejection(value, MON_NAME_MAX_LENGTH) === undefined;
 }
 
+/**
+ * Longest nickname a pre-M09 save could hold. Stored Mon records still accept
+ * these so an upgrade never drops a name the player already had; no new name
+ * may use this bound.
+ */
+export const LEGACY_MON_NAME_MAX_LENGTH = 64;
+
+/**
+ * True when a write may move a Mon's nickname from `before` to `after`.
+ *
+ * - Unchanged: allowed, including a legacy name M09 would reject, so a re-save
+ *   keeps it.
+ * - Null to a name: a new naming, so `after` must pass {@linkcode isStoredMonName}
+ *   (at most {@linkcode MON_NAME_MAX_LENGTH}).
+ * - Anything else (renaming, clearing): refused. The nickname is set once.
+ *
+ * `MonInstanceSchema` cannot tell a legacy name from a new one, so every path
+ * that writes a stored Mon's nickname checks the change with this.
+ */
+export function isAllowedMonNicknameWrite(before: string | null, after: string | null): boolean {
+  if (after === before) return true;
+  return before === null && after !== null && isStoredMonName(after);
+}
+
 /** The COPY_DECK id for a {@linkcode MonNameRejection}, for the M09 error line. */
 export function monNameErrorCopyId(reason: MonNameRejection): MonNameErrorCopyId {
   switch (reason) {

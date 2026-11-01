@@ -1,0 +1,23 @@
+name: Website content contracts
+on:
+  pull_request:
+    paths:
+      - 'packages/content/site-content/**'
+      - 'packages/payload/src/site-content/**'
+      - 'apps/web/components/cms/**'
+      - 'apps/web/components/home/**'
+      - '.github/workflows/site-content-contracts.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  pure-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+      - name: Published content, placement and embed policies
+        run: node --experimental-strip-types --test packages/content/site-content/core.node-test.ts packages/content/site-content/reader.node-test.ts

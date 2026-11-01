@@ -82,6 +82,8 @@ try {
 const targets = [
   join(root, 'apps/web/public/viro'),
   join(root, 'apps/mobile/public/viro'),
+  // The ops console's Models page previews Mon GLBs with the Viro web renderer.
+  join(root, 'apps/admin-vite/public/viro'),
 ];
 
 for (const target of targets) {

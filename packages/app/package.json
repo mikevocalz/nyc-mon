@@ -17,6 +17,7 @@
     "test": "node --test '**/*.test.ts'"
   },
   "dependencies": {
+    "zod": "catalog:",
     "@acme/assets": "workspace:*",
     "@acme/auth": "workspace:*",
     "@acme/content": "workspace:*",
@@ -25,12 +26,20 @@
     "@acme/ui": "workspace:*",
     "@tanstack/react-query": "catalog:",
     "date-fns": "catalog:",
+    "expo-apple-authentication": "catalog:",
+    "expo-auth-session": "catalog:",
+    "expo-crypto": "catalog:",
     "expo-calendar": "catalog:",
     "expo-document-picker": "catalog:",
     "expo-file-system": "catalog:",
     "expo-image-picker": "catalog:",
+    "expo-audio": "catalog:",
+    "expo-location": "catalog:",
+    "expo-network": "catalog:",
+    "expo-sensors": "catalog:",
     "expo-notifications": "catalog:",
     "expo-router": "catalog:",
+    "expo-web-browser": "catalog:",
     "lucide-react": "catalog:",
     "lucide-react-native": "catalog:",
     "react-native-audio-api": "catalog:",
@@ -55,7 +64,9 @@
     "eslint-config-expo": "catalog:",
     "react": "catalog:",
     "react-native": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "three": "catalog:",
+    "@types/three": "catalog:"
   },
   "peerDependencies": {
     "react": "*",

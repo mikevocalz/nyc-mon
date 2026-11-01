@@ -1,0 +1,3 @@
+[23:07:59.398] rive  compiling 5 markup files as one document: ../game-transition/scene.rml, ../leaderboard/scene.rml, ../start-angled/scene.rml, scene.rml, shared-vm.rml
+[23:07:59.545] rive  built /Users/mikevocalz/nyc-mon/packages/ui/rive/lobby/game-lobby/build/game-lobby.riv (614266 bytes, 149ms, 0 errors, 0 warnings)
+{"success": true, "command": "build", "data": {"riv": "/Users/mikevocalz/nyc-mon/packages/ui/rive/lobby/game-lobby/build/game-lobby.riv", "bytes": 614266, "buildMs": 149.5, "problems": []}, "errors": [], "warnings": []}

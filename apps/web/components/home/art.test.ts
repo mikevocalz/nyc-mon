@@ -11,7 +11,7 @@ registerHooks({
   },
 });
 
-const { ART_SLOTS, WORLD_SLOTS, art, artHref, starterSlot } = await import('./art.ts');
+const { ART_SLOTS, WORLD_SLOTS, art, artHref, starterArt } = await import('./art.ts');
 
 const EXPECTED = [
   'hero',
@@ -21,9 +21,6 @@ const EXPECTED = [
   'hlynk.static',
   'hlynk.scanner',
   'hlynk.controls',
-  'starter.1',
-  'starter.2',
-  'starter.3',
   'care',
   'hatch',
 ];
@@ -63,15 +60,21 @@ test('world sizes describe the grid columns each frame occupies', () => {
   assert.match(art('world.secondary').sizes, /33rem/);
 });
 
-test('starter slots key off @acme/content slot numbers', () => {
-  assert.equal(starterSlot(1), 'starter.1');
-  assert.equal(starterSlot(3), 'starter.3');
+test('starter art keys off @acme/content slot numbers; every starter Baby has art, Fye Dot included', () => {
+  for (const id of [1, 2, 3, 4] as const) assert.ok(starterArt(id), `slot ${id}: art`);
+  assert.match(artHref(starterArt(4)!), /fye-dot\.webp$/, 'slot 4 shows Fye Dot, never another Mon');
 });
 
 test('creature art fills the starter and hatch slots and carries no place caption (PS-028)', () => {
-  const creatures = ['starter.1', 'starter.2', 'starter.3', 'hatch'] as const;
-  for (const slot of creatures) {
-    const entry = art(slot);
+  const entries = [
+    ['starter 1', starterArt(1)],
+    ['starter 2', starterArt(2)],
+    ['starter 3', starterArt(3)],
+    ['starter 4', starterArt(4)],
+    ['hatch', art('hatch')],
+  ] as const;
+  for (const [slot, entry] of entries) {
+    assert.ok(entry, `${slot}: art`);
     assert.match(artHref(entry), /creatures\//, `${slot}: reads @acme/assets/creatures`);
     assert.equal(entry.caption, undefined, `${slot}: a Mon is not a place`);
     assert.equal(entry.district, undefined, `${slot}: no district disc`);
@@ -81,9 +84,9 @@ test('creature art fills the starter and hatch slots and carries no place captio
 });
 
 test('each starter poster names its own Baby form, with no pronoun for the Mon (PS-005)', () => {
-  const names = { 'starter.1': 'Squeaklet', 'starter.2': 'Kittee Cee', 'starter.3': 'Yotito' } as const;
-  for (const [slot, name] of Object.entries(names) as [keyof typeof names, string][]) {
-    const { alt } = art(slot);
+  const names = { 1: 'Squeaklet', 2: 'Kittee Cee', 3: 'Yotito', 4: 'Fye Dot' } as const;
+  for (const [slot, name] of Object.entries(names)) {
+    const alt = starterArt(Number(slot) as 1 | 2 | 3 | 4)?.alt ?? '';
     assert.ok(alt.startsWith(`${name}, `), `${slot}: alt names ${name}`);
     assert.doesNotMatch(alt, /\b(it|its|he|his|him|she|her)\b/i, `${slot}: no pronoun`);
   }

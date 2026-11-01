@@ -20,6 +20,10 @@ export const dropZone = tv({
     title: 'text-center font-display text-base tracking-wide text-ink-50 md:text-lg',
     description: 'max-w-content-form text-center text-sm text-silver-300 md:text-base',
     glyph: '',
+    browse:
+      'mt-1 inline-flex min-h-11 cursor-pointer items-center justify-center border-2 border-silver-300 px-4 ' +
+      'font-display text-sm text-ink-50 underline-offset-4 hover:underline ' +
+      'focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-silver-100',
   },
   variants: {
     tone: toneVariants((c) => ({ root: c.controlBorder, tile: `${c.face} ${c.controlKeyline}`, glyph: c.onFace })),

@@ -1,0 +1,17 @@
+{
+  "checks": [
+    "browser drag/drop uploads a media record through the existing Bunny hook",
+    "browser media picker replaces only the chosen page/section image",
+    "saving a draft does not change the anonymous published page",
+    "explicit preview opens a private saved draft with noindex",
+    "saved-draft preview refreshes without publishing",
+    "exit preview removes the private preview session",
+    "browser Publish updates page copy and selected image without a deployment",
+    "section copy, gallery, YouTube and allowlisted UI iframe render through the existing UI",
+    "all twelve marketing and legal page routes render published CMS records",
+    "unpublishing does not resurrect the old hardcoded homepage",
+    "phone-width Story page has no horizontal overflow"
+  ],
+  "errors": [],
+  "externalTransport": "Bunny image transport and embedded external page responses isolated with test fixtures; real built website/admin/DB."
+}

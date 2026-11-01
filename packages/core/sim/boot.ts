@@ -27,6 +27,13 @@ export interface BootSnapshot {
   readonly ageAnswer: AgeAnswer | undefined;
   /** Boot time, epoch ms. The only clock the route reads. */
   readonly nowMs: number;
+  /**
+   * Mons whose nickname question (M09) has been answered or skipped, by
+   * `monInstanceId`. A nickname is optional: a Mon is always its species,
+   * so once the question was seen a Mon with no nickname boots to the
+   * companion. Unset reads as none seen.
+   */
+  readonly nicknamePromptSeen?: readonly string[];
 }
 
 /**
@@ -36,7 +43,7 @@ export interface BootSnapshot {
  * - `guardian-consent`: M05 (an age answer is stored and needs consent).
  * - `caller-name`: M07 (a session whose server profile, already restored, has no Caller name).
  * - `egg-choice`: M08 (a Caller exists but has no egg or Mon yet).
- * - `mon-name`: M09 (the Mon has hatched but has no nickname; naming can't be skipped, D-16f).
+ * - `mon-name`: M09, the optional nickname question (the Mon has hatched, has no nickname, and the question was never answered or skipped).
  */
 export type OnboardingStep = 'create-account' | 'guardian-consent' | 'caller-name' | 'egg-choice' | 'mon-name';
 
@@ -57,8 +64,9 @@ export type BootRoute =
  * Order: unreadable save → `save-recovered` (M22); a session with no save on
  * this device → `restore` (the app fetches `GET /v1/me/mons` and the Caller
  * profile, writes the save, and calls this again); denied consent →
- * `consent-denied` (M05); a hatched Mon with no nickname → `mon-name` (M09);
- * a named Mon → `companion` (M13); an egg past
+ * `consent-denied` (M05); a hatched Mon with no nickname whose nickname
+ * question was never seen → `mon-name` (M09); any other hatched Mon →
+ * `companion` (M13), nickname or not; an egg past
  * `incubationEndsAt` or mid-presentation → `egg-ready` (M11); an egg still
  * incubating → `incubating` (M11); a Caller with nothing yet → `egg-choice`;
  * no Caller → `caller-name` with a session (the restored profile had no
@@ -105,7 +113,9 @@ function routeLoadedSave(save: SaveCurrent, snapshot: BootSnapshot): BootRoute {
 
   const mon = save.mons[0] ?? hatchedMon(save.hatches);
   if (mon !== undefined) {
-    return mon.nickname === null
+    // A nickname is optional (the Mon is always its species): ask once, never force it.
+    const asked = snapshot.nicknamePromptSeen?.includes(mon.monInstanceId) ?? false;
+    return mon.nickname === null && !asked
       ? { kind: 'resume-onboarding', step: 'mon-name' }
       : { kind: 'companion', monInstanceId: mon.monInstanceId };
   }

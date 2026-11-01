@@ -1,0 +1,9 @@
+[23:07:55.974] rive  deferred replay: inline
+[23:07:55.975] rive  baking release scripts, as a publish ships them, with watchdog checks
+[23:07:55.976] rive  compiling 2 markup files as one document: ../game-lobby/shared-vm.rml, scene.rml
+[23:07:56.030] rive  built /Users/mikevocalz/nyc-mon/packages/ui/rive/lobby/game-transition/build/game-transition.riv (234928 bytes, 55ms, 0 errors, 0 warnings)
+[23:07:56.031] rive  showing GameTransitionHost [1/2]
+[23:07:56.031] rive  viewport 390x844 @1x
+[23:07:56.256] rive  bench advance: mean 0.002ms p50 0.001ms p95 0.006ms max 0.044ms
+[23:07:56.256] rive  bench render: mean 0.144ms p50 0.109ms p95 0.409ms max 1.337ms
+[23:07:56.256] rive  bench memory: 0 -> 0 wasm pages (+0) over 600 frames

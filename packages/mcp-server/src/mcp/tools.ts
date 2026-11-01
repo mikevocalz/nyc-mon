@@ -1,374 +1,718 @@
-import { z } from 'zod';
-import type { AuthContext } from '../auth/oauth.ts';
-import { permitted, resolveActingVoice, type ResolvedActor, type SpeakerHint } from '../auth/actor.ts';
-import type { CallerData } from '../data/caller.ts';
-import type { PresenceService } from '../presence/service.ts';
-import { toolError, permissionDenied } from './errors.ts';
+import { randomUUID } from 'node:crypto';
 import {
+  advanceCare,
+  createInitialCareState,
+  applyCareAction,
+  deriveMonMood,
+  listUnmetNeeds,
+  type CareAction,
+  type CareNeed,
+  type CareState,
+  type MonInstance,
+  type MonMood,
+  voiceStage,
+} from '@acme/core';
+import type { CallToolResult, McpServer } from '@modelcontextprotocol/server';
+import { FALLBACK_MON_LINGO, monVoiceView, voiceGuideFor, type MonLingo } from '@acme/content/voice';
+import type { z } from 'zod';
+import { permitted, resolveActingVoice, type ActingVoice, type SpeakerHint } from '../auth/actor.ts';
+import { isAdultByBirthYear } from '../auth/request-auth.ts';
+import type { CallerData, MonWithCare } from '../data/caller.ts';
+import { AdultRequiredError, EggNotReadyError, NotFoundError, WriteUnconfirmedError } from '../data/errors.ts';
+import type { FamiliarDirectory } from '../presence/fixtures.ts';
+import type { PresenceService } from '../presence/service.ts';
+import type { Permission } from '../presence/types.ts';
+import { failure, success } from './errors.ts';
+import { BABY_TALK_RULE, eggSpeech, monSpeech, type MonOccasion } from './mon-speech.ts';
+import {
+  AcknowledgeOutput,
   AcknowledgePersonInput,
-  CheckOnMonInput,
-  FeedMonInput,
-  HealMonInput,
+  CARE_SUGGESTIONS,
+  CareResultOutput,
+  FamiliarPeopleOutput,
+  HatchEggOutput,
+  IncubationOutput,
   InjectPresenceEventInput,
   MonIdInput,
+  MonStatusOutput,
+  NoInput,
   PersonIdInput,
-  PlayWithMonInput,
-  TalkToMonInput,
+  PersonRelationshipOutput,
+  SpeakerHintSchema,
+  PresenceEventOutput,
+  PresentPeopleOutput,
+  SharedMemoriesOutput,
+  careInput,
+  checkOnMonOutput,
+  hatchEggInput,
+  playInput,
+  talkToMonOutput,
 } from './schemas.ts';
+import type { McpAppsRegistration } from './ui-seam.ts';
 
-/**
- * Tool registry (ADR 0005). Definitions are data; `src/mcp/server.ts` maps them
- * onto `McpServer.registerTool`. Names are snake_case and stable — `alexa-ai`
- * generates the add-on manifest by introspection.
- *
- * Conventions:
- *  - Handlers return { structuredContent } — no canned dialogue (ADR 0009).
- *  - Mutating tools resolve ActingVoice first; a denied call returns
- *    PERMISSION_DENIED_NOT_CALLER and never reaches the data layer.
- *  - `speakerHint` travels on the call context (Voice ID for the direct
- *    speaker only — ADR 0007).
- */
+/** Tools every build lists. Each maps to real `/v1` data (ADR 0015 §4). */
+export const CORE_TOOL_NAMES = [
+  'get_mon_status',
+  'check_on_mon',
+  'check_incubation',
+  'hatch_egg',
+  'talk_to_mon',
+  'feed_mon',
+  'rest_mon',
+  'wake_mon',
+  'play_with_mon',
+] as const;
 
-export interface ToolResult {
-  readonly isError?: boolean;
-  readonly structuredContent: Record<string, unknown>;
-  readonly content?: readonly { readonly type: 'text'; readonly text: string }[];
-}
+/** Tools registered only in dev and simulator mode, over seeded fictional fixtures (ADR 0015 §2). */
+export const DEV_TOOL_NAMES = [
+  'get_familiar_people',
+  'get_present_people',
+  'get_person_relationship',
+  'get_shared_memories',
+  'acknowledge_person',
+  'inject_presence_event',
+] as const;
 
+export type ToolName = (typeof CORE_TOOL_NAMES)[number] | (typeof DEV_TOOL_NAMES)[number];
+
+/** Everything a tool call can see. Built per HTTP request from the verified token. */
 export interface ToolContext {
-  readonly auth: AuthContext;
+  /** The linked Caller; undefined only for a service token, which never reaches tools/call. */
+  readonly callerId: string | undefined;
+  /** From the token's `birth_year` claim, when the issuer sends one. */
+  readonly birthYear: number | undefined;
   readonly data: CallerData;
   readonly presence: PresenceService;
-  readonly speakerHint?: SpeakerHint;
-  /** Dev/demo flag from env — gates the inject_presence_event tool. */
-  readonly devMode: boolean;
+  /** Present exactly when dev mode is on; its presence gates the dev tools. */
+  readonly familiar: FamiliarDirectory | undefined;
+  readonly now: () => number;
 }
 
-export interface ToolDef<Input> {
-  readonly name: string;
-  readonly description: string;
-  readonly inputSchema: Input;
-  readonly annotations: {
-    readonly title: string;
-    readonly readOnlyHint: boolean;
-    readonly destructiveHint: boolean;
-    readonly idempotentHint?: boolean;
-    readonly openWorldHint?: boolean;
-  };
-  /** Permission key for mutating tools; undefined = read. */
-  readonly requiredPermission?: 'talk' | 'play' | 'feed' | 'care';
-  readonly handler: (args: unknown, ctx: ToolContext) => Promise<ToolResult>;
+// ------------------------------------------------------------- helpers ---
+
+type Linked = { readonly callerId: string };
+
+/** The Caller id, or the failure to return. Refuses a token whose birth year says under 18. */
+function linkedCaller(ctx: ToolContext): Linked | CallToolResult {
+  if (ctx.callerId === undefined) return failure('not-linked');
+  if (ctx.birthYear !== undefined && !isAdultByBirthYear(ctx.birthYear, ctx.now())) return failure('adults-only');
+  return { callerId: ctx.callerId };
 }
 
-/** Shared gate: resolve voice + enforce permission for mutating tools. */
-async function gate(
-  ctx: ToolContext,
-  requiredPermission: 'talk' | 'play' | 'feed' | 'care' | undefined,
-  monId?: string,
-): Promise<{ actor: ResolvedActor; denied: ToolResult | null }> {
-  const actor = await resolveActingVoice(ctx.data, ctx.auth.callerId, ctx.speakerHint);
-  if (requiredPermission && !permitted(actor, requiredPermission)) {
-    return { actor, denied: permissionDenied(actor.voice, [requiredPermission], monId) };
+function isResult(value: unknown): value is CallToolResult {
+  return typeof value === 'object' && value !== null && 'content' in value;
+}
+
+async function guarded(fn: () => Promise<CallToolResult>): Promise<CallToolResult> {
+  try {
+    return await fn();
+  } catch (error) {
+    if (error instanceof AdultRequiredError) return failure('adults-only');
+    if (error instanceof NotFoundError) return failure('mon-not-found');
+    if (error instanceof WriteUnconfirmedError) return failure('not-confirmed');
+    console.error('[mcp-server] tool failed:', error instanceof Error ? error.message : String(error));
+    return failure('unavailable');
   }
-  return { actor, denied: null };
 }
 
-function upstreamError(err: unknown): ToolResult {
-  const message = err instanceof Error ? err.message : String(err);
-  return toolError({ code: 'UPSTREAM_UNAVAILABLE', message });
+/**
+ * The Mon's lines and lingo as Payload publishes them (`GET /v1/mon-lingo`).
+ * When `/v1` can't answer, the bundled fallback keeps the tools working; the
+ * voice data is never a reason to fail a care call.
+ */
+async function lingoFor(ctx: ToolContext, callerId: string): Promise<MonLingo> {
+  if (ctx.data.monLingo === undefined) return FALLBACK_MON_LINGO;
+  try {
+    return await ctx.data.monLingo(callerId);
+  } catch (error) {
+    console.error('[mcp] mon-lingo unavailable, using the bundled fallback:', error instanceof Error ? error.message : String(error));
+    return FALLBACK_MON_LINGO;
+  }
 }
 
-// ---------------------------------------------------------------- tools ---
+/**
+ * The Mon as tools report it. `gender` and `voice` (from `@acme/content/voice`, the
+ * one Mon voice module, read against the lingo Payload serves) are for a
+ * client that voices the Mon itself (the web simulator); Alexa reads replies
+ * in its own voice (PLATFORM-DOCS §2.8) and copy never uses a pronoun for a
+ * Mon (PS-005).
+ */
+async function monView(ctx: ToolContext, callerId: string, mon: MonInstance, lingo?: MonLingo) {
+  const served = lingo ?? (await lingoFor(ctx, callerId));
+  return {
+    monId: mon.monInstanceId,
+    name: mon.nickname,
+    speciesId: mon.speciesId,
+    stage: mon.stage,
+    bond: mon.bond,
+    hatchedAt: mon.hatchedAt,
+    gender: mon.gender,
+    voice: monVoiceView(mon, ctx.now(), served),
+  };
+}
 
-export const tools: readonly ToolDef<z.ZodTypeAny>[] = [
-  {
-    name: 'talk_to_mon',
-    description:
-      'Presence-gated conversation turn with a Mon. Resolves the acting voice (Caller / familiar / unknown); a familiar without the talk grant — or an unknown voice — is refused before any state is read.',
-    inputSchema: TalkToMonInput,
-    annotations: { title: 'Talk to Mon', readOnlyHint: false, destructiveHint: false },
-    requiredPermission: 'talk',
-    handler: async (args, ctx) => {
-      const parsed = TalkToMonInput.parse(args);
-      const { actor, denied } = await gate(ctx, 'talk', parsed.monId);
-      if (denied) return denied;
-      try {
-        const mon = await ctx.data.resolveActiveMon(ctx.auth.callerId, parsed.monId);
-        if (!mon) return toolError({ code: 'MON_NOT_FOUND', message: 'No active Mon for this Caller.' });
-        // TODO(dialogue): hand the utterance + Mon context to the personality
-        // layer (AWS Builder mini-challenge: Bedrock/Strands). The skill + model
-        // produce the spoken reply; this tool only supplies structured context.
-        const present = ctx.presence.presentPeople(ctx.auth.callerId);
-        const care = await ctx.data.getCareState(mon.monInstanceId);
-        return {
-          structuredContent: {
-            mon,
-            context: {
-              pendingRequest: care?.pendingRequest ?? null,
-              presentPeople: present.map((p) => p.personId),
-            },
-            actingVoice: actor.voice,
-          },
-        };
-      } catch (err) {
-        return upstreamError(err);
+/**
+ * `mon` plus what the Mon may say (`say`, `speechRule`), from one read of the
+ * lingo. Both speech fields are absent for a Mon that speaks in full.
+ */
+async function monAndSpeech(ctx: ToolContext, callerId: string, mon: MonInstance, mood: MonMood, occasion: MonOccasion) {
+  const lingo = await lingoFor(ctx, callerId);
+  return { mon: await monView(ctx, callerId, mon, lingo), ...monSpeech(mon, mood, occasion, lingo, ctx.now()) };
+}
+
+/**
+ * talk_to_mon for a Caller whose only companion is still an egg: the no-mon
+ * failure, carrying the egg's babble so Alexa can babble for the egg.
+ */
+async function eggOnlyTalk(ctx: ToolContext, callerId: string): Promise<CallToolResult> {
+  const eggs = [...(await ctx.data.listIncubatingEggs(callerId))].sort((a, b) => a.egg.incubationEndsAt - b.egg.incubationEndsAt);
+  const first = eggs[0];
+  if (first === undefined) return failure('no-mon');
+  const speech = eggSpeech(first.egg, await lingoFor(ctx, callerId), ctx.now());
+  return failure('no-mon', { egg: { eggId: first.egg.eggId, ...speech }, speechRule: BABY_TALK_RULE });
+}
+
+function isNoMon(result: CallToolResult): boolean {
+  const error = (result.structuredContent as { error?: { reason?: unknown } } | undefined)?.error;
+  return error?.reason === 'no-mon';
+}
+
+function careView(care: CareState) {
+  return {
+    energy: care.energy,
+    fullness: care.fullness,
+    social: care.social,
+    activity: care.activity.kind,
+    sluggish: care.sluggishUntil !== null && care.sluggishUntil > care.updatedAt,
+    wantsFood: care.pendingRequest !== null,
+    lastFedAt: care.lastFedAt,
+  };
+}
+
+/** Stored state advanced to now, so meters are current rather than as of the last write. */
+function current(entry: MonWithCare, now: number): MonWithCare {
+  return advanceCare({ mon: entry.mon, care: entry.care }, now).state;
+}
+
+/** Fallbacks already logged, so a stale or missing companion warns once per Caller, not per call. */
+const loggedFallbacks = new Set<string>();
+const MAX_LOGGED_FALLBACKS = 1_000;
+
+function logFallbackOnce(callerId: string, activeMonInstanceId: string | null): void {
+  const key = `${callerId}\u0000${activeMonInstanceId ?? ''}`;
+  if (loggedFallbacks.has(key)) return;
+  if (loggedFallbacks.size >= MAX_LOGGED_FALLBACKS) loggedFallbacks.clear();
+  loggedFallbacks.add(key);
+  const why = activeMonInstanceId === null ? 'no companion chosen' : `companion ${activeMonInstanceId} is not among the Caller's Mons`;
+  console.warn(`[mcp-server] ${why}; answering for the most recently hatched Mon`);
+}
+
+/**
+ * The Mon a tool acts on. A named `monId` wins. Otherwise the Caller's chosen
+ * companion (`users.activeMonInstanceId`), so every surface answers for, and
+ * speaks in the voice of, the same Mon the Caller picked. Only when no
+ * companion is chosen, or it names a Mon the Caller no longer has, does the
+ * most recently hatched Mon answer.
+ */
+async function resolveMon(ctx: ToolContext, callerId: string, monId: string | undefined): Promise<MonWithCare | CallToolResult> {
+  const { mons, activeMonInstanceId } = await ctx.data.listMons(callerId);
+  if (mons.length === 0) return failure('no-mon');
+  const byId = (id: string) => mons.find((entry) => entry.mon.monInstanceId === id);
+  if (monId !== undefined) {
+    const found = byId(monId);
+    return found === undefined ? failure('mon-not-found') : current(found, ctx.now());
+  }
+  const active = activeMonInstanceId === null ? undefined : byId(activeMonInstanceId);
+  if (active !== undefined) return current(active, ctx.now());
+  if (mons.length > 1) logFallbackOnce(callerId, activeMonInstanceId);
+  const latest = [...mons].sort((a, b) => b.mon.hatchedAt - a.mon.hatchedAt)[0];
+  return latest === undefined ? failure('no-mon') : current(latest, ctx.now());
+}
+
+/** "12 minutes", "1 minute": how a speaker says the time left on an egg. */
+function timeLeft(incubationEndsAt: number, now: number): { minutesRemaining: number; timeLeft: string } {
+  const minutesRemaining = Math.max(1, Math.ceil((incubationEndsAt - now) / 60_000));
+  return { minutesRemaining, timeLeft: minutesRemaining === 1 ? '1 minute' : `${minutesRemaining} minutes` };
+}
+
+/**
+ * hatch_egg: the Caller's own egg only (the Caller-only rule, a familiar or
+ * unverified voice is refused before anything is read), never before its
+ * incubation ends. Safe to retry: `/v1` returns the Mon an egg already minted.
+ * The new Mon is returned explicitly, so the card shows it even while the
+ * Caller's chosen companion (`activeMonInstanceId`) stays another Mon.
+ */
+async function runHatch(ctx: ToolContext, args: { eggId?: string; speakerHint?: SpeakerHint }): Promise<CallToolResult> {
+  const linked = linkedCaller(ctx);
+  if (isResult(linked)) return linked;
+  const actor = actorFor(ctx, linked.callerId, args.speakerHint);
+  if (actor.kind !== 'caller') return failure('not-permitted', { speaker: speakerView(actor) });
+
+  return guarded(async () => {
+    const now = ctx.now();
+    const eggs = [...(await ctx.data.listIncubatingEggs(linked.callerId))].sort((a, b) => a.egg.incubationEndsAt - b.egg.incubationEndsAt);
+    const listed = args.eggId === undefined ? eggs[0] : eggs.find((e) => e.egg.eggId === args.eggId);
+    // A named egg that is no longer listed has hatched already (or is not the
+    // Caller's): /v1 answers with its Mon, or 404, which reads as no egg.
+    const eggId = listed?.egg.eggId ?? args.eggId;
+    if (eggId === undefined) return failure('no-egg');
+    if (listed !== undefined && listed.egg.incubationEndsAt > now) {
+      return failure('egg-not-ready', { eggId, ...timeLeft(listed.egg.incubationEndsAt, now) });
+    }
+    let mon: MonInstance;
+    try {
+      mon = await ctx.data.hatchEgg(linked.callerId, eggId);
+    } catch (error) {
+      // The server's clock says not yet (ours ran a little ahead).
+      if (error instanceof EggNotReadyError) {
+        return failure('egg-not-ready', { eggId, ...timeLeft(listed?.egg.incubationEndsAt ?? now + 60_000, now) });
       }
+      if (error instanceof NotFoundError) return failure('no-egg');
+      throw error;
+    }
+    const { mons } = await ctx.data.listMons(linked.callerId);
+    const stored = mons.find((entry) => entry.mon.monInstanceId === mon.monInstanceId);
+    const state = current(stored ?? { mon, care: createInitialCareState(mon.monInstanceId, mon.hatchedAt) }, now);
+    const alreadyHatched = listed === undefined;
+    return success({
+      hatched: true,
+      alreadyHatched,
+      hatching: !alreadyHatched,
+      egg: { eggId, speciesId: listed?.egg.speciesId ?? 'dex-001' },
+      ...(await monAndSpeech(ctx, linked.callerId, state.mon, deriveMonMood(state.care), 'first-words')),
+      care: careView(state.care),
+      mood: deriveMonMood(state.care),
+    });
+  });
+}
+
+function suggestedCare(state: MonWithCare, needs: readonly CareNeed[]): (typeof CARE_SUGGESTIONS)[number][] {
+  if (state.care.activity.kind === 'asleep') return ['wait'];
+  const sluggish = state.care.sluggishUntil !== null && state.care.sluggishUntil > state.care.updatedAt;
+  const out: (typeof CARE_SUGGESTIONS)[number][] = [];
+  if (!sluggish && (state.care.pendingRequest !== null || needs.includes('fullness'))) out.push('feed');
+  if (needs.includes('energy')) out.push('rest');
+  if (!sluggish && needs.includes('social')) out.push('play');
+  return out.length === 0 ? ['wait'] : out;
+}
+
+function presentPeople(ctx: ToolContext, callerId: string) {
+  const familiar = ctx.familiar;
+  if (familiar === undefined) return [];
+  return ctx.presence.presentPeople(callerId, ctx.now()).flatMap((p) => {
+    const person = familiar.getPerson(callerId, p.personId);
+    return person === undefined
+      ? []
+      : [{ personId: p.personId, displayName: person.displayName, tier: p.tier, confidence: p.confidence }];
+  });
+}
+
+function speakerView(actor: ActingVoice) {
+  if (actor.kind === 'caller') return { kind: 'caller' as const };
+  if (actor.kind === 'unverified') return { kind: 'unverified' as const, personId: actor.personId };
+  return { kind: 'familiar' as const, personId: actor.person.personId, displayName: actor.person.displayName };
+}
+
+function actorFor(ctx: ToolContext, callerId: string, hint: SpeakerHint | undefined): ActingVoice {
+  return resolveActingVoice({ familiar: ctx.familiar, presence: ctx.presence }, callerId, hint, ctx.now());
+}
+
+interface CareToolSpec {
+  readonly permission: keyof Permission;
+  readonly action: (args: { quality?: number }) => CareAction;
+}
+
+/** Shared flow for the four canon care actions. A predicted decline writes nothing. */
+async function runCare(
+  ctx: ToolContext,
+  spec: CareToolSpec,
+  args: { monId?: string; quality?: number; speakerHint?: SpeakerHint; intentId?: string },
+): Promise<CallToolResult> {
+  const linked = linkedCaller(ctx);
+  if (isResult(linked)) return linked;
+  const actor = actorFor(ctx, linked.callerId, args.speakerHint);
+  if (!permitted(actor, spec.permission)) return failure('not-permitted', { speaker: speakerView(actor) });
+
+  return guarded(async () => {
+    const state = await resolveMon(ctx, linked.callerId, args.monId);
+    if (isResult(state)) return state;
+    const now = ctx.now();
+    const action = spec.action(args);
+    const predicted = applyCareAction(state, action, now);
+    if (predicted.outcome.kind === 'declined') {
+      return success({
+        applied: false,
+        declinedBecause: predicted.outcome.reason,
+        ...(await monAndSpeech(ctx, linked.callerId, state.mon, deriveMonMood(state.care), 'hello')),
+        care: careView(state.care),
+        mood: deriveMonMood(state.care),
+      });
+    }
+    const written = current(
+      await ctx.data.applyCare({
+        callerId: linked.callerId,
+        monInstanceId: state.mon.monInstanceId,
+        action,
+        at: now,
+        // JSON-RPC ids are connection-local and can restart after reconnect.
+        // A client can supply one stable UUID for a retry. Without one, mint
+        // a fresh UUID so two separate calls can never collide.
+        intentKey: `mcp:${args.intentId ?? randomUUID()}`,
+      }),
+      now,
+    );
+    const outcome = predicted.outcome;
+    const effect = outcome.kind === 'woke' ? (outcome.early ? 'woke-early' : 'woke') : outcome.kind;
+    return success({
+      applied: true,
+      effect,
+      ...(await monAndSpeech(ctx, linked.callerId, written.mon, deriveMonMood(written.care), effect === 'played' ? 'played' : 'hello')),
+      care: careView(written.care),
+      mood: deriveMonMood(written.care),
+    });
+  });
+}
+
+// ------------------------------------------------------------ registry ---
+
+interface ToolDef<I extends z.ZodType, O extends z.ZodType> {
+  readonly name: ToolName;
+  readonly title: string;
+  readonly description: string;
+  readonly input: I;
+  readonly output: O;
+  readonly annotations: { readOnlyHint: boolean; destructiveHint: boolean; idempotentHint: boolean; openWorldHint: boolean };
+  readonly run: (args: z.infer<I>, request: ToolRequest) => Promise<CallToolResult>;
+}
+
+/** Facts about the MCP request a tool call arrived on. */
+export interface ToolRequest {
+  /** The JSON-RPC id of the `tools/call`. */
+  readonly requestId: string | number;
+}
+
+/** A tool ready to register: `call` parses raw arguments through the tool's own input schema. */
+interface RegisteredToolDef extends Omit<ToolDef<z.ZodType, z.ZodType>, 'run'> {
+  readonly call: (raw: unknown, request: ToolRequest) => Promise<CallToolResult>;
+}
+
+const READ = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false };
+const WRITE = { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false };
+
+function def<I extends z.ZodType, O extends z.ZodType>(tool: ToolDef<I, O>): RegisteredToolDef {
+  const { run, ...rest } = tool;
+  return {
+    ...rest,
+    // The SDK has already validated against `input`; parsing again here gives
+    // `run` its typed value without a cast and costs microseconds.
+    call: async (raw, request) => {
+      const parsed = tool.input.safeParse(raw);
+      return parsed.success ? run(parsed.data, request) : failure('invalid-input');
     },
-  },
-  {
-    name: 'check_on_mon',
-    description:
-      'How is the Mon right now — status plus who is currently detected in the room. The James-scene hook: presentPeople + confidence tiers tell the personality layer whether the Mon greets, hedges, or stays quiet.',
-    inputSchema: CheckOnMonInput,
-    annotations: { title: 'Check on Mon', readOnlyHint: true, destructiveHint: false },
-    handler: async (args, ctx) => {
-      const parsed = CheckOnMonInput.parse(args);
-      try {
-        const mon = await ctx.data.resolveActiveMon(ctx.auth.callerId, parsed.monId);
-        if (!mon) return toolError({ code: 'MON_NOT_FOUND', message: 'No active Mon for this Caller.' });
-        const care = await ctx.data.getCareState(mon.monInstanceId);
-        const present = ctx.presence.presentPeople(ctx.auth.callerId);
-        return { structuredContent: { mon, care, stage: mon.stage, presentPeople: present } };
-      } catch (err) {
-        return upstreamError(err);
-      }
-    },
-  },
-  {
-    name: 'get_mon_status',
-    description: 'Stage, care meters (energy / fullness / social), activity, last-fed and pending needs for a Mon. Read-only.',
-    inputSchema: MonIdInput,
-    annotations: { title: 'Mon status', readOnlyHint: true, destructiveHint: false },
-    handler: async (args, ctx) => {
-      const parsed = MonIdInput.parse(args);
-      try {
-        const mon = await ctx.data.resolveActiveMon(ctx.auth.callerId, parsed.monId);
-        if (!mon) return toolError({ code: 'MON_NOT_FOUND', message: 'No active Mon for this Caller.' });
-        const care = await ctx.data.getCareState(mon.monInstanceId);
-        // TODO(mood): derive moodHint from meters + activity (canon has no
-        // mood field — it is computed here for the personality layer only).
-        return { structuredContent: { mon, care, stage: mon.stage } };
-      } catch (err) {
-        return upstreamError(err);
-      }
-    },
-  },
-  {
-    name: 'feed_mon',
-    description: 'Feed a Mon an inventory item. Caller-only unless a familiar holds the feed grant — this is the James refusal path (PERMISSION_DENIED_NOT_CALLER).',
-    inputSchema: FeedMonInput,
-    annotations: { title: 'Feed Mon', readOnlyHint: false, destructiveHint: false, idempotentHint: true },
-    requiredPermission: 'feed',
-    handler: async (args, ctx) => {
-      const parsed = FeedMonInput.parse(args);
-      const { denied } = await gate(ctx, 'feed', parsed.monId);
-      if (denied) return denied;
-      try {
-        const mon = await ctx.data.resolveActiveMon(ctx.auth.callerId, parsed.monId);
-        if (!mon) return toolError({ code: 'MON_NOT_FOUND', message: 'No active Mon for this Caller.' });
-        // TODO(inventory): resolve itemId → foodClassId + nutrition from the
-        // Caller's inventory before applying the care action.
-        const care = await ctx.data.applyCareAction(
-          mon.monInstanceId,
-          { kind: 'feed', itemId: parsed.itemId },
-          `mcp-feed-${parsed.itemId}-${Date.now()}`,
-        );
-        return { structuredContent: { mon, care, applied: care != null } };
-      } catch (err) {
-        return upstreamError(err);
-      }
-    },
-  },
-  {
-    name: 'play_with_mon',
-    description: 'Play an activity with a Mon; quality scales Social and bond. Familiar voices need the play grant.',
-    inputSchema: PlayWithMonInput,
-    annotations: { title: 'Play with Mon', readOnlyHint: false, destructiveHint: false },
-    requiredPermission: 'play',
-    handler: async (args, ctx) => {
-      const parsed = PlayWithMonInput.parse(args);
-      const { denied } = await gate(ctx, 'play', parsed.monId);
-      if (denied) return denied;
-      try {
-        const mon = await ctx.data.resolveActiveMon(ctx.auth.callerId, parsed.monId);
-        if (!mon) return toolError({ code: 'MON_NOT_FOUND', message: 'No active Mon for this Caller.' });
-        const care = await ctx.data.applyCareAction(
-          mon.monInstanceId,
-          { kind: 'play', quality: parsed.quality ?? 0.5 },
-          `mcp-play-${Date.now()}`,
-        );
-        return { structuredContent: { mon, care, applied: care != null } };
-      } catch (err) {
-        return upstreamError(err);
-      }
-    },
-  },
-  {
-    name: 'heal_mon',
-    description:
-      'Nurse Nay soothe flow. Canon has no HP/sickness (Law 8): this comforts a sluggish or neglected Mon, it never "cures". Caller/care-grant only.',
-    inputSchema: HealMonInput,
-    annotations: { title: 'Heal Mon (Nurse Nay)', readOnlyHint: false, destructiveHint: false, idempotentHint: true },
-    requiredPermission: 'care',
-    handler: async (args, ctx) => {
-      const parsed = HealMonInput.parse(args);
-      const { denied } = await gate(ctx, 'care', parsed.monId);
-      if (denied) return denied;
-      try {
-        const mon = await ctx.data.resolveActiveMon(ctx.auth.callerId, parsed.monId);
-        if (!mon) return toolError({ code: 'MON_NOT_FOUND', message: 'No active Mon for this Caller.' });
-        // TODO(canon): the soothe action's exact care delta is Nurse Nay's
-        // flow — not yet specified in canon bibles; keep 'soothe' on the seam.
-        const care = await ctx.data.applyCareAction(
-          mon.monInstanceId,
-          { kind: 'soothe' },
-          `mcp-soothe-${Date.now()}`,
-        );
-        return { structuredContent: { mon, care, applied: care != null } };
-      } catch (err) {
-        return upstreamError(err);
-      }
-    },
-  },
-  {
-    name: 'get_inventory',
-    description: "The Caller's item inventory (food classes, rare items). Read-only.",
-    inputSchema: MonIdInput,
-    annotations: { title: 'Inventory', readOnlyHint: true, destructiveHint: false },
-    handler: async (_args, ctx) => {
-      try {
-        const items = await ctx.data.listInventory(ctx.auth.callerId);
-        return { structuredContent: { items } };
-      } catch (err) {
-        return upstreamError(err);
-      }
-    },
-  },
-  {
-    name: 'check_incubation',
-    description: "Whether the Caller's outstanding egg is still incubating and when it ends. Read-only.",
-    inputSchema: z.object({}),
-    annotations: { title: 'Check incubation', readOnlyHint: true, destructiveHint: false },
-    handler: async (_args, ctx) => {
-      try {
-        const incubation = await ctx.data.getIncubation(ctx.auth.callerId);
-        if (!incubation) return { structuredContent: { incubating: false } };
-        const minutesRemaining = Math.max(0, (incubation.incubationEndsAt - Date.now()) / 60_000);
-        return { structuredContent: { incubating: true, ...incubation, minutesRemaining } };
-      } catch (err) {
-        return upstreamError(err);
-      }
-    },
-  },
-  {
-    name: 'get_familiar_people',
-    description: "The Caller's enrolled familiar people (self-enrolled, revocable). Read-only.",
-    inputSchema: z.object({}),
-    annotations: { title: 'Familiar people', readOnlyHint: true, destructiveHint: false },
-    handler: async (_args, ctx) => {
-      try {
-        const people = await ctx.data.listFamiliarPeople(ctx.auth.callerId);
-        return { structuredContent: { people } };
-      } catch (err) {
-        return upstreamError(err);
-      }
-    },
-  },
-  {
-    name: 'get_present_people',
-    description: 'Familiar people detected in the room right now, with confidence tier. Read-only.',
-    inputSchema: z.object({}),
-    annotations: { title: 'Present people', readOnlyHint: true, destructiveHint: false },
-    handler: async (_args, ctx) => {
-      const present = ctx.presence.presentPeople(ctx.auth.callerId);
-      const named = await Promise.all(
-        present.map(async (p) => {
-          const person = await ctx.data.getFamiliarPerson(ctx.auth.callerId, p.personId).catch(() => null);
-          return { ...p, displayName: person?.displayName };
-        }),
-      );
-      return { structuredContent: { people: named } };
-    },
-  },
-  {
-    name: 'get_person_relationship',
-    description: 'Relationship, permissions and familiarity between the Caller’s Mon and one familiar person. Read-only.',
-    inputSchema: PersonIdInput,
-    annotations: { title: 'Person relationship', readOnlyHint: true, destructiveHint: false },
-    handler: async (args, ctx) => {
-      const parsed = PersonIdInput.parse(args);
-      try {
-        const person = await ctx.data.getFamiliarPerson(ctx.auth.callerId, parsed.personId);
-        if (!person) return toolError({ code: 'MON_NOT_FOUND', message: 'No such familiar person.' });
-        return {
-          structuredContent: {
-            person,
-            relationship: person.relationship,
-            permissions: person.permissions,
-            // TODO(canon): bond-per-person familiarity model does not exist yet.
-          },
-        };
-      } catch (err) {
-        return upstreamError(err);
-      }
-    },
-  },
-  {
-    name: 'get_shared_memories',
-    description: 'Shared moments between the Mon and a familiar person. Read-only.',
-    inputSchema: PersonIdInput,
-    annotations: { title: 'Shared memories', readOnlyHint: true, destructiveHint: false },
-    handler: async (args, ctx) => {
-      const parsed = PersonIdInput.parse(args);
-      try {
-        // TODO(memories): a shared-memories store does not exist yet — design
-        // target is per-(monInstanceId, personId) records appended by
-        // acknowledge_person and notable care events.
-        return { structuredContent: { personId: parsed.personId, memories: [] } };
-      } catch (err) {
-        return upstreamError(err);
-      }
-    },
-  },
-  {
-    name: 'acknowledge_person',
-    description: 'Record that the Mon recognised a present familiar person (greeted / hedged / ignored). Feeds the shared-memory log.',
-    inputSchema: AcknowledgePersonInput,
-    annotations: { title: 'Acknowledge person', readOnlyHint: false, destructiveHint: false },
-    handler: async (args, ctx) => {
-      const parsed = AcknowledgePersonInput.parse(args);
-      try {
-        const latest = ctx.presence.latestFor(ctx.auth.callerId, parsed.personId);
-        if (!latest) {
-          return toolError({
-            code: 'PRESENCE_REQUIRED',
-            message: 'No fresh presence event for this person; the Mon cannot acknowledge someone not detected.',
+  };
+}
+
+/** The tool definitions for one request. Dev tools exist only when `ctx.familiar` is set. */
+export function buildTools(ctx: ToolContext) {
+  const devMode = ctx.familiar !== undefined;
+  const core = [
+    def({
+      name: 'get_mon_status',
+      title: 'Mon status',
+      description:
+        "Exact care meters for the Caller's Mon: Energy, Fullness and Social from 0 to 1, stage, bond, whether it is asleep, and whether it asked for food.",
+      input: MonIdInput,
+      output: MonStatusOutput,
+      annotations: READ,
+      run: async (args) => {
+        const linked = linkedCaller(ctx);
+        if (isResult(linked)) return linked;
+        return guarded(async () => {
+          const state = await resolveMon(ctx, linked.callerId, args.monId);
+          if (isResult(state)) return state;
+          const mood = deriveMonMood(state.care);
+          return success({
+            ...(await monAndSpeech(ctx, linked.callerId, state.mon, mood, state.care.pendingRequest !== null ? 'hungry' : 'hello')),
+            care: careView(state.care),
+            mood,
+            needs: listUnmetNeeds(state.care),
           });
-        }
-        // TODO(memories): append {personId, acknowledgedAs, ts} to the
-        // shared-memories store once it exists.
-        return { structuredContent: { acknowledged: true, personId: parsed.personId, at: Date.now() } };
-      } catch (err) {
-        return upstreamError(err);
-      }
-    },
-  },
-  {
-    name: 'inject_presence_event',
-    description:
-      'DEV/SIMULATOR ONLY — publish a synthetic PresenceEvent into the presence service. This is the James-scene hook for the web simulator and demo rehearsal; it is refused outside dev mode.',
-    inputSchema: InjectPresenceEventInput,
-    annotations: { title: 'Inject presence (dev)', readOnlyHint: false, destructiveHint: true },
-    handler: async (args, ctx) => {
-      if (!ctx.devMode) {
-        return toolError({ code: 'PERMISSION_DENIED_NOT_CALLER', message: 'inject_presence_event is dev-mode only.' });
-      }
-      const parsed = InjectPresenceEventInput.parse(args);
-      const event = ctx.presence.ingest({ ...parsed, eventId: parsed.eventId ?? `evt-${Date.now()}` });
-      if (!event) return toolError({ code: 'UPSTREAM_UNAVAILABLE', message: 'Malformed presence event.' });
-      return { structuredContent: { event } };
-    },
-  },
-];
+        });
+      },
+    }),
+    def({
+      name: 'check_on_mon',
+      title: 'Check on Mon',
+      description:
+        "How the Caller's Mon is doing and what it needs: its mood, which needs are low, and the care that would help most (feed, rest, play, or wait).",
+      input: MonIdInput,
+      output: checkOnMonOutput(devMode),
+      annotations: READ,
+      run: async (args) => {
+        const linked = linkedCaller(ctx);
+        if (isResult(linked)) return linked;
+        return guarded(async () => {
+          const state = await resolveMon(ctx, linked.callerId, args.monId);
+          if (isResult(state)) return state;
+          const needs = listUnmetNeeds(state.care);
+          const mood = deriveMonMood(state.care);
+          return success({
+            ...(await monAndSpeech(ctx, linked.callerId, state.mon, mood, state.care.pendingRequest !== null ? 'hungry' : 'hello')),
+            mood,
+            needs,
+            suggestedCare: suggestedCare(state, needs),
+            ...(devMode ? { presentPeople: presentPeople(ctx, linked.callerId) } : {}),
+          });
+        });
+      },
+    }),
+    def({
+      name: 'check_incubation',
+      title: 'Check incubation',
+      description: "Whether the Caller has an egg incubating, how many minutes are left, and whether it is ready to hatch (hatch_egg hatches it).",
+      input: NoInput,
+      output: IncubationOutput,
+      annotations: READ,
+      run: async () => {
+        const linked = linkedCaller(ctx);
+        if (isResult(linked)) return linked;
+        return guarded(async () => {
+          const now = ctx.now();
+          const listed = await ctx.data.listIncubatingEggs(linked.callerId);
+          const lingo = listed.length === 0 ? undefined : await lingoFor(ctx, linked.callerId);
+          const eggs = listed.map(({ egg }) => ({
+            eggId: egg.eggId,
+            speciesId: egg.speciesId,
+            incubationEndsAt: egg.incubationEndsAt,
+            minutesRemaining: Math.max(0, Math.ceil((egg.incubationEndsAt - now) / 60_000)),
+            readyToHatch: egg.incubationEndsAt <= now,
+            ...(lingo === undefined ? {} : eggSpeech(egg, lingo, now)),
+          }));
+          return success({ incubating: eggs.length > 0, eggs, ...(eggs.length > 0 ? { speechRule: BABY_TALK_RULE } : {}) });
+        });
+      },
+    }),
+    def({
+      name: 'hatch_egg',
+      title: 'Hatch egg',
+      description:
+        "Hatch the Caller's egg once incubation has ended, and show it hatching. Returns the Mon it hatched into. Before the egg is ready it refuses and says how many minutes are left. Only the Caller can hatch. Safe to retry.",
+      input: hatchEggInput(devMode),
+      output: HatchEggOutput,
+      annotations: { ...WRITE, idempotentHint: true },
+      run: (args) => runHatch(ctx, args),
+    }),
+    def({
+      name: 'talk_to_mon',
+      title: 'Talk to Mon',
+      description:
+        "Use when the Caller talks to their Mon, or to their egg. Returns the Mon's state (mood, needs, awake or asleep, whether it wants food) and who is speaking, so the reply can be voiced in character. When `say` is present with verbatim true, the Mon's words are exactly say.text. A Caller with only an egg gets no-mon with the egg's babble in error.egg.say. Writes nothing.",
+      input: careInput(devMode),
+      output: talkToMonOutput(devMode),
+      annotations: READ,
+      run: async (args) => {
+        const linked = linkedCaller(ctx);
+        if (isResult(linked)) return linked;
+        const hint = SpeakerHintSchema.optional().parse('speakerHint' in args ? args.speakerHint : undefined);
+        const actor = actorFor(ctx, linked.callerId, hint);
+        return guarded(async () => {
+          const state = await resolveMon(ctx, linked.callerId, args.monId);
+          if (isResult(state)) return args.monId === undefined && isNoMon(state) ? eggOnlyTalk(ctx, linked.callerId) : state;
+          const mood = deriveMonMood(state.care);
+          const wantsFood = state.care.pendingRequest !== null;
+          return success({
+            ...(await monAndSpeech(ctx, linked.callerId, state.mon, mood, wantsFood ? 'hungry' : 'hello')),
+            mood,
+            voiceGuide: voiceGuideFor(state.mon, mood, await lingoFor(ctx, linked.callerId), voiceStage(state.mon, ctx.now())),
+            needs: listUnmetNeeds(state.care),
+            activity: state.care.activity.kind,
+            wantsFood,
+            speaker: speakerView(actor),
+            ...(devMode ? { presentPeople: presentPeople(ctx, linked.callerId) } : {}),
+          });
+        });
+      },
+    }),
+    def({
+      name: 'feed_mon',
+      title: 'Share a meal',
+      description:
+        'Share a meal with the Mon (feed it). No food item is chosen. A Mon that is asleep or sluggish from overeating declines, and nothing changes.',
+      input: careInput(devMode),
+      output: CareResultOutput,
+      annotations: WRITE,
+      run: (args) => runCare(ctx, { permission: 'feed', action: () => ({ kind: 'feed' }) }, args),
+    }),
+    def({
+      name: 'rest_mon',
+      title: 'Put Mon to rest',
+      description: 'Put the Mon to sleep so its Energy recovers. Declines if it is already asleep.',
+      input: careInput(devMode),
+      output: CareResultOutput,
+      annotations: WRITE,
+      run: (args) => runCare(ctx, { permission: 'rest', action: () => ({ kind: 'rest' }) }, args),
+    }),
+    def({
+      name: 'wake_mon',
+      title: 'Wake Mon',
+      description: 'Wake the Mon up. Waking it before its Energy recovers costs some Social. Declines if it is already awake.',
+      input: careInput(devMode),
+      output: CareResultOutput,
+      annotations: WRITE,
+      run: (args) => runCare(ctx, { permission: 'rest', action: () => ({ kind: 'wake' }) }, args),
+    }),
+    def({
+      name: 'play_with_mon',
+      title: 'Play with Mon',
+      description:
+        'Play with the Mon (Peek). Raises Social and bond and costs some Energy. Declines if it is asleep or too tired.',
+      input: playInput(devMode),
+      output: CareResultOutput,
+      annotations: WRITE,
+      run: (args) =>
+        runCare(
+          ctx,
+          { permission: 'play', action: ({ quality }) => ({ kind: 'play', quality: quality ?? 0.5 }) },
+          args,
+        ),
+    }),
+  ];
 
-export const toolNames = tools.map((t) => t.name);
+  const familiar = ctx.familiar;
+  if (familiar === undefined) return core;
+
+  const person = (callerId: string, personId: string) => familiar.getPerson(callerId, personId);
+  const personView = (p: NonNullable<ReturnType<typeof person>>) => ({
+    personId: p.personId,
+    displayName: p.displayName,
+    relationship: p.relationship,
+    permissions: p.permissions,
+    fictional: p.fictional,
+  });
+
+  const dev = [
+    def({
+      name: 'get_familiar_people',
+      title: 'Familiar people',
+      description: "Simulator only. The fictional people in the Caller's circle and what each may do with the Mon.",
+      input: NoInput,
+      output: FamiliarPeopleOutput,
+      annotations: READ,
+      run: async () => {
+        const linked = linkedCaller(ctx);
+        if (isResult(linked)) return linked;
+        return success({ people: familiar.listPeople(linked.callerId).map(personView) });
+      },
+    }),
+    def({
+      name: 'get_present_people',
+      title: 'Present people',
+      description: 'Simulator only. Familiar people detected nearby in the last 90 seconds, with a confidence tier.',
+      input: NoInput,
+      output: PresentPeopleOutput,
+      annotations: READ,
+      run: async () => {
+        const linked = linkedCaller(ctx);
+        if (isResult(linked)) return linked;
+        return success({ people: presentPeople(ctx, linked.callerId) });
+      },
+    }),
+    def({
+      name: 'get_person_relationship',
+      title: 'Person relationship',
+      description: 'Simulator only. One familiar person: relationship to the Caller and what they may do with the Mon.',
+      input: PersonIdInput,
+      output: PersonRelationshipOutput,
+      annotations: READ,
+      run: async (args) => {
+        const linked = linkedCaller(ctx);
+        if (isResult(linked)) return linked;
+        const p = person(linked.callerId, args.personId);
+        return p === undefined ? failure('person-not-found') : success({ person: personView(p) });
+      },
+    }),
+    def({
+      name: 'get_shared_memories',
+      title: 'Shared memories',
+      description: 'Simulator only. Moments the Mon shared with one familiar person, newest first.',
+      input: PersonIdInput,
+      output: SharedMemoriesOutput,
+      annotations: READ,
+      run: async (args) => {
+        const linked = linkedCaller(ctx);
+        if (isResult(linked)) return linked;
+        if (person(linked.callerId, args.personId) === undefined) return failure('person-not-found');
+        const memories = familiar.listMemories(linked.callerId, args.personId).map(({ memoryId, summary, at }) => ({
+          memoryId,
+          summary,
+          at,
+        }));
+        return success({ personId: args.personId, memories });
+      },
+    }),
+    def({
+      name: 'acknowledge_person',
+      title: 'Acknowledge person',
+      description: 'Simulator only. Record that the Mon noticed a familiar person who is nearby (greeted, hedged or ignored).',
+      input: AcknowledgePersonInput,
+      output: AcknowledgeOutput,
+      annotations: WRITE,
+      run: async (args) => {
+        const linked = linkedCaller(ctx);
+        if (isResult(linked)) return linked;
+        const p = person(linked.callerId, args.personId);
+        if (p === undefined) return failure('person-not-found');
+        if (ctx.presence.latestFor(linked.callerId, args.personId, ctx.now()) === null) return failure('not-detected');
+        const verb = { greeted: 'Greeted', hedged: 'Half-recognised', ignored: 'Noticed but ignored' }[args.acknowledgedAs];
+        const memory = familiar.recordMemory(linked.callerId, args.personId, `${verb} ${p.displayName}.`, ctx.now());
+        return success({ personId: args.personId, memoryId: memory.memoryId, at: memory.at });
+      },
+    }),
+    def({
+      name: 'inject_presence_event',
+      title: 'Inject presence (simulator)',
+      description: 'Simulator only. Mark a fictional familiar person as detected nearby, with a confidence from 0 to 1.',
+      input: InjectPresenceEventInput,
+      output: PresenceEventOutput,
+      annotations: { ...WRITE, idempotentHint: false },
+      run: async (args) => {
+        const linked = linkedCaller(ctx);
+        if (isResult(linked)) return linked;
+        if (person(linked.callerId, args.personId) === undefined) return failure('person-not-found');
+        const event = ctx.presence.ingest({
+          eventId: `evt-${randomUUID()}`,
+          personId: args.personId,
+          callerId: linked.callerId,
+          confidence: args.confidence,
+          ts: ctx.now(),
+          source: 'simulator',
+          monInstanceId: args.monInstanceId,
+        });
+        return event === null ? failure('unavailable') : success({ event });
+      },
+    }),
+  ];
+
+  return [...core, ...dev];
+}
+
+/** Registers every tool for this request on `server`, linking MCP Apps views from `ui` when given. */
+export function registerTools(server: McpServer, ctx: ToolContext, ui: McpAppsRegistration | undefined): void {
+  for (const tool of buildTools(ctx)) {
+    const resourceUri = ui?.toolResourceUris[tool.name];
+    server.registerTool(
+      tool.name,
+      {
+        title: tool.title,
+        description: tool.description,
+        inputSchema: tool.input,
+        outputSchema: tool.output,
+        annotations: { title: tool.title, ...tool.annotations },
+        // MCP Apps: linked tools stay visible to the model and callable from
+        // the view (the card's care buttons call them with `{ monId }`).
+        ...(resourceUri === undefined ? {} : { _meta: { ui: { resourceUri, visibility: ['model', 'app'] } } }),
+      },
+      (args: unknown, extra: { mcpReq: { id: string | number } }) => tool.call(args, { requestId: extra.mcpReq.id }),
+    );
+  }
+}

@@ -1,0 +1,5 @@
+name: game-lobby
+main: GameLobby
+logs:
+  file: build/rive.log
+  problems: build/problems.log

@@ -1,6 +1,6 @@
 # M13 Home (Baby): copy
 
-Owner: `ux-writer`. Voice and glossary: `docs/COPY_DECK.md`. `{name}` is `MonInstance.nickname`, falling back to the Baby form name from `@acme/content` (`formName`) when the nickname is null. No pronoun for a Mon (PS-005). "H-Lynk", never "device" (Law 9). Every string here is `voice: "ui"`; the Mon has no lines (Q32: Babies use species sounds only, pending).
+Owner: `ux-writer`. Voice and glossary: `docs/COPY_DECK.md`. `{name}` is `MonInstance.nickname`, falling back to the Baby form name from `@acme/content` (`formName`) when the nickname is null. No pronoun for a Mon (PS-005). "H-Lynk", never "device" (Law 9). Every string here is `voice: "ui"`; the Mon has no lines here (Decision 32: a Baby babbles on its first day, then says at most two words).
 
 ## Strings
 
@@ -43,4 +43,4 @@ Owner: `ux-writer`. Voice and glossary: `docs/COPY_DECK.md`. `{name}` is `MonIns
 ## Open copy questions
 
 1. Q18: if the meter is renamed (e.g. "Social HP"), `m13.ring.social` and `m13.status.many` change; "Wants to play" stays.
-2. Does a Baby's request ever carry character voice? Q32 says no for now; nothing here assumes otherwise.
+2. Does a Baby's request ever carry character voice? Only within Decision 32: babble on its first day, then the family sound plus at most two words. These strings stay `voice: "ui"`; nothing here assumes otherwise.

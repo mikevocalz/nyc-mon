@@ -121,7 +121,8 @@ export function Select({
           className={s.select({ className: twMerge('flex-row items-center text-left', rounded ? 'rounded-soft' : '', className) })}
           {...triggerExtras}
         >
-          <Text numberOfLines={1} className="text-base font-semibold text-ink-50">
+          {/* An empty-value option is the field's prompt: muted, like a placeholder. */}
+          <Text numberOfLines={1} className={selected && selected.value !== '' ? 'text-base font-semibold text-ink-50' : 'text-base text-silver-400'}>
             {selected ? (selected.label ?? selected.value) : ' '}
           </Text>
         </Pressable>

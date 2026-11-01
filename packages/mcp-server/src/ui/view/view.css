@@ -1,0 +1,32 @@
+/*
+ * The kit's web styles, as apps/storybook/globals.css sets them up (Tailwind v4
+ * with `important`, @acme/theme theme.css, the kit and companion sources).
+ * One difference: the two brand fonts load as the same files' WOFF2 builds
+ * from packages/assets/fonts (inlined by the build) instead of the TTFs,
+ * which would add about 300 KB of base64 for the same glyphs.
+ */
+@import 'tailwindcss' important;
+@import '@acme/theme/theme.css';
+
+@source '../../../../ui';
+@source '../../../../app/features/companion';
+@source '.';
+
+@font-face {
+  font-family: 'Archivo Black';
+  src: url('../../../../assets/fonts/ArchivoBlack-Regular.woff2') format('woff2');
+  font-weight: 400 900;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Space Grotesk';
+  src: url('../../../../assets/fonts/SpaceGrotesk-Variable.woff2') format('woff2');
+  font-weight: 300 700;
+  font-display: swap;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+}

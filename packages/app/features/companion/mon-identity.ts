@@ -1,5 +1,6 @@
 import { allSpecies, bloodlineLabel, bloodlines, eggs } from '@acme/content';
 import { CREATURE_ART, type CreatureArt } from '@acme/assets/creatures';
+import { currentAdminStills, stillFor, type AdminStillMap } from '../mons/admin-stills.ts';
 import type { EggRecord, MonInstance } from '@acme/core/types';
 
 /** What every Phase 1 screen shows about one Mon, read from `@acme/content` by `speciesId`. */
@@ -13,21 +14,21 @@ export interface MonIdentity {
   readonly bloodlineName: string | null;
   /** "Hood Ratti Bloodline" (Decision #11), or null when content has no Bloodline for the species. */
   readonly bloodlineLabel: string | null;
-  /** The 2D Baby still (stand-in for the model, PS-007), or undefined when no art ships for the form. */
+  /** The 2D Baby still (stand-in for the model, PS-007): the approved console still, else the bundled one, else undefined. */
   readonly art: CreatureArt | undefined;
 }
 
 const speciesById = new Map(allSpecies.map((s) => [s.speciesId, s]));
 const bloodlineById = new Map(bloodlines.map((b) => [b.bloodlineId, b]));
 
-/** Art for a form by Dex number and kind; undefined when the bundle has none. */
-export function artFor(kind: 'baby' | 'egg', dexId: number | null): CreatureArt | undefined {
-  if (dexId === null) return undefined;
-  return CREATURE_ART.find((a) => a.kind === kind && a.dexId === dexId);
-}
+export { artFor } from './creature-art.ts';
 
-/** Identity of a hatched Mon. Pure; never throws for an unknown species. */
-export function monIdentity(mon: MonInstance): MonIdentity {
+/**
+ * Identity of a hatched Mon. Pure given `stills`; never throws for an unknown
+ * species. Screens pass `useAdminStills()` so they redraw when the console
+ * stills land; other callers read the store's current list.
+ */
+export function monIdentity(mon: MonInstance, stills: AdminStillMap = currentAdminStills()): MonIdentity {
   const species = speciesById.get(mon.speciesId);
   const bloodline = species === undefined ? undefined : bloodlineById.get(species.bloodlineId);
   const label = bloodline === undefined ? null : bloodlineLabel(bloodline);
@@ -40,7 +41,7 @@ export function monIdentity(mon: MonInstance): MonIdentity {
     dexId,
     bloodlineName: bloodline?.bloodlineName ?? null,
     bloodlineLabel: label,
-    art: artFor('baby', dexId),
+    art: stillFor('baby', dexId, species?.speciesId, stills, CREATURE_ART),
   };
 }
 
@@ -55,7 +56,7 @@ export interface EggIdentity {
   readonly bloodlineLabel: string | null;
 }
 
-export function eggIdentity(egg: EggRecord): EggIdentity {
+export function eggIdentity(egg: EggRecord, stills: AdminStillMap = currentAdminStills()): EggIdentity {
   const starter = eggs.find((e) => e.speciesId === egg.speciesId);
   const eggSpecies = speciesById.get(egg.speciesId);
   const baby = speciesById.get(egg.hatchesIntoSpeciesId);
@@ -65,9 +66,9 @@ export function eggIdentity(egg: EggRecord): EggIdentity {
   return {
     eggName: starter?.eggName ?? eggSpecies?.formName ?? '',
     eggDexId,
-    eggArt: artFor('egg', eggDexId),
+    eggArt: stillFor('egg', eggDexId, egg.speciesId, stills, CREATURE_ART),
     babyName: baby?.formName ?? label ?? '',
-    babyArt: artFor('baby', baby?.dexId ?? null),
+    babyArt: stillFor('baby', baby?.dexId ?? null, baby?.speciesId, stills, CREATURE_ART),
     bloodlineLabel: label,
   };
 }

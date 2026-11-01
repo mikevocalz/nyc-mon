@@ -18,7 +18,7 @@
  */
 import './rn-globals-shim';
 import React from 'react';
-import type { Role } from 'react-native';
+import type { Role, StyleProp, ViewStyle } from 'react-native';
 import { ScrollView as RNScrollView } from 'react-native';
 import { css, type CN } from './html/css';
 import { ButtonBase, InputBase } from './html/dom';
@@ -53,8 +53,27 @@ function withBodyText<P extends object>(Component: React.FC<P & CN>, displayName
 
 // ---- generic containers (html-elements backed) ------------------------------
 
+/**
+ * The containers' `style` takes React Native's ViewStyle as well as
+ * @expo/html-elements' own. html-elements types its style as
+ * `Omit<RN ViewStyle, 'position'> & WebViewStyle`, an intersection, and hands
+ * the value to RN's View (native) or react-native-web's View (web) unchanged,
+ * so a plain RN ViewStyle is always valid at runtime. The intersection breaks
+ * at type level once expo/types (expo-env.d.ts) augments RN's ViewStyle with
+ * the web animation props: Expo widens `animationDelay` to
+ * `string | number | …` while html-elements keeps `string`, and every RN
+ * ViewStyle stops being assignable. A union accepts either shape, whichever
+ * way the augmentation lands.
+ */
+type HtmlViewProps = React.ComponentProps<typeof EDiv>;
+type ContainerProps = Omit<HtmlViewProps, 'style'> & CN & { style?: StyleProp<ViewStyle> | HtmlViewProps['style'] };
+
+function container(Component: React.ComponentType<HtmlViewProps>, displayName: string) {
+  return css(Component, displayName) as React.FC<ContainerProps>;
+}
+
 // <div> on web, View on native.
-export const View = css(EDiv, 'View');
+export const View = container(EDiv, 'View');
 
 // <span> on web, Text on native.
 export const Text = withBodyText(css(ESpan, 'Text'), 'CSS(Text)');
@@ -75,12 +94,12 @@ export const ScrollView = css(RNScrollView, 'ScrollView', {
 // ---- semantic landmarks (@expo/html-elements) --------------------------------
 // Real HTML landmarks on web, correct accessibility roles on native.
 
-export const Main = css(EMain, 'Main');
-export const Section = css(ESection, 'Section');
-export const Article = css(EArticle, 'Article');
-export const Nav = css(ENav, 'Nav');
-export const Header = css(EHeader, 'Header');
-export const Footer = css(EFooter, 'Footer');
+export const Main = container(EMain, 'Main');
+export const Section = container(ESection, 'Section');
+export const Article = container(EArticle, 'Article');
+export const Nav = container(ENav, 'Nav');
+export const Header = container(EHeader, 'Header');
+export const Footer = container(EFooter, 'Footer');
 
 export const H1 = withBodyText(css(EH1, 'H1'), 'CSS(H1)');
 export const H2 = withBodyText(css(EH2, 'H2'), 'CSS(H2)');

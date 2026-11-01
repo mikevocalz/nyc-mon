@@ -1,0 +1,5 @@
+[23:07:46.948] rive  deferred replay: inline
+[23:07:46.949] rive  compiling 2 markup files as one document: ../game-lobby/shared-vm.rml, scene.rml
+[23:07:47.002] rive  built /Users/mikevocalz/nyc-mon/packages/ui/rive/lobby/start-angled/build/start-angled.riv (142704 bytes, 53ms, 0 errors, 0 warnings)
+[23:07:47.004] rive  showing StartAngledHost [1/2]
+[23:07:47.006] rive  wrote /Users/mikevocalz/nyc-mon/packages/ui/rive/lobby/start-angled/build/start-angled.data.json

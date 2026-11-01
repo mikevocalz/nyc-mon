@@ -5,7 +5,7 @@ import { W01_COPY } from './copy.ts';
 import {
   DEFAULT_HUD_TAB, HUD_BANNED, HUD_SIZE, HUD_TAB_BAR, HUD_TABS, hudCaption, hudTabAt, hudTabRect, initialHudState,
   type HudContent,
-} from './hlynk-hud.ts';
+} from '@acme/ui/three/hlynk/hud';
 import { hudContent } from './hlynk-hud-content.ts';
 
 const content: HudContent = hudContent();
@@ -17,7 +17,7 @@ test('the tabs are the creator\'s five, in order, and open on Crew', () => {
   assert.deepEqual([...HUD_TABS], ['dex', 'crew', 'care', 'bag', 'city']);
   assert.deepEqual(HUD_TABS.map((t) => content.tabs[t]), ['Dex', 'Crew', 'Care', 'Bag', 'City']);
   assert.equal(DEFAULT_HUD_TAB, 'crew');
-  assert.deepEqual(initialHudState(), { tab: 'crew', hover: null, sound: true, presses: 0, taps: 0 });
+  assert.deepEqual(initialHudState(), { tab: 'crew', sound: true });
 });
 
 test('each tab rect hit-tests to its own tab at its centre and inner corners', () => {
@@ -62,11 +62,12 @@ test('the default tab is the static screen: the first starter\'s Baby name and "
   assert.equal(hudCaption('crew', content), 'Crew: Squeaklet. Your Mon.');
 });
 
-test('Dex lists the three starters with their Dex numbers from @acme/content', () => {
-  assert.equal(content.dex.length, 3);
+test('Dex lists the four starters with their Dex numbers from @acme/content', () => {
+  assert.equal(content.dex.length, 4);
   for (const entry of content.dex) assert.match(entry.no, /^No\. \d{3}$/);
   assert.equal(content.dex[0]?.name, 'Squeaklet');
-  assert.equal(new Set(content.dex.map((d) => d.no)).size, 3);
+  assert.equal(content.dex[3]?.name, 'Fye Dot');
+  assert.equal(new Set(content.dex.map((d) => d.no)).size, 4);
 });
 
 test('Care shows Energy, Fullness and Social at the CARE section\'s example levels, labelled as examples', () => {
@@ -119,7 +120,7 @@ test('one store carries the tab both ways: DOM writes reach a subscriber, and th
   store.setState({ tab: 'care' }); // the radio group
   const hit = hudTabAt(...uv(hudTabRect(4).x + 10, hudTabRect(4).y + 10)); // a click on City in 3D
   if (hit) store.setState({ tab: hit });
-  store.setState({ hover: 'dex' }); // hover alone does not change the tab
+  store.setState({ sound: false }); // the sound switch alone does not change the tab
   unsubscribe();
   assert.deepEqual(seen, ['care', 'city']);
   assert.equal(store.getState().tab, 'city');

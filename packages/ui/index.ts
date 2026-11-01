@@ -12,9 +12,11 @@ export { useIsHeadset } from './use-is-headset';
 export { isHeadsetAndroid } from './headset';
 export { LinkButton, type LinkButtonProps, type LinkButtonVariant } from './LinkButton';
 export { IconButton, type IconButtonProps } from './IconButton';
+export { BackButton, type BackButtonProps } from './BackButton';
 export { Card, type CardProps } from './Card';
 export { Badge, type BadgeProps } from './Badge';
-export { Avatar, AVATAR_GRADIENTS, type AvatarProps, type AvatarGradient, type AvatarGradientPreset, type AvatarVariant } from './Avatar';
+export { Avatar, type AvatarProps } from './Avatar';
+export { AVATAR_GRADIENTS, type AvatarGradient, type AvatarGradientPreset, type AvatarVariant } from './avatar-look';
 export { Image, type ImageProps } from './Image';
 
 // forms
@@ -72,6 +74,8 @@ export { SegmentedControl, type SegmentedControlProps, type SegmentedOption } fr
 export { FieldGroup, type FieldGroupProps, type FieldSectionProps } from './FieldGroup';
 export { Slider, type SliderProps } from './Slider';
 export { Collapsible, type CollapsibleProps } from './Collapsible';
+export { RiveLoader, type RiveLoaderProps } from './RiveLoader';
+export { riveLoaderColors, type RiveLoaderPhase, type RiveLoaderScheme, type RiveLoaderColors } from './rive-loader-bindings';
 export { List, ListItem, type ListProps, type ListItemProps } from './List';
 export { NativeSlot, type NativeSlotProps } from './NativeSlot';
 export { Menu, type MenuProps, type MenuAction } from './Menu';
@@ -82,7 +86,7 @@ export {
   type MotionViewProps, type MotionTextProps, type MotionPresetProps,
 } from './motion';
 export { PressScale, type PressScaleProps } from './press-scale';
-export { useInstanceStore, useStore } from './use-instance-store';
+export { useInstance, useInstanceStore, useStore } from './use-instance-store';
 export * from './audio';
 
 export { GridFloor, type GridFloorProps } from './backgrounds/GridFloor';
@@ -99,6 +103,20 @@ export { HolographicTerrain, type HolographicTerrainProps } from './three/Hologr
 export { NeonTide, type NeonTideProps, type NeonTideOrigin } from './three/NeonTide';
 export { ThreeCanvas } from './three/ThreeCanvas';
 export type { ThreeBackend, ThreeCanvasHandle, ThreeCanvasProps, ThreeContext, ThreeFrame, ThreePointer, ThreeScene, ThreeSetup } from './three/types';
+// The H-Lynk in 3D, one stage on web and native (also '@acme/ui/three/hlynk').
+export {
+  DeviceStage, HLynkHudStage, createChoiceScreen, createHudScreen, createIncubateScreen, incubateOptionTarget,
+  INCUBATE_EGG_TARGET, INCUBATE_START_TARGET, createIncubatingScreen, type IncubatingView, createStageReady, StageReadyGate, type StageReadyResource,
+  type ChoiceAction, type ChoiceItem, type ChoicePanel, type DeviceCapture, type DeviceKey, type DeviceScreen,
+  type DeviceStageApi, type DeviceStageProps, type IncubateScreenOptions, type ScreenModelSource,
+  type HLynkHudStageControls, type HLynkHudStageProps, type HudContent, type HudMeter, type HudTab,
+  createGlassScreen, createSwitchScreen, GLASS_MON_TARGET, glassGeometry, type GlassAction, type GlassLayout, type GlassLine, type GlassRing, type GlassTone, type GlassView,
+  type ScreenMonSource,
+} from './three/hlynk';
+// Empties the shared Baby/egg GLB parses and glass caches while the H-Lynk is down (no three.js import).
+export { releaseHLynkResources, type ReleaseCount } from './three/release';
+// Baby GLB download progress for the stage loader (no three.js import).
+export { glbFraction, glbProgressStore, type GlbProgress } from './three/mon/load-progress';
 export { RiverTide, type RiverTideProps, type RiverTideOrigin } from './backgrounds/RiverTide';
 export { RainWindow, type RainWindowProps } from './backgrounds/RainWindow';
 export { LazyScene, type LazySceneProps, type LazySceneState } from './backgrounds/LazyScene';
@@ -106,6 +124,9 @@ export { SceneSection, type SceneSectionProps } from './backgrounds/SceneSection
 export { SkylineDivider, type SkylineDividerProps } from './backgrounds/SkylineDivider';
 export { useInView } from './backgrounds/use-in-view';
 export { useReducedMotion } from './backgrounds/use-reduced-motion';
+export {
+  getKitPreferences, setKitPreferences, subscribeKitPreferences, useForcedReducedMotion, useSoundEnabled,
+} from './device-preferences';
 export type { InView, InViewOptions } from './backgrounds/use-in-view.types';
 // Districts and tones: one module for the whole kit.
 export {
@@ -137,6 +158,7 @@ export type { TextEffectOptions, GlitchIntensity, GlitchSpeed, TextGlowLevel } f
 
 // H-Lynk chrome: shell, scanner head, screen, trackpad, keys.
 export * from './hlynk';
+export * from './arrangement';
 
 // Phase 1 loop primitives: egg choice, case, incubation, hatch (M08–M12) and care (M13–M18).
 export * from './hatch';

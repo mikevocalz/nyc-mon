@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>%NYC_MON_TITLE%</title>
+<!-- Same globals as apps/storybook/.storybook/preview-head.html: next/image
+     (through solito/image) reads process.env at module load, and the kit reads
+     __DEV__ before rn-globals-shim defines it. -->
+<script>
+  globalThis.process ??= { env: {} };
+  globalThis.process.env ??= {};
+  globalThis.__DEV__ ??= false;
+  // Storybook's Vite builder defines `global` for CJS dependencies; a plain
+  // Vite build does not, and some kit dependencies read it at load.
+  globalThis.global ??= globalThis;
+</script>
+</head>
+<body>
+<div id="root"></div>
+<script type="module" src="./main.tsx"></script>
+</body>
+</html>

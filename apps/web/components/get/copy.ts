@@ -1,7 +1,7 @@
 import { HOME_COPY } from '@acme/spatial/copy';
 import { W01_COPY } from '../home/copy';
 import { W04_COPY } from '../how-it-works/copy';
-import { LEGAL_COPY } from '../legal/copy';
+import { LEGAL_COPY } from '@acme/app/features/legal/copy.ts';
 import { WAITLIST_COPY } from '../waitlist/copy';
 
 /**

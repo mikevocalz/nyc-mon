@@ -7,11 +7,12 @@ import { Text } from './Text';
 import { View } from './tw';
 
 /**
- * The shell with side panes (M13–M16 on the Quest 2D window, 1280 × 800 dp
- * by default, resizable 360–1280). From 840 dp wide the stage opens a leading
- * and a trailing pane at `content-form` width; the shell keeps the centre and
- * its 440 pt cap. Narrower, the panes are gone and the screen draws the same
- * panel inside the shell. Resize the canvas to see the switch.
+ * The companion loop's shell host. From `md` the stage shows one companion
+ * pane beside the shell (landscape: pane left, shell right, the open-foldable
+ * layout) or under it (portrait); below `md` the pane is hidden and screens
+ * draw the same content inside the H-Lynk screen. Breakpoint and orientation
+ * classes drive it, so these fixed-size frames show the layout of whichever
+ * window Storybook runs in.
  */
 const meta = {
   title: 'H-Lynk/HLynkStage',
@@ -41,7 +42,7 @@ const Panel = ({ title }: { title: string }) => (
   </View>
 );
 
-/** Quest default: 1280 × 800. Both panes, shell centred. */
+/** Quest default: 1280 × 800. Leading and trailing stacked in the companion pane, shell on the right. */
 export const QuestWindow: Story = {
   args: { children: null },
   render: () => (
@@ -53,7 +54,7 @@ export const QuestWindow: Story = {
   ),
 };
 
-/** Trailing pane only: the leading pane stays as an empty column so the shell does not shift. */
+/** Trailing content only: it alone fills the companion pane. */
 export const TrailingOnly: Story = {
   args: { children: null },
   render: () => (

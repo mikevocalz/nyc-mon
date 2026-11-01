@@ -1,0 +1,7 @@
+{
+  "name": "game-perf",
+  "version": "0.1.0",
+  "description": "Game-loop platform glue on Android: window refresh-rate vote, PowerManager thermal headroom, and an ADPF PerformanceHintManager session for the render thread. Local Expo module, autolinked via apps/mobile's autolinking searchPaths.",
+  "private": true,
+  "platforms": ["android"]
+}

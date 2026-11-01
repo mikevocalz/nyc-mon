@@ -8,9 +8,9 @@ Package manager: pnpm 12.8.1. Node `>=24.15.0 <26`. Task runner: Turborepo 2.11.
 
 | §1.1 expects | Repo has | Status |
 |---|---|---|
-| `apps/mobile` (Expo latest, New Arch, expo-router) | `apps/mobile` (Expo SDK 58.0.3, RN 0.88.0-rc.3, expo-router 58.0.13) | Present |
+| `apps/mobile` (Expo latest, New Arch, expo-router) | `apps/mobile` (Expo SDK 58.0.12, RN 0.88.0, expo-router 58.0.21) | Present |
 | `apps/web` (Next.js App Router, Vercel) | `apps/web` (Next 16.3.8, App Router, product and promo site only) | Present |
-| — | `apps/admin-vite` (TanStack Start 1.168.60 on Vite 8, Payload admin at `/admin`, Payload REST and Better Auth at `/payload-api`; ADR 0003) | Extra |
+| — | `apps/admin-vite` (TanStack Start 1.169.2 on Vite 8, Payload admin at `/admin`, Payload REST and Better Auth at `/payload-api`; ADR 0003) | Extra |
 | — | `apps/storybook` (Storybook 10.6.1 on Vite, react-native-web) | Extra |
 | `packages/ui` | `packages/ui` (`@acme/ui`, the NYC-Tron kit) | Present |
 | `packages/ui/html` | `packages/ui/html` (`@acme/ui/html`; `@acme/ui/primitives` re-exports it) | Present |
@@ -48,7 +48,7 @@ The commit message calls these "the v7 canon sources", but the docx and the inde
 
 ### `apps/mobile`
 
-- Expo SDK **58.0.3**, React Native **0.88.0-rc.3**, React **19.3.0**. New Architecture is the only mode on SDK 58; `app.config.ts` also sets `newArchEnabled: true`.
+- Expo SDK **58.0.12**, React Native **0.88.0**, React **19.3.0**. New Architecture is the only mode on SDK 58; `app.config.ts` also sets `newArchEnabled: true`.
 - Config: `apps/mobile/app.config.ts` — name `NYC-MON`, slug `nyc-mon`, scheme `nycmon`, iOS `com.nycmon.app`, Android `com.nycmon.app` (minSdk 29), `experiments.typedRoutes: true`, `experiments.reactCompiler: true`. Plugins include `expo-router`, `expo-build-properties`, `expo-splash-screen`, `expo-font`, `expo-image`, `expo-horizon-core`.
 - Router: **expo-router 58.0.13**, file routes under `apps/mobile/app/`:
   - `_layout.tsx`, `+not-found.tsx`
@@ -68,7 +68,7 @@ The commit message calls these "the v7 canon sources", but the docx and the inde
 - Lint guard: `apps/web/eslint.config.mjs` forbids raw semantic tags in `app/(site)/**` and `components/site/**` ("Use @acme/ui/html or an @acme/ui component") and forbids importing `@expo/ui` / `@expo/html-elements` directly. `components/site/Landing.tsx` is allow-listed for GSAP but does not exist.
 ### `apps/admin-vite`
 
-- **TanStack Start** 1.168.60 + `@payloadcms/tanstack-start` 4.0.0-canary.37 on Vite 8.3.2, `@vitejs/plugin-rsc` 0.5.35, Nitro 3.0.260903-beta with the `vercel` preset (Build Output API v3 in `.vercel/output`). Dev port 5174, `strictPort`. `pnpm --filter admin-vite dev` loads the root `.env` then `.env.local` through `node --env-file-if-exists`, which never overrides variables already set in the shell.
+- **TanStack Start** 1.169.2 + `@payloadcms/tanstack-start` 4.0.0-canary.37 on Vite 8.3.4, `@vitejs/plugin-rsc` 0.5.38, Nitro 3.0.260903-beta with the `vercel` preset (Build Output API v3 in `.vercel/output`). Dev port 5174, `strictPort`. `pnpm --filter admin-vite dev` loads the root `.env` then `.env.local` through `node --env-file-if-exists`, which never overrides variables already set in the shell.
 - Routes under `apps/admin-vite/src/routes/`: `index.tsx` (307 to `/admin`), `_payload.tsx` (pathless layout, `no-store` + `noindex`), `_payload/admin.index.tsx` and `_payload/admin.$.tsx` (admin views), `_payload/payload-api.$.ts` (Payload REST through `handleEndpoints`, including Better Auth at `/payload-api/auth/*`). No GraphQL.
 - Consumes `packages/payload/src/payload.config.ts` unchanged; the generated import map is `src/routes/_payload/importMap.js` (`pnpm --filter admin-vite payload:importmap`).
 
@@ -76,7 +76,7 @@ The commit message calls these "the v7 canon sources", but the docx and the inde
 
 ### `apps/storybook`
 
-- Storybook **10.6.1** (`@storybook/react-vite`), Vite 8, `vite-plugin-react-native-web`, `@storybook/addon-a11y`, `@storybook/addon-vitest` with Vitest **5.0.3** + Playwright browser runner. Stories live next to components in `packages/ui`. Run: `pnpm --filter storybook dev` (port 6006).
+- Storybook **10.6.2** (`@storybook/react-vite`), Vite 8, `vite-plugin-react-native-web`, `@storybook/addon-a11y`, `@storybook/addon-vitest` with Vitest **5.0.5** + Playwright browser runner. Stories live next to components in `packages/ui`. Run: `pnpm --filter storybook dev` (port 6006).
 
 ## 4. Packages
 
@@ -85,7 +85,7 @@ The commit message calls these "the v7 canon sources", but the docx and the inde
 | `packages/ui` | `@acme/ui` | The NYC-Tron UI kit (section 5). Entry points: `.`, `./tw`, `./primitives`, `./html`, `./gpu`, `./three`, `./neon`, `./elements`, `./progress`, `./haptics`, `./icons`, `./native`. Also holds the WebGPU/three.js canvases (`three/`, `gpu/`) and one Expo native module (`modules/nyc-carousel`). |
 | `packages/theme` | `@acme/theme` | Tokens. `tokens.ts` is the only file with hexes; `build-css.mjs` generates `theme.css` (Tailwind v4 `@theme` with `light-dark()`) and `theme-native.css` (Uniwind). `contrast.mjs` is a WCAG ratio script (section 6). |
 | `packages/assets` | `@acme/assets` | `brand/` logo PNGs, `fonts/ArchivoBlack-Regular.ttf`, `fonts/SpaceGrotesk-Variable.ttf`, `photos/*.webp` (ten NYC photos keyed by district: downtown, midtown, harlem, megacity). |
-| `packages/app` | `@acme/app` | Solito feature screens from the starter: `features/{editor,error,explore,home,notifications,profile,schedule,settings}`, `providers/` (React Query, safe area). Zustand stores per feature; MMKV in `features/editor/preferences.store.native.ts`. Nothing NYC-MON-specific. |
+| `packages/app` | `@acme/app` | Solito feature screens from the starter: `features/{editor,error,explore,home,notifications,profile,schedule,settings}`, `providers/` (React Query, safe area). Zustand stores per feature; MMKV in `features/editor/preferences.store.native.ts`. *(Oct-4 note predates the game lanes — `features/game/` is now the NYC-MON city; see §12.)* |
 | `packages/payload` | `@acme/payload` | Payload CMS 4.0.0-canary.37 config (`src/payload.config.ts`), collections `Users` (auth) and `Media`, Better Auth options (`src/auth/`), generated `src/payload-types.ts`, and a typed REST reader in `index.ts`. Hosted by `apps/admin-vite`. |
 | `packages/spatial` | `@acme/spatial` | Viro (fork `@reactvision/react-viro` 3.0.2-moyo.1) and Rive XR scenes, district scene, spatial audio, and the site copy constants (`homeCopy.ts`, exported as `@acme/spatial/copy`). Out of Phase 1 scope except that `apps/web` reads its copy. |
 | `packages/config` | `@acme/config` | `eslint/base.mjs`, `eslint/boundaries.mjs` (keeps platform UI behind `@acme/ui`), `prettier/index.json`, `typescript/{base,nextjs,react-library}.json`, `jest-rsc-preset.js`. |
@@ -338,32 +338,32 @@ Not present: Better Auth, Supabase, Firebase, Clerk, Auth.js; no passkey, Sign i
 
 - **zustand 5.0.15**: used in about 31 files across `apps/*` and `packages/*` (feature stores in `packages/app/features/*/*.store.ts`, `packages/spatial/districtStore.ts`, `packages/ui/use-instance-store.ts`, web header state).
 - **react-native-mmkv 4.3.2** (`createMMKV`): one store, `packages/app/features/editor/preferences.store.native.ts`, plus `apps/mobile/src/navigation/split-view/pane-storage.ts` (handed to the kit's pane overrides through `configurePaneOverrideStorage`). No versioned save blob exists.
-- **@tanstack/react-query 5.104.1** for server data (`packages/app/providers/query-provider.tsx`).
+- **@tanstack/react-query 5.104.3** for server data (`packages/app/providers/query-provider.tsx`).
 
 ## 10. Installed versions of the §0B seams
 
 | Package | Installed | Read from |
 |---|---|---|
 | `three` | 0.186.1 (r186) | `packages/ui/node_modules/three/package.json` (`@types/three` 0.186.0) |
-| `react-native-webgpu` | 0.10.4 | `apps/mobile`, `packages/ui` → `node_modules/.pnpm/react-native-webgpu@0.10.4` |
-| `typegpu` | 0.12.6 | `packages/ui` |
+| `react-native-webgpu` | 0.16.0 | `apps/mobile`, `packages/ui` → `node_modules/.pnpm/react-native-webgpu@0.16.0` |
+| `typegpu` | 0.12.7 | `packages/ui` |
 | `@typegpu/three` | 0.12.1 | `packages/ui` |
-| `@typegpu/gl` | 0.12.5 | `packages/ui` (`unplugin-typegpu` 0.12.4 in `packages/ui`, `apps/web`) |
-| `@shopify/react-native-skia` | 3.0.2, aliased to `react-native-skia@3.0.2` | `packages/ui`; apps import `react-native-skia` 3.0.2; `canvaskit-wasm` 0.41.0 on web |
-| `react-native-reanimated` | 4.7.0 (`react-native-worklets` 0.13.0) | `apps/mobile`, `packages/ui`, `packages/app` |
+| `@typegpu/gl` | 0.12.6 | `packages/ui` (`unplugin-typegpu` 0.12.5 in `packages/ui`, `apps/web`) |
+| `@shopify/react-native-skia` | 3.6.1, aliased to `react-native-skia@3.6.1` | `packages/ui`; apps import `react-native-skia` 3.6.1; `canvaskit-wasm` 0.41.1 on web |
+| `react-native-reanimated` | 4.7.1 (`react-native-worklets` 0.13.0) | `apps/mobile`, `packages/ui`, `packages/app` |
 | `expo-notifications` | **not installed**, not in the catalog | — |
-| `expo-haptics` | **not installed**; catalog pins 58.0.4 but no workspace depends on it. Haptics today use `react-native-pulsar` 1.7.0 (`packages/ui/haptics.native.ts`) | — |
-| `expo-router` | 58.0.13 | `apps/mobile`, `packages/app` |
-| `next` | 16.3.8 | `apps/web` |
-| `zod` | 4.6.5 | `apps/web` only |
+| `expo-haptics` | **not installed**; catalog pins 58.0.6 but no workspace depends on it. Haptics today use `react-native-pulsar` 1.7.0 (`packages/ui/haptics.native.ts`) | — |
+| `expo-router` | 58.0.21 | `apps/mobile`, `packages/app` |
+| `next` | 16.4.2 | `apps/web` |
+| `zod` | 4.6.7 | `apps/web` only |
 | `zustand` | 5.0.15 | see section 9 |
 | `react-native-mmkv` | 4.3.2 | `apps/mobile`, `packages/app` |
-| `expo` / `react-native` / `react` | 58.0.3 / 0.88.0-rc.3 / 19.3.0 | all apps |
-| `tailwindcss` / `uniwind` | 4.3.3 / 1.12.1 | apps, `packages/ui` |
-| `vitest` | 5.0.3 | `apps/storybook` only; packages test with `node --test` |
+| `expo` / `react-native` / `react` | 58.0.12 / 0.88.0 / 19.3.0 | all apps |
+| `tailwindcss` / `uniwind` | 4.3.3 / 1.12.2 | apps, `packages/ui` |
+| `vitest` | 5.0.5 | `apps/storybook` only; packages test with `node --test` |
 | `payload` | 4.0.0-canary.37 | `apps/admin-vite`, `packages/payload` |
 
-The §1.2 floor holds: three r186 ≥ r168, RN 0.88 ≥ 0.81, New Architecture only. RN 0.88 is a release candidate, and Payload 4 is a canary.
+The §1.2 floor holds: three r186 ≥ r168, RN 0.88 ≥ 0.81, New Architecture only. RN 0.88.0 is the stable release, and Payload 4 is a canary (4.0.0-canary.37).
 
 ## 11. Gaps that block later milestones
 
@@ -379,3 +379,39 @@ The §1.2 floor holds: three r186 ≥ r168, RN 0.88 ≥ 0.81, New Architecture o
 10. Web header/footer use `@acme/ui/tw`, not `@acme/ui/html`, and duplicate the kit's `NavBar` / `SiteFooter`.
 11. None of the §4 or §5 routes exist; current routes are the starter's demo screens.
 12. No H-Lynk kit components (section 5.5).
+
+## 12. Living City module (`@acme/app`, `features/game/living-city/`) — added 2026-10-18
+
+This map was written 2026-10-04 at `42c3273`, before the Harlem game lanes
+landed; `features/game/` is absent from §4–§11 rather than documented
+wrongly. The Living City program (`docs/plans/living-city-prompt.md`,
+PRs 01–10) added a deterministic traffic/pedestrian/signal/lamp/clock
+simulation under `packages/app/features/game/living-city/` (34 files,
+~11 k lines incl. 15 test files) on the `lane-lc-handoff` integration
+branch. It is **docs-and-module only**: the game feature itself
+(`city-scene`, `world/`, `character/`, `render-runtime/`, `perf/`,
+`game-session`) predates the program and is documented in
+`docs/implementation/city-world.md` and `docs/implementation/worklet-rendering.md`.
+
+- **Seams it uses (nothing duplicated):** `SceneActorFactory` actor mount
+  (`scene-actor.ts`), the flat `number[]` + `Synchronizable` snapshot
+  channel (`render-snapshot.ts` pattern), `createStreetClearance` +
+  `placeStreetFurniture` placements (`world/walkability.ts`,
+  `world/street-furniture.ts`), `game-session.ts` module-scope stores,
+  `perf/tier.ts` (`LIVING_CITY_CAPS`), the bundled v3 tile
+  (`city-data.ts bundledCity()`).
+- **External touchpoints (the only files outside `living-city/` it
+  edits):** `GameScreen.tsx` (actors + sky pick),
+  `render-runtime/worklet-host.ts` (second `Synchronizable`),
+  `render-runtime/game-render.ts` (worklet actor mounts),
+  `city-scene.ts` (adaptive-bridge call), `perf/tier.ts` (tier section).
+- **Flags:** `EXPO_PUBLIC_LIVING_CITY` (default off, zero-diff) and
+  `EXPO_PUBLIC_LIVING_CITY_TIER` (`low|medium|high|xr`).
+- **Docs:** architecture `docs/architecture/LIVING_CITY.md`; program
+  audit/scouts/reports `docs/living-city/` (PR01 `EXISTING_SYSTEMS_AUDIT.md`
+  + four scout files + `asset-ledger.md`, PR02–PR09 reports, PR10
+  `scenario-matrix.md`, `source-index.md`, `pr10-handoff.md`);
+  license chain `docs/living-city/ASSET_NOTICES.md` +
+  `docs/licenses/provenance-2026-10-17.md`.
+- **Tests:** `node --test 'features/game/living-city/*.test.ts'` — 124
+  cases; `tsc`/`eslint` clean. Not covered by CI (see pr10-handoff §CI).

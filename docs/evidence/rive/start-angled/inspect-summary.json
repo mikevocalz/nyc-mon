@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "summary": true,
+  "problems": [],
+  "artboards": [
+    {"name": "StartAngledHost", "objects": 12, "types": {"AnimationState": 1, "AnyState": 1, "Artboard": 1, "EntryState": 1, "ExitState": 1, "LayoutComponentStyle": 1, "LinearAnimation": 1, "NestedArtboard": 1, "NestedStateMachine": 1, "StateMachine": 1, "StateMachineLayer": 1, "StateTransition": 1}},
+    {"name": "StartAngled", "objects": 593, "types": {"AnimationState": 20, "AnyState": 7, "Artboard": 1, "BindablePropertyBoolean": 22, "BindablePropertyEnum": 19, "BindablePropertyTrigger": 4, "CubicEaseInterpolator": 3, "DataBindContext": 47, "EntryState": 7, "Event": 1, "ExitState": 7, "Feather": 1, "Fill": 5, "FocusActionTarget": 1, "FocusData": 1, "GamepadInput": 2, "KeyFrameBool": 4, "KeyFrameColor": 18, "KeyFrameDouble": 31, "KeyFrameString": 4, "KeyboardInput": 3, "KeyedObject": 47, "KeyedProperty": 50, "LayoutComponentStyle": 1, "LinearAnimation": 20, "ListenerFireEvent": 2, "ListenerInputType": 3, "ListenerInputTypeGamepad": 1, "ListenerInputTypeKeyboard": 1, "ListenerInputTypeSemantic": 1, "ListenerViewModelChange": 7, "Node": 1, "PointsPath": 6, "SemanticData": 1, "SemanticInput": 1, "Shape": 6, "SolidColor": 10, "StateMachine": 1, "StateMachineLayer": 7, "StateMachineListener": 4, "StateMachineListenerSingle": 3, "StateTransition": 44, "StraightVertex": 36, "Stroke": 5, "Text": 3, "TextStyleAxis": 3, "TextStylePaint": 3, "TextValueRun": 3, "TransitionPropertyViewModelComparator": 38, "TransitionValueBooleanComparator": 17, "TransitionValueEnumComparator": 19, "TransitionValueTriggerComparator": 2, "TransitionViewModelCondition": 38, "TrimPath": 1}}
+  ],
+  "roots": {"objects": 67, "types": {"Backboard": 1, "ComponentAsset": 1, "DataEnumCustom": 3, "DataEnumValue": 13, "FontAsset": 1, "ViewModel": 7, "ViewModelInstance": 7, "ViewModelInstanceBoolean": 4, "ViewModelInstanceEnum": 3, "ViewModelInstanceString": 1, "ViewModelInstanceTrigger": 1, "ViewModelInstanceViewModel": 8, "ViewModelPropertyBoolean": 4, "ViewModelPropertyEnumCustom": 3, "ViewModelPropertyString": 1, "ViewModelPropertyTrigger": 1, "ViewModelPropertyViewModel": 8}}
+}

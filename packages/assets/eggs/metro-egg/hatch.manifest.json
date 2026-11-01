@@ -1,0 +1,136 @@
+{
+  "runtimeVersion": 1,
+  "eggId": "metro-egg",
+  "eggSpeciesId": "dex-001",
+  "eggName": "Metro Egg",
+  "dexId": 1,
+  "hatchesIntoSpeciesId": "dex-002",
+  "babyName": "Squeaklet",
+  "bloodlineId": "F01",
+  "source": {
+    "mesh": "packages/assets/eggs/metro-egg/source/Metro-Egg.glb",
+    "meshSha256": "8715d82626dd4fe5d5667b0301090ea20ad2e60032c6856cd40ee6f0127ef362",
+    "sourceRevision": "creator upload 2026-10-21, optimized GLB (40k tris, 1024 JPEG textures)",
+    "approval": "pending creator review",
+    "reference": "packages/assets/eggs/metro-egg/source/reference-front.png",
+    "referenceSha256": "cf8e3e79b795480f9131ef10b1905f5125109176860ed5e07c21887a85dcdcd6",
+    "canonMatch": "Bible skin (v7, STARTERS_EXTRACT:194): glossy vivid red egg with white stripes. Reference: the Glossy Spotted Red Egg with White Bands."
+  },
+  "baby": {
+    "model": null,
+    "proxy": true,
+    "note": "No Squeaklet model or rig exists. The build uses a labeled proxy for pipeline tests only."
+  },
+  "fractureSeed": 1001,
+  "fracture": {
+    "capShards": 5,
+    "waist": 0.5,
+    "waistWobble": 0.07,
+    "edgeNoise": 0.22,
+    "shellThickness": 0.0016,
+    "innerColorSource": "creator 2026-10-21: metro red, corner pink, signal light grey, prism charcoal",
+    "innerColorSrgb": "#C8141A"
+  },
+  "gooProfile": {
+    "color": [
+      0.98,
+      0.86,
+      0.62,
+      0.78
+    ],
+    "emissiveFleck": [
+      0.25,
+      0.12,
+      0.02
+    ],
+    "drips": 3,
+    "dripRadius": 0.0028,
+    "puddleRadius": 0.05
+  },
+  "timing": {
+    "fps": 30,
+    "phases": {
+      "stir": [
+        0.0,
+        1.0
+      ],
+      "pressure": [
+        1.0,
+        1.8
+      ],
+      "crack": [
+        1.8,
+        4.2
+      ],
+      "burst": [
+        4.2,
+        4.7
+      ],
+      "emerge": [
+        4.7,
+        6.5
+      ]
+    },
+    "crackBeats": [
+      0.25,
+      0.55,
+      0.85
+    ]
+  },
+  "runtime": {
+    "glb": "metro-egg-hatch.glb",
+    "coordinates": "glTF Y-up, metres, egg base at origin, Caller faces -Z",
+    "clipMap": {
+      "idle": "egg_idle",
+      "hatch": "hatch",
+      "leanIn": "attention_lean_in",
+      "hesitate": "attention_hesitate"
+    },
+    "phaseSeconds": {
+      "stir": [
+        0.0,
+        1.0
+      ],
+      "pressure": [
+        1.0,
+        1.8
+      ],
+      "crack": [
+        1.8,
+        4.2
+      ],
+      "burst": [
+        4.2,
+        4.7
+      ],
+      "emerge": [
+        4.7,
+        6.5
+      ]
+    },
+    "crackBeatSeconds": [
+      2.4,
+      3.1333333333333333,
+      3.8333333333333335
+    ],
+    "shellPieceNames": [
+      "Shell_Cup",
+      "Shell_Crown",
+      "Shell_Shard_01",
+      "Shell_Shard_02",
+      "Shell_Shard_03",
+      "Shell_Shard_04"
+    ],
+    "crackOrder": [
+      "Shell_Shard_04",
+      "Shell_Shard_03",
+      "Shell_Shard_01"
+    ],
+    "babyLanding": [
+      0.0836,
+      -0.0996,
+      0.0
+    ],
+    "glbBytes": 1336100
+  }
+}

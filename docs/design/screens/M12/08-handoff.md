@@ -11,7 +11,7 @@ Implementation contract for `platform`, `render`, `sim-core` and the kit. Inputs
 | B3 | Notification response routing: `addNotificationResponseReceivedListener` + `useLastNotificationResponse` in the root layout, payload parsed with a new `ReadyNotificationDataSchema` (Law 5) | platform | M23 → M12 |
 | B4 | `hatch` / `attention` in `ANIMATION_INTENTS` and `ModelClipMapSchema`, and `deriveFirstLook(monInstanceId): 'lean-in' \| 'hesitate'` (pure, seeded with the sim's `hash128`) | sim-core | first look |
 | B5 | `CreatureStage` in `/(home)/_layout.tsx`; M09 moved to `/(home)/name` | platform + M09 lane | continuity |
-| B6 | `HatchEgg`, `HatchBurst`, `CaptureCase` (`opening`/`open`), haptic verbs | kit / render | the show |
+| B6 | `HatchEgg`, `HatchBurst`, haptic verbs (no `CaptureCase`, Decision 29) | kit / render | the show |
 | B7 | Mike: first-look weights; Q30 (soft seam assumed); Q11 (egg skin per line assumed) | Mike | art, seed |
 
 ## The hatch writer (B1)
@@ -49,7 +49,7 @@ const state = pending?.hatch;                                        // HatchSta
 | `presenting` | none (`open` is a no-op on presenting) | **in progress**, resume at the start of `state.phase` |
 | `incubating` and `now < incubationEndsAt` | none | **early**: `router.replace('/(home)')` |
 | `ready` / `incubating` past end, arrived from the notification | none | **pre**; trackpad tap → `applyHatch(eggId, { type: 'open', now }, now)` |
-| `ready` / past end, arrived from M11's tap (`?from=m11`) | `applyHatch(eggId, { type: 'open', now }, now)` before the first frame of `case-open` | **in progress** |
+| `ready` / past end, arrived from M11's tap (`?from=m11`) | `applyHatch(eggId, { type: 'open', now }, now)` before the first frame of `stir` | **in progress** |
 
 The `open` write commits the individual (`ready → presenting` mints via `mintMonInstance`) **before** any reveal frame. A kill at any later point resumes the same Mon.
 
@@ -91,7 +91,7 @@ Same shell geometry as M11 (`screens/M11/08-handoff.md` "Layout"): SE, Pro Max, 
 | Element | Component | testID |
 |---|---|---|
 | Shell | `HLynkShell testIDPrefix="m12"` | `m12-shell`, `m12-led`, `m12-trackpad` |
-| Case | `CaptureCase` | `m12-case` |
+| Egg scene | `View` (image role) around `HatchEgg`; replaces `CaptureCase` / `m12-case` (Decision 29, 2026-10-21) | `m12-egg-scene` |
 | Egg | `HatchEgg` | `m12-egg` |
 | Burst | `HatchBurst` | `m12-burst` |
 | Creature | `CreatureStage` (layout-level) | `home-creature-stage` |
@@ -102,7 +102,7 @@ Same shell geometry as M11 (`screens/M11/08-handoff.md` "Layout"): SE, Pro Max, 
 | CTA | `TrackpadActions` | `m12-action-name`, `m12-action-home` |
 | Pre action | `TrackpadActions` | `m12-action-open` |
 
-E2E hooks: the screen container carries `testID` `m12-phase-<phase>` for the current phase on the screen container so Maestro/Detox can assert the sequence and the resume point.
+E2E hooks: the screen container carries `testID` `m12-phase-<phase>` (`stir`, `pressure`, `crack`, `burst`, `emerge`, `attention`) for the current phase on the screen container so Maestro/Detox can assert the sequence and the resume point.
 
 ## Motion
 
@@ -117,10 +117,12 @@ All phase animation runs on the UI thread from shared values; JS work per phase 
 
 ## Haptic score
 
+> Superseded by Decision 29 (2026-10-21): the lid-release (`hatchLatch`) and scan-line beats are gone with the case and scanner.
+
 | Beat | Façade verb | Preset |
 |---|---|---|
-| lid release | `hatchLatch` | `latch` |
-| scan line | `selection` | `System.selection` |
+| `stir` starts | `tap` | `System.impactLight` |
+| `pressure` starts | `selection` | `System.selection` |
 | each crack ×3 | `hatchCrack` | `snap` |
 | burst peak | `hatchBloom` | `bloom` |
 | emerge | `hatchEmerge` | `unfurl` |

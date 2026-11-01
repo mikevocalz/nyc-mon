@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "at": "2026-10-28T16:34:03.853Z",
+  "sourceCommit": "e511698e08c47a396a9bc62263c75f8deb58acb9",
+  "mode": "provider-only",
+  "status": "PASSED",
+  "qualificationScope": "Provider inference only; NOT complete Personal AI acceptance",
+  "checks": [
+    {
+      "id": "account-model-availability",
+      "status": "PASSED",
+      "ms": 199
+    },
+    {
+      "id": "real-nebius-nvidia-inference",
+      "status": "PASSED",
+      "ms": 2580
+    }
+  ],
+  "receipts": [
+    {
+      "provider": "nebius-token-factory",
+      "endpoint": "https://api.tokenfactory.us-central1.nebius.com/v1",
+      "requestedModel": "nvidia/Nemotron-3_5-Lightning",
+      "returnedModel": "nvidia/Nemotron-3_5-Lightning",
+      "responseId": "chatcmpl-54ed2c0d",
+      "requestId": "348fa41a2ba51f0a9130d70af4779610",
+      "completedAt": "2026-10-28T16:34:03.851Z",
+      "latencyMs": 2579,
+      "inputTokens": 29,
+      "outputTokens": 568,
+      "toolCalls": 0
+    }
+  ]
+}

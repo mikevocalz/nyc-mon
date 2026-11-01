@@ -41,4 +41,12 @@ export interface DropZoneProps extends Omit<React.ComponentProps<typeof View>, '
   tone?: ControlTone;
   /** Theme by neighbourhood. Default Midtown (orange). */
   district?: District;
+  /**
+   * Web: shows a button that opens the system file picker, the keyboard and
+   * pointer path for people who can't drag (WCAG 2.5.7). Picked files arrive
+   * through `onDrop` like dropped ones. Native ignores it.
+   */
+  browseLabel?: string;
+  /** Web: the picker's `accept` filter, e.g. ".glb". */
+  accept?: string;
 }

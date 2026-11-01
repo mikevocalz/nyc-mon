@@ -77,18 +77,31 @@ export interface Config {
     'integrity-runs': IntegrityRun;
     'idempotency-records': IdempotencyRecord;
     waitlist: Waitlist;
+    'language-lexicon': LanguageLexicon;
+    'mon-models': MonModel;
+    'mon-art': MonArt;
     sessions: Session;
     accounts: Account;
     verifications: Verification;
     passkeys: Passkey;
     twoFactors: TwoFactor;
     deviceCodes: DeviceCode;
+    jwks: Jwk;
+    oauthClients: OauthClient;
+    oauthResources: OauthResource;
+    oauthClientResources: OauthClientResource;
+    oauthRefreshTokens: OauthRefreshToken;
+    oauthAccessTokens: OauthAccessToken;
+    oauthConsents: OauthConsent;
+    oauthClientAssertions: OauthClientAssertion;
     rateLimits: RateLimit;
+    'site-pages': SitePage;
     'payload-kv': PayloadKv;
     'payload-jobs': PayloadJob;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
     'payload-migrations': PayloadMigration;
+    'payload-llm-instructions': PayloadLlmInstruction;
   };
   collectionsJoins: {};
   collectionsSelect: {
@@ -102,34 +115,51 @@ export interface Config {
     'integrity-runs': IntegrityRunsSelect<false> | IntegrityRunsSelect<true>;
     'idempotency-records': IdempotencyRecordsSelect<false> | IdempotencyRecordsSelect<true>;
     waitlist: WaitlistSelect<false> | WaitlistSelect<true>;
+    'language-lexicon': LanguageLexiconSelect<false> | LanguageLexiconSelect<true>;
+    'mon-models': MonModelsSelect<false> | MonModelsSelect<true>;
+    'mon-art': MonArtSelect<false> | MonArtSelect<true>;
     sessions: SessionsSelect<false> | SessionsSelect<true>;
     accounts: AccountsSelect<false> | AccountsSelect<true>;
     verifications: VerificationsSelect<false> | VerificationsSelect<true>;
     passkeys: PasskeysSelect<false> | PasskeysSelect<true>;
     twoFactors: TwoFactorsSelect<false> | TwoFactorsSelect<true>;
     deviceCodes: DeviceCodesSelect<false> | DeviceCodesSelect<true>;
+    jwks: JwksSelect<false> | JwksSelect<true>;
+    oauthClients: OauthClientsSelect<false> | OauthClientsSelect<true>;
+    oauthResources: OauthResourcesSelect<false> | OauthResourcesSelect<true>;
+    oauthClientResources: OauthClientResourcesSelect<false> | OauthClientResourcesSelect<true>;
+    oauthRefreshTokens: OauthRefreshTokensSelect<false> | OauthRefreshTokensSelect<true>;
+    oauthAccessTokens: OauthAccessTokensSelect<false> | OauthAccessTokensSelect<true>;
+    oauthConsents: OauthConsentsSelect<false> | OauthConsentsSelect<true>;
+    oauthClientAssertions: OauthClientAssertionsSelect<false> | OauthClientAssertionsSelect<true>;
     rateLimits: RateLimitsSelect<false> | RateLimitsSelect<true>;
+    'site-pages': SitePagesSelect<false> | SitePagesSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-jobs': PayloadJobsSelect<false> | PayloadJobsSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
     'payload-migrations': PayloadMigrationsSelect<false> | PayloadMigrationsSelect<true>;
+    'payload-llm-instructions': PayloadLlmInstructionsSelect<false> | PayloadLlmInstructionsSelect<true>;
   };
   db: {
     defaultIDType: number;
   };
   fallbackLocale: null;
   globals: {
+    'mon-voices': MonVoice;
     'payload-jobs-stats': PayloadJobsStat;
   };
   globalsSelect: {
+    'mon-voices': MonVoicesSelect<false> | MonVoicesSelect<true>;
     'payload-jobs-stats': PayloadJobsStatsSelect<false> | PayloadJobsStatsSelect<true>;
   };
   locale: null;
   widgets: {
+    welcome: WelcomeWidget;
     collections: CollectionsWidget;
     'collection-query': CollectionQueryWidget;
     activity: ActivityWidget;
+    'upload-dropzone': UploadDropzoneWidget;
   };
   user: User;
   jobs: {
@@ -195,6 +225,14 @@ export interface User {
         | 'sent_in_error'
       )
     | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
   collection: 'users';
@@ -207,6 +245,18 @@ export interface Media {
   id: number;
   bunnyUrl?: string | null;
   alt: string;
+  /**
+   * Derived from real page, section and image references, including saved revisions.
+   */
+  websiteUsage?: string | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
   url?: string | null;
@@ -216,6 +266,16 @@ export interface Media {
   filesize?: number | null;
   width?: number | null;
   height?: number | null;
+  original?: {
+    filename?: string | null;
+    url?: string | null;
+    mimeType?: string | null;
+    filesize?: number | null;
+    width?: number | null;
+    height?: number | null;
+    prefix?: string | null;
+    _objectKey?: string | null;
+  };
   focalX?: number | null;
   focalY?: number | null;
 }
@@ -232,6 +292,14 @@ export interface GuardianConsent {
   emailsSent: number;
   lastEmailSentAt?: string | null;
   parentRequest: 'none' | 'review' | 'delete';
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -251,6 +319,14 @@ export interface Egg {
   createdAtMs: number;
   incubationEndsAt: number;
   hatched: boolean;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -268,8 +344,17 @@ export interface MonInstance {
   hatchedAt: number;
   bond: number;
   stage: 'Baby' | 'Small' | 'Mid' | 'Max';
+  gender?: ('female' | 'male') | null;
   voiceLineageId?: string | null;
   serverConfirmedAt?: string | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -315,6 +400,14 @@ export interface CareState {
     | number
     | boolean
     | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -363,6 +456,14 @@ export interface AuditEvent {
       )
     | null;
   requestId?: string | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -379,6 +480,14 @@ export interface IntegrityRun {
   idMismatch: number;
   orphans: number;
   staleReady: number;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -393,6 +502,14 @@ export interface IdempotencyRecord {
   status: number;
   contentType: string;
   body: string;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -405,8 +522,457 @@ export interface Waitlist {
   email: string;
   district?: ('downtown' | 'midtown' | 'harlem' | 'megacity') | null;
   source?: string | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
+}
+/**
+ * NYC-Mon voice/dialect lexicon and the Mon's lines. Publish a row to make it canon; only published, active rows are spoken. Identity-linked language is opt-in/persona-driven only; never infer identity from a Caller.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "language-lexicon".
+ */
+export interface LanguageLexicon {
+  id: number;
+  key: string;
+  entryType: 'lexicon' | 'pronunciation_rule' | 'grammar_rule' | 'call_response' | 'ballroom_term' | 'style_rule';
+  canonicalText: string;
+  spokenForm?: string | null;
+  meaning: string;
+  /**
+   * Categories the Mon's voice reads: mon-line, pronunciation, stage-direction, word-palette, voice-rule, babble. mon-line: triggerText is the occasion (hello, first-words, hungry…), responseText the line, with speciesId and stage. pronunciation: canonicalText is the screen word, variants the other spellings, spokenForm what the voice says. stage-direction: variants are the keywords, spokenForm the audio tag. babble: the wordless sounds an Egg and a Baby in its first 24 hours make (Decision 32); subcategory syllable, family-sound (with bloodlineId) or egg-sound, canonicalText the sound.
+   */
+  category: string;
+  subcategory?: string | null;
+  /**
+   * Pipe-delimited tags, e.g. Black NYC English|AAE|NYC
+   */
+  communityTags?: string | null;
+  /**
+   * Pipe-delimited borough/neighborhood tags or all
+   */
+  boroughTags?: string | null;
+  register?: string | null;
+  tone?: string | null;
+  ageMin?: number | null;
+  usageFrequency?: ('low' | 'medium' | 'high') | null;
+  mirrorStrength?: ('none' | 'low' | 'medium' | 'high') | null;
+  ttsPronunciation?: string | null;
+  pronunciationNotes?: string | null;
+  grammarNotes?: string | null;
+  triggerText?: string | null;
+  responseText?: string | null;
+  relationshipGate?: string | null;
+  activationPolicy: string;
+  avoidWhen?: string | null;
+  identityInference: string;
+  profanity: 'none';
+  /**
+   * Mon form, e.g. dex-002
+   */
+  speciesId?: string | null;
+  /**
+   * Bloodline, e.g. F01
+   */
+  bloodlineId?: string | null;
+  stage?: ('Egg' | 'Baby' | 'Small' | 'Mid' | 'Max') | null;
+  mood?: ('content' | 'asleep' | 'sluggish' | 'needs-fullness' | 'needs-energy' | 'needs-social') | null;
+  /**
+   * Pipe-delimited: other spellings (pronunciation) or keywords (stage-direction).
+   */
+  variants?: string | null;
+  spokenPlural?: string | null;
+  /**
+   * Lower first.
+   */
+  sortOrder?: number | null;
+  locale: string;
+  sourceBasis?: string | null;
+  sourceUrl?: string | null;
+  editorNotes?: string | null;
+  active: boolean;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedAt: string;
+  createdAt: string;
+  _status?: ('draft' | 'published') | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "mon-models".
+ */
+export interface MonModel {
+  id: number;
+  speciesId:
+    | 'dex-001'
+    | 'dex-002'
+    | 'dex-003'
+    | 'dex-004'
+    | 'dex-005'
+    | 'dex-006'
+    | 'dex-007'
+    | 'dex-008'
+    | 'dex-009'
+    | 'dex-010'
+    | 'dex-011'
+    | 'dex-012'
+    | 'dex-013'
+    | 'dex-014'
+    | 'dex-061'
+    | 'dex-062'
+    | 'dex-063'
+    | 'dex-064'
+    | 'dex-065'
+    | 'dex-066'
+    | 'dex-067'
+    | 'dex-020'
+    | 'dex-021'
+    | 'dex-022'
+    | 'dex-023'
+    | 'dex-024'
+    | 'dex-015'
+    | 'dex-016'
+    | 'dex-017'
+    | 'dex-018'
+    | 'dex-019'
+    | 'dex-025'
+    | 'dex-026'
+    | 'dex-027'
+    | 'dex-028'
+    | 'dex-029'
+    | 'dex-030'
+    | 'dex-031'
+    | 'dex-032'
+    | 'dex-033'
+    | 'dex-034'
+    | 'dex-035'
+    | 'dex-036'
+    | 'dex-037'
+    | 'dex-038'
+    | 'dex-039'
+    | 'dex-040'
+    | 'dex-041'
+    | 'dex-042'
+    | 'dex-043'
+    | 'dex-044'
+    | 'dex-045'
+    | 'dex-046'
+    | 'dex-047'
+    | 'dex-048'
+    | 'dex-049'
+    | 'dex-050'
+    | 'dex-051'
+    | 'dex-052'
+    | 'dex-053'
+    | 'dex-054'
+    | 'dex-055'
+    | 'dex-056'
+    | 'dex-057'
+    | 'dex-058'
+    | 'dex-059'
+    | 'dex-060'
+    | 'dex-068'
+    | 'dex-069'
+    | 'dex-070'
+    | 'dex-071'
+    | 'dex-072'
+    | 'dex-073'
+    | 'dex-074'
+    | 'dex-075'
+    | 'dex-076'
+    | 'dex-077'
+    | 'dex-078'
+    | 'dex-079'
+    | 'dex-080'
+    | 'dex-081'
+    | 'dex-082'
+    | 'dex-083'
+    | 'dex-084'
+    | 'dex-085'
+    | 'dex-086'
+    | 'dex-087'
+    | 'dex-088'
+    | 'dex-089'
+    | 'dex-090'
+    | 'dex-091'
+    | 'dex-092'
+    | 'dex-093'
+    | 'dex-094'
+    | 'dex-095'
+    | 'dex-096'
+    | 'dex-097'
+    | 'dex-098'
+    | 'dex-099'
+    | 'dex-100'
+    | 'dex-101'
+    | 'dex-102'
+    | 'dex-103'
+    | 'dex-104'
+    | 'dex-105'
+    | 'dex-106'
+    | 'dex-107'
+    | 'dex-108'
+    | 'dex-109';
+  stage?: string | null;
+  bloodlineId?: string | null;
+  /**
+   * Only approved models reach the game. Uploading a new file sets this back to In review.
+   */
+  status: 'in-review' | 'approved';
+  bunnyUrl?: string | null;
+  /**
+   * Uniform scale applied in every scene. 1 keeps the exported size.
+   */
+  scale: number;
+  /**
+   * Moves the model so its feet sit on the floor at the origin.
+   */
+  position: {
+    x: number;
+    y: number;
+    z: number;
+  };
+  /**
+   * Turns the model so it faces the camera (+Z).
+   */
+  rotation: {
+    x: number;
+    y: number;
+    z: number;
+  };
+  /**
+   * Which clip in the file plays for each moment. Clip names come from the uploaded file.
+   */
+  animations?:
+    | {
+        role: 'idle' | 'asleep' | 'feed' | 'rest' | 'wake' | 'play' | 'hatch' | 'evolve';
+        clip: string;
+        loop?: boolean | null;
+        id?: string | null;
+      }[]
+    | null;
+  animationClips?:
+    | {
+        name?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  morphTargets?:
+    | {
+        name?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  heightMeters?: number | null;
+  credit?: {
+    author?: string | null;
+    license?: ('owned' | 'cc0' | 'cc-by-4.0' | 'other') | null;
+    sourceUrl?: string | null;
+  };
+  notes?: string | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedAt: string;
+  createdAt: string;
+  url?: string | null;
+  thumbnailURL?: string | null;
+  filename?: string | null;
+  mimeType?: string | null;
+  filesize?: number | null;
+  width?: number | null;
+  height?: number | null;
+  original?: {
+    filename?: string | null;
+    url?: string | null;
+    mimeType?: string | null;
+    filesize?: number | null;
+    width?: number | null;
+    height?: number | null;
+    prefix?: string | null;
+    _objectKey?: string | null;
+  };
+  focalX?: number | null;
+  focalY?: number | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "mon-art".
+ */
+export interface MonArt {
+  id: number;
+  speciesId:
+    | 'dex-001'
+    | 'dex-002'
+    | 'dex-003'
+    | 'dex-004'
+    | 'dex-005'
+    | 'dex-006'
+    | 'dex-007'
+    | 'dex-008'
+    | 'dex-009'
+    | 'dex-010'
+    | 'dex-011'
+    | 'dex-012'
+    | 'dex-013'
+    | 'dex-014'
+    | 'dex-061'
+    | 'dex-062'
+    | 'dex-063'
+    | 'dex-064'
+    | 'dex-065'
+    | 'dex-066'
+    | 'dex-067'
+    | 'dex-020'
+    | 'dex-021'
+    | 'dex-022'
+    | 'dex-023'
+    | 'dex-024'
+    | 'dex-015'
+    | 'dex-016'
+    | 'dex-017'
+    | 'dex-018'
+    | 'dex-019'
+    | 'dex-025'
+    | 'dex-026'
+    | 'dex-027'
+    | 'dex-028'
+    | 'dex-029'
+    | 'dex-030'
+    | 'dex-031'
+    | 'dex-032'
+    | 'dex-033'
+    | 'dex-034'
+    | 'dex-035'
+    | 'dex-036'
+    | 'dex-037'
+    | 'dex-038'
+    | 'dex-039'
+    | 'dex-040'
+    | 'dex-041'
+    | 'dex-042'
+    | 'dex-043'
+    | 'dex-044'
+    | 'dex-045'
+    | 'dex-046'
+    | 'dex-047'
+    | 'dex-048'
+    | 'dex-049'
+    | 'dex-050'
+    | 'dex-051'
+    | 'dex-052'
+    | 'dex-053'
+    | 'dex-054'
+    | 'dex-055'
+    | 'dex-056'
+    | 'dex-057'
+    | 'dex-058'
+    | 'dex-059'
+    | 'dex-060'
+    | 'dex-068'
+    | 'dex-069'
+    | 'dex-070'
+    | 'dex-071'
+    | 'dex-072'
+    | 'dex-073'
+    | 'dex-074'
+    | 'dex-075'
+    | 'dex-076'
+    | 'dex-077'
+    | 'dex-078'
+    | 'dex-079'
+    | 'dex-080'
+    | 'dex-081'
+    | 'dex-082'
+    | 'dex-083'
+    | 'dex-084'
+    | 'dex-085'
+    | 'dex-086'
+    | 'dex-087'
+    | 'dex-088'
+    | 'dex-089'
+    | 'dex-090'
+    | 'dex-091'
+    | 'dex-092'
+    | 'dex-093'
+    | 'dex-094'
+    | 'dex-095'
+    | 'dex-096'
+    | 'dex-097'
+    | 'dex-098'
+    | 'dex-099'
+    | 'dex-100'
+    | 'dex-101'
+    | 'dex-102'
+    | 'dex-103'
+    | 'dex-104'
+    | 'dex-105'
+    | 'dex-106'
+    | 'dex-107'
+    | 'dex-108'
+    | 'dex-109';
+  stage?: string | null;
+  bloodlineId?: string | null;
+  /**
+   * Only approved stills reach the site and apps. Uploading a new picture sets this back to In review.
+   */
+  status: 'in-review' | 'approved';
+  /**
+   * What the picture shows, for screen readers. Name the Mon; no pronoun for it.
+   */
+  alt: string;
+  bunnyUrl?: string | null;
+  credit?: {
+    author?: string | null;
+    sourceUrl?: string | null;
+  };
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedAt: string;
+  createdAt: string;
+  url?: string | null;
+  thumbnailURL?: string | null;
+  filename?: string | null;
+  mimeType?: string | null;
+  filesize?: number | null;
+  width?: number | null;
+  height?: number | null;
+  original?: {
+    filename?: string | null;
+    url?: string | null;
+    mimeType?: string | null;
+    filesize?: number | null;
+    width?: number | null;
+    height?: number | null;
+    prefix?: string | null;
+    _objectKey?: string | null;
+  };
+  focalX?: number | null;
+  focalY?: number | null;
 }
 /**
  * Auto-generated from Better Auth schema (session)
@@ -422,6 +988,14 @@ export interface Session {
   userAgent?: string | null;
   user: number | User;
   surface?: string | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -443,6 +1017,14 @@ export interface Account {
   refreshTokenExpiresAt?: string | null;
   scope?: string | null;
   password?: string | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -457,6 +1039,14 @@ export interface Verification {
   identifier: string;
   value: string;
   expiresAt: string;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -477,6 +1067,14 @@ export interface Passkey {
   backedUp: boolean;
   transports?: string | null;
   aaguid?: string | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -494,6 +1092,14 @@ export interface TwoFactor {
   verified?: boolean | null;
   failedVerificationCount?: number | null;
   lockedUntil?: string | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -514,6 +1120,439 @@ export interface DeviceCode {
   pollingInterval?: number | null;
   clientId?: string | null;
   scope?: string | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Auto-generated from Better Auth schema (jwks)
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "jwks".
+ */
+export interface Jwk {
+  id: number;
+  publicKey: string;
+  privateKey: string;
+  expiresAt?: string | null;
+  alg?: string | null;
+  crv?: string | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Auto-generated from Better Auth schema (oauthClient)
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "oauthClients".
+ */
+export interface OauthClient {
+  id: number;
+  clientId: string;
+  clientSecret?: string | null;
+  clientDiscoveryId?: string | null;
+  disabled?: boolean | null;
+  skipConsent?: boolean | null;
+  enableEndSession?: boolean | null;
+  subjectType?: string | null;
+  scopes?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  clientCredentialsScopes?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  user?: (number | null) | User;
+  name?: string | null;
+  uri?: string | null;
+  icon?: string | null;
+  contacts?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  tos?: string | null;
+  policy?: string | null;
+  softwareId?: string | null;
+  softwareVersion?: string | null;
+  softwareStatement?: string | null;
+  redirectUris:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  postLogoutRedirectUris?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  backchannelLogoutUri?: string | null;
+  backchannelLogoutSessionRequired?: boolean | null;
+  tokenEndpointAuthMethod?: string | null;
+  applicationType?: string | null;
+  jwks?: string | null;
+  jwksUri?: string | null;
+  grantTypes?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  responseTypes?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  requirePKCE?: boolean | null;
+  dpopBoundAccessTokens?: boolean | null;
+  referenceId?: string | null;
+  metadata?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Auto-generated from Better Auth schema (oauthResource)
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "oauthResources".
+ */
+export interface OauthResource {
+  id: number;
+  identifier: string;
+  name: string;
+  accessTokenTtl?: number | null;
+  refreshTokenTtl?: number | null;
+  signingAlgorithm?: string | null;
+  signingKeyId?: string | null;
+  allowedScopes?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  customClaims?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  dpopBoundAccessTokensRequired?: boolean | null;
+  disabled?: boolean | null;
+  policyVersion?: number | null;
+  metadata?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Auto-generated from Better Auth schema (oauthClientResource)
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "oauthClientResources".
+ */
+export interface OauthClientResource {
+  id: number;
+  clientId: string;
+  resourceId: string;
+  metadata?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Auto-generated from Better Auth schema (oauthRefreshToken)
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "oauthRefreshTokens".
+ */
+export interface OauthRefreshToken {
+  id: number;
+  token: string;
+  clientId: string;
+  session?: (number | null) | Session;
+  user: number | User;
+  referenceId?: string | null;
+  authorizationCodeId?: string | null;
+  resources?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  requestedUserInfoClaims?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  expiresAt?: string | null;
+  revoked?: string | null;
+  rotatedAt?: string | null;
+  rotationReplayResponse?: string | null;
+  rotationReplayExpiresAt?: string | null;
+  authTime?: string | null;
+  confirmation?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  scopes:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Auto-generated from Better Auth schema (oauthAccessToken)
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "oauthAccessTokens".
+ */
+export interface OauthAccessToken {
+  id: number;
+  token?: string | null;
+  clientId: string;
+  session?: (number | null) | Session;
+  user?: (number | null) | User;
+  referenceId?: string | null;
+  authorizationCodeId?: string | null;
+  resources?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  requestedUserInfoClaims?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  refresh?: (number | null) | OauthRefreshToken;
+  expiresAt?: string | null;
+  revoked?: string | null;
+  confirmation?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  scopes:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Auto-generated from Better Auth schema (oauthConsent)
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "oauthConsents".
+ */
+export interface OauthConsent {
+  id: number;
+  clientId: string;
+  user?: (number | null) | User;
+  referenceId?: string | null;
+  resources?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  requestedUserInfoClaims?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  scopes:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Auto-generated from Better Auth schema (oauthClientAssertion)
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "oauthClientAssertions".
+ */
+export interface OauthClientAssertion {
+  id: number;
+  expiresAt: string;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -528,8 +1567,153 @@ export interface RateLimit {
   key: string;
   count: number;
   lastRequest: number;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
+}
+/**
+ * Choose the page, then its named section. Copy, image positions and embeds stay attached to that section. Save a draft before publishing.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "site-pages".
+ */
+export interface SitePage {
+  id: number;
+  title: string;
+  /**
+   * Examples: /, /story, /city, /mons, /how-it-works, /get. Creating a record alone does not register a new website route.
+   */
+  route: string;
+  seo?: {
+    title?: string | null;
+    description?: string | null;
+  };
+  sections: {
+    label: string;
+    /**
+     * Keep this stable when editing an existing section. Homepage identifiers: hero, signage, world, district-divider, hlynk, starters, grid, care, hatch, waitlist.
+     */
+    sectionKey: string;
+    hidden?: boolean | null;
+    copy?:
+      | {
+          label: string;
+          key: string;
+          value?: string | null;
+          id?: string | null;
+        }[]
+      | null;
+    /**
+     * Reorder these blocks with their drag handles. Image positions replace an existing slot; inline images, galleries, text, YouTube and UI embeds appear after the section.
+     */
+    content?: (Text | Image | Gallery | Youtube | Iframe)[] | null;
+    id?: string | null;
+  }[];
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedAt: string;
+  createdAt: string;
+  _status?: ('draft' | 'published') | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "Text".
+ */
+export interface Text {
+  heading?: string | null;
+  body: string;
+  linkLabel?: string | null;
+  link?: string | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'text';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "Image".
+ */
+export interface Image {
+  /**
+   * inline adds an image below the section. Existing homepage positions include hero, world.primary, world.secondary, hlynk.static, hlynk.scanner, hlynk.controls, starter.1, starter.2, starter.3, and hatch.
+   */
+  slot: string;
+  /**
+   * Drop an image into the upload control, upload a new file, or choose from the media library. To change one placement, select a new media item rather than replacing a shared file.
+   */
+  image: number | Media;
+  /**
+   * Leave blank to use the media library alternative text.
+   */
+  alt?: string | null;
+  decorative?: boolean | null;
+  caption?: string | null;
+  focalX?: number | null;
+  focalY?: number | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'image';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "Gallery".
+ */
+export interface Gallery {
+  images: {
+    /**
+     * Drop an image into the upload control, upload a new file, or choose from the media library. To change one placement, select a new media item rather than replacing a shared file.
+     */
+    image: number | Media;
+    /**
+     * Leave blank to use the media library alternative text.
+     */
+    alt?: string | null;
+    caption?: string | null;
+    id?: string | null;
+  }[];
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'gallery';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "Youtube".
+ */
+export interface Youtube {
+  title: string;
+  url: string;
+  caption?: string | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'youtube';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "Iframe".
+ */
+export interface Iframe {
+  title: string;
+  /**
+   * Paste the URL only, not iframe HTML. Embed hosts are approved on the server. The target must allow this website to frame it.
+   */
+  url: string;
+  aspect?: ('16:9' | '4:3' | '1:1' | '9:16') | null;
+  caption?: string | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'iframe';
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -706,6 +1890,18 @@ export interface PayloadLockedDocument {
         value: number | Waitlist;
       } | null)
     | ({
+        relationTo: 'language-lexicon';
+        value: number | LanguageLexicon;
+      } | null)
+    | ({
+        relationTo: 'mon-models';
+        value: number | MonModel;
+      } | null)
+    | ({
+        relationTo: 'mon-art';
+        value: number | MonArt;
+      } | null)
+    | ({
         relationTo: 'sessions';
         value: number | Session;
       } | null)
@@ -730,8 +1926,44 @@ export interface PayloadLockedDocument {
         value: number | DeviceCode;
       } | null)
     | ({
+        relationTo: 'jwks';
+        value: number | Jwk;
+      } | null)
+    | ({
+        relationTo: 'oauthClients';
+        value: number | OauthClient;
+      } | null)
+    | ({
+        relationTo: 'oauthResources';
+        value: number | OauthResource;
+      } | null)
+    | ({
+        relationTo: 'oauthClientResources';
+        value: number | OauthClientResource;
+      } | null)
+    | ({
+        relationTo: 'oauthRefreshTokens';
+        value: number | OauthRefreshToken;
+      } | null)
+    | ({
+        relationTo: 'oauthAccessTokens';
+        value: number | OauthAccessToken;
+      } | null)
+    | ({
+        relationTo: 'oauthConsents';
+        value: number | OauthConsent;
+      } | null)
+    | ({
+        relationTo: 'oauthClientAssertions';
+        value: number | OauthClientAssertion;
+      } | null)
+    | ({
         relationTo: 'rateLimits';
         value: number | RateLimit;
+      } | null)
+    | ({
+        relationTo: 'site-pages';
+        value: number | SitePage;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -777,6 +2009,28 @@ export interface PayloadMigration {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "payload-llm-instructions".
+ */
+export interface PayloadLlmInstruction {
+  id: string;
+  entitySlug: string;
+  title?: string | null;
+  entityType: 'collection' | 'global';
+  additionalInstructions?: string | null;
+  systemInstructions?: string | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "users_select".
  */
 export interface UsersSelect<T extends boolean = true> {
@@ -798,6 +2052,8 @@ export interface UsersSelect<T extends boolean = true> {
   deletionScheduledFor?: T;
   deletionScheduledBy?: T;
   deletionReason?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -808,6 +2064,9 @@ export interface UsersSelect<T extends boolean = true> {
 export interface MediaSelect<T extends boolean = true> {
   bunnyUrl?: T;
   alt?: T;
+  websiteUsage?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
   url?: T;
@@ -817,6 +2076,18 @@ export interface MediaSelect<T extends boolean = true> {
   filesize?: T;
   width?: T;
   height?: T;
+  original?:
+    | T
+    | {
+        filename?: T;
+        url?: T;
+        mimeType?: T;
+        filesize?: T;
+        width?: T;
+        height?: T;
+        prefix?: T;
+        _objectKey?: T;
+      };
   focalX?: T;
   focalY?: T;
 }
@@ -832,6 +2103,8 @@ export interface GuardianConsentsSelect<T extends boolean = true> {
   emailsSent?: T;
   lastEmailSentAt?: T;
   parentRequest?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -850,6 +2123,8 @@ export interface EggsSelect<T extends boolean = true> {
   createdAtMs?: T;
   incubationEndsAt?: T;
   hatched?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -866,8 +2141,11 @@ export interface MonInstancesSelect<T extends boolean = true> {
   hatchedAt?: T;
   bond?: T;
   stage?: T;
+  gender?: T;
   voiceLineageId?: T;
   serverConfirmedAt?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -888,6 +2166,8 @@ export interface CareStatesSelect<T extends boolean = true> {
   sluggishUntil?: T;
   pendingRequest?: T;
   lastSeqByDevice?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -904,6 +2184,8 @@ export interface AuditEventsSelect<T extends boolean = true> {
   targetId?: T;
   reasonCode?: T;
   requestId?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -919,6 +2201,8 @@ export interface IntegrityRunsSelect<T extends boolean = true> {
   idMismatch?: T;
   orphans?: T;
   staleReady?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -932,6 +2216,8 @@ export interface IdempotencyRecordsSelect<T extends boolean = true> {
   status?: T;
   contentType?: T;
   body?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -943,8 +2229,180 @@ export interface WaitlistSelect<T extends boolean = true> {
   email?: T;
   district?: T;
   source?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "language-lexicon_select".
+ */
+export interface LanguageLexiconSelect<T extends boolean = true> {
+  key?: T;
+  entryType?: T;
+  canonicalText?: T;
+  spokenForm?: T;
+  meaning?: T;
+  category?: T;
+  subcategory?: T;
+  communityTags?: T;
+  boroughTags?: T;
+  register?: T;
+  tone?: T;
+  ageMin?: T;
+  usageFrequency?: T;
+  mirrorStrength?: T;
+  ttsPronunciation?: T;
+  pronunciationNotes?: T;
+  grammarNotes?: T;
+  triggerText?: T;
+  responseText?: T;
+  relationshipGate?: T;
+  activationPolicy?: T;
+  avoidWhen?: T;
+  identityInference?: T;
+  profanity?: T;
+  speciesId?: T;
+  bloodlineId?: T;
+  stage?: T;
+  mood?: T;
+  variants?: T;
+  spokenPlural?: T;
+  sortOrder?: T;
+  locale?: T;
+  sourceBasis?: T;
+  sourceUrl?: T;
+  editorNotes?: T;
+  active?: T;
+  createdBy?: T;
+  updatedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  _status?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "mon-models_select".
+ */
+export interface MonModelsSelect<T extends boolean = true> {
+  speciesId?: T;
+  stage?: T;
+  bloodlineId?: T;
+  status?: T;
+  bunnyUrl?: T;
+  scale?: T;
+  position?:
+    | T
+    | {
+        x?: T;
+        y?: T;
+        z?: T;
+      };
+  rotation?:
+    | T
+    | {
+        x?: T;
+        y?: T;
+        z?: T;
+      };
+  animations?:
+    | T
+    | {
+        role?: T;
+        clip?: T;
+        loop?: T;
+        id?: T;
+      };
+  animationClips?:
+    | T
+    | {
+        name?: T;
+        id?: T;
+      };
+  morphTargets?:
+    | T
+    | {
+        name?: T;
+        id?: T;
+      };
+  heightMeters?: T;
+  credit?:
+    | T
+    | {
+        author?: T;
+        license?: T;
+        sourceUrl?: T;
+      };
+  notes?: T;
+  createdBy?: T;
+  updatedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  url?: T;
+  thumbnailURL?: T;
+  filename?: T;
+  mimeType?: T;
+  filesize?: T;
+  width?: T;
+  height?: T;
+  original?:
+    | T
+    | {
+        filename?: T;
+        url?: T;
+        mimeType?: T;
+        filesize?: T;
+        width?: T;
+        height?: T;
+        prefix?: T;
+        _objectKey?: T;
+      };
+  focalX?: T;
+  focalY?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "mon-art_select".
+ */
+export interface MonArtSelect<T extends boolean = true> {
+  speciesId?: T;
+  stage?: T;
+  bloodlineId?: T;
+  status?: T;
+  alt?: T;
+  bunnyUrl?: T;
+  credit?:
+    | T
+    | {
+        author?: T;
+        sourceUrl?: T;
+      };
+  createdBy?: T;
+  updatedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  url?: T;
+  thumbnailURL?: T;
+  filename?: T;
+  mimeType?: T;
+  filesize?: T;
+  width?: T;
+  height?: T;
+  original?:
+    | T
+    | {
+        filename?: T;
+        url?: T;
+        mimeType?: T;
+        filesize?: T;
+        width?: T;
+        height?: T;
+        prefix?: T;
+        _objectKey?: T;
+      };
+  focalX?: T;
+  focalY?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -957,6 +2415,8 @@ export interface SessionsSelect<T extends boolean = true> {
   userAgent?: T;
   user?: T;
   surface?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -975,6 +2435,8 @@ export interface AccountsSelect<T extends boolean = true> {
   refreshTokenExpiresAt?: T;
   scope?: T;
   password?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -986,6 +2448,8 @@ export interface VerificationsSelect<T extends boolean = true> {
   identifier?: T;
   value?: T;
   expiresAt?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1003,6 +2467,8 @@ export interface PasskeysSelect<T extends boolean = true> {
   backedUp?: T;
   transports?: T;
   aaguid?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1017,6 +2483,8 @@ export interface TwoFactorsSelect<T extends boolean = true> {
   verified?: T;
   failedVerificationCount?: T;
   lockedUntil?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1034,6 +2502,177 @@ export interface DeviceCodesSelect<T extends boolean = true> {
   pollingInterval?: T;
   clientId?: T;
   scope?: T;
+  createdBy?: T;
+  updatedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "jwks_select".
+ */
+export interface JwksSelect<T extends boolean = true> {
+  publicKey?: T;
+  privateKey?: T;
+  expiresAt?: T;
+  alg?: T;
+  crv?: T;
+  createdBy?: T;
+  updatedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "oauthClients_select".
+ */
+export interface OauthClientsSelect<T extends boolean = true> {
+  clientId?: T;
+  clientSecret?: T;
+  clientDiscoveryId?: T;
+  disabled?: T;
+  skipConsent?: T;
+  enableEndSession?: T;
+  subjectType?: T;
+  scopes?: T;
+  clientCredentialsScopes?: T;
+  user?: T;
+  name?: T;
+  uri?: T;
+  icon?: T;
+  contacts?: T;
+  tos?: T;
+  policy?: T;
+  softwareId?: T;
+  softwareVersion?: T;
+  softwareStatement?: T;
+  redirectUris?: T;
+  postLogoutRedirectUris?: T;
+  backchannelLogoutUri?: T;
+  backchannelLogoutSessionRequired?: T;
+  tokenEndpointAuthMethod?: T;
+  applicationType?: T;
+  jwks?: T;
+  jwksUri?: T;
+  grantTypes?: T;
+  responseTypes?: T;
+  requirePKCE?: T;
+  dpopBoundAccessTokens?: T;
+  referenceId?: T;
+  metadata?: T;
+  createdBy?: T;
+  updatedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "oauthResources_select".
+ */
+export interface OauthResourcesSelect<T extends boolean = true> {
+  identifier?: T;
+  name?: T;
+  accessTokenTtl?: T;
+  refreshTokenTtl?: T;
+  signingAlgorithm?: T;
+  signingKeyId?: T;
+  allowedScopes?: T;
+  customClaims?: T;
+  dpopBoundAccessTokensRequired?: T;
+  disabled?: T;
+  policyVersion?: T;
+  metadata?: T;
+  createdBy?: T;
+  updatedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "oauthClientResources_select".
+ */
+export interface OauthClientResourcesSelect<T extends boolean = true> {
+  clientId?: T;
+  resourceId?: T;
+  metadata?: T;
+  createdBy?: T;
+  updatedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "oauthRefreshTokens_select".
+ */
+export interface OauthRefreshTokensSelect<T extends boolean = true> {
+  token?: T;
+  clientId?: T;
+  session?: T;
+  user?: T;
+  referenceId?: T;
+  authorizationCodeId?: T;
+  resources?: T;
+  requestedUserInfoClaims?: T;
+  expiresAt?: T;
+  revoked?: T;
+  rotatedAt?: T;
+  rotationReplayResponse?: T;
+  rotationReplayExpiresAt?: T;
+  authTime?: T;
+  confirmation?: T;
+  scopes?: T;
+  createdBy?: T;
+  updatedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "oauthAccessTokens_select".
+ */
+export interface OauthAccessTokensSelect<T extends boolean = true> {
+  token?: T;
+  clientId?: T;
+  session?: T;
+  user?: T;
+  referenceId?: T;
+  authorizationCodeId?: T;
+  resources?: T;
+  requestedUserInfoClaims?: T;
+  refresh?: T;
+  expiresAt?: T;
+  revoked?: T;
+  confirmation?: T;
+  scopes?: T;
+  createdBy?: T;
+  updatedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "oauthConsents_select".
+ */
+export interface OauthConsentsSelect<T extends boolean = true> {
+  clientId?: T;
+  user?: T;
+  referenceId?: T;
+  resources?: T;
+  requestedUserInfoClaims?: T;
+  scopes?: T;
+  createdBy?: T;
+  updatedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "oauthClientAssertions_select".
+ */
+export interface OauthClientAssertionsSelect<T extends boolean = true> {
+  expiresAt?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1045,8 +2684,105 @@ export interface RateLimitsSelect<T extends boolean = true> {
   key?: T;
   count?: T;
   lastRequest?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "site-pages_select".
+ */
+export interface SitePagesSelect<T extends boolean = true> {
+  title?: T;
+  route?: T;
+  seo?:
+    | T
+    | {
+        title?: T;
+        description?: T;
+      };
+  sections?:
+    | T
+    | {
+        label?: T;
+        sectionKey?: T;
+        hidden?: T;
+        copy?:
+          | T
+          | {
+              label?: T;
+              key?: T;
+              value?: T;
+              id?: T;
+            };
+        content?:
+          | T
+          | {
+              text?:
+                | T
+                | {
+                    heading?: T;
+                    body?: T;
+                    linkLabel?: T;
+                    link?: T;
+                    id?: T;
+                    blockName?: T;
+                  };
+              image?:
+                | T
+                | {
+                    slot?: T;
+                    image?: T;
+                    alt?: T;
+                    decorative?: T;
+                    caption?: T;
+                    focalX?: T;
+                    focalY?: T;
+                    id?: T;
+                    blockName?: T;
+                  };
+              gallery?:
+                | T
+                | {
+                    images?:
+                      | T
+                      | {
+                          image?: T;
+                          alt?: T;
+                          caption?: T;
+                          id?: T;
+                        };
+                    id?: T;
+                    blockName?: T;
+                  };
+              youtube?:
+                | T
+                | {
+                    title?: T;
+                    url?: T;
+                    caption?: T;
+                    id?: T;
+                    blockName?: T;
+                  };
+              iframe?:
+                | T
+                | {
+                    title?: T;
+                    url?: T;
+                    aspect?: T;
+                    caption?: T;
+                    id?: T;
+                    blockName?: T;
+                  };
+            };
+        id?: T;
+      };
+  createdBy?: T;
+  updatedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  _status?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -1130,6 +2866,124 @@ export interface PayloadMigrationsSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "payload-llm-instructions_select".
+ */
+export interface PayloadLlmInstructionsSelect<T extends boolean = true> {
+  id?: T;
+  entitySlug?: T;
+  title?: T;
+  entityType?: T;
+  additionalInstructions?: T;
+  systemInstructions?: T;
+  createdBy?: T;
+  updatedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * The voice each Mon lineage speaks with, pitch by stage, and delivery by mood. Words and pronunciations are in the Language Lexicon.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "mon-voices".
+ */
+export interface MonVoice {
+  id: number;
+  provider: 'elevenlabs';
+  /**
+   * ElevenLabs model id. v4 Turbo performs audio tags.
+   */
+  model: string;
+  /**
+   * One row per lineage slot. A pool shorter than the slot count wraps, so fill each pool.
+   */
+  lineages?:
+    | {
+        lineageId: string;
+        /**
+         * ElevenLabs voice id.
+         */
+        voiceId: string;
+        name: string;
+        style: number;
+        speed: number;
+        id?: string | null;
+      }[]
+    | null;
+  stagePitch?: {
+    /**
+     * Pitch for the Egg's babble from inside the shell (Decision 32), set higher than the Baby's. Empty: silent.
+     */
+    egg?: number | null;
+    /**
+     * Pitch factor, 1 is the voice as cast. Empty: silent.
+     */
+    baby?: number | null;
+    /**
+     * Pitch factor, 1 is the voice as cast. Empty: silent.
+     */
+    small?: number | null;
+    /**
+     * Pitch factor, 1 is the voice as cast. Empty: silent.
+     */
+    mid?: number | null;
+    /**
+     * Pitch factor, 1 is the voice as cast. Empty: silent.
+     */
+    max?: number | null;
+  };
+  moods?:
+    | {
+        mood: 'content' | 'asleep' | 'sluggish' | 'needs-fullness' | 'needs-energy' | 'needs-social';
+        /**
+         * Audio tag before the line, e.g. [happily]. Empty: none.
+         */
+        tag?: string | null;
+        /**
+         * Lower is livelier, higher is flatter.
+         */
+        stability: number;
+        /**
+         * How closely the output keeps to the cast voice.
+         */
+        similarityBoost: number;
+        id?: string | null;
+      }[]
+    | null;
+  defaultDelivery: {
+    tag?: string | null;
+    /**
+     * Lower is livelier, higher is flatter.
+     */
+    stability: number;
+    /**
+     * How closely the output keeps to the cast voice.
+     */
+    similarityBoost: number;
+  };
+  /**
+   * In these moods the Mon keeps its voice but drops the swagger.
+   */
+  lowEnergy: {
+    moods?: ('content' | 'asleep' | 'sluggish' | 'needs-fullness' | 'needs-energy' | 'needs-social')[] | null;
+    /**
+     * Multiplies the voice’s style.
+     */
+    styleFactor: number;
+    maxSpeed: number;
+  };
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-jobs-stats".
  */
 export interface PayloadJobsStat {
@@ -1148,6 +3002,61 @@ export interface PayloadJobsStat {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "mon-voices_select".
+ */
+export interface MonVoicesSelect<T extends boolean = true> {
+  provider?: T;
+  model?: T;
+  lineages?:
+    | T
+    | {
+        lineageId?: T;
+        voiceId?: T;
+        name?: T;
+        style?: T;
+        speed?: T;
+        id?: T;
+      };
+  stagePitch?:
+    | T
+    | {
+        egg?: T;
+        baby?: T;
+        small?: T;
+        mid?: T;
+        max?: T;
+      };
+  moods?:
+    | T
+    | {
+        mood?: T;
+        tag?: T;
+        stability?: T;
+        similarityBoost?: T;
+        id?: T;
+      };
+  defaultDelivery?:
+    | T
+    | {
+        tag?: T;
+        stability?: T;
+        similarityBoost?: T;
+      };
+  lowEnergy?:
+    | T
+    | {
+        moods?: T;
+        styleFactor?: T;
+        maxSpeed?: T;
+      };
+  createdBy?: T;
+  updatedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-jobs-stats_select".
  */
 export interface PayloadJobsStatsSelect<T extends boolean = true> {
@@ -1155,6 +3064,16 @@ export interface PayloadJobsStatsSelect<T extends boolean = true> {
   updatedAt?: T;
   createdAt?: T;
   globalType?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "welcome_widget".
+ */
+export interface WelcomeWidget {
+  data?: {
+    [k: string]: unknown;
+  };
+  width: 'full';
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -1176,13 +3095,25 @@ export interface CollectionQueryWidget {
     relatedCollection:
       | 'users'
       | 'media'
+      | 'language-lexicon'
+      | 'mon-models'
+      | 'mon-art'
       | 'sessions'
       | 'accounts'
       | 'verifications'
       | 'passkeys'
       | 'twoFactors'
       | 'deviceCodes'
-      | 'rateLimits';
+      | 'jwks'
+      | 'oauthClients'
+      | 'oauthResources'
+      | 'oauthClientResources'
+      | 'oauthRefreshTokens'
+      | 'oauthAccessTokens'
+      | 'oauthConsents'
+      | 'oauthClientAssertions'
+      | 'rateLimits'
+      | 'site-pages';
     where?:
       | {
           [k: string]: unknown;
@@ -1208,15 +3139,37 @@ export interface ActivityWidget {
       | (
           | 'users'
           | 'media'
+          | 'language-lexicon'
+          | 'mon-models'
+          | 'mon-art'
           | 'sessions'
           | 'accounts'
           | 'verifications'
           | 'passkeys'
           | 'twoFactors'
           | 'deviceCodes'
+          | 'jwks'
+          | 'oauthClients'
+          | 'oauthResources'
+          | 'oauthClientResources'
+          | 'oauthRefreshTokens'
+          | 'oauthAccessTokens'
+          | 'oauthConsents'
+          | 'oauthClientAssertions'
           | 'rateLimits'
+          | 'site-pages'
         )[]
       | null;
+  };
+  width: 'small' | 'medium' | 'large' | 'x-large' | 'full';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "upload-dropzone_widget".
+ */
+export interface UploadDropzoneWidget {
+  data?: {
+    excludedCollections?: ('media' | 'mon-models' | 'mon-art')[] | null;
   };
   width: 'x-small' | 'small' | 'medium' | 'large' | 'x-large' | 'full';
 }

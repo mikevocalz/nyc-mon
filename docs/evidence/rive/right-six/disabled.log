@@ -1,0 +1,6 @@
+[23:07:25.814] rive  deferred replay: inline
+[23:07:25.869] rive  built /Users/mikevocalz/nyc-mon/packages/ui/rive/arcade-controls/right-six/build/right-six.riv (144444 bytes, 54ms, 0 errors, 0 warnings)
+[23:07:25.870] rive  data: buttons/c/state = disabled
+[23:07:25.871] rive  showing RightSix [1/2]
+[23:07:25.871] rive  viewport 209x204 @1x
+[23:07:25.891] rive  wrote /Users/mikevocalz/nyc-mon/docs/evidence/rive/right-six/disabled.png

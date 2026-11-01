@@ -2,7 +2,7 @@
 
 Owner: `ux-writer`. Inputs: `01-research.md`, `03-direction.md`; Law 9; Decisions #5, #6, #8, #14; PS-005; Q32. Glossary: `docs/COPY_DECK.md`.
 
-All strings are `voice: "ui"`. The Baby does not speak (Q32 open). No pronoun for the Mon (PS-005): restructure or repeat the name. `{babyName}` is the Baby form name from content (`Squeaklet`, `Kittee Cee`, `Yotito`; Decision #9) until M09 sets a nickname; `{monName}` is the nickname when set, else `{babyName}`.
+All strings are `voice: "ui"`. The new Baby says no words: on its first day it only babbles (Decision 32). No pronoun for the Mon (PS-005): restructure or repeat the name. `{babyName}` is the Baby form name from content (`Squeaklet`, `Kittee Cee`, `Yotito`; Decision #9) until M09 sets a nickname; `{monName}` is the nickname when set, else `{babyName}`.
 
 Fewer words than any other screen. The show carries the moment; text exists for the screen reader and for the two choices.
 
@@ -10,24 +10,28 @@ Fewer words than any other screen. The show carries the moment; text exists for 
 
 | ID | String | Voice | Max | Notes | Canon |
 |---|---|---|---|---|---|
-| `m12.trackpad.open` | Open the case | ui | 20 | pre; same as `m11.trackpad.open` | `V11 ¶49` |
+| `m12.trackpad.open` | Hatch your egg | ui | 20 | pre; same as `m11.trackpad.open`. Was "Open the case"; superseded by Decision 29 (2026-10-21) | Decision 29 |
 | `m12.skip` | Skip | ui | 12 | visible from 2000 ms | brief §3.5 |
 | `m12.skip.a11y.hint` | Goes to the end. Nothing about your Mon changes. | ui | — | the honest promise | Law 6 |
 | `m12.first_look.hesitate.trackpad` | Stay close | ui | 16 | trackpad label and labelled button on the hesitate path | Decision #14 |
 | `m12.first_look.hesitate.hint` | Hold the trackpad to stay close. | ui | 40 | caption after 8 s without input; never earlier | — |
 | `m12.plate.a11y.label` | {babyName}, {bloodlineLabel} | ui | — | `SignagePlate`; `{bloodlineLabel}` e.g. "Hood Ratti Bloodline" (Decision #11) | #6, #11 |
-| `m12.cta.name` | Name {babyName} | ui | 24 | complete, `nickname === null` → M09 | Decision #5 |
+| `m12.cta.name` | Meet {babyName} | ui | 24 | complete, nickname question not yet seen → M09 (the optional nickname question) | Decision #5; Mike, 2026-10-27 |
 | `m12.cta.home` | Go to {monName} | ui | 24 | complete, nickname set → M13 | — |
 
 ## Announcements (polite, VoiceOver / TalkBack)
 
 The show is visual; these make it followable without sight. One line per phase, never more.
 
+> Superseded by Decision 29 (2026-10-21): `m12.a11y.case_open` ("The case opens.") is removed; `stir` and `pressure` announce the egg instead.
+
 | ID | String | When |
 |---|---|---|
-| `m12.a11y.case_open` | The case opens. | `case-open` |
+| `m12.a11y.stir` | Something moves inside your egg. | `stir` |
+| `m12.a11y.pressure` | Light glows through the shell. | `pressure` |
 | `m12.a11y.crack` | Your egg is cracking. | first crack only |
 | `m12.a11y.emerge` | {babyName} hatched. | `emerge` |
+| `m12.a11y.hatched_from` | {babyName} hatched from the {eggName}. | the reveal resolves into colour (HatchSequence3D `resolve`), or the reduced-motion cross-fade |
 | `m12.a11y.first_look.lean_in` | {babyName} looks at you and leans in. | lean-in |
 | `m12.a11y.first_look.hesitate` | {babyName} looks at you, then peeks out from the shell. | hesitate starts |
 | `m12.a11y.first_look.resolved` | {babyName} comes closer and leans in. | hesitate resolved by the Caller |

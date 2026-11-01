@@ -5,14 +5,14 @@ import {
   MonInstanceSchema,
   PutCareRequestSchema,
 } from '@acme/core/schemas';
-import type { MonInstance } from '@acme/core/types';
+import type { EggRecord, MonInstance } from '@acme/core/types';
 import {
   applyCareWrites,
   createInitialCareState,
   deriveMonInstanceId,
   mintMonInstance,
 } from '@acme/core/sim';
-import { APIError, commitTransaction, createLocalReq, getPayload, initTransaction, killTransaction } from 'payload';
+import { APIError, NotFound, commitTransaction, createPayloadRequest, getPayload, initTransaction, killTransaction } from 'payload';
 import type { Payload, PayloadRequest, User } from 'payload';
 import type {} from '../../../payload-types.ts';
 import { CARE_STATES_SLUG, toCareState } from '../../../collections/CareStates.ts';
@@ -20,6 +20,7 @@ import { EGGS_SLUG } from '../../../collections/Eggs.ts';
 import { parseRecord } from '../../../collections/guards.ts';
 import { MON_INSTANCES_SLUG, toMonInstance } from '../../../collections/MonInstances.ts';
 import { runIdempotent } from './idempotency.ts';
+import { isAdultByBirthYear, isServiceRoute, readServiceCaller } from './service-caller.ts';
 
 export type V1ErrorCode =
   | 'UNAUTHORIZED'
@@ -27,13 +28,14 @@ export type V1ErrorCode =
   | 'INVALID_RECORD'
   | 'NOT_FOUND'
   | 'NOT_READY'
+  | 'ADULT_REQUIRED'
   | 'INTERNAL_ERROR';
 
 export function v1Error(code: V1ErrorCode, message: string, status: number): Response {
   return Response.json({ ok: false, error: { code, message } }, { status });
 }
 
-function v1Ok<T>(data: T): Response {
+export function v1Ok<T>(data: T): Response {
   return Response.json({ ok: true, data }, { status: 200 });
 }
 
@@ -43,36 +45,100 @@ interface V1Context {
   req: PayloadRequest;
 }
 
-async function getPayloadInstance(): Promise<Payload> {
+export async function getPayloadInstance(): Promise<Payload> {
   const { default: config } = await import('../../../payload.config.ts');
   return getPayload({ config });
 }
 
-async function buildContext(request: Request): Promise<V1Context | Response> {
-  const payload = await getPayloadInstance();
-  const { user } = await payload.auth({ headers: request.headers });
-  if (user === null) {
+/** The signed-in (or service-delegated) Caller behind a `/v1` request. */
+export interface V1Caller {
+  readonly callerId: string;
+  readonly user: Record<string, unknown>;
+}
+
+/** Test seams for {@link authenticateCaller}. */
+export interface AuthenticateCallerOptions {
+  /** `V1_MCP_SERVICE_KEY`; defaults to the process env. */
+  readonly serviceKey?: string;
+  readonly nowMs?: number;
+}
+
+async function loadUserById(payload: Payload, callerId: string): Promise<Record<string, unknown> | undefined> {
+  try {
+    return asRecord(
+      await payload.findByID({ collection: 'users', id: callerId, depth: 0, overrideAccess: true, disableErrors: true }),
+    );
+  } catch (error) {
+    // Only "no such user" means unauthenticated. Anything else (the database
+    // is down, a query failed) propagates so the route answers 5xx, not 401.
+    if (error instanceof NotFound) return undefined;
+    throw error;
+  }
+}
+
+/**
+ * Resolves who a `/v1` request acts for: the MCP server's on-behalf-of
+ * headers (`service-caller.ts`, adults only), else the session or bearer
+ * token Payload's auth strategy accepts. Consent is checked on both paths.
+ */
+export async function authenticateCaller(
+  payload: Payload,
+  request: Request,
+  options: AuthenticateCallerOptions = {},
+): Promise<V1Caller | Response> {
+  const service = readServiceCaller(request, options.serviceKey ?? process.env.V1_MCP_SERVICE_KEY);
+  let user: Record<string, unknown> | undefined;
+  if (service.kind === 'rejected') {
     return v1Error('UNAUTHORIZED', 'Sign in required.', 401);
   }
+  // The service key reaches only the routes the MCP server calls; on any other
+  // route the service headers are refused rather than ignored.
+  if (service.kind === 'caller' && !isServiceRoute(request)) {
+    return v1Error('UNAUTHORIZED', 'Sign in required.', 401);
+  }
+  if (service.kind === 'caller') {
+    user = await loadUserById(payload, service.callerId);
+    if (user === undefined) return v1Error('UNAUTHORIZED', 'Sign in required.', 401);
+    if (!isAdultByBirthYear(user.birthYear, options.nowMs ?? Date.now())) {
+      return v1Error('ADULT_REQUIRED', 'This account is not available here.', 403);
+    }
+  } else {
+    const auth = await payload.auth({ headers: request.headers });
+    user = asRecord(auth.user ?? undefined);
+    if (user === undefined) return v1Error('UNAUTHORIZED', 'Sign in required.', 401);
+  }
 
-  const callerId = String((user as { id?: string | number }).id ?? '');
+  const callerId = String(user.id ?? '');
   if (callerId === '') {
     return v1Error('INTERNAL_ERROR', 'Authenticated user has no id.', 500);
   }
 
-  const consentStatus = (user as { consentStatus?: string }).consentStatus;
+  const consentStatus = user.consentStatus;
   if (consentStatus === 'pending' || consentStatus === 'denied') {
     return v1Error('CONSENT_REQUIRED', 'Guardian consent is required.', 403);
   }
-
-  const req = await createLocalReq(
-    { user: user as unknown as User, req: { headers: request.headers } as Partial<PayloadRequest> },
-    payload,
-  );
-  return { payload, callerId, req };
+  return { callerId, user };
 }
 
-async function withTransaction<T>(req: PayloadRequest, fn: () => Promise<T>): Promise<T> {
+async function buildContext(request: Request, getPayloadFor: () => Promise<Payload> = getPayloadInstance): Promise<V1Context | Response> {
+  const payload = await getPayloadFor();
+  let caller: V1Caller | Response;
+  try {
+    caller = await authenticateCaller(payload, request);
+  } catch (error) {
+    return handleAPIError(error);
+  }
+  if (caller instanceof Response) return caller;
+
+  const req = await createPayloadRequest({
+    payload,
+    user: caller.user as unknown as User,
+    req: { headers: request.headers } as Partial<PayloadRequest>,
+  });
+  return { payload, callerId: caller.callerId, req };
+}
+
+export async function withTransaction<T>(req: PayloadRequest, fn: () => Promise<T>): Promise<T> {
   const ownTransaction = await initTransaction(req);
   try {
     const result = await fn();
@@ -84,7 +150,7 @@ async function withTransaction<T>(req: PayloadRequest, fn: () => Promise<T>): Pr
   }
 }
 
-function asRecord(value: unknown): Record<string, unknown> | undefined {
+export function asRecord(value: unknown): Record<string, unknown> | undefined {
   return typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : undefined;
 }
 
@@ -96,7 +162,7 @@ async function safeParseJSON(request: Request): Promise<unknown> {
   }
 }
 
-function handleAPIError(error: unknown): Response {
+export function handleAPIError(error: unknown): Response {
   if (error instanceof APIError) {
     const data = error.data as Record<string, unknown> | undefined;
     const code = typeof data?.code === 'string' ? data.code : 'INTERNAL_ERROR';
@@ -108,13 +174,13 @@ function handleAPIError(error: unknown): Response {
   return v1Error('INTERNAL_ERROR', 'Unknown error.', 500);
 }
 
-function monFromDoc(raw: unknown): MonInstance {
+export function monFromDoc(raw: unknown): MonInstance {
   const doc = asRecord(raw);
   if (doc === undefined) throw new Error('mon document is not a record');
   return parseRecord(MonInstanceSchema, toMonInstance(doc), 'mon');
 }
 
-async function findCareDoc(payload: Payload, req: PayloadRequest, monInstanceId: string): Promise<Record<string, unknown> | undefined> {
+export async function findCareDoc(payload: Payload, req: PayloadRequest | undefined, monInstanceId: string): Promise<Record<string, unknown> | undefined> {
   const result = await payload.find({
     collection: CARE_STATES_SLUG,
     where: { monInstanceId: { equals: monInstanceId } },
@@ -126,35 +192,61 @@ async function findCareDoc(payload: Payload, req: PayloadRequest, monInstanceId:
   return asRecord(result.docs[0]);
 }
 
-/** GET /v1/me/mons */
-export async function handleListMyMons(request: Request): Promise<Response> {
-  const context = await buildContext(request);
-  if (context instanceof Response) return context;
-  const { payload, callerId, req } = context;
-
-  const monDocs = await payload.find({
-    collection: MON_INSTANCES_SLUG,
-    where: { callerId: { equals: callerId } },
-    limit: 0,
-    depth: 0,
-    overrideAccess: true,
-    req,
-  });
-
-  const result = [];
-
-  for (const raw of monDocs.docs) {
-    const mon = monFromDoc(raw);
-    const careDoc = await findCareDoc(payload, req, mon.monInstanceId);
-    const careState =
-      careDoc === undefined
-        ? createInitialCareState(mon.monInstanceId, mon.hatchedAt)
-        : parseRecord(CareStateSchema, toCareState(careDoc), 'care');
-    result.push({ mon, care: careState });
-  }
-
-  return v1Ok({ mons: result });
+/** Dependencies for {@link createListMyMonsHandler}; tests pass a fake Payload. */
+export interface ListMyMonsDeps {
+  readonly getPayload: () => Promise<Payload>;
+  readonly now?: () => number;
+  readonly serviceKey?: string;
 }
+
+/** `users.activeMonInstanceId` as the API reports it: a non-empty id, or null. */
+function activeMonIdOf(user: Record<string, unknown>): string | null {
+  const value = user.activeMonInstanceId;
+  return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
+/**
+ * `GET /v1/me/mons`: the Caller's Mons with their authoritative care states,
+ * plus `activeMonInstanceId`, the companion the Caller chose (null when unset).
+ * Clients that act on "the" Mon without naming one use that id, not the most
+ * recently hatched Mon.
+ */
+export function createListMyMonsHandler(deps: ListMyMonsDeps): (request: Request) => Promise<Response> {
+  return async (request) => {
+    const payload = await deps.getPayload();
+    const nowMs = deps.now?.() ?? Date.now();
+    try {
+      const caller = await authenticateCaller(payload, request, { serviceKey: deps.serviceKey, nowMs });
+      if (caller instanceof Response) return caller;
+
+      const monDocs = await payload.find({
+        collection: MON_INSTANCES_SLUG,
+        where: { callerId: { equals: caller.callerId } },
+        limit: 0,
+        depth: 0,
+        overrideAccess: true,
+      });
+
+      const mons = [];
+      for (const raw of monDocs.docs) {
+        const mon = monFromDoc(raw);
+        const careDoc = await findCareDoc(payload, undefined, mon.monInstanceId);
+        const care =
+          careDoc === undefined
+            ? createInitialCareState(mon.monInstanceId, mon.hatchedAt)
+            : parseRecord(CareStateSchema, toCareState(careDoc), 'care');
+        mons.push({ mon, care });
+      }
+
+      return v1Ok({ mons, activeMonInstanceId: activeMonIdOf(caller.user) });
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  };
+}
+
+/** `GET /v1/me/mons`, wired to the live Payload. */
+export const handleListMyMons = createListMyMonsHandler({ getPayload: getPayloadInstance });
 
 /**
  * POST /v1/eggs — mutating, so a request carrying `Idempotency-Key` replays
@@ -286,6 +378,8 @@ async function hatchEgg(context: V1Context, eggId: string): Promise<Response> {
     const minted = mintMonInstance(eggRecord);
     const monToCreate = {
       ...minted,
+      // MonInstances' validate hook derives the id from eggId and refuses a Mon without it.
+      eggId: eggRecord.eggId,
       stage: 'Baby' as const,
       serverConfirmedAt: new Date(),
     };
@@ -322,13 +416,18 @@ async function hatchEgg(context: V1Context, eggId: string): Promise<Response> {
  * PUT /v1/mons/:id/care (the ADR 0001 §1.4 contract; the route file also
  * mounts POST as an alias) — mutating; see {@link handleCreateEgg}.
  */
-export async function handleApplyCare(request: Request, monInstanceId: string): Promise<Response> {
-  const context = await buildContext(request);
-  if (context instanceof Response) return context;
-  return runIdempotent(context.payload, { callerId: context.callerId }, request, () =>
-    applyCare(context, request, monInstanceId),
-  );
+export function createApplyCareHandler(deps: { readonly getPayload: () => Promise<Payload> }): (request: Request, monInstanceId: string) => Promise<Response> {
+  return async (request, monInstanceId) => {
+    const context = await buildContext(request, deps.getPayload);
+    if (context instanceof Response) return context;
+    return runIdempotent(context.payload, { callerId: context.callerId }, request, () =>
+      applyCare(context, request, monInstanceId),
+    );
+  };
 }
+
+/** `PUT /v1/mons/:id/care`, wired to the live Payload. */
+export const handleApplyCare = createApplyCareHandler({ getPayload: getPayloadInstance });
 
 async function applyCare(context: V1Context, request: Request, monInstanceId: string): Promise<Response> {
   const { payload, callerId, req } = context;
@@ -437,13 +536,28 @@ async function applyCare(context: V1Context, request: Request, monInstanceId: st
         if (typeof seq === 'number' && seq > ackedSeq) ackedSeq = seq;
       }
 
-      return { mon: nextMon, care: nextCare, ackedSeq };
+      return { mon: nextMon, care: nextCare, ackedSeq, applied: countFreshWrites(writes, startingSeqs) };
     });
 
     return v1Ok(result);
   } catch (error) {
     return handleAPIError(error);
   }
+}
+
+/**
+ * The writes `applyCareWrites` applies rather than drops: seq above the
+ * device's last applied seq, first copy of each `(deviceId, seq)`.
+ */
+export function countFreshWrites(
+  writes: readonly { readonly deviceId: string; readonly seq: number }[],
+  lastSeqByDevice: Readonly<Record<string, number>>,
+): number {
+  const seen = new Set<string>();
+  for (const w of writes) {
+    if (w.seq > (lastSeqByDevice[w.deviceId] ?? 0)) seen.add(`${w.deviceId}#${w.seq}`);
+  }
+  return seen.size;
 }
 
 function toEggRecord(doc: Record<string, unknown>): unknown {
@@ -459,3 +573,64 @@ function toEggRecord(doc: Record<string, unknown>): unknown {
     incubationEndsAt: doc.incubationEndsAt,
   };
 }
+
+/** One egg the Caller is still incubating, as `GET /v1/me/eggs` returns it. */
+export interface IncubatingEgg {
+  readonly egg: EggRecord;
+  /** True once `incubationEndsAt` has passed; the hatch has not run yet. */
+  readonly readyToHatch: boolean;
+}
+
+/** Dependencies for {@link createListMyEggsHandler}; tests pass a fake Payload. */
+export interface ListMyEggsDeps {
+  readonly getPayload: () => Promise<Payload>;
+  readonly now?: () => number;
+  readonly serviceKey?: string;
+}
+
+/**
+ * `GET /v1/me/eggs`: the Caller's eggs that have not hatched into a Mon yet,
+ * soonest first. Read-only. An egg counts as hatched when a MonInstance with
+ * its `eggId` exists (the hatch route mints one and never flips `hatched`).
+ */
+export function createListMyEggsHandler(deps: ListMyEggsDeps): (request: Request) => Promise<Response> {
+  return async (request) => {
+    const payload = await deps.getPayload();
+    const nowMs = deps.now?.() ?? Date.now();
+    try {
+      const caller = await authenticateCaller(payload, request, { serviceKey: deps.serviceKey, nowMs });
+      if (caller instanceof Response) return caller;
+
+      const [eggDocs, monDocs] = await Promise.all([
+        payload.find({
+          collection: EGGS_SLUG,
+          where: { callerId: { equals: caller.callerId } },
+          limit: 0,
+          depth: 0,
+          overrideAccess: true,
+        }),
+        payload.find({
+          collection: MON_INSTANCES_SLUG,
+          where: { callerId: { equals: caller.callerId } },
+          limit: 0,
+          depth: 0,
+          overrideAccess: true,
+        }),
+      ]);
+      const hatchedEggIds = new Set(
+        monDocs.docs.map((doc) => asRecord(doc)?.eggId).filter((id): id is string => typeof id === 'string'),
+      );
+      const eggs: IncubatingEgg[] = eggDocs.docs
+        .map((doc) => parseRecord(EggRecordSchema, toEggRecord(asRecord(doc) ?? {}), 'egg'))
+        .filter((egg) => !hatchedEggIds.has(egg.eggId) && !hatchedEggIds.has(egg.monInstanceId))
+        .sort((a, b) => a.incubationEndsAt - b.incubationEndsAt)
+        .map((egg) => ({ egg, readyToHatch: egg.incubationEndsAt <= nowMs }));
+      return v1Ok({ eggs });
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  };
+}
+
+/** `GET /v1/me/eggs`, wired to the live Payload. */
+export const handleListMyEggs = createListMyEggsHandler({ getPayload: getPayloadInstance });

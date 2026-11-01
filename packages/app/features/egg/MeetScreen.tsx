@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, type ReactNode } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, type ReactNode } from 'react';
 import { useWindowDimensions } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { bloodlines, eggs } from '@acme/content';
@@ -9,29 +9,45 @@ import {
   Card,
   ChoiceRows,
   ChoiceTriptych,
+  createChoiceScreen,
+  createStageReady,
+  DeviceStage,
   ErrorMessage,
   Heading,
+  HLynkFit,
   HLynkShell,
+  SafeArea,
+  StageReadyGate,
   StatusRow,
   Text,
   TrackpadActions,
   useInstanceStore,
-  useLayoutSize,
+  useIsHeadset,
   useReducedMotion,
   useStore,
+  type ChoicePanel,
   type ChoiceTriptychItem,
+  type DeviceKey,
+  type FitStep,
+  type HLynkFitContext,
   type ShellTrackpadProps,
+  type StageReadyResource,
 } from '@acme/ui';
 import { haptics } from '@acme/ui/haptics';
-import { ScrollView, View } from '@acme/ui/tw';
+import { View } from '@acme/ui/tw';
 import { selectActiveMon, selectPendingEgg, useMonStore } from '../mon/mon.store';
 import { announcePolitely } from '../onboarding/announce';
 import { copy as onboardingCopy } from '../onboarding/copy';
 import { readConsentRequested } from '../onboarding/onboarding.store';
 import { schemeForTime } from '../onboarding/time-scheme';
 import { useTextRamp } from './use-text-ramp';
+import { CompanionPane } from '../companion/CompanionPane';
+import { CompanionStageHost, useTabletClass } from '../companion/CompanionStageHost';
 import { eggCopy } from './copy';
 import { EggStill } from './EggStill';
+import { eggGlowTint, eggModelSource } from './egg-source';
+import { StageControls, type StageControl } from './StageControls';
+import { StageLoader } from './StageLoader';
 import {
   buildEggViews,
   entryRedirect,
@@ -44,7 +60,7 @@ import {
   type EggView,
   type MeetState,
 } from './egg-model';
-import { isAccessibilityTextSize, isLandscapeWindow } from './window-layout';
+import { isAccessibilityTextSize, isLandscapeWindow, meetFitBlocks, TRIPTYCH_LANDSCAPE_MAX_DP } from './window-layout';
 
 /** Built once at import: a content parse failure surfaces as the route's error state. */
 function loadEggs(): { views: readonly EggView[] } | { error: true } {
@@ -60,10 +76,23 @@ interface MeetStore extends MeetState {
   /** Content rebuilt after "Try again". */
   readonly loaded: ReturnType<typeof loadEggs>;
   readonly scheme: 'daylit' | 'night';
+  /**
+   * The 3D H-Lynk stage: `starting` until its first frame with the eggs,
+   * then `ready`; `failed` when no GPU backend starts (the 2D shell then).
+   */
+  readonly stage3d: 'starting' | 'ready' | 'failed';
+  /** The stage's ready signal, for the Suspense gate over the Rive loader. */
+  readonly stageReady: StageReadyResource;
 }
 
+/** The kit's convention for a model that does not exist yet (MonView, MonsModels3D, EggStill). */
+const COMING_SOON = 'Coming Soon';
+
+/** Glass button targets on M08's panel. */
+type MeetAction = 'look' | 'choose' | 'confirm-yes' | 'confirm-no';
+
 /**
- * M08 egg choice (docs/design/screens/M08/08-handoff.md, D-16a–e). Three
+ * M08 egg choice (docs/design/screens/M08/08-handoff.md, D-16a–e). Four
  * eggs, no default. Browsing → approaching (a tile fills, the card rises) →
  * confirming (the button path asks once) → M10 with `?bloodline=`. Holding
  * the trackpad commits directly. Nothing is written here: the choice lives in
@@ -78,16 +107,18 @@ export function MeetScreen() {
   // us, so a resized Horizon window or split view re-lays out live.
   const { fontScale } = useWindowDimensions();
   const listLayout = isAccessibilityTextSize(fontScale);
-  const { size: area, onLayout } = useLayoutSize({ width: 351, height: 468 });
-  const landscape = isLandscapeWindow(area.width, area.height);
+  const headset = useIsHeadset();
 
   const store = useInstanceStore<MeetStore>(() => ({
     ...MEET_INITIAL,
     holding: false,
     loaded: loadEggs(),
     scheme: schemeForTime(Date.now()),
+    stage3d: 'starting',
+    stageReady: createStageReady(),
   }));
-  const { phase, focused, holding, loaded, scheme } = useStore(store);
+  const { phase, focused, holding, loaded, scheme, stage3d, stageReady } = useStore(store);
+  const tablet = useTabletClass();
 
   // Re-entry guard (handoff § States "already chosen"): on mount and on focus.
   useFocusEffect(
@@ -102,6 +133,51 @@ export function MeetScreen() {
   const views = 'views' in loaded ? loaded.views : [];
   const count = views.length;
   const egg = focused === null ? undefined : views[focused];
+
+  const titleText = eggCopy('m08.title');
+  const captionText = eggCopy('m08.santoro.caption');
+
+  const onStageReady = useCallback(() => {
+    store.setState({ stage3d: 'ready' });
+    store.getState().stageReady.settle();
+  }, [store]);
+  const onStageBackend = useCallback((backend: unknown) => {
+    if (backend !== null) return;
+    store.setState({ stage3d: 'failed' });
+    store.getState().stageReady.settle();
+  }, [store]);
+
+  // The glass buttons and the 3D keys call the latest handlers through a store,
+  // written after each commit (an effect) and read only from event paths, so
+  // the screen object (and the scene built from it) stays stable.
+  const handlers = useInstanceStore<{ action: (a: MeetAction) => void; key: (k: DeviceKey) => void }>(() => ({ action: () => undefined, key: () => undefined }));
+  const onStageKey = useCallback((key: DeviceKey) => handlers.getState().key(key), [handlers]);
+
+  // The egg choice on the 3D H-Lynk's glass: the same DeviceStage the
+  // website's H-LYNK section shows, with this screen's store as the focus.
+  // A tap on an egg (or its slot) focuses it exactly as a tile press does.
+  const eggScreen = useMemo(
+    () => createChoiceScreen({
+      title: titleText,
+      hint: captionText,
+      comingSoon: COMING_SOON,
+      items: ('views' in loaded ? loaded.views : []).map((v) => ({
+        target: v.bloodlineId, label: v.eggName, detail: v.bloodline, source: eggModelSource(v), glow: eggGlowTint(v),
+      })),
+      focused: () => store.getState().focused,
+      subscribe: (onChange) => store.subscribe((next, prev) => {
+        if (next.focused !== prev.focused || next.phase !== prev.phase) onChange();
+      }),
+      onSelect: (i) => {
+        haptics.selection();
+        const next = meetFocus(store.getState(), i);
+        store.setState({ phase: next.phase, focused: next.focused });
+      },
+      panel: () => meetPanel(store.getState(), 'views' in loaded ? loaded.views : [], captionText),
+      onAction: (target) => handlers.getState().action(target as MeetAction),
+    }),
+    [loaded, store, titleText, captionText, handlers],
+  );
 
   const choose = (chosen: EggView) => {
     haptics.success();
@@ -128,6 +204,39 @@ export function MeetScreen() {
     haptics.tap();
     set(meetStep(store.getState(), 1, count));
   };
+  const askConfirm = () => {
+    haptics.tap();
+    set(meetAskConfirm(store.getState()));
+  };
+  /** The trackpad (and Enter on the glass): one step forward through browse → card → confirm → choose. */
+  const activate = () => {
+    const now = store.getState();
+    const at = now.focused === null ? undefined : views[now.focused];
+    if (now.phase === 'browsing' || at === undefined) lookCloser();
+    else if (now.phase === 'approaching') askConfirm();
+    else choose(at);
+  };
+  useEffect(() => {
+    handlers.setState({
+    action: (a) => {
+      const at = egg;
+      if (a === 'look') lookCloser();
+      else if (a === 'choose') askConfirm();
+      else if (a === 'confirm-yes' && at !== undefined) choose(at);
+      else if (a === 'confirm-no') back();
+    },
+    key: (k) => {
+      if (k === 'prev') step(-1);
+      else if (k === 'next') step(1);
+      else if (k === 'activate') activate();
+      else if (k === 'menu') {
+        // Menu: back to all four eggs.
+        haptics.selection();
+        set(MEET_INITIAL);
+      } else back();
+    },
+    });
+  });
 
   const consentPending = readConsentRequested();
   const statusRow = consentPending ? (
@@ -197,7 +306,7 @@ export function MeetScreen() {
 
   const card = egg === undefined ? null : (
     <Card variant="notch" surface="page" title={egg.eggName} titleLevel={2} padded={false} testID="m08-card">
-      <ScrollView className="max-h-full" contentContainerClassName="gap-2 p-3">
+      <View className="max-h-full gap-2 p-3">
         <Text
           className={`${t.strong} tabular-nums text-text`}
           accessibilityLabel={eggCopy('m08.card.number.a11y', { dexId: egg.dexId })}
@@ -235,7 +344,7 @@ export function MeetScreen() {
             </View>
           </View>
         )}
-      </ScrollView>
+      </View>
     </Card>
   );
 
@@ -257,53 +366,223 @@ export function MeetScreen() {
     </View>
   );
 
-  return shell(
-    <View onLayout={onLayout} className={`flex-1 gap-3 ${landscape ? 'p-6' : 'p-4'}`}>
-      {phase === 'browsing' || listLayout ? (
-        <View className="gap-1">
-          <Heading level={1} className={t.title} testID="m08-title">{eggCopy('m08.title')}</Heading>
-          <Text className={`${t.body} text-text-muted`} testID="m08-caption">{eggCopy('m08.santoro.caption')}</Text>
-          {santoroLine !== '' ? <Text className={`${t.body} text-text`} testID="m08-santoro-line">{santoroLine}</Text> : null}
-        </View>
-      ) : null}
-      {listLayout ? (
-        <ScrollView className="flex-1" contentContainerClassName="gap-3">
-          <ChoiceRows
-            rows={views.map((v, i) => ({
-              key: v.bloodlineId,
-              label: tileItems[i]!.label,
-              detail: v.bloodline,
-              accessibilityLabel: tileItems[i]!.accessibilityLabel,
-              media: <EggStill dexId={v.dexId} />,
-            }))}
-            value={focused}
-            onChange={(i) => set(meetFocus(store.getState(), i))}
-            accessibilityLabel={eggCopy('m08.title')}
-            testID="m08-triptych"
-            rowTestID={(row) => `m08-egg-${row.key}`}
+  const showHead = phase === 'browsing' || listLayout;
+  const head = (type: FitStep) => (
+    <View className="gap-1">
+      <Heading level={1} className={type.title.className} testID="m08-title">{titleText}</Heading>
+      <Text className={`${type.body.className} text-text-muted`} testID="m08-caption">{captionText}</Text>
+      {santoroLine !== '' ? <Text className={`${type.body.className} text-text`} testID="m08-santoro-line">{santoroLine}</Text> : null}
+    </View>
+  );
+
+  // The 3D stage runs unless motion is reduced, the GPU never started, or the
+  // text size switched the choice to rows. While it loads, the kit's Rive
+  // loader covers it (Suspense on the stage's ready signal); the photo tiles
+  // never show on this path.
+  const stageOn = !reducedMotion && !listLayout && stage3d !== 'failed' && views.length > 0;
+
+  // The 3D H-Lynk REPLACES the 2D shell, and nothing 2D shows beside it: the
+  // egg's card, its buttons and the confirm step are drawn on the glass, and
+  // the 3D keys and trackpad drive it. The 2D shell below is only the
+  // fallback: reduced motion, no GPU, large text (rows) or a load error.
+  // Screen readers and keyboards get the triptych radio group and the
+  // stage's actions as visually hidden controls.
+  if (stageOn && !('error' in loaded)) {
+    const controls: StageControl[] = [
+      ...(phase === 'browsing'
+        ? [{ key: 'look', label: eggCopy('m08.action.look'), onPress: lookCloser, testID: 'm08-look' }]
+        : []),
+      ...(phase === 'approaching' && egg !== undefined
+        ? [
+            { key: 'choose', label: eggCopy('m08.cta.choose', { eggName: egg.eggName }), onPress: askConfirm, testID: 'm08-choose' },
+            { key: 'prev', label: eggCopy('m08.action.prev'), onPress: () => step(-1), testID: 'm08-prev' },
+            { key: 'all', label: eggCopy('m08.action.all'), onPress: () => set(MEET_INITIAL), testID: 'm08-all' },
+            { key: 'next', label: eggCopy('m08.action.next'), onPress: () => step(1), testID: 'm08-next' },
+          ]
+        : []),
+      ...(phase === 'confirming' && egg !== undefined
+        ? [
+            { key: 'yes', label: eggCopy('m08.confirm.yes'), hint: eggCopy('m08.confirm.title', { eggName: egg.eggName }), onPress: () => choose(egg), testID: 'm08-confirm-yes' },
+            { key: 'no', label: eggCopy('m08.confirm.no'), onPress: back, testID: 'm08-confirm-no' },
+          ]
+        : []),
+      { key: 'back', label: eggCopy('m08.back.a11y.label'), onPress: back, testID: 'm08-back' },
+    ];
+    return (
+      <View className="flex-1 bg-ink-950" testID="m08-3d">
+        <SafeArea className="flex-1" edges={['top', 'bottom', 'left', 'right']}>
+          {/* Phones: the stage fills the screen. Tablets: the egg's facts beside or under the device. */}
+          <CompanionStageHost
+            enabled={tablet.companion}
+            pane={<MeetPane egg={phase === 'browsing' ? undefined : egg} />}
+            device={<>
+            {/* Visually hidden from the first frame: the radio group screen readers and keyboards use. */}
+            <View className="absolute inset-0 opacity-0" pointerEvents="none" testID="m08-triptych-a11y">
+              <ChoiceTriptych
+                // No photos behind the 3D stage, not even invisible ones: the radio group needs only the labels.
+                items={tileItems.map((item) => ({ ...item, media: null }))}
+                focusedIndex={focused}
+                onFocusChange={(i) => set(meetFocus(store.getState(), i))}
+                accessibilityLabel={titleText}
+                focusedOverlay={null}
+                overlayPlacement="bottom"
+                holding={holding}
+                reducedMotion={reducedMotion}
+                testID="m08-triptych"
+                itemTestID={(item) => `m08-egg-${item.key}`}
+              />
+            </View>
+            <View
+              testID="m08-device-stage"
+              aria-hidden
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+              className="absolute inset-0"
+            >
+              <DeviceStage
+                screen={eggScreen}
+                label={titleText}
+                className="h-full"
+                stageClassName="min-h-0 w-full flex-1"
+                glassScale={tablet.glassScale}
+                onKey={onStageKey}
+                onReady={onStageReady}
+                onBackendChange={onStageBackend}
+              />
+            </View>
+            <Suspense fallback={<StageLoader label={titleText} testID="m08-stage-loader" />}>
+              <StageReadyGate resource={stageReady} />
+            </Suspense>
+            <StageControls controls={controls} testID="m08-stage-controls" />
+            </>}
           />
-          {card}
-          {actions}
-        </ScrollView>
-      ) : (
-        <>
-          <View className="flex-1" style={landscape ? { maxWidth: 3 * 300 + 2 * 12, width: '100%', alignSelf: 'center' } : undefined}>
-            <ChoiceTriptych
-              items={tileItems}
-              focusedIndex={focused}
-              onFocusChange={(i) => set(meetFocus(store.getState(), i))}
-              accessibilityLabel={eggCopy('m08.title')}
-              focusedOverlay={card}
-              overlayPlacement={landscape ? 'trailing' : 'bottom'}
-              holding={holding}
-              reducedMotion={reducedMotion}
-              testID="m08-triptych"
-              itemTestID={(item) => `m08-egg-${item.key}`}
-            />
+        </SafeArea>
+      </View>
+    );
+  }
+
+  // Decision H-3: nothing in the H-Lynk screen scrolls; HLynkFit steps the type
+  // and spacing down until the step fits. The triptych is the flexible media.
+  const fitBlocks = (ctx: HLynkFitContext) => meetFitBlocks({
+    titleChars: titleText.length,
+    captionChars: captionText.length,
+    santoroChars: santoroLine.length,
+    headInScreen: showHead,
+    listLayout,
+    cardShown: card !== null,
+    confirming: phase === 'confirming',
+    actionsShown: phase !== 'confirming',
+    fontScale: ctx.fontScale,
+  });
+
+  return shell(
+    <HLynkFit testID="m08-fit" ramp={headset ? 'xr' : 'mobile'} blocks={fitBlocks}>
+      {(fit, ctx) => {
+        const landscape = isLandscapeWindow(ctx.widthPt, ctx.heightPt);
+        return (
+          <View style={{ flexGrow: 1, gap: fit.type.gapPt }}>
+            {showHead ? head(fit.type) : null}
+            {listLayout ? (
+              <View style={{ gap: fit.type.gapPt }}>
+                <ChoiceRows
+                  rows={views.map((v, i) => ({
+                    key: v.bloodlineId,
+                    label: tileItems[i]!.label,
+                    detail: v.bloodline,
+                    accessibilityLabel: tileItems[i]!.accessibilityLabel,
+                    media: <EggStill dexId={v.dexId} />,
+                  }))}
+                  value={focused}
+                  onChange={(i) => set(meetFocus(store.getState(), i))}
+                  accessibilityLabel={titleText}
+                  testID="m08-triptych"
+                  rowTestID={(row) => `m08-egg-${row.key}`}
+                />
+                {card}
+                {actions}
+              </View>
+            ) : (
+              <>
+                <View
+                  // Portrait stacks the stage over the card, top-aligned; a landscape window from md puts them side by side.
+                  className="justify-start gap-3 md:landscape:flex-row md:landscape:items-stretch"
+                  style={{ flexGrow: 1, minHeight: fit.mediaPt, ...(landscape ? { maxWidth: TRIPTYCH_LANDSCAPE_MAX_DP, width: '100%', alignSelf: 'center' } : null) }}
+                >
+                  <View className="relative min-h-0 flex-1">
+                    <ChoiceTriptych
+                      items={tileItems}
+                      focusedIndex={focused}
+                      onFocusChange={(i) => set(meetFocus(store.getState(), i))}
+                      accessibilityLabel={titleText}
+                      focusedOverlay={card}
+                      overlayPlacement={landscape ? 'trailing' : 'bottom'}
+                      holding={holding}
+                      reducedMotion={reducedMotion}
+                      testID="m08-triptych"
+                      itemTestID={(item) => `m08-egg-${item.key}`}
+                    />
+                  </View>
+                </View>
+                {actions}
+              </>
+            )}
           </View>
-          {actions}
-        </>
+        );
+      }}
+    </HLynkFit>,
+  );
+}
+
+/** What M08's glass shows under the eggs: the hint, the focused egg's card, or the confirm step. */
+function meetPanel(state: MeetState, views: readonly EggView[], hint: string): ChoicePanel {
+  const at = state.focused === null ? undefined : views[state.focused];
+  if (state.phase === 'browsing' || at === undefined) {
+    return { body: hint, actions: [{ target: 'look', label: eggCopy('m08.action.look'), tone: 'primary' }] };
+  }
+  if (state.phase === 'confirming') {
+    return {
+      heading: eggCopy('m08.confirm.title', { eggName: at.eggName }),
+      body: eggCopy('m08.confirm.body'),
+      actions: [
+        { target: 'confirm-yes', label: eggCopy('m08.confirm.yes'), tone: 'primary' },
+        { target: 'confirm-no', label: eggCopy('m08.confirm.no'), tone: 'secondary' },
+      ],
+    };
+  }
+  return {
+    heading: at.eggName,
+    meta: `${eggCopy('m08.card.number', { dexNumber: at.dexNumber })}  ${eggCopy('m08.card.bloodline', { bloodline: at.bloodline })}`,
+    body: eggCopy('m08.card.body'),
+    actions: [{ target: 'choose', label: eggCopy('m08.cta.choose', { eggName: at.eggName }), tone: 'primary' }],
+  };
+}
+
+/**
+ * M08's companion pane on tablets: the focused egg's name, number and
+ * Bloodline, the only canon-settled facts before the hatch (08-handoff P3;
+ * culture notes are not authored yet). Nothing focused: how to pick one.
+ */
+function MeetPane({ egg }: { egg: EggView | undefined }) {
+  return (
+    <CompanionPane
+      title={egg?.eggName ?? eggCopy('pane.meet.title')}
+      testID="m08-pane"
+      empty={egg === undefined ? { title: eggCopy('pane.meet.empty.title'), description: eggCopy('pane.meet.empty.body') } : null}
+    >
+      {egg === undefined ? null : (
+        <View className="gap-3" testID="m08-pane-facts">
+          <View accessible accessibilityLabel={`${eggCopy('pane.meet.number')}, ${eggCopy('m08.card.number.a11y', { dexId: egg.dexId })}`} className="min-h-target justify-center gap-1 border-b border-border py-2">
+            <Text className="text-xr-caption text-text-muted">{eggCopy('pane.meet.number')}</Text>
+            <Text className="text-xr-body text-text" style={{ fontVariant: ['tabular-nums'] }}>{eggCopy('m08.card.number', { dexNumber: egg.dexNumber })}</Text>
+          </View>
+          <View accessible accessibilityLabel={`${eggCopy('pane.meet.bloodline')}, ${egg.bloodline}`} className="min-h-target justify-center gap-1 border-b border-border py-2">
+            <Text className="text-xr-caption text-text-muted">{eggCopy('pane.meet.bloodline')}</Text>
+            <Text className="text-xr-body text-text">{eggCopy('m08.card.bloodline', { bloodline: egg.bloodline })}</Text>
+          </View>
+          <Text className="text-xr-body text-text">{eggCopy('m08.card.body')}</Text>
+          <Text className="text-xr-body text-text-muted">{eggCopy('m08.santoro.caption')}</Text>
+        </View>
       )}
-    </View>,
+    </CompanionPane>
   );
 }

@@ -1,54 +1,68 @@
-import type { CareState, MonInstance } from '@acme/core';
-import type { FamiliarPerson } from '../presence/types.ts';
-import type { InventoryItem } from '../mcp/schemas.ts';
+import type { MonLingo } from '@acme/content/lingo';
+import type { CareAction, CareState, EggRecord, MonInstance } from '@acme/core';
+
+/** One Mon with its stored care state, as `/v1/me/mons` returns it. */
+export interface MonWithCare {
+  readonly mon: MonInstance;
+  readonly care: CareState;
+}
+
+/** The Caller's Mons and the companion they chose, as `/v1/me/mons` returns them. */
+export interface CallerMons {
+  readonly mons: readonly MonWithCare[];
+  /**
+   * `users.activeMonInstanceId`: the Mon the Caller chose. Null when none is
+   * chosen or `/v1` predates the field. It can name a Mon no longer in `mons`.
+   */
+  readonly activeMonInstanceId: string | null;
+}
+
+/** One unhatched egg, as `/v1/me/eggs` returns it. */
+export interface IncubatingEgg {
+  readonly egg: EggRecord;
+  readonly readyToHatch: boolean;
+}
+
+/** One care action a tool asks `/v1` to apply. */
+export interface CareWriteIntent {
+  readonly callerId: string;
+  readonly monInstanceId: string;
+  readonly action: CareAction;
+  /** Epoch ms the action happens at, used only on the first send of an intent. */
+  readonly at: number;
+  /** Stable for one intent across retries, e.g. derived from the JSON-RPC request id. */
+  readonly intentKey: string;
+}
 
 /**
- * Data-access seam: everything the tools need that lives behind the existing
- * stack. Two backends, one interface — see ADR 0003 and system-design §1.
- *
- *   Production  → the `/v1` contract on the admin-vite host
- *                 (GET /v1/me/mons, PUT /v1/mons/:id/care, POST /v1/eggs…),
- *                 authenticated as the linked Caller. FamiliarPerson +
- *                 inventory have no `/v1` surface yet; they sit behind
- *                 the same seam until Payload collections exist.
- *   Dev / demo  → fixtures, so the simulator runs with no Postgres.
- *
- * TODO(v1): implement `V1CallerData` with fetch + the Caller's session token.
- * Every method below is intentionally unimplemented — tools must not guess.
+ * Everything the tools read or write for one linked Caller. The production
+ * implementation is `V1CallerData` (`./v1.ts`) over admin-vite's `/v1`
+ * contract (ADR 0001 §1.4). Methods throw the errors in `./errors.ts`.
  */
 export interface CallerData {
-  /** The Caller's Mons; `/v1/me/mons` equivalent. */
-  listMons(callerId: string): Promise<MonInstance[]>;
-  /** The Caller's "active" Mon (DECISIONS #18: Home asks which is active). */
-  resolveActiveMon(callerId: string, monId?: string): Promise<MonInstance | null>;
-  getCareState(monInstanceId: string): Promise<CareState | null>;
-  /** Mutations go through the care contract so seq ordering + idempotency hold. */
-  applyCareAction(
-    monInstanceId: string,
-    action: { kind: 'feed'; itemId: string } | { kind: 'play'; quality: number } | { kind: 'soothe' },
-    idempotencyKey: string,
-  ): Promise<CareState | null>;
-  listInventory(callerId: string): Promise<InventoryItem[]>;
-  listFamiliarPeople(callerId: string): Promise<FamiliarPerson[]>;
-  getFamiliarPerson(callerId: string, personId: string): Promise<FamiliarPerson | null>;
-  /** Incubation state for the Caller's outstanding egg, if any. */
-  getIncubation(callerId: string): Promise<{ eggId: string; incubationEndsAt: number } | null>;
+  /**
+   * `GET /v1/mon-lingo`: the Mon's lines and lingo as Payload publishes them.
+   * Optional so a test double can leave it out; the tools then use the
+   * bundled fallback.
+   */
+  monLingo?(callerId: string): Promise<MonLingo>;
+  /** `GET /v1/me/mons`. */
+  listMons(callerId: string): Promise<CallerMons>;
+  /** `GET /v1/me/eggs`. */
+  listIncubatingEggs(callerId: string): Promise<readonly IncubatingEgg[]>;
+  /**
+   * `PUT /v1/mons/:id/care` with one write. `intentKey` names one Caller
+   * intent (one tool call); sending the same intent again reuses its
+   * Idempotency-Key, seq and `at`, so `/v1` replays instead of applying twice.
+   * Throws `WriteUnconfirmedError` when the write was sent but not answered.
+   */
+  applyCare(write: CareWriteIntent): Promise<MonWithCare>;
+  /**
+   * `POST /v1/eggs/:id/hatch` for one of the Caller's own eggs. Returns the
+   * Mon it hatched into. Idempotent on the server: a second call for the same
+   * egg returns the Mon the first one minted. Throws `EggNotReadyError` while
+   * the egg is still incubating and `NotFoundError` when the Caller has no
+   * such egg.
+   */
+  hatchEgg(callerId: string, eggId: string): Promise<MonInstance>;
 }
-
-const NOT_IMPLEMENTED = 'TODO(data): bind CallerData to /v1 + Payload (see src/data/caller.ts)';
-
-function unimplemented(): never {
-  throw new Error(NOT_IMPLEMENTED);
-}
-
-/** Placeholder backend — swap for `V1CallerData` (prod) or fixtures (demo). */
-export const stubCallerData: CallerData = {
-  listMons: unimplemented,
-  resolveActiveMon: unimplemented,
-  getCareState: unimplemented,
-  applyCareAction: unimplemented,
-  listInventory: unimplemented,
-  listFamiliarPeople: unimplemented,
-  getFamiliarPerson: unimplemented,
-  getIncubation: unimplemented,
-};

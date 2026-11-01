@@ -38,6 +38,7 @@ import { withPayload } from '@payloadcms/tanstack-start';
 import { tanstackStart } from '@tanstack/react-start/plugin/vite';
 import viteReact from '@vitejs/plugin-react';
 import rsc from '@vitejs/plugin-rsc';
+import { transformWithOxc, type Plugin } from 'vite';
 import { nitro } from 'nitro/vite';
 import { defineConfig, type ConfigEnv, type UserConfig } from 'vite';
 
@@ -141,9 +142,27 @@ const kitSsrNoExternal = [
   '@react-native/normalize-colors',
 ];
 
+/**
+ * @reactvision/react-viro ships its web components as CommonJS `.js` with raw
+ * JSX inside (`<ViroWebContext_1.Provider>`), which Vite's transform and the
+ * dependency optimizer both refuse to parse. The console's Models page renders
+ * them (packages/spatial/MonModelViewer.tsx), so those files are compiled as
+ * JSX here. Classic runtime: each file already requires React.
+ */
+const viroWebJsx = {
+  name: 'nyc-mon:viro-web-jsx',
+  async transform(code: string, id: string) {
+    const file = id.split('?')[0] ?? id;
+    if (!/@reactvision[/+]react-viro.*[/]dist[/].*\.js$/.test(file) || !code.includes('</')) return null;
+    const out = await transformWithOxc(code, file, { lang: 'jsx', jsx: { runtime: 'classic' } });
+    return { code: out.code, map: out.map };
+  },
+};
+
 const payloadConfig = withPayload(
     ({ pluginOptions }) => ({
       plugins: [
+        { ...viroWebJsx, enforce: 'pre' } satisfies Plugin,
         rsc(pluginOptions.rsc),
         tanstackStart({
           // rsc.enabled, the `.client.*` SSR exemption for @payloadcms/*, and
@@ -178,6 +197,7 @@ const payloadConfig = withPayload(
         include: kitOptimizeInclude,
         rolldownOptions: {
           tsconfig: appTsconfig,
+          plugins: [viroWebJsx],
           // The optimizer keeps its own extension list and ignores
           // `resolve.extensions`; without the web entries it bundles native
           // files over their `.web.*` siblings.

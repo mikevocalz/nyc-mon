@@ -1,0 +1,150 @@
+{
+  "schema": 1,
+  "artboard": "RightSix",
+  "stateMachine": "Cluster",
+  "viewModel": {
+    "name": "Default",
+    "viewModel": "RightSix",
+    "properties": [
+      {
+        "name": "buttons",
+        "path": "buttons",
+        "type": "viewModel",
+        "value": {
+          "name": "Default",
+          "viewModel": "Buttons",
+          "properties": [
+            {
+              "name": "x",
+              "path": "buttons/x",
+              "type": "viewModel",
+              "value": {
+                "name": "X",
+                "viewModel": "Button",
+                "properties": [
+                  {
+                    "name": "state",
+                    "path": "buttons/x/state",
+                    "type": "enum",
+                    "enumType": "ButtonState",
+                    "value": "idle",
+                    "index": 0,
+                    "values": ["idle", "pressed", "held", "released", "disabled", "cooldown"],
+                    "changed": false
+                  }
+                ]
+              }
+            },
+            {
+              "name": "y",
+              "path": "buttons/y",
+              "type": "viewModel",
+              "value": {
+                "name": "Y",
+                "viewModel": "Button",
+                "properties": [
+                  {
+                    "name": "state",
+                    "path": "buttons/y/state",
+                    "type": "enum",
+                    "enumType": "ButtonState",
+                    "value": "idle",
+                    "index": 0,
+                    "values": ["idle", "pressed", "held", "released", "disabled", "cooldown"],
+                    "changed": false
+                  }
+                ]
+              }
+            },
+            {
+              "name": "z",
+              "path": "buttons/z",
+              "type": "viewModel",
+              "value": {
+                "name": "Z",
+                "viewModel": "Button",
+                "properties": [
+                  {
+                    "name": "state",
+                    "path": "buttons/z/state",
+                    "type": "enum",
+                    "enumType": "ButtonState",
+                    "value": "idle",
+                    "index": 0,
+                    "values": ["idle", "pressed", "held", "released", "disabled", "cooldown"],
+                    "changed": false
+                  }
+                ]
+              }
+            },
+            {
+              "name": "a",
+              "path": "buttons/a",
+              "type": "viewModel",
+              "value": {
+                "name": "A",
+                "viewModel": "Button",
+                "properties": [
+                  {
+                    "name": "state",
+                    "path": "buttons/a/state",
+                    "type": "enum",
+                    "enumType": "ButtonState",
+                    "value": "held",
+                    "index": 2,
+                    "values": ["idle", "pressed", "held", "released", "disabled", "cooldown"],
+                    "changed": true
+                  }
+                ]
+              }
+            },
+            {
+              "name": "b",
+              "path": "buttons/b",
+              "type": "viewModel",
+              "value": {
+                "name": "B",
+                "viewModel": "Button",
+                "properties": [
+                  {
+                    "name": "state",
+                    "path": "buttons/b/state",
+                    "type": "enum",
+                    "enumType": "ButtonState",
+                    "value": "idle",
+                    "index": 0,
+                    "values": ["idle", "pressed", "held", "released", "disabled", "cooldown"],
+                    "changed": false
+                  }
+                ]
+              }
+            },
+            {
+              "name": "c",
+              "path": "buttons/c",
+              "type": "viewModel",
+              "value": {
+                "name": "C",
+                "viewModel": "Button",
+                "properties": [
+                  {
+                    "name": "state",
+                    "path": "buttons/c/state",
+                    "type": "enum",
+                    "enumType": "ButtonState",
+                    "value": "idle",
+                    "index": 0,
+                    "values": ["idle", "pressed", "held", "released", "disabled", "cooldown"],
+                    "changed": false
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "globals": [],
+  "nested": []
+}

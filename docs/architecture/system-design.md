@@ -15,7 +15,7 @@ Three new surfaces bolt onto the stack that already exists. Nothing existing mov
 | **MCP server** (`@acme/mcp-server`, `packages/mcp-server`) | New Node service, deployed as its own project. Streamable HTTP transport, MCP spec 2025-11-25 (ADR 0005). OAuth 2.1 + PKCE (S256) + RFC 9728 PRM (ADR 0006). | `/v1` on the admin-vite host for Mon/care data; the Familiar Presence Service for `PresenceEvent`s; Better Auth for the linked Caller. |
 | **Familiar Presence Service** | Logical service; the first implementation is a module inside `@acme/mcp-server` (`src/presence/`) fed by Supabase Realtime channels. Enrollment and mic live in the NYC-Mon phone/web app, never on Echo (ADR 0007). | Supabase Realtime (presence-event fan-out), Payload (`familiar-people`, `speaker-embeddings` collections — TODO, not yet created). |
 | **Web Alexa+ simulator** (`packages/web-sim`, TODO) | A real MCP client over Streamable HTTP driven by the Agent Skill + a real model. This is the judged surface. | `@acme/mcp-server` directly. No hand-written intent router (ADR 0009). |
-| **Agent Skill** (`.devin/skills/nyc-mon-alexa/SKILL.md`) | Repo file, loaded by whatever agent drives the session. | Carries character, tool routing and the permission model. |
+| **Agent Skill** (`skills/nyc-mon-companion/SKILL.md`) | Repo file, loaded by whatever agent drives the session. | Carries character, tool routing and the permission model. |
 
 ### Attachment points (nothing here is re-invented)
 

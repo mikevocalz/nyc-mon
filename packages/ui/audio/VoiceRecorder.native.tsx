@@ -7,6 +7,7 @@ import { View, Text } from '../tw';
 import { Button } from '../Button';
 import { Mic, Square, Trash2 } from '../icons';
 import { haptics } from '../haptics';
+import { useInstance } from '../use-instance-store';
 import { TONE_CLASSES, resolveControlTone } from '../district';
 import { AudioPlayer } from './AudioPlayer';
 import { CutTile } from './PlayerShell';
@@ -66,13 +67,12 @@ function createRecorderStore() {
  */
 export function VoiceRecorder({ onComplete, onCancel, maxSeconds, tone: toneProp, district, className }: VoiceRecorderProps) {
   const tone = resolveControlTone(toneProp, district);
-  const store = useRef<ReturnType<typeof createRecorderStore> | null>(null);
-  store.current ??= createRecorderStore();
-  const recording = useStore(store.current, (state) => state.recording);
-  const seconds = useStore(store.current, (state) => state.seconds);
-  const levels = useStore(store.current, (state) => state.levels);
-  const error = useStore(store.current, (state) => state.error);
-  const take = useStore(store.current, (state) => state.take);
+  const store = useInstance(createRecorderStore);
+  const recording = useStore(store, (state) => state.recording);
+  const seconds = useStore(store, (state) => state.seconds);
+  const levels = useStore(store, (state) => state.levels);
+  const error = useStore(store, (state) => state.error);
+  const take = useStore(store, (state) => state.take);
 
   const recorder = useRef<AudioRecorder | null>(null);
   const context = useRef<AudioContext | null>(null);
@@ -123,7 +123,7 @@ export function VoiceRecorder({ onComplete, onCancel, maxSeconds, tone: toneProp
     captured.current = [];
 
     if (!(await ensurePermission())) {
-      store.current?.getState().set({
+      store.getState().set({
         error: 'Microphone access is needed to record a voice note.',
       });
       return;
@@ -134,7 +134,7 @@ export function VoiceRecorder({ onComplete, onCancel, maxSeconds, tone: toneProp
 
     const started = await instance.start();
     if (started.status === 'error') {
-      store.current?.getState().set({
+      store.getState().set({
         error: 'Could not start recording. Check the microphone permission.',
       });
       return;
@@ -151,13 +151,13 @@ export function VoiceRecorder({ onComplete, onCancel, maxSeconds, tone: toneProp
     recorder.current = instance;
     context.current = audioContext;
     analyser.current = node;
-    store.current?.getState().set({ recording: true, seconds: 0, levels: [], error: null });
+    store.getState().set({ recording: true, seconds: 0, levels: [], error: null });
 
     const buffer = new Uint8Array(node.frequencyBinCount);
     meter.current = setInterval(() => {
       const current = analyser.current;
-      const state = store.current?.getState();
-      if (current === null || state === undefined) return;
+      const state = store.getState();
+      if (current === null) return;
 
       current.getByteTimeDomainData(buffer);
       const level = frameLevel(buffer);
@@ -166,8 +166,7 @@ export function VoiceRecorder({ onComplete, onCancel, maxSeconds, tone: toneProp
     }, SAMPLE_MS);
 
     clock.current = setInterval(() => {
-      const state = store.current?.getState();
-      if (state === undefined) return;
+      const state = store.getState();
       const next = state.seconds + 1;
       state.set({ seconds: next });
       if (maxSeconds !== undefined && next >= maxSeconds) void stop();
@@ -186,10 +185,10 @@ export function VoiceRecorder({ onComplete, onCancel, maxSeconds, tone: toneProp
     analyser.current = null;
 
     const path = result?.status === 'success' ? result.paths[0] : undefined;
-    store.current?.getState().set({ recording: false });
+    store.getState().set({ recording: false });
 
     if (path === undefined) {
-      store.current?.getState().set({ error: 'Nothing was recorded.' });
+      store.getState().set({ error: 'Nothing was recorded.' });
       return;
     }
 
@@ -198,7 +197,7 @@ export function VoiceRecorder({ onComplete, onCancel, maxSeconds, tone: toneProp
     // later that the mic was covered. This is also why the review player uses
     // the captured levels: the shape you watched while recording is the shape
     // you scrub through.
-    store.current?.getState().set({
+    store.getState().set({
       take: {
         uri: path,
         duration: result?.status === 'success' ? result.duration : seconds,
@@ -231,7 +230,7 @@ export function VoiceRecorder({ onComplete, onCancel, maxSeconds, tone: toneProp
             tone={tone}
             className="flex-1"
             onPress={() => {
-              store.current?.getState().set({ take: null, levels: [], seconds: 0 });
+              store.getState().set({ take: null, levels: [], seconds: 0 });
             }}
           />
           <Button title="Use recording" tone={tone} className="flex-1" onPress={() => onComplete(take)} />

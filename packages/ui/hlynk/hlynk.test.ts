@@ -28,14 +28,15 @@ test('16 Pro Max and Pixel 8 match DIRECTION.md', () => {
   assert.equal(Math.round(pixel.rowPt), 310);
 });
 
-test('short windows drop to compact; tablets stay phone-width', () => {
+test('short windows drop to compact; a tall tablet grows the device (Decision H-1)', () => {
   const landscape = measureShell({ widthPt: 667, heightPt: 375, safeTopPt: 0, safeBottomPt: 0 });
   assert.equal(landscape.layout, 'compact');
   assert.equal(landscape.rowPt, 72);
   assert.equal(landscape.headPt, 24);
   const tablet = measureShell({ widthPt: 834, heightPt: 1194, safeTopPt: 24, safeBottomPt: 20 });
   assert.equal(tablet.layout, 'standard');
-  assert.equal(tablet.bodyWidthPt, 440);
+  assert.equal(tablet.bodyWidthPt, HLYNK_GEOMETRY.maxGrownWidthPt);
+  assert.equal(tablet.screenHeightPt, ((HLYNK_GEOMETRY.maxGrownWidthPt - 24) * 4) / 3);
   assert.equal(tablet.rowPt, HLYNK_GEOMETRY.maxRowPt);
 });
 

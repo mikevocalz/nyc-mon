@@ -1,0 +1,35 @@
+diff --git a/lib/module/views/SkiaView.web.js b/lib/module/views/SkiaView.web.js
+--- a/lib/module/views/SkiaView.web.js	2026-10-31 14:31:28
++++ b/lib/module/views/SkiaView.web.js	2026-10-31 14:31:28
+@@ -260,8 +260,12 @@
+     };
+   }, [setPicture, getContext, getSize, redraw, makeImageSnapshot, measure, measureInWindow, nativeId]);
+ 
+-  // Let go of the recordings the view holds.
++  // Let go of the recordings the view holds, and of the picture: the
++  // <Canvas> that set it owns it and deletes it when it unmounts. Under a
++  // hidden <Activity> the view keeps its state, so a picture left here is
++  // painted again, already deleted, when the view is revealed.
+   useEffect(() => () => {
++    pictureRef.current = null;
+     queueRef.current.forEach(recording => recording.release());
+     queueRef.current = [];
+     shownRef.current.forEach(recording => recording.release());
+diff --git a/src/views/SkiaView.web.tsx b/src/views/SkiaView.web.tsx
+--- a/src/views/SkiaView.web.tsx	2026-10-31 14:31:28
++++ b/src/views/SkiaView.web.tsx	2026-10-31 14:31:28
+@@ -370,9 +370,13 @@
+     nativeId,
+   ]);
+ 
+-  // Let go of the recordings the view holds.
++  // Let go of the recordings the view holds, and of the picture: the
++  // <Canvas> that set it owns it and deletes it when it unmounts. Under a
++  // hidden <Activity> the view keeps its state, so a picture left here is
++  // painted again, already deleted, when the view is revealed.
+   useEffect(
+     () => () => {
++      pictureRef.current = null;
+       queueRef.current.forEach((recording) => recording.release());
+       queueRef.current = [];
+       shownRef.current.forEach((recording) => recording.release());

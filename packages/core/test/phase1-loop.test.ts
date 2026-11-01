@@ -5,6 +5,7 @@ import {
   JournalEntrySchema,
   ModelClipMapSchema,
   MonInstanceSchema,
+  MonNameSchema,
   PeekRoundSchema,
   PlaySessionSchema,
   ReadyNotificationDataSchema,
@@ -14,7 +15,13 @@ import { isCallerUnder13 } from '../sim/consent.ts';
 import { deriveFirstLook } from '../sim/first-look.ts';
 import { createEggRecord, deriveMonInstanceId, HatchIntegrityError } from '../sim/hatch.ts';
 import { appendCareToJournal, appendJournalEntry, countDaysTogether, journalEntryId } from '../sim/journal.ts';
-import { MON_NAME_MAX_LENGTH, monNameErrorCopyId, validateMonName } from '../sim/mon-name.ts';
+import {
+  isAllowedMonNicknameWrite,
+  LEGACY_MON_NAME_MAX_LENGTH,
+  MON_NAME_MAX_LENGTH,
+  monNameErrorCopyId,
+  validateMonName,
+} from '../sim/mon-name.ts';
 import { PEEK_MIN_QUALITY, peekQuality } from '../sim/play.ts';
 import { acknowledgeEggCreate, createWriteQueue, enqueueEggCreate, toCreateEggRequest } from '../sim/queue.ts';
 import { deriveAnimationIntent, IDLE_PRESENCE } from '../sim/scene-input.ts';
@@ -57,10 +64,10 @@ describe('validateMonName (M09)', () => {
     ]);
   });
 
-  it('schemas reject a 17-character nickname everywhere the nickname is stored or sent', () => {
+  it('schemas reject a 17-character nickname everywhere a new name is stored or sent', () => {
     const long = 'a'.repeat(17);
-    expect(MonInstanceSchema.safeParse(makeMon({ nickname: long })).success).toBe(false);
-    expect(MonInstanceSchema.safeParse(makeMon({ nickname: 'a'.repeat(16) })).success).toBe(true);
+    expect(MonNameSchema.safeParse(long).success).toBe(false);
+    expect(MonNameSchema.safeParse('a'.repeat(16)).success).toBe(true);
     const egg = createEggRecord({
       eggId: 'egg-1',
       speciesId: 'dex-001',
@@ -72,6 +79,27 @@ describe('validateMonName (M09)', () => {
     });
     expect(EggRecordSchema.safeParse({ ...egg, nickname: long }).success).toBe(false);
     expect(CreateEggRequestSchema.safeParse({ ...toCreateEggRequest(egg), nickname: long }).success).toBe(false);
+  });
+
+  it('a stored Mon keeps a legacy nickname up to 64 characters, and nothing longer', () => {
+    // Pre-M09 saves allowed 1–64 (docs/plans/phase1-canon-assets-readiness.md:
+    // "Preserve previously valid names when upgrading saves").
+    expect(MonInstanceSchema.safeParse(makeMon({ nickname: 'a'.repeat(17) })).success).toBe(true);
+    expect(MonInstanceSchema.safeParse(makeMon({ nickname: 'a'.repeat(LEGACY_MON_NAME_MAX_LENGTH) })).success).toBe(true);
+    expect(MonInstanceSchema.safeParse(makeMon({ nickname: 'a'.repeat(LEGACY_MON_NAME_MAX_LENGTH + 1) })).success).toBe(false);
+    expect(MonInstanceSchema.safeParse(makeMon({ nickname: '' })).success).toBe(false);
+  });
+
+  it('a nickname write names once at M09 length and keeps a legacy name only unchanged', () => {
+    const legacy = 'a'.repeat(17);
+    expect(isAllowedMonNicknameWrite(null, 'a'.repeat(16))).toBe(true);
+    expect(isAllowedMonNicknameWrite(null, legacy)).toBe(false);
+    expect(isAllowedMonNicknameWrite(null, '  Pip  ')).toBe(false);
+    expect(isAllowedMonNicknameWrite(null, null)).toBe(true);
+    expect(isAllowedMonNicknameWrite(legacy, legacy)).toBe(true);
+    expect(isAllowedMonNicknameWrite(legacy, 'Pip')).toBe(false);
+    expect(isAllowedMonNicknameWrite('Pip', 'a'.repeat(17))).toBe(false);
+    expect(isAllowedMonNicknameWrite('Pip', null)).toBe(false);
   });
 });
 

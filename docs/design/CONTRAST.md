@@ -18,7 +18,7 @@ The registry lives in `packages/theme/contrast.ts`; `packages/theme/contrast.tes
 
 <!-- contrast:summary:start -->
 
-- 405 measured rows: 379 pass, 0 fail, 26 exempt (decorative or disabled).
+- 418 measured rows: 390 pass, 0 fail, 28 exempt (decorative or disabled).
 
 <!-- contrast:summary:end -->
 - Semantic tokens are measured in light and dark. Palette steps (`orange-500`, `ink-950`) do not change with the theme and get one `both` row.
@@ -85,8 +85,8 @@ The test keeps these honest: each forbidden pair below must still measure under 
 |---|---|---|---|---:|---|---|---|
 | text on surface | light | `text` #000000 | `surface` #F3F4F4 | 19.06 | text (4.5) | pass | `packages/ui/Text.tsx:39`, `packages/ui/Heading.tsx:25` |
 | text on surface | dark | `text` #F8F8F8 | `surface` #00041C | 19.12 | text (4.5) | pass | `packages/ui/Text.tsx:39`, `packages/ui/Heading.tsx:25` |
-| muted text on surface | light | `text-muted` #61656A | `surface` #F3F4F4 | 5.33 | text (4.5) | pass | `packages/ui/Text.tsx:40`, `apps/mobile/components/AppTabBar.tsx:86`, `packages/app/features/schedule/BookingSurface.tsx:63` |
-| muted text on surface | dark | `text-muted` #BEC0C2 | `surface` #00041C | 11.13 | text (4.5) | pass | `packages/ui/Text.tsx:40`, `apps/mobile/components/AppTabBar.tsx:86`, `packages/app/features/schedule/BookingSurface.tsx:63` |
+| muted text on surface | light | `text-muted` #61656A | `surface` #F3F4F4 | 5.33 | text (4.5) | pass | `packages/ui/Text.tsx:40`, `packages/app/features/navigation/ShellNav.tsx:67`, `packages/app/features/schedule/BookingSurface.tsx:63` |
+| muted text on surface | dark | `text-muted` #BEC0C2 | `surface` #00041C | 11.13 | text (4.5) | pass | `packages/ui/Text.tsx:40`, `packages/app/features/navigation/ShellNav.tsx:67`, `packages/app/features/schedule/BookingSurface.tsx:63` |
 | muted text on raised | light | `text-muted` #61656A | `surface-raised` #FFFFFF | 5.87 | text (4.5) | pass | `packages/app/features/home/home-content.tsx:76`, `packages/ui/Text.tsx:40` |
 | muted text on raised | dark | `text-muted` #BEC0C2 | `surface-raised` #0A1230 | 10.08 | text (4.5) | pass | `packages/app/features/home/home-content.tsx:76`, `packages/ui/Text.tsx:40` |
 | primary text on surface | light | `primary` #A35100 | `surface` #F3F4F4 | 5.10 | large-text (3) | pass | `packages/app/features/error/screen.shared.tsx:19`; font-display text-display-xl (60px) |
@@ -99,16 +99,16 @@ The test keeps these honest: each forbidden pair below must still measure under 
 | accent text on raised | dark | `accent` #4BA8F0 | `surface-raised` #0A1230 | 7.14 | text (4.5) | pass | `packages/ui/Text.tsx:41`, `packages/app/features/home/home-content.tsx:77`, `packages/app/features/editor/AttachSheet.tsx:88` |
 | accent icon in accent/10 well | light | `accent` #0058F8 | `surface-raised + accent/10` #E6EEFE | 4.81 | ui (3) | pass | `packages/app/features/home/home.data.ts:29`, `packages/app/features/home/home.data.ts:34` |
 | accent icon in accent/10 well | dark | `accent` #4BA8F0 | `surface-raised + accent/10` #112143 | 6.17 | ui (3) | pass | `packages/app/features/home/home.data.ts:29`, `packages/app/features/home/home.data.ts:34` |
-| accent bell icon on raised | light | `accent` #0058F8 | `surface-raised` #FFFFFF | 5.60 | ui (3) | pass | `apps/mobile/components/AppHeader.tsx:69` |
-| accent bell icon on raised | dark | `accent` #4BA8F0 | `surface-raised` #0A1230 | 7.14 | ui (3) | pass | `apps/mobile/components/AppHeader.tsx:69` |
+| accent bell icon on raised | light | `accent` #0058F8 | `surface-raised` #FFFFFF | 5.60 | ui (3) | pass | `apps/mobile/components/AppHeader.tsx:68` |
+| accent bell icon on raised | dark | `accent` #4BA8F0 | `surface-raised` #0A1230 | 7.14 | ui (3) | pass | `apps/mobile/components/AppHeader.tsx:68` |
 | danger text on raised | light | `danger` #D50000 | `surface-raised` #FFFFFF | 5.48 | text (4.5) | pass | `packages/ui/Text.tsx:44`, `packages/app/features/editor/AttachSheet.tsx:168` |
 | danger text on raised | dark | `danger` #FA4040 | `surface-raised` #0A1230 | 5.14 | text (4.5) | pass | `packages/ui/Text.tsx:44`, `packages/app/features/editor/AttachSheet.tsx:168` |
-| on-primary on primary | light | `on-primary` #FFFFFF | `primary` #A35100 | 5.62 | text (4.5) | pass | `packages/app/features/home/home-content.tsx:48`, `packages/app/features/explore/explore.store.ts:17`, `apps/mobile/components/AppTabBar.tsx:86` |
-| on-primary on primary | dark | `on-primary` #00041C | `primary` #FC7C00 | 7.76 | text (4.5) | pass | `packages/app/features/home/home-content.tsx:48`, `packages/app/features/explore/explore.store.ts:17`, `apps/mobile/components/AppTabBar.tsx:86` |
+| on-primary on primary | light | `on-primary` #FFFFFF | `primary` #A35100 | 5.62 | text (4.5) | pass | `packages/app/features/home/home-content.tsx:48`, `packages/app/features/explore/explore.store.ts:17`, `packages/app/features/navigation/ShellNav.tsx:67` |
+| on-primary on primary | dark | `on-primary` #00041C | `primary` #FC7C00 | 7.76 | text (4.5) | pass | `packages/app/features/home/home-content.tsx:48`, `packages/app/features/explore/explore.store.ts:17`, `packages/app/features/navigation/ShellNav.tsx:67` |
 | on-primary/90 on primary | light | `on-primary/90` #F6EEE6 | `primary` #A35100 | 4.88 | text (4.5) | pass | `packages/app/features/home/home-content.tsx:53`, `packages/app/features/home/home-content.tsx:54` |
 | on-primary/90 on primary | dark | `on-primary/90` #191019 | `primary` #FC7C00 | 7.10 | text (4.5) | pass | `packages/app/features/home/home-content.tsx:53`, `packages/app/features/home/home-content.tsx:54` |
-| on-primary on primary-pressed | light | `on-primary` #FFFFFF | `primary-pressed` #884300 | 7.37 | text (4.5) | pass | `packages/app/features/explore/explore.store.ts:18`, `apps/mobile/components/AppTabBar.tsx:78` |
-| on-primary on primary-pressed | dark | `on-primary` #00041C | `primary-pressed` #FD9D40 | 9.74 | text (4.5) | pass | `packages/app/features/explore/explore.store.ts:18`, `apps/mobile/components/AppTabBar.tsx:78` |
+| on-primary on primary-pressed | light | `on-primary` #FFFFFF | `primary-pressed` #884300 | 7.37 | text (4.5) | pass | `packages/app/features/explore/explore.store.ts:18`, `packages/app/features/navigation/ShellNav.tsx:63` |
+| on-primary on primary-pressed | dark | `on-primary` #00041C | `primary-pressed` #FD9D40 | 9.74 | text (4.5) | pass | `packages/app/features/explore/explore.store.ts:18`, `packages/app/features/navigation/ShellNav.tsx:63` |
 | on-accent on accent | light | `on-accent` #FFFFFF | `accent` #0058F8 | 5.60 | text (4.5) | pass | `packages/app/features/explore/explore.store.ts:19` |
 | on-accent on accent | dark | `on-accent` #00041C | `accent` #4BA8F0 | 7.89 | text (4.5) | pass | `packages/app/features/explore/explore.store.ts:19` |
 | inverse text on text | light | `text-inverse` #F8F8F8 | `text` #000000 | 19.77 | text (4.5) | pass | `packages/ui/Text.tsx:43`, `packages/ui/Heading.tsx:29` |
@@ -132,10 +132,10 @@ The test keeps these honest: each forbidden pair below must still measure under 
 | nav action edge | both | `orange-500` #FC7C00 | `ink-950` #00041C | 7.76 | ui (3) | pass | `packages/ui/nav/NavBar.tsx:92`, `packages/ui/nav/NavBar.tsx:99` |
 | profile ring active | both | `orange-500` #FC7C00 | `ink-950` #00041C | 7.76 | ui (3) | pass | `apps/web/components/site/SiteChrome.tsx:47`; ring-offset-ink-950 puts the night bar between the avatar and the ring |
 | profile ring hover | both | `silver-400` #CED0D1 | `ink-950` #00041C | 13.12 | ui (3) | pass | `apps/web/components/site/SiteChrome.tsx:47` |
-| unread dot | light | `danger` #D50000 | `surface-raised` #FFFFFF | 5.48 | ui (3) | pass | `apps/mobile/components/AppHeader.tsx:70` |
-| unread dot | dark | `danger` #FA4040 | `surface-raised` #0A1230 | 5.14 | ui (3) | pass | `apps/mobile/components/AppHeader.tsx:70` |
-| theme border | light | `border` #D2D4D6 | `surface-raised` #FFFFFF | 1.49 | decorative (0) | exempt | `apps/mobile/components/AppHeader.tsx:67`; frame on controls whose text label or icon identifies them; separators |
-| theme border | dark | `border` #1A2E6E | `surface-raised` #0A1230 | 1.45 | decorative (0) | exempt | `apps/mobile/components/AppHeader.tsx:67`; frame on controls whose text label or icon identifies them; separators |
+| unread dot | light | `danger` #D50000 | `surface-raised` #FFFFFF | 5.48 | ui (3) | pass | `apps/mobile/components/AppHeader.tsx:69` |
+| unread dot | dark | `danger` #FA4040 | `surface-raised` #0A1230 | 5.14 | ui (3) | pass | `apps/mobile/components/AppHeader.tsx:69` |
+| theme border | light | `border` #D2D4D6 | `surface-raised` #FFFFFF | 1.49 | decorative (0) | exempt | `apps/mobile/components/AppHeader.tsx:66`; frame on controls whose text label or icon identifies them; separators |
+| theme border | dark | `border` #1A2E6E | `surface-raised` #0A1230 | 1.45 | decorative (0) | exempt | `apps/mobile/components/AppHeader.tsx:66`; frame on controls whose text label or icon identifies them; separators |
 | neon glow | light | `glow` #F3F4F4 | `bg` #F3F4F4 | 1.00 | decorative (0) | exempt | `packages/theme/tokens.ts:340`, `packages/ui/district/tones.ts:132`; box-shadow halo behind a surface that already has its own edge; fully transparent on daylit (no glow in daylight) |
 | neon glow | dark | `glow` #003BAB | `bg` #00041C | 2.14 | decorative (0) | exempt | `packages/theme/tokens.ts:340`, `packages/ui/district/tones.ts:132`; box-shadow halo behind a surface that already has its own edge; fully transparent on daylit (no glow in daylight) |
 | hot glow | light | `glow-hot` #F3F4F4 | `bg` #F3F4F4 | 1.00 | decorative (0) | exempt | `packages/theme/tokens.ts:343`; box-shadow halo behind a surface that already has its own edge; fully transparent on daylit (no glow in daylight) |
@@ -218,8 +218,8 @@ The test keeps these honest: each forbidden pair below must still measure under 
 | sort glyph carolina-300 | both | `carolina-300` #A5D4F8 | `ink-900` #14182E | 11.15 | ui (3) | pass | `packages/ui/DataTable.tsx:59` |
 | sort glyph leaf-300 | both | `leaf-300` #9FD79D | `ink-900` #14182E | 10.57 | ui (3) | pass | `packages/ui/DataTable.tsx:60` |
 | sort glyph apple-300 | both | `apple-300` #FC8080 | `ink-900` #14182E | 7.12 | ui (3) | pass | `packages/ui/DataTable.tsx:62` |
-| card themed heading on night face | both | `ink-50` #F8F8F8 | `ink-950` #00041C | 19.12 | text (4.5) | pass | `packages/theme/theme.css:328`, `packages/app/features/profile/profile-content.tsx:100`; text-text inside a cornerCut or beam Card resolves to ink-50 on the face |
-| card themed muted on night face | both | `silver-500` #BEC0C2 | `ink-950` #00041C | 11.13 | text (4.5) | pass | `packages/theme/theme.css:329`, `packages/theme/theme.css:330`, `packages/app/features/profile/profile-content.tsx:101`; text-muted and text-secondary inside the Card face resolve to silver-500 |
+| card themed heading on night face | both | `ink-50` #F8F8F8 | `ink-950` #00041C | 19.12 | text (4.5) | pass | `packages/theme/theme.css:328`, `packages/app/features/game/controls-settings/ControlsSettingsScreen.tsx:328`; text-text inside a cornerCut or beam Card resolves to ink-50 on the face |
+| card themed muted on night face | both | `silver-500` #BEC0C2 | `ink-950` #00041C | 11.13 | text (4.5) | pass | `packages/theme/theme.css:329`, `packages/theme/theme.css:330`, `packages/app/features/game/controls-settings/ControlsSettingsScreen.tsx:329`; text-muted and text-secondary inside the Card face resolve to silver-500 |
 | card themed primary on night face | both | `orange-500` #FC7C00 | `ink-950` #00041C | 7.76 | text (4.5) | pass | `packages/theme/theme.css:332` |
 | card themed accent on night face | both | `carolina-500` #4BA8F0 | `ink-950` #00041C | 7.89 | text (4.5) | pass | `packages/theme/theme.css:338`, `packages/theme/theme.css:349`; accent and info share carolina-500 on the face |
 | card themed success on night face | both | `leaf-500` #3FAE3A | `ink-950` #00041C | 7.09 | text (4.5) | pass | `packages/theme/theme.css:345` |
@@ -310,10 +310,10 @@ The test keeps these honest: each forbidden pair below must still measure under 
 | hlynk: key and trackpad focus outline on body | both | `hlynk-core-ink` #FFFFFF | `hlynk-core-body` #D50000 | 5.48 | ui (3) | pass | `packages/ui/hlynk/HLynkKey.tsx:69`, `packages/ui/hlynk/Trackpad.web.tsx:48` |
 | hlynk: trackpad ring, booting or disabled | both | `led-off` #5E0000 | `hlynk-core-black` #000000 | 1.48 | disabled (0) | exempt | `packages/ui/hlynk/TrackpadFace.tsx:41`; inactive trackpad during boot (WCAG 1.4.11 inactive components) |
 | hlynk: reduced-motion LED cue in the black head | both | `led-on` #F80000 | `hlynk-core-black` #000000 | 4.99 | ui (3) | pass | `packages/ui/hlynk/ScannerLed.tsx:96`, `packages/ui/hlynk/ScannerLed.tsx:104`, `packages/ui/hlynk/ScannerLed.tsx:107`; tick row, filled dot and exclamation dot that stand in for the LED rhythm |
-| scene plate headline | both | `orange-500` #FC7C00 | `ink-800` #25293D | 5.48 | large-text (3) | pass | `packages/app/features/explore/explore-content.tsx:22`, `packages/app/features/profile/profile-content.tsx:46`, `packages/app/features/error/screen.shared.tsx:25`; display-sm heading and the display-xl 404 on the plate |
+| scene plate headline | both | `orange-500` #FC7C00 | `ink-800` #25293D | 5.48 | large-text (3) | pass | `packages/app/features/explore/explore-content.tsx:22`, `packages/app/features/profile/profile-content.tsx:34`, `packages/app/features/error/screen.shared.tsx:25`; display-sm heading and the display-xl 404 on the plate |
 | scene plate title | both | `ink-50` #F8F8F8 | `ink-800` #25293D | 13.51 | large-text (3) | pass | `packages/app/features/error/screen.shared.tsx:29` |
-| scene plate body | both | `silver-200` #ECECED | `ink-800` #25293D | 12.16 | text (4.5) | pass | `packages/app/features/profile/profile-content.tsx:47`, `packages/app/features/error/screen.shared.tsx:32` |
-| scene plate line | both | `silver-300` #DFE0E1 | `ink-800` #25293D | 10.86 | text (4.5) | pass | `packages/app/features/explore/explore-content.tsx:43`, `packages/app/features/profile/profile-content.tsx:45` |
+| scene plate body | both | `silver-200` #ECECED | `ink-800` #25293D | 12.16 | text (4.5) | pass | `packages/app/features/error/screen.shared.tsx:32` |
+| scene plate line | both | `silver-300` #DFE0E1 | `ink-800` #25293D | 10.86 | text (4.5) | pass | `packages/app/features/explore/explore-content.tsx:43`, `packages/app/features/profile/profile-content.tsx:33` |
 | scene plate tab label | both | `silver-200` #ECECED | `ink-900` #14182E | 14.82 | text (4.5) | pass | `packages/app/features/explore/explore-content.tsx:25` |
 | scene plate tab edge | both | `ink-400` #90929C | `ink-800` #25293D | 4.63 | ui (3) | pass | `packages/app/features/explore/explore-content.tsx:23` |
 | scene plate selected tab label | both | `ink-950` #00041C | `orange-500` #FC7C00 | 7.76 | text (4.5) | pass | `packages/app/features/explore/explore-content.tsx:26` |
@@ -332,6 +332,19 @@ The test keeps these honest: each forbidden pair below must still measure under 
 | hlynk-care label on black face | both | `silver-300` #DFE0E1 | `signage-black` #000000 | 15.89 | text (4.5) | pass | `packages/ui/Button.tsx:82`, `packages/ui/Button.tsx:113` |
 | disabled label | both | `ink-400` #90929C | `ink-950` #00041C | 6.55 | disabled (0) | exempt | `packages/ui/Button.tsx:48`, `packages/ui/IconButton.tsx:79`, `packages/ui/neon/NeonChevron.tsx:55`, `packages/ui/audio/PlayerShell.tsx:123`; inactive control |
 | disabled slider icon | both | `ink-700` #3C3F51 | `ink-950` #00041C | 1.96 | disabled (0) | exempt | `packages/ui/cards/CardSlider.shared.tsx:159`; inactive control |
+| arcade: cap glyph idle on graphite cap | both | `silver-300` #DFE0E1 | `concrete-800` #303337 | 9.60 | text (4.5) | pass | `packages/ui/game-controls/StartStopPill.tsx:299`, `packages/ui/rive/arcade-controls/right-six/scene.rml:250` |
+| arcade: cap glyph pressed on graphite cap | both | `signage-white` #FFFFFF | `concrete-800` #303337 | 12.69 | text (4.5) | pass | `packages/ui/rive/arcade-controls/right-six/scene.rml:339` |
+| arcade: structure keyline on housing plate | both | `royal-400` #4082FA | `concrete-900` #1C1E21 | 4.61 | ui (3) | pass | `packages/ui/rive/arcade-controls/left-stick/scene.rml:128` |
+| arcade: structure keyline on graphite cap | both | `royal-400` #4082FA | `concrete-800` #303337 | 3.50 | ui (3) | pass | `packages/ui/rive/arcade-controls/right-six/scene.rml:290` |
+| arcade: held and focus ring in a well | both | `carolina-500` #4BA8F0 | `signage-black` #000000 | 8.16 | ui (3) | pass | `packages/ui/game-controls/ArcadeActionButton.tsx:200`, `packages/ui/rive/arcade-controls/start-stop/scene.rml:40` |
+| arcade: stop hold ring in a well | both | `apple-500` #F80000 | `signage-black` #000000 | 4.99 | ui (3) | pass | `packages/ui/rive/arcade-controls/start-stop/scene.rml:81`, `packages/ui/rive/arcade-controls/start-stop/scene.rml:98` |
+| arcade: cap glyph disabled on graphite cap | both | `concrete-700` #484C51 | `concrete-800` #303337 | 1.47 | disabled (0) | exempt | `packages/ui/rive/arcade-controls/right-six/scene.rml:378`; inactive control; accessibilityState.disabled and the isDisabled semantic flag carry the state |
+| rank panel: downtown and default header keyline on ink face | both | `royal-400` #4082FA | `ink-800` #25293D | 3.96 | ui (3) | pass | `packages/ui/lobby/leaderboard-style.ts:17`, `packages/ui/lobby/leaderboard-style.ts:27` |
+| rank panel: midtown header keyline on ink face | both | `orange-500` #FC7C00 | `ink-800` #25293D | 5.48 | ui (3) | pass | `packages/ui/lobby/leaderboard-style.ts:19` |
+| rank panel: harlem brick header keyline on ink face | both | `orange-600` #D96B00 | `ink-800` #25293D | 4.14 | ui (3) | pass | `packages/ui/lobby/leaderboard-style.ts:21` |
+| rank panel: megacity header keyline on ink face | both | `carolina-500` #4BA8F0 | `ink-800` #25293D | 5.58 | ui (3) | pass | `packages/ui/lobby/leaderboard-style.ts:23` |
+| rank panel: own-row marker on ink face | both | `carolina-500` #4BA8F0 | `ink-800` #25293D | 5.58 | ui (3) | pass | `packages/ui/lobby/leaderboard-style.ts:33` |
+| rank panel: row divider on ink face | both | `royal-500/40` #163C88 | `ink-800` #25293D | 1.39 | decorative (0) | exempt | `packages/ui/lobby/leaderboard-style.ts:30`; divider between rows; each row is identified by its rank and name text |
 
 <!-- contrast:usage:end -->
 
@@ -522,5 +535,8 @@ The test keeps these honest: each forbidden pair below must still measure under 
 | concrete-900 keys on Core body | `concrete-900` #1C1E21 on `hlynk-core-body` #D50000 | 3.05 | 3.5 | Passes 3:1 by 0.05; too thin a margin for key edges. Core keys are pure black. |
 | black keys on apple-700 | `signage-black` #000000 on `apple-700` #AE0000 | 2.80 | 3 | Why the body is not the deeper red. |
 | brick face on night | `orange-800` #884300 on `ink-950` #00041C | 2.76 | 3 | Brick (orange-800) is a face colour; its control edge on night is orange-700. |
+| royal keyline on ink panel | `royal-500` #0058F8 on `ink-800` #25293D | 2.56 | 3 | Royal-500 measures 2.56:1 on the SolidPanel ink face; keylines there use royal-400. |
+| brick keyline on ink panel | `orange-700` #A35100 on `ink-800` #25293D | 2.55 | 3 | Orange-700 measures 2.55:1 on the SolidPanel ink face; brick keylines there use orange-600. |
+| royal on housing plate | `royal-500` #0058F8 on `concrete-900` #1C1E21 | 2.98 | 3 | Royal-500 measures 2.98:1 on the arcade housing plate; structure keylines on graphite use royal-400. |
 
 <!-- contrast:forbidden:end -->

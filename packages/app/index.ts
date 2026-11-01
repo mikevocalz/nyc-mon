@@ -5,7 +5,7 @@ export { ExploreScreen } from './features/explore/screen';
 export { NotificationsScreen } from './features/notifications/screen';
 export { ProfileScreen } from './features/profile/screen';
 export { SettingsScreen } from './features/settings/screen';
-export { useProfile, AVATAR_URI, type ThemePreference } from './features/profile/profile.store';
+export { useProfile, type ThemePreference } from './features/profile/profile.store';
 export { ScheduleScreen } from './features/schedule/screen';
 export { MenuButton } from './features/home/menu-button';
 export { buildDemoDay, DEMO_RESOURCES, DEMO_DAY, DEMO_NOW } from './features/schedule/fixtures';

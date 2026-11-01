@@ -11,15 +11,25 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PayloadRouteImport } from './routes/_payload'
+import { Route as DotwellKnownOauthAuthorizationServerRouteImport } from './routes/[.]well-known/oauth-authorization-server'
 import { Route as GuardianConsentIdRouteImport } from './routes/guardian-consent/$id'
+import { Route as OauthConsentRouteImport } from './routes/oauth/consent'
+import { Route as OauthRefusedRouteImport } from './routes/oauth/refused'
+import { Route as OauthSignInRouteImport } from './routes/oauth/sign-in'
 import { Route as V1EggsRouteImport } from './routes/v1/eggs'
 import { Route as V1GuardianConsentsRouteImport } from './routes/v1/guardian-consents'
+import { Route as V1MonLingoRouteImport } from './routes/v1/mon-lingo'
+import { Route as V1MonVoiceRouteImport } from './routes/v1/mon-voice'
 import { Route as V1WaitlistRouteImport } from './routes/v1/waitlist'
 import { Route as PayloadAdminIndexRouteImport } from './routes/_payload/admin.index'
 import { Route as PayloadAdminSplatRouteImport } from './routes/_payload/admin.$'
 import { Route as PayloadPayloadApiSplatRouteImport } from './routes/_payload/payload-api.$'
+import { Route as V1MeCompanionMemoryRouteImport } from './routes/v1/me/companion-memory'
+import { Route as V1MeEggsRouteImport } from './routes/v1/me/eggs'
 import { Route as V1MeMonsRouteImport } from './routes/v1/me/mons'
+import { Route as V1MonsAdoptRouteImport } from './routes/v1/mons/adopt'
 import { Route as V1EggsIdHatchRouteImport } from './routes/v1/eggs/$id/hatch'
+import { Route as V1MonModelsGlbSpeciesRouteImport } from './routes/v1/mon-models/glb/$species'
 import { Route as V1MonsIdCareRouteImport } from './routes/v1/mons/$id/care'
 
 const IndexRoute = IndexRouteImport.update({
@@ -31,9 +41,30 @@ const PayloadRoute = PayloadRouteImport.update({
   id: '/_payload',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DotwellKnownOauthAuthorizationServerRoute =
+  DotwellKnownOauthAuthorizationServerRouteImport.update({
+    id: '/.well-known/oauth-authorization-server',
+    path: '/.well-known/oauth-authorization-server',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const GuardianConsentIdRoute = GuardianConsentIdRouteImport.update({
   id: '/guardian-consent/$id',
   path: '/guardian-consent/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OauthConsentRoute = OauthConsentRouteImport.update({
+  id: '/oauth/consent',
+  path: '/oauth/consent',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OauthRefusedRoute = OauthRefusedRouteImport.update({
+  id: '/oauth/refused',
+  path: '/oauth/refused',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OauthSignInRoute = OauthSignInRouteImport.update({
+  id: '/oauth/sign-in',
+  path: '/oauth/sign-in',
   getParentRoute: () => rootRouteImport,
 } as any)
 const V1EggsRoute = V1EggsRouteImport.update({
@@ -44,6 +75,16 @@ const V1EggsRoute = V1EggsRouteImport.update({
 const V1GuardianConsentsRoute = V1GuardianConsentsRouteImport.update({
   id: '/v1/guardian-consents',
   path: '/v1/guardian-consents',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const V1MonLingoRoute = V1MonLingoRouteImport.update({
+  id: '/v1/mon-lingo',
+  path: '/v1/mon-lingo',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const V1MonVoiceRoute = V1MonVoiceRouteImport.update({
+  id: '/v1/mon-voice',
+  path: '/v1/mon-voice',
   getParentRoute: () => rootRouteImport,
 } as any)
 const V1WaitlistRoute = V1WaitlistRouteImport.update({
@@ -66,15 +107,35 @@ const PayloadPayloadApiSplatRoute = PayloadPayloadApiSplatRouteImport.update({
   path: '/payload-api/$',
   getParentRoute: () => PayloadRoute,
 } as any)
+const V1MeCompanionMemoryRoute = V1MeCompanionMemoryRouteImport.update({
+  id: '/v1/me/companion-memory',
+  path: '/v1/me/companion-memory',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const V1MeEggsRoute = V1MeEggsRouteImport.update({
+  id: '/v1/me/eggs',
+  path: '/v1/me/eggs',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const V1MeMonsRoute = V1MeMonsRouteImport.update({
   id: '/v1/me/mons',
   path: '/v1/me/mons',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const V1MonsAdoptRoute = V1MonsAdoptRouteImport.update({
+  id: '/v1/mons/adopt',
+  path: '/v1/mons/adopt',
   getParentRoute: () => rootRouteImport,
 } as any)
 const V1EggsIdHatchRoute = V1EggsIdHatchRouteImport.update({
   id: '/$id/hatch',
   path: '/$id/hatch',
   getParentRoute: () => V1EggsRoute,
+} as any)
+const V1MonModelsGlbSpeciesRoute = V1MonModelsGlbSpeciesRouteImport.update({
+  id: '/v1/mon-models/glb/$species',
+  path: '/v1/mon-models/glb/$species',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const V1MonsIdCareRoute = V1MonsIdCareRouteImport.update({
   id: '/v1/mons/$id/care',
@@ -84,96 +145,166 @@ const V1MonsIdCareRoute = V1MonsIdCareRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/.well-known/oauth-authorization-server': typeof DotwellKnownOauthAuthorizationServerRoute
   '/guardian-consent/$id': typeof GuardianConsentIdRoute
+  '/oauth/consent': typeof OauthConsentRoute
+  '/oauth/refused': typeof OauthRefusedRoute
+  '/oauth/sign-in': typeof OauthSignInRoute
   '/v1/eggs': typeof V1EggsRouteWithChildren
   '/v1/guardian-consents': typeof V1GuardianConsentsRoute
+  '/v1/mon-lingo': typeof V1MonLingoRoute
+  '/v1/mon-voice': typeof V1MonVoiceRoute
   '/v1/waitlist': typeof V1WaitlistRoute
   '/admin/$': typeof PayloadAdminSplatRoute
   '/payload-api/$': typeof PayloadPayloadApiSplatRoute
+  '/v1/me/companion-memory': typeof V1MeCompanionMemoryRoute
+  '/v1/me/eggs': typeof V1MeEggsRoute
   '/v1/me/mons': typeof V1MeMonsRoute
+  '/v1/mons/adopt': typeof V1MonsAdoptRoute
   '/admin/': typeof PayloadAdminIndexRoute
   '/v1/eggs/$id/hatch': typeof V1EggsIdHatchRoute
+  '/v1/mon-models/glb/$species': typeof V1MonModelsGlbSpeciesRoute
   '/v1/mons/$id/care': typeof V1MonsIdCareRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/.well-known/oauth-authorization-server': typeof DotwellKnownOauthAuthorizationServerRoute
   '/guardian-consent/$id': typeof GuardianConsentIdRoute
+  '/oauth/consent': typeof OauthConsentRoute
+  '/oauth/refused': typeof OauthRefusedRoute
+  '/oauth/sign-in': typeof OauthSignInRoute
   '/v1/eggs': typeof V1EggsRouteWithChildren
   '/v1/guardian-consents': typeof V1GuardianConsentsRoute
+  '/v1/mon-lingo': typeof V1MonLingoRoute
+  '/v1/mon-voice': typeof V1MonVoiceRoute
   '/v1/waitlist': typeof V1WaitlistRoute
   '/admin/$': typeof PayloadAdminSplatRoute
   '/payload-api/$': typeof PayloadPayloadApiSplatRoute
+  '/v1/me/companion-memory': typeof V1MeCompanionMemoryRoute
+  '/v1/me/eggs': typeof V1MeEggsRoute
   '/v1/me/mons': typeof V1MeMonsRoute
+  '/v1/mons/adopt': typeof V1MonsAdoptRoute
   '/admin': typeof PayloadAdminIndexRoute
   '/v1/eggs/$id/hatch': typeof V1EggsIdHatchRoute
+  '/v1/mon-models/glb/$species': typeof V1MonModelsGlbSpeciesRoute
   '/v1/mons/$id/care': typeof V1MonsIdCareRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_payload': typeof PayloadRouteWithChildren
+  '/.well-known/oauth-authorization-server': typeof DotwellKnownOauthAuthorizationServerRoute
   '/guardian-consent/$id': typeof GuardianConsentIdRoute
+  '/oauth/consent': typeof OauthConsentRoute
+  '/oauth/refused': typeof OauthRefusedRoute
+  '/oauth/sign-in': typeof OauthSignInRoute
   '/v1/eggs': typeof V1EggsRouteWithChildren
   '/v1/guardian-consents': typeof V1GuardianConsentsRoute
+  '/v1/mon-lingo': typeof V1MonLingoRoute
+  '/v1/mon-voice': typeof V1MonVoiceRoute
   '/v1/waitlist': typeof V1WaitlistRoute
   '/_payload/admin/$': typeof PayloadAdminSplatRoute
   '/_payload/payload-api/$': typeof PayloadPayloadApiSplatRoute
+  '/v1/me/companion-memory': typeof V1MeCompanionMemoryRoute
+  '/v1/me/eggs': typeof V1MeEggsRoute
   '/v1/me/mons': typeof V1MeMonsRoute
+  '/v1/mons/adopt': typeof V1MonsAdoptRoute
   '/_payload/admin/': typeof PayloadAdminIndexRoute
   '/v1/eggs/$id/hatch': typeof V1EggsIdHatchRoute
+  '/v1/mon-models/glb/$species': typeof V1MonModelsGlbSpeciesRoute
   '/v1/mons/$id/care': typeof V1MonsIdCareRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/.well-known/oauth-authorization-server'
     | '/guardian-consent/$id'
+    | '/oauth/consent'
+    | '/oauth/refused'
+    | '/oauth/sign-in'
     | '/v1/eggs'
     | '/v1/guardian-consents'
+    | '/v1/mon-lingo'
+    | '/v1/mon-voice'
     | '/v1/waitlist'
     | '/admin/$'
     | '/payload-api/$'
+    | '/v1/me/companion-memory'
+    | '/v1/me/eggs'
     | '/v1/me/mons'
+    | '/v1/mons/adopt'
     | '/admin/'
     | '/v1/eggs/$id/hatch'
+    | '/v1/mon-models/glb/$species'
     | '/v1/mons/$id/care'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/.well-known/oauth-authorization-server'
     | '/guardian-consent/$id'
+    | '/oauth/consent'
+    | '/oauth/refused'
+    | '/oauth/sign-in'
     | '/v1/eggs'
     | '/v1/guardian-consents'
+    | '/v1/mon-lingo'
+    | '/v1/mon-voice'
     | '/v1/waitlist'
     | '/admin/$'
     | '/payload-api/$'
+    | '/v1/me/companion-memory'
+    | '/v1/me/eggs'
     | '/v1/me/mons'
+    | '/v1/mons/adopt'
     | '/admin'
     | '/v1/eggs/$id/hatch'
+    | '/v1/mon-models/glb/$species'
     | '/v1/mons/$id/care'
   id:
     | '__root__'
     | '/'
     | '/_payload'
+    | '/.well-known/oauth-authorization-server'
     | '/guardian-consent/$id'
+    | '/oauth/consent'
+    | '/oauth/refused'
+    | '/oauth/sign-in'
     | '/v1/eggs'
     | '/v1/guardian-consents'
+    | '/v1/mon-lingo'
+    | '/v1/mon-voice'
     | '/v1/waitlist'
     | '/_payload/admin/$'
     | '/_payload/payload-api/$'
+    | '/v1/me/companion-memory'
+    | '/v1/me/eggs'
     | '/v1/me/mons'
+    | '/v1/mons/adopt'
     | '/_payload/admin/'
     | '/v1/eggs/$id/hatch'
+    | '/v1/mon-models/glb/$species'
     | '/v1/mons/$id/care'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   PayloadRoute: typeof PayloadRouteWithChildren
+  DotwellKnownOauthAuthorizationServerRoute: typeof DotwellKnownOauthAuthorizationServerRoute
   GuardianConsentIdRoute: typeof GuardianConsentIdRoute
+  OauthConsentRoute: typeof OauthConsentRoute
+  OauthRefusedRoute: typeof OauthRefusedRoute
+  OauthSignInRoute: typeof OauthSignInRoute
   V1EggsRoute: typeof V1EggsRouteWithChildren
   V1GuardianConsentsRoute: typeof V1GuardianConsentsRoute
+  V1MonLingoRoute: typeof V1MonLingoRoute
+  V1MonVoiceRoute: typeof V1MonVoiceRoute
   V1WaitlistRoute: typeof V1WaitlistRoute
+  V1MeCompanionMemoryRoute: typeof V1MeCompanionMemoryRoute
+  V1MeEggsRoute: typeof V1MeEggsRoute
   V1MeMonsRoute: typeof V1MeMonsRoute
+  V1MonsAdoptRoute: typeof V1MonsAdoptRoute
+  V1MonModelsGlbSpeciesRoute: typeof V1MonModelsGlbSpeciesRoute
   V1MonsIdCareRoute: typeof V1MonsIdCareRoute
 }
 
@@ -193,11 +324,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PayloadRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/.well-known/oauth-authorization-server': {
+      id: '/.well-known/oauth-authorization-server'
+      path: '/.well-known/oauth-authorization-server'
+      fullPath: '/.well-known/oauth-authorization-server'
+      preLoaderRoute: typeof DotwellKnownOauthAuthorizationServerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/guardian-consent/$id': {
       id: '/guardian-consent/$id'
       path: '/guardian-consent/$id'
       fullPath: '/guardian-consent/$id'
       preLoaderRoute: typeof GuardianConsentIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/oauth/consent': {
+      id: '/oauth/consent'
+      path: '/oauth/consent'
+      fullPath: '/oauth/consent'
+      preLoaderRoute: typeof OauthConsentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/oauth/refused': {
+      id: '/oauth/refused'
+      path: '/oauth/refused'
+      fullPath: '/oauth/refused'
+      preLoaderRoute: typeof OauthRefusedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/oauth/sign-in': {
+      id: '/oauth/sign-in'
+      path: '/oauth/sign-in'
+      fullPath: '/oauth/sign-in'
+      preLoaderRoute: typeof OauthSignInRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/v1/eggs': {
@@ -212,6 +371,20 @@ declare module '@tanstack/react-router' {
       path: '/v1/guardian-consents'
       fullPath: '/v1/guardian-consents'
       preLoaderRoute: typeof V1GuardianConsentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/v1/mon-lingo': {
+      id: '/v1/mon-lingo'
+      path: '/v1/mon-lingo'
+      fullPath: '/v1/mon-lingo'
+      preLoaderRoute: typeof V1MonLingoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/v1/mon-voice': {
+      id: '/v1/mon-voice'
+      path: '/v1/mon-voice'
+      fullPath: '/v1/mon-voice'
+      preLoaderRoute: typeof V1MonVoiceRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/v1/waitlist': {
@@ -242,11 +415,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PayloadPayloadApiSplatRouteImport
       parentRoute: typeof PayloadRoute
     }
+    '/v1/me/companion-memory': {
+      id: '/v1/me/companion-memory'
+      path: '/v1/me/companion-memory'
+      fullPath: '/v1/me/companion-memory'
+      preLoaderRoute: typeof V1MeCompanionMemoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/v1/me/eggs': {
+      id: '/v1/me/eggs'
+      path: '/v1/me/eggs'
+      fullPath: '/v1/me/eggs'
+      preLoaderRoute: typeof V1MeEggsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/v1/me/mons': {
       id: '/v1/me/mons'
       path: '/v1/me/mons'
       fullPath: '/v1/me/mons'
       preLoaderRoute: typeof V1MeMonsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/v1/mons/adopt': {
+      id: '/v1/mons/adopt'
+      path: '/v1/mons/adopt'
+      fullPath: '/v1/mons/adopt'
+      preLoaderRoute: typeof V1MonsAdoptRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/v1/eggs/$id/hatch': {
@@ -255,6 +449,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/v1/eggs/$id/hatch'
       preLoaderRoute: typeof V1EggsIdHatchRouteImport
       parentRoute: typeof V1EggsRoute
+    }
+    '/v1/mon-models/glb/$species': {
+      id: '/v1/mon-models/glb/$species'
+      path: '/v1/mon-models/glb/$species'
+      fullPath: '/v1/mon-models/glb/$species'
+      preLoaderRoute: typeof V1MonModelsGlbSpeciesRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/v1/mons/$id/care': {
       id: '/v1/mons/$id/care'
@@ -295,11 +496,22 @@ const V1EggsRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   PayloadRoute: PayloadRouteWithChildren,
+  DotwellKnownOauthAuthorizationServerRoute:
+    DotwellKnownOauthAuthorizationServerRoute,
   GuardianConsentIdRoute: GuardianConsentIdRoute,
+  OauthConsentRoute: OauthConsentRoute,
+  OauthRefusedRoute: OauthRefusedRoute,
+  OauthSignInRoute: OauthSignInRoute,
   V1EggsRoute: V1EggsRouteWithChildren,
   V1GuardianConsentsRoute: V1GuardianConsentsRoute,
+  V1MonLingoRoute: V1MonLingoRoute,
+  V1MonVoiceRoute: V1MonVoiceRoute,
   V1WaitlistRoute: V1WaitlistRoute,
+  V1MeCompanionMemoryRoute: V1MeCompanionMemoryRoute,
+  V1MeEggsRoute: V1MeEggsRoute,
   V1MeMonsRoute: V1MeMonsRoute,
+  V1MonsAdoptRoute: V1MonsAdoptRoute,
+  V1MonModelsGlbSpeciesRoute: V1MonModelsGlbSpeciesRoute,
   V1MonsIdCareRoute: V1MonsIdCareRoute,
 }
 export const routeTree = rootRouteImport

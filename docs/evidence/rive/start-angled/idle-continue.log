@@ -1,0 +1,8 @@
+[23:07:48.236] rive  deferred replay: inline
+[23:07:48.237] rive  compiling 2 markup files as one document: ../game-lobby/shared-vm.rml, scene.rml
+[23:07:48.275] rive  built /Users/mikevocalz/nyc-mon/packages/ui/rive/lobby/start-angled/build/start-angled.riv (142704 bytes, 39ms, 0 errors, 0 warnings)
+[23:07:48.276] rive  data: lobby/resume/eligible = true
+[23:07:48.276] rive  data: lobby/resume/district = Harlem
+[23:07:48.276] rive  showing StartAngledHost [1/2]
+[23:07:48.276] rive  viewport 343x128 @1x
+[23:07:48.287] rive  wrote /Users/mikevocalz/nyc-mon/docs/evidence/rive/start-angled/idle-continue.png

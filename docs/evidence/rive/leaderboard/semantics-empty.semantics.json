@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "artboard": "Leaderboard",
+  "roots": [
+    {
+      "id": 4,
+      "role": "text",
+      "roleValue": 7,
+      "label": "NYC Rank",
+      "value": "",
+      "hint": "",
+      "headingLevel": 2,
+      "stateFlags": 0,
+      "traitFlags": 0,
+      "bounds": {"x": 16, "y": 11.0688477, "width": 85.9941406, "height": 17.8623047},
+      "children": []
+    },
+    {
+      "id": 2,
+      "role": "text",
+      "roleValue": 7,
+      "label": "No ranks yet. Play a round to be ranked.",
+      "value": "",
+      "hint": "",
+      "headingLevel": 0,
+      "stateFlags": 512,
+      "traitFlags": 0,
+      "bounds": {"x": 16, "y": 64, "width": 287.504883, "height": 19.1381836},
+      "children": []
+    }
+  ]
+}

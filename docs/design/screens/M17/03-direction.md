@@ -51,3 +51,7 @@ Entry: `motion-enter` on the card and sheet. Photo mode: portrait expands with `
 - No bond bar, no XP, no "next evolution in".
 - No placeholder rows ("Culture: coming soon").
 - No Caller name, date or location inside an exported image.
+
+## Amendment 2026-10-29
+
+"Shell: none" stands and is restated (D20g). Mike, 2026-10-29: "good ideas, go (make sure ui/ux skills are used for designing this! i no longer want this experience inside the h-lynk but just in the screen!)". `/mon/:id` stays this Dex profile. Care lives on M32 Mon Space, which has no H-Lynk frame either. The current code that renders the Dex inside `GlassStage` (`DexProfileScreen.tsx:150-176`) is drift and should be removed. Care mistakes, weight bands and discipline are never shown here (D20e, D20f).

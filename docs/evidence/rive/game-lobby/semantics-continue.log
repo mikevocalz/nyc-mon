@@ -1,0 +1,8 @@
+[23:08:08.018] rive  deferred replay: inline
+[23:08:08.021] rive  compiling 5 markup files as one document: ../game-transition/scene.rml, ../leaderboard/scene.rml, ../start-angled/scene.rml, scene.rml, shared-vm.rml
+[23:08:08.167] rive  built /Users/mikevocalz/nyc-mon/packages/ui/rive/lobby/game-lobby/build/game-lobby.riv (614266 bytes, 147ms, 0 errors, 0 warnings)
+[23:08:08.169] rive  data: transition/phase = done
+[23:08:08.169] rive  data: lobby/resume/eligible = true
+[23:08:08.170] rive  showing GameLobby [1/8]
+[23:08:08.172] rive  viewport 390x844 @1x
+[23:08:08.172] rive  wrote /Users/mikevocalz/nyc-mon/docs/evidence/rive/game-lobby/semantics-continue.semantics.json

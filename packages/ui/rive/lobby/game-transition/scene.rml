@@ -1,0 +1,575 @@
+<Rive version="1" kind="fragment">
+    <!-- NYC-MON game transition (Master Directive v2 §3, G02 handoff § Motion).
+         The opaque cover between the lobby and the first gameplay frame. The
+         host owns transition/phase: enter when START resolves to a load, hold
+         while the world builds, reveal once the resumed frame is ready, done
+         after the cover has gone. Rive reflects the phase; it never advances
+         it on its own, so an interrupted load can jump to done from any phase.
+         Reduced motion is an authored sibling per phase (plain fades, no trace,
+         no scale), chosen by a11y/reducedMotion on every transition.
+         Ids use client 4: lobby/game-lobby symlinks this file beside its own.
+         Colours are token hexes from packages/theme/tokens.ts (ARGB, no #). -->
+    <Artboard isComponent="true" defaultStateMachineId="4:37" viewModelId="4:50" viewModelInstanceId="4:54"
+              x="1800" y="0" width="390" height="844" styleId="4:29" name="GameTransition" id="4:30">
+        <LayoutComponentStyle layoutWidthScaleType="fill" layoutHeightScaleType="fill" name="Transition Style" id="4:29"/>
+
+        <!-- Root fill box, then the cover: one fill box carrying the plate
+             colour, padding 16 so the frame stays off the window edge at every
+             viewport. -->
+        <LayoutComponent width="390" height="844" styleId="4:11" name="Root" id="4:10">
+            <LayoutComponentStyle layoutWidthScaleType="fill" layoutHeightScaleType="fill" name="Root Style" id="4:11"/>
+            <!-- The cover proper. Opacity and scale are keyed here, one box below
+                 the root: a key on the grafted root box itself is ignored when
+                 the component is nested with NestedArtboardLayout. -->
+            <LayoutComponent width="390" height="844" styleId="4:3" name="Cover" id="4:13">
+            <LayoutComponentStyle layoutWidthScaleType="fill" layoutHeightScaleType="fill"
+                                  flexDirectionValue="column" layoutAlignmentType="center"
+                                  paddingLeft="16" paddingRight="16" paddingTop="16" paddingBottom="16"
+                                  paddingLeftUnitsValue="points" paddingRightUnitsValue="points"
+                                  paddingTopUnitsValue="points" paddingBottomUnitsValue="points"
+                                  name="Cover Style" id="4:3"/>
+            <Fill name="Plate"><SolidColor colorValue="FF00041C" name="C" id="4:12"/></Fill>
+
+            <!-- Frame box: fills the padded area, draws the frame, centres the words -->
+            <LayoutComponent width="358" height="812" styleId="4:15" name="FrameBox" id="4:14">
+                <LayoutComponentStyle layoutWidthScaleType="fill" layoutHeightScaleType="fill"
+                                      flexDirectionValue="column" layoutAlignmentType="center"
+                                      gapVertical="12" gapVerticalUnitsValue="points"
+                                      name="FrameBox Style" id="4:15"/>
+
+                <!-- perimeter: the frame box's own strokes, so they follow its
+                     computed size at every viewport (a Shape path keeps its
+                     drawn size under layout). Royal keyline plus the energy
+                     trace, a short orange segment a TrimPath carries round the
+                     outline. The two corner cuts below are small boxes pinned to
+                     the corners: a plate-coloured triangle masks the frame's
+                     corner and a diagonal keyline closes the cut. -->
+                <Stroke thickness="2" join="round" name="Line"><SolidColor colorValue="FF0058F8" name="C" id="4:22"/></Stroke>
+                <Stroke thickness="4" cap="round" join="round" name="Trace">
+                    <SolidColor colorValue="FFFC7C00" name="C" id="4:25"/>
+                    <TrimPath start="0" end="0.12" offset="0" name="Trim" id="4:26"/>
+                </Stroke>
+                <LayoutComponent width="28" height="28" styleId="4:61" name="CutTL" id="4:60">
+                    <LayoutComponentStyle positionTypeValue="absolute" layoutWidthScaleType="fixed" layoutHeightScaleType="fixed"
+                                          positionLeft="-2" positionTop="-2"
+                                          positionLeftUnitsValue="points" positionTopUnitsValue="points"
+                                          name="CutTL Style" id="4:61"/>
+                    <Shape x="14" y="14" name="Mask">
+                        <PointsPath isClosed="true" isClockwise="true" name="Path">
+                            <StraightVertex x="-14" y="-14"/><StraightVertex x="14" y="-14"/><StraightVertex x="-14" y="14"/>
+                        </PointsPath>
+                        <Fill name="Fill"><SolidColor colorValue="FF00041C" name="C" id="4:62"/></Fill>
+                    </Shape>
+                    <Shape x="14" y="14" name="Cut">
+                        <PointsPath isClosed="false" name="Path">
+                            <StraightVertex x="-12" y="14"/><StraightVertex x="14" y="-12"/>
+                        </PointsPath>
+                        <Stroke thickness="2" cap="round" name="Line"><SolidColor colorValue="FF0058F8" name="C" id="4:63"/></Stroke>
+                    </Shape>
+                </LayoutComponent>
+                <LayoutComponent width="28" height="28" styleId="4:65" name="CutBR" id="4:64">
+                    <LayoutComponentStyle positionTypeValue="absolute" layoutWidthScaleType="fixed" layoutHeightScaleType="fixed"
+                                          positionRight="-2" positionBottom="-2"
+                                          positionRightUnitsValue="points" positionBottomUnitsValue="points"
+                                          name="CutBR Style" id="4:65"/>
+                    <Shape x="14" y="14" name="Mask">
+                        <PointsPath isClosed="true" isClockwise="true" name="Path">
+                            <StraightVertex x="14" y="14"/><StraightVertex x="-14" y="14"/><StraightVertex x="14" y="-14"/>
+                        </PointsPath>
+                        <Fill name="Fill"><SolidColor colorValue="FF00041C" name="C" id="4:66"/></Fill>
+                    </Shape>
+                    <Shape x="14" y="14" name="Cut">
+                        <PointsPath isClosed="false" name="Path">
+                            <StraightVertex x="-14" y="12"/><StraightVertex x="12" y="-14"/>
+                        </PointsPath>
+                        <Stroke thickness="2" cap="round" name="Line"><SolidColor colorValue="FF0058F8" name="C" id="4:67"/></Stroke>
+                    </Shape>
+                </LayoutComponent>
+
+                <!-- wordmark and the loading line, hugged so the layout centres
+                     them without stretching the glyphs -->
+                <Text alignValue="center" originX="0.5" originY="0.5" sizingValue="autoWidth" name="Wordmark" id="4:31">
+                    <LayoutParticipant layoutWidthScaleType="hug" layoutHeightScaleType="hug" name="Participant"/>
+                    <TextStylePaint fontSize="34" letterSpacing="1" fontAssetId="4:900" familyName="Archivo Black" styleName="Regular" name="Wordmark Style" id="4:32">
+                        <Fill name="Fill"><SolidColor colorValue="FFFC7C00" name="C"/></Fill>
+                    </TextStylePaint>
+                    <TextValueRun styleId="4:32" text="NYC-MON" name="Run"/>
+                </Text>
+                <Text alignValue="center" originX="0.5" originY="0.5" sizingValue="autoWidth" name="Caption" id="4:33">
+                    <LayoutParticipant layoutWidthScaleType="hug" layoutHeightScaleType="hug" name="Participant"/>
+                    <SemanticData role="text" label="Loading your game" isLiveRegion="true" name="Semantics"/>
+                    <TextStylePaint fontSize="15" fontAssetId="4:901" familyName="Space Grotesk" styleName="Medium" name="Caption Style" id="4:34">
+                        <Fill name="Fill"><SolidColor colorValue="FFDFE0E1" name="C" id="4:35"/></Fill>
+                        <TextStyleAxis tag="2003265652" axisValue="500" name="Weight"/>
+                    </TextStylePaint>
+                    <TextValueRun styleId="4:34" text="Loading your game" name="Run"/>
+                </Text>
+            </LayoutComponent>
+            </LayoutComponent>
+        </LayoutComponent>
+
+        <StateMachine name="Transition" id="4:37">
+            <!-- Phase layer: four phases, each with a full and a reduced state.
+                 Every state reaches every other on the enum, so the host can
+                 jump to done mid-reveal (interrupted) and a reduced-motion
+                 change mid-phase lands on the sibling at once. -->
+            <StateMachineLayer name="Phase" id="4:38">
+                <AnyState x="1100" y="-200"/>
+                <ExitState x="1300" y="-200"/>
+                <EntryState x="0" y="0">
+                    <StateTransition stateToId="4:600">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="false"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="4:610">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="true"/></TransitionViewModelCondition>
+                    </StateTransition>
+                </EntryState>
+                <AnimationState x="160" y="0" animationId="4:400" reset="true" id="4:600">
+                    <StateTransition stateToId="4:610" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="4:91"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="true"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="4:601" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="4:92"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="false"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="4:611" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="4:92"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="true"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="4:602" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="4:93"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="false"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="4:612" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="4:93"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="true"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="4:603" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="4:94"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="false"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="4:613" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="4:94"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="true"/></TransitionViewModelCondition>
+                    </StateTransition>
+                </AnimationState>
+                <AnimationState x="160" y="200" animationId="4:410" reset="true" id="4:610">
+                    <StateTransition stateToId="4:600" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="4:91"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="false"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="4:601" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="4:92"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="false"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="4:611" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="4:92"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="true"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="4:602" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="4:93"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="false"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="4:612" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="4:93"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="true"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="4:603" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="4:94"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="false"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="4:613" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="4:94"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="true"/></TransitionViewModelCondition>
+                    </StateTransition>
+                </AnimationState>
+                <AnimationState x="400" y="0" animationId="4:401" reset="true" id="4:601">
+                    <StateTransition stateToId="4:600" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="4:91"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="false"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="4:610" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="4:91"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="true"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="4:611" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="4:92"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="true"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="4:602" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="4:93"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="false"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="4:612" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="4:93"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="true"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="4:603" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="4:94"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="false"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="4:613" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="4:94"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="true"/></TransitionViewModelCondition>
+                    </StateTransition>
+                </AnimationState>
+                <AnimationState x="400" y="200" animationId="4:411" reset="true" id="4:611">
+                    <StateTransition stateToId="4:600" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="4:91"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="false"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="4:610" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="4:91"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="true"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="4:601" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="4:92"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="false"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="4:602" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="4:93"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="false"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="4:612" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="4:93"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="true"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="4:603" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="4:94"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="false"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="4:613" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="4:94"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="true"/></TransitionViewModelCondition>
+                    </StateTransition>
+                </AnimationState>
+                <AnimationState x="640" y="0" animationId="4:402" reset="true" id="4:602">
+                    <StateTransition stateToId="4:600" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="4:91"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="false"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="4:610" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="4:91"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="true"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="4:601" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="4:92"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="false"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="4:611" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="4:92"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="true"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="4:612" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="4:93"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="true"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="4:603" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="4:94"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="false"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="4:613" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="4:94"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="true"/></TransitionViewModelCondition>
+                    </StateTransition>
+                </AnimationState>
+                <AnimationState x="640" y="200" animationId="4:412" reset="true" id="4:612">
+                    <StateTransition stateToId="4:600" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="4:91"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="false"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="4:610" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="4:91"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="true"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="4:601" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="4:92"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="false"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="4:611" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="4:92"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="true"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="4:602" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="4:93"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="false"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="4:603" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="4:94"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="false"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="4:613" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="4:94"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="true"/></TransitionViewModelCondition>
+                    </StateTransition>
+                </AnimationState>
+                <AnimationState x="880" y="0" animationId="4:403" reset="true" id="4:603">
+                    <StateTransition stateToId="4:600" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="4:91"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="false"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="4:610" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="4:91"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="true"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="4:601" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="4:92"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="false"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="4:611" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="4:92"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="true"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="4:602" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="4:93"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="false"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="4:612" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="4:93"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="true"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="4:613" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="4:94"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="true"/></TransitionViewModelCondition>
+                    </StateTransition>
+                </AnimationState>
+                <AnimationState x="880" y="200" animationId="4:413" reset="true" id="4:613">
+                    <StateTransition stateToId="4:600" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="4:91"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="false"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="4:610" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="4:91"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="true"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="4:601" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="4:92"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="false"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="4:611" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="4:92"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="true"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="4:602" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="4:93"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="false"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="4:612" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="4:93"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="true"/></TransitionViewModelCondition>
+                    </StateTransition>
+                    <StateTransition stateToId="4:603" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:51" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="4:94"/></TransitionViewModelCondition>
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyBoolean><DataBindContext sourcePathIds="4:50-4:53-9:82" propertyKey="634"/></BindablePropertyBoolean></TransitionPropertyViewModelComparator><TransitionValueBooleanComparator value="false"/></TransitionViewModelCondition>
+                    </StateTransition>
+                </AnimationState>
+            </StateMachineLayer>
+
+            <!-- Theme layer: night plate and royal frame, or the daylit plate
+                 with the orange-950 keyline the kit uses on a light surface -->
+            <StateMachineLayer name="Theme" id="4:39">
+                <AnyState x="500" y="-120"/>
+                <ExitState x="700" y="-120"/>
+                <EntryState x="0" y="0"><StateTransition stateToId="4:620"/></EntryState>
+                <AnimationState x="160" y="0" animationId="4:420" id="4:620">
+                    <StateTransition stateToId="4:621" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:52-9:62" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="9:111"/></TransitionViewModelCondition>
+                    </StateTransition>
+                </AnimationState>
+                <AnimationState x="400" y="0" animationId="4:421" id="4:621">
+                    <StateTransition stateToId="4:620" duration="0">
+                        <TransitionViewModelCondition><TransitionPropertyViewModelComparator><BindablePropertyEnum><DataBindContext sourcePathIds="4:50-4:52-9:62" propertyKey="637"/></BindablePropertyEnum></TransitionPropertyViewModelComparator><TransitionValueEnumComparator value="9:112"/></TransitionViewModelCondition>
+                    </StateTransition>
+                </AnimationState>
+            </StateMachineLayer>
+        </StateMachine>
+
+        <!-- Full-motion phase timelines. Keyed: Cover opacity and scale, the
+             trace offset, the trace colour (alpha 00 is off). -->
+        <LinearAnimation duration="18" name="Enter" id="4:400">
+            <KeyedObject objectId="4:13">
+                <KeyedProperty property="opacity">
+                    <KeyFrameDouble value="0" frame="0" interpolationType="cubic"><CubicEaseInterpolator x1="0" y1="0" x2="0.58" y2="1"/></KeyFrameDouble>
+                    <KeyFrameDouble value="1" frame="18" interpolationType="linear"/>
+                </KeyedProperty>
+                <KeyedProperty property="scaleX"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty>
+                <KeyedProperty property="scaleY"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="4:25"><KeyedProperty property="colorValue"><KeyFrameColor value="FFFC7C00" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="4:26"><KeyedProperty property="offset">
+                <KeyFrameDouble value="0" frame="0" interpolationType="cubic"><CubicEaseInterpolator x1="0" y1="0" x2="0.58" y2="1"/></KeyFrameDouble>
+                <KeyFrameDouble value="0.25" frame="18" interpolationType="linear"/>
+            </KeyedProperty></KeyedObject>
+        </LinearAnimation>
+        <!-- Hold: one trace pass round the perimeter every 72 frames, looping -->
+        <LinearAnimation duration="72" loopValue="loop" name="Hold" id="4:401">
+            <KeyedObject objectId="4:13">
+                <KeyedProperty property="opacity"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty>
+                <KeyedProperty property="scaleX"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty>
+                <KeyedProperty property="scaleY"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="4:25"><KeyedProperty property="colorValue"><KeyFrameColor value="FFFC7C00" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="4:26"><KeyedProperty property="offset">
+                <KeyFrameDouble value="0.25" frame="0" interpolationType="linear"/>
+                <KeyFrameDouble value="1.25" frame="72" interpolationType="linear"/>
+            </KeyedProperty></KeyedObject>
+        </LinearAnimation>
+        <!-- Reveal: the cover lifts away over 24 frames (400 ms), ease in -->
+        <LinearAnimation duration="24" name="Reveal" id="4:402">
+            <KeyedObject objectId="4:13">
+                <KeyedProperty property="opacity">
+                    <KeyFrameDouble value="1" frame="0" interpolationType="cubic"><CubicEaseInterpolator x1="0.42" y1="0" x2="1" y2="1"/></KeyFrameDouble>
+                    <KeyFrameDouble value="0" frame="24" interpolationType="linear"/>
+                </KeyedProperty>
+                <KeyedProperty property="scaleX">
+                    <KeyFrameDouble value="1" frame="0" interpolationType="cubic"><CubicEaseInterpolator x1="0.42" y1="0" x2="1" y2="1"/></KeyFrameDouble>
+                    <KeyFrameDouble value="1.04" frame="24" interpolationType="linear"/>
+                </KeyedProperty>
+                <KeyedProperty property="scaleY">
+                    <KeyFrameDouble value="1" frame="0" interpolationType="cubic"><CubicEaseInterpolator x1="0.42" y1="0" x2="1" y2="1"/></KeyFrameDouble>
+                    <KeyFrameDouble value="1.04" frame="24" interpolationType="linear"/>
+                </KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="4:25"><KeyedProperty property="colorValue"><KeyFrameColor value="FFFC7C00" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="4:26"><KeyedProperty property="offset"><KeyFrameDouble value="0.25" interpolationType="linear"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+        <LinearAnimation duration="1" name="Done" id="4:403">
+            <KeyedObject objectId="4:13">
+                <KeyedProperty property="opacity"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty>
+                <KeyedProperty property="scaleX"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty>
+                <KeyedProperty property="scaleY"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="4:25"><KeyedProperty property="colorValue"><KeyFrameColor value="00FC7C00" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="4:26"><KeyedProperty property="offset"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+
+        <!-- Reduced-motion siblings: plain fades, no trace, no scale.
+             tokens.ts motion-enter.reduced is a 200 ms fade (12 frames). -->
+        <LinearAnimation duration="12" name="EnterReduced" id="4:410">
+            <KeyedObject objectId="4:13">
+                <KeyedProperty property="opacity">
+                    <KeyFrameDouble value="0" frame="0" interpolationType="linear"/>
+                    <KeyFrameDouble value="1" frame="12" interpolationType="linear"/>
+                </KeyedProperty>
+                <KeyedProperty property="scaleX"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty>
+                <KeyedProperty property="scaleY"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="4:25"><KeyedProperty property="colorValue"><KeyFrameColor value="00FC7C00" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="4:26"><KeyedProperty property="offset"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+        <LinearAnimation duration="1" name="HoldReduced" id="4:411">
+            <KeyedObject objectId="4:13">
+                <KeyedProperty property="opacity"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty>
+                <KeyedProperty property="scaleX"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty>
+                <KeyedProperty property="scaleY"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="4:25"><KeyedProperty property="colorValue"><KeyFrameColor value="00FC7C00" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="4:26"><KeyedProperty property="offset"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+        <LinearAnimation duration="12" name="RevealReduced" id="4:412">
+            <KeyedObject objectId="4:13">
+                <KeyedProperty property="opacity">
+                    <KeyFrameDouble value="1" frame="0" interpolationType="linear"/>
+                    <KeyFrameDouble value="0" frame="12" interpolationType="linear"/>
+                </KeyedProperty>
+                <KeyedProperty property="scaleX"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty>
+                <KeyedProperty property="scaleY"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="4:25"><KeyedProperty property="colorValue"><KeyFrameColor value="00FC7C00" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="4:26"><KeyedProperty property="offset"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+        <LinearAnimation duration="1" name="DoneReduced" id="4:413">
+            <KeyedObject objectId="4:13">
+                <KeyedProperty property="opacity"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty>
+                <KeyedProperty property="scaleX"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty>
+                <KeyedProperty property="scaleY"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="4:25"><KeyedProperty property="colorValue"><KeyFrameColor value="00FC7C00" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="4:26"><KeyedProperty property="offset"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+
+        <!-- Theme timelines: plate, keyline, caption -->
+        <LinearAnimation duration="1" name="Night" id="4:420">
+            <KeyedObject objectId="4:12"><KeyedProperty property="colorValue"><KeyFrameColor value="FF00041C" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="4:22"><KeyedProperty property="colorValue"><KeyFrameColor value="FF0058F8" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="4:35"><KeyedProperty property="colorValue"><KeyFrameColor value="FFDFE0E1" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="4:62"><KeyedProperty property="colorValue"><KeyFrameColor value="FF00041C" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="4:66"><KeyedProperty property="colorValue"><KeyFrameColor value="FF00041C" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="4:63"><KeyedProperty property="colorValue"><KeyFrameColor value="FF0058F8" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="4:67"><KeyedProperty property="colorValue"><KeyFrameColor value="FF0058F8" interpolationType="linear"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+        <LinearAnimation duration="1" name="Daylit" id="4:421">
+            <KeyedObject objectId="4:12"><KeyedProperty property="colorValue"><KeyFrameColor value="FFF3F4F4" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="4:22"><KeyedProperty property="colorValue"><KeyFrameColor value="FF3C1E00" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="4:35"><KeyedProperty property="colorValue"><KeyFrameColor value="FF61656A" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="4:62"><KeyedProperty property="colorValue"><KeyFrameColor value="FFF3F4F4" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="4:66"><KeyedProperty property="colorValue"><KeyFrameColor value="FFF3F4F4" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="4:63"><KeyedProperty property="colorValue"><KeyFrameColor value="FF3C1E00" interpolationType="linear"/></KeyedProperty></KeyedObject>
+            <KeyedObject objectId="4:67"><KeyedProperty property="colorValue"><KeyFrameColor value="FF3C1E00" interpolationType="linear"/></KeyedProperty></KeyedObject>
+        </LinearAnimation>
+    </Artboard>
+
+    <ComponentAsset artboardId="4:30" name="GameTransition"/>
+
+    <!-- The host the CLI shows (rive.yaml main). It binds the root view model
+         and hands the transition instance to the component through
+         dataBindPathIds, which is the only way a nested artboard receives its
+         data. game-lobby nests the same component from its own root. -->
+    <Artboard defaultStateMachineId="4:7" viewModelId="4:40" viewModelInstanceId="4:41" x="1300" y="0"
+              width="390" height="844" styleId="4:5" name="GameTransitionHost" id="4:2">
+        <LayoutComponentStyle name="Host Style" id="4:5"/>
+        <LayoutComponent width="390" height="844" styleId="4:17" name="Root" id="4:16">
+            <LayoutComponentStyle layoutWidthScaleType="fill" layoutHeightScaleType="fill" name="Root Style" id="4:17"/>
+            <NestedArtboardLayout artboardId="4:30" dataBindPathIds="4:40-4:45" instanceWidthScaleType="fill" instanceHeightScaleType="fill" name="Transition" id="4:18">
+                <!-- without this the component's machine never runs: no fades, no trace, no theme -->
+                <NestedStateMachine animationId="4:37" name="Machine"/>
+            </NestedArtboardLayout>
+        </LayoutComponent>
+        <StateMachine name="Host" id="4:7">
+            <StateMachineLayer name="L" id="4:8">
+                <AnyState x="400" y="-120"/>
+                <ExitState x="600" y="-120"/>
+                <EntryState x="0" y="0"><StateTransition stateToId="4:19"/></EntryState>
+                <AnimationState x="160" y="0" animationId="4:6" id="4:19"/>
+            </StateMachineLayer>
+        </StateMachine>
+        <LinearAnimation duration="1" name="Rest" id="4:6"/>
+    </Artboard>
+
+    <FontAsset file="../../../../assets/fonts/ArchivoBlack-Regular.ttf" name="Archivo Black" id="4:900"/>
+    <FontAsset file="../../../../assets/fonts/SpaceGrotesk-Variable.ttf" name="Space Grotesk" id="4:901"/>
+
+    <DataEnumCustom name="TransitionPhase" id="4:90">
+        <DataEnumValue key="enter" value="Enter" id="4:91"/>
+        <DataEnumValue key="hold" value="Hold" id="4:92"/>
+        <DataEnumValue key="reveal" value="Reveal" id="4:93"/>
+        <DataEnumValue key="done" value="Done" id="4:94"/>
+    </DataEnumCustom>
+
+    <!-- View models. Paths the host writes: transition/phase, theme/variant,
+         layout/profile, a11y/reducedMotion. Theme, Layout and A11y come from
+         shared-vm.rml (client 9), the file every lobby project links in. -->
+    <ViewModel defaultInstanceId="4:54" name="Transition" id="4:50">
+        <ViewModelPropertyEnumCustom enumId="4:90" name="phase" id="4:51"/>
+        <ViewModelPropertyViewModel viewModelReferenceId="9:60" name="theme" id="4:52"/>
+        <ViewModelPropertyViewModel viewModelReferenceId="9:80" name="a11y" id="4:53"/>
+        <ViewModelInstance exports="true" name="Default" id="4:54">
+            <ViewModelInstanceEnum propertyValue="4:91" viewModelPropertyId="4:51"/>
+            <ViewModelInstanceViewModel propertyValue="9:61" viewModelPropertyId="4:52"/>
+            <ViewModelInstanceViewModel propertyValue="9:81" viewModelPropertyId="4:53"/>
+        </ViewModelInstance>
+    </ViewModel>
+    <ViewModel defaultInstanceId="4:41" name="GameTransitionRoot" id="4:40">
+        <ViewModelPropertyViewModel viewModelReferenceId="4:50" name="transition" id="4:45"/>
+        <ViewModelPropertyViewModel viewModelReferenceId="9:60" name="theme" id="4:46"/>
+        <ViewModelPropertyViewModel viewModelReferenceId="9:70" name="layout" id="4:47"/>
+        <ViewModelPropertyViewModel viewModelReferenceId="9:80" name="a11y" id="4:48"/>
+        <ViewModelInstance exports="true" name="Default" id="4:41">
+            <ViewModelInstanceViewModel propertyValue="4:54" viewModelPropertyId="4:45"/>
+            <ViewModelInstanceViewModel propertyValue="9:61" viewModelPropertyId="4:46"/>
+            <ViewModelInstanceViewModel propertyValue="9:71" viewModelPropertyId="4:47"/>
+            <ViewModelInstanceViewModel propertyValue="9:81" viewModelPropertyId="4:48"/>
+        </ViewModelInstance>
+    </ViewModel>
+</Rive>

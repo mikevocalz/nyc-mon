@@ -1,0 +1,2 @@
+[23:07:29.245] rive  built /Users/mikevocalz/nyc-mon/packages/ui/rive/arcade-controls/start-stop/build/start-stop.riv (142340 bytes, 38ms, 0 errors, 0 warnings)
+{"success": true, "command": "build", "data": {"riv": "/Users/mikevocalz/nyc-mon/packages/ui/rive/arcade-controls/start-stop/build/start-stop.riv", "bytes": 142340, "buildMs": 38.9, "problems": []}, "errors": [], "warnings": []}

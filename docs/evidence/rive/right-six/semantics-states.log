@@ -1,0 +1,8 @@
+[23:07:28.218] rive  deferred replay: inline
+[23:07:28.272] rive  built /Users/mikevocalz/nyc-mon/packages/ui/rive/arcade-controls/right-six/build/right-six.riv (144444 bytes, 53ms, 0 errors, 0 warnings)
+[23:07:28.273] rive  data: buttons/c/state = disabled
+[23:07:28.273] rive  data: buttons/z/state = cooldown
+[23:07:28.273] rive  data: buttons/a/state = held
+[23:07:28.273] rive  showing RightSix [1/2]
+[23:07:28.273] rive  viewport 209x204 @1x
+[23:07:28.273] rive  wrote /Users/mikevocalz/nyc-mon/docs/evidence/rive/right-six/semantics-states.semantics.json
