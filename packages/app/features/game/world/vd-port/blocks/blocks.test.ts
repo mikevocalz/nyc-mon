@@ -119,6 +119,9 @@ test('the blocks material (shell and near level) builds to WGSL with no WebGL-on
   const canvas = { width: 300, height: 150, style: {}, addEventListener() {}, removeEventListener() {}, getContext: () => null } as unknown as HTMLCanvasElement;
   const renderer = new THREE.WebGPURenderer({ canvas });
   await renderer.init().catch(() => undefined);
+  // CPU-only WGSL builds have no runtime binding cache. r187 treats only
+  // undefined (not the failed-init null) as absent; keep its real compiler.
+  Reflect.set(renderer, '_bindings', undefined);
   (renderer as unknown as { backend: { capabilities: unknown } }).backend.capabilities = { getUniformBufferLimit: () => 65_536 };
   (renderer as unknown as { hasFeature: () => boolean }).hasFeature = () => false;
   type Builder = { scene: unknown; camera: unknown; material: unknown; context: { material: unknown }; fogNode: unknown; build(): void; fragmentShader?: string };

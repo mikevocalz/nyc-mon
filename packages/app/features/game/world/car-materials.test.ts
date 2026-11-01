@@ -33,6 +33,9 @@ async function stubRenderer() {
   } as unknown as HTMLCanvasElement;
   const renderer = new THREE.WebGPURenderer({ canvas });
   await renderer.init().catch(() => undefined);
+  // CPU-only WGSL builds have no runtime binding cache. r187 treats only
+  // undefined (not the failed-init null) as absent; keep its real compiler.
+  Reflect.set(renderer, '_bindings', undefined);
   (renderer as unknown as { backend: { capabilities: unknown } }).backend.capabilities = { getUniformBufferLimit: () => 65_536 };
   (renderer as unknown as { hasFeature: () => boolean }).hasFeature = () => false;
   return renderer;
