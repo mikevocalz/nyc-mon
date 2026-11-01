@@ -245,14 +245,25 @@ function tick(s: Session) {
 function disposeSession(s: Session) {
   if (s.disposed) return;
   s.disposed = true;
-  try {
-    s.built?.dispose?.();
+  // A partially built scene can throw while freeing its geometry. Never let
+  // that skip the renderer's loop/buffer cleanup (r187 render() starts the
+  // internal animation loop again, even after our post-init stop).
+  const cleanup = (where: string, task: () => void | Promise<void>) => {
+    try {
+      const pending = task();
+      if (pending) void pending.catch((error: unknown) => emit(s, 'error', describeRuntimeError(where, error)));
+    } catch (error) {
+      emit(s, 'error', describeRuntimeError(where, error));
+    }
+  };
+  const renderer = s.renderer;
+  if (renderer?.initialized) cleanup('dispose animation', () => stopInternalLoop(renderer));
+  cleanup('dispose scene', () => s.built?.dispose?.());
+  if (renderer) {
     // three's dispose leaves the canvas target's multisampled colour and
     // depth buffers to a GC on the shared device: about 100 MB at the iPad size.
-    if (s.renderer) releaseCanvasBuffers(s.renderer);
-    s.renderer?.dispose();
-  } catch (error) {
-    emit(s, 'error', describeRuntimeError('dispose', error));
+    cleanup('dispose canvas buffers', () => { releaseCanvasBuffers(renderer); });
+    cleanup('dispose renderer', () => renderer.dispose());
   }
   s.built = null;
   s.renderer = null;
