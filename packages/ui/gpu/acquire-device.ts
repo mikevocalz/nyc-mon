@@ -74,5 +74,21 @@ export async function acquireSharedOrOwnDevice(deps: AcquireDeviceDeps): Promise
   }
   const adapter = await deps.requestAdapter();
   if (!adapter) return null;
-  return { device: await adapter.requestDevice(ownDeviceDescriptor(adapter)), source: 'own', sharedError };
+  return { device: await requestDeviceWithFallback(adapter), source: 'own', sharedError };
+}
+
+/**
+ * The full descriptor (every advertised feature and limit) buys the widest
+ * device on capable GPUs — but a device can refuse it even though every entry
+ * came from its own adapter (Dawn requestDevice rejects a requiredFeatures/
+ * requiredLimits member it won't grant). Fall back to a bare requestDevice
+ * before declaring the GPU unsupported — an adapterless failure must come
+ * from requestAdapter returning null, not from a strict descriptor.
+ */
+export async function requestDeviceWithFallback(adapter: GPUAdapter): Promise<GPUDevice> {
+  try {
+    return await adapter.requestDevice(ownDeviceDescriptor(adapter));
+  } catch {
+    return adapter.requestDevice();
+  }
 }
