@@ -83,7 +83,7 @@ describe.skipIf(url === undefined)('X1 collections on Postgres', () => {
     bond: 0,
     stage: 'Baby' as const,
     // The create hook requires the egg-derived gender and voice lineage (Bible v11 ¶54, ¶56).
-    gender: deriveMonGender(eggId),
+    gender: deriveMonGender(eggId, 'dex-001'),
     voiceLineageId: deriveVoiceLineageId({ eggId, speciesId: 'dex-001' }),
   });
 
