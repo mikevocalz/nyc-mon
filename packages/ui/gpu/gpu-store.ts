@@ -55,7 +55,7 @@ async function start(): Promise<void> {
     adopt(tgpu.initFromDevice({ device }), module, 'own');
   } catch (error) {
     console.warn('[GpuCanvas] WebGPU unavailable, using the fallback renderer.', error);
-    gpuStore.setState({ support: 'unsupported' });
+    gpuStore.setState({ support: 'unsupported', reason: `own-fail:${error instanceof Error ? error.message.slice(0, 120) : String(error).slice(0, 120)}` });
   }
 }
 
