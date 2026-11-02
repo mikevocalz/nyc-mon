@@ -76,6 +76,33 @@ const inRing = (ring: readonly (readonly number[])[], x: number, z: number) => {
   return c;
 };
 let ownedSpecs: Set<string> | null = null;
+type OwnedRing = readonly (readonly number[])[];
+const OWNERSHIP_CELL = 128;
+let ownedRings: Map<number, Map<number, OwnedRing[]>> | null = null;
+
+function ownershipGrid(): Map<number, Map<number, OwnedRing[]>> {
+  if (ownedRings) return ownedRings;
+  const grid = new Map<number, Map<number, OwnedRing[]>>();
+  for (const list of RING_STRUCTURES) for (const structure of list) for (const ring of structure.owned as readonly OwnedRing[]) {
+    let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
+    for (const point of ring) {
+      x0 = Math.min(x0, point[0]!); x1 = Math.max(x1, point[0]!);
+      z0 = Math.min(z0, point[1]!); z1 = Math.max(z1, point[1]!);
+    }
+    // Inclusive max buckets preserve the exact raycast's boundary behavior.
+    for (let cx = Math.floor(x0 / OWNERSHIP_CELL); cx <= Math.floor(x1 / OWNERSHIP_CELL); cx++) {
+      let column = grid.get(cx);
+      if (!column) { column = new Map(); grid.set(cx, column); }
+      for (let cz = Math.floor(z0 / OWNERSHIP_CELL); cz <= Math.floor(z1 / OWNERSHIP_CELL); cz++) {
+        let candidates = column.get(cz);
+        if (!candidates) { candidates = []; column.set(cz, candidates); }
+        candidates.push(ring);
+      }
+    }
+  }
+  ownedRings = grid;
+  return grid;
+}
 
 // Every ring's lane-A structures. A ring baked with none (ring 3) types as `readonly []`; iterating the list drops it.
 const RING_STRUCTURES = [VD_BLOCKS.structures, VD_BLOCKS_RING1.structures, VD_BLOCKS_RING2.structures, VD_BLOCKS_RING3.structures, VD_BLOCKS_RING4.structures, VD_BLOCKS_RING5.structures, VD_BLOCKS_RING6.structures, VD_BLOCKS_RING7.structures, VD_BLOCKS_RING8.structures, VD_BLOCKS_RING9.structures, VD_BLOCKS_RING10.structures];
@@ -86,13 +113,14 @@ const RING_STRUCTURES = [VD_BLOCKS.structures, VD_BLOCKS_RING1.structures, VD_BL
  */
 export function vdBlocksOwn(frontId: string | null, x: number, z: number): boolean {
   if (!vdBlockBytes()) return false;
-  ownedSpecs ??= new Set(RING_STRUCTURES.flat().filter((s) => s.kind === 'fk').map((s) => s.id.slice(3)));
+  if (!ownedSpecs) ownedSpecs = new Set(RING_STRUCTURES.flat().filter((s) => s.kind === 'fk').map((s) => s.id.slice(3)));
   if (frontId && ownedSpecs.has(frontId.split('#')[0]!)) return true;
-  for (const list of RING_STRUCTURES) for (const s of list) for (const r of s.owned as readonly (readonly (readonly number[])[])[]) if (inRing(r, x, z)) return true;
+  const candidates = ownershipGrid().get(Math.floor(x / OWNERSHIP_CELL))?.get(Math.floor(z / OWNERSHIP_CELL));
+  for (const ring of candidates ?? []) if (inRing(ring, x, z)) return true;
   return false;
 }
 
-export function build(ctx: VdPortCtx): VdPortPart {
+export function* prepare(ctx: VdPortCtx): Generator<number, VdPortPart> {
   const packs = vdBlockBytes();
   if (!packs) return EMPTY_PART;
   const { THREE } = ctx;
@@ -111,6 +139,9 @@ export function build(ctx: VdPortCtx): VdPortPart {
   (blocksMat as unknown as { maskNode: unknown }).maskNode = ditherFadeMask(THREE);
   const shellMat = blocksMat, nearMat = blocksMat;
 
+  const initialChildren = new Set(ctx.group.children);
+  let completed = false;
+  try {
   // ---- the shell: resident, one mesh per 128 m cell (the home pack's cells and, with its bytes in, ring 1's)
   const shells = new Map<number, Mesh[]>();
   let triangles = 0;
@@ -133,6 +164,8 @@ export function build(ctx: VdPortCtx): VdPortPart {
   const identity = maxShell > 65535 ? new Uint32Array(maxShell) : new Uint16Array(maxShell);
   for (let i = 0; i < maxShell; i++) identity[i] = i;
   const shellIndex = new THREE.BufferAttribute(identity, 1);
+  const shellCount = shellSets.reduce((n, set) => n + set.infos.length, 0);
+  let shellsDone = 0;
   for (const { infos, bytes: shellBytes } of shellSets) for (const info of infos) {
     const a = decodeShellCell(shellBytes, info, 'cell-local');
     const g = new THREE.BufferGeometry();
@@ -159,6 +192,7 @@ export function build(ctx: VdPortCtx): VdPortPart {
     const num = m.userData.cell as number;
     (shells.get(num) ?? shells.set(num, []).get(num)!).push(m);
     triangles += info.triangles;
+    yield ++shellsDone / (shellCount + 1);
   }
 
   // ---- the near level: a template (one zero-area triangle in the layer's layout) and the lazy cells
@@ -293,6 +327,7 @@ export function build(ctx: VdPortCtx): VdPortPart {
   // builds none.
   const nearIn = new Set<number>();
   let updates = 0;
+  completed = true;
   return {
     update() {
       if (++updates <= 2) return;
@@ -312,5 +347,22 @@ export function build(ctx: VdPortCtx): VdPortPart {
     },
     stats: { meshes: [...shells.values()].reduce((a, l) => a + l.length, 0) + 1, triangles, structures: VD_BLOCKS.structures.length + VD_BLOCKS_RING1.structures.length },
   };
+  } finally {
+    if (!completed) {
+      for (const child of [...ctx.group.children]) if (!initialChildren.has(child)) {
+        (child as Mesh).geometry?.dispose();
+        ctx.group.remove(child);
+      }
+      blocksMat.dispose();
+      fw14.dispose();
+    }
+  }
 }
 
+/** Synchronous builder for worklet/host callers that own their scheduling. */
+export function build(ctx: VdPortCtx): VdPortPart {
+  const steps = prepare(ctx);
+  let next = steps.next();
+  while (!next.done) next = steps.next();
+  return next.value;
+}

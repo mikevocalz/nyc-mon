@@ -79,6 +79,8 @@ export interface ThreeFrame {
 
 /** What a scene gets from the canvas, once per renderer. */
 export interface ThreeContext {
+  /** Aborted when this canvas preparation is abandoned. */
+  signal?: AbortSignal;
   THREE: Three;
   renderer: ThreeWebGpu.WebGPURenderer;
   backend: ThreeBackend;
@@ -101,6 +103,9 @@ export interface ThreeScene<P> {
  * a lost device or a remount builds a new one). Anything that changes at
  * runtime belongs in params, read in `update`.
  */
+/** Scene preparation may yield while retaining ownership of partial resources. */
+export type ThreePreparation<P> = (context: ThreeContext, params: P) => ThreeScene<P> | Promise<ThreeScene<P>>;
+
 export type ThreeSetup<P> = (context: ThreeContext, params: P) => ThreeScene<P>;
 
 export interface ThreeCanvasHandle {
@@ -119,7 +124,7 @@ export interface ThreeCanvasProps<P> {
    * usually `() => import('./my-scene').then((m) => m.setup)`, so three.js and
    * the scene's TSL stay out of the first bundle chunk on web.
    */
-  load: () => Promise<ThreeSetup<P>>;
+  load: () => Promise<ThreePreparation<P>>;
   /** Handed to `update` every frame. While the loop is stopped, a new params identity draws one frame. */
   params: P;
   /** Web only: use WebGPURenderer's WebGL2 backend even where WebGPU works. For stories and tests. */

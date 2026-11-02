@@ -187,3 +187,54 @@ test('seen from outside, every body and level shows front faces: no see-through 
     }
   }
 });
+
+test('distance levels retain the near silhouette, including rays that miss the coarse body entirely', () => {
+  // The winding check above ignores rays with no hit. That let a coarse
+  // body pass after its door/roof outline had disappeared. Use the near
+  // body's occupied pixels as the reference instead.
+  const material = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
+  const ray = new THREE.Raycaster();
+  for (const id of VD_CAR_IDS) {
+    const d = decodeVdCar(id);
+    const meshFor = (lod: (typeof VD_LODS)[number]) => {
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.BufferAttribute(d.positions, 3));
+      geometry.setIndex(new THREE.BufferAttribute(d.lodIndices[lod], 1));
+      return new THREE.Mesh(geometry, material);
+    };
+    const meshes = { near: meshFor('near'), mid: meshFor('mid'), far: meshFor('far') };
+    const box = new THREE.Box3().setFromBufferAttribute(meshes.near.geometry.getAttribute('position') as THREE.BufferAttribute);
+    const lo = box.min.toArray(); const hi = box.max.toArray();
+    let occupied = 0;
+    const missing = { mid: 0, far: 0 };
+    const interior = { mid: 0, far: 0 };
+    for (const direction of [[1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1], [0, -1, 0]]) {
+      const along = direction.findIndex((x) => x !== 0);
+      const [u, w] = [0, 1, 2].filter((x) => x !== along) as [number, number];
+      for (let i = 1; i < 16; i++) for (let j = 1; j < 16; j++) {
+        const origin = [0, 0, 0];
+        origin[u] = lo[u]! + (hi[u]! - lo[u]!) * i / 16;
+        origin[w] = lo[w]! + (hi[w]! - lo[w]!) * j / 16;
+        origin[along] = direction[along]! > 0 ? lo[along]! - 1 : hi[along]! + 1;
+        ray.set(new THREE.Vector3(origin[0], origin[1], origin[2]), new THREE.Vector3(direction[0], direction[1], direction[2]));
+        const reference = ray.intersectObject(meshes.near, false);
+        if (reference.length === 0) continue;
+        occupied++;
+        for (const lod of ['mid', 'far'] as const) {
+          const hits = ray.intersectObject(meshes[lod], false);
+          if (hits.length === 0) missing[lod]++;
+          // A missing outside panel can still hit the far inside panel.
+          // Count those as well, beyond the simplifier's surface tolerance.
+          else if (Math.abs(hits[0]!.distance - reference[0]!.distance) > 0.2) interior[lod]++;
+        }
+      }
+    }
+    assert.ok(occupied > 500, `${id}: sampled the body outline`);
+    assert.ok(missing.mid / occupied <= 0.02, `${id} mid loses ${(100 * missing.mid / occupied).toFixed(1)}% of the near silhouette`);
+    assert.ok(missing.far / occupied <= 0.04, `${id} far loses ${(100 * missing.far / occupied).toFixed(1)}% of the near silhouette`);
+    assert.ok(interior.mid / occupied <= 0.04, `${id} mid exposes the interior on ${(100 * interior.mid / occupied).toFixed(1)}% of the near surface`);
+    assert.ok(interior.far / occupied <= 0.06, `${id} far exposes the interior on ${(100 * interior.far / occupied).toFixed(1)}% of the near surface`);
+    for (const mesh of Object.values(meshes)) mesh.geometry.dispose();
+  }
+  material.dispose();
+});

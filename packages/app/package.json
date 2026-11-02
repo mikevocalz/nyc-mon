@@ -8,6 +8,12 @@
     ".": "./index.ts",
     "./features/*": "./features/*"
   },
+  "imports": {
+    "#cell-source-platform": {
+      "react-native": "./features/game/world/cell-source/platform.native.ts",
+      "default": "./features/game/world/cell-source/platform.ts"
+    }
+  },
   "sideEffects": [
     "*.css"
   ],

@@ -2,8 +2,9 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import * as THREE from 'three/webgpu';
 import type { ThreeContext, ThreeFrame } from '@acme/ui/three';
-import { CAMERA_MIN_DISTANCE, CHASE_PITCH, cameraPose, createCityScene, OVERVIEW_PITCH } from './city-scene.ts';
+import { CAMERA_MIN_DISTANCE, CHASE_PITCH, cameraPose, createCityScene, nightLightForward, OVERVIEW_PITCH } from './city-scene.ts';
 import { parseCityDataset } from './city-dataset.ts';
+import { CAMERA_CLEARANCE, createCameraBlocker } from './camera-collision.ts';
 import { syntheticTileV2 as fixtureV2 } from './world/synthetic-tile.ts';
 import type { SceneActorFactory } from './scene-actor.ts';
 
@@ -223,4 +224,64 @@ test('a held shot stays in world space across repeated frames and origin rebases
     chase.position[0] + root.position.x, chase.position[1], chase.position[2] + root.position.z,
   ]);
   built.dispose?.();
+});
+
+
+test('Klipp returns from an authored shot to the unobstructed chase eye without changing saved zoom', () => {
+  const input = params();
+  input.camera = { x: -4, z: -7, yaw: Math.PI / 2, distance: 8 };
+  const blocked = createCameraBlocker(input.dataset.buildings);
+  assert.equal(blocked(...cameraPose(input.camera).position, 0), true, 'requested chase eye begins inside the wall');
+  const built = createCityScene(context(), input);
+  const camera = built.camera as THREE.PerspectiveCamera;
+  const first = camera.position.clone();
+  assert.equal(blocked(first.x, first.y, first.z, CAMERA_CLEARANCE), false);
+  assert.ok(camera.near < input.camera.distance * 0.02, 'near clip follows the unobstructed eye');
+  const shot = {
+    position: [-20, 8, 30] as [number, number, number],
+    quaternion: [0, 0, 0, 1] as [number, number, number, number],
+    near: .2, far: 2000, fov: 60,
+    lookAt: [-4, 1.2, -7] as [number, number, number],
+  };
+  built.update!(frame(1), { ...input, cinematicShot: shot });
+  assert.deepEqual(camera.position.toArray(), shot.position, 'cinematic pose remains authored');
+  built.update!(frame(1), { ...input, cinematicShot: null });
+  assert.ok(camera.position.distanceTo(first) < 1e-8);
+  assert.equal(blocked(camera.position.x, camera.position.y, camera.position.z, CAMERA_CLEARANCE), false);
+  assert.equal(input.camera.distance, 8);
+  built.dispose?.();
+});
+
+
+test('an authored shot without a look-at point focuses at its position and ranks lights along its rotation', () => {
+  const input = params();
+  const built = createCityScene(context(), input);
+  const shot = {
+    position: [55, 4, 32] as [number, number, number],
+    quaternion: [0, Math.SQRT1_2, 0, Math.SQRT1_2] as [number, number, number, number],
+    near: .2, far: 2000, fov: 60,
+  };
+  built.update!(frame(1), { ...input, cinematicShot: shot });
+  assert.deepEqual(built.camera.position.toArray(), shot.position);
+  assert.deepEqual(built.scene.getObjectByName('city:sky')!.position.toArray(), shot.position);
+  if (built.scene.fog instanceof THREE.Fog) assert.equal(built.scene.fog.near, 250, 'no unrelated chase look point');
+  const forward = nightLightForward(built.camera as THREE.PerspectiveCamera, 0, 0, new THREE.Vector3());
+  const expectedForward = built.camera.getWorldDirection(new THREE.Vector3());
+  expectedForward.y = 0; expectedForward.normalize();
+  assert.ok(forward.distanceTo(expectedForward) < 1e-8, 'lighting follows the rendered authored rotation');
+  assert.ok(forward.x < -0.01, 'rotation affects facing rather than retaining the chase direction');
+  assert.ok(Math.abs(forward.x - -55 / Math.hypot(55, 32)) > 0.1, 'facing does not point at the origin');
+  assert.ok(Math.abs(Math.hypot(forward.x, forward.z) - 1) < 1e-8);
+  built.dispose?.();
+});
+
+
+test('night-light forward normalizes target directions and remains defined for a vertical camera', () => {
+  const camera = new THREE.PerspectiveCamera();
+  const scratch = new THREE.Vector3();
+  assert.equal(nightLightForward(camera, 3, 4, scratch), scratch);
+  assert.deepEqual(scratch.toArray(), [0.6, 0, 0.8]);
+  camera.rotation.x = Math.PI / 2;
+  nightLightForward(camera, 0, 0, scratch);
+  assert.deepEqual(scratch.toArray(), [0, 0, -1]);
 });

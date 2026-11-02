@@ -13,6 +13,19 @@ const CHUNK = { paint: 256, detail: 128, glass: 256 } as const;
 // a varying ground, so a front written in a chunk's batch must read the same height it reads in the whole plan
 const groundY = (x: number, z: number) => ((Math.floor(x / 7) + Math.floor(z / 11)) & 1) * 0.14;
 
+test('the counting pass preserves positions and features without allocating render attributes', () => {
+  const plan = { ...PLAN, fronts: PLAN.fronts.slice(0, 3) };
+  const whole = emitPlan(plan, groundY);
+  const counted = emitPlan(plan, groundY, undefined, undefined, true);
+  assert.deepEqual(counted.features, whole.features);
+  for (const slot of SLOTS) {
+    assert.deepEqual(counted.buffers[slot].position, whole.buffers[slot].position);
+    assert.equal(counted.buffers[slot].normal.length, 0);
+    assert.equal(counted.buffers[slot].color.length, 0);
+    for (const attribute of Object.values(counted.buffers[slot].extra)) assert.equal(attribute.length, 0);
+  }
+});
+
 for (const ring of [1, 2] as const) {
   test(`ring ${ring}: the lazy packages equal splitByCell of the resident mesh`, () => {
     const fronts = PLAN.fronts.filter((f) => f.ring === ring);

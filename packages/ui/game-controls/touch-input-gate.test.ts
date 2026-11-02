@@ -84,3 +84,18 @@ describe('H8: hiding the touch slots releases only touch', () => {
     assert.equal(router.stick.engaged, true);
   });
 });
+
+it('controller unmount releases its own full-stick and touch buttons while preserving hardware', () => {
+  const router = createGameInputRouter();
+  const gate = createTouchInputGate({ router, live: true });
+  router.buttonDown('x', 'gamepad', 1);
+  gate.down('b', 2);
+  gate.move(0, 1, 'begin', 3);
+  assert.equal(router.stick.engaged, true);
+  gate.dispose();
+  assert.equal(router.stick.engaged, false);
+  assert.deepEqual([...router.heldButtons], ['x']);
+  const accepted = router.diagnostics.accepted;
+  gate.dispose();
+  assert.equal(router.diagnostics.accepted, accepted, 'cleanup is idempotent');
+});

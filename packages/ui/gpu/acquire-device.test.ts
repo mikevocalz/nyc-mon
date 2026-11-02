@@ -74,3 +74,37 @@ test('the web and node source refuses to share, so the own path runs there', asy
   const { importSharedDevice } = await import('./shared-device-source.ts');
   assert.throws(() => importSharedDevice(), /native only/);
 });
+
+test('adapter limits handed back as strings are coerced to numbers, not passed through', async () => {
+  const { ownDeviceDescriptor } = await import('./acquire-device.ts');
+  // react-native-webgpu's JSI layer returns u64 limits as strings (same
+  // serialization the Skia pointer hit) — the descriptor must never carry a
+  // string into requestDevice's host call.
+  const adapter = {
+    limits: { maxBufferSize: '4294967296', maxBindGroups: 4, badLimit: 'not-a-number', hugeLimit: '18446744073709551615' },
+    features: new Set(['texture-compression-etc2']),
+  } as unknown as GPUAdapter;
+  const got = ownDeviceDescriptor(adapter);
+  const limits = got.requiredLimits as Record<string, number>;
+  assert.equal(typeof limits['maxBufferSize'], 'number');
+  assert.equal(limits['maxBufferSize'], 4294967296);
+  assert.equal(limits['maxBindGroups'], 4);
+  assert.equal(limits['badLimit'], undefined);
+  assert.equal(limits['hugeLimit'], undefined);
+});
+
+test('a synchronous native descriptor error still retries without a descriptor', async () => {
+  const { requestDeviceWithFallback } = await import('./acquire-device.ts');
+  const device = fakeDevice('bare-native');
+  const calls: (GPUDeviceDescriptor | undefined)[] = [];
+  const adapter = {
+    requestDevice(descriptor?: GPUDeviceDescriptor) {
+      calls.push(descriptor);
+      if (descriptor) throw new Error('Exception in HostFunction: Value is a string, expected a number');
+      return Promise.resolve(device);
+    },
+  } as unknown as GPUAdapter;
+  assert.equal(await requestDeviceWithFallback(adapter), device);
+  assert.equal(calls.length, 2);
+  assert.equal(calls[1], undefined);
+});

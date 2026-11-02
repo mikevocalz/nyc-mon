@@ -1,4 +1,8 @@
 import assert from 'node:assert/strict';
+import { createTouchInputGate } from '../../../../ui/game-controls/touch-input-gate.ts';
+import { readStick } from '../../../../ui/game-controls/stick-math.ts';
+import { createGameInputRouter } from '../../../../ui/game-controls/create-game-input-router.ts';
+import { DEFAULT_CONTROLLER_PROFILE } from '../../../../ui/game-controls/contract.ts';
 import { test } from 'node:test';
 import { CHASE_DISTANCES, INITIAL_CITY_CAMERA, yawBehind } from '../city-camera.ts';
 import {
@@ -88,6 +92,27 @@ test('spawn lands on walkable ground near the look-at point, facing away from th
   assert.ok(near(yawBehind(placed.caller.heading), 0.5));
   assert.equal(placed.camera.distance, CHASE_DISTANCES[0], 'the 220 m map view pulls in to the chase');
   assert.equal(spawnCaller(INITIAL_CALLER_STATE, INITIAL_CITY_CAMERA, { isWalkable: () => false, groundHeight: () => 0 }), null);
+});
+
+test('a relocated spawn is the first chase target, with no easing from a blocked request point', () => {
+  const world: WorldQueries = { isWalkable: (x, z) => Math.hypot(x, z) >= 5, groundHeight: () => 0.14 };
+  const placed = spawnCaller(INITIAL_CALLER_STATE, { x: 0, z: 0, yaw: 0.5, distance: 220 }, world)!;
+  assert.ok(Math.hypot(placed.caller.x, placed.caller.z) >= 5);
+  assert.equal(placed.camera.x, placed.caller.x);
+  assert.equal(placed.camera.z, placed.caller.z);
+  assert.equal(placed.camera.yaw, 0.5);
+  assert.equal(placed.camera.distance, CHASE_DISTANCES[0]);
+});
+
+test('follow smoothing never leaves the camera anchor inside a building corner', () => {
+  const world: WorldQueries = { isWalkable: (x) => x >= 0, groundHeight: () => 0 };
+  const before: GameFrame = { caller: { ...spawned, x: 1, z: 0 },
+    camera: { x: -1, z: 0, yaw: 0.5, distance: 18 }, chase: IDLE_CHASE };
+  const after = stepGameFrame(before, RELEASED_CONTROLS, 1 / 60, false, world);
+  assert.equal(after.camera.x, after.caller.x);
+  assert.equal(after.camera.z, after.caller.z);
+  assert.equal(after.camera.yaw, before.camera.yaw);
+  assert.equal(after.camera.distance, 18);
 });
 
 function frame(): GameFrame {
@@ -265,4 +290,41 @@ test('recentre wins over a settle in flight', () => {
   const chase = recentreChase(releasing.caller, releasing.chase);
   assert.equal(chase.settle.targetYaw, null);
   assert.notEqual(chase.recentreYaw, null);
+});
+
+
+test('touch analog travel and gamepad strength run fully, return to walk and clear on release/cancel/look', () => {
+  const router = createGameInputRouter();
+  const gate = createTouchInputGate({ router, live: true });
+  const tuning = DEFAULT_CONTROLLER_PROFILE.stick;
+  const move = (travel: number) => {
+    const reading = readStick(0, -travel, tuning);
+    gate.move(reading.x, reading.y, 'begin', 1);
+    return { ...RELEASED_CONTROLS, stickX: router.stick.x, stickY: router.stick.y, engaged: router.stick.engaged };
+  };
+  let caller = stepCaller(spawned, move(tuning.clampRadiusDp * 0.4), 0, 0.1, open);
+  assert.equal(caller.gait, 'walk');
+  const full = move(tuning.clampRadiusDp);
+  for (let i = 0; i < 120; i++) caller = stepCaller(caller, full, 0, 1 / 60, open);
+  assert.equal(caller.gait, 'run'); assert.ok(near(caller.pace, RUN_SPEED, 1e-3));
+  caller = stepCaller(caller, stick(0, 0.6), 0, 0.1, open);
+  assert.equal(caller.gait, 'walk');
+  gate.down('b', 2);
+  caller = stepCaller(caller, { ...move(tuning.clampRadiusDp * 0.3), run: router.heldButtons.has('b') }, 0, 0.1, open);
+  gate.up('b', 3);
+  assert.equal(caller.gait, 'run', 'B retains light-push run override');
+  gate.setLive(false, 'background');
+  caller = stepCaller(caller, RELEASED_CONTROLS, 0, 0.1, open);
+  assert.equal(caller.gait, 'idle'); assert.equal(caller.pace, 0);
+  gate.setLive(true);
+  gate.move(0, 0, 'end', 4);
+  caller = stepCaller(caller, { ...RELEASED_CONTROLS, engaged: router.stick.engaged, stickX: router.stick.x, stickY: router.stick.y }, 0, 0.1, open);
+  assert.equal(caller.gait, 'idle');
+  caller = stepCaller(caller, { ...full, look: true }, 0, 0.1, open);
+  assert.equal(caller.gait, 'idle', 'full stick in camera mode does not move Caller');
+  router.cancelAll('screen-transition');
+  router.move(0, 1, 'begin', 'gamepad', 2);
+  caller = stepCaller(caller, stick(router.stick.x, router.stick.y), 0, 0.1, open);
+  assert.equal(caller.gait, 'run', 'shared gamepad full travel reaches the same curve');
+  gate.dispose();
 });

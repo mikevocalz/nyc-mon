@@ -34,8 +34,9 @@ const SPECIES = ['P_m', 'H_m', 'Q_m', 'R_m', 'L_m', 'Z_m'];
 // ponytail: a quarter of the w1 cards (450 a tree, ~5k triangles with bark); raise THIN's
 // divisor once the Duo frame budget for the vd lane is measured.
 const THIN = 4;
-// The mid level (90 m out): a twelfth of the cards on a plain trunk, so a tree does not swap from a ball to a model.
-const THIN_MID = 12;
+// Mid keeps two thirds of the near cards. The former 1/12 source sampling
+// enlarged isolated cards so much that the crown changed shape on approach.
+const THIN_MID = 6;
 const ATLAS = 256;
 const BARK_TINT = { plane: [0.88, 0.93, 1.06], willow: [0.49, 0.51, 0.56], oak: [1.15, 1.3, 1.6], zelkova: [0.48, 0.59, 0.74], pear: [0.46, 0.52, 0.9], linden: [0.6, 0.56, 0.54] };
 // Each scan's linear mean, from bxTrees.js barkMaterial: plane 0.30/0.28/0.25, the others about 0.14.
@@ -85,6 +86,26 @@ function thin(leaf, every = THIN) {
   return { P, N, UV, S, I };
 }
 
+/** Fit the thinned crown back into the authored near silhouette bounds. */
+function matchCrownBounds(mid, near) {
+  const bounds = (p) => {
+    const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+    for (let i = 0; i < p.length; i++) { lo[i % 3] = Math.min(lo[i % 3], p[i]); hi[i % 3] = Math.max(hi[i % 3], p[i]); }
+    return { lo, hi };
+  };
+  const source = bounds(mid.P), target = bounds(near.P);
+  const scale = source.hi.map((h, c) => (target.hi[c] - target.lo[c]) / (h - source.lo[c]));
+  for (let i = 0; i < mid.P.length; i++) {
+    const c = i % 3;
+    mid.P[i] = target.lo[c] + (mid.P[i] - source.lo[c]) / (source.hi[c] - source.lo[c]) * (target.hi[c] - target.lo[c]);
+  }
+  for (let i = 0; i < mid.N.length; i += 3) {
+    const n = [mid.N[i] / scale[0], mid.N[i + 1] / scale[1], mid.N[i + 2] / scale[2]];
+    const length = Math.hypot(...n) || 1;
+    for (let c = 0; c < 3; c++) mid.N[i + c] = n[c] / length;
+  }
+}
+
 function atlas(file) {
   // Pillow decodes the WebP to raw RGBA at ATLAS x ATLAS (premultiplied edges are not an issue: alpha is cut at 0.5).
   const out = execFileSync('python3', ['-c', [
@@ -109,6 +130,7 @@ for (const id of SPECIES) {
   const leafRaw = unpack(raw, base, head.w1.leaf, true);
   const leaf = thin(leafRaw);
   const mid = thin(leafRaw, THIN_MID);
+  matchCrownBounds(mid, leaf);
   const tint = BARK_TINT[head.bark]; const mean = BARK_MEAN[head.bark];
   trees.push({
     id, height: head.H, width: head.W,

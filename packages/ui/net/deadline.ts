@@ -37,20 +37,29 @@ export async function fetchBytesWithDeadline(
   if (signal?.aborted) controller.abort();
   else signal?.addEventListener('abort', onCallerAbort, { once: true });
   const startedAt = Date.now();
-  let timer: ReturnType<typeof setTimeout> | undefined = setTimeout(expire(headerMs), headerMs);
+  // Race, not rely on abort: RN's polyfilled fetch does not propagate
+  // AbortSignal into an in-flight body read, so an aborted await can still
+  // pend forever. The race guarantees the deadline rejects either way.
+  const timeout = (ms: number): Promise<never> =>
+    new Promise<never>((_, reject) =>
+      setTimeout(() => {
+        timedOutAfter = ms;
+        controller.abort();
+        reject(new Error(`net: GET ${url} timed out after ${ms} ms`));
+      }, ms),
+    );
   try {
-    const res = await fetchFn(url, { signal: controller.signal });
-    clearTimeout(timer);
+    const res = await Promise.race([fetchFn(url, { signal: controller.signal }), timeout(headerMs)]);
     // Headers are in: the body gets the rest of the total budget.
     const left = Math.max(1, totalMs - (Date.now() - startedAt));
-    timer = setTimeout(expire(totalMs), left);
     if (!res.ok) throw new Error(`net: GET ${url} answered ${res.status}`);
-    return await res.arrayBuffer();
+    return await Promise.race([res.arrayBuffer(), timeout(left)]);
   } catch (cause) {
+    // An abort propagated from the fetch is a deadline expiry in disguise:
+    // surface the budget that fired, not whatever the abort threw.
     if (timedOutAfter > 0 && !signal?.aborted) throw new Error(`net: GET ${url} timed out after ${timedOutAfter} ms`);
     throw cause;
   } finally {
-    clearTimeout(timer);
     signal?.removeEventListener('abort', onCallerAbort);
   }
 }

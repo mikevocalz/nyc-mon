@@ -143,6 +143,17 @@ export function createTouchInputGate(options: TouchInputGateOptions): TouchInput
     },
     dispose() {
       for (const id of [...pending.keys()]) releaseAccessibility(id);
+      // The controller can unmount while the game input subscriber remains.
+      // Release this gate's touch ownership without cancelling hardware.
+      const t = now();
+      for (const id of [...touchHeld]) {
+        touchHeld.delete(id);
+        router.buttonUp(id, 'touch', t);
+      }
+      if (touchStick) {
+        touchStick = false;
+        router.move(0, 0, 'cancel', 'touch', t);
+      }
     },
   };
 }

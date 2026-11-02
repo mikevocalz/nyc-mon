@@ -55,6 +55,8 @@
 //   for f in lincoln suv van taxinv200 mercedes charger mtaxd40; do
 //     curl -sSL -o tooling/city/.cache/vd-cars/$f.glb $B/$f.glb; done
 //   node tooling/city/bake-cars.mjs
+import { Buffer } from 'node:buffer';
+import { carLodFace } from './car-lod-face.mjs';
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -342,14 +344,12 @@ function orient(P, N, idx) {
 /**
  * near / mid / far index lists over the unwelded LOD1 vertices. `near` is the exterior triangles (turned to their
  * normals) decimated by meshoptimizer's attribute-aware simplifier with Permissive, which collapses across the colour
- * and normal seams of the unwelded input and keeps every corner on its own side of a seam. `mid` and `far` decimate
- * `near` harder: on the unwelded mesh the simplifier stalls at its open borders, so those two simplify the
- * position-welded surface and then put each corner back on the vertex at that position whose normal best matches
- * the triangle. The old bake stopped at the welded index, so a decimated triangle took the first vertex at each
- * position, often an interior or a wheel vertex, and drew in its colour and normal: the grey, black and see-through
- * panels on distant cars.
+ * and normal seams of the unwelded input and keeps every corner on its own side of a seam. `mid` and `far` use the
+ * same indexed surface through topology-preserving simplification with bounded errors and separate material/paint
+ * boundaries. They may exceed the requested triangle
+ * target when the body cannot reduce further without losing its silhouette, paint/glass boundaries or wheels.
  */
-function buildLevels(id, P, N, C, R, ext, side, counts) {
+function buildLevels(id, P, N, C, R, ext, counts) {
   const budget = id === 'mtaxd40' ? BUS_LEVEL_TRIS : LEVEL_TRIS;
   const Pf = Float32Array.from(P);
   const nv = P.length / 3;
@@ -364,41 +364,47 @@ function buildLevels(id, P, N, C, R, ext, side, counts) {
   const near = ext.length / 3 > budget.near
     ? [...MeshoptSimplifier.simplifyWithAttributes(Uint32Array.from(ext), Pf, 3, attrs, 7, weights, lampLock, budget.near * 3, 1, ['Permissive'])[0]]
     : [...ext];
-  // Weld near's vertices by position; the representative of a position is the first near vertex there.
-  const remap = MeshoptSimplifier.generatePositionRemap(Pf, 3);
-  const group = new Map();
-  for (const v of new Set(near)) { const w = remap[v]; if (!group.has(w)) group.set(w, []); group.get(w).push(v); }
-  const rep = new Map([...group].map(([w, list]) => [w, list[0]]));
-  const welded = Uint32Array.from(near, (v) => rep.get(remap[v]));
-  // A clustered triangle faces the outside air (its winding is flipped if that air lies behind it; one sealed in on
-  // both sides is dropped), and each corner takes the vertex at its position whose normal best matches that face.
-  const unweld = (idx) => {
+  counts.flipped = orient(Pf, N, near);
+  // Weld geometric corners only within the same material/paint class. Keep
+  // separate coincident vertices at glass, tyre, lamp and paint boundaries.
+  const positionRemap = MeshoptSimplifier.generatePositionRemap(Pf, 3);
+  const groups = new Map();
+  const groupFor = new Map();
+  for (const v of new Set(near)) {
+    const key = `${positionRemap[v]}:${R[v]}:${C[v * 3]},${C[v * 3 + 1]},${C[v * 3 + 2]}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(v);
+    groupFor.set(v, key);
+  }
+  const reps = [...groups.values()].map((g) => g[0]);
+  const local = new Map([...groups.keys()].map((key, i) => [key, i]));
+  const welded = Uint32Array.from(near, (v) => local.get(groupFor.get(v)));
+  const positions = new Float32Array(reps.length * 3);
+  reps.forEach((v, i) => positions.set(Pf.subarray(v * 3, v * 3 + 3), i * 3));
+  const simplifyLevel = (target, maxError) => {
+    // Topology-preserving edge collapse, never simplifySloppy's grid
+    // clustering: clustering joined opposite surfaces and punched holes.
+    const idx = MeshoptSimplifier.simplify(welded, positions, 3,
+      Math.min(welded.length, target * 3), maxError)[0];
     const out = [];
     for (let t = 0; t < idx.length; t += 3) {
-      let tri = [idx[t], idx[t + 1], idx[t + 2]];
-      const { front, back } = side(tri[0] * 3, tri[1] * 3, tri[2] * 3);
-      if (front + back === 0) continue;
-      if (back > front) tri = [tri[0], tri[2], tri[1]];
-      const [a, b, c] = tri.map((v) => v * 3);
-      const gx = (P[b + 1] - P[a + 1]) * (P[c + 2] - P[a + 2]) - (P[b + 2] - P[a + 2]) * (P[c + 1] - P[a + 1]);
-      const gy = (P[b + 2] - P[a + 2]) * (P[c] - P[a]) - (P[b] - P[a]) * (P[c + 2] - P[a + 2]);
-      const gz = (P[b] - P[a]) * (P[c + 1] - P[a + 1]) - (P[b + 1] - P[a + 1]) * (P[c] - P[a]);
-      const len = Math.hypot(gx, gy, gz);
+      const tri = [reps[idx[t]], reps[idx[t + 1]], reps[idx[t + 2]]];
+      const face = carLodFace(P, tri);
+      // A collapsed face has no facing or normal; never divide by zero.
+      if (!face) continue;
+      const { gx, gy, gz, length } = face;
       for (const corner of tri) {
         let best = corner; let score = -Infinity;
-        for (const v of group.get(remap[corner])) {
-          const d = (N[v * 3] * gx + N[v * 3 + 1] * gy + N[v * 3 + 2] * gz) / len;
-          if (d > score) { score = d; best = v; }
+        for (const v of groups.get(groupFor.get(corner))) {
+          const dot = (N[v * 3] * gx + N[v * 3 + 1] * gy + N[v * 3 + 2] * gz) / length;
+          if (dot > score) { best = v; score = dot; }
         }
-        // No vertex there faces this way (the clusterer bridged two surfaces): a copy with the face's own normal,
-        // so the facet lights as the side it shows instead of the one it hides.
         if (score < MIN_FACING) {
           const v = P.length / 3;
           P.push(P[best * 3], P[best * 3 + 1], P[best * 3 + 2]);
-          N.push(gx / len, gy / len, gz / len);
+          N.push(gx / length, gy / length, gz / length);
           C.push(C[best * 3], C[best * 3 + 1], C[best * 3 + 2]);
           R.push(R[best]);
-          counts.refaced = (counts.refaced ?? 0) + 1;
           best = v;
         }
         out.push(best);
@@ -406,26 +412,7 @@ function buildLevels(id, P, N, C, R, ext, side, counts) {
     }
     return out;
   };
-  // The clusterer may answer with any vertex of the buffer it is given, so it gets the representatives alone.
-  const reps = [...new Set(welded)];
-  const local = new Map(reps.map((v, i) => [v, i]));
-  const repPositions = new Float32Array(reps.length * 3);
-  reps.forEach((v, i) => repPositions.set(Pf.subarray(v * 3, v * 3 + 3), i * 3));
-  const weldedLocal = Uint32Array.from(welded, (v) => local.get(v));
-  // The tyres' contact patches (nothing else comes within 6 cm of the street) stay put, so a clustered car still stands.
-  const groundLock = Uint8Array.from(reps, (v) => (P[v * 3 + 1] < 0.06 ? 1 : 0));
-  const decimate = (tris) => unweld(Array.from(MeshoptSimplifier.simplifySloppy(weldedLocal, repPositions, 3, groundLock, Math.min(weldedLocal.length, tris * 3), 1)[0], (i) => reps[i]));
-  counts.flipped = orient(Pf, N, near);
-  // The clusterer can lose a whole tyre at a coarse grid (the cab's far level floated 21 cm): ask for more until the
-  // level still stands on the street, at most the mid budget.
-  const floor = (idx) => idx.reduce((m, v) => Math.min(m, P[v * 3 + 1]), Infinity);
-  const ground = floor(near) + 0.08;
-  const standing = (tris) => {
-    let out = decimate(tris);
-    for (let n = tris; floor(out) > ground && n < budget.mid; ) { n = Math.min(budget.mid, Math.round(n * 1.4)); out = decimate(n); }
-    return out;
-  };
-  return { near, mid: standing(budget.mid), far: standing(budget.far) };
+  return { near, mid: simplifyLevel(budget.mid, 0.005), far: simplifyLevel(budget.far, 0.01) };
 }
 
 const cars = [];
@@ -501,10 +488,10 @@ for (const id of CARS) {
     for (const k of idx) I.push(base + k);
   }
   regrowWheels(P, C, R, hubs, wheelOf, counts);
-  const { keep: exterior, side } = exteriorTriangles(Float32Array.from(P), I);
+  const { keep: exterior } = exteriorTriangles(Float32Array.from(P), I);
   counts.interior = (I.length - exterior.length) / 3;
   deriveLamps(P, N, C, R, size, counts, new Set(exterior));
-  const levels = buildLevels(id, P, N, C, R, exterior, side, counts);
+  const levels = buildLevels(id, P, N, C, R, exterior, counts);
   // Keep only the vertices some level draws, renumbered in first-use order.
   const used = new Int32Array(P.length / 3).fill(-1);
   let nv = 0;

@@ -12,6 +12,11 @@ const dezig = (v: number) => ((v & 1) !== 0 ? ~(v >>> 1) : v >>> 1);
 
 /** Decodes `elementCount` elements of `byteStride` bytes from an encodeVertexBuffer stream into `target`. */
 export function decodeVertexBuffer(target: Uint8Array, elementCount: number, byteStride: number, source: Uint8Array): void {
+  const steps = decodeVertexBufferSteps(target, elementCount, byteStride, source);
+  while (!steps.next().done) { /* drain the exact cooperative decoder */ }
+}
+
+export function* decodeVertexBufferSteps(target: Uint8Array, elementCount: number, byteStride: number, source: Uint8Array): Generator<void, void, void> {
   assert(source[0] === 0xa0 || source[0] === 0xa1, 'not a vertex buffer');
   assert(target.length >= elementCount * byteStride, 'target too small');
   const version = source[0]! & 0x0f;
@@ -19,12 +24,13 @@ export function decodeVertexBuffer(target: Uint8Array, elementCount: number, byt
   const deltas = new Uint8Array(maxBlockElements * byteStride);
   const tailSize = version === 0 ? byteStride : byteStride + byteStride / 4;
   const tailDataOffs = source.length - tailSize;
-  const tempData = source.slice(tailDataOffs, tailDataOffs + byteStride);
+  const tempData = new Uint8Array(source.subarray(tailDataOffs, tailDataOffs + byteStride));
   const channels = version === 0 ? null : source.slice(tailDataOffs + byteStride, tailDataOffs + tailSize);
   let srcOffs = 1;
   const headerModes = [[0, 2, 4, 8], [0, 1, 2, 4], [1, 2, 4, 8]];
 
   for (let dstElemBase = 0; dstElemBase < elementCount; dstElemBase += maxBlockElements) {
+    if (dstElemBase > 0) yield;
     const n = Math.min(elementCount - dstElemBase, maxBlockElements);
     const groupCount = ((n + 0x0f) & ~0x0f) >>> 4;
     const headerByteCount = ((groupCount + 0x03) & ~0x03) >>> 2;
@@ -121,6 +127,11 @@ function pushfifo(fifo: Uint32Array, n: number) {
 
 /** Decodes `count` indices from an encodeIndexBuffer stream into `target` (Uint16Array or Uint32Array). */
 export function decodeIndexBuffer(target: Uint16Array | Uint32Array, count: number, source: Uint8Array): void {
+  const steps = decodeIndexBufferSteps(target, count, source);
+  while (!steps.next().done) { /* drain the exact cooperative decoder */ }
+}
+
+export function* decodeIndexBufferSteps(target: Uint16Array | Uint32Array, count: number, source: Uint8Array): Generator<void, void, void> {
   assert(source[0] === 0xe1, 'not an index buffer');
   assert(count % 3 === 0 && target.length >= count, 'index count');
   const dst = target;
@@ -142,6 +153,7 @@ export function decodeIndexBuffer(target: Uint16Array | Uint32Array, count: numb
   const decodeIndex = (v: number) => (last += dezig(v));
   let o = 0;
   for (let i = 0; i < triCount; i++) {
+    if (i > 0 && i % 128 === 0) yield;
     const code = source[codeOffs++]!;
     const b0 = code >>> 4, b1 = code & 0x0f;
     if (b0 < 0x0f) {

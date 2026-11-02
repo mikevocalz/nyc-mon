@@ -160,6 +160,9 @@ export function stepGameFrame(
     const settled = stepBlockSettle(settle, camera, controls, { x: caller.x, z: caller.z, heading: caller.heading, moving }, step, reducedMotion, streets, frame.chase.recentreYaw !== null);
     settle = settled.settle;
     camera = settled.camera;
+    // Follow smoothing may cut a building corner while the player walks
+    // around it. Keep the chase anchor on their valid position in that case.
+    if (!world.isWalkable(camera.x, camera.z)) camera = { ...camera, x: caller.x, z: caller.z };
   }
   const chase: ChaseState = recentreYaw === frame.chase.recentreYaw && settle === frame.chase.settle ? frame.chase : { recentreYaw, settle };
   const following = caller.spawned && Math.hypot(camera.x - caller.x, camera.z - caller.z) > 0.01;
@@ -190,7 +193,7 @@ export function spawnCaller(state: CallerState, camera: CityCamera, world: World
     pace: 0,
     jump: GROUNDED,
   };
-  return { caller, camera: { ...camera, distance: spawnChaseDistance(camera.distance) }, chase: IDLE_CHASE };
+  return { caller, camera: { ...camera, x: point.x, z: point.z, distance: spawnChaseDistance(camera.distance) }, chase: IDLE_CHASE };
 }
 
 /** The A cap. A press in the air does nothing. */

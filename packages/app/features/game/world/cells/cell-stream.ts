@@ -200,6 +200,7 @@ interface Slot {
   fading: -1 | 0 | 1;
   unwantedSince: number;
   distance: number;
+  preparing?: boolean;
 }
 
 interface Layer {
@@ -408,6 +409,7 @@ export function createCellStream(THREE: Three, meshes: readonly Mesh[], options:
     hold(layer, pkg, 1);
     if (layer.templateFrames === -2) { layer.template.visible = true; layer.templateFrames = 2; }
     const ms = now() - start;
+    if (ms > preset.stream.msPerFrame) log?.('slow-cell', { stage: 'attach', layer: layer.name, cx: pkg.cx, cz: pkg.cz, ms: +ms.toFixed(2), bytes: pkg.bytes });
     stats.builtThisFrame++;
     stats.buildMsThisFrame += ms;
     if (ms > stats.maxBuildMs) stats.maxBuildMs = ms;
@@ -499,6 +501,7 @@ export function createCellStream(THREE: Three, meshes: readonly Mesh[], options:
   };
 
   const pick = (camera: Vec3, k: number, nowS: number, radius: number) => {
+    const previousRequests = slots.filter((slot) => slot.preparing);
     requests.length = 0;
     stats.fetching = 0;
     polling = 0;
@@ -534,6 +537,7 @@ export function createCellStream(THREE: Three, meshes: readonly Mesh[], options:
         prefetch(slot, false);
       }
     }
+    for (const slot of previousRequests) if (!requests.includes(slot)) { slot.pkg.release?.(); slot.preparing = false; }
     requests.sort((a, b) => (a.pinned === b.pinned ? a.distance - b.distance : a.pinned ? -1 : 1));
   };
 
@@ -603,13 +607,24 @@ export function createCellStream(THREE: Three, meshes: readonly Mesh[], options:
         if (stats.builtThisFrame > 0 && (now() - start >= preset.stream.msPerFrame || uploaded + slot.pkg.bytes > preset.stream.uploadBytesPerFrame)) break;
         if (lostBytes(slot)) continue;
         if (!fits(slot)) { refuse(slot); continue; }
+        if (slot.pkg.prepare) {
+          slot.preparing = true;
+          const preparationStart = now();
+          const ready = slot.pkg.prepare(start + preset.stream.msPerFrame, now);
+          const preparationMs = now() - preparationStart;
+          if (preparationMs > preset.stream.msPerFrame) log?.('slow-cell', { stage: 'prepare', layer: slot.layer.name, cx: slot.pkg.cx, cz: slot.pkg.cz, ms: +preparationMs.toFixed(2), bytes: slot.pkg.bytes });
+          stats.buildMsThisFrame += preparationMs;
+          stats.maxBuildMs = Math.max(stats.maxBuildMs, preparationMs);
+          if (!ready) break;
+          slot.preparing = false;
+        }
         build(slot, true);
         uploaded += slot.pkg.bytes;
       }
       requests.splice(0, i);
       stats.pending = requests.length + stats.fetching;
       const fading = advanceFades(dt);
-      if (log && (stats.builtThisFrame > 0)) {
+      if (log && (stats.builtThisFrame > 0 || stats.buildMsThisFrame > 0)) {
         log('frame', {
           built: stats.builtThisFrame, buildMs: +stats.buildMsThisFrame.toFixed(2), cells: stats.cells,
           mb: +(stats.bytes / 1e6).toFixed(1), tris: stats.triangles, pending: stats.pending, evictions: stats.evictions,
@@ -625,7 +640,10 @@ export function createCellStream(THREE: Three, meshes: readonly Mesh[], options:
       last.at = -Infinity;
     },
     dispose() {
-      for (const slot of slots) if (slot.mesh) evict(slot);
+      for (const slot of slots) {
+        if (slot.mesh) evict(slot);
+        else if (slot.preparing) slot.pkg.release?.();
+      }
       // The template geometry stays with its mesh, whose builder disposes it (city-mesh.ts, facelift, road paint);
       // only a material this module cloned is its own.
       for (const layer of layers) if (layer.cloned) layer.material.dispose();

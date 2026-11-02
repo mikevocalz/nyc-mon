@@ -25,7 +25,7 @@ import { emitPlan, EXTRA, SLOTS, type EmitResult, type Slot } from './emit.ts';
 import { FASCIA_ATLAS_HEIGHT, FASCIA_ATLAS_R8, FASCIA_ATLAS_WIDTH } from './fascia-atlas.generated.ts';
 import { createStorefrontMaterials } from './materials.ts';
 import type { Front } from './plan-types.ts';
-import { vdStorefrontPlan } from './load.ts';
+import { vdStorefrontChunkIndex, vdStorefrontPlan } from './load.ts';
 import { vdBlocksOwn } from '../blocks/index.ts';
 import { packageRingStorefronts, storefrontLayout } from './ring-packages.ts';
 
@@ -71,7 +71,7 @@ export function planFitsTile(toScene: VdPortCtx['toScene']): boolean {
 }
 
 export function build(ctx: VdPortCtx): VdPortPart {
-  // preloaded with the block packs (load.ts, load-game-scene.ts); null when plan.bin did not load, which load.ts logged
+  // Preloaded with the block packs (load.ts, load-game-scene.ts); null only before preparation or in fixtures.
   const plan = vdStorefrontPlan();
   if (!plan || !planFitsTile(ctx.toScene)) return EMPTY_PART;
   const { THREE } = ctx;
@@ -94,11 +94,12 @@ export function build(ctx: VdPortCtx): VdPortPart {
   const mats = createStorefrontMaterials(THREE, ctx.night, ctx.physical, FASCIA_ATLAS_R8, FASCIA_ATLAS_WIDTH, FASCIA_ATLAS_HEIGHT);
   const meshes: Mesh[] = [];
   let triangles = 0;
-  let features: EmitResult['features'] = result?.features ?? [];
+  const features: EmitResult['features'] = result?.features ?? [];
+  let featureCount: number | null = null;
   if (streamed) {
     const fronts = plan.fronts.filter((f) => (f.ring != null || inTile(f)) && !ownedByBlocks(f));
-    const packed = packageRingStorefronts(plan, fronts, (x, z) => ctx.groundY(x, z), { paint: LAYER.paint!.chunk, detail: LAYER.detail!.chunk, glass: LAYER.glass!.chunk });
-    features = packed.features;
+    const packed = packageRingStorefronts(plan, fronts, (x, z) => ctx.groundY(x, z), { paint: LAYER.paint!.chunk, detail: LAYER.detail!.chunk, glass: LAYER.glass!.chunk }, vdStorefrontChunkIndex());
+    featureCount = packed.featureCount;
     for (const slot of SLOTS) {
       const pkgs = packed.packages[slot];
       if (pkgs.length === 0) continue;
@@ -158,6 +159,6 @@ export function build(ctx: VdPortCtx): VdPortPart {
       for (const m of meshes) { m.removeFromParent(); m.geometry.dispose(); }
       mats.dispose();
     },
-    stats: { meshes: meshes.length, triangles, structures: count('door') + count('gate') + count('unit') + count('sign') + count('awning') },
+    stats: { meshes: meshes.length, triangles, structures: featureCount ?? count('door') + count('gate') + count('unit') + count('sign') + count('awning') },
   };
 }

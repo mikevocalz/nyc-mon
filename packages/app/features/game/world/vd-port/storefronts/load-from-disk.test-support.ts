@@ -1,6 +1,7 @@
 // Tests and harnesses build the scene without load-game-scene.ts, so the storefront plan is read here from the file
 // the bake wrote (plan.bin, committed).
 import { readFileSync } from 'node:fs';
+import { decodeStorefrontChunkIndex } from './chunk-index.ts';
 import type { StorefrontPlan } from './plan-types.ts';
 import { decodeStorefrontPlan, setVdStorefrontPlan } from './load.ts';
 
@@ -15,6 +16,6 @@ export function readVdStorefrontPlanFromDisk(): StorefrontPlan {
 /** Reads plan.bin and hands it to load.ts, as preloadVdStorefrontPlan does in the app. */
 export function loadVdStorefrontPlanFromDisk(): StorefrontPlan {
   const plan = readVdStorefrontPlanFromDisk();
-  setVdStorefrontPlan(plan);
+  setVdStorefrontPlan(plan, decodeStorefrontChunkIndex(new Uint8Array(readFileSync(new URL('./plan-index.bin', import.meta.url)))));
   return plan;
 }

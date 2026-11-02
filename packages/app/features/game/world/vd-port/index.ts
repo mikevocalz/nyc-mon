@@ -10,12 +10,13 @@
 import type { Three } from '@acme/ui/three';
 import type { Node } from 'three/webgpu';
 import type { CityDatasetV3 } from '../../city-dataset.ts';
-import { build as buildBlocks } from './blocks/index.ts';
+import { prepare as prepareBlocks } from './blocks/index.ts';
 import { build as buildStorefronts } from './storefronts/index.ts';
 import { build as buildFurniture } from './furniture/index.ts';
 import { build as buildFarTier } from './far-tier/index.ts';
 import { buildGen, EXPERIMENTAL_WORLD_GEN } from '../gen/layer.ts';
 import { valdradaToScene } from './transform.ts';
+import { EMPTY_PART } from './types.ts';
 import type { VdEnv, VdLayerBudget, VdPortCtx, VdPortPart, VdStreamLayer } from './types.ts';
 import type { CellPackage } from '../cells/cell-rules.ts';
 import type { CellStream, ExternalLayer } from '../cells/cell-stream.ts';
@@ -26,6 +27,8 @@ export type { VdEnv, VdLayerBudget, VdPortCtx, VdPortPart, VdStreamLayer } from 
 type Mesh = InstanceType<Three['Mesh']>;
 
 export interface VdPortOptions {
+  /** Optional build timing evidence, using the host's existing stream logger. */
+  log?: (line: string, data: Record<string, unknown>) => void;
   physical: boolean;
   /** Valdrada's ENV.night: 0 by day, 0.92 under its night skies (sky.js isNight). */
   night: number;
@@ -65,7 +68,7 @@ export function vdNight(timeOfDay: number): number {
   return Math.max(0, Math.min(0.92, ((timeOfDay - 0.15) / 0.85) * 0.92));
 }
 
-export function buildVdPort(THREE: Three, dataset: CityDatasetV3, options: VdPortOptions): VdPort {
+export function* prepareVdPort(THREE: Three, dataset: CityDatasetV3, options: VdPortOptions): Generator<number, VdPort> {
   const group = new THREE.Group();
   group.name = 'city:vd-port';
   const T = THREE.TSL;
@@ -111,7 +114,32 @@ export function buildVdPort(THREE: Three, dataset: CityDatasetV3, options: VdPor
       stream?.addExternal(ext);
     },
   };
-  const parts: VdPortPart[] = [buildBlocks(ctx), buildStorefronts(ctx), buildFurniture(ctx), buildFarTier(ctx)];
+  const parts: VdPortPart[] = [];
+  let completed = false;
+  try {
+  const now = () => performance.now();
+  let laneStart = now();
+  const recordLane = (lane: string) => {
+    options.log?.('prepare-lane', { lane, wallMs: +(now() - laneStart).toFixed(2) });
+    laneStart = now();
+  };
+  const blocks = prepareBlocks(ctx);
+  let stepStart = now();
+  let step = blocks.next();
+  let blockMs = now() - stepStart, maxStepMs = blockMs;
+  try {
+    while (!step.done) {
+      yield step.value * 0.7;
+      stepStart = now(); step = blocks.next();
+      const elapsed = now() - stepStart;
+      blockMs += elapsed; maxStepMs = Math.max(maxStepMs, elapsed);
+    }
+    parts.push(step.value);
+  } finally { if (!step.done) blocks.return(EMPTY_PART); }
+  options.log?.('prepare-lane', { lane: 'blocks', activeMs: +blockMs.toFixed(2), maxStepMs: +maxStepMs.toFixed(2) }); yield 0.7;
+  laneStart = now(); parts.push(buildStorefronts(ctx)); recordLane('storefronts'); yield 0.8;
+  laneStart = now(); parts.push(buildFurniture(ctx)); recordLane('furniture'); yield 0.9;
+  laneStart = now(); parts.push(buildFarTier(ctx)); recordLane('far'); yield 0.98;
   // The gen lane (world/gen): seeded procedural infill on the cell stack, opt-in only
   // (EXPO_PUBLIC_WORLD_GEN). Off, the parts list — and the render — is unchanged.
   if (EXPERIMENTAL_WORLD_GEN) parts.push(buildGen(ctx, dataset));
@@ -121,6 +149,7 @@ export function buildVdPort(THREE: Three, dataset: CityDatasetV3, options: VdPor
     stats.triangles += p.stats.triangles;
     stats.structures += p.stats.structures;
   }
+  completed = true;
   return {
     group,
     streamMeshes,
@@ -139,4 +168,15 @@ export function buildVdPort(THREE: Three, dataset: CityDatasetV3, options: VdPor
     },
     stats,
   };
+  } finally {
+    if (!completed) for (const part of parts) part.dispose();
+  }
+}
+
+/** Synchronous builder for worklet/host callers that own their scheduling. */
+export function buildVdPort(THREE: Three, dataset: CityDatasetV3, options: VdPortOptions): VdPort {
+  const steps = prepareVdPort(THREE, dataset, options);
+  let next = steps.next();
+  while (!next.done) next = steps.next();
+  return next.value;
 }
