@@ -19,6 +19,7 @@ apps/admin-vite/.vercel
 tooling/*
 !tooling/copy-viro-web-assets.mjs
 !tooling/copy-skia-web-assets.mjs
+!tooling/copy-basis-assets.mjs
 docs
 .p6
 skills

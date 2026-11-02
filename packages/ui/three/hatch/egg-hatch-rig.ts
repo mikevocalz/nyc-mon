@@ -9,6 +9,7 @@ import {
 } from './hatch-manifest';
 import { weldShellSeamNormals } from './shell-seams';
 import { disposeObjectTree } from '../dispose-object.ts';
+import { ktx2LoaderFor, type Ktx2Renderer } from '../ktx2.ts';
 import { SharedParseCache, type ParseLease } from '../parse-cache.ts';
 
 /** An egg's runtime assets as `@acme/assets/eggs` exports them: the manifest JSON and the bundled GLB (URL on web, asset id on native). */
@@ -49,16 +50,20 @@ export function preloadEggHatch(eggId: string, source: EggHatchSource): void {
   cache.preload(eggId, () => fetchEgg(eggId, source));
 }
 
-async function loadEgg(eggId: string, source: EggHatchSource): Promise<LoadedEgg> {
+async function loadEgg(eggId: string, source: EggHatchSource, renderer?: Ktx2Renderer): Promise<LoadedEgg> {
   const manifest = parseEggHatchManifest(source.manifest);
   if (manifest.eggId !== eggId) {
     throw new EggHatchAssetError('egg-mismatch', `asked for ${eggId}, manifest describes ${manifest.eggId}`);
   }
   const bytes = await cache.bytesFor(eggId, () => fetchEgg(eggId, source));
   const loader = new GLTFLoader();
-  // The GLBs use KHR_mesh_quantization only, which GLTFLoader reads with no
-  // decoder. Meshopt and Draco are off the table: both decoders need
-  // WebAssembly, which Hermes doesn't have.
+  // KTX2 textures (KHR_texture_basisu) decode through the renderer's shared
+  // loader (ktx2.ts); without a renderer there is no format detection, so the
+  // loader stays bare. The GLBs use KHR_mesh_quantization for geometry, which
+  // GLTFLoader reads with no decoder. Meshopt and Draco are off the table:
+  // both decoders need WebAssembly, which Hermes doesn't have.
+  const ktx2 = renderer ? await ktx2LoaderFor(renderer) : null;
+  if (ktx2) loader.setKTX2Loader(ktx2);
   if (eggTexturePlugin) loader.register(eggTexturePlugin);
   let gltf: GLTF;
   try {
@@ -139,9 +144,13 @@ export class EggHatchRig {
     this.apply({ kind: 'hatch', seconds: 0 });
   }
 
-  /** Loads (or reuses) the egg and builds a rig. Rejects with `EggHatchAssetError` on any contract break. */
-  static async create(eggId: string, source: EggHatchSource): Promise<EggHatchRig> {
-    const lease = cache.acquire(eggId, () => loadEgg(eggId, source));
+  /**
+   * Loads (or reuses) the egg and builds a rig. Rejects with `EggHatchAssetError`
+   * on any contract break. `renderer` detects the KTX2 texture formats (ktx2.ts);
+   * omit it to parse without KTX2 support.
+   */
+  static async create(eggId: string, source: EggHatchSource, renderer?: Ktx2Renderer): Promise<EggHatchRig> {
+    const lease = cache.acquire(eggId, () => loadEgg(eggId, source, renderer));
     try {
       return new EggHatchRig(eggId, await lease.value, lease);
     } catch (error) {

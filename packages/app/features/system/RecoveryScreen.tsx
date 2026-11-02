@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { createEmptySave, readBootSave } from '@acme/core/save';
 import { Button, ErrorMessage, FadeIn, Heading, ResponsiveDialog, Text, useInstanceStore, useStore } from '@acme/ui';
 import { View } from '@acme/ui/tw';
+import { gpuStore } from '@acme/ui/gpu/gpu-store';
 import { retryGlass } from '../companion/home-stage.store';
 import { ErrorScreen } from '../error/screen';
 import { ScreenPanes } from '../layout/ScreenPanes';
@@ -111,6 +112,9 @@ export function RecoveryScreen() {
             <View className="gap-3 md:gap-4">
               <Heading level={1} size="display-sm" className="md:text-display-md">{systemCopy(plan.titleId)}</Heading>
               <Text selectable className="md:text-lg">{body}</Text>
+              {state === 'webgpu-unavailable' ? (
+                <Text variant="caption" tone="muted" testID="m22-gpu-reason">{`gpu-reason:${gpuStore.getState().reason ?? 'none'}`}</Text>
+              ) : null}
               {plan.noteId !== undefined ? (
                 <Text variant="caption" tone="muted" className="md:text-base">{systemCopy(plan.noteId)}</Text>
               ) : null}

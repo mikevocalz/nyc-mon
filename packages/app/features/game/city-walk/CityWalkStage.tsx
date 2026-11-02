@@ -49,6 +49,9 @@ import {
   type WalkLabel,
 } from './walk-destinations.ts';
 import { createStreetLabelSource, type StreetLabelSource } from './walk-street.ts';
+import { EXPERIMENTAL_WORLD_GEN } from '../world/gen/flag.ts';
+import { genPoiLabelsFor } from '../world/gen/places.ts';
+import { createWalkQueries } from '../world/walkability.ts';
 
 const RENDERER_PARAMS = physicalRendererParams();
 
@@ -172,7 +175,16 @@ export default function CityWalkStage() {
 
   const destinations = useMemo(() => (city.ok ? walkDestinations(city.dataset.origin) : []), [city]);
   const landmarks = useMemo(() => (city.ok ? landmarkLabels(city.dataset.origin) : []), [city]);
-  const allLabels = useMemo(() => [...landmarks, ...signs, ...streetLabels], [landmarks, signs, streetLabels]);
+  // The gen lane's named places join the overlay's landmark channel (world/gen/places.ts):
+  // descriptor names for generated schools, parks and pitches. Opt-in — flag off, this is [].
+  const genPoi = useMemo<readonly WalkLabel[]>(
+    () =>
+      city.ok && EXPERIMENTAL_WORLD_GEN
+        ? genPoiLabelsFor(city.dataset, createWalkQueries(city.dataset).groundHeight).map((l) => ({ ...l, kind: 'landmark' as const }))
+        : [],
+    [city],
+  );
+  const allLabels = useMemo(() => [...landmarks, ...genPoi, ...signs, ...streetLabels], [landmarks, genPoi, signs, streetLabels]);
   const goToOptions = useMemo(() => destinations.map((d) => ({ value: d.key, label: d.name })), [destinations]);
 
   // A fresh mount has drawn nothing: a first frame from an earlier visit must not count.
@@ -266,9 +278,9 @@ export default function CityWalkStage() {
 
   // The overlay's label supply (kept in a ref so the per-move layout never touches React state).
   useEffect(() => {
-    labelGroups.current = { landmarks, signs, streets: streetLabels };
+    labelGroups.current = { landmarks: [...landmarks, ...genPoi], signs, streets: streetLabels };
     layoutLabels();
-  }, [landmarks, signs, streetLabels, layoutLabels]);
+  }, [landmarks, genPoi, signs, streetLabels, layoutLabels]);
   // A resize moves every projected point.
   useEffect(() => {
     layoutLabels();
@@ -282,14 +294,17 @@ export default function CityWalkStage() {
     void Promise.all([
       import('../world/vd-port/systems/data/assets.ts'),
       import('@acme/ui/three/asset-bytes'),
+      import('../world/cell-source/index.ts'),
       Promise.resolve(vdStorefrontPlan()),
-    ]).then(([{ VD_SYSTEM_ASSETS }, { fetchAssetBytes }, plan]) => {
+    ]).then(([{ VD_SYSTEM_ASSETS }, { fetchAssetBytes }, { vdSystemFetch }, plan]) => {
       if (!alive) return;
       setSigns(signLabels(plan));
       if (streets.current) return;
       streets.current = createStreetLabelSource(async (key) => {
         const id = VD_SYSTEM_ASSETS.labels?.[key];
-        return id === undefined ? null : fetchAssetBytes(id);
+        // The cell-source path pin-verifies the bundled copy against vd-systems-manifest (merged into
+        // VD_MANIFEST); a key outside the emitted cells resolves null, an empty labels cell as before.
+        return vdSystemFetch('labels', key, id === undefined ? undefined : () => fetchAssetBytes(id));
       });
       ensureStreetCells();
     });

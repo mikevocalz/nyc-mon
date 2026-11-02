@@ -233,7 +233,13 @@ export const loadGameScene = (): Promise<ThreeSetup<GameSceneParams>> => {
   // The vd port's block packs, storefront plan and the far tier's bundled home chunks are read while the scene module
   // loads: the world is built synchronously and needs them there (the rest of the far tier streams through the cell
   // source on demand).
-  return Promise.all([import('./city-scene.ts'), preloadVdBlocks(), preloadVdStorefrontPlan(), preloadVdFar()]).then(([m]) => {
+  const mark = (f: number) => <T>(v: T): T => (gameScreenActions.loadStage('moduleLoaded', f), v);
+  return Promise.all([
+    import('./city-scene.ts').then(mark(0.3)),
+    preloadVdBlocks().then(mark(0.5)),
+    preloadVdStorefrontPlan().then(mark(0.7)),
+    preloadVdFar().then(mark(0.9)),
+  ]).then(([m]) => {
     gameScreenActions.loadStage('moduleLoaded');
     return withFirstFrameSignal(m.createCityScene);
   });

@@ -48,7 +48,7 @@ describe.skipIf(url === undefined)('merge and deletion on Postgres', () => {
       data: {
         monInstanceId, eggId, speciesId: 'dex-002', nickname: 'Pip', callerId, hatchedAt, bond: 0, stage: 'Baby',
         // The create hook requires the egg-derived gender and voice lineage (Bible v11 ¶54, ¶56).
-        gender: deriveMonGender(eggId), voiceLineageId: deriveVoiceLineageId({ eggId, speciesId: 'dex-001' }),
+        gender: deriveMonGender(eggId, 'dex-001'), voiceLineageId: deriveVoiceLineageId({ eggId, speciesId: 'dex-001' }),
       },
       overrideAccess: true,
     });

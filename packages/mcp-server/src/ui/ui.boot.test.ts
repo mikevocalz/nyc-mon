@@ -10,6 +10,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { buildUi } from './build.ts';
 import { getUiResources, type UiResource } from './index.ts';
 import { MON_MODEL_ORIGIN } from './model-origin.ts';
+import { modelFixturePath } from './test-host/model-fixtures.ts';
 
 /**
  * Boots each built view in Playwright's bundled Chromium (never the system
@@ -21,7 +22,6 @@ import { MON_MODEL_ORIGIN } from './model-origin.ts';
  */
 
 const here = dirname(fileURLToPath(import.meta.url));
-const MONS_DIR = join(here, '../../../../apps/web/public/mons');
 const now = Date.now();
 const care = { energy: 0.7, fullness: 0.22, social: 0.55, activity: 'awake', sluggish: false, wantsFood: true, lastFedAt: null };
 const monFor = (speciesId: string) => ({ monId: 'mon_demo', name: null, speciesId, stage: 'Baby' });
@@ -72,6 +72,7 @@ afterAll(async () => {
 interface Boot {
   frame: Frame;
   errors: string[];
+  requests: string[];
   close: () => Promise<void>;
 }
 
@@ -84,6 +85,8 @@ async function boot(view: 'mon-card' | 'mon-room', opts: {
   callFails?: boolean;
   /** Script run in the view's document before the view's own (to stub browser APIs). */
   preScript?: string;
+  /** Negative contract fixture: a glTF document requiring an unavailable decoder. */
+  modelBody?: string;
 }): Promise<Boot> {
   const built = resources.find((r) => r.id === view)!.html;
   const html = opts.preScript ? built.replace('<head>', `<head><script>${opts.preScript}</script>`) : built;
@@ -93,7 +96,7 @@ async function boot(view: 'mon-card' | 'mon-room', opts: {
   await ctx.route(`${MON_MODEL_ORIGIN}/mons/*.glb`, async (route) => {
     const name = new URL(route.request().url()).pathname.split('/').pop()!;
     try {
-      const body = await readFile(join(MONS_DIR, name));
+      const body = opts.modelBody ?? await readFile(modelFixturePath(name));
       await route.fulfill({ status: 200, body, headers: { 'content-type': 'model/gltf-binary', 'access-control-allow-origin': '*' } });
     } catch {
       await route.fulfill({ status: 404, body: 'No such model.' });
@@ -101,18 +104,20 @@ async function boot(view: 'mon-card' | 'mon-room', opts: {
   });
   const page = await ctx.newPage();
   const errors: string[] = [];
+  const requests: string[] = [];
+  page.on('request', (request) => requests.push(request.url()));
   page.on('pageerror', (e) => errors.push(String(e)));
   page.on('console', (m) => {
     if (m.type() === 'error') errors.push(m.text());
   });
   await page.goto(hostUrl);
-  const { gpu: _gpu, preScript: _pre, ...mount } = opts;
+  const { gpu: _gpu, preScript: _pre, modelBody: _model, ...mount } = opts;
   await page.evaluate((m) => window.mountView(m), { html, ...mount });
   const handle = await page.waitForSelector('iframe');
   const frame = (await handle.contentFrame())!;
   await frame.waitForFunction(() => (document.getElementById('root')?.innerText ?? '').trim().length > 0, null, { timeout: 15_000 })
     .catch(() => undefined);
-  return { frame, errors, close: () => ctx.close() };
+  return { frame, errors, requests, close: () => ctx.close() };
 }
 
 const echoShow8 = (mode: 'inline' | 'fullscreen', theme: 'light' | 'dark') => ({
@@ -137,6 +142,31 @@ const CLICK = { timeout: 15_000 };
 const NO_WEBGL = `(() => { const g = HTMLCanvasElement.prototype.getContext; HTMLCanvasElement.prototype.getContext = function (t, ...a) { return /webgl/i.test(String(t)) ? null : g.call(this, t, ...a); }; })();`;
 
 describe('built views boot in a spec host (bundled Chromium)', { timeout: 60_000 }, () => {
+  it('a model requiring Basis textures falls back to its authored still without fetching a decoder', async () => {
+    // A deliberately unsupported glTF, not a replacement for any normal model fixture.
+    const modelBody = JSON.stringify({
+      asset: { version: '2.0' },
+      extensionsUsed: ['KHR_texture_basisu'], extensionsRequired: ['KHR_texture_basisu'],
+      scene: 0, scenes: [{ nodes: [0] }], nodes: [{ mesh: 0 }],
+      meshes: [{ primitives: [{ attributes: { POSITION: 0 }, material: 0 }] }],
+      buffers: [{ uri: `data:application/octet-stream;base64,${Buffer.alloc(36).toString('base64')}`, byteLength: 36 }],
+      bufferViews: [{ buffer: 0, byteLength: 36 }],
+      accessors: [{ bufferView: 0, componentType: 5126, count: 3, type: 'VEC3', min: [0, 0, 0], max: [0, 0, 0] }],
+      materials: [{ pbrMetallicRoughness: { baseColorTexture: { index: 0 } } }],
+      textures: [{ extensions: { KHR_texture_basisu: { source: 0 } } }],
+      images: [{ uri: 'unavailable.ktx2', mimeType: 'image/ktx2' }],
+    });
+    const b = await boot('mon-card', { ...echoShow8('inline', 'light'), result: { mon: monFor('dex-002'), care }, modelBody });
+    try {
+      await b.frame.waitForFunction(() => document.querySelector('img[alt*="Squeaklet"]') !== null, null, { timeout: 15_000 });
+      expect(await b.frame.locator('canvas[data-engine^="three.js"]').count()).toBe(0);
+      expect(b.requests.filter((url) => /basis_transcoder|unavailable\.ktx2|\.wasm(?:\?|$)/i.test(url))).toEqual([]);
+      expect(b.errors.filter((error) => /wasm|basis_transcoder|worker/i.test(error))).toEqual([]);
+    } finally {
+      await b.close();
+    }
+  });
+
   for (const [speciesId, form] of [['dex-002', 'Squeaklet'], ['dex-009', 'Kittee Cee'], ['dex-062', 'Yotito']] as const) {
     for (const theme of ['light', 'dark'] as const) {
       it(`card: ${form}, ${theme}`, async () => {

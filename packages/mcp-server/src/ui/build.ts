@@ -57,6 +57,21 @@ function creatureArt(): Plugin {
   };
 }
 
+/** The MCP sandbox cannot execute the shared KTX2 loader's WASM/worker decoder. */
+function sandboxTextureDecoders(): Plugin {
+  const sharedLoader = join(repoRoot, 'packages', 'ui', 'three', 'ktx2.ts');
+  return {
+    name: 'nyc-mon:sandbox-texture-decoders',
+    enforce: 'pre',
+    resolveId(source, importer) {
+      if (importer && source.startsWith('.') && resolve(dirname(importer), source) === sharedLoader) {
+        return join(viewDir, 'ktx2-sandbox.ts');
+      }
+      return null;
+    },
+  };
+}
+
 /** Storybook's `viteFinal`, exactly as `storybook build` applies it. */
 async function storybookConfig(base: InlineConfig): Promise<InlineConfig> {
   const main = (await import(pathToFileURL(join(storybookDir, '.storybook', 'main.ts')).href)) as {
@@ -92,7 +107,7 @@ async function buildView(view: UiViewId): Promise<string> {
     },
   };
   const config = await storybookConfig(base);
-  config.plugins = [creatureArt(), ...(config.plugins ?? []), viteSingleFile({ removeViteModuleLoader: true })];
+  config.plugins = [creatureArt(), sandboxTextureDecoders(), ...(config.plugins ?? []), viteSingleFile({ removeViteModuleLoader: true })];
   // CanvasKit cannot load in the MCP Apps sandbox; swap its web loader for a
   // stand-in that never fetches (view/skia-web-sandbox.ts).
   const alias = config.resolve?.alias;

@@ -8,9 +8,11 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { describe, it } from 'node:test';
 import { VD_SYSTEM_MANIFEST } from './data/vd-systems-manifest.ts';
 import { VD_CELL_MANIFEST } from './data/vd-cells-manifest.ts';
+import { VD_MANIFEST, configureVdCellSource, vdCellSource, vdSystemFetch } from './index.ts';
 import { createCellSource } from './cell-source.ts';
 import { createMemoryStore } from './store.ts';
 import type { CellIo } from './types.ts';
+import { decodeColliderCell } from '../vd-port/systems/colliders.ts';
 
 const DATA = new URL('../vd-port/systems/data/', import.meta.url);
 const sha = (b: Uint8Array) => createHash('sha256').update(b).digest('hex');
@@ -59,6 +61,45 @@ describe('VD_SYSTEM_MANIFEST', () => {
     const got = await src.fetch(anyKey, () => Promise.resolve(disk));
     assert.ok(got, 'the bundled copy serves offline');
     assert.equal(sha(got!), VD_SYSTEM_MANIFEST.cells[anyKey]!.sha256, 'served bytes verify against the pin');
+    src.dispose();
+  });
+
+  it('the runtime default is the merged manifest: cell and system keys coexist, every pin carries sha256 + bytes', () => {
+    // VD_MANIFEST is what configureVdCellSource installs when no manifest is handed in (index.ts).
+    assert.equal(Object.keys(VD_MANIFEST.cells).length, Object.keys(VD_CELL_MANIFEST.cells).length + Object.keys(VD_SYSTEM_MANIFEST.cells).length);
+    for (const k of Object.keys(VD_CELL_MANIFEST.cells)) assert.ok(k in VD_MANIFEST.cells, `geometry key ${k} survived the merge`);
+    for (const k of Object.keys(VD_SYSTEM_MANIFEST.cells)) assert.ok(k in VD_MANIFEST.cells, `system key ${k} survived the merge`);
+    // Both namespaces are present, not just counted.
+    assert.ok('far/L4_-10_10.bin' in VD_MANIFEST.cells && 'colliders/-11_-2' in VD_MANIFEST.cells);
+    for (const [k, e] of Object.entries(VD_MANIFEST.cells)) {
+      assert.match(e.sha256, /^[0-9a-f]{64}$/, `${k} sha256 pin`);
+      assert.ok(Number.isInteger(e.bytes) && e.bytes > 0, `${k} byte pin`);
+      assert.ok(e.path.length > 0, `${k} host path`);
+    }
+  });
+
+  it('the configured source serves a bundled system pack that decodes through the VGC1 reader', async () => {
+    // The runtime path end to end: configureVdCellSource's default manifest + vdSystemFetch +
+    // decodeColliderCell. A bundled `colliders` pack round-trips its pin and lands a real decode —
+    // the first kind with a runtime reader (labels read in walk-street.ts; this exercises colliders).
+    const key = 'colliders/-11_-2'; // 62 bytes, the smallest emitted pack
+    const disk = new Uint8Array(readFileSync(new URL('./colliders/-11_-2.bin', DATA)));
+    const src = configureVdCellSource({ io: io(new Map()), store: createMemoryStore() });
+    assert.ok(src !== null && vdCellSource() === src, 'the shared source configured');
+    const bytes = await vdSystemFetch('colliders', '-11_-2', () => Promise.resolve(disk));
+    assert.ok(bytes instanceof Uint8Array, 'the bundled copy served through the merged manifest');
+    const cell = decodeColliderCell(bytes as Uint8Array);
+    assert.equal(`${cell.cx}_${cell.cz}`, '-11_-2');
+    assert.equal(sha(bytes as Uint8Array), VD_SYSTEM_MANIFEST.cells[key]!.sha256);
+
+    // The same key is now INSIDE the manifest: a torn bundled copy is refused by the pin instead of
+    // falling through to the old unmanifested-bundled fallback (which would have served it unverified).
+    const torn = disk.slice();
+    torn[torn.length - 1]! ^= 0xff;
+    assert.equal(await vdSystemFetch('colliders', '-11_-3', () => Promise.resolve(torn)), null, 'a torn bundled pack is refused by the pin');
+    // An unmanifested key still gets the unverified bundled fallback — only manifested keys pin.
+    const orphan = await vdSystemFetch('colliders', '999_999', () => Promise.resolve(new Uint8Array([1, 2, 3])));
+    assert.ok(orphan instanceof Uint8Array && orphan.byteLength === 3, 'an unmanifested key serves its bundled copy unverified');
     src.dispose();
   });
 

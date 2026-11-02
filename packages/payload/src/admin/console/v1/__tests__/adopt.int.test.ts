@@ -59,7 +59,7 @@ describe.skipIf(url === undefined)('M21 adopt and care replay on Postgres', () =
       egg: { eggId, speciesId: starter.speciesId, hatchesIntoSpeciesId: starter.hatchesIntoSpeciesId, incubationMinutes: 15, createdAt },
       mon: {
         monInstanceId, speciesId: starter.hatchesIntoSpeciesId, stage: 'Baby', bond: 0.3, nickname: 'Pip',
-        gender: deriveMonGender(eggId), voiceLineageId: deriveVoiceLineageId({ eggId, speciesId: starter.speciesId }),
+        gender: deriveMonGender(eggId, starter.speciesId), voiceLineageId: deriveVoiceLineageId({ eggId, speciesId: starter.speciesId }),
       },
       care: { ...createInitialCareState(monInstanceId, createdAt + 16 * 60_000), fullness: 0.8 },
       deviceId: DEVICE,

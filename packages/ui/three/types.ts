@@ -25,11 +25,18 @@ export type Three = typeof ThreeWebGpu;
  * WebGL2 path.
  */
 export type ThreeBackend = 'webgpu' | 'webgl2';
-/** JS-thread submission cost, not GPU completion or Android UI frame time. */
+/** JS-thread submission cost plus, when armed, the GPU's own clock — not Android UI frame time. */
 export interface ThreeFrameTiming {
   cpuMs: number;
   intervalMs: number | null;
   backend: ThreeBackend;
+  /**
+   * GPU render-pass duration in ms, resolved through three's timestamp
+   * query pool (EXPO_PUBLIC_WORLD_PERF; gpu-timestamps.ts). Present only
+   * when the channel armed; null until the first resolve lands. The value
+   * is the last resolved frame's total — it lags this sample's frame.
+   */
+  gpuMs?: number | null;
   /** Scene update() cost — G1 stage attribution, set when the probe timed stages. */
   updateMs?: number;
   /** advanceNodeFrame() cost (info.reset + nodeFrame.update). */
