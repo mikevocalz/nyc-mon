@@ -324,3 +324,5 @@ patchedDependencies:
   react-native-nitro-fetch@1.9.0: patches/react-native-nitro-fetch@1.9.0.patch
   react-native-skia@3.8.1: patches/react-native-skia@3.8.1.patch
   react-native-worklets@0.13.0: patches/react-native-worklets@0.13.0.patch
+  # Preserve geometric-normal sun bias across the r187 upgrade (patchy bumped facades).
+  three@0.187.0: patches/three@0.187.0.patch
