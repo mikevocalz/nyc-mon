@@ -1,0 +1,1 @@
+(globalThis.TURBOPACK||(globalThis.TURBOPACK=[])).push(["object"==typeof document?document.currentScript:void 0,567207,e=>{"use strict";e.s(["importSharedDevice",0,function(){throw Error("Skia shares its GPU device on native only; using the own device")}])}]);
