@@ -628,6 +628,7 @@ patchedDependencies:
   react-native-nitro-fetch@1.9.0: 1d09d5e53696fae343001822979d7accc4ef1e5bfdebc71f2c68dc7f700ebf51
   react-native-skia@3.8.1: c17be69fbfcefb2116ab2aa1d87b91dc1893a513ccc8042d7c2d53b858156fca
   react-native-worklets@0.13.0: 1b9cd2d9a9630c9652643ab12092e794598366c4b36719eb37875da116d0f553
+  three@0.187.0: 47ccb7e1b7b2962aba7f0399a19d8029cb9cef07001773f900257261523bfaa3
 
 importers:
 
@@ -1333,7 +1334,7 @@ importers:
         version: 0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1)
       three:
         specifier: 'catalog:'
-        version: 0.187.0
+        version: 0.187.0(patch_hash=47ccb7e1b7b2962aba7f0399a19d8029cb9cef07001773f900257261523bfaa3)
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
@@ -1753,7 +1754,7 @@ importers:
         version: 0.12.8(typegpu@0.12.9)
       '@typegpu/three':
         specifier: 'catalog:'
-        version: 0.12.2(@typegpu/gl@0.12.8(typegpu@0.12.9))(three@0.187.0)(typegpu@0.12.9)
+        version: 0.12.2(@typegpu/gl@0.12.8(typegpu@0.12.9))(three@0.187.0(patch_hash=47ccb7e1b7b2962aba7f0399a19d8029cb9cef07001773f900257261523bfaa3))(typegpu@0.12.9)
       expo-drag-drop-content-view:
         specifier: 'catalog:'
         version: 0.9.2(expo@58.0.14)(react-native@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0)
@@ -1831,7 +1832,7 @@ importers:
         version: 3.3.1(tailwind-merge@3.7.0)(tailwindcss@4.3.3)
       three:
         specifier: 'catalog:'
-        version: 0.187.0
+        version: 0.187.0(patch_hash=47ccb7e1b7b2962aba7f0399a19d8029cb9cef07001773f900257261523bfaa3)
       typegpu:
         specifier: 'catalog:'
         version: 0.12.9
@@ -16036,10 +16037,10 @@ snapshots:
       tinyest: 0.3.4
       typegpu: 0.12.9
 
-  '@typegpu/three@0.12.2(@typegpu/gl@0.12.8(typegpu@0.12.9))(three@0.187.0)(typegpu@0.12.9)':
+  '@typegpu/three@0.12.2(@typegpu/gl@0.12.8(typegpu@0.12.9))(three@0.187.0(patch_hash=47ccb7e1b7b2962aba7f0399a19d8029cb9cef07001773f900257261523bfaa3))(typegpu@0.12.9)':
     dependencies:
       '@typegpu/gl': 0.12.8(typegpu@0.12.9)
-      three: 0.187.0
+      three: 0.187.0(patch_hash=47ccb7e1b7b2962aba7f0399a19d8029cb9cef07001773f900257261523bfaa3)
       typegpu: 0.12.9
 
   '@types/aria-query@5.0.4': {}
@@ -21873,7 +21874,7 @@ snapshots:
     dependencies:
       real-require: 1.0.0
 
-  three@0.187.0: {}
+  three@0.187.0(patch_hash=47ccb7e1b7b2962aba7f0399a19d8029cb9cef07001773f900257261523bfaa3): {}
 
   throat@5.0.0: {}
 
