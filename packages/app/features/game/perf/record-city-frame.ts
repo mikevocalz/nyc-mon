@@ -6,6 +6,12 @@
  * `stages` (G1 attribution) splits cpuMs: scene update / nodeFrame advance /
  * renderer.render / present, plus the renderer's own draw-call and triangle
  * counts and the drawing-buffer size (render-scale verification).
+ *
+ * `gpu` (Phase 4) is the GPU half of the split — render-pass ms resolved
+ * through three's timestamp-query pool when EXPO_PUBLIC_WORLD_PERF armed
+ * it; null when the flag is off, the device lacks 'timestamp-query', or
+ * no resolve landed in the window. Compare cpuP90Ms vs gpu.p90Ms for
+ * encode- vs render-bound (docs/implementation/profiling.md).
  */
 import type { ThreeFrameTiming } from '@acme/ui/three';
 import { FrameSampleWindow } from './frame-sampler.ts';
@@ -42,6 +48,12 @@ export function recordCityFrame(sample: ThreeFrameTiming): void {
       trianglesMax: result.stages.trianglesMax,
       bufferW: result.stages.bufferW,
       bufferH: result.stages.bufferH,
+    },
+    gpu: result.gpu === null ? null : {
+      samples: result.gpu.samples,
+      p50Ms: round2(result.gpu.p50Ms),
+      p90Ms: round2(result.gpu.p90Ms),
+      worstMs: round2(result.gpu.worstMs),
     },
   });
 }

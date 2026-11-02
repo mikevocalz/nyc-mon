@@ -108,7 +108,7 @@ export function createEggHatchScene({ renderer, invalidate }: ThreeContext, init
   const load = (params: EggHatchSceneParams) => {
     const eggId = params.eggId;
     loadingEggId = eggId;
-    EggHatchRig.create(eggId, params.source).then(
+    EggHatchRig.create(eggId, params.source, renderer).then(
       (next) => {
         if (disposed || loadingEggId !== eggId) {
           next.dispose();

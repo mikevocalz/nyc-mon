@@ -12,5 +12,14 @@ import { importDevice } from 'react-native-webgpu';
  * installed natively.
  */
 export function importSharedDevice(): GPUDevice {
-  return importDevice(Skia.getNativeDevice());
+  const pointer = Skia.getNativeDevice() as bigint | string;
+  // Skia's .d.ts declares bigint, but at runtime it hands the raw pointer as
+  // a string on iOS (its host fn returns the address). Coerce it before
+  // importDevice — "Value is a string, expected a number" (A12X iPad).
+  if (typeof pointer !== 'string') return importDevice(pointer);
+  try {
+    return importDevice(BigInt(pointer));
+  } catch {
+    return importDevice(BigInt(pointer.startsWith('0x') || pointer.startsWith('0X') ? pointer : `0x${pointer}`));
+  }
 }

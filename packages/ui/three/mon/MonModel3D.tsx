@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { ktx2LoaderFor } from '../ktx2.ts';
 import { cueAnchorMs, parseSpeechCue, sampleSpeechTrack, utteranceTimeMs, type MonSpeechCue } from './lipsync/cue.ts';
 import { EXPRESSION_CHANNELS, mouthToRig, SPEECH_CHANNELS, type RigTargets } from './lipsync/retarget.ts';
 import { damp } from './lipsync/smoothing.ts';
@@ -391,13 +392,16 @@ export function MonModel3D({
     // fetch()es them, which connect-src governs, and an MCP Apps host only puts
     // declared origins there, so the Mon renders untextured in the Alexa card.
     // TextureLoader decodes through <img> under img-src, which allows blob:
-    // (the path GLTFLoader already takes on older Safari).
-    new GLTFLoader()
-      .register((parser) => {
+    // (the path GLTFLoader already takes on older Safari). KTX2 textures go to
+    // the renderer's shared loader (ktx2.ts), attached before the load starts.
+    void ktx2LoaderFor(renderer).then((ktx2) => {
+      if (disposed) return;
+      const gltfLoader = new GLTFLoader().register((parser) => {
         parser.textureLoader = new THREE.TextureLoader(parser.options.manager);
         return { name: 'NYC_MON_IMG_TEXTURES' };
-      })
-      .load(
+      });
+      if (ktx2) gltfLoader.setKTX2Loader(ktx2);
+      gltfLoader.load(
       url,
       (gltf) => {
         if (disposed) return;
@@ -460,7 +464,8 @@ export function MonModel3D({
         setState('error');
         onErrorRef.current?.(error);
       },
-    );
+      );
+    });
 
     /**
      * The value the clip last gave each channel speech or blinking writes on
