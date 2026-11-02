@@ -1,7 +1,7 @@
 // The vd-port block packs (tooling/city/vd-port/write.mjs) to vertex arrays, decoded with the meshopt reference decoder
 // (meshopt.ts). Scene metres throughout.
 import { CELL, cellNum, type CellAttribute, type CellLocalPositionFrame, type CellPackage } from '../../cells/cell-rules.ts';
-import { decodeIndexBuffer, decodeVertexBuffer } from './meshopt.ts';
+import { decodeVertexBuffer, decodeIndexBufferSteps, decodeVertexBufferSteps } from './meshopt.ts';
 
 export type BlockCoordinateFrame = 'absolute' | 'cell-local';
 
@@ -53,6 +53,14 @@ const NEAR_Q = 128;
  * two streams. VDN2 adds a float32 y origin (header 20 bytes, written when a structure over 256 m tall — Central
  * Park South's supertalls — puts a vertex past int16 at 1/128 m absolute); VDN1's origin is 0. */
 export function decodeNearCell(file: Uint8Array, cx: number, cz: number, coordinateFrame: BlockCoordinateFrame = 'absolute'): NearArrays {
+  const steps = decodeNearCellSteps(file, cx, cz, coordinateFrame);
+  let step = steps.next();
+  while (!step.done) step = steps.next();
+  return step.value;
+}
+
+/** Lossless decoder checkpoints bound each meshopt block, index batch and attribute conversion batch. */
+export function* decodeNearCellSteps(file: Uint8Array, cx: number, cz: number, coordinateFrame: BlockCoordinateFrame = 'absolute'): Generator<void, NearArrays, void> {
   if (file[0] !== 0x56 || file[1] !== 0x44 || file[2] !== 0x4e || (file[3] !== 0x31 && file[3] !== 0x32)) throw new Error('not a VDN1/VDN2 near cell');
   const v2 = file[3] === 0x32;
   const dv = new DataView(file.buffer, file.byteOffset, file.byteLength);
@@ -61,14 +69,17 @@ export function decodeNearCell(file: Uint8Array, cx: number, cz: number, coordin
   const head = v2 ? 20 : 16;
   const wide = (word & 0x80000000) !== 0, evLen = word & 0x7fffffff;
   const vb = new Uint8Array(n * 16);
-  decodeVertexBuffer(vb, n, 16, file.subarray(head, head + evLen));
+  yield* decodeVertexBufferSteps(vb, n, 16, file.subarray(head, head + evLen));
+  yield;
   const index = wide ? new Uint32Array(count) : new Uint16Array(count);
-  decodeIndexBuffer(index, count, file.subarray(head + evLen));
+  yield* decodeIndexBufferSteps(index, count, file.subarray(head + evLen));
+  yield;
   const ox = coordinateFrame === 'cell-local' ? 0 : cx * CELL + CELL / 2;
   const oz = coordinateFrame === 'cell-local' ? 0 : cz * CELL + CELL / 2;
   const position = new Float32Array(n * 3), color = new Uint8Array(n * 4), emissive = new Uint8Array(n * 4);
   const v = new DataView(vb.buffer);
   for (let i = 0; i < n; i++) {
+    if (i > 0 && i % 256 === 0) yield;
     position[i * 3] = v.getInt16(i * 16, true) / NEAR_Q + ox;
     position[i * 3 + 1] = v.getInt16(i * 16 + 2, true) / NEAR_Q + yOrigin;
     position[i * 3 + 2] = v.getInt16(i * 16 + 4, true) / NEAR_Q + oz;
@@ -116,8 +127,8 @@ export function decodeShellCell(all: Uint8Array, info: ShellCellInfo, coordinate
  * `bytes` is the GPU upload: float32x3 + RGBA8 + RGBA8 per vertex, and the index.
  */
 export function lazyNearPackage(info: NearCellInfo, file: () => Uint8Array, coordinateFrame: BlockCoordinateFrame = 'absolute'): CellPackage {
-  let arrays: NearArrays | null = null;
-  const get = () => (arrays ??= decodeNearCell(file(), info.cx, info.cz, coordinateFrame));
+  const decoder = nearCellPreparation(file, info.cx, info.cz, coordinateFrame);
+  const get = decoder.get;
   const b = info.bounds;
   return {
     cx: info.cx, cz: info.cz, num: cellNum(info.cx, info.cz), size: CELL,
@@ -137,6 +148,36 @@ export function lazyNearPackage(info: NearCellInfo, file: () => Uint8Array, coor
     triangles: info.triangles,
     bounds: Float64Array.from([b[0]!, b[1]!, b[2]!, b[3]!, b[4]!, b[5]!]),
     bytes: nearCellBytes(info),
-    release() { arrays = null; },
+    prepare: decoder.prepare,
+    release: decoder.release,
+  };
+}
+
+
+/** A released partial decode is discarded; a later request starts from verified bytes again. */
+export function nearCellPreparation(file: () => Uint8Array, cx: number, cz: number, coordinateFrame: BlockCoordinateFrame) {
+  let arrays: NearArrays | null = null;
+  let steps: Generator<void, NearArrays, void> | null = null;
+  const prepare = (deadline: number, now: () => number): boolean => {
+    if (arrays) return true;
+    if (now() >= deadline) return false;
+    steps ??= decodeNearCellSteps(file(), cx, cz, coordinateFrame);
+    try {
+      do {
+        const step = steps.next();
+        if (step.done) { arrays = step.value; steps = null; return true; }
+      } while (now() < deadline);
+      return false;
+    } catch (error) {
+      const failed = steps;
+      steps = null;
+      failed?.return(undefined as never);
+      throw error;
+    }
+  };
+  return {
+    prepare,
+    get() { prepare(Infinity, () => 0); return arrays!; },
+    release() { steps?.return(undefined as never); steps = null; arrays = null; },
   };
 }

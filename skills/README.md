@@ -32,7 +32,7 @@ Each pack carries the upstream LICENSE and a `SOURCE.md` with the repo URL, the 
 ## Not copied
 
 - **WorldFlowAI everything-claude-code** (https://github.com/WorldFlowAI/everything-claude-code) is installed as the `ecc:*` plugin, so its agents, skills and commands load from the plugin, not from this folder. Lanes E and F use it for subagent coordination and the review loop.
-- **CodeRabbit** (https://github.com/coderabbitai) publishes no skill pack. Its part in the directive is a workflow: an independent review of each PR, fixes for every finding, then a retest before the PR is re-requested. Lane F runs it.
+- **CodeRabbit** (https://github.com/coderabbitai) is an independent review workflow, available through the CodeRabbit CLI and the `coderabbit:code-review` plugin skill when installed. It is not vendored in this folder. Read the actual plugin skill before running the CLI; verify its version and authentication, run the review, address its issues, then retest before re-requesting PR review. Lane F records the actual CodeRabbit output separately from agent reviews. Tool availability alone is not evidence that a review ran.
 - **Margelo `native-module-helper`** does not exist in margelo/react-native-skills and has no verified upstream, so nothing was copied. Use `margelo/build-nitro-modules` and `callstack-create-react-native-library` instead.
 - **Impeccable** ships only the built skill here (`plugin/skills/impeccable`, 2.2 MB of 86 MB). Its `scripts/impeccable` launcher downloads the engine binary into `~/.impeccable/bin/` on first run; no binary is committed.
 

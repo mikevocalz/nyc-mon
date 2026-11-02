@@ -217,3 +217,19 @@ describe('leverTiltDeg', () => {
     assert.deepEqual(leverTiltDeg({ x: 5, y: 5 }, 0, 14), { rotateX: 0, rotateY: 0 });
   });
 });
+
+
+it('native lever uses planar transforms at full push without reducing input', async () => {
+  const { nativeLeverTransform } = await import('./stick-math.ts');
+  for (const [dx, dy] of [[0, -56], [56, 0], [0, 56], [-56, 0], [56, -56]]) {
+    const reading = readStick(dx!, dy!, { clampRadiusDp: 56, deadZone: 0.15, sensitivity: 1 });
+    assert.ok(Math.abs(Math.hypot(reading.x, reading.y) - 1) < 1e-9);
+    const offset = leverOffsetDp(dx!, dy!, reading, { mode: 'analog', clampRadiusDp: 56, travelDp: 36 });
+    const tilt = leverTiltDeg(offset, 36, 14);
+    const transforms = nativeLeverTransform(offset, tilt);
+    assert.deepEqual(transforms.slice(0, 2), [{ translateX: offset.x }, { translateY: offset.y }]);
+    assert.ok(transforms[2].scaleX > 0.96 && transforms[2].scaleX <= 1);
+    assert.ok(transforms[3].scaleY > 0.96 && transforms[3].scaleY <= 1);
+    assert.ok(transforms.every(transform => !('perspective' in transform || 'rotateX' in transform || 'rotateY' in transform)));
+  }
+});

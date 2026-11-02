@@ -1,6 +1,6 @@
 // The far tier as it streams: the CTL1 chunks decode whole, the packages are lazy over the cell source, and the
 // layer keeps the resident mount's contract (position=origin + the quantized scale, cell-local under the render
-// root, one shared zero for ao/emissive, matrixAutoUpdate=false through the streamer).
+// root, shared zero attributes for ao/emissive, matrixAutoUpdate=false through the streamer).
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
@@ -74,6 +74,11 @@ test('streamed: three lazy layers in reach order — bundled chunks ready, fetch
       assert.equal(far.spec.sharedMaterial, true);
       assert.equal(far.spec.pin, false);
       assert.equal(far.template.userData.vdShell, 1);
+      for (const layer of [far, ground, lm]) {
+        const ao = layer.template.geometry.getAttribute('ao') as THREE.BufferAttribute;
+        assert.ok(ao.array instanceof Float32Array, `${layer.template.name}: supported scalar AO format`);
+        assert.equal(ao.normalized, false);
+      }
       // the eager set makes its packages ready; a chunk with no bytes anywhere stays unbuilt, never throws
       const eager = loaded ? VD_FAR.chunks.filter((c) => far.packages[VD_FAR.chunks.indexOf(c)]!.ready?.() === true).length : 0;
       assert.ok(eager >= HOME.length, 'the bundled home chunks are ready');
@@ -90,6 +95,10 @@ test('streamed: three lazy layers in reach order — bundled chunks ready, fetch
         const attrs = Object.keys(p.attributes).sort();
         assert.deepEqual(attrs, ['ao', 'color', 'emissive', 'position', 'uv'], `${c.f} attributes`);
         assert.equal(p.attributes.position!.array instanceof Int16Array, true, `${c.f} quantized positions kept`);
+        assert.ok(p.attributes.ao!.array instanceof Float32Array, `${c.f} scalar AO uploaded as float`);
+        assert.equal(p.attributes.ao!.normalized, false);
+        assert.equal(p.attributes.ao!.array, p.attributes.ao!.array, `${c.f} AO conversion cached`);
+        assert.equal(p.bytes, p.vertexCount * 26 + c.tris * 12, `${c.f} expanded AO included in byte budget`);
         const f = p.positionFrame!;
         const [ex, ez] = toScene(c.origin[0]!, c.origin[1]!) as [number, number];
         assert.ok(Math.abs(f.origin[0]! - ex) <= 0.06 && Math.abs(f.origin[2]! - ez) <= 0.06, `${c.f} origin`);

@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "generator": "tooling/city/bake-vd-storefront-index.mjs",
+  "inputs": {
+    "tooling/city/bake-vd-storefront-index.mjs": "1b9d2661b5bbabb192232329c897041089d4d57a3f9e8d7181783bf9ec953d58",
+    "packages/app/features/game/world/vd-port/storefronts/plan.bin": "03f654572fffbce16c636d775f907102a4baa2f6584e8ee20946ad5c2cabaeac",
+    "packages/app/features/game/world/vd-port/storefronts/load.ts": "dd8fdcd0411606af0cd3d087cd47729ecd7cec22e03ef4ba34c8a501127d823c",
+    "packages/app/features/game/world/vd-port/storefronts/emit.ts": "579302a0f7046ab5a1ce36104814f067e26931f54b22604394e757dc2727b492",
+    "packages/app/features/game/world/vd-port/storefronts/chunk-index.ts": "4e3a948567f2a023c0e8e554dcd3720f9d11af77c24dabb5536215b2f709d20e",
+    "packages/app/features/game/world/cells/cell-rules.ts": "033fa2a72409ca1671f85c1c6fc386135b4ca7b1d1d6aff84c670c7000df291a",
+    "packages/app/features/game/world/sky-rig.ts": "89c4115a7f9e07aff38107c149e3a09e0d566e9c65097aa7ebe8f18f595c8c96",
+    "packages/app/features/game/data/harlem-apollo.json": "3bdd4dd9591add9481f829c0071cc6339155c39ad5a2af6dfdf9ae1c0075477d",
+    "packages/app/features/game/city-dataset.ts": "018c93d82c91a11574859f1289565dd1d0c025a1d5f426113aa7e632711e2b68",
+    "packages/app/features/game/world/walkability.ts": "5160b02ee8c7c458c8e3d46fe7ccfd49c5e1266534b6062096b8769c4cdc161b",
+    "packages/app/features/game/world/geometry.ts": "4757ca3a0b9c60de6b33a1055448ae61cb53de762d7cec5de32e99232cce6b0f",
+    "packages/app/features/game/world/curb.ts": "51167217fd61ebe12d2eb4b39f0f7914e123da143924d0721df184816e44afaf"
+  },
+  "bytes": 7131864,
+  "sha256": "ef9fcc7374b44e4e5db66445ce514ce2bda84c5d13515c2b3b4491914cc1dda0"
+}

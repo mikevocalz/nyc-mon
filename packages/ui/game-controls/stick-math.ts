@@ -186,3 +186,13 @@ export function leverTiltDeg(offset: { x: number; y: number }, travelDp: number,
   if (!(travelDp > 0)) return { rotateX: 0, rotateY: 0 };
   return { rotateX: (-offset.y / travelDp) * maxDeg || 0, rotateY: (offset.x / travelDp) * maxDeg || 0 };
 }
+
+/** Native GPU-backed cap views stay in one plane while the authored dome supplies depth. */
+export function nativeLeverTransform(offset: { x: number; y: number }, tilt: { rotateX: number; rotateY: number }): [{ translateX: number }, { translateY: number }, { scaleX: number }, { scaleY: number }] {
+  'worklet';
+  return [
+    { translateX: offset.x }, { translateY: offset.y },
+    { scaleX: Math.cos(tilt.rotateY * Math.PI / 180) },
+    { scaleY: Math.cos(tilt.rotateX * Math.PI / 180) },
+  ];
+}

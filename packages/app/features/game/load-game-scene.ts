@@ -18,7 +18,7 @@
 // bar follows the real work and START's 20 s no-progress watchdog
 // (lobby/await-world-ready.ts) sees a slow A12X compile moving instead of
 // one silent stretch between "built" and "drawn".
-import type { ThreeSetup } from '@acme/ui/three';
+import type { ThreeSetup, ThreePreparation, ThreeScene } from '@acme/ui/three';
 import type { CitySceneParams } from './city-scene.ts';
 import { gameScreenActions, loadProgressAt, type LoadStage } from './game-session.ts';
 import { preloadVdBlocks } from './world/vd-port/blocks/load.ts';
@@ -58,14 +58,32 @@ export class CompileProgressEvent {
   }
 }
 
-/** Installs CompileProgressEvent as the global ProgressEvent; returns the undo. */
+interface CompileProgressLease {
+  users: number;
+  previous: PropertyDescriptor | undefined;
+}
+let compileProgressLease: CompileProgressLease | null = null;
+
+/** Concurrent compiles share one installation; each undo releases exactly one lease. */
 export function withCompileProgressEvent(): () => void {
   const g = globalThis as { ProgressEvent?: unknown };
-  const had = Object.prototype.hasOwnProperty.call(g, 'ProgressEvent');
-  const previous = g.ProgressEvent;
-  g.ProgressEvent = CompileProgressEvent;
+  // An external replacement starts a new ownership generation. Old callbacks
+  // must never restore over that replacement or a later generation's shim.
+  if (!compileProgressLease || g.ProgressEvent !== CompileProgressEvent) {
+    compileProgressLease = { users: 0, previous: Object.getOwnPropertyDescriptor(g, 'ProgressEvent') };
+    g.ProgressEvent = CompileProgressEvent;
+  }
+  const lease = compileProgressLease;
+  lease.users++;
+  let released = false;
   return () => {
-    if (had) g.ProgressEvent = previous;
+    if (released) return;
+    released = true;
+    lease.users--;
+    if (lease.users !== 0 || compileProgressLease !== lease) return;
+    compileProgressLease = null;
+    if (g.ProgressEvent !== CompileProgressEvent) return;
+    if (lease.previous) Object.defineProperty(g, 'ProgressEvent', lease.previous);
     else delete g.ProgressEvent;
   };
 }
@@ -138,12 +156,14 @@ export function planWarmUp(root: { traverse?(fn: (o: unknown) => void): void }):
   return { chunks, objects: objects.length };
 }
 
+export function withFirstFrameSignal(setup: ThreeSetup<CitySceneParams>, report?: LoadStageReporter, trace?: CompileTracer, timing?: LoadTimingSink | null): ThreeSetup<GameSceneParams>;
+export function withFirstFrameSignal(setup: ThreePreparation<CitySceneParams>, report?: LoadStageReporter, trace?: CompileTracer, timing?: LoadTimingSink | null): ThreePreparation<GameSceneParams>;
 export function withFirstFrameSignal(
-  setup: ThreeSetup<CitySceneParams>,
+  setup: ThreePreparation<CitySceneParams>,
   report: LoadStageReporter = gameScreenActions.loadStage,
   trace?: CompileTracer,
   timing: LoadTimingSink | null = LOAD_TIMING ? (line) => console.info(line) : null,
-): ThreeSetup<GameSceneParams> {
+): ThreePreparation<GameSceneParams> {
   return (context, initial) => {
     const t0 = Date.now();
     let tLast = t0;
@@ -155,80 +175,102 @@ export function withFirstFrameSignal(
     };
     const step = throttled(report);
     // Layered over `initial`, not spread: the worklet path's params are getters (camera, preset) read live.
+    let lastBuildPercent = -1;
     const withProgress = Object.create(initial, {
-      onBuildProgress: { value: (f: number) => { step('worldBuilt', f); time('worldBuilt', f, `build ${f}`); } },
+      onBuildProgress: { value: (f: number) => {
+        const percent = Math.floor(f * 100);
+        if (percent === lastBuildPercent) return;
+        lastBuildPercent = percent;
+        step('worldBuilt', f);
+        time('worldBuilt', f, `build ${f}`);
+      } },
     }) as typeof initial;
-    const built = setup(context, withProgress);
-    report('worldBuilt');
-    time('worldBuilt', 1, 'worldBuilt');
-    let compiled = false;
-    let compileSteps = 0;
-    const restore = withCompileProgressEvent();
-    const ready = () => {
-      restore();
-      compiled = true;
-      report('compile');
-      time('compile', 1, `compiled ${compileSteps}`);
-      context.invalidate();
-    };
-    const onProgress = (event: { loaded?: number; total?: number }) => {
-      compileSteps++;
-      const total = Number(event?.total);
-      const fraction = total > 0 ? Number(event?.loaded) / total : compileSteps / (compileSteps + 8);
-      step('compile', fraction);
-      time('compile', fraction, `compile ${compileSteps}/${total || '?'}`);
-    };
-    // compileAsync collects its render list synchronously (the renderer is initialised), then builds one object per
-    // yield. compileForFrames runs it in the post pipeline's scene pass (its target and MRT), so the frames reuse those
-    // pipelines; the first real frame still has the post chain and the shadow cascades to build, in one synchronous draw
-    // with no progress report (the likeliest 20 s stall on the A12X). So once the list is taken, every drawable waits on
-    // a hidden layer and the frames after the compile reveal a few materials each (planWarmUp), reporting between them.
-    const compile = compileForFrames(context.renderer as never, built.scene, built.camera, onProgress);
-    const warm = planWarmUp(built.scene as never);
-    if (trace) {
-      trace('compileAsync started');
-      compile.then(
-        () => {
-          trace('compileAsync resolved');
-          ready();
+    const result = setup(context, withProgress);
+    const finish = (built: ThreeScene<CitySceneParams>): ThreeScene<GameSceneParams> => {
+      if (context.signal?.aborted) { built.dispose?.(); throw Object.assign(new Error('Scene preparation aborted'), { name: 'AbortError' }); }
+      report('worldBuilt');
+      time('worldBuilt', 1, 'worldBuilt');
+      let disposed = false;
+      let firstFrameTimer: ReturnType<typeof setTimeout> | undefined;
+      let compiled = false;
+      let compileSteps = 0;
+      const restore = withCompileProgressEvent();
+      const ready = () => {
+        restore();
+        if (disposed || context.signal?.aborted) return;
+        compiled = true;
+        report('compile');
+        time('compile', 1, `compiled ${compileSteps}`);
+        context.invalidate();
+      };
+      const onProgress = (event: { loaded?: number; total?: number }) => {
+        compileSteps++;
+        const total = Number(event?.total);
+        const fraction = total > 0 ? Number(event?.loaded) / total : compileSteps / (compileSteps + 8);
+        step('compile', fraction);
+        time('compile', fraction, `compile ${compileSteps}/${total || '?'}`);
+      };
+      // compileAsync collects its render list synchronously (the renderer is initialised), then builds one object per
+      // yield. compileForFrames runs it in the post pipeline's scene pass (its target and MRT), so the frames reuse those
+      // pipelines; the first real frame still has the post chain and the shadow cascades to build, in one synchronous draw
+      // with no progress report (the likeliest 20 s stall on the A12X). So once the list is taken, every drawable waits on
+      // a hidden layer and the frames after the compile reveal a few materials each (planWarmUp), reporting between them.
+      const compile = compileForFrames(context.renderer as never, built.scene, built.camera, onProgress);
+      const warm = planWarmUp(built.scene as never);
+      if (trace) {
+        trace('compileAsync started');
+        compile.then(
+          () => {
+            trace('compileAsync resolved');
+            ready();
+          },
+          (error: unknown) => {
+            trace(`compileAsync rejected: ${error instanceof Error ? `${error.name}: ${error.message}` : String(error)}`);
+            ready();
+          },
+        );
+      } else {
+        compile.then(ready, ready);
+      }
+      let next = 0;
+      let signalled = false;
+      return {
+        ...built,
+        dispose: () => {
+          if (disposed) return;
+          disposed = true;
+          if (firstFrameTimer !== undefined) clearTimeout(firstFrameTimer);
+          restore();
+          built.dispose?.();
         },
-        (error: unknown) => {
-          trace(`compileAsync rejected: ${error instanceof Error ? `${error.name}: ${error.message}` : String(error)}`);
-          ready();
+        update: (frame, params) => {
+          if (disposed || context.signal?.aborted) return;
+          built.update?.(frame, params);
+          if (signalled || !compiled) return;
+          if (next < warm.chunks.length) {
+            warm.chunks[next++]!();
+            const f = next / warm.chunks.length;
+            step('firstRender', f);
+            time('firstRender', f, `warm ${next}/${warm.chunks.length}`);
+            // The frame this update belongs to draws the chunk; ask for the next one.
+            context.invalidate();
+            return;
+          }
+          signalled = true;
+          report('firstRender');
+          time('firstRender', 1, 'firstRender');
+          firstFrameTimer = setTimeout(() => {
+            time('firstRender', 1, 'firstFrame');
+            params.onFirstFrame();
+          }, 0);
         },
-      );
-    } else {
-      compile.then(ready, ready);
-    }
-    let next = 0;
-    let signalled = false;
-    return {
-      ...built,
-      update: (frame, params) => {
-        built.update?.(frame, params);
-        if (signalled || !compiled) return;
-        if (next < warm.chunks.length) {
-          warm.chunks[next++]!();
-          const f = next / warm.chunks.length;
-          step('firstRender', f);
-          time('firstRender', f, `warm ${next}/${warm.chunks.length}`);
-          // The frame this update belongs to draws the chunk; ask for the next one.
-          context.invalidate();
-          return;
-        }
-        signalled = true;
-        report('firstRender');
-        time('firstRender', 1, 'firstRender');
-        setTimeout(() => {
-          time('firstRender', 1, 'firstFrame');
-          params.onFirstFrame();
-        }, 0);
-      },
+      };
     };
+    return result instanceof Promise ? result.then(finish) : finish(result);
   };
 }
 
-export const loadGameScene = (): Promise<ThreeSetup<GameSceneParams>> => {
+export const loadGameScene = (): Promise<ThreePreparation<GameSceneParams>> => {
   gameScreenActions.loadStage('requested');
   // The vd port's block packs, storefront plan and the far tier's bundled home chunks are read while the scene module
   // loads: the world is built synchronously and needs them there (the rest of the far tier streams through the cell
@@ -241,6 +283,6 @@ export const loadGameScene = (): Promise<ThreeSetup<GameSceneParams>> => {
     preloadVdFar().then(mark(0.9)),
   ]).then(([m]) => {
     gameScreenActions.loadStage('moduleLoaded');
-    return withFirstFrameSignal(m.createCityScene);
+    return withFirstFrameSignal(m.createCitySceneAsync);
   });
 };

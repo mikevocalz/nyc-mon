@@ -1,10 +1,5 @@
-// The lean-draw path (vd-leandraw.ts, EXPO_PUBLIC_WORLD_VD_LEANDRAW): the
-// near and mid vd tiers merge across species into one instanced draw each —
-// per-vertex aSp marks the species, per-instance aSpecies keeps it — and
-// the far trunk cross folds into the far leaf mesh (aCrown/aBase per
-// instance, aSolid per vertex). buildTrees and buildVdTreeMeshes take
-// `leanDraw` as a param so both sides run in one process; the shipped
-// default stays the env flag.
+// Lean-draw folds the far trunk/crown while near/mid retain species partitions.
+// Both paths preserve the global tier selector and authored instance transforms.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
@@ -62,70 +57,22 @@ test('the flag parses like every world lane and stays off when unset', () => {
   assert.equal(VD_LEANDRAW, false, 'unset in this environment');
 });
 
-test('leandraw merges every vd tier across species: five objects replace 21', () => {
-  const vd = buildVdTreeMeshes(THREE as never, 8, 16, 32, false, true);
-  assert.ok(vd.merged, 'the merged set exists under the flag');
-  assert.equal(vd.objects.length, 5);
-  assert.deepEqual(
-    vd.objects.map((o) => o.name),
-    ['city:trees-vd-bark-all', 'city:trees-vd-leaf-all', 'city:trees-vd-mid-all', 'city:trees-vd-midtrunk', 'city:trees-vd-far'],
-  );
-  // The species entries stay for their far boxes; their meshes never draw.
-  assert.equal(vd.species.length, VD_TREES.length);
-  const off = buildVdTreeMeshes(THREE as never, 8, 16, 32, false, false);
-  assert.equal(off.merged, null, 'the default path builds no merged set');
-  assert.equal(off.objects.length, VD_TREES.length * 3 + 3);
-  vd.dispose();
-  off.dispose();
-});
-
-test('the merged geometries carry every species, aSp and the instanced picks', () => {
-  const vd = buildVdTreeMeshes(THREE as never, 8, 16, 32, false, true);
+test('leandraw retains exact species geometry and disposes each geometry once', () => {
+  const vd = buildVdTreeMeshes(THREE as never, 48, 160, 32, false, true);
   assert.ok(vd.merged);
-  // Vertex totals are the six parts concatenated.
-  let barkVerts = 0;
-  let leafVerts = 0;
-  let midVerts = 0;
-  for (const s of vd.species) {
-    barkVerts += s.bark.geometry.getAttribute('position').count;
-    leafVerts += s.leaf.geometry.getAttribute('position').count;
-    midVerts += s.midLeaf.geometry.getAttribute('position').count;
-  }
-  assert.equal(vd.merged.bark.geometry.getAttribute('position').count, barkVerts);
-  assert.equal(vd.merged.leaf.geometry.getAttribute('position').count, leafVerts);
-  assert.equal(vd.merged.mid.geometry.getAttribute('position').count, midVerts);
-  // aSp runs through the species in order and covers each part's vertex run.
-  for (const [geometry, perSpecies] of [
-    [vd.merged.bark.geometry, vd.species.map((s) => s.bark.geometry.getAttribute('position').count)],
-    [vd.merged.leaf.geometry, vd.species.map((s) => s.leaf.geometry.getAttribute('position').count)],
-    [vd.merged.mid.geometry, vd.species.map((s) => s.midLeaf.geometry.getAttribute('position').count)],
-  ] as const) {
-    const aSp = geometry.getAttribute('aSp');
-    assert.equal(aSp.count, perSpecies.reduce((a, b) => a + b, 0));
-    const ends = perSpecies.reduce<number[]>((acc, n) => [...acc, (acc.at(-1) ?? 0) + n], []);
-    // Boundary verts: last vertex of each species run and the first of the next.
-    for (const [s, end] of ends.entries()) {
-      assert.equal(aSp.getX(end - 1), s, `aSp species ${s} last vertex`);
-      if (s + 1 < ends.length) assert.equal(aSp.getX(end), s + 1, `aSp species ${s + 1} first vertex`);
+  assert.equal(vd.objects.length, VD_TREES.length * 3 + 2);
+  for (const [i, species] of vd.species.entries()) {
+    for (const [mesh, source] of [[species.bark, VD_TREES[i]!.bark], [species.leaf, VD_TREES[i]!.leaf], [species.midLeaf, VD_TREES[i]!.mid]] as const) {
+      assert.equal(mesh.geometry.index!.count, Buffer.from(source.index, 'base64').byteLength / 2);
+      assert.ok(mesh.geometry.getAttribute('position').count > 0);
+      assert.equal(mesh.geometry.getAttribute('aSpecies'), undefined, 'no collapsed foreign species');
+      let disposals = 0;
+      mesh.geometry.addEventListener('dispose', () => disposals++);
+      mesh.geometry.userData.disposalCount = () => disposals;
     }
-    // The instanced species pick rides beside it.
-    const aSpecies = geometry.getAttribute('aSpecies');
-    assert.ok(aSpecies, 'aSpecies bound');
-    assert.equal(aSpecies.itemSize, 1);
   }
-  // Bark keeps its species tint per vertex; leaves keep uv + shade and use
-  // aSp as the atlas layer.
-  assert.ok(vd.merged.bark.geometry.getAttribute('aTint'));
-  assert.equal(vd.merged.bark.geometry.getAttribute('aTint').itemSize, 3);
-  assert.ok(vd.merged.leaf.geometry.getAttribute('uv'));
-  assert.ok(vd.merged.leaf.geometry.getAttribute('aShade'));
-  assert.ok(vd.merged.mid.geometry.getAttribute('uv'));
-  assert.ok(vd.merged.mid.geometry.getAttribute('aShade'));
-  // The per-instance pick is sized to the tier capacity.
-  assert.equal(vd.merged.barkSpecies.count, 8);
-  assert.equal(vd.merged.leafSpecies.count, 8);
-  assert.equal(vd.merged.midSpecies.count, 16);
   vd.dispose();
+  for (const species of vd.species) for (const mesh of [species.bark, species.leaf, species.midLeaf]) assert.equal(mesh.geometry.userData.disposalCount(), 1);
 });
 
 test('the folded far mesh is one draw: trunk cross plus crown cross, box per instance', () => {
@@ -151,43 +98,36 @@ test('the folded far mesh is one draw: trunk cross plus crown cross, box per ins
   vd.dispose();
 });
 
-test('the fill packs all species into one near draw pair and one mid draw', () => {
+test('species partitions preserve global caps, exact matrix mapping and empty visibility', () => {
   const ds = dataset();
   const { tiers, placements } = expectedTiers(ds);
   const speciesOf = expectedSpecies(placements);
   const { materials, trees } = build(ds, { lean: false, leanDraw: true });
-  // Only the merged meshes and the shared mid/far pools show.
-  assert.equal(trees.objects.length, 3 + 5);
-  const barks = named(trees, 'city:trees-vd-bark-');
-  const leaves = named(trees, 'city:trees-vd-leaf-');
-  const mids = named(trees, 'city:trees-vd-mid-');
-  assert.equal(barks.length, 1);
-  assert.equal(leaves.length, 1);
-  assert.equal(mids.length, 1);
-  const bark = one(trees, 'city:trees-vd-bark-all');
-  const leaf = one(trees, 'city:trees-vd-leaf-all');
-  const mid = one(trees, 'city:trees-vd-mid-all');
-  const midTrunk = one(trees, 'city:trees-vd-midtrunk');
-  const far = one(trees, 'city:trees-vd-far');
-  const farCrowns = one(trees, 'city:trees-far');
-  assert.equal(bark.count, tiers.nearCount);
-  assert.equal(leaf.count, tiers.nearCount);
-  assert.equal(mid.count, tiers.midCount);
-  assert.equal(midTrunk.count, tiers.midCount);
-  assert.equal(far.count, tiers.farCount);
-  assert.equal(farCrowns.count, tiers.overCount);
-  // The species pick matches the tree's recorded/hashed species.
-  const barkSp = bark.geometry.getAttribute('aSpecies');
-  const leafSp = leaf.geometry.getAttribute('aSpecies');
-  for (let k = 0; k < bark.count; k++) {
-    const sp = speciesOf[tiers.near[k]!]!;
-    assert.equal(barkSp.getX(k), sp, `aSpecies[${k}]`);
-    assert.equal(leafSp.getX(k), sp, `aSpecies[${k}]`);
+  for (const [prefix, selected, count, cap] of [
+    ['city:trees-vd-bark-', tiers.near, tiers.nearCount, 48],
+    ['city:trees-vd-leaf-', tiers.near, tiers.nearCount, 48],
+    ['city:trees-vd-mid-', tiers.mid, tiers.midCount, 160],
+  ] as const) {
+    const meshes = named(trees, prefix);
+    assert.equal(meshes.length, VD_TREES.length);
+    assert.equal(meshes.reduce((n, mesh) => n + mesh.count, 0), count);
+    assert.ok(count <= cap);
+    for (const [sp, mesh] of meshes.entries()) {
+      const expected = Array.from(selected.subarray(0, count)).filter(i => speciesOf[i] === sp);
+      assert.equal(mesh.count, expected.length);
+      assert.equal(mesh.visible, mesh.count > 0);
+      for (const [row, i] of expected.entries()) {
+        const matrix = mesh.instanceMatrix.array;
+        assert.ok(Math.abs(matrix[row * 16 + 12]! - placements[i]!.x) < 1e-4);
+        assert.ok(Math.abs(matrix[row * 16 + 14]! - placements[i]!.z) < 1e-4);
+      }
+    }
   }
-  const midSp = mid.geometry.getAttribute('aSpecies');
-  for (let k = 0; k < mid.count; k++) assert.equal(midSp.getX(k), speciesOf[tiers.mid[k]!], `mid aSpecies[${k}]`);
-  trees.dispose();
-  materials.dispose();
+  trees.update(100000, 100000, 8);
+  for (const prefix of ['city:trees-vd-bark-', 'city:trees-vd-leaf-', 'city:trees-vd-mid-']) {
+    for (const mesh of named(trees, prefix)) { assert.equal(mesh.count, 0); assert.equal(mesh.visible, false); }
+  }
+  trees.dispose(); materials.dispose();
 });
 
 test('leandraw far instances carry the species crown box and the plain tree matrix', () => {
@@ -227,18 +167,18 @@ test('leandraw far instances carry the species crown box and the plain tree matr
   materials.dispose();
 });
 
-test('lean + leandraw: the mid folds into the folded far pool, near stays one draw pair', () => {
+test('lean + leandraw: mid folds into the far pool, near retains species partitions', () => {
   const ds = dataset();
   const { tiers } = expectedTiers(ds, VD_LEAN_NEAR_TREE_CAP);
   assert.ok(tiers.midCount > 0, 'the Apollo focus has mid-tier candidates');
   const { materials, trees } = build(ds, { lean: true, leanDraw: true });
-  const bark = one(trees, 'city:trees-vd-bark-all');
-  const mid = one(trees, 'city:trees-vd-mid-all');
+  const barks = named(trees, 'city:trees-vd-bark-');
+  const mids = named(trees, 'city:trees-vd-mid-');
   const midTrunk = one(trees, 'city:trees-vd-midtrunk');
   const far = one(trees, 'city:trees-vd-far');
   const farTrunk = one(trees, 'city:trees-vd-fartrunk');
-  assert.equal(bark.count, tiers.nearCount);
-  for (const m of [mid, midTrunk]) {
+  assert.equal(barks.reduce((n, mesh) => n + mesh.count, 0), tiers.nearCount);
+  for (const m of [...mids, midTrunk]) {
     assert.equal(m.count, 0, m.name);
     assert.equal(m.visible, false, m.name);
   }

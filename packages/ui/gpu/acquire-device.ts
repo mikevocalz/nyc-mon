@@ -116,7 +116,9 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T | null> {
 }
 
 export async function requestDeviceWithFallback(adapter: GPUAdapter): Promise<GPUDevice> {
-  const wide = await withTimeout(adapter.requestDevice(ownDeviceDescriptor(adapter)), REQUEST_DEVICE_TIMEOUT_MS).catch(() => null);
+  // JSI descriptor conversion can throw before requestDevice returns a Promise.
+  // Include that host call in the rejection boundary so the bare retry runs.
+  const wide = await withTimeout(Promise.resolve().then(() => adapter.requestDevice(ownDeviceDescriptor(adapter))), REQUEST_DEVICE_TIMEOUT_MS).catch(() => null);
   if (wide) return wide;
   const bare = await withTimeout(adapter.requestDevice(), REQUEST_DEVICE_TIMEOUT_MS);
   if (!bare) throw new Error('requestDevice() timed out or returned no device');

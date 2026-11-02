@@ -120,8 +120,11 @@ test('distance levels: mid and far are decimations of the same body over the sam
     assert.equal(d.lodIndices.near, d.indices);
     const mid = d.lodIndices.mid.length / 3;
     const far = d.lodIndices.far.length / 3;
-    assert.ok(mid >= d.triangles / 12 && mid <= d.triangles / 2.5, `${id} mid ${mid} of ${d.triangles}`);
-    assert.ok(far >= 60 && far < mid && far <= d.triangles / 10, `${id} far ${far}`);
+    // Error-constrained edge collapse may stop above its requested triangle
+    // target. Keep the silhouette/material seams instead of forcing a
+    // 900/260-triangle car with holes through the doors and wheels.
+    assert.ok(mid >= d.triangles / 12 && mid <= d.triangles * 0.65, `${id} mid ${mid} of ${d.triangles}`);
+    assert.ok(far >= 60 && far < mid && far <= d.triangles / 2, `${id} far ${far}`);
     for (const lod of ['mid', 'far'] as const) {
       const idx = d.lodIndices[lod];
       for (let i = 0; i < idx.length; i++) assert.ok(idx[i]! < nv, `${id} ${lod} index in range`);
@@ -134,7 +137,7 @@ test('distance levels: mid and far are decimations of the same body over the sam
       const { size } = bounds(d.positions);
       // Prune may drop a bumper speck at `far`; the body still spans most of its length.
       assert.ok(hi - lo > size[2]! * (lod === 'mid' ? 0.9 : 0.8), `${id} ${lod} keeps its length (${(hi - lo).toFixed(2)})`);
-      assert.ok(floor < 0.15, `${id} ${lod} keeps its wheels on the ground (${floor.toFixed(3)})`);
+      assert.ok(floor < 0.08, `${id} ${lod} keeps its wheels on the ground (${floor.toFixed(3)})`);
     }
   }
 });
@@ -148,5 +151,16 @@ test('the level geometries share one vertex attribute set and differ only by ind
     assert.notEqual(g.mid.index, g.near.index);
     assert.ok(g.far.index!.count < g.mid.index!.count && g.mid.index!.count < g.near.index!.count);
     for (const lod of VD_LODS) g[lod].dispose();
+  }
+});
+
+test('coarse corners retain an exact near-source position, part and paint color', () => {
+  for (const id of VD_CAR_IDS) {
+    const d = decodeVdCar(id);
+    const key = (v: number) => `${d.positions.subarray(v * 3, v * 3 + 3)}:${d.partIds[v]}:${d.colors.subarray(v * 3, v * 3 + 3)}`;
+    const source = new Set(Array.from(d.lodIndices.near, key));
+    for (const lod of ['mid', 'far'] as const) {
+      for (const vertex of new Set(d.lodIndices[lod])) assert.ok(source.has(key(vertex)), `${id} ${lod}: corner preserves the source material and paint`);
+    }
   }
 });

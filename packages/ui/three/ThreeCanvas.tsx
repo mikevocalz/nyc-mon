@@ -300,6 +300,7 @@ function JsThreeCanvas<P>({
     const rt = runtime.current!;
     const using: ThreeBackend = backend;
     let cancelled = false;
+    const preparation = new AbortController();
     let renderer: WebGPURenderer | null = null;
     let built: ThreeScene<P> | null = null;
     const start = async () => {
@@ -330,7 +331,8 @@ function JsThreeCanvas<P>({
       // was granted 'timestamp-query' (gpu-timestamps.ts). Flag off: not
       // even the hasFeature call runs.
       rt.gpuTiming = WORLD_PERF_GPU_TIMESTAMPS ? armGpuTimestamps(renderer) : null;
-      built = setup({ THREE, renderer, backend: using, invalidate }, rt.params);
+      built = await setup({ THREE, renderer, backend: using, invalidate, signal: preparation.signal }, rt.params);
+      if (cancelled) { built.dispose?.(); built = null; return; }
       rt.renderer = renderer;
       rt.built = built;
       rt.surface = surface;
@@ -346,6 +348,7 @@ function JsThreeCanvas<P>({
     });
     return () => {
       cancelled = true;
+      preparation.abort();
       built?.dispose?.();
       if (renderer) releaseCanvasBuffers(renderer);
       void renderer?.dispose().catch((error: unknown) => console.warn('[ThreeCanvas] dispose failed', error));

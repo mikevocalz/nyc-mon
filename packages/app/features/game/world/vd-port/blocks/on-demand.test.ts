@@ -9,7 +9,7 @@ import { createMemoryStore } from '../../cell-source/store.ts';
 import type { CellIo } from '../../cell-source/types.ts';
 import { VD_BLOCKS } from './data/manifest.ts';
 import { sourceNearPackage } from './on-demand.ts';
-import type { NearCellInfo } from './codec.ts';
+import { decodeNearCell, type NearCellInfo } from './codec.ts';
 
 const sha = (b: Uint8Array) => createHash('sha256').update(b).digest('hex');
 const disk = (level: string, key: string) => new Uint8Array(readFileSync(new URL(`./data/${level}/${key}.bin`, import.meta.url)));
@@ -34,6 +34,17 @@ describe('sourceNearPackage', () => {
     pkg.prefetch?.();
     for (let i = 0; i < 50 && !pkg.ready?.(); i++) await new Promise((r) => setTimeout(r, 2));
     assert.equal(pkg.ready?.(), true);
+    let now = 0;
+    assert.equal(pkg.prepare!(2, () => now++), false);
+    pkg.release!();
+    let frames = 0;
+    while (!pkg.prepare!(now + 2, () => now++)) assert.ok(++frames < 10_000);
+    assert.ok(frames > 20);
+    const expected = decodeNearCell(disk('near', info.key), info.cx, info.cz);
+    assert.deepEqual(pkg.attributes.position!.array, expected.position);
+    assert.deepEqual(pkg.attributes.color!.array, expected.color);
+    assert.deepEqual(pkg.attributes.emissive!.array, expected.emissive);
+    assert.deepEqual(pkg.index, expected.index);
     assert.equal(pkg.attributes.position!.array.length, info.vertices * 3);
     assert.equal(pkg.index?.length, info.triangles * 3);
     pkg.release?.();

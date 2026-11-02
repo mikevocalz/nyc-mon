@@ -76,6 +76,8 @@ export interface CellPackage {
    */
   readonly index?: Uint16Array | Uint32Array | null;
   readonly triangles?: number;
+  /** Cooperatively prepare exact attributes; false defers attachment until a later frame. */
+  prepare?(deadline: number, now: () => number): boolean;
   release?(): void;
   /**
    * A package whose bytes arrive asynchronously (a Metro asset fetched on demand: world/vd-port/furniture): `ready` is

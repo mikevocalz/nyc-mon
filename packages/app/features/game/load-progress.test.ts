@@ -194,3 +194,67 @@ test('the render runtime carries a stage fraction across as `stage:fraction`', a
   routeRenderEvent('stage', formatRuntimeStage('worldBuilt'), sinks);
   assert.deepEqual(got, [['compile', 0.457], ['worldBuilt', undefined]]);
 });
+
+test('cancelled asynchronous setup disposes its result before compile can start', async () => {
+  const { withFirstFrameSignal } = await import('./load-game-scene.ts');
+  const abort = new AbortController();
+  let disposed = 0, compiled = 0;
+  let finish!: (value: unknown) => void;
+  const setup = withFirstFrameSignal(() => new Promise<unknown>((resolve) => { finish = resolve; }) as Promise<never>);
+  const pending = setup({ signal: abort.signal, renderer: { compileAsync() { compiled++; } }, invalidate() {} } as never, {} as never);
+  abort.abort();
+  finish({ dispose() { disposed++; } });
+  await assert.rejects(Promise.resolve(pending), /abort/i);
+  assert.equal(disposed, 1);
+  assert.equal(compiled, 0);
+});
+
+test('compile ProgressEvent leases survive overlapping scenes and late old callbacks', async () => {
+  const { withCompileProgressEvent, CompileProgressEvent } = await import('./load-game-scene.ts');
+  const g = globalThis as { ProgressEvent?: unknown };
+  const original = Object.getOwnPropertyDescriptor(g, 'ProgressEvent');
+  class PriorEvent {}
+  class ForeignEvent {}
+  try {
+    Object.defineProperty(g, 'ProgressEvent', { value: PriorEvent, configurable: true, writable: true });
+    const oldDispose = withCompileProgressEvent();
+    const newReady = withCompileProgressEvent();
+    oldDispose();
+    assert.equal(g.ProgressEvent, CompileProgressEvent, 'new scene still owns a lease');
+    newReady();
+    assert.equal(g.ProgressEvent, PriorEvent, 'last scene restores first original');
+    const nextDispose = withCompileProgressEvent();
+    oldDispose(); newReady();
+    assert.equal(g.ProgressEvent, CompileProgressEvent, 'late callbacks cannot clobber new generation');
+    g.ProgressEvent = ForeignEvent;
+    nextDispose();
+    assert.equal(g.ProgressEvent, ForeignEvent, 'foreign replacement remains owned externally');
+    const displaced = withCompileProgressEvent();
+    g.ProgressEvent = PriorEvent;
+    const replacement = withCompileProgressEvent();
+    displaced();
+    assert.equal(g.ProgressEvent, CompileProgressEvent, 'displaced generation cannot restore over new lease');
+    replacement();
+    assert.equal(g.ProgressEvent, PriorEvent);
+    delete g.ProgressEvent;
+    const noGlobal = withCompileProgressEvent();
+    noGlobal(); noGlobal();
+    assert.equal(Object.hasOwn(g, 'ProgressEvent'), false);
+  } finally {
+    if (original) Object.defineProperty(g, 'ProgressEvent', original);
+    else delete g.ProgressEvent;
+  }
+});
+
+test('fine-grained geometry checkpoints emit at most one timing beacon per build percent', async () => {
+  const { withFirstFrameSignal } = await import('./load-game-scene.ts');
+  const lines: string[] = [];
+  const setup = withFirstFrameSignal((_context, params) => {
+    for (let i = 0; i <= 10_000; i++) params.onBuildProgress?.(i / 10_000);
+    return { scene: { traverse() {} }, camera: {} } as never;
+  }, () => {}, undefined, (line) => lines.push(line));
+  const built = setup({ renderer: { compileAsync: async () => {} }, invalidate() {} } as never, {} as never);
+  assert.ok(lines.filter((line) => /\] build /.test(line)).length <= 101);
+  await Promise.resolve();
+  built.dispose?.();
+});

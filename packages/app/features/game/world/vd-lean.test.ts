@@ -99,7 +99,7 @@ test('lean on: mid candidates land in the imposter pool and the mid meshes stay 
   assert.equal(farLeaf.count, tiers.midCount + tiers.farCount);
   assert.equal(farTrunk.count, farLeaf.count);
   assert.equal(farCrowns.count, tiers.overCount);
-  // Every pooled instance carries a valid atlas layer and card tiling.
+  // Every pooled instance carries a valid whole-canopy view with no leaf tiling.
   const layer = farLeaf.geometry.getAttribute('aLayer');
   const rep = farLeaf.geometry.getAttribute('aRep');
   const seen = new Set<number>();
@@ -107,7 +107,8 @@ test('lean on: mid candidates land in the imposter pool and the mid meshes stay 
     const l = layer.getX(k);
     assert.ok(l >= 0 && l < VD_TREES.length && l === Math.floor(l), `aLayer[${k}] = ${l}`);
     seen.add(l);
-    assert.ok(rep.getX(k) >= 2 && rep.getY(k) >= 2, `aRep[${k}]`);
+    assert.equal(rep.getX(k), 1, `whole-canopy U[${k}]`);
+    assert.equal(rep.getY(k), 1, `whole-canopy V[${k}]`);
   }
   assert.ok(seen.size >= 2, `imposter pool spans ${seen.size} species`);
   // The mid-derived rows take the same crown-box transform: leaf origin one

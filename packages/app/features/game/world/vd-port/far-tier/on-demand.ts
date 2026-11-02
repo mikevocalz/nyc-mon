@@ -17,6 +17,7 @@ import { vdCellFetch } from '../../cell-source/index.ts';
 import { parseCtl1, type CtlTile } from './codec.ts';
 import { vdFarBundled, vdFarBytes } from './load.ts';
 import { VD_FAR } from './data/manifest.ts';
+import { farAoValues } from './ao-attribute.ts';
 
 type U8 = Uint8Array;
 type I16 = Int16Array;
@@ -131,8 +132,9 @@ const attrs = (
   position: { array: position, itemSize: 3, normalized: false },
   color: { array: color, itemSize: 4, normalized: true },
   uv: { array: uv, itemSize: 2, normalized: false },
-  // the shared zero bytes serve `ao` (0 -> sky share 1) and `emissive` (no emission), one CPU array for every far mesh
-  ao: { array: ao ?? zeros.subarray(0, itemVertexCount), itemSize: 1, normalized: true },
+  // Scalar normalized bytes have no WebGPU vertex format; conversion is
+  // cached per decoded AO section, and zero-only meshes share float storage.
+  ao: { array: farAoValues(ao, itemVertexCount), itemSize: 1, normalized: false },
   emissive: { array: zeros.subarray(0, itemVertexCount * 4), itemSize: 4, normalized: true },
 });
 
@@ -164,7 +166,7 @@ export function sourceFarChunk(info: FarChunkInfo, toScene: SceneMap, zeros: U8)
     vertexCount: info.nv,
     triangles: info.tris,
     bounds: sceneBounds(info.bounds, toScene),
-    bytes: info.nv * 23 + info.tris * 12,
+    bytes: info.nv * 26 + info.tris * 12,
     ...base(st, info.f),
   };
 }
@@ -209,7 +211,7 @@ export function sourceFarGround(info: FarChunkInfo, toScene: SceneMap, zeros: U8
     vertexCount: info.gnv,
     triangles: info.gtris,
     bounds: sceneBounds(info.bounds, toScene),
-    bytes: info.gnv * 23 + info.gtris * 12,
+    bytes: info.gnv * 26 + info.gtris * 12,
     ...base(st, info.f),
   };
 }
@@ -244,7 +246,7 @@ export function sourceFarLandmark(entry: FarLandmarkEntry, toScene: SceneMap, ze
     vertexCount: it.nv,
     triangles: it.tris,
     bounds: Float64Array.from([cx - r, cy - r, cz - r, cx + r, cy + r, cz + r]),
-    bytes: it.nv * 23 + it.ni * 4,
+    bytes: it.nv * 26 + it.ni * 4,
     ...base(st, file),
   };
 }

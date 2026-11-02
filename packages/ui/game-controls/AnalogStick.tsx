@@ -38,7 +38,7 @@
 // profile scale so a full push always reaches the well's edge
 // (arcade-ergonomics.md §8); the tuning's dp is at reference scale 1.0.
 import { useCallback, useEffect, useRef } from 'react';
-import { AccessibilityInfo, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native';
+import { AccessibilityInfo, Platform, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native';
 import {
   GestureDetector,
   GestureStateManager,
@@ -59,7 +59,7 @@ import { useInstanceStore, useStore } from '../use-instance-store';
 import type { Direction8, Phase, StickMode, StickPlacement, StickReading, StickTuning } from './contract.ts';
 import { ArcadeRiveSurface } from './ArcadeRiveSurface';
 import type { ArcadeRiveSource } from './ArcadeRiveSurface.types.ts';
-import { NEUTRAL_STICK, leverOffsetDp, leverTiltDeg, readStick, stickOrigin, toDigitalReading } from './stick-math.ts';
+import { NEUTRAL_STICK, leverOffsetDp, leverTiltDeg, nativeLeverTransform, readStick, stickOrigin, toDigitalReading } from './stick-math.ts';
 import { DIRECTION_WORDS, STICK_GEOMETRY_DP, insideCircle } from './touch-geometry.ts';
 import { mustReleaseOnDisable } from './touch-ownership.ts';
 import type { ArcadeRiveBinding } from './rive-binding.ts';
@@ -111,6 +111,7 @@ const LEVER_SPRING = { damping: 14, stiffness: 520, mass: 0.5 } as const;
 /** How far the cap leans at the gate, in degrees, and the perspective that makes the lean read. */
 const LEVER_TILT_DEG = 14;
 const LEVER_PERSPECTIVE = 320;
+const NATIVE_CAP_PLANE = Platform.OS !== 'web';
 /** The cap artboard and machine in `left-stick.riv` (left-stick/scene.rml). */
 const PAD_ARTBOARD = 'Thumbpad';
 const PAD_STATE_MACHINE = 'Pad';
@@ -269,46 +270,40 @@ export function AnalogStick({
     onTouchesUp: (e: GestureTouchEvent) => {
       'worklet';
       const current = owner.get();
-      if (current === -1 || !e.changedTouches.some((t) => t.id === current)) return;
+      if (current === -1) return;
+      const ended = e.changedTouches.some(t => t.id === current) || !e.allTouches.some(t => t.id === current);
+      if (!ended) return;
+      // Queue neutral before native deactivation can synchronously finalize.
+      runOnJS(publish)(0, 0, false, 'none', 'end', Date.now());
       owner.set(-1);
-      lastX.set(0);
-      lastY.set(0);
-      lastEngaged.set(false);
-      lastDirection.set('none');
+      lastX.set(0); lastY.set(0);
+      lastEngaged.set(false); lastDirection.set('none');
       engage.set(reducedMotion ? 0 : withTiming(0, { duration: ENGAGE_MS }));
       shiftX.set(reducedMotion ? 0 : withSpring(0, RETURN_SPRING));
       shiftY.set(reducedMotion ? 0 : withSpring(0, RETURN_SPRING));
       padX.set(reducedMotion ? 0 : withSpring(0, LEVER_SPRING));
       padY.set(reducedMotion ? 0 : withSpring(0, LEVER_SPRING));
-      if (e.numberOfTouches === 0) GestureStateManager.deactivate(e.handlerTag);
-      runOnJS(publish)(0, 0, false, 'none', 'end', Date.now());
+      GestureStateManager.deactivate(e.handlerTag);
     },
     onTouchesCancel: (e: GestureTouchEvent) => {
       'worklet';
       const current = owner.get();
-      if (current === -1 || !e.changedTouches.some((t) => t.id === current)) return;
-      owner.set(-1);
-      lastEngaged.set(false);
-      lastDirection.set('none');
-      engage.set(0);
-      shiftX.set(0);
-      shiftY.set(0);
-      padX.set(0);
-      padY.set(0);
+      if (current === -1) return;
+      if (e.changedTouches.length > 0 && !e.changedTouches.some(t => t.id === current) && e.allTouches.some(t => t.id === current)) return;
       runOnJS(publish)(0, 0, false, 'none', 'cancel', Date.now());
+      owner.set(-1);
+      lastX.set(0); lastY.set(0);
+      lastEngaged.set(false); lastDirection.set('none');
+      engage.set(0); shiftX.set(0); shiftY.set(0); padX.set(0); padY.set(0);
     },
     onFinalize: () => {
       'worklet';
       if (owner.get() === -1) return;
-      owner.set(-1);
-      lastEngaged.set(false);
-      lastDirection.set('none');
-      engage.set(0);
-      shiftX.set(0);
-      shiftY.set(0);
-      padX.set(0);
-      padY.set(0);
       runOnJS(publish)(0, 0, false, 'none', 'cancel', Date.now());
+      owner.set(-1);
+      lastX.set(0); lastY.set(0);
+      lastEngaged.set(false); lastDirection.set('none');
+      engage.set(0); shiftX.set(0); shiftY.set(0); padX.set(0); padY.set(0);
     },
   });
 
@@ -341,7 +336,10 @@ export function AnalogStick({
     const offset = { x: padX.get(), y: padY.get() };
     const tilt = leverTiltDeg(offset, travelDp, LEVER_TILT_DEG);
     return {
-      transform: [
+      // Native Rive draws through a GPU-backed view: rotating that plane
+      // through its parent clips half the cap on iPad. Keep its native plane
+      // flat; the authored highlight plus 2D foreshortening carry the lean.
+      transform: NATIVE_CAP_PLANE ? nativeLeverTransform(offset, tilt) : [
         { perspective: LEVER_PERSPECTIVE },
         { translateX: offset.x },
         { translateY: offset.y },

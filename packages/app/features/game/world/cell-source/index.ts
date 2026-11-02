@@ -1,10 +1,11 @@
 // The cell source's front door for the world lanes. Configuration is explicit: a baseUrl is handed in (or the
 // EXPO_PUBLIC_VD_CELL_BASE env), never invented here; with none the source still serves the bundled and cached
-// copies. Platform IO and the store resolve through platform.ts / platform.native.ts (Metro picks the native file).
+// copies. The package import condition selects native SHA-256/disk IO on Metro and WebCrypto/cache IO on web/Node.
+// An explicit platform.ts import bypasses Metro native selection and cannot verify bundled cells on Hermes.
 import { createCellSource, type CellSource } from './cell-source.ts';
 import { VD_CELL_MANIFEST } from './data/vd-cells-manifest.ts';
 import { VD_SYSTEM_MANIFEST } from './data/vd-systems-manifest.ts';
-import { platformIo, platformStore } from './platform.ts';
+import { platformIo, platformStore } from '#cell-source-platform';
 import type { CellIo, CellManifest, CellStore } from './types.ts';
 
 export type { CellSource } from './cell-source.ts';

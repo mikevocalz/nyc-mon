@@ -92,3 +92,19 @@ test('adapter limits handed back as strings are coerced to numbers, not passed t
   assert.equal(limits['badLimit'], undefined);
   assert.equal(limits['hugeLimit'], undefined);
 });
+
+test('a synchronous native descriptor error still retries without a descriptor', async () => {
+  const { requestDeviceWithFallback } = await import('./acquire-device.ts');
+  const device = fakeDevice('bare-native');
+  const calls: (GPUDeviceDescriptor | undefined)[] = [];
+  const adapter = {
+    requestDevice(descriptor?: GPUDeviceDescriptor) {
+      calls.push(descriptor);
+      if (descriptor) throw new Error('Exception in HostFunction: Value is a string, expected a number');
+      return Promise.resolve(device);
+    },
+  } as unknown as GPUAdapter;
+  assert.equal(await requestDeviceWithFallback(adapter), device);
+  assert.equal(calls.length, 2);
+  assert.equal(calls[1], undefined);
+});

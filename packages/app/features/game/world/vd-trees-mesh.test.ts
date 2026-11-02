@@ -56,7 +56,8 @@ test('the shared far geometries are unit-sized and carry the per-instance attrib
   for (const [s, sp] of vd.species.entries()) {
     assert.equal(sp.far.layer, s);
     assert.ok(sp.far.hw > 0 && sp.far.hh > 0 && sp.far.y0 > 0, `species ${s} crown box`);
-    assert.ok(sp.far.repU >= 2 && sp.far.repV >= 2, `species ${s} tiling`);
+    assert.equal(sp.far.repU, 1, `species ${s} whole-canopy horizontal projection`);
+    assert.equal(sp.far.repV, 1, `species ${s} whole-canopy vertical projection`);
   }
   vd.dispose();
 });
@@ -86,7 +87,8 @@ test('the fill packs all species into the merged buffers and keeps the per-speci
     const l = layer.getX(k);
     assert.ok(l >= 0 && l < VD_TREES.length && l === Math.floor(l), `aLayer[${k}] = ${l}`);
     seen.add(l);
-    assert.ok(rep.getX(k) >= 2 && rep.getY(k) >= 2, `aRep[${k}]`);
+    assert.equal(rep.getX(k), 1, `aRep[${k}] horizontal canopy projection`);
+    assert.equal(rep.getY(k), 1, `aRep[${k}] vertical canopy projection`);
   }
   assert.ok(seen.size >= 2, `far instances span ${seen.size} species`);
   // The leaf matrix carries the crown box: with rotation about Y only, the

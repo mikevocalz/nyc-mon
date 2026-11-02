@@ -8,7 +8,7 @@ import * as THREE from 'three/webgpu';
 import type { Three } from '@acme/ui/three';
 import { WORLD_PRESETS } from '../../../perf/tier-presets.ts';
 import { createCellStream } from '../../cells/cell-stream.ts';
-import { buildVdPort } from '../index.ts';
+import { buildVdPort, prepareVdPort } from '../index.ts';
 import { decodeNearCell, decodeShellCell, lazyNearPackage, nearCellBytes, type ShellCellInfo } from './codec.ts';
 import { decodeVertexBuffer } from './meshopt.ts';
 import { CELL } from '../../cells/cell-rules.ts';
@@ -318,4 +318,37 @@ test('lane B leaves the facade kit\'s fronts to lane A once the packs are in, an
   } finally {
     setVdBlockBytes(null);
   }
+});
+
+
+test('port preparation yields completed shell cells and cancellation disposes its partial resources', () => {
+  setVdBlockBytes({ shell: shellBytes, near: nearBytes, level: 'near' });
+  const groups: THREE.Group[] = [];
+  class CapturedGroup extends THREE.Group { constructor() { super(); groups.push(this); } }
+  const capture = { ...T, Group: CapturedGroup } as unknown as Three;
+  const dataset = parseCityDataset(JSON.parse(readFileSync(new URL('../../../data/harlem-apollo.json', import.meta.url), 'utf8')));
+  const options = { physical: false, night: 0, groundY: () => 0.14, sunDirection: [0, 1, 0] as const, sunColor: [1, 1, 1] as const, horizon: [0.8, 0.8, 0.9] as const };
+  try {
+    const preparation = prepareVdPort(capture, dataset, options);
+    const first = preparation.next();
+    assert.equal(first.done, false);
+    const group = groups[0]!;
+    assert.equal(group.children.filter(child => child.name === SHELL_NAME).length, 1);
+    let disposed = 0;
+    (group.children[0] as THREE.Mesh).geometry.addEventListener('dispose', () => disposed++);
+    preparation.return(undefined as never);
+    assert.equal(disposed, 1);
+    assert.equal(group.children.length, 0);
+    const resumed = prepareVdPort(T, dataset, options);
+    let previous = 0, yields = 0, step = resumed.next();
+    while (!step.done) {
+      assert.ok(step.value >= previous && step.value < 1);
+      previous = step.value; yields++; step = resumed.next();
+    }
+    assert.ok(yields >= VD_BLOCKS.shell.length + 4);
+    const reference = buildVdPort(T, dataset, options);
+    assert.deepEqual(step.value.stats, reference.stats);
+    assert.deepEqual(step.value.group.children.map(child => child.name), reference.group.children.map(child => child.name));
+    step.value.dispose(); reference.dispose();
+  } finally { setVdBlockBytes(null); }
 });

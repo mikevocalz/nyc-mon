@@ -195,7 +195,7 @@ export function buildTrees(
   lean = VD_LEAN,
   /** vd lane, overridable for tests: the lean material bodies (vd-leanmat.ts). Defaults to the flag. */
   leanMat = VD_LEANMAT,
-  /** vd lane, overridable for tests: the merged cross-species draws (vd-leandraw.ts). Defaults to the flag. */
+  /** vd lane, overridable for tests: the folded far trunk/crown draw (vd-leandraw.ts). Defaults to the flag. */
   leanDraw = VD_LEANDRAW,
   /** vd lane under the physical stack: the model trees decode their display colours to linear (vd-trees-mesh.ts). */
   linearColors = false,
@@ -316,23 +316,14 @@ export function buildTrees(
         for (const s of vd.species) { s.count = 0; s.midCount = 0; }
         let midTrunkCount = 0;
         let farCount = 0;
-        // leandraw: the near and mid tiers write the merged cross-species
-        // meshes under one cursor each, and the folded far mesh keeps the
-        // plain tree matrix — the crown box and base height ride aCrown/aBase.
-        let nearMergedCount = 0;
-        let midMergedCount = 0;
+        // Near/mid pack only their selected species. The folded far mesh keeps
+        // the plain tree matrix; crown box and base height ride aCrown/aBase.
         const m = vd.merged;
         const midTrunkRows = vd.midTrunk.instanceMatrix.array as Float32Array;
         const farLeafRows = vd.farLeaf.instanceMatrix.array as Float32Array;
         const farTrunkRows = vd.farTrunk.instanceMatrix.array as Float32Array;
         const farLayer = vd.farLayer.array as Float32Array;
         const farRep = vd.farRep.array as Float32Array;
-        const mergedBarkRows = m ? (m.bark.instanceMatrix.array as Float32Array) : null;
-        const mergedLeafRows = m ? (m.leaf.instanceMatrix.array as Float32Array) : null;
-        const mergedMidRows = m ? (m.mid.instanceMatrix.array as Float32Array) : null;
-        const mergedBarkSp = m ? (m.barkSpecies.array as Float32Array) : null;
-        const mergedLeafSp = m ? (m.leafSpecies.array as Float32Array) : null;
-        const mergedMidSp = m ? (m.midSpecies.array as Float32Array) : null;
         const mergedCrown = m ? (m.farCrown.array as Float32Array) : null;
         const mergedBase = m ? (m.farBase.array as Float32Array) : null;
         // One imposter row: the unit crown box takes the species' extents in
@@ -371,13 +362,6 @@ export function buildTrees(
         for (let k = 0; k < vdTiers.nearCount; k++) {
           const i = vdTiers.near[k]!;
           const row = vdMatrices.subarray(i * 16, i * 16 + 16);
-          if (mergedBarkRows && mergedLeafRows && mergedBarkSp && mergedLeafSp) {
-            const slot = nearMergedCount++;
-            mergedBarkRows.set(row, slot * 16);
-            mergedLeafRows.set(row, slot * 16);
-            mergedBarkSp[slot] = mergedLeafSp[slot] = vdSpeciesOf[i]!;
-            continue;
-          }
           const s = vd.species[vdSpeciesOf[i]!]!;
           const slot = s.count++;
           (s.bark.instanceMatrix.array as Float32Array).set(row, slot * 16);
@@ -390,13 +374,6 @@ export function buildTrees(
           // Lean: the mid level draws through the shared imposter pool, so the
           // per-species card meshes and the mid trunk stay at count 0.
           if (lean) { imposter(s.far, row); continue; }
-          if (mergedMidRows && mergedMidSp) {
-            const slot = midMergedCount++;
-            mergedMidRows.set(row, slot * 16);
-            mergedMidSp[slot] = vdSpeciesOf[i]!;
-            midTrunkRows.set(row, midTrunkCount++ * 16);
-            continue;
-          }
           const slot = s.midCount++;
           (s.midLeaf.instanceMatrix.array as Float32Array).set(row, slot * 16);
           midTrunkRows.set(row, midTrunkCount++ * 16);
@@ -428,14 +405,7 @@ export function buildTrees(
           attr.needsUpdate = true;
         }
         if (m) {
-          for (const [mesh, c] of [[m.bark, nearMergedCount], [m.leaf, nearMergedCount], [m.mid, midMergedCount]] as const) {
-            mesh.count = c;
-            mesh.visible = c > 0;
-            mesh.instanceMatrix.clearUpdateRanges();
-            if (c > 0) mesh.instanceMatrix.addUpdateRange(0, c * 16);
-            mesh.instanceMatrix.needsUpdate = true;
-          }
-          for (const [attr, n] of [[m.barkSpecies, nearMergedCount], [m.leafSpecies, nearMergedCount], [m.midSpecies, midMergedCount], [m.farCrown, farCount * 4], [m.farBase, farCount]] as const) {
+          for (const [attr, n] of [[m.farCrown, farCount * 4], [m.farBase, farCount]] as const) {
             attr.clearUpdateRanges();
             if (n > 0) attr.addUpdateRange(0, n);
             attr.needsUpdate = true;

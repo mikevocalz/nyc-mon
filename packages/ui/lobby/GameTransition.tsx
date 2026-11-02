@@ -57,21 +57,27 @@ export function GameTransition({ phase, reducedMotion, scheme = 'night', rive, p
     <View
       {...(testIdProps(testID) as object)}
       testID={testID}
-      aria-hidden
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
+      accessibilityViewIsModal
       className={`absolute inset-0 ${scheme === 'night' ? 'bg-ink-950' : 'bg-concrete-50'}`}
     >
-      <LobbyRiveSurface
-        riveFile={rive?.file}
-        artboardName={rive?.artboardName}
-        stateMachineName={rive?.stateMachineName}
-        onBinding={binding.onBinding}
-        style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 }}
-      />
+      <View aria-hidden accessibilityElementsHidden importantForAccessibility="no-hide-descendants" className="absolute inset-0">
+        <LobbyRiveSurface
+          riveFile={rive?.file}
+          artboardName={rive?.artboardName}
+          stateMachineName={rive?.stateMachineName}
+          onBinding={binding.onBinding}
+          style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 }}
+        />
+      </View>
       {phase === 'hold' && progress !== undefined ? (
         <View className="absolute inset-0 items-center justify-center px-8" pointerEvents="none">
-          <View className="w-full max-w-[420px] gap-2">
+          <View
+            accessible
+            accessibilityRole="progressbar"
+            accessibilityLabel={progressA11yLabel ?? progressLabel}
+            accessibilityValue={{ min: 0, max: 100, now: progressFraction(progress, 100) * 100, text: percentLabel(progressFraction(progress, 100)) }}
+            className="w-full max-w-[420px] gap-2"
+          >
             {/* The cover is painted by its own scheme, not the app theme, so the label takes the cover's ink directly. */}
             <View className="flex-row justify-between" aria-hidden>
               <Text className={`text-sm font-semibold ${scheme === 'night' ? 'text-ink-50' : 'text-ink-950'}`}>{progressLabel}</Text>

@@ -620,3 +620,6 @@ writeFileSync(join(OUT_DIR, 'fascia-atlas.generated.ts'), [
   '',
 ].join('\n'));
 console.log(JSON.stringify({ ...stats, fronts: fronts.length, slots: signs.length, atlas: `${AW}x${AH}`, fonts: [...fontsUsed] }));
+
+// Exact runtime chunk metadata must be regenerated with every plan bake.
+await import('./bake-vd-storefront-index.mjs');

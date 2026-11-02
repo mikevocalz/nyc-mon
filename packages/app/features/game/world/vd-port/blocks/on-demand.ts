@@ -11,7 +11,7 @@
 import type { CellAttribute, CellLocalPositionFrame, CellPackage } from '../../cells/cell-rules.ts';
 import { cellNum, CELL } from '../../cells/cell-rules.ts';
 import { vdCellFetch } from '../../cell-source/index.ts';
-import { decodeNearCell, nearCellBytes, type BlockCoordinateFrame, type NearArrays, type NearCellInfo } from './codec.ts';
+import { nearCellPreparation, nearCellBytes, type BlockCoordinateFrame, type NearCellInfo } from './codec.ts';
 
 export function sourceNearPackage(
   info: NearCellInfo,
@@ -22,12 +22,12 @@ export function sourceNearPackage(
   sourceKey?: string,
 ): CellPackage {
   let file: Uint8Array | null = null;
-  let arrays: NearArrays | null = null;
   let pending: Promise<boolean> | null = null;
-  const get = () => {
+  const decoder = nearCellPreparation(() => {
     if (!file) throw new Error(`vd-port: near cell ${info.key} built before its bytes`);
-    return (arrays ??= decodeNearCell(file, info.cx, info.cz, coordinateFrame));
-  };
+    return file;
+  }, info.cx, info.cz, coordinateFrame);
+  const get = decoder.get;
   const b = info.bounds;
   return {
     cx: info.cx, cz: info.cz, num: cellNum(info.cx, info.cz), size: CELL,
@@ -48,7 +48,8 @@ export function sourceNearPackage(
     triangles: info.triangles,
     bounds: Float64Array.from([b[0]!, b[1]!, b[2]!, b[3]!, b[4]!, b[5]!]),
     bytes: nearCellBytes(info),
-    release() { arrays = null; },
+    prepare: decoder.prepare,
+    release: decoder.release,
     ready: () => file !== null,
     prefetch() {
       if (file) return;

@@ -20,6 +20,7 @@ import { makeBlocksMaterial } from '../blocks/shell-material.ts';
 import { VD_FW14 } from '../blocks/data/manifest.ts';
 import { VD_FAR } from './data/manifest.ts';
 import { decodeBase64 } from '../../foliage.ts';
+import { farAoValues } from './ao-attribute.ts';
 
 type Mesh = InstanceType<Three['Mesh']>;
 
@@ -55,7 +56,7 @@ const templateOf = (ctx: VdPortCtx, mat: Mesh['material'], name: string): Mesh =
   g.setAttribute('position', new THREE.BufferAttribute(new Int16Array(9), 3));
   g.setAttribute('color', new THREE.BufferAttribute(new Uint8Array(12), 4, true));
   g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(6), 2));
-  g.setAttribute('ao', new THREE.BufferAttribute(new Uint8Array(3), 1, true));
+  g.setAttribute('ao', new THREE.BufferAttribute(farAoValues(null, 3), 1));
   g.setAttribute('emissive', new THREE.BufferAttribute(new Uint8Array(12), 4, true));
   g.setIndex(new THREE.BufferAttribute(new Uint32Array([0, 1, 2]), 1));
   g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 0);
@@ -72,7 +73,7 @@ function buildStreamed(ctx: VdPortCtx): VdPortPart {
   const fw14 = fw14Of(ctx);
   const mat = makeBlocksMaterial(ctx.THREE, ctx.env, fw14);
   (mat as unknown as { maskNode: unknown }).maskNode = ditherFadeMask(ctx.THREE);
-  // the shared zero attribute bytes serve `ao` (0 -> full sky share) and `emissive` (no emission) on every far mesh
+  // Emissive keeps shared zero bytes; scalar AO uses shared float storage.
   const zeros = new Uint8Array(VD_FAR.maxVertices * 4);
   const spec = { errorM: 8, chunk: 2048, fade: true, pin: false, sharedMaterial: true, reachM: FAR_REACH_M };
   const budget = farBudgetOf(ctx);
@@ -112,7 +113,6 @@ function buildResident(ctx: VdPortCtx, far: NonNullable<ReturnType<typeof vdFarB
   let triangles = 0;
 
   const emissive = new THREE.BufferAttribute(new Uint8Array(VD_FAR.maxVertices * 4), 4, true);
-  const aoZeros = new Uint8Array(VD_FAR.maxVertices);
   const groundCol = VD_FAR.groundColor;
   const attach = (
     m: Mesh,
@@ -147,7 +147,7 @@ function buildResident(ctx: VdPortCtx, far: NonNullable<ReturnType<typeof vdFarB
       g.setAttribute('position', new THREE.BufferAttribute(S.pos, 3));
       g.setAttribute('color', new THREE.BufferAttribute(S.col, 4, true));
       g.setAttribute('uv', new THREE.BufferAttribute(S.uv, 2));
-      g.setAttribute('ao', new THREE.BufferAttribute(S.ao && S.ao.length * 3 === S.pos.length ? S.ao : aoZeros.subarray(0, S.pos.length / 3), 1, true));
+      g.setAttribute('ao', new THREE.BufferAttribute(farAoValues(S.ao instanceof Uint8Array && S.ao.length * 3 === S.pos.length ? S.ao : null, S.pos.length / 3), 1));
       g.setAttribute('emissive', emissive);
       g.setIndex(new THREE.BufferAttribute(S.idx, 1));
       g.computeBoundingSphere();
@@ -167,7 +167,7 @@ function buildResident(ctx: VdPortCtx, far: NonNullable<ReturnType<typeof vdFarB
       g.setAttribute('position', new THREE.BufferAttribute(S.gpos, 3));
       g.setAttribute('color', new THREE.BufferAttribute(col, 4, true));
       g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
-      g.setAttribute('ao', new THREE.BufferAttribute(aoZeros.subarray(0, nv), 1, true));
+      g.setAttribute('ao', new THREE.BufferAttribute(farAoValues(null, nv), 1));
       g.setAttribute('emissive', emissive);
       g.setIndex(new THREE.BufferAttribute(S.gidx, 1));
       g.computeBoundingSphere();
@@ -186,7 +186,7 @@ function buildResident(ctx: VdPortCtx, far: NonNullable<ReturnType<typeof vdFarB
       g.setAttribute('position', new THREE.BufferAttribute(S.pos!.subarray(it.v0 * 3, (it.v0 + it.nv) * 3), 3));
       g.setAttribute('color', new THREE.BufferAttribute(S.col!.subarray(it.v0 * 4, (it.v0 + it.nv) * 4), 4, true));
       g.setAttribute('uv', new THREE.BufferAttribute(S.uv!.subarray(it.v0 * 2, (it.v0 + it.nv) * 2), 2));
-      g.setAttribute('ao', new THREE.BufferAttribute(aoZeros.subarray(0, it.nv), 1, true));
+      g.setAttribute('ao', new THREE.BufferAttribute(farAoValues(null, it.nv), 1));
       g.setAttribute('emissive', emissive);
       g.setIndex(new THREE.BufferAttribute(S.idx!.subarray(it.i0, it.i0 + it.ni), 1));
       g.computeBoundingSphere();

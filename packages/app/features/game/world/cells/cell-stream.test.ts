@@ -371,3 +371,44 @@ test('packages sharing one file: building the first releases the bytes, so the s
   assert.equal(cells(f.root).length, 2);
   stream.dispose();
 });
+
+test('incremental preparation defers attachment and releases cancelled work', () => {
+  const { mesh, group } = detailLayer(1);
+  let prepares = 0, releases = 0, reads = 0;
+  const pkg = trianglePackage({ num: 99, bounds: new Float64Array([0, 0, 0, 2, 1, 2]),
+    get attributes() { reads++; return { position: { array: new Float32Array(9), itemSize: 3, normalized: false } }; },
+    prepare() { prepares++; return prepares >= 3; }, release() { releases++; },
+  });
+  Object.defineProperty(pkg, 'attributes', { get() { reads++; return { position: { array: new Float32Array(9), itemSize: 3, normalized: false } }; } });
+  reads = 0;
+  const stream = createCellStream(T, [], { preset: preset(), external: [{ template: mesh, spec: { errorM: 1, chunk: 256, fade: false }, packages: [pkg] }] });
+  stream.update({ x: 0, y: 0, z: 0 }, K, 0);
+  assert.equal(reads, 0); assert.equal(stream.stats.cells, 0); assert.equal(stream.stats.pending, 1);
+  stream.update({ x: 100000, y: 0, z: 0 }, K, 1);
+  assert.equal(releases, 1, 'leaving reach cancels partially prepared data');
+  stream.update({ x: 0, y: 0, z: 0 }, K, 2);
+  assert.equal(stream.stats.cells, 0);
+  stream.update({ x: 0, y: 0, z: 0 }, K, 2.01);
+  assert.equal(stream.stats.cells, 1); assert.equal(reads, 1);
+  assert.equal(cells(group).length, 1);
+  stream.dispose();
+});
+
+
+test('camera-away cancellation releases prepared work removed from the request queue', () => {
+  const { mesh } = detailLayer(1);
+  let ready = true, releases = 0;
+  const pkg = trianglePackage({ num: 99, bounds: new Float64Array([0, 0, 0, 2, 1, 2]),
+    attributes: { position: { array: new Float32Array(9), itemSize: 3, normalized: false } },
+    ready: () => ready, prepare: () => false, release() { releases++; },
+  });
+  const stream = createCellStream(T, [], { preset: preset(), external: [{ template: mesh, spec: { errorM: 1, chunk: 256, fade: false }, packages: [pkg] }] });
+  stream.update({ x: 0, y: 0, z: 0 }, K, 0);
+  assert.equal(stream.stats.pending, 1);
+  ready = false;
+  stream.update({ x: 0, y: 0, z: 0 }, K, 0.01); // lost bytes removes the request before a new pick
+  stream.update({ x: 100000, y: 0, z: 0 }, K, 1);
+  assert.equal(releases, 1, 'all slots, including queue-removed work, cancel when no longer wanted');
+  stream.dispose();
+  assert.equal(releases, 1, 'cancelled work is not released twice');
+});

@@ -140,7 +140,9 @@ export class Writer {
   near = false;
   /** The fascia atlas's solid cell, for lit surfaces that are not lettering (uv into a coverage of 1). */
   solidUv: [number, number] = [0, 0];
-  constructor() {
+  private readonly positionsOnly: boolean;
+  constructor(positionsOnly = false) {
+    this.positionsOnly = positionsOnly;
     for (const s of SLOTS) {
       const extra: Record<string, Bag> = {};
       for (const k of Object.keys(EXTRA[s])) extra[k] = new Bag();
@@ -164,6 +166,7 @@ export class Writer {
     const r = this.rough ?? ROUGH[ws];
     for (const i of order) {
       B.position.push(p[i]![0]!); B.position.push(p[i]![1]!); B.position.push(p[i]![2]!);
+      if (this.positionsOnly) continue;
       B.normal.push(n[0]!); B.normal.push(n[1]!); B.normal.push(n[2]!);
       B.color.push(col[0]!); B.color.push(col[1]!); B.color.push(col[2]!); B.color.push(r);
       for (const [k, size] of Object.entries(EXTRA[slot])) {
@@ -607,12 +610,15 @@ function unitBody(W: Writer, F: Frame, U: NonNullable<Front['units']>[number], f
  * Writes the whole plan. `groundY` is the walking surface under a scene point (ctx.groundY). `onFront`, when given, is
  * called after each front written with the vertices every slot holds by then, so a caller can tell which triangles
  * came from which front (index.ts packages the ring fronts that way).
+ * `positionsOnly` is for package counting: positions, features and holes stay
+ * identical, while normals, colors and extra attribute arrays stay empty.
  */
 export function emitPlan(
   plan: StorefrontPlan, groundY: (x: number, z: number) => number, filter?: (f: Front) => boolean,
   onFront?: (front: Front, vertices: Readonly<Record<Slot, number>>) => void,
+  positionsOnly = false,
 ): EmitResult {
-  const W = new Writer();
+  const W = new Writer(positionsOnly);
   // the atlas's last cell is solid (bake-vd-storefronts.mjs): a lit surface that is not lettering samples it
   const A = plan.atlas, last = (A.width / A.cellW) * (A.height / A.cellH) - 1;
   W.solidUv = [((last % A.cols) + 0.5) * A.cellW / A.width, (Math.floor(last / A.cols) + 0.5) * A.cellH / A.height];
