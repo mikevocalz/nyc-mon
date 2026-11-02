@@ -8,9 +8,8 @@ import { clearKeychainSnapshot, writeKeychainSnapshot } from './keychain-widget'
 /**
  * One call after every care tick and every care action (contract §4 and §7):
  * refreshes the keychain widget and reschedules the Mon's call notifications.
- * The store (lane c) calls it with the active Mon's
- * `selectMonCareView(state, now, options)` and
- * `predictRealCalls(state, now, CARE_HORIZON_MS, options)`. Cheap when nothing
+ * The root's useCareSurfaces service supplies the active Mon's Phase 1
+ * view and predictions through phase1CareSurfaces. Cheap when nothing
  * changed: the widget write is skipped by signature and the notification
  * reconcile cancels and schedules only the difference.
  */

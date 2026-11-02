@@ -49,8 +49,8 @@ let queue: Promise<unknown> = Promise.resolve();
 
 /**
  * Makes the phone's pending care notifications for one Mon match the plan.
- * Call after every care tick and action with `predictRealCalls(...)` and the
- * view's `paused`. Never asks for permission: Mon Space's one-time ask sheet
+ * Called by the root care-surfaces service after every care tick/action and
+ * foreground/preference change. Never asks for permission: Mon Space's one-time ask sheet
  * (lane c) and the Settings "Mon calls" row own the prompt. With the switch
  * off or no OS grant, this only cancels. Errors are swallowed: the in-app LED still shows calls.
  */

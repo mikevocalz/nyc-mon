@@ -3,8 +3,8 @@ import { isRealCallKind, type PredictedCall } from './care-notification-plan.ts'
 
 /**
  * The keychain widget's data (contract §7, canon Decision #36). The app builds
- * it from `selectMonCareView` and `predictRealCalls` after every tick and
- * action and writes it as JSON to the App Group (`keychain-widget.native.ts`);
+ * it from the Phase 1 adapter after every tick and action and writes it as
+ * JSON to the App Group (`keychain-widget.native.ts`);
  * the WidgetKit extension (`apps/mobile/targets/keychain-widget`) decodes it
  * as `KeychainSnapshot.swift`. Change both together and bump the version.
  *

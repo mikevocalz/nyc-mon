@@ -2,9 +2,8 @@ import { careCopy } from './care-copy.ts';
 
 /**
  * Care-call notification planner (contract §7), the pure half. Input is what
- * `predictRealCalls(state, now, CARE_HORIZON_MS, options)` and
- * `selectMonCareView(...).paused` return in `@acme/core/sim`; the types here
- * are structural copies of contract §3 so this file runs under `node --test`
+ * phase1CareSurfaces derives from the existing `@acme/core/sim` care events;
+ * the types here also accept future contract §3 care engines and run under `node --test`
  * without the core build. The native half (`care-notifications.native.ts`)
  * reads the phone's pending requests, runs {@linkcode reconcileCareSchedule}
  * and applies the result.
@@ -31,7 +30,7 @@ export function isRealCallKind(kind: unknown): kind is RealCallKind {
   return typeof kind === 'string' && REAL_CALL_KINDS.has(kind);
 }
 
-/** One element of `predictRealCalls(...)`. */
+/** One predicted real care event (or a false call, which the planner rejects). */
 export interface PredictedCall {
   readonly kind: CareCallKind;
   readonly at: number;

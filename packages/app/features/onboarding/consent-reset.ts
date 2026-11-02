@@ -1,5 +1,6 @@
 import { loadSave } from '@acme/core/save';
 import type { KeyValueStorage } from './storage.types';
+import { clearCareSaveOwner } from '../mon-space/care-surface-owner.ts';
 
 /** The keys {@linkcode resetAfterConsentDenied} clears. Same strings as `ONBOARDING_KEYS` / `SAVE_KEY`. */
 export const CONSENT_RESET_KEYS = {
@@ -46,6 +47,7 @@ export function resetAfterConsentDenied(onboarding: KeyValueStorage, save: KeyVa
   const removedDeniedSave = savedCallerIsDenied(save.getString(CONSENT_RESET_KEYS.save));
   if (removedDeniedSave) {
     save.remove(CONSENT_RESET_KEYS.save);
+    clearCareSaveOwner(save);
     onboarding.remove(CONSENT_RESET_KEYS.hasSession);
   }
   return { removedDeniedSave };
