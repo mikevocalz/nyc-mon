@@ -11,9 +11,8 @@
 //
 // r186 against Slop's three@dev, checked before porting:
 // - SunLight has no static registerNode in r186 (examples/jsm/lights/SunLight.js);
-//   the light node is registered with renderer.library.addLight, Slop's
-//   fallback branch. NodeLibrary.addClass warns on a second registration,
-//   so it is guarded with getLightNodeClass.
+//   the light node is registered with SunLight.registerNode, Slop's
+//   fallback branch (r187 deprecated library.addLight/getLightNodeClass).
 // - SunLightShadow fixes the cascade count at 2 (SunLightShadow.js _cascadeCount),
 //   so the shadow1 probe uses a DirectionalLight with one map instead.
 // - SkyMesh's vertexNode writes z = w (objects/SkyMesh.js); the reversed-depth
@@ -89,6 +88,12 @@ export interface PhysicalRigOptions {
   /** ClusteredLighting maxLights from the tier. */
   clusteredMaxLights: number;
   preset?: PhysicalPresetId;
+  /**
+   * Drawn frames between sun shadow re-renders (EXPO_PUBLIC_WORLD_SHADOW_INTERVAL,
+   * physical-look.ts). >1 sets the light's shadow.autoUpdate = false and raises
+   * needsUpdate on ticks and on sun/preset/far changes. Default 1: every frame.
+   */
+  shadowInterval?: number;
 }
 
 export interface PhysicalRig {
@@ -105,15 +110,21 @@ export interface PhysicalRig {
   readonly preset: PhysicalPresetId;
   /** Re-light for a preset; rebakes the environment into the same render target. */
   applyPreset(id: PhysicalPresetId, force?: boolean): void;
+  /**
+   * perf/adaptive-tiers.ts: the shadow refresh interval at runtime — the same
+   * autoUpdate/needsUpdate throttle EXPO_PUBLIC_WORLD_SHADOW_INTERVAL sets at
+   * construction. 1 restores every-frame refresh; >1 throttles and pokes one
+   * immediate refresh so the change lands on the next frame, not the next tick.
+   * No-op without a sun. The explicit env pick beats adaptive (the scene
+   * suppresses this action kind while EXPO_PUBLIC_WORLD_SHADOW_INTERVAL is set).
+   */
+  setShadowInterval(interval: number): void;
   /** Per frame: shadow far plane from camera altitude; the shadow1 light follows the focus. */
   update(cameraY: number, focusX: number, focusZ: number): void;
   dispose(): void;
 }
 
-function isLightNodeRegistered(renderer: RendererT, lightClass: unknown): boolean {
-  const library = renderer.library as unknown as { getLightNodeClass(light: unknown): unknown };
-  return library.getLightNodeClass(lightClass) !== null;
-}
+
 
 function maxTextureDimension(renderer: RendererT | null): number | undefined {
   const backend = renderer?.backend as unknown as { device?: { limits?: { maxTextureDimension2D?: number } } } | undefined;
@@ -214,8 +225,8 @@ export function createPhysicalRig(
   const shadowTile = sunShadowTile(options.shadowTile, maxTextureDimension(renderer));
   let sun: SunLight | InstanceType<Three['DirectionalLight']> | null = null;
   if (features.sunShadow === 2) {
-    if (renderer && !isLightNodeRegistered(renderer, SunLight)) {
-      renderer.library.addLight(SunLightNode as never, SunLight as never);
+    if (renderer) {
+      (SunLight as unknown as { registerNode(node: unknown): void }).registerNode(SunLightNode);
     }
     const s = new SunLight(new THREE.Color(start.colors.sun), start.sunIntensity);
     s.name = 'city:physical-sun';
@@ -251,6 +262,27 @@ export function createPhysicalRig(
     scene.add(sun);
     added.push(sun);
   }
+
+  // EXPO_PUBLIC_WORLD_SHADOW_INTERVAL: refresh the atlas every Nth drawn
+  // frame instead of every frame. ShadowNode.updateBefore honours
+  // shadow.autoUpdate/needsUpdate (three r187 ShadowNode.js:806-824), so the
+  // atlas holds between ticks — a moving caster's shadow lags up to N-1
+  // frames, which is why this stays a flag. needsUpdate starts true so the
+  // first frame still renders the map. `let`: the adaptive tier policy moves
+  // the interval at runtime through setShadowInterval.
+  let shadowInterval = Math.max(1, Math.floor(options.shadowInterval ?? 1));
+  let throttled = shadowInterval > 1 && sun !== null;
+  const lightShadow = () => sun?.shadow as unknown as { autoUpdate: boolean; needsUpdate: boolean } | undefined;
+  if (throttled) {
+    const sh = lightShadow()!;
+    sh.autoUpdate = false;
+    sh.needsUpdate = true;
+  }
+  let intervalTick = 0;
+  /** A sun change that can't wait for the tick (preset direction, shadow far, focus move). */
+  const pokeShadow = () => {
+    if (throttled) lightShadow()!.needsUpdate = true;
+  };
 
   let hemi: InstanceType<Three['HemisphereLight']> | null = null;
   if (features.hemisphere) {
@@ -299,6 +331,8 @@ export function createPhysicalRig(
       sun.color.set(p.colors.sun);
       sun.intensity = p.sunIntensity;
       placeSun(p.sunDirection);
+      // The sun moved: the atlas can't wait for the interval tick.
+      pokeShadow();
     }
     if (hemi) {
       hemi.color.set(p.colors.hemiSky);
@@ -357,14 +391,37 @@ export function createPhysicalRig(
       return presetId;
     },
     applyPreset,
+    setShadowInterval(interval: number) {
+      const next = Math.max(1, Math.min(8, Math.floor(interval)));
+      if (next === shadowInterval || !sun) return;
+      shadowInterval = next;
+      throttled = shadowInterval > 1;
+      intervalTick = 0;
+      const sh = lightShadow();
+      if (sh) {
+        sh.autoUpdate = !throttled;
+        // The change itself can't wait for a tick — refresh the atlas once now.
+        sh.needsUpdate = true;
+      }
+    },
     update(cameraY, x, z) {
       if (!sun) return;
+      // Every Nth frame the atlas re-renders; preset/far/focus changes poke it directly.
+      if (throttled) {
+        intervalTick = (intervalTick + 1) % shadowInterval;
+        if (intervalTick === 0) lightShadow()!.needsUpdate = true;
+      }
       if (features.sunShadow === 2) {
-        sun.shadow.camera.far = shadowFarForAltitude(cameraY);
+        const far = shadowFarForAltitude(cameraY);
+        if (sun.shadow.camera.far !== far) {
+          sun.shadow.camera.far = far;
+          pokeShadow();
+        }
       } else if (x !== focusX || z !== focusZ) {
         focusX = x;
         focusZ = z;
         placeSun(PHYSICAL_PRESETS[presetId].sunDirection);
+        pokeShadow();
       }
     },
     dispose() {

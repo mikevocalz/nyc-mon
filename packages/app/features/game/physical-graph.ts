@@ -46,6 +46,18 @@ export function loadSsrNode(): typeof import('three/examples/jsm/tsl/display/SSR
     : viaNode('three/examples/jsm/tsl/display/SSRNode.js')) as typeof import('three/examples/jsm/tsl/display/SSRNode.js');
 }
 
+export function loadFsr1Node(): typeof import('three/examples/jsm/tsl/display/FSR1Node.js') {
+  return (typeof require === 'function'
+    ? require('three/examples/jsm/tsl/display/FSR1Node.js')
+    : viaNode('three/examples/jsm/tsl/display/FSR1Node.js')) as typeof import('three/examples/jsm/tsl/display/FSR1Node.js');
+}
+
+export function loadTaauNode(): typeof import('three/examples/jsm/tsl/display/TAAUNode.js') {
+  return (typeof require === 'function'
+    ? require('three/examples/jsm/tsl/display/TAAUNode.js')
+    : viaNode('three/examples/jsm/tsl/display/TAAUNode.js')) as typeof import('three/examples/jsm/tsl/display/TAAUNode.js');
+}
+
 export function loadLoftedCar(): typeof import('./living-city/lofted-car.ts') {
   return (typeof require === 'function' ? require('./living-city/lofted-car.ts') : viaNode('./living-city/lofted-car.ts')) as typeof import('./living-city/lofted-car.ts');
 }

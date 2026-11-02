@@ -111,8 +111,8 @@ export interface SharedProbeDeps {
 
 /**
  * `shared`: a texture made on three's device is cleared by WebGPU, read
- * back, then handed to Skia's MakeImageFromGPUTexture, which accepts only
- * textures of its own device (react-native-skia 3.6.1 Image/ImageFactory.d.ts:
+ * back, then handed to Skia's MakeFromGPUTexture, which accepts only
+ * textures of its own device (react-native-skia 3.8.1 Image/ImageFactory.d.ts:
  * "must be created ... on the shared device"; throws if invalid). Pass:
  * the read-back is the marker and Skia takes the texture.
  */
@@ -144,7 +144,7 @@ export async function probeShared(deps: SharedProbeDeps): Promise<ProbeRecord> {
     let skiaAccepts: boolean | null = null;
     if (deps.skia) {
       try {
-        deps.skia.Image.MakeImageFromGPUTexture(texture).dispose();
+        deps.skia.Image.MakeFromGPUTexture(texture).dispose();
         skiaAccepts = true;
       } catch (error) {
         skiaAccepts = false;

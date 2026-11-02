@@ -17,5 +17,5 @@ export default [
   },
   // public/viro holds vendored, minified Viro web and SLAM builds (third-party
   // output, see public/viro/wasm/THIRD-PARTY-LICENSES.md); they aren't ours to lint.
-  { ignores: ['dist/**', '.output/**', '.vercel/**', '.tanstack/**', 'src/routeTree.gen.ts', 'public/viro/**'] },
+  { ignores: ['dist/**', '.output/**', '.vercel/**', '.tanstack/**', 'src/routeTree.gen.ts', 'public/viro/**', 'public/basis/**'] },
 ];

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { ktx2LoaderFor } from '../ktx2.ts';
 import { createHatchLight, whitener, type HatchLightTheme } from './hatch-light.ts';
 import { standFraming } from './framing.ts';
 import { weldSceneMorphSeams } from './morph-seams.ts';
@@ -145,14 +146,18 @@ function crackGlow(model: THREE.Object3D): (level: number) => void {
   };
 }
 
-function loadGlb(url: string): Promise<GLTF> {
-  // Same texture path as MonModel3D: <img> decoding, which an MCP Apps CSP allows for blob:.
-  return new GLTFLoader()
-    .register((parser) => {
-      parser.textureLoader = new THREE.TextureLoader(parser.options.manager);
-      return { name: 'NYC_MON_IMG_TEXTURES' };
+function loadGlb(url: string, renderer: THREE.WebGLRenderer): Promise<GLTF> {
+  // Same texture path as MonModel3D: <img> decoding, which an MCP Apps CSP
+  // allows for blob:; KTX2 textures go to the renderer's shared loader (ktx2.ts).
+  return ktx2LoaderFor(renderer)
+    .then((ktx2) => {
+      const loader = new GLTFLoader().register((parser) => {
+        parser.textureLoader = new THREE.TextureLoader(parser.options.manager);
+        return { name: 'NYC_MON_IMG_TEXTURES' };
+      });
+      if (ktx2) loader.setKTX2Loader(ktx2);
+      return loader.loadAsync(url);
     })
-    .loadAsync(url)
     .then((gltf) => {
       // Shape keys must move both copies of a UV-split vertex alike (morph-seams.ts).
       weldSceneMorphSeams(gltf.scene);
@@ -228,7 +233,7 @@ export function HatchSequence3D({ eggUrl, monUrl, monClips, width, height, label
     };
 
     // The egg is small and shows at once; the moment starts when the Baby is in too.
-    const eggLoad = loadGlb(eggUrl).then((gltf) => {
+    const eggLoad = loadGlb(eggUrl, renderer).then((gltf) => {
       if (disposed) return;
       const model = gltf.scene;
       const proxy = model.getObjectByName(PROXY_NODE);
@@ -265,7 +270,7 @@ export function HatchSequence3D({ eggUrl, monUrl, monClips, width, height, label
       light = createHatchLight(size.y, { theme: latest.current.theme });
       scene.add(light.group);
     });
-    const monLoad = loadGlb(monUrl).then((gltf) => {
+    const monLoad = loadGlb(monUrl, renderer).then((gltf) => {
       if (disposed) return;
       const model = gltf.scene;
       const size = centre(model);

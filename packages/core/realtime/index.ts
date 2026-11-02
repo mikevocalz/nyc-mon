@@ -12,3 +12,4 @@ export {
   type JoinRefusal,
   type TrustedJoin,
 } from './district-authority.ts';
+export { GEN_DISTRICT_ID, genDistrictSpec } from './gen-district.ts';
