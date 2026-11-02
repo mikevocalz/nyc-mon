@@ -47,9 +47,18 @@ export interface AcquireDeviceDeps {
 export function ownDeviceDescriptor(adapter: GPUAdapter): GPUDeviceDescriptor {
   // for...in reaches GPUSupportedLimits' WebIDL attributes; spread and
   // Object.keys see none, which is why requiredLimits is not `adapter.limits`.
+  // react-native-webgpu's JSI layer returns u64 limits (maxBufferSize, the
+  // binding-size members) as strings — the same serialization the Skia
+  // pointer hit — and handing a string back into requestDevice throws
+  // "Value is a string, expected a number" in the host function. Coerce to a
+  // number; a limit that can't fit a safe integer is dropped rather than
+  // passed through as a string (A12X iPad, Dawn 157).
   const requiredLimits: Record<string, number> = {};
-  const limits = (adapter.limits ?? {}) as unknown as Record<string, number>;
-  for (const name in limits) requiredLimits[name] = limits[name]!;
+  const limits = (adapter.limits ?? {}) as unknown as Record<string, number | string>;
+  for (const name in limits) {
+    const value = Number(limits[name]);
+    if (Number.isSafeInteger(value)) requiredLimits[name] = value;
+  }
   return {
     label: 'nyc-mon:own',
     requiredFeatures: (adapter.features ? [...adapter.features] : []) as GPUFeatureName[],
