@@ -1,11 +1,15 @@
 import { AudioContext } from 'react-native-audio-api';
+import { holdAmbientSession } from '../../audio/session';
 import { soundEnabled } from '../../device-preferences';
-import { scheduleChirp, type ChirpContext } from './chirp-core';
+import { chirpSeconds, scheduleChirp } from './chirp-core';
 
 /**
  * Native: the same chirp on react-native-audio-api, which mirrors Web Audio.
  * The context is made on the first press and kept; the stage's Sound switch
- * decides whether a press plays.
+ * decides whether a press plays. Each chirp takes the shared ambient-session
+ * lease (audio/session.native.ts) for its length, so the Ring/Silent switch
+ * silences it, and a voice line or care cue playing at the same moment keeps
+ * its own lease.
  */
 let context: AudioContext | null = null;
 
@@ -22,6 +26,14 @@ export function primeSideKeyChirp(): void {
 export function playSideKeyChirp(): void {
   // The Caller's Sound switch (Settings, M19) wins over the stage's own prop.
   if (!soundEnabled()) return;
+  // The lease goes first so the session is ambient before the context starts.
+  holdAmbientSession(chirpSeconds());
   primeSideKeyChirp();
-  if (context) scheduleChirp(context as unknown as ChirpContext);
+  if (!context) return;
+  const ctx = context;
+  if (ctx.state === 'suspended') {
+    void ctx.resume().then(() => scheduleChirp(ctx), () => {});
+    return;
+  }
+  scheduleChirp(ctx);
 }

@@ -52,11 +52,11 @@ export interface SkiaSurfaceLike {
   dispose(): void;
 }
 
-/** The parts of the react-native-skia 3.6.1 `Skia` API the bridge and the device probes call. */
+/** The parts of the react-native-skia 3.8.1 `Skia` API the bridge and the device probes call. */
 export interface SkiaInterop {
   getNativeDevice(): bigint;
   Surface: { MakeFromGPUTexture(texture: GPUTexture): SkiaSurfaceLike };
-  Image: { MakeImageFromGPUTexture(texture: GPUTexture): { dispose(): void } };
+  Image: { MakeFromGPUTexture(texture: GPUTexture): { dispose(): void } };
   XYWHRect(x: number, y: number, width: number, height: number): SkiaRectLike;
   Paint(): SkiaPaintLike;
 }
