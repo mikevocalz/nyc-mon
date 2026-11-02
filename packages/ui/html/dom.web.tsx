@@ -294,3 +294,39 @@ export const DropSurface = ({
 }: DropSurfaceProps) => (
   <div {...toDom(className, style)} {...props} />
 );
+
+export type FilePickerBaseProps = P & {
+  /** Visible text of the control. */
+  label: string;
+  /** Passed to the input's `accept`, e.g. ".glb,model/gltf-binary". */
+  accept?: string;
+  multiple?: boolean;
+  disabled?: boolean;
+  onFiles: (files: File[]) => void;
+  testID?: string;
+};
+
+/**
+ * The browse path beside a drop target: a visible label wrapping a visually
+ * hidden file input, so a click, Enter or Space opens the system picker and
+ * the choice arrives as `File`s. The input stays focusable; the label shows
+ * focus through `:focus-within`. Raw DOM stays inside /ui/html.
+ */
+export const FilePickerBase = ({ className, style, label, accept, multiple, disabled, onFiles, testID }: FilePickerBaseProps) => (
+  <label {...toDom(className, style)} data-testid={testID} aria-disabled={disabled || undefined}>
+    <input
+      type="file"
+      accept={accept}
+      multiple={multiple}
+      disabled={disabled}
+      style={VISUALLY_HIDDEN}
+      onChange={(event) => {
+        const files = Array.from(event.currentTarget.files ?? []);
+        // Clear it so picking the same file again still fires a change.
+        event.currentTarget.value = '';
+        if (files.length) onFiles(files);
+      }}
+    />
+    {label}
+  </label>
+);

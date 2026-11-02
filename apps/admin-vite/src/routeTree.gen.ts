@@ -29,6 +29,7 @@ import { Route as V1MeEggsRouteImport } from './routes/v1/me/eggs'
 import { Route as V1MeMonsRouteImport } from './routes/v1/me/mons'
 import { Route as V1MonsAdoptRouteImport } from './routes/v1/mons/adopt'
 import { Route as V1EggsIdHatchRouteImport } from './routes/v1/eggs/$id/hatch'
+import { Route as V1MonModelsGlbSpeciesRouteImport } from './routes/v1/mon-models/glb/$species'
 import { Route as V1MonsIdCareRouteImport } from './routes/v1/mons/$id/care'
 
 const IndexRoute = IndexRouteImport.update({
@@ -131,6 +132,11 @@ const V1EggsIdHatchRoute = V1EggsIdHatchRouteImport.update({
   path: '/$id/hatch',
   getParentRoute: () => V1EggsRoute,
 } as any)
+const V1MonModelsGlbSpeciesRoute = V1MonModelsGlbSpeciesRouteImport.update({
+  id: '/v1/mon-models/glb/$species',
+  path: '/v1/mon-models/glb/$species',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const V1MonsIdCareRoute = V1MonsIdCareRouteImport.update({
   id: '/v1/mons/$id/care',
   path: '/v1/mons/$id/care',
@@ -157,6 +163,7 @@ export interface FileRoutesByFullPath {
   '/v1/mons/adopt': typeof V1MonsAdoptRoute
   '/admin/': typeof PayloadAdminIndexRoute
   '/v1/eggs/$id/hatch': typeof V1EggsIdHatchRoute
+  '/v1/mon-models/glb/$species': typeof V1MonModelsGlbSpeciesRoute
   '/v1/mons/$id/care': typeof V1MonsIdCareRoute
 }
 export interface FileRoutesByTo {
@@ -179,6 +186,7 @@ export interface FileRoutesByTo {
   '/v1/mons/adopt': typeof V1MonsAdoptRoute
   '/admin': typeof PayloadAdminIndexRoute
   '/v1/eggs/$id/hatch': typeof V1EggsIdHatchRoute
+  '/v1/mon-models/glb/$species': typeof V1MonModelsGlbSpeciesRoute
   '/v1/mons/$id/care': typeof V1MonsIdCareRoute
 }
 export interface FileRoutesById {
@@ -203,6 +211,7 @@ export interface FileRoutesById {
   '/v1/mons/adopt': typeof V1MonsAdoptRoute
   '/_payload/admin/': typeof PayloadAdminIndexRoute
   '/v1/eggs/$id/hatch': typeof V1EggsIdHatchRoute
+  '/v1/mon-models/glb/$species': typeof V1MonModelsGlbSpeciesRoute
   '/v1/mons/$id/care': typeof V1MonsIdCareRoute
 }
 export interface FileRouteTypes {
@@ -227,6 +236,7 @@ export interface FileRouteTypes {
     | '/v1/mons/adopt'
     | '/admin/'
     | '/v1/eggs/$id/hatch'
+    | '/v1/mon-models/glb/$species'
     | '/v1/mons/$id/care'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -249,6 +259,7 @@ export interface FileRouteTypes {
     | '/v1/mons/adopt'
     | '/admin'
     | '/v1/eggs/$id/hatch'
+    | '/v1/mon-models/glb/$species'
     | '/v1/mons/$id/care'
   id:
     | '__root__'
@@ -272,6 +283,7 @@ export interface FileRouteTypes {
     | '/v1/mons/adopt'
     | '/_payload/admin/'
     | '/v1/eggs/$id/hatch'
+    | '/v1/mon-models/glb/$species'
     | '/v1/mons/$id/care'
   fileRoutesById: FileRoutesById
 }
@@ -292,6 +304,7 @@ export interface RootRouteChildren {
   V1MeEggsRoute: typeof V1MeEggsRoute
   V1MeMonsRoute: typeof V1MeMonsRoute
   V1MonsAdoptRoute: typeof V1MonsAdoptRoute
+  V1MonModelsGlbSpeciesRoute: typeof V1MonModelsGlbSpeciesRoute
   V1MonsIdCareRoute: typeof V1MonsIdCareRoute
 }
 
@@ -437,6 +450,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof V1EggsIdHatchRouteImport
       parentRoute: typeof V1EggsRoute
     }
+    '/v1/mon-models/glb/$species': {
+      id: '/v1/mon-models/glb/$species'
+      path: '/v1/mon-models/glb/$species'
+      fullPath: '/v1/mon-models/glb/$species'
+      preLoaderRoute: typeof V1MonModelsGlbSpeciesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/v1/mons/$id/care': {
       id: '/v1/mons/$id/care'
       path: '/v1/mons/$id/care'
@@ -491,6 +511,7 @@ const rootRouteChildren: RootRouteChildren = {
   V1MeEggsRoute: V1MeEggsRoute,
   V1MeMonsRoute: V1MeMonsRoute,
   V1MonsAdoptRoute: V1MonsAdoptRoute,
+  V1MonModelsGlbSpeciesRoute: V1MonModelsGlbSpeciesRoute,
   V1MonsIdCareRoute: V1MonsIdCareRoute,
 }
 export const routeTree = rootRouteImport

@@ -101,8 +101,6 @@ export function FeedScreen() {
       case 'fell-asleep':
       case 'woke':
       case 'played':
-      case 'paused':
-      case 'resumed':
         // Feed never returns these; listed so a new outcome fails typecheck here.
         return;
       default:

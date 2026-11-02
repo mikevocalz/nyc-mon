@@ -1,0 +1,69 @@
+# Asset production pipeline — Blender → GLB → LOD → manifest → R2/Bunny → three
+
+Phase 2 (PR 2) state doc, written 2026-10-31 on `pixy-branch`. Maps the target
+§9 chain — `Blender Skills → Blender MCP → Procedural Geometry → Optimization →
+LOD/HLOD → Meshopt/GLB → KTX2 → Manifest → Cloudflare R2 → Three.js` — onto what
+the repo actually has, with the verified bits marked.
+
+## Verified today
+
+- **Blender MCP live**: `blender_mcp.py` addon installed, Blender 5.2.3 LTS
+  listening on `localhost:9876`. `execute_code` drove a real bpy script → GLB
+  export (`/tmp/phase2-smoke.glb`, valid glTF 2.0 binary). The exporter reports
+  **Draco and MeshOptimizer bridges available** in the installed Blender — the
+  Meshopt/GLB encode stage needs no external tooling for Blender-side work.
+  `tooling/blender/hatching/build.py` is already written to run live in an MCP
+  session via `build.run(path)` (README:30-33).
+- **Blender Skills pack vendored**: `skills/blender-skills/` @ upstream
+  `8f778d2` (MIT) — 94 skill dirs + shared `references/` (asset-pipeline,
+  mcp-integration, mcp-tools, polycount-budgets, validation-checklist…). Entry
+  point `blender-director/SKILL.md`. Pure markdown, no scripts — safety-reviewed.
+  Registered in `skills/README.md` (lanes B1, E). Caveat recorded in SOURCE.md:
+  pack skills expect a BlenderMCP connection; without it they degrade to manual
+  UI guidance. This checkout has the addon socket working.
+
+## Stage-by-stage state (from the Phase-2 audit)
+
+| Stage | State | Evidence | Gap |
+|---|---|---|---|
+| Procedural geometry | Proven, egg-scoped | `tooling/blender/hatching/` (fracture/goo/baby_proxy/build) — headless `blender -b -P build.py -- manifests/<egg>.json` | Nothing general-purpose |
+| GLB output | Proven | `packages/assets/eggs/<egg>/<egg>-hatch.glb` (4 eggs shipped) + Blender export verified today | — |
+| Optimization | Partial | `compress.sh` = gltf-transform dedup+quantize only (deliberately no meshopt/Draco — Hermes lacks WASM); `MeshoptSimplifier` powers city LOD | No generic asset optimize pass; Mon GLBs ship 19–24 MB unoptimized |
+| LOD/HLOD | City: proven (3 tiers + far L4/L6 + imposters). Assets: near/mid/far bake landed | `harvest.js`, `write.mjs`, `bake-cars.mjs` (near/mid/far index lists), `tooling/assets/lod.mjs` (per-GLB tiers + pinned manifest) | No per-asset HLOD |
+| KTX2 | Decode only; platform verdict in | `bake-cars.mjs`, `bake-pbr.mjs` transcode `KHR_texture_basisu` in; verdict: **web GO** (needs `requiredFeatures` on the shared device + `setKTX2Loader` + transcoder assets), **native NO-GO for BasisU** (no WASM on Hermes) but GO for raw-vkFormat KTX2, **Viro NO-GO** (virocore has no basisu) | No encoder installed (`gltfpack` present, needs `toktx`); ~~shared `GPUDevice` requests no features~~ done (`ownDeviceDescriptor`, `acquire-device.ts` + `gpu-store.ts`); ~~no `setKTX2Loader` wiring~~ done (`three/ktx2.ts` shared per-renderer loader on `mon-rig.ts`, `egg-hatch-rig.ts`, `MonModel3D.tsx`, `HatchSequence3D.tsx`); transcoder assets copied by `tooling/copy-basis-assets.mjs` → `/basis/` |
+| Manifest | Per-lane | `hatch.manifest.json`, `vd-cells-manifest.ts`, `vd-systems-manifest.ts`, Payload `mon-models` rows | No asset→manifest for new GLB geometry |
+| R2 release | Proven, city-only | `r2-publish.mjs` (SigV4, sha256 re-hash, immutable, release-last manifest, rollback) + `r2-verify.mjs` | Locked to vd-cell manifest shape; no GLB asset lane (eggs bundle, Mons go Bunny) |
+| Validation | Working, fragmented | `validate.py` (egg-deep), `validate-glb.mjs` (container+bounds), `glb.ts` (upload gate), `asset-validation.ts` (descriptors), city tests | No tri/material/UV/normals checks on GLBs; nothing runs in CI |
+| Collision proxies | City only | `write-colliders.mjs` (prism VGC1) | No per-asset collider generation |
+| Mon/character production | Manual upload only | Payload admin staged upload → `checkMonModelFile`/`readGlb` → Bunny → `/v1/mon-models/glb/<dex>` | 2/115 forms exist; no rig/clip/morph conformance check (runtime wants `jawBone`, `lid_*`, `up_turn_*` — `mon-rig.ts`), no LODs, no batch tooling |
+
+## Next slices (PR 2 continues)
+
+1. ~~`tooling/assets/lod.mjs` — generic LOD0/1/2 bake via `MeshoptSimplifier`
+   (already a dependency) + manifest entry reusing `asset-validation.ts`'s
+   near/medium/far tier vocabulary. Cheapest real win.~~ **Done** —
+   `tooling/assets/lod.mjs` (index-only decimation, sha256-pinned manifest;
+   bake tier names near/mid/far, `mid` = descriptor `medium`) +
+   `tooling/assets/lod.test.mjs`.
+2. Asset manifest writer + publish lane for GLB geometry — **decided
+   2026-10-31: Bunny CDN via the Payload staged-upload path** (the mon-models
+   `_staging` flow + `beforeChange` gate), not a new R2 lane. Next slice: a
+   manifest writer + Payload collection shape for general assets.
+3. KTX2: platform verdict done (see stage row). Next steps: populate
+   `requiredFeatures` from `adapter.features` in `gpu-store.ts:51` /
+   `acquire-device.ts:56`, wire `setKTX2Loader` on the three GLTFLoader sites,
+   serve `basis_transcoder` assets on web, install `toktx`, encode per-platform
+   (UASTC web / raw-vkFormat ASTC native / leave Viro lanes uncompressed or
+   dual-emit). Runtime sampling proof still owed on browser+simulator.
+4. ~~CI: wire `validate-glb.mjs` + a tri/UV/normals check into a workflow.~~
+   **Done** — `.github/workflows/asset-validation.yml` + extended validator
+   (tri budget 100k, NORMAL/TEXCOORD_0 checks, quantized-units fix).
+   `corner-egg-hatch.glb` (152,850 tris) now fails the gate — real finding,
+   open decision: bake LODs or raise budget.
+5. Mon batch conformance check against `mon-rig.ts` expectations.
+
+## Notes for lanes
+
+- Keep editable `.blend` sources out of shipped asset dirs (`packages/assets/eggs/*/source/` pattern already does this).
+- meshopt/Draco in GLBs shipped to native is a hard no while Hermes lacks WASM — quantize (KHR_mesh_quantization) is the compatible codec (`compress.sh`, `glbDequantize.ts`).
+- Do not claim MCP-driven assets were produced unless the `execute_code` transcript is in the PR.

@@ -8,13 +8,14 @@ import { brand, palette, semantic } from '@acme/theme';
 import { CARE_COLORS } from '../../../ui/care/care-colors.ts';
 import { buildUi } from './build.ts';
 import { readFileSync } from 'node:fs';
+import { modelFixturePath } from './test-host/model-fixtures.ts';
 import { careOutcomeText, clipsFor, eggDetailText, eggTimeText, MON_CLIPS, spokenSummary, toMonViewModel } from './contract.ts';
 import { getUiResources, MON_MODEL_ORIGIN, mcpAppsRegistration, parseUiManifest, UI_MIME_TYPE, UI_TOOL_LINKS, type UiResource } from './index.ts';
 
 /**
  * Budgets per view, measured 2026-10-08. The card is about 1398 KiB raw,
  * 475 KiB gzip: React, react-native-web and the kit pieces, the ext-apps App
- * runtime with zod (about 445 KiB), Tailwind's CSS, two WOFF2 fonts and three
+ * runtime with zod (about 445 KiB), Tailwind's CSS, two WOFF2 fonts and four
  * Baby stills. The room adds the GridBand backdrop (GridFloor, the TypeGPU
  * scene and the CanvasKit loader glue, not the WASM): about 2270 KiB raw,
  * 722 KiB gzip. Alexa+ names no byte limit; it asks for one gzipped,
@@ -25,8 +26,13 @@ const BUDGET: Readonly<Record<string, { raw: number; gzip: number }>> = {
   // evolution light, shards and synthesized sound (hatch-light.ts,
   // hatch-sound.ts, 2026-10-23) add about 37 KB raw, 12 KB gzip: drawn in
   // three.js because the MCP Apps CSP refuses the Rive runtime's WebAssembly.
-  'mon-card': { raw: 2200 * 1024, gzip: 700 * 1024 },
-  'mon-room': { raw: 2950 * 1024, gzip: 920 * 1024 },
+  // The fourth starter (Decision 38, 2026-10-29) brings the LanternFye forms,
+  // their v8 records and the Signal Egg thumbnail into the starter bundle,
+  // which put the room about 1 KB over 2950 KiB; it gets 8 KiB more. Fye
+  // Dot's still (2026-10-30) joins the Baby set at full size instead of a
+  // thumbnail, about 40 KB raw and 19 KB gzip on each view.
+  'mon-card': { raw: 2272 * 1024, gzip: 736 * 1024 },
+  'mon-room': { raw: 3024 * 1024, gzip: 944 * 1024 },
 };
 
 /**
@@ -112,6 +118,14 @@ describe('built MCP App views', () => {
     for (const { id, html } of resources) {
       expect(Buffer.byteLength(html), `${id} raw bytes`).toBeLessThanOrEqual(BUDGET[id]!.raw);
       expect(gzipSync(html, { level: 9 }).byteLength, `${id} gzip bytes`).toBeLessThanOrEqual(BUDGET[id]!.gzip);
+    }
+  });
+
+  it('does not embed the WASM texture decoders that the MCP sandbox cannot execute', () => {
+    for (const { html } of resources) {
+      expect(html).not.toContain('data:application/wasm');
+      expect(html).not.toContain('basis_transcoder.wasm');
+      expect(html).not.toContain('basis_transcoder.js');
     }
   });
 
@@ -217,6 +231,16 @@ describe('view model (adapter onto the companion models)', () => {
     expect(toMonViewModel({ mon: { monId: 'm1', speciesId: 'dex-002' }, care: careView })?.egg).toBeNull();
   });
 
+  it("reads the server's gated say line for a babbling Mon or egg, and null otherwise", () => {
+    const say = { text: 'Bwa-gu mi!', caption: 'Bwa-gu mi!', voiceStage: 'baby-talk', verbatim: true };
+    const mon = { monId: 'm1', speciesId: 'dex-002' };
+    expect(toMonViewModel({ mon, care: careView, say })?.say).toEqual({ caption: 'Bwa-gu mi!', voiceStage: 'baby-talk' });
+    expect(toMonViewModel({ mon, care: careView })?.say).toBeNull();
+    expect(toMonViewModel({ mon, care: careView, say: { caption: 'x', voiceStage: 'shouting' } })?.say).toBeNull();
+    const egg = { eggId: 'e', speciesId: 'dex-001', incubationEndsAt: Date.now() + 60_000, minutesRemaining: 1, readyToHatch: false, say };
+    expect(toMonViewModel({ incubating: true, eggs: [egg] })?.say).toEqual({ caption: 'Bwa-gu mi!', voiceStage: 'baby-talk' });
+  });
+
   describe("hatch_egg's result", () => {
     const hatchResult = (hatching: boolean) => ({
       hatched: true,
@@ -261,9 +285,8 @@ describe('view model (adapter onto the companion models)', () => {
 
 describe('mood on screen (MonModel3D clip by mood)', () => {
   const careView = { energy: 0.72, fullness: 0.31, social: 0.58, activity: 'awake', sluggish: false, wantsFood: true, lastFedAt: null };
-  const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..');
   const glbClips = (file: string): Set<string> => {
-    const b = readFileSync(join(repoRoot, 'apps/web/public/mons', `${file}.glb`));
+    const b = readFileSync(modelFixturePath(`${file}.glb`));
     const json = JSON.parse(b.subarray(20, 20 + b.readUInt32LE(12)).toString('utf8')) as { animations?: { name: string }[] };
     return new Set((json.animations ?? []).map((a) => a.name));
   };

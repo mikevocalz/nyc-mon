@@ -11,7 +11,6 @@ import {
   createEggRecord,
   createHatchState,
   createInitialCareState,
-  createInitialClassicCare,
   enqueueCareWrite,
   enqueueEggCreate,
   type HatchEvent,
@@ -186,15 +185,14 @@ export function createMonStore(io: SaveIO, options: MonStoreOptions = {}) {
       const hatches = save.hatches.some((h) => h.eggId === eggId)
         ? save.hatches.map((h) => (h.eggId === eggId ? next : h))
         : [...save.hatches, next];
-      let { mons, care, journal, classic } = save;
+      let { mons, care, journal } = save;
       const newMon = next.kind === 'hatched' && !mons.some((m) => m.monInstanceId === next.mon.monInstanceId);
       if (newMon) {
         mons = [...mons, next.mon];
         care = [...care, createInitialCareState(next.mon.monInstanceId, atMs)];
-        classic = [...classic, createInitialClassicCare(next.mon, atMs)];
         journal = [...appendJournalEntry(journal, { monInstanceId: next.mon.monInstanceId, kind: 'hatched', at: atMs })];
       }
-      io.write({ ...save, savedAt: atMs, hatches, mons, care, journal, classic });
+      io.write({ ...save, savedAt: atMs, hatches, mons, care, journal });
       if (newMon) set({ activeMonInstanceId: next.mon.monInstanceId });
       return next;
     },

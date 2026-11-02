@@ -12,7 +12,7 @@ import {
   deriveMonInstanceId,
   mintMonInstance,
 } from '@acme/core/sim';
-import { APIError, NotFound, commitTransaction, createLocalReq, getPayload, initTransaction, killTransaction } from 'payload';
+import { APIError, NotFound, commitTransaction, createPayloadRequest, getPayload, initTransaction, killTransaction } from 'payload';
 import type { Payload, PayloadRequest, User } from 'payload';
 import type {} from '../../../payload-types.ts';
 import { CARE_STATES_SLUG, toCareState } from '../../../collections/CareStates.ts';
@@ -130,10 +130,11 @@ async function buildContext(request: Request, getPayloadFor: () => Promise<Paylo
   }
   if (caller instanceof Response) return caller;
 
-  const req = await createLocalReq(
-    { user: caller.user as unknown as User, req: { headers: request.headers } as Partial<PayloadRequest> },
+  const req = await createPayloadRequest({
     payload,
-  );
+    user: caller.user as unknown as User,
+    req: { headers: request.headers } as Partial<PayloadRequest>,
+  });
   return { payload, callerId: caller.callerId, req };
 }
 

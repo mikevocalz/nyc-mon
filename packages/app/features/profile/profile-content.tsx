@@ -10,6 +10,7 @@ import { Avatar, Heading, Image, LoadingSkeleton, PressScale, Text, FadeIn, Scal
 import { ChevronRight, KeyRound, Settings as SettingsIcon } from '@acme/ui/icons';
 import { copy } from '../onboarding/copy';
 import { monIdentity } from '../companion/mon-identity';
+import { useAdminStills } from '../mons/use-admin-stills';
 import { tickMinuteClock, useMinuteClock } from '../companion/minute-clock';
 import { useMonStore } from '../mon/mon.store';
 import { callerSummary } from './caller-model';
@@ -102,6 +103,7 @@ export function CallerRecord() {
 export function MonsRaised() {
   const router = useRouter();
   const { hydrated, summary } = useCallerSummary();
+  const stills = useAdminStills();
   let body: ReactNode;
   if (!hydrated) {
     body = (
@@ -117,7 +119,7 @@ export function MonsRaised() {
     );
   } else {
     body = summary.mons.map(({ mon, daysTogether }) => {
-      const who = monIdentity(mon);
+      const who = monIdentity(mon, stills);
       const stage = callerCopy('caller.mons.stage', { stage: mon.stage });
       const days = daysTogetherLine(daysTogether);
       return (

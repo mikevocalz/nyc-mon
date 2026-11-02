@@ -128,7 +128,9 @@ function build(THREE: Three, env: ShellEnv, fw14: TextureT | null): BasicMat {
     const V = T.normalize(T.cameraPosition.sub(wPos));
     N = T.select(T.dot(N, V).lessThan(0), N.negate(), N) as unknown as V3;
     const ndl = T.max(T.dot(N, env.sunDir), 0);
-    const light = env.skyAmbient.mul(T.float(0.8).add(T.max(N.y, 0).mul(0.3))).mul(T.mix(WALL_SKY, 1, T.abs(N.y)))
+    const aoA = T.attribute('ao', 'float') as unknown as F;
+    const aoV = T.mix(T.float(1), aoA, T.step(T.float(0.001), aoA));
+    const light = env.skyAmbient.mul(T.float(0.8).add(T.max(N.y, 0).mul(0.3))).mul(T.mix(WALL_SKY, 1, T.abs(N.y))).mul(aoV)
       .add(env.sunColor.mul(ndl.mul(1.05)).mul(T.smoothstep(-0.06, 0.04, env.sunDir.y)));
     dc.mulAssign(light);
     // TOWERFX

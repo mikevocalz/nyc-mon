@@ -204,7 +204,11 @@ export function writeVehicleFlares(
   mount: FlareMount,
   focus: LightFocus,
   metresPerPixel: number,
+  originX = 0,
+  originZ = 0,
 ): number {
+  const rx = vehicle.x - originX;
+  const rz = vehicle.z - originZ;
   const dx = vehicle.x - focus.x;
   const dz = vehicle.z - focus.z;
   const y = focus.y ?? 0;
@@ -226,9 +230,9 @@ export function writeVehicleFlares(
     for (let side = -1; side <= 1; side += 2) {
       const lx = side * (front ? mount.frontX : mount.rearX);
       const o = s * FLARE_STRIDE;
-      pos[o] = vehicle.x + lx * cy + lz * sy;
+      pos[o] = rx + lx * cy + lz * sy;
       pos[o + 1] = ly;
-      pos[o + 2] = vehicle.z - lx * sy + lz * cy;
+      pos[o + 2] = rz - lx * sy + lz * cy;
       pos[o + 3] = size;
       col[o] = rgb[0] * w;
       col[o + 1] = rgb[1] * w;

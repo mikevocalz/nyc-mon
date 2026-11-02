@@ -31,7 +31,7 @@ describe('per-individual gender and voice lineage', () => {
   });
 
   it('reaches both genders and every voice slot over a sample of eggs', () => {
-    const genders = new Set(SAMPLE.map(deriveMonGender));
+    const genders = new Set(SAMPLE.map((id) => deriveMonGender(id)));
     expect(genders).toEqual(new Set(['female', 'male']));
     const slots = new Set(SAMPLE.map((id) => parseVoiceLineageId(deriveVoiceLineageId(eggFor(id)))?.slot));
     expect(slots).toEqual(new Set(Array.from({ length: VOICE_SLOTS_PER_GENDER }, (_, i) => i + 1)));
@@ -55,9 +55,10 @@ describe('per-individual gender and voice lineage', () => {
   });
 
   it('names the line by the egg form, so the lineage id says which pool to read', () => {
-    const lineage = deriveVoiceLineageId(eggFor('egg-7'));
+    const egg = eggFor('egg-7');
+    const lineage = deriveVoiceLineageId(egg);
     const parsed = parseVoiceLineageId(lineage);
-    expect(parsed).toEqual({ lineKey: 'dex-001', gender: deriveMonGender('egg-7'), slot: expect.any(Number) });
+    expect(parsed).toEqual({ lineKey: 'dex-001', gender: deriveMonGender('egg-7', egg.speciesId), slot: expect.any(Number) });
     expect(lineage).toBe(`dex-001/${parsed?.gender}/${parsed?.slot}`);
   });
 
@@ -71,7 +72,7 @@ describe('per-individual gender and voice lineage', () => {
     const egg = eggFor('egg-42');
     const mon = mintMonInstance(egg);
     expect(MonInstanceSchema.parse(mon)).toEqual(mon);
-    expect(mon.gender).toBe(deriveMonGender('egg-42'));
+    expect(mon.gender).toBe(deriveMonGender('egg-42', egg.speciesId));
     expect(mon.voiceLineageId).toBe(deriveVoiceLineageId(egg));
     expect(mintMonInstance(egg)).toEqual(mon);
   });

@@ -22,6 +22,8 @@ import type { ThreeSetup } from '@acme/ui/three';
 import type { CitySceneParams } from './city-scene.ts';
 import { gameScreenActions, loadProgressAt, type LoadStage } from './game-session.ts';
 import { preloadVdBlocks } from './world/vd-port/blocks/load.ts';
+import { preloadVdFar } from './world/vd-port/far-tier/load.ts';
+import { preloadVdStorefrontPlan } from './world/vd-port/storefronts/load.ts';
 import { compileForFrames } from './compile-pass.ts';
 
 export interface GameSceneParams extends CitySceneParams {
@@ -228,8 +230,16 @@ export function withFirstFrameSignal(
 
 export const loadGameScene = (): Promise<ThreeSetup<GameSceneParams>> => {
   gameScreenActions.loadStage('requested');
-  // The vd port's block packs are read while the scene module loads: the world is built synchronously and needs them there.
-  return Promise.all([import('./city-scene.ts'), preloadVdBlocks()]).then(([m]) => {
+  // The vd port's block packs, storefront plan and the far tier's bundled home chunks are read while the scene module
+  // loads: the world is built synchronously and needs them there (the rest of the far tier streams through the cell
+  // source on demand).
+  const mark = (f: number) => <T>(v: T): T => (gameScreenActions.loadStage('moduleLoaded', f), v);
+  return Promise.all([
+    import('./city-scene.ts').then(mark(0.3)),
+    preloadVdBlocks().then(mark(0.5)),
+    preloadVdStorefrontPlan().then(mark(0.7)),
+    preloadVdFar().then(mark(0.9)),
+  ]).then(([m]) => {
     gameScreenActions.loadStage('moduleLoaded');
     return withFirstFrameSignal(m.createCityScene);
   });

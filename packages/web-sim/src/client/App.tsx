@@ -29,6 +29,7 @@ import {
 import { IDLE, nextConversation, openEar, type ConversationEvent, type ConversationMode, type Ear } from './handsFree.ts';
 import { monSpeechPort } from './monSpeechPort.ts';
 import { createSentenceSplitter } from './sentenceStream.ts';
+import { gatedLine } from './monVoice.ts';
 import { loadVoice, sameVoice, saveVoice, stickyVoice, type RememberedVoice } from './sessionVoice.ts';
 import { canListen, canSpeak, listen, setSessionVoice, stopSpeaking } from './speech.ts';
 import { addSpeechCueListener, emitSpeechCue } from './speechCues.ts';
@@ -568,7 +569,8 @@ export function App({ config }: { config: PublicConfig }) {
       const say = (sentences: string[]) => {
         for (const raw of sentences) {
           // Quote marks are never spoken (and never captioned): the voice gets the words only.
-          const s = spokenText(raw);
+          // The speech gate keeps the caption on what the voice says (babble for an Egg; Decision 32).
+          const s = gatedLine(spokenText(raw), voiceRef.current?.voice);
           if (!s) continue;
           if (marksRef.current && marksRef.current.firstSentence === undefined) marksRef.current.firstSentence = performance.now();
           spokeAny = true;
@@ -675,7 +677,7 @@ export function App({ config }: { config: PublicConfig }) {
         say(splitter.flush());
         // A canned line (refusal, step limit) was never streamed: speak it now.
         if (reply && !spokeAny) say([reply]);
-        if (reply) push({ kind: 'mon', id: newId('m'), text: reply, at: Date.now() });
+        if (reply) push({ kind: 'mon', id: newId('m'), text: gatedLine(reply, voiceRef.current?.voice), at: Date.now() });
         if (turn.outcome === 'truncated') notice('The reply was cut off before a tool call finished. Ask again.', 'error');
         finishSpeech();
       } catch (err) {

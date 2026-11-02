@@ -1,6 +1,6 @@
 import { deriveVoiceLineageId, LIFECYCLE_STAGES, MON_MOODS, type MonMood } from '@acme/core';
 import { describe, expect, it } from 'vitest';
-import { FALLBACK_MON_LINGO, MON_LINGO_SEED_ROWS, MON_VOICES_SEED, monLingoFromRows, parseMonLingo } from '../lingo/index.ts';
+import { FALLBACK_MON_LINGO, MON_BABBLE_SEED_ROWS, MON_EGG_STAGE_PITCH, MON_LINGO_SEED_ROWS, MON_VOICES_SEED, monLingoFromRows, parseMonLingo } from '../lingo/index.ts';
 import { MON_LINE_OCCASIONS, monLine } from '../mon-lines.ts';
 import { allSpecies, bloodlines } from '../mons/index.ts';
 import { captionText } from '../captions.ts';
@@ -17,6 +17,10 @@ import * as legacyVoices from './legacy/voices.ts';
  * (hard-coded tables). Every plan the planner makes from the seed (and from
  * the seed after a JSON round trip, which is what a client receives from
  * `GET /v1/mon-lingo`) must serialize byte for byte like the legacy plan.
+ *
+ * Decision 32 (2026-10-29) changed what an Egg and a Baby say on purpose (the
+ * speech gate), so parity covers the stages the gate leaves alone (Small, Mid,
+ * Max, and no Mon voice), compared without the plan's two new fields.
  */
 
 export const PARITY_TEXTS: readonly string[] = [
@@ -53,7 +57,7 @@ function legacyRefs(): (MonVoiceRef | undefined)[] {
   for (const bloodline of bloodlines) for (let i = 0; i < 40; i++) lineages.add(deriveVoiceLineageId({ eggId: `egg-${i}`, speciesId: bloodline.chain.speciesId }));
   const refs: (MonVoiceRef | undefined)[] = [undefined];
   for (const lineageId of lineages) {
-    for (const stage of LIFECYCLE_STAGES) {
+    for (const stage of LIFECYCLE_STAGES.filter((s) => s !== 'Egg' && s !== 'Baby')) {
       refs.push({ lineageId, stage });
       for (const mood of MON_MOODS) refs.push({ lineageId, stage, mood });
     }
@@ -66,20 +70,26 @@ describe('lingo parity: seed tables vs the hard-coded tables they replaced', () 
 
   it('the served JSON parses back', () => {
     expect(served).toBeDefined();
-    expect(monLingoFromRows(MON_LINGO_SEED_ROWS, MON_VOICES_SEED)).toEqual(FALLBACK_MON_LINGO);
+    expect(served).toEqual(FALLBACK_MON_LINGO);
+    expect(monLingoFromRows([...MON_LINGO_SEED_ROWS, ...MON_BABBLE_SEED_ROWS], { ...MON_VOICES_SEED, stagePitch: { ...MON_VOICES_SEED.stagePitch, egg: MON_EGG_STAGE_PITCH } })).toEqual(FALLBACK_MON_LINGO);
   });
 
   it('plans every text for every lineage, stage and mood byte-identically', () => {
     let compared = 0;
+    const withoutGate = (plan: ReturnType<typeof planMonUtterance>) => {
+      const { voiceStage: _stage, gated, ...rest } = plan;
+      expect(gated).toBe(false);
+      return JSON.stringify(rest);
+    };
     for (const ref of legacyRefs()) {
       for (const text of PARITY_TEXTS) {
         const legacy = JSON.stringify(legacyVoice.planMonUtterance(text, ref));
-        expect(JSON.stringify(planMonUtterance(text, ref)), `${ref?.lineageId}/${ref?.stage}/${ref?.mood} ${text}`).toBe(legacy);
-        expect(JSON.stringify(planMonUtterance(text, ref, served))).toBe(legacy);
+        expect(withoutGate(planMonUtterance(text, ref)), `${ref?.lineageId}/${ref?.stage}/${ref?.mood} ${text}`).toBe(legacy);
+        expect(withoutGate(planMonUtterance(text, ref, served))).toBe(legacy);
         compared += 1;
       }
     }
-    expect(compared).toBeGreaterThan(20_000);
+    expect(compared).toBeGreaterThan(10_000);
     // 60,000+ plans: about 3 s locally, past vitest's 5 s default on shared CI runners.
   }, 60_000);
 

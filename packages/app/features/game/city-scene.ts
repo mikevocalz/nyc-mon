@@ -7,7 +7,7 @@ import type { ThreeContext, ThreeScene } from '@acme/ui/three';
 import type { CityDatasetV3 } from './city-dataset.ts';
 import type { ActorFrame, SceneActor, SceneActorFactory } from './scene-actor.ts';
 import { buildCityWorld } from './world/index.ts';
-import { installShadowPassAlphaTest } from './world/shadow-pass-alpha.ts';
+import { createKlippShotRig, type KlippCameraShot } from './camera/klipp-shot-bridge.ts';
 import { shadowSafeCasters } from './world/vd-port/shared/shadow-safe.ts';
 import { cityCompilePass, type CompilePass } from './compile-pass.ts';
 import { EXPERIMENTAL_WORLD_POST, mountCityPostPipeline, resolvePostOptions } from './post/pipeline.ts';
@@ -15,7 +15,8 @@ import { livingCityAdaptiveBridge } from './living-city/adaptive-bridge.ts';
 import { EXPERIMENTAL_WORLD_RENDER_SCALE, mountRenderScale } from './perf/render-scale.ts';
 import { EXPERIMENTAL_WORLD_THERMAL, thermalSignal, thermalWorsened } from './perf/thermal.ts';
 import { TIER, tierBundle, WORLD_TIER, WORLD_TIER_SELECTED } from './perf/tier.ts';
-import { detectWorldPreset, screenErrorScale, worldStreamEnabled } from './perf/tier-presets.ts';
+import { adaptiveFrameBridge, createAdaptiveTierController, EXPERIMENTAL_WORLD_ADAPTIVE } from './perf/adaptive-tiers.ts';
+import { detectWorldPreset, screenErrorScale, WORLD_PRESETS, WORLD_PRESET_SELECTED, worldStreamEnabled } from './perf/tier-presets.ts';
 import type { CellStreamStats } from './world/cells/cell-stream.ts';
 import { parseSkyRigFlag, type SkyName } from './world/sky-rig.ts';
 import { FrameSampleWindow } from './perf/frame-sampler.ts';
@@ -25,6 +26,8 @@ import {
   isDeviceLaneProbe,
   physicalFeaturesFor,
   WORLD_PROBE,
+  WORLD_SHADOW_INTERVAL,
+  WORLD_SHADOW_INTERVAL_SELECTED,
   type DeviceLaneProbe,
   type PhysicalFeatures,
   type PhysicalPresetId,
@@ -35,6 +38,10 @@ import type { PhysicalRig } from './world/physical-rig.ts';
 import { loadPhysicalRig } from './physical-graph.ts';
 import { backendUploaded, createUploadedReleaser, RELEASE_UPLOADED } from './world/release-uploaded.ts';
 import { applyReversedDepthOffsets } from './world/reversed-depth-offset.ts';
+import { createFloatingOrigin, updateFloatingOrigin } from './world/floating-origin.ts';
+import { setRenderOrigin } from './world/render-space.ts';
+import { CELL } from './world/cells/cell-rules.ts';
+import { cameraPose, type CameraPose } from './city-camera-pose.ts';
 
 export interface CityCamera {
   x: number;
@@ -45,6 +52,8 @@ export interface CityCamera {
 export interface CitySceneParams {
   dataset: CityDatasetV3;
   camera: CityCamera;
+  /** Optional shot output for the Klipp rig; no change to the saved player camera. */
+  cinematicShot?: KlippCameraShot | null;
   /** Created once from the first params with the scene's THREE; later changes need a remount, like the dataset. */
   actors?: readonly SceneActorFactory[];
   /** L1 sky pick (morning/dusk/night) — only read when the sky rig flag is on. */
@@ -92,54 +101,23 @@ export const STREAM_START_SHARE = 0.5;
 /** The streamer's live counts by scene, for tests and probes; absent for a scene built without streaming. */
 export const cityStreamStats = new WeakMap<object, Readonly<CellStreamStats>>();
 
-/** Camera distance clamp, metres. The floor is chase range for a 1.8 m Caller. */
-export const CAMERA_MIN_DISTANCE = 8;
-export const CAMERA_MAX_DISTANCE = 3000;
-/** Pitch above the horizon: low behind the Caller, the original overview tilt (atan 0.8) from 220 m out. */
-export const CHASE_PITCH = 0.35;
-export const OVERVIEW_PITCH = Math.atan(0.8);
-export const OVERVIEW_DISTANCE = 220;
-/** Close up the camera looks at the Caller's chest, not the ground under their feet. */
-const CHASE_LOOK_HEIGHT = 1.2;
 /** Feature budget for one tile. Geometry is merged per material, so this bounds build time and memory, not draw calls. */
 export const MAX_SCENE_FEATURES = 40_000;
 
-const smooth = (t: number) => t * t * (3 - 2 * t);
-
-export interface CameraPose {
-  position: [number, number, number];
-  target: [number, number, number];
-  pitch: number;
-  distance: number;
-}
-
-/**
- * Where the camera sits for a CityCamera. Horizontal offset `distance`
- * behind the target along (sin yaw, cos yaw), height `distance * tan(pitch)`,
- * so from 220 m out it matches the original framing (height 0.8 x distance)
- * that camera-input.ts's pan maths assumes. Pure, for tests; `out` reuses the
- * caller's pose object so the frame loop allocates nothing.
- */
-export function cameraPose(value: CityCamera, out: CameraPose = { position: [0, 0, 0], target: [0, 0, 0], pitch: 0, distance: 0 }): CameraPose {
-  const distance = Math.max(CAMERA_MIN_DISTANCE, Math.min(CAMERA_MAX_DISTANCE, value.distance));
-  const t = smooth(Math.max(0, Math.min(1, (distance - CAMERA_MIN_DISTANCE) / (OVERVIEW_DISTANCE - CAMERA_MIN_DISTANCE))));
-  const pitch = CHASE_PITCH + (OVERVIEW_PITCH - CHASE_PITCH) * t;
-  const lookY = CHASE_LOOK_HEIGHT * (1 - t);
-  out.position[0] = value.x + Math.sin(value.yaw) * distance;
-  out.position[1] = lookY + distance * Math.tan(pitch);
-  out.position[2] = value.z + Math.cos(value.yaw) * distance;
-  out.target[0] = value.x;
-  out.target[1] = lookY;
-  out.target[2] = value.z;
-  out.pitch = pitch;
-  out.distance = distance;
-  return out;
-}
+// The pose maths lives in city-camera-pose.ts (pure) so the website's walk projects through the same numbers.
+export {
+  CAMERA_MAX_DISTANCE,
+  CAMERA_MIN_DISTANCE,
+  cameraPose,
+  CHASE_PITCH,
+  OVERVIEW_DISTANCE,
+  OVERVIEW_PITCH,
+  type CameraPose,
+} from './city-camera-pose.ts';
 
 export function createCityScene(context: ThreeContext, initial: CitySceneParams): ThreeScene<CitySceneParams> {
   const { THREE, invalidate, renderer } = context;
-  // The shadow pass re-keyed every caster every frame without it (world/shadow-pass-alpha.ts).
-  installShadowPassAlphaTest(THREE);
+  // r187 upstreamed the shadow-pass alphaTest bypass (world/shadow-pass-alpha.test.ts pins it).
   if (![initial.camera.x, initial.camera.z, initial.camera.yaw, initial.camera.distance].every(Number.isFinite)) throw new Error('Invalid city camera');
   // The dataset arrives parsed (city-data.ts runs parseCityDataset once per runtime); only check the shape here.
   const dataset = initial.dataset;
@@ -151,6 +129,19 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(50, 1, 0.5, 10_000);
+  // Klipp owns every write to the camera: `explore` replays the chase pose,
+  // `shot` takes over while a cinematic shot is fed, and Klipp blends between
+  // them (a cut under reduced motion). The scene only converts the output
+  // position from absolute world metres to the shared render origin.
+  const shots = createKlippShotRig(camera);
+  const origin = createFloatingOrigin();
+  updateFloatingOrigin(origin, initial.camera.x, initial.camera.z);
+  const renderRoot = new THREE.Group();
+  renderRoot.position.set(-origin.cx * CELL, 0, -origin.cz * CELL);
+  renderRoot.updateMatrix();
+  renderRoot.matrixAutoUpdate = false;
+  scene.add(renderRoot);
+  setRenderOrigin(scene, origin.cx * CELL, 0, origin.cz * CELL);
   // L6 "holding frame rate": the tier bundle contributes the option
   // defaults the lower lanes expose (env size, glass tier, post picks)
   // when the selector is set or the render-scale controller is on — with
@@ -182,9 +173,9 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
     ...(physical?.pbrMaterials && physical.clustered
       ? { nightLights: { streetlamps: physicalTier.streetlampLights, storefronts: physicalTier.storefrontLights } }
       : {}),
-    ...(worldStreamEnabled(physical !== null) ? { stream: { preset, log: streamLog } } : {}),
+    ...(worldStreamEnabled(physical !== null) ? { stream: { preset, log: streamLog, wake: invalidate } } : {}),
   });
-  scene.add(world.sky, world.group);
+  renderRoot.add(world.sky, world.group);
   scene.fog = world.fog;
   // react-native-webgpu renders black through three's output pass, shadow
   // maps and Color backgrounds (metro-live README): linear output, no tone
@@ -214,6 +205,7 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
         shadowTile: physicalTier.shadowTile,
         clusteredMaxLights: physicalTier.clusteredMaxLights,
         preset: initial.preset ?? DEFAULT_PHYSICAL_PRESET,
+        shadowInterval: WORLD_SHADOW_INTERVAL,
       })
     : null;
   if (rig) {
@@ -239,6 +231,8 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
           bloom: physical.bloom,
           grade: physical.grade,
           msaaDiscard: physical.msaaDiscard,
+          upscale: physical.upscale,
+          upscaleScale: preset.upscaleScale,
           settings: {
             look: PHYSICAL_PRESETS[rig?.preset ?? DEFAULT_PHYSICAL_PRESET].grade,
             ssr: physicalTier.ssr,
@@ -266,13 +260,74 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
   // the pipeline sizes its own targets, so the vd lane leaves the physical
   // path's scale as it was. An explicit EXPO_PUBLIC_WORLD_RENDER_SCALE=0
   // still turns it off.
+  //
+  // The upscale slot and the pixel-ratio scale path are mutually exclusive
+  // mechanisms (upscaling-eval §4): under EXPO_PUBLIC_WORLD_UPSCALE the
+  // dynamic knob is the scene pass's setResolutionScale — input-only, so
+  // the output buffer (and TAAU's history targets) stays fixed — and the
+  // controller must never drive setPixelRatio. The adapter's base ratio is
+  // 1, so `base × scale` lands on the pass as the bare scale.
+  const upscalePass = physical?.upscale != null ? (post?.scenePass ?? null) : null;
   const renderScaleEnv = process.env.EXPO_PUBLIC_WORLD_RENDER_SCALE;
   const renderScaleOff =
     renderScaleEnv != null && renderScaleEnv.trim() !== '' && !parseSkyRigFlag(renderScaleEnv);
   const renderScale =
     renderer && !renderScaleOff && (EXPERIMENTAL_WORLD_RENDER_SCALE || (VD_LANE && physical === null))
-      ? mountRenderScale(renderer, (bundle ?? tierBundle(WORLD_TIER)).scale)
+      ? upscalePass
+        ? mountRenderScale(
+            {
+              getPixelRatio: () => 1,
+              setPixelRatio: (v: number) => upscalePass.setResolutionScale(v),
+            },
+            { ...(bundle ?? tierBundle(WORLD_TIER)).scale, startScale: upscalePass.getResolutionScale() },
+          )
+        : mountRenderScale(renderer, (bundle ?? tierBundle(WORLD_TIER)).scale)
       : null;
+  if (renderScale && upscalePass) {
+    console.info(
+      '[NYC-Mon/perf] render scale drives the scene pass setResolutionScale — EXPO_PUBLIC_WORLD_UPSCALE owns the output buffer',
+    );
+  }
+  // Phase 6 (PR 6): adaptive quality tiers — the closed frame reports the
+  // probe channel already produces step the streaming preset row, the sun
+  // shadow interval and the scale channel down and back
+  // (perf/adaptive-tiers.ts, EXPO_PUBLIC_WORLD_ADAPTIVE). Explicit picks
+  // beat it: an env-pinned preset keeps its row, an env-pinned shadow
+  // interval its refresh, and an armed render-scale controller owns the
+  // scale channel outright — two controllers on one channel would fight.
+  let adaptiveScaleFactor = 1;
+  let adaptiveBaseRatio = renderer?.getPixelRatio() ?? 1;
+  const adaptive = EXPERIMENTAL_WORLD_ADAPTIVE
+    ? createAdaptiveTierController({
+        startPreset: preset.name,
+        scaleChannel: upscalePass ? 'upscaleScale' : 'renderScale',
+        startScale: upscalePass?.getResolutionScale() ?? 1,
+        tier: WORLD_PRESET_SELECTED === null && world.stream !== null,
+        shadowInterval: !WORLD_SHADOW_INTERVAL_SELECTED && rig?.sun != null,
+        scale: renderScale === null,
+        // The upscale slot starts at 0.5 input — the pixel-ratio floor would
+        // clamp every step; half the eval's start is the provisional bottom.
+        scaleFloor: upscalePass ? 0.25 : undefined,
+        apply: (action) => {
+          switch (action.kind) {
+            case 'tier':
+              world.stream?.setPreset(WORLD_PRESETS[action.to]);
+              break;
+            case 'shadowInterval':
+              rig?.setShadowInterval(action.to);
+              break;
+            case 'upscaleScale':
+              upscalePass?.setResolutionScale(action.to);
+              break;
+            case 'renderScale':
+              adaptiveScaleFactor = action.to;
+              renderer?.setPixelRatio(adaptiveBaseRatio * adaptiveScaleFactor);
+              break;
+          }
+        },
+      })
+    : null;
+  if (adaptive) adaptiveFrameBridge.push = adaptive.push;
   // Last consumed thermalSignal sample — the monitor (perf/thermal.ts,
   // flag-gated) bumps seq on each poll; a move to a worse level forces a
   // render-scale down-step so the tier drops before the device throttles.
@@ -299,7 +354,7 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
     for (const factory of initial.actors ?? []) {
       const actor = factory(THREE);
       actors.push(actor);
-      scene.add(actor.object as InstanceType<typeof THREE.Object3D>);
+      (actor.coordinateSpace === 'render' ? scene : renderRoot).add(actor.object as InstanceType<typeof THREE.Object3D>);
     }
   } catch (error) {
     post?.dispose();
@@ -350,32 +405,44 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
   // Per-frame scratch: the pose, the actor frame and the camera write into
   // preallocated objects, so the update loop allocates nothing.
   const pose: CameraPose = { position: [0, 0, 0], target: [0, 0, 0], pitch: 0, distance: 0 };
-  const actorFrame: { -readonly [K in keyof ActorFrame]: ActorFrame[K] } = { delta: 0, time: 0, reducedMotion: false };
+  const actorFrame: { -readonly [K in keyof ActorFrame]: ActorFrame[K] } = { delta: 0, time: 0, reducedMotion: false, originX: origin.cx * CELL, originZ: origin.cz * CELL, originChanged: false };
+  const streamCamera = { x: 0, y: 0, z: 0 };
+  let lastOriginChanged = true;
 
-  function positionCamera(value: CityCamera) {
+  function positionCamera(value: CityCamera, cinematicShot: KlippCameraShot | null | undefined, delta: number, reducedMotion: boolean) {
     if (![value.x, value.z, value.yaw, value.distance].every(Number.isFinite)) throw new Error('Invalid city camera');
     cameraPose(value, pose);
-    // No spreads in the frame loop: each would materialise an arguments array.
-    camera.position.set(pose.position[0], pose.position[1], pose.position[2]);
-    camera.lookAt(pose.target[0], pose.target[1], pose.target[2]);
+    const ox = origin.cx * CELL, oz = origin.cz * CELL;
     // Near and far follow the zoom so depth precision holds from 8 m to 3 km.
     const near = Math.max(0.1, Math.min(5, pose.distance * 0.02));
     const far = Math.max(3000, pose.distance * 6);
-    if (camera.near !== near || camera.far !== far) {
-      camera.near = near;
-      camera.far = far;
-      camera.updateProjectionMatrix();
-    }
-    world.setViewDistance(pose.distance, far);
+    shots.setChase(pose.position, pose.target, near, far);
+    shots.setShot(cinematicShot);
+    shots.setReducedMotion(reducedMotion);
+    const moving = shots.update(delta);
+    const out = shots.shot;
+    const focusX = out.hasLookAtTarget ? out.lookAtTarget[0] : out.position[0];
+    const focusZ = out.hasLookAtTarget ? out.lookAtTarget[2] : out.position[2];
+    const viewDistance = out.hasLookAtTarget
+      ? Math.hypot(out.position[0] - focusX, out.position[1] - out.lookAtTarget[1], out.position[2] - focusZ)
+      : pose.distance;
+    world.setViewDistance(viewDistance, camera.far);
     // After the distance: tree LOD reads it.
-    world.setFocus(value.x, value.z);
-    world.sky.position.copy(camera.position);
-    world.sky.scale.setScalar(far * 0.9);
+    world.setFocus(focusX, focusZ, ox, oz, lastOriginChanged);
+    world.sky.position.set(out.position[0], out.position[1], out.position[2]);
+    world.sky.scale.setScalar(camera.far * 0.9);
+    // Klipp's state and streaming stay in world metres; only the rendered
+    // camera is shifted into the shared floating-origin space.
+    streamCamera.x = out.position[0];
+    streamCamera.y = out.position[1];
+    streamCamera.z = out.position[2];
+    camera.position.set(out.position[0] - ox, out.position[1], out.position[2] - oz);
+    return moving;
   }
-  positionCamera(initial.camera);
+  positionCamera(initial.camera, initial.cinematicShot, 0, false);
   // The START set, after every scene pass above (shadow roles, depth offsets) has reached the layer templates.
   camera.updateMatrixWorld();
-  world.primeStream(camera.position, errorScale(), preset.residentRadiusM * STREAM_START_SHARE);
+  world.primeStream(streamCamera, errorScale(), preset.residentRadiusM * STREAM_START_SHARE);
   if (world.stream) cityStreamStats.set(scene, world.stream.stats);
   if (streamLog && world.stream) {
     streamLog('preset', { preset: preset.name, stream: true, radius: preset.residentRadiusM, k: Math.round(errorScale()) });
@@ -404,7 +471,20 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
       // Frame pacing for the scale controller: the interval between these
       // calls is the draw cadence — JS submission pacing, not GPU or UI
       // thread time (perf/render-scale.ts header says what it is not).
-      renderScale?.frame(now, frame.pixelRatio);
+      // Under the upscale slot the adapter's base ratio is 1, so the
+      // controller's output lands on setResolutionScale as the bare scale.
+      renderScale?.frame(now, upscalePass ? 1 : frame.pixelRatio);
+      // The adaptive controller's render-scale channel: the canvas's
+      // applySize re-stamps the raw device ratio on resize, so re-assert the
+      // adaptive scale each frame the way mountRenderScale does (three
+      // early-returns when unchanged). The upscale slot's pass keeps its own
+      // resolution scale — it needs no per-frame assert.
+      if (adaptive) {
+        adaptiveBaseRatio = upscalePass ? 1 : frame.pixelRatio;
+        if (!upscalePass && adaptiveScaleFactor !== 1) {
+          renderer?.setPixelRatio(adaptiveBaseRatio * adaptiveScaleFactor);
+        }
+      }
       // PR09: adaptive living-city crowd caps — once the controller has
       // surrendered real fill rate, thin the ambient population one tier
       // (living-city/bundled-host.ts owns the marks; one-way). The bridge
@@ -423,7 +503,18 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
           );
         }
       }
+      const originChanged = updateFloatingOrigin(origin, params.camera.x, params.camera.z);
+      lastOriginChanged = originChanged;
+      if (originChanged) {
+        renderRoot.position.set(-origin.cx * CELL, 0, -origin.cz * CELL);
+        renderRoot.updateMatrix();
+        setRenderOrigin(scene, origin.cx * CELL, 0, origin.cz * CELL);
+        invalidate?.();
+      }
       if (actors.length > 0) {
+        actorFrame.originX = origin.cx * CELL;
+        actorFrame.originZ = origin.cz * CELL;
+        actorFrame.originChanged = originChanged;
         let delta = frame.delta > 0 ? frame.delta : 0;
         // A redraw requested by a moving actor: measure the gap ourselves. The first frame after rest moves nothing.
         if (delta === 0 && moving && lastActorTick > 0) delta = Math.min(Math.max((now - lastActorTick) / 1000, 0), 0.1);
@@ -438,9 +529,9 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
         moving = anyMoving;
       }
       // After the actors: a chase camera reads the Caller's position in this frame's params.
-      positionCamera(params.camera);
+      const cameraMoving = positionCamera(params.camera, params.cinematicShot, frame.delta, frame.reducedMotion === true);
       // Cells in and out for this camera; while some are still to build or fading, ask for the next frame.
-      if (world.updateStream(camera.position, errorScale(), now / 1000)) invalidate?.();
+      if (world.updateStream(streamCamera, errorScale(), now / 1000)) invalidate?.();
       if (streamLog && world.stream && now - streamLogAt >= 5000) {
         streamLogAt = now;
         const st = world.stream.stats;
@@ -450,7 +541,7 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
         });
       }
       if (rig) {
-        rig.update(camera.position.y, params.camera.x, params.camera.z);
+        rig.update(camera.position.y, shots.shot.lookAtTarget[0] - origin.cx * CELL, shots.shot.lookAtTarget[2] - origin.cz * CELL);
         const preset = params.preset ?? DEFAULT_PHYSICAL_PRESET;
         if (preset !== rig.preset) {
           // The rebake renders PMREM cube faces through renderer.render, which
@@ -461,18 +552,18 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
           invalidate?.();
         }
         // Night light follows the camera and the preset's interior glow (world/physical/night-lights.ts).
-        const fx = pose.target[0] - pose.position[0];
-        const fz = pose.target[2] - pose.position[2];
+        const fx = shots.shot.lookAtTarget[0] - streamCamera.x;
+        const fz = shots.shot.lookAtTarget[2] - streamCamera.z;
         const fl = Math.hypot(fx, fz) || 1;
         world.updateNightLights(
-          camera.position.x, camera.position.y, camera.position.z, fx / fl, fz / fl, rig.uniforms.uInteriorGlow.value,
+          streamCamera.x, streamCamera.y, streamCamera.z, fx / fl, fz / fl, rig.uniforms.uInteriorGlow.value,
         );
       }
       // Precipitation animates on the shader clock — while rain or snow is
       // live the loop must keep drawing, or the on-demand canvas freezes
       // the weather with the world.
       const precip = world.weather;
-      if (moving || (precip !== null && Math.max(precip.wet.value, precip.snow.value) > 0.01)) invalidate?.();
+      if (moving || cameraMoving || (precip !== null && Math.max(precip.wet.value, precip.snow.value) > 0.01)) invalidate?.();
       if (probeWindow) {
         const end = typeof performance !== 'undefined' ? performance.now() : Date.now();
         probeSample.cpuMs = end - now;
@@ -492,15 +583,24 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
       if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return;
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
+      // Klipp converts normalised viewOffset to pixels with this size.
+      shots.setSize(width, height);
       // The canvas just re-stamped the raw device pixel ratio — re-apply the scale.
       renderScale?.resized();
+      if (adaptive && !upscalePass && adaptiveScaleFactor !== 1) {
+        renderer?.setPixelRatio(adaptiveBaseRatio * adaptiveScaleFactor);
+      }
     },
     dispose: () => {
       if (disposed) return;
       disposed = true;
+      shots.dispose();
       // First, while every instanced mesh is still in the scene: their storage
       // instance matrices are freed by nothing else (physical-rig.ts).
       if (rigModule && renderer && storageSwapped > 0) rigModule.releaseStorageInstanceMatrices(renderer, scene);
+      // The adaptive sink detaches before anything it could actuate goes away.
+      if (adaptive && adaptiveFrameBridge.push === adaptive.push) adaptiveFrameBridge.push = null;
+      if (adaptive && !upscalePass && adaptiveScaleFactor !== 1) renderer?.setPixelRatio(adaptiveBaseRatio);
       renderScale?.dispose();
       probeCleanup?.();
       post?.dispose();

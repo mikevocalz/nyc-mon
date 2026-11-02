@@ -14,7 +14,7 @@ const METER_ORDER = ['Energy', 'Fullness', 'Social'] as const;
 
 /**
  * What the H-Lynk's screen shows (PS-037), all from approved sources: the
- * tier name and "Your Mon" (copy.ts), the three starters' Baby names and Dex
+ * tier name and "Your Mon" (copy.ts), the four starters' Baby names and Dex
  * numbers (@acme/content, Baby forms only), the CARE section's example meter
  * levels with its "example" line, and the four district names. Nothing is
  * invented for the screen.

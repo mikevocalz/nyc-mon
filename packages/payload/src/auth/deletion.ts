@@ -4,7 +4,7 @@
 // sanctuary, its nickname is cleared, and its id and history stay. Decision
 // #15 does the same when a guardian says no.
 import type { CollectionSlug, Payload, PayloadRequest, TaskConfig } from 'payload';
-import { commitTransaction, createLocalReq, initTransaction, killTransaction } from 'payload';
+import { commitTransaction, createPayloadRequest, initTransaction, killTransaction } from 'payload';
 import { CALLER_DELETION_CONTEXT_KEY } from '../collections/MonInstances.ts';
 
 /**
@@ -104,7 +104,7 @@ async function releaseCallerData(payload: Payload, userId: string, req: PayloadR
  * scheduled or not yet due.
  */
 export async function deleteCallerAccount(payload: Payload, userId: string, nowMs: number = Date.now()): Promise<CallerDeletion> {
-  const req = await createLocalReq({}, payload);
+  const req = await createPayloadRequest({ payload });
   const ownTransaction = await initTransaction(req);
   try {
     const user = (await payload.findByID({ collection: 'users', id: userId, depth: 0, overrideAccess: true, req })) as unknown as Record<string, unknown>;
@@ -130,7 +130,7 @@ export async function deleteCallerAccount(payload: Payload, userId: string, nowM
  * 7-day grace stays for deletions staff schedule from the console.
  */
 export async function releaseOwnAccount(payload: Payload, userId: string): Promise<CallerDeletion> {
-  const req = await createLocalReq({}, payload);
+  const req = await createPayloadRequest({ payload });
   const ownTransaction = await initTransaction(req);
   try {
     const released = await releaseCallerData(payload, userId, req);

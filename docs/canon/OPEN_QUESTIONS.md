@@ -97,10 +97,11 @@ The Bible outranks the build prompt (`IDX L7-L8`; BUILD_PROMPT_v3 §0B Law 1). E
 
 **Q30. Hatch performance.** v7: "Family seam opens softly; reveal #002 Squeaklet, one individual." (`[v7] M7 L411`), with per-line light cues. `ARCH L422-L441`: "first crack → multiple cracks → goo leak → shell separates → Mon struggles out → first breath → looks for Caller". The prompt: "egg crack driven by `hatchProgress`" (§3.5). Fill in: the hatch is ______ (soft seam opening / crack-and-struggle / other).
 
-**Q31. Refusal at Baby stage.** v11 requires "listening/talking/refusal performance" for conversation (`V11 ¶97`) and says Mons "refuse" (`V11 ¶43`). The prompt's `refuse` clip plays in M08 and M14. v7's Baby notes give only an "approach/step-back cue" (`[v7] M7 L509`). Yes/no: a Baby's refusal is a step-back/turn-away body cue with no speech?
+**Q31. Refusal at Baby stage.** (Partly answered 2026-10-29 by Decision #34, see §J: false calls exist; the cue is still open.) v11 requires "listening/talking/refusal performance" for conversation (`V11 ¶97`) and says Mons "refuse" (`V11 ¶43`). The prompt's `refuse` clip plays in M08 and M14. v7's Baby notes give only an "approach/step-back cue" (`[v7] M7 L509`). Yes/no: a Baby's refusal is a step-back/turn-away body cue with no speech?
 
-**Q32. Baby voice.** v11: "Hatchlings may use baby-talk/gibberish, then limited speech, then full speech." (`V11 ¶56`). v7 gives species sounds (scritchy chirps; chirrup and purr; yips and a short rally howl). Yes/no: Phase 1 Babies use only species sounds, no baby-talk words?
+**Q32. Baby voice.** **Answered → Decision #32.** Original question kept for the record: v11: "Hatchlings may use baby-talk/gibberish, then limited speech, then full speech." (`V11 ¶56`). v7 gives species sounds (scritchy chirps; chirrup and purr; yips and a short rally howl). Yes/no: Phase 1 Babies use only species sounds, no baby-talk words?
   **Partly answered 2026-10-23 (Mike), Hood Ratti line only:** a Squeaklet uses the family sound plus at most two words ("Bet!", "Food?"), never a sentence, and no "Callah" yet. Open for the other two lines.
+  **Answered 2026-10-29 (Mike), all three lines:** an Egg babbles (wordless baby sounds, no real words), and a Baby keeps babbling for its first 24 hours after `hatchedAt`. After that a Baby speaks the 2026-10-23 limit above: the family sound plus at most two words, never a sentence, no "Callah". Small, Mid and Max speak in full. This holds for Squeaklet, Kittee Cee and Yotito, with one `voiceLineageId` for life (`V11 ¶56`). See `docs/canon/DECISIONS.md` Decision 32.
 
 **Q33. Type field.** v7 types all three Babies "Neutral". The index calls type fields "legacy data until the explicit migration map is authored" (`IDX L41`); v11 lists that map as open (`V11 ¶101`). Yes/no: Phase 1 content omits type/Affinity entirely?
 
@@ -120,6 +121,27 @@ The Bible outranks the build prompt (`IDX L7-L8`; BUILD_PROMPT_v3 §0B Law 1). E
 **Q39. Hood Ratti as both bloodline and form.** "Hood Ratti" is the F01 family name and the Mid form #004 (`ROSTER L24`, `L153`); "Bodega Cee" and "Barrio-Yote" are Mid forms whose names differ from their bloodline. v11 calls Hood Ratti "a form/species label" (`V11 ¶44`). No action needed unless Mike wants it: copy must say "Hood Ratti Bloodline" for the bloodline, and plain "Hood Ratti" only for the #004 form.
 
 ---
+
+## J. What the Mon Space decisions settle (2026-10-29)
+
+Decisions #33–#37 record Mike's approval of the Mon Space care build: "good ideas, go (make sure ui/ux skills are used for designing this! i no longer want this experience inside the h-lynk but just in the screen!)". He approved mechanics, not numbers, and answered none of the label or content questions directly. Each line says what the decisions settle and what they leave open.
+
+| Q | Status | What is settled | Still open |
+|---|---|---|---|
+| Q18 Meter name | Open | Nothing. Mon Space shows the three meters as heart rows labelled with today's names | "Social" vs "Social HP" |
+| Q19 Care numbers | Partly answered | The classic rules carry Mike's numbers: a 15-minute call window, at most 4 piles, a cold cured in 2–3 doses (Decision #34) | Every decay, gain and threshold rate for the three meters; v7's numbers are still not adopted |
+| Q20 Needs threshold | Open | Nothing. A call opens where a meter crosses the existing needs-you line; the heart rows are a display mapping (design D20), not a threshold ruling | The needs-you and clear thresholds |
+| Q21 Absence rules | Partly answered | An official pause with no catch-up (Decision #36) is the vacation mode | The free sitter after 24 h and the return floor |
+| Q22 Food classes | Partly answered | Two portion kinds exist: a meal and a snack, and a snack adds more weight (Decision #34) | Species food classes, the tray, eat clips |
+| Q23 Baby portions | Open | Nothing | Baby meal and snack sizes |
+| Q24 Favourites | Open | Nothing | The starter favourites |
+| Q25 Sleep | Partly answered | Bedtime exists: at bedtime the Mon falls asleep, lights off inverts the screen, and a light left on through the call window is one mistake (Decision #34). Manual rest stays | The bedtime and wake times (interim 21:00 and 08:00 local, `TODO(canon)`) and whether the Caller chooses them; the early-wake cost |
+| Q26 Bond | Partly answered | Bond is one input to the evolution branch and the stage trigger (Decision #35) | Whether bond is ever shown, and how it grows |
+| Q27 Incubation length | Open | Nothing | Whether 15/30/60 min changes anything |
+| Q31 Baby refusal | Partly answered | A Baby can make a false call, and the Caller answers it by setting a boundary (Decision #34). That is a new moment where the Mon wants its own way | What a Baby's refusal or false call looks and sounds like (body cue, speech or both) |
+| Q41 HP meter | Partly answered | Care has no HP. A cold, poop, discipline and weight are care states, not meters, and the three canon meters stay the only meters (Decision #34) | Whether combat HP is a separate stat in Phase 2 |
+| Q42 Sheet labels | Open | Nothing. Mon Space uses its own menu words (`docs/COPY_DECK.md`); none of DEX, CREW, CARE, BAG, CITY or "CALL MON" becomes canon | All of it |
+| Q43 Lifecycle triggers | Answered → Decision #35 | See the Q43 status line above | Tuning numbers only |
 
 ## E. Which missing file would answer what
 
@@ -149,10 +171,12 @@ No question here is answered by this note. The public site (`apps/web`) no longe
 
 The spatial contract (ADR 0010-0012, `docs/spatial/CONTRACT.md`) also waits on three questions already listed: **Q19** (care numbers), **Q20** (needs threshold, which sets when a mood turns to `needs-*`) and **Q29** (Baby height, which sets the Mon's real-world scale on a table or a floor). The questions below are new.
 
-**Q43. Lifecycle triggers.** v11 fixes the stages, Egg → Baby → Small → Mid → Max (`V11 ¶25`), and says a hatchling stays Baby until an authored evolution. No source says what moves a Mon from Baby to Small, Small to Mid, or Mid to one of its Max forms. `EvolutionEvent` holds only a bond floor, marked TODO(canon). Fill in: each stage change is triggered by ______ (bond / age / care history / a story event / other), and the Mid → Max branch is chosen by ______.
+**Q43. Lifecycle triggers.** **Answered → Decision #35 (2026-10-29)**; see the status line below. v11 fixes the stages, Egg → Baby → Small → Mid → Max (`V11 ¶25`), and says a hatchling stays Baby until an authored evolution. No source says what moves a Mon from Baby to Small, Small to Mid, or Mid to one of its Max forms. `EvolutionEvent` holds only a bond floor, marked TODO(canon). Fill in: each stage change is triggered by ______ (bond / age / care history / a story event / other), and the Mid → Max branch is chosen by ______.
 
 **Q44. Starter behaviours in a room.** The spatial brief proposes room behaviours per starter: "Yotes perimeter/dawn-dusk", "Bodega Cee warm spot", "Hood Ratti low routes". No canon source describes how any starter moves through a room. Yes/no: are these canon behaviours for the Yote, Bodega Baddiee Cee and Hood Ratti Bloodlines? If yes, at which stages?
 
 **Q45. Origin block, habitats and active hours.** `MonInstance` now has empty Phase-2 slots `originBlock`, `habitatTags` and `activeHours`. Canon lists no blocks and no habitats and gives no active hours. Fill in: the list of blocks a Mon can come from = ______; the habitat list = ______; does a bloodline (or an individual) have active hours, and what are they for each starter = ______?
+
+**Q43 status.** **Answered → Decision #35 (2026-10-29).** A stage change is ready when the Mon's unpaused age in its stage reaches Baby → Small 2 days, Small → Mid 5 days, Mid → Max 10 days, and bond reaches the event's `minBond`. Care history (mistakes, discipline, weight band, bond) picks the Max branch among the three canon forms of Decision #12. All numbers are `TODO(canon)` tuning. Law 7 still needs authored `EvolutionEvent`s.
 
 **Q46. What a block legend is.** The slogan is "Every block has a legend." The scene contract reserves a `legend` field (null in Phase 1) for a block's legend. No source defines a legend as a record. Fill in: a legend is ______ (a story text / a Hood Mon / an event / other), and it belongs to ______ (a block / a Mon / both).

@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import type { CityCamera } from './city-scene.ts';
 import { MIN_CAMERA_DISTANCE,
   CHASE_DISTANCES, chaseCamera, createCityCameraStore, INITIAL_CITY_CAMERA, lookAroundAction, moveCityCamera,
-  nextChaseDistance, spawnChaseDistance, swingYaw, yawBehind,
+  moveCityCameraBounded, nextChaseDistance, spawnChaseDistance, swingYaw, yawBehind,
 } from './city-camera.ts';
 
 test('camera pan follows heading without mutating its input', () => {
@@ -30,6 +30,18 @@ test('orbit wraps and zoom stays within renderer limits', () => {
   assert.ok(Math.abs(moveCityCamera(camera, { type: 'orbit', radians: -Math.PI / 2 }).yaw - Math.PI * 1.5) < 1e-9);
   assert.equal(moveCityCamera({ ...camera, distance: 20 }, { type: 'zoom', factor: 0.001 }).distance, MIN_CAMERA_DISTANCE);
   assert.equal(moveCityCamera({ ...camera, distance: 2000 }, { type: 'zoom', factor: 10 }).distance, 3000);
+});
+
+test('travel jumps to a ground point inside its bounds and can reframe the distance', () => {
+  const camera = { ...INITIAL_CITY_CAMERA, yaw: 0 };
+  const landed = moveCityCamera(camera, { type: 'travel', x: 1500, z: -1500, distance: 500 });
+  assert.deepEqual({ x: landed.x, z: landed.z, distance: landed.distance, yaw: landed.yaw }, { x: 1500, z: -1500, distance: 500, yaw: 0 });
+  // past the default square it clamps like a pan; a wider bounds rect lets the walk reach the rings
+  assert.equal(moveCityCamera(camera, { type: 'travel', x: 9000, z: 0 }).x, 2000);
+  const wide = { minX: -30_000, maxX: 30_000, minZ: -10_000, maxZ: 40_000 };
+  assert.equal(moveCityCameraBounded(camera, { type: 'travel', x: 9000, z: 0 }, wide).x, 9000);
+  assert.equal(moveCityCameraBounded(camera, { type: 'pan', right: 9000, forward: 0 }, wide).x, camera.x + 500);
+  assert.equal(moveCityCamera(camera, { type: 'travel', x: Number.NaN, z: 0 }), camera);
 });
 
 test('camera stores are isolated and reset restores the initial view', () => {

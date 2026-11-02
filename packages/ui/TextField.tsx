@@ -40,7 +40,8 @@ const daylit = tv({
     label: 'self-start font-sans text-type-label text-text',
     input:
       'w-full min-h-11 rounded-none border-2 border-text-muted bg-surface-raised px-4 py-2.5 text-base text-text ' +
-      'placeholder:text-text-muted transition-colors duration-fast focus:border-focus focus:outline-none motion-reduce:transition-none',
+      'placeholder:text-text-muted transition-colors duration-fast focus:border-focus focus:outline-none ' +
+      'focus-visible:ring-2 focus-visible:ring-focus motion-reduce:transition-none',
     message: NEON_FIELD.message,
   },
   variants: {

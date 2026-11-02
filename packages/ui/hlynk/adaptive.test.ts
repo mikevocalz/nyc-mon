@@ -200,7 +200,7 @@ function contentArea(p: HLynkPlacement): { width: number; height: number } {
 
 // Mirrors incubateFitBlocks and meetFitBlocks (packages/app/features/egg/window-layout.ts)
 // with the shipped copy lengths: m10.title 33, m10.body 76, "Ready at 12:45 PM tomorrow" 26,
-// m08.title 13, m08.santoro.caption 42. The app cannot import this file (no ./hlynk/layout export).
+// m08.title 13, m08.santoro.caption 41. The app cannot import this file (no ./hlynk/layout export).
 const M10_STACK: FitBlock[] = [
   { kind: 'text', role: 'title', chars: 33 },
   { kind: 'text', role: 'body', chars: 76, tight: true },
@@ -212,7 +212,7 @@ const M10_STACK: FitBlock[] = [
 const M10_SIDE: FitBlock[] = M10_STACK.map((b) => (b.kind === 'media' ? { ...b, maxPt: 360 } : b));
 const M08: FitBlock[] = [
   { kind: 'text', role: 'title', chars: 13 },
-  { kind: 'text', role: 'body', chars: 42, tight: true },
+  { kind: 'text', role: 'body', chars: 41, tight: true },
   { kind: 'media', minPt: 96, maxPt: 10_000 },
   { kind: 'controls', size: 'sm', minRowWidthPt: 320 },
 ];

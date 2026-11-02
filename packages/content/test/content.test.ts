@@ -90,8 +90,9 @@ describe('content integrity (§8)', () => {
     const starters = await import('../mons/starters.ts');
     const { inheritedDexDetails } = await import('../mons/inherited-v11-details.ts');
     const { starterDexDetails } = await import('../mons/inherited-v11-starters.ts');
-    expect(starters.starterSpecies).toEqual(allSpecies.slice(0, 21));
-    expect(starters.starterSpecies.map((s) => s.dexId)).toEqual(Object.keys(starterDexDetails).map(Number));
+    expect(starters.starterSpecies).toEqual(allSpecies.slice(0, 26));
+    // Object keys come back in numeric order; the starters are in slot order (F04 is slot 4 but #20-24).
+    expect(starters.starterSpecies.map((s) => s.dexId).sort((a, b) => (a ?? 0) - (b ?? 0))).toEqual(Object.keys(starterDexDetails).map(Number));
     expect(Object.keys(inheritedDexDetails)).toHaveLength(109);
   });
 
@@ -156,11 +157,12 @@ describe('content integrity (§8)', () => {
     }
   });
 
-  it('starters are F01, F02, F12 in slots 1-3 (DECISIONS.md #1)', () => {
+  it('starters are F01, F02, F12, F04 in slots 1-4 (DECISIONS.md #1, #38)', () => {
     expect(starterBloodlines.map((starter) => [starter.slot, starter.bloodline.bloodlineId])).toEqual([
       [1, 'F01'],
       [2, 'F02'],
       [3, 'F12'],
+      [4, 'F04'],
     ]);
   });
 
@@ -169,6 +171,7 @@ describe('content integrity (§8)', () => {
       'Hood Ratti Bloodline',
       'Bodega Baddiee Cee Bloodline',
       'Yote Bloodline',
+      'LanternFye Bloodline',
     ]);
   });
 });
@@ -179,6 +182,7 @@ describe('eggs', () => {
       { bloodlineId: 'F01', speciesId: 'dex-001', dexId: 1, eggName: 'Metro Egg', hatchesIntoSpeciesId: 'dex-002' },
       { bloodlineId: 'F02', speciesId: 'dex-008', dexId: 8, eggName: 'Corner Egg', hatchesIntoSpeciesId: 'dex-009' },
       { bloodlineId: 'F12', speciesId: 'dex-061', dexId: 61, eggName: 'Prism Egg', hatchesIntoSpeciesId: 'dex-062' },
+      { bloodlineId: 'F04', speciesId: 'dex-020', dexId: 20, eggName: 'Signal Egg', hatchesIntoSpeciesId: 'dex-021' },
     ]);
   });
 });

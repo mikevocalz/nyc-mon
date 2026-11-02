@@ -8,6 +8,7 @@ import { closeLoop, resampleSmooth, smoothJitter } from './clip-smoothing.ts';
 import { idleConfig } from './idle/config.ts';
 import { weldSceneMorphSeams } from './morph-seams.ts';
 import { disposeObjectTree } from '../dispose-object.ts';
+import { ktx2LoaderFor, type Ktx2Renderer } from '../ktx2.ts';
 import { SharedParseCache, type ParseLease } from '../parse-cache.ts';
 import { createIdleEngine, LOOPS, resolveIdleClips, type IdleAction, type IdleEngine, type IdleFrame } from './idle/engine.ts';
 
@@ -129,15 +130,20 @@ function fetchMon(source: Pick<MonRigSource, 'key' | 'glb'>): Promise<ArrayBuffe
   });
 }
 
-/** Starts fetching a Mon's GLB bytes (26-34 MB) ahead of its first stage. Safe to call repeatedly; a no-op once parsed. */
+/** Starts fetching a Mon's GLB bytes (19-24 MB) ahead of its first stage. Safe to call repeatedly; a no-op once parsed. */
 export function preloadMonRig(source: Pick<MonRigSource, 'key' | 'glb'>): void {
   cache.preload(source.key, () => fetchMon(source));
 }
 
-async function parse(source: Pick<MonRigSource, 'key' | 'glb'>): Promise<Parsed> {
+async function parse(source: Pick<MonRigSource, 'key' | 'glb'>, renderer?: Ktx2Renderer): Promise<Parsed> {
   const bytes = await cache.bytesFor(source.key, () => fetchMon(source));
   const loader = new GLTFLoader();
-  // Plain glTF: no Draco or Meshopt (their decoders need WebAssembly, which Hermes lacks).
+  // KTX2 textures (KHR_texture_basisu) decode through the renderer's shared
+  // loader (ktx2.ts); without a renderer there is no format detection, so the
+  // loader stays bare. Plain glTF: no Draco or Meshopt (their decoders need
+  // WebAssembly, which Hermes lacks).
+  const ktx2 = renderer ? await ktx2LoaderFor(renderer) : null;
+  if (ktx2) loader.setKTX2Loader(ktx2);
   if (eggTexturePlugin) loader.register(eggTexturePlugin);
   const gltf = await loader.parseAsync(bytes, '');
   // Once per parse, shared by every clone: the clips as MonModel3D cleans them
@@ -201,8 +207,9 @@ export class MonRig {
   private blinkStart = -1;
   private disposed = false;
 
-  static async create(source: MonRigSource): Promise<MonRig> {
-    const lease = cache.acquire(source.key, () => parse(source));
+  /** `renderer` detects the KTX2 texture formats (ktx2.ts); omit it to parse without KTX2 support. */
+  static async create(source: MonRigSource, renderer?: Ktx2Renderer): Promise<MonRig> {
+    const lease = cache.acquire(source.key, () => parse(source, renderer));
     try {
       return new MonRig(source, await lease.value, lease);
     } catch (error) {

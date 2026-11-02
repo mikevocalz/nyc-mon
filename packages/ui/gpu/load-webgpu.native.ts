@@ -5,7 +5,7 @@ import type { GpuCanvasRef, WebGpuModule } from './types';
 // react-native-webgpu's Canvas, filling its parent, transparent over the views behind.
 // GPU surface: the Canvas takes a style, not a className.
 function NativeGpuCanvas({ ref }: { ref?: Ref<GpuCanvasRef> }) {
-  return createElement(Canvas, { ref: ref as Ref<CanvasRef>, opaque: false, style: { flex: 1 } });
+  return createElement(Canvas, { ref: ref as Ref<CanvasRef>, android: { opaque: false }, style: { flex: 1 } });
 }
 
 /**

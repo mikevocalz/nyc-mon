@@ -3,7 +3,7 @@ import { inferAdditionalFields } from 'better-auth/client/plugins';
 import { createAuthClient } from 'better-auth/react';
 import type { AuthResult } from './AuthResult.ts';
 import type { AuthDataResult, LinkedAccount } from './LinkedAccount.ts';
-import { AUTH_BASE_PATH } from './paths.ts';
+import { APP_SURFACE, AUTH_BASE_PATH, SURFACE_HEADER } from './paths.ts';
 import type { SignInRequest, SocialProvider } from './SignInRequest.ts';
 import type { SignUpRequest } from './SignUpRequest.ts';
 import { toAuthResult } from './toAuthResult.ts';
@@ -45,35 +45,49 @@ function birthYearData(birthYear: number | undefined): { additionalData?: { birt
 export function createAuth({ baseURL, appOrigin }: CreateAuthOptions) {
   const client = buildClient(baseURL, appOrigin);
 
+  /**
+   * Every sign-in or sign-up the app makes carries the app surface marker so
+   * the server's APP_ALLOWED_EMAILS gate (packages/payload app-allowlist.ts)
+   * recognises it — the same endpoints, unmarked, serve the OAuth linking
+   * flow the judges use.
+   */
+  const appSurface = { headers: { [SURFACE_HEADER]: APP_SURFACE } };
+
   async function signIn(request: SignInRequest): Promise<AuthResult> {
     switch (request.method) {
       case 'email':
         return toAuthResult(
-          await client.signIn.email({ email: request.email, password: request.password }),
+          await client.signIn.email({ email: request.email, password: request.password }, appSurface),
         );
       case 'passkey':
-        return toAuthResult(await client.signIn.passkey());
+        return toAuthResult(await client.signIn.passkey(undefined, appSurface));
       case 'social':
         return toAuthResult(
-          await client.signIn.social({
-            provider: request.provider,
-            callbackURL: request.callbackURL,
-            ...(request.errorCallbackURL === undefined ? {} : { errorCallbackURL: request.errorCallbackURL }),
-            ...birthYearData(request.birthYear),
-          }),
+          await client.signIn.social(
+            {
+              provider: request.provider,
+              callbackURL: request.callbackURL,
+              ...(request.errorCallbackURL === undefined ? {} : { errorCallbackURL: request.errorCallbackURL }),
+              ...birthYearData(request.birthYear),
+            },
+            appSurface,
+          ),
         );
       case 'id-token':
         return toAuthResult(
-          await client.signIn.social({
-            provider: request.provider,
-            idToken: {
-              token: request.token,
-              ...(request.nonce === undefined ? {} : { nonce: request.nonce }),
-              ...(request.accessToken === undefined ? {} : { accessToken: request.accessToken }),
-              ...(request.name === undefined ? {} : { user: { name: request.name } }),
+          await client.signIn.social(
+            {
+              provider: request.provider,
+              idToken: {
+                token: request.token,
+                ...(request.nonce === undefined ? {} : { nonce: request.nonce }),
+                ...(request.accessToken === undefined ? {} : { accessToken: request.accessToken }),
+                ...(request.name === undefined ? {} : { user: { name: request.name } }),
+              },
+              ...birthYearData(request.birthYear),
             },
-            ...birthYearData(request.birthYear),
-          }),
+            appSurface,
+          ),
         );
       default: {
         const unreachable: never = request;
@@ -84,13 +98,16 @@ export function createAuth({ baseURL, appOrigin }: CreateAuthOptions) {
 
   async function signUp(request: SignUpRequest): Promise<AuthResult> {
     return toAuthResult(
-      await client.signUp.email({
-        email: request.email,
-        password: request.password,
-        name: request.name,
-        birthYear: request.birthYear,
-        callbackURL: request.callbackURL,
-      }),
+      await client.signUp.email(
+        {
+          email: request.email,
+          password: request.password,
+          name: request.name,
+          birthYear: request.birthYear,
+          callbackURL: request.callbackURL,
+        },
+        appSurface,
+      ),
     );
   }
 

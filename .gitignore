@@ -7,6 +7,7 @@ node_modules
 .env
 .env.*
 !.env.example
+!.env.r2.example
 
 # Build outputs
 dist
@@ -33,6 +34,8 @@ scripts/out/
 
 # Copied by tooling/copy-skia-web-assets.mjs at postinstall (Storybook keeps the committed copy).
 packages/web-sim/public/canvaskit/
+# Copied by tooling/copy-basis-assets.mjs at postinstall (the apps keep committed copies).
+packages/web-sim/public/basis/
 
 # Offline Alexa readiness reports and per-run evidence.
 .alexa-readiness/

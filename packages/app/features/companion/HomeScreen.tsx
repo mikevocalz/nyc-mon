@@ -85,7 +85,7 @@ export function HomeScreen({ mon }: { mon: MonInstance }) {
   const scheme = asleep ? 'night' : clockScheme;
   const dexId = identity?.dexId ?? null;
   // The Mon's voice (canon lines only); its caption takes the glass subtitle while it shows.
-  const voice = useMonVoice(mon, care === undefined ? undefined : deriveMonMood(care));
+  const voice = useMonVoice(mon, care === undefined ? undefined : deriveMonMood(care), { ambient: !asleep });
   /** A line for a tap or a return, unless the Mon is asleep: asking for food gets "hungry". */
   const speak = (askingForFood: boolean) => {
     if (asleep) return;

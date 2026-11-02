@@ -3,9 +3,16 @@ import { DISTRICT_TONE, LinkButton, TONE_CLASSES, type District } from '@acme/ui
 import { Heading, List, ListItem, Paragraph, Section, Text } from '@acme/ui/html';
 import { View } from '@acme/ui/tw';
 import { ArtTile } from './ArtTile';
-import { photoArt } from './art';
-import { W04_COPY } from './copy';
+import { photoArt as defaultArt } from './art';
+import { W04_COPY as DEFAULT_COPY } from './copy';
 import { siteHref } from '../../lib/site-href';
+import { copyGroups } from '../cms/bindings';
+import { routeArt } from '../cms/route-art';
+import type { CmsPageProps } from '../cms/PageSections';
+export function CityTerminus({page}: CmsPageProps = {}) {
+const W04_COPY = copyGroups(DEFAULT_COPY, page);
+const photoArt: typeof defaultArt = (id, sizes, position) => routeArt(page, 'city', 'bridge', defaultArt(id, sizes, position));
+
 
 /** North to south, then Mega City: the order a rider reads them on a line map (as home's SignageBoard). */
 const ROUTE: readonly District[] = ['harlem', 'midtown', 'downtown', 'megacity'];
@@ -16,7 +23,7 @@ const ROUTE: readonly District[] = ['harlem', 'midtown', 'downtown', 'megacity']
  * world's line beside it, and under that the four districts as a signage
  * board with the link to walk one. All of it is the home page's copy.
  */
-export function CityTerminus() {
+
   const copy = W04_COPY.city;
   return (
     <Section aria-labelledby="w04-city-title" data-testid="w04-city" id="trg-hiw-city" className="relative gap-8 pl-16 md:pl-36">
@@ -64,4 +71,5 @@ export function CityTerminus() {
       </View>
     </Section>
   );
+
 }

@@ -20,6 +20,13 @@ import { tileIdsForSquare } from '../valdrada/decode.mjs';
 registerHooks({
   load(url, ctx, next) {
     const r = next(url, ctx);
+    // The Instancer's pool caps (instancer.js CAPS) are ceilings Valdrada sizes for its own streamed tile set; the
+    // union bakes assemble up to three times as many tiles into one Instancer, so under VD_TILES the caps scale up.
+    // A cap is a ceiling, not a count — claims and slots are unchanged, nothing is re-derived here.
+    if (url.endsWith('/client/src/city/instancer.js')) {
+      const src = String(r.source).replace('const cap = CAPS[name] ?? 2000;', 'const cap = (CAPS[name] ?? 2000) * (globalThis.__vdCapScale || 1);');
+      return { ...r, source: src, shortCircuit: true };
+    }
     if (!url.endsWith('/client/src/city/roofEngine.js')) return r;
     const src = String(r.source).replace('export function buildRoof(env) {',
       'export function buildRoof(env) { globalThis.__vdRoofEnv = env; try { return buildRoof__vd(env); } finally { globalThis.__vdRoofEnv = null; } }\nfunction buildRoof__vd(env) {');
@@ -30,6 +37,9 @@ registerHooks({
 export async function assembleCity(log = () => {}) {
   const { assembleTile } = await vd('world/assemble.js');
   const { Instancer } = await vd('city/instancer.js');
+  // VD_TILES: an explicit id list ('t_1_-5,...'), else the bundled square's (the ring bakes pass home + ring).
+  const ids = process.env.VD_TILES ? process.env.VD_TILES.split(',') : tileIdsForSquare();
+  if (process.env.VD_TILES) globalThis.__vdCapScale = Math.max(1, Math.ceil((ids.length / 20) * 1.5));
   const scene = new THREE.Scene();
   const instancer = new Instancer(scene);
   const roofOf = new Map(); // `${pool}:${slot}` -> { roofY, h, ring }
@@ -48,7 +58,7 @@ export async function assembleCity(log = () => {}) {
   const mat = new THREE.MeshStandardMaterial();
   const ctx = { scene, instancer, signalReg: [], landmarks: null, facadeMat: mat, groundMat: mat, makeFacadeMat: () => mat };
   const groups = [];
-  for (const id of tileIdsForSquare()) {
+  for (const id of ids) {
     const t0 = Date.now();
     const res = await assembleTile(id.replace(/^t_/, ''), tileBytes(id), ctx);
     groups.push({ id, group: res.group });

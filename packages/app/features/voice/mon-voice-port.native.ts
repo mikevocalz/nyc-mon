@@ -1,8 +1,9 @@
-import type { MonLingo, MonVoicePort } from '@acme/content/voice';
-import { AudioContext, AudioManager, type AudioBuffer, type SessionOptions } from 'react-native-audio-api';
+import type { MonLingo } from '@acme/content/voice';
+import { AudioContext, type AudioBuffer } from 'react-native-audio-api';
+import { acquireAmbientSession } from '@acme/ui/audio-session';
 import { APP_ORIGIN } from '@acme/auth';
 import { AUTH_BASE_URL } from '../onboarding/auth';
-import type { MonVoiceSubject } from './mon-speaker';
+import type { MonVoiceSubject, SpeakerPort } from './mon-speaker';
 import { requestMonVoice } from './mon-voice-request';
 
 /**
@@ -16,34 +17,31 @@ import { requestMonVoice } from './mon-voice-request';
  * `detune` (cents) shifts pitch through WSOLA without changing length, the
  * same effect the web simulator's ffmpeg filter bakes in.
  *
- * Mute switch: while the Mon speaks, iOS uses the `ambient` session category,
- * which the Ring/Silent switch silences and which mixes with the Caller's own
- * music; when the line ends the library default (`playback`) comes back, so
- * voice notes keep playing with the switch on. Android has no mute switch; the
- * media volume decides.
+ * Mute switch: while the Mon speaks, the line holds a lease on the kit's one
+ * session owner (`@acme/ui/audio-session`), which keeps iOS in the `ambient`
+ * category: the Ring/Silent switch silences it and it mixes with the Caller's
+ * own music. The library default (`playback`) comes back only after the last
+ * holder (this line, a care cue, the side-key chirp) lets go, so voice notes
+ * keep playing with the switch on and a cue ending mid-line never unmutes the
+ * rest of it. Android has no mute switch; the media volume decides.
  *
  * No Web Speech or other TTS on native: when the server sends no clip, the
- * caption carries the line (mon-speaker.ts).
+ * caption carries the line (mon-speaker.ts). That includes an Egg: the server
+ * looks the Mon up in `mon-instances`, which has no row until the hatch, so
+ * an Egg's babble is a 404 and shows as a caption only.
+ *
+ * The server gates the line by its own clock and sends the caption it gated
+ * to (`x-mon-caption`); `captionOf` hands it to the speaker, which shows it
+ * in place of the local one.
  */
 
 export interface NativeMonClip {
   readonly buffer: AudioBuffer;
   readonly pitch: number;
+  readonly caption?: string;
 }
 
 let context: AudioContext | null = null;
-
-const SPEAKING: SessionOptions = { iosCategory: 'ambient', iosMode: 'default', iosOptions: [] };
-/** react-native-audio-api's own default (AudioSessionManager.mm), which the voice note player relies on. */
-const AFTER: SessionOptions = { iosCategory: 'playback', iosMode: 'default', iosOptions: [] };
-
-function setSession(options: SessionOptions): void {
-  try {
-    AudioManager.setAudioSessionOptions(options);
-  } catch {
-    // No session control here: keep whatever is set.
-  }
-}
 
 function audioContext(): AudioContext {
   context ??= new AudioContext();
@@ -64,8 +62,9 @@ export const MON_VOICE_HEADERS: Readonly<Record<string, string>> = { origin: APP
  * pitch left to apply, so native needs nothing from `_lingo` itself; the
  * parameter keeps both ports one shape.
  */
-export function createMonVoicePort(mon: MonVoiceSubject, _lingo?: MonLingo): MonVoicePort<NativeMonClip> {
+export function createMonVoicePort(mon: MonVoiceSubject, _lingo?: MonLingo): SpeakerPort<NativeMonClip> {
   return {
+    captionOf: (clip) => clip.caption,
     async prepare(text, signal) {
       const clip = await requestMonVoice({ monId: mon.monInstanceId, text, ...(mon.mood === undefined ? {} : { mood: mon.mood }) }, signal, {
         baseUrl: AUTH_BASE_URL,
@@ -74,7 +73,7 @@ export function createMonVoicePort(mon: MonVoiceSubject, _lingo?: MonLingo): Mon
       });
       if (signal.aborted) throw abortError();
       const buffer = await audioContext().decodeAudioData(clip.bytes);
-      return { buffer, pitch: clip.pitch };
+      return { buffer, pitch: clip.pitch, ...(clip.caption === undefined ? {} : { caption: clip.caption }) };
     },
     play(clip, signal) {
       return new Promise<void>((resolve) => {
@@ -82,7 +81,7 @@ export function createMonVoicePort(mon: MonVoiceSubject, _lingo?: MonLingo): Mon
           resolve();
           return;
         }
-        setSession(SPEAKING);
+        const releaseSession = acquireAmbientSession();
         let settled = false;
         let source: ReturnType<AudioContext['createBufferSource']> | null = null;
         const finish = () => {
@@ -90,7 +89,7 @@ export function createMonVoicePort(mon: MonVoiceSubject, _lingo?: MonLingo): Mon
           settled = true;
           signal.removeEventListener('abort', cut);
           if (source !== null) source.onended = null;
-          setSession(AFTER);
+          releaseSession();
           resolve();
         };
         const cut = () => {

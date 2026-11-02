@@ -16,7 +16,7 @@
 | Registered Dex, `rosterEntries` | **115 / 115** | Stable Dex IDs, bloodlines, roster names and stages, including explicit null where open |
 | Resolved `bloodlines` | **18 / 19** | F01–F18 complete Egg → Baby → Small → Mid → one-or-more Max branches |
 | Runnable-schema `allSpecies` | **109 / 115** | F01–F18 only; F19 isolated until lifecycle approval |
-| Phase-1 starter bloodlines/eggs | **3 / 3** | F01, F02, F12 in original selection order; no new starter egg options |
+| Phase-1 starter bloodlines/eggs | **4 / 4** | F01, F02, F12 in original selection order, then F04 LanternFye (Signal Egg #020) in slot 4 ([Decision 38](https://github.com/mikevocalz/nyc-mon/blob/main/docs/canon/DECISIONS.md)). The Signal Egg's 3D mesh is the restored tan spotted egg Mike chose to ship; it does not match the red polka-dot art reference |
 | Inherited legacy type labels | **109 / 109** | Read-only archival labels; never a combat `affinityId` |
 | Per-form size direction | **109 / 109** | Text targets/ranges; `scaleMeters` remains null until numeric scale is authored |
 | Per-form descriptive lore | **109 / 109** | Inherited authored introductions; not an individual's culture/biography |
@@ -56,6 +56,6 @@ The inherited progression baseline identifies **level 25** as the Max evolution 
 
 ## Validation gates
 
-Run `pnpm --filter @acme/content test`, `pnpm --filter @acme/content typecheck`, `pnpm --filter @acme/core typecheck`, and the repository CI. The content tests compare all 115 `rosterEntries` with the checked-in v11.1 table, validate the 18 complete chains, preserve three starters, verify nine unlock items, and ensure **no** Phase-1 evolution event can fire.
+Run `pnpm --filter @acme/content test`, `pnpm --filter @acme/content typecheck`, `pnpm --filter @acme/core typecheck`, and the repository CI. The content tests compare all 115 `rosterEntries` with the checked-in v11.1 table, validate the 18 complete chains, preserve the four starters in slot order, verify the nine original starter unlock items, and ensure **no** Phase-1 evolution event can fire.
 
 **Merge policy:** review PR and CI evidence first; do not merge this sync into `main` without approval.

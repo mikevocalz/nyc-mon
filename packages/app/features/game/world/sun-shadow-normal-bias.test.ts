@@ -3,7 +3,7 @@
 // fragment stage normalWorld is the material's normalNode. The physical facades
 // bump every brick, sill and cornice (physical/facade.ts) and fade that bump
 // with camera distance, so each brick looked up the shadow map at a different
-// point and the pattern changed as the Caller walked. patches/three@0.186.1.patch
+// point and the pattern changed as the Caller walked. patches/three@0.187.0.patch
 // offsets along normalWorldGeometry instead; this pins it.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';

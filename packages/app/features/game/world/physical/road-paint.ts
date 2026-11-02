@@ -36,6 +36,7 @@ import { ROAD_PAINT } from '../physical-materials-constants.ts';
 import { asColorNode, asNode, asTsl, type TslNode } from './loose-tsl.ts';
 import { roadPuddleField, roadWetMasks, transparentEffectMrt } from './roads.ts';
 import { physicalTsl, type PhysicalMaterialUniforms } from './tsl-common.ts';
+import { worldPatternPosition } from '../render-space.ts';
 
 type Point = [number, number];
 type Rgb = readonly [number, number, number];
@@ -56,6 +57,8 @@ const YELLOW = linearRgb(physicalCityMaterials.roadPaint.yellow);
 /** Indexed strips: position xyz, side (offset from the strip centre) xz, paint (metres along, period, duty), linear colour. */
 export interface RoadPaintArrays {
   position: Float32Array;
+  /** Double-precision source positions for cell-local packaging (Float32 `position` stays for legacy callers). */
+  position64?: Float64Array;
   side: Float32Array;
   paint: Float32Array;
   color: Float32Array;
@@ -172,6 +175,7 @@ export function buildRoadPaint(dataset: CityDatasetV3, topology: LaneTopology, b
 
   return {
     position: new Float32Array(position),
+    position64: Float64Array.from(position),
     side: new Float32Array(side),
     paint: new Float32Array(paint),
     color: new Float32Array(colors),
@@ -248,12 +252,12 @@ export function createRoadPaintMaterial(THREE: Three, uniforms: PhysicalMaterial
   const onSoFar = (x: TslNode) => T.floor(x).mul(duty).add(T.clamp(T.fract(x).sub(T.float(1.0).sub(duty).mul(0.5)), 0.0, duty));
   const dashes = onSoFar(t.add(footprint.mul(0.5))).sub(onSoFar(t.sub(footprint.mul(0.5)))).div(footprint);
 
-  const xz = T.positionWorld.xz;
+  const xz = asTsl(worldPatternPosition(THREE)).xz;
   const detail = T.smoothstep(70.0, 15.0, T.length(T.positionWorld.sub(T.cameraPosition)));
   const wear = T.mix(T.float(0.5), noise2D(xz.mul(0.8)).mul(0.6).add(noise2D(xz.mul(2.3)).mul(0.4)), detail);
   mat.opacityNode = asNode(dashes.mul(T.varying(T.float(1.0).div(widen))).mul(T.smoothstep(0.1, 0.6, wear).mul(0.4).add(0.55)));
 
-  const wet = roadWetMasks(T, asTsl(uniforms.uRoadWetness), roadPuddleField(THREE, T.positionWorld.x, T.positionWorld.z));
+  const wet = roadWetMasks(T, asTsl(uniforms.uRoadWetness), roadPuddleField(THREE, xz.x, xz.y));
   mat.colorNode = asColorNode(T.vec3(T.mix(T.float(1.0), T.float(0.72), wet.y).mul(T.mix(T.float(1.0), T.float(0.86), wet.z))));
   mat.roughnessNode = asNode(T.mix(T.mix(T.float(0.62), T.float(0.42), wet.z), T.float(0.2), wet.y));
   mat.name = 'physical:road-paint';
@@ -266,6 +270,7 @@ export function createRoadPaintMesh(THREE: Three, arrays: RoadPaintArrays, mater
   const normal = new Float32Array(arrays.position.length);
   for (let i = 1; i < normal.length; i += 3) normal[i] = 1;
   geometry.setAttribute('position', new THREE.BufferAttribute(arrays.position, 3));
+  if (arrays.position64) geometry.userData.position64 = arrays.position64;
   geometry.setAttribute('normal', new THREE.BufferAttribute(normal, 3));
   geometry.setAttribute('color', new THREE.BufferAttribute(arrays.color, 3));
   geometry.setAttribute('side', new THREE.BufferAttribute(arrays.side, 2));

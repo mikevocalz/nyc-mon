@@ -11,11 +11,13 @@
     "./html": "./html/index.tsx",
     "./backgrounds/CityBlocks": "./backgrounds/CityBlocks.tsx",
     "./gpu": "./gpu/index.ts",
+    "./gpu/gpu-store": "./gpu/gpu-store.ts",
     "./three": "./three/index.ts",
     "./three/cel": "./three/cel/index.ts",
     "./three/hlynk": "./three/hlynk/index.ts",
     "./three/hlynk/hud": "./three/hlynk/hud.ts",
     "./three/internals": "./three/renderer-internals.ts",
+    "./three/gpu-timestamps": "./three/gpu-timestamps.ts",
     "./neon": "./neon/index.ts",
     "./elements": "./elements/index.ts",
     "./progress": "./progress/index.ts",
@@ -28,6 +30,15 @@
       "default": "./icons.web.ts"
     },
     "./native": "./native.ts",
+    "./net": {
+      "react-native": "./net/index.native.ts",
+      "browser": "./net/index.web.ts",
+      "default": "./net/index.ts"
+    },
+    "./audio-session": {
+      "react-native": "./audio/session.native.ts",
+      "default": "./audio/session.ts"
+    },
     "./game-perf": {
       "react-native": "./game-perf.native.ts",
       "default": "./game-perf.ts"
@@ -48,7 +59,8 @@
     "./three/mon/lipsync": "./three/mon/lipsync/index.ts",
     "./three/mon/hatch-sound": "./three/mon/hatch-sound.ts",
     "./three/mon/hatch-timeline": "./three/mon/hatch-timeline.ts",
-    "./three/mon/idle": "./three/mon/idle/index.ts"
+    "./three/mon/idle": "./three/mon/idle/index.ts",
+    "./site-embed": "./html/SiteEmbed.tsx"
   },
   "sideEffects": [
     "./rn-globals-shim.ts",
@@ -86,6 +98,7 @@
     "react-native-gesture-handler": "catalog:",
     "react-native-graph": "catalog:",
     "react-native-keyboard-controller": "catalog:",
+    "react-native-nitro-fetch": "catalog:",
     "react-native-nitro-modules": "catalog:",
     "react-native-pulsar": "catalog:",
     "react-native-reanimated": "catalog:",

@@ -1,10 +1,12 @@
 import { createHash } from 'node:crypto';
-import { MAX_SPOKEN_TEXT, monVoiceRef, planMonUtterance, type MonLingo } from '@acme/content/voice';
+import { babbleInventory, MAX_SPOKEN_TEXT, monVoiceRef, planMonUtterance, type MonLingo, type MonUtterance } from '@acme/content/voice';
+import { deriveVoiceLineageId, enforceVoiceStage, voiceStage, type MonInstance, type MonMood } from '@acme/core';
 import { MonInstanceSchema, MonMoodSchema } from '@acme/core/schemas';
 import { getPayload } from 'payload';
 import type { Payload } from 'payload';
 import { z } from 'zod';
 import { parseRecord } from '../../../collections/guards.ts';
+import { EGGS_SLUG } from '../../../collections/Eggs.ts';
 import { MON_INSTANCES_SLUG, toMonInstance } from '../../../collections/MonInstances.ts';
 import { preflight, withCors } from './cors.ts';
 import { authenticateCaller, v1Error } from './game.ts';
@@ -18,17 +20,29 @@ import { createFixedWindowLimiter } from './rate-limit.ts';
  *
  * Body `{ monId, text, mood? }`. The server loads the Mon (owner only; any
  * other Mon is a 404), plans the line with `planMonUtterance` from its stored
- * `voiceLineageId` and stage and the lingo Payload publishes (the
- * `language-lexicon` rows and the `mon-voices` global, read through the same
- * cached reader as `GET /v1/mon-lingo`), the plan every surface uses, and asks ElevenLabs
- * for the clip. `ELEVENLABS_API_KEY` stays on the server.
+ * `voiceLineageId`, stage and `hatchedAt` on the server's clock (`deps.now`)
+ * and the lingo Payload publishes (the `language-lexicon` rows and the
+ * `mon-voices` global, read through the same cached reader as
+ * `GET /v1/mon-lingo`), the plan every surface uses, and asks ElevenLabs for
+ * the clip. `ELEVENLABS_API_KEY` stays on the server.
+ *
+ * The plan gates the line by voice stage first (Decision 32): an Egg and a
+ * Baby in its first 24 hours babble whatever was posted, and a Baby after that
+ * says the family sound and at most two words. The body has no stage field,
+ * so a client cannot claim more speech than the stored Mon has. A Mon with no
+ * voice lineage is gated the same way, by species, so its caption has no
+ * words either.
  *
  * Answers:
  * - 200 `audio/mpeg`. `x-mon-pitch` is the pitch factor baked into the clip
  *   (always 1 here: no ffmpeg on this host) and `x-mon-pitch-target` the
  *   stage's factor, so the player applies `target / baked` itself without
  *   changing duration (react-native-audio-api: detune with pitchCorrection).
- * - 204 with `x-mon-voice-reason`: `silent` (an Egg, or nothing to say),
+ * - `x-mon-voice-stage` (`baby-talk`, `limited` or `full`) and `x-mon-caption`
+ *   (the gated caption, URL-encoded with encodeURIComponent) are on every 200
+ *   and 204: the client shows that caption, not the text it posted.
+ * - 204 with `x-mon-voice-reason`: `silent` (nothing to say aloud, or a stage
+ *   with no pitch),
  *   `no-voice` (no lineage voice for this Mon) or `no-key` (the server has no
  *   ElevenLabs key). The client shows the caption and may use its fallback.
  * - 400 malformed or over MAX_SPOKEN_TEXT, 401, 404, 413, 415 (not JSON), 429, 502.
@@ -39,6 +53,10 @@ import { createFixedWindowLimiter } from './rate-limit.ts';
  */
 
 export const MON_VOICE_REASON_HEADER = 'x-mon-voice-reason';
+/** The voice stage the line was gated at. */
+export const MON_VOICE_STAGE_HEADER = 'x-mon-voice-stage';
+/** The caption of what was spoken (after the gate), URL-encoded. */
+export const MON_CAPTION_HEADER = 'x-mon-caption';
 export type MonVoiceSilenceReason = 'silent' | 'no-voice' | 'no-key';
 
 const ELEVENLABS_URL = 'https://api.elevenlabs.io/v1/text-to-speech';
@@ -112,19 +130,65 @@ export interface MonVoiceDeps {
   readonly corsOrigins: () => Promise<readonly string[]>;
   /** The Mon's lingo as Payload publishes it (`language-lexicon` + `mon-voices`), the tables the line is planned with. */
   readonly lingo: (payload: Payload) => Promise<MonLingo>;
+  /** The server clock the voice stage is read on (Date.now). Never a client's. */
+  readonly now?: () => number;
 }
 
-const EXPOSED_HEADERS = ['x-mon-pitch', 'x-mon-pitch-target', MON_VOICE_REASON_HEADER, 'x-mon-voice-cache'];
+const EXPOSED_HEADERS = ['x-mon-pitch', 'x-mon-pitch-target', MON_VOICE_REASON_HEADER, 'x-mon-voice-cache', MON_VOICE_STAGE_HEADER, MON_CAPTION_HEADER];
 
-function silent(reason: MonVoiceSilenceReason): Response {
-  return new Response(null, { status: 204, headers: { 'cache-control': 'no-store', [MON_VOICE_REASON_HEADER]: reason } });
+function planHeaders(plan: MonUtterance): Record<string, string> {
+  return { [MON_VOICE_STAGE_HEADER]: plan.voiceStage, [MON_CAPTION_HEADER]: encodeURIComponent(plan.caption) };
+}
+
+function silent(reason: MonVoiceSilenceReason, plan: MonUtterance): Response {
+  return new Response(null, { status: 204, headers: { 'cache-control': 'no-store', [MON_VOICE_REASON_HEADER]: reason, ...planHeaders(plan) } });
+}
+
+/**
+ * The plan for `text` from the stored Mon at `now`. With a voice lineage the
+ * planner gates the line itself; without one it has no ref to gate by, so the
+ * line is gated here by species before planning.
+ */
+/** What the planner reads from a stored Mon, or from an unhatched egg standing in for one. */
+type VoiceHolder = Pick<MonInstance, 'monInstanceId' | 'speciesId' | 'stage' | 'voiceLineageId'> & { readonly hatchedAt: number | null };
+
+/**
+ * An unhatched egg of the Caller's, by the `monInstanceId` it reserves, as the
+ * Egg it voices (Decision 32): its line's lineage, stage Egg. Undefined when
+ * the Caller has no such egg.
+ */
+async function eggHolder(payload: Payload, monId: string, callerId: string): Promise<VoiceHolder | undefined> {
+  const found = await payload.find({
+    collection: EGGS_SLUG,
+    where: { monInstanceId: { equals: monId }, callerId: { equals: callerId }, hatched: { equals: false } },
+    limit: 1,
+    depth: 0,
+    overrideAccess: true,
+  });
+  const egg = found.docs[0] as Record<string, unknown> | undefined;
+  if (egg === undefined || typeof egg.eggId !== 'string' || typeof egg.speciesId !== 'string') return undefined;
+  return {
+    monInstanceId: monId,
+    speciesId: egg.speciesId,
+    stage: 'Egg',
+    hatchedAt: null,
+    voiceLineageId: deriveVoiceLineageId({ eggId: egg.eggId, speciesId: egg.speciesId }),
+  };
+}
+
+function planFor(text: string, mon: VoiceHolder, mood: MonMood | undefined, lingo: MonLingo, now: number): MonUtterance {
+  const ref = monVoiceRef(mon, now);
+  if (ref !== null) return planMonUtterance(text, { ...ref, ...(mood ? { mood } : {}) }, lingo);
+  const stage = voiceStage(mon, now);
+  const gated = enforceVoiceStage(text, stage, babbleInventory({ speciesId: mon.speciesId }, mon.stage, lingo), { seed: `${mon.monInstanceId}|${text}` });
+  return { ...planMonUtterance(gated.text, undefined, lingo), voiceStage: stage, gated: gated.replaced };
 }
 
 function planKey(parts: unknown): string {
   return createHash('sha256').update(JSON.stringify(parts)).digest('hex');
 }
 
-function clipResponse(clip: Uint8Array, key: string, pitchTarget: number, cache: 'hit' | 'miss'): Response {
+function clipResponse(clip: Uint8Array, key: string, pitchTarget: number, cache: 'hit' | 'miss', plan: MonUtterance): Response {
   return new Response(clip as BodyInit, {
     status: 200,
     headers: {
@@ -136,6 +200,7 @@ function clipResponse(clip: Uint8Array, key: string, pitchTarget: number, cache:
       'x-mon-pitch': '1',
       'x-mon-pitch-target': String(pitchTarget),
       'x-mon-voice-cache': cache,
+      ...planHeaders(plan),
     },
   });
 }
@@ -191,21 +256,21 @@ function speakHandler(deps: MonVoiceDeps): (request: Request) => Promise<Respons
         overrideAccess: true,
       });
       const doc = found.docs[0] as Record<string, unknown> | undefined;
-      if (doc === undefined) return v1Error('NOT_FOUND', 'Mon not found.', 404);
-      const mon = parseRecord(MonInstanceSchema, toMonInstance(doc), 'mon');
+      // Before the hatch the Mon is still its egg: the egg's reserved id voices the Egg's babble.
+      const mon = doc === undefined ? await eggHolder(payload, input.monId, caller.callerId) : parseRecord(MonInstanceSchema, toMonInstance(doc), 'mon');
+      if (mon === undefined) return v1Error('NOT_FOUND', 'Mon not found.', 404);
 
-      const ref = monVoiceRef(mon);
       const lingo = await deps.lingo(payload);
-      const plan = planMonUtterance(input.text, ref === null ? undefined : { ...ref, ...(input.mood ? { mood: input.mood } : {}) }, lingo);
-      if (plan.voice.kind === 'silent') return silent('silent');
-      if (plan.voice.kind === 'fallback') return silent('no-voice');
+      const plan = planFor(input.text, mon, input.mood, lingo, (deps.now ?? Date.now)());
+      if (plan.voice.kind === 'silent') return silent('silent', plan);
+      if (plan.voice.kind === 'fallback') return silent('no-voice', plan);
       const apiKey = deps.apiKey();
-      if (apiKey === undefined || apiKey === '') return silent('no-key');
+      if (apiKey === undefined || apiKey === '') return silent('no-key', plan);
 
       const { voiceId, model, settings, pitchFactor, lineageId } = plan.voice;
       const key = planKey({ voiceId, model, settings, spoken: plan.spoken, format: OUTPUT_FORMAT });
       const cached = deps.cache.get(key);
-      if (cached !== undefined) return clipResponse(cached, key, pitchFactor, 'hit');
+      if (cached !== undefined) return clipResponse(cached, key, pitchFactor, 'hit', plan);
 
       let clip: Uint8Array;
       try {
@@ -227,7 +292,7 @@ function speakHandler(deps: MonVoiceDeps): (request: Request) => Promise<Respons
         return v1Error('INTERNAL_ERROR', 'Voice unavailable.', 502);
       }
       deps.cache.set(key, clip);
-      return clipResponse(clip, key, pitchFactor, 'miss');
+      return clipResponse(clip, key, pitchFactor, 'miss', plan);
     } catch (error) {
       console.error('[mon-voice] failed', error instanceof Error ? error.name : 'unknown');
       return v1Error('INTERNAL_ERROR', 'Voice unavailable.', 500);

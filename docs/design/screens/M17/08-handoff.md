@@ -72,3 +72,7 @@ Compact: 16 pt gutter; portrait 4:5 full width; `space.4` between portrait and t
 - No string for a Small, Mid or Max form, or the words for those stages, is reachable from this screen.
 - No row renders with null canon data.
 - An exported PNG has an alpha channel, no text chunks and no EXIF.
+
+## Amendment 2026-10-29
+
+Shell: none, restated (D20g). Remove the H-Lynk `GlassStage` wrapper from `DexProfileScreen`; the flat Dex is the spec. A link to M32 Mon Space may sit beside Back; M32 owns care.

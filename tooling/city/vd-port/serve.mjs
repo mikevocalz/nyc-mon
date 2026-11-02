@@ -32,27 +32,31 @@ export const PATCHES = [
     'export async function areaBuild(group, ctx) {\n  (globalThis.__vdAreaCtx ||= {})[ctx.key] = ctx;'],
 ];
 
-export function startServer({ valdrada = join(homedir(), 'src/valdrada'), cache, deps, port = 0 } = {}) {
+export function startServer({ valdrada = join(homedir(), 'src/valdrada'), cache, deps, overlay, port = 0 } = {}) {
   const roots = [
     ['/src/', join(valdrada, 'client/src/')],
     ['/tiles/', join(cache, 'valdrada/')],
     ['/textures/', join(cache, 'valdrada-textures/')],
     ['/node/three/', join(deps, 'three/')],
     ['/node/earcut/', join(deps, 'earcut/')],
+    ...(overlay ? [['/', overlay]] : []),
     ['/', join(valdrada, 'client/public/')],
   ];
   const server = createServer(async (req, res) => {
     const url = decodeURIComponent((req.url || '/').split('?')[0]);
     try {
-      if (url === '/harness.html' || url === '/harness.js' || url === '/eztree-stub.js' || url === '/harvest.js') {
+      if (url === '/harness.html' || url === '/harness.js' || url === '/eztree-stub.js' || url === '/harvest.js' || url === '/far-bake.html') {
         res.writeHead(200, { 'content-type': TYPES[extname(url)] });
         res.end(await readFile(join(HERE, url.slice(1))));
         return;
       }
-      const [prefix, dir] = roots.find(([p]) => url.startsWith(p));
-      const file = normalize(join(dir, url.slice(prefix.length)));
-      if (!file.startsWith(dir)) throw new Error('outside root');
-      await stat(file);
+      let file = null;
+      for (const [prefix, dir] of roots.filter(([p]) => url.startsWith(p))) {
+        const candidate = normalize(join(dir, url.slice(prefix.length)));
+        if (!candidate.startsWith(dir)) continue;
+        try { await stat(candidate); file = candidate; break; } catch { /* try the next root */ }
+      }
+      if (!file) throw new Error('not found');
       let body = await readFile(file);
       for (const [suffix, find, replace] of PATCHES) {
         if (!url.endsWith(suffix)) continue;

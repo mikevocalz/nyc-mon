@@ -102,15 +102,13 @@ describe('voice registry', () => {
     expect(resolveVoice('not-a-lineage')).toBeNull();
   });
 
-  it('keeps the Egg silent and lowers the voice as the Mon grows', () => {
-    expect(voicePitchFactor('Egg')).toBeNull();
-    const rates = LIFECYCLE_STAGES.filter((s) => s !== 'Egg').map((s) => voicePitchFactor(s));
-    expect(rates).toEqual([1.3, 1.15, 1, 0.92]);
+  it('pitches the Egg highest (its babble, Decision 32) and lowers the voice as the Mon grows', () => {
+    const rates = LIFECYCLE_STAGES.map((s) => voicePitchFactor(s));
+    expect(rates).toEqual([1.45, 1.3, 1.15, 1, 0.92]);
     for (const stage of LIFECYCLE_STAGES) {
       const pitch = webSpeechPitch(stage);
-      if (stage === 'Egg') expect(pitch).toBeNull();
-      else expect(pitch).toBeGreaterThanOrEqual(0);
-      if (pitch !== null) expect(pitch).toBeLessThanOrEqual(2);
+      expect(pitch).toBeGreaterThanOrEqual(0);
+      expect(pitch).toBeLessThanOrEqual(2);
     }
   });
 

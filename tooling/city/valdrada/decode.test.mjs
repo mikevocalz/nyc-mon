@@ -163,9 +163,16 @@ test('N3: a naive offset-and-scale reprojection is wrong by >0.5 m inside the sq
 test('N4: cached bytes match the recorded SHA-256 pins; tampering fails', () => {
   assert.equal(pins.tag, 'v0.4.0');
   assert.equal(pins.commit, '2724c79');
+  const destOf = (rel) => {
+    const name = rel.split('/').pop();
+    if (rel.startsWith('Content/tiles/')) return join(CACHE, name);
+    if (rel.startsWith('Content/data/')) return join(CACHE, '..', 'valdrada-public', 'data', name);
+    if (rel.startsWith('Content/models/')) return join(CACHE, '..', 'valdrada-public', 'models', 'landmarks', name);
+    if (rel.startsWith('Content/textures/')) return join(CACHE, '..', 'valdrada-textures', name);
+    return join(CACHE, name);
+  };
   for (const [rel, p] of Object.entries(pins.files)) {
-    const name = rel === 'Content/tiles/manifest.json' ? 'manifest.json' : rel.split('/').pop();
-    const buf = readFileSync(join(CACHE, name));
+    const buf = readFileSync(destOf(rel));
     assert.equal(createHash('sha256').update(buf).digest('hex'), p.sha256, `${rel} sha256`);
     assert.equal(buf.length, p.bytes, `${rel} byte size`);
     const tampered = Buffer.from(buf);

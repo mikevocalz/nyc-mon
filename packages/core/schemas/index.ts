@@ -10,15 +10,8 @@ export {
   CareStateSchema,
   FoodPortionSchema,
 } from './care.ts';
-export {
-  AttentionCallSchema,
-  CALL_KINDS,
-  CallKindSchema,
-  ClassicCareStateSchema,
-  ColdSchema,
-} from './classic-care.ts';
 export { EggRecordSchema, INCUBATION_MINUTES, IncubationMinutesSchema } from './egg.ts';
-export { EvolutionCareConditionsSchema, EvolutionEventSchema, WEIGHT_BANDS, WeightBandSchema } from './evolution.ts';
+export { EvolutionEventSchema } from './evolution.ts';
 export {
   HATCH_PRESENTATION_PHASES,
   HATCH_PRESENTATION_PHASES_V2,
@@ -41,7 +34,6 @@ export {
   SaveV1Schema,
   SaveV2Schema,
   SaveV3Schema,
-  SaveV4Schema,
   WriteQueueSchema,
   WriteQueueV1Schema,
 } from './save.ts';

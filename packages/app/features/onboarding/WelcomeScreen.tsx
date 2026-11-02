@@ -54,6 +54,7 @@ const EGG_CAPTION: Record<string, OnboardingCopyId> = {
   F01: 'm02.p2.caption.f01',
   F02: 'm02.p2.caption.f02',
   F12: 'm02.p2.caption.f12',
+  F04: 'm02.p2.caption.f04',
 };
 
 /**
@@ -66,6 +67,7 @@ const EGG_SIZES = [
   { w: 62, h: 84 }, // #001 Metro Egg
   { w: 70, h: 96 }, // #008 Corner Egg
   { w: 58, h: 78 }, // #061 Prism Egg
+  { w: 64, h: 86 }, // #020 Signal Egg
 ] as const;
 
 /** One porcelain egg silhouette: unmarked raised face with a hairline keyline. */
@@ -142,27 +144,30 @@ function CityArt() {
 }
 
 /**
- * Panel 2: the three eggs on one ground line, still, each with its Bloodline
- * caption. Captions are hidden from assistive tech — the figure's alt reads
+ * Panel 2: the four eggs on one ground line, still, each with its Bloodline
+ * caption. Each egg and its caption share one equal column, so four fit a
+ * 390pt phone without the captions running past the edge. Captions are hidden from assistive tech — the figure's alt reads
  * every name and Bloodline already (07-a11y).
  */
 function EggsArt() {
   return (
     <View className="flex-1 items-center justify-center px-4">
-      <View className="flex-row items-end justify-center gap-8">
+      <View className="w-full max-w-md flex-row items-end">
         {eggs.map((egg, i) => (
-          <EggShape key={egg.speciesId} w={EGG_SIZES[i]?.w ?? 62} h={EGG_SIZES[i]?.h ?? 84} />
+          <View key={egg.speciesId} className="flex-1 items-center">
+            <EggShape w={EGG_SIZES[i]?.w ?? 62} h={EGG_SIZES[i]?.h ?? 84} />
+          </View>
         ))}
       </View>
-      {/* One ground line under the three, then a caption per egg. */}
-      <View aria-hidden className="mt-0.5 h-px w-4/5 bg-concrete-400" />
-      <View className="mt-3 flex-row items-start justify-center gap-4">
+      {/* One ground line under the eggs, then a caption per egg. */}
+      <View aria-hidden className="mt-0.5 h-px w-full max-w-md bg-concrete-400" />
+      <View className="mt-3 w-full max-w-md flex-row items-start gap-2">
         {eggs.map((egg) => (
           <Text
             key={egg.speciesId}
             variant="caption"
             tone="muted"
-            className="w-24 text-center"
+            className="flex-1 text-center"
             testID={`m02-p2-caption-${egg.bloodlineId.toLowerCase()}`}
           >
             {copy(EGG_CAPTION[egg.bloodlineId] ?? 'm02.p2.caption.f01')}

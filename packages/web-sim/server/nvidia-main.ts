@@ -13,6 +13,7 @@ import { createMemoryClient, createMemoryProxy, withPersistentMemory } from './c
 import { createMonLingoProxy, createMonLingoSource } from './mon-lingo-source.ts';
 import { createSkillLoader, resolveSkillPath } from './skill.ts';
 import { withServedVoice } from './voice-guide.ts';
+import { createV1MonRoster } from './mon-roster.ts';
 
 /** Focused NVIDIA route inside the existing simulator package. Bedrock/Alexa entry stays unchanged. */
 const env = loadNvidiaEnv();
@@ -24,6 +25,8 @@ const memory = createMemoryClient({ baseUrl: env.V1_BASE_URL, serviceKey: env.V1
 // The Mon's lines and lingo from Payload (GET /v1/mon-lingo), one cached copy revalidated by ETag
 // (mon-lingo-source.ts). TTS, the ASR word boost, the host note and each turn's voice guide read it.
 const lingo = createMonLingoSource({ baseUrl: env.V1_BASE_URL, serviceKey: env.V1_MCP_SERVICE_KEY });
+// The signed-in Caller's Mons from /v1 (mon-roster.ts): how much a Mon may say comes from here, never from the page.
+const roster = createV1MonRoster({ baseUrl: env.V1_BASE_URL, serviceKey: env.V1_MCP_SERVICE_KEY });
 const backend = nebiusBackend({ apiKey: env.NEBIUS_API_KEY, baseUrl: env.NEBIUS_BASE_URL,
   modelId: env.SIM_NEBIUS_MODEL_ID, maxTokens: env.SIM_MAX_OUTPUT_TOKENS }, {
   onReceipt: (receipt) => console.info('[nvidia-runtime]', JSON.stringify(receipt)),
@@ -34,7 +37,7 @@ const memoryLimit = createRateLimiter(30, { globalPerMinute: 120 });
 const memoryProxy = createMemoryProxy({ origin: new URL(env.SIM_PUBLIC_ORIGIN).origin, auth, memory, rateLimit: memoryLimit });
 const lingoProxy = createMonLingoProxy({ origin: new URL(env.SIM_PUBLIC_ORIGIN).origin, auth, source: lingo, rateLimit: createRateLimiter(30, { globalPerMinute: 240 }) });
 // The Mon's voice: same handler and sign-in as the simulator's /api/tts, its own rate limiter (nvidia-tts.ts).
-const tts = createNvidiaTts(env, { auth, fetch, lingo });
+const tts = createNvidiaTts(env, { auth, fetch, lingo, roster });
 const csp = nvidiaCsp(env);
 
 const requestFrom = (req: IncomingMessage) => nodeRequest(req, env.SIM_PUBLIC_ORIGIN);
@@ -61,8 +64,8 @@ async function start() {
       // Owner capture is request-local. Shared backend never stores one person's context for another.
       let owner: string | undefined;
       const handle = createModelHandler({
-        // The served voice guide for this turn's Mon goes on the system prompt the Nebius request carries (voice-guide.ts).
-        backend: withServedVoice(withPersistentMemory(backend,memory,() => owner), lingo, () => owner), system, allowedOrigin: new URL(env.SIM_PUBLIC_ORIGIN).origin,
+        // The served voice guide for this turn's Mon goes on the system prompt the Nebius request carries, and the reply is gated by the Mon's voice stage (voice-guide.ts).
+        backend: withServedVoice(withPersistentMemory(backend,memory,() => owner), lingo, () => owner, async () => (owner === undefined ? null : roster(owner))), system, allowedOrigin: new URL(env.SIM_PUBLIC_ORIGIN).origin,
         auth: async (authorization) => { const actor = await auth(authorization); owner = actor.callerId; return actor; },
         rateLimit: () => modelLimit(owner ?? 'unauthenticated'),
       });

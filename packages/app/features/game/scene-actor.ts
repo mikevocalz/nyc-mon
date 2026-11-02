@@ -10,6 +10,9 @@ export interface ActorFrame {
   readonly delta: number;
   readonly time: number;
   readonly reducedMotion: boolean;
+  readonly originX?: number;
+  readonly originZ?: number;
+  readonly originChanged?: boolean;
 }
 
 /**
@@ -20,6 +23,7 @@ export interface ActorFrame {
 export interface SceneActor {
   readonly id: string;
   readonly object: unknown;
+  readonly coordinateSpace?: 'absolute' | 'render';
   /** Advance one frame. Return true while the actor is still moving, so an on-demand canvas keeps drawing. */
   update(frame: ActorFrame): boolean;
   dispose(): void;

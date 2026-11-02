@@ -31,8 +31,8 @@ function body(overrides: { egg?: Partial<AdoptMonRequest['egg']>; mon?: Partial<
       stage: 'Baby',
       bond: 0.4,
       nickname: 'Pip',
-      gender: deriveMonGender(EGG_ID),
-      voiceLineageId: deriveVoiceLineageId({ eggId: EGG_ID, speciesId: starter.speciesId }),
+      gender: deriveMonGender(egg.eggId, egg.speciesId),
+      voiceLineageId: deriveVoiceLineageId(egg),
       ...overrides.mon,
     },
     care: { ...createInitialCareState(MON_ID, HATCHED + 60_000), energy: 0.7, fullness: 0.9, updatedAt: NOW - 60_000 },
@@ -123,9 +123,31 @@ describe('POST /v1/mons/adopt', () => {
     expect(data.mon).toMatchObject({ monInstanceId: MON_ID, callerId: 'c1', stage: 'Baby', bond: 0.4, nickname: 'Pip', hatchedAt: HATCHED });
     expect(data.care).toMatchObject({ energy: 0.7, fullness: 0.9 });
     expect(fake.tables[EGGS_SLUG]).toMatchObject([{ eggId: EGG_ID, monInstanceId: MON_ID, callerId: 'c1', createdAtMs: CREATED, incubationEndsAt: HATCHED }]);
-    expect(fake.tables[MON_INSTANCES_SLUG]).toMatchObject([{ eggId: EGG_ID, callerId: 'c1', gender: deriveMonGender(EGG_ID) }]);
+    expect(fake.tables[MON_INSTANCES_SLUG]).toMatchObject([{ eggId: EGG_ID, callerId: 'c1', gender: deriveMonGender(EGG_ID, starter.speciesId) }]);
     // The writes the snapshot already holds are recorded as applied, so a replay skips them.
     expect(fake.tables[CARE_STATES_SLUG]).toMatchObject([{ monInstanceId: MON_ID, lastSeqByDevice: { 'device-ipad': 4 } }]);
+  });
+
+  it.each(starterEggs)('preserves the minted gender and lineage for starter $speciesId on adoption and replay', async (starterEgg) => {
+    const input = body({
+      egg: { speciesId: starterEgg.speciesId, hatchesIntoSpeciesId: starterEgg.hatchesIntoSpeciesId },
+      mon: { speciesId: starterEgg.hatchesIntoSpeciesId },
+    });
+    const fake = fakePayload();
+    const h = handler(fake);
+    const first = await ok(await h(post(input)));
+    const expected = {
+      gender: deriveMonGender(EGG_ID, starterEgg.speciesId),
+      voiceLineageId: deriveVoiceLineageId(input.egg),
+    };
+    expect(first.mon).toMatchObject(expected);
+    const replay = await ok(await h(post(input)));
+    expect(replay.adopted).toBe(false);
+    expect(replay.mon).toMatchObject(expected);
+    expect(fake.tables[MON_INSTANCES_SLUG]).toHaveLength(1);
+    const flipped = expected.gender === 'male' ? 'female' : 'male';
+    const invalid = await handler(fakePayload())(post({ ...input, mon: { ...input.mon, gender: flipped } }));
+    expect(await errorOf(invalid)).toMatchObject({ status: 400, code: 'INVALID_RECORD', message: 'gender is not the egg-derived gender.' });
   });
 
   it('owns the Mon by the session, never by anything the client sends', async () => {
@@ -202,6 +224,18 @@ describe('adopt rules (content and egg-derived ids)', () => {
     expect(check(body({ mon: { gender: null, voiceLineageId: null } }))).toBeNull();
   });
 
+  it('accepts a Fye Dot hatched from the Signal Egg, the fourth starter (Decision 38)', () => {
+    const signal = starterEggs.find((e) => e.bloodlineId === 'F04')!;
+    expect([signal.speciesId, signal.hatchesIntoSpeciesId]).toEqual(['dex-020', 'dex-021']);
+    const fromSignal = body({
+      egg: { speciesId: signal.speciesId, hatchesIntoSpeciesId: signal.hatchesIntoSpeciesId },
+      mon: { speciesId: signal.hatchesIntoSpeciesId, voiceLineageId: deriveVoiceLineageId({ eggId: EGG_ID, speciesId: signal.speciesId }) },
+    });
+    expect(check(fromSignal)).toBeNull();
+    expect(check({ ...fromSignal, mon: { ...fromSignal.mon, speciesId: 'dex-022', stage: 'Small' } })).toBeNull();
+    expect(check({ ...fromSignal, mon: { ...fromSignal.mon, speciesId: starter.hatchesIntoSpeciesId } })).toMatch(/not a form/);
+  });
+
   it('refuses an id the egg does not derive', () => {
     expect(check(body({ mon: { monInstanceId: 'mon_mine' } }))).toMatch(/derived/);
   });
@@ -219,7 +253,7 @@ describe('adopt rules (content and egg-derived ids)', () => {
   });
 
   it('refuses a gender or voice the egg did not mint', () => {
-    const flipped = deriveMonGender(EGG_ID) === 'male' ? 'female' : 'male';
+    const flipped = deriveMonGender(EGG_ID, starter.speciesId) === 'male' ? 'female' : 'male';
     expect(check(body({ mon: { gender: flipped } }))).toMatch(/gender/);
     expect(check(body({ mon: { voiceLineageId: 'dex-001/female/9' } }))).toMatch(/voice/);
   });

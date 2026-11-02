@@ -206,6 +206,18 @@ describe('Alexa+ authorization server', () => {
     expect(((await get.json()) as { issuer: string }).issuer).toBe(ORIGIN);
   });
 
+  it('uses the configured origin and auth path when metadata arrives in an envelope', async () => {
+    const handler = createAuthServerMetadataHandler({
+      api: { getOAuthServerConfig: async () => ({ response: {}, headers: {} }) },
+      options: { baseURL: 'https://configured.example/', basePath: '/custom/auth' },
+    });
+    const result = await handler(new Request('https://configured.example/.well-known/oauth-authorization-server'));
+    const metadata = await result.json();
+    expect(metadata.issuer).toBe('https://configured.example');
+    expect(metadata.authorization_endpoint).toBe('https://configured.example/custom/auth/oauth2/authorize');
+    expect(metadata.token_endpoint).toBe('https://configured.example/custom/auth/oauth2/token');
+  });
+
   it('publishes RFC 8414 metadata Amazon accepts, with no OIDC', async () => {
     const metadata = (await auth.api.getOAuthServerConfig()) as unknown as Record<string, unknown>;
     expect(metadata.issuer).toBe(ORIGIN);

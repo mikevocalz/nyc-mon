@@ -31,6 +31,7 @@ import { REPO, THREE, vd } from './valdrada-runtime.mjs';
 import { assembleCity } from './assemble-city.mjs';
 import { EXTENT_METERS } from '../valdrada/decode.mjs';
 import { AFF, toSceneExact, valdradaGround } from './valdrada-ground.mjs';
+import { packLampSpots } from './lamp-pack.mjs';
 
 const OUT = join(REPO, 'packages/app/features/game/world/vd-port/furniture/data');
 const TILE = join(REPO, 'packages/app/features/game/data/harlem-apollo.json');
@@ -38,6 +39,74 @@ const TILE = join(REPO, 'packages/app/features/game/data/harlem-apollo.json');
 const toScene = toSceneExact;
 const groundVd = valdradaGround;
 const log = (s) => process.stderr.write(s + '\n');
+// --ring ring1 (or VD_RING=ring1): assemble the ring's tiles too (VD_TILES, assemble-city.mjs) and keep the pieces
+// in its region as well as the square's. --ring ring2 .. --ring ring10: the union bake — home + rings 1..N tiles and
+// regions — so the earlier rings' pieces are regenerated alongside the new ring's rather than dropped. Furniture
+// pools are resident, self-culling draws, so the rings' instances join the same pools and assets (pools.bin,
+// lamps.ts) rather than streaming.
+const RING = process.argv.includes('--ring') ? process.argv[process.argv.indexOf('--ring') + 1] : process.env.VD_RING ?? null;
+let inRegion = null;
+if (RING === 'ring1' || RING === 'ring2' || RING === 'ring3' || RING === 'ring4' || RING === 'ring5' || RING === 'ring6' || RING === 'ring7' || RING === 'ring8' || RING === 'ring9' || RING === 'ring10') {
+  const { RING1_TILES, ring1RectsScene, inRing1Scene, inHomeSquare } = await import('./ring1.mjs');
+  const { tileIdsForSquare } = await import('../valdrada/decode.mjs');
+  const tiles = [...tileIdsForSquare(), ...RING1_TILES.map((k) => `t_${k}`)];
+  const R1S = ring1RectsScene(AFF);
+  inRegion = (x, z) => inHomeSquare(x, z) || inRing1Scene(x, z, R1S);
+  if (RING !== 'ring1') {
+    const { RING2_TILES, ring2RectsScene, inRing2Scene } = await import('./ring2.mjs');
+    for (const k of RING2_TILES) tiles.push(`t_${k}`);
+    const R2S = ring2RectsScene(AFF);
+    const keepR1 = inRegion;
+    inRegion = (x, z) => keepR1(x, z) || inRing2Scene(x, z, R2S);
+    if (RING === 'ring3' || RING === 'ring4' || RING === 'ring5' || RING === 'ring6' || RING === 'ring7' || RING === 'ring8' || RING === 'ring9' || RING === 'ring10') {
+      const { RING3_TILES, ring3RectsScene, inRing3Scene } = await import('./ring3.mjs');
+      for (const k of RING3_TILES) tiles.push(`t_${k}`);
+      const R3S = ring3RectsScene(AFF);
+      const keepR2 = inRegion;
+      inRegion = (x, z) => keepR2(x, z) || inRing3Scene(x, z, R3S);
+      if (RING === 'ring4' || RING === 'ring5' || RING === 'ring6' || RING === 'ring7' || RING === 'ring8' || RING === 'ring9' || RING === 'ring10') {
+        const { RING4_TILES, ring4RectsScene, inRing4Scene } = await import('./ring4.mjs');
+        for (const k of RING4_TILES) tiles.push(`t_${k}`);
+        const R4S = ring4RectsScene(AFF);
+        const keepR3 = inRegion;
+        inRegion = (x, z) => keepR3(x, z) || inRing4Scene(x, z, R4S);
+        if (RING === 'ring5' || RING === 'ring6' || RING === 'ring7' || RING === 'ring8' || RING === 'ring9' || RING === 'ring10') {
+          const { RING5_TILES, ring5RectsScene, inRing5Scene } = await import('./ring5.mjs');
+          for (const k of RING5_TILES) tiles.push(`t_${k}`);
+          const R5S = ring5RectsScene(AFF);
+          const keepR4 = inRegion;
+          inRegion = (x, z) => keepR4(x, z) || inRing5Scene(x, z, R5S);
+          if (RING === 'ring6' || RING === 'ring7' || RING === 'ring8' || RING === 'ring9' || RING === 'ring10') {
+            const { RING6_TILES, ring6RectsScene, inRing6Scene } = await import('./ring6.mjs');
+            for (const k of RING6_TILES) tiles.push(`t_${k}`);
+            const R6S = ring6RectsScene(AFF);
+            const keepR5 = inRegion;
+            inRegion = (x, z) => keepR5(x, z) || inRing6Scene(x, z, R6S);
+            if (RING === 'ring7' || RING === 'ring8' || RING === 'ring9' || RING === 'ring10') {
+              const { RING7_TILES, ring7RectsScene, inRing7Scene } = await import('./ring7.mjs');
+              for (const k of RING7_TILES) tiles.push(`t_${k}`);
+              const R7S = ring7RectsScene(AFF);
+              const keepR6 = inRegion;
+              inRegion = (x, z) => keepR6(x, z) || inRing7Scene(x, z, R7S);
+              // rings 8-10 (western Queens, the South Bronx, Staten Island's North Shore), each joining the union
+              for (const n of [8, 9, 10]) {
+                if (+RING.slice(4) < n) break;
+                const m = await import(`./ring${n}.mjs`);
+                for (const k of m[`RING${n}_TILES`]) tiles.push(`t_${k}`);
+                const RS = m[`ring${n}RectsScene`](AFF), inR = m[`inRing${n}Scene`];
+                const keep = inRegion;
+                inRegion = (x, z) => keep(x, z) || inR(x, z, RS);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  process.env.VD_TILES = [...new Set(tiles)].join(',');
+} else if (RING) throw new Error(`unknown --ring ${RING}`);
+const keep = (x, z) => inRegion ? inRegion(x, z) : Math.abs(x) <= EXTENT_METERS && Math.abs(z) <= EXTENT_METERS;
+
 const { instancer, roofOf, signalReg } = await assembleCity(log);
 // sim/signals.js SignalController: which lit lens or pedestrian head each slot is, and the axis it serves. Code in the
 // instance flags (pool-data.ts): bits 1-3 the lamp (1 sigR, 2 sigA, 3 sigG, 4 pedHand, 5 pedMan), bit 4 serves E-W.
@@ -90,12 +159,17 @@ const ourBuildingAt = (x, z) => (bgrid.get(`${Math.floor(x / BCELL)}_${Math.floo
 // ---------------------------------------------------------------- instances
 const _m = new THREE.Matrix4(), _p = new THREE.Vector3(), _q = new THREE.Quaternion(), _s = new THREE.Vector3(), _e = new THREE.Euler();
 const pools = [];
-const stats = { roofNoBuilding: 0, outside: 0 };
+const stats = { roofNoBuilding: 0, outside: 0, dupClaim: 0 };
 const lamps = [];
 for (const [name, p] of instancer.pools) {
   if (OTHER_LANES(name) || !p.pos || !geos[name]) continue;
   const def = geos[name];
   const rows = [];
+  // one compiled record claims once: a tile can carry the same record twice (tile 0_17's sign pole at (410.04,
+  // 8925.33) is emitted twice upstream), and the instancer claims it twice — furniture.test.ts's double-claim
+  // check. A row identical on every field is the same record; two poles sharing a corner differ somewhere
+  // (~0.25 m apart, opposite yaws), so nothing real is dropped.
+  const seen = new Set();
   for (let slot = 0; slot < p.top; slot++) {
     if (!p.alive[slot]) continue;
     _m.fromArray(p.mats, slot * 16).decompose(_p, _q, _s);
@@ -104,7 +178,7 @@ for (const [name, p] of instancer.pools) {
       if (Math.abs(e[1]) + Math.abs(e[9]) > 1e-4 * (_s.x + _s.z) || Math.abs(e[4]) + Math.abs(e[6]) > 1e-4 * _s.y) throw new Error(`${name}: a non-yaw rotation`);
     }
     const [x, z] = toScene(_p.x, _p.z);
-    if (Math.abs(x) > EXTENT_METERS || Math.abs(z) > EXTENT_METERS) { stats.outside++; continue; }
+    if (!keep(x, z)) { stats.outside++; continue; }
     const roof = roofOf.get(`${name}:${slot}`);
     let y, ground;
     if (roof) {
@@ -126,7 +200,11 @@ for (const [name, p] of instancer.pools) {
     // record carries the lamp at full scale and the shader collapses it when its lamp is off
     const sig = signalCode.get(`${name}:${slot}`) ?? 0;
     if (sig) { const k = 1 / Math.max(_s.x, 1e-6); _s.multiplyScalar(k); }
-    rows.push({ x, y, z, yaw, sx: _s.x, sy: _s.y, sz: _s.z, r: p.cols[slot * 3], g: p.cols[slot * 3 + 1], b: p.cols[slot * 3 + 2], ground: ground | sig, vx: _p.x, vy: _p.y, vz: _p.z });
+    const row = { x, y, z, yaw, sx: _s.x, sy: _s.y, sz: _s.z, r: p.cols[slot * 3], g: p.cols[slot * 3 + 1], b: p.cols[slot * 3 + 2], ground: ground | sig, vx: _p.x, vy: _p.y, vz: _p.z };
+    const dupKey = `${row.x.toFixed(3)}|${row.y.toFixed(3)}|${row.z.toFixed(3)}|${row.yaw.toFixed(4)}|${row.sx.toFixed(3)}|${row.sy.toFixed(3)}|${row.sz.toFixed(3)}|${row.r}|${row.g}|${row.b}|${row.ground}`;
+    if (seen.has(dupKey)) { stats.dupClaim++; continue; }
+    seen.add(dupKey);
+    rows.push(row);
     // city/props.js L296 / L300: the light a pole throws (N11 fixture kind, head height, arm yaw)
     if (name === 'lampCobra' || name === 'lampCrook') {
       const crook = name === 'lampCrook', out = crook ? 1.7 : 3.4;
@@ -142,20 +220,23 @@ for (const [name, p] of instancer.pools) {
 
 // ---------------------------------------------------------------- packing
 // instance record, 24 bytes (furniture/pool-data.ts INSTANCE_BYTES): f32 x, f32 y, f32 z, u16 yaw (2pi/65536),
-// u16 sx, sy, sz (1/4096), u8 r, g, b (linear, 2/255), u8 flags (bit 0: y is over the ground, add ctx.groundY)
+// u16 sx, sy, sz (1/4096, or the pool's coarser scaleQ: scaleQFor), u8 r, g, b (linear, 2/255), u8 flags (bit 0: y is over the ground, add ctx.groundY)
 const INSTANCE_BYTES = 24;
 const q16 = (v, k) => { const q = Math.round(v * k); if (q < 0 || q > 65535) throw new Error(`u16 overflow ${v}`); return q; };
 const q8 = (v) => { const q = Math.round((v / 2) * 255); if (q < 0 || q > 255) throw new Error(`u8 overflow ${v}`); return q; };
-function packInstances(rows) {
+// the pool's scale step: 4096 unless a piece is longer than 65535/4096 = 16 units (ring 8: a scaffold run 18.2 m along a
+// Long Island City facade), then the largest power of two that still holds its longest scale in a u16
+const scaleQFor = (rows) => { const m = rows.reduce((a, r) => Math.max(a, r.sx, r.sy, r.sz), 0); let q = 4096; while (q > 1 && Math.round(m * q) > 65535) q /= 2; return q; };
+function packInstances(rows, name = '', SQ = 4096) {
   const buf = Buffer.alloc(rows.length * INSTANCE_BYTES);
-  rows.forEach((r, i) => {
+  rows.forEach((r, i) => { try {
     const o = i * INSTANCE_BYTES;
     buf.writeFloatLE(r.x, o); buf.writeFloatLE(r.y, o + 4); buf.writeFloatLE(r.z, o + 8);
     buf.writeUInt16LE(q16(((r.yaw % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI), 65536 / (2 * Math.PI)) & 0xffff, o + 12);
-    buf.writeUInt16LE(q16(r.sx, 4096), o + 14); buf.writeUInt16LE(q16(r.sy, 4096), o + 16); buf.writeUInt16LE(q16(r.sz, 4096), o + 18);
+    buf.writeUInt16LE(q16(r.sx, SQ), o + 14); buf.writeUInt16LE(q16(r.sy, SQ), o + 16); buf.writeUInt16LE(q16(r.sz, SQ), o + 18);
     buf.writeUInt8(q8(r.r), o + 20); buf.writeUInt8(q8(r.g), o + 21); buf.writeUInt8(q8(r.b), o + 22);
     buf.writeUInt8(r.ground, o + 23);
-  });
+  } catch (e) { throw new Error(`${name} instance at Valdrada (${r.vx?.toFixed(1)}, ${r.vy?.toFixed(1)}, ${r.vz?.toFixed(1)}) scale (${r.sx}, ${r.sy}, ${r.sz}): ${e.message}`); } });
   return buf;
 }
 // geometry: f32 position, i8 normal (x127), u16 linear colour (x65535), f32 uv, u32 index
@@ -219,7 +300,7 @@ const geoRef = (g) => `{ vertices: ${g.n}, triangles: ${g.tris}, radius: ${g.rad
 const geoRows = pools.map((p) => `  ${JSON.stringify(p.name)}: ${geoRef(packGeometry(uvFor(p, p.def.geo)))},`);
 // the subway pool ships its own coarse level (furnitureKit G.subway.lod, instancer.js L451 setLOD)
 const lodRows = pools.filter((p) => p.def.lod && p.def.lod.geo).map((p) => `  ${JSON.stringify(p.name)}: { distance: ${p.def.lod.dist ?? 120}, geometry: ${geoRef(packGeometry(uvFor(p, p.def.lod.geo)))} },`);
-const poolRows = pools.map((p) => `  { name: ${JSON.stringify(p.name)}, material: '${p.material}', shadow: ${p.shadow}, roofLow: ${p.roofLow}, count: ${p.rows.length}, data: [${put(packInstances(p.rows))}] },`);
+const poolRows = pools.map((p) => `  { name: ${JSON.stringify(p.name)}, material: '${p.material}', shadow: ${p.shadow}, roofLow: ${p.roofLow}, count: ${p.rows.length}, data: [${put(packInstances(p.rows, p.name, scaleQFor(p.rows)))}]${scaleQFor(p.rows) !== 4096 ? `, scaleQ: ${scaleQFor(p.rows)}` : ''} },`);
 const ASSETS = join(OUT, '../assets');
 mkdirSync(ASSETS, { recursive: true });
 writeFileSync(join(ASSETS, 'pools.bin'), Buffer.concat(blob));
@@ -245,8 +326,11 @@ export const VD_PANEL_ATLAS = { width: ${W}, height: ${H}, bytes: ${atlasRle.len
 `);
 for (const f of ['geometry.ts', 'instances.ts', 'panel-atlas.ts']) rmSync(join(OUT, f), { force: true });
 writeFileSync(join(OUT, 'lamps.ts'), `${header('Lamp light spots: city/props.js L296/L300 over the claimed poles; kinds index world/night11.js FIXTURES.')}
-/** [x, y over ground, z, fixture kind (night11 FIXTURES; -1 legacy), mounting height m, arm yaw or NaN for a round throw] per lamp. */
-export const VD_LAMP_SPOTS: readonly number[] = ${JSON.stringify(lamps.flatMap((l) => [+l.x.toFixed(3), +l.y.toFixed(3), +l.z.toFixed(3), l.kind, l.head, l.yaw === null ? null : +l.yaw.toFixed(4)])).replace(/null/g, 'NaN')};
+import { decodeLampSpots } from '../lamp-codec.ts';
+
+/** [x, y over ground, z, fixture kind (night11 FIXTURES; -1 legacy), mounting height m, arm yaw or NaN for a round throw] per lamp,
+ * packed 16 bytes a lamp (lamp-codec.ts; tooling/city/vd-port/lamp-pack.mjs). */
+export const VD_LAMP_SPOTS: readonly number[] = decodeLampSpots(${JSON.stringify(packLampSpots(lamps))});
 `);
 // placement fixture for the tests: Valdrada world point -> the instance it became, a sample per pool
 const fixture = {};
@@ -257,7 +341,7 @@ export const VD_PLACEMENT_SAMPLES: Readonly<Record<string, readonly (readonly nu
 
 const total = pools.reduce((s, p) => s + p.rows.length, 0);
 const hash = createHash('sha256');
-for (const p of pools) hash.update(p.name).update(packInstances(p.rows));
+for (const p of pools) hash.update(p.name).update(packInstances(p.rows, p.name, scaleQFor(p.rows)));
 console.log(JSON.stringify({
   pools: pools.length, instances: total, lamps: lamps.length, ...stats, atlas: `${W}x${H} rle ${atlasRle.length} B`,
   hash: hash.digest('hex').slice(0, 16),

@@ -209,7 +209,7 @@ export function createDeviceScene(
   // Models standing on the glass (the egg choice's eggs). Each loads on its
   // own; a slot whose model fails keeps its label and nothing else.
   const models = screen.models ?? [];
-  const stand = standModels(THREE, device.group, models, screen.size);
+  const stand = standModels(THREE, device.group, models, screen.size, renderer);
   const modelHits = stand.hits;
 
   // Raycasts run only when the pointer moved or went down, never on a frame
@@ -487,7 +487,7 @@ function screenTexture(
  * focused model comes forward and turns slowly; the others step back. Every
  * model idles on its own clip; under reduced motion each holds still.
  */
-function standModels(THREE: Three, parent: Group, models: readonly ScreenModel[], screenSize: DeviceScreen['size']) {
+function standModels(THREE: Three, parent: Group, models: readonly ScreenModel[], screenSize: DeviceScreen['size'], renderer: ThreeContext['renderer']) {
   interface Holder {
     target: string;
     holder: Group;
@@ -635,7 +635,7 @@ function standModels(THREE: Three, parent: Group, models: readonly ScreenModel[]
         if (source.kind === 'mon') {
           // A Baby: the shared Mon rig (mon-rig.ts), idling on its mood's clips, standing in place.
           void import('../mon/mon-rig')
-            .then(({ MonRig }) => MonRig.create(source))
+            .then(({ MonRig }) => MonRig.create(source, renderer))
             .then((rig) => {
               if (disposed || isDisposed()) {
                 rig.dispose();
@@ -680,7 +680,7 @@ function standModels(THREE: Three, parent: Group, models: readonly ScreenModel[]
           return;
         }
         void import('../hatch/egg-hatch-rig')
-          .then(({ EggHatchRig }) => EggHatchRig.create(source.eggId, { manifest: source.manifest, glb: source.glb }))
+          .then(({ EggHatchRig }) => EggHatchRig.create(source.eggId, { manifest: source.manifest, glb: source.glb }, renderer))
           .then((rig) => {
             if (disposed || isDisposed()) {
               rig.dispose();

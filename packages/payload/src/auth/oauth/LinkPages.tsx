@@ -185,7 +185,7 @@ function LinkFrame({ intro, aside, children }: { intro?: ReactNode; aside?: Reac
 function Status({ message }: { message: string | undefined }) {
   return (
     <Output aria-live="polite">
-      <ErrorMessage message={message} />
+      <ErrorMessage surface="page" message={message} />
     </Output>
   );
 }

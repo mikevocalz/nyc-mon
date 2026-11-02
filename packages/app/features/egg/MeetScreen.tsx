@@ -92,7 +92,7 @@ const COMING_SOON = 'Coming Soon';
 type MeetAction = 'look' | 'choose' | 'confirm-yes' | 'confirm-no';
 
 /**
- * M08 egg choice (docs/design/screens/M08/08-handoff.md, D-16a–e). Three
+ * M08 egg choice (docs/design/screens/M08/08-handoff.md, D-16a–e). Four
  * eggs, no default. Browsing → approaching (a tile fills, the card rises) →
  * confirming (the button path asks once) → M10 with `?bloodline=`. Holding
  * the trackpad commits directly. Nothing is written here: the choice lives in
@@ -230,7 +230,7 @@ export function MeetScreen() {
       else if (k === 'next') step(1);
       else if (k === 'activate') activate();
       else if (k === 'menu') {
-        // Menu: back to all three eggs.
+        // Menu: back to all four eggs.
         haptics.selection();
         set(MEET_INITIAL);
       } else back();

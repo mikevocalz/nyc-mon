@@ -235,7 +235,7 @@ export type MonClip =
     }
   /** The server has no ElevenLabs voice (204): the session's one browser voice reads it. */
   | { readonly kind: 'browser'; readonly text: string; readonly pitch: number | undefined }
-  /** Nothing to play: an Egg, an empty line, or (`unavailable`) the voice failed twice and the caption carries the words. */
+  /** Nothing to play: an empty line, or (`unavailable`) the voice failed twice and the caption carries the words. */
   | { readonly kind: 'silent'; readonly reason?: 'unavailable' };
 
 /** The last Mon voice this session used; a reply without a voice of its own speaks in it. */
@@ -475,7 +475,9 @@ let tail: Promise<void> = Promise.resolve();
  * /api/tts and plays it at rate 1; a failure is retried once and then stays
  * silent, never another voice. Web Speech reads only when the server has no
  * ElevenLabs at all (204), in one browser voice for the whole session. An Egg
- * is silent. `{ queue: true }` appends to what is speaking; otherwise it cuts
+ * and a first-day Baby babble (Decision 32): the plan gates the line, and the
+ * request carries the voice stage, which the server can only lower further.
+ * `{ queue: true }` appends to what is speaking; otherwise it cuts
  * it off. Resolves when this text has finished (or was cancelled).
  */
 export async function speakAs(text: string, voice: MonVoice | undefined, opts: SpeakAsOptions = {}): Promise<void> {

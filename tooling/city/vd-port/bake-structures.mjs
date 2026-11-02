@@ -95,6 +95,86 @@ const { createWalkQueries } = await import(pathToFileURL(join(REPO, 'packages/ap
 const dataset = parseCityDataset(JSON.parse(readFileSync(join(REPO, 'packages/app/features/game/data/harlem-apollo.json'), 'utf8')));
 const ourGround = createWalkQueries(dataset).groundHeight;
 
+// --ring ring1 (or VD_RING=ring1): assemble the ring's tiles too (VD_TILES, assemble-city.mjs) and keep the pieces
+// in its region as well as the square's. --ring ring2 .. --ring ring10: the union bake — home + rings 1..N tiles and
+// regions — so the earlier rings' cells are repacked alongside the new ring's rather than dropped. The ring-only
+// cells stream: they pack under cells/<ring>/, carry key '<ring>/<cx>_<cz>' (the fetch path
+// 'structures/<ring>/<cx>_<cz>'), and stay out of VD_CELL_ASSETS.
+const RING = process.argv.includes('--ring') ? process.argv[process.argv.indexOf('--ring') + 1] : process.env.VD_RING ?? null;
+let inRegion = null;
+let R1S = null, inRing1 = null, inRing2 = null, inRing3 = null, inRing4 = null, inRing5 = null, inRing6 = null;
+/** Rings 7..10's scene tests, for ringCellKey's namespace (the last ring baked falls through to RING). */
+const inRingN = {};
+if (RING === 'ring1' || RING === 'ring2' || RING === 'ring3' || RING === 'ring4' || RING === 'ring5' || RING === 'ring6' || RING === 'ring7' || RING === 'ring8' || RING === 'ring9' || RING === 'ring10') {
+  const { RING1_TILES, ring1RectsScene, inRing1Scene, inHomeSquare } = await import('./ring1.mjs');
+  const { tileIdsForSquare } = await import('../valdrada/decode.mjs');
+  const tiles = [...tileIdsForSquare(), ...RING1_TILES.map((k) => `t_${k}`)];
+  const { AFF: R1AFF } = await import('./valdrada-ground.mjs');
+  R1S = ring1RectsScene(R1AFF);
+  inRing1 = (x, z) => inRing1Scene(x, z, R1S);
+  inRegion = (x, z) => inHomeSquare(x, z) || inRing1(x, z);
+  if (RING !== 'ring1') {
+    const { RING2_TILES, ring2RectsScene, inRing2Scene } = await import('./ring2.mjs');
+    for (const k of RING2_TILES) tiles.push(`t_${k}`);
+    const R2S = ring2RectsScene(R1AFF);
+    inRing2 = (x, z) => inRing2Scene(x, z, R2S);
+    const keepR1 = inRegion;
+    inRegion = (x, z) => keepR1(x, z) || inRing2(x, z);
+    if (RING === 'ring3' || RING === 'ring4' || RING === 'ring5' || RING === 'ring6' || RING === 'ring7' || RING === 'ring8' || RING === 'ring9' || RING === 'ring10') {
+      const { RING3_TILES, ring3RectsScene, inRing3Scene } = await import('./ring3.mjs');
+      for (const k of RING3_TILES) tiles.push(`t_${k}`);
+      const R3S = ring3RectsScene(R1AFF);
+      inRing3 = (x, z) => inRing3Scene(x, z, R3S);
+      const keepR2 = inRegion;
+      inRegion = (x, z) => keepR2(x, z) || inRing3(x, z);
+      if (RING === 'ring4' || RING === 'ring5' || RING === 'ring6' || RING === 'ring7' || RING === 'ring8' || RING === 'ring9' || RING === 'ring10') {
+        const { RING4_TILES, ring4RectsScene, inRing4Scene } = await import('./ring4.mjs');
+        for (const k of RING4_TILES) tiles.push(`t_${k}`);
+        const R4S = ring4RectsScene(R1AFF);
+        inRing4 = (x, z) => inRing4Scene(x, z, R4S);
+        const keepR3 = inRegion;
+        inRegion = (x, z) => keepR3(x, z) || inRing4(x, z);
+        if (RING === 'ring5' || RING === 'ring6' || RING === 'ring7' || RING === 'ring8' || RING === 'ring9' || RING === 'ring10') {
+          const { RING5_TILES, ring5RectsScene, inRing5Scene } = await import('./ring5.mjs');
+          for (const k of RING5_TILES) tiles.push(`t_${k}`);
+          const R5S = ring5RectsScene(R1AFF);
+          inRing5 = (x, z) => inRing5Scene(x, z, R5S);
+          const keepR4 = inRegion;
+          inRegion = (x, z) => keepR4(x, z) || inRing5(x, z);
+          if (RING === 'ring6' || RING === 'ring7' || RING === 'ring8' || RING === 'ring9' || RING === 'ring10') {
+            const { RING6_TILES, ring6RectsScene, inRing6Scene } = await import('./ring6.mjs');
+            for (const k of RING6_TILES) tiles.push(`t_${k}`);
+            const R6S = ring6RectsScene(R1AFF);
+            inRing6 = (x, z) => inRing6Scene(x, z, R6S);
+            const keepR5 = inRegion;
+            inRegion = (x, z) => keepR5(x, z) || inRing6(x, z);
+            if (RING === 'ring7' || RING === 'ring8' || RING === 'ring9' || RING === 'ring10') {
+              const { RING7_TILES, ring7RectsScene, inRing7Scene } = await import('./ring7.mjs');
+              for (const k of RING7_TILES) tiles.push(`t_${k}`);
+              const R7S = ring7RectsScene(R1AFF);
+              inRingN[7] = (x, z) => inRing7Scene(x, z, R7S);
+              const keepR6 = inRegion;
+              inRegion = (x, z) => keepR6(x, z) || inRingN[7](x, z);
+              // rings 8-10 (western Queens, the South Bronx, Staten Island's North Shore), each joining the union
+              for (const n of [8, 9, 10]) {
+                if (+RING.slice(4) < n) break;
+                const m = await import(`./ring${n}.mjs`);
+                for (const k of m[`RING${n}_TILES`]) tiles.push(`t_${k}`);
+                const RS = m[`ring${n}RectsScene`](R1AFF), inR = m[`inRing${n}Scene`];
+                inRingN[n] = (x, z) => inR(x, z, RS);
+                const keep = inRegion;
+                inRegion = (x, z) => keep(x, z) || inRingN[n](x, z);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  process.env.VD_TILES = [...new Set(tiles)].join(',');
+} else if (RING) throw new Error(`unknown --ring ${RING}`);
+const keep = (x, z) => inRegion ? inRegion(x, z) : Math.abs(x) <= EXTENT && Math.abs(z) <= EXTENT;
+
 const { groups } = await assembleCity(log);
 const PK = await vd('city/pk/props.js');
 const LK = await vd('city/lk/life.js');
@@ -179,7 +259,7 @@ const placements = new Map();   // cell key -> [{ proto, lod, m: Float32Array(12
 const _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _Y = new THREE.Vector3(0, 1, 0), _one = new THREE.Vector3(1, 1, 1), _v = new THREE.Vector3();
 const affine = (dy) => new THREE.Matrix4().set(AFF.sx, 0, 0, AFF.ox, 0, 1, 0, dy, 0, 0, AFF.sz, AFF.oz, 0, 0, 0, 1);
 function place(protoId, lod, worldMatrix, dy, sceneX, sceneZ) {
-  if (protoId < 0 || Math.abs(sceneX) > EXTENT || Math.abs(sceneZ) > EXTENT) return false;
+  if (protoId < 0 || !keep(sceneX, sceneZ)) return false;
   const M = affine(dy).multiply(worldMatrix);
   const e = M.elements;
   const key = `${Math.floor(sceneX / CELL)}_${Math.floor(sceneZ / CELL)}`;
@@ -200,7 +280,7 @@ for (const part of ['pk', 'lk']) {
   const mod = part === 'pk' ? PK : LK;
   for (const it of posedItems[part]) {
     const [sx, sz] = toSceneExact(it.x, it.z);
-    if (Math.abs(sx) > EXTENT || Math.abs(sz) > EXTENT) continue;
+    if (!keep(sx, sz)) continue;
     const dy = ourGround(sx, sz) - valdradaGround(it.x, it.z);
     _m4.compose(_v.set(it.x, it.y, it.z), _q.setFromAxisAngle(_Y, it.yaw), _one);
     if (part === 'pk' && (it.kind === 'lamp' || (it.kind === 'signal' && it.p && it.p.lamp))) {
@@ -272,7 +352,7 @@ for (const { group } of groups) {
         _w.premultiply(mesh.matrixWorld);
         _v.setFromMatrixPosition(_w);
         const [sx, sz] = toSceneExact(_v.x, _v.z);
-        if (Math.abs(sx) > EXTENT || Math.abs(sz) > EXTENT) continue;
+        if (!keep(sx, sz)) continue;
         if (proto === -2) proto = addProto(mesh.geometry.clone(), slotOf(mats[0]), mesh.castShadow, true);
         if (place(proto, 0, _w.clone(), vkDy(_v.x, _v.z), sx, sz)) stats.vkInstances++;
       }
@@ -286,7 +366,7 @@ for (const { group } of groups) {
       let cx = 0, cz = 0;
       for (let k = 0; k < 3; k++) { cx += pos.getX(t + k) / 3; cz += pos.getZ(t + k) / 3; }
       const [sx, sz] = toSceneExact(cx, cz);
-      if (Math.abs(sx) > EXTENT || Math.abs(sz) > EXTENT) continue;
+      if (!keep(sx, sz)) continue;
       const key = `${Math.floor(sx / CELL)}_${Math.floor(sz / CELL)}`;
       if (!byCell.has(key)) byCell.set(key, []);
       byCell.get(key).push(t);
@@ -438,15 +518,36 @@ const cellRows = [];
 let diskBytes = sharedOffset;
 const vertsOf = (pr) => protos[pr].geo.attributes.position.count;
 const corner = new THREE.Vector3();
-for (const [key, list] of [...placements].sort()) {
-  const own = protos.filter((p) => !p.shared && p.cell === key);
+const ringCellKey = (key, list) => {
+  if (!RING) return { key, file: `${key}.bin`, bundled: true };
+  const [cx, cz] = key.split('_').map(Number);
+  const home = cx * CELL < 850 && cx * CELL + CELL > -850 && cz * CELL < 850 && cz * CELL + CELL > -850;
+  if (home) return { key, file: `${key}.bin`, bundled: true };
+  // a cell inside a ring but not overlapping the square streams: its file lives under cells/<ring>/ and its key
+  // carries the ring namespace, so 'structures/<key>' never collides with a home cell's pin. Under the union bake
+  // a cell keeps the lowest ring namespace its placements reach: a ring-1 placement pins 'ring1', else a ring-2
+  // placement 'ring2', a ring-3 'ring3', a ring-4 'ring4', a ring-5 'ring5', else the cell is new to the latest ring
+  // and packs under it.
+  // A cell-local prototype's placement is its own cell (the vk corridor pieces' matrix is near identity, which is
+  // inside ring 1's rect — it must not namespace the cell), so its ring is the cell's, not its matrix's.
+  const at = (x) => { const p = protos[x.proto]; return p && !p.shared && p.cell === key ? [cx * CELL + CELL / 2, cz * CELL + CELL / 2] : [x.m[3], x.m[11]]; };
+  const inNs = (inR) => !!inR && list.some((x) => inR(...at(x)));
+  // rings 7..9 checked in order like 1..6; the ring being baked is the fall-through
+  const later = [7, 8, 9].find((n) => `ring${n}` !== RING && inNs(inRingN[n]));
+  const ns = inNs(inRing1) ? 'ring1' : inNs(inRing2) ? 'ring2' : inNs(inRing3) ? 'ring3' : inNs(inRing4) ? 'ring4' : inNs(inRing5) ? 'ring5' : inNs(inRing6) ? 'ring6' : later ? `ring${later}` : RING;
+  return { key: `${ns}/${key}`, file: `${ns}/${key}.bin`, bundled: false };
+};
+for (const [cellKey, list] of [...placements].sort()) {
+  const { key, file: cellFile } = ringCellKey(cellKey, list);
+  const own = protos.filter((p) => !p.shared && p.cell === cellKey);
   const bodies = [];
   let off = 0;
   for (const p of own) { const { body, meta } = packProto(p); protoMeta[p.id] = { ...meta, file: key, offset: off, bytes: body.length }; bodies.push(body); off += body.length; }
   const pl = Buffer.alloc(list.length * PLACEMENT_BYTES);
   list.forEach((x, i) => { pl.writeUInt32LE(x.proto, i * PLACEMENT_BYTES); pl.writeUInt32LE(x.lod, i * PLACEMENT_BYTES + 4); for (let k = 0; k < 12; k++) pl.writeFloatLE(x.m[k], i * PLACEMENT_BYTES + 8 + k * 4); });
   const file = Buffer.concat([...bodies, pl]);
-  writeFileSync(join(CELLS_DIR, `${key}.bin`), file);
+  mkdirSync(dirname(join(CELLS_DIR, cellFile)), { recursive: true });
+  writeFileSync(join(CELLS_DIR, cellFile), file);
   diskBytes += file.length;
   let x0 = Infinity, y0 = Infinity, z0 = Infinity, x1 = -Infinity, y1 = -Infinity, z1 = -Infinity;
   for (const x of list) {
@@ -568,7 +669,7 @@ writeFileSync(join(CELLS_DIR, 'index.ts'), `${hdr('Metro asset ids of the cell p
 // A function per entry, so a cell's asset module is only required when the streamer asks for it (Node tests read the
 // files from disk and never call these).
 export const VD_CELL_ASSETS: Readonly<Record<string, () => number>> = {
-${cellRows.map((c) => `  '${c.key}': () => require('./${c.key}.bin') as number,`).join('\n')}
+${cellRows.filter((c) => !c.key.includes('/')).map((c) => `  '${c.key}': () => require('./${c.key}.bin') as number,`).join('\n')}
 };
 
 export const VD_PROTOS_ASSET = (): number => require('../assets/protos.bin') as number;

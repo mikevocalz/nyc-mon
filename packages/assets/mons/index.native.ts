@@ -1,17 +1,15 @@
 /**
- * Native: the same files the web serves (apps/web/public/mons), required as
- * Metro assets (apps/mobile/metro.config.js lists glb in assetExts). Nothing
- * is copied: Metro resolves them inside the workspace it already watches.
+ * Native: the same CDN objects the web resolves — the admin origin's stable
+ * 302 to the approved mon-models row. Remote URLs: no 19-24 MB files get
+ * bundled into the app, and the loader follows the redirect to the CDN.
  */
 import type { MonModelAsset } from './index.ts';
-
-declare const require: (path: string) => number;
 
 export type { MonModelAsset } from './index.ts';
 
 export const MON_MODEL_ASSETS: readonly MonModelAsset[] = [
-  { dexId: 2, key: 'squeaklet', glb: require('../../../apps/web/public/mons/squeaklet.glb') },
-  { dexId: 3, key: 'lil-ratti', glb: require('../../../apps/web/public/mons/lil-ratti.glb') },
+  { dexId: 2, key: 'squeaklet', glb: 'https://admin.nyc-mon.city/v1/mon-models/glb/dex-002' },
+  { dexId: 3, key: 'lil-ratti', glb: 'https://admin.nyc-mon.city/v1/mon-models/glb/dex-003' },
 ];
 
 export function monModelAssetForDex(dexId: number | null): MonModelAsset | undefined {

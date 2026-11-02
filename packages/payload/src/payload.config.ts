@@ -9,8 +9,10 @@ import {
 import { betterAuth } from 'better-auth';
 import { mcpPlugin } from '@payloadcms/plugin-mcp';
 import { APIError, buildConfig } from 'payload';
-import sharp from 'sharp';
 import { deleteDueCallersTask, selfDeletionOptions } from './auth/deletion';
+import { consoleSignInGate } from './auth/admin-allowlist';
+import { appSignInGate } from './auth/app-allowlist';
+import { SURFACE_HEADER } from './auth/surface';
 import { AUTH_BASE_PATH, PAYLOAD_API_ROUTE, PAYLOAD_CORS_ORIGINS, PAYLOAD_ORIGINS, betterAuthOptions, sendMail } from './auth/options';
 import { accountMerge } from './auth/plugins/account-merge';
 import { adminComponents } from './admin/components';
@@ -26,9 +28,11 @@ import { IdempotencyRecords } from './collections/IdempotencyRecords';
 import { IntegrityRuns } from './collections/IntegrityRuns';
 import { MonInstances } from './collections/MonInstances';
 import { MonModels } from './collections/MonModels';
+import { MonArt } from './collections/MonArt';
 import { LanguageLexicon } from './collections/LanguageLexicon';
 import { Waitlist } from './collections/Waitlist';
 import { MonVoices } from './globals/MonVoices';
+import { siteContentPlugin } from './site-content/plugin';
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 const isProduction = process.env.NODE_ENV === 'production';
@@ -56,7 +60,7 @@ export default buildConfig({
     api: PAYLOAD_API_ROUTE,
   },
   endpoints: consoleEndpoints,
-  collections: [Users, Media, GuardianConsents, Eggs, MonInstances, CareStates, AuditEvents, IntegrityRuns, IdempotencyRecords, Waitlist, LanguageLexicon, MonModels],
+  collections: [Users, Media, GuardianConsents, Eggs, MonInstances, CareStates, AuditEvents, IntegrityRuns, IdempotencyRecords, Waitlist, LanguageLexicon, MonModels, MonArt],
   // The Mon's voice casting and delivery; its words are in LanguageLexicon.
   globals: [MonVoices],
   plugins: [
@@ -121,9 +125,21 @@ export default buildConfig({
           // Self-service deletion (M20): Mons and eggs pass to the sanctuary
           // before Better Auth removes the user (deletion.ts, DECISIONS L3).
           user: { ...betterAuthOptions.user, deleteUser: selfDeletionOptions(payload) },
+          hooks: {
+            ...betterAuthOptions.hooks,
+            // Two allowlist gates ahead of the shared before-hook: the game
+            // app's sign-in (x-nycmon-surface: app) answers to
+            // APP_ALLOWED_EMAILS, and the console's credential sign-in
+            // (x-nycmon-surface: admin) to ADMIN_ALLOWED_EMAILS. Everything
+            // else — callers via linking, the judges' OAuth sign-in, /v1 —
+            // falls through untouched.
+            before: appSignInGate(consoleSignInGate(betterAuthOptions.hooks?.before, payload), payload),
+          },
           database: payloadAdapter({ payloadClient: payload }),
         }),
     }),
+    // Opt in on an isolated database after generating/reviewing the additive migration.
+    ...(process.env.NYCMON_SITE_EDITOR === '1' ? [siteContentPlugin] : []),
   ],
   db: postgresAdapter({
     pool: {
@@ -140,10 +156,26 @@ export default buildConfig({
     // Account deletion after the 7-day grace (ADR 0001 as amended by L3).
     tasks: [deleteDueCallersTask],
   },
-  cors: PAYLOAD_CORS_ORIGINS,
+  cors: {
+    origins: PAYLOAD_CORS_ORIGINS,
+    // The game app (nyc-mon.city → this origin) and the console mark their
+    // sign-in requests with the surface header; without it the browser's
+    // CORS preflight would refuse the cross-origin call. The rest are
+    // Payload's defaults — dropping them broke every /v1 route that carries
+    // Authorization, Content-Type or the waitlist forward secret.
+    headers: [
+      SURFACE_HEADER,
+      'Origin',
+      'X-Requested-With',
+      'Content-Type',
+      'Accept',
+      'Authorization',
+      'Payload-HTTP-Method-Override',
+      'x-nycmon-forward-secret',
+    ],
+  },
   csrf: PAYLOAD_ORIGINS,
   secret: process.env.PAYLOAD_SECRET || '',
-  sharp,
   typescript: {
     outputFile: path.resolve(dirname, 'payload-types.ts'),
   },

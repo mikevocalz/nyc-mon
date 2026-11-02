@@ -45,7 +45,8 @@ const fromB64 = (s, Ctor) => { const b = Buffer.from(s, 'base64'); return new Ct
 const r3 = (v) => Math.round(v * 1000) / 1000;
 const inRing = (ring, x, z) => { let c = false; for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) { const [xi, zi] = ring[i], [xj, zj] = ring[j]; if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) c = !c; } return c; };
 
-export async function writePacks(structures, { nearErrM, heroErrM }) {
+export async function writePacks(structures, { nearErrM, heroErrM, outDir = OUT, label = "125th Street blocks and landmarks", constName = 'VD_BLOCKS', fw14 = 'inline', bundled = () => true }) {
+  const OUT = outDir;
   const { MeshoptEncoder, MeshoptSimplifier } = await import(meshoptPath);
   await MeshoptEncoder.ready;
   await MeshoptSimplifier.ready;
@@ -88,14 +89,49 @@ export async function writePacks(structures, { nearErrM, heroErrM }) {
     const dy = CURB - s.base;
     const T = (x, y, z) => { const [sx, sz] = toScene(x, z); return [sx, y + dy, sz]; };
     // ---- the near level
-    const P = fromB64(s.near.pos, Float32Array), C = fromB64(s.near.col, Uint8Array), E = fromB64(s.near.emi, Uint8Array), NM = fromB64(s.near.nmix, Uint8Array), I = fromB64(s.near.idx, Uint32Array);
-    const V = new Float64Array(P.length);
+    const P = fromB64(s.near.pos, Float32Array), I = fromB64(s.near.idx, Uint32Array);
+    // plain arrays: splitFar below appends midpoint vertices
+    const C = Array.from(fromB64(s.near.col, Uint8Array)), E = Array.from(fromB64(s.near.emi, Uint8Array)), NM = Array.from(fromB64(s.near.nmix, Uint8Array));
+    const V = new Array(P.length);
     for (let i = 0; i < P.length; i += 3) { const [x, y, z] = T(P[i], P[i + 1], P[i + 2]); V[i] = x; V[i + 1] = y; V[i + 2] = z; }
+    // vd-port: a near vertex is int16 at 1/128 m about its triangle's cell centre (±256 m), so a triangle with a
+    // vertex further than that from the centre of the cell its centroid falls in can't be written. Bridges have
+    // them (ring 8: the lite level's simplification leaves single triangles hundreds of metres long on the long
+    // spans; near cell 18_15 overflowed at -276.8 m). Such a triangle splits at its
+    // longest edge's midpoint (attributes interpolated) until every piece fits; the surface is unchanged and the
+    // new vertices lie on the old edges, so the structure's box is too. Nothing else in the packs reaches this.
+    const FAR = 250;
+    const mid = (a, b) => {
+      const v = V.length / 3;
+      for (let k = 0; k < 3; k++) V.push((V[a * 3 + k] + V[b * 3 + k]) / 2);
+      for (let k = 0; k < 3; k++) C.push(Math.round((C[a * 3 + k] + C[b * 3 + k]) / 2));
+      for (let k = 0; k < 3; k++) E.push(Math.round((E[a * 3 + k] + E[b * 3 + k]) / 2));
+      for (let k = 0; k < 2; k++) NM.push(Math.round((NM[a * 2 + k] + NM[b * 2 + k]) / 2));
+      return v;
+    };
+    const splitFar = (IL) => {
+      const out = [];
+      const stack = [];
+      for (let t = IL.length - 3; t >= 0; t -= 3) stack.push([IL[t], IL[t + 1], IL[t + 2]]);
+      while (stack.length) {
+        const tri = stack.pop();
+        const mx = (V[tri[0] * 3] + V[tri[1] * 3] + V[tri[2] * 3]) / 3, mz = (V[tri[0] * 3 + 2] + V[tri[1] * 3 + 2] + V[tri[2] * 3 + 2]) / 3;
+        const ox = Math.floor(mx / CELL) * CELL + CELL / 2, oz = Math.floor(mz / CELL) * CELL + CELL / 2;
+        if (tri.every((v) => Math.abs(V[v * 3] - ox) <= FAR && Math.abs(V[v * 3 + 2] - oz) <= FAR)) { out.push(...tri); continue; }
+        const len = (a, b) => Math.hypot(V[a * 3] - V[b * 3], V[a * 3 + 2] - V[b * 3 + 2]);
+        const e = [len(tri[0], tri[1]), len(tri[1], tri[2]), len(tri[2], tri[0])];
+        const k = e.indexOf(Math.max(...e)), a = tri[k], b = tri[(k + 1) % 3], c = tri[(k + 2) % 3];
+        const m = mid(a, b);
+        // keep the winding: (a, m, c) then (m, b, c)
+        stack.push([m, b, c], [a, m, c]);
+      }
+      return out;
+    };
     const sBox = [Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity];
     const levelTris = {};
     for (const L of LEVELS) {
       const cells = levelCells.get(L.name);
-      const IL = L.index(s, V, C, E, I);
+      const IL = splitFar(L.index(s, V, C, E, I));
       levelTris[L.name] = IL.length / 3;
       const remap = new Map();   // cellKey -> Int32Array(vertex -> cell vertex)
       for (let t = 0; t < IL.length; t += 3) {
@@ -108,7 +144,7 @@ export async function writePacks(structures, { nearErrM, heroErrM }) {
         const last = cell.ranges[cell.ranges.length - 1];
         if (last && last[0] === s.id) last[2] += 3; else cell.ranges.push([s.id, cell.idx.length, 3]);
         let rm2 = remap.get(key);
-        if (!rm2) remap.set(key, (rm2 = new Int32Array(P.length / 3).fill(-1)));
+        if (!rm2) remap.set(key, (rm2 = new Int32Array(V.length / 3).fill(-1)));
         for (const v of [a, b, c]) {
           if (rm2[v] < 0) {
             rm2[v] = cell.pos.length / 3;
@@ -180,9 +216,16 @@ export async function writePacks(structures, { nearErrM, heroErrM }) {
   for (const [key, c] of [...levelCells.get(L.name)].sort()) {
     const ox = c.cx * CELL + CELL / 2, oz = c.cz * CELL + CELL / 2;
     const n = c.pos.length / 3;
+    // VDN2: y is absolute in the stream, so a structure over 256 m tall (Central Park South's supertalls) overflows
+    // int16 at 1/128 m; such a cell writes 'VDN2' with a float32 y origin the decoder adds back (codec.ts), the rest
+    // stay 'VDN1' byte for byte.
+    let yMin = Infinity, yMax = -Infinity;
+    for (let i = 0; i < n; i++) { if (c.pos[i * 3 + 1] < yMin) yMin = c.pos[i * 3 + 1]; if (c.pos[i * 3 + 1] > yMax) yMax = c.pos[i * 3 + 1]; }
+    const v2 = n > 0 && (yMin * NEAR_Q < -32768 || yMax * NEAR_Q > 32767);
+    const yOrigin = v2 ? Math.round(((yMin + yMax) / 2) * NEAR_Q) / NEAR_Q : 0;
     const vb = new Uint8Array(n * 16), dv = new DataView(vb.buffer);
     for (let i = 0; i < n; i++) {
-      const q = [(c.pos[i * 3] - ox) * NEAR_Q, c.pos[i * 3 + 1] * NEAR_Q, (c.pos[i * 3 + 2] - oz) * NEAR_Q].map(Math.round);
+      const q = [(c.pos[i * 3] - ox) * NEAR_Q, (c.pos[i * 3 + 1] - yOrigin) * NEAR_Q, (c.pos[i * 3 + 2] - oz) * NEAR_Q].map(Math.round);
       for (const v of q) if (v < -32768 || v > 32767) throw new Error(`near cell ${key}: a vertex lies ${v / NEAR_Q} m from the cell centre`);
       dv.setInt16(i * 16, q[0], true); dv.setInt16(i * 16 + 2, q[1], true); dv.setInt16(i * 16 + 4, q[2], true);
       vb[i * 16 + 8] = c.col[i * 3]; vb[i * 16 + 9] = c.col[i * 3 + 1]; vb[i * 16 + 10] = c.col[i * 3 + 2]; vb[i * 16 + 11] = c.nmix[i * 2];
@@ -192,14 +235,17 @@ export async function writePacks(structures, { nearErrM, heroErrM }) {
     const ib = wide ? Uint32Array.from(c.idx) : Uint16Array.from(c.idx);
     const ev = MeshoptEncoder.encodeVertexBuffer(vb, n, 16);
     const ei = MeshoptEncoder.encodeIndexBuffer(new Uint8Array(ib.buffer), ib.length, wide ? 4 : 2);
-    const head = Buffer.alloc(16);
-    head.write('VDN1', 0, 'latin1'); head.writeUInt32LE(n, 4); head.writeUInt32LE(ib.length, 8); head.writeUInt32LE(ev.length + (wide ? 0x80000000 : 0), 12);
+    const head = Buffer.alloc(v2 ? 20 : 16);
+    head.write(v2 ? 'VDN2' : 'VDN1', 0, 'latin1'); head.writeUInt32LE(n, 4); head.writeUInt32LE(ib.length, 8); head.writeUInt32LE(ev.length + (wide ? 0x80000000 : 0), 12);
+    if (v2) head.writeFloatLE(yOrigin, 16);
     const file = Buffer.concat([head, Buffer.from(ev), Buffer.from(ei)]);
     await writeFile(join(OUT, L.name, `${key}.bin`), file);
     nearFileBytes += file.length;
     nearCells.push({ key, cx: c.cx, cz: c.cz, vertices: n, triangles: c.tris, wide, bounds: c.bounds.map(r3),
       // GPU bytes: float32x3 position + unorm8x4 colour + unorm8x4 emissive + float32x2 uv (blocks material), and the index
-      bytes: n * 28 + ib.length * (wide ? 4 : 2), fileBytes: file.length, ranges: c.ranges });
+      bytes: n * 28 + ib.length * (wide ? 4 : 2), fileBytes: file.length, ranges: c.ranges,
+      // bundled: the cell ships as a Metro asset (the ring marks only its home-overlap cells; the rest stream)
+      ...(bundled(c.cx, c.cz) ? {} : { bundled: false }) });
   }
   levelFileBytes[L.name] = nearFileBytes;
   }
@@ -214,8 +260,10 @@ export async function writePacks(structures, { nearErrM, heroErrM }) {
       const q = [(c.pos[i * 3] - ox) * 8, c.pos[i * 3 + 1] * 8, (c.pos[i * 3 + 2] - oz) * 8].map(Math.round);
       dv.setInt16(i * 16, q[0], true); dv.setInt16(i * 16 + 2, q[1], true); dv.setInt16(i * 16 + 4, q[2], true);
       vb.set(c.col.slice(i * 4, i * 4 + 4), i * 16 + 8);
-      const uq = [c.emi[i * 2] * 1024, c.emi[i * 2 + 1] * 1024].map(Math.round);
-      for (const v of uq) if (v < -32768 || v > 32767) throw new Error(`shell cell ${key}: a face spans ${v / 1024} window-grid tiles`);
+      // vd-port: a face can span more window-grid tiles than int16 at 1/1024 holds (a bridge's simplified cables
+      // run hundreds of metres per triangle — ring 7): the uv clamps at the int16 edge, which only chooses the
+      // wrap phase the oversize face ends on; the near level draws the real detail
+      const uq = [c.emi[i * 2] * 1024, c.emi[i * 2 + 1] * 1024].map((v) => Math.max(-32768, Math.min(32767, Math.round(v))));
       dv.setInt16(i * 16 + 12, uq[0], true); dv.setInt16(i * 16 + 14, uq[1], true);
     }
     const ev = Buffer.from(MeshoptEncoder.encodeVertexBuffer(vb, n, 16));
@@ -225,9 +273,14 @@ export async function writePacks(structures, { nearErrM, heroErrM }) {
   }
   await writeFile(join(OUT, 'shell.bin'), Buffer.concat(shellParts));
 
-  // ---- FW14 (textures/far_windows_fw14.png, Content/textures in the dataset): RGBA bytes for a DataTexture
-  const sharp = (await import(sharpPath)).default;
-  const fw = await sharp(join(ROOT, 'tooling/city/.cache/valdrada-textures/far_windows_fw14.png')).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  // ---- FW14 (textures/far_windows_fw14.png, Content/textures in the dataset): RGBA bytes for a DataTexture.
+  // A ring's manifest re-exports the home pack's ('ref'), it does not carry a second copy.
+  let fwLine = `export { VD_FW14 } from '../data/manifest.ts';`;
+  if (fw14 === 'inline') {
+    const sharp = (await import(sharpPath)).default;
+    const fw = await sharp(join(ROOT, 'tooling/city/.cache/valdrada-textures/far_windows_fw14.png')).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    fwLine = `export const VD_FW14 = { width: ${fw.info.width}, height: ${fw.info.height}, rgba: '${fw.data.toString('base64')}' } as const;`;
+  }
 
   const manifest = {
     source: 'github.com/mkturkcan/valdrada @ 2724c79 (MIT); tiles: huggingface.co/datasets/mehmetkeremturkcan/valdrada v0.4.0 (ODbL 1.0)',
@@ -241,14 +294,15 @@ export async function writePacks(structures, { nearErrM, heroErrM }) {
   };
   const ts = [
     '// Generated by tooling/city/vd-port/bake.mjs (write.mjs). Do not edit.',
-    `// Valdrada's 125th Street blocks and landmarks in bounds: ${manifest.source}.`,
-    `export const VD_BLOCKS = ${JSON.stringify(manifest)} as const;`,
-    `export const VD_FW14 = { width: ${fw.info.width}, height: ${fw.info.height}, rgba: '${fw.data.toString('base64')}' } as const;`,
+    `// Valdrada's ${label} in bounds: ${manifest.source}.`,
+    `export const ${constName} = ${JSON.stringify(manifest)} as const;`,
+    fwLine,
     '',
   ].join('\n');
   await writeFile(join(OUT, 'manifest.ts'), ts);
-  const keys = levelOut.near.map((c) => c.key);
-  const liteKeys = levelOut.lite.map((c) => c.key);
+  // Only the cells the bundle ships are require()d here; the rest stream through the cell source.
+  const keys = levelOut.near.filter((c) => c.bundled !== false).map((c) => c.key);
+  const liteKeys = levelOut.lite.filter((c) => c.bundled !== false).map((c) => c.key);
   await writeFile(join(OUT, 'assets.ts'), [
     '// Generated by tooling/city/vd-port/write.mjs. Metro registers .bin as an asset (apps/mobile/metro.config.js), so',
     '// require() gives an asset id that @acme/ui/three/asset-bytes resolves and reads (vd-port/blocks/load.ts).',

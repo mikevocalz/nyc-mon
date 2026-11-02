@@ -8,6 +8,7 @@ export {
   ViroSharedFrame,
   ViroAmbientLight,
   ViroBox,
+  ViroCamera,
   ViroController,
   ViroDirectionalLight,
   ViroGameLoop,

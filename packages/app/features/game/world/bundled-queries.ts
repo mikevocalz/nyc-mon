@@ -4,6 +4,8 @@
 import { bundledCity } from '../city-data.ts';
 import { buildObstacles } from './obstacles.ts';
 import { createStreetClearance, createWalkQueries, type WalkQueries } from './walkability.ts';
+import { EXPERIMENTAL_WORLD_GEN } from './gen/flag.ts';
+import { createGenBlockedFor } from './gen/places.ts';
 
 let bundled: WalkQueries | null = null;
 function queries(): WalkQueries {
@@ -17,7 +19,14 @@ function queries(): WalkQueries {
   // Ground and buildings from the walk queries; poles, trunks, hydrants and parked cars block too.
   const walk = createWalkQueries(city.dataset);
   const obstacles = buildObstacles(city.dataset, createStreetClearance(city.dataset));
-  bundled = { isWalkable: (x, z) => walk.isWalkable(x, z) && !obstacles.blocked(x, z), groundHeight: walk.groundHeight };
+  // The gen lane's prisms as one more blocked layer (world/gen/places.ts), only
+  // with EXPO_PUBLIC_WORLD_GEN: flag off, `genBlocked` is null and the composed
+  // query is byte-identical to before — the same composition obstacles take.
+  const genBlocked = EXPERIMENTAL_WORLD_GEN ? createGenBlockedFor(city.dataset, walk.groundHeight) : null;
+  bundled = {
+    isWalkable: (x, z) => walk.isWalkable(x, z) && !obstacles.blocked(x, z) && !(genBlocked?.(x, z) ?? false),
+    groundHeight: walk.groundHeight,
+  };
   return bundled;
 }
 

@@ -28,6 +28,7 @@ import { CITY_COLORS, type CityColor } from './palette.ts';
 import { EXPERIMENTAL_SURFACE_DETAIL, SURFACE_DETAIL } from './surface-detail.ts';
 import { LIT_SHARE_CAP, LIT_SHARE_DAY, LIT_SHARE_GAIN, LIT_SHARE_TOD, WINDOW_GRID } from './windows.ts';
 import { ATLAS_HEIGHT, ATLAS_WIDTH, atlasPixels } from './pixel-font.ts';
+import { worldPatternPosition } from './render-space.ts';
 import type { Node } from 'three/webgpu';
 
 type Mat = InstanceType<Three['Material']>;
@@ -271,7 +272,7 @@ export function roadsGraphs(THREE: Three, surfaceDetail = EXPERIMENTAL_SURFACE_D
     // linear combination of x and z is constant along a diagonal, so the
     // grain would read as stripes. Its short distance LOD avoids moire.
     const a = SURFACE_DETAIL.asphalt;
-    const cell = T.floor(T.positionWorld.xz.div(a.cellMetres));
+    const cell = T.floor(worldPatternPosition(THREE).xz.div(a.cellMetres));
     const grain = T.fract(T.sin(
       cell.x.mul(a.hashDotX).add(cell.y.mul(a.hashDotZ)),
     ).mul(a.hashScale));
@@ -296,7 +297,7 @@ export function roadsGraphs(THREE: Three, surfaceDetail = EXPERIMENTAL_SURFACE_D
  */
 export function sidewalkGlow(THREE: Three): Node<'vec3'> | Node<'color'> {
   const { T, c, detail } = cityShaderTools(THREE);
-  const p = T.positionWorld.xz.div(1.5);
+  const p = worldPatternPosition(THREE).xz.div(1.5);
   const f = T.abs(T.fract(p).sub(0.5));
   const line = T.smoothstep(0.43, 0.48, T.max(f.x, f.y));
   return c('sidewalkGrid').mul(line.mul(0.32).mul(detail(25, 90)));

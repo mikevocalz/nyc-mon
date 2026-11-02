@@ -115,6 +115,7 @@ export async function measureWalk(): Promise<Walk> {
   const { parseCityDataset } = await import('../../city-dataset.ts');
   const { createCityScene, cityStreamStats } = await import('../../city-scene.ts');
   (await import('../vd-port/blocks/load-from-disk.test-support.ts')).loadVdBlocksFromDisk();
+  (await import('../vd-port/storefronts/load-from-disk.test-support.ts')).loadVdStorefrontPlanFromDisk();
   const { physicalRendererParams } = await import('../physical-look.ts');
   const { advanceNodeFrame } = await import('@acme/ui/three/internals');
 

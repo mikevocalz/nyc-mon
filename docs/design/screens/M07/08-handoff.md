@@ -12,7 +12,7 @@ Implementation contract for `platform` and the kit. Inputs: `01-research.md` to 
 | B4 | The block-list filter exists and is tested on names from the communities `V11 ¶53` lists before launch (`06-critique.md` blocker 2) | `platform` | `m07.error.blocked` |
 | B5 | Schema mismatch: `CallerProfileSchema.callerName` in `@acme/core` allows 1–32 characters; the UI rule is 16. Tighten the schema to the confirmed rule so data and UI agree (Law 5) | `sim-core` | storage |
 
-Not blocking: Q32 (do Babies speak) stays open and no longer touches M07 (P4). Name changes later and wrong-block reporting are out of scope (`05-copy.md` open questions 1 and 3); the copy promises neither.
+Not blocking: Q32 (do Babies speak) is closed by Decision 32 and does not touch M07 (P4). Name changes later and wrong-block reporting are out of scope (`05-copy.md` open questions 1 and 3); the copy promises neither.
 
 ## Route and intent
 

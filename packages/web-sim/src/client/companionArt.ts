@@ -5,10 +5,12 @@
  * the name and meters without inventing art.
  */
 import cornerEgg from './art/corner-egg.webp';
+import fyeDot from './art/fye-dot.webp';
 import kitteeCee from './art/kittee-cee.webp';
 import lilRatti from './art/lil-ratti.webp';
 import metroEgg from './art/metro-egg.webp';
 import prismEgg from './art/prism-egg.webp';
+import signalEgg from './art/signal-egg.webp';
 import squeaklet from './art/squeaklet.webp';
 import yotito from './art/yotito.webp';
 
@@ -23,6 +25,8 @@ const ART: Readonly<Record<number, CompanionArt>> = {
   3: { src: url(lilRatti), alt: 'Lil’ Ratti, a charcoal rat Mon with big pink ears, in a red hoodie, black shorts and red high-tops.', width: 960, height: 1200, cutout: true },
   8: { src: url(cornerEgg), alt: 'The Corner Egg, glossy pink with a white fur band and tiny gold heart, resting on a bodega step.', width: 960, height: 1200, cutout: false },
   9: { src: url(kitteeCee), alt: 'Kittee Cee, a calico cat Mon with soft paws, sitting on a Harlem bodega step beside a fruit stand.', width: 960, height: 1200, cutout: false },
+  20: { src: url(signalEgg), alt: 'The Signal Egg, a cream speckled egg covered in black dots and a few red-ringed dots, on a sunlit brownstone sidewalk.', width: 960, height: 1200, cutout: false },
+  21: { src: url(fyeDot), alt: 'Fye Dot, a glossy black hopper Mon with white polka dots and black-and-white striped antennae, crouched on a sunny brownstone stoop.', width: 960, height: 1200, cutout: false },
   61: { src: url(prismEgg), alt: 'The Prism Egg, glossy black with painted flames and a clear crystal inset, on a Times Square ledge.', width: 960, height: 1200, cutout: false },
   62: { src: url(yotito), alt: 'Yotito, a sandy-gray coyote Mon with tall ears and big paws, standing on a bright Times Square sidewalk.', width: 960, height: 1200, cutout: false },
 };

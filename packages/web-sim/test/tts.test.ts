@@ -9,8 +9,11 @@ import {
   pitchShiftArgs,
   type TtsFetch,
 } from '../server/tts.ts';
-import { ELEVENLABS_TTS_MODEL } from '@acme/content/voice';
+import { babbleInventory, captionText, ELEVENLABS_TTS_MODEL } from '@acme/content/voice';
+import { MON_EGG_STAGE_PITCH } from '@acme/content/lingo';
+import { isBabble } from '@acme/core';
 import { expressiveVoiceSettings, resolveVoice } from '@acme/content/voices';
+import { trustClaim } from './fixtures/roster.ts';
 
 const ORIGIN = 'http://localhost:5180';
 const LINEAGE = 'dex-001/female/1';
@@ -40,6 +43,7 @@ function handler(
   opts: { apiKey?: string; fetchFn?: TtsFetch; limit?: number; auth?: ModelAuthCheck; pitchShift?: PitchShifter | null } = {},
 ) {
   return createTtsHandler({
+    roster: trustClaim,
     allowedOrigin: ORIGIN,
     rateLimit: createRateLimiter(opts.limit ?? 100),
     apiKey: 'apiKey' in opts ? opts.apiKey : 'test-key',
@@ -68,10 +72,76 @@ describe('/api/tts', () => {
     expect(fetchFn).not.toHaveBeenCalled();
   });
 
-  it('answers 204 for an Egg: an Egg does not speak', async () => {
+  it('voices an Egg: babble at the Egg pitch, never the words it was sent', async () => {
     const fetchFn = fakeFetch();
-    const res = await handler({ fetchFn })(post({ text: 'hi', lineageId: LINEAGE, stage: 'Egg', mood: 'content' }), 'ip');
-    expect(res.status).toBe(204);
+    const pitchShift = fakeShifter();
+    const res = await handler({ fetchFn, pitchShift })(post({ text: 'Hello Callah, I love you', lineageId: LINEAGE, stage: 'Egg', mood: 'content' }), 'ip');
+    expect(res.status).toBe(200);
+    expect(pitchShift.mock.calls[0]?.[1]).toBe(MON_EGG_STAGE_PITCH);
+    expect(res.headers.get('x-mon-pitch')).toBe(String(MON_EGG_STAGE_PITCH));
+    const { text } = sentBody(fetchFn) as { text: string };
+    const inv = babbleInventory({ lineageId: LINEAGE }, 'Egg');
+    // The spoken text may carry the mood's lead tag; the words are babble.
+    expect(isBabble(text, inv)).toBe(true);
+    const caption = decodeURIComponent(res.headers.get('x-mon-caption') ?? '');
+    expect(isBabble(caption, inv)).toBe(true);
+    expect(caption).not.toMatch(/Callah|love/i);
+  });
+
+  it('caps a claimed voice stage: an Egg claiming full still babbles, a Small claiming baby-talk babbles', async () => {
+    const egg = fakeFetch();
+    await handler({ fetchFn: egg })(post({ text: 'I love you', lineageId: LINEAGE, stage: 'Egg', voiceStage: 'full' }), 'ip');
+    expect(isBabble((sentBody(egg) as { text: string }).text, babbleInventory({ lineageId: LINEAGE }, 'Egg'))).toBe(true);
+    const small = fakeFetch();
+    const res = await handler({ fetchFn: small })(post({ text: 'I love you', lineageId: LINEAGE, stage: 'Small', voiceStage: 'baby-talk' }), 'ip');
+    expect(res.status).toBe(200);
+    expect(isBabble((sentBody(small) as { text: string }).text, babbleInventory({ lineageId: LINEAGE }, 'Small'))).toBe(true);
+  });
+
+  it('sends the caption it voiced, URL-encoded, so the client shows what was said', async () => {
+    const res = await handler()(post({ text: '*chuckle* Yeah Callah, I’m good.', lineageId: LINEAGE, stage: 'Small' }), 'ip');
+    expect(decodeURIComponent(res.headers.get('x-mon-caption') ?? '')).toBe(captionText('*chuckle* Yeah Callah, I’m good.'));
+    const timed = vi.fn<TtsFetch>(async () => Response.json({ audio_base64: 'AAAA' }));
+    const json = await handler({ fetchFn: timed })(new Request(`${ORIGIN}/api/tts`, {
+      method: 'POST', headers: { 'content-type': 'application/json', origin: ORIGIN, accept: 'application/json' },
+      body: JSON.stringify({ text: 'Bet!', lineageId: LINEAGE, stage: 'Baby', voiceStage: 'baby-talk' }),
+    }), 'ip');
+    expect(json.status).toBe(200);
+    expect(isBabble(decodeURIComponent(json.headers.get('x-mon-caption') ?? ''), babbleInventory({ lineageId: LINEAGE }, 'Baby'))).toBe(true);
+  });
+
+  it('the server’s roster decides: an Egg sent as stage Max still babbles, at the Egg pitch', async () => {
+    const fetchFn = fakeFetch();
+    const pitchShift = fakeShifter();
+    const roster = vi.fn(async () => [{ speciesId: 'dex-001', stage: 'Egg' as const, hatchedAt: null, voiceLineageId: LINEAGE }]);
+    const h = createTtsHandler({ roster, allowedOrigin: ORIGIN, rateLimit: createRateLimiter(100), apiKey: 'k', fetch: fetchFn, pitchShift });
+    const res = await h(post({ text: 'I love you, Callah', lineageId: LINEAGE, stage: 'Max', voiceStage: 'full' }), 'ip');
+    expect(res.status).toBe(200);
+    const { text } = sentBody(fetchFn) as { text: string };
+    expect(isBabble(text, babbleInventory({ lineageId: LINEAGE }, 'Egg'))).toBe(true);
+    expect(text).not.toMatch(/love|Callah/i);
+    expect(pitchShift.mock.calls[0]?.[1]).toBe(MON_EGG_STAGE_PITCH);
+  });
+
+  it('babbles when the roster is unknown, empty, or does not hold the lineage', async () => {
+    for (const roster of [async () => null, async () => [], async () => [{ speciesId: 'dex-002', stage: 'Small' as const, hatchedAt: 0, voiceLineageId: 'dex-001/male/2' }], async () => { throw new Error('down'); }]) {
+      const fetchFn = fakeFetch();
+      await createTtsHandler({ roster, allowedOrigin: ORIGIN, rateLimit: createRateLimiter(100), apiKey: 'k', fetch: fetchFn, pitchShift: null })(
+        post({ text: 'I love you', lineageId: LINEAGE, stage: 'Max' }), 'ip');
+      expect(isBabble((sentBody(fetchFn) as { text: string }).text, babbleInventory({ lineageId: LINEAGE }, 'Max'))).toBe(true);
+    }
+  });
+
+  it('passes the request’s authorization to the roster', async () => {
+    const roster = vi.fn(async () => [{ speciesId: 'dex-002', stage: 'Small' as const, hatchedAt: 0, voiceLineageId: LINEAGE }]);
+    await createTtsHandler({ roster, allowedOrigin: ORIGIN, rateLimit: createRateLimiter(100), apiKey: 'k', fetch: fakeFetch(), pitchShift: null })(
+      new Request(`${ORIGIN}/api/tts`, { method: 'POST', headers: { 'content-type': 'application/json', origin: ORIGIN, authorization: 'Bearer t' }, body: JSON.stringify({ text: 'hi', lineageId: LINEAGE, stage: 'Small' }) }), 'ip');
+    expect((roster.mock.calls[0] as unknown[])[0]).toBe('Bearer t');
+  });
+
+  it('rejects an unknown voice stage', async () => {
+    const fetchFn = fakeFetch();
+    expect((await handler({ fetchFn })(post({ text: 'hi', lineageId: LINEAGE, stage: 'Baby', voiceStage: 'shout' }), 'ip')).status).toBe(400);
     expect(fetchFn).not.toHaveBeenCalled();
   });
 
@@ -234,7 +304,9 @@ describe('pitch filter', () => {
     expect(pitchFilter(1.3)).toBe('asetrate=57330,aresample=44100,atempo=0.769231');
     expect(pitchFilter(1.15)).toBe('asetrate=50715,aresample=44100,atempo=0.869565');
     expect(pitchFilter(0.92)).toBe('asetrate=40572,aresample=44100,atempo=1.086957');
-    for (const factor of [1.3, 1.15, 1, 0.92]) {
+    // The Egg (Decision 32): 1.45 relabels to 63945 Hz, atempo 0.69, inside atempo's 0.5 to 100.
+    expect(pitchFilter(1.45)).toBe('asetrate=63945,aresample=44100,atempo=0.689655');
+    for (const factor of [1.45, 1.3, 1.15, 1, 0.92]) {
       const [, rate, , tempo] = /asetrate=(\d+),aresample=(\d+),atempo=([\d.]+)/.exec(pitchFilter(factor)) ?? [];
       // The relabel plays rate/44100 faster; atempo slows it by `tempo`. Net duration change ~1.
       expect((Number(rate) / 44_100) * Number(tempo)).toBeCloseTo(1, 5);
@@ -289,6 +361,7 @@ describe('/api/tts JSON (lip-sync)', () => {
     let finishFace!: (f: unknown) => void;
     const face = vi.fn(() => new Promise((r) => (finishFace = r)));
     const h = createTtsHandler({
+      roster: trustClaim,
       allowedOrigin: ORIGIN,
       rateLimit: createRateLimiter(100),
       apiKey: 'k',
@@ -319,6 +392,7 @@ describe('/api/tts JSON (lip-sync)', () => {
 
   it('a face that fails or an unknown id answers 204; the clip still has its alignment', async () => {
     const h = createTtsHandler({
+      roster: trustClaim,
       allowedOrigin: ORIGIN,
       rateLimit: createRateLimiter(100),
       apiKey: 'k',
@@ -336,7 +410,7 @@ describe('/api/tts JSON (lip-sync)', () => {
     const auth = vi.fn(async (header: string | null) => {
       if (header !== 'Bearer ok') throw new Error('no');
     });
-    const h = createTtsHandler({ allowedOrigin: ORIGIN, rateLimit: createRateLimiter(100), apiKey: 'k', fetch: timed(), pitchShift: null, face: async () => null, auth: auth as never });
+    const h = createTtsHandler({ roster: trustClaim, allowedOrigin: ORIGIN, rateLimit: createRateLimiter(100), apiKey: 'k', fetch: timed(), pitchShift: null, face: async () => null, auth: auth as never });
     const id = '00000000-0000-4000-8000-000000000000';
     expect((await h(getFace(id, { origin: 'https://evil.example', authorization: 'Bearer ok' }), 'ip')).status).toBe(403);
     expect((await h(getFace(id, { 'sec-fetch-site': 'cross-site', authorization: 'Bearer ok' }), 'ip')).status).toBe(403);

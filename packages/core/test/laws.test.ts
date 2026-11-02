@@ -58,7 +58,6 @@ describe('Law 7: Baby stays Baby', () => {
     toStage: 'Small',
     toSpeciesId: null,
     minBond: 0.2,
-    care: {},
   };
 
   it('blocks an authored EvolutionEvent while the Phase 1 flag is off', () => {

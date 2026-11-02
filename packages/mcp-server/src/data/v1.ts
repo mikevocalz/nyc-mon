@@ -217,12 +217,6 @@ export function writeLanded(care: CareState, action: CareAction, at: number): bo
       return care.lastSocialAt === at;
     case 'wake':
       return care.activity.kind === 'awake' && care.updatedAt >= at;
-    case 'pause':
-      return care.pause?.since === at;
-    case 'resume':
-      // An unpaused reread may predate this intent; without a resume timestamp,
-      // it cannot confirm a lost response. Keep the idempotent retry available.
-      return false;
   }
 }
 

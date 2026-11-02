@@ -2,7 +2,7 @@
 
 Owner: `ux-writer`. Inputs: `01-research.md`, `03-direction.md`; Law 9; Decisions #5, #6, #8, #14; PS-005; Q32. Glossary: `docs/COPY_DECK.md`.
 
-All strings are `voice: "ui"`. The Baby does not speak (Q32 open). No pronoun for the Mon (PS-005): restructure or repeat the name. `{babyName}` is the Baby form name from content (`Squeaklet`, `Kittee Cee`, `Yotito`; Decision #9) until M09 sets a nickname; `{monName}` is the nickname when set, else `{babyName}`.
+All strings are `voice: "ui"`. The new Baby says no words: on its first day it only babbles (Decision 32). No pronoun for the Mon (PS-005): restructure or repeat the name. `{babyName}` is the Baby form name from content (`Squeaklet`, `Kittee Cee`, `Yotito`; Decision #9) until M09 sets a nickname; `{monName}` is the nickname when set, else `{babyName}`.
 
 Fewer words than any other screen. The show carries the moment; text exists for the screen reader and for the two choices.
 

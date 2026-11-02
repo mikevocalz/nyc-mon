@@ -24,9 +24,9 @@ function mon(id: string, speciesId: string, nickname: string | null = null): Mon
   };
 }
 
-/** Clip names straight from the GLB's JSON chunk (apps/web/public/mons). */
+/** Clip names straight from the historical authored fixture GLB's JSON chunk. */
 function glbClips(file: string): Set<string> {
-  const bytes = readFileSync(new URL(`../../../../apps/web/public/mons/${file}`, import.meta.url));
+  const bytes = readFileSync(new URL(`../../../ui/three/test-fixtures/mons/${file}`, import.meta.url));
   const length = bytes.readUInt32LE(12);
   const json = JSON.parse(bytes.subarray(20, 20 + length).toString('utf8')) as { animations?: { name: string }[] };
   return new Set((json.animations ?? []).map((a) => a.name));

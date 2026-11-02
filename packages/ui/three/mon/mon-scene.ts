@@ -67,7 +67,7 @@ export function createMonScene({ renderer, invalidate }: ThreeContext, initial: 
     boundX = Math.max(0, visibleHalf * 0.9 - rig.halfSpan(Math.hypot(rig.size.x, rig.size.z) / 2));
   };
 
-  MonRig.create(initial.source).then(
+  MonRig.create(initial.source, renderer).then(
     (r) => {
       if (disposed) {
         r.dispose();

@@ -11,8 +11,8 @@ Captured 2026-10-21 on branch `feat/egg-native-hatch`.
 - `source-six-views.webp`: the creator's four egg meshes as supplied, front,
   back, left, right, top and bottom (rows: Corner, Prism, the unassigned tan
   spotted egg, Metro). The Signal Egg row in `threejs-playback.webp` was built
-  from that tan egg and is superseded: Decision 31 makes the red polka-dot egg
-  the Signal Egg, and it has no mesh yet.
+  from that tan egg. Decision 38 (2026-10-29) ships that mesh as the Signal
+  Egg, though the egg's art reference is the red polka-dot egg (Decision 31).
 
 Not shown here: anything on a phone, WebGPU frame times, or the real Baby
 models, which don't exist yet.
