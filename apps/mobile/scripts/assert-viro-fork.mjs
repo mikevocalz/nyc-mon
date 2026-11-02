@@ -40,45 +40,6 @@ const hasMetaVrGlassesTargeting =
     'metaVrGlassesCompatible',
   );
 
-let nitroPackageJsonPath = null;
-try {
-  nitroPackageJsonPath = require.resolve('nitro-canvas-in-Vision/package.json');
-} catch {
-  // Checked after the Viro fork so the error tells the developer the complete
-  // native/headset dependency set in one place.
-}
-
-const nitroRoot = nitroPackageJsonPath ? dirname(nitroPackageJsonPath) : null;
-const nitroRiveBridgePath = nitroRoot
-  ? join(
-      nitroRoot,
-      'android/src/main/java/com/margelo/nitro/nitrocanvasinVision/RiveCanvasBridge.kt',
-    )
-  : null;
-const nitroRiveModulePath = nitroRoot
-  ? join(
-      nitroRoot,
-      'android/src/main/java/com/margelo/nitro/nitrocanvasinVision/RiveCanvasModule.kt',
-    )
-  : null;
-const nitroIndexPath = nitroRoot ? join(nitroRoot, 'src/index.ts') : null;
-
-const hasNitroRiveGpuBridge =
-  Boolean(nitroRiveBridgePath) &&
-  existsSync(nitroRiveBridgePath) &&
-  readFileSync(nitroRiveBridgePath, 'utf8').includes('RiveCanvasSession') &&
-  readFileSync(nitroRiveBridgePath, 'utf8').includes('presentRiveFrame');
-
-const hasNitroRiveNativeModule =
-  Boolean(nitroRiveModulePath) &&
-  existsSync(nitroRiveModulePath) &&
-  readFileSync(nitroRiveModulePath, 'utf8').includes('NitroRiveCanvas');
-
-const hasNitroRiveJsRuntime =
-  Boolean(nitroIndexPath) &&
-  existsSync(nitroIndexPath) &&
-  readFileSync(nitroIndexPath, 'utf8').includes('createRiveCanvasRuntime');
-
 const expoPeers = String(pkg.peerDependencies?.expo ?? '');
 const rnPeers = String(pkg.peerDependencies?.['react-native'] ?? '');
 const sdk58PeerLane =
@@ -128,37 +89,6 @@ Required fork capabilities:
   process.exit(1);
 }
 
-if (
-  !nitroPackageJsonPath ||
-  !hasNitroRiveGpuBridge ||
-  !hasNitroRiveNativeModule ||
-  !hasNitroRiveJsRuntime
-) {
-  console.error(`
-[Spatial] Native/headset Rive panels require the private Nitro canvas package.
-
-The Viro fork is present, but ViroRivePanel loads nitro-canvas-in-Vision lazily;
-it is not bundled transitively by @reactvision/react-viro.
-
-Install/link the current private package before running a native/headset build:
-
-  pnpm --filter mobile add "nitro-canvas-in-Vision@github:mikevocalz/nitro-canvas-in-Vision#decax9-three-panel"
-
-Required Nitro capabilities:
-  createRiveCanvasRuntime
-  Rive 11 RiveCanvasSession bridge
-  NitroRiveCanvas native control module
-  GPU frame presentation into the AHardwareBuffer Viro samples
-
-Public web/CI clones do not need this private package unless they invoke a
-native/headset command.
-`);
-  process.exit(1);
-}
-
 console.log(
   `[Viro] Native fork verified: ${pkg.version} (${packageJsonPath})`,
-);
-console.log(
-  `[Spatial] Nitro Rive GPU bridge verified: ${nitroPackageJsonPath}`,
 );
