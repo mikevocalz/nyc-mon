@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { auth } from './auth';
 import { useRouter } from 'expo-router';
 import { CALLER_NAME_MAX_LENGTH, callerNameErrorCopyId, isConsentRequired, validateCallerName } from '@acme/core/sim';
 import { MIN_BIRTH_YEAR } from '@acme/core/schemas';
@@ -32,6 +33,7 @@ const ERROR_DEBOUNCE_MS = 1000;
  * lands (ADR 0001 queued writes).
  */
 export function CallerNameScreen() {
+  const session = auth().useSession();
   const router = useRouter();
   const ageAnswer = useOnboarding((s) => s.ageAnswer);
   // Stable for the mount: the consent decision shouldn't drift mid-render.
@@ -66,9 +68,10 @@ export function CallerNameScreen() {
 
   const hint = consentPending ? copy('m07.field.hint.pending') : under13 ? copy('m07.field.hint.under13') : copy('m07.field.hint');
   const result = validate(raw);
-  const canContinue = raw !== '' && result.ok && error === undefined;
+  const canContinue = raw !== '' && result.ok && error === undefined && !session.isPending && session.data?.user != null;
 
   const confirm = () => {
+    if (session.isPending || !session.data?.user) return;
     const check = validate(raw);
     if (!check.ok) {
       setError(copy(callerNameErrorCopyId(check.reason)));
@@ -83,7 +86,7 @@ export function CallerNameScreen() {
       consentStatus: under13 ? 'pending' : (existing?.consentStatus ?? 'not-required'),
       createdAt: existing?.createdAt ?? nowMs,
     };
-    const saved = storeCallerProfile(caller, nowMs);
+    const saved = storeCallerProfile(caller, nowMs, session.data.user.id);
     // The profile store reads the Caller name once at load; keep it current.
     useProfile.getState().setName(saved.caller?.callerName ?? caller.callerName);
     announcePolitely(copy('m07.confirmed.a11y.announce'));

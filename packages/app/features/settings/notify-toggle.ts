@@ -9,7 +9,7 @@ import {
   cancelReadyNotifications, getNotifyPermission, requestNotifyPermission,
 } from '../onboarding/notify-permission';
 import { useOnboarding } from '../onboarding/onboarding.store';
-import { notificationsOn, notifyToggleAction, type NotifyPermissionState } from './device-prefs-model.ts';
+import { DEFAULT_DEVICE_PREFS, notificationsOn, notifyToggleAction, type NotifyPermissionState } from './device-prefs-model.ts';
 import { useDevicePrefs } from './device-prefs.store';
 
 /**
@@ -42,14 +42,14 @@ export function useNotifyToggle() {
   }, [store]);
 
   const known = permission ?? 'undetermined';
-  const on = notificationsOn({ notifications: wanted, haptics: true, sound: true, forceReducedMotion: false }, known);
+  const on = notificationsOn({ ...DEFAULT_DEVICE_PREFS, notifications: wanted }, known);
 
   const set = async (wantOn: boolean) => {
     const prefs = useDevicePrefs.getState();
     switch (notifyToggleAction(wantOn, known)) {
       case 'disable':
         prefs.set('notifications', false);
-        await cancelReadyNotifications();
+        await cancelReadyNotifications(); // egg alerts only; Mon calls have their own switch
         break;
       case 'enable':
         prefs.set('notifications', true);

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
-  QUIET_READY, SHOW_NOTIFICATION, createReadyBannerHold, foregroundBehavior, readyNotificationId,
+  QUIET_READY, SHOW_NOTIFICATION, createReadyBannerHold, foregroundBehavior, isReadyNotificationId, readyNotificationId,
 } from './notify-foreground.ts';
 
 const READY = (eggId: string) => ({ eggId, url: '/(home)/hatch' });
@@ -49,5 +49,26 @@ describe('ready banner hold', () => {
     h.hold('egg-2');
     releaseOld();
     assert.equal(h.store.getState().onScreenEggId, 'egg-2');
+  });
+});
+
+describe('foregroundBehavior (care calls)', () => {
+  const CARE = { kind: 'mon-care-call', monInstanceId: 'm1', callKind: 'social', at: 1, url: '/mon-space' };
+
+  it('keeps a care call out of the banner while the app is open, but in the list', () => {
+    assert.deepEqual(foregroundBehavior(CARE, null), QUIET_READY);
+    assert.deepEqual(foregroundBehavior(CARE, 'egg-1'), QUIET_READY);
+  });
+
+  it('a malformed care payload shows as usual', () => {
+    assert.deepEqual(foregroundBehavior({ ...CARE, callKind: 'false-call' }, null), SHOW_NOTIFICATION);
+  });
+});
+
+describe('isReadyNotificationId', () => {
+  it('matches egg alerts only, so turning egg alerts off leaves Mon calls scheduled', () => {
+    assert.equal(isReadyNotificationId(readyNotificationId('egg-1')), true);
+    assert.equal(isReadyNotificationId('mon-care:m1:hunger:0'), false);
+    assert.equal(isReadyNotificationId('2f6c-uuid'), false);
   });
 });

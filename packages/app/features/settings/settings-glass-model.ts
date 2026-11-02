@@ -10,11 +10,11 @@ import { themeLabel } from './theme-options.ts';
 import { TIME_OF_DAY_COPY, TIME_OF_DAY_OPTIONS } from './time-of-day-options.ts';
 
 export type SettingsRowId =
-  | 'account' | 'caller' | 'notify' | 'haptics' | 'sound' | 'motion' | 'theme' | 'timeOfDay' | 'controls'
+  | 'account' | 'caller' | 'notify' | 'monCalls' | 'haptics' | 'sound' | 'motion' | 'theme' | 'timeOfDay' | 'controls'
   | 'export' | 'legal' | 'credits' | 'signOut' | 'deleteAccount';
 
 /** The rows whose select flips a switch in place. */
-export const SWITCH_ROWS: readonly SettingsRowId[] = ['notify', 'haptics', 'sound', 'motion'];
+export const SWITCH_ROWS: readonly SettingsRowId[] = ['notify', 'monCalls', 'haptics', 'sound', 'motion'];
 
 export interface SettingsRow {
   readonly id: SettingsRowId;
@@ -43,6 +43,8 @@ export interface SettingsRowsInput {
   readonly notify?: boolean | null;
   /** The OS blocks alerts: the row opens the phone's Settings instead. */
   readonly notifyDenied?: boolean;
+  /** Mon calls on (D20b), or null where the app never notifies (web; no row then). Shares the OS grant with egg alerts. */
+  readonly monCalls?: boolean | null;
   readonly haptics?: boolean;
   readonly sound?: boolean;
   /** Reduced motion in effect (forced or from the OS). */
@@ -74,6 +76,13 @@ export function settingsRows(input: SettingsRowsInput): SettingsRow[] {
       id: 'notify', label: copy('settings.notify.label'), value: onOff(input.notify),
       verb: input.notifyDenied ? copy('settings.notify.open_settings') : change,
       hint: copy(input.notifyDenied ? 'settings.notify.caption.denied' : 'settings.notify.caption'),
+    });
+  }
+  if (input.monCalls !== undefined && input.monCalls !== null) {
+    rows.push({
+      id: 'monCalls', label: copy('settings.mon_calls.label'), value: onOff(input.monCalls),
+      verb: input.notifyDenied ? copy('settings.notify.open_settings') : change,
+      hint: copy(input.notifyDenied ? 'settings.notify.caption.denied' : 'settings.mon_calls.caption'),
     });
   }
   if (input.haptics !== undefined) {

@@ -4,11 +4,12 @@ import { useEffect, useRef } from 'react';
 import { useGlobalSearchParams, usePathname, useRouter } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import { readyBannerHold } from './notify-foreground';
-import { deepLinkStore, readyLinkFromResponse, type ResponseLike } from './notify-route';
+import { appLinkFromResponse, deepLinkStore, type ResponseLike } from './notify-route';
 
 /**
  * Routes a tap on the hatch-ready notification to M12 (`/(home)/hatch?eggId=`,
- * M12 handoff B3). Mount once, in the root layout.
+ * M12 handoff B3) and a tap on a care call to Mon Space (`/mon-space?monId=`,
+ * contract §7). Mount once, in the root layout.
  *
  * Cold start: `Notifications.getLastNotificationResponse()`, the synchronous
  * read in expo-notifications 58.0.11, where `getLastNotificationResponseAsync`
@@ -31,18 +32,18 @@ import { deepLinkStore, readyLinkFromResponse, type ResponseLike } from './notif
 export function useReadyNotificationRouting(): void {
   const router = useRouter();
   const pathname = usePathname();
-  const { eggId } = useGlobalSearchParams<{ eggId?: string }>();
+  const { eggId, monId } = useGlobalSearchParams<{ eggId?: string; monId?: string }>();
   // The listener is installed once; it reads where the app is through a ref.
-  const current = useRef({ pathname, eggId });
+  const current = useRef({ pathname, eggId, monId });
   useEffect(() => {
-    current.current = { pathname, eggId };
-  }, [pathname, eggId]);
+    current.current = { pathname, eggId, monId };
+  }, [pathname, eggId, monId]);
   useEffect(() => {
     Notifications.setNotificationHandler({
       handleNotification: async (notification) => readyBannerHold.behaviorFor(notification.request.content.data),
     });
     const handle = (response: ResponseLike) => {
-      const result = readyLinkFromResponse(response);
+      const result = appLinkFromResponse(response);
       if (!result.ok) {
         if (result.reason === 'not-hatch-ready' && __DEV__) {
           console.warn(`[notify] ignored a notification tap: ${result.issues ?? 'bad payload'}`);

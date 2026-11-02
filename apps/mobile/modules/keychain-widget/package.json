@@ -1,0 +1,7 @@
+{
+  "name": "keychain-widget",
+  "version": "0.1.0",
+  "description": "Writes the Mon keychain snapshot to the App Group and reloads the WidgetKit timeline.",
+  "private": true,
+  "platforms": ["ios"]
+}

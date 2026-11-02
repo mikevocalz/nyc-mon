@@ -4,6 +4,7 @@
 // real client and storage.
 import type { AuthResult } from '@acme/auth';
 import type { KeyValueStorage } from '../onboarding/storage.types.ts';
+import { clearCareSaveOwner } from '../mon-space/care-surface-owner.ts';
 
 /** Where the app goes once the account is gone: M02, the first-run Welcome. */
 export const DELETED_PATH = '/(onboarding)/welcome';
@@ -45,5 +46,6 @@ export interface LocalAccountKeys {
 export function clearLocalAccount(onboarding: KeyValueStorage, save: KeyValueStorage, keys: LocalAccountKeys): void {
   save.remove(keys.save);
   save.remove(DEVICE_ID_KEY);
+  clearCareSaveOwner(save);
   for (const key of keys.onboarding) onboarding.remove(key);
 }

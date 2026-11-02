@@ -5,6 +5,7 @@ import { View } from '@acme/ui/tw';
 import { copy } from '../onboarding/copy';
 import { useDevicePrefs } from './device-prefs.store';
 import { useNotifyToggle } from './notify-toggle';
+import { useMonCallsToggle } from './mon-calls-toggle';
 
 /** One switch with its caption, as the Permission Center lays them out. */
 function SwitchRow({ label, caption, value, onChange, testID }: {
@@ -23,7 +24,7 @@ function SwitchRow({ label, caption, value, onChange, testID }: {
 }
 
 /**
- * M19 "This device": Egg alerts, Haptics, Sound and Reduce motion. Each
+ * M19 "This device": Egg alerts, Mon calls, Haptics, Sound and Reduce motion. Each
  * switch writes device-prefs.store (MMKV), and the kit obeys at once.
  */
 export function DeviceCard({ className }: { className?: string }) {
@@ -33,6 +34,7 @@ export function DeviceCard({ className }: { className?: string }) {
   const set = useDevicePrefs((s) => s.set);
   const reduced = useReducedMotion();
   const notify = useNotifyToggle();
+  const monCalls = useMonCallsToggle();
   const native = process.env.EXPO_OS !== 'web';
   return (
     <FadeIn delay={150} className={className}>
@@ -50,6 +52,11 @@ export function DeviceCard({ className }: { className?: string }) {
               </View>
             ) : null}
           </View>
+        ) : null}
+        {native && monCalls.available ? (
+          <SwitchRow testID="settings-mon-calls" label={copy('settings.mon_calls.label')}
+            caption={copy(monCalls.denied ? 'settings.notify.caption.denied' : 'settings.mon_calls.caption')}
+            value={monCalls.on} onChange={(v) => void monCalls.set(v)} />
         ) : null}
         {native ? (
           <SwitchRow testID="settings-haptics" label={copy('settings.haptics.label')} caption={copy('settings.haptics.caption')}
