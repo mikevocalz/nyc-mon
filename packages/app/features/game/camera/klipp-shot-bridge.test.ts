@@ -134,3 +134,23 @@ test('the rig allocates nothing and writes nothing once settled', () => {
   assert.ok(camera.projectionMatrix.equals(projection), 'no lens rebuild when nothing changed');
   r.dispose();
 });
+
+
+test('first transitions with zero, negative and non-finite delta stay finite and progress on the on-demand clock', (t) => {
+  let clock = 1000;
+  t.mock.method(performance, 'now', () => clock);
+  for (const delta of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+    for (const initialized of [false, true]) {
+      const { camera, r } = rig();
+      if (initialized) r.update(0);
+      r.setShot(shot);
+      for (let i = 0; i < 20; i++) {
+        clock += 100;
+        r.update(delta);
+        assert.ok([...camera.position.toArray(), ...camera.quaternion.toArray(), camera.fov, camera.near, camera.far].every(Number.isFinite), `delta ${delta}, initialized ${initialized}`);
+      }
+      assert.deepEqual(camera.position.toArray(), shot.position);
+      r.dispose();
+    }
+  }
+});

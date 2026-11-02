@@ -5,6 +5,7 @@ import { finishPreparation, runPreparation } from './scene-preparation.ts';
 // asks for the next frame itself.
 import { VD_LANE, VD_SHADOWS, VD_TONEMAP } from './world/curb.ts';
 import type { ThreeContext, ThreeScene } from '@acme/ui/three';
+import type { PerspectiveCamera, Vector3 } from 'three/webgpu';
 import type { CityDatasetV3 } from './city-dataset.ts';
 import type { ActorFrame, SceneActor, SceneActorFactory } from './scene-actor.ts';
 import { prepareCityWorld } from './world/index.ts';
@@ -44,6 +45,19 @@ import { setRenderOrigin } from './world/render-space.ts';
 import { CELL } from './world/cells/cell-rules.ts';
 import { cameraPose, type CameraPose } from './city-camera-pose.ts';
 import { CAMERA_CLEARANCE, createCameraBlocker, createChaseCameraConstraint } from './camera-collision.ts';
+
+/** Night-light ranking requires a unit horizontal forward even for quaternion-only or vertical shots. */
+export function nightLightForward(camera: PerspectiveCamera, dx: number, dz: number, out: Vector3): Vector3 {
+  let length = Math.hypot(dx, dz);
+  if (!(length > 1e-6)) {
+    camera.getWorldDirection(out);
+    dx = out.x;
+    dz = out.z;
+    length = Math.hypot(dx, dz);
+  }
+  if (!(length > 1e-6)) return out.set(0, 0, -1);
+  return out.set(dx / length, 0, dz / length);
+}
 
 export interface CityCamera {
   x: number;
@@ -431,6 +445,7 @@ function* prepareCityScene(context: ThreeContext, initial: CitySceneParams): Gen
     const pose: CameraPose = { position: [0, 0, 0], target: [0, 0, 0], pitch: 0, distance: 0 };
     const actorFrame: { -readonly [K in keyof ActorFrame]: ActorFrame[K] } = { delta: 0, time: 0, reducedMotion: false, originX: origin.cx * CELL, originZ: origin.cz * CELL, originChanged: false };
     const streamCamera = { x: 0, y: 0, z: 0 };
+    const nightForward = new THREE.Vector3();
     let lastOriginChanged = true;
 
     function positionCamera(value: CityCamera, cinematicShot: KlippCameraShot | null | undefined, delta: number, reducedMotion: boolean) {
@@ -569,7 +584,10 @@ function* prepareCityScene(context: ThreeContext, initial: CitySceneParams): Gen
           });
         }
         if (rig) {
-          rig.update(camera.position.y, shots.shot.lookAtTarget[0] - origin.cx * CELL, shots.shot.lookAtTarget[2] - origin.cz * CELL);
+          const out = shots.shot;
+          const focusX = out.hasLookAtTarget ? out.lookAtTarget[0] : out.position[0];
+          const focusZ = out.hasLookAtTarget ? out.lookAtTarget[2] : out.position[2];
+          rig.update(camera.position.y, focusX - origin.cx * CELL, focusZ - origin.cz * CELL);
           const preset = params.preset ?? DEFAULT_PHYSICAL_PRESET;
           if (preset !== rig.preset) {
             // The rebake renders PMREM cube faces through renderer.render, which
@@ -580,11 +598,9 @@ function* prepareCityScene(context: ThreeContext, initial: CitySceneParams): Gen
             invalidate?.();
           }
           // Night light follows the camera and the preset's interior glow (world/physical/night-lights.ts).
-          const fx = shots.shot.lookAtTarget[0] - streamCamera.x;
-          const fz = shots.shot.lookAtTarget[2] - streamCamera.z;
-          const fl = Math.hypot(fx, fz) || 1;
+          nightLightForward(camera, focusX - streamCamera.x, focusZ - streamCamera.z, nightForward);
           world.updateNightLights(
-            streamCamera.x, streamCamera.y, streamCamera.z, fx / fl, fz / fl, rig.uniforms.uInteriorGlow.value,
+            streamCamera.x, streamCamera.y, streamCamera.z, nightForward.x, nightForward.z, rig.uniforms.uInteriorGlow.value,
           );
         }
         // Precipitation animates on the shader clock — while rain or snow is
